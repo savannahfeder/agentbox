@@ -9,9 +9,10 @@ import type { BridgeStateEvent } from './task-remote-control.mts';
 import { taskFolderPath, real, restoreTaskFolder } from './task-folders.mts';
 import { SHIP_LABEL, ShipQueue, readShipSettings, shipScriptFor, shipSlot } from './ship-queue.mts';
 import { MainTests } from './main-went-red.mts';
+import { CloudServerWatch, serverError } from './cloud-server-down.mts';
 import { folderJob } from './task-folders-offthread.mts';
 import { gitJob } from './git-change-offthread.mts';
-import { queuedReplyText, submitReply, framedTeammate } from './live-replies.mts';
+import { queuedReplyText, submitReply, framedPick, framedTeammate } from './live-replies.mts';
 import { resolveAnsweredNotes, wakeForNotes } from './notes-wake.mjs';
 import { TEAM_LOOK, TEAM_LOOK_LINE } from '../shared/team-look.mjs';
 import { editedFilesLine } from '../shared/artifact-marks.mjs';
@@ -908,6 +909,8 @@ const SWITCH_RESTARTS = 3;
 const SWITCH_WINDOW_MS = 30 * 60_000;
 // The reasons a queued thread's line names (`status().cannotStart`).
 const SAID_WHY_NOT_STARTED = new Set(['setup', 'asleep', 'cloud-carried', 'engine', 'login', 'memory', 'slow-folder', 'error', 'brake']);
+// Refusals that waiting will not fix, so Try again reports them instead of queueing the thread.
+const NEVER_CLEARS = new Set(['model', 'project', 'practice', 'folder']);
 // Making a thread's folder takes seconds; past this it is said to be slow.
 const SLOW_FOLDER_MS = 2 * 60_000;
 // A project's kit for a new thread from the phone: left again at most this
@@ -1220,6 +1223,7 @@ export class Supervisor {
   declare onShipped: () => void;
   declare shipQueue: ShipQueue;
   declare mainTests: MainTests;
+  declare cloudServerWatch: Pick<CloudServerWatch, 'down' | 'up'>;
   declare sessions: Map<string, WorkerSession>;
   declare onChange: (() => void) | null;
   declare onRecovered: ((news: RecoveryNews) => void) | null;
@@ -1442,6 +1446,7 @@ export class Supervisor {
     // agent has ended its turn, so main was red for four days in October with
     // nobody reading the cross (main/main-went-red.mts).
     this.mainTests = new MainTests({ store, userDir });
+    this.cloudServerWatch = new CloudServerWatch({ store, userDir, home: config?.home || undefined });
     this._compactionJobs = new Map();
     this.sessions = new Map(); // itemId -> {child, product, startedAt, tail, itemId}
     // Spawns waiting on their row's folder, and folders made for the spawn that
@@ -2040,8 +2045,13 @@ export class Supervisor {
       if (this._roomFor(this._engineFor(item), item, { asked: true })) {
         // A start that throws is said on the press, not lost with the rest of the selection.
         try {
-          this._spawnResume(item);
-          out.resumed += 1;
+          const turnedAway = this._spawnResume(item);
+          if (!turnedAway) out.resumed += 1;
+          else if (NEVER_CLEARS.has(turnedAway)) out.failed += 1;
+          else {
+            this._resumeQueue.add(item.id);
+            out.queued += 1;
+          }
         } catch (error) {
           this._noteNotStarting(item, 'error', this._engineFor(item));
           out.failed += 1;
@@ -2132,7 +2142,8 @@ export class Supervisor {
       // waits behind the OTHER subscription is a resume that never happens.
       if (!this._roomFor(this._engineFor(item), item, { asked: true })) continue;
       this._resumeQueue.delete(item.id);
-      this._spawnResume(item);
+      const turnedAway = this._spawnResume(item);
+      if (turnedAway && !NEVER_CLEARS.has(turnedAway)) this._resumeQueue.add(item.id);
     }
   }
 
@@ -2140,11 +2151,18 @@ export class Supervisor {
   // worker has not answered: that is what puts "the founder has answered" in
   // the brief instead of briefing a stranger about a thread she is mid-way
   // through. Otherwise it is an ordinary session on the item.
-  _spawnResume(item: WorkItem) {
+  //
+  // Returns the reason spawnWorker turned the row away (it does not throw for
+  // one), or null when a run is on it or on its way.
+  _spawnResume(item: WorkItem): string | null {
     const live = item.answer && item.answer !== '(withdrawn)';
     if (live) this._handledAnswers.add(this._answerKey(item));
+    const before = this._notStarting?.get(item.id);
     // She resumed it by name, and its launch asks memory the way its queue did.
     this.spawnWorker(item, { continuation: !!live, asked: true });
+    if (this.sessions.has(item.id) || this._preparing?.has(item.id)) return null;
+    const noted = this._notStarting?.get(item.id);
+    return noted && noted !== before ? noted.why : null;
   }
 
   // The recovery command. When every worker dies at once (the founder's plan
@@ -6658,6 +6676,7 @@ export class Supervisor {
     const h = (this._cloudHealth ??= { faults: 0, lastError: null, restUntil: 0 });
     if (session.sessionId != null || session.result != null) {
       Object.assign(h, { faults: 0, lastError: null, restUntil: 0 });
+      this.cloudServerWatch?.up();
       return;
     }
     if (!signal && code === 0) return;
@@ -6672,7 +6691,11 @@ export class Supervisor {
     h.faults += 1;
     this._startBudget.failed();
     h.lastError = said || `a cloud run ended (${signal || code}) before its agent started`;
-    if (h.faults >= CLOUD_FAULTS_TO_REST) h.restUntil = Date.now() + CLOUD_REST_MS;
+    if (h.faults >= CLOUD_FAULTS_TO_REST) {
+      h.restUntil = Date.now() + CLOUD_REST_MS;
+      const broke = serverError(session.tail);
+      if (broke) this.cloudServerWatch?.down(broke, h.faults);
+    }
     this.onChange?.();
   }
 
@@ -6693,7 +6716,8 @@ export class Supervisor {
       }
       const n = (this._cloudStartFails.get(item.id) ?? 0) + 1;
       this._cloudStartFails.set(item.id, n);
-      keep = n >= CLOUD_STARTS_TO_GIVE_UP;
+      // A server that errored is not mended by starting this thread there again.
+      keep = !!serverError(session.tail) || n >= CLOUD_STARTS_TO_GIVE_UP;
     }
     if (!keep) return false;
     this._cloudStartFails.delete(item.id);
@@ -9354,6 +9378,7 @@ export class Supervisor {
     } else if (continuation && toldBy(item)) {
       item = { ...item, answer: framedTeammate(toldBy(item)!.name, item.answer) };
     }
+    if (continuation && item.answer && !toldBy(item)) item = { ...item, answer: framedPick(item.answer) };
     let prompt: string;
     // THE TWO KINDS OF RESUME SAY DIFFERENT THINGS, and handing a finished
     // session the interrupted wording would tell it to go looking for a step it

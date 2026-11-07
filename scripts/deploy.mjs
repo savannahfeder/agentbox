@@ -8,14 +8,16 @@
 // signs you in to whatever has signed out, and then puts out every place
 // people get Agentbox from, in this order:
 //   1. the Mac app: built, signed and notarised (about 15 minutes)
-//   2. npm, for `npx agentbox-app`
-//   3. the download on agentbox.ac, and the feed installed copies update from
-//   4. the cloud machine's image, then the cloud server
+//   2. the download on agentbox.ac, and the feed installed copies update from
+//   3. the cloud machine's image, then the cloud server
+//   4. npm, for `npx agentbox-app`
 // and ends by reading each one back and saying which has the new version.
 //
 // The Mac build goes first because it is the slow step and the one most likely
 // to fail, and until it is done nothing anybody can see has changed: a failure
-// there is fixed by running this again.
+// there is fixed by running this again. npm goes last because its sign-in is
+// the one most often forgotten: missing it leaves npm for the next release
+// and holds nothing else back.
 //
 // The Apple password never passes through here. The first run asks Apple's own
 // tool to save it in the Keychain (`notarytool store-credentials`) and every
@@ -164,12 +166,14 @@ const npmSignIn = {
   fix: () => live('npm', ['login']),
 };
 const signedOut = [];
-function signIn(s) {
-  if (s.ok()) { console.log(`  ✓ ${s.name}`); return; }
-  if (checkOnly) { console.log(`  ✗ ${s.name}: signed out; a real run signs you in here`); signedOut.push(s.name); return; }
+function signIn(s, { required = true } = {}) {
+  if (s.ok()) { console.log(`  ✓ ${s.name}`); return true; }
+  if (checkOnly) { console.log(`  ✗ ${s.name}: signed out; a real run signs you in here`); signedOut.push(s.name); return false; }
   say(`signing in to ${s.name}`);
-  if (!s.fix() || !s.ok()) stop(`Still not signed in to ${s.name}. Run npm run deploy again to retry.`);
-  console.log(`  ✓ ${s.name}`);
+  if (s.fix() && s.ok()) { console.log(`  ✓ ${s.name}`); return true; }
+  if (required) stop(`Still not signed in to ${s.name}. Run npm run deploy again to retry.`);
+  console.log(`  ✗ ${s.name}: still signed out, so it is skipped`);
+  return false;
 }
 signIns.forEach(signIn);
 
@@ -205,29 +209,17 @@ if (spawnSync('node', ['scripts/release.mjs'], { cwd: repo, stdio: 'inherit', en
 }
 
 // ---------------------------------------------------------------------------
-// 5. NPM. The checks before-publish.mjs makes were made at step 1, against
-// the commit this run pinned; main has moved on since, which is not a reason
-// to publish something else.
-// npm sessions expire, and publishing can require its own approval after login.
-signIn(npmSignIn);
-say(`publishing ${PACKAGE}@${version} to npm (it may ask for a one-time code)`);
-if (!live('npm', ['publish'], { AGENTBOX_PUBLISH_ANYWAY: '1' })) {
-  stop('npm did not publish, so nothing was put out yet: the Mac app is built but not uploaded.', 'Run npm run deploy again; it builds the Mac app again first.');
-}
-
-// ---------------------------------------------------------------------------
-// 6. THE DOWNLOAD AND THE UPDATE FEED. publish-download.mjs checks the file
+// 5. THE DOWNLOAD AND THE UPDATE FEED. publish-download.mjs checks the file
 // the website hands out against this build before it says it is done.
 say('putting the Mac app on agentbox.ac and in the update feed');
 if (!live('node', ['scripts/publish-download.mjs', `release/Agentbox-${version}-universal.dmg`, '--publish'],
   { AGENTBOX_RELEASE_COMMIT: commit })) {
-  stop(`npm has ${version} and the website does not yet. The reason is just above.`,
+  stop(`The Mac app ${version} is built, and the website does not have it yet. The reason is just above.`,
     `To finish, run: node scripts/publish-download.mjs release/Agentbox-${version}-universal.dmg --publish`);
 }
-restorePackageJson();
 
 // ---------------------------------------------------------------------------
-// 7. THE CLOUD MACHINE'S IMAGE, which every cloud run starts from. Built only
+// 6. THE CLOUD MACHINE'S IMAGE, which every cloud run starts from. Built only
 // when cloud/sandbox/ or this Mac's Claude Code or Codex version changed.
 say('updating the cloud machine (a few minutes when it changed)');
 const imageOk = live('node', ['scripts/cloud-setup.mjs'], { AGENTBOX_CLOUD_CONFIG: serverFile });
@@ -235,6 +227,17 @@ const imageOk = live('node', ['scripts/cloud-setup.mjs'], { AGENTBOX_CLOUD_CONFI
 // The cloud server, from the same commit.
 say('updating the cloud server');
 const serverOk = live('node', ['scripts/cloud-gateway-setup.mjs'], { AGENTBOX_CLOUD_CONFIG: serverFile });
+
+// ---------------------------------------------------------------------------
+// 7. NPM. The checks before-publish.mjs makes were made at step 1, against
+// the commit this run pinned; main has moved on since, which is not a reason
+// to publish something else.
+// npm sessions expire, and publishing can require its own approval after login.
+if (signIn(npmSignIn, { required: false })) {
+  say(`publishing ${PACKAGE}@${version} to npm (it may ask for a one-time code)`);
+  if (!live('npm', ['publish'], { AGENTBOX_PUBLISH_ANYWAY: '1' })) console.log('  ✗ npm did not publish; the reason is just above');
+}
+restorePackageJson();
 
 // ---------------------------------------------------------------------------
 // 8. EACH PLACE, READ BACK.
@@ -259,7 +262,7 @@ if (lines.every((l) => l.ok) && imageOk) {
   console.log(`\nAgentbox ${version} is out everywhere. Restart Agentbox to run it yourself.`);
   // MAIN'S OWN NUMBER DOES NOT FOLLOW A RELEASE, and nothing said so (F-147).
   // The version is written into package.json for this run and taken back out
-  // at step 6, because this folder may not commit (scripts/hooks/pre-commit).
+  // at step 7, because this folder may not commit (scripts/hooks/pre-commit).
   // Main went two releases behind in silence, so a clone built from the README
   // called itself a version that was out before it.
   if (version !== mainVersion) {
@@ -269,6 +272,7 @@ if (lines.every((l) => l.ok) && imageOk) {
   console.log('');
 } else {
   stop('Not every place has the new version yet; the ✗ lines above say which.',
+    lines.find((l) => l.part === 'npm' && !l.ok) ? 'npm gets the next release. Run npm login before then.' : '',
     imageOk ? '' : `For the cloud machine, run: AGENTBOX_CLOUD_CONFIG=${serverFile} node scripts/cloud-setup.mjs`,
     lines.find((l) => l.part === 'cloud server' && !l.ok) ? `For the cloud server, run: AGENTBOX_CLOUD_CONFIG=${serverFile} node scripts/cloud-gateway-setup.mjs` : '');
 }

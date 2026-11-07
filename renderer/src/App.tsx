@@ -28,7 +28,7 @@ import { setClaudeModels, setCodexFreePlan } from './models';
 import { codexFromSettings } from './web-settings';
 import { advanceAfter, advanceLandsHere, pickSentWords, pickStaysPut, replyMovesOn, opensIntoNeedsYou, nextAfterAdvance, sayWhoseBox, sentLineSays, type Advance } from './advance';
 import { arrowRows, spotIn, stepIn } from './one-thing-at-a-time';
-import { AIMED_AT_THE_THREAD_YOU_LEFT, pickLandsHere, type Arrival } from './pick-settles';
+import { AIMED_AT_THE_THREAD_YOU_LEFT, CLICK_FOR_THE_THREAD_YOU_LEFT, clickAimedHere, pickLandsHere, type Arrival, type Point } from './pick-settles';
 import { freshCopy, staysOnTheTask, stillFollowing, wayOut, type Followed } from './stay-with-a-command';
 import { List } from './components/List';
 import { LogoOrbit } from './components/LogoOrbit';
@@ -1815,6 +1815,14 @@ export default function App() {
   /** The thread the advance last put in front of you, so a number aimed at the
    *  one before it cannot answer this one (./pick-settles). */
   const arrived = useRef<Arrival>(null);
+  // Screen coordinates, so a move Chromium makes up after a layout change,
+  // which carries the same ones, is not taken for the hand moving.
+  const pointer = useRef<Point | null>(null);
+  useEffect(() => {
+    const moved = (e: PointerEvent) => { pointer.current = { x: e.screenX, y: e.screenY }; };
+    window.addEventListener('pointermove', moved, true);
+    return () => window.removeEventListener('pointermove', moved, true);
+  }, []);
   // The grace window: an action is held for a few seconds before anything is
   // written; Z inside the window cancels it completely. Short on purpose: a
   // stray agent start is cheap, unlike a stray email.
@@ -5312,7 +5320,11 @@ export default function App() {
   // already standing. The strip's own guard is the other half of F-48, for the
   // rows moving under a pointer on one thread (components/Focus.tsx).
   const pickAimedHere = useCallback((item: WorkItem, n: number) => {
-    if (!pickLandsHere(arrived.current, keyOf(item), Date.now())) { showToast(AIMED_AT_THE_THREAD_YOU_LEFT); return; }
+    if (!clickAimedHere(arrived.current, keyOf(item), Date.now(), pointer.current)) {
+      if (arrived.current) arrived.current.from = null;
+      showToast(CLICK_FOR_THE_THREAD_YOU_LEFT);
+      return;
+    }
     void pickOption(item, n);
   }, [pickOption, showToast]);
 
@@ -6601,7 +6613,7 @@ export default function App() {
     // THE APP MOVED YOU, SO THE KEY THAT SENDS WAITS A MOMENT (./pick-settles).
     // The one place a thread is put in front of you without your asking, and so
     // the one place a number already on its way can answer a thread unread.
-    arrived.current = { key: keyOf(next.item), at: Date.now() };
+    arrived.current = { key: keyOf(next.item), at: Date.now(), from: pointer.current };
     setFocused(next.item); markSeen(next.item);
     const at = onBoard ? list.findIndex((i) => i.id === next.item.id && i.product === next.item.product) : next.index;
     setSelected(at >= 0 ? at : 0);
@@ -6664,6 +6676,7 @@ export default function App() {
   const artifactView = artifactPlacement(artifactMode, artifactWidth);
   const notesHere = fullScreenDoc && !!focused && openDoc?.product === focused.product && !openDoc.readOnly && takesNotesSidebar(openDoc.src);
   const notesShown = notesHere && notesOpen;
+  const notesClosed = notesHere && !notesOpen;
   const [artifactHeader, setArtifactHeader] = useState<HTMLDivElement | null>(null);
   const readingWidth = 'balanced';
   const [taskHeader, setTaskHeader] = useState<HTMLDivElement | null>(null);
@@ -6803,6 +6816,7 @@ export default function App() {
   // THE FIRST RUN ENDS IN THE INBOX, where the tutorial takes over.
   const finishFresh = useCallback(() => {
     finishFirstRun(localStorage);
+    rememberOffered(localStorage);
     setTour(startTour());
     setFresh(false);
     setView('inbox');
@@ -6815,6 +6829,8 @@ export default function App() {
   const finishClassic = useCallback((sent: string | null, runAt = 0, draft?: string) => {
     const to = firstRunLanding(sent, runAt);
     finishFirstRun(localStorage);
+    // Onboarding was the moment to offer it; a project made later is mid-task (F-164).
+    rememberOffered(localStorage);
     setLessons(localStorage, ['open', 'pick']);
     setLessonList(['open', 'pick']);
     setFresh(false);
@@ -7382,7 +7398,7 @@ export default function App() {
     <FreeAgentContext.Provider value={freeWaitIds}>
     <TryAgainContext.Provider value={tryAgain}>
     <CloudOfferContext.Provider value={cloudOfferNow ? { offer: cloudOfferNow, onGo: (go) => void onCloudGo(go) } : null}>
-    <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app workspace-layout${narrowSidebar ? ` gt-rail gt-inset gt-sumleft${sideFolded ? '' : ' gt-rail-open'}` : ''}${focused && !settingsOpen && !inChats ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${sideFolded ? ' workspace-collapsed' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${notesShown ? ' notes-open' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}${cardOnScreen ? ' asking' : ''}${(queueSpot || onePage) && focused ? ' one-at-a-time' : ''}`}>
+    <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app workspace-layout${narrowSidebar ? ` gt-rail gt-inset gt-sumleft${sideFolded ? '' : ' gt-rail-open'}` : ''}${focused && !settingsOpen && !inChats ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${sideFolded ? ' workspace-collapsed' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${notesShown ? ' notes-open' : ''}${notesClosed ? ' notes-closed' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}${cardOnScreen ? ' asking' : ''}${(queueSpot || onePage) && focused ? ' one-at-a-time' : ''}`}>
 
       {/* At the end of <body>, so its drag rectangles are reported after the
           top bar's and this layout's ::after strip. Inside the app, those put
@@ -7572,6 +7588,7 @@ export default function App() {
               here, on a phone only (searchInTheList). It ended the tabs row
               (w-3c51d02de5) until an iPhone clipped it out of sight there,
               because that row scrolls sideways (w-33511040d7). */}
+          {filesShown && !focused && <div className="th-right" id="fp-head-slot" />}
           {!focused && !settingsOpen && !teamShown && !filesShown && !connectionsShown && (teammatesShown && !evOn ? teammatesUi.right : roomShown && roomsUi.heading?.right !== undefined ? roomsUi.heading.right : (
             <HeaderActions
               page="inbox"

@@ -17,11 +17,11 @@ const dock = focus.slice(focus.indexOf('<div className="focus-dock-inner">'));
 describe('one at a time, under a full screen page', () => {
   it('draws no options at the foot', () => {
     // `page` since every thread with an agent got the one-at-a-time page (w-65bcefb857).
-    expect(dock).toMatch(/\{page && stripShown && !fullScreenDoc && !closeAsk && \(\s*<div className=\{`one-choices[^`]*`\}>/);
+    expect(dock).toMatch(/\{page && stripShown && !fullScreenDoc && !closeAsk && !answered && \(\s*<div className=\{`one-choices[^`]*`\}>/);
   });
   it('brings them up with the reply box, like every other full screen page', () => {
     expect(focus).toContain('const offerInDock = stripShown && fullScreenDoc && replyOpen;');
-    expect(dock).toContain('{offerInDock && (closeAsk ? null : (');
+    expect(dock).toContain('{offerInDock && (closeAsk || answered ? null : (');
   });
 });
 
@@ -33,6 +33,6 @@ describe('what must not change', () => {
     expect(dock).toMatch(/<div className=\{`one-choices[^`]*`\}>\s*<OptionsOffer[^/]{0,600}\bbare=\{!shipAsk\?\.headed\}\s*\/>/);
   });
   it('keeps them out of the conversation in one at a time', () => {
-    expect(focus).toContain('{offerInPane && (page || closeAsk ? null : (');
+    expect(focus).toContain('{offerInPane && (page || closeAsk || answered ? null : (');
   });
 });

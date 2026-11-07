@@ -161,7 +161,7 @@ const PICK = /^Option (\d+): ([^\n]+)$/;
 /** A pick's line in the thread, or null when the answer is a typed reply. */
 export function pickedLine(answer: string): { said: string; words: string } | null {
   const picked = PICK.exec(answer);
-  return picked ? { said: `You picked option ${picked[1]}`, words: picked[2].replace(/\s*\(recommended\)\s*$/i, '').trim() } : null;
+  return picked ? { said: `You picked option ${picked[1]}`, words: picked[2].replace(/\s*\(recommended\)/i, '').trim() } : null;
 }
 
 // HOW LONG AFTER YOUR REPLY A LIFTED SNOOZE STILL BELONGS TO IT. The app

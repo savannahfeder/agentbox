@@ -8,7 +8,7 @@
 // picks its column. Typing, Enter or a double click edits; a tag cell opens its
 // tags. Space opens the whole row. Every change is written back to the file.
 import { memo, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { filterRows, hrefOf, logoFor, readTable, shownLink, sortRows, tableFromGrid, type Column, type ColumnKind, type Sort, type Table } from '../table-file';
+import { cellLink, filterRows, logoFor, readTable, shownLink, shownText, sortRows, tableFromGrid, type CellLink, type Column, type ColumnKind, type Sort, type Table } from '../table-file';
 import {
   addColumn, addRows, boxOf, filterChoices, likeItsColumn, cellsIn, dropColumn, dropRows, fromClipboard, inBox, moved, orderAfterAdd, orderAfterDrop,
   pasteInto, renameColumn, shapeOf, showColumnAs, toClipboard, writeCells, writeTable, type At, type Box, type Pick,
@@ -57,20 +57,24 @@ const TagChip = ({ column, value }: { column: Column; value: string }) => {
   return <span className={`tbl-tag tone-${column.tones[key] ?? 'grey'}`}>{column.values.find((x) => x.toLowerCase() === key) ?? value.trim()}</span>;
 };
 
-function CellBody({ table, col, row, value }: { table: Table; col: number; row: string[]; value: string }) {
+function CellBody({ table, col, row, value, link }: { table: Table; col: number; row: string[]; value: string; link: CellLink | null }) {
   const column = table.columns[col];
   const v = value.trim();
   if (!v) return null;
-  if (column.kind === 'name') return <>{table.logoCol >= 0 && <Logo host={logoFor(table, row)} name={v} />}<span className="tbl-ell">{v}</span></>;
-  if (column.kind === 'tag') return <TagChip column={column} value={v} />;
-  if (column.kind === 'link') return <a className="tbl-ell" href={hrefOf(v)} target="_blank" rel="noreferrer">{shownLink(v)}</a>;
-  if (column.kind === 'email') return <a className="tbl-ell" href={`mailto:${v}`}>{v}</a>;
-  if (column.kind === 'number' || column.kind === 'date') return <span className="tbl-ell">{v}</span>;
-  return <span className="tbl-ell">{v}</span>;
+  const words = link ? <a className="tbl-ell" href={link.href} target={link.href.startsWith('mailto:') ? undefined : '_blank'} rel="noreferrer">{link.text}</a>
+    : <span className="tbl-ell">{v}</span>;
+  if (column.kind === 'name') return <>{table.logoCol >= 0 && <Logo host={logoFor(table, row)} name={link?.text ?? v} />}{words}</>;
+  if (column.kind === 'tag' && !link) return <TagChip column={column} value={v} />;
+  return words;
 }
 
-const cellClass = (kind: ColumnKind) =>
-  kind === 'name' ? ' tbl-name' : kind === 'number' ? ' tbl-num' : kind === 'date' ? ' tbl-date' : kind === 'link' || kind === 'email' ? ' tbl-link' : kind === 'tag' ? ' tbl-tagcell' : '';
+const cellClass = (kind: ColumnKind, link: boolean) =>
+  kind === 'name' ? ' tbl-name' : kind === 'number' ? ' tbl-num' : kind === 'date' ? ' tbl-date' : kind === 'link' || kind === 'email' || link ? ' tbl-link' : kind === 'tag' ? ' tbl-tagcell' : '';
+
+const hoverText = (kind: ColumnKind, v: string, link: CellLink | null) => {
+  if (link) return kind === 'link' || kind === 'email' || link.text === shownLink(link.href) ? link.href.replace(/^mailto:/, '') : `${link.text}\n${shownLink(link.href)}`;
+  return kind === 'name' || (kind === 'text' && v.length > 40) ? v.trim() || undefined : undefined;
+};
 
 // One row, told only what of the pick touches it, so a move redraws two rows and not fifty.
 // A ranked file's own rank stands where the row number goes, so a list is not numbered twice.
@@ -87,10 +91,10 @@ const Row = memo(function Row({ table, row, r, n, c0, c1, at, whole, hands }: {
       if (table.ranked && i === 0) return null;
       const kind = table.columns[i].kind;
       const sel = i >= c0 && i <= c1;
-      const long = kind === 'text' && v.length > 40;
-      return <div key={i} className={`tbl-td${cellClass(kind)}${sel ? ' sel' : ''}${i === at ? ' at' : ''}`} role="cell"
-        data-r={hands ? r : undefined} data-c={hands ? i : undefined} title={kind === 'name' || kind === 'link' || kind === 'email' || long ? v.trim() || undefined : undefined}>
-        <CellBody table={table} col={i} row={row} value={v} />
+      const link = cellLink(table, row, i);
+      return <div key={i} className={`tbl-td${cellClass(kind, !!link)}${sel ? ' sel' : ''}${i === at ? ' at' : ''}`} role="cell"
+        data-r={hands ? r : undefined} data-c={hands ? i : undefined} title={hoverText(kind, v, link)}>
+        <CellBody table={table} col={i} row={row} value={v} link={link} />
         {hands && i === (table.ranked ? 1 : 0) && <button type="button" className="tbl-open" tabIndex={-1} aria-label="Open this row" title="Open this row (Space)">{OPEN}</button>}
       </div>;
     })}
@@ -124,7 +128,7 @@ function measure(table: Table, cap: number, only?: number): { px: Map<string, nu
     else for (let r = 0; r < table.rows.length; r += step) {
       const v = table.rows[r][i] ?? '';
       // Only strings near the longest can be the widest; measuring each would be slow.
-      if (v.length >= longest[i].length * 0.7) w = Math.max(w, Math.min(cap, text(`14px ${family}`, c.kind === 'link' ? shownLink(v) : v)));
+      if (v.length >= longest[i].length * 0.7) w = Math.max(w, Math.min(cap, text(`14px ${family}`, c.kind === 'link' ? cellLink(table, table.rows[r], i)?.text ?? v : shownText(v))));
     }
     const head = c.name.length * 7.6 + 20 + 24;
     px.set(c.name, Math.ceil(Math.max(head, w + (c.kind === 'name' && table.logoCol >= 0 ? 28 : 0)) + 34));
@@ -393,9 +397,11 @@ function RowSheet({ table, row, place, count, editable, from, onWrite, onStep, o
     if (typingIn(e.target as Element)) return;
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); e.stopPropagation(); onStep(e.key === 'ArrowDown' ? 1 : -1); }
   };
-  return <div className="tbl-sheet" ref={sheet} tabIndex={-1} role="dialog" aria-label={row[nameAt] || 'Row'} data-own-escape="" onKeyDown={key}>
+  const name = shownText(row[nameAt] ?? '');
+  const link = cellLink(table, row, nameAt);
+  return <div className="tbl-sheet" ref={sheet} tabIndex={-1} role="dialog" aria-label={name || 'Row'} data-own-escape="" onKeyDown={key}>
     <div className="tbl-sheet-head">
-      <div className="tbl-sheet-name">{row[nameAt]?.trim() || 'Untitled'}</div>
+      <div className="tbl-sheet-name">{link ? <a href={link.href} target="_blank" rel="noreferrer" title={shownLink(link.href)}>{link.text}</a> : name || 'Untitled'}</div>
       <span className="tbl-sheet-at">{place + 1} of {count}</span>
       <button type="button" className="tbl-btn tbl-icon" disabled={place <= 0} onClick={() => onStep(-1)} aria-label="Row above" title="Row above (↑)">{glyph('M4 10l4-4 4 4')}</button>
       <button type="button" className="tbl-btn tbl-icon" disabled={place >= count - 1} onClick={() => onStep(1)} aria-label="Row below" title="Row below (↓)">{glyph('M4 6l4 4 4-4')}</button>
@@ -417,14 +423,22 @@ const SEARCH = <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7"
 const OPEN = glyph('M9.5 3H13v3.5M13 3L8.5 7.5M6.5 13H3V9.5M3 13l4.5-4.5');
 const CARET = glyph('M5 6.5l3 3 3-3');
 
-type Hast = { type: string; tagName?: string; value?: string; children?: Hast[] };
+type Hast = { type: string; tagName?: string; value?: string; children?: Hast[]; properties?: { href?: unknown } };
 const textOf = (n: Hast): string => (n.type === 'text' ? n.value ?? '' : (n.children ?? []).map(textOf).join(''));
+// A cell that is one link and nothing else goes back to `[text](url)`, so the table can draw it.
+const cellOf = (td: Hast): string => {
+  const parts = (td.children ?? []).filter((c) => !(c.type === 'text' && !(c.value ?? '').trim()));
+  const a = parts.length === 1 && parts[0].tagName === 'a' ? parts[0] : null;
+  const href = typeof a?.properties?.href === 'string' ? a.properties.href : '';
+  const words = a ? textOf(a).trim() : '';
+  return a && href && words !== href ? `[${words}](${href})` : textOf(td).trim();
+};
 const rowsOf = (n: Hast): Hast[] => (n.tagName === 'tr' ? [n] : (n.children ?? []).flatMap(rowsOf));
 
 /** The header row and rows of a markdown table, as react-markdown hands its node over. */
 export function gridFromHast(node: Hast | undefined): string[][] {
   if (!node) return [];
-  return rowsOf(node).map((tr) => (tr.children ?? []).filter((c) => c.tagName === 'th' || c.tagName === 'td').map((c) => textOf(c).trim()));
+  return rowsOf(node).map((tr) => (tr.children ?? []).filter((c) => c.tagName === 'th' || c.tagName === 'td').map(cellOf));
 }
 
 /** A markdown table in a message: every row, in the message, no toolbar; a header still sorts. */
@@ -1028,6 +1042,8 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   const sheetRow = sheet !== null ? table.rows[order[sheet]] : null;
   const n = sel ? sel.r1 - sel.r0 + 1 : 0;
   const atValue = pick ? table.rows[order[pick.a.r]]?.[pick.a.c] ?? '' : '';
+  const atRow = pick ? table.rows[order[pick.a.r]] : undefined;
+  const atLink = pick && atRow ? cellLink(table, atRow, pick.a.c) : null;
   const floatCol = float?.col !== undefined ? table.columns[float.col] : null;
 
   return (
@@ -1188,10 +1204,10 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
             closeFloat();
             void navigator.clipboard?.readText?.().then((t) => paste(t)).catch(() => setProblem({ error: `Press ${CMD}V to paste here.` }));
           }} />}
-          {pick && (table.columns[pick.a.c]?.kind === 'link' || table.columns[pick.a.c]?.kind === 'email') && atValue.trim() && (
-            <MenuRow label={table.columns[pick.a.c].kind === 'email' ? 'Write an email' : 'Open link'} hint={`${CMD}click`} onClick={() => {
+          {atLink && (
+            <MenuRow label={atLink.href.startsWith('mailto:') ? 'Write an email' : 'Open link'} hint={`${CMD}click`} onClick={() => {
               closeFloat();
-              window.open(table.columns[pick.a.c].kind === 'email' ? `mailto:${atValue.trim()}` : hrefOf(atValue), '_blank', 'noreferrer');
+              window.open(atLink.href, '_blank', 'noreferrer');
             }} />
           )}
           {onComment && atValue.trim() && <MenuRow label="Comment" onClick={() => { onComment(atValue.trim()); closeFloat(); }} />}

@@ -61,7 +61,7 @@ describe('folded', () => {
     expect(sign).toMatch(/aria-label="Show the 3 choices"/);
   });
   it('at its right end, after the R', () => {
-    expect(focus).toMatch(/<span className="dock-pill-key"><kbd>R<\/kbd><\/span>\s*\{choicesFolded && page && stripShown && !fullScreenDoc && !closeAsk && <ChoicesShow count=\{options\.length\} onShow=\{foldChoices\} \/>\}/);
+    expect(focus).toMatch(/<span className="dock-pill-key"><kbd>R<\/kbd><\/span>\s*\{choicesFolded && page && stripShown && !fullScreenDoc && !closeAsk && !answered && <ChoicesShow count=\{options\.length\} onShow=\{foldChoices\} \/>\}/);
   });
   it('which brings the box back without opening the reply', () => {
     expect(read('renderer/src/components/OneThingAtATime.tsx')).toMatch(/onClick=\{\(e\) => \{ e\.stopPropagation\(\); onShow\(\); \}\}/);

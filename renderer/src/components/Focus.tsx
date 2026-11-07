@@ -31,7 +31,7 @@ import { providerCommand } from '../../../shared/provider-commands.mts';
 
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent as BoxKeyEvent, type ReactNode } from 'react';
 import { Face, TeamContext, firstName } from '../team/people';
-import { workAudience } from '../threads/page-rules';
+import { isDirect, peopleInConversation, peopleToAdd, workAudience } from '../threads/page-rules';
 import {
   allModels, joinNames, moreCount, recentModels, replyBoxAsk, replyWaitsUntil, type Harness, type ModelPick,
 } from '../threads/composer-rules';
@@ -114,7 +114,7 @@ import { foldedReply } from '../folded-reply';
 import { applyDockHeight } from '../dock-height';
 import { resumeTo } from '../thread-bottom';
 import { optionIsClipped, optionPeek } from '../option-peek';
-import { changedFiles, onlyNamedFiles, shipOfferFor, shipOfferLive, standingFrom, UNREAD, type ChangedFile, type Standing } from '../ship-offer';
+import { changedFiles, FOLDER_SETTLES_MS, folderMayStillMove, onlyNamedFiles, shipOfferFor, shipOfferLive, standingFrom, UNREAD, type ChangedFile, type Standing } from '../ship-offer';
 import { MOVED_PX, THE_OPTIONS_MOVED, clickLandsOnTheRowYouSaw } from '../pick-settles';
 import { askHeading, askFull, askIsClipped } from '../ask-line';
 import { replyIsSwallowed, replyReaches } from '../../../shared/agents.mjs';
@@ -130,7 +130,7 @@ import { SidebarIcon } from './SidebarIcon';
 import { Byline, ConversationAside } from './Byline';
 import { ItemThread } from './ItemThread';
 import { ContinuedFrom } from '../threads/ContinuedFrom';
-import type { PendingSaid } from '../item-thread';
+import { answerOnItsWay, type PendingSaid } from '../item-thread';
 import { isTroubleRow } from '../trouble-row';
 import { rowTitle } from '../list-rules';
 import { useKeepInWindow } from '../keep-in-window';
@@ -1285,7 +1285,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // conversation is: the run that is writing the trace writes the change the
   // moment it exits, and without this she would have to leave the card and come
   // back before the code she watched being written became pressable. A finished
-  // row does not change under her, so it is read once.
+  // row is read once, after the short while its folder takes to settle.
   const [figures, setFigures] = useState<ChangeFigures | null>(null);
   // And where its folder stands, off the same file, because the figures alone
   // cannot say whether any of this reached a commit (../ship-offer.ts).
@@ -1310,9 +1310,13 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         .catch(() => { if (live) { setFigures(null); setStanding(UNREAD); setChanged([]); } });
     };
     read();
-    if (!session) return () => { live = false; };
+    // And for a short while after the run ends: its folder is read back after
+    // its result is written (../ship-offer.ts, folderMayStillMove).
+    const settling = !!session || folderMayStillMove(item, Date.now());
+    if (!settling) return () => { live = false; };
     const timer = setInterval(read, pollEvery(4000, onPhone()));
-    return () => { live = false; clearInterval(timer); };
+    const settled = session ? null : setTimeout(() => clearInterval(timer), FOLDER_SETTLES_MS);
+    return () => { live = false; clearInterval(timer); if (settled) clearTimeout(settled); };
   }, [item.product, item.id, item.updatedAt, session?.startedAt, agent]);
   const summaryNow = summaryOffered ? (summaryShown ? 'open' : 'closed') : null;
 
@@ -1670,6 +1674,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const shipAsk = shipOfferLive(item, { change: !!figures, running: !!session || !!agent }) ? shipOfferFor(standing, onlyNamedFiles(changed, referencedFiles(item.result, item.note, item.body, item.answer, { dir: productDir }), productDir)) : null;
   const shipOffer = !!shipAsk;
   const stripShown = showOptions || shipOffer;
+  // A pick is held a few seconds for Z before it is written, and the card it
+  // answered stayed up all that time, as if nothing had been taken (F-170).
+  const answered = answerOnItsWay(sending);
   // Whatever the pane is leading with, not the ask alone: on a row the user
   // wrote, the ask is the one field a worker cannot answer in (format.ts says
   // why). The agent's own offer wins wherever there is one.
@@ -1808,8 +1815,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       stateShown={summarised && summaryOffered}
       /* ADD PEOPLE, beside the faces (w-71e6af492d). A conversation only: the
          control decides that for itself off the record on screen, so nothing
-         here has to ask again. */
-      onAddPeople={onAddPeople}
+         here has to ask again. Where the corner's menu offers it, that is
+         the one place. */
+      onAddPeople={cornerHeaderTarget ? undefined : onAddPeople}
     />
   );
 
@@ -1831,6 +1839,26 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       <span className="cf-files">in {fileCount(figures)}</span>
     </span>
   ) : null;
+  // THE CODE BUTTON, in the corner beside Done (w-c25aae4035): people never
+  // found the change while it was only a row in the dots menu.
+  const openChange = () => onOpenDoc?.(changePathFor(item.id));
+  const codeButton = figures ? (
+    <span className="ts-code-figures">
+      {signed(figures).map(({ sign, text }) => (
+        <span key={sign} className={sign === '+' ? 'code-plus' : 'code-minus'}>{text}</span>
+      ))}
+    </span>
+  ) : null;
+
+  // ADD PEOPLE IS A ROW IN THE MENU, not a button beside it. A conversation
+  // adds through New thread, so it lists nobody here.
+  const cornerPeople = (() => {
+    if (!teamCtx || !onAddPeople || !crumbFrom || inChats || !(direct || summarised)) return null;
+    const project = teamCtx.products.get(item.product);
+    if (isDirect(project)) return peopleInConversation(project, teamCtx.me, teamCtx.state.people) ? { people: [], conversation: true } : null;
+    const people = peopleToAdd({ item, me: teamCtx.me, company: teamCtx.state.people });
+    return people.length ? { people, conversation: false } : null;
+  })();
 
   /* THE THREAD'S MENU: the three verbs that crowded the right of the bar
      (the terminal mark, the code figures, the Done mark), as rows under one
@@ -1852,7 +1880,11 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       key={`${item.product}:${item.id}`}
       files={<ThreadFilesButton files={madeHere} onOpen={(f) => (opensBig(f.src) ? openBig(f.src) : onOpenDoc?.(f.src))} />}
       change={changeFigures}
-      onViewChange={() => onOpenDoc?.(changePathFor(item.id))}
+      codeButton={codeButton}
+      codeOpen={openDoc === changePathFor(item.id)}
+      onViewChange={openChange}
+      addPeople={cornerPeople}
+      onAddPeople={onAddPeople ? (person) => onAddPeople(item, person) : undefined}
       /* A PHONE HAS NO TERMINAL AND NO ⌘J (QA batch 005, F-118), and it is the
          only way it has of putting a thread off (F-117). */
       terminal={direct || onPhone() ? null : terminalOpen ? 'open' : 'closed'}
@@ -2013,7 +2045,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     {/* THE CORNER: THE THREAD'S MENU, and nothing else. The Summary button
         that stood beside it (w-e731ca9376) moved onto the summary itself on
         w-a3482b8c2c: the rail opens it, the icon beside its title closes it. */}
-    {cornerHeaderTarget && createPortal(<span className="ts-top">{sentUp && aboveDock}{queue && <QueueNav spot={queue.spot} onStep={queue.onStep} />}{crumbFrom && !inChats && (direct || summarised) && <ConversationAside item={item} onAddPeople={onAddPeople} />}{threadMenu}</span>, cornerHeaderTarget)}
+    {cornerHeaderTarget && createPortal(<span className="ts-top">{sentUp && aboveDock}{queue && <QueueNav spot={queue.spot} onStep={queue.onStep} />}{crumbFrom && !inChats && (direct || summarised) && <ConversationAside item={item} />}{threadMenu}</span>, cornerHeaderTarget)}
     {artifact && (
       <ThreadArtifacts item={item} open={artifact} withAgent={!direct && !heldByPerson && !item.agent}
         onClose={() => setArtifact(null)} onNotice={onNotice} />
@@ -2287,7 +2319,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         {!fullScreenDoc && !askAtTask && closeAskStrip(false)}
         {questions}
         {/* One at a time draws them at the foot instead, apart from the reply box. */}
-        {offerInPane && (page || closeAsk ? null : (
+        {offerInPane && (page || closeAsk || answered ? null : (
           <OptionsOffer
             ask={ask} askAll={askAll} options={options}
             peekOption={peekOption} askPeek={askPeek}
@@ -2476,7 +2508,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             something the page does not: there was nothing over "Ship it
             (recommended)" saying the change had never been committed (F-79,
             ../ship-offer.ts). */}
-        {page && stripShown && !fullScreenDoc && !closeAsk && (
+        {page && stripShown && !fullScreenDoc && !closeAsk && !answered && (
           <div className={`one-choices${choicesFolded ? ' one-choices-folded' : ''}`}>
             <OptionsOffer
               ask={ask} askAll={askAll} options={options}
@@ -2508,7 +2540,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               folds. It follows nobody down a page, because in that mode there
               is no page of conversation on the screen. */}
           {fullScreenDoc && closeAskStrip(true)}
-          {offerInDock && (closeAsk ? null : (
+          {offerInDock && (closeAsk || answered ? null : (
             <OptionsOffer
               ask={ask} askAll={askAll} options={options}
               peekOption={peekOption} askPeek={askPeek}
@@ -2571,7 +2603,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                 >{modelWord}</span>
               )}
               <span className="dock-pill-key"><kbd>R</kbd></span>
-              {choicesFolded && page && stripShown && !fullScreenDoc && !closeAsk && <ChoicesShow count={options.length} onShow={foldChoices} />}
+              {choicesFolded && page && stripShown && !fullScreenDoc && !closeAsk && !answered && <ChoicesShow count={options.length} onShow={foldChoices} />}
             </button>
           )}
         </div>
