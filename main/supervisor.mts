@@ -11,7 +11,7 @@ import { SHIP_LABEL, ShipQueue, readShipSettings, shipScriptFor, shipSlot } from
 import { MainTests } from './main-went-red.mts';
 import { folderJob } from './task-folders-offthread.mts';
 import { gitJob } from './git-change-offthread.mts';
-import { queuedReplyText, submitReply, framedTeammate } from './live-replies.mts';
+import { queuedReplyText, submitReply, framedPick, framedTeammate } from './live-replies.mts';
 import { resolveAnsweredNotes, wakeForNotes } from './notes-wake.mjs';
 import { TEAM_LOOK, TEAM_LOOK_LINE } from '../shared/team-look.mjs';
 import { editedFilesLine } from '../shared/artifact-marks.mjs';
@@ -521,6 +521,8 @@ export interface FruitlessRecord {
   saidTs?: number;
   saidWhy?: string;
   saidGaveUp?: boolean;
+  // The `endedAt` of the run the stranded pass read to its end and had nothing to say about.
+  quietAt?: number;
   resetsAt?: string;
   strandedSince?: number;
 }
@@ -906,6 +908,8 @@ const SWITCH_RESTARTS = 3;
 const SWITCH_WINDOW_MS = 30 * 60_000;
 // The reasons a queued thread's line names (`status().cannotStart`).
 const SAID_WHY_NOT_STARTED = new Set(['setup', 'asleep', 'cloud-carried', 'engine', 'login', 'memory', 'slow-folder', 'error', 'brake']);
+// Refusals that waiting will not fix, so Try again reports them instead of queueing the thread.
+const NEVER_CLEARS = new Set(['model', 'project', 'practice', 'folder']);
 // Making a thread's folder takes seconds; past this it is said to be slow.
 const SLOW_FOLDER_MS = 2 * 60_000;
 // A project's kit for a new thread from the phone: left again at most this
@@ -997,7 +1001,8 @@ const HUNG_QUIET_MS = 10 * 60_000;
 // missed passes: past any slow pass, well under the ten minutes above.
 const SLEPT_GAP_MS = 2 * 60_000;
 const PROFILES_KEPT_MS = 1000;
-const TRACES_KEPT = 500;
+// A tick may spend this long reading session logs it has never read.
+const NEW_TRACES_BUDGET_MS = 250;
 // Awake this long and not joined or taken back, a row handed to the cloud runs here (`_carriedHolds`).
 const PHONE_QUIET_MS = 10 * 60_000;
 // Two hangs on one row inside this window and the app stops restarting it and
@@ -2037,8 +2042,13 @@ export class Supervisor {
       if (this._roomFor(this._engineFor(item), item, { asked: true })) {
         // A start that throws is said on the press, not lost with the rest of the selection.
         try {
-          this._spawnResume(item);
-          out.resumed += 1;
+          const turnedAway = this._spawnResume(item);
+          if (!turnedAway) out.resumed += 1;
+          else if (NEVER_CLEARS.has(turnedAway)) out.failed += 1;
+          else {
+            this._resumeQueue.add(item.id);
+            out.queued += 1;
+          }
         } catch (error) {
           this._noteNotStarting(item, 'error', this._engineFor(item));
           out.failed += 1;
@@ -2129,7 +2139,8 @@ export class Supervisor {
       // waits behind the OTHER subscription is a resume that never happens.
       if (!this._roomFor(this._engineFor(item), item, { asked: true })) continue;
       this._resumeQueue.delete(item.id);
-      this._spawnResume(item);
+      const turnedAway = this._spawnResume(item);
+      if (turnedAway && !NEVER_CLEARS.has(turnedAway)) this._resumeQueue.add(item.id);
     }
   }
 
@@ -2137,11 +2148,18 @@ export class Supervisor {
   // worker has not answered: that is what puts "the founder has answered" in
   // the brief instead of briefing a stranger about a thread she is mid-way
   // through. Otherwise it is an ordinary session on the item.
-  _spawnResume(item: WorkItem) {
+  //
+  // Returns the reason spawnWorker turned the row away (it does not throw for
+  // one), or null when a run is on it or on its way.
+  _spawnResume(item: WorkItem): string | null {
     const live = item.answer && item.answer !== '(withdrawn)';
     if (live) this._handledAnswers.add(this._answerKey(item));
+    const before = this._notStarting?.get(item.id);
     // She resumed it by name, and its launch asks memory the way its queue did.
     this.spawnWorker(item, { continuation: !!live, asked: true });
+    if (this.sessions.has(item.id) || this._preparing?.has(item.id)) return null;
+    const noted = this._notStarting?.get(item.id);
+    return noted && noted !== before ? noted.why : null;
   }
 
   // The recovery command. When every worker dies at once (the founder's plan
@@ -4783,7 +4801,7 @@ export class Supervisor {
       .finally(() => { this._routing = false; });
   }
 
-  sayItOnEveryStrandedRow(items: WorkItem[], now = Date.now()) {
+  sayItOnEveryStrandedRow(items: WorkItem[], now = Date.now(), { budgetMs = NEW_TRACES_BUDGET_MS } = {}) {
     let dirty = false;
     // AND THE SAME PASS COUNTS THEM, for the line above her list. The count
     // is taken here rather than in the snapshot because this is the one place
@@ -4796,6 +4814,12 @@ export class Supervisor {
     const byKey = new Map(items.map((i) => [`${i.product}:${i.id}`, i]));
     let dirs: Map<string, string> | null = null;
     const dirOf = (slug: string) => (dirs ??= new Map(this.store.listProducts().map((p) => [p.slug, p.dir]))).get(slug);
+    // How long this pass may spend on traces it has never read: the rest are
+    // read on later ticks, and one is always read so the queue cannot stall.
+    // hrtime, so a fake clock still leaves a budget.
+    const startedAt = process.hrtime.bigint();
+    let readOne = false;
+    const outOfTime = () => readOne && Number(process.hrtime.bigint() - startedAt) / 1e6 > budgetMs;
     for (const [key, seen] of Object.entries(this._fruitless)) {
       if (!seen?.runs) continue;
       try {
@@ -4843,11 +4867,31 @@ export class Supervisor {
           continue;
         }
 
+        // A run already read to its end is not looked at again, or every stuck
+        // thread costs a folder listing and a stamp every tick while it stays stuck.
+        if (seen.quietAt != null && seen.quietAt === (seen.endedAt ?? 0)) continue;
+
         // WHAT THE LAST RUN ACTUALLY DID, read off its own trace. The session
         // object is long gone by now — often the whole process is — and the
         // trace is the only thing left that knows.
+        const unread = !this._traces?.has(key);
+        if (unread && outOfTime()) continue;
+        if (unread) readOne = true;
         const trace = this._lastTrace(product, id, dirOf);
-        if (!trace || !traceShowsASilentDeath(trace)) continue;
+        if (!trace) continue;
+        if (!traceShowsASilentDeath(trace)) {
+          // Only a trace with its exit line is settled: that line is written
+          // after the run is recorded as ended, so the first read can land
+          // before it. No trace at all can mean a read that failed, and that
+          // must not silence the thread, so it is asked about again next tick.
+          // Another run ending moves `endedAt` and reopens the question.
+          if (trace.exitCode != null) {
+            seen.quietAt = seen.endedAt ?? 0;
+            this._traces?.delete(key);
+            dirty = true;
+          }
+          continue;
+        }
 
         const cause = troubleCause(trace.stderr);
         // THE HOUR THE LIMIT LETS GO, AND THIS PASS WAS DROPPING IT.
@@ -4920,13 +4964,18 @@ export class Supervisor {
       }
     }
     this._stranded = stranded;
+    // And the traces of rows nothing is stuck on any more go with them, so the
+    // map `_lastTrace` keeps is the size of this pass.
+    if (this._traces) for (const key of this._traces.keys()) if (!this._fruitless[key]) this._traces.delete(key);
     if (dirty) this._saveState();
   }
 
   // The newest trace a row has, read once. Null when the row has never been
   // spawned, which is the ordinary case for most of `_fruitless` and is not an
   // error.
-  // Kept per log until its size or time changes: the stranded pass asks every tick.
+  // Kept per row until its log changes, with no cap: the pass walks every row in
+  // the same order, so a cap below that count evicts each answer before the next
+  // tick reaches it. The pass drops the rows that are no longer stranded.
   _lastTrace(product: string, id: string, dirOf: (slug: string) => string | undefined = (slug) => this.store.listProducts().find((p) => p.slug === slug)?.dir) {
     const dir = dirOf(product);
     if (!dir) return null;
@@ -4941,14 +4990,12 @@ export class Supervisor {
     const file = path.join(sessions, logs[logs.length - 1]);
     try {
       const st = fs.statSync(file);
-      const stamp = `${st.size}:${st.mtimeMs}`;
+      const stamp = `${file}:${st.size}:${st.mtimeMs}`;
       this._traces ??= new Map();
-      const kept = this._traces.get(file);
+      const kept = this._traces.get(`${product}:${id}`);
       if (kept?.stamp === stamp) return kept.trace;
       const trace = readDeadRunTrace(fs.readFileSync(file, 'utf8'));
-      this._traces.delete(file);
-      if (this._traces.size >= TRACES_KEPT) this._traces.delete(this._traces.keys().next().value!);
-      this._traces.set(file, { stamp, trace });
+      this._traces.set(`${product}:${id}`, { stamp, trace });
       return trace;
     } catch { return null; }
   }
@@ -6661,7 +6708,9 @@ export class Supervisor {
       }
       const n = (this._cloudStartFails.get(item.id) ?? 0) + 1;
       this._cloudStartFails.set(item.id, n);
-      keep = n >= CLOUD_STARTS_TO_GIVE_UP;
+      // A server that errored is not mended by starting this thread there again.
+      const serverBroke = (session.tail ?? []).some((l) => typeof l === 'string' && /agentbox cloud:.*the cloud server said 5\d\d\b/.test(l));
+      keep = serverBroke || n >= CLOUD_STARTS_TO_GIVE_UP;
     }
     if (!keep) return false;
     this._cloudStartFails.delete(item.id);
@@ -6897,7 +6946,7 @@ export class Supervisor {
   // one; a personal project, a command she typed, or a Remote Control session
   // stays on this Mac.
   _mayRunInCloud(item: WorkItem, product: Product | null | undefined, cwd: string | null | undefined, { remoteOnly = false }: { remoteOnly?: boolean } = {}) {
-    if (remoteOnly || teammateIdOf(item)) return false;
+    if (remoteOnly) return false;
     if (item?.id && (this.threadOnMac?.[item.id] === true || this._movedHere(item.id))) return false;
     if (!product || !cwd || cwd === product.repoPath) return false;
     if (cwd === product.dir ? !item?.id || !this._cloudTakesPlain() : !product.repoPath) return false;
@@ -6952,7 +7001,6 @@ export class Supervisor {
     if (!this._cloudSetUp()) return null;
     if (!this._cloudFirst()) return { why: 'started-before' };
     if (item?.id && this.threadOnMac?.[item.id] === true) return { why: 'kept' };
-    if (teammateIdOf(item)) return { why: 'teammate' };
     if (item?.id && this._movedHere(item.id)) return this._movedWhy?.[item.id] ?? { why: 'handed-back', detail: null };
     if (this._mustRunHere(item, engine)) return { why: 'codex-reply' };
     if (!this._cloudTakesProject(product)) return { why: 'project' };
@@ -7475,8 +7523,6 @@ export class Supervisor {
   // The part of `_mayRunInCloud` that can be asked before a row has a folder.
   _cloudEligible(item: WorkItem | null | undefined) {
     if (!item || String(item.id || '').startsWith('digest-')) return false;
-    // The team chat it talks through is files on this computer.
-    if (teammateIdOf(item)) return false;
     if (this.threadOnMac?.[item.id] === true || this._movedHere(item.id)) return false;
     return this._cloudTakesProject(this.store.listProducts?.().find((p) => p.slug === item.product));
   }
@@ -9325,6 +9371,7 @@ export class Supervisor {
     } else if (continuation && toldBy(item)) {
       item = { ...item, answer: framedTeammate(toldBy(item)!.name, item.answer) };
     }
+    if (continuation && item.answer && !toldBy(item)) item = { ...item, answer: framedPick(item.answer) };
     let prompt: string;
     // THE TWO KINDS OF RESUME SAY DIFFERENT THINGS, and handing a finished
     // session the interrupted wording would tell it to go looking for a step it

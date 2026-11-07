@@ -3,7 +3,7 @@
 // Asked for 2026-11-03 (w-d7e61eb261): make documents and other files shareable
 // on the web, with a way to make an account from there. A link is read by
 // people who are not signed in, so a mistake in
-// 20261105000000_a_file_anyone_with_its_link_can_read.sql is a stranger reading
+// 20261105000001_a_file_anyone_with_its_link_can_read.sql is a stranger reading
 // someone's other files, or a link that keeps working after it was stopped.
 // Every migration runs here in PGlite and each door is tried from each side:
 // Maya shares, Jun is signed in on another team, Theo comments, and nobody
@@ -12,6 +12,7 @@ import { it, expect, beforeAll, afterAll, describe } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
+import { emptyDatabase } from './an-empty-test-database.mjs';
 
 const dir = path.join(import.meta.dirname, '..', 'cloud/supabase/migrations');
 const migration = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort().map((f) => fs.readFileSync(path.join(dir, f), 'utf8')).join('\n');
@@ -51,7 +52,7 @@ const comments = (tok, who = null) => (who ? rows(who, `select * from public.fil
 const comment = (who, tok, body = 'Looks good') => rows(who, `select public.comment_on_file_link($1, $2) as id`, [tok, body]);
 
 beforeAll(async () => {
-  db = new PGlite();
+  db = new PGlite(await emptyDatabase());
   await db.exec(STAND_IN);
   await db.exec(migration);
   await db.exec(GRANTS);

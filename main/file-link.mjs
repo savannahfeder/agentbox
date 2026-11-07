@@ -1,5 +1,5 @@
 // A FILE ON THIS COMPUTER, READY TO GO INTO A LINK ANYONE CAN OPEN
-// (cloud/supabase/migrations/20261105000000_a_file_anyone_with_its_link_can_read.sql).
+// (cloud/supabase/migrations/20261105000001_a_file_anyone_with_its_link_can_read.sql).
 //
 // A page's own pictures, styles and scripts are put inside it, because the
 // copy on the web has no folder beside it. Only files in the page's own

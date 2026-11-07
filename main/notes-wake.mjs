@@ -53,7 +53,7 @@ export function resolveAnsweredNotes({ store, people = [], now = Date.now() }) {
 // on its question opens and the next tick starts the run. A note written to a
 // teammate, a thank-you, or one marked `wait` waits for Send (a `toagent`
 // mark), which tells the agent every note it names on a file in one reply.
-export async function noteToItsAgent({ store, supervisor, product, id, mark, nameOf = () => 'the person writing to you', people = [] }) {
+export async function noteToItsAgent({ store, supervisor, product, id, mark, nameOf = () => 'the person writing to you', people = [], handOffMs = 1500 }) {
   if (mark?.do === 'approve') return approvalToItsAgent({ store, supervisor, product, id, mark });
   if (mark?.do === 'note' && mark.wait) return false;
   const ids = mark?.do === 'note' ? [mark.id] : mark?.do === 'toagent' ? mark.on ?? [] : [];
@@ -74,11 +74,18 @@ export async function noteToItsAgent({ store, supervisor, product, id, mark, nam
   if (!byVersion.size) return false;
   const text = [...byVersion.values()].map(({ version, count, notes }) => notesForTheAgent({ notes }, version, count, { nameOf }).text).join('\n\n');
   const sent = [...byVersion.values()].flatMap(({ notes }) => notes.map((n) => n.id));
-  // Marked after, so a reply that fails leaves the notes to send again.
-  await submitReply(supervisor, { product, id, answer: text }, () => store.answerItem(product, id, { answer: text, fromNotes: sent }));
+  const going = submitReply(supervisor, { product, id, answer: text }, () => store.answerItem(product, id, { answer: text, fromNotes: sent }))
+    .then(() => { supervisor.liftBrakeForHer?.(); supervisor.wake?.(); });
+  // A running agent acknowledges a line at its next break, which can be minutes
+  // into a long command. Once written to its input the line is the CLI's, so the
+  // note box is not held for that, and a quick failure still leaves the notes unsent.
+  let timer;
+  const handedOff = await Promise.race([
+    going.then(() => true),
+    new Promise((resolve) => { timer = setTimeout(() => resolve(false), handOffMs); }),
+  ]).finally(() => clearTimeout(timer));
+  if (!handedOff) going.catch((err) => console.warn(`[notes] a note to the agent on ${id} was not saved as a reply: ${err?.message ?? err}`));
   store.fileMark(product, id, { do: 'sent', on: sent });
-  supervisor.liftBrakeForHer?.();
-  supervisor.wake?.();
   return true;
 }
 

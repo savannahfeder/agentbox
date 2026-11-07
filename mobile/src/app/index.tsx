@@ -2,7 +2,8 @@
 // tabs as words under the title, each row its title over the project and
 // age, and a new thread under the thumb. Or, picked in View and filters, the
 // board: one column a swipe.
-import { Redirect, router } from 'expo-router';
+import { Redirect } from 'expo-router';
+import { router } from '../lib/router';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

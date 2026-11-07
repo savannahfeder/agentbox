@@ -18,7 +18,6 @@ function local(why: string, detail: WhyNotCloud['detail']): string {
       if (/^merging into main\b/i.test(String(detail ?? ''))) return 'Merging into main happens on this computer.';
       return detail ? `Its cloud run needed ${detail}, which only this computer has.` : 'Its cloud run needed something only this computer has.';
     case 'cloud-refused': return 'The cloud couldn’t start it, so it runs here instead.';
-    case 'teammate': return 'A teammate talks in the team chat, which only this computer has.';
     case 'codex-reply': return 'Codex on this computer has this thread open, so its reply runs here.';
     case 'project': return 'The cloud doesn’t run threads from this project.';
     case 'folder': return 'It works in a folder that stays on this computer.';

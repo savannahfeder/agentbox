@@ -2,7 +2,8 @@
 // in a dark room as the phone site's PictureView does; a document reads in
 // place and a page draws in place, as its document pane does; a film or a
 // sound plays.
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
+import { router } from '../lib/router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Image } from 'expo-image';

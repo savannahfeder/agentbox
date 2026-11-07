@@ -191,6 +191,17 @@ export function queuedReplyText(item: QueuedItem, history: QueuedLine[], deliver
 
 const toldNameOf=(item: QueuedItem)=>(item.wrote?.answer?.source==='system'?item.wrote.answer.from:null);
 
+// A pressed option, as the app writes it (pickOption in renderer/src/App.tsx).
+const PICK=/^Option \d+: [^\n]+$/;
+
+// A pick is the go-ahead. Bare, "Option 2: Binary units" after "then wait for
+// my pick" was read as a choice to note, and the run ended with nothing built
+// (F-182).
+export function framedPick(answer: string): string{
+ if(!PICK.test(answer))return answer;
+ return `${answer}\n\nThey chose this from the options you offered. Choosing is the go-ahead: do what that option says now, rather than only noting the choice. Anything their standing instructions say needs their yes still does.`;
+}
+
 // A teammate's words, as a turn reads them. A hand-off from a teammate is work
 // to do, not the person's yes to anything.
 export function framedTeammate<T>(name: string | null | undefined,text: T): T | string{

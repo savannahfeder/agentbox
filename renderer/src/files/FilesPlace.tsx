@@ -18,14 +18,17 @@ import './files-place.css';
 const NONE: FilesPlaceList = { files: [], projects: [], folders: [] };
 const NO_FOLDERS: FileFolder[] = [];
 
+// A pass over every file takes seconds on a big store; a visit starts from the last one.
+let lastList: FilesPlaceList | null = null;
+
 /** Every file, read again whenever the store says something changed. */
 export function useFilesList(on: boolean) {
-  const [list, setList] = useState<FilesPlaceList | null>(null);
+  const [list, setList] = useState<FilesPlaceList | null>(() => lastList);
   useEffect(() => {
     if (!on) return;
     let live = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    const read = () => { void api.filesPlace().then((l) => { if (live) setList(l); }); };
+    const read = () => { void api.filesPlace().then((l) => { lastList = l; if (live) setList(l); }); };
     read();
     // A burst of changes reads once.
     const off = api.onChanged(() => { if (timer) clearTimeout(timer); timer = setTimeout(read, 400); });

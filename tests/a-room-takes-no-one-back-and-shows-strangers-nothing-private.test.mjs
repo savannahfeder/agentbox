@@ -23,6 +23,7 @@ import { it, expect, beforeAll, afterAll, describe } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
+import { emptyDatabase } from './an-empty-test-database.mjs';
 
 const migrationsDir = path.join(import.meta.dirname, '..', 'cloud/supabase/migrations');
 const migration = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort()
@@ -84,7 +85,7 @@ async function signUp(id, email, fullName) {
 }
 
 beforeAll(async () => {
-  db = new PGlite();
+  db = new PGlite(await emptyDatabase());
   await db.exec(SUPABASE_STAND_IN);
   await db.exec(migration);
   await db.exec(GRANTS);
@@ -209,7 +210,7 @@ describe('the internal helpers are no one’s to call, even on stock default gra
   const can = async (role, f) => (await stock.query(`select has_function_privilege($1, $2, 'execute') as ok`, [role, f])).rows[0].ok;
 
   beforeAll(async () => {
-    stock = new PGlite();
+    stock = new PGlite(await emptyDatabase());
     await stock.exec(SUPABASE_STAND_IN);
     await stock.exec(STOCK_DEFAULT);
     await stock.exec(migration);

@@ -15,7 +15,7 @@
 // outranks a prose hit. Nothing is dropped for ranking low.
 
 import { searchText } from './format';
-import { fold, wordStart } from '../../shared/word-match.mjs';
+import { fold, withHumps, wordStart } from '../../shared/word-match.mjs';
 import { rowSummary, SUMMARY_BUDGET } from './list-rules';
 import { ticketQuery } from './ticket-references';
 
@@ -106,7 +106,7 @@ function haystack(i: Searchable): Hay {
   if (cached) return cached;
   // The list draws the label (rowTitle, list-rules.ts) with the title under it,
   // so both are searched.
-  const title = squash(fold([i.label, i.title].filter(Boolean).join(' . ')));
+  const title = squash(fold(withHumps([i.label, i.title].filter(Boolean).join(' . '))));
   const body = searchText(i.body);
   const result = searchText(i.result);
   const note = searchText(i.note);
@@ -114,7 +114,7 @@ function haystack(i: Searchable): Hay {
   // Fields, and the label and title above, are joined with ' . ' so no phrase
   // is found straddling the seam between two of them.
   const prose = [body, result, note, answer].filter(Boolean).join(' . ');
-  const all = `${fold(i.id)} . ${title} . ${squash(fold(prose))}`;
+  const all = `${fold(i.id)} . ${title} . ${squash(fold(withHumps(prose)))}`;
   const hay: Hay = {
     title,
     all,
