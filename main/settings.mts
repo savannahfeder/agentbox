@@ -126,6 +126,7 @@ export interface SettingsSupervisor {
   readMessageRules(): string;
   readProjectInstructions(slug: string): string;
   projectSessionArgs(slug: string): string[] | null | undefined;
+  defaultSessionArgs?(): string[];
   _projectProfile?(slug: string): string | null;
   _profilesFor?(engine: string): string[];
   _accountKey(engine: string | null | undefined, profile: string | null | undefined): string;
@@ -616,12 +617,19 @@ export function alphaFeatures(config?: SettingsConfig | null, { packaged = isPac
   };
 }
 
+// With nothing saved, workers start on the supervisor's default (auto), so
+// that is what this screen reads and what a picked mode is built on.
+export function workspaceSessionArgs(config: SettingsConfig, supervisor?: SettingsSupervisor | null): string[] {
+  if (Array.isArray(config.sessionArgs)) return config.sessionArgs as string[];
+  return supervisor?.defaultSessionArgs?.() ?? [];
+}
+
 // `search: false` is for a read on a timer (`knownEngine`).
 export function readSettings({ config, supervisor, store }: SettingsDeps, { search = true }: { search?: boolean } = {}) {
   const products = store.listProducts();
   const status = supervisor.status();
   const sessions = [...supervisor.sessions.values()];
-  const workspaceArgs = Array.isArray(config.sessionArgs) ? config.sessionArgs : [];
+  const workspaceArgs = workspaceSessionArgs(config, supervisor);
   // Read once and used twice below, so the ceiling the stepper offers and the
   // sentence explaining it cannot come from two different answers.
   const slotsHere = machineSlots();
@@ -1026,7 +1034,7 @@ export function setProjectSetting({ config, supervisor, store }: SettingsDeps, {
       }
       const map = { ...(config.projectSessionArgs ?? {}) };
       if (value === 'workspace') delete map[product];
-      else map[product] = buildSessionArgs(config.sessionArgs ?? [], value);
+      else map[product] = buildSessionArgs(workspaceSessionArgs(config, supervisor), value);
       // An empty map is removed rather than written as `{}`: her config file is
       // read by people, and a key that means nothing is a key that gets asked
       // about.
@@ -1497,7 +1505,7 @@ export function setWorkspaceSetting({ config, supervisor, store }: SettingsDeps,
     }
     case 'permission':
       if (!CLAUDE_MODES.includes(value as string)) throw new Error(`unknown permission mode: ${value}`);
-      saveConfig(config, { sessionArgs: buildSessionArgs(config.sessionArgs ?? [], value) });
+      saveConfig(config, { sessionArgs: buildSessionArgs(workspaceSessionArgs(config, supervisor), value) });
       break;
     // THE SAME QUESTION FOR THE OTHER ENGINE, and it is a separate key because
     // it is a separate answer: a Claude Code mode and a Codex mode are not
@@ -1558,7 +1566,7 @@ export function setWorkspaceSetting({ config, supervisor, store }: SettingsDeps,
     // null both mean the CLI's own default, which is the flag being absent.
     case 'model': {
       const model = value === null || value === undefined || value === '' ? null : String(value);
-      saveConfig(config, { sessionArgs: setModelArg(config.sessionArgs ?? [], model) });
+      saveConfig(config, { sessionArgs: setModelArg(workspaceSessionArgs(config, supervisor), model) });
       break;
     }
     default:
