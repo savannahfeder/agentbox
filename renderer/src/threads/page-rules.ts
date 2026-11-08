@@ -282,7 +282,7 @@ export function sorted<T extends Ranked & { product?: string }>(rows: T[], d: Di
 
 /** The same order, for the board's cards, which carry a level and a project
  *  slug. A card of yours is timed by its thread, so Done reads when it finished. */
-const timed = (e: BoardEntry): Ranked => ({ ...e, product: e.projectSlug, ...(e.item ? { status: e.item.status, wrote: e.item.wrote, createdAt: e.item.createdAt, start: e.item.start, place: e.item.place, pinned: e.item.pinned } : {}) });
+const timed = (e: BoardEntry): Ranked => ({ ...e, product: e.projectSlug, ...(e.item ? { status: e.item.status, wrote: e.item.wrote, createdAt: e.item.createdAt, start: e.item.start, place: e.item.place, pinned: e.item.pinned, placedAt: e.item.placedAt } : {}) });
 export function sortedEntries(entries: BoardEntry[], d: Display, column?: string, projectOrder: string[] = [], direct?: ReadonlySet<string>): BoardEntry[] {
   const by = order(d, column, projectOrder, direct);
   return entries.slice().sort((a, b) => by(timed(a), timed(b)));
