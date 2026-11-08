@@ -24,11 +24,11 @@ describe('leaving a document that did not save', () => {
     expect(leave).toContain('onClose()');
     expect(leave).not.toMatch(/localStorage\.removeItem/);
   });
-  it('Escape goes the way Back does, so after a failed save it leaves rather than try again', () => {
-    expect(view).toMatch(/else if \(compare\) setCompare\(false\);\s*else leave\(\);/);
+  it('Escape goes the way Close does, so after a failed save it leaves rather than try again', () => {
+    expect(view).toMatch(/else if \(draftPlace\) setDraftPlace\(null\);\s*else leave\(\);/);
   });
   it('the failure says what the next press does', () => {
-    expect(view).toContain('Press back again to leave');
+    expect(view).toContain('Close it again to leave');
   });
   it('stepping to another file or version after a failed save goes, keeping the draft', () => {
     const away = view.slice(view.indexOf('const away = '), view.indexOf('const leave = ()'));
