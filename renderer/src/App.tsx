@@ -185,7 +185,7 @@ import { priorityCommands, priorityIdOf, priorityLabelOf, type PriorityId } from
 import { runNowCommands } from './run-now';
 import { withOlder } from './older-threads';
 import { NO_FILTER, filterBox, harnessOf, isFiltering, type BoxFilter as BoxFilterState, type Harness } from './box-filter';
-import { URGENT_PRIORITY, itemPriority, moveProduct, placeScore, placedScore } from '../../shared/rank.mjs';
+import { URGENT_PRIORITY, itemPriority, shownPriority, moveProduct, placeScore, placedScore } from '../../shared/rank.mjs';
 import { rankProducts } from './project-priority';
 import { threadsMade, approvableFiled, doItHereWrites, answerAllWrites, RUN_IT } from './threads-made';
 import { waitingCounts } from './threads-made';
@@ -237,7 +237,7 @@ import { FoundInside } from './components/FoundInside';
 import type { PlaceAct } from './threads/ThreadMenu';
 import { SignInPage } from './team/SignInPage';
 import { SIGN_IN_TO_SHARE, ShareLink, canShareFile } from './components/ShareLink';
-import { DEFAULT_DISPLAY, sentAt as sentAtOf, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, crumbTab, flipView, isDirect, nextTab, pageDisplay, pageFor, peopleInConversation, peopleToAdd, readDisplay, readPrivacy, rowSharing, whatAddPeopleDoes, writeDisplay, writePrivacy, keeps as keepsDisplay, overlayPins, overlayPlaces, dropWithPins, rankScore, sorted as sortedByDisplay, tabOfState, type Display, type Privacy, type Unsaved, type UnsavedPins } from './threads/page-rules';
+import { DEFAULT_DISPLAY, rowPriorityId, sentAt as sentAtOf, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, crumbTab, flipView, isDirect, nextTab, pageDisplay, pageFor, peopleInConversation, peopleToAdd, readDisplay, readPrivacy, rowSharing, whatAddPeopleDoes, writeDisplay, writePrivacy, keeps as keepsDisplay, overlayPins, overlayPlaces, dropWithPins, rankScore, sorted as sortedByDisplay, tabOfState, type Display, type Privacy, type Unsaved, type UnsavedPins } from './threads/page-rules';
 import { inboxEveryone, mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
 import { boardStops, leadStops, listStops, stepFromPlace, stepStop, stopKey, type PageStop, type Stop } from './threads/walk-rules';
 import { usePointerHold, useHeldOrder } from './threads/steady-rows';
@@ -250,9 +250,9 @@ import { TickedBar } from './components/TickedBar';
 import { AgentSending } from './team/AgentSending';
 import { HomePage, type NeedsRow, type ProgressRow, type TeamRow } from './home/HomePage';
 import { SkyBackdrop } from './home/SkyBackdrop';
-import { useDarkWindow, useHomeSettings } from './home/home-settings';
-import { skyFor } from './home/sky';
-import { engineLetter, engineName, greeting, needsLine, teamRowState, weekCounts } from './home/home-model';
+import { SKY_THEME_KEY, setHomeSetting, useDarkWindow, useHomeSettings } from './home/home-settings';
+import { SKY_THEMES, skyTheme } from './home/sky';
+import { engineLetter, engineName, greeting, teamRowState, weekCounts } from './home/home-model';
 import { sentFrom } from './team/company';
 import { reachAudienceOf } from '../../shared/teammate-reach.mjs';
 
@@ -957,6 +957,14 @@ export default function App() {
       }));
     });
   }, []);
+  // Light, Dark and Match system take any sky theme off; a sky theme brings its own look.
+  const chooseLook = useCallback((next: Look) => { setHomeSetting(SKY_THEME_KEY, null); setLook(next); }, [setLook]);
+  const chooseSkyTheme = useCallback((id: string) => {
+    const k = skyTheme(id);
+    if (!k) return;
+    setLook(k.dark ? 'ember-grid' : 'light');
+    setHomeSetting(SKY_THEME_KEY, id);
+  }, [setLook]);
 
   const setTune = useCallback((next: SkinTune) => {
     const sk = resolveSkin(localStorage.getItem(SKIN_KEY));
@@ -2751,7 +2759,7 @@ export default function App() {
   // "In progress" on the one-list home is a list until someone picks the board.
   const [evChosen, setEvChosen] = useState<EvView | null>(() => readEvView(undefined, null));
   // On the layout with only two tabs, In progress is your board, so Later and Done have a place.
-  const evView: EvView = evChosen ?? (homeLayout === 'list' ? 'list' : 'board');
+  const evView: EvView = evChosen ?? 'list';
   const setEvView = (v: EvView) => { setEvChosen(v); writeEvView(v); };
   const evTeamKey = roomsOn ? (snap?.team?.rooms?.rooms ?? []).find((r) => r.teamId)?.id ?? null : null;
   const sharesThreads = useCallback((personId: string) => (snap?.team?.cards ?? []).some((c) => c.personId === personId && c.visible), [snap?.team?.cards]);
@@ -2874,12 +2882,14 @@ export default function App() {
   const [homeOpen, setHomeOpen] = useState(homeSet.on);
   useEffect(() => { setHomeOpen(homeSet.on); }, [homeSet.on]);
   const darkWindow = useDarkWindow();
-  const sky = skyFor(darkWindow, darkWindow ? homeSet.darkSky : homeSet.lightSky);
+  // A sky theme is worn only while the window wears its look.
+  const skyPicked = homeSet.on ? skyTheme(homeSet.skyTheme) : null;
+  const sky = skyPicked && skyPicked.dark === darkWindow ? skyPicked : null;
   useEffect(() => {
     const root = document.documentElement;
-    if (homeSet.on && !darkWindow && sky.frame) { root.dataset.skyFrame = sky.id; root.style.setProperty('--sky-frame', sky.frame); }
+    if (sky?.frame) { root.dataset.skyFrame = sky.id; root.style.setProperty('--sky-frame', sky.frame); }
     else { delete root.dataset.skyFrame; root.style.removeProperty('--sky-frame'); }
-  }, [homeSet.on, darkWindow, sky]);
+  }, [sky]);
   const [connectionsPage, setConnectionsPage] = useState<{ focus: string | null } | null>(null);
   const sharedFileNews = snap?.team?.sharedFileNews ?? [];
   const theirRows = useMemo(
@@ -3279,6 +3289,8 @@ export default function App() {
   // Full screen is for one look. Once the file is put down, the next one opens beside.
   useEffect(() => { if (!openDoc) setArtifactMode('beside'); }, [openDoc]);
   const openTeammateFile = useCallback((product: string, src: string) => { setOpenDoc({ product, src, readOnly: true }); }, []);
+  // An AI teammate of yours writes into your own project, so its files are yours to edit.
+  const openMateFile = useCallback((product: string, src: string) => { setOpenDoc({ product, src }); }, []);
   // A copy of a teammate's file does not outlive their thread on the screen.
   useEffect(() => { setOpenDoc((doc) => (doc?.readOnly ? null : doc)); }, [openCard?.personId, openCard?.threadId]);
   const [artifactBody, setArtifactBody] = useState<HTMLDivElement | null>(null);
@@ -4066,7 +4078,7 @@ export default function App() {
   const teammatesUi = useTeammates({
     items, view: snap?.teammates, asking: (snap?.approvals ?? []).map((a) => a.item), running: snap?.supervisor?.running ?? NO_RUNNING, queued: snap?.supervisor?.queued, products: snap?.products ?? [], engines: snap?.engines?.choices ?? [],
     models: teammateModels,
-    onOpenFile: openTeammateFile,
+    onOpenFile: openMateFile,
     onNewProject: () => setNewProject(true),
     me: team?.byId.get(team.me ?? '')?.name ?? '',
     mePic: team?.byId.get(team.me ?? '')?.avatarUrl ?? null,
@@ -7269,8 +7281,7 @@ export default function App() {
   const homeNeeds: NeedsRow[] = homeShown ? inbox.slice(0, 80).map((i) => {
     const sent = team ? sentFrom(i, team.products.get(i.product), team.me) : null;
     const from = sent ? (team?.byId.get(sent.from)?.name?.split(/\s+/)[0] ?? 'Someone') : null;
-    const { who, line } = needsLine({ from, engine: i.engine, stopped: false, project: i.productName });
-    return { key: `${i.product}/${i.id}`, letter: from ? who.slice(0, 1).toUpperCase() : engineLetter(i.engine), title: rowTitle(i), line, at: sentAtOf(i), unread: isUnread(i, seenAt, unreadSince, team?.me ?? null) };
+    return { key: `${i.product}/${i.id}`, letter: from ? from.slice(0, 1).toUpperCase() : engineLetter(i.engine), title: rowTitle(i), from, priority: rowPriorityId(shownPriority(i)), project: i.productName, at: sentAtOf(i), unread: isUnread(i, seenAt, unreadSince, team?.me ?? null) };
   }) : [];
   const homeTeam: TeamRow[] | null = !homeShown || !teamMode ? null : members.filter((m) => m.kind === 'person' || (m.kind === 'mate' && m.key.startsWith('mate:'))).map((m) => {
     const id = m.key.slice(m.key.indexOf(':') + 1);
@@ -7291,7 +7302,7 @@ export default function App() {
     if (!item) return;
     setFocused(item); markSeen(item);
   };
-  const skyOnInbox = homeSet.on && !homeShown && (['inbox', 'progress', 'snoozed', 'done'] as string[]).includes(view) && !onBoard && !onPhone() && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
+  const skyOnInbox = !!sky && !homeShown && (['inbox', 'progress', 'snoozed', 'done'] as string[]).includes(view) && !onBoard && !onPhone() && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
     && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown && !evOn;
   const tasksShown = teamMode && tasksOn && !!snap && view === 'inbox' && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused && !teammatesShown && !roomShown && !filesShown && !connectionsShown;
   const firstNameOf = (id: string) => team?.byId.get(id)?.name?.split(/\s+/)[0] ?? 'Someone';
@@ -7587,7 +7598,7 @@ export default function App() {
               <CrossIcon />
             </button>
           </nav>
-        ) : (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : settingsPage === 'team' ? 'Team' : 'Settings'}</h1></div> : focused ? (inChats ? <><div className="gc-head"><div className="gc-head-col"><span className="workspace-title gc-col-title">{homeLayout === 'chats' ? 'Team' : 'Chats'}</span></div><div className="workspace-task-header cx-task-header" ref={setTaskHeader} /></div><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></>) : (filesShown ? <h1 className="workspace-title">Files</h1> : connectionsShown ? <h1 className="workspace-title">Connections</h1> : chatsPlaceShown ? <h1 className="workspace-title">Team</h1> : teamShown ? <h1 className="workspace-title">{openCard ? (cardFromPlace ? 'Team' : 'Threads') : 'Team'}</h1> : evOn ? <h1 className="workspace-title">{roomsUi.live ? 'Inbox' : 'Threads'}</h1> : teammatesShown ? teammatesUi.title : roomsUi.live && !roomShown ? <h1 className="workspace-title">Inbox</h1> : roomShown && roomsUi.heading ? roomsUi.heading.title : <h1 className="workspace-title">Threads</h1>))}
+        ) : (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : settingsPage === 'team' ? 'Team' : 'Settings'}</h1></div> : focused ? (inChats ? <><div className="gc-head"><div className="gc-head-col"><span className="workspace-title gc-col-title">{homeLayout === 'chats' ? 'Team' : 'Chats'}</span></div><div className="workspace-task-header cx-task-header" ref={setTaskHeader} /></div><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></>) : (filesShown ? <h1 className="workspace-title">Files</h1> : connectionsShown ? <h1 className="workspace-title">Connections</h1> : chatsPlaceShown ? <h1 className="workspace-title">Team</h1> : teamShown ? <h1 className="workspace-title">{openCard ? (cardFromPlace ? 'Team' : 'Inbox') : 'Team'}</h1> : evOn ? <h1 className="workspace-title">Inbox</h1> : teammatesShown ? teammatesUi.title : roomsUi.live && !roomShown ? <h1 className="workspace-title">Inbox</h1> : roomShown && roomsUi.heading ? roomsUi.heading.title : <h1 className="workspace-title">Inbox</h1>))}
         {/* THE PLUS, THE COMMAND MARK AND THE COG STEP OFF WHILE SHE IS
             SEARCHING, and that is the half of the chosen design that is not the
             cross. It is forced, not chosen: .topbar and .body carry the same 22px
@@ -7739,7 +7750,7 @@ export default function App() {
                     was opened from. */}
                 <TeammateThread card={openCard} person={team?.byId.get(openCard.personId) ?? null} now={now}
                   syncedAt={snap.team.lastSyncAt ?? null} onNotice={showToast} onOpenDoc={openTeammateFile} openAt={cardOpenAt}
-                  backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Everyone' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Threads')}
+                  backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Everyone' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Inbox')}
                   onBack={() => { setOpenCard(null); setTeamOpen(false); }}
                   onContinue={() => continueTeammateThread(openCard)}
                   onMessage={() => {
@@ -7762,8 +7773,8 @@ export default function App() {
                   running, which is when a row's line about what stopped it
                   points here. */}
               {planWords && !snap.supervisor.running?.length && !run && !focused && !focusedRepeat && !teammatesShown && <PlanBar words={planWords} onSetup={setSetupPlan} />}
-              {homeShown && <SkyBackdrop art={sky.art} from={150} span={240} />}
-              {skyOnInbox && <SkyBackdrop art={sky.art} below=".list-pane .row" span={200} />}
+              {homeShown && sky && <SkyBackdrop art={sky.art} from={sky.dark ? 40 : 150} span={sky.dark ? 300 : 240} />}
+              {skyOnInbox && sky && <SkyBackdrop art={sky.art} below=".list-pane .row" span={200} />}
               {homeShown ? (
                 <HomePage hello={greeting(new Date(now).getHours(), snap.team?.me?.name ?? null)} now={now}
                   needs={homeNeeds} needsCount={needsYouCount.inbox} progressCount={mineShown ? shownCount(progressTab) : 0}
@@ -7848,7 +7859,7 @@ export default function App() {
                   // On the board there is no tab: the page Esc goes back to
                   // is headed Threads (w-34eb858714).
                   crumbFrom={teamOpen ? 'Team' : search !== null ? 'Search'
-                    : onBoard ? 'Threads'
+                    : onBoard ? 'Inbox'
                     : directOpen && roomsUi.openId ? 'Groups'
                     : crumbTabNow === 'inbox' && team ? needsWord(picked, team.me)
                       : INBOX_TABS.find((t) => t.view === crumbTabNow)?.label}
@@ -8400,7 +8411,9 @@ export default function App() {
         batch={multiSel.size > 0}
         look={look}
         machine={machine}
-        onSetLook={(l) => { setLook(l); setModal(null); }}
+        onSetLook={(l) => { chooseLook(l); setModal(null); }}
+        skyThemes={homeSet.on ? SKY_THEMES.map((k) => ({ id: k.id, name: k.name, on: homeSet.skyTheme === k.id })) : []}
+        onSkyTheme={(id) => { chooseSkyTheme(id); setModal(null); }}
         staleFiles={snap.restartNeeded?.files ?? []}
         /*
          * A newer Agentbox that has already downloaded itself. The palette is
@@ -8717,8 +8730,9 @@ export default function App() {
           onSectionChange={setSettingsPage}
           onPaneChange={setSettingsAt}
           look={pickedLook ?? look}
-          onSetLook={setLook}
+          onSetLook={chooseLook}
           keyHints={keyHints}
+          onSkyTheme={chooseSkyTheme}
           onSetKeyHints={setHints}
           tune={tune}
           onSetTune={setTune}

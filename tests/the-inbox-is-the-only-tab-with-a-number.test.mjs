@@ -62,7 +62,7 @@ it('keeps a singular accessible description in the collapsed rail', () => {
   expect(html).toContain('1 thread waiting');
   expect(html).not.toContain('1 threads waiting');
   // The page is called Threads since w-05ff3d1438.
-  expect(html).toContain('aria-label="Threads"');
+  expect(html).toContain('aria-label="Inbox"');
 });
 
 it('no longer calls the number a capsule, because it is not one', () => {

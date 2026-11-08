@@ -5,7 +5,7 @@
 // which say nothing; the bars are the last seven days ending today. Someone
 // with no team gets no Team door. Measured on the pure rules Home draws from.
 import { describe, it, expect } from 'vitest';
-import { doors, engineLetter, greeting, needsLine, teamRowState, weekCounts } from '../renderer/src/home/home-model.ts';
+import { doors, engineLetter, greeting, teamRowState, weekCounts } from '../renderer/src/home/home-model.ts';
 
 const at = (y, mo, d, h = 12) => new Date(y, mo - 1, d, h).getTime();
 const now = at(2026, 11, 8, 15);
@@ -50,11 +50,6 @@ describe('the greeting', () => {
 });
 
 describe('a row says who it is from', () => {
-  it('names the teammate who asked, or the agent that answered', () => {
-    expect(needsLine({ from: 'Sam', engine: 'claude', stopped: false, project: 'launch' }).line).toBe('Sam asked you · launch');
-    expect(needsLine({ from: null, engine: 'codex', stopped: false, project: 'agentbox' }).line).toBe('Codex answered · agentbox');
-    expect(needsLine({ from: null, engine: undefined, stopped: false, project: 'agentbox' }).who).toBe('Claude Code');
-  });
   it('gives Codex its own letter so it reads apart from Claude Code', () => {
     expect(engineLetter('codex')).toBe('X');
     expect(engineLetter('claude')).toBe('C');
