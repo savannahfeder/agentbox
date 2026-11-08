@@ -1,12 +1,9 @@
-// SIDE BY SIDE GIVES BOTH PICTURES THE ROOM.
+// A PICTURE IS SIZED BY THE ROOM ITS BOX REALLY HAS.
 //
-// Sofia pressed Side by side on v2 and got two pictures at 26% with dark space
-// above and below and a third of the width taken by the comment list. Measured
-// in the browser copy at 1440x900 with two 1600x1000 versions: each picture
-// was drawn 446x279 (28%). The comment list kept its 340 px, and the stage
-// sized each picture as if it had the single view's 52 px of air either side
-// when the split has 16. The split now takes the whole width, and the picture
-// is sized by the air its box really has.
+// Two versions side by side once drew each picture at 28% (446x279 of a
+// 1600x1000 picture, at 1440x900), because the stage assumed the single
+// view's 52 px of air either side. Side by side is gone (2026-11-08), but the
+// stage still sizes a picture from the padding its box has, not a constant.
 import { it, expect } from 'vitest';
 import fs from 'node:fs';
 import { roomInside } from '../renderer/src/artifact-pins.ts';
@@ -22,10 +19,8 @@ it('never gives a negative room', () => {
   expect(roomInside({ clientWidth: 10, clientHeight: 10, paddingLeft: '16px', paddingRight: '16px', paddingTop: '16px', paddingBottom: '16px' })).toEqual({ w: 0, h: 0 });
 });
 
-it('side by side takes the comment list away and the stage reads its own padding', () => {
-  const view = fs.readFileSync(new URL('../renderer/src/components/ArtifactView.tsx', import.meta.url), 'utf8');
+it('the stage reads its own padding', () => {
   const stage = fs.readFileSync(new URL('../renderer/src/components/ArtifactStage.tsx', import.meta.url), 'utf8');
-  expect(view).toMatch(/\{!compare && \(foundNow === 'looking'/);
   expect(stage).toMatch(/roomInside\(/);
   expect(stage).not.toMatch(/PICTURE_AIR/);
 });
