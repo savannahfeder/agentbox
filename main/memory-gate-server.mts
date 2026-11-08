@@ -32,7 +32,7 @@ import net from 'node:net';
 import path from 'node:path';
 import http from 'node:http';
 import { execFile } from 'node:child_process';
-import { MemoryGate, pressureFrom } from './memory-gate.mts';
+import { MemoryGate, pressureFrom, GATE_LINES } from './memory-gate.mts';
 import type { GateAnswer, MemoryGateOptions, Pressure, PressureReading } from './memory-gate.mts';
 import { CommandHistory } from './memory-gate-history.mts';
 import type { Verdict } from './memory-gate-history.mts';
@@ -516,9 +516,7 @@ export class MemoryGateServer {
     this.polling = true;
     try {
       this.reading = await this.readPressure();
-      // Swapping alone is tight here, never critical: critical stops even an
-      // agent's `ls`, and an agent kept waiting keeps all of its memory.
-      this.gate.setPressure(pressureFrom(this.reading, { criticalSwap: Infinity }));
+      this.gate.setPressure(pressureFrom(this.reading, GATE_LINES));
       // Processes are only looked at while something is granted: nothing
       // else needs them, and each look costs a `ps`.
       if (this.grants.size) this._sample(await this.sampleProcesses());
