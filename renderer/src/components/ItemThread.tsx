@@ -205,17 +205,17 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
   // at all; then nothing in the thread is a chip and the conversation is
   // exactly what it was.
   const [changed, setChanged] = useState<string[]>([]);
-  // WHETHER THE MIDDLE OF THIS CONVERSATION WAS ASKED BACK. Held per row and
-  // dropped when she leaves it, so no thread is ever born at full length: the
-  // window is still what a long row opens with, and this is the door out of it.
-  // It survives the poll while a worker writes, because losing the messages she
-  // just went looking for every eight seconds is the same fault wearing a
-  // timer.
   const team = useContext(TeamContext);
   const me = team?.me ?? null;
   // Where she was in this thread, when she is coming back to it (../thread-place.ts).
   const place = placeKey(item);
   const kept = useMemo(() => placeToReturnTo(place, arrivedAt(item, me)), [place]); // eslint-disable-line react-hooks/exhaustive-deps
+  // WHETHER THE MIDDLE OF THIS CONVERSATION WAS ASKED BACK. Held per row and
+  // dropped when she leaves it, unless she comes back to it unchanged, so no
+  // thread is ever born at full length: the window is still what a long row
+  // opens with, and this is the door out of it. It survives the poll while a
+  // worker writes, because losing the messages she just went looking for every
+  // eight seconds is the same fault wearing a timer.
   const [whole, setWhole] = useState(false);
   useEffect(() => { setWhole(!!kept?.whole); }, [item.product, item.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // The regular read below has only the newest runs; the middle needs them all.
