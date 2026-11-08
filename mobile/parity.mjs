@@ -29,6 +29,7 @@ const SET = 'mobile/src/ui/SettingsPages.tsx';
 const FILTERS = 'mobile/src/ui/Filters.tsx';
 const OFFERS = 'mobile/src/lib/thread-offers.ts';
 const PROJECT = 'mobile/src/app/settings/project/[slug].tsx';
+const ROOMS = 'mobile/src/lib/rooms-settings.ts';
 
 export const PARITY = {
   // ⌘K
@@ -127,7 +128,7 @@ export const PARITY = {
   'settings-page:instructions': { phone: SET, find: "id: 'instructions'", still: 'ADHD mode only; the instruction text stays on the computer' },
   'settings-page:projects': { phone: SET, find: "id: 'projects'" },
   'settings-page:team': { phone: SET, find: "id: 'team'" },
-  'settings-page:rooms': { missing: 'a Rooms page writing your card and name to the team cloud' },
+  'settings-page:rooms': { phone: SET, find: "id: 'rooms'", still: 'no picture of how your room sees your card' },
   'settings-page:cloud': { desktopOnly: SELLS },
 
   // Rows Settings search finds
@@ -143,18 +144,18 @@ export const PARITY = {
   'settings:shortcuts/Keyboard shortcuts': { desktopOnly: KEYS },
   'settings:phone/Use it on your phone': { phone: SET, find: 'label="Projects on your phone"' },
   'settings:alpha/Rooms': { phone: SET, find: 'label="Rooms"' },
-  'settings:rooms/Show my full name': { missing: 'a Rooms page' },
-  'settings:rooms/What you are working on': { missing: 'a Rooms page' },
-  'settings:rooms/Your activity on your page': { missing: 'a Rooms page' },
-  'settings:rooms/Go invisible': { missing: 'a Rooms page' },
+  'settings:rooms/Show my full name': { phone: ROOMS, find: "'Show my full name', full" },
+  'settings:rooms/What you are working on': { phone: ROOMS, find: "'What you are working on', working" },
+  'settings:rooms/Your activity on your page': { phone: ROOMS, find: "'Your activity on your page', me.show_activity" },
+  'settings:rooms/Go invisible': { phone: ROOMS, find: "'Go invisible', !!invisible" },
   'settings:claude/Usage': { phone: SET, find: '<Meters meters={meterPair(a.usage?.limits' },
   'settings:claude/Signed in': { phone: SET, find: "key: 'activeAccount'" },
-  'settings:claude/Cloud accounts': { missing: 'the cloud\'s accounts in the copy' },
+  'settings:claude/Cloud accounts': { phone: SET, find: 'cloudOnlyAccounts(w, engine)' },
   'settings:claude/Keys for cloud threads': { desktopOnly: SECRET },
   'settings:claude/Permission mode': { phone: SET, find: "key: 'permission'" },
   'settings:codex/Usage': { phone: SET, find: '<Meters meters={meterPair(a.usage?.limits' },
   'settings:codex/Signed in': { phone: SET, find: "key: 'activeAccount'" },
-  'settings:codex/Cloud accounts': { missing: 'the cloud\'s accounts in the copy' },
+  'settings:codex/Cloud accounts': { phone: SET, find: 'cloudInUseName(s.settings!.workspace, engine)' },
   'settings:codex/Permission mode': { phone: SET, find: "key: 'codexMode'" },
   'settings:cloud/Your plan': { desktopOnly: SELLS },
   'settings:cloud/This month': { desktopOnly: SELLS },
@@ -170,4 +171,4 @@ export const PARITY = {
   'settings:team/Team': { phone: 'mobile/src/ui/TeamPage.tsx', find: 'inviteTo' },
 };
 
-export const STILL_TO_DO = 33;
+export const STILL_TO_DO = 27;

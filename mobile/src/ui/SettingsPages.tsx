@@ -5,7 +5,7 @@
 import Constants from 'expo-constants';
 import { router } from '../lib/router';
 import * as WebBrowser from 'expo-web-browser';
-import { useState, type ComponentType } from 'react';
+import { useCallback, useEffect, useState, type ComponentType } from 'react';
 import { Pressable, View } from 'react-native';
 import { meterPair } from '../../../renderer/src/account-words';
 import { cloudRunsLine, cloudToggleTarget, type CloudMode } from '../../../renderer/src/cloud-menu';
@@ -15,6 +15,8 @@ import { MODE_ORDER, MODE_SENTENCE, MODE_WORDS } from '../../../renderer/src/mod
 import { runningFigures } from '../../../renderer/src/running-reading';
 import type { UsageLimit } from '../../../renderer/src/types';
 import { inRunningOrder } from '../lib/palette';
+import { cloudInUseName, cloudOnlyAccounts, newerUsage, placesOf, withPlaces } from '../lib/cloud-accounts';
+import { readMyRoomCard, roomCardGroups, roomCardPatch, roomsPageShown, saveMyRoomCard } from '../lib/rooms-settings';
 import { NAME } from '../../../shared/product-name.mjs';
 import { deleteAccount } from '../../../renderer/src/phone-account';
 import { withDeadline } from '../lib/deadline';
@@ -210,19 +212,26 @@ function Accounts({ engine, list }: { engine: 'claude' | 'codex'; list: Account[
   const mine = asked?.engine === engine ? asked : null;
   const chosen = (a: Account) => (mine ? mine.account === a.id : a.chosen);
   const picked = list.some(chosen);
-  if (!list.length) return <Row first label="Not signed in" />;
+  const w = s.settings!.workspace;
+  const inCloud = cloudOnlyAccounts(w, engine);
+  if (!list.length && !inCloud.length) return <Row first label="Not signed in" />;
   return (
     <>
       {list.map((a, i) => {
         const live = picked && chosen(a);
+        const signingIn = a.signedIn === false;
+        const line = backAt(a.resetsAt, c.now) ?? a.note ?? (signingIn ? 'Finish signing in to use it' : a.plan ?? 'Signed in');
         return (
           <Row key={a.id} first={i === 0} label={a.email ?? a.name ?? 'Not signed in'} badge={live ? 'In use' : undefined}
-            desc={backAt(a.resetsAt, c.now) ?? a.note ?? (a.signedIn === false ? 'Finish signing in to use it' : a.plan ?? 'Signed in')}
-            below={<Meters meters={meterPair(a.usage?.limits, c.now)} />}
+            desc={signingIn ? line : withPlaces(line, placesOf(w, engine, a.id))}
+            below={<Meters meters={meterPair(newerUsage(w, engine, a.id, a.usage ?? null)?.limits, c.now)} />}
             reading={mine && live ? r : undefined}
             control={!live && list.length > 1 ? <Button title={picked ? 'Use this one' : 'Use only this one'} onPress={() => void s.change({ scope: 'workspace', key: 'activeAccount', value: { engine, account: a.id } })} /> : undefined} />
         );
       })}
+      {inCloud.map((a, i) => (
+        <Row key={`cloud-${i}`} first={!list.length && i === 0} label={a.name} desc={a.desc || undefined} below={<Meters meters={meterPair(a.usage?.limits, c.now)} />} />
+      ))}
     </>
   );
 }
@@ -239,7 +248,7 @@ function CloudGroup({ engine }: { engine: 'claude' | 'codex' }) {
   const mode = r.value as CloudMode;
   return (
     <Group label="Cloud">
-      <Row first label="Use the cloud" desc={cloudRunsLine(mode, cloud.inUse?.[engine] ?? null, COMPUTER)} reading={r}
+      <Row first label="Use the cloud" desc={cloudRunsLine(mode, cloudInUseName(s.settings!.workspace, engine), COMPUTER)} reading={r}
         control={<Switch label="Use the cloud" on={mode !== 'mac'} onChange={() => void s.change({ scope: 'workspace', key: 'cloudRuns', value: cloudToggleTarget({ mode, whenOn: cloud.whenOn }) })} />} />
     </Group>
   );
@@ -457,7 +466,50 @@ function Projects() {
   );
 }
 
-export type PageId = 'general' | 'appearance' | 'phone' | 'alpha' | 'claude' | 'codex' | 'running' | 'instructions' | 'projects' | 'team';
+/** Your room card, read from and written to the account itself (lib/rooms-settings.ts). */
+function Rooms() {
+  const c = useCloud();
+  const cloud = c.signedIn ? c.cloud : null;
+  const [card, setCard] = useState<Awaited<ReturnType<typeof readMyRoomCard>> | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const load = useCallback(async () => {
+    if (!cloud) return;
+    try { setCard(await readMyRoomCard(cloud)); } catch (err) { setError(String((err as Error)?.message ?? err)); }
+  }, [cloud]);
+  useEffect(() => {
+    void load();
+    const timer = setInterval(() => void load(), 5000);
+    return () => clearInterval(timer);
+  }, [load]);
+  if (!card) return error ? <Aside>{error}</Aside> : null;
+  const me = card.me;
+  if (!me) return <Group label="Your card"><Row first label="Making your room card" desc="This takes a few seconds." /></Group>;
+  const flip = async (id: string, on: boolean) => {
+    const patch = roomCardPatch(id, on, { me, fullName: card.fullName, now: Date.now() });
+    if (!patch || !cloud) return;
+    setCard({ ...card, me: { ...me, ...patch } });
+    setError(null);
+    try {
+      const saved = await saveMyRoomCard(cloud, patch);
+      setCard((was) => (was ? { ...was, me: saved } : was));
+    } catch (err) {
+      setError(String((err as Error)?.message ?? err));
+      void load();
+    }
+  };
+  return (
+    <>
+      {roomCardGroups(me, card.fullName, c.now).map((g) => (
+        <Group key={g.label} label={g.label}>
+          {g.rows.map((r, i) => <Row key={r.id} first={i === 0} label={r.label} desc={r.desc} control={<Switch label={r.label} on={r.on} onChange={(v) => void flip(r.id, v)} />} />)}
+        </Group>
+      ))}
+      {error ? <Aside>{error}</Aside> : null}
+    </>
+  );
+}
+
+export type PageId = 'general' | 'appearance' | 'phone' | 'alpha' | 'claude' | 'codex' | 'running' | 'instructions' | 'projects' | 'team' | 'rooms';
 export interface SettingsPageDef { id: PageId; label: string; group: 'Personal' | 'Agents' | 'Workspace'; lede?: string; Body: ComponentType; shown: (s: SettingsState) => boolean }
 
 const hasComputer = (s: SettingsState) => !!s.settings;
@@ -472,5 +524,6 @@ export const SETTINGS_PAGES: SettingsPageDef[] = [
   { id: 'instructions', label: 'Instructions', group: 'Agents', Body: Instructions, shown: hasComputer },
   { id: 'projects', label: 'Projects', group: 'Workspace', Body: Projects, shown: hasComputer },
   { id: 'team', label: 'Team', group: 'Workspace', Body: TeamPage, shown: () => true },
+  { id: 'rooms', label: 'Rooms', group: 'Workspace', Body: Rooms, shown: (s) => roomsPageShown(s.settings) },
 ];
 export const GROUPS = ['Personal', 'Agents', 'Workspace'] as const;

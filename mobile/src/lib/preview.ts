@@ -130,7 +130,13 @@ export function previewSettings(now = Date.now()) {
         agentsAuto: true, sessionsAtOnce: 4, agentsTotal: 6, agentsAutoTotal: 6, agentsNudge: 0, slotsMax: 12, slotsSuggested: 6, running: 3,
         memoryGate: { on: true, slots: null, slotsAuto: 2, slotsMax: 8, now: 'Memory is fine. Nothing heavy running.', reading: { heavy: 1, waiting: 0, pressure: 'normal', usedPct: 58, asked: 14, waited: 2, refused: 0, holding: false } },
         leftovers: { on: false, now: null },
-        cloud: { mode: 'full', whenOn: 'full', engines: ['claude'], inUse: { claude: 'you@example.com', codex: null } },
+        cloud: {
+          mode: 'full', whenOn: 'full', engines: ['claude'], inUse: { claude: 'you@example.com', codex: null },
+          accounts: [
+            { engine: 'claude', email: 'you@example.com', inUse: true, plan: 'Max 20x', state: 'ready', limitedUntil: null, same: 'default', usage: { at: now - 2 * MIN, limits: [usage('session', 36, now + 3 * 60 * MIN), usage('week', 61, now + 3 * 24 * 60 * MIN)] } },
+            { engine: 'claude', email: 'cloud@example.com', inUse: false, plan: 'Pro', state: 'ready', limitedUntil: null, same: null, usage: { at: now - 30 * MIN, limits: [usage('session', 8, now + 4 * 60 * MIN), usage('week', 22, now + 6 * 24 * 60 * MIN)] } },
+          ],
+        },
         cloudPermission: 'bypassPermissions', cloudCodexMode: 'same', paused: false, productOrder: ['agentbox', 'film'],
         accounts: [
           { id: 'default', email: 'you@example.com', chosen: false, state: 'live', note: null, plan: 'Max 20x', running: 2,
@@ -259,7 +265,11 @@ export function previewGroups(now = Date.now()) {
     },
     select(table: string, query: string) {
       const q = new URLSearchParams(query);
-      if (table === 'room_profiles') return profiles;
+      if (table === 'room_profiles') {
+        const one = q.get('person_id');
+        return one?.startsWith('eq.') ? profiles.filter((p) => p.person_id === one.slice(3)) : profiles;
+      }
+      if (table === 'people' && q.get('id') === 'eq.preview') return [{ name: names.preview }];
       if (table === 'room_presence') return presence;
       if (table === 'room_reads') return reads;
       if (table === 'thread_cards') return q.has('shipped_at') ? shipped : cards;
@@ -274,6 +284,11 @@ export function previewGroups(now = Date.now()) {
       if (when?.startsWith('gt.')) rows = rows.filter((m) => m.created_at > when.slice(3));
       if (when?.startsWith('lt.')) rows = rows.filter((m) => m.created_at < when.slice(3));
       return rows.sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, Number(q.get('limit') ?? 200));
+    },
+    saveProfile(patch: Record<string, unknown>) {
+      const mine = profiles.find((p) => p.person_id === 'preview')!;
+      Object.assign(mine, patch);
+      return [mine];
     },
     send(row: Record<string, any>) {
       const made = msg(row.room_id, 'preview', new Date().toISOString(), row.body, { in_reply_to: row.in_reply_to ?? null, mentions: row.mentions ?? [] });
@@ -409,7 +424,8 @@ export function previewCloud(now = () => Date.now()) {
     async rpc(name: string, args: Record<string, any> = {}) { return groups.rpc(name, args); },
     async listFiles() { return []; },
     async removeFiles() {},
-    async update(_table: string, query: string, patch: Record<string, unknown>) {
+    async update(table: string, query: string, patch: Record<string, unknown>) {
+      if (table === 'room_profiles') return groups.saveProfile(patch);
       const id = decodeURIComponent(/id=eq\.([^&]+)/.exec(query)?.[1] ?? '');
       const at = rows.commands.findIndex((c) => c.id === id && !c.taken_at && !c.claimed_at);
       if (at < 0) return [];
