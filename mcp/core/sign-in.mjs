@@ -43,13 +43,13 @@ export async function waitForSignIn(id, askId, { product = null, waitMs = WAIT_M
   const until = Date.now() + waitMs;
   for (;;) {
     const { item } = own(id, product);
-    if (item.signIn?.id !== askId || item.signIn.done) return { status: 'closed', message: 'This sign-in is no longer open on the thread.' };
+    if (item.signIn?.id !== askId || item.signIn.done) return { status: 'closed', ask: askId, message: 'This sign-in is no longer open on the thread.' };
     const answer = answerTo(item, askId);
     if (answer) {
       const status = answer.said === 'signed-in' ? 'signed_in' : answer.said;
-      return { status, ...(answer.url ? { url: answer.url } : {}), message: SAID[answer.said] };
+      return { status, ask: askId, ...(answer.url ? { url: answer.url } : {}), message: SAID[answer.said] };
     }
-    if (item.status === 'done') return { status: 'closed', message: 'The thread was closed.' };
+    if (item.status === 'done') return { status: 'closed', ask: askId, message: 'The thread was closed.' };
     if (Date.now() >= until) {
       return {
         status: 'waiting', ask: askId,

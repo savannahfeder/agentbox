@@ -382,25 +382,35 @@ const COMPUTER_ASK = /\bxcode\b|simulator|testflight/i;
 // A TASK THAT SAYS TO SIGN IN OR CONNECT TO A SERVICE signs in the way a real
 // agent is told to: its login's own link, through the sign_in tool, waited on
 // (mcp/tools.mjs). The links are shaped like each service's real one.
+// The last field is the variable its token is kept under for later cloud runs (sign_in's keep).
 const BROWSER_SIGN_INS = [
-  [/github/i, 'GitHub', 'https://github.com/login/device', () => `${Math.random().toString(36).slice(2, 6)}-${Math.random().toString(36).slice(2, 6)}`.toUpperCase(), 'to open the pull request'],
-  [/vercel/i, 'Vercel', 'https://vercel.com/oauth/device', () => Math.random().toString(36).slice(2, 10).toUpperCase(), 'to deploy the site'],
-  [/linear/i, 'Linear', 'https://mcp.linear.app/authorize?response_type=code&client_id=stand-in&redirect_uri=http%3A%2F%2Flocalhost%3A54012%2Fcallback&state=s', null, 'to file the issues in your workspace'],
-  [/notion/i, 'Notion', 'https://mcp.notion.com/authorize?response_type=code&client_id=stand-in&redirect_uri=http%3A%2F%2Flocalhost%3A54013%2Fcallback&state=s', null, 'to read your pages'],
-  [/supabase/i, 'Supabase', 'https://supabase.com/dashboard/cli/login?session_id=stand-in', null, 'to apply the change to the database'],
+  [/github/i, 'GitHub', 'https://github.com/login/device', () => `${Math.random().toString(36).slice(2, 6)}-${Math.random().toString(36).slice(2, 6)}`.toUpperCase(), 'to work with your repository', 'GH_TOKEN'],
+  [/vercel/i, 'Vercel', 'https://vercel.com/oauth/device', () => Math.random().toString(36).slice(2, 10).toUpperCase(), 'to deploy the site', 'VERCEL_TOKEN'],
+  [/linear/i, 'Linear', 'https://mcp.linear.app/authorize?response_type=code&client_id=stand-in&redirect_uri=http%3A%2F%2Flocalhost%3A54012%2Fcallback&state=s', null, 'to work with your Linear issues', 'LINEAR_API_KEY'],
+  [/notion/i, 'Notion', 'https://mcp.notion.com/authorize?response_type=code&client_id=stand-in&redirect_uri=http%3A%2F%2Flocalhost%3A54013%2Fcallback&state=s', null, 'to read your pages', 'NOTION_TOKEN'],
+  [/supabase/i, 'Supabase', 'https://supabase.com/dashboard/cli/login?session_id=stand-in', null, 'to work with the database', 'SUPABASE_ACCESS_TOKEN'],
 ];
 {
   const task = promptText.match(/^Title: [\s\S]*?(?=\n# |(?![\s\S]))/m)?.[0] ?? '';
-  const service = /\b(sign(ed)? in|log(ged)? in|connect(ed)?|authenticate)\b/i.test(task) && process.env.ZERO_ITEM ? BROWSER_SIGN_INS.find(([re]) => re.test(task)) : null;
+  const brief = (() => { const at = argv.indexOf('--append-system-prompt'); return at >= 0 ? argv[at + 1] ?? '' : ''; })();
+  // Told about sign_in, a run signs in to any service the task needs; otherwise only when the task says to.
+  const wants = brief.includes('sign_in tool') || /\b(sign(ed)? in|log(ged)? in|connect(ed)?|authenticate)\b/i.test(task);
+  const already = /Signed in to \w+/.test(promptText);
+  // A service whose token a cloud run already carries is signed in already.
+  const service = wants && !already && process.env.ZERO_ITEM ? BROWSER_SIGN_INS.find(([re, , , , , key]) => re.test(task) && !process.env[key]) : null;
   const server = service && storeServer();
   if (server) {
-    const [, name, url, code, why] = service;
+    const [, name, url, code, why, key] = service;
+    const inCloud = `${brief}\n${promptText}`.includes('# You are running on a cloud machine');
     const session = mcpSession(server);
     try {
       say({ type: 'assistant', session_id: sessionId, message: { content: [{ type: 'text', text: `Started the ${name} login. Waiting for you to sign in.` }] } });
       const ask = async (args) => { const r = await session.call('sign_in', args, 70_000); if (r?.error || r?.result?.isError) throw new Error(r?.error?.message ?? r?.result?.content?.[0]?.text); return JSON.parse(r.result.content[0].text); };
       let out = await ask({ service: name, url, ...(code ? { code: code() } : {}), why });
+      const asked = out.ask;
       for (let i = 0; i < 12 && out.status === 'waiting' && !stopping; i += 1) out = await ask({ ask: out.ask });
+      // A cloud machine forgets its logins, so the token goes to every later cloud run.
+      if (inCloud && (out.status === 'signed_in' || out.status === 'landed') && asked) await ask({ ask: asked, keep: { name: key, value: `stand-in-${key.toLowerCase()}` } }).catch(() => {});
       said = out.status === 'signed_in' || out.status === 'landed' ? `Signed in to ${name} and finished "${titleIn(promptText) ?? 'this'}". It is done.`
         : out.status === 'skipped' ? `**${name} is not signed in, so that part is left.**\n\nEverything that did not need ${name} is done. Reply when you want to sign in and I will ask again.`
           : `**I am still waiting for you to sign in to ${name}.**\n\nReply when you have, and I will carry on.`;
