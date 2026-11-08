@@ -64,14 +64,25 @@ const walks = new Map();
 // disk reads share four threads with these, and a walk that asked for every
 // folder at once kept them waiting for seconds.
 const READS_AT_ONCE = 2;
+// A folder read that never comes back (a hung mount) ends the walk here, with
+// what it found so far, rather than holding every lookup on the tree.
+export const WALK_GIVES_UP_MS = 60_000;
+// Folders whose read was still out when a walk gave up. Each such read holds one
+// of the four disk threads until it returns, so later walks skip the folder
+// rather than spending another thread on it.
+const stuck = new Set();
 // Every file name in one tree, read without holding the main process.
 async function walkNames(tree, fs) {
     const names = new Map();
     const queue = [{ dir: tree, depth: 0 }];
+    const out = new Set();
     let reading = 0;
+    let stopped = false;
     const waiting = [];
     const reader = async () => {
         for (;;) {
+            if (stopped)
+                return;
             const next = queue.shift();
             if (!next) {
                 if (!reading)
@@ -79,13 +90,18 @@ async function walkNames(tree, fs) {
                 await new Promise((r) => waiting.push(r));
                 continue;
             }
-            reading += 1;
             const { dir, depth } = next;
+            if (stuck.has(dir))
+                continue;
+            reading += 1;
+            out.add(dir);
             let entries = [];
             try {
                 entries = await fs.promises.readdir(dir, { withFileTypes: true });
             }
             catch { /* gone or unreadable */ }
+            out.delete(dir);
+            stuck.delete(dir);
             for (const e of entries) {
                 if (e.name.startsWith('.'))
                     continue;
@@ -103,20 +119,35 @@ async function walkNames(tree, fs) {
             waiting.splice(0).forEach((r) => r());
         }
     };
-    await Promise.all(Array.from({ length: READS_AT_ONCE }, reader));
+    let timer;
+    const givenUp = new Promise((r) => { timer = setTimeout(r, WALK_GIVES_UP_MS); timer.unref?.(); });
+    await Promise.race([Promise.all(Array.from({ length: READS_AT_ONCE }, reader)), givenUp]);
+    clearTimeout(timer);
+    stopped = true;
+    for (const dir of out)
+        stuck.add(dir);
+    waiting.splice(0).forEach((r) => r());
     return names;
 }
 // The carried-file shelf and the written-elsewhere list take a whole `fs`, but
 // read only what a caller's fake supplies, which is why requests type it narrow.
 const whole = (fs) => fs;
 // A walk that took long answers for this many times as long, so a slow disk is
-// not walked end to end without a pause.
+// not walked end to end without a pause, but never past the cap: a file written
+// in that time is not found.
 const SLOW_WALK_KEEPS = 10;
+export const HUNT_KEPT_AT_MOST_MS = 30_000;
 // One walk per tree at a time: a name asked while it runs waits on it, even past
-// its window or when the look must be current.
+// its window. A look that must be current waits for it and then walks again,
+// since the running walk may have read a folder before the file was there.
 function freshly(key, fs, now, read, fresh = false) {
     const kept = walks.get(key);
-    if (kept && kept.fs === fs && (kept.running || (!fresh && now - kept.at < Math.max(HUNT_FRESH_MS, kept.took * SLOW_WALK_KEEPS))))
+    if (kept && kept.fs === fs && kept.running && fresh) {
+        kept.again ??= kept.value.then(() => freshly(key, fs, now, read, true));
+        return kept.again;
+    }
+    const keptFor = (k) => Math.min(HUNT_KEPT_AT_MOST_MS, Math.max(HUNT_FRESH_MS, k.took * SLOW_WALK_KEEPS));
+    if (kept && kept.fs === fs && (kept.running || (!fresh && now - kept.at < keptFor(kept))))
         return kept.value;
     const started = performance.now();
     const entry = { at: now, fs, value: null, running: true, took: 0 };
