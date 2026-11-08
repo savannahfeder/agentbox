@@ -38,7 +38,14 @@ describe('a store build', () => {
   it('never turns group chat on, whatever the computer says', () => {
     expect(read('mobile/src/state/groups.tsx')).toMatch(/setOn\(!STORE_BUILD && groupsOn\(rows\)\)/);
   });
-  it('draws no Alpha features page', () => {
-    expect(read('mobile/src/ui/SettingsPages.tsx')).toMatch(/\{ id: 'alpha', [^}]*shown: \(s\) => !STORE_BUILD && hasComputer\(s\) \}/);
+  // The app review board (2026-11-08) still reached it through Search, which
+  // lists every page, so the page is left out of the list itself.
+  it('has no Alpha features page anywhere: Settings, Search, or its own address', () => {
+    expect(read('mobile/src/ui/SettingsPages.tsx')).toMatch(/export const SETTINGS_PAGES = STORE_BUILD \? ALL_PAGES\.filter\(\(p\) => p\.id !== 'alpha'\) : ALL_PAGES;/);
+    for (const reader of ['mobile/src/app/search.tsx', 'mobile/src/app/settings/[page].tsx', 'mobile/src/app/settings/index.tsx', 'mobile/src/ui/SettingsHome.tsx']) {
+      const text = read(reader);
+      expect(text, reader).toMatch(/SETTINGS_PAGES/);
+      expect(text, reader).not.toMatch(/ALL_PAGES/);
+    }
   });
 });
