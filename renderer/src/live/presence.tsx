@@ -24,10 +24,20 @@ export function presenceLook(): PresenceLook {
 
 export interface LiveUser { name: string; color: string; kind?: 'person' | 'agent'; person?: string | null }
 
-function caretFor(user: Record<string, unknown>, clientId: number): HTMLElement {
+const FRESH_MS = 3500;
+const MOST_FLAGS = 8;
+// When each cursor last moved, kept per room, so a cursor the editor draws again keeps its name showing.
+const movedIn = new WeakMap<Awareness, Map<number, number>>();
+function freshIn(moved: Map<number, number> | undefined): Set<number> {
+  const now = Date.now();
+  return new Set([...(moved ?? [])].filter(([, at]) => now - at < FRESH_MS).sort((a, b) => b[1] - a[1]).slice(0, MOST_FLAGS).map(([id]) => id));
+}
+
+function caretFor(user: Record<string, unknown>, clientId: number, fresh = false): HTMLElement {
   const u = user as unknown as LiveUser;
   const caret = document.createElement('span');
   caret.dataset.client = String(clientId);
+  if (fresh) caret.classList.add('is-fresh');
   caret.className = `lv-caret${u.kind === 'agent' ? ' is-agent' : ''}`;
   caret.style.setProperty('--lv', u.color || '#7aa2ff');
   caret.dataset.name = u.name ?? '';
@@ -59,36 +69,36 @@ const LiveCarets = Extension.create<{ awareness: Awareness | null; user: LiveUse
     const { awareness, user } = this.options;
     if (!awareness) return [];
     awareness.setLocalStateField('user', user);
+    // Heard before the cursor plugin hears it, so a cursor drawn for a move knows it moved.
+    const moved = movedIn.get(awareness) ?? new Map<number, number>();
+    movedIn.set(awareness, moved);
+    awareness.on('change', ({ added, updated, removed }: { added: number[]; updated: number[]; removed: number[] }) => {
+      const now = Date.now();
+      for (const id of [...added, ...updated]) if (id !== awareness.clientID) moved.set(id, now);
+      for (const id of removed) moved.delete(id);
+    });
     return [yCursorPlugin(awareness, {
-      cursorBuilder: caretFor,
+      cursorBuilder: (u: Record<string, unknown>, clientId: number) => caretFor(u, clientId, freshIn(moved).has(clientId)),
       selectionBuilder: (u: Record<string, unknown>) => ({ class: 'lv-sel', style: `--lv: ${String(u.color ?? '#7aa2ff')}` }),
     })];
   },
 });
 
-const FRESH_MS = 3500;
-const MOST_FLAGS = 8;
-
-/** Names show on the cursors of the few people who moved last, then fade. */
+/** Names show on the cursors of the few people who moved last, and fade from the rest. */
 function useFreshFlags(session: LiveSession, column: HTMLElement | null) {
   useEffect(() => {
     if (!column) return undefined;
-    const { awareness } = session.live;
-    const moved = new Map<number, number>();
+    // The editor keeps a cursor's element as it moves, so the name is shown or hidden on it here.
+    let frame = 0;
     const paint = () => {
-      const now = Date.now();
-      for (const [id, at] of moved) if (now - at > FRESH_MS) moved.delete(id);
-      const fresh = new Set([...moved].sort((a, b) => b[1] - a[1]).slice(0, MOST_FLAGS).map(([id]) => String(id)));
-      for (const el of column.querySelectorAll<HTMLElement>('.lv-caret')) el.classList.toggle('is-fresh', fresh.has(el.dataset.client ?? ''));
+      frame = 0;
+      const fresh = freshIn(movedIn.get(session.live.awareness));
+      for (const el of column.querySelectorAll<HTMLElement>('.lv-caret')) el.classList.toggle('is-fresh', fresh.has(Number(el.dataset.client)));
     };
-    const onChange = ({ added, updated }: { added: number[]; updated: number[] }) => {
-      const now = Date.now();
-      for (const id of [...added, ...updated]) if (id !== session.doc.clientID) moved.set(id, now);
-      requestAnimationFrame(paint);
-    };
-    awareness.on('change', onChange);
+    const soon = () => { frame ||= requestAnimationFrame(paint); };
+    session.live.awareness.on('change', soon);
     const sweep = window.setInterval(paint, 500);
-    return () => { awareness.off('change', onChange); window.clearInterval(sweep); };
+    return () => { session.live.awareness.off('change', soon); window.clearInterval(sweep); if (frame) cancelAnimationFrame(frame); };
   }, [session.live, column]);
 }
 

@@ -1,6 +1,9 @@
 // Who is on which cell of a live table, drawn on the cells themselves.
-import { useEffect, useState, type RefObject } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import type { LiveSession } from './live-session';
+
+const FRESH_MS = 3500;
+const MOST_NAMES = 6;
 
 /** Whether a copy that can write the file is in the room, this one included. */
 export function useRoomKept(room: LiveSession | null): boolean {
@@ -24,18 +27,27 @@ interface Ids { rowIds: string[]; colIds: string[] }
  */
 export function useCellMarks(box: RefObject<HTMLElement | null>, room: LiveSession | null, ids: RefObject<Ids | null>, order: number[], tick: unknown) {
   const [seen, setSeen] = useState(0);
+  const moved = useRef(new Map<number, number>());
   useEffect(() => {
     if (!room) return undefined;
-    const bump = () => setSeen((n) => n + 1);
+    const bump = ({ added, updated }: { added: number[]; updated: number[] }) => {
+      const now = Date.now();
+      for (const id of [...added, ...updated]) moved.current.set(id, now);
+      setSeen((n) => n + 1);
+    };
     room.live.awareness.on('change', bump);
-    return () => room.live.awareness.off('change', bump);
+    // Names fade from cells whose people have stopped, with nothing new to redraw them.
+    const sweep = window.setInterval(() => setSeen((n) => n + 1), 1000);
+    return () => { room.live.awareness.off('change', bump); window.clearInterval(sweep); };
   }, [room?.live]);
   useEffect(() => {
     const el = box.current;
     if (!el) return;
-    for (const c of el.querySelectorAll<HTMLElement>('[data-lv]')) { c.removeAttribute('data-lv'); c.style.removeProperty('--lv'); c.classList.remove('lv-cell', 'is-agent'); }
+    for (const c of el.querySelectorAll<HTMLElement>('[data-lv]')) { c.removeAttribute('data-lv'); c.style.removeProperty('--lv'); c.classList.remove('lv-cell', 'is-agent', 'is-fresh'); }
     const now = ids.current;
     if (!room || !now) return;
+    const at = Date.now();
+    const fresh = new Set([...moved.current].filter(([, t]) => at - t < FRESH_MS).sort((a, b) => b[1] - a[1]).slice(0, MOST_NAMES).map(([id]) => id));
     const viewAt = new Map(order.map((row, place) => [row, place]));
     for (const [client, s] of room.live.awareness.getStates()) {
       if (client === room.doc.clientID) continue;
@@ -51,6 +63,7 @@ export function useCellMarks(box: RefObject<HTMLElement | null>, room: LiveSessi
       target.dataset.lv = target.dataset.lv ? `${target.dataset.lv}, ${user.name}` : user.name;
       target.style.setProperty('--lv', user.color ?? '#7aa2ff');
       target.classList.add('lv-cell');
+      if (fresh.has(client)) target.classList.add('is-fresh');
       if (user.kind === 'agent') target.classList.add('is-agent');
     }
   });

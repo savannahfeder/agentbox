@@ -258,6 +258,7 @@ function OpenFile({ fileKey, onClose, onPlace, onNotice }: {
   </footer>;
   return <ArtifactView
     product={product}
+    project={view?.project ?? null}
     threadName="Files"
     shareThread={view?.sentIn.find((p) => p.kind === 'thread' && p.product === product && p.id)?.id ?? undefined}
     lines={(view?.lines ?? []) as LedgerLine[]}
