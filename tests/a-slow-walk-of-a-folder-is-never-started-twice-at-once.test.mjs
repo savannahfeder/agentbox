@@ -42,11 +42,16 @@ const gated = {
       try {
         const out = await fs.promises.readdir(dir, opts);
         if (held) await held;
+        if (String(dir) === hangOn) await hanging;
         return out;
       } finally { open -= 1; }
     },
   },
 };
+// One folder whose read does not come back until unhang().
+let hangOn = null;
+let unhang = () => {};
+const hanging = new Promise((r) => { unhang = () => { hangOn = null; r(); }; });
 const hold = () => { held = new Promise((r) => { release = () => { held = null; r(); }; }); };
 const find = (src, { now = 1_000_000, fresh = false } = {}) => resolveArtifact({
   src, product: 'ours', products: [{ slug: 'ours', dir: docs, repoPath: null }], fs: gated, now, fresh,
@@ -80,7 +85,7 @@ describe('a walk still running', () => {
     expect(readsOf(docs)).toBe(1);
   });
 
-  it('is waited on by a look that must be current, which then walks again and finds a file written meanwhile', async () => {
+  it('is waited on by a look that must be current, which then walks the tree again', async () => {
     hold();
     const first = find('a.png');
     await tick();
@@ -95,14 +100,24 @@ describe('a walk still running', () => {
     expect(readsOf(docs)).toBe(2);
   });
 
-  it('gives up on a folder read that never comes back, and the next lookup is not held by it', async () => {
+  it('gives up on a folder read that never comes back; later walks skip that folder until its read returns', async () => {
+    const hung = path.join(docs, 'designs', 'w-3');
+    hangOn = hung;
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     try {
-      hold();
-      const stuck = find('a.png');
+      const stuck = find('shot.png', { now: 1_000_000 });
+      // The rest of the tree is read for real before the clock jumps.
+      for (let i = 0; i < 5000 && !(readsOf(hung) && open === 1 && reads.length > 40); i++) await tick();
       await vi.advanceTimersByTimeAsync(WALK_GIVES_UP_MS + 1);
-      expect((await stuck).ok).toBe(false);
-    } finally { vi.useRealTimers(); release(); }
+      expect((await stuck).ok).toBe(true);
+      const later = await find('shot.png', { now: 1_000_000 + HUNT_KEPT_AT_MOST_MS + 1 });
+      expect(later.ok).toBe(true);
+      expect(readsOf(hung)).toBe(1);
+      unhang();
+      await tick();
+      await find('shot.png', { now: 1_000_000 + 2 * HUNT_KEPT_AT_MOST_MS + 2 });
+      expect(readsOf(hung)).toBe(2);
+    } finally { vi.useRealTimers(); unhang(); }
   });
 
   it('reads at most two folders at a time', async () => {
