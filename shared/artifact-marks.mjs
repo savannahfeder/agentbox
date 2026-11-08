@@ -480,6 +480,25 @@ export function familyOfName(file) {
   return keyOf(name, name);
 }
 
+/** The reviewable paths one line's words name, repeats included. */
+function* pathsSaidOn(l) {
+  const p = l?.patch;
+  if (!p) return;
+  for (const field of ['body', 'answer', 'result', 'note']) {
+    if (typeof p[field] !== 'string' || !ANY_EXT.test(p[field])) continue;
+    filesInLinesInternals.searched += 1;
+    // A person's own words only count a file they attached. The notes sent to an
+    // agent name the file it should make, which does not exist yet.
+    const linksOnly = l.source === 'founder' && (field === 'answer' || field === 'body');
+    const edited = linksOnly && EDITED_WORDS.test(p[field]);
+    for (const m of p[field].replace(FENCE, '').matchAll(NAMED)) {
+      if (linksOnly && !m[1]) continue;
+      const path = (m[1] ?? m[2] ?? m[3]).replace(/^\.\//, '');
+      if (!shorthand(path)) yield { path, edited };
+    }
+  }
+}
+
 /** Every reviewable file a thread's lines name, in the order they name them. */
 export function filesInLines(lines) {
   const out = [];
@@ -491,24 +510,33 @@ export function filesInLines(lines) {
       seen.add(p.artifact.path);
       out.push({ path: p.artifact.path, by: l.by ?? null, at: l.ts, edited: true });
     }
-    for (const field of ['body', 'answer', 'result', 'note']) {
-      if (typeof p[field] !== 'string' || !ANY_EXT.test(p[field])) continue;
-      filesInLinesInternals.searched += 1;
-      // A person's own words only count a file they attached. The notes sent to an
-      // agent name the file it should make, which does not exist yet.
-      const linksOnly = l.source === 'founder' && (field === 'answer' || field === 'body');
-      const edited = linksOnly && EDITED_WORDS.test(p[field]);
-      for (const m of p[field].replace(FENCE, '').matchAll(NAMED)) {
-        if (linksOnly && !m[1]) continue;
-        const path = (m[1] ?? m[2] ?? m[3]).replace(/^\.\//, '');
-        if (seen.has(path) || shorthand(path)) continue;
-        seen.add(path);
-        const agent = p.voice?.name ?? (l.source === 'agent' ? '' : null);
-        out.push({ path, by: l.by ?? null, at: l.ts, ...(agent !== null ? { agent } : {}), ...(edited ? { edited: true } : {}), ...(p.newer === true ? { newer: true } : {}), ...(p.made === true ? { made: true } : {}) });
-      }
+    for (const { path, edited } of pathsSaidOn(l)) {
+      if (seen.has(path)) continue;
+      seen.add(path);
+      const agent = p.voice?.name ?? (l.source === 'agent' ? '' : null);
+      out.push({ path, by: l.by ?? null, at: l.ts, ...(agent !== null ? { agent } : {}), ...(edited ? { edited: true } : {}), ...(p.newer === true ? { newer: true } : {}), ...(p.made === true ? { made: true } : {}) });
     }
   }
   return out;
+}
+
+/**
+ * The ids of a family's versions that the newest message naming any of them
+ * names. An agent that offers sky.png and sky-v5.png side by side is offering
+ * two choices, and neither is the other's older copy.
+ */
+export function offeredTogether(lines, family) {
+  const versions = family?.versions ?? [];
+  const list = lines ?? [];
+  for (let i = list.length - 1; i >= 0; i--) {
+    const ids = new Set();
+    for (const { path } of pathsSaidOn(list[i])) {
+      const v = versions.find((x) => [x.path, ...(x.also ?? [])].some((p) => endsWithPath(p, path) || endsWithPath(path, p)));
+      if (v) ids.add(v.id);
+    }
+    if (ids.size) return ids;
+  }
+  return new Set();
 }
 
 /** "Shared by …" for a version: the agent and who it works for when an agent shared it. */
@@ -568,12 +596,16 @@ export function approvalSince(family, index, approvals, nameOf) {
   return `${nameOf(given.by)} approved v${old.n}. ${nameOf(here.by)} changed it since, so this version is not approved.`;
 }
 
-/** What to ask before approving version `index`, or null: a newer version, or comments still open on it. */
-export function approveAsk(family, index, notes) {
+/**
+ * What to ask before approving version `index`, or null: a newer version, or
+ * comments still open on it. A version in `offered` (offeredTogether) is a
+ * choice still on the table, so a newer one beside it is not asked about.
+ */
+export function approveAsk(family, index, notes, offered = null) {
   const versions = family?.versions ?? [];
   const here = versions[index];
   if (!here) return null;
-  const newest = index < versions.length - 1 ? versions.at(-1) : null;
+  const newest = index < versions.length - 1 && !offered?.has(here.id) ? versions.at(-1) : null;
   const open = (notes ?? []).filter((n) => n.file === here.id && !n.resolved).length + carriedNotes(family, index, notes).length;
   if (!newest && !open) return null;
   const said = [`Approve v${here.n}?`];

@@ -43,6 +43,20 @@ On the cloud alone, a thread goes quiet 20 minutes after an answer.
   use the founder's own Claude or Codex account: "we're not giving other
   people access to my account".
 - `status` shows the server and its end date. `off` deletes it at once.
+- What the first one (2026-11-08) taught:
+  - Only the desktop app sends threads to the phone. The headless
+    `npx agentbox-app` copy never does. So the server runs the desktop app on
+    a virtual screen (xvfb), built from the public repository.
+  - It signs in to the demo account only when `~/.agentbox/team.config.json`
+    holds the cloud's public address. The password comes from
+    `AGENTBOX_TEAM_TEST_LOGIN`.
+  - The desktop app has no screen to click, so make the project and its
+    first thread in the headless app over an SSH tunnel to port 7777. Then set
+    `accountId` in `~/app/zero.config.json` to the account that holds them.
+  - Give git a demo identity on the server, or the agent's first answer asks
+    the reviewer for a name and email.
+  - The proof that it works: reply on the demo account from app.agentbox.ac,
+    and an answer comes back.
 - It always ends. The end date is 14 days unless `--days` says otherwise, and
   30 at most. The machine shuts itself down then, AWS deletes it on shutdown,
   and an AWS schedule deletes it too.

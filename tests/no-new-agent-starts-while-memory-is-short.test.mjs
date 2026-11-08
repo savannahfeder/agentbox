@@ -224,8 +224,11 @@ describe('the Running page', () => {
   });
 
   it('says so in a sentence, and the switch no longer promises everything else runs as normal', () => {
+    // The page's figures are one rule the desktop and the phone both draw.
+    const words = fs.readFileSync(new URL('../renderer/src/running-reading.ts', import.meta.url), 'utf8');
+    expect(words).toContain('New agents wait until memory frees up. Urgent tasks still start.');
     const pane = fs.readFileSync(new URL('../renderer/src/components/Settings.tsx', import.meta.url), 'utf8');
-    expect(pane).toContain('New agents wait until memory frees up. Urgent tasks still start.');
-    expect(pane).not.toContain('Everything else runs as normal');
+    expect(pane).toMatch(/runningFigures\(/);
+    expect(pane + words).not.toContain('Everything else runs as normal');
   });
 });

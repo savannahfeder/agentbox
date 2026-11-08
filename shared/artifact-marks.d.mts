@@ -44,7 +44,9 @@ export const MAX_EDIT_BYTES: number;
 export function editedWords(name: string, path: string): string;
 export function editClash(family: Pick<FileFamily, 'versions'> | null | undefined, baseN: number, me: string | null, nameOf: (id: string | null) => string): string | null;
 /** What to ask before approving version `index`, or null. */
-export function approveAsk(family: Pick<FileFamily, 'versions'> | null | undefined, index: number, notes: readonly { file: string; resolved?: boolean }[] | null | undefined): { text: string; newest: FileFamily['versions'][number] | null } | null;
+export function approveAsk(family: Pick<FileFamily, 'versions'> | null | undefined, index: number, notes: readonly { file: string; resolved?: boolean }[] | null | undefined, offered?: ReadonlySet<string> | null): { text: string; newest: FileFamily['versions'][number] | null } | null;
+/** The ids of a family's versions that the newest message naming any of them names. */
+export function offeredTogether(lines: unknown[] | null | undefined, family: Pick<FileFamily, 'versions'> | null | undefined): Set<string>;
 /** `group-seat-picker-v3.png` as `group-seat-picker.png`. */
 export function baseName(name: string): string;
 /** The key of the family a path belongs to, with \0 as /. */

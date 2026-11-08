@@ -12,6 +12,7 @@ import { readDisplay, writeDisplay, filteredEmptyWords, updatedWords, type Displ
 import { InboxComposer } from '../ui/NewThreadForm';
 import { closeWords, COUNT_GAP, filterCount, moreToTheRight, phoneBoard, shownTabs, TAB_GAP, TABS, tabsTighten, type Row, type TabId } from '../lib/tabs';
 import { evViewOf, keepEvView, myItems, type EvView } from '../lib/everything';
+import { agentChoices, type Harness } from '../lib/agent-filter';
 import { EverythingPlace } from '../ui/Everything';
 import { bottomTabs, type PlaceId } from '../lib/groups';
 import { useGroups } from '../state/groups';
@@ -24,12 +25,15 @@ import type { RoomMention as MentionRowData, Teammate } from '../../../renderer/
 import { appStore } from '../platform/persist';
 import { useCloud } from '../state/cloud';
 import { Magnifier, StateGlyph, ViewButton, ViewMenu } from '../ui/Filters';
-import { Cloud, Gear, Pen, Pin, Repeat, Tick } from '../ui/icons';
+import { Cloud, Gear, More, Pen, Pin, Repeat, Tick } from '../ui/icons';
+import { LaterSheet } from '../ui/Later';
+import { inLater, pickedActs, pickedPriority, pickedResume } from '../lib/picked';
+import { priorityIdOf, priorityLabelOf } from '../../../renderer/src/priority';
 import { Waiting } from '../ui/LogoOrbit';
 import { repeatRow, repeatTag } from '../../../renderer/src/repeat-words';
 import type { PhoneRepeat } from '../../../renderer/src/phone-repeats';
-import { barsFor } from '../ui/Pickers';
-import { footRoom, IconButton, PriorityBars, RunningMark, T, TopBar, Wall } from '../ui/parts';
+import { barsFor, PriorityRows } from '../ui/Pickers';
+import { footRoom, IconButton, PriorityBars, RunningMark, SheetRow, T, TopBar, Wall } from '../ui/parts';
 import { color, corner, font, size } from '../ui/theme';
 import { StatusNotice } from '../ui/StatusNotice';
 import { ComputerWait } from '../ui/Onboarding';
@@ -337,15 +341,19 @@ export default function Threads() {
   // Remembered between launches, as the site keeps it in the page's storage.
   const [display, setDisplayRaw] = useState<Display>(() => readDisplay('inbox', appStore));
   const setDisplay = (d: Display) => { setDisplayRaw(d); writeDisplay('inbox', d, appStore); };
+  // Not kept between launches, as the desktop's filter is not.
+  const [agent, setAgent] = useState<Harness | null>(null);
   const order = useMemo(() => c.view.products.map((p) => p.slug), [c.view.products]);
-  const shown = useMemo(() => shownTabs(c.tabs, display, c.now, order), [c.tabs, display, c.now, order]);
-  const board = useMemo(() => (!teamMode && display.view === 'board' ? phoneBoard(c.view, c.tabs, display, c.now) : null), [teamMode, display, c.view, c.tabs, c.now]);
+  const shown = useMemo(() => shownTabs(c.tabs, display, c.now, order, agent), [c.tabs, display, c.now, order, agent]);
+  const board = useMemo(() => (!teamMode && display.view === 'board' ? phoneBoard(c.view, c.tabs, display, c.now, agent) : null), [teamMode, display, c.view, c.tabs, c.now, agent]);
   // Your card's board: your own threads, and what waits on you is Needs you, so it is no column (whose-board.ts).
   const mineBoard = useMemo(() => (onEverything && evView === 'board'
-    ? phoneBoard({ ...c.view, items: myItems(c.view.items) }, c.tabs, display, c.now).filter((col) => col.state !== 'waiting') : null), [onEverything, evView, display, c.view, c.tabs, c.now]);
+    ? phoneBoard({ ...c.view, items: myItems(c.view.items) }, c.tabs, display, c.now, agent).filter((col) => col.state !== 'waiting') : null), [onEverything, evView, display, c.view, c.tabs, c.now, agent]);
   const rowOf = useMemo(() => new Map(Object.values(c.tabs).flat().map((r) => [r.key, r])), [c.tabs]);
   const [picked, setPicked] = useState<Set<string> | null>(null);
   const [closing, setClosing] = useState(false);
+  const [pickedMenu, setPickedMenu] = useState(false);
+  const [pickingLevel, setPickingLevel] = useState(false);
   useEffect(() => { setPicked(null); }, [place, tab]);
   if (!c.opened) return <Wall><Waiting /></Wall>;
   if (!c.signedIn) return <Redirect href="/sign-in" />;
@@ -371,8 +379,16 @@ export default function Threads() {
     setClosing(true);
     try { await c.closeAll(rows.filter((r) => picked?.has(r.key)).map((r) => r.item)); setPicked(null); } finally { setClosing(false); }
   };
+  const pickedItems = rows.filter((r) => picked?.has(r.key)).map((r) => r.item);
+  const acts = pickedActs(pickedItems, { tab, unread: c.unread });
+  const pickedDone = () => { setPickedMenu(false); setPickingLevel(false); setPicked(null); };
+  const laterPicked = (until: number, label?: string) => { pickedDone(); void c.laterAll(pickedItems, until, label); };
+  const working = (i: { id: string; product: string }) => c.view.running.some((r: { itemId: string; product: string }) => r.itemId === i.id && r.product === i.product);
+  const resumable = pickedResume(pickedItems, working);
+  const level = pickedPriority(pickedItems);
   const unfiltered: Display = { ...display, priorities: [], projects: [], updated: 'any', privacy: 'any' };
-  const clear = () => setDisplay(unfiltered);
+  const clear = () => { setDisplay(unfiltered); setAgent(null); };
+  const agents = agentChoices(board || mineBoard ? Object.values(c.tabs).flat() : c.tabs[tab], display, c.now, agent);
   const menuCount = () => {
     const drawnBoard = onEverything ? mineBoard : board;
     const wholeBoard = !drawnBoard ? null : onEverything
@@ -439,7 +455,7 @@ export default function Threads() {
       <TopBar title={teamMode ? 'Inbox' : 'Threads'} right={<>
         <IconButton label="Search threads" onPress={() => router.push('/search')}><Magnifier size={18} /></IconButton>
         {penUp && <IconButton label="New thread" onPress={() => router.push('/new')}><Pen size={18} tint={color.dim} /></IconButton>}
-        <ViewButton display={display} open={menu} onPress={() => setMenu(!menu)} />
+        <ViewButton display={display} agent={agent} open={menu} onPress={() => setMenu(!menu)} />
         <IconButton label="Settings" onPress={() => router.push('/settings')}><Gear /></IconButton>
       </>} below={board ? undefined : <Tabs on={onEverything ? 'everything' : tab} counts={counts} pick={setPlace} team={teamMode} />} />
       <StatusNotice message={c.status} />
@@ -449,15 +465,28 @@ export default function Threads() {
       {picked && (
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingBottom: foot, paddingTop: 8, paddingHorizontal: size.inset, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: color.bg, borderTopWidth: 1, borderTopColor: color.line }}>
           <T style={{ flex: 1, fontSize: 14, color: color.dim }}>{picked.size ? `${picked.size} selected` : 'Tap threads to select them'}</T>
+          {picked.size > 0 && <IconButton label="More" onPress={() => setPickedMenu(true)}><More /></IconButton>}
           <Pressable onPress={() => setPicked(null)} accessibilityRole="button" style={({ pressed }) => ({ height: 36, paddingHorizontal: 14, justifyContent: 'center', backgroundColor: pressed ? color.picked : 'transparent' })}>
             <T style={{ fontSize: 14, color: color.dim }}>Cancel</T>
           </Pressable>
-          <Pressable disabled={!picked.size || closing} onPress={() => void closePicked()} accessibilityRole="button"
-            style={({ pressed }) => ({ height: 36, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: !picked.size || closing ? 0.5 : 1 })}>
-            <T style={{ fontSize: 14, fontFamily: font.semibold }}>{closing ? 'Closing…' : closeWords(picked.size)}</T>
-          </Pressable>
+          {acts.includes('close') && (
+            <Pressable disabled={!picked.size || closing} onPress={() => void closePicked()} accessibilityRole="button"
+              style={({ pressed }) => ({ height: 36, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: !picked.size || closing ? 0.5 : 1 })}>
+              <T style={{ fontSize: 14, fontFamily: font.semibold }}>{closing ? 'Closing…' : closeWords(picked.size)}</T>
+            </Pressable>
+          )}
         </View>
       )}
+      {/* Later as one thread's More sheet has it, then the rest of the desktop's commands on ticked rows. */}
+      <LaterSheet visible={pickedMenu} onClose={() => { setPickedMenu(false); setPickingLevel(false); }} onPick={laterPicked}
+        onNow={inLater(pickedItems, c.now) ? () => laterPicked(0) : undefined}
+        instead={pickingLevel && level ? <PriorityRows value={level.value} pick={(value) => { pickedDone(); void c.pressPicked(pickedItems, { kind: 'priority', value }); }} /> : undefined}>
+        {resumable && <SheetRow label="Resume agents" aside={resumable.ids.length < resumable.of ? `${resumable.ids.length} of ${resumable.of}` : undefined}
+          onPress={() => { pickedDone(); void c.pressPicked(pickedItems, { kind: 'resume' }); }} />}
+        {level && <SheetRow label="Priority" aside={level.value === null ? undefined : priorityLabelOf(priorityIdOf(level.value))} onPress={() => setPickingLevel(true)} />}
+        {acts.includes('read') && <SheetRow label="Mark read" onPress={() => { pickedItems.forEach((i) => c.markSeen(i)); pickedDone(); }} />}
+        {acts.includes('unread') && <SheetRow label="Mark unread" onPress={() => { pickedItems.forEach((i) => c.markUnseen(i)); pickedDone(); }} />}
+      </LaterSheet>
       {!picked && !penUp && !(inboxEmpty && !board) && <Pressable accessibilityLabel="New thread" accessibilityRole="button" onPress={() => router.push('/new')}
         style={({ pressed }) => ({
           position: 'absolute', right: 20, bottom: foot + 16, width: 56, height: 56, borderRadius: 28,
@@ -466,7 +495,7 @@ export default function Threads() {
         })}>
         <Pen />
       </Pressable>}
-      {menu && <ViewMenu display={headerDisplay} onDisplay={onHeaderDisplay} products={c.view.products} items={c.view.items} {...menuCount()} tab={tab} close={() => setMenu(false)}
+      {menu && <ViewMenu display={headerDisplay} onDisplay={onHeaderDisplay} agent={agent} agents={agents} onAgent={setAgent} products={c.view.products} items={c.view.items} {...menuCount()} tab={tab} close={() => setMenu(false)}
         onSelect={rows.length && !board ? () => { setMenu(false); setPicked(new Set()); } : undefined} />}
     </Wall>
     </Picking.Provider>
