@@ -53,23 +53,26 @@ export function Group({ label, children }: { label?: string; children: ReactNode
 export function Row({ label, desc, control, first = false, reading, badge, stack = false, below }: { label: string; desc?: string | null; control?: ReactNode; first?: boolean; reading?: Reading; badge?: string; stack?: boolean; below?: ReactNode }) {
   const note = reading?.waiting ? 'Waiting for your computer' : reading?.refused ? `Not changed (${reading.refused})` : null;
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20, paddingVertical: 14, borderTopWidth: first ? 0 : 1, borderTopColor: color.line }}>
-      <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <T style={{ fontSize: 13.5, fontFamily: font.medium, letterSpacing: -0.04 }}>{label}</T>
-          {badge ? <T style={{ fontSize: 11, color: color.dim, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, paddingHorizontal: 6, paddingVertical: 1 }}>{badge}</T> : null}
-        </View>
-        {desc ? <T style={{ fontSize: 12.5, lineHeight: 18.75, color: color.faint, marginTop: 3 }}>{desc}</T> : null}
-        {below}
-        {note ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 4 }}>
-            {reading?.waiting ? <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: color.accent }} /> : null}
-            <T style={{ fontSize: 12.5, lineHeight: 18.75, color: color.dim }}>{note}</T>
+    <View style={{ paddingVertical: 14, borderTopWidth: first ? 0 : 1, borderTopColor: color.line }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20 }}>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <T style={{ fontSize: 13.5, fontFamily: font.medium, letterSpacing: -0.04 }}>{label}</T>
+            {badge ? <T style={{ fontSize: 11, color: color.dim, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, paddingHorizontal: 6, paddingVertical: 1 }}>{badge}</T> : null}
           </View>
-        ) : null}
-        {stack && control ? <View style={{ flexDirection: 'row', marginTop: 10 }}>{control}</View> : null}
+          {desc ? <T style={{ fontSize: 12.5, lineHeight: 18.75, color: color.faint, marginTop: 3 }}>{desc}</T> : null}
+          {note ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 4 }}>
+              {reading?.waiting ? <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: color.accent }} /> : null}
+              <T style={{ fontSize: 12.5, lineHeight: 18.75, color: color.dim }}>{note}</T>
+            </View>
+          ) : null}
+          {stack && control ? <View style={{ flexDirection: 'row', marginTop: 10 }}>{control}</View> : null}
+        </View>
+        {stack ? null : control}
       </View>
-      {stack ? null : control}
+      {/* Full width, under the control too, so a meter beside a button keeps its bar. */}
+      {below}
     </View>
   );
 }
