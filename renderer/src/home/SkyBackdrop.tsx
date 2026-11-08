@@ -6,14 +6,9 @@ import { drawSky, type SkyArt } from './sky';
  * everything on it. It goes in as the window's first child so the page's own
  * positioned layers paint over it in document order.
  *
- * `from` is where the dots begin, in px from the card's top; `below` instead
- * starts them `gap` px under the lowest element it matches, and follows the
- * page as rows come and go. However long the list, the last `band` px of the
- * card stay sky and the list stops above them (home.css).
+ * `from` is where the dots begin, in px from the card's top.
  */
-export function SkyBackdrop({ art, from, below, gap = 30, span = 220, band = 190 }: {
-  art: SkyArt; from?: number; below?: string; gap?: number; span?: number; band?: number;
-}) {
+export function SkyBackdrop({ art, from = 0, span = 220 }: { art: SkyArt; from?: number; span?: number }) {
   useLayoutEffect(() => {
     const host = document.querySelector<HTMLElement>('.app.workspace-layout');
     if (!host) return;
@@ -32,18 +27,11 @@ export function SkyBackdrop({ art, from, below, gap = 30, span = 220, band = 190
       const L = parseFloat(b.left) || 0, T = parseFloat(b.top) || 0, R = parseFloat(b.right) || 0, B = parseFloat(b.bottom) || 0;
       const w = hr.width - L - R, h = hr.height - T - B;
       if (w <= 0 || h <= 0) return;
-      const lowest = below ? Math.max(0, ...[...host.querySelectorAll(below)].map((e) => e.getBoundingClientRect().bottom)) : 0;
-      const under = below ? Math.round((lowest || hr.top + T) - hr.top - T + gap) : (from ?? 0);
-      // A list longer than the card keeps the last `band` px as sky, with the streak drawn inside it.
-      // The same height as the list's margin in home.css, so a short window keeps its rows.
-      const room = Math.max(0, Math.min(band, (window.innerHeight - 700) * 0.75));
-      const banded = !!below && under > h - room;
-      const start = banded ? Math.round(h - room) : under;
-      const key = [L, T, w, h, start].join(',');
+      const key = [L, T, w, h].join(',');
       if (key === last) return;
       last = key;
       Object.assign(wrap.style, { left: `${L}px`, top: `${T}px`, width: `${w}px`, height: `${h}px` });
-      drawSky(canvas, art, { from: start, span: banded ? 120 : span, curveTop: banded ? start - 60 : 0, dpr: Math.min(2, window.devicePixelRatio || 1) });
+      drawSky(canvas, art, { from, span, dpr: Math.min(2, window.devicePixelRatio || 1) });
     };
     const later = () => { if (!frame) frame = requestAnimationFrame(paint); };
     paint();
@@ -52,10 +40,7 @@ export function SkyBackdrop({ art, from, below, gap = 30, span = 220, band = 190
     // The card moves when the sidebar opens or folds, which changes the window's classes, not its size.
     const moved = new MutationObserver(later);
     moved.observe(host, { attributes: true, attributeFilter: ['class'] });
-    const pane = host.querySelector('.list-pane');
-    const mo = below && pane ? new MutationObserver(later) : null;
-    if (mo && pane) mo.observe(pane, { childList: true, subtree: true });
-    return () => { ro.disconnect(); moved.disconnect(); mo?.disconnect(); if (frame) cancelAnimationFrame(frame); wrap.remove(); };
-  }, [art, from, below, gap, span, band]);
+    return () => { ro.disconnect(); moved.disconnect(); if (frame) cancelAnimationFrame(frame); wrap.remove(); };
+  }, [art, from, span]);
   return null;
 }

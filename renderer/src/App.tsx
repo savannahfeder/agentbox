@@ -250,6 +250,7 @@ import { TickedBar } from './components/TickedBar';
 import { AgentSending } from './team/AgentSending';
 import { HomePage, type NeedsRow, type ProgressRow, type TeamRow } from './home/HomePage';
 import { SkyBackdrop } from './home/SkyBackdrop';
+import { InboxSky } from './home/InboxSky';
 import { SKY_THEME_KEY, setHomeSetting, useDarkWindow, useHomeSettings } from './home/home-settings';
 import { SKY_THEMES, skyTheme } from './home/sky';
 import { engineLetter, engineName, greeting, teamRowState, weekCounts } from './home/home-model';
@@ -7774,7 +7775,7 @@ export default function App() {
                   points here. */}
               {planWords && !snap.supervisor.running?.length && !run && !focused && !focusedRepeat && !teammatesShown && <PlanBar words={planWords} onSetup={setSetupPlan} />}
               {homeShown && sky && <SkyBackdrop art={sky.art} from={sky.dark ? 40 : 150} span={sky.dark ? 300 : 240} />}
-              {skyOnInbox && sky && <SkyBackdrop art={sky.art} below=".list-pane .row" span={200} />}
+              {skyOnInbox && sky && <InboxSky art={sky.art} />}
               {homeShown ? (
                 <HomePage hello={greeting(new Date(now).getHours(), snap.team?.me?.name ?? null)} now={now}
                   needs={homeNeeds} needsCount={needsYouCount.inbox} progressCount={mineShown ? shownCount(progressTab) : 0}
