@@ -16,20 +16,10 @@ interface NoteReplyStore extends Omit<NotesStore, 'listItems'> {
   answerItem(product: string, id: string, input: { answer: string; fromNotes: string[] }): unknown;
 }
 
-export type NotesTell = (product: string, id: string, line: { text: string; from: { teammate: string; name: string }; fromNotes: string[] }) => Promise<unknown>;
-
-/** Tells each agent the notes on its files once; resolves to how many were told. */
-export function wakeForNotes(opts: {
-  store: NotesStore;
-  team: { state?(): { me?: { id?: string } | null; people?: readonly Person[] } | null | undefined } | null | undefined;
-  tell: NotesTell | null | undefined;
-  now?: number;
-}): Promise<number>;
-
 /** Resolves the notes a newer version answered; returns how many. */
 export function resolveAnsweredNotes(opts: { store: NotesStore; people?: readonly Person[]; now?: number }): number;
 
-/** Sends your note, or your reply on a note it was sent, on an agent's file to that agent as your reply; resolves false when nothing went. */
+/** Sends your notes on an agent's file, or the replies under one it already has, to that agent as your reply; resolves false when nothing went. */
 export function noteToItsAgent(opts: {
   store: NoteReplyStore;
   supervisor: ReplySupervisor & { liftBrakeForHer?(): unknown; wake?(): unknown };

@@ -944,7 +944,6 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
           const n = file.notes.find((x) => x.id === mark.on);
           if (!n) return { ok: false, error: 'that comment is gone' };
           await writeTo(n.thread, mark);
-          if (mark.do === 'reply' && n.thread.ref.kind !== 'shared' && n.thread.ref.kind !== 'room') return { ok: true, wrote: { product: n.thread.ref.product, id: n.thread.ref.id } };
         } else if (mark.do === 'seen') {
           const by = new Map();
           for (const id of mark.on ?? []) {
@@ -953,10 +952,16 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
           }
           for (const [thread, on] of by) await writeTo(thread, { do: 'seen', on });
         } else if (mark.do === 'toagent') {
-          const n = file.notes.find((x) => x.id === mark.on?.[0]);
-          if (!n) return { ok: false, error: 'that comment is gone' };
-          await writeTo(n.thread, { do: 'toagent', on: [n.id] });
-          if (n.thread.ref.kind !== 'shared' && n.thread.ref.kind !== 'room') return { ok: true, wrote: { product: n.thread.ref.product, id: n.thread.ref.id } };
+          // Send hands over every waiting comment at once, each on the thread it was written in.
+          const by = new Map();
+          for (const id of mark.on ?? []) {
+            const thread = file.notes.find((x) => x.id === id)?.thread;
+            if (thread) by.set(thread, [...(by.get(thread) ?? []), id]);
+          }
+          if (!by.size) return { ok: false, error: 'that comment is gone' };
+          for (const [thread, on] of by) await writeTo(thread, { do: 'toagent', on });
+          const own = [...by.keys()].find((t) => t.ref.kind !== 'shared' && t.ref.kind !== 'room');
+          if (own) return { ok: true, wrote: { product: own.ref.product, id: own.ref.id } };
         } else if (mark.do === 'note' || mark.do === 'approve' || mark.do === 'unapprove') {
           const { chain } = await lineChain(file);
           const v = chain.find((x) => x.id === mark.file);
