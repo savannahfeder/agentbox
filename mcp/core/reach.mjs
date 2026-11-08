@@ -224,12 +224,14 @@ function keepWhatOthersWrote(known, content) {
   // Only when this thread can see every version: a copy elsewhere may hold one it cannot read.
   if (known.chain.length < 2 || known.chain.length !== known.versions) return null;
   const head = known.chain[known.chain.length - 1];
-  const itsOwn = !head.edited && typeof head.agent === 'string' && (head.agent || PLAIN_AGENT) === known.voice;
+  // A save this thread's own agent names carries no voice, teammate or not.
+  const itsOwn = !head.edited && (head.agent === '' || head.agent === known.voice);
   if (itsOwn || reviewKind(head.path) !== 'markdown') return null;
   const headText = readVersion(known.dir, head);
   if (headText == null || headText === content) return null;
   let baseText = null;
-  let gap = Infinity;
+  // Nearer the newest than any older version: written from it, so nothing of theirs is missing.
+  let gap = lineGap(headText, content);
   for (const v of known.chain.slice(0, -1)) {
     const was = readVersion(known.dir, v);
     if (was == null) continue;
