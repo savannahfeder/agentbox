@@ -169,7 +169,8 @@ export function NewThreadFields({ form, inline = false, onFocus, onBlur }: { for
           ? (
             <Pressable onPress={() => setSheet('to')} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               {mate && mate !== 'new' ? <TeammateMark t={mate} /> : mate === 'new' ? <TeammateMark t={null} /> : onAuto ? <AutoMark /> : null}
-              <Pickable style={{ fontSize: 15 }} onPress={() => setSheet('to')}>{toWord ?? agentWordFor(agents.engines, engine)}</Pickable>
+              {/* The row is the button; a second one inside it is a button in a button. */}
+              <T style={{ fontSize: 15, textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: color.faint }}>{toWord ?? agentWordFor(agents.engines, engine)}</T>
             </Pressable>
           )
           : <T style={{ fontSize: 15 }}>Agent</T>}

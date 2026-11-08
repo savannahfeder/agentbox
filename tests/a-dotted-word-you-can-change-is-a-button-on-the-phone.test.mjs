@@ -15,6 +15,12 @@ describe('Pickable', () => {
   it('says it is a button', () => {
     expect(pickable).toMatch(/role="button"/);
   });
+  it('is never inside another button, which the web build refuses as a button in a button', () => {
+    const form = fs.readFileSync('mobile/src/ui/NewThreadForm.tsx', 'utf8');
+    const toRow = form.slice(form.indexOf('<Field label="To">'), form.indexOf('<Field label="Model">'));
+    expect(toRow).toMatch(/<Pressable onPress=\{\(\) => setSheet\('to'\)\}/);
+    expect(toRow).not.toMatch(/<Pickable/);
+  });
   it('stays text, so it can sit inside a sentence', () => {
     expect(pickable).toMatch(/<T onPress=/);
     expect(pickable).not.toMatch(/<Pressable/);
