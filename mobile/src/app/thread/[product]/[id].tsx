@@ -113,8 +113,10 @@ function Said({ e, starts, ends, product, dir, files, sendNow, openOrigin, name 
 
 const StopMark = () => <Svg width={9} height={9} viewBox="0 0 12 12"><Rect x={1.5} y={1.5} width={9} height={9} fill={color.dim} /></Svg>;
 
-function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0, showChoices }: {
+function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0, showChoices, onTyped }: {
   thread: Thread; offers: Offers; busy: boolean; setBusy: (on: boolean) => void; stop: () => void; setError: (m: string | null) => void;
+  /** Whether the box holds anything to send, for the page's links that would send without it. */
+  onTyped?: (typed: boolean) => void;
   /** With the choices folded, how many there are and the way back to them (OneThingAtATime.tsx `ChoicesShow`). */
   foldedChoices?: number; showChoices?: () => void;
 }) {
@@ -128,6 +130,7 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
   const [picked, setPicked] = useState<Choices>({});
   const [sheet, setSheet] = useState<'priority' | 'mode' | 'model' | 'attach' | null>(null);
   const ready = !!draft.text.trim() || draft.files.length > 0;
+  useEffect(() => { onTyped?.(ready); }, [ready]);
   const priority = picked.priority ?? priorityValueOf(shownLevel(item));
   const agents = useComputerAgents();
   const codex = { codexModels: agents.codexModels, codexDefault: agents.codexDefault };
@@ -301,6 +304,7 @@ export default function ThreadScreen() {
   const [asking, setAsking] = useState(false);
   // Send now was pressed and her Mac has not taken her words yet.
   const [cutting, setCutting] = useState(false);
+  const [typed, setTyped] = useState(false);
   // What came before the newest answer, opened from its fold (lib/one-page.ts).
   const [earlierOpen, setEarlierOpen] = useState(false);
   const [contextWhole, setContextWhole] = useState(false);
@@ -387,7 +391,8 @@ export default function ThreadScreen() {
   const openOrigin = () => { if (thread.parent) openThread(thread.parent); };
   const below = [
     ...(offers.back ? [{ label: offers.back.label, dim: offers.back.dim, onPress: () => void press({ kind: 'later', until: 0 }) }] : []),
-    ...(offers.sendBack ? [{ label: 'send back to agent', onPress: () => void press({ kind: 'send-back' }) }] : []),
+    // Sending back with words typed is Send; this link would leave them behind.
+    ...(offers.sendBack && !typed ? [{ label: 'send back to agent', onPress: () => void press({ kind: 'send-back' }) }] : []),
   ];
 
   let prev: Kind | null = null;
@@ -532,7 +537,7 @@ export default function ThreadScreen() {
           </ScrollView>
         )}
         <Dock thread={thread} offers={offers} busy={busy} setBusy={setBusy} setError={setError} stop={() => void press({ kind: 'stop' })}
-          foldedChoices={thread.options.length > 0 && !asking && choicesFolded ? thread.options.length : 0} showChoices={foldChoices} />
+          foldedChoices={thread.options.length > 0 && !asking && choicesFolded ? thread.options.length : 0} showChoices={foldChoices} onTyped={setTyped} />
       </KeyboardAvoidingView>
       <ThreadMenu open={menu} close={() => setMenu(false)} now={c.now} laterNow={offers.laterNow} runNow={offers.runNow} moveToCloud={offers.moveToCloud}
         onLater={(until, label) => void press({ kind: 'later', until, label, running: !!thread.running }, item, back)}
