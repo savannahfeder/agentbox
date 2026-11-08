@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  addressedTo, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, nextStep, noteGoesTo, otherFilesInLines, placeWords, resolvedInWords, reviewKind, sharedByWords, stepsThrough, threadFiles, versionForPath, viewKind, whereAPressLands, whoseIsTheFile,
+  addressedTo, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, nextStep, noteGoesTo, offeredTogether, otherFilesInLines, placeWords, resolvedInWords, reviewKind, sharedByWords, stepsThrough, threadFiles, versionForPath, viewKind, whereAPressLands, whoseIsTheFile,
 } from '../../../shared/artifact-marks.mjs';
 import type { FileVersion } from '../../../shared/artifact-marks.mjs';
 import { api } from '../api';
@@ -325,7 +325,7 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, lines
   const approve = async () => {
     if (!version || !family || !at) return;
     if (mineApproved) return approveNow(version, true);
-    const ask = approveAsk(family, at.vi, marks.notes);
+    const ask = approveAsk(family, at.vi, marks.notes, offeredTogether(lines, family));
     if (ask) { setApproveAsked(ask); return; }
     return approveNow(version);
   };
