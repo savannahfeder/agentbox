@@ -15,8 +15,8 @@ const playwright = (p) => () => ({ chromium: { executablePath: () => p } });
 const none = () => { throw new Error('Cannot find module playwright'); };
 
 describe('which browser the verify drives start', () => {
-  it('is Google Chrome on a Mac, whatever else is installed', () => {
-    expect(findChrome('darwin', { VERIFY_CHROME: '/opt/other' }, playwright('/opt/pw/chrome'))).toBe(MAC);
+  it('is Google Chrome on a Mac with no Chrome for Testing, whatever else is named', () => {
+    expect(findChrome('darwin', { VERIFY_CHROME: '/opt/other' }, playwright('/opt/pw/chrome'), () => [])).toBe(MAC);
   });
 
   it('is the one VERIFY_CHROME names elsewhere', () => {

@@ -20,10 +20,13 @@ import { letTheTerminalFallBehind, DROP_PAST_BYTES } from '../main/terminal-outp
 const ROOT = path.resolve(import.meta.dirname, '..');
 
 // A program that logs constantly and counts timer ticks, run on a terminal
-// whose reader never reads, for three seconds.
+// whose reader never reads, for three seconds from when it has started: on a
+// slow runner Node's own startup took enough of a three-second window from the
+// first to leave it under 20 ticks.
 function ticksOnAStuckTerminal(fix) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stuck-terminal-'));
   const out = path.join(dir, 'ticks');
+  const started = path.join(dir, 'started');
   const child = path.join(dir, 'child.mts');
   fs.writeFileSync(child, `
     import fs from 'node:fs';
@@ -31,6 +34,7 @@ function ticksOnAStuckTerminal(fix) {
     if (${fix}) letTheTerminalFallBehind(process.stdout);
     let ticks = 0;
     setInterval(() => fs.writeFileSync(${JSON.stringify(out)}, String(++ticks)), 100);
+    fs.writeFileSync(${JSON.stringify(started)}, '');
     const line = 'x'.repeat(200);
     const spam = () => { for (let k = 0; k < 200; k++) console.log(line); setTimeout(spam, 10); };
     spam();
@@ -40,11 +44,14 @@ import os, pty, sys, time, signal
 pid, fd = pty.fork()
 if pid == 0:
     os.execv(sys.argv[1], [sys.argv[1], '--experimental-strip-types', '--disable-warning=ExperimentalWarning', sys.argv[2]])
+deadline = time.time() + 15
+while not os.path.exists(sys.argv[3]) and time.time() < deadline:
+    time.sleep(0.02)
 time.sleep(3)
 os.kill(pid, signal.SIGKILL)
 os.waitpid(pid, 0)
 `;
-  spawnSync('python3', ['-I', '-c', py, process.execPath, child], { timeout: 20_000 });
+  spawnSync('python3', ['-I', '-c', py, process.execPath, child, started], { timeout: 25_000 });
   const ticks = fs.existsSync(out) ? Number(fs.readFileSync(out, 'utf8')) : 0;
   fs.rmSync(dir, { recursive: true, force: true });
   return ticks;
