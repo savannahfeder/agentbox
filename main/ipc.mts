@@ -402,6 +402,16 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // the one on screen means ⌘Y allows a command nobody was reading.
   let looking: { product: string | null; id: string } | null = null;
   const pendingApprovals = () => cardsInFront(approvals.listPending(config.storeRoot), looking);
+  // When each card was first sent to the window, so a chord in its first moment answers nothing (shared/card-settles.mts).
+  const sentAt = new Map<string, number>();
+  const sendingApprovals = () => {
+    const cards = pendingApprovals();
+    const now = Date.now();
+    for (const id of [...sentAt.keys()]) if (!cards.some((c) => c.id === id)) sentAt.delete(id);
+    for (const c of cards) if (!sentAt.has(c.id)) sentAt.set(c.id, now);
+    return cards;
+  };
+  const cardSentAt = (id: string) => sentAt.get(id) ?? null;
   ipcMain.handle('zero:looking', (event, { product = null, id = null }: { product?: string | null; id?: string | null } = {}) => {
     // The window's own top frame and nothing else, the guard
     // `zero:refresh-usage` carries: this moves which card ⌘Y answers. A page
@@ -676,7 +686,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       agents: liveAgents(),
       // The open thread's own card first, which is the order the chord and the
       // Agents menu answer in too (shared/which-card-is-in-front.mts).
-      approvals: pendingApprovals(),
+      approvals: sendingApprovals(),
       // A screen that says which thread it has open is sent only that thread's
       // live detail.
       supervisor: ask && 'open' in ask ? { ...running, running: lightRunning(running.running, ask.open) } : running,
@@ -2811,5 +2821,5 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // buttons do, rather than reaching past it into approvals.answer.
   // `push` goes with it so the updater can make the window refetch when a
   // download finishes, without holding the window itself.
-  return { answerApproval, pendingApprovals, push };
+  return { answerApproval, pendingApprovals, cardSentAt, push };
 }

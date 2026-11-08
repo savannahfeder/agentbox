@@ -24,42 +24,29 @@ it('draws the asking row title, and only when the row is there', () => {
   // stamps it off ZERO_ITEM); the card simply never read it.
   expect(app).toContain('const row = approvalRow(a.item);');
   expect(app).toContain('className="approval-task"');
-  expect(app).toContain('<span className="approval-task-title">{row.title}</span>');
+  expect(app).toContain('<span className="approval-task-title">{agent} · {asker}</span>');
   // A title she cannot click through to is a caption pretending to be a door,
-  // so a missing row draws no button at all.
-  expect(app).toContain('{row && (');
+  // so a missing row draws the name and no button.
+  expect(app).toContain(') : <span className="approval-task-title">{asker}</span>}');
 });
 
-// HER HIERARCHY, 2026-09-24: "The most important thing to see is starting the
-// store server so the worker can read the ledger. The chat and where it's
-// located are actually lower in the hierarchy... I'd recommend cutting out
-// anything that's not necessary. For instance, Agentbox asks to run."
-it('leads with what the command does and puts the chat and the folder under it', () => {
+// THE ORDER PICKED ON 2026-11-08 (w-78be9e67e8): who asks, what it wants in
+// words, the exact thing, where. What the yes opens stays with the exact thing.
+it('reads top to bottom as who, what, the exact thing, then where', () => {
   const app = read('App.tsx');
   const card = app.slice(app.indexOf('className="approvals"'), app.indexOf('approval-actions'));
-
-  // The worker's own sentence is the lede. The product line is its FALLBACK
-  // and nothing else, so it can never sit above a description again.
-  expect(card).toContain('{said ?? <>{product} {reads.what}</>}');
-
-  // The order on the card, top to bottom.
   const at = (s) => { const i = card.indexOf(s); expect(i, `${s} is not on the card`).toBeGreaterThan(-1); return i; };
+  expect(at('approval-from')).toBeLessThan(at('approval-lede'));
   expect(at('approval-lede')).toBeLessThan(at('approval-cmd'));
-  expect(at('approval-cmd')).toBeLessThan(at('approval-meta'));
-  // What the yes opens stays with the command, above the quiet line: those two
-  // sentences widen what runs and must never sit under the chat.
-  expect(at('approval-opens')).toBeLessThan(at('approval-meta'));
-  // The chat and the folder share one line rather than being two stacks.
-  expect(at('approval-where')).toBeGreaterThan(at('approval-meta'));
-  expect(at('approval-task')).toBeGreaterThan(at('approval-meta'));
+  expect(at('approval-cmd')).toBeLessThan(at('approval-opens'));
+  expect(at('approval-opens')).toBeLessThan(at('approval-where'));
+  expect(card).toContain('<div className="approval-lede">{view.title}</div>');
 });
 
-it('never says the verb twice on one card', () => {
+it('says the folder once, in words, with the whole path on hover', () => {
   const app = read('App.tsx');
-  // With a description the verb goes quiet on the meta line; without one it is
-  // already the lede, and repeating it underneath is the clutter she asked us
-  // to cut.
-  expect(app).toContain("const where = [said ? reads.what : null, cwd ? `in ${cwd}` : null]");
+  expect(app).toContain('<div className="approval-where" title={cwd ?? undefined}>');
+  expect(app).not.toContain('`in ${cwd}`');
 });
 
 it('has dropped the blocks that were merged away', () => {

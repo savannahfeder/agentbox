@@ -36,7 +36,7 @@ describe('the page wiring', () => {
   const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
   it('answers the chord the way Allow and Deny do, ahead of every other key', () => {
     const onKey = app.slice(app.indexOf('const onKey = (e: KeyboardEvent) => {'));
-    const chord = onKey.indexOf('cardChord(e, cardOnStage.current)');
+    const chord = onKey.indexOf('cardChord(e, cardOnStage.current,');
     expect(chord).toBeGreaterThan(0);
     expect(chord).toBeLessThan(onKey.indexOf("e.key.toLowerCase() === 'k'"));
   });

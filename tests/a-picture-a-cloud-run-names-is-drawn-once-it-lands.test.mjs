@@ -28,7 +28,10 @@ describe('a picture named by its full path', () => {
   it('is drawn from the app\'s picture scheme, bare or as a file url', () => {
     for (const src of ['/Users/x/p/designs/w-1/a.png', 'file:///Users/x/p/designs/w-1/a.png']) {
       const drawn = renderToStaticMarkup(createElement(ArtifactImg, { src, roots: [], onOpen: () => {} }));
-      expect(drawn).toContain(`src="${pictureUrl('/Users/x/p/designs/w-1/a.png')}"`);
+      // The first draw holds the place; the address it draws from is `data-full`
+      // (tests/a-picture-is-drawn-from-a-copy-the-size-it-is-shown-at).
+      expect(drawn).toContain(`data-full="${pictureUrl('/Users/x/p/designs/w-1/a.png')}"`);
+      expect(drawn).not.toContain('file:///');
     }
   });
 

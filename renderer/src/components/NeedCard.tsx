@@ -211,6 +211,8 @@ export function NeedCard({ source, fallback }: { source: string; fallback: React
     const where = folderOf(need.path);
     const send = async (path: string | null) => {
       setBusy(true); setSaid(null);
+      // A prop handing a picked file to the thread, not Express's res.sendFile.
+      // nosemgrep: javascript.express.security.audit.express-res-sendfile.express-res-sendfile
       const out = await place.sendFile(path, need, !live);
       setBusy(false);
       if (out === false) return;
