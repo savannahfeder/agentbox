@@ -425,6 +425,29 @@ at AgentCore's published rates. The plan limits are set from these.
   ten agents. The hours never come back, and a paid plan never spends them
   (`FREE` in cloud/gateway/plans.mjs). Sign-in is the app's own sign-in page.
 
+### The team plan (the owner, 2026-11-06; to build for 2026-11-17)
+
+- **Trial:** every team gets 14 days from the day it was made, with 10 cloud
+  hours per member, shared by the whole team. No card. It replaces each
+  member's own 5 free hours while it lasts; it does not add to them.
+- **Paying:** $40 a member a month (Stripe price `agentbox_cloud_team_monthly`,
+  quantity = members). Each seat brings Pro's 10 agents at once and 400
+  hours, and the hours are one pool for the team.
+- **Which hours a run spends:** the person's own paid plan first, then the
+  team's (paid or trial), then their free hours.
+- **How it is counted:** a run is still reserved in the person's own ledger,
+  so starts, stops, ceilings and the sweep work as they do. The run carries
+  its team, and when it ends its seconds go to `ledger/teams/<team>.json`
+  (`used` by month, `trialUsed`) through the same owed-write list as run
+  records, so a failed write is retried, not lost. A start reads the team
+  ledger and the members' live runs; members are few, so this costs a handful
+  of reads. Two members starting in the same instant can pass the at-once
+  limit by one; the hours still bound what it costs.
+- **Who is on the team** is read from the database (`team_members`,
+  `teams.created_at`) with the service key, cached for a minute.
+- Risk at full use: a seat that spends all 400 hours costs about $28 of the
+  $40 (measured $0.07 an agent-hour).
+
 ## Phases
 
 1. Spike: AgentCore measured for real. Running as w-bad6fbae78.

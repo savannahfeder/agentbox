@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { readDisplay, writeDisplay, filteredEmptyWords, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
 import { InboxComposer } from '../ui/NewThreadForm';
-import { COUNT_GAP, moreToTheRight, phoneBoard, shownTabs, TAB_GAP, TABS, tabsTighten, type Row, type TabId } from '../lib/tabs';
+import { COUNT_GAP, filterCount, moreToTheRight, phoneBoard, shownTabs, TAB_GAP, TABS, tabsTighten, type Row, type TabId } from '../lib/tabs';
 import { evViewOf, keepEvView, myItems, type EvView } from '../lib/everything';
 import { EverythingPlace } from '../ui/Everything';
 import { bottomTabs, type PlaceId } from '../lib/groups';
@@ -354,7 +354,16 @@ export default function Threads() {
     setClosing(true);
     try { await c.closeAll(rows.filter((r) => picked?.has(r.key)).map((r) => r.item)); setPicked(null); } finally { setClosing(false); }
   };
-  const clear = () => setDisplay({ ...display, priorities: [], projects: [], updated: 'any', privacy: 'any' });
+  const unfiltered: Display = { ...display, priorities: [], projects: [], updated: 'any', privacy: 'any' };
+  const clear = () => setDisplay(unfiltered);
+  const menuCount = () => {
+    const drawnBoard = onEverything ? mineBoard : board;
+    const wholeBoard = !drawnBoard ? null : onEverything
+      ? phoneBoard({ ...c.view, items: myItems(c.view.items) }, c.tabs, unfiltered, c.now).filter((col) => col.state !== 'waiting')
+      : phoneBoard(c.view, c.tabs, unfiltered, c.now);
+    const above = mentionsShown ? mentions.length + asks.length : repeatsShown ? c.repeats.length : 0;
+    return filterCount({ rows: shown.rows[tab], whole: c.tabs[tab], mineOnly: onEverything, above, board: drawnBoard, wholeBoard });
+  };
   // A permission card sits over the corner the pen is in, so the pen moves up to the bar (8fa6c548).
   const penUp = c.view.approvals.length > 0;
   // The empty inbox draws the form itself, so it needs no pen.
@@ -440,7 +449,7 @@ export default function Threads() {
         })}>
         <Pen />
       </Pressable>}
-      {menu && <ViewMenu display={headerDisplay} onDisplay={onHeaderDisplay} products={c.view.products} items={c.view.items} shown={rows.length} total={shown.whole[tab]} tab={tab} close={() => setMenu(false)}
+      {menu && <ViewMenu display={headerDisplay} onDisplay={onHeaderDisplay} products={c.view.products} items={c.view.items} {...menuCount()} tab={tab} close={() => setMenu(false)}
         onSelect={rows.length && !board ? () => { setMenu(false); setPicked(new Set()); } : undefined} />}
     </Wall>
     </Picking.Provider>
