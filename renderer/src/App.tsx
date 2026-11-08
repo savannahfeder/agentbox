@@ -4058,6 +4058,7 @@ export default function App() {
     items, view: snap?.teammates, asking: (snap?.approvals ?? []).map((a) => a.item), running: snap?.supervisor?.running ?? NO_RUNNING, queued: snap?.supervisor?.queued, products: snap?.products ?? [], engines: snap?.engines?.choices ?? [],
     models: teammateModels,
     onOpenFile: openTeammateFile,
+    onNewProject: () => setNewProject(true),
     me: team?.byId.get(team.me ?? '')?.name ?? '',
     mePic: team?.byId.get(team.me ?? '')?.avatarUrl ?? null,
     onEnter: () => { roomsUi.leave(); setChatsPlace(null); setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setFocusedRepeat(null); },
@@ -7826,6 +7827,7 @@ export default function App() {
                     // time lands a second time (OpenDoc, DocPane.tsx).
                     ...(at ? { atFrom: Date.now() } : {}),
                   })}
+                  onCloseDoc={putDocDown}
                   parent={focused.parent ? items.find((i) => i.id === focused.parent && i.product === focused.product) ?? null : null}
                   blockedBy={items.find((i) => i.parent === focused.id && i.product === focused.product && i.status !== 'done') ?? null}
                   filed={threadsMade(items, focused).map((i) => ({ id: i.id, title: rowTitle(i), state: stateOfMine(i), approve: approvableFiled(i, stateOfMine(i)), item: i }))}
@@ -8791,6 +8793,7 @@ export default function App() {
                 walking: runRef.current !== null,
                 offered: !neverOffered(localStorage),
                 touring: tourRef.current !== null,
+                writing: modalNow.current === 'compose' || clearWriting,
               })) setOffer({ product: slug });
             } catch (err) {
               // Nothing is held open any more, because nothing was typed: the
