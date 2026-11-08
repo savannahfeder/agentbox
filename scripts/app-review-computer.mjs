@@ -122,7 +122,7 @@ ConditionPathExists=/etc/agentbox-review.env
 User=agentbox
 WorkingDirectory=/home/agentbox
 EnvironmentFile=/etc/agentbox-review.env
-ExecStart=/usr/bin/env agentbox-app --no-open --port ${PORT}
+ExecStart=/usr/bin/env agentbox --no-open --port ${PORT}
 Restart=always
 RestartSec=10
 [Install]

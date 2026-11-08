@@ -12,6 +12,7 @@
 // machine is doing, and `off` deletes it at once. It never makes a second
 // machine while one is on, and never keeps one longer than 30 days.
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
 import { expiryOf, userDataOf, runInstancesArgs, scheduleArgs, envFileOf, hoursLeft, refuseSecond, secretsFrom, retried, KEYCHAIN, CODEX_LOGIN, MAX_DAYS, DEFAULT_DAYS } from '../scripts/app-review-computer.mjs';
 
 const NOW = Date.parse('2026-11-09T12:00:00Z');
@@ -125,6 +126,13 @@ describe('whose account the agents run on', () => {
   it('Codex is installed, and Claude Code is not', () => {
     expect(ud).toMatch(/npm install -g agentbox-app @openai\/codex/);
     expect(ud).not.toMatch(/claude-code/);
+  });
+  // The first machine (2026-11-08) restarted forever on "agentbox-app: No such
+  // file": the npm package is agentbox-app but its command is `agentbox`.
+  it('starts the app by the command the package installs', () => {
+    const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+    expect(Object.keys(pkg.bin)).toEqual(['agentbox']);
+    expect(ud).toMatch(/ExecStart=\/usr\/bin\/env agentbox --no-open --port 7777/);
   });
   it('Codex signs in on the machine with a device code, as the user the app runs as', () => {
     expect(CODEX_LOGIN).toBe('sudo -u agentbox -H codex login --device-auth');
