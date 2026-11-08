@@ -201,8 +201,14 @@ function MembersFirst(p: Parts) {
 }
 
 // 3. The trial first, as Vercel's trial banner: how long, how much, and what happens at the end.
+// Each person has hours of their own, as a seat is one person's $40 cloud plan (the owner, 2026-11-08).
+const TRIAL_HOURS_EACH = 10;
+const TRIAL_AGENTS_EACH = 2;
 function TrialFirst(p: Parts) {
   const spentDays = p.team.trial ? 14 - p.v.days : 14;
+  const each = p.team.trial ? TRIAL_HOURS_EACH : HOURS_A_SEAT;
+  const mine = p.members.find((m) => m.me);
+  const myLeft = Math.max(0, each * 3600 - (mine?.usedSeconds ?? 0));
   return <>
     <div className="tb-hero">
       <div className="tb-hero-title">{p.team.trial ? `${p.v.days} days left in your team's trial` : `Your team is on ${p.v.seatsLine}`}</div>
@@ -212,19 +218,36 @@ function TrialFirst(p: Parts) {
     </div>
     <div className="tb-compare">
       <div className="tb-compare-card">
-        <div className="tb-compare-name">Now</div>
-        <div className="tb-compare-big">{p.v.hoursLeft} of {p.v.hoursAll}</div>
-        <div className="tb-compare-small">cloud hours left, shared by {p.members.length}</div>
-        <div className="tb-compare-small">{p.team.agents} agents at once</div>
+        <div className="tb-compare-name">Now, each person</div>
+        <div className="tb-compare-big">{hours(myLeft)} of {each}</div>
+        <div className="tb-compare-small">of your trial hours left</div>
+        <div className="tb-compare-small">{TRIAL_AGENTS_EACH} agents at once</div>
       </div>
       <div className="tb-compare-card">
-        <div className="tb-compare-name">From {p.v.ends}</div>
-        <div className="tb-compare-big">{p.v.price}</div>
-        <div className="tb-compare-small">{n(HOURS_A_SEAT * p.members.length)} cloud hours a month, shared</div>
-        <div className="tb-compare-small">{AGENTS_A_SEAT * p.members.length} agents at once · paid by {p.team.owner ? 'you' : "your team's owner"}</div>
+        <div className="tb-compare-name">From {p.v.ends}, each person</div>
+        <div className="tb-compare-big">${DOLLARS_A_SEAT} a month</div>
+        <div className="tb-compare-small">{HOURS_A_SEAT} cloud hours a month, as on Pro</div>
+        <div className="tb-compare-small">{AGENTS_A_SEAT} agents at once · {p.team.owner ? `you pay ${p.v.price} for ${p.members.length}` : "paid by your team's owner"}</div>
       </div>
     </div>
-    <Section label={`Members · ${p.members.length}`} action={p.team.owner ? <InviteButton {...p} /> : undefined}><MemberRows {...p} /></Section>
+    <Section label={`Members · ${p.members.length}`} action={p.team.owner ? <InviteButton {...p} /> : undefined}>
+      <div className="tb-members">
+        {p.members.map((m) => {
+          const left = Math.max(0, each * 3600 - m.usedSeconds);
+          return (
+            <div key={m.id} className="tb-member">
+              <Face name={m.name} me={m.me} />
+              <div className="tb-member-name">{m.me ? 'You' : m.name}<small>{m.role === 'owner' ? 'Owner' : 'Member'}</small></div>
+              <div className="tb-member-use">
+                <span className="tb-member-bar"><i style={{ width: `${Math.round((left / (each * 3600)) * 100)}%` }} /></span>
+                <span className="tb-member-hours">{hours(left)} of {each} h</span>
+              </div>
+              <div className="tb-member-running">{m.running ? `${m.running} running` : ''}</div>
+            </div>
+          );
+        })}
+      </div>
+    </Section>
   </>;
 }
 
