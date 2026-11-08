@@ -124,21 +124,22 @@ function startedByYou(item) {
   return answeredInThread(item);
 }
 
-// The primary makes a teammate when the person said yes to one. It is a draft
-// that sets itself up by asking them, as one you made would.
+// Any thread makes a teammate when the person's own words on it asked for one.
+// It is a draft that sets itself up by asking them, as one you made would.
 export function teamHire({ name, job } = {}, ctx = {}) {
-  const { dir, me, team, item, project } = teammateContext(ctx);
-  if (!me.primary) throw new Error('only your primary employee makes new teammates; suggest one to the person instead');
-  if (!startedByYou(item)) throw new Error('make a teammate only in a run started by the person\'s words or answered by them: ask them first, with options');
+  const env = ctx.env ?? process.env;
+  if (!String(env.ZERO_ITEM ?? '').trim()) throw new Error('this session is not running for a thread, so nothing says the person asked for a teammate: ask them to make one on the Team page');
+  const { dir, me, team, item, project } = teammateContext({ ...ctx, outsider: true });
+  if (!startedByYou(item)) throw new Error('the person did not ask for a teammate on this thread, neither in its opening words nor in a reply: ask them first, with options, and make it once they say yes');
   const role = plain(name).slice(0, 40);
   const words = String(job ?? '').trim();
   if (!role || !words) throw new Error('give the new teammate a name that says its role, and its job in plain words');
   if (team.some((t) => t.name.toLowerCase() === role.toLowerCase())) throw new Error(`${role} is taken; pick another name`);
   const now = ctx.now ?? Date.now();
   const id = newTeammateId();
-  writeTeammate(dir, id, { name: role, role, letter: letterFor(role, team), job: words.slice(0, 2000), status: 'draft', product: me.product ?? project.id, createdAt: now, paused: false }, now);
+  writeTeammate(dir, id, { name: role, role, letter: letterFor(role, team), job: words.slice(0, 2000), status: 'draft', product: me?.product ?? project.id, createdAt: now, paused: false }, now);
   writeChat(dir, { kind: 'msg', from: YOU, to: [id], text: words.slice(0, 8000), setup: true }, now);
-  writeChat(dir, { kind: 'act', from: me.id, verb: 'hired', text: `${me.name} made ${role}, which is setting itself up.` }, now);
+  writeChat(dir, { kind: 'act', from: me?.id ?? YOU, verb: 'hired', text: `${me?.name ?? 'You'} made ${role}, which is setting itself up.` }, now);
   return { teammate: { id, name: role, status: 'draft' }, note: `${role} wakes now to set itself up, and asks the person what it cannot tell from the job.` };
 }
 
