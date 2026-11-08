@@ -47,8 +47,8 @@ import { NOTES_CLOSED_KEY, notesSidebarOpen, rememberNotesSidebar, takesNotesSid
 import { docKind, EVEN_SPLIT, escapeClosesDoc, escapeInTheFileClosesIt, focusIsInTheFile, readSplit, writeSplit } from './doc-pane';
 import { changeOwnsKey } from './code-keys';
 import { askStillStands, bringsBack, closesAgain, graceUndoneLine, nextUndo, shownAfterUndo, ticksAfterUndo, undoAsk, HOLDS_A_KEY, NOTHING_TO_UNDO, UNDID_CLOSING } from './undo-window';
-import { answeredAlready, TOO_LATE_TO_WITHDRAW } from './withdraw-send';
-import { addUndoMark, UNDO_MARKS_EVENT, type UndidSpec } from './undo-marks';
+import { answeredAlready, TOO_LATE_TO_WITHDRAW, UNDID_SENDING, withoutWithdrawnSends } from './withdraw-send';
+import { addUndoMark, readUndoMarks, UNDO_MARKS_EVENT, type UndidSpec } from './undo-marks';
 import { whatTheFileSentUp } from '../../shared/artifact-keys.mts';
 import { ALIVE_EVERY_MS, markWindowAlive, type Place, placeIsSomewhere, readPlace, windowWasJustHere, writePlace, writeScroll } from './where-she-was';
 import { Rail } from './components/Rail';
@@ -1978,7 +1978,14 @@ export default function App() {
       .finally(() => { olderAsking.current = false; });
   }, [older.length, olderMore]);
   const itemsWithOlder = useMemo(() => withOlder(snap?.items ?? [], older), [snap?.items, older]);
-  const items = walkRows(itemsWithOlder, run);
+  const [undoMarks, setUndoMarks] = useState(() => readUndoMarks());
+  useEffect(() => {
+    const reread = () => setUndoMarks(readUndoMarks());
+    window.addEventListener(UNDO_MARKS_EVENT, reread);
+    return () => window.removeEventListener(UNDO_MARKS_EVENT, reread);
+  }, []);
+  const listed = useMemo(() => withoutWithdrawnSends(itemsWithOlder, undoMarks), [itemsWithOlder, undoMarks]);
+  const items = walkRows(listed, run);
 
   /* --------------------- her agents, as rows in her list ------------------- */
   // EVERY CLAUDE CODE AGENT ON HER MACHINE THAT AGENTBOX DID NOT START. They are
@@ -8325,7 +8332,7 @@ export default function App() {
                 const row = rows.find((i) => i.id === one.id && i.product === one.product);
                 if (answeredAlready(row)) return { refused: TOO_LATE_TO_WITHDRAW, open: row };
                 await api.answer({ product: one.product, id: one.id, status: 'done' });
-              }, [{ ...one, words: 'Undid sending it' }]);
+              }, [{ ...one, words: UNDID_SENDING }]);
             }
             // Read before the line is said: a tool with no login left in
             // usage means nothing started, and the line has to say so.
