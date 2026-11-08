@@ -1895,7 +1895,7 @@ export class Supervisor {
   }
 
   /**
-   * WAIT FOR THAT COMMIT'S TESTS ON GITHUB, BESIDE EVERYTHING ELSE.
+   * WAIT FOR THAT COMMIT'S TESTS AND SECURITY RUNS ON GITHUB, BESIDE EVERYTHING ELSE.
    *
    * Nothing waits on this: no ship, no agent, no tick. It is started and
    * dropped, every failure inside it is quiet, and the app quitting ends it
@@ -1907,6 +1907,9 @@ export class Supervisor {
     try {
       this.mainTests.watch(shipped as ShippedNote & { sha: string }).catch(() => {});
     } catch { /* a watch that cannot start is not a ship that failed */ }
+    try {
+      this.mainTests.watchSecurity(shipped as ShippedNote & { sha: string }).catch(() => {});
+    } catch { /* nor is this one */ }
   }
 
   stop() {

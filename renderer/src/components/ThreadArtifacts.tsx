@@ -7,7 +7,6 @@ import type { LedgerLine } from '../thread-history';
 import type { ArtifactMark, FileElsewhere, FileMarks, Person, WorkItem } from '../types';
 import { ArtifactView, NO_MARKS, type ArtifactOpen } from './ArtifactView';
 import { useFileLine } from '../file-numbers';
-import { shownTitle } from '../../../shared/thread-title.mjs';
 import { filesInLines, threadFiles } from '../../../shared/artifact-marks.mjs';
 
 /** This thread's marks with those from the other copies, every pin numbered in the order it was made. */
@@ -31,13 +30,12 @@ export function markGoesTo(mark: ArtifactMark, elsewhere: FileElsewhere[]): stri
   return elsewhere.flatMap((e) => e.notes).find((n) => n.id === m.on)?.key ?? null;
 }
 
-export function ThreadArtifacts({ item, open, withAgent, onBeside, onClose, onNotice }: {
+export function ThreadArtifacts({ item, open, withAgent, onClose, onBeside, onNotice }: {
   item: WorkItem;
   open: ArtifactOpen;
   withAgent: boolean;
-  /** Puts the file in hand beside the chat. */
-  onBeside?: (path: string) => void;
   onClose: () => void;
+  onBeside?: (path: string) => void;
   onNotice: (words: string) => void;
 }) {
   const team = useContext(TeamContext);
@@ -75,7 +73,6 @@ export function ThreadArtifacts({ item, open, withAgent, onBeside, onClose, onNo
   return <ArtifactView
     product={item.product}
     thread={item.id}
-    threadName={shownTitle(item)}
     lines={allLines}
     numbers={numbered.numbers}
     marks={marks}
@@ -93,7 +90,7 @@ export function ThreadArtifacts({ item, open, withAgent, onBeside, onClose, onNo
       return out.ok ? null : out.error ?? 'That did not save.';
     }}
     onOutside={(src) => { void api.openArtifactExternally({ product: item.product, src }).then((r) => { if (!r.ok) onNotice(r.error || `${src} could not be opened.`); }); }}
-    onBeside={onBeside}
     onClose={onClose}
+    onBeside={onBeside}
   />;
 }
