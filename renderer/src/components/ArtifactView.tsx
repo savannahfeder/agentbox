@@ -47,7 +47,7 @@ const KIND_WORD = { image: 'Picture', film: 'Film', pdf: 'PDF', deck: 'Slides', 
 
 const newId = () => `n${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
-export function ArtifactView({ product, thread, draftsAcross, shareThread, threadName, lines, numbers, marks, me, people, open, ownerOfRow, write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, below, files: fromElsewhere, typing = false }: {
+export function ArtifactView({ product, thread, draftsAcross, shareThread, threadName, lines, numbers, marks, me, people, open, ownerOfRow, write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, onBeside, below, files: fromElsewhere, typing = false }: {
   /** Each path's number on its file's version line, which every surface counts by. */
   numbers?: Record<string, number>;
   /** What to say of a version with no bytes on this computer, by who made it. */
@@ -78,6 +78,8 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
   editGoes?: string;
   onClose: () => void;
   onOutside?: (path: string) => void;
+  /** Closes this view and opens the file in the pane beside the chat. */
+  onBeside?: (path: string) => void;
   /** A line under the file, the full width of the window. */
   below?: ReactNode;
   /** Opened to write in, so the editor takes the cursor. */
@@ -696,6 +698,7 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
         {(thread ?? shareThread) && version && foundNow === 'open' && !compare && canShareFile(version.path) && (
           <ShareLink product={product} thread={(thread ?? shareThread)!} src={version.path} signedIn={!!me} />
         )}
+        {onBeside && version && !compare && <button type="button" className="av-btn" onClick={() => away(() => onBeside(version.path))}><NoteGlyph name="beside" />Open on the side</button>}
         {onOutside && version && foundNow === 'open' && <button type="button" className="av-btn" onClick={() => onOutside(version.path)}><NoteGlyph name="outside" />Open outside</button>}
         <button type="button" className="av-btn av-leave" onClick={leave} title="Back (esc)"><NoteGlyph name="back" />Back</button>
       </header>

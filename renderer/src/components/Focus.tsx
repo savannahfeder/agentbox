@@ -2080,6 +2080,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     {cornerHeaderTarget && createPortal(<span className="ts-top">{sentUp && aboveDock}{queue && <QueueNav spot={queue.spot} onStep={queue.onStep} />}{crumbFrom && !inChats && (direct || summarised) && <ConversationAside item={item} />}{threadMenu}</span>, cornerHeaderTarget)}
     {artifact && (
       <ThreadArtifacts item={item} open={artifact} withAgent={!direct && !heldByPerson && !item.agent}
+        onBeside={onOpenDoc ? (src) => { setArtifact(null); onOpenDoc(src); } : undefined}
         onClose={() => setArtifact(null)} onNotice={onNotice} />
     )}
     {picture && (
