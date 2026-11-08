@@ -501,6 +501,7 @@ function Field({ column, value, editable, onWrite, hands, cells }: {
   const [draft, setDraft] = useState(value);
   const [picking, setPicking] = useState(false);
   const here = useRef<HTMLDivElement>(null);
+  const dropped = useRef(false);
   useEffect(() => setDraft(value), [value]);
   // A list closing takes its focus with it; the keys go back to the sheet, so Escape and undo still work.
   const done = () => {
@@ -529,12 +530,14 @@ function Field({ column, value, editable, onWrite, hands, cells }: {
     </div>;
   }
   if (!editable) return <div className="tbl-field-text">{value || <span className="tbl-field-none">Empty</span>}</div>;
+  // Escape drops the typing, as it does in the grid; the blur after it must not write the draft its closure still holds.
+  const toSheet = (el: HTMLElement) => el.closest<HTMLElement>('.tbl-sheet')?.focus({ preventScroll: true });
   return <GrowingText className="tbl-field-box" value={draft} label={column.name} onChange={setDraft}
-    onBlur={() => { if (draft !== value) onWrite(draft); }}
+    onBlur={() => { if (!dropped.current && draft !== value) onWrite(draft); dropped.current = false; }}
     onKeyDown={(e) => {
       e.stopPropagation();
-      if (e.key === 'Escape') { e.preventDefault(); setDraft(value); (e.target as HTMLElement).blur(); }
-      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); (e.target as HTMLElement).blur(); }
+      if (e.key === 'Escape') { e.preventDefault(); dropped.current = true; setDraft(value); toSheet(e.target as HTMLElement); }
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); toSheet(e.target as HTMLElement); }
     }} />;
 }
 
