@@ -18,10 +18,10 @@
 export const RANK_STEP = 100;
 
 /** Clean a proposed order: strings only, no blanks, no duplicates. */
-export function normalizeOrder(slugs) {
+export function normalizeOrder(slugs: unknown): string[] {
   if (!Array.isArray(slugs)) return [];
-  const seen = new Set();
-  const out = [];
+  const seen = new Set<string>();
+  const out: string[] = [];
   for (const slug of slugs) {
     if (typeof slug !== 'string' || !slug || seen.has(slug)) continue;
     seen.add(slug);
@@ -38,7 +38,7 @@ export function normalizeOrder(slugs) {
  * has never placed must not silently outrank one she has, and an empty order
  * has to behave exactly like the flat inbox that existed before ranking did.
  */
-export function productRankScore(order, slug) {
+export function productRankScore(order: readonly string[], slug: string): number {
   const idx = order.indexOf(slug);
   if (idx === -1) return 0;
   return (order.length - idx) * RANK_STEP;
@@ -61,7 +61,7 @@ export function productRankScore(order, slug) {
  * The fleet does not need it: a conversation is held by a person and never
  * spawns, so the supervisor's score never meets one.
  */
-export function placeScore(order, slug, direct) {
+export function placeScore(order: readonly string[], slug: string, direct?: ReadonlySet<string>): number {
   if (direct?.has(slug)) return order.length * RANK_STEP;
   return productRankScore(order, slug);
 }
@@ -87,10 +87,12 @@ export function placeScore(order, slug, direct) {
  */
 export const DEFAULT_PRIORITY = 5;
 
-export function itemPriority(item) {
+type Prioritised = { priority?: number | null } | null | undefined;
+
+export function itemPriority(item: Prioritised): number {
   if (!item) return DEFAULT_PRIORITY;
   const n = item.priority;
-  return Number.isFinite(n) && n > 0 ? n : DEFAULT_PRIORITY;
+  return Number.isFinite(n) && (n as number) > 0 ? n as number : DEFAULT_PRIORITY;
 }
 
 /**
@@ -107,7 +109,7 @@ export function itemPriority(item) {
  * conversation never spawns, so there is no running order for it to disagree
  * with. `conversation` is the caller's to say, since only it knows the product.
  */
-export function shownPriority(item, conversation = false) {
+export function shownPriority(item: Prioritised, conversation = false): number | null {
   if (conversation) return item?.priority ?? null;
   return itemPriority(item);
 }
@@ -130,7 +132,7 @@ export const URGENT_PRIORITY = 9;
  * this predicate takes a running session away from something else, so an
  * agent's nine interrupts like hers; a wrong one is hers to lower.
  */
-export function isUrgent(item) {
+export function isUrgent(item: Prioritised): boolean {
   return itemPriority(item) >= URGENT_PRIORITY;
 }
 
@@ -139,10 +141,10 @@ export function isUrgent(item) {
  * before the order existed, and preserves the founder's intent: everything she
  * called high comes first, then untagged, then everything she called low.
  */
-export function orderFromTiers(tiers) {
+export function orderFromTiers(tiers: Record<string, number> | null | undefined): string[] {
   if (!tiers || typeof tiers !== 'object') return [];
   const slugs = Object.keys(tiers);
-  const rank = (s) => (tiers[s] > 0 ? 0 : tiers[s] < 0 ? 2 : 1);
+  const rank = (s: string) => (tiers[s] > 0 ? 0 : tiers[s] < 0 ? 2 : 1);
   return normalizeOrder(slugs.filter((s) => tiers[s] !== 0).sort((a, b) => rank(a) - rank(b)));
 }
 
@@ -157,7 +159,10 @@ export function orderFromTiers(tiers) {
  * the same X range, and dragging up or down moved nothing at all (founder,
  * 2026-08-06). Row first, then position within the row.
  */
-export function landingIndex(rects, x, y) {
+export function landingIndex(
+  rects: ReadonlyArray<{ top: number; bottom: number; left: number; width: number } | null | undefined>,
+  x: number, y: number,
+): number {
   if (!Array.isArray(rects)) return 0;
   for (let i = 0; i < rects.length; i += 1) {
     const r = rects[i];
@@ -182,8 +187,8 @@ export function landingIndex(rects, x, y) {
  * sorting the way it always did: a new Urgent thread still lands by its level,
  * next to the placed ones rather than under all of them.
  */
-export function placedScore(place, natural) {
-  return Number.isFinite(place) ? place : natural;
+export function placedScore(place: number | null | undefined, natural: number): number {
+  return Number.isFinite(place) ? place as number : natural;
 }
 
 /**
@@ -198,12 +203,12 @@ export function placedScore(place, natural) {
  * of their own first, spread in the order they were drawn. The rows below are
  * never written.
  */
-export function dropPlaces(rows, from, to) {
+export function dropPlaces(rows: ReadonlyArray<{ id: string; score: number }>, from: number, to: number): Record<string, number> | null {
   if (!Array.isArray(rows) || from < 0 || from >= rows.length) return null;
   const rest = rows.filter((_, i) => i !== from);
   const at = Math.max(0, Math.min(rest.length, to > from ? to - 1 : to));
   if (at === from || !rest.length) return null;
-  const close = (a, b) => Math.abs(a - b) < 1e-6;
+  const close = (a: number, b: number) => Math.abs(a - b) < 1e-6;
   const below = rest[at]?.score;
   const floor = below ?? rest[at - 1].score - 2;
   // The run of rows just above the drop that tie with the floor.
@@ -212,7 +217,7 @@ export function dropPlaces(rows, from, to) {
   const ceiling = top > 0 ? rest[top - 1].score : floor + 2;
   const run = rest.slice(top, at);
   const step = (ceiling - floor) / (run.length + 2);
-  const out = {};
+  const out: Record<string, number> = {};
   run.forEach((r, j) => { out[r.id] = floor + (run.length + 1 - j) * step; });
   out[rows[from].id] = floor + step;
   return out;
@@ -223,7 +228,7 @@ export function dropPlaces(rows, from, to) {
  * never in the order join it on their first move, so dragging an unranked chip
  * is how it gets ranked at all.
  */
-export function moveProduct(order, slug, toIndex) {
+export function moveProduct(order: readonly string[], slug: string, toIndex: number): string[] {
   const base = normalizeOrder(order).filter((s) => s !== slug);
   const at = Math.max(0, Math.min(base.length, Math.trunc(toIndex)));
   base.splice(at, 0, slug);

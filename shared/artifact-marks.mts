@@ -7,6 +7,155 @@
 
 import { PLAIN_AGENT } from './agent-voice.mts';
 
+export type NotePlace =
+  | { kind: 'pin'; x: number; y: number }
+  | { kind: 'time'; s: number; x?: number; y?: number }
+  | { kind: 'page'; n: number; word?: 'Slide'; x?: number; y?: number }
+  | { kind: 'quote'; text: string; x?: undefined; y?: undefined }
+  | { kind: 'whole'; x?: undefined; y?: undefined };
+
+export type Mark =
+  | { do: 'note'; id: string; file: string; place: NotePlace; text: string; mentions?: string[]; owner?: string; wait?: boolean }
+  | { do: 'reply'; id: string; on: string; file: string; text: string }
+  | { do: 'resolve' | 'reopen'; on: string; in?: string }
+  | { do: 'approve' | 'unapprove'; file: string; owner?: string }
+  | { do: 'seen' | 'sent' | 'toagent'; on: string[] }
+  | { do: 'edit'; file: string; path?: string; over?: string; text?: string }
+  | { do: 'reconcile'; file: string; path?: string; missed?: string; from?: string; clash?: number; replace?: boolean };
+
+export type MarkKind = Mark['do'];
+
+// Loose on purpose: callers gather marks from ledger lines that carry no type.
+export interface MarkEntry {
+  do?: string;
+  id?: string;
+  file?: string;
+  path?: string;
+  place?: NotePlace;
+  text?: string;
+  mentions?: readonly string[];
+  owner?: string;
+  on?: string | readonly string[];
+  wait?: boolean;
+  in?: string;
+  over?: string;
+  missed?: string;
+  from?: string;
+  clash?: number;
+  replace?: boolean;
+  by?: string | null;
+  ts: number;
+  uid?: string | null;
+}
+
+type StampedMark = Mark & { by?: string | null; ts: number; uid?: string | null };
+
+export interface FileReply { id: string; text: string; by: string | null; ts: number }
+
+export interface FileNote {
+  id: string;
+  file: string;
+  place: NotePlace;
+  text: string;
+  by: string | null;
+  ts: number;
+  mentions: string[];
+  owner: string | null;
+  uid: string | null;
+  pin?: number;
+  wait?: boolean;
+  sent?: boolean;
+  toAgent?: boolean;
+  replies?: FileReply[];
+  resolved?: boolean;
+  resolvedBy?: string | null;
+  resolvedIn?: string;
+}
+
+export interface FileApproval { file: string; by: string | null; ts: number; owner: string | null }
+
+export interface FileEdit { file: string; path: string; by: string | null; ts: number }
+
+export interface FileMarks {
+  notes: FileNote[];
+  approvals: FileApproval[];
+  seen: Record<string, string[]>;
+  edits?: FileEdit[];
+}
+
+export interface LinePatch {
+  artifact?: Mark | null;
+  voice?: { name?: string } | null;
+  [field: string]: unknown;
+}
+
+export interface ThreadLine {
+  id?: string;
+  ts: number;
+  by?: string | null;
+  source?: string;
+  uid?: string | null;
+  patch?: LinePatch | null;
+}
+
+export interface ThreadFile { path: string; by?: string | null; at?: number; agent?: string; edited?: boolean; newer?: boolean; made?: boolean }
+
+export interface NamedFile extends ThreadFile { by: string | null; at: number }
+
+/** `agent` is set when an agent shared it: its name, or empty when it has none. `newer`: made in another place after this thread's own. */
+export interface FileVersion {
+  id: string;
+  name: string;
+  path: string;
+  n: number;
+  by: string | null;
+  at: number;
+  agent?: string;
+  edited?: boolean;
+  made?: boolean;
+  newer?: boolean;
+  also?: string[];
+}
+
+export interface FileFamily { key: string; versions: FileVersion[] }
+
+/** A thread's file as its version line numbers it. `path` is null where only a teammate has that version; `here` is how this thread named it. */
+export interface FileLine {
+  key: string;
+  versions: Array<{ n: number; name: string; path: string | null; by: string | null; at: number; agent?: string; here: string[] }>;
+}
+
+export interface FileStep { fi: number; vi: number }
+
+export type ReviewKind = 'image' | 'film' | 'pdf' | 'markdown' | 'deck';
+export type OtherKind = 'page' | 'table' | 'code';
+export type ViewKind = ReviewKind | OtherKind;
+
+export interface FileNews {
+  kind: 'note' | 'named' | 'reply' | 'approved';
+  id: string;
+  on?: string;
+  by: string | null;
+  ts: number;
+  file: string;
+  text?: string;
+}
+
+export interface FileNewsRow {
+  artifacts?: FileMarks | null;
+  runner?: string | null;
+  createdBy?: string | null;
+  people?: readonly string[] | null;
+  status?: string;
+  wrote?: Readonly<Record<string, { by?: string | null; ts: number } | undefined>> | null;
+}
+
+export interface NotePerson { id: string; name?: string | null }
+
+export type NoteTarget = { to: 'agent' } | { to: 'person'; person: string } | { to: 'nobody' };
+
+type NameOf = (id: string | null) => string;
+
 const MARK_ID = /^[\w-]{1,64}$/;
 const FILE_ID = /^[^/\\\0]{1,160}$/;
 const MAX_NOTE_CHARS = 4000;
@@ -16,22 +165,24 @@ const MAX_NAMED = 12;
 const MAX_SEEN = 50;
 // Under the 24,000 the cloud allows one mark, with room for the rest of it.
 export const MAX_EDIT_BYTES = 20_000;
-const byteLength = (s) => new TextEncoder().encode(s).length;
-const documentPath = (v) => (typeof v === 'string' && !v.startsWith('/') && !v.split('/').includes('..') && /\.(?:md|markdown)$/i.test(v) && v.length <= 400 ? v : null);
+const byteLength = (s: string): number => new TextEncoder().encode(s).length;
+const documentPath = (v: unknown): string | null => (typeof v === 'string' && !v.startsWith('/') && !v.split('/').includes('..') && /\.(?:md|markdown)$/i.test(v) && v.length <= 400 ? v : null);
 
-const shortId = (v) => (typeof v === 'string' && MARK_ID.test(v) ? v : null);
-const fileId = (v) => (typeof v === 'string' && FILE_ID.test(v) && v !== '.' && v !== '..' ? v : null);
-const unit = (v) => typeof v === 'number' && v >= 0 && v <= 1;
+const shortId = (v: unknown): string | null => (typeof v === 'string' && MARK_ID.test(v) ? v : null);
+const fileId = (v: unknown): string | null => (typeof v === 'string' && FILE_ID.test(v) && v !== '.' && v !== '..' ? v : null);
+const unit = (v: unknown): v is number => typeof v === 'number' && v >= 0 && v <= 1;
 
-function cleanPlace(place) {
+type RawPlace = { kind?: unknown; x?: unknown; y?: unknown; s?: unknown; n?: unknown; word?: unknown; text?: unknown };
+
+function cleanPlace(place: RawPlace | null | undefined): NotePlace | undefined {
   switch (place?.kind) {
     case 'pin': return unit(place.x) && unit(place.y) ? { kind: 'pin', x: place.x, y: place.y } : undefined;
     case 'time':
-      if (!Number.isFinite(place.s) || place.s < 0) return undefined;
-      return unit(place.x) && unit(place.y) ? { kind: 'time', s: place.s, x: place.x, y: place.y } : { kind: 'time', s: place.s };
+      if (!Number.isFinite(place.s) || (place.s as number) < 0) return undefined;
+      return unit(place.x) && unit(place.y) ? { kind: 'time', s: place.s as number, x: place.x, y: place.y } : { kind: 'time', s: place.s as number };
     case 'page': {
-      if (!Number.isInteger(place.n) || place.n < 1) return undefined;
-      return { kind: 'page', n: place.n, ...(place.word === 'Slide' ? { word: 'Slide' } : {}), ...(unit(place.x) && unit(place.y) ? { x: place.x, y: place.y } : {}) };
+      if (!Number.isInteger(place.n) || (place.n as number) < 1) return undefined;
+      return { kind: 'page', n: place.n as number, ...(place.word === 'Slide' ? { word: 'Slide' as const } : {}), ...(unit(place.x) && unit(place.y) ? { x: place.x, y: place.y } : {}) };
     }
     case 'quote': {
       const text = typeof place.text === 'string' ? place.text.trim().slice(0, MAX_QUOTE_CHARS) : '';
@@ -43,17 +194,18 @@ function cleanPlace(place) {
 }
 
 /** A mark as the ledger may hold it, or undefined. A teammate's copy wrote it, so nothing is believed. */
-export function cleanMark(value) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+export function cleanMark(raw: unknown): Mark | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const value = raw as Record<string, unknown>;
   const owner = shortId(value.owner);
   switch (value.do) {
     case 'note': {
       const id = shortId(value.id);
       const file = fileId(value.file);
-      const place = cleanPlace(value.place);
+      const place = cleanPlace(value.place as RawPlace | null | undefined);
       const text = typeof value.text === 'string' ? value.text.trim().slice(0, MAX_NOTE_CHARS) : '';
       if (!id || !file || !place || !text) return undefined;
-      const mentions = Array.isArray(value.mentions) ? [...new Set(value.mentions.map(shortId).filter(Boolean))].slice(0, MAX_NAMED) : [];
+      const mentions = Array.isArray(value.mentions) ? [...new Set(value.mentions.map(shortId).filter(Boolean) as string[])].slice(0, MAX_NAMED) : [];
       // `wait`: held for Send rather than told to the agent as it is added.
       return { do: 'note', id, file, place, text, ...(mentions.length ? { mentions } : {}), ...(owner ? { owner } : {}), ...(value.wait === true ? { wait: true } : {}) };
     }
@@ -75,7 +227,7 @@ export function cleanMark(value) {
       return file ? { do: value.do, file, ...(owner ? { owner } : {}) } : undefined;
     }
     case 'seen': case 'sent': case 'toagent': {
-      const on = (Array.isArray(value.on) ? value.on : []).map(shortId).filter(Boolean).slice(0, MAX_SEEN);
+      const on = (Array.isArray(value.on) ? value.on : []).map(shortId).filter(Boolean).slice(0, MAX_SEEN) as string[];
       return on.length ? { do: value.do, on } : undefined;
     }
     // `path` once the owner's copy has written the file; `text` on its way there
@@ -98,35 +250,37 @@ export function cleanMark(value) {
       const path = value.path !== undefined ? documentPath(value.path) : null;
       const missed = value.missed !== undefined ? documentPath(value.missed) : null;
       const from = fileId(value.from);
-      return { do: 'reconcile', file, ...(path ? { path } : {}), ...(missed ? { missed } : {}), ...(from ? { from } : {}), ...(Number.isInteger(value.clash) && value.clash > 0 ? { clash: value.clash } : {}), ...(value.replace === true ? { replace: true } : {}) };
+      return { do: 'reconcile', file, ...(path ? { path } : {}), ...(missed ? { missed } : {}), ...(from ? { from } : {}), ...(Number.isInteger(value.clash) && (value.clash as number) > 0 ? { clash: value.clash as number } : {}), ...(value.replace === true ? { replace: true } : {}) };
     }
     default: return undefined;
   }
 }
 
 /** Only that this person has looked at something, which is nothing anyone else needs to read. */
-export const isBookkeepingMark = (mark) => mark?.do === 'seen' || mark?.do === 'sent' || mark?.do === 'reconcile';
+export const isBookkeepingMark = (mark: { do?: unknown } | null | undefined): boolean => mark?.do === 'seen' || mark?.do === 'sent' || mark?.do === 'reconcile';
 
 /**
  * Every mark on a thread, oldest first, as what it now says. Each entry is the
  * mark plus the `by` and `ts` of its line. The first note under an id stands, so
  * a later line cannot rewrite one, and only the approver can take an approval back.
  */
-export function marksOf(entries) {
-  const notes = new Map();
-  const given = new Map();
-  const pins = new Map();
-  const seen = new Map();
-  const sent = new Set();
-  const toAgent = new Set();
-  const settled = new Map();
-  const replies = new Map();
-  const edits = [];
-  for (const e of entries ?? []) {
+export function marksOf(entries: readonly MarkEntry[] | null | undefined): FileMarks {
+  const notes = new Map<string, FileNote>();
+  const given = new Map<string, FileApproval & { on: boolean }>();
+  const pins = new Map<string, number>();
+  const seen = new Map<string, Set<string>>();
+  const sent = new Set<string>();
+  const toAgent = new Set<string>();
+  const settled = new Map<string, { ts: number; by: string | null; resolved: boolean; in: string | null }>();
+  const replies = new Map<string, FileReply & { on: string }>();
+  const edits: FileEdit[] = [];
+  for (const entry of entries ?? []) {
+    // Every entry was let through cleanMark when its line was read.
+    const e = entry as StampedMark;
     if (e.do === 'edit' && e.path) {
       edits.push({ file: e.file, path: e.path, by: e.by ?? null, ts: e.ts });
     } else if (e.do === 'note' && !notes.has(e.id)) {
-      const note = { id: e.id, file: e.file, place: e.place, text: e.text, by: e.by ?? null, ts: e.ts, mentions: e.mentions ?? [], owner: e.owner ?? null, uid: e.uid ?? null, ...(e.wait ? { wait: true } : {}) };
+      const note: FileNote = { id: e.id, file: e.file, place: e.place, text: e.text, by: e.by ?? null, ts: e.ts, mentions: e.mentions ?? [], owner: e.owner ?? null, uid: e.uid ?? null, ...(e.wait ? { wait: true } : {}) };
       if (e.place.kind === 'pin' || ((e.place.kind === 'time' || e.place.kind === 'page') && unit(e.place.x))) {
         const n = (pins.get(e.file) ?? 0) + 1;
         pins.set(e.file, n);
@@ -145,19 +299,19 @@ export function marksOf(entries) {
     } else if (e.do === 'seen') {
       const who = e.by ?? '';
       if (!seen.has(who)) seen.set(who, new Set());
-      for (const id of e.on) seen.get(who).add(id);
+      for (const id of e.on) seen.get(who)!.add(id);
     } else if (e.do === 'sent') {
       for (const id of e.on) sent.add(id);
     } else if (e.do === 'toagent') {
       for (const id of e.on) toAgent.add(id);
     }
   }
-  const answers = new Map();
+  const answers = new Map<string, FileReply[]>();
   for (const r of [...replies.values()].sort((a, b) => a.ts - b.ts)) {
     if (!answers.has(r.on)) answers.set(r.on, []);
-    answers.get(r.on).push({ id: r.id, text: r.text, by: r.by, ts: r.ts });
+    answers.get(r.on)!.push({ id: r.id, text: r.text, by: r.by, ts: r.ts });
   }
-  const list = [...notes.values()].map((n) => {
+  const list = [...notes.values()].map((n): FileNote => {
     const s = settled.get(n.id);
     const out = { ...n, ...(sent.has(n.id) ? { sent: true } : {}), ...(toAgent.has(n.id) ? { toAgent: true } : {}), ...(answers.has(n.id) ? { replies: answers.get(n.id) } : {}) };
     return s?.resolved ? { ...out, resolved: true, resolvedBy: s.by, ...(s.in ? { resolvedIn: s.in } : {}) } : out;
@@ -171,20 +325,20 @@ export function marksOf(entries) {
 }
 
 /** An approval's name for `seen`: a person seeing it says nothing about a later press. */
-export const approvalId = (a) => `a${Math.trunc(Number(a.ts) || 0)}`;
+export const approvalId = (a: Pick<FileApproval, 'ts'>): string => `a${Math.trunc(Number(a.ts) || 0)}`;
 
-const clock = (s) => {
+const clock = (s: number): string => {
   const whole = Math.floor(Number(s) || 0);
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
 };
 
 /** "Pin 2", "0:12", "Slide 3", the quote, "Whole file". */
-export function placeWords(note) {
+export function placeWords(note: { place?: NotePlace | null; pin?: number | string } | null | undefined): string {
   const place = note?.place;
   switch (place?.kind) {
-    case 'pin': return `Pin ${note.pin ?? 1}`;
-    case 'time': return unit(place.x) ? `Pin ${note.pin ?? 1} at ${clock(place.s)}` : clock(place.s);
-    case 'page': return unit(place.x) ? `Pin ${note.pin ?? 1} on ${place.word ?? 'Page'} ${place.n}` : `${place.word ?? 'Page'} ${place.n}`;
+    case 'pin': return `Pin ${note!.pin ?? 1}`;
+    case 'time': return unit(place.x) ? `Pin ${note!.pin ?? 1} at ${clock(place.s)}` : clock(place.s);
+    case 'page': return unit(place.x) ? `Pin ${note!.pin ?? 1} on ${place.word ?? 'Page'} ${place.n}` : `${place.word ?? 'Page'} ${place.n}`;
     case 'quote': return `“${place.text}”`;
     default: return 'Whole file';
   }
@@ -201,7 +355,7 @@ const SAVED_PREFIX = /^[a-z0-9]{8}-[a-z0-9]{1,6}-/;
 // A copy carries a mark in its name: a thread's attachments, or a group's file as kept here.
 const SENT_COPY = /(^|\/)(attachments|\.room-files)\//;
 
-export function shownName(path) {
+export function shownName(path: string | null | undefined): string {
   const clean = String(path ?? '').split(/[?#]/)[0];
   const base = clean.split('/').pop() ?? '';
   // A hash in front is a shared thread's copy, even when an agent names it bare.
@@ -209,7 +363,7 @@ export function shownName(path) {
   return base.replace(COPY_PREFIX, '').replace(SAVED_PREFIX, '');
 }
 
-const KINDS = [
+const KINDS: ReadonlyArray<readonly [ReviewKind, RegExp]> = [
   ['image', /\.(png|jpe?g|gif|webp|svg)$/i],
   ['film', /\.(mp4|mov|m4v|webm)$/i],
   ['pdf', /\.pdf$/i],
@@ -217,29 +371,29 @@ const KINDS = [
   ['deck', /\.pptx$/i],
 ];
 /** What the view can open, or null. */
-export const reviewKind = (path) => KINDS.find(([, re]) => re.test(String(path ?? '').split(/[?#]/)[0]))?.[0] ?? null;
+export const reviewKind = (path: string | null | undefined): ReviewKind | null => KINDS.find(([, re]) => re.test(String(path ?? '').split(/[?#]/)[0]))?.[0] ?? null;
 
 // Only what plainly means "another go at this file". A bare number does not:
 // shot-3.png and shot-4.png are two shots.
 const VERSION_TAIL = /(?:[-_ ]v\d+|\s*\(\d+\)|-\d+-|[-_ ](?:final|latest))$/i;
 
-function baseStem(name) {
+function baseStem(name: string): string {
   const dot = name.lastIndexOf('.');
   let stem = dot > 0 ? name.slice(0, dot) : name;
   while (VERSION_TAIL.test(stem) && stem.replace(VERSION_TAIL, '')) stem = stem.replace(VERSION_TAIL, '');
   return stem;
 }
-const stemOf = (name) => baseStem(name).toLowerCase();
+const stemOf = (name: string): string => baseStem(name).toLowerCase();
 
 /** `group-seat-picker-v3.png` as `group-seat-picker.png`. */
-export function baseName(name) {
+export function baseName(name: string): string {
   const dot = name.lastIndexOf('.');
   return `${baseStem(name)}${dot > 0 ? name.slice(dot) : ''}`;
 }
 
 // A page or a script is keyed by its stem and extension, as it was keyed by its
 // whole name before versions of one folded, so where it was filed still holds.
-function keyOf(name, path) {
+function keyOf(name: string, path: string): string {
   const stem = stemOf(name);
   const kind = reviewKind(path);
   if (kind) return `${stem}\0${kind}`;
@@ -247,9 +401,9 @@ function keyOf(name, path) {
 }
 
 /** The key of the family a path belongs to, in plain characters (a database refuses \0). */
-export const familyKeyOf = (path) => keyOf(shownName(path), path).replace(/\0/g, '/');
+export const familyKeyOf = (path: string): string => keyOf(shownName(path), path).replace(/\0/g, '/');
 
-const endsWithPath = (whole, part) => whole === part || whole.endsWith(`/${part}`);
+const endsWithPath = (whole: string, part: string): boolean => whole === part || whole.endsWith(`/${part}`);
 
 /**
  * The files of a thread, grouped into families of versions, oldest version first
@@ -261,9 +415,9 @@ const endsWithPath = (whole, part) => whole === part || whole.endsWith(`/${part}
  * (shared/version-line.mts). A family the line knows is numbered by it, in its
  * order, and a path the line does not know is no version of that family.
  */
-export function threadFiles(files, numbers = null) {
-  const families = new Map();
-  const seenPaths = new Set();
+export function threadFiles(files: readonly ThreadFile[] | null | undefined, numbers: Readonly<Record<string, number>> | null = null): FileFamily[] {
+  const families = new Map<string, { key: string; versions: Array<FileVersion & { line?: number }> }>();
+  const seenPaths = new Set<string>();
   for (const f of files ?? []) {
     const path = String(f.path ?? '').replace(/^\.\//, '');
     if (!path || seenPaths.has(path)) continue;
@@ -272,7 +426,7 @@ export function threadFiles(files, numbers = null) {
     const key = keyOf(name, path);
     let family = families.get(key);
     if (!family) { family = { key, versions: [] }; families.set(key, family); }
-    const line = Number.isInteger(numbers?.[path]) ? numbers[path] : undefined;
+    const line = Number.isInteger(numbers?.[path]) ? numbers![path] : undefined;
     const same = family.versions.filter((v) => v.name === name);
     // Another path is the same file only when one ends with the other: a bare
     // name or a relative path inside a whole one. Two folders are two files.
@@ -288,19 +442,19 @@ export function threadFiles(files, numbers = null) {
   const out = [...families.values()];
   for (const family of out) {
     if (!family.versions.some((v) => v.line !== undefined)) continue;
-    const byLine = new Map();
+    const byLine = new Map<number, FileVersion & { line?: number }>();
     for (const v of family.versions) {
       if (v.line === undefined) continue;
       const was = byLine.get(v.line);
       if (was) (was.also ??= []).push(v.path, ...(v.also ?? []));
       else byLine.set(v.line, v);
     }
-    family.versions = [...byLine.values()].sort((a, b) => a.line - b.line).map(({ line, ...v }) => ({ ...v, n: line }));
+    family.versions = [...byLine.values()].sort((a, b) => a.line! - b.line!).map(({ line, ...v }) => ({ ...v, n: line! }));
   }
   return out;
 }
 
-function cleanAsked(raw) {
+function cleanAsked(raw: string | null | undefined): string {
   let p = String(raw ?? '').replace(/^file:\/\//, '').split(/[?#]/)[0];
   try { p = decodeURIComponent(p); } catch { /* left as written */ }
   return p.replace(/^\.\//, '');
@@ -315,9 +469,9 @@ function cleanAsked(raw) {
  * the number of each path the thread said, and a line for each version made
  * elsewhere, so threadFiles counts every version the line holds.
  */
-export function lineAsThread(line) {
-  const numbers = {};
-  const lines = [];
+export function lineAsThread(line: readonly FileLine[] | null | undefined): { numbers: Record<string, number>; lines: ThreadLine[] } {
+  const numbers: Record<string, number> = {};
+  const lines: ThreadLine[] = [];
   for (const file of line ?? []) {
     for (const v of file.versions ?? []) {
       for (const p of v.here ?? []) numbers[p] = v.n;
@@ -338,9 +492,9 @@ export function lineAsThread(line) {
  * Where a press opens: the version a note or mark names (`file`), else the one
  * a card's path names, else with neither the newest. Never another file.
  */
-export function whereAPressLands(families, { path, file } = {}) {
+export function whereAPressLands(families: readonly FileFamily[] | null | undefined, { path, file }: { path?: string | null; file?: string | null } = {}): FileStep | null {
   const flat = (families ?? []).flatMap((f, fi) => f.versions.map((v, vi) => ({ fi, vi, v })));
-  const at = (x) => (x ? { fi: x.fi, vi: x.vi } : null);
+  const at = (x: FileStep | null | undefined): FileStep | null => (x ? { fi: x.fi, vi: x.vi } : null);
   if (file) {
     const hit = flat.find((x) => x.v.id === file);
     if (hit || !path) return at(hit);
@@ -353,9 +507,9 @@ export function whereAPressLands(families, { path, file } = {}) {
 }
 
 /** The versions `paths` name, in their order, each once: what the arrows step through. */
-export function stepsThrough(families, paths) {
-  const out = [];
-  const seen = new Set();
+export function stepsThrough(families: readonly FileFamily[], paths: readonly string[] | null | undefined): FileStep[] {
+  const out: FileStep[] = [];
+  const seen = new Set<FileVersion>();
   for (const p of paths ?? []) {
     const v = versionForPath(families, p);
     if (!v || seen.has(v)) continue;
@@ -371,7 +525,7 @@ export function stepsThrough(families, paths) {
  * of them; a version picked off the list keeps its family's place. Without,
  * the next file at its newest version.
  */
-export function nextStep(families, steps, at, by) {
+export function nextStep(families: readonly FileFamily[] | null | undefined, steps: readonly FileStep[] | null | undefined, at: FileStep | null, by: number): FileStep | null {
   if (!at) return null;
   if (steps?.length) {
     let i = steps.findIndex((s) => s.fi === at.fi && s.vi === at.vi);
@@ -382,11 +536,11 @@ export function nextStep(families, steps, at, by) {
   return families?.[fi] ? { fi, vi: families[fi].versions.length - 1 } : null;
 }
 
-export function versionForPath(families, raw) {
+export function versionForPath(families: readonly FileFamily[] | null | undefined, raw: string | null | undefined): FileVersion | null {
   const asked = cleanAsked(raw);
   if (!asked) return null;
   const all = (families ?? []).flatMap((f) => f.versions);
-  const pathsOf = (v) => [v.path, ...(v.also ?? [])];
+  const pathsOf = (v: FileVersion): string[] => [v.path, ...(v.also ?? [])];
   const exact = all.find((v) => pathsOf(v).includes(asked));
   if (exact) return exact;
   const tail = all.filter((v) => pathsOf(v).some((p) => p.endsWith(`/${asked}`) || asked.endsWith(`/${p}`)));
@@ -411,25 +565,25 @@ const FENCE = /```[\s\S]*?(?:```|$)/g;
 const EDITED_WORDS = /^Updated [^\n]+\.\s*\n\n\[/;
 
 /** The message that carries an edit to people who only see messages: a group, or a shared thread's readers. */
-export const editedWords = (name, path) => `Updated ${name}.\n\n[${name}](${path})`;
+export const editedWords = (name: string, path: string): string => `Updated ${name}.\n\n[${name}](${path})`;
 
 // Files the big view does not review but Files still lists: a page an agent made,
 // a script. Unlike reviewable kinds, a bare word in a sentence ("node.js") is no
 // claim, so only a link or a code span counts, and Files keeps those really on disk.
-const OTHER_KINDS = [['page', /\.html?$/i], ['table', /\.(csv|tsv)$/i], ['code', /\.(py|ipynb|js|mjs|cjs|ts|mts|cts|tsx|jsx|rb|go|rs|sh|sql|css|txt|json|ya?ml|xml)$/i]];
-export const otherKind = (path) => OTHER_KINDS.find(([, re]) => re.test(String(path ?? '').split(/[?#]/)[0]))?.[0] ?? null;
+const OTHER_KINDS: ReadonlyArray<readonly [OtherKind, RegExp]> = [['page', /\.html?$/i], ['table', /\.(csv|tsv)$/i], ['code', /\.(py|ipynb|js|mjs|cjs|ts|mts|cts|tsx|jsx|rb|go|rs|sh|sql|css|txt|json|ya?ml|xml)$/i]];
+export const otherKind = (path: string | null | undefined): OtherKind | null => OTHER_KINDS.find(([, re]) => re.test(String(path ?? '').split(/[?#]/)[0]))?.[0] ?? null;
 /** Which page the big view draws for a file, or null. */
-export const viewKind = (path) => reviewKind(path) ?? otherKind(path);
+export const viewKind = (path: string | null | undefined): ViewKind | null => reviewKind(path) ?? otherKind(path);
 /** Whether a file pressed in a group opens in the big view: what it reviews, and a table. */
-export const opensBigInAGroup = (name) => !!reviewKind(name) || otherKind(name) === 'table';
+export const opensBigInAGroup = (name: string | null | undefined): boolean => !!reviewKind(name) || otherKind(name) === 'table';
 // The brief has an agent name a page or table it made by its bare path, so one
 // with a folder in it counts too. A script named bare is a sentence about code.
 // Read back from each ending: tried at every letter, it is slow on long messages.
 const BARE_END = /\/[\w.-]+\.(?:html?|csv|tsv)(?![\w/-])/gi;
 const MAY_BE_BARE = new RegExp(BARE_END.source, 'i');
 const BARE_OTHER = /(?<![\w./:@~(\[-])((?:\.?\/)?[\w.-]+(?:\/[\w.-]+)+\.(?:html?|csv|tsv))$/i;
-function bareOthers(text) {
-  const out = [];
+function bareOthers(text: string): Array<{ at: number; path: string }> {
+  const out: Array<{ at: number; path: string }> = [];
   for (const m of text.matchAll(BARE_END)) {
     const end = m.index + m[0].length;
     let start = m.index;
@@ -443,12 +597,12 @@ function bareOthers(text) {
 const OTHER_NAMED =/\]\(<?((?:\.?\/)?[^()\s>:]+\.[A-Za-z0-9]+)>?\)|`((?:\.?\/)?[\w.-]+(?:\/[\w.-]+)*\.[A-Za-z0-9]+)`/g;
 
 // "-390.png" is the end of a name said before it, not a file.
-const shorthand = (path) => /^[-_]/.test(path.split('/').pop() ?? '');
+const shorthand = (path: string): boolean => /^[-_]/.test(path.split('/').pop() ?? '');
 
 /** What filesInLines leaves out, in the same shape. A person's own words only count what they attached, a link. */
-export function otherFilesInLines(lines) {
-  const out = [];
-  const seen = new Set();
+export function otherFilesInLines(lines: readonly ThreadLine[] | null | undefined): NamedFile[] {
+  const out: NamedFile[] = [];
+  const seen = new Set<string>();
   for (const l of lines ?? []) {
     const p = l?.patch;
     if (!p) continue;
@@ -475,15 +629,15 @@ export function otherFilesInLines(lines) {
 }
 
 /** The family a file of this name joins, as threadFiles keys it. */
-export function familyOfName(file) {
+export function familyOfName(file: string | null | undefined): string {
   const name = shownName(String(file ?? '').replace(/^\.\//, ''));
   return keyOf(name, name);
 }
 
 /** Every reviewable file a thread's lines name, in the order they name them. */
-export function filesInLines(lines) {
-  const out = [];
-  const seen = new Set();
+export function filesInLines(lines: readonly ThreadLine[] | null | undefined): NamedFile[] {
+  const out: NamedFile[] = [];
+  const seen = new Set<string>();
   for (const l of lines ?? []) {
     const p = l?.patch;
     if (!p) continue;
@@ -512,7 +666,7 @@ export function filesInLines(lines) {
 }
 
 /** "Shared by …" for a version: the agent and who it works for when an agent shared it. */
-export function sharedByWords(v, { me, nameOf }) {
+export function sharedByWords(v: Pick<FileVersion, 'by' | 'agent' | 'edited' | 'made'> | null | undefined, { me, nameOf }: { me: string | null; nameOf: (id: string) => string }): string {
   const whose = !v?.by || v.by === me ? null : nameOf(v.by);
   if (v?.edited) return `Edited by ${whose ?? 'you'}`;
   if (v?.made) return `Made by ${whose ?? 'you'}`;
@@ -523,9 +677,9 @@ export function sharedByWords(v, { me, nameOf }) {
 }
 
 /** "Resolved by your agent in v15": a comment the version `v` answered. */
-export function resolvedInWords(v, { me, nameOf }) {
+export function resolvedInWords(v: Pick<FileVersion, 'by' | 'agent' | 'n'>, { me, nameOf }: { me: string | null; nameOf: (id: string) => string }): string {
   const whose = !v?.by || v.by === me ? null : nameOf(v.by);
-  let who;
+  let who: string;
   if (typeof v?.agent !== 'string') who = whose ?? 'you';
   else if (v.agent && v.agent !== PLAIN_AGENT) who = v.agent;
   else who = whose ? `${whose}'s agent` : 'your agent';
@@ -537,13 +691,13 @@ export function resolvedInWords(v, { me, nameOf }) {
  * the same comment, not a copy, so resolving it here resolves it everywhere.
  * `from` names the version it was made on ("v1").
  */
-export function carriedNotes(family, index, notes, { resolved = false } = {}) {
+export function carriedNotes<N extends Pick<FileNote, 'file' | 'resolved'>>(family: Pick<FileFamily, 'versions'> | null | undefined, index: number, notes: readonly N[] | null | undefined, { resolved = false }: { resolved?: boolean } = {}): Array<N & { from: string }> {
   const earlier = new Map((family?.versions ?? []).slice(0, Math.max(0, index)).map((v) => [v.id, v]));
-  return (notes ?? []).filter((n) => earlier.has(n.file) && (resolved || !n.resolved)).map((n) => ({ ...n, from: `v${earlier.get(n.file).n}` }));
+  return (notes ?? []).filter((n) => earlier.has(n.file) && (resolved || !n.resolved)).map((n) => ({ ...n, from: `v${earlier.get(n.file)!.n}` }));
 }
 
 /** What to tell someone editing version `baseN` when somebody else has saved since, or null. */
-export function editClash(family, baseN, me, nameOf) {
+export function editClash(family: Pick<FileFamily, 'versions'> | null | undefined, baseN: number, me: string | null, nameOf: NameOf): string | null {
   const versions = family?.versions ?? [];
   const other = versions.slice(baseN).filter((v) => v.by !== me).at(-1);
   if (!other) return null;
@@ -551,29 +705,29 @@ export function editClash(family, baseN, me, nameOf) {
 }
 
 /** What a person calls a file at any version: one name, whatever each version is named on disk. */
-export function familyName(family, version) {
+export function familyName(family: { versions: ReadonlyArray<Pick<FileVersion, 'name'>> } | null | undefined, version?: Pick<FileVersion, 'name'> | null): string {
   const all = family?.versions ?? [];
   if (all.length > 1) return baseName(all[0].name);
   return all[0]?.name ?? version?.name ?? '';
 }
 
 /** What to say on a version whose words changed after an earlier one was approved, or null. */
-export function approvalSince(family, index, approvals, nameOf) {
+export function approvalSince(family: Pick<FileFamily, 'versions'> | null | undefined, index: number, approvals: ReadonlyArray<Pick<FileApproval, 'file' | 'by'>> | null | undefined, nameOf: NameOf): string | null {
   const versions = family?.versions ?? [];
   const here = versions[index];
   if (!here || (approvals ?? []).some((a) => a.file === here.id)) return null;
   const old = versions.slice(0, index).reverse().find((v) => (approvals ?? []).some((a) => a.file === v.id));
   if (!old) return null;
-  const given = approvals.filter((a) => a.file === old.id).at(-1);
+  const given = approvals!.filter((a) => a.file === old.id).at(-1)!;
   return `${nameOf(given.by)} approved v${old.n}. ${nameOf(here.by)} changed it since, so this version is not approved.`;
 }
 
 /** What to ask before approving version `index`, or null: a newer version, or comments still open on it. */
-export function approveAsk(family, index, notes) {
+export function approveAsk(family: Pick<FileFamily, 'versions'> | null | undefined, index: number, notes: ReadonlyArray<Pick<FileNote, 'file' | 'resolved'>> | null | undefined): { text: string; newest: FileVersion | null } | null {
   const versions = family?.versions ?? [];
   const here = versions[index];
   if (!here) return null;
-  const newest = index < versions.length - 1 ? versions.at(-1) : null;
+  const newest = index < versions.length - 1 ? versions.at(-1)! : null;
   const open = (notes ?? []).filter((n) => n.file === here.id && !n.resolved).length + carriedNotes(family, index, notes).length;
   if (!newest && !open) return null;
   const said = [`Approve v${here.n}?`];
@@ -583,32 +737,33 @@ export function approveAsk(family, index, notes) {
 }
 
 /** The newest edited copy of the file at `path`, or `path` when nobody has edited it. */
-export function newestOfFamily(path, edits) {
+export function newestOfFamily(path: string, edits: ReadonlyArray<{ path: string }> | null | undefined): string {
   if (!edits?.length) return path;
   const family = threadFiles([{ path }, ...edits.map((e) => ({ path: e.path }))]).find((f) => f.versions.some((v) => v.path === String(path).replace(/^\.\//, '')));
   return family?.versions.at(-1)?.path ?? path;
 }
 
 /** The line that tells an agent which files people have edited, or null. Its own later version ends it. */
-export function editedFilesLine(lines) {
+export function editedFilesLine(lines: readonly ThreadLine[] | null | undefined): string | null {
   const families = threadFiles(filesInLines(lines));
   const moved = families.filter((f) => f.versions.at(-1)?.edited && f.versions.length > 1);
-  const missedOn = new Map((lines ?? []).flatMap((l) => (l?.patch?.artifact?.do === 'reconcile' && l.patch.artifact.missed ? [[l.patch.artifact.file, l.patch.artifact.missed]] : [])));
+  const missedOn = new Map((lines ?? []).flatMap((l): Array<[string, string]> => (l?.patch?.artifact?.do === 'reconcile' && l.patch.artifact.missed ? [[l.patch.artifact.file, l.patch.artifact.missed]] : [])));
   const missed = families.flatMap((f) => {
-    const newest = f.versions.at(-1);
+    // threadFiles never makes a family without a version.
+    const newest = f.versions.at(-1)!;
     return missedOn.has(newest?.id) ? [`${newest.path} was written without the edit in ${missedOn.get(newest.id)}`] : [];
   });
-  const clashed = new Map((lines ?? []).flatMap((l) => (l?.patch?.artifact?.do === 'reconcile' && l.patch.artifact.clash && l.patch.artifact.path ? [[l.patch.artifact.path, l.patch.artifact.file]] : [])));
-  const kept = moved.flatMap((f) => (clashed.has(f.versions.at(-1).path) ? [`${f.versions.at(-1).path} kept a person's words where your ${clashed.get(f.versions.at(-1).path)} changed the same ones`] : []));
-  const said = [];
-  if (moved.length) said.push(`People edited files on this thread. Read the newest version, not the copy you remember: ${moved.map((f) => `${f.versions[0].name} is now ${f.versions.at(-1).path}`).join('; ')}. An edit your next version leaves out is merged back in, so to undo one because they asked, pass replacesEdits to write_document.`);
+  const clashed = new Map((lines ?? []).flatMap((l): Array<[string, string]> => (l?.patch?.artifact?.do === 'reconcile' && l.patch.artifact.clash && l.patch.artifact.path ? [[l.patch.artifact.path, l.patch.artifact.file]] : [])));
+  const kept = moved.flatMap((f) => (clashed.has(f.versions.at(-1)!.path) ? [`${f.versions.at(-1)!.path} kept a person's words where your ${clashed.get(f.versions.at(-1)!.path)} changed the same ones`] : []));
+  const said: string[] = [];
+  if (moved.length) said.push(`People edited files on this thread. Read the newest version, not the copy you remember: ${moved.map((f) => `${f.versions[0].name} is now ${f.versions.at(-1)!.path}`).join('; ')}. An edit your next version leaves out is merged back in, so to undo one because they asked, pass replacesEdits to write_document.`);
   if (kept.length) said.push(`${kept.join('; ')}.`);
   if (missed.length) said.push(`${missed.join('; ')}. Read that edit and carry it across unless you were told otherwise.`);
   return said.join(' ') || null;
 }
 
 /** Who said the file first, which is who an approval or a note reaches in a conversation. */
-export function whoseIsTheFile(files, id) {
+export function whoseIsTheFile(files: readonly ThreadFile[] | null | undefined, id: string): string | null {
   const hit = threadFiles(files).flatMap((f) => f.versions).find((v) => v.id === id);
   return hit?.by ?? null;
 }
@@ -616,7 +771,7 @@ export function whoseIsTheFile(files, id) {
 /* ---------------------------- who it waits on ---------------------------- */
 
 /** Words written to you ("Maya, ...", "@Maya") or a question that names you. */
-export function asksByName(text, name) {
+export function asksByName(text: string | null | undefined, name: string | null | undefined): boolean {
   const first = firstWord(name);
   if (first.length < 2) return false;
   if (addressedTo(text, [{ id: 'you', name: first }])) return true;
@@ -627,13 +782,13 @@ export function asksByName(text, name) {
  * What on this row is waiting on this person: notes on their file, notes naming
  * them and approvals of their file, from someone else, not yet seen or settled.
  */
-export function fileNewsFor(item, me, { myName = null } = {}) {
+export function fileNewsFor(item: FileNewsRow | null | undefined, me: string | null | undefined, { myName = null }: { myName?: string | null } = {}): FileNews[] {
   const marks = item?.artifacts;
   if (!marks || !me) return [];
   const seen = new Set(marks.seen?.[me] ?? []);
-  const ownerOfRow = item.runner ?? item.createdBy ?? null;
-  const asksMe = (text) => asksByName(text, myName);
-  const news = [];
+  const ownerOfRow = item!.runner ?? item!.createdBy ?? null;
+  const asksMe = (text: string): boolean => asksByName(text, myName);
+  const news: FileNews[] = [];
   for (const n of marks.notes ?? []) {
     if (n.by === me || n.resolved || seen.has(n.id)) continue;
     const named = (n.mentions ?? []).includes(me) || asksMe(n.text);
@@ -649,21 +804,21 @@ export function fileNewsFor(item, me, { myName = null } = {}) {
     }
   }
   // An approval is a decision everyone on the conversation acts on, not only the owner.
-  const onIt = (item.people ?? []).includes(me);
+  const onIt = (item!.people ?? []).includes(me);
   for (const a of marks.approvals ?? []) {
     const id = approvalId(a);
     if (a.by === me || seen.has(id) || ((a.owner ?? ownerOfRow) !== me && !onIt)) continue;
     news.push({ kind: 'approved', id, by: a.by, ts: a.ts, file: a.file });
   }
   // Your own Done settles what came before it, or the closed thread stays in Needs you.
-  const close = item.status === 'done' && item.wrote?.status?.by === me ? item.wrote.status.ts : 0;
+  const close = item!.status === 'done' && item!.wrote?.status?.by === me ? item!.wrote.status.ts : 0;
   return news.filter((n) => n.ts > close).sort((x, y) => x.ts - y.ts);
 }
 
-const visibleName = (id) => String(id ?? '').replace(/#\d+$/, '');
+const visibleName = (id: string | null | undefined): string => String(id ?? '').replace(/#\d+$/, '');
 
 /** A row's line for what waits: "Maya approved onboarding-a.png". */
-export function fileNewsLine(news, nameOf) {
+export function fileNewsLine(news: readonly FileNews[] | null | undefined, nameOf: NameOf): string | null {
   const last = news?.[news.length - 1];
   if (!last) return null;
   const who = nameOf(last.by);
@@ -677,7 +832,7 @@ export function fileNewsLine(news, nameOf) {
 /* --------------------------------- agents -------------------------------- */
 
 /** `onboarding-a.png` as v2: what an agent saves its next go as, so it lands as the next version. */
-export function nextVersionName(name, count) {
+export function nextVersionName(name: string, count: number): string {
   const dot = name.lastIndexOf('.');
   const ext = dot > 0 ? name.slice(dot) : '';
   let stem = dot > 0 ? name.slice(0, dot) : name;
@@ -688,11 +843,11 @@ export function nextVersionName(name, count) {
 }
 
 /** The open notes on this version not yet sent to the agent, as the words that send them. */
-export function notesForTheAgent(marks, version, count, { nameOf = () => 'Someone' } = {}) {
+export function notesForTheAgent(marks: Pick<FileMarks, 'notes'> | null | undefined, version: Pick<FileVersion, 'id' | 'path' | 'name'>, count: number, { nameOf = () => 'Someone' }: { nameOf?: NameOf } = {}): { text: string; ids: string[] } {
   const open = (marks?.notes ?? []).filter((n) => n.file === version.id && !n.resolved && !n.sent);
-  const say = (n) => {
+  const say = (n: FileNote): string => {
     const at = unit(n.place.x)
-      ?`${placeWords(n)}, ${Math.round(n.place.x * 100)}% across and ${Math.round(n.place.y * 100)}% down`
+      ?`${placeWords(n)}, ${Math.round(n.place.x * 100)}% across and ${Math.round(n.place.y! * 100)}% down`
       : placeWords(n);
     return `- ${at}: ${n.text} (${nameOf(n.by)})`;
   };
@@ -705,11 +860,11 @@ export function notesForTheAgent(marks, version, count, { nameOf = () => 'Someon
   return { text, ids: open.map((n) => n.id) };
 }
 
-const escaped = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const firstWord = (name) => String(name ?? '').trim().split(/\s+/)[0] ?? '';
+const escaped = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const firstWord = (name: string | null | undefined): string => String(name ?? '').trim().split(/\s+/)[0] ?? '';
 
 /** The teammate a note opens on ("Sofia, ...", "Hey Sofia:") or names with @, by id, or null. */
-export function addressedTo(text, people) {
+export function addressedTo(text: string | null | undefined, people: readonly NotePerson[] | null | undefined): string | null {
   const words = String(text ?? '').trim();
   for (const p of people ?? []) {
     const name = firstWord(p?.name);
@@ -728,7 +883,7 @@ const PRAISE = /^(?:(?:v\d+|it|this|that|all|so|very|really|is|['’]s)\s+)*(?:t
 // En and em dash, built from their codes so no dash sits in the source the no-dash check reads.
 const DASHES = String.fromCharCode(0x2013, 0x2014);
 const CLAUSES = new RegExp(String.raw`[,.;:!…${DASHES}]+|\s+-\s+|\s+(?:and|&)\s+`);
-export function onlyThanks(text) {
+export function onlyThanks(text: string | null | undefined): boolean {
   const words = String(text ?? '').replace(new RegExp(String.raw`[^\p{L}\p{N}\s,.;:!?…${DASHES}&'’-]`, 'gu'), ' ').trim();
   if (!words || words.includes('?')) return false;
   const clauses = words.split(CLAUSES).map((c) => c.trim().replace(/\s+/g, ' ')).filter(Boolean);
@@ -740,7 +895,7 @@ export function onlyThanks(text) {
  * to, or nobody (a thank-you or an approval that asks for nothing). Only the
  * agent's notes start a run; "Send to the agent" (`toAgent`) overrules.
  */
-export function noteGoesTo(note, people = []) {
+export function noteGoesTo(note: { text?: string; mentions?: readonly string[]; toAgent?: boolean } | null | undefined, people: readonly NotePerson[] = []): NoteTarget {
   if (note?.toAgent) return { to: 'agent' };
   const named = note?.mentions?.[0] ?? addressedTo(note?.text, people);
   if (named) return { to: 'person', person: named };
@@ -752,7 +907,7 @@ export function noteGoesTo(note, people = []) {
 }
 
 /** Every file a thread names that a note can be on: pictures, films and documents, then pages and scripts. */
-export const notedFilesInLines = (lines) => [...filesInLines(lines), ...otherFilesInLines(lines)];
+export const notedFilesInLines = (lines: readonly ThreadLine[] | null | undefined): NamedFile[] => [...filesInLines(lines), ...otherFilesInLines(lines)];
 
 /**
  * A teammate's open notes on the files an agent made on this thread, one turn
@@ -760,16 +915,20 @@ export const notedFilesInLines = (lines) => [...filesInLines(lines), ...otherFil
  * the owner, wait for the owner's own press.
  */
 /** A note held for Send that nobody has sent yet. */
-export const stillWaiting = (note) => !!note?.wait && !note.toAgent && !note.sent;
+export const stillWaiting = (note: Pick<FileNote, 'wait' | 'toAgent' | 'sent'> | null | undefined): boolean => !!note?.wait && !note.toAgent && !note.sent;
 
-export function notesForItsAgent(lines, marks,{ me, nameOf = () => 'Someone', people = [] } = {}) {
-  const out = [];
+export function notesForItsAgent(
+  lines: readonly ThreadLine[] | null | undefined,
+  marks: Pick<FileMarks, 'notes'> | null | undefined,
+  { me, nameOf = () => 'Someone', people = [] }: { me?: string | null; nameOf?: NameOf; people?: readonly NotePerson[] } = {},
+): Array<{ by: string | null; ids: string[]; text: string }> {
+  const out: Array<{ by: string | null; ids: string[]; text: string }> = [];
   for (const family of threadFiles(notedFilesInLines(lines))) {
     for (const version of family.versions) {
       if (typeof version.agent !== 'string') continue;
       const open = (marks?.notes ?? []).filter((n) => n.file === version.id && n.by && n.by !== me && !n.resolved && !n.sent && !stillWaiting(n) && noteGoesTo(n, people).to === 'agent');
       if (!open.length) continue;
-      const first = (id) => String(nameOf(id)).split(/\s+/)[0];
+      const first = (id: string | null): string => String(nameOf(id)).split(/\s+/)[0];
       const { text, ids } = notesForTheAgent({ notes: open }, version, family.versions.length, { nameOf: first });
       out.push({ by: open[0].by, ids, text: `${nameOf(open[0].by)} left notes on ${version.name}, a file you made on this thread.\n\n${text}` });
     }
@@ -783,10 +942,10 @@ export function notesForItsAgent(lines, marks,{ me, nameOf = () => 'Someone', pe
  * teammate's next version. A reopen after that version keeps it open.
  * Returns `[{ on, in }]`, the comment and the version.
  */
-export function answeredNotes(lines, { people = [] } = {}) {
-  const entries = [];
-  const sentAt = new Map();
-  const settledAt = new Map();
+export function answeredNotes(lines: readonly ThreadLine[] | null | undefined, { people = [] }: { people?: readonly NotePerson[] } = {}): Array<{ on: string; in: string }> {
+  const entries: MarkEntry[] = [];
+  const sentAt = new Map<string, number>();
+  const settledAt = new Map<string, number>();
   for (const l of lines ?? []) {
     const a = l?.patch?.artifact;
     if (!a) continue;
@@ -796,13 +955,13 @@ export function answeredNotes(lines, { people = [] } = {}) {
   }
   // Notes told to an agent name the file it should make, which is no version until it does.
   const families = threadFiles(notedFilesInLines((lines ?? []).filter((l) => !l?.patch?.fromNotes)));
-  const out = [];
+  const out: Array<{ on: string; in: string }> = [];
   for (const n of marksOf(entries).notes) {
     if (n.resolved) continue;
     const family = families.find((f) => f.versions.some((v) => v.id === n.file));
     if (!family) continue;
     const later = family.versions.slice(family.versions.findIndex((v) => v.id === n.file) + 1);
-    let answer = sentAt.has(n.id) ? later.find((v) => typeof v.agent === 'string' && v.at > sentAt.get(n.id)) : undefined;
+    let answer = sentAt.has(n.id) ? later.find((v) => typeof v.agent === 'string' && v.at > sentAt.get(n.id)!) : undefined;
     if (!answer) {
       const goes = noteGoesTo(n, people);
       if (goes.to === 'person') answer = later.find((v) => v.by === goes.person && v.at > n.ts);
@@ -816,7 +975,7 @@ export function answeredNotes(lines, { people = [] } = {}) {
 /* ---------------------------------- quotes ------------------------------- */
 
 /** Where a quoted passage sits in some text, spacing aside. Returns offsets into `text`. */
-export function findQuote(text, quote) {
+export function findQuote(text: string | null | undefined, quote: string | null | undefined): { start: number; end: number } | null {
   const words = String(quote ?? '').trim().split(/\s+/).filter(Boolean);
   if (!words.length) return null;
   const escaped = words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));

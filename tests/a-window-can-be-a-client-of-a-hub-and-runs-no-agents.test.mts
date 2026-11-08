@@ -109,7 +109,7 @@ describe('the client carries no part of the hub', () => {
     const start = fs.readFileSync(path.join(root, 'main', 'start.mjs'), 'utf8');
     expect(start).not.toMatch(/^\s*import\s[^(]*from\s*['"]\.\/(main|hub-client)\.m[jt]s/m);
     expect(start).toMatch(/import\(['"]\.\/main\.mts['"]\)/);
-    expect(start).toMatch(/import\(['"]\.\/hub-client\.mjs['"]\)/);
+    expect(start).toMatch(/import\(['"]\.\/hub-client\.mts['"]\)/);
   });
 });
 

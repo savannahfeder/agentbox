@@ -6,32 +6,41 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { foldTeammates, foldChat, foldPlaybooks } from '../../shared/teammates.mts';
+import type { ChatKind, Playbook, TeamChat, Teammate } from '../../shared/teammates.mts';
 import { foldOutbox } from '../../shared/teammate-reach.mts';
+import type { Outbox, OutboxLine, TeamView } from '../../shared/teammate-reach.mts';
 
 const MAX_READ = 4 * 1024 * 1024;
 const MAX_LINE = 64 * 1024;
 
-export function teamDir(storeRoot, accountId) {
+// The writers fill in a line's time when it has none.
+type Unwritten<L> = L extends unknown ? Omit<L, 'ts'> & { ts?: number } : never;
+
+export interface ChatWrite { kind: ChatKind; id?: string; ts?: number; [field: string]: unknown }
+
+export interface PlaybookWrite { kind: string; ts?: number; [field: string]: unknown }
+
+export function teamDir(storeRoot: string | null | undefined, accountId: string | null | undefined): string {
   if (!storeRoot || !accountId) throw new Error('teammates need a store root and an account');
   return path.join(storeRoot, 'teammates', String(accountId).replace(/[^A-Za-z0-9_-]/g, '-'));
 }
 
-export const teammatesFile = (dir) => path.join(dir, 'teammates.jsonl');
-export const chatFile = (dir) => path.join(dir, 'chat.jsonl');
-export const playbooksFile = (dir) => path.join(dir, 'playbooks.jsonl');
+export const teammatesFile = (dir: string): string => path.join(dir, 'teammates.jsonl');
+export const chatFile = (dir: string): string => path.join(dir, 'chat.jsonl');
+export const playbooksFile = (dir: string): string => path.join(dir, 'playbooks.jsonl');
 // What agents asked to say to people, which only the app can send, and who is on
 // the team and what the owner can read, which only the app can know.
-export const outboxFile = (dir) => path.join(dir, 'outbox.jsonl');
-export const teamViewFile = (dir) => path.join(dir, 'team-view.json');
+export const outboxFile = (dir: string): string => path.join(dir, 'outbox.jsonl');
+export const teamViewFile = (dir: string): string => path.join(dir, 'team-view.json');
 // A teammate's method, which its own runs edit, and the threads it learns
 // from, which the app writes out whole.
-export const methodFile = (dir, id) => path.join(dir, 'methods', `${id}.md`);
-export const sourcesDir = (dir, id) => path.join(dir, 'sources', id);
+export const methodFile = (dir: string, id: string): string => path.join(dir, 'methods', `${id}.md`);
+export const sourcesDir = (dir: string, id: string): string => path.join(dir, 'sources', id);
 
 const VERSIONS_KEPT = 30;
 
 /** Writes the method whole, keeping the text it replaces so a bad change can be undone. */
-export function writeMethod(dir, id, text) {
+export function writeMethod(dir: string, id: string, text: string): string {
   const file = methodFile(dir, id);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   let before = '';
@@ -50,7 +59,7 @@ export function writeMethod(dir, id, text) {
 }
 
 /** The method's text and when it last changed, or null when it has none. */
-export function readMethod(dir, id) {
+export function readMethod(dir: string, id: string): { file: string; text: string; changedAt: number } | null {
   try {
     const file = methodFile(dir, id);
     const st = fs.statSync(file);
@@ -63,11 +72,11 @@ export function readMethod(dir, id) {
 
 // The screen asks for these on every refresh; a file only read again when it
 // has changed keeps a long chat from costing a parse each time.
-const READ = new Map();
+const READ = new Map<string, { key: string; lines: unknown[] }>();
 
-function readLines(file) {
-  let text;
-  let key;
+function readLines(file: string): unknown[] {
+  let text: string;
+  let key: string;
   try {
     const st = fs.statSync(file);
     const size = st.size;
@@ -86,10 +95,10 @@ function readLines(file) {
       text = fs.readFileSync(file, 'utf8');
     }
   } catch (e) {
-    if (e.code === 'ENOENT') return [];
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return [];
     throw e;
   }
-  const out = [];
+  const out: unknown[] = [];
   for (const raw of text.split('\n')) {
     if (!raw.trim()) continue;
     try { out.push(JSON.parse(raw)); } catch { /* a torn last line from a crash; the rest still reads */ }
@@ -98,7 +107,7 @@ function readLines(file) {
   return out.slice();
 }
 
-function append(file, obj) {
+function append<T>(file: string, obj: T): T {
   const buf = Buffer.from(JSON.stringify(obj) + '\n', 'utf8');
   if (buf.length > MAX_LINE) throw new Error(`teammates line too large (${buf.length} bytes)`);
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -114,39 +123,39 @@ export const newPlaybookId = () => `p-${crypto.randomBytes(5).toString('hex')}`;
 export const newLessonId = () => `l-${crypto.randomBytes(5).toString('hex')}`;
 export const newDutyId = () => `d-${crypto.randomBytes(4).toString('hex')}`;
 
-export function readTeammates(dir, now = Date.now()) {
+export function readTeammates(dir: string, now = Date.now()): Teammate[] {
   return foldTeammates(readLines(teammatesFile(dir)), now);
 }
 
-export function readChat(dir) {
+export function readChat(dir: string): TeamChat {
   return foldChat(readLines(chatFile(dir)));
 }
 
-export function writeTeammate(dir, id, patch, now = Date.now()) {
+export function writeTeammate(dir: string, id: string, patch: Record<string, unknown>, now = Date.now()) {
   return append(teammatesFile(dir), { id, ts: now, patch });
 }
 
-export function writeChat(dir, line, now = Date.now()) {
+export function writeChat(dir: string, line: ChatWrite, now = Date.now()): ChatWrite & { ts: number } {
   const full = { ...line, ts: line.ts ?? now };
   if (full.kind !== 'seen' && !full.id) full.id = newMessageId();
   return append(chatFile(dir), full);
 }
 
-export function readOutbox(dir) {
+export function readOutbox(dir: string): Outbox {
   return foldOutbox(readLines(outboxFile(dir)));
 }
 
-export function writeOutbox(dir, line, now = Date.now()) {
+export function writeOutbox(dir: string, line: Unwritten<OutboxLine>, now = Date.now()) {
   return append(outboxFile(dir), { ...line, ts: line.ts ?? now });
 }
 
 export const newOutId = () => `o-${crypto.randomBytes(6).toString('hex')}`;
 
-export function readTeamView(dir) {
+export function readTeamView(dir: string): TeamView | null {
   try { return JSON.parse(fs.readFileSync(teamViewFile(dir), 'utf8')); } catch { return null; }
 }
 
-export function writeTeamView(dir, view) {
+export function writeTeamView(dir: string, view: TeamView): void {
   fs.mkdirSync(dir, { recursive: true });
   const file = teamViewFile(dir);
   const tmp = `${file}.${process.pid}.tmp`;
@@ -154,10 +163,10 @@ export function writeTeamView(dir, view) {
   fs.renameSync(tmp, file);
 }
 
-export function readPlaybooks(dir) {
+export function readPlaybooks(dir: string): Playbook[] {
   return foldPlaybooks(readLines(playbooksFile(dir)));
 }
 
-export function writePlaybook(dir, line, now = Date.now()) {
+export function writePlaybook(dir: string, line: PlaybookWrite, now = Date.now()) {
   return append(playbooksFile(dir), { ...line, ts: line.ts ?? now });
 }

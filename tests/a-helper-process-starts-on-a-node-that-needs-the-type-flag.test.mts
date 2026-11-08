@@ -40,7 +40,7 @@ describe('every helper the app starts on a .mts file asks for it', () => {
   it.each([
     ['main/supervisor.mts', /spawn\(process\.execPath, \[\.\.\.stripTypesFlags\(\), this\._cloudRunPath\(\)/],
     ['main/supervisor.mts', /spawn\(process\.execPath, \[\.\.\.stripTypesFlags\(\), fileURLToPath\(new URL\('\.\/cloud\/host\.mts'/],
-    ['main/supervisor.mts', /spawn\(process\.execPath, \[\.\.\.stripTypesFlags\(\), fileURLToPath\(new URL\('\.\/run-host\.mjs'/],
+    ['main/supervisor.mts', /spawn\(process\.execPath, \[\.\.\.stripTypesFlags\(\), fileURLToPath\(new URL\('\.\/run-host\.mts'/],
     ['main/terminal-hosts.mts', /spawn\(process\.execPath, \[\.\.\.stripTypesFlags\(\), fileURLToPath\(new URL\('\.\/terminal-host\.mts'/],
   ])('%s starts it with the flag', (file, line) => {
     expect(read(file)).toMatch(line);

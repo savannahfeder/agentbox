@@ -6,7 +6,7 @@
 // agent's wording is one step back, and typed words are what cannot be got back.
 import fsDefault from 'node:fs';
 import path from 'node:path';
-import { filesInLines, reviewKind, threadFiles } from '../shared/artifact-marks.mts';
+import { filesInLines, reviewKind, threadFiles, type FileFamily, type FileVersion, type Mark, type ThreadLine } from '../shared/artifact-marks.mts';
 import { changes, changeSize, mergeText } from '../shared/text-merge.mts';
 import { saveNextVersion } from './file-version.mts';
 import { isInside, MAX_DOC_BYTES } from './doc-file.mts';
@@ -16,7 +16,19 @@ const LOOK_BACK = 30;
 // Past half changed it is a rewrite, not a revision of anything.
 const MOST_CHANGED = 0.5;
 
-function readVersion(dir, v, fs) {
+type Fs = typeof fsDefault;
+
+interface NothingToDo { do: 'none'; file: string }
+interface MissedEdit { do: 'missed'; file: string; missed: string; from?: string }
+interface MergeEdit { do: 'merge'; file: string; from: string; path: string; text: string; clash?: number }
+export type ReconcilePlan = NothingToDo | MissedEdit | MergeEdit;
+
+/** A line `reconcileThread` appends to the thread. */
+export type ReconcilePatch = { artifact: Mark } | { note: string };
+
+interface EarlierVersion { v: FileVersion; text: string }
+
+function readVersion(dir: string, v: FileVersion, fs: Fs): string | null {
   const file = path.resolve(dir, v.path);
   if (!isInside(dir, file)) return null;
   try {
@@ -27,14 +39,15 @@ function readVersion(dir, v, fs) {
   }
 }
 
-function planFamily(family, dir, fs) {
+// The caller only plans families of three versions or more.
+function planFamily(family: FileFamily, dir: string, fs: Fs): ReconcilePlan | null {
   const versions = family.versions;
-  const newest = versions.at(-1);
+  const newest = versions.at(-1)!;
   const newestEdit = versions.findLastIndex((v) => v.edited);
-  const nothing = { do: 'none', file: newest.id };
+  const nothing: NothingToDo = { do: 'none', file: newest.id };
   const words = readVersion(dir, newest, fs);
   if (words === null) return null;
-  const earlier = versions.slice(0, -1).slice(-LOOK_BACK).map((v) => ({ v, text: readVersion(dir, v, fs) })).filter((x) => x.text !== null);
+  const earlier = versions.slice(0, -1).slice(-LOOK_BACK).map((v) => ({ v, text: readVersion(dir, v, fs) })).filter((x): x is EarlierVersion => x.text !== null);
   const head = earlier.at(-1);
   if (!head || head.v !== versions.at(-2)) return null;
   // The same words as a version already kept is someone going back to it on purpose.
@@ -42,14 +55,14 @@ function planFamily(family, dir, fs) {
 
   const sized = earlier.map((x) => ({ ...x, size: changeSize(x.text, words) }));
   const closest = sized.reduce((best, x) => (x.size <= best.size ? x : best));
-  const missed = { do: 'missed', file: newest.id, missed: versions[newestEdit].path };
+  const missed: MissedEdit = { do: 'missed', file: newest.id, missed: versions[newestEdit].path };
   if (closest.size > (words.length + closest.text.length) * MOST_CHANGED) {
     const edit = earlier.find((x) => x.v === versions[newestEdit]);
-    const before = earlier[earlier.indexOf(edit) - 1];
+    const before = earlier[(earlier as (EarlierVersion | undefined)[]).indexOf(edit) - 1];
     const typed = edit && before ? changes(before.text, edit.text).map((c) => c.text.trim()).filter(Boolean) : [];
     return typed.some((t) => !words.includes(t)) ? missed : nothing;
   }
-  if (closest.v === head.v || closest.size === sized.at(-1).size) return nothing;
+  if (closest.v === head.v || closest.size === sized.at(-1)!.size) return nothing;
   // Nobody else wrote since where it started: it went back over its own work.
   if (!versions.slice(versions.indexOf(closest.v) + 1, -1).some((v) => v.edited)) return nothing;
 
@@ -60,12 +73,13 @@ function planFamily(family, dir, fs) {
 }
 
 /** What each document on this thread needs, for those whose newest version an agent wrote over someone's edit. */
-export function planReconcile({ dir, lines, fs = fsDefault }) {
+export function planReconcile({ dir, lines, fs = fsDefault }: { dir: string; lines: ThreadLine[] | null | undefined; fs?: Fs }): ReconcilePlan[] {
   const settled = new Set((lines ?? []).flatMap((l) => (l?.patch?.artifact?.do === 'reconcile' ? [l.patch.artifact.file] : [])));
-  const plans = [];
+  const plans: ReconcilePlan[] = [];
   for (const family of threadFiles(filesInLines(lines))) {
     const versions = family.versions;
-    const newest = versions.at(-1);
+    // threadFiles makes a family only for a file it has a version of.
+    const newest = versions.at(-1)!;
     if (versions.length < 3 || newest.edited || settled.has(newest.id)) continue;
     if (reviewKind(newest.path) !== 'markdown' || !versions.some((v) => v.edited)) continue;
     const plan = planFamily(family, dir, fs);
@@ -80,7 +94,25 @@ export function planReconcile({ dir, lines, fs = fsDefault }) {
  * yet), and only when the row moved since the last look. A failure says so here
  * and the row is looked at again next time.
  */
-export function reconcileRows({ items, isLive, dirOf, historyOf, writeTo, looked, warn = () => {}, fs = fsDefault }) {
+export interface ReconcileRow {
+  id: string;
+  product: string;
+  updatedAt?: unknown;
+  artifacts?: { edits?: readonly unknown[] } | null;
+}
+
+export interface ReconcileRowsOptions<I extends ReconcileRow> {
+  items: readonly I[];
+  isLive: (item: I) => boolean;
+  dirOf: (item: I) => string;
+  historyOf: (item: I) => ThreadLine[];
+  writeTo: (item: I, patch: ReconcilePatch) => unknown;
+  looked: Map<string, unknown>;
+  warn?: (words: string) => void;
+  fs?: Fs;
+}
+
+export function reconcileRows<I extends ReconcileRow>({ items, isLive, dirOf, historyOf, writeTo, looked, warn = () => {}, fs = fsDefault }: ReconcileRowsOptions<I>): void {
   for (const item of items) {
     if (!item.artifacts?.edits?.length || isLive(item)) continue;
     const key = `${item.product}\0${item.id}`;
@@ -90,7 +122,7 @@ export function reconcileRows({ items, isLive, dirOf, historyOf, writeTo, looked
       reconcileThread({ dir: dirOf(item), threadId: item.id, lines: historyOf(item), write: (patch) => writeTo(item, patch), fs });
     } catch (err) {
       looked.delete(key);
-      warn(`could not reconcile the versions on ${item.id}: ${err?.message ?? err}`);
+      warn(`could not reconcile the versions on ${item.id}: ${(err as Error | null)?.message ?? err}`);
     }
   }
 }
@@ -100,7 +132,7 @@ export function reconcileRows({ items, isLive, dirOf, historyOf, writeTo, looked
  * last, so a crash in between leaves something the next look finishes: a merged
  * version is itself the person's edit on top, which the plan then leaves alone.
  */
-export function reconcileThread({ dir, threadId, lines, write, fs = fsDefault }) {
+export function reconcileThread({ dir, threadId, lines, write, fs = fsDefault }: { dir: string; threadId: string; lines: ThreadLine[]; write: (patch: ReconcilePatch) => void; fs?: Fs }): ReconcilePlan[] {
   const plans = planReconcile({ dir, lines, fs });
   for (const plan of plans) {
     if (plan.do === 'merge') {

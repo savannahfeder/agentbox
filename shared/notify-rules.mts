@@ -27,7 +27,11 @@ export const AWAY_AFTER_MS = 5 * 60 * 1000;
 // She is at the app, so say nothing. Focus alone is not enough (see above) and
 // idleness alone is not either: a still keyboard while she is reading Slack is
 // not a reason to stay quiet.
-export function atTheApp({ focused = false, idleMs = 0 } = {}) {
+export interface Waiting { id?: string; title?: unknown; thread?: unknown; kind?: string }
+type WaitingList = ReadonlyArray<Waiting | null | undefined> | null | undefined;
+export interface Banner { title: string; body: string; open: string | null }
+
+export function atTheApp({ focused = false, idleMs = 0 }: { focused?: boolean; idleMs?: number } = {}): boolean {
   return !!focused && idleMs < AWAY_AFTER_MS;
 }
 
@@ -36,7 +40,7 @@ export function atTheApp({ focused = false, idleMs = 0 } = {}) {
 // desktop banner above is how she hears; buzzing the phone in her bag as well
 // is the "tons and tons of notifications" she reported (2026-10-13). The
 // phone is for when she has left the machine, which only the idle clock knows.
-export function atTheComputer({ idleMs = 0 } = {}) {
+export function atTheComputer({ idleMs = 0 }: { idleMs?: number } = {}): boolean {
   return idleMs < AWAY_AFTER_MS;
 }
 
@@ -54,7 +58,7 @@ export function atTheComputer({ idleMs = 0 } = {}) {
 // arrival that most deserved to reach her, the first one after she got clear,
 // was the one the app silently dropped before any rule here could see it.
 // tests/the-first-arrival-after-inbox-zero-still-speaks.test.mts.
-export function isNew(known, id) {
+export function isNew(known: ReadonlySet<string> | null | undefined, id: string): boolean {
   if (!known) return false;
   return !known.has(id);
 }
@@ -62,7 +66,7 @@ export function isNew(known, id) {
 // A title long enough to be a paragraph is normal here; hers run past a
 // hundred characters. macOS will hard-truncate mid-word, so cut on a space and
 // say that it was cut.
-export function clip(text, max = 120) {
+export function clip(text: unknown, max = 120): string {
   const s = String(text ?? '').replace(/\s+/g, ' ').trim();
   if (s.length <= max) return s;
   const cut = s.slice(0, max);
@@ -96,8 +100,8 @@ export function clip(text, max = 120) {
 // under a strict one-and-done rule, and the run would still be standing there
 // when she got back. So an approval gets to speak once more, and that is the
 // cap: at most two in one stretch away, never more.
-export function shouldSpeak({ spoke = false, spokeAsk = false, waiting = [] } = {}) {
-  const items = (waiting ?? []).filter(Boolean);
+export function shouldSpeak({ spoke = false, spokeAsk = false, waiting = [] }: { spoke?: boolean; spokeAsk?: boolean; waiting?: WaitingList } = {}): boolean {
+  const items = (waiting ?? []).filter(Boolean) as Waiting[];
   if (!items.length) return false;
   if (!spoke) return true;
   if (spokeAsk) return false;
@@ -125,8 +129,8 @@ export function shouldSpeak({ spoke = false, spokeAsk = false, waiting = [] } = 
 //
 // `waiting` is everything unseen, oldest first. Returns null when there is
 // nothing to say.
-export function banner(waiting) {
-  const items = (waiting ?? []).filter(Boolean);
+export function banner(waiting: WaitingList): Banner | null {
+  const items = (waiting ?? []).filter(Boolean) as Waiting[];
   if (!items.length) return null;
 
   // A frozen worker outranks a finished one, so when both are unseen the
@@ -155,10 +159,10 @@ export function banner(waiting) {
 // above for keeping a name out of the title does not hold there. The sentence
 // moves under it. An approval names the thread that is asking (`thread`) and
 // what it wants to run; with no thread to name, it is the desktop's words.
-export function phoneBanner(waiting) {
+export function phoneBanner(waiting: WaitingList): Banner | null {
   const say = banner(waiting);
   if (!say) return null;
-  const items = waiting.filter(Boolean);
+  const items = waiting!.filter(Boolean) as Waiting[];
   const asks = items.filter((i) => i.kind === 'approval');
   const lead = asks.length ? asks[0] : items[items.length - 1];
   const name = clip(asks.length ? lead.thread : lead.title, 80);

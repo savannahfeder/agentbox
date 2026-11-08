@@ -22,8 +22,83 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFile, execFileSync } from 'node:child_process';
 
+export type Readdir = (dir: string) => string[];
+type PathTest = (p: string) => boolean;
+
+/** What a login shell said about one program. */
+export interface ShellAnswer { path: string | null; answered: boolean }
+/** A lookup may also hand back a bare path or null, the shape it had before `answered`. */
+export type ShellReading = ShellAnswer | string | null;
+export type ShellLookup = () => ShellReading;
+export type ShellLookupLater = () => ShellAnswer | Promise<ShellAnswer>;
+
+type ShellProbe = [shell: string, flags: string, timeout: number];
+type ShellArgs = [flags: string, command: string];
+type ShellQuestion = [shell: string, args: ShellArgs, timeout: number];
+type ShellReply = { out: string; err?: undefined } | { err: unknown; out?: undefined };
+export type ShellRun = (shell: string, args: ShellArgs, timeout?: number) => string;
+export type ShellRunLater = (shell: string, args: ShellArgs, timeout?: number) => Promise<string>;
+
+/** What execFile and execFileSync throw, read for how the shell ended. */
+interface ShellFailure { status?: number | null; signal?: NodeJS.Signals | null; code?: string | number | null; stdout?: string | Buffer }
+
+interface EngineWindows {
+  ownPaths?: (home: string) => string[];
+  packageExes?: string[][];
+}
+
+interface EngineDeclaration {
+  bin: string;
+  name: string;
+  installUrl: string;
+  ownPaths: (home: string) => string[];
+  appCopies?: (home: string, readdir?: Readdir) => string[];
+  evidence: (home: string, env?: NodeJS.ProcessEnv) => string[];
+  windows?: EngineWindows;
+}
+
+export interface EngineSpec extends Required<EngineDeclaration> {
+  candidates(home?: string, readdir?: Readdir, platform?: NodeJS.Platform): string[];
+}
+
+/** Where a search found the program: a path somebody set, their shell, our PATH, the list, or a desktop app's copy. */
+export type EngineFrom = 'settings' | 'shell' | 'path' | 'disk' | 'app';
+
+export interface EngineSearch {
+  path: string | null;
+  found: boolean;
+  certain: boolean;
+  from: EngineFrom | null;
+  searched: string[];
+  evidence: string | null;
+}
+
+export interface EvidenceOptions {
+  home?: string;
+  env?: NodeJS.ProcessEnv;
+  exists?: PathTest;
+  dangles?: PathTest;
+  platform?: NodeJS.Platform;
+}
+
+export interface FindEngineOptions extends EvidenceOptions {
+  configured?: string | null;
+  shellLookup?: ShellLookup | null;
+  readdir?: Readdir;
+}
+
+export interface ResolveEngineOptions extends Omit<FindEngineOptions, 'configured' | 'shellLookup'> {
+  now?: number;
+  shellLookup?: (() => ShellAnswer) | null;
+  shellLookupLater?: ShellLookupLater | null;
+}
+
+interface AskShellOptions { env?: NodeJS.ProcessEnv; exists?: PathTest; run?: ShellRun; bin?: string }
+interface AskShellLaterOptions { env?: NodeJS.ProcessEnv; exists?: PathTest; run?: ShellRun | ShellRunLater; bin?: string }
+type AskShellForAllOptions = Omit<AskShellOptions, 'bin'>;
+
 /** Every package manager's default bin directory, in order, shared by all engines. */
-export function sharedBinDirs(home = os.homedir()) {
+export function sharedBinDirs(home: string = os.homedir()): string[] {
   return [
     '/opt/homebrew/bin',                           // Homebrew, Apple Silicon
     '/usr/local/bin',                              // Homebrew on Intel, and npm -g
@@ -51,22 +126,22 @@ export function sharedBinDirs(home = os.homedir()) {
  * Relative entries are dropped. A "." or a "node_modules/.bin" on PATH would
  * let whatever folder the app sits in decide what gets spawned.
  */
-export function pathDirs(env = process.env, platform = process.platform) {
+export function pathDirs(env: NodeJS.ProcessEnv | null | undefined = process.env, platform: NodeJS.Platform = process.platform): string[] {
   const p = pathsOf(platform);
-  const dirs = new Set();
+  const dirs = new Set<string>();
   for (const dir of String(envValue(env, 'PATH', platform) ?? '').split(p.delimiter)) {
     if (dir && p.isAbsolute(dir)) dirs.add(dir);
   }
   return [...dirs];
 }
 
-const pathsOf = (platform) => (platform === 'win32' ? path.win32 : path.posix);
+const pathsOf = (platform: NodeJS.Platform) => (platform === 'win32' ? path.win32 : path.posix);
 
 /**
  * Windows reads environment keys case-insensitively, and a copy keeps the
  * spelling it was started with. Explorer and PowerShell start it as `Path`.
  */
-export function envValue(env, name, platform = process.platform) {
+export function envValue(env: NodeJS.ProcessEnv | null | undefined, name: string, platform: NodeJS.Platform = process.platform): string | undefined {
   if (!env) return undefined;
   if (platform !== 'win32') return env[name];
   const key = Object.keys(env).find((k) => k.toUpperCase() === name.toUpperCase());
@@ -77,8 +152,8 @@ export function envValue(env, name, platform = process.platform) {
  * One bin directory per installed Node. nvm, fnm, n and asdf keep one per
  * version, and a global npm install under them lands only there.
  */
-export function versionedBinPaths(bin, home = os.homedir(), readdir = defaultReaddir) {
-  const under = (dir, tail) => readdir(path.join(home, dir)).map((v) => path.join(home, dir, v, tail));
+export function versionedBinPaths(bin: string, home: string = os.homedir(), readdir: Readdir = defaultReaddir): string[] {
+  const under = (dir: string, tail: string) => readdir(path.join(home, dir)).map((v) => path.join(home, dir, v, tail));
   return [
     ...under('.nvm/versions/node', `bin/${bin}`),
     ...under('.local/share/fnm/node-versions', `installation/bin/${bin}`),
@@ -88,7 +163,7 @@ export function versionedBinPaths(bin, home = os.homedir(), readdir = defaultRea
   ];
 }
 
-function defaultReaddir(dir) {
+function defaultReaddir(dir: string): string[] {
   try { return fs.readdirSync(dir); } catch { return []; }
 }
 
@@ -97,12 +172,12 @@ function defaultReaddir(dir) {
  * engines' installers point a stable link at a versioned file and swap it on
  * update, so this is a tool mid-upgrade, not a missing one.
  */
-function defaultDangles(p) {
+function defaultDangles(p: string): boolean {
   try { return !!fs.lstatSync(p) && !fs.existsSync(p); } catch { return false; }
 }
 
 /** Newest version folder first, by number and not by spelling. */
-function newestFirst(a, b) {
+function newestFirst(a: string, b: string): number {
   const x = a.split('.').map(Number), y = b.split('.').map(Number);
   for (let i = 0; i < Math.max(x.length, y.length); i++) {
     if ((x[i] ?? 0) !== (y[i] ?? 0)) return (y[i] ?? 0) - (x[i] ?? 0);
@@ -123,8 +198,8 @@ function newestFirst(a, b) {
  *   windows     `ownPaths` and the `packageExes` an npm install keeps beside
  *               its shim, all ending in a real .exe
  */
-function engine({ bin, name, installUrl, ownPaths, appCopies = () => [], evidence, windows = {} }) {
-  const spec = {
+function engine({ bin, name, installUrl, ownPaths, appCopies = () => [], evidence, windows = {} }: EngineDeclaration): EngineSpec {
+  const spec: EngineSpec = {
     bin,
     name,
     installUrl,
@@ -150,13 +225,13 @@ function engine({ bin, name, installUrl, ownPaths, appCopies = () => [], evidenc
  * `#!/bin/sh` script, and its `.cmd` needs cmd.exe, which strips the quotes
  * from a JSON argument. The npm package keeps the real exe beside the shim.
  */
-export function windowsCandidates(spec, home = os.homedir()) {
+export function windowsCandidates(spec: EngineSpec, home: string = os.homedir()): string[] {
   return spec.windows.ownPaths?.(home) ?? [];
 }
 
 // npm keeps its package beside the shim it writes, so a directory with no
 // shim is not looked into.
-function windowsExesIn(spec, dir, hasShim) {
+function windowsExesIn(spec: EngineSpec, dir: string, hasShim: boolean): string[] {
   const { packageExes = [] } = spec.windows;
   return [
     path.win32.join(dir, `${spec.bin}.exe`),
@@ -234,8 +309,8 @@ export const ENGINES = {
     // ~/.codex is unused.
     evidence: (home, env = process.env) => {
       const homes = [env?.CODEX_HOME, path.join(home, '.codex')].filter(Boolean);
-      const out = [];
-      for (const dir of new Set(homes)) {
+      const out: string[] = [];
+      for (const dir of new Set(homes as string[])) {
         out.push(
           path.join(dir, 'auth.json'),                    // it has been logged in
           path.join(dir, 'config.toml'),
@@ -262,21 +337,23 @@ export const ENGINES = {
   }),
 };
 
-export function engineKeys() {
-  return Object.keys(ENGINES);
+export type EngineKey = keyof typeof ENGINES;
+
+export function engineKeys(): EngineKey[] {
+  return Object.keys(ENGINES) as EngineKey[];
 }
 
-function engineFor(key) {
-  const found = ENGINES[key];
+function engineFor(key: string): EngineSpec {
+  const found = (ENGINES as Partial<Record<string, EngineSpec>>)[key];
   if (!found) throw new Error(`no coding agent is declared as ${JSON.stringify(key)}`);
   return found;
 }
 
 // Their $SHELL first, then zsh and bash, because a $SHELL that will not start
 // says nothing about the tool.
-export function shellProbes(env = process.env) {
+export function shellProbes(env: NodeJS.ProcessEnv = process.env): ShellProbe[] {
   const preferred = env.SHELL || '/bin/zsh';
-  const out = [[preferred, '-lic', 4000], [preferred, '-lc', 2500]];
+  const out: ShellProbe[] = [[preferred, '-lic', 4000], [preferred, '-lc', 2500]];
   for (const other of ['/bin/zsh', '/bin/bash']) {
     if (other !== preferred) out.push([other, '-lic', 2500]);
   }
@@ -298,22 +375,22 @@ const PROGRAM_NAME = /^[A-Za-z0-9][A-Za-z0-9._+-]*$/;
  * a real exit status. Login and interactive (`-lic`) because version managers
  * add themselves to PATH only in `.zprofile` and `.zshrc`.
  */
-export function askShell({ env = process.env, exists = fs.existsSync, run = defaultRun, bin = 'claude' } = {}) {
+export function askShell({ env = process.env, exists = fs.existsSync, run = defaultRun, bin = 'claude' }: AskShellOptions = {}): ShellAnswer {
   const asking = shellQuestion({ env, exists, bin });
   for (let step = asking.next(); ; ) {
     if (step.done) return step.value;
-    let reply;
+    let reply: ShellReply;
     try { reply = { out: run(...step.value) }; } catch (err) { reply = { err }; }
     step = asking.next(reply);
   }
 }
 
 /** `askShell` without holding the window: each probe is awaited. */
-export async function askShellLater({ env = process.env, exists = fs.existsSync, run = shellRunnerLater(process.env), bin = 'claude' } = {}) {
+export async function askShellLater({ env = process.env, exists = fs.existsSync, run = shellRunnerLater(process.env), bin = 'claude' }: AskShellLaterOptions = {}): Promise<ShellAnswer> {
   const asking = shellQuestion({ env, exists, bin });
   for (let step = asking.next(); ; ) {
     if (step.done) return step.value;
-    let reply;
+    let reply: ShellReply;
     try { reply = { out: await run(...step.value) }; } catch (err) { reply = { err }; }
     step = asking.next(reply);
   }
@@ -321,7 +398,7 @@ export async function askShellLater({ env = process.env, exists = fs.existsSync,
 
 // The probes and what their replies mean, written once for both askers: it
 // yields each probe to run and is handed back `{ out }` or `{ err }`.
-function* shellQuestion({ env, exists, bin }) {
+function* shellQuestion({ env, exists, bin }: { env: NodeJS.ProcessEnv; exists: PathTest; bin: string }): Generator<ShellQuestion, ShellAnswer, ShellReply> {
   if (typeof bin !== 'string' || !PROGRAM_NAME.test(bin)) {
     throw new Error(`askShell looks up a program name, and ${JSON.stringify(bin)} is not one`);
   }
@@ -344,10 +421,11 @@ function* shellQuestion({ env, exists, bin }) {
 
 // A timeout and a missing shell also throw here, and neither is a fact about
 // the tool.
-function exitedSayingNo(e) {
+function exitedSayingNo(e: unknown): boolean {
   if (!e || typeof e !== 'object') return false;
-  if (e.signal || e.code === 'ETIMEDOUT' || e.code === 'ENOENT') return false;
-  return typeof e.status === 'number';
+  const { signal, code, status } = e as ShellFailure;
+  if (signal || code === 'ETIMEDOUT' || code === 'ENOENT') return false;
+  return typeof status === 'number';
 }
 
 /**
@@ -368,15 +446,15 @@ function exitedSayingNo(e) {
  */
 const REACHED = 'agentbox-shell-reached';
 const notReached = () => Object.assign(new Error('the shell profile ended the shell before the question ran'), { code: 'ENOTREACHED' });
-function afterReached(stdout) {
+function afterReached(stdout: string | Buffer | null | undefined): string | null {
   const lines = String(stdout ?? '').split('\n');
   const at = lines.map((l) => l.trim()).lastIndexOf(REACHED);
   return at < 0 ? null : lines.slice(at + 1).join('\n');
 }
 
-export function shellRunner(env = process.env) {
+export function shellRunner(env: NodeJS.ProcessEnv = process.env): ShellRun {
   return (shell, [flags, command], timeout = 4000) => {
-    let out;
+    let out: string;
     try {
       out = execFileSync(shell, [flags, `echo ${REACHED}; ${command}`], {
         encoding: 'utf8',
@@ -390,7 +468,8 @@ export function shellRunner(env = process.env) {
         env,
       });
     } catch (e) {
-      if (typeof e?.status === 'number' && !e.signal && afterReached(e.stdout) === null) throw notReached();
+      const failed = e as ShellFailure | null;
+      if (typeof failed?.status === 'number' && !failed.signal && afterReached(failed.stdout) === null) throw notReached();
       throw e;
     }
     const answer = afterReached(out);
@@ -399,7 +478,7 @@ export function shellRunner(env = process.env) {
   };
 }
 
-function defaultRun(shell, args, timeout = 4000) {
+function defaultRun(shell: string, args: ShellArgs, timeout: number = 4000): string {
   return shellRunner(process.env)(shell, args, timeout);
 }
 
@@ -409,8 +488,8 @@ function defaultRun(shell, args, timeout = 4000) {
  * `exitedSayingNo` reads: a timeout carries ETIMEDOUT, a plain non-zero exit a
  * numeric `status`.
  */
-export function shellRunnerLater(env = process.env) {
-  return (shell, [flags, command], timeout = 4000) => new Promise((resolve, reject) => {
+export function shellRunnerLater(env: NodeJS.ProcessEnv = process.env): ShellRunLater {
+  return (shell, [flags, command], timeout = 4000) => new Promise<string>((resolve, reject) => {
     const child = execFile(shell, [flags, `echo ${REACHED}; ${command}`], {
       encoding: 'utf8', timeout, killSignal: 'SIGKILL', maxBuffer: 1024 * 1024, env,
     }, (err, stdout) => {
@@ -431,7 +510,7 @@ export function shellRunnerLater(env = process.env) {
 }
 
 // A lookup that returns a bare path or null (the old shape) counts as answered.
-function shellSaid(result) {
+function shellSaid(result: ShellReading | undefined): ShellAnswer {
   if (typeof result === 'string') return { path: result, answered: true };
   if (!result || typeof result !== 'object') return { path: null, answered: true };
   return { path: result.path ?? null, answered: result.answered !== false };
@@ -444,7 +523,7 @@ function shellSaid(result) {
  * exists, and is named after an engine, since lines come back in any order.
  * This never records an absence; only the per-engine probe may settle one.
  */
-export function askShellForAll(bins, { env = process.env, exists = fs.existsSync, run = defaultRun } = {}) {
+export function askShellForAll(bins: string[], { env = process.env, exists = fs.existsSync, run = defaultRun }: AskShellForAllOptions = {}): Record<string, string> {
   for (const bin of bins) {
     if (typeof bin !== 'string' || !PROGRAM_NAME.test(bin)) {
       throw new Error(`askShellForAll looks up program names, and ${JSON.stringify(bin)} is not one`);
@@ -454,7 +533,7 @@ export function askShellForAll(bins, { env = process.env, exists = fs.existsSync
   for (const [shell, flags, timeout] of shellProbes(env)) {
     let out = '';
     try { out = run(shell, [flags, command], timeout); } catch { continue; }
-    const found = {};
+    const found: Record<string, string> = {};
     for (const line of String(out).split('\n').map((s) => s.trim()).filter(Boolean)) {
       if (!line.startsWith('/') || !exists(line)) continue;
       const bin = bins.find((b) => path.basename(line) === b);
@@ -469,9 +548,9 @@ export function askShellForAll(bins, { env = process.env, exists = fs.existsSync
  * Seed every engine's cached shell answer from one probe. If the shell fails,
  * each engine falls back to its own probe.
  */
-export function warmShellAnswers({ now = Date.now(), platform = process.platform, ...how } = {}) {
+export function warmShellAnswers({ now = Date.now(), platform = process.platform, ...how }: AskShellForAllOptions & { now?: number; platform?: NodeJS.Platform } = {}): void {
   if (platform === 'win32') return;
-  let found = {};
+  let found: Record<string, string> = {};
   try { found = askShellForAll(engineKeys().map((k) => ENGINES[k].bin), how); } catch { return; }
   for (const key of engineKeys()) {
     const where = found[ENGINES[key].bin];
@@ -480,7 +559,7 @@ export function warmShellAnswers({ now = Date.now(), platform = process.platform
 }
 
 // A lookup that throws is read as no answer, so the list still gets its turn.
-function askedShell(lookup) {
+function askedShell(lookup: ShellLookup): ShellAnswer {
   try { return shellSaid(lookup()); } catch { return { path: null, answered: false }; }
 }
 
@@ -488,9 +567,9 @@ function askedShell(lookup) {
  * The first trace the tool left behind, or null. Never spawned; it only stops
  * the app saying the tool is missing. A dangling candidate counts too.
  */
-export function installEvidence(key, {
+export function installEvidence(key: string, {
   home = os.homedir(), env = process.env, exists = fs.existsSync, dangles = defaultDangles, platform = process.platform,
-} = {}) {
+}: EvidenceOptions = {}): string | null {
   const spec = engineFor(key);
   for (const p of spec.evidence(home, env)) if (exists(p)) return p;
   for (const p of spec.candidates(home, () => [], platform)) if (dangles(p)) return p;
@@ -503,7 +582,7 @@ export function installEvidence(key, {
  * does not exist is still returned as the path, so a spawn fails naming the
  * path they chose, with found false and certain true.
  */
-export function findEngine(key, {
+export function findEngine(key: string, {
   configured = null,
   home = os.homedir(),
   env = process.env,
@@ -512,7 +591,7 @@ export function findEngine(key, {
   readdir = defaultReaddir,
   dangles = defaultDangles,
   platform = process.platform,
-} = {}) {
+}: FindEngineOptions = {}): EngineSearch {
   const spec = engineFor(key);
   if (configured) {
     return {
@@ -574,12 +653,12 @@ export function findEngine(key, {
 // once, and the shell is asked again in the background for the next read.
 
 const SHELL_TTL = 30_000;
-const held = new Map();
-const asking = new Map();
+const held = new Map<string, { answer: ShellAnswer; at: number }>();
+const asking = new Map<string, Promise<void>>();
 
-export function resolveEngine(key, configured = null, { now = Date.now(), shellLookup = null, shellLookupLater = null, ...where } = {}) {
+export function resolveEngine(key: string, configured: string | null = null, { now = Date.now(), shellLookup = null, shellLookupLater = null, ...where }: ResolveEngineOptions = {}): EngineSearch {
   const spec = engineFor(key);
-  const remembered = () => {
+  const remembered = (): ShellAnswer => {
     const last = held.get(key);
     if (!last) {
       const answer = (shellLookup ?? (() => askShell({ bin: spec.bin })))();
@@ -604,16 +683,16 @@ export function resolveEngine(key, configured = null, { now = Date.now(), shellL
  * held, for a caller that promised a fresh look (Check again, setup, the
  * update check). Never rejects.
  */
-export function lookAgain(key, { now = Date.now(), shellLookupLater = null, platform = process.platform } = {}) {
+export function lookAgain(key: string, { now = Date.now(), shellLookupLater = null, platform = process.platform }: { now?: number; shellLookupLater?: ShellLookupLater | null; platform?: NodeJS.Platform } = {}): Promise<void> {
   const spec = engineFor(key);
   // The Windows search never reads a shell answer (findEngine).
   if (platform === 'win32') return Promise.resolve();
   return askAgain(key, shellLookupLater ?? (() => askShellLater({ bin: spec.bin })), now);
 }
 
-function askAgain(key, lookup, now) {
-  if (asking.has(key)) return asking.get(key);
-  const turn = new Promise((resolve) => resolve(lookup())).then(
+function askAgain(key: string, lookup: ShellLookupLater, now: number): Promise<void> {
+  if (asking.has(key)) return asking.get(key)!;
+  const turn: Promise<void> = new Promise<ShellAnswer>((resolve) => resolve(lookup())).then(
     (answer) => {
       if (asking.get(key) !== turn) return;
       // A shell that timed out under load says nothing, and must not replace
@@ -629,7 +708,7 @@ function askAgain(key, lookup, now) {
   return turn;
 }
 
-export function forgetEngine(key) {
+export function forgetEngine(key: string): void {
   engineFor(key); // throws for an undeclared engine
   held.delete(key);
   // An answer already on its way was asked for before this, so it is dropped.

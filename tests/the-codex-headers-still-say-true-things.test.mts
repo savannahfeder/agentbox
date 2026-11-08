@@ -52,7 +52,7 @@ describe('the transport header', () => {
 
   // AND IT IS REALLY IMPORTED, which is the fact the header now has to match.
   it('is really imported by the supervisor', () => {
-    expect(read('main/supervisor.mts')).toMatch(/from '\.\/codex-app-server\.mjs'/);
+    expect(read('main/supervisor.mts')).toMatch(/from '\.\/codex-app-server\.mts'/);
   });
 });
 
@@ -123,8 +123,8 @@ describe('the supervisor comments the last two reviews contradicted', () => {
   });
 
   it('no longer says config.mjs does not write codexBin', () => {
-    expect(source).not.toMatch(/`codexBin` is not written by\s*\n?\s*\*?\s*main\/config\.mjs at all yet/);
-    expect(source).not.toMatch(/is not written by[\s\S]{0,40}main\/config\.mjs at all yet/);
+    expect(source).not.toMatch(/`codexBin` is not written by\s*\n?\s*\*?\s*main\/config\.mts at all yet/);
+    expect(source).not.toMatch(/is not written by[\s\S]{0,40}main\/config\.mts at all yet/);
   });
 
   // THE SIXTH. `codexThreadParamsFor` said a row with a model on it "runs on

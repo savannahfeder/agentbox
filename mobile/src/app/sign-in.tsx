@@ -30,9 +30,9 @@ export default function SignIn() {
   const run = (which: string, how: () => Promise<unknown>) => async () => {
     if (!c.cloud) return;
     setBusy(which); setError(null); setFailed(false);
-    try { await c.signedInWith(how); } catch (err: any) {
-      if (err?.code === 'ERR_REQUEST_CANCELED') return;
-      setError(String(err?.message ?? '') || 'That did not work. Try again.');
+    try { await c.signedInWith(how); } catch (err) {
+      if ((err as { code?: string })?.code === 'ERR_REQUEST_CANCELED') return;
+      setError(String((err as Error)?.message ?? '') || 'That did not work. Try again.');
       setFailed(which === 'email');
     } finally { setBusy(null); }
   };

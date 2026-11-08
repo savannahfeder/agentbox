@@ -5,16 +5,19 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Name } from '../../shared/product-name.mjs';
+import type { RoomDecision } from './rooms.mts';
 
 const MARK = `<!-- Written by ${Name} from what your team marked. Edits here are replaced. -->`;
 const FILE = 'decisions.md';
 
-const on = (rows) => rows.filter((r) => r.on).sort((a, b) => b.at - a.at);
-const day = (at) => new Date(at).toISOString().slice(0, 10);
-const line = (r, nameOf) => `- ${r.body.trim()} (${nameOf(r.saidBy)}, ${day(r.at)})`;
+type NameOf = (id: string | null) => string;
+
+const on = (rows: readonly RoomDecision[]) => rows.filter((r) => r.on).sort((a, b) => b.at - a.at);
+const day = (at: number) => new Date(at).toISOString().slice(0, 10);
+const line = (r: RoomDecision, nameOf: NameOf) => `- ${r.body.trim()} (${nameOf(r.saidBy)}, ${day(r.at)})`;
 
 /** The team's decisions and this project's. `rows` come from the team's own group. */
-export function decisionsDoc({ project, teamName, rows, nameOf }) {
+export function decisionsDoc({ project, teamName, rows, nameOf }: { project?: string; teamName: string; rows: readonly RoomDecision[]; nameOf: NameOf }): string {
   const here = on(rows).filter((r) => !r.project || r.project === project);
   const priority = here.find((r) => r.kind === 'priority');
   const team = here.filter((r) => r.kind === 'decision' && !r.project);
@@ -30,12 +33,17 @@ export function decisionsDoc({ project, teamName, rows, nameOf }) {
 }
 
 /** Writes each project's document where it changed. Returns how many it wrote. */
-export function writeDecisionDocs({ products, teamName, rows, nameOf }) {
+export function writeDecisionDocs({ products, teamName, rows, nameOf }: {
+  products: readonly ({ dir?: string | null; name?: string; team?: { direct?: boolean } | null } | null | undefined)[];
+  teamName: string;
+  rows: readonly RoomDecision[];
+  nameOf: NameOf;
+}): number {
   let wrote = 0;
   for (const product of products) {
     if (!product?.dir || product.team?.direct) continue;
     const file = path.join(product.dir, FILE);
-    let had = null;
+    let had: string | null = null;
     try { had = fs.readFileSync(file, 'utf8'); } catch { /* not there yet */ }
     if (had === null && !on(rows).length) continue;
     if (had !== null && !had.startsWith(MARK)) continue;

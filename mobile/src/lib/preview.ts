@@ -3,6 +3,8 @@
 // stand-in for the cloud that keeps what the phone sends in memory.
 import { macAway, macSeenOf } from '../../../renderer/src/phone-rows';
 import type { PhoneRows } from '../../../renderer/src/phone-rows';
+import type { LedgerLine } from '../../../renderer/src/thread-history';
+import type { WorkItem } from '../../../renderer/src/types';
 import { PREVIEW_ATTACHED, previewLink } from './preview-files.mjs';
 
 const DEV = '0a1b2c3d4e5f';
@@ -15,9 +17,9 @@ export function previewRows(now = Date.now()): PhoneRows {
   const iso = (ms: number) => new Date(ms).toISOString();
   // No computer is behind the preview to say its runs are still going, so they say it for the whole session.
   const STILL_GOING = now + 24 * 60 * MIN;
-  const thread = (project: string, item: any, history: any[], extra: Record<string, unknown> = {}) => ({
+  const thread = (project: string, item: Partial<WorkItem> & Pick<WorkItem, 'id' | 'updatedAt'>, history: Omit<LedgerLine, 'id'>[], extra: Record<string, unknown> = {}) => ({
     device: DEV, project, item: item.id, updated_at: iso(item.updatedAt),
-    snapshot: { v: 3, item: { kind: 'directive', labels: ['founder'], priority: 0, ...item }, history: history.map((l) => ({ id: item.id, ...l })), olderLines: 0, ...extra },
+    snapshot: { v: 3, item: { kind: 'directive', labels: ['founder'], priority: 0, ...item } as WorkItem, history: history.map((l) => ({ id: item.id, ...l })), olderLines: 0, ...extra },
   });
   const planAsk = 'Plan the phone app. I want alerts that reach my lock screen and a way to reply without opening the Mac.';
   const planResult = 'The plan is ready and Codex has reviewed it.\n\nThe first version signs you in, shows your inbox and lets you reply. Alerts come next, then messages between people.\n\n![The inbox on the phone](designs/w-1a2b3c4d5e/inbox.png)\n\n**Getting it approved** is mostly about two things: deleting an account has to delete what you shared, and messages need a report button.\n\n## Options\n1. Start building the first version (recommended)\n2. Wait until the Apple account is checked';
@@ -188,6 +190,20 @@ const PREVIEW_TEAM = {
   invites: [{ email: 'lee@example.com' }],
 };
 
+/** A message the phone writes to `room_messages`. */
+type MessageRow = { room_id: string; body: string; in_reply_to?: string | null; mentions?: string[] };
+
+/** A setting the phone sent, with every field any of its keys carries: the preview trusts its own sends. */
+interface SentSetting {
+  scope: string; key: string; product?: string;
+  value: { to: string[]; text?: string; answers?: Record<string, string>; id?: string; paused: boolean; starter?: string; product?: string; engine?: string; account?: string; all: boolean; except: string[] };
+}
+type PreviewWorkspace = Record<string, unknown> & {
+  alpha: Record<string, unknown>; memoryGate: Record<string, unknown>; leftovers: Record<string, unknown>;
+  accounts: { id: string; chosen: boolean }[]; codexAccounts: { id: string; chosen: boolean }[];
+};
+type PreviewMate = Record<string, unknown> & { id: string; paused?: boolean; now?: unknown; nowBeforePause?: unknown };
+
 /** Groups as the cloud keeps them (20261021000000_rooms.sql), for the Groups tab. Every name is made up. */
 export function previewGroups(now = Date.now()) {
   const iso = (ms: number) => new Date(ms).toISOString();
@@ -236,7 +252,7 @@ export function previewGroups(now = Date.now()) {
   ];
   const names: Record<string, string> = { preview: 'Ada Lovelace', 'p-2': 'Sam Rivera', 'p-3': 'Kai Ito', 'p-4': 'Maya Chen', 'p-5': 'Lee Park' };
   return {
-    rpc(name: string, args: Record<string, any>) {
+    rpc(name: string, args: Record<string, string>) {
       if (name === 'my_rooms') return rooms;
       if (name === 'room_people') return members[args.r] ?? [];
       if (name === 'room_names') return (members[args.r] ?? []).map((id) => ({ person_id: id, name: profiles.find((p) => p.person_id === id)?.display_name ?? names[id], avatar_url: null, has_card: true }));
@@ -261,7 +277,7 @@ export function previewGroups(now = Date.now()) {
       if (when?.startsWith('lt.')) rows = rows.filter((m) => m.created_at < when.slice(3));
       return rows.sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, Number(q.get('limit') ?? 200));
     },
-    send(row: Record<string, any>) {
+    send(row: MessageRow) {
       const made = msg(row.room_id, 'preview', new Date().toISOString(), row.body, { in_reply_to: row.in_reply_to ?? null, mentions: row.mentions ?? [] });
       messages.push(made);
       return made;
@@ -297,34 +313,34 @@ export function previewCloud(now = () => Date.now()) {
   let signedIn = scene !== 'signed-out' && !walking;
   const settings = previewSettings(now());
   // `?scene=codex`: a computer whose chosen agent is Codex, so a thread naming none runs on it.
-  if (scene === 'codex') (settings.settings.workspace as any).engine = 'codex';
+  if (scene === 'codex') (settings.settings.workspace as PreviewWorkspace).engine = 'codex';
   // `previewOffline = true` on the page: reads and sends fail as they do on a phone with no signal.
   const noSignal = () => {
-    if ((globalThis as any).previewOffline) throw new Error('fetch failed: java.net.UnknownHostException: Unable to resolve host "preview.supabase.co": No address associated with hostname');
+    if ((globalThis as typeof globalThis & { previewOffline?: boolean }).previewOffline) throw new Error('fetch failed: java.net.UnknownHostException: Unable to resolve host "preview.supabase.co": No address associated with hostname');
   };
   const team = { ...PREVIEW_TEAM, members: [...PREVIEW_TEAM.members], invites: [...PREVIEW_TEAM.invites] };
   // The Mac takes a change a moment later and sends its settings again.
   const takeSetting = (c: PhoneRows['commands'][number]) => setTimeout(() => {
-    const { scope, key, value, product } = c.payload ?? {};
+    const { scope, key, value, product } = (c.payload ?? {}) as SentSetting;
     // Away, as the banner says it is: a teammate does not get what you sent, as it would not from a real computer.
     if (scope === 'teammate' && macAway(macSeenOf(rows.projects), now())) return;
-    const w: any = settings.settings.workspace;
-    const repeats: any[] = (settings.settings as any).repeats;
-    const mates: any = (settings.settings as any).teammates;
+    const w: PreviewWorkspace = settings.settings.workspace;
+    const repeats: Record<string, unknown>[] = settings.settings.repeats;
+    const mates: { chat: Record<string, unknown>[]; list: PreviewMate[] } = settings.settings.teammates;
     if (scope === 'teammate' && key === 'post') {
       mates.chat.push({ id: `m-${c.id}`, kind: 'msg', from: 'you', to: value.to, text: value.text, ...(value.answers ? { answers: value.answers } : {}), ts: now() });
       // The teammate answers a moment later, as a run of it would; a paused one does not.
-      if (!mates.list.find((x: any) => x.id === value.to[0])?.paused) setTimeout(() => {
+      if (!mates.list.find((x: PreviewMate) => x.id === value.to[0])?.paused) setTimeout(() => {
         mates.chat.push({ id: `m-${c.id}-r`, kind: 'msg', from: value.to[0], to: ['you'], text: 'Got it. I will tell you when it is done.', ts: now() });
         settings.updated_at = new Date(now()).toISOString();
       }, 4000);
     } else if (scope === 'teammate' && key === 'pause') {
-      const m = mates.list.find((x: any) => x.id === value.id);
+      const m = mates.list.find((x: PreviewMate) => x.id === value.id);
       if (m) Object.assign(m, { paused: value.paused, now: value.paused ? 'Paused' : m.nowBeforePause ?? null, nowBeforePause: value.paused ? m.now : undefined });
     } else if (scope === 'teammate' && key === 'describe') {
       mates.list.push({ id: `t-${c.id}`, name: 'New teammate', letter: 'N', role: null, job: value.text ?? value.starter, primary: false, paused: false, status: 'draft', product: value.product, waiting: [], running: null, duties: [], runsThisWeek: 0 });
-    } else if (scope === 'thread') { const t = rows.threads.find((r) => r.project === product && r.item === c.payload.item); if (t) { t.snapshot.item.pinned = value || undefined; t.updated_at = new Date(now() + 1).toISOString(); } }
-    else if (scope === 'repeat' && key === 'end') (settings.settings as any).repeats = repeats.filter((r) => !(r.product === product && r.id === c.payload.id));
+    } else if (scope === 'thread') { const t = rows.threads.find((r) => r.project === product && r.item === c.payload.item); if (t) { (t.snapshot.item as { pinned?: unknown }).pinned = value || undefined; t.updated_at = new Date(now() + 1).toISOString(); } }
+    else if (scope === 'repeat' && key === 'end') (settings.settings as { repeats: unknown[] }).repeats = repeats.filter((r) => !(r.product === product && r.id === c.payload.id));
     else if (scope === 'repeat' && key === 'change') Object.assign(repeats.find((r) => r.product === product && r.id === c.payload.id) ?? {}, value);
     else if (scope === 'repeat' && key === 'new') repeats.push({ product, id: `r-${c.id}`, priority: 5, createdAt: now(), served: '', ...value });
     else if (scope === 'project') Object.assign(settings.settings.projects.find((p) => p.slug === product) ?? {}, { [key]: value });
@@ -333,13 +349,13 @@ export function previewCloud(now = () => Date.now()) {
     else if (key === 'memoryGateSlots') w.memoryGate.slots = value;
     else if (key === 'cleanupLeftovers') w.leftovers.on = value;
     else if (key === 'sessionsAtOnce') Object.assign(w, { sessionsAtOnce: value, agentsAuto: false });
-    else if (key === 'activeAccount') (value.engine === 'codex' ? w.codexAccounts : w.accounts).forEach((a: any) => { a.chosen = a.id === value.account; });
+    else if (key === 'activeAccount') (value.engine === 'codex' ? w.codexAccounts : w.accounts).forEach((a: { id: string; chosen: boolean }) => { a.chosen = a.id === value.account; });
     else if (key === 'phoneProjects') settings.settings.projects.forEach((p) => { p.onPhone = value.all && !value.except.includes(p.slug); });
     else if (key !== 'agentsFeltSlow') w[key] = value;
     Object.assign(c, { taken_at: new Date(now()).toISOString(), outcome: 'done' });
     settings.updated_at = new Date(now()).toISOString();
   }, 1500);
-  const devices = new Map<string, Record<string, any>>();
+  const devices = new Map<string, Record<string, unknown>>();
   const groups = previewGroups(now());
   const session = () => (signedIn ? { access_token: 'preview', refresh_token: 'preview', expires_at: now() + 3600_000, user: { id: 'preview', email: 'you@example.com' } } : null);
   return {
@@ -361,13 +377,13 @@ export function previewCloud(now = () => Date.now()) {
       if (table === 'team_invites') return team.invites;
       return [];
     },
-    async insert(table: string, row: Record<string, any>) {
-      if (table === 'room_messages') return groups.send(row);
-      if (table === 'team_invites' && !team.invites.some((i) => i.email === row.email)) team.invites.push({ email: row.email });
+    async insert(table: string, row: Record<string, unknown>) {
+      if (table === 'room_messages') return groups.send(row as MessageRow);
+      if (table === 'team_invites' && !team.invites.some((i) => i.email === row.email)) team.invites.push({ email: row.email as string });
       return row;
     },
-    async upsert(table: string, row: Record<string, any>) {
-      if (table === 'push_devices') devices.set(row.token, row);
+    async upsert(table: string, row: Record<string, unknown>) {
+      if (table === 'push_devices') devices.set(row.token as string, row);
       return row;
     },
     async remove(table: string, query: string) {
@@ -377,7 +393,7 @@ export function previewCloud(now = () => Date.now()) {
       if (table === 'team_members') { const gone = team.members.filter((m) => m.person_id === eq('person_id')); team.members = team.members.filter((m) => m.person_id !== eq('person_id')); return gone; }
       return [];
     },
-    async rpc(name: string, args: Record<string, any> = {}) { return groups.rpc(name, args); },
+    async rpc(name: string, args: Record<string, string> = {}) { return groups.rpc(name, args); },
     async listFiles() { return []; },
     async removeFiles() {},
     async update(_table: string, query: string, patch: Record<string, unknown>) {
@@ -390,7 +406,7 @@ export function previewCloud(now = () => Date.now()) {
     async signFiles(_bucket: string, paths: string[]) {
       return new Map(paths.map((p) => [p, previewLink(p.slice(p.lastIndexOf('/') + 1))]));
     },
-    async insertCommand(row: Record<string, any>) {
+    async insertCommand(row: Record<string, unknown>) {
       noSignal();
       const made = { id: `c-${rows.commands.length + 1}`, payload: {}, item: null, ...row, created_at: new Date(now()).toISOString(), claimed_at: null, taken_at: null, outcome: null } as PhoneRows['commands'][number];
       rows.commands.push(made);

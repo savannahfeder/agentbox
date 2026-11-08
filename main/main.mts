@@ -340,7 +340,7 @@ async function createWindow() {
   const [shellPath] = await Promise.all([recoverShellPath(), learnShellDataDirs()]);
   process.env.PATH = shellPath.path;
   if (shellPath.error) console.warn('agentbox: could not load your shell PATH; using the inherited PATH:', shellPath.error);
-  const config = loadConfig(dataDir) as unknown as AppConfig;
+  const config = loadConfig(dataDir) as AppConfig;
   // The store modules read the app's own home variable at call time; setting it
   // here points auth session files, sync, and every store path at its root.
   // Written under every name this app has had, because a store server or a
@@ -490,7 +490,7 @@ async function createWindow() {
       decrypt: (buf: Buffer) => (safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(buf) : buf.toString('utf8')),
       packaged: app.isPackaged,
       openExternal: (url: string) => shell.openExternal(url),
-    } as unknown as Parameters<typeof supabaseSession>[0]) as TeamSession,
+    }) as TeamSession,
     store,
     disk: workItemsDisk,
     accountRoot: config.accountRoot,

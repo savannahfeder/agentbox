@@ -18,13 +18,18 @@ const {
 } = process.env;
 
 const OFFLINE = `The owner's app is offline, so ${NAME} cannot be reached and nothing was done. It works again when their Agentbox is open.`;
-const failed = (text) => ({ isError: true, content: [{ type: 'text', text }] });
-const send = (msg) => process.stdout.write(`${JSON.stringify(msg)}\n`);
+interface ToolResult { isError?: boolean; content: { type: 'text'; text: string }[] }
+interface McpTool { name: string; description?: string; inputSchema: Record<string, unknown> }
+interface AppAnswer { id: number; result?: { tools?: McpTool[] } & Partial<ToolResult> }
+interface RpcRequest { id?: string | number; method?: string; params?: { protocolVersion?: string; name?: string; [key: string]: unknown } }
 
-let sock = null;
+const failed = (text: string): ToolResult => ({ isError: true, content: [{ type: 'text', text }] });
+const send = (msg: Record<string, unknown>) => process.stdout.write(`${JSON.stringify(msg)}\n`);
+
+let sock: net.Socket | null = null;
 let buf = '';
 let nextId = 0;
-const waiting = new Map();
+const waiting = new Map<number, (answer: AppAnswer | null) => void>();
 
 function gone() {
   sock = null;
@@ -33,7 +38,7 @@ function gone() {
   waiting.clear();
 }
 
-const channel = () => new Promise((resolve) => {
+const channel = () => new Promise<net.Socket | null>((resolve) => {
   if (sock) { resolve(sock); return; }
   if (!SOCK) { resolve(null); return; }
   const s = net.createConnection(SOCK);
@@ -47,7 +52,7 @@ const channel = () => new Promise((resolve) => {
     while ((i = buf.indexOf('\n')) >= 0) {
       const line = buf.slice(0, i);
       buf = buf.slice(i + 1);
-      let m;
+      let m: AppAnswer;
       try { m = JSON.parse(line); } catch { continue; }
       waiting.get(m.id)?.(m);
       waiting.delete(m.id);
@@ -56,17 +61,17 @@ const channel = () => new Promise((resolve) => {
 });
 
 /** The app's answer, or null when the app cannot be reached. */
-async function ask(method, params) {
+async function ask(method: string, params: unknown): Promise<AppAnswer | null> {
   const s = await channel();
   if (!s) return null;
   const id = nextId += 1;
-  return new Promise((resolve) => {
+  return new Promise<AppAnswer | null>((resolve) => {
     waiting.set(id, resolve);
     s.write(`${JSON.stringify({ id, run: RUN, connection: CONNECTION, method, params })}\n`);
   });
 }
 
-let lastTools = null;
+let lastTools: McpTool[] | null = null;
 async function toolsList() {
   const got = await ask('tools/list', {});
   if (got?.result?.tools) { lastTools = got.result.tools; return { tools: lastTools }; }
@@ -75,7 +80,7 @@ async function toolsList() {
   return { tools: [{ name: OFFLINE_TOOL, description: `Says why ${NAME} cannot be reached right now.`, inputSchema: { type: 'object', properties: {} } }] };
 }
 
-async function toolsCall(params) {
+async function toolsCall(params: RpcRequest['params']) {
   if (params?.name === OFFLINE_TOOL) {
     const got = await ask('tools/list', {});
     return { content: [{ type: 'text', text: got ? `${NAME} is reachable again.` : OFFLINE }], ...(got ? {} : { isError: true }) };
@@ -88,7 +93,7 @@ async function toolsCall(params) {
 
 const rl = readline.createInterface({ input: process.stdin });
 rl.on('line', async (line) => {
-  let msg;
+  let msg: RpcRequest;
   try { msg = JSON.parse(line); } catch { return; }
   const { id, method, params } = msg;
   if (id === undefined) return;

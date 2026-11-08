@@ -29,6 +29,64 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { machineryPath } from './store/home.mts';
+import type { RepoChange, WorkStands } from './git-change.mts';
+
+// The same shapes renderer/src/code-artifact.ts draws, and the two must agree.
+export type Row = ['=' | '+' | '-', string];
+export type RowNums = [old: number | null, now: number | null];
+
+export interface Hunk {
+  rows: Row[];
+  nums?: RowNums[];
+  said?: string;
+  at?: number;
+  plus: number;
+  minus: number;
+}
+
+export interface ChangedFile {
+  path: string;
+  abs?: string;
+  hunks: Hunk[];
+  plus: number;
+  minus: number;
+  at?: number;
+  leftOut?: number;
+  fromDisk?: boolean;
+}
+
+export interface TranscriptChange {
+  files: ChangedFile[];
+  roots: string[];
+  plus: number;
+  minus: number;
+  editCount: number;
+  withProse: number;
+  startedAt?: number;
+  endedAt?: number;
+}
+
+export interface MergedChange extends TranscriptChange, WorkStands {
+  knowsYou: boolean | null;
+  fromDisk: number;
+}
+
+export interface SavedChange extends MergedChange { item: string }
+
+interface EditInput {
+  file_path?: string;
+  notebook_path?: string;
+  edits?: ReadonlyArray<{ old_string?: unknown; new_string?: unknown } | null>;
+  old_string?: unknown;
+  new_string?: unknown;
+  content?: unknown;
+  old_source?: unknown;
+  new_source?: unknown;
+}
+
+interface TranscriptBlock { type?: unknown; name?: string; text?: unknown; input?: EditInput }
+
+interface TranscriptRow { type?: unknown; timestamp?: string; message?: { content?: ReadonlyArray<TranscriptBlock | null> } }
 
 /** The tools that change a file on disk. Read, Bash and the rest are not edits. */
 const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
@@ -53,9 +111,9 @@ const SCRATCH = /^\/(private\/)?(tmp|var\/folders)\//;
  * can still open must not depend on the checkout outliving the run. `/tmp/gone`
  * resolves through `/tmp` to `/private/tmp/gone` with nothing on disk at all.
  */
-function realRoot(root) {
+function realRoot(root: string): string | null {
   let head = path.resolve(root);
-  const tail = [];
+  const tail: string[] = [];
   for (let i = 0; i < 64; i += 1) {
     try {
       const real = fs.realpathSync(head);
@@ -70,7 +128,7 @@ function realRoot(root) {
   return null;
 }
 
-function lines(text) {
+function lines(text: unknown): string[] {
   const s = String(text ?? '');
   if (!s) return [];
   const out = s.split('\n');
@@ -87,23 +145,23 @@ function lines(text) {
  * one-line insertion read as one green line inside its own neighbours rather
  * than as the whole block replaced. `old` empty (a Write) is every line green.
  */
-export function rowsForEdit(oldText, newText) {
+export function rowsForEdit(oldText: unknown, newText: unknown): Row[] {
   const a = lines(oldText);
   const b = lines(newText);
-  if (!a.length) return b.map((l) => ['+', l]);
-  if (!b.length) return a.map((l) => ['-', l]);
+  if (!a.length) return b.map((l): Row => ['+', l]);
+  if (!b.length) return a.map((l): Row => ['-', l]);
 
   // A guard on the table rather than on the file: a 400x400 table is 160k
   // cells and instant, a 20k x 20k one is 400M and would hang the exit
   // handler. Past it the edit is shown as a straight replacement, which is
   // what a whole-file rewrite honestly is.
   if (a.length * b.length > 4_000_000) {
-    return [...a.map((l) => ['-', l]), ...b.map((l) => ['+', l])];
+    return [...a.map((l): Row => ['-', l]), ...b.map((l): Row => ['+', l])];
   }
 
   const n = a.length, m = b.length;
   const table = new Uint32Array((n + 1) * (m + 1));
-  const at = (i, j) => i * (m + 1) + j;
+  const at = (i: number, j: number): number => i * (m + 1) + j;
   for (let i = n - 1; i >= 0; i--) {
     for (let j = m - 1; j >= 0; j--) {
       table[at(i, j)] = a[i] === b[j]
@@ -111,7 +169,7 @@ export function rowsForEdit(oldText, newText) {
         : Math.max(table[at(i + 1, j)], table[at(i, j + 1)]);
     }
   }
-  const rows = [];
+  const rows: Row[] = [];
   let i = 0, j = 0;
   while (i < n && j < m) {
     if (a[i] === b[j]) { rows.push(['=', a[i]]); i++; j++; }
@@ -124,8 +182,8 @@ export function rowsForEdit(oldText, newText) {
 }
 
 /** Every edit inside one tool call, as one hunk each. */
-function hunksFromCall(input) {
-  const out = [];
+function hunksFromCall(input: EditInput | null | undefined): Row[][] {
+  const out: Row[][] = [];
   if (Array.isArray(input?.edits)) {
     for (const e of input.edits) out.push(rowsForEdit(e?.old_string, e?.new_string));
     return out;
@@ -149,7 +207,7 @@ function hunksFromCall(input) {
  * The agent's own sentence, taken from the text blocks of the same message the
  * edit was in. One line, because that is all the file ever needs to carry.
  */
-function proseFrom(content) {
+function proseFrom(content: ReadonlyArray<TranscriptBlock | null> | null | undefined): string {
   if (!Array.isArray(content)) return '';
   const said = content.filter((b) => b?.type === 'text').map((b) => String(b.text ?? '')).join('\n').trim();
   if (!said) return '';
@@ -171,8 +229,8 @@ function proseFrom(content) {
  * file belongs in her artifact at all — inside one of this run's own roots, and
  * not scratch — and the arithmetic underneath the panel.
  */
-function collector({ roots = [] } = {}) {
-  const files = new Map();
+function collector({ roots = [] }: { roots?: readonly string[] } = {}) {
+  const files = new Map<string, ChangedFile>();
   const totals = { plus: 0, minus: 0, editCount: 0, withProse: 0, startedAt: 0, endedAt: 0 };
 
   // EACH ROOT AND ALSO WHAT IT REALLY IS, because a tool may report either
@@ -186,7 +244,7 @@ function collector({ roots = [] } = {}) {
   // /var), but nothing here is macOS-specific: any checkout reached through a
   // symlink has the same shape, and matching both spellings costs one stat per
   // root, once.
-  const spellings = new Set();
+  const spellings = new Set<string>();
   for (const r of roots.filter(Boolean)) {
     spellings.add(r);
     const real = realRoot(r);
@@ -194,7 +252,7 @@ function collector({ roots = [] } = {}) {
   }
   const sorted = [...spellings].map((r) => (r.endsWith('/') ? r : `${r}/`)).sort((a, b) => b.length - a.length);
 
-  const relative = (abs) => {
+  const relative = (abs: string): string | null => {
     for (const root of sorted) if (abs.startsWith(root)) return abs.slice(root.length);
     return null;
   };
@@ -202,7 +260,7 @@ function collector({ roots = [] } = {}) {
   return {
     files,
     totals,
-    add(abs, rows, { said = '', stamp = 0 } = {}) {
+    add(abs: string | null | undefined, rows: Row[], { said = '', stamp = 0 }: { said?: string; stamp?: number } = {}): void {
       abs = String(abs ?? '').trim();
       if (!abs || NOT_CODE.test(abs)) return;
       const rel = relative(abs);
@@ -214,7 +272,7 @@ function collector({ roots = [] } = {}) {
       const m = rows.filter((r) => r[0] === '-').length;
       if (!p && !m) return;
       const key = rel ?? abs;
-      const file = files.get(key) ?? { path: key, abs, hunks: [], plus: 0, minus: 0, at: stamp };
+      const file: ChangedFile = files.get(key) ?? { path: key, abs, hunks: [], plus: 0, minus: 0, at: stamp };
       file.hunks.push({ rows, said: said || undefined, at: stamp || undefined, plus: p, minus: m });
       file.plus += p; file.minus += m;
       files.set(key, file);
@@ -226,7 +284,7 @@ function collector({ roots = [] } = {}) {
         if (stamp > totals.endedAt) totals.endedAt = stamp;
       }
     },
-    done() {
+    done(): TranscriptChange {
       return {
         files: [...files.values()],
         // The checkouts this run's work happened in, so a change read back
@@ -243,12 +301,12 @@ function collector({ roots = [] } = {}) {
   };
 }
 
-export function changeFromTranscript(text, { roots = [], since = 0 } = {}) {
+export function changeFromTranscript(text: string | null | undefined, { roots = [], since = 0 }: { roots?: readonly string[]; since?: number } = {}): TranscriptChange {
   const into = collector({ roots });
 
   for (const raw of String(text ?? '').split('\n')) {
     if (!raw.trim()) continue;
-    let row;
+    let row: TranscriptRow | null;
     try { row = JSON.parse(raw); } catch { continue; }
     if (row?.type !== 'assistant') continue;
     const content = row?.message?.content;
@@ -272,12 +330,12 @@ export function changeFromTranscript(text, { roots = [], since = 0 } = {}) {
 }
 
 /** Where a run's change is written, product-relative. */
-export function changePath(itemId) {
+export function changePath(itemId: string): string {
   return `runs/${itemId}/the-change-it-made.change`;
 }
 
 /** An absolute path as the shortest of the run's roots can say it. */
-export function shortPath(abs, roots = []) {
+export function shortPath(abs: string, roots: readonly string[] = []): string | null {
   const sorted = [...roots].filter(Boolean).map((r) => (r.endsWith('/') ? r : `${r}/`)).sort((a, b) => b.length - a.length);
   for (const root of sorted) if (String(abs).startsWith(root)) return String(abs).slice(root.length);
   return null;
@@ -289,9 +347,9 @@ export function shortPath(abs, roots = []) {
  * where not one of them could be read (main/git-change.mts says what each
  * means).
  */
-export function standsAcross(repoChanges = []) {
+export function standsAcross(repoChanges: ReadonlyArray<Pick<RepoChange, 'stands'> | null | undefined> = []): WorkStands {
   const all = repoChanges.map((r) => r?.stands).filter(Boolean);
-  const across = (key) => {
+  const across = (key: keyof WorkStands): boolean | null => {
     const known = all.map((s) => s?.[key]).filter((v) => typeof v === 'boolean');
     return known.length ? known.some(Boolean) : null;
   };
@@ -303,7 +361,7 @@ export function standsAcross(repoChanges = []) {
  * that cannot name an author is a no, because the offer is one press and it
  * has to be true of all of them. Null where not one of them could be read.
  */
-export function knowsYouAcross(repoChanges = []) {
+export function knowsYouAcross(repoChanges: ReadonlyArray<Pick<RepoChange, 'knowsYou'> | null | undefined> = []): boolean | null {
   const known = repoChanges.map((r) => r?.knowsYou).filter((v) => typeof v === 'boolean');
   return known.length ? known.every(Boolean) : null;
 }
@@ -321,8 +379,8 @@ export function knowsYouAcross(repoChanges = []) {
  * reports a run writes into the product's own folder, which is not a checkout,
  * and anything under a product with no repository at all.
  */
-export function mergeChange(fromTranscript, repoChanges = [], { roots = [] } = {}) {
-  const files = new Map(fromTranscript.files.map((f) => [f.path, f]));
+export function mergeChange(fromTranscript: TranscriptChange, repoChanges: ReadonlyArray<RepoChange | null | undefined> = [], { roots = [] }: { roots?: readonly string[] } = {}): MergedChange {
+  const files = new Map(fromTranscript.files.map((f): [string, ChangedFile] => [f.path, f]));
   let fromDisk = 0;
   for (const repo of repoChanges) {
     if (!repo?.root) continue;
@@ -380,9 +438,17 @@ export function mergeChange(fromTranscript, repoChanges = [], { roots = [] } = {
  * which is most runs: a session that answered a question or drew a page has
  * nothing to show here and must not leave an empty artifact behind.
  */
-export function writeChangeForRun({ transcript, docsDir, itemId, roots = [], since = 0, repos = [], change: prepared = null }) {
+export function writeChangeForRun({ transcript, docsDir, itemId, roots = [], since = 0, repos = [], change: prepared = null }: {
+  transcript: string;
+  docsDir?: string | null;
+  itemId?: string | null;
+  roots?: readonly string[];
+  since?: number;
+  repos?: ReadonlyArray<RepoChange | null>;
+  change?: TranscriptChange | null;
+}): string | null {
   if (!docsDir || !itemId) return null;
-  const allRoots = [...roots, ...repos.map((r) => r?.root).filter(Boolean)];
+  const allRoots = [...roots, ...repos.map((r) => r?.root).filter(Boolean) as string[]];
   let said = prepared;
   if (!said) {
     let text = '';
@@ -420,9 +486,9 @@ export function writeChangeForRun({ transcript, docsDir, itemId, roots = [], sin
  * Returns null either way: nothing was saved for THIS run, which is what the
  * caller reports.
  */
-function restand(file, change) {
+function restand(file: string, change: MergedChange): null {
   if (change.committed === null && change.uncommitted === null) return null;
-  let saved;
+  let saved: Partial<SavedChange> | null;
   try { saved = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
   if (!saved || !Array.isArray(saved.files)) return null;
   if (saved.committed === change.committed && saved.uncommitted === change.uncommitted
@@ -436,8 +502,8 @@ function restand(file, change) {
 }
 
 /** Read a change back off disk for the pane. */
-export function readChange(file) {
-  const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+export function readChange(file: string): SavedChange {
+  const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as SavedChange | null;
   if (!parsed || !Array.isArray(parsed.files)) throw new Error('that file is not a change');
   return parsed;
 }

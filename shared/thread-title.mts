@@ -23,7 +23,7 @@ const TAIL = new Set(`a an the of to for at on in into with by from and or but n
 
 // Where a whole clause ends: the name ends there. Otherwise it keeps its six words.
 const BREAK = new Set(`and but because since which that when while if so`.split(/\s+/));
-const bare = (w) => w.toLowerCase().replace(/[^a-z']/g, '');
+const bare = (w: string) => w.toLowerCase().replace(/[^a-z']/g, '');
 
 // A phrase starts at these, so a cut just before one leaves the phrase before it whole.
 const CUT_BEFORE = new Set(`at on in into onto for with without by from about after before until during over under
@@ -38,9 +38,9 @@ const SUBJECT = new Set(`i we you he she they it`.split(/\s+/));
 // "say they got X" reports X: the reporting words go and X stays.
 const REPORTED = /\b(?:say|says|said|report|reports|reported|tell us|told us|mention|mentions|mentioned)\s+(?:that\s+)?(?:they|he|she|we)\s+/i;
 
-const words = (s) => s.split(/\s+/).filter(Boolean);
+const words = (s: string) => s.split(/\s+/).filter(Boolean);
 
-function plain(text) {
+function plain(text: string | null | undefined): string {
   return String(text ?? '')
     .split('\n')
     .map((l) => l.replace(/^\s*(?:>\s?)+/, '').replace(/^\s*(?:[-*•]|\d{1,2}[.)])\s+/, '').replace(/^#+\s+/, '').trim())
@@ -57,7 +57,7 @@ function plain(text) {
 const ABBREVIATION = /(?:^|\s)(?:dr|mr|mrs|ms|st|jr|sr|vs|etc|inc|ltd|no|e\.g|i\.e|[a-z])$/i;
 
 /** The first sentence: up to a . ! or ? that a space and a capital, or the end, follow. */
-function firstSentenceOf(t) {
+function firstSentenceOf(t: string): string {
   const re = /[.!?]+(?=\s+["“'(\[]?[A-Z0-9]|\s*$)/g;
   for (let m = re.exec(t); m; m = re.exec(t)) {
     if (m[0] === '.' && ABBREVIATION.test(t.slice(0, m.index))) continue;
@@ -76,13 +76,13 @@ const PICTURE_LINK = /(?<!`)!\[([^\]\n]*)\]\([^)\n]*\)(?!`)/;
 const FILE_LINK = /(?<![!`])\[([^\]\n]*)\]\((?:\.\/)?(?:attachments|phone-files)\/[^)\n]*\)(?!`)/g;
 
 /** A message's words for a line that cannot draw: no pictures, and a file down to its name. */
-export function withoutFiles(text) {
+export function withoutFiles(text: string | null | undefined): string {
   const said = String(text ?? '');
   const out = said.replace(new RegExp(PICTURE_LINK.source, 'g'), '').replace(FILE_LINK, '$1');
   return out === said ? said : out.trim();
 }
 
-function alreadyShort(raw) {
+function alreadyShort(raw: string | null | undefined): boolean {
   const t = String(raw ?? '').trim();
   if (!t || t.includes('\n') || /^>/.test(t)) return false;
   const n = words(t).length;
@@ -90,7 +90,7 @@ function alreadyShort(raw) {
 }
 
 /** Where a clause too long to keep whole is cut: the longest that fits six words, else the shortest up to eight. */
-function naturalCut(w) {
+function naturalCut(w: string[]): number {
   const at = w.map((x, k) => (k >= 3 && k <= MOST_WORDS && CUT_BEFORE.has(bare(x)) ? k : -1)).filter((k) => k > 0);
   const short = at.filter((k) => k <= TITLE_WORDS);
   return short.length ? short[short.length - 1] : at[0] ?? -1;
@@ -102,7 +102,7 @@ function naturalCut(w) {
  * back as its first clause if that is short, or else cut where a phrase ends,
  * with no greeting, no "can you", no quote mark and no trailing punctuation.
  */
-export function shortTitle(opening) {
+export function shortTitle(opening: string | null | undefined): string {
   const text = withoutFiles(opening).trim() || PICTURE_LINK.exec(String(opening ?? ''))?.[1] || opening;
   if (alreadyShort(text)) return String(text).trim().replace(/(?<!\.)\.$/, '');
   let t = plain(text);
@@ -137,7 +137,13 @@ export function shortTitle(opening) {
  * reads: the namer's label, unless the person renamed it after, in which case
  * theirs; and either one held to the rule.
  */
-export function shownTitle(i) {
+export interface Titled {
+  title?: string;
+  label?: string;
+  wrote?: { title?: { ts: number; source?: string }; label?: { ts: number; source?: string } };
+}
+
+export function shownTitle(i: Titled | null | undefined): string {
   const title = String(i?.title ?? '');
   const label = String(i?.label ?? '').trim();
   if (!label) return shortTitle(title);

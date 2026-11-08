@@ -145,7 +145,7 @@ describe('files and pictures a message names', () => {
       { text: ', ' },
       { text: 'cut.mp4', mention: { kind: 'media', src: 'films/cut.mp4' } },
       { text: ' and ' },
-      { text: 'main.mjs', mention: { kind: 'code', src: 'main/main.mts' } },
+      { text: 'main.mts', mention: { kind: 'code', src: 'main/main.mts' } },
     ]);
   });
 

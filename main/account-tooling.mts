@@ -39,6 +39,36 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+export interface ToolingResult {
+  dir: string | null | undefined;
+  linked: string[];
+  already: string[];
+  theirs: string[];
+  missing: string[];
+  skipped: 'default' | 'no-dir' | 'same' | null;
+}
+
+/** Whose login a Claude folder holds, read off its `.claude.json`. */
+export interface AccountIdentity {
+  email: string;
+  accountUuid: string | null;
+  organizationUuid?: string;
+}
+
+/** An identity as callers hold it, possibly spread from a null `accountIdentity`. */
+export interface IdentityLike {
+  email?: string | null;
+  organizationUuid?: string | null;
+  accountUuid?: string | null;
+}
+
+export interface CloudLoginLike {
+  org?: string | null;
+  email?: string | null;
+}
+
+type Occupancy = 'none' | 'ours' | 'theirs';
+
 /**
  * The three folders a session reads its own tooling out of, and the only
  *  three. See the note above for why `plugins` is not here. */
@@ -48,7 +78,7 @@ export const SHARED_DIRS = ['skills', 'commands', 'agents'];
  * Where the first login lives: the home folder Claude Code uses when nothing
  *  sets CLAUDE_CONFIG_DIR, which is the account every one of these links
  *  points back at. */
-export function defaultClaudeHome(home = os.homedir()) {
+export function defaultClaudeHome(home: string = os.homedir()): string {
   return path.join(home, '.claude');
 }
 
@@ -74,7 +104,11 @@ export function defaultClaudeHome(home = os.homedir()) {
  * @returns {{ home: string, profile: string }} `profile` is the word the fleet
  *   spawns on, which for every home but the first one IS the path.
  */
-export function makeClaudeHome({ home = os.homedir(), mkdir = fs.mkdirSync, exists = fs.existsSync } = {}) {
+export function makeClaudeHome({ home = os.homedir(), mkdir = fs.mkdirSync, exists = fs.existsSync }: {
+  home?: string;
+  mkdir?: (dir: string, options: { recursive: true }) => unknown;
+  exists?: (dir: string) => boolean;
+} = {}): { home: string; profile: string } {
   for (let n = 2; n < 100; n += 1) {
     const dir = path.join(home, `.claude-${n}`);
     if (exists(dir)) continue;
@@ -91,11 +125,11 @@ export function makeClaudeHome({ home = os.homedir(), mkdir = fs.mkdirSync, exis
  *  business driving the browser half of it. The folder is spelled out in full
  *  rather than left as `~`, because `~` inside a variable assignment is not
  *  expanded by every shell the same way. */
-export function claudeLoginCommand(home) {
+export function claudeLoginCommand(home: string): string {
   return `CLAUDE_CONFIG_DIR=${home} claude auth login`;
 }
 
-function realOrNull(p) {
+function realOrNull(p: string): string | null {
   try { return fs.realpathSync(p); } catch { return null; }
 }
 
@@ -104,7 +138,7 @@ function realOrNull(p) {
  *  precisely the thing we must be able to see. Returns 'none' when the name is
  *  free, 'ours' when it is already the link this module would have made, and
  *  'theirs' for anything else at all. */
-function occupancy(target, source) {
+function occupancy(target: string, source: string): Occupancy {
   let st;
   try { st = fs.lstatSync(target); } catch { return 'none'; }
   if (!st.isSymbolicLink()) return 'theirs';
@@ -128,9 +162,12 @@ function occupancy(target, source) {
  *  that IS the first login by another path), or 'no-dir' (a folder that does
  *  not exist, which means the account is misconfigured and making a home for it
  *  would only hide that). */
-export function linkAccountTooling(dir, { home = os.homedir(), source = null } = {}) {
+export function linkAccountTooling(
+  dir: string | null | undefined,
+  { home = os.homedir(), source = null }: { home?: string; source?: string | null } = {},
+): ToolingResult {
   const src = source ?? defaultClaudeHome(home);
-  const out = { dir, linked: [], already: [], theirs: [], missing: [], skipped: null };
+  const out: ToolingResult = { dir, linked: [], already: [], theirs: [], missing: [], skipped: null };
   if (!dir || dir === 'default') return { ...out, skipped: 'default' };
 
   const real = realOrNull(dir);
@@ -166,13 +203,14 @@ export function linkAccountTooling(dir, { home = os.homedir(), source = null } =
  *  changed and there is therefore nothing to say. Silence is the ordinary case:
  *  after the first spawn on an account every later one finds the links already
  *  made. */
-export function toolingLine(result) {
+export function toolingLine(result: ToolingResult | null | undefined): string | null {
   if (!result || !result.linked.length) return null;
-  const where = path.basename(result.dir);
+  // Only a result for a real folder links anything.
+  const where = path.basename(result.dir!);
   return `Gave the ${where} account your ${list(result.linked)}.`;
 }
 
-function list(names) {
+function list(names: string[]): string {
   if (names.length === 1) return names[0];
   return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 }
@@ -195,9 +233,9 @@ function list(names) {
 // One line of the answer, read from the file Claude Code keeps its own account
 // in. Null when the folder holds no login, which reads on the page as the one
 // honest thing we can say about it.
-const identityCache = new Map();
+const identityCache = new Map<string, { mtime: number; value: AccountIdentity | null }>();
 
-export function accountIdentity(dir, { home = os.homedir() } = {}) {
+export function accountIdentity(dir: string | null | undefined, { home = os.homedir() }: { home?: string } = {}): AccountIdentity | null {
   // With no CLAUDE_CONFIG_DIR, Claude Code reads ~/.claude.json and never
   // ~/.claude/.claude.json; that one belongs to CLAUDE_CONFIG_DIR=~/.claude.
   const file = path.join(dir || home, '.claude.json');
@@ -210,9 +248,9 @@ export function accountIdentity(dir, { home = os.homedir() } = {}) {
   const hit = identityCache.get(file);
   if (hit && hit.mtime === mtime) return hit.value;
 
-  let value = null;
+  let value: AccountIdentity | null = null;
   try {
-    const acct = JSON.parse(fs.readFileSync(file, 'utf8'))?.oauthAccount;
+    const acct: { emailAddress?: string; accountUuid?: string; organizationUuid?: string } | undefined = JSON.parse(fs.readFileSync(file, 'utf8'))?.oauthAccount;
     if (acct?.emailAddress) {
       value = { email: acct.emailAddress, accountUuid: acct.accountUuid ?? null, ...(acct.organizationUuid ? { organizationUuid: acct.organizationUuid } : {}) };
     }
@@ -231,9 +269,9 @@ export function accountIdentity(dir, { home = os.homedir() } = {}) {
  * here is in it, or when two different emails are, so a team organization is
  * never pinned on whichever member happens to be signed in here.
  */
-export function nameForOrganization(org, identities) {
+export function nameForOrganization(org: string | null | undefined, identities: (IdentityLike | null | undefined)[]): string | null {
   if (!org) return null;
-  const emails = new Set(identities.filter((id) => id?.organizationUuid === org && id.email).map((id) => id.email));
+  const emails = new Set(identities.filter((id) => id?.organizationUuid === org && id.email).map((id) => id!.email as string));
   return emails.size === 1 ? [...emails][0] : null;
 }
 
@@ -243,12 +281,16 @@ export function nameForOrganization(org, identities) {
  * its organization is the one email here in it, and none when two people here
  * share it.
  */
-export function profileForCloudLogin(login, identities) {
+export function profileForCloudLogin(login: CloudLoginLike, identities: (IdentityLike & { profile?: string | null })[]): string | null {
   return identities.find((id) => isCloudLoginOf(login, id, identities))?.profile ?? null;
 }
 
 /** Whether a cloud login is the same subscription as one login here, by `profileForCloudLogin`'s rule. */
-export function isCloudLoginOf({ org, email }, identity, identities) {
+export function isCloudLoginOf(
+  { org, email }: CloudLoginLike,
+  identity: IdentityLike | null | undefined,
+  identities: (IdentityLike | null | undefined)[],
+): boolean {
   if (!org || !identity?.email || identity.organizationUuid !== org) return false;
   return (email || nameForOrganization(org, identities)) === identity.email;
 }
@@ -277,8 +319,8 @@ export function isCloudLoginOf({ org, email }, identity, identities) {
  * what happens, and says the number above is too high rather than telling her
  * to go and change something.
  *  Null when the two really are different subscriptions. */
-export function duplicateAccountNote(identities) {
-  const seen = new Map();
+export function duplicateAccountNote(identities: (IdentityLike | null | undefined)[]): string | null {
+  const seen = new Map<string, number>();
   for (const id of identities) {
     if (!id?.accountUuid) continue;
     seen.set(id.accountUuid, (seen.get(id.accountUuid) ?? 0) + 1);

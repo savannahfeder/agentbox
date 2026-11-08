@@ -77,10 +77,21 @@ export const BASELINE_SLOTS = 4;
  */
 // Read once: they cannot change while the app runs, and the agents' clock asks
 // for every waiting thread on every tick.
-let thisMachine = null;
+let thisMachine: { memBytes: number; cores: number } | null = null;
 const machineNow = () => (thisMachine ??= { memBytes: os.totalmem(), cores: os.cpus().length });
 
-export function machineSlots({ memBytes = machineNow().memBytes, cores = machineNow().cores } = {}) {
+export interface MachineReading { memBytes?: number; cores?: number }
+
+export interface MachineSlots {
+  slots: number;
+  memGb: number;
+  cores: number;
+  byMemory: number;
+  byCores: number;
+  known: boolean;
+}
+
+export function machineSlots({ memBytes = machineNow().memBytes, cores = machineNow().cores }: MachineReading = {}): MachineSlots {
   const memGb = Math.round((Number(memBytes) || 0) / (1024 ** 3));
   const cpu = Math.max(0, Math.round(Number(cores) || 0));
   // NOTHING TO GO ON IS ITS OWN ANSWER, not a small one. `os.totalmem()` coming
@@ -125,7 +136,7 @@ export function machineSlots({ memBytes = machineNow().memBytes, cores = machine
  * subtracts, and never below one: a person saying the Mac is struggling is a
  * better reading than any arithmetic here.
  */
-export function autoAgents({ memBytes, cores, gated = false, nudge = 0 } = {}) {
+export function autoAgents({ memBytes, cores, gated = false, nudge = 0 }: MachineReading & { gated?: boolean; nudge?: number } = {}): number {
   const base = machineSlots({ memBytes, cores }).slots;
   const forGate = gated ? Math.floor((base * 3) / 2) : base;
   const n = Number(nudge);
@@ -142,7 +153,7 @@ export function autoAgents({ memBytes, cores, gated = false, nudge = 0 } = {}) {
  * each, because an account that may start nothing is an account whose rows
  * never move.
  */
-export function perAccountAgents(total, accounts) {
+export function perAccountAgents(total: number | null | undefined, accounts: number | null | undefined): number {
   const n = Math.max(1, Math.floor(Number(accounts) || 1));
   return Math.max(1, Math.floor((Number(total) || 1) / n));
 }
@@ -158,7 +169,7 @@ export function perAccountAgents(total, accounts) {
  * when the machine could not be read, because the honest version of it would
  * have to say "this Mac has 0 GB".
  */
-export function machineNote({ slots, memGb, cores, known = true }, at = 0) {
+export function machineNote({ slots, memGb, cores, known = true }: Pick<MachineSlots, 'slots' | 'memGb' | 'cores'> & { known?: boolean }, at: number | undefined = 0): string | null {
   if (!known) return null;
   if (at && at <= slots) return null;
   return `This computer has ${memGb} GB and ${cores} cores, so we suggest ${slots} at once. Go higher if you want to.`;

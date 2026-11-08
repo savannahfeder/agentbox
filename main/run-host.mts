@@ -21,11 +21,99 @@ import os from 'node:os';
 import net from 'node:net';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { EventEmitter } from 'node:events';
+import type { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { nameSlug } from '../shared/product-name.mjs';
-import { attachClaudeInput } from './claude-input.mts';
+import { attachClaudeInput, type ClaudeInput, type HostInputState, type PipedChild } from './claude-input.mts';
+
+export interface SpoolFiles {
+  out: string;
+  err: string;
+  exit: string;
+}
+
+export interface RunStart {
+  bin: string | null | undefined;
+  argv: string[];
+  env: Record<string, string | undefined>;
+  cwd: string;
+  spool?: string;
+}
+
+/** The first line on a connection, which says what it is for. */
+export type RunHostRequest =
+  | { op: 'hello'; t?: undefined }
+  | ({ op: 'start'; runId: string; t?: undefined } & RunStart)
+  | { op: 'attach'; runId: string; out: number | null; err: number | null; t?: undefined };
+
+/** Every later line from the app. */
+export type RunHostInput = { op?: undefined } & (
+  | { t: 'i'; d: string }
+  | { t: 'I' }
+  | { t: 'k'; s: NodeJS.Signals }
+  | { t: 'keep' }
+  | { t: 'bye' }
+);
+
+export interface RunExit { code: number | null; signal: NodeJS.Signals | null; ended: boolean }
+
+/** What the host says about a run. */
+export type RunHostOutput =
+  | { t: 'started'; pid?: number }
+  | ({ t: 'state'; pid: number | null; from: { out: number; err: number } } & HostInputState)
+  | { t: 'o' | 'e'; d: string }
+  | ({ t: 'x' } & RunExit)
+  | { t: 'gone' };
+
+/** The answer to `{op:'hello'}`. */
+export interface RunHostHello { protocol: number; stamp: string; pid: number }
+
+type Send = (msg: RunHostOutput | RunHostHello) => void;
+
+export interface ServeRunsOptions {
+  sockPath: string;
+  spoolDir: string;
+  idleMs?: number;
+  keepEndedMs?: number;
+  onIdle?: () => void;
+  log?: (message: string) => void;
+  stamp?: string;
+}
+
+export interface RunHost {
+  server: net.Server;
+  started: Promise<'taken' | 'serving'>;
+  runs(): number;
+  close(): Promise<void>;
+}
+
+interface HeldRun {
+  runId: string;
+  files: SpoolFiles;
+  out: number;
+  err: number;
+  client: true | null;
+  clientSock?: net.Socket | null;
+  clientSend?: Send | null;
+  exit: RunExit | null;
+  child: ChildProcessWithoutNullStreams | null;
+  forgetTimer: NodeJS.Timeout | null;
+  input?: PipedChild & ClaudeInput;
+  inputClosed?: boolean;
+  keep?: boolean;
+}
+
+/** The worker's stdin as the host's own input rule sees it: writes reach the worker only while no app is attached. */
+interface GateInput {
+  readonly writable: boolean;
+  write(chunk: string | Buffer): boolean;
+  end(): unknown;
+  on(event: string, listener: (...args: unknown[]) => void): unknown;
+}
+
+type InputGate = EventEmitter & { stdout: Readable; stdin: GateInput };
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // The app attaches to any host speaking this, whichever version started it, so
@@ -37,30 +125,30 @@ const MADE_OF = ['run-host.mts', 'claude-input.mts'];
 // An ended run nobody attached to is forgotten after this.
 const KEEP_ENDED_MS = 6 * 60 * 60 * 1000;
 
-export function runHostStamp() {
+export function runHostStamp(): string {
   const h = crypto.createHash('sha1');
   for (const f of MADE_OF) { try { h.update(fs.readFileSync(path.join(HERE, f))); } catch { h.update(f); } }
   return h.digest('hex').slice(0, 12);
 }
 
 // Short enough for a socket's path (104 bytes on macOS), and this user's own.
-export function runHostSocket({ stamp = runHostStamp(), dir = os.tmpdir(), uid = process.getuid?.() ?? 0 } = {}) {
+export function runHostSocket({ stamp = runHostStamp(), dir = os.tmpdir(), uid = process.getuid?.() ?? 0 }: { stamp?: string; dir?: string; uid?: number } = {}): string {
   return path.join(dir, `${nameSlug}-runs-${uid}-${stamp}.sock`);
 }
 
-export const spoolFiles = (spoolDir, runId) => ({
+export const spoolFiles = (spoolDir: string, runId: string): SpoolFiles => ({
   out: path.join(spoolDir, `${runId}.out`),
   err: path.join(spoolDir, `${runId}.err`),
   exit: path.join(spoolDir, `${runId}.exit`),
 });
 
-const validId = (id) => typeof id === 'string' && /^[A-Za-z0-9-]{8,80}$/.test(id);
+const validId = (id: unknown): id is string => typeof id === 'string' && /^[A-Za-z0-9-]{8,80}$/.test(id);
 
-export function serveRuns({ sockPath, spoolDir, idleMs = 60_000, keepEndedMs = KEEP_ENDED_MS, onIdle = () => {}, log = () => {}, stamp = runHostStamp() }) {
+export function serveRuns({ sockPath, spoolDir, idleMs = 60_000, keepEndedMs = KEEP_ENDED_MS, onIdle = () => {}, log = () => {}, stamp = runHostStamp() }: ServeRunsOptions): RunHost {
   fs.mkdirSync(spoolDir, { recursive: true, mode: 0o700 });
-  const runs = new Map();
+  const runs = new Map<string, HeldRun>();
   let clients = 0;
-  let idleTimer = null;
+  let idleTimer: NodeJS.Timeout | undefined;
   const idle = () => {
     clearTimeout(idleTimer);
     if (clients || runs.size) return;
@@ -68,43 +156,43 @@ export function serveRuns({ sockPath, spoolDir, idleMs = 60_000, keepEndedMs = K
     idleTimer.unref?.();
   };
 
-  const forget = (run) => {
-    clearTimeout(run.forgetTimer);
+  const forget = (run: HeldRun) => {
+    clearTimeout(run.forgetTimer ?? undefined);
     runs.delete(run.runId);
     for (const f of Object.values(run.files)) { try { fs.unlinkSync(f); } catch { /* gone */ } }
     idle();
   };
 
   // Each app names its own spool folder: copies of the app share one host.
-  function startRun(sock, { runId, bin, argv, env, cwd, spool }, send) {
+  function startRun(sock: net.Socket, { runId, bin, argv, env, cwd, spool }: Extract<RunHostRequest, { op: 'start' }>, send: Send): void {
     const dirFor = typeof spool === 'string' && path.isAbsolute(spool) ? spool : spoolDir;
-    let files = null;
+    let files: SpoolFiles | null = null;
     try {
       fs.mkdirSync(dirFor, { recursive: true, mode: 0o700 });
       files = spoolFiles(dirFor, runId);
       if (validId(runId)) for (const f of [files.out, files.err]) fs.writeFileSync(f, '', { mode: 0o600 });
-    } catch (e) { log(`run host: ${e.message}`); files = null; }
+    } catch (e) { log(`run host: ${(e as Error).message}`); files = null; }
     if (!files || !validId(runId) || runs.has(runId) || typeof bin !== 'string' || !Array.isArray(argv)) {
       send({ t: 'e', d: Buffer.from('agentbox: the run host was sent no run it could start\n').toString('base64') });
       send({ t: 'x', code: 75, signal: null, ended: false });
       sock.end();
       return;
     }
-    const run = { runId, files, out: 0, err: 0, client: null, exit: null, child: null, forgetTimer: null };
+    const run: HeldRun = { runId, files, out: 0, err: 0, client: null, exit: null, child: null, forgetTimer: null };
     runs.set(runId, run);
-    let child;
+    let child: ChildProcessWithoutNullStreams | null;
     try {
       child = spawn(bin, argv.map(String), { cwd, env: env && typeof env === 'object' ? env : {}, stdio: ['pipe', 'pipe', 'pipe'] });
     } catch (err) {
       child = null;
-      ended(run, { code: -2, signal: null, said: err?.message ?? String(err) });
+      ended(run, { code: -2, signal: null, said: (err as Error | null)?.message ?? String(err) });
     }
     if (!child) { attach(run, sock, 0, 0, send); return; }
     run.child = child;
     // The app's own rule for closing input, run here on the same stream. Its
     // writes reach the worker only while no app is attached; an attached app
     // runs the same rule itself and says when.
-    const gate = new EventEmitter();
+    const gate = new EventEmitter() as InputGate;
     gate.stdout = child.stdout;
     gate.stdin = {
       get writable() { return child.stdin.writable; },
@@ -117,11 +205,12 @@ export function serveRuns({ sockPath, spoolDir, idleMs = 60_000, keepEndedMs = K
       },
       on: (ev, fn) => child.stdin.on(ev, fn),
     };
-    run.input = attachClaudeInput(gate);
+    // attachClaudeInput reads only the child's stdin, stdout and events, which the gate has.
+    run.input = attachClaudeInput(gate as PipedChild);
     child.stdin.on('error', () => {});
-    for (const [stream, key, tag] of [[child.stdout, 'out', 'o'], [child.stderr, 'err', 'e']]) {
-      stream.on('data', (b) => {
-        try { fs.appendFileSync(run.files[key], b); } catch (e) { log(`run host: ${e.message}`); }
+    for (const [stream, key, tag] of [[child.stdout, 'out', 'o'], [child.stderr, 'err', 'e']] as const) {
+      stream.on('data', (b: Buffer) => {
+        try { fs.appendFileSync(run.files[key], b); } catch (e) { log(`run host: ${(e as Error).message}`); }
         run[key] += b.length;
         run.clientSend?.({ t: tag, d: b.toString('base64') });
       });
@@ -135,7 +224,7 @@ export function serveRuns({ sockPath, spoolDir, idleMs = 60_000, keepEndedMs = K
     attach(run, sock, 0, 0, send, { fresh: true });
   }
 
-  function ended(run, { code, signal, said = null }) {
+  function ended(run: HeldRun, { code, signal, said = null }: { code: number | null; signal: NodeJS.Signals | null; said?: string | null }): void {
     if (said) {
       const b = Buffer.from(`${said}\n`);
       try { fs.appendFileSync(run.files.err, b); } catch { /* the message is still sent */ }
@@ -151,7 +240,7 @@ export function serveRuns({ sockPath, spoolDir, idleMs = 60_000, keepEndedMs = K
   }
 
   // What was printed since `out`/`err`, then everything as it comes.
-  function attach(run, sock, out, err, send, { fresh = false } = {}) {
+  function attach(run: HeldRun, sock: net.Socket, out: number, err: number, send: Send, { fresh = false }: { fresh?: boolean } = {}): void {
     if (run.clientSock && run.clientSock !== sock) run.clientSock.destroy();
     run.client = true;
     run.clientSock = sock;
@@ -161,7 +250,7 @@ export function serveRuns({ sockPath, spoolDir, idleMs = 60_000, keepEndedMs = K
       const s = run.input?.inputState?.() ?? null;
       send({ t: 'state', pid: run.child?.pid ?? null, from, ...(s ?? {}), closed: !!run.inputClosed });
     }
-    for (const [key, tag] of [['out', 'o'], ['err', 'e']]) {
+    for (const [key, tag] of [['out', 'o'], ['err', 'e']] as const) {
       if (!(from[key] < run[key])) continue;
       try {
         const fd = fs.openSync(run.files[key], 'r');
@@ -170,13 +259,13 @@ export function serveRuns({ sockPath, spoolDir, idleMs = 60_000, keepEndedMs = K
           fs.readSync(fd, buf, 0, buf.length, from[key]);
           send({ t: tag, d: buf.toString('base64') });
         } finally { fs.closeSync(fd); }
-      } catch (e) { log(`run host: ${e.message}`); }
+      } catch (e) { log(`run host: ${(e as Error).message}`); }
     }
     run.clientSend = send;
     if (run.exit) { send({ t: 'x', ...run.exit }); sock.end(); forget(run); }
   }
 
-  function detach(run, sock) {
+  function detach(run: HeldRun, sock: net.Socket): void {
     if (run.clientSock !== sock) return;
     run.client = null;
     run.clientSock = null;
@@ -189,26 +278,26 @@ export function serveRuns({ sockPath, spoolDir, idleMs = 60_000, keepEndedMs = K
     clients += 1;
     clearTimeout(idleTimer);
     let buf = '';
-    let run = null;
+    let run: HeldRun | null = null;
     let first = true;
-    const send = (msg) => { if (!sock.destroyed) sock.write(`${JSON.stringify(msg)}\n`); };
+    const send: Send = (msg) => { if (!sock.destroyed) sock.write(`${JSON.stringify(msg)}\n`); };
     sock.setEncoding('utf8');
-    sock.on('data', (d) => {
+    sock.on('data', (d: string) => {
       buf += d;
       let n;
       while ((n = buf.indexOf('\n')) >= 0) {
         const line = buf.slice(0, n);
         buf = buf.slice(n + 1);
-        let msg;
+        let msg: RunHostRequest | RunHostInput;
         try { msg = JSON.parse(line); } catch { continue; }
         if (first) {
           first = false;
           if (msg.op === 'hello') { send({ protocol: PROTOCOL, stamp, pid: process.pid }); continue; }
-          if (msg.op === 'start') { startRun(sock, msg, send); run = runs.get(msg.runId)?.clientSock === sock ? runs.get(msg.runId) : null; continue; }
+          if (msg.op === 'start') { startRun(sock, msg, send); run = runs.get(msg.runId)?.clientSock === sock ? runs.get(msg.runId)! : null; continue; }
           if (msg.op === 'attach') {
             run = runs.get(msg.runId) ?? null;
             if (!run) { send({ t: 'gone' }); sock.end(); continue; }
-            attach(run, sock, Number.isFinite(msg.out) ? msg.out : -1, Number.isFinite(msg.err) ? msg.err : -1, send);
+            attach(run, sock, Number.isFinite(msg.out) ? msg.out as number : -1, Number.isFinite(msg.err) ? msg.err as number : -1, send);
             continue;
           }
           sock.end();
@@ -235,10 +324,10 @@ export function serveRuns({ sockPath, spoolDir, idleMs = 60_000, keepEndedMs = K
   server.on('error', (err) => log(`run host: ${err.message}`));
   // Node deletes the path a server listened on as it closes, so it listens on
   // a name of its own and moves it into place.
-  let mine = null;
+  let mine: number | null = null;
   const own = `${sockPath}.${process.pid}`;
   const ours = () => { try { return mine !== null && fs.statSync(sockPath).ino === mine; } catch { return false; } };
-  const started = new Promise((resolve) => {
+  const started = new Promise<'taken' | 'serving'>((resolve) => {
     const probe = net.connect(sockPath);
     const timer = setTimeout(() => { probe.destroy(); resolve('taken'); }, 2_000);
     probe.once('connect', () => { clearTimeout(timer); probe.destroy(); resolve('taken'); });
@@ -246,7 +335,7 @@ export function serveRuns({ sockPath, spoolDir, idleMs = 60_000, keepEndedMs = K
       clearTimeout(timer);
       try { fs.unlinkSync(own); } catch { /* not there */ }
       server.listen(own, () => {
-        try { fs.chmodSync(own, 0o600); fs.renameSync(own, sockPath); mine = fs.statSync(sockPath).ino; } catch (err) { log(`run host: ${err.message}`); }
+        try { fs.chmodSync(own, 0o600); fs.renameSync(own, sockPath); mine = fs.statSync(sockPath).ino; } catch (err) { log(`run host: ${(err as Error).message}`); }
         idle();
         resolve('serving');
       });
@@ -256,7 +345,7 @@ export function serveRuns({ sockPath, spoolDir, idleMs = 60_000, keepEndedMs = K
     server,
     started,
     runs: () => runs.size,
-    close: () => started.then(() => new Promise((resolve) => {
+    close: () => started.then(() => new Promise<void>((resolve) => {
       clearTimeout(idleTimer);
       if (ours()) { try { fs.unlinkSync(sockPath); } catch { /* gone */ } }
       if (server.listening) server.close(() => resolve()); else resolve();
@@ -275,7 +364,7 @@ if (path.basename(process.argv[1] || '') === 'run-host.mts') {
   });
   if (await host.started === 'taken') process.exit(HOST_ALREADY_THERE);
   process.on('uncaughtException', (err) => process.stderr.write(`run host: ${err?.stack || err}\n`));
-  process.on('unhandledRejection', (err) => process.stderr.write(`run host: ${err?.stack || err}\n`));
+  process.on('unhandledRejection', (err) => process.stderr.write(`run host: ${(err as Error | null)?.stack || err}\n`));
   // The app going is not a reason to end, and nor is the terminal it ran from.
   for (const sig of ['SIGHUP', 'SIGINT']) process.on(sig, () => {});
 }

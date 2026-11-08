@@ -400,7 +400,7 @@ describe('the cap on the sentence an agent is typing', () => {
     // 2026-10-07: the Claude reader moved into its own adapter file.
     const claudeReader = fs.readFileSync(path.join(repoRoot, 'main', 'harnesses', 'claude-stream.mts'), 'utf8');
     expect(claudeReader).not.toMatch(/(const|let|var)\s+SAYING_CAP\s*=/);
-    expect(claudeReader).toMatch(/import\s*\{\s*SAYING_CAP\s*\}\s*from\s*['"]\.\.\/codex\.mjs['"]/);
+    expect(claudeReader).toMatch(/import\s*\{\s*SAYING_CAP\s*\}\s*from\s*['"]\.\.\/codex\.mts['"]/);
     expect(fs.readFileSync(path.join(repoRoot, 'main', 'codex.mts'), 'utf8')).toMatch(/export const SAYING_CAP\s*=/);
   });
 });

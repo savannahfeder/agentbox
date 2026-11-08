@@ -21,8 +21,27 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { cardDigest } from '../shared/approval-card.mts';
+import type { ApprovalRequest } from './approval-prompt-core.mts';
 
-export function spoolDir(storeRoot) {
+/** What JSON.parse can give back for a spool file. */
+export type SpoolJson = Record<string, unknown> | unknown[] | string | number | boolean | null;
+
+/** An answer file whose signature `answerIsHers` has checked. `allow` is signed as `!!allow`, so it is only truthy or not. */
+export type SignedAnswer = {
+  allow?: unknown;
+  note: string | null;
+  at: number;
+  card: string;
+  sig: string;
+};
+
+interface Sighting {
+  at: number;
+  seq: number;
+  card?: string | null;
+}
+
+export function spoolDir(storeRoot: string): string {
   return path.join(storeRoot, '.approvals');
 }
 
@@ -40,11 +59,11 @@ export function spoolDir(storeRoot) {
 // anyway. Not closed here: a same-uid worker can kill that server or patch its
 // check. macOS keeps it from reading Agentbox's memory, so it cannot sign.
 
-let pair = null;
+let pair: crypto.KeyPairKeyObjectResult | null = null;
 const keys = () => (pair ??= crypto.generateKeyPairSync('ed25519'));
 
 /** The half it is safe to hand a worker: it verifies and it cannot sign. */
-export function approvalPublicKey() {
+export function approvalPublicKey(): string {
   return keys().publicKey.export({ type: 'spki', format: 'der' }).toString('base64');
 }
 
@@ -66,7 +85,7 @@ export { cardDigest };
 
 // An array, not an object, because the verifier rebuilds these bytes from a
 // parsed file and object key order would change them.
-function decisionBytes(id, allow, note, at, card) {
+function decisionBytes(id: unknown, allow: unknown, note: unknown, at: unknown, card: unknown): Buffer {
   return Buffer.from(JSON.stringify([String(id), !!allow, note ?? null, at ?? null, card ?? null]), 'utf8');
 }
 
@@ -74,7 +93,7 @@ function decisionBytes(id, allow, note, at, card) {
  * Whether Agentbox signed this answer for this request. False for anything a
  * worker writes, including a real answer whose `card` was edited.
  */
-export function answerIsHers(id, answer, publicKey = approvalPublicKey()) {
+export function answerIsHers(id: string, answer: SpoolJson | undefined, publicKey: string = approvalPublicKey()): answer is SignedAnswer {
   if (!answer || typeof answer !== 'object' || Array.isArray(answer)) return false;
   if (typeof answer.sig !== 'string' || !answer.sig) return false;
   try {
@@ -106,13 +125,13 @@ const READ_FLAGS = fs.constants.O_RDONLY | fs.constants.O_NONBLOCK | O_NOFOLLOW;
 const APPEND_FLAGS = fs.constants.O_WRONLY | fs.constants.O_APPEND | fs.constants.O_CREAT | O_NOFOLLOW;
 
 // `lstat`, because `existsSync` follows a link and says no for a dangling one.
-export function spoolEntryExists(dir, name) {
+export function spoolEntryExists(dir: string, name: string): boolean {
   try { fs.lstatSync(path.join(dir, name)); return true; } catch { return false; }
 }
 
 // `rm` unlinks a symlink rather than following it, so this never reaches
 // outside the spool, and it removes a directory, which `unlink` refuses.
-export function removeSpoolEntry(dir, name) {
+export function removeSpoolEntry(dir: string, name: string): void {
   try { fs.rmSync(path.join(dir, name), { recursive: true, force: true }); } catch { /* already gone */ }
 }
 
@@ -121,8 +140,8 @@ export function removeSpoolEntry(dir, name) {
  * never opened, O_NONBLOCK so a fifo cannot freeze the main process, and
  * `fstat` on the open descriptor so the name cannot be swapped after a check.
  */
-export function readSpoolJson(dir, name) {
-  let fd = null;
+export function readSpoolJson(dir: string, name: string): SpoolJson {
+  let fd: number | null = null;
   try {
     fd = fs.openSync(path.join(dir, name), READ_FLAGS);
     const stat = fs.fstatSync(fd);
@@ -142,10 +161,10 @@ export function readSpoolJson(dir, name) {
  * a link, but would lose her click whenever something squatted the name. The
  * second attempt is for a directory, which `rename` cannot replace.
  */
-export function writeSpoolFile(dir, name, text) {
+export function writeSpoolFile(dir: string, name: string, text: string): boolean {
   const dest = path.join(dir, name);
   const tmp = path.join(dir, `.${crypto.randomUUID()}.tmp`);
-  let fd = null;
+  let fd: number | null = null;
   try {
     fd = fs.openSync(tmp, 'wx', 0o600);
     fs.writeFileSync(fd, text);
@@ -174,9 +193,9 @@ export function writeSpoolFile(dir, name, text) {
  * so anything that is not a regular file is removed, with a warning, and a
  * real file opened in its place.
  */
-export function appendSpoolLine(dir, name, line) {
+export function appendSpoolLine(dir: string, name: string, line: string): boolean {
   if (appendOnce(dir, name, line)) return true;
-  let squatter = null;
+  let squatter: fs.Stats | null = null;
   try { squatter = fs.lstatSync(path.join(dir, name)); } catch { return false; }
   if (squatter.isFile()) return false; // a real log we simply could not write to
   console.warn(`zero: ${name} in the approvals spool was ${squatter.isSymbolicLink() ? 'a link' : 'not a file'}, which only a worker can have done; it has been removed and the audit line written to a real one`);
@@ -184,8 +203,8 @@ export function appendSpoolLine(dir, name, line) {
   return appendOnce(dir, name, line);
 }
 
-function appendOnce(dir, name, line) {
-  let fd = null;
+function appendOnce(dir: string, name: string, line: string): boolean {
+  let fd: number | null = null;
   try {
     fd = fs.openSync(path.join(dir, name), APPEND_FLAGS, 0o600);
     fs.writeFileSync(fd, line);
@@ -204,7 +223,7 @@ function appendOnce(dir, name, line) {
  * act on. `seq` only increases; `at` here is what the TTL counts from. Keyed by
  * directory and id, and pruned to what is on disk on every pass.
  */
-const seenAt = new Map();
+const seenAt = new Map<string, Sighting>();
 let sightings = 0;
 
 const REQUEST_SUFFIX = '.request.json';
@@ -221,15 +240,15 @@ const REQUEST_SUFFIX = '.request.json';
  * crash puts its own request back every two seconds
  * (approval-prompt-core.mts).
  */
-const fromTheLastRun = new Set();
+const fromTheLastRun = new Set<string>();
 
 /**
  * Forget every card in the spool. Called once at startup, before any worker of
  * this run can have raised one, and never after.
  */
-export function dropCardsFromTheLastRun(storeRoot) {
+export function dropCardsFromTheLastRun(storeRoot: string): number {
   const dir = spoolDir(storeRoot);
-  let files = [];
+  let files: string[] = [];
   try { files = fs.readdirSync(dir); } catch { return 0; }
   let dropped = 0;
   for (const f of files) {
@@ -254,16 +273,16 @@ export function dropCardsFromTheLastRun(storeRoot) {
  * On a coarse clock (tmpfs) two files share a ctime, so the kernel-assigned
  * inode breaks the tie.
  */
-function bornAt(dir, name) {
+function bornAt(dir: string, name: string): { ctime: bigint; ino: bigint } {
   try {
     const st = fs.lstatSync(path.join(dir, name), { bigint: true });
     return { ctime: st.ctimeNs, ino: st.ino };
   } catch { return { ctime: 2n ** 63n, ino: 2n ** 63n }; } // gone or unreadable: never in front of something real
 }
 
-export function listPending(storeRoot, { now = Date.now } = {}) {
+export function listPending(storeRoot: string, { now = Date.now }: { now?: () => number } = {}): ApprovalRequest[] {
   const dir = spoolDir(storeRoot);
-  let files = [];
+  let files: string[] = [];
   try { files = fs.readdirSync(dir); } catch { return []; }
   const at = now();
   // NUL cannot occur in a path, so two spools never collide.
@@ -278,12 +297,13 @@ export function listPending(storeRoot, { now = Date.now } = {}) {
       : a.born.ino < b.born.ino ? -1 : a.born.ino > b.born.ino ? 1 : 0))) {
     seenAt.set(prefix + f.slice(0, -REQUEST_SUFFIX.length), { at, seq: sightings += 1 });
   }
-  const present = new Set();
-  const pending = [];
+  const present = new Set<string>();
+  const pending: { request: ApprovalRequest; seq: number }[] = [];
   for (const f of names) {
     const id = f.slice(0, -REQUEST_SUFFIX.length);
     const key = prefix + id;
-    const seen = seenAt.get(key);
+    // Every name was queued in the loop just above.
+    const seen = seenAt.get(key)!;
     if (at - seen.at > REQUEST_TTL_MS) {
       console.warn(`zero: approval ${id} sat in the spool with nothing waiting on it for ${Math.round(REQUEST_TTL_MS / 60_000)} minutes; it has been taken out`);
       removeSpoolEntry(dir, f);
@@ -300,7 +320,7 @@ export function listPending(storeRoot, { now = Date.now } = {}) {
       console.warn(`zero: an answer file appeared for approval ${id} that the founder did not write; it has been deleted and the card is still waiting`);
       removeSpoolEntry(dir, answerName);
     }
-    const request = readSpoolJson(dir, f);
+    const request = readSpoolJson(dir, f) as ApprovalRequest | null;
     // `answer` signs this digest, so her press authorises the card she saw.
     // Kept from the last successful read, because an unreadable file also
     // leaves her screen, so the old digest is still the last card she saw.
@@ -314,16 +334,16 @@ export function listPending(storeRoot, { now = Date.now } = {}) {
 }
 
 /** The digest of the card last shown for this request, or null if none was. */
-export function cardShown(storeRoot, id) {
+export function cardShown(storeRoot: string, id: string): string | null {
   return seenAt.get(`${spoolDir(storeRoot)}\0${id}`)?.card ?? null;
 }
 
 /** Whether `card` is the card last drawn for this request: a phone answers with the one it drew. */
-export function cardStillShown(storeRoot, id, card) {
+export function cardStillShown(storeRoot: string, id: string, card: unknown): boolean {
   return typeof card === 'string' && !!card && cardShown(storeRoot, id) === card;
 }
 
-export function answer(storeRoot, id, allow, note) {
+export function answer(storeRoot: string, id: string, allow: unknown, note?: string | null): boolean {
   if (!/^[\w-]+$/.test(String(id ?? ''))) return false;
   const dir = spoolDir(storeRoot);
   if (!spoolEntryExists(dir, `${id}.request.json`)) return false;

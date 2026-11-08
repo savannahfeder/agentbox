@@ -23,7 +23,19 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { machineryPath } from './home.mts';
-import { isWorkItemId } from '../../shared/work-items.mts';
+import { isWorkItemId, type PatchInput } from '../../shared/work-items.mts';
+
+export interface PendingWrite {
+  item: string;
+  ts: number;
+  writtenAt: string;
+  holder: string | null;
+  epoch: number | null;
+  refusedBecause: string;
+  patch: PatchInput;
+  file: string;
+  relPath: string;
+}
 
 const DIR = 'pending-writes';
 // Delivered messages move here rather than being deleted: the next session
@@ -32,14 +44,14 @@ const DIR = 'pending-writes';
 const COLLECTED = 'collected';
 
 // A holder id reaches us from an MCP client and ends up in a filename.
-function safeHolder(holder) {
+function safeHolder(holder: string | null | undefined): string {
   return String(holder ?? 'unknown').replace(/[^A-Za-z0-9._-]/g, '-').slice(0, 40) || 'unknown';
 }
 
 // In the app's home beside the ledger, not in the product folder. The reason
 // the header gives still holds — this must survive a reboot and /tmp does not —
 // and `~/.astral` survives one exactly as well (main/store/home.mts).
-function itemDir(projectDir, id) {
+function itemDir(projectDir: string, id: string): string {
   if (!isWorkItemId(id)) throw new Error(`invalid work item id: ${id}`);
   return machineryPath(projectDir, path.join(DIR, id));
 }
@@ -50,7 +62,10 @@ function itemDir(projectDir, id) {
  * re-claim and re-send, which is the whole difference between a lost night and
  * a retry.
  */
-export function parkPendingWrite(projectDir, id, patch, { holder, epoch = null, reason = '', now = Date.now() } = {}) {
+export function parkPendingWrite(
+  projectDir: string, id: string, patch: PatchInput | null | undefined,
+  { holder, epoch = null, reason = '', now = Date.now() }: { holder?: string | null; epoch?: number | null; reason?: string; now?: number } = {},
+): PendingWrite {
   const dir = itemDir(projectDir, id);
   fs.mkdirSync(dir, { recursive: true });
   const name = `${now}-${safeHolder(holder)}.json`;
@@ -69,21 +84,21 @@ export function parkPendingWrite(projectDir, id, patch, { holder, epoch = null, 
 }
 
 /** Every write still waiting on this row, oldest first. */
-export function readPendingWrites(projectDir, id) {
-  let dir;
+export function readPendingWrites(projectDir: string, id: string): PendingWrite[] {
+  let dir: string;
   try { dir = itemDir(projectDir, id); } catch { return []; }
-  let names = [];
+  let names: string[] = [];
   try {
     names = fs.readdirSync(dir, { withFileTypes: true })
       .filter((e) => e.isFile() && e.name.endsWith('.json'))
       .map((e) => e.name);
   } catch (err) {
-    if (err.code === 'ENOENT') return [];
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
     throw err;
   }
-  const out = [];
+  const out: PendingWrite[] = [];
   for (const name of names.sort()) {
-    let record = null;
+    let record: Omit<PendingWrite, 'file' | 'relPath'> | null = null;
     try { record = JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8')); } catch { continue; }
     if (!record || typeof record !== 'object') continue;
     out.push({ ...record, file: path.join(dir, name), relPath: path.join(DIR, id, name) });
@@ -97,13 +112,13 @@ export function readPendingWrites(projectDir, id) {
  * given the message and has now spoken, so a third session must not be handed
  * the same words again. The files move rather than vanish.
  */
-export function collectPendingWrites(projectDir, id, { by = null, now = Date.now() } = {}) {
+export function collectPendingWrites(projectDir: string, id: string, { by = null, now = Date.now() }: { by?: string | null; now?: number } = {}): string[] {
   const waiting = readPendingWrites(projectDir, id);
   if (!waiting.length) return [];
   const dir = itemDir(projectDir, id);
   const done = path.join(dir, COLLECTED);
   fs.mkdirSync(done, { recursive: true });
-  const moved = [];
+  const moved: string[] = [];
   for (const record of waiting) {
     const target = path.join(done, path.basename(record.file));
     try {
@@ -115,7 +130,7 @@ export function collectPendingWrites(projectDir, id, { by = null, now = Date.now
   return moved;
 }
 
-function stripPaths({ file, relPath, ...rest }) {
+function stripPaths({ file, relPath, ...rest }: PendingWrite): Omit<PendingWrite, 'file' | 'relPath'> {
   return rest;
 }
 

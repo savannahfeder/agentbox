@@ -23,6 +23,7 @@ import { forgetClaudeBin, INSTALL_URL } from './claude-bin.mts';
 import { lookAgain } from './engine-bin.mts';
 import { AGENT_MODES } from '../shared/agents.mts';
 import type { AgentMode } from '../shared/agents.mts';
+import type { ProfileTrouble } from './supervisor.mts';
 import { analyticsKey, diagnosticsOn } from './analytics.mts';
 import { CLAUDE_PERMISSION_MODES } from '../shared/work-items.mts';
 import { accountSentence, engineTroubleNote, refineCause } from '../shared/spawn-trouble.mts';
@@ -57,6 +58,7 @@ export interface SettingsConfig {
   codexFrom?: string | null;
   codexMode?: string | null;
   codexModel?: string | null;
+  engineChoice?: unknown;
   outsideAgents?: unknown;
   sessionArgs?: string[] | null;
   projectSessionArgs?: Record<string, string[] | null | undefined> | null;
@@ -116,12 +118,15 @@ export interface LeftoverReading {
   survivors?: unknown[];
 }
 
+/** One account's trouble as `Supervisor#status` reports it. */
+export type AccountTroubleRow = Pick<ProfileTrouble, 'cause' | 'since' | 'at' | 'resetsAt'>;
+
 export interface SettingsSupervisor {
   sessions: Map<unknown, SettingsSession>;
   paused: boolean;
   cloudPlan?: unknown;
   _profileCooldown?: Record<string, number>;
-  status(): { capacity?: number; accountTrouble?: Record<string, unknown>; [fact: string]: unknown };
+  status(): { capacity?: number; accountTrouble?: Record<string, AccountTroubleRow | undefined>; [fact: string]: unknown };
   readStanding(): string;
   readMessageRules(): string;
   readProjectInstructions(slug: string): string;
@@ -868,11 +873,11 @@ export function readSettings({ config, supervisor, store }: SettingsDeps, { sear
       // of Agentbox. Read off the binary, cached against its own mtime, and
       // falling back to the table committed at build time on a Mac that has no
       // Claude Code on it (main/claude-models.mts).
-      claudeModels: claudeModels({ bin: config.claudeBin as never }).models
+      claudeModels: claudeModels({ bin: config.claudeBin }).models
         // WITH THE LEVEL EACH ONE THINKS AT WHEN NOBODY PICKS, beside its name
         // rather than as a list of its own, the same shape the Codex rows
         // above already use. It is per model and it really differs.
-        .map((m: { alias: string; label: string; id: string; defaultLevel?: string }) => ({ id: m.alias, label: m.label, model: m.id, defaultLevel: m.defaultLevel })),
+        .map((m) => ({ id: m.alias, label: m.label, model: m.id, defaultLevel: m.defaultLevel })),
       standingLines: lineCount(standing),
       messageRulesLines: lineCount(messageRules),
       projectsWithInstructions: projects.filter((p) => p.instructions.trim()).length,

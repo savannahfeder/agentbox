@@ -19,6 +19,35 @@ import { resolveProduct } from './account.mts';
 import { noteWrittenElsewhere } from '../../main/store/written-elsewhere.mts';
 import { readItemHistory, readWorkItem } from '../../main/store/work-items.mts';
 import { familyOfName, filesInLines } from '../../shared/artifact-marks.mts';
+import type { CreationEnvelope } from '../../main/store/project.mts';
+
+export interface DocumentView {
+  id: string | null;
+  title: string;
+  kind: string | undefined;
+  path: string | null;
+  dir: string | null;
+  folder: string | null;
+  status: string;
+  replacedBy: string | null;
+  updatedAt: string | null;
+  cataloged: boolean;
+}
+
+export interface DocumentFilter {
+  folder?: string | null;
+  kind?: string | null;
+  status?: string | null;
+  pathPrefix?: string | null;
+  query?: string | null;
+  catalogedOnly?: boolean;
+}
+
+export type ReadDocument = DocumentView & { content: unknown; newestVersion?: string; note?: string };
+
+export type WrittenDocument = DocumentView & { created: boolean; moved: string | null | undefined };
+
+type Env = Record<string, string | undefined>;
 
 const MAX_CONTENT_BYTES = 2 * 1024 * 1024;
 
@@ -41,12 +70,12 @@ const SKIP_DIRS = new Set([
 ]);
 const MAX_WALK_ENTRIES = 2000;
 
-function walkFiles(root) {
-  const out = [];
+function walkFiles(root: string): string[] {
+  const out: string[] = [];
   const stack = [''];
   while (stack.length && out.length < MAX_WALK_ENTRIES) {
-    const rel = stack.pop();
-    let entries = [];
+    const rel = stack.pop()!;
+    let entries: fs.Dirent[] = [];
     try { entries = fs.readdirSync(path.join(root, rel), { withFileTypes: true }); } catch { continue; }
     for (const e of entries) {
       if (e.name.startsWith('.')) continue;
@@ -65,12 +94,12 @@ function walkFiles(root) {
 // What a path implies about how it should be read. One rule, used both for
 // files found on disk and for documents written through this server, so the two
 // can never disagree about the same filename.
-function kindForPath(rel) {
+function kindForPath(rel: string | null | undefined): 'design' | 'markdown' {
   return /\.html?$/i.test(rel || '') ? 'design' : 'markdown';
 }
 
-function fileView(root, rel) {
-  let updatedAt = null;
+function fileView(root: string, rel: string): DocumentView {
+  let updatedAt: string | null = null;
   try { updatedAt = new Date(fs.statSync(path.join(root, rel)).mtimeMs).toISOString(); } catch { /* raced a delete */ }
   return {
     id: null,
@@ -86,10 +115,10 @@ function fileView(root, rel) {
   };
 }
 
-function envelopeView(c) {
+function envelopeView(c: CreationEnvelope): DocumentView {
   return {
     id: c.id,
-    title: c.title,
+    title: c.title as string,
     kind: c.kind,
     path: c.path ?? null,
     dir: c.dir ?? null,
@@ -108,7 +137,7 @@ function envelopeView(c) {
  * A catalog entry always wins over the bare file it describes, since it carries
  * the title and status a person chose.
  */
-export function listDocuments(ref, { folder = null, kind = null, status = null, pathPrefix = null, query = null, catalogedOnly = false } = {}) {
+export function listDocuments(ref: string | null | undefined, { folder = null, kind = null, status = null, pathPrefix = null, query = null, catalogedOnly = false }: DocumentFilter = {}): DocumentView[] {
   const project = resolveProduct(ref);
   const idx = readIndex(project.dir);
   const wanted = query ? String(query).toLowerCase() : null;
@@ -130,7 +159,7 @@ export function listDocuments(ref, { folder = null, kind = null, status = null, 
 }
 
 /** One document, by id or by path. */
-export function readDocument(ref, { id = null, path: relPath = null } = {}) {
+export function readDocument(ref: string | null | undefined, { id = null, path: relPath = null }: { id?: string | null; path?: string | null } = {}): ReadDocument {
   const project = resolveProduct(ref);
   if (!id && !relPath) throw new Error('read_document needs either an id or a path');
   const idx = readIndex(project.dir);
@@ -146,13 +175,13 @@ export function readDocument(ref, { id = null, path: relPath = null } = {}) {
     if (id) throw new Error(`no document with id ${id} in ${project.name}`);
     if (deniesGitOrEnvPath(relPath)) throw new Error(`refusing to read a .git/.env path: ${relPath}`);
     if (deniesMachineryPath(relPath)) throw new Error(`refusing to read a reserved store path: ${relPath}`);
-    let content;
+    let content: string;
     try {
       content = fs.readFileSync(assertInside(project.dir, relPath), 'utf8');
     } catch {
       throw new Error(`no document at path ${relPath} in ${project.name} (list_documents shows what exists)`);
     }
-    return withEditsRead(project.dir, relPath, { ...fileView(project.dir, relPath), content });
+    return withEditsRead(project.dir, relPath, { ...fileView(project.dir, relPath!), content });
   }
   if (envelope.dir) {
     throw new Error(`"${envelope.title}" is folder-backed, which this server does not serve; its files live at ${path.join(project.dir, envelope.dir)}`);
@@ -163,13 +192,13 @@ export function readDocument(ref, { id = null, path: relPath = null } = {}) {
 
 // A person's edit is a new file under designs/<thread>/, so the path an agent
 // remembers still holds the old words, and it would quote them as current.
-function withEditsRead(root, rel, doc) {
+function withEditsRead<D extends DocumentView & { content: unknown }>(root: string, rel: string | null | undefined, doc: D): D | (D & { content: string; newestVersion: string; note: string }) {
   if (!rel || !/\.(?:md|markdown)$/i.test(rel) || rel.startsWith('designs/')) return doc;
   const family = familyOfName(rel);
-  let best = null;
+  let best: string | null = null;
   let bestAt = 0;
   try { bestAt = fs.statSync(path.join(root, rel)).mtimeMs; } catch { return doc; }
-  let threads = [];
+  let threads: fs.Dirent[] = [];
   try { threads = fs.readdirSync(path.join(root, 'designs'), { withFileTypes: true }).filter((d) => d.isDirectory()); } catch { return doc; }
   for (const t of threads) {
     for (const name of fs.readdirSync(path.join(root, 'designs', t.name))) {
@@ -191,10 +220,17 @@ function withEditsRead(root, rel, doc) {
  * which loses a document to a race is exactly the thing this whole design is
  * trying to stop happening).
  */
-export async function writeDocument(ref, { id = null, path: relPath = null, title = null, kind = null, content = null, status = null } = {}) {
+export async function writeDocument(ref: string | null | undefined, { id = null, path: relPath = null, title = null, kind = null, content = null, status = null }: {
+  id?: string | null;
+  path?: string | null;
+  title?: string | null;
+  kind?: string | null;
+  content?: unknown;
+  status?: string | null;
+} = {}): Promise<WrittenDocument> {
   const project = resolveProduct(ref);
 
-  return runForProject(project.id, async () => {
+  return runForProject(project.id, async (): Promise<WrittenDocument> => {
     const idx = readIndex(project.dir);
     const existing = id
       ? (idx.creations ?? []).find((c) => !c.deleted && c.id === id)
@@ -241,7 +277,7 @@ export async function writeDocument(ref, { id = null, path: relPath = null, titl
     // opens it. Refuse instead.
     if (content == null && !existing) throw new Error('a new document needs content');
 
-    const envelope = {
+    const envelope: CreationEnvelope = {
       ...(existing ?? {}),
       id: existing?.id ?? `a-${crypto.randomBytes(4).toString('hex')}`,
       kind: nextKind,
@@ -259,7 +295,7 @@ export async function writeDocument(ref, { id = null, path: relPath = null, titl
     saveCreation(project.dir, envelope, content);
     if (status && CREATION_STATUSES.includes(status)) setCreationStatus(project.dir, envelope.id, { status });
 
-    return { ...envelopeView(readIndex(project.dir).creations.find((c) => c.id === envelope.id)), created: !existing, moved: moved ? existing.path : null };
+    return { ...envelopeView(readIndex(project.dir).creations.find((c) => c.id === envelope.id)!), created: !existing, moved: moved ? existing.path : null };
   });
 }
 
@@ -268,9 +304,14 @@ export async function writeDocument(ref, { id = null, path: relPath = null, titl
  * and an agent often calls its document by title alone, so the thread names
  * what its agent writes, once. `update` is the session's own write to its row.
  */
-export async function nameOnThread(written, { ownItem, update, env = process.env, note = null }) {
+export async function nameOnThread(written: Pick<DocumentView, 'title' | 'path'>, { ownItem, update, env = process.env, note = null }: {
+  ownItem?: string | null;
+  update: (id: string, patch: { note: string }) => Promise<unknown>;
+  env?: Env;
+  note?: string | null;
+}): Promise<{ onThread: boolean; say?: string }> {
   const link = `[${written.title}](${written.path})`;
-  const unnamed = (why) => ({ onThread: false, say: `${why}, so it is not in Files: name it as ${link} when you tell them about it.` });
+  const unnamed = (why: string) => ({ onThread: false, say: `${why}, so it is not in Files: name it as ${link} when you tell them about it.` });
   if (!ownItem) return unnamed('This session is not on a thread');
   try {
     const mine = resolveProduct(String(env.ZERO_PRODUCT ?? '').trim());
@@ -282,12 +323,12 @@ export async function nameOnThread(written, { ownItem, update, env = process.env
     await update(ownItem, { note: note ?? `Saved ${link}` });
     return { onThread: true };
   } catch (err) {
-    return unnamed(`It is saved, but it could not be put on this thread (${err?.message ?? err})`);
+    return unnamed(`It is saved, but it could not be put on this thread (${(err as Error | null)?.message ?? err})`);
   }
 }
 
 /** A document a thread's agent wrote into another project is listed on the thread's own, so the name it says there opens. */
-export function noteWrittenForRun(targetRef, rel, { env = process.env } = {}) {
+export function noteWrittenForRun(targetRef: string | null | undefined, rel: unknown, { env = process.env }: { env?: Env } = {}): void {
   const own = String(env.ZERO_PRODUCT ?? '').trim();
   if (!own || typeof rel !== 'string' || !rel) return;
   let mine; let target;

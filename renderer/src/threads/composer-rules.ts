@@ -373,7 +373,7 @@ export function teammates(people: readonly Person[], me: string | null): Person[
 }
 
 /**
- * "Find a person": any part of a name, or the start of an email, in any case.
+ * "Find a person" matches any part of a name, or the start of an email, in any case.
  * An email is matched from its start because the end of it is the domain the
  * whole team shares, so "th" used to keep everyone at northwind.test.
  */

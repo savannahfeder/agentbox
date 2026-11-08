@@ -231,7 +231,7 @@ export function answerWhatOnlyTheWindowAnswered(ipcMain: CollectingIpcMain) {
  *  `countClient` and `now` are for tests.
  */
 export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, userDir = dataDir, openExternal = openInBrowser, host = null, countClient = null, now = Date.now }: BootOptions = {}) {
-  const config = loadConfig(dataDir) as unknown as HeadlessConfig;
+  const config = loadConfig(dataDir) as HeadlessConfig;
   // The browser editor uses the same user files as the desktop. Finish the
   // older migrations first so only user content enters the combined file.
   carryHerBriefsAcross(appDir, userDir);

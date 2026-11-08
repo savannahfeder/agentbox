@@ -85,7 +85,7 @@ describe('renderer/src/browser-bridge.ts', () => {
   });
 
   it('never takes a bridge off a desktop window that already has one', () => {
-    expect(source).toMatch(/if \(typeof window === 'undefined' \|\| \(window as any\)\.zero\) return false;/);
+    expect(source).toMatch(/if \(typeof window === 'undefined' \|\| window\.zero\) return false;/);
   });
 
   it('is installed by api.ts before api.ts reads window.zero', () => {

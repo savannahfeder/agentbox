@@ -8,7 +8,14 @@
 // with conflict markers in it, because a document a person reads is the point.
 
 const MAX_LINES = 3000;
-const splitLines = (text) => {
+type Pair = [number, number];
+
+export type MergeResult =
+  | { ok: true; text: string }
+  | { ok: false; clashes: number; tooBig?: undefined }
+  | { ok: false; tooBig: true; clashes?: undefined };
+
+const splitLines = (text: string | null | undefined): string[] => {
   const s = String(text ?? '');
   return s ? s.split(/(?<=\n)/) : [];
 };
@@ -19,8 +26,8 @@ const splitLines = (text) => {
  * it is found: the version a write is fewest lines from is the one it was
  * copied from, and that is the base the merge needs.
  */
-export function lineGap(a, b) {
-  const held = new Map();
+export function lineGap(a: string | null | undefined, b: string | null | undefined): number {
+  const held = new Map<string, number>();
   for (const l of splitLines(a)) held.set(l, (held.get(l) ?? 0) + 1);
   let gap = 0;
   for (const l of splitLines(b)) {
@@ -35,7 +42,7 @@ export function lineGap(a, b) {
  * The lines of `a` and `b` that are the same, as pairs of indexes, longest-first.
  * null when the two are too long to line up; the caller refuses rather than guesses.
  */
-function samePairs(a, b) {
+function samePairs(a: string[], b: string[]): Pair[] | null {
   let head = 0;
   while (head < a.length && head < b.length && a[head] === b[head]) head += 1;
   let tail = 0;
@@ -44,7 +51,7 @@ function samePairs(a, b) {
   const A = a.slice(head, a.length - tail);
   const B = b.slice(head, b.length - tail);
   if (A.length > MAX_LINES || B.length > MAX_LINES) return null;
-  const pairs = [];
+  const pairs: Pair[] = [];
   for (let i = 0; i < head; i += 1) pairs.push([i, i]);
   if (A.length && B.length) {
     const w = B.length + 1;
@@ -67,7 +74,7 @@ function samePairs(a, b) {
   return pairs;
 }
 
-const indexOfSame = (lines, pairs) => {
+const indexOfSame = (lines: string[], pairs: Pair[]): Int32Array => {
   const at = new Int32Array(lines.length).fill(-1);
   for (const [i, j] of pairs) at[i] = j;
   return at;
@@ -78,7 +85,7 @@ const indexOfSame = (lines, pairs) => {
  * be kept; `{ ok: false, clashes }` when a run of lines was changed two ways, or
  * `{ ok: false, tooBig: true }` when the documents are too long to line up.
  */
-export function mergeThree({ base, ours, theirs }) {
+export function mergeThree({ base, ours, theirs }: { base: string | null | undefined; ours: string | null | undefined; theirs: string | null | undefined }): MergeResult {
   const b = splitLines(base);
   const o = splitLines(ours);
   const t = splitLines(theirs);
@@ -87,7 +94,7 @@ export function mergeThree({ base, ours, theirs }) {
   if (!toOurs || !toTheirs) return { ok: false, tooBig: true };
   const inOurs = indexOfSame(b, toOurs);
   const inTheirs = indexOfSame(b, toTheirs);
-  const out = [];
+  const out: string[] = [];
   let clashes = 0;
   let bi = 0; let oi = 0; let ti = 0;
   for (;;) {

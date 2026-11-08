@@ -4,15 +4,35 @@
 // network and locale names under NETWORK and LOCALE are all that is ever read
 // from a shell, and workers still pass through their billing scrub. On Windows
 // the terminal's shell comes from PATH, SystemRoot or windir, and ComSpec.
-import { execFile } from 'node:child_process';
+import { execFile, type ExecFileOptionsWithStringEncoding } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { envValue } from './engine-bin.mts';
 
+export type ShellRun = (file: string, args: string[], options: ExecFileOptionsWithStringEncoding) => Promise<string> | string;
+
+export interface ShellReadOptions {
+  env?: NodeJS.ProcessEnv;
+  platform?: NodeJS.Platform;
+  run?: ShellRun;
+}
+
+/** Where the shell says Claude Code and Codex keep their sessions. */
+export type ShellDataDirs = Partial<Record<'CLAUDE_CONFIG_DIR' | 'CODEX_HOME', string>>;
+
+/** What one login shell said: session folders, network settings, and language. */
+export interface ShellSettings {
+  dirs: ShellDataDirs;
+  network: Record<string, string>;
+  locale: Record<string, string>;
+}
+
+type ShellAttempt = [shell: string, flags: string, timeout: number];
+
 // The shell a person actually has. `$SHELL` when that file exists, then zsh,
 // bash, and sh. A machine with no zsh used to spawn `/bin/zsh`: the terminal
 // never came up, and the self-update never built.
-export function loginShell(env = process.env, exists = fs.existsSync) {
+export function loginShell(env: NodeJS.ProcessEnv = process.env, exists: (p: string) => boolean = fs.existsSync): string {
   const preferred = env.SHELL;
   if (preferred && exists(preferred)) return preferred;
   for (const candidate of ['/bin/zsh', '/bin/bash', '/bin/sh']) {
@@ -22,12 +42,12 @@ export function loginShell(env = process.env, exists = fs.existsSync) {
 }
 
 // Only drive-rooted paths, so nothing resolves against the terminal's folder.
-const rooted = (p) => (/^[A-Za-z]:[\\/]/.test(p ?? '') ? p : null);
-const windowsValue = (env, name) => rooted(envValue(env, name, 'win32'));
-export const windowsRoot = (env = process.env) => windowsValue(env, 'SystemRoot') ?? windowsValue(env, 'windir') ?? 'C:\\Windows';
+const rooted = (p: string | undefined) => (/^[A-Za-z]:[\\/]/.test(p ?? '') ? p : null);
+const windowsValue = (env: NodeJS.ProcessEnv, name: string) => rooted(envValue(env, name, 'win32'));
+export const windowsRoot = (env: NodeJS.ProcessEnv = process.env): string => windowsValue(env, 'SystemRoot') ?? windowsValue(env, 'windir') ?? 'C:\\Windows';
 
 // Windows has no login shell and no -l: PowerShell reads -l as a command.
-export function terminalShell(env = process.env, exists = fs.existsSync, platform = process.platform) {
+export function terminalShell(env: NodeJS.ProcessEnv = process.env, exists: (p: string) => boolean = fs.existsSync, platform: NodeJS.Platform = process.platform): { file: string; args: string[] } {
   if (platform !== 'win32') return { file: loginShell(env, exists), args: ['-l'] };
   const w = path.win32;
   const root = windowsRoot(env);
@@ -39,7 +59,7 @@ export function terminalShell(env = process.env, exists = fs.existsSync, platfor
 }
 
 const MARKER = '\0agentbox-path\0';
-function runShell(file, args, options) {
+function runShell(file: string, args: string[], options: ExecFileOptionsWithStringEncoding): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = execFile(file, args, options, (error, stdout) => error ? reject(error) : resolve(stdout));
     child.stdin?.end();
@@ -65,17 +85,23 @@ function runShell(file, args, options) {
  *  is a fact about that shell, not about where their tools are. The program
  *  finder (main/engine-bin.mts shellProbes) falls back the same way.
  */
-export function loginShellAttempts(env = process.env, platform = process.platform) {
+export function loginShellAttempts(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): ShellAttempt[] {
   const system = platform === 'darwin' ? '/bin/zsh' : '/bin/bash';
   const theirs = env.SHELL || (platform === 'darwin' ? '/bin/zsh' : '/bin/sh');
-  const out = [[theirs, '-ilc', 5000], [theirs, '-lc', 2500]];
+  const out: ShellAttempt[] = [[theirs, '-ilc', 5000], [theirs, '-lc', 2500]];
   if (system !== theirs) out.push([system, '-ilc', 2500]);
   return out;
 }
 
 /** The first attempt whose output `read` accepts; the first failure otherwise. */
-async function askLoginShell({ env, platform, run, script, read }) {
-  let first = null;
+async function askLoginShell<T>({ env, platform, run, script, read }: {
+  env: NodeJS.ProcessEnv;
+  platform: NodeJS.Platform;
+  run: ShellRun;
+  script: (shell: string) => string;
+  read: (stdout: string) => T;
+}): Promise<T> {
+  let first: unknown = null;
   for (const [shell, flags, timeout] of loginShellAttempts(env, platform)) {
     try {
       const stdout = String(await run(shell, [flags, script(shell)], {
@@ -90,7 +116,7 @@ async function askLoginShell({ env, platform, run, script, read }) {
   throw first;
 }
 
-const isFish = (shell) => path.basename(shell) === 'fish';
+const isFish = (shell: string) => path.basename(shell) === 'fish';
 
 /**
  * WHERE THE SHELL SAYS CLAUDE CODE AND CODEX KEEP THEIR SESSIONS (w-e46f2e9cea).
@@ -106,7 +132,7 @@ const isFish = (shell) => path.basename(shell) === 'fish';
  *  Only an absolute path is kept. A quoted `~` the shell did not expand is
  *  expanded here; anything else, or no answer at all, is left out. */
 const DIRS_MARKER = '\0agentbox-dirs\0';
-const DIRS = ['CLAUDE_CONFIG_DIR', 'CODEX_HOME'];
+const DIRS = ['CLAUDE_CONFIG_DIR', 'CODEX_HOME'] as const;
 
 /**
  * HOW THIS MACHINE REACHES THE NETWORK, WHEN ONLY THE SHELL PROFILE SAYS (2026-10-15).
@@ -154,24 +180,24 @@ const MAC_LOCALE = 'en_US.UTF-8';
 const SETTINGS = [...DIRS, ...PROXIES, ...CERTIFICATES, ...LOCALE];
 
 /** Everything above from one login shell, as { dirs, network, locale }. */
-export async function readShellSettings({ env = process.env, platform = process.platform, run = runShell } = {}) {
-  const none = { dirs: {}, network: {}, locale: {} };
+export async function readShellSettings({ env = process.env, platform = process.platform, run = runShell }: ShellReadOptions = {}): Promise<ShellSettings> {
+  const none: ShellSettings = { dirs: {}, network: {}, locale: {} };
   if (platform !== 'darwin' && platform !== 'linux') return none;
   const script = () => `printf '\\0agentbox-dirs\\0${'%s\\0'.repeat(SETTINGS.length)}' ${SETTINGS.map((n) => `"$${n}"`).join(' ')}`;
-  const read = (stdout) => {
+  const read = (stdout: string) => {
     const start = stdout.lastIndexOf(DIRS_MARKER);
     if (start < 0) throw Error('Your shell did not answer.');
     return stdout.slice(start + DIRS_MARKER.length).split('\0');
   };
-  let values;
+  let values: string[];
   try {
     values = await askLoginShell({ env, platform, run, script, read });
   } catch {
     return none;
   }
   const raw = Object.fromEntries(SETTINGS.map((name, i) => [name, String(values[i] ?? '').trim()]));
-  const single = (v) => v && !/[\r\n]/.test(v);
-  const folder = (v) => {
+  const single = (v: string) => v && !/[\r\n]/.test(v);
+  const folder = (v: string): string | null => {
     if (!single(v)) return null;
     if (v === '~' || v.startsWith('~/')) {
       if (!env.HOME) return null;
@@ -179,22 +205,22 @@ export async function readShellSettings({ env = process.env, platform = process.
     }
     return path.isAbsolute(v) ? v : null;
   };
-  const out = { dirs: {}, network: {}, locale: {} };
-  for (const name of DIRS) if (folder(raw[name])) out.dirs[name] = folder(raw[name]);
+  const out: ShellSettings = { dirs: {}, network: {}, locale: {} };
+  for (const name of DIRS) if (folder(raw[name])) out.dirs[name] = folder(raw[name])!;
   for (const name of PROXIES) if (single(raw[name])) out.network[name] = raw[name];
-  for (const name of CERTIFICATES) if (folder(raw[name])) out.network[name] = folder(raw[name]);
+  for (const name of CERTIFICATES) if (folder(raw[name])) out.network[name] = folder(raw[name])!;
   for (const name of LOCALE) if (single(raw[name]) && /^[A-Za-z0-9_.@-]+$/.test(raw[name])) out.locale[name] = raw[name];
   return out;
 }
 
-export async function readShellDataDirs(opts = {}) {
+export async function readShellDataDirs(opts: ShellReadOptions = {}): Promise<ShellDataDirs> {
   return (await readShellSettings(opts)).dirs;
 }
 
 /** What to add to a launch environment, given what the shell said. Never overwrites. */
-export function launchAdditions({ network = {}, locale = {} } = {}, env = process.env, platform = process.platform) {
-  const set = (name) => env[name] !== undefined && env[name] !== '';
-  const add = {};
+export function launchAdditions({ network = {}, locale = {} }: Partial<Pick<ShellSettings, 'network' | 'locale'>> = {}, env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): Record<string, string> {
+  const set = (name: string) => env[name] !== undefined && env[name] !== '';
+  const add: Record<string, string> = {};
   if (!PROXIES.some(set)) for (const name of PROXIES) if (network[name]) add[name] = network[name];
   for (const name of CERTIFICATES) if (network[name] && !set(name)) add[name] = network[name];
   if (!LOCALE.some(set)) {
@@ -212,9 +238,9 @@ export function launchAdditions({ network = {}, locale = {} } = {}, env = proces
  *  environment) here, because this is the one shell read that both the desktop
  *  (main/main.mts) and the browser copy (bin/agentbox.mjs) wait for before the
  *  first worker starts. */
-let shellDataEnv = {};
-export const shellDataDirsNow = () => shellDataEnv;
-export function learnShellDataDirs({ into = process.env, ...opts } = {}) {
+let shellDataEnv: ShellDataDirs = {};
+export const shellDataDirsNow = (): ShellDataDirs => shellDataEnv;
+export function learnShellDataDirs({ into = process.env, ...opts }: ShellReadOptions & { into?: NodeJS.ProcessEnv } = {}): Promise<ShellDataDirs> {
   return readShellSettings(opts).then((found) => {
     shellDataEnv = found.dirs;
     Object.assign(into, launchAdditions(found, opts.env ?? process.env, opts.platform ?? process.platform));
@@ -222,7 +248,7 @@ export function learnShellDataDirs({ into = process.env, ...opts } = {}) {
   });
 }
 
-export async function recoverShellPath({ env = process.env, platform = process.platform, run = runShell } = {}) {
+export async function recoverShellPath({ env = process.env, platform = process.platform, run = runShell }: ShellReadOptions = {}): Promise<{ path: string; error: string | null }> {
   const original = env.PATH || '';
   // LINUX TOO (2026-10-15). A launcher entry starts the app with the desktop
   // session's environment, and that session read ~/.profile without -i, so
@@ -230,9 +256,9 @@ export async function recoverShellPath({ env = process.env, platform = process.p
   // running interactively, return") never reached it. readShellDataDirs above
   // already asked on Linux for the same reason.
   if (platform !== 'darwin' && platform !== 'linux') return { path: original, error: null };
-  const script = (shell) => `printf '\\0agentbox-path\\0%s\\0' ${isFish(shell) ? '(string join : $PATH)' : '"$PATH"'}`;
-  const read = (stdout) => {
-    // NUL framing keeps messages printed by .zshrc out of the returned PATH.
+  const script = (shell: string) => `printf '\\0agentbox-path\\0%s\\0' ${isFish(shell) ? '(string join : $PATH)' : '"$PATH"'}`;
+  const read = (stdout: string) => {
+    //NUL framing keeps messages printed by .zshrc out of the returned PATH.
     const start = stdout.lastIndexOf(MARKER);
     const end = start < 0 ? -1 : stdout.indexOf('\0', start + MARKER.length);
     const recovered = end < 0 ? '' : stdout.slice(start + MARKER.length, end);
@@ -248,6 +274,6 @@ export async function recoverShellPath({ env = process.env, platform = process.p
     const entries = [...new Set([...recovered, ...original.split(':')].filter(Boolean))];
     return { path: entries.join(':'), error: null };
   } catch (error) {
-    return { path: original, error: String(error?.message || error) };
+    return { path: original, error: String((error as Error | null)?.message || error) };
   }
 }

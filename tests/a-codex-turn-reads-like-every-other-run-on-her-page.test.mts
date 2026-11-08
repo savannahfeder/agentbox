@@ -896,7 +896,8 @@ describe('Codex readers stay behind the engine and approval boundary', () => {
       ...sources(join(repo, 'shared')),
     ].filter((f) => !f.endsWith(join('main', 'codex.mts')));
     const target = join(repo, 'main', 'codex.mts');
-    const importers = app.filter((f) => [...readFileSync(f, 'utf8').matchAll(/from\s+['"]([^'"]+)['"]/g)]
+    // `import type` is erased before the code runs, so it lends no reader.
+    const importers = app.filter((f) => [...readFileSync(f, 'utf8').matchAll(/^import\s+(?!type\s)[^;]*?from\s+['"]([^'"]+)['"]/gm)]
       .some((m) => join(dirname(f), m[1]) === target));
     expect(importers.sort()).toEqual([
       join(repo, 'main', 'codex-approvals.mts'),
@@ -907,9 +908,9 @@ describe('Codex readers stay behind the engine and approval boundary', () => {
 
   it('lends the approvals path the one word rule and no reader at all', () => {
     const source = readFileSync(join(repo, 'main', 'codex-approvals.mts'), 'utf8');
-    const block = source.match(/import\s*\{([^}]*)\}\s*from\s+'\.\/codex\.mjs'/);
+    const block = source.match(/import\s*\{([^}]*)\}\s*from\s+'\.\/codex\.mts'/);
     expect(block).toBeTruthy();
-    expect(block[1].split(',').map((n) => n.trim()).filter(Boolean)).toEqual(['fileVerbWord']);
+    expect(block[1].split(',').map((n) => n.trim()).filter((n) => n && !n.startsWith('type '))).toEqual(['fileVerbWord']);
   });
 
   // AND WHAT IT TAKES, asserted whole rather than searched for, so a new import
@@ -931,7 +932,7 @@ describe('Codex readers stay behind the engine and approval boundary', () => {
     // Matched as a BLOCK and not a line: the import is written across several
     // lines now, and a line-at-a-time reader would find no names at all and
     // pass this assertion against an empty list.
-    const block = source.match(/import\s*\{([^}]*)\}\s*from\s+'\.\.\/codex\.mjs'/);
+    const block = source.match(/import\s*\{([^}]*)\}\s*from\s+'\.\.\/codex\.mts'/);
     expect(block).toBeTruthy();
     const named = block[1].split(',').map((n) => n.trim()).filter(Boolean);
     expect(named.sort()).toEqual([
@@ -941,9 +942,9 @@ describe('Codex readers stay behind the engine and approval boundary', () => {
   });
   it('lends Claude only the cap and keeps raw readers out of the supervisor', () => {
     const source = readFileSync(join(repo, 'main', 'harnesses', 'claude-stream.mts'), 'utf8');
-    const block = source.match(/import\s*\{([^}]*)\}\s*from\s+'\.\.\/codex\.mjs'/);
+    const block = source.match(/import\s*\{([^}]*)\}\s*from\s+'\.\.\/codex\.mts'/);
     expect(block).toBeTruthy();
     expect(block[1].split(',').map((n) => n.trim()).filter(Boolean)).toEqual(['SAYING_CAP']);
-    expect(readFileSync(join(repo, 'main', 'supervisor.mts'), 'utf8')).not.toMatch(/from\s+['"]\.\/codex\.mjs['"]/);
+    expect(readFileSync(join(repo, 'main', 'supervisor.mts'), 'utf8')).not.toMatch(/from\s+['"]\.\/codex\.mts['"]/);
   });
 });

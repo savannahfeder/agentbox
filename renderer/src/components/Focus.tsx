@@ -90,7 +90,7 @@ import { PictureView, picturesFor, type Picture } from './PictureView';
 import { opensAsPicture } from '../picture-view';
 import { ThreadArtifacts } from './ThreadArtifacts';
 import type { ArtifactOpen } from './ArtifactView';
-import { fileNewsFor, shownName, viewKind } from '../../../shared/artifact-marks.mts';
+import { fileNewsFor, shownName, viewKind, type ThreadLine } from '../../../shared/artifact-marks.mts';
 import { opensInTheLargeViewer } from '../artifact-layout';
 import { carryLine, type CarryState } from '../../../shared/carried-files.mts';
 import { watchScrollGutter } from '../scroll-gutter';
@@ -537,7 +537,7 @@ export function FolderPreview({ product, folder, onOpen, quiet, thread }: {
   const [shown, setShown] = useState<{ pictures: string[]; total: number } | null>(() => folderSeen.get(key) ?? null);
   const [asking, setAsking] = useState(!quiet && !folderSeen.has(key));
   useEffect(() => {
-    const api = (window as any).zero;
+    const api = window.zero;
     if (quiet || !api?.folderPictures) { setAsking(false); return; }
     let live = true;
     api.folderPictures({ product, src: folder })
@@ -616,7 +616,7 @@ export function ArtifactLink({ kind, product, src, fallback, onOpen, children }:
   useEffect(() => {
     setHref(fallback);
     if (!src || /^https?:/.test(src)) return;
-    (window as any).zero?.openArtifact?.({ product, src: sourceReference(src) ?? src, mode: 'resolve' })
+    window.zero?.openArtifact?.({ product, src: sourceReference(src) ?? src, mode: 'resolve' })
       .then((r: { ok: boolean; opened?: string }) => { if (r?.ok && r.opened) setHref(`file://${r.opened}`); })
       .catch(() => {});
   }, [product, src]);
@@ -658,7 +658,7 @@ export function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
   useEffect(() => {
     let live = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    const api = (window as any).zero;
+    const api = window.zero;
     if (!api?.openArtifact) { setSrc(fallback ?? null); return () => { live = false; }; }
     api.openArtifact({ product, src: path, mode: 'resolve' })
       .then((r: { ok: boolean; opened?: string }) => {
@@ -1333,7 +1333,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     path, at: Date.now(), ...(from && opensAsPicture(path) ? { steps: picturesFor(paneRef.current, path, from).pictures.map((p) => p.path) } : {}),
   });
   const openFileMark = useCallback((link: FileMarkLink) => setArtifact({ file: link.file, note: link.id, at: Date.now() }), []);
-  const [historyLines, setHistoryLines] = useState<unknown[]>([]);
+  const [historyLines, setHistoryLines] = useState<readonly ThreadLine[]>([]);
   useEffect(() => {
     let live = true;
     const read = () => { void api.itemHistory({ product: item.product, id: item.id }).then((r) => { if (live) setHistoryLines(r?.lines ?? []); }); };
@@ -1373,7 +1373,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     };
 
     const find = (src: string) => {
-      const zero = (window as any).zero;
+      const zero = window.zero;
       if (!zero?.openArtifact) return Promise.resolve(null);
       return zero.openArtifact({ product, src, mode: 'resolve' })
         .then((r: { ok: boolean; opened?: string }) => (r?.ok && r.opened && isImagePath(r.opened) ? r.opened : null));
@@ -1399,7 +1399,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       // A reference like cart.mjs:2 is that file; its line number is only a label.
       const source = sourceReference(href);
       if (source && !asksForANewTab(click) && whereALinkGoes(source, click, { pane: !!onOpenDoc }) === 'pane') { onOpenDoc?.(source); return; }
-      const api = (window as any).zero;
+      const api = window.zero;
       if (!api?.openArtifact) { window.open(resolveSrc(href), '_blank'); return; }
       api.openArtifact({ product, src: source ?? href, thread: item.id, ...(source ? { mode: 'source' } : {}) }).then((r: { ok: boolean; error?: string}) => {
         if (!r?.ok) onNotice(r?.error || `${href} could not be opened.`);

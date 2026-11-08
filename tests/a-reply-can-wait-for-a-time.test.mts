@@ -236,7 +236,7 @@ describe('the reply box and the app', () => {
   // A reply for later started nothing, so its Z has nothing of its own to stop.
   it('Z on a reply set for later leaves an agent already working on the thread running', () => {
     const undo = answerWith.slice(answerWith.indexOf('pushUndo({'));
-    expect(undo).toMatch(/if \(!runStays\) await \(window\.zero as any\)\?\.stopSession\?\./);
+    expect(undo).toMatch(/if \(!runStays\) await window\.zero\?\.stopSession\?\./);
     expect(undo).toMatch(/\.\.\.\(runStays \? \{ answer: '\(withdrawn\)' \} : withdrawReply\(item\.status\)\)/);
   });
 

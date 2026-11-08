@@ -47,7 +47,7 @@ import { folderPictures } from './folder-pictures.mts';
 import { docUrl } from './doc-scheme.mts';
 import { readDoc, writeDoc } from './doc-file.mts';
 import { linkCopyOf, linkSource } from './file-link.mts';
-import { familyKeyOf } from '../shared/artifact-marks.mts';
+import { familyKeyOf, type Mark } from '../shared/artifact-marks.mts';
 import { readItemHistory } from './store/work-items.mts';
 import { readChange } from './code-change.mts';
 import { findFile, readCodeFile, writeCodeFile } from './code-file.mts';
@@ -96,6 +96,7 @@ import type { UpdateTerminals } from './agent-updates.mts';
 import type { AttachmentFile } from './save-attachments.mts';
 import type { PostInput } from './teammates.mts';
 import type { ConversationInput } from './agents.mts';
+import type { ConnectionTile } from './connections/index.mts';
 
 export interface IpcEvent { sender?: unknown; senderFrame?: { parent?: unknown } | null }
 export type IpcListener = { bivarianceHack(event: IpcEvent, payload?: unknown): unknown }['bivarianceHack'];
@@ -118,7 +119,8 @@ export interface IpcOpenDialog {
   filters?: { name: string; extensions: string[] }[];
 }
 
-export interface IpcHost {
+/** `W` is the window the deps hand over, so the dialog is opened over the same kind of window. */
+export interface IpcHost<W extends IpcWindow = IpcWindow> {
   ipcMain: { handle(channel: string, listener: IpcListener): unknown };
   app: {
     isPackaged: boolean;
@@ -128,7 +130,7 @@ export interface IpcHost {
     focus?(options?: { steal: boolean }): void;
     accessibilitySupportEnabled?: boolean;
   };
-  dialog: { showOpenDialog(window: ElectronWindow, options: IpcOpenDialog): Promise<{ canceled: boolean; noDialog?: boolean; filePaths: string[] }> };
+  dialog: { showOpenDialog(window: W, options: IpcOpenDialog): Promise<{ canceled: boolean; noDialog?: boolean; filePaths: string[] }> };
   shell?: IpcShell;
   micAccess?(): unknown;
   readClipboardText?(): unknown;
@@ -149,7 +151,6 @@ export interface IpcUpdater {
   move?(): unknown;
 }
 
-type ConnectionTile = { id: string } & Record<string, unknown>;
 export interface IpcConnections {
   connectedIds(): Promise<string[]>;
   checkStale(): Promise<unknown>;
@@ -173,15 +174,15 @@ export interface IpcCopies {
 export type IpcTeam = ReturnType<typeof createTeamService>;
 export type IpcConfig = StoreConfig & SupervisorConfig & SettingsConfig & { accountRoot: string; storeRoot: string; feedbackUrl?: unknown };
 
-export interface IpcDeps {
+export interface IpcDeps<W extends IpcWindow = IpcWindow> {
   store: Store;
   supervisor: Supervisor;
   config: IpcConfig;
-  window: IpcWindow;
+  window: W;
   analytics?: IpcAnalytics;
   docGrants?: { grant(file: string, roots: string[]): unknown } | null;
   updater?: IpcUpdater;
-  host: IpcHost;
+  host: IpcHost<W>;
   team?: IpcTeam | null;
   connections?: IpcConnections | null;
   copies?: IpcCopies | null;
@@ -203,7 +204,8 @@ export interface TeammateArgs {
 
 type TerminalPayload = { product: unknown; id: unknown; action?: string; data?: string; cols: number; rows: number; offset: number; wait: number };
 type LookedAgain = Awaited<ReturnType<typeof lookAgainFor>>;
-type ElectronWindow = import('electron').BaseWindow;
+// A handler that imports Electron's own dialog runs only in the app, whose window is a BrowserWindow.
+type AppWindow = import('electron').BrowserWindow;
 type WorkspaceSet = { key: string; value?: unknown };
 interface FilesPlace {
   forAgents(): Promise<unknown>;
@@ -218,10 +220,12 @@ interface FilesPlace {
   lineFor(ask: { product: string; id: string }): Promise<unknown>;
   mark(key: string, mark: unknown): Promise<{ ok: boolean; wrote?: { product: string; id: string } } & Record<string, unknown>>;
   pictureNamed(src: unknown): Promise<string | null>;
+  newDocument(ask: { project: string; name: string; kind?: 'document' | 'table'; folder?: string | null; by?: string | null }): Promise<{ key: string }>;
+  addFiles(ask: { project: string; paths?: string[]; folder?: string | null; by?: string | null }): Promise<{ added: number; refused: string[]; keys: string[] }>;
 }
 // The JS defaults `team = null` and `nameOf = () => ...` read as the whole type.
 const filesPlaceFor = appFilesPlace as (deps: { store: Store; team: IpcTeam | null; accountRoot: string; storeRoot: string; notify?: () => void }) => FilesPlace;
-type RoomCalls = Record<string, (...args: unknown[]) => unknown>;
+type RoomCalls = Record<RoomOp, (...args: unknown[]) => unknown>;
 type ImportableThreads = Awaited<ReturnType<typeof readImportableThreads>>;
 type SetProjectPayload = { product?: string; key: string; value?: unknown };
 type CloudAccountModule = typeof import('./cloud/account.mts');
@@ -240,7 +244,7 @@ const CARD_CHANGED = 'The approval request changed between being drawn and being
 // WHAT COUNTS AS SENT WHEN NOTHING IS. Analytics is optional here on purpose:
 // every test and every copy without a key gets an object that answers no to
 // everything, so no call site has to ask whether it exists.
-const NO_ANALYTICS = { enabled: false, track: () => false } as unknown as IpcAnalytics;
+const NO_ANALYTICS: IpcAnalytics = { enabled: false, track: () => false, flush: () => {} };
 
 // A copy with no updater wired in: the tests, and any host that constructs the
 // IPC surface by hand. It reports the state a build from source really is in
@@ -263,9 +267,10 @@ const NO_UPDATER: IpcUpdater = {
 };
 
 const TEAMMATE_OPS = new Set(['create', 'describe', 'start', 'update', 'stop', 'remove', 'post', 'goAhead', 'remember', 'forget', 'method', 'unsend']);
-const ROOM_OPS = new Set(['refresh', 'send', 'markRead', 'markDone', 'markUnread', 'react', 'decide','edit', 'deleteMessage', 'putFile', 'putFileFrom', 'file', 'fileOnDisk', 'fileText', 'markFile', 'older', 'saveProfile', 'goInvisible', 'comeBack', 'link', 'revokeLink', 'preview', 'listed', 'invitesSent', 'joinByLink', 'joinListed', 'acceptInvite', 'invite', 'create', 'rename', 'leave', 'remove', 'pin', 'mute']);
+const ROOM_OPS = new Set(['refresh', 'send', 'markRead', 'markDone', 'markUnread', 'react', 'decide','edit', 'deleteMessage', 'putFile', 'putFileFrom', 'file', 'fileOnDisk', 'fileText', 'markFile', 'older', 'saveProfile', 'goInvisible', 'comeBack', 'link', 'revokeLink', 'preview', 'listed', 'invitesSent', 'joinByLink', 'joinListed', 'acceptInvite', 'invite', 'create', 'rename', 'leave', 'remove', 'pin', 'mute'] as const);
+type RoomOp = typeof ROOM_OPS extends Set<infer O> ? O : never;
 
-export function registerIpc({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null, connections = null, copies = null, onCount = () => {} }: IpcDeps) {
+export function registerIpc<W extends IpcWindow>({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null, connections = null, copies = null, onCount = () => {} }: IpcDeps<W>) {
   // The three Electron things, or a plain Node stand-in for them. There is no
   // default: a caller that forgets says so here rather than throwing eighty
   // lines further down on `ipcMain.handle` of undefined.
@@ -574,7 +579,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   void taskTerminals.ready().then(lookAtTerminals);
   setInterval(lookAtTerminals,60_000).unref?.();
   const agentUpdates=new AgentUpdates({
-    installation:async engine=>{await lookAgainFor(engine,config);return installedAgent(engine,config as unknown as Parameters<typeof installedAgent>[1]);},
+    installation:async engine=>{await lookAgainFor(engine,config);return installedAgent(engine,config);},
     refresh:async engine=>{await lookAgainFor(engine,config);await refreshAgentModels(engine,config,supervisor._codexOfferHomes());if(engine==='codex')for(const profile of supervisor._codexProfiles())supervisor._releaseIdleCodex(profile);},
   });
   ipcMain.handle('zero:agent-update',async(event,{engine,action}: {engine: string; action?: string}={} as {engine: string; action?: string})=>{
@@ -988,7 +993,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   // WHO IS SIGNED IN, and the project a row is in, for the team's rules.
   const teamMe = () => team?.state()?.me?.id ?? null;
-  const noteBy = (by: string) => team?.firstNameOf?.(by) || 'the person writing to you';
+  const noteBy = (by: string | null) => team?.firstNameOf?.(by) || 'the person writing to you';
   const teamPeople = () => team?.state?.()?.people ?? [];
   const productOf = (slug: string) => store.listProducts().find((p) => p.slug === slug) ?? null;
 
@@ -1124,9 +1129,9 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   ipcMain.handle('zero:rooms', async (_e, { op, args = [] }: { op?: string; args?: unknown } = {}) => {
     const rooms = team?.rooms;
     if (!rooms) return { ok: false, error: 'This build has no team cloud set up.' };
-    if (!ROOM_OPS.has(op as string)) return { ok: false, error: `no room call named ${op}` };
+    if (!ROOM_OPS.has(op as RoomOp)) return { ok: false, error: `no room call named ${op}` };
     try {
-      const value = await (rooms as unknown as RoomCalls)[op as string](...(Array.isArray(args) ? args : [args]));
+      const value = await (rooms as RoomCalls)[op as RoomOp](...(Array.isArray(args) ? args : [args]));
       push();
       return { ok: true, value: value ?? null, rooms: rooms.state() };
     } catch (err) {
@@ -1222,7 +1227,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       store.fileMark(product, id, mark);
       push();
       void team?.syncNow?.()?.catch?.(() => {});
-      try { await noteToItsAgent({ store, supervisor, product, id, mark, nameOf: noteBy, people: teamPeople() }); }
+      try { await noteToItsAgent({ store, supervisor, product, id, mark: mark as Mark, nameOf: noteBy, people: teamPeople() }); }
       catch (err) { return { ok: false, error: `The note is saved, but it did not reach the agent: ${(err as Error)?.message ?? err}` }; }
       return { ok: true };
     } catch (err) {
@@ -1522,7 +1527,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     const connected = store.listProducts().map((p) => p.repoPath).filter(Boolean);
     const isDir = (p: string) => { try { return fsWatch.statSync(p).isDirectory(); } catch { return false; } };
     const openAt = chooserStartsIn(startIn, { known: connected, home: os.homedir() }).find(isDir) ?? null;
-    const r = await dialog.showOpenDialog(window as unknown as ElectronWindow, {
+    const r = await dialog.showOpenDialog(window, {
       // The title is what the screen behind it asks. On Linux the chooser
       // draws one, and it was still asking "Where is its code?", the heading
       // that screen gave up in w-ec62ab6b38.
@@ -1953,7 +1958,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
         return { ok: true, ...readSettings({ config, supervisor, store }) };
       }
       const { dialog } = await import('electron');
-      const r = await dialog.showOpenDialog(window as unknown as ElectronWindow, {
+      const r = await dialog.showOpenDialog(window as IpcWindow as AppWindow, {
         title: engine === 'codex' ? 'Where is Codex?' : 'Where is Claude Code?',
         buttonLabel: 'Use this one',
         properties: ['openFile', 'showHiddenFiles', 'treatPackageAsDirectory'],
@@ -2118,7 +2123,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     try {
       const account = await import('./cloud/account.mts');
       const shell = await shellNow();
-      return await (account[name] as unknown as (options: Record<string, unknown>) => Promise<unknown>)({ ...args, openExternal: (u: string) => shell.openExternal(u), home: supervisor.config.home || os.homedir() });
+      return await (account[name] as (options: Record<string, unknown>) => Promise<unknown>)({ ...args, openExternal: (u: string) => shell.openExternal(u), home: supervisor.config.home || os.homedir() });
     } catch (err) {
       return { ok: false, error: 'unreachable', message: `The cloud did not answer: ${(err as Error)?.message || err}` };
     }
@@ -2169,7 +2174,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     try {
       let file = asked;
       if (choose) {
-        const r = await dialog.showOpenDialog(window as unknown as ElectronWindow, { title: 'Pick the file to send', buttonLabel: 'Send this file', properties: ['openFile'] });
+        const r = await dialog.showOpenDialog(window, { title: 'Pick the file to send', buttonLabel: 'Send this file', properties: ['openFile'] });
         // The browser copy has no file panel (main/serve.mts).
         if (r.noDialog) return { ok: false, error: `Choosing a file needs the ${Name} app on this computer.` };
         if (r.canceled || !r.filePaths?.length) return { ok: true, canceled: true };
@@ -2293,7 +2298,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       const dir = productDirOf(product);
       if (!dir) return { ok: false, error: 'That project could not be found.' };
       const { dialog } = await import('electron');
-      const r = await dialog.showOpenDialog(window as unknown as ElectronWindow, {
+      const r = await dialog.showOpenDialog(window as IpcWindow as AppWindow, {
         title: 'Pick a picture for this project',
         buttonLabel: 'Use this picture',
         properties: ['openFile'],
@@ -2477,7 +2482,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   });
   ipcMain.handle('zero:files-place-upload', async (_e, { project, folder }: { project?: unknown; folder?: unknown } = {}) => {
     try {
-      const r = await dialog.showOpenDialog(window as unknown as ElectronWindow, { title: `Add files to ${String(project ?? '')}`, buttonLabel: 'Add', properties: ['openFile', 'multiSelections'] });
+      const r = await dialog.showOpenDialog(window, { title: `Add files to ${String(project ?? '')}`, buttonLabel: 'Add', properties: ['openFile', 'multiSelections'] });
       if (r.noDialog) return { ok: false, error: `Adding files needs the ${Name} app on this computer.` };
       if (r.canceled || !r.filePaths?.length) return { ok: true, added: 0, refused: [], keys: [] };
       const out = await filesPlaceNow().addFiles({ project: String(project ?? ''), folder: typeof folder === 'string' ? folder : null, paths: r.filePaths });
@@ -2504,7 +2509,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     const { wrote, ...out } = await filesPlaceNow().mark(String(key ?? ''), mark);
     if (out.ok) { push(); void team?.syncNow?.()?.catch?.(() => {}); }
     if (out.ok && wrote) {
-      try { await noteToItsAgent({ store, supervisor, ...wrote, mark, nameOf: noteBy, people: teamPeople() }); }
+      try { await noteToItsAgent({ store, supervisor, ...wrote, mark: mark as Mark, nameOf: noteBy, people: teamPeople() }); }
       catch (err) { return { ok: false, error: `The note is saved, but it did not reach the agent: ${(err as Error)?.message ?? err}` }; }
     }
     return out;

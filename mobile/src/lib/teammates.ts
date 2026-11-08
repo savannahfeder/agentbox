@@ -20,25 +20,35 @@ export interface PhoneTeam {
 
 const blank = { role: null, job: null, goal: null, counted: null, asksFirst: null, works: null, worksLabel: null, engine: null, model: null, effort: null, limit: 0, paused: false, status: 'active', memory: [], createdAt: 0, waiting: [], now: null, running: null, queued: 0, done: [], runsThisWeek: 0 };
 
+/** As much of a computer's settings copy as its teammates ride in (shared/phone-snapshot.mts `phoneTeammatesOf`). */
+interface TeamSettings {
+  workspace?: { alpha?: { teammates?: boolean } };
+  teammates?: { list?: Partial<Teammate>[]; chat?: TeamChatLine[]; runs?: TeamRunLine[]; trouble?: string };
+}
+
 /** The computer with teammates on that was heard from last, and its teammates; null when none has them on. */
-export function teamFrom(rows: readonly { device: string; updated_at?: string; settings?: any }[]): PhoneTeam | null {
+export function teamFrom(rows: readonly { device: string; updated_at?: string; settings?: TeamSettings | null }[]): PhoneTeam | null {
   const at = (r: { updated_at?: string }) => Date.parse(r.updated_at ?? '') || 0;
   const on = rows
     .filter((r) => r.settings?.workspace?.alpha?.teammates && Array.isArray(r.settings?.teammates?.list))
     .sort((a, b) => at(b) - at(a))[0];
   if (!on) return null;
-  const t = on.settings.teammates;
+  const t = on.settings!.teammates!;
   return {
     device: on.device,
     copyAt: at(on),
     view: {
-      list: t.list.map((m: any) => ({ ...blank, ...m, letter: m.letter || String(m.name ?? '?').slice(0, 1) })),
+      list: t.list!.map((m: Partial<Teammate>) => ({ ...blank, ...m, letter: m.letter || String(m.name ?? '?').slice(0, 1) }) as Teammate),
       chat: Array.isArray(t.chat) ? t.chat : [],
       runs: Array.isArray(t.runs) ? t.runs : [],
       ...(t.trouble ? { trouble: t.trouble } : {}),
     },
   };
 }
+
+/** A teammate setting's value: a message (`post`) or a pause, as Teammates.tsx sends them. */
+interface TeammateSetting { to?: string[]; text?: string; answers?: Record<string, string>; id?: string; paused?: boolean }
+type TeammateCommand = PhoneRows['commands'][number] & { payload: { value?: TeammateSetting } };
 
 /** A command the computer's copy may not reflect yet: not taken, or taken after the copy was made, and not refused. */
 const notInCopy = (c: PhoneRows['commands'][number], copyAt: number) =>
@@ -55,7 +65,7 @@ export function withPhoneAnswers(team: PhoneTeam | null, commands: PhoneRows['co
     .map((c) => `${c.project}/${c.item}`));
   // A message to one that the copy does not have yet: it has not got your words.
   const told = new Set(commands
-    .filter((c) => c.kind === 'setting' && c.device === team.device && c.payload?.scope === 'teammate' && c.payload.key === 'post' && notInCopy(c, team.copyAt))
+    .filter((c): c is TeammateCommand => c.kind === 'setting' && c.device === team.device && c.payload?.scope === 'teammate' && c.payload.key === 'post' && notInCopy(c, team.copyAt))
     .flatMap((c) => (Array.isArray(c.payload.value?.to) ? c.payload.value.to : [])));
   if (!settled.size && !told.size) return team;
   const WAITS = 'Waiting for your computer';
@@ -135,7 +145,7 @@ export function onTheirWay(commands: PhoneRows['commands'], team: PhoneTeam | nu
   if (!team) return [];
   const out: Pending[] = [];
   for (const c of commands) {
-    const p = c.payload;
+    const p = c.payload as TeammateCommand['payload'];
     if (c.kind !== 'setting' || c.device !== team.device || p?.scope !== 'teammate' || p.key !== 'post') continue;
     const takenAt = c.taken_at ? Date.parse(c.taken_at) || 0 : null;
     const refused = c.outcome?.startsWith('refused') ? c.outcome.replace(/^refused:\s*/, '') : null;
@@ -150,10 +160,10 @@ export function onTheirWay(commands: PhoneRows['commands'], team: PhoneTeam | nu
 export function pauseOnItsWay(commands: PhoneRows['commands'], team: PhoneTeam | null, id: string): boolean | null {
   if (!team) return null;
   const asked = commands
-    .filter((c) => c.kind === 'setting' && c.device === team.device && notInCopy(c, team.copyAt) && c.payload?.scope === 'teammate' && c.payload.key === 'pause' && c.payload.value?.id === id)
+    .filter((c): c is TeammateCommand => c.kind === 'setting' && c.device === team.device && notInCopy(c, team.copyAt) && c.payload?.scope === 'teammate' && c.payload.key === 'pause' && (c.payload.value as TeammateSetting | undefined)?.id === id)
     .sort((a, b) => (Date.parse(a.created_at) || 0) - (Date.parse(b.created_at) || 0))
     .at(-1);
-  return asked ? asked.payload.value.paused === true : null;
+  return asked ? asked.payload.value!.paused === true : null;
 }
 
 /** Each teammate asking you something, with its newest open question, for the head of Needs you. */

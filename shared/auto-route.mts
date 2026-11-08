@@ -13,16 +13,36 @@
 //
 // The model you picked in the box stays the model the thread runs on, whoever
 // takes it.
-import { teammateLabel, teammateIdOf, activeRunOf, TEAMMATE_LABEL_PREFIX } from './teammates.mts';
+import { teammateLabel, teammateIdOf, activeRunOf, TEAMMATE_LABEL_PREFIX, type Labelled, type RunItem } from './teammates.mts';
+import type { Routed as RouteRecord } from './work-items.mts';
+
+export type { Routed as RouteRecord } from './work-items.mts';
+
+export interface RouteDecision { to?: string; ask?: string[]; why: string }
+export interface RouteMate {
+  id: string;
+  name: string;
+  role?: string | null;
+  job?: string | null;
+  goal?: string | null;
+  duties?: readonly { what: string }[];
+  status?: string;
+  paused?: boolean;
+  primary?: boolean;
+  endedAt?: number | null;
+}
+type RouteItem = Labelled & { updatedAt?: number; label?: string; title?: string };
+/** A type alias, not an interface, so it passes where a store patch is a plain record. */
+export type RoutedPatch = { labels: string[]; routed: RouteRecord; start?: 'later' };
 
 export const AUTO_LABEL = 'auto';
 
-export function isAuto(item) {
+export function isAuto(item: { labels?: readonly string[] } | null | undefined): boolean {
   return (item?.labels ?? []).includes(AUTO_LABEL);
 }
 
 /** Auto has asked the person which teammate should take it, and waits on them. */
-export function asksWho(item) {
+export function asksWho(item: { labels?: readonly string[]; routed?: { ask?: readonly string[] } | null } | null | undefined): boolean {
   return isAuto(item) && Array.isArray(item?.routed?.ask) && item.routed.ask.length > 0;
 }
 
@@ -38,7 +58,7 @@ export const PRIMARY_TIE_WHY = 'Two teammates fit, so it decides who does the wo
  * The teammates a thread can go to by their job: set up, not paused, not
  * ended. The primary is not one of them; it is offered for what spans jobs.
  */
-export function routeCandidates(teammates = []) {
+export function routeCandidates<T extends RouteMate>(teammates: readonly T[] = []): T[] {
   return teammates.filter((t) => t && t.id && t.name && !t.primary && !t.endedAt && !t.paused && (t.status ?? 'active') === 'active');
 }
 
@@ -46,20 +66,20 @@ export function routeCandidates(teammates = []) {
  * PURE. What Auto could not place goes to the primary when there is one: two
  * that fit, or no usable answer. A clear answer is left as it was.
  */
-export function orPrimary(decision, primary) {
+export function orPrimary(decision: RouteDecision | null | undefined, primary: { id: string } | null | undefined): RouteDecision {
   if (!primary) return decision ?? { to: 'agent', why: FAILED_WHY };
   if (!decision) return { to: `mate:${primary.id}`, why: PRIMARY_WHY };
   if (decision.ask) return { to: `mate:${primary.id}`, why: PRIMARY_TIE_WHY };
   return decision;
 }
 
-const cut = (s, n) => {
+const cut = (s: string | null | undefined, n: number) => {
   const t = String(s ?? '').replace(/\s+/g, ' ').trim();
   return t.length > n ? `${t.slice(0, n - 1)}…` : t;
 };
 
 /** A teammate's newest threads, by the name each shows on the row. */
-function recentTitles(id, items, n = 6) {
+function recentTitles(id: string, items: readonly RouteItem[] | null | undefined, n = 6): string[] {
   return (items ?? [])
     .filter((i) => teammateIdOf(i) === id)
     .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
@@ -69,7 +89,12 @@ function recentTitles(id, items, n = 6) {
 }
 
 /** PURE. The one question the small model is asked about a thread sent To Auto. */
-export function routePrompt(item, candidates, items = [], { primary = null } = {}) {
+export function routePrompt(
+  item: { title?: string; body?: string } | null | undefined,
+  candidates: readonly RouteMate[],
+  items: readonly RouteItem[] = [],
+  { primary = null }: { primary?: RouteMate | null } = {},
+): string {
   const who = candidates.map((t, n) => {
     const parts = [`[${n + 1}] ${t.name}${t.role && t.role.toLowerCase() !== t.name.toLowerCase() ? `, ${t.role}` : ''}.`];
     if (t.job) parts.push(`Job: ${cut(t.job, 300)}`);
@@ -108,7 +133,7 @@ export function routePrompt(item, candidates, items = [], { primary = null } = {
   ].filter((l, i, all) => !(l === '' && all[i - 1] === '')).join('\n');
 }
 
-function cleanWhy(text) {
+function cleanWhy(text: string | null | undefined): string {
   const t = String(text ?? '')
     .replace(/^["'`“”‘’]+|["'`“”‘’]+$/g, '')
     .replace(/\s+/g, ' ')
@@ -123,7 +148,7 @@ function cleanWhy(text) {
  *  line, a number or two, a bar, a sentence. Anything else is no answer, and a
  *  thread with no answer goes to an agent rather than waiting (FAILED_WHY).
  */
-export function readRoute(text, candidates, primary = null) {
+export function readRoute(text: string, candidates: readonly { id: string }[], primary: { id: string } | null = null): RouteDecision | null {
   const line = String(text ?? '').split('\n').map((l) => l.trim()).find(Boolean) ?? '';
   const p = /^\[?P\]?\s*\|\s*(.*)$/i.exec(line);
   if (p) return primary ? { to: `mate:${primary.id}`, why: cleanWhy(p[1]) || PRIMARY_WHY } : null;
@@ -131,10 +156,10 @@ export function readRoute(text, candidates, primary = null) {
   if (!m) return null;
   const a = Number(m[1]);
   const b = m[2] === undefined ? null : Number(m[2]);
-  const inRange = (n) => n >= 0 && n <= candidates.length;
+  const inRange = (n: number) => n >= 0 && n <= candidates.length;
   if (!inRange(a) || (b !== null && !inRange(b))) return null;
   const why = cleanWhy(m[3]);
-  const key = (n) => (n === 0 ? 'agent' : `mate:${candidates[n - 1].id}`);
+  const key = (n: number) => (n === 0 ? 'agent' : `mate:${candidates[n - 1].id}`);
   if (b !== null && b !== a) {
     if (a === 0 || b === 0) return null;
     return { ask: [key(a), key(b)], why: why || 'Both of them could take this.' };
@@ -150,7 +175,11 @@ export function readRoute(text, candidates, primary = null) {
  *  a teammate that is already running something queues it behind that run, the
  *  way a teammate's own work queues (shared/teammates.mts `planWakes`).
  */
-export function routedPatch(item, decision, { items = [], now = Date.now(), by = 'auto' } = {}) {
+export function routedPatch(
+  item: { id?: string; labels?: readonly string[] } | null | undefined,
+  decision: RouteDecision,
+  { items = [], now = Date.now(), by = 'auto' }: { items?: readonly RunItem[]; now?: number; by?: 'auto' | 'you' } = {},
+): RoutedPatch {
   const others = (item?.labels ?? []).filter((l) => l !== AUTO_LABEL && !String(l).startsWith(TEAMMATE_LABEL_PREFIX));
   if (decision.ask) {
     return { labels: [...others, AUTO_LABEL], routed: { ask: decision.ask, why: decision.why, at: now, by } };

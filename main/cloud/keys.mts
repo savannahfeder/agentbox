@@ -13,9 +13,27 @@ import { keyNameRefused, keyObjectKey, KEY_VALUE_MAX, keyLabel } from '../../sha
 
 export { keyLabel };
 
-export const cloudKeysPath = (home = os.homedir()) => path.join(home, '.agentbox', 'cloud-keys.json');
+/** The bucket the keys go to: anything that can put and delete an object by name. */
+export interface KeyStorage {
+  put(key: string, body: string): Promise<unknown>;
+  del?(key: string): Promise<unknown>;
+}
 
-function readNote(home) {
+export interface SavedKey {
+  name: string;
+  savedAt: number | null;
+  label: string | null;
+}
+
+interface KeyNote {
+  keys: Record<string, { id: string; savedAt?: number; label?: string | null }>;
+  /** Objects of replaced or removed keys the cloud has not deleted yet. */
+  retired: { id: string; at: number }[];
+}
+
+export const cloudKeysPath = (home: string = os.homedir()): string => path.join(home, '.agentbox', 'cloud-keys.json');
+
+function readNote(home: string): KeyNote {
   try {
     const n = JSON.parse(fs.readFileSync(cloudKeysPath(home), 'utf8'));
     return { keys: n?.keys && typeof n.keys === 'object' ? n.keys : {}, retired: Array.isArray(n?.retired) ? n.retired : [] };
@@ -24,7 +42,7 @@ function readNote(home) {
   }
 }
 
-function writeNote(note, home) {
+function writeNote(note: KeyNote, home: string): void {
   const file = cloudKeysPath(home);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.${crypto.randomUUID()}.tmp`;
@@ -33,7 +51,7 @@ function writeNote(note, home) {
 }
 
 /** The saved keys, by name: [{ name, savedAt }]. */
-export function cloudKeyNames({ home = os.homedir() } = {}) {
+export function cloudKeyNames({ home = os.homedir() }: { home?: string } = {}): SavedKey[] {
   return Object.entries(readNote(home).keys)
     .filter(([name, k]) => !keyNameRefused(name) && typeof k?.id === 'string')
     .map(([name, k]) => ({ name, savedAt: k.savedAt ?? null, label: typeof k.label === 'string' && k.label ? k.label : null }))
@@ -41,7 +59,7 @@ export function cloudKeyNames({ home = os.homedir() } = {}) {
 }
 
 /** What a cloud run carries: each key's name and object. */
-export function keysCarried({ home = os.homedir() } = {}) {
+export function keysCarried({ home = os.homedir() }: { home?: string } = {}): { name: string; key: string }[] {
   const { keys } = readNote(home);
   return cloudKeyNames({ home }).map(({ name }) => ({ name, key: keyObjectKey(keys[name].id) }));
 }
@@ -49,16 +67,21 @@ export function keysCarried({ home = os.homedir() } = {}) {
 // A replaced or removed key is deleted at once: a run that was handed its
 // link a moment before only goes without it. One the cloud would not delete
 // is tried again at the next save or removal.
-async function sweep(note, storage) {
-  const keep = [];
+async function sweep(note: KeyNote, storage: KeyStorage): Promise<void> {
+  const keep: KeyNote['retired'] = [];
   for (const r of note.retired) {
-    try { await storage.del(keyObjectKey(r.id)); } catch { keep.push(r); }
+    // A bucket with no `del` throws here too, and its retired keys wait in the note.
+    try { await storage.del!(keyObjectKey(r.id)); } catch { keep.push(r); }
   }
   note.retired = keep;
 }
 
 /** Keeps `value` in the cloud under `name`, in place of any key of that name. */
-export async function saveCloudKey(name, value, { storage, home = os.homedir(), now = Date.now(), label = null } = {}) {
+export async function saveCloudKey(
+  name: string,
+  value: unknown,
+  { storage, home = os.homedir(), now = Date.now(), label = null }: { storage: KeyStorage; home?: string; now?: number; label?: string | null } = {} as { storage: KeyStorage },
+): Promise<{ name: string; savedAt: number }> {
   const refused = keyNameRefused(name);
   if (refused) throw new Error(refused);
   const v = typeof value === 'string' ? value.trim() : '';
@@ -76,7 +99,10 @@ export async function saveCloudKey(name, value, { storage, home = os.homedir(), 
 }
 
 /** Takes the key out of the cloud and out of every later run. */
-export async function removeCloudKey(name, { storage, home = os.homedir(), now = Date.now() } = {}) {
+export async function removeCloudKey(
+  name: string,
+  { storage, home = os.homedir(), now = Date.now() }: { storage: KeyStorage; home?: string; now?: number } = {} as { storage: KeyStorage },
+): Promise<boolean> {
   const note = readNote(home);
   const was = note.keys[name];
   if (!was) return false;

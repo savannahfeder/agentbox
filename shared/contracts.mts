@@ -176,12 +176,18 @@ export const CHAT_SCOPED_EVENTS = [
 /* ------------------------------ chat + asks ------------------------------ */
 // ChatMessage: { id, role: 'user'|'agent', text, ts, receipts?: string[] }
 
+export interface AskRequest { requestId: string; timeoutMs?: number; [field: string]: unknown }
+export interface AskResponse { requestId: string; cancelled?: boolean; reason?: string; [field: string]: unknown }
+type Resolve = (response: AskResponse) => void;
+type Timer = ReturnType<typeof setTimeout>;
+
 export function makeAskRegistry() {
   // Idempotent ask_user round-trips: one pending request at a time per session,
   // stable requestId, stale/duplicate answers rejected, timeout expires cleanly.
-  const pending = new Map(); // requestId -> { resolve, timer }
+  // A null timer is a request without a timeout; clearTimeout ignores it.
+  const pending = new Map<string, { resolve: Resolve; timer: Timer | null }>();
   return {
-    register(request, resolve, onTimeout) {
+    register(request: AskRequest, resolve: Resolve, onTimeout?: () => void): boolean {
       if (!request?.requestId) throw new Error('ask request needs requestId');
       if (pending.has(request.requestId)) return false; // duplicate register = no-op
       const timer = request.timeoutMs
@@ -190,22 +196,22 @@ export function makeAskRegistry() {
       pending.set(request.requestId, { resolve, timer });
       return true;
     },
-    answer(response) {
+    answer(response: AskResponse): { ok: true } | { ok: false; reason: string } {
       const entry = pending.get(response?.requestId);
       if (!entry) return { ok: false, reason: 'stale-or-unknown' };
-      clearTimeout(entry.timer);
+      clearTimeout(entry.timer as Timer);
       pending.delete(response.requestId);
       entry.resolve(response);
       return { ok: true };
     },
-    cancelAll(reason = 'cancelled') {
+    cancelAll(reason = 'cancelled'): void {
       for (const [id, entry] of pending) {
-        clearTimeout(entry.timer);
+        clearTimeout(entry.timer as Timer);
         entry.resolve({ requestId: id, cancelled: true, reason });
       }
       pending.clear();
     },
-    has(requestId) { return pending.has(requestId); },
+    has(requestId: string): boolean { return pending.has(requestId); },
     get size() { return pending.size; },
   };
 }
@@ -254,13 +260,15 @@ const BLOCK_NODES = new Set([
   'orderedList', 'codeBlock', 'horizontalRule', 'tableRow',
 ]);
 
-function gatherText(node, out) {
+interface DocNode { text?: unknown; content?: unknown; type?: string }
+
+function gatherText(node: DocNode | unknown[] | null | undefined, out: string[]): void {
   if (!node || typeof node !== 'object') return;
-  if (Array.isArray(node)) { for (const n of node) gatherText(n, out); return; }
+  if (Array.isArray(node)) { for (const n of node) gatherText(n as DocNode, out); return; }
   if (typeof node.text === 'string') { out.push(node.text); return; }
   if (Array.isArray(node.content)) {
     for (const n of node.content) gatherText(n, out);
-    if (BLOCK_NODES.has(node.type)) out.push('\n\n');
+    if (BLOCK_NODES.has(node.type as string)) out.push('\n\n');
   }
 }
 
@@ -274,14 +282,14 @@ function gatherText(node, out) {
  * is ugly, and it is the point: a founder can see what is there, copy it, and
  * ask the agent to rewrite it. A blank panel tells them their work is gone.
  */
-export function creationText(content) {
+export function creationText(content: unknown): string {
   if (typeof content === 'string') return content;
   if (content == null) return '';
   if (typeof content !== 'object') return String(content);
   for (const key of ['markdown', 'body', 'text']) {
-    if (typeof content[key] === 'string') return content[key];
+    if (typeof (content as Record<string, unknown>)[key] === 'string') return (content as Record<string, string>)[key];
   }
-  const parts = [];
+  const parts: string[] = [];
   gatherText(content, parts);
   const text = parts.join('').replace(/\n{3,}/g, '\n\n').trim();
   if (text) return text;
@@ -292,10 +300,12 @@ export function creationText(content) {
 //   one of: path (project-relative single file) or dir (project-relative
 //   folder, requires entry: the file to run/open within that folder) }
 // Content lives on disk, not the envelope.
-export function validateCreation(c) {
-  const errors = [];
+export interface CreationShape { id?: string; kind?: string; title?: string; path?: string; dir?: string; entry?: string }
+
+export function validateCreation(c: CreationShape | null | undefined): string[] {
+  const errors: string[] = [];
   if (!c?.id) errors.push('creation.id required');
-  if (!CREATION_KINDS.includes(c?.kind)) errors.push(`creation.kind must be one of ${CREATION_KINDS.join('|')}`);
+  if (!CREATION_KINDS.includes(c?.kind as string)) errors.push(`creation.kind must be one of ${CREATION_KINDS.join('|')}`);
   if (!c?.title) errors.push('creation.title required');
   const hasPath = typeof c?.path === 'string' && c.path.length > 0;
   const hasDir = typeof c?.dir === 'string' && c.dir.length > 0;
@@ -314,12 +324,29 @@ export const SEVERITIES = ['critical', 'major', 'minor', 'note'];
 //
 // The structural honesty rule (Codex round 2): EXECUTED requires evidence that
 // RESOLVES. resolver = { eventSeqs(runId): Set<number>, screenshots(runId): Set<string> }
-export function validateFinding(f, resolver) {
-  const errors = [];
+export type EvidenceRef =
+  | { type: 'event'; runId: string; seq: number; file?: undefined }
+  | { type: 'screenshot'; runId: string; file: string; seq?: undefined };
+export interface Finding {
+  id?: string;
+  title?: string;
+  provenance?: string;
+  severity?: string;
+  evidenceRefs?: readonly EvidenceRef[];
+  repro?: readonly string[];
+  [field: string]: unknown;
+}
+export interface EvidenceResolver {
+  eventSeqs?(runId: string): ReadonlySet<number> | null | undefined;
+  screenshots?(runId: string): ReadonlySet<string> | null | undefined;
+}
+
+export function validateFinding(f: Finding | null | undefined, resolver?: EvidenceResolver | null): string[] {
+  const errors: string[] = [];
   if (!f?.id) errors.push('finding.id required');
   if (!f?.title) errors.push('finding.title required');
-  if (!PROVENANCE.includes(f?.provenance)) errors.push('finding.provenance must be EXECUTED|INFERRED');
-  if (!SEVERITIES.includes(f?.severity)) errors.push('finding.severity invalid');
+  if (!PROVENANCE.includes(f?.provenance as string)) errors.push('finding.provenance must be EXECUTED|INFERRED');
+  if (!SEVERITIES.includes(f?.severity as string)) errors.push('finding.severity invalid');
   if (f?.provenance === 'EXECUTED') {
     if (!Array.isArray(f.evidenceRefs) || f.evidenceRefs.length === 0) {
       errors.push(`finding ${f.id}: EXECUTED requires non-empty evidenceRefs`);
@@ -348,8 +375,10 @@ export function validateFinding(f, resolver) {
 // Report: { schemaVersion, title, kicker, receipts: { sessions, minutes, findings },
 //   intro, findings: Finding[], coverage?, wtp? (QUARANTINED, never a headline),
 //   dissent?, theDo: { title, body } }  Reports END in a DO.
-export function validateReport(r, resolver) {
-  const errors = [];
+export interface Report { title?: string; theDo?: { title?: string; body?: string }; findings?: readonly Finding[]; [field: string]: unknown }
+
+export function validateReport(r: Report | null | undefined, resolver?: EvidenceResolver | null): string[] {
+  const errors: string[] = [];
   if (!r?.title) errors.push('report.title required');
   if (!r?.theDo?.title) errors.push('report must end in a DO (theDo.title required)');
   if (!Array.isArray(r?.findings) || r.findings.length === 0) errors.push('report.findings required');
@@ -362,11 +391,13 @@ export const BROWSER_MODES = ['playwright', 'patchright'];
 
 // RunConfig: { runId, productDir, entryUrl, personaIds: string[],
 //   skillVersions: {}, browserMode, model, startedAt, schemaVersion }
-export function validateRunConfig(c) {
-  const errors = [];
+export interface RunConfig { runId?: string; entryUrl?: string; browserMode?: string; personaIds?: readonly string[]; [field: string]: unknown }
+
+export function validateRunConfig(c: RunConfig | null | undefined): string[] {
+  const errors: string[] = [];
   if (!c?.runId) errors.push('runConfig.runId required');
   if (!c?.entryUrl) errors.push('runConfig.entryUrl required');
-  if (!BROWSER_MODES.includes(c?.browserMode)) errors.push('runConfig.browserMode invalid');
+  if (!BROWSER_MODES.includes(c?.browserMode as string)) errors.push('runConfig.browserMode invalid');
   if (!Array.isArray(c?.personaIds) || c.personaIds.length === 0) errors.push('runConfig.personaIds required');
   return errors;
 }
@@ -388,7 +419,7 @@ export const RUN_EVENT_TYPES = [
 //   reason? }  A run with any status:'pending' entry is 'needs-cleanup', which is
 // a COMPLETION GATE: the UI keeps the run open until each entry is cleaned or
 // dismissed with a persisted reason.
-export function runNeedsCleanup(hygieneEntries) {
+export function runNeedsCleanup(hygieneEntries: readonly { status?: string }[] | null | undefined): boolean {
   return (hygieneEntries ?? []).some((h) => h.status === 'pending');
 }
 
@@ -402,7 +433,7 @@ export const PAYMENT_RULE =
 /* ------------------------- diff-rerun noise honesty ------------------------ */
 // v1 makes NO numeric delta claims by default. Count-level comparisons are
 // UNCALIBRATED unless >= 2 prior same-config baseline runs exist.
-export function noiseBand(baselineFindingCounts) {
+export function noiseBand(baselineFindingCounts: readonly number[] | null | undefined): { calibrated: boolean; label: string; min?: number; max?: number } {
   if (!Array.isArray(baselineFindingCounts) || baselineFindingCounts.length < 2) {
     return { calibrated: false, label: 'UNCALIBRATED' };
   }

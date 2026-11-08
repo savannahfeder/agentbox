@@ -2,19 +2,24 @@
 // page to come back to, PKCE, and a client registered for that page.
 import http from 'node:http';
 import crypto from 'node:crypto';
+import type { AddressInfo } from 'node:net';
 import {
   discoverAuthorizationServerMetadata, discoverOAuthProtectedResourceMetadata,
   exchangeAuthorization, refreshAuthorization, registerClient, startAuthorization,
 } from '@modelcontextprotocol/sdk/client/auth.js';
+import type { OAuthClientInformationMixed, OAuthTokens } from '@modelcontextprotocol/sdk/shared/auth.js';
+import type { FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js';
+import type { CatalogTool } from '../../shared/connections-catalog.mts';
 import { Name } from '../../shared/product-name.mjs';
+import type { SignedIn, SignInGot } from './vault.mts';
 
 export const SIGN_IN_MS = 5 * 60_000;
 export const STEP_MS = 15_000;
 
-export const deadlineFetch = (ms) => (url, init = {}) =>
+export const deadlineFetch = (ms: number): FetchLike => (url, init = {}) =>
   fetch(url, { ...init, signal: init.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(ms)]) : AbortSignal.timeout(ms) });
 
-async function discover(entry, fetchFn) {
+async function discover(entry: CatalogTool, fetchFn: FetchLike) {
   const fallback = new URL('/', entry.address).toString();
   let authServer = fallback;
   try {
@@ -26,14 +31,14 @@ async function discover(entry, fetchFn) {
   return { authServer, metadata };
 }
 
-function loopbackPage({ state, ms, port = 0, name }) {
-  let settle;
-  const code = new Promise((resolve, reject) => { settle = { resolve, reject }; });
+function loopbackPage({ state, ms, port = 0, name }: { state: string; ms: number; port?: number; name: string }) {
+  let settle!: { resolve: (code: string | null) => void; reject: (err: Error) => void };
+  const code = new Promise<string | null>((resolve, reject) => { settle = { resolve, reject }; });
   // Nobody is awaiting this yet while the client registers.
   code.catch(() => {});
   const server = http.createServer((req, res) => {
-    const u = new URL(req.url, 'http://127.0.0.1');
-    const say = (status, words) => {
+    const u = new URL(req.url!, 'http://127.0.0.1');
+    const say = (status: number, words: string) => {
       res.writeHead(status, { 'content-type': 'text/html; charset=utf-8' });
       res.end(`<!doctype html><meta charset="utf-8"><title>${Name}</title><body style="font:15px -apple-system,system-ui,sans-serif;margin:64px;color:#222">${words}</body>`);
     };
@@ -46,10 +51,10 @@ function loopbackPage({ state, ms, port = 0, name }) {
   const timer = setTimeout(() => settle.reject(new Error('The sign-in did not finish in time, so nothing was connected. Press Connect to try again.')), ms);
   return {
     code,
-    listen: () => new Promise((resolve, reject) => {
-      server.once('error', (err) => reject(err?.code === 'EADDRINUSE' ? new Error(`Another sign-in is using the address ${name} comes back to. Finish that one, then try again.`) : err));
+    listen: () => new Promise<string>((resolve, reject) => {
+      server.once('error', (err: NodeJS.ErrnoException) => reject(err?.code === 'EADDRINUSE' ? new Error(`Another sign-in is using the address ${name} comes back to. Finish that one, then try again.`) : err));
       // A client made in a vendor's console is told one exact address, so that one has a fixed port.
-      server.listen(port, '127.0.0.1', () => resolve(port ? `http://localhost:${port}/callback` : `http://127.0.0.1:${server.address().port}/callback`));
+      server.listen(port, '127.0.0.1', () => resolve(port ? `http://localhost:${port}/callback` : `http://127.0.0.1:${(server.address() as AddressInfo).port}/callback`));
     }),
     close: () => { clearTimeout(timer); server.closeAllConnections?.(); server.close(); },
     cancel: () => settle.reject(new Error('The sign-in was cancelled.')),
@@ -57,11 +62,18 @@ function loopbackPage({ state, ms, port = 0, name }) {
 }
 
 /** The whole dance. Returns what the vault keeps; never a partial sign-in. */
-export async function signIn({ entry, openExternal, client: ownClient = null, ownPort = 0, ms = SIGN_IN_MS, onCancelable = () => {} }) {
+export async function signIn({ entry, openExternal, client: ownClient = null, ownPort = 0, ms = SIGN_IN_MS, onCancelable = () => {} }: {
+  entry: CatalogTool;
+  openExternal: (url: string) => unknown;
+  client?: OAuthClientInformationMixed | null;
+  ownPort?: number;
+  ms?: number;
+  onCancelable?: (cancel: () => void) => void;
+}): Promise<SignInGot> {
   const fetchFn = deadlineFetch(STEP_MS);
   let found;
   try { found = await discover(entry, fetchFn); } catch (err) {
-    throw entry.custom ? Object.assign(err, { noRegistration: true }) : err;
+    throw entry.custom ? Object.assign(err as Error, { noRegistration: true }) : err;
   }
   const { authServer, metadata } = found;
   if (!ownClient && !metadata.registration_endpoint) {
@@ -86,7 +98,7 @@ export async function signIn({ entry, openExternal, client: ownClient = null, ow
     let tokens;
     try {
       tokens = await exchangeAuthorization(authServer, {
-        metadata, clientInformation: client, authorizationCode: code, codeVerifier, redirectUri: redirectUrl, resource, fetchFn,
+        metadata, clientInformation: client, authorizationCode: code!, codeVerifier, redirectUri: redirectUrl, resource, fetchFn,
       });
     } catch (err) {
       if (ownClient) throw new Error(`${entry.name} did not accept that client ID and secret, so nothing was connected.`);
@@ -97,9 +109,10 @@ export async function signIn({ entry, openExternal, client: ownClient = null, ow
 }
 
 /** One refresh. A server that rotates gets its new token kept; one that does not keeps the old. */
-export async function refreshTokens({ entry, signedIn }) {
-  const tokens = await refreshAuthorization(signedIn.authServer, {
-    metadata: signedIn.metadata, clientInformation: signedIn.client, refreshToken: signedIn.tokens.refresh_token,
+export async function refreshTokens({ entry, signedIn }: { entry: CatalogTool; signedIn: SignedIn }): Promise<OAuthTokens> {
+  // Only a sign-in holding a refresh token is refreshed, and only the OAuth dance leaves one, with its server and client.
+  const tokens = await refreshAuthorization(signedIn.authServer!, {
+    metadata: signedIn.metadata, clientInformation: signedIn.client!, refreshToken: signedIn.tokens.refresh_token!,
     resource: new URL(entry.address), fetchFn: deadlineFetch(STEP_MS),
   });
   return { ...tokens, refresh_token: tokens.refresh_token ?? signedIn.tokens.refresh_token };

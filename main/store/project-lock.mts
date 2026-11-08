@@ -44,24 +44,28 @@ const ACQUIRE_TIMEOUT_MS = 15_000;
 // contention), then easing off so a genuinely stuck lock is not spun on.
 const BACKOFF_MS = [1, 2, 5, 10, 20, 50, 100, 200];
 
-const lockPath = (projectDir) => path.join(projectDir, '.lock');
+// All optional: whoever wrote the file may have died mid-write.
+interface LockHolder { token?: string; pid?: number; at?: number; label?: string }
+export interface LockOptions { label?: string; timeoutMs?: number }
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const lockPath = (projectDir: string) => path.join(projectDir, '.lock');
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // Is this pid gone? Signal 0 checks existence without delivering anything.
 // Only the FALSE answer here is trustworthy (see the header): a live pid may be
 // a recycled number, but a missing one is definitely not our holder.
-function pidGone(pid) {
-  if (!Number.isInteger(pid) || pid <= 0) return true;
-  try { process.kill(pid, 0); return false; } catch (err) { return err.code === 'ESRCH'; }
+function pidGone(pid: unknown): boolean {
+  if (!Number.isInteger(pid) || (pid as number) <= 0) return true;
+  try { process.kill(pid as number, 0); return false; } catch (err) { return (err as NodeJS.ErrnoException).code === 'ESRCH'; }
 }
 
-function readHolder(file) {
+function readHolder(file: string): LockHolder | null {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
 }
 
 // Try once. Returns the token on success, null if someone else holds it.
-function tryAcquire(file, label) {
+function tryAcquire(file: string, label: string): string | null {
   const token = crypto.randomBytes(12).toString('hex');
   try {
     fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -73,7 +77,7 @@ function tryAcquire(file, label) {
     }
     return token;
   } catch (err) {
-    if (err.code !== 'EEXIST') throw err;
+    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
     return null;
   }
 }
@@ -82,7 +86,7 @@ function tryAcquire(file, label) {
 // what makes this safe against the race with a legitimate holder releasing at
 // the same moment: we only unlink the exact holder we decided was stale, so a
 // fresh lock taken in between survives.
-function breakIfStale(file, now = Date.now()) {
+function breakIfStale(file: string, now = Date.now()): void {
   const held = readHolder(file);
   if (!held) {
     // Unreadable or truncated: a torn write from a holder that died mid-create.
@@ -93,7 +97,7 @@ function breakIfStale(file, now = Date.now()) {
     } catch { /* already gone; someone else won the break */ }
     return;
   }
-  const expired = !Number.isFinite(held.at) || (now - held.at) > STALE_MS;
+  const expired = !Number.isFinite(held.at) || (now - held.at!) > STALE_MS;
   const dead = pidGone(held.pid);
   if (!expired && !dead) return;
 
@@ -105,7 +109,7 @@ function breakIfStale(file, now = Date.now()) {
   try { fs.unlinkSync(file); } catch { /* someone else broke it first */ }
 }
 
-function release(file, token) {
+function release(file: string, token: string): boolean {
   const held = readHolder(file);
   // Only ever release OUR lock. If the token differs, ours was already broken
   // as stale and someone else legitimately holds it now; unlinking would evict
@@ -121,7 +125,7 @@ function release(file, token) {
  * spawn, never call another locked helper (the lock is not reentrant, and a
  * nested acquire would deadlock against itself until the stale timeout).
  */
-export async function withProjectLock(projectDir, fn, { label = '', timeoutMs = ACQUIRE_TIMEOUT_MS } = {}) {
+export async function withProjectLock<T>(projectDir: string, fn: () => T | Promise<T>, { label = '', timeoutMs = ACQUIRE_TIMEOUT_MS }: LockOptions = {}): Promise<T> {
   const file = lockPath(projectDir);
   const deadline = Date.now() + timeoutMs;
   let attempt = 0;
@@ -141,7 +145,7 @@ export async function withProjectLock(projectDir, fn, { label = '', timeoutMs = 
       const held = readHolder(file);
       throw new Error(
         `could not lock ${projectDir} within ${timeoutMs}ms` +
-        (held ? ` (held by pid ${held.pid}${held.label ? ` for ${held.label}` : ''} since ${new Date(held.at).toISOString()})` : ''),
+        (held ? ` (held by pid ${held.pid}${held.label ? ` for ${held.label}` : ''} since ${new Date(held.at!).toISOString()})` : ''),
       );
     }
     await sleep(BACKOFF_MS[Math.min(attempt++, BACKOFF_MS.length - 1)]);
@@ -152,7 +156,7 @@ export async function withProjectLock(projectDir, fn, { label = '', timeoutMs = 
 // buffer nobody will ever notify parks the thread for the duration instead of
 // spinning the CPU, which a busy loop would do.
 const PARK = new Int32Array(new SharedArrayBuffer(4));
-function sleepSync(ms) {
+function sleepSync(ms: number): void {
   Atomics.wait(PARK, 0, 0, ms);
 }
 
@@ -169,7 +173,7 @@ function sleepSync(ms) {
  * applies with more force: KEEP THE BODY SHORT. Read, mutate, rename. Never do
  * IO that can hang here.
  */
-export function withProjectLockSync(projectDir, fn, { label = '', timeoutMs = ACQUIRE_TIMEOUT_MS } = {}) {
+export function withProjectLockSync<T>(projectDir: string, fn: () => T, { label = '', timeoutMs = ACQUIRE_TIMEOUT_MS }: LockOptions = {}): T {
   const file = lockPath(projectDir);
   const deadline = Date.now() + timeoutMs;
   let attempt = 0;
@@ -189,7 +193,7 @@ export function withProjectLockSync(projectDir, fn, { label = '', timeoutMs = AC
       const held = readHolder(file);
       throw new Error(
         `could not lock ${projectDir} within ${timeoutMs}ms` +
-        (held ? ` (held by pid ${held.pid}${held.label ? ` for ${held.label}` : ''} since ${new Date(held.at).toISOString()})` : ''),
+        (held ? ` (held by pid ${held.pid}${held.label ? ` for ${held.label}` : ''} since ${new Date(held.at!).toISOString()})` : ''),
       );
     }
     sleepSync(BACKOFF_MS[Math.min(attempt++, BACKOFF_MS.length - 1)]);

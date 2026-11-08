@@ -36,6 +36,7 @@ import os from 'node:os';
 import {
   ENGINES, findEngine, resolveEngine, forgetEngine, installEvidence as evidenceFor,
   versionedBinPaths,
+  type EngineSearch, type EvidenceOptions, type FindEngineOptions, type Readdir, type ResolveEngineOptions,
 } from './engine-bin.mts';
 
 const CODEX = ENGINES.codex;
@@ -43,39 +44,39 @@ const CODEX = ENGINES.codex;
 export const INSTALL_URL = CODEX.installUrl;
 
 /** Every normal home for this binary, in order; the first that exists wins. */
-export function candidatePaths(home = os.homedir()) {
+export function candidatePaths(home: string = os.homedir()): string[] {
   return CODEX.candidates(home, () => []);
 }
 
 /** One bin directory per installed Node, read rather than guessed. */
-export function versionedPaths(home = os.homedir(), readdir = undefined) {
+export function versionedPaths(home: string = os.homedir(), readdir: Readdir | undefined = undefined): string[] {
   return versionedBinPaths('codex', home, readdir);
 }
 
 /** The copies the ChatGPT and Codex desktop apps carry inside themselves. */
-export function appCopyPaths(home = os.homedir()) {
+export function appCopyPaths(home: string = os.homedir()): string[] {
   return CODEX.appCopies(home);
 }
 
 /** What Codex leaves behind. None of it is ever spawned. */
-export function evidencePaths(home = os.homedir(), env = process.env) {
+export function evidencePaths(home: string = os.homedir(), env: NodeJS.ProcessEnv = process.env): string[] {
   return CODEX.evidence(home, env);
 }
 
-export function installEvidence({ home = os.homedir(), env = process.env, exists, dangles } = {}) {
+export function installEvidence({ home = os.homedir(), env = process.env, exists, dangles }: Pick<EvidenceOptions, 'home' | 'env' | 'exists' | 'dangles'> = {}): string | null {
   return evidenceFor('codex', { home, env, exists, dangles });
 }
 
 /** The whole search. See main/engine-bin.mts for what each answer means. */
-export function findCodexBin(where = {}) {
+export function findCodexBin(where: FindEngineOptions = {}): EngineSearch {
   return findEngine('codex', where);
 }
 
 /** The same search with the shell step held for thirty seconds. */
-export function resolveCodexBin(configured = null, where = {}) {
+export function resolveCodexBin(configured: string | null = null, where: ResolveEngineOptions = {}): EngineSearch {
   return resolveEngine('codex', configured, where);
 }
 
-export function forgetCodexBin() {
+export function forgetCodexBin(): void {
   forgetEngine('codex');
 }

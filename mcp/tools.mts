@@ -14,10 +14,10 @@
 import path from 'node:path';
 import { z } from 'zod';
 import { resolveAccount } from './core/account.mts';
-import { listProducts, getProduct, createProduct, updateProduct } from './core/products.mts';
+import { listProducts, getProduct, createProduct, updateProduct, type ProductPatch } from './core/products.mts';
 import { listDocuments, nameOnThread, noteWrittenForRun, readDocument, writeDocument } from './core/documents.mts';
 import { listSkills, fetchSkill, fetchReference } from './core/skills.mts';
-import { listWorkItems, updateItem, createClaimRegistry } from './core/work.mts';
+import { listWorkItems, updateItem, createClaimRegistry, type AgentPatch, type ClaimAsk, type ItemFields, type WorkListFilter } from './core/work.mts';
 import { readStandingInstruction, setStandingInstruction } from './core/repeats.mts';
 import { teamPost, teamPass, teamRemember, teamSetup, teamRoster, teamPlaybook, teamMethod, teamHire, noteToAnotherThread } from './core/teammates.mts';
 import { documentVersion, documentsWithFolders, fileWrittenDocument, teamFile, teamTell, teamTask, teamThreads, teamRead, waitsNamed } from './core/reach.mts';
@@ -36,12 +36,12 @@ import { Name, possessive } from '../shared/product-name.mjs';
 import { EFFORT_WORDS, MODEL_WORDS, effortWord, modelWord } from '../shared/model-words.mts';
 
 // The model and effort an agent wrote, in the words a run starts with.
-function runWords(fields) {
-  for (const [field, read] of [['model', modelWord], ['effort', effortWord]]) {
+function runWords(fields: { model?: string; effort?: string }) {
+  for (const [field, read] of [['model', modelWord], ['effort', effortWord]] as const) {
     if (fields[field] === undefined) continue;
     const out = read(fields[field]);
     if (out.error) throw new Error(out.error);
-    fields[field] = out[field];
+    fields[field] = (out as Record<string, string | undefined>)[field];
   }
   return fields;
 }
@@ -61,19 +61,73 @@ const MISSING = [
   'run_creation', 'browsing the web or anything they are signed into', 'ask_user',
 ];
 
-const json = (value) => ({ content: [{ type: 'text', text: JSON.stringify(value, null, 2) }] });
-const text = (s) => ({ content: [{ type: 'text', text: s }] });
+export type ToolText = { content: { type: 'text'; text: string }[]; isError?: boolean };
+// `run` is a method so each tool can name its own arguments: the SDK checks
+// them against `schema` before the call, which the types cannot follow.
+export interface StoreTool {
+  name: string;
+  description: string;
+  schema: z.ZodRawShape;
+  run(args: object): ToolText | Promise<ToolText>;
+}
+
+export interface CloudResourceAsk { kind: 'file' | 'skill'; path: string; scope?: 'task' | 'documents' | 'account' }
+
+type DocumentStatus = 'current' | 'history' | 'exploration';
+interface DocumentFilter { kind?: string; status?: DocumentStatus; pathPrefix?: string; query?: string; catalogedOnly?: boolean }
+interface WriteDocumentArgs {
+  product: string;
+  id?: string;
+  path?: string;
+  title?: string;
+  kind?: string;
+  content?: string;
+  status?: DocumentStatus;
+  folder?: string;
+  versionOf?: string;
+  replacesEdits?: boolean;
+}
+interface TeamDuty { what: string; every?: 'day' | 'weekday' | 'week'; at?: string | string[]; on?: number; after?: 'ship'; most?: number; tell?: string }
+interface TeamSetupArgs {
+  name?: string;
+  role?: string;
+  job?: string;
+  goal?: string;
+  counted?: string;
+  asksFirst?: string;
+  duties?: TeamDuty[];
+  runsOn?: 'claude' | 'codex';
+  handoffsNeedYes?: boolean;
+  pausedUntil?: string | null;
+  readsMessages?: boolean;
+  voice?: string;
+  voiceWords?: string;
+  ready?: boolean;
+}
+interface SentFiles { files?: string[]; versionOf?: string; folder?: string }
+interface TeamTellArgs extends SentFiles { text?: string; to?: string[]; group?: string; thread?: boolean; outside?: boolean }
+interface TeamTaskArgs extends SentFiles { to: string; title: string; details?: string; due?: string; blockedBy?: string[] }
+
+export interface BuildToolsOptions {
+  holder?: string;
+  ownItem?: string | null;
+  ownProduct?: string | null;
+  requestCloudResource?: ((ask: CloudResourceAsk) => unknown) | null;
+}
+
+const json = (value: unknown): ToolText => ({ content: [{ type: 'text', text: JSON.stringify(value, null, 2) }] });
+const text = (s: string): ToolText => ({ content: [{ type: 'text', text: s }] });
 
 // Any thrown error becomes a readable tool result rather than a protocol fault:
 // a model that gets a sentence back can correct itself, where a transport error
 // just ends the turn.
-const guard = (fn) => async (args) => {
-  try { return await fn(args ?? {}); } catch (err) { return { ...text(`error: ${err?.message ?? err}`), isError: true }; }
+const guard = (fn: StoreTool['run']) => async (args: object | undefined): Promise<ToolText> => {
+  try { return await fn(args ?? {}); } catch (err) { return { ...text(`error: ${(err as Error)?.message ?? err}`), isError: true }; }
 };
 
 // `ownItem` is the row this server's session was started for, if any, and
 // `ownProduct` its project.
-export function buildTools({ holder, ownItem: givenItem, ownProduct = process.env.ZERO_PRODUCT || null, requestCloudResource = null } = {}) {
+export function buildTools({ holder, ownItem: givenItem, ownProduct = process.env.ZERO_PRODUCT || null, requestCloudResource = null }: BuildToolsOptions = {}) {
   const ownItem = givenItem === undefined ? process.env.ZERO_ITEM || null : givenItem;
   const account = resolveAccount();
   // Cloud runs share one process, whose own ZERO_ITEM belongs to no run or to
@@ -86,19 +140,19 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
   const hasPeople = onATeam(accountId);
   const capabilities = CAPABILITIES.filter((c) => (c.includes('teammate') ? hasTeam : c.includes('on a team') ? hasPeople : true));
 
-  const tools = [
+  const tools: StoreTool[] = [
     /* ------------------------------- products ------------------------------ */
     {
       name: 'list_products',
       description: 'Every product this founder is building, with its one-line description, the path to its code repository, how many documents it has, and how much work is open, claimed, or blocked. Start here: it is the only call that shows the whole portfolio at once, and product names from it are what every other tool accepts.',
       schema: { includeArchived: z.boolean().optional() },
-      run: ({ includeArchived }) => json(listProducts({ includeArchived })),
+      run: ({ includeArchived }: { includeArchived?: boolean }) => json(listProducts({ includeArchived })),
     },
     {
       name: 'get_product',
       description: 'One product in detail. Accepts its name, slug, or id.',
       schema: { product: z.string() },
-      run: ({ product }) => json(getProduct(product)),
+      run: ({ product }: { product: string }) => json(getProduct(product)),
     },
     {
       name: 'create_product',
@@ -108,7 +162,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         oneLiner: z.string().optional(),
         repoPath: z.string().optional().describe('absolute path to the git checkout; must already exist'),
       },
-      run: ({ name, oneLiner, repoPath }) => json(createProduct(name, { oneLiner, repoPath })),
+      run: ({ name, oneLiner, repoPath }: { name: string; oneLiner?: string; repoPath?: string }) => json(createProduct(name, { oneLiner, repoPath })),
     },
     {
       name: 'update_product',
@@ -120,7 +174,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         repoPath: z.string().optional(),
         archived: z.boolean().optional(),
       },
-      run: ({ product, ...patch }) => json(updateProduct(product, patch)),
+      run: ({ product, ...patch }: { product: string } & ProductPatch) => json(updateProduct(product, patch)),
     },
 
     /* ------------------------------ documents ------------------------------ */
@@ -137,7 +191,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         catalogedOnly: z.boolean().optional().describe('only what the library index lists; omit to see everything'),
       },
       // The folder filter goes after the list: a folder in Files holds more than a directory of its name.
-      run: ({ product, folder, ...filter }) => {
+      run: ({ product, folder, ...filter }: { product: string; folder?: string } & DocumentFilter) => {
         const all = documentsWithFolders(listDocuments(product, filter), { folder });
         return json(all.filter((d) => !folder || d.folder === folder || d.filesFolder));
       },
@@ -146,7 +200,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
       name: 'read_document',
       description: 'Read one document\'s full content, by id or by path.',
       schema: { product: z.string(), id: z.string().optional(), path: z.string().optional() },
-      run: ({ product, id, path }) => json(readDocument(product, { id, path })),
+      run: ({ product, id, path }: { product: string; id?: string; path?: string }) => json(readDocument(product, { id, path })),
     },
     {
       name: 'write_document',
@@ -163,7 +217,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         versionOf: z.string().optional().describe('the name of a file someone already has, on this thread or in Files, that this content revises. It is saved as that file\'s next version (-v2, -v3) in this thread\'s folder and opens as the same file, with its comments; no path is needed and nobody has to be sent it. A copy of such a file written under its own name elsewhere is saved this way too. The newest version is nobody\'s to overwrite: if somebody edited the file since the copy you wrote from, your changes are merged into theirs, and when the same lines changed both ways nothing is saved and the answer names the version to read'),
         replacesEdits: z.boolean().optional().describe('with versionOf: you mean to undo what someone typed in an earlier version, because they asked. Without it, an edit your version leaves out is merged back in'),
       },
-      run: async ({ product, folder, versionOf, replacesEdits, ...doc }) => {
+      run: async ({ product, folder, versionOf, replacesEdits, ...doc }: WriteDocumentArgs) => {
         const version = doc.content == null ? null : documentVersion({ product, versionOf, path: doc.path ?? null, content: replacesEdits ? null : doc.content, ownItem, env: env() });
         const into = version ? version.product : product;
         // A merge keeps what somebody else saved while this run was writing, so
@@ -171,8 +225,8 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         const written = await writeDocument(into, version ? { ...doc, id: undefined, path: version.path, title: doc.title ?? version.title, ...(version.content != null ? { content: version.content } : {}) } : doc);
         if (doc.content == null) return json(written);
         noteWrittenForRun(into, written.path, thisRun());
-        const named = await nameOnThread(written, { ownItem, env: env(), update: (id, patch) => claims.update(id, patch), note: version?.note });
-        if (replacesEdits && version && named.onThread) await claims.update(ownItem, { artifact: { do: 'reconcile', file: path.basename(written.path), replace: true } });
+        const named = await nameOnThread(written, { ownItem, env: env(), update: (id: string, patch: AgentPatch) => claims.update(id, patch), note: version?.note });
+        if (replacesEdits && version && named.onThread) await claims.update(ownItem!, { artifact: { do: 'reconcile', file: path.basename(written.path!), replace: true } });
         return json({ ...written, ...named, ...(version ? { versionOf: version.of } : {}), ...(version?.merged ? { merged: version.merged, note: version.note } : {}), ...fileWrittenDocument({ path: written.path, folder }) });
       },
     },
@@ -188,13 +242,13 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
       name: 'fetch_skill',
       description: 'One skill in full, with a short header explaining which of its tools exist here and which are your own job. These were written for the agent inside the app, so the method applies exactly and some tool names do not.',
       schema: { name: z.string() },
-      run: ({ name }) => json(fetchSkill(name, { capabilities, missing: MISSING })),
+      run: ({ name }: { name: string }) => json(fetchSkill(name, { capabilities, missing: MISSING })),
     },
     {
       name: 'fetch_reference',
       description: 'A reference file that belongs to a skill, listed in that skill\'s references field. Larger than a skill and fetched separately for that reason.',
       schema: { path: z.string().describe('e.g. "design/references/craft.md"') },
-      run: ({ path }) => text(fetchReference(path)),
+      run: ({ path }: { path: string }) => text(fetchReference(path)),
     },
 
     /* ------------------------------ work items ----------------------------- */
@@ -208,7 +262,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         labels: z.array(z.string()).optional(),
         includeDone: z.boolean().optional(),
       },
-      run: (args) => json(listWorkItems(args)),
+      run: (args: WorkListFilter) => json(listWorkItems(args)),
     },
     {
       name: 'create_work_item',
@@ -225,7 +279,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         model: z.string().max(80).optional().describe(MODEL_WORDS),
         effort: z.string().optional().describe(EFFORT_WORDS),
       },
-      run: ({ product, ...fields }) => {
+      run: ({ product, ...fields }: { product: string } & ItemFields & { model?: string; effort?: string }) => {
         runWords(fields);
         return json(claims.file(product, fields));
       },
@@ -243,7 +297,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         }).optional(),
       },
       // A bare call from a session started for a row means that row, not the oldest open one anywhere.
-      run: async ({ product, id, filter }) => {
+      run: async ({ product, id, filter }: ClaimAsk) => {
         if (!id && !filter && ownItem) return json(await claims.claim({ id: ownItem }));
         return json(await claims.claim({ product, id, filter: filter ?? (id ? null : {}) }));
       },
@@ -269,7 +323,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         model: z.string().max(80).optional().describe(MODEL_WORDS),
         effort: z.string().optional().describe(EFFORT_WORDS),
       },
-      run: async ({ id, ...patch }) => {
+      run: async ({ id, ...patch }: { id: string } & AgentPatch & { model?: string; effort?: string; blockedBy?: string[] }) => {
         runWords(patch);
         if (patch.blockedBy) patch.blockedBy = waitsNamed(patch.blockedBy);
         return json(noteToAnotherThread(id, patch, { ownItem }) ?? await claims.update(id, patch));
@@ -279,7 +333,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
       name: 'release_work_item',
       description: 'Hand an item back unfinished so another session can take it. Worth doing when you find it is not what you thought, or belongs to work you are not equipped for; otherwise it stays held until this session ends.',
       schema: { id: z.string() },
-      run: ({ id }) => json(claims.release(id)),
+      run: ({ id }: { id: string }) => json(claims.release(id)),
     },
 
     /* --------------------------- repeating tasks --------------------------- */
@@ -298,7 +352,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
       schema: {
         instruction: z.string().describe('the whole standing instruction, as the person would have typed it'),
       },
-      run: ({ instruction }) => json(setStandingInstruction({ instruction }, thisRun())),
+      run: ({ instruction }: { instruction: string }) => json(setStandingInstruction({ instruction }, thisRun())),
     },
 
     /* ------------------------------- teammates ------------------------------ */
@@ -313,7 +367,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         options: z.array(z.string()).optional().describe('short answers the person can tap, when asking them a question'),
         document: z.string().optional().describe('a document you wrote in this project, by its path, for anything long. It shows as a card to open beside your one sentence'),
       },
-      run: ({ text: words, to, options, document }) => json(teamPost({ text: words, to, options, document }, thisRun())),
+      run: ({ text: words, to, options, document }: { text: string; to?: string[]; options?: string[]; document?: string }) => json(teamPost({ text: words, to, options, document }, thisRun())),
     },
     {
       name: 'team_pass',
@@ -324,13 +378,13 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         details: z.string().describe('everything they need to do it'),
         project: z.string().optional().describe('the project the work is in, when it is not the teammate\'s own (from another thread it defaults to that thread\'s)'),
       },
-      run: ({ to, title, details, project }) => json(teamPass({ to, title, details, project }, thisRun())),
+      run: ({ to, title, details, project }: { to: string; title: string; details: string; project?: string }) => json(teamPass({ to, title, details, project }, thisRun())),
     },
     {
       name: 'team_remember',
       description: 'Keep a standing preference the person stated ("from now on", "always", "never", "I prefer") in a few words, in their terms. The person sees it in the team chat and can undo it. If you have a method file, put it there too: your method is what every later run reads.',
       schema: { text: z.string().describe('the preference, in a few words') },
-      run: ({ text: words }) => json(teamRemember({ text: words }, thisRun())),
+      run: ({ text: words }: { text: string }) => json(teamRemember({ text: words }, thisRun())),
     },
     {
       name: 'team_playbook',
@@ -339,7 +393,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         playbook: z.string().describe('its title, like "How you write posts"'),
         lesson: z.string().optional().describe('the lesson, one sentence in their terms'),
       },
-      run: ({ playbook, lesson }) => json(teamPlaybook({ playbook, lesson }, thisRun())),
+      run: ({ playbook, lesson }: { playbook: string; lesson?: string }) => json(teamPlaybook({ playbook, lesson }, thisRun())),
     },
     {
       name: 'team_hire',
@@ -348,7 +402,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         name: z.string().describe('a name that says its role, like Support lead'),
         job: z.string().describe('its job in plain words'),
       },
-      run: ({ name, job }) => json(teamHire({ name, job }, thisRun())),
+      run: ({ name, job }: { name: string; job: string }) => json(teamHire({ name, job }, thisRun())),
     },
     {
       name: 'team_method',
@@ -358,7 +412,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         old: z.string().optional().describe('one passage of it, exactly as it reads now'),
         new: z.string().optional().describe('what replaces that passage'),
       },
-      run: (args) => json(teamMethod(args, thisRun())),
+      run: (args: { text?: string; old?: string; new?: string }) => json(teamMethod(args, thisRun())),
     },
     {
       name: 'team_setup',
@@ -387,7 +441,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         voiceWords: z.string().optional().describe('how you write, in one sentence of your own, instead of voice'),
         ready: z.boolean().optional(),
       },
-      run: (args) => json(teamSetup(args, thisRun())),
+      run: (args: TeamSetupArgs) => json(teamSetup(args, thisRun())),
     },
     {
       name: 'team_roster',
@@ -412,7 +466,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         versionOf: z.string().optional().describe('the name of a file already on this thread or conversation that the one file in files replaces. It is sent under that name with the next -v2, -v3, so it opens as the next version of the same file, with its comments. Without it a file is a separate file'),
         folder: z.string().optional().describe('a folder of this thread\'s project to file these in, by name, such as Launch. It is made if there is none'),
       },
-      run: (args) => json(teamTell(args, thisRun())),
+      run: (args: TeamTellArgs) => json(teamTell(args, thisRun())),
     },
     {
       name: 'team_file',
@@ -421,7 +475,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         files: z.array(z.string()).describe('the files, by path in this thread\'s folder, its project or the project\'s code'),
         folder: z.string().describe('the folder\'s name, such as Launch, or with its project, such as Company > Launch'),
       },
-      run: (args) => json(teamFile(args, thisRun())),
+      run: (args: { files: string[]; folder: string }) => json(teamFile(args, thisRun())),
     },
     {
       name: 'team_task',
@@ -436,7 +490,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         folder: z.string().optional().describe('a folder of this thread\'s project to file these in, by name, such as Launch. It is made if there is none'),
         blockedBy: z.array(z.string()).optional().describe('what it waits on: a person\'s name, or a thread id from team_threads (a task is a thread there). Their row says Blocked on, and it clears by itself when that thread is finished or that person writes to them'),
       },
-      run: (args) => json(teamTask(args, thisRun())),
+      run: (args: TeamTaskArgs) => json(teamTask(args, thisRun())),
     },
     {
       name: 'team_threads',
@@ -452,7 +506,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         thread: z.string().optional().describe('the thread id'),
         folder: z.string().optional().describe('a folder\'s name: what is in it, with each file\'s path. Read with no arguments, this also lists every folder'),
       },
-      run: (args) => json(teamRead(args, thisRun())),
+      run: (args: { person?: string; thread?: string; folder?: string }) => json(teamRead(args, thisRun())),
     },
 
     /* -------------------------------- chats -------------------------------- */
@@ -460,7 +514,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
       name: 'list_chats',
       description: `Past conversations between the founder and ${possessive} own in-app agent, for one product, newest first.`,
       schema: { product: z.string() },
-      run: ({ product }) => json(listProductChats(product)),
+      run: ({ product }: { product: string }) => json(listProductChats(product)),
     },
     {
       name: 'read_chat',
@@ -470,7 +524,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         chatId: z.string().optional().describe('defaults to the most recent chat'),
         limit: z.number().int().optional().describe('how many messages from the end; default 100'),
       },
-      run: ({ product, chatId, limit }) => json(readProductChat(product, { chatId, limit })),
+      run: ({ product, chatId, limit }: { product: string; chatId?: string; limit?: number }) => json(readProductChat(product, { chatId, limit })),
     },
 
     /* --------------------------------- pages ------------------------------- */
@@ -490,7 +544,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         width: z.number().int().optional().describe('viewport width; default 1280'),
         height: z.number().int().optional().describe('viewport height; default 900'),
       },
-      run: async ({ product, url, width, height }) => json(await lookAtPage({ product, url, width, height })),
+      run: async ({ product, url, width, height }: { product: string; url: string; width?: number; height?: number }) => json(await lookAtPage({ product, url, width, height })),
     },
   ];
 
@@ -502,7 +556,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
       path: z.string().describe('file or folder path (relative, ~/…, or absolute), or installed skill name'),
       scope: z.enum(['task', 'documents', 'account']).optional().describe('for a relative file path: this task, this product\'s documents, or the account\'s documents; omitted for a full path or a skill'),
     },
-    run: async (args) => json(await requestCloudResource(args)),
+    run: async (args: CloudResourceAsk) => json(await requestCloudResource(args)),
   });
 
   // Teammates are an alpha feature: their tools are offered once there is a
@@ -517,10 +571,10 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
 const PEOPLE_TOOLS = new Set(['team_tell', 'team_task', 'team_file', 'team_threads', 'team_read']);
 
 // The app writes who is on the team once someone is signed in on one.
-function onATeam(accountId) {
+function onATeam(accountId: string): boolean {
   try { return !!readTeamView(teamDir(legacyRoot(), accountId))?.me; } catch { return false; }
 }
 
-function teammatesExist(accountId) {
+function teammatesExist(accountId: string): boolean {
   try { return readTeammates(teamDir(legacyRoot(), accountId)).length > 0; } catch { return false; }
 }

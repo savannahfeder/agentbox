@@ -189,11 +189,19 @@ the build.
 ## The app is TypeScript; write new code and tests as `.mts` (2026-11-06)
 
 `main/`, `shared/`, `mcp/` and `tests/` are `.mts`, run as they are (Node
-strips the types; nothing compiles them), and checked by strict `tsc` in CI.
-Only syntax that strips cleanly is allowed: no enums, namespaces or parameter
-properties. The few `.mjs` left there are named, with the reason, in
-`tests/the-back-end-is-typescript-that-runs-as-it-is`. `tests/fixtures` stays
-`.mjs` because those are fake CLIs started as their own processes.
+strips the types; nothing compiles them). `npm run typecheck` is strict `tsc`
+over the back end and the renderer, CI runs it and the phone app's on every
+push, and all three are clean: keep them that way. The tests are not
+type-checked yet. Only syntax that strips cleanly is allowed: no enums,
+namespaces or parameter properties. The few `.mjs` left there are named, with
+the reason, in `tests/the-back-end-is-typescript-that-runs-as-it-is`.
+`tests/fixtures` stays `.mjs` because those are fake CLIs started as their own
+processes.
+
+No `@ts-ignore`, `@ts-nocheck` or `@ts-expect-error`, and no `any` as a type,
+in `main/`, `shared/`, `mcp/`, `renderer/src` or `mobile/src`
+(`tests/no-type-check-is-switched-off-and-any-only-goes-down`). Name the shape,
+or take `unknown` and narrow it.
 
 Node loads `.mts` by itself from 22.18. On an older 22, start a script that
 reaches the back end as `node scripts/run.mjs scripts/<name>.mjs`, which adds

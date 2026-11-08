@@ -3,9 +3,9 @@
  * window has no address bar and no Back, so a page it is walked to is a page
  * nobody can leave.
  */
-export function leavesTheApp(appUrl, next) {
-  let at;
-  let to;
+export function leavesTheApp(appUrl: string, next: string): boolean {
+  let at: URL;
+  let to: URL;
   try { at = new URL(appUrl); to = new URL(next); } catch { return true; }
   return at.protocol !== to.protocol || at.host !== to.host || at.pathname !== to.pathname;
 }

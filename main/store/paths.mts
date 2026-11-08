@@ -19,14 +19,14 @@ export const ENV_PATH_RE = /(^|\/)\.env[^/]*(\/|$)/;
 // (assertInside treats both as separators) and lowercased, so a case-
 // insensitive filesystem (the default on macOS/Windows) can never let
 // `.Git/config` alias the real `.git` past a case-sensitive regex.
-export function normalizeForDenyCheck(rel) {
+export function normalizeForDenyCheck(rel: unknown): string {
   return String(rel).replace(/\\/g, '/').toLowerCase();
 }
 
 // True iff `rel` names a .git or .env path in ANY segment. null/undefined -> false.
 // The single canonical predicate; other modules re-export it rather than
 // duplicating the regexes.
-export function deniesGitOrEnvPath(rel) {
+export function deniesGitOrEnvPath(rel: unknown): boolean {
   if (rel == null) return false;
   const norm = normalizeForDenyCheck(rel);
   return GIT_PATH_RE.test(norm) || ENV_PATH_RE.test(norm);
@@ -37,7 +37,7 @@ export function deniesGitOrEnvPath(rel) {
 // ensureMachineryDir, so the store write boundary must reserve them. Normalized
 // like deniesGitOrEnvPath so case or a backslash cannot alias one. null -> false.
 const MACHINERY_SET = new Set(MACHINERY);
-export function deniesMachineryPath(rel) {
+export function deniesMachineryPath(rel: unknown): boolean {
   if (rel == null) return false;
   return normalizeForDenyCheck(rel).split('/').some((seg) => MACHINERY_SET.has(seg));
 }
@@ -46,7 +46,7 @@ export function deniesMachineryPath(rel) {
 // ancestor so a symlinked directory cannot smuggle the path outside; reject
 // a symlink as the final component (lstat). Throws on any violation, returns
 // the absolute (real-ancestor-based) path on success.
-export function assertInside(root, rel) {
+export function assertInside(root: string, rel: unknown): string {
   if (typeof rel !== 'string' || !rel) throw new Error('empty path');
   if (path.isAbsolute(rel)) throw new Error(`absolute path rejected: ${rel}`);
   if (rel.split(/[\\/]/).some((seg) => seg === '..')) throw new Error(`dot-dot rejected: ${rel}`);
@@ -62,13 +62,13 @@ export function assertInside(root, rel) {
   try {
     if (fs.lstatSync(target).isSymbolicLink()) throw new Error(`symlink rejected: ${rel}`);
   } catch (e) {
-    if (e.code !== 'ENOENT') throw e;
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
   }
   return target;
 }
 
 // Same check as a boolean, for canUseTool-style callers.
-export function isInside(root, rel) {
+export function isInside(root: string, rel: unknown): boolean {
   try { assertInside(root, rel); return true; } catch { return false; }
 }
 
@@ -83,7 +83,7 @@ export function isInside(root, rel) {
 // once when the envelope was first cataloged. A stale or externally-supplied
 // envelope (e.g. merged in from a sync peer, or written before this check
 // existed) must never grant access outside its own creation folder.
-export function assertCreationDir(root, dir) {
+export function assertCreationDir(root: string, dir: unknown): string {
   const rel = String(dir ?? '').replace(/\\/g, '/');
   const segments = rel.split('/').filter(Boolean);
   if (segments[0] !== 'creations' || segments.length < 2 || segments[1] === '.' || segments[1] === '..') {

@@ -46,13 +46,34 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+/** What one account's config file says about its plan. `known: false` changes nothing anywhere. */
+export interface ClaudePlan {
+  known: boolean;
+  ended?: boolean;
+  max: boolean;
+  label: string | null;
+  tier: string | null;
+  from: 'org-tier' | 'user-tier' | 'org-type' | null;
+  file: string;
+}
+
+/** The fields of `.claude.json`'s `oauthAccount` read here, as Claude Code writes them. */
+interface OAuthAccount {
+  accountUuid?: string;
+  organizationRateLimitTier?: string | null;
+  userRateLimitTier?: string | null;
+  organizationType?: string | null;
+  billingType?: string | null;
+  [field: string]: unknown;
+}
+
 /**
  * WHERE CLAUDE CODE'S CONFIG FILE IS FOR ONE OF AGENTBOX'S ACCOUNTS.
  *
  *  'default' is the account with no CLAUDE_CONFIG_DIR, so its file is beside
  *  the home folder rather than inside `~/.claude`. Anything else is the folder
  *  CLAUDE_CONFIG_DIR names, and the file is inside it. */
-export function planFile(profile, home = os.homedir()) {
+export function planFile(profile: string | null | undefined, home: string = os.homedir()): string {
   if (!profile || profile === 'default') return path.join(home, '.claude.json');
   const dir = profile.startsWith('~/') ? path.join(home, profile.slice(2)) : profile;
   return path.join(dir, '.claude.json');
@@ -66,7 +87,7 @@ export function planFile(profile, home = os.homedir()) {
  *  `default_claude_max_20x` -> `Max 20x`. The `default_` and `claude_` parts
  *  are Anthropic's own scaffolding around the name and say nothing to anybody
  *  looking at a settings page. */
-export function planLabel(raw) {
+export function planLabel(raw: string | null | undefined): string | null {
   const s = String(raw ?? '').trim();
   if (!s) return null;
   const bare = s.replace(/^default_/, '').replace(/^claude_/, '');
@@ -85,7 +106,7 @@ export function planLabel(raw) {
  * WHETHER A TIER STRING IS A MAX PLAN. Whole word, so a plan that merely
  *  contains the letters (a hypothetical `maximum_something`) is not mistaken
  *  for one. */
-export function isMaxTier(raw) {
+export function isMaxTier(raw: string | null | undefined): boolean {
   return /(^|_)max(_|$)/i.test(String(raw ?? ''));
 }
 
@@ -96,9 +117,9 @@ export function isMaxTier(raw) {
  *  Claude Code has not fetched a profile for yet: all of them come back
  *  `known: false`, which every caller here treats as "leave everything exactly
  *  as it was". */
-const planCache = new Map();
+const planCache = new Map<string, { mtime: number; size: number; plan: ClaudePlan }>();
 
-export function readPlan(profile, { home = os.homedir(), file = null } = {}) {
+export function readPlan(profile: string | null | undefined, { home = os.homedir(), file = null }: { home?: string; file?: string | null } = {}): ClaudePlan {
   const at = file ?? planFile(profile, home);
   // Keyed on the file's mtime AND its size, as accountIdentity is keyed on the
   // mtime alone: the cloud tiles ask on every snapshot.
@@ -108,7 +129,7 @@ export function readPlan(profile, { home = os.homedir(), file = null } = {}) {
   // the cache then served the first one's plan for ever. A subscription
   // renewed in that window read as ended until the file was written again, so
   // `Supervisor#_forgetRenewedSubscriptions` never let the account back in.
-  let stat = null;
+  let stat: fs.Stats | null = null;
   try { stat = fs.statSync(at); } catch { /* read below says none */ }
   const hit = planCache.get(at);
   if (stat && hit?.mtime === stat.mtimeMs && hit?.size === stat.size) return hit.plan;
@@ -117,9 +138,9 @@ export function readPlan(profile, { home = os.homedir(), file = null } = {}) {
   return plan;
 }
 
-function readPlanNow(at) {
-  const none = { known: false, max: false, label: null, tier: null, from: null, file: at };
-  let account = null;
+function readPlanNow(at: string): ClaudePlan {
+  const none: ClaudePlan = { known: false, max: false, label: null, tier: null, from: null, file: at };
+  let account: OAuthAccount | null = null;
   try {
     account = JSON.parse(fs.readFileSync(at, 'utf8'))?.oauthAccount ?? null;
   } catch {
@@ -157,17 +178,17 @@ function readPlanNow(at) {
  */
 const PLAN_FIELDS = ['accountUuid', 'organizationUuid', 'organizationType', 'organizationRateLimitTier',
   'userRateLimitTier', 'seatTier', 'billingType', 'hasExtraUsageEnabled', 'planDisplayName', 'subscriptionCreatedAt'];
-const stampCache = new Map();
+const stampCache = new Map<string, { mtime: number; stamp: string | null }>();
 
-export function planStamp(profile, { home = os.homedir(), file = null } = {}) {
+export function planStamp(profile: string | null | undefined, { home = os.homedir(), file = null }: { home?: string; file?: string | null } = {}): string | null {
   const at = file ?? planFile(profile, home);
   let mtime;
   try { mtime = fs.statSync(at).mtimeMs; } catch { return null; }
   const hit = stampCache.get(at);
   if (hit?.mtime === mtime) return hit.stamp;
-  let stamp = null;
+  let stamp: string | null = null;
   try {
-    const account = JSON.parse(fs.readFileSync(at, 'utf8'))?.oauthAccount;
+    const account: OAuthAccount | undefined = JSON.parse(fs.readFileSync(at, 'utf8'))?.oauthAccount;
     if (account?.accountUuid) {
       stamp = JSON.stringify(PLAN_FIELDS.map((k) => (k === 'hasExtraUsageEnabled' ? account[k] === true : account[k] ?? null)));
     }
@@ -179,8 +200,11 @@ export function planStamp(profile, { home = os.homedir(), file = null } = {}) {
 /**
  * THE PLAN ON EVERY ACCOUNT AGENTBOX IS CONFIGURED TO RUN ON, in the same order
  *  the supervisor round-robins them. */
-export function readPlans(profiles, { home = os.homedir() } = {}) {
-  const list = (Array.isArray(profiles) && profiles.length ? profiles : ['default']).map((p) => p || 'default');
+export function readPlans(
+  profiles: readonly (string | null | undefined)[] | null | undefined,
+  { home = os.homedir() }: { home?: string } = {},
+): (ClaudePlan & { profile: string })[] {
+  const list = (Array.isArray(profiles) && profiles.length ? profiles : ['default']).map((p: string | null | undefined) => p || 'default');
   return list.map((profile) => ({ profile, ...readPlan(profile, { home }) }));
 }
 
@@ -200,7 +224,7 @@ export function readPlans(profiles, { home = os.homedir() } = {}) {
  *
  *  AND AN UNREADABLE ACCOUNT NEVER LOWERS IT. Somebody whose config file we
  *  cannot parse gets exactly the app they had before this existed. */
-export function slotsForPlans(plans, fallback = 3) {
+export function slotsForPlans(plans: readonly Pick<ClaudePlan, 'known' | 'ended' | 'max'>[] | null | undefined, fallback: number = 3): number {
   // An ended subscription runs nothing, so it has no say in how many run.
   const known = (plans ?? []).filter((p) => p.known && !p.ended);
   if (!known.length) return fallback;

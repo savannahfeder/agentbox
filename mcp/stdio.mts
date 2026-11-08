@@ -21,7 +21,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import path from 'node:path';
-import { buildTools } from './tools.mts';
+import type { Readable, Writable } from 'node:stream';
+import { buildTools, type BuildToolsOptions } from './tools.mts';
 import { NAME, Name, nameSlug } from '../shared/product-name.mjs';
 
 const LOG = `[${nameSlug}-store]`;
@@ -33,7 +34,7 @@ console.log = (...args) => console.error(LOG, ...args);
  * cloud run's connection when many share a process (main/cloud/run.mts), each
  * holding its own claims (`holder`). Returns a close that gives them back.
  */
-export async function serveStore({ input = process.stdin, output = process.stdout, holder, ownItem, ownProduct, requestCloudResource } = {}) {
+export async function serveStore({ input = process.stdin, output = process.stdout, holder, ownItem, ownProduct, requestCloudResource }: BuildToolsOptions & { input?: Readable; output?: Writable } = {}): Promise<{ close: () => Promise<void> }> {
   const { account, tools, claims } = buildTools({ holder, requestCloudResource, ...(ownItem !== undefined ? { ownItem } : {}), ...(ownProduct !== undefined ? { ownProduct } : {}) });
 
   const server = new McpServer(

@@ -77,6 +77,7 @@ describe('the back end keeps no JavaScript it does not need', () => {
 
   it('is .mts but for the entry, the name Expo reads, and declarations for untyped packages', () => {
     expect([...left('main'), ...left('shared'), ...left('mcp')].sort()).toEqual([
+      'main/phone-sw.js',           // the phone's service worker, which its browser loads as it is
       'main/start.mjs',             // package.json main, the file Electron starts
       'main/untyped-packages.d.mts',
       'shared/product-name.d.mts',

@@ -8,23 +8,63 @@
 import { GIVEN_TASK, WORK_THREAD, pickFields } from './work-items.mts';
 import { blockedOnMe, deadlineOf, isLate } from './team-tasks.mts';
 
-export const isShared = (product) => !!product?.team?.projectId;
+/** Who wrote a field's surviving value, and when. */
+export interface FieldWriter { ts: number; source?: string; by?: string }
+
+/** A row as these rules read it; every field is optional because a private row carries none of the team's. */
+export interface TeamRow {
+  id?: string;
+  label?: string;
+  labels?: readonly string[];
+  status?: string;
+  createdAt?: number;
+  createdBy?: string | null;
+  assignee?: string;
+  runner?: string;
+  people?: readonly string[];
+  wrote?: Readonly<Record<string, FieldWriter | undefined>>;
+}
+
+/** One thing said in a conversation. */
+export interface TalkLine { by: string; ts: number; text: string }
+
+/** Who said what, and where, in a conversation between people. */
+export interface Talk {
+  chat?: readonly TalkLine[];
+  threads?: Readonly<Record<string, { by: string; text: string; replies?: readonly TalkLine[] }>>;
+  /** Per person, when they last marked it done. */
+  settled?: Readonly<Record<string, number>>;
+}
+
+/** A row in a conversation: the talk on it, approvals of its files, and a wait that ended. */
+export interface TalkRow extends TeamRow {
+  talk?: Talk | null;
+  artifacts?: { approvals?: readonly { by: string | null; ts?: number }[] } | null;
+  waitEnded?: { at: number } | null;
+}
+
+/** A project as far as the team rules read it. */
+export type TeamProductLike = { team?: { projectId?: string; sharedBy?: string | null; direct?: unknown } | null } | null | undefined;
+
+export const isShared = (product: TeamProductLike): boolean => !!product?.team?.projectId;
 
 // A thread's label is a person's only when a person wrote it; the row namer
 // writes one from the first message, and a chat with a person is named for them.
-export const nameIsAPersons = (item) => !!String(item?.label ?? '').trim() && item?.wrote?.label?.source !== 'agent';
+export const nameIsAPersons = (item: TeamRow | null | undefined): boolean => !!String(item?.label ?? '').trim() && item?.wrote?.label?.source !== 'agent';
+
+interface PersonLike { id: string; name?: string | null; email?: string | null }
 
 // The cloud fills a missing name with the part before the @, which tells nobody who it is.
-const ownName = (p) => {
+const ownName = (p: PersonLike): string => {
   const name = String(p?.name ?? '').trim();
   const local = String(p?.email ?? '').split('@')[0];
   return name && name !== local ? name : '';
 };
 
 /** The team as it is drawn: each person once, someone with no name of their own by their email. */
-export function teamPeopleShown(people) {
-  const seen = new Set();
-  const out = [];
+export function teamPeopleShown<P extends PersonLike>(people: readonly P[] | null | undefined): P[] {
+  const seen = new Set<string>();
+  const out: P[] = [];
   for (const p of people ?? []) {
     if (!p?.id || seen.has(p.id)) continue;
     seen.add(p.id);
@@ -36,39 +76,39 @@ export function teamPeopleShown(people) {
 // THE PERSON WHOSE MAC RUNS AGENTS ON A ROW: whoever it was handed to, else
 // whoever started it, else (a row from before anyone signed in) whoever shared
 // the project.
-export function runnerOf(item, product) {
+export function runnerOf(item: TeamRow | null | undefined, product: TeamProductLike): string | null {
   return item?.runner || item?.createdBy || product?.team?.sharedBy || null;
 }
 
 // A row a person has been given waits for that person, not for an agent.
-export const heldByAPerson = (item) => !!item?.assignee && item.assignee !== 'agent';
+export const heldByAPerson = (item: TeamRow | null | undefined): boolean => !!item?.assignee && item.assignee !== 'agent';
 
 // A TASK GIVEN TO A PERSON: a row of its own in the record the two of them share
 // for messages, because a project never leaves its Mac and this record does. The
 // mark is what tells it from the conversation beside it, and only the line that
 // makes the row can set it (whatATeammateMaySet).
 export { GIVEN_TASK };
-export const isTaskRow = (item) => (item?.labels ?? []).includes(GIVEN_TASK);
-export const isGivenTask = (item, product) => !!product?.team?.direct && isTaskRow(item);
+export const isTaskRow = (item: { labels?: readonly string[] } | null | undefined): boolean => (item?.labels ?? []).includes(GIVEN_TASK);
+export const isGivenTask = (item: { labels?: readonly string[] } | null | undefined, product: TeamProductLike): boolean => !!product?.team?.direct && isTaskRow(item);
 
 // A THREAD ABOUT ONE PIECE OF WORK, started with a subject, beside the
 // conversation in the same record. Talk without a subject never lands in one.
 export { WORK_THREAD };
-export const isWorkThread = (item) => (item?.labels ?? []).includes(WORK_THREAD);
+export const isWorkThread = (item: { labels?: readonly string[] } | null | undefined): boolean => (item?.labels ?? []).includes(WORK_THREAD);
 
-export function taskGiver(item) {
+export function taskGiver(item: TeamRow): string | null {
   return (item?.people ?? []).find((p) => p !== item.assignee) ?? item?.createdBy ?? null;
 }
 
 // When a task last had words on it that were not yours; when it was made if none.
-export function taskNewsAt(item, me) {
+export function taskNewsAt(item: TalkRow | null | undefined, me: string | null): number {
   const chat = item?.talk?.chat ?? [];
   for (let k = chat.length - 1; k >= 0; k -= 1) if (chat[k].by !== me) return chat[k].ts;
   return item?.createdAt ?? 0;
 }
 
 // May a worker run on this row on this Mac, signed in as `me`?
-export function mayRunHere(item, product, me) {
+export function mayRunHere(item: TeamRow | null | undefined, product: TeamProductLike, me: string | null): boolean {
   // Before the unshared answer: a person's row in a project of your own is theirs
   // to do, and answering yes here is how a task to Dev ran on the sender's Mac.
   if (heldByAPerson(item)) return false;
@@ -101,12 +141,18 @@ const STARTS_A_RUN = ['body', 'answer', 'status', 'runAt'];
 // runner's. True leaves the row to the inbox's ordinary rules, which is what a
 // private row, or any row on a Mac nobody is signed in on, always gets.
 // WHO SPOKE LAST IN A CONVERSATION: the writer of its newest message.
-export function lastSpeaker(item) {
+export function lastSpeaker(item: TeamRow | null | undefined): string | null {
   const a = item?.wrote?.answer;
   const b = item?.wrote?.body;
   const latest = a && (!b || (a.ts ?? 0) >= (b.ts ?? 0)) ? a : b;
   return latest?.by ?? item?.createdBy ?? null;
 }
+
+/** One thread you are in where somebody spoke after you. */
+export interface ThreadWaiting { uid: string; mine: boolean; fresh: number; people: string[]; text: string; last: string; lastBy: string }
+
+/** What in a conversation waits on you. */
+export interface Waits { chat: number; threads: ThreadWaiting[] }
 
 /**
  * WHAT IN A CONVERSATION IS WAITING ON YOU (w-920461cbe6). Asked the day
@@ -126,14 +172,14 @@ export function lastSpeaker(item) {
  * (`talk.settled`, w-8a14927b21), so your own message reopening it brings
  * nothing old back.
  */
-export function whatWaits(item, me) {
+export function whatWaits(item: TalkRow | null | undefined, me: string | null): Waits | null {
   const talk = item?.talk;
   if (!talk || !me) return null;
   // Your approval of a file answers what was said before it, as a reply would.
-  const approved = Math.max(0, ...(item.artifacts?.approvals ?? []).filter((a) => a.by === me).map((a) => a.ts ?? 0));
+  const approved = Math.max(0, ...(item!.artifacts?.approvals ?? []).filter((a) => a.by === me).map((a) => a.ts ?? 0));
   const settled = Math.max(talk.settled?.[me] ?? 0, approved);
-  const since = (list) => { let n = 0; for (let k = list.length - 1; k >= 0 && list[k].by !== me && list[k].ts > settled; k -= 1) n += 1; return n; };
-  const threads = [];
+  const since = (list: readonly TalkLine[]): number => { let n = 0; for (let k = list.length - 1; k >= 0 && list[k].by !== me && list[k].ts > settled; k -= 1) n += 1; return n; };
+  const threads: (ThreadWaiting & { at: number })[] = [];
   for (const [uid, t] of Object.entries(talk.threads ?? {})) {
     const replies = t.replies ?? [];
     if (t.by !== me && !replies.some((r) => r.by === me)) continue;
@@ -151,7 +197,7 @@ export function whatWaits(item, me) {
   return { chat: since(talk.chat ?? []), threads: threads.map(({ at, ...t }) => t) };
 }
 
-export function inMyInbox(item, product, me, now = Date.now()) {
+export function inMyInbox(item: TalkRow, product: TeamProductLike, me: string | null, now = Date.now()): boolean {
   if (!isShared(product) || !me) return true;
   // A CONVERSATION NEEDS WHOEVER DID NOT SPEAK LAST (2026-10-01), so a message
   // to three people is in all three inboxes until one of them answers, and the
@@ -162,7 +208,8 @@ export function inMyInbox(item, product, me, now = Date.now()) {
     if (item.status === 'done') return false;
     // What it waited on ended (the person left the team), and you have not
     // spoken since: it is yours to decide again.
-    if (item.waitEnded?.at > Math.max(0, ...(item.talk?.chat ?? []).filter((s) => s.by === me).map((s) => s.ts ?? 0))) return true;
+    // With no wait that ended, `undefined > n` is false, which is the answer.
+    if ((item.waitEnded?.at as number) > Math.max(0, ...(item.talk?.chat ?? []).filter((s) => s.by === me).map((s) => s.ts ?? 0))) return true;
     // A task someone gave you that is past its deadline is yours to act on again.
     if (isTaskRow(item) && item.assignee === me && taskGiver(item) !== me && isLate(deadlineOf(item, me), now)) return true;
     // A task blocked on you waits on you until you next write on it.
@@ -181,13 +228,13 @@ export function inMyInbox(item, product, me, now = Date.now()) {
 // A CLOSED ROW STILL OWES YOU WHAT ITS CLOSER SAID FIRST. The status is shared,
 // so someone answering and then closing would otherwise take their answer off
 // your list before you read it. `seen`: when you last opened the row.
-export function closedOverWords(item, product, me, seen = 0) {
+export function closedOverWords(item: TalkRow, product: TeamProductLike, me: string | null, seen = 0): boolean {
   if (!me || !product?.team?.direct || item?.status !== 'done') return false;
   const closer = item.wrote?.status?.by;
   if (!closer || closer === me) return false;
   const waits = whatWaits(item, me);
   if (!waits || (!waits.chat && !waits.threads.length)) return false;
-  const said = [...(item.talk.chat ?? []), ...Object.values(item.talk.threads ?? {}).flatMap((t) => t.replies ?? [])];
+  const said = [...(item.talk!.chat ?? []), ...Object.values(item.talk!.threads ?? {}).flatMap((t) => t.replies ?? [])];
   return said.some((s) => s.by !== me && s.ts > seen);
 }
 
@@ -196,7 +243,7 @@ export function closedOverWords(item, product, me, seen = 0) {
 // it puts the news away without a close of your own, which would land in
 // theirs. A week on it is old news.
 const CLOSE_NEWS_MS = 7 * 86_400_000;
-export function closedByTheOther(item, product, me, seen = 0, now = Date.now()) {
+export function closedByTheOther(item: TalkRow, product: TeamProductLike, me: string | null, seen = 0, now = Date.now()): boolean {
   if (!me || !product?.team?.direct || !isTaskRow(item) || item.status !== 'done') return false;
   const close = item.wrote?.status;
   if (!close?.by || close.by === me || !(item.people ?? []).includes(close.by)) return false;
@@ -207,7 +254,7 @@ export function closedByTheOther(item, product, me, seen = 0, now = Date.now()) 
 // one of them writes and `inMyInbox` brings it back. It used to count as Done
 // (w-57a202a968); nothing was finished, and the team could not find what they
 // were waiting on.
-export function iSpokeLast(item, product, me) {
+export function iSpokeLast(item: TalkRow, product: TeamProductLike, me: string | null): boolean {
   if (!me || !product?.team?.direct || item?.status === 'done' || isTaskRow(item)) return false;
   // Done for you means nothing in it waits on you: the chat or any thread.
   const waits = whatWaits(item, me);
@@ -218,7 +265,7 @@ export function iSpokeLast(item, product, me) {
 // A REPLY HANDS A PERSON-TO-PERSON ROW TO THE OTHER PERSON, so a conversation
 // goes back and forth between two inboxes instead of sitting in both. Returns
 // who it goes to, or null when a reply changes nothing about whose it is.
-export function handedOnByReply(item, product, me) {
+export function handedOnByReply(item: TeamRow, product: TeamProductLike, me: string | null): string | null {
   if (!isShared(product) || !me || !heldByAPerson(item) || item.assignee !== me || isGivenTask(item, product)) return null;
   const people = Array.isArray(item.people) ? item.people : [];
   return people.find((p) => p !== me) || (item.createdBy && item.createdBy !== me ? item.createdBy : null);
@@ -279,18 +326,25 @@ const IN_A_MESSAGE_ALSO = ['title', 'body', 'answer', 'note', 'result', 'people'
 // reachable either way.
 const WHEN_A_MESSAGE_OPENS = ['priority'];
 const TASK_AUDIENCE = ['visibility', 'visibleTo'];
-const opensARow = (patch) => 'kind' in patch;
-export function whatATeammateMaySet(line, { direct = false } = {}) {
+const opensARow = (patch: object): boolean => 'kind' in patch;
+
+/** A ledger line as it crosses the cloud: open JSON until a rule here has read it. */
+export type PulledLine = Record<string, unknown>;
+
+/** What is left of a teammate's line once it holds only what they may set. */
+export interface TeammateLine { id: unknown; ts: unknown; source: unknown; by: unknown; uid: unknown; patch: Record<string, unknown> }
+
+export function whatATeammateMaySet(line: PulledLine | null | undefined, { direct = false }: { direct?: boolean } = {}): TeammateLine | null {
   if (!line || typeof line !== 'object' || !line.patch || typeof line.patch !== 'object') return null;
   const allowed = direct
     ? [...A_TEAMMATE_MAY_SET, ...IN_A_MESSAGE_ALSO, ...(opensARow(line.patch) ? WHEN_A_MESSAGE_OPENS : [])]
     : A_TEAMMATE_MAY_SET;
-  const kept = {};
-  for (const field of allowed) if (field in line.patch) kept[field] = line.patch[field];
+  const kept: Record<string, unknown> = {};
+  for (const field of allowed) if (field in line.patch) kept[field] = (line.patch as Record<string, unknown>)[field];
   if (direct && opensARow(line.patch) && isTaskRow(line.patch)) {
     kept.labels = [GIVEN_TASK];
     // Whether the team may read the task's card, which its holder publishes.
-    for (const field of TASK_AUDIENCE) if (field in line.patch) kept[field] = line.patch[field];
+    for (const field of TASK_AUDIENCE) if (field in line.patch) kept[field] = (line.patch as Record<string, unknown>)[field];
   }
   else if (direct && opensARow(line.patch) && isWorkThread(line.patch)) kept.labels = [WORK_THREAD];
   const patch = pickFields(kept);
@@ -301,20 +355,20 @@ export function whatATeammateMaySet(line, { direct = false } = {}) {
 // A LEASE BELONGS TO THE MAC THAT TOOK IT. A claim, an epoch, a release or a
 // heartbeat is a worker's hold on one Mac, so it never rides a line across to
 // another one — not even to a second copy of the app that is also yours.
-export function withoutALease(line) {
-  const out = { ...line };
+export function withoutALease<L extends PulledLine>(line: L): L {
+  const out: PulledLine = { ...line };
   delete out.claim; delete out.epoch; delete out.release; delete out.heartbeat;
-  return out;
+  return out as L;
 }
 
 // A LINE AS IT COMES BACK FROM THE CLOUD, the same on both backends. Who wrote
 // it and when are the database's (by_person, created_at), never the copy in
 // the body, and a teammate's line carries no lease (above).
-export function asPulled(body, { by, at, me }) {
+export function asPulled<B extends PulledLine>(body: B, { by, at, me }: { by: string; at: number; me: string | null }): B & { by: string } {
   const line = { ...body, by };
   if (by === me) return line;
   const kept = withoutALease(line);
-  if (Number.isFinite(at)) kept.ts = at;
+  if (Number.isFinite(at)) (kept as PulledLine).ts = at;
   return kept;
 }
 
@@ -334,7 +388,7 @@ export function asPulled(body, { by, at, me }) {
 // carrying those across would start a second agent on the same row on your
 // other Mac. So nothing crosses there, and your own words stay where you typed
 // them. Returns null when the line is not yours to bring back.
-export function whatYourOtherCopyMaySet(line, { direct = false } = {}) {
+export function whatYourOtherCopyMaySet<L extends PulledLine>(line: L | null | undefined, { direct = false }: { direct?: boolean } = {}): L | null {
   if (!direct || !line || typeof line !== 'object') return null;
   return withoutALease(line);
 }

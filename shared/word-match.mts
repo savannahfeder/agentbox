@@ -7,25 +7,31 @@
 // Folding must keep the length, because callers slice the original text at
 // offsets found in the folded one. Curly quotes and dashes fold to what a
 // keyboard types.
-const FOLDED = { '‘': "'", '’': "'", 'ʼ': "'", '“': '"', '”': '"', '–': '-', '—': '-' };
+const FOLDED: Record<string, string> = { '‘': "'", '’': "'", 'ʼ': "'", '“': '"', '”': '"', '–': '-', '—': '-' };
 
-export function fold(text) {
+export interface WordQuery {
+  terms: string[];
+  phrase: string;
+  quoted: boolean;
+}
+
+export function fold(text: unknown): string {
   return String(text ?? '').toLowerCase().replace(/[‘’ʼ“”–—]/g, (c) => FOLDED[c]);
 }
 
 /** Unfolded text with its camelCase names also written split ("toKebab" adds "to Kebab"), for haystacks that are matched and never sliced. */
-export function withHumps(text) {
+export function withHumps(text: unknown): string {
   const raw = String(text ?? '');
   const split = raw.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
   return split === raw ? raw : `${raw} . ${split}`;
 }
 
-export function isWordChar(c) {
+export function isWordChar(c: string): boolean {
   return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
 }
 
 /** Where `needle` starts a word in `hay`, at or after `from`, or -1. `whole` also wants the word to end there. */
-export function wordStart(hay, needle, from = 0, whole = false) {
+export function wordStart(hay: string, needle: string, from = 0, whole = false): number {
   if (!needle) return -1;
   let at = hay.indexOf(needle, from);
   while (at >= 0) {
@@ -38,7 +44,7 @@ export function wordStart(hay, needle, from = 0, whole = false) {
 }
 
 /** The typed words: all must appear. A query in double quotes must appear as that phrase. */
-export function queryOf(query) {
+export function queryOf(query: string): WordQuery {
   const folded = fold(query).trim();
   const quoted = folded.length > 2 && folded.startsWith('"') && folded.endsWith('"');
   const inner = (quoted ? folded.slice(1, -1) : folded).replace(/"/g, ' ').trim();
@@ -46,17 +52,17 @@ export function queryOf(query) {
   return { terms, phrase: terms.length > 1 ? terms.join(' ') : '', quoted: quoted && terms.length > 0 };
 }
 
-const termAt = (hay, terms, i, from = 0) => wordStart(hay, terms[i], from, i < terms.length - 1);
+const termAt = (hay: string, terms: string[], i: number, from = 0): number => wordStart(hay, terms[i], from, i < terms.length - 1);
 
 /** Whether folded text holds the whole query. */
-export function holds(foldedText, q) {
+export function holds(foldedText: string, q: WordQuery): boolean {
   if (!q.terms.length) return false;
   if (q.quoted) return wordStart(foldedText.replace(/\s+/g, ' '), q.phrase) >= 0;
   return q.terms.every((_, i) => termAt(foldedText, q.terms, i) >= 0);
 }
 
 /** Where the longest typed word starts in folded text, or 0. */
-export function firstHit(foldedText, q) {
+export function firstHit(foldedText: string, q: WordQuery): number {
   const order = q.terms.map((_, i) => i).sort((a, b) => q.terms[b].length - q.terms[a].length);
   for (const i of order) {
     const at = termAt(foldedText, q.terms, i);
@@ -66,7 +72,7 @@ export function firstHit(foldedText, q) {
 }
 
 /** At most `budget` characters of `text` with the match inside, cut on spaces and marked with an ellipsis on a cut side. */
-export function windowAround(text, hit, budget) {
+export function windowAround(text: unknown, hit: number, budget: number): string {
   const flat = String(text ?? '').replace(/\s+/g, ' ').trim();
   if (flat.length <= budget) return flat;
   let start = Math.max(0, hit - 24);

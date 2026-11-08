@@ -2,20 +2,86 @@
 // MEAN TO A PERSON. Fresh each time: nothing to go stale, no stream left open.
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { STATES } from '../../shared/connections-catalog.mts';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { STATES, type ConnectionState } from '../../shared/connections-catalog.mts';
 import { Name } from '../../shared/product-name.mjs';
 
 export class ToolAnswered extends Error {
-  constructor(status) { super(`the tool answered ${status}`); this.status = status; }
+  declare status: number;
+  constructor(status: number) { super(`the tool answered ${status}`); this.status = status; }
 }
+
+/** The client a conversation is handed. Its `callTool`, given no result schema, answers a plain `CallToolResult`. */
+export type ToolClient = Pick<Client, 'listTools' | 'callTool' | 'getServerVersion'>;
+
+/** What a failed conversation may carry, from the SDK, the fetch, or this app. */
+export interface ToolError {
+  status?: number;
+  code?: number | string;
+  name?: string;
+  message?: string;
+  unreachable?: boolean;
+  shaken?: boolean;
+  noRegistration?: boolean;
+}
+
+/** A row a read tool listed. Each vendor shapes its own, so these are the fields looked for. */
+export interface ToolRow extends DealFields {
+  id?: string | number;
+  identifier?: string;
+  title?: string;
+  name?: string;
+  display_name?: string;
+  login?: string;
+  url?: string;
+  text?: string;
+  content?: string;
+  body?: string;
+  markdown?: string;
+  description?: string;
+  status?: Named;
+  state?: string;
+  priority?: Named;
+  assignee?: Named;
+  project?: Named;
+  updatedAt?: string;
+  comments?: CommentRow[];
+  properties?: DealFields;
+}
+
+/** A HubSpot deal's fields, under `properties` or on the row itself. */
+export interface DealFields {
+  dealname?: string;
+  name?: string;
+  description?: string;
+  amount?: string | number;
+  dealstage?: string;
+  hubspot_owner_name?: string;
+  hubspot_owner_id?: string;
+  closedate?: string;
+  hs_lastmodifieddate?: string;
+}
+
+/** Some tools name a status or a person with an object, others with plain text. */
+export type Named = { name?: string } | (string & { name?: undefined });
+
+export interface CommentRow {
+  author?: Named;
+  user?: string;
+  createdAt?: string;
+  body?: string;
+  text?: string;
+}
+
+export type ReadRow = ToolRow | string | number | boolean | null;
 
 // An answer that says this address is not an MCP server, or not one we know.
 // Waiting does not change it, so it is not "down".
-const NOT_HERE = new Set([404, 405, 406, 410, 415]);
+const NOT_HERE: ReadonlySet<unknown> = new Set([404, 405, 406, 410, 415]);
 const METHOD_NOT_FOUND = -32601;
 
 /** Which state an error means. Anything not plainly about the account or the address is "down". */
-export function stateOfError(err) {
+export function stateOfError(err: ToolError | null | undefined): ConnectionState {
   if (err?.status === 401) return STATES.NOT_SIGNED_IN;
   if (err?.status === 403) return STATES.NOT_ALLOWED;
   if (err?.unreachable || NOT_HERE.has(err?.code) || err?.code === -1 || err?.code === METHOD_NOT_FOUND
@@ -30,12 +96,17 @@ const NO_RECONNECTS = { maxRetries: 0, initialReconnectionDelay: 1000, maxReconn
  * at once, thrown as `ToolAnswered`. `err.shaken` says whether it had got past
  * the handshake: a write may only be tried again if it had not.
  */
-export async function talk({ address, token, ms, use }) {
+export async function talk<T>({ address, token, ms, use }: {
+  address: string;
+  token: string;
+  ms?: number;
+  use: (client: ToolClient) => T | Promise<T>;
+}): Promise<T> {
   const ended = new AbortController();
   const timer = setTimeout(() => ended.abort(new Error('the tool did not answer in time')), ms);
   const client = new Client({ name: Name, version: '1.0.0' });
   let shaken = false;
-  const fetchWithToken = async (url, init = {}) => {
+  const fetchWithToken = async (url: string | URL, init: RequestInit = {}) => {
     const headers = new Headers(init.headers);
     headers.set('authorization', `Bearer ${token}`);
     const res = await fetch(url, { ...init, headers, signal: init.signal ? AbortSignal.any([init.signal, ended.signal]) : ended.signal });
@@ -43,7 +114,7 @@ export async function talk({ address, token, ms, use }) {
     return res;
   };
   const transport = new StreamableHTTPClientTransport(new URL(address), { fetch: fetchWithToken, reconnectionOptions: NO_RECONNECTS });
-  const hard = new Promise((_, reject) => { ended.signal.addEventListener('abort', () => reject(ended.signal.reason), { once: true }); });
+  const hard = new Promise<never>((_, reject) => { ended.signal.addEventListener('abort', () => reject(ended.signal.reason), { once: true }); });
   const conversation = (async () => {
     await client.connect(transport, { timeout: ms });
     shaken = true;
@@ -52,7 +123,7 @@ export async function talk({ address, token, ms, use }) {
   try {
     return await Promise.race([hard, conversation]);
   } catch (err) {
-    err.shaken = shaken;
+    (err as ToolError).shaken = shaken;
     throw err;
   } finally {
     clearTimeout(timer);
@@ -62,17 +133,17 @@ export async function talk({ address, token, ms, use }) {
 }
 
 const LINE_MAX = 120;
-const oneLine = (s) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, LINE_MAX);
+const oneLine = (s: unknown): string => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, LINE_MAX);
 
-function firstList(value) {
+function firstList(value: unknown): ReadRow[] | null {
   if (Array.isArray(value)) return value;
   if (value && typeof value === 'object') for (const v of Object.values(value)) { if (Array.isArray(v)) return v; }
   return null;
 }
 
-const nameIn = (row) => row.title ?? row.name ?? row.display_name ?? row.login ?? row.properties?.dealname;
+const nameIn = (row: ToolRow): string | undefined => row.title ?? row.name ?? row.display_name ?? row.login ?? row.properties?.dealname;
 
-const describe = (row) => {
+const describe = (row: ReadRow): string => {
   if (row && typeof row === 'object') {
     // "Who is this sign-in" answers often wrap the person one level down.
     const inner = Object.values(row).find((v) => v && typeof v === 'object' && !Array.isArray(v) && nameIn(v));
@@ -87,13 +158,13 @@ const describe = (row) => {
 };
 
 /** How many things a read tool's answer lists, or null when it is not a list. */
-export function countRead(result) {
+export function countRead(result: CallToolResult | null | undefined): number | null {
   const text = (result?.content ?? []).filter((c) => c?.type === 'text').map((c) => c.text).join('\n').trim();
   try { return firstList(JSON.parse(text))?.length ?? null; } catch { return null; }
 }
 
 /** A read tool's answer as one line, or null when it read nothing at all. */
-export function oneLineRead(result) {
+export function oneLineRead(result: CallToolResult | null | undefined): string | null {
   const text = (result?.content ?? []).filter((c) => c?.type === 'text').map((c) => c.text).join('\n').trim();
   if (!text) return null;
   let parsed;

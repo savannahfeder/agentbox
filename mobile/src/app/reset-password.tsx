@@ -23,7 +23,7 @@ export default function ResetPassword() {
   const attempt = (fn: () => Promise<void>) => async () => {
     if (busy || !c.cloud) return;
     setBusy(true); setError(null);
-    try { await fn(); } catch (err: any) { setError(String(err?.message ?? '') || 'That did not work. Try again.'); } finally { setBusy(false); }
+    try { await fn(); } catch (err) { setError(String((err as Error)?.message ?? '') || 'That did not work. Try again.'); } finally { setBusy(false); }
   };
   const ask = attempt(async () => { await c.cloud!.askPasswordReset(email, googleReturn); setStep('sent'); });
   const save = attempt(async () => { await c.cloud!.setPassword(password); router.replace('/'); });

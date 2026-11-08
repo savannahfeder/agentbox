@@ -38,7 +38,7 @@ import path from 'node:path';
 // Imported rather than re-derived: what identifies an agent is a rule, and
 // there is one copy of it.
 import { agentKey } from '../shared/agents.mts';
-import type { AgentLike } from '../shared/agents.d.mts';
+import type { AgentLike } from '../shared/agents.mts';
 
 export interface SpokeTurn { at: number; text: string }
 

@@ -12,6 +12,8 @@ export interface CloudConfig {
   endpoint?: string;
   credentials?: unknown;
   timeoutMs?: number;
+  claudeCodeVersion?: string;
+  codexVersion?: string;
 }
 
 export async function cloudClients(config: CloudConfig | null | undefined, { env = process.env, home }: { env?: NodeJS.ProcessEnv; home?: string } = {}) {

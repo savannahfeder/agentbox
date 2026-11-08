@@ -16,16 +16,21 @@
  *  (a sidebar row, a hover card) cannot hold one. */
 export const STATUS_MAX = 80;
 
+export interface PersonStatus { text: string; until: number | null }
+export type HoldId = 'today' | 'tomorrow' | 'week' | 'open';
+
+interface StatusLike { text?: unknown; until?: number | null }
+
 /** What the app stores from what somebody typed: trimmed, cut to one line and
  *  to STATUS_MAX, or null when they said nothing. */
-export function cleanStatus(text) {
+export function cleanStatus(text: unknown): string | null {
   const one = String(text ?? '').replace(/\s+/g, ' ').trim();
   return one ? one.slice(0, STATUS_MAX) : null;
 }
 
 /** The status as it reads NOW: null when there is no text, or when the time
  *  they chose has passed. Everything that draws a status goes through here. */
-export function liveStatus(status, now = Date.now()) {
+export function liveStatus(status: StatusLike | null | undefined, now = Date.now()): PersonStatus | null {
   const text = cleanStatus(status?.text);
   if (!text) return null;
   const until = status?.until ?? null;
@@ -35,13 +40,13 @@ export function liveStatus(status, now = Date.now()) {
 
 /** True when there is text in the cloud that no longer reads, which is the
  *  owner's Mac's cue to clear it. */
-export function hasLapsed(status, now = Date.now()) {
+export function hasLapsed(status: StatusLike | null | undefined, now = Date.now()): boolean {
   return !!cleanStatus(status?.text) && !!status?.until && status.until <= now;
 }
 
 /** How long it holds, in words, for the end of a line: "until 6pm today",
  *  "until Monday", "until Mar 3". Empty when it holds until they clear it. */
-export function holdsUntil(until, now = Date.now()) {
+export function holdsUntil(until: number | null | undefined, now = Date.now()): string {
   if (!until || until <= now) return '';
   const d = new Date(until);
   if (new Date(now).toDateString() === d.toDateString()) {
@@ -56,7 +61,7 @@ export function holdsUntil(until, now = Date.now()) {
 }
 
 /** The four holds the app offers, in the order they are drawn. */
-export const HOLDS = [
+export const HOLDS: { id: HoldId; label: string }[] = [
   { id: 'today', label: 'Today' },
   { id: 'tomorrow', label: 'Tomorrow' },
   { id: 'week', label: 'This week' },
@@ -67,14 +72,14 @@ export const HOLDS = [
  *  ahead ("they should be able to choose their own timelines", 2026-10-04);
  *  anything else, now, the past or not a number at all, falls back to the
  *  named hold, so a stale or garbled moment can never end a status at once. */
-export function statusEnds({ hold = 'open', until } = {}, now = Date.now()) {
+export function statusEnds({ hold = 'open', until }: { hold?: HoldId | string; until?: number | null } = {}, now = Date.now()): number | null {
   if (typeof until === 'number' && Number.isFinite(until) && until > now) return until;
   return holdEnds(hold, now);
 }
 
 /** When a hold runs out. Today and tomorrow end at the end of that day, so a
  *  line set at 9am and one set at 4pm both last the day out. */
-export function holdEnds(id, now = Date.now()) {
+export function holdEnds(id: HoldId | string, now = Date.now()): number | null {
   if (id === 'open') return null;
   const d = new Date(now);
   d.setHours(23, 59, 59, 999);

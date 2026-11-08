@@ -2,7 +2,7 @@
 // Its own file so the listener can use it without importing the session,
 // which imports the listener.
 
-export function plainAuthError(message) {
+export function plainAuthError(message: unknown): string {
   const m = String(message ?? '');
   if (/invalid login credentials/i.test(m)) return 'That email and password do not match an account.';
   if (/email not confirmed/i.test(m)) return 'Confirm your email first: follow the link we sent, then sign in.';

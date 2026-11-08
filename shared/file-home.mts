@@ -3,6 +3,6 @@
 // left out of every list of threads they read.
 export const FILE_HOME = 'file-home';
 
-export const isFileHome = (item) => Array.isArray(item?.labels) && item.labels.includes(FILE_HOME);
+export const isFileHome = (item: { labels?: readonly string[] | null } | null | undefined): boolean => Array.isArray(item?.labels) && item.labels.includes(FILE_HOME);
 
-export const withoutFileHomes = (items) => items.filter((i) => !isFileHome(i));
+export const withoutFileHomes = <T extends { labels?: readonly string[] | null }>(items: T[]): T[] => items.filter((i) => !isFileHome(i));

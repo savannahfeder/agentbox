@@ -93,7 +93,7 @@ export const DEMO_PRODUCTS = [
 const MIN = 60_000;
 const HR = 3_600_000;
 
-function lines(now) {
+function lines(now: number) {
   const rows = [];
 
   /* ------------------------------- Kettle -------------------------------- */
@@ -293,8 +293,15 @@ function lines(now) {
 // own directive is a founder line, so the demo also shows the case where an
 // agent may not rewrite the title, which is the real rule and not a simplified
 // one.
-export function demoLedgerLines(now = Date.now()) {
-  const byProduct = {};
+export type DemoLedgerLine = {
+  id: string;
+  ts: number;
+  source: 'system' | 'founder' | 'agent';
+  patch: Record<string, unknown>;
+};
+
+export function demoLedgerLines(now: number = Date.now()): Record<string, DemoLedgerLine[]> {
+  const byProduct: Record<string, DemoLedgerLine[]> = {};
   for (const p of DEMO_PRODUCTS) byProduct[p.slug] = [];
 
   for (const row of lines(now)) {

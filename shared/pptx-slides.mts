@@ -3,17 +3,25 @@
 // no animation: enough to review a deck and comment on a slide, not to replace
 // PowerPoint, and "Open outside" is one press away.
 
-const EMU_DEFAULT = { w: 9144000, h: 6858000 };
+export interface SlideSize { w: number; h: number }
+export type SlideBox = { x: number; y: number; w: number; h: number } | null;
+export type SlidePart =
+  | { kind: 'picture'; file: string; box: SlideBox }
+  | { kind: 'words'; title: boolean; box: SlideBox; paragraphs: { text: string; pt: number | null }[] };
+export interface Deck { size: SlideSize; slides: SlidePart[][]; picture: (file: string) => Promise<Uint8Array | null> }
+export type Inflate = (bytes: Uint8Array) => Promise<Uint8Array>;
+
+const EMU_DEFAULT: SlideSize = { w: 9144000, h: 6858000 };
 
 /** The files in a zip, by name, each with a way to read its bytes. */
-export function zipEntries(bytes, inflate) {
+export function zipEntries(bytes: Uint8Array, inflate: Inflate): Map<string, () => Promise<Uint8Array>> {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   let end = bytes.length - 22;
   while (end >= 0 && view.getUint32(end, true) !== 0x06054b50) end -= 1;
   if (end < 0) throw new Error('not a zip file');
   const count = view.getUint16(end + 10, true);
   let at = view.getUint32(end + 16, true);
-  const out = new Map();
+  const out = new Map<string, () => Promise<Uint8Array>>();
   const decode = new TextDecoder();
   for (let i = 0; i < count; i += 1) {
     if (view.getUint32(at, true) !== 0x02014b50) throw new Error('a damaged zip file');
@@ -34,11 +42,11 @@ export function zipEntries(bytes, inflate) {
   return out;
 }
 
-const attr = (tag, name) => new RegExp(`\\b${name}="([^"]*)"`).exec(tag)?.[1] ?? null;
-const unescape = (s) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+const attr = (tag: string, name: string): string | null => new RegExp(`\\b${name}="([^"]*)"`).exec(tag)?.[1] ?? null;
+const unescape = (s: string): string => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
 
 /** One shape's box in parts of the slide, or null when it has none of its own. */
-function boxOf(xml, size) {
+function boxOf(xml: string, size: SlideSize): SlideBox {
   const off = /<a:off\b[^>]*>/.exec(xml)?.[0];
   const ext = /<a:ext\b[^>]*cx=[^>]*>/.exec(xml)?.[0];
   if (!off || !ext) return null;
@@ -49,8 +57,8 @@ function boxOf(xml, size) {
 }
 
 /** What one slide's XML says is on it. `rels` maps a picture's r:id to its file in the zip. */
-export function readSlide(xml, rels, size = EMU_DEFAULT) {
-  const parts = [];
+export function readSlide(xml: string, rels: Map<string | null, string>, size: SlideSize = EMU_DEFAULT): SlidePart[] {
+  const parts: SlidePart[] = [];
   for (const m of String(xml).matchAll(/<p:(sp|pic)\b[\s\S]*?<\/p:\1>/g)) {
     const shape = m[0];
     if (m[1] === 'pic') {
@@ -72,26 +80,26 @@ export function readSlide(xml, rels, size = EMU_DEFAULT) {
   return parts;
 }
 
-const inOrder = (a, b) => Number(/(\d+)\.xml$/.exec(a)?.[1]) - Number(/(\d+)\.xml$/.exec(b)?.[1]);
+const inOrder = (a: string, b: string): number => Number(/(\d+)\.xml$/.exec(a)?.[1]) - Number(/(\d+)\.xml$/.exec(b)?.[1]);
 
 /** Every slide of a deck, in order, with its size. `inflate(bytes)` undoes zip's compression. */
-export async function readDeck(bytes, inflate) {
+export async function readDeck(bytes: Uint8Array, inflate: Inflate): Promise<Deck> {
   const entries = zipEntries(bytes, inflate);
-  const text = async (name) => {
+  const text = async (name: string): Promise<string> => {
     const read = entries.get(name);
     return read ? new TextDecoder().decode(await read()) : '';
   };
   const sizeTag = /<p:sldSz\b[^>]*>/.exec(await text('ppt/presentation.xml'))?.[0];
   const size = sizeTag ? { w: Number(attr(sizeTag, 'cx')), h: Number(attr(sizeTag, 'cy')) } : EMU_DEFAULT;
   const names = [...entries.keys()].filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n)).sort(inOrder);
-  const slides = [];
+  const slides: SlidePart[][] = [];
   for (const name of names) {
     const relsXml = await text(name.replace('slides/', 'slides/_rels/').concat('.rels'));
-    const rels = new Map([...relsXml.matchAll(/<Relationship\b[^>]*>/g)].map((m) => {
+    const rels = new Map([...relsXml.matchAll(/<Relationship\b[^>]*>/g)].map((m): [string | null, string] => {
       const target = attr(m[0], 'Target') ?? '';
       return [attr(m[0], 'Id'), target.startsWith('/') ? target.slice(1) : `ppt/${target.replace(/^\.\.\//, '')}`];
     }));
     slides.push(readSlide(await text(name), rels, size));
   }
-  return { size, slides, picture: (file) => entries.get(file)?.() ?? Promise.resolve(null) };
+  return { size, slides, picture: (file: string) => entries.get(file)?.() ?? Promise.resolve(null) };
 }

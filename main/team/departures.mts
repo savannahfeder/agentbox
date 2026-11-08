@@ -4,14 +4,37 @@
 // people hold. Every step that makes something is kept by key, so a pass that
 // fails half way is safe to run again.
 import { isMateCard } from '../../shared/mate-cards.mts';
+import type { BoardCardLike } from '../../shared/mate-cards.mts';
 import { iSpokeLast, isTaskRow } from '../../shared/team-rules.mts';
 import { handedFromLabel, handedWords, standingDepartures } from '../../shared/team-departures.mts';
+import type { HandedMate } from '../../shared/team-departures.mts';
+import type { TalkRow } from '../../shared/team-rules.mts';
+import type { TeamProduct } from './index.mts';
 
-const peopleOn = (product) => new Set([...(product.team?.people ?? []), ...(product.team?.sharedBy ? [product.team.sharedBy] : [])]);
+export interface Departure { personId: string; name: string; handTo: string; mates: HandedMate[]; at: number; by: string }
 
-export async function handOverDepartures({ departures, me, people, cards, products, read, write, give, compose, makeMate, isDone, markDone, now, log = () => {} }) {
+export interface HandOverRow extends TalkRow { id: string; title?: string; body?: unknown; priority?: number; due?: string; agent?: unknown }
+
+const peopleOn = (product: TeamProduct) => new Set([...(product.team?.people ?? []), ...(product.team?.sharedBy ? [product.team.sharedBy] : [])]);
+
+export async function handOverDepartures({ departures, me, people, cards, products, read, write, give, compose, makeMate, isDone, markDone, now, log = () => {} }: {
+  departures: readonly Departure[];
+  me: string;
+  people: readonly { id: string; name?: string }[];
+  cards: readonly (BoardCardLike & { project?: unknown })[] | null | undefined;
+  products: readonly TeamProduct[];
+  read: (product: TeamProduct) => HandOverRow[];
+  write: (dir: string, id: string, patch: Record<string, unknown>, source: string, at?: number) => unknown;
+  give: (to: string, task: { title: string | undefined; body: string; priority: number | undefined; due: string | undefined }) => Promise<unknown>;
+  compose: (slug: string, fields: Record<string, unknown>) => { id?: string } | null | undefined;
+  makeMate: (mate: { name: string; job: string | null; memory: string }) => unknown;
+  isDone: (key: string) => boolean;
+  markDone: (key: string) => void;
+  now: number;
+  log?: (line: string) => void;
+}): Promise<number> {
   let moved = 0;
-  const nameOf = (id) => (id === me ? 'You' : people.find((p) => p.id === id)?.name ?? 'Someone');
+  const nameOf = (id: string) => (id === me ? 'You' : people.find((p) => p.id === id)?.name ?? 'Someone');
   for (const d of standingDepartures(departures, people)) {
     const key = `${d.personId}:${d.at}`;
     if (isDone(key)) continue;
@@ -21,12 +44,13 @@ export async function handOverDepartures({ departures, me, people, cards, produc
     const home = products.find((p) => !p.team?.direct && !p.practice && !p.personal);
     // Held by you, so no agent starts on it; the line is what puts it in Needs
     // you, and it has to come after the words you are taken to have written.
-    const needsYou = (row, said) => {
+    // Only ever called once `home` is known to be there.
+    const needsYou = (row: { id?: string } | null | undefined, said: string) => {
       if (!row?.id) return;
       const at = Math.max(now, Date.now()) + 1;
-      write(home.dir, row.id, { waitEnded: { said, at }, handedOver: { said, at } }, 'system', at);
+      write(home!.dir, row.id, { waitEnded: { said, at }, handedOver: { said, at } }, 'system', at);
     };
-    const once = async (step, fn) => {
+    const once = async (step: string, fn: () => unknown) => {
       if (isDone(`${key}:${step}`)) return;
       await fn();
       markDone(`${key}:${step}`);
@@ -82,7 +106,7 @@ export async function handOverDepartures({ departures, me, people, cards, produc
       }
       markDone(key);
     } catch (err) {
-      log(`team: handing over ${left}'s work: ${err?.message ?? err}`);
+      log(`team: handing over ${left}'s work: ${(err as Error | null)?.message ?? err}`);
     }
   }
   return moved;

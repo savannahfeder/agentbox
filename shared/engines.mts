@@ -19,11 +19,38 @@ import { HARNESS_DEFINITIONS } from './harness-definitions.mts';
  * but is not offered anywhere until it is admitted. The bar for admission is in
  * docs/harnesses.md.
  */
-export const ENGINES = HARNESS_DEFINITIONS
+export interface Engine {
+  id: string;
+  label: string;
+  word: string;
+}
+
+/** A row as the fold hands it over: the engine, the model chosen for it, and when the engine field was set. */
+export interface EngineRow {
+  engine?: string | null;
+  model?: string | null;
+  wrote?: Record<string, { ts?: number; source?: string } | undefined>;
+}
+
+/**
+ * The workspace's half. `engineChoice` and `engineAt` are `unknown` on purpose:
+ * anything that is not an ISO date string is off, so writing `true` must not
+ * satisfy the type.
+ */
+export interface EngineWorkspace {
+  engine?: string | null;
+  engineChoice?: unknown;
+  engineAt?: unknown;
+}
+
+/** Which engine binaries the finders found, by engine id. */
+export type EnginesFound = Record<string, boolean | undefined>;
+
+export const ENGINES: Engine[] = HARNESS_DEFINITIONS
   .filter(({ admitted }) => admitted !== false)
   .map(({ id, label, word }) => ({ id, label, word }));
 
-export const ENGINE_IDS = ENGINES.map((e) => e.id);
+export const ENGINE_IDS: string[] = ENGINES.map((e) => e.id);
 
 /**
  * What a task runs on when nobody has chosen. It is Claude Code for the speed
@@ -60,7 +87,7 @@ export const ENGINE_CHOICE_ENABLED = Symbol('the second engine is wired up in th
 // or "2026", and `"engineChoice": "1"` must not open the second engine.
 const A_MOMENT = /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
 
-function momentIn(written) {
+function momentIn(written: unknown): number | null {
   if (typeof written !== 'string' || !A_MOMENT.test(written)) return null;
   const at = Date.parse(written);
   return Number.isFinite(at) ? at : null;
@@ -73,7 +100,7 @@ function momentIn(written) {
  * rather than app state so every machine reading the same store agrees.
  * main/supervisor.mts `_engineFor` is the only place that turns it into the token.
  */
-export function engineChoiceSince(config = {}) {
+export function engineChoiceSince(config: EngineWorkspace | null = {}): number | null {
   return momentIn(config?.engineChoice);
 }
 
@@ -82,7 +109,7 @@ export function engineChoiceSince(config = {}) {
  * `engine` by `setWorkspaceSetting`), or null. Null means the default was typed
  * into the file by hand, in the same act as `engineChoice`, so it is never stale.
  */
-export function engineDefaultSince(config = {}) {
+export function engineDefaultSince(config: EngineWorkspace | null = {}): number | null {
   return momentIn(config?.engineAt);
 }
 
@@ -91,7 +118,7 @@ export function engineDefaultSince(config = {}) {
  * Never true for Claude Code: discarding that default could only move work onto
  * the second engine.
  */
-export function engineDefaultIsStale(config = {}) {
+export function engineDefaultIsStale(config: EngineWorkspace | null = {}): boolean {
   const since = engineChoiceSince(config);
   if (since === null) return false;
   if (!enginePicked(config?.engine)) return false;
@@ -108,19 +135,19 @@ export function engineDefaultIsStale(config = {}) {
  * `wrote.engine.source` is not consulted, because a ledger line names its own
  * author as an unchecked string.
  */
-export function engineChoiceOnRowIsStale(item, config = {}) {
+export function engineChoiceOnRowIsStale(item: EngineRow | null | undefined, config: EngineWorkspace | null = {}): boolean {
   const since = engineChoiceSince(config);
   if (since === null) return false;
   if (!enginePicked(item?.engine)) return false;
   const ts = item?.wrote?.engine?.ts;
-  return !(Number.isFinite(ts) && ts >= since);
+  return !(Number.isFinite(ts) && ts! >= since);
 }
 
-export function isEngine(id) {
+export function isEngine(id: unknown): id is string {
   return typeof id === 'string' && ENGINE_IDS.includes(id);
 }
 
-export function engineLabel(id) {
+export function engineLabel(id: string | null | undefined): string {
   return ENGINES.find((e) => e.id === id)?.label ?? ENGINES[0].label;
 }
 
@@ -134,7 +161,7 @@ export function engineLabel(id) {
  * snapshot. tests/a-codex-row-from-august-still-runs-on-claude.test.mts pins the
  * caller list.
  */
-export function availableEngines(found = {}) {
+export function availableEngines(found: EnginesFound = {}): Engine[] {
   const home = homeEngine(found);
   return ENGINES.filter((e) => e.id === home || (e.id !== DEFAULT_ENGINE && found[e.id]));
 }
@@ -144,12 +171,12 @@ export function availableEngines(found = {}) {
  * is explicitly false and Codex was found. Undefined means a caller that never
  * asked, and reads as Claude Code being here.
  */
-export function homeEngine(found = {}) {
+export function homeEngine(found: EnginesFound = {}): string {
   return found.claude === false && found.codex ? 'codex' : DEFAULT_ENGINE;
 }
 
 /** Whether there is a choice to make at all. One engine is not a choice. */
-export function engineChoiceExists(found = {}) {
+export function engineChoiceExists(found: EnginesFound = {}): boolean {
   return availableEngines(found).length > 1;
 }
 
@@ -160,7 +187,10 @@ export function engineChoiceExists(found = {}) {
  * before the gate's moment. An engine whose binary is not on this Mac falls back
  * to Claude Code, since the row may have been chosen on another machine.
  */
-export function engineFor(item, { config = {}, found = {}, enabled } = {}) {
+export function engineFor(
+  item: EngineRow | null | undefined,
+  { config = {}, found = {}, enabled }: { config?: EngineWorkspace | null; found?: EnginesFound; enabled?: typeof ENGINE_CHOICE_ENABLED } = {},
+): string {
   if (homeEngine(found) !== DEFAULT_ENGINE) return homeEngine(found);
   if (enabled !== ENGINE_CHOICE_ENABLED) return DEFAULT_ENGINE;
   const wanted = isEngine(item?.engine) && !engineChoiceOnRowIsStale(item, config) ? item.engine : null;
@@ -174,7 +204,7 @@ export function engineFor(item, { config = {}, found = {}, enabled } = {}) {
  * Whether the row names an engine other than the default. The composer's footer
  * stays open on it, like the level and the model (renderer/src/compose-footer.ts).
  */
-export function enginePicked(id) {
+export function enginePicked(id: unknown): boolean {
   return isEngine(id) && id !== DEFAULT_ENGINE;
 }
 
@@ -186,7 +216,7 @@ export function enginePicked(id) {
  * main/supervisor.mts decides what to do with it. A row naming no engine keeps
  * its model.
  */
-export function modelForEngine(item, engine) {
+export function modelForEngine(item: EngineRow | null | undefined, engine: string | null): string | null {
   const model = typeof item?.model === 'string' && item.model ? item.model : null;
   if (!model) return null;
   if (isEngine(item?.engine) && item.engine !== engine) return null;

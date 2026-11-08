@@ -41,7 +41,29 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CLAUDE_MODELS, READ_FROM } from '../shared/claude-models.generated.mts';
+import { CLAUDE_MODELS, READ_FROM, type ClaudeModel } from '../shared/claude-models.generated.mts';
+
+/** One model of the catalog inside the Claude Code binary. */
+export interface CatalogName {
+  id: string;
+  family: string;
+  label: string;
+  defaultLevel: string | null;
+}
+
+/** Family word to the model id it resolves to, e.g. `opus` to `claude-opus-5-5`. */
+export type AliasTable = Record<string, string>;
+
+interface LocalTable {
+  models: ClaudeModel[];
+  readFrom?: string | null;
+}
+
+export interface ClaudeModelsAnswer {
+  models: ClaudeModel[];
+  readFrom: string | null;
+  source: 'cli' | 'read' | 'built';
+}
 
 // WHAT THE LAST BUILD ON THIS MACHINE READ, which is a better floor than the
 // committed table and is not a file anybody edits.
@@ -57,14 +79,14 @@ import { CLAUDE_MODELS, READ_FROM } from '../shared/claude-models.generated.mts'
 const LOCAL = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'shared', 'claude-models.local.json');
 
 /** The table this machine read at build time, or null if there is none to trust. */
-function readLocal(at) {
+function readLocal(at: string): LocalTable | null {
   try {
-    const table = JSON.parse(fs.readFileSync(at, 'utf8'));
+    const table: { models?: unknown; readFrom?: string | null } = JSON.parse(fs.readFileSync(at, 'utf8'));
     if (!Array.isArray(table.models) || !table.models.length) return null;
     // Every row has to carry what the picker draws. A half-written file is a
     // worse answer than the committed table, not a better one.
-    if (!table.models.every((m) => m && typeof m.alias === 'string' && typeof m.label === 'string')) return null;
-    return table;
+    if (!table.models.every((m: Partial<ClaudeModel> | null) => m && typeof m.alias === 'string' && typeof m.label === 'string')) return null;
+    return table as LocalTable;
   } catch { return null; }
 }
 
@@ -80,10 +102,10 @@ const CHUNK = 8 * 1024 * 1024;
 const OVERLAP = 64 * 1024;
 
 /** The alias table: which model id each family word resolves to. */
-export function readAliases(text) {
+export function readAliases(text: string): AliasTable | null {
   const m = text.match(/latest_per_family:\{([^}]*)\}/);
   if (!m) return null;
-  const out = {};
+  const out: AliasTable = {};
   for (const [, alias, id] of m[1].matchAll(/([a-z_]+):"([^"]+)"/g)) out[alias] = id;
   return Object.keys(out).length ? out : null;
 }
@@ -107,8 +129,8 @@ export function readAliases(text) {
  * immediately before the alias's own, inside its family, and no version number
  * is ever read by us.
  */
-export function readNames(text) {
-  const out = [];
+export function readNames(text: string): CatalogName[] {
+  const out: CatalogName[] = [];
   for (const m of text.matchAll(/id:"(claude-[a-z0-9-]+)",family:"([a-z]+)",display_name:"([^"]+)"(.{0,1200}?)(?=id:"claude-|$)/gs)) {
     const [, id, family, label, rest] = m;
     out.push({ id, family, label, defaultLevel: rest.match(/default_effort:"([a-z]+)"/)?.[1] ?? null });
@@ -117,7 +139,7 @@ export function readNames(text) {
 }
 
 /** The catalog's own name for one id, or undefined if it names none. */
-export const nameOf = (names, id) => names.find((n) => n.id === id)?.label;
+export const nameOf = (names: CatalogName[], id: string): string | undefined => names.find((n) => n.id === id)?.label;
 
 // AND HOW HARD THAT MODEL THINKS WHEN NOBODY SAYS.
 //
@@ -148,10 +170,10 @@ export const nameOf = (names, id) => names.find((n) => n.id === id)?.label;
  * time she spends waiting for a picker to open. Measured on her Mac against
  * 2.1.270: 82 ms for the whole file, 8 ms stopping at the alias table.
  */
-export function scan(binPath, { chunk = CHUNK } = {}) {
-  let aliases = null;
-  const names = [];
-  const seen = new Set();
+export function scan(binPath: string, { chunk = CHUNK }: { chunk?: number } = {}): { aliases: AliasTable | null; names: CatalogName[] } {
+  let aliases: AliasTable | null = null;
+  const names: CatalogName[] = [];
+  const seen = new Set<string>();
   const fd = fs.openSync(binPath, 'r');
   try {
     const size = fs.fstatSync(fd).size;
@@ -180,10 +202,10 @@ export function scan(binPath, { chunk = CHUNK } = {}) {
 
 /* A family with only one model in the * catalog contributes one row, not a duplicate.
 */
-export function rowsFrom({ aliases, names }) {
+export function rowsFrom({ aliases, names }: { aliases: AliasTable | null; names: CatalogName[] }): ClaudeModel[] | null {
   if (!aliases) return null;
   const order = [...HER_ORDER, ...Object.keys(aliases).filter((a) => !HER_ORDER.includes(a)).sort()];
-  const rows = [];
+  const rows: ClaudeModel[] = [];
   for (const alias of order) {
     const id = aliases[alias];
     const self = names.find((x) => x.id === id);
@@ -192,10 +214,10 @@ export function rowsFrom({ aliases, names }) {
     // `defaultLevel` travels beside the name rather than as a list of its own,
     // the way main/codex-models.mts carries its models' levels: it is per model,
     // so a table of its own could disagree with the row it belongs to.
-    rows.push({ alias, id, label, defaultLevel: self.defaultLevel ?? null });
+    rows.push({ alias, id, label, defaultLevel: self!.defaultLevel ?? null });
     // The entry immediately before this one inside its own family. The catalog
     // is ascending, so that is the model she was on before the newest shipped.
-    const family = names.filter((n) => n.family === self.family);
+    const family = names.filter((n) => n.family === self!.family);
     const before = family[family.findIndex((n) => n.id === id) - 1];
     if (before) {
       rows.push({ alias: before.id, id: before.id, label: before.label, defaultLevel: before.defaultLevel ?? null });
@@ -214,12 +236,12 @@ export function rowsFrom({ aliases, names }) {
 // path, size and mtime of the binary that produced it. `claude update` replaces
 // that file, so the very next read is a fresh one. There is no staleness window
 // and no interval to tune.
-let memo = null;
+let memo: { stamp: string; value: ClaudeModelsAnswer } | null = null;
 
 /** Exported for the tests, and for anything that has a reason to force a re-read. */
-export function forget() { memo = null; }
+export function forget(): void { memo = null; }
 
-function stampOf(binPath) {
+function stampOf(binPath: string): string | null {
   try {
     const s = fs.statSync(binPath);
     return `${binPath}:${s.size}:${s.mtimeMs}`;
@@ -247,11 +269,11 @@ function stampOf(binPath) {
  * worth a process started while she waits. `readFrom` is the committed table's
  * version, and it is meaningful whenever `source` is not `'cli'`.
  */
-export function claudeModels({ bin = null, local = LOCAL } = {}) {
+export function claudeModels({ bin = null, local = LOCAL }: { bin?: string | null; local?: string } = {}): ClaudeModelsAnswer {
   // THE FLOOR IS THE FRESHER OF THE TWO TABLES NOBODY HAS TO ASK FOR: what the
   // last build on this machine read, and the one committed to the repository.
   const read = readLocal(local);
-  const built = {
+  const built: ClaudeModelsAnswer = {
     models: (read?.models ?? CLAUDE_MODELS).map((m) => ({
       alias: m.alias, id: m.id, label: m.label, defaultLevel: m.defaultLevel ?? null,
     })),
@@ -262,15 +284,15 @@ export function claudeModels({ bin = null, local = LOCAL } = {}) {
   const stamp = stampOf(bin);
   if (!stamp) return built;
   if (memo?.stamp === stamp) return memo.value;
-  let rows = null;
+  let rows: ClaudeModel[] | null = null;
   try { rows = rowsFrom(scan(bin)); } catch { rows = null; }
   // A CLI WE CANNOT READ IS NOT A REASON TO DRAW AN EMPTY PICKER, and it is not
   // a reason to stop either: this is the labelling, not the spawn, and the alias
   // Agentbox sends works whether or not this file could find the table it is in.
-  const value = rows ? { models: rows, readFrom: null, source: 'cli' } : built;
+  const value: ClaudeModelsAnswer = rows ? { models: rows, readFrom: null, source: 'cli' } : built;
   memo = { stamp, value };
   return value;
 }
 
 /** Just the rows, for the callers that do not care where they came from. */
-export function claudeModelRows(opts = {}) { return claudeModels(opts).models; }
+export function claudeModelRows(opts: Parameters<typeof claudeModels>[0] = {}): ClaudeModel[] { return claudeModels(opts).models; }

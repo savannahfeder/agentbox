@@ -7,11 +7,63 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { SCHEMA_VERSION, validateCreation, creationText, TEXT_CREATION_KINDS } from '../../shared/contracts.mts';
 import { assertInside, assertCreationDir, deniesGitOrEnvPath } from './paths.mts';
-import { migrateIndex } from './migrate.mts';
+import { migrateIndex, type StoredIndex } from './migrate.mts';
 import { withProjectLockSync } from './project-lock.mts';
 import { projectWritten } from './projects-changed.mts';
 import { readEnv } from '../../shared/product-name.mjs';
 import { defaultStoreRoot } from './home.mts';
+import type { ChatMessage } from './chats.mts';
+
+// `kind` and `title` are optional because a deleted entry keeps only `id`, `deleted` and `ts`.
+export interface CreationEnvelope {
+  id: string;
+  kind?: string;
+  title?: string;
+  ts?: number;
+  schemaVersion?: number;
+  path?: string;
+  dir?: string;
+  entry?: string;
+  meta?: Record<string, unknown>;
+  status?: string;
+  replacedBy?: string;
+  updatedAt?: string;
+  deleted?: boolean;
+  [field: string]: unknown;
+}
+
+export interface ProjectIndex {
+  schemaVersion: number;
+  creations: CreationEnvelope[];
+  runs: unknown[];
+  reports: unknown[];
+  updatedAt: string | null;
+  [field: string]: unknown;
+}
+
+export interface ProjectFile {
+  schemaVersion?: number;
+  id: string;
+  name: string;
+  createdAt?: string;
+  cloudId?: string | null;
+  archived?: boolean;
+  productCreationId?: string | null;
+  [field: string]: unknown;
+}
+export type LoadedProject = ProjectFile & { dir: string };
+
+export interface ProjectSummary {
+  id: string;
+  name: string;
+  createdAt?: string;
+  updatedAt: string | null;
+  dir: string;
+  cloudId: string | null;
+  archived: boolean;
+}
+
+interface ViewFile { openTabs?: string[]; activeTab?: string | null; pinnedTabs?: string[]; browsers?: unknown[]; [field: string]: unknown }
 
 // The machine-wide root: the store-home variable, else the same default
 // loadConfig uses when a config names no store. This is where device-local
@@ -27,7 +79,7 @@ import { defaultStoreRoot } from './home.mts';
 // Her live store is named in zero.config.json and handed to every worker as
 // the app's own home variable, so this line is only ever the answer for an
 // install carrying no config and no store-home variable.
-export function legacyRoot() {
+export function legacyRoot(): string {
   return readEnv('HOME') || defaultStoreRoot();
 }
 
@@ -36,20 +88,20 @@ export function legacyRoot() {
 // every caller having to thread a userId through. One account is active per
 // running app at a time; switching accounts re-inits (see the account-scoped
 // persistence spec).
-let currentAccountId = null;
+let currentAccountId: string | null = null;
 
 // A user id sanitized to a safe single path segment (Supabase ids are UUIDs;
 // this is belt-and-braces so a hostile/odd id can never escape accounts/).
-function sanitizeAccountId(userId) {
+function sanitizeAccountId(userId: unknown): string {
   return String(userId ?? '').toLowerCase().replace(/[^a-z0-9-]+/g, '').slice(0, 64) || 'account';
 }
 
-export function accountRootFor(userId) {
+export function accountRootFor(userId: unknown): string {
   return path.join(legacyRoot(), 'accounts', sanitizeAccountId(userId));
 }
 
 // Enter an account's data space. All later dataRoot answers resolve here.
-export function setAccountScope(userId) {
+export function setAccountScope(userId: string | null | undefined): string {
   currentAccountId = userId ? sanitizeAccountId(userId) : null;
   return dataRoot();
 }
@@ -57,11 +109,11 @@ export function setAccountScope(userId) {
 // Leave the account space (sign-out). Signed out is DEV-ONLY (packaged builds
 // always gate), and resolves back to the legacy root, exactly the pre-account
 // behavior, so the founder's dev workflow is unchanged.
-export function clearAccountScope() {
+export function clearAccountScope(): void {
   currentAccountId = null;
 }
 
-export function getAccountId() {
+export function getAccountId(): string | null {
   return currentAccountId;
 }
 
@@ -69,44 +121,47 @@ export function getAccountId() {
 // <legacyRoot>/accounts/<X>; signed out (dev only) it is the legacy root
 // itself. Machine-wide files deliberately use legacyRoot instead, so they
 // stay global across accounts.
-export function dataRoot() {
+export function dataRoot(): string {
   const base = legacyRoot();
   return currentAccountId ? path.join(base, 'accounts', currentAccountId) : base;
 }
 
-export function sanitizeName(name) {
+export function sanitizeName(name: unknown): string {
   const slug = String(name ?? '').trim().toLowerCase()
     .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
   return slug || 'untitled';
 }
 
-export function atomicWriteJson(file, obj) {
+export function atomicWriteJson(file: string, obj: unknown): void {
   const tmp = `${file}.tmp-${crypto.randomBytes(4).toString('hex')}`;
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(tmp, JSON.stringify(obj, null, 2));
   fs.renameSync(tmp, file);
 }
 
-export function readJson(file, fallback = null) {
+/** The file's JSON, taken to be a `T` without checking, or `fallback` when it is missing or unreadable. */
+export function readJson<T>(file: string, fallback: T): T;
+export function readJson<T = unknown>(file: string): T | null;
+export function readJson<T>(file: string, fallback: T | null = null): T | null {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
 }
 
-function emptyIndex() {
+function emptyIndex(): ProjectIndex {
   return { schemaVersion: SCHEMA_VERSION, creations: [], runs: [], reports: [], updatedAt: null };
 }
 
 // Read index.json, migrating a v1 shape to v2 on the way in. The migrated
 // result is written back only when it actually differs from what was on
 // disk, so a project already on v2 never takes a spurious write.
-export function readIndex(projectDir) {
+export function readIndex(projectDir: string): ProjectIndex {
   const file = path.join(projectDir, 'index.json');
-  const raw = readJson(file, emptyIndex());
+  const raw = readJson<StoredIndex>(file, emptyIndex());
   const idx = migrateIndex(raw);
   if (idx !== raw) atomicWriteJson(file, idx);
   return idx;
 }
 
-export function createProject(name, root = dataRoot()) {
+export function createProject(name: string, root = dataRoot()): LoadedProject {
   fs.mkdirSync(root, { recursive: true });
   let slug = sanitizeName(name);
   let dir = path.join(root, slug);
@@ -123,7 +178,7 @@ export function createProject(name, root = dataRoot()) {
   for (const sub of ['personas', 'transcripts', 'reports', 'designs', 'creations']) {
     fs.mkdirSync(path.join(dir, sub), { recursive: true });
   }
-  const project = { schemaVersion: SCHEMA_VERSION, id: slug, name: String(name ?? slug), createdAt: new Date().toISOString() };
+  const project: ProjectFile = { schemaVersion: SCHEMA_VERSION, id: slug, name: String(name ?? slug), createdAt: new Date().toISOString() };
   atomicWriteJson(path.join(dir, 'project.json'), project);
   projectWritten();
   atomicWriteJson(path.join(dir, 'index.json'), emptyIndex());
@@ -134,13 +189,13 @@ export function createProject(name, root = dataRoot()) {
 // it must be a friendly, clean starting page: NO scaffolding comments. The
 // agent keeps the index in shape from its skills; the doc itself stays plain
 // prose.
-export function starterNotesDoc(name) {
+export function starterNotesDoc(name: string): string {
   return `# ${name}\n\nThis is your product's living map. I keep it short and current as we work: the decisions we make, where things stand, and where the real detail lives. Everything we build together shows up beside this.\n\n## Decisions\n\nNothing decided yet.\n\n## Where we are\n\nJust getting started.\n`;
 }
 
-export function listProjects(root = dataRoot()) {
+export function listProjects(root = dataRoot()): ProjectSummary[] {
   if (!fs.existsSync(root)) return [];
-  return fs.readdirSync(root, { withFileTypes: true })
+  return (fs.readdirSync(root, { withFileTypes: true })
     // A project may be a symlink into another store root (one physical dir
     // reachable from two roots); a Dirent reports a symlink as
     // not-a-directory, so resolve with stat before filtering.
@@ -148,9 +203,9 @@ export function listProjects(root = dataRoot()) {
       try { return fs.statSync(path.join(root, e.name)).isDirectory(); } catch { return false; }
     })
     .map((e) => {
-      const p = readJson(path.join(root, e.name, 'project.json'));
+      const p = readJson<ProjectFile>(path.join(root, e.name, 'project.json'));
       if (!p) return null;
-      const idx = readJson(path.join(root, e.name, 'index.json'), emptyIndex());
+      const idx = readJson<StoredIndex>(path.join(root, e.name, 'index.json'), emptyIndex());
       // cloudId and archived ride along because consumers dedupe against them:
       // the app's cloud bootstrap checks `local.cloudId === row.project_id` to
       // decide a registry row is already represented locally. When this list
@@ -160,13 +215,13 @@ export function listProjects(root = dataRoot()) {
       // identity with the duplicate's (2026-08-04).
       return { id: p.id, name: p.name, createdAt: p.createdAt, updatedAt: idx.updatedAt, dir: path.join(root, e.name), cloudId: p.cloudId ?? null, archived: p.archived === true };
     })
-    .filter(Boolean)
+    .filter(Boolean) as ProjectSummary[])
     .sort((a, b) => String(b.updatedAt ?? b.createdAt).localeCompare(String(a.updatedAt ?? a.createdAt)));
 }
 
-export function loadProject(id, root = dataRoot()) {
+export function loadProject(id: string, root = dataRoot()): LoadedProject | null {
   const dir = path.join(root, sanitizeName(id));
-  const p = readJson(path.join(dir, 'project.json'));
+  const p = readJson<ProjectFile>(path.join(dir, 'project.json'));
   return p ? { ...p, dir } : null;
 }
 
@@ -176,12 +231,12 @@ export function loadProject(id, root = dataRoot()) {
 // drifted apart (two products can even carry the same id, so no id-based lookup
 // can tell them apart). Anything that has already resolved a product should keep
 // hold of its directory and come back through here.
-export function loadProjectAt(dir) {
-  const p = readJson(path.join(dir, 'project.json'));
+export function loadProjectAt(dir: string): LoadedProject | null {
+  const p = readJson<ProjectFile>(path.join(dir, 'project.json'));
   return p ? { ...p, dir } : null;
 }
 
-export function renameProject(id, newName, root = dataRoot()) {
+export function renameProject(id: string, newName: unknown, root = dataRoot()): LoadedProject | null {
   const name = String(newName ?? '').trim();
   if (!name) return null;
   return patchProject(id, { name }, root);
@@ -191,7 +246,7 @@ export function renameProject(id, newName, root = dataRoot()) {
 // Containment is belt-and-braces: the id resolves through sanitizeName to a
 // DIRECT child of the data root, and that child must actually be a project
 // (project.json present), so a stray id can never point the rm anywhere else.
-export function deleteProject(id, root = dataRoot()) {
+export function deleteProject(id: string, root = dataRoot()): boolean {
   const slug = sanitizeName(id);
   const dir = path.join(root, slug);
   if (path.dirname(path.resolve(dir)) !== path.resolve(root)) throw new Error('refusing: path escapes the data root');
@@ -207,7 +262,7 @@ export function deleteProject(id, root = dataRoot()) {
 // to the event loop so the app stays responsive while the folder is erased.
 // Same containment guards as the sync version, so a stray id can never point
 // the rm outside the data root.
-export async function deleteProjectAsync(id, root = dataRoot()) {
+export async function deleteProjectAsync(id: string, root = dataRoot()): Promise<boolean> {
   const slug = sanitizeName(id);
   const dir = path.join(root, slug);
   if (path.dirname(path.resolve(dir)) !== path.resolve(root)) throw new Error('refusing: path escapes the data root');
@@ -218,7 +273,7 @@ export async function deleteProjectAsync(id, root = dataRoot()) {
 }
 
 // Shallow-merge fields into project.json (e.g. lastSessionId for resume).
-export function patchProject(id, patch, root = dataRoot()) {
+export function patchProject(id: string, patch: Partial<ProjectFile>, root = dataRoot()): LoadedProject | null {
   const p = loadProject(id, root);
   if (!p) return null;
   return patchProjectAt(p.dir, patch);
@@ -227,7 +282,7 @@ export function patchProject(id, patch, root = dataRoot()) {
 // The same write, aimed at a folder a caller already resolved. This is the safe
 // one: a write that re-derives its folder from an id lands wherever that id
 // happens to name, which is not always the product the caller looked up.
-export function patchProjectAt(dir, patch) {
+export function patchProjectAt(dir: string, patch: Partial<ProjectFile>): LoadedProject | null {
   const p = loadProjectAt(dir);
   if (!p) return null;
   atomicWriteJson(path.join(dir, 'project.json'), { ...p, dir: undefined, ...patch });
@@ -251,7 +306,7 @@ export function patchProjectAt(dir, patch) {
 // 30-second staleness timer across a slow push would get it broken mid-flight,
 // which is worse than not locking at all. This section is a read, a mutate, and
 // a rename, so it is over in about a millisecond.
-export function updateIndex(projectDir, mutate) {
+export function updateIndex(projectDir: string, mutate: (idx: ProjectIndex) => void): ProjectIndex {
   return withProjectLockSync(projectDir, () => {
     const file = path.join(projectDir, 'index.json');
     const idx = readIndex(projectDir);
@@ -263,33 +318,33 @@ export function updateIndex(projectDir, mutate) {
 }
 
 /* --------------------------------- chat --------------------------------- */
-export function appendChat(projectDir, message) {
+export function appendChat(projectDir: string, message: ChatMessage): void {
   fs.appendFileSync(path.join(projectDir, 'chat.jsonl'), JSON.stringify(message) + '\n');
 }
 
 // The log is append-only; a message is UPDATED by appending a line with the
 // same id (asks do this when answered). Reading folds duplicates: last line
 // wins, the message keeps its original position in the conversation.
-export function readChat(projectDir) {
-  let lines;
+export function readChat(projectDir: string): ChatMessage[] {
+  let lines: string[];
   try {
     lines = fs.readFileSync(path.join(projectDir, 'chat.jsonl'), 'utf8').split('\n').filter(Boolean);
   } catch { return []; }
-  const order = []; const byId = new Map();
+  const order: string[] = []; const byId = new Map<string, ChatMessage>();
   for (const l of lines) {
-    let m; try { m = JSON.parse(l); } catch { continue; } // torn tail line: skip
+    let m: ChatMessage | null; try { m = JSON.parse(l); } catch { continue; } // torn tail line: skip
     if (!m?.id) continue;
     if (!byId.has(m.id)) order.push(m.id);
     byId.set(m.id, { ...(byId.get(m.id) ?? {}), ...m });
   }
-  return order.map((id) => byId.get(id));
+  return order.map((id) => byId.get(id)!);
 }
 
 /* ------------------------------- creations ------------------------------- */
 // Envelope in index.json; content in the file at envelope.path (project-relative)
 // for a single-file creation, or under envelope.dir (a git-backed folder,
 // see main/creations/materialize.mjs) for a folder-backed one.
-export function saveCreation(projectDir, envelope, content) {
+export function saveCreation(projectDir: string, envelope: CreationEnvelope, content: unknown): string {
   // Validate at the sink, not on trust: every catalog writer routes through
   // here, so a malformed envelope (an unregistered kind, path and dir both
   // set) is refused before it can land in index.json. The phantom kind 'doc'
@@ -340,7 +395,7 @@ export function saveCreation(projectDir, envelope, content) {
   // a .json file is an existing, deliberate path), and the envelope's own
   // extension is the declaration rather than something to infer.
   const wantsText = content != null
-    && TEXT_CREATION_KINDS.includes(envelope.kind)
+    && TEXT_CREATION_KINDS.includes(envelope.kind!)
     && !/\.json$/i.test(rel);
   const body = wantsText ? creationText(content) : content;
   if (typeof body === 'string') {
@@ -392,11 +447,11 @@ export function saveCreation(projectDir, envelope, content) {
 //                moved on and had no reason to think about it again.
 export const CREATION_STATUSES = ['current', 'history', 'exploration'];
 
-export function setCreationStatus(projectDir, id, { status, replacedBy } = {}) {
+export function setCreationStatus(projectDir: string, id: string, { status, replacedBy }: { status?: string; replacedBy?: unknown } = {}): CreationEnvelope {
   const idx = readIndex(projectDir);
   const envelope = (idx.creations ?? []).find((c) => c.id === id && !c.deleted);
   if (!envelope) throw new Error(`no such creation: ${id}`);
-  const next = { ...envelope, updatedAt: new Date().toISOString() };
+  const next: CreationEnvelope = { ...envelope, updatedAt: new Date().toISOString() };
   if (status === 'history' || status === 'exploration') {
     next.status = status;
     const note = typeof replacedBy === 'string' ? replacedBy.trim() : '';
@@ -415,7 +470,7 @@ export function setCreationStatus(projectDir, id, { status, replacedBy } = {}) {
 // folder-backed creation's `dir` is removed recursively. A directory-shaped
 // `path` (e.g. a live run) is left on disk, only the catalog entry tombstones.
 // Returns the removed envelope, or null if there was no such creation.
-export function deleteCreation(projectDir, id) {
+export function deleteCreation(projectDir: string, id: string): CreationEnvelope | null {
   const idx = readIndex(projectDir);
   const envelope = (idx.creations ?? []).find((c) => c.id === id);
   if (!envelope) return null;
@@ -434,7 +489,7 @@ export function deleteCreation(projectDir, id) {
     // swallowed here (disk left alone, catalog still tombstones below); a
     // real removal failure on a legitimately-scoped dir is a genuine error
     // and must surface, not silently report success.
-    let abs = null;
+    let abs: string | null = null;
     try { abs = assertCreationDir(projectDir, envelope.dir); } catch { /* unsafe dir: leave disk alone */ }
     if (abs) fs.rmSync(abs, { recursive: true, force: true });
   }
@@ -447,7 +502,7 @@ export function deleteCreation(projectDir, id) {
   // (spawn ENOENT, misreported by the SDK as a libc problem). Clearing it here
   // covers every deletion caller.
   const projFile = path.join(projectDir, 'project.json');
-  const proj = readJson(projFile);
+  const proj = readJson<ProjectFile>(projFile);
   if (proj?.productCreationId === id) {
     atomicWriteJson(projFile, { ...proj, productCreationId: null });
     projectWritten();
@@ -455,7 +510,7 @@ export function deleteCreation(projectDir, id) {
   return envelope;
 }
 
-export function readCreationContent(projectDir, envelope) {
+export function readCreationContent(projectDir: string, envelope: CreationEnvelope): unknown {
   const rel = envelope.path;
   if (!rel) throw new Error(`unsafe creation path: ${rel}`);
   // A kind 'file' creation is raw bytes (video, audio, an arbitrary asset);
@@ -486,10 +541,10 @@ export function readCreationContent(projectDir, envelope) {
 // must not yank her away. The live creation.opened event still focuses the tab
 // for a founder who IS watching, and her own saveView still wins afterwards
 // (closing a tab is her call, and last write wins). Returns the tab list.
-export function noteOpenedTab(projectDir, creationId) {
+export function noteOpenedTab(projectDir: string, creationId: unknown): string[] | null {
   if (!projectDir || typeof creationId !== 'string' || !creationId) return null;
   const file = path.join(projectDir, 'view.json');
-  const view = readJson(file, null) ?? { openTabs: [], activeTab: null, pinnedTabs: [], browsers: [] };
+  const view = readJson<ViewFile | null>(file, null) ?? { openTabs: [], activeTab: null, pinnedTabs: [], browsers: [] };
   const openTabs = Array.isArray(view.openTabs) ? view.openTabs : [];
   if (openTabs.includes(creationId)) return openTabs;
   const next = [...openTabs, creationId].slice(-200);
@@ -503,14 +558,14 @@ export function noteOpenedTab(projectDir, creationId) {
 // actually open plus small docs (library excerpts stay populated). The
 // renderer hydrates anything else through IPC.creationContent on tab open.
 export const SNAPSHOT_SMALL_CONTENT_BYTES = 16 * 1024;
-export function snapshotCreations(projectDir, openIds = new Set()) {
+export function snapshotCreations(projectDir: string, openIds = new Set<string>()): { envelope: CreationEnvelope; content: unknown }[] {
   const live = (readIndex(projectDir).creations ?? []).filter((c) => !c.deleted);
   return live.map((envelope) => {
     // a live-run's path is a run DIRECTORY, not a content file: it has no body
     // to read (the tab rebuilds its last still from meta), so skip the read
     // rather than lean on a directory read throwing.
     if (envelope.kind === 'live-run') return { envelope, content: null };
-    let content = null;
+    let content: unknown = null;
     try {
       // readCreationContent enforces containment and the .git/.env deny; a
       // tampered index.json yields a null-content tab, never file contents.

@@ -34,9 +34,21 @@
 //
 //   Saying you meant it, with ZERO_DEV_ON_REAL_STORE=1.
 
+import type { AddressInfo, Server } from 'node:net';
+
 // `storeHasWork` is passed in rather than read here so this stays a pure
 // decision and can be tested without a disk.
-export function hotWindowVerdict({ devUrl, fixtures, forced, storeRoot, storeHasWork }) {
+export interface HotWindowFacts {
+  devUrl?: string | null;
+  fixtures: boolean;
+  forced: boolean;
+  storeRoot: string;
+  storeHasWork: boolean;
+}
+
+export interface HotWindowVerdict { allow: boolean; reason: string; message?: string }
+
+export function hotWindowVerdict({ devUrl, fixtures, forced, storeRoot, storeHasWork }: HotWindowFacts): HotWindowVerdict {
   if (!devUrl) return { allow: true, reason: 'no dev server' };
   if (fixtures) return { allow: true, reason: 'fixtures' };
   if (forced) return { allow: true, reason: 'ZERO_DEV_ON_REAL_STORE' };
@@ -61,7 +73,7 @@ export function hotWindowVerdict({ devUrl, fixtures, forced, storeRoot, storeHas
 
 // Whether a store root has anybody's work under it. An account directory is the
 // smallest true sign: a throwaway home has none, hers has one.
-export function storeHasWork(fs, path, storeRoot) {
+export function storeHasWork(fs: { readdirSync(dir: string): string[] }, path: { join(...parts: string[]): string }, storeRoot: string): boolean {
   try {
     const accounts = path.join(storeRoot, 'accounts');
     return fs.readdirSync(accounts).some((name) => !name.startsWith('.'));
@@ -89,14 +101,15 @@ export function storeHasWork(fs, path, storeRoot) {
 // run takes a free ephemeral port and tells its own electron where to find it.
 // A window polling yesterday's port then polls it forever and nothing answers,
 // which is the whole point.
-export function chooseDevPort(net) {
+export function chooseDevPort(net: { createServer(): Server }): Promise<number> {
   const server = net.createServer();
   return new Promise((resolve, reject) => {
     server.once('error', reject);
     // Port 0 asks the OS for one nothing else holds, so this can never pick a
     // port some other window is already waiting on.
     server.listen(0, '127.0.0.1', () => {
-      const { port } = server.address();
+      // A TCP listen answers with an address, never a pipe name.
+      const { port } = server.address() as AddressInfo;
       server.close((err) => (err ? reject(err) : resolve(port)));
     });
   });

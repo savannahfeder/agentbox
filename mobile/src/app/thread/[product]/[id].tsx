@@ -19,10 +19,10 @@ import { stateWordOf } from '../../../../../renderer/src/threads/summary-rules';
 import { summaryOf, threadState } from '../../../../../shared/thread-cards.mts';
 import { arrivedAt } from '../../../../../renderer/src/unread';
 import { dayClock } from '../../../lib/back-at';
-import type { Choices, Press } from '../../../lib/actions';
+import type { Choices, Press, PressedItem } from '../../../lib/actions';
 import { useDraft } from '../../../lib/drafts';
 import { typedWords } from '../../../lib/files';
-import { threadOf, type FiledRow, type Thread } from '../../../lib/thread';
+import { threadOf, type FiledRow, type Thread, type ThreadEvent, type ThreadNode, type ThreadSaid } from '../../../lib/thread';
 import { askUnderAnswer, CHOICES_FOLDED, foldKey, foldedKeys, pageOf, splitHeadline, spotIn, stepIn, toggleFold } from '../../../lib/one-page';
 import { mateOf } from '../../../lib/teammates';
 import { TeammateMark } from '../../../ui/Teammates';
@@ -61,7 +61,7 @@ function StateDot({ state }: { state: string }) {
 }
 
 type Kind = 'msg' | 'same' | 'act' | 'work';
-const kindOf = (n: any): Kind => (n.kind === 'run' ? 'work' : n.kind === 'work' ? (n.yours ? 'act' : 'work') : n.same && !n.resumed ? 'same' : 'msg');
+const kindOf = (n: ThreadNode): Kind => (n.kind === 'run' ? 'work' : n.kind === 'work' ? (n.yours ? 'act' : 'work') : n.same && !n.resumed ? 'same' : 'msg');
 // The thread's 22px column and the pulls between its blocks (styles.css `.thread-block`).
 function gapBefore(prev: Kind, cur: Kind, afterGap: boolean) {
   if (cur === 'same') return 8;
@@ -74,7 +74,7 @@ function gapBefore(prev: Kind, cur: Kind, afterGap: boolean) {
 }
 
 function Said({ e, starts, ends, product, dir, files, sendNow, openOrigin, name }: {
-  e: any; starts: boolean; ends: boolean; product: string; dir: string | null; files: MessageFiles; sendNow?: () => void; openOrigin: () => void;
+  e: ThreadSaid; starts: boolean; ends: boolean; product: string; dir: string | null; files: MessageFiles; sendNow?: () => void; openOrigin: () => void;
   /** A teammate's run is signed with its name. */
   name?: string;
 }) {
@@ -309,7 +309,7 @@ export default function ThreadScreen() {
   const thread = useMemo(() => threadOf(c.rows, c.view, String(product), String(id), { whole, tabs: c.tabs }), [c.rows, c.view, c.tabs, product, id, whole]);
   const { dir, files } = useMessageFiles(String(product), String(id));
   const inset = useSafeAreaInsets();
-  const waiting = !!thread?.events.some((e: any) => e.kind !== 'work' && e.pending);
+  const waiting = !!thread?.events.some((e: ThreadEvent) => e.kind !== 'work' && e.pending);
   useEffect(() => { if (!waiting) setCutting(false); }, [waiting]);
   // Read once opened, and again when an answer lands while it is open (App.tsx `focusedArrival`).
   const arrived = thread ? arrivedAt(thread.item) : 0;
@@ -360,7 +360,7 @@ export default function ThreadScreen() {
   const offers = offersOf(item, facts);
   // With what the computer says of it while nothing runs, so waiting its turn reads Queued.
   const live = liveOf(item, { ...facts, ...waitFacts(c.view, item.id) });
-  const press = async (p: Press, on: any = item, then?: () => void) => {
+  const press = async (p: Press, on: PressedItem = item, then?: () => void) => {
     setBusy(true); setError(null);
     try { await c.send(p, on); then?.(); return true; } catch (err) { setError(String((err as Error)?.message ?? err)); return false; } finally { setBusy(false); }
   };
@@ -391,7 +391,7 @@ export default function ThreadScreen() {
 
   let prev: Kind | null = null;
   let afterGap = false;
-  const blocks = page.answer ? [] : thread.nodes.map((n: any, k: number) => {
+  const blocks = page.answer ? [] : thread.nodes.map((n: ThreadNode, k: number) => {
     // Answered since: the page is drawn from that answer down.
     if ((n.kind === 'run' ? n.items[n.items.length - 1]?.i : n.i) < page.from) return null;
     const kind = kindOf(n);
@@ -510,7 +510,7 @@ export default function ThreadScreen() {
           )}
           {thread.after.length > 0 && (
             <View style={{ marginTop: 22, gap: 9 }}>
-              {thread.after.map((a: any, k: number) => <ActLine key={`${a.at}-${k}`} act={a} joined={k > 0} />)}
+              {thread.after.map((a, k: number) => <ActLine key={`${a.at}-${k}`} act={a} joined={k > 0} />)}
             </View>
           )}
           <View onLayout={(e) => { footList.current = e.nativeEvent.layout.y; }}>

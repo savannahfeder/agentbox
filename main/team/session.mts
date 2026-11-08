@@ -16,8 +16,36 @@ import { supabaseBackend } from './supabase-backend.mts';
 import { standinSession } from './standin-backend.mts';
 import { signInWithGoogle, cancelGoogleSignIn } from './sign-in.mts';
 import { plainAuthError } from './auth-words.mts';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { TeamBackend, TeamSession } from './index.mts';
 
 export { plainAuthError };
+
+export interface CloudConfig {
+  url: string;
+  anonKey: string;
+  phoneSite?: string;
+  signInReturn?: string;
+  standin?: boolean;
+  contact?: string;
+  operator?: string;
+  governingLaw?: string;
+}
+
+export interface CloudConfigLookup { packaged?: boolean; home?: string; env?: NodeJS.ProcessEnv }
+
+export interface SessionSealing {
+  encrypt?: ((text: string) => Buffer | string) | null;
+  decrypt?: ((raw: Buffer) => string) | null;
+}
+
+export interface SupabaseSessionOptions extends SessionSealing {
+  cloudConfig: CloudConfig | null;
+  sessionFile: string;
+  openExternal: (url: string) => unknown;
+  packaged?: boolean;
+  testLogin?: string | null;
+}
 
 // A BUILD SOMEONE INSTALLED IGNORES THE TWO TEST SWITCHES BELOW. Found by
 // review 2026-10-01: AGENTBOX_TEAM_CONFIG and AGENTBOX_TEAM_TEST_LOGIN were
@@ -44,7 +72,7 @@ export const isPackagedElectron = () => !!process.versions?.electron && !process
 // anything that could set an environment variable could point the app at
 // another server. appHome() reads AGENTBOX_HOME, so using it here would reopen
 // that door; os.homedir() cannot be talked into lying.
-export function teamConfigOnThisMac(home = os.homedir()) {
+export function teamConfigOnThisMac(home = os.homedir()): string {
   return path.join(home, `.${nameSlug}`, 'team.config.json');
 }
 
@@ -71,18 +99,18 @@ export function teamConfigOnThisMac(home = os.homedir()) {
 // A FRESH COPY HANDED A TEAM FILE IS A SECOND PERSON ON THAT TEAM (2026-10-21):
 // a power tester in her room. It loads that file and no other, so the ⌘K
 // window, which is handed none, stays the single-person app.
-export function loadCloudConfig(appDir, options = {}) {
+export function loadCloudConfig(appDir: string, options: CloudConfigLookup = {}): CloudConfig | null {
   return withPhoneSite(cloudConfigFound(appDir, options));
 }
 
 // A config for our own database without a site address gets the one that ships.
-function withPhoneSite(c) {
+function withPhoneSite(c: CloudConfig | null): CloudConfig | null {
   if (!c || c.phoneSite) return c;
-  const ours = (u) => String(u).replace(/\/+$/, '') === CLOUD_ADDRESS.supabaseUrl;
+  const ours = (u: unknown) => String(u).replace(/\/+$/, '') === CLOUD_ADDRESS.supabaseUrl;
   return ours(c.url) ? { ...c, phoneSite: PHONE_SITE } : c;
 }
 
-function cloudConfigFound(appDir, { packaged = isPackagedElectron(), home = os.homedir(), env = process.env } = {}) {
+function cloudConfigFound(appDir: string, { packaged = isPackagedElectron(), home = os.homedir(), env = process.env }: CloudConfigLookup = {}): CloudConfig | null {
   if (packaged) return bakedTeam(appDir);
   if (runningAsAFreshUser(env) && !env.AGENTBOX_TEAM_CONFIG) return null;
   const tries = runningAsAFreshUser(env) ? [env.AGENTBOX_TEAM_CONFIG] : [
@@ -90,39 +118,40 @@ function cloudConfigFound(appDir, { packaged = isPackagedElectron(), home = os.h
     path.join(appDir, 'cloud', 'team.config.json'),
     teamConfigOnThisMac(home),
   ];
-  let found = null;
+  let found: CloudConfig | null = null;
   for (const file of tries) {
     if (!file) continue;
     try {
-      const c = JSON.parse(fs.readFileSync(file, 'utf8'));
+      const c: CloudConfig = JSON.parse(fs.readFileSync(file, 'utf8'));
       if (typeof c.url !== 'string' || typeof c.anonKey !== 'string') continue;
       // A field the winning file lacks (phoneSite, added later) comes from a
       // file further down for the same cloud, never from another cloud's.
       if (!found) found = c;
-      else if (c.url === found.url) found = { ...c, ...found };
+      // TypeScript loses the narrowing of `found` inside its own reassignment.
+      else if (c.url === found.url) found = { ...c, ...(found as CloudConfig) };
     } catch { /* try the next place; none of them is the single-person app */ }
   }
   return found;
 }
 
-function bakedTeam(appDir) {
+function bakedTeam(appDir: string): CloudConfig | null {
   try {
-    const b = JSON.parse(fs.readFileSync(path.join(appDir, 'package.json'), 'utf8')).bakedTeam;
+    const b: { url?: unknown; anonKey?: unknown; phoneSite?: unknown } | undefined = JSON.parse(fs.readFileSync(path.join(appDir, 'package.json'), 'utf8')).bakedTeam;
     if (typeof b?.url !== 'string' || typeof b.anonKey !== 'string') return null;
     const site = typeof b.phoneSite === 'string' && /^https:\/\/[^\s/]+(\/\S*)?$/.test(b.phoneSite) ? { phoneSite: b.phoneSite } : {};
     return { url: b.url, anonKey: b.anonKey, ...site };
   } catch { return null; }
 }
 
-function fileStorage(file, { encrypt, decrypt }) {
-  const read = () => {
+function fileStorage(file: string, { encrypt, decrypt }: SessionSealing) {
+  const read = (): Record<string, string> => {
     try {
       const raw = fs.readFileSync(file);
       const text = decrypt ? decrypt(raw) : raw.toString('utf8');
       return JSON.parse(text);
     } catch { return {}; }
   };
-  const write = (data) => {
+  const write = (data: Record<string, string>) => {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     const text = JSON.stringify(data);
     const tmp = `${file}.${process.pid}.tmp`;
@@ -130,10 +159,10 @@ function fileStorage(file, { encrypt, decrypt }) {
     fs.renameSync(tmp, file);
   };
   return {
-    getItem: (key) => read()[key] ?? null,
-    setItem: (key, value) => { const d = read(); d[key] = value; write(d); },
+    getItem: (key: string) => read()[key] ?? null,
+    setItem: (key: string, value: string) => { const d = read(); d[key] = value; write(d); },
     // Nothing to remove writes nothing, so a Mac never signed in never asks the keychain.
-    removeItem: (key) => { const d = read(); if (!(key in d)) return; delete d[key]; write(d); },
+    removeItem: (key: string) => { const d = read(); if (!(key in d)) return; delete d[key]; write(d); },
   };
 }
 
@@ -141,19 +170,20 @@ function fileStorage(file, { encrypt, decrypt }) {
 // library waits for ever, and the phone's and the team's sync wait on it.
 // Long enough for a file going up on a slow network.
 const DATABASE_DEADLINE_MS = 5 * 60_000;
-export const withDeadline = (ms = DATABASE_DEADLINE_MS) => (url, init = {}) =>
+export const withDeadline = (ms = DATABASE_DEADLINE_MS) => (url: Parameters<typeof fetch>[0], init: RequestInit = {}): Promise<Response> =>
   fetch(url, { ...init, signal: init.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(ms)]) : AbortSignal.timeout(ms) });
 
-export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decrypt = null, openExternal, packaged = isPackagedElectron(), testLogin = process.env.AGENTBOX_TEAM_TEST_LOGIN }) {
+export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decrypt = null, openExternal, packaged = isPackagedElectron(), testLogin = process.env.AGENTBOX_TEAM_TEST_LOGIN }: SupabaseSessionOptions): TeamSession {
   const configured = !!cloudConfig;
   if (packaged) testLogin = null;
   if (cloudConfig?.standin && !packaged) return standinSession({ cloudConfig, testLogin });
-  let client = null;
+  let client: SupabaseClient | null = null;
 
-  async function getClient() {
+  // Asked for only once `configured` has been checked.
+  async function getClient(): Promise<SupabaseClient> {
     if (client) return client;
     const { createClient } = await import('@supabase/supabase-js');
-    client = createClient(cloudConfig.url, cloudConfig.anonKey, {
+    client = createClient(cloudConfig!.url, cloudConfig!.anonKey, {
       global: { fetch: withDeadline() },
       auth: {
         flowType: 'pkce',
@@ -185,7 +215,7 @@ export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decr
       return null;
     },
 
-    async signIn({ onUrl, log } = {}) {
+    async signIn({ onUrl, log }: { onUrl?: (url: string) => void; log?: (line: string) => void } = {}) {
       if (!configured) throw new Error('this build has no team cloud configured');
       const c = await getClient();
       await signInWithGoogle({ client: c, openExternal, onUrl, log, returnUrl: cloudConfig.signInReturn || 'http://127.0.0.1:54783/auth/callback' });
@@ -235,7 +265,7 @@ export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decr
     // The session an Agentbox Cloud sign-in made (main/cloud/account.mts), so
     // one sign-in connects the phone too. Null for another database's.
     async adoptSession(s) {
-      const same = (u) => String(u ?? '').replace(/\/+$/, '');
+      const same = (u: unknown) => String(u ?? '').replace(/\/+$/, '');
       if (!configured || !s?.access_token || !s.refresh_token || same(s.supabaseUrl) !== same(cloudConfig.url)) return null;
       const c = await getClient();
       const { error } = await c.auth.setSession({ access_token: s.access_token, refresh_token: s.refresh_token });
@@ -260,18 +290,18 @@ export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decr
 // there is nowhere safe and it throws, because writing the token where a worker
 // reads it is worse than a sign-in to do again. A copy an older version left in
 // the store, under either name, is carried across.
-const isInside = (file, root) => {
+const isInside = (file: string, root: string) => {
   const f = path.resolve(file);
   const r = path.resolve(root);
   return f === r || f.startsWith(r + path.sep);
 };
 
-function configHome({ home, env }) {
+function configHome({ home, env }: { home: string; env?: NodeJS.ProcessEnv }) {
   const given = typeof env?.XDG_CONFIG_HOME === 'string' ? env.XDG_CONFIG_HOME.trim() : '';
   return given && path.isAbsolute(given) ? given : path.join(home, '.config');
 }
 
-export function sessionFileOutsideStore({ dir, name, storeRoot, home = os.homedir(), env = process.env }) {
+export function sessionFileOutsideStore({ dir, name, storeRoot, home = os.homedir(), env = process.env }: { dir: string; name: string; storeRoot: string; home?: string; env?: NodeJS.ProcessEnv }): string {
   let file = path.join(dir, name);
   if (isInside(file, storeRoot)) {
     const tag = crypto.createHash('sha256').update(path.resolve(storeRoot)).digest('hex').slice(0, 16);
@@ -294,13 +324,13 @@ export function sessionFileOutsideStore({ dir, name, storeRoot, home = os.homedi
 }
 
 // The headless app keeps its sign-in as plain JSON readable by this user only.
-export function headlessSessionFile({ userDir, storeRoot, home, env }) {
+export function headlessSessionFile({ userDir, storeRoot, home, env }: { userDir: string; storeRoot: string; home?: string; env?: NodeJS.ProcessEnv }): string {
   return sessionFileOutsideStore({ dir: userDir, name: 'team-session.json', storeRoot, home, env });
 }
 
 // The same session shape over the in-memory cloud, for tests.
-export function memorySession(backendFor) {
-  let signedIn = null;
+export function memorySession(backendFor: () => TeamBackend): TeamSession {
+  let signedIn: TeamBackend | null = null;
   return {
     configured: true,
     async restore() { return signedIn; },

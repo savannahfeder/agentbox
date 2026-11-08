@@ -8,17 +8,48 @@
 // only the team sync can see those end. An agent's wait on threads is not: the
 // supervisor resumes those (resumeFinishedWaits).
 
-export const personWait = (id) => `person:${id}`;
-export const cardWait = (person, thread) => `card:${person}:${thread}`;
+export interface WaitingItem {
+  id: string;
+  status?: string;
+  blockedBy?: readonly string[];
+  runner?: string | null;
+  createdBy?: string | null;
+  label?: string;
+  title?: string;
+  product?: string;
+  updatedAt?: number;
+  agent?: unknown;
+  wrote?: Record<string, { ts?: number; source?: string } | undefined>;
+}
+
+export interface WaitCard {
+  personId: string;
+  threadId: string;
+  title?: string | null;
+  state?: string;
+  visible?: boolean;
+  updatedAt?: number;
+}
+
+export type WaitPart =
+  | { kind: 'person'; person: string }
+  | { kind: 'name'; name: string; person?: undefined }
+  | { kind: 'card'; person: string; thread: string }
+  | { kind: 'thread'; thread: string; person?: undefined };
+
+type NameOf = (id: string) => string;
+
+export const personWait = (id: string): string => `person:${id}`;
+export const cardWait = (person: string, thread: string): string => `card:${person}:${thread}`;
 // Someone off the team, or what it waits on, in plain words: a task's block only.
 const NAME = 'name:';
 const NAME_CHARS = 64 - NAME.length;
-export function nameWait(words) {
+export function nameWait(words: string | null | undefined): string | null {
   const said = String(words ?? '').replace(/\s+/g, ' ').trim().slice(0, NAME_CHARS).trim();
   return said ? `${NAME}${said}` : null;
 }
 
-export function waitParts(id) {
+export function waitParts(id: string): WaitPart {
   if (id.startsWith('person:')) return { kind: 'person', person: id.slice('person:'.length) };
   if (id.startsWith(NAME)) return { kind: 'name', name: id.slice(NAME.length) };
   if (id.startsWith('card:')) {
@@ -31,26 +62,34 @@ export function waitParts(id) {
 // Waiting on the row's own owner is a question for them, not a wait. And a
 // reply after the agent wrote it is answered by the agent's next words, which
 // must reach them.
-function onOthers(item) {
+function onOthers(item: Omit<WaitingItem, 'id'>): boolean {
   const reply = item.wrote?.answer;
   if (reply?.source === 'founder' && (reply.ts ?? 0) > (item.wrote?.blockedBy?.ts ?? 0)) return false;
-  return item.blockedBy.every((id) => {
+  return item.blockedBy!.every((id) => {
     const w = waitParts(String(id));
     return w.kind !== 'thread' && w.person !== (item.runner ?? item.createdBy ?? null);
   });
 }
 
-export function setByPerson(item) {
+export function setByPerson(item: Omit<WaitingItem, 'id'> | null | undefined): boolean {
   if (item?.status === 'done' || !Array.isArray(item?.blockedBy) || !item.blockedBy.length) return false;
   return item.wrote?.blockedBy?.source === 'founder' || onOthers(item);
 }
 
 // Nothing waits for ever: a wait with no end comes back and says so.
 export const WAIT_GIVES_UP_MS = 3 * 86_400_000;
-const FIRST = (name) => String(name ?? '').trim().split(/\s+/)[0] || 'Someone';
-const named = (item) => item?.label || item?.title || 'a thread';
+const FIRST = (name: string | null | undefined) => String(name ?? '').trim().split(/\s+/)[0] || 'Someone';
+const named = (item: { label?: string; title?: string } | null | undefined) => item?.label || item?.title || 'a thread';
 
-function oneEnd(id, since, { items, cards, lastWordFrom, nameOf }) {
+export interface WaitEndContext {
+  items: readonly WaitingItem[];
+  cards: readonly WaitCard[];
+  lastWordFrom: (person: string) => number;
+  nameOf: NameOf;
+  now: number;
+}
+
+function oneEnd(id: string, since: number, { items, cards, lastWordFrom, nameOf }: WaitEndContext): string | null {
   const w = waitParts(id);
   if (w.kind === 'person') return lastWordFrom(w.person) > since ? `${FIRST(nameOf(w.person))} wrote to you` : null;
   if (w.kind === 'name') return null;
@@ -63,7 +102,7 @@ function oneEnd(id, since, { items, cards, lastWordFrom, nameOf }) {
   return row.status === 'done' ? `“${named(row)}” finished` : null;
 }
 
-function waitingOnWords(id, { items, nameOf }) {
+function waitingOnWords(id: string, { items, nameOf }: Pick<WaitEndContext, 'items' | 'nameOf'>): string {
   const w = waitParts(id);
   if (w.kind === 'thread') return `“${named(items.find((i) => i.id === w.thread))}”`;
   if (w.kind === 'name') return w.name;
@@ -71,25 +110,29 @@ function waitingOnWords(id, { items, nameOf }) {
 }
 
 /** The threads whose waits have ended, each with the words that say how. */
-export function endedWaits(rows, ctx) {
-  const out = [];
+export function endedWaits<T extends WaitingItem>(rows: readonly T[], ctx: WaitEndContext): { item: T; said: string }[] {
+  const out: { item: T; said: string }[] = [];
   for (const item of rows) {
     if (!setByPerson(item)) continue;
-    const since = item.wrote.blockedBy.ts ?? 0;
+    // setByPerson holds only for a row whose wait the fold recorded.
+    const since = item.wrote!.blockedBy!.ts ?? 0;
     if (ctx.now - since >= WAIT_GIVES_UP_MS) {
-      out.push({ item, said: `Still waiting on ${waitingOnWords(item.blockedBy[0], ctx)} after 3 days` });
+      out.push({ item, said: `Still waiting on ${waitingOnWords(item.blockedBy![0], ctx)} after 3 days` });
       continue;
     }
-    const ends = item.blockedBy.map((id) => oneEnd(id, since, ctx));
-    if (ends.every(Boolean)) out.push({ item, said: ends.at(-1) });
+    const ends = item.blockedBy!.map((id) => oneEnd(id, since, ctx));
+    if (ends.every(Boolean)) out.push({ item, said: ends.at(-1)! });
   }
   return out;
 }
 
 /** The status column's words for a thread that waits, and the whole of it for the hover. */
-export function waitWords(item, { items = [], cards = [], nameOf }) {
+export function waitWords(
+  item: WaitingItem | null | undefined,
+  { items = [], cards = [], nameOf }: { items?: readonly WaitingItem[]; cards?: readonly WaitCard[]; nameOf: NameOf },
+): { word: string; title: string } | null {
   if (!setByPerson(item)) return null;
-  const w = waitParts(item.blockedBy[0]);
+  const w = waitParts(item!.blockedBy![0]);
   if (w.kind === 'person') { const name = FIRST(nameOf(w.person)); return { word: `Waits on ${name}`, title: `Waits on ${name}` }; }
   if (w.kind === 'name') return { word: `Waits on ${w.name}`, title: `Waits on ${w.name}` };
   if (w.kind === 'card') {
@@ -103,7 +146,14 @@ export function waitWords(item, { items = [], cards = [], nameOf }) {
 const CHOICES = 8;
 
 /** What a thread can wait on: people, then open threads, newest first. */
-export function waitChoices({ item, me, people, items, cards, nameOf }) {
+export function waitChoices({ item, me, people, items, cards, nameOf }: {
+  item: WaitingItem;
+  me: string | null;
+  people: readonly { id: string; name?: string | null }[];
+  items: readonly WaitingItem[];
+  cards: readonly WaitCard[];
+  nameOf: NameOf;
+}): { id: string; label: string }[] {
   const humans = people.filter((p) => p.id !== me).map((p) => ({ id: personWait(p.id), label: FIRST(p.name) }));
   const mine = items.filter((i) => i.product === item.product && i.id !== item.id && i.status !== 'done' && !i.agent)
     .map((i) => ({ id: i.id, label: named(i), at: i.updatedAt ?? 0 }));

@@ -3,6 +3,7 @@
 // tells real agents to write, so the fixtures double as a schema preview.
 
 import type { AgentSession, FolderListing, Snapshot, WorkspaceSettings } from './types';
+import type { LedgerLine } from './thread-history';
 // The engine ids, labels and the default are read off the one file that holds
 // them rather than typed again here. A fixture that spelled "Claude Code" for
 // itself is a fixture that could go on saying it after the app had stopped.
@@ -554,7 +555,7 @@ export const fixtureTraces: Record<string, Array<{ startedAt: number; text: stri
 // fixtures double as a schema preview and a history that contradicts the row it
 // belongs to would review nothing. The lease heartbeats are left out here for
 // the same reason the main process drops them: they are not events.
-export const fixtureHistory: Record<string, Array<Record<string, any>>> = {
+export const fixtureHistory: Record<string, LedgerLine[]> = {
   // the card whose one page was named in full. The ledger is here so the
   // MESSAGE is on screen beside its file row, because the whole point is that
   // the path she can read in the prose is the file she can press underneath

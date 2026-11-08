@@ -2,10 +2,54 @@
 // its way: the copy the computer sent (shared/phone-settings.mts), with the
 // commands left for it laid over it until a newer copy arrives.
 import type { PhoneRows } from './phone-rows';
+import type { AgentMode, CodexModeId, PermissionMode, RepeatRule, TeamChatLine, Teammate, TeamRunLine } from './types';
 
 export interface Change { scope: 'workspace' | 'project'; key: string; value?: unknown; product?: string }
-export interface SettingsRow { device: string; name: string; updated_at: string; settings: any }
-export interface Reading { value: any; waiting: boolean; refused: string | null }
+
+/** A computer's workspace settings as it sends them (shared/phone-settings.mts phoneSettingsOf). */
+export interface PhoneWorkspaceCopy {
+  plan: string | null;
+  cornerTag: boolean;
+  diagnostics: boolean;
+  adhdMode: boolean;
+  alpha: { rooms: boolean; teammates: boolean; multiplayer: boolean };
+  importNew: boolean;
+  outsideAgents: AgentMode;
+  permission: PermissionMode;
+  codexMode: CodexModeId | null;
+  engines: string[];
+  claudeModels: { id: string; label: string; model: string; defaultLevel?: string | null }[];
+  codexFreePlan: boolean;
+  engine: string | null;
+  codexModels: { id: string; label: string; levels: string[]; defaultLevel: string | null }[];
+  codexModelDefault: string | null;
+  claude: { found: boolean };
+  codex: { found: boolean };
+  agentsAuto: boolean;
+  sessionsAtOnce: number;
+  agentsTotal: number;
+  agentsAutoTotal: number;
+  agentsNudge: number;
+  slotsMax: number;
+  slotsSuggested: number;
+  running: number;
+  memoryGate: { on: boolean; slots: number | null; slotsAuto: number; slotsMax: number; now: string | null };
+  leftovers: { on: boolean; now: string | null };
+  accounts: { id: string; email: string | null; chosen: boolean; state?: string; note: string | null; resetsAt: number | null; plan: string | null; running: number }[];
+  codexAccounts: { id: string; email: string | null; name: string | null; plan: string | null; signedIn: boolean; chosen: boolean }[];
+}
+export interface PhoneProjectCopy { slug: string; name: string; onPhone: boolean; autonomous: boolean; permission: PermissionMode | 'workspace'; codexMode: CodexModeId | 'workspace'; account: string; running: number }
+/** The whole copy, with the repeating tasks and teammates main/phone-inbox.mts adds beside it. */
+export interface PhoneSettingsCopy {
+  v: number;
+  version: string;
+  workspace: PhoneWorkspaceCopy;
+  projects: PhoneProjectCopy[];
+  repeats?: RepeatRule[];
+  teammates?: { list: Partial<Teammate>[]; chat: TeamChatLine[]; runs: TeamRunLine[]; trouble?: string };
+}
+export interface SettingsRow { device: string; name: string; updated_at: string; settings: PhoneSettingsCopy }
+export interface Reading { value: unknown; waiting: boolean; refused: string | null }
 export type Changes = Map<string, Reading>;
 
 const REFUSAL_SHOWN_MS = 10 * 60_000;
@@ -25,7 +69,7 @@ export function changesOn(computer: SettingsRow | null, commands: PhoneRows['com
     .filter((c) => c.kind === 'setting' && c.device === computer.device && c.outcome !== TAKEN_BACK && c.payload?.key)
     .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
   for (const c of mine) {
-    const key = changeKey(c.payload);
+    const key = changeKey(c.payload as Change);
     const takenAt = c.taken_at ? Date.parse(c.taken_at) || 0 : null;
     if (takenAt === null) out.set(key, { value: c.payload.value, waiting: true, refused: null });
     else if (c.outcome?.startsWith('refused')) {

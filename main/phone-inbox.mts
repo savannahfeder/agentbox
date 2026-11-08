@@ -38,13 +38,14 @@ import { threadSnapshot, threadsWorthCarrying, snapshotKey, checkCommand, madeHe
 import { phoneSettingsOf, settingRoute } from '../shared/phone-settings.mts';
 import { createPhoneUploads, UPLOAD_LIMITS } from './phone-uploads.mts';
 import type { PhoneBackend, ThreadSnapshot, UploadedFile } from './phone-uploads.mts';
-import { createPhoneAlerts } from './phone-alerts.mts';
+import { createPhoneAlerts, type AlertsChange, type AlertsState } from './phone-alerts.mts';
 import { PHONE_FILES_MAX, phoneFilesIn, phoneFileSafeName, phoneAttachmentRel } from '../shared/phone-files.mts';
 import { runOfClaim, cloudCard } from '../shared/cloud-kit.mts';
 import { isCarried } from '../shared/cloud-carry.mts';
 import { heldForUndo } from '../shared/phone-undo.mts';
 import type { CarriedCommand } from '../shared/cloud-carry.mts';
-import type { PhoneWait } from '../shared/phone-snapshot.mts';
+import type { PhoneWait, TeammatesViewSeen } from '../shared/phone-snapshot.mts';
+import type { SettingChange, SettingsModel } from '../shared/phone-settings.mts';
 
 // A file her phone sent with a reply or a new thread (shared/phone-files.mts).
 export { phoneFilesIn };
@@ -121,7 +122,7 @@ export interface PhoneLiveRun {
   doing?: { label?: unknown; startedAt?: unknown }[];
 }
 
-export interface PhoneApprovalAsk { id: string; product?: string; item?: string; card?: unknown; [key: string]: unknown }
+export interface PhoneApprovalAsk { id: string; product?: string | null; item?: string | null; card?: unknown; [key: string]: unknown }
 
 export interface AdoptArgs {
   project: string;
@@ -152,7 +153,8 @@ export interface PhoneBackendCalls extends Partial<PhoneBackend> {
   addPhoneCommand(command: object): Promise<unknown>;
   getPhoneFile?(file: { owner: string; device: string; name: string }): Promise<Buffer | null>;
   putPhoneSettings?(settings: { owner: string; device: string; name: string; settings: unknown }): Promise<unknown>;
-  pushDevices?: unknown;
+  pushDevices?(owner: string): Promise<{ token: string }[]>;
+  dropPushDevice?(token: string, owner: string): Promise<unknown>;
 }
 
 export interface ChannelResult { ok?: unknown; error?: string; reason?: string; id?: unknown; [key: string]: unknown }
@@ -175,10 +177,10 @@ export interface PhoneInboxOptions {
   liveOf?: (slug: string, id: string) => PhoneLiveRun | null;
   waitsOf?: () => { byId?: Record<string, PhoneWait>; paused?: boolean } | null;
   approvalsOf?: () => PhoneApprovalAsk[];
-  readSettings?: (() => unknown) | null;
+  readSettings?: (() => SettingsModel | null | Promise<SettingsModel | null>) | null;
   pinsOf?: () => Record<string, boolean>;
-  repeatsOf?: (() => unknown) | null;
-  teammatesOf?: (() => unknown) | null;
+  repeatsOf?: (() => Parameters<typeof phoneRepeatsOf>[0]) | null;
+  teammatesOf?: (() => TeammatesViewSeen | null) | null;
   version?: string;
   name?: string;
   idleMs?: (() => number) | null;
@@ -217,22 +219,15 @@ export interface PhoneState {
   doing: Record<string, { at: number }>;
   made: Record<string, { id: string; at: number }>;
   uploaded: Record<string, UploadedFile>;
-  alerted: Record<string, unknown>;
+  alerted: AlertsState['alerted'];
   adopted: Record<string, AdoptedRun>;
-  webAlerts: Record<string, unknown>;
+  webAlerts: AlertsState['webAlerts'];
 }
 
 type Snapshot = ReturnType<typeof threadSnapshot>;
 type Manifest = ReturnType<ReturnType<typeof createPhoneUploads>['manifest']>;
 type LiveCopy = { since: number; where: 'cloud' | 'mac'; doing: { label: string; startedAt: number }[]; at: number; movable?: boolean; runId?: string };
 type BuiltCopy = { inputs: string; key: string; live: LiveCopy | null; files: Manifest | null; askKey: string; waitKey: string; base: Snapshot | null };
-
-declare module '../shared/phone-snapshot.mts' {
-  export function phoneApproval(request: { id: unknown; at?: unknown; tool?: unknown; input?: unknown }, card: unknown, ctx?: { home?: string | null }): Record<string, unknown>;
-  export function phoneRepeatsOf(rules: unknown, slugs: string[], opts?: { home?: string | null }): unknown[];
-  export function phoneTeammatesOf(view: unknown, opts?: { home?: string | null; limits?: typeof TEAMMATES_LIMITS }): Record<string, unknown> | null;
-  export const TEAMMATES_LIMITS: { mates: number; lines: number; textChars: number; bytes: number };
-}
 
 export function createPhoneInbox({
   backend,
@@ -626,7 +621,7 @@ export function createPhoneInbox({
             if (ready) {
               try {
                 const ownAlerts = cmd.kind === 'setting' && !!alerts?.takesSetting(ready.payload);
-                const out: ChannelResult | null | undefined = ownAlerts ? await alerts!.setting(ready.payload) : await apply(ready);
+                const out: ChannelResult | null | undefined = ownAlerts ? await alerts!.setting(ready.payload as AlertsChange) : await apply(ready);
                 if (cmd.kind === 'new' && typeof out?.id === 'string') state.made[madeHere(cmd.id)] = { id: out.id, at: now() };
                 if (cmd.kind === 'setting' && !ownAlerts) changedSettings = true;
                 outcome = 'done';
@@ -925,7 +920,8 @@ export function applyThrough(channels: Map<string, PhoneChannel>) {
     if (cmd.kind !== 'setting') return ROUTES[cmd.kind]?.(cmd) ?? [];
     const read = channels.get('zero:settings-read');
     if (!read) return [];
-    return settingRoute(cmd.payload, await read({ sender: null }));
+    // `checkCommand` checked the change; the channel answers with the settings model.
+    return settingRoute(cmd.payload as SettingChange, await read({ sender: null }) as SettingsModel | null);
   };
   return async (cmd: PhoneCommand): Promise<ChannelResult | null | undefined> => {
     const [channel, args, then] = await routeOf({ ...cmd, payload: cmd.payload || {} });

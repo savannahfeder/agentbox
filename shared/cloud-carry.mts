@@ -9,8 +9,46 @@
 
 export const CARRIED = 'computer';
 
+/** Any command row, as the phone's table, the server or the screen holds it. */
+type CommandLike = { payload?: { carried?: unknown; notBefore?: unknown } | null } | null | undefined;
+
+export interface CarryItem {
+  id?: string;
+  product?: string;
+  title?: unknown;
+  body?: unknown;
+  answer?: unknown;
+  model?: string | null;
+  effort?: string | null;
+}
+
+export interface CarryRepeat {
+  rule: string;
+  key: string;
+}
+
+export type CarriedCommand = {
+  project: string;
+  item: string;
+} & ({
+  kind: 'reply';
+  payload: { carried: typeof CARRIED; text: string; notBefore?: number };
+} | {
+  kind: 'run-now';
+  payload: {
+    carried: typeof CARRIED;
+    title: string;
+    body: string;
+    engine?: string;
+    model?: string;
+    effort?: string;
+    notBefore?: number;
+    repeat?: CarryRepeat;
+  };
+});
+
 /** Whether a command is the computer's own hand-over rather than something the phone sent. */
-export const isCarried = (cmd) => cmd?.payload?.carried === CARRIED;
+export const isCarried = (cmd: unknown): boolean => (cmd as CommandLike)?.payload?.carried === CARRIED;
 
 // A pass this late means the process was frozen (Supervisor SLEPT_GAP_MS).
 export const SLEPT_GAP_MS = 2 * 60_000;
@@ -34,11 +72,18 @@ export const CARRY_AGAIN_MS = 30 * 60_000;
  * later, and while a pass is overdue by a gap. A key or mouse touched since
  * the wake is a person at the Mac: `idleMs` under the time since `wokeAt`.
  */
-export function macAsleep({ now = Date.now(), lastTickAt = 0, wokeAt = 0, idleMs = null, gapMs = SLEPT_GAP_MS, settleMs = ASLEEP_SETTLE_MS } = {}) {
+export function macAsleep({ now = Date.now(), lastTickAt = 0, wokeAt = 0, idleMs = null, gapMs = SLEPT_GAP_MS, settleMs = ASLEEP_SETTLE_MS }: {
+  now?: number;
+  lastTickAt?: number;
+  wokeAt?: number;
+  idleMs?: number | null;
+  gapMs?: number;
+  settleMs?: number;
+} = {}): boolean {
   const overdue = lastTickAt > 0 && now - lastTickAt >= gapMs;
   const settling = wokeAt > 0 && now - wokeAt < settleMs;
   if (!overdue && !settling) return false;
-  if (!overdue && Number.isFinite(idleMs) && idleMs < now - wokeAt) return false;
+  if (!overdue && Number.isFinite(idleMs) && idleMs! < now - wokeAt) return false;
   return true;
 }
 
@@ -49,10 +94,16 @@ export function macAsleep({ now = Date.now(), lastTickAt = 0, wokeAt = 0, idleMs
  * the row's own id. `notBefore` is the moment it may start; `repeat` names
  * the repeating task a run not yet made belongs to ({ rule, key }).
  */
-export function carryCommand({ item, continuation = false, engine = null, notBefore = null, repeat = null } = {}) {
+export function carryCommand({ item, continuation = false, engine = null, notBefore = null, repeat = null }: {
+  item?: CarryItem | null;
+  continuation?: boolean;
+  engine?: string | null;
+  notBefore?: number | null;
+  repeat?: CarryRepeat | null;
+} = {}): CarriedCommand | null {
   if (!item?.id || !item.product) return null;
   const base = { project: item.product, item: item.id };
-  const when = Number.isFinite(notBefore) ? { notBefore } : {};
+  const when: { notBefore?: number } = Number.isFinite(notBefore) ? { notBefore: notBefore! } : {};
   if (continuation) {
     if (typeof item.answer !== 'string' || !item.answer.trim()) return null;
     return { ...base, kind: 'reply', payload: { carried: CARRIED, text: item.answer, ...when } };
@@ -76,7 +127,7 @@ export function carryCommand({ item, continuation = false, engine = null, notBef
 }
 
 /** The moment a command may start, or 0 for at once. */
-export const notBeforeOf = (cmd) => (Number.isFinite(Number(cmd?.payload?.notBefore)) ? Number(cmd.payload.notBefore) : 0);
+export const notBeforeOf = (cmd: unknown): number => (Number.isFinite(Number((cmd as CommandLike)?.payload?.notBefore)) ? Number((cmd as CommandLike)!.payload!.notBefore) : 0);
 
 /**
  * Whether a hand-over the computer is holding a row for is to be written
@@ -84,7 +135,7 @@ export const notBeforeOf = (cmd) => (Number.isFinite(Number(cmd?.payload?.notBef
  * after the moment it could have run. `at` is when it was handed over,
  * `notBefore` the moment it was handed over for.
  */
-export function handOverSpent({ at = 0, notBefore = 0, now = Date.now(), againMs = CARRY_AGAIN_MS } = {}) {
+export function handOverSpent({ at = 0, notBefore = 0, now = Date.now(), againMs = CARRY_AGAIN_MS }: { at?: number; notBefore?: number | null; now?: number; againMs?: number } = {}): boolean {
   if (!at) return false;
   return now - Math.max(at, notBefore || 0) >= againMs;
 }

@@ -27,6 +27,78 @@ import path from 'node:path';
 import { shortPath } from './code-change.mts';
 import { filesFromPatch } from './git-change.mts';
 
+/** One entry of a `fileChange` item's `changes`, as Codex's schema has it. */
+export interface CodexFileChange {
+  path: string;
+  diff?: string;
+  kind: { type: string; move_path?: string | null };
+}
+
+/** The fields of a thread item these readers look at. Every other field is ignored. */
+export interface CodexItem {
+  type?: string;
+  id?: string;
+  text?: string;
+  phase?: string | null;
+  review?: string;
+  command?: string;
+  changes?: CodexFileChange[];
+}
+
+interface CodexTurn {
+  status?: string;
+  error?: { message?: string; additionalDetails?: string | null } | null;
+  items?: CodexItem[];
+  durationMs?: number;
+}
+
+/** The `params` of the notifications read here. */
+export interface CodexEventParams {
+  thread?: { id?: string };
+  item?: CodexItem;
+  turn?: CodexTurn;
+  delta?: string;
+  completedAtMs?: number;
+}
+
+/** One notification as `rememberCodexChange` keeps it. */
+export interface CodexFrame {
+  method: string;
+  params: unknown;
+  emittedAtMs?: number;
+}
+
+/** The session fields these readers write, on the supervisor's per-run session. */
+export interface CodexReadSession {
+  sessionId?: string | null;
+  result?: string | null;
+  resultIsError?: boolean;
+  codexFinalAnswer?: boolean;
+  saying?: string;
+  sayingAt?: number;
+  codexChange?: CodexFrame[];
+  codexChangeBytes?: number;
+}
+
+type ChangeRow = string[];
+
+interface ChangeHunk {
+  rows: ChangeRow[];
+  said?: string;
+  at?: number;
+  plus: number;
+  minus: number;
+}
+
+interface ChangeFile {
+  path: string;
+  abs: string;
+  hunks: ChangeHunk[];
+  plus: number;
+  minus: number;
+  at: number;
+}
+
 /**
  * The longest live sentence kept in memory. Past it the live text is dropped
  * and the trace delivers the block whole. This is the only copy; the Claude
@@ -51,10 +123,10 @@ export const SCRATCH = /^\/(private\/)?(tmp|var\/folders)\//;
  * A turn that ends with no final answer gets no result, so the supervisor's own
  * "said nothing" handling takes over.
  */
-export function captureCodexEvent(session, method, params) {
+export function captureCodexEvent(session: CodexReadSession | null | undefined, method: string, params: unknown): void {
   try {
     if (!session || typeof method !== 'string') return;
-    const p = params ?? {};
+    const p = (params ?? {}) as CodexEventParams;
 
     // The id `thread/resume` takes is at `params.thread.id`. This notification
     // has no `params.threadId`.
@@ -65,7 +137,7 @@ export function captureCodexEvent(session, method, params) {
     }
 
     if (method === 'item/completed') {
-      const item = p.item ?? {};
+      const item: CodexItem = p.item ?? {};
       if (item.type === 'exitedReviewMode' && typeof item.review === 'string' && item.review.trim()) {
         session.result = item.review;
         session.resultIsError = false;
@@ -102,12 +174,12 @@ export function captureCodexEvent(session, method, params) {
   } catch { /* see the note at the top of this file */ }
 }
 
-function turnStatus(method, turn) {
+function turnStatus(method: string, turn: CodexTurn | null | undefined): string {
   if (typeof turn?.status === 'string') return turn.status;
   return method === 'turn/failed' ? 'failed' : 'completed';
 }
 
-function turnTrouble(turn, status) {
+function turnTrouble(turn: CodexTurn | null | undefined, status: string): string {
   const why = String(turn?.error?.message ?? '').trim();
   const more = String(turn?.error?.additionalDetails ?? '').trim();
   const head = why || (status === 'interrupted' ? 'the turn was interrupted' : `the turn ${status}`);
@@ -118,10 +190,10 @@ function turnTrouble(turn, status) {
  * The final answer in `turn.items`, which still holds it when the item events
  * were missed. Only a `final_answer` counts, never the last message.
  */
-function finalAnswerIn(items) {
+function finalAnswerIn(items: CodexItem[] | null | undefined): string | null {
   if (!Array.isArray(items)) return null;
   for (let i = items.length - 1; i >= 0; i -= 1) {
-    const item = items[i];
+    const item: CodexItem | null | undefined = items[i];
     if (item?.type === 'exitedReviewMode' && typeof item.review === 'string' && item.review.trim()) return item.review;
     if (item?.type === 'agentMessage' && item?.phase === 'final_answer') return String(item.text ?? '');
   }
@@ -139,10 +211,10 @@ function finalAnswerIn(items) {
  * - Past `SAYING_CAP` it is dropped, never cut, because a cut string never
  *   matches the traced one.
  */
-export function codexStreamingText(session, method, params) {
+export function codexStreamingText(session: CodexReadSession | null | undefined, method: string, params: unknown): boolean {
   try {
     if (!session) return false;
-    const p = params ?? {};
+    const p = (params ?? {}) as CodexEventParams;
 
     if (method === 'item/started') {
       // Only a new message resets it. A command or patch starting leaves the
@@ -174,13 +246,13 @@ export function codexStreamingText(session, method, params) {
  * as `[Bash]`, the command it really ran. File changes use `Write` and `Edit`,
  * because run-files.ts finds a run's files by those words.
  */
-export function traceCodexEvent(method, params) {
+export function traceCodexEvent(method: string, params: unknown): string | null {
   try {
-    const p = params ?? {};
+    const p = (params ?? {}) as CodexEventParams;
     const at = new Date().toISOString().slice(11, 19);
 
     if (method === 'item/completed') {
-      const item = p.item ?? {};
+      const item: CodexItem = p.item ?? {};
 
       if (item.type === 'exitedReviewMode' && typeof item.review === 'string') {
         return item.review.trim() ? `${at}  ${item.review.trim()}` : null;
@@ -214,7 +286,7 @@ export function traceCodexEvent(method, params) {
       const bad = status !== 'completed';
       // A Codex run is always one turn, so the footer shows the duration where
       // Claude Code's shows a turn count.
-      const span = Number.isFinite(turn.durationMs) ? `${(turn.durationMs / 1000).toFixed(1)}s` : '?s';
+      const span = Number.isFinite(turn.durationMs) ? `${(turn.durationMs! / 1000).toFixed(1)}s` : '?s';
       const said = bad ? turnTrouble(turn, status) : (finalAnswerIn(turn.items) ?? '');
       return `\n${at}  == RESULT (${status}${bad ? ' ERROR' : ''} · ${span}) ==\n${said.slice(0, 4000)}`;
     }
@@ -225,19 +297,21 @@ export function traceCodexEvent(method, params) {
   }
 }
 
-function changesOf(item) {
+function changesOf(item: CodexItem | null | undefined): CodexFileChange[] {
   return Array.isArray(item?.changes) ? item.changes : [];
 }
+
+export type FileVerb = 'Write' | 'Delete' | 'Move' | 'Edit';
 
 /**
  * What one file change did, as Write, Delete, Move or Edit, or null when it
  * names no file. The approval card in main/codex-approvals.mts uses the same
  * function, so the card and the trace use the same word.
  */
-export function fileVerbWord(change) {
+export function fileVerbWord(change: CodexFileChange | null | undefined): FileVerb | null {
   const from = String(change?.path ?? '').trim();
   if (!from) return null;
-  const kind = change?.kind ?? {};
+  const kind: Partial<CodexFileChange['kind']> = change?.kind ?? {};
   const to = typeof kind.move_path === 'string' ? kind.move_path.trim() : '';
   if (kind.type === 'add') return 'Write';
   if (kind.type === 'delete') return 'Delete';
@@ -246,7 +320,7 @@ export function fileVerbWord(change) {
   return null;
 }
 
-function fileVerb(change) {
+function fileVerb(change: CodexFileChange): string | null {
   const word = fileVerbWord(change);
   if (!word) return null;
   const from = String(change.path).trim().slice(0, 200);
@@ -255,16 +329,16 @@ function fileVerb(change) {
 }
 
 /** The short In Progress tail, in the same words the Claude Code reader uses. */
-export function summarizeCodexEvent(method, params) {
+export function summarizeCodexEvent(method: string, params: unknown): string | null {
   try {
-    const p = params ?? {};
+    const p = (params ?? {}) as CodexEventParams;
 
     if (method === 'item/completed') {
-      const item = p.item ?? {};
+      const item: CodexItem = p.item ?? {};
       if (item?.type === 'agentMessage') return String(item.text ?? '').slice(0, 300) || null;
       if (item?.type === 'commandExecution') return String(item.command ?? '').trim() ? 'tool: Bash' : null;
       if (item?.type === 'fileChange') {
-        const words = [];
+        const words: string[] = [];
         for (const change of changesOf(item)) {
           const verb = fileVerb(change);
           if (!verb) continue;
@@ -310,10 +384,10 @@ export const CHANGE_BYTE_CAP = 16 * 1024 * 1024;
  * list, because `changeFromCodexTurn` pairs each change with the message just
  * before it.
  */
-export function rememberCodexChange(session, method, params) {
+export function rememberCodexChange(session: CodexReadSession | null | undefined, method: string, params: unknown): void {
   try {
     if (!session || method !== 'item/completed') return;
-    const type = params?.item?.type;
+    const type = (params as CodexEventParams | null | undefined)?.item?.type;
     if (type !== 'fileChange' && type !== 'agentMessage') return;
     const kept = session.codexChange ?? (session.codexChange = []);
     if (kept.length >= CHANGE_FRAME_CAP) return;
@@ -329,8 +403,8 @@ export function rememberCodexChange(session, method, params) {
  * Roughly how big one frame is: the length of its `text` and each `diff`.
  * Not JSON.stringify, which would cost the very memory the cap guards.
  */
-function frameSize(params) {
-  const item = params?.item ?? {};
+function frameSize(params: unknown): number {
+  const item: CodexItem = (params as CodexEventParams | null | undefined)?.item ?? {};
   let n = String(item.text ?? '').length;
   for (const change of changesOf(item)) n += String(change?.diff ?? '').length;
   return n;
@@ -344,7 +418,7 @@ function frameSize(params) {
  * `events` are the `{method, params}` frames `rememberCodexChange` kept, in
  * order. `roots` and `since` mean what they mean in code-change.mts.
  */
-export function changeFromCodexTurn(events, { roots = [], since = 0 } = {}) {
+export function changeFromCodexTurn(events: readonly CodexFrame[] | null | undefined, { roots = [], since = 0 }: { roots?: string[]; since?: number } = {}) {
   const into = collector({ roots });
   // Codex narrates in a separate agentMessage just before it applies a patch,
   // so the sentence beside a hunk is the nearest preceding message.
@@ -352,8 +426,8 @@ export function changeFromCodexTurn(events, { roots = [], since = 0 } = {}) {
 
   for (const event of Array.isArray(events) ? events : []) {
     if (event?.method !== 'item/completed') continue;
-    const p = event.params ?? {};
-    const item = p.item ?? {};
+    const p = (event.params ?? {}) as CodexEventParams;
+    const item: CodexItem = p.item ?? {};
 
     if (item?.type === 'agentMessage') {
       said = proseFrom(item.text);
@@ -375,7 +449,7 @@ export function changeFromCodexTurn(events, { roots = [], since = 0 } = {}) {
 }
 
 /** Where the file is after the change. A rename is filed under its new path, as in main/git-change.mts. */
-function destinationOf(change) {
+function destinationOf(change: CodexFileChange | null | undefined): string | null {
   const to = typeof change?.kind?.move_path === 'string' ? change.kind.move_path.trim() : '';
   const from = String(change?.path ?? '').trim();
   return to || from || null;
@@ -386,7 +460,7 @@ function destinationOf(change) {
  * diff rather than trusting the kind, because an add arrives as raw content and
  * the shape of a delete has not been observed.
  */
-function hunksFor(change) {
+function hunksFor(change: CodexFileChange | null | undefined): { rows: ChangeRow[] }[] {
   const diff = String(change?.diff ?? '');
   if (!diff) return [];
   if (diff.startsWith('@@')) {
@@ -400,14 +474,14 @@ function hunksFor(change) {
 }
 
 /** A trailing newline is a line terminator, not an empty last line. */
-function splitLines(text) {
+function splitLines(text: string): string[] {
   const out = String(text ?? '').split('\n');
   if (out.length > 1 && out[out.length - 1] === '') out.pop();
   return out;
 }
 
 /** The last non-empty line of what the agent said, as code-change.mts keeps it. */
-function proseFrom(text) {
+function proseFrom(text: string | undefined): string {
   const said = String(text ?? '').trim();
   if (!said) return '';
   const first = said.split('\n').map((l) => l.trim()).filter(Boolean).pop() ?? '';
@@ -420,13 +494,13 @@ function proseFrom(text) {
  * real path is taken from the deepest ancestor that still exists, because the
  * worktree may already be removed when this runs.
  */
-function rootSpellings(roots) {
-  const out = new Set();
+function rootSpellings(roots: string[]): string[] {
+  const out = new Set<string>();
   for (const root of roots.filter(Boolean)) {
     const given = path.resolve(root);
     out.add(given);
     let head = given;
-    const tail = [];
+    const tail: string[] = [];
     for (let i = 0; i < 64; i += 1) {
       try {
         const real = fs.realpathSync(head);
@@ -443,13 +517,13 @@ function rootSpellings(roots) {
 }
 
 /** The same tally as the private collector in code-change.mts, over absolute paths from events. */
-function collector({ roots = [] } = {}) {
-  const files = new Map();
+function collector({ roots = [] }: { roots?: string[] } = {}) {
+  const files = new Map<string, ChangeFile>();
   const totals = { plus: 0, minus: 0, editCount: 0, withProse: 0, startedAt: 0, endedAt: 0 };
   const spellings = rootSpellings(roots);
 
   return {
-    add(abs, rows, { said = '', stamp = 0 } = {}) {
+    add(abs: string, rows: ChangeRow[], { said = '', stamp = 0 }: { said?: string; stamp?: number } = {}) {
       abs = String(abs ?? '').trim();
       if (!abs || NOT_CODE.test(abs)) return;
       const rel = shortPath(abs, spellings);
@@ -461,7 +535,7 @@ function collector({ roots = [] } = {}) {
       const m = rows.filter((r) => r[0] === '-').length;
       if (!p && !m) return;
       const key = rel ?? abs;
-      const file = files.get(key) ?? { path: key, abs, hunks: [], plus: 0, minus: 0, at: stamp };
+      const file: ChangeFile = files.get(key) ?? { path: key, abs, hunks: [], plus: 0, minus: 0, at: stamp };
       file.hunks.push({ rows, said: said || undefined, at: stamp || undefined, plus: p, minus: m });
       file.plus += p; file.minus += m;
       files.set(key, file);

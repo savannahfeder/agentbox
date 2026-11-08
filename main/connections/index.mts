@@ -3,10 +3,105 @@
 // one, because anything a worker's children are handed, the worker can read
 // (main/approvals.mts).
 import crypto from 'node:crypto';
-import { ACCESS, clockAt, onLoopback, OWN_CLIENT_PORT, OWN_CLIENT_REDIRECT, STATES, stateWords } from '../../shared/connections-catalog.mts';
-import { connectionVault, CANNOT_ENCRYPT } from './vault.mts';
+import type { OAuthClientInformationMixed, OAuthTokens } from '@modelcontextprotocol/sdk/shared/auth.js';
+import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js';
+import {
+  ACCESS, clockAt, onLoopback, OWN_CLIENT_PORT, OWN_CLIENT_REDIRECT, STATES, stateWords,
+  type Access, type CatalogTool, type ConnectionState, type ConnectionTold, type GroupId,
+} from '../../shared/connections-catalog.mts';
+import {
+  connectionVault, CANNOT_ENCRYPT,
+  type ConnectionFailure, type ConnectionsCipher, type ConnectionStatus, type SignedIn, type SignInGot, type VaultData,
+} from './vault.mts';
 import { refreshTokens, signIn, SIGN_IN_MS } from './oauth.mts';
-import { countRead, oneLineRead, stateOfError, talk } from './talk.mts';
+import { countRead, oneLineRead, stateOfError, talk, type ToolClient, type ToolError } from './talk.mts';
+
+/** What the Connections page draws for one tool. Never a token. */
+export interface ConnectionTile {
+  id: string;
+  name: string;
+  state: ConnectionState;
+  word: string;
+  todo: string | null;
+  connected: boolean;
+  group: GroupId | 'added';
+  access: Access;
+  needs: string | null;
+  hint: string | null;
+  said: { reads: string; writes: string } | null;
+  custom: boolean;
+  address: string;
+  redirect: string | null;
+  hasClient: boolean;
+  endsAt: number | null;
+  at: number | null;
+  workedAt: number | null;
+  toolCount: number | null;
+  read: string | null;
+  since: number | null;
+  nextTryAt: number | null;
+  stoppedTryingAt: number | null;
+  seen: number | null;
+  seenAtLeast: boolean;
+  things: string | null;
+  changed: string[];
+  reads: string[] | null;
+  writes: string[];
+  lastUsedAt: number | null;
+  failures: ConnectionFailure[];
+  copyable: boolean;
+  copyAsks: 'channels' | null;
+  chooses?: true;
+  chosen?: string[];
+  offered?: { name: string; description: string; runsAlone: boolean }[];
+}
+
+/** A row for Needs you. */
+export type NeedsYouRow = {
+  title: string;
+  problem: string;
+  body: string;
+};
+
+/** A connection that was out for a while and works again. `before` is whether it had ever worked. */
+export interface Recovered {
+  id: string;
+  name: string;
+  since: number;
+  at: number;
+  before: boolean;
+}
+
+export interface ConnectionsOptions {
+  vaultFile: string;
+  cipher: ConnectionsCipher | null | undefined;
+  catalog: CatalogTool[];
+  openExternal: (url: string) => unknown;
+  signInMs?: number;
+  checkMs?: number;
+  callMs?: number;
+  now?: () => number;
+  personId?: () => string | null;
+  onChange?: () => void;
+  onRecovered?: (back: Recovered) => void;
+  onNeedsYou?: (row: NeedsYouRow) => void;
+  onWhoChanged?: () => void;
+  onSignedIn?: (entry: CatalogTool) => void;
+  /** Which tools a copy sealed with a test key may sign in to: a rule, or a list of ids. */
+  testOnlyFor?: ((entry: CatalogTool) => boolean) | string[] | null;
+  retrySteps?: number[];
+  retryFor?: number;
+  recoveryRowAfter?: number;
+  ownClientPort?: number;
+  allowLoopback?: boolean;
+  keepAliveEvery?: number;
+}
+
+type StatusPatch = Partial<ConnectionStatus>;
+
+export type ConnectResult =
+  | { ok: true; tile: ConnectionTile | null }
+  | { ok: false; error: string | null; needsKey?: true; needsClient?: true; existing?: string };
 
 export const CHECK_MS = 20_000;
 export const CALL_MS = 60_000;
@@ -28,39 +123,39 @@ const FAILURES_KEPT = 50;
 const OFFERED_MOST = 60;
 const FAILED_WHY_MOST = 160;
 
-const clip = (s, n) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
-const SIGNED_OUT = new Set([STATES.NOT_SIGNED_IN, STATES.NOT_ALLOWED, STATES.CHOOSE_READS]);
+const clip = (s: unknown, n: number): string => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
+const SIGNED_OUT: ReadonlySet<ConnectionState | undefined> = new Set([STATES.NOT_SIGNED_IN, STATES.NOT_ALLOWED, STATES.CHOOSE_READS]);
 
 /** When the app next tries a down connection by itself, or null when it will not. */
-export function nextTryAt(status, { steps = RETRY_STEPS_MS, retryFor = RETRY_FOR_MS } = {}) {
+export function nextTryAt(status: ConnectionStatus | null | undefined, { steps = RETRY_STEPS_MS, retryFor = RETRY_FOR_MS }: { steps?: number[]; retryFor?: number } = {}): number | null {
   if (status?.state !== STATES.DOWN || !status.at) return null;
   const since = status.since ?? status.at;
   const next = status.at + steps[Math.min(Math.max(1, status.tries ?? 1), steps.length) - 1];
   return next <= since + retryFor ? next : null;
 }
 
-const fingerprint = (tool) => crypto.createHash('sha256').update(JSON.stringify([tool.name, tool.description ?? '', tool.inputSchema ?? null])).digest('base64url');
-const prints = (tools) => Object.fromEntries(tools.map((t) => [t.name, fingerprint(t)]));
+const fingerprint = (tool: Tool): string => crypto.createHash('sha256').update(JSON.stringify([tool.name, tool.description ?? '', tool.inputSchema ?? null])).digest('base64url');
+const prints = (tools: Tool[]): Record<string, string> => Object.fromEntries(tools.map((t) => [t.name, fingerprint(t)]));
 /** Tools added, gone or reworded since the person last saw the list. */
-function toolsChanged(accepted, tools) {
+function toolsChanged(accepted: Record<string, string>, tools: Tool[]): string[] {
   const now = prints(tools);
   return [...new Set([...Object.keys(accepted), ...Object.keys(now)])].filter((n) => accepted[n] !== now[n]).sort();
 }
 
 // Two yes-or-no facts about a sign-in, and all a tile may know of one.
-const signInFacts = (c, entry) => ({
+const signInFacts = (c: SignedIn | undefined, entry: CatalogTool) => ({
   redirect: entry.access === ACCESS.OWN_CLIENT ? OWN_CLIENT_REDIRECT : null,
   hasClient: !!c?.client?.client_secret,
   endsAt: c && !c.tokens?.refresh_token ? (c.expiresAt ?? null) : null,
 });
-const needsNoArgument = (t) => !t?.inputSchema?.required?.length;
-const expiryOf = (tokens, at) => (Number(tokens?.expires_in) > 0 ? at + Number(tokens.expires_in) * 1000 : null);
+const needsNoArgument = (t: Tool | undefined): boolean => !t?.inputSchema?.required?.length;
+const expiryOf = (tokens: OAuthTokens | undefined, at: number): number | null => (Number(tokens?.expires_in) > 0 ? at + Number(tokens!.expires_in) * 1000 : null);
 
 /**
  * A tool with no written list reads only what its person ticked. A check needs a
  * ticked tool that runs with no argument, or there is no real read to prove it.
  */
-function asChosen(entry, c) {
+function asChosen(entry: CatalogTool, c: Pick<SignedIn, 'chosen' | 'status'> | undefined): CatalogTool {
   if (entry.reads) return entry;
   const reads = c?.chosen ?? [];
   const tools = c?.status?.tools ?? [];
@@ -68,11 +163,11 @@ function asChosen(entry, c) {
   return { ...entry, reads, writes: [], check: checkable ? { tool: checkable, args: {}, things: null } : null };
 }
 
-function normalAddress(address) {
+function normalAddress(address: string): string | null {
   try { const u = new URL(address); return `${u.origin}${u.pathname.replace(/\/+$/, '')}${u.search}`; } catch { return null; }
 }
 
-function hostName(address) {
+function hostName(address: string): string {
   const host = new URL(address).hostname.replace(/^(mcp|api|www)\./, '');
   return host.charAt(0).toUpperCase() + host.slice(1);
 }
@@ -82,25 +177,25 @@ export function createConnections({
   personId = () => null, onChange = () => {}, onRecovered = () => {}, onNeedsYou = () => {}, onWhoChanged = () => {}, onSignedIn = () => {}, testOnlyFor = null,
   retrySteps = RETRY_STEPS_MS, retryFor = RETRY_FOR_MS, recoveryRowAfter = RECOVERY_ROW_AFTER_MS,
   ownClientPort = OWN_CLIENT_PORT, allowLoopback = false, keepAliveEvery = KEEP_ALIVE_EVERY_MS,
-}) {
+}: ConnectionsOptions) {
   const vault = connectionVault({ file: vaultFile, cipher });
-  const everyEntry = (saved) => [...catalog, ...Object.values(saved?.custom ?? {})];
-  const entryIn = (id, saved) => everyEntry(saved).find((e) => e.id === id) ?? null;
+  const everyEntry = (saved: VaultData): CatalogTool[] => [...catalog, ...Object.values(saved?.custom ?? {})];
+  const entryIn = (id: string, saved: VaultData): CatalogTool | null => everyEntry(saved).find((e) => e.id === id) ?? null;
   // Only a tool that may need the file reads it, so a Mac with none asks no keychain.
-  const entryOf = (id) => {
+  const entryOf = (id: string): CatalogTool | null => {
     const listed = catalog.find((e) => e.id === id);
     if (listed?.reads) return listed;
     const saved = vault.readNow();
     const e = entryIn(id, saved);
     return e ? asChosen(e, saved.connections?.[id]) : null;
   };
-  const refreshing = new Map();
-  const checking = new Map();
-  const signingIn = new Map();
-  const retry = { on: false, timer: null, keepAlive: null };
-  const nextTry = (s) => nextTryAt(s, { steps: retrySteps, retryFor });
+  const refreshing = new Map<string, Promise<string>>();
+  const checking = new Map<string, Promise<ConnectionTile | null>>();
+  const signingIn = new Map<string, () => void>();
+  const retry: { on: boolean; timer: NodeJS.Timeout | null; keepAlive: NodeJS.Timeout | null } = { on: false, timer: null, keepAlive: null };
+  const nextTry = (s: ConnectionStatus | undefined) => nextTryAt(s, { steps: retrySteps, retryFor });
 
-  const tileOf = (listed, saved) => {
+  const tileOf = (listed: CatalogTool, saved: VaultData): ConnectionTile => {
     const c = saved?.connections?.[listed.id];
     const entry = asChosen(listed, c);
     const s = c?.status ?? {};
@@ -115,7 +210,8 @@ export function createConnections({
       address: entry.address, ...signInFacts(c, entry),
       at: s.at ?? null, workedAt: s.workedAt ?? null, toolCount: s.toolCount ?? null, read: s.read ?? null,
       since: c ? (s.since ?? s.at ?? null) : null, nextTryAt: c ? nextTry(s) : null,
-      stoppedTryingAt: c && state === STATES.DOWN && !nextTry(s) ? (s.since ?? s.at ?? null) + retryFor : null,
+      // A down state is always saved with its `at`.
+      stoppedTryingAt: c && state === STATES.DOWN && !nextTry(s) ? (s.since ?? s.at ?? null)! + retryFor : null,
       seen: s.seen ?? null, seenAtLeast: s.seen != null && s.seen >= (entry.check?.args?.limit ?? Infinity), things: entry.check?.things ?? null,
       changed: s.changed ?? [], reads: entry.reads, writes: entry.writes,
       lastUsedAt: c?.activity?.lastUsedAt ?? null, failures: c?.activity?.failures ?? [],
@@ -126,7 +222,7 @@ export function createConnections({
 
   // One refresh per connection at a time, whoever noticed first. `spent` is the
   // token that got refused: if the vault already holds another, somebody refreshed.
-  function refreshOnce(entry, spent) {
+  function refreshOnce(entry: CatalogTool, spent: string): Promise<string> {
     const running = refreshing.get(entry.id);
     if (running) return running;
     const run = (async () => {
@@ -134,10 +230,11 @@ export function createConnections({
       if (!c) throw Object.assign(new Error('not connected'), { status: 401 });
       if (c.tokens.access_token !== spent) return c.tokens.access_token;
       if (!c.tokens.refresh_token) throw Object.assign(new Error('no way to refresh'), { status: 401 });
-      let tokens;
+      let tokens: OAuthTokens;
       try { tokens = await refreshTokens({ entry, signedIn: c }); } catch (err) {
         // A refused refresh is a lost sign-in. One that did not get through is not.
-        const refused = /invalid_grant|invalid_client|unauthorized_client/i.test(`${err?.name} ${err?.code} ${err?.message}`) || err?.constructor?.errorCode === 'invalid_grant';
+        const refused = /invalid_grant|invalid_client|unauthorized_client/i.test(`${(err as ToolError | null)?.name} ${(err as ToolError | null)?.code} ${(err as ToolError | null)?.message}`)
+          || (err as { constructor?: { errorCode?: string } } | null)?.constructor?.errorCode === 'invalid_grant';
         throw refused ? Object.assign(new Error('the sign-in is no longer accepted'), { status: 401 }) : err;
       }
       await vault.update((d) => {
@@ -156,14 +253,14 @@ export function createConnections({
    * for a write too; a write whose answer was lost is never sent twice, and that
    * is not this path.
    */
-  async function withTool(entry, use, { ms } = {}) {
+  async function withTool<T>(entry: CatalogTool, use: (client: ToolClient) => T | Promise<T>, { ms }: { ms?: number } = {}): Promise<T> {
     const c = (await vault.read()).connections?.[entry.id];
     if (!c) throw Object.assign(new Error('not connected'), { status: 401 });
     const token = c.tokens.access_token;
     try {
       return await talk({ address: entry.address, token, ms, use });
     } catch (err) {
-      if (err?.status !== 401) throw err;
+      if ((err as ToolError | null)?.status !== 401) throw err;
       const fresh = await refreshOnce(entry, token);
       return talk({ address: entry.address, token: fresh, ms, use });
     }
@@ -171,15 +268,16 @@ export function createConnections({
 
   // `since` is when the state last changed and `tries` how many checks in a row
   // found it down, so a tile can say "down since" and the retries stay bounded.
-  async function saveStatus(id, patch) {
-    let recovered = null;
-    let lost = null;
+  async function saveStatus(id: string, patch: StatusPatch): Promise<void> {
+    // Set inside the update below, which TS cannot follow, hence `as`.
+    let recovered = null as Omit<Recovered, 'name'> | null;
+    let lost = null as { at: number } | null;
     let whoChanged = false;
     await vault.update((d) => {
       const c = d.connections?.[id];
       if (!c) return;
-      const before = c.status ?? {};
-      const next = { ...before, ...patch };
+      const before: ConnectionStatus = c.status ?? {};
+      const next: ConnectionStatus = { ...before, ...patch };
       if (patch.state) {
         const turned = patch.state !== before.state;
         const at = patch.at ?? now();
@@ -189,7 +287,8 @@ export function createConnections({
         const wasOut = before.state === STATES.DOWN || before.state === STATES.UNREACHABLE;
         const outFor = at - (before.since ?? before.at ?? at);
         if (wasOut && patch.state === STATES.WORKS && outFor >= recoveryRowAfter) {
-          recovered = { id, since: before.since ?? before.at, at, before: !!before.workedAt };
+          // An out state is always saved with its `at`.
+          recovered = { id, since: (before.since ?? before.at)!, at, before: !!before.workedAt };
         }
         if (turned && patch.state === STATES.NOT_SIGNED_IN) lost = { at };
         if (turned && SIGNED_OUT.has(patch.state) !== SIGNED_OUT.has(before.state)) whoChanged = true;
@@ -200,7 +299,7 @@ export function createConnections({
     if (whoChanged) { try { onWhoChanged(); } catch { /* the next publish says it */ } }
     const name = catalog.find((e) => e.id === id)?.name ?? (await vault.read()).custom?.[id]?.name ?? id;
     if (recovered) {
-      try { onRecovered({ ...recovered, name }); } catch (err) { console.warn('zero: could not say a connection works again:', err?.message ?? err); }
+      try { onRecovered({ ...recovered, name }); } catch (err) { console.warn('zero: could not say a connection works again:', (err as Error | null)?.message ?? err); }
     }
     if (lost) {
       fileRow({
@@ -212,16 +311,16 @@ export function createConnections({
     void armRetry();
   }
 
-  function fileRow(row) {
-    try { onNeedsYou(row); } catch (err) { console.warn('zero: could not put a connection in Needs you:', err?.message ?? err); }
+  function fileRow(row: NeedsYouRow): void {
+    try { onNeedsYou(row); } catch (err) { console.warn('zero: could not put a connection in Needs you:', (err as Error | null)?.message ?? err); }
   }
 
-  async function armRetry() {
+  async function armRetry(): Promise<void> {
     if (!retry.on) return;
-    clearTimeout(retry.timer);
+    clearTimeout(retry.timer!);
     retry.timer = null;
     const saved = await vault.read();
-    const times = everyEntry(saved).map((e) => nextTry(saved.connections?.[e.id]?.status)).filter(Boolean);
+    const times = everyEntry(saved).map((e) => nextTry(saved.connections?.[e.id]?.status)).filter(Boolean) as number[];
     if (!retry.on || !times.length) return;
     retry.timer = setTimeout(async () => {
       retry.timer = null;
@@ -235,7 +334,7 @@ export function createConnections({
   }
 
   /** What a sign-in leaves in the vault, keeping the person's own choices and history. */
-  async function keepSignIn(id, got, { custom = null } = {}) {
+  async function keepSignIn(id: string, got: SignInGot, { custom = null }: { custom?: CatalogTool | null } = {}): Promise<void> {
     await vault.update((d) => {
       d.connections ??= {};
       const was = d.connections[id];
@@ -248,7 +347,7 @@ export function createConnections({
     });
   }
 
-  async function runSignIn(id, entry, client) {
+  async function runSignIn(id: string, entry: CatalogTool, client: OAuthClientInformationMixed | null): Promise<SignInGot> {
     signingIn.get(id)?.();
     try {
       return await signIn({ entry, client, ownPort: ownClientPort, openExternal, ms: signInMs, onCancelable: (cancel) => signingIn.set(id, cancel) });
@@ -257,13 +356,13 @@ export function createConnections({
 
   const service = {
     catalog,
-    async list() {
+    async list(): Promise<{ tiles: ConnectionTile[]; canEncrypt: boolean }> {
       const saved = await vault.read();
       return { tiles: everyEntry(saved).map((e) => tileOf(e, saved)), canEncrypt: vault.mayEncrypt() };
     },
 
     /** `clientId` and `clientSecret` for a tool that takes a client made in its console, `key` for one that takes a token. */
-    async connect(id, { clientId = null, clientSecret = null, key = null } = {}) {
+    async connect(id: string, { clientId = null, clientSecret = null, key = null }: { clientId?: string | null; clientSecret?: string | null; key?: string | null } = {}): Promise<ConnectResult> {
       const saved = await vault.read();
       const listed = entryIn(id, saved);
       if (!listed) return { ok: false, error: 'There is no such tool.' };
@@ -286,11 +385,11 @@ export function createConnections({
           await keepSignIn(id, await runSignIn(id, entry, client));
         }
       } catch (err) {
-        return { ok: false, error: String(err?.message ?? err) };
+        return { ok: false, error: String((err as Error | null)?.message ?? err) };
       }
       const tile = await service.check(id);
       if (!tile || (tile.state !== STATES.NOT_SIGNED_IN && tile.state !== STATES.NOT_ALLOWED)) {
-        try { onSignedIn(entry); } catch (err) { console.warn('zero: could not act on a new sign-in:', err?.message ?? err); }
+        try { onSignedIn(entry); } catch (err) { console.warn('zero: could not act on a new sign-in:', (err as Error | null)?.message ?? err); }
       }
       return { ok: true, tile };
     },
@@ -299,7 +398,7 @@ export function createConnections({
      * Any tool by its address. Nothing is kept until a sign-in or key got through,
      * and it reads nothing until its person has ticked what agents may read.
      */
-    async addByAddress({ address, key = null } = {}) {
+    async addByAddress({ address, key = null }: { address?: string; key?: string | null } = {}): Promise<ConnectResult> {
       const asked = String(address ?? '').trim();
       let u;
       try { u = new URL(asked); } catch { return { ok: false, error: 'That is not an address. It starts with https://' }; }
@@ -310,24 +409,25 @@ export function createConnections({
       if (already) return { ok: false, existing: already.id, error: `${already.name} is already on this page.` };
       if (!vault.canEncrypt()) return { ok: false, error: CANNOT_ENCRYPT };
       if (testOnlyFor && !onLoopback(asked)) return { ok: false, error: CANNOT_ENCRYPT };
-      const id = `custom-${crypto.createHash('sha256').update(norm).digest('hex').slice(0, 12)}`;
-      const entry = {
+      // `asked` parsed as a URL above, so it has a normal form.
+      const id = `custom-${crypto.createHash('sha256').update(norm!).digest('hex').slice(0, 12)}`;
+      const entry: CatalogTool = {
         id, name: hostName(asked), address: asked, custom: true, group: 'added', access: ACCESS.SIGN_IN, auth: 'oauth', redirect: 'loopback', registration: 'dynamic', scope: null, needs: null, copy: null,
         reads: null, writes: [], check: null, ...(key ? { signsInWithKey: true } : {}),
       };
       try {
-        const got = key ? { tokens: { access_token: String(key).trim(), token_type: 'Bearer' } } : await runSignIn(id, entry, null);
+        const got: SignInGot = key ? { tokens: { access_token: String(key).trim(), token_type: 'Bearer' } } : await runSignIn(id, entry, null);
         await keepSignIn(id, got, { custom: entry });
       } catch (err) {
-        if (err?.noRegistration) return { ok: false, needsKey: true, error: 'This tool does not let apps sign in by themselves. Paste an API key or token from it.' };
-        return { ok: false, error: String(err?.message ?? err) };
+        if ((err as ToolError | null)?.noRegistration) return { ok: false, needsKey: true, error: 'This tool does not let apps sign in by themselves. Paste an API key or token from it.' };
+        return { ok: false, error: String((err as Error | null)?.message ?? err) };
       }
       const tile = await service.check(id);
       return { ok: true, tile };
     },
 
     /** What agents may read on a tool with no written list. Names it does not offer are dropped. */
-    async chooseReads(id, names) {
+    async chooseReads(id: string, names: unknown[] | null | undefined): Promise<ConnectionTile | null> {
       const saved = await vault.read();
       const offered = new Set((saved.connections?.[id]?.status?.tools ?? []).map((t) => t.name));
       if (!saved.connections?.[id] || entryIn(id, saved)?.reads) return null;
@@ -336,9 +436,9 @@ export function createConnections({
       return service.check(id);
     },
 
-    cancelConnect(id) { signingIn.get(id)?.(); signingIn.delete(id); },
+    cancelConnect(id: string): void { signingIn.get(id)?.(); signingIn.delete(id); },
 
-    async disconnect(id) {
+    async disconnect(id: string): Promise<{ ok: true }> {
       service.cancelConnect(id);
       await vault.update((d) => {
         if (d.connections) delete d.connections[id];
@@ -354,7 +454,7 @@ export function createConnections({
      * ever said after a read that came back with something in it. A failed check
      * touches the status and nothing else.
      */
-    check(id) {
+    check(id: string): Promise<ConnectionTile | null> {
       const running = checking.get(id);
       if (running) return running;
       const run = (async () => {
@@ -364,14 +464,14 @@ export function createConnections({
         const before = saved.connections?.[id];
         if (!before) return tileOf(listed, {});
         const at = now();
-        let patch;
+        let patch: StatusPatch;
         try {
           const found = await withTool(listed, async (client) => {
             const { tools } = await client.listTools(undefined, { timeout: checkMs });
             const entry = asChosen(listed, { ...before, status: { ...before.status, tools } });
             if (!entry.check) return { tools, choosing: true, server: client.getServerVersion?.()?.name };
-            if (!tools.some((t) => t.name === entry.check.tool)) throw Object.assign(new Error(`it no longer offers ${entry.check.tool}`), { unreachable: true });
-            const result = await client.callTool({ name: entry.check.tool, arguments: entry.check.args }, undefined, { timeout: checkMs });
+            if (!tools.some((t) => t.name === entry.check!.tool)) throw Object.assign(new Error(`it no longer offers ${entry.check.tool}`), { unreachable: true });
+            const result = await client.callTool({ name: entry.check.tool, arguments: entry.check.args }, undefined, { timeout: checkMs }) as CallToolResult;
             if (result.isError) throw new Error(oneLineRead(result) ?? 'the read failed');
             return { tools, line: oneLineRead(result), seen: countRead(result), server: client.getServerVersion?.()?.name };
           }, { ms: checkMs });
@@ -386,7 +486,7 @@ export function createConnections({
           // A name is what a server calls itself: shown, and never used to decide anything.
           const named = clip(found.server, 40);
           if (listed.custom && named && named !== listed.name) await vault.update((d) => { if (d.custom?.[id]) d.custom[id].name = named; });
-        } catch (err) { patch = { state: stateOfError(err), at }; }
+        } catch (err) { patch = { state: stateOfError(err as ToolError), at }; }
         await saveStatus(id, patch);
         const after = await vault.read();
         return tileOf(entryIn(id, after) ?? listed, after);
@@ -396,7 +496,7 @@ export function createConnections({
     },
 
     /** Called when the page opens: time is read, not waited for. */
-    async checkStale({ now: at = now() } = {}) {
+    async checkStale({ now: at = now() }: { now?: number } = {}): Promise<void> {
       const saved = await vault.read();
       await Promise.all(everyEntry(saved)
         .filter((e) => saved.connections?.[e.id] && at - (saved.connections[e.id].status?.at ?? 0) > DAY_MS)
@@ -407,7 +507,7 @@ export function createConnections({
      * Renews a sign-in before it ends, where the tool gave a way to, and says so a
      * while ahead where it did not. A job should never be how anybody finds out.
      */
-    async keepAlive() {
+    async keepAlive(): Promise<void> {
       const saved = await vault.read();
       const at = now();
       for (const listed of everyEntry(saved)) {
@@ -416,7 +516,7 @@ export function createConnections({
         if (c.tokens?.refresh_token) {
           if (c.expiresAt - at > RENEW_BEFORE_MS) continue;
           try { await refreshOnce(listed, c.tokens.access_token); } catch (err) {
-            if (err?.status === 401) await saveStatus(listed.id, { state: STATES.NOT_SIGNED_IN, at });
+            if ((err as ToolError | null)?.status === 401) await saveStatus(listed.id, { state: STATES.NOT_SIGNED_IN, at });
             // Anything else did not get through: the next pass tries, up to the limit above.
           }
         } else if (c.expiresAt - at <= WARN_BEFORE_MS && c.warnedFor !== c.expiresAt) {
@@ -430,7 +530,7 @@ export function createConnections({
       }
     },
 
-    async acceptTools(id) {
+    async acceptTools(id: string): Promise<void> {
       await vault.update((d) => {
         const s = d.connections?.[id]?.status;
         if (s?.tools) { s.accepted = prints(s.tools); s.changed = []; }
@@ -439,7 +539,7 @@ export function createConnections({
     },
 
     /** Who the team may be told has this tool. An outage does not take it away; a lost sign-in does. */
-    async connectedIds() {
+    async connectedIds(): Promise<string[]> {
       const saved = await vault.read();
       return everyEntry(saved).filter((e) => saved.connections?.[e.id] && !SIGNED_OUT.has(saved.connections[e.id].status?.state)).map((e) => e.id);
     },
@@ -450,7 +550,7 @@ export function createConnections({
      * lost sign-in or lost access is off until it is put right, unless
      * `includeLapsed` asks only whether it is still theirs.
      */
-    workingNow({ includeLapsed = false } = {}) {
+    workingNow({ includeLapsed = false }: { includeLapsed?: boolean } = {}): CatalogTool[] {
       const saved = vault.readNow();
       const me = personId() ?? null;
       return everyEntry(saved).filter((e) => {
@@ -460,11 +560,11 @@ export function createConnections({
         if (includeLapsed) return true;
         const { state, workedAt } = c.status ?? {};
         return !!workedAt && state !== STATES.NOT_SIGNED_IN && state !== STATES.NOT_ALLOWED && state !== STATES.UNREACHABLE && state !== STATES.CHOOSE_READS;
-      }).map((e) => asChosen(e, saved.connections[e.id]));
+      }).map((e) => asChosen(e, saved.connections![e.id]));
     },
 
     /** Every tool in the catalog as this person's copy has it, for what a worker is told. */
-    statusNow() {
+    statusNow(): ConnectionTold[] {
       const saved = vault.readNow();
       const me = personId() ?? null;
       const given = new Set(service.workingNow().map((e) => e.id));
@@ -480,19 +580,19 @@ export function createConnections({
     },
 
     /** Tries a down connection again on the bounded schedule, and keeps sign-ins alive, from now until stop. */
-    startRetrying() {
+    startRetrying(): void {
       retry.on = true;
       void armRetry();
       void service.keepAlive().catch(() => {});
-      clearInterval(retry.keepAlive);
+      clearInterval(retry.keepAlive!);
       retry.keepAlive = setInterval(() => { void service.keepAlive().catch(() => {}); }, keepAliveEvery);
       retry.keepAlive.unref?.();
     },
 
-    async stop() {
+    async stop(): Promise<void> {
       retry.on = false;
-      clearTimeout(retry.timer);
-      clearInterval(retry.keepAlive);
+      clearTimeout(retry.timer!);
+      clearInterval(retry.keepAlive!);
       retry.timer = null;
       retry.keepAlive = null;
       for (const cancel of signingIn.values()) cancel();
@@ -504,12 +604,12 @@ export function createConnections({
     _withTool: withTool,
     _saveStatus: saveStatus,
     // An agent's real read counts: a tile should not say down over one that just worked.
-    async _noteRead(id) {
+    async _noteRead(id: string): Promise<void> {
       const state = (await vault.read()).connections?.[id]?.status?.state;
       if (state === STATES.DOWN || state === STATES.UNREACHABLE) await saveStatus(id, { state: STATES.WORKS, at: now(), workedAt: now() });
     },
     /** One use by an agent: when, and if it failed which tool and why. Never what it asked for. */
-    async _noteUse(id, { tool, wrote = false, ok, why = null }) {
+    async _noteUse(id: string, { tool, wrote = false, ok, why = null }: { tool: string; wrote?: boolean; ok: boolean; why?: string | null }): Promise<void> {
       const at = now();
       await vault.update((d) => {
         const c = d.connections?.[id];
@@ -520,14 +620,14 @@ export function createConnections({
       });
       onChange();
     },
-    async _noteTools(id, tools) {
+    async _noteTools(id: string, tools: Tool[]): Promise<void> {
       const c = (await vault.read()).connections?.[id];
       const accepted = c?.status?.accepted;
       if (!accepted) return;
       const changed = toolsChanged(accepted, tools);
-      if (JSON.stringify(changed) !== JSON.stringify(c.status.changed ?? [])) await saveStatus(id, { tools, changed, toolCount: tools.length });
+      if (JSON.stringify(changed) !== JSON.stringify(c!.status!.changed ?? [])) await saveStatus(id, { tools, changed, toolCount: tools.length });
     },
-    _read: () => vault.read(),
+    _read: (): Promise<VaultData> => vault.read(),
     // The clock that stamped every `at` here, so whoever puts one into words
     // reads it against the same one.
     _now: now,
@@ -535,3 +635,5 @@ export function createConnections({
   };
   return service;
 }
+
+export type Connections = ReturnType<typeof createConnections>;

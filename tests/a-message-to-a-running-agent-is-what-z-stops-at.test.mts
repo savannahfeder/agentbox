@@ -124,7 +124,7 @@ describe('after the window, when Z cannot reach it', () => {
 
   it('takes the entry off again when the hand-over failed, because then nothing was sent', () => {
     const branch = liveBranch();
-    const failed = branch.slice(branch.indexOf('failed: (error: Error) => {'));
+    const failed = branch.slice(branch.indexOf('failed: (error: unknown) => {'));
     expect(failed).toMatch(/setUndoStack\(\(u\) => u\.filter\(\(e\) => e !== alreadyGone\)\)/);
     // The words go back through `putBack`, shared with the other reply path.
     expect(failed).toMatch(/putBack\(error\)/);

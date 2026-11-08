@@ -17,18 +17,41 @@ import path from 'node:path';
 import {
   DAY_NAMES, foldRepeats, isOwed, isRepeatRule, occurrenceId, periodKey, repeatLabel,
   standingInstruction, PROTOCOL_OPENS, INSTRUCTION_MARK,
+  type RepeatLine, type RepeatRule,
 } from '../shared/repeats.mts';
 import { machineryPath } from './store/home.mts';
 import { NAME } from '../shared/product-name.mjs';
+import type { StoreModules } from './store-modules.mts';
 
 const FILE = 'repeats.jsonl';
+
+type Schedule = { every?: string; at?: string; on?: number };
+
+export interface RuleInput extends Schedule {
+  title: string;
+  body?: string;
+  priority?: number;
+  engine?: string | null;
+  model?: string | null;
+  startsNext?: boolean;
+}
+
+export type RulePatch = Schedule & { startsNext?: boolean; served?: string; endedAt?: number; [field: string]: unknown };
+
+export interface ServeResult {
+  occurrenceId: string | null;
+  created: boolean;
+  superseded: string | null;
+  misses: number;
+  alert: string[] | null;
+}
 
 // What a refused rule is called when we say we cannot keep it. A weekly rule
 // whose day is missing used to print "every week at 08:00", which names the one
 // part that was fine and hides the part that was not.
-function describeRule({ every, at, on }) {
+function describeRule({ every, at, on }: Schedule): string {
   if (every === 'week') {
-    const day = DAY_NAMES[on] ?? 'no day';
+    const day = DAY_NAMES[on as number] ?? 'no day';
     return `every week on ${day} at ${at}`;
   }
   return `every ${every} at ${at}`;
@@ -70,22 +93,25 @@ export const OCCURRENCE_PROTOCOL = [
 ].join('\n');
 
 export class Repeats {
-  constructor(storeModules) {
+  // Null for a reader that never serves (mcp/core/repeats.mts).
+  declare modules: StoreModules | null;
+
+  constructor(storeModules: StoreModules | null) {
     this.modules = storeModules;
   }
 
   // In the app's home, not the product folder: a repeat rule is our record of
   // what to run, not one of her documents (main/store/home.mts).
-  filePath(productDir) {
+  filePath(productDir: string): string {
     return machineryPath(productDir, FILE);
   }
 
-  _read(productDir) {
+  _read(productDir: string): (RepeatLine | null)[] {
     let raw = '';
     try {
       raw = fs.readFileSync(this.filePath(productDir), 'utf8');
     } catch (err) {
-      if (err.code === 'ENOENT') return [];
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
       throw err;
     }
     return raw.split('\n').filter(Boolean).map((line) => {
@@ -95,15 +121,15 @@ export class Repeats {
     });
   }
 
-  _append(productDir, id, patch, now = Date.now()) {
+  _append(productDir: string, id: string, patch: Record<string, unknown>, now = Date.now()): void {
     fs.appendFileSync(this.filePath(productDir), `${JSON.stringify({ id, ts: now, patch })}\n`);
   }
 
-  list(productDir, now = Date.now()) {
+  list(productDir: string, now = Date.now()): RepeatRule[] {
     return [...foldRepeats(this._read(productDir), now).values()];
   }
 
-  get(productDir, id, now = Date.now()) {
+  get(productDir: string, id: string, now = Date.now()): RepeatRule | null {
     return foldRepeats(this._read(productDir), now).get(id) ?? null;
   }
 
@@ -116,9 +142,9 @@ export class Repeats {
   // for an engine this Mac never offered her.
   // `startsNext`: the rule is made from a thread that already ran, so the
   // period it is in counts as served and the first run comes at its next time.
-  setRule(productDir, {
+  setRule(productDir: string, {
     title, body, priority = 5, every = 'day', at, on, engine, model, startsNext = false,
-  }, now = Date.now()) {
+  }: RuleInput, now = Date.now()): RepeatRule | null {
     // Refused here rather than stored and ignored later: a rule that cannot be
     // kept has to fail while the user is still looking at what they typed.
     //
@@ -141,7 +167,7 @@ export class Repeats {
 
   // `startsNext` as in `setRule`: the period the new schedule is in counts as
   // served, so moving a rule from a run that just answered starts nothing now.
-  patchRule(productDir, id, { startsNext = false, ...patch }, now = Date.now()) {
+  patchRule(productDir: string, id: string, { startsNext = false, ...patch }: RulePatch, now = Date.now()): RepeatRule | null {
     // `on` joins the other two: changing a daily rule to a Thursday one sends
     // every, at AND on, and checking the first two alone refused the change for
     // the same reason a new weekly rule was refused.
@@ -162,14 +188,14 @@ export class Repeats {
 
   // Ending one is a small durable fact rather than an archive, so it does not
   // collide with what `done` means on a work item.
-  endRule(productDir, id, now = Date.now()) {
+  endRule(productDir: string, id: string, now = Date.now()): RepeatRule | null {
     return this.patchRule(productDir, id, { endedAt: now }, now);
   }
 
   // The rules whose current period has not been served. Never more than one
   // period per rule: there is no queue of missed firings, only a condition that
   // is currently false, which is why three days away costs one run.
-  due(productDir, now = Date.now()) {
+  due(productDir: string, now = Date.now()): { rule: RepeatRule; key: string | null }[] {
     return this.list(productDir, now)
       .filter((rule) => isOwed(rule, now))
       .map((rule) => ({ rule, key: periodKey(rule, now) }));
@@ -188,15 +214,15 @@ export class Repeats {
    * create that finds the id present and does nothing, rather than running the
    * work twice.
    */
-  async serve(productDir, ruleId, key, now = Date.now()) {
-    const { workItemsDisk, lock } = this.modules;
-    return lock.withProjectLock(productDir, async () => {
+  async serve(productDir: string, ruleId: string, key: string, now = Date.now()): Promise<ServeResult> {
+    const { workItemsDisk, lock } = this.modules!;
+    return lock.withProjectLock(productDir, async (): Promise<ServeResult> => {
       const rule = this.get(productDir, ruleId, now);
       const nothing = { occurrenceId: null, created: false, superseded: null, misses: rule?.misses ?? 0, alert: null };
       if (!rule || rule.endedAt || !isRepeatRule(rule)) return nothing;
 
       const id = occurrenceId(ruleId, key);
-      let superseded = null;
+      let superseded: string | null = null;
       let misses = rule.misses ?? 0;
 
       // The predecessor's state is re-read HERE, inside the lock. A worker
@@ -244,7 +270,7 @@ export class Repeats {
 }
 
 /** The row a period's run is made as, before it exists (a sleeping Mac hands it over, shared/cloud-carry.mts). */
-export function occurrenceFields(rule, key, now) {
+export function occurrenceFields(rule: RepeatRule, key: string, now?: number) {
   return {
     title: `${rule.title} · ${dayStamp(key, now)}`,
     body: `${OCCURRENCE_PROTOCOL.replace('<REPEAT_LABEL>', repeatLabel(rule.id))}\n\n${standingInstruction(rule)}`,
@@ -258,7 +284,7 @@ export function occurrenceFields(rule, key, now) {
 
 // A run made after the day it serves (the first run of a new rule, or a Mac
 // asleep through it) is named for the day it ran.
-function dayStamp(key, now) {
+function dayStamp(key: string, now: number | undefined): string {
   const [y, m, d] = key.split('-').map(Number);
   const served = new Date(y, m - 1, d);
   const day = now != null && now > served.getTime() + 86_400_000 ? new Date(now) : served;
@@ -266,9 +292,9 @@ function dayStamp(key, now) {
 }
 
 // The period keys the misses covered, oldest first, for the alert's wording.
-function missedKeys(currentKey, misses) {
+function missedKeys(currentKey: string, misses: number): string[] {
   const [y, m, d] = currentKey.split('-').map(Number);
-  const keys = [];
+  const keys: string[] = [];
   for (let back = misses; back >= 1; back--) {
     const day = new Date(y, m - 1, d - back);
     const mm = String(day.getMonth() + 1).padStart(2, '0');

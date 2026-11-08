@@ -10,7 +10,11 @@ import path from 'node:path';
 const LOOPBACK = /^(127\.\d+\.\d+\.\d+|localhost|\[::1\])$/;
 const KEY_AT_LEAST = 24;
 
-function checked(url, key) {
+export interface HubAddress { url: string; key: string; invalid?: undefined }
+export interface UnusableHub { invalid: string }
+export type HubReading = HubAddress | UnusableHub;
+
+function checked(url: unknown, key: unknown): HubReading {
   if (typeof key !== 'string' || key.length < KEY_AT_LEAST) return { invalid: 'its key is missing or too short' };
   let at;
   try { at = new URL(String(url)); } catch { return { invalid: 'its address cannot be read' }; }
@@ -19,15 +23,15 @@ function checked(url, key) {
 }
 
 /** `null` when this Mac names no hub; `{ url, key }`; or `{ invalid }` when it names one that cannot be used. */
-export function readHubAddress(env = process.env, home = os.homedir()) {
+export function readHubAddress(env: NodeJS.ProcessEnv = process.env, home: string = os.homedir()): HubReading | null {
   if (env.AGENTBOX_HUB) return checked(env.AGENTBOX_HUB, env.AGENTBOX_HUB_KEY);
   const file = path.join(home, '.agentbox', 'hub.json');
   let text;
   try { text = fs.readFileSync(file, 'utf8'); } catch (err) {
-    return err.code === 'ENOENT' ? null : { invalid: `${file} cannot be read` };
+    return (err as NodeJS.ErrnoException).code === 'ENOENT' ? null : { invalid: `${file} cannot be read` };
   }
   try {
-    const { url, key } = JSON.parse(text);
+    const { url, key }: { url?: unknown; key?: unknown } = JSON.parse(text);
     const hub = checked(url, key);
     return hub.invalid ? { invalid: `${file}: ${hub.invalid}` } : hub;
   } catch {
@@ -37,7 +41,7 @@ export function readHubAddress(env = process.env, home = os.homedir()) {
 
 // A store has one owner. A Mac that names a hub never falls back to running
 // agents itself, even when it cannot read which hub.
-export function whichApp(hub) {
+export function whichApp(hub: HubReading | null): 'whole' | 'refuse' | 'client' {
   if (!hub) return 'whole';
   return hub.invalid ? 'refuse' : 'client';
 }

@@ -12,7 +12,8 @@
 // time: while it is open, another bad day is a note on it.
 import fs from 'node:fs';
 import path from 'node:path';
-import { dayOf } from './freeze-recorder.mts';
+import { dayOf, type FreezeLine } from './freeze-recorder.mts';
+import type { FiledItem, Store, StoreProduct } from './store.mts';
 
 export const FILE_AT_MS = 1000;
 export const FREEZE_LABEL = 'app-froze';
@@ -20,13 +21,31 @@ const STATE = 'freeze-watch.json';
 const GROUPS = 5;
 const FRAMES = 12;
 
-const seconds = (ms) => `${(ms / 1000).toFixed(1)} s`;
+interface HoldGroup { where: string; times: number; totalMs: number; longest: FreezeLine }
+
+export type FreezeRow = Required<Pick<FiledItem, 'title' | 'problem' | 'body'>>;
+
+/** What `freeze-watch.json` keeps: the last day looked at, and the thread it filed. */
+interface FreezeWatchState { checked?: string; open?: { product: string; id: string } }
+
+type FreezeStore = Pick<Store, 'listProducts' | 'listItems' | 'readItem' | 'noteItem' | 'fileOnItsOwn'>;
+
+export interface FreezeWatchOptions {
+  store: FreezeStore;
+  userDir: string;
+  appDir: string;
+  logDir?: string;
+  now?: () => number;
+  log?: Pick<Console, 'warn' | 'info'>;
+}
+
+const seconds = (ms: number) => `${(ms / 1000).toFixed(1)} s`;
 
 /** Every freeze line of one day's log, oldest first. */
-export function freezesOn(logDir, day) {
+export function freezesOn(logDir: string, day: string): FreezeLine[] {
   let text = '';
   try { text = fs.readFileSync(path.join(logDir, `freeze-${day}.jsonl`), 'utf8'); } catch { return []; }
-  const out = [];
+  const out: FreezeLine[] = [];
   for (const raw of text.split('\n')) {
     if (!raw.trim()) continue;
     try {
@@ -38,8 +57,8 @@ export function freezesOn(logDir, day) {
 }
 
 /** The day's holds grouped by what held them, most time first. Pure. */
-function groupsOf(lines) {
-  const by = new Map();
+function groupsOf(lines: FreezeLine[]): HoldGroup[] {
+  const by = new Map<string, HoldGroup>();
   for (const l of lines) {
     const where = String(l.where ?? '(unknown)');
     const g = by.get(where) ?? { where, times: 0, totalMs: 0, longest: l };
@@ -51,7 +70,7 @@ function groupsOf(lines) {
   return [...by.values()].sort((a, b) => b.totalMs - a.totalMs);
 }
 
-function listOf(lines) {
+function listOf(lines: FreezeLine[]): string[] {
   return groupsOf(lines).slice(0, GROUPS).flatMap((g, i) => {
     const stack = g.longest.stacks?.[0];
     return [
@@ -65,7 +84,7 @@ function listOf(lines) {
 }
 
 /** The thread for a day's freezes, or null when none reached FILE_AT_MS. Pure. */
-export function freezeRow(lines, { day }) {
+export function freezeRow(lines: FreezeLine[], { day }: { day: string }): FreezeRow | null {
   if (!lines.some((l) => l.ms >= FILE_AT_MS)) return null;
   const longest = Math.max(...lines.map((l) => l.ms));
   const total = lines.reduce((sum, l) => sum + l.ms, 0);
@@ -87,36 +106,43 @@ export function freezeRow(lines, { day }) {
 }
 
 /** What the open thread hears about another bad day. Pure. */
-export function freezeNote(lines, { day }) {
+export function freezeNote(lines: FreezeLine[], { day }: { day: string }): string | null {
   const row = freezeRow(lines, { day });
   if (!row) return null;
   return [`Again on ${day}: ${row.title.replace(/^The app froze /, '').replace(/ on \S+,/, ',')}.`, '', ...listOf(lines)].join('\n');
 }
 
 export class FreezeWatch {
-  constructor({ store, userDir, appDir, logDir = path.join(userDir, 'memory-log'), now = Date.now, log = console }) {
+  declare store: FreezeStore;
+  declare userDir: string;
+  declare appDir: string;
+  declare logDir: string;
+  declare now: () => number;
+  declare log: Pick<Console, 'warn' | 'info'>;
+
+  constructor({ store, userDir, appDir, logDir = path.join(userDir, 'memory-log'), now = Date.now, log = console }: FreezeWatchOptions) {
     Object.assign(this, { store, userDir, appDir, logDir, now, log });
   }
 
-  read() {
+  read(): FreezeWatchState {
     try { return JSON.parse(fs.readFileSync(path.join(this.userDir, STATE), 'utf8')) ?? {}; } catch { return {}; }
   }
 
-  write(state) {
+  write(state: FreezeWatchState): void {
     try {
       fs.mkdirSync(this.userDir, { recursive: true });
       fs.writeFileSync(path.join(this.userDir, STATE), `${JSON.stringify(state)}\n`);
-    } catch (err) { this.log.warn?.(`freeze-watch: could not keep what it checked: ${err.message}`); }
+    } catch (err) { this.log.warn?.(`freeze-watch: could not keep what it checked: ${(err as Error).message}`); }
   }
 
   /** The project on the repository the app runs from, the one with the most threads if several are. */
-  project() {
-    const real = (p) => { try { return fs.realpathSync(p); } catch { return null; } };
+  project(): StoreProduct | null {
+    const real = (p: string) => { try { return fs.realpathSync(p); } catch { return null; } };
     const app = real(this.appDir);
     if (!app) return null;
     const mine = this.store.listProducts().filter((p) => p.repoPath && real(p.repoPath) === app);
     if (mine.length <= 1) return mine[0] ?? null;
-    const count = (slug) => this.store.listItems().filter((i) => i.product === slug).length;
+    const count = (slug: string) => this.store.listItems().filter((i) => i.product === slug).length;
     return mine.sort((a, b) => count(b.slug) - count(a.slug))[0];
   }
 
@@ -131,10 +157,11 @@ export class FreezeWatch {
     if (!product) { this.write({ ...state, checked: day }); return null; }
     const open = state.open ? this.store.readItem(state.open.product, state.open.id) : null;
     let wrote = null;
+    // `product` is only set when freezeRow found a day worth filing, so neither of these is null.
     if (open && open.status !== 'done') {
-      wrote = this.store.noteItem(open.product, open.id, freezeNote(lines, { day }));
+      wrote = this.store.noteItem(open.product, open.id, freezeNote(lines, { day })!);
     } else {
-      const row = freezeRow(lines, { day });
+      const row = freezeRow(lines, { day })!;
       wrote = this.store.fileOnItsOwn(product.slug, { ...row, kind: 'task', labels: [FREEZE_LABEL] });
       state.open = { product: product.slug, id: wrote.id };
       this.log.info?.(`freeze-watch: the app froze on ${day}; filed ${wrote.id}.`);

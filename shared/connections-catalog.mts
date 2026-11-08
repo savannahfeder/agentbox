@@ -21,7 +21,14 @@ export const STATES = Object.freeze({
   CHOOSE_READS: 'choose_reads',
 });
 
-const WORDS = {
+export type ConnectionState = (typeof STATES)[keyof typeof STATES];
+
+export interface StateWords {
+  word: string;
+  todo: string | null;
+}
+
+const WORDS: Record<string, StateWords> = {
   [STATES.NOT_CONNECTED]: { word: 'Not connected', todo: null },
   [STATES.WORKS]: { word: 'Works', todo: null },
   [STATES.NOT_SIGNED_IN]: { word: 'Not signed in', todo: 'Sign in again. Agents cannot reach it until you do.' },
@@ -31,17 +38,17 @@ const WORDS = {
   [STATES.UNREACHABLE]: { word: 'Could not reach its tools', todo: `It answered, but not as a tool agents can use, so its address may be wrong or it has changed how it works. Waiting will not fix this. Disconnect and connect again, and if it still says this, tell whoever looks after ${Name}.` },
   [STATES.CHOOSE_READS]: { word: 'Choose what agents may read', todo: 'It is signed in and these are its tools. Tick the ones that only read. Agents use a ticked tool without asking, and everything else stays off.' },
 };
-export const stateWords = (state) => WORDS[state] ?? WORDS[STATES.NOT_CONNECTED];
+export const stateWords = (state: string): StateWords => WORDS[state] ?? WORDS[STATES.NOT_CONNECTED];
 
 /** A check reads up to this many, so "I can see 3 issues" is a count and 50 is "at least". */
 export const CHECK_LIMIT = 50;
 
 /** A time the way a person says it: "6:05am" today, "yesterday 6:05pm", "Oct 30 6:05pm". */
-export function clockAt(ms, now = Date.now()) {
+export function clockAt(ms: number, now: number = Date.now()): string {
   const d = new Date(ms);
   const h = d.getHours();
   const clock = `${h % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')}${h < 12 ? 'am' : 'pm'}`;
-  const day = (t) => new Date(t).toDateString();
+  const day = (t: number) => new Date(t).toDateString();
   if (day(ms) === day(now)) return clock;
   if (day(ms) === day(now - 86_400_000)) return `yesterday ${clock}`;
   return `${d.toLocaleString('en-US', { month: 'short' })} ${d.getDate()} ${clock}`;
@@ -55,11 +62,59 @@ export const ACCESS = Object.freeze({
   VENDOR_APPROVAL: 'vendor_approval',
 });
 
+export type Access = (typeof ACCESS)[keyof typeof ACCESS];
+
+export type GroupId = 'docs' | 'work' | 'talk' | 'sales' | 'design';
+
+export interface ToolArgs {
+  limit?: number;
+  [name: string]: unknown;
+}
+
+export interface ToolCall {
+  tool: string;
+  args: ToolArgs;
+}
+
+/** The read that proves a connection works; `things` names what it lists, or null for a read of one thing. */
+export interface ToolCheck extends ToolCall {
+  things: string | null;
+}
+
+/** How a tool's rows are kept as files (main/connections/copies.mts). */
+export type CopyRecipe =
+  | { kind: 'thread'; things: string; asks: 'channels'; list?: undefined; get?: undefined }
+  | { kind: 'issue' | 'page' | 'deal'; things: string; list: ToolCall; get?: { tool: string; arg: string }; asks?: undefined };
+
+/** One tool on the Connections page: the catalog's own, or one added by its address. */
+export interface CatalogTool {
+  id: string;
+  name: string;
+  group: GroupId | 'added';
+  address: string;
+  access: Access;
+  registration: 'dynamic' | 'own' | 'none';
+  auth: 'oauth';
+  redirect: 'loopback' | 'fixed';
+  scope: string | null;
+  needs: string | null;
+  hint?: string | null;
+  said?: { reads: string; writes: string } | null;
+  copy: CopyRecipe | null;
+  /** Null for a tool with no written list: its person ticks what agents may read. */
+  reads: string[] | null;
+  writes: string[];
+  check: ToolCheck | null;
+  standin?: boolean;
+  custom?: boolean;
+  signsInWithKey?: boolean;
+}
+
 /** The address a client made in a vendor's own console has to be told to come back to. */
 export const OWN_CLIENT_PORT = 33418;
 export const OWN_CLIENT_REDIRECT = `http://localhost:${OWN_CLIENT_PORT}/callback`;
 
-export const GROUPS = Object.freeze([
+export const GROUPS: readonly { id: GroupId; name: string }[] = Object.freeze([
   { id: 'docs', name: 'Documents' },
   { id: 'work', name: 'Tracking and code' },
   { id: 'talk', name: 'Messages and calendar' },
@@ -69,12 +124,14 @@ export const GROUPS = Object.freeze([
 
 // `needs` is the whole story, said when a connect is refused; `hint` is the one
 // line a sheet shows; `said` sums up `reads` and `writes` for a person.
-const tool = (fields) => Object.freeze({ auth: 'oauth', redirect: 'loopback', scope: null, needs: null, hint: null, said: null, copy: null, ...fields });
+type Defaulted = 'auth' | 'redirect' | 'scope' | 'needs' | 'hint' | 'said' | 'copy';
+type ToolFields = Omit<CatalogTool, Defaulted> & Partial<Pick<CatalogTool, Defaulted>>;
+const tool = (fields: ToolFields): CatalogTool => Object.freeze({ auth: 'oauth', redirect: 'loopback', scope: null, needs: null, hint: null, said: null, copy: null, ...fields });
 // The vendor lets any app register itself, so Connect is the whole job.
-const signIn = (fields) => tool({ access: ACCESS.SIGN_IN, registration: 'dynamic', ...fields });
-const ownClient = (fields) => tool({ access: ACCESS.OWN_CLIENT, registration: 'own', redirect: 'fixed', ...fields });
+const signIn = (fields: Omit<ToolFields, 'access' | 'registration'>): CatalogTool => tool({ access: ACCESS.SIGN_IN, registration: 'dynamic', ...fields });
+const ownClient = (fields: Omit<ToolFields, 'access' | 'registration'>): CatalogTool => tool({ access: ACCESS.OWN_CLIENT, registration: 'own', redirect: 'fixed', ...fields });
 // No written list yet: agents get only the tools the person ticks after connecting.
-const youChoose = { reads: null, writes: [], check: null };
+const youChoose: Pick<CatalogTool, 'reads' | 'writes' | 'check'> = { reads: null, writes: [], check: null };
 
 const GOOGLE_NEEDS = 'Google offers this in its Workspace Developer Preview. Your team joins the preview, turns the server on in a Google Cloud project and makes an OAuth client there.';
 const GOOGLE_HINT = 'Your Google Workspace admin gives you these.';
@@ -226,7 +283,7 @@ const REAL_TOOLS = [
   }),
 ];
 
-const TEST_TRACKER = {
+const TEST_TRACKER: Omit<CatalogTool, 'address'> = {
   id: 'test-tracker',
   name: 'Test tracker',
   group: 'work',
@@ -242,11 +299,13 @@ const TEST_TRACKER = {
   check: { tool: 'list_issues', args: { limit: CHECK_LIMIT }, things: 'issues' },
 };
 
-export const onLoopback = (address) => {
+export const onLoopback = (address: string): boolean => {
   try { const u = new URL(address); return u.protocol === 'http:' && u.hostname === '127.0.0.1'; } catch { return false; }
 };
 
-function standIns(env) {
+type Env = Record<string, string | undefined>;
+
+function standIns(env: Env): Record<string, string> {
   try {
     const list = JSON.parse(env.AGENTBOX_TOOLS_STANDINS ?? '{}');
     return list && typeof list === 'object' ? list : {};
@@ -259,10 +318,10 @@ function standIns(env) {
  * somewhere else. A stand-in keeps its real tile's lists and check, so what passes
  * against it is the code that will run against the vendor.
  */
-export function catalogFor({ env = {}, packaged = false } = {}) {
+export function catalogFor({ env = {}, packaged = false }: { env?: Env; packaged?: boolean } = {}): CatalogTool[] {
   const at = env.AGENTBOX_TOOLS_FIXTURE;
-  const stand = packaged ? {} : standIns(env);
-  const tools = REAL_TOOLS.map((e) => (onLoopback(stand[e.id]) ? { ...e, address: stand[e.id], standin: true } : e));
+  const stand: Record<string, string> = packaged ? {} : standIns(env);
+  const tools = REAL_TOOLS.map((e): CatalogTool => (onLoopback(stand[e.id]) ? { ...e, address: stand[e.id], standin: true } : e));
   return !packaged && at && onLoopback(at) ? [{ ...TEST_TRACKER, address: at }, ...tools] : tools;
 }
 
@@ -270,16 +329,38 @@ export function catalogFor({ env = {}, packaged = false } = {}) {
  * The name a worker knows the server by. It holds no run id, so a resumed thread
  * finds its tools under the name it used before.
  */
-export const connectionServerName = (id) => `connection-${id}`;
+export const connectionServerName = (id: string): string => `connection-${id}`;
 
-const pageOf = (t) => `agentbox://connections/${t.id}`;
-const sinceWhen = (t, now) => (t.at ? ` since ${clockAt(t.since ?? t.at, now)}, last tried ${clockAt(t.at, now)}` : '');
+/** One connection in the state the Connections page shows, as a worker is told it. */
+export interface ConnectionTold {
+  id: string;
+  name: string;
+  state: string;
+  given?: boolean;
+  since?: number | null;
+  at?: number | null;
+  endsAt?: number | null;
+}
+
+/** A tool's folder kept up to date in Files. */
+export interface CopyTold {
+  name: string;
+  folder: string;
+  projectName: string;
+  count: number;
+  okAt?: number | null;
+}
+
+type Times = Pick<ConnectionTold, 'since' | 'at'>;
+
+const pageOf = (t: Pick<ConnectionTold, 'id'>) => `agentbox://connections/${t.id}`;
+const sinceWhen = (t: Times, now: number) => (t.at ? ` since ${clockAt(t.since ?? t.at, now)}, last tried ${clockAt(t.at, now)}` : '');
 
 /** The words the page and an agent both use for a connection that is down. */
-export const downWords = (t, now = Date.now()) => `${t.name} is connected but down${sinceWhen(t, now)}.`;
+export const downWords = (t: Times & { name: string }, now: number = Date.now()): string => `${t.name} is connected but down${sinceWhen(t, now)}.`;
 
 /** What a worker is told about Files against the tools. `copies` are the folders kept up to date there. */
-export function filesComeFirst(copies, now = Date.now()) {
+export function filesComeFirst(copies: readonly CopyTold[], now: number = Date.now()): string {
   const kept = copies.map((c) => `- ${c.name}: the ${c.folder} folder of ${c.projectName}, ${c.count} files, last copied ${c.okAt ? clockAt(c.okAt, now) : 'not yet'}.`);
   return [
     '## Files comes first',
@@ -294,7 +375,7 @@ export function filesComeFirst(copies, now = Date.now()) {
 }
 
 /** One connection as a worker is told it, in the state the Connections page shows. */
-export function connectionLine(t, now = Date.now()) {
+export function connectionLine(t: ConnectionTold, now: number = Date.now()): string {
   const tools = `Its tools are under mcp__${connectionServerName(t.id)}`;
   const noTool = 'This run has no tool for it, so do not look for another way in.';
   const dontConnect = 'Do not offer to connect it.';

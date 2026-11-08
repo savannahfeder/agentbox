@@ -51,7 +51,7 @@ const ADDRESS = /^(https?|data):/i;
 
 function parse(text: string, place: Place) {
   const tree = fromMarkdown(String(text ?? ''), { extensions: [gfm()], mdastExtensions: [gfmFromMarkdown()] });
-  linkArtifactPaths(tree as any, { dir: place.dir ?? null });
+  linkArtifactPaths(tree as Parameters<typeof linkArtifactPaths>[0], { dir: place.dir ?? null });
   return tree;
 }
 

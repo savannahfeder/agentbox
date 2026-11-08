@@ -26,6 +26,6 @@ import { makeWriteQueue } from './write-queue.mts';
 
 export const projectQueue = makeWriteQueue();
 
-export function runForProject(projectId, fn) {
+export function runForProject<T>(projectId: string, fn: () => T | Promise<T>): Promise<T> {
   return projectQueue.run(projectId, fn);
 }

@@ -19,7 +19,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { Name, WAS, envNames, nameSlug, readEnv } from '../../shared/product-name.mjs';
 
-const isDir = (dir) => { try { return fs.statSync(dir).isDirectory(); } catch { return false; } };
+const isDir = (dir: string) => { try { return fs.statSync(dir).isDirectory(); } catch { return false; } };
 
 /**
  * The store root under every env name this app has had, for every process we
@@ -27,8 +27,8 @@ const isDir = (dir) => { try { return fs.statSync(dir).isDirectory(); } catch { 
  * a user's own script) reads only the name it was written against, and a
  * worker with no store root writes its session nowhere.
  */
-export function storeRootEnv(storeRoot) {
-  const env = {};
+export function storeRootEnv(storeRoot: string): Record<string, string> {
+  const env: Record<string, string> = {};
   for (const key of envNames('HOME')) env[key] = storeRoot;
   return env;
 }
@@ -37,7 +37,11 @@ export function storeRootEnv(storeRoot) {
 // folder of the app's name in the home directory. Linux: $XDG_DATA_HOME/<slug>,
 // or ~/.local/share/<slug> when that is unset, blank or not absolute. A caller
 // that passes a stand-in home must pass an env that belongs to it.
-export function defaultStoreRoot({ home = os.homedir(), platform = process.platform, env = process.env } = {}) {
+type Env = Record<string, string | undefined>;
+
+export function defaultStoreRoot(
+  { home = os.homedir(), platform = process.platform, env = process.env }: { home?: string; platform?: NodeJS.Platform; env?: Env | null } = {},
+): string {
   if (platform !== 'linux') return path.join(home, Name);
   const given = typeof env?.XDG_DATA_HOME === 'string' ? env.XDG_DATA_HOME.trim() : '';
   const base = given && path.isAbsolute(given) ? given : path.join(home, '.local', 'share');
@@ -49,7 +53,7 @@ export function defaultStoreRoot({ home = os.homedir(), platform = process.platf
 // started before a rename exports the old variable, and an old dot-folder holds
 // a real store. The current name wins, then the newest old name on disk.
 // `homeDir`, `platform` and `env` are for tests; production passes none.
-export function appHome(homeDir = os.homedir(), { platform = process.platform, env } = {}) {
+export function appHome(homeDir = os.homedir(), { platform = process.platform, env }: { platform?: NodeJS.Platform; env?: Env } = {}): string {
   const override = readEnv('HOME', env);
   if (override) return override;
   const here = path.join(homeDir, `.${nameSlug}`);
@@ -71,7 +75,7 @@ export function appHome(homeDir = os.homedir(), { platform = process.platform, e
 
 // Claude Code's own encoding: every character that is not a letter or a digit
 // becomes a dash, so `/Users/you/a.b` becomes `-Users-you-a-b`.
-export function encodeProjectPath(dir) {
+export function encodeProjectPath(dir: string): string {
   return String(dir).replace(/[^A-Za-z0-9]/g, '-');
 }
 
@@ -80,7 +84,7 @@ export function encodeProjectPath(dir) {
 // path it belongs to in `.origin` and a mismatch gets a short hash suffix.
 const ORIGIN = '.origin';
 
-function readOrigin(dir) {
+function readOrigin(dir: string): string | null {
   try { return fs.readFileSync(path.join(dir, ORIGIN), 'utf8').trim(); } catch { return null; }
 }
 
@@ -91,13 +95,13 @@ function readOrigin(dir) {
  * then moves every record one level down. Every caller passes through here, so
  * this is where that is refused.
  */
-export function isMachineryDir(dir, home = appHome()) {
+export function isMachineryDir(dir: string, home = appHome()): boolean {
   const root = path.resolve(path.join(home, 'projects'));
   return path.resolve(dir).startsWith(root + path.sep);
 }
 
 /** `<home>/projects/<encoded>` for this project directory. Creates nothing. */
-export function machineryDir(projectDir, home = appHome()) {
+export function machineryDir(projectDir: string, home = appHome()): string {
   const real = path.resolve(projectDir);
   // Already a machinery directory: return it as is, so a caller that passed
   // one still gets the right ledger rather than a nested one.
@@ -124,7 +128,7 @@ const LOGS = new Set(['work-items.jsonl', 'repeats.jsonl']);
  * call, not once per process, because a file of ours can turn up in the
  * product folder after the first move. It costs one stat per name.
  */
-export function ensureMachineryDir(projectDir, home = appHome()) {
+export function ensureMachineryDir(projectDir: string, home = appHome()): string {
   const dir = machineryDir(projectDir, home);
   fs.mkdirSync(dir, { recursive: true });
   // A directory that is already ours is not swept, and its `.origin` is left
@@ -151,15 +155,15 @@ export function ensureMachineryDir(projectDir, home = appHome()) {
  *     `<name>.superseded-<mtime>`. This is rare, because run records are now
  *     written straight here (main/code-change.mts).
  */
-export function foldStray(from, to, rel = path.basename(to)) {
-  let stray;
+export function foldStray(from: string, to: string, rel = path.basename(to)): boolean {
+  let stray: fs.Stats;
   try { stray = fs.statSync(from); } catch { return false; }
 
-  let landed;
+  let landed: fs.Stats;
   try { landed = fs.statSync(to); } catch { return adoptLegacy(from, to); }
 
   if (stray.isDirectory() && landed.isDirectory()) {
-    let entries = [];
+    let entries: string[] = [];
     try { entries = fs.readdirSync(from); } catch { return false; }
     for (const name of entries) foldStray(path.join(from, name), path.join(to, name), name);
     try { fs.rmdirSync(from); } catch { /* not empty, or gone already */ }
@@ -179,7 +183,7 @@ export function foldStray(from, to, rel = path.basename(to)) {
       fs.rmSync(from, { force: true });
       return true;
     } catch (err) {
-      console.warn(`${nameSlug}: could not fold ${from} into ${to}: ${err.message}`);
+      console.warn(`${nameSlug}: could not fold ${from} into ${to}: ${(err as Error).message}`);
       return false;
     }
   }
@@ -193,7 +197,7 @@ export function foldStray(from, to, rel = path.basename(to)) {
     }
     return true;
   } catch (err) {
-    console.warn(`${nameSlug}: could not carry ${from} across: ${err.message}`);
+    console.warn(`${nameSlug}: could not carry ${from} across: ${(err as Error).message}`);
     return false;
   }
 }
@@ -207,7 +211,7 @@ export function foldStray(from, to, rel = path.basename(to)) {
  * Many processes may call this at once. A failed rename is benign: ENOENT means
  * nothing to move, EEXIST or ENOTEMPTY means another process moved it first.
  */
-export function machineryPath(projectDir, rel, home = appHome()) {
+export function machineryPath(projectDir: string, rel: string, home = appHome()): string {
   if (typeof rel !== 'string' || !rel || path.isAbsolute(rel) || rel.split(/[\\/]/).includes('..')) {
     throw new Error(`unsafe machinery path: ${rel}`);
   }
@@ -227,21 +231,21 @@ export function machineryPath(projectDir, rel, home = appHome()) {
  * `foldStray`, and the old directory is removed only when just its marker is
  * left. Returns the product folders whose records were carried.
  */
-export function carryMisplacedMachinery(fromHome, storeRoot, toHome = storeRoot) {
+export function carryMisplacedMachinery(fromHome: string | null | undefined, storeRoot: string, toHome = storeRoot): string[] {
   if (!fromHome || !storeRoot) return [];
   const from = path.resolve(fromHome);
   if (from === path.resolve(toHome)) return [];
   const inside = path.resolve(storeRoot) + path.sep;
-  let names = [];
+  let names: string[] = [];
   try { names = fs.readdirSync(path.join(from, 'projects')); } catch { return []; }
-  const carried = [];
+  const carried: string[] = [];
   for (const name of names) {
     const dir = path.join(from, 'projects', name);
     const origin = readOrigin(dir);
     if (!origin || !path.resolve(origin).startsWith(inside)) continue;
     const target = ensureMachineryDir(origin, toHome);
     for (const rel of MACHINERY) foldStray(path.join(dir, rel), path.join(target, rel), rel);
-    let left = [];
+    let left: string[] = [];
     try { left = fs.readdirSync(dir); } catch { /* gone already */ }
     if (left.length === 1 && left[0] === ORIGIN) {
       try { fs.rmSync(path.join(dir, ORIGIN)); fs.rmdirSync(dir); } catch { /* best effort */ }
@@ -261,7 +265,7 @@ export function carryMisplacedMachinery(fromHome, storeRoot, toHome = storeRoot)
  * Never throws, because a leftover directory is a few kilobytes and failing a
  * launch over it would be worse. Returns { removed, why }.
  */
-export function removeMachinery(projectDir, home = appHome()) {
+export function removeMachinery(projectDir: string, home = appHome()): { removed: boolean; why?: string } {
   const real = path.resolve(projectDir);
   const dir = machineryDir(real, home);
   let there = false;
@@ -276,14 +280,14 @@ export function removeMachinery(projectDir, home = appHome()) {
     fs.rmSync(dir, { recursive: true, force: true });
     return { removed: true };
   } catch (err) {
-    console.warn(`${nameSlug}: could not remove ${dir}: ${err.message}`);
-    return { removed: false, why: err.message };
+    console.warn(`${nameSlug}: could not remove ${dir}: ${(err as Error).message}`);
+    return { removed: false, why: (err as Error).message };
   }
 }
 
 // Moves one legacy path in, if it is there. Never throws, so a store that
 // cannot be migrated still opens on the new path.
-export function adoptLegacy(from, to) {
+export function adoptLegacy(from: string, to: string): boolean {
   let there = false;
   try { there = fs.existsSync(from); } catch { return false; }
   if (!there) return false;
@@ -292,10 +296,11 @@ export function adoptLegacy(from, to) {
     fs.renameSync(from, to);
     return true;
   } catch (err) {
-    if (err.code === 'EXDEV') return copyAcross(from, to);
+    if ((err as NodeJS.ErrnoException).code === 'EXDEV') return copyAcross(from, to);
     // EEXIST / ENOTEMPTY: another process won the race, which is the good case.
-    if (err.code !== 'EEXIST' && err.code !== 'ENOTEMPTY' && err.code !== 'ENOENT') {
-      console.warn(`${nameSlug}: could not move ${from} into the app's home: ${err.message}`);
+    const { code } = err as NodeJS.ErrnoException;
+    if (code !== 'EEXIST' && code !== 'ENOTEMPTY' && code !== 'ENOENT') {
+      console.warn(`${nameSlug}: could not move ${from} into the app's home: ${(err as Error).message}`);
     }
     return false;
   }
@@ -303,13 +308,13 @@ export function adoptLegacy(from, to) {
 
 // A rename cannot cross volumes, so copy and then remove. In that order, a
 // failure halfway leaves the original where it was.
-function copyAcross(from, to) {
+function copyAcross(from: string, to: string): boolean {
   try {
     fs.cpSync(from, to, { recursive: true, errorOnExist: true, force: false });
     fs.rmSync(from, { recursive: true, force: true });
     return true;
   } catch (err) {
-    console.warn(`${nameSlug}: could not copy ${from} into the app's home: ${err.message}`);
+    console.warn(`${nameSlug}: could not copy ${from} into the app's home: ${(err as Error).message}`);
     return false;
   }
 }

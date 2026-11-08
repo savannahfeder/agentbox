@@ -41,6 +41,110 @@
 import { StringDecoder } from 'node:string_decoder';
 import { NAME, Name, nameSlug } from '../shared/product-name.mjs';
 
+export type ApprovalDecision = 'accept' | 'acceptForSession' | 'decline' | 'cancel';
+export type ElicitationAction = 'accept' | 'decline' | 'cancel';
+type ApprovalShape = 'decision' | 'grant' | 'elicitation' | 'legacy';
+type RpcId = number | string;
+
+export interface CodexRpcError {
+  code: number;
+  message: string;
+}
+
+/** A server request's answer without the JSON-RPC envelope. */
+export type CodexAnswer = { result: unknown } | { error: CodexRpcError };
+
+interface RpcFrame {
+  id?: RpcId;
+  method?: string;
+  params?: unknown;
+  result?: unknown;
+  error?: { message?: string };
+}
+type ServerRequestFrame = RpcFrame & { id: RpcId; method: string };
+type ResponseFrame = RpcFrame & { id: RpcId };
+type NotificationFrame = RpcFrame & { method: string };
+
+export interface CodexGone {
+  reason: 'write' | 'protocol' | 'error' | 'closed' | 'exit';
+  code: number | null;
+  signal: NodeJS.Signals | null;
+  error: Error | null;
+  note: string | null;
+  stderr: string;
+  why?: string;
+}
+type GoneDetail = Partial<Pick<CodexGone, 'code' | 'signal' | 'error' | 'note'>>;
+
+export interface CodexThreadHandlers {
+  onNotification?: (method: string, params: unknown) => unknown;
+  /** Resolves to an approval word, an elicitation action, or a permissions grant object. */
+  onApproval?: (method: string, params: unknown) => unknown;
+  onClosed?: (gone: CodexGone) => unknown;
+}
+
+interface CodexStream {
+  on(event: 'data', listener: (chunk: string | Buffer) => void): unknown;
+  on(event: 'error', listener: (err: Error) => void): unknown;
+  on(event: 'end' | 'close', listener: () => void): unknown;
+}
+
+/** Anything child-process-shaped with piped stdio; tests pass a fake. */
+export interface CodexTransport {
+  stdin: {
+    write(text: string, callback: (err?: Error | null) => void): unknown;
+    end(): unknown;
+    on?(event: 'error', listener: (err: Error) => void): unknown;
+  };
+  stdout: CodexStream;
+  stderr?: CodexStream | null;
+  on(event: 'error', listener: (err: Error) => void): unknown;
+  on(event: 'exit', listener: (code: number | null, signal: NodeJS.Signals | null) => void): unknown;
+  kill(): unknown;
+}
+
+export interface CodexAppServerOptions {
+  transport?: CodexTransport | null;
+  spawn?: (() => CodexTransport) | null;
+  clientInfo?: { name: string; title?: string; version: string };
+  onNotification?: ((method: string, params: unknown) => unknown) | null;
+  onUnknownRequest?: ((method: string, params: unknown) => unknown) | null;
+  requestTimeoutMs?: number;
+  maxFrameLength?: number;
+  stderrLimit?: number;
+}
+
+interface Pending {
+  resolve(value: unknown): void;
+  reject(err: Error): void;
+  method: string;
+  onResult?(result: unknown): void;
+  timer: NodeJS.Timeout;
+}
+
+interface FileSystemGrant {
+  read?: string[];
+  write?: string[];
+  globScanMaxDepth?: number;
+}
+
+interface PermissionsGrant {
+  permissions: { fileSystem?: FileSystemGrant; network?: { enabled: boolean } };
+  scope?: 'turn' | 'session';
+  strictAutoReview?: boolean;
+}
+
+export interface CodexThread {
+  id?: string;
+  [key: string]: unknown;
+}
+
+interface ThreadResult {
+  thread?: CodexThread | null;
+}
+
+export type ResumeThreadParams = { threadId?: unknown; [key: string]: unknown };
+
 /**
  * How this client names itself to the server. It appears in `userAgent` and in
  * Codex's own session records, so it comes from shared/product-name.mjs rather
@@ -54,13 +158,13 @@ export const CLIENT_INFO = Object.freeze({ name: nameSlug, title: NAME, version:
  * rather than an answer, so a handler returning one is refused. `abort` is a
  * legacy word and is not here.
  */
-export const APPROVAL_DECISIONS = Object.freeze(['accept', 'acceptForSession', 'decline', 'cancel']);
+export const APPROVAL_DECISIONS: readonly ApprovalDecision[] = Object.freeze(['accept', 'acceptForSession', 'decline', 'cancel']);
 
 /**
  * The actions an MCP elicitation takes. `McpServerElicitationRequestResponse`
  * has no `acceptForSession`.
  */
-export const ELICITATION_ACTIONS = Object.freeze(['accept', 'decline', 'cancel']);
+export const ELICITATION_ACTIONS: readonly ElicitationAction[] = Object.freeze(['accept', 'decline', 'cancel']);
 
 /**
  * The refusal. `decline` lets the agent carry on and try something else, while
@@ -93,7 +197,7 @@ export const REQUEST_TIMEOUT_MS = 2 * 60_000;
  * is one. Refused with the error frame, the call fails as "user rejected MCP
  * tool call", so it must reach the handler. Its answer is `{ action }`.
  */
-const APPROVAL_SHAPE = new Map([
+const APPROVAL_SHAPE = new Map<string, ApprovalShape>([
   ['item/commandExecution/requestApproval', 'decision'],
   ['item/fileChange/requestApproval', 'decision'],
   ['item/permissions/requestApproval', 'grant'],
@@ -179,7 +283,7 @@ const REFUSAL_ERROR = Object.freeze({
 });
 
 /** A refusal that names what was asked, so it is one somebody can act on. */
-const cannotServe = (method, why) => Object.freeze({
+const cannotServe = (method: string, why: string): CodexRpcError => Object.freeze({
   code: -32001,
   message: `${Name} cannot answer ${method}: ${why}.`,
 });
@@ -188,7 +292,7 @@ const UNKNOWN_REQUEST = `${Name} does not recognise this request, so it is refus
 
 // Refuse in the method's own vocabulary where it has one. A declined
 // elicitation leaves the turn running; the error frame is a protocol failure.
-const refusal = (shape) => {
+const refusal = (shape: ApprovalShape): CodexAnswer => {
   if (shape === 'decision') return { result: { decision: REFUSAL_DECISION } };
   if (shape === 'elicitation') return { result: { action: REFUSAL_DECISION } };
   // v1 SAYS NO WITH AN OBJECT, NOT A WORD. `decline` is not in its
@@ -199,7 +303,7 @@ const refusal = (shape) => {
 };
 
 /** This client's yes to `method`, without the JSON-RPC envelope, or null for a request a yes does not answer. */
-export function yesTo(method) {
+export function yesTo(method: string): { result: { decision: 'accept' } | { action: 'accept' } } | null {
   const shape = APPROVAL_SHAPE.get(method);
   if (shape === 'decision') return { result: { decision: 'accept' } };
   if (shape === 'elicitation') return { result: { action: 'accept' } };
@@ -211,15 +315,15 @@ export function yesTo(method) {
  * JSON-RPC envelope: for the cloud server driving a Codex run with the
  * computer shut (cloud/gateway/phone.mjs), so it refuses in these words.
  */
-export function refusalTo(method) {
+export function refusalTo(method: string): CodexAnswer {
   const cannot = CANNOT_SERVE.get(method);
   if (cannot) return { error: cannotServe(method, cannot) };
   const shape = APPROVAL_SHAPE.get(method);
   return shape ? refusal(shape) : { error: cannotServe(method, UNKNOWN_REQUEST) };
 }
 
-const plain = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
-const only = (keys, allowed) => keys.every((k) => allowed.includes(k));
+const plain = <T extends object = Record<string, unknown>>(v: unknown): v is T => !!v && typeof v === 'object' && !Array.isArray(v);
+const only = (keys: string[], allowed: string[]) => keys.every((k) => allowed.includes(k));
 
 /**
  * One long-lived `codex app-server`.
@@ -245,18 +349,18 @@ export function createCodexAppServer({
   requestTimeoutMs = REQUEST_TIMEOUT_MS,
   maxFrameLength = MAX_FRAME_LENGTH,
   stderrLimit = 64 * 1024,
-} = {}) {
+}: CodexAppServerOptions = {}) {
   const child = transport ?? spawn?.();
   if (!child) throw new Error('createCodexAppServer needs a transport or a spawn that makes one');
 
-  const pending = new Map();    // OUR request id -> { resolve, reject, method, onResult }
-  const threads = new Map();    // thread id -> handlers
-  const openCards = new Set();  // THEIR request ids, each waiting on a person
+  const pending = new Map<RpcId, Pending>();              // OUR request id
+  const threads = new Map<string, CodexThreadHandlers>(); // thread id -> handlers
+  const openCards = new Set<RpcId>();  // THEIR request ids, each waiting on a person
   const decoder = new StringDecoder('utf8');
   let nextId = 1;
   let buffer = '';
   let stderrText = '';
-  let gone = null;              // null while live; the closing reason once not
+  let gone: CodexGone | null = null; // null while live; the closing reason once not
   let drained = false;          // stdout has ended, so the diagnostics are complete
   let finished = false;
   let resumeLeavesTurns = true; // false once this Codex refuses `excludeTurns`
@@ -267,28 +371,28 @@ export function createCodexAppServer({
    * matters most: a refusal that never arrived looks the same as no answer. A
    * `false` return is only backpressure, not a failure.
    */
-  function write(msg) {
+  function write(msg: object): boolean {
     if (gone) return false;
     let text;
     try {
       text = JSON.stringify(msg) + '\n';
     } catch (err) {
-      fail('write', { error: err });
+      fail('write', { error: err as Error });
       return false;
     }
     try {
-      child.stdin.write(text, (err) => { if (err) fail('write', { error: err }); });
+      child!.stdin.write(text, (err) => { if (err) fail('write', { error: err }); });
     } catch (err) {
-      fail('write', { error: err });
+      fail('write', { error: err as Error });
       return false;
     }
     return !gone;
   }
 
-  function send(method, params, onResult) {
+  function send<T = unknown>(method: string, params?: unknown, onResult?: (result: T) => void): Promise<T> {
     if (gone) return Promise.reject(new Error(`${method}: codex app-server is no longer running (${gone.reason})`));
     const id = nextId++;
-    return new Promise((resolve, reject) => {
+    return new Promise<T>((resolve, reject) => {
       // Armed before the write. See REQUEST_TIMEOUT_MS.
       const timer = setTimeout(() => {
         if (!pending.delete(id)) return;
@@ -304,7 +408,7 @@ export function createCodexAppServer({
     });
   }
 
-  const notify = (method) => write({ jsonrpc: '2.0', method });
+  const notify = (method: string) => write({ jsonrpc: '2.0', method });
 
   // A StringDecoder, because a chunk can end in the middle of a UTF-8 sequence.
   child.stdout.on('data', (chunk) => {
@@ -333,9 +437,9 @@ export function createCodexAppServer({
   child.stdin?.on?.('error', (err) => fail('error', { error: err }));
   child.stdout.on?.('error', (err) => fail('error', { error: err }));
   child.stderr?.on?.('error', () => { /* tracing, not protocol */ });
-  for (const event of ['end', 'close']) child.stdout.on?.(event, () => { drained = true; if (gone) finish(); });
+  for (const event of ['end', 'close'] as const) child.stdout.on?.(event, () => { drained = true; if (gone) finish(); });
 
-  function read(line) {
+  function read(line: string) {
     // The data handler's check only sees an unterminated line. See
     // MAX_FRAME_LENGTH.
     if (line.length > maxFrameLength) {
@@ -344,24 +448,24 @@ export function createCodexAppServer({
     const text = line.trim();
     if (!text) return;                       // framing, not content
 
-    let msg;
+    let msg: RpcFrame;
     try {
       msg = JSON.parse(text);
     } catch {
       return fail('protocol', { note: 'a line on stdout could not be read as JSON, and it may have been an approval request' });
     }
-    if (!plain(msg)) {
+    if (!plain<RpcFrame>(msg)) {
       return fail('protocol', { note: 'a line on stdout could not be read as a message, and it may have been an approval request' });
     }
 
     // `!== undefined`, because the server's ids start at zero.
-    if (msg.id !== undefined && msg.method !== undefined) return serverRequest(msg);
-    if (msg.id !== undefined) return response(msg);
-    if (typeof msg.method === 'string') return notification(msg);
+    if (msg.id !== undefined && msg.method !== undefined) return serverRequest(msg as ServerRequestFrame);
+    if (msg.id !== undefined) return response(msg as ResponseFrame);
+    if (typeof msg.method === 'string') return notification(msg as NotificationFrame);
     fail('protocol', { note: 'a message on stdout was neither a request, a response nor a notification' });
   }
 
-  function response(msg) {
+  function response(msg: ResponseFrame) {
     const waiting = pending.get(msg.id);
     if (!waiting) return;
     pending.delete(msg.id);
@@ -377,10 +481,10 @@ export function createCodexAppServer({
     waiting.resolve(msg.result);
   }
 
-  function notification(msg) {
+  function notification(msg: NotificationFrame) {
     const id = threadOf(msg.params);
     const handlers = id === null ? null : threads.get(id);
-    if (handlers?.onNotification) call(() => handlers.onNotification(msg.method, msg.params));
+    if (handlers?.onNotification) call(() => handlers.onNotification!(msg.method, msg.params));
     else call(() => onNotification?.(msg.method, msg.params));
   }
 
@@ -388,7 +492,7 @@ export function createCodexAppServer({
    * Answer a server request. Never awaits the handler, because one card waits
    * for a person and every thread reads through this loop.
    */
-  function serverRequest(msg) {
+  function serverRequest(msg: ServerRequestFrame) {
     // Two open requests on one id cannot both be answered, so treat it like an
     // unreadable frame and end the connection.
     if (openCards.has(msg.id)) {
@@ -428,7 +532,7 @@ export function createCodexAppServer({
    * The only answer a card gets. A card on a dead connection is already closed,
    * so a late answer is dropped.
    */
-  function answerCard(id, body) {
+  function answerCard(id: RpcId, body: CodexAnswer) {
     if (!openCards.delete(id)) return;
     write({ jsonrpc: '2.0', id, ...body });
   }
@@ -439,18 +543,18 @@ export function createCodexAppServer({
    * rather than turned into a yes. `content` is never sent, because Agentbox
    * only answers elicitations that ask for no input.
    */
-  function translate(shape, answered) {
+  function translate(shape: ApprovalShape, answered: unknown): CodexAnswer | null {
     if (shape === 'decision') {
-      return APPROVAL_DECISIONS.includes(answered) ? { result: { decision: answered } } : null;
+      return APPROVAL_DECISIONS.includes(answered as ApprovalDecision) ? { result: { decision: answered } } : null;
     }
     if (shape === 'elicitation') {
-      return ELICITATION_ACTIONS.includes(answered) ? { result: { action: answered } } : null;
+      return ELICITATION_ACTIONS.includes(answered as ElicitationAction) ? { result: { action: answered } } : null;
     }
     if (shape === 'legacy') {
       // Our word in, Codex's older word out. A word that is not one of our four
       // answers null, which lands on the deny-by-default rule exactly as it
       // does for every other shape.
-      const said = Object.hasOwn(LEGACY_DECISIONS, answered) ? LEGACY_DECISIONS[answered] : null;
+      const said = Object.hasOwn(LEGACY_DECISIONS, answered as PropertyKey) ? LEGACY_DECISIONS[answered as keyof typeof LEGACY_DECISIONS] : null;
       return said ? { result: { decision: said } } : null;
     }
     const grant = grantFrom(answered);
@@ -465,7 +569,7 @@ export function createCodexAppServer({
    * count. The `entries` form of the filesystem profile is refused because its
    * shape is unmeasured.
    */
-  function grantFrom(answered) {
+  function grantFrom(answered: unknown): PermissionsGrant | null {
     if (!plain(answered)) return null;
     const top = Object.keys(answered);
     if (!top.includes('permissions') || !only(top, ['permissions', 'scope', 'strictAutoReview'])) return null;
@@ -475,14 +579,14 @@ export function createCodexAppServer({
     const areas = Object.keys(profile);
     if (!areas.length || !only(areas, ['fileSystem', 'network'])) return null;
 
-    const permissions = {};
+    const permissions: PermissionsGrant['permissions'] = {};
     if (areas.includes('fileSystem')) {
       const asked = profile.fileSystem;
       if (!plain(asked)) return null;
       const keys = Object.keys(asked);
       if (!keys.length || !only(keys, ['read', 'write', 'globScanMaxDepth'])) return null;
-      const fileSystem = {};
-      for (const list of ['read', 'write']) {
+      const fileSystem: FileSystemGrant = {};
+      for (const list of ['read', 'write'] as const) {
         if (!keys.includes(list)) continue;
         const paths = asked[list];
         if (!Array.isArray(paths) || !paths.length) return null;
@@ -490,7 +594,7 @@ export function createCodexAppServer({
         fileSystem[list] = [...paths];
       }
       if (keys.includes('globScanMaxDepth')) {
-        const depth = asked.globScanMaxDepth;
+        const depth = asked.globScanMaxDepth as number;
         if (!Number.isInteger(depth) || depth < 1) return null;
         fileSystem.globScanMaxDepth = depth;
       }
@@ -504,7 +608,7 @@ export function createCodexAppServer({
       permissions.network = { enabled: asked.enabled };
     }
 
-    const grant = { permissions };
+    const grant: PermissionsGrant = { permissions };
     // Default to `turn`, the narrower scope.
     if (top.includes('scope')) {
       if (answered.scope !== 'turn' && answered.scope !== 'session') return null;
@@ -521,20 +625,20 @@ export function createCodexAppServer({
 
   // Most lines carry `params.threadId`, but `thread/started` has
   // `params.thread.id`.
-  function threadOf(params) {
-    if (!plain(params)) return null;
+  function threadOf(params: unknown): string | null {
+    if (!plain<{ threadId?: unknown; thread?: { id?: unknown } | null }>(params)) return null;
     if (typeof params.threadId === 'string') return params.threadId;
     if (typeof params.thread?.id === 'string') return params.thread.id;
     return null;
   }
 
   // A listener that throws must not stop the read loop for every other thread.
-  function call(fn) {
+  function call(fn: () => unknown) {
     try { fn(); } catch { /* the caller's problem, and not worth the fleet */ }
   }
 
   /** Why this connection ended, in a sentence that names something actionable. */
-  function cause({ withTail = true } = {}) {
+  function cause({ withTail = true }: { withTail?: boolean } = {}): string {
     const tail = withTail ? stderrText.trim().split('\n').slice(-3).join(' ').trim() : '';
     const said = tail ? `: ${tail}` : '';
     if (!gone) return `the connection to codex app-server failed on write${said}`;
@@ -552,7 +656,7 @@ export function createCodexAppServer({
    * approval is written, and finished once stdout drains, because `exit` often
    * arrives before the last of the tracing that explains it.
    */
-  function fail(reason, detail = {}) {
+  function fail(reason: CodexGone['reason'], detail: GoneDetail = {}) {
     if (gone) return;
     gone = { reason, code: null, signal: null, error: null, note: null, ...detail, stderr: stderrText };
     if (reason !== 'exit') stop();
@@ -562,8 +666,8 @@ export function createCodexAppServer({
   }
 
   function stop() {
-    try { child.stdin.end(); } catch { /* already gone */ }
-    try { child.kill(); } catch { /* already gone */ }
+    try { child!.stdin.end(); } catch { /* already gone */ }
+    try { child!.kill(); } catch { /* already gone */ }
   }
 
   /**
@@ -571,11 +675,12 @@ export function createCodexAppServer({
    * `onClosed`, and every timer and registration is dropped, so no work item is
    * left waiting and nothing keeps the client alive.
    */
+  // Only ever reached once `fail` has set `gone`.
   function finish() {
     if (finished) return;
     finished = true;
-    gone.stderr = stderrText;
-    gone.why = cause({ withTail: false });
+    gone!.stderr = stderrText;
+    gone!.why = cause({ withTail: false });
     const why = cause();
 
     openCards.clear();
@@ -587,14 +692,14 @@ export function createCodexAppServer({
     }
     const listening = [...threads.values()];
     threads.clear();
-    for (const handlers of listening) call(() => handlers.onClosed?.(gone));
+    for (const handlers of listening) call(() => handlers.onClosed?.(gone!));
   }
 
-  const watch = (threadId, handlers = {}) => { threads.set(threadId, handlers); return threadId; };
+  const watch = (threadId: string, handlers: CodexThreadHandlers = {}): string => { threads.set(threadId, handlers); return threadId; };
 
   return {
     /** Any client request, for the ones with no wrapper (`config/read`). */
-    request: (method, params) => send(method, params),
+    request: (method: string, params?: unknown) => send(method, params),
 
     /**
      * The handshake: `initialize`, then the `initialized` notification once the
@@ -611,7 +716,7 @@ export function createCodexAppServer({
      * a later `thread/resume` can find it; pass true only for work that will
      * never be continued.
      */
-    startThread: (params = {}, handlers = {}) => send(
+    startThread: (params: Record<string, unknown> = {}, handlers: CodexThreadHandlers = {}) => send<ThreadResult | null>(
       'thread/start',
       { ephemeral: false, ...params },
       (result) => { const id = result?.thread?.id; if (typeof id === 'string') watch(id, handlers); },
@@ -627,33 +732,33 @@ export function createCodexAppServer({
      * thread on it. Codex before 0.155 refuses the field without the
      * experimental API, so that Codex is asked again in full.
      */
-    resumeThread: (params = {}, handlers = {}) => {
+    resumeThread: (params: ResumeThreadParams = {}, handlers: CodexThreadHandlers = {}) => {
       const id = typeof params.threadId === 'string' ? params.threadId : null;
       if (id) watch(id, handlers);
       const lean = resumeLeavesTurns;
       return send('thread/resume', lean ? { ...params, excludeTurns: true } : params)
-        .catch((err) => {
+        .catch((err: Error) => {
           if (!lean || !/excludeTurns/.test(err?.message ?? '')) throw err;
           resumeLeavesTurns = false;
           return send('thread/resume', params);
         })
-        .catch((err) => {
+        .catch((err: Error) => {
           if (id && threads.get(id) === handlers) threads.delete(id);
           throw err;
         });
     },
 
-    startTurn: (threadId, params = {}) => send('turn/start', { threadId, ...params }),
+    startTurn: (threadId: string, params: Record<string, unknown> = {}) => send('turn/start', { threadId, ...params }),
 
     /** Both ids: a turn is not identified by either one alone. */
-    interruptTurn: (threadId, turnId) => send('turn/interrupt', { threadId, turnId }),
-    steerTurn: (threadId, expectedTurnId, text, pictures = []) => send('turn/steer', {threadId, expectedTurnId, input:[{type:'text',text}, ...pictures.map((p) => ({type:'localImage', path:p}))]}),
+    interruptTurn: (threadId: string, turnId: string) => send('turn/interrupt', { threadId, turnId }),
+    steerTurn: (threadId: string, expectedTurnId: string, text: string, pictures: string[] = []) => send('turn/steer', {threadId, expectedTurnId, input:[{type:'text',text}, ...pictures.map((p) => ({type:'localImage', path:p}))]}),
 
     watch,
-    unwatch: (threadId) => threads.delete(threadId),
+    unwatch: (threadId: string) => threads.delete(threadId),
 
     /** Stop on purpose. Same settling as a crash, so callers have one ending. */
-    close: (note = 'no reason given') => fail('closed', { note }),
+    close: (note: string = 'no reason given') => fail('closed', { note }),
 
     isClosed: () => gone !== null,
     /** The tracing tail, for a cause report. Never protocol. */
@@ -661,3 +766,5 @@ export function createCodexAppServer({
     stats: () => ({ pending: pending.size, threads: threads.size, approvals: openCards.size }),
   };
 }
+
+export type CodexAppServer = ReturnType<typeof createCodexAppServer>;

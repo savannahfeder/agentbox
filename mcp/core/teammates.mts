@@ -15,13 +15,31 @@ import {
 import { teammateIdOf, hopOf, workOf, setupTitle, isSetupTitle, mentionsIn, isWorks, letterFor, cleanDuty, dutyStart, isDate, tooLongForAChat, METHOD_CAP, VOICES, YOU, MAX_HOPS, HOP_LABEL_PREFIX } from '../../shared/teammates.mts';
 import { periodKey } from '../../shared/repeats.mts';
 import { resolveProduct, resolveAccount } from './account.mts';
+import type { Duty, Playbook, Teammate } from '../../shared/teammates.mts';
+import type { WorkItem } from '../../shared/work-items.mts';
+import type { ProjectSummary } from '../../main/store/project.mts';
+
+/** Where a store tool is called from: the run's environment, and the clock. */
+export interface RunContext { env?: NodeJS.ProcessEnv; now?: number }
+
+/** The run a store tool was called from, and the teammate it is, when it is one. */
+export interface TeammateContext {
+  dir: string;
+  me: Teammate | null;
+  team: Teammate[];
+  item: WorkItem;
+  project: ProjectSummary;
+  hop: number;
+  /** Where the words were written, carried on what it posts: a thread for the person, or a teammate's run and its work. */
+  writtenIn: { via: string; viaProduct: string } | { run: string; work: string };
+}
 
 // A title or a choice is drawn as plain words, so markdown in one shows as stars.
-const plain = (s) => String(s ?? '').replace(/\*\*|__|`/g, '').replace(/\s+/g, ' ').trim();
+const plain = (s: unknown): string => String(s ?? '').replace(/\*\*|__|`/g, '').replace(/\s+/g, ' ').trim();
 
 const NOT_A_TEAMMATE = 'this session is not a teammate\'s run, so it has no team chat to write to';
 
-function projectOf(itemId, product) {
+function projectOf(itemId: string, product: string | null): ProjectSummary {
   if (product) return resolveProduct(product);
   for (const p of listProjects()) {
     try { if (readWorkItem(p.dir, itemId)) return p; } catch { /* a product with no ledger */ }
@@ -31,7 +49,9 @@ function projectOf(itemId, product) {
 
 // `outsider` lets a thread that is no teammate's run in: it speaks for the
 // person (`me` is null), which is what they asked it to do.
-export function teammateContext({ env = process.env, now = Date.now(), outsider = false } = {}) {
+export function teammateContext(opts: RunContext & { outsider: true }): TeammateContext;
+export function teammateContext(opts?: RunContext & { outsider?: false }): TeammateContext & { me: Teammate };
+export function teammateContext({ env = process.env, now = Date.now(), outsider = false }: RunContext & { outsider?: boolean } = {}): TeammateContext {
   const itemId = String(env.ZERO_ITEM ?? '').trim();
   if (!itemId) throw new Error(NOT_A_TEAMMATE);
   const project = projectOf(itemId, String(env.ZERO_PRODUCT ?? '').trim() || null);
@@ -51,9 +71,9 @@ export function teammateContext({ env = process.env, now = Date.now(), outsider 
   return { dir, me, team, item, project, hop, writtenIn: { run: item.id, work: workOf(item) } };
 }
 
-function idsFor(names, team, me) {
+function idsFor(names: unknown, team: readonly Teammate[], me: Teammate | null): string[] {
   const list = (Array.isArray(names) ? names : [names]).map((n) => String(n ?? '').trim().replace(/^@/, '')).filter(Boolean);
-  const out = [];
+  const out: string[] = [];
   for (const n of list) {
     const lower = n.toLowerCase();
     const t = team.find((x) => x.id === n || x.name.toLowerCase() === lower);
@@ -64,7 +84,7 @@ function idsFor(names, team, me) {
 }
 
 // A document on a chat line opens from a card, and only from the thread's project.
-function documentOf(rel, project) {
+function documentOf(rel: string, project: ProjectSummary): { product: string; src: string; name: string } {
   const asked = String(rel).trim();
   const file = path.resolve(project.dir, asked);
   if (path.isAbsolute(asked) || !file.startsWith(project.dir + path.sep)) throw new Error(`${asked} is outside this project. Write the document in the project, then send it.`);
@@ -73,7 +93,7 @@ function documentOf(rel, project) {
   return { product: project.id, src, name: path.basename(file) };
 }
 
-export function teamPost({ text, to = [], options, document } = {}, ctx = {}) {
+export function teamPost({ text, to = [], options, document }: { text?: unknown; to?: string | string[]; options?: unknown; document?: string } = {}, ctx: RunContext = {}) {
   const { dir, me, team, hop, writtenIn, project } = teammateContext({ ...ctx, outsider: true });
   const words = String(text ?? '').trim();
   if (!words) throw new Error('nothing to post');
@@ -90,7 +110,7 @@ export function teamPost({ text, to = [], options, document } = {}, ctx = {}) {
   return { posted: m.id, to: [...ids].map((x) => team.find((t) => t.id === x)?.name), note };
 }
 
-export function teamPass({ to, title, details, project: named } = {}, ctx = {}) {
+export function teamPass({ to, title, details, project: named }: { to?: unknown; title?: unknown; details?: unknown; project?: string } = {}, ctx: RunContext = {}) {
   const { dir, me, team, hop, writtenIn, project, item } = teammateContext({ ...ctx, outsider: true });
   // The work is done where it is named, or for a thread handing it on, in that
   // thread's project; otherwise in the receiver's own.
@@ -105,8 +125,9 @@ export function teamPass({ to, title, details, project: named } = {}, ctx = {}) 
   const held = me && !yours && them?.handoffsNeedYes !== false;
   return {
     passed: m.id, to: them?.name,
+    // idsFor names only teammates on the team, so `them` is found.
     note: held
-      ? `${them.name} takes work from teammates only with the person's yes, so this waits in their inbox until they reply. Say so in your answer.`
+      ? `${them!.name} takes work from teammates only with the person's yes, so this waits in their inbox until they reply. Say so in your answer.`
       : yours ? `The person asked for this, so it starts now for ${them?.name ?? 'them'}, in the thread they already have on this work or a new one.`
         : `It goes to the thread ${them?.name ?? 'they'} already has on this work, or starts one, and wakes them.`,
   };
@@ -114,14 +135,14 @@ export function teamPass({ to, title, details, project: named } = {}, ctx = {}) 
 
 // The person's own words started this run, or they have replied on it: the
 // opening is theirs, or their answer is the newest word on it.
-function startedByYou(item) {
+function startedByYou(item: WorkItem | null | undefined): boolean {
   if (item?.wrote?.body?.source === 'founder') return true;
   return answeredInThread(item);
 }
 
 // The primary makes a teammate when the person said yes to one. It is a draft
 // that sets itself up by asking them, as one you made would.
-export function teamHire({ name, job } = {}, ctx = {}) {
+export function teamHire({ name, job }: { name?: unknown; job?: unknown } = {}, ctx: RunContext = {}) {
   const { dir, me, team, item, project } = teammateContext(ctx);
   if (!me.primary) throw new Error('only your primary employee makes new teammates; suggest one to the person instead');
   if (!startedByYou(item)) throw new Error('make a teammate only in a run started by the person\'s words or answered by them: ask them first, with options');
@@ -137,7 +158,7 @@ export function teamHire({ name, job } = {}, ctx = {}) {
   return { teammate: { id, name: role, status: 'draft' }, note: `${role} wakes now to set itself up, and asks the person what it cannot tell from the job.` };
 }
 
-export function teamRemember({ text } = {}, ctx = {}) {
+export function teamRemember({ text }: { text?: unknown } = {}, ctx: RunContext = {}) {
   const { dir, me, item } = teammateContext(ctx);
   const words = String(text ?? '').trim();
   if (!words) throw new Error('nothing to remember');
@@ -152,19 +173,19 @@ export function teamRemember({ text } = {}, ctx = {}) {
 const EVERY = ['day', 'weekday', 'week', 'never'];
 
 // Or answered in the setup thread itself, which reaches the run as its answer.
-function answeredInThread(item) {
+function answeredInThread(item: WorkItem | null | undefined): boolean {
   const said = typeof item?.answer === 'string' ? item.answer.trim() : '';
-  return !!said && said !== '(withdrawn)' && item.wrote?.answer?.source === 'founder';
+  return !!said && said !== '(withdrawn)' && item!.wrote?.answer?.source === 'founder';
 }
 
-function answeredSince(dir, id) {
+function answeredSince(dir: string, id: string): boolean {
   const { messages } = readChat(dir);
   const asked = messages.filter((m) => m.kind === 'msg' && m.from === YOU && m.setup && (m.to ?? []).includes(id)).at(-1);
   return messages.some((m) => m.kind === 'msg' && m.from === YOU && !m.setup && (m.to ?? []).includes(id) && m.ts > (asked?.ts ?? 0));
 }
 
 // What a change to these says in the chat, so you can see it saved.
-const SAID = {
+const SAID: { [K in keyof Teammate]?: string } = {
   name: 'its name', role: 'its role', job: 'its job', goal: 'its goal', counted: 'how it counts its goal',
   asksFirst: 'what needs your yes first', works: 'when it works', duties: 'what it does on its own',
   handoffsNeedYes: 'whether work from teammates waits for your yes', pausedUntil: 'when it is paused until',
@@ -173,7 +194,7 @@ const SAID = {
 
 // Made from your threads and has written its method from them: the threads
 // answered what a newcomer would otherwise have to ask.
-function learnedFromThreads(dir, id) {
+function learnedFromThreads(dir: string, id: string): boolean {
   try {
     return fs.readdirSync(sourcesDir(dir, id)).length > 0 && fs.statSync(methodFile(dir, id)).size > 0;
   } catch {
@@ -183,10 +204,13 @@ function learnedFromThreads(dir, id) {
 
 // Duties keep their id, and what they have served, when one with the same
 // words is set again.
-function dutiesFrom(list, me, now) {
+/** A duty as an agent sends it to team_setup, before cleanDuty has checked it. */
+interface DutyArgs { what?: unknown; every?: unknown; at?: unknown; on?: unknown; after?: unknown; most?: unknown; tell?: unknown }
+
+function dutiesFrom(list: readonly DutyArgs[], me: Teammate, now: number): { duties: Duty[]; served: Record<string, string> } {
   if (!Array.isArray(list)) throw new Error('duties is a list of { what, every, at, on } or { what, after: "ship", most }');
-  const out = [];
-  const served = {};
+  const out: Duty[] = [];
+  const served: Record<string, string> = {};
   for (const raw of list) {
     const what = String(raw?.what ?? '').trim();
     if (!what) throw new Error('each duty needs what it does');
@@ -199,20 +223,41 @@ function dutiesFrom(list, me, now) {
   return { duties: out, served };
 }
 
-export function teamSetup({ name, role, job, goal, counted, asksFirst, every, at, on, duties, runsOn, handoffsNeedYes, pausedUntil, readsMessages, voice, voiceWords, ready } = {}, ctx = {}) {
+/** What team_setup is given; every field is checked before it is kept. */
+interface TeamSetupInput {
+  name?: unknown;
+  role?: unknown;
+  job?: unknown;
+  goal?: unknown;
+  counted?: unknown;
+  asksFirst?: unknown;
+  every?: string;
+  at?: string;
+  on?: number;
+  duties?: readonly DutyArgs[];
+  runsOn?: unknown;
+  handoffsNeedYes?: unknown;
+  pausedUntil?: unknown;
+  readsMessages?: unknown;
+  voice?: string;
+  voiceWords?: unknown;
+  ready?: unknown;
+}
+
+export function teamSetup({ name, role, job, goal, counted, asksFirst, every, at, on, duties, runsOn, handoffsNeedYes, pausedUntil, readsMessages, voice, voiceWords, ready }: TeamSetupInput = {}, ctx: RunContext = {}) {
   const { dir, me, team, item, project } = teammateContext(ctx);
   const now = ctx.now ?? Date.now();
   if (typeof asksFirst === 'string' && /\?\s*$/.test(asksFirst)) {
     throw new Error('asksFirst is what needs the person\'s yes before you do it, said as a statement ("Anything that goes out in public"). Ask a question with team_post instead.');
   }
-  const patch = {};
+  const patch: Partial<Teammate> = {};
   if (typeof name === 'string' && name.trim()) {
     const clean = name.trim().replace(/\s+/g, ' ').slice(0, 40);
     if (team.some((t) => t.id !== me.id && t.name.toLowerCase() === clean.toLowerCase())) throw new Error(`${clean} is taken; pick another name`);
     patch.name = clean;
     patch.letter = letterFor(clean, team.filter((t) => t.id !== me.id));
   }
-  for (const [k, v] of Object.entries({ role, job, goal, counted, asksFirst })) if (typeof v === 'string' && v.trim()) patch[k] = v.trim();
+  for (const [k, v] of Object.entries({ role, job, goal, counted, asksFirst })) if (typeof v === 'string' && v.trim()) (patch as Record<string, unknown>)[k] = v.trim();
   if (every !== undefined) {
     if (!EVERY.includes(every)) throw new Error(`every is one of ${EVERY.join(', ')}`);
     if (every === 'never') patch.works = null;
@@ -263,22 +308,23 @@ export function teamSetup({ name, role, job, goal, counted, asksFirst, every, at
     try { updateWorkItem(project.dir, item.id, { title: setupTitle(patch.name) }, { source: 'system', now }); } catch { /* the old title stands */ }
   }
   if (ready === true && me.status === 'draft') writeChat(dir, { kind: 'act', from: me.id, verb: 'started' }, now);
-  const changed = Object.keys(SAID).filter((k) => k in patch && JSON.stringify(patch[k]) !== JSON.stringify(me[k] ?? null));
+  const changed = (Object.keys(SAID) as (keyof Teammate)[]).filter((k) => k in patch && JSON.stringify(patch[k]) !== JSON.stringify(me[k] ?? null));
   if (me.status === 'active' && changed.length) {
     const parts = changed.map((k) => SAID[k]);
     writeChat(dir, { kind: 'act', from: me.id, verb: 'updated', text: `Updated ${parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0]}` }, now);
   }
-  const after = readTeammates(dir, now).find((t) => t.id === me.id);
+  // Its own line was just written, so it folds back.
+  const after = readTeammates(dir, now).find((t) => t.id === me.id)!;
   return { teammate: { name: after.name, role: after.role, job: after.job, goal: after.goal, counted: after.counted, asksFirst: after.asksFirst, works: after.works, duties: after.duties, runsOn: after.engine ?? 'your default', handoffsNeedYes: after.handoffsNeedYes !== false, pausedUntil: after.pausedUntil ?? null, status: after.status } };
 }
 
 // The teammate's method, written whole or one passage at a time. Through the
 // store because a Codex run may write only inside its own task folder.
-export function teamMethod({ text, old, new: replacement } = {}, ctx = {}) {
+export function teamMethod({ text, old, new: replacement }: { text?: unknown; old?: unknown; new?: unknown } = {}, ctx: RunContext = {}) {
   const { dir, me } = teammateContext(ctx);
   let current = '';
   try { current = fs.readFileSync(methodFile(dir, me.id), 'utf8'); } catch { /* none yet */ }
-  let next;
+  let next: string;
   if (typeof text === 'string') {
     if (!text.trim()) throw new Error('your method cannot be empty');
     next = text;
@@ -297,13 +343,13 @@ export function teamMethod({ text, old, new: replacement } = {}, ctx = {}) {
 // A lesson about how the person likes a kind of work done, kept in the
 // playbook of that title so every teammate doing that work reads it. With no
 // lesson it starts reading a playbook another teammate wrote.
-export function teamPlaybook({ playbook, lesson } = {}, ctx = {}) {
+export function teamPlaybook({ playbook, lesson }: { playbook?: unknown; lesson?: unknown } = {}, ctx: RunContext = {}) {
   const { dir, me, item, project } = teammateContext(ctx);
   const now = ctx.now ?? Date.now();
   const title = plain(playbook).slice(0, 120);
   if (!title) throw new Error('name the playbook, like "How you write posts"');
   const books = readPlaybooks(dir);
-  let book = books.find((b) => b.title.toLowerCase() === title.toLowerCase());
+  let book: Omit<Playbook, 'updatedAt'> | undefined = books.find((b) => b.title.toLowerCase() === title.toLowerCase());
   if (lesson === undefined) {
     if (!book) throw new Error(`no playbook called ${title}. The team has: ${books.map((b) => b.title).join(', ') || 'none yet'}. Add a lesson to start one.`);
     if (!book.readers.includes(me.id)) writePlaybook(dir, { kind: 'reader', book: book.id, teammate: me.id }, now);
@@ -322,14 +368,14 @@ export function teamPlaybook({ playbook, lesson } = {}, ctx = {}) {
   return { playbook: book.id, kept: true, id };
 }
 
-export function teamRoster(ctx = {}) {
+export function teamRoster(ctx: RunContext = {}) {
   const { dir, me, team } = teammateContext({ ...ctx, outsider: true });
   const { messages } = readChat(dir);
-  const nameOf = (id) => (id === YOU ? 'the person' : team.find((t) => t.id === id)?.name ?? 'a teammate');
+  const nameOf = (id: unknown): string => (id === YOU ? 'the person' : team.find((t) => t.id === id)?.name ?? 'a teammate');
   return {
     you: me?.name ?? null,
     team: team.map((t) => ({ name: t.name, role: t.role, job: t.job, paused: t.paused, status: t.status })),
-    recent: messages.filter((m) => m.kind === 'msg' || m.kind === 'pass').slice(-20).map((m) => ({ from: nameOf(m.from), to: m.kind === 'pass' ? [nameOf(m.to)] : (m.to ?? []).map(nameOf), text: m.kind === 'pass' ? `passed: ${m.title}` : m.text, at: new Date(m.ts).toISOString() })),
+    recent: messages.filter((m) => m.kind === 'msg' || m.kind === 'pass').slice(-20).map((m) => ({ from: nameOf(m.from), to: m.kind === 'pass' ? [nameOf(m.to)] : ((m.to ?? []) as string[]).map(nameOf), text: m.kind === 'pass' ? `passed: ${m.title}` : m.text, at: new Date(m.ts).toISOString() })),
   };
 }
 
@@ -337,13 +383,13 @@ export function teamRoster(ctx = {}) {
 // teammate's reply, which the supervisor takes as a turn, as it does a person's
 // reply: her own stop or close outranks it, and so does the hand-off count.
 // Null when this is not that, and the ordinary write goes ahead.
-export function noteToAnotherThread(id, patch, { ownItem, now = Date.now() } = {}) {
+export function noteToAnotherThread(id: string, patch: { note?: unknown; result?: unknown } | null | undefined, { ownItem, now = Date.now() }: { ownItem?: string | null; now?: number } = {}) {
   if (!ownItem || !id || id === ownItem) return null;
-  const keys = Object.keys(patch ?? {}).filter((k) => patch[k] !== undefined);
+  const keys = Object.keys(patch ?? {}).filter((k) => (patch as Record<string, unknown>)[k] !== undefined);
   if (!keys.length || keys.some((k) => k !== 'note' && k !== 'result')) return null;
-  const words = String(patch.note ?? patch.result ?? '').trim();
+  const words = String(patch!.note ?? patch!.result ?? '').trim();
   if (!words) return null;
-  let target; let writer;
+  let target: ProjectSummary; let writer: ProjectSummary;
   try {
     target = projectOf(id, null);
     writer = projectOf(ownItem, null);

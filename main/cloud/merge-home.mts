@@ -9,7 +9,29 @@ import path from 'node:path';
 // The exact line the cloud run is told to end on (main/cloud/run.mts). One that
 // asks for more than the merge is an agent's.
 const PLAIN = /^merging into main$/i;
-export const isPlainMerge = (what) => PLAIN.test(String(what ?? '').trim());
+export const isPlainMerge = (what: unknown): boolean => PLAIN.test(String(what ?? '').trim());
+
+export interface MergeHomeResult {
+  ok: boolean;
+  why?: string;
+  said?: string;
+  commits?: number;
+  into?: string;
+  /** The remote main was pushed to, when it is published. */
+  pushedTo?: string;
+  /** Merged here, with only the push left undone. */
+  merged?: boolean;
+}
+
+export interface MergeHomeOptions {
+  /** A turn at the memory check before the push; answers with what gives it back. */
+  beforePush?: (() => Promise<() => void>) | null;
+}
+
+interface GitResult {
+  ok: boolean;
+  out: string;
+}
 
 const GIT_MS = 20_000;
 const FETCH_MS = 2 * 60_000;
@@ -18,7 +40,7 @@ const PUSH_MS = 20 * 60_000;
 // Never a prompt for a password: a fetch or push nobody can answer fails instead.
 const NO_PROMPT = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
 
-function git(cwd, args, { timeout = GIT_MS, env = process.env } = {}) {
+function git(cwd: string, args: string[], { timeout = GIT_MS, env = process.env }: { timeout?: number; env?: NodeJS.ProcessEnv } = {}): Promise<GitResult> {
   return new Promise((resolve) => {
     execFile('git', args, { cwd, encoding: 'utf8', timeout, env, maxBuffer: 16 * 1024 * 1024 }, (error, stdout, stderr) => {
       resolve(error
@@ -28,17 +50,17 @@ function git(cwd, args, { timeout = GIT_MS, env = process.env } = {}) {
   });
 }
 
-const count = async (cwd, range) => { const r = await git(cwd, ['rev-list', '--count', range]); return r.ok ? Number(r.out) || 0 : null; };
+const count = async (cwd: string, range: string): Promise<number | null> => { const r = await git(cwd, ['rev-list', '--count', range]); return r.ok ? Number(r.out) || 0 : null; };
 
 /** Where main is published, as `{ remote, ref }`, or null for a main that lives only here. */
-async function publishedAt(base, into) {
+async function publishedAt(base: string, into: string): Promise<{ remote: string; ref: string } | null> {
   const remote = await git(base, ['config', '--get', `branch.${into}.remote`]);
   const ref = await git(base, ['config', '--get', `branch.${into}.merge`]);
   return remote.ok && ref.ok && remote.out && ref.out ? { remote: remote.out, ref: ref.out } : null;
 }
 
 // Main here caught up with the published copy, when that is a plain fast-forward.
-async function catchUp(base, { remote }) {
+async function catchUp(base: string, { remote }: { remote: string }): Promise<MergeHomeResult> {
   const fetched = await git(base, ['fetch', '--quiet', remote], { timeout: FETCH_MS, env: NO_PROMPT });
   if (!fetched.ok) return { ok: false, why: `could not reach ${remote} to bring main up to date`, said: fetched.out };
   const ahead = await count(base, '@{u}..HEAD');
@@ -52,9 +74,9 @@ async function catchUp(base, { remote }) {
   return { ok: true };
 }
 
-const clean = async (cwd) => { const s = await git(cwd, ['status', '--porcelain']); return s.ok && s.out === ''; };
+const clean = async (cwd: string): Promise<boolean> => { const s = await git(cwd, ['status', '--porcelain']); return s.ok && s.out === ''; };
 
-async function mergeNow(cwd, { beforePush = null } = {}) {
+async function mergeNow(cwd: string, { beforePush = null }: MergeHomeOptions = {}): Promise<MergeHomeResult> {
   const branch = await git(cwd, ['rev-parse', '--abbrev-ref', 'HEAD']);
   if (!branch.ok || branch.out === 'HEAD') return { ok: false, why: "this thread's folder is not on a branch of its own" };
   if (!(await clean(cwd))) return { ok: false, why: "this thread's folder has changes that are not committed" };
@@ -95,7 +117,7 @@ async function mergeNow(cwd, { beforePush = null } = {}) {
 }
 
 // One at a time, so two threads never merge into the same main at once.
-let last = Promise.resolve();
+let last: Promise<unknown> = Promise.resolve();
 
 /**
  * Merge the branch checked out in the thread's folder `cwd` into main in the
@@ -104,14 +126,14 @@ let last = Promise.resolve();
  * `{ ok: true, commits, into, pushedTo? }`, or `{ ok: false, why, said?, merged? }`:
  * main as it was, or merged here when only the push failed.
  */
-export function mergeHome(cwd, options = {}) {
-  const run = last.then(() => mergeNow(cwd, options)).catch((e) => ({ ok: false, why: String(e?.message ?? e) }));
+export function mergeHome(cwd: string, options: MergeHomeOptions = {}): Promise<MergeHomeResult> {
+  const run = last.then(() => mergeNow(cwd, options)).catch((e): MergeHomeResult => ({ ok: false, why: String((e as Error | null)?.message ?? e) }));
   last = run;
   return run;
 }
 
 /** The thread's answer once the app has merged it. */
-export function mergedSentence({ commits, into = 'main', pushedTo = null }) {
+export function mergedSentence({ commits, into = 'main', pushedTo = null }: { commits?: number; into?: string; pushedTo?: string | null }): string {
   if (!commits) return `**Already on ${into}.** Everything this thread made was on ${into} already, so nothing needed merging.`;
   const them = commits === 1 ? 'The commit this thread made is' : `The ${commits} commits this thread made are`;
   if (pushedTo) return `**Merged into ${into} and pushed.** ${them} on ${into} here and on ${pushedTo} now.`;

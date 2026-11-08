@@ -72,7 +72,7 @@ const toB64url = (data: Uint8Array): string => {
 };
 
 /** A P-256 pair as Web Push signs with it: the public point raw, the private scalar. */
-export async function makeVapidKeys(subtle: SubtleCrypto): Promise<VapidKeys> {
+export async function makeVapidKeys(subtle: typeof globalThis.crypto.subtle): Promise<VapidKeys> {
   const pair = await subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
   const raw = new Uint8Array(await subtle.exportKey('raw', pair.publicKey));
   const jwk = await subtle.exportKey('jwk', pair.privateKey);

@@ -170,9 +170,10 @@ describe('every script that starts a Chrome is guarded', () => {
   // all, so that the per-file checks below are not silently checking nothing.
   // It was 40 while every one-off harness was committed. Those are gitignored
   // now (scripts/scratch/) and the 133 already in the tree were deleted on
-  // 2026-09-23, which left seven.
+  // 2026-09-23, which left seven. Deleting the unused one-offs on 2026-11-08
+  // left two.
   it('finds the launchers', () => {
-    expect(launchers.length).toBeGreaterThan(3);
+    expect(launchers.length).toBeGreaterThan(1);
   });
 
   it.each(launchers.map((f) => f.name))('%s cleans up after itself', (name) => {

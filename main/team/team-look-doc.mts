@@ -9,13 +9,16 @@ import { TEAM_LOOK } from '../../shared/team-look.mts';
 const MARK = `<!-- The Team look from your team's group, kept here by ${Name}. Edit it in the group: edits here are replaced. -->`;
 
 /** Writes each project's copy where it changed. Returns how many it wrote. */
-export function writeTeamLookDocs({ products, text }) {
+export function writeTeamLookDocs({ products, text }: {
+  products: readonly ({ dir?: string | null; team?: { direct?: boolean } | null } | null | undefined)[] | null | undefined;
+  text: unknown;
+}): number {
   let wrote = 0;
   const doc = `${MARK}\n${String(text ?? '')}`;
   for (const product of products ?? []) {
     if (!product?.dir || product.team?.direct) continue;
     const file = path.join(product.dir, TEAM_LOOK);
-    let had = null;
+    let had: string | null = null;
     try { had = fs.readFileSync(file, 'utf8'); } catch { /* not there yet */ }
     if (had !== null && (!had.startsWith(MARK) || had === doc)) continue;
     fs.writeFileSync(file, doc);

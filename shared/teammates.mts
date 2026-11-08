@@ -7,6 +7,106 @@
 // What is new lives in two append-only files per account: the teammates
 // themselves, and one team chat that you and every teammate write to.
 import { periodKey, isRepeatRule, servedOf, dateKey, clockLabel, DAY_NAMES } from './repeats.mts';
+import type { RepeatShape } from './repeats.mts';
+
+/** Anything that carries labels, which is where a run says whose it is. */
+export interface Labelled { id?: string; labels?: readonly string[] }
+
+/** Who wrote a field's surviving value, and when. */
+export interface Written { source?: string; ts: number }
+
+/** A work item as the teammate rules read it. */
+export interface RunItem {
+  id: string;
+  product: string;
+  status?: string;
+  labels?: readonly string[];
+  title?: string;
+  label?: string;
+  answer?: string | null;
+  result?: string;
+  note?: string;
+  start?: string;
+  createdAt?: number;
+  updatedAt?: number;
+  wrote?: Partial<Record<'note' | 'result' | 'answer' | 'status' | 'start' | 'labels', Written>>;
+}
+
+export type DutyEvery = 'day' | 'weekday' | 'week';
+
+/** Something a teammate does on its own, as cleanDuty keeps it. */
+export type Duty =
+  | { id: string; what: string; after: 'ship'; most?: number; tell?: string }
+  | { id: string; what: string; every: DutyEvery; at: string[]; on?: number; tell?: string };
+
+/** A duty as the rules read it, whichever kind it is. */
+export interface DutyLike {
+  id: string;
+  what: string;
+  tell?: string | null;
+  after?: string;
+  most?: number;
+  every?: DutyEvery;
+  at?: readonly string[];
+  on?: number;
+}
+
+/** Something a teammate was told to keep. */
+export interface Memory { id: string; text: string; from: string | null; at: number; by: string | null }
+
+export type TeammateStatusWord = 'draft' | 'active';
+
+/** A teammate as its file folds. */
+export interface Teammate {
+  id: string;
+  name: string;
+  letter?: string | null;
+  role?: string | null;
+  job?: string | null;
+  goal?: string | null;
+  counted?: string | null;
+  asksFirst?: string | null;
+  works?: RepeatShape | null;
+  product?: string | null;
+  engine?: string | null;
+  model?: string | null;
+  effort?: string | null;
+  limit: number;
+  status: TeammateStatusWord;
+  starter?: string | null;
+  primary?: boolean;
+  voice?: string | null;
+  voiceText?: string | null;
+  readsMessages?: boolean;
+  openToTeam?: boolean;
+  paused: boolean;
+  pausedUntil?: string | null;
+  handoffsNeedYes?: boolean;
+  createdAt: number;
+  updatedAt: number;
+  endedAt?: number | null;
+  served: string;
+  memory: Memory[];
+  duties: Duty[];
+  dutyServed: Record<string, string>;
+}
+
+/** A teammate as the waking rules read it. */
+export interface TeammateLike {
+  id: string;
+  name?: string;
+  product?: string | null;
+  limit?: number;
+  status?: string;
+  paused?: boolean;
+  pausedUntil?: string | null;
+  endedAt?: number | null;
+  handoffsNeedYes?: boolean;
+  works?: unknown;
+  served?: string;
+  duties?: readonly DutyLike[];
+  dutyServed?: Record<string, string>;
+}
 
 export const TEAMMATE_LABEL_PREFIX = 'teammate:';
 export const FROM_LABEL_PREFIX = 'from:';
@@ -19,27 +119,27 @@ export const CHAT_TAIL = 30;
 export const MAX_HOPS = 8;
 
 // Teammates are an alpha feature (Settings, Alpha features): off unless switched on.
-export function teammatesOn(config) {
+export function teammatesOn(config: { alphaTeammates?: unknown } | null | undefined): boolean {
   return config?.alphaTeammates === true;
 }
 export const HOP_LABEL_PREFIX = 'hop:';
 
-export function hopOf(item) {
+export function hopOf(item: Labelled | null | undefined): number {
   const found = (item?.labels ?? []).find((l) => typeof l === 'string' && l.startsWith(HOP_LABEL_PREFIX));
   const n = found ? Number(found.slice(HOP_LABEL_PREFIX.length)) : 0;
   return Number.isInteger(n) && n >= 0 ? n : 0;
 }
 
-export function teammateLabel(id) {
+export function teammateLabel(id: string): string {
   return `${TEAMMATE_LABEL_PREFIX}${id}`;
 }
 
-export function teammateIdOf(item) {
+export function teammateIdOf(item: Labelled | null | undefined): string | null {
   const found = (item?.labels ?? []).find((l) => typeof l === 'string' && l.startsWith(TEAMMATE_LABEL_PREFIX));
   return found ? found.slice(TEAMMATE_LABEL_PREFIX.length) : null;
 }
 
-export function passedFromOf(item) {
+export function passedFromOf(item: Labelled | null | undefined): string | null {
   const found = (item?.labels ?? []).find((l) => typeof l === 'string' && l.startsWith(FROM_LABEL_PREFIX));
   return found ? found.slice(FROM_LABEL_PREFIX.length) : null;
 }
@@ -47,13 +147,15 @@ export function passedFromOf(item) {
 // WHICH OF YOUR WORK A RUN IS ON: the thread of yours it came from, carried on
 // by every hand-off made from it. A run with no label is its own work.
 export const WORK_LABEL_PREFIX = 'work:';
-export function workOf(item) {
+export function workOf(item: { id: string; labels?: readonly string[] }): string;
+export function workOf(item: Labelled | null | undefined): string | null;
+export function workOf(item: Labelled | null | undefined): string | null {
   const found = (item?.labels ?? []).find((l) => typeof l === 'string' && l.startsWith(WORK_LABEL_PREFIX));
   return found ? found.slice(WORK_LABEL_PREFIX.length) : item?.id ?? null;
 }
 
 const ID_RE = /^t-[0-9a-f]{6,}$/;
-export function isTeammateId(id) {
+export function isTeammateId(id: unknown): id is string {
   return typeof id === 'string' && ID_RE.test(id);
 }
 
@@ -61,7 +163,7 @@ export function isTeammateId(id) {
 
 // A field written and missing from here is folded away at the next start, the
 // way `on` once vanished from every weekly repeating task.
-const FIELDS = [
+const FIELDS: readonly string[] = [
   'name', 'letter', 'role', 'job', 'goal', 'counted', 'works', 'asksFirst',
   'product', 'engine', 'model', 'effort', 'limit', 'paused', 'status',
   'endedAt', 'served', 'starter', 'createdAt', 'duties', 'dutyServed',
@@ -78,11 +180,14 @@ const FIELDS = [
   'voice', 'voiceText',
 ];
 
-export const STATUSES = ['draft', 'active'];
+export const STATUSES: readonly TeammateStatusWord[] = ['draft', 'active'];
+
+/** How a teammate sounds, with a sample of it. */
+export interface Voice { id: string; label: string; says: string; sample?: string }
 
 // How each teammate sounds, so a team of them does not read as one writer. Every
 // sample says the same thing, so picking between them shows the difference.
-export const VOICES = [
+export const VOICES: (Voice & { sample: string })[] = [
   { id: 'blunt', label: 'Blunt', says: 'Blunt. The point in your first words, then stop. Fragments are fine. No warm-up, no softening, no sign-off, no "I".', sample: 'Deploy failed. Bad migration. Fixing it now.' },
   { id: 'warm', label: 'Warm', says: 'Warm and easy, like a friend at work. Use their first name, say "hey", give credit when it is earned, write the way you talk. Never gushing.', sample: 'Hey Maya, small snag with the deploy. I\'m on it, nothing you need to do.' },
   { id: 'dry', label: 'Dry', says: 'Dry. Short flat statements, names and numbers, no reassurance, and a straight-faced aside about the absurd part of the situation. Never "I think", never an exclamation mark.', sample: 'The deploy failed, third time today. Same migration. It has commitment.' },
@@ -92,7 +197,9 @@ export const VOICES = [
 
 export const VOICE_WORDS_MOST = 300;
 
-export function voiceOf(t) {
+type Voiced = { id?: string; voice?: string | null; voiceText?: string | null } | null | undefined;
+
+export function voiceOf(t: Voiced): Voice {
   const own = typeof t?.voiceText === 'string' ? t.voiceText.trim() : '';
   if (own) return { id: 'own', label: 'Your own', says: own };
   const given = VOICES.find((v) => v.id === t?.voice);
@@ -105,7 +212,7 @@ export function voiceOf(t) {
 // Over this a chat message is refused. Real ones ran to 291 before any limit.
 export const CHAT_MOST = 500;
 
-export function tooLongForAChat(words) {
+export function tooLongForAChat(words: unknown): string | null {
   const n = String(words ?? '').length;
   return n > CHAT_MOST
     ? `That is ${n} characters, and a chat message stops at ${CHAT_MOST}. Nothing was sent. Say it in a line or two, or several short messages, or put it in a document and send one sentence with it attached.`
@@ -113,7 +220,7 @@ export function tooLongForAChat(words) {
 }
 
 /** The part of a teammate's brief on how it writes to people. */
-export function howYouWrite(t) {
+export function howYouWrite(t: Voiced): string {
   return [
     '## How you write',
     '- In a chat (team_post, team_tell) write the way a good colleague writes in Slack: a line or two, then stop. One or two short sentences, usually under 150 characters.',
@@ -128,7 +235,7 @@ export function howYouWrite(t) {
 }
 
 /** A teammate's last message, in place of the worker's rules for one, and last in its system prompt so nothing outranks it by position. */
-export function howYourRunEnds() {
+export function howYourRunEnds(): string {
   return [
     '## Your last message on this thread',
     'The message that ends your run is a chat message, written once: the app puts it on this thread, options and all. This holds even when you were asked a question or asked for detail.',
@@ -139,18 +246,18 @@ export function howYourRunEnds() {
   ].join('\n');
 }
 
-export const isDate = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00`));
+export const isDate = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00`));
 
 /** The primary teammate, while it is set up and working, or null. */
-export function primaryOf(team = []) {
+export function primaryOf<T extends { primary?: boolean; endedAt?: number | null; paused?: boolean; status?: string }>(team: readonly T[] | null = []): T | null {
   return (team ?? []).find((t) => t?.primary && !t.endedAt && !t.paused && (t.status ?? 'active') === 'active') ?? null;
 }
 
-export function pausedNow(t, now = Date.now()) {
+export function pausedNow(t: { pausedUntil?: string | null } | null | undefined, now = Date.now()): boolean {
   return isDate(t?.pausedUntil) && dateKey(now) < t.pausedUntil;
 }
 
-export function isWorks(works) {
+export function isWorks(works: unknown): works is RepeatShape {
   return isRepeatRule(works);
 }
 
@@ -159,40 +266,43 @@ export function isWorks(works) {
 // in its project. A teammate with only the older single `works` schedule has
 // none, and its round runs as before.
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
-const EVERY_DUTY = ['day', 'weekday', 'week'];
+const EVERY_DUTY: readonly unknown[] = ['day', 'weekday', 'week'];
 
-export function cleanDuty(d) {
+/** A duty as somebody wrote it; cleanDuty checks every field before it keeps one. */
+interface DutyIn { id?: unknown; what?: unknown; tell?: unknown; after?: unknown; most?: unknown; every?: unknown; at?: unknown; on?: unknown }
+
+export function cleanDuty(d: DutyIn | null | undefined): Duty | null {
   if (!d || typeof d !== 'object') return null;
   const id = typeof d.id === 'string' && /^d-[\w-]{1,40}$/.test(d.id) ? d.id : null;
   const what = cleanText(d.what, 300);
   if (!id || !what) return null;
   const tell = cleanText(d.tell, 300);
   if (d.after === 'ship') {
-    const most = Number.isInteger(d.most) && d.most >= 1 && d.most <= 14 ? d.most : null;
+    const most = Number.isInteger(d.most) && (d.most as number) >= 1 && (d.most as number) <= 14 ? d.most as number : null;
     return { id, what, after: 'ship', ...(most ? { most } : {}), ...(tell ? { tell } : {}) };
   }
   const at = (Array.isArray(d.at) ? d.at : [d.at]).filter((x) => typeof x === 'string' && TIME.test(x));
   if (!EVERY_DUTY.includes(d.every) || !at.length || at.length !== (Array.isArray(d.at) ? d.at : [d.at]).length) return null;
-  if (d.every === 'week' && !(Number.isInteger(d.on) && d.on >= 0 && d.on <= 6)) return null;
-  return { id, what, every: d.every, at: [...new Set(at)].sort().slice(0, 6), ...(d.every === 'week' ? { on: d.on } : {}), ...(tell ? { tell } : {}) };
+  if (d.every === 'week' && !(Number.isInteger(d.on) && (d.on as number) >= 0 && (d.on as number) <= 6)) return null;
+  return { id, what, every: d.every as DutyEvery, at: [...new Set(at as string[])].sort().slice(0, 6), ...(d.every === 'week' ? { on: d.on as number } : {}), ...(tell ? { tell } : {}) };
 }
 
 const TIMES_WORD = ['', 'once', 'twice', 'three times', 'four times', 'five times'];
 
 /** When a duty runs, in plain words: "Daily at 9:00am and 3:00pm", "After a ship, at most twice a week". */
-export function dutyWhen(d) {
+export function dutyWhen(d: DutyLike): string {
   if (d?.after === 'ship') return d.most ? `After a ship, at most ${TIMES_WORD[d.most] ?? `${d.most} times`} a week` : 'After a ship';
   const at = (Array.isArray(d?.at) ? d.at : []).map((x) => clockLabel(x));
   if (!at.length) return '';
   const times = at.length === 1 ? at[0] : `${at.slice(0, -1).join(', ')} and ${at.at(-1)}`;
   if (d.every === 'day') return `Daily at ${times}`;
   if (d.every === 'weekday') return `Weekdays at ${times}`;
-  return `${DAY_NAMES[d.on]}s at ${times}`;
+  return `${DAY_NAMES[d.on as number]}s at ${times}`;
 }
 
 /** The latest time slot of a timed duty that has come, as "YYYY-MM-DDTHH:MM", or null before the first. */
-export function dutySlot(d, now = Date.now()) {
-  let best = null;
+export function dutySlot(d: DutyLike, now = Date.now()): string | null {
+  let best: string | null = null;
   for (const at of d.at ?? []) {
     const key = periodKey({ every: d.every, at, ...(d.every === 'week' ? { on: d.on } : {}) }, now);
     if (!key) continue;
@@ -203,7 +313,7 @@ export function dutySlot(d, now = Date.now()) {
 }
 
 /** What a duty has seen so far when it is set, so a time or a ship already past fires nothing. */
-export function dutyStart(d, now = Date.now()) {
+export function dutyStart(d: DutyLike, now = Date.now()): string {
   return d.after === 'ship' ? `ship@${now}` : dutySlot(d, now) ?? '';
 }
 
@@ -211,22 +321,22 @@ export const DUTY_LABEL_PREFIX = 'duty:';
 
 // What needs the person's yes first, as a rule. A question saved there is not
 // one (setup refuses it now; older teammates may still carry one).
-export function yesFirst(asksFirst) {
+export function yesFirst(asksFirst: string | null | undefined): string | null {
   const rule = String(asksFirst ?? '').trim();
   return rule && !rule.endsWith('?') ? rule : null;
 }
 // A run your own words in a teammate's chat woke. You are in that chat
 // waiting for its answer, so it is next for a free agent.
 export const CHAT_LABEL = 'from-chat';
-export const dutyOf = (item) => (item?.labels ?? []).find((l) => typeof l === 'string' && l.startsWith(DUTY_LABEL_PREFIX))?.slice(DUTY_LABEL_PREFIX.length) ?? null;
+export const dutyOf = (item: Labelled | null | undefined): string | null => (item?.labels ?? []).find((l) => typeof l === 'string' && l.startsWith(DUTY_LABEL_PREFIX))?.slice(DUTY_LABEL_PREFIX.length) ?? null;
 
-function cleanText(v, max = 2000) {
+function cleanText(v: unknown, max = 2000): string | null {
   if (typeof v !== 'string') return null;
   const t = v.trim();
   return t ? t.slice(0, max) : null;
 }
 
-function coerce(field, value) {
+function coerce(field: string, value: unknown): unknown {
   switch (field) {
     case 'name': return cleanText(value, 40);
     case 'role': return cleanText(value, 60);
@@ -237,9 +347,9 @@ function coerce(field, value) {
     case 'job': case 'goal': case 'counted': case 'asksFirst': return cleanText(value, 2000);
     case 'product': case 'engine': case 'model': case 'effort': case 'starter': return cleanText(value, 120);
     case 'works': return value === null ? null : isWorks(value) ? { every: value.every, at: value.at, ...(value.every === 'week' ? { on: value.on } : {}) } : undefined;
-    case 'limit': return Number.isInteger(value) && value >= 1 && value <= 500 ? value : undefined;
+    case 'limit': return Number.isInteger(value) && (value as number) >= 1 && (value as number) <= 500 ? value : undefined;
     case 'paused': case 'handoffsNeedYes': case 'primary': case 'readsMessages': case 'openToTeam': return !!value;
-    case 'status': return STATUSES.includes(value) ? value : undefined;
+    case 'status': return (STATUSES as readonly unknown[]).includes(value) ? value : undefined;
     case 'voice': return value === null ? null : VOICES.some((v) => v.id === value) ? value : undefined;
     case 'voiceText': return value === null ? null : cleanText(value, VOICE_WORDS_MOST);
     case 'endedAt': case 'createdAt': return Number.isFinite(value) ? value : value === null ? null : undefined;
@@ -248,7 +358,7 @@ function coerce(field, value) {
     case 'duties': return Array.isArray(value) ? value.map(cleanDuty).filter(Boolean).slice(0, 12) : value === null ? [] : undefined;
     case 'dutyServed': {
       if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
-      const out = {};
+      const out: Record<string, string> = {};
       for (const [k, v] of Object.entries(value)) if (/^d-[\w-]{1,40}$/.test(k) && typeof v === 'string' && v.length <= 40) out[k] = v;
       return out;
     }
@@ -256,12 +366,22 @@ function coerce(field, value) {
   }
 }
 
+/** One line of the teammates file as it was written; the fold checks each field before it uses one. */
+interface TeammateLineIn {
+  id?: unknown;
+  ts: number;
+  patch?: Record<string, unknown> & { remember?: { id?: unknown; text?: unknown; from?: unknown; at: number; by?: unknown } | null };
+}
+
+/** A teammate while its lines fold: the name may come in a later line. */
+type Folding = Omit<Teammate, 'name'> & { name?: string };
+
 // Newest wins per field. Memory is a list, written as `remember`/`forget` lines
 // so two runs learning at once both keep what they learned.
-export function foldTeammates(lines, now = Date.now()) {
+export function foldTeammates(lines: readonly unknown[] | null | undefined, now = Date.now()): Teammate[] {
   const today = dateKey(now);
-  const byId = new Map();
-  for (const line of lines ?? []) {
+  const byId = new Map<string, Folding>();
+  for (const line of (lines ?? []) as readonly (TeammateLineIn | null)[]) {
     if (!line || typeof line !== 'object') continue;
     const { id, ts, patch } = line;
     if (!isTeammateId(id) || !Number.isFinite(ts) || !patch || typeof patch !== 'object') continue;
@@ -276,31 +396,31 @@ export function foldTeammates(lines, now = Date.now()) {
       const v = coerce(field, patch[field]);
       if (v === undefined) continue;
       if (field === 'served') {
-        if (v <= today && v > t.served) t.served = v;
+        if ((v as string) <= today && (v as string) > t.served) t.served = v as string;
         continue;
       }
       // What each duty has served is kept per duty, so two runs marking two
       // duties at once both land.
       if (field === 'dutyServed') {
-        t.dutyServed = { ...(t.dutyServed ?? {}), ...v };
+        t.dutyServed = { ...(t.dutyServed ?? {}), ...(v as Record<string, string>) };
         continue;
       }
-      t[field] = v;
+      (t as Record<string, unknown>)[field] = v;
     }
     const r = patch.remember;
     if (r && typeof r === 'object' && typeof r.id === 'string' && cleanText(r.text, 300) && !t.memory.some((m) => m.id === r.id)) {
-      t.memory.push({ id: r.id, text: cleanText(r.text, 300), from: cleanText(r.from, 300), at: Number.isFinite(r.at) ? r.at : ts, by: typeof r.by === 'string' ? r.by : null });
+      t.memory.push({ id: r.id, text: cleanText(r.text, 300)!, from: cleanText(r.from, 300), at: Number.isFinite(r.at) ? r.at : ts, by: typeof r.by === 'string' ? r.by : null });
     }
     if (typeof patch.forget === 'string') t.memory = t.memory.filter((m) => m.id !== patch.forget);
   }
-  return [...byId.values()]
-    .filter((t) => !t.endedAt && t.name)
+  return ([...byId.values()]
+    .filter((t) => !t.endedAt && t.name) as Teammate[])
     .sort((a, b) => a.createdAt - b.createdAt);
 }
 
 // A free letter for a new teammate: its own initial when nobody has it, else
 // the next letter of its name, else the first free one.
-export function letterFor(name, teammates = []) {
+export function letterFor(name: string | null | undefined, teammates: readonly { letter?: string | null }[] = []): string {
   const taken = new Set(teammates.map((t) => t.letter).filter(Boolean));
   const letters = String(name ?? '').toUpperCase().replace(/[^A-Z]/g, '');
   for (const ch of letters) if (!taken.has(ch)) return ch;
@@ -313,22 +433,41 @@ export function letterFor(name, teammates = []) {
 // every teammate doing that work reads the same lessons. Lines: `book` (made),
 // `lesson` (added, by a teammate, from a thread), `reader` (a teammate reads
 // it), `forget` (a lesson taken out).
-export function foldPlaybooks(lines) {
-  const books = new Map();
-  const lessonBook = new Map();
-  for (const line of lines ?? []) {
+/** A lesson in a playbook, and the thread it was learned from. */
+export interface Lesson { id: string; text: string; ts: number; by: string | null; from: { product: string; id: string; title: string } | null }
+
+/** What the person taught their teammates about one kind of work. */
+export interface Playbook { id: string; title: string; readers: string[]; lessons: Lesson[]; updatedAt: number }
+
+/** One line of the playbooks file as it was written; the fold checks each field before it uses one. */
+interface PlaybookLineIn {
+  kind?: unknown;
+  id: string;
+  ts: number;
+  book: string;
+  title?: unknown;
+  text?: unknown;
+  by?: unknown;
+  teammate?: unknown;
+  from?: { product?: unknown; id?: unknown; title?: unknown } | null;
+}
+
+export function foldPlaybooks(lines: readonly unknown[] | null | undefined): Playbook[] {
+  const books = new Map<string, Playbook>();
+  const lessonBook = new Map<string, Playbook>();
+  for (const line of (lines ?? []) as readonly (PlaybookLineIn | null)[]) {
     if (!line || typeof line !== 'object' || !Number.isFinite(line.ts)) continue;
     if (line.kind === 'book' && typeof line.id === 'string' && cleanText(line.title, 120)) {
       const had = books.get(line.id);
-      if (had) { had.title = cleanText(line.title, 120); had.updatedAt = Math.max(had.updatedAt, line.ts); continue; }
-      books.set(line.id, { id: line.id, title: cleanText(line.title, 120), readers: [], lessons: [], updatedAt: line.ts });
+      if (had) { had.title = cleanText(line.title, 120)!; had.updatedAt = Math.max(had.updatedAt, line.ts); continue; }
+      books.set(line.id, { id: line.id, title: cleanText(line.title, 120)!, readers: [], lessons: [], updatedAt: line.ts });
       continue;
     }
     const book = books.get(line.book);
     if (line.kind === 'lesson' && book && typeof line.id === 'string' && cleanText(line.text, 400) && !book.lessons.some((l) => l.id === line.id)) {
       const from = line.from && typeof line.from === 'object' && typeof line.from.id === 'string'
         ? { product: String(line.from.product ?? ''), id: line.from.id, title: cleanText(line.from.title, 200) ?? '' } : null;
-      book.lessons.push({ id: line.id, text: cleanText(line.text, 400), ts: line.ts, by: typeof line.by === 'string' ? line.by : null, from });
+      book.lessons.push({ id: line.id, text: cleanText(line.text, 400)!, ts: line.ts, by: typeof line.by === 'string' ? line.by : null, from });
       lessonBook.set(line.id, book);
       if (isTeammateId(line.by) && !book.readers.includes(line.by)) book.readers.push(line.by);
       book.updatedAt = Math.max(book.updatedAt, line.ts);
@@ -336,7 +475,7 @@ export function foldPlaybooks(lines) {
       book.readers.push(line.teammate);
       book.updatedAt = Math.max(book.updatedAt, line.ts);
     } else if (line.kind === 'forget' && lessonBook.has(line.id)) {
-      const b = lessonBook.get(line.id);
+      const b = lessonBook.get(line.id)!;
       b.lessons = b.lessons.filter((l) => l.id !== line.id);
       b.updatedAt = Math.max(b.updatedAt, line.ts);
     }
@@ -346,42 +485,92 @@ export function foldPlaybooks(lines) {
 
 // ---------------------------------------------------------------- the chat
 
-export const CHAT_KINDS = ['msg', 'pass', 'seen', 'act'];
+export type ChatKind = 'msg' | 'pass' | 'seen' | 'act';
 
-export function foldChat(lines) {
-  const messages = [];
-  const seen = new Set();
+export const CHAT_KINDS: readonly ChatKind[] = ['msg', 'pass', 'seen', 'act'];
+
+/** A message, hand-off or note in the team chat. */
+export interface ChatLine {
+  id: string;
+  kind: Exclude<ChatKind, 'seen'>;
+  from: string;
+  /** Who it names: a list on a message, one teammate on a pass. */
+  to?: string | string[];
+  text?: string;
+  ts: number;
+  title?: string;
+  details?: string;
+  product?: string;
+  fromName?: string;
+  setup?: boolean;
+  start?: boolean;
+  fresh?: boolean;
+  yours?: boolean;
+  hop?: number;
+  via?: string;
+  viaProduct?: string | null;
+  work?: string;
+  run?: string;
+  verb?: string;
+  ref?: string;
+  /** The threads a new teammate is made from, on the words that set it up. */
+  threads?: { product?: string; id: string; title?: string }[];
+  /** A teammate's question offers these answers to tap. */
+  options?: string[];
+  /** On your message: the answer it gives each of a teammate's questions, by question id. */
+  answers?: Record<string, string>;
+  /** A document that goes with the words, drawn as a card to open. */
+  doc?: { product: string; src: string; name: string };
+}
+
+/** A message read into a run, and when. */
+export interface SeenInto { ref: string; for: string; ts: number }
+
+/** The team chat as it folds. */
+export interface TeamChat {
+  messages: ChatLine[];
+  seen: Set<string>;
+  /** Run id to the messages read into it. */
+  into: Map<string, SeenInto[]>;
+}
+
+/** One line of the chat file as it was written; the fold checks each field before it uses one. */
+interface ChatLineIn { kind?: unknown; id?: unknown; ts: number; ref?: unknown; for?: unknown; run?: unknown }
+
+export function foldChat(lines: readonly unknown[] | null | undefined): TeamChat {
+  const messages: ChatLine[] = [];
+  const seen = new Set<string>();
   // Run id to the messages read into it, and when.
-  const into = new Map();
-  const ids = new Set();
-  for (const line of lines ?? []) {
-    if (!line || typeof line !== 'object' || !CHAT_KINDS.includes(line.kind)) continue;
+  const into = new Map<string, SeenInto[]>();
+  const ids = new Set<string>();
+  for (const line of (lines ?? []) as readonly (ChatLineIn | null)[]) {
+    if (!line || typeof line !== 'object' || !(CHAT_KINDS as readonly unknown[]).includes(line.kind)) continue;
     if (!Number.isFinite(line.ts)) continue;
     if (line.kind === 'seen') {
       if (typeof line.ref === 'string' && typeof line.for === 'string') {
         seen.add(seenKey(line.ref, line.for));
         if (typeof line.run === 'string') {
           if (!into.has(line.run)) into.set(line.run, []);
-          into.get(line.run).push({ ref: line.ref, for: line.for, ts: line.ts });
+          into.get(line.run)!.push({ ref: line.ref, for: line.for, ts: line.ts });
         }
       }
       continue;
     }
     if (typeof line.id !== 'string' || ids.has(line.id)) continue;
     ids.add(line.id);
-    messages.push(line);
+    messages.push(line as ChatLine);
   }
   messages.sort((a, b) => a.ts - b.ts);
   return { messages, seen, into };
 }
 
-export function seenKey(msgId, teammateId) {
+export function seenKey(msgId: string, teammateId: string): string {
   return `${msgId}>${teammateId}`;
 }
 
 // Who a message is addressed to: the ones it names with @, matched on name.
-export function mentionsIn(text, teammates = []) {
-  const out = [];
+export function mentionsIn(text: string | null | undefined, teammates: readonly { id: string; name?: string | null }[] = []): string[] {
+  const out: string[] = [];
   const lower = String(text ?? '').toLowerCase();
   for (const t of teammates) {
     if (!t.name) continue;
@@ -393,13 +582,13 @@ export function mentionsIn(text, teammates = []) {
 
 // ---------------------------------------------------------------- runs
 
-export function runsOf(teammateId, items) {
+export function runsOf<T extends Labelled>(teammateId: string, items: readonly T[] | null | undefined): T[] {
   return (items ?? []).filter((i) => teammateIdOf(i) === teammateId);
 }
 
 // A finished word from the agent that the person has not answered: the run is
 // waiting on them, and so in Needs you, not running.
-export function waitingOnYou(item) {
+export function waitingOnYou(item: RunItem | null | undefined): boolean {
   if (!item || item.status === 'done' || item.status === 'claimed') return false;
   // Queued behind another run, or closed quietly: neither is in your inbox.
   if (item.start === 'later' || (item.labels ?? []).includes('clean')) return false;
@@ -414,7 +603,7 @@ export function waitingOnYou(item) {
 // sat a day unanswered; your answer or close on any of them starts it again.
 export const UNREAD_HOLD = 3;
 
-export function dutyUnread(teammateId, dutyId, items, now = Date.now()) {
+export function dutyUnread(teammateId: string, dutyId: string, items: readonly RunItem[], now = Date.now()): boolean {
   const reached = runsOf(teammateId, items)
     .filter((i) => dutyOf(i) === dutyId && i.wrote?.result?.source === 'agent' && !(i.labels ?? []).includes('clean'))
     .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
@@ -430,29 +619,29 @@ export function dutyUnread(teammateId, dutyId, items, now = Date.now()) {
   return false;
 }
 
-export function isQueued(item) {
+export function isQueued(item: { status?: string; start?: string } | null | undefined): boolean {
   return item?.status === 'open' && item?.start === 'later';
 }
 
 // Running or about to: one at a time per teammate, so this is what the queue
 // waits behind.
-export function isActiveRun(item) {
+export function isActiveRun(item: RunItem | null | undefined): boolean {
   if (!item || item.status === 'done') return false;
   if (isQueued(item)) return false;
   return !waitingOnYou(item);
 }
 
-export function activeRunOf(teammateId, items) {
+export function activeRunOf(teammateId: string, items: readonly RunItem[] | null | undefined): RunItem | null {
   return runsOf(teammateId, items).find(isActiveRun) ?? null;
 }
 
-export function runsThisWeek(teammateId, items, now = Date.now()) {
+export function runsThisWeek(teammateId: string, items: readonly RunItem[] | null | undefined, now = Date.now()): number {
   return runsOf(teammateId, items).filter((i) => (i.createdAt ?? 0) > now - WEEK_MS).length;
 }
 
 // Deterministic, so a tick that dies after creating the run and before marking
 // the message seen finds the same row next time rather than making a second.
-export function runIdFor(seed) {
+export function runIdFor(seed: unknown): string {
   let h1 = 0x811c9dc5;
   let h2 = 0x1b873593;
   const s = String(seed);
@@ -466,12 +655,12 @@ export function runIdFor(seed) {
 
 // Which runs have handed each other work, newest first: two runs are talking
 // once a message from one was taken into the other.
-function talkingRuns(chat) {
+function talkingRuns(chat: ChatLike | null | undefined): Map<string, Map<string, number>> {
   const byId = new Map((chat?.messages ?? []).map((m) => [m.id, m]));
-  const links = new Map();
-  const link = (a, b, ts) => {
+  const links = new Map<string, Map<string, number>>();
+  const link = (a: string, b: string, ts: number) => {
     if (!links.has(a)) links.set(a, new Map());
-    if ((links.get(a).get(b) ?? -1) < ts) links.get(a).set(b, ts);
+    if ((links.get(a)!.get(b) ?? -1) < ts) links.get(a)!.set(b, ts);
   };
   for (const [run, taken] of chat?.into ?? []) {
     for (const s of taken) {
@@ -483,24 +672,24 @@ function talkingRuns(chat) {
 }
 
 // The words a hand-off puts on the thread it goes to.
-export function handOffText(m) {
+export function handOffText(m: { title?: string; details?: string }): string {
   return [m.title ? `**${m.title}**` : null, String(m.details ?? '').trim() || null].filter(Boolean).join('\n\n') || 'Work passed on';
 }
 
-function clip(text, max) {
+function clip(text: unknown, max: number): string {
   const t = String(text ?? '').replace(/\s+/g, ' ').trim();
   return t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t;
 }
 
 // Named, because the Team view and Today list runs with no teammate beside them.
-export function setupTitle(name) {
+export function setupTitle(name: string | null | undefined): string {
   const n = String(name ?? '').trim();
   return !n || n === 'New teammate' ? 'Set up a new teammate' : `Set up ${n}`;
 }
 
-export const isSetupTitle = (title) => title === 'Set up its job' || /^Set up /.test(String(title ?? ''));
+export const isSetupTitle = (title: string | null | undefined): boolean => title === 'Set up its job' || /^Set up /.test(String(title ?? ''));
 
-export function runTitle(trigger, teammate) {
+export function runTitle(trigger: WakeTrigger, teammate: { name?: string }): string {
   if (trigger.kind === 'schedule') return trigger.label === 'week' ? "This week's round" : "Today's round";
   if (trigger.kind === 'duty') return clip(trigger.what, 120);
   if (trigger.kind === 'pass') return clip(trigger.title || 'Work passed on', 120);
@@ -510,18 +699,62 @@ export function runTitle(trigger, teammate) {
   return clip(trigger.fromName ? `From ${trigger.fromName}: ${said}` : said, 120);
 }
 
-const firstLine = (text) => String(text ?? '').trim().split('\n')[0].trim();
+const firstLine = (text: unknown): string => String(text ?? '').trim().split('\n')[0].trim();
 
 // What a message says to one teammate it names: from its @Name to the end of
 // that sentence, when there is anything there.
-function partFor(text, name) {
+function partFor(text: unknown, name: string | undefined): string | null {
   const words = String(text ?? '');
   const at = name ? words.search(new RegExp(`@${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])`, 'i')) : -1;
   if (at < 0) return null;
-  const rest = words.slice(at + name.length + 1).replace(/^[\s,:;–—-]+/, '');
+  const rest = words.slice(at + name!.length + 1).replace(/^[\s,:;–—-]+/, '');
   const part = rest.split(/\n|\s@\w/)[0].replace(/[\s.,;:]+$/, '').trim();
   return part ? part[0].toUpperCase() + part.slice(1) : null;
 }
+
+/** The team chat as the waking rules read it. */
+export interface ChatLike {
+  messages?: readonly ChatLine[];
+  seen: ReadonlySet<string>;
+  into?: ReadonlyMap<string, readonly SeenInto[]>;
+}
+
+interface TriggerBase {
+  from?: string;
+  msg?: string;
+  hop?: number;
+  product?: string;
+  via?: string;
+  viaProduct?: string | null;
+  work?: string;
+  hold?: boolean;
+  key?: string;
+}
+
+/** What woke a teammate's run. */
+export type WakeTrigger =
+  | (TriggerBase & { kind: 'schedule'; key: string; label: string })
+  | (TriggerBase & { kind: 'duty'; duty: string; what: string; tell?: string; key: string })
+  | (TriggerBase & { kind: 'pass'; fromName?: string; title?: string; details?: string })
+  | (TriggerBase & { kind: 'message'; text?: string; fromName?: string; opening?: 'start' | 'setup' });
+
+interface ActionBase { teammate: string; msg?: string; trigger?: WakeTrigger }
+
+/** One thing the tick should do. */
+export type WakeAction =
+  | (ActionBase & { type: 'run'; id: string; trigger: WakeTrigger; title: string; start: 'now' | 'later' })
+  | (ActionBase & { type: 'seen'; msg: string; run?: string })
+  | (ActionBase & { type: 'served'; key: string })
+  | (ActionBase & { type: 'dutyServed'; duty: string; key: string })
+  | (ActionBase & { type: 'answer'; item: string; product: string; text: string | undefined; msg: string })
+  | (ActionBase & { type: 'tell'; item: string; product: string | null; text: string; from: { teammate: string; name: string }; hop: number; hold: boolean; msg: string })
+  | (ActionBase & { type: 'release'; item: string; product: string })
+  | (ActionBase & { type: 'limit' })
+  | (ActionBase & { type: 'unread'; duty: string; what: string })
+  | (ActionBase & { type: 'hops'; msg: string; from: string });
+
+/** A run made earlier in the same tick, before any row for it exists. */
+type MadeRun = Omit<RunItem, 'product'> & { teammate: string; product: string | null };
 
 // What the tick should do now, decided without touching anything, so it can be
 // tested on plain data and the main process only carries it out.
@@ -541,34 +774,41 @@ function partFor(text, name) {
 // - One run at a time: a new run behind an active one is made queued, and a
 //   teammate with nothing active gets its oldest queued run released.
 // - A teammate past its weekly runs takes nothing new except your own words.
-export function planWakes({ teammates = [], chat = { messages: [], seen: new Set() }, items = [], now = Date.now(), shipped = {} } = {}) {
-  const actions = [];
+export function planWakes({ teammates = [], chat = { messages: [], seen: new Set() }, items = [], now = Date.now(), shipped = {} }: {
+  teammates?: readonly TeammateLike[];
+  chat?: ChatLike;
+  items?: readonly RunItem[];
+  now?: number;
+  /** When each project last shipped. */
+  shipped?: Readonly<Record<string, number>>;
+} = {}): WakeAction[] {
+  const actions: WakeAction[] = [];
   const live = teammates.filter((t) => !t.endedAt);
   const byId = new Map(live.map((t) => [t.id, t]));
-  const pendingNew = new Map();
-  const startsNow = new Map();
-  const limited = new Set();
+  const pendingNew = new Map<string, number>();
+  const startsNow = new Map<string, boolean>();
+  const limited = new Set<string>();
 
   const talking = talkingRuns(chat);
   // Runs made this tick, so a second hand-off in the same tick finds the first.
-  const made = [];
-  const homeOf = (t, m) => {
+  const made: MadeRun[] = [];
+  const homeOf = (t: TeammateLike, m: ChatLine): RunItem | MadeRun | null => {
     const runs = [...runsOf(t.id, items), ...made.filter((r) => r.teammate === t.id)];
-    const partners = talking.get(m.run);
-    const partner = partners && runs.filter((r) => partners.has(r.id)).sort((a, b) => partners.get(b.id) - partners.get(a.id))[0];
+    const partners = talking.get(m.run as string);
+    const partner = partners && runs.filter((r) => partners.has(r.id)).sort((a, b) => partners.get(b.id)! - partners.get(a.id)!)[0];
     if (partner) return partner;
     const where = m.product ?? t.product ?? null;
     return runs.filter((r) => m.work && workOf(r) === m.work && (!where || !r.product || r.product === where))
       .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))[0] ?? null;
   };
-  const closedByYou = (r) => r.status === 'done' && r.wrote?.status?.source === 'founder';
+  const closedByYou = (r: RunItem | MadeRun): boolean => r.status === 'done' && r.wrote?.status?.source === 'founder';
 
-  const active = (t) => !!activeRunOf(t.id, items) || startsNow.get(t.id);
-  const overLimit = (t) => runsThisWeek(t.id, items, now) + (pendingNew.get(t.id) ?? 0) >= (t.limit ?? DEFAULT_LIMIT);
+  const active = (t: TeammateLike) => !!activeRunOf(t.id, items) || startsNow.get(t.id);
+  const overLimit = (t: TeammateLike) => runsThisWeek(t.id, items, now) + (pendingNew.get(t.id) ?? 0) >= (t.limit ?? DEFAULT_LIMIT);
 
   // A held run waits for your reply, not for its turn, so it neither queues
   // nor holds up the teammate's next run.
-  const newRun = (t, trigger, seed, { fromYou = false, hold = false } = {}) => {
+  const newRun = (t: TeammateLike, trigger: WakeTrigger, seed: string, { fromYou = false, hold = false }: { fromYou?: boolean; hold?: boolean } = {}): string | null => {
     if (!fromYou && overLimit(t)) {
       limited.add(t.id);
       return null;
@@ -583,7 +823,7 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
 
   for (const m of chat.messages ?? []) {
     if (m.kind !== 'msg' && m.kind !== 'pass') continue;
-    const targets = m.kind === 'pass' ? [m.to] : (Array.isArray(m.to) ? m.to : []);
+    const targets = m.kind === 'pass' ? [m.to as string] : (Array.isArray(m.to) ? m.to : []);
     for (const tid of targets) {
       const t = byId.get(tid);
       if (!t || chat.seen.has(seenKey(m.id, tid))) continue;
@@ -591,7 +831,7 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
       if (t.paused && m.from !== YOU) continue;
       const fromYou = m.from === YOU;
       if (!fromYou && m.kind === 'msg') { actions.push({ type: 'seen', msg: m.id, teammate: tid }); continue; }
-      const hop = fromYou ? 0 : (Number.isInteger(m.hop) ? m.hop : 0) + 1;
+      const hop = fromYou ? 0 : (Number.isInteger(m.hop) ? m.hop as number : 0) + 1;
       if (hop > MAX_HOPS) {
         actions.push({ type: 'seen', msg: m.id, teammate: tid });
         actions.push({ type: 'hops', teammate: tid, msg: m.id, from: m.from });
@@ -625,7 +865,7 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
       // the thread that spoke for you, when one did.
       const origin = { ...(m.product ? { product: m.product } : {}), ...(m.via ? { via: m.via, viaProduct: m.viaProduct ?? null } : {}) };
       const work = fromYou ? m.via ?? null : m.work ?? null;
-      const trigger = m.kind === 'pass'
+      const trigger: WakeTrigger = m.kind === 'pass'
         ? { kind: 'pass', from: m.from, ...(m.fromName ? { fromName: m.fromName } : {}), title: m.title, details: m.details, msg: m.id, hop, ...origin, ...(work ? { work } : {}), ...(hold ? { hold } : {}) }
         : { kind: 'message', from: m.from, text: m.text, msg: m.id, hop, ...origin, ...(work ? { work } : {}), ...(fromYou && m.start ? { opening: 'start' } : fromYou && m.setup ? { opening: 'setup' } : {}) };
       const id = newRun(t, trigger, `${m.id}>${tid}`, { fromYou, hold });
@@ -634,7 +874,7 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
         made.push({ id, teammate: tid, product: m.product ?? t.product ?? null, status: 'open', labels: [`${WORK_LABEL_PREFIX}${work ?? id}`] });
         if (typeof m.run === 'string') {
           if (!talking.has(m.run)) talking.set(m.run, new Map());
-          talking.get(m.run).set(id, now);
+          talking.get(m.run)!.set(id, now);
         }
       }
     }
@@ -656,9 +896,9 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
         continue;
       }
       const served = t.dutyServed?.[d.id] ?? '';
-      let key = null;
+      let key: string | null = null;
       if (d.after === 'ship') {
-        const at = shipped?.[t.product];
+        const at = shipped?.[t.product as string];
         const seenAt = Number(String(served).replace(/^ship@/, '')) || 0;
         if (!Number.isFinite(at) || at <= seenAt) continue;
         const week = runsOf(t.id, items).filter((i) => dutyOf(i) === d.id && now - (i.createdAt ?? 0) < WEEK_MS).length;
@@ -686,7 +926,27 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
 
 // ---------------------------------------------------------------- what you see
 
-function verbFor(item, teammates) {
+type Named = { id: string; name?: string };
+
+/** One line a run leaves in the team chat. */
+export interface RunLine {
+  teammate: string;
+  item: string;
+  product: string;
+  title?: string;
+  id: string;
+  kind: 'run';
+  verb: 'queued' | 'passed' | 'picked' | 'answered' | 'sent' | 'stopped' | 'finished';
+  ts: number;
+  by?: string;
+  byName?: string;
+  text?: string;
+  said?: string;
+  waiting?: boolean;
+  answered?: boolean;
+}
+
+function verbFor(item: RunItem, teammates: readonly Named[]): { verb: 'passed' | 'picked'; by?: string; byName?: string } {
   const from = passedFromOf(item);
   if (from) {
     const who = teammates.find((t) => t.id === from);
@@ -698,14 +958,14 @@ function verbFor(item, teammates) {
 // The note is written at the moment of the close, so a run reopened and
 // finished later reads as finished again.
 export const STOPPED_NOTE = 'Stopped by you.';
-export function stoppedByYou(item) {
+export function stoppedByYou(item: RunItem | null | undefined): boolean {
   return item?.status === 'done' && item.note === STOPPED_NOTE && item.wrote?.note?.ts === item.wrote?.status?.ts;
 }
 
 // The lines a run leaves in the chat, read straight off the ledger so they can
 // never disagree with it: picked up (or passed on), sent you, finished.
-export function runLines(items, teammates = []) {
-  const out = [];
+export function runLines(items: readonly RunItem[] | null | undefined, teammates: readonly Named[] = []): RunLine[] {
+  const out: RunLine[] = [];
   for (const item of items ?? []) {
     const tid = teammateIdOf(item);
     if (!tid) continue;
@@ -734,14 +994,29 @@ export function runLines(items, teammates = []) {
   return out.sort((a, b) => a.ts - b.ts);
 }
 
-function startOfDay(now) {
+function startOfDay(now: number): number {
   const d = new Date(now);
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 }
 
+/** A run, by where it lives and what it is called. */
+export interface ItemRef { id: string; product: string; title?: string }
+
+/** What a teammate is on, what waits on you, and what it finished today. */
+export interface TeammateStatus {
+  waiting: ItemRef[];
+  /** In words: its run's name, "Waiting on you" or "Paused". */
+  now: string | null | undefined;
+  running: { id: string; product: string } | null;
+  queued: number;
+  next: ItemRef[];
+  done: ItemRef[];
+  runsThisWeek: number;
+}
+
 // The panel beside a teammate: what is waiting on you, what it is on now, and
 // what it finished today.
-export function statusOf(teammate, items, now = Date.now()) {
+export function statusOf(teammate: { id: string; paused?: boolean }, items: readonly RunItem[] | null | undefined, now = Date.now()): TeammateStatus {
   const runs = runsOf(teammate.id, items);
   const waiting = runs.filter(waitingOnYou).map((i) => ({ id: i.id, product: i.product, title: i.label || i.title }));
   const running = runs.find((i) => isActiveRun(i));
@@ -751,7 +1026,7 @@ export function statusOf(teammate, items, now = Date.now()) {
   const done = runs
     .filter((i) => i.status === 'done' && (i.wrote?.status?.ts ?? i.updatedAt ?? 0) >= today)
     .map((i) => ({ id: i.id, product: i.product, title: i.label || i.title }));
-  let now_ = null;
+  let now_: string | null | undefined = null;
   if (running) now_ = running.label || running.title;
   else if (waiting.length) now_ = 'Waiting on you';
   else if (teammate.paused) now_ = 'Paused';
@@ -766,7 +1041,7 @@ export function statusOf(teammate, items, now = Date.now()) {
 export const GREETING = 'Hi. What should I take off your plate? Pick one, or tell me in your own words.';
 
 /** The starters a new teammate offers: those whose job or name nobody on the team has yet. */
-export function starterAsks(team = []) {
+export function starterAsks(team: readonly { starter?: string | null; name?: string }[] = []): { starter: string; ask: string; name: string; role: string }[] {
   return STARTERS.filter((s) => !team.some((t) => t.starter === s.starter || t.name === s.name))
     .map((s) => ({ starter: s.starter, ask: s.ask, name: s.name, role: s.role }));
 }
@@ -774,7 +1049,24 @@ export function starterAsks(team = []) {
 // Above the app's default, Medium: a teammate works with nobody watching.
 export const TEAMMATE_EFFORT = 'high';
 
-export const STARTERS = [
+/** A teammate a new person can start from, and what it brings them. */
+export interface Starter {
+  starter: string;
+  name: string;
+  role: string;
+  primary?: boolean;
+  voice: string;
+  ask: string;
+  outcome: string;
+  sends: string;
+  job: string;
+  goal: string;
+  counted: string;
+  asksFirst: string;
+  works: RepeatShape | null;
+}
+
+export const STARTERS: Starter[] = [
   {
     starter: 'chief', name: 'Chief of staff', role: 'Chief of staff', primary: true, voice: 'careful',
     ask: 'Be the one I talk to',
@@ -866,11 +1158,11 @@ const STOP = new Set(('the a an and or but for to of in on at by with from into 
   + 'my our your their me we you i us can could would should will please pls just also some any all new more make do does did get got let lets '
   + 'need want like have has had what which who how why when where there here then than them they not no yes ok okay one two three today tomorrow week').split(' '));
 
-function wordsOf(title) {
+function wordsOf(title: string | null | undefined): Set<string> {
   return new Set(String(title ?? '').toLowerCase().replace(/[’']/g, '').split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !STOP.has(w)));
 }
 
-function alike(a, b) {
+function alike(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
   let shared = 0;
   for (const w of a) if (b.has(w)) shared += 1;
   return shared >= 2 && shared / Math.min(a.size, b.size) >= 0.6;
@@ -878,7 +1170,7 @@ function alike(a, b) {
 
 // Threads you wrote yourself in the last month: not a teammate's or a repeat's
 // runs, not imported, not an offer.
-function yourAsks(items, now) {
+function yourAsks(items: readonly RunItem[] | null | undefined, now: number): RunItem[] {
   return (items ?? []).filter((i) => {
     const labels = i.labels ?? [];
     if (!labels.includes('founder') || i.wrote?.labels?.source === 'agent') return false;
@@ -892,8 +1184,8 @@ function yourAsks(items, now) {
  * alike enough to be one job, under a key no offer has used. One open offer at
  * a time, and one a day at most.
  */
-function askedOnce(group) {
-  const seen = new Map();
+function askedOnce(group: readonly RunItem[]): { title: string; n: number }[] {
+  const seen = new Map<string, { title: string; n: number }>();
   for (const i of group) {
     const title = String(i.label || i.title).trim();
     const had = seen.get(title.toLowerCase());
@@ -902,20 +1194,33 @@ function askedOnce(group) {
   return [...seen.values()];
 }
 
-export function offerFrom({ items = [], offered = new Set(), now = Date.now() } = {}) {
+/** A teammate offered for a kind of thing you keep asking for. */
+export interface Offer {
+  key: string;
+  product: string;
+  count: number;
+  titles: string[];
+  asked: { title: string; n: number }[];
+  threads: { product: string; id: string; title: string }[];
+  title: string;
+  said: string;
+}
+
+export function offerFrom({ items = [], offered = new Set(), now = Date.now() }: { items?: readonly RunItem[]; offered?: ReadonlySet<unknown>; now?: number } = {}): Offer | null {
   const open = (items ?? []).filter((i) => (i.labels ?? []).includes(OFFER_LABEL));
   if (open.some((i) => i.status !== 'done' || now - (i.createdAt ?? 0) < 24 * 60 * 60 * 1000)) return null;
   const asks = yourAsks(items, now).sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+  // Every ask has its bag of words, so the lookups below always find one.
   const bags = new Map(asks.map((i) => [i.id, wordsOf(i.title)]));
   for (const lead of asks) {
-    const group = asks.filter((i) => i === lead || alike(bags.get(lead.id), bags.get(i.id)));
+    const group = asks.filter((i) => i === lead || alike(bags.get(lead.id)!, bags.get(i.id)!));
     if (group.length < OFFER_AT_LEAST) continue;
-    const counts = new Map();
-    for (const i of group) for (const w of bags.get(i.id)) counts.set(w, (counts.get(w) ?? 0) + 1);
+    const counts = new Map<string, number>();
+    for (const i of group) for (const w of bags.get(i.id)!) counts.set(w, (counts.get(w) ?? 0) + 1);
     const common = [...counts].filter(([, n]) => n >= Math.ceil(group.length / 2)).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 3).map(([w]) => w);
     const key = common.sort().join('-');
     if (!key || offered.has(key)) continue;
-    const byProduct = new Map();
+    const byProduct = new Map<string, number>();
     for (const i of group) byProduct.set(i.product, (byProduct.get(i.product) ?? 0) + 1);
     const product = [...byProduct].sort((a, b) => b[1] - a[1])[0]?.[0] ?? lead.product;
     return {
@@ -940,21 +1245,21 @@ const OFFER_THREADS = 12;
 export const METHOD_CAP = 16_000;
 
 const KEYS = /\b(sk-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|xox[abprs]-[A-Za-z0-9-]{10,})\b/g;
-const redact = (text) => String(text ?? '').replace(KEYS, '[key removed]');
-const cutText = (text, most) => (text.length > most ? `${text.slice(0, most).trimEnd()}… (cut, ${text.length - most} more characters)` : text);
+const redact = (text: unknown): string => String(text ?? '').replace(KEYS, '[key removed]');
+const cutText = (text: string, most: number): string => (text.length > most ? `${text.slice(0, most).trimEnd()}… (cut, ${text.length - most} more characters)` : text);
 
 /**
  * One thread written out for a teammate to learn from: every word the person
  * said and every answer the agent gave, in order. A thread too long for `cap`
  * loses the agent's words first; the person's are kept whole.
  */
-export function sourceText(thread, turns, { cap = 80_000 } = {}) {
+export function sourceText(thread: { title?: string; product?: string; id: string }, turns: readonly Turn[] | null | undefined, { cap = 80_000 }: { cap?: number } = {}): string {
   const said = (turns ?? []).filter((x) => (x.source === 'founder' || x.source === 'agent') && String(x.text ?? '').trim());
-  const render = (agentMost) => [
+  const render = (agentMost: number): string => [
     `# ${thread.title} (${thread.product}/${thread.id})`,
     ...said.map((x) => (x.source === 'founder'
-      ? `## You\n\n${redact(x.text.trim())}`
-      : `## The agent\n\n${cutText(redact(x.text.trim()), agentMost)}`)),
+      ? `## You\n\n${redact(x.text!.trim())}`
+      : `## The agent\n\n${cutText(redact(x.text!.trim()), agentMost)}`)),
   ].join('\n\n');
   for (const most of [Infinity, 6000, 1500, 400]) {
     const text = render(most);
@@ -966,7 +1271,10 @@ export function sourceText(thread, turns, { cap = 80_000 } = {}) {
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const RECORD_DAYS = 21;
 
-const headline = (text) => clip(String(text ?? '').split('\n').map((l) => l.replace(/\*\*|__|`|^#+\s*/g, '').trim()).find(Boolean) ?? '', 240);
+/** One turn of a thread: who said it, on which field, and the words. */
+export interface Turn { source?: string; field?: string; text?: string }
+
+const headline = (text: unknown): string => clip(String(text ?? '').split('\n').map((l) => l.replace(/\*\*|__|`|^#+\s*/g, '').trim()).find(Boolean) ?? '', 240);
 
 /**
  * The record of a teammate's recent work, read off the ledger: each run of the
@@ -975,12 +1283,16 @@ const headline = (text) => clip(String(text ?? '').split('\n').map((l) => l.repl
  * left out. Past `cap` the oldest runs go first. `read(product, id)` gives a
  * thread's turns.
  */
-export function recordOf(runs, read, { now = Date.now(), cap = 8000, days = RECORD_DAYS } = {}) {
+export function recordOf(
+  runs: readonly RunItem[] | null | undefined,
+  read: (product: string, id: string) => readonly Turn[] | null | undefined,
+  { now = Date.now(), cap = 8000, days = RECORD_DAYS }: { now?: number; cap?: number; days?: number } = {},
+): string {
   const since = now - days * DAY_MS;
-  const entries = [];
+  const entries: string[] = [];
   const ordered = [...(runs ?? [])].filter((r) => (r.createdAt ?? 0) >= since).sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
   for (const r of ordered) {
-    let turns = [];
+    let turns: readonly Turn[] = [];
     try { turns = read(r.product, r.id) ?? []; } catch { turns = []; }
     const yours = turns
       .filter((x) => x.source === 'founder' && (x.field === 'body' || x.field === 'answer'))
@@ -1006,7 +1318,7 @@ export function recordOf(runs, read, { now = Date.now(), cap = 8000, days = RECO
 }
 
 /** What a tap on the offer meant: 'make', 'dismiss', or your own words to make one from. */
-export function offerAnswer(answer) {
+export function offerAnswer(answer: unknown): { kind: 'make' | 'dismiss'; words?: string } | null {
   const said = String(answer ?? '').trim();
   if (!said || said === '(withdrawn)') return null;
   if (/not now|^no\b|^2\.?$/i.test(said)) return { kind: 'dismiss' };

@@ -92,6 +92,9 @@ export interface StoreItem extends Omit<WorkItem, 'product'> {
   [field: string]: unknown;
 }
 
+/** An item as listItems returns it: always with the slug of the project it came from. */
+export type ListedItem = StoreItem & { product: string };
+
 export interface AnswerInput {
   answer?: string | null;
   status?: string | null;
@@ -406,9 +409,9 @@ export class Store {
   /* ------------------------------ work items ----------------------------- */
   // The cross-product fold. Every item carries its product slug so the
   // renderer can group, filter, and rail without a second lookup.
-  listItems(now = Date.now()) {
+  listItems(now = Date.now()): ListedItem[] {
     const { workItemsDisk } = this.modules;
-    const all: (StoreItem & { product: string })[] = [];
+    const all: ListedItem[] = [];
     // WHAT ONE REPLY MAY DO IS NOT ON THE LEDGER, so it is joined on here, once
     // for the whole fold rather than a file read per row (main/answer-modes.mts).
     const modes = answerModes({ now });
@@ -455,7 +458,7 @@ export class Store {
     const { workItemsDisk } = this.modules;
     const item = workItemsDisk.readWorkItem(this.productDir(slug), id, now);
     if (!item) return null;
-    const row = { ...item, product: slug };
+    const row: StoreItem & { product: string } = { ...item, product: slug };
     const mode = readAnswerMode(slug, id, { now });
     if (mode !== undefined) row.answerMode = mode;
     return row;
@@ -559,7 +562,7 @@ export class Store {
   answerItem(slug: string, id: string, { answer, status, priority, permissionMode, engine, model, effort, inReplyTo, fromPhone, voice, forAgent, fromNotes, putAway }: AnswerInput) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
-    let item: (StoreItem & { product: string }) | null = null;
+    let item: StoreItem | null = null;
     // THE MODEL GOES ON FIRST, BEFORE THE ANSWER. A reply on an idle row is
     // what starts a run, and the run reads the model off the item; written
     // after the answer it is a race the run can win, and she would pick a model
@@ -955,7 +958,7 @@ export class Store {
   }
 
   /* ------------------------------- teammates ------------------------------ */
-  teammatesView(items?: StoreItem[] | null, now = Date.now()) {
+  teammatesView(items?: ListedItem[] | null, now = Date.now()) {
     if (!this.teammates) return null;
     return this.teammates.view(items ?? this.listItems(now), now);
   }
@@ -1803,7 +1806,7 @@ export class Store {
       }
       this.answerCodexImport(slug, rowId!, 'yes', { thread, now: last + 2, bodyAt: fresh ? at + 1 : last + 2 });
       if (land === 'sorted' && !thread.waiting) {
-        workItemsDisk.updateWorkItem(dir, rowId, { status: 'done' }, { source: 'founder', now: last + 4 });
+        workItemsDisk.updateWorkItem(dir, rowId!, { status: 'done' }, { source: 'founder', now: last + 4 });
         done += 1;
       }
       ids.push(rowId!);

@@ -21,7 +21,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { cursorIndex, cursorMark, type CursorMark } from './cursor-follows';
 import { createPortal, flushSync } from 'react-dom';
 import { readySkin, swapLook } from './look-switch';
-import type { AgentTurn, AnswerMode, Approval, CloudPlan, PermissionMode, Product, RepeatRule, RepeatShape, RunningSession, Snapshot, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
+import type { AgentTurn, AnswerMode, Approval, ApprovalInput, CloudPlan, PermissionMode, Product, RepeatRule, RepeatShape, RunningSession, Snapshot, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
 import type { ReplyPick } from './reply-pick';
 import { api } from './api';
 import { setClaudeModels, setCodexFreePlan } from './models';
@@ -3314,7 +3314,7 @@ export default function App() {
   // still in the page and every letter she types goes into the file instead of
   // into the palette's field.
   useEffect(() => {
-    const off = (window.zero as any)?.onKeyInTheFile?.((k: { key: string; meta?: boolean; ctrl?: boolean; fromGuest?: boolean }) => {
+    const off = window.zero?.onKeyInTheFile?.((k: { key: string; meta?: boolean; ctrl?: boolean; fromGuest?: boolean }) => {
       // A KEY OUT OF A WEBVIEW NEEDS NO FOCUS CHECK, and must not be given
       // one. The check below exists to stop a key being answered twice when
       // the window's own handler also heard it. The window never hears a
@@ -3458,7 +3458,7 @@ export default function App() {
       ...fresh.map((i) => ({ id: i.id, title: rowTitle(i), product: i.product, productName: i.productName, kind: 'item' })),
       ...freshAsks.map((a) => ({
         id: a.id,
-        title: String((a.input as any)?.description ?? (a.input as any)?.command ?? a.tool ?? 'a command'),
+        title: String((a.input as ApprovalInput)?.description ?? (a.input as ApprovalInput)?.command ?? a.tool ?? 'a command'),
         // The thread that is asking, which heads the phone's alert.
         thread: (() => { const of = a.item ? snap.items.find((i) => i.id === a.item) : null; return of ? rowTitle(of) : null; })(),
         item: a.item ?? null,
@@ -4674,7 +4674,7 @@ export default function App() {
         // two stop toasts and the resume toast. Everything else was comment
         // prose, which she never reads.
         pushUndo({ label: 'Approval withdrawn, back in your inbox', undoes: 'take back that approval and stop the agent', brings: item, undid, run: async () => {
-          await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id });
+          await window.zero?.stopSession?.({ product: item.product, id: item.id });
           await api.answer({ product: item.product, id: item.id, answer: '(withdrawn)', status: 'open' });
         } });
       }, toast, undefined, stay, { product: item.product, id: item.id }, undid);
@@ -4725,7 +4725,7 @@ export default function App() {
       undoes: start ? `take back those ${n} approvals and stop their agents` : `reopen those ${n} proposals`,
       undid: kids.map((k) => ({ product: k.product, id: k.id, words: start ? 'Undid your approval' : 'Undid closing it' })),
       run: async () => {
-        if (start) for (const k of kids) await (window.zero as any)?.stopSession?.({ product: k.product, id: k.id });
+        if (start) for (const k of kids) await window.zero?.stopSession?.({ product: k.product, id: k.id });
         for (const w of undo) await api.answer(w);
       },
     });
@@ -4964,7 +4964,7 @@ export default function App() {
           await refresh();
           setTimeout(() => setSending((q) => q.filter((s) => s !== mine && s !== gone)), LANDED_MS);
         },
-        failed: (error: Error) => {
+        failed: (error: unknown) => {
           setSending((q) => q.filter((s) => s !== mine && s !== gone));
           setUndoStack((u) => u.filter((e) => e !== alreadyGone));
           putBack(error);
@@ -5112,7 +5112,7 @@ export default function App() {
         if (later || waiting) await api.schedule({ product: item.product, id: item.id, runAt: priorRunAt });
         if (wasScheduled && priorSnooze) await api.snooze({ product: item.product, id: item.id, snoozedUntil: priorSnooze });
         // `withdraw`: on the phone, take back the reply itself if her Mac has not taken it.
-        if (!runStays) await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id, withdraw: true });
+        if (!runStays) await window.zero?.stopSession?.({ product: item.product, id: item.id, withdraw: true });
         // Put the thread back exactly where the reply found it. The rule and
         // what it cost are in list-rules (`withdrawReply`): restoring the
         // status only when the reply had changed one left an already-open row
@@ -5298,7 +5298,7 @@ export default function App() {
       catch (error) { letGo(); throw error; }
       setTimeout(letGo, LANDED_MS);
       pushUndo({ label: `Option ${option.n} withdrawn, back in your inbox`, undoes: `take back option ${option.n}`, brings: item, undid, restore: takeBack, run: async () => {
-        await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id });
+        await window.zero?.stopSession?.({ product: item.product, id: item.id });
         // Back exactly where the pick found it, the same one write a typed
         // reply's undo makes. Hardcoding 'open' was right while a pick could
         // only ever happen on an open row; a pick on a finished one would have
@@ -5616,7 +5616,7 @@ export default function App() {
   // It is NOT the question the stop asks. See `stoppable` in list-rules: this is
   // a fact about a process, and In progress is a promise about a row.
   const working = useCallback(
-    (item: WorkItem) => !!snap?.supervisor.running?.some((s: any) => s.itemId === item.id),
+    (item: WorkItem) => !!snap?.supervisor.running?.some((s) => s.itemId === item.id),
     [snap?.supervisor.running],
   );
 
@@ -5646,14 +5646,14 @@ export default function App() {
     // toast says it went rather than that it stopped (Codex's review of step 1,
     // finding 7).
     if (onCloudPhone()) {
-      try { await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id }); } catch (err) { showToast(`Not sent: ${String((err as Error)?.message ?? err)}`); return; }
+      try { await window.zero?.stopSession?.({ product: item.product, id: item.id }); } catch (err) { showToast(`Not sent: ${String((err as Error)?.message ?? err)}`); return; }
       showToast('Stop sent. Your computer stops the agent when it gets it.');
       await refresh();
       return;
     }
     const wasRunning = working(item);
     setFollowing({ product: item.product, id: item.id });
-    await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id });
+    await window.zero?.stopSession?.({ product: item.product, id: item.id });
     // Three sentences rather than two and a dash. See the approval label above.
     showToast(wasRunning
       ? 'Agent stopped. Back in your inbox. Reply to redirect it.'
@@ -5689,7 +5689,7 @@ export default function App() {
     // these would be a write into nothing. Both behave like a task in every way
     // she can see and in none that she cannot.
     if (item.agent || isTroubleRow(item) || isUpdateRow(item)) return;
-    const r = await (window.zero as any)?.redeliver?.({ product: item.product, id: item.id });
+    const r = await window.zero?.redeliver?.({ product: item.product, id: item.id });
     showToast(r?.ok ? `A fresh agent is picking this up → ${item.productName}` : 'Nothing here to restart',
       r?.ok ? { product: item.product, id: item.id } : undefined);
     await refresh();
@@ -5706,7 +5706,7 @@ export default function App() {
     // these would be a write into nothing. Both behave like a task in every way
     // she can see and in none that she cannot.
     if (item.agent || isTroubleRow(item) || isUpdateRow(item)) return;
-    await (window.zero as any)?.reopen?.({ product: item.product, id: item.id });
+    await window.zero?.reopen?.({ product: item.product, id: item.id });
     showToast(`Back in the queue → ${item.productName}`, { product: item.product, id: item.id });
     // Back in the queue is out of her inbox, so it hands her the next task
     // too.
@@ -5729,7 +5729,7 @@ export default function App() {
 
   // Resume: `ids` for the rows she ticked, null for everything stranded.
   const resumeAgents = useCallback(async (ids: string[] | null) => {
-    const r = await (window.zero as any)?.resumeAgents?.(ids ? { ids } : undefined);
+    const r = await window.zero?.resumeAgents?.(ids ? { ids } : undefined);
     setMultiSel(new Set());
     showToast(r?.cleared
       ? `Resuming: ${r.cleared} interrupted ${r.cleared === 1 ? 'agent' : 'agents'} respawning`
@@ -5742,7 +5742,7 @@ export default function App() {
   // nothing else can, the ones a worker already filed as done.
   const putAgentBackOn = useCallback(async (list: WorkItem[]) => {
     const ids = list.map((i) => i.id);
-    const r = await (window.zero as any)?.resumeItems?.({ ids });
+    const r = await window.zero?.resumeItems?.({ ids });
     setMultiSel(new Set());
     const started = r?.resumed ?? 0;
     const queued = r?.queued ?? 0;
@@ -5775,7 +5775,7 @@ export default function App() {
   // path, from the row, the thread and ⌘K. It leaves you where you are.
   const tryAgain = useCallback(async (item: WorkItem) => {
     if (item.agent || isTroubleRow(item) || isUpdateRow(item)) return;
-    const r = await Promise.resolve((window.zero as any)?.resumeItems?.({ ids: [item.id] }))
+    const r = await Promise.resolve(window.zero?.resumeItems?.({ ids: [item.id] }))
       .catch((err: Error) => ({ failed: 1, why: err?.message }));
     showToast(tryAgainWords(r));
     await refresh();
@@ -8607,7 +8607,7 @@ export default function App() {
           // order is not something to type your way through one step at a
           // time. Fine grained ordering is the drag in the composer.
           const next = moveProduct(rankedProducts.map((p) => p.slug), slug, 0);
-          await (window.zero as any)?.setProductOrder?.({ order: next });
+          await window.zero?.setProductOrder?.({ order: next });
           const name = snap.products.find((p) => p.slug === slug)?.name ?? slug;
           showToast(`${name} is now first`);
           await refresh();
@@ -8671,7 +8671,7 @@ export default function App() {
           // reads, written the one way it is always written.
           ranked={rankedProducts}
           onSetOrder={async (slugs) => {
-            await (window.zero as any)?.setProductOrder?.({ order: slugs });
+            await window.zero?.setProductOrder?.({ order: slugs });
             await refresh();
           }}
           /* TEAM MANAGEMENT, handed to Settings rather than imported by it
@@ -9098,10 +9098,10 @@ export default function App() {
                   const row = approvalRow(a.item);
                   const mcp = a.tool.startsWith('mcp__');
                   const product = approvalAsker(row ? rowTitle(row) : null, snap.products.find((p) => p.slug === a.product)?.name ?? a.product ?? 'an agent');
-                  const said = !mcp && (a.input as any)?.description
-                    ? String((a.input as any).description).slice(0, 200)
+                  const said = !mcp && (a.input as ApprovalInput)?.description
+                    ? String((a.input as ApprovalInput).description).slice(0, 200)
                     : null;
-                  const cwd = !mcp && (a.input as any)?.cwd ? String((a.input as any).cwd) : null;
+                  const cwd = !mcp && (a.input as ApprovalInput)?.cwd ? String((a.input as ApprovalInput).cwd) : null;
                   // WITH a description the verb goes quiet and keeps the folder
                   // company. WITHOUT one it is already the loudest line on the
                   // card, and repeating it underneath would be the card saying
@@ -9143,11 +9143,11 @@ export default function App() {
                           four blocks left these below the chat for one commit,
                           which put the most dangerous sentence on the card
                           under the least important one. */}
-                      {!mcp && (a.input as any)?.host && (
-                        <div className="approval-opens">opens the network to {String((a.input as any).host)}</div>
+                      {!mcp && (a.input as ApprovalInput)?.host && (
+                        <div className="approval-opens">opens the network to {String((a.input as ApprovalInput).host)}</div>
                       )}
-                      {!mcp && (a.input as any)?.grantRoot && (
-                        <div className="approval-opens">and asks to write anywhere under {String((a.input as any).grantRoot)} for the rest of this run</div>
+                      {!mcp && (a.input as ApprovalInput)?.grantRoot && (
+                        <div className="approval-opens">and asks to write anywhere under {String((a.input as ApprovalInput).grantRoot)} for the rest of this run</div>
                       )}
                       {/* THE TWO THINGS SHE PUT AT THE BOTTOM, on one line
                           between them. The folder is still here and still

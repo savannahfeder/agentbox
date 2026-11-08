@@ -6,12 +6,12 @@ import { readEnv } from '../../shared/product-name.mjs';
 import { readCloudUsage } from '../cloud/usage.mts';
 import { phoneDevice } from '../phone-inbox.mts';
 import { roomPrefsFile } from './rooms.mts';
-import type { PresenceFacts } from './rooms.mts';
+import type { PresenceFacts, RoomDecision } from './rooms.mts';
 import { createRoomHours } from './room-hours.mts';
 import { writeDecisionDocs } from './decisions-doc.mts';
 import { writeTeamLookDocs } from './team-look-doc.mts';
 
-interface DecisionDocsArgs { teamName: string; rows: unknown[]; nameOf: (id: string) => string }
+interface DecisionDocsArgs { teamName: string; rows: RoomDecision[]; nameOf: (id: string | null) => string }
 
 export interface RoomsSetupOptions {
   config: { alphaRooms?: boolean | null; storeRoot: string; accountRoot?: string | null };

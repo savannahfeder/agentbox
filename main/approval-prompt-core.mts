@@ -187,9 +187,10 @@ export function serveApprovals({ env = process.env, input = process.stdin, outpu
   }
 
   // One audit line per decision; the request/answer pair leaves the spool.
+  // Only reached past the `!SPOOL` refusal at the top of the request.
   function finish(id: string, request: ApprovalRequest, answer: unknown) {
-    appendSpoolLine(SPOOL, 'log.jsonl', `${JSON.stringify({ ...request, answer, decidedAt: Date.now() })}\n`);
-    for (const f of [`${id}.request.json`, `${id}.answer.json`]) removeSpoolEntry(SPOOL, f);
+    appendSpoolLine(SPOOL!, 'log.jsonl', `${JSON.stringify({ ...request, answer, decidedAt: Date.now() })}\n`);
+    for (const f of [`${id}.request.json`, `${id}.answer.json`]) removeSpoolEntry(SPOOL!, f);
   }
 
   const rl = readline.createInterface({ input });

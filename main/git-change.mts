@@ -28,6 +28,23 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import type { ChangedFile, Hunk, Row, RowNums } from './code-change.mts';
+
+export interface RepoSnapshot { root: string; head: string | null; before: Map<string, string | null>; at: number }
+
+export interface WorkStands { committed: boolean | null; uncommitted: boolean | null }
+
+export interface RepoChange {
+  files: ChangedFile[];
+  plus: number;
+  minus: number;
+  root: string | null;
+  stands: WorkStands;
+  knowsYou: boolean | null;
+  at?: number;
+}
+
+interface HunkStarts { old: number; now: number }
 
 /** Bigger than this is not a file anybody reads a diff of. */
 const BIG_FILE = 512 * 1024;
@@ -41,7 +58,7 @@ const MAX_ROWS_PER_FILE = 20_000;
 /** The store's own bookkeeping, which git would not offer anyway. */
 const NOT_CODE = /(^|\/)(node_modules|\.git)\//;
 
-function git(cwd, args, { maxBuffer = 64 * 1024 * 1024 } = {}) {
+function git(cwd: string, args: readonly string[], { maxBuffer = 64 * 1024 * 1024 }: { maxBuffer?: number } = {}): string {
   // A user's `diff.mnemonicPrefix` rewrites a/ and b/ into c/ i/ o/ w/.
   // The reader below only knows one prefix. Turn the setting off for this
   // process so a checkout reads the same on every machine.
@@ -53,17 +70,17 @@ function git(cwd, args, { maxBuffer = 64 * 1024 * 1024 } = {}) {
   });
 }
 
-function tryGit(cwd, args, opts) {
+function tryGit(cwd: string, args: readonly string[], opts?: { maxBuffer?: number }): string | null {
   try { return git(cwd, args, opts); } catch { return null; }
 }
 
 /** Split a -z list, dropping the empty tail. */
-function zList(out) {
+function zList(out: string | null | undefined): string[] {
   return String(out ?? '').split('\0').filter(Boolean);
 }
 
 /** Text we would draw. A NUL in the first block means a picture or a binary. */
-function readTextFile(file) {
+function readTextFile(file: string): string | null {
   let stat;
   try { stat = fs.statSync(file); } catch { return null; }
   if (!stat.isFile() || stat.size > BIG_FILE) return null;
@@ -87,7 +104,7 @@ function readTextFile(file) {
  * ordinary case for a product with no code, and the caller carries on with
  * the conversation alone.
  */
-export function snapshotRepo(cwd) {
+export function snapshotRepo(cwd: string | null | undefined): RepoSnapshot | null {
   if (!cwd) return null;
   const root = tryGit(cwd, ['rev-parse', '--show-toplevel'])?.trim();
   if (!root) return null;
@@ -99,7 +116,7 @@ export function snapshotRepo(cwd) {
   const dirty = head ? zList(tryGit(root, ['diff', '--name-only', '-z', 'HEAD'])) : [];
   const others = zList(tryGit(root, ['ls-files', '-z', '--others', '--exclude-standard']));
 
-  const before = new Map();
+  const before = new Map<string, string | null>();
   let kept = 0;
   for (const rel of new Set([...dirty, ...others])) {
     if (NOT_CODE.test(rel)) continue;
@@ -122,7 +139,7 @@ const CUT_FROM = ['refs/remotes/origin/HEAD', 'refs/remotes/origin/main', 'refs/
 
 /** The commit this branch was cut from, or null where there is nothing to be
  *  ahead of: no default branch, or a checkout sitting on it. */
-function cutFrom(root) {
+function cutFrom(root: string): string | null {
   const here = tryGit(root, ['rev-parse', '--abbrev-ref', 'HEAD'])?.trim();
   for (const ref of CUT_FROM) {
     const sha = tryGit(root, ['rev-parse', '--verify', '--quiet', ref])?.trim();
@@ -149,7 +166,7 @@ function cutFrom(root) {
  * folder already let go, or a checkout on the default branch itself — and null
  * is what makes the offer fall back to the one it made before this existed.
  */
-export function whereTheWorkStands(root) {
+export function whereTheWorkStands(root: string | null | undefined): WorkStands {
   const unread = { committed: null, uncommitted: null };
   if (!root) return unread;
   const status = tryGit(root, ['status', '--porcelain']);
@@ -177,10 +194,10 @@ export function whereTheWorkStands(root) {
  * Null where there is nothing to read, which is every product with no
  * repository, and null leaves the offer where it was.
  */
-export function gitKnowsYou(root) {
+export function gitKnowsYou(root: string | null | undefined): boolean | null {
   if (!root) return null;
   if (tryGit(root, ['rev-parse', '--git-dir']) === null) return null;
-  const named = (who) => tryGit(root, ['-c', 'user.useConfigOnly=true', 'var', who]) !== null;
+  const named = (who: string): boolean => tryGit(root, ['-c', 'user.useConfigOnly=true', 'var', who]) !== null;
   return named('GIT_AUTHOR_IDENT') && named('GIT_COMMITTER_IDENT');
 }
 
@@ -196,7 +213,7 @@ export function gitKnowsYou(root) {
  * run covers and are not needed: walking the body gives the same answer and
  * cannot disagree with the rows actually drawn.
  */
-function hunkStarts(header) {
+function hunkStarts(header: string): HunkStarts | null {
   const m = /^@@+ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(String(header ?? ''));
   return m ? { old: Number(m[1]), now: Number(m[2]) } : null;
 }
@@ -215,9 +232,9 @@ function hunkStarts(header) {
  * With no header there are no numbers, and that is left honest rather than
  * guessed: `nums` comes back null and the pane draws the gutter empty.
  */
-function rowsFromPatchBody(body, starts) {
-  const rows = [];
-  const nums = starts ? [] : null;
+function rowsFromPatchBody(body: readonly string[], starts: HunkStarts | null): { rows: Row[]; nums: RowNums[] | null } {
+  const rows: Row[] = [];
+  const nums: RowNums[] | null = starts ? [] : null;
   let old = starts?.old ?? 0;
   let now = starts?.now ?? 0;
   for (const line of body) {
@@ -239,13 +256,13 @@ function rowsFromPatchBody(body, starts) {
  * also brings the three lines of context that make a save able to find its
  * place again (renderer/src/code-edit.ts).
  */
-export function filesFromPatch(patch) {
-  const out = new Map();
-  let file = null;
-  let oldName = null;
-  let hunk = null;
+export function filesFromPatch(patch: string | null | undefined): ChangedFile[] {
+  const out = new Map<string, ChangedFile>();
+  let file: ChangedFile | null = null;
+  let oldName: string | null = null;
+  let hunk: string[] | null = null;
   // The `@@` line for the hunk being collected, kept until its body is closed.
-  let starts = null;
+  let starts: HunkStarts | null = null;
   const closeHunk = () => {
     if (!file || !hunk) return;
     const { rows, nums } = rowsFromPatchBody(hunk, starts);
@@ -258,7 +275,7 @@ export function filesFromPatch(patch) {
     file.plus += plus;
     file.minus += minus;
   };
-  const nameOn = (line, side) => {
+  const nameOn = (line: string, side: 'old' | 'new'): string | null => {
     const name = line.slice(4).trim();
     if (name === '/dev/null') return null;
     // a/ and b/ are the ordinary prefixes. c/ i/ o/ w/ are mnemonicPrefix,
@@ -289,14 +306,14 @@ export function filesFromPatch(patch) {
 }
 
 /** A file that was not there before: every line of it, green. */
-function wholeFileRows(text) {
+function wholeFileRows(text: string): Row[] {
   const parts = String(text).split('\n');
   if (parts.length > 1 && parts[parts.length - 1] === '') parts.pop();
-  return parts.map((l) => ['+', l]);
+  return parts.map((l): Row => ['+', l]);
 }
 
 /** Two texts, diffed by git without either of them being in a repository. */
-function patchBetweenTexts(before, after) {
+function patchBetweenTexts(before: string, after: string): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-diff-'));
   try {
     const a = path.join(dir, 'before');
@@ -308,7 +325,7 @@ function patchBetweenTexts(before, after) {
     try {
       return git(dir, ['diff', '--no-color', '--no-ext-diff', '--no-index', '-U3', '--', a, b]);
     } catch (e) {
-      return String(e?.stdout ?? '');
+      return String((e as { stdout?: string } | null)?.stdout ?? '');
     }
   } finally {
     try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
@@ -328,20 +345,20 @@ function patchBetweenTexts(before, after) {
  * - Written by this run and never tracked: there is no before, so the file is
  *   every line green.
  */
-export function changeFromRepo(snapshot) {
+export function changeFromRepo(snapshot: RepoSnapshot | null | undefined): RepoChange {
   if (!snapshot?.root) {
     const root = snapshot?.root ?? null;
     return { files: [], plus: 0, minus: 0, root, stands: whereTheWorkStands(root), knowsYou: gitKnowsYou(root) };
   }
   const { root, head, before } = snapshot;
-  const files = new Map();
-  const add = (file) => {
+  const files = new Map<string, ChangedFile>();
+  const add = (file: ChangedFile): void => {
     if (!file.hunks.length) return;
     if (file.hunks.length && file.plus + file.minus > MAX_ROWS_PER_FILE) {
       // Kept honest rather than kept whole: a generated file can be tens of
       // thousands of lines and nobody reads past the first screen anyway.
       let rows = 0;
-      const keep = [];
+      const keep: Hunk[] = [];
       for (const h of file.hunks) {
         if (rows >= MAX_ROWS_PER_FILE) break;
         keep.push(h);
@@ -383,7 +400,7 @@ export function changeFromRepo(snapshot) {
     // A FILE NOBODY HAS SEEN BEFORE NUMBERS ITSELF. Every row is an addition
     // and the file starts at line 1, so there is nothing to parse and no reason
     // to leave this the one place in the pane with an empty gutter.
-    const nums = rows.map((_, i) => [null, i + 1]);
+    const nums = rows.map((_, i): RowNums => [null, i + 1]);
     add({ path: rel, hunks: [{ rows, nums, plus: rows.length, minus: 0 }], plus: rows.length, minus: 0 });
   }
 

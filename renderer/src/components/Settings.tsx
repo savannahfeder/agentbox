@@ -2862,7 +2862,7 @@ function WebComputerPane({ pane, web, onWorkspace, onProject, onOpenProject }: {
             desc={`Tests and builds take turns, urgent first, and new agents wait to start until memory frees up.${two ? ' Claude Code and Codex both.' : ''}`}>
             <Switch label="Hold heavy work when memory is short" on={!!gate.value} onChange={(v) => onWorkspace('memoryGate', v)} />
           </ReadRow>
-          {gate.value && !isAuto && (
+          {(gate.value as boolean) && !isAuto && (
             <ReadRow label="Heavy commands at once" reading={slots}
               desc={slots.value === null ? `Auto: ${w.memoryGate.slotsAuto} on this computer, one for every 8 GB of memory.` : `You picked ${slots.value}. Auto is ${w.memoryGate.slotsAuto} on this computer.`}>
               <Stepper label="Heavy commands at once" value={(slots.value as number | null) ?? w.memoryGate.slotsAuto} min={1} max={w.memoryGate.slotsMax ?? 8}

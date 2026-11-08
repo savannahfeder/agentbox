@@ -18,20 +18,61 @@
 
 import { shownPriority } from './rank.mts';
 import { isTaskRow, taskGiver } from './team-rules.mts';
-import { deadlineOf } from './team-tasks.mts';
+import { deadlineOf, type TaskRow } from './team-tasks.mts';
 import { isShippedNote } from './shipped-note.mts';
 import { shownTitle, withoutFiles } from './thread-title.mts';
 
-export const THREAD_STATES = ['waiting', 'running', 'scheduled', 'done'];
+export const THREAD_STATES = ['waiting', 'running', 'scheduled', 'done'] as const;
+export type ThreadState = typeof THREAD_STATES[number];
+
+export interface CardItem extends TaskRow {
+  start?: string;
+  runAt?: number;
+  claim?: unknown;
+  claimExpired?: boolean;
+  kind?: string;
+  result?: string;
+  note?: string;
+  problem?: string;
+  progress?: string;
+  solution?: string;
+  shippedAt?: number;
+  visibleTo?: readonly string[];
+  blocks?: readonly string[];
+  priority?: number | null;
+}
+
+export type ProjectSeen = { personal?: boolean; seenBy?: string; seenByPeople?: readonly string[] } | null | undefined;
+export type Visibility = 'team' | 'people' | 'private';
+type Linked = { id: string; title: string | null };
+
+// A type, not an interface, so it goes up among the cloud's cards (main/team/sync.mts SyncCard).
+export type OwnCard = {
+  threadId: string;
+  visible: boolean;
+  title: string | null;
+  project: string | null;
+  people: string[] | null;
+  state: ThreadState;
+  priority: number | null;
+  problem: string | null;
+  progress: string | null;
+  solution: string | null;
+  blockedBy: Linked[];
+  blocks: Linked[];
+  updatedAt: number;
+  shippedAt?: number;
+  task?: { from: string | null; dueAt?: number; clock?: boolean };
+};
 
 /** Which of the four states a thread is in. */
-export function threadState(item, now = Date.now()) {
+export function threadState(item: CardItem, now = Date.now()): ThreadState {
   if (item.status === 'done') return 'done';
   // A thread in Later is not running and nobody has to act on it, which is the
   // scheduled family. It has no moment, so what it SAYS is "Not started"
   // (threadStateWords in the window); the four card states are unchanged.
   if (item.start === 'later') return 'scheduled';
-  if (Number.isFinite(item.runAt) && item.runAt > now) return 'scheduled';
+  if (Number.isFinite(item.runAt) && item.runAt! > now) return 'scheduled';
   if (item.status === 'claimed' && item.claim && !item.claimExpired) return 'running';
   // Sent to an agent and not yet picked up: it is about to run, nobody has to
   // act on it, so it is not waiting on anyone. A blocked one, like a hand-off
@@ -41,7 +82,7 @@ export function threadState(item, now = Date.now()) {
   return sentToAnAgent ? 'running' : 'waiting';
 }
 
-const personHolds = (item) => typeof item.assignee === 'string' && item.assignee !== 'agent';
+const personHolds = (item: CardItem) => typeof item.assignee === 'string' && item.assignee !== 'agent';
 
 // ONLY EMPHASIS IS STRIPPED, AND ONLY WHERE IT IS A PAIR (w-a33b339772).
 //
@@ -55,7 +96,7 @@ const personHolds = (item) => typeof item.assignee === 'string' && item.assignee
 // followed by a dot or a slash. Underscores have to clear the word on either
 // side too, or `user_id_v2` reads as emphasis around `id`. A mark with no
 // partner is left exactly where the person put it.
-const EMPHASIS = [
+const EMPHASIS: [RegExp, string][] = [
   [/\*\*(\w[^*\n]*?)\*\*/g, '$1'],
   [/(?<!\w)__(\w[^_\n]*?)__(?!\w)/g, '$1'],
   [/\*(\w[^*\n]*?)\*/g, '$1'],
@@ -71,7 +112,7 @@ const EMPHASIS = [
 const SENTENCE = /^(.+?\w[.!?]["'”’)\]]?)(?=\s+["“'(\[]?[A-Z]|\s*$)/;
 
 // The first sentence of some prose, without markdown, short enough for a line.
-export function firstSentence(text, max = 240) {
+export function firstSentence(text: string | null | undefined, max = 240): string {
   if (typeof text !== 'string') return '';
   let plain = withoutFiles(text)
     .replace(/^#+\s.*$/gm, '')
@@ -107,19 +148,19 @@ export const CONTEXT_WORDS = 45;
 export const DONE_STEPS = 6;
 export const DONE_STEP_WORDS = 15;
 
-export function wordsIn(text) {
+export function wordsIn(text: string | null | undefined): number {
   return typeof text === 'string' ? text.split(/\s+/).filter(Boolean).length : 0;
 }
 
 /** The Done steps in `progress`: one per line, the marks a writer puts in front of a step taken off. */
-export function doneSteps(progress) {
+export function doneSteps(progress: string | null | undefined): string[] {
   if (typeof progress !== 'string') return [];
   return progress.split('\n').map((l) => l.trim().replace(/^(?:[-*•✓✔]\s*)+/, '').trim()).filter(Boolean);
 }
 
 /** The thread's summary: what the agent or the person wrote, else stand-ins. */
-export function summaryOf(item) {
-  const has = (f) => typeof item[f] === 'string';
+export function summaryOf(item: CardItem): { problem: string; progress: string; solution: string; written: boolean } {
+  const has = (f: 'problem' | 'progress' | 'solution') => typeof item[f] === 'string';
   // A finished turn's result is what was done, so it stands in for the
   // Solution, and a checkpoint for the Progress. Read the other way round, a
   // persona saw "Progress: Done: ..." over "Solution: Not written yet" and
@@ -129,22 +170,22 @@ export function summaryOf(item) {
   const said = firstSentence(item.result || '');
   const asks = said.endsWith('?');
   return {
-    problem: has('problem') ? item.problem : firstSentence(item.body || item.title),
-    progress: has('progress') ? item.progress : (asks ? said : firstSentence(item.result ? '' : item.note || '')),
-    solution: has('solution') ? item.solution : (asks ? '' : said),
+    problem: has('problem') ? item.problem! : firstSentence(item.body || item.title),
+    progress: has('progress') ? item.progress! : (asks ? said : firstSentence(item.result ? '' : item.note || '')),
+    solution: has('solution') ? item.solution! : (asks ? '' : said),
     written: has('problem') || has('progress') || has('solution'),
   };
 }
 
-const startOfDay = (now) => { const d = new Date(now); d.setHours(0, 0, 0, 0); return d.getTime(); };
+const startOfDay = (now: number) => { const d = new Date(now); d.setHours(0, 0, 0, 0); return d.getTime(); };
 
 // How long a finished thread stays in the cloud: long enough to list a week's
 // shipped work and to tell someone who was away. Boards still draw only today's.
 const FINISHED_CARDS_KEPT_MS = 7 * 86_400_000;
 
 /** When this thread shipped: a person's word, else the app's own note once its merge lands. An agent saying so does not count. */
-export function shippedAtOf(item) {
-  if (Number.isFinite(item?.shippedAt)) return item.shippedAt > 0 ? item.shippedAt : null;
+export function shippedAtOf(item: Pick<CardItem, 'shippedAt' | 'note' | 'wrote'> | null | undefined): number | null {
+  if (Number.isFinite(item?.shippedAt)) return item!.shippedAt! > 0 ? item!.shippedAt! : null;
   if (isShippedNote(item?.note) && item?.wrote?.note?.source === 'system') return item.wrote.note.ts ?? null;
   return null;
 }
@@ -174,7 +215,11 @@ export function shippedAtOf(item) {
  */
 // A THREAD WITH NO WORD OF ITS OWN FOLLOWS ITS PROJECT (w-b989839656). A
 // thread from before you joined still stays yours whatever the project says.
-export function shownToTeam(item, since = null, product = null) {
+export function shownToTeam(
+  item: Pick<CardItem, 'visibility' | 'visibleTo' | 'createdAt'> | null | undefined,
+  since: number | null = null,
+  product: ProjectSeen = null,
+): boolean {
   const own = ownVisibility(item);
   if (own === 'team') return true;
   if (own === 'people') return shownToPeople(item, product).length > 0;
@@ -183,11 +228,11 @@ export function shownToTeam(item, since = null, product = null) {
   return projectSeenBy(product).who !== 'private';
 }
 
-const ownVisibility = (item) => {
+const ownVisibility = (item: { visibility?: string } | null | undefined): Visibility | undefined => {
   const v = item?.visibility;
   return v === 'team' || v === 'people' || v === 'private' ? v : undefined;
 };
-const cleanIds = (ids) => [...new Set((Array.isArray(ids) ? ids : []).filter((id) => typeof id === 'string' && id))];
+const cleanIds = (ids: unknown): string[] => [...new Set((Array.isArray(ids) ? ids : []).filter((id): id is string => typeof id === 'string' && !!id))];
 
 /**
  * WHO SEES A PROJECT'S THREADS (w-b989839656, approved 2026-10-05). Projects
@@ -198,7 +243,7 @@ const cleanIds = (ids) => [...new Set((Array.isArray(ids) ? ids : []).filter((id
  * My Workspace is Just you whatever its file says. Chosen people naming nobody
  * reaches nobody, so it reads as Just you and never as the team.
  */
-export function projectSeenBy(product) {
+export function projectSeenBy(product: ProjectSeen): { who: Visibility; people: string[] } {
   if (product?.personal === true || product?.seenBy === 'private') return { who: 'private', people: [] };
   if (product?.seenBy === 'people') {
     const people = cleanIds(product.seenByPeople);
@@ -215,7 +260,7 @@ export function projectSeenBy(product) {
  * thread, is what covers every path a thread arrives by at once: the
  * composer, an agent filing a proposal, a repeat.
  */
-export function visibilityOf(item, product = null) {
+export function visibilityOf(item: { visibility?: string } | null | undefined, product: ProjectSeen = null): Visibility | undefined {
   const own = ownVisibility(item);
   if (own) return own;
   const { who } = projectSeenBy(product);
@@ -223,9 +268,9 @@ export function visibilityOf(item, product = null) {
 }
 
 /** Whom a shared thread reaches, by id, or [] for the whole team. */
-export function shownToPeople(item, product = null) {
+export function shownToPeople(item: Pick<CardItem, 'visibility' | 'visibleTo'> | null | undefined, product: ProjectSeen = null): string[] {
   const own = ownVisibility(item);
-  if (own === 'people') return cleanIds(item.visibleTo);
+  if (own === 'people') return cleanIds(item!.visibleTo);
   if (own) return [];
   const seen = projectSeenBy(product);
   return seen.who === 'people' ? seen.people : [];
@@ -234,7 +279,7 @@ export function shownToPeople(item, product = null) {
 // A TASK YOU HOLD COUNTS ON YOUR CARD. With no words unless its giver let the
 // team read it: then its name, level, deadline and block, so anyone can list
 // every task on the team.
-function heldTaskCard(item, now, me) {
+function heldTaskCard(item: CardItem & { id: string }, now: number, me: string | null): OwnCard {
   const seen = item.visibility === 'team' ? null : item.visibility === 'people' ? cleanIds(item.visibleTo) : undefined;
   if (seen === undefined || (seen && !seen.length)) {
     return {
@@ -252,18 +297,33 @@ function heldTaskCard(item, now, me) {
   };
 }
 
-export function cardsFor({ products, readItems, now = Date.now(), since = null, me = null, running = [] }) {
+export interface CardProduct {
+  name: string;
+  personal?: boolean;
+  seenBy?: string;
+  seenByPeople?: readonly string[];
+  team?: { direct?: unknown } | null;
+}
+
+export function cardsFor<P extends CardProduct>({ products, readItems, now = Date.now(), since = null, me = null, running = [] }: {
+  products: readonly P[];
+  readItems: (product: P) => readonly (CardItem & { id: string })[];
+  now?: number;
+  since?: number | null;
+  me?: string | null;
+  running?: Iterable<string>;
+}): OwnCard[] {
   const live = new Set(running);
-  const cards = [];
-  const titleOf = new Map();
-  const all = [];
+  const cards: OwnCard[] = [];
+  const titleOf = new Map<string, string | null>();
+  const all: { item: CardItem & { id: string }; product: P }[] = [];
   for (const product of products) {
     if (product.team?.direct) {
       for (const item of me ? readItems(product) : []) {
         if (item.agent || !isTaskRow(item) || item.assignee !== me) continue;
         if (item.status !== 'done') { cards.push(heldTaskCard(item, now, me)); continue; }
         // A finished one the team can read stays a week, so a task blocked on it sees it finish.
-        if (item.visibility && item.updatedAt >= startOfDay(now - FINISHED_CARDS_KEPT_MS)) {
+        if (item.visibility && item.updatedAt! >= startOfDay(now - FINISHED_CARDS_KEPT_MS)) {
           const card = heldTaskCard(item, now, me);
           if (card.title != null) cards.push(card);
         }
@@ -285,14 +345,14 @@ export function cardsFor({ products, readItems, now = Date.now(), since = null, 
       all.push({ item, product });
     }
   }
-  const linked = (ids) => (Array.isArray(ids) ? ids : []).map((id) => ({ id, title: titleOf.get(id) ?? null }));
+  const linked = (ids: unknown): Linked[] => (Array.isArray(ids) ? ids : []).map((id) => ({ id, title: titleOf.get(id) ?? null }));
   const kept = startOfDay(now - FINISHED_CARDS_KEPT_MS);
   for (const { item, product } of all) {
     if (!shownToTeam(item, since, product)) continue;
     // A session the folded row cannot show: a personal worker holds no claim,
     // and its second turn has a result on the row, which reads as waiting.
     const state = live.has(item.id) ? 'running' : threadState(item, now);
-    if (state === 'done' && !(item.updatedAt >= kept)) continue;
+    if (state === 'done' && !(item.updatedAt! >= kept)) continue;
     const s = summaryOf(item);
     const shippedAt = shippedAtOf(item);
     cards.push({

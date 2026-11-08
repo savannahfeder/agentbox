@@ -10,7 +10,75 @@
 import { NAME } from '../shared/product-name.mjs';
 const HOUR = 3_600_000;
 
-export function sameInstant(a, b) {
+export interface HerWords {
+  at: number;
+  text: string;
+}
+
+export interface AgentLike {
+  pid?: number;
+  ppid?: number;
+  sessionId?: string | null;
+  name?: string;
+  cwd?: string;
+  startedAt?: number;
+  status?: string | null;
+  waitingFor?: string | null;
+  lastActiveAt?: number;
+  // The whole of its last reply, not its last block: Claude Code writes one
+  // answer as a new line every time it stops for a tool.
+  lastSaid?: string;
+  saidAt?: number;
+  about?: string;
+  lastAsked?: string;
+  touched?: string[];
+  // Every message the user typed into that session, oldest first.
+  asked?: HerWords[];
+  // What main/agent-schedule.mts delivered into it from Agentbox.
+  spoke?: HerWords[];
+  product?: string | null;
+  productName?: string | null;
+  startedByZero?: boolean;
+  runAt?: number;
+  runAtSetAt?: number;
+  // The agent's own last activity at the moment she closed the row.
+  doneThrough?: number;
+  repliedAt?: number;
+  statusAt?: number;
+}
+
+/** How many of her own sessions the inbox takes. */
+export type AgentMode = 'all' | 'waiting' | 'off';
+
+export interface AgentTurnLike {
+  at: number;
+  who: 'you' | 'it';
+  text: string;
+  // A continuation of the block above rather than a new message.
+  same?: boolean;
+  // Set by `threadWindow` on the first block after the cut.
+  resumed?: boolean;
+  kind?: undefined;
+  // `capRuns` stamps the count it dropped on whatever came last, which with `run: 0` is a message.
+  more?: number;
+}
+
+/** One thing the agent ran, between two messages. */
+export interface AgentWorkLike {
+  kind: 'work';
+  standalone?: true;
+  at: number;
+  verb: string;
+  subject: string;
+  output: string;
+  lines: number;
+  failed: boolean;
+  more?: number;
+}
+
+export type AgentEventLike = AgentTurnLike | AgentWorkLike;
+
+export function sameInstant(a: string, b: string): boolean {
   const one = Date.parse(a);
   const two = Date.parse(b);
   if (!Number.isFinite(one) || !Number.isFinite(two)) return false;
@@ -21,14 +89,17 @@ export function sameInstant(a, b) {
 // Agentbox's own workers are already work items, so they must not show again
 // as agent rows. The supervisor spawns them from the Electron main process, so
 // their ppid is the app's pid; the sessionId it records is a second key.
-export function startedByZero(agent, { pids = new Set(), sessionIds = new Set() } = {}) {
+export function startedByZero(
+  agent: AgentLike,
+  { pids = new Set(), sessionIds = new Set() }: { pids?: Set<number>; sessionIds?: Set<string> } = {},
+): boolean {
   if (agent.sessionId && sessionIds.has(agent.sessionId)) return true;
   return !!agent.ppid && pids.has(agent.ppid);
 }
 
 // Only an agent waiting on a person reaches the inbox. Most are idle at any
 // moment; they stay listed but do not interrupt.
-export function asksSomething(agent) {
+export function asksSomething(agent: AgentLike): boolean {
   return agent.status === 'waiting';
 }
 
@@ -38,14 +109,14 @@ export function asksSomething(agent) {
 //
 // This decides the row's headline and whether it interrupts. The reply box is
 // gated by `replyIsSwallowed`, not by this.
-export function replyReaches(agent) {
+export function replyReaches(agent: AgentLike): boolean {
   return asksSomething(agent) && agent.waitingFor === 'input needed';
 }
 
 // The only agent a reply cannot reach is one stopped on a permission prompt.
 // An idle session at its prompt does read a line written to its socket.
 // `reply` in main/agents.mts refuses the same case.
-export function replyIsSwallowed(agent) {
+export function replyIsSwallowed(agent: AgentLike | null | undefined): boolean {
   return agent?.waitingFor === 'permission prompt';
 }
 
@@ -55,7 +126,7 @@ export function replyIsSwallowed(agent) {
 // be newer than the reply, because the session is still idle for a moment
 // before it picks the message up. An older CLI that publishes no status is
 // never moved, since nothing could show it stopping.
-export function tookHerReply(agent) {
+export function tookHerReply(agent: AgentLike): boolean {
   const spoke = agent?.repliedAt ?? 0;
   if (!spoke) return false;
   if (!agent?.status) return false;
@@ -65,7 +136,7 @@ export function tookHerReply(agent) {
 
 // `statusAt` is the session's own stamp on its status. A session with none is
 // never seen to stop, so `tookHerReply` handles that case first.
-export function stoppedSince(agent, since) {
+export function stoppedSince(agent: AgentLike, since: number): boolean {
   const at = agent?.statusAt ?? 0;
   if (at <= since) return false;
   return agent?.status === 'idle' || agent?.status === 'waiting';
@@ -76,14 +147,14 @@ export function stoppedSince(agent, since) {
 
 // The key a deferral or close is stored under. Pids get reused, so it is the
 // sessionId when there is one, otherwise the pid plus its start time.
-export function agentKey(agent) {
+export function agentKey(agent: AgentLike): string {
   if (agent?.sessionId) return `session:${agent.sessionId}`;
   return `pid:${agent?.pid ?? 0}:${agent?.startedAt ?? 0}`;
 }
 
 // A predicate, not a timer, like `isDue` for work items: once `runAt` passes
 // the row is back, so a missed moment comes back late rather than being lost.
-export function putOff(agent, now = Date.now()) {
+export function putOff(agent: AgentLike, now: number = Date.now()): boolean {
   return (agent?.runAt ?? 0) > now;
 }
 
@@ -91,13 +162,13 @@ export function putOff(agent, now = Date.now()) {
 // something; it is not compared against later activity. `doneThrough` is a
 // timestamp, not a boolean, so `close(key, 0)` can undo it (`closeAgentRow` in
 // App.tsx).
-export function putAway(agent) {
+export function putAway(agent: AgentLike): boolean {
   return (agent?.doneThrough ?? 0) > 0;
 }
 
 // The words. The row clips the summary at SUMMARY_BUDGET (112 characters) on
 // the last full stop, so the first sentence has to carry the point alone.
-export function howLong(ms) {
+export function howLong(ms: number): string {
   if (!Number.isFinite(ms) || ms < 0) return 'a moment';
   const days = Math.floor(ms / 86400000);
   if (days >= 1) return `${days} day${days === 1 ? '' : 's'}`;
@@ -107,7 +178,7 @@ export function howLong(ms) {
   return `${mins} minute${mins === 1 ? '' : 's'}`;
 }
 
-export function whereItRuns(agent) {
+export function whereItRuns(agent: AgentLike): string {
   const owner = agent.productName;
   if (owner) return owner;
   const cwd = agent.cwd ?? '';
@@ -117,7 +188,7 @@ export function whereItRuns(agent) {
 
 // Flattens typing to one line. Markdown markers go because the card quotes
 // this inside its own markdown.
-function readableWords(raw) {
+function readableWords(raw: string | null | undefined): string {
   return String(raw ?? '')
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/\[Image[^\]]*\]/g, ' ')
@@ -128,7 +199,7 @@ function readableWords(raw) {
 }
 
 // Cuts from the front, which suits a person's message. See `howItEnded`.
-function oneSentence(raw, budget = 180) {
+function oneSentence(raw: string | null | undefined, budget = 180): string {
   const text = readableWords(raw);
   if (!text) return '';
   if (text.length <= budget) return text;
@@ -138,13 +209,13 @@ function oneSentence(raw, budget = 180) {
   return `${text.slice(0, window.lastIndexOf(' ') > 40 ? window.lastIndexOf(' ') : budget).trimEnd()}…`;
 }
 
-export function lastWord(agent, budget = 180) {
+export function lastWord(agent: AgentLike, budget = 180): string {
   return oneSentence(agent.lastSaid, budget);
 }
 
 // Whole sentences from the end of a message, because an agent puts what it
 // found last.
-export function howItEnded(raw, budget = 320) {
+export function howItEnded(raw: string | null | undefined, budget = 320): string {
   const text = readableWords(raw);
   if (!text) return '';
   if (text.length <= budget) return text;
@@ -157,7 +228,7 @@ export function howItEnded(raw, budget = 320) {
 
 // The heading over the agent's last words: when it spoke, and whether that came
 // after the user's latest message.
-function saidWhen(agent, now) {
+function saidWhen(agent: AgentLike, now: number): string {
   const at = Number(agent?.saidAt) || 0;
   if (!at) return '**It stopped here:**';
   const when = ago(at, now);
@@ -171,18 +242,18 @@ function saidWhen(agent, now) {
 
 // The last thing the user typed, from the session's own `last-prompt` line,
 // which never holds a tool result.
-export function lastAsk(agent, budget = 180) {
+export function lastAsk(agent: AgentLike, budget = 180): string {
   return oneSentence(agent.lastAsked, budget);
 }
 
 // Claude Code keeps a one-line title of each session in its transcript; that
 // is `about`. The row title puts the session's name in front of it, because
 // two sessions can run in the same folder.
-export function whatItIs(agent) {
+export function whatItIs(agent: AgentLike): string {
   return String(agent?.about ?? '').replace(/\s+/g, ' ').trim();
 }
 
-export function agentTitle(agent, now = Date.now()) {
+export function agentTitle(agent: AgentLike, now: number = Date.now()): string {
   const about = whatItIs(agent);
   if (about) return `${agent.name}: ${about}`;
   if (replyReaches(agent)) return `${agent.name} is waiting for you`;
@@ -203,7 +274,7 @@ export function agentTitle(agent, now = Date.now()) {
 //
 // An unreadable transcript gives an empty list, never a fallback to
 // `lastAsked`, so the caller knows it only has the last message.
-export function herWords(agent) {
+export function herWords(agent: AgentLike): HerWords[] {
   const asked = (agent?.asked ?? []).filter((t) => t && t.text);
   const spoke = (agent?.spoke ?? []).filter((t) => t && t.text);
   if (!spoke.length || !asked.length) return asked;
@@ -226,12 +297,12 @@ export function herWords(agent) {
 // are preferred when there are any.
 const RECALLS_SOMETHING = 60;
 
-function worthRecalling(turns) {
+function worthRecalling(turns: HerWords[]): HerWords[] {
   const meaty = turns.filter((t) => t.text.length >= RECALLS_SOMETHING);
   return meaty.length ? meaty : turns;
 }
 
-function ago(at, now) {
+function ago(at: number, now: number): string {
   if (!at) return '';
   const gap = now - at;
   if (gap < 0) return 'just now';
@@ -239,11 +310,11 @@ function ago(at, now) {
   return `${howLong(gap)} ago`;
 }
 
-function context(agent, now = Date.now()) {
+function context(agent: AgentLike, now: number = Date.now()): string {
   const words = herWords(agent);
   const said = howItEnded(agent.lastSaid);
   const where = whereItRuns(agent);
-  const lines = [];
+  const lines: string[] = [];
 
   const [opening, ...rest] = words;
   if (opening) {
@@ -275,12 +346,12 @@ function context(agent, now = Date.now()) {
   return `\n\n${lines.join('\n\n')}`;
 }
 
-function list(names) {
+function list(names: string[]): string {
   if (names.length === 1) return names[0];
   return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 }
 
-export function agentRow(agent, now = Date.now()) {
+export function agentRow(agent: AgentLike, now: number = Date.now()): { title: string; body: string } {
   const waited = howLong(now - (agent.lastActiveAt ?? agent.startedAt ?? now));
   const title = agentTitle(agent, now);
   const rest = context(agent, now);
@@ -314,9 +385,9 @@ export function agentRow(agent, now = Date.now()) {
 
 // There is no separate agents tab: an outside agent is in the inbox or
 // nowhere. Which ones is a setting.
-export const AGENT_MODES = ['all', 'waiting', 'off'];
+export const AGENT_MODES: AgentMode[] = ['all', 'waiting', 'off'];
 
-export function reachesInbox(agent, now = Date.now(), mode = 'all') {
+export function reachesInbox(agent: AgentLike, now: number = Date.now(), mode: AgentMode = 'all'): boolean {
   if (agent.startedByZero) return false;
   if (mode === 'off') return false;
   // A replied-to session is in In progress instead (`progressAfterReply`).
@@ -332,13 +403,13 @@ export function reachesInbox(agent, now = Date.now(), mode = 'all') {
 // user's reply moves an agent here; a working session nobody spoke to stays in
 // the inbox. A reply cancels a deferral, as `replyClearsSchedule` does for work
 // items, so `putOff` is not checked.
-export function progressAfterReply(agent, now = Date.now(), mode = 'all') {
+export function progressAfterReply(agent: AgentLike, now: number = Date.now(), mode: AgentMode = 'all'): boolean {
   if (agent.startedByZero) return false;
   if (mode === 'off') return false;
   return tookHerReply(agent);
 }
 
-export function listed(agent) {
+export function listed(agent: AgentLike): boolean {
   return !agent.startedByZero;
 }
 
@@ -347,20 +418,20 @@ export function listed(agent) {
 // never appear, because main/agents.mts drops records whose process is gone.
 export const RAIL_CUT_MS = 24 * 60 * 60 * 1000;
 
-export function onTheRail(agent, now = Date.now()) {
+export function onTheRail(agent: AgentLike, now: number = Date.now()): boolean {
   if (!listed(agent)) return false;
   const moved = agent.lastActiveAt || agent.startedAt || 0;
   return moved > 0 && now - moved <= RAIL_CUT_MS;
 }
 
 // Not cut here; the row's CSS `text-overflow` cuts it to the width shown.
-export function railLine(agent) {
+export function railLine(agent: AgentLike): string {
   return whatItIs(agent) || lastWord(agent) || 'Has not said anything yet';
 }
 
 // Pure recency, because the list draws day headings as it goes and any other
 // order repeats a heading. Waiting agents are ranked in the inbox, not here.
-export function byRecency(a, b) {
+export function byRecency(a: AgentLike, b: AgentLike): number {
   return (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0);
 }
 
@@ -370,7 +441,10 @@ export function byRecency(a, b) {
 export const TRAIL_OPENING = 3;
 export const TRAIL_TURNS = 40;
 
-export function conversationWindow(turns, { opening = TRAIL_OPENING, keep = TRAIL_TURNS } = {}) {
+export function conversationWindow(
+  turns: readonly AgentTurnLike[] | null | undefined,
+  { opening = TRAIL_OPENING, keep = TRAIL_TURNS }: { opening?: number; keep?: number } = {},
+): { turns: AgentTurnLike[]; omitted: number } {
   const all = (turns ?? []).filter((t) => t && t.text);
   if (all.length <= keep) return { turns: all, omitted: 0 };
   const head = all.slice(0, opening);
@@ -380,7 +454,7 @@ export function conversationWindow(turns, { opening = TRAIL_OPENING, keep = TRAI
 
 // The line that stands for the hidden middle. It gives the count, and pressing
 // it shows those messages.
-export function conversationGap(omitted) {
+export function conversationGap(omitted: number): string {
   if (!omitted) return '';
   return `Show the ${omitted} message${omitted === 1 ? '' : 's'} in between`;
 }
@@ -399,12 +473,12 @@ export {
   changedFile, fileInChange, CHANGES_A_FILE,
 } from './work-lines.mts';
 
-export function runOverflow(more) {
+export function runOverflow(more: number): string {
   if (!more) return '';
   return `and ${more} more thing${more === 1 ? '' : 's'} it ran, not shown`;
 }
 
-export function outputCut(shownLines, allLines) {
+export function outputCut(shownLines: number, allLines: number): string {
   if (!allLines || allLines <= shownLines) return '';
   return `${allLines - shownLines} more line${allLines - shownLines === 1 ? '' : 's'} came back, not kept`;
 }
@@ -413,9 +487,12 @@ export function outputCut(shownLines, allLines) {
 // window counts messages only, so tool calls cannot push messages out, and work
 // between two kept messages comes with them. `whole` is what pressing the gap
 // line asks for: every message, with work still capped by `capRuns`.
-export function threadWindow(events, { opening = TRAIL_OPENING, keep = TRAIL_TURNS, whole = false } = {}) {
+export function threadWindow(
+  events: readonly AgentEventLike[] | null | undefined,
+  { opening = TRAIL_OPENING, keep = TRAIL_TURNS, whole = false }: { opening?: number; keep?: number; whole?: boolean } = {},
+): { events: AgentEventLike[]; omitted: number } {
   const all = (events ?? []).filter((e) => e && (e.kind === 'work' ? true : !!e.text));
-  const saidAt = [];
+  const saidAt: number[] = [];
   all.forEach((e, i) => { if (e.kind !== 'work') saidAt.push(i); });
   if (whole || saidAt.length <= keep) return { events: capRuns(all), omitted: 0 };
 
@@ -440,11 +517,15 @@ export function threadWindow(events, { opening = TRAIL_OPENING, keep = TRAIL_TUR
  * `same` continuations included, exactly as `threadWindow` cuts, which is why
  * the renderer must not work this out itself.
  */
-export function gapIndex(events, omitted, { opening = TRAIL_OPENING } = {}) {
+export function gapIndex(
+  events: readonly AgentEventLike[] | null | undefined,
+  omitted: number,
+  { opening = TRAIL_OPENING }: { opening?: number } = {},
+): number {
   if (!omitted) return -1;
   let blocks = 0;
   for (let i = 0; i < (events?.length ?? 0); i += 1) {
-    if (events[i].kind === 'work') continue;
+    if (events![i].kind === 'work') continue;
     blocks += 1;
     if (blocks === opening + 1) return i - 1;
   }
@@ -453,8 +534,11 @@ export function gapIndex(events, omitted, { opening = TRAIL_OPENING } = {}) {
 
 // A run past WORK_RUN records how many it dropped in `more`. Past WORK_TOTAL
 // the oldest work lines go and every message stays.
-export function capRuns(events, { run = WORK_RUN, total = WORK_TOTAL } = {}) {
-  const out = [];
+export function capRuns(
+  events: readonly AgentEventLike[],
+  { run = WORK_RUN, total = WORK_TOTAL }: { run?: number; total?: number } = {},
+): AgentEventLike[] {
+  const out: AgentEventLike[] = [];
   let inRun = 0;
   let dropped = 0;
   for (const e of events) {
@@ -484,7 +568,7 @@ export function capRuns(events, { run = WORK_RUN, total = WORK_TOTAL } = {}) {
 // Messages, not blocks: a reply split by tool calls draws as several blocks
 // but counts once. The transcript reader sets `same` on each continuation
 // block, and only it can tell.
-export function saidCount(events) {
+export function saidCount(events: readonly AgentEventLike[] | null | undefined): number {
   let n = 0;
   for (const e of events ?? []) {
     if (!e || e.kind === 'work' || !e.text || e.same) continue;
@@ -501,8 +585,8 @@ const LEAKED = /<\/(?:antml:)?(?:result|invoke|parameter|function_calls)>|<(?:an
 
 // A tag inside backticks, inline or fenced, was typed on purpose and is not a
 // leak, so code spans are skipped.
-function firstLeak(text) {
-  const code = [];
+function firstLeak(text: string): number {
+  const code: [number, number][] = [];
   let i = 0;
   while (i < text.length) {
     if (text.startsWith('```', i)) {
@@ -520,13 +604,16 @@ function firstLeak(text) {
   const re = new RegExp(LEAKED.source, 'g');
   let m = re.exec(text);
   while (m) {
-    if (!code.some(([s, e]) => m.index >= s && m.index < e)) return m.index;
+    if (!code.some(([s, e]) => m!.index >= s && m!.index < e)) return m.index;
     m = re.exec(text);
   }
   return -1;
 }
 
-export function unleaked(text) {
+// Anything that is not a string goes back as it came, for callers that pass whatever a stored field held.
+export function unleaked(text: string): string;
+export function unleaked<T>(text: T): T;
+export function unleaked(text: unknown): unknown {
   if (typeof text !== 'string') return text;
   const hit = firstLeak(text);
   return hit < 0 ? text : text.slice(0, hit).trimEnd();

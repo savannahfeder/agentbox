@@ -25,9 +25,17 @@ import { resolveAccount, resolveProduct } from './account.mts';
 /** Where a captured picture lands, beside everything else she is shown. */
 const SHOTS = 'attachments';
 
+export interface PageShot { png?: Buffer; title?: string; text?: string; error?: string }
+
+export type Capture = (page: { url: string; width: number; height: number }) => Promise<PageShot>;
+
+export interface LookedAt { product: string; url: string; picture: string; title: string; text: string }
+
+interface CdpMessage { id?: number; method?: string; sessionId?: string; result?: unknown; error?: { message?: string } }
+
 /** Only loopback. Anything else is refused with the reason. */
-export function localTarget(url) {
-  let parsed;
+export function localTarget(url: unknown): string {
+  let parsed: URL;
   try { parsed = new URL(String(url ?? '')); } catch { throw Error(`Not a URL: ${url}`); }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     throw Error(`Only http and https can be opened, not ${parsed.protocol.replace(':', '')}.`);
@@ -41,11 +49,11 @@ export function localTarget(url) {
 }
 
 /** Chrome, wherever this Mac keeps it, or null when it has none. */
-export function findChrome(candidates = [
+export function findChrome(candidates: readonly string[] = [
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   '/Applications/Chromium.app/Contents/MacOS/Chromium',
   '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
-]) {
+]): string | null {
   for (const bin of candidates) { try { if (fs.statSync(bin).isFile()) return bin; } catch { /* next */ } }
   return null;
 }
@@ -57,7 +65,14 @@ export function findChrome(candidates = [
  * the real one below drives Chrome over the devtools protocol, which is the
  * same mechanism the design rounds in this repo already use.
  */
-export async function lookAtPage({ product, url, width = 1280, height = 900, capture = captureWithChrome, now = Date.now } = {}) {
+export async function lookAtPage({ product, url, width = 1280, height = 900, capture = captureWithChrome, now = Date.now }: {
+  product?: string | null;
+  url?: unknown;
+  width?: number;
+  height?: number;
+  capture?: Capture;
+  now?: () => number;
+} = {}): Promise<LookedAt> {
   const target = localTarget(url);
   // The account scope has to be set before a product can be found, and this
   // module is reachable without going through the tool surface that does it.
@@ -86,7 +101,13 @@ export async function lookAtPage({ product, url, width = 1280, height = 900, cap
  * for the load event, read the rendered text, take the picture. Nothing is
  * stored in the browser, and it is thrown away with the profile directory.
  */
-export async function captureWithChrome({ url, width, height, chrome = findChrome(), timeoutMs = 20_000 }) {
+export async function captureWithChrome({ url, width, height, chrome = findChrome(), timeoutMs = 20_000 }: {
+  url: string;
+  width: number;
+  height: number;
+  chrome?: string | null;
+  timeoutMs?: number;
+}): Promise<PageShot> {
   if (!chrome) return { error: 'No Chrome, Chromium or Edge on this computer, so there is nothing to open the page with.' };
   const profile = fs.mkdtempSync(path.join(process.env.TMPDIR ?? '/tmp', 'look-at-page-'));
   const child = spawn(chrome, [
@@ -97,7 +118,7 @@ export async function captureWithChrome({ url, width, height, chrome = findChrom
   const done = () => { try { child.kill('SIGKILL'); } catch { /* already gone */ } try { fs.rmSync(profile, { recursive: true, force: true }); } catch { /* best effort */ } };
 
   try {
-    const wsUrl = await new Promise((resolve, reject) => {
+    const wsUrl = await new Promise<string>((resolve, reject) => {
       let buf = '';
       const timer = setTimeout(() => reject(Error('the browser never started')), timeoutMs);
       child.stderr.on('data', (d) => {
@@ -110,40 +131,40 @@ export async function captureWithChrome({ url, width, height, chrome = findChrom
     const ws = new WebSocket(wsUrl);
     await new Promise((r, j) => { ws.onopen = r; ws.onerror = () => j(Error('could not talk to the browser')); });
     let id = 1;
-    const waiting = new Map();
-    ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.id && waiting.has(m.id)) { waiting.get(m.id)(m); waiting.delete(m.id); } };
-    const send = (method, params = {}, sessionId) => new Promise((resolve, reject) => {
+    const waiting = new Map<number, (m: CdpMessage) => void>();
+    ws.onmessage = (e: MessageEvent) => { const m = JSON.parse(e.data) as CdpMessage; if (m.id && waiting.has(m.id)) { waiting.get(m.id)!(m); waiting.delete(m.id); } };
+    const send = <T,>(method: string, params: object = {}, sessionId?: string) => new Promise<T>((resolve, reject) => {
       const mine = id++;
-      waiting.set(mine, (m) => (m.error ? reject(Error(`${method}: ${m.error.message}`)) : resolve(m.result)));
+      waiting.set(mine, (m) => (m.error ? reject(Error(`${method}: ${m.error.message}`)) : resolve(m.result as T)));
       ws.send(JSON.stringify({ id: mine, method, params, sessionId }));
     });
-    const { targetId } = await send('Target.createTarget', { url: 'about:blank' });
-    const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true });
-    const call = (m, p) => send(m, p, sessionId);
+    const { targetId } = await send<{ targetId: string }>('Target.createTarget', { url: 'about:blank' });
+    const { sessionId } = await send<{ sessionId: string }>('Target.attachToTarget', { targetId, flatten: true });
+    const call = <T = unknown,>(m: string, p?: object) => send<T>(m, p, sessionId);
     await call('Page.enable');
     await call('Runtime.enable');
     await call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 2, mobile: false });
     await call('Page.navigate', { url });
     // The load event, or the timeout, whichever comes first: a page that never
     // finishes loading is still worth photographing.
-    await new Promise((resolve) => {
+    await new Promise<void>((resolve) => {
       const stop = setTimeout(resolve, Math.min(timeoutMs, 10_000));
-      const onMsg = (e) => {
-        const m = JSON.parse(e.data);
+      const onMsg = (e: MessageEvent) => {
+        const m = JSON.parse(e.data) as CdpMessage;
         if (m.method === 'Page.loadEventFired' && m.sessionId === sessionId) { clearTimeout(stop); ws.removeEventListener('message', onMsg); resolve(); }
       };
       ws.addEventListener('message', onMsg);
     });
     await new Promise((r) => setTimeout(r, 400));
-    const read = await call('Runtime.evaluate', {
+    const read = await call<{ result?: { value?: { title?: string; text?: string } } } | null>('Runtime.evaluate', {
       expression: '({ title: document.title, text: document.body ? document.body.innerText : "" })',
       returnByValue: true,
     });
-    const { data } = await call('Page.captureScreenshot', { format: 'png' });
+    const { data } = await call<{ data: string }>('Page.captureScreenshot', { format: 'png' });
     ws.close();
     return { png: Buffer.from(data, 'base64'), ...(read?.result?.value ?? {}) };
   } catch (error) {
-    return { error: `The page could not be opened: ${error.message}` };
+    return { error: `The page could not be opened: ${(error as Error).message}` };
   } finally {
     done();
   }

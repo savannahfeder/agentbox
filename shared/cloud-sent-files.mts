@@ -31,5 +31,5 @@ export function fileToSend(asked: unknown, { home = os.homedir() }: { home?: str
 export function filesSentFor(env: NodeJS.ProcessEnv | null | undefined, opts?: { home?: string }): string[] {
   let list: unknown;
   try { list = JSON.parse(env?.AGENTBOX_SEND_FILES || '[]'); } catch { return []; }
-  return Array.isArray(list) ? list.map((f) => fileToSend(f, opts)).filter((f) => f.path).map((f) => f.path) : [];
+  return Array.isArray(list) ? list.map((f) => fileToSend(f, opts)).filter((f): f is Extract<FileToSend, { size: number }> => Boolean(f.path)).map((f) => f.path) : [];
 }

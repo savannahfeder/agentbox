@@ -7,8 +7,8 @@ import path from 'node:path';
 const NEWEST = 20;
 const TAIL = 120_000;
 
-export function readRunTraces(dir, { whole = false } = {}) {
-  let files;
+export function readRunTraces(dir: string, { whole = false }: { whole?: boolean } = {}): { startedAt: number; text: string }[] {
+  let files: string[];
   try { files = fs.readdirSync(dir).filter((f) => f.endsWith('.log')).sort(); } catch { return []; }
   return (whole ? files : files.slice(-NEWEST)).map((f) => {
     let text = '';

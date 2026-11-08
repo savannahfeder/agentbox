@@ -18,8 +18,62 @@ import { appendSpoolLine, cardDigest, removeSpoolEntry, spoolDir, spoolEntryExis
 
 import { REFUSAL_DECISION } from './codex-app-server.mts';
 
-import { fileVerbWord } from './codex.mts';
+import { fileVerbWord, type CodexItem } from './codex.mts';
+import type { ApprovalRequest } from './approval-prompt-core.mts';
 import { Name, isOurSlug } from '../shared/product-name.mjs';
+
+/** What a card shows: the tool word the renderer draws and the fields it reads off `input`. */
+export interface CodexCard {
+  tool: string;
+  input: Record<string, string>;
+}
+
+interface NetworkApprovalContext {
+  host?: string;
+  protocol?: string;
+}
+
+/** The fields of a Codex approval request's `params` that a card is drawn from. */
+export interface CodexApprovalParams {
+  itemId?: string;
+  reason?: string;
+  grantRoot?: string;
+  command?: string;
+  commandActions?: ({ command?: string } | null)[];
+  networkApprovalContext?: NetworkApprovalContext | null;
+  cwd?: string;
+  serverName?: string;
+  message?: string;
+  _meta?: { codex_approval_kind?: string; tool_params?: Record<string, unknown> | null } | null;
+}
+
+/** Who is asking. Every field comes from the app, never from the worker. */
+export interface CodexApprovalContext {
+  product?: string | null;
+  item?: string | null;
+  storeServer?: string | null;
+  connectionServers?: string[];
+  say?: (line: string) => unknown;
+  scope?: string;
+}
+
+type CodexApprovalAnswer = typeof ACCEPT_DECISION | typeof REFUSAL_DECISION;
+
+interface OpenCard {
+  request: ApprovalRequest;
+  scope: string | null;
+  decide(allow: unknown, note?: string | null, extra?: Record<string, unknown>): boolean;
+  poll?: NodeJS.Timeout;
+  saidItCouldNotGoBack?: boolean;
+}
+
+export interface CodexApprovalsOptions {
+  storeRoot: string;
+  pollMs?: number;
+  uuid?: () => unknown;
+  now?: () => number;
+  onChange?: (() => unknown) | null;
+}
 
 /** How often a waiting card sweeps a forged answer and puts itself back on screen. */
 export const POLL_MS = 2_000;
@@ -37,7 +91,7 @@ export const CARD_CAP = 4_000;
 /** The protocol values in Codex's `NetworkApprovalProtocol` schema. Any other value is not printed. */
 const NETWORK_PROTOCOLS = ['http', 'https', 'socks5Tcp', 'socks5Udp'];
 
-function networkHost(context) {
+function networkHost(context: NetworkApprovalContext | null | undefined): string {
   if (!context || typeof context !== 'object' || Array.isArray(context)) return '';
   const host = typeof context.host === 'string' ? context.host.trim() : '';
   if (!host) return '';
@@ -54,13 +108,13 @@ function networkHost(context) {
  */
 export const MCP_TOOL_CALL_KIND = 'mcp_tool_call';
 
-export function isMcpToolCall(params) {
+export function isMcpToolCall(params: CodexApprovalParams | null | undefined): boolean {
   const meta = params?._meta;
   if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return false;
   return meta.codex_approval_kind === MCP_TOOL_CALL_KIND;
 }
 
-export function elicitationServer(params) {
+export function elicitationServer(params: CodexApprovalParams | null | undefined): string {
   return typeof params?.serverName === 'string' ? params.serverName.trim() : '';
 }
 
@@ -71,7 +125,7 @@ export function elicitationServer(params) {
  * old name. Only names this app has had match, and a run with no store server
  * never matches.
  */
-export function isStoreElicitation(params, storeServer) {
+export function isStoreElicitation(params: CodexApprovalParams | null | undefined, storeServer: string | null | undefined): boolean {
   if (!storeServer) return false;
   const server = elicitationServer(params);
   if (!server) return false;
@@ -83,14 +137,14 @@ export function isStoreElicitation(params, storeServer) {
  * and the arguments. Returns null when Codex sent no sentence, so `ask` refuses
  * rather than drawing a card nobody can answer.
  */
-export function mcpToolCard(params) {
+export function mcpToolCard(params: CodexApprovalParams | null | undefined): CodexCard | null {
   // The same channel carries an MCP server's own request for typed input, which
   // an allow-or-deny card cannot answer, so `ask` refuses it.
   if (!isMcpToolCall(params)) return null;
   const server = elicitationServer(params);
   const said = typeof params?.message === 'string' ? params.message.trim() : '';
   if (!said) return null;
-  const input = { description: said };
+  const input: Record<string, string> = { description: said };
   if (server) input.server = server;
   const args = params?._meta?.tool_params;
   if (args && typeof args === 'object' && Object.keys(args).length) {
@@ -101,7 +155,7 @@ export function mcpToolCard(params) {
   return { tool: 'Mcp', input };
 }
 
-function readable(text) {
+function readable(text: string): string {
   if (text.length <= CARD_CAP) return text;
   const dropped = text.length - CARD_CAP;
   return `${text.slice(0, CARD_CAP)}\n[+${dropped} character${dropped === 1 ? '' : 's'} not shown]`;
@@ -114,9 +168,9 @@ function readable(text) {
  * file content for an add, so it is printed as it came and never parsed.
  * `tool` is the one verb when every change shares it, and `Edit` otherwise.
  */
-export function fileChangeCard(item) {
-  const blocks = [];
-  const words = [];
+export function fileChangeCard(item: CodexItem | null | undefined): CodexCard | null {
+  const blocks: string[] = [];
+  const words: string[] = [];
   for (const change of Array.isArray(item?.changes) ? item.changes : []) {
     const word = fileVerbWord(change);
     if (!word) continue;
@@ -161,8 +215,12 @@ export const REMEMBERED_CHANGES = 32;
  * a host. This app only ever answers `accept` or `decline`, so a yes to one
  * command never becomes a standing grant.
  */
-export function codexApprovalCard(method, params, seen = null) {
-  const p = params ?? {};
+export function codexApprovalCard(
+  method: string,
+  params: CodexApprovalParams | null | undefined,
+  seen: { get?(itemId: string): CodexCard | undefined } | null = null,
+): CodexCard | null {
+  const p: CodexApprovalParams = params ?? {};
 
   if (method === 'mcpServer/elicitation/request') return mcpToolCard(p);
 
@@ -189,7 +247,7 @@ export function codexApprovalCard(method, params, seen = null) {
   const command = spoken || parsed;
   const host = networkHost(p.networkApprovalContext);
   if (!command && !host) return null;
-  const input = {};
+  const input: Record<string, string> = {};
   if (command) input.command = readable(command);
   if (host) input.host = host;
   // The same command means different things in different folders, so the card
@@ -220,16 +278,21 @@ export function createCodexApprovals({
   uuid = () => crypto.randomUUID(),
   now = () => Date.now(),
   onChange = null,
-} = {}) {
+}: CodexApprovalsOptions) {
   const dir = spoolDir(storeRoot);
-  const open = new Map(); // id -> { request, scope, decide, poll }
+  const open = new Map<string, OpenCard>();
 
   /**
    * The promise main/codex-app-server.mts holds the server request open on.
    * It always resolves, with accept or the refusal, and never rejects or hangs,
    * because an unsettled promise parks the worker forever.
    */
-  const ask = (context, method, params, seen = null) => new Promise((resolve) => {
+  const ask = (
+    context: CodexApprovalContext,
+    method: string,
+    params: CodexApprovalParams | null | undefined,
+    seen: Map<string, CodexCard> | null = null,
+  ) => new Promise<CodexApprovalAnswer>((resolve) => {
     // Calls to Agentbox's own store server are allowed without a card, as the
     // Claude Code path allows them in `worker-permissions.json`. The server name
     // comes from the app through `scope`, not from the worker, and
@@ -264,7 +327,7 @@ export function createCodexApprovals({
     }
 
     const id = String(uuid());
-    const request = {
+    const request: ApprovalRequest = {
       id,
       at: now(),
       product: context?.product ?? null,
@@ -281,14 +344,14 @@ export function createCodexApprovals({
       fs.mkdirSync(dir, { recursive: true });
       put = writeSpoolFile(dir, `${id}.request.json`, JSON.stringify(request));
     } catch (err) {
-      console.warn('zero: could not put a codex approval in the spool:', err?.message ?? err);
+      console.warn('zero: could not put a codex approval in the spool:', (err as Error)?.message ?? err);
     }
     if (!put) {
       resolve(REFUSAL_DECISION);
       return;
     }
 
-    const entry = {
+    const entry: OpenCard = {
       request,
       // The worker that asked, so `close` can deny its cards when it stops.
       scope: context?.scope ?? null,
@@ -318,7 +381,7 @@ export function createCodexApprovals({
    * outlives its REQUEST_TTL_MS, so whoever is waiting keeps its own request
    * there and the sweep only ever takes one nobody is holding up.
    */
-  function tend(id) {
+  function tend(id: string) {
     const entry = open.get(id);
     if (!entry) return;
     const forged = `${id}.answer.json`;
@@ -344,7 +407,7 @@ export function createCodexApprovals({
   }
 
   /** Writes one audit line per decision and removes the request and answer files. */
-  function finish(id, request, decided) {
+  function finish(id: string, request: ApprovalRequest, decided: Record<string, unknown>) {
     // A failed log write must not block the decision, so the return is ignored.
     appendSpoolLine(dir, 'log.jsonl', `${JSON.stringify({ ...request, answer: decided, decidedAt: now() })}\n`);
     for (const f of [`${id}.request.json`, `${id}.answer.json`]) removeSpoolEntry(dir, f);
@@ -360,33 +423,33 @@ export function createCodexApprovals({
      * `listPending`, and the founder's next answer goes to it instead of the card
      * she is reading.
      */
-    scope: (context = {}) => {
+    scope: (context: CodexApprovalContext = {}) => {
       const id = `scope-${scopes += 1}`;
       const bound = { ...context, scope: id };
       // Kept per worker because item ids are only unique within one thread, and
       // a shared map would let one thread's patch answer another's approval.
-      const seen = new Map(); // itemId -> the card its approval will be drawn as
+      const seen = new Map<string, CodexCard>(); // itemId -> the card its approval will be drawn as
       return {
         /**
          * Remembers the card for each file change on `item/started`, which
          * arrives before the approval. `item/completed` arrives only after it.
          * Must never throw, because it runs inside the supervisor's stream loop.
          */
-        remember: (method, params) => {
+        remember: (method: string, params: unknown) => {
           try {
             if (method !== 'item/started') return;
-            const item = params?.item;
+            const item = (params as { item?: CodexItem } | null | undefined)?.item;
             if (item?.type !== 'fileChange' || typeof item.id !== 'string' || !item.id) return;
             const card = fileChangeCard(item);
             if (!card) return;
             seen.set(item.id, card);
             // Drops the oldest. A Map keeps insertion order, so the first key is
             // the oldest change.
-            while (seen.size > REMEMBERED_CHANGES) seen.delete(seen.keys().next().value);
+            while (seen.size > REMEMBERED_CHANGES) seen.delete(seen.keys().next().value!);
           } catch { /* a card is never worth a session */ }
         },
-        handle: (method, params) => ask(bound, method, params, seen),
-        close: (why = 'the worker that asked this has stopped') => {
+        handle: (method: string, params: unknown) => ask(bound, method, params as CodexApprovalParams | null | undefined, seen),
+        close: (why: string = 'the worker that asked this has stopped') => {
           seen.clear();
           let closed = 0;
           for (const entry of [...open.values()]) {
@@ -403,7 +466,7 @@ export function createCodexApprovals({
      * main/ipc.mts beside `approvals.answer`. Returns false for anything that is
      * not an open Codex card, so a late click on a timed-out card approves nothing.
      */
-    settle: (id, allow, note) => open.get(String(id))?.decide(allow, note) ?? false,
+    settle: (id: unknown, allow: unknown, note?: string | null) => open.get(String(id))?.decide(allow, note) ?? false,
 
     /**
      * True when the card the founder saw differs from the request held in
@@ -413,7 +476,7 @@ export function createCodexApprovals({
      * not hold, such as Claude Code cards, so it never turns their answer into a
      * deny.
      */
-    changed: (id, shown) => {
+    changed: (id: unknown, shown: unknown) => {
       const entry = open.get(String(id));
       if (!entry) return false;
       const mine = cardDigest(entry.request);
@@ -421,7 +484,7 @@ export function createCodexApprovals({
     },
 
     /** Denies every open card, for app shutdown. */
-    close: (why = `${Name} is shutting down`) => {
+    close: (why: string = `${Name} is shutting down`) => {
       for (const entry of [...open.values()]) entry.decide(false, why, { closed: true });
     },
 

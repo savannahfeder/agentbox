@@ -3,19 +3,29 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isContinuedNote } from '../../shared/thread-continued.mts';
+import type { SharedPatch, SharedThreadView } from './thread-share.mts';
 
 // Enough for the agent to pick up the thread without one old thread filling its prompt.
 export const CONTINUE_MESSAGES = 20;
 export const CONTINUE_MESSAGE_CHARS = 2_000;
 
 const FILE_LINK = /(!?)\[([^\]\n]*)\]\(attachments\/([\w.-]+)\)/g;
-const shownName = (name) => name.replace(/^[0-9a-f]{12}-/, '');
-const quoted = (text) => text.split('\n').map((l) => (l ? `> ${l}` : '>')).join('\n');
+const shownName = (name: string) => name.replace(/^[0-9a-f]{12}-/, '');
+const quoted = (text: string) => text.split('\n').map((l) => (l ? `> ${l}` : '>')).join('\n');
+
+export interface ContinueFile { name: string; srcPath: string }
+
+export interface ContinueBrief { title: string; body: string; files: ContinueFile[] }
 
 /** `work` is what this copy holds of the thread (thread-share.mts `read`). */
-export function briefToContinue({ work, title, ownerName, nameOf }) {
-  const files = new Map();
-  const unlinked = (text) => text.replace(FILE_LINK, (_, bang, label, name) => {
+export function briefToContinue({ work, title, ownerName, nameOf }: {
+  work: Pick<SharedThreadView, 'lines' | 'earlier'> & { dir: string };
+  title?: string | null;
+  ownerName: string;
+  nameOf: (id: string | undefined) => string | null;
+}): ContinueBrief {
+  const files = new Map<string, ContinueFile>();
+  const unlinked = (text: string) => text.replace(FILE_LINK, (_: string, bang: string, label: string, name: string) => {
     const srcPath = path.join(work.dir, 'attachments', name);
     const shown = shownName(name);
     if (fs.existsSync(srcPath) && !files.has(name)) {
@@ -25,15 +35,15 @@ export function briefToContinue({ work, title, ownerName, nameOf }) {
     return bang || !label || label === shown ? shown : `${label} (${shown})`;
   });
 
-  const said = [];
+  const said: { who: string; text: string }[] = [];
   const lines = [...(work.lines ?? [])].sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0));
   for (const l of lines) {
-    const p = l.patch ?? {};
+    const p: SharedPatch = l.patch ?? {};
     if (p.comment) {
       if (!isContinuedNote(p.comment.text) && p.comment.text) said.push({ who: `${nameOf(l.by) ?? 'Someone'} commented`, text: p.comment.text });
       continue;
     }
-    const text = ['body', 'answer', 'result', 'note'].map((f) => p[f]).filter(Boolean).join('\n\n');
+    const text = (['body', 'answer', 'result', 'note'] as const).map((f) => p[f]).filter(Boolean).join('\n\n');
     if (!text) continue;
     said.push({ who: l.source === 'founder' ? (nameOf(l.by) ?? ownerName) : `${ownerName}'s agent`, text });
   }

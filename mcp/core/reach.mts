@@ -18,18 +18,33 @@ import { resolveProduct } from './account.mts';
 import { listProducts } from './products.mts';
 import { MAX_SENT_BYTES, MAX_SENT_WORDS, sizeWords } from '../../shared/carried-files.mts';
 import { looksSecret } from '../../main/team/carry-files.mts';
+import type { RunContext, TeammateContext } from './teammates.mts';
+import type { OutFile, OutLine, TeamView, ViewCard, ViewFolder } from '../../shared/teammate-reach.mts';
+import type { WorkItem } from '../../shared/work-items.mts';
+import type { FileNote, MarkEntry, ThreadLine } from '../../shared/artifact-marks.mts';
+import type { DocumentView } from './documents.mts';
 
 const TEXT_MOST = 8000;
 
-function context(ctx = {}) {
+/** The team view while the owner is signed in. */
+type SignedInView = TeamView & { me: NonNullable<TeamView['me']> };
+type ViewPerson = TeamView['people'][number];
+
+/** A run about to reach people: its own context, the team view, and whether that view is too old to trust. */
+interface ReachContext extends TeammateContext { view: SignedInView; now: number; stale: boolean }
+
+/** Who a message goes to: a group, or people, with the names it shows. */
+interface Audience { room?: string; people?: string[]; names: string[] }
+
+function context(ctx: RunContext = {}): ReachContext {
   const c = teammateContext({ ...ctx, outsider: true });
   const now = ctx.now ?? Date.now();
-  const view = readTeamView(c.dir);
+  const view = readTeamView(c.dir) as TeamView | null;
   if (!view?.me) throw new Error('your owner is not signed in to a team here, so there is nobody to write to');
-  return { ...c, view, now, stale: now - (view.at ?? 0) > VIEW_FRESH_MS };
+  return { ...c, view: view as SignedInView, now, stale: now - (view.at ?? 0) > VIEW_FRESH_MS };
 }
 
-function personNamed(name, view) {
+function personNamed(name: unknown, view: SignedInView): ViewPerson {
   const raw = String(name ?? '').trim().replace(/^@/, '');
   const lower = raw.toLowerCase();
   const others = view.people.filter((p) => p.id !== view.me.id);
@@ -42,7 +57,7 @@ function personNamed(name, view) {
 }
 
 /** `person:<name>` in a wait, as the id the lists and the team sync read. */
-export function waitsNamed(blockedBy, ctx = {}) {
+export function waitsNamed(blockedBy: string[], ctx: RunContext = {}): string[] {
   if (!blockedBy.some((w) => String(w).startsWith('person:'))) return blockedBy;
   const { view } = context(ctx);
   const owner = view.people.find((p) => p.id === view.me.id);
@@ -57,9 +72,9 @@ export function waitsNamed(blockedBy, ctx = {}) {
   });
 }
 
-const uniqueById = (list) => [...new Map(list.map((p) => [p.id, p])).values()];
+const uniqueById = <T extends { id: string }>(list: readonly T[]): T[] => [...new Map(list.map((p) => [p.id, p])).values()];
 
-function audience({ to, group, thread }, { view, item }) {
+function audience({ to, group, thread }: { to?: unknown; group?: unknown; thread?: unknown }, { view, item }: { view: SignedInView; item: WorkItem }): Audience {
   if (group) {
     const lower = String(group).trim().toLowerCase();
     const room = (view.rooms ?? []).find((r) => r.name.toLowerCase() === lower || r.id === group);
@@ -68,7 +83,7 @@ function audience({ to, group, thread }, { view, item }) {
   }
   if (thread) {
     const ids = [...new Set([...(item.people ?? []), ...(item.visibleTo ?? [])])].filter((p) => p !== view.me.id);
-    const people = ids.map((id) => view.people.find((p) => p.id === id)).filter(Boolean);
+    const people = ids.map((id) => view.people.find((p) => p.id === id)).filter(Boolean) as ViewPerson[];
     if (!people.length) throw new Error('this thread has no people on it but your owner: name who you mean in to');
     return { people: people.map((p) => p.id), names: people.map((p) => p.name) };
   }
@@ -79,16 +94,16 @@ function audience({ to, group, thread }, { view, item }) {
   return { people: people.map((p) => p.id), names: people.map((p) => p.name) };
 }
 
-function leave(c, fields) {
+function leave(c: ReachContext, fields: Omit<OutLine, 'kind' | 'id' | 'ts' | 'from' | 'run' | 'product'>): { line: Omit<OutLine, 'ts'>; held: boolean } {
   if (c.stale) throw new Error('the app is not running, so this cannot be sent now. Say so in your answer, with the words, and finish');
   const { me, item, project, dir, now } = c;
-  const line = {
+  const line: Omit<OutLine, 'ts'> = {
     kind: 'out', id: newOutId(),
     from: { mate: me?.id ?? null, name: me?.name ?? PLAIN_AGENT }, run: item.id, product: project.id,
     ...fields,
   };
   // One press, one send: "Send v2 to Dev" is the yes a card would ask for.
-  const named = (fields.people ?? []).map((id) => c.view.people.find((p) => p.id === id)).filter(Boolean);
+  const named = (fields.people ?? []).map((id) => c.view.people.find((p) => p.id === id)).filter(Boolean) as ViewPerson[];
   if (named.length === (fields.people ?? []).length && !fields.outside && saidToSendTo(readItemHistory(project.dir, item.id), named)) line.saidYes = true;
   writeOutbox(dir, line, now);
   const { yes } = readOutbox(dir);
@@ -97,13 +112,13 @@ function leave(c, fields) {
 }
 
 const FILES_MOST = 10;
-const realOf = (p) => { try { return fs.realpathSync(p); } catch { return null; } };
-const inside = (root, file) => !!root && (file === root || file.startsWith(root + path.sep));
-const hiddenIn = (rel) => rel.split(path.sep).some((s) => s.startsWith('.'));
+const realOf = (p: string): string | null => { try { return fs.realpathSync(p); } catch { return null; } };
+const inside = (root: string | null, file: string): boolean => !!root && (file === root || file.startsWith(root + path.sep));
+const hiddenIn = (rel: string): boolean => rel.split(path.sep).some((s) => s.startsWith('.'));
 
 /** Where this thread's agent may send files from: its own checkout, its project, and the project's code. */
-function threadFolders({ project, item }) {
-  let repo = null;
+function threadFolders({ project, item }: Pick<TeammateContext, 'project' | 'item'>): { checkout: string | null; dir: string | null; repo: string | null } {
+  let repo: string | null = null;
   try { repo = JSON.parse(fs.readFileSync(path.join(project.dir, 'project.json'), 'utf8')).repoPath || null; } catch { /* no code folder */ }
   return {
     checkout: repo ? realOf(path.join(repo, '.claude', 'worktrees', item.id)) : null,
@@ -113,12 +128,12 @@ function threadFolders({ project, item }) {
 }
 
 /** The files an agent named, as a person's attachments are handed over: `{ name, srcPath }`. */
-function filesToCarry(list, c) {
+function filesToCarry(list: unknown, c: ReachContext): OutFile[] {
   const asked = (Array.isArray(list) ? list : list == null ? [] : [list]).map((f) => String(f ?? '').trim()).filter(Boolean);
   if (!asked.length) return [];
   if (asked.length > FILES_MOST) throw new Error(`a message carries at most ${FILES_MOST} files`);
   const { checkout, dir, repo } = threadFolders(c);
-  const roots = [checkout, dir, repo].filter(Boolean);
+  const roots = [checkout, dir, repo].filter(Boolean) as string[];
   const copyInto = checkout ?? dir;
   return asked.map((ask) => {
     const found = (path.isAbsolute(ask) ? [ask] : roots.map((r) => path.join(r, ask))).map(realOf).find(Boolean);
@@ -144,10 +159,23 @@ function filesToCarry(list, c) {
  * them. `voice` is who this run speaks as, so a version of its own can be told
  * from somebody else's.
  */
-export function knownFile(name, ctx = {}) {
+/** What this thread and Files know of one file. */
+export interface KnownFile {
+  versions: number;
+  names: Set<string>;
+  paths: string[];
+  path: string | null;
+  chain: { name: string; path: string; edited: boolean; agent: string | null }[];
+  dir: string | null;
+  voice: string;
+  /** A version of it is on disk. */
+  real?: boolean;
+}
+
+export function knownFile(name: string, ctx: RunContext = {}): KnownFile {
   const family = familyOfName(name);
-  const out = { versions: 0, names: new Set(), paths: [], path: null, chain: [], dir: null, voice: PLAIN_AGENT };
-  let c;
+  const out: KnownFile = { versions: 0, names: new Set(), paths: [], path: null, chain: [], dir: null, voice: PLAIN_AGENT };
+  let c: TeammateContext;
   try { c = teammateContext({ ...ctx, outsider: true }); } catch { return out; }
   out.dir = c.project.dir;
   out.voice = c.me?.name || PLAIN_AGENT;
@@ -163,7 +191,7 @@ export function knownFile(name, ctx = {}) {
     out.versions = here?.versions.length ?? 0;
     out.path = here?.versions.at(-1)?.path ?? null;
   } catch { /* a thread with no history yet */ }
-  for (const f of readTeamView(c.dir)?.folders ?? []) {
+  for (const f of (readTeamView(c.dir) as TeamView | null)?.folders ?? []) {
     for (const x of f.files ?? []) {
       if (familyOfName(x.file) !== family) continue;
       out.names.add(x.file);
@@ -181,12 +209,19 @@ export function knownFile(name, ctx = {}) {
  * another path. It goes in this thread's own folder, beside nobody's original,
  * and needs no person to send it to. null: an ordinary write.
  */
-export function documentVersion({ product, versionOf, path: rel = null, content = null, ownItem = null, env = process.env }) {
+export function documentVersion({ product, versionOf, path: rel = null, content = null, ownItem = null, env = process.env }: {
+  product: string;
+  versionOf?: string;
+  path?: string | null;
+  content?: string | null;
+  ownItem?: string | null;
+  env?: NodeJS.ProcessEnv;
+}) {
   const asked = String(versionOf ?? '').trim();
   const name = asked ? shownName(asked) : rel ? path.basename(rel) : '';
   if (!name) return null;
   const known = knownFile(name, { env });
-  if (!asked && !(known.real && known.names.has(name) && !known.paths.includes(rel))) return null;
+  if (!asked && !(known.real && known.names.has(name) && !(known.paths as readonly (string | null)[]).includes(rel))) return null;
   const ext = path.extname(rel ?? '') || path.extname(name);
   if (kindOfName(name) !== kindOfName(`x${ext}`)) throw new Error(`${rel} is a ${ext.slice(1) || 'file'} and ${name} a ${path.extname(name).slice(1) || 'file'}, so it cannot be its next version`);
   const own = String(env.ZERO_PRODUCT ?? '').trim();
@@ -205,7 +240,7 @@ export function documentVersion({ product, versionOf, path: rel = null, content 
   };
 }
 
-const readVersion = (dir, v) => {
+const readVersion = (dir: string, v: { path: string }): string | null => {
   try { return fs.readFileSync(path.isAbsolute(v.path) ? v.path : path.join(dir, v.path), 'utf8'); } catch { return null; }
 };
 
@@ -219,7 +254,7 @@ const readVersion = (dir, v) => {
  * from. Both sides changing the same lines throws: that is the one case somebody
  * has to answer for, and losing either set of words silently is not an answer.
  */
-function keepWhatOthersWrote(known, content) {
+function keepWhatOthersWrote(known: KnownFile, content: string | null): { content: string; merged: string } | null {
   if (typeof content !== 'string' || !known.dir) return null;
   // Only when this thread can see every version: a copy elsewhere may hold one it cannot read.
   if (known.chain.length < 2 || known.chain.length !== known.versions) return null;
@@ -228,7 +263,7 @@ function keepWhatOthersWrote(known, content) {
   if (itsOwn || reviewKind(head.path) !== 'markdown') return null;
   const headText = readVersion(known.dir, head);
   if (headText == null || headText === content) return null;
-  let baseText = null;
+  let baseText: string | null = null;
   let gap = Infinity;
   for (const v of known.chain.slice(0, -1)) {
     const was = readVersion(known.dir, v);
@@ -247,7 +282,7 @@ function keepWhatOthersWrote(known, content) {
 }
 
 /** The name the next version of `name` takes: past every version known, and past `taken`. */
-export function nextVersionFor(name, ext, { known = knownFile(name), taken = () => false } = {}) {
+export function nextVersionFor(name: string, ext: string, { known = knownFile(name), taken = () => false }: { known?: KnownFile; taken?: (name: string) => boolean } = {}): string {
   const was = shownName(String(name).trim());
   const base = baseName(was).replace(/\.[^.]+$/, '') + ext;
   let n = Math.max(1, known.versions, Number(/[-_ ]v(\d+)$/i.exec(was.replace(/\.[^.]+$/, ''))?.[1] ?? 1));
@@ -256,10 +291,10 @@ export function nextVersionFor(name, ext, { known = knownFile(name), taken = () 
   return next;
 }
 
-const kindOfName = (n) => reviewKind(n) ?? path.extname(n).toLowerCase();
+const kindOfName = (n: string): string => reviewKind(n) ?? path.extname(n).toLowerCase();
 
 /** The one file carried under the name that makes it the next version of `versionOf` (shared/artifact-marks.mts). */
-function asVersion(carried, versionOf) {
+function asVersion(carried: OutFile[], versionOf: unknown): OutFile[] {
   if (versionOf == null || versionOf === '') return carried;
   if (carried.length !== 1) throw new Error('versionOf takes one file: send each new version on its own');
   const was = shownName(String(versionOf).trim());
@@ -271,15 +306,15 @@ function asVersion(carried, versionOf) {
 
 // One card per message: the app's. An agent that also asks makes a second one.
 const ONE_CARD = 'The app shows your owner these exact words on one card. Do not ask them for this yes yourself, and do not end your run on a question about it. This thread is told when they answer.';
-const heldNote = (out) => (out.outside
+const heldNote = (out: { outside?: boolean; names: readonly string[] }): string => (out.outside
   ? `This is meant to leave the team, so it waits for your owner's yes. ${ONE_CARD}`
   : `You have not written to ${out.names.join(' and ')} before, so this waits for your owner's yes. ${ONE_CARD} Carry on with what you can.`);
 
 // The thread's project is the one place an agent files into. The app sends it on
 // from the log under the same rules as a person's move (main/files-place.mts).
-const projectNames = () => { try { return listProducts().map((p) => p.name); } catch { return []; } };
+const projectNames = (): string[] => { try { return listProducts().map((p) => p.name); } catch { return []; } };
 
-function fileInFolder(c, names, folder) {
+function fileInFolder(c: ReachContext, names: readonly string[], folder: string) {
   const made = folderNamed({ project: c.project.name, name: folder, known: (c.view.folders ?? []).filter((f) => !f.inside).map((f) => ({ id: f.id, project: f.project, name: f.folder, parent: null })), roots: projectNames(), dir: c.dir, by: c.view.me.id, now: c.now });
   for (const name of names) {
     writeFolderLog(c.dir, { op: 'place', key: fileKeyIn(c.project.name, name), project: c.project.name, family: familyOfName(name), folder: made.id, by: c.view.me.id, at: c.now });
@@ -288,13 +323,13 @@ function fileInFolder(c, names, folder) {
 }
 
 /** Puts what an agent made in a folder of its thread's project, by name, making the folder if needed. */
-export function teamFile({ files, folder } = {}, ctx = {}) {
+export function teamFile({ files, folder }: { files?: unknown; folder?: string } = {}, ctx: RunContext = {}) {
   const names = (Array.isArray(files) ? files : files == null ? [] : [files]).map((f) => path.basename(String(f ?? '').trim())).filter(Boolean);
   if (!String(folder ?? '').trim()) throw new Error('name a folder to put them in');
   if (!names.length) throw new Error('name a file to put in the folder');
   if (names.length > FILES_MOST) throw new Error(`at most ${FILES_MOST} files at a time`);
   const c = context(ctx);
-  const made = fileInFolder(c, names, folder);
+  const made = fileInFolder(c, names, folder!);
   const missing = linkOnThread(c, files);
   const where = `${made.project} > ${made.name}`;
   return {
@@ -308,56 +343,62 @@ export function teamFile({ files, folder } = {}, ctx = {}) {
  * line names yet, since Files lists only what a thread names. Returns the ones
  * that are not there.
  */
-function linkOnThread(c, files) {
+function linkOnThread(c: ReachContext, files: unknown): string[] {
   const asked = (Array.isArray(files) ? files : [files]).map((f) => String(f ?? '').trim()).filter(Boolean);
   const { checkout, dir, repo } = threadFolders(c);
-  const roots = [checkout, dir, repo].filter(Boolean);
-  let lines = [];
+  const roots = [checkout, dir, repo].filter(Boolean) as string[];
+  let lines: ReturnType<typeof readItemHistory> = [];
   try { lines = readItemHistory(c.project.dir, c.item.id, { max: Number.MAX_SAFE_INTEGER }); } catch { /* a thread with no lines yet */ }
   const said = new Set([...filesInLines(lines), ...otherFilesInLines(lines)].map((f) => f.path));
-  const missing = [];
-  const links = [];
+  const missing: string[] = [];
+  const links: string[] = [];
   for (const ask of asked) {
     const found = (path.isAbsolute(ask) ? [ask] : roots.map((r) => path.join(r, ask))).map(realOf).find((f) => f && fs.statSync(f).isFile());
     const root = found && roots.find((r) => inside(r, found));
     if (!root) { missing.push(path.basename(ask)); continue; }
-    const rel = path.relative(root, found).split(path.sep).join('/');
+    const rel = path.relative(root, found!).split(path.sep).join('/');
     if (!said.has(rel) && !hiddenIn(rel)) links.push(`[${path.basename(rel)}](${rel})`);
   }
   if (links.length) updateWorkItem(c.project.dir, c.item.id, { note: `Filed ${links.join(', ')}` }, { source: 'agent', now: c.now });
   return missing;
 }
 
-const TOP_OF_PATH = (rel) => (String(rel ?? '').includes('/') ? String(rel).split('/')[0] : null);
+const TOP_OF_PATH = (rel: unknown): string | null => (String(rel ?? '').includes('/') ? String(rel).split('/')[0] : null);
 
 /** After write_document: what Files now says about where it sits. `filedIn` only once the line is written. */
-export function fileWrittenDocument({ path: rel, folder } = {}, ctx = {}) {
+export function fileWrittenDocument({ path: rel, folder }: { path?: string | null; folder?: string } = {}, ctx: RunContext = {}): { say?: string; filedIn?: string; filedWhere?: string } {
   const asked = String(folder ?? '').trim();
   const top = TOP_OF_PATH(rel);
   if (!asked && !top) return {};
-  let c;
+  let c: ReachContext;
   try { c = context(ctx); } catch (err) {
-    return asked ? { say: `It is saved, but it is not in ${asked}: ${err.message}.` } : {};
+    return asked ? { say: `It is saved, but it is not in ${asked}: ${(err as Error).message}.` } : {};
   }
   const known = (c.view.folders ?? []).filter((f) => !f.inside && f.project?.toLowerCase() === c.project.name.toLowerCase());
   const match = top && known.find((f) => f.folder.toLowerCase() === top.toLowerCase())?.folder;
   const into = asked || match;
   if (!into) return { say: `It is saved at ${rel}. ${top} is a directory on disk, not a folder in Files, so in Files it sits at the top of ${c.project.name}. Pass folder to put it in one.` };
   try {
-    const made = fileInFolder(c, [path.basename(rel)], into);
+    // With no path, basename throws here and the answer says it was not filed.
+    const made = fileInFolder(c, [path.basename(rel as string)], into);
     return { filedIn: made.name, filedWhere: `${made.project} > ${made.name}` };
   } catch (err) {
-    return { say: `It is saved, but it is not in ${into}: ${err.message}.` };
+    return { say: `It is saved, but it is not in ${into}: ${(err as Error).message}.` };
   }
 }
 
+/** A document as list_documents gives it, with its folder in Files; one only Files holds is listed with a note. */
+type FiledDocument =
+  | (DocumentView & { filesFolder?: string })
+  | { id: null; title: string; kind: string; path?: string; folder: string; filesFolder: string; versions?: number; status: string; cataloged: false; note: string };
+
 /** list_documents as a person sees it: each file's folder in Files, and the files only Files holds. */
-export function documentsWithFolders(list, { folder = null } = {}, ctx = {}) {
-  let c;
+export function documentsWithFolders(list: DocumentView[], { folder = null }: { folder?: string | null } = {}, ctx: RunContext = {}): FiledDocument[] {
+  let c: ReachContext;
   try { c = context(ctx); } catch { return list; }
   const known = foldersNow(c).filter((f) => f.project?.toLowerCase() === c.project.name.toLowerCase());
   if (!known.length) return list;
-  const out = list.map((d) => ({ ...d }));
+  const out: FiledDocument[] = list.map((d) => ({ ...d }));
   for (const f of known) {
     for (const file of f.files ?? []) {
       const hit = out.find((d) => path.basename(d.path ?? '') === file.file);
@@ -368,17 +409,20 @@ export function documentsWithFolders(list, { folder = null } = {}, ctx = {}) {
   if (!folder) return out;
   const asked = String(folder).toLowerCase();
   const isFilesFolder = known.some((f) => f.folder.toLowerCase() === asked);
-  return isFilesFolder ? out.filter((d) => d.filesFolder?.toLowerCase() === asked || d.folder?.toLowerCase() === asked).map((d) => ({ ...d, filesFolder: known.find((f) => f.folder.toLowerCase() === asked).folder })) : list;
+  return isFilesFolder ? out.filter((d) => d.filesFolder?.toLowerCase() === asked || d.folder?.toLowerCase() === asked).map((d) => ({ ...d, filesFolder: known.find((f) => f.folder.toLowerCase() === asked)!.folder })) : list;
 }
 
 // What this Mac's agents have asked to say there and the group cannot show yet.
-const waitingForRoom = ({ dir }, room) => readOutbox(dir).out
+const waitingForRoom = ({ dir }: { dir: string }, room: string) => readOutbox(dir).out
   .filter((o) => o.room === room && !['sent', 'failed', 'refused', 'undone'].includes(o.state))
   .map((o) => ({ at: o.ts, agent: { id: o.from?.mate ?? null, run: o.run, name: o.from?.name } }));
 
-const askedByOwner = (item) => (item?.labels ?? []).includes(CHAT_LABEL) || item?.wrote?.answer?.source === 'founder';
+const askedByOwner = (item: WorkItem | null | undefined): boolean => (item?.labels ?? []).includes(CHAT_LABEL) || item?.wrote?.answer?.source === 'founder';
 
-export function teamTell({ text, to, group, thread, outside, files, versionOf, folder } = {}, ctx = {}) {
+/** What team_tell and team_task take with the files a message carries. */
+interface SentFiles { files?: unknown; versionOf?: unknown; folder?: string }
+
+export function teamTell({ text, to, group, thread, outside, files, versionOf, folder }: SentFiles & { text?: unknown; to?: unknown; group?: unknown; thread?: unknown; outside?: boolean } = {}, ctx: RunContext = {}) {
   const words = String(text ?? '').trim();
   const c = context(ctx);
   const carried = asVersion(filesToCarry(files, c), versionOf);
@@ -392,7 +436,7 @@ export function teamTell({ text, to, group, thread, outside, files, versionOf, f
     if (whyNot) throw new Error(whyNot);
   }
   const { line, held } = leave(c, { ...who, text: words.slice(0, TEXT_MOST), ...(carried.length ? { files: carried } : {}), ...(outside ? { outside: true } : {}) });
-  if (String(folder ?? '').trim()) fileInFolder(c, carried.map((f) => f.name), folder);
+  if (String(folder ?? '').trim()) fileInFolder(c, carried.map((f) => f.name), folder!);
   return {
     to: who.names, held, ...(carried.length ? { files: carried.map((f) => f.name) } : {}),
     note: held ? heldNote(line) : 'It goes in about ten seconds, under your name, unless your owner takes it back. A reply comes back to this thread as a turn; do not wait for it.',
@@ -400,7 +444,7 @@ export function teamTell({ text, to, group, thread, outside, files, versionOf, f
 }
 
 // What a task is blocked on, from words an agent can write: a person's name, or a thread id from team_threads.
-function blocksNamed(list, view) {
+function blocksNamed(list: unknown, view: SignedInView): string[] {
   return (Array.isArray(list) ? list : [list]).filter((w) => String(w ?? '').trim()).map((w) => {
     const raw = String(w).trim();
     const card = (view.cards ?? []).find((k) => k.threadId === raw);
@@ -409,7 +453,7 @@ function blocksNamed(list, view) {
   });
 }
 
-export function teamTask({ to, title, details, due, files, versionOf, folder, blockedBy } = {}, ctx = {}) {
+export function teamTask({ to, title, details, due, files, versionOf, folder, blockedBy }: SentFiles & { to?: unknown; title?: unknown; details?: unknown; due?: string; blockedBy?: unknown } = {}, ctx: RunContext = {}) {
   const list = Array.isArray(to) ? to : [to];
   if (list.length !== 1) throw new Error('a task goes to one person; use team_tell for several');
   const named = String(title ?? '').trim();
@@ -420,7 +464,7 @@ export function teamTask({ to, title, details, due, files, versionOf, folder, bl
   const who = audience({ to: list }, c);
   const blocks = blockedBy === undefined ? [] : blocksNamed(blockedBy, c.view);
   const { line, held } = leave(c, { ...who, task: true, title: named.slice(0, 200), text: String(details ?? '').trim().slice(0, TEXT_MOST), ...(carried.length ? { files: carried } : {}), ...(due ? { due } : {}), ...(blocks.length ? { blockedBy: blocks } : {}) });
-  if (String(folder ?? '').trim() && carried.length) fileInFolder(c, carried.map((f) => f.name), folder);
+  if (String(folder ?? '').trim() && carried.length) fileInFolder(c, carried.map((f) => f.name), folder!);
   return {
     to: who.names, held, ...(carried.length ? { files: carried.map((f) => f.name) } : {}),
     note: held ? heldNote(line) : 'It goes in about ten seconds, as a task from you, unless your owner takes it back. Their replies and their finishing it come back to this thread as a turn.',
@@ -429,25 +473,28 @@ export function teamTask({ to, title, details, due, files, versionOf, folder, bl
 
 // An AI teammate reads direct messages only when its owner has said it may. A
 // thread the person started is them asking.
-const mayReadMessages = ({ me }) => !me || me.readsMessages === true;
+const mayReadMessages = ({ me }: Pick<TeammateContext, 'me'>): boolean => !me || me.readsMessages === true;
 
 const NOT_OPEN = 'your owner has not let you read their direct messages. They choose that on your page; say so if you need it';
 
-function directRecords(view) {
-  const out = [];
+function directRecords(view: SignedInView): { people: string[]; rows: WorkItem[] }[] {
+  const out: { people: string[]; rows: WorkItem[] }[] = [];
   for (const d of view.directs ?? []) {
-    let rows = [];
+    let rows: WorkItem[] = [];
     try { rows = readWorkItems(d.dir); } catch { continue; }
     out.push({ people: d.people, rows: rows.filter((r) => !isTaskRow(r)) });
   }
   return out;
 }
 
-const nameIn = (view) => (id) => view.people.find((p) => p.id === id)?.name ?? 'Someone';
+const nameIn = (view: SignedInView) => (id: string | null | undefined): string => view.people.find((p) => p.id === id)?.name ?? 'Someone';
+
+/** A card its holder publishes as a task. */
+type TaskCard = ViewCard & { task: NonNullable<ViewCard['task']> };
 
 // A task's card, as an agent reads it: who gave it, the day it is due by, and what blocks it.
-function taskFacts(card, nameOf, cards) {
-  const day = (at) => { const d = new Date(at - 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+function taskFacts(card: TaskCard, nameOf: (id: string) => string, cards: readonly ViewCard[]) {
+  const day = (at: number): string => { const d = new Date(at - 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
   const blocks = (card.blockedBy ?? []).map(({ id }) => {
     if (id.startsWith('person:')) return nameOf(id.slice('person:'.length));
     if (id.startsWith('name:')) return id.slice('name:'.length);
@@ -457,18 +504,18 @@ function taskFacts(card, nameOf, cards) {
   });
   return {
     from: card.task.from ? nameOf(card.task.from) : null,
-    ...(Number.isFinite(card.task.dueAt) ? { due: card.task.clock ? new Date(card.task.dueAt).toISOString() : day(card.task.dueAt), late: Date.now() >= card.task.dueAt } : {}),
+    ...(Number.isFinite(card.task.dueAt) ? { due: card.task.clock ? new Date(card.task.dueAt!).toISOString() : day(card.task.dueAt!), late: Date.now() >= card.task.dueAt! } : {}),
     ...(blocks.length ? { blockedBy: blocks } : {}),
   };
 }
 
-export function teamThreads(ctx = {}) {
+export function teamThreads(ctx: RunContext = {}) {
   const c = context(ctx);
   const nameOf = nameIn(c.view);
   const threads = (c.view.cards ?? []).map((k) => ({
     person: nameOf(k.personId), thread: k.threadId, title: k.title, project: k.project, state: k.state,
     ...(k.problem ? { context: k.problem } : {}), ...(k.progress ? { done: k.progress } : {}),
-    ...(k.task ? { task: taskFacts(k, nameOf, c.view.cards ?? []) } : {}),
+    ...(k.task ? { task: taskFacts(k as TaskCard, nameOf, c.view.cards ?? []) } : {}),
     updated: new Date(k.updatedAt ?? 0).toISOString(),
   }));
   if (!mayReadMessages(c)) return { threads, note: 'Your owner\'s direct messages are not here: they have not let you read them.' };
@@ -485,7 +532,12 @@ export function teamThreads(ctx = {}) {
  * whether it is open. A comment still open on an earlier version is listed on
  * the later ones too, saying which version it came from.
  */
-function filesOf(lines, marks, nameOf, elsewhere = () => []) {
+type NameOf = (id: string | null | undefined) => string;
+
+/** A comment on a copy of a file sent into a conversation, and which conversation. */
+interface ElsewhereNote { id: string; by: string; where: string; text: string; status: string; in: string }
+
+function filesOf(lines: readonly ThreadLine[] | null | undefined, marks: readonly MarkEntry[], nameOf: NameOf, elsewhere: (name: string) => ElsewhereNote[] = () => []) {
   const marked = marksOf(marks);
   return threadFiles(filesInLines(lines)).flatMap((family) => family.versions.map((v, i) => ({
     file: v.name,
@@ -494,7 +546,7 @@ function filesOf(lines, marks, nameOf, elsewhere = () => []) {
     versions: family.versions.length,
     by: v.by ? nameOf(v.by) : null,
     approvedBy: marked.approvals.filter((a) => a.file === v.id).map((a) => nameOf(a.by)),
-    comments: [...marked.notes.filter((n) => n.file === v.id), ...carriedNotes(family, i, marked.notes)].map((n) => ({
+    comments: ([...marked.notes.filter((n) => n.file === v.id), ...carriedNotes(family, i, marked.notes)] as (FileNote & { from?: string })[]).map((n) => ({
       id: n.id, by: nameOf(n.by), where: placeWords(n), text: n.text,
       status: n.resolved ? 'resolved' : 'open',
       ...(n.from ? { from: `${n.from}, still open` } : {}),
@@ -508,14 +560,14 @@ function filesOf(lines, marks, nameOf, elsewhere = () => []) {
  * conversation, by its name, saying which conversation. Only where the owner
  * lets this agent read their messages, since that is where the notes were made.
  */
-function notesElsewhere(c, nameOf) {
+function notesElsewhere(c: ReachContext, nameOf: NameOf): (name: string) => ElsewhereNote[] {
   if (!mayReadMessages(c)) return () => [];
-  let found = null;
-  const all = () => {
+  let found: { name: string; note: ElsewhereNote }[] | null = null;
+  const all = (): { name: string; note: ElsewhereNote }[] => {
     if (found) return found;
     found = [];
     for (const d of c.view.directs ?? []) {
-      let rows = [];
+      let rows: WorkItem[] = [];
       try { rows = readWorkItems(d.dir); } catch { continue; }
       const where = `conversation with ${d.people.map(nameOf).join(', ')}`;
       for (const r of rows) {
@@ -533,15 +585,17 @@ function notesElsewhere(c, nameOf) {
   return (name) => all().filter((f) => f.name === name).map((f) => f.note);
 }
 
-const markEntries = (lines) => (lines ?? []).filter((l) => l?.patch?.artifact).map((l) => ({ ...l.patch.artifact, by: l.by ?? null, ts: l.ts, uid: l.uid ?? null }));
+const markEntries = (lines: readonly ThreadLine[] | null | undefined): MarkEntry[] => (lines ?? []).filter((l) => l?.patch?.artifact).map((l) => ({ ...l.patch!.artifact, by: l.by ?? null, ts: l.ts, uid: l.uid ?? null }));
 
-const foldersOut = (list) => list.map(({ id: _id, ...f }) => f);
+const foldersOut = (list: readonly ViewFolder[]) => list.map(({ id: _id, ...f }) => f);
+
+type FolderNow = ViewFolder & { files: NonNullable<ViewFolder['files']> };
 
 // The app rewrites its view on a tick, and a filing agent checks at once, so what
 // this run's log says since then goes on top.
-function foldersNow(c) {
+function foldersNow(c: ReachContext): FolderNow[] {
   const lib = foldFolders(readFolderLog(c.dir));
-  const out = (c.view.folders ?? []).map((f) => ({ ...f, files: [...(f.files ?? [])] }));
+  const out: FolderNow[] = (c.view.folders ?? []).map((f) => ({ ...f, files: [...(f.files ?? [])] }));
   for (const f of lib.folders) {
     if (!out.some((x) => x.id === f.id || (x.project?.toLowerCase() === f.project.toLowerCase() && x.folder.toLowerCase() === f.name.toLowerCase()))) {
       out.push({ id: f.id, project: f.project, folder: f.name, files: [] });
@@ -550,17 +604,18 @@ function foldersNow(c) {
   for (const p of lib.places.values()) {
     // On the stamp itself it counts: the app stamps before it reads, and filing twice changes nothing.
     if (p.at < (c.view.at ?? 0)) continue;
-    const same = (x) => familyOfName(x.file) === p.family;
+    const same = (x: { file: string }) => familyOfName(x.file) === p.family;
     const had = out.flatMap((f) => f.files).find(same);
     for (const f of out) f.files = f.files.filter((x) => !same(x));
-    const into = out.find((f) => f.id === lib.canon(p.folder));
+    // A file taken out of every folder has none to go into.
+    const into = out.find((f) => f.id === lib.canon(p.folder as string));
     if (into) into.files.push(had ?? { file: String(p.family).split('\0')[0], justFiled: true });
   }
   return out;
 }
 
 // "the launch folder" and "launch" are the same ask.
-function foldersNamed(all, asked) {
+function foldersNamed(all: readonly FolderNow[], asked: unknown): FolderNow[] {
   const words = String(asked).toLowerCase().replace(/\b(the|folder)\b/g, ' ').replace(/\s+/g, ' ').trim();
   const hits = all.filter((f) => f.folder.toLowerCase() === words);
   const near = hits.length ? hits : all.filter((f) => words && f.folder.toLowerCase().includes(words));
@@ -568,14 +623,14 @@ function foldersNamed(all, asked) {
   return near;
 }
 
-export function teamRead({ person, thread, folder } = {}, ctx = {}) {
+export function teamRead({ person, thread, folder }: { person?: unknown; thread?: unknown; folder?: unknown } = {}, ctx: RunContext = {}) {
   const c = context(ctx);
   const nameOf = nameIn(c.view);
   if (String(folder ?? '').trim()) return { folders: foldersOut(foldersNamed(foldersNow(c), folder)) };
   // Nobody named: this thread's own files, with what people have said on them.
   if (!String(person ?? '').trim() && !thread) {
     const history = readItemHistory(c.project.dir, c.item.id);
-    const named = (id) => nameOf(id ?? c.view.me.id);
+    const named: NameOf = (id) => nameOf(id ?? c.view.me.id);
     return { title: c.item.title, files: filesOf(history, markEntries(history), named, notesElsewhere(c, named)), folders: foldersOut(foldersNow(c)) };
   }
   const isOwner = thread && String(person ?? '').trim().toLowerCase() === c.view.me.name.toLowerCase();
@@ -593,10 +648,10 @@ export function teamRead({ person, thread, folder } = {}, ctx = {}) {
 
 // A thread is read only while the owner's card for it is there: the cloud decides
 // who may read a card, and its work leaves this computer when the card does.
-function readThread(c, who, threadId, nameOf) {
+function readThread(c: ReachContext, who: ViewPerson, threadId: string, nameOf: NameOf) {
   const card = (c.view.cards ?? []).find((k) => k.personId === who.id && k.threadId === threadId);
   if (!card) throw new Error(`you cannot read ${threadId}: your owner cannot see it. team_threads lists what they can`);
-  const lineOf = (l) => {
+  const lineOf = (l: ThreadLine) => {
     const text = l.patch?.body ?? l.patch?.answer ?? l.patch?.result ?? l.patch?.note;
     return text ? { from: l.source === 'agent' ? 'The agent' : nameOf(l.by), text, at: new Date(l.ts).toISOString() } : null;
   };
@@ -609,8 +664,9 @@ function readThread(c, who, threadId, nameOf) {
       files: filesOf(history, markEntries(history), (id) => nameOf(id ?? who.id), notesElsewhere(c, (id) => nameOf(id ?? who.id))),
     };
   }
-  let work = null;
-  try { work = JSON.parse(fs.readFileSync(path.join(c.view.threadsDir, who.id, threadId, 'thread.json'), 'utf8')); } catch { /* not come down yet */ }
+  let work: { earlier?: number; lines?: ThreadLine[]; marks?: ThreadLine[] } | null = null;
+  // With no threads folder the join throws, which reads as nothing come down yet.
+  try { work = JSON.parse(fs.readFileSync(path.join(c.view.threadsDir as string, who.id, threadId, 'thread.json'), 'utf8')); } catch { /* not come down yet */ }
   if (!work) return { title: card.title, person: who.name, context: card.problem ?? null, done: card.progress ?? null, messages: [], note: 'Only the card has reached this computer so far.' };
   return {
     title: card.title, person: who.name, earlier: work.earlier ?? 0, messages: (work.lines ?? []).map(lineOf).filter(Boolean),

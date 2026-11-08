@@ -20,7 +20,7 @@ import { ChatsPlace, TeammateMark, teammatesWaiting } from '../ui/Teammates';
 import { Face } from '../ui/Groups';
 import { mentionRows } from '../../../renderer/src/team/rooms/room-rules';
 import { mateOf, questionsForYou } from '../lib/teammates';
-import type { RoomMention as MentionRowData, Teammate } from '../../../renderer/src/types';
+import type { RoomMention as MentionRowData, Teammate, WorkItem } from '../../../renderer/src/types';
 import { appStore } from '../platform/persist';
 import { useCloud } from '../state/cloud';
 import { Magnifier, StateGlyph, ViewButton, ViewMenu } from '../ui/Filters';
@@ -137,7 +137,7 @@ function QuestionRow({ mate, text, at, first, now, open }: { mate: Teammate; tex
 }
 
 /** Repeating tasks above what is put off, as the desktop's Later tab has them (List.tsx). */
-function RepeatRows({ repeats, items, now }: { repeats: PhoneRepeat[]; items: any[]; now: number }) {
+function RepeatRows({ repeats, items, now }: { repeats: PhoneRepeat[]; items: WorkItem[]; now: number }) {
   const small = { fontSize: 11, lineHeight: 20, color: color.faint };
   return (
     <View style={{ paddingBottom: 8 }}>
@@ -375,7 +375,7 @@ export default function Threads() {
     if (d.view !== evView) { setEvView(d.view as EvView); if (place === 'inbox') setPlace('everything'); }
     setDisplay({ ...d, view: display.view });
   };
-  const threadRow = (i: any, first: boolean) => {
+  const threadRow = (i: WorkItem, first: boolean) => {
     const r = rowOf.get(`${i.product}/${i.id}`);
     return r ? <ThreadRow key={r.key} row={r} first={first} unread={c.unread(i)} mate={mateOf(i, c.team)} /> : null;
   };

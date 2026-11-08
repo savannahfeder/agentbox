@@ -13,11 +13,48 @@ import { roomBody } from '../shared/agent-voice.mts';
 import { statusOf, teammatesOn } from '../shared/teammates.mts';
 import { readChat, readOutbox, readTeamView, writeChat, writeOutbox, writeTeamView } from './store/teammates-files.mts';
 import { readItemHistory } from './store/work-items.mts';
+import type { AgentReply, OutboxEntry, ReachItem, TeamView, ViewCard, ViewFolder } from '../shared/teammate-reach.mts';
+import type { RunItem } from '../shared/teammates.mts';
+import type { Teammates } from './teammates.mts';
+import type { createTeamService } from './team/index.mts';
 
 const CARDS_IN_VIEW = 60;
 
+/** The team service, as far as reaching people needs it. */
+export type ReachTeam = Pick<ReturnType<typeof createTeamService>, 'state' | 'rooms' | 'giveTask' | 'message'>;
+
+type ReachState = NonNullable<ReturnType<ReachTeam['state']>>;
+type SignedIn = ReachState & { me: NonNullable<ReachState['me']> };
+
+/** A project as reaching people reads it: its folder, and who a conversation is with. */
+interface ReachProduct { slug: string; dir?: string | null; team?: { direct?: unknown; people?: readonly string[]; sharedBy?: string | null } | null }
+
+/** A row of the store as reaching people reads it. */
+type ReachRun = ReachItem & { product: string };
+
+/** The store, as far as reaching people needs it. */
+export interface ReachStore {
+  config?: { accountRoot?: string } | null;
+  listProducts(): ReachProduct[];
+  readItem(slug: string, id: string): { status?: string; answer?: string; labels?: string[] } | null;
+  productDir(slug: string): string;
+  modules: {
+    workItemsDisk: {
+      createWorkItem(dir: string, fields: Record<string, unknown>, opts: { source: string; now: number }): { id: string };
+      updateWorkItem(dir: string, id: string, patch: Record<string, unknown>, opts: { source: string; now: number }): unknown;
+    };
+    lock: { withProjectLock(dir: string, fn: () => Promise<unknown>): Promise<unknown> };
+  };
+}
+
+/** Says something on an agent's own thread, as a reply from someone. */
+export type ReachTell = (product: string, run: string, line: { text: string; from: { teammate: string; name: string } }) => unknown;
+
 /** This person's AI teammates with what each is on, for the team's board. */
-export function matesForTheTeam(store, config) {
+export function matesForTheTeam<T extends { id: string; paused?: boolean }>(
+  store: { teammates?: { list(): T[] } | null; listItems(): readonly RunItem[] },
+  config: { alphaTeammates?: unknown } | null | undefined,
+): (T & { now: string | null | undefined; running: boolean })[] {
   if (!teammatesOn(config) || !store.teammates) return [];
   const items = store.listItems();
   return store.teammates.list().map((t) => {
@@ -26,34 +63,35 @@ export function matesForTheTeam(store, config) {
   });
 }
 
-function viewOf(state, products, threadsDir, now, team) {
+function viewOf(state: SignedIn, products: readonly ReachProduct[], threadsDir: string | null, now: number, team: readonly { id: string; name?: string | null; openToTeam?: boolean }[]): Omit<TeamView, 'folders'> {
   const rooms = (state.rooms?.rooms ?? []).map((r) => ({
     id: r.id, name: r.name,
     recent: recentInGroup(state.rooms?.messages?.[r.id] ?? [], { me: state.me.id, team }),
   }));
   const directs = products.filter((p) => p.team?.direct && p.dir).map((p) => ({
-    dir: p.dir,
-    people: [...new Set([...(p.team.people ?? []), ...(p.team.sharedBy ? [p.team.sharedBy] : [])])].filter((x) => x !== state.me.id),
+    dir: p.dir!,
+    people: [...new Set([...(p.team!.people ?? []), ...(p.team!.sharedBy ? [p.team!.sharedBy] : [])])].filter((x) => x !== state.me.id),
   }));
-  const keep = (c) => ({
+  const keep = (c: ViewCard & { visible?: boolean }): ViewCard => ({
     personId: c.personId, threadId: c.threadId, title: c.title, project: c.project, state: c.state,
     problem: c.problem ?? null, progress: c.progress ?? null, updatedAt: c.updatedAt,
     ...(c.task ? { task: c.task, blockedBy: c.blockedBy ?? [] } : {}),
   });
+  // The cloud fills in a name for everyone, and the cards it sends are whole thread cards.
   return {
     at: now,
-    me: { id: state.me.id, name: state.me.name },
-    people: (state.people ?? []).map((p) => ({ id: p.id, name: p.name })),
+    me: { id: state.me.id, name: state.me.name as string },
+    people: (state.people ?? []).map((p) => ({ id: p.id, name: p.name as string })),
     rooms,
     directs,
-    cards: (state.cards ?? []).filter((c) => c.visible !== false).slice().sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0)).slice(0, CARDS_IN_VIEW).map(keep),
+    cards: ((state.cards ?? []) as (ViewCard & { visible?: boolean })[]).filter((c) => c.visible !== false).slice().sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0)).slice(0, CARDS_IN_VIEW).map(keep),
     threadsDir,
   };
 }
 
-const roomFileName = (name) => String(name).replace(/[^\w.-]+/g, '-').replace(/^[^A-Za-z0-9]+/, '').slice(0, 130) || 'file';
+const roomFileName = (name: string): string => String(name).replace(/[^\w.-]+/g, '-').replace(/^[^A-Za-z0-9]+/, '').slice(0, 130) || 'file';
 
-const replied = (name, words) => `${name} replied to your message:\n\n> ${String(words).trim().split('\n').join('\n> ')}`;
+const replied = (name: string, words: unknown): string => `${name} replied to your message:\n\n> ${String(words).trim().split('\n').join('\n> ')}`;
 
 // A file sent with a reply crosses after the line that names it, so a reply
 // waits this long for it before it goes without it, saying so.
@@ -61,9 +99,9 @@ const FILE_WAIT_MS = 10 * 60_000;
 const FILE_LINK = /!?\[([^\]\n]*)\]\(attachments\/([\w.-]+)\)/g;
 
 /** A reply's file links as names and paths on this Mac; `waiting` while one has not arrived. */
-export function filesForTheAgent(text, dir, { at, now }) {
+export function filesForTheAgent(text: unknown, dir: string, { at, now }: { at: number; now: number }): { text: string; waiting: boolean } {
   let waiting = false;
-  const out = String(text).replace(FILE_LINK, (_, label, name) => {
+  const out = String(text).replace(FILE_LINK, (_: string, label: string, name: string) => {
     const shown = label.trim() || name;
     const where = path.join(dir, 'attachments', name);
     if (fs.existsSync(where)) return `${shown} (on this Mac at ${where})`;
@@ -75,16 +113,25 @@ export function filesForTheAgent(text, dir, { at, now }) {
 
 // The fold's talk record keeps 280 characters of a message, for a row's line:
 // the agent is handed the ledger's own words.
-function wholeWords(store, items, r) {
+interface HistoryLine { by?: string; ts?: number; patch?: { answer?: unknown; body?: unknown } | null }
+
+function wholeWords(store: ReachStore, items: readonly ReachRun[], r: AgentReply): { text: unknown; dir: string | null } {
   const convo = items.find((i) => i.id === r.conversation);
   if (!convo) return { text: r.text, dir: null };
   const dir = store.productDir(convo.product);
-  const wordsOf = (l) => [l?.patch?.answer, l?.patch?.body].find((w) => typeof w === 'string' && w.trim());
-  const words = wordsOf(readItemHistory(dir, convo.id).findLast((l) => l.by === r.by && l.ts === r.ts && wordsOf(l)));
+  const wordsOf = (l: HistoryLine | undefined) => [l?.patch?.answer, l?.patch?.body].find((w) => typeof w === 'string' && w.trim());
+  const words = wordsOf((readItemHistory(dir, convo.id) as HistoryLine[]).findLast((l) => l.by === r.by && l.ts === r.ts && wordsOf(l)));
   return { text: words ?? r.text, dir };
 }
 
-export async function reachTick({ mates, store, team, items, now = Date.now(), tell }) {
+export async function reachTick({ mates, store, team, items, now = Date.now(), tell }: {
+  mates: Teammates;
+  store: ReachStore;
+  team: ReachTeam | null | undefined;
+  items: readonly ReachRun[];
+  now?: number;
+  tell?: ReachTell;
+}): Promise<void> {
   const state = team?.state?.();
   const dir = mates.dir();
   if (!state?.me || !state.team) {
@@ -93,34 +140,37 @@ export async function reachTick({ mates, store, team, items, now = Date.now(), t
     return;
   }
   const threadsDir = store.config?.accountRoot ? path.join(store.config.accountRoot, '_team-threads', state.me.id) : null;
-  const folders = await mates.foldersForAgents?.().catch((err) => { console.warn(`files: folders for agents: ${err.message}`); return null; });
+  const folders = await mates.foldersForAgents?.().catch((err: Error) => { console.warn(`files: folders for agents: ${err.message}`); return null; });
   const list = mates.list(now);
-  writeTeamView(dir, { ...viewOf(state, store.listProducts(), threadsDir, now, list), folders: folders ?? readTeamView(dir)?.folders ?? [] });
+  writeTeamView(dir, { ...viewOf(state as SignedIn, store.listProducts(), threadsDir, now, list), folders: (folders as ViewFolder[] | null | undefined) ?? (readTeamView(dir) as TeamView | null)?.folders ?? [] });
 
-  const nameOfPerson = (id) => state.people?.find((p) => p.id === id)?.name ?? 'Someone';
-  const row = (slug, id) => { try { return store.readItem(slug, id); } catch { return null; } };
+  const nameOfPerson = (id: string | null): string => state.people?.find((p) => p.id === id)?.name ?? 'Someone';
+  const row = (slug: string, id: string) => { try { return store.readItem(slug, id); } catch { return null; } };
 
-  const send = async (o) => {
+  // An outbox message names a group only when the team view listed it, which it
+  // does only with rooms on; the team is there because its state was read above.
+  const send = async (o: OutboxEntry): Promise<void> => {
     const voice = { ...(o.from.mate ? { id: o.from.mate } : {}), name: o.from.name, run: o.run };
     // Never a message without the files it was written with.
     const files = (o.files ?? []).map((f) => ({ name: f.name, srcPath: f.srcPath }));
     const gone = files.find((f) => !fs.existsSync(f.srcPath));
     if (gone) throw new Error(`${gone.name} is no longer at ${gone.srcPath}`);
     if (o.room) {
-      const links = [];
+      const links: string[] = [];
       for (const f of files) {
-        const stored = await team.rooms.putFileFrom(o.room, { name: `${crypto.randomBytes(4).toString('hex')}-${roomFileName(f.name)}`, srcPath: f.srcPath });
+        const stored = await team!.rooms!.putFileFrom(o.room, { name: `${crypto.randomBytes(4).toString('hex')}-${roomFileName(f.name)}`, srcPath: f.srcPath });
         links.push(`[${f.name}](attachments/${stored})`);
       }
-      await team.rooms.send(o.room, roomBody(voice, [o.text, links.join('\n')].filter(Boolean).join('\n\n')));
-    } else if (o.task) await team.giveTask(o.people[0], { title: o.title, body: o.text, due: o.due, files, voice, ...(o.blockedBy ? { blockedBy: o.blockedBy } : {}) });
-    else await team.message(o.people, o.text, undefined, files, { voice });
+      await team!.rooms!.send(o.room, roomBody(voice, [o.text, links.join('\n')].filter(Boolean).join('\n\n')));
+      // A task is always for one person (mcp/core/reach.mts teamTask).
+    } else if (o.task) await team!.giveTask(o.people![0], { title: o.title, body: o.text, due: o.due, files, voice, ...(o.blockedBy ? { blockedBy: o.blockedBy } : {}) });
+    else await team!.message(o.people, o.text, undefined, files, { voice });
     writeOutbox(dir, { kind: 'state', ref: o.id, state: 'sent' }, now);
     if (o.from.mate) writeChat(dir, { kind: 'act', from: o.from.mate, verb: 'wrote', text: `Wrote to ${audienceWords(o)}: ${String(o.title ?? o.text).replace(/\s+/g, ' ').slice(0, 160)}` }, now);
   };
 
   // What went wrong is said on the agent's own thread, then it stops trying.
-  const tryToSend = async (o) => {
+  const tryToSend = async (o: OutboxEntry): Promise<boolean | undefined> => {
     try {
       await send(o);
       return true;
@@ -128,13 +178,13 @@ export async function reachTick({ mates, store, team, items, now = Date.now(), t
       writeOutbox(dir, { kind: 'try', ref: o.id }, now);
       if (o.tries + 1 < MOST_TRIES) return false;
       writeOutbox(dir, { kind: 'state', ref: o.id, state: 'failed' }, now);
-      await tell?.(o.product, o.run, { text: `Your message to ${audienceWords(o)} could not be sent: ${err.message}. It was not sent.`, from: { teammate: 'app', name: 'The app' } });
+      await tell?.(o.product, o.run, { text: `Your message to ${audienceWords(o)} could not be sent: ${(err as Error).message}. It was not sent.`, from: { teammate: 'app', name: 'The app' } });
     }
   };
 
   const fromApp = { teammate: 'app', name: 'The app' };
   // A run that has finished is not woken to hear it.
-  const runOpen = (o) => { const r = row(o.product, o.run); return !!r && r.status !== 'done'; };
+  const runOpen = (o: OutboxEntry): boolean => { const r = row(o.product, o.run); return !!r && r.status !== 'done'; };
 
   const { out, yes } = readOutbox(dir);
   for (const o of out) {
@@ -149,13 +199,14 @@ export async function reachTick({ mates, store, team, items, now = Date.now(), t
       continue;
     }
     if (o.state === 'asked') {
-      const ask = row(o.rowProduct, o.row);
+      // The line that marks a message asked names the ask's row and project with it.
+      const ask = row(o.rowProduct!, o.row!);
       if (!ask) { writeOutbox(dir, { kind: 'state', ref: o.id, state: 'refused' }, now); continue; }
       const tap = reachAnswer(ask.answer, { outside: !!o.outside });
       // Closed with no answer is a no; so is a row that has gone.
-      const answer = tap ?? (ask.status === 'done' ? { kind: 'no' } : null);
+      const answer: ReturnType<typeof reachAnswer> = tap ?? (ask.status === 'done' ? { kind: 'no' } : null);
       if (!answer) continue;
-      const finish = (word) => store.modules.workItemsDisk.updateWorkItem(store.productDir(o.rowProduct), o.row, {
+      const finish = (word: string) => store.modules.workItemsDisk.updateWorkItem(store.productDir(o.rowProduct!), o.row!, {
         status: 'done', labels: [...(ask.labels ?? []).filter((l) => l !== 'clean'), 'clean'], note: word,
       }, { source: 'system', now });
       if (answer.kind === 'no') {
@@ -178,7 +229,7 @@ export async function reachTick({ mates, store, team, items, now = Date.now(), t
     const { workItemsDisk, lock } = store.modules;
     const slug = store.listProducts().some((p) => p.slug === o.product) ? o.product : mates._product(null);
     const pdir = store.productDir(slug);
-    let id = null;
+    let id: string | null = null;
     await lock.withProjectLock(pdir, async () => {
       const made = workItemsDisk.createWorkItem(pdir, {
         title: askTitle(o), body: askWhere(o), kind: 'question', priority: 5, labels: [REACH_LABEL], visibility: 'private',
@@ -190,10 +241,10 @@ export async function reachTick({ mates, store, team, items, now = Date.now(), t
   }
 
   const products = new Map(store.listProducts().map((p) => [p.slug, p]));
-  const direct = (i) => !!products.get(i.product)?.team?.direct;
+  const direct = (i: ReachRun): boolean => !!products.get(i.product)?.team?.direct;
   const chat = readChat(dir);
   const seen = new Set([...chat.seen].filter((k) => k.endsWith('>reach')).map((k) => k.slice(0, -'>reach'.length)));
-  const mark = (key) => writeChat(dir, { kind: 'seen', ref: key, for: 'reach' }, now);
+  const mark = (key: string) => writeChat(dir, { kind: 'seen', ref: key, for: 'reach' }, now);
 
   const rooms = state.rooms?.messages ?? {};
   for (const r of repliesToAgents({ items, rooms, me: state.me.id, seen, direct, ownerName: state.me.name ?? null })) {
@@ -202,7 +253,7 @@ export async function reachTick({ mates, store, team, items, now = Date.now(), t
     // Nobody to carry it to: it is in the owner's Needs you as any message is.
     if (run && !closedByOwner) {
       const name = nameOfPerson(r.by);
-      let words = r.text;
+      let words: unknown = r.text;
       if (!r.finished) {
         const whole = wholeWords(store, items, r);
         const files = whole.dir ? filesForTheAgent(whole.text, whole.dir, { at: r.ts, now }) : { text: whole.text, waiting: false };
@@ -216,7 +267,8 @@ export async function reachTick({ mates, store, team, items, now = Date.now(), t
   }
 
   for (const r of requestsToMates({ items, team: list, me: state.me.id, seen, direct })) {
-    const t = list.find((x) => x.id === r.teammate);
+    // requestsToMates names only teammates on this list.
+    const t = list.find((x) => x.id === r.teammate)!;
     const name = nameOfPerson(r.by);
     writeOutbox(dir, { kind: 'yes', who: t.id, key: `person:${r.by}` }, now);
     writeChat(dir, {

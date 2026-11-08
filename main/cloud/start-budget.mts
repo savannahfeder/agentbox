@@ -8,26 +8,50 @@
 // has been measured at this rate: a stand-in with tiny files proved nothing about
 // a 278 MB transcript.
 
+import type { Pressure } from '../memory-gate.mts';
+
 const STALL_LIMIT_MS = 500;
 const COOL_MS = 30_000;
 
+export interface StartBudgetOptions {
+  start?: number;
+  floor?: number;
+  ceiling?: number;
+  stallLimitMs?: number;
+  coolMs?: number;
+  clock?: () => number;
+}
+
+export interface StartReading {
+  pressure?: Pressure;
+  stallMs?: number;
+}
+
 export class StartBudget {
-  constructor({ start = 2, floor = 1, ceiling = 8, stallLimitMs = STALL_LIMIT_MS, coolMs = COOL_MS, clock = Date.now } = {}) {
+  declare value: number;
+  declare floor: number;
+  declare ceiling: number;
+  declare stallLimitMs: number;
+  declare coolMs: number;
+  declare clock: () => number;
+  declare cutAt: number;
+
+  constructor({ start = 2, floor = 1, ceiling = 8, stallLimitMs = STALL_LIMIT_MS, coolMs = COOL_MS, clock = Date.now }: StartBudgetOptions = {}) {
     Object.assign(this, { value: start, floor, ceiling, stallLimitMs, coolMs, clock });
     this.cutAt = -Infinity;
   }
 
-  now() { return this.value; }
+  now(): number { return this.value; }
 
-  started({ pressure, stallMs } = {}) {
+  started({ pressure, stallMs }: StartReading = {}): void {
     if (pressure === 'critical') { this.value = this.floor; this.cutAt = this.clock(); return; }
     if (pressure === 'tight' || (stallMs ?? 0) >= this.stallLimitMs) { this._cut(); return; }
     if (this.clock() - this.cutAt >= this.coolMs) this.value = Math.min(this.ceiling, this.value + 1);
   }
 
-  failed() { this._cut(); }
+  failed(): void { this._cut(); }
 
-  _cut() {
+  _cut(): void {
     const at = this.clock();
     if (at - this.cutAt < this.coolMs) return;
     this.cutAt = at;

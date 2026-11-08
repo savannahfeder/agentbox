@@ -162,7 +162,7 @@ describe('what the wait actually is', () => {
   });
   it('never switches her to the row when a live reply fails', () => {
     const app = read('renderer/src/App.tsx');
-    const failed = app.slice(app.indexOf('        failed: (error: Error) => {'), app.indexOf('    // TAKING A SEND BACK'));
+    const failed = app.slice(app.indexOf('        failed: (error: unknown) => {'), app.indexOf('    // TAKING A SEND BACK'));
     expect(failed).not.toContain('setFocused(item)');
     // The words that say where the message went are shared by both reply
     // paths since 2026-10-13 (`putBack`), so they are read where they live.
@@ -183,7 +183,7 @@ describe('the pane it is drawn in', () => {
 
   it('gives the words back and takes the message down when the send fails', () => {
     const app = read('renderer/src/App.tsx');
-    const failed = app.slice(app.indexOf('        failed: (error: Error) => {'));
+    const failed = app.slice(app.indexOf('        failed: (error: unknown) => {'));
     // `gone` is the same message after the three second hold (w-5281ef1221):
     // the queue holds one object or the other, and a failure takes either down.
     expect(failed.slice(0, 400)).toContain('setSending((q) => q.filter((s) => s !== mine && s !== gone))');

@@ -3,7 +3,22 @@
 
 // Plain words, not tool names. Edit is "changed" because a reader who is not a
 // programmer takes "edited" to mean a document was revised.
-const VERBS = {
+export type ToolInput = { readonly [field: string]: unknown };
+type Where = string | null | undefined;
+export interface CommandWork { verb: string; doing: string; subject: string }
+interface Phrase { verb: string; doing: string }
+interface StageWords extends Phrase { names: string[]; many?: string; plural?: Phrase; whole?: boolean }
+interface Family extends Phrase {
+  heads: string[];
+  take: 'files' | 'first' | 'named' | 'url';
+  skip?: string[];
+  many?: string;
+  empty?: string;
+  plural?: Phrase;
+}
+export interface WorkRun<E> { kind: 'run'; at: number; items: E[] }
+
+const VERBS: Record<string, string> = {
   Bash: 'ran',
   Read: 'read',
   Write: 'wrote',
@@ -29,7 +44,7 @@ const VERBS = {
 // An MCP tool name is `mcp__<server>__<tool>` and the server name may itself
 // hold underscores (`mcp__plugin_paper-desktop_paper__write_html`), so the tool
 // is what follows the last double underscore.
-export function workVerb(name) {
+export function workVerb(name: string | null | undefined): string {
   const n = String(name ?? '').trim();
   if (!n) return 'did something';
   if (VERBS[n]) return VERBS[n];
@@ -43,7 +58,7 @@ const PATH_SEGMENTS = 3;
 
 // `home` has no default on purpose: with none given, a path is shown whole
 // rather than shortened against a guess at whose machine this is.
-export function shortPath(raw, cwd = '', home = '') {
+export function shortPath(raw: unknown, cwd: Where = '', home: Where = ''): string {
   const s = String(raw ?? '').trim();
   if (!s) return '';
   if (!s.startsWith('/') && !s.startsWith('~')) return s;
@@ -66,7 +81,7 @@ export function shortPath(raw, cwd = '', home = '') {
 
 // The leading `…/` says segments were dropped. Without it `components/Tweaks.tsx`
 // would read as a path from the root of something.
-function trimSegments(p) {
+function trimSegments(p: string): string {
   // The lead is kept when nothing is trimmed, because `/x/store.mjs` and
   // `x/store.mjs` are different files.
   const lead = p.startsWith('~/') ? '~/' : p.startsWith('/') ? '/' : '';
@@ -103,7 +118,7 @@ const HEREDOC = /<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1([\s\S]*)$/;
 // row of `python3 - …` lines cannot be told apart.
 const HEREDOC_HEAD = 12;
 
-function firstScriptLine(body, marker) {
+function firstScriptLine(body: string | undefined, marker: string): string {
   for (const line of String(body ?? '').split('\n')) {
     const t = line.trim();
     // The closing marker is not a line of the script. It is matched exactly,
@@ -115,7 +130,7 @@ function firstScriptLine(body, marker) {
   return '';
 }
 
-export function plainCommand(raw) {
+export function plainCommand(raw: unknown): string {
   let s = String(raw ?? '').trim();
   if (!s) return '';
   const whole = s;
@@ -148,7 +163,7 @@ const BOOKKEEPING = new Set([
 // A Claude transcript writes `mcp__<server>__<tool>`, with the server named
 // after the product, and Codex reports the bare tool. `ToolSearch` is Claude
 // Code loading a tool's schema.
-export function isBookkeeping(name) {
+export function isBookkeeping(name: string | null | undefined): boolean {
   const n = String(name ?? '').trim();
   if (!n) return false;
   if (n === 'ToolSearch') return true;
@@ -168,7 +183,7 @@ const NOISE = new Set(['echo', 'cd', 'pwd', 'true', 'false', ':', 'sleep', 'clea
 // or writes a file this does not account for, so it gives up rather than guess.
 const QUIET_REDIRECT = /^[0-9]*>>?&?(?:[0-9]+|\/dev\/null)$/;
 
-const FAMILIES = [
+const FAMILIES: Family[] = [
   { verb: 'read', doing: 'Reading', heads: ['cat', 'head', 'tail', 'less', 'more', 'nl', 'bat'], take: 'files', skip: ['-n', '-c', '-m'] },
   { verb: 'counted the lines in', doing: 'Counting the lines in', heads: ['wc'], take: 'files' },
   { verb: 'searched for', doing: 'Searching for', heads: ['grep', 'rg', 'ag', 'ack'], take: 'first', many: 'things', skip: ['-e', '-m', '-A', '-B', '-C'] },
@@ -181,12 +196,12 @@ const FAMILIES = [
   { verb: 'made a file', doing: 'Making a file', heads: ['touch'], take: 'files', plural: { verb: 'made files', doing: 'Making files' } },
   { verb: 'fetched', doing: 'Fetching', heads: ['curl', 'wget'], take: 'url', many: 'pages', skip: ['-o', '-w', '-H', '-X', '-d', '-u', '-A', '-e', '-F', '--output', '--header', '--data'] },
 ];
-const BY_HEAD = new Map();
+const BY_HEAD = new Map<string, Family>();
 for (const family of FAMILIES) for (const head of family.heads) BY_HEAD.set(head, family);
 
 // Subcommands not listed keep their command, because a vague verb over
 // `git merge-base` says less than the command does.
-const GIT = {
+const GIT: Record<string, Phrase> = {
   status: { verb: 'checked what changed', doing: 'Checking what changed' },
   diff: { verb: 'checked what changed', doing: 'Checking what changed' },
   log: { verb: 'read the code history', doing: 'Reading the code history' },
@@ -211,9 +226,9 @@ const SCRIPTS = new Set(['node', 'python', 'python3', 'ruby', 'osascript', 'deno
 const TEST_RUNNERS = new Set(['vitest', 'jest', 'pytest', 'mocha', 'ava']);
 const TEST_FILE = /\.(?:test|spec)\.[a-z]+$/;
 
-const lastSegment = (file) => String(file).split('/').filter(Boolean).pop() ?? '';
+const lastSegment = (file: string) => String(file).split('/').filter(Boolean).pop() ?? '';
 
-function unquote(token) {
+function unquote(token: string | undefined): string {
   const t = String(token);
   if (t.length > 1 && (t[0] === '"' || t[0] === "'") && t[t.length - 1] === t[0]) return t.slice(1, -1);
   return t;
@@ -221,8 +236,8 @@ function unquote(token) {
 
 // Splits only outside quotes: a `;` inside a sed script or a grep pattern is
 // not a new command.
-function splitOutside(text, separators) {
-  const out = [];
+function splitOutside(text: string, separators: readonly string[]): string[] {
+  const out: string[] = [];
   let buffer = '';
   let quote = '';
   for (let i = 0; i < text.length; i += 1) {
@@ -242,14 +257,14 @@ function splitOutside(text, separators) {
   return out.map((part) => part.trim()).filter(Boolean);
 }
 
-const tokens = (segment) => splitOutside(segment, [' ', '\t']);
-const isFlag = (token) => token.startsWith('-') && token !== '-';
-const looksLikeAFile = (token) => /[./]/.test(token) && !token.startsWith('-');
+const tokens = (segment: string) => splitOutside(segment, [' ', '\t']);
+const isFlag = (token: string) => token.startsWith('-') && token !== '-';
+const looksLikeAFile = (token: string) => /[./]/.test(token) && !token.startsWith('-');
 
 // The arguments of one stage, with the quiet redirects and the flag values
 // dropped. Null when something is there that this file cannot account for.
-function argumentsOf(words, skip = []) {
-  const out = [];
+function argumentsOf(words: readonly string[], skip: readonly string[] = []): string[] | null {
+  const out: string[] = [];
   for (let i = 0; i < words.length; i += 1) {
     const raw = words[i];
     const quoted = raw[0] === '"' || raw[0] === "'";
@@ -270,7 +285,7 @@ function argumentsOf(words, skip = []) {
 
 // One stage of one segment, as a verb and the things it names, or 'noise', or
 // null for "this file does not know".
-function stageWords(stage, cwd, home) {
+function stageWords(stage: string, cwd: Where, home: Where): StageWords | 'noise' | null {
   const words = tokens(stage);
   if (!words.length) return 'noise';
   const head = unquote(words[0]);
@@ -320,7 +335,7 @@ function stageWords(stage, cwd, home) {
 
 const URL_LIKE = /^(?:https?:\/\/|www\.|localhost|127\.0\.0\.1)/;
 
-function namesFor(family, args, cwd, home) {
+function namesFor(family: Family, args: string[], cwd: Where, home: Where): string[] {
   if (family.take === 'first') return args.slice(0, 1);
   // The URL is not always the first argument, as in
   // `curl -s -o /dev/null -w '%{http_code}' <url>`.
@@ -339,7 +354,7 @@ function namesFor(family, args, cwd, home) {
 
 // Keeps what the subcommand named (the file, the branch or the message),
 // because a bare verb tells a developer less than the command did.
-function gitWords(rest, cwd, home) {
+function gitWords(rest: readonly string[], cwd: Where, home: Where): StageWords | null {
   const words = [...rest];
   // `git -C <path> <subcommand>`: the folder is not the verb.
   while (words.length && isFlag(unquote(words[0]))) {
@@ -355,7 +370,7 @@ function gitWords(rest, cwd, home) {
 // Not a ref: the remote it went to, and the `--` that ends the flags.
 const NOT_A_REF = new Set(['origin', 'upstream', '.', '--', 'HEAD']);
 
-function gitNames(sub, rest, cwd, home) {
+function gitNames(sub: string, rest: readonly string[], cwd: Where, home: Where): string[] {
   if (sub === 'commit') {
     // The message is absent when it came in on stdin (`git commit -F -`).
     const at = rest.findIndex((w) => unquote(w) === '-m' || unquote(w) === '--message');
@@ -378,7 +393,7 @@ function gitNames(sub, rest, cwd, home) {
 // The leading quote survives on a line the trace cut mid-string.
 const SED_SCRIPT = /^['"]?[0-9,$]*[a-zA-Z]?[/#|]/;
 
-function sedWords(rest, cwd, home) {
+function sedWords(rest: readonly string[], cwd: Where, home: Where): StageWords | null {
   const args = argumentsOf(rest);
   if (args === null) return null;
   const flags = rest.map(unquote).filter(isFlag);
@@ -395,7 +410,7 @@ function sedWords(rest, cwd, home) {
   return file ? { verb: 'read', doing: 'Reading', names: [shortPath(file, cwd, home)] } : null;
 }
 
-function runnerWords(rest, cwd, home) {
+function runnerWords(rest: readonly string[], cwd: Where, home: Where): StageWords | 'noise' | null {
   const words = rest.map(unquote).filter((w) => w !== '--yes' && w !== '-y' && w !== '-s');
   let tool = words[0] ?? '';
   if (tool === 'run' || tool === 'exec') tool = words[1] ?? '';
@@ -417,7 +432,7 @@ function runnerWords(rest, cwd, home) {
 // A trace line is cut at 200 characters, so the last test file on a long
 // `vitest run a b c` often arrives without its extension. Anything that looks
 // like a path counts.
-function testWords(rest) {
+function testWords(rest: readonly string[]): StageWords {
   const args = rest.map(unquote).filter((w) => !isFlag(w) && w !== 'run');
   const files = args.filter((w) => TEST_FILE.test(w) || w.includes('/'));
   return { ...TESTS, names: files.map(lastSegment) };
@@ -425,7 +440,7 @@ function testWords(rest) {
 
 // Up to three names, then a count that says what it counted, so the cap is
 // never silent.
-function joinNames(names, many = 'files') {
+function joinNames(names: readonly string[], many = 'files'): string {
   const list = [...new Set(names.filter(Boolean))];
   if (!list.length) return '';
   if (list.length > 3) return `${list.length} ${many}`;
@@ -439,10 +454,10 @@ function joinNames(names, many = 'files') {
  * `cwd` and `home` are the session's folder and the machine's home, passed on
  * to `shortPath`.
  */
-export function commandWork(raw, cwd = '', home = '') {
+export function commandWork(raw: unknown, cwd: Where = '', home: Where = ''): CommandWork | null {
   const command = plainCommand(raw);
   if (!command) return null;
-  const steps = [];
+  const steps: StageWords[] = [];
   for (const segment of splitOutside(command, ['&&', '||', ';', '\n'])) {
     // A pipeline's first stage is what ran; the rest is plumbing that shapes
     // its output (`| head`, `| sort | uniq -c`).
@@ -464,7 +479,7 @@ export function commandWork(raw, cwd = '', home = '') {
 
 // What the call acted on, as short as it can be without being wrong. With a
 // `cwd`, paths under it are shown relative to it.
-export function workSubject(input, cwd = '', home = '') {
+export function workSubject(input: ToolInput | null | undefined, cwd: Where = '', home: Where = ''): string {
   const i = input ?? {};
   if (i.command != null && String(i.command).trim()) {
     return plainCommand(i.command);
@@ -476,7 +491,7 @@ export function workSubject(input, cwd = '', home = '') {
 }
 
 // The whole string, shown above the output when a line is opened.
-export function fullSubject(input) {
+export function fullSubject(input: ToolInput | null | undefined): string {
   const i = input ?? {};
   const raw = i.command ?? i.file_path ?? i.path ?? i.notebook_path
     ?? i.pattern ?? i.query ?? i.to ?? i.url ?? i.prompt ?? '';
@@ -487,9 +502,12 @@ export function fullSubject(input) {
 // lines, which say more than a fold does.
 export const RUN_MIN = 3;
 
-export function groupWork(events, { min = RUN_MIN } = {}) {
-  const out = [];
-  let run = [];
+export function groupWork<E extends { kind?: string; yours?: boolean; standalone?: boolean; at?: number }>(
+  events: readonly E[] | null | undefined,
+  { min = RUN_MIN }: { min?: number } = {},
+): (E | WorkRun<E>)[] {
+  const out: (E | WorkRun<E>)[] = [];
+  let run: E[] = [];
   const flush = () => {
     if (!run.length) return;
     if (run.length >= min) out.push({ kind: 'run', at: run[0].at ?? 0, items: run });
@@ -518,10 +536,10 @@ export function groupWork(events, { min = RUN_MIN } = {}) {
 const PLAIN = new Set(['ran', 'read', 'wrote', 'changed', 'looked for', 'searched for', 'fetched', 'messaged']);
 const TALLY_VERBS = 3;
 
-export function runSummary(items) {
+export function runSummary(items: readonly { verb: string }[] | null | undefined): string {
   const list = (items ?? []).filter(Boolean);
   if (!list.length) return '';
-  const counts = new Map();
+  const counts = new Map<string, number>();
   for (const e of list) counts.set(e.verb, (counts.get(e.verb) ?? 0) + 1);
   const byCount = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 
@@ -536,7 +554,7 @@ export function runSummary(items) {
 
 // A failure inside a fold is said on the closed line, so nobody has to open it
 // to find bad news.
-export function runFailures(items) {
+export function runFailures(items: readonly ({ failed?: boolean } | null | undefined)[] | null | undefined): string {
   const bad = (items ?? []).filter((e) => e && e.failed).length;
   if (!bad) return '';
   return `${bad} failed`;
@@ -552,7 +570,7 @@ export const CHANGES_A_FILE = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEd
  * nothing. Whole because it is matched against the change's own list, and the
  * shortened form on screen has had its front thrown away.
  */
-export function changedFile(name, input) {
+export function changedFile(name: string | null | undefined, input: ToolInput | null | undefined): string {
   if (!CHANGES_A_FILE.has(String(name ?? ''))) return '';
   const i = input ?? {};
   return String(i.file_path ?? i.notebook_path ?? '').trim();
@@ -569,10 +587,10 @@ export function changedFile(name, input) {
  * The longest match wins: `src/a.ts` and `renderer/src/a.ts` are both suffixes
  * of the second one's absolute path.
  */
-export function fileInChange(paths, raw) {
+export function fileInChange(paths: Iterable<string> | null | undefined, raw: string | null | undefined): string | null {
   const p = String(raw ?? '').trim().replace(/^\/private\/tmp\//, '/tmp/');
   if (!p) return null;
-  let best = null;
+  let best: string | null = null;
   for (const key of paths ?? []) {
     const k = String(key ?? '').trim();
     if (!k) continue;

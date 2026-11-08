@@ -25,6 +25,7 @@ import os from 'node:os';
 import {
   ENGINES, findEngine, resolveEngine, forgetEngine, installEvidence as evidenceFor,
   versionedBinPaths, askShell, shellProbes,
+  type EngineSearch, type EvidenceOptions, type FindEngineOptions, type Readdir, type ResolveEngineOptions,
 } from './engine-bin.mts';
 
 export { askShell, shellProbes };
@@ -34,39 +35,39 @@ const CLAUDE = ENGINES.claude;
 export const INSTALL_URL = CLAUDE.installUrl;
 
 /** Every normal home for this binary, in order; the first that exists wins. */
-export function candidatePaths(home = os.homedir()) {
+export function candidatePaths(home: string = os.homedir()): string[] {
   return CLAUDE.candidates(home, () => []);
 }
 
 /** One bin directory per installed Node, read rather than guessed. */
-export function versionedPaths(home = os.homedir(), readdir = undefined) {
+export function versionedPaths(home: string = os.homedir(), readdir: Readdir | undefined = undefined): string[] {
   return versionedBinPaths('claude', home, readdir);
 }
 
 /** The copy the Claude desktop app keeps for itself, newest version first. */
-export function appCopyPaths(home = os.homedir(), readdir = undefined) {
+export function appCopyPaths(home: string = os.homedir(), readdir: Readdir | undefined = undefined): string[] {
   return CLAUDE.appCopies(home, readdir);
 }
 
 /** What Claude Code leaves behind. None of it is ever spawned. */
-export function evidencePaths(home = os.homedir()) {
+export function evidencePaths(home: string = os.homedir()): string[] {
   return CLAUDE.evidence(home, {});
 }
 
-export function installEvidence({ home = os.homedir(), exists, dangles } = {}) {
+export function installEvidence({ home = os.homedir(), exists, dangles }: Pick<EvidenceOptions, 'home' | 'exists' | 'dangles'> = {}): string | null {
   return evidenceFor('claude', { home, env: {}, exists, dangles });
 }
 
 /** The whole search. See main/engine-bin.mts for what each answer means. */
-export function findClaudeBin(where = {}) {
+export function findClaudeBin(where: FindEngineOptions = {}): EngineSearch {
   return findEngine('claude', where);
 }
 
 /** The same search with the shell step held for thirty seconds. */
-export function resolveClaudeBin(configured = null, where = {}) {
+export function resolveClaudeBin(configured: string | null = null, where: ResolveEngineOptions = {}): EngineSearch {
   return resolveEngine('claude', configured, where);
 }
 
-export function forgetClaudeBin() {
+export function forgetClaudeBin(): void {
   forgetEngine('claude');
 }

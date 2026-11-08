@@ -31,11 +31,27 @@
 // there is no single authority to copy, these are written for the person
 // reading them, in the words the rest of this app uses.
 
+export type CodexModeId = 'read-only' | 'auto' | 'full-access';
+
+/**
+ * `sandbox` and `approvalPolicy` are plain strings on purpose: Codex's own
+ *  schema is the authority on what it accepts, and a union here would be a
+ *  copy of it that nothing checks.
+ */
+export interface CodexMode {
+  label: string;
+  sandbox: string;
+  approvalPolicy: string;
+  what: string;
+}
+
+export type CodexReviewer = 'user' | 'auto_review' | 'guardian_subagent';
+
 /** Her three, in order of what they let an agent do. */
-export const CODEX_MODE_ORDER = ['read-only', 'auto', 'full-access'];
+export const CODEX_MODE_ORDER: CodexModeId[] = ['read-only', 'auto', 'full-access'];
 
 /** The one a worker runs in when nothing has been picked. */
-export const CODEX_DEFAULT_MODE = 'auto';
+export const CODEX_DEFAULT_MODE: CodexModeId = 'auto';
 
 /**
  * WHO A SANDBOX ESCAPE IS ROUTED TO, in Codex's own three words. Read off
@@ -50,14 +66,14 @@ export const CODEX_DEFAULT_MODE = 'auto';
  *  the run is lost, so `codexReviewer` below falls back rather than passing one
  *  through.
  */
-export const CODEX_REVIEWERS = ['user', 'auto_review', 'guardian_subagent'];
+export const CODEX_REVIEWERS: CodexReviewer[] = ['user', 'auto_review', 'guardian_subagent'];
 
 /** The reviewer that puts the question in front of the person. */
-export const ASKS_THE_PERSON = 'user';
+export const ASKS_THE_PERSON: CodexReviewer = 'user';
 
 /** Invalid explicit reviewers fall back to asking the person. */
-export function codexReviewer(asked = null) {
-  return CODEX_REVIEWERS.includes(asked) ? asked : ASKS_THE_PERSON;
+export function codexReviewer(asked: string | null = null): CodexReviewer {
+  return CODEX_REVIEWERS.includes(asked as CodexReviewer) ? asked as CodexReviewer : ASKS_THE_PERSON;
 }
 
 /**
@@ -73,7 +89,7 @@ export function codexReviewer(asked = null) {
  *  `codexPosture` explicitly supplies each mode's reviewer so the account's
  *  configuration cannot change who answers an escalation.
  */
-export const CODEX_MODES = {
+export const CODEX_MODES: Record<CodexModeId, CodexMode> = {
   'read-only': {
     label: 'Read only',
     sandbox: 'read-only',
@@ -96,7 +112,7 @@ export const CODEX_MODES = {
 };
 
 /** Whether a word is one of the three. */
-export function isCodexMode(word) {
+export function isCodexMode(word: unknown): word is CodexModeId {
   return typeof word === 'string' && Object.hasOwn(CODEX_MODES, word);
 }
 
@@ -107,8 +123,11 @@ export function isCodexMode(word) {
  *  start one. The writers (main/settings.mts) validate on the way IN, which is
  *  where a typo can still be reported to the person who made it.
  */
-export function codexPosture(mode, { reviewer = null } = {}) {
-  const row = CODEX_MODES[mode] ?? CODEX_MODES[CODEX_DEFAULT_MODE];
+export function codexPosture(
+  mode: string | null | undefined,
+  { reviewer = null }: { reviewer?: string | null } = {},
+): { sandbox: string; approvalPolicy: string; approvalsReviewer: CodexReviewer } {
+  const row = CODEX_MODES[mode as CodexModeId] ?? CODEX_MODES[CODEX_DEFAULT_MODE];
   return {
     sandbox: row.sandbox,
     approvalPolicy: row.approvalPolicy,
@@ -117,8 +136,8 @@ export function codexPosture(mode, { reviewer = null } = {}) {
 }
 
 /** The label for a mode, for any surface that has to name one. */
-export function codexModeWords(mode) {
-  return (CODEX_MODES[mode] ?? CODEX_MODES[CODEX_DEFAULT_MODE]).label;
+export function codexModeWords(mode: string | null | undefined): string {
+  return (CODEX_MODES[mode as CodexModeId] ?? CODEX_MODES[CODEX_DEFAULT_MODE]).label;
 }
 
 /**
@@ -129,14 +148,14 @@ export function codexModeWords(mode) {
  *  menu she is looking at only ever offers one of the two, and both mean "the
  *  sensible default" on their own engine.
  */
-export const CODEX_MODE_COMMAND = {
+export const CODEX_MODE_COMMAND: Record<CodexModeId, string> = {
   'read-only': '/read-only',
   auto: '/auto',
   'full-access': '/full-access',
 };
 
 /** One sentence per row of the menu, in the same voice as the Claude Code list. */
-export const CODEX_MODE_HINT = {
+export const CODEX_MODE_HINT: Record<CodexModeId, string> = {
   'read-only': 'reads and searches, writes nothing',
   auto: 'works in the project folder, reviews extra access automatically',
   'full-access': 'anything, anywhere, without asking',
@@ -146,12 +165,12 @@ export const CODEX_MODE_HINT = {
  * The rows the menu draws for what has been typed. Mirrors `menuRowsFor` on the
  *  Claude Code side, including the way back when a mode is already set.
  */
-export function codexMenuRowsFor(query, set) {
+export function codexMenuRowsFor(query: string | null, set?: unknown): (CodexModeId | null)[] {
   if (query === null) return [];
   const rows = CODEX_MODE_ORDER.filter((id) => CODEX_MODE_COMMAND[id].slice(1).startsWith(query.toLowerCase()));
   // `/clear` puts it back to whatever the project is already set to, and is
   // only offered when there is something to clear.
-  const back = set && 'clear'.startsWith(query.toLowerCase()) ? [null] : [];
+  const back: null[] = set && 'clear'.startsWith(query.toLowerCase()) ? [null] : [];
   return [...rows, ...back];
 }
 
@@ -161,20 +180,20 @@ export function codexMenuRowsFor(query, set) {
  *  after it. Codex prints no such line, so these are ours, kept in the same
  *  rhythm so the two engines read alike on one screen.
  */
-export const CODEX_MODE_STATUS = {
+export const CODEX_MODE_STATUS: Record<CodexModeId, string> = {
   'read-only': 'read only on',
   auto: 'auto on',
   'full-access': 'full access on',
 };
 
 /** The next one round the loop, for Shift+Tab. */
-export function nextCodexMode(mode) {
+export function nextCodexMode(mode: CodexModeId): CodexModeId {
   const at = CODEX_MODE_ORDER.indexOf(mode);
   return CODEX_MODE_ORDER[(at + 1) % CODEX_MODE_ORDER.length];
 }
 
 /** The mode a typed `/word ` means, or null when it means nothing. */
-export function exactCodexMode(word) {
+export function exactCodexMode(word: string | null | undefined): CodexModeId | null {
   if (!word) return null;
   const hit = CODEX_MODE_ORDER.find((id) => CODEX_MODE_COMMAND[id] === `/${word}`);
   return hit ?? null;

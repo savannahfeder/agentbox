@@ -87,6 +87,6 @@ describe('App.tsx uses both', () => {
     expect(app).toMatch(/catch \(error\) \{\s*setSending\(\(q\) => q\.filter\(\(s\) => s !== mine\)\);\s*putBack\(error\);\s*return;\s*\}/);
   });
   it('and so does one to a working agent, through the same words', () => {
-    expect(app).toMatch(/failed: \(error: Error\) => \{[\s\S]{0,200}putBack\(error\);/);
+    expect(app).toMatch(/failed: \(error: unknown\) => \{[\s\S]{0,200}putBack\(error\);/);
   });
 });

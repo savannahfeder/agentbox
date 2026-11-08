@@ -31,6 +31,9 @@ export interface GatewayBody {
   message?: string;
   url?: unknown;
   where?: unknown;
+  /** On `/v1/me`: the plan, and the free hours a new account starts with. */
+  plan?: unknown;
+  free?: FreeHours;
   [field: string]: unknown;
 }
 
@@ -277,10 +280,10 @@ export async function signInToCloud({ config, acceptedTerms, name = os.hostname(
 }
 
 // The server's cloud and this Mac's key for it, or null when signed out.
-function signedIn(env: NodeJS.ProcessEnv, home: string) {
+function signedIn(env: NodeJS.ProcessEnv, home: string): { gateway: string; key: string } | null {
   const gateway = readCloudConfig(env, home)?.gateway;
   const key = gateway ? readCloudKey(env, home) : null;
-  return key ? { gateway, key } : null;
+  return key ? { gateway: gateway!, key } : null;
 }
 
 type FreeHours = { agents: number; hours: number; usedSeconds: number };

@@ -47,6 +47,6 @@ describe('⌘K', () => {
   });
 
   it('the new user stays one command away for whoever builds the app', () => {
-    expect(JSON.parse(read('package.json')).scripts.fresh).toBe('node scripts/fresh-user.mjs');
+    expect(JSON.parse(read('package.json')).scripts.fresh).toBe('node scripts/run.mjs scripts/fresh-user.mjs');
   });
 });

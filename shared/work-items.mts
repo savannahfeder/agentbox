@@ -36,9 +36,183 @@ import { resolveEdits } from './message-edits.mts';
 import { cleanVoice } from './agent-voice.mts';
 import { cleanMark, isBookkeepingMark, marksOf } from './artifact-marks.mts';
 import { isContinuedNote } from './thread-continued.mts';
-import { wordWaits } from './answers.mts';
+import { wordWaits, type AnsweredItem } from './answers.mts';
+import type { AgentVoice } from './agent-voice.mts';
+import type { EditLine, MessageEdit } from './message-edits.mts';
 
 export { wordWaits };
+
+export type WorkItemStatus = typeof WORK_ITEM_STATUSES[number];
+export type WorkItemSource = typeof WORK_ITEM_SOURCES[number];
+export type Visibility = 'team' | 'people' | 'private';
+
+export interface WorkItemClaim { holder: string; leaseUntil: number }
+export interface Reaction { on: string; emoji: string; off?: true }
+export interface Routed { to?: string; ask?: string[]; why: string; at: number; by: 'auto' | 'you' }
+export interface SaidAt { said: string; at: number }
+export interface TeammateFrom { teammate: string; name: string }
+export type MessageEditPatch = { on: string; gone: true; text?: undefined } | { on: string; text: string; gone?: undefined };
+export interface LinkComment { name: string; file: string; text: string }
+export type ArtifactMarkPatch = NonNullable<ReturnType<typeof cleanMark>>;
+
+// A type rather than an interface so a patch passes where `Record<string, unknown>` is asked for.
+export type WorkItemPatch = {
+  title?: string;
+  label?: string;
+  body?: string;
+  kind?: string;
+  labels?: string[];
+  priority?: number;
+  parent?: string;
+  status?: WorkItemStatus;
+  result?: string;
+  note?: string;
+  answer?: string;
+  product?: string;
+  runAt?: number;
+  snoozedUntil?: number;
+  answeredThrough?: number;
+  engine?: string;
+  model?: string;
+  effort?: string;
+  start?: 'later' | 'now';
+  assignee?: string;
+  runner?: string;
+  due?: string;
+  people?: string[];
+  visibility?: Visibility;
+  visibleTo?: string[];
+  problem?: string;
+  progress?: string;
+  solution?: string;
+  blockedBy?: string[];
+  blocks?: string[];
+  react?: Reaction;
+  inReplyTo?: string;
+  edit?: MessageEditPatch;
+  from?: TeammateFrom;
+  voice?: AgentVoice;
+  forAgent?: AgentVoice;
+  fromNotes?: string[];
+  fromPhone?: string;
+  routed?: Routed;
+  shippedAt?: number;
+  waitEnded?: SaidAt;
+  handedOver?: SaidAt;
+  linkComment?: LinkComment;
+  comment?: { text: string };
+  artifact?: ArtifactMarkPatch;
+  putAway?: boolean;
+};
+export type WorkItemField = keyof WorkItemPatch;
+export type PatchInput = { readonly [K in WorkItemField]?: unknown };
+type PatchValue = NonNullable<WorkItemPatch[WorkItemField]>;
+type PatchEntry = { [K in WorkItemField]-?: [K, NonNullable<WorkItemPatch[K]>] }[WorkItemField];
+
+// Marks on one line, not values the row holds, so the fold never keeps them as fields.
+type LineMark = 'react' | 'inReplyTo' | 'edit' | 'from' | 'voice' | 'forAgent' | 'fromNotes' | 'comment' | 'artifact' | 'putAway';
+
+export interface FieldWrite {
+  ts: number;
+  source: WorkItemSource;
+  by?: string;
+  from?: string;
+  teammate?: string;
+  voice?: AgentVoice;
+  forAgent?: AgentVoice;
+}
+
+export interface TalkLine { by: string; ts: number; text: string; voice?: AgentVoice; forAgent?: AgentVoice }
+export interface TalkThread { by: string; text: string; voice?: AgentVoice; replies: TalkLine[] }
+export interface Talk {
+  chat: TalkLine[];
+  threads: Record<string, TalkThread>;
+  settled?: Record<string, number>;
+}
+export interface WaitingComment { by: string; ts: number; text: string }
+
+export type WorkItem = Omit<WorkItemPatch, LineMark> & {
+  id: string;
+  status: WorkItemStatus;
+  title: string;
+  kind: string;
+  labels: string[];
+  priority: number;
+  epoch: number;
+  claim: WorkItemClaim | null;
+  claimExpired: boolean;
+  createdAt: number;
+  updatedAt: number;
+  createdBy: string | null;
+  wrote: Record<string, FieldWrite | undefined>;
+  placedAt?: number;
+  waitingComments?: WaitingComment[];
+  reactions?: Record<string, Record<string, string[]>>;
+  edits?: Record<string, MessageEdit>;
+  artifacts?: ReturnType<typeof marksOf>;
+  talk?: Talk;
+};
+
+interface Press { ts: number; off: boolean; who: string; on: string; emoji: string }
+interface Said {
+  uid: string | null;
+  by: string;
+  ts: number;
+  text: string;
+  inReplyTo: string | null;
+  body: boolean;
+  crossed?: number;
+  voice?: AgentVoice;
+  forAgent?: AgentVoice;
+}
+interface Close { by: string; ts: number; done: boolean; spoke: boolean }
+type ArtifactLine = ArtifactMarkPatch & { by: string | null; ts: number; uid: string | null };
+
+export type FoldingItem = Omit<WorkItem, 'claimExpired'> & {
+  claimExpired?: boolean;
+  reacts?: Map<string, Press>;
+  artifactLines?: ArtifactLine[];
+  editLines?: EditLine[];
+  said?: Said[];
+  closes?: Close[];
+  closedFrom?: { at: number; by: string | null };
+};
+
+export interface WorkItemLine {
+  id: string;
+  ts: number;
+  source: WorkItemSource;
+  by: string | null;
+  uid: string | null;
+  epoch: number | null;
+  // Unchecked: the fold reads `holder` and `leaseUntil` defensively.
+  claim: Record<string, unknown> | null;
+  heartbeat: boolean;
+  release: boolean;
+  patch: WorkItemPatch;
+}
+
+export interface PatchLine { id: string; ts: number; source: WorkItemSource; patch: WorkItemPatch; epoch?: number }
+export interface ClaimLine {
+  id: string;
+  ts: number;
+  source: 'agent';
+  epoch: number;
+  claim: WorkItemClaim;
+  patch: WorkItemPatch;
+  heartbeat?: true;
+}
+export interface ReleaseLine { id: string; ts: number; source: 'agent'; epoch: number; release: true }
+
+export interface ThreadTurn {
+  ts: number;
+  source: WorkItemSource;
+  field: typeof THREAD_FIELDS[number];
+  text: string;
+  from?: string;
+}
+
+export interface WorkItemFilter { status?: string | null; kind?: string | null; product?: string | null; parent?: string | null; labels?: readonly string[] | null }
 
 /* ------------------------------- lifecycle ------------------------------- */
 // The only states the claim machinery reasons about. Everything else about what
@@ -47,15 +221,15 @@ export { wordWaits };
 // blocked is not a synonym for "hard": it means this item cannot proceed until
 // something outside it changes, which is the one distinction a puller has to
 // make, since claiming a blocked item wastes a whole session.
-export const WORK_ITEM_STATUSES = ['open', 'claimed', 'done', 'blocked'];
+export const WORK_ITEM_STATUSES = ['open', 'claimed', 'done', 'blocked'] as const;
 
 // Claimable states. done is terminal; claimed belongs to someone until its lease
 // lapses; blocked is skipped by a filter-based pull but can still be claimed by
 // id, because a worker sent specifically to unblock something should not be told
 // no by its own queue.
-const PULLABLE = ['open'];
+const PULLABLE: readonly WorkItemStatus[] = ['open'];
 
-export const WORK_ITEM_SOURCES = ['agent', 'founder', 'system'];
+export const WORK_ITEM_SOURCES = ['agent', 'founder', 'system'] as const;
 
 // CLAUDE CODE'S OWN SIX PERMISSION MODES, by its own values. Read off
 // `claude --help` on 2.1.241 and off code.claude.com/docs/en/permission-modes,
@@ -114,7 +288,7 @@ export const CLAUDE_PERMISSION_MODES = [
 // LIST prefers it (`rowTitle`, list-rules.ts). Everything else still reads the
 // title, so the user's own words are what they find when they open the row, and
 // search matches either name.
-export const WORK_ITEM_FIELDS = [
+export const WORK_ITEM_FIELDS: readonly WorkItemField[] = [
   'title', 'label', 'body', 'kind', 'labels', 'priority', 'parent',
   'status', 'result', 'note', 'answer', 'product', 'runAt', 'snoozedUntil', 'answeredThrough',
   'engine', 'model', 'effort',
@@ -223,15 +397,18 @@ export const WORK_ITEM_FIELDS = [
 const SHARED_FIELDS = new Set(['problem', 'progress', 'solution', 'blockedBy', 'blocks']);
 const MAX_SUMMARY = 1200;
 
+type Fields = { readonly [key: string]: unknown };
+type Unchecked = string | number | boolean | null | undefined | unknown[] | Fields;
+
 const ROUTE_TO = /^(agent|mate:[A-Za-z0-9_-]{1,64})$/;
 /** The `routed` field as it is kept, or undefined for anything else. */
-export function cleanRouted(value) {
+export function cleanRouted(value: Unchecked): Routed | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
   const why = typeof value.why === 'string' ? value.why.slice(0, 200) : '';
-  const at = Number.isFinite(value.at) ? Math.trunc(value.at) : 0;
+  const at = Number.isFinite(value.at) ? Math.trunc(value.at as number) : 0;
   const by = value.by === 'you' ? 'you' : 'auto';
   if (Array.isArray(value.ask)) {
-    const ask = [...new Set(value.ask.filter((x) => typeof x === 'string' && ROUTE_TO.test(x)))].slice(0, 3);
+    const ask = [...new Set(value.ask.filter((x): x is string => typeof x === 'string' && ROUTE_TO.test(x)))].slice(0, 3);
     return ask.length ? { ask, why, at, by } : undefined;
   }
   return typeof value.to === 'string' && ROUTE_TO.test(value.to) ? { to: value.to, why, at, by } : undefined;
@@ -239,18 +416,18 @@ export function cleanRouted(value) {
 
 // A person id or a line id: short, plain, never an object a writer slipped in.
 const MAX_PERSON_CHARS = 64;
-function shortId(value) {
+function shortId(value: unknown): string | null {
   return typeof value === 'string' && value && value.length <= MAX_PERSON_CHARS ? value : null;
 }
 // A day, or a day and a time on the reader's clock: "2026-11-01T10:00".
 const DAY_RE = /^(\d{4})-(\d{2})-(\d{2})(?:T([01]\d|2[0-3]):([0-5]\d))?$/;
-function calendarDay(value) {
+function calendarDay(value: unknown): string | undefined {
   if (value === 'none') return 'none';
   const m = typeof value === 'string' ? DAY_RE.exec(value) : null;
   if (!m) return undefined;
   const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
   const date = new Date(Date.UTC(y, mo - 1, d));
-  return date.getUTCFullYear() === y && date.getUTCMonth() === mo - 1 && date.getUTCDate() === d ? value : undefined;
+  return date.getUTCFullYear() === y && date.getUTCMonth() === mo - 1 && date.getUTCDate() === d ? value as string : undefined;
 }
 
 // How long a claim survives without a heartbeat. The MCP server heartbeats on a
@@ -283,7 +460,7 @@ export const MAX_LINE_BYTES = 256 * 1024;
 
 const ID_RE = /^[a-zA-Z0-9_-]{1,64}$/;
 
-export function isWorkItemId(id) {
+export function isWorkItemId(id: unknown): id is string {
   return typeof id === 'string' && ID_RE.test(id);
 }
 
@@ -291,21 +468,25 @@ export function isWorkItemId(id) {
 // One appended line. Kept as a builder rather than an object literal at each
 // call site so the MCP and the app cannot drift on shape, and so validation runs
 // once, here, before anything reaches disk.
-export function buildLine({ id, patch, source = 'agent', epoch = null, now = Date.now() }) {
+export function buildLine({ id, patch, source = 'agent', epoch = null, now = Date.now() }: {
+  id: string; patch: PatchInput; source?: string; epoch?: number | null; now?: number;
+}): PatchLine {
   if (!isWorkItemId(id)) throw new Error(`invalid work item id: ${id}`);
-  const src = WORK_ITEM_SOURCES.includes(source) ? source : 'agent';
+  const src = (WORK_ITEM_SOURCES as readonly string[]).includes(source) ? source as WorkItemSource : 'agent';
   const clean = pickFields(patch);
   if (!clean || !Object.keys(clean).length) throw new Error('patch had no recognized work item fields');
-  const line = { id, ts: Number.isFinite(now) ? now : Date.now(), source: src, patch: clean };
+  const line: PatchLine = { id, ts: Number.isFinite(now) ? now : Date.now(), source: src, patch: clean };
   // Only an agent is fenced. A founder line carrying an epoch would be claiming
   // to be a worker, so the epoch is dropped rather than honored.
-  if (src === 'agent' && Number.isFinite(epoch)) line.epoch = epoch;
+  if (src === 'agent' && Number.isFinite(epoch)) line.epoch = epoch as number;
   return line;
 }
 
 // A claim line is its own shape: it is the thing that MINTS an epoch rather than
 // being fenced by one, so it never goes through buildLine.
-export function buildClaimLine({ id, epoch, holder, now = Date.now(), leaseMs = LEASE_MS }) {
+interface ClaimInput { id: string; epoch: number; holder?: string | null; now?: number; leaseMs?: number }
+
+export function buildClaimLine({ id, epoch, holder, now = Date.now(), leaseMs = LEASE_MS }: ClaimInput): ClaimLine {
   if (!isWorkItemId(id)) throw new Error(`invalid work item id: ${id}`);
   if (!Number.isFinite(epoch) || epoch < 1) throw new Error(`invalid epoch: ${epoch}`);
   const ts = Number.isFinite(now) ? now : Date.now();
@@ -326,7 +507,7 @@ export function buildClaimLine({ id, epoch, holder, now = Date.now(), leaseMs = 
 // have moved on from, and one landed three seconds after the founder archived an
 // item and pulled it back out of her archive. The fold ignores a heartbeat's
 // patch too, for the lines already written.
-export function buildHeartbeatLine({ id, epoch, holder, now = Date.now(), leaseMs = LEASE_MS }) {
+export function buildHeartbeatLine({ id, epoch, holder, now = Date.now(), leaseMs = LEASE_MS }: ClaimInput): ClaimLine {
   const line = buildClaimLine({ id, epoch, holder, now, leaseMs });
   line.heartbeat = true;
   line.patch = {};
@@ -345,7 +526,7 @@ export function buildHeartbeatLine({ id, epoch, holder, now = Date.now(), leaseM
 // its blocked status. Handing back an UNFINISHED claim still reads open,
 // because the fold derives that from the claim being gone rather than from
 // anyone writing it down.
-export function buildReleaseLine({ id, epoch, now = Date.now() }) {
+export function buildReleaseLine({ id, epoch, now = Date.now() }: { id: string; epoch: number; now?: number }): ReleaseLine {
   if (!isWorkItemId(id)) throw new Error(`invalid work item id: ${id}`);
   return { id, ts: Number.isFinite(now) ? now : Date.now(), source: 'agent', epoch, release: true };
 }
@@ -353,8 +534,8 @@ export function buildReleaseLine({ id, epoch, now = Date.now() }) {
 /* -------------------------------- reading -------------------------------- */
 // One line, defensively read. Anything unparseable returns null so a corrupt
 // ledger degrades to an older picture rather than a broken list.
-export function normalizeLine(line) {
-  let raw = line;
+export function normalizeLine(line: unknown): WorkItemLine | null {
+  let raw = line as Unchecked;
   if (typeof raw === 'string') {
     const text = raw.trim();
     if (!text) return null;
@@ -364,7 +545,7 @@ export function normalizeLine(line) {
   if (!isWorkItemId(raw.id)) return null;
   const patch = raw.patch;
   if (patch != null && (typeof patch !== 'object' || Array.isArray(patch))) return null;
-  const source = WORK_ITEM_SOURCES.includes(raw.source) ? raw.source : 'agent';
+  const source = (WORK_ITEM_SOURCES as readonly unknown[]).includes(raw.source) ? raw.source as WorkItemSource : 'agent';
   // Validate on READ, not only on write. buildLine cleans what WE append, but
   // the file is the contract and anything can be in it: a line from an older
   // build, a hand edit, a future writer that learned a field we do not know.
@@ -376,7 +557,7 @@ export function normalizeLine(line) {
   const cleanPatch = pickFields(patch) ?? {};
   return {
     id: raw.id,
-    ts: Number.isFinite(raw.ts) ? raw.ts : 0,
+    ts: Number.isFinite(raw.ts) ? raw.ts as number : 0,
     source,
     // WHO WROTE IT and the line's own id. Stamped where a line reaches the
     // disk on a signed-in Mac (main/store/work-items.mts), absent everywhere
@@ -384,8 +565,8 @@ export function normalizeLine(line) {
     by: shortId(raw.by),
     uid: shortId(raw.uid),
     // A founder line is never fenced, so its epoch is ignored even if present.
-    epoch: source === 'agent' && Number.isFinite(raw.epoch) ? raw.epoch : null,
-    claim: raw.claim && typeof raw.claim === 'object' ? raw.claim : null,
+    epoch: source === 'agent' && Number.isFinite(raw.epoch) ? raw.epoch as number : null,
+    claim: raw.claim && typeof raw.claim === 'object' ? raw.claim as Record<string, unknown> : null,
     heartbeat: raw.heartbeat === true,
     release: raw.release === true,
     patch: cleanPatch,
@@ -394,15 +575,15 @@ export function normalizeLine(line) {
 
 // Keep only recognized fields, coerced. Returns null when nothing survives, so a
 // caller can refuse the write instead of appending a line that means nothing.
-export function pickFields(patch) {
+export function pickFields(patch: unknown): WorkItemPatch | null {
   if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return null;
-  const out = {};
+  const out: Partial<Record<WorkItemField, PatchValue>> = {};
   for (const [field, value] of Object.entries(patch)) {
-    if (!WORK_ITEM_FIELDS.includes(field)) continue;
+    if (!(WORK_ITEM_FIELDS as readonly string[]).includes(field)) continue;
     const clean = coerceField(field, value);
-    if (clean !== undefined) out[field] = clean;
+    if (clean !== undefined) out[field as WorkItemField] = clean;
   }
-  return Object.keys(out).length ? out : null;
+  return Object.keys(out).length ? out as WorkItemPatch : null;
 }
 
 // Over-long text is CUT WITH A MARK, never silently. Five digest rows sit in
@@ -412,15 +593,15 @@ export function pickFields(patch) {
 // (2026-08-06). A writer that can see it lost 400 characters can summarise and
 // try again. One that cannot has to guess, and guessing is what flooded her.
 const encoder = new TextEncoder();
-const byteLength = (text) => encoder.encode(text).length;
+const byteLength = (text: string) => encoder.encode(text).length;
 
-function str(value, max) {
+function str(value: unknown, max: number): string | undefined {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
   if (!trimmed) return undefined;
   if (byteLength(trimmed) <= max) return trimmed;
-  const mark = (n) => `\n\n[truncated: ${n} characters dropped by the store]`;
-  const fits = (keep) => byteLength(trimmed.slice(0, keep) + mark(trimmed.length - keep)) <= max;
+  const mark = (n: number) => `\n\n[truncated: ${n} characters dropped by the store]`;
+  const fits = (keep: number) => byteLength(trimmed.slice(0, keep) + mark(trimmed.length - keep)) <= max;
   // The longest prefix that still leaves room for the mark describing the cut,
   // since the mark must not itself overflow the field it is describing. Cost
   // rises with every character kept and the count it removes from the mark
@@ -442,12 +623,12 @@ function str(value, max) {
 // A text field whose empty string MEANS something: nothing chosen. Only a
 // string may clear it, so a `null` that reached here without going through
 // `answerItem` is still dropped rather than guessed at.
-function clearable(value, max) {
+function clearable(value: unknown, max: number): string | undefined {
   if (typeof value !== 'string') return undefined;
   return value.trim() ? str(value, max) : '';
 }
 
-function coerceField(field, value) {
+function coerceField(field: string, value: Unchecked): PatchValue | undefined {
   switch (field) {
     case 'title': return str(value, MAX_TITLE);
     // The written name the list draws. Bounded the same way the title is and no
@@ -491,15 +672,15 @@ function coerceField(field, value) {
     // the workspace default would have thrown in exactly the place described
     // above, before the answer was written, losing the message.
     case 'model': case 'effort': case 'engine': return clearable(value, MAX_SHORT);
-    case 'status': return WORK_ITEM_STATUSES.includes(value) ? value : undefined;
-    case 'priority': return Number.isFinite(value) ? Math.trunc(value) : undefined;
+    case 'status': return (WORK_ITEM_STATUSES as readonly unknown[]).includes(value) ? value as WorkItemStatus : undefined;
+    case 'priority': return Number.isFinite(value) ? Math.trunc(value as number) : undefined;
     // When this item may next be acted on, in epoch ms. 0 means unscheduled,
     // and it is a REAL value rather than a missing one on purpose: a field
     // that coerces to undefined is dropped by the fold, so without a falsy
     // sentinel a schedule could be set and never cleared.
-    case 'runAt': return Number.isFinite(value) ? Math.trunc(value) : undefined;
+    case 'runAt': return Number.isFinite(value) ? Math.trunc(value as number) : undefined;
     // An inbox reminder, independent of when work may start. 0 brings it back.
-    case 'snoozedUntil': return Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : undefined;
+    case 'snoozedUntil': return Number.isFinite(value) ? Math.max(0, Math.trunc(value as number)) : undefined;
     // 'later' or 'now', and 'now' is the falsy sentinel for the same reason
     // runAt keeps 0: a field that coerces to undefined is dropped by the fold,
     // so without a real value for "started" nothing could ever clear it.
@@ -517,18 +698,18 @@ function coerceField(field, value) {
     //
     // A ts rather than a flag, so her NEXT answer outdates it by carrying a
     // later one, with nothing to clear and nobody who has to remember to.
-    case 'answeredThrough': return Number.isFinite(value) ? Math.trunc(value) : undefined;
+    case 'answeredThrough': return Number.isFinite(value) ? Math.trunc(value as number) : undefined;
     // An empty list is a real value: it is how the last label, `ship` above
     // all, comes off.
     case 'labels': {
       if (!Array.isArray(value)) return undefined;
-      return value.map((l) => str(l, MAX_SHORT)).filter(Boolean).slice(0, MAX_LABELS);
+      return (value.map((l) => str(l, MAX_SHORT)).filter(Boolean) as string[]).slice(0, MAX_LABELS);
     }
     case 'assignee': case 'runner': return shortId(value) ?? undefined;
     case 'due': return calendarDay(value);
     case 'people': {
       if (!Array.isArray(value)) return undefined;
-      const people = [...new Set(value.map(shortId).filter(Boolean))].slice(0, MAX_LABELS);
+      const people = [...new Set(value.map(shortId).filter(Boolean) as string[])].slice(0, MAX_LABELS);
       return people.length ? people : undefined;
     }
     // WHICH MESSAGE AND WHICH EMOJI. `on` is a line uid, bounded like any other
@@ -544,7 +725,7 @@ function coerceField(field, value) {
     }
     case 'inReplyTo': return shortId(value) ?? undefined;
     case 'comment': {
-      const text = value && typeof value === 'object' ? str(value.text, MAX_TEXT_BYTES) : undefined;
+      const text = value && typeof value === 'object' ? str((value as Fields).text, MAX_TEXT_BYTES) : undefined;
       return text ? { text } : undefined;
     }
     case 'artifact': return cleanMark(value);
@@ -556,7 +737,7 @@ function coerceField(field, value) {
     }
     case 'voice': case 'forAgent': return cleanVoice(value) ?? undefined;
     case 'fromNotes': {
-      const ids = Array.isArray(value) ? value.map(shortId).filter(Boolean).slice(0, MAX_LABELS) : [];
+      const ids = Array.isArray(value) ? (value.map(shortId).filter(Boolean) as string[]).slice(0, MAX_LABELS) : [];
       return ids.length ? ids : undefined;
     }
     case 'edit': {
@@ -573,7 +754,7 @@ function coerceField(field, value) {
     // off a thread, and the thread then reaches nobody until she names one.
     case 'visibleTo': {
       if (!Array.isArray(value)) return undefined;
-      return [...new Set(value.map(shortId).filter(Boolean))].slice(0, MAX_LABELS);
+      return [...new Set(value.map(shortId).filter(Boolean) as string[])].slice(0, MAX_LABELS);
     }
     // An empty string is a real value here: it is how a person clears a line
     // of the summary, and a field that coerces to undefined cannot be cleared.
@@ -581,11 +762,11 @@ function coerceField(field, value) {
       return typeof value === 'string' ? value.trim().slice(0, MAX_SUMMARY) : undefined;
     case 'blockedBy': case 'blocks': {
       if (!Array.isArray(value)) return undefined;
-      return [...new Set(value.map(shortId).filter(Boolean))].slice(0, MAX_LABELS);
+      return [...new Set(value.map(shortId).filter(Boolean) as string[])].slice(0, MAX_LABELS);
     }
     case 'routed': return cleanRouted(value);
     case 'putAway': return typeof value === 'boolean' ? value : undefined;
-    case 'shippedAt': return Number.isFinite(value) && value >= 0 ? Math.trunc(value) : undefined;
+    case 'shippedAt': return Number.isFinite(value) && (value as number) >= 0 ? Math.trunc(value as number) : undefined;
     case 'linkComment': {
       if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
       const name = str(value.name, MAX_SHORT);
@@ -594,9 +775,9 @@ function coerceField(field, value) {
       return name && file && text ? { name, file, text } : undefined;
     }
     case 'waitEnded': case 'handedOver': {
-      if (!value || typeof value !== 'object' || !Number.isFinite(value.at)) return undefined;
-      const said = str(value.said, MAX_SUMMARY);
-      return said ? { said, at: Math.trunc(value.at) } : undefined;
+      if (!value || typeof value !== 'object' || !Number.isFinite((value as Fields).at)) return undefined;
+      const said = str((value as Fields).said, MAX_SUMMARY);
+      return said ? { said, at: Math.trunc((value as Fields).at as number) } : undefined;
     }
     default: return undefined;
   }
@@ -629,10 +810,10 @@ function coerceField(field, value) {
 // chips do not reorder themselves under somebody's pointer as a teammate's
 // lines arrive. Returns null when every press has been taken back, which is
 // what leaves a row with no `reactions` at all.
-function rollUpReactions(presses) {
+function rollUpReactions(presses: Map<string, Press>): Record<string, Record<string, string[]>> | null {
   const live = [...presses.values()].filter((p) => !p.off).sort((a, b) => a.ts - b.ts);
   if (!live.length) return null;
-  const out = {};
+  const out: Record<string, Record<string, string[]>> = {};
   for (const press of live) {
     const message = out[press.on] ?? (out[press.on] = {});
     (message[press.emoji] ?? (message[press.emoji] = [])).push(press.who);
@@ -649,15 +830,15 @@ function rollUpReactions(presses) {
 // Any status a worker or the founder actually chose (done, blocked, or one we
 // have not invented yet) is theirs, and nothing about giving a claim back
 // overwrites it.
-export function finishItem(raw, now = Date.now()) {
+export function finishItem(raw: FoldingItem, now = Date.now()): WorkItem {
   // A copy, one level deep, so the raw item can be folded on and a finished
   // one handed out is never changed under its holder.
-  const item = {};
+  const item = {} as FoldingItem;
   for (const [k, v] of Object.entries(raw)) {
-    item[k] = Array.isArray(v) ? [...v]
+    (item as Record<string, unknown>)[k] = Array.isArray(v) ? [...v]
       : v instanceof Map ? new Map(v)
         : v instanceof Set ? new Set(v)
-          : v && Object.getPrototypeOf(v) === Object.prototype ? { ...v } : v;
+          : v && Object.getPrototypeOf(v) === Object.prototype ? { ...(v as object) } : v;
   }
   item.claimExpired = !!(item.claim && item.claim.leaseUntil < now);
   if (item.status === 'claimed' && (!item.claim || item.claimExpired)) item.status = 'open';
@@ -681,7 +862,7 @@ export function finishItem(raw, now = Date.now()) {
     const said = edits?.size ? item.said.flatMap((s) => {
       const e = s.uid ? edits.get(s.uid) : null;
       if (!e) return [s];
-      return e.gone ? [] : [{ ...s, text: e.text.trim().slice(0, TALK_TEXT) }];
+      return e.gone ? [] : [{ ...s, text: e.text!.trim().slice(0, TALK_TEXT) }];
     }) : item.said;
     delete item.said;
     if (Array.isArray(item.people) && item.people.length) {
@@ -691,12 +872,12 @@ export function finishItem(raw, now = Date.now()) {
       reopenIfWrittenPastTheClose(item, said);
     }
   }
-  return item;
+  return item as WorkItem;
 }
 
 // The owner replied, closed it or put it off. Read in ledger order, not by
 // clock, because a comment's time is the cloud's and a reply's is this Mac's.
-function dealsWithComments({ source, patch }) {
+function dealsWithComments({ source, patch }: WorkItemLine): boolean {
   if (source !== 'founder' || !patch) return false;
   return (typeof patch.answer === 'string' && !!patch.answer.trim() && patch.answer !== WITHDRAWN)
     || patch.status === 'done' || patch.start === 'later'
@@ -704,7 +885,7 @@ function dealsWithComments({ source, patch }) {
 }
 
 /** A line that writes the row's short name, or who has seen what, and nothing else (see the fold's foot). */
-function isNotNews(line) {
+function isNotNews(line: WorkItemLine): boolean {
   if (line.claim || line.release || line.heartbeat) return false;
   const fields = Object.keys(line.patch ?? {});
   if (fields.length !== 1) return false;
@@ -712,7 +893,7 @@ function isNotNews(line) {
 }
 
 /** Lines folded onto `items` in place, unfinished: `finishItem` makes each one readable. */
-export function foldRawInto(items, lines, touched = null) {
+export function foldRawInto(items: Map<string, FoldingItem>, lines: unknown, touched: Set<string> | null = null): void {
   for (const raw of Array.isArray(lines) ? lines : []) {
     const line = normalizeLine(raw);
     if (!line) continue;
@@ -743,11 +924,12 @@ export function foldRawInto(items, lines, touched = null) {
       // extends a lease it still legitimately holds.
       const renewsHeldClaim = !line.heartbeat || (item.claim
         && line.epoch === item.epoch && line.claim.holder === item.claim.holder);
-      if (line.epoch >= item.epoch && renewsHeldClaim) {
-        item.epoch = line.epoch;
+      // A claim line without an epoch (not written by buildClaimLine) compares as 0 and sets it null.
+      if ((line.epoch as number) >= item.epoch && renewsHeldClaim) {
+        item.epoch = line.epoch as number;
         item.claim = {
           holder: String(line.claim.holder ?? ''),
-          leaseUntil: Number.isFinite(line.claim.leaseUntil) ? line.claim.leaseUntil : line.ts,
+          leaseUntil: Number.isFinite(line.claim.leaseUntil) ? line.claim.leaseUntil as number : line.ts,
         };
       }
     }
@@ -761,7 +943,7 @@ export function foldRawInto(items, lines, touched = null) {
     // 'blocked', and, three seconds after the founder archived one, over that.
     // Enforced on READ as well as at the write, because the lines that did it
     // are already in her ledger and will be there forever.
-    const patch = line.heartbeat ? {} : line.patch;
+    const patch: WorkItemPatch = line.heartbeat ? {} : line.patch;
 
     // WHO SAID WHAT, AND WHERE, for a conversation between people
     // (w-920461cbe6). Every person's message, kept in a list of its own because
@@ -786,7 +968,7 @@ export function foldRawInto(items, lines, touched = null) {
     }
     if (line.by && typeof patch.putAway === 'boolean') (item.closes ??= []).push({ by: line.by, ts: line.ts, done: patch.putAway, spoke: false });
 
-    for (const [field, value] of Object.entries(patch)) {
+    for (const [field, value] of Object.entries(patch) as PatchEntry[]) {
       // A REACTION IS ACCUMULATED, NOT HELD. Every other field below keeps one
       // value and the newest writer owns it; a reaction belongs to the person
       // who pressed it, so two people on one message have to survive each other.
@@ -829,7 +1011,7 @@ export function foldRawInto(items, lines, touched = null) {
       // moves past a teammate's.
       const toldNow = told && field === 'answer';
       if (held && !(toldNow && line.ts >= held.ts) && !beats(line, held, field)) continue;
-      item[field] = value;
+      (item as Record<string, unknown>)[field] = value;
       item.wrote[field] = { ts: line.ts, source: authorityOf(line, field, value) };
       if (line.by) item.wrote[field].by = line.by;
       if (toldNow) Object.assign(item.wrote[field], { from: told.name, teammate: told.teammate });
@@ -867,10 +1049,10 @@ export function foldRawInto(items, lines, touched = null) {
 
 }
 
-export function foldWorkItems(lines, now = Date.now()) {
-  const raw = new Map();
+export function foldWorkItems(lines: unknown, now = Date.now()): Map<string, WorkItem> {
+  const raw = new Map<string, FoldingItem>();
   foldRawInto(raw, lines);
-  const items = new Map();
+  const items = new Map<string, WorkItem>();
   for (const [id, item] of raw) items.set(id, finishItem(item, now));
   return items;
 }
@@ -898,9 +1080,9 @@ const TALK_KEEP = 100;
  * So does one that follows their words since the close, because sending
  * writes the message and the reopen as two lines (`answerItem`, main/store.mts).
  */
-function settledBy(closes, said = []) {
-  const at = {};
-  const spokeSince = (by, from, to) => said.some((s) => s.by === by && !s.body && s.ts > from && s.ts <= to);
+function settledBy(closes: Close[], said: Said[] = []): Record<string, number> | null {
+  const at: Record<string, number> = {};
+  const spokeSince = (by: string, from: number, to: number) => said.some((s) => s.by === by && !s.body && s.ts > from && s.ts <= to);
   for (const c of [...closes].sort((a, b) => a.ts - b.ts)) {
     if (c.done) at[c.by] = c.ts;
     else if (!c.spoke && !spokeSince(c.by, at[c.by], c.ts)) delete at[c.by];
@@ -916,29 +1098,29 @@ export const WORK_THREAD = 'work-thread';
 // A reply reopens a closed chat only if its sender's Mac saw the close, since
 // that is what writes the reopen. One that did not (stamped after the close, or
 // before it but reaching this Mac after) reopens it here, or it is on no list.
-function reopenIfWrittenPastTheClose(item, said) {
+function reopenIfWrittenPastTheClose(item: FoldingItem, said: Said[]): void {
   const close = item.status === 'done' ? item.wrote.status : null;
   if (!close?.by) return;
   const others = said.filter((s) => s.by !== close.by && !s.body);
   const crossed = others.filter((s) => s.crossed === close.ts);
   if (!crossed.length && !others.some((s) => s.ts > close.ts)) return;
   item.status = 'open';
-  if (crossed.length && item.talk.settled?.[close.by]) item.talk.settled[close.by] = Math.min(...crossed.map((s) => s.ts)) - 1;
+  if (crossed.length && item.talk!.settled?.[close.by]) item.talk!.settled[close.by] = Math.min(...crossed.map((s) => s.ts)) - 1;
 }
 
-function talkOf(said) {
+function talkOf(said: Said[]): Talk {
   const lines = [...said].sort((a, b) => a.ts - b.ts);
-  const chat = [];
-  const threads = {};
-  const parents = new Map();
-  const bodies = new Set();
+  const chat: TalkLine[] = [];
+  const threads: Record<string, TalkThread> = {};
+  const parents = new Map<string, TalkLine>();
+  const bodies = new Set<string>();
   for (const s of lines) {
     // A rename that sends the same opening words again is not a new message.
     if (s.body) { if (bodies.has(s.text)) continue; bodies.add(s.text); }
     const said1 = { by: s.by, ts: s.ts, text: s.text, ...(s.voice ? { voice: s.voice } : {}), ...(s.forAgent ? { forAgent: s.forAgent } : {}) };
     const parent = s.inReplyTo ? parents.get(s.inReplyTo) : null;
     if (parent) {
-      (threads[s.inReplyTo] ??= { by: parent.by, text: parent.text, replies: [], ...(parent.voice ? { voice: parent.voice } : {}) }).replies.push(said1);
+      (threads[s.inReplyTo!] ??= { by: parent.by, text: parent.text, replies: [], ...(parent.voice ? { voice: parent.voice } : {}) }).replies.push(said1);
       continue;
     }
     // A reply to a message this chat does not hold is drawn in the chat, so it
@@ -967,10 +1149,10 @@ function talkOf(said) {
 // the results sessions wrote back, the checkpoints they left her, and the body
 // each round rewrote to ask the next question. status, labels, priority and
 // claims are how the row moves, not anything anyone said.
-const THREAD_FIELDS = ['body', 'note', 'result', 'answer'];
+const THREAD_FIELDS = ['body', 'note', 'result', 'answer'] as const;
 
-export function threadOf(lines, id) {
-  const turns = [];
+export function threadOf(lines: unknown, id: string): ThreadTurn[] {
+  const turns: ThreadTurn[] = [];
   for (const raw of Array.isArray(lines) ? lines : []) {
     const line = normalizeLine(raw);
     if (!line || line.id !== id) continue;
@@ -991,8 +1173,8 @@ export function threadOf(lines, id) {
   // THE SAME TEXT TWICE IS ONE THING SAID ONCE. A patch that rewrites a title
   // and re-sends an unchanged body is the ordinary case, and the second copy is
   // not a turn: it is the store's shape leaking into what reads as a transcript.
-  const out = [];
-  const seen = new Set();
+  const out: ThreadTurn[] = [];
+  const seen = new Set<string>();
   for (const turn of turns) {
     const key = `${turn.field}:${turn.text}`;
     if (seen.has(key)) continue;
@@ -1011,7 +1193,7 @@ export function threadOf(lines, id) {
 // she just handed it to: the claim, the blocked, the done that follow could
 // never land. So a handback claims no authority, and the item moves again
 // as it should.
-function authorityOf(line, field, value) {
+function authorityOf(line: WorkItemLine, field: string, value: unknown): WorkItemSource {
   if (line.source === 'founder' && field === 'status' && value === 'open') return 'system';
   // Her clearing a moment is not a moment she set, so the agent may book one again.
   if (line.source === 'founder' && field === 'runAt' && !value) return 'system';
@@ -1020,7 +1202,7 @@ function authorityOf(line, field, value) {
 
 // Does the incoming line outrank the one already holding this field? The founder
 // wins over any agent regardless of time; between equals, later wins.
-function beats(incoming, held, field) {
+function beats(incoming: WorkItemLine, held: FieldWrite, field: string): boolean {
   if (SHARED_FIELDS.has(field)) return incoming.ts >= held.ts;
   if (held.source === 'founder' && incoming.source !== 'founder') return false;
   if (incoming.source === 'founder' && held.source !== 'founder') return true;
@@ -1043,17 +1225,19 @@ function beats(incoming, held, field) {
 // "Add it to Later" on the card writes `start: 'later'`, which means exactly
 // what a future moment means and never arrives on its own: not claimable, no
 // session, not in the inbox. Pressing start on the thread writes 'now'.
-export function isDue(item, now = Date.now()) {
+type Schedulable = AnsweredItem & { start?: string; runAt?: number };
+
+export function isDue(item: Schedulable | null | undefined, now = Date.now()): boolean {
   if (item?.start === 'later') return false;
   return !item?.runAt || item.runAt <= now || wordWaits(item);
 }
 
 /** Written down and deliberately not begun. */
-export function notStarted(item) {
+export function notStarted(item: { start?: string } | null | undefined): boolean {
   return item?.start === 'later';
 }
 
-export function isClaimable(item, now = Date.now()) {
+export function isClaimable(item: WorkItem | null | undefined, now = Date.now()): boolean {
   if (!item) return false;
   if (!PULLABLE.includes(item.status)) return false;
   if (!isDue(item, now)) return false;
@@ -1062,11 +1246,11 @@ export function isClaimable(item, now = Date.now()) {
 
 // The list, in the order a puller should consider it: highest priority first,
 // then oldest, so nothing starves behind a stream of new arrivals.
-export function sortForPull(items) {
+export function sortForPull<T extends { priority?: number; createdAt: number }>(items: Iterable<T>): T[] {
   return [...items].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0) || a.createdAt - b.createdAt);
 }
 
-export function matchesFilter(item, filter = {}) {
+export function matchesFilter(item: Partial<Pick<WorkItem, 'status' | 'kind' | 'product' | 'parent' | 'labels'>> | null | undefined, filter: WorkItemFilter = {}): boolean {
   if (!item) return false;
   if (filter.status && item.status !== filter.status) return false;
   if (filter.kind && item.kind !== filter.kind) return false;

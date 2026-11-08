@@ -32,7 +32,7 @@ export default function RepeatPage() {
       </Wall>
     );
   }
-  const items = c.view.items as any[];
+  const items = c.view.items;
   const last = rule.lastOccurrence ? items.find((i) => i.id === rule.lastOccurrence) ?? null : null;
   const runs = items.filter((i) => i.product === rule.product && ruleIdOf(i) === rule.id).sort((a, b) => b.createdAt - a.createdAt).slice(0, 20);
   const read = readRule(typed);

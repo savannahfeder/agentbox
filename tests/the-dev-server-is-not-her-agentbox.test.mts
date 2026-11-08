@@ -77,7 +77,7 @@ describe('whether a store root has anybody work under it', () => {
 describe('the guard is wired into the only place every dev window passes', () => {
   it('is asked for in main.mts before the window is loaded', () => {
     const main = read('main/main.mts');
-    expect(main).toMatch(/import \{ hotWindowVerdict, storeHasWork \} from '\.\/dev-window\.mjs'/);
+    expect(main).toMatch(/import \{ hotWindowVerdict, storeHasWork \} from '\.\/dev-window\.mts'/);
     expect(main).toMatch(/const verdict = hotWindowVerdict\(/);
     expect(main.indexOf('const verdict = hotWindowVerdict(')).toBeLessThan(main.indexOf('pageReady = true'));
   });

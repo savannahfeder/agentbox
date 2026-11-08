@@ -16,6 +16,7 @@ import path from 'node:path';
 import http from 'node:http';
 import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
+import { stripTypeScriptTypes } from 'node:module';
 import { createSandbox, pickBaseEnv, REDACTED } from '../cloud/sandbox/server.mjs';
 import { cloudRun, cloudNote, CLOUD_NOTE } from '../main/cloud/run.mts';
 import { saveCloudKey, removeCloudKey, keysCarried, cloudKeyNames, cloudKeysPath, keyLabel } from '../main/cloud/keys.mts';
@@ -248,9 +249,13 @@ describe('the note a cloud run reads', () => {
 });
 
 describe('the name rule', () => {
-  it('is the same file on the Mac and in the cloud image', () => {
+  // The image runs plain JavaScript, so its copy is the Mac's file with the
+  // types taken out: the same code, compared without the spacing.
+  it('is the same code on the Mac and in the cloud image', () => {
     const read = (p) => fs.readFileSync(new URL(p, import.meta.url), 'utf8');
-    expect(read('../cloud/sandbox/key-names.mjs')).toBe(read('../shared/cloud-key-names.mts'));
+    const code = (src) => stripTypeScriptTypes(src, { mode: 'strip' }).replace(/\s+/g, '');
+    expect(code(read('../cloud/sandbox/key-names.mjs'))).toBe(code(read('../shared/cloud-key-names.mts')));
+    expect(code('export function f(name) {}')).not.toBe(code('export function g(name: unknown) {}'));
     expect(read('../cloud/sandbox/Dockerfile')).toMatch(/COPY [^\n]*key-names\.mjs/);
     expect(read('../scripts/cloud-setup.mjs')).toMatch(/IMAGE_FILES = \[[^\]]*'key-names\.mjs'/);
   });

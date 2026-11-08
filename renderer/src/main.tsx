@@ -54,7 +54,7 @@ window.addEventListener('error', (e) => {
   comeBack();
 });
 window.addEventListener('unhandledrejection', (e) => {
-  const r: any = (e as PromiseRejectionEvent).reason;
+  const r: { name?: string; message?: string; stack?: string } | null | undefined = (e as PromiseRejectionEvent).reason;
   sendCrash(r?.name ?? 'UnhandledRejection', r?.message ?? String(r ?? ''), r?.stack ?? '');
 });
 

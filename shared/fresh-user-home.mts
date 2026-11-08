@@ -93,7 +93,7 @@ export function makeHome(now = new Date()) {
 /**
  * Symlinks, not copies: nothing is duplicated, and nothing here can write back
  *  over her real install that the app could not already write. */
-function link(from, to) {
+function link(from: string, to: string): boolean {
   try {
     if (!fs.existsSync(from)) return false;
     // A LINK THAT IS ALREADY THERE IS ONLY GOOD IF IT STILL RESOLVES. `lstat`
@@ -141,7 +141,10 @@ function link(from, to) {
 // can be tried on this Mac. The keychain still is, because Claude Code keeps
 // its sign-in there; `freshEnv(..., { ownSignIns: true })` gives that copy a
 // sign-in folder of its own so it reads and writes a different entry.
-export function prepareHome(home, { withAgents = false, withTools = true, realHome = os.homedir(), codexHome = process.env.CODEX_HOME || path.join(realHome, '.codex') } = {}) {
+export function prepareHome(
+  home: string,
+  { withAgents = false, withTools = true, realHome = os.homedir(), codexHome = process.env.CODEX_HOME || path.join(realHome, '.codex') }: { withAgents?: boolean; withTools?: boolean; realHome?: string; codexHome?: string } = {},
+) {
   const claudeBin = withTools
     ? link(path.join(realHome, '.local/bin/claude'), path.join(home, '.local/bin/claude'))
     : false;
@@ -200,8 +203,8 @@ export const NOT_INHERITED = Object.freeze([
  *  is the mark, so the copy knows it is a test and does not count as a person;
  *  see `runningAsAFreshUser` above. And everything in `NOT_INHERITED` is taken
  *  out, because a stranger's copy may not be handed her store. */
-export function freshEnv(home, env = process.env, { ownSignIns = false } = {}) {
-  const fresh = { ...env, HOME: home, CFFIXED_USER_HOME: home, [FRESH_USER_ENV]: '1' };
+export function freshEnv(home: string, env: NodeJS.ProcessEnv = process.env, { ownSignIns = false }: { ownSignIns?: boolean } = {}): NodeJS.ProcessEnv {
+  const fresh: NodeJS.ProcessEnv ={ ...env, HOME: home, CFFIXED_USER_HOME: home, [FRESH_USER_ENV]: '1' };
   for (const key of NOT_INHERITED) delete fresh[key];
   // A COPY THAT SIGNS IN FOR ITSELF signs in to folders of its own. Claude Code
   // names its keychain entry after CLAUDE_CONFIG_DIR (measured 2026-10-05: a
@@ -215,6 +218,6 @@ export function freshEnv(home, env = process.env, { ownSignIns = false } = {}) {
 }
 
 /** Make one and link its two prerequisites, in a single call. */
-export function newFreshHome({ withAgents = false, realHome = os.homedir(), now } = {}) {
+export function newFreshHome({ withAgents = false, realHome = os.homedir(), now }: { withAgents?: boolean; realHome?: string; now?: Date } = {}) {
   return prepareHome(makeHome(now), { withAgents, realHome });
 }

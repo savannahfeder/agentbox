@@ -122,6 +122,6 @@ describe('the finder that was written and then imported by nothing', () => {
     expect(source).not.toMatch(/NOTHING IMPORTS IT YET/i);
     expect(source).not.toMatch(/it is deliberately inert/i);
     // And it names the caller, so the next reader does not have to grep for one.
-    expect(source).toMatch(/main\/config\.mjs/);
+    expect(source).toMatch(/main\/config\.mts/);
   });
 });

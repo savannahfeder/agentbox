@@ -54,14 +54,21 @@ import { shellDataDirsNow } from './shell-path.mts';
 // The listing, held against the home folder's mtime. Creating or deleting a
 // folder there moves it; signing IN does not, which is why only the listing is
 // cached here and the login is re-read per call.
-let listCache = { home: null, mtime: -1, names: [] };
+let listCache: { home: string | null; mtime: number; names: string[] } = { home: null, mtime: -1, names: [] };
 
-function claudeShapedDirs(home) {
+/** One signed-in Claude folder found on the disk. */
+export interface DiscoveredProfile {
+  dir: string;
+  email: string;
+  accountUuid: string;
+}
+
+function claudeShapedDirs(home: string): string[] {
   let mtime;
   try { mtime = fs.statSync(home).mtimeMs; } catch { return []; }
   if (listCache.home === home && listCache.mtime === mtime) return listCache.names;
 
-  let names = [];
+  let names: string[] = [];
   try {
     names = fs.readdirSync(home, { withFileTypes: true })
       // `.claude` and `.claude-second`, yes. `claude-work` with no dot is
@@ -88,9 +95,9 @@ function claudeShapedDirs(home) {
  *  Folders holding the same subscription are all returned — deduplication is
  *  `effectiveProfiles`' job, because a screen that wants to say "these two are
  *  one account" needs to have seen both. */
-export function discoverProfiles({ home = os.homedir() } = {}) {
-  const out = [];
-  const seen = new Set();
+export function discoverProfiles({ home = os.homedir() }: { home?: string } = {}): DiscoveredProfile[] {
+  const out: DiscoveredProfile[] = [];
+  const seen = new Set<string>();
   const dflt = defaultClaudeHome(home);
   for (const name of claudeShapedDirs(home)) {
     const dir = path.join(home, name);
@@ -109,7 +116,7 @@ export function discoverProfiles({ home = os.homedir() } = {}) {
 
 /** A `.claude-<anything>` folder directly in the home directory: the shape
  *  discovery looks for and Add account makes. */
-function isHomeFolder(dir, home) {
+function isHomeFolder(dir: string, home: string): boolean {
   const full = path.resolve(dir);
   return path.dirname(full) === path.resolve(home) && path.basename(full).startsWith('.claude-');
 }
@@ -123,16 +130,19 @@ function isHomeFolder(dir, home) {
  *  'default' for ~/.claude (which is what spawning with no CLAUDE_CONFIG_DIR
  *  means), and an absolute folder path for anything else. It always answers
  *  with at least ['default'], because somewhere has to be spawnable. */
-export function effectiveProfiles(configured, { home = os.homedir(), shellDir = shellDataDirsNow().CLAUDE_CONFIG_DIR } = {}) {
-  const mine = (Array.isArray(configured) ? configured : []).map((p) => p || 'default');
+export function effectiveProfiles(
+  configured: readonly (string | null | undefined)[] | null | undefined,
+  { home = os.homedir(), shellDir = shellDataDirsNow().CLAUDE_CONFIG_DIR }: { home?: string; shellDir?: string | null } = {},
+): string[] {
+  const mine = (Array.isArray(configured) ? configured : []).map((p: string | null | undefined) => p || 'default');
   const dflt = defaultClaudeHome(home);
-  const dirOf = (p) => (p === 'default' ? dflt : p);
-  const isDefault = (p) => p === 'default' || dirOf(p) === dflt;
-  const idOf = (p) => accountIdentity(isDefault(p) ? null : dirOf(p), { home });
+  const dirOf = (p: string) => (p === 'default' ? dflt : p);
+  const isDefault = (p: string) => p === 'default' || dirOf(p) === dflt;
+  const idOf = (p: string) => accountIdentity(isDefault(p) ? null : dirOf(p), { home });
 
   // Which subscriptions her own list already covers, the default login's first
   // so that it is the one kept when a second folder holds the same account.
-  const have = new Set();
+  const have = new Set<string>();
   for (const p of mine) {
     const id = isDefault(p) ? idOf(p) : null;
     if (id?.accountUuid) have.add(id.accountUuid);
@@ -146,7 +156,7 @@ export function effectiveProfiles(configured, { home = os.homedir(), shellDir = 
   // was listed twice (tests/an-account-shows-once-and-only-once-it-is-signed-in).
   // The default login is never judged, and a folder anywhere else is a
   // hand-written setting and stays exactly as written.
-  const list = [];
+  const list: string[] = [];
   for (const p of mine) {
     if (isDefault(p)) { list.push(p); continue; }
     const id = idOf(p);
@@ -172,16 +182,17 @@ export function effectiveProfiles(configured, { home = os.homedir(), shellDir = 
   // different sign-in from naming nothing.
   const shell = typeof shellDir === 'string' && path.isAbsolute(shellDir) ? shellDir : null;
   const shellId = shell ? accountIdentity(shell, { home }) : null;
-  if (shellId?.accountUuid && !list.includes(shell)) {
+  // `shellId` is only ever read for a `shell`, so a login here means `shell` is set.
+  if (shellId?.accountUuid && !list.includes(shell!)) {
     const dfltId = idOf('default');
     const takesDefault = !dfltId?.accountUuid || dfltId.accountUuid === shellId.accountUuid;
     if (takesDefault && list.some(isDefault)) {
-      list.splice(list.findIndex(isDefault), 1, shell);
+      list.splice(list.findIndex(isDefault), 1, shell!);
       for (let i = list.length - 1; i >= 0; i--) if (list[i] !== shell && isDefault(list[i])) list.splice(i, 1);
       have.add(shellId.accountUuid);
     } else if (!have.has(shellId.accountUuid)) {
       have.add(shellId.accountUuid);
-      list.push(shell);
+      list.push(shell!);
     }
   }
   const listed = new Set(list.map((p) => dirOf(p)));
@@ -217,14 +228,18 @@ export function effectiveProfiles(configured, { home = os.homedir(), shellDir = 
  *  folders of one subscription disagree: each entry is what was true when a
  *  run last died there, and nothing clears a folder nothing spawns on.
  *  Codex keys are never considered — an account's key carries its engine. */
-export function troubleForProfile(troubles, profile, { home = os.homedir() } = {}) {
+export function troubleForProfile<T extends { at?: number | null; since?: number | null }>(
+  troubles: Record<string, T | null | undefined> | null | undefined,
+  profile: string,
+  { home = os.homedir() }: { home?: string } = {},
+): T | null {
   const dflt = defaultClaudeHome(home);
-  const dirOf = (p) => (p === 'default' ? dflt : p);
-  const idOf = (p) => accountIdentity(dirOf(p) === dflt ? null : dirOf(p), { home });
+  const dirOf = (p: string) => (p === 'default' ? dflt : p);
+  const idOf = (p: string) => accountIdentity(dirOf(p) === dflt ? null : dirOf(p), { home });
   const own = troubles?.[profile] ?? null;
   const mine = idOf(profile)?.accountUuid;
   if (!mine) return own;
-  const when = (t) => t?.at ?? t?.since ?? 0;
+  const when = (t: T | null) => t?.at ?? t?.since ?? 0;
   let best = own;
   for (const [key, t] of Object.entries(troubles ?? {})) {
     if (!t || key === profile || key.startsWith('codex:')) continue;

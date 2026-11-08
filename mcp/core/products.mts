@@ -12,14 +12,33 @@ import { listProjects, createProject, loadProjectAt, patchProjectAt, readIndex, 
 import { readWorkItems } from '../../main/store/work-items.mts';
 import { resolveProduct } from './account.mts';
 import { SCHEMA_VERSION } from '../../shared/contracts.mts';
+import type { WorkItem } from '../../shared/work-items.mts';
 
 // Fields the MCP may set on project.json beyond what the app already writes.
 const PRODUCT_FIELDS = ['name', 'oneLiner', 'repoPath', 'archived'];
 
-function describe(project, { now = Date.now() } = {}) {
+export interface ProductPatch { name?: string; oneLiner?: string | null; repoPath?: string | null; archived?: boolean }
+
+interface ProjectRef { id: string; name: string; dir: string; createdAt?: string | null; updatedAt?: string | null }
+interface ProjectMeta { oneLiner?: string; repoPath?: string; archived?: boolean }
+
+export interface ProductSummary {
+  id: string;
+  name: string;
+  dir: string;
+  oneLiner: string | null;
+  repoPath: string | null;
+  archived: boolean;
+  documents: number;
+  workItems: { open: number; claimed: number; blocked: number };
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+function describe(project: ProjectRef, { now = Date.now() }: { now?: number } = {}): ProductSummary {
   const idx = readIndex(project.dir);
-  const meta = readJson(path.join(project.dir, 'project.json'), {}) ?? {};
-  let work = [];
+  const meta: ProjectMeta = readJson(path.join(project.dir, 'project.json'), {}) ?? {};
+  let work: WorkItem[] = [];
   try { work = readWorkItems(project.dir, now); } catch { /* a product with no ledger yet */ }
 
   const live = work.filter((w) => w.status !== 'done');
@@ -30,7 +49,7 @@ function describe(project, { now = Date.now() } = {}) {
     oneLiner: meta.oneLiner ?? null,
     repoPath: meta.repoPath ?? null,
     archived: meta.archived === true,
-    documents: (idx.creations ?? []).filter((c) => !c.deleted).length,
+    documents: (idx.creations ?? []).filter((c: { deleted?: boolean }) => !c.deleted).length,
     workItems: { open: live.filter((w) => w.status === 'open').length, claimed: live.filter((w) => w.status === 'claimed').length, blocked: live.filter((w) => w.status === 'blocked').length },
     createdAt: project.createdAt ?? null,
     updatedAt: project.updatedAt ?? null,
@@ -38,13 +57,13 @@ function describe(project, { now = Date.now() } = {}) {
 }
 
 /** Every product in one call: the cross-product view. */
-export function listProducts({ includeArchived = false, now = Date.now() } = {}) {
+export function listProducts({ includeArchived = false, now = Date.now() }: { includeArchived?: boolean; now?: number } = {}): ProductSummary[] {
   return listProjects()
     .map((p) => describe(p, { now }))
     .filter((p) => includeArchived || !p.archived);
 }
 
-export function getProduct(ref, { now = Date.now() } = {}) {
+export function getProduct(ref: string, { now = Date.now() }: { now?: number } = {}): ProductSummary {
   return describe(resolveProduct(ref), { now });
 }
 
@@ -53,7 +72,7 @@ export function getProduct(ref, { now = Date.now() } = {}) {
  * understands, plus the starter notes doc, so a product made from Claude Code is
  * indistinguishable from one made in the app.
  */
-export function createProduct(name, { oneLiner = null, repoPath = null } = {}) {
+export function createProduct(name: string, { oneLiner = null, repoPath = null }: { oneLiner?: string | null; repoPath?: string | null } = {}): ProductSummary {
   if (!name || !String(name).trim()) throw new Error('a product needs a name');
   const project = createProject(String(name).trim());
 
@@ -81,7 +100,7 @@ export function createProduct(name, { oneLiner = null, repoPath = null } = {}) {
 // were the one just changed. Nothing errored. Keeping the resolved directory is
 // what makes the read and the write name the same product, and it is the only
 // lookup that still works when two products share an id.
-export function updateProduct(ref, patch = {}) {
+export function updateProduct(ref: string, patch: ProductPatch = {}): ProductSummary {
   const project = resolveProduct(ref);
   const clean = cleanPatch(patch);
   if (!Object.keys(clean).length) throw new Error(`nothing to update (recognized fields: ${PRODUCT_FIELDS.join(', ')})`);
@@ -89,8 +108,8 @@ export function updateProduct(ref, patch = {}) {
   return describe({ ...project, ...loadProjectAt(project.dir) });
 }
 
-function cleanPatch(patch) {
-  const out = {};
+function cleanPatch(patch: ProductPatch | null | undefined): { name?: string; oneLiner?: string; repoPath?: string; archived?: boolean } {
+  const out: { [field: string]: string | boolean } = {};
   for (const [k, v] of Object.entries(patch ?? {})) {
     if (!PRODUCT_FIELDS.includes(k) || v == null) continue;
     if (k === 'archived') { out.archived = v === true; continue; }

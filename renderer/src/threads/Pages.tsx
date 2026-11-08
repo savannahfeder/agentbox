@@ -780,7 +780,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
       priority={shownPriority(item)} updatedAt={task.at} when={back} now={now} />;
   }
   if (said) {
-    const fileNews = fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string) => (said.people.length > 1 ? firstName(team?.byId.get(id) ?? null) : ''))?.trim();
+    const fileNews = fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string | null) => (said.people.length > 1 ? firstName(team?.byId.get(id ?? '') ?? null) : ''))?.trim();
     const agent = fileNews ? null : agentSaidLast(item, allItems);
     return <RowCells status={status} title={<MessageTitle people={said.people} fromMe={!fileNews && !agent && said.fromMe} text={fileNews ?? (agent ? `${agent.who}: ${agent.text}` : said.text)} name={item.label || (isWorkThread(item) ? item.title : null)} />} aside={due?.word} late={!!due?.late} pinned={!!item.pinned && item.status !== 'done'} where="" person={person}
       priority={messagePriority(item)} updatedAt={when} when={back} now={now} action={action} />;
@@ -798,7 +798,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
   // the Status column says Queued on exactly those rows, and one fact in two
   // places on one row is what the column was drawn to end. `FreeAgentContext`
   // is untouched and still decides whether the cloud offers itself.
-  const commented = fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string) => firstName(team?.byId.get(id) ?? null))
+  const commented = fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string | null) => firstName(team?.byId.get(id ?? '') ?? null))
     ?? commentLine(item.waitingComments, (id) => firstName(team?.byId.get(id) ?? null))
     ?? (waitCameBack(item) ? item.waitEnded?.said : null)
     ?? item.handedOver?.said;

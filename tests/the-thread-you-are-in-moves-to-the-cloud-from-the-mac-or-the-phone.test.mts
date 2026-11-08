@@ -165,7 +165,7 @@ describe('from the phone', () => {
     expect(offersOf(item, { session: { startedAt: NOW }, inProgress: true, now: NOW }).moveToCloud).toBe(false);
     expect(planFor({ kind: 'move-to-cloud' }, item, NOW).steps).toEqual([{ door: 'moveToCloud', payload: { product: 'p', id: 'w-a', ids: ['w-a'] } }]);
     expect(read('mobile/src/ui/ThreadMenu.tsx')).toMatch(/label="Move to cloud"/);
-    expect(read('renderer/src/phone-send.ts')).toMatch(/moveToCloud: \(p: unknown\) => leave\(REQUEST_CHANNELS\.moveToCloud, p\)/);
+    expect(read('renderer/src/phone-send.ts')).toMatch(/moveToCloud: \(p: PhoneAsk\) => leave\(REQUEST_CHANNELS\.moveToCloud, p\)/);
   });
 
   it('the database takes the new command', () => {

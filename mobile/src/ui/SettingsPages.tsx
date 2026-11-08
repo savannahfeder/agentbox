@@ -85,7 +85,7 @@ function General() {
           <Group label={`What ${NAME} sends`}>
             <SettingSwitch first label="Counts and crash reports" desc={`That ${NAME} was opened, that a task was opened, that a reply was sent, and a report when something breaks. Never your code, your prompts, your keys or your paths, and never a title.`} k="diagnostics" copy={w.diagnostics} />
           </Group>
-          <Group label="Updates"><Row first label={`${NAME} ${s.settings.version}`} /></Group>
+          <Group label="Updates"><Row first label={`${NAME} ${s.settings!.version}`} /></Group>
         </>
       ) : <Aside>{NOT_YET}</Aside>}
     </>
@@ -262,7 +262,7 @@ function AgentsAtOnce() {
   const auto = s.reading('workspace', 'agentsAuto', w.agentsAuto);
   const count = s.reading('workspace', 'sessionsAtOnce', w.sessionsAtOnce);
   const isAuto = isAutoNow(s, w);
-  const say = (n: number) => `${n} ${n === 1 ? 'agent' : 'agents'}`;
+  const say = (n: number | undefined) => `${n} ${n === 1 ? 'agent' : 'agents'}`;
   const options = [{ value: 'auto', label: `Automatic (${say(w.agentsTotal)})` }, ...Array.from({ length: w.slotsMax ?? 12 }, (_, i) => ({ value: String(i + 1), label: say(i + 1) }))];
   return (
     <Row first stack label="How many run at once" reading={auto.waiting || auto.refused ? auto : count}
@@ -271,7 +271,7 @@ function AgentsAtOnce() {
         onChange={(v) => void (v === 'auto' ? s.change({ scope: 'workspace', key: 'agentsAuto', value: true }) : s.change({ scope: 'workspace', key: 'sessionsAtOnce', value: Number(v) }))} />} />
   );
 }
-const isAutoNow = (s: SettingsState, w: any) => {
+const isAutoNow = (s: SettingsState, w: Pick<NonNullable<SettingsState['settings']>['workspace'], 'agentsAuto' | 'sessionsAtOnce'>) => {
   const auto = s.reading('workspace', 'agentsAuto', w.agentsAuto);
   const count = s.reading('workspace', 'sessionsAtOnce', w.sessionsAtOnce);
   return auto.waiting ? !!auto.value : count.waiting ? false : !!auto.value;

@@ -11,28 +11,30 @@ import { fileURLToPath } from 'node:url';
 import { installNotifier } from './notify.mts';
 import { mayOpenOutside, sameHub } from './hub-rules.mts';
 import { NAME } from '../shared/product-name.mjs';
+import type { HubAddress } from './hub-address.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const RETRY_MS = 5_000;
 
-const waitingPage = (hubUrl) => `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html><title>${NAME}</title>
+const waitingPage = (hubUrl: string) => `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html><title>${NAME}</title>
 <body style="margin:0;height:100vh;display:grid;place-items:center;background:#1a1a1c;color:#e8e6e3;font:15px -apple-system,system-ui,sans-serif">
 <div style="max-width:440px;text-align:center"><p style="font-weight:600">${NAME} can't reach your hub</p>
 <p style="color:#a3a09b">Trying ${hubUrl} again every few seconds. Your agents keep running there.</p></div>`)}`;
 
-export function refuseToStart(why) {
+export function refuseToStart(why: string): void {
   app.whenReady().then(() => {
     dialog.showErrorBox(`${NAME} can't start`, `This Mac names a hub that can't be used, and it will not run agents itself while it does: ${why}`);
     app.quit();
   });
 }
 
-export function startHubClient(hub) {
+export function startHubClient(hub: HubAddress): void {
   if (!app.requestSingleInstanceLock()) { app.quit(); return; }
-  let window = null;
-  let retry = null;
+  let window: BrowserWindow | null = null;
+  let retry: NodeJS.Timeout | undefined = undefined;
 
-  const load = () => { window.loadURL(`${hub.url}/?token=${encodeURIComponent(hub.key)}`).catch(() => {}); };
+  // Only reached while the window is open: `closed` clears the retry timer.
+  const load = () => { window!.loadURL(`${hub.url}/?token=${encodeURIComponent(hub.key)}`).catch(() => {}); };
 
   const open = () => {
     window = new BrowserWindow({
@@ -57,7 +59,7 @@ export function startHubClient(hub) {
     webContents.on('did-fail-load', (_e, code, _why, url, isMain) => {
       // -3 is a load this window itself replaced.
       if (!isMain || code === -3 || !sameHub(url, hub.url)) return;
-      window.loadURL(waitingPage(hub.url)).catch(() => {});
+      window!.loadURL(waitingPage(hub.url)).catch(() => {});
       clearTimeout(retry);
       retry = setTimeout(load, RETRY_MS);
     });
@@ -67,10 +69,10 @@ export function startHubClient(hub) {
     load();
   };
 
-  ipcMain.handle('zero:badge', (_e, count) => {
-    if (process.platform === 'darwin') app.dock.setBadge(count > 0 ? String(count) : '');
+  ipcMain.handle('zero:badge', (_e, count: number) => {
+    if (process.platform === 'darwin') app.dock!.setBadge(count > 0 ? String(count) : '');
   });
-  ipcMain.handle('hub:open', (_e, address) => {
+  ipcMain.handle('hub:open', (_e, address: string) => {
     if (!mayOpenOutside(address)) return false;
     shell.openExternal(address);
     return true;

@@ -3,6 +3,13 @@
 
 import type { Engine } from '../../shared/engines.mts';
 import type { AgentVoice } from '../../shared/agent-voice.mts';
+import type { CarryState } from '../../shared/carried-files.mts';
+import type { FileLinkAsk, FileLinkState, LinkComment, PublicLink } from './api';
+import type { LedgerLine } from './thread-history';
+import type { AgentFile } from './onboarding';
+import type { AgentFolder, SessionThread } from './agent-import-card';
+import type { TryAgainOutcome } from './try-again';
+import type { EngineSetupState } from './plan-setup';
 
 export type { AgentVoice };
 
@@ -967,6 +974,9 @@ export interface Approval {
   input: Record<string, unknown>;
 }
 
+/** The fields of an approval's input the card reads. */
+export type ApprovalInput = { description?: string; command?: string; cwd?: string; host?: string; grantRoot?: string };
+
 // One live Claude Code session on this machine, as the main process measured
 // it. Not a work item and never in a ledger: `main/agents.mts` reads these off
 // `~/.claude/sessions` and `claude agents --json` every couple of seconds.
@@ -1668,9 +1678,10 @@ declare global {
       agentReply(p: { pid: number; text: string }): Promise<{ ok: boolean; delivered?: boolean; working?: boolean; name?: string; reason?: string }>;
       agentReveal(p: { pid: number }): Promise<{ ok: boolean; name?: string; reason?: string }>;
       agentConversation(p: { pid: number; sessionId: string | null; cwd: string }): Promise<AgentConversation>;
-      dashboard(slug: string): Promise<any>;
-      terminal(p: {product:string;id:string;action:'open'|'read'|'write'|'resize'|'close';data?:string;cols?:number;rows?:number;offset?:number;wait?:number}): Promise<any>;
-      agentUpdate?(p:{engine:string;action:'check'|'recheck'|'start'|'status'|'refresh'}):Promise<any>;
+      dashboard(slug: string): Promise<ProductDashboard | null>;
+      terminal<A extends TerminalAction>(p: TerminalAsk<A>): Promise<TerminalAnswer<A>>;
+      // Null from the phone's own site, which has no coding agents to update.
+      agentUpdate?(p:{engine:string;action:AgentUpdateAction}):Promise<AgentUpdate | true | null>;
       commandCatalog(p: {product: string; id: string}): Promise<string[]>;
       command(p: {product: string; id: string; text: string}): Promise<{state: string; at: number; text?: string; name?: string}>;
       compact(p: { product: string; id: string }): Promise<{state: string; at: number}>;
@@ -1777,7 +1788,8 @@ declare global {
       // The picker the app draws itself, for a tab with no Mac dialog.
       listFolders?(p?: { at?: string | null; showHidden?: boolean }): Promise<FolderListing>;
       folderExists?(p: { path: string }): Promise<{ exists: boolean }>;
-      stopSession(p: { product: string; id: string }): Promise<WorkItem>;
+      // `withdraw` is read by the phone's bridges, which take a waiting reply back (phone-rows.ts takeBack).
+      stopSession(p: { product: string; id: string; withdraw?: boolean }): Promise<WorkItem>;
       runNow?(p: { product: string; id: string }): Promise<{ ok: boolean; reason?: 'running' | 'missing' | 'paused' | 'scheduled' | 'held' }>;
       reopen(p: { product: string; id: string }): Promise<WorkItem>;
       // The user's standing instructions: one text, briefed to every session.
@@ -1805,7 +1817,7 @@ declare global {
       /**
        * A key the app owns, pressed while the keyboard was inside an open
        *  file. shared/artifact-keys.mts says which keys those are. */
-      onKeyInTheFile?(fn: (k: { key: string; meta?: boolean; ctrl?: boolean; alt?: boolean; shift?: boolean }) => void): () => void;
+      onKeyInTheFile?(fn: (k: { key: string; meta?: boolean; ctrl?: boolean; alt?: boolean; shift?: boolean; fromGuest?: boolean }) => void): () => void;
       saveAttachments(p: { product: string; files: Array<{ name: string; dataBase64?: string; srcPath?: string }> }): Promise<Array<{ rel: string; name: string; image: boolean }>>;
       pathForFile(file: File): string | null;
       /** Pasted bytes to disk, so the draft carries a path. */
@@ -1862,8 +1874,102 @@ declare global {
       }>, needsYou?: Array<{ id: string; product: string }>): Promise<void>;
       // She clicked the banner: open this row.
       onOpenItem?(fn: (p: { id: string }) => void): () => void;
+      onFind?(fn: (p: { step?: number }) => void): () => void;
+      onZoomPercent?(fn: (p: { percent?: number }) => void): () => void;
+      onPhoneChanged?(fn: () => void): () => void;
+      phoneLink?(p: { action: 'status' | 'on' | 'off' | 'reset' | 'via' | 'stop-alerts'; via?: PhoneRoute; device?: string }): Promise<PhoneLink>;
+      sessionTrace?(p: { product: string; id: string; whole?: boolean; have?: Record<string, string> }): Promise<{ sessions: Array<{ startedAt: number; text: string }> }>;
+      itemHistory?(p: { product: string; id: string; before?: number }): Promise<{ ok: boolean; lines: LedgerLine[]; error?: string }>;
+      // `mode`: 'resolve' finds the file without opening it, 'source' opens it in the editor.
+      openArtifact?(p: { product: string; src: string; mode?: string; thread?: string }): Promise<OpenedFile>;
+      folderPictures?(p: { product: string; src: string }): Promise<{ ok: boolean; folder?: string; pictures?: string[]; total?: number; error?: string }>;
+      readDoc?(p: { product: string; src: string; thread?: string }): Promise<{ ok: boolean; text?: string; mtime?: number; error?: string; coming?: boolean; waits?: boolean; carry?: CarryState }>;
+      writeDoc?(p: { product: string; src: string; text: string; mtime: number; thread?: string }): Promise<{ ok: boolean; mtime?: number; error?: string; stale?: boolean }>;
+      fileLink?(p: FileLinkAsk): Promise<FileLinkState>;
+      fileLinkShare?(p: FileLinkAsk): Promise<FileLinkState>;
+      fileLinkStop?(p: { token: string }): Promise<{ ok: boolean; error?: string }>;
+      fileLinks?(): Promise<{ ok: boolean; error?: string; links?: PublicLink[] }>;
+      fileLinkComments?(p: { token: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
+      fileLinkComment?(p: { token: string; text: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
+      retryFile?(p: { product: string; src: string }): Promise<unknown>;
+      codeChange?(p: { product: string; src: string }): Promise<{ ok: boolean; change?: unknown; error?: string }>;
+      codeFile?(p: { product: string; src: string; path: string }): Promise<{ ok: boolean; text?: string; mtime?: number; path?: string; error?: string }>;
+      saveCodeFile?(p: { product: string; src: string; path: string; text: string; mtime: number }): Promise<{ ok: boolean; mtime?: number; path?: string; stale?: boolean; error?: string }>;
+      railNote?(p: { product: string }): Promise<{ ok: boolean; text?: string; mtime?: number; error?: string }>;
+      saveRailNote?(p: { product: string; text: string }): Promise<{ ok: boolean; mtime?: number; error?: string }>;
+      scheduleAgent?(p: { key: string; runAt: number }): Promise<{ ok: boolean; runAt: number }>;
+      unreplyAgent?(p: { key: string }): Promise<{ ok: boolean; repliedAt: number }>;
+      closeAgent?(p: { key: string; through: number }): Promise<{ ok: boolean; doneThrough: number }>;
+      resumeAgents?(p?: { ids: string[] }): Promise<{ ok: boolean; cleared?: number }>;
+      resumeItems?(p: { ids: string[] }): Promise<{ ok: boolean } & TryAgainOutcome>;
+      redeliver?(p: { product: string; id: string }): Promise<{ ok: boolean; error?: string }>;
+      claudeRecheck?(): Promise<{ ok: boolean; error?: string; workspace?: { claudeFound?: boolean; claudeCertain?: boolean; claudeInstallUrl?: string } }>;
+      codexRecheck?(): Promise<{ ok: boolean; error?: string; workspace?: { found?: boolean; certain?: boolean } }>;
+      codexAddAccount?(): Promise<AddedAccount>;
+      claudeAddAccount?(): Promise<AddedAccount>;
+      engineBin(p: { engine: 'claude' | 'codex'; action?: 'search' }): Promise<Settings & { canceled?: boolean; refused?: string }>;
+      engineSetup?(p: { action: 'ready' | 'start' | 'status' | 'again' | 'cancel'; engine: 'claude' | 'codex' }): Promise<EngineSetupAnswer>;
+      projectRename?(p: { product: string; name: string }): Promise<Settings>;
+      projectIcon(p: { product: string }): Promise<Settings & { canceled?: boolean }>;
+      projectIconClear?(p: { product: string }): Promise<Settings>;
+      projectSeenBy?(p: { product: string; who: 'private' | 'team' | 'people'; people?: string[] }): Promise<{ ok: boolean; error?: string }>;
+      projectArchive?(p: { product: string; archived: boolean }): Promise<Settings>;
+      agentFiles?(p: { folder: string | null; product: string | null }): Promise<{ user?: AgentFile[]; project?: AgentFile[]; chosen?: string[] | null }>;
+      agentFolders?(): Promise<{ folders?: AgentFolder[] }>;
+      importAgents?(p: { product: string; agents: string[] }): Promise<{ added?: number; already?: number }>;
+      agentThreads?(): Promise<{ threads?: SessionThread[] }>;
+      searchAgentThreads?(p: { again?: boolean }): Promise<{ threads?: SessionThread[]; reached?: number }>;
+      importThreads?(p: { product: string; threads: string[]; land?: 'sorted' | 'inbox' }): Promise<{ added?: number; already?: number; done?: number }>;
+      firstRunExamples?(p: { product: string }): Promise<{ ids: string[] }>;
+      firstRunPractice?(): Promise<{ slug: string; examples: string[]; backdrop?: string[] }>;
+      firstRunPracticeEnd?(): Promise<unknown>;
+      onboardingArm?(): Promise<unknown>;
+      notifyTest?(): Promise<unknown>;
+      cloudSignIn?(p: { action: 'start' | 'code' | 'cancel' | 'remove'; engine: 'claude' | 'codex'; key?: string | null; code?: string }): Promise<{ ok: boolean; key?: string | null; error?: string }>;
+      cloudSendFile?(p: { product: string; id: string; path?: string; choose?: boolean; hold?: boolean; also?: string }): Promise<{ ok: boolean; path?: string; canceled?: boolean; held?: boolean; words?: string; error?: string }>;
+      cloudFileInfo?(p: { path: string }): Promise<{ ok: boolean; size?: number; error?: string }>;
+      cloudSendCode?(p: { product: string; id: string; about: string; code: string; also?: string }): Promise<{ ok: boolean; error?: string }>;
+      cloudKey?(p: { action: 'save' | 'remove'; name: string; value?: string; label?: string; reply?: { product: string; id: string; answer: string } }): Promise<{ ok: boolean; keys?: { name: string; savedAt: number | null; label?: string | null }[]; freed?: string[]; cloudOff?: boolean; error?: string }>;
+      cloudAccountSignIn?(p: { method: 'google' | 'email' | 'sign-up' | 'resend' | 'agree' | 'reset' | 'reset-wait' | 'new-password'; email?: string; password?: string; name?: string; acceptTerms?: boolean }): Promise<{ ok: boolean; confirm?: boolean; needsTerms?: boolean; sent?: boolean; opened?: boolean; error?: string; cancelled?: boolean }>;
+      cloudAccountCancel?(): Promise<unknown>;
+      cloudAccountReopen?(): Promise<unknown>;
+      cloudAccountSignOut?(): Promise<unknown>;
+      cloudAccountPlan?(): Promise<CloudPlan>;
+      cloudAccountPay?(p: { plan: 'pro' | 'plus' | 'max' }): Promise<{ ok: boolean; where?: 'checkout' | 'billing'; error?: string; message?: string }>;
+      cloudAccountBilling?(): Promise<{ ok: boolean; error?: string; message?: string }>;
+      cloudClipboardCode?(): Promise<{ code: string | null }>;
     };
   }
+}
+
+export type AppBridge = NonNullable<Window['zero']>;
+
+/** What a project's dashboard ledger folds to (main/store.mts readDashboard). */
+export interface ProductDashboard {
+  stage?: string;
+  headline?: { label: string; value: string } | null;
+  rows?: { label: string; value: string }[];
+  intent?: string;
+  oneLiner?: string | null;
+}
+
+export type TerminalAction = 'open' | 'read' | 'write' | 'resize' | 'close';
+export type TerminalAsk<A extends TerminalAction = TerminalAction> = { product: string; id: string; action: A; data?: string; cols?: number; rows?: number; offset?: number; wait?: number };
+/** A read of the shell (main/task-terminals.mts TerminalState). `live`: the read waited for output. */
+export interface TerminalScreen { token: string; cwd: string; data: string; offset: number; truncated: boolean; exited: boolean; exitCode: number | null; process: string; live?: true }
+/** Opening and reading answer the screen; writing, resizing and closing answer `true`. */
+export type TerminalAnswer<A extends TerminalAction> = A extends 'open' | 'read' ? TerminalScreen : true;
+
+export type AgentUpdateAction = 'check' | 'recheck' | 'start' | 'status' | 'refresh';
+/** One coding agent's update (main/agent-updates.mts UpdateEntry). */
+export interface AgentUpdate { engine: string; state: string; message?: string; checkedAt?: number; installed?: string; latest?: string }
+
+/** Where a path in a message resolved to (main/ipc.mts zero:open-artifact). */
+export interface OpenedFile { ok: boolean; opened?: string; url?: string; error?: string; coming?: boolean; waits?: boolean; note?: string; carry?: CarryState }
+export interface AddedAccount { ok: boolean; command?: string; home?: string; error?: string }
+export interface EngineSetupAnswer {
+  ok: boolean; error?: string; phase?: EngineSetupState['phase']; log?: string;
+  found?: boolean; signedIn?: boolean; certain?: boolean; bin?: string | null; already?: boolean;
 }
 
 

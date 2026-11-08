@@ -13,10 +13,14 @@
 //     .takeMissing() a reader: another try at what has not landed
 import crypto from 'node:crypto';
 import fsDefault from 'node:fs';
+import type { Stats } from 'node:fs';
 import path from 'node:path';
 import { resolveArtifact } from '../artifact-path.mts';
 import { MAX_CARRIED_BYTES, MAX_SENT_BYTES, PART_BYTES, filesADocumentDraws, isCarriedKind, namedFiles, plainRef, sizeWords } from '../../shared/carried-files.mts';
 import { chunkFile, entryKey, partFile, plainPartPath, shelve, shelvedEntries, validEntry } from './carried-shelf.mts';
+import type { CarriedChunk, CarriedEntry, CarriedFileEntry, CarriedPart, RawCarriedEntry } from './carried-shelf.mts';
+import type { CarrySent, FileCarrier } from './sync.mts';
+import type { TeamRecord } from './projects.mts';
 
 const WORKTREE = /(^|\/)\.claude\/worktrees\/[^/]+\//;
 const MAX_PARTS = 40;
@@ -24,22 +28,61 @@ const MAX_ENTRY_BYTES = 3 * MAX_CARRIED_BYTES;
 const TRIES_AT_A_PIECE = 3;
 const ROUNDS_WITHOUT_A_PIECE = 10;
 
-const isPicture = (file) => /\.(?:png|jpe?g|gif|webp|svg|avif)$/i.test(file);
-const isInside = (root, file) => file === root || file.startsWith(root + path.sep);
-const hiddenIn = (rel) => rel.replace(WORKTREE, '$1').split('/').some((s) => s.startsWith('.'));
+type Fs = typeof fsDefault;
+
+export interface CarryProject {
+  slug: string;
+  dir: string;
+  repoPath?: string | null;
+  team?: TeamRecord | null;
+}
+
+export type NotSent = 'missing' | 'secret' | 'hidden' | 'outside';
+
+export interface FoundFile { file: string; size: number; root: string; none?: undefined }
+
+export type FoundToSend = FoundFile | { none: NotSent; file?: undefined };
+
+type ProjectPlace = { root: string; rel: string; hidden?: undefined } | { hidden: true; root?: undefined };
+
+type ReadPart = { file: string; big: true; size: number; path: string; bytes?: undefined } | { file: string; bytes: Buffer; path: string; big?: undefined };
+type SmallPart = Extract<ReadPart, { bytes: Buffer }>;
+
+type ChunkedPart = CarriedPart & { chunks: CarriedChunk[] };
+
+interface UploadTask { key: string; done: boolean; entry: CarriedFileEntry | null; error: string | null; promise?: Promise<void> }
+
+export interface FileCarrierOptions {
+  dir: string;
+  has: (names: string[]) => Promise<string[]>;
+  put: (name: string, data: string) => Promise<unknown>;
+  get: (name: string) => Promise<unknown>;
+  putPiece?: ((name: string, bytes: Buffer) => Promise<unknown>) | null;
+  getPiece?: ((name: string) => Promise<Buffer | null>) | null;
+  find: (ref: string, how: { meant: boolean }) => FoundToSend | null | Promise<FoundToSend | null>;
+  now?: () => number;
+  log?: (line: string) => void;
+  fs?: Fs;
+  sleep?: (ms: number) => Promise<unknown>;
+  retryMs?: number[];
+}
+
+const isPicture = (file: string) => /\.(?:png|jpe?g|gif|webp|svg|avif)$/i.test(file);
+const isInside = (root: string, file: string) => file === root || file.startsWith(root + path.sep);
+const hiddenIn = (rel: string) => rel.replace(WORKTREE, '$1').split('/').some((s) => s.startsWith('.'));
 
 // A name that says what is inside it is no business of a message. Only the
 // kinds in shared/carried-files.mts can go at all; this stops `secrets.md`.
 const SECRET_WORD = /(^|[-_. ])(secrets?|credentials?|private[-_ ]?keys?|(?:api|access|ssh|secret)[-_ ]?keys?|id_(?:rsa|ed25519|ecdsa|dsa)|keychain|netrc)([-_. ]|$)/i;
 const SECRET_STEM = /^(?:\.?env(?:\.[\w-]+)?|keys?|passwords?|passwd)$/i;
-export const looksSecret = (rel) => String(rel).split('/').some((seg) => SECRET_WORD.test(seg) || SECRET_STEM.test(seg.replace(/\.(?:md|markdown|html?|pdf|png|jpe?g|txt)$/i, '')));
+export const looksSecret = (rel: unknown): boolean => String(rel).split('/').some((seg) => SECRET_WORD.test(seg) || SECRET_STEM.test(seg.replace(/\.(?:md|markdown|html?|pdf|png|jpe?g|txt)$/i, '')));
 
-function realOf(file, fs) { try { return fs.realpathSync(file); } catch { return null; } }
+function realOf(file: string, fs: Fs): string | null { try { return fs.realpathSync(file); } catch { return null; } }
 
 /** Where a real file sits in a project: `{ root, rel }`, `{ hidden }` when something on the way is hidden, or null. */
-function placeIn(project, real, fs) {
+function placeIn(project: CarryProject, real: string, fs: Fs): ProjectPlace | null {
   let hidden = false;
-  for (const root of [project.dir, project.repoPath].filter(Boolean)) {
+  for (const root of [project.dir, project.repoPath].filter(Boolean) as string[]) {
     const home = realOf(root, fs);
     if (!home || !isInside(home, real)) continue;
     const rel = path.relative(home, real).split(path.sep).join('/');
@@ -61,7 +104,13 @@ function placeIn(project, real, fs) {
  * private project and send it. Never another conversation's folder, and never
  * a file whose real place is outside the projects or behind a hidden folder.
  */
-export async function findFileToSend({ ref, meant = false, conversation, products, fs = fsDefault }) {
+export async function findFileToSend({ ref, meant = false, conversation, products, fs = fsDefault }: {
+  ref: string;
+  meant?: boolean;
+  conversation?: { dir: string; people?: string[] | null } | null;
+  products: CarryProject[];
+  fs?: Fs;
+}): Promise<FoundToSend> {
   const raw = plainRef(ref);
   if (!isCarriedKind(raw)) return { none: 'missing' };
   if (looksSecret(raw)) return { none: 'secret' };
@@ -70,9 +119,9 @@ export async function findFileToSend({ ref, meant = false, conversation, product
   const others = products.filter((p) => !p.team?.direct);
   const own = conversation?.dir ? products.find((p) => p.dir === conversation.dir) : null;
 
-  const answer = (real, place) => {
+  const answer = (real: string, place: { root: string; rel: string }): FoundToSend => {
     if (looksSecret(place.rel)) return { none: 'secret' };
-    let st;
+    let st: Stats;
     try { st = fs.statSync(real); } catch { return { none: 'missing' }; }
     return st.isFile() ? { file: real, size: st.size, root: place.root } : { none: 'missing' };
   };
@@ -92,36 +141,36 @@ export async function findFileToSend({ ref, meant = false, conversation, product
   if (raw.split('/').some((s) => s === '..')) return { none: 'outside' };
   if (hiddenIn(raw)) return { none: 'hidden' };
   const people = conversation?.people ?? null;
-  const everyoneMaySee = (p) => p.team?.projectId && (p.team.visibility !== 'people'
-    || (people?.length > 0 && people.every((who) => who === p.team.sharedBy || p.team.people?.includes(who))));
+  const everyoneMaySee = (p: CarryProject) => p.team?.projectId && (p.team.visibility !== 'people'
+    || (people?.length! > 0 && people!.every((who) => who === p.team!.sharedBy || p.team!.people?.includes(who))));
   // This conversation's own folder only by exact path: a walk through it would
   // find a teammate's file of the same name, and send it on as yours.
   if (own && !raw.startsWith('attachments/carried/')) {
     const real = realOf(path.join(own.dir, raw), fs);
-    const place = real && placeIn(own, real, fs);
-    if (place?.root) return answer(real, place);
+    const place = (real && placeIn(own, real, fs)) as ProjectPlace | null;
+    if (place?.root) return answer(real!, place);
   }
-  let best = null;
+  let best: { real: string; place: { root: string; rel: string }; at: number } | null = null;
   for (const p of others.filter((x) => meant || everyoneMaySee(x))) {
     const found = await resolveArtifact({ src: raw, product: p.slug, products: [{ ...p, team: undefined }], fs, fresh: true });
     if (!found.ok) continue;
     const real = realOf(found.path, fs);
-    const place = real && placeIn(p, real, fs);
+    const place = (real && placeIn(p, real, fs)) as ProjectPlace | null;
     if (!place?.root) continue;
-    const at = fs.statSync(real).mtimeMs;
-    if (!best || at > best.at) best = { real, place, at };
+    const at = fs.statSync(real!).mtimeMs;
+    if (!best || at > best.at) best = { real: real!, place, at };
   }
   return best ? answer(best.real, best.place) : { none: 'missing' };
 }
 
-const safeName = (file, room = 140) => path.basename(file).replace(/[^A-Za-z0-9_.-]+/g, '-').replace(/^[^A-Za-z0-9]+/, '').slice(-room) || 'file';
-const sumOf = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex').slice(0, 12);
-const cloudNameOf = (bytes, file) => `${sumOf(bytes)}-${safeName(file)}`;
+const safeName = (file: string, room = 140) => path.basename(file).replace(/[^A-Za-z0-9_.-]+/g, '-').replace(/^[^A-Za-z0-9]+/, '').slice(-room) || 'file';
+const sumOf = (bytes: Buffer) => crypto.createHash('sha256').update(bytes).digest('hex').slice(0, 12);
+const cloudNameOf = (bytes: Buffer, file: string) => `${sumOf(bytes)}-${safeName(file)}`;
 
 // The document and the pictures it draws, each inside the same project and each
 // named by the document: a neighbour nobody draws stays behind. A main file over
 // the limit (a film) is read later, a piece at a time, and draws nothing.
-function partsOf({ file, root, size }, fs) {
+function partsOf({ file, root, size }: FoundFile, fs: Fs): ReadPart[] {
   if (size > MAX_CARRIED_BYTES) return [{ file, big: true, size, path: path.basename(file) }];
   const main = { file, bytes: fs.readFileSync(file) };
   const parts = [main];
@@ -147,12 +196,12 @@ function partsOf({ file, root, size }, fs) {
 }
 
 /** The pieces a big file is cut into: how many, and how long each is. Nothing is read. */
-export function pieceSizes(size) {
+export function pieceSizes(size: number): number[] {
   const n = Math.ceil(size / PART_BYTES);
   return Array.from({ length: n }, (_, i) => Math.min(PART_BYTES, size - i * PART_BYTES));
 }
 
-const escaped = (s) => s.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+const escaped = (s: string) => s.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
 /**
  * A room keeps each message as it is written and has no ledger to say what a
@@ -160,10 +209,15 @@ const escaped = (s) => s.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
  * them goes up and the name becomes a link to it, and a file too big gets a line
  * everyone reads. A name nothing was found for is left as it was.
  */
-export async function carryIntoRoom(body, { find, put, log = () => {}, fs = fsDefault }) {
+export async function carryIntoRoom(body: string, { find, put, log = () => {}, fs = fsDefault }: {
+  find?: ((ref: string, how: { meant: boolean }) => FoundToSend | null | Promise<FoundToSend | null>) | null;
+  put: (name: string, data: string) => Promise<unknown>;
+  log?: (line: string) => void;
+  fs?: Fs;
+}): Promise<string> {
   if (!find) return body;
   let words = body;
-  const said = [];
+  const said: string[] = [];
   for (const { ref, meant } of namedFiles(body)) {
     if (ref.startsWith('attachments/')) continue;
     const found = await Promise.resolve(find(ref, { meant })).catch(() => null);
@@ -173,7 +227,7 @@ export async function carryIntoRoom(body, { find, put, log = () => {}, fs = fsDe
     const bytes = fs.readFileSync(found.file);
     const cloud = cloudNameOf(bytes, found.file);
     try { await put(cloud, bytes.toString('base64')); } catch (err) {
-      log(`room files: sending ${cloud}: ${err?.message ?? err}`);
+      log(`room files: sending ${cloud}: ${(err as Error | null)?.message ?? err}`);
       said.push(`${shown} did not send. Send the message again to try once more.`);
       continue;
     }
@@ -190,26 +244,26 @@ export async function carryIntoRoom(body, { find, put, log = () => {}, fs = fsDe
 export function createFileCarrier({
   dir, has, put, get, putPiece = null, getPiece = null, find, now = Date.now, log = () => {}, fs = fsDefault,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), retryMs = [1000, 4000],
-}) {
-  const uploads = new Map(); // ref -> { key, done, entry, error }
-  const downloads = new Map(); // `${entry key}/${part}` -> promise
-  const rounds = new Map(); // the same key -> rounds that brought no new piece
-  const givenUp = new Set();
+}: FileCarrierOptions): FileCarrier & { settled(): Promise<void> } {
+  const uploads = new Map<string, UploadTask>();
+  const downloads = new Map<string, Promise<void>>(); // `${entry key}/${part}` -> promise
+  const rounds = new Map<string, number>(); // the same key -> rounds that brought no new piece
+  const givenUp = new Set<string>();
 
-  const quietly = async (what, fn, fallback) => {
-    try { return await fn(); } catch (err) { log(`team files: ${what}: ${err?.message ?? err}`); return fallback; }
+  const quietly = async <T, F = undefined>(what: string, fn: () => T | Promise<T>, fallback?: F): Promise<T | F | undefined> => {
+    try { return await fn(); } catch (err) { log(`team files: ${what}: ${(err as Error | null)?.message ?? err}`); return fallback; }
   };
 
   // The sender's own word about a name, kept only here. Not written again when
   // nothing in it changed, so a long upload does not rewrite the index each pass.
-  const noting = (entry) => {
+  const noting = (entry: CarriedEntry) => {
     const was = shelvedEntries(dir, { fs }).find((e) => e.ref === entry.ref);
-    const plain = (e) => JSON.stringify({ ...e, at: 0 });
+    const plain = (e: CarriedEntry) => JSON.stringify({ ...e, at: 0 });
     if (was && plain(was) === plain(entry)) return;
     shelve(dir, [entry], { fs });
   };
 
-  function store(entry, part, bytes) {
+  function store(entry: CarriedFileEntry, part: CarriedPart, bytes: Buffer) {
     const to = partFile(dir, entry, part);
     fs.mkdirSync(path.dirname(to), { recursive: true });
     const tmp = `${to}.${process.pid}.tmp`;
@@ -217,8 +271,8 @@ export function createFileCarrier({
     fs.renameSync(tmp, to);
   }
 
-  async function withRetries(send) {
-    let last;
+  async function withRetries(send: () => Promise<unknown>): Promise<void> {
+    let last: unknown;
     for (let i = 0; i < TRIES_AT_A_PIECE; i += 1) {
       try { await send(); return; } catch (err) { last = err; if (i < TRIES_AT_A_PIECE - 1) await sleep(retryMs[i] ?? 0); }
     }
@@ -226,7 +280,7 @@ export function createFileCarrier({
   }
 
   // A piece already in storage is the same piece, since its name is what is in it.
-  async function sendPiece(cloud, buf) {
+  async function sendPiece(cloud: string, buf: Buffer): Promise<void> {
     if (putPiece) return withRetries(() => putPiece(cloud, buf));
     const there = await has([cloud]);
     if (!there.includes(cloud)) await withRetries(() => put(cloud, buf.toString('base64')));
@@ -234,17 +288,17 @@ export function createFileCarrier({
 
   // A file over 10 MB, sent a piece at a time while the pass goes on. The
   // pieces are read one by one, so 1 GB never sits in memory.
-  function startUpload(ref, found, at) {
-    const task = { key: `${found.file}|${found.size}`, done: false, entry: null, error: null };
+  function startUpload(ref: string, found: FoundFile, at: number): UploadTask {
+    const task: UploadTask = { key: `${found.file}|${found.size}`, done: false, entry: null, error: null };
     const total = pieceSizes(found.size).length;
     const base = safeName(found.file);
-    const progress = (done) => noting({ ref, mine: true, coming: true, here: found.file, done, total, at });
+    const progress = (done: number) => noting({ ref, mine: true, coming: true, here: found.file, done, total, at });
     progress(0);
     task.promise = (async () => {
       const fd = fs.openSync(found.file, 'r');
       try {
         const whole = crypto.createHash('sha256');
-        const chunks = [];
+        const chunks: CarriedChunk[] = [];
         for (const [i, length] of pieceSizes(found.size).entries()) {
           const buf = Buffer.alloc(length);
           let read = 0;
@@ -261,10 +315,10 @@ export function createFileCarrier({
         }
         const name = base;
         const main = plainPartPath(name) ? name : `file${path.extname(name)}`;
-        const part = { path: main, cloud: `${whole.digest('hex').slice(0, 12)}-${base}`, size: found.size, chunks, ...(putPiece ? { bucket: true } : {}) };
+        const part: CarriedPart = { path: main, cloud: `${whole.digest('hex').slice(0, 12)}-${base}`, size: found.size, chunks, ...(putPiece ? { bucket: true } : {}) };
         task.entry = { ref, main, parts: [part], at };
       } catch (err) {
-        log(`team files: sending ${ref} in parts: ${err?.message ?? err}`);
+        log(`team files: sending ${ref} in parts: ${(err as Error | null)?.message ?? err}`);
         task.error = 'upload';
       } finally {
         fs.closeSync(fd);
@@ -274,8 +328,8 @@ export function createFileCarrier({
     return task;
   }
 
-  function bigSend(ref, found, at) {
-    let task = uploads.get(ref);
+  function bigSend(ref: string, found: FoundFile, at: number): CarrySent {
+    let task: UploadTask | null | undefined = uploads.get(ref);
     if (task && task.key !== `${found.file}|${found.size}`) { uploads.delete(ref); task = null; }
     if (!task) { task = startUpload(ref, found, at); uploads.set(ref, task); }
     if (!task.done) return { sent: false, working: true };
@@ -284,23 +338,24 @@ export function createFileCarrier({
       noting({ ref, mine: true, failed: true, why: task.error, here: found.file, at });
       return { sent: true, failed: true };
     }
-    noting({ ...task.entry, mine: true, here: found.file });
-    return { entry: task.entry, sent: true };
+    // A finished upload without an error always set its entry.
+    noting({ ...task.entry!, mine: true, here: found.file });
+    return { entry: task.entry!, sent: true };
   }
 
-  const chunkCount = (entry, part) => part.chunks.filter((c) => fs.existsSync(chunkFile(dir, entry, part, c))).length;
+  const chunkCount = (entry: CarriedFileEntry, part: ChunkedPart) => part.chunks.filter((c) => fs.existsSync(chunkFile(dir, entry, part, c))).length;
 
   // Every piece of a big part, then the part itself put back together and
   // checked against the name the sender gave the whole. True when it is here.
-  async function gatherPart(entry, part) {
+  async function gatherPart(entry: CarriedFileEntry, part: ChunkedPart): Promise<boolean> {
     const missing = part.chunks.filter((c) => !fs.existsSync(chunkFile(dir, entry, part, c)));
     if (part.bucket && !getPiece) return false;
     if (missing.length) {
       const there = part.bucket ? null : new Set(await has(missing.map((c) => c.cloud)));
       for (const c of missing.filter((m) => !there || there.has(m.cloud))) {
-        let bytes;
+        let bytes: Buffer | null;
         if (part.bucket) {
-          bytes = await getPiece(c.cloud);
+          bytes = await getPiece!(c.cloud);
           if (!Buffer.isBuffer(bytes)) continue;
         } else {
           const data = await get(c.cloud);
@@ -335,7 +390,7 @@ export function createFileCarrier({
     return true;
   }
 
-  function startGathering(entry, part) {
+  function startGathering(entry: CarriedFileEntry, part: ChunkedPart) {
     const key = `${entryKey(entry)}/${part.path}`;
     if (downloads.has(key) || givenUp.has(key)) return;
     const before = chunkCount(entry, part);
@@ -343,8 +398,8 @@ export function createFileCarrier({
     const run = (async () => {
       let whole = false;
       try { whole = await gatherPart(entry, part); } catch (err) {
-        log(`team files: putting ${part.cloud} together: ${err?.message ?? err}`);
-        if (err?.damaged) return spoilt();
+        log(`team files: putting ${part.cloud} together: ${(err as Error | null)?.message ?? err}`);
+        if ((err as { damaged?: boolean } | null)?.damaged) return spoilt();
       }
       if (whole) return;
       const stuck = chunkCount(entry, part) <= before ? (rounds.get(key) ?? 0) + 1 : 0;
@@ -354,10 +409,10 @@ export function createFileCarrier({
     downloads.set(key, run);
   }
 
-  async function takeParts(entry) {
+  async function takeParts(entry: CarriedFileEntry): Promise<boolean> {
     const missing = (entry.parts ?? []).filter((p) => !fs.existsSync(partFile(dir, entry, p)));
     if (!missing.length) return true;
-    for (const part of missing.filter((p) => p.chunks)) startGathering(entry, part);
+    for (const part of missing.filter((p) => p.chunks) as ChunkedPart[]) startGathering(entry, part);
     const small = missing.filter((p) => !p.chunks);
     if (small.length) {
       const there = new Set(await quietly('asking', () => has(small.map((p) => p.cloud)), []));
@@ -382,7 +437,7 @@ export function createFileCarrier({
      * something to say; a bare word with nothing behind it hands them a quiet
      * one, so their tile never waits for it.
      */
-    async send(ref, { meant = false, final = false } = {}) {
+    async send(ref: string, { meant = false, final = false }: { meant?: boolean; final?: boolean } = {}): Promise<CarrySent> {
       const at = now();
       const going = uploads.get(ref);
       if (going && !going.done) return { sent: false, working: true };
@@ -416,7 +471,8 @@ export function createFileCarrier({
       }
       noting({ ref, mine: true, coming: true, here: found.file, at });
       const main = read[0].path;
-      const parts = read.map((p) => ({ path: p.path, cloud: cloudNameOf(p.bytes, p.file), size: p.bytes.length, bytes: p.bytes }));
+      // A big main file comes back alone, so past it every part was read.
+      const parts = (read as SmallPart[]).map((p) => ({ path: p.path, cloud: cloudNameOf(p.bytes, p.file), size: p.bytes.length, bytes: p.bytes }));
       const there = await quietly('asking', () => has(parts.map((p) => p.cloud)), null);
       if (!there) return { sent: false };
       for (const part of parts.filter((p) => !there.includes(p.cloud))) {
@@ -430,24 +486,24 @@ export function createFileCarrier({
     },
 
     /** Gives up on a file for good, and says why on the sender's own tile. */
-    giveUp(ref, why = 'upload') {
+    giveUp(ref: string, why = 'upload') {
       const was = shelvedEntries(dir, { fs }).find((e) => e.ref === ref);
       noting({ ref, mine: true, failed: true, why, ...(was?.here ? { here: was.here } : {}), at: now() });
     },
 
     /** A teammate's words name a file whose list has not come: remembered, so its tile can say so. */
-    expect(ref, by, at) {
+    expect(ref: string, by: string, at: number) {
       if (shelvedEntries(dir, { fs }).some((e) => e.ref === ref)) return;
       shelve(dir, [{ ref, expecting: true, by, at }], { fs });
     },
 
     /** Forgets a failed try, so the next send starts clean. */
-    forget(ref) {
+    forget(ref: string) {
       uploads.delete(ref);
     },
 
-    async take(rawEntries) {
-      const entries = rawEntries.map(validEntry).filter(Boolean);
+    async take(rawEntries: unknown[]) {
+      const entries = (rawEntries as (RawCarriedEntry | null)[]).map(validEntry).filter(Boolean) as CarriedEntry[];
       if (!entries.length) return;
       for (const entry of entries) if (entry.parts) await takeParts(entry);
       shelve(dir, entries, { fs });

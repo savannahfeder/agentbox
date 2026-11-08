@@ -13,11 +13,11 @@ import { CloudServerWatch, serverError } from './cloud-server-down.mts';
 import { folderJob } from './task-folders-offthread.mts';
 import { gitJob } from './git-change-offthread.mts';
 import { queuedReplyText, submitReply, framedPick, framedTeammate } from './live-replies.mts';
-import { resolveAnsweredNotes, wakeForNotes } from './notes-wake.mts';
+import { resolveAnsweredNotes, wakeForNotes, type NotesTell } from './notes-wake.mts';
 import { TEAM_LOOK, TEAM_LOOK_LINE } from '../shared/team-look.mts';
 import { editedFilesLine } from '../shared/artifact-marks.mts';
 import { readItemHistory, updateWorkItem } from './store/work-items.mts';
-import { reconcileRows } from './version-reconcile.mts';
+import { reconcileRows, type ReconcilePatch } from './version-reconcile.mts';
 import { taskCommand } from './task-commands.mts';
 import { providerCommand, reviewTarget, nativeCommandNames } from '../shared/provider-commands.mts';
 import {agentInstructionsUnified, readSystemTemplate, writeInstruction} from './instruction-settings.mts';
@@ -189,7 +189,7 @@ import { autoAgents } from './machine.mts';
 import { runEndedProps } from './analytics.mts';
 import { appendRun, runLedgerPath } from './run-ledger.mts';
 import { toolServerLaunch } from './tool-server-launch.mts';
-import type { ChildProcess, SpawnOptions as ChildSpawnOptions } from 'node:child_process';
+import type { ChildProcess, ChildProcessWithoutNullStreams, SpawnOptions as ChildSpawnOptions } from 'node:child_process';
 import type { WriteStream } from 'node:fs';
 import type { PressureSample } from './start-hold.mts';
 import type { RepeatRule } from '../shared/repeats.mts';
@@ -200,7 +200,8 @@ import type { ActiveTool } from './agent-activity.mts';
 import type { ShipItem, ShipProduct } from './ship-queue.mts';
 import type { CloudKit } from './cloud/kit.mts';
 import type { CatchUpCard } from './catch-up.mts';
-import type { QueuedLine, ReplyPayload } from './live-replies.mts';
+import type { QueuedLine, ReplyItem, ReplyPayload } from './live-replies.mts';
+import type { Talk } from '../shared/work-items.mts';
 import type { Kit } from '../shared/cloud-kit.mts';
 
 type MergeOutcome = MergeHomeResult;
@@ -247,10 +248,15 @@ export type WorkItem = {
   assignee?: string;
   runner?: string;
   people?: string[];
-  talk?: unknown;
-  routed?: { to?: string; ask?: string[]; why: string; at: number; by: 'auto' | 'you' } | null;
+  talk?: Talk | null;
+  routed?:{ to?: string; ask?: string[]; why: string; at: number; by: 'auto' | 'you' } | null;
   wrote?: Record<string, FieldWrite | undefined>;
 };
+
+/** A row as a store write hands it back: it may not name its product, and a withdrawn answer is null. */
+export type StoredRow = Omit<WorkItem, 'product' | 'answer'> & { product?: string; answer?: string | null };
+
+type AnswerKeyed = Pick<WorkItem, 'product' | 'id' | 'wrote'> & { answer?: string | null };
 
 /** A project, as `Store#listProducts` hands it over. */
 export interface Product {
@@ -505,7 +511,7 @@ export interface StoppedSessionRecord {
 export interface ProfileTrouble {
   since?: number;
   at?: number;
-  cause?: string;
+  cause: string;
   raw?: string;
   stamp?: number;
   resetsAt?: number;
@@ -692,9 +698,9 @@ export interface SupervisorStore {
   readThread?(slug: string, id: string): ThreadTurn[];
   readHistory?(slug: string, id: string, opts?: { max?: number; before?: number }): QueuedLine[];
   isDue(item: WorkItem, now?: number): boolean;
-  answerItem(slug: string, id: string, patch: { answer?: string; status?: WorkItemStatus | null; [field: string]: unknown }): WorkItem | null | undefined;
-  tellItem(slug: string, id: string, opts: { text: string; from?: { teammate: string; name: string }; hold?: boolean; hop?: number | null; fromNotes?: unknown[] | null }): WorkItem | null | undefined;
-  recordSessionResult(slug: string, id: string, opts: { result: string; status?: WorkItemStatus | null }): WorkItem | null | undefined;
+  answerItem(slug: string, id: string, patch: { answer?: string; status?: WorkItemStatus | null; [field: string]: unknown }): StoredRow | null | undefined;
+  tellItem(slug: string, id: string, opts: { text: string; from?: { teammate: string | null; name: string }; hold?: boolean; hop?: number | null; fromNotes?: unknown[] | null }): ReplyItem | null | undefined;
+  recordSessionResult(slug: string, id: string, opts: { result: string; status?: WorkItemStatus | null }): StoredRow | null | undefined;
   releaseRunClaim(slug: string, id: string, run: unknown): unknown;
   nameItem(slug: string, id: string, label: string): unknown;
   catchUpItem(slug: string, id: string, opts: { label?: string; problem?: string; result?: string }): unknown;
@@ -2695,7 +2701,7 @@ export class Supervisor {
       isLive: (item: WorkItem) => this.sessions.has(item.id) || this._cloudWorkOutstanding(item),
       dirOf: (item: WorkItem) => this.store.productDir(item.product),
       historyOf: (item: WorkItem) => readItemHistory(this.store.productDir(item.product), item.id, { max: Number.MAX_SAFE_INTEGER }),
-      writeTo: (item: WorkItem, patch: Partial<WorkItem>) => updateWorkItem(this.store.productDir(item.product), item.id, patch, { source: 'system' }),
+      writeTo: (item: WorkItem, patch: ReconcilePatch) => updateWorkItem(this.store.productDir(item.product), item.id, patch, { source: 'system' }),
       looked: (this._versionsLooked ??= new Map()),
       warn: (words?: string) => console.warn(`zero: ${words}`),
     });
@@ -3849,7 +3855,7 @@ export class Supervisor {
   // permanently. The old text-only key is still honoured on read so the marks
   // already on disk keep suppressing the spawns they were written for; they age
   // out of the saved window on their own.
-  _answerKey(item: WorkItem, answer: string | null | undefined = item.answer) {
+  _answerKey(item: AnswerKeyed, answer: string | null | undefined = item.answer) {
     return `${item.product}:${item.id}:${String(answer ?? '').slice(0, 80)}:${item.wrote?.answer?.ts ?? 0}`;
   }
 
@@ -5214,7 +5220,7 @@ export class Supervisor {
     let room = this._maxCloud() - this._cloudLoad() - pausing;
     if (starts <= 0 || room <= 0) return;
     const byId = new Map((items ?? []).map((i) => [i.id, i]));
-    const asked = (s: WorkerSession) => !!this._moveAsked?.has(s.itemId) as unknown as number;
+    const asked = (s: WorkerSession) => Number(!!this._moveAsked?.has(s.itemId));
     let asking: Set<unknown> | null = null;
     const candidates = [...this.sessions.values()]
       .filter((s) => this._movesToCloud(s, byId.get(s.itemId) ?? null))
@@ -7171,7 +7177,7 @@ export class Supervisor {
     this._liveSessions[item.id] = kept;
     // A reply written while the app was away was not heard by this run.
     const heard = !!rec.heard && !!item.answer && this._answerKey(item) === rec.heard;
-    this._startSession(heard ? item : { ...item, answer: null } as unknown as WorkItem, {
+    this._startSession(heard ? item : { ...item, answer: undefined }, {
       product, cwd: rec.cwd as string, profile: rec.profile as string, engine: rec.engine ?? 'claude', where: 'local',
       plan: { args: [], command: false, resumeId: rec.resumed ? rec.sessionId : null },
       continuation: !!rec.continuation, spawnFiles: rec.spawnFiles ?? [], adopted: { child, rec },
@@ -9019,7 +9025,7 @@ export class Supervisor {
     const team = this.store.teammates?.team;
     if (!team) return;
     const deadline = this.config.teammateReplyDeadlineMs ?? 30_000;
-    const tell = async (product: string, id: string, { text, from, fromNotes }: { text: string; from: { teammate: string; name: string }; fromNotes?: unknown[] | null }) => {
+    const tell: NotesTell = async (product, id, { text, from, fromNotes }) => {
       let timer: NodeJS.Timeout | undefined;
       const late = new Promise((resolve) => { timer = setTimeout(() => resolve('late'), deadline); });
       const sent = submitReply(this, { product, id, answer: text, from: from.name }, () => this.store.tellItem(product, id, { text, from, fromNotes }));
@@ -10908,7 +10914,7 @@ export class Supervisor {
         });
         proc.once('exit', (code, signal) => resolveExit({ code, signal }));
         proc.once('error', () => resolveExit({ code: 1, signal: null }));
-        return proc;
+        return proc as ChildProcessWithoutNullStreams;
       },
       onNotification: (method: string, params: unknown) => this._codexUsage().saw(method, params as { rateLimits?: unknown } | null | undefined, home),
     });
@@ -11473,7 +11479,8 @@ export class Supervisor {
     // and its helpers going (main/run-host.mts).
     const hosted = !!this.hostRuns && where !== 'cloud' && !remoteOnly && !plan.command;
     const child: WorkerChild = adopted?.child ?? harness.spawn(this, plan, { cwd, item, profile, env, cloud: where === 'cloud', host: hosted ? this._runHost() : null }) as WorkerChild;
-    if (child instanceof HostedRun && !adopted) child.once('exit', (code) => { if (code === HOST_LOST && !Number.isInteger(child.pid)) this._runHostBroken = Date.now(); });
+    // Cast so the test does not narrow `child` and leave it `WorkerChild | HostedRun`, whose overloads cannot be called.
+    if ((child as WorkerChild) instanceof HostedRun && !adopted) child.once('exit', (code) => { if (code === HOST_LOST && !Number.isInteger(child.pid)) this._runHostBroken = Date.now(); });
 
     // `command` RIDES ON THE SESSION so the cap can leave it out (`_load`).
     // The exit handler already needed the same fact from `plan`; this is that
@@ -13158,7 +13165,7 @@ export class Supervisor {
   /** Claude Code's own name for an alias or a version, off this Mac, else the word itself. */
   _claudeModelLabel(word: string) {
     let rows: readonly { alias?: string; id?: string; label?: string }[] = CLAUDE_MODELS;
-    try { rows = claudeModelRows({ bin: this.config.claudeBin as never }) ?? CLAUDE_MODELS; } catch { rows = CLAUDE_MODELS; }
+    try { rows = claudeModelRows({ bin: this.config.claudeBin }) ?? CLAUDE_MODELS; } catch { rows = CLAUDE_MODELS; }
     return rows.find((m) => m.alias === word || m.id === word)?.label ?? word;
   }
 

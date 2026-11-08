@@ -16,9 +16,33 @@ import { keyAsks, keyWords } from './cloud-keys.mts';
 export const NEED = 'AGENTBOX-NEEDS:';
 const NEED_LINE = /^\s*`?AGENTBOX-NEEDS:\s*(sign-in|key|file|code)\s+([^|`]+?)\s*(?:\|\s*([^`]*?))?\s*`?\s*$/i;
 
+export interface Service {
+  id: string;
+  name: string;
+  keys: { name: string; label: string }[];
+  tokenUrl: string;
+}
+
+export type Need =
+  | { kind: 'sign-in'; service: Service; why: string }
+  | { kind: 'key'; name: string; what: string }
+  | { kind: 'file'; path: string; why: string }
+  | { kind: 'code'; about: string; why: string };
+
+/** The parts of a thread's row these read. */
+export interface NeedsItem {
+  id?: string;
+  product?: string;
+  status?: string;
+  agent?: unknown;
+  answer?: string | null;
+  result?: string | null;
+  wrote?: Record<string, { ts?: number } | undefined>;
+}
+
 // The services a sign-in can name, each with the variables its tools read and
 // the page where a person makes a token.
-export const SERVICES = Object.freeze([
+export const SERVICES: readonly Service[] = Object.freeze([
   { id: 'supabase', name: 'Supabase', keys: [{ name: 'SUPABASE_ACCESS_TOKEN', label: 'Supabase access token' }], tokenUrl: 'https://supabase.com/dashboard/account/tokens' },
   { id: 'vercel', name: 'Vercel', keys: [{ name: 'VERCEL_TOKEN', label: 'Vercel token' }], tokenUrl: 'https://vercel.com/account/tokens' },
   { id: 'github', name: 'GitHub', keys: [{ name: 'GH_TOKEN', label: 'GitHub token' }], tokenUrl: 'https://github.com/settings/tokens' },
@@ -32,23 +56,23 @@ export const SERVICES = Object.freeze([
   { id: 'fly', name: 'Fly.io', keys: [{ name: 'FLY_API_TOKEN', label: 'Fly.io token' }], tokenUrl: 'https://fly.io/user/personal_access_tokens' },
   { id: 'linear', name: 'Linear', keys: [{ name: 'LINEAR_API_KEY', label: 'Linear API key' }], tokenUrl: 'https://linear.app/settings/account/security' },
 ]);
-export const serviceById = (id) => SERVICES.find((s) => s.id === String(id ?? '').trim().toLowerCase()) ?? null;
+export const serviceById = (id: string | null | undefined): Service | null => SERVICES.find((s) => s.id === String(id ?? '').trim().toLowerCase()) ?? null;
 
-const tidy = (s) => String(s ?? '').trim().replace(/^[\u2014\u2013:\s-]+/, '');
+const tidy = (s: string | null | undefined): string => String(s ?? '').trim().replace(/^[\u2014\u2013:\s-]+/, '');
 
 /**
  * What a message asks for, in order and once each:
  * { kind: 'sign-in', service, why } | { kind: 'key', name, what } | { kind: 'file', path, why } | { kind: 'code', about, why }.
  * A sign-in to a service not on the list is left out: the run is told to ask for a key instead.
  */
-export function needsIn(text) {
-  const out = [];
-  const seen = new Set();
-  const add = (need, id) => { if (!seen.has(id)) { seen.add(id); out.push(need); } };
+export function needsIn(text: string | null | undefined): Need[] {
+  const out: Need[] = [];
+  const seen = new Set<string>();
+  const add = (need: Need, id: string) => { if (!seen.has(id)) { seen.add(id); out.push(need); } };
   for (const line of String(text ?? '').split('\n')) {
     const m = NEED_LINE.exec(line);
     if (!m) continue;
-    const kind = m[1].toLowerCase();
+    const kind = m[1].toLowerCase() as Need['kind'];
     const arg = m[2].trim();
     const why = tidy(m[3]);
     if (kind === 'sign-in') {
@@ -68,28 +92,28 @@ export function needsIn(text) {
 }
 
 /** Whether `line` is one of those asks, in either form. */
-export const isNeedLine = (line) => needsIn(line).length > 0;
+export const isNeedLine = (line: string | null | undefined): boolean => needsIn(line).length > 0;
 
 /** One name for a need, the same in the thread and atop Needs you. */
-export const needId = (need) => (need.kind === 'sign-in' ? `sign-in:${need.service.id}` : need.kind === 'key' ? `key:${need.name}` : need.kind === 'file' ? `file:${need.path}` : `code:${need.about}`);
+export const needId = (need: Need): string => (need.kind === 'sign-in' ? `sign-in:${need.service.id}` : need.kind === 'key' ? `key:${need.name}` : need.kind === 'file' ? `file:${need.path}` : `code:${need.about}`);
 
 /** The variables a sign-in or a key asks to be saved; none for a file or a code. */
-export const keysOf = (need) => (need.kind === 'sign-in' ? need.service.keys.map((k) => k.name) : need.kind === 'key' ? [need.name] : []);
+export const keysOf = (need: Need): string[] => (need.kind === 'sign-in' ? need.service.keys.map((k) => k.name) : need.kind === 'key' ? [need.name] : []);
 
-const spokenSince = (item) => item.answer !== '(withdrawn)' && (item.wrote?.answer?.ts ?? 0) > (item.wrote?.result?.ts ?? 0);
+const spokenSince = (item: NeedsItem): boolean => item.answer !== '(withdrawn)' && (item.wrote?.answer?.ts ?? 0) > (item.wrote?.result?.ts ?? 0);
 
 /**
  * What an open thread still waits on: its latest answer's asks less the
  * sign-ins and keys already saved. Nothing once it has been answered since.
  */
-export function needsLeft(item, saved = []) {
+export function needsLeft(item: NeedsItem | null | undefined, saved: Iterable<string> = []): Need[] {
   if (!item || item.status !== 'open' || spokenSince(item)) return [];
   const have = new Set(saved);
   return needsIn(item.result).filter((n) => { const k = keysOf(n); return !k.length || !k.every((x) => have.has(x)); });
 }
 
 /** The few words a thread's row says while it waits on these. */
-export function needsWord(needs) {
+export function needsWord(needs: readonly Need[]): string | null {
   const first = needs[0];
   if (!first) return null;
   // Round ten: a row said "Needs Vercel" for a thread waiting on three things.
@@ -100,10 +124,10 @@ export function needsWord(needs) {
   return 'Needs a key';
 }
 
-const listed = (words) => (words.length < 3 ? words.join(' and ') : `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`);
+const listed = (words: string[]): string => (words.length < 3 ? words.join(' and ') : `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`);
 
 /** What goes back to a thread once its sign-ins and keys are all saved. */
-export function connectedReply(needs) {
+export function connectedReply(needs: readonly Need[]): string {
   const signIns = needs.filter((n) => n.kind === 'sign-in').map((n) => n.service.name);
   const keys = needs.filter((n) => n.kind === 'key').map((n) => (keyWords(n.what) ? `the ${keyWords(n.what)}` : n.name));
   const said = [signIns.length ? `connected ${listed(signIns)}` : null, keys.length ? `saved ${listed(keys)}` : null].filter(Boolean).join(' and ');
@@ -115,9 +139,9 @@ export function connectedReply(needs) {
  * for sign-ins and keys that are now all saved, and nothing said to them since.
  * Each with the reply that sends it on.
  */
-export function threadsKeysFree(items, saved) {
+export function threadsKeysFree<T extends NeedsItem>(items: readonly T[] | null | undefined, saved: Iterable<string>): { product: T['product']; id: string; answer: string }[] {
   const have = new Set(saved);
-  const out = [];
+  const out: { product: T['product']; id: string; answer: string }[] = [];
   for (const item of items ?? []) {
     if (!item?.id || item.status !== 'open' || item.agent) continue;
     const needs = needsIn(item.result);

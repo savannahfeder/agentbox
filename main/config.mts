@@ -10,7 +10,7 @@ import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { resolveClaudeBin, candidatePaths } from './claude-bin.mts';
-import { warmShellAnswers } from './engine-bin.mts';
+import { warmShellAnswers, type EngineFrom } from './engine-bin.mts';
 import { resolveCodexBin } from './codex-bin.mts';
 import { defaultStoreRoot } from './store/home.mts';
 import { readPlans, slotsForPlans } from './claude-plan.mts';
@@ -34,7 +34,55 @@ const CONFIG_NAME = 'zero.config.json';
  */
 export const DEFAULT_SESSIONS_AT_ONCE = 3;
 
-export const DEFAULTS = {
+export interface ConfigDefaults {
+  accountId: string | null;
+  claudeBin: string | null;
+  maxConcurrentSessions: number;
+  agentsAuto: boolean;
+  agentsNudge: number;
+  agentsAtOnce: number | null;
+  memoryGate: boolean;
+  memoryGateSlots: number | null;
+  cloudRuns: boolean | string | null;
+  maxCloudSessions: number | null;
+  cleanupLeftovers: boolean;
+  cleanupLeftoversSince: number | null;
+  sessionArgs: string[] | null;
+  storeMcpCommand: string | string[] | null;
+  autonomousProducts: string[];
+  products: string[];
+  engineChoice: string | boolean | null;
+}
+
+/**
+ * The live config: `zero.config.json` over `DEFAULTS`, plus what `loadConfig`
+ * worked out about this machine. The file is written by hand, so any other key
+ * in it is carried through as it was written.
+ */
+export interface Config extends ConfigDefaults {
+  [key: string]: unknown;
+  accountId: string;
+  claudeBin: string;
+  freshInstall: boolean;
+  storeRoot: string;
+  accountRoot: string;
+  claudeBinConfigured: string | null;
+  claudeFound: boolean;
+  claudeCertain: boolean;
+  claudeFrom: EngineFrom | null;
+  codexBinConfigured: string | null;
+  codexBin: string | null;
+  codexFound: boolean;
+  codexCertain: boolean;
+  codexFrom: EngineFrom | null;
+  machineSlots: number;
+  planSlotsFrom: string | null;
+  authProfiles?: string[] | null;
+  home: string;
+  appDir: string;
+}
+
+export const DEFAULTS: ConfigDefaults = {
   // ONE ACCOUNT FOLDER PER INSTALL, AND NOBODY ELSE'S.
   //
   // This was a literal id for most of the app's life, which meant every copy
@@ -145,9 +193,9 @@ export const DEFAULTS = {
  * `home` is the machine's home folder and exists so a test can be run against
  *  a laid-out one rather than against whoever is logged in. Nothing in the app
  *  passes it. */
-export function loadConfig(appDir, { home = os.homedir() } = {}) {
+export function loadConfig(appDir: string, { home = os.homedir() }: { home?: string } = {}): Config {
   const file = path.join(appDir, CONFIG_NAME);
-  let overrides = {};
+  let overrides: Record<string, unknown> = {};
   // WHETHER THIS MAC HAS EVER RUN AGENTBOX BEFORE. There is exactly one honest
   // marker of that and this is it: no config file at all. A file that exists
   // but happens not to mention a setting is somebody who has been here for
@@ -164,10 +212,11 @@ export function loadConfig(appDir, { home = os.homedir() } = {}) {
   try {
     overrides = JSON.parse(fs.readFileSync(file, 'utf8'));
   } catch (err) {
-    if (err.code === 'ENOENT') fresh = true;
-    else console.warn(`zero: could not read ${file}: ${err.message}`);
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') fresh = true;
+    else console.warn(`zero: could not read ${file}: ${(err as Error).message}`);
   }
-  const config = { ...DEFAULTS, ...overrides, freshInstall: fresh };
+  // Filled in below before it is returned.
+  const config = { ...DEFAULTS, ...overrides, freshInstall: fresh } as Config;
   // Where the inbox's own files live, when the file names no store. A path in
   // the file always wins, including on Linux. The default is computed here, not
   // at import: on Linux it is the XDG data directory, and on macOS a folder of
@@ -204,7 +253,7 @@ export function loadConfig(appDir, { home = os.homedir() } = {}) {
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(file, `${JSON.stringify({ ...overrides, accountId: config.accountId, ...(firstLaunch ? { engineChoice: firstLaunch } : {}) }, null, 2)}\n`);
     } catch (err) {
-      console.warn(`zero: could not write the new account id to ${file}: ${err.message}`);
+      console.warn(`zero: could not write the new account id to ${file}: ${(err as Error).message}`);
     }
   }
   config.accountRoot = path.join(config.storeRoot, 'accounts', config.accountId);
@@ -337,7 +386,7 @@ export function loadConfig(appDir, { home = os.homedir() } = {}) {
     try {
       saveConfig(config, { engineChoice: codexOpened });
     } catch (err) {
-      console.warn(`zero: could not open the Codex choice in ${file}: ${err.message}`);
+      console.warn(`zero: could not open the Codex choice in ${file}: ${(err as Error).message}`);
     }
   }
   return config;
@@ -349,12 +398,12 @@ export function loadConfig(appDir, { home = os.homedir() } = {}) {
  *  August on Claude Code: it was written before this moment, so it is stale
  *  (`engineChoiceOnRowIsStale`). A moment already written is kept, and
  *  `"engineChoice": false` written by hand keeps the choice shut. */
-export function codexChoiceToOpen(config, codexFound) {
+export function codexChoiceToOpen(config: { engineChoice?: unknown }, codexFound: boolean | null | undefined): string | null {
   if (!codexFound || config.engineChoice != null) return null;
   return new Date().toISOString();
 }
 
-export function configFile(appDir) {
+export function configFile(appDir: string): string {
   return path.join(appDir, CONFIG_NAME);
 }
 
@@ -387,7 +436,7 @@ export function configFile(appDir) {
  * answers correctly inside the child while staying a plain function a test can
  * call with no Electron and no launch.
  */
-export function configDir({ appDir, userData, packaged = false, env = process.env } = {}) {
+export function configDir({ appDir, userData, packaged = false, env = process.env }: { appDir: string; userData: string; packaged?: boolean; env?: NodeJS.ProcessEnv }): string {
   if (packaged) return userData;
   return runningAsAFreshUser(env) || runningAsADemo(env) ? userData : appDir;
 }
@@ -406,15 +455,15 @@ export function configDir({ appDir, userData, packaged = false, env = process.en
 //
 // Written through a rename, like the standing instructions: a half-written
 // config is a fleet that boots with no grants at all.
-export function saveConfig(config, patch) {
-  const appDir = config.appDir;
+export function saveConfig(config: object, patch: Record<string, unknown>): Record<string, unknown> {
+  const appDir = (config as { appDir?: string }).appDir;
   if (!appDir) throw new Error('config has no appDir; cannot save');
   const file = configFile(appDir);
-  let onDisk = {};
+  let onDisk: Record<string, unknown> = {};
   try {
     onDisk = JSON.parse(fs.readFileSync(file, 'utf8'));
   } catch (err) {
-    if (err.code !== 'ENOENT') throw err;
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
   }
   const next = { ...onDisk };
   // NOTHING IS PINNED HERE ANY MORE, and the deletion is the point. This used
@@ -434,9 +483,10 @@ export function saveConfig(config, patch) {
   const tmp = `${file}.tmp-${process.pid}`;
   fs.writeFileSync(tmp, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
   fs.renameSync(tmp, file);
+  const live = config as Record<string, unknown>;
   for (const [key, value] of Object.entries(patch)) {
-    if (value === undefined) delete config[key];
-    else config[key] = value;
+    if (value === undefined) delete live[key];
+    else live[key] = value;
   }
   return next;
 }

@@ -1,10 +1,10 @@
 // PURE. The files a thread made, for the Files button over it.
-import { filesInLines, threadFiles } from '../../../shared/artifact-marks.mts';
+import { filesInLines, threadFiles, type ThreadLine } from '../../../shared/artifact-marks.mts';
 
 export interface ThreadFile { src: string; name: string; notes: number; at: number }
 
 /** Each file once at its newest version, with the notes on any version, newest first. */
-export function filesMadeHere(lines: unknown[], notes: { file: string }[]): ThreadFile[] {
+export function filesMadeHere(lines: readonly ThreadLine[], notes: { file: string }[]): ThreadFile[] {
   return threadFiles(filesInLines(lines)).map((family: { versions: { id: string; name: string; path: string; at: number }[] }) => {
     const newest = family.versions[family.versions.length - 1];
     const ids = new Set(family.versions.map((v) => v.id));

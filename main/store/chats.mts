@@ -10,22 +10,37 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { atomicWriteJson, readJson } from './project.mts';
 
-const iso = () => new Date().toISOString();
-const chatsDir = (projectDir) => path.join(projectDir, 'chats');
-const indexFile = (projectDir) => path.join(chatsDir(projectDir), 'index.json');
+export interface ChatEntry {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  lastSessionId: string | null;
+  modelId?: string;
+  [field: string]: unknown;
+}
+interface ChatIndex { chats?: ChatEntry[] }
+export interface AskQuestion { id: string; [field: string]: unknown }
+export interface ChatAsk { requestId?: string; status?: string; questions?: AskQuestion[]; [field: string]: unknown }
+export interface ChatMessage { id: string; ask?: ChatAsk; [field: string]: unknown }
+export interface AskAnswer { id?: string; choiceId?: unknown; choiceIds?: unknown; freeText?: unknown; skipped?: unknown }
 
-export function sanitizeChatId(id) {
+const iso = () => new Date().toISOString();
+const chatsDir = (projectDir: string) => path.join(projectDir, 'chats');
+const indexFile = (projectDir: string) => path.join(chatsDir(projectDir), 'index.json');
+
+export function sanitizeChatId(id: unknown): string {
   const s = String(id ?? '').replace(/[^a-zA-Z0-9_-]/g, '');
   if (!s) throw new Error(`bad chat id: ${id}`);
   return s;
 }
 
-export function chatFile(projectDir, chatId) {
+export function chatFile(projectDir: string, chatId: string): string {
   return path.join(chatsDir(projectDir), `${sanitizeChatId(chatId)}.jsonl`);
 }
 
-function mutateIndex(projectDir, mutate) {
-  const idx = readJson(indexFile(projectDir), { chats: [] });
+function mutateIndex(projectDir: string, mutate: (idx: ChatIndex) => void): ChatIndex {
+  const idx = readJson<ChatIndex>(indexFile(projectDir), { chats: [] });
   mutate(idx);
   atomicWriteJson(indexFile(projectDir), idx);
   return idx;
@@ -35,10 +50,10 @@ function mutateIndex(projectDir, mutate) {
 // ONCE (copy to chats/main.jsonl, rename the original to .migrated so a failed
 // first-open never strands history), carries project.lastSessionId over, and
 // guarantees at least one chat exists.
-export function ensureChats(projectDir, project = {}) {
+export function ensureChats(projectDir: string, project: { lastSessionId?: string | null } = {}): ChatEntry[] {
   fs.mkdirSync(chatsDir(projectDir), { recursive: true });
   if (!fs.existsSync(indexFile(projectDir))) {
-    const chats = [];
+    const chats: ChatEntry[] = [];
     const legacy = path.join(projectDir, 'chat.jsonl');
     if (fs.existsSync(legacy)) {
       fs.copyFileSync(legacy, chatFile(projectDir, 'main'));
@@ -53,8 +68,8 @@ export function ensureChats(projectDir, project = {}) {
 
 // Registry with self-repair: entries whose log file is gone are dropped
 // (and pruned from the index so they stay gone), newest first.
-export function listChats(projectDir) {
-  const idx = readJson(indexFile(projectDir), { chats: [] });
+export function listChats(projectDir: string): ChatEntry[] {
+  const idx = readJson<ChatIndex>(indexFile(projectDir), { chats: [] });
   const alive = (idx.chats ?? []).filter((c) => {
     try { return c?.id && fs.existsSync(chatFile(projectDir, c.id)); } catch { return false; }
   });
@@ -64,24 +79,24 @@ export function listChats(projectDir) {
   return [...alive].sort((a, b) => String(b.updatedAt ?? '').localeCompare(String(a.updatedAt ?? '')));
 }
 
-export function getChat(projectDir, chatId) {
+export function getChat(projectDir: string, chatId: string): ChatEntry | null {
   return listChats(projectDir).find((c) => c.id === chatId) ?? null;
 }
 
-export function createChat(projectDir, title = 'New chat', { modelId } = {}) {
+export function createChat(projectDir: string, title = 'New chat', { modelId }: { modelId?: string | null } = {}): ChatEntry {
   fs.mkdirSync(chatsDir(projectDir), { recursive: true });
   const id = `c-${crypto.randomBytes(4).toString('hex')}`;
   fs.writeFileSync(chatFile(projectDir, id), '');
   // modelId pins THIS conversation's model at birth (the caller passes the
   // workspace's most recent choice). Undefined = follow the global default,
   // which is what every pre-existing chat does.
-  const chat = { id, title, createdAt: iso(), updatedAt: iso(), lastSessionId: null, ...(modelId ? { modelId } : {}) };
+  const chat: ChatEntry = { id, title, createdAt: iso(), updatedAt: iso(), lastSessionId: null, ...(modelId ? { modelId } : {}) };
   mutateIndex(projectDir, (idx) => { idx.chats = [...(idx.chats ?? []), chat]; });
   return chat;
 }
 
-export function patchChat(projectDir, chatId, patch) {
-  let out = null;
+export function patchChat(projectDir: string, chatId: string, patch: Partial<ChatEntry>): ChatEntry | null {
+  let out: ChatEntry | null = null;
   mutateIndex(projectDir, (idx) => {
     idx.chats = (idx.chats ?? []).map((c) => {
       if (c.id !== chatId) return c;
@@ -92,7 +107,7 @@ export function patchChat(projectDir, chatId, patch) {
   return out;
 }
 
-export function renameChat(projectDir, chatId, title) {
+export function renameChat(projectDir: string, chatId: string, title: unknown): ChatEntry | null {
   const t = String(title ?? '').trim();
   return t ? patchChat(projectDir, chatId, { title: t }) : null;
 }
@@ -100,7 +115,7 @@ export function renameChat(projectDir, chatId, title) {
 // Delete = move the log into chats/.trash/ (never rm) and drop the entry.
 // The caller must close the chat's session FIRST; a trashed chat takes no
 // further writes (appendChatMessage refuses unregistered chats).
-export function trashChat(projectDir, chatId) {
+export function trashChat(projectDir: string, chatId: string): boolean {
   const entry = getChat(projectDir, chatId);
   if (!entry) return false;
   const trash = path.join(chatsDir(projectDir), '.trash');
@@ -123,9 +138,12 @@ export function trashChat(projectDir, chatId) {
 // unsent composer draft text). The active chat is always protected, which is what
 // keeps a scrub-then-ensure cycle from churning: ensureChats only recreates when
 // zero chats remain, and the one you are looking at never gets scrubbed.
-export function scrubEmptyChats(projectDir, { keepIds = [], activeId } = {}) {
+export function scrubEmptyChats(
+  projectDir: string,
+  { keepIds = [], activeId }: { keepIds?: string[] | null; activeId?: string | null } = {},
+): { removed: string[] } {
   const keep = new Set([...(keepIds ?? []), ...(activeId ? [activeId] : [])]);
-  const removed = [];
+  const removed: string[] = [];
   for (const c of listChats(projectDir)) {
     if (keep.has(c.id)) continue;
     if (readChatLog(projectDir, c.id).length > 0) continue;
@@ -134,7 +152,7 @@ export function scrubEmptyChats(projectDir, { keepIds = [], activeId } = {}) {
   return { removed };
 }
 
-export function appendChatMessage(projectDir, chatId, message) {
+export function appendChatMessage(projectDir: string, chatId: string, message: ChatMessage): void {
   if (!getChat(projectDir, chatId)) throw new Error(`no such chat: ${chatId}`);
   fs.appendFileSync(chatFile(projectDir, chatId), JSON.stringify(message) + '\n');
   patchChat(projectDir, chatId, { updatedAt: iso() });
@@ -147,12 +165,12 @@ export function appendChatMessage(projectDir, chatId, message) {
 // Folds any tapped answers into the card, persists it as answered
 // (last-line-wins), and returns the resolved message, or null when there is
 // no matching pending ask.
-export function resolvePendingAsk(projectDir, chatId, requestId, answers = []) {
+export function resolvePendingAsk(projectDir: string, chatId: string, requestId: string, answers: readonly (AskAnswer | null)[] = []): ChatMessage | null {
   const card = readChatLog(projectDir, chatId)
     .find((m) => m.ask?.requestId === requestId && m.ask.status === 'pending');
   if (!card) return null;
   const list = Array.isArray(answers) ? answers : [];
-  const questions = (card.ask.questions ?? []).map((q) => {
+  const questions = (card.ask!.questions ?? []).map((q) => {
     const a = list.find((x) => x?.id === q.id);
     return a
       ? {
@@ -172,17 +190,17 @@ export function resolvePendingAsk(projectDir, chatId, requestId, answers = []) {
   return resolved;
 }
 
-export function readChatLog(projectDir, chatId) {
-  let lines;
+export function readChatLog(projectDir: string, chatId: string): ChatMessage[] {
+  let lines: string[];
   try {
     lines = fs.readFileSync(chatFile(projectDir, chatId), 'utf8').split('\n').filter(Boolean);
   } catch { return []; }
-  const order = []; const byId = new Map();
+  const order: string[] = []; const byId = new Map<string, ChatMessage>();
   for (const l of lines) {
-    let m; try { m = JSON.parse(l); } catch { continue; } // torn tail line: skip
+    let m: ChatMessage | null; try { m = JSON.parse(l); } catch { continue; } // torn tail line: skip
     if (!m?.id) continue;
     if (!byId.has(m.id)) order.push(m.id);
     byId.set(m.id, { ...(byId.get(m.id) ?? {}), ...m });
   }
-  return order.map((id) => byId.get(id));
+  return order.map((id) => byId.get(id)!);
 }

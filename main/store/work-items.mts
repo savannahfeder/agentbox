@@ -20,20 +20,49 @@ import { withProjectLock } from './project-lock.mts';
 import {
   foldWorkItems, foldRawInto, finishItem, normalizeLine, buildLine, buildClaimLine, buildHeartbeatLine, buildReleaseLine,
   isClaimable, sortForPull, matchesFilter, isWorkItemId, MAX_LINE_BYTES, LEASE_MS,
+  type WorkItem, type FoldingItem, type PatchInput, type WorkItemSource, type WorkItemFilter, type WorkItemLine,
+  type WorkItemPatch, type WorkItemClaim, type PatchLine, type ClaimLine, type ReleaseLine,
 } from '../../shared/work-items.mts';
+
+/** A line as the ledger file holds it: parsed, not checked (`normalizeLine` is the check). */
+export type LedgerLine = {
+  id: string;
+  ts: number;
+  source?: WorkItemSource;
+  by?: string;
+  uid?: string;
+  epoch?: number;
+  patch?: WorkItemPatch;
+  claim?: WorkItemClaim;
+  heartbeat?: boolean;
+  release?: boolean;
+};
+
+// Any string: buildLine reads one it does not know as 'agent'.
+export interface WriteOptions { source?: string; now?: number }
+export interface HistoryOptions { max?: number; before?: number }
+export interface LeaseOptions { epoch: number; holder?: string | null; leaseMs?: number; now?: number }
+export interface ClaimOptions { id?: string | null; filter?: WorkItemFilter | null; holder?: string; leaseMs?: number; now?: number }
+export type ClaimResult =
+  | { claimed: true; epoch: number; item: WorkItem }
+  | { claimed: false; reason: string; heldBy?: string };
+
+type Stamped = (PatchLine | ClaimLine | ReleaseLine) & { by?: string; uid?: string };
+interface LedgerPin { stamp: string; st: fs.Stats | null; fd: number | null; gen: number }
+interface HeldFold { stamp: string; items: Map<string, WorkItem>; raw: Map<string, FoldingItem>; gen: number; offset: number; from: number }
 
 const LEDGER = 'work-items.jsonl';
 // Never load an unbounded jsonl into memory: past this, read only the trailing
 // window. The fold tolerates the torn leading line that produces, exactly as
 // records.mjs and the chat log already do.
 const MAX_LEDGER_BYTES = 8 * 1024 * 1024;
-const warnedOversize = new Set();
+const warnedOversize = new Set<string>();
 
 // THE LEDGER LIVES IN THE APP'S HOME, NOT IN THE FOLDER SHE UPLOADS FILES TO.
 // It used to be `<product>/work-items.jsonl`, and on a product with no code repo
 // registered that folder is the worker's own working directory. main/store/home.mts
 // says why it moved and moves the old file in the first time this is called.
-function ledgerPath(projectDir) {
+function ledgerPath(projectDir: string): string {
   return machineryPath(projectDir, LEDGER);
 }
 
@@ -52,16 +81,16 @@ function ledgerPath(projectDir) {
 // Main sets it on sign-in. The store's MCP server is another process, so it
 // reads AGENTBOX_PERSON_ID, which the supervisor hands it. With neither, no line
 // is stamped and the single-person app writes exactly what it always wrote.
-let lineAuthor = null;
-export function setLineAuthor(personId) {
+let lineAuthor: string | null = null;
+export function setLineAuthor(personId: string | null | undefined): void {
   lineAuthor = typeof personId === 'string' && personId ? personId : null;
 }
-function currentAuthor() {
+function currentAuthor(): string | null {
   return lineAuthor ?? (process.env.AGENTBOX_PERSON_ID || null);
 }
 const newLineUid = () => `l-${crypto.randomBytes(8).toString('hex')}`;
 
-function appendLine(file, obj) {
+function appendLine(file: string, obj: Stamped): Stamped {
   const author = currentAuthor();
   // `by` and `uid` are added here, the one place every line passes, so no
   // writer can forget them. A line that already carries them keeps its own.
@@ -69,7 +98,7 @@ function appendLine(file, obj) {
   return writeLine(file, line);
 }
 
-function writeLine(file, obj) {
+function writeLine<T>(file: string, obj: T): T {
   const buf = Buffer.from(JSON.stringify(obj) + '\n', 'utf8');
   if (buf.length > MAX_LINE_BYTES) throw new Error(`work item line too large (${buf.length} bytes, max ${MAX_LINE_BYTES})`);
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -84,8 +113,8 @@ function writeLine(file, obj) {
 }
 
 /* --------------------------------- reading ------------------------------- */
-function readLines(file) {
-  let text;
+function readLines(file: string): string[] {
+  let text: string;
   try {
     const size = fs.statSync(file).size;
     if (size > MAX_LEDGER_BYTES) {
@@ -105,7 +134,7 @@ function readLines(file) {
       text = fs.readFileSync(file, 'utf8');
     }
   } catch (err) {
-    if (err.code === 'ENOENT') return [];
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
     throw err;
   }
   return text.split('\n').filter((l) => l && Buffer.byteLength(l, 'utf8') <= MAX_LINE_BYTES);
@@ -138,7 +167,7 @@ function readLines(file) {
 // zero, where no lease has lapsed yet, and every caller gets a copy aged
 // against its own `now` (`aged` below). Handing out the cached objects
 // themselves would let one caller's edit become every later caller's truth.
-const folded = new Map();
+const folded = new Map<string, HeldFold>();
 const MAX_FOLDS_HELD = 64;
 const REWINDOW_BYTES = 2 * 1024 * 1024;
 
@@ -156,52 +185,52 @@ const REWINDOW_BYTES = 2 * 1024 * 1024;
 // given to another file, so a number we do not recognise means a different
 // file. The generation below carries that into the stamp, so a replaced ledger
 // is read from the start by every cache keyed on it, not just the fold.
-const pinned = new Map();
+const pinned = new Map<string, { fd: number; ino: number; gen: number }>();
 const MAX_PINS = 64;
 let generations = 0;
 
-function dropPin(file) {
+function dropPin(file: string): void {
   const pin = pinned.get(file);
   if (!pin) return;
   pinned.delete(file);
   try { fs.closeSync(pin.fd); } catch { /* already gone */ }
 }
 
-function ledgerPin(file) {
-  const absent = { stamp: 'absent', st: null, fd: null, gen: 0 };
-  let st = null;
-  try { st = fs.statSync(file); } catch (err) { if (err.code !== 'ENOENT') throw err; }
+function ledgerPin(file: string): LedgerPin {
+  const absent: LedgerPin = { stamp: 'absent', st: null, fd: null, gen: 0 };
+  let st: fs.Stats | null = null;
+  try { st = fs.statSync(file); } catch (err) { if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err; }
   if (!st) { dropPin(file); return absent; }
   let pin = pinned.get(file);
   if (!pin || pin.ino !== st.ino) {
     dropPin(file);
-    let fd;
+    let fd: number;
     try { fd = fs.openSync(file, 'r'); } catch (err) {
-      if (err.code !== 'ENOENT') throw err;
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
       return absent;
     }
     // The file that ended up held, which is a different one from the stat above
     // if it was replaced between the two calls.
     st = fs.fstatSync(fd);
     generations += 1;
-    if (pinned.size >= MAX_PINS) dropPin(pinned.keys().next().value);
+    if (pinned.size >= MAX_PINS) dropPin(pinned.keys().next().value!);
     pin = { fd, ino: st.ino, gen: generations };
     pinned.set(file, pin);
   }
   return { stamp: `${pin.gen}:${st.size}:${st.mtimeMs}`, st, fd: pin.fd, gen: pin.gen };
 }
 
-function ledgerStamp(file) {
+function ledgerStamp(file: string): string {
   return ledgerPin(file).stamp;
 }
 
-const usable = (l) => l && Buffer.byteLength(l, 'utf8') <= MAX_LINE_BYTES;
+const usable = (l: string) => l && Buffer.byteLength(l, 'utf8') <= MAX_LINE_BYTES;
 
 // A ledger that has only grown is folded on from where it was: every running
 // agent's heartbeat changes the file, and folding all 8 MB again each time
 // held up every request the window made. A file that shrank, was replaced, or
 // changed without growing is read from the start.
-function foldedLedger(file) {
+function foldedLedger(file: string): Map<string, WorkItem> {
   const pin = ledgerPin(file);
   const st = pin.st;
   const held = folded.get(file);
@@ -212,50 +241,50 @@ function foldedLedger(file) {
   const inWindow = held && st && (held.from === 0 ? st.size <= MAX_LEDGER_BYTES : st.size - held.from <= MAX_LEDGER_BYTES + REWINDOW_BYTES);
   if (held && st && held.gen === pin.gen && st.size > held.offset && held.raw && inWindow) {
     const buf = Buffer.allocUnsafe(st.size - held.offset);
-    const n = fs.readSync(pin.fd, buf, 0, buf.length, held.offset);
+    const n = fs.readSync(pin.fd!, buf, 0, buf.length, held.offset);
     // Whole lines only, by the byte: a line still being written waits for
     // the next read rather than being cut through a character.
     const end = n ? buf.lastIndexOf(0x0a, n - 1) + 1 : 0;
     const chunk = buf.toString('utf8', 0, end);
     held.offset += end;
-    const touched = new Set();
+    const touched = new Set<string>();
     foldRawInto(held.raw, chunk.split('\n').filter(usable), touched);
     // Only threads new to this fold or reopened in it: the rest were looked at
     // already, and one with no title anywhere would be read for on every line.
     if (held.from > 0) {
-      const was = (id) => held.items.get(id);
-      const arrived = [...touched].filter((id) => !was(id) || was(id).status === 'done');
-      restoreCutHeads(held.raw, arrived, pin.fd, held.from, held.offset);
+      const was = (id: string) => held.items.get(id);
+      const arrived = [...touched].filter((id) => !was(id) || was(id)!.status === 'done');
+      restoreCutHeads(held.raw, arrived, pin.fd!, held.from, held.offset);
     }
-    for (const id of touched) held.items.set(id, finishItem(held.raw.get(id), 0));
+    for (const id of touched) held.items.set(id, finishItem(held.raw.get(id)!, 0));
     held.stamp = pin.stamp;
     return held.items;
   }
   // Time zero, so the lease pass inside the fold expires nothing: a lease is
   // only ever lapsed against the clock of the call asking, and that is `aged`.
-  const raw = new Map();
+  const raw = new Map<string, FoldingItem>();
   let offset = 0;
   let from = 0;
   if (st) {
-    const read = readWindow(file, st.size, pin.fd);
+    const read = readWindow(file, st.size, pin.fd!);
     foldRawInto(raw, read.text.split('\n').filter(usable));
-    if (read.from > 0) restoreCutHeads(raw, raw.keys(), pin.fd, read.from, read.end);
+    if (read.from > 0) restoreCutHeads(raw, raw.keys(), pin.fd!, read.from, read.end);
     offset = read.end;
     from = read.from;
   }
-  const items = new Map();
+  const items = new Map<string, WorkItem>();
   for (const [id, item] of raw) items.set(id, finishItem(item, 0));
   // One entry per ledger, so a real store has a few dozen. The cap is for the
   // long-lived MCP server, which walks temporary project dirs that never come
   // back; a Map iterates in insertion order, so the oldest key goes first.
-  if (folded.size >= MAX_FOLDS_HELD) folded.delete(folded.keys().next().value);
+  if (folded.size >= MAX_FOLDS_HELD) folded.delete(folded.keys().next().value!);
   folded.set(file, { stamp: pin.stamp, items, raw, gen: pin.gen, offset, from });
   return items;
 }
 
 // The ledger's trailing window, as text, to its last whole line, and the byte
 // that ends at, read through the descriptor the fold holds open.
-function readWindow(file, size, fd) {
+function readWindow(file: string, size: number, fd: number): { text: string; end: number; from: number } {
   if (size > MAX_LEDGER_BYTES && !warnedOversize.has(file)) {
     warnedOversize.add(file);
     console.warn(`work-items: ${file} is ${size} bytes; reading only the last ${MAX_LEDGER_BYTES}`);
@@ -277,20 +306,20 @@ function readWindow(file, size, fd) {
 // THE CLAIM STAYS THE WINDOW'S. `claimWorkItem` numbers a claim from the window,
 // so one made after the cut can be lower than one before it, and the older one
 // would fence off everything its agent wrote since.
-function restoreCutHeads(raw, ids, fd, from, end) {
-  const cut = new Set();
+function restoreCutHeads(raw: Map<string, FoldingItem>, ids: Iterable<string>, fd: number, from: number, end: number): void {
+  const cut = new Set<string>();
   for (const id of ids) {
-    const item = raw.get(id);
+    const item = raw.get(id)!;
     if (!item.wrote.title && item.status !== 'done') cut.add(id);
   }
   if (!cut.size) return;
   const lines = linesUpTo(fd, end, cut);
-  const restored = new Map();
+  const restored = new Map<string, FoldingItem>();
   foldRawInto(restored, lines.filter((l) => l.at < from).map((l) => l.text));
   const found = [...restored.keys()].filter((id) => cut.has(id));
-  for (const id of found) Object.assign(restored.get(id), { epoch: 0, claim: null });
+  for (const id of found) Object.assign(restored.get(id)!, { epoch: 0, claim: null });
   foldRawInto(restored, lines.filter((l) => l.at >= from).map((l) => l.text));
-  for (const id of found) raw.set(id, restored.get(id));
+  for (const id of found) raw.set(id, restored.get(id)!);
 }
 
 // The whole lines before byte `end` that carry one of `ids`, with the byte each
@@ -298,8 +327,8 @@ function restoreCutHeads(raw, ids, fd, from, end) {
 // not one of them is never decoded; the fold checks whose each line really is.
 const PIECE_BYTES = 1024 * 1024;
 const ID_KEY = Buffer.from('"id":"');
-function linesUpTo(fd, end, ids) {
-  const out = [];
+function linesUpTo(fd: number, end: number, ids: Set<string>): { text: string; at: number }[] {
+  const out: { text: string; at: number }[] = [];
   let rest = Buffer.alloc(0);
   let restAt = 0;
   for (let pos = 0; pos < end;) {
@@ -309,7 +338,7 @@ function linesUpTo(fd, end, ids) {
     pos += n;
     const bytes = rest.length ? Buffer.concat([rest, buf.subarray(0, n)]) : buf.subarray(0, n);
     const whole = bytes.lastIndexOf(0x0a) + 1;
-    const starts = new Set();
+    const starts = new Set<number>();
     for (let at = bytes.indexOf(ID_KEY); at !== -1 && at < whole; at = bytes.indexOf(ID_KEY, at + ID_KEY.length)) {
       const from = at + ID_KEY.length;
       if (ids.has(bytes.toString('latin1', from, bytes.indexOf(0x22, from)))) starts.add(bytes.lastIndexOf(0x0a, at) + 1);
@@ -327,9 +356,9 @@ function linesUpTo(fd, end, ids) {
 // One item as of `now`: a copy, with the lease rule that `foldWorkItems` applies
 // at the end of its own pass applied here instead. The two mutable fields a
 // caller can reach through a spread are copied with it.
-function aged(item, now) {
+function aged(item: WorkItem, now: number): WorkItem {
   const claimExpired = !!(item.claim && item.claim.leaseUntil < now);
-  const out = {
+  const out: WorkItem = {
     ...item,
     labels: Array.isArray(item.labels) ? [...item.labels] : item.labels,
     wrote: { ...item.wrote },
@@ -341,8 +370,8 @@ function aged(item, now) {
 }
 
 /** Every work item in one product, folded. */
-export function readWorkItems(projectDir, now = Date.now()) {
-  const out = [];
+export function readWorkItems(projectDir: string, now = Date.now()): WorkItem[] {
+  const out: WorkItem[] = [];
   for (const item of foldedLedger(ledgerPath(projectDir)).values()) out.push(aged(item, now));
   return out;
 }
@@ -361,24 +390,24 @@ export function readWorkItems(projectDir, now = Date.now()) {
  * Finished threads only: this is history, and it is where the tabs that ask
  * for it go. A ledger that fits in the window has nothing to give.
  */
-const wholeFolds = new Map();
-export function readOlderWorkItems(projectDir, now = Date.now()) {
+const wholeFolds = new Map<string, { stamp: string; items: Map<string, WorkItem> }>();
+export function readOlderWorkItems(projectDir: string, now = Date.now()): WorkItem[] {
   const file = ledgerPath(projectDir);
-  let size;
+  let size: number;
   try { size = fs.statSync(file).size; } catch { return []; }
   if (size <= MAX_LEDGER_BYTES) return [];
   const stamp = ledgerStamp(file);
   let whole = wholeFolds.get(file);
   if (!whole || whole.stamp !== stamp) {
-    let lines;
+    let lines: string[];
     try { lines = fs.readFileSync(file, 'utf8').split('\n').filter((l) => l && Buffer.byteLength(l, 'utf8') <= MAX_LINE_BYTES); } catch { return []; }
     // Few ledgers are ever this big; hold the latest fold of each, no more.
-    if (wholeFolds.size >= 8) wholeFolds.delete(wholeFolds.keys().next().value);
+    if (wholeFolds.size >= 8) wholeFolds.delete(wholeFolds.keys().next().value!);
     whole = { stamp, items: foldWorkItems(lines, 0) };
     wholeFolds.set(file, whole);
   }
   const windowed = foldedLedger(file);
-  const out = [];
+  const out: WorkItem[] = [];
   for (const item of whole.items.values()) {
     if (item.status !== 'done') continue;
     const seen = windowed.get(item.id);
@@ -390,7 +419,7 @@ export function readOlderWorkItems(projectDir, now = Date.now()) {
 }
 
 /** One work item, or null. */
-export function readWorkItem(projectDir, id, now = Date.now()) {
+export function readWorkItem(projectDir: string, id: string, now = Date.now()): WorkItem | null {
   if (!isWorkItemId(id)) return null;
   const item = foldedLedger(ledgerPath(projectDir)).get(id);
   return item ? aged(item, now) : null;
@@ -408,23 +437,23 @@ export function readWorkItem(projectDir, id, now = Date.now()) {
  * keyed on the file's identity exactly as the fold is. The lines handed out are
  * the kept ones, frozen, so no caller can edit what the next one reads.
  */
-const histories = new Map();
+const histories = new Map<string, { stamp: string; byId: Map<string, LedgerLine[]> }>();
 const HISTORIES_HELD = 8;
-function deepFreeze(v) {
+function deepFreeze<T>(v: T): T {
   if (v && typeof v === 'object' && !Object.isFrozen(v)) {
     Object.freeze(v);
-    for (const k of Object.keys(v)) deepFreeze(v[k]);
+    for (const k of Object.keys(v)) deepFreeze((v as Record<string, unknown>)[k]);
   }
   return v;
 }
-function historiesOf(file) {
+function historiesOf(file: string): Map<string, LedgerLine[]> {
   const stamp = ledgerStamp(file);
   const held = histories.get(file);
   if (held && held.stamp === stamp) return held.byId;
-  const byId = new Map();
+  const byId = new Map<string, LedgerLine[]>();
   if (stamp !== 'absent') {
     for (const raw of readLines(file)) {
-      let line;
+      let line: LedgerLine;
       try { line = JSON.parse(raw); } catch { continue; }
       if (!line || typeof line.id !== 'string' || line.heartbeat || line.release) continue;
       let list = byId.get(line.id);
@@ -433,31 +462,31 @@ function historiesOf(file) {
     }
   }
   histories.delete(file);
-  if (histories.size >= HISTORIES_HELD) histories.delete(histories.keys().next().value);
+  if (histories.size >= HISTORIES_HELD) histories.delete(histories.keys().next().value!);
   histories.set(file, { stamp, byId });
   return byId;
 }
 // `before` keeps the lines written at or before that moment, and the cap then
 // counts back from there rather than from the newest line.
-export function readItemHistory(projectDir, id, opts) {
+export function readItemHistory(projectDir: string, id: string, opts?: HistoryOptions): LedgerLine[] {
   return historyFrom(historiesOf(ledgerPath(projectDir)), id, opts);
 }
 
 /** readItemHistory for many threads of one project, its ledger found and read once. */
-export function readItemHistories(projectDir) {
+export function readItemHistories(projectDir: string): (id: string, opts?: HistoryOptions) => LedgerLine[] {
   const byId = historiesOf(ledgerPath(projectDir));
   return (id, opts) => historyFrom(byId, id, opts);
 }
 
-function historyFrom(byId, id, { max = 400, before } = {}) {
+function historyFrom(byId: Map<string, LedgerLine[]>, id: string, { max = 400, before }: HistoryOptions = {}): LedgerLine[] {
   const lines = byId.get(id);
   if (!lines) return [];
-  const upTo = Number.isFinite(before) ? lines.filter((l) => l.ts <= before) : lines;
+  const upTo = Number.isFinite(before) ? lines.filter((l) => l.ts <= before!) : lines;
   return upTo.slice(-max);
 }
 
 /* -------------------------------- mutating ------------------------------- */
-export function newWorkItemId() {
+export function newWorkItemId(): string {
   return `w-${crypto.randomBytes(5).toString('hex')}`;
 }
 
@@ -465,11 +494,12 @@ export function newWorkItemId() {
  * Create a work item. A plain append: no lock, because there is no read to
  * modify and the id is fresh, so there is nothing to race against.
  */
-export function createWorkItem(projectDir, { title, ...rest } = {}, { source = 'agent', now = Date.now() } = {}) {
+export function createWorkItem(projectDir: string, { title, ...rest }: PatchInput = {}, { source = 'agent', now = Date.now() }: WriteOptions = {}): WorkItem {
   if (!title || typeof title !== 'string' || !title.trim()) throw new Error('a work item needs a title');
   const id = newWorkItemId();
   appendLine(ledgerPath(projectDir), buildLine({ id, patch: { title, status: 'open', ...rest }, source, now }));
-  return readWorkItem(projectDir, id, now);
+  // The line just appended makes the item.
+  return readWorkItem(projectDir, id, now)!;
 }
 
 /**
@@ -488,14 +518,14 @@ export function createWorkItem(projectDir, { title, ...rest } = {}, { source = '
  * together. It does not lock itself because its caller has more to write in the
  * same critical section, and this lock is not reentrant.
  */
-export function createWorkItemIfAbsent(projectDir, id, { title, ...rest } = {}, { source = 'agent', now = Date.now() } = {}) {
+export function createWorkItemIfAbsent(projectDir: string, id: string, { title, ...rest }: PatchInput = {}, { source = 'agent', now = Date.now() }: WriteOptions = {}): { created: boolean; item: WorkItem } {
   if (!isWorkItemId(id)) throw new Error(`invalid work item id: ${id}`);
   if (!title || typeof title !== 'string' || !title.trim()) throw new Error('a work item needs a title');
   const file = ledgerPath(projectDir);
   const existing = foldWorkItems(readLines(file), now).get(id);
   if (existing) return { created: false, item: existing };
   appendLine(file, buildLine({ id, patch: { title, status: 'open', ...rest }, source, now }));
-  return { created: true, item: readWorkItem(projectDir, id, now) };
+  return { created: true, item: readWorkItem(projectDir, id, now)! };
 }
 
 /**
@@ -506,9 +536,12 @@ export function createWorkItemIfAbsent(projectDir, id, { title, ...rest } = {}, 
  * under; the fold discards the line if that claim has since been superseded.
  * A founder write passes source 'founder' and no epoch, and is never fenced.
  */
-export function updateWorkItem(projectDir, id, patch, { epoch = null, source = 'agent', now = Date.now() } = {}) {
+export function updateWorkItem(
+  projectDir: string, id: string, patch: PatchInput,
+  { epoch = null, source = 'agent', now = Date.now() }: WriteOptions & { epoch?: number | null } = {},
+): WorkItem {
   appendLine(ledgerPath(projectDir), buildLine({ id, patch, source, epoch, now }));
-  return readWorkItem(projectDir, id, now);
+  return readWorkItem(projectDir, id, now)!;
 }
 
 /**
@@ -525,15 +558,15 @@ export function updateWorkItem(projectDir, id, patch, { epoch = null, source = '
  * never a throw for the ordinary case of losing a race: a worker that loses
  * should ask for the next item, not die.
  */
-export async function claimWorkItem(projectDir, { id = null, filter = null, holder, leaseMs = LEASE_MS, now = Date.now() } = {}) {
+export async function claimWorkItem(projectDir: string, { id = null, filter = null, holder, leaseMs = LEASE_MS, now = Date.now() }: ClaimOptions = {}): Promise<ClaimResult> {
   if (!holder) throw new Error('a claim needs a holder id');
   if (!id && !filter) throw new Error('claim needs either an id or a filter');
   const file = ledgerPath(projectDir);
 
-  return withProjectLock(projectDir, async () => {
+  return withProjectLock(projectDir, async (): Promise<ClaimResult> => {
     const items = foldWorkItems(readLines(file), now);
 
-    let target = null;
+    let target: WorkItem | null = null;
     if (id) {
       const item = items.get(id);
       if (!item) return { claimed: false, reason: 'no such work item' };
@@ -552,7 +585,7 @@ export async function claimWorkItem(projectDir, { id = null, filter = null, hold
       }
       target = item;
     } else {
-      const candidates = sortForPull([...items.values()].filter((i) => matchesFilter(i, filter) && isClaimable(i, now)));
+      const candidates = sortForPull([...items.values()].filter((i) => matchesFilter(i, filter!) && isClaimable(i, now)));
       if (!candidates.length) return { claimed: false, reason: 'nothing available' };
       target = candidates[0];
     }
@@ -562,36 +595,41 @@ export async function claimWorkItem(projectDir, { id = null, filter = null, hold
     // stale rather than merely old.
     const epoch = (target.epoch ?? 0) + 1;
     appendLine(file, buildClaimLine({ id: target.id, epoch, holder, now, leaseMs }));
-    return { claimed: true, epoch, item: foldWorkItems(readLines(file), now).get(target.id) };
+    return { claimed: true, epoch, item: foldWorkItems(readLines(file), now).get(target.id)! };
   }, { label: `claim ${id ?? 'next'}` });
 }
 
+// Every caller passes an epoch; the `{}` default only reaches buildClaimLine's own refusal.
 /** Extend a lease. Written by the server on a timer, never by a model. */
-export function heartbeatWorkItem(projectDir, id, { epoch, holder, leaseMs = LEASE_MS, now = Date.now() } = {}) {
+export function heartbeatWorkItem(projectDir: string, id: string, { epoch, holder, leaseMs = LEASE_MS, now = Date.now() }: LeaseOptions = {} as LeaseOptions): void {
   appendLine(ledgerPath(projectDir), buildHeartbeatLine({ id, epoch, holder, now, leaseMs }));
 }
 
 /** Hand an item back without finishing it. */
-export function releaseWorkItem(projectDir, id, { epoch, now = Date.now() } = {}) {
+export function releaseWorkItem(projectDir: string, id: string, { epoch, now = Date.now() }: { epoch: number; now?: number } = {} as { epoch: number }): WorkItem {
   appendLine(ledgerPath(projectDir), buildReleaseLine({ id, epoch, now }));
-  return readWorkItem(projectDir, id, now);
+  return readWorkItem(projectDir, id, now)!;
 }
 
 // Release only the uninterrupted claim acquired by this run. A tool server
 // may outlive its turn, so process lifetime is not run lifetime. The first
 // claim after the spawn snapshot identifies the holder; same-holder renewals
 // are allowed, but a release or another holder ends this run's ownership.
-export function releaseRunClaim(projectDir, id, { afterEpoch, startedAt, now = Date.now() } = {}) {
+export function releaseRunClaim(
+  projectDir: string, id: string,
+  { afterEpoch, startedAt, now = Date.now() }: { afterEpoch?: number; startedAt?: number; now?: number } = {},
+): WorkItem | null | undefined {
   if (!Number.isFinite(afterEpoch) || !Number.isFinite(startedAt)) return null;
-  const lines = readLines(ledgerPath(projectDir)).map(normalizeLine).filter(line => line?.id === id);
+  const lines = readLines(ledgerPath(projectDir)).map(normalizeLine).filter((line): line is WorkItemLine => line?.id === id);
   const item = foldWorkItems(lines, now).get(id);
   if (!item?.claim) return item;
-  const claims = lines.filter(line => line.claim && !line.heartbeat && line.epoch > afterEpoch);
+  // A line with no epoch compares as 0 here, as it always has.
+  const claims = lines.filter(line => line.claim && !line.heartbeat && (line.epoch as number) > afterEpoch!);
   const first = claims[0];
-  if (!first || first.epoch !== afterEpoch + 1 || first.ts < startedAt) return item;
-  if (claims.some(line => line.claim.holder !== first.claim.holder)) return item;
-  if (lines.some(line => line.release && line.epoch >= first.epoch)) return item;
-  if (item.claim.holder !== first.claim.holder) return item;
+  if (!first || first.epoch !== afterEpoch! + 1 || first.ts < startedAt!) return item;
+  if (claims.some(line => line.claim!.holder !== first.claim!.holder)) return item;
+  if (lines.some(line => line.release && (line.epoch as number) >= first.epoch!)) return item;
+  if (item.claim.holder !== first.claim!.holder) return item;
   // A concurrent new claim fences this append out through its newer epoch.
   return releaseWorkItem(projectDir, id, { epoch: item.epoch, now });
 }
@@ -605,9 +643,9 @@ export function releaseRunClaim(projectDir, id, { afterEpoch, startedAt, now = D
 // it apart on the next pull. So is one too big to write, which used to throw
 // and leave the pull cursor in front of it forever (review, 2026-10-01): a bad
 // line is skipped and the pull moves past it. Returns how many were appended.
-export function appendForeignLines(projectDir, lines) {
+export function appendForeignLines(projectDir: string, lines: readonly unknown[]): number {
   const file = ledgerPath(projectDir);
-  const have = new Set();
+  const have = new Set<string>();
   for (const text of readLines(file)) {
     const uid = /"uid":"([^"]+)"/.exec(text)?.[1];
     if (uid) have.add(uid);
@@ -627,17 +665,17 @@ export function appendForeignLines(projectDir, lines) {
 // Every line after a byte offset, as written, and where the file ends. The
 // ledger only grows, so an offset is a cursor: sync keeps the one it pushed to
 // and asks from there next time.
-export function readLinesFrom(projectDir, offset = 0) {
+export function readLinesFrom(projectDir: string, offset = 0): { lines: LedgerLine[]; end: number } {
   const file = ledgerPath(projectDir);
-  let size;
+  let size: number;
   try { size = fs.statSync(file).size; } catch (err) {
-    if (err.code === 'ENOENT') return { lines: [], end: 0 };
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return { lines: [], end: 0 };
     throw err;
   }
   const start = Math.max(0, Math.min(Number(offset) || 0, size));
   if (start >= size) return { lines: [], end: size };
   const fd = fs.openSync(file, 'r');
-  let text;
+  let text: string;
   try {
     const buf = Buffer.allocUnsafe(size - start);
     const read = fs.readSync(fd, buf, 0, size - start, start);
@@ -649,7 +687,7 @@ export function readLinesFrom(projectDir, offset = 0) {
   const lastNewline = text.lastIndexOf('\n');
   if (lastNewline < 0) return { lines: [], end: start };
   const whole = text.slice(0, lastNewline + 1);
-  const lines = [];
+  const lines: LedgerLine[] = [];
   for (const piece of whole.split('\n')) {
     if (!piece || Buffer.byteLength(piece, 'utf8') > MAX_LINE_BYTES) continue;
     try { lines.push(JSON.parse(piece)); } catch { /* a torn line reads as nothing, as in the fold */ }

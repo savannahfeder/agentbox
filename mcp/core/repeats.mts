@@ -14,9 +14,23 @@
 
 import { Repeats } from '../../main/repeats.mts';
 import { readWorkItem } from '../../main/store/work-items.mts';
-import { listProjects } from '../../main/store/project.mts';
-import { nextRunAt, ruleIdOf, ruleLabel, standingInstruction } from '../../shared/repeats.mts';
+import { listProjects, type ProjectSummary } from '../../main/store/project.mts';
+import { nextRunAt, ruleIdOf, ruleLabel, standingInstruction, type RepeatRule } from '../../shared/repeats.mts';
+import type { WorkItem } from '../../shared/work-items.mts';
 import { resolveProduct } from './account.mts';
+
+interface RunOptions { env?: NodeJS.ProcessEnv | Record<string, string | undefined>; now?: number }
+interface RuleOfRun { project: ProjectSummary; item: WorkItem; ruleId: string; rule: RepeatRule }
+export interface StandingInstruction {
+  repeat: string;
+  product: string;
+  run: string;
+  label: string;
+  instruction: string | undefined;
+  schedule: string;
+  nextRun: number | null;
+  ended: boolean;
+}
 
 const NO_THREAD = 'this session is not on a thread, so there is no repeating task behind it';
 
@@ -24,7 +38,7 @@ const NO_THREAD = 'this session is not on a thread, so there is no repeating tas
 // nothing below creates a work item or takes the project lock.
 const rules = new Repeats(null);
 
-function projectOf(itemId, product) {
+function projectOf(itemId: string, product: string | null): ProjectSummary {
   if (product) return resolveProduct(product);
   for (const p of listProjects()) {
     try { if (readWorkItem(p.dir, itemId)) return p; } catch { /* a product with no ledger */ }
@@ -33,7 +47,7 @@ function projectOf(itemId, product) {
 }
 
 /** The rule this session's run belongs to, or a sentence saying why there is none. */
-function ruleBehindThisRun({ env = process.env, now = Date.now() } = {}) {
+function ruleBehindThisRun({ env = process.env, now = Date.now() }: RunOptions = {}): RuleOfRun {
   const itemId = String(env.ZERO_ITEM ?? '').trim();
   if (!itemId) throw new Error(NO_THREAD);
 
@@ -50,7 +64,7 @@ function ruleBehindThisRun({ env = process.env, now = Date.now() } = {}) {
   return { project, item, ruleId, rule };
 }
 
-function asAnswer({ project, item, ruleId, rule }, now) {
+function asAnswer({ project, item, ruleId, rule }: RuleOfRun, now: number): StandingInstruction {
   return {
     repeat: ruleId,
     product: project.id,
@@ -64,7 +78,7 @@ function asAnswer({ project, item, ruleId, rule }, now) {
 }
 
 /** What every run after this one is told, as it stands. */
-export function readStandingInstruction({ env = process.env, now = Date.now() } = {}) {
+export function readStandingInstruction({ env = process.env, now = Date.now() }: RunOptions = {}): StandingInstruction {
   return asAnswer(ruleBehindThisRun({ env, now }), now);
 }
 
@@ -73,7 +87,7 @@ export function readStandingInstruction({ env = process.env, now = Date.now() } 
  * person's own screen performs and the only one that can also take a sentence
  * back out.
  */
-export function setStandingInstruction({ instruction }, { env = process.env, now = Date.now() } = {}) {
+export function setStandingInstruction({ instruction }: { instruction: unknown }, { env = process.env, now = Date.now() }: RunOptions = {}): StandingInstruction {
   const words = typeof instruction === 'string' ? instruction.trim() : '';
   if (!words) throw new Error('a repeating task needs an instruction; send the whole of it, not an empty one');
 
@@ -83,6 +97,7 @@ export function setStandingInstruction({ instruction }, { env = process.env, now
   // Only the body. The title is a label the app derived from what the person
   // typed, and a line added to a standing instruction is not a new name for the
   // task.
-  const rule = rules.patchRule(found.project.dir, found.ruleId, { body: words }, now);
+  // The rule was read just above, so the patched one is on file.
+  const rule = rules.patchRule(found.project.dir, found.ruleId, { body: words }, now)!;
   return asAnswer({ ...found, rule }, now);
 }

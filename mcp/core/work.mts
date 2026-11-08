@@ -24,7 +24,7 @@ import {
   readWorkItems, readWorkItem, createWorkItem, updateWorkItem,
   claimWorkItem, heartbeatWorkItem, releaseWorkItem, LEASE_MS,
 } from '../../main/store/work-items.mts';
-import { matchesFilter } from '../../shared/work-items.mts';
+import { matchesFilter, type PatchInput, type WorkItem, type WorkItemField, type WorkItemFilter, type WorkItemSource, type WorkItemStatus } from '../../shared/work-items.mts';
 import { unleaked } from '../../shared/agents.mts';
 import { CONTEXT_WORDS, DONE_STEPS, DONE_STEP_WORDS, SUMMARY_WORDS, doneSteps, wordsIn } from '../../shared/thread-cards.mts';
 import {
@@ -41,13 +41,26 @@ const LOG = `[${nameSlug}-store]`;
 // slow disk) still leave a full beat of margin before anything lapses.
 const HEARTBEAT_MS = Math.floor(LEASE_MS / 3);
 
+type Project = ReturnType<typeof resolveProduct>;
+export type ProductItem = Omit<WorkItem, 'product'> & { product: string; productName: string };
+export type AgentPatch = { [K in WorkItemField]?: unknown } & { closeBecause?: string; deferBecause?: string };
+
+export interface WorkListFilter {
+  product?: string | null;
+  status?: WorkItemStatus | null;
+  kind?: string | null;
+  labels?: string[] | null;
+  includeDone?: boolean;
+  now?: number;
+}
+
 /** Every work item across every product, newest activity first. */
-export function listWorkItems({ product = null, status = null, kind = null, labels = null, includeDone = false, now = Date.now() } = {}) {
+export function listWorkItems({ product = null, status = null, kind = null, labels = null, includeDone = false, now = Date.now() }: WorkListFilter = {}): ProductItem[] {
   const projects = product ? [resolveProduct(product)] : listProjects();
-  const out = [];
+  const out: ProductItem[] = [];
 
   for (const p of projects) {
-    let items = [];
+    let items: WorkItem[] = [];
     try { items = readWorkItems(p.dir, now); } catch { continue; } // a product with no ledger has no work
     for (const item of items) {
       if (!includeDone && item.status === 'done') continue;
@@ -60,7 +73,7 @@ export function listWorkItems({ product = null, status = null, kind = null, labe
 }
 
 /** Find which product owns an id, so callers do not have to track it. */
-function locate(id, { product = null } = {}) {
+function locate(id: string, { product = null }: { product?: string | null } = {}): { project: Project; item: WorkItem } {
   if (product) {
     const p = resolveProduct(product);
     const item = readWorkItem(p.dir, id);
@@ -68,7 +81,7 @@ function locate(id, { product = null } = {}) {
     return { project: p, item };
   }
   for (const p of listProjects()) {
-    let item = null;
+    let item: WorkItem | null = null;
     try { item = readWorkItem(p.dir, id); } catch { continue; }
     if (item) return { project: p, item };
   }
@@ -82,24 +95,27 @@ function locate(id, { product = null } = {}) {
 // holds what the user typed, and the user's words are theirs whatever they
 // contain. The pane cuts it again on the way out, because the rows that
 // already carry it are still on screen.
-const WORDS = ['result', 'note', 'body', 'title', 'label'];
+const WORDS = ['result', 'note', 'body', 'title', 'label'] as const;
 
-function saidPlainly(fields, source) {
+function saidPlainly<T extends PatchInput>(fields: T, source: WorkItemSource): T {
   if (source === 'founder' || !fields) return fields;
   const out = { ...fields };
   for (const f of WORDS) {
-    if (typeof out[f] === 'string') out[f] = unleaked(out[f]);
+    if (typeof out[f] === 'string') (out as Record<string, unknown>)[f] = unleaked(out[f]);
   }
   return out;
 }
 
-export function createItem(product, fields = {}, { source = 'agent', from = [] } = {}) {
+export type ItemFields = PatchInput & { title?: string; parent?: string; visibility?: string };
+type Privacy = { visibility?: 'private' | 'people'; visibleTo?: string[] };
+
+export function createItem(product: string, fields: ItemFields = {}, { source = 'agent', from = [] }: { source?: WorkItemSource; from?: string[] } = {}): ProductItem {
   const p = resolveProduct(product);
-  const sources = [...from, fields.parent].filter(Boolean).map((id) => { try { return locate(id).item; } catch { return null; } });
-  const kept = fields.visibility ? {} : privacyFrom(sources);
+  const sources = [...from, fields.parent].filter(Boolean).map((id) => { try { return locate(id as string).item; } catch { return null; } });
+  const kept: Privacy & { engine?: string; model?: string; effort?: string } = fields.visibility ? {} : privacyFrom(sources);
   // A row filed under a thread runs as that thread does, or it falls to the default engine.
   const parent = fields.parent ? sources.at(-1) : null;
-  for (const f of ['engine', 'model', 'effort']) if (fields[f] == null && parent?.[f]) kept[f] = parent[f];
+  for (const f of ['engine', 'model', 'effort'] as const) if (fields[f] == null && parent?.[f]) kept[f] = parent[f];
   const item = createWorkItem(p.dir, saidPlainly({ ...fields, ...kept }, source), { source });
   return { ...item, product: p.id, productName: p.name };
 }
@@ -132,7 +148,7 @@ export function createItem(product, fields = {}, { source = 'agent', from = [] }
  * is not a proposal waiting in Later: it is a row in their inbox
  * (`isProposal`, renderer/src/list-rules.ts).
  */
-function alsoOnThisThread(beside, parent) {
+function alsoOnThisThread(beside: string[], parent: string | undefined): string {
   const n = beside.length + 1;
   const where = parent ? `under ${parent}` : 'under no thread at all';
   const fold = parent
@@ -146,8 +162,8 @@ function alsoOnThisThread(beside, parent) {
 }
 
 /** The live threads already filed under the same parent, this one aside. */
-function besideIt(product, item) {
-  let items = [];
+function besideIt(product: string, item: Pick<WorkItem, 'id' | 'parent'>): string[] {
+  let items: WorkItem[] = [];
   try { items = readWorkItems(resolveProduct(product).dir, Date.now()); } catch { return []; }
   return items
     .filter((i) => i.id !== item.id && i.parent === item.parent && i.status !== 'done')
@@ -163,8 +179,8 @@ function besideIt(product, item) {
  * Private if any is, else only the people every one of them names. A source
  * with no word of its own leaves the project to decide, as before.
  */
-export function privacyFrom(items) {
-  let people = null;
+export function privacyFrom(items: readonly (Pick<WorkItem, 'visibility' | 'visibleTo'> | null | undefined)[]): Privacy {
+  let people: string[] | null = null;
   for (const item of items) {
     if (item?.visibility === 'private') return { visibility: 'private' };
     if (item?.visibility !== 'people') continue;
@@ -178,16 +194,16 @@ export function privacyFrom(items) {
 // A teammate's run is known by these labels, and labels are written whole, so
 // a run that closes with ["clean"] would stop being its teammate's run.
 const RUN_LABELS = ['teammate:', 'hop:', 'from:', 'work:'];
-function keepRunLabels(had, patch) {
+function keepRunLabels<P extends { labels?: unknown }>(had: Pick<WorkItem, 'labels'> | null | undefined, patch: P): P {
   if (!Array.isArray(patch.labels)) return patch;
   const before = had?.labels ?? [];
   if (!before.some((l) => String(l).startsWith('teammate:'))) return patch;
   const kept = before.filter((l) => l === 'founder' || RUN_LABELS.some((p) => String(l).startsWith(p)));
-  const missing = kept.filter((l) => !patch.labels.includes(l));
+  const missing = kept.filter((l) => !(patch.labels as unknown[]).includes(l));
   return missing.length ? { ...patch, labels: [...patch.labels, ...missing] } : patch;
 }
 
-export function updateItem(id, patch, { product = null, epoch = null, source = 'agent' } = {}) {
+export function updateItem(id: string, patch: PatchInput, { product = null, epoch = null, source = 'agent' }: { product?: string | null; epoch?: number | null; source?: WorkItemSource } = {}): ProductItem {
   const { project, item: had } = locate(id, { product });
   const item = updateWorkItem(project.dir, id, saidPlainly(keepRunLabels(had, patch), source), { epoch, source });
   return { ...item, product: project.id, productName: project.name };
@@ -215,7 +231,7 @@ export function updateItem(id, patch, { product = null, epoch = null, source = '
  * A run of a repeating task is not a user's ask. The task was set up to run
  * daily and close quietly when there is nothing to say, so `repeat:` rows keep that.
  */
-const plainly = (s) => String(s ?? '')
+const plainly = (s: unknown) => String(s ?? '')
   .toLowerCase()
   .replace(/[‘’]/g, "'")
   .replace(/[“”]/g, '"')
@@ -224,13 +240,13 @@ const plainly = (s) => String(s ?? '')
 
 // A thread she sent to Auto or to a teammate carries `routed` and a teammate
 // label, and is her ask all the same.
-export function herRow(item) {
+export function herRow(item: Pick<WorkItem, 'labels' | 'routed'> | null | undefined): boolean {
   const labels = item?.labels ?? [];
   if (!labels.includes('founder')) return false;
-  return !!item.routed || !labels.some((l) => String(l).startsWith('repeat:') || String(l).startsWith('teammate:'));
+  return !!item!.routed || !labels.some((l) => String(l).startsWith('repeat:') || String(l).startsWith('teammate:'));
 }
 
-export function saidToClose(item, words) {
+export function saidToClose(item: Pick<WorkItem, 'answer' | 'body' | 'title'> | null | undefined, words: unknown): boolean {
   const quote = plainly(words).replace(/^["'\s]+|["'.,!?\s]+$/g, '');
   if (quote.length < 4) return false;
   return [item?.answer, item?.body, item?.title].some((t) => plainly(t).includes(quote));
@@ -262,8 +278,8 @@ const DEFERRED_AS_AGENT = 'The put-off was saved as YOURS, not theirs, so the ro
 // Since w-54e9c7243f the summary is Context (`problem`, CONTEXT_WORDS) and Done
 // (`progress`, at most DONE_STEPS lines of DONE_STEP_WORDS each); `solution`
 // keeps the old one-sentence limit for any writer still sending it.
-function takeOverLong(patch) {
-  const said = [];
+function takeOverLong(patch: { problem?: unknown; progress?: unknown; solution?: unknown }): { summaryTooLong?: string } {
+  const said: string[] = [];
   if (typeof patch.problem === 'string' && wordsIn(patch.problem) > CONTEXT_WORDS) {
     said.push(`context, the problem field (${wordsIn(patch.problem)} words; ${CONTEXT_WORDS} at most)`);
     delete patch.problem;
@@ -285,7 +301,7 @@ function takeOverLong(patch) {
 
 const REOPENED = 'This thread was marked done, so your write opened it again for the people on it.';
 const SAYING = ['note', 'result', 'progress', 'summary', 'problem'];
-const saysSomething = (patch) => patch?.status !== 'done' && SAYING.some((k) => typeof patch?.[k] === 'string' && patch[k].trim());
+const saysSomething = (patch: Readonly<Record<string, unknown>> | null | undefined) => patch?.status !== 'done' && SAYING.some((k) => typeof patch?.[k] === 'string' && (patch[k] as string).trim());
 const LEFT_OPEN = 'The row was left OPEN. The founder wrote it, and only she closes her own rows unless she asked you to: everything else you sent was written, and your answer reaches her inbox as an answer. If she did ask you to close it, send status done again with closeBecause set to her exact words asking for it.';
 
 /**
@@ -293,13 +309,13 @@ const LEFT_OPEN = 'The row was left OPEN. The founder wrote it, and only she clo
  * the file: the session that lost a night's work read "claim it first", had no
  * reason to think anything had survived, and ended its turn.
  */
-function carried(parked) {
+function carried(parked: { relPath: string; item: string } | null): string {
   if (!parked) return ' Your write could NOT be parked, so re-send it once you hold the claim.';
   return ` YOUR WRITE WAS NOT LOST: it is parked at ${parked.relPath} inside the product folder, and the next session to claim ${parked.item} is handed it. If this session should still be the one to say it, claim the item again and send it again.`;
 }
 
 /** What the session taking the row over is told at the moment it takes it. */
-function pendingNotice(pending) {
+function pendingNotice(pending: readonly unknown[]): string {
   const n = pending.length;
   return `${n} write${n === 1 ? '' : 's'} to this row ${n === 1 ? 'was' : 'were'} refused when an earlier session lost its claim, and ${n === 1 ? 'it is' : 'they are'} waiting in \`pending\`. Nobody has seen ${n === 1 ? 'it' : 'them'}: not the founder, not the row. Read ${n === 1 ? 'it' : 'them'}, decide what is still true, and carry that into your own note or result. Your first write to this row files ${n === 1 ? 'it' : 'them'} as delivered.`;
 }
@@ -309,17 +325,37 @@ function pendingNotice(pending) {
  * them alive. Purely in-memory, and that is correct: it describes this process's
  * liveness, and it is supposed to vanish when the process does.
  */
-export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder } = {}) {
+interface Held { dir: string; epoch: number; pending: boolean; live: boolean }
+type PendingWrite = ReturnType<typeof readPendingWrites>[number];
+
+export interface ClaimAsk { product?: string | null; id?: string | null; filter?: WorkItemFilter | null }
+export type ClaimOutcome =
+  | { claimed: true; epoch: number; item: ProductItem; pending?: PendingWrite[]; pendingNotice?: string; reason?: never; heldBy?: never }
+  | { claimed: false; reason: string; heldBy?: string };
+export type UpdateOutcome = Partial<WorkItem> & { leftOpen?: string; deferredAsAgent?: string; summaryTooLong?: string; reopened?: string };
+
+export interface ClaimRegistry {
+  holder: string | undefined;
+  claim(ask: ClaimAsk): Promise<ClaimOutcome>;
+  update(id: string, patch: AgentPatch): Promise<UpdateOutcome>;
+  release(id: string): WorkItem | null;
+  file(product: string, fields: ItemFields): ProductItem & { alsoFiled?: string };
+  holding(): string[];
+  _beat(): void;
+  _stop(): void;
+}
+
+export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder }: { heartbeatMs?: number; holder?: string } = {}): ClaimRegistry {
   // `live` is the difference between holding the row and merely still being
   // allowed to speak on it. A finished row gives its claim straight back, so
   // nothing waits on a lease for work that is over, but the session keeps its
   // epoch: the founder replies to finished rows constantly, and the session she
   // is replying to has to be able to answer her.
-  const held = new Map(); // workItemId -> { dir, epoch, pending, live }
+  const held = new Map<string, Held>(); // workItemId -> { dir, epoch, pending, live }
   // The threads this run has filed under no parent at all, so that the second
   // loose one is counted even though the store cannot group them.
-  const loose = [];
-  let timer = null;
+  const loose: string[] = [];
+  let timer: NodeJS.Timeout | null = null;
   const liveCount = () => [...held.values()].filter((h) => h.live).length;
 
   const beat = () => {
@@ -328,7 +364,7 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder } = {})
       try {
         const current = readWorkItem(dir, id);
         if (!current?.claim || current.epoch !== epoch || current.claim.holder !== holder) {
-          held.get(id).live = false;
+          held.get(id)!.live = false;
           continue;
         }
         heartbeatWorkItem(dir, id, { epoch, holder });
@@ -336,7 +372,7 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder } = {})
         // A failed beat is not fatal: the lease still has two beats of margin,
         // and the next one may well succeed. Losing the claim is the correct
         // outcome if they all keep failing.
-        console.error(`${LOG} heartbeat failed for ${id}: ${err?.message ?? err}`);
+        console.error(`${LOG} heartbeat failed for ${id}: ${(err as Error)?.message ?? err}`);
       }
     }
     stopTimer();
@@ -358,22 +394,22 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder } = {})
   // (an id that belongs to no product at all), and a failure to park must never
   // hide the refusal itself, so it degrades to a null and the caller still
   // throws.
-  const parkIn = (dir, id, patch, epoch, reason) => {
+  const parkIn = (dir: string, id: string, patch: AgentPatch, epoch: number | null, reason: string) => {
     try {
       return parkPendingWrite(dir, id, patch, { holder, epoch, reason });
     } catch (err) {
-      console.error(`${LOG} could not park a refused write for ${id}: ${err?.message ?? err}`);
+      console.error(`${LOG} could not park a refused write for ${id}: ${(err as Error)?.message ?? err}`);
       return null;
     }
   };
 
-  const park = (id, patch, reason) => {
-    let dir = null;
+  const park = (id: string, patch: AgentPatch, reason: string) => {
+    let dir: string | null = null;
     try { dir = locate(id).project.dir; } catch { return null; }
     return parkIn(dir, id, patch, null, reason);
   };
 
-  const registry = {
+  const registry: ClaimRegistry = {
     holder,
     async claim({ product = null, id = null, filter = null }) {
       // A claim by id can address any product; a filtered pull walks products in
@@ -430,7 +466,7 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder } = {})
       let holding = held.get(id);
       let reopened = false;
       if (!holding?.live) {
-        let taken = null;
+        let taken: ClaimOutcome | null = null;
         try { taken = await registry.claim({ id }); } catch { /* an id in no product: park below */ }
         // Something said to a finished thread opens it again, so its people see
         // it. A person's Done outranks an agent's word, so the reopen is theirs.
@@ -468,10 +504,10 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder } = {})
       }
       let theirMoment = 0;
       let deferredAsAgent = null;
-      if (deferBecause !== undefined && Number.isFinite(asked.runAt) && asked.runAt > 0) {
+      if (deferBecause !== undefined && Number.isFinite(asked.runAt) && (asked.runAt as number) > 0) {
         const before = readWorkItem(holding.dir, id);
         if (herRow(before) && saidToClose(before, deferBecause)) {
-          theirMoment = asked.runAt;
+          theirMoment = asked.runAt as number;
           delete asked.runAt;
         } else {
           deferredAsAgent = { deferredAsAgent: DEFERRED_AS_AGENT };
@@ -513,7 +549,7 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder } = {})
       // it is the epoch that keeps this session able to answer her.
       if (item?.status === 'done' && holding.live) {
         try { releaseWorkItem(holding.dir, id, { epoch: holding.epoch }); }
-        catch (err) { console.error(`${LOG} could not give back the claim on ${id}: ${err?.message ?? err}`); }
+        catch (err) { console.error(`${LOG} could not give back the claim on ${id}: ${(err as Error)?.message ?? err}`); }
         holding.live = false;
         stopTimer();
       }
@@ -523,7 +559,7 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder } = {})
       if (leftOpen) {
         if (holding.live) {
           try { item = releaseWorkItem(holding.dir, id, { epoch: holding.epoch }); }
-          catch (err) { console.error(`${LOG} could not give back the claim on ${id}: ${err?.message ?? err}`); }
+          catch (err) { console.error(`${LOG} could not give back the claim on ${id}: ${(err as Error)?.message ?? err}`); }
           holding.live = false;
           stopTimer();
         }

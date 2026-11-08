@@ -34,8 +34,8 @@ export const TEAM_LOOK_TEMPLATE = [
 export const TEAM_LOOK_POSTED = `Team look: our colours, fonts, logo and voice, which every agent reads before visual work. Open it and press Edit to change it.\n\n[${TEAM_LOOK}](attachments/${TEAM_LOOK})`;
 
 /** The stored name of the newest version a group's messages carry, or null. */
-export function newestTeamLook(messages) {
-  let newest = null;
+export function newestTeamLook(messages: readonly { body?: string | null; at: number; deleted?: boolean }[] | null | undefined): string | null {
+  let newest: string | null = null;
   for (const m of [...(messages ?? [])].filter((x) => !x.deleted).sort((a, b) => a.at - b.at)) {
     for (const hit of String(m.body ?? '').matchAll(/\]\(attachments\/([A-Za-z0-9][\w.-]*)\)/g)) {
       if (shownName(`attachments/${hit[1]}`) === TEAM_LOOK) newest = hit[1];

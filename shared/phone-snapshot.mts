@@ -8,12 +8,144 @@
 // the conversation. Long text is cut, and only the latest lines go. Browser-
 // safe: no node imports.
 
-import { checkSetting } from './phone-settings.mts';
+import { checkSetting, type SettingChange } from './phone-settings.mts';
 
 // How much of one thread goes up. The latest of a thread is what she reads on
 // a phone; the whole of it stays on the Mac. `bytes` is measured in UTF-8, as
 // the database measures it (Codex's review of step 1, finding 9).
 export const SNAPSHOT_LIMITS = { lines: 400, textChars: 12_000, items: 300, bytes: 900_000 };
+
+export type SnapshotLimits = typeof SNAPSHOT_LIMITS;
+
+/** Where her home folder is, so it is written ~ in a copy. */
+interface Ctx {
+  home?: string | null;
+}
+
+/** Named fields copied out of a row, a line or a teammate: text cut and cleaned, numbers, flags, short lists of words. */
+export type Copied = Record<string, unknown>;
+
+/** Who wrote a field of a row, and when. */
+export interface Wrote {
+  ts: number;
+  source: string;
+}
+
+/** A line of a thread's history as a copy carries it. */
+export interface SnapshotLine {
+  id: unknown;
+  ts: number;
+  source: string;
+  patch: Copied;
+}
+
+/** One thread as the phone reads it with the computer shut. */
+export type ThreadSnapshot = {
+  v: number;
+  item: Copied & { wrote?: Record<string, Wrote> };
+  history: SnapshotLine[];
+  olderLines: number;
+};
+
+/** A row's fields as this file reads them, before they are picked. */
+interface RowSeen {
+  wrote?: Record<string, { source?: unknown; ts?: unknown } | undefined> | null;
+}
+
+/** A line of store.readHistory, before it is picked. */
+interface HistorySeen {
+  claim?: unknown;
+  release?: unknown;
+  heartbeat?: unknown;
+  source?: unknown;
+  ts?: unknown;
+  patch?: object | null;
+}
+
+interface ThreadRefSeen {
+  id?: unknown;
+  product?: unknown;
+  title?: unknown;
+}
+
+interface MateSeen extends ThreadRefSeen {
+  endedAt?: unknown;
+  running?: ThreadRefSeen | null;
+  waiting?: (ThreadRefSeen | null)[] | null;
+  duties?: object[] | null;
+}
+
+interface TeamLineSeen {
+  id?: unknown;
+  ts?: unknown;
+  kind?: unknown;
+  answers?: unknown;
+}
+
+/** Your AI teammates and your chat with them, as main/teammates.mts `view` gives them. */
+export interface TeammatesViewSeen {
+  list?: MateSeen[] | null;
+  chat?: TeamLineSeen[] | null;
+  runs?: TeamLineSeen[] | null;
+  trouble?: unknown;
+}
+
+/** Why a thread nothing is running on is waiting, as the phone draws it. */
+export interface PhoneWait {
+  state: string;
+  tool?: string;
+  until?: number;
+}
+
+/** What the Mac's own status (Supervisor#status) says about the queue. */
+export interface StatusSeen {
+  stalled?: string[];
+  shipping?: string[];
+  signInNeeded?: Record<string, unknown>;
+  atLimit?: Record<string, { tool?: unknown; until?: unknown } | null>;
+  runNow?: string[];
+  queued?: string[];
+  paused?: boolean;
+}
+
+/** Her choice of projects on her phone, as the config keeps it (`phoneProducts`). The first shape was `{ owner, slugs }`. */
+export interface PhoneChoiceSaved {
+  owner?: unknown;
+  all?: boolean;
+  except?: unknown[];
+  slugs?: unknown[];
+}
+
+export interface PhoneChoice {
+  all: boolean;
+  except: string[];
+}
+
+/** A command from her phone, as its table holds it. */
+export interface PhoneCommandSeen {
+  kind: string;
+  project?: string | null;
+  item?: string | null;
+  payload?: Record<string, unknown> | null;
+}
+
+/** A permission card waiting on her, as the Mac drew it. */
+export interface ApprovalSeen {
+  id: unknown;
+  at?: unknown;
+  tool?: unknown;
+  input?: unknown;
+}
+
+/** A permission card as her phone draws it. No `card` when it was not drawn whole: that one is answered on the computer. */
+export interface PhoneApproval {
+  id: string;
+  at: number;
+  tool: string;
+  input: unknown;
+  card: unknown;
+  answerOnComputer?: boolean;
+}
 
 // WHAT A COPY MAY CARRY, BY NAME (Codex's review of step 1, finding 2). A copy
 // is built out of these and nothing else, never by copying a row and deleting
@@ -32,7 +164,7 @@ const LINE_FIELDS = [
   'note', 'answer', 'runAt', 'snoozedUntil', 'start', 'due', 'problem',
   'progress', 'solution', 'inReplyTo',
 ];
-const SOURCES = new Set(['founder', 'agent', 'system']);
+const SOURCES: ReadonlySet<unknown> = new Set(['founder', 'agent', 'system']);
 
 // KEYS AND TOKENS IN WHAT AN AGENT OR SHE WROTE, hidden. A conversation can
 // quote one ("here is the key it used"), and a copy online is no place for it.
@@ -61,10 +193,11 @@ const WEAK = '(?:[A-Z0-9_]*TOKEN[A-Z0-9_]*|token)';
 const VALUE = '(?:"((?:[^"\\\\\\n]|\\\\.)*)"|\'((?:[^\'\\\\\\n]|\\\\.)*)\'|([^\\s"\',;]+))';
 const NAMED_STRONG = new RegExp(`\\b(${STRONG})(["']?\\s*[:=]\\s*)${VALUE}`, 'gi');
 const NAMED_WEAK = new RegExp(`\\b(${WEAK})(["']?\\s*[:=]\\s*)${VALUE}`, 'g');
-const hidden = (name, sep, dq, sq, bare) => `${name}${sep}${dq !== undefined ? '"[hidden]"' : sq !== undefined ? "'[hidden]'" : '[hidden]'}`;
-function hideNamed(text) {
-  let out = text.replace(NAMED_STRONG, (m, name, sep, dq, sq, bare) => (bare === '[hidden]' ? m : hidden(name, sep, dq, sq, bare)));
-  out = out.replace(NAMED_WEAK, (m, name, sep, dq, sq, bare) => {
+type Quoted = string | undefined;
+const hidden = (name: string, sep: string, dq: Quoted, sq: Quoted, bare: Quoted): string => `${name}${sep}${dq !== undefined ? '"[hidden]"' : sq !== undefined ? "'[hidden]'" : '[hidden]'}`;
+function hideNamed(text: string): string {
+  let out = text.replace(NAMED_STRONG, (m: string, name: string, sep: string, dq: Quoted, sq: Quoted, bare: Quoted) => (bare === '[hidden]' ? m : hidden(name, sep, dq, sq, bare)));
+  out = out.replace(NAMED_WEAK, (m: string, name: string, sep: string, dq: Quoted, sq: Quoted, bare: Quoted) => {
     const value = dq ?? sq ?? bare ?? '';
     // MAX_TOKENS=128000 and TOKEN_LIMIT=8192 are settings: a bare number is
     // never taken for a key under this weaker name.
@@ -82,7 +215,7 @@ const KEYLIKE = /\b(?=[A-Za-z0-9_-]{32,}\b)(?=[A-Za-z0-9_-]*[a-z])(?=[A-Za-z0-9_
 // random prefix joined to the file's own name, and hidden, its link leads nowhere.
 // Bounded so a long run with no extension costs little.
 const FILE_PATH = /[\w./~-]{0,300}\.(?:png|jpe?g|gif|webp|heic|svg|mp4|mov|webm|m4a|mp3|wav|pdf|txt|md|html?|csv|json|zip)(?![\w])/gi;
-function hideKeyLike(text) {
+function hideKeyLike(text: string): string {
   let out = '';
   let at = 0;
   for (const m of text.matchAll(FILE_PATH)) {
@@ -91,9 +224,9 @@ function hideKeyLike(text) {
   }
   return out + text.slice(at).replace(KEYLIKE, '[hidden]');
 }
-export function hideSecrets(text, { home = null } = {}) {
+export function hideSecrets(text: unknown, { home = null }: Ctx = {}): string {
   let out = String(text);
-  for (const re of SECRETS) out = out.replace(re, (m, bearer) => (typeof bearer === 'string' && /^(Bearer|Basic)/i.test(bearer) ? `${bearer}[hidden]` : '[hidden]'));
+  for (const re of SECRETS) out = out.replace(re, (m: string, bearer: unknown) => (typeof bearer === 'string' && /^(Bearer|Basic)/i.test(bearer) ? `${bearer}[hidden]` : '[hidden]'));
   out = hideNamed(out);
   out = hideKeyLike(out);
   // Her home folder is ~ online, as it is in a crash report (shared/crash-scrub.mts).
@@ -101,37 +234,41 @@ export function hideSecrets(text, { home = null } = {}) {
   return out;
 }
 
-const clip = (s, n, ctx) => {
+const clip = (s: unknown, n: number, ctx?: Ctx): string => {
   const t = hideSecrets(s, ctx);
   return t.length > n ? `${t.slice(0, n)}…` : t;
 };
 // A value of a named field: text cut and cleaned, numbers as they are, short
 // lists of words, nothing nested.
-function plain(v, n, ctx) {
+function plain(v: unknown, n: number, ctx: Ctx): string | number | boolean | null | string[] | undefined {
   if (typeof v === 'string') return clip(v, n, ctx);
   if (typeof v === 'number' && Number.isFinite(v)) return v;
   if (typeof v === 'boolean' || v === null) return v;
   if (Array.isArray(v)) return v.filter((x) => typeof x === 'string').slice(0, 40).map((x) => clip(x, 200, ctx));
   return undefined;
 }
-function pick(obj, fields, n, ctx) {
-  const out = {};
+function pick(obj: object | null | undefined, fields: readonly string[], n: number, ctx: Ctx): Copied {
+  const out: Copied = {};
   for (const f of fields) {
     if (!obj || !(f in obj)) continue;
-    const v = plain(obj[f], n, ctx);
+    const v = plain((obj as Record<string, unknown>)[f], n, ctx);
     if (v !== undefined) out[f] = v;
   }
   return out;
 }
 
-export const bytesOf = (value) => new TextEncoder().encode(JSON.stringify(value)).length;
+export const bytesOf = (value: unknown): number => new TextEncoder().encode(JSON.stringify(value)).length;
 
 // THE REPEATING TASKS OF THE PROJECTS ON HER PHONE, cleaned as a thread's
 // words are, riding with the computer's settings copy.
 const REPEAT_FIELDS = ['id', 'title', 'body', 'priority', 'every', 'on', 'at', 'engine', 'model', 'createdAt', 'updatedAt', 'served', 'lastOccurrence'];
 export const REPEATS_MAX = 200;
-export function phoneRepeatsOf(rules, slugs, { home = null } = {}) {
-  const on = new Set(slugs);
+export function phoneRepeatsOf(
+  rules: readonly { id?: unknown; product?: string; endedAt?: unknown }[] | null | undefined,
+  slugs: Iterable<string>,
+  { home = null }: Ctx = {},
+): Copied[] {
+  const on = new Set<string | undefined>(slugs);
   return (Array.isArray(rules) ? rules : [])
     .filter((r) => r && !r.endedAt && on.has(r.product) && typeof r.id === 'string')
     .slice(0, REPEATS_MAX)
@@ -145,9 +282,9 @@ const MATE_FIELDS = ['id', 'name', 'letter', 'role', 'job', 'primary', 'paused',
 const CHAT_FIELDS = ['id', 'kind', 'from', 'to', 'text', 'title', 'details', 'verb', 'ref', 'options', 'ts', 'via', 'setup', 'start', 'product'];
 const RUN_FIELDS = ['id', 'kind', 'teammate', 'item', 'product', 'title', 'verb', 'by', 'byName', 'waiting', 'answered', 'text', 'ts', 'said'];
 export const TEAMMATES_LIMITS = { mates: 40, lines: 300, textChars: 3000, bytes: 120_000 };
-const ref = (r, ctx) => (r && typeof r.id === 'string' && typeof r.product === 'string' ? { id: r.id, product: r.product, title: clip(String(r.title ?? ''), 300, ctx) } : null);
+const ref = (r: ThreadRefSeen | null | undefined, ctx: Ctx): { id: string; product: string; title: string } | null => (r && typeof r.id === 'string' && typeof r.product === 'string' ? { id: r.id, product: r.product, title: clip(String(r.title ?? ''), 300, ctx) } : null);
 
-export function phoneTeammatesOf(view, { home = null, limits = TEAMMATES_LIMITS } = {}) {
+export function phoneTeammatesOf(view: TeammatesViewSeen | null | undefined, { home = null, limits = TEAMMATES_LIMITS }: Ctx & { limits?: typeof TEAMMATES_LIMITS } = {}) {
   if (!view || !Array.isArray(view.list)) return null;
   const ctx = { home };
   const n = limits.textChars;
@@ -157,7 +294,7 @@ export function phoneTeammatesOf(view, { home = null, limits = TEAMMATES_LIMITS 
     waiting: (Array.isArray(t.waiting) ? t.waiting : []).slice(0, 20).map((r) => ref(r, ctx)).filter(Boolean),
     duties: (Array.isArray(t.duties) ? t.duties : []).slice(0, 12).map((d) => pick(d, ['id', 'what', 'when'], 300, ctx)),
   }));
-  const lines = (all, fields) => (Array.isArray(all) ? all : []).filter((l) => l && typeof l.id === 'string' && Number.isFinite(l.ts)).slice(-limits.lines).map((l) => {
+  const lines = (all: TeamLineSeen[] | null | undefined, fields: readonly string[]): Copied[] => (Array.isArray(all) ? all : []).filter((l) => l && typeof l.id === 'string' && Number.isFinite(l.ts)).slice(-limits.lines).map((l) => {
     const out = pick(l, fields, n, ctx);
     if (l.answers && typeof l.answers === 'object' && !Array.isArray(l.answers)) {
       out.answers = Object.fromEntries(Object.entries(l.answers).filter(([, a]) => typeof a === 'string').slice(0, 20).map(([q, a]) => [String(q).slice(0, 80), clip(a, 2000, ctx)]));
@@ -166,10 +303,11 @@ export function phoneTeammatesOf(view, { home = null, limits = TEAMMATES_LIMITS 
   });
   const chat = lines(view.chat, CHAT_FIELDS);
   const runs = lines(view.runs, RUN_FIELDS);
-  const out = { list, chat: [], runs: [], ...(typeof view.trouble === 'string' ? { trouble: clip(view.trouble, 300, ctx) } : {}) };
+  const out: { list: typeof list; chat: Copied[]; runs: Copied[]; trouble?: string } = { list, chat: [], runs: [], ...(typeof view.trouble === 'string' ? { trouble: clip(view.trouble, 300, ctx) } : {}) };
   // The newest lines first, until it would not fit beside the settings.
   let left = limits.bytes - bytesOf(out);
-  const newestFirst = [...chat.map((l, i) => ({ l, i })), ...runs.map((l, i) => ({ l, i }))].sort((a, b) => b.l.ts - a.l.ts || b.i - a.i).map((x) => x.l);
+  // Every line kept has a finite `ts` (the filter in `lines`).
+  const newestFirst = [...chat.map((l, i) => ({ l, i })), ...runs.map((l, i) => ({ l, i }))].sort((a, b) => (b.l.ts as number) - (a.l.ts as number) || b.i - a.i).map((x) => x.l);
   for (const l of newestFirst) {
     left -= bytesOf(l) + 1;
     if (left < 0) break;
@@ -182,31 +320,37 @@ export function phoneTeammatesOf(view, { home = null, limits = TEAMMATES_LIMITS 
 
 // `item` is the folded row; `history` is store.readHistory for it. `home` is
 // her home folder, written ~ in the copy.
-export function threadSnapshot(item, history = [], limits = SNAPSHOT_LIMITS, { home = null } = {}) {
+export function threadSnapshot(
+  item: (RowSeen & Record<string, unknown>) | null | undefined,
+  history: readonly (HistorySeen | null)[] = [],
+  limits: SnapshotLimits = SNAPSHOT_LIMITS,
+  { home = null }: Ctx = {},
+): ThreadSnapshot {
   const ctx = { home };
-  const row = pick(item, ROW_FIELDS, limits.textChars, ctx);
+  const row: ThreadSnapshot['item'] = pick(item, ROW_FIELDS, limits.textChars, ctx);
   // Who wrote each field, which is how the screens tell her words from an
   // agent's: the source and the moment, nothing else of it.
   if (item?.wrote && typeof item.wrote === 'object') {
-    const wrote = {};
+    const wrote: Record<string, Wrote> = {};
     for (const f of ROW_FIELDS) {
       const w = item.wrote[f];
-      if (w && SOURCES.has(w.source) && Number.isFinite(w.ts)) wrote[f] = { ts: w.ts, source: w.source };
+      // Checked here: a source on the list, and a finite moment.
+      if (w && SOURCES.has(w.source) && Number.isFinite(w.ts)) wrote[f] = { ts: w.ts as number, source: w.source as string };
     }
     row.wrote = wrote;
   }
-  const lines = [];
+  const lines: SnapshotLine[] = [];
   for (const l of Array.isArray(history) ? history : []) {
     if (!l || l.claim || l.release || l.heartbeat || !SOURCES.has(l.source) || !Number.isFinite(l.ts)) continue;
     const patch = pick(l.patch, LINE_FIELDS, limits.textChars, ctx);
     if (!Object.keys(patch).length) continue;
-    lines.push({ id: row.id, ts: l.ts, source: l.source, patch });
+    lines.push({ id: row.id, ts: l.ts as number, source: l.source as string, patch });
   }
   // Under the database's megabyte, with room: fewer lines until it fits, and
   // then shorter text, so one long thread never stops the rest being sent.
   for (let keep = limits.lines, chars = limits.textChars; ;) {
     const kept = lines.slice(-keep);
-    const snap = {
+    const snap: ThreadSnapshot = {
       v: 3,
       item: chars === limits.textChars ? row : pick(row, ROW_FIELDS, chars, ctx),
       history: chars === limits.textChars ? kept : kept.map((l) => ({ ...l, patch: pick(l.patch, LINE_FIELDS, chars, ctx) })),
@@ -236,17 +380,17 @@ export function threadSnapshot(item, history = [], limits = SNAPSHOT_LIMITS, { h
 // left out, so the projects she had on stay on.
 // `every` is every project here, by slug.
 // The projects that can go to a phone at all: not the walk's practice project.
-export const phoneEligible = (products) => (Array.isArray(products) ? products : []).map((p) => p?.slug).filter((s) => typeof s === 'string' && s && s !== 'practice');
-export function phoneChoiceOf(saved, personId, every = []) {
-  const mine = personId && saved && typeof saved === 'object' && saved.owner === personId ? saved : null;
+export const phoneEligible = (products: readonly ({ slug?: string } | null)[] | null | undefined): string[] => (Array.isArray(products) ? products : []).map((p) => p?.slug).filter((s) => typeof s === 'string' && s && s !== 'practice') as string[];
+export function phoneChoiceOf(saved: unknown, personId: string | null | undefined, every: string[] = []): PhoneChoice {
+  const mine = personId && saved && typeof saved === 'object' && (saved as PhoneChoiceSaved).owner === personId ? saved as PhoneChoiceSaved : null;
   if (!mine) return { all: true, except: [] };
   if (mine.all === undefined && Array.isArray(mine.slugs)) {
     const on = new Set(mine.slugs);
     return { all: true, except: every.filter((s) => !on.has(s)) };
   }
-  return { all: mine.all !== false, except: Array.isArray(mine.except) ? mine.except.filter((s) => typeof s === 'string' && s) : [] };
+  return { all: mine.all !== false, except: Array.isArray(mine.except) ? mine.except.filter((s) => typeof s === 'string' && s) as string[] : [] };
 }
-export function phoneProjectsOf(saved, personId, every = []) {
+export function phoneProjectsOf(saved: unknown, personId: string | null | undefined, every: string[] = []): string[] {
   if (!personId) return [];
   const { all, except } = phoneChoiceOf(saved, personId, every);
   if (!all) return [];
@@ -254,7 +398,7 @@ export function phoneProjectsOf(saved, personId, every = []) {
   return every.filter((s) => typeof s === 'string' && s && !kept.has(s));
 }
 // One project on or off the phone; the rest as they were.
-export function withPhoneProject(saved, personId, slug, on, every = []) {
+export function withPhoneProject(saved: unknown, personId: string | null | undefined, slug: string, on: boolean, every: string[] = []): { owner: string; all: boolean; except: string[] } {
   if (!personId) throw new Error('sign in first');
   const { all, except } = phoneChoiceOf(saved, personId, every);
   const kept = new Set(except);
@@ -262,7 +406,7 @@ export function withPhoneProject(saved, personId, slug, on, every = []) {
   return { owner: personId, all, except: [...kept] };
 }
 // The whole phone on or off; which projects stay local is remembered.
-export function withPhoneAll(saved, personId, on, every = []) {
+export function withPhoneAll(saved: unknown, personId: string | null | undefined, on: unknown, every: string[] = []): { owner: string; all: boolean; except: string[] } {
   if (!personId) throw new Error('sign in first');
   const { except } = phoneChoiceOf(saved, personId, every);
   return { owner: personId, all: !!on, except };
@@ -272,11 +416,11 @@ export function withPhoneAll(saved, personId, on, every = []) {
 // under this id, and a reply to it before then is a reply to this id. The Mac
 // remembers which real row it became (main/phone-inbox.mts) (Codex's review of
 // step 1, finding 8). Shaped like a row id, so every screen takes it.
-export const madeHere = (commandId) => `w-${String(commandId).replace(/[^0-9a-f]/gi, '').slice(0, 10).toLowerCase()}`;
+export const madeHere = (commandId: unknown): string => `w-${String(commandId).replace(/[^0-9a-f]/gi, '').slice(0, 10).toLowerCase()}`;
 
 // The threads of a project worth carrying: everything not yet archived, and
 // what was finished in the last fortnight, newest first, at most `items`.
-export function threadsWorthCarrying(items, { now = Date.now(), limits = SNAPSHOT_LIMITS } = {}) {
+export function threadsWorthCarrying<T extends { agent?: unknown; status?: string; updatedAt?: number }>(items: readonly T[] | null | undefined, { now = Date.now(), limits = SNAPSHOT_LIMITS }: { now?: number; limits?: SnapshotLimits } = {}): T[] {
   const fortnight = 14 * 24 * 3600_000;
   return (Array.isArray(items) ? items : [])
     .filter((i) => i && !i.agent && (i.status !== 'done' || now - (i.updatedAt ?? 0) < fortnight))
@@ -291,10 +435,10 @@ export function threadsWorthCarrying(items, { now = Date.now(), limits = SNAPSHO
 // cannot start anything, then the queue. `paused` is the whole fleet's, and the
 // publisher lays it on each open thread with no other reason.
 export const WAIT_STATES = ['queued', 'next', 'signin', 'limit', 'paused', 'stalled', 'shipping'];
-export function phoneWaitsOf(status) {
-  const byId = {};
+export function phoneWaitsOf(status: StatusSeen | null | undefined): { byId: Record<string, PhoneWait>; paused: boolean } {
+  const byId: Record<string, PhoneWait> = {};
   if (!status) return { byId, paused: false };
-  const set = (id, wait) => { if (typeof id === 'string' && id && !byId[id]) byId[id] = wait; };
+  const set = (id: unknown, wait: PhoneWait) => { if (typeof id === 'string' && id && !byId[id]) byId[id] = wait; };
   for (const id of status.stalled ?? []) set(id, { state: 'stalled' });
   for (const id of status.shipping ?? []) set(id, { state: 'shipping' });
   for (const [id, tool] of Object.entries(status.signInNeeded ?? {})) set(id, { state: 'signin', tool: String(tool) });
@@ -305,7 +449,7 @@ export function phoneWaitsOf(status) {
 }
 
 // A cheap, stable fingerprint, so a thread that did not change is not sent.
-export function snapshotKey(snapshot) {
+export function snapshotKey(snapshot: unknown): string {
   const text = JSON.stringify(snapshot);
   let h = 2166136261;
   for (let i = 0; i < text.length; i += 1) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619); }
@@ -321,19 +465,19 @@ export const PHONE_COMMANDS = ['reply', 'new', 'snooze', 'close', 'stop', 'run-n
 // A PERMISSION CARD AS HER PHONE DRAWS IT: what the agent asks to do, with the
 // secrets in it hidden as a thread's words are, and the fingerprint of the card
 // her Mac drew, which her answer must carry back.
-export function phoneApproval(request, card, ctx = {}) {
+export function phoneApproval(request: ApprovalSeen, card: unknown, ctx: Ctx = {}): PhoneApproval {
   // Her Allow signs the whole request by its digest, so the phone may carry the
   // digest only when it drew the request whole; a card that hid, clipped or
   // dropped anything carries none and is answered on the computer. A home path
   // written ~ is for her eyes, not a value hidden from what she signs.
   let lossy = false;
-  const text = (s, n) => {
+  const text = (s: string, n: number): string => {
     if (hideSecrets(s) !== s) lossy = true;
     const t = hideSecrets(s, ctx);
     if (t.length > n) { lossy = true; return `${t.slice(0, n)}…`; }
     return t;
   };
-  const clean = (v, depth = 0) => {
+  const clean = (v: unknown, depth = 0): unknown => {
     if (typeof v === 'string') return text(v, 4000);
     if (typeof v === 'number' || typeof v === 'boolean' || v === null) return v;
     if (depth > 3) { lossy = true; return undefined; }
@@ -353,44 +497,47 @@ export function phoneApproval(request, card, ctx = {}) {
 // take it (main/ipc.mts zero:answer, zero:compose): only these fields, each
 // only in its right shape. Null on a reply clears a choice, as in the window.
 const WORD = /^[A-Za-z][\w.:-]{0,79}$/;
-const word = (v, n = 80) => typeof v === 'string' && v.length <= n && WORD.test(v);
-const orNull = (ok) => (v) => v === null || ok(v);
-const CHOICES = {
+type Ok = (v: unknown) => boolean;
+const word = (v: unknown, n: number = 80): boolean => typeof v === 'string' && v.length <= n && WORD.test(v);
+const orNull = (ok: Ok): Ok => (v) => v === null || ok(v);
+// The number rules compare only once `isInteger` or `isFinite` has said it is one.
+const CHOICES: Record<string, Record<string, Ok>> = {
   reply: {
     permissionMode: orNull((v) => word(v, 40)), model: orNull(word), effort: orNull((v) => word(v, 20)),
-    priority: (v) => Number.isInteger(v) && v >= 0 && v <= 10, now: (v) => v === true, unschedule: (v) => v === true,
-    runAt: (v) => Number.isFinite(v) && v > 0,
+    priority: (v) => Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 10, now: (v) => v === true, unschedule: (v) => v === true,
+    runAt: (v) => Number.isFinite(v) && (v as number) > 0,
   },
   new: {
-    runAt: (v) => Number.isFinite(v) && v > 0, start: (v) => v === 'later' || v === 'now',
-    engine: (v) => word(v, 40), model: word, effort: (v) => word(v, 20), priority: (v) => Number.isInteger(v) && v >= 0 && v <= 10,
+    runAt: (v) => Number.isFinite(v) && (v as number) > 0, start: (v) => v === 'later' || v === 'now',
+    engine: (v) => word(v, 40), model: word, effort: (v) => word(v, 20), priority: (v) => Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 10,
     assignee: (v) => typeof v === 'string' && v.length >= 1 && v.length <= 80, due: (v) => typeof v === 'string' && v.length <= 40,
-    visibility: (v) => ['team', 'people', 'private'].includes(v),
-    visibleTo: (v) => Array.isArray(v) && v.length <= 50 && v.every((x) => typeof x === 'string' && x.length <= 80),
+    visibility: (v) => ['team', 'people', 'private'].includes(v as string),
+    visibleTo: (v) => Array.isArray(v) && v.length <= 50 && v.every((x: unknown) => typeof x === 'string' && x.length <= 80),
     // To Auto (shared/auto-route.mts), and no other label.
     labels: (v) => Array.isArray(v) && v.length === 1 && v[0] === 'auto',
   },
 };
-export function phoneChoices(kind, p) {
-  const out = {};
+export function phoneChoices(kind: string, p: Record<string, unknown> | null | undefined): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
   for (const [k, ok] of Object.entries(CHOICES[kind] ?? {})) if (p && k in p && p[k] !== undefined && ok(p[k])) out[k] = p[k];
   return out;
 }
-export function checkCommand(cmd, { projects, hasItem }) {
+export function checkCommand(cmd: PhoneCommandSeen | null | undefined, { projects, hasItem }: { projects: readonly (string | null | undefined)[]; hasItem: (project: string, id: string) => boolean }): string | null {
   if (!cmd || !PHONE_COMMANDS.includes(cmd.kind)) return 'not something the phone may do';
-  if (cmd.kind === 'setting') return cmd.project != null || cmd.item != null ? 'a setting names no project or thread' : checkSetting(cmd.payload);
+  if (cmd.kind === 'setting') return cmd.project != null || cmd.item != null ? 'a setting names no project or thread' : checkSetting(cmd.payload as SettingChange | null | undefined);
   if (!projects.includes(cmd.project)) return 'that project is not on your phone';
-  const p = cmd.payload || {};
+  const p: Record<string, unknown> = cmd.payload || {};
   if (cmd.kind === 'new') {
     const title = typeof p.title === 'string' ? p.title.trim() : '';
     const body = typeof p.body === 'string' ? p.body.trim() : '';
     if (!title && !body) return 'a new thread needs some words';
     return null;
   }
-  if (!cmd.item || !hasItem(cmd.project, cmd.item)) return 'that thread is not on your phone';
+  // On the phone's list of projects, so a slug.
+  if (!cmd.item || !hasItem(cmd.project!, cmd.item)) return 'that thread is not on your phone';
   if (cmd.kind === 'reply' && !(typeof p.text === 'string' && p.text.trim())) return 'an empty reply';
-  if (cmd.kind === 'snooze' && !(Number.isFinite(p.until) && p.until >= 0)) return 'a snooze needs a time';
-  if (cmd.kind === 'schedule' && !(Number.isFinite(p.runAt) && p.runAt >= 0)) return 'a schedule needs a time';
+  if (cmd.kind === 'snooze' && !(Number.isFinite(p.until) && (p.until as number) >= 0)) return 'a snooze needs a time';
+  if (cmd.kind === 'schedule' && !(Number.isFinite(p.runAt) && (p.runAt as number) >= 0)) return 'a schedule needs a time';
   if (cmd.kind === 'approve' && !(typeof p.approval === 'string' && /^[\w-]{1,80}$/.test(p.approval) && typeof p.allow === 'boolean'
     && typeof p.card === 'string' && /^[\w+/=-]{8,200}$/.test(p.card) && (p.note === undefined || (typeof p.note === 'string' && p.note.length <= 500)))) return 'an answer needs its card';
   return null;
@@ -401,7 +548,11 @@ export function checkCommand(cmd, { projects, hasItem }) {
 // written it: her reply, the agent's answer and the row waiting on her
 // (main/store.mts recordSessionResult). The computer's own copy replaces this
 // one once it is back and has brought the run home.
-export function withCloudTurn(snapshot, { reply, answer, repliedAt, answeredAt, status = 'blocked' }, limits = SNAPSHOT_LIMITS) {
+export function withCloudTurn(
+  snapshot: ThreadSnapshot | null | undefined,
+  { reply, answer, repliedAt, answeredAt, status = 'blocked' }: { reply?: unknown; answer?: unknown; repliedAt?: number; answeredAt: number; status?: string },
+  limits: SnapshotLimits = SNAPSHOT_LIMITS,
+) {
   if (!snapshot || typeof snapshot !== 'object' || !snapshot.item?.id) return null;
   const ctx = { home: null };
   const id = snapshot.item.id;
@@ -427,7 +578,7 @@ export function withCloudTurn(snapshot, { reply, answer, repliedAt, answeredAt, 
 
 // THE PHONE'S COPY OF A THREAD THE CLOUD STARTED FROM THE PHONE, before its
 // computer has one: the row her ask made, being worked on.
-export function newThreadSnapshot({ itemId, title, body = '', at }, limits = SNAPSHOT_LIMITS) {
+export function newThreadSnapshot({ itemId, title, body = '', at }: { itemId: string; title?: unknown; body?: unknown; at: number }, limits: SnapshotLimits = SNAPSHOT_LIMITS): ThreadSnapshot {
   const words = { title: String(title ?? ''), ...(body ? { body: String(body) } : {}) };
   const said = { ts: at, source: 'founder' };
   return threadSnapshot(

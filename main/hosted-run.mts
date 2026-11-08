@@ -5,22 +5,73 @@
 import net from 'node:net';
 import { EventEmitter } from 'node:events';
 import { PassThrough, Writable } from 'node:stream';
+import type { ClaudeInput } from './claude-input.mts';
+import type { RunHostInput, RunHostOutput, RunHostRequest, RunStart } from './run-host.mts';
+import type { BridgeStateEvent } from './task-remote-control.mts';
+import type { RemoteUserEvent, RunExitHow } from './supervisor.mts';
 
 // The host went away without saying how the run ended.
 export const HOST_LOST = 75;
 const CONNECT_TRIES = 50;
 const CONNECT_EVERY_MS = 100;
 
-export class HostedRun extends EventEmitter {
+export type HostedRunStart = RunStart;
+
+export interface HostedRunOptions {
+  sockPath: string;
+  runId: string;
+  start?: HostedRunStart | null;
+  out?: number | null;
+  err?: number | null;
+  pid?: number | null;
+}
+
+/** How far the run's output has been read, in bytes; null when the app attached without saying. */
+export interface HostedRunRead {
+  out: number | null;
+  err: number | null;
+}
+
+export type HostedRunState = Extract<RunHostOutput, { t: 'state' }>;
+
+interface HostedRunEvents {
+  spawn: [];
+  error: [error: Error];
+  exit: [code: number | null, signal: NodeJS.Signals | null, how?: RunExitHow];
+  close: [code: number | null, signal: NodeJS.Signals | null];
+  'input-state': [state: HostedRunState];
+  'input-turn': [event?: unknown];
+  'remote-user': [event: RemoteUserEvent];
+  'bridge-state': [event: BridgeStateEvent];
+}
+
+// main/claude-input.mts adds its methods to a hosted run as it does to a child.
+export interface HostedRun extends Partial<ClaudeInput> {}
+
+export class HostedRun extends EventEmitter<HostedRunEvents> {
+  declare runId: string;
+  declare sockPath: string;
+  declare pid: number | undefined;
+  declare exitCode: number | null;
+  declare signalCode: NodeJS.Signals | null;
+  declare read: HostedRunRead;
+  declare stdout: PassThrough;
+  declare stderr: PassThrough;
+  declare stdin: Writable;
+  declare _over: boolean;
+  declare _detached: boolean;
+  declare _queued: string[] | null;
+  declare _sock: net.Socket;
+
   /**
    * `start` is `{ bin, argv, env, cwd }` for a new run; without it this
    * attaches to `runId` and reads from `out`/`err` on.
    */
-  constructor({ sockPath, runId, start = null, out = 0, err = 0, pid = null }) {
+  constructor({ sockPath, runId, start = null, out = 0, err = 0, pid = null }: HostedRunOptions) {
     super();
     this.runId = runId;
     this.sockPath = sockPath;
-    this.pid = Number.isInteger(pid) ? pid : undefined;
+    this.pid = Number.isInteger(pid) ? pid! : undefined;
     this.exitCode = null;
     this.signalCode = null;
     this.read = { out, err };
@@ -39,7 +90,7 @@ export class HostedRun extends EventEmitter {
   }
 
   // A host just started takes a moment to listen.
-  _connect(first, tries) {
+  _connect(first: RunHostRequest, tries: number): void {
     const sock = net.connect(this.sockPath);
     this._sock = sock;
     let connected = false;
@@ -51,13 +102,13 @@ export class HostedRun extends EventEmitter {
       this._queued = null;
     });
     let buf = '';
-    sock.on('data', (d) => {
+    sock.on('data', (d: string) => {
       buf += d;
       let n;
       while ((n = buf.indexOf('\n')) >= 0) {
         const line = buf.slice(0, n);
         buf = buf.slice(n + 1);
-        let msg;
+        let msg: RunHostOutput;
         try { msg = JSON.parse(line); } catch { continue; }
         this._hear(msg);
       }
@@ -71,24 +122,25 @@ export class HostedRun extends EventEmitter {
     });
   }
 
-  _send(msg) {
+  _send(msg: RunHostInput): void {
     if (this._over || this._detached) return;
     const line = `${JSON.stringify(msg)}\n`;
     if (this._queued) this._queued.push(line); else if (!this._sock.destroyed) this._sock.write(line);
   }
 
-  _hear(msg) {
+  _hear(msg: RunHostOutput): void {
     if (this._detached) return;
     if (msg.t === 'started') {
       if (Number.isInteger(msg.pid)) this.pid = msg.pid;
       this.emit('spawn');
     } else if (msg.t === 'state') {
-      if (Number.isInteger(msg.pid)) this.pid = msg.pid;
+      if (Number.isInteger(msg.pid)) this.pid = msg.pid!;
       if (msg.from) this.read = { out: msg.from.out, err: msg.from.err };
       this.emit('input-state', msg);
     } else if (msg.t === 'o' || msg.t === 'e') {
       const b = Buffer.from(String(msg.d ?? ''), 'base64');
-      this.read[msg.t === 'o' ? 'out' : 'err'] += b.length;
+      // A count that started at null counts from nothing: null + n is n.
+      (this.read[msg.t === 'o' ? 'out' : 'err'] as number) += b.length;
       (msg.t === 'o' ? this.stdout : this.stderr).write(b);
     } else if (msg.t === 'x') {
       if (msg.ended) this.endedInHost = true;
@@ -100,7 +152,7 @@ export class HostedRun extends EventEmitter {
     }
   }
 
-  _end(code, signal) {
+  _end(code: number | null, signal: NodeJS.Signals | null): void {
     if (this._over) return;
     this._over = true;
     this.exitCode = code;
@@ -117,20 +169,20 @@ export class HostedRun extends EventEmitter {
 
   // Straight to the worker when its pid is known, so a quit that follows at
   // once cannot outrun the message.
-  kill(signal = 'SIGTERM') {
+  kill(signal: NodeJS.Signals = 'SIGTERM'): boolean {
     if (this._over || this._detached) return false;
-    if (Number.isInteger(this.pid)) { try { process.kill(this.pid, signal); return true; } catch { /* the host's turn */ } }
+    if (Number.isInteger(this.pid)) { try { process.kill(this.pid!, signal); return true; } catch { /* the host's turn */ } }
     this._send({ t: 'k', s: signal });
     return true;
   }
 
   /** The app can find this run again: an app that vanishes leaves it going. */
-  keep() {
+  keep(): void {
     this._send({ t: 'keep' });
   }
 
   /** Let go and leave the run going. Returns how far its output was read. */
-  detach() {
+  detach(): HostedRunRead | null {
     if (this._over || this._detached) return null;
     this._send({ t: 'bye' });
     this._detached = true;
