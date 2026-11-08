@@ -33,6 +33,37 @@
 .lv-caret.is-agent .lv-flag::before { content: ''; flex: none; width: 5px; height: 5px; box-shadow: inset 0 0 0 1.5px var(--lv); }
 .lv-sel { background: color-mix(in srgb, var(--lv) 22%, transparent); }
 
+/* Ways to colour a name, while one is chosen (presenceTags). "You" takes the
+   same tag in the page's own ink. */
+.doc-sheet[class*='lv-tags-'] .lv-you { --lv: #b9bcc6; }
+.doc-sheet[class*='lv-tags-'] .lv-you::before { background: var(--lv); }
+/* Ink: a dark tag, the person's colour only in a small square before the name. */
+.doc-sheet.lv-tags-ink :is(.lv-caret, .lv-you) .lv-flag {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: #e8e9ee; background: #24262c;
+  box-shadow: 0 8px 18px -8px rgba(0, 0, 0, .75), inset 0 0 0 1px rgba(255, 255, 255, .08);
+}
+.doc-sheet.lv-tags-ink :is(.lv-caret:not(.is-agent), .lv-you) .lv-flag::before { content: ''; flex: none; width: 6px; height: 6px; background: var(--lv); }
+.doc-sheet.lv-tags-ink .lv-caret.is-agent .lv-flag { color: #c9cbd3; }
+/* Muted: the person's colour, deepened toward the page, with light words. */
+.doc-sheet.lv-tags-muted :is(.lv-caret:not(.is-agent), .lv-you) .lv-flag {
+  color: #f3f4f7; background: color-mix(in oklab, var(--lv) 58%, #16181d);
+  box-shadow: 0 8px 18px -8px rgba(0, 0, 0, .75), inset 0 1px 0 rgba(255, 255, 255, .12);
+}
+.doc-sheet.lv-tags-muted .lv-you .lv-flag { background: #3a3c44; }
+/* Outline: the page's dark, edged in the person's colour. */
+.doc-sheet.lv-tags-outline :is(.lv-caret:not(.is-agent), .lv-you) .lv-flag {
+  color: #eceef2; background: #1d1f25;
+  box-shadow: 0 8px 18px -8px rgba(0, 0, 0, .75), inset 0 0 0 1px var(--lv);
+}
+.doc-sheet.lv-tags-outline .lv-caret.is-agent .lv-flag { background: #1d1f25; box-shadow: 0 8px 18px -8px rgba(0, 0, 0, .75), inset 0 0 0 1px color-mix(in srgb, var(--lv) 45%, transparent); }
+/* Name: no tag at all, the name in the person's colour above the cursor. */
+.doc-sheet.lv-tags-name :is(.lv-caret, .lv-you) .lv-flag {
+  display: inline-flex; align-items: center; gap: 5px; padding: 0 2px; bottom: calc(100% + 4px);
+  color: var(--lv); background: none; box-shadow: none;
+  text-shadow: 0 0 3px var(--doc-page, #1b1c20), 0 0 6px var(--doc-page, #1b1c20);
+}
+
 /* Looks that draw the place elsewhere keep the cursor bare. */
 .doc-sheet:is(.lv-look-rail, .lv-look-gutter, .lv-look-tint) .lv-flag { display: none; }
 

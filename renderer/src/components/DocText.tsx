@@ -30,7 +30,7 @@ import { agoWords } from '../threads/summary-rules';
 import { DocOutline } from './DocOutline';
 import { scrollKey, useKeptScroll } from '../kept-scroll';
 import type { LiveSession } from '../live/live-session';
-import { LivePresence, liveExtensions, presenceLook } from '../live/presence';
+import { LivePresence, liveExtensions, presenceLook, presenceTags } from '../live/presence';
 import './doc-reading.css';
 
 const SAVE_DEBOUNCE_MS = 900;
@@ -348,6 +348,7 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
   }, [linkPop?.pinned]);
 
   const [look] = useState(presenceLook);
+  const [tags] = useState(presenceTags);
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
   useKeptScroll(scroller, scrollKey(product, src));
   const [column, setColumn] = useState<HTMLDivElement | null>(null);
@@ -422,7 +423,7 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
         openFor(a, true);
       }}
     >
-      <div className={`doc-sheet${collab ? ` lv-look-${look}` : ''}`}>
+      <div className={`doc-sheet${collab ? ` lv-look-${look} lv-tags-${tags}` : ''}`}>
         <div className="doc-column" ref={setColumn}>
           {collab && <LivePresence session={collab} editor={editor} column={column} look={look} />}
           {versions?.byline && <p className="doc-byline">{versions.byline}</p>}

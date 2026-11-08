@@ -22,7 +22,7 @@ const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 await page.goto(arg('url'));
 await page.waitForTimeout(4000);
-await page.evaluate((l) => localStorage.setItem('live-presence-look', l), arg('look', 'flags'));
+await page.evaluate(([l, t]) => { localStorage.setItem('live-presence-look', l); localStorage.setItem('live-tag-style', t); }, [arg('look', 'flags'), arg('tags', 'ink')]);
 await page.reload();
 await page.waitForTimeout(3500);
 await page.getByText(THREAD).first().click();
@@ -37,10 +37,19 @@ if (TYPE) {
     // A picture after each typed word, so "You" is up in every one.
     const words = TYPE.match(/\s*\S+/g) ?? [];
     for (const [i, w] of words.entries()) {
-      await page.keyboard.type(w, { delay: 60 });
-      await page.waitForTimeout(250);
+      // Wait, up to a few seconds, for a person's name and an agent's to be up on
+      // screen together, then type the next word so "You" is up too, and shoot.
+      for (let k = 0; k < 80; k++) {
+        const up = await page.evaluate((k) => {
+          const shown = (sel) => [...document.querySelectorAll(sel)].some((c) => { const r = c.getBoundingClientRect(); return r.top > 80 && r.top < innerHeight - 40; });
+          return shown('.lv-caret.is-fresh:not(.is-agent)') && (k > 40 || shown('.lv-caret.is-fresh.is-agent'));
+        }, k);
+        if (up) break;
+        await page.waitForTimeout(150);
+      }
+      await page.keyboard.type(w, { delay: 40 });
+      await page.waitForTimeout(120);
       await page.screenshot({ path: OUT.replace(/\.png$/, `-${i + 1}.png`) });
-      await page.waitForTimeout(Number(arg('every', 900)));
     }
     console.log(JSON.stringify({ out: OUT, frames: words.length, errors }));
     await browser.close();
