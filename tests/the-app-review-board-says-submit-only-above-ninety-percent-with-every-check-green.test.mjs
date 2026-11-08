@@ -61,6 +61,18 @@ describe('the verdict', () => {
     expect(verdict({ p_accept: 0.99, reviewers: { answered: 2, failed: 0 } }, [...green, { name: 'demo', ok: false }]).submit).toBe(false);
     expect(verdict({ p_accept: 0.99, reviewers: { answered: 2, failed: 0 } }, [...green, { name: 'demo', ok: null }]).submit).toBe(false);
   });
+  // `--assume` asks what the odds would be once the person's steps are done;
+  // odds on things nobody has checked are never a reason to submit.
+  it('not while anything is only assumed', () => {
+    const d = verdict({ p_accept: 0.99, reviewers: { answered: 2, failed: 0 } }, green, ['the privacy page is live']);
+    expect(d.submit).toBe(false);
+    expect(d.why.join(' ')).toMatch(/these odds assume 1 thing not yet checked/);
+  });
+  it('the reviewers are told what is assumed, apart from what was checked', async () => {
+    const { reviewerPrompt } = await import('../scripts/app-review-board.mjs');
+    const prompt = reviewerPrompt({ listing: {}, notes: '', checks: [], assume: ['the demo account answers'] });
+    expect(prompt).toMatch(/ASSUMED TRUE BY SUBMISSION, NOT YET CHECKED:\n- the demo account answers/);
+  });
   it('not on one reviewer alone', () => {
     expect(verdict({ p_accept: 0.99, reviewers: { answered: 1, failed: 1 } }, green).submit).toBe(false);
   });

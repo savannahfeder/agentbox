@@ -7,6 +7,10 @@
 // rejection rate, not a measurement.
 //
 //   node scripts/app-review-board.mjs [--codex 2] [--claude 1] [--out dir] [--prompt-only]
+//     [--with review.txt]... [--assume "what will be true by submission"]...
+//
+// `--assume` gives the odds once the person's own steps are done; with any
+// assumption the board never says submit.
 //
 // The demo account is checked when REVIEW_EMAIL and REVIEW_PASSWORD are set.
 import fs from 'node:fs';
@@ -67,8 +71,9 @@ export function combine(reviews) {
   };
 }
 
-export function verdict(board, checks) {
+export function verdict(board, checks, assume = []) {
   const why = [];
+  if (assume.length) why.push(`these odds assume ${assume.length} thing${assume.length === 1 ? '' : 's'} not yet checked`);
   if (board.p_accept == null || board.p_accept < BAR) why.push(`odds of acceptance ${board.p_accept == null ? 'unknown' : `${Math.round(board.p_accept * 100)}%`}, under ${BAR * 100}%`);
   if (board.reviewers.answered < 2) why.push(`${board.reviewers.answered} reviewer answered; two are needed`);
   for (const c of checks) if (c.ok !== true) why.push(`${c.name}: ${c.ok === null ? 'not checked' : 'failed'}${c.detail ? ` (${c.detail})` : ''}`);
@@ -128,7 +133,7 @@ async function demoAccount({ fetchImpl, env, deadlineMs }) {
   } catch (err) { return { name, ok: false, detail: String(err?.message ?? err) }; }
 }
 
-export function reviewerPrompt({ listing, notes, checks }) {
+export function reviewerPrompt({ listing, notes, checks, assume = [] }) {
   return `You are an Apple App Review reviewer. This iPhone app is about to be submitted to the public App Store for the first time. Predict whether it is accepted on the first submission.
 
 Read the current App Review Guidelines yourself: https://developer.apple.com/app-store/review/guidelines/ . Do not rely on memory.
@@ -143,7 +148,7 @@ THE REVIEW NOTES: ${JSON.stringify(notes)}
 
 WHAT WAS CHECKED LIVE just now:
 ${checks.map((c) => `- ${c.name}: ${c.ok === true ? 'yes' : c.ok === false ? 'NO' : 'not checked'}${c.detail ? ` (${c.detail})` : ''}`).join('\n')}
-
+${assume.length ? `\nASSUMED TRUE BY SUBMISSION, NOT YET CHECKED:\n${assume.map((a) => `- ${a}`).join('\n')}\nWhere an assumption and a live check disagree, judge the app as it will be once the assumptions hold, and price each assumption's own chance of going wrong into your odds.\n` : ''}
 Go through the app the way a reviewer does: launch, sign in with the demo account, every tab, a thread, reply, new thread, attachments, dictation, alerts, Settings, the privacy policy, Delete account, every link out. Do not edit any file and do not run the test suite.
 
 Answer with your reasoning, then end with exactly one JSON block:
@@ -179,13 +184,14 @@ function run(engine, prompt, dir) {
   });
 }
 
-function report(board, checks, decision) {
+function report(board, checks, decision, assume = []) {
   const pct = (p) => (p == null ? 'unknown' : `${Math.round(p * 100)}%`);
   return [
     `# App review board, ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC`,
     '',
     `**${decision.submit ? 'Submit.' : 'Not yet.'}** Odds of first acceptance: ${pct(board.p_accept)} (bar ${BAR * 100}%). Reviewers answered: ${board.reviewers.answered}, failed: ${board.reviewers.failed}.`,
     '',
+    ...(assume.length ? ['## These odds assume, not yet checked', '', ...assume.map((a) => `- ${a}`), ''] : []),
     ...(decision.why.length ? ['## What stands in the way', '', ...decision.why.map((w) => `- ${w}`), ''] : []),
     '## Risks, highest first', '',
     '| Guideline | Odds it rejects | What the reviewer sees | Fix |', '|---|---|---|---|',
@@ -203,7 +209,8 @@ async function main() {
   const store = JSON.parse(fs.readFileSync(path.join(root, 'mobile', 'store.config.json'), 'utf8')).apple;
   const listing = store.info['en-US'];
   const checks = await gateChecks({ listing });
-  const prompt = reviewerPrompt({ listing, notes: store.review.notes, checks });
+  const assume = args.flatMap((a, i) => (a === '--assume' ? [args[i + 1]] : []));
+  const prompt = reviewerPrompt({ listing, notes: store.review.notes, checks, assume });
   const out = opt('out', fs.mkdtempSync(path.join(os.tmpdir(), 'app-review-board-out-')));
   fs.mkdirSync(out, { recursive: true });
   fs.writeFileSync(path.join(out, 'prompt.txt'), prompt);
@@ -218,9 +225,9 @@ async function main() {
   }
   reviews.forEach((r, i) => fs.writeFileSync(path.join(out, `reviewer-${i + 1}-${r.engine}.txt`), r.text ?? ''));
   const board = combine(reviews);
-  const decision = verdict(board, checks);
+  const decision = verdict(board, checks, assume);
   fs.writeFileSync(path.join(out, 'board.json'), JSON.stringify({ board, checks, decision, reviews: reviews.map(({ text: _t, ...r }) => r) }, null, 2));
-  fs.writeFileSync(path.join(out, 'report.md'), report(board, checks, decision));
+  fs.writeFileSync(path.join(out, 'report.md'), report(board, checks, decision, assume));
   fs.rmSync(dir, { recursive: true, force: true });
   console.log(path.join(out, 'report.md'));
   process.exitCode = decision.submit ? 0 : 1;
