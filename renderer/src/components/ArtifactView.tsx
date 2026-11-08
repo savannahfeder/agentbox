@@ -670,7 +670,8 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, lines
             <ShareLink icon product={product} thread={(thread ?? shareThread)!} src={version.path} signedIn={!!me} />
           )}
           {onOutside && version && foundNow === 'open' && <button type="button" className="doc-mark" aria-label="Open outside" title="Open outside" onClick={() => onOutside(version.path)}><ArtifactControlGlyph kind="open" /></button>}
-          {onBeside && version && <FocusControl style="corners-bare" focused onClick={() => onBeside(version.path)} />}
+          {/* The side pane has no versions to step, so it shows the newest. */}
+          {onBeside && family && <FocusControl style="corners-bare" focused onClick={() => onBeside(family.versions[family.versions.length - 1].path)} />}
         </span>
       </header>
       <div className="av-body">

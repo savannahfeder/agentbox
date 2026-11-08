@@ -34,7 +34,7 @@ describe('the open file header', () => {
   });
 
   it('ends with the side pane\'s full-screen toggle, which puts the file beside the chat', () => {
-    expect(header).toMatch(/onBeside && version && <FocusControl style="corners-bare" focused onClick=\{\(\) => onBeside\(version\.path\)\} \/>/);
+    expect(header).toMatch(/onBeside && family && <FocusControl style="corners-bare" focused onClick=\{\(\) => onBeside\([^\n]*\)\} \/>/);
     expect(header.lastIndexOf('<FocusControl')).toBeGreaterThan(header.indexOf('aria-label="Open outside"'));
   });
 

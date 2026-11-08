@@ -67,6 +67,13 @@ describe('the wiring', () => {
     const pane = read('renderer/src/components/DocPane.tsx');
     expect(pane).toMatch(/<FilmPlayer [^\n]*wide=\{!onMode\}/);
   });
+  // A power tester stepped to v1 in full screen, went back beside, and read v1
+  // as the current file: the side pane has no version controls to say otherwise.
+  it('beside the chat is the newest version, whichever one full screen was on', () => {
+    const view = read('renderer/src/components/ArtifactView.tsx');
+    expect(view).toMatch(/onBeside\(family\.versions\[family\.versions\.length - 1\]\.path\)/);
+    expect(view).not.toMatch(/onBeside\(version\.path\)/);
+  });
   it('the file view\'s own button puts the file back beside the chat, on both', () => {
     expect(threadView).toMatch(/onBeside/);
     expect(focus).toMatch(/onBeside=\{/);
