@@ -3648,6 +3648,9 @@ img.product-mark { object-fit: cover; opacity: 1; }
   place-items: center;
   padding-top: 0;
   padding-bottom: 25vh;
+  /* A click anywhere outside the box closes it, the title bar included. The
+     strip drawn after it stands down in workspace-navigation.css. */
+  -webkit-app-region: no-drag;
 }
 
 /* THE IMPORT CARD THAT ENDS SETUP WAS DRAWN DIMMED. Setup's veil is 299 and

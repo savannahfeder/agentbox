@@ -85,6 +85,8 @@ export interface PlanSummary {
 /** The top of Settings › Plan and Billing: the plan paid for, and this month's agents and hours as meters. */
 export function planSummary(plan: CloudPlan | null): PlanSummary | null {
   if (plan && onFree(plan)) return freeSummary(plan);
+  // Spent free hours stay on the page as Free with none left, rather than vanishing.
+  if (plan?.plan === 'none' && plan.free) return freeSummary({ ...plan, agents: plan.free.agents, hoursPerMonth: plan.free.hours, usedSeconds: plan.free.usedSeconds });
   const mine = paidOf(plan);
   if (!plan || !mine) return null;
   const running = plan.running ?? 0;
@@ -116,7 +118,8 @@ function freeSummary(plan: CloudPlan): PlanSummary {
     manage: false,
     period: 'Usage', change: 'Change plan',
     agents: { line: `${running} of ${agents} running`, percent: Math.min(100, Math.round((running / Math.max(1, agents)) * 100)) },
-    hours: { label: 'Hours left', line: `${Math.floor(left * 10) / 10} of ${n(hours)}`, percent: Math.round((left / Math.max(1, hours)) * 100) },
+    // Rounded up, so it reads 0 only when a run can no longer start.
+    hours: { label: 'Hours left', line: `${Math.ceil(left * 10) / 10} of ${n(hours)}`, percent: hours > 0 ? Math.round((left / hours) * 100) : 0 },
   };
 }
 

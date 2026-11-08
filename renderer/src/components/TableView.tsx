@@ -138,15 +138,18 @@ function measure(table: Table, cap: number, only?: number): { px: Map<string, nu
   return { px, wide: wide >= 0 ? table.columns[wide].name : null };
 }
 
-function tracks(table: Table, natural: ReturnType<typeof measure>, sized: Record<string, number>): string {
+// In a message, no column may be wider than 60% of the message (`cqi`, the
+// `.tbl-inline` container), so beside an open file the next column still shows.
+function tracks(table: Table, natural: ReturnType<typeof measure>, sized: Record<string, number>, inline = false): string {
   const shown = table.columns.filter((_, i) => !(table.ranked && i === 0));
   const fills = natural.wide && !sized[natural.wide] && shown.some((c) => c.name === natural.wide) ? natural.wide : null;
+  const px = (w: number) => (inline ? `min(${w}px, 60cqi)` : `${w}px`);
   return shown.map((c, i) => {
     if (sized[c.name]) return `${sized[c.name]}px`;
     const w = natural.px.get(c.name) ?? 160;
-    if (c.name === fills) return `minmax(${Math.min(w, 180)}px, ${w}fr)`;
-    if (!fills && i === shown.length - 1) return `minmax(${w}px, 1fr)`;
-    return `${w}px`;
+    if (c.name === fills) return `minmax(${px(Math.min(w, 180))}, ${w}fr)`;
+    if (!fills && i === shown.length - 1) return `minmax(${px(w)}, 1fr)`;
+    return px(w);
   }).join(' ');
 }
 
@@ -509,8 +512,11 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   // out when the search, a filter or the sort changes, not when a cell does, so
   // a row typed into does not jump out from under the caret.
   const [doc, setDoc] = useState<Doc>(() => ({ from: base, table: base, order: ids(base.rows.length) }));
-  let live = doc;
-  if (doc.from !== base) { live = { from: base, table: base, order: viewOrder(base, searched, picked, sort) }; setDoc(live); }
+  // A new table is drawn at once and kept just after the paint. Kept during the
+  // draw instead, it never settled when the message around it redrew in the same paint.
+  const fresh = useMemo<Doc | null>(() => (doc.from === base ? null : { from: base, table: base, order: viewOrder(base, searched, picked, sort) }), [base, doc.from]); // eslint-disable-line react-hooks/exhaustive-deps
+  const live = fresh ?? doc;
+  useLayoutEffect(() => { if (fresh) setDoc(fresh); }, [fresh]);
   const { table, order } = live;
   const docRef = useRef(live);
   docRef.current = live;
@@ -540,7 +546,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   useEffect(() => { setPick(null); setEditing(null); setSheet(null); setFloat(null); setRenaming(null); setProblem(null); }, [base]);
 
   const natural = useMemo(() => measure(base, mode === 'full' || inline ? 300 : 220), [base, mode, inline]);
-  const template = useMemo(() => tracks(table, natural, sized), [table, natural, sized]);
+  const template = useMemo(() => tracks(table, natural, sized, inline), [table, natural, sized, inline]);
   const root = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const keys = useRef<HTMLTextAreaElement>(null);
