@@ -8272,7 +8272,7 @@ export default function App() {
             // SHOW WHERE IT WENT (2026-10-01: a new thread looked as if it
             // was never made, since it was not in the inbox). Alone, the tab
             // moves to where it landed; on a team, the toast and its O say so.
-            const landsOn = tabAfterSending({ team: teamMode, kind: how.kind, first, later, view, covered: teamOpen || !!focused });
+            const landsOn = tabAfterSending({ team: teamMode, kind: how.kind, first, later, view, covered: teamOpen || !!focused || homeShown });
             if (landsOn) {
               setView(landsOn);
               setSelected(0);

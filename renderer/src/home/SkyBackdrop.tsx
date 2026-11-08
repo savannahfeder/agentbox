@@ -9,9 +9,9 @@ import { drawSky, type SkyArt } from './sky';
  * `from` is where the dots begin, in px from the card's top; `below` instead
  * starts them `gap` px under the lowest element it matches, and follows the
  * page as rows come and go. However long the list, the last `band` px of the
- * card stay sky; the rows fade out above it (home.css).
+ * card stay sky and the list stops above them (home.css).
  */
-export function SkyBackdrop({ art, from, below, gap = 30, span = 220, band = 220 }: {
+export function SkyBackdrop({ art, from, below, gap = 30, span = 220, band = 190 }: {
   art: SkyArt; from?: number; below?: string; gap?: number; span?: number; band?: number;
 }) {
   useLayoutEffect(() => {
@@ -33,12 +33,15 @@ export function SkyBackdrop({ art, from, below, gap = 30, span = 220, band = 220
       const w = hr.width - L - R, h = hr.height - T - B;
       if (w <= 0 || h <= 0) return;
       const lowest = below ? Math.max(0, ...[...host.querySelectorAll(below)].map((e) => e.getBoundingClientRect().bottom)) : 0;
-      const start = below ? Math.min(Math.round((lowest || hr.top + T) - hr.top - T + gap), Math.round(h - band)) : (from ?? 0);
+      const under = below ? Math.round((lowest || hr.top + T) - hr.top - T + gap) : (from ?? 0);
+      // A list longer than the card keeps the last `band` px as sky, with the streak drawn inside it.
+      const banded = !!below && under > h - band;
+      const start = banded ? Math.round(h - band) : under;
       const key = [L, T, w, h, start].join(',');
       if (key === last) return;
       last = key;
       Object.assign(wrap.style, { left: `${L}px`, top: `${T}px`, width: `${w}px`, height: `${h}px` });
-      drawSky(canvas, art, { from: start, span, dpr: Math.min(2, window.devicePixelRatio || 1) });
+      drawSky(canvas, art, { from: start, span: banded ? 120 : span, curveTop: banded ? start - 60 : 0, dpr: Math.min(2, window.devicePixelRatio || 1) });
     };
     const later = () => { if (!frame) frame = requestAnimationFrame(paint); };
     paint();

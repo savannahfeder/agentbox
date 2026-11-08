@@ -68,7 +68,8 @@ const BAYER = [0, 32, 8, 40, 2, 34, 10, 42, 48, 16, 56, 24, 50, 18, 58, 26, 12, 
 
 /** Paints `art` into `canvas` at its CSS size. Dots start at `from` px and are
  *  fully in by `from + span`, dropping out in the ordered pattern above that. */
-export function drawSky(canvas: HTMLCanvasElement, art: SkyArt, { from, span, dpr = 2 }: { from: number; span: number; dpr?: number }) {
+/** `curveTop` lays the streak out in the card below that line instead of the whole card. */
+export function drawSky(canvas: HTMLCanvasElement, art: SkyArt, { from, span, dpr = 2, curveTop = 0 }: { from: number; span: number; dpr?: number; curveTop?: number }) {
   const W = canvas.clientWidth, H = canvas.clientHeight;
   if (!W || !H) return;
   canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
@@ -89,6 +90,7 @@ export function drawSky(canvas: HTMLCanvasElement, art: SkyArt, { from, span, dp
     return a + (b - a) * s + (c - a) * t + (a - b - c + d) * s * t;
   };
   const { y0, y1, bend, palette: P } = art;
+  const CH = H - curveTop;
   const S = Math.max(W, H);
   const dim = art.dim ?? 1, coreW = art.coreW ?? 0.022, hotW = art.hotW ?? 0.006, haloW = art.haloW ?? 0.2;
   const grain = art.grain ?? 0.16, peak = art.peak, fall = art.fall ?? 0.9;
@@ -100,7 +102,7 @@ export function drawSky(canvas: HTMLCanvasElement, art: SkyArt, { from, span, dp
     const gx = gc.getContext('2d');
     if (gx) {
       gx.scale(dpr, dpr);
-      const path = () => { gx.beginPath(); for (let xx = -40; xx <= W + 40; xx += 8) { const t = xx / W; const yy = (y0 + (y1 - y0) * t + bend * t * (1 - t)) * H; if (xx === -40) gx.moveTo(xx, yy); else gx.lineTo(xx, yy); } };
+      const path = () => { gx.beginPath(); for (let xx = -40; xx <= W + 40; xx += 8) { const t = xx / W; const yy = curveTop + (y0 + (y1 - y0) * t + bend * t * (1 - t)) * CH; if (xx === -40) gx.moveTo(xx, yy); else gx.lineTo(xx, yy); } };
       for (const [col, w, bl, dy] of art.glow) { gx.save(); gx.filter = `blur(${bl}px)`; gx.strokeStyle = col; gx.lineWidth = w; gx.lineCap = 'round'; gx.translate(0, dy); path(); gx.stroke(); gx.restore(); }
       gx.globalCompositeOperation = 'destination-in';
       const gr = gx.createLinearGradient(0, from, 0, from + span + 120);
@@ -119,8 +121,8 @@ export function drawSky(canvas: HTMLCanvasElement, art: SkyArt, { from, span, dp
     for (let i = 0; i < cols; i++) {
       const x = i * pitch;
       const t = x / W;
-      const cyv = (y0 + (y1 - y0) * t + bend * t * (1 - t)) * H;
-      const slope = ((y1 - y0) + bend * (1 - 2 * t)) * H / W;
+      const cyv = curveTop + (y0 + (y1 - y0) * t + bend * t * (1 - t)) * CH;
+      const slope = ((y1 - y0) + bend * (1 - 2 * t)) * CH / W;
       const d = ((cyv - y) / Math.sqrt(1 + slope * slope)) / S;
       const n = vn(i / 22, j / 22) * 0.6 + vn(i / 6, j / 6) * 0.4;
       const along = Math.max(0, 1 - Math.abs(t - peak) * fall);
