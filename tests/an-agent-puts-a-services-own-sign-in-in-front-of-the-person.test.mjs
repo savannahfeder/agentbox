@@ -25,7 +25,9 @@ import { liveLine } from '../renderer/src/live-line.ts';
 const { SignInCard } = await import('../renderer/src/components/SignInCard.tsx');
 
 const LINK = 'https://github.com/login/device';
-const MCP_LINK = (port) => `https://mcp.example.com/authorize?client_id=x&redirect_uri=${encodeURIComponent(`http://localhost:${port}/callback`)}&state=s1`;
+// An address in a link, never listened on: only the tests below that start a listener ask for a free port.
+const BACK = 33418;
+const MCP_LINK = (at = BACK) => `https://mcp.example.com/authorize?client_id=x&redirect_uri=${encodeURIComponent(`http://localhost:${at}/callback`)}&state=s1`;
 
 describe('what a sign-in ask may carry', () => {
   it('a service, its http or https link, and a code', () => {
@@ -43,7 +45,7 @@ describe('what a sign-in ask may carry', () => {
     expect(cleanSignInAnswer({ id: 's-abcdef12', said: 'maybe' })).toBeUndefined();
   });
   it('knows a link that sends the browser back to localhost, and one that does not', () => {
-    expect(comesBackTo(MCP_LINK(33418))).toEqual({ port: 33418, path: '/callback' });
+    expect(comesBackTo(MCP_LINK())).toEqual({ port: BACK, path: '/callback' });
     expect(comesBackTo(LINK)).toBeNull();
     expect(comesBackTo('https://x.test/a?redirect_uri=https%3A%2F%2Fx.test%2Fback')).toBeNull();
   });
@@ -96,11 +98,11 @@ describe('the sign_in tool', () => {
   it('hands back the address the browser landed on', async () => {
     const t = thread();
     const ts = await tools(t.id);
-    const waiting = call(ts, { service: 'Linear', url: MCP_LINK(4000) });
+    const waiting = call(ts, { service: 'Linear', url: MCP_LINK() });
     await new Promise((r) => setTimeout(r, 300));
     const ask = openSignIn(disk.readWorkItem(product.dir, t.id));
-    answer(t.id, { id: ask.id, said: 'landed', url: 'http://localhost:4000/callback?code=c&state=s1' }, 'system');
-    expect(await waiting).toMatchObject({ status: 'landed', url: 'http://localhost:4000/callback?code=c&state=s1' });
+    answer(t.id, { id: ask.id, said: 'landed', url: `http://localhost:${BACK}/callback?code=c&state=s1` }, 'system');
+    expect(await waiting).toMatchObject({ status: 'landed', url: `http://localhost:${BACK}/callback?code=c&state=s1` });
   });
 
   it('waits less than Codex\'s minute, and keeps waiting on the same ask', async () => {
@@ -165,7 +167,7 @@ describe('the card', () => {
     expect(html).toContain('>Not now<');
   });
   it('offers to take the landed address only for a cloud thread whose sign-in comes back to localhost', () => {
-    const ask = { id: 's-abcdef12', service: 'Linear', url: MCP_LINK(4000) };
+    const ask = { id: 's-abcdef12', service: 'Linear', url: MCP_LINK() };
     expect(draw(ask, true)).toContain('Page did not load after signing in?');
     expect(draw(ask, false)).not.toContain('Page did not load');
     expect(draw({ ...ask, url: LINK }, true)).not.toContain('Page did not load');
