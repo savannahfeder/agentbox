@@ -46,6 +46,8 @@ export function approveAsk(family: Pick<FileFamily, 'versions'> | null | undefin
 export function baseName(name: string): string;
 /** The key of the family a path belongs to, with \0 as /. */
 export function familyKeyOf(path: string): string;
+/** A file's identity across its versions: the same for plan.md and plan-v3.md. */
+export function familyOfName(file: unknown): string;
 export function familyName(family: Pick<FileFamily, 'versions'> | null | undefined, version: FileFamily['versions'][number] | null | undefined): string;
 export function approvalSince(family: Pick<FileFamily, 'versions'> | null | undefined, index: number, approvals: Array<{ file: string; by: string | null }> | null | undefined, nameOf: (id: string | null) => string): string | null;
 export function newestOfFamily(path: string, edits: Array<{ path: string }> | null | undefined): string;

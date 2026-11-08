@@ -41,6 +41,7 @@ import { api } from '../api';
 import { CodeFile } from './CodeFile';
 import { TableView, useTableSave } from './TableView';
 import { useLiveSession, useLiveTicket } from '../live/live-session';
+import { familyOfName } from '../../../shared/artifact-marks.mjs';
 import { isTablePath } from '../table-file';
 import { FilmPlayer } from './FilmPlayer';
 import { PdfPages } from './PdfPages';
@@ -161,6 +162,10 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
   const threadsFile = /^(?:\.\/)?designs\/[\w-]+\/[^/]+$/.test(src) && (kind === 'markdown' || kind === 'table') && !doc.readOnly;
   const liveTicket = useLiveTicket(threadsFile ? { product: doc.product, name: src.split('/').pop() ?? src } : null);
   const liveSession = useLiveSession(liveTicket);
+  const liveRef = useRef(liveSession);
+  liveRef.current = liveSession;
+  const family = familyOfName(src.split('/').pop() ?? src);
+  const shownFamily = useRef<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   // The address the frame points at, minted by main when it resolved the file.
   // An html page is served from its own origin so its pictures load; see
@@ -192,9 +197,14 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
 
   useEffect(() => {
     let live = true;
-    setResolved(null); setText(null); setMtime(0); setUrl(null); setChange(null);
-    setHere({ url: src, canBack: false, canForward: false, loading: true });
-    setWebFailed(null); setWebReady(false);
+    // A newer version of a live file is the same room: the words stay up and the editor keeps its place.
+    const sameLiveFile = !!liveRef.current && shownFamily.current === family;
+    shownFamily.current = family;
+    if (!sameLiveFile) {
+      setResolved(null); setText(null); setMtime(0); setUrl(null); setChange(null);
+      setHere({ url: src, canBack: false, canForward: false, loading: true });
+      setWebFailed(null); setWebReady(false);
+    }
     // A website is not looked for on disk: the address is the document.
     if (kind === 'website') { setFailed(null); setResolved(src); setUrl(src); return () => { live = false; }; }
     if (isLocalPreview(src)) { setFailed(null); setResolved(src); setUrl(src); return () => { live = false; }; }
@@ -454,7 +464,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
         ) : (
           <Beside aside={aside}>
             <DocText
-              key={resolved ?? doc.src}
+              key={liveSession ? `live:${family}` : (resolved ?? doc.src)}
               product={doc.product}
               src={doc.src}
               folder={resolved ? resolved.replace(/\/[^/]*$/, '') : null}

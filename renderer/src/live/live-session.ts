@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import * as Y from 'yjs';
 import { connectLive, type LiveConnection, type LiveState } from './client.mjs';
 import { api } from '../api';
+import { familyOfName } from '../../../shared/artifact-marks.mjs';
 import type { LiveRoomTicket } from '../types';
 
 const ROOM_WAIT_MS = 4000;
@@ -21,7 +22,8 @@ export interface LiveSession {
 /** The room a file opens in, asked of main once per file. Undefined while asking. */
 export function useLiveTicket(file: { product: string; project?: string | null; name: string } | null): LiveRoomTicket | null | undefined {
   const [ticket, setTicket] = useState<LiveRoomTicket | null | undefined>(file ? undefined : null);
-  const key = file ? `${file.product}\0${file.project ?? ''}\0${file.name}` : '';
+  // By the file's family, so a newer version of the same file stays in the same room.
+  const key = file ? `${file.product}\0${file.project ?? ''}\0${familyOfName(file.name)}` : '';
   useEffect(() => {
     if (!file) { setTicket(null); return undefined; }
     let gone = false;
