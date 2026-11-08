@@ -18,7 +18,7 @@ import { chromeIsUp, CHROME_HOLD, CHROME_REACH } from './full-screen-chrome';
 // followed by a refetch.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { cursorIndex, cursorMark, type CursorMark } from './cursor-follows';
+import { cursorAfterWait, cursorIndex, cursorMark, cursorWait, type CursorMark, type CursorWait } from './cursor-follows';
 import { createPortal, flushSync } from 'react-dom';
 import { readySkin, swapLook } from './look-switch';
 import type { AgentTurn, AnswerMode, Approval, CloudPlan, PermissionMode, Product, RepeatRule, RepeatShape, RunningSession, Snapshot, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
@@ -3044,11 +3044,15 @@ export default function App() {
   // moved (./cursor-follows). Worked out here, in the render, so the board
   // never sees one frame of the wrong card and scrolls to it.
   const drawnAt = useRef<CursorMark | null>(null);
+  // The row a Z is putting back (`undo`).
+  const cursorBack = useRef<CursorWait | null>(null);
   // Not while the keyboard is on a teammate's card: moving `selected` would
   // take it off that card.
-  const cursor = cursorIndex({ list, selected, last: cardSel ? null : drawnAt.current });
+  const putBack = cursorAfterWait({ list, wait: cursorBack.current, moved: !!cardSel || (!!drawnAt.current && selected !== drawnAt.current.index), now });
+  const cursor = putBack.index >= 0 ? putBack.index : cursorIndex({ list, selected, last: cardSel ? null : drawnAt.current });
   const current: WorkItem | undefined = list[cursor];
   useLayoutEffect(() => {
+    cursorBack.current = putBack.keep;
     // A drop just moved this thread; the cursor goes with it (`keepPlaces`).
     const dropped = selectAfterDrop.current;
     const at = dropped ? list.findIndex((i) => i.id === dropped) : -1;
@@ -5819,6 +5823,7 @@ export default function App() {
       // thread that she did it and took it back.
       const now = Date.now();
       leaveUndoMarks(pending.undid, now, now);
+      cursorBack.current = cursorWait(pending.item, now);
       // Opened in the same case as the late Z below (./undo-window): from a
       // task, because the action moved her off it. From a list it is already
       // back in front of her.
@@ -5880,6 +5885,8 @@ export default function App() {
     leaveUndoMarks(last.undid, from, Date.now());
     const restored = last.restore?.();
     const item = restoredItem(restored ?? null);
+    const backTo = item ?? last.brings;
+    if (backTo) cursorBack.current = cursorWait(backTo, Date.now());
     const shown = shownAfterUndo(restored, last.brings, { onATask: !!focused });
     // Say what the undo actually did, AND WHERE THE WORDS WENT, because the two
     // boxes are different places and she has to be told which one to look in. A
