@@ -11,11 +11,16 @@
 //
 // Now one walk per tree runs at a time and everyone waits on it, it reads two
 // folders at a time, and a walk that took long answers for ten times as long.
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+//
+// A review then found three ways that went wrong, each pinned below: a slow
+// walk's answer kept for minutes, a look that must be current handed a walk
+// begun before its file was written, and one folder read that never returns
+// holding every lookup on the tree for good.
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { resolveArtifact, HUNT_FRESH_MS } from '../main/artifact-path.mjs';
+import { resolveArtifact, HUNT_FRESH_MS, HUNT_KEPT_AT_MOST_MS, WALK_GIVES_UP_MS } from '../main/artifact-path.mjs';
 
 let root;
 let docs;
@@ -33,9 +38,11 @@ const gated = {
       reads.push(String(dir));
       open += 1;
       peak = Math.max(peak, open);
+      // Read first, then held: what a slow disk does to a folder already read.
       try {
+        const out = await fs.promises.readdir(dir, opts);
         if (held) await held;
-        return await fs.promises.readdir(dir, opts);
+        return out;
       } finally { open -= 1; }
     },
   },
@@ -73,15 +80,29 @@ describe('a walk still running', () => {
     expect(readsOf(docs)).toBe(1);
   });
 
-  it('is waited on by a look that must be current', async () => {
+  it('is waited on by a look that must be current, which then walks again and finds a file written meanwhile', async () => {
     hold();
     const first = find('a.png');
     await tick();
-    const current = find('b.png', { fresh: true });
+    fs.writeFileSync(path.join(docs, 'designs', 'w-7', 'new.png'), 'x');
+    const current = find('new.png', { fresh: true });
+    const alsoCurrent = find('new.png', { fresh: true });
     await tick();
     release();
-    await Promise.all([first, current]);
-    expect(readsOf(docs)).toBe(1);
+    const [, found, alsoFound] = await Promise.all([first, current, alsoCurrent]);
+    expect(found).toEqual({ ok: true, path: path.join(docs, 'designs', 'w-7', 'new.png') });
+    expect(alsoFound.ok).toBe(true);
+    expect(readsOf(docs)).toBe(2);
+  });
+
+  it('gives up on a folder read that never comes back, and the next lookup is not held by it', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      hold();
+      const stuck = find('a.png');
+      await vi.advanceTimersByTimeAsync(WALK_GIVES_UP_MS + 1);
+      expect((await stuck).ok).toBe(false);
+    } finally { vi.useRealTimers(); release(); }
   });
 
   it('reads at most two folders at a time', async () => {
@@ -98,7 +119,7 @@ describe('a walk that has finished', () => {
     expect(readsOf(docs)).toBe(2);
   });
 
-  it('a slow one answers for ten times as long as it took', async () => {
+  it('a slow one answers for longer than 5 s', async () => {
     hold();
     const first = find('a.png', { now: 1_000_000 });
     await new Promise((r) => setTimeout(r, 700));
@@ -106,7 +127,17 @@ describe('a walk that has finished', () => {
     await first;
     await find('b.png', { now: 1_000_000 + HUNT_FRESH_MS + 500 });
     expect(readsOf(docs)).toBe(1);
-    await find('c.png', { now: 1_000_000 + 8_000 });
+  });
+
+  it('but never past 30 s, however slow it was', async () => {
+    hold();
+    const first = find('a.png', { now: 1_000_000 });
+    await new Promise((r) => setTimeout(r, 3_100));
+    release();
+    await first;
+    await find('b.png', { now: 1_000_000 + HUNT_KEPT_AT_MOST_MS - 1 });
+    expect(readsOf(docs)).toBe(1);
+    await find('c.png', { now: 1_000_000 + HUNT_KEPT_AT_MOST_MS });
     expect(readsOf(docs)).toBe(2);
   });
 
