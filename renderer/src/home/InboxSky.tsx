@@ -2,7 +2,7 @@ import { useLayoutEffect } from 'react';
 import { drawSky, type SkyArt } from './sky';
 
 /**
- * The Inbox's sky, approved 2026-11-08: a soft band behind the header and a
+ * The Inbox's sky, approved 2026-11-08: the sky behind the header and a
  * faint one behind the foot of the list. Both lie under the rows, so the list
  * keeps every line. The header band is the foot band turned over, so the two
  * read as one sky (home.css .inbox-sky).

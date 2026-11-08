@@ -47,9 +47,9 @@ const LIGHT_SKIES: Sky[] = [
   { id: 'sage', name: 'Light green sky', dark: false, frame: '#e3e8e5', art: light(
     { core: [40, 160, 125], hot: [170, 215, 120], halo: [70, 135, 190], ember: [40, 120, 100] },
     [['rgba(90,150,200,0.30)', 280, 90, -130], ['rgba(80,185,150,0.40)', 120, 50, -10], ['rgba(190,225,140,0.55)', 34, 18, 0]]) },
-  { id: 'dusk-light', name: 'Light purple sky', dark: false, frame: '#ebe5e9', art: light(
-    { core: [240, 90, 160], hot: [255, 150, 150], halo: [130, 100, 225], ember: [200, 80, 150] },
-    [['rgba(170,140,240,0.30)', 260, 90, -120], ['rgba(255,150,195,0.42)', 120, 50, -10], ['rgba(255,185,170,0.50)', 34, 18, 0]]) },
+  { id: 'dusk-light', name: 'Light purple sky', dark: false, frame: '#e7e5ee', art: light(
+    { core: [165, 105, 235], hot: [215, 170, 250], halo: [110, 125, 235], ember: [145, 95, 210] },
+    [['rgba(140,150,240,0.30)', 260, 90, -120], ['rgba(175,130,240,0.40)', 120, 50, -10], ['rgba(215,180,250,0.50)', 34, 18, 0]]) },
 ];
 
 /** Every sky theme, in the order Settings and Command-K show them. */
