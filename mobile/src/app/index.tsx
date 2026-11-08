@@ -12,6 +12,7 @@ import { readDisplay, writeDisplay, filteredEmptyWords, updatedWords, type Displ
 import { InboxComposer } from '../ui/NewThreadForm';
 import { COUNT_GAP, filterCount, moreToTheRight, phoneBoard, shownTabs, TAB_GAP, TABS, tabsTighten, type Row, type TabId } from '../lib/tabs';
 import { evViewOf, keepEvView, myItems, type EvView } from '../lib/everything';
+import { agentChoices, type Harness } from '../lib/agent-filter';
 import { EverythingPlace } from '../ui/Everything';
 import { bottomTabs, type PlaceId } from '../lib/groups';
 import { useGroups } from '../state/groups';
@@ -320,12 +321,14 @@ export default function Threads() {
   // Remembered between launches, as the site keeps it in the page's storage.
   const [display, setDisplayRaw] = useState<Display>(() => readDisplay('inbox', appStore));
   const setDisplay = (d: Display) => { setDisplayRaw(d); writeDisplay('inbox', d, appStore); };
+  // Not kept between launches, as the desktop's filter is not.
+  const [agent, setAgent] = useState<Harness | null>(null);
   const order = useMemo(() => c.view.products.map((p) => p.slug), [c.view.products]);
-  const shown = useMemo(() => shownTabs(c.tabs, display, c.now, order), [c.tabs, display, c.now, order]);
-  const board = useMemo(() => (!teamMode && display.view === 'board' ? phoneBoard(c.view, c.tabs, display, c.now) : null), [teamMode, display, c.view, c.tabs, c.now]);
+  const shown = useMemo(() => shownTabs(c.tabs, display, c.now, order, agent), [c.tabs, display, c.now, order, agent]);
+  const board = useMemo(() => (!teamMode && display.view === 'board' ? phoneBoard(c.view, c.tabs, display, c.now, agent) : null), [teamMode, display, c.view, c.tabs, c.now, agent]);
   // Your card's board: your own threads, and what waits on you is Needs you, so it is no column (whose-board.ts).
   const mineBoard = useMemo(() => (onEverything && evView === 'board'
-    ? phoneBoard({ ...c.view, items: myItems(c.view.items) }, c.tabs, display, c.now).filter((col) => col.state !== 'waiting') : null), [onEverything, evView, display, c.view, c.tabs, c.now]);
+    ? phoneBoard({ ...c.view, items: myItems(c.view.items) }, c.tabs, display, c.now, agent).filter((col) => col.state !== 'waiting') : null), [onEverything, evView, display, c.view, c.tabs, c.now, agent]);
   const rowOf = useMemo(() => new Map(Object.values(c.tabs).flat().map((r) => [r.key, r])), [c.tabs]);
   const [picked, setPicked] = useState<Set<string> | null>(null);
   const [closing, setClosing] = useState(false);
@@ -355,7 +358,8 @@ export default function Threads() {
     try { await c.closeAll(rows.filter((r) => picked?.has(r.key)).map((r) => r.item)); setPicked(null); } finally { setClosing(false); }
   };
   const unfiltered: Display = { ...display, priorities: [], projects: [], updated: 'any', privacy: 'any' };
-  const clear = () => setDisplay(unfiltered);
+  const clear = () => { setDisplay(unfiltered); setAgent(null); };
+  const agents = agentChoices(board || mineBoard ? Object.values(c.tabs).flat() : c.tabs[tab], display, c.now, agent);
   const menuCount = () => {
     const drawnBoard = onEverything ? mineBoard : board;
     const wholeBoard = !drawnBoard ? null : onEverything
@@ -422,7 +426,7 @@ export default function Threads() {
       <TopBar title={teamMode ? 'Inbox' : 'Threads'} right={<>
         <IconButton label="Search threads" onPress={() => router.push('/search')}><Magnifier size={18} /></IconButton>
         {penUp && <IconButton label="New thread" onPress={() => router.push('/new')}><Pen size={18} tint={color.dim} /></IconButton>}
-        <ViewButton display={display} open={menu} onPress={() => setMenu(!menu)} />
+        <ViewButton display={display} agent={agent} open={menu} onPress={() => setMenu(!menu)} />
         <IconButton label="Settings" onPress={() => router.push('/settings')}><Gear /></IconButton>
       </>} below={board ? undefined : <Tabs on={onEverything ? 'everything' : tab} counts={counts} pick={setPlace} team={teamMode} />} />
       <StatusNotice message={c.status} />
@@ -449,7 +453,7 @@ export default function Threads() {
         })}>
         <Pen />
       </Pressable>}
-      {menu && <ViewMenu display={headerDisplay} onDisplay={onHeaderDisplay} products={c.view.products} items={c.view.items} {...menuCount()} tab={tab} close={() => setMenu(false)}
+      {menu && <ViewMenu display={headerDisplay} onDisplay={onHeaderDisplay} agent={agent} agents={agents} onAgent={setAgent} products={c.view.products} items={c.view.items} {...menuCount()} tab={tab} close={() => setMenu(false)}
         onSelect={rows.length && !board ? () => { setMenu(false); setPicked(new Set()); } : undefined} />}
     </Wall>
     </Picking.Provider>

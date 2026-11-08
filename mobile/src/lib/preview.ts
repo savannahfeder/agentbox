@@ -49,7 +49,7 @@ export function previewRows(now = Date.now()): PhoneRows {
         { ts: at(70), source: 'founder', patch: { body: roundAsk } },
         { ts: at(9), source: 'agent', patch: { status: 'blocked', note: roundNote } },
       ], { attached }),
-      thread('site', { id: 'w-3c4d5e6f7a', title: 'Show when each account limit resets', status: 'done', priority: 0, body: 'I need to see when my limits reset.', result: meterResult, createdAt: at(200), updatedAt: at(52), wrote: { body: her(at(200)), status: agent(at(52)), result: agent(at(52)) } }, [
+      thread('site', { id: 'w-3c4d5e6f7a', title: 'Show when each account limit resets', status: 'done', priority: 0, engine: 'codex', body: 'I need to see when my limits reset.', result: meterResult, createdAt: at(200), updatedAt: at(52), wrote: { body: her(at(200)), status: agent(at(52)), result: agent(at(52)) } }, [
         { ts: at(200), source: 'founder', patch: { body: 'I need to see when my limits reset.' } },
         { ts: at(52), source: 'agent', patch: { status: 'done', result: meterResult } },
       ]),
