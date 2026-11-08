@@ -8729,8 +8729,8 @@ export default function App() {
           onPaneChange={setSettingsAt}
           look={pickedLook ?? look}
           onSetLook={chooseLook}
-          onSkyTheme={chooseSkyTheme}
           keyHints={keyHints}
+          onSkyTheme={chooseSkyTheme}
           onSetKeyHints={setHints}
           tune={tune}
           onSetTune={setTune}
