@@ -42,6 +42,8 @@ export interface UsageLimit {
   resetsOn: string | null;
   resetsAt: number | null;
   zone: string | null;
+  /** A five hour window that started over after this reading: its new figure is unread. */
+  reset?: boolean;
 }
 
 /** One live session as `Supervisor#status` reports it. Only the engine is read;
@@ -287,6 +289,22 @@ export function limitsStillRunning(limits: UsageLimit[] | null | undefined, now 
   return (limits ?? []).filter((l) => !Number.isFinite(l?.resetsAt) || l.resetsAt! + JUST_RESET_MS > now);
 }
 
+/**
+ * WHAT THE PANEL AND THE SIDEBAR DRAW: the windows still running, plus the five
+ * hour window if it ended while another still runs, marked `reset` and with no
+ * percent. Dropping it hid the window a person checks before starting agents,
+ * and let the sidebar's one figure become the week's (QA batch 011, F-166, F-193).
+ */
+export function limitsToShow(limits: UsageLimit[] | null | undefined, now = Date.now()): UsageLimit[] {
+  const running = limitsStillRunning(limits, now);
+  if (!running.length) return running;
+  return (limits ?? []).flatMap((l) => {
+    if (running.includes(l)) return [l];
+    if (l.span !== 'session') return [];
+    return [{ ...l, percent: Number.NaN, resetsAt: null, resetsText: null, resetsOn: null, reset: true }];
+  });
+}
+
 /* ------------------- whether a reading can be believed -------------------- */
 // Claude Code says which folder it read and never which login it signed in
 // with, so a reading can carry another account's numbers under this one's
@@ -416,15 +434,15 @@ export function resetDay(at: number, now = Date.now()): string | null {
 export function limitRows(
   limits: UsageLimit[] | null | undefined,
   now = Date.now(),
-): { key: string; name: string; used: number; when: string | null }[] {
+): { key: string; name: string; used: number | null; when: string | null }[] {
   const here = localZone();
-  return limitsStillRunning(limits, now).map((l) => ({
+  return limitsToShow(limits, now).map((l) => ({
     // Stable across redraws, and it has to carry the qualifier: Claude Code's
     // two week rows are otherwise the same string.
     key: `${l.span}:${l.qualifier ?? ''}`,
     name: l.name,
-    used: l.percent,
-    when: whenItStartsOver(l, now, here),
+    used: l.reset ? null : l.percent,
+    when: l.reset ? null : whenItStartsOver(l, now, here),
   }));
 }
 
@@ -457,9 +475,10 @@ export function usageSentence(
   now = Date.now(),
   engineWord: string | null = null,
 ): string | null {
-  const live = limitsStillRunning(limits, now);
+  const live = limitsToShow(limits, now);
   if (!live.length) return null;
   const said = live.map((l) => {
+    if (l.reset) return `${l.name}: reset since the last reading.`;
     const when = l.resetsAt ? `, ${untilReset(l.resetsAt - now)}` : l.resetsText ? `, resets ${l.resetsText}` : '';
     return `${l.name}: ${l.percent}% used${when}.`;
   }).join(' ');

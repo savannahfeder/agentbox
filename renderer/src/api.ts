@@ -583,6 +583,16 @@ export const api = {
         base.supervisor.queued = queued;
         base.supervisor.capacity = base.supervisor.running.filter((r) => (r as { where?: string }).where !== 'cloud').length;
       }
+      // &usagestale: a Codex reading six hours old whose five hour window has ended.
+      if (params.has('usagestale')) {
+        const now = Date.now();
+        const limits = [
+          { span: 'session' as const, qualifier: null, name: 'This session', percent: 2, resetsText: null, resetsOn: null, resetsAt: now - 60 * 60_000, zone: null },
+          { span: 'week' as const, qualifier: null, name: 'This week', percent: 30, resetsText: null, resetsOn: null, resetsAt: now + (3 * 24 + 16) * 3_600_000, zone: null },
+        ];
+        base.usage = { engine: 'codex', limits, at: now - 6 * 3_600_000 };
+        base.usageByEngine = [base.usage];
+      }
       return fixtureSecondEngine(base, engineFixtures);
     }
     // A document's holder thread is the app's, so no list of threads draws it.

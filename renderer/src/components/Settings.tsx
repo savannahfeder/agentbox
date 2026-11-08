@@ -1612,6 +1612,9 @@ function ProjectTitle({ project, onRename }: {
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditing(true); } }}
       >
         {project.name}
+        {/* Projects promises "open it to rename it", and a title that only
+            lights under the pointer was never found (QA batch 011, F-172). */}
+        <svg className="set-title-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /></svg>
       </h1>
     );
   }

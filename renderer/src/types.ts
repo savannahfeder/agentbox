@@ -819,6 +819,8 @@ export interface UsageLimit {
    *  Then the clock time is printed instead, or nothing. */
   resetsAt: number | null;
   zone: string | null;
+  /** A five hour window that started over after this reading (shared/usage.mts `limitsToShow`). */
+  reset?: boolean;
 }
 
 /** The Agentbox Cloud plan this Mac is signed in to, as the cloud server counts it. */

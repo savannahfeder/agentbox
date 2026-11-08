@@ -176,6 +176,7 @@ export type FoldingItem = Omit<WorkItem, 'claimExpired'> & {
   said?: Said[];
   closes?: Close[];
   closedFrom?: { at: number; by: string | null };
+  snoozedFrom?: { at: number; by: string | null };
 };
 
 export interface WorkItemLine {
@@ -852,6 +853,7 @@ export function finishItem(raw: FoldingItem, now = Date.now()): WorkItem {
     delete item.artifactLines;
   }
   delete item.closedFrom;
+  delete item.snoozedFrom;
   const closes = item.closes;
   delete item.closes;
   const editLines = item.editLines;
@@ -1033,13 +1035,21 @@ export function foldRawInto(items: Map<string, FoldingItem>, lines: unknown, tou
     // by whoever closed it, with no news between, sets `placedAt` to where the
     // close found the row, and the lists sort on it. `updatedAt` still only
     // moves forward: team sync and the caches read it as "something changed".
-    const bareStatus = line.source === 'founder' && Object.keys(patch).length === 1 ? patch.status : undefined;
+    // Later taken straight back is the same: a bare `snoozedUntil` of 0.
+    const bare = line.source === 'founder' && Object.keys(patch).length === 1;
+    const bareStatus = bare ? patch.status : undefined;
+    const bareLater = bare && 'snoozedUntil' in patch ? Number(patch.snoozedUntil) || 0 : undefined;
     if (bareStatus === 'open' && item.closedFrom && item.closedFrom.by === line.by) {
       item.placedAt = item.closedFrom.at;
       delete item.closedFrom;
+    } else if (bareLater === 0 && item.snoozedFrom && item.snoozedFrom.by === line.by) {
+      item.placedAt = item.snoozedFrom.at;
+      delete item.snoozedFrom;
     } else if (!isNotNews(line)) {
       if (bareStatus === 'done') item.closedFrom ??= { at: item.placedAt ?? item.updatedAt, by: line.by };
       else delete item.closedFrom;
+      if (bareLater !== undefined && bareLater > 0 && !item.snoozedFrom) item.snoozedFrom = { at: item.placedAt ?? item.updatedAt, by: line.by };
+      else delete item.snoozedFrom;
       delete item.placedAt;
     }
     if (!isNotNews(line)) item.updatedAt = Math.max(item.updatedAt, line.ts);

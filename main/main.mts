@@ -53,6 +53,7 @@ import { keepThePageAlive } from './when-the-page-stops.mts';
 import { createAnalytics, createDailyCount } from './analytics.mts';
 import { createUpdater } from './updater.mts';
 import { quitStep, flushBeforeQuit, quitThenExit } from './quit-sequence.mts';
+import { askBeforeClosingWhileWorking } from './close-while-working.mts';
 import { createPlace } from '../shared/where-it-runs-from.mts';
 import { createSourceUpdater } from './source-updater.mts';
 import { learnShellDataDirs, recoverShellPath } from './shell-path.mts';
@@ -1305,6 +1306,8 @@ async function createWindow() {
       quitThenExit(app, { what: 'the screenshot run' });
     }, Number(process.env.ZERO_SCREENSHOT_DELAY_MS ?? 2500));
   }
+
+  askBeforeClosingWhileWorking({ app, window, dialog, working: () => supervisor._load(), name: Name });
 
   window.on('closed', () => {
     supervisor.stop();
