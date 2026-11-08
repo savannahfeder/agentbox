@@ -30,6 +30,12 @@ export interface ClaudeInput {
   control(request: Record<string, unknown>, timeoutMs?: number): Promise<ControlResult>;
   interrupt(): Promise<{ interrupted: boolean }>;
   steer(text: string): Promise<{ accepted: boolean }>;
+  /** Keep input open this long after each finished turn, for the next message. */
+  waitAfterTurns(ms: number): void;
+  /** Between turns, waiting for the next message. */
+  waitingForNext(): boolean;
+  /** End the wait now: input closes as it would have at the turn's end. */
+  stopWaiting(): void;
   lastInterruptAt?: number;
   endedInHost?: boolean;
 }
@@ -122,9 +128,32 @@ export function attachClaudeInput<C extends PipedChild>(child: C & ClaudeInput):
   // Claude replays it only when that turn first speaks. Send now must not cut
   // that turn: it was the answer (w-0202576e73).
   let inTurn = false;
+  // BETWEEN TURNS, WAITING FOR THE NEXT MESSAGE (`waitAfterTurns`). A cloud
+  // run that closed its input here ended, and the next reply paid a whole new
+  // machine, about two minutes, before the agent read it.
+  let waitMs = 0, between = false, betweenTimer: NodeJS.Timeout | null = null;
   // `end` answers false in the run host while an app is attached and closing is the app's to do.
-  const closeInput = () => { if ((child.stdin.end() as unknown) === false) return; closed = true; ended = true; clearTimeout(wakeTimer ?? undefined); };
+  const closeInput = () => {
+    if ((child.stdin.end() as unknown) === false) return;
+    closed = true; ended = true; between = false;
+    clearTimeout(wakeTimer ?? undefined); clearTimeout(betweenTimer ?? undefined);
+  };
   const mayClose = () => !held && atResult && !pending.size && !waiting.length;
+  const endTurn = () => {
+    if (!waitMs) { closeInput(); return; }
+    if (between) return;
+    between = true;
+    betweenTimer = setTimeout(() => { between = false; if (mayClose() && !closed) closeInput(); }, waitMs);
+    betweenTimer.unref?.();
+    // After this line's other readers, so the session already holds the result.
+    setImmediate(() => { if (between) child.emit('turn-over'); });
+  };
+  const nextTurn = () => {
+    if (!between) return;
+    between = false;
+    clearTimeout(betweenTimer ?? undefined);
+    child.emit('next-turn');
+  };
   // Not into a session she is driving, and not when her own message is about
   // to start the next turn. Kept out of `pending`, so it never holds input open.
   const nameWhatIsStillOut = () => {
@@ -138,6 +167,7 @@ export function attachClaudeInput<C extends PipedChild>(child: C & ClaudeInput):
   };
   const fail: (reason: string) => void = reason => {
     closed = true;
+    clearTimeout(betweenTimer ?? undefined);
     for (const request of pending.values()) {
       clearTimeout(request.timer);
       request.reject(turnClosed(reason));
@@ -173,7 +203,8 @@ export function attachClaudeInput<C extends PipedChild>(child: C & ClaudeInput):
         inTurn = true;
         for (const request of pending.values()) request.taken = true;
       }
-      if (event.type === 'assistant') { atResult = false; inTurn = true; }
+      // The agent speaking again unasked (a background job woke it) is a turn too.
+      if (event.type === 'assistant') { atResult = false; inTurn = true; nextTurn(); }
       if (event.type === 'user' && !event.parent_tool_use_id && typeof event.uuid === 'string' && !seenUsers.has(event.uuid)) {
         seenUsers.add(event.uuid);
         const content = event.message?.content;
@@ -195,14 +226,14 @@ export function attachClaudeInput<C extends PipedChild>(child: C & ClaudeInput):
         // wake that never comes, so a session cannot sit open forever.
         clearTimeout(wakeTimer ?? undefined);
         if (!waiting.length && atResult && !closed) {
-          wakeTimer = setTimeout(() => { if (mayClose() && !closed) closeInput(); }, WAKE_GRACE_MS);
+          wakeTimer = setTimeout(() => { if (mayClose() && !closed) endTurn(); }, WAKE_GRACE_MS);
           wakeTimer.unref?.();
         }
       }
       if (event.type === 'result') {
         atResult = true;
         inTurn = false;
-        if (mayClose()) closeInput();
+        if (mayClose()) endTurn();
         else if (waiting.length) nameWhatIsStillOut();
       }
     }
@@ -216,7 +247,16 @@ export function attachClaudeInput<C extends PipedChild>(child: C & ClaudeInput):
   });
   child.inputState = () => ({ atResult, waiting: [...waiting], closed });
   child.waitingOn = () => [...waiting];
-  child.ranToTheEnd = () => ended || !!child.endedInHost;
+  // Between turns counts: the answer is out and nothing is left running.
+  child.ranToTheEnd = () => ended || between || !!child.endedInHost;
+  child.waitAfterTurns = (ms) => { waitMs = Math.max(0, Number(ms) || 0); };
+  child.waitingForNext = () => between;
+  child.stopWaiting = () => {
+    if (!between) return;
+    between = false;
+    clearTimeout(betweenTimer ?? undefined);
+    if (mayClose() && !closed) closeInput();
+  };
   child.holdInput = value => {
     if (closed && value) throw Error('This session has ended. Open remote control again to resume it.');
     held = !!value;
@@ -258,6 +298,7 @@ export function attachClaudeInput<C extends PipedChild>(child: C & ClaudeInput):
     pending.set(uuid, { resolve, reject, taken: !inTurn });
     try {
       child.stdin.write(JSON.stringify({ type: 'user', uuid, message: { role: 'user', content: text }, parent_tool_use_id: null, session_id: '' }) + '\n');
+      nextTurn();
     } catch (error) {
       pending.delete(uuid);
       reject(turnClosed((error as Error)?.message || 'The agent input connection closed.'));
