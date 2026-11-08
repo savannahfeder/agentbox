@@ -23,7 +23,7 @@ import type { Choices, Press } from '../../../lib/actions';
 import { useDraft } from '../../../lib/drafts';
 import { typedWords } from '../../../lib/files';
 import { threadOf, type FiledRow, type Thread } from '../../../lib/thread';
-import { askUnderAnswer, CHOICES_FOLDED, foldKey, foldedKeys, pageOf, splitHeadline, spotIn, stepIn, toggleFold } from '../../../lib/one-page';
+import { askUnderAnswer, CHOICES_FOLDED, foldKey, foldedKeys, pageOf, splitHeadline, spotIn, stepIn, toggleFold, walkKeeping } from '../../../lib/one-page';
 import { mateOf } from '../../../lib/teammates';
 import { TeammateMark } from '../../../ui/Teammates';
 import { screenGate } from '../../../lib/thread-gate';
@@ -328,6 +328,7 @@ export default function ThreadScreen() {
   const footList = useRef(0);
   // A page opens on its name; only a conversation with no answer yet opens at its end, to follow it.
   const placedOn = useRef<string | null>(null);
+  const walked = useRef<typeof c.tabs.inbox>([]);
 
   const back =() => (router.canGoBack() ? router.back() : router.replace('/'));
   const gate = screenGate(c);
@@ -349,9 +350,12 @@ export default function ThreadScreen() {
     resting.current = !page.answer && !thread.outcome && page.from === 0;
   }
   // Its place in Needs you, with the arrows that walk it (OneThingAtATime.tsx `QueueNav`).
-  const spot = spotIn(c.tabs.inbox, { product: String(product), id: String(id) });
+  const here = { product: String(product), id: String(id) };
+  const walk = walkKeeping(c.tabs.inbox, here, walked.current);
+  walked.current = walk;
+  const spot = spotIn(walk, here);
   const step = (dir: 1 | -1) => {
-    const to = stepIn(c.tabs.inbox, { product: String(product), id: String(id) }, dir);
+    const to = stepIn(walk, here, dir);
     if (to) router.setParams({ product: to.product, id: to.id });
   };
   const roundKey = foldKey(item);
