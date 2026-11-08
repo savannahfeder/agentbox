@@ -42,7 +42,7 @@ import { InstructionSettings, sizeLabel } from './InstructionSettings';
 import { EVERY } from '../instruction-scope';
 import type {AccountUsageReading, Usage, UsageLimit, WorkspaceSettings} from '../types';
 import { accountLabel, cloudAccountInUse, cloudToggleTarget, countedAccounts, type CloudStatus } from '../cloud-menu';
-import { cloudBilling, planSummary, type PaidPlan } from '../cloud-upgrade';
+import { cloudBilling, planKey, planSummary, type PaidPlan } from '../cloud-upgrade';
 import { keyLooksWrong } from '../key-asks';
 import { CloudPlanCards } from './CloudPlanCards';
 import type { CloudPlan } from '../types';
@@ -977,7 +977,7 @@ function CloudPlansPage({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: (
     const t = setInterval(async () => {
       n += 1;
       const p = await read();
-      if (p.plan !== was || n > 60) { setWaitingFor(null); setChosen(null); clearInterval(t); }
+      if (planKey(p) !== was || n > 60) { setWaitingFor(null); setChosen(null); clearInterval(t); }
     }, 5000);
     return () => clearInterval(t);
   }, [waitingFor]);
@@ -991,7 +991,16 @@ function CloudPlansPage({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: (
     if (!out.ok) { setSaid(out.message || 'Stripe could not be opened. Try again.'); return; }
     setChosen(id);
     setSwitching(out.where === 'billing');
-    setWaitingFor(plan?.plan ?? 'none');
+    setWaitingFor(planKey(plan));
+  };
+  const [teamOpening, setTeamOpening] = useState(false);
+  const payForTeam = async () => {
+    setSaid(null); setTeamOpening(true);
+    const out = await api.cloudAccountPay('team');
+    setTeamOpening(false);
+    if (!out.ok) { setSaid(out.message || 'Stripe could not be opened. Try again.'); return; }
+    setSwitching(out.where === 'billing');
+    setWaitingFor(planKey(plan));
   };
   const [switching, setSwitching] = useState(false);
   const [billSaid, setBillSaid] = useState<string | null>(null);
@@ -1029,12 +1038,13 @@ function CloudPlansPage({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: (
               <div className="bill-price">{sum.price} · {billSaid ?? sum.who}</div>
             </div>
             {sum.manage && <button type="button" className="set-ghost" onClick={() => void billing()}>Manage billing</button>}
+            {sum.teamPay && <button type="button" className="set-ghost" disabled={teamOpening || !!waitingFor} onClick={() => void payForTeam()}>{teamOpening ? 'Opening Stripe…' : sum.teamPay}</button>}
           </div>
         </Group>
         <Group id="cloud-use" label={sum.period} bare>
           <div className="bill-meters">{meter('Agents in the cloud', sum.agents)}{meter(sum.hours.label, sum.hours)}</div>
         </Group>
-        <Group id="cloud-plans" label={sum.change} bare><div className="bill-cards">{cards}</div></Group>
+        {sum.change && <Group id="cloud-plans" label={sum.change} bare><div className="bill-cards">{cards}</div></Group>}
         {lines}
       </Page>
     );

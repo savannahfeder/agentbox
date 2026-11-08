@@ -11,6 +11,8 @@ import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { PLANS, TEAM } from '../cloud/gateway/plans.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
 import { supabaseRest, teamsFrom } from '../cloud/gateway/phone.mjs';
+import { cloudPlanOf } from '../main/cloud/account.mts';
+import { planKey, planSummary } from '../renderer/src/cloud-upgrade.ts';
 
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';
@@ -204,6 +206,52 @@ describe('who is on a team, as the database says', () => {
     t = 61_000;
     await teams(A);
     expect(asked).toHaveLength(4);
+  });
+});
+
+describe('what the app makes of it', () => {
+  const NOW = MADE + 5 * DAY;
+  const trial = { trial: true, endsAt: MADE + 14 * DAY, seats: 0, members: 3, owner: true, agents: 6, running: 2, hours: 30, usedSeconds: 8.5 * 3600 };
+  const server = (team, over = {}) => ({ plan: 'none', agents: 0, hoursPerMonth: 0, running: 2, usedSeconds: 0, free: { agents: 2, hours: 5, usedSeconds: 0 }, team, ...over });
+  const seen = (team, over) => ({ signedIn: true, ...cloudPlanOf(server(team, over)) });
+
+  it('a team with hours left reads as the team plan, with its agents and hours', () => {
+    expect(cloudPlanOf(server(trial))).toMatchObject({ plan: 'team', agents: 6, hoursPerMonth: 30, usedSeconds: 8.5 * 3600 });
+  });
+
+  it('a team whose hours are spent reads as the free hours left', () => {
+    expect(cloudPlanOf(server({ ...trial, usedSeconds: 30 * 3600 })).plan).toBe('free');
+  });
+
+  it('a plan of one\'s own reads as that plan, team or no team', () => {
+    expect(cloudPlanOf(server(trial, { plan: 'pro', agents: 10, hoursPerMonth: 400 })).plan).toBe('pro');
+  });
+
+  it('the trial says the days left and the hours left, and the owner can pay for every seat', () => {
+    expect(planSummary(seen(trial), NOW)).toMatchObject({
+      name: 'Team trial', price: '9 days left', who: '30 cloud hours shared by your team', manage: false, change: null,
+      teamPay: 'Pay for 3 seats · $120 a month',
+      agents: { line: '2 of 6 running' }, hours: { label: 'Hours left', line: '21.5 of 30' },
+    });
+  });
+
+  it('on its last day it says 1 day, never 0', () => {
+    expect(planSummary(seen(trial), MADE + 14 * DAY - 60_000).price).toBe('1 day left');
+  });
+
+  it('anyone but the owner is not offered to pay', () => {
+    expect(planSummary(seen({ ...trial, owner: false }), NOW).teamPay).toBeUndefined();
+  });
+
+  it('a paid team says its seats and price, and only its owner manages billing', () => {
+    const paid = { ...trial, trial: false, endsAt: null, seats: 3, agents: 30, hours: 1200, usedSeconds: 212 * 3600 };
+    expect(planSummary(seen(paid), NOW)).toMatchObject({ name: 'Team', price: '$120 a month', who: '3 seats, billed monthly by Stripe', manage: true, change: null, hours: { line: '988 of 1,200' } });
+    expect(planSummary(seen({ ...paid, owner: false }), NOW)).toMatchObject({ manage: false });
+    expect(planSummary(seen(paid), NOW).teamPay).toBeUndefined();
+  });
+
+  it('a trial becoming paid seats counts as a change, so the page reads again until it lands', () => {
+    expect(planKey(seen(trial))).not.toBe(planKey(seen({ ...trial, trial: false, seats: 3 })));
   });
 });
 

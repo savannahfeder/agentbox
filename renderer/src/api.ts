@@ -1646,12 +1646,18 @@ export const api = {
     if (useFixtures) {
       if (params.get('cloudplan') === 'pro') return { signedIn: true, plan: 'pro', unlimited: false, agents: 10, hoursPerMonth: 400, running: 6, usedSeconds: 88 * 3600 };
       if (params.get('cloudplan') === 'free') return { signedIn: true, plan: 'free', unlimited: false, agents: 2, hoursPerMonth: 5, running: 1, usedSeconds: 1.5 * 3600, billing: null };
+      // &cloudplan=team-trial|team: on a team of 3, its trial 9 days from its end, or 3 seats paid for.
+      if (params.get('cloudplan') === 'team-trial' || params.get('cloudplan') === 'team') {
+        const trial = params.get('cloudplan') === 'team-trial';
+        const team = { trial, endsAt: trial ? Date.now() + 9 * 86_400_000 : null, seats: trial ? 0 : 3, members: 3, owner: params.get('owner') !== '0', agents: trial ? 6 : 30, running: 2, hours: trial ? 30 : 1200, usedSeconds: (trial ? 8.5 : 212) * 3600 };
+        return { signedIn: true, plan: 'team', unlimited: false, agents: team.agents, hoursPerMonth: team.hours, running: 2, usedSeconds: team.usedSeconds, billing: null, team };
+      }
       if (params.get('cloudplan') === 'spent') return { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0, billing: null, free: { agents: 2, hours: 5, usedSeconds: 5 * 3600 } };
       return { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0 };
     }
     return (await (window.zero as any)?.cloudAccountPlan?.()) ?? { signedIn: false };
   },
-  async cloudAccountPay(plan: 'pro' | 'plus' | 'max'): Promise<{ ok: boolean; where?: 'checkout' | 'billing'; error?: string; message?: string }> {
+  async cloudAccountPay(plan: 'pro' | 'plus' | 'max' | 'team'): Promise<{ ok: boolean; where?: 'checkout' | 'billing'; error?: string; message?: string }> {
     const zero = window.zero as any;
     if (!zero?.cloudAccountPay) return { ok: false, message: RESTART_NOTE };
     return zero.cloudAccountPay({ plan });

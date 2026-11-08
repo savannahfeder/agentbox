@@ -3,7 +3,7 @@
 // card on the board when the computer is full and threads wait; the plans as
 // cards on Settings › Plan and Billing; the next plan up when this one has no room.
 // Drawn in components/List.tsx and components/CloudPlans.tsx.
-import { PLANS } from '../../cloud/gateway/plans.mjs';
+import { PLANS, TEAM } from '../../cloud/gateway/plans.mjs';
 import { Name } from '../../shared/product-name.mjs';
 import type { CloudStatus } from './cloud-menu';
 import type { CloudPlan } from './types';
@@ -14,6 +14,8 @@ const NAME: Record<PaidPlan, string> = { pro: 'Pro', plus: 'Plus', max: 'Max' };
 const n = (x: number) => x.toLocaleString('en-US');
 const paidOf = (plan: CloudPlan | null): PaidPlan | null => (ORDER.includes(plan?.plan as PaidPlan) ? (plan!.plan as PaidPlan) : null);
 const onFree = (plan: CloudPlan | null) => plan?.plan === 'free';
+/** What a payment changes: a plan, or a team's trial becoming paid seats. */
+export const planKey = (plan: CloudPlan | null) => `${plan?.plan ?? 'none'}${plan?.team?.trial ? ':trial' : ''}`;
 
 export interface OfferGo { label: string; act: 'sign-in' | 'plans' | 'cloud-on' | 'pay'; plan?: PaidPlan }
 export interface Offer { say: string; waiting: string; go: OfferGo | null }
@@ -76,14 +78,17 @@ export function planCards(plan: CloudPlan | null): PlanCard[] {
 
 export interface PlanSummary {
   name: string; price: string; who: string; manage: boolean;
-  /** Over the meters, and over the cards. */
-  period: string; change: string;
+  /** Over the meters, and over the cards; no cards on a team's plan, which its owner pays for. */
+  period: string; change: string | null;
+  /** The team's owner, on its trial: the button that pays for every seat. */
+  teamPay?: string;
   agents: { line: string; percent: number };
   hours: { label: string; line: string; percent: number };
 }
 
 /** The top of Settings › Plan and Billing: the plan paid for, and this month's agents and hours as meters. */
-export function planSummary(plan: CloudPlan | null): PlanSummary | null {
+export function planSummary(plan: CloudPlan | null, now = Date.now()): PlanSummary | null {
+  if (plan?.plan === 'team' && plan.team) return teamSummary(plan, plan.team, now);
   if (plan && onFree(plan)) return freeSummary(plan);
   // Spent free hours stay on the page as Free with none left, rather than vanishing.
   if (plan?.plan === 'none' && plan.free) return freeSummary({ ...plan, agents: plan.free.agents, hoursPerMonth: plan.free.hours, usedSeconds: plan.free.usedSeconds });
@@ -102,6 +107,28 @@ export function planSummary(plan: CloudPlan | null): PlanSummary | null {
       ? { line: `${running} running, no limit`, percent: 0 }
       : { line: `${running} of ${plan.agents ?? 0} running`, percent: Math.min(100, Math.round((running / Math.max(1, plan.agents ?? 1)) * 100)) },
     hours: { label: 'Hours used', line: `${n(Math.floor((plan.usedSeconds ?? 0) / 3600))} of ${n(hoursAll)} hours`, percent: usedPercent(plan) },
+  };
+}
+
+const hoursLeft = (hours: number, usedSeconds: number) => {
+  const left = Math.max(0, hours * 3600 - usedSeconds) / 3600;
+  // Rounded up, so it reads 0 only when a run can no longer start.
+  return { label: 'Hours left', line: `${Math.ceil(left * 10) / 10} of ${n(hours)}`, percent: hours > 0 ? Math.round((left / hours) * 100) : 0 };
+};
+
+// A team's hours are one pool for every member: its trial's, or its seats' this month.
+function teamSummary(plan: CloudPlan, team: NonNullable<CloudPlan['team']>, now: number): PlanSummary {
+  const days = team.endsAt ? Math.max(1, Math.ceil((team.endsAt - now) / 86_400_000)) : 0;
+  const seats = (k: number) => `${k} ${k === 1 ? 'seat' : 'seats'}`;
+  return {
+    name: team.trial ? 'Team trial' : 'Team',
+    price: team.trial ? `${days} ${days === 1 ? 'day' : 'days'} left` : `$${n(TEAM.dollarsPerSeat * team.seats)} a month`,
+    who: team.trial ? `${n(team.hours)} cloud hours shared by your team` : `${seats(team.seats)}, billed monthly by Stripe`,
+    manage: !team.trial && team.owner,
+    period: 'Usage', change: null,
+    ...(team.trial && team.owner ? { teamPay: `Pay for ${seats(team.members)} · $${n(TEAM.dollarsPerSeat * team.members)} a month` } : {}),
+    agents: { line: `${plan.running ?? 0} of ${team.agents} running`, percent: Math.min(100, Math.round(((plan.running ?? 0) / Math.max(1, team.agents)) * 100)) },
+    hours: hoursLeft(team.hours, team.usedSeconds),
   };
 }
 
