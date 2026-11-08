@@ -6,7 +6,7 @@ import { whereTheWorkStands } from './git-change.mjs';
 import { taskFolderPath } from './task-folders.mts';
 import { GROUPS } from '../shared/connections-catalog.mjs';
 import { projectSeenBy } from '../shared/thread-cards.mjs';
-import { createEngineSetup } from './engine-setup.mts';
+import { createEngineSetup, engineSetUpHere } from './engine-setup.mts';
 // IPC: a thin, typed-by-convention surface. The renderer asks; the main
 // process derives from files and answers. Pushes go one way: "state changed,
 // refetch." No state is cached on either side of the bridge.
@@ -70,7 +70,7 @@ import { readImportableThreads, readSearchableThreads } from './importable-threa
 import { readChatEnds } from './agent-sessions.mts';
 import { markImported } from '../shared/agent-import.mts';
 import { codexIdOf, importChoice, isCodexImportRow, isNotImportedRow } from '../shared/codex-import.mts';
-import { checkProjectFolder, chooserStartsIn } from '../shared/project-folder-check.mts';
+import { checkProjectFolder, chooserStartsIn, folderFromChooser } from '../shared/project-folder-check.mts';
 import { openFreshUser } from './fresh-user.mts';
 import { openDemo } from './demo.mts';
 import { AgentSchedule } from './agent-schedule.mts';
@@ -88,6 +88,7 @@ import { saveAttachments } from './save-attachments.mts';
 import { stageAttachment, stageAttachmentPart } from './stage-attachment.mts';
 import type { StagedPart } from './stage-attachment.mts';
 import { readRunTraces } from './run-traces.mjs';
+import { openInBrowser } from './open-in-browser.mts';
 import type { AnswerInput, ComposeInput, Store, StoreConfig } from './store.mts';
 import type { Supervisor, SupervisorConfig } from './supervisor.mts';
 import type { SettingsConfig } from './settings.mts';
@@ -211,6 +212,8 @@ interface FilesPlace {
   makeFolder(ask: { project?: string; name?: string; parent: string | null }): Promise<{ id?: string }>;
   renameFolder(ask: { id: string; name?: string }): Promise<{ id?: string }>;
   moveFile(ask: { key: string; folder: string | null }): Promise<{ id?: string }>;
+  newDocument(ask: { project: string; name: string; kind: 'document' | 'table'; folder: string | null }): Promise<{ key: string }>;
+  addFiles(ask: { project: string; folder: string | null; paths: string[] }): Promise<{ added: number; refused: string[]; keys: string[] }>;
   open(key: string): Promise<unknown>;
   edit(key: string, text?: string): Promise<{ ok: boolean } & Record<string, unknown>>;
   editOnThread(ask: { product: string; id: string; path: string; baseId?: string; text: string; taken?: unknown; since?: unknown }): { ok: boolean } & Record<string, unknown>;
@@ -1539,10 +1542,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     if (r.canceled || !r.filePaths?.length) return { path: null };
     // A chooser hands back whatever its location bar held, dots and all. The
     // folder a path names is what gets stored and what gets checked (F-123).
-    const picked = path.resolve(r.filePaths[0]);
-    const verdict = checkProjectFolder(picked, { home: os.homedir() });
-    if (!verdict.ok) return { path: null, refused: verdict.say };
-    return { path: picked };
+    return folderFromChooser(path.resolve(r.filePaths[0]), { home: os.homedir(), isDir });
   });
 
   // THE PICKER THE APP DRAWS ITSELF, for a tab that has no Mac dialog.
@@ -1974,6 +1974,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // finder is the recheck, so what gets installed lands on the config and the
   // rest of the app runs on it without a restart.
   const engineSetup = createEngineSetup({
+    setUpHere: engineSetUpHere,
     find: (engine: string) => {
       const finders: Record<string, (() => Promise<{ found: boolean | undefined; path: string | null | undefined; certain: boolean | undefined }>) | undefined> = {
         // `certain` travels with the answer, so a search that established
@@ -2568,7 +2569,11 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   ipcMain.handle('zero:open-artifact', async (_e, { product, src, mode, thread }: { product: string; src?: unknown; mode?: string; thread?: unknown }) => {
     const shell = await shellNow();
     if (typeof src !== 'string' || !src) return { ok: false, error: 'no path' };
-    if (/^https?:/.test(src)) { if (mode !== 'resolve') shell.openExternal(src); return { ok: true, opened: src } }
+    if (/^https?:/.test(src)) {
+      if (mode === 'resolve') return { ok: true, opened: src };
+      const opened = await openInBrowser(src, { shell });
+      return opened.ok ? { ok: true, opened: src } : opened;
+    }
     let found = await resolveArtifact({
       src,
       product,

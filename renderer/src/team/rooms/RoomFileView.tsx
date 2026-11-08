@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 import { marksOf } from '../../../../shared/artifact-marks.mjs';
 import { ArtifactView } from '../../components/ArtifactView';
 import type { LedgerLine } from '../../thread-history';
-import type { ArtifactMark, FileMarks, Person, RoomMessage } from '../../types';
+import type { ArtifactMark, FileMarks, Person, Room, RoomMessage } from '../../types';
 import type { ChatPerson } from './RoomChat';
 
 export interface RoomFiles {
@@ -20,8 +20,8 @@ const nameIn = (path: string) => path.replace(/^\.?\/?attachments\//, '');
 /** Where it opens: a file pressed in the chat, or the comment a Needs you row is about. */
 export interface RoomFileOpening { name?: string; note?: string | null; file?: string | null; at: number }
 
-export function RoomFileView({ messages, people, meId, opening, files, onNewVersion, onClose }: {
-  messages: RoomMessage[]; people: ChatPerson[]; meId: string | null; opening: RoomFileOpening; files: RoomFiles;
+export function RoomFileView({ room, messages, people, meId, opening, files, onNewVersion, onClose }: {
+  room: Room; messages: RoomMessage[]; people: ChatPerson[]; meId: string | null; opening: RoomFileOpening; files: RoomFiles;
   onNewVersion?: (name: string, text: string) => Promise<string | null>; onClose: () => void;
 }) {
   const lines = useMemo(() => messages.filter((m) => !m.deleted).map((m) => (
@@ -36,6 +36,6 @@ export function RoomFileView({ messages, people, meId, opening, files, onNewVers
     ...(opening.file ? { file: opening.file } : {}),
     at: opening.at,
   }), [opening]);
-  return <ArtifactView product="" lines={lines} marks={marks} me={meId} people={named}
+  return <ArtifactView product="" draftsAcross={`room:${room.id}`} lines={lines} marks={marks} me={meId} people={named}
     open={open} ownerOfRow={null} write={files.write} onNewVersion={onNewVersion} onClose={onClose} files={stage} />;
 }

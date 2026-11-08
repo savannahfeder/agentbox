@@ -89,15 +89,22 @@ export function shortPath(full: string, home?: string | null): string {
 
 /* --------------------------------- controls ------------------------------- */
 
-function Switch({ on, onChange, label, busy }: { on: boolean; onChange: (v: boolean) => void; label: string; busy?: boolean }) {
+// It flips on the click, not when the save answers: a slow answer read as a
+// click that did not land. Once the save settles it shows what was saved.
+export function Switch({ on, onChange, label, busy }: { on: boolean; onChange: (v: boolean) => void | Promise<unknown>; label: string; busy?: boolean }) {
+  const [want, setWant] = useState<boolean | null>(null);
+  const shown = want ?? on;
   return (
     <button
       type="button"
       role="switch"
-      aria-checked={on}
+      aria-checked={shown}
       aria-label={label}
-      className={`set-sw ${on ? 'on' : ''} ${busy ? 'busy' : ''}`}
-      onClick={() => onChange(!on)}
+      className={`set-sw ${shown ? 'on' : ''} ${busy ? 'busy' : ''}`}
+      onClick={() => {
+        setWant(!shown);
+        void Promise.resolve(onChange(!shown)).catch(() => {}).finally(() => setWant(null));
+      }}
     />
   );
 }
@@ -1605,6 +1612,9 @@ function ProjectTitle({ project, onRename }: {
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditing(true); } }}
       >
         {project.name}
+        {/* Projects promises "open it to rename it", and a title that only
+            lights under the pointer was never found (QA batch 011, F-172). */}
+        <svg className="set-title-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /></svg>
       </h1>
     );
   }

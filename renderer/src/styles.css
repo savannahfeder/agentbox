@@ -2314,9 +2314,14 @@ body {
    card had stopped earning its keep. See "ONE SURFACE" below for what replaced
    it and why. The list is untouched and still a card.
 */
+/* `clip`, not `hidden`: a hidden box can still be scrolled by code, and
+   anything poking out below the pane let a centred search match slide the
+   whole thread up, reply box and all. The `:is` outranks the team pages'
+   own `overflow: hidden` when a thread is open inside one. */
 .list-pane.pinned {
-  overflow: hidden; display: flex; flex-direction: column;
+  display: flex; flex-direction: column;
 }
+.list-pane.pinned:is(.pinned, .rm-open, .tq-open, .pl-open) { overflow: clip; }
 
 /* Design C, chosen 2026-08-13: taking the card away works best and also solves
    the full screen problem, while the inbox keeps its own UI and highlight. So
@@ -3648,6 +3653,9 @@ img.product-mark { object-fit: cover; opacity: 1; }
   place-items: center;
   padding-top: 0;
   padding-bottom: 25vh;
+  /* A click anywhere outside the box closes it, the title bar included. The
+     strip drawn after it stands down in workspace-navigation.css. */
+  -webkit-app-region: no-drag;
 }
 
 /* THE IMPORT CARD THAT ENDS SETUP WAS DRAWN DIMMED. Setup's veil is 299 and
@@ -5264,6 +5272,8 @@ img.product-mark { object-fit: cover; opacity: 1; }
   color: var(--text); background: none; outline: none;
 }
 .set-title-edit { cursor: text; }
+.set-title-pencil { width: 0.55em; height: 0.55em; margin-left: 0.35em; vertical-align: 0.02em; color: var(--text-faint); opacity: 0.7; }
+.set-title-edit:hover .set-title-pencil, .set-title-edit:focus-visible .set-title-pencil { color: var(--text); opacity: 1; }
 .set-title-edit:hover, .set-title-edit:focus-visible { background: var(--bg-hover); }
 .set-title-input { border-color: var(--accent); background: var(--bg); min-width: 12ch; }
 .set-title-row { display: flex; align-items: center; gap: 12px; }
@@ -8883,6 +8893,9 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .live-details pre { margin: 5px 0 12px; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.6 ui-monospace, monospace; }
 .live-action + .live-action, .live-recent { margin-top: 12px; }
 .live-details-label { margin-bottom: 6px; color: var(--text-faint); }
+/* The line holds its own label: `.focus-scroll` is not positioned, so without
+   this the label escaped the scroller and sat a long thread's height below the pane. */
+.live-brief { position: relative; }
 .live-announcement { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @media (hover: none) { .live-chevron { opacity: 1; } }
 /* Past tool batches are quiet text, with details revealed deliberately. */

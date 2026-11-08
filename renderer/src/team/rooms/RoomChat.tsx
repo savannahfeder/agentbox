@@ -274,7 +274,7 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
       onPutFile={calls.onPutFile} onPutFileFrom={calls.onPutFileFrom} sending={calls.sending} onNotice={onNotice}
       onEditLast={() => { const mine = myNewest(messages, meId, root?.id ?? null); if (mine) setEditing(mine.id); }}
       onSend={(body) => onSend(body, { inReplyTo: root?.id ?? null, mentions: mentionsIn(body, others) })} />
-    {viewing && calls.files && <RoomFileView messages={messages} people={people} meId={meId} opening={viewing} files={calls.files} onNewVersion={calls.onPutFile ? newVersion : undefined} onClose={() => setViewing(null)} />}
+    {viewing && calls.files && <RoomFileView room={room} messages={messages} people={people} meId={meId} opening={viewing} files={calls.files} onNewVersion={calls.onPutFile ? newVersion : undefined} onClose={() => setViewing(null)} />}
   </div>;
 }
 
