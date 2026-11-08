@@ -10,7 +10,7 @@
 // in tests, and behind a plain HTTP server (gatewayServer).
 import crypto from 'node:crypto';
 import http from 'node:http';
-import { FREE, PLANS, RUN_CEILING_MS, SIGNIN_CEILING_MS, SIGNINS_AT_ONCE } from './plans.mjs';
+import { FREE, PLANS, TEAM, RUN_CEILING_MS, SIGNIN_CEILING_MS, SIGNINS_AT_ONCE } from './plans.mjs';
 import { TERMS_VERSION } from './terms.mjs';
 import { LOGIN_NAME } from '../../shared/cloud-login-name.mjs';
 import { Name } from '../../shared/product-name.mjs';
@@ -58,6 +58,7 @@ const LINK_NOTE_MS = 60 * 60_000;
 // A cloud key unused this long is refused. Its use is noted at most once a
 // day, so a relay polling through a long run never ends its own key.
 const KEY_IDLE_MS = 30 * 24 * 60 * 60_000;
+const DAY_MS = 24 * 60 * 60_000;
 const KEY_USE_NOTE_MS = 24 * 60 * 60_000;
 // Only these save a sign-in; a run given a link that writes one could keep it.
 const SAVES_A_SIGNIN = new Set(['signin', 'renew']);
@@ -126,7 +127,9 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   phone = null,
   // The database (./phone.mjs supabaseRest), where who is subscribed is read
   // by the people it is about. Without it the cloud runs as it always has.
-  db = null }) {
+  db = null,
+  // The team someone is on, { id, createdAt, members, owners }, or null. Without it nobody is on a team.
+  teams = null }) {
   const termsRefusal = () => new Refusal(403, 'terms', `accept the terms of ${termsVersion} first`, { terms: termsVersion });
   const personKey = (person) => `ledger/people/${person}.json`;
   const deviceKey = (key) => `ledger/devices/${sha256(key)}.json`;
@@ -144,15 +147,48 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   const recOf = async (person) => ({ ...fresh(), ...(await readJson(personKey(person))) });
 
   const live = (rec, kind) => Object.values(rec.live).filter((s) => s.kind === kind);
+  // A run spends its person's plan, their team's hours (`s.team`) or their free hours (`s.free`).
+  const ownRuns = (rec) => live(rec, 'run').filter((s) => !s.free && !s.team);
   // A run going counts against this month only for its time in this month.
-  const usedNow = (rec, t) => (rec.used[month(t)] || 0) + live(rec, 'run').reduce((sum, s) => sum + (t - Math.max(s.at, monthStart(t))) / 1000, 0);
-  // With no plan, runs spend the free hours instead, which never come back.
+  const usedNow = (rec, t) => (rec.used[month(t)] || 0) + ownRuns(rec).reduce((sum, s) => sum + (t - Math.max(s.at, monthStart(t))) / 1000, 0);
+  // With no plan, runs spend the team's hours or the free hours, which never come back.
   const onFree = (rec) => !planOf(rec).agents;
   const freeUsedNow = (rec, t) => (rec.freeUsed || 0) + live(rec, 'run').filter((s) => s.free).reduce((sum, s) => sum + (t - s.at) / 1000, 0);
   const freeSpent = (rec, t) => freeUsedNow(rec, t) >= free.hours * 3600;
-  const overHours = (rec, t) => (onFree(rec) ? freeSpent(rec, t) : planOf(rec).hoursPerMonth != null && usedNow(rec, t) >= planOf(rec).hoursPerMonth * 3600);
-  // A run a cancelled plan started does not carry on on the free hours.
-  const outOfPlan = (rec, s) => onFree(rec) && !s.free;
+  const ownOver = (rec, t) => planOf(rec).hoursPerMonth != null && usedNow(rec, t) >= planOf(rec).hoursPerMonth * 3600;
+  // A team's runs are held to its hours by the sweep, which reads the other
+  // members; a run a cancelled plan started does not carry on.
+  const runOver = (rec, s, t) => (s.team ? false : s.free ? freeSpent(rec, t) : onFree(rec) || ownOver(rec, t));
+
+  // TEAMS. Each member's record keeps their share of the team's hours, and a
+  // team's use is the sum over its members, so no two members write one record.
+  const teamKey = (id) => `ledger/teams/${id}.json`;
+  const teamUsedOf = (rec, id, trial, t) => (trial ? rec.teamTrialUsed?.[id] || 0 : rec.teamUsed?.[id]?.[month(t)] || 0)
+    + live(rec, 'run').filter((s) => s.team === id && !!s.trial === trial).reduce((sum, s) => sum + (t - (trial ? s.at : Math.max(s.at, monthStart(t)))) / 1000, 0);
+  async function teamNow(person, t) {
+    if (!teams) return null;
+    const team = await teams(person);
+    if (!team?.id || !Array.isArray(team.members)) return null;
+    const bill = (await readJson(teamKey(team.id))) || {};
+    const seats = bill.plan === 'team' && PAYING.has(bill.stripe?.status) ? Math.max(0, Math.floor(Number(bill.seats)) || 0) : 0;
+    const endsAt = Number(team.createdAt) + TEAM.trialDays * DAY_MS;
+    const trial = !seats && t < endsAt;
+    if (!seats && !trial) return null;
+    const members = team.members.filter((m) => PERSON.test(m));
+    const others = await Promise.all(members.filter((m) => m !== person).map(recOf));
+    return {
+      id: team.id, trial, seats, endsAt: trial ? endsAt : null, members: members.length, owner: (team.owners || []).includes(person),
+      agents: seats ? seats * TEAM.agentsPerSeat : members.length * TEAM.trialAgentsPerMember,
+      seconds: (seats ? seats * TEAM.hoursPerSeat : members.length * TEAM.trialHoursPerMember) * 3600,
+      othersUsed: others.reduce((sum, o) => sum + teamUsedOf(o, team.id, trial, t), 0),
+      othersRunning: others.reduce((sum, o) => sum + live(o, 'run').filter((s) => s.team === team.id).length, 0),
+    };
+  }
+  // A team that cannot be read is no team for this start; the sweep leaves its runs alone.
+  const teamOrNone = (person, t) => teamNow(person, t).catch((err) => { log(`could not read ${person}'s team: ${err?.message || err}`); return null; });
+  const teamUsedAll = (tm, rec, t) => tm.othersUsed + teamUsedOf(rec, tm.id, tm.trial, t);
+  const teamLeft = (tm, rec, t) => !!tm && teamUsedAll(tm, rec, t) < tm.seconds;
+  const teamRunning = (tm, rec) => tm.othersRunning + live(rec, 'run').filter((s) => s.team === tm.id).length;
 
   // Ending a session in the ledger: its time charged to each month it ran
   // in, and, in the same write, its stop and its record owed. `update` makes
@@ -163,12 +199,17 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     rec.retired = { ...(rec.retired || {}), [sid]: at };
     const charged = s.kind === 'run' && why !== 'not-started';
     if (charged && s.free) rec.freeUsed = (rec.freeUsed || 0) + Math.max(0, (at - s.at) / 1000);
-    else if (charged) for (const [m, secs] of secondsByMonth(s.at, at)) rec.used[m] = (rec.used[m] || 0) + secs;
+    else if (charged && s.team && s.trial) rec.teamTrialUsed = { ...rec.teamTrialUsed, [s.team]: (rec.teamTrialUsed?.[s.team] || 0) + Math.max(0, (at - s.at) / 1000) };
+    else if (charged && s.team) {
+      const byMonth = { ...rec.teamUsed?.[s.team] };
+      for (const [m, secs] of secondsByMonth(s.at, at)) byMonth[m] = (byMonth[m] || 0) + secs;
+      rec.teamUsed = { ...rec.teamUsed, [s.team]: byMonth };
+    } else if (charged) for (const [m, secs] of secondsByMonth(s.at, at)) rec.used[m] = (rec.used[m] || 0) + secs;
     if (!stoppingOf(rec).some((e) => e.sid === sid)) rec.stopping = [...stoppingOf(rec), { sid, tries: 0 }];
     if (charged) {
       rec.unrecorded = [...(rec.unrecorded || []), {
         key: `ledger/runs/${ctx.person}/${month(at)}/${sid}-${s.at}.json`,
-        sessionId: sid, runId: s.runId, startedAt: s.at, endedAt: at, seconds: Math.max(0, Math.round((at - s.at) / 1000)), why, ...(s.free ? { free: true } : {}),
+        sessionId: sid, runId: s.runId, startedAt: s.at, endedAt: at, seconds: Math.max(0, Math.round((at - s.at) / 1000)), why, ...(s.free ? { free: true } : {}), ...(s.team ? { team: s.team } : {}),
       }];
     }
     ctx.ended.push(sid);
@@ -178,10 +219,9 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   function settle(rec, ctx, t) {
     rec.retired = Object.fromEntries(Object.entries(rec.retired || {}).filter(([, at]) => t - at < RETIRED_MS));
     for (const [sid, s] of Object.entries(rec.live)) if (t - s.at >= ceilingOf(s)) end(rec, ctx, sid, s.at + ceilingOf(s), 'ceiling');
-    const over = overHours(rec, t);
-    for (const [sid, s] of Object.entries(rec.live)) if (s.kind === 'run' && (over || outOfPlan(rec, s))) end(rec, ctx, sid, t, 'hours');
+    for (const [sid, s] of Object.entries(rec.live)) if (s.kind === 'run' && runOver(rec, s, t)) end(rec, ctx, sid, t, 'hours');
   }
-  const needsSettling = (rec, t) => Object.values(rec.live).some((s) => t - s.at >= ceilingOf(s)) || live(rec, 'run').some((s) => outOfPlan(rec, s)) || (live(rec, 'run').length > 0 && overHours(rec, t));
+  const needsSettling = (rec, t) => Object.values(rec.live).some((s) => t - s.at >= ceilingOf(s)) || live(rec, 'run').some((s) => runOver(rec, s, t));
 
   // Read, change and write one person's record; a write that lost a race
   // reads again, so two starts can never both take the last agent.
@@ -287,7 +327,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     }
   }
 
-  function summary(rec, t) {
+  function summary(rec, t, tm = null) {
     const plan = planOf(rec);
     return {
       plan: plans[rec.plan] ? rec.plan : 'none', unlimited: !!plan.unlimited, agents: plan.unlimited ? null : plan.agents, hoursPerMonth: plan.hoursPerMonth, running: live(rec, 'run').length, usedSeconds: rec.used[month(t)] || 0, month: month(t),
@@ -295,11 +335,31 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       terms: { accepted: rec.terms?.version ?? null, current: termsVersion },
       // Apart from the plan, so an app from before the free hours still reads no plan.
       ...(onFree(rec) ? { free: { agents: free.agents, hours: free.hours, usedSeconds: Math.min(free.hours * 3600, Math.round(rec.freeUsed || 0)) } } : {}),
+      ...(tm ? { team: {
+        trial: tm.trial, endsAt: tm.endsAt, seats: tm.seats, members: tm.members, owner: tm.owner, agents: tm.agents, running: teamRunning(tm, rec),
+        hours: tm.seconds / 3600, usedSeconds: Math.min(tm.seconds, Math.round(teamUsedAll(tm, rec, t))),
+      } } : {}),
     };
   }
 
+  // Why a run spending these hours cannot start now, or null when it can.
+  function paysRefusal(rec, plan, pays, team, t) {
+    if (pays === 'own') {
+      if (ownOver(rec, t)) return { ok: false, error: 'hours', message: `This month's ${plan.hoursPerMonth} cloud hours are used.` };
+      if (ownRuns(rec).length >= plan.agents) {
+        return { ok: false, error: 'agents', message: plan.unlimited ? `${plan.agents} cloud agents are running, the most one account can run at once.` : `All ${plan.agents} of your cloud agents are running.` };
+      }
+    } else if (pays === 'team') {
+      if (teamRunning(team, rec) >= team.agents) return { ok: false, error: 'agents', message: `All ${team.agents} of your team's cloud agents are running.` };
+    } else {
+      if (freeSpent(rec, t)) return { ok: false, error: 'plan', message: `${team ? 'Your team\'s cloud hours and your' : 'Your'} ${free.hours} free cloud hours are used. Choose a cloud plan to keep running agents there.` };
+      if (live(rec, 'run').filter((s) => s.free).length >= free.agents) return { ok: false, error: 'agents', message: 'Both of your free cloud agents are running.' };
+    }
+    return null;
+  }
+
   // Take a place for a session that is starting, or say why there is none.
-  function reserve(rec, ctx, sid, kind, runId, t, { paused }) {
+  function reserve(rec, ctx, sid, kind, runId, t, { paused, team = null }) {
     settle(rec, ctx, t);
     const was = rec.live[sid];
     // The same start asked again, because its answer was lost, is the same
@@ -311,23 +371,19 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     if (stoppingOf(rec).some((e) => e.sid === sid) || rec.retired?.[sid] !== undefined) return { ok: false, error: 'busy', message: 'this session has ended; a new run takes a new one' };
     // Changed terms hold back what begins something new; a run going finishes.
     if (rec.terms?.version !== termsVersion) return { ok: false, error: 'terms', terms: termsVersion, message: `accept the terms of ${termsVersion} first` };
+    // Which hours this run spends: the person's plan, then their team's, then their free hours.
+    let pays = null;
     if (kind === 'run') {
       const plan = planOf(rec);
       if (paused) return { ok: false, error: 'paused', message: 'The cloud is not starting new runs right now.' };
-      if (onFree(rec)) {
-        if (freeSpent(rec, t)) return { ok: false, error: 'plan', message: `Your ${free.hours} free cloud hours are used. Choose a cloud plan to keep running agents there.` };
-        if (live(rec, 'run').length >= free.agents) return { ok: false, error: 'agents', message: `Both of your free cloud agents are running.` };
-      } else {
-        if (overHours(rec, t)) return { ok: false, error: 'hours', message: `This month's ${plan.hoursPerMonth} cloud hours are used.` };
-        if (live(rec, 'run').length >= plan.agents) {
-          return { ok: false, error: 'agents', message: plan.unlimited ? `${plan.agents} cloud agents are running, the most one account can run at once.` : `All ${plan.agents} of your cloud agents are running.` };
-        }
-      }
+      pays = !onFree(rec) ? 'own' : teamLeft(team, rec, t) ? 'team' : 'free';
+      const refusal = paysRefusal(rec, plan, pays, team, t);
+      if (refusal) return refusal;
     } else if (live(rec, 'signin').length >= SIGNINS_AT_ONCE) {
       return { ok: false, error: 'signins', message: `${SIGNINS_AT_ONCE} sign-ins are already waiting.` };
     }
     const nonce = crypto.randomUUID();
-    rec.live[sid] = { kind, runId: typeof runId === 'string' ? runId : null, at: t, nonce, ...(kind === 'run' && onFree(rec) ? { free: true } : {}) };
+    rec.live[sid] = { kind, runId: typeof runId === 'string' ? runId : null, at: t, nonce, ...(pays === 'free' ? { free: true } : {}), ...(pays === 'team' ? { team: team.id, trial: team.trial } : {}) };
     return { ok: true, nonce, fresh: true };
   }
 
@@ -384,7 +440,8 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     let freshPlace = false;
     if (kind) {
       const sw = kind === 'run' ? await readJson(SWITCH) : null;
-      const verdict = await update(person, (rec, ctx) => reserve(rec, ctx, sessionId, kind, sent.runId, now(), { paused: !!sw?.paused }));
+      const team = kind === 'run' ? await teamOrNone(person, now()) : null;
+      const verdict = await update(person, (rec, ctx) => reserve(rec, ctx, sessionId, kind, sent.runId, now(), { paused: !!sw?.paused, team }));
       if (!verdict.ok) return verdict;
       ({ nonce } = verdict);
       freshPlace = !!verdict.fresh;
@@ -450,7 +507,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     if (op !== 'head' && key.startsWith('logins/') && !savesAKey) throw new Refusal(403, 'not-yours-to-touch', 'a sign-in is never read or written from a Mac');
     const s = Math.min(LINK_MAX_SECONDS, Math.max(60, Number(seconds) || LINK_MAX_SECONDS));
     if (op === 'put') {
-      if (onFree(rec) && freeSpent(rec, now())) throw new Refusal(403, 'plan', `Your ${free.hours} free cloud hours are used. Choose a cloud plan to keep running agents there.`);
+      if (onFree(rec) && freeSpent(rec, now()) && !teamLeft(await teamOrNone(person, now()), rec, now())) throw new Refusal(403, 'plan', `Your ${free.hours} free cloud hours are used. Choose a cloud plan to keep running agents there.`);
       if (rec.storage?.full) throw new Refusal(403, 'storage', `Your cloud storage is full (${gib(storageBytes)} GB). It empties as runs older than a week are deleted.`);
       const until = now() + s * 1000;
       if (!(rec.linksUntil >= until)) await update(person, (r) => { r.linksUntil = Math.max(r.linksUntil || 0, until + LINK_NOTE_MS); });
@@ -633,7 +690,10 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
         await accept(person);
         return { status: 200, body: { ok: true, terms: termsVersion } };
       }
-      if (route === 'GET /v1/me') return { status: 200, body: await update(person, (rec, ctx) => { settle(rec, ctx, now()); return summary(rec, now()); }) };
+      if (route === 'GET /v1/me') {
+        const tm = await teamOrNone(person, now());
+        return { status: 200, body: await update(person, (rec, ctx) => { settle(rec, ctx, now()); return summary(rec, now(), tm); }) };
+      }
       if (route === 'POST /v1/invoke') return { status: 200, body: await invoke(person, data) };
       if (route === 'POST /v1/stop') return { status: 200, body: await stop(person, data) };
       if (route === 'POST /v1/link') return { status: 200, body: await link(person, rec, data) };
@@ -668,12 +728,10 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     if (rec.disabled) return { ok: false, error: 'disabled' };
     if (rec.terms?.version !== termsVersion) return { ok: false, error: 'terms' };
     if ((await readJson(SWITCH))?.paused) return { ok: false, error: 'paused' };
-    const onTheFreeHours = onFree(rec);
-    if (onTheFreeHours && freeSpent(rec, t)) return { ok: false, error: 'plan' };
-    if (!onTheFreeHours && overHours(rec, t)) return { ok: false, error: 'hours' };
-    const running = live(rec, 'run').filter((s) => t - s.at < ceilingOf(s)).length;
-    if (running >= (onTheFreeHours ? free.agents : planOf(rec).agents)) return { ok: false, error: 'agents' };
-    return { ok: true };
+    const team = onFree(rec) ? await teamOrNone(person, t) : null;
+    const pays = !onFree(rec) ? 'own' : teamLeft(team, rec, t) ? 'team' : 'free';
+    const refusal = paysRefusal(rec, planOf(rec), pays, team, t);
+    return refusal ? { ok: false, error: refusal.error } : { ok: true };
   }
 
   const carry = phone ? createPhoneCarry({
@@ -691,7 +749,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     active: async (person, sessionId, runId) => {
       const r = await recOf(person);
       const s = r.live[sessionId];
-      return !r.disabled && s?.runId === runId && now() - s.at < ceilingOf(s) && !overHours(r, now());
+      return !r.disabled && s?.runId === runId && now() - s.at < ceilingOf(s) && !runOver(r, s, now());
     },
   }) : null;
   const phoneSweep = async () => {
@@ -714,9 +772,20 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       const there = await objects.head(`runs/u-${person}/${s.runId}/done.json`).catch(() => null);
       if (there) finished.add(s.runId);
     }
+    // A team's runs end once its hours are spent or its trial is over. A team
+    // that cannot be read leaves them running until a sweep that can.
+    const teamRuns = live(before, 'run').filter((s) => s.team);
+    let teamDone = false;
+    if (teamRuns.length) {
+      try {
+        const tm = await teamNow(person, t);
+        teamDone = !tm || teamRuns.some((s) => s.team !== tm.id) || !teamLeft(tm, before, t);
+      } catch (err) { log(`could not read ${person}'s team: ${err?.message || err}`); }
+    }
     const rec = await update(person, (r, ctx) => {
       settle(r, ctx, t);
       for (const [sid, s] of Object.entries(r.live)) if (s.kind === 'run' && finished.has(s.runId)) end(r, ctx, sid, t, 'done');
+      if (teamDone) for (const [sid, s] of Object.entries(r.live)) if (s.kind === 'run' && s.team) end(r, ctx, sid, t, 'hours');
       return r;
     });
     // Everything still owed, from this sweep or before it, is tried again; a
