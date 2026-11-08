@@ -1,7 +1,10 @@
 // What the bar under ticked threads offers, by the desktop's batch commands
 // (App.tsx `itemCommands` with a selection), and what each one's toast says.
 import { clipToSentence, hiddenUntil, rowTitle } from '../../../renderer/src/list-rules';
+import { priorityIdOf, priorityLabelOf, priorityValueOf } from '../../../renderer/src/priority';
+import type { Plan } from './actions';
 import type { TabId } from './tabs';
+import { shownLevel } from './thread-offers';
 
 export type PickedAct = 'close' | 'later' | 'read' | 'unread';
 
@@ -36,4 +39,39 @@ export function batchWords(press: { kind: 'close' } | { kind: 'later'; until: nu
     };
   }
   return { did: (n) => (n > 1 ? `${n} back in the inbox` : 'Back in the inbox'), undid: () => 'Returned to Later', partial: (done, of) => `${done} of ${of} back in the inbox.` };
+}
+
+// Threads the computer has made, and not an agent's own session (thread-offers.ts `made`).
+const made = (items: readonly any[]) => items.filter((i) => !i.agent && !i.waitsForMac);
+
+/** Resume agents: the ticked threads no agent is on, against how many are ticked. */
+export function pickedResume(items: readonly any[], working: (item: any) => boolean): { ids: string[]; of: number } | null {
+  const ids = made(items).filter((i) => !working(i)).map((i) => i.id);
+  return ids.length ? { ids, of: items.length } : null;
+}
+
+/** Priority, at the level every ticked thread shows, or none when they disagree. */
+export function pickedPriority(items: readonly any[]): { value: number | null } | null {
+  const levels = new Set(made(items).map(shownLevel));
+  if (!levels.size) return null;
+  return { value: levels.size === 1 ? priorityValueOf([...levels][0]) : null };
+}
+
+export type PickedPress = { kind: 'resume' } | { kind: 'priority'; value: number };
+
+/** App.tsx `putAgentBackOn` and `retag` on ticked rows, with their toasts and, as there, no Undo. */
+export function pickedPlan(press: PickedPress, items: readonly any[], { working, waits = false }: { working: (item: any) => boolean; waits?: boolean }): Plan | null {
+  if (press.kind === 'resume') {
+    const resume = pickedResume(items, working);
+    if (!resume) return null;
+    return { steps: [{ door: 'resumeItems', payload: { ids: resume.ids } }], toast: waits ? 'Up next once your computer is back.' : `${resume.ids.length} resumed`, goes: null };
+  }
+  const on = made(items);
+  if (!on.length) return null;
+  const word = priorityLabelOf(priorityIdOf(press.value)).toLowerCase();
+  return {
+    steps: on.map((i) => ({ door: 'threadEdit' as const, payload: { product: i.product, id: i.id, patch: { priority: press.value } } })),
+    toast: on.length > 1 ? `${on.length} set to ${word}` : `Priority: ${word}`,
+    goes: null,
+  };
 }

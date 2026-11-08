@@ -5,8 +5,8 @@
 // the priorities. The phone's bar under ticked threads had Close only
 // (`closePicked` in mobile/src/app/index.tsx). These cases hold the desktop's
 // rules for when each is offered, and the words its toasts say, against
-// mobile/src/lib/picked.ts. Resume and priority are left to the thread's own
-// settings.
+// mobile/src/lib/picked.ts. Resume and priority have their own test
+// (ticked-threads-on-the-phone-resume-together-and-take-one-priority).
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { batchWords, inLater, pickedActs } from '../mobile/src/lib/picked';

@@ -43,13 +43,15 @@ export function TimeBox({ value, onChange, placeholder, onSubmit, line, onLine, 
   );
 }
 
-export function LaterSheet({ visible, onClose, onPick, onNow, subtitle, children }: {
+export function LaterSheet({ visible, onClose, onPick, onNow, subtitle, children, instead }: {
   visible: boolean; onClose: () => void; onPick: (until: number, label: string) => void;
   /** Given when the thread is already in Later: "Now (back to inbox)" brings it back. */
   onNow?: () => void;
   subtitle?: string;
   /** More rows, under a line. */
   children?: React.ReactNode;
+  /** A page one of those rows opened, drawn in this sheet rather than a second one over it. */
+  instead?: React.ReactNode;
 }) {
   const [text, setText] = useState('');
   const [refused, setRefused] = useState(false);
@@ -62,6 +64,7 @@ export function LaterSheet({ visible, onClose, onPick, onNow, subtitle, children
     if (!text.trim()) return;
     if (typed) { close(); onPick(typed.ts, parseWhen(text, now)?.label ?? typed.hint); } else setRefused(true);
   };
+  if (instead) return <TypingSheet open={visible} close={close}>{instead}</TypingSheet>;
   return (
     <TypingSheet open={visible} close={close}>
       <SheetHead>Later</SheetHead>

@@ -13,9 +13,9 @@ import { color, font } from './theme';
 const LEVEL: Record<PriorityId, 1 | 2 | 3 | 4> = { urgent: 4, high: 3, medium: 2, low: 1 };
 export const barsFor = (priority: number | null | undefined) => LEVEL[priorityIdOf(priority)];
 
-/** The four levels under their head, for a sheet of its own or the thread's menu. */
-export function PriorityRows({ value, pick }: { value: number; pick: (v: number) => void }) {
-  const on = priorityIdOf(value);
+/** The four levels under their head, for a sheet of its own or the thread's menu; none marked for ticked threads that disagree. */
+export function PriorityRows({ value, pick }: { value: number | null; pick: (v: number) => void }) {
+  const on = value === null ? null : priorityIdOf(value);
   return (
     <>
       <SheetHead>Priority</SheetHead>

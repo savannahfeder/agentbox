@@ -28,7 +28,7 @@ import { previewCloud } from '../lib/preview';
 import { ALERTS_KEY, leaveAddress, readAlerts, takeAddressBack, type KeptAlerts } from '../lib/push-device';
 import type { PlaceId } from '../lib/groups';
 import { phoneTabs } from '../lib/tabs';
-import { batchWords } from '../lib/picked';
+import { batchWords, pickedPlan, type PickedPress } from '../lib/picked';
 import { onTheirWay, teamFrom, withPendingPauses, withPhoneAnswers } from '../lib/teammates';
 import { isUnread, markSeen as markSeenIn, markUnseen as markUnseenIn, readSeen } from '../lib/unread';
 import { alertToken, alertTokenIfAllowed, setIconCount } from '../platform/alerts';
@@ -285,6 +285,20 @@ function useCloudState() {
   }, [sender, say]);
   const closeAll = useCallback((items: PressedItem[]) => pressAll(items, { kind: 'close' }), [pressAll]);
   const laterAll = useCallback((items: PressedItem[], until: number, label?: string) => pressAll(items, { kind: 'later', until, label }), [pressAll]);
+  // Resume and Priority on ticked threads, one plan for all of them.
+  const running = view.running;
+  const pressPicked = useCallback(async (items: PressedItem[], press: PickedPress) => {
+    if (!sender) return;
+    const at = Date.now();
+    const working = (i: PressedItem) => running.some((r: { itemId: string; product: string }) => r.itemId === i.id && r.product === i.product);
+    const plan = pickedPlan(press, items, { working, waits: macAway(macSeenOf(rowsNow.current.projects), at) && !cloudCarriesOn(rowsNow.current.projects) });
+    if (!plan) return;
+    try {
+      await runSteps(sender, plan.steps);
+      if (plan.toast) say(plan.toast);
+    } catch (err) { say(message(err)); }
+    setNow(Date.now());
+  }, [sender, say, running]);
 
   // Where a command in Search sends the inbox page, and a permission card put aside (App.tsx `minimizedApproval`).
   const [wanted, setWanted] = useState<{ place: PlaceId; menu?: boolean; group?: boolean } | null>(null);
@@ -367,7 +381,7 @@ function useCloudState() {
   }, [cloud, setRows, keepAlerts]);
 
   return {
-    cloud, opened, signedIn, rows, view, tabs, repeats, status, loading: read.first, onlineAt: read.error ? 0 : read.fetchedAt, now, refresh, send, closeAll, laterAll, attach, fileOf, toast, say,
+    cloud, opened, signedIn, rows, view, tabs, repeats, status, loading: read.first, onlineAt: read.error ? 0 : read.fetchedAt, now, refresh, send, closeAll, laterAll, pressPicked, attach, fileOf, toast, say,
     team, teamPending, watchTeam, askTeammate, wanted, goTo: setWanted, takeWanted: () => setWanted(null), minimizedApproval, setMinimizedApproval, approvalRoom, setApprovalRoom,
     dismissToast: () => setToast(null), signedInWith, signOut, preview: PREVIEW,
     notice, noticeRead, agreed, answerNotice, withdrawNotice: () => answerNotice(false),

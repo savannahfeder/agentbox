@@ -27,11 +27,12 @@ import { useCloud } from '../state/cloud';
 import { Magnifier, StateGlyph, ViewButton, ViewMenu } from '../ui/Filters';
 import { Cloud, Gear, More, Pen, Pin, Repeat, Tick } from '../ui/icons';
 import { LaterSheet } from '../ui/Later';
-import { inLater, pickedActs } from '../lib/picked';
+import { inLater, pickedActs, pickedPriority, pickedResume } from '../lib/picked';
+import { priorityIdOf, priorityLabelOf } from '../../../renderer/src/priority';
 import { Waiting } from '../ui/LogoOrbit';
 import { repeatRow, repeatTag } from '../../../renderer/src/repeat-words';
 import type { PhoneRepeat } from '../../../renderer/src/phone-repeats';
-import { barsFor } from '../ui/Pickers';
+import { barsFor, PriorityRows } from '../ui/Pickers';
 import { footRoom, IconButton, PriorityBars, RunningMark, SheetRow, T, TopBar, Wall } from '../ui/parts';
 import { color, corner, font, size } from '../ui/theme';
 import { StatusNotice } from '../ui/StatusNotice';
@@ -335,6 +336,7 @@ export default function Threads() {
   const [picked, setPicked] = useState<Set<string> | null>(null);
   const [closing, setClosing] = useState(false);
   const [pickedMenu, setPickedMenu] = useState(false);
+  const [pickingLevel, setPickingLevel] = useState(false);
   useEffect(() => { setPicked(null); }, [place, tab]);
   if (!c.opened) return <Wall><Waiting /></Wall>;
   if (!c.signedIn) return <Redirect href="/sign-in" />;
@@ -362,8 +364,11 @@ export default function Threads() {
   };
   const pickedItems = rows.filter((r) => picked?.has(r.key)).map((r) => r.item);
   const acts = pickedActs(pickedItems, { tab, unread: c.unread });
-  const pickedDone = () => { setPickedMenu(false); setPicked(null); };
+  const pickedDone = () => { setPickedMenu(false); setPickingLevel(false); setPicked(null); };
   const laterPicked = (until: number, label?: string) => { pickedDone(); void c.laterAll(pickedItems, until, label); };
+  const working = (i: { id: string; product: string }) => c.view.running.some((r: { itemId: string; product: string }) => r.itemId === i.id && r.product === i.product);
+  const resumable = pickedResume(pickedItems, working);
+  const level = pickedPriority(pickedItems);
   const unfiltered: Display = { ...display, priorities: [], projects: [], updated: 'any', privacy: 'any' };
   const clear = () => { setDisplay(unfiltered); setAgent(null); };
   const agents = agentChoices(board || mineBoard ? Object.values(c.tabs).flat() : c.tabs[tab], display, c.now, agent);
@@ -456,8 +461,12 @@ export default function Threads() {
         </View>
       )}
       {/* Later as one thread's More sheet has it, then the rest of the desktop's commands on ticked rows. */}
-      <LaterSheet visible={pickedMenu} onClose={() => setPickedMenu(false)} onPick={laterPicked}
-        onNow={inLater(pickedItems, c.now) ? () => laterPicked(0) : undefined}>
+      <LaterSheet visible={pickedMenu} onClose={() => { setPickedMenu(false); setPickingLevel(false); }} onPick={laterPicked}
+        onNow={inLater(pickedItems, c.now) ? () => laterPicked(0) : undefined}
+        instead={pickingLevel && level ? <PriorityRows value={level.value} pick={(value) => { pickedDone(); void c.pressPicked(pickedItems, { kind: 'priority', value }); }} /> : undefined}>
+        {resumable && <SheetRow label="Resume agents" aside={resumable.ids.length < resumable.of ? `${resumable.ids.length} of ${resumable.of}` : undefined}
+          onPress={() => { pickedDone(); void c.pressPicked(pickedItems, { kind: 'resume' }); }} />}
+        {level && <SheetRow label="Priority" aside={level.value === null ? undefined : priorityLabelOf(priorityIdOf(level.value))} onPress={() => setPickingLevel(true)} />}
         {acts.includes('read') && <SheetRow label="Mark read" onPress={() => { pickedItems.forEach((i) => c.markSeen(i)); pickedDone(); }} />}
         {acts.includes('unread') && <SheetRow label="Mark unread" onPress={() => { pickedItems.forEach((i) => c.markUnseen(i)); pickedDone(); }} />}
       </LaterSheet>
