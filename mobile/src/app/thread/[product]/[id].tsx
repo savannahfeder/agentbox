@@ -542,6 +542,7 @@ export default function ThreadScreen() {
         pinned={item.status === 'done' || item.waitsForMac ? null : !!item.pinned}
         onPin={(pin) => void press({ kind: 'pin', pinned: pin })}
         onUnread={() => { c.markUnseen(item); back(); }}
+        onReport={() => router.push({ pathname: '/settings/feedback', params: { report: `${product}/${id}`, title: item.title ?? '' } })}
         onClose={close} closed={threadState(item) === 'done'} />
       {summary && <Summary thread={thread} now={c.now} close={() => setSummary(false)} />}
     </Wall>
