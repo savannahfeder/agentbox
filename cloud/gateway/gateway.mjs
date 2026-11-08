@@ -122,7 +122,7 @@ export function memoryObjects() {
   };
 }
 
-export function createGateway({ agentcore, links, removeObject, objects, whoIs, stripe = null, now = Date.now, plans = PLANS, free = FREE, termsVersion = TERMS_VERSION, storageBytes = STORAGE_BYTES, log = () => {},
+export function createGateway({ agentcore, links, removeObject, objects, whoIs, stripe = null, now = Date.now, plans = PLANS, free = FREE, teamPlan = TEAM, termsVersion = TERMS_VERSION, storageBytes = STORAGE_BYTES, log = () => {},
   // The phone's replies with the computer shut (./phone.mjs): { db, runFiles, sendPush }.
   phone = null,
   // The database (./phone.mjs supabaseRest), where who is subscribed is read
@@ -171,15 +171,15 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     if (!team?.id || !Array.isArray(team.members)) return null;
     const bill = (await readJson(teamKey(team.id))) || {};
     const seats = bill.plan === 'team' && PAYING.has(bill.stripe?.status) ? Math.max(0, Math.floor(Number(bill.seats)) || 0) : 0;
-    const endsAt = Number(team.createdAt) + TEAM.trialDays * DAY_MS;
+    const endsAt = Number(team.createdAt) + teamPlan.trialDays * DAY_MS;
     const trial = !seats && t < endsAt;
     if (!seats && !trial) return null;
     const members = team.members.filter((m) => PERSON.test(m));
     const others = await Promise.all(members.filter((m) => m !== person).map(recOf));
     return {
       id: team.id, trial, seats, endsAt: trial ? endsAt : null, members: members.length, owner: (team.owners || []).includes(person),
-      agents: seats ? seats * TEAM.agentsPerSeat : members.length * TEAM.trialAgentsPerMember,
-      seconds: (seats ? seats * TEAM.hoursPerSeat : members.length * TEAM.trialHoursPerMember) * 3600,
+      agents: seats ? seats * teamPlan.agentsPerSeat : members.length * teamPlan.trialAgentsPerMember,
+      seconds: (seats ? seats * teamPlan.hoursPerSeat : members.length * teamPlan.trialHoursPerMember) * 3600,
       othersUsed: others.reduce((sum, o) => sum + teamUsedOf(o, team.id, trial, t), 0),
       othersRunning: others.reduce((sum, o) => sum + live(o, 'run').filter((s) => s.team === team.id).length, 0),
     };
