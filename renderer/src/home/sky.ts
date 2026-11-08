@@ -38,7 +38,7 @@ const DARK_SKIES: Sky[] = [
 
 const light = (palette: Palette, glow: Glow[]): SkyArt => ({
   ...DARK_BASE, coreW: 0.03, haloW: 0.22, palette, glow,
-  bg: '#ffffff', light: true, lightBg: [255, 255, 255], dim: 0.9, grain: 0.02, lightStrength: 0.85, lightDepth: 200,
+  bg: '#ffffff', light: true, lightBg: [255, 255, 255], dim: 1, grain: 0.03, lightStrength: 1, lightDepth: 165,
 });
 
 // The card is white and the sky fades into it, the way dark fades to black.
