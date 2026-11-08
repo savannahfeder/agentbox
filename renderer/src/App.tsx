@@ -87,7 +87,7 @@ import {
 } from './drafts';
 import { approvalStage, approvalClickAllowed, cardChord, pressWithin } from './approval-stage';
 import { roomForTheCard } from './room-for-the-card';
-import { approvalAnswered, approvalAsker, approvalReads, approvalShown } from './approval-card';
+import { approvalAnswered, approvalAsker, approvalView } from './approval-card';
 // The new task card's two sentences: why it will not take one, and where the
 // one it took went. Only the second is raised from here, because by the time
 // there is anything to confirm the card has closed.
@@ -184,7 +184,7 @@ import {
 import { priorityCommands, priorityIdOf, priorityLabelOf, type PriorityId } from './priority';
 import { runNowCommands } from './run-now';
 import { withOlder } from './older-threads';
-import { NO_FILTER, filterBox, isFiltering, type BoxFilter as BoxFilterState, type Harness } from './box-filter';
+import { NO_FILTER, filterBox, harnessOf, isFiltering, type BoxFilter as BoxFilterState, type Harness } from './box-filter';
 import { URGENT_PRIORITY, itemPriority, moveProduct, placeScore, placedScore } from '../../shared/rank.mjs';
 import { rankProducts } from './project-priority';
 import { threadsMade, approvableFiled, doItHereWrites, answerAllWrites, RUN_IT } from './threads-made';
@@ -1085,6 +1085,7 @@ export default function App() {
   const answerCardRef = useRef(answerCard);
   answerCardRef.current = answerCard;
   const cardOnStage = useRef<string | null>(null);
+  const cardDrawnAt = useRef<{ id: string; at: number } | null>(null);
   // The card that held the stage when she pressed: the store push usually beats
   // the animation, and a card cannot finish leaving once the snapshot has
   // forgotten it exists.
@@ -5984,7 +5985,7 @@ export default function App() {
       // window, so the palette this opened was drawn where nobody could see it,
       // and the Escape after it closed that rather than anything visible. The
       // beat that teaches ⌘K is the last one, standing on the real app.
-      const chord = cardChord(e, cardOnStage.current);
+      const chord = cardChord(e, cardOnStage.current, cardDrawnAt.current?.id === cardOnStage.current ? cardDrawnAt.current.at : null);
       if (chord) { e.preventDefault(); void answerCardRef.current(chord.id, chord.allow); return; }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         if (walkScreenRef.current) return;
@@ -7383,6 +7384,7 @@ export default function App() {
   const asksShown = !stage.card && !signInGate && onTheInbox ? inboxAsks(inbox, savedCloudKeys, asksPutOff) : [];
   const cardOnScreen = !!stage.card || asksShown.length > 0;
   cardOnStage.current = stage.card && !stage.verdict ? stage.card.id : null;
+  if (cardOnStage.current && cardDrawnAt.current?.id !== cardOnStage.current) cardDrawnAt.current = { id: cardOnStage.current, at: Date.now() };
   const mover = {
     ids: new Set([...(snap?.cloud?.movable ?? []), ...(snap?.supervisor.running ?? []).filter((r) => r.movable).map((r) => r.itemId)]),
     move: (id: string, product: string) => { void moveToCloud([id], product); },
@@ -9066,10 +9068,8 @@ export default function App() {
         const { card: a, verdict, waiting } = stage;
         if (!a) return null;
         if (onPhone() && minimizedApproval === a.id) return null;
-        // WHAT IT IS ASKING AND WHAT IT IS ASKING ABOUT, and neither is
-        // hardcoded any more: "asks to run" over a diff is a lie, and it is the
-        // first thing she reads. approval-card.ts is the only copy.
-        const reads = approvalReads(a.input, a.tool);
+        // What it wants in words, the exact thing, and where: approval-card.ts is the only copy.
+        const view = approvalView(a.input, a.tool);
         return (
           <div className="approvals" ref={cardRoom}>
             <div className="approval-stack">
@@ -9084,112 +9084,53 @@ export default function App() {
                     <span className="approval-verdict-word">{verdict === 'allow' ? 'Allowed' : 'Denied'}</span>
                   </div>
                 )}
-                {/* THE ORDER OF THIS CARD. The most important thing to see is
-                    what the command will do; the chat and the folder are lower
-                    in the hierarchy; and too many stacked lines of text are
-                    hard to process, so anything unnecessary is cut.
-
-                    So the card is four blocks and was six:
-
-                      1. WHAT WILL HAPPEN, in words. The worker's own
-                         description of the command, which is the most
-                         important thing on the card.
-                      2. THE COMMAND ITSELF, which is the thing being
-                         authorised and the only part that has to be exact.
-                      3. ONE quiet line carrying the two lower things, the
-                         chat and the folder, plus the verb.
-                      4. Allow and Deny.
-
-                    "<Product> asks to run" is no longer a block of its own. It
-                    is the fallback for block 1 and appears only when there is
-                    no description, which is the only case where it is the best
-                    sentence the card has. The verb is never lost: with a
-                    description it rides the quiet line, because "asks to run"
-                    over a patch would still be a lie and approval-card.ts is
-                    still the only place that decides it.
-
-                    The transparency is not touched; it was already right. */}
+                {/* Who is asking (the agent and its thread, which opens behind
+                    the card), what it wants in words, the exact thing being
+                    authorised, then where. The exact thing is never cut here:
+                    the one cap is in main/codex-approvals.mjs, which says how
+                    much it dropped, and the block scrolls. */}
                 {(() => {
                   const row = approvalRow(a.item);
                   const mcp = a.tool.startsWith('mcp__');
-                  const product = approvalAsker(row ? rowTitle(row) : null, snap.products.find((p) => p.slug === a.product)?.name ?? a.product ?? 'an agent');
-                  const said = !mcp && (a.input as any)?.description
-                    ? String((a.input as any).description).slice(0, 200)
-                    : null;
+                  const agent = row ? (harnessOf(row) === 'codex' ? 'Codex' : 'Claude Code') : null;
+                  const asker = approvalAsker(row ? rowTitle(row) : null, snap.products.find((p) => p.slug === a.product)?.name ?? a.product ?? 'An agent');
                   const cwd = !mcp && (a.input as any)?.cwd ? String((a.input as any).cwd) : null;
-                  // WITH a description the verb goes quiet and keeps the folder
-                  // company. WITHOUT one it is already the loudest line on the
-                  // card, and repeating it underneath would be the card saying
-                  // one thing twice, which is the clutter this card cuts.
-                  const where = [said ? reads.what : null, cwd ? `in ${cwd}` : null]
-                    .filter(Boolean).join(' ');
+                  const body = view.body;
                   return (
                     <>
-                      <div className="approval-lede">
-                        <span className="approval-lede-text">
-                          {said ?? <>{product} {reads.what}</>}
-                        </span>
-                        {waiting > 0 && <span className="approval-count">+{waiting} waiting</span>}
+                      <div className="approval-from">
+                        {row ? (
+                          <button type="button" className="approval-task" title="Open this thread. The card stays where it is." onClick={() => openApprovalRow(a.item)}>
+                            <span className="approval-task-title">{agent} · {asker}</span>
+                            <span className="approval-task-go" aria-hidden="true">↗</span>
+                          </button>
+                        ) : <span className="approval-task-title">{asker}</span>}
+                        {waiting > 0 && <span className="approval-count">{waiting} more waiting</span>}
                         {onPhone() && <button type="button" className="approval-minimize" onClick={() => setMinimizedApproval(a.id)}>Minimize</button>}
                       </div>
-                      {/* THE WHOLE THING SHE IS ANSWERING ABOUT, AND THE CAP IS
-                          NOT HERE. This sliced to 400 characters with no mark on
-                          it while nothing capped the card at the source, so she
-                          read four hundred characters and authorised however
-                          many there were. The display boundary and the
-                          enforcement boundary must not differ, and on Codex they
-                          differ constantly: it reads, searches and edits by
-                          running shell commands, so a long one is the ordinary
-                          case, and a patch is longer again. The one cap left is
-                          in main/codex-approvals.mjs, which says out loud how
-                          much it dropped, and this <pre> scrolls (styles.css). */}
-                      <pre className="approval-cmd">{approvalShown(reads.body, a.tool)}</pre>
-                      {/* AND WHAT ELSE THE YES OPENS, which is the half a card
-                          can be silent about while still looking complete. A
-                          command approval carries the host the sandbox would be
-                          opened to, and a patch approval can carry a root it
-                          asks to write anywhere under for the rest of the run.
-                          Both were on the params and neither reached her.
-
-                          THEY STAY WITH THE COMMAND, ABOVE THE QUIET LINE. They
-                          are not the same kind of fact as the folder any more:
-                          the folder is context that belongs lower, and these two
-                          widen what the yes does. A round that cut the card to
-                          four blocks left these below the chat for one commit,
-                          which put the most dangerous sentence on the card
-                          under the least important one. */}
-                      {!mcp && (a.input as any)?.host && (
-                        <div className="approval-opens">opens the network to {String((a.input as any).host)}</div>
+                      <div className="approval-lede">{view.title}</div>
+                      {body.kind === 'text' && <pre className="approval-cmd">{body.text}</pre>}
+                      {body.kind === 'diff' && (
+                        <div className="approval-cmd approval-diff">
+                          {body.lines.map((l, i) => <div key={i} className={`approval-dl ${l.mark}`}><span className="approval-dm" aria-hidden="true">{l.mark === 'add' ? '+' : l.mark === 'del' ? '−' : ''}</span><span>{l.text}</span></div>)}
+                        </div>
+                      )}
+                      {body.kind === 'fields' && (
+                        <div className="approval-cmd approval-fields">
+                          {body.rows.map(([k, v]) => <div key={k} className="approval-fr"><span className="approval-fk">{k}</span><span className="approval-fv">{v}</span></div>)}
+                        </div>
+                      )}
+                      {/* What else the yes opens stays with the exact thing, above the folder. */}
+                      {!mcp && (a.input as any)?.host && body.kind === 'text' && body.text !== String((a.input as any).host) && (
+                        <div className="approval-opens">Opens the network to {String((a.input as any).host)}</div>
                       )}
                       {!mcp && (a.input as any)?.grantRoot && (
-                        <div className="approval-opens">and asks to write anywhere under {String((a.input as any).grantRoot)} for the rest of this run</div>
+                        <div className="approval-opens">And asks to write anywhere under {String((a.input as any).grantRoot)} for the rest of this run</div>
                       )}
-                      {/* THE TWO THINGS SHE PUT AT THE BOTTOM, on one line
-                          between them. The folder is still here and still
-                          matters: `cat auth.json` in a scratch clone and in her
-                          home directory are the same eleven characters and two
-                          different questions. It is simply no longer a stack of
-                          its own.
-
-                          The chat is the way into the agent, and pressing it
-                          opens that row BEHIND the card without answering
-                          anything. A row that has gone draws no button: a title
-                          she cannot click through to is a caption pretending to
-                          be a door. */}
-                      {(where || row) && (
-                        <div className="approval-meta">
-                          {where && <span className="approval-where">{where}</span>}
-                          {row && (
-                            <button
-                              type="button"
-                              className="approval-task"
-                              title="Open this agent. The card stays where it is."
-                              onClick={() => openApprovalRow(a.item)}
-                            >
-                              <span className="approval-task-title">{row.title}</span>
-                              <span className="approval-task-go" aria-hidden="true">↗</span>
-                            </button>
-                          )}
+                      {(view.where || body.kind === 'diff') && (
+                        <div className="approval-where" title={cwd ?? undefined}>
+                          {view.where}
+                          {body.kind === 'diff' && (body.added || body.removed) ? <>{view.where ? ' · ' : ''}<span className="approval-add">+{body.added}</span> <span className="approval-del">−{body.removed}</span></> : null}
                         </div>
                       )}
                     </>
@@ -9199,9 +9140,8 @@ export default function App() {
                   {/* The acknowledgement starts on the press, not on the round
                       trip: main answers the file and echoes the same verdict
                       back, so the click and the chord land on one behaviour. */}
-                  <button className="approval-allow" onPointerDown={() => { approvalPress.current = `${a.id}:true`; }} onPointerCancel={() => { approvalPress.current = null; }} onClick={(e) => clickCard(a.id, true, e.detail)}>Allow</button>
-                  <button className="approval-deny" onPointerDown={() => { approvalPress.current = `${a.id}:false`; }} onPointerCancel={() => { approvalPress.current = null; }} onClick={(e) => clickCard(a.id, false, e.detail)}>Deny</button>
-                  <span className="approval-hint">{chord('⌘Y')} / {chord('⌘N')} · {a.tool}</span>
+                  <button className="approval-allow" onPointerDown={() => { approvalPress.current = `${a.id}:true`; }} onPointerCancel={() => { approvalPress.current = null; }} onClick={(e) => clickCard(a.id, true, e.detail)}>Allow<span className="approval-key">{chord('⌘1')}</span></button>
+                  <button className="approval-deny" onPointerDown={() => { approvalPress.current = `${a.id}:false`; }} onPointerCancel={() => { approvalPress.current = null; }} onClick={(e) => clickCard(a.id, false, e.detail)}>Deny<span className="approval-key">{chord('⌘2')}</span></button>
                 </div>
               </div>
             </div>

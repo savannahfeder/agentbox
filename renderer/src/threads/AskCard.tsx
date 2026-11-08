@@ -23,16 +23,14 @@ export function AskCard({ asks, onGive, onLater, room }: {
         {waiting > 1 && <div className="approval-ghost g2" />}
         {waiting > 0 && <div className="approval-ghost g1" />}
         <div className="approval-card" key={ask.key}>
-          <div className="approval-lede">
-            <span className="approval-lede-text">{ask.title}</span>
-            {waiting > 0 && <span className="approval-count">+{waiting} waiting</span>}
-          </div>
-          <div className="approval-meta">
+          <div className="approval-from">
             <button type="button" className="approval-task" title="Open this thread" onClick={() => onGive(ask)}>
               <span className="approval-task-title">{thread}</span>
               <span className="approval-task-go" aria-hidden="true">↗</span>
             </button>
+            {waiting > 0 && <span className="approval-count">{waiting} more waiting</span>}
           </div>
+          <div className="approval-lede">{ask.title}</div>
           <div className="approval-actions">
             <button type="button" className="approval-allow" onClick={() => onGive(ask)}>{ask.act}</button>
             <button type="button" className="approval-deny" onClick={() => onLater(ask)}>Later</button>
