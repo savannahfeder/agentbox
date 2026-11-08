@@ -7826,6 +7826,7 @@ export default function App() {
                     // time lands a second time (OpenDoc, DocPane.tsx).
                     ...(at ? { atFrom: Date.now() } : {}),
                   })}
+                  onCloseDoc={putDocDown}
                   parent={focused.parent ? items.find((i) => i.id === focused.parent && i.product === focused.product) ?? null : null}
                   blockedBy={items.find((i) => i.parent === focused.id && i.product === focused.product && i.status !== 'done') ?? null}
                   filed={threadsMade(items, focused).map((i) => ({ id: i.id, title: rowTitle(i), state: stateOfMine(i), approve: approvableFiled(i, stateOfMine(i)), item: i }))}
