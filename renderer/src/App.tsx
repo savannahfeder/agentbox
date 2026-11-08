@@ -6953,7 +6953,7 @@ export default function App() {
 
   // Leaving Chats forgets which conversation was open there, or the same row
   // opened from Needs you lands back on the Chats screen with another reply box.
-  const openView = (next: View) => { setHomeOpen(false); roomsUi.leave(); setChatsDirect(null); teammatesUi.leave(); setFilesPage(null); setConnectionsPage(null); setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); setEvPick(null); setTodayOn(false); setTasksOn(false); setChatsPlace(null); };
+  const openView = (next: View) => { roomsUi.leave(); setChatsDirect(null); teammatesUi.leave(); setFilesPage(null); setConnectionsPage(null); setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); setEvPick(null); setTodayOn(false); setTasksOn(false); setChatsPlace(null); setHomeOpen(false); };
   useEffect(() => {
     if (!onPhone()) return;
     if (signInGate) {
@@ -7206,12 +7206,14 @@ export default function App() {
     // Not on a phone: there Needs you is just the inbox, and the team is
     // under Everything else ("you shouldn't put teammates in the top bar",
     // w-33511040d7).
-    corner: onPhone() || homeSet.on ? null
+    corner: onPhone() ? null
       : <NeedsFaces members={evSplit.shown} picked={evOn ? evKey : null} waits={waits} onPick={(key) => pickMember(key)} onAdd={teammatesUi.live ? teammatesUi.onNew : undefined} />,
     progress: !onPhone() ? { count: mineShown ? shownCount(progressTab) : 0, on: view !== 'done' && evOn && evKey === 'me' } : undefined,
     today: homeLayout === 'list' && !onPhone() ? { on: todayOn, onToday: () => { goNeedsYou(); setTodayOn(true); } } : undefined,
     tasks: homeLayout === 'list' && !onPhone() ? { on: tasksOn, onTasks: () => { goNeedsYou(); setTasksOn(true); } } : undefined,
   } : null;
+  // Home's Team card and the Team page say what the faces at the end of the tab bar did.
+  if (teamTabs && homeSet.on) teamTabs.corner = null;
   const dayStart = new Date(now).setHours(0, 0, 0, 0);
   const evItems = evMember?.kind === 'mate' ? (mateRunsOf(items, evMember.key.slice('mate:'.length), dayStart)) : [];
   const evCards = evMember?.kind === 'person' ? personCardsOf(cards, evMember.key.slice('person:'.length), dayStart) : [];
