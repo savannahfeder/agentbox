@@ -67,6 +67,6 @@ export function DocOutline({ scroller, page }: { scroller: HTMLElement | null; p
 /** A heading's own words, without the name on a teammate's cursor standing in it. */
 function headingWords(el: Element): string {
   const copy = el.cloneNode(true) as Element;
-  for (const c of copy.querySelectorAll('.lv-caret')) c.remove();
+  for (const c of copy.querySelectorAll('.lv-caret, .lv-you')) c.remove();
   return copy.textContent ?? '';
 }

@@ -37,6 +37,7 @@ const SAVE_DEBOUNCE_MS = 900;
 // The copy that keeps a live file saves at least this often while people keep typing.
 const LIVE_SAVE_EVERY_MS = 60_000;
 const LIVE_WRITE_MS = 2_000;
+const MOVES_THE_CURSOR = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown']);
 
 // A link in the editor never navigates on its own; she gets a hover card with
 // the real actions instead. A typed or pasted bare domain becomes a proper URL
@@ -147,10 +148,26 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
     if (!room || !dom) return undefined;
     const down = () => room.hold(true);
     const up = () => room.hold(false);
+    // A key that only moves the cursor is read back from the page a moment later,
+    // and an edit redrawing the page meanwhile put the cursor back: End then typing
+    // landed mid-sentence.
+    let moving: number | null = null;
+    const key = (e: KeyboardEvent) => {
+      if (!MOVES_THE_CURSOR.has(e.key)) return;
+      room.hold(true);
+      if (moving != null) window.clearTimeout(moving);
+      moving = window.setTimeout(() => { moving = null; room.hold(false); }, 150);
+    };
     dom.addEventListener('pointerdown', down);
+    dom.addEventListener('keydown', key);
     window.addEventListener('pointerup', up);
     window.addEventListener('blur', up);
-    return () => { dom.removeEventListener('pointerdown', down); window.removeEventListener('pointerup', up); window.removeEventListener('blur', up); room.hold(false); };
+    return () => {
+      dom.removeEventListener('pointerdown', down); dom.removeEventListener('keydown', key);
+      window.removeEventListener('pointerup', up); window.removeEventListener('blur', up);
+      if (moving != null) window.clearTimeout(moving);
+      room.hold(false);
+    };
   }, [editor, collab?.live]);
 
   // An empty room is filled once, by the copy the room picked, from the file.

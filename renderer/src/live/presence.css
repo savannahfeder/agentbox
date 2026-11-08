@@ -3,22 +3,34 @@
 
 .doc-column { position: relative; }
 
-/* The cursor: a thin line in the person's colour, its name above it for a
-   moment after they type, then only the line. */
+/* The cursor: a line in the person's colour with a small square cap, and
+   their name resting on the cap for a moment after they move. */
 .lv-caret {
   position: relative; margin: 0 -1px; border-left: 2px solid var(--lv); pointer-events: none;
   word-break: normal;
 }
+.lv-caret::before {
+  content: ''; position: absolute; left: -4px; top: -3px; width: 6px; height: 6px; background: var(--lv);
+}
 .lv-flag {
-  position: absolute; left: -2px; bottom: 100%; padding: 1px 5px 2px; white-space: nowrap;
-  font-weight: 600; font-size: 10px; line-height: 14px; font-family: inherit; font-style: normal; letter-spacing: .01em; max-width: 180px; overflow: hidden; text-overflow: ellipsis;
-  color: #0d1220; background: var(--lv); border-radius: 0;
-  opacity: 0; transition: opacity .5s ease-out;
+  position: absolute; left: -4px; bottom: calc(100% + 3px); padding: 3px 7px 3px 6px; white-space: nowrap;
+  font-weight: 600; font-size: 11px; line-height: 14px; font-family: inherit; font-style: normal; letter-spacing: .005em;
+  max-width: 180px; overflow: hidden; text-overflow: ellipsis;
+  color: #0b0e16; background: var(--lv); border-radius: 0;
+  box-shadow: 0 8px 18px -8px rgba(0, 0, 0, .7), inset 0 1px 0 rgba(255, 255, 255, .28);
+  opacity: 0; transform: translateY(3px); transition: opacity .45s ease-out, transform .45s ease-out;
   user-select: none;
 }
-.lv-caret.is-fresh .lv-flag { opacity: 1; transition-duration: .12s; }
+.lv-caret.is-fresh .lv-flag { opacity: 1; transform: none; transition-duration: .14s; }
+/* An agent: the same flag, dark, its colour in the words and a hollow square. */
 .lv-caret.is-agent { border-left-style: dashed; }
-.lv-caret.is-agent .lv-flag { background: var(--doc-page, var(--bg)); color: var(--lv); box-shadow: inset 0 0 0 1px var(--lv); }
+.lv-caret.is-agent::before { background: var(--doc-page, var(--bg)); box-shadow: inset 0 0 0 1.5px var(--lv); }
+.lv-caret.is-agent .lv-flag {
+  display: inline-flex; align-items: center; gap: 5px;
+  color: var(--lv); background: color-mix(in srgb, var(--lv) 14%, var(--doc-page, #15171d));
+  box-shadow: 0 8px 18px -8px rgba(0, 0, 0, .7), inset 0 0 0 1px color-mix(in srgb, var(--lv) 55%, transparent);
+}
+.lv-caret.is-agent .lv-flag::before { content: ''; flex: none; width: 5px; height: 5px; box-shadow: inset 0 0 0 1.5px var(--lv); }
 .lv-sel { background: color-mix(in srgb, var(--lv) 22%, transparent); }
 
 /* Looks that draw the place elsewhere keep the cursor bare. */
@@ -62,6 +74,10 @@
 
 /* Your own cursor: the page's own ink and "You", shown as you move or type, then faded. */
 .lv-you { position: relative; pointer-events: none; }
-.lv-you .lv-flag { left: -1px; background: var(--text); color: var(--doc-page, var(--bg)); opacity: 1; animation: lv-you-fade 1.6s ease-out forwards; }
+.lv-you::before { content: ''; position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; background: var(--text); animation: lv-you-fade 1.6s ease-out forwards; }
+.lv-you .lv-flag {
+  left: -3px; background: var(--text); color: var(--doc-page, var(--bg));
+  opacity: 1; transform: none; animation: lv-you-fade 1.6s ease-out forwards;
+}
 @keyframes lv-you-fade { 0%, 60% { opacity: 1; } 100% { opacity: 0; } }
 .doc-sheet:is(.lv-look-rail, .lv-look-gutter, .lv-look-tint) .lv-you .lv-flag { display: block; }

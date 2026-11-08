@@ -26,23 +26,40 @@ export function presenceLook(): PresenceLook {
 
 export interface LiveUser { name: string; color: string; kind?: 'person' | 'agent'; person?: string | null }
 
-const FRESH_MS = 1500;
-const MOST_FLAGS = 3;
-// Past this many, more cursors are noise to read and cost every window a redraw of each on every move.
-const MOST_CARETS = 30;
-// When each cursor last moved, kept per room, so a cursor the editor draws again keeps its name showing.
-const movedIn = new WeakMap<Awareness, Map<number, number>>();
-function freshIn(moved: Map<number, number> | undefined): Set<number> {
-  const now = Date.now();
-  return new Set([...(moved ?? [])].filter(([, at]) => now - at < FRESH_MS).sort((a, b) => b[1] - a[1]).slice(0, MOST_FLAGS).map(([id]) => id));
+// With a hundred people moving many times a second, "the few who moved last"
+// changes faster than a name can be read. So a name, and a drawn cursor, holds
+// a place for a while once it has one, and the next to move takes a free place.
+class Places {
+  private held = new Map<number, number>();
+  constructor(private most: number, private holdMs: number, private renew: boolean) {}
+  private expire(now: number) { for (const [id, at] of this.held) if (now - at > this.holdMs) this.held.delete(id); }
+  moved(id: number, now = Date.now()) {
+    this.expire(now);
+    if (this.held.has(id) ? this.renew : this.held.size < this.most) this.held.set(id, now);
+  }
+  drop(id: number) { this.held.delete(id); }
+  has(id: number, now = Date.now()) { this.expire(now); return this.held.has(id); }
+  count(now = Date.now()) { this.expire(now); return this.held.size; }
 }
+// Three names at a time, each up long enough to read: two people's and an
+// agent's, since agents land whole sentences and would take every place.
+class Names {
+  private people = new Places(2, 2000, false);
+  private agents = new Places(1, 2000, false);
+  moved(id: number, agent: boolean) { (agent ? this.agents : this.people).moved(id); }
+  drop(id: number) { this.people.drop(id); this.agents.drop(id); }
+  has(id: number) { return this.people.has(id) || this.agents.has(id); }
+}
+const named = new WeakMap<Awareness, Names>();
+// Past thirty, more cursors are noise to read and cost every window a redraw of each on every move.
+const MOST_CARETS = 30;
+const namedIn = (a: Awareness) => { let p = named.get(a); if (!p) { p = new Names(); named.set(a, p); } return p; };
 
 function caretFor(user: Record<string, unknown>, clientId: number, fresh = false): HTMLElement {
   const u = user as unknown as LiveUser;
   const caret = document.createElement('span');
   caret.dataset.client = String(clientId);
-  if (fresh) caret.classList.add('is-fresh');
-  caret.className = `lv-caret${u.kind === 'agent' ? ' is-agent' : ''}`;
+  caret.className = `lv-caret${u.kind === 'agent' ? ' is-agent' : ''}${fresh ? ' is-fresh' : ''}`;
   caret.style.setProperty('--lv', u.color || '#7aa2ff');
   caret.dataset.name = u.name ?? '';
   caret.dataset.kind = u.kind ?? 'person';
@@ -107,28 +124,31 @@ const LiveCarets = Extension.create<{ awareness: Awareness | null; user: LiveUse
     if (!awareness) return [];
     awareness.setLocalStateField('user', user);
     // Heard before the cursor plugin hears it, so a cursor drawn for a move knows it moved.
-    const moved = movedIn.get(awareness) ?? new Map<number, number>();
-    movedIn.set(awareness, moved);
+    const names = namedIn(awareness);
+    const moved = new Map<number, number>();
     awareness.on('change', ({ added, updated, removed }: { added: number[]; updated: number[]; removed: number[] }) => {
       const now = Date.now();
-      for (const id of [...added, ...updated]) if (id !== awareness.clientID) moved.set(id, now);
-      for (const id of removed) moved.delete(id);
+      for (const id of [...added, ...updated]) {
+        if (id !== awareness.clientID) moved.set(id, now);
+      }
+      for (const id of removed) { moved.delete(id); names.drop(id); }
     });
     // The cursors drawn are the ones that moved last; everyone else is counted by the faces.
     let drawn = new Set<number>();
     let drawnAt = 0;
     const isDrawn = (me: number, id: number) => {
       if (id === me) return false;
+      if (moved.size <= MOST_CARETS) return true;
       const now = Date.now();
       if (now - drawnAt > 100) {
         drawnAt = now;
         drawn = new Set([...moved].sort((a, b) => b[1] - a[1]).slice(0, MOST_CARETS).map(([c]) => c));
       }
-      return moved.size <= MOST_CARETS || drawn.has(id);
+      return drawn.has(id) || names.has(id);
     };
     return [yCursorPlugin(awareness, {
       awarenessStateFilter: isDrawn,
-      cursorBuilder: (u: Record<string, unknown>, clientId: number) => caretFor(u, clientId, freshIn(moved).has(clientId)),
+      cursorBuilder: (u: Record<string, unknown>, clientId: number) => caretFor(u, clientId, names.has(clientId)),
       selectionBuilder: (u: Record<string, unknown>) => ({ class: 'lv-sel', style: `--lv: ${String(u.color ?? '#7aa2ff')}` }),
     })];
   },
@@ -140,14 +160,28 @@ function useFreshFlags(session: LiveSession, column: HTMLElement | null) {
     if (!column) return undefined;
     // The editor keeps a cursor's element as it moves, so the name is shown or hidden on it here.
     let frame = 0;
+    // A cursor can move a moment before the words it points into arrive, and is
+    // drawn only once they have, so a move is looked at again for a second.
+    const movedNow = new Map<number, number>();
     const paint = () => {
       frame = 0;
-      const fresh = freshIn(movedIn.get(session.live.awareness));
-      for (const el of column.querySelectorAll<HTMLElement>('.lv-caret')) el.classList.toggle('is-fresh', fresh.has(Number(el.dataset.client)));
+      const names = namedIn(session.live.awareness);
+      const now = Date.now();
+      // A name is only worth a place on a cursor the person can see.
+      for (const [id, at] of movedNow) {
+        const el = column.querySelector<HTMLElement>(`.lv-caret[data-client="${id}"]`);
+        const r = el?.getBoundingClientRect();
+        if (el && r && r.bottom > 0 && r.top < window.innerHeight) { names.moved(id, el.dataset.kind === 'agent'); movedNow.delete(id); }
+        else if (el || now - at > 1000) movedNow.delete(id);
+      }
+      for (const el of column.querySelectorAll<HTMLElement>('.lv-caret')) el.classList.toggle('is-fresh', names.has(Number(el.dataset.client)));
     };
-    const soon = () => { frame ||= requestAnimationFrame(paint); };
+    const soon = ({ added = [], updated = [] }: { added?: number[]; updated?: number[] } = {}) => {
+      for (const id of [...added, ...updated]) if (id !== session.doc.clientID) movedNow.set(id, Date.now());
+      frame ||= requestAnimationFrame(paint);
+    };
     session.live.awareness.on('change', soon);
-    const sweep = window.setInterval(paint, 500);
+    const sweep = window.setInterval(() => soon(), 200);
     return () => { session.live.awareness.off('change', soon); window.clearInterval(sweep); if (frame) cancelAnimationFrame(frame); };
   }, [session.live, column]);
 }
@@ -200,7 +234,7 @@ function useSpots(editor: Editor | null, column: HTMLElement | null, session: Li
         while (block && block.parentElement && !block.parentElement.classList.contains('ProseMirror')) block = block.parentElement;
         let section = '';
         for (let b: Element | null = block; b; b = b.previousElementSibling) {
-          if (/^H[1-3]$/.test(b.tagName)) { const c = b.cloneNode(true) as Element; for (const x of c.querySelectorAll('.lv-caret')) x.remove(); section = c.textContent ?? ''; break; }
+          if (/^H[1-3]$/.test(b.tagName)) { const c = b.cloneNode(true) as Element; for (const x of c.querySelectorAll('.lv-caret, .lv-you')) x.remove(); section = c.textContent ?? ''; break; }
         }
         out.push({
           name: el.dataset.name ?? '',
