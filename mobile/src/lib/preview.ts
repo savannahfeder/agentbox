@@ -49,7 +49,7 @@ export function previewRows(now = Date.now()): PhoneRows {
         { ts: at(70), source: 'founder', patch: { body: roundAsk } },
         { ts: at(9), source: 'agent', patch: { status: 'blocked', note: roundNote } },
       ], { attached }),
-      thread('site', { id: 'w-3c4d5e6f7a', title: 'Show when each account limit resets', status: 'done', priority: 0, body: 'I need to see when my limits reset.', result: meterResult, createdAt: at(200), updatedAt: at(52), wrote: { body: her(at(200)), status: agent(at(52)), result: agent(at(52)) } }, [
+      thread('site', { id: 'w-3c4d5e6f7a', title: 'Show when each account limit resets', status: 'done', priority: 0, engine: 'codex', body: 'I need to see when my limits reset.', result: meterResult, createdAt: at(200), updatedAt: at(52), wrote: { body: her(at(200)), status: agent(at(52)), result: agent(at(52)) } }, [
         { ts: at(200), source: 'founder', patch: { body: 'I need to see when my limits reset.' } },
         { ts: at(52), source: 'agent', patch: { status: 'done', result: meterResult } },
       ]),
@@ -242,6 +242,12 @@ export function previewGroups(now = Date.now()) {
     { person_id: 'p-3', thread_id: 'w-card-1', title: 'Fix the login meter', project: 'Agentbox', state: 'running', priority: 5, problem: 'The meter shows the wrong reset time on Max accounts.', progress: 'Found where the time is read.', solution: null, visible: true, updated_at: at(10) },
     { person_id: 'p-2', thread_id: 'w-card-2', title: 'Pick the sign-in screen', project: 'Website', state: 'waiting', priority: 5, problem: 'Two sign-in screens are left.', progress: null, solution: null, visible: true, updated_at: at(25) },
   ];
+  // What shipped this week: two teammates' threads and one of yours.
+  const shipped = [
+    { person_id: 'p-2', thread_id: 'w-card-3', title: 'Put the new sign-in screen live', project: 'Website', state: 'done', priority: 5, visible: true, people: null, shipped_at: at(2 * 24 * 60), updated_at: at(2 * 24 * 60) },
+    { person_id: 'preview', thread_id: 'w-7a8b9c0d1e', title: 'Rename the Display menu', project: 'Agentbox', state: 'done', priority: 5, visible: true, people: null, shipped_at: at(1500), updated_at: at(1500) },
+    { person_id: 'p-3', thread_id: 'w-card-4', title: 'Show when each login resets', project: 'Agentbox', state: 'done', priority: 5, visible: true, people: null, shipped_at: at(40), updated_at: at(40) },
+  ];
   const names: Record<string, string> = { preview: 'Ada Lovelace', 'p-2': 'Sam Rivera', 'p-3': 'Kai Ito', 'p-4': 'Maya Chen', 'p-5': 'Lee Park' };
   return {
     rpc(name: string, args: Record<string, any>) {
@@ -256,7 +262,7 @@ export function previewGroups(now = Date.now()) {
       if (table === 'room_profiles') return profiles;
       if (table === 'room_presence') return presence;
       if (table === 'room_reads') return reads;
-      if (table === 'thread_cards') return cards;
+      if (table === 'thread_cards') return q.has('shipped_at') ? shipped : cards;
       // A small drawing of a screen, as a stored file comes back.
       if (table === 'room_files') return [{ data: 'iVBORw0KGgoAAAANSUhEUgAAADAAAAAkCAIAAABAJy5dAAAAXElEQVR42u3VsQ0AEBBAUWNYQcRORlGoLKqQsIJGIdpDJH7y68srLnfKWfNUChAgQIBGreSjAQIEiDsESApKMQibp1WvlwBtB+0N0AWQfIfmAF0A8ToAAQL0K6gDciTequifOckAAAAASUVORK5CYII=' }];
       if (table !== 'room_messages') return null;

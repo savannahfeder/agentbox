@@ -28,6 +28,7 @@ import { previewCloud } from '../lib/preview';
 import { ALERTS_KEY, leaveAddress, readAlerts, takeAddressBack, type KeptAlerts } from '../lib/push-device';
 import type { PlaceId } from '../lib/groups';
 import { phoneTabs } from '../lib/tabs';
+import { batchWords } from '../lib/picked';
 import { onTheirWay, teamFrom, withPendingPauses, withPhoneAnswers } from '../lib/teammates';
 import { isUnread, markSeen as markSeenIn, markUnseen as markUnseenIn, readSeen } from '../lib/unread';
 import { alertToken, alertTokenIfAllowed, setIconCount } from '../platform/alerts';
@@ -259,28 +260,31 @@ function useCloudState() {
     return made;
   }, [sender, say, agreed, askNotice]);
 
-  // Threads picked together and closed in one go, with one Undo for all of them.
-  const closeAll = useCallback(async (items: PressedItem[]) => {
+  // Threads picked together and closed or put off in one go, each by the plan one thread's press sends, with one Undo for all of them.
+  const pressAll = useCallback(async (items: PressedItem[], press: Extract<Press, { kind: 'close' | 'later' }>) => {
     if (!sender) return;
+    const words = batchWords(press, items);
     const undo: Step[] = [];
     let done = 0;
     try {
       for (const item of items) {
         const at = Date.now();
-        const plan = planFor({ kind: 'close' }, item, at, { away: macAway(macSeenOf(rowsNow.current.projects), at), cloud: cloudCarriesOn(rowsNow.current.projects) });
-        if (!plan) continue;
+        const plan = planFor(press, item, at, { away: macAway(macSeenOf(rowsNow.current.projects), at), cloud: cloudCarriesOn(rowsNow.current.projects) });
+        if (!plan?.steps.length) continue;
         const made = await runSteps(sender, plan.steps);
         if (made && typeof made === 'object' && 'ok' in made && made.ok === false) throw new Error(String((made as { error?: string }).error ?? 'Not sent.'));
         done += 1;
         if (plan.undo) undo.push(...plan.undo(made));
       }
-      const back = async () => { try { await runSteps(sender, undo); say(`Reopened ${done} ${done === 1 ? 'thread' : 'threads'}`); } catch (err) { say(message(err)); } };
-      say(`Closed ${done} ${done === 1 ? 'thread' : 'threads'}${undo.length ? ' · press Z to undo' : ''}`, undo.length ? back : undefined);
+      const back = async () => { try { await runSteps(sender, undo); say(words.undid(done)); } catch (err) { say(message(err)); } };
+      say(`${words.did(done)}${undo.length ? ' · press Z to undo' : ''}`, undo.length ? back : undefined);
     } catch (err) {
-      say(`Closed ${done} of ${items.length}. ${message(err)}`);
+      say(`${words.partial(done, items.length)} ${message(err)}`);
     }
     setNow(Date.now());
   }, [sender, say]);
+  const closeAll = useCallback((items: PressedItem[]) => pressAll(items, { kind: 'close' }), [pressAll]);
+  const laterAll = useCallback((items: PressedItem[], until: number, label?: string) => pressAll(items, { kind: 'later', until, label }), [pressAll]);
 
   // Where a command in Search sends the inbox page, and a permission card put aside (App.tsx `minimizedApproval`).
   const [wanted, setWanted] = useState<{ place: PlaceId; menu?: boolean; group?: boolean } | null>(null);
@@ -363,7 +367,7 @@ function useCloudState() {
   }, [cloud, setRows, keepAlerts]);
 
   return {
-    cloud, opened, signedIn, rows, view, tabs, repeats, status, loading: read.first, onlineAt: read.error ? 0 : read.fetchedAt, now, refresh, send, closeAll, attach, fileOf, toast, say,
+    cloud, opened, signedIn, rows, view, tabs, repeats, status, loading: read.first, onlineAt: read.error ? 0 : read.fetchedAt, now, refresh, send, closeAll, laterAll, attach, fileOf, toast, say,
     team, teamPending, watchTeam, askTeammate, wanted, goTo: setWanted, takeWanted: () => setWanted(null), minimizedApproval, setMinimizedApproval, approvalRoom, setApprovalRoom,
     dismissToast: () => setToast(null), signedInWith, signOut, preview: PREVIEW,
     notice, noticeRead, agreed, answerNotice, withdrawNotice: () => answerNotice(false),
