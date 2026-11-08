@@ -64,6 +64,13 @@ function readHolder(file: string): LockHolder | null {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
 }
 
+function heldBy(held: LockHolder | null): string {
+  if (!held) return '';
+  const at = new Date(held.at ?? NaN);
+  const since = Number.isNaN(at.getTime()) ? '' : ` since ${at.toISOString()}`;
+  return ` (held by pid ${held.pid}${held.label ? ` for ${held.label}` : ''}${since})`;
+}
+
 // Try once. Returns the token on success, null if someone else holds it.
 function tryAcquire(file: string, label: string): string | null {
   const token = crypto.randomBytes(12).toString('hex');
@@ -142,11 +149,7 @@ export async function withProjectLock<T>(projectDir: string, fn: () => T | Promi
 
     breakIfStale(file);
     if (Date.now() >= deadline) {
-      const held = readHolder(file);
-      throw new Error(
-        `could not lock ${projectDir} within ${timeoutMs}ms` +
-        (held ? ` (held by pid ${held.pid}${held.label ? ` for ${held.label}` : ''} since ${new Date(held.at!).toISOString()})` : ''),
-      );
+      throw new Error(`could not lock ${projectDir} within ${timeoutMs}ms${heldBy(readHolder(file))}`);
     }
     await sleep(BACKOFF_MS[Math.min(attempt++, BACKOFF_MS.length - 1)]);
   }
@@ -190,11 +193,7 @@ export function withProjectLockSync<T>(projectDir: string, fn: () => T, { label 
 
     breakIfStale(file);
     if (Date.now() >= deadline) {
-      const held = readHolder(file);
-      throw new Error(
-        `could not lock ${projectDir} within ${timeoutMs}ms` +
-        (held ? ` (held by pid ${held.pid}${held.label ? ` for ${held.label}` : ''} since ${new Date(held.at!).toISOString()})` : ''),
-      );
+      throw new Error(`could not lock ${projectDir} within ${timeoutMs}ms${heldBy(readHolder(file))}`);
     }
     sleepSync(BACKOFF_MS[Math.min(attempt++, BACKOFF_MS.length - 1)]);
   }

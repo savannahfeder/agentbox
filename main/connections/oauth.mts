@@ -31,9 +31,9 @@ async function discover(entry: CatalogTool, fetchFn: FetchLike) {
   return { authServer, metadata };
 }
 
-function loopbackPage({ state, ms, port = 0, name }: { state: string; ms: number; port?: number; name: string }) {
-  let settle!: { resolve: (code: string | null) => void; reject: (err: Error) => void };
-  const code = new Promise<string | null>((resolve, reject) => { settle = { resolve, reject }; });
+export function loopbackPage({ state, ms, port = 0, name }: { state: string; ms: number; port?: number; name: string }) {
+  let settle!: { resolve: (code: string) => void; reject: (err: Error) => void };
+  const code = new Promise<string>((resolve, reject) => { settle = { resolve, reject }; });
   // Nobody is awaiting this yet while the client registers.
   code.catch(() => {});
   const server = http.createServer((req, res) => {
@@ -45,8 +45,10 @@ function loopbackPage({ state, ms, port = 0, name }: { state: string; ms: number
     // A stray or forged knock must not end a sign-in the person is in the middle of.
     if (u.pathname !== '/callback' || u.searchParams.get('state') !== state) { say(400, `This is not the sign-in ${Name} is waiting for.`); return; }
     if (u.searchParams.get('error')) { say(200, 'Nothing was connected. You can close this tab.'); settle.reject(new Error('You said no on the sign-in screen, so nothing was connected.')); return; }
+    const got = u.searchParams.get('code');
+    if (!got) { say(400, `Nothing was connected. Go back to ${Name} and press Connect to try again.`); settle.reject(new Error(`${name} came back without a code, so nothing was connected.`)); return; }
     say(200, `Connected. You can close this tab and go back to ${Name}.`);
-    settle.resolve(u.searchParams.get('code'));
+    settle.resolve(got);
   });
   const timer = setTimeout(() => settle.reject(new Error('The sign-in did not finish in time, so nothing was connected. Press Connect to try again.')), ms);
   return {
@@ -98,7 +100,7 @@ export async function signIn({ entry, openExternal, client: ownClient = null, ow
     let tokens;
     try {
       tokens = await exchangeAuthorization(authServer, {
-        metadata, clientInformation: client, authorizationCode: code!, codeVerifier, redirectUri: redirectUrl, resource, fetchFn,
+        metadata, clientInformation: client, authorizationCode: code, codeVerifier, redirectUri: redirectUrl, resource, fetchFn,
       });
     } catch (err) {
       if (ownClient) throw new Error(`${entry.name} did not accept that client ID and secret, so nothing was connected.`);
