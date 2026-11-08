@@ -42,6 +42,7 @@ import type { CollectingIpcMain, IpcHandler } from './serve.mts';
 import { carryHerBriefsAcross, joinMessageRules, setAsideShippedMessageRules, unifyAgentInstructions } from './instruction-settings.mts';
 import * as approvals from './approvals.mjs';
 import { recoveryToast } from '../shared/recovery.mts';
+import { CHORD_ANSWERS, chordLands } from '../shared/card-settles.mts';
 import { phoneWaitsOf } from '../shared/phone-snapshot.mjs';
 import { teammatesOn } from '../shared/teammates.mjs';
 import { dataFolderName, isNewUserBuild } from '../shared/side-build.mjs';
@@ -1047,14 +1048,16 @@ async function createWindow() {
       event.preventDefault();
       return;
     }
-    if (key !== 'y' && key !== 'n') return;
+    const allow = CHORD_ANSWERS[key];
+    if (allow === undefined) return;
     const front = cardInFront();
     if (!front) return;
+    event.preventDefault(); // the page never sees the chord; no double-answer
+    if (!chordLands(ipc.cardSentAt(front.id), Date.now())) return;
     // Through the ipc layer's own door, so the renderer is told what was
     // decided and can acknowledge it. Answering the file directly from here is
     // what made the chord feel like nothing had happened (2026-08-06).
-    ipc.answerApproval(front.id, key === 'y');
-    event.preventDefault(); // the page never sees the chord; no double-answer
+    ipc.answerApproval(front.id, allow);
   });
 
   // ---- END OF THE CHORD WIRING ----
