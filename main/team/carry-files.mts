@@ -295,8 +295,9 @@ export function createFileCarrier({
     const progress = (done: number) => noting({ ref, mine: true, coming: true, here: found.file, done, total, at });
     progress(0);
     task.promise = (async () => {
-      const fd = fs.openSync(found.file, 'r');
+      let fd: number | null = null;
       try {
+        fd = fs.openSync(found.file, 'r');
         const whole = crypto.createHash('sha256');
         const chunks: CarriedChunk[] = [];
         for (const [i, length] of pieceSizes(found.size).entries()) {
@@ -321,7 +322,7 @@ export function createFileCarrier({
         log(`team files: sending ${ref} in parts: ${(err as Error | null)?.message ?? err}`);
         task.error = 'upload';
       } finally {
-        fs.closeSync(fd);
+        if (fd !== null) fs.closeSync(fd);
         task.done = true;
       }
     })();
