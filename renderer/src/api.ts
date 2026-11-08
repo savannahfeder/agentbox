@@ -1650,7 +1650,18 @@ export const api = {
       if (params.get('cloudplan') === 'team-trial' || params.get('cloudplan') === 'team') {
         const trial = params.get('cloudplan') === 'team-trial';
         const team = { trial, endsAt: trial ? Date.now() + 9 * 86_400_000 : null, seats: trial ? 0 : 3, members: 3, owner: params.get('owner') !== '0', agents: trial ? 6 : 30, running: 2, hours: trial ? 30 : 1200, usedSeconds: (params.has('spent') ? (trial ? 30 : 1200) : trial ? 8.5 : 212) * 3600 };
-        return { signedIn: true, plan: 'team', unlimited: false, agents: team.agents, hoursPerMonth: team.hours, running: 2, usedSeconds: team.usedSeconds, billing: null, team };
+        const owner = team.owner;
+        const h = 3600;
+        const teamMembers = [
+          { id: 'p1', name: 'Sam Rivera', email: 'sam@example.com', role: (owner ? 'owner' : 'member') as 'owner' | 'member', usedSeconds: (trial ? 4.2 : 96) * h, running: 1, me: true },
+          { id: 'p2', name: 'Priya Natarajan', email: 'priya@example.com', role: (owner ? 'member' : 'owner') as 'owner' | 'member', usedSeconds: (trial ? 3.1 : 81) * h, running: 1 },
+          { id: 'p3', name: 'Leo Okafor', email: 'leo@example.com', role: 'member' as const, usedSeconds: (trial ? 1.2 : 35) * h, running: 0 },
+        ];
+        const day = 86_400_000;
+        const teamBilling = trial
+          ? { periodStart: null, periodEnd: null, nextAt: null, nextAmount: null, card: null, email: owner ? 'sam@example.com' : null, invoices: [] }
+          : { periodStart: Date.now() - 12 * day, periodEnd: Date.now() + 18 * day, nextAt: Date.now() + 18 * day, nextAmount: 120, card: { brand: 'Visa', last4: '4242' }, email: 'billing@example.com', invoices: [1, 2].map((k) => ({ at: Date.now() - (12 + 30 * (k - 1)) * day, amount: 120, status: 'paid' as const })) };
+        return { signedIn: true, plan: 'team', unlimited: false, agents: team.agents, hoursPerMonth: team.hours, running: 2, usedSeconds: team.usedSeconds, billing: null, team, teamMembers, teamBilling };
       }
       if (params.get('cloudplan') === 'spent') return { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0, billing: null, free: { agents: 2, hours: 5, usedSeconds: 5 * 3600 } };
       return { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0 };

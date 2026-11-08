@@ -43,6 +43,7 @@ import { EVERY } from '../instruction-scope';
 import type {AccountUsageReading, Usage, UsageLimit, WorkspaceSettings} from '../types';
 import { accountLabel, cloudAccountInUse, cloudToggleTarget, countedAccounts, type CloudStatus } from '../cloud-menu';
 import { cloudBilling, planKey, planSummary, type PaidPlan } from '../cloud-upgrade';
+import { TeamBilling, type TeamBillingLayout } from '../team/TeamBilling';
 import { keyLooksWrong } from '../key-asks';
 import { CloudPlanCards } from './CloudPlanCards';
 import type { CloudPlan } from '../types';
@@ -1019,6 +1020,16 @@ function CloudPlansPage({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: (
       {bill.says && !waitingFor && <p className="cloud-plans-say">{bill.says}</p>}
     </>
   );
+  if (plan?.plan === 'team' && plan.team) {
+    const layout = (new URLSearchParams(location.search).get('teambilling') || 'sections') as TeamBillingLayout;
+    return (
+      <Page title="Plan and Billing">
+        <TeamBilling team={plan.team} members={plan.teamMembers ?? []} billing={plan.teamBilling ?? null} layout={layout}
+          onPay={() => void payForTeam()} onManage={() => void billing()} />
+        {lines}
+      </Page>
+    );
+  }
   // THE PLAN YOU PAY FOR, FOUND UNDER BILLING (the founder's pick of five, 2026-10-25).
   const sum = planSummary(plan);
   if (sum) {

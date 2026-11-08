@@ -829,6 +829,9 @@ export interface CloudPlan {
   free?: { agents: number; hours: number; usedSeconds: number };
   /** The team's shared hours: a trial until `endsAt`, or `seats` paid for. */
   team?: { trial: boolean; endsAt: number | null; seats: number; members: number; owner: boolean; agents: number; running: number; hours: number; usedSeconds: number };
+  /** Who is on the team and what each used, and, for its owner, what Stripe holds. */
+  teamMembers?: import('./team/TeamBilling').TeamBillingMember[];
+  teamBilling?: import('./team/TeamBilling').TeamBillingDetails | null;
   /** Who bills the plan: Stripe, or nobody because it was set by hand. Absent from older servers. */
   billing?: 'stripe' | 'given' | null;
   error?: string;

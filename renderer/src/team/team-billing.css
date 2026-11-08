@@ -1,0 +1,53 @@
+/* A team's Plan and Billing (TeamBilling.tsx), built from the billing page's own parts. */
+.tb-small { font-size: 12px; padding: 3px 10px; }
+.tb-members { display: grid; }
+.tb-member { display: grid; grid-template-columns: 26px 1fr 220px 80px; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; color: var(--text); }
+.tb-member:first-child { border-top: 0; }
+.tb-member-name small { display: block; margin-top: 2px; font-size: 12px; color: var(--text-faint); }
+.tb-member-use { display: flex; align-items: center; gap: 10px; }
+.tb-member-bar { flex: 1; height: 2px; background: var(--line); }
+.tb-member-bar i { display: block; height: 100%; min-width: 2px; background: var(--accent); }
+.tb-member-hours { min-width: 44px; text-align: right; font-size: 12.5px; color: var(--text-dim); }
+.tb-member-running { text-align: right; font-size: 12px; color: var(--text-faint); }
+
+.tb-invoices { display: grid; }
+.tb-invoice { display: grid; grid-template-columns: 1fr 100px 80px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 13px; color: var(--text-dim); }
+.tb-invoice:first-child { border-top: 0; }
+.tb-status { text-align: right; color: var(--text-faint); }
+.tb-status.is-failed { color: var(--text); }
+
+.tb-strip, .tb-hero { margin-top: 28px; }
+.tb-table-head > :last-child, .tb-table-row > :last-child { text-align: right; }
+.tb-columns > div { min-width: 0; }
+.tb-columns .tb-member { grid-template-columns: 26px 1fr 110px 64px; }
+.tb-strip { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 18px; align-items: center; padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--wash); }
+.tb-strip-figure b { display: block; font-size: 22px; font-weight: 400; color: var(--text); }
+.tb-strip-figure span { font-size: 12px; color: var(--text-faint); }
+.tb-table { display: grid; }
+.tb-table-head, .tb-table-row { display: grid; grid-template-columns: 1.4fr 0.8fr 1.4fr 0.6fr; gap: 12px; align-items: center; padding: 10px 0; font-size: 14px; color: var(--text); }
+.tb-table-head { font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); padding-top: 0; }
+.tb-table-row { border-top: 1px solid var(--line); }
+.tb-table-who { display: flex; align-items: center; gap: 10px; }
+
+.tb-hero { padding: 22px; border: 1px solid var(--line); border-radius: 10px; background: var(--wash); display: grid; gap: 12px; justify-items: start; }
+.tb-hero-title { font-size: 18px; color: var(--text); }
+.tb-hero-track { width: 100%; height: 2px; background: var(--line); }
+.tb-hero-track i { display: block; height: 100%; background: var(--accent); }
+.tb-hero-ends { width: 100%; display: flex; justify-content: space-between; font-size: 12px; color: var(--text-faint); }
+.tb-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 24px; }
+.tb-compare-card { padding: 16px 18px; border: 1px solid var(--line); border-radius: 10px; }
+.tb-compare-name { font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
+.tb-compare-big { margin: 8px 0 6px; font-size: 22px; color: var(--text); }
+.tb-compare-small { font-size: 12.5px; color: var(--text-dim); line-height: 1.6; }
+
+.tb-columns { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 24px; align-items: start; }
+.tb-big { font-size: 30px; color: var(--text); margin-bottom: 10px; }
+.tb-big span { font-size: 14px; color: var(--text-faint); }
+.tb-side { margin-top: 70px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--wash); display: grid; gap: 10px; }
+.tb-side-row { display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px; color: var(--text-faint); }
+.tb-side-row b { font-weight: 400; color: var(--text); text-align: right; }
+.tb-side-row.tb-faint b { color: var(--text-dim); }
+
+.tb-tabs { display: flex; gap: 22px; margin: 26px 0 16px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--text-faint); }
+.tb-tabs span { padding-bottom: 9px; }
+.tb-tabs span.on { color: var(--text); border-bottom: 1px solid var(--accent); }
