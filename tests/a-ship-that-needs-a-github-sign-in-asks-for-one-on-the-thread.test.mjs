@@ -197,14 +197,13 @@ describe('the sign-in kept on this computer', () => {
 });
 
 describe('the card', () => {
-  const draw = (why) => renderToStaticMarkup(h(GitHubSignInCard, { why, save: async () => null, openLink: () => {} }));
+  const draw = (why) => renderToStaticMarkup(h(GitHubSignInCard, { why, signIn: async () => ({ error: 'x' }), save: async () => null, openLink: () => {}, copy: () => {} }));
 
-  it('asks for a token, says where to get one and that it ships again', () => {
+  it('asks for a sign-in, with a token as the other way', () => {
     const html = draw(NO_GITHUB_SIGN_IN);
     expect(html).toContain('Sign in to GitHub');
-    expect(html).toContain('github.com/settings/tokens/new?scopes=repo');
-    expect(html).toContain('type="password"');
-    expect(html).toContain('Ships again as soon as it is saved');
+    expect(html).toContain('Sign in with GitHub');
+    expect(html).toContain('Paste a token instead');
   });
 
   it('says a saved token was refused', () => {

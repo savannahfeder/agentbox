@@ -55,6 +55,10 @@ export function gitHubPushSignIn({ file, cipher, fetchImpl, timeoutMs }: { file:
       const token = saved();
       return token ? { env: { [TOKEN_VAR]: token }, config: pushConfig() } : null;
     },
+    /** Drops the saved token, so git's own sign-in answers the push. */
+    async forget() {
+      if (saved()) await vault.update((data: Record<string, unknown>) => { delete data.token; delete data.savedAt; });
+    },
     /** Checks the token with GitHub and keeps it; throws with words for the card. */
     async save(value: unknown) {
       const token = typeof value === 'string' ? value.trim() : '';

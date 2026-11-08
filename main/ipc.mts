@@ -80,6 +80,8 @@ import { EVENT_NAMES } from '../shared/analytics-events.mts';
 import { appFinder } from './everything-found.mjs';
 import { appFilesPlace } from './files-place.mjs';
 import { Name } from '../shared/product-name.mjs';
+import { setUpGit, startGhLogin } from './github-browser-sign-in.mts';
+import type { GhLogin } from './github-browser-sign-in.mts';
 import { handedOnByReply, isGivenTask } from '../shared/team-rules.mjs';
 import { closeRefusal, closedAnywayNote } from '../shared/not-shipped.mts';
 import { lightRunning, snapshotSender } from '../shared/snapshot-delta.mjs';
@@ -2165,6 +2167,25 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       store.answerSignIn(product, id, { id: ask, said, url });
       push();
       return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+  // GitHub's own sign-in for this computer's git, started from the card on a ship that could not push.
+  let ghLogin: GhLogin | null = null;
+  ipcMain.handle('zero:github-browser-sign-in', async () => {
+    try {
+      ghLogin?.cancel();
+      const login = ghLogin = await startGhLogin();
+      void login.done.then(async (ok) => {
+        if (ghLogin === login) ghLogin = null;
+        if (!ok || !await setUpGit()) return;
+        await supervisor.gitHubSignIn?.forget().catch(() => {});
+        store.shipAgainAfterGitHubSignIn();
+        supervisor.wake();
+        push();
+      });
+      return { ok: true, code: login.code, url: login.url };
     } catch (err) {
       return { ok: false, error: String((err as Error).message) };
     }

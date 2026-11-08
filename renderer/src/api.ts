@@ -1648,6 +1648,13 @@ export const api = {
     return zero.gitHubSignIn(p);
   },
 
+  /** Starts GitHub's own sign-in for this computer's git; answers with its code and link. */
+  async gitHubBrowserSignIn(): Promise<{ ok: boolean; code?: string; url?: string; error?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.gitHubBrowserSignIn) return { ok: false, error: RESTART_NOTE };
+    return zero.gitHubBrowserSignIn();
+  },
+
   /** What the person did with a sign-in link an agent on this thread is waiting on. */
   async signInAnswer(p: { product: string; id: string; ask: string; said: 'signed-in' | 'skipped' | 'landed'; url?: string }): Promise<{ ok: boolean; error?: string }> {
     const zero = window.zero as any;

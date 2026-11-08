@@ -417,6 +417,8 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
           </div>
           {md(clean(outcome.text))}
           {signInWhy && <GitHubSignInCard why={signInWhy} openLink={(href) => { void api.openArtifactExternally({ product: item.product, src: href }); }}
+            copy={(text) => { void navigator.clipboard?.writeText(text).then(() => say('Copied'), () => say('That did not copy.')); }}
+            signIn={async () => { const r = await api.gitHubBrowserSignIn(); return r.ok && r.code && r.url ? { code: r.code, url: r.url } : { error: r.error ?? 'GitHub\'s sign-in did not start.' }; }}
             save={async (token) => { const r = await api.gitHubSignIn({ token }); if (!r.ok) return r.error ?? 'That did not save. Try again.'; say('GitHub connected. Shipping it again.'); return null; }} />}
         </div>
       )
