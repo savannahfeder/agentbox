@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react';
 import { Platform, TextInput, View } from 'react-native';
 import { cloudCarriesOn } from '../../../../renderer/src/phone-rows';
 import { searchSettings, type SettingsHit } from '../../../../renderer/src/settings-search';
+import { phoneSettingsRows } from '../../lib/settings-rows';
 import { useCloud } from '../../state/cloud';
 import { useSettings } from '../../state/settings';
 import { Magnifier } from '../../ui/Filters';
@@ -24,6 +25,7 @@ export default function SettingsHome() {
   const hits = useMemo(() => searchSettings(q, {
     pages: SETTINGS_PAGES.filter((p) => p.shown(s)).map((p) => p.id),
     projects: s.settings?.projects ?? [],
+    rows: phoneSettingsRows(s.settings),
   }), [q, s]);
   const open = (hit: SettingsHit) => {
     const project = hit.page.startsWith('project:') ? hit.page.slice('project:'.length) : null;

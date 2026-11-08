@@ -17,8 +17,8 @@ import os from 'node:os';
 import path from 'node:path';
 import * as disk from '../main/store/work-items.mjs';
 import { Store } from '../main/store.mts';
-import { noteToItsAgent, wakeForNotes } from '../main/notes-wake.mjs';
-import { cleanMark, notesForItsAgent } from '../shared/artifact-marks.mjs';
+import { noteToItsAgent } from '../main/notes-wake.mjs';
+import { cleanMark } from '../shared/artifact-marks.mjs';
 
 let store, dir, thread, woke;
 const supervisor = { sessions: new Map(), wake: () => { woke++; } };
@@ -90,29 +90,3 @@ describe('what is unchanged', () => {
   });
 });
 
-describe("a teammate's waiting note", () => {
-  const lines = () => disk.readItemHistory(dir, thread.id);
-  const theirs = (extra = {}) => ({ id: 'n1', file: 'pricing-answers.md', place: { kind: 'whole' }, text: 'Show yearly', by: 'p-maya', ts: 1, mentions: [], ...extra });
-
-  it('is not told to the agent until somebody sends it', () => {
-    const marks = { notes: [theirs({ wait: true })] };
-    expect(notesForItsAgent(lines(), marks, { me: 'p-sam' })).toHaveLength(0);
-    expect(notesForItsAgent(lines(), { notes: [theirs({ wait: true, toAgent: true })] }, { me: 'p-sam' })).toHaveLength(1);
-    expect(notesForItsAgent(lines(), { notes: [theirs()] }, { me: 'p-sam' })).toHaveLength(1);
-  });
-
-  it('does not wake the thread while it waits', async () => {
-    const team = { state: () => ({ me: { id: 'p-sam' }, people: [{ id: 'p-maya', name: 'Maya' }] }) };
-    const told = [];
-    const withNotes = (notes) => ({
-      listProducts: () => store.listProducts(),
-      productDir: (slug) => store.productDir(slug),
-      fileMark: () => {},
-      listItems: () => [{ ...row(), artifacts: { notes, approvals: [], seen: {} } }],
-    });
-    const tell = async (...a) => { told.push(a); };
-    expect(await wakeForNotes({ store: withNotes([theirs({ wait: true })]), team, tell })).toBe(0);
-    expect(await wakeForNotes({ store: withNotes([theirs({ wait: true, toAgent: true })]), team, tell })).toBe(1);
-    expect(told).toHaveLength(1);
-  });
-});

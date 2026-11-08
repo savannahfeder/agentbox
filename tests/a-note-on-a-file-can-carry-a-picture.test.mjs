@@ -65,7 +65,7 @@ describe('the file view wires it up', () => {
   const card = read('renderer/src/components/FileNoteCard.tsx');
 
   it('the note box takes a paste and a drop', () => {
-    expect(view).toMatch(/aria-label="Note"[\s\S]{0,600}onPaste=/);
+    expect(view).toMatch(/aria-label="Comment"[\s\S]{0,600}onPaste=/);
     expect(view).toMatch(/onDrop=/);
   });
 

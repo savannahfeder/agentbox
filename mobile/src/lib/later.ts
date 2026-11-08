@@ -4,6 +4,18 @@
 import { dayAndTime, parseWhen } from '../../../renderer/src/format';
 import { laterPresets } from '../../../renderer/src/later-times';
 import { previewLine } from '../../../renderer/src/components/SchedulePicker';
+import { laterHint, mondayIsTomorrow, mondayMorning, tomorrowMorning } from '../../../renderer/src/threads/composer-rules';
+
+/** Send later on a reply, as components/ReplyLater.tsx offers it; `at` is the time set now, or 0. */
+export function replyLaterRows(now: number, at: number): { label: string; ts: number; hint?: string; on?: true }[] {
+  const tomorrow = tomorrowMorning(now);
+  const monday = mondayMorning(now);
+  return [
+    ...(at > 0 ? [{ label: 'Remove the time', ts: 0 }] : []),
+    { label: 'Tomorrow morning', ts: tomorrow, hint: laterHint(tomorrow), ...(at === tomorrow ? { on: true as const } : {}) },
+    ...(mondayIsTomorrow(now) ? [] : [{ label: 'Monday morning', ts: monday, hint: laterHint(monday), ...(at === monday ? { on: true as const } : {}) }]),
+  ];
+}
 
 export interface LaterRow { label: string; ts: number; hint: string; now?: true }
 
