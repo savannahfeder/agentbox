@@ -101,10 +101,12 @@ const marksWereOut = () => { try { return localStorage.getItem(MARKS_KEY) === '1
 // A note longer than this asks once before the cross throws it away.
 const ASK_BEFORE_DISCARD_MS = 5000;
 
-export function FormatBar({ box, onChange, onAttach, onFromFiles, onVoice, onNotice, voiceKey = '', voice: control, onRecording }: {
+export function FormatBar({ box, onChange, onAttach, onFromFiles, onVoice, onNotice, voiceKey = '', voice: control, onRecording, mention = true }: {
   /** The reply box itself: the bar works on the selection that is in it. */
   box: { current: HTMLTextAreaElement | null };
   onChange: (text: string) => void;
+  /** False where the box has nobody to mention. */
+  mention?: boolean;
   /** Open the file picker. Absent where there is nothing to attach to. */
   onAttach?: () => void;
   /** A file picked from Files, which the clip then offers beside the disk. */
@@ -248,10 +250,12 @@ export function FormatBar({ box, onChange, onAttach, onFromFiles, onVoice, onNot
       )}
       {/* WHAT PUTS SOMETHING INTO THE MESSAGE comes first; the marks that
           change what is already there wait behind Aa, after a gap. */}
-      <button type="button" className="fmt-btn" title="Mention someone" aria-label="Mention someone"
-        onMouseDown={hold} onClick={() => put('@')}>
-        <span className="fmt-letter">@</span>
-      </button>
+      {mention && (
+        <button type="button" className="fmt-btn" title="Mention someone" aria-label="Mention someone"
+          onMouseDown={hold} onClick={() => put('@')}>
+          <span className="fmt-letter">@</span>
+        </button>
+      )}
       {onAttach && (
         <span className="fmt-emoji-wrap" ref={attachWrap}>
           <button type="button" className="fmt-btn" title="Attach a file" aria-label="Attach a file" aria-expanded={onFromFiles ? !!attachFrom : undefined}
