@@ -173,6 +173,8 @@ function kindOf(name: string, values: string[], first: boolean): ColumnKind {
   if (share(filled, (v) => EMAIL.test(v)) >= 0.8) return 'email';
   if (share(filled, (v) => URLISH.test(v) && !NUMBER.test(v)) >= 0.8) return 'link';
   if (!(LABEL_NUMBER.test(name) && !AMOUNT_HEADER.test(name)) && share(filled, (v) => NUMBER.test(v) || Number.isFinite(amountOf(v))) >= 0.9) return 'number';
+  // Names with a day in them read as words, not as dates and not as tags.
+  if (share(filled, (v) => Number.isFinite(dateOf(v))) >= 0.8 && share(filled, onlyADate) < 0.8) return 'text';
   if (share(filled, (v) => Number.isFinite(dateOf(v)) && onlyADate(v)) >= 0.8 && (DATE_HEADER.test(name) || filled.some((v) => MONTH.test(v) || v.includes('/') || /^\d{4}-/.test(v)))) return 'date';
   const short = filled.every((v) => v.length <= 28 && v.split(/\s+/).length <= 4);
   const distinct = new Set(filled.map((v) => v.toLowerCase())).size;

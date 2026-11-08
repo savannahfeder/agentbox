@@ -154,7 +154,7 @@ describe('a day picked from the calendar is written the way the column writes da
   });
   // A tester picked a day in Launch ("Cloud Thu Nov 12") and the file lost "Cloud".
   it('a column of names with a day in them is not guessed to be dates; a column of days still is', () => {
-    expect(readTable('Goal,Launch\nA,Cloud Thu Nov 12\nB,Multiplayer Tue Nov 17\nC,Cloud Thu Nov 12\n', 'x.csv').columns[1].kind).not.toBe('date');
+    expect(readTable('Goal,Launch\nA,Cloud Thu Nov 12\nB,Multiplayer Tue Nov 17\nC,Cloud Thu Nov 12\nD,Both\n', 'x.csv').columns[1].kind).toBe('text');
     expect(readTable('Goal,By\nA,Mon Nov 9\nB,Sat Nov 7\nC,Thu Nov 12\n', 'x.csv').columns[1].kind).toBe('date');
     expect(readTable('Goal,Due\nA,2026-11-12T10:30:00Z\nB,2026-11-13\n', 'x.csv').columns[1].kind).toBe('date');
   });
