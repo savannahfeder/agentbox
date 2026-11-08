@@ -1,8 +1,9 @@
 // Where the app's own return address lands. Google's sign-in sheet takes its
 // return itself; a reset email's link is opened from the mail app, so it is
 // taken here, and only when this phone asked for a reset.
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { router } from '../lib/router';
 import { useCloud } from '../state/cloud';
 import { Waiting } from '../ui/LogoOrbit';
 import { Wall } from '../ui/parts';

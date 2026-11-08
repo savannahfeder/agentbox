@@ -46,8 +46,23 @@ export function openingFor(store: KeptStore, engine: Harness, codexDefault: stri
   };
 }
 
-/** The agent a new thread opens on: the one last picked, where the computer offers it (engines.ts `startingEngine`). */
-export const openingEngine = (store: KeptStore, engines: Engine[]): Harness => startingEngine(readLastEngine(asStorage(store)), engines);
+/** The agent a new thread opens on: the one last picked, else the computer's own, where the computer offers it (engines.ts `startingEngine`). */
+export const openingEngine = (store: KeptStore, engines: Engine[], workspace: string | null = null): Harness =>
+  startingEngine(readLastEngine(asStorage(store), workspace), engines);
+
+/** The computer's agents as the phone last read them, so a slow or failed read does not drop it to Claude Code alone. */
+export interface Agents { engines: Engine[]; workspace: string; codexModels: ModelChoice[]; codexDefault: string | null }
+const AGENTS_KEY = 'agentbox.computerAgents';
+export function keptAgents(store: KeptStore): Agents | null {
+  try {
+    const a = JSON.parse(store.getItem(AGENTS_KEY) ?? 'null');
+    if (!a || !Array.isArray(a.engines) || !a.engines.length || typeof a.workspace !== 'string') return null;
+    return { engines: a.engines, workspace: a.workspace, codexModels: Array.isArray(a.codexModels) ? a.codexModels : [], codexDefault: a.codexDefault ?? null };
+  } catch { return null; }
+}
+export function keepAgents(store: KeptStore, agents: Agents) {
+  try { store.setItem(AGENTS_KEY, JSON.stringify(agents)); } catch { /* read again next time */ }
+}
 export function pickEngine(store: KeptStore, engine: Harness) { writeLastEngine(engine, asStorage(store)); }
 
 export function pickProject(store: KeptStore, slug: string) {
@@ -83,10 +98,23 @@ export function newThreadChoices({ priority, engine = 'claude', model, effort, e
   };
 }
 
+/**
+ * The agent a thread runs on, by the computer's rule (shared/engines.mjs
+ * `engineFor`): Codex on a computer with only Codex, else the row's own, else
+ * its model's, else the computer's chosen agent where it still has it. A row
+ * names its agent only when the computer offers two.
+ */
+function threadEngine(item: { engine?: string; model?: string }, agents: Partial<Agents>): Harness {
+  const has = (id: string) => (agents.engines ?? []).some((e) => e.id === id);
+  if (has('codex') && !has('claude')) return 'codex';
+  if (item.engine === 'codex' || item.engine === 'claude') return item.engine;
+  if (item.model) return harnessOf(item.model, agents.codexModels);
+  return agents.workspace === 'codex' && has('codex') ? 'codex' : 'claude';
+}
+
 /** The model a thread's reply box shows and lists: that thread's own agent's, not always Claude's. */
-export function replyModel(item: { engine?: string; model?: string }, picked: Pick<Choices, 'model'>, codex: CodexOpts = {}) {
-  const engine: Harness = item.engine === 'codex' || item.engine === 'claude' ? item.engine
-    : item.model ? harnessOf(item.model, codex.codexModels) : 'claude';
+export function replyModel(item: { engine?: string; model?: string }, picked: Pick<Choices, 'model'>, codex: CodexOpts & Partial<Agents> = {}) {
+  const engine = threadEngine(item, codex);
   const model = picked.model ?? item.model ?? defaultModelFor(engine, codex.codexDefault ?? null);
   return { engine, model, label: engineModelLabel(engine, model, codex) };
 }
