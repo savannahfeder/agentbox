@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { phoneView } from '../renderer/src/phone-rows';
-import { madeHere } from '../shared/phone-snapshot.mjs';
+import { madeHere } from '../shared/phone-snapshot.mts';
 import { DEFAULT_DISPLAY } from '../renderer/src/threads/page-rules';
 import { phoneBoard, phoneTabs } from '../mobile/src/lib/tabs';
 

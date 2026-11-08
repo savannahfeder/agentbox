@@ -7,14 +7,14 @@
 // address"), and with no phone site Settings drops its Privacy policy and Terms
 // rows, which App Review requires (guideline 5.1.1(i)). Both reviewer passes
 // on 2026-11-08 (Claude and Codex) flagged it. The address and key are public
-// and already ship in shared/cloud-address.mjs, so a build with nothing given
+// and already ship in shared/cloud-address.mts, so a build with nothing given
 // now uses them; whatever is given still wins.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { cloudConfig } from '../mobile/app.config';
-import { CLOUD_ADDRESS, PHONE_SITE } from '../shared/cloud-address.mjs';
+import { CLOUD_ADDRESS, PHONE_SITE } from '../shared/cloud-address.mts';
 
 const none = path.join(os.tmpdir(), 'no-such-team-config.json');
 const file = (c) => { const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'team-config-')), 'team.config.json'); fs.writeFileSync(f, JSON.stringify(c)); return f; };

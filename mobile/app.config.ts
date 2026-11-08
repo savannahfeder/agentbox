@@ -3,7 +3,7 @@
 // The cloud's public address and key come from the same file the phone site
 // reads (scripts/phone-site-config.mjs), or from the environment on Expo's
 // build machines, which see only what git tracks, else from
-// shared/cloud-address.mjs. The
+// shared/cloud-address.mts. The
 // bundle id is permanent once a build uses it; the environment can name another
 // for a copy of the app built elsewhere.
 import fs from 'node:fs';
@@ -11,7 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { ExpoConfig } from 'expo/config';
 import { NAME, nameSlug } from '../shared/product-name.mjs';
-import { CLOUD_ADDRESS, PHONE_SITE } from '../shared/cloud-address.mjs';
+import { CLOUD_ADDRESS, PHONE_SITE } from '../shared/cloud-address.mts';
 
 // `phoneSite` is where a new account's email link lands (the phone website),
 // and where Settings' Privacy policy and Terms open. With nothing given, the

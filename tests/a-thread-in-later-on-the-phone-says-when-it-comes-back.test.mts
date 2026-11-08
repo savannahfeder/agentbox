@@ -8,7 +8,7 @@
 // sent and the Queued it gives anything the computer has not taken.
 import { describe, it, expect } from 'vitest';
 import { phoneView, phoneSlug } from '../renderer/src/phone-rows';
-import { madeHere } from '../shared/phone-snapshot.mjs';
+import { madeHere } from '../shared/phone-snapshot.mts';
 import { phoneTabs } from '../mobile/src/lib/tabs';
 import { backWords } from '../renderer/src/threads/page-rules';
 

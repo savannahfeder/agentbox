@@ -7,7 +7,7 @@
 // they left after the plain toast's 2.5 s, before the window had half run.
 import { describe, it, expect } from 'vitest';
 import { toastLife } from '../mobile/src/lib/overlays';
-import { PHONE_UNDO_MS, PHONE_UNDO_HOLD_MS } from '../shared/phone-undo.mjs';
+import { PHONE_UNDO_MS, PHONE_UNDO_HOLD_MS } from '../shared/phone-undo.mts';
 
 const undo = async () => {};
 
