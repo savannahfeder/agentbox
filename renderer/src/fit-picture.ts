@@ -45,6 +45,11 @@ async function shrinkable(blob: Blob): Promise<boolean> {
   return !new TextDecoder('latin1').decode(head).includes('acTL');
 }
 
+/** The picture's place answered that nothing is there. */
+export class PictureMissing extends Error {
+  constructor(status?: number) { super(`picture not found (${status ?? 'no answer'})`); }
+}
+
 // Two at a time, so opening a thread of thirty does not decode thirty at once.
 const AT_ONCE = 2;
 let running = 0;
@@ -66,7 +71,7 @@ async function inTurn<T>(work: () => Promise<T>): Promise<T> {
 export function fitPicture(url: string, box: Box, tools: FitTools = browser): Promise<{ url: string; shrunk: boolean }> {
   return inTurn(async () => {
     const res = await tools.fetch(url);
-    if (!res.ok) throw new Error(`picture not found (${res.status ?? 'no answer'})`);
+    if (!res.ok) throw new PictureMissing(res.status);
     const blob = await res.blob();
     if (!(await shrinkable(blob))) return { url: tools.link(blob), shrunk: false };
     const whole = await tools.decode(blob);

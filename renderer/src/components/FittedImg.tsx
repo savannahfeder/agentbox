@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ImgHTMLAttributes } from 'react';
-import { fitPicture } from '../fit-picture';
+import { fitPicture, PictureMissing } from '../fit-picture';
 
 type Props = Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> & {
   src: string;
@@ -59,7 +59,12 @@ export function FittedImg({ src, cover = false, maxHeight, minWidth = 0, ...img 
     let made: string | null = null;
     fitPicture(src, { ...room, cover })
       .then((r) => { made = r.url; if (live) setDrawn({ for: src, url: r.url }); else URL.revokeObjectURL(r.url); })
-      .catch(() => { if (live) setFailed(src); });
+      .catch((err) => {
+        if (!live) return;
+        // Nothing there: the caller's next place is tried now, not after a second load fails.
+        if (err instanceof PictureMissing && img.onError) img.onError(undefined as never);
+        else setFailed(src);
+      });
     return () => { live = false; if (made) URL.revokeObjectURL(made); };
   }, [src, room, near, cover]);
   if (failed === src) return <img {...img} src={src} />;
