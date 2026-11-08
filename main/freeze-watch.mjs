@@ -13,6 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { dayOf } from './freeze-recorder.mts';
+import { SWAP_CRITICAL_MBPS } from './memory-gate.mts';
 
 export const FILE_AT_MS = 1000;
 export const FREEZE_LABEL = 'app-froze';
@@ -64,8 +65,47 @@ function listOf(lines) {
   });
 }
 
+/** The minute lines of one day's memory log (main/memory-log.mts), oldest first. */
+export function memoryOn(logDir, day) {
+  let text = '';
+  try { text = fs.readFileSync(path.join(logDir, `memory-${day}.jsonl`), 'utf8'); } catch { return []; }
+  const out = [];
+  for (const raw of text.split('\n')) {
+    if (!raw.trim()) continue;
+    try {
+      const line = JSON.parse(raw);
+      // The recorder's heap lines share the file and carry no pressure.
+      if (line && 'pressure' in line) out.push(line);
+    } catch { /* a line cut short by a quit */ }
+  }
+  return out;
+}
+
+const clock = (at) => { const d = new Date(at); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+const held = (list, name) => (list ?? []).slice().sort((a, b) => (b.mb ?? 0) - (a.mb ?? 0)).slice(0, 3).map((p) => `${p[name] ?? '?'} ${Math.round(p.mb ?? 0)} MB`);
+
+/**
+ * How short of memory the Mac was over the day, from its minute log. A main
+ * thread held while the Mac swaps hard is mostly the Mac paging the app back
+ * in, wherever the hold landed, so the thread says when that was so. Pure.
+ */
+export function memoryWords(lines) {
+  if (!lines?.length) return [];
+  const count = (word) => lines.filter((l) => l.pressure === word).length;
+  const out = [`Pressure: critical ${count('critical')}, tight ${count('tight')} of ${lines.length} minutes logged.`];
+  const rated = lines.filter((l) => Number.isFinite(l.swapInMbps));
+  if (!rated.length) return out;
+  const worst = rated.reduce((a, b) => (b.swapInMbps > a.swapInMbps ? b : a));
+  const heavy = rated.filter((l) => l.swapInMbps >= SWAP_CRITICAL_MBPS).length;
+  const peakMb = Math.max(0, ...lines.map((l) => (Number.isFinite(l.swapMb) ? l.swapMb : 0)));
+  out.unshift(`Swapping: up to ${worst.swapInMbps} MB/s read back off the disk (a minute's average), ${heavy} ${heavy === 1 ? 'minute' : 'minutes'} at ${SWAP_CRITICAL_MBPS} MB/s or more, the rate at which the app holds new agents.${peakMb ? ` Swap peaked at ${(peakMb / 1024).toFixed(1)} GB.` : ''}`);
+  out.push(`It swapped hardest at ${clock(worst.at)}. Memory then: the app ${Math.round(worst.app?.mb ?? 0)} MB; tasks ${held(worst.tasks, 'item').join(', ') || 'none'}; outside the app ${held(worst.others, 'name').join(', ') || 'nothing logged'}.`);
+  if (heavy) out.push('The Mac was swapping hard, so the holds above are as likely the Mac paging the app back in as the code they name: start with what held memory.');
+  return out;
+}
+
 /** The thread for a day's freezes, or null when none reached FILE_AT_MS. Pure. */
-export function freezeRow(lines, { day }) {
+export function freezeRow(lines, { day, memory = [] }) {
   if (!lines.some((l) => l.ms >= FILE_AT_MS)) return null;
   const longest = Math.max(...lines.map((l) => l.ms));
   const total = lines.reduce((sum, l) => sum + l.ms, 0);
@@ -81,16 +121,18 @@ export function freezeRow(lines, { day }) {
       '',
       ...listOf(lines),
       '',
+      ...(memoryWords(memory).length ? ['How short of memory the Mac was that day:', '', ...memoryWords(memory), ''] : []),
       'Find what held the thread in the first of these, fix it, and measure it before and after. `node scripts/measure-speed.mjs` runs a copy of the app on a large made-up inbox, presses keys the way a person does, and prints each request\'s time and every freeze with its stack. The whole log is `memory-log/freeze-' + day + '.jsonl` in the app\'s data folder on the computer that froze, kept a week.',
     ].join('\n'),
   };
 }
 
 /** What the open thread hears about another bad day. Pure. */
-export function freezeNote(lines, { day }) {
+export function freezeNote(lines, { day, memory = [] }) {
   const row = freezeRow(lines, { day });
   if (!row) return null;
-  return [`Again on ${day}: ${row.title.replace(/^The app froze /, '').replace(/ on \S+,/, ',')}.`, '', ...listOf(lines)].join('\n');
+  const words = memoryWords(memory);
+  return [`Again on ${day}: ${row.title.replace(/^The app froze /, '').replace(/ on \S+,/, ',')}.`, '', ...listOf(lines), ...(words.length ? ['', ...words] : [])].join('\n');
 }
 
 export class FreezeWatch {
@@ -130,11 +172,12 @@ export class FreezeWatch {
     const product = freezeRow(lines, { day }) ? this.project() : null;
     if (!product) { this.write({ ...state, checked: day }); return null; }
     const open = state.open ? this.store.readItem(state.open.product, state.open.id) : null;
+    const memory = memoryOn(this.logDir, day);
     let wrote = null;
     if (open && open.status !== 'done') {
-      wrote = this.store.noteItem(open.product, open.id, freezeNote(lines, { day }));
+      wrote = this.store.noteItem(open.product, open.id, freezeNote(lines, { day, memory }));
     } else {
-      const row = freezeRow(lines, { day });
+      const row = freezeRow(lines, { day, memory });
       wrote = this.store.fileOnItsOwn(product.slug, { ...row, kind: 'task', labels: [FREEZE_LABEL] });
       state.open = { product: product.slug, id: wrote.id };
       this.log.info?.(`freeze-watch: the app froze on ${day}; filed ${wrote.id}.`);
