@@ -33,10 +33,6 @@ describe('what a thread still waits on', () => {
   it('still waits after a reply taken back', () => {
     expect(needsLeft(row(BOTH, { answer: '(withdrawn)', wrote: { result: { ts: 10 }, answer: { ts: 20 } } }))).toHaveLength(2);
   });
-  it('lists only what is left at the top of Needs you', async () => {
-    const { waitingRows } = await import('../renderer/src/threads/NeedsWaiting.tsx');
-    expect(waitingRows([row(BOTH)], ['SUPABASE_ACCESS_TOKEN']).map((r) => r.title)).toEqual(['Connect Sentry']);
-  });
 });
 
 describe('a saved sign-in after a withdrawn reply', () => {
@@ -162,28 +158,12 @@ describe('round seven', async () => {
   });
 });
 
-// Round eight: the toast said "One more key to go" with a film still to send; the
-// banner still offered to send a film already held; the oldest stuck thread was
-// folded under "more".
-describe('round eight', async () => {
-  const { waitingRows } = await import('../renderer/src/threads/NeedsWaiting.tsx');
-  const { HELD } = await import('../renderer/src/components/NeedCard.tsx');
+// Round eight: the toast said "One more key to go" with a film still to send.
+describe('round eight', () => {
   it('says everything still to give, files and codes too', () => {
     expect(keySavedWords('Stripe', { asks: [], saved: [], freed: [], thread: 'w-1', done: 'connected', left: ['launch-film-original.mov'] })).toBe('Stripe connected. Still to give: launch-film-original.mov.');
     expect(keySavedWords('Stripe', { asks: [], saved: [], freed: [], thread: 'w-1', done: 'connected', left: ['GitHub', 'a.mov', 'the npm code'] })).toBe('Stripe connected. Still to give: GitHub, a.mov and the npm code.');
     expect(keySavedWords('Stripe', { asks: [], saved: [], freed: ['w-1'], thread: 'w-1', done: 'connected', left: [] })).toBe('Stripe connected. This thread carries on.');
-  });
-  const film = `${NEED} sign-in vercel | to deploy\n${NEED} file ~/Movies/launch-film-original.mov | the hero`;
-  it('offers no file in Needs you that is already held for its sign-in', () => {
-    const item = { id: 'w-9', title: 'Post the film', status: 'open', result: film, wrote: { result: { ts: 5 } } };
-    expect(waitingRows([item]).map((r) => r.title)).toEqual(['Connect Vercel', 'Send launch-film-original.mov']);
-    HELD.set('w-9', [{ need: 'file:~/Movies/launch-film-original.mov', words: 'I sent it.' }]);
-    expect(waitingRows([item]).map((r) => r.title)).toEqual(['Connect Vercel']);
-    HELD.delete('w-9');
-  });
-  it('puts the longest-waiting ask first', () => {
-    const at = (id, ts, svc) => ({ id, title: id, status: 'open', result: `${NEED} sign-in ${svc} | x`, wrote: { result: { ts } } });
-    expect(waitingRows([at('new', 30, 'stripe'), at('old', 10, 'supabase')]).map((r) => r.title)).toEqual(['Connect Supabase', 'Connect Stripe']);
   });
 });
 

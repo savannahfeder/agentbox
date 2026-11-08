@@ -18,6 +18,7 @@ import { priorityIdOf } from '../../../renderer/src/priority';
 import { toApproveWords, waitingCounts } from '../../../renderer/src/threads-made';
 import type { phoneView } from '../../../renderer/src/phone-rows';
 import type { ThreadStateWord, WorkItem } from '../../../renderer/src/types';
+import { teammateIdOf } from '../../../shared/teammates.mts';
 
 export type TabId = 'inbox' | 'progress' | 'snoozed' | 'done';
 export const TABS: { id: TabId; label: string }[] = [
@@ -124,6 +125,23 @@ export function shownTabs(tabs: Record<TabId, Row[]>, display: Display, now: num
     rows: { inbox: pick('inbox'), progress: pick('progress'), snoozed: pick('snoozed'), done: pick('done') } as Record<TabId, Row[]>,
     whole: { inbox: tabs.inbox.length, progress: tabs.progress.length, snoozed: tabs.snoozed.length, done: tabs.done.length } as Record<TabId, number>,
   };
+}
+
+/**
+ * View and filters' "Showing N of M": what the screen draws against what it
+ * would draw with no filter on. `above` is the rows drawn over the list that no
+ * filter hides (mentions, questions, repeating tasks).
+ */
+export function filterCount({ rows, whole, mineOnly = false, above = 0, board = null, wholeBoard = null }: {
+  rows: Pick<Row, 'item'>[]; whole: Pick<Row, 'item'>[]; mineOnly?: boolean; above?: number;
+  board?: { rows: unknown[] }[] | null; wholeBoard?: { rows: unknown[] }[] | null;
+}) {
+  if (board && wholeBoard) {
+    const cards = (b: { rows: unknown[] }[]) => b.reduce((n, c) => n + c.rows.length, 0);
+    return { shown: cards(board), total: cards(wholeBoard) };
+  }
+  const counted = (list: Pick<Row, 'item'>[]) => (mineOnly ? list.filter((r) => !teammateIdOf(r.item)) : list).length;
+  return { shown: counted(rows) + above, total: counted(whole) + above };
 }
 
 /** The board, column by column, as the site draws it (page-rules.ts `boardColumns`). */

@@ -134,6 +134,11 @@ export function connectedReply(needs: readonly Need[]): string {
   return `I ${said}. Carry on.`;
 }
 
+/** The reply for a key given after the person answered its ask in words: the thread may have moved on, so no "Carry on". */
+export function lateReply(needs: readonly Need[]): string {
+  return `${connectedReply(needs).replace(/\. Carry on\.$/, '')} after all, so you can use it now.`;
+}
+
 /**
  * The threads a saved key lets carry on: open, their latest answer asking only
  * for sign-ins and keys that are now all saved, and nothing said to them since.

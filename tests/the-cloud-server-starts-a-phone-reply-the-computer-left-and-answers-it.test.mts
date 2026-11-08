@@ -96,6 +96,8 @@ async function setup({ plan = 'test', startAnswer = () => ({ ok: true }), ticket
     whoIs: async (t) => (t === 'session-of-a' ? { id: A } : null),
     now: () => clock,
     plans: SET,
+    // No plan here means the free hours are spent too.
+    free: { agents: 2, hours: 0 },
     log: (m) => logs.push(m),
     phone: {
       db,

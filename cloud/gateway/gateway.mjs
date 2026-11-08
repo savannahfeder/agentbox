@@ -450,7 +450,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     if (op !== 'head' && key.startsWith('logins/') && !savesAKey) throw new Refusal(403, 'not-yours-to-touch', 'a sign-in is never read or written from a Mac');
     const s = Math.min(LINK_MAX_SECONDS, Math.max(60, Number(seconds) || LINK_MAX_SECONDS));
     if (op === 'put') {
-      if (!planOf(rec).agents) throw new Refusal(403, 'plan', 'Choose a cloud plan to run agents there.');
+      if (onFree(rec) && freeSpent(rec, now())) throw new Refusal(403, 'plan', `Your ${free.hours} free cloud hours are used. Choose a cloud plan to keep running agents there.`);
       if (rec.storage?.full) throw new Refusal(403, 'storage', `Your cloud storage is full (${gib(storageBytes)} GB). It empties as runs older than a week are deleted.`);
       const until = now() + s * 1000;
       if (!(rec.linksUntil >= until)) await update(person, (r) => { r.linksUntil = Math.max(r.linksUntil || 0, until + LINK_NOTE_MS); });
@@ -668,11 +668,11 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     if (rec.disabled) return { ok: false, error: 'disabled' };
     if (rec.terms?.version !== termsVersion) return { ok: false, error: 'terms' };
     if ((await readJson(SWITCH))?.paused) return { ok: false, error: 'paused' };
-    const plan = planOf(rec);
-    if (!plan.agents) return { ok: false, error: 'plan' };
-    if (overHours(rec, t)) return { ok: false, error: 'hours' };
+    const onTheFreeHours = onFree(rec);
+    if (onTheFreeHours && freeSpent(rec, t)) return { ok: false, error: 'plan' };
+    if (!onTheFreeHours && overHours(rec, t)) return { ok: false, error: 'hours' };
     const running = live(rec, 'run').filter((s) => t - s.at < ceilingOf(s)).length;
-    if (running >= plan.agents) return { ok: false, error: 'agents' };
+    if (running >= (onTheFreeHours ? free.agents : planOf(rec).agents)) return { ok: false, error: 'agents' };
     return { ok: true };
   }
 
@@ -803,7 +803,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     return { ok: true };
   }
 
-  return { handle, objectCreated, sweep, admin, phoneSweep };
+  return { handle, objectCreated, sweep, admin, phoneSweep, room };
 }
 
 /** The page a browser lands on after Stripe's checkout or billing page, with the way back into the app. */

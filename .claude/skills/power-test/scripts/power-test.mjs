@@ -8,6 +8,7 @@
 //     --real                                           the Claude Code and Codex this computer has, on their plans (billed)
 //     --cloud                                          every thread in this Mac's cloud (implies --real); the Mac sleeps and shuts under the runs
 //     --cloud-accounts a@x.com,b@y.com                 the cloud accounts the copies may spend, of those signed in (default all)
+//     --free-hours 0.5                                 with --stand-in-cloud: start on the Free plan with that many hours
 //     --chaos none|light|normal|heavy                  what goes wrong around them (default normal)
 //     --round-minutes 20                               one tester session, before it is started again with its diary
 //     --model <alias>                                  the testers' model
@@ -71,6 +72,8 @@ const chaos = opt('chaos', 'normal');
 const cloud = flag('cloud');
 const standInCloud = flag('stand-in-cloud');
 if (standInCloud && (cloud || flag('real'))) stop('--stand-in-cloud is the stand-ins\' own cloud; it cannot go with --real or --cloud.');
+const freeHours = opt('free-hours');
+if (freeHours && !standInCloud) stop('--free-hours starts the stand-in cloud\'s account on the Free plan: add --stand-in-cloud.');
 const real = flag('real') || cloud;
 const cloudAccounts = opt('cloud-accounts');
 if (cloudAccounts && !cloud) stop('--cloud-accounts narrows the cloud\'s accounts: add --cloud.');
@@ -208,7 +211,7 @@ for (const person of people) {
   fs.mkdirSync(dir, { recursive: true });
   const shape = real ? [] : ['--logins', String(person.logins), ...(person.codex ? [] : ['--no-codex'])];
   say(`${person.name}: starting a copy of the app shaped like their setup`);
-  const up = await live(name, 'up', ...(real ? ['--real'] : []), ...(cloud ? ['--cloud'] : []), ...(standInCloud ? ['--stand-in-cloud'] : []), ...(cloudAccounts ? ['--cloud-accounts', cloudAccounts] : []), ...shape, '--projects', person.projects.join(','), ...(team ? ['--team', team] : []), ...(alpha ? ['--alpha', alpha] : []));
+  const up = await live(name, 'up', ...(real ? ['--real'] : []), ...(cloud ? ['--cloud'] : []), ...(standInCloud ? ['--stand-in-cloud'] : []), ...(freeHours ? ['--free-hours', freeHours] : []), ...(cloudAccounts ? ['--cloud-accounts', cloudAccounts] : []), ...shape, '--projects', person.projects.join(','), ...(team ? ['--team', team] : []), ...(alpha ? ['--alpha', alpha] : []));
   fs.writeFileSync(path.join(dir, 'up.log'), up.out);
   const stateFile = path.join(instanceDir(name), 'instance.json');
   const state = readJson(stateFile);

@@ -329,7 +329,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
   const saying = session?.saying && session.sayingAt
     ? { text: session.saying, at: session.sayingAt, run: session.startedAt }
     : null;
-  const built = itemThread(ledger.lines, withEveryRun(everyRun, sessions), saying, { whole, engine, pending: sending, chat, undone: marksFor(undoMarks, item.product, item.id), numbers: fileLine.numbers });
+  const built = itemThread(ledger.lines, withEveryRun(everyRun, sessions), saying, { whole, engine, pending: sending, chat, undone: marksFor(undoMarks, item.product, item.id), numbers: fileLine.numbers, me });
   const said = built.events.map((e) => (e.kind === 'work' ? e : { ...e, text: clean(e.text ?? '') }));
   /* * WHILE AN AGENT IS WORKING, THE LAST THING ON THE PAGE IS THE THINKING
      COMPONENT, AND THE COMMANDS UNDER IT ARE ITS OWN.

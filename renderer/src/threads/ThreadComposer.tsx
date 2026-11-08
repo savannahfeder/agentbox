@@ -66,7 +66,7 @@ import {
   allModels, findPeople, harnessFields, laterHint, momentFromWords, mondayMorning, moreCount,
   joinNames, placeholderFor, projectsOffered, projectSwatch, recentModels,
   sharingFields, cardProject, startingVisibility, startingChosen, teammates, threadMessage, tomorrowMorning, chosenWords, VISIBILITY_ROWS,
-  dueChoices, dueWords, headRows, NOT_BLOCKED, keyOnTheNewThreadCard, messageSubject, toSections, findInvited, type ToSection,
+  dueChoices, dueWords, headRows, NOT_BLOCKED, keyOnTheNewThreadCard, modEnterSendsTheCard, messageSubject, toSections, findInvited, type ToSection,
   agentOnThisWork, atOffers, atWordAt, cardDraftPlace, cardDraftToKeep, handedFromLabel, withoutAtWord,
   startingWhen, whenOnDraft, whenToSend, whenWords,
   type AtOffer, type HandFrom, type Harness, type Keyboard, type ModelPick, type SendAs, type SendWhen, type Visibility,
@@ -780,18 +780,20 @@ export function ThreadComposer({
   // handler still runs first and marks the press handled, so it never sends twice.
   const sendRef = useRef(send);
   sendRef.current = send;
+  const wordsRef = useRef(text);
+  wordsRef.current = text;
   useEffect(() => {
-    // On the page the card's own onKeyDown hears ⌘↵ inside it, and outside it
-    // the key is not the card's.
-    if (inline) return;
     const on = (e: KeyboardEvent) => {
       if (e.defaultPrevented || !(e.metaKey || e.ctrlKey) || e.key !== 'Enter') return;
+      const at = document.activeElement as HTMLElement | null;
+      const where: Keyboard = !at || at === document.body ? 'nothing' : card.current?.contains(at) ? 'the card' : 'away';
+      if (!modEnterSendsTheCard({ inline, on: where, hasWords: !!wordsRef.current.trim() })) return;
       e.preventDefault();
       void sendRef.current();
     };
     window.addEventListener('keydown', on);
     return () => window.removeEventListener('keydown', on);
-  }, []);
+  }, [inline]);
 
   const addFiles = async (files: FileList | File[] | null) => {
     if (!files || !files.length) return;

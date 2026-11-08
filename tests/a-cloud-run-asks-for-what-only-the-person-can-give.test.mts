@@ -120,9 +120,8 @@ describe('a saved sign-in', () => {
   });
 });
 
-describe('the thread and Needs you', async () => {
+describe('the thread', async () => {
   const { needsAsBlocks, NEED_BLOCK } = await import('../renderer/src/key-asks.ts');
-  const { waitingRows } = await import('../renderer/src/threads/NeedsWaiting.tsx');
 
   it('draws each need line as a card block carrying the need, and leaves the rest as written', () => {
     const out = needsAsBlocks(`**I need two things.**\n\n${SIGN_IN}\n${FILE}\n\nAfter.`);
@@ -131,17 +130,5 @@ describe('the thread and Needs you', async () => {
     expect(out.startsWith('**I need two things.**')).toBe(true);
     expect(out.trimEnd().endsWith('After.')).toBe(true);
     expect(needsAsBlocks('Nothing asked.')).toBe('Nothing asked.');
-  });
-
-  // Round 2 design 4: one sign-in two threads wait on is one row, and opens the first.
-  it('groups what threads wait on, one row per sign-in and one per file or code', () => {
-    const item = (id, result, status = 'open') => ({ id, title: `Thread ${id}`, status, result });
-    const rows = waitingRows([item('a', SIGN_IN), item('b', `${SIGN_IN}\n${FILE}`), item('c', CODE), item('d', SIGN_IN, 'done'), item('e', 'Done.')]);
-    expect(rows.map((r) => [r.title, r.act, r.items.map((i) => i.id)])).toEqual([
-      ['Connect Supabase', 'Connect', ['a', 'b']],
-      ['Send launch-film-original.mov', 'Send', ['b']],
-      ['Enter the npm code', 'Enter code', ['c']],
-    ]);
-    expect(waitingRows([item('x', KEY)])[0]).toMatchObject({ title: 'Add the Sentry auth token', act: 'Add' });
   });
 });

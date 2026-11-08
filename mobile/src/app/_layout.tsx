@@ -1,4 +1,5 @@
 import '../platform/polyfills';
+import '../platform/crash';
 import { Geist_400Regular, Geist_500Medium, Geist_600SemiBold, useFonts } from '@expo-google-fonts/geist';
 import { GeistMono_400Regular, GeistMono_500Medium } from '@expo-google-fonts/geist-mono';
 import * as Notifications from 'expo-notifications';

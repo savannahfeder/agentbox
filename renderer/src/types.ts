@@ -832,6 +832,8 @@ export interface CloudPlan {
   hoursPerMonth?: number;
   running?: number;
   usedSeconds?: number;
+  /** With no plan: the free hours, spent or not. */
+  free?: { agents: number; hours: number; usedSeconds: number };
   /** Who bills the plan: Stripe, or nobody because it was set by hand. Absent from older servers. */
   billing?: 'stripe' | 'given' | null;
   error?: string;

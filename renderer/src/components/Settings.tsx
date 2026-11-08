@@ -574,12 +574,13 @@ export function accountTile(a: OneAccount, { many, now, onUse, cloud = false, on
     // as well, because until somebody picked, every account took a share of
     // the work and none of them was the one; the supervisor answers `chosen`
     // now, so the tile with it is the account and the others offer the switch.
-    inUse: !!h?.chosen,
+    // The supervisor names one Codex login as the one that runs even before it is signed in.
+    inUse: !!h?.chosen && !signingIn,
     limits: a.limits, checkedAt: a.checkedAt, usageError: a.usageError,
     use: h?.signedIn && !h.chosen && many ? { word: 'Switch', onUse: () => onUse(h.profile) } : null,
     trouble,
     cmd: trouble && h?.dir ? `CLAUDE_CONFIG_DIR=${h.dir} claude` : null,
-    meters: !!(h || a.limits?.length),
+    meters: !!a.limits?.length || (!!h && !signingIn),
   };
 }
 

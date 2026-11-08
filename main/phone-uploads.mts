@@ -30,6 +30,8 @@ export interface ThreadSnapshot {
 }
 
 export interface NamedFile { key: string; file: string }
+// Folder -> its lowercased names, as listed when its mtime was `mtimeMs`.
+export type FolderListings = Map<string, { mtimeMs: number; names: Set<string> }>;
 
 export interface NamedFolder { key: string; pictures: NamedFile[] }
 
@@ -190,7 +192,7 @@ export function keyOf(file: string, { docs, repo }: Roots) {
  * own folders only. A bare name is looked for where the screens look for it
  * (renderer/src/message-folders.ts pictureRoots), in that order.
  */
-export function filesNamed(snapshot: ThreadSnapshot | null | undefined, { dir, repoPath = null, home }: { dir?: string | null; repoPath?: string | null; home: string }): NamedFile[] {
+export function filesNamed(snapshot: ThreadSnapshot | null | undefined, { dir, repoPath = null, home, listings = new Map() }: { dir?: string | null; repoPath?: string | null; home: string; listings?: FolderListings }): NamedFile[] {
   const docs = dir && real(dir);
   if (!docs) return [];
   const repo = repoPath ? real(repoPath) : null;
@@ -222,20 +224,32 @@ export function filesNamed(snapshot: ThreadSnapshot | null | undefined, { dir, r
     ...folders, id && path.join(docs, 'designs', id), repo && id && path.join(repo, '.claude', 'worktrees', id),
     docs, path.join(docs, 'designs'), path.join(docs, 'attachments'), repo, repo && path.join(repo, 'designs'),
   ].filter(Boolean) as string[])];
-  // Each folder is listed once; a name its listing lacks is not there, and one it
+  // A folder is listed again only when its own mtime moved, so listings shared
+  // across threads stay right. A name its listing lacks is not there, and one it
   // has is confirmed on disk, which also settles a case-sensitive volume.
-  const listings = new Map<string, Set<string> | null>();
+  const checked = new Map<string, Set<string> | null>();
   const listed = (dir: string) => {
-    if (!listings.has(dir)) {
-      let names: Set<string> | null = null;
+    if (checked.has(dir)) return checked.get(dir) ?? null;
+    // A missing folder is remembered as mtime -1, so its appearing is a change.
+    let mtimeMs: number | null = null;
+    try { mtimeMs = fs.statSync(dir).mtimeMs; } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT' || code === 'ENOTDIR') mtimeMs = -1;
+    }
+    const was = listings.get(dir);
+    let names: Set<string> | null = null;
+    if (was && mtimeMs != null && was.mtimeMs === mtimeMs) names = was.names;
+    else {
       try { names = new Set(fs.readdirSync(dir).map((n) => n.normalize('NFC').toLowerCase())); } catch (err) {
         // No such folder holds nothing; one we may not list is asked file by file.
         const code = (err as NodeJS.ErrnoException).code;
         if (code === 'ENOENT' || code === 'ENOTDIR') names = new Set();
       }
-      listings.set(dir, names);
+      if (mtimeMs != null && names) listings.set(dir, { mtimeMs, names });
+      else listings.delete(dir);
     }
-    return listings.get(dir) ?? null;
+    checked.set(dir, names);
+    return names;
   };
   const exists = (file: string) => {
     const names = listed(path.dirname(file));
@@ -330,6 +344,8 @@ export function createPhoneUploads({ backend, owner, device, alive = () => true,
   const names = new Map<string, { size: number; mtimeMs: number; name: string }>(); // file -> { size, mtimeMs, name }
   const queue = new Map<string, UploadJob>(); // file -> { bytes, rank, roots, threads }
   const memo = new Map<string, { base: string; at: number; sig: string; out: ThreadManifest | null }>(); // thread -> { base, at, sig, out }
+  // Every thread of a project looks in the same folders.
+  const listings: FolderListings = new Map();
   let running: Promise<void> | null = null;
   let restUntil = 0;
   let saidFull = false;
@@ -405,7 +421,7 @@ export function createPhoneUploads({ backend, owner, device, alive = () => true,
     let out: ThreadManifest | null = null;
     if (now() - rank <= limits.days * 24 * 3600_000) {
       const snapshot = typeof made === 'function' ? made() : made;
-      const named = filesNamed(snapshot, { dir, repoPath, home });
+      const named = filesNamed(snapshot, { dir, repoPath, home, listings });
       const folders = foldersNamed(snapshot, { dir, repoPath, home });
       const where = { docs: real(dir), repo: repoPath && real(repoPath) };
       // Each page with its own files right after it.
