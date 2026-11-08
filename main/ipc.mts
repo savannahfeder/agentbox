@@ -500,6 +500,20 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     return { readings: await accountUsage.readAll(profiles.length ? profiles : ['default'], { refresh: !!refresh }) };
   });
 
+  // Last readings only: the phone pass runs every minute and must never start
+  // a `claude /usage` of its own (main/main.mts phoneSettings).
+  const usageForPhone = () => {
+    const current = usage.peek();
+    const newer = <R extends { at?: number }>(a: R | null, b: R | null) => (!a ? b : !b ? a : (b.at ?? 0) > (a.at ?? 0) ? b : a);
+    const profiles = effectiveProfiles(config.authProfiles, { home: config.home });
+    const claude = (profiles.length ? profiles : ['default'])
+      .map((profile) => newer(accountUsage.peek(profile), current?.profile === profile ? current : null))
+      .filter(Boolean);
+    let codex: unknown[] = [];
+    try { codex = supervisor.codexAccountUsage(); } catch { /* no Codex reading */ }
+    return { claude, codex };
+  };
+
   // Agents this run has already counted. In memory on purpose: a fresh launch
   // seeing the same agent again is a fresh fact about the app being used.
   const seenAgents = new Set<string>();
@@ -2811,5 +2825,5 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // buttons do, rather than reaching past it into approvals.answer.
   // `push` goes with it so the updater can make the window refetch when a
   // download finishes, without holding the window itself.
-  return { answerApproval, pendingApprovals, push };
+  return { answerApproval, pendingApprovals, push, usageForPhone };
 }

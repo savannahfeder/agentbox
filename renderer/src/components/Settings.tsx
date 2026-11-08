@@ -41,12 +41,14 @@ import { updateLook } from '../update-row';
 import { InstructionSettings, sizeLabel } from './InstructionSettings';
 import { EVERY } from '../instruction-scope';
 import type {AccountUsageReading, Usage, UsageLimit, WorkspaceSettings} from '../types';
-import { accountLabel, cloudAccountInUse, cloudToggleTarget, countedAccounts, type CloudStatus } from '../cloud-menu';
+import { accountLabel, cloudAccountInUse, cloudRunsLine, cloudToggleTarget, countedAccounts, type CloudStatus } from '../cloud-menu';
 import { cloudBilling, planSummary, type PaidPlan } from '../cloud-upgrade';
 import { keyLooksWrong } from '../key-asks';
 import { CloudPlanCards } from './CloudPlanCards';
 import type { CloudPlan } from '../types';
 import { cloudAccountState, hourWords, meterPair, resetWords } from '../account-words';
+import { runningFigures, type GateReading } from '../running-reading';
+import { CODEX_CLOUD_WHAT, sameAsHere } from '../cloud-permission-words';
 import { accountReadingFor, accountsOnce, codexAccountsOnce, type HereLogin, type OneAccount } from '../accounts-once';
 import { LOOKS, lookMeans, SKINS, TUNE_DEFAULT, TUNE_LIMITS, type Look, type SkinId, type SkinTune } from '../skins';
 import { readySkin } from '../look-switch';
@@ -591,18 +593,7 @@ export function accountTile(a: OneAccount, { many, now, onUse, cloud = false, on
   };
 }
 
-/**
- * The cloud row's sentence: when threads go there, and on which account.
- *
- * ONE ACCOUNT, HOWEVER MANY ARE SIGNED IN THERE (w-dac993a554). This listed
- * them and ended "in turn", which is what `pickCloudLogin` used to do; it takes
- * one account now and waits for it, so the sentence names that one.
- */
-export function cloudRunsLine(mode: CloudStatus['mode'], inUse: string | null): string {
-  if (mode === 'mac') return 'Every thread runs on this computer.';
-  const when = mode === 'all' ? 'Threads start there first' : 'Threads start there when this computer is full';
-  return `${when}, on ${inUse ?? 'your cloud account'}.`;
-}
+export { cloudRunsLine };
 
 /*
  * THE SETTINGS SHELL, which is the app's own terminal opened against the one
@@ -745,26 +736,11 @@ export function agentCountOptions(w: {
  */
 function Reading({ running, capacity, gate }: {
   running?: number; capacity?: number;
-  gate?: { on: boolean; reading?: { heavy: number | null; waiting: number | null; pressure: string | null; usedPct: number | null; asked: number | null; waited: number | null; refused: number | null; holding?: boolean } };
+  gate?: { on: boolean; reading?: GateReading };
 }) {
-  const r = gate?.on ? gate.reading : null;
-  if (!r) return null;
-  const word = r.pressure === 'critical' ? 'Very short' : r.pressure === 'tight' ? 'Tight' : r.pressure ? 'Fine' : null;
-  const cells: Array<{ n: string; of: string }> = [];
-  if (Number.isFinite(running)) cells.push({ n: String(running), of: capacity ? `of ${capacity} running` : 'running' });
-  if (r.heavy !== null) cells.push({ n: String(r.heavy), of: 'heavy at once' });
-  if (r.waiting !== null) cells.push({ n: String(r.waiting), of: 'waiting on memory' });
-  if (word) cells.push({ n: word, of: 'memory now' });
-  // The day's tally is one sentence and only where there is one to tell. "None
-  // turned away" is the part that answers "is this Mac coping", so it is said
-  // in full rather than left to a nought the eye skips.
-  const tally = r.asked
-    ? `Today: ${r.asked} commands asked, ${r.waited ?? 0} waited, ${r.refused ? `${r.refused} turned away` : 'none turned away'}.`
-    : null;
-  // NEW AGENTS HELD FOR MEMORY (w-ec27ff1a51) is said while it is happening,
-  // because a queue that is not moving and says nothing reads as broken.
-  const holding = r.holding ? 'New agents wait until memory frees up. Urgent tasks still start.' : null;
-  if (!cells.length && !tally && !holding) return null;
+  const f = runningFigures({ running, capacity, gate });
+  if (!f) return null;
+  const { cells, holding, tally } = f;
   return (
     <div className="set-group">
       <div className="set-plate">
@@ -773,9 +749,9 @@ function Reading({ running, capacity, gate }: {
             {cells.map((c) => <div key={c.of}><b>{c.n}</b><span>{c.of}</span></div>)}
           </div>
         )}
-        {r.usedPct !== null && (
+        {f.usedPct !== null && (
           <div className="set-row set-bar-row">
-            <i className="set-bar"><i className={r.pressure === 'normal' ? '' : 'hot'} style={{ width: `${r.usedPct}%` }} /></i>
+            <i className="set-bar"><i className={f.hot ? 'hot' : ''} style={{ width: `${f.usedPct}%` }} /></i>
           </div>
         )}
         {holding && <div className="set-row set-row-warn">{holding}</div>}
@@ -1113,13 +1089,6 @@ const CODEX_MODE_OPTIONS: Array<{ value: CodexModeId; label: string }> = CODEX_M
   (value) => ({ value, label: CODEX_MODES[value].label }),
 );
 
-const SAME_AS_HERE = 'The same as on this computer.';
-
-// Full access's own sentence says "on this computer", which a cloud run is not.
-const CODEX_CLOUD_WHAT: Record<CodexModeId, string> = {
-  ...Object.fromEntries(CODEX_MODE_ORDER.map((id) => [id, CODEX_MODES[id].what])) as Record<CodexModeId, string>,
-  'full-access': 'Anything on its own throwaway cloud machine, without asking.',
-};
 
 /* -------------------- the model is not asked here ------------------------- */
 // The new task card asks which model a run goes out on, keeps the answer
@@ -2088,7 +2057,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                   />
                 </Row>
                 {cloudHere && (
-                  <Row label="In the cloud" desc={w.cloudCodexMode && w.cloudCodexMode !== 'same' ? CODEX_CLOUD_WHAT[w.cloudCodexMode] : SAME_AS_HERE}>
+                  <Row label="In the cloud" desc={w.cloudCodexMode && w.cloudCodexMode !== 'same' ? CODEX_CLOUD_WHAT[w.cloudCodexMode] : sameAsHere()}>
                     <Picker
                       bare
                       label="Permission mode in the cloud"
@@ -2123,7 +2092,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                     with nobody there to approve anything, so by default it
                     does not ask (main/cloud-permission.mts). */}
                 {cloudHere && (
-                  <Row label="In the cloud" desc={w.cloudPermission && w.cloudPermission !== 'same' ? PERMISSION_SENTENCE[w.cloudPermission] : SAME_AS_HERE}>
+                  <Row label="In the cloud" desc={w.cloudPermission && w.cloudPermission !== 'same' ? PERMISSION_SENTENCE[w.cloudPermission] : sameAsHere()}>
                     <Picker
                       bare
                       label="Permission mode in the cloud"

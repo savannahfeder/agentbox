@@ -98,6 +98,7 @@ export interface SettingsProduct {
   repoPath?: string | null;
   logo?: string | null;
   archived?: boolean;
+  createdAt?: number | null;
 }
 
 export interface SettingsSession { engine?: string | null; profile?: string | null; product?: string }
@@ -725,6 +726,8 @@ export function readSettings({ config, supervisor, store }: SettingsDeps, { sear
       repoPath: product.repoPath,
       // THE MARK, already a drawable url or null, resolved once by listProducts.
       logo: product.logo,
+      // What places an unranked project in the running order (shared/rank.mjs rankProducts).
+      createdAt: product.createdAt ?? null,
       // ONE SWITCH A PROJECT STILL HAS (w-d19d6d387c, 2026-09-22). It had five
       // controls, and what they did was not clear even after reading their
       // labels, so project-level instructions replace them. The drive, the
@@ -766,6 +769,7 @@ export function readSettings({ config, supervisor, store }: SettingsDeps, { sear
       phoneAll: phoneChoiceOf(config.phoneProducts, process.env.AGENTBOX_PERSON_ID, phoneEligible(products)).all,
       cloudPlan: typeof supervisor.cloudPlan === 'string' ? supervisor.cloudPlan : null,
       agentsRunning: !supervisor.paused,
+      productOrder: Array.isArray(status.productOrder) ? status.productOrder as string[] : [],
       // The number picked on the menu, for the whole computer, or what is
       // running as the limit now when nothing was picked.
       sessionsAtOnce: typeof config.agentsAtOnce === 'number' ? config.agentsAtOnce : status.capacity,

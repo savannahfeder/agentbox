@@ -22,7 +22,7 @@ function asideOf(id: PageId, s: SettingsState, email: string | undefined, look: 
   if (!w) return undefined;
   if (id === 'claude') return chosen(w.accounts);
   if (id === 'codex') return chosen(w.codexAccounts);
-  if (id === 'running') return w.agentsAuto ? `Automatic (${w.agentsTotal})` : `${w.sessionsAtOnce} at once`;
+  if (id === 'running') return w.paused ? 'Paused' : w.agentsAuto ? `Automatic (${w.agentsTotal})` : `${w.sessionsAtOnce} at once`;
   if (id === 'instructions') return w.adhdMode ? 'ADHD mode' : undefined;
   if (id === 'projects') return String(s.settings.projects.length);
   return undefined;
