@@ -30,7 +30,7 @@ function scrollerOf(el: Element): Element | null {
  * for the full-screen viewer.
  */
 export function FittedImg({ src, cover = false, maxHeight, minWidth = 0, ...img }: Props) {
-  const place = useRef<HTMLSpanElement | null>(null);
+  const place = useRef<HTMLImageElement | null>(null);
   const [room, setRoom] = useState<{ width: number; height?: number } | null>(null);
   const [near, setNear] = useState(false);
   const [drawn, setDrawn] = useState<{ for: string; url: string } | null>(null);
@@ -68,6 +68,10 @@ export function FittedImg({ src, cover = false, maxHeight, minWidth = 0, ...img 
     return () => { live = false; if (made) URL.revokeObjectURL(made); };
   }, [src, room, near, cover]);
   if (failed === src) return <img {...img} src={src} />;
-  if (drawn?.for !== src) return <span ref={place} className={`${img.className ?? ''} arriving`} aria-hidden="true" />;
+  if (drawn?.for !== src) {
+    // An empty picture holding the place: what draws it, and the viewer, read `data-full`.
+    const { onError: _e, onLoad: _l, alt: _a, ...still } = img;
+    return <img {...still} ref={place} className={`${img.className ?? ''} arriving`} alt="" aria-hidden="true" data-full={src} />;
+  }
   return <img {...img} src={drawn.url} data-full={src} />;
 }
