@@ -48,7 +48,7 @@ function SidebarNote({ note, product, on, who, person, me, onGo }: {
         <Face person={person} name={person ? undefined : who} me={me} />
         <span className="sb-who">{who}</span>
         {note.place.kind === 'pin' && <span className="av-pin-tag sb-pin">{pinLabel(note)}</span>}
-        <span className="sb-when">{note.sent && <NoteGlyph name="check" />}{note.sent ? 'Sent ' : ''}{clock(note.ts)}</span>
+        <span className="sb-when">{note.sent && <NoteGlyph name="check" />}{clock(note.ts)}</span>
       </span>
       {note.place.kind === 'quote' && <span className="sb-quote">{note.place.text}</span>}
       {words && <span className="sb-text">{words}</span>}

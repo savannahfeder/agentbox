@@ -204,6 +204,11 @@ describe('the sidebar', () => {
     expect(side).toContain("querySelector<HTMLElement>('.doc-rich-content, .code-file')");
     expect(read('components/CodeFile.tsx')).toContain('className="code-file"');
   });
+  // A tester pressed Send at 12:38 and read "Sent 11:58pm": the time is when the note was written.
+  it('does not call the time a note was written the time it was sent', () => {
+    expect(side).not.toMatch(/'Sent '\s*:\s*''\}\{clock\(note\.ts\)/);
+    expect(side).toContain('{note.sent && <NoteGlyph name="check" />}{clock(note.ts)}');
+  });
   it('writes a spot as a pin and words as a quote', () => {
     expect(side).toContain("spot ? { kind: 'pin', x: spot.x, y: spot.y } : quote ? { kind: 'quote', text: quote } : { kind: 'whole' }");
   });
