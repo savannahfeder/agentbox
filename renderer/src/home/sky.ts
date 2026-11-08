@@ -20,7 +20,8 @@ export type SkyArt = {
 };
 
 export type SkyId = string;
-export type Sky = { id: SkyId; name: string; art: SkyArt; frame?: string };
+/** A theme of its own: the window's light or dark look, with this sky on Home and the Inbox. */
+export type Sky = { id: SkyId; name: string; dark: boolean; art: SkyArt; frame?: string };
 
 const DUSK: Palette = { core: [235, 85, 150], hot: [255, 195, 160], halo: [105, 60, 185], ember: [150, 40, 90] };
 const EMBER: Palette = { core: [250, 92, 28], hot: [140, 150, 90], halo: [30, 92, 175], ember: [170, 55, 20] };
@@ -28,10 +29,11 @@ const AURORA: Palette = { core: [50, 215, 150], hot: [170, 255, 205], halo: [50,
 
 const DARK_BASE = { y0: 1.0, y1: 0.36, bend: -0.1, dim: 0.95, peak: 0.7, coreW: 0.024, haloW: 0.3, grain: 0.1 };
 
-export const DARK_SKIES: Sky[] = [
-  { id: 'dusk', name: 'Dusk', art: { ...DARK_BASE, palette: DUSK, bg: '#0d0b0f' } },
-  { id: 'ember', name: 'Ember', art: { ...DARK_BASE, palette: EMBER, bg: '#0e0d0c', y0: 0.25, y1: 1.0, peak: 0.3 } },
-  { id: 'aurora', name: 'Aurora', art: { ...DARK_BASE, palette: AURORA, bg: '#0b0e0e', y0: 0.6, y1: 0.68, bend: -0.55, peak: 0.55, fall: 0.5 } },
+// The card stays a step off black so rows and text keep their contrast.
+const DARK_SKIES: Sky[] = [
+  { id: 'dusk', name: 'Dark pink sky', dark: true, art: { ...DARK_BASE, palette: DUSK, bg: '#1a171d' } },
+  { id: 'ember', name: 'Dark orange sky', dark: true, art: { ...DARK_BASE, palette: EMBER, bg: '#1b1917', y0: 0.25, y1: 1.0, peak: 0.3 } },
+  { id: 'aurora', name: 'Dark green sky', dark: true, art: { ...DARK_BASE, palette: AURORA, bg: '#161a19', y0: 0.6, y1: 0.68, bend: -0.55, peak: 0.55, fall: 0.5 } },
 ];
 
 const light = (palette: Palette, glow: Glow[]): SkyArt => ({
@@ -41,27 +43,20 @@ const light = (palette: Palette, glow: Glow[]): SkyArt => ({
 
 // The card is white and the sky fades into it, the way dark fades to black.
 // `frame` tints the window around the card so the white stands off it.
-export const LIGHT_SKIES: Sky[] = [
-  { id: 'sage', name: 'Sage', frame: '#e3e8e5', art: light(
+const LIGHT_SKIES: Sky[] = [
+  { id: 'sage', name: 'Light green sky', dark: false, frame: '#e3e8e5', art: light(
     { core: [40, 160, 125], hot: [170, 215, 120], halo: [70, 135, 190], ember: [40, 120, 100] },
     [['rgba(90,150,200,0.30)', 280, 90, -130], ['rgba(80,185,150,0.40)', 120, 50, -10], ['rgba(190,225,140,0.55)', 34, 18, 0]]) },
-  { id: 'dusk', name: 'Dusk', frame: '#ebe5e9', art: light(
+  { id: 'dusk-light', name: 'Light pink sky', dark: false, frame: '#ebe5e9', art: light(
     { core: [240, 90, 160], hot: [255, 150, 150], halo: [130, 100, 225], ember: [200, 80, 150] },
     [['rgba(170,140,240,0.30)', 260, 90, -120], ['rgba(255,150,195,0.42)', 120, 50, -10], ['rgba(255,185,170,0.50)', 34, 18, 0]]) },
-  { id: 'morning', name: 'Morning', frame: '#e4e8ee', art: light(
-    { core: [255, 150, 70], hot: [255, 205, 120], halo: [70, 140, 235], ember: [235, 110, 60] },
-    [['rgba(110,160,240,0.34)', 280, 90, -130], ['rgba(255,175,110,0.42)', 120, 50, -10], ['rgba(255,205,130,0.55)', 34, 18, 0]]) },
-  { id: 'ember', name: 'Ember', frame: '#ebe6e0', art: light(
-    { core: [245, 105, 35], hot: [255, 185, 80], halo: [110, 120, 150], ember: [210, 80, 30] },
-    [['rgba(130,135,165,0.26)', 280, 90, -130], ['rgba(250,140,70,0.40)', 120, 50, -10], ['rgba(255,190,90,0.55)', 34, 18, 0]]) },
-  { id: 'slate', name: 'Slate', frame: '#e3e5e9', art: light(
-    { core: [70, 95, 150], hot: [130, 160, 215], halo: [140, 150, 175], ember: [80, 95, 125] },
-    [['rgba(140,150,180,0.30)', 280, 90, -130], ['rgba(100,130,195,0.36)', 120, 50, -10], ['rgba(150,180,230,0.50)', 34, 18, 0]]) },
 ];
 
-export function skyFor(dark: boolean, id: string | null | undefined): Sky {
-  const list = dark ? DARK_SKIES : LIGHT_SKIES;
-  return list.find((s) => s.id === id) ?? list[0];
+/** Every sky theme, in the order Settings and Command-K show them. */
+export const SKY_THEMES: Sky[] = [...DARK_SKIES, ...LIGHT_SKIES];
+
+export function skyTheme(id: string | null | undefined): Sky | null {
+  return SKY_THEMES.find((s) => s.id === id) ?? null;
 }
 
 const BAYER = [0, 32, 8, 40, 2, 34, 10, 42, 48, 16, 56, 24, 50, 18, 58, 26, 12, 44, 4, 36, 14, 46, 6, 38, 60, 28, 52, 20, 62, 30, 54, 22, 3, 35, 11, 43, 1, 33, 9, 41, 51, 19, 59, 27, 49, 17, 57, 25, 15, 47, 7, 39, 13, 45, 5, 37, 63, 31, 55, 23, 61, 29, 53, 21];

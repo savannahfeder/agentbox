@@ -124,7 +124,7 @@ describe('one choice for the whole page', () => {
     const theirs = readDisplay('team', memory());
     expect(pageDisplay(mine, 'shared', true).privacy).toBe('shared');
     expect(pageDisplay(theirs, 'shared', true).privacy).toBe('shared');
-    expect(pageDisplay(theirs, 'shared', true).view).toBe('board');
+    expect(pageDisplay(theirs, 'shared', true).view).toBe('list');
   });
   it('means nothing off a team, where no row is private, so it reads as neither there', () => {
     expect(pageDisplay(display(), 'shared', false).privacy).toBe('any');

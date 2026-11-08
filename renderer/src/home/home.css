@@ -116,7 +116,17 @@
    foot and scrolls inside what is left, so a row is never read over the dots
    and the keys never walk a row out of sight. */
 .app.sky-shown:not(.home-shown) .list-pane {
-  margin-bottom: 190px;
+  /* A short window gives the list its room: the band shrinks with the height and is gone under 700px. */
+  margin-bottom: clamp(0px, calc((100vh - 700px) * 0.75), 190px);
   -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
   mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
 }
+
+/* A row's facts as tags in the Inbox's own column type, so they read as
+   settings of the thread rather than a sentence about it. */
+.hm-tags { display: flex; align-items: center; gap: 10px; margin-top: 3px; min-width: 0; overflow: hidden; }
+.hm-tag { display: inline-flex; align-items: center; gap: 6px; font: 10.5px/16px var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--text-faint); white-space: nowrap; }
+.hm-tag:last-child { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.hm-prio { display: inline-flex; align-items: center; color: var(--text-faint); }
+.hm-prio.urgent { color: var(--accent); }
+.hm-prio .th-prio-mark { margin: 0; }

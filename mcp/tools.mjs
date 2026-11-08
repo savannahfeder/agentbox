@@ -343,7 +343,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
     },
     {
       name: 'team_hire',
-      description: 'Your primary employee only: make a new teammate the person said yes to, in a run their words started or answered. It wakes as a draft and sets itself up by asking them. Ask the person first, with options; never make one they did not agree to.',
+      description: 'Make a new teammate the person asked for or said yes to, in a thread their words started or answered. It wakes as a draft and sets itself up by asking them. Ask the person first, with options; never make one they did not agree to.',
       schema: {
         name: z.string().describe('a name that says its role, like Support lead'),
         job: z.string().describe('its job in plain words'),

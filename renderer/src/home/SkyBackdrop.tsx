@@ -35,8 +35,10 @@ export function SkyBackdrop({ art, from, below, gap = 30, span = 220, band = 190
       const lowest = below ? Math.max(0, ...[...host.querySelectorAll(below)].map((e) => e.getBoundingClientRect().bottom)) : 0;
       const under = below ? Math.round((lowest || hr.top + T) - hr.top - T + gap) : (from ?? 0);
       // A list longer than the card keeps the last `band` px as sky, with the streak drawn inside it.
-      const banded = !!below && under > h - band;
-      const start = banded ? Math.round(h - band) : under;
+      // The same height as the list's margin in home.css, so a short window keeps its rows.
+      const room = Math.max(0, Math.min(band, (window.innerHeight - 700) * 0.75));
+      const banded = !!below && under > h - room;
+      const start = banded ? Math.round(h - room) : under;
       const key = [L, T, w, h, start].join(',');
       if (key === last) return;
       last = key;
