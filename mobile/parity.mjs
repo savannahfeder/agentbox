@@ -74,6 +74,7 @@ export const PARITY = {
   'palette:theme-light': { phone: P, find: 'look-${l.id}' },
   'palette:theme-dark': { phone: P, find: 'look-${l.id}' },
   'palette:theme-match': { phone: P, find: 'look-${l.id}' },
+  'palette:theme-sky-*': { missing: 'the sky themes behind the desktop\'s Home and Inbox (an Alpha feature); the phone has neither the skies nor Home' },
 
   // A thread
   'thread:done': { phone: MENU, find: 'label="Close this thread"' },
@@ -171,4 +172,5 @@ export const PARITY = {
   'settings:team/Team': { phone: 'mobile/src/ui/TeamPage.tsx', find: 'inviteTo' },
 };
 
-export const STILL_TO_DO = 25;
+// 26 from 25 once, on 2026-11-09: the skies reached the desktop on main before this check did.
+export const STILL_TO_DO = 26;
