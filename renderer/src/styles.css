@@ -2175,6 +2175,7 @@ body {
   border: 1px solid var(--line); border-radius: var(--artifact-corner-small); background: var(--bg-raised);
 }
 .folder-preview-shot.arriving { aspect-ratio: 16 / 10; border: 1px solid var(--line); border-radius: var(--artifact-corner-small); cursor: default; }
+.folder-preview-picture.arriving { display: block; width: 100%; aspect-ratio: 16 / 10; border: 1px solid var(--line); border-radius: var(--artifact-corner-small); }
 .folder-preview-shot:hover img { border-color: var(--text-faint); }
 .folder-preview-shot:focus-visible img { outline: 1px solid var(--text-faint); outline-offset: 2px; }
 .folder-preview-label {
