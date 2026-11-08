@@ -145,6 +145,24 @@ describe('the sign_in tool', () => {
   });
 });
 
+// Found by a power tester: a thread moved to Codex kept the Vercel card and "waiting for you to sign in" for good.
+describe('a sign-in whose run has ended', () => {
+  it('is closed, and an answered one is left as it was', async () => {
+    const { Supervisor } = await import('../main/supervisor.mts');
+    const { askToSignIn } = await import('../mcp/core/sign-in.mjs');
+    const store = { readItem: (slug, id) => disk.readWorkItem(product.dir, id), productDir: () => product.dir, modules: { workItemsDisk: disk } };
+    const open = thread();
+    askToSignIn(open.id, { service: 'Vercel', url: LINK }, { product: product.id });
+    Supervisor.prototype._closeSignInItWaitedOn.call({ store }, { ...open, product: product.id });
+    expect(openSignIn(disk.readWorkItem(product.dir, open.id))).toBeNull();
+    const answered = thread();
+    const ask = askToSignIn(answered.id, { service: 'Vercel', url: LINK }, { product: product.id });
+    answer(answered.id, { id: ask.id, said: 'signed-in' });
+    Supervisor.prototype._closeSignInItWaitedOn.call({ store }, { ...answered, product: product.id });
+    expect(disk.readWorkItem(product.dir, answered.id).signIn.done).toBeUndefined();
+  });
+});
+
 describe('the thread while it waits', () => {
   const item = (over = {}) => ({ id: 'w-1', product: 'p', status: 'claimed', title: 'Deploy', signIn: { id: 's-abcdef12', service: 'Vercel', url: LINK, at: 1 }, ...over });
   it('says what the agent waits for', () => {

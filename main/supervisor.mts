@@ -6771,6 +6771,15 @@ export class Supervisor {
     }, { file: this.runLedger ?? runLedgerPath() });
   }
 
+  // Nobody is waiting on a sign-in once the run that asked has ended, so its card goes.
+  _closeSignInItWaitedOn(item: WorkItem) {
+    try {
+      const now = this.store.readItem(item.product, item.id) ?? item;
+      const ask = openSignIn(now);
+      if (ask) this.store.modules.workItemsDisk.updateWorkItem(this.store.productDir(item.product), item.id, { signIn: { ...ask, done: true } }, { source: 'system' });
+    } catch (e) { console.warn('zero: could not close a sign-in its run left open:', (e as Error).message); }
+  }
+
   _noteHowTheRunStarted(item: WorkItem, session: RunState) {
     if (!item?.id || !session) return;
     const key = `${item.product}:${item.id}`;
@@ -11870,6 +11879,7 @@ export class Supervisor {
       this._noteCloudOutcome(session, code, signal);
       this._leaveKitForThePhone(item, session);
       this._noteHowTheRunStarted(item, session);
+      this._closeSignInItWaitedOn(item);
       onLine(`session exited (${code})`);
       if (this._noteCloudHandBack(item, session, cwd)) onLine('the cloud handed this request back to this computer; the next one goes to the cloud');
       else if (this._cloudKeptOnMac(item, session, code, signal)) onLine('the cloud could not run this thread, so this request runs on this computer');
