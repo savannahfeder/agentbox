@@ -8,6 +8,8 @@
 // works off the window's main thread) and drawn from that copy. The full-screen
 // viewer still opens the original.
 
+import { fetchableFileUrl } from './phone-files';
+
 /** Points the picture is shown in. `cover` fills the box and crops, as a Files cover does. */
 export interface Box { width: number; height?: number; cover?: boolean }
 
@@ -20,7 +22,8 @@ export interface FitTools {
 }
 
 const browser: FitTools = {
-  fetch: (url) => fetch(url),
+  // The phone and browser copies reach the app's picture scheme over http.
+  fetch: (url) => fetch(fetchableFileUrl(url)),
   decode: (from, resize) => (resize ? createImageBitmap(from, resize) : createImageBitmap(from)),
   encode: async (picture) => {
     const canvas = new OffscreenCanvas(picture.width, picture.height);

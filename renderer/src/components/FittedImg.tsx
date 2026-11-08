@@ -12,6 +12,15 @@ type Props = Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> & {
   minWidth?: number;
 };
 
+// The pane the picture scrolls in: an observer on the page alone would count a
+// picture clipped by the pane as out of view however close it is.
+function scrollerOf(el: Element): Element | null {
+  for (let at = el.parentElement; at; at = at.parentElement) {
+    if (/(auto|scroll)/.test(getComputedStyle(at).overflowY)) return at;
+  }
+  return null;
+}
+
 /**
  * An <img> drawn from a copy the size of its place (../fit-picture.ts). The
  * place is held by a placeholder carrying the picture's own classes, so every
@@ -23,6 +32,7 @@ type Props = Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> & {
 export function FittedImg({ src, cover = false, maxHeight, minWidth = 0, ...img }: Props) {
   const place = useRef<HTMLSpanElement | null>(null);
   const [room, setRoom] = useState<{ width: number; height?: number } | null>(null);
+  const [near, setNear] = useState(false);
   const [drawn, setDrawn] = useState<{ for: string; url: string } | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   useLayoutEffect(() => {
@@ -33,15 +43,25 @@ export function FittedImg({ src, cover = false, maxHeight, minWidth = 0, ...img 
     const grown = measured > 0 ? width / measured : 1;
     setRoom({ width, height: cover ? Math.max((el?.clientHeight ?? 0) * grown, 1) : maxHeight });
   });
+  // Made when it comes within a screen of view, so a thread opened at its end
+  // draws what is on screen first and the pictures far above cost nothing yet.
   useEffect(() => {
-    if (!room) return;
+    const el = place.current;
+    if (near || !el || typeof IntersectionObserver === 'undefined') { setNear(true); return; }
+    const watch = new IntersectionObserver((seen) => { if (seen.some((s) => s.isIntersecting)) setNear(true); },
+      { root: scrollerOf(el), rootMargin: '100% 0px' });
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [near]);
+  useEffect(() => {
+    if (!room || !near) return;
     let live = true;
     let made: string | null = null;
     fitPicture(src, { ...room, cover })
       .then((r) => { made = r.url; if (live) setDrawn({ for: src, url: r.url }); else URL.revokeObjectURL(r.url); })
       .catch(() => { if (live) setFailed(src); });
     return () => { live = false; if (made) URL.revokeObjectURL(made); };
-  }, [src, room, cover]);
+  }, [src, room, near, cover]);
   if (failed === src) return <img {...img} src={src} />;
   if (drawn?.for !== src) return <span ref={place} className={`${img.className ?? ''} arriving`} aria-hidden="true" />;
   return <img {...img} src={drawn.url} data-full={src} />;
