@@ -61,6 +61,7 @@
 // worst this can do is make somebody run `git worktree add` again.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { Name, nameSlug } from '../shared/product-name.mjs';
 import { insideGitFolder } from '../shared/project-folder-check.mts';
@@ -257,6 +258,25 @@ export function safeTaskName(id: unknown): string {
  * every comparison in the supervisor is concerned.
  */
 export const real = (dir: string) => { try { return fs.realpathSync(dir); } catch { return dir; } };
+
+/**
+ * Marks the folder that holds a project's task folders for Time Machine to
+ * skip. Each task folder carries a copy of the project's packages, tens of
+ * thousands of files, and the work in it is committed to the project's own
+ * repository, which is backed up. Once per folder per run; a failure is no
+ * reason to stop a task.
+ */
+const keptOutOfBackups = new Set<string>();
+export function keepOutOfBackups(dir: string, {
+  platform = process.platform,
+  run = (cmd: string, args: string[]) => { execFileSync(cmd, args, { timeout: 5_000, stdio: 'ignore' }); },
+}: { platform?: string; run?: (cmd: string, args: string[]) => unknown } = {}): boolean {
+  if (platform !== 'darwin' || keptOutOfBackups.has(dir)) return false;
+  keptOutOfBackups.add(dir);
+  // Time Machine never backs up the temporary folder, where every test's checkout is.
+  if (real(dir).startsWith(real(os.tmpdir()) + path.sep)) return false;
+  try { run('/usr/bin/tmutil', ['addexclusion', dir]); return true; } catch { return false; }
+}
 
 export function taskFolderPath(repoPath: string, id: unknown): string {
   return path.join(real(repoPath), ...WORKTREES, safeTaskName(id));
@@ -648,6 +668,7 @@ export function ensureTaskFolder(dir: string, id: unknown, { pid = process.pid, 
   // ever drops registrations whose folder is already gone.
   tryGit(root, ['worktree', 'prune']);
   fs.mkdirSync(path.dirname(folder), { recursive: true });
+  keepOutOfBackups(path.dirname(folder));
 
   hideFromTheCheckout(root);
 
