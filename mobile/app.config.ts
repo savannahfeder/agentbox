@@ -55,7 +55,6 @@ const config: ExpoConfig = {
     // iPhone only; it still runs in an iPad's iPhone mode, where reviewers sometimes test.
     supportsTablet: false,
     bundleIdentifier: bundleId,
-    usesAppleSignIn: true,
     // HTTPS through the system is exempt from export rules.
     config: { usesNonExemptEncryption: false },
     // Repeats what the packages' own manifests declare, which Apple does not
@@ -78,7 +77,6 @@ const config: ExpoConfig = {
     'expo-router',
     // The keychain holds the sign-in without Face ID, so the build asks for none.
     ['expo-secure-store', { faceIDPermission: false }],
-    'expo-apple-authentication',
     ['expo-notifications', { color: '#ee6018' }],
     'expo-video',
     // Apple shows these words when the app first asks; the camera is never asked for.
