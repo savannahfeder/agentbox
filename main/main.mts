@@ -442,6 +442,8 @@ async function createWindow() {
   const supervisor = new Supervisor(config, store, appDir, dataDir, userDir);
   // Local runs outlive a quit or a restart of the app (main/run-host.mjs).
   supervisor.hostRuns = true;
+  // And their store tools come from one shared process (main/tool-host.mjs).
+  supervisor.shareTools = true;
   // THAT agents start and stop work (main/analytics.mts checks the switch).
   supervisor.count = (name, props) => analytics.track(name, props);
   // Whether anyone has touched the Mac since a wake (Supervisor#asleep).
