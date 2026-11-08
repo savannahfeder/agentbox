@@ -666,7 +666,9 @@ export interface SavedState {
   rowSessions?: Record<string, RowSessionRecord>;
   stoppedSessions?: Record<string, StoppedSessionRecord>;
   compactions?: Record<string, CompactionRecord>;
-  nativeCommands?: Record<string, string[]>;
+  /** Per thread, its session's slash commands: an index into `nativeCommandLists`, or the list itself in files saved before those lists. */
+  nativeCommands?: Record<string, string[] | number>;
+  nativeCommandLists?: string[][];
   lastDigestTry?: Record<string, number>;
   deliveryAttempts?: Record<string, number>;
   fruitless?: Record<string, FruitlessRecord>;
@@ -683,6 +685,32 @@ export interface SavedState {
   threadOnMac?: Record<string, boolean>;
   movedToMac?: Record<string, number>;
   movedWhy?: Record<string, MovedWhy>;
+}
+
+// Nearly every session offers the same commands, so each distinct list is saved
+// once and threads point at it (tests/the-supervisors-saved-state-stays-small...).
+export function packCommands(byThread: Record<string, string[]>): { nativeCommandLists: string[][]; nativeCommands: Record<string, number> } {
+  const lists: string[][] = [];
+  const at = new Map<string, number>();
+  const nativeCommands: Record<string, number> = {};
+  for (const [id, names] of Object.entries(byThread ?? {})) {
+    if (!Array.isArray(names)) continue;
+    const key = JSON.stringify(names);
+    let i = at.get(key);
+    if (i === undefined) { i = lists.length; lists.push(names); at.set(key, i); }
+    nativeCommands[id] = i;
+  }
+  return { nativeCommandLists: lists, nativeCommands };
+}
+
+export function unpackCommands(state: Pick<SavedState, 'nativeCommands' | 'nativeCommandLists'>): Record<string, string[]> {
+  const lists = state.nativeCommandLists ?? [];
+  const out: Record<string, string[]> = {};
+  for (const [id, v] of Object.entries(state.nativeCommands ?? {})) {
+    if (Array.isArray(v)) out[id] = v;
+    else if (Array.isArray(lists[v])) out[id] = lists[v];
+  }
+  return out;
 }
 
 /** The store, as far as the supervisor uses it (main/store.mts). */
@@ -1275,6 +1303,8 @@ export class Supervisor {
   declare _stoppedSessions: Record<string, StoppedSessionRecord>;
   declare _compactions: Record<string, CompactionRecord>;
   declare _nativeCommands: Record<string, string[]>;
+  /** What `_saveState` last wrote, so an unchanged save writes nothing. */
+  _savedText?: string;
   declare _deliveryAttempts: Record<string, number>;
   declare _fruitless: Record<string, FruitlessRecord>;
   declare _heldStarts: Record<string, HeldStart>;
@@ -1525,7 +1555,7 @@ export class Supervisor {
       // (`_noteStoppedByAccount`).
       this._stoppedSessions = state.stoppedSessions ?? {};
       this._compactions = state.compactions ?? {};
-      this._nativeCommands = state.nativeCommands ?? {};
+      this._nativeCommands = unpackCommands(state);
       for (const value of Object.values(this._compactions)) if (value.state === 'running') value.state = 'failed';
       // When a digest was last ATTEMPTED, per product. The digest row itself is
       // the real watermark (it lives in the store and survives everything);
@@ -1898,7 +1928,7 @@ export class Supervisor {
   }
 
   /**
-   * WAIT FOR THAT COMMIT'S TESTS ON GITHUB, BESIDE EVERYTHING ELSE.
+   * WAIT FOR THAT COMMIT'S TESTS AND SECURITY RUNS ON GITHUB, BESIDE EVERYTHING ELSE.
    *
    * Nothing waits on this: no ship, no agent, no tick. It is started and
    * dropped, every failure inside it is quiet, and the app quitting ends it
@@ -1910,6 +1940,9 @@ export class Supervisor {
     try {
       this.mainTests.watch(shipped as ShippedNote & { sha: string }).catch(() => {});
     } catch { /* a watch that cannot start is not a ship that failed */ }
+    try {
+      this.mainTests.watchSecurity(shipped as ShippedNote & { sha: string }).catch(() => {});
+    } catch { /* nor is this one */ }
   }
 
   stop() {
@@ -7960,7 +7993,7 @@ export class Supervisor {
 
   _saveState() {
     try {
-      fs.writeFileSync(this._stateFile, JSON.stringify({
+      const text = JSON.stringify({
         handledAnswers: [...this._handledAnswers].slice(-500),
         resumedWaits: [...this._resumedWaits].slice(-500),
         waitsSince: this._waitsSince,
@@ -7987,7 +8020,7 @@ export class Supervisor {
         rowSessions: this._rowSessions,
         stoppedSessions: this._stoppedSessions,
         compactions: this._compactions,
-        nativeCommands: this._nativeCommands,
+        ...packCommands(this._nativeCommands),
         lastDigestTry: this.lastDigestTry,
         deliveryAttempts: this._deliveryAttempts,
         fruitless: this._fruitless,
@@ -8003,7 +8036,11 @@ export class Supervisor {
         profileTrouble: this._profileTrouble,
         profileCooldown: this._profileCooldown,
         carried: this._carried,
-      }));
+      });
+      // Saves come in clusters, most with nothing new; each used to rewrite the whole file.
+      if (text === this._savedText) return;
+      fs.writeFileSync(this._stateFile, text);
+      this._savedText = text;
     } catch {}
   }
 
