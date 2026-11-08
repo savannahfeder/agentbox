@@ -31,10 +31,12 @@ export function markGoesTo(mark: ArtifactMark, elsewhere: FileElsewhere[]): stri
   return elsewhere.flatMap((e) => e.notes).find((n) => n.id === m.on)?.key ?? null;
 }
 
-export function ThreadArtifacts({ item, open, withAgent, onClose, onNotice }: {
+export function ThreadArtifacts({ item, open, withAgent, onBeside, onClose, onNotice }: {
   item: WorkItem;
   open: ArtifactOpen;
   withAgent: boolean;
+  /** Puts the file in hand beside the chat. */
+  onBeside?: (path: string) => void;
   onClose: () => void;
   onNotice: (words: string) => void;
 }) {
@@ -91,6 +93,7 @@ export function ThreadArtifacts({ item, open, withAgent, onClose, onNotice }: {
       return out.ok ? null : out.error ?? 'That did not save.';
     }}
     onOutside={(src) => { void api.openArtifactExternally({ product: item.product, src }).then((r) => { if (!r.ok) onNotice(r.error || `${src} could not be opened.`); }); }}
+    onBeside={onBeside}
     onClose={onClose}
   />;
 }

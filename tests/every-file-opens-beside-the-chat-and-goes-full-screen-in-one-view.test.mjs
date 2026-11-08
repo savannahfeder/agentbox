@@ -1,0 +1,69 @@
+// EVERY FILE OPENS BESIDE THE CHAT, AND FULL SCREEN IS ONE VIEW (w-375c72d32e, 2026-11-08).
+//
+// What broke: there were two full-screen views. A note, a page or a script
+// opened beside the chat, and that pane's corner-arrows button hid the chat
+// with a plain full-screen pane: no versions, no notes column, no Approve. A
+// picture, a table, a PDF or a film skipped the side pane and opened straight
+// into the other full-screen view (ArtifactView), which had all three. Measured
+// in the browser copy at 1440x900: a markdown file's full screen had no
+// "v1 of 2" and no Approve; a picture never showed beside the chat at all.
+//
+// Now any file the side pane can draw opens there first, its full-screen
+// button opens the one view with versions, notes and Approve, and that view's
+// top-right button puts the file back beside the chat. A deck, which the pane
+// cannot draw, still opens straight into full screen. A website, a local app
+// and a code change are not files that view reads, so they keep the pane's own.
+import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
+import { fullScreenTakes, whereAFileOpens } from '../renderer/src/artifact-layout.ts';
+
+const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
+
+describe('where a file pressed in a thread opens', () => {
+  it('beside the chat, for every kind the pane draws', () => {
+    for (const f of ['shot.png', 'designs/w-1/onboarding-v3.jpg', 'demo.mp4', 'brief.pdf', 'leads/fintech-leads.csv', 'notes.md', 'designs/w-1/options.html', 'cart.mjs']) {
+      expect(whereAFileOpens(f), f).toBe('beside');
+    }
+  });
+  it('straight into full screen for a deck, which the pane cannot draw', () => {
+    expect(whereAFileOpens('pitch.pptx')).toBe('full');
+  });
+  it('the old way for what is not a file the full-screen view reads', () => {
+    for (const f of ['https://example.com/report.html', 'https://example.com/shot.png', 'http://localhost:3000', 'run.change', 'model.xlsx', null, '']) {
+      expect(whereAFileOpens(f), String(f)).toBeNull();
+    }
+  });
+});
+
+describe('what the full-screen button opens', () => {
+  it('the one file view for every file it reads', () => {
+    for (const f of ['shot.png', 'demo.mp4', 'brief.pdf', 'leads.csv', 'notes.md', 'page.html', 'cart.mjs', 'pitch.pptx']) expect(fullScreenTakes(f), f).toBe(true);
+  });
+  it('the pane\'s own full screen for a website, a local app and a code change', () => {
+    for (const f of ['https://example.com/page.html', 'http://127.0.0.1:5173/', 'run.change']) expect(fullScreenTakes(f), f).toBe(false);
+  });
+});
+
+describe('the wiring', () => {
+  const focus = read('renderer/src/components/Focus.tsx');
+  const app = read('renderer/src/App.tsx');
+  const threadView = read('renderer/src/components/ThreadArtifacts.tsx');
+  const teammate = read('renderer/src/threads/TeammateThread.tsx');
+
+  it('a thread opens a file with the rule, and a picture goes beside rather than to the picture viewer', () => {
+    expect(focus).toMatch(/whereAFileOpens\(/);
+    const openHref = focus.slice(focus.indexOf('const openHref'), focus.indexOf("if (goes === 'picture')"));
+    expect(openHref).toMatch(/opensBeside\(href\)/);
+  });
+  it('the side pane\'s full-screen button opens the file view on your thread and on a teammate\'s', () => {
+    const onMode = app.slice(app.indexOf('onMode={mode => {'), app.indexOf('split={artifactFraction('));
+    expect(onMode).toMatch(/fullScreenTakes\(/);
+    expect(onMode).toMatch(/setFullAt\(/);
+    expect(onMode).toMatch(/setCardOpenAt\(/);
+  });
+  it('the file view\'s own button puts the file back beside the chat, on both', () => {
+    expect(threadView).toMatch(/onBeside/);
+    expect(focus).toMatch(/onBeside=\{/);
+    expect(teammate).toMatch(/onBeside=\{/);
+  });
+});

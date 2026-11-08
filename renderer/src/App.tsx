@@ -9,7 +9,7 @@ import type {FocusControlStyle} from './focus-control';
 import {reviewLabEnabled} from './review-lab';
 import { deliverReply } from './deliver-reply.mjs';
 import { ArtifactSurface } from './components/ArtifactSurface';
-import { artifactPlacement, artifactFraction, type ArtifactMode } from './artifact-layout';
+import { artifactPlacement, artifactFraction, fullScreenTakes, type ArtifactMode } from './artifact-layout';
 import { besideDocument } from './message-artifacts';
 import { chromeIsUp, CHROME_HOLD, CHROME_REACH } from './full-screen-chrome';
 // the app's renderer: one state machine, keyboard-first. The Superhuman grammar:
@@ -3151,6 +3151,9 @@ export default function App() {
   useEffect(()=>{document.documentElement.dataset.reviewStyle=reviewLab ? reviewStyle : 'header-tools-open';},[reviewLab,reviewStyle]);
   const [artifactMode, setArtifactMode] = useState<ArtifactMode>('beside');
   const [artifactReturnBeside, setArtifactReturnBeside] = useState(false);
+  // The file beside the chat asked to go full screen, for that one thread.
+  const [fullAt, setFullAt] = useState<{ key: string; open: ArtifactOpen } | null>(null);
+  useEffect(() => { setFullAt(null); }, [focused?.product, focused?.id]);
   // Open unless someone closed it, in this window or another.
   const [notesOpen, setNotesOpen] = useState(() => notesSidebarOpen(localStorage));
   useEffect(() => {
@@ -3257,6 +3260,8 @@ export default function App() {
     if (card && doc?.auto) closedBeside.current.add(besideKey(card, doc.src));
     setOpenDoc(null);
   };
+  // The full-screen view opens over the pane, which would otherwise play on under it.
+  const pauseFilmsBeside = () => { for (const film of document.querySelectorAll<HTMLVideoElement>('.doc-pane video')) film.pause(); };
   const closeArtifact = () => {
     if (artifactMode === 'focus' && artifactReturnBeside) setArtifactMode('beside');
     else putDocDown();
@@ -7808,7 +7813,7 @@ export default function App() {
                   inlineArtifacts
                   previewSample={api.isFixtures && (reviewLab || new URLSearchParams(location.search).has('artifactTweaks')) ? artifactPreviewSample : undefined}
                   artifactView={openDoc ? artifactView : undefined}
-                  openAt={foundOpenAt?.key === `${focused.product}/${focused.id}` ? foundOpenAt.open : null}
+                  openAt={fullAt?.key === `${focused.product}/${focused.id}` ? fullAt.open : foundOpenAt?.key === `${focused.product}/${focused.id}` ? foundOpenAt.open : null}
                   onOpenArtifact={(src, mode) => { setArtifactReturnBeside(false); setArtifactMode(mode); setOpenDoc({product: focused.product, src}); }}
                   item={focused}
                   resumeAt={resumeAt}
@@ -8128,6 +8133,12 @@ export default function App() {
               mode={artifactMode}
                 onMode={mode => {
                   if (mode === 'beside' && !roomBeside) { putDocDown(); return; }
+                  // Full screen is the one view with versions, notes and Approve, wherever the file is a thread's.
+                  if (mode === 'focus' && fullScreenTakes(openDoc.src) && !onPhone()) {
+                    const open = { path: openDoc.src, at: Date.now() };
+                    if (focused && !focused.agent && !openDoc.readOnly && openDoc.product === focused.product) { pauseFilmsBeside(); setFullAt({ key: `${focused.product}/${focused.id}`, open }); return; }
+                    if (openCard && openDoc.readOnly) { pauseFilmsBeside(); setCardOpenAt(open); return; }
+                  }
                   setArtifactReturnBeside(artifactMode === 'beside'); setArtifactMode(mode);
                 }}
                 split={artifactFraction(split, artifactWidth)}
