@@ -62,6 +62,9 @@ const config: ExpoConfig = {
     'expo-video',
     // Apple shows these words when the app first asks; the camera is never asked for.
     ['expo-image-picker', { photosPermission: 'Pick a photo or video to attach to a message for your agent.', cameraPermission: false, microphonePermission: MICROPHONE_USE }],
+    // Add-only: saving a picture or film from a thread. The read line repeats the picker's so neither overwrites the other.
+    ['expo-media-library', { photosPermission: 'Pick a photo or video to attach to a message for your agent.', savePhotosPermission: `Save a picture or film from a thread to your Photos.`, granularPermissions: ['photo', 'video'] }],
+    'expo-sharing',
     ['expo-speech-recognition', { microphonePermission: MICROPHONE_USE, speechRecognitionPermission: SPEECH_USE }],
   ],
   experiments: { typedRoutes: false },
