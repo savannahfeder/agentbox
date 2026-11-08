@@ -59,7 +59,7 @@
 //
 // Branches are never deleted here. Every commit survives the folder, so the
 // worst this can do is make somebody run `git worktree add` again.
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -269,7 +269,8 @@ export const real = (dir: string) => { try { return fs.realpathSync(dir); } catc
 const keptOutOfBackups = new Set<string>();
 export function keepOutOfBackups(dir: string, {
   platform = process.platform,
-  run = (cmd: string, args: string[]) => { execFileSync(cmd, args, { timeout: 5_000, stdio: 'ignore' }); },
+  // Not waited on: nothing needs its answer, and a task folder is often made on the window's thread.
+  run = (cmd: string, args: string[]) => { execFile(cmd, args, { timeout: 5_000 }, () => { /* best effort */ }); },
 }: { platform?: string; run?: (cmd: string, args: string[]) => unknown } = {}): boolean {
   if (platform !== 'darwin' || keptOutOfBackups.has(dir)) return false;
   keptOutOfBackups.add(dir);
