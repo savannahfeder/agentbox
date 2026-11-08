@@ -111,9 +111,11 @@ export function TeammateMenu({ t, shown, onOpen, call, onDeleted }: { t: Teammat
 
 const NO_QUEUE: string[] = [];
 
-export function TeammatesPage({ view, items = [], open, products, engines, onOpen, onOpenThread, onOpenFile = noFile, onChanged, me, mePic = null, sessions = NO_SESSIONS, queued = NO_QUEUE, models = NO_MODELS, tabOf = noTab }: {
+export function TeammatesPage({ view, items = [], open, products, engines, onOpen, onOpenThread, onOpenFile = noFile, onChanged, me, mePic = null, sessions = NO_SESSIONS, queued = NO_QUEUE, models = NO_MODELS, tabOf = noTab, onNewProject }: {
   queued?: string[];
   onOpenFile?: (product: string, src: string) => void;
+  /** Opens the New project card, from the last row of Works in. */
+  onNewProject?: () => void;
   /** Every thread the app holds, so what a teammate sent you is drawn as its inbox row. */
   items?: WorkItem[];
   models?: TeammateModels;
@@ -146,7 +148,7 @@ export function TeammatesPage({ view, items = [], open, products, engines, onOpe
   const shown = shownOf(open, team);
   const t = shown.kind === 'new' ? null : team.find((x) => x.id === shown.id) ?? null;
   let main: ReactNode;
-  if (shown.kind === 'new' || !t) main = <NewTeammate team={team} products={products} call={call} error={error} onOpen={onOpen} />;
+  if (shown.kind === 'new' || !t) main = <NewTeammate team={team} products={products} call={call} error={error} onOpen={onOpen} onNewProject={onNewProject} />;
   else if (shown.kind === 'about') main = <About t={t} call={call} error={error} onOpen={onOpen} />;
   else if (shown.kind === 'book') main = <PlaybookPage t={t} book={view?.playbooks?.find((p) => p.id === shown.book) ?? null} team={team} onOpen={onOpen} onOpenThread={onOpenThread} />;
   else {
@@ -154,7 +156,7 @@ export function TeammatesPage({ view, items = [], open, products, engines, onOpe
       <ChatColumn view={view} items={items} products={products} team={team} t={t} me={me} mePic={mePic} call={call} sessions={sessions} queued={queued} onOpen={onOpen} onOpenThread={onOpenThread} onOpenFile={onOpenFile} tabOf={tabOf}
         placeholder={t.status === 'draft' ? `Answer ${t.name === 'New teammate' ? 'your new teammate' : t.name}` : `Message ${t.name}`} error={error} />
       {shown.kind === 'log' && <LogPanel view={view} team={team} t={t} sessions={sessions} call={call} onClose={() => onOpen(t.id)} onOpenThread={onOpenThread} />}
-      {shown.kind === 'sheet' && <Details t={t} view={view} products={products} engines={engines} models={models} call={call} onOpen={onOpen} />}
+      {shown.kind === 'sheet' && <Details t={t} view={view} products={products} engines={engines} models={models} call={call} onOpen={onOpen} onNewProject={onNewProject} />}
     </>;
   }
   return <div className="gr-page tq-chats"><div className="gr-body">
@@ -269,21 +271,33 @@ function SentCard({ runs, items, tabOf, onOpenThread }: {
   </div>;
 }
 
+// Where a teammate can work: not My Workspace or a person's direct record,
+// which are projects in the store but no place for its runs.
+function placesToWork(products: Product[]): Product[] {
+  return products.filter((p) => !p.practice && !p.personal && !p.team?.direct);
+}
+
+const newProjectRow = (onNewProject?: () => void) => (onNewProject ? { label: '+ New project', onPick: onNewProject } : null);
+
 // One choice from a few, behind its current value, in the app's own small menu.
-function PickOne({ value, options, onPick, label }: { value: string; options: { id: string; label: string }[]; onPick: (id: string) => void; label: string }) {
+function PickOne({ value, options, onPick, label, more }: { value: string; options: { id: string; label: string }[]; onPick: (id: string) => void; label: string; more?: { label: string; onPick: () => void } | null }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     if (!open) return undefined;
     const away = (e: MouseEvent) => { if (!wrap.current?.contains(e.target as Node)) setOpen(false); };
+    // Before the window's own Escape, which leaves the page.
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setOpen(false); } };
     document.addEventListener('mousedown', away);
-    return () => document.removeEventListener('mousedown', away);
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', esc); };
   }, [open]);
   const shown = options.find((o) => o.id === value)?.label ?? value;
   return <span className="compose-word-wrap tq-pick" ref={wrap}>
     <button type="button" className="compose-word set" aria-haspopup="listbox" aria-expanded={open} aria-label={label} onClick={() => setOpen((o) => !o)}>{shown}</button>
     {open && <span className="prio-menu" role="listbox" aria-label={label}>
       {options.map((o) => <button key={o.id} type="button" role="option" aria-selected={o.id === value} className={`prio-menu-row${o.id === value ? ' on' : ''}`} onClick={() => { setOpen(false); if (o.id !== value) onPick(o.id); }}><span className="prio-menu-label">{o.label}</span></button>)}
+      {more && <button type="button" role="option" aria-selected={false} className="prio-menu-row" onClick={() => { setOpen(false); more.onPick(); }}><span className="prio-menu-label">{more.label}</span></button>}
     </span>}
   </span>;
 }
@@ -505,12 +519,11 @@ function LogPanel({ view, team, t, sessions, call, onClose, onOpenThread }: { vi
 /* --------------------------------------------------------------- details */
 // What it does and how it writes, over its chat when you ask, the settings folded
 // below. What you pick is kept the moment you pick it.
-function Details({ t, view, products, engines, models, call, onOpen }: { t: Teammate; view: TeammatesView | null; products: Product[]; engines: { id: string; label: string }[]; models: TeammateModels; call: Call; onOpen: (open: string) => void }) {
+function Details({ t, view, products, engines, models, call, onOpen, onNewProject }: { t: Teammate; view: TeammatesView | null; products: Product[]; engines: { id: string; label: string }[]; models: TeammateModels; call: Call; onOpen: (open: string) => void; onNewProject?: () => void }) {
   const [saved, setSaved] = useState(false);
   useEffect(() => { if (!saved) return undefined; const timer = setTimeout(() => setSaved(false), 2000); return () => clearTimeout(timer); }, [saved]);
   const keep = (patch: Record<string, unknown>) => { void call('update', { id: t.id, patch }).then((ok) => { if (ok !== false) setSaved(true); }); };
-  // A person's direct record is a project in the store, but no place to work.
-  const real = products.filter((p) => !p.practice && !p.team?.direct);
+  const real = placesToWork(products);
   const books = (view?.playbooks ?? []).filter((p) => (t.playbooks ?? []).includes(p.id));
   const product = real.find((p) => p.slug === t.product);
   const about = () => onOpen(`about:${t.id}`);
@@ -525,14 +538,15 @@ function Details({ t, view, products, engines, models, call, onOpen }: { t: Team
       <dd><EditJob key={t.job ?? ''} job={t.job} shown={t.job ? clipLine(firstSentence(t.status === 'draft' ? jobLine(t) : t.job), 150) : null} onSave={(job) => keep({ job })} onRead={about} /></dd>
       <dt>How it writes</dt>
       <dd><VoicePick voice={voiceOf(t)} words={t.voiceText ?? null} onPick={keep} /></dd>
-      <dt>On its own</dt>
+      {/* While it is set up its times are guesses it is asking you about. */}
+      {t.status !== 'draft' && <><dt>On its own</dt>
       <dd>{t.duties?.length
         ? t.duties.map((d) => <span key={d.id} className="tq-duty">{d.what}
           {d.after === 'ship' || !d.every || !d.at ? <small>{d.when}</small> : <When every={d.every} at={d.at} on={d.on} canStop={false}
             onChange={(next) => keep({ duties: (t.duties ?? []).map(({ when: _when, lastRan: _lastRan, ...x }) => (x.id === d.id ? { ...x, ...next } : x)) })} />}
         </span>)
         : <When every={t.works?.every ?? null} at={t.works?.at ? [t.works.at] : []} on={t.works?.on} canStop
-          onChange={(next) => keep({ works: next.every ? { every: next.every, at: next.at[0], ...(next.every === 'week' ? { on: next.on } : {}) } : null })} />}</dd>
+          onChange={(next) => keep({ works: next.every ? { every: next.every, at: next.at[0], ...(next.every === 'week' ? { on: next.on } : {}) } : null })} />}</dd></>}
       {knows.length > 0 && <><dt>Knows</dt><dd>
         {knows.map((m) => <span key={m.id} className="tq-knows" title={m.text}>{m.text}</span>)}
         {t.memory.length > knows.length && <Inline onClick={about}>All {t.memory.length}</Inline>}
@@ -554,8 +568,8 @@ function Details({ t, view, products, engines, models, call, onOpen }: { t: Team
         {engines.length > 1 && <><dt>Runs on</dt>
           <dd><PickOne value={t.engine ?? ''} label="Runs on" options={[...(t.engine ? [] : [{ id: '', label: 'Your default' }]), ...engines]} onPick={(id) => keep({ engine: id })} /></dd></>}
         <dt>Works in</dt>
-        <dd>{real.length > 1
-          ? <PickOne value={t.product} label="Works in" options={real.map((p) => ({ id: p.slug, label: p.name }))} onPick={(slug) => keep({ product: slug })} />
+        <dd>{real.length > 1 || onNewProject
+          ? <PickOne value={t.product} label="Works in" options={real.map((p) => ({ id: p.slug, label: p.name }))} onPick={(slug) => keep({ product: slug })} more={newProjectRow(onNewProject)} />
           : product?.name ?? t.product}</dd>
         <dt>Can read</dt>
         <dd><PickOne value={t.readsMessages ? 'all' : 'threads'} label="What it can read" options={READS} onPick={(id) => keep({ readsMessages: id === 'all' })} /></dd>
@@ -692,8 +706,8 @@ function PlaybookPage({ t, book, team, onOpen, onOpenThread }: { t: Teammate; bo
 /* ----------------------------------------------------------- new teammate */
 // A new teammate starts as a chat: it asks what to take on, with the starters
 // as answers to tap, and the draft your answer makes asks you the rest.
-function NewTeammate({ team, products, call, error, onOpen }: { team: Teammate[]; products: Product[]; call: Call; error: string | null; onOpen: (id: string) => void }) {
-  const real = products.filter((p) => !p.practice && !p.team?.direct);
+function NewTeammate({ team, products, call, error, onOpen, onNewProject }: { team: Teammate[]; products: Product[]; call: Call; error: string | null; onOpen: (id: string) => void; onNewProject?: () => void }) {
+  const real = placesToWork(products);
   const [slug, setSlug] = useState<string | null>(() => {
     const last = rememberedProject();
     return real.find((p) => p.slug === last)?.slug ?? real.find((p) => p.repoPath)?.slug ?? null;
@@ -727,8 +741,8 @@ function NewTeammate({ team, products, call, error, onOpen }: { team: Teammate[]
             ))}</div>}
             <p className="tq-new-ask">How should it write?</p>
             <VoicePick voice={picked} words={sounds.voiceText} onPick={setSounds} none="Let it choose" />
-            {real.length > 1 && <><p className="tq-new-ask">Where does it work?</p>
-              <PickOne value={where?.slug ?? ''} label="Works in" options={real.map((p) => ({ id: p.slug, label: p.name }))} onPick={setSlug} /></>}
+            {(real.length > 1 || (real.length > 0 && onNewProject)) && <><p className="tq-new-ask">Where does it work?</p>
+              <PickOne value={where?.slug ?? ''} label="Works in" options={real.map((p) => ({ id: p.slug, label: p.name }))} onPick={setSlug} more={newProjectRow(onNewProject)} /></>}
           </div>
         </div>
       </div>

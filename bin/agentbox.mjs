@@ -22,6 +22,7 @@ import { learnShellDataDirs } from '../main/shell-path.mts';
 import { startFreezeRecorder } from '../main/freeze-recorder.mts';
 import { readHubAddress } from '../main/hub-address.mts';
 import { watchNewChatsFor } from '../main/new-chats-watch.mts';
+import { osOpenDialog } from '../main/os-folder-window.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const appDir = path.dirname(here);
@@ -79,7 +80,7 @@ if (!fs.existsSync(path.join(dist, 'index.html'))) {
 // CODEX_HOME from reaching a worker by inheritance, so without this a copy's
 // workers signed in to ~/.claude and ~/.codex (w-6d8c543a43).
 await learnShellDataDirs();
-const booted = await bootHeadless({ dataDir, appDir, userDir: dataDir });
+const booted = await bootHeadless({ dataDir, appDir, userDir: dataDir, osDialog: osOpenDialog });
 // What held the thread each time it froze, as the desktop records it.
 startFreezeRecorder({
   dir: path.join(dataDir, 'memory-log'),

@@ -67,7 +67,8 @@ describe('the live account cannot be missed', () => {
   // login -- and main answers which (`readSettings`), so the card says it
   // rather than leaving a person to guess which plan is being spent.
   it('marks the one account that is in use', () => {
-    expect(card).toContain('inUse: !!h?.chosen,');
+    // A login still signing in is never the one in use, chosen or not.
+    expect(card).toContain('inUse: !!h?.chosen && !signingIn,');
     expect(card).not.toContain('accounts.some((a) => a.chosen)');
   });
 });

@@ -105,6 +105,21 @@ export function rankMatches<T extends { id: string; label?: string }>(query: str
   return [...rows].sort((a, b) => rank(a) - rank(b));
 }
 
+/** Escape closes ⌘K from the window's capture phase, so a panel under it that
+ *  stops the key's propagation cannot take the first press. */
+export function escapeClosesThePalette(
+  win: Pick<Window, 'addEventListener' | 'removeEventListener'>,
+  close: () => void,
+): () => void {
+  const key = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    close();
+  };
+  win.addEventListener('keydown', key, true);
+  return () => win.removeEventListener('keydown', key, true);
+}
+
 /* ---------------------------- the appearance rows ------------------------ */
 
 // A row as described, with the look it goes to instead of a callback, so this

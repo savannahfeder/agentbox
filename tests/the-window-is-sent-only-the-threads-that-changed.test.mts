@@ -252,7 +252,7 @@ describe('through the real store and the real handler', () => {
   }, 30_000);
 
   afterAll(async () => {
-    await booted?.supervisor?.stopAll?.().catch?.(() => {});
+    try { booted?.supervisor.killAll(); booted?.supervisor.stop(); } catch { /* done */ }
     if (dir) fs.rmSync(dir, { recursive: true, force: true });
   });
 
