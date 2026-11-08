@@ -21,7 +21,9 @@ export function threadFiles(files: ThreadFile[] | null | undefined, numbers?: Re
 export function lineAsThread(line: ReadonlyArray<{ key: string; versions: ReadonlyArray<{ n: number; name: string; path: string | null; by: string | null; at: number; agent?: string; here: string[] }> }> | null | undefined): { numbers: Record<string, number>; lines: unknown[] };
 export function whereAPressLands(families: FileFamily[] | null | undefined, press?: { path?: string | null; file?: string | null }): { fi: number; vi: number } | null;
 export function versionForPath(families: FileFamily[] | null | undefined, path: string | null | undefined): FileVersion | null;
+export function stillInHand(families: FileFamily[] | null | undefined, at: { fi: number; vi: number } | null, held: { id: string; path: string } | null): { fi: number; vi: number } | null;
 export function stepsThrough(families: FileFamily[], paths: string[] | null | undefined): Array<{ fi: number; vi: number }>;
+export function latestPicturesSaid(lines: unknown[] | null | undefined): string[];
 export function nextStep(families: FileFamily[] | null | undefined, steps: Array<{ fi: number; vi: number }> | null | undefined, at: { fi: number; vi: number } | null, by: number): { fi: number; vi: number } | null;
 export function filesInLines(lines: unknown[] | null | undefined): Array<{ path: string; by: string | null; at: number; agent?: string }>;
 export function notedFilesInLines(lines: unknown[] | null | undefined): Array<{ path: string; by: string | null; at: number; agent?: string }>;
@@ -44,7 +46,9 @@ export const MAX_EDIT_BYTES: number;
 export function editedWords(name: string, path: string): string;
 export function editClash(family: Pick<FileFamily, 'versions'> | null | undefined, baseN: number, me: string | null, nameOf: (id: string | null) => string): string | null;
 /** What to ask before approving version `index`, or null. */
-export function approveAsk(family: Pick<FileFamily, 'versions'> | null | undefined, index: number, notes: readonly { file: string; resolved?: boolean }[] | null | undefined): { text: string; newest: FileFamily['versions'][number] | null } | null;
+export function approveAsk(family: Pick<FileFamily, 'versions'> | null | undefined, index: number, notes: readonly { file: string; resolved?: boolean }[] | null | undefined, offered?: ReadonlySet<string> | null): { text: string; newest: FileFamily['versions'][number] | null } | null;
+/** The ids of a family's versions that the newest message naming any of them names. */
+export function offeredTogether(lines: unknown[] | null | undefined, family: Pick<FileFamily, 'versions'> | null | undefined): Set<string>;
 /** `group-seat-picker-v3.png` as `group-seat-picker.png`. */
 export function baseName(name: string): string;
 /** The key of the family a path belongs to, with \0 as /. */

@@ -40,10 +40,10 @@ describe('a workday stopped mid-day', () => {
     const out = fs.mkdtempSync(path.join(os.tmpdir(), 'workday-stopped-'));
     const bin = path.join(out, 'bin');
     fs.mkdirSync(bin);
-    // A Claude Code that never answers, so the day is still asking for its usage when the signal lands.
-    fs.writeFileSync(path.join(bin, 'claude'), '#!/bin/sh\nexec sleep 20\n', { mode: 0o755 });
+    // A Codex that can sandbox and never finishes a stretch, so the day is mid-stretch when the signal lands.
+    fs.writeFileSync(path.join(bin, 'codex'), '#!/bin/sh\n[ "$1" = sandbox ] && exit 0\nexec sleep 20\n', { mode: 0o755 });
     try {
-      const child = spawn(process.execPath, [...stripTypesFlags(), WORKDAY, '--who', 'founder', '--engine', 'claude', '--pace', '--hours', '1',
+      const child = spawn(process.execPath, [...stripTypesFlags(), WORKDAY, '--who', 'founder', '--engine', 'codex', '--codex-home', out, '--pace', '--hours', '1',
         '--url', 'http://127.0.0.1:9/', '--out', out], { env: { ...process.env, PATH: `${bin}:${process.env.PATH}` } });
       let said = '';
       child.stdout.on('data', (d) => { said += d; });

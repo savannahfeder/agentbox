@@ -352,30 +352,63 @@ export function whereAPressLands(families, { path, file } = {}) {
   return at(flat.at(-1));
 }
 
-/** The versions `paths` name, in their order, each once: what the arrows step through. */
+/**
+ * Where the version in hand (`held`: its id and path) sits in `families` now,
+ * else `at` if that still names a version, else null. `at` alone goes stale
+ * when the list fills in and reorders or folds copies into one version.
+ */
+export function stillInHand(families, at, held) {
+  const fits = (p) => !!p && !!families?.[p.fi]?.versions[p.vi];
+  if (held && fits(at) && families[at.fi].versions[at.vi].id === held.id) return at;
+  if (held) {
+    const flat = (families ?? []).flatMap((f, fi) => f.versions.map((v, vi) => ({ fi, vi, v })));
+    const v = flat.find((x) => x.v.id === held.id)?.v ?? versionForPath(families, held.path);
+    const hit = v && flat.find((x) => x.v === v);
+    if (hit) return { fi: hit.fi, vi: hit.vi };
+  }
+  return fits(at) ? at : null;
+}
+
+/**
+ * What the arrows step through: one step per file `paths` name, in their order,
+ * at the newest version they name. Versions are the header's to step, never the arrows'.
+ */
 export function stepsThrough(families, paths) {
   const out = [];
-  const seen = new Set();
   for (const p of paths ?? []) {
     const v = versionForPath(families, p);
-    if (!v || seen.has(v)) continue;
-    seen.add(v);
+    if (!v) continue;
     const fi = families.findIndex((f) => f.versions.includes(v));
-    out.push({ fi, vi: families[fi].versions.indexOf(v) });
+    const vi = families[fi].versions.indexOf(v);
+    const had = out.find((s) => s.fi === fi);
+    if (!had) out.push({ fi, vi });
+    else had.vi = Math.max(had.vi, vi);
   }
   return out;
 }
 
+/** The pictures the agent drew since you last spoke, or in its last answer that drew any. */
+export function latestPicturesSaid(lines) {
+  const pictures = (turn) => filesInLines(turn).filter((f) => reviewKind(f.path) === 'image').map((f) => f.path);
+  let turn = [];
+  for (const l of [...(lines ?? [])].reverse()) {
+    if (l?.source === 'founder') {
+      if (pictures(turn).length) break;
+      turn = [];
+    } else if (l?.source === 'agent') turn.unshift(l);
+  }
+  return pictures(turn);
+}
+
 /**
  * Where an arrow press from `at` goes, or null at an end. With steps, the next
- * of them; a version picked off the list keeps its family's place. Without,
- * the next file at its newest version.
+ * file in them, whichever version of this one is open. Without, the next file
+ * at its newest version.
  */
 export function nextStep(families, steps, at, by) {
   if (!at) return null;
   if (steps?.length) {
-    let i = steps.findIndex((s) => s.fi === at.fi && s.vi === at.vi);
-    if (i < 0) i = steps.findIndex((s) => s.fi === at.fi);
+    const i = steps.findIndex((s) => s.fi === at.fi);
     return i < 0 ? null : steps[i + by] ?? null;
   }
   const fi = at.fi + by;
@@ -480,6 +513,25 @@ export function familyOfName(file) {
   return keyOf(name, name);
 }
 
+/** The reviewable paths one line's words name, repeats included. */
+function* pathsSaidOn(l) {
+  const p = l?.patch;
+  if (!p) return;
+  for (const field of ['body', 'answer', 'result', 'note']) {
+    if (typeof p[field] !== 'string' || !ANY_EXT.test(p[field])) continue;
+    filesInLinesInternals.searched += 1;
+    // A person's own words only count a file they attached. The notes sent to an
+    // agent name the file it should make, which does not exist yet.
+    const linksOnly = l.source === 'founder' && (field === 'answer' || field === 'body');
+    const edited = linksOnly && EDITED_WORDS.test(p[field]);
+    for (const m of p[field].replace(FENCE, '').matchAll(NAMED)) {
+      if (linksOnly && !m[1]) continue;
+      const path = (m[1] ?? m[2] ?? m[3]).replace(/^\.\//, '');
+      if (!shorthand(path)) yield { path, edited };
+    }
+  }
+}
+
 /** Every reviewable file a thread's lines name, in the order they name them. */
 export function filesInLines(lines) {
   const out = [];
@@ -491,24 +543,33 @@ export function filesInLines(lines) {
       seen.add(p.artifact.path);
       out.push({ path: p.artifact.path, by: l.by ?? null, at: l.ts, edited: true });
     }
-    for (const field of ['body', 'answer', 'result', 'note']) {
-      if (typeof p[field] !== 'string' || !ANY_EXT.test(p[field])) continue;
-      filesInLinesInternals.searched += 1;
-      // A person's own words only count a file they attached. The notes sent to an
-      // agent name the file it should make, which does not exist yet.
-      const linksOnly = l.source === 'founder' && (field === 'answer' || field === 'body');
-      const edited = linksOnly && EDITED_WORDS.test(p[field]);
-      for (const m of p[field].replace(FENCE, '').matchAll(NAMED)) {
-        if (linksOnly && !m[1]) continue;
-        const path = (m[1] ?? m[2] ?? m[3]).replace(/^\.\//, '');
-        if (seen.has(path) || shorthand(path)) continue;
-        seen.add(path);
-        const agent = p.voice?.name ?? (l.source === 'agent' ? '' : null);
-        out.push({ path, by: l.by ?? null, at: l.ts, ...(agent !== null ? { agent } : {}), ...(edited ? { edited: true } : {}), ...(p.newer === true ? { newer: true } : {}), ...(p.made === true ? { made: true } : {}) });
-      }
+    for (const { path, edited } of pathsSaidOn(l)) {
+      if (seen.has(path)) continue;
+      seen.add(path);
+      const agent = p.voice?.name ?? (l.source === 'agent' ? '' : null);
+      out.push({ path, by: l.by ?? null, at: l.ts, ...(agent !== null ? { agent } : {}), ...(edited ? { edited: true } : {}), ...(p.newer === true ? { newer: true } : {}), ...(p.made === true ? { made: true } : {}) });
     }
   }
   return out;
+}
+
+/**
+ * The ids of a family's versions that the newest message naming any of them
+ * names. An agent that offers sky.png and sky-v5.png side by side is offering
+ * two choices, and neither is the other's older copy.
+ */
+export function offeredTogether(lines, family) {
+  const versions = family?.versions ?? [];
+  const list = lines ?? [];
+  for (let i = list.length - 1; i >= 0; i--) {
+    const ids = new Set();
+    for (const { path } of pathsSaidOn(list[i])) {
+      const v = versions.find((x) => [x.path, ...(x.also ?? [])].some((p) => endsWithPath(p, path) || endsWithPath(path, p)));
+      if (v) ids.add(v.id);
+    }
+    if (ids.size) return ids;
+  }
+  return new Set();
 }
 
 /** "Shared by …" for a version: the agent and who it works for when an agent shared it. */
@@ -568,12 +629,16 @@ export function approvalSince(family, index, approvals, nameOf) {
   return `${nameOf(given.by)} approved v${old.n}. ${nameOf(here.by)} changed it since, so this version is not approved.`;
 }
 
-/** What to ask before approving version `index`, or null: a newer version, or comments still open on it. */
-export function approveAsk(family, index, notes) {
+/**
+ * What to ask before approving version `index`, or null: a newer version, or
+ * comments still open on it. A version in `offered` (offeredTogether) is a
+ * choice still on the table, so a newer one beside it is not asked about.
+ */
+export function approveAsk(family, index, notes, offered = null) {
   const versions = family?.versions ?? [];
   const here = versions[index];
   if (!here) return null;
-  const newest = index < versions.length - 1 ? versions.at(-1) : null;
+  const newest = index < versions.length - 1 && !offered?.has(here.id) ? versions.at(-1) : null;
   const open = (notes ?? []).filter((n) => n.file === here.id && !n.resolved).length + carriedNotes(family, index, notes).length;
   if (!newest && !open) return null;
   const said = [`Approve v${here.n}?`];

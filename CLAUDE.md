@@ -126,6 +126,11 @@ When a change wants synthetic users before it ships, they are `power-test`,
 with the people the change is for. Team and Rooms changes get several testers
 at once on one team. The phone app's testers are `product-loop`.
 
+Synthetic users run on Codex, never Claude Code (2026-11-08): the person keeps
+a Codex plan for testing only. Both skills start every tester as `codex exec`
+on the Codex login with the best plan; never run one as a subagent
+(`tests/every-synthetic-tester-runs-on-codex`).
+
 The standard for the tester loop is thread w-e5f506ccb3: a synthetic team
 used the multiplayer build for whole workdays, logged what broke, agents
 fixed it on the branch, and the team tested the fixes. The person only chose

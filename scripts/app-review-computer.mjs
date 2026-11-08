@@ -27,13 +27,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { CLOUD_ADDRESS } from '../shared/cloud-address.mjs';
 
 export const DEFAULT_DAYS = 14;
 export const MAX_DAYS = 30;
 const PURPOSE = 'app-review';
 const NAME = 'agentbox-app-review';
 const ROLE = `${NAME}-scheduler`;
-const PORT = 7777;
+const PHONE_SITE_ADDRESS = 'https://app.agentbox.ac';
 const ON_STATES = ['pending', 'running', 'stopping', 'stopped'];
 const UBUNTU = '/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id';
 const DAY_MS = 24 * 60 * 60_000;
@@ -97,8 +98,10 @@ EOF
 systemctl daemon-reload
 systemctl enable --now agentbox-review-expiry
 
+export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y git xz-utils
+# git and Node's build tools, then what Electron needs on a screen that is not there.
+apt-get install -y git xz-utils xvfb build-essential python3 libgtk-3-0t64 libnss3 libasound2t64 libgbm1 libxss1 libxtst6 libatk-bridge2.0-0t64 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libpango-1.0-0 libcairo2 libcups2t64 libsecret-1-0
 # Node from nodejs.org, checked against its published checksum.
 NODE=v22.14.0
 cd /tmp
@@ -107,8 +110,17 @@ curl -fsSLO https://nodejs.org/dist/$NODE/SHASUMS256.txt
 grep " node-$NODE-linux-x64.tar.xz$" SHASUMS256.txt | sha256sum -c -
 tar -xJf node-$NODE-linux-x64.tar.xz -C /usr/local --strip-components=1
 cd /
-npm install -g agentbox-app @openai/codex
+npm install -g @openai/codex
 id agentbox || useradd -m -s /bin/bash agentbox
+
+# The desktop app, which alone carries threads to the phone (main/main.mts),
+# built from the public repository and pointed at Agentbox Cloud.
+sudo -u agentbox -H bash -c 'cd ~ && git clone -q --depth 1 https://github.com/savannahfeder/agentbox app && cd app && npm ci --no-audit --no-fund && npm run build && node scripts/brand-electron.mjs'
+sudo -u agentbox mkdir -p /home/agentbox/.agentbox
+cat >/home/agentbox/.agentbox/team.config.json <<'EOF'
+${JSON.stringify({ url: CLOUD_ADDRESS.supabaseUrl, anonKey: CLOUD_ADDRESS.anonKey, phoneSite: PHONE_SITE_ADDRESS })}
+EOF
+chown agentbox:agentbox /home/agentbox/.agentbox/team.config.json
 
 # The demo project the reviewer's agents work in.
 sudo -u agentbox bash -c 'mkdir -p ~/demo && cd ~/demo && git init -q && printf "# Demo site\\n\\nA small page for trying Agentbox.\\n" > README.md && printf "<!doctype html><title>Demo</title><h1>Hello</h1>\\n" > index.html && git add -A && git -c user.name=Agentbox -c user.email=demo@agentbox.invalid commit -qm "A small page"'
@@ -122,7 +134,7 @@ ConditionPathExists=/etc/agentbox-review.env
 User=agentbox
 WorkingDirectory=/home/agentbox
 EnvironmentFile=/etc/agentbox-review.env
-ExecStart=/usr/bin/env agentbox --no-open --port ${PORT}
+ExecStart=/usr/bin/xvfb-run -a /home/agentbox/app/node_modules/.bin/electron /home/agentbox/app --no-sandbox
 Restart=always
 RestartSec=10
 [Install]
@@ -227,7 +239,7 @@ async function on(days) {
   }
   await ssh(state, 'cloud-init status --wait', { timeout: 30 * 60_000 });
   await ssh(state, 'sudo install -m 600 /dev/stdin /etc/agentbox-review.env && sudo systemctl enable --now agentbox-review', { input: login });
-  console.log(`Running and signed in to the demo account. Next: \`login\` signs Codex in.\nTo open the app from this Mac:\n  ssh -i ${keyFile} -N -L ${PORT}:127.0.0.1:${PORT} ubuntu@${state.ip}\nthen the address in: ssh -i ${keyFile} ubuntu@${state.ip} journalctl -u agentbox-review`);
+  console.log(`Running and signed in to the demo account. Next: \`login\` signs Codex in.\nIts log: ssh -i ${keyFile} ubuntu@${state.ip} journalctl -u agentbox-review`);
 }
 
 // Prints Codex's code and address; it waits until someone types the code in a
