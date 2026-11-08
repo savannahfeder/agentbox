@@ -26,6 +26,7 @@ import { AttachRow } from './AttachRow';
 import { FileLinkBrowser } from './FileLinkBrowser';
 import { OpeningWait } from './OpeningWait';
 import { CrossIcon } from './CrossIcon';
+import { ArtifactControlGlyph } from './ArtifactControlGlyph';
 import { DocText } from './DocText';
 import { FileNoteCard } from './FileNoteCard';
 import { NoteGlyph } from './NoteGlyphs';
@@ -47,7 +48,7 @@ const KIND_WORD = { image: 'Picture', film: 'Film', pdf: 'PDF', deck: 'Slides', 
 
 const newId = () => `n${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
-export function ArtifactView({ product, thread, draftsAcross, shareThread, threadName, lines, numbers, marks, me, people, open, ownerOfRow, write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, below, files: fromElsewhere, typing = false }: {
+export function ArtifactView({ product, thread, draftsAcross, shareThread, threadName, lines, numbers, marks, me, people, open, ownerOfRow, write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onBeside, onOutside, below, files: fromElsewhere, typing = false }: {
   /** Each path's number on its file's version line, which every surface counts by. */
   numbers?: Record<string, number>;
   /** What to say of a version with no bytes on this computer, by who made it. */
@@ -77,6 +78,8 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
   /** Said after a save that only becomes a version on someone else's computer. */
   editGoes?: string;
   onClose: () => void;
+  /** Puts the file in hand beside the chat, where that is somewhere to go. */
+  onBeside?: (path: string) => void;
   onOutside?: (path: string) => void;
   /** A line under the file, the full width of the window. */
   below?: ReactNode;
@@ -697,6 +700,11 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
           <ShareLink product={product} thread={(thread ?? shareThread)!} src={version.path} signedIn={!!me} />
         )}
         {onOutside && version && foundNow === 'open' && <button type="button" className="av-btn" onClick={() => onOutside(version.path)}><NoteGlyph name="outside" />Open outside</button>}
+        {onBeside && version && (
+          <button type="button" className="av-btn av-beside" title="Beside the chat" aria-label="Beside the chat" onClick={() => away(() => onBeside(version.path))}>
+            <ArtifactControlGlyph><path d="M3 7h4V3m6 0v4h4M3 13h4v4m6 0v-4h4" /></ArtifactControlGlyph>
+          </button>
+        )}
         <button type="button" className="av-btn av-leave" onClick={leave} title="Back (esc)"><NoteGlyph name="back" />Back</button>
       </header>
       <div className="av-body">

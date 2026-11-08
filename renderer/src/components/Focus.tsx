@@ -1367,7 +1367,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   useEffect(() => {
     if (!openAt || onPhone()) return;
     const kept = besideTurn.current;
-    const turn = kept?.path === openAt.path ? kept.steps : undefined;
+    const turn = kept && kept.path === openAt.path ? kept.steps : undefined;
     setArtifact({ ...(turn ? { steps: turn } : {}), ...openAt, at: Date.now() });
   }, [openAt]);
 

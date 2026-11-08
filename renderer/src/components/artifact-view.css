@@ -37,6 +37,8 @@
 .av-btn:hover:not(:disabled) { background: var(--wash); }
 .av-glyph { flex: none; }
 .av-btn.is-on { background: var(--wash-strong); }
+.av-btn.av-beside { width: 28px; padding: 0; color: var(--text-dim); }
+.av-btn.av-beside:hover { color: var(--text); }
 .av-approved { flex: none; display: inline-flex; align-items: center; gap: 7px; font: 11.5px var(--mono); color: var(--text-dim); white-space: nowrap; }
 .av-approved i { width: 6px; height: 6px; background: var(--code-plus); }
 .av-approved.is-old { color: var(--text-faint); }
