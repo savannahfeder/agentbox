@@ -2314,9 +2314,14 @@ body {
    card had stopped earning its keep. See "ONE SURFACE" below for what replaced
    it and why. The list is untouched and still a card.
 */
+/* `clip`, not `hidden`: a hidden box can still be scrolled by code, and
+   anything poking out below the pane let a centred search match slide the
+   whole thread up, reply box and all. The `:is` outranks the team pages'
+   own `overflow: hidden` when a thread is open inside one. */
 .list-pane.pinned {
-  overflow: hidden; display: flex; flex-direction: column;
+  display: flex; flex-direction: column;
 }
+.list-pane.pinned:is(.pinned, .rm-open, .tq-open, .pl-open) { overflow: clip; }
 
 /* Design C, chosen 2026-08-13: taking the card away works best and also solves
    the full screen problem, while the inbox keeps its own UI and highlight. So
@@ -8888,6 +8893,9 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .live-details pre { margin: 5px 0 12px; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.6 ui-monospace, monospace; }
 .live-action + .live-action, .live-recent { margin-top: 12px; }
 .live-details-label { margin-bottom: 6px; color: var(--text-faint); }
+/* The line holds its own label: `.focus-scroll` is not positioned, so without
+   this the label escaped the scroller and sat a long thread's height below the pane. */
+.live-brief { position: relative; }
 .live-announcement { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @media (hover: none) { .live-chevron { opacity: 1; } }
 /* Past tool batches are quiet text, with details revealed deliberately. */
