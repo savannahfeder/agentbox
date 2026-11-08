@@ -55,8 +55,8 @@ export const screenJustChanged = (changedAt: number | null, now: number): boolea
 const printable = (key: string) => key.length === 1 && key !== ' ';
 // These change something you may not have meant to change; the rest only move you.
 const ACTS = new Set(['e', 'l']);
-const OPEN_THREAD_KEYS = new Set(['j', 'k', 'r', 'n', 'z', '/', 'o', 'g', 's']);
-const LIST_KEYS = new Set(['j', 'k', 'r', 'n', 'z', '/', 'o', 'g', 'b', 'i', '1', '2']);
+const OPEN_THREAD_KEYS = new Set(['j', 'k', 'r', 'n', 'z', 'o', 'g', 's']);
+const LIST_KEYS = new Set(['j', 'k', 'r', 'n', 'z', 'o', 'g', 'b', 'i', '1', '2']);
 // With no row to act on these would do nothing, so on an empty list they are words.
 const ROW_KEYS = new Set(['e', 'l', 'j', 'k', 'r', '1', '2']);
 export const rowKey = (key: string): boolean => ROW_KEYS.has(key.toLowerCase());

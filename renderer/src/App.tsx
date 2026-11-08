@@ -6145,17 +6145,6 @@ export default function App() {
       // (keys.ts). Here, above the split, because Escape leaves a thread in
       // one branch and the list in another and both hand the list back.
       if (takesTheListBack(e.key)) setHoveredId(null);
-      // SEARCH OPENS FROM ANYWHERE, which is why it sits above the branch that
-      // splits the list from an open task: `/` means
-      // the same thing in both, and a shortcut written twice is one edit away
-      // from meaning two things. Its keystroke is swallowed up at the guard
-      // above (keys.ts), because it opens a text field and would otherwise type
-      // itself into it.
-      if (e.key === '/') {
-        e.preventDefault();
-        openSearch();
-        return;
-      }
       // O OPENS THE TASK THE TOAST IS ABOUT (w-f0bfe32859): "I very often,
       // after submitting a task, click 'Open it' in the toast." Z takes back
       // what the toast announced; O goes into it. Here, above the split, because
@@ -8392,7 +8381,6 @@ export default function App() {
           : undefined}
         keyHints={keyHints}
         onSetKeyHints={(v) => { setModal(null); setHints(v); }}
-        onSearch={openSearch}
         findThreads={findThreads}
         findChats={findChats}
         findInside={insideForPalette}
