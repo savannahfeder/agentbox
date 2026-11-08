@@ -35,6 +35,11 @@ describe('a store build', () => {
   it('reads the switch the way Metro writes it into the bundle', () => {
     expect(read('mobile/src/lib/store-build.ts')).toMatch(/export const STORE_BUILD = process\.env\.EXPO_PUBLIC_STORE_BUILD === '1';/);
   });
+  // A reviewer on the board (2026-11-08) found AI teammates, also an Alpha
+  // feature, would still appear once a computer switched them on.
+  it('never shows AI teammates either, whatever the computer says', () => {
+    expect(read('mobile/src/state/cloud.tsx')).toMatch(/const team = useMemo\(\(\) => \(STORE_BUILD \? null : /);
+  });
   it('never turns group chat on, whatever the computer says', () => {
     expect(read('mobile/src/state/groups.tsx')).toMatch(/setOn\(!STORE_BUILD && groupsOn\(rows\)\)/);
   });
