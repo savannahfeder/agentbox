@@ -37,8 +37,11 @@ While Apple reviews the app, the demo account needs a computer signed in to it.
 On the cloud alone, a thread goes quiet 20 minutes after an answer.
 
 - `scripts/app-review-computer.mjs on` makes one small AWS server that does
-  this. It needs `REVIEW_EMAIL`, `REVIEW_PASSWORD`, and
-  `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`.
+  this. It reads the demo password from this Mac's Keychain.
+- `login` signs Codex in on the server. It prints a code to type into a
+  browser signed in to the Codex account the founder keeps for this. Never
+  use the founder's own Claude or Codex account: "we're not giving other
+  people access to my account".
 - `status` shows the server and its end date. `off` deletes it at once.
 - It always ends. The end date is 14 days unless `--days` says otherwise, and
   30 at most. The machine shuts itself down then, AWS deletes it on shutdown,

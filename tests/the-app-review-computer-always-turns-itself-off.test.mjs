@@ -12,7 +12,8 @@
 // machine is doing, and `off` deletes it at once. It never makes a second
 // machine while one is on, and never keeps one longer than 30 days.
 import { describe, it, expect } from 'vitest';
-import { expiryOf, userDataOf, runInstancesArgs, scheduleArgs, envFileOf, hoursLeft, refuseSecond, MAX_DAYS, DEFAULT_DAYS } from '../scripts/app-review-computer.mjs';
+import fs from 'node:fs';
+import { expiryOf, userDataOf, runInstancesArgs, scheduleArgs, envFileOf, hoursLeft, refuseSecond, secretsFrom, retried, KEYCHAIN, CODEX_LOGIN, MAX_DAYS, DEFAULT_DAYS } from '../scripts/app-review-computer.mjs';
 
 const NOW = Date.parse('2026-11-09T12:00:00Z');
 
@@ -68,6 +69,21 @@ describe('guard two: an AWS schedule deletes it at the end date', () => {
   });
 });
 
+// The first real `on` (2026-11-08) made the scheduler's role and asked for the
+// schedule in the same second; AWS refused ("must allow AWS EventBridge
+// Scheduler to assume the role") because a new role takes seconds to take hold.
+describe('guard two, with a role made a moment ago', () => {
+  it('asks again until the role takes hold', async () => {
+    let n = 0;
+    const out = await retried(() => { n += 1; if (n < 3) throw new Error('must allow AWS EventBridge Scheduler to assume the role'); return 'made'; }, { tries: 6, sleep: async () => {} });
+    expect(out).toBe('made');
+    expect(n).toBe(3);
+  });
+  it('gives up after its tries, saying the last error', async () => {
+    await expect(retried(() => { throw new Error('still no'); }, { tries: 3, sleep: async () => {} })).rejects.toThrow('still no');
+  });
+});
+
 describe('the machine it makes', () => {
   const args = runInstancesArgs({ ami: 'ami-1', securityGroup: 'sg-1', keyName: 'k', userData: 'x', expiresAt: '2026-11-23T12:00:00.000Z' });
   it('is labelled with its end date, so status and off can find it', () => {
@@ -92,12 +108,51 @@ describe('one at a time', () => {
 });
 
 describe('the sign-in file', () => {
-  it('holds the demo login and the Claude token', () => {
-    expect(envFileOf({ email: 'r@x.ac', password: 'p:w', claudeToken: 't' })).toBe('AGENTBOX_TEAM_TEST_LOGIN=r@x.ac:p:w\nCLAUDE_CODE_OAUTH_TOKEN=t\n');
+  it('holds the demo login and nothing else', () => {
+    expect(envFileOf({ email: 'r@x.ac', password: 'p:w' })).toBe('AGENTBOX_TEAM_TEST_LOGIN=r@x.ac:p:w\n');
   });
   it('refuses a value that would break the file', () => {
-    expect(() => envFileOf({ email: 'r@x.ac', password: 'p\nX=1', claudeToken: 't' })).toThrow();
-    expect(() => envFileOf({ email: '', password: 'p', claudeToken: 't' })).toThrow();
+    expect(() => envFileOf({ email: 'r@x.ac', password: 'p\nX=1' })).toThrow();
+    expect(() => envFileOf({ email: '', password: 'p' })).toThrow();
+  });
+});
+
+// The founder, 2026-11-08: "why are we signing in? we're not giving other people
+// access to my account? if we need an account best to just use a $30 codex one".
+// So the agents run on Codex, signed in on the machine itself by a code typed
+// into a browser: no Claude token, and no token carried from the Mac.
+describe('whose account the agents run on', () => {
+  const ud = userDataOf({ expiresAt: '2026-11-23T12:00:00.000Z' });
+  it('Codex is installed, and Claude Code is not', () => {
+    expect(ud).toMatch(/npm install -g agentbox-app @openai\/codex/);
+    expect(ud).not.toMatch(/claude-code/);
+  });
+  // The first machine (2026-11-08) restarted forever on "agentbox-app: No such
+  // file": the npm package is agentbox-app but its command is `agentbox`.
+  it('starts the app by the command the package installs', () => {
+    const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+    expect(Object.keys(pkg.bin)).toEqual(['agentbox']);
+    expect(ud).toMatch(/ExecStart=\/usr\/bin\/env agentbox --no-open --port 7777/);
+  });
+  it('Codex signs in on the machine with a device code, as the user the app runs as', () => {
+    expect(CODEX_LOGIN).toBe('sudo -u agentbox -H codex login --device-auth');
+  });
+  it('no Claude token is asked for anywhere', () => {
+    expect(envFileOf({ email: 'r@x.ac', password: 'p' })).not.toMatch(/CLAUDE/);
+    expect(KEYCHAIN).toEqual({ password: 'AGENTBOX_APP_REVIEW' });
+  });
+});
+
+describe('where the demo password comes from', () => {
+  const keychain = (service, account) => `${service}/${account}`;
+  it('the Keychain, when the environment has none', () => {
+    expect(secretsFrom({}, keychain)).toEqual({ email: 'appreview@agentbox.ac', password: `${KEYCHAIN.password}/appreview@agentbox.ac` });
+  });
+  it('the environment first', () => {
+    expect(secretsFrom({ REVIEW_EMAIL: 'b@x.ac', REVIEW_PASSWORD: 'p' }, keychain)).toEqual({ email: 'b@x.ac', password: 'p' });
+  });
+  it('nothing in either is refused before any machine is made', () => {
+    expect(() => envFileOf(secretsFrom({}, () => ''))).toThrow(/missing/);
   });
 });
 
