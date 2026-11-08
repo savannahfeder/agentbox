@@ -12,6 +12,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { appHome } from '../main/store/home.mts';
+import { stripTypesFlags } from '../main/strip-types.mts';
 import { loadStore } from '../main/store-modules.mts';
 import { Teammates } from '../main/teammates.mts';
 import { writeChat } from '../main/store/teammates-files.mts';
@@ -40,7 +41,7 @@ describe('a stand-in on a teammate\'s run', () => {
     };
     team = new Teammates(store);
     config = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'stand-in-mate-')), 'mcp.json');
-    fs.writeFileSync(config, JSON.stringify({ mcpServers: { agentbox: { command: process.execPath, args: [path.join(root, 'mcp', 'stdio.mts')], env: { STORE_ACCOUNT_ID: process.env.STORE_ACCOUNT_ID } } } }));
+    fs.writeFileSync(config, JSON.stringify({ mcpServers: { agentbox: { command: process.execPath, args: [...stripTypesFlags(), path.join(root, 'mcp', 'stdio.mts')], env: { STORE_ACCOUNT_ID: process.env.STORE_ACCOUNT_ID } } } }));
   });
   afterEach(() => { delete process.env.STORE_ACCOUNT_ID; });
 

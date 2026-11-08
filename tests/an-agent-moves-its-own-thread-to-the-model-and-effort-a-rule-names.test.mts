@@ -16,6 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { Supervisor } from '../main/supervisor.mts';
+import { stripTypesFlags } from '../main/strip-types.mts';
 import { EFFORT_LEVELS as THE_APPS_LEVELS } from '../shared/effort-levels.mts';
 import { EFFORT_LEVELS, effortWord, modelWord } from '../shared/model-words.mts';
 
@@ -28,7 +29,7 @@ describe('the words an agent may write', () => {
   // had become .mts, and mcp/tools.mts could not load: no agent had store tools.
   it('load on plain Node, where the store tools start', () => {
     const tools = new URL('../mcp/tools.mts', import.meta.url).href;
-    const run = spawnSync(process.execPath, ['--input-type=module', '-e', `await import(${JSON.stringify(tools)})`], { encoding: 'utf8', timeout: 30_000 });
+    const run = spawnSync(process.execPath, ['--input-type=module', ...stripTypesFlags(), '-e', `await import(${JSON.stringify(tools)})`], { encoding: 'utf8', timeout: 30_000 });
     expect(run.stderr).toBe('');
     expect(run.status).toBe(0);
   });

@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
+import { stripTypesFlags } from '../main/strip-types.mts';
 import { mcpIsolation, resumeThreadParams, workerThreadParams } from '../main/codex-session.mts';
 import { createCodexApprovals } from '../main/codex-approvals.mts';
 import { codexLineForTheCloud, KEPT_WHILE_AWAY, mcpConfigForTheCloud, servedHere, toolEnv } from '../main/cloud/run.mts';
@@ -160,7 +161,7 @@ describe('a cloud run', () => {
   });
 
   it('a proxy started the way the relay starts one, with its app gone, says so', async () => {
-    const entry = { command: process.execPath, args: [path.resolve(import.meta.dirname, '../mcp/connection-proxy.mts')], env: { ...SERVER.env, AGENTBOX_CONNECTION_NAME: 'Test tracker', AGENTBOX_CONNECTIONS_SOCK: path.join(os.tmpdir(), 'nobody-here.sock') } };
+    const entry = { command: process.execPath, args: [...stripTypesFlags(), path.resolve(import.meta.dirname, '../mcp/connection-proxy.mts')], env: { ...SERVER.env, AGENTBOX_CONNECTION_NAME: 'Test tracker', AGENTBOX_CONNECTIONS_SOCK: path.join(os.tmpdir(), 'nobody-here.sock') } };
     const child = spawn(entry.command, entry.args, { env: toolEnv({ PATH: process.env.PATH, ...entry.env }), stdio: ['pipe', 'pipe', 'inherit'] });
     let out = '';
     child.stdout.setEncoding('utf8');

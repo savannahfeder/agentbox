@@ -90,7 +90,7 @@ describe('the guard is wired into the only place every dev window passes', () =>
 describe('npm run dev says the same thing before it starts anything', () => {
   const refuses = (env) => {
     try {
-      execFileSync(process.execPath, [path.join(root, 'scripts', 'dev.mjs')], {
+      execFileSync(process.execPath, [path.join(root, 'scripts', 'run.mjs'), path.join(root, 'scripts', 'dev.mjs')], {
         cwd: root,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
