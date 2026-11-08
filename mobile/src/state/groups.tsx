@@ -8,6 +8,7 @@ import { readSettingsRows } from '../../../renderer/src/phone-rows';
 import { groupsOn, NO_GROUPS, phoneGroups } from '../../../renderer/src/phone-groups';
 import type { RoomsState } from '../../../renderer/src/types';
 import { LAST_GROUP_KEY } from '../lib/groups';
+import { STORE_BUILD } from '../lib/store-build';
 import { appStore } from '../platform/persist';
 import { useCloud } from './cloud';
 
@@ -27,7 +28,7 @@ function useGroupsState() {
 
   useEffect(() => {
     if (!cloud) { setOn(false); return; }
-    const read = () => readSettingsRows((t, q) => cloud.select(t, q)).then((rows) => setOn(groupsOn(rows)), () => { /* kept as it was until the next read */ });
+    const read = () => readSettingsRows((t, q) => cloud.select(t, q)).then((rows) => setOn(!STORE_BUILD && groupsOn(rows)), () => { /* kept as it was until the next read */ });
     void read();
     const timer = setInterval(() => { if (AppState.currentState === 'active') void read(); }, SETTINGS_MS);
     return () => clearInterval(timer);

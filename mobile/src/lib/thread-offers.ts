@@ -13,7 +13,7 @@ import { doneSteps, summaryOf } from '../../../shared/thread-cards.mjs';
 
 export interface Session { startedAt: number; activity?: { id: string; label: string; detail: string; startedAt?: number }[]; helpers?: number; engine?: string; where?: string; movable?: boolean }
 // What the computer said of the thread when nothing runs on it (phone-rows.ts `waitFacts`), so waiting reads Queued.
-type Waits = Pick<LiveFacts, 'queued' | 'runNow' | 'signInNeeded' | 'atLimit' | 'paused' | 'stalled' | 'shipping'>;
+type Waits = Pick<LiveFacts, 'queued' | 'runNow' | 'signInNeeded' | 'atLimit' | 'paused' | 'stalled' | 'shipping' | 'asking'>;
 interface Facts extends Waits { session: Session | null; inProgress: boolean; now: number }
 
 // The desktop's word for a thread a dead worker left (status-word.ts), which its bar over the conversation explains there.

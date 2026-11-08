@@ -13,6 +13,7 @@ import { NAME } from '../../../shared/product-name.mjs';
 import { deleteAccount } from '../../../renderer/src/phone-account';
 import { withDeadline } from '../lib/deadline';
 import { backAt } from '../lib/back-at';
+import { STORE_BUILD } from '../lib/store-build';
 import { PHONE_LOOKS } from '../lib/look';
 import { alertsHere, sendTestAlert } from '../platform/alerts';
 import { useCloud } from '../state/cloud';
@@ -72,6 +73,7 @@ function General() {
         <Group label="About">
           <NavRow first label="Privacy policy" onPress={() => void WebBrowser.openBrowserAsync(`${site}/privacy`)} />
           <NavRow label="Terms" onPress={() => void WebBrowser.openBrowserAsync(`${site}/terms`)} />
+          <NavRow label="Help" onPress={() => void WebBrowser.openBrowserAsync(`${site}/support`)} />
         </Group>
       ) : null}
       <Sheet open={deleting} close={() => setDeleting(false)}>
@@ -375,7 +377,7 @@ export const SETTINGS_PAGES: SettingsPageDef[] = [
   { id: 'general', label: 'General', group: 'Personal', Body: General, shown: () => true },
   { id: 'appearance', label: 'Appearance', group: 'Personal', Body: Appearance, shown: () => true },
   { id: 'phone', label: 'Phone', group: 'Personal', lede: 'Read and reply from your phone, even with your computer closed.', Body: Phone, shown: () => true },
-  { id: 'alpha', label: 'Alpha features', group: 'Personal', lede: 'Early features you can try before they are finished. They may change or go away.', Body: Alpha, shown: hasComputer },
+  { id: 'alpha', label: 'Alpha features', group: 'Personal', lede: 'Early features you can try before they are finished. They may change or go away.', Body: Alpha, shown: (s) => !STORE_BUILD && hasComputer(s) },
   { id: 'claude', label: 'Claude Code', group: 'Agents', Body: Claude, shown: hasComputer },
   { id: 'codex', label: 'Codex', group: 'Agents', Body: Codex, shown: (s) => !!s.settings && (s.settings.workspace.engines.includes('codex') || s.settings.workspace.codex.found) },
   { id: 'running', label: 'Running', group: 'Agents', Body: Running, shown: hasComputer },
