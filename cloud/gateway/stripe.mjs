@@ -108,6 +108,10 @@ export function stripeClient({ key, webhookSecret, managedPayments = false, fetc
       return (await call('POST', '/v1/billing_portal/sessions', { customer, return_url: returnUrl, ...flow })).url;
     },
     subscription: (id) => call('GET', `/v1/subscriptions/${encodeURIComponent(id)}`),
+    // For a team's billing page: its card, where invoices go, and the last few.
+    subscriptionWithCard: (id) => call('GET', `/v1/subscriptions/${encodeURIComponent(id)}`, { expand: ['default_payment_method'] }),
+    customer: (id) => call('GET', `/v1/customers/${encodeURIComponent(id)}`, { expand: ['invoice_settings.default_payment_method'] }),
+    invoices: (customer, limit = 4) => call('GET', '/v1/invoices', { customer, limit }),
     signed: (raw, header, nowMs) => stripeSigned(raw, header, webhookSecret, nowMs),
   };
 }

@@ -31,6 +31,8 @@ function setup({ start = MADE + 60_000 } = {}) {
     if (u.pathname === '/v1/checkout/sessions') return json(200, { id: 'cs_team_1', url: 'https://checkout.stripe.com/c/pay/cs_team_1' });
     if (u.pathname.startsWith('/v1/checkout/sessions/')) return json(200, { id: 'cs_team_1', status: 'open', url: 'https://checkout.stripe.com/c/pay/cs_team_1' });
     if (u.pathname === '/v1/billing_portal/sessions') return json(200, { url: 'https://billing.stripe.com/p/session/team_1' });
+    if (u.pathname === '/v1/customers/cus_team') return json(200, { id: 'cus_team', email: 'billing@example.com', invoice_settings: { default_payment_method: null } });
+    if (u.pathname === '/v1/invoices') return json(200, { data: [{ created: 1794900000, status: 'paid', amount_paid: 12000, amount_due: 12000 }, { created: 1792300000, status: 'open', amount_paid: 0, amount_due: 12000, attempted: true }] });
     const m = /^\/v1\/subscriptions\/(.+)$/.exec(u.pathname);
     if (m) return subs.has(m[1]) ? json(200, subs.get(m[1])) : json(404, { error: { message: 'No such subscription' } });
     return json(404, { error: { message: 'not faked' } });
@@ -54,7 +56,11 @@ function setup({ start = MADE + 60_000 } = {}) {
     return gw.handle({ method, path, headers: { authorization: `Bearer ${keys[who]}`, host: HOST }, body: body ? JSON.stringify(body) : '' });
   };
   const webhook = (id, status, quantity) => {
-    subs.set(id, { id, object: 'subscription', status, customer: 'cus_team', metadata: { team: 'team-1', person: A }, items: { data: [{ quantity, price: { id: 'price_team', lookup_key: 'agentbox_cloud_team_monthly' } }] } });
+    subs.set(id, {
+      id, object: 'subscription', status, customer: 'cus_team', metadata: { team: 'team-1', person: A },
+      default_payment_method: { card: { brand: 'visa', last4: '4242' } },
+      items: { data: [{ quantity, current_period_start: 1794900000, current_period_end: 1797500000, price: { id: 'price_team', lookup_key: 'agentbox_cloud_team_monthly' } }] },
+    });
     const raw = JSON.stringify({ id: `evt_${crypto.randomUUID()}`, type: 'customer.subscription.updated', data: { object: { id, object: 'subscription', status } } });
     const t = Math.floor(clock / 1000);
     const sig = `t=${t},v1=${crypto.createHmac('sha256', SECRET).update(`${t}.${raw}`).digest('hex')}`;
@@ -110,6 +116,31 @@ describe('Stripe\'s webhook', () => {
     const { owner, webhook } = setup();
     await webhook('sub_team', 'active', 2);
     expect((await owner('GET', '/v1/me')).body.plan).toBe('none');
+  });
+});
+
+describe('what the owner sees of Stripe', () => {
+  it('the period, the next bill, the card, where invoices go and the last invoices', async () => {
+    const { owner, webhook } = setup();
+    await webhook('sub_team', 'active', 3);
+    expect((await owner('GET', '/v1/team-billing')).body).toEqual({
+      owner: true, periodStart: 1794900000 * 1000, periodEnd: 1797500000 * 1000,
+      nextAt: 1797500000 * 1000, nextAmount: 120,
+      card: { brand: 'Visa', last4: '4242' }, email: 'billing@example.com',
+      invoices: [{ at: 1794900000 * 1000, amount: 120, status: 'paid' }, { at: 1792300000 * 1000, amount: 120, status: 'failed' }],
+    });
+  });
+
+  it('before paying, nothing of Stripe, and no call to it', async () => {
+    const { owner, calls } = setup();
+    expect((await owner('GET', '/v1/team-billing')).body).toMatchObject({ owner: true, card: null, invoices: [], nextAt: null });
+    expect(calls).toEqual([]);
+  });
+
+  it('anyone else on the team is told only that the owner pays', async () => {
+    const { member, webhook } = setup();
+    await webhook('sub_team', 'active', 3);
+    expect((await member('GET', '/v1/team-billing')).body).toEqual({ owner: false });
   });
 });
 

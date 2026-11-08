@@ -719,6 +719,41 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     return { received: true };
   }
 
+  // WHAT THE TEAM'S OWNER SEES OF STRIPE on Plan and Billing: the period, the
+  // next bill, the card, where invoices go and the last few. Anyone else on
+  // the team is told only that the owner pays.
+  async function teamBilling(person) {
+    const team = teams ? await teams(person) : null;
+    if (!team?.id) throw new Refusal(404, 'no-team', 'You are not on a team.');
+    if (!(team.owners || []).includes(person)) return { owner: false };
+    const bill = (await readJson(teamKey(team.id))) || {};
+    const empty = { owner: true, periodStart: null, periodEnd: null, nextAt: null, nextAmount: null, card: null, email: null, invoices: [] };
+    if (!stripe || !bill.stripe?.customer) return empty;
+    const [sub, customer, invoices] = await Promise.all([
+      bill.stripe.subscription ? stripe.subscriptionWithCard(bill.stripe.subscription).catch(() => null) : null,
+      stripe.customer(bill.stripe.customer).catch(() => null),
+      stripe.invoices(bill.stripe.customer).catch(() => null),
+    ]);
+    const item = sub?.items?.data?.[0];
+    const at = (s) => (Number.isFinite(Number(s)) && Number(s) > 0 ? Number(s) * 1000 : null);
+    // Newer Stripe keeps the period on the item, older on the subscription.
+    const periodStart = at(item?.current_period_start ?? sub?.current_period_start);
+    const periodEnd = at(item?.current_period_end ?? sub?.current_period_end);
+    const card = sub?.default_payment_method?.card ?? customer?.invoice_settings?.default_payment_method?.card ?? null;
+    const pays = PAYING.has(sub?.status) && !sub?.cancel_at_period_end;
+    return {
+      ...empty, periodStart, periodEnd,
+      nextAt: pays ? periodEnd : null,
+      nextAmount: pays ? (Math.floor(Number(item?.quantity)) || bill.seats || 0) * teamPlan.dollarsPerSeat : null,
+      card: card ? { brand: String(card.brand || '').replace(/^./, (c) => c.toUpperCase()), last4: String(card.last4 || '') } : null,
+      email: typeof customer?.email === 'string' ? customer.email : null,
+      invoices: (invoices?.data ?? []).map((i) => ({
+        at: at(i.created), amount: Math.round(Number(i.status === 'paid' ? i.amount_paid : i.amount_due) / 100),
+        status: i.status === 'paid' ? 'paid' : i.attempted ? 'failed' : 'open',
+      })).filter((i) => i.at),
+    };
+  }
+
   // A team's subscription puts every member on its seats while it pays.
   async function teamEvent(sub) {
     const team = String(sub.metadata.team);
@@ -775,6 +810,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       if (route === 'POST /v1/delete') return { status: 200, body: await remove(person, data) };
       if (route === 'POST /v1/checkout') return { status: 200, body: await checkout(person, data, headers) };
       if (route === 'POST /v1/billing') return { status: 200, body: await billing(person, headers) };
+      if (route === 'GET /v1/team-billing') return { status: 200, body: await teamBilling(person) };
       return { status: 404, body: { error: 'not-found' } };
     } catch (err) {
       if (err instanceof Refusal) return { status: err.status, body: { error: err.error, message: err.message, ...err.extra } };
