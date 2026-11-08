@@ -25,6 +25,8 @@
 // folded is a failure.
 
 import { useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Face, TeamContext, firstName } from '../team/people';
 import { Name } from '../../../shared/product-name.mjs';
 import { LINE_MISSING } from '../reveal-line';
@@ -32,6 +34,7 @@ import { activitySummary, keepActivityKeyLocal } from '../activity-summary';
 import { actWhen, actWords } from '../act-line';
 import { herTurnEnds, herTurnStarts, threadParts } from '../her-turns';
 import { holdAtBottom, lastMessageIn } from '../thread-bottom';
+import { blockKeys, lineIds } from '../thread-keys';
 import { NOT_ANSWERING_MS, THREAD_NOT_ANSWERING_MS, threadWaitWords } from '../not-answering';
 import { onCloudPhone, onPhone } from '../phone-screen';
 import { threadPieces, typedParts } from '../typed-message';
@@ -208,11 +211,10 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
     window.addEventListener(EDIT_LAST, last);
     return () => window.removeEventListener(EDIT_LAST, last);
   });
-  // Which work lines are open, and how far. Kept per conversation, not globally.
-  const [open, setOpen] = useState<Map<number, number>>(new Map());
-  // Which folded RUNS she has opened, by the index of their first line. Runs
-  // are aggregated, and a run she opened stays open while she reads.
-  const [runsOpen, setRunsOpen] = useState<Set<number>>(new Set());
+  // Which work lines are open, and how far, by name (../thread-keys).
+  const [open, setOpen] = useState<Map<string, number>>(new Map());
+  // Which folded runs are open, by name, so a run stays open while the agent adds to the thread.
+  const [runsOpen, setRunsOpen] = useState<Set<string>>(new Set());
   const foot = useRef<HTMLDivElement>(null);
   const decide = useContext(DecideContext);
   // A TEAMMATE'S MESSAGE is theirs, not "You": drawn with their face and name.
@@ -312,9 +314,11 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   // CONSECUTIVE TOOL CALLS FOLD INTO ONE LINE, aggregated behind one toggle
   // rather than each drawn on its own. The rule and
   // the threshold live in shared/work-lines.mjs with the histogram that set
-  // them. Each node keeps the index it had in the raw list, because that is
-  // what the open-map is keyed on and what the gap below is measured against.
+  // them. Each node keeps the index it had in the raw list, which the gap below
+  // is measured against; what is open is kept by name instead.
   const nodes = groupWork(events.map((e, i) => ({ ...e, i })), { min: 1 }) as ThreadNode[];
+  const ids = lineIds(events);
+  const keys = blockKeys(nodes, ids);
   // WHICH OF HER MESSAGES OPEN A CHAPTER, and so wear the rule above them. The
   // whole of when is in ../her-turns.ts; the cut middle counts as a break.
   const cutAt = cutIndex(nodes, gapAfter);
@@ -377,16 +381,14 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
         </button>
       )}
       {nodes.map((e, n) => {
-        // A folded run answers to the index of its first line, so opening one
-        // survives the thread reloading under her while an agent works.
-        const key = e.kind === 'run' ? (e.items[0]?.i ?? -1) : e.i;
+        const key = keys[n];
         // AND THE GAP ANSWERS TO THE LAST LINE IN THE NODE, not the first. The
         // seam can fall on work rather than on a message now, and consecutive
-        // work is folded into one run: matching on `key` would look for the seam
-        // at the run's opening line and never find it, taking the door off the
+        // work is folded into one run: matching on the run's opening line would
+        // never find the seam, taking the door off the
         // screen on exactly the rows that need it.
         const ends = e.kind === 'run' ? (e.items[e.items.length - 1]?.i ?? -1) : e.i;
-        const stepLine = (k: number, next: number) => setOpen((was) => {
+        const stepLine = (k: string, next: number) => setOpen((was) => {
           const map = new Map(was);
           if (next === SHUT) map.delete(k); else map.set(k, next);
           return map;
@@ -404,7 +406,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
           : slot && !slot.head ? 'is-msg is-chat-cont'
           : e.same ? 'is-msg-same' : 'is-msg';
         return (
-        <div key={`${e.at}-${key}-${n}`} className={`thread-block ${holds} ${ends === gapAfter ? 'has-gap' : ''}${chat && e.kind !== 'work' && e.kind !== 'run' && e.uid && e.uid === openThread ? ' is-thread-open' : ''}`} data-exchange={exchanges[n]} data-line={e.kind === 'work' || e.kind === 'run' ? undefined : e.uid ?? `at-${e.at}`}>
+        <div key={key} className={`thread-block ${holds} ${ends === gapAfter ? 'has-gap' : ''}${chat && e.kind !== 'work' && e.kind !== 'run' && e.uid && e.uid === openThread ? ' is-thread-open' : ''}`} data-exchange={exchanges[n]} data-line={e.kind === 'work' || e.kind === 'run' ? undefined : e.uid ?? `at-${e.at}`}>
           {slot?.day && <div className="chat-day">{slot.day}</div>}
           {e.kind === 'work' && e.yours
             ? <ActLine act={e} />
@@ -417,6 +419,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                   if (next.has(key)) next.delete(key); else next.add(key);
                   return next;
                 })}
+                nameOf={(i) => ids[i]}
                 lineState={(k) => open.get(k) ?? SHUT}
                 onStepLine={stepLine}
                 code={code}
@@ -638,12 +641,13 @@ const chevron = (
 // WHAT IS NEVER FOLDED IS A FAILURE. The closed line says how many of the calls
 // inside it failed, in the same colour a single failed line uses, because a
 // fold she has to open to find bad news in is worse than the wall it replaced.
-function RunLine({ items, open, onToggle, lineState, onStepLine, code }: {
+function RunLine({ items, open, onToggle, nameOf, lineState, onStepLine, code }: {
   items: (AgentWork & { i: number })[];
   open: boolean;
   onToggle: () => void;
-  lineState: (key: number) => number;
-  onStepLine: (key: number, next: number) => void;
+  nameOf: (i: number) => string;
+  lineState: (key: string) => number;
+  onStepLine: (key: string, next: number) => void;
   code?: CodeInThread | null;
 }) {
   const failed = runFailures(items);
@@ -658,10 +662,10 @@ function RunLine({ items, open, onToggle, lineState, onStepLine, code }: {
         <div className="did-run-body">
           {items.map((w) => (
             <WorkLine
-              key={w.i}
+              key={nameOf(w.i)}
               work={w}
-              state={lineState(w.i)}
-              onStep={(next) => onStepLine(w.i, next)}
+              state={lineState(nameOf(w.i))}
+              onStep={(next) => onStepLine(nameOf(w.i), next)}
               code={code}
             />
           ))}
@@ -806,6 +810,9 @@ function WorkLine({ work, state, onStep, code }: {
  * seeing it. The first build was a grey sentence with a long time after it and
  * was turned down as ugly; this is the drawing chosen after (round4-single).
  */
+// A pick sits on one line, so a paragraph or a link in it is drawn as its words.
+const INLINE = ['strong', 'em', 'code', 'del'];
+
 export function ActLine({ act }: { act: AgentWork }) {
   // A TEAMMATE'S ACTION is theirs: their first name where "You" would be.
   const team = useContext(TeamContext);
@@ -818,7 +825,13 @@ export function ActLine({ act }: { act: AgentWork }) {
         {act.fileMark && openFile
           ? <button type="button" className="act-file-link" onClick={() => openFile(act.fileMark!)}>{words.lead}</button>
           : words.lead}
-        {words.choice && <span className="act-choice"> {words.choice}</span>}
+        {/* Drawn as the options card drew it, not as the markdown it was written in (F-170). */}
+        {words.choice && (
+          <span className="act-choice">
+            {' '}
+            <ReactMarkdown remarkPlugins={[remarkGfm]} allowedElements={INLINE} unwrapDisallowed>{words.choice}</ReactMarkdown>
+          </span>
+        )}
       </span>
       <span className="act-when">{actWhen(act.at)}</span>
     </div>

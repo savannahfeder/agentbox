@@ -7,6 +7,7 @@ import {
   offerFrom, offerAnswer, OFFER_LABEL, OFFER_MAKE, OFFER_NOT_NOW, TEAMMATE_EFFORT, GREETING, starterAsks,
   dutyWhen, dutyOf, DUTY_LABEL_PREFIX, CHAT_LABEL, yesFirst, WORK_LABEL_PREFIX, isActiveRun, isQueued, STOPPED_NOTE,
   METHOD_CAP, recordOf, sourceText, pausedNow, WEEK_MS, workOf, UNREAD_HOLD, cleanDuty, dutyStart, howYouWrite, VOICES,
+  replyMessageId, projectNamedIn,
 } from '../shared/teammates.mjs';
 import { reachTick } from './teammate-reach.mjs';
 import { filesFoldersBrief } from '../shared/file-folders.mjs';
@@ -218,7 +219,7 @@ interface Opening { body: string; yours: boolean }
 
 const CHAT_FOR_SCREEN = 400;
 
-const TROUBLE_VERB: Record<string, string> = { run: 'start a run', answer: 'get your message', tell: 'take a hand-off', release: 'start its next run', seen: 'mark a message read', served: 'mark its round served', dutyServed: 'mark a duty done' };
+const TROUBLE_VERB: Record<string, string> = { run: 'start a run', answer: 'get your message', replied: 'put its answer in the chat', tell: 'take a hand-off', release: 'start its next run', seen: 'mark a message read', served: 'mark its round served', dutyServed: 'mark a duty done' };
 
 // When each project last shipped, from the note the ship queue leaves.
 function shippedByProduct(items?: TeamItem[] | null) {
@@ -480,7 +481,9 @@ export class Teammates {
     const said = answers && typeof answers === 'object' && !Array.isArray(answers)
       ? Object.fromEntries(Object.entries(answers).filter(([, a]) => typeof a === 'string' && a.trim()).map(([q, a]) => [q, a.trim().slice(0, 2000)]))
       : {};
-    return writeChat(this.dir(), { kind: 'msg', from: YOU, to: known, text: words.slice(0, 8000), ...(options ? { options } : {}), ...(fresh ? { fresh: true } : {}), ...(Object.keys(said).length ? { answers: said } : {}) }, now);
+    // Work you name a project for is done in that project, in a thread of its own there.
+    const product = projectNamedIn(words, this.store.listProducts().filter((p) => !p.practice && !p.personal));
+    return writeChat(this.dir(), { kind: 'msg', from: YOU, to: known, text: words.slice(0, 8000), ...(product ? { product } : {}), ...(options ? { options } : {}), ...(fresh ? { fresh: true } : {}), ...(Object.keys(said).length ? { answers: said } : {}) }, now);
   }
 
   // Your go-ahead for work held after too many hand-offs: the same work again,
@@ -622,6 +625,9 @@ export class Teammates {
         } else if (a.type === 'tell') {
           if (!tell) throw new Error('nothing here can hand work to a thread');
           await tell(a.product, a.item, { text: a.text, from: a.from, hold: a.hold, hop: a.hop });
+        } else if (a.type === 'replied') {
+          if (a.say) writeChat(this.dir(), { kind: 'msg', id: replyMessageId(a.item), from: a.teammate, to: [], text: a.text.slice(0, 4000), run: a.item }, now);
+          workItemsDisk.updateWorkItem(this.store.productDir(a.product), a.item, { status: 'done', labels: [...a.labels, 'clean'] }, { source: 'system', now });
         } else if (a.type === 'release') {
           const dir = this.store.productDir(a.product);
           workItemsDisk.updateWorkItem(dir, a.item, { start: 'now' }, { source: 'system', now });
@@ -801,8 +807,9 @@ export class Teammates {
     if (products.length < 2) return [];
     return [
       "## The person's projects",
-      ...products.map((p) => `- ${p.name}${p.slug === t.product ? ' (yours)' : ''}: ${p.repoPath ? `code at ${p.repoPath}` : 'no code'}${p.dir ? `, docs at ${p.dir}` : ''}`),
-      'Read any of them when your job needs it. Change files only in your own, unless the person asks.',
+      // No documents folder by path: a cloud run is sent every folder its brief names.
+      ...products.map((p) => `- ${p.name}${p.slug === t.product ? ' (yours)' : ''}: ${p.repoPath ? `code at ${p.repoPath}` : 'no code'}`),
+      'Read any of them when your job needs it; list_documents and read_document open any project\'s documents by its name. Never change files, branches or commits in another project\'s folder, even when the person asks: those folders are their own working copies. This run has a folder of its own in this thread\'s project. Work in another project goes to a thread of its own there: team_pass with project set, to the teammate whose job it is, or to yourself.',
       '',
     ];
   }
@@ -942,7 +949,7 @@ export class Teammates {
       '- A tool saying your work is valid is not your work being good: a lint, a build or a check passing is the floor, not the finish. Before you show anything, look at what you made the way they will see it, the frames, the page, the picture, against the craft\'s own standard and their own instructions about how work is shown, and fix what fails. Showing something you never looked at is the thing they notice first.',
       '- Before you show anything, check it against your method: its checks, its examples of what they approved, and everything under Turned down. Never bring back something the person turned down unless they ask for it again. Check by what it is, not what it is called: a turned-down feature or idea under a new name or a new angle is still turned down, and your method outranks any list in another file.',
       '- Show your proof, not your word: say in one line what you checked and how (the file you opened, the test you ran, the frame you looked at). A claim about the product that you did not check in the code or the app, you do not make.',
-      `- When the person corrects, approves, turns down or decides something, update your method in this run, before you finish: edit ${file} (or use team_method when you cannot write there), quote their words with the date and thread, and change what it contradicts rather than adding a second rule beside it. Write only what they said or showed; mark your own reading as yours. Say in one line what changed.`,
+      `- When the person corrects, approves, turns down or decides something, update your method in this run, before you finish, with team_method: quote their words with the date and thread, and change what it contradicts rather than adding a second rule beside it. Write only what they said or showed; mark your own reading as yours. Say in one line what changed.`,
       '- Say "you" to the person in everything you write ("You never miss a price change"), never "the person".',
       '- Need a teammate to do something? Hand it over with team_pass (to, title, details). In the details, point at the threads, files and links it needs rather than retelling them, so nothing is lost on the way. It waits for the person\'s yes unless they told that teammate otherwise. Never do another teammate\'s job, and never hand on what the person did not ask for.',
       '- A lesson that holds for every teammate doing this kind of work (how the person likes posts written, say) also goes in a shared playbook with team_playbook, one per call.',
@@ -1012,7 +1019,7 @@ export class Teammates {
   _buildMethodFirst(t: Teammate, file: string, sources: SourceFile[], fromThreads: boolean) {
     return [
       fromThreads && t.status === 'draft' ? '## The threads you come from' : '## First, build your method',
-      `You have no method yet. ${t.status === 'draft' ? 'Before anything else' : 'Before you do what woke you'}, write it at ${file} (or with team_method when you cannot write there): one file, in plain markdown, that every later run of yours reads whole. Read every file below in full first; they are the person's threads with every word said, uncut.`,
+      `You have no method yet. ${t.status === 'draft' ? 'Before anything else' : 'Before you do what woke you'}, write it with team_method (it is kept at ${file}): one file, in plain markdown, that every later run of yours reads whole. Read every file below in full first; they are the person's threads with every word said, uncut.`,
       ...(sources.length ? sources.map((s) => `- ${s.file} (${s.title}, ${s.chars} characters)`) : ['- (no past threads yet: write it from your job and what the person says)']),
       '',
       'Write these sections, each rule with the person\'s own words in quotes, the date and the thread id it came from:',

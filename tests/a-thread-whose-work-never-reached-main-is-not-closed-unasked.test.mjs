@@ -99,6 +99,7 @@ describe('closing it', () => {
       options: [
         { n: 1, text: 'Have the agent ship it', recommended: true, act: 'ship' },
         { n: 2, text: 'Close it anyway', recommended: false, act: 'close' },
+        { n: 3, text: 'Keep this thread open', recommended: false, act: 'keep' },
       ],
     });
   });

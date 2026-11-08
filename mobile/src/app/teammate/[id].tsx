@@ -2,7 +2,8 @@
 // (renderer/src/teammates/TeammatesPage.tsx `ChatColumn`): what it said and
 // did, its questions with answers to tap, the threads it sent you, and a box
 // to write to it. What you send goes to your computer, which wakes it.
-import { Redirect, router, useLocalSearchParams } from 'expo-router';
+import { Redirect, useLocalSearchParams } from 'expo-router';
+import { router } from '../../lib/router';
 import { useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { answersMessage } from '../../../../renderer/src/teammates/chat-lines';

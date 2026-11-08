@@ -2,7 +2,7 @@
 // rules (renderer/src/team/everything/members.ts, whose-board.ts) from what the
 // phone can read, and whose work goes under the card that is lit.
 import { buildMembers, mateRunsOf, moreLine, orderMembers, personCardsOf, readOrder, rowsShown, teamRunsOf, type Member } from '../../../renderer/src/team/everything/members';
-import { boardItems, flipEvView, readEvView, writeEvView, type EvView } from '../../../renderer/src/team/everything/whose-board';
+import { flipEvView, readEvView, writeEvView, type EvView } from '../../../renderer/src/team/everything/whose-board';
 import { teammateIdOf } from '../../../shared/teammates.mjs';
 import type { Room, RoomMessage, Teammate, ThreadCard } from '../../../renderer/src/types';
 import { groupName } from './groups';
@@ -67,8 +67,8 @@ export function phoneMembers({ meId, rooms, messages, teamPeople = [], cards = [
   }), readOrder(asStorage(store)));
 }
 
-/** Your own threads, without your AI teammates' runs, which their cards hold. */
-export const myItems = <T>(items: readonly T[]) => boardItems(items, { picked: [], mate: null, mineOnly: true }, (i) => teammateIdOf(i as any));
+/** Your own threads, without your AI teammates' runs: a phone card draws no teammate's name, so their cards hold them. */
+export const myItems = <T>(items: readonly T[]) => items.filter((i) => !teammateIdOf(i as any));
 
 /** Two cards a row on a phone. One row usually, and the line that shows the rest (CardsArea.tsx). */
 export const CARDS_PER_ROW = 2;

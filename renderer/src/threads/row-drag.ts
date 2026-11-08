@@ -158,7 +158,7 @@ function copyOf(card: HTMLElement): HTMLElement {
   return copy;
 }
 
-const scrollerOf = (el: HTMLElement | null): HTMLElement | null => {
+export const scrollerOf = (el: HTMLElement | null): HTMLElement | null => {
   for (let at = el?.parentElement ?? null; at; at = at.parentElement) {
     const o = getComputedStyle(at).overflowY;
     if ((o === 'auto' || o === 'scroll') && at.scrollHeight > at.clientHeight) return at;

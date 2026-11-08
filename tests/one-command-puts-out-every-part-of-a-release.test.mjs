@@ -118,14 +118,16 @@ describe('the deploy script', () => {
 
   // The Mac build first: it is slow and the likeliest to fail, and until it is
   // done nothing public has changed, so a failure is fixed by running it again.
-  it('runs the Mac build, npm, the download and the cloud server, in that order', () => {
+  // npm last: it is the sign-in most often forgotten, and a run that misses it
+  // has already put out everything else (a-deploy-waits-until-publishing-to-log-in-to-npm).
+  it('runs the Mac build, the download, the cloud server and npm, in that order', () => {
     const at = (s) => deploy.indexOf(s);
     for (const s of ["'scripts/release.mjs'", "['publish']", "'scripts/publish-download.mjs'", "'scripts/cloud-gateway-setup.mjs'"]) {
       expect(at(s), s).toBeGreaterThan(-1);
     }
-    expect(at("'scripts/release.mjs'")).toBeLessThan(at("['publish']"));
-    expect(at("['publish']")).toBeLessThan(at("'scripts/publish-download.mjs'"));
+    expect(at("'scripts/release.mjs'")).toBeLessThan(at("'scripts/publish-download.mjs'"));
     expect(at("'scripts/publish-download.mjs'")).toBeLessThan(at("'scripts/cloud-gateway-setup.mjs'"));
+    expect(at("'scripts/cloud-gateway-setup.mjs'")).toBeLessThan(at("['publish']"));
   });
 
   // w-6771163ced: file delivery reached main on 2026-10-28 and no cloud run

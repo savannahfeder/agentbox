@@ -11,13 +11,14 @@ import {
   type FileComment, type Rpc, type SharedFile, type Shown,
 } from './shared-file';
 import { SharedSignIn } from './SharedSignIn';
+import { Name } from '../../../shared/product-name.mjs';
 import '../components/doc-reading.css';
 import '../components/file-views.css';
 import './shared-file.css';
 
 export const SITE = 'https://agentbox.ac';
 export const DOWNLOAD = 'https://agentbox.ac/download';
-export const WHAT_AGENTBOX_IS = 'Agentbox is an inbox for your Claude Code and Codex agents.';
+export const WHAT_AGENTBOX_IS = `${Name} is an inbox for your Claude Code and Codex agents.`;
 // Whoever made their account from this page, for the one line offering the Mac app.
 const NEW_HERE = 'agentbox-new-here';
 
@@ -83,7 +84,7 @@ export function SharedFilePage({ token, client, finishing = null }: {
 
   const file = load.state === 'file' ? load.file : null;
   const title = file ? titleOf(file).title : null;
-  useEffect(() => { document.title = title ? `${title} · Agentbox` : 'Agentbox'; }, [title]);
+  useEffect(() => { document.title = title ? `${title} · ${Name}` : Name; }, [title]);
 
   const [commentsOpen, setCommentsOpen] = useState(false);
   // Signing in from this page is always for commenting, so it comes back to the comments.
@@ -160,7 +161,7 @@ export function TopBar({ count, open, onComments }: { count: number | null; open
             {count === 0 ? 'Comment' : count === 1 ? '1 comment' : `${count} comments`}
           </button>
         )}
-        <a href={SITE}>Get Agentbox</a>
+        <a href={SITE}>Get {Name}</a>
       </nav>
     </header>
   );
@@ -277,7 +278,7 @@ export function Comments({ file, comments, signedIn, onAsk, post, remove }: {
         </>
       )}
       {error && <p className="sf-error" role="alert">{error}</p>}
-      {offer && <p className="sf-offer">{WHAT_AGENTBOX_IS} <a href={DOWNLOAD}>Get Agentbox</a></p>}
+      {offer && <p className="sf-offer">{WHAT_AGENTBOX_IS} <a href={DOWNLOAD}>Get {Name}</a></p>}
     </div>
   );
 }

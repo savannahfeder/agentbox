@@ -23,6 +23,8 @@
 @media(max-width:700px) { .app.workspace-layout { --workspace-width: 38px; } .workspace-layout .workspace-navigation button > span { display: none; } }
 
 .workspace-layout::after { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 40px; -webkit-app-region: drag; }
+/* Reported after ⌘K's backdrop, so it would put the drag back over the box's outside. */
+.workspace-layout:has(> .palette-backdrop)::after { -webkit-app-region: no-drag; }
 /* NO TRAFFIC LIGHTS on Linux or Windows, so the 40px above is an empty band
    over the pane. The top inset matches the bottom one. The drag strip is that
    same height: any taller and it covers the top of the pane and eats the

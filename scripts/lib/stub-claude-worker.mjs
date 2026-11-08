@@ -63,6 +63,7 @@ if (plan.receipts) {
       argv,
       cwd: process.cwd(),
       sessionId,
+      mcp: Object.fromEntries(Object.entries(mcpServers()).map(([name, server]) => [name, server?.type ?? 'stdio'])),
       env: Object.fromEntries(Object.entries(process.env).filter(([k]) => (
         k.startsWith('ZERO_') || k.startsWith('STORE_') || k.startsWith('ANTHROPIC_')
         || k.startsWith('CLAUDE') || k.startsWith('OPENAI_') || k.startsWith('CODEX_')
@@ -126,7 +127,7 @@ function mcpServers() {
 }
 
 /** The approvals server Agentbox wrote into this worker's --mcp-config, spoken to
- *  exactly the way Claude Code speaks to it: MCP over the child's stdio. */
+ *  exactly the way Claude Code speaks to it: over the child's stdio, or HTTP when shared. */
 async function askTheFounder({ tool_name: toolName, input }) {
   if (argv.indexOf('--mcp-config') < 0) throw new Error('no --mcp-config was passed, so there is no approvals channel to use');
   const server = mcpServers()['zero-approvals'];
@@ -140,7 +141,43 @@ async function askTheFounder({ tool_name: toolName, input }) {
   try { return JSON.parse(text); } catch { return { behavior: 'deny', message: `unreadable answer: ${text}` }; }
 }
 
+// The store server: one of its own carries the account, a shared one is reached by its address.
+function storeServer() {
+  return Object.entries(mcpServers()).find(([name, s]) => name !== 'zero-approvals' && (s?.env?.STORE_ACCOUNT_ID || (s?.type === 'http' && /\/store$/.test(s.url ?? ''))))?.[1];
+}
+
+// A server the app shares between runs (main/tool-host.mjs), spoken to over
+// HTTP as Claude Code speaks to it.
+function httpSession(server) {
+  let sid = null;
+  let nextId = 1;
+  const call = async (method, params) => {
+    const id = nextId++;
+    try {
+      const res = await fetch(server.url, {
+        method: 'POST',
+        headers: { ...server.headers, 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...(sid ? { 'mcp-session-id': sid } : {}) },
+        body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+        signal: AbortSignal.timeout(20_000),
+      });
+      sid = res.headers.get('mcp-session-id') ?? sid;
+      if (!res.ok) return { error: { message: `${method} was refused (${res.status})` } };
+      const answer = (await res.text()).split('\n\n').filter((e) => e.startsWith('event: message'))
+        .map((e) => JSON.parse(e.slice(e.indexOf('data: ') + 6))).find((m) => m.id === id);
+      return answer ?? { error: { message: `${method} had no answer` } };
+    } catch (err) {
+      return { error: { message: `${method} had no answer in 20 s: ${err.message}` } };
+    }
+  };
+  const ready = call('initialize', { protocolVersion: '2025-06-18', clientInfo: { name: 'agentbox-proof-stub', version: '1.0.0' }, capabilities: {} });
+  return {
+    call: async (name, args) => { await ready; return call('tools/call', { name, arguments: args }); },
+    close: () => { if (sid) fetch(server.url, { method: 'DELETE', headers: { ...server.headers, 'mcp-session-id': sid }, signal: AbortSignal.timeout(5_000) }).catch(() => {}); },
+  };
+}
+
 function mcpSession(server) {
+  if (server.type === 'http') return httpSession(server);
   const child = spawn(server.command, server.args ?? [], {
     env: { ...process.env, ...(server.env ?? {}) },
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -182,7 +219,7 @@ const ROLES = [[/\b(ci|tests?|flaky|bugs?|qa|quality)\b/i, 'Quality lead'], [/\b
   [/\b(investors?|fundrais\w*|raise)\b/i, 'Fundraiser'], [/\b(support|customers?|tickets?)\b/i, 'Support lead'], [/\b(summar\w*|changelog|digest|shipped)\b/i, 'Release notes lead'],
   [/\b(marketing|posts?|tweets?|videos?|launch)\b/i, 'Marketing lead'], [/\b(growth|signups?|metrics?)\b/i, 'Growth lead']];
 async function actAsTeammate(brief, prompt, answer) {
-  const server = Object.entries(mcpServers()).find(([name, s]) => name !== 'zero-approvals' && s?.env?.STORE_ACCOUNT_ID)?.[1];
+  const server = storeServer();
   if (!server) return;
   const session = mcpSession(server);
   const text = (r) => r?.result?.content?.[0]?.text ?? '';
@@ -215,7 +252,7 @@ let said = plan.say ?? 'the stub worker ran';
 // acts.<name> ({ calls: [{ tool, args }], say }), so a proof can have an agent
 // write a document or attach a file. A refused call is said in the answer.
 async function actFromPlan({ calls = [], say: words }) {
-  const server = Object.entries(mcpServers()).find(([name, s]) => name !== 'zero-approvals' && s?.env?.STORE_ACCOUNT_ID)?.[1];
+  const server = storeServer();
   if (!server) return 'the stub had no store tools to act with';
   const session = mcpSession(server);
   const refused = [];

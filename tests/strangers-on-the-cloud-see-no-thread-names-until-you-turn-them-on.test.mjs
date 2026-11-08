@@ -12,6 +12,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
+import { emptyDatabase } from './an-empty-test-database.mjs';
 
 const dir = path.join(import.meta.dirname, '..', 'cloud/supabase/migrations');
 const files = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
@@ -44,7 +45,7 @@ const card = (id) => one('select show_working from public.room_profiles where pe
 const row = (id) => one('select working_on, activity, agents_running, updated_at from public.room_presence where person_id = $1', [id]);
 
 beforeAll(async () => {
-  db = new PGlite();
+  db = new PGlite(await emptyDatabase());
   await db.exec(STAND_IN);
   await db.exec(sql(files.filter((f) => f < THIS)));
   for (const [id, show] of [[SHOWS, 'everyone'], [TEAM, 'team'], [NONE, 'none'], [NEW, null]]) {

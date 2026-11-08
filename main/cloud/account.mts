@@ -51,10 +51,13 @@ export interface CloudAccountSession {
   startReset(email: unknown): Promise<void>;
   waitForReset(): Promise<void>;
   newPassword(password: unknown): Promise<string>;
+  takeSession(): PhoneSession | null;
   cancel(): unknown;
   reopen(): unknown;
   held?: string | null;
 }
+
+export interface PhoneSession { supabaseUrl: string; access_token: string; refresh_token: string }
 
 export interface CloudAccountSessionOptions {
   config: CloudAccountConfig;
@@ -116,8 +119,12 @@ export function cloudAccountSession({ config, openExternal, log = () => {}, crea
       global: { fetch: withDeadline() },
     });
   };
-  const tokenOf = (data: { session?: { access_token?: string } | null } | null | undefined) => {
+  // The last sign-in's database session, kept in memory for the phone side
+  // (main/team/), which needs one of its own; taken once.
+  let handOver: PhoneSession | null = null;
+  const tokenOf = (data: { session?: { access_token?: string; refresh_token?: string } | null } | null | undefined) => {
     if (!data?.session?.access_token) throw new Error('Signing in came back without a session. Try again.');
+    handOver = data.session.refresh_token ? { supabaseUrl: config.supabaseUrl, access_token: data.session.access_token, refresh_token: data.session.refresh_token } : null;
     return data.session.access_token;
   };
   return {
@@ -187,7 +194,8 @@ export function cloudAccountSession({ config, openExternal, log = () => {}, crea
       resetting = null;
       return token;
     },
-    cancel: () => { resetting = null; confirming = null; return cancelGoogleSignIn(); },
+    takeSession: () => { const s = handOver; handOver = null; return s; },
+    cancel: () => { resetting = null; confirming = null; handOver = null; return cancelGoogleSignIn(); },
     reopen: () => (lastUrl ? openExternal(lastUrl) : null),
   };
 }
@@ -275,13 +283,22 @@ function signedIn(env: NodeJS.ProcessEnv, home: string) {
   return key ? { gateway, key } : null;
 }
 
+type FreeHours = { agents: number; hours: number; usedSeconds: number };
+
+/** No plan with free hours left reads as the `free` plan, so every screen draws it like a plan. */
+export function cloudPlanOf<T extends { plan?: unknown; free?: FreeHours }>(me: T): T | (T & { plan: 'free'; agents: number; hoursPerMonth: number; usedSeconds: number }) {
+  const f = me.free;
+  if (me.plan !== 'none' || !f || f.usedSeconds >= f.hours * 3600) return me;
+  return { ...me, plan: 'free', agents: f.agents, hoursPerMonth: f.hours, usedSeconds: f.usedSeconds };
+}
+
 /** The plan, its agents and hours, and what is used, as the server counts them. */
 export async function cloudPlan({ env = process.env, home = os.homedir() }: StoreDirs = {}) {
   const at = signedIn(env, home);
   if (!at) return { signedIn: false };
   const me = await ask(at.gateway, '/v1/me', { key: at.key });
   if (me.status === 401) forgetCloudKey(at.key, env, home);
-  return me.status === 200 ? { signedIn: true, ...me.body } : { signedIn: me.status !== 401, error: me.body.error || 'refused', message: me.body.message };
+  return me.status === 200 ? { signedIn: true, ...cloudPlanOf(me.body) } : { signedIn: me.status !== 401, error: me.body.error || 'refused', message: me.body.message };
 }
 
 /** End every other Mac's cloud key, for a Mac that was lost; this one stays signed in. */
