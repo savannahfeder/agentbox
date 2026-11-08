@@ -90,9 +90,11 @@
 .tbl-th:not(:disabled):hover, .tbl-th.sorted { color: var(--text); }
 .tbl-arrow { font-family: inherit; }
 .tbl-td {
-  display: flex; align-items: center; height: 46px; padding: 0 16px;
+  display: flex; align-items: center; height: var(--tbl-row-h, 46px); padding: 0 16px;
   white-space: nowrap; overflow: hidden;
 }
+/* A wrapped column shows up to three lines; past that it is cut off as before. */
+.tbl-td.wrap .tbl-ell { white-space: normal; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-height: 20px; }
 /* The row number and the first column stay put while the rest scrolls sideways,
    so a cell far to the right still says whose row it is. */
 .tbl-tr > :nth-child(1), .tbl-tr > :nth-child(2) { position: sticky; background: var(--surface); z-index: 1; }
@@ -148,7 +150,7 @@
 
 /* A markdown table in a message: the same table, in the message's own flow.
    Every row shows, nothing sticks, and it sits on the message's ground. */
-.tbl-inline { margin: 18px 0; font-size: 14px; }
+.tbl-inline { margin: 18px 0; font-size: 14px; container-type: inline-size; }
 .tbl-inline .tbl-scroll { overflow-x: auto; overflow-y: visible; }
 .tbl-inline .tbl-grid { border-left: 1px solid var(--tbl-line); }
 .tbl-inline .tbl-tr > :nth-child(1), .tbl-inline .tbl-tr > :nth-child(2) { position: static; background: transparent; }
@@ -224,6 +226,14 @@
   background: var(--surface); box-shadow: inset 0 0 0 2px var(--tbl-at), var(--shadow-lg);
   white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text;
 }
+/* A cut-off cell, picked, shows its words whole over it: the edit box's place and look, read only. */
+.tbl-peek {
+  position: absolute; z-index: 5; box-sizing: border-box; overflow-y: auto;
+  padding: 13px 16px; font-size: 14px; line-height: 20px; color: var(--text);
+  background: var(--surface); box-shadow: inset 0 0 0 2px var(--tbl-at), var(--shadow-lg);
+  white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; cursor: text;
+}
+.tbl.holding .tbl-peek { display: none; }
 .tbl-edit-box[readonly] { box-shadow: inset 0 0 0 1px var(--line-strong), var(--shadow-lg); }
 
 /* A tag cell's list drops from the cell, or rises over it near the foot of the view. */
@@ -235,6 +245,62 @@
 .tbl-pick .when-row.hi { background: var(--bg-selected); color: var(--text); }
 .tbl-pick .when-row.on .tbl-tag { box-shadow: inset 0 0 0 1px currentColor; }
 .tbl-pick-add { font-family: inherit; font-size: 13px; }
+/* A column's type, small and quiet before its name. */
+.tbl-kind { display: inline-flex; vertical-align: -2px; margin-right: 7px; color: var(--text-faint); }
+.tbl-kind svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
+.tbl-menu .when-row .tbl-kind { margin-right: 0; }
+
+/* Each tag's own menu waits at the end of its row. */
+.tbl-pick-row { position: relative; display: flex; }
+.tbl-pick-row .when-row { padding-right: 34px; }
+.tbl-pick-more {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  width: 24px; height: 24px; display: grid; place-items: center; padding: 0;
+  background: none; border: 0; border-radius: var(--radius); color: var(--text-dim); cursor: pointer; opacity: 0;
+}
+.tbl-pick-more svg { width: 14px; height: 14px; fill: currentColor; }
+.tbl-menu-back { width: 100%; background: none; border: 0; cursor: pointer; align-items: center; gap: 4px; font-family: inherit; }
+.tbl-menu-back:hover { color: var(--text); }
+.tbl-menu-back svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+/* The keys and the pointer share one highlight: the pointer moves it, and keys move it away from the pointer. */
+.tbl-pick .tbl-pick-row .when-row:hover:not(.hi) { background: none; }
+.tbl-pick-row.hi .tbl-pick-more { opacity: 1; }
+.tbl-pick-more:hover { color: var(--text); background: var(--bg-hover); }
+
+/* One tag: its name, its colour, and a way to delete it. */
+.tbl-tagedit-head { display: flex; align-items: center; gap: 2px; margin: 6px 5px 3px 2px; }
+.tbl-tagedit-head .tbl-icon { width: 28px; height: 28px; flex: none; }
+.tbl-tagedit-head .tbl-icon svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.tbl-tagedit-tones { display: flex; gap: 4px; padding: 4px 9px 6px; }
+.tbl-swatch { width: 26px; height: 26px; display: grid; place-items: center; padding: 0; border: 0; cursor: pointer; }
+.tbl-swatch::after { content: ''; width: 10px; height: 10px; background: var(--dot); }
+.tbl-swatch:hover, .tbl-swatch.on { box-shadow: inset 0 0 0 1.5px var(--dot); }
+.tbl-danger .when-row-label { color: var(--ti-rose); }
+
+/* A date cell's calendar. */
+.tbl-cal-head { display: flex; align-items: center; gap: 2px; padding: 4px 4px 2px 9px; }
+.tbl-cal-month { flex: 1; font-size: 13px; color: var(--text); }
+.tbl-cal-head .tbl-icon { width: 28px; height: 28px; }
+.tbl-cal-head .tbl-icon svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.tbl-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; padding: 0 5px 4px; }
+.tbl-cal-wd { height: 24px; display: grid; place-items: center; font: 10.5px var(--mono); color: var(--text-faint); }
+.tbl-cal-day {
+  height: 30px; padding: 0; font: inherit; font-size: 12.5px; font-variant-numeric: tabular-nums;
+  color: var(--text-dim); background: none; border: 0; border-radius: var(--radius); cursor: pointer;
+}
+.tbl-cal-day:hover { background: var(--bg-selected); color: var(--text); }
+.tbl-cal-day.out { color: var(--text-faint); opacity: 0.55; }
+.tbl-cal-day.today { color: var(--text); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.tbl-cal-day.on { background: var(--tbl-at); color: #fff; box-shadow: none; }
+.tbl-cal-foot { display: flex; gap: 2px; border-top: 1px solid var(--line); padding-top: 3px; margin-top: 2px; }
+.tbl-cal-foot .when-row { width: auto; }
+
+/* Rows and columns picked can be picked up and moved; a line shows where they will land. */
+.tbl.rows-move .tbl-rn.sel[data-rn], .tbl.cols-move .tbl-th.sel { cursor: grab; }
+.tbl.moving, .tbl.moving * { cursor: grabbing !important; }
+.tbl-drop { position: absolute; z-index: 7; pointer-events: none; background: var(--tbl-at); }
+.tbl-drop.row { left: 0; height: 2px; }
+.tbl-drop.col { top: 0; width: 2px; }
 
 /* A menu at the pointer. */
 .when-menu.tbl-menu.tbl-float { position: fixed; top: 0; width: 220px; z-index: 1000; }
@@ -265,6 +331,7 @@
 .tbl-field-tagbtn { align-self: flex-start; display: inline-flex; padding: 4px 0; background: none; border: 0; cursor: pointer; font: inherit; }
 .tbl-field-tagbtn:disabled { cursor: default; }
 .tbl-field-tag { display: flex; flex-direction: column; }
+.tbl-field-datebtn { color: var(--text); text-align: left; }
 .tbl-field-pick { margin-top: 4px; width: 260px; padding: 4px; background: var(--pop); border: 1px solid var(--line-strong); box-shadow: var(--shadow-lg); }
 
 /* A new row, at the foot. */

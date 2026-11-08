@@ -45,7 +45,7 @@ const names = (client) => client.sent.map((p) => p.event);
 
 afterEach(async () => {
   for (const { dir, booted } of made.splice(0)) {
-    await booted?.supervisor?.stopAll?.().catch?.(() => {});
+    try { booted?.supervisor.killAll(); booted?.supervisor.stop(); } catch { /* done */ }
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });

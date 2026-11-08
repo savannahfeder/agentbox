@@ -77,7 +77,7 @@ import { diagramSource } from '../diagram-fence';
 import { DiagramBlock } from './DiagramBlock';
 import { NeedCard, NeedPlace, HELD, setHeld } from './NeedCard';
 import { NEED_BLOCK, isNewestAnswer, keyFromReply, keyLooksWrong, keySavedWords, needsAsBlocks } from '../key-asks';
-import { connectedReply, needsIn, needId, keysOf, type Need } from '../../../shared/cloud-needs.mjs';
+import { connectedReply, lateReply, needsIn, needId, keysOf, type Need } from '../../../shared/cloud-needs.mjs';
 import { keyLabel, keyWords } from '../../../shared/cloud-keys.mjs';
 import { referencedFiles, isImagePath } from '../referenced-files';
 import { pictureRoots } from '../message-folders';
@@ -1538,7 +1538,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     const held = (HELD.get(item.id) ?? []).map((h) => h.words).join(' ');
     return [connected, held].filter(Boolean).join(' ');
   };
-  const saveKeys = async (fields: { name: string; value: string; label: string }[], need: Need, words?: string) => {
+  const saveKeys = async (fields: { name: string; value: string; label: string }[], need: Need, words?: string, late = false) => {
+    if (late) return saveLate(fields, need);
     let out: Awaited<ReturnType<typeof api.cloudKey>> = { ok: true };
     const savedAfter = [...(savedKeys ?? []), ...fields.map((f) => f.name)];
     const left = openAfter(savedAfter, heldHere.map((h) => h.need));
@@ -1560,7 +1561,28 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     onNotice(keySavedWords(said, { asks: latestAsks, saved, freed: out.freed ?? [], thread: item.id, cloudOff: !!out.cloudOff, done: need.kind === 'sign-in' ? 'connected' : 'saved', left: left.map(needName) }));
     return null;
   };
-  const sendFile = async (path: string | null, need: Need) => {
+  // A key from a card already answered in words: nothing is held for it, and the thread hears it came after all.
+  const saveLate = async (fields: { name: string; value: string; label: string }[], need: Need) => {
+    let out: Awaited<ReturnType<typeof api.cloudKey>> = { ok: true };
+    for (const [i, f] of fields.entries()) {
+      const reply = i === fields.length - 1 ? { product: item.product, id: item.id, answer: lateReply([need]) } : undefined;
+      out = await api.cloudKey({ action: 'save', name: f.name, value: f.value, label: f.label, ...(reply ? { reply } : {}) });
+      if (!out.ok) return out.error || 'The cloud did not take the key. Try again.';
+    }
+    const names = fields.map((f) => f.name);
+    setKeysJustSaved((was) => [...was, ...names]);
+    const said = need.kind === 'sign-in' ? need.service.name : fields[0].label;
+    onNotice(keySavedWords(said, { asks: names, saved: names, freed: out.freed ?? [], thread: item.id, cloudOff: !!out.cloudOff, done: need.kind === 'sign-in' ? 'connected' : 'saved' }));
+    return null;
+  };
+  const sendFile = async (path: string | null, need: Need, late = false) => {
+    if (late) {
+      const out = await api.cloudSendFile({ product: item.product, id: item.id, ...(path ? { path } : { choose: true }), hold: false });
+      if (out.canceled) return false;
+      if (!out.ok) return out.error || 'The file could not be sent. Try again.';
+      onNotice(`Sent ${out.path?.split('/').pop()}. This thread has it now.`);
+      return null;
+    }
     const waitFor = openAfter(savedKeys ?? [], [...heldHere.map((h) => h.need), needId(need)]);
     const also = heldWords();
     const out = await api.cloudSendFile({ product: item.product, id: item.id, ...(path ? { path } : { choose: true }), hold: waitFor.length > 0, ...(also && !waitFor.length ? { also } : {}) });
@@ -1950,7 +1972,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
         <rect x="1.5" y="1.5" width="9" height="9" fill="currentColor" />
       </svg>
-      Stop
+      <span className="dock-stop-word">Stop</span>
     </button>
   ) : null;
 
