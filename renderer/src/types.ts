@@ -244,7 +244,7 @@ export interface FileNote {
   from?: string;
   /** In the Files place, the thread or chat it was written in. */
   in?: string;
-  replies?: { id: string; text: string; by: string | null; ts: number }[];
+  replies?: { id: string; text: string; by: string | null; ts: number; sent?: boolean }[];
 }
 
 export interface FileApproval { file: string; by: string | null; ts: number; owner: string | null }
@@ -816,11 +816,21 @@ export interface UsageLimit {
   reset?: boolean;
 }
 
+/** What a paying team's owner sees of Stripe on Plan and Billing (team/TeamBilling.tsx). */
+export interface TeamBillingInvoice { at: number; amount: number; status: 'paid' | 'open' | 'failed' }
+export interface TeamBillingDetails {
+  periodStart: number | null; periodEnd: number | null;
+  nextAt: number | null; nextAmount: number | null;
+  card: { brand: string; last4: string } | null;
+  email: string | null;
+  invoices: TeamBillingInvoice[];
+}
+
 /** The Agentbox Cloud plan this Mac is signed in to, as the cloud server counts it. */
 export interface CloudPlan {
   signedIn: boolean;
-  /** 'free' is no plan with free hours left (main/cloud/account.mts cloudPlanOf). */
-  plan?: 'none' | 'free' | 'pro' | 'plus' | 'max';
+  /** 'team' and 'free' are no plan of one's own, with the team's or the free hours left (main/cloud/account.mts cloudPlanOf). */
+  plan?: 'none' | 'free' | 'team' | 'pro' | 'plus' | 'max';
   unlimited?: boolean;
   /** Agents at once; null when unlimited. */
   agents?: number | null;
@@ -829,6 +839,12 @@ export interface CloudPlan {
   usedSeconds?: number;
   /** With no plan: the free hours, spent or not. */
   free?: { agents: number; hours: number; usedSeconds: number };
+  /** The team's shared hours: a trial until `endsAt`, or `seats` paid for. */
+  /** Hours and agents are this person's own; `people` is every member's own use (names come from the team). */
+  team?: {
+    trial: boolean; endsAt: number | null; seats: number; members: number; owner: boolean; agents: number; running: number; hours: number; usedSeconds: number;
+    people?: { id: string; usedSeconds: number; running: number; name?: string }[];
+  };
   /** Who bills the plan: Stripe, or nobody because it was set by hand. Absent from older servers. */
   billing?: 'stripe' | 'given' | null;
   error?: string;

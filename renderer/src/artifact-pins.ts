@@ -1,6 +1,6 @@
 // PURE. How the big file view (components/ArtifactView.tsx) draws its pins,
 // zooms a picture, and what it offers for the file it found.
-import { noteGoesTo, notesForTheAgent, placeWords, tagsYourAgent } from '../../shared/artifact-marks.mjs';
+import { noteGoesTo, notesForTheAgent, placeWords, tagsYourAgent, unsentReplies } from '../../shared/artifact-marks.mjs';
 import type { FileVersion } from '../../shared/artifact-marks.mjs';
 import { MAX_ZOOM } from './picture-view';
 import type { FileMarks, FileNote, NotePlace } from './types';
@@ -201,11 +201,12 @@ export function viewOffers(found: Found, signedIn: boolean): { approve: boolean;
 
 type Named = ReadonlyArray<{ id: string; name?: string | null }>;
 
-/** Your own open comments on this version that Send hands your agent. Main sends none on a file the agent did not make. */
+/** Your own open comments on this version that Send hands your agent, and those it has with a reply of yours since. Main sends none on a file the agent did not make. */
 export function notesToSendTheAgent(marks: FileMarks, version: FileVersion, count: number, people: Named, me: string | null): string[] {
   if (typeof version.agent !== 'string') return [];
   const mine = (id: string) => marks.notes.find((n) => n.id === id);
-  return notesForTheAgent(marks, version, count).ids.filter((id) => mine(id)?.by === me && noteGoesTo(mine(id), people).to === 'agent');
+  const replied = marks.notes.filter((n) => n.file === version.id && unsentReplies(n, people).some((r) => r.by === me)).map((n) => n.id);
+  return [...notesForTheAgent(marks, version, count).ids.filter((id) => mine(id)?.by === me && noteGoesTo(mine(id), people).to === 'agent'), ...replied];
 }
 
 /**
