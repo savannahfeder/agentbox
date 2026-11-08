@@ -61,6 +61,35 @@ describe('a teammate setting itself up', () => {
     expect(titleOf(run)).toBe('Set up Pricing researcher');
   });
 
+  // 2026-11-08: YC Partner was named by its owner, not by its own team_setup,
+  // so its setup thread stayed "Set up a new teammate" and its owner could not
+  // find the thread its Day 1 work was in.
+  it('retitles its setup run with a name it was given, when it saves without naming itself', async () => {
+    const { teammate } = team.describe({ text: 'Run our own YC-style program', greeted: true });
+    const run = runFor(teammate, 'Set up a new teammate');
+    team.update(teammate.id, { name: 'YC Partner' });
+    const core = await import('../mcp/core/teammates.mjs');
+    core.teamSetup({ job: 'I run our own YC-style program' });
+    expect(titleOf(run)).toBe('Set up YC Partner');
+  });
+
+  it('keeps the setup title while it is still a new teammate', async () => {
+    const { teammate } = team.describe({ text: 'Run our own YC-style program', greeted: true });
+    const run = runFor(teammate, 'Set up a new teammate');
+    const core = await import('../mcp/core/teammates.mjs');
+    core.teamSetup({ job: 'I run our own YC-style program' });
+    expect(titleOf(run)).toBe('Set up a new teammate');
+  });
+
+  it('leaves a run whose own words start with "Set up" alone', async () => {
+    const { teammate } = team.describe({ text: 'Run our own YC-style program', greeted: true });
+    const run = runFor(teammate, 'Set up Stripe webhooks for me');
+    team.update(teammate.id, { name: 'YC Partner' });
+    const core = await import('../mcp/core/teammates.mjs');
+    core.teamSetup({ job: 'I run our own YC-style program' });
+    expect(titleOf(run)).toBe('Set up Stripe webhooks for me');
+  });
+
   it('leaves a run that is not its setup alone when renamed', async () => {
     const { teammate } = team.describe({ text: 'Someone to check competitor prices every Monday', greeted: true });
     const run = runFor(teammate, 'Compare Jane and Cliniko');

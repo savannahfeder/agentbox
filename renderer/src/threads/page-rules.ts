@@ -34,11 +34,11 @@ export interface Display {
   privacy?: Privacy;
 }
 
-// Your own page opens as a list and the team page as a board, by default, and
-// either is remembered once changed.
+// Both pages open as a list, each tab on its own, and B turns either into a
+// board; the choice is remembered once changed.
 export const DEFAULT_DISPLAY: Record<PageId, Display> = {
   inbox: { view: 'list', sort: 'priority', priorities: [], projects: [], updated: 'any', privacy: 'any' },
-  team: { view: 'board', sort: 'priority', priorities: [], projects: [], updated: 'any', privacy: 'any' },
+  team: { view: 'list', sort: 'priority', priorities: [], projects: [], updated: 'any', privacy: 'any' },
 };
 
 /**
