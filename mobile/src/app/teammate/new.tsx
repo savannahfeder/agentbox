@@ -73,7 +73,7 @@ export default function NewTeammate() {
           {!team && <T style={{ marginTop: 18, fontSize: 14, lineHeight: 21, color: color.dim }}>Your computer has not sent your teammates yet. Turn on AI teammates there, in Settings, Alpha features.</T>}
           {error && <T style={{ marginTop: 14, fontSize: 13, color: color.dim }}>{error}</T>}
         </ScrollView>
-        <MateComposer placeholder="Answer your new teammate" send={(text) => make({ text })} />
+        <MateComposer mate={null} placeholder="Answer your new teammate" send={(text) => make({ text })} />
       </KeyboardAvoidingView>
       <Sheet open={sheet} close={() => setSheet(false)}>
         <SheetHead>Works in</SheetHead>
