@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  addressedTo, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, nextStep, noteGoesTo, otherFilesInLines, placeWords, resolvedInWords, reviewKind, sharedByWords, stepsThrough, threadFiles, versionForPath, viewKind, whereAPressLands, whoseIsTheFile,
+  addressedTo, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, nextStep, noteGoesTo, otherFilesInLines, placeWords, resolvedInWords, reviewKind, sharedByWords, stepsThrough, stillInHand, threadFiles, versionForPath, viewKind, whereAPressLands, whoseIsTheFile,
 } from '../../../shared/artifact-marks.mjs';
 import type { FileVersion } from '../../../shared/artifact-marks.mjs';
 import { api } from '../api';
@@ -100,7 +100,15 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, lines
   const flat = useMemo(() => families.flatMap((f, fi) => f.versions.map((v, vi) => ({ fi, vi, v }))), [families]);
   const steps = useMemo(() => stepsThrough(families, open.steps), [families, open.steps]);
 
-  const [at, setAt] = useState<{ fi: number; vi: number } | null>(null);
+  // The place carries its version's id and path, so a list that fills in later still finds it.
+  const [placed, setPlaced] = useState<{ fi: number; vi: number; held: { id: string; path: string } | null } | null>(null);
+  const familiesNow = useRef(families);
+  familiesNow.current = families;
+  const setAt = useCallback((p: { fi: number; vi: number }) => {
+    const v = familiesNow.current[p.fi]?.versions[p.vi];
+    setPlaced({ fi: p.fi, vi: p.vi, held: v ? { id: v.id, path: v.path } : null });
+  }, []);
+  const at = useMemo(() => stillInHand(families, placed && { fi: placed.fi, vi: placed.vi }, placed?.held ?? null), [families, placed]);
   const [activeId, setActiveId] = useState<string | null>(open.note ?? null);
   const [go, setGo] = useState<StageGo>(null);
   const [draftPlace, setDraftPlace] = useState<NotePlace | null>(null);
@@ -130,7 +138,7 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, lines
     const press = `${open.at ?? 0}:${!!marks.notes.find((n) => n.id === open.note)}:${lines.length > 0}`;
     if (!flat.length) return;
     if (placedFor.current === press) {
-      const same = flat.find((x) => x.v.id === inHand.current);
+      const same = placed?.held && at ? flat.find((x) => x.fi === at.fi && x.vi === at.vi) : undefined;
       if (same && staysOnNewest({ kind: viewKind(same.v.path), wasNewest: newestInHand.current })) setAt({ fi: same.fi, vi: families[same.fi].versions.length - 1 });
       else if (same) setAt({ fi: same.fi, vi: same.vi });
       return;
@@ -654,10 +662,10 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, lines
       <header className="av-top">
         <button type="button" className="doc-mark av-back" aria-label="Back" title="Back to the thread (esc)" onClick={leave}><ArtifactControlGlyph><path d="M16 10H4m5-5-5 5 5 5" /></ArtifactControlGlyph></button>
         <span className="av-name">{familyName(family, editing?.base ?? version) || ((editing?.base ?? version)?.name ?? '')}</span>
-        {family && family.versions.length > 1 && (
+        {family && version && family.versions.length > 1 && (
           <span className="av-versions">
             <button type="button" className="av-chev" disabled={at!.vi === 0} onClick={() => stepVersion(-1)} aria-label="Older version">‹</button>
-            <span className="av-of">v{version!.n} of {family.versions.length}</span>
+            <span className="av-of">v{version.n} of {family.versions.length}</span>
             <button type="button" className="av-chev" disabled={at!.vi === family.versions.length - 1} onClick={() => stepVersion(1)} aria-label="Newer version">›</button>
             {!isNewest && <button type="button" className="av-newest" onClick={() => stepVersion(family.versions.length - 1 - at!.vi)}>Show v{family.versions[family.versions.length - 1].n}</button>}
           </span>

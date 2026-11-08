@@ -352,6 +352,23 @@ export function whereAPressLands(families, { path, file } = {}) {
   return at(flat.at(-1));
 }
 
+/**
+ * Where the version in hand (`held`: its id and path) sits in `families` now,
+ * else `at` if that still names a version, else null. `at` alone goes stale
+ * when the list fills in and reorders or folds copies into one version.
+ */
+export function stillInHand(families, at, held) {
+  const fits = (p) => !!p && !!families?.[p.fi]?.versions[p.vi];
+  if (held && fits(at) && families[at.fi].versions[at.vi].id === held.id) return at;
+  if (held) {
+    const flat = (families ?? []).flatMap((f, fi) => f.versions.map((v, vi) => ({ fi, vi, v })));
+    const v = flat.find((x) => x.v.id === held.id)?.v ?? versionForPath(families, held.path);
+    const hit = v && flat.find((x) => x.v === v);
+    if (hit) return { fi: hit.fi, vi: hit.vi };
+  }
+  return fits(at) ? at : null;
+}
+
 /** The versions `paths` name, in their order, each once: what the arrows step through. */
 export function stepsThrough(families, paths) {
   const out = [];
