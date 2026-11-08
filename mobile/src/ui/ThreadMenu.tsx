@@ -9,7 +9,7 @@ import { TimeBox, TypingSheet } from './Later';
 import { Pin } from './icons';
 import { SheetHead, SheetRow, SheetSep } from './parts';
 
-export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = false, pinned, onPin, onUnread, onLater, onBack, onRunNow, onMoveToCloud, onClose, closed = false }: {
+export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = false, pinned, onPin, onUnread, onLater, onBack, onRunNow, onMoveToCloud, onReport, onClose, closed = false }: {
   open: boolean; close: () => void; now: number;
   /** Closed already: the lists never put it in Later, so neither Later nor Close is offered. */
   closed?: boolean;
@@ -27,6 +27,8 @@ export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = f
   onBack: () => void;
   onRunNow: () => void;
   onMoveToCloud?: () => void;
+  /** Report what an agent wrote here (App Review 1.2). */
+  onReport?: () => void;
   onClose: () => void;
 }) {
   const [text, setText] = useState('');
@@ -56,6 +58,7 @@ export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = f
       {runNow && <SheetRow label="Run now" onPress={() => { done(); onRunNow(); }} />}
       {pinned !== null && <SheetRow label={pinned ? 'Unpin thread' : 'Pin thread'} lead={<Pin size={15} />} onPress={() => { done(); onPin(!pinned); }} />}
       {onUnread && <SheetRow label="Mark unread" onPress={() => { done(); onUnread(); }} />}
+      {onReport && <SheetRow label="Report this thread" onPress={() => { done(); onReport(); }} />}
       {!closed && <SheetRow label="Close this thread" onPress={() => { done(); onClose(); }} />}
     </TypingSheet>
   );

@@ -24,6 +24,12 @@
         "EXPO_PUBLIC_STORE_BUILD": "1"
       }
     },
+    "store-launch-test": {
+      "extends": "launch-test",
+      "env": {
+        "EXPO_PUBLIC_STORE_BUILD": "1"
+      }
+    },
     "launch-test": {
       "extends": "base",
       "distribution": "internal",
