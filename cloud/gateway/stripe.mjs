@@ -67,14 +67,16 @@ export function stripeClient({ key, webhookSecret, managedPayments = false, fetc
   }
 
   return {
-    async checkout({ person, plan, customer, successUrl, cancelUrl }) {
+    // `team`: a team's seats, `quantity` of them, which the webhook gives the whole team.
+    async checkout({ person, plan, customer, successUrl, cancelUrl, team = null, quantity = 1 }) {
+      const metadata = { person, ...(team ? { team } : {}) };
       const session = await call('POST', '/v1/checkout/sessions', {
         mode: 'subscription',
-        line_items: [{ price: await priceOf(plan), quantity: 1 }],
+        line_items: [{ price: await priceOf(plan), quantity }],
         client_reference_id: person,
-        // The webhook finds the person on the subscription, whatever event it is.
-        subscription_data: { metadata: { person } },
-        metadata: { person },
+        // The webhook finds the person, or the team, on the subscription, whatever event it is.
+        subscription_data: { metadata },
+        metadata,
         ...(customer ? { customer } : {}),
         success_url: successUrl,
         cancel_url: cancelUrl,

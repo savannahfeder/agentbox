@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { PLANS, TEAM } from '../cloud/gateway/plans.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
+import { supabaseRest, teamsFrom } from '../cloud/gateway/phone.mjs';
 
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';
@@ -170,6 +171,39 @@ describe('the paid team', () => {
     const me = await a.me();
     expect(me.usedSeconds).toBe(3600);
     expect(me.team.usedSeconds).toBe(0);
+  });
+});
+
+describe('who is on a team, as the database says', () => {
+  const fakeDb = (rows) => {
+    const asked = [];
+    const fetchImpl = async (url) => {
+      asked.push(url);
+      const body = url.includes('person_id=eq.') ? rows.mine : rows.all;
+      return { ok: true, status: 200, text: async () => JSON.stringify(body) };
+    };
+    return { db: supabaseRest({ url: 'https://db.test', serviceKey: 'k', fetchImpl }), asked };
+  };
+
+  it('reads the team, when it was made, its members and its owners', async () => {
+    const { db } = fakeDb({ mine: [{ team_id: 'team-1', teams: { created_at: '2026-11-17T09:00:00Z' } }], all: [{ person_id: A, role: 'owner' }, { person_id: B, role: 'member' }] });
+    expect(await db.teamOf(A)).toEqual({ id: 'team-1', createdAt: MADE, members: [A, B], owners: [A] });
+  });
+
+  it('someone on no team is on none', async () => {
+    const { db } = fakeDb({ mine: [], all: [] });
+    expect(await db.teamOf(C)).toBeNull();
+  });
+
+  it('is asked once a minute a person, not on every start', async () => {
+    const { db, asked } = fakeDb({ mine: [{ team_id: 'team-1', teams: { created_at: '2026-11-17T09:00:00Z' } }], all: [{ person_id: A, role: 'owner' }] });
+    let t = 0;
+    const teams = teamsFrom(db, { now: () => t });
+    await teams(A); await teams(A);
+    expect(asked).toHaveLength(2);
+    t = 61_000;
+    await teams(A);
+    expect(asked).toHaveLength(4);
   });
 });
 

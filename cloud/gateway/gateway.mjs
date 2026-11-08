@@ -587,8 +587,42 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   // until the webhook lands only the checkout this server opened knows one
   // was paid: so it is remembered, reopened for the same plan, closed before
   // another plan's, and a paid one sends you to the billing page.
+  // A team's ledger, read and written as a person's is, so two writes never cross.
+  async function updateTeam(id, change) {
+    for (let i = 0; i < 8; i += 1) {
+      const cur = await objects.get(teamKey(id));
+      const bill = cur ? JSON.parse(cur.body) : {};
+      const out = change(bill);
+      try {
+        await objects.put(teamKey(id), JSON.stringify(bill), cur ? { ifMatch: cur.etag } : { ifNoneMatch: '*' });
+        return out;
+      } catch (err) {
+        if (!err?.conflict) throw err;
+      }
+    }
+    throw new Error('the team\'s ledger kept changing under this write');
+  }
+
+  // THE TEAM'S SEATS, bought by its owner, one a member.
+  async function teamCheckout(person, headers) {
+    const team = teams ? await teams(person) : null;
+    if (!team?.id) throw new Refusal(404, 'no-team', 'You are not on a team.');
+    if (!(team.owners || []).includes(person)) throw new Refusal(403, 'owner', 'Only your team\'s owner can pay for the team. Ask them to choose the team plan.');
+    const base = hostOf(headers);
+    const bill = (await readJson(teamKey(team.id))) || {};
+    if (PAYING.has(bill.stripe?.status) && bill.stripe.customer) return { url: await stripe.billing({ customer: bill.stripe.customer, returnUrl: `${base}/v1/paid?billing=1` }), where: 'billing' };
+    if (bill.checkout?.id) {
+      const open = await stripe.session(bill.checkout.id).catch(() => null);
+      if (open?.status === 'open') return { url: open.url, where: 'checkout' };
+    }
+    const made = await stripe.checkout({ person, plan: 'team', team: team.id, quantity: Math.max(1, team.members.length), customer: bill.stripe?.customer, successUrl: `${base}/v1/paid?plan=team`, cancelUrl: `${base}/v1/paid?cancelled=1` });
+    await updateTeam(team.id, (b) => { b.checkout = { id: made.id, url: made.url, by: person, at: now() }; });
+    return { url: made.url, where: 'checkout' };
+  }
+
   async function checkout(person, { plan }, headers) {
     if (!stripe) throw billingRefusal();
+    if (plan === 'team') return teamCheckout(person, headers);
     if (!sellable(plan)) throw bad('choose pro, plus or max');
     const base = hostOf(headers);
     const toBilling = async (customer) => ({ url: await stripe.billing({ customer, returnUrl: `${base}/v1/paid?billing=1` }), where: 'billing' });
@@ -631,7 +665,12 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
 
   async function billing(person, headers) {
     if (!stripe) throw billingRefusal();
-    const { customer } = (await recOf(person)).stripe || {};
+    let { customer } = (await recOf(person)).stripe || {};
+    // An owner who pays for the team and not for themselves manages the team's.
+    if (!customer && teams) {
+      const team = await teams(person);
+      if (team?.id && (team.owners || []).includes(person)) customer = (await readJson(teamKey(team.id)))?.stripe?.customer;
+    }
     if (!customer) throw new Refusal(404, 'no-billing', 'You have not paid for a cloud plan yet.');
     return { url: await stripe.billing({ customer, returnUrl: `${hostOf(headers)}/v1/paid?billing=1` }) };
   }
@@ -647,6 +686,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     const id = event?.type === 'checkout.session.completed' ? o.subscription : String(event?.type || '').startsWith('customer.subscription.') ? o.id : null;
     if (typeof id !== 'string' || !id) return { received: true };
     const sub = await stripe.subscription(id);
+    if (sub?.metadata?.team) return teamEvent(sub);
     const person = String(sub?.metadata?.person || '').toLowerCase();
     if (!PERSON.test(person)) { log(`subscription ${id} names nobody`); return { received: true }; }
     const pays = PAYING.has(sub.status);
@@ -660,6 +700,25 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       if (pays) delete rec.checkout;
     });
     log(`${person} is on ${plan} (Stripe ${sub.status})`);
+    return { received: true };
+  }
+
+  // A team's subscription puts every member on its seats while it pays.
+  async function teamEvent(sub) {
+    const team = String(sub.metadata.team);
+    if (!/^[A-Za-z0-9-]{1,64}$/.test(team)) { log(`subscription ${sub.id} names no team`); return { received: true }; }
+    const pays = PAYING.has(sub.status);
+    const item = sub.items?.data?.[0];
+    if (pays && planOfLookupKey(item?.price?.lookup_key) !== 'team') { log(`subscription ${sub.id} is on a price no team plan sells`); return { received: true }; }
+    await updateTeam(team, (bill) => {
+      // An old subscription ending leaves alone a newer one that pays.
+      if (!pays && bill.stripe?.subscription && bill.stripe.subscription !== sub.id && PAYING.has(bill.stripe.status)) return;
+      bill.plan = pays ? 'team' : 'none';
+      bill.seats = Math.max(0, Math.floor(Number(item?.quantity)) || 0);
+      bill.stripe = { customer: sub.customer, subscription: sub.id, status: sub.status, at: now() };
+      if (pays) delete bill.checkout;
+    });
+    log(`team ${team} is on ${pays ? `${Math.floor(Number(item?.quantity)) || 0} seats` : 'no plan'} (Stripe ${sub.status})`);
     return { received: true };
   }
 
@@ -878,7 +937,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
 /** The page a browser lands on after Stripe's checkout or billing page, with the way back into the app. */
 export function paidPage(query) {
   const plan = query.get('plan') ?? '';
-  const named = Object.hasOwn(PLANS, plan) && PLANS[plan].agents > 0 ? ` ${plan.charAt(0).toUpperCase()}${plan.slice(1)}` : '';
+  const named = plan === 'team' ? ' for your team' : Object.hasOwn(PLANS, plan) && PLANS[plan].agents > 0 ? ` ${plan.charAt(0).toUpperCase()}${plan.slice(1)}` : '';
   const head = query.has('cancelled') ? 'Nothing was charged'
     : query.has('billing') ? 'All done on Stripe'
       : `You’re on ${Name} Cloud${named}`;
