@@ -72,7 +72,7 @@ beforeAll(async () => {
 }, 30_000);
 
 afterAll(async () => {
-  await booted?.supervisor?.stopAll?.()?.catch?.(() => {});
+  try { booted?.supervisor.killAll(); booted?.supervisor.stop(); } catch { /* done */ }
   // AND THE COPY'S OWN TIMER AND WATCHER STOP BEFORE ITS FOLDER GOES, so
   // nothing can write into the folder while it is being deleted; the retries
   // cover a write already on its way (see `callStoreTool`).

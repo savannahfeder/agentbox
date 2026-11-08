@@ -41,7 +41,11 @@ beforeAll(async () => {
     { type: 'ai-title', aiTitle: 'Speed up the search endpoint' },
     { type: 'assistant', cwd: folder, entrypoint: 'cli', timestamp: at(25), message: { role: 'assistant', content: [{ type: 'text', text: 'An index takes it to 40ms. Shall I add the migration?' }] } },
   ].map((r) => JSON.stringify(r)).join('\n')}\n`);
-  fs.writeFileSync(path.join(dir, 'zero.config.json'), JSON.stringify({ storeRoot: path.join(dir, 'store') }));
+  // The app asks each agent whether it is signed in. The real Claude Code
+  // rewrites its config here a moment later, which raced the folder's removal.
+  const agent = path.join(dir, 'agent-stand-in');
+  fs.writeFileSync(agent, '#!/bin/sh\necho "{}"\n', { mode: 0o755 });
+  fs.writeFileSync(path.join(dir, 'zero.config.json'), JSON.stringify({ storeRoot: path.join(dir, 'store'), claudeBin: agent, codexBin: agent }));
   const { bootHeadless } = await import('../main/serve.mts');
   booted = await bootHeadless({ dataDir: dir, appDir: repoRoot, userDir: dir });
   booted.store.createProduct({ name: 'Kestrel', repoPath: folder });
@@ -49,8 +53,8 @@ beforeAll(async () => {
 
 afterAll(async () => {
   vi.unstubAllEnvs();
-  await booted?.supervisor?.stopAll?.().catch?.(() => {});
-  if (dir) fs.rmSync(dir, { recursive: true, force: true });
+  try { booted?.supervisor.killAll(); booted?.supervisor.stop(); } catch { /* done */ }
+  if (dir) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 // AND IT FINDS A CHAT NEWER THAN THE FIRST SEARCH. The search is read once

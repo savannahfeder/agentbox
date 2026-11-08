@@ -317,7 +317,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
     },
     {
       name: 'team_pass',
-      description: 'Hand a piece of work to a teammate whose job it is, or hand an answer back to a teammate waiting on you. It goes to the thread they already have on this work, or starts one, and shows in the team chat. From a teammate it waits for the person\'s yes before they start, unless the person told the receiver it need not. On a thread that is not a teammate\'s run, use it when the person asks you to give something to one of their teammates (call team_roster first to see who is on the team). Put everything they need in the details: steps, files, links, what done looks like.',
+      description: 'Hand a piece of work to a teammate whose job it is, or hand an answer back to a teammate waiting on you. It goes to the thread they already have on this work, or starts one, and shows in the team chat. From a teammate it waits for the person\'s yes before they start, unless the person told the receiver it need not. On a thread that is not a teammate\'s run, use it when the person asks you to give something to one of their teammates (call team_roster first to see who is on the team). Put everything they need in the details: steps, files, links, what done looks like. Work in another project can go to yourself, with project set: it starts in a thread of its own there.',
       schema: {
         to: z.string().describe('the teammate\'s name'),
         title: z.string().describe('the work, in a short line'),
