@@ -27,6 +27,11 @@ describe('marking the folder', () => {
   it('leaves a folder in the temporary folder alone, which Time Machine never backs up', () => {
     const run = vi.fn();
     expect(keepOutOfBackups(path.join(os.tmpdir(), `repo-${Math.random()}`, '.claude', 'worktrees'), { platform: 'darwin', run })).toBe(false);
+    // Spelled through the link a Mac's /var is, as a folder that exists is.
+    const made = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-'));
+    expect(keepOutOfBackups(fs.realpathSync(made), { platform: 'darwin', run })).toBe(false);
+    expect(keepOutOfBackups(path.join(made, 'not-made-yet'), { platform: 'darwin', run })).toBe(false);
+    fs.rmSync(made, { recursive: true, force: true });
     expect(run).not.toHaveBeenCalled();
   });
 

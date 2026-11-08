@@ -275,7 +275,9 @@ export function keepOutOfBackups(dir: string, {
   if (platform !== 'darwin' || keptOutOfBackups.has(dir)) return false;
   keptOutOfBackups.add(dir);
   // Time Machine never backs up the temporary folder, where every test's checkout is.
-  if (real(dir).startsWith(real(os.tmpdir()) + path.sep)) return false;
+  // Either spelling: on a Mac /var is a link to /private/var, and a folder not made yet has no real path.
+  const temp = [os.tmpdir(), real(os.tmpdir())].map((t) => t + path.sep);
+  if ([dir, real(dir)].some((d) => temp.some((t) => d.startsWith(t)))) return false;
   try { run('/usr/bin/tmutil', ['addexclusion', dir]); return true; } catch { return false; }
 }
 
