@@ -9,6 +9,8 @@
 //
 // The unsent comment now lives in localStorage under the file version it was
 // typed on, and the view reads it back whenever that version is on screen.
+// Since then, words with no pin travel to the next file instead
+// (an-unpinned-comment-comes-with-you-to-the-next-file); a pinned one stays here.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { commentDraftKey, readCommentDraft, saveCommentDraft } from '../renderer/src/comment-drafts';
@@ -69,13 +71,13 @@ describe('the comment box on a file', () => {
   const view = fs.readFileSync(new URL('../renderer/src/components/ArtifactView.tsx', import.meta.url), 'utf8');
 
   it('reads the version\'s unsent comment back when that version comes on screen', () => {
-    const onVersion = view.match(/useEffect\(\(\) => \{\n\s*const kept = readCommentDraft[\s\S]*?\}, \[version\?\.id\]\);/)?.[0] ?? '';
+    const onVersion = view.match(/useEffect\(\(\) => \{\n\s*const kept = openCommentDraft[\s\S]*?\}, \[version\?\.id\]\);/)?.[0] ?? '';
     expect(onVersion).toMatch(/setWords\(kept\.words\)/);
     expect(onVersion).toMatch(/setDraftPlace\(kept\.place\)/);
   });
 
   it('writes every change of words or pin under the version they belong to', () => {
-    const saves = view.match(/useEffect\(\(\) => \{[^\n]*saveCommentDraft[\s\S]*?\}, \[words, draftPlace\]\);/)?.[0] ?? '';
+    const saves = view.match(/useEffect\(\(\) => \{[\s\S]*?keepCommentDraft[\s\S]*?\}, \[words, draftPlace\]\);/)?.[0] ?? '';
     expect(saves).toMatch(/draftOf\.current/);
   });
 

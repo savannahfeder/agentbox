@@ -1,0 +1,26 @@
+/* THE CONVERSATION BESIDE AN OPEN FILE. A file opened beside a thread leaves
+   the conversation as little as 400px (artifact-layout.ts). Rules written for
+   the full-width thread broke there: the reply bar's chips wrapped onto two
+   rows and code lines ran off the right edge. These answer to the space the
+   conversation actually has, so a narrow window with no file open gets them
+   too. The side margins stay: the 44px left edge lines up with the back arrow. */
+.focus-pane { container: talk / inline-size; }
+.dock-card { container: reply / inline-size; }
+
+@container talk (max-width: 560px) {
+  /* A line nobody can scroll to is a line nobody reads: the scrollbar is
+     hidden until a trackpad touches it. */
+  .markdown pre, .markdown pre code { white-space: pre-wrap; overflow-wrap: anywhere; }
+}
+
+/* Under 460 the bar's words no longer fit one row ("Medium", "Auto", the
+   model, the paperclip, "Stop" need about 425). The priority keeps its bars
+   and Stop its square; both keep their names for the pointer and screen
+   readers. */
+@container reply (max-width: 460px) {
+  .dock-chips { flex-wrap: nowrap; }
+  .dock-chips .tc-chip-word, .dock-bar .dock-stop-word { display: none; }
+  .dock-chips .compose-word-wrap { min-width: 0; }
+  .dock-chips .tc-chip { min-width: 0; overflow: hidden; }
+  .compose-sentence.dock-bar .dock-stop { width: 32px; padding: 0; justify-content: center; }
+}

@@ -2,8 +2,8 @@
 // return itself; a reset email's link is opened from the mail app, so it is
 // taken here, and only when this phone asked for a reset.
 import { useLocalSearchParams } from 'expo-router';
-import { router } from '../lib/router';
 import { useEffect, useState } from 'react';
+import { router } from '../lib/router';
 import { useCloud } from '../state/cloud';
 import { Waiting } from '../ui/LogoOrbit';
 import { Wall } from '../ui/parts';
