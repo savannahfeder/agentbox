@@ -54,13 +54,6 @@ export function engineLetter(engine: string | undefined): string {
   return engine === 'codex' ? 'X' : 'C';
 }
 
-/** A Needs you row's second line: who it is from and which project. */
-export function needsLine({ from, engine, stopped, project }: { from: string | null; engine?: string; stopped: boolean; project: string }): { who: string; line: string } {
-  const who = from ?? engineName(engine);
-  const verb = from ? 'asked you' : stopped ? 'stopped' : 'answered';
-  return { who, line: `${who} ${verb} · ${project}` };
-}
-
 export type TeamRowState = 'working' | 'waiting' | 'quiet';
 
 export function teamRowState({ agents, waitingOnYou }: { agents: number | null; waitingOnYou: boolean }): TeamRowState {
