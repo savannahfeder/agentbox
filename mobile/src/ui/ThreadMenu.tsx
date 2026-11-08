@@ -91,7 +91,7 @@ export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = f
       <TypingSheet open={open} close={done}>
         <SheetHead>Rename</SheetHead>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, minHeight: 52 }}>
-          <TextInput value={naming} onChangeText={setNaming} autoFocus selectTextOnFocus returnKeyType="done" onSubmitEditing={rename} maxLength={200}
+          <TextInput value={naming} onChangeText={setNaming} autoFocus returnKeyType="done" onSubmitEditing={rename} maxLength={200}
             accessibilityLabel="The thread's name"
             style={[{ flex: 1, height: 40, paddingHorizontal: 10, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: color.field, fontFamily: font.regular, fontSize: 15, color: color.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
           <Pressable disabled={!ready} onPress={rename} accessibilityRole="button" hitSlop={8}

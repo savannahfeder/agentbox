@@ -190,6 +190,12 @@ describe('the thread page and its menu', () => {
       expect(menu).toContain(`label=${words}`);
     }
   });
+  // A tester typed " v1" after the name and the thread was renamed "v1": the whole name had been selected.
+  it('Rename opens with the cursor after the name, not over it', () => {
+    const field = menu.slice(menu.indexOf('<SheetHead>Rename</SheetHead>'), menu.indexOf("accessibilityLabel=\"The thread's name\""));
+    expect(field).toContain('<TextInput value={naming}');
+    expect(field).not.toContain('selectTextOnFocus');
+  });
 });
 
 function sender() {
