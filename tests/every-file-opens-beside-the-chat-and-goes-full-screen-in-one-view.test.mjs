@@ -67,6 +67,14 @@ describe('the wiring', () => {
     const pane = read('renderer/src/components/DocPane.tsx');
     expect(pane).toMatch(/<FilmPlayer [^\n]*wide=\{!onMode\}/);
   });
+  // A power tester played a film to 0:03 beside the chat, went full screen, and
+  // found it stopped at 0:00.
+  it('a film goes full screen at the moment it had reached beside the chat', () => {
+    const onMode = app.slice(app.indexOf('onMode={mode => {'), app.indexOf('split={artifactFraction('));
+    expect(onMode).toMatch(/time: filmBeside\(\)/);
+    const view = read('renderer/src/components/ArtifactView.tsx');
+    expect(view).toMatch(/open\.time[^\n]*setGo\(\{ place: \{ kind: 'time', s: open\.time \}/);
+  });
   // A power tester stepped to v1 in full screen, went back beside, and read v1
   // as the current file: the side pane has no version controls to say otherwise.
   it('beside the chat is the newest version, whichever one full screen was on', () => {

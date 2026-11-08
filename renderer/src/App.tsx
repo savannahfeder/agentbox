@@ -3257,7 +3257,12 @@ export default function App() {
     setOpenDoc(null);
   };
   // The full-screen view opens over the pane, which would otherwise play on under it.
-  const pauseFilmsBeside = () => { for (const film of document.querySelectorAll<HTMLVideoElement>('.doc-pane video')) film.pause(); };
+  // Paused, and the moment it had reached, which full screen takes up.
+  const filmBeside = () => {
+    let s: number | undefined;
+    for (const film of document.querySelectorAll<HTMLVideoElement>('.doc-pane video')) { film.pause(); if (film.currentTime > 0) s = film.currentTime; }
+    return s;
+  };
   const closeArtifact = () => {
     if (artifactMode === 'focus' && artifactReturnBeside) setArtifactMode('beside');
     else putDocDown();
@@ -8122,9 +8127,12 @@ export default function App() {
                   if (mode === 'beside' && !roomBeside) { putDocDown(); return; }
                   // Full screen is the one view with versions, notes and Approve, wherever the file is a thread's.
                   if (mode === 'focus' && fullScreenTakes(openDoc.src) && !onPhone()) {
-                    const open = { path: openDoc.src, at: Date.now() };
-                    if (focused && !focused.agent && !openDoc.readOnly && openDoc.product === focused.product) { pauseFilmsBeside(); setFullAt({ key: `${focused.product}/${focused.id}`, open }); return; }
-                    if (openCard && openDoc.readOnly) { pauseFilmsBeside(); setCardOpenAt(open); return; }
+                    const thread = !!focused && !focused.agent && !openDoc.readOnly && openDoc.product === focused.product;
+                    if (thread || (openCard && openDoc.readOnly)) {
+                      const open = { path: openDoc.src, at: Date.now(), time: filmBeside() };
+                      if (thread) setFullAt({ key: `${focused!.product}/${focused!.id}`, open }); else setCardOpenAt(open);
+                      return;
+                    }
                   }
                   setArtifactReturnBeside(artifactMode === 'beside'); setArtifactMode(mode);
                 }}

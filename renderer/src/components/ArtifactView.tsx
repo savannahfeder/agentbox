@@ -36,7 +36,7 @@ import { paneKey, staysOnNewest } from '../table-follows';
 import './artifact-view.css';
 
 /** `steps`: the paths the arrows step through, in order, when the press came from a turn of the thread. */
-export interface ArtifactOpen { path?: string; file?: string; note?: string; at?: number; steps?: string[] }
+export interface ArtifactOpen { path?: string; file?: string; note?: string; at?: number; steps?: string[]; /** Where a film beside the chat had got to, in seconds. */ time?: number }
 
 type Editing = { fam: string; text: string; draft?: string; folder: string | null; base: ReturnType<typeof threadFiles>[number]['versions'][number] };
 
@@ -143,6 +143,7 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, lines
     setAt(hit);
     const note = open.note ? marks.notes.find((n) => n.id === open.note) : null;
     if (note) { setActiveId(note.id); if (note.resolved) setShowSettled(true); setGo({ place: note.place, at: Date.now() }); }
+    else if (open.time) setGo({ place: { kind: 'time', s: open.time }, at: Date.now() });
   }, [flat.length, open.at, open.note, open.file, open.path, !!marks.notes.find((n) => n.id === open.note)]);
 
   const family = at ? families[at.fi] : undefined;
