@@ -11,7 +11,10 @@
 //   3. `off` deletes it, its schedule, its key and its firewall rule at once.
 // It makes no second machine while one exists.
 //
-//   REVIEW_EMAIL=… REVIEW_PASSWORD=… CLAUDE_CODE_OAUTH_TOKEN=… node scripts/app-review-computer.mjs on [--days 14]
+//   node scripts/app-review-computer.mjs on [--days 14]
+// The demo password and the Claude token come from REVIEW_PASSWORD and
+// CLAUDE_CODE_OAUTH_TOKEN, else from this Mac's Keychain (KEYCHAIN below), so
+// neither has to be typed anywhere but `security`'s own prompt.
 //   node scripts/app-review-computer.mjs status
 //   node scripts/app-review-computer.mjs off
 //
@@ -45,6 +48,19 @@ export const hoursLeft = (expiresAt, now) => Math.max(0, Math.round((Date.parse(
 export function refuseSecond(instances) {
   const on = instances.filter((i) => ON_STATES.includes(i.State?.Name));
   if (on.length) throw new Error(`A review computer is already on: ${on.map((i) => i.InstanceId).join(', ')}. Run \`off\` first, or \`status\`.`);
+}
+
+export const REVIEW_EMAIL = 'appreview@agentbox.ac';
+export const KEYCHAIN = { password: 'AGENTBOX_APP_REVIEW', claude: 'AGENTBOX_APP_REVIEW_CLAUDE' };
+
+/** The demo login and Claude token: from the environment, else this Mac's Keychain. */
+export function secretsFrom(env, keychain) {
+  const email = env.REVIEW_EMAIL || REVIEW_EMAIL;
+  return {
+    email,
+    password: env.REVIEW_PASSWORD || keychain(KEYCHAIN.password, email),
+    claudeToken: env.CLAUDE_CODE_OAUTH_TOKEN || keychain(KEYCHAIN.claude, 'token'),
+  };
 }
 
 export function envFileOf({ email, password, claudeToken }) {
@@ -169,7 +185,10 @@ async function ssh(state, command, { input, timeout = 120_000 } = {}) {
 
 async function on(days) {
   refuseSecond(ours());
-  const login = envFileOf({ email: process.env.REVIEW_EMAIL, password: process.env.REVIEW_PASSWORD, claudeToken: process.env.CLAUDE_CODE_OAUTH_TOKEN });
+  const keychain = (service, account) => {
+    try { return execFileSync('security', ['find-generic-password', '-s', service, '-a', account, '-w'], { encoding: 'utf8', timeout: 20_000 }).trim(); } catch { return ''; }
+  };
+  const login = envFileOf(secretsFrom(process.env, keychain));
   const expiresAt = expiryOf(Date.now(), days);
   const stamp = Date.now().toString(36);
   fs.mkdirSync(home, { recursive: true, mode: 0o700 });

@@ -12,7 +12,7 @@
 // machine is doing, and `off` deletes it at once. It never makes a second
 // machine while one is on, and never keeps one longer than 30 days.
 import { describe, it, expect } from 'vitest';
-import { expiryOf, userDataOf, runInstancesArgs, scheduleArgs, envFileOf, hoursLeft, refuseSecond, MAX_DAYS, DEFAULT_DAYS } from '../scripts/app-review-computer.mjs';
+import { expiryOf, userDataOf, runInstancesArgs, scheduleArgs, envFileOf, hoursLeft, refuseSecond, secretsFrom, KEYCHAIN, MAX_DAYS, DEFAULT_DAYS } from '../scripts/app-review-computer.mjs';
 
 const NOW = Date.parse('2026-11-09T12:00:00Z');
 
@@ -98,6 +98,21 @@ describe('the sign-in file', () => {
   it('refuses a value that would break the file', () => {
     expect(() => envFileOf({ email: 'r@x.ac', password: 'p\nX=1', claudeToken: 't' })).toThrow();
     expect(() => envFileOf({ email: '', password: 'p', claudeToken: 't' })).toThrow();
+  });
+});
+
+// A Mac's permission check refused an agent catching a Claude token (2026-11-08),
+// so the person saves it in the Keychain and the command reads it there.
+describe('where the secrets come from', () => {
+  const keychain = (service, account) => `${service}/${account}`;
+  it('the Keychain, when the environment has none', () => {
+    expect(secretsFrom({}, keychain)).toEqual({ email: 'appreview@agentbox.ac', password: `${KEYCHAIN.password}/appreview@agentbox.ac`, claudeToken: `${KEYCHAIN.claude}/token` });
+  });
+  it('the environment first', () => {
+    expect(secretsFrom({ REVIEW_EMAIL: 'b@x.ac', REVIEW_PASSWORD: 'p', CLAUDE_CODE_OAUTH_TOKEN: 't' }, keychain)).toEqual({ email: 'b@x.ac', password: 'p', claudeToken: 't' });
+  });
+  it('nothing in either is refused before any machine is made', () => {
+    expect(() => envFileOf(secretsFrom({}, () => ''))).toThrow(/missing/);
   });
 });
 
