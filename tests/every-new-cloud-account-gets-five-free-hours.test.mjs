@@ -193,6 +193,14 @@ describe('the screens, on the free hours', () => {
     expect(planSummary({ ...free, usedSeconds: 5 * 3600 - 120 }).hours.line).toBe('0.1 of 5');
   });
 
+  // A power tester ran out, opened Plan and Billing, and the Free plan had gone
+  // with nothing saying why. Underneath it stays no plan, so nothing tries the cloud again.
+  it('spent free hours still show the Free plan, with none left', () => {
+    const spent = { signedIn: true, plan: 'none', agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0, free: { agents: 2, hours: 5, usedSeconds: 5 * 3600 } };
+    expect(planSummary(spent)).toMatchObject({ name: 'Free', hours: { label: 'Hours left', line: '0 of 5', percent: 0 } });
+    expect(planSummary({ ...spent, free: undefined })).toBeNull();
+  });
+
   it('every free hour used leaves none, never a negative', () => {
     expect(planSummary({ ...free, usedSeconds: 5 * 3600 }).hours).toMatchObject({ line: '0 of 5', percent: 0 });
     expect(planSummary({ ...free, usedSeconds: 6 * 3600 }).hours).toMatchObject({ line: '0 of 5', percent: 0 });
