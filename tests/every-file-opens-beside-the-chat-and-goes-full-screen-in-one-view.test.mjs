@@ -61,6 +61,12 @@ describe('the wiring', () => {
     expect(onMode).toMatch(/setFullAt\(/);
     expect(onMode).toMatch(/setCardOpenAt\(/);
   });
+  // Three power testers read the film's own corner-arrows button, beside the
+  // pane's identical one, as a second full screen that skipped the notes.
+  it('a film beside the chat has one full-screen button, the pane\'s', () => {
+    const pane = read('renderer/src/components/DocPane.tsx');
+    expect(pane).toMatch(/<FilmPlayer [^\n]*wide=\{!onMode\}/);
+  });
   it('the file view\'s own button puts the file back beside the chat, on both', () => {
     expect(threadView).toMatch(/onBeside/);
     expect(focus).toMatch(/onBeside=\{/);
