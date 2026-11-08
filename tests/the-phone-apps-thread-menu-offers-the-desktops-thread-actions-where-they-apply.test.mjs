@@ -178,6 +178,22 @@ describe('Stop repeating', () => {
   });
 });
 
+// A tester pressed Reopen with the computer off and read "Reopened" over a thread still closed.
+describe('with the computer away and no cloud to carry it', () => {
+  const away = { away: true };
+  it('a change the computer makes says it waits for it', () => {
+    expect(planFor({ kind: 'reopen' }, item({ status: 'done' }), NOW, away).toast).toBe('Reopens when your computer is back: Draw it');
+    expect(planFor({ kind: 'restart' }, item(), NOW, away).toast).toBe('Up next once your computer is back.');
+    expect(planFor({ kind: 'move', to: 'b', name: 'Beta' }, item(), NOW, away).toast).toBe('Moves to Beta when your computer is back');
+    expect(planFor({ kind: 'keep-here', keep: true }, item(), NOW, away).toast).toBe('Runs only on your computer once it is back');
+  });
+  it('and says it is done while the computer is there', () => {
+    expect(planFor({ kind: 'reopen' }, item({ status: 'done' }), NOW).toast).toBe('Reopened: Draw it');
+    expect(planFor({ kind: 'move', to: 'b', name: 'Beta' }, item(), NOW).toast).toBe('Moved to Beta');
+    expect(planFor({ kind: 'move', to: 'b', name: 'Beta' }, item(), NOW, { away: true, cloud: true }).toast).toBe('Moved to Beta');
+  });
+});
+
 describe('the thread page and its menu', () => {
   const page = fs.readFileSync('mobile/src/app/thread/[product]/[id].tsx', 'utf8');
   const menu = fs.readFileSync('mobile/src/ui/ThreadMenu.tsx', 'utf8');

@@ -210,7 +210,7 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
       // App.tsx `retag`'s toast.
       return { steps: [{ door: 'threadEdit', payload: { ...on, patch: { priority: press.value } } }], toast: `Priority: ${priorityLabelOf(priorityIdOf(press.value)).toLowerCase()}` };
     case 'reopen':
-      return { steps: [{ door: 'reopen', payload: on }], toast: `Reopened: ${clipToSentence(item.title ?? '', TOAST_TITLE)}` };
+      return { steps: [{ door: 'reopen', payload: on }], toast: `${waits ? 'Reopens when your computer is back' : 'Reopened'}: ${clipToSentence(item.title ?? '', TOAST_TITLE)}` };
     case 'try-again':
       return { steps: [{ door: 'resumeItems', payload: { ids: [item.id] } }], toast: waits ? 'Up next once your computer is back.' : tryAgainWords({ resumed: 1 }) };
     case 'resume':
@@ -218,11 +218,15 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
       return { steps: [{ door: 'resumeItems', payload: { ids: [item.id] } }], toast: waits ? 'Up next once your computer is back.' : '1 resumed' };
     case 'restart':
       // App.tsx `redeliver`'s toast.
-      return { steps: [{ door: 'redeliver', payload: on }], toast: `A fresh agent is picking this up → ${to}` };
+      return { steps: [{ door: 'redeliver', payload: on }], toast: waits ? 'Up next once your computer is back.' : `A fresh agent is picking this up → ${to}` };
     case 'keep-here':
-      return { steps: [{ door: 'setThreadOnMac', payload: { onMac: { [item.id]: press.keep ? true : null } } }], toast: press.keep ? 'This thread now runs only on your computer' : 'This thread can run on the cloud again' };
+      return {
+        steps: [{ door: 'setThreadOnMac', payload: { onMac: { [item.id]: press.keep ? true : null } } }],
+        toast: waits ? (press.keep ? 'Runs only on your computer once it is back' : 'Can run on the cloud again once your computer is back')
+          : press.keep ? 'This thread now runs only on your computer' : 'This thread can run on the cloud again',
+      };
     case 'move':
-      return { steps: [{ door: 'moveItem', payload: { ...on, to: press.to } }], toast: `Moved to ${press.name}`, goes: null };
+      return { steps: [{ door: 'moveItem', payload: { ...on, to: press.to } }], toast: waits ? `Moves to ${press.name} when your computer is back` : `Moved to ${press.name}`, goes: null };
     case 'approve-filed':
       return reply('Approved. Run it.', {}, `${waits ? 'Waiting for your computer' : 'Running'} → ${(item.title ?? '').slice(0, 40)}`, 'Approval withdrawn, back in your inbox');
     case 'do-here': {

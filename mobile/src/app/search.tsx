@@ -107,8 +107,8 @@ function SearchScreen() {
     computer: computerFacts(s),
   })), [q, c.team, g.on, g.state.rooms, s]);
   const leave = () => (router.canGoBack() ? router.back() : router.replace('/'));
-  const run = async ({ act }: PhoneCommand) => {
-    if ('setting' in act) { await s.change(act.setting); leave(); return; }
+  const run = async ({ act, label }: PhoneCommand) => {
+    if ('setting' in act) { await s.change(act.setting); c.say(`Sent to your computer: ${label}`); leave(); return; }
     if ('look' in act) { pickLook(act.look); leave(); return; }
     if ('push' in act) { if (router.canGoBack()) router.replace(act.push as never); else router.push(act.push as never); return; }
     if ('group' in act) { g.setLast(act.group); c.goTo({ place: 'chats', group: true }); leave(); return; }

@@ -4,6 +4,8 @@
 // being on (Palette.tsx `cloud-toggle`, cloud-menu.ts `cloudCommands`). The
 // phone had the switch only in Settings, and a synthetic tester on 2026-11-08
 // typed "cloud" into the phone's search and found nothing but a thread.
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { commandsFor, phoneCommands } from '../mobile/src/lib/palette';
 
@@ -28,6 +30,12 @@ describe('the cloud in the command list', () => {
   it('is found by typing cloud', () => {
     const all = phoneCommands({ team: false, computer: computer({ mode: 'mac' }) });
     expect(commandsFor('cloud', all).map((c) => c.id)).toEqual(expect.arrayContaining(['cloud-toggle', 'cloud-full', 'cloud-all']));
+  });
+
+  // A tester ran Rank Website first and Pause agents from search, and the list closed without a word.
+  it('says what it sent when a command changes the computer\'s settings', () => {
+    const src = fs.readFileSync(path.join(import.meta.dirname, '..', 'mobile', 'src', 'app', 'search.tsx'), 'utf8');
+    expect(src).toMatch(/'setting' in act\) \{ await s\.change\(act\.setting\); c\.say\(`Sent to your computer: \$\{label\}`\)/);
   });
 
   it('is not offered on a computer the cloud is not set up for', () => {
