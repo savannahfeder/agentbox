@@ -60,7 +60,10 @@ describe('which npm an update runs', () => {
 });
 
 describe('the build an update really runs', () => {
-  it('runs through the shell this machine has, with no SHELL set and no zsh asked for', async () => {
+  // Only where zsh is missing, which is the case this guards. Where zsh is
+  // there, this spawn starts the person's own interactive login shell, and on
+  // a Mac busy with the push hook's tests that took over 60 seconds.
+  it.runIf(!fs.existsSync('/bin/zsh'))('runs through the shell this machine has, with no SHELL set and no zsh asked for', async () => {
     const out = await defaultNpm(process.cwd(), {})(['--version']);
     expect(out.out).not.toMatch(/ENOENT/);
   });
