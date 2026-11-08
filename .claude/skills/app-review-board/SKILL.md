@@ -31,6 +31,27 @@ REVIEW_EMAIL=… REVIEW_PASSWORD=… node scripts/app-review-board.mjs --codex 2
 - `<dir>/report.md` is the verdict: the risks, highest first, each with its
   fix. The exit code is 0 only for Submit.
 
+## The review computer
+
+While Apple reviews the app, the demo account needs a computer signed in to it.
+On the cloud alone, a thread goes quiet 20 minutes after an answer.
+
+- `scripts/app-review-computer.mjs on` makes one small AWS server that does
+  this. It needs `REVIEW_EMAIL`, `REVIEW_PASSWORD`, and
+  `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`.
+- `status` shows the server and its end date. `off` deletes it at once.
+- It always ends. The end date is 14 days unless `--days` says otherwise, and
+  30 at most. The machine shuts itself down then, AWS deletes it on shutdown,
+  and an AWS schedule deletes it too.
+- The founder asked for it to be turned off for certain. So when you turn it
+  on:
+  1. File a thread with `runAt` at the end date plus an hour: "Check the App
+     Review computer is gone". It runs `status`, and `off` if anything is
+     left.
+  2. Run `off` the day the app is approved or rejected for good, and say so on
+     the App Store thread.
+  3. Never run `on` again without saying so on that thread.
+
 ## Use it as a loop
 
 1. Run the board.

@@ -1,0 +1,104 @@
+// THE APP REVIEW COMPUTER ALWAYS TURNS ITSELF OFF.
+//
+// App Review needs the demo account answered for days with no computer of the
+// reviewer's: the cloud alone goes quiet 20 minutes after an answer
+// (IDLE_CLOSE_MS) and will not start from a project snapshot older than six
+// days (KIT_FRESH_MS). So scripts/app-review-computer.mjs keeps a small server
+// on, signed in to the demo account. The founder, 2026-11-08: "you have to make
+// sure that we eventually turn it off. Otherwise we're going to end up spending
+// a lot of compute unintentionally." So every machine it makes has an end date,
+// held three ways: the machine shuts itself down then and AWS deletes it
+// (counted again at every boot), an AWS schedule deletes it then whatever the
+// machine is doing, and `off` deletes it at once. It never makes a second
+// machine while one is on, and never keeps one longer than 30 days.
+import { describe, it, expect } from 'vitest';
+import { expiryOf, userDataOf, runInstancesArgs, scheduleArgs, envFileOf, hoursLeft, refuseSecond, MAX_DAYS, DEFAULT_DAYS } from '../scripts/app-review-computer.mjs';
+
+const NOW = Date.parse('2026-11-09T12:00:00Z');
+
+describe('the end date', () => {
+  it('is two weeks away unless asked otherwise', () => {
+    expect(DEFAULT_DAYS).toBe(14);
+    expect(expiryOf(NOW)).toBe('2026-11-23T12:00:00.000Z');
+  });
+  it('is never more than 30 days away, and never none', () => {
+    expect(MAX_DAYS).toBe(30);
+    expect(expiryOf(NOW, 30)).toBe('2026-12-09T12:00:00.000Z');
+    expect(() => expiryOf(NOW, 31)).toThrow(/30 days/);
+    expect(() => expiryOf(NOW, 0)).toThrow();
+    expect(() => expiryOf(NOW, Number.NaN)).toThrow();
+  });
+});
+
+describe('guard one: the machine turns itself off, and AWS deletes it', () => {
+  const ud = userDataOf({ expiresAt: '2026-11-23T12:00:00.000Z' });
+  it('is told to delete itself on shutdown, not just stop', () => {
+    expect(runInstancesArgs({ ami: 'ami-1', securityGroup: 'sg-1', keyName: 'k', userData: ud, expiresAt: '2026-11-23T12:00:00.000Z' }).join(' ')).toMatch(/--instance-initiated-shutdown-behavior terminate/);
+  });
+  it('shuts down at the end date, counted again at every boot', () => {
+    expect(ud).toContain(`EXPIRES=${Date.parse('2026-11-23T12:00:00.000Z') / 1000}`);
+    expect(ud).toMatch(/shutdown -h \+\$left/);
+    expect(ud).toMatch(/shutdown -h now/);
+    expect(ud).toMatch(/WantedBy=multi-user\.target/);
+    expect(ud).toMatch(/systemctl enable --now agentbox-review-expiry/);
+  });
+  it('carries no password or token: those go over SSH to a file only root reads', () => {
+    expect(ud).not.toMatch(/TEST_LOGIN=|OAUTH_TOKEN=/);
+    expect(ud).toMatch(/EnvironmentFile=\/etc\/agentbox-review\.env/);
+  });
+});
+
+describe('guard two: an AWS schedule deletes it at the end date', () => {
+  const args = scheduleArgs({ instanceId: 'i-0abc', expiresAt: '2026-11-23T12:00:00.000Z', roleArn: 'arn:aws:iam::1:role/r' });
+  it('at the end date, once, and then removes itself', () => {
+    const s = args.join(' ');
+    expect(s).toMatch(/--schedule-expression at\(2026-11-23T12:00:00\)/);
+    expect(s).toMatch(/--schedule-expression-timezone UTC/);
+    expect(s).toMatch(/--action-after-completion DELETE/);
+  });
+  it('deletes exactly that machine', () => {
+    const target = JSON.parse(args[args.indexOf('--target') + 1]);
+    expect(target.Arn).toBe('arn:aws:scheduler:::aws-sdk:ec2:terminateInstances');
+    expect(JSON.parse(target.Input)).toEqual({ InstanceIds: ['i-0abc'] });
+  });
+});
+
+describe('the machine it makes', () => {
+  const args = runInstancesArgs({ ami: 'ami-1', securityGroup: 'sg-1', keyName: 'k', userData: 'x', expiresAt: '2026-11-23T12:00:00.000Z' });
+  it('is labelled with its end date, so status and off can find it', () => {
+    const tags = args[args.indexOf('--tag-specifications') + 1];
+    expect(tags).toMatch(/Key=agentbox:purpose,Value=app-review/);
+    expect(tags).toMatch(/Key=agentbox:expires,Value=2026-11-23T12:00:00.000Z/);
+  });
+  it('is one small machine', () => {
+    expect(args.join(' ')).toMatch(/--instance-type t3\.medium/);
+    expect(args.join(' ')).toMatch(/--count 1/);
+  });
+});
+
+describe('one at a time', () => {
+  it('refuses a second while one is on or starting', () => {
+    expect(() => refuseSecond([{ InstanceId: 'i-1', State: { Name: 'running' } }])).toThrow(/already on: i-1/);
+    expect(() => refuseSecond([{ InstanceId: 'i-1', State: { Name: 'pending' } }])).toThrow(/already on/);
+  });
+  it('a machine already shutting down or gone does not count', () => {
+    expect(() => refuseSecond([{ InstanceId: 'i-1', State: { Name: 'terminated' } }, { InstanceId: 'i-2', State: { Name: 'shutting-down' } }])).not.toThrow();
+  });
+});
+
+describe('the sign-in file', () => {
+  it('holds the demo login and the Claude token', () => {
+    expect(envFileOf({ email: 'r@x.ac', password: 'p:w', claudeToken: 't' })).toBe('AGENTBOX_TEAM_TEST_LOGIN=r@x.ac:p:w\nCLAUDE_CODE_OAUTH_TOKEN=t\n');
+  });
+  it('refuses a value that would break the file', () => {
+    expect(() => envFileOf({ email: 'r@x.ac', password: 'p\nX=1', claudeToken: 't' })).toThrow();
+    expect(() => envFileOf({ email: '', password: 'p', claudeToken: 't' })).toThrow();
+  });
+});
+
+describe('status', () => {
+  it('says how long is left, and nothing below zero', () => {
+    expect(hoursLeft('2026-11-23T12:00:00.000Z', NOW)).toBe(336);
+    expect(hoursLeft('2026-11-01T12:00:00.000Z', NOW)).toBe(0);
+  });
+});
