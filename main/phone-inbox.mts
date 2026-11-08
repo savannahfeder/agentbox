@@ -45,6 +45,7 @@ import { isCarried } from '../shared/cloud-carry.mjs';
 import { heldForUndo } from '../shared/phone-undo.mjs';
 import type { CarriedCommand } from '../shared/cloud-carry.mjs';
 import type { PhoneWait } from '../shared/phone-snapshot.mjs';
+import { leftByAMove } from '../shared/move-thread.mts';
 
 // A file her phone sent with a reply or a new thread (shared/phone-files.mjs).
 export { phoneFilesIn };
@@ -395,7 +396,7 @@ export function createPhoneInbox({
         beats.set(key, now());
         if (state.sent[key] !== said) { state.sent[key] = said; save(); }
       }
-      const rows = threadsWorthCarrying(listItems(p.slug), { now: now() });
+      const rows = threadsWorthCarrying(listItems(p.slug).filter((i) => !leftByAMove(i)), { now: now() });
       const batch: { item: string; snapshot: unknown; key: string }[] = [];
       const here = new Set<string>();
       for (const raw of rows) {

@@ -1,4 +1,4 @@
-// A THREAD THAT ALREADY RAN CAN MOVE, AND STARTS OVER THERE (w-8b637c7802).
+// A THREAD THAT ALREADY RAN CAN MOVE (w-8b637c7802).
 //
 // Two testers sent a thread to the wrong project because the card kept the
 // last pick. The agent answered within seconds, and from then on ⌘K said "Only
@@ -6,9 +6,9 @@
 // way out was to type it again in the right project. Measured through the
 // store and the rule ⌘K draws from.
 //
-// The branch and task folder stay where they are, so the thread starts over in
-// the new project from your message. It is refused while an agent is in it, and
-// when it changed code in its old project, which a move would strand.
+// The branch and task folder stay where they are. It is refused while an agent
+// is in it, and when it changed code in its old project, which a move would
+// strand. What it carries is tests/a-moved-thread-keeps-its-answer-and-leaves-no-copy-in-done.
 import { beforeEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -67,15 +67,15 @@ describe('what it carries when it ran', () => {
 });
 
 describe('the move', () => {
-  it('opens it in the new project to run there, and closes the old one saying where it went', () => {
+  it('opens it in the new project with its answer, and closes the old one saying where it went', () => {
     const was = answered('explain this error: cannot find module ./store from settings.tsx');
     const out = store.moveItem('backend', was.id, 'frontend');
 
     const landed = store.readItem('frontend', out.item.id);
     expect(landed.title).toBe(was.title);
-    expect(landed.status).toBe('open');
+    expect(landed.status).toBe(was.status);
     expect(landed.labels).toContain('founder');
-    expect(landed.result ?? null).toBe(null);
+    expect(landed.result).toBe('There is no ./store in this repo.');
     expect(landed.body).toContain(movedHere('Backend'));
 
     const left = store.readItem('backend', was.id);
@@ -86,12 +86,12 @@ describe('the move', () => {
 
   // Closed as the app, the old row read as an agent finishing your thread and
   // stayed in Needs you beside the moved one, marked DONE.
-  it('leaves Needs you on both ends, and Z can still reopen the old row', () => {
+  it('is in Needs you once, as the moved thread, and Z can still reopen the old row', () => {
     const was = answered('explain this error');
     const out = store.moveItem('backend', was.id, 'frontend');
     const left = store.readItem('backend', was.id);
     expect(belongsInInbox(left)).toBe(false);
-    expect(belongsInInbox(store.readItem('frontend', out.item.id))).toBe(false);
+    expect(belongsInInbox(store.readItem('frontend', out.item.id))).toBe(true);
     store.answerItem('backend', was.id, { status: 'open' });
     expect(store.readItem('backend', was.id).status).toBe('open');
   });

@@ -1,7 +1,7 @@
 import { openSourceFile } from './open-source-file.mts';
 import {submitReply} from './live-replies.mts';
 import { noteToItsAgent } from './notes-wake.mjs';
-import { CHANGED_HERE, ranHere, whyItCannotMove } from '../shared/move-thread.mts';
+import { CHANGED_HERE, leftByAMove, ranHere, whyItCannotMove } from '../shared/move-thread.mts';
 import { whereTheWorkStands } from './git-change.mjs';
 import { taskFolderPath } from './task-folders.mts';
 import { GROUPS } from '../shared/connections-catalog.mjs';
@@ -664,7 +664,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     return snapshots.answer({
       products: store.listProducts(),
       // Each with the place she dragged it to, if she did (w-6e5b532a95).
-      items: supervisor.withPlaces(items),
+      items: supervisor.withPlaces(items.filter((i) => !leftByAMove(i))),
       // THE TEAM: who is signed in, their team and its people, and the
       // title-free activity of their private work. Null on a build with no
       // team cloud, which is the single-person app.
