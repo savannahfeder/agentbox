@@ -59,7 +59,7 @@ function makeWriter(i, roomUrl, kind, latencies, observer) {
   const doc = new Y.Doc();
   const live = connectLive({
     doc,
-    hello: { name: `${kind} ${i}`, kind, canSave: i === 0 },
+    hello: { name: `${kind} ${i}`, kind, canSave: i === 0, canSeed: i === 0 },
     open: () => laggedSocket(roomUrl),
   });
   const probe = doc.getMap('probe');

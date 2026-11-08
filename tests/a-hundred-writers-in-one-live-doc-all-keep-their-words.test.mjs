@@ -77,6 +77,17 @@ describe('a live doc', () => {
     expect(writers.map((w) => w.live.room().keeper)).toEqual([true, false, false, false, false]);
   });
 
+  it('asks a copy holding the file to fill an empty room, not one that joined first without it', async () => {
+    const room = createRoom({ tickMs: 5 });
+    rooms.push(room);
+    const make = (hello) => connectLive({ doc: new Y.Doc(), hello: { name: 'x', ...hello }, open: () => pairedSockets(room), flushMs: 5 });
+    const watcher = make({ canSeed: false });
+    await new Promise((r) => setTimeout(r, 30));
+    const holder = make({});
+    await new Promise((r) => setTimeout(r, 60));
+    expect([watcher.room().seed, holder.room().seed]).toEqual([false, true]);
+  });
+
   it('passes keeping on when the keeper leaves, and to nobody who cannot save', async () => {
     const room = createRoom({ tickMs: 5 });
     rooms.push(room);

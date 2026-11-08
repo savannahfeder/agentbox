@@ -44,7 +44,9 @@ export function createRoom({ tickMs = 40, onEmpty = () => {} } = {}) {
 
   function roles() {
     const ready = seats.filter((s) => s.hello);
-    const nextSeeder = empty() ? (ready.includes(seeder) ? seeder : ready[0] ?? null) : null;
+    // Only a copy holding the file can fill an empty room from it.
+    const fillers = ready.filter((s) => s.hello.canSeed !== false);
+    const nextSeeder = empty() ? (fillers.includes(seeder) ? seeder : fillers[0] ?? null) : null;
     // The owner's copy writes straight onto the file; anyone else's goes through the owner.
     const nextKeeper = ready.find((s) => s.hello.canSave && s.hello.owner) ?? ready.find((s) => s.hello.canSave) ?? null;
     seeder = nextSeeder;

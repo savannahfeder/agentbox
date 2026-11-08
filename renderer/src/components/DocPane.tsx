@@ -40,6 +40,7 @@ import { createPortal } from 'react-dom';
 import { api } from '../api';
 import { CodeFile } from './CodeFile';
 import { TableView, useTableSave } from './TableView';
+import { useLiveSession, useLiveTicket } from '../live/live-session';
 import { isTablePath } from '../table-file';
 import { FilmPlayer } from './FilmPlayer';
 import { PdfPages } from './PdfPages';
@@ -155,6 +156,11 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
   const [text, setText] = useState<string | null>(null);
   const [mtime, setMtime] = useState<number>(0);
   const saveTable = useTableSave({ product: doc.product, src: doc.src, mtime });
+  // A thread's own file is the team's when the thread is: teammates with it open type into one live copy.
+  // A project's other documents are each person's own and stay out of it.
+  const threadsFile = /^(?:\.\/)?designs\/[\w-]+\/[^/]+$/.test(src) && (kind === 'markdown' || kind === 'table') && !doc.readOnly;
+  const liveTicket = useLiveTicket(threadsFile ? { product: doc.product, name: src.split('/').pop() ?? src } : null);
+  const liveSession = useLiveSession(liveTicket);
   const [failed, setFailed] = useState<string | null>(null);
   // The address the frame points at, minted by main when it resolved the file.
   // An html page is served from its own origin so its pictures load; see
@@ -439,10 +445,10 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
             : text !== null
               ? <div className="preview-frame"><iframe className="doc-view" srcDoc={text} sandbox="allow-scripts" title={crumb.join('/')} /></div>
               : <PreviewLoading />) : <PreviewLoading />
-        ) : text === null ? (
+        ) : text === null || (threadsFile && liveTicket === undefined) ? (
           <PreviewLoading />
         ) : kind === 'table' ? (
-          <TableView text={text} path={src} mode="pane" onSave={doc.readOnly ? undefined : saveTable} onReload={() => setLooks((n) => n + 1)} onNotice={onNotice} storeKey={`${doc.product}/${src}`} />
+          <TableView text={text} path={src} mode="pane" live={liveSession} onSave={doc.readOnly ? undefined : saveTable} onReload={() => setLooks((n) => n + 1)} onNotice={onNotice} storeKey={`${doc.product}/${src}`} />
         ) : kind === 'text' ? (
           <div className="code-scroll" ref={setCodeBox}><CodeFile text={text} /></div>
         ) : (
@@ -457,6 +463,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
               onSaved={(at) => setMtime(at)}
               onNotice={onNotice}
               readOnly={doc.readOnly}
+              live={liveSession}
             />
           </Beside>
         )}

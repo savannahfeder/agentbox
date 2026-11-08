@@ -4,8 +4,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import Collaboration from '@tiptap/extension-collaboration';
-import CollaborationCaret from '@tiptap/extension-collaboration-caret';
-import type { AnyExtension } from '@tiptap/core';
+import { Extension, type AnyExtension } from '@tiptap/core';
+import { yCursorPlugin } from '@tiptap/y-tiptap';
+import type { Awareness } from 'y-protocols/awareness';
 import { Face } from '../team/people';
 import type { LiveSession } from './live-session';
 import './presence.css';
@@ -23,9 +24,10 @@ export function presenceLook(): PresenceLook {
 
 export interface LiveUser { name: string; color: string; kind?: 'person' | 'agent'; person?: string | null }
 
-function caretFor(user: Record<string, unknown>): HTMLElement {
+function caretFor(user: Record<string, unknown>, clientId: number): HTMLElement {
   const u = user as unknown as LiveUser;
   const caret = document.createElement('span');
+  caret.dataset.client = String(clientId);
   caret.className = `lv-caret${u.kind === 'agent' ? ' is-agent' : ''}`;
   caret.style.setProperty('--lv', u.color || '#7aa2ff');
   caret.dataset.name = u.name ?? '';
@@ -41,13 +43,53 @@ function caretFor(user: Record<string, unknown>): HTMLElement {
 export function liveExtensions(session: LiveSession): AnyExtension[] {
   return [
     Collaboration.configure({ document: session.doc }),
-    CollaborationCaret.configure({
-      provider: { awareness: session.live.awareness },
+    LiveCarets.configure({
+      awareness: session.live.awareness,
       user: { name: session.me.name, color: session.me.color, kind: session.me.kind, person: session.me.person },
-      render: caretFor,
-      selectionRender: (user: Record<string, unknown>) => ({ class: 'lv-sel', style: `--lv: ${String(user.color ?? '#7aa2ff')}` }),
     }),
   ];
+}
+
+// The cursor plugin itself rather than CollaborationCaret, which drops the
+// client id a cursor needs to say who moved last.
+const LiveCarets = Extension.create<{ awareness: Awareness | null; user: LiveUser | null }>({
+  name: 'liveCarets',
+  addOptions() { return { awareness: null, user: null }; },
+  addProseMirrorPlugins() {
+    const { awareness, user } = this.options;
+    if (!awareness) return [];
+    awareness.setLocalStateField('user', user);
+    return [yCursorPlugin(awareness, {
+      cursorBuilder: caretFor,
+      selectionBuilder: (u: Record<string, unknown>) => ({ class: 'lv-sel', style: `--lv: ${String(u.color ?? '#7aa2ff')}` }),
+    })];
+  },
+});
+
+const FRESH_MS = 3500;
+const MOST_FLAGS = 8;
+
+/** Names show on the cursors of the few people who moved last, then fade. */
+function useFreshFlags(session: LiveSession, column: HTMLElement | null) {
+  useEffect(() => {
+    if (!column) return undefined;
+    const { awareness } = session.live;
+    const moved = new Map<number, number>();
+    const paint = () => {
+      const now = Date.now();
+      for (const [id, at] of moved) if (now - at > FRESH_MS) moved.delete(id);
+      const fresh = new Set([...moved].sort((a, b) => b[1] - a[1]).slice(0, MOST_FLAGS).map(([id]) => String(id)));
+      for (const el of column.querySelectorAll<HTMLElement>('.lv-caret')) el.classList.toggle('is-fresh', fresh.has(el.dataset.client ?? ''));
+    };
+    const onChange = ({ added, updated }: { added: number[]; updated: number[] }) => {
+      const now = Date.now();
+      for (const id of [...added, ...updated]) if (id !== session.doc.clientID) moved.set(id, now);
+      requestAnimationFrame(paint);
+    };
+    awareness.on('change', onChange);
+    const sweep = window.setInterval(paint, 500);
+    return () => { awareness.off('change', onChange); window.clearInterval(sweep); };
+  }, [session.live, column]);
 }
 
 interface Here { id: number; name: string; color: string; agent: boolean; person: string | null; me: boolean }
@@ -127,6 +169,7 @@ function useSpots(editor: Editor | null, column: HTMLElement | null, session: Li
 }
 
 const MOST_FACES = 5;
+const MOST_SQUARES = 5;
 
 function Faces({ here }: { here: Here[] }) {
   const shown = here.slice(0, MOST_FACES);
@@ -152,6 +195,7 @@ export function LiveFaces({ session }: { session: LiveSession }) {
 /** What is drawn around the page: who is here, and where they are. */
 export function LivePresence({ session, editor, column, look }: { session: LiveSession; editor: Editor | null; column: HTMLElement | null; look: PresenceLook }) {
   const here = useHere(session);
+  useFreshFlags(session, column);
   const spots = useSpots(editor, column, session);
   const others = here.filter((h) => !h.me);
   const height = column?.scrollHeight ?? 1;
@@ -172,8 +216,8 @@ export function LivePresence({ session, editor, column, look }: { session: LiveS
       )}
       {look === 'gutter' && byBlock.map(([top, list]) => (
         <div key={top} className="lv-gutter" style={{ top }} aria-hidden="true">
-          {list.slice(0, 6).map((s, i) => <span key={i} className={`lv-sq${s.agent ? ' is-agent' : ''}`} style={{ ['--lv' as string]: s.color }} title={s.name} />)}
-          {list.length > 6 && <span className="lv-sq-more">+{list.length - 6}</span>}
+          {list.slice(0, MOST_SQUARES).map((s, i) => <span key={i} className={`lv-sq${s.agent ? ' is-agent' : ''}`} style={{ ['--lv' as string]: s.color }} title={s.name} />)}
+          {list.length > MOST_SQUARES && <span className="lv-sq-more">+{list.length - MOST_SQUARES}</span>}
         </div>
       ))}
       {look === 'tint' && byBlock.map(([top, list]) => (

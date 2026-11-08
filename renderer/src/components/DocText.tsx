@@ -36,6 +36,7 @@ import './doc-reading.css';
 const SAVE_DEBOUNCE_MS = 900;
 // The copy that keeps a live file saves at least this often while people keep typing.
 const LIVE_SAVE_EVERY_MS = 60_000;
+const LIVE_WRITE_MS = 2_000;
 
 // A link in the editor never navigates on its own; she gets a hover card with
 // the real actions instead. A typed or pasted bare domain becomes a proper URL
@@ -120,8 +121,13 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
       // Everyone else's words are in the room, and the keeper saves them.
       if (room && !room.keeper) return;
       dirty.current = true;
-      if (saveTimer.current != null) window.clearTimeout(saveTimer.current);
-      saveTimer.current = window.setTimeout(save, SAVE_DEBOUNCE_MS);
+      // In a busy room the typing never pauses, so a save is never put off, only spaced out.
+      if (room) {
+        saveTimer.current ??= window.setTimeout(() => { saveTimer.current = null; void save(); }, LIVE_WRITE_MS);
+      } else {
+        if (saveTimer.current != null) window.clearTimeout(saveTimer.current);
+        saveTimer.current = window.setTimeout(save, SAVE_DEBOUNCE_MS);
+      }
       if (room) {
         firstUnsaved.current ??= Date.now();
         if (Date.now() - firstUnsaved.current > LIVE_SAVE_EVERY_MS) {
@@ -135,14 +141,15 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
   // An empty room is filled once, by the copy the room picked, from the file.
   const seeded = useRef(false);
   useEffect(() => {
-    if (!editor || !collab?.seed || seeded.current) return;
+    // The editor the live one replaced is still handed to this effect once, already destroyed.
+    if (!editor || editor.isDestroyed || !collab?.seed || seeded.current) return;
     if (collab.doc.getXmlFragment('default').length > 0) return;
     seeded.current = true;
     editor.commands.setContent(mdToPmDoc(versions?.draft ?? text), { emitUpdate: false });
   }, [editor, collab?.seed, collab?.doc]);
   // Becoming the keeper with words nobody saved yet: save them.
   useEffect(() => {
-    if (!editor || !collab?.keeper) return;
+    if (!editor || editor.isDestroyed || !collab?.keeper) return;
     dirty.current = true;
     if (saveTimer.current != null) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(save, SAVE_DEBOUNCE_MS);
@@ -179,7 +186,7 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
   // The document changed under her (an agent rewrote it): take it only when she
   // is not mid-edit, and skip our own save echoing back.
   useEffect(() => {
-    if (!editor || text === onDisk.current) return;
+    if (!editor || editor.isDestroyed || text === onDisk.current) return;
     const room = liveNow.current;
     if (room) {
       // In a live file a new version is merged in once, by the keeper.
