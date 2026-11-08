@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { keysOf, needId, type Need } from '../../../shared/cloud-needs.mjs';
 import { Name } from '../../../shared/product-name.mjs';
 import { keyLabel, keyWords } from '../../../shared/cloud-keys.mjs';
+import type { KeySource } from '../../../shared/cloud-key-sources.mjs';
 import { codeLooksWrong, keyLooksWrong } from '../key-asks';
 import { DARK_INK, logoOf } from '../connections/logos';
 import './need-card.css';
@@ -19,7 +20,8 @@ export const NeedPlace = createContext<{
   // Every need of the message, in order: the facts are said on its first
   // sign-in or key and the way out once, under its last card.
   needs: Need[];
-  saveKeys: (fields: { name: string; value: string; label: string }[], need: Need, words?: string) => Promise<string | null>;
+  // `from`: read on this computer, where the run said the key is, instead of a pasted value.
+  saveKeys: (fields: { name: string; value: string; label: string; from?: KeySource }[], need: Need, words?: string) => Promise<string | null>;
   sendFile: (path: string | null, need: Need) => Promise<string | null>;
   sendCode: (about: string, code: string) => Promise<string | null>;
   fileInfo?: (path: string) => Promise<{ ok: boolean; size?: number; error?: string }>;
@@ -83,8 +85,31 @@ export function fileWhy(path: string, why: string, info: { ok: boolean; size?: n
 const fileName = (p: string) => p.split('/').filter(Boolean).pop() ?? p;
 const folderOf = (p: string) => { const parts = p.split('/').filter(Boolean); return parts.length > 1 ? parts[parts.length - 2] : null; };
 
-/** Fields for a sign-in or a key, kept for every cloud thread. */
-function KeyFields({ need, fields, plain }: { need: Need; fields: { name: string; label: string }[]; plain: string }) {
+const placeName = (src: KeySource) => (src.place === 'keychain' ? 'your Keychain' : src.place === 'shell' ? 'your shell' : fileName(src.from));
+const placeItem = (src: KeySource) => (src.place === 'shell' ? `$${src.from}` : src.entry ? `${src.entry} in ${src.from}` : src.from);
+
+/** The key where the run said it is on this computer, read and saved in one press. */
+function FromHere({ need, name, label, src }: { need: Need; name: string; label: string; src: KeySource }) {
+  const place = useContext(NeedPlace)!;
+  const [busy, setBusy] = useState(false);
+  const [said, setSaid] = useState<string | null>(null);
+  const go = async () => {
+    setBusy(true); setSaid(null);
+    const out = await place.saveKeys([{ name, value: '', label, from: src }], need);
+    setBusy(false);
+    if (out) setSaid(out); else focusNextAsk();
+  };
+  return <>
+    <div className="need-acts need-here">
+      <button type="button" className="need-btn need-main" disabled={busy} onClick={() => void go()}>{busy ? 'Reading' : `Use the one in ${placeName(src)}`}</button>
+      <span className="need-from" title={placeItem(src)}>{placeItem(src)}</span>
+    </div>
+    {said && <p className="need-said" role="status">{said}</p>}
+  </>;
+}
+
+/** Fields for a sign-in or a key, kept for every cloud thread. `second` when a press above already offers the key. */
+function KeyFields({ need, fields, plain, second = false }: { need: Need; fields: { name: string; label: string }[]; plain: string; second?: boolean }) {
   const place = useContext(NeedPlace)!;
   const [values, setValues] = useState<Record<string, string>>({});
   const [said, setSaid] = useState<string | null>(null);
@@ -111,9 +136,9 @@ function KeyFields({ need, fields, plain }: { need: Need; fields: { name: string
     {fields.map((f, i) => (
       <div className="need-row" key={f.name}>
         <input className="need-input" type="password" onKeyDown={giveBackKeys} onFocus={(e) => e.currentTarget.select()} autoComplete="off" spellCheck={false} aria-label={f.label}
-          placeholder={`Paste the ${fields.length > 1 ? lower(f.label) : plain}`}
+          placeholder={second ? 'Or paste it' : `Paste the ${fields.length > 1 ? lower(f.label) : plain}`}
           value={values[f.name] ?? ''} onChange={(e) => { setValues((v) => ({ ...v, [f.name]: e.target.value })); setSaid(null); }} />
-        {i === fields.length - 1 && <button type="submit" className="need-btn need-main" disabled={busy || !some}>{busy ? 'Saving' : anyway ? 'Save anyway' : 'Save'}</button>}
+        {i === fields.length - 1 && <button type="submit" className={second ? 'need-btn' : 'need-btn need-main'} disabled={busy || !some}>{busy ? 'Saving' : anyway ? 'Save anyway' : 'Save'}</button>}
       </div>
     ))}
     {said && <p className="need-said" role="status">{said}</p>}
@@ -204,7 +229,8 @@ export function NeedCard({ source, fallback }: { source: string; fallback: React
           <div>{I.lock}<span>Kept encrypted in your {Name} Cloud</span></div>
           <div>{I.cloud}<span>Every thread can use it from now on</span></div>
         </div> : getIt && <div className="need-why need-also">{getIt}. Kept the same way.</div>}
-        <KeyFields need={need} fields={fields} plain={plain} />
+        {key?.from && <FromHere need={need} name={key.name} label={fields[0].label} src={key.from} />}
+        <KeyFields need={need} fields={fields} plain={plain} second={!!key?.from} />
       </div></div>
       {showFoot && <Footer />}
     </div>;

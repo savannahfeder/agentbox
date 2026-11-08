@@ -29,6 +29,8 @@ export interface ResourceFile {
   url: string;
   untar?: string;
   mode?: number;
+  // A saved key's name: the sandbox places it as a key (./key-asks.mts), not as a file.
+  key?: string;
 }
 
 export interface ResourceContext {

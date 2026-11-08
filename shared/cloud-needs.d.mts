@@ -1,7 +1,8 @@
-export type Service = { id: string; name: string; keys: { name: string; label: string }[]; tokenUrl: string };
+import type { KeySource } from './cloud-key-sources.mjs';
+export type Service ={ id: string; name: string; keys: { name: string; label: string }[]; tokenUrl: string };
 export type Need =
   | { kind: 'sign-in'; service: Service; why: string }
-  | { kind: 'key'; name: string; what: string }
+  | { kind: 'key'; name: string; what: string; from?: KeySource }
   | { kind: 'file'; path: string; why: string }
   | { kind: 'code'; about: string; why: string };
 export declare const NEED: string;

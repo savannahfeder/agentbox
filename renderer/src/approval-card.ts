@@ -22,6 +22,8 @@
 /** What is drawn when there is nothing readable to draw. Not JSON, and not a
  *  blank box either: it is a sentence, and the honest answer to it is Deny. */
 import { Name } from '../../shared/product-name.mjs';
+import { keyLabel } from '../../shared/cloud-keys.mjs';
+import { keySource, keySourceWords } from '../../shared/cloud-key-sources.mjs';
 export const UNREADABLE = `${Name} could not read what this asks for.`;
 
 export type ApprovalReading = {
@@ -68,6 +70,14 @@ export const approvalAnswered = (allow: boolean) =>
  * one would be the card lying about the question it is asking.
  */
 export function approvalReads(input: unknown, tool?: string): ApprovalReading {
+  // A cloud run asking this computer for a key (main/cloud/key-asks.mts KEY_CARD).
+  if (tool === 'cloud_key') {
+    const it = (input ?? {}) as Record<string, unknown>;
+    const name = String(it.name ?? '');
+    const src = keySource(it);
+    if (!src || !/^[A-Z][A-Z0-9_]{1,79}$/.test(name)) return { what: 'asks for a key from this computer', body: UNREADABLE };
+    return { what: 'asks for a key from this computer', body: [keyLabel(String(it.what ?? '')) ?? name, `From ${keySourceWords(src)}`, `Kept for every cloud thread as ${name}`].join('\n') };
+  }
   // MCP argument names are arbitrary: "command" or "host" is not native
   // permission metadata. Keep the existing card, name the server/tool, and
   // show each argument separately with lossless JSON escaping for its value.

@@ -12,6 +12,7 @@
 // (main/cloud/keys.mjs). A file goes with the thread's next cloud turn, at the
 // same path. A code goes back as the reply.
 import { keyAsks, keyWords } from './cloud-keys.mjs';
+import { keySourceFromWords } from './cloud-key-sources.mjs';
 
 export const NEED = 'AGENTBOX-NEEDS:';
 const NEED_LINE = /^\s*`?AGENTBOX-NEEDS:\s*(sign-in|key|file|code)\s+([^|`]+?)\s*(?:\|\s*([^`]*?))?\s*`?\s*$/i;
@@ -56,7 +57,11 @@ export function needsIn(text) {
       if (service) add({ kind, service, why }, `sign-in:${service.id}`);
     } else if (kind === 'key') {
       const [name, ...rest] = arg.split(/\s+/);
-      if (/^[A-Z][A-Z0-9_]{1,79}$/.test(name)) add({ kind, name, what: why || tidy(rest.join(' ')) }, `key:${name}`);
+      // A third part may say where on their computer it is (shared/cloud-key-sources.mjs).
+      const parts = why.split('|');
+      const from = parts.length === 2 ? keySourceFromWords(parts[1]) : null;
+      const what = from ? tidy(parts[0]) : why;
+      if (/^[A-Z][A-Z0-9_]{1,79}$/.test(name)) add({ kind, name, what: what || tidy(rest.join(' ')), ...(from ? { from } : {}) }, `key:${name}`);
     } else if (kind === 'file') {
       if (/^(~\/|\/)/.test(arg)) add({ kind, path: arg, why }, `file:${arg}`);
     } else {

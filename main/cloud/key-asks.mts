@@ -15,6 +15,7 @@ import { keySource, keySourceLine } from '../../shared/cloud-key-sources.mjs';
 import { readKeyFrom, keyIsThere } from './key-source.mts';
 import type { KeySource, ReadOptions } from './key-source.mts';
 import { cloudKeyNames, keysCarried, saveCloudKey } from './keys.mjs';
+import type { KeyStorage } from './keys.mjs';
 
 /** The `tool` of a key card in the approvals spool; renderer/src/approval-card.ts draws it. */
 export const KEY_CARD = 'cloud_key';
@@ -30,7 +31,7 @@ export interface KeyAsksOptions extends ReadOptions {
   item: string | null;
   product: string | null;
   home: string;
-  storage: { put: (k: string, body: string) => Promise<unknown>; del: (k: string) => Promise<unknown>; getUrl: (k: string) => Promise<string> };
+  storage: KeyStorage & { getUrl: (k: string) => Promise<string> };
   // The keys this run was started with.
   carried: string[];
   // Whether the cloud machine takes a key mid-run (its image has `live-keys`).

@@ -73,7 +73,7 @@ const guard = (fn) => async (args) => {
 
 // `ownItem` is the row this server's session was started for, if any, and
 // `ownProduct` its project.
-export function buildTools({ holder, ownItem: givenItem, ownProduct = process.env.ZERO_PRODUCT || null, requestCloudResource = null } = {}) {
+export function buildTools({ holder, ownItem: givenItem, ownProduct = process.env.ZERO_PRODUCT || null, requestCloudResource = null, requestCloudKey = null } = {}) {
   const ownItem = givenItem === undefined ? process.env.ZERO_ITEM || null : givenItem;
   const account = resolveAccount();
   // Cloud runs share one process, whose own ZERO_ITEM belongs to no run or to
@@ -503,6 +503,19 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
       scope: z.enum(['task', 'documents', 'account']).optional().describe('for a relative file path: this task, this product\'s documents, or the account\'s documents; omitted for a full path or a skill'),
     },
     run: async (args) => json(await requestCloudResource(args)),
+  });
+
+  if (typeof requestCloudKey === 'function') tools.push({
+    name: 'request_cloud_key',
+    description: 'Ask this thread’s computer for a key the run needs when you know where it is kept there: their instructions, notes or memory name a Keychain item, a file under their home folder, or a variable in their shell. They get a card to allow it; once allowed it is saved for every cloud run and handed to this one. The call waits up to 15 minutes for their answer. Returns saved (with the file this run reads it from), already, denied, not_found, no_answer or unavailable, each with what to do next. When you do not know where the key is, do not guess: ask for it with the key line at the end of your turn.',
+    schema: {
+      name: z.string().describe('the environment variable its tools read, such as POSTHOG_PERSONAL_KEY'),
+      what: z.string().describe('what it is, in plain words, such as "the PostHog personal API key the daily report reads"'),
+      place: z.enum(['keychain', 'file', 'shell']),
+      from: z.string().describe('the Keychain item\'s name, the file\'s path (~/… or absolute), or the shell variable\'s name'),
+      entry: z.string().optional().describe('for an .env-style file, the variable inside it'),
+    },
+    run: async (args) => json(await requestCloudKey(args)),
   });
 
   // Teammates are an alpha feature: their tools are offered once there is a
