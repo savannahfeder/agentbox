@@ -31,9 +31,9 @@ const DARK_BASE = { y0: 1.0, y1: 0.36, bend: -0.1, dim: 0.95, peak: 0.7, coreW: 
 
 // The card stays a step off black so rows and text keep their contrast.
 const DARK_SKIES: Sky[] = [
-  { id: 'dusk', name: 'Dusk', dark: true, art: { ...DARK_BASE, palette: DUSK, bg: '#1a171d' } },
-  { id: 'ember', name: 'Ember', dark: true, art: { ...DARK_BASE, palette: EMBER, bg: '#1b1917', y0: 0.25, y1: 1.0, peak: 0.3 } },
-  { id: 'aurora', name: 'Aurora', dark: true, art: { ...DARK_BASE, palette: AURORA, bg: '#161a19', y0: 0.6, y1: 0.68, bend: -0.55, peak: 0.55, fall: 0.5 } },
+  { id: 'dusk', name: 'Dark pink sky', dark: true, art: { ...DARK_BASE, palette: DUSK, bg: '#1a171d' } },
+  { id: 'ember', name: 'Dark orange sky', dark: true, art: { ...DARK_BASE, palette: EMBER, bg: '#1b1917', y0: 0.25, y1: 1.0, peak: 0.3 } },
+  { id: 'aurora', name: 'Dark green sky', dark: true, art: { ...DARK_BASE, palette: AURORA, bg: '#161a19', y0: 0.6, y1: 0.68, bend: -0.55, peak: 0.55, fall: 0.5 } },
 ];
 
 const light = (palette: Palette, glow: Glow[]): SkyArt => ({
@@ -44,10 +44,10 @@ const light = (palette: Palette, glow: Glow[]): SkyArt => ({
 // The card is white and the sky fades into it, the way dark fades to black.
 // `frame` tints the window around the card so the white stands off it.
 const LIGHT_SKIES: Sky[] = [
-  { id: 'sage', name: 'Sage', dark: false, frame: '#e3e8e5', art: light(
+  { id: 'sage', name: 'Light green sky', dark: false, frame: '#e3e8e5', art: light(
     { core: [40, 160, 125], hot: [170, 215, 120], halo: [70, 135, 190], ember: [40, 120, 100] },
     [['rgba(90,150,200,0.30)', 280, 90, -130], ['rgba(80,185,150,0.40)', 120, 50, -10], ['rgba(190,225,140,0.55)', 34, 18, 0]]) },
-  { id: 'dusk-light', name: 'Dusk Light', dark: false, frame: '#ebe5e9', art: light(
+  { id: 'dusk-light', name: 'Light pink sky', dark: false, frame: '#ebe5e9', art: light(
     { core: [240, 90, 160], hot: [255, 150, 150], halo: [130, 100, 225], ember: [200, 80, 150] },
     [['rgba(170,140,240,0.30)', 260, 90, -120], ['rgba(255,150,195,0.42)', 120, 50, -10], ['rgba(255,185,170,0.50)', 34, 18, 0]]) },
 ];

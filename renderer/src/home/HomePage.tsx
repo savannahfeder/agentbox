@@ -81,7 +81,7 @@ export function HomePage({ hello, now, needs, needsCount, progressCount, team, p
                 <span className="hm-face">{r.letter}</span>
                 <span className="hm-text"><b>{r.title}</b>
                   <span className="hm-tags">
-                    {r.priority && <span className={`hm-tag hm-prio${r.priority === 'urgent' ? ' urgent' : ''}`}><PriorityMark id={r.priority} />{priorityLabelOf(r.priority)}</span>}
+                    {r.priority && <span className={`hm-prio${r.priority === 'urgent' ? ' urgent' : ''}`} title={priorityLabelOf(r.priority)} aria-label={priorityLabelOf(r.priority)}><PriorityMark id={r.priority} /></span>}
                     {r.from && <span className="hm-tag">{r.from}</span>}
                     <span className="hm-tag">{r.project}</span>
                   </span>
