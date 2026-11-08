@@ -932,7 +932,11 @@ export function applyThrough(channels: Map<string, PhoneChannel>) {
     if (cmd.kind !== 'setting') return ROUTES[cmd.kind]?.(cmd) ?? [];
     const read = channels.get('zero:settings-read');
     if (!read) return [];
-    return settingRoute(cmd.payload, await read({ sender: null }));
+    const model = (await read({ sender: null })) as Record<string, unknown> | null;
+    if (cmd.payload?.key !== 'stopLink') return settingRoute(cmd.payload, model);
+    // Checked against the cloud's list now, not the copy the phone last saw.
+    const listed = (await channels.get('zero:file-links')?.({ sender: null }, {})) as { ok?: boolean; links?: unknown[] } | null | undefined;
+    return settingRoute(cmd.payload, { ...model, links: listed?.ok ? listed.links : [] });
   };
   return async (cmd: PhoneCommand): Promise<ChannelResult | null | undefined> => {
     const [channel, args, then] = await routeOf({ ...cmd, payload: cmd.payload || {} });

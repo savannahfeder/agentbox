@@ -36,7 +36,7 @@ import { lastAccountAsk, webProjectRow, webSettingsGroups, webSettingsPages } fr
 import { whatTakesEscape } from '../settings-escape';
 import { WebAlertsGroup } from './WebAlerts';
 import { api, RESTART_NOTE, type PublicLink } from '../api';
-import { shareWords } from './ShareLink';
+import { publicLinkLine, shareWords } from '../public-link-words';
 import { updateLook } from '../update-row';
 import { InstructionSettings, sizeLabel } from './InstructionSettings';
 import { EVERY } from '../instruction-scope';
@@ -357,11 +357,7 @@ type Agent = ReturnType<typeof agentStory>;
 /** Whichever of two readings was taken later, either possibly absent. */
 const loadPublicLinks = () => api.fileLinks();
 
-/** One live link's row: its file, when it went up or was updated, and its comments. */
-export function publicLinkLine(l: PublicLink, now = Date.now()): string {
-  const when = shareWords.shared(l, now);
-  return l.comments ? `${when} · ${shareWords.comments(l.comments)}` : when;
-}
+export { publicLinkLine };
 
 /** WHAT THIS PERSON MADE PUBLIC, in one list, so it can be checked and stopped without finding each file. */
 export function PublicLinks({ load = loadPublicLinks, first = null, now = Date.now() }: {

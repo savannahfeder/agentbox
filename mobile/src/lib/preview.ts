@@ -139,6 +139,10 @@ export function previewSettings(now = Date.now()) {
             usage: { at: now - 9 * MIN, limits: [usage('session', 100, now + 19 * 60 * MIN), usage('week', 88, now + 2 * 24 * 60 * MIN)] } },
         ],
         codexAccounts: [{ id: 'default', email: 'you@example.com', name: 'You', plan: 'Plus', signedIn: true, chosen: false, usage: { at: now - 20 * MIN, limits: [usage('week', 12, now + 5 * 24 * 60 * MIN)] } }],
+        publicLinks: [
+          { token: 'preview-launch-plan', name: 'launch-plan.md', url: 'https://example.com/f/preview-launch-plan', createdAt: now - 26 * 60 * MIN, updatedAt: now - 40 * MIN, comments: 2 },
+          { token: 'preview-pricing-page', name: 'pricing.html', url: 'https://example.com/f/preview-pricing-page', createdAt: now - 3 * 24 * 60 * MIN, updatedAt: now - 3 * 24 * 60 * MIN, comments: 0 },
+        ],
       },
       projects: [
         { slug: 'agentbox', name: 'Agentbox', onPhone: true, autonomous: true, permission: 'workspace', codexMode: 'workspace', account: 'any', running: 2 },
@@ -364,6 +368,7 @@ export function previewCloud(now = () => Date.now()) {
     else if (key === 'sessionsAtOnce') Object.assign(w, { sessionsAtOnce: value, agentsAuto: false });
     else if (key === 'activeAccount') (value.engine === 'codex' ? w.codexAccounts : w.accounts).forEach((a: any) => { a.chosen = a.id === value.account; });
     else if (key === 'phoneProjects') settings.settings.projects.forEach((p) => { p.onPhone = value.all && !value.except.includes(p.slug); });
+    else if (key === 'stopLink') w.publicLinks = w.publicLinks.filter((l: { token: string }) => l.token !== value);
     else if (key !== 'agentsFeltSlow' && key !== 'resumeStopped') w[key] = value;
     Object.assign(c, { taken_at: new Date(now()).toISOString(), outcome: 'done' });
     settings.updated_at = new Date(now()).toISOString();

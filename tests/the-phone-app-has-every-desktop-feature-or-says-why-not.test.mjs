@@ -32,6 +32,7 @@ const READS_ON_THE_DESKTOP = [
   'renderer/src/settings-search.ts',
 ];
 const READS_ON_THE_PHONE = [
+  'mobile/src/app/index.tsx',
   'mobile/src/app/search.tsx',
   'mobile/src/app/settings/project/[slug].tsx',
   'mobile/src/app/thread/[product]/[id].tsx',

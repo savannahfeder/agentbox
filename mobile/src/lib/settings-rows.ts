@@ -14,8 +14,8 @@ const ROWS = [
   'team/Team',
 ];
 
-/** Every row the phone draws for this computer's copy; the cloud's only for an agent the cloud has. */
-export function phoneSettingsRows(settings: { workspace?: { cloud?: { engines?: string[] } | null } } | null | undefined): string[] {
+/** Every row the phone draws for this computer's copy; the cloud's only for an agent the cloud has, Public links only while there are some. */
+export function phoneSettingsRows(settings: { workspace?: { cloud?: { engines?: string[] } | null; publicLinks?: unknown[] } } | null | undefined): string[] {
   const cloud = settings?.workspace?.cloud?.engines ?? [];
-  return [...ROWS, ...cloud.map((engine) => `${engine}/Cloud accounts`)];
+  return [...ROWS, ...(settings?.workspace?.publicLinks?.length ? ['general/Public links'] : []), ...cloud.map((engine) => `${engine}/Cloud accounts`)];
 }

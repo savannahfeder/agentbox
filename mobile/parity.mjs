@@ -80,7 +80,7 @@ export const PARITY = {
   'thread:unsnooze': { phone: MENU, find: 'if (row.now) onBack()' },
   'thread:read': { phone: 'mobile/src/lib/unread.ts', find: 'export function markSeen' },
   'thread:unread': { phone: MENU, find: 'label="Mark unread"' },
-  'thread:resume': { missing: 'resume on ticked rows (a thread setting for zero:resume-items)' },
+  'thread:resume': { phone: 'mobile/src/app/index.tsx', find: 'label="Resume agents"' },
   'thread:remote-control': { desktopOnly: 'it hands the computer\'s own session to Claude\'s app' },
   'thread:open-terminal': { desktopOnly: 'a terminal on the computer' },
   'thread:approve': { phone: THREAD, find: "kind: 'approve-filed'", still: 'only proposals filed from a thread' },
@@ -132,7 +132,7 @@ export const PARITY = {
 
   // Rows Settings search finds
   'settings:general/Your account': { phone: SET, find: 'Signed in as' },
-  'settings:general/Public links': { missing: 'the computer\'s public links in the copy, and a way to stop one' },
+  'settings:general/Public links': { phone: SET, find: '<Group label="Public links">' },
   'settings:general/Show keyboard shortcut hints': { desktopOnly: KEYS },
   'settings:general/Shrink the sidebar to icons': { desktopOnly: MAC },
   'settings:general/Counts and crash reports': { phone: SET, find: 'label="Counts and crash reports"' },
@@ -170,4 +170,4 @@ export const PARITY = {
   'settings:team/Team': { phone: 'mobile/src/ui/TeamPage.tsx', find: 'inviteTo' },
 };
 
-export const STILL_TO_DO = 33;
+export const STILL_TO_DO = 31;

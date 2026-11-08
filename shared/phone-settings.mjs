@@ -22,6 +22,7 @@ const count = (v) => Number.isInteger(v) && v >= 1 && v <= 64;
 const accountId = (v) => typeof v === 'string' && ACCOUNT_ID.test(v) && v !== '.' && v !== '..';
 // main/cloud-permission.mts CLOUD_SAME: the cloud starts in this computer's mode.
 const CLOUD_SAME = 'same';
+const LINK_TOKEN = /^[\w-]{8,128}$/;
 const slugList = (v) => Array.isArray(v) && v.length >= 1 && v.length <= 500 && v.every((s) => typeof s === 'string' && SLUG.test(s)) && new Set(v).size === v.length;
 
 const WORKSPACE = {
@@ -51,6 +52,8 @@ const WORKSPACE = {
   resumeStopped: (v) => v === true,
   // The whole running order, as the desktop's drag sends it.
   productOrder: slugList,
+  // One of the copy's public links, by its token, for the desktop's Stop sharing.
+  stopLink: (v) => typeof v === 'string' && LINK_TOKEN.test(v),
   // The web app's alerts: kept by the phone pass itself (main/phone-alerts.mjs), never the window's.
   [WEB_ALERTS_KEY]: webAlertsOk,
   [WEB_ALERTS_TEST_KEY]: webAlertsTestOk,
@@ -208,6 +211,10 @@ export function settingRoute(p, model) {
   }
   if (p.key === 'paused') return ['zero:supervisor-pause', p.value];
   if (p.key === 'resumeStopped') return ['zero:resume-agents', {}];
+  if (p.key === 'stopLink') {
+    if (!(model?.links ?? []).some((l) => l?.token === p.value)) throw new Error('that link is not one of your public links');
+    return ['zero:file-link-stop', { token: p.value }];
+  }
   if (p.key === 'productOrder') {
     const known = new Set((model?.projects ?? []).map((x) => x.slug));
     if (!p.value.every((s) => known.has(s))) throw new Error('that project is not on this computer');
@@ -323,6 +330,10 @@ export function phoneSettingsOf(model, { version }) {
         id: accountIdOf(a.profile), email: a.email ?? null, name: a.name ?? null, plan: a.plan ?? null, signedIn: !!a.signedIn, chosen: !!a.chosen,
         usage: usageFor(model.usage?.codex, a.profile),
       })),
+      // Not `source`: it names the file on this computer.
+      publicLinks: (Array.isArray(model.links) ? model.links : [])
+        .filter((l) => typeof l?.token === 'string' && LINK_TOKEN.test(l.token) && typeof l.url === 'string')
+        .map((l) => ({ token: l.token, name: String(l.name ?? ''), url: l.url, createdAt: num(l.createdAt), updatedAt: num(l.updatedAt), comments: Number(l.comments) || 0 })),
     },
     projects: rankProducts(model.projects ?? [], order).map((p) => ({
       slug: p.slug, name: p.name, onPhone: !!p.onPhone, autonomous: !!p.autonomous,

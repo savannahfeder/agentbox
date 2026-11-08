@@ -14,7 +14,10 @@ import { CODEX_MODES, CODEX_MODE_ORDER } from '../../../renderer/src/codex-modes
 import { MODE_ORDER, MODE_SENTENCE, MODE_WORDS } from '../../../renderer/src/modes';
 import { runningFigures } from '../../../renderer/src/running-reading';
 import type { UsageLimit } from '../../../renderer/src/types';
+import { publicLinkLine, shareWords } from '../../../renderer/src/public-link-words';
 import { inRunningOrder } from '../lib/palette';
+import { linksShown, type PhoneLink } from '../lib/public-links';
+import { share } from './LinkMenu';
 import { NAME } from '../../../shared/product-name.mjs';
 import { deleteAccount } from '../../../renderer/src/phone-account';
 import { withDeadline } from '../lib/deadline';
@@ -47,6 +50,32 @@ function SettingSwitch({ label, desc, k, copy, first }: { label: string; desc?: 
   return <Row first={first} label={label} desc={desc} reading={r} control={<Switch label={label} on={!!r.value} onChange={(v) => void s.change({ scope: 'workspace', key: k, value: v })} />} />;
 }
 
+/** Settings.tsx `PublicLinks`: what you made public, each stopped on a second press. Copy link is the phone's share sheet. */
+function PublicLinks({ links, now }: { links: PhoneLink[]; now: number }) {
+  const s = useSettings();
+  const [asking, setAsking] = useState<string | null>(null);
+  const stopping = s.reading('workspace', 'stopLink', null);
+  const shown = linksShown(links, stopping);
+  if (!shown.length) return null;
+  const stop = (l: PhoneLink) => {
+    if (asking !== l.token) { setAsking(l.token); return; }
+    setAsking(null);
+    void s.change({ scope: 'workspace', key: 'stopLink', value: l.token });
+  };
+  return (
+    <Group label="Public links">
+      {shown.map((l, i) => (
+        <Row key={l.token} first={i === 0} label={l.name} desc={publicLinkLine(l, now)} stack
+          reading={i === 0 && stopping.refused ? stopping : undefined}
+          control={<View style={{ flexDirection: 'row', gap: 8 }}>
+            <Button title="Copy link" onPress={() => share(l.url)} />
+            <Button title={asking === l.token ? shareWords.stopAsk(l.comments) : 'Stop sharing'} onPress={() => stop(l)} />
+          </View>} />
+      ))}
+    </Group>
+  );
+}
+
 function General() {
   const c = useCloud();
   const s = useSettings();
@@ -66,6 +95,7 @@ function General() {
         <Row first label={`Signed in as ${c.cloud?.session()?.user.email ?? ''}`} control={<Button title="Sign out" onPress={() => { c.signOut(); router.replace('/sign-in'); }} />} />
         <Row label="Delete account" desc={said ?? 'Your account and everything you put online, here and in shared projects.'} control={<Button title="Delete" disabled={busy} onPress={() => setDeleting(true)} />} />
       </Group>
+      {w?.publicLinks?.length ? <PublicLinks links={w.publicLinks} now={c.now} /> : null}
       <Group label="Claude Code and Codex">
         <Row first label="Send your messages to your agents"
           desc={agreedAt ? `On since ${agreedAt}. What you write goes through your computer to Claude Code, by Anthropic, or Codex, by OpenAI, on your own account.` : 'Off. Replies and new threads wait until you turn this on.'}
