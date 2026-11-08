@@ -17,6 +17,12 @@
       "distribution": "store",
       "autoIncrement": true,
       "environment": "production"
+    },
+    "store": {
+      "extends": "production",
+      "env": {
+        "EXPO_PUBLIC_STORE_BUILD": "1"
+      }
     }
   },
   "submit": {
@@ -24,6 +30,9 @@
       "ios": {
         "ascAppId": "6826402748"
       }
+    },
+    "store": {
+      "extends": "production"
     }
   }
 }

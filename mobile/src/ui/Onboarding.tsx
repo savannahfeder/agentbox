@@ -150,7 +150,10 @@ export function Bars({ at }: { at: Setup }) {
 /** Signed in here, and no computer has sent this account anything yet. Signing in there is what connects it. */
 export function ComputerWait({ email, signOut }: { email: string | null; signOut: () => void }) {
   return (
-    <Screen top={24} foot={<Btn kind="quiet" label="Use another account" onPress={signOut} />}>
+    <Screen top={24} foot={<>
+      <Btn label="Settings" onPress={() => router.push('/settings')} />
+      <Btn kind="quiet" label="Use another account" onPress={signOut} />
+    </>}>
       <Bars at="computer" />
       <Devices state="waiting" />
       <Head style={{ marginTop: 28 }}>{'Waiting for\nyour computer'}</Head>
