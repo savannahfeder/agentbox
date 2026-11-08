@@ -2081,7 +2081,8 @@ body {
    button shrinks to what is in it and the box would be 4:3 of nothing.
    `auto 4 / 3` takes the picture's own shape the moment its first bytes give
    it. Four :root outweigh the phone's own picture rules in phone.css. */
-:root:root:root:root .inline-image-open:has(> .inline-image[data-phone-img="loading"]) { width: 100%; }
+:root:root:root:root .inline-image-open:has(> .inline-image[data-phone-img="loading"]),
+:root:root:root:root .inline-image-open:has(> .inline-image.arriving) { width: 100%; }
 :root:root:root:root .inline-image[data-phone-img="loading"],
 :root:root:root:root .doc-picture[data-phone-img="loading"] {
   display: block; width: 100%; max-width: 100%; height: auto; aspect-ratio: auto 4 / 3;
