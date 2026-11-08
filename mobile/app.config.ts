@@ -58,6 +58,18 @@ const config: ExpoConfig = {
     usesAppleSignIn: true,
     // HTTPS through the system is exempt from export rules.
     config: { usesNonExemptEncryption: false },
+    // Repeats what the packages' own manifests declare, which Apple does not
+    // always read from a static pod (docs.expo.dev/guides/apple-privacy).
+    privacyManifests: {
+      NSPrivacyTracking: false,
+      NSPrivacyTrackingDomains: [],
+      NSPrivacyAccessedAPITypes: [
+        { NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategoryUserDefaults', NSPrivacyAccessedAPITypeReasons: ['CA92.1'] },
+        { NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategorySystemBootTime', NSPrivacyAccessedAPITypeReasons: ['35F9.1'] },
+        { NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategoryFileTimestamp', NSPrivacyAccessedAPITypeReasons: ['0A2A.1', '3B52.1', 'C617.1'] },
+        { NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategoryDiskSpace', NSPrivacyAccessedAPITypeReasons: ['85F4.1', 'E174.1'] },
+      ],
+    },
   },
   // Android's own icon shapes wait for its phase (docs/mobile/PLAN.md).
   android: { package: bundleId },
