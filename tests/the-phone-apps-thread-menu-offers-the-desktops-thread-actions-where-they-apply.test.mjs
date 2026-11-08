@@ -11,6 +11,7 @@
 // computer's own handler. Held here: each offered where it applies, and not
 // where it does not, and what each press sends and says.
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
 import { phoneSlug } from '../renderer/src/phone-rows';
 import { phoneSender } from '../renderer/src/phone-send';
 import { liveOf, moveChoices, offersOf, ruleFor } from '../mobile/src/lib/thread-offers';
@@ -164,6 +165,20 @@ describe('Stop repeating', () => {
     expect(ruleFor(item(), rules)).toBeNull();
     expect(ruleFor(item({ labels: ['repeat:r-9'] }), rules)).toBeNull();
     expect(ruleFor(item({ labels: ['repeat:r-2'] }), rules)).toBeNull();
+  });
+});
+
+describe('the thread page and its menu', () => {
+  const page = fs.readFileSync('mobile/src/app/thread/[product]/[id].tsx', 'utf8');
+  const menu = fs.readFileSync('mobile/src/ui/ThreadMenu.tsx', 'utf8');
+  it('the page hands the menu each offer', () => {
+    for (const wired of ['tryAgain={offers.tryAgain}', 'restart={offers.restart}', 'reopen={offers.reopen}', 'place={offers.place}',
+      'priority={offers.priority ?', 'name={offers.rename ?', 'projects={offers.move ? moveChoices(', 'repeats={!!rule}']) expect(page).toContain(wired);
+  });
+  it('the menu says each in the desktop\'s words', () => {
+    for (const words of ['"Try again"', '"Restart the agent (it stopped)"', '"Reopen"', '"Priority"', '"Rename"', '"Move to another project"', '"Stop repeating"']) {
+      expect(menu).toContain(`label=${words}`);
+    }
   });
 });
 

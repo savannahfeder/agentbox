@@ -323,7 +323,16 @@ export function previewCloud(now = () => Date.now()) {
       if (m) Object.assign(m, { paused: value.paused, now: value.paused ? 'Paused' : m.nowBeforePause ?? null, nowBeforePause: value.paused ? m.now : undefined });
     } else if (scope === 'teammate' && key === 'describe') {
       mates.list.push({ id: `t-${c.id}`, name: 'New teammate', letter: 'N', role: null, job: value.text ?? value.starter, primary: false, paused: false, status: 'draft', product: value.product, waiting: [], running: null, duties: [], runsThisWeek: 0 });
-    } else if (scope === 'thread') { const t = rows.threads.find((r) => r.project === product && r.item === c.payload.item); if (t) { t.snapshot.item.pinned = value || undefined; t.updated_at = new Date(now() + 1).toISOString(); } }
+    } else if (scope === 'thread') {
+      const t = rows.threads.find((r) => r.project === product && r.item === c.payload.item);
+      const item = t?.snapshot.item;
+      if (item && key === 'pinned') item.pinned = value || undefined;
+      else if (item && key === 'onMac') item.onMac = value || undefined;
+      else if (item && (key === 'label' || key === 'priority')) item[key] = value;
+      else if (item && key === 'moveTo') t.project = value;
+      else if (item && (key === 'resume' || key === 'redeliver')) Object.assign(item, { status: 'claimed', updatedAt: now() });
+      if (t) t.updated_at = new Date(now() + 1).toISOString();
+    }
     else if (scope === 'repeat' && key === 'end') (settings.settings as any).repeats = repeats.filter((r) => !(r.product === product && r.id === c.payload.id));
     else if (scope === 'repeat' && key === 'change') Object.assign(repeats.find((r) => r.product === product && r.id === c.payload.id) ?? {}, value);
     else if (scope === 'repeat' && key === 'new') repeats.push({ product, id: `r-${c.id}`, priority: 5, createdAt: now(), served: '', ...value });

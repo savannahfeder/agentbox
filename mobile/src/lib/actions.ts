@@ -19,7 +19,7 @@ import { ruleLabel, type RepeatShape } from '../../../shared/repeats.mjs';
 import type { Saved } from './attach';
 import { dayClock } from './back-at';
 
-export interface Choices { priority?: number; permissionMode?: string; model?: string; effort?: string; engine?: string; runAt?: number; start?: 'later' | 'now'; repeat?: RepeatShape; labels?: string[] }
+export interface Choices { priority?: number; permissionMode?: string; model?: string | null; effort?: string | null; engine?: string; runAt?: number; start?: 'later' | 'now'; repeat?: RepeatShape; labels?: string[] }
 export interface RuleRef { product: string; id: string; title: string }
 
 export type Press =
@@ -116,7 +116,9 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
     const runAt = Number(item.runAt) || 0;
     const snoozed = Number(item.snoozedUntil) || 0;
     const steps: Step[] = [{ door: 'answer', payload: { ...on, ...choices, answer, ...(status ? { status } : {}) } }];
-    if (runAt > now) steps.push({ door: 'schedule', payload: { ...on, runAt: 0 } });
+    // A reply set for later sets the thread's time itself (main/phone-inbox.mts ROUTES).
+    const later = Number(choices.runAt) > now;
+    if (runAt > now && !later) steps.push({ door: 'schedule', payload: { ...on, runAt: 0 } });
     if (snoozed > now) steps.push({ door: 'snooze', payload: { ...on, snoozedUntil: 0 } });
     return {
       steps,
@@ -150,8 +152,11 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
   });
 
   switch (press.kind) {
-    case 'reply':
-      return press.text.trim() ? reply(press.text, press.choices ?? {}, waits ? `Waiting for your computer${to ? ` → ${to}` : ''}` : to ? `Sent → ${to}` : 'Sent', 'Reply withdrawn, back in your inbox') : null;
+    case 'reply': {
+      const at = Number(press.choices?.runAt) || 0;
+      const said = at > now ? `Sends ${dayClock(at, now)}${to ? ` → ${to}` : ''}` : waits ? `Waiting for your computer${to ? ` → ${to}` : ''}` : to ? `Sent → ${to}` : 'Sent';
+      return press.text.trim() ? reply(press.text, press.choices ?? {}, said, 'Reply withdrawn, back in your inbox') : null;
+    }
     case 'pick':
       // "Close this task" is done, never sent: as a reply it would start a run to close it (App.tsx).
       if (closesTheTask(press.option.text)) return close();

@@ -360,6 +360,8 @@ const CHOICES = {
     permissionMode: orNull((v) => word(v, 40)), model: orNull(word), effort: orNull((v) => word(v, 20)),
     priority: (v) => Number.isInteger(v) && v >= 0 && v <= 10, now: (v) => v === true, unschedule: (v) => v === true,
     runAt: (v) => Number.isFinite(v) && v > 0,
+    // Only when the reply moves the thread to the other agent (renderer/src/reply-pick.ts).
+    engine: (v) => v === 'claude' || v === 'codex',
   },
   new: {
     runAt: (v) => Number.isFinite(v) && v > 0, start: (v) => v === 'later' || v === 'now',
