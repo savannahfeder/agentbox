@@ -159,6 +159,7 @@ import type { Spot } from '../one-thing-at-a-time';
 import { ChoicesFold, ChoicesShow, QueueNav } from './OneThingAtATime';
 import { InlineTable, gridFromHast } from './TableView';
 import { foldKey, foldedKeys, toggleFold } from '../one-thing-at-a-time';
+import { watchForBlank } from '../blank-check';
 const needName = (n: Need) => (n.kind === 'sign-in' ? n.service.name : n.kind === 'key' ? (keyWords(n.what) ? `the ${keyWords(n.what)}` : n.name) : n.kind === 'file' ? (n.path.split('/').pop() ?? n.path) : `the ${n.about} code`);
 
 // A relative product path is an artifact, however the worker wrote it:
@@ -1337,6 +1338,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     path, at: Date.now(), ...(from && opensAsPicture(path) ? { steps: picturesFor(paneRef.current, path, from).pictures.map((p) => p.path) } : {}),
   });
   const openFileMark = useCallback((link: FileMarkLink) => setArtifact({ file: link.file, note: link.id, at: Date.now() }), []);
+  useEffect(() => watchForBlank(`${item.product}/${item.id}`), [item.product, item.id]);
   const [historyLines, setHistoryLines] = useState<unknown[]>([]);
   useEffect(() => {
     let live = true;
