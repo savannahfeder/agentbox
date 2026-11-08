@@ -178,7 +178,7 @@ import { NAME, Name, envName, nameSlug, isOurSlug } from '../shared/product-name
 import { signInFiles, signInStamp } from './sign-in-files.mts';
 import { runsOn } from './runs-on.mts';
 import { MemoryGateServer, defaultSocketPath as memoryGateSocketPath, readMacPressure } from './memory-gate-server.mts';
-import { startDecision, readMacPressureNow, SETTLE_MS } from './start-hold.mts';
+import { startDecision, readMacPressureNow, SETTLE_MS, STALE_MS } from './start-hold.mts';
 import { MemoryLog } from './memory-log.mts';
 import { StartBudget } from './cloud/start-budget.mjs';
 import { isPlainMerge, mergeHome, mergedSentence } from './cloud/merge-home.mjs';
@@ -1302,6 +1302,8 @@ export class Supervisor {
   declare _nativeCommands: Record<string, string[]>;
   /** What `_saveState` last wrote, so an unchanged save writes nothing. */
   _savedText?: string;
+  _savesHeld?: number;
+  _saveWanted?: boolean;
   declare _deliveryAttempts: Record<string, number>;
   declare _fruitless: Record<string, FruitlessRecord>;
   declare _heldStarts: Record<string, HeldStart>;
@@ -2048,6 +2050,10 @@ export class Supervisor {
   // is exactly what it is. Her explicit resume outranks the delivery mark and
   // the three-failure cap, the same way resumeStopped's does.
   resumeItems(ids: string[] | null = null) {
+    return this._savingOnce(() => this._resumeItemsNow(ids));
+  }
+
+  _resumeItemsNow(ids: string[] | null) {
     const only = new Set(Array.isArray(ids) ? ids : []);
     const out: { resumed: number; queued: number; working: number; missing: number; failed: number; why?: string } = { resumed: 0, queued: 0, working: 0, missing: 0, failed: 0 };
     if (!only.size) return out;
@@ -2297,7 +2303,12 @@ export class Supervisor {
   // done to it: no fresh worker, no cleared mark, no stranger briefed from
   // zero. It waits for the user, which is deliberately preferred over
   // restarting it.
+  // Each thread it puts back asks for a save of the whole state; one write covers them all.
   recoverInterrupted(reason = 'startup') {
+    return this._savingOnce(() => this._recoverInterruptedNow(reason));
+  }
+
+  _recoverInterruptedNow(reason: string) {
     const out: RecoveryNews = { reason, resumed: 0, waiting: 0, queued: 0, running: 0, resting: 0, missing: 0, resumedIds: [], waitingIds: [], missingIds: [] };
     this._recoverPending = false;
     let items: WorkItem[];
@@ -4663,7 +4674,7 @@ export class Supervisor {
    *   row behind it waited for good (tests/a-row-is-named-on-an-account-that-has-room).
    */
   nameTheRows(items: WorkItem[], now = Date.now()) {
-    if (this._naming) return undefined;
+    if (this._naming || this._memoryCritical(now)) return undefined;
     this._nameMisses ??= new Map();
     const key = (i: WorkItem) => `${i.product}:${i.id}`;
     const next = items
@@ -4688,6 +4699,7 @@ export class Supervisor {
    * agent's own last message.
    */
   catchUpTheImports(items: WorkItem[], now = Date.now()) {
+    if (this._memoryCritical(now)) return Promise.resolve([]);
     this._catchingUp ??= new Set();
     this._catchUpMisses ??= new Map();
     const key = (i: WorkItem) => `${i.product}:${i.id}`;
@@ -4745,6 +4757,18 @@ export class Supervisor {
    * getting nothing is the row keeping its own title, which is what every row
    * had before the namer existed.
    */
+  /**
+   * Whether the Mac reads critical now (main/start-hold.mts's reading). Naming,
+   * sorting and catching up are tidying that nothing waits on, and each is a
+   * 200 to 300 MB process, so they wait while it does. A missing or stale
+   * reading is not a reason to wait.
+   */
+  _memoryCritical(now = Date.now()) {
+    const r = this._memReading;
+    if (!r || !(Math.abs(now - Number(r.at)) <= STALE_MS)) return false;
+    return pressureFrom(r) === 'critical';
+  }
+
   async _askSmall<T>(ask: (opts: SmallModelAsk) => Promise<T> | T, { product = null }: { product?: string | null } = {}): Promise<T | ''> {
     const home = this._homeEngine();
     const engines = this._projectProfile(product)
@@ -4785,7 +4809,7 @@ export class Supervisor {
    * every fifteen seconds.
    */
   sortTheMessages(items: WorkItem[], me: string | null | undefined) {
-    if (this._sortingMessages || !me) return undefined;
+    if (this._sortingMessages || !me || this._memoryCritical()) return undefined;
     this._sortedMessages ??= new Set();
     const products = new Map((this.store.listProducts?.() ?? []).map((p) => [p.slug, p]));
     const next = items
@@ -7978,6 +8002,7 @@ export class Supervisor {
   }
 
   _saveState() {
+    if (this._savesHeld) { this._saveWanted = true; return; }
     try {
       const text = JSON.stringify({
         handledAnswers: [...this._handledAnswers].slice(-500),
@@ -8028,6 +8053,20 @@ export class Supervisor {
       fs.writeFileSync(this._stateFile, text);
       this._savedText = text;
     } catch {}
+  }
+
+  /** Runs a synchronous `fn` with every save it asks for made once, when it returns or throws. */
+  _savingOnce<T>(fn: () => T): T {
+    this._savesHeld = (this._savesHeld ?? 0) + 1;
+    try {
+      return fn();
+    } finally {
+      this._savesHeld -= 1;
+      if (!this._savesHeld && this._saveWanted) {
+        this._saveWanted = false;
+        this._saveState();
+      }
+    }
   }
 
   /* ----------------------------- the first run ---------------------------- */

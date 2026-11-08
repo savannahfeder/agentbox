@@ -111,10 +111,10 @@ describe('the tools', () => {
     });
   });
 
-  it('the page draws the card, and opens it where a teammate\'s file opens', () => {
+  it('the page draws the card, and opens it in the document pane', () => {
     const page = fs.readFileSync(new URL('../renderer/src/teammates/TeammatesPage.tsx', import.meta.url), 'utf8');
     expect(page).toMatch(/m\.doc && <button[^\n]*tq-doc-card[^\n]*onOpenFile\(m\.doc!\.product, m\.doc!\.src\)/);
-    expect(fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8')).toMatch(/onOpenFile: openTeammateFile/);
+    expect(fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8')).toMatch(/onOpenFile: openMateFile/);
     // Escape left Chats with the document still open, on the copy.
     expect(fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8')).toMatch(/if \(e\.key === 'Escape' && openDoc\) \{ e\.preventDefault\(\); closeArtifact\(\); return; \}\s*if \(e\.key === 'Escape'\) \{ e\.preventDefault\(\); teammatesUi\.back\(\); \}/);
     // Beside the Chats list and the chat, a document left the chat one letter wide.

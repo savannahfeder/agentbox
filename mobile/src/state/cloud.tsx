@@ -17,6 +17,7 @@ import { fileOnPhone, objectsToSign, renewLinks, type Links } from '../../../ren
 import { BUCKET, cloudPlaces } from '../../../renderer/src/cloud-files';
 import { SEND_MAX_BYTES, sendFiles } from '../../../renderer/src/phone-sends-files';
 import { drawFromBytes } from '../lib/files';
+import { STORE_BUILD } from '../lib/store-build';
 import { toastParts } from '../../../renderer/src/toast-parts';
 import type { Saved } from '../lib/attach';
 import type { Picked } from '../platform/pick';
@@ -131,7 +132,7 @@ function useCloudState() {
   const view = useMemo(() => phoneView(rows, now), [rows, now]);
   const tabs = useMemo(() => phoneTabs(view, now), [view, now]);
   const repeats = useMemo(() => phoneRepeats(settingsRows, rows.commands, rows.projects, now), [settingsRows, rows.commands, rows.projects, now]);
-  const team = useMemo(() => withPendingPauses(withPhoneAnswers(teamFrom(settingsRows), rows.commands), rows.commands), [settingsRows, rows.commands]);
+  const team = useMemo(() => (STORE_BUILD ? null : withPendingPauses(withPhoneAnswers(teamFrom(settingsRows), rows.commands), rows.commands)), [settingsRows, rows.commands]);
   const teamPending = useMemo(() => onTheirWay(rows.commands, team, now), [rows.commands, team, now]);
   /** A chat with a teammate is on screen until the returned function runs. */
   const watchTeam = useCallback(() => {
@@ -189,6 +190,8 @@ function useCloudState() {
     void persist.write(NOTICE_KEY, JSON.stringify(v));
     for (const go of noticeWaiters.current.splice(0)) go(yes);
   }, [me]);
+  // The notice left unanswered: what waited goes no further, and the next send asks again.
+  const leaveNotice = useCallback(() => { for (const go of noticeWaiters.current.splice(0)) go(false); }, []);
   const askNotice = useCallback(async () => {
     router.push('/ai-notice');
     const yes = await new Promise<boolean>((resolve) => { noticeWaiters.current.push(resolve); });
@@ -387,7 +390,7 @@ function useCloudState() {
     cloud, opened, signedIn, rows, view, tabs, repeats, status, loading: read.first, onlineAt: read.error ? 0 : read.fetchedAt, now, refresh, send, closeAll, laterAll, pressPicked, attach, fileOf, toast, say,
     team, teamPending, watchTeam, askTeammate, wanted, goTo: setWanted, takeWanted: () => setWanted(null), minimizedApproval, setMinimizedApproval, approvalRoom, setApprovalRoom,
     dismissToast: () => setToast(null), signedInWith, signOut, preview: PREVIEW,
-    notice: mine, noticeRead, agreed, answerNotice, withdrawNotice: () => answerNotice(false),
+    notice: mine, noticeRead, agreed, answerNotice, leaveNotice, withdrawNotice: () => answerNotice(false),
     alerts, turnOnAlerts, turnOffAlerts,
     connect, markSeen, markUnseen, unread, sendFeedback, version: APP_VERSION, build: BUILD,
     // The one map of her files' links, filled in place; `signedAt` moves when it does.

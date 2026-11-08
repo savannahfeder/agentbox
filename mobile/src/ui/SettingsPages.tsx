@@ -101,7 +101,7 @@ function General() {
       {w?.publicLinks?.length ? <PublicLinks links={w.publicLinks} now={c.now} /> : null}
       <Group label="Claude Code and Codex">
         <Row first label="Send your messages to your agents"
-          desc={agreedAt ? `On since ${agreedAt}. What you write goes through your computer to Claude Code, by Anthropic, or Codex, by OpenAI, on your own account.` : 'Off. Replies and new threads wait until you turn this on.'}
+          desc={agreedAt ? `On since ${agreedAt}. What you write goes through your computer or Agentbox Cloud to Claude Code, by Anthropic, or Codex, by OpenAI, on your own account.` : 'Off. Replies and new threads wait until you turn this on.'}
           control={agreedAt ? <Button title="Turn off" onPress={() => c.withdrawNotice()} /> : <Button title="Turn on" onPress={() => router.push('/ai-notice')} />} />
       </Group>
       <Group label="Feedback">
@@ -545,11 +545,11 @@ export type PageId = 'general' | 'appearance' | 'phone' | 'alpha' | 'claude' | '
 export interface SettingsPageDef { id: PageId; label: string; group: 'Personal' | 'Agents' | 'Workspace'; lede?: string; Body: ComponentType; shown: (s: SettingsState) => boolean }
 
 const hasComputer = (s: SettingsState) => !!s.settings;
-export const SETTINGS_PAGES: SettingsPageDef[] = [
+const ALL_PAGES: SettingsPageDef[] = [
   { id: 'general', label: 'General', group: 'Personal', Body: General, shown: () => true },
   { id: 'appearance', label: 'Appearance', group: 'Personal', Body: Appearance, shown: () => true },
   { id: 'phone', label: 'Phone', group: 'Personal', lede: 'Read and reply from your phone, even with your computer closed.', Body: Phone, shown: () => true },
-  { id: 'alpha', label: 'Alpha features', group: 'Personal', lede: 'Early features you can try before they are finished. They may change or go away.', Body: Alpha, shown: (s) => !STORE_BUILD && hasComputer(s) },
+  { id: 'alpha', label: 'Alpha features', group: 'Personal', lede: 'Early features you can try before they are finished. They may change or go away.', Body: Alpha, shown: hasComputer },
   { id: 'claude', label: 'Claude Code', group: 'Agents', Body: Claude, shown: hasComputer },
   { id: 'codex', label: 'Codex', group: 'Agents', Body: Codex, shown: (s) => !!s.settings && (s.settings.workspace.engines.includes('codex') || s.settings.workspace.codex.found) },
   { id: 'running', label: 'Running', group: 'Agents', Body: Running, shown: hasComputer },
@@ -558,4 +558,7 @@ export const SETTINGS_PAGES: SettingsPageDef[] = [
   { id: 'team', label: 'Team', group: 'Workspace', Body: TeamPage, shown: () => true },
   { id: 'rooms', label: 'Rooms', group: 'Workspace', Body: Rooms, shown: (s) => roomsPageShown(s.settings) },
 ];
+// Left out here, the store build's Settings, Search and page addresses never reach them.
+const NOT_IN_STORE = new Set(['alpha', 'team']);
+export const SETTINGS_PAGES = STORE_BUILD ? ALL_PAGES.filter((p) => !NOT_IN_STORE.has(p.id)) : ALL_PAGES;
 export const GROUPS = ['Personal', 'Agents', 'Workspace'] as const;

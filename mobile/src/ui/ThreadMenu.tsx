@@ -18,7 +18,7 @@ import { color, corner, font } from './theme';
 
 type Page = 'menu' | 'priority' | 'rename' | 'move';
 
-export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = false, pinned, onPin, onUnread, onLater, onBack, onRunNow, onMoveToCloud, onClose, closed = false,
+export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = false, pinned, onPin, onUnread, onLater, onBack, onRunNow, onMoveToCloud, onReport, onClose, closed = false,
   tryAgain = false, onTryAgain, restart = false, onRestart, resume = null, onResume, reopen = false, onReopen, priority = null, onPriority, name = null, onRename,
   projects = [], onMove, place = null, onPlace, repeats = false, onEndRepeat }: {
   open: boolean; close: () => void; now: number;
@@ -38,6 +38,8 @@ export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = f
   onBack: () => void;
   onRunNow: () => void;
   onMoveToCloud?: () => void;
+  /** Report what an agent wrote here (App Review 1.2). */
+  onReport?: () => void;
   onClose: () => void;
   tryAgain?: boolean; onTryAgain?: () => void;
   restart?: boolean; onRestart?: () => void;
@@ -126,6 +128,7 @@ export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = f
       {pinned !== null && <SheetRow label={pinned ? 'Unpin thread' : 'Pin thread'} lead={<Pin size={15} />} onPress={() => { done(); onPin(!pinned); }} />}
       {repeats && <SheetRow label="Stop repeating" onPress={act(onEndRepeat)} />}
       {onUnread && <SheetRow label="Mark unread" onPress={() => { done(); onUnread(); }} />}
+      {onReport && <SheetRow label="Report this thread" onPress={() => { done(); onReport(); }} />}
       {!closed && <SheetRow label="Close this thread" onPress={() => { done(); onClose(); }} />}
     </TypingSheet>
   );

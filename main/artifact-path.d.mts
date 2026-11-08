@@ -37,5 +37,7 @@ export interface ArtifactRequest {
 }
 export declare function artifactRoots(prod: ArtifactProduct | null | undefined): string[];
 export declare const HUNT_FRESH_MS = 5000;
+export declare const HUNT_KEPT_AT_MOST_MS = 30000;
+export declare const WALK_GIVES_UP_MS = 60000;
 export declare function notFoundMessage(raw: string, own: ArtifactProduct | null | undefined, product: string | null | undefined): string;
 export declare function resolveArtifact({ src, product, products, accountRoot, storeRoot, fs, now, fresh, nameOf, thread }: ArtifactRequest): Promise<ArtifactFound>;

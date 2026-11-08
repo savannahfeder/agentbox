@@ -303,6 +303,13 @@ is asleep.
 - Apple's own upload check runs only on a real upload.
 - The listing is `mobile/store.config.json`, pushed with `eas metadata:push`.
   EAS cannot send the App Privacy answers or screenshots.
+- The app review board (`scripts/app-review-board.mjs`, skill
+  `app-review-board`) is the gate before every submission. It runs fresh
+  Codex and Claude reviewers and live checks, and says submit only at 90% or
+  more with every check green. Its first round found consent skipped on
+  approving a filed task, Alpha features still reachable through Search, no
+  way to report an answer, a long video that could crash the app, and AI
+  teammates as a hidden feature. All are fixed.
 
 ## Costs
 
