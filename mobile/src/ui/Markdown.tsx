@@ -12,6 +12,7 @@ import { pictureSource, shapeOfDrawn } from '../lib/files';
 import { inlineSpans, messageBlocks, type Block, type MentionKind, type Span } from '../lib/markdown';
 import { offerLink } from './LinkMenu';
 import { T } from './parts';
+import { Selectable } from './Selectable';
 import { Player } from './Player';
 import { color, corner, font } from './theme';
 
@@ -302,7 +303,7 @@ function Table({ block }: { block: Extract<Block, { kind: 'table' }> }) {
                     // `th`: half the raised grey.
                     ...(r === 0 ? { backgroundColor: color.film } : {}),
                   }}>
-                    <T selectable style={cellText(r, c)}><Words spans={row[c] ?? []} /></T>
+                    <Selectable style={cellText(r, c)} spans={row[c] ?? []}><Words spans={row[c] ?? []} /></Selectable>
                   </View>
                 ))}
               </View>
@@ -365,15 +366,14 @@ function One({ block: b, tone, depth }: { block: Block; tone?: string; depth: nu
   const ink = tone ? { color: tone } : null;
   const headings = doc ? DOC_HEADING : HEADING;
   switch (b.kind) {
-    // Selectable, so a hold selects words to copy (from the phone app, 2026-10-29: "I can't select text").
-    case 'p': return <T selectable style={[body, ink]}><Words spans={b.spans} /></T>;
-    case 'h': return <T selectable style={[body, ink, headings[b.depth] ?? headings[4]]}><Words spans={b.spans} /></T>;
+    case 'p': return <Selectable style={[body, ink]} spans={b.spans}><Words spans={b.spans} /></Selectable>;
+    case 'h': return <Selectable style={[body, ink, headings[b.depth] ?? headings[4]]} spans={b.spans}><Words spans={b.spans} /></Selectable>;
     case 'code':
       return (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
           style={{ backgroundColor: color.raised, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: color.line }}
           contentContainerStyle={{ paddingVertical: 12, paddingHorizontal: 14, flexGrow: 1 }}>
-          <T selectable style={{ fontFamily: font.mono, fontSize: 13, lineHeight: 20.8, color: color.text }}>{b.text}</T>
+          <Selectable style={{ fontFamily: font.mono, fontSize: 13, lineHeight: 20.8, color: color.text }}>{b.text}</Selectable>
         </ScrollView>
       );
     case 'quote':

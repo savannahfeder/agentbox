@@ -41,6 +41,7 @@ import { SentFiles, ThreadFiles, useMessageFiles } from '../../../ui/Files';
 import { Back, Chevron, Clip, DoneMark, More, Panel } from '../../../ui/icons';
 import { Waiting } from '../../../ui/LogoOrbit';
 import { Markdown, type MessageFiles } from '../../../ui/Markdown';
+import { Selectable } from '../../../ui/Selectable';
 import { footRoom, IconButton, Pickable, PriorityBars, RunningMark, T, TopBar, Wall } from '../../../ui/parts';
 import { ModelSheet, ModeSheet, PrioritySheet, barsFor } from '../../../ui/Pickers';
 import { ThreadMenu } from '../../../ui/ThreadMenu';
@@ -102,7 +103,7 @@ function Said({ e, starts, ends, product, dir, files, sendNow, openOrigin, name 
         {/* Her words as typed; the files the app wrote into them are drawn, not read out. */}
         {yours ? (
           <>
-            {!!words.trim() && <T selectable style={{ fontSize: 17, lineHeight: 26.35, fontFamily: font.medium }}>{words}</T>}
+            {!!words.trim() && <Selectable style={{ fontSize: 17, lineHeight: 26.35, fontFamily: font.medium }}>{words}</Selectable>}
             <SentFiles text={e.text ?? ''} product={product} />
           </>
         ) : <Markdown text={e.text ?? ''} dir={dir} files={files} />}
@@ -487,7 +488,7 @@ export default function ThreadScreen() {
                   <T style={{ fontFamily: font.mono, fontSize: 10.5, color: color.faint }}>{when(page.answer.at)}</T>
                 </View>
               )}
-              {page.answer.headline && <T selectable style={{ fontFamily: font.semibold, fontSize: 17, lineHeight: 24.65, marginBottom: 8 }}>{page.answer.headline}</T>}
+              {page.answer.headline && <Selectable style={{ fontFamily: font.semibold, fontSize: 17, lineHeight: 24.65, marginBottom: 8 }}>{page.answer.headline}</Selectable>}
               {!!page.answer.rest.trim() && <Markdown text={page.answer.rest} dir={dir} files={files} />}
               {page.appNote && <T style={{ fontSize: 13, lineHeight: 19, marginTop: 14, color: color.faint }}>{page.appNote}</T>}
             </View>
