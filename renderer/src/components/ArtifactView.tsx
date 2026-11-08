@@ -27,6 +27,7 @@ import { FileLinkBrowser } from './FileLinkBrowser';
 import { OpeningWait } from './OpeningWait';
 import { CrossIcon } from './CrossIcon';
 import { ArtifactControlGlyph } from './ArtifactControlGlyph';
+import { FocusControl } from './FocusControl';
 import { DocText } from './DocText';
 import { FileNoteCard } from './FileNoteCard';
 import { NoteGlyph } from './NoteGlyphs';
@@ -48,7 +49,7 @@ const KIND_WORD = { image: 'Picture', film: 'Film', pdf: 'PDF', deck: 'Slides', 
 
 const newId = () => `n${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
-export function ArtifactView({ product, thread, shareThread, lines, numbers, marks, me, people, open, ownerOfRow, write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, below, files: fromElsewhere, typing = false }: {
+export function ArtifactView({ product, thread, shareThread, lines, numbers, marks, me, people, open, ownerOfRow, write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, onBeside, below, files: fromElsewhere, typing = false }: {
   /** Each path's number on its file's version line, which every surface counts by. */
   numbers?: Record<string, number>;
   /** What to say of a version with no bytes on this computer, by who made it. */
@@ -76,6 +77,8 @@ export function ArtifactView({ product, thread, shareThread, lines, numbers, mar
   editGoes?: string;
   onClose: () => void;
   onOutside?: (path: string) => void;
+  /** Only where there is a chat to sit beside. */
+  onBeside?: (path: string) => void;
   /** A line under the file, the full width of the window. */
   below?: ReactNode;
   /** Opened to write in, so the editor takes the cursor. */
@@ -160,6 +163,7 @@ export function ArtifactView({ product, thread, shareThread, lines, numbers, mar
   const { open: openNotes, resolved: settled } = commentsInList([...notesHere, ...carriedAll], undo);
   const approvalsHere = marks.approvals.filter((a) => a.file === version?.id);
   const mineApproved = approvalsHere.some((a) => a.by === me);
+  const othersApproved = approvalsHere.filter((a) => a.by !== me);
   const earlier = family && !approvalsHere.length
     ? family.versions.slice(0, at!.vi).reverse().find((v) => marks.approvals.some((a) => a.file === v.id)) : undefined;
 
@@ -633,6 +637,7 @@ export function ArtifactView({ product, thread, shareThread, lines, numbers, mar
     <StageLink.Provider value={setLink}>
     <div className="artifact-view" data-find-layer role="dialog" aria-label={version?.name ?? 'File'}>
       <header className="av-top">
+        <button type="button" className="doc-mark av-back" aria-label="Back" title="Back to the thread (esc)" onClick={leave}><ArtifactControlGlyph><path d="M16 10H4m5-5-5 5 5 5" /></ArtifactControlGlyph></button>
         <span className="av-name">{familyName(family, editing?.base ?? version) || ((editing?.base ?? version)?.name ?? '')}</span>
         {family && family.versions.length > 1 && (
           <span className="av-versions">
@@ -643,19 +648,14 @@ export function ArtifactView({ product, thread, shareThread, lines, numbers, mar
           </span>
         )}
         <span className="av-spring" />
-        {approvalsHere.some((a) => a.by !== me) && (
-          <span className="av-approved"><i aria-hidden="true" />Approved by {approvalsHere.filter((a) => a.by !== me).map((a) => nameOf(a.by)).join(', ')}</span>
-        )}
-        {earlier && <span className="av-approved is-old" title={approvalSince(family, at!.vi, marks.approvals, nameOf) ?? undefined}>{version?.edited ? approvalSince(family, at!.vi, marks.approvals, nameOf) : `v${earlier.n} approved, this version is not`}</span>}
         {editing && editWord && <span className="av-saved" role="status">{editWord}</span>}
-        {offers.approve && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{mineApproved ? 'Approved' : 'Approve'}</button>}
         {canRestore && !editing && <button type="button" className="av-btn" disabled={restoring} onClick={() => void restore()}><NoteGlyph name="undo" />Restore this version</button>}
         <span className="doc-marks">
           {(thread ?? shareThread) && version && foundNow === 'open' && canShareFile(version.path) && (
             <ShareLink icon product={product} thread={(thread ?? shareThread)!} src={version.path} signedIn={!!me} />
           )}
           {onOutside && version && foundNow === 'open' && <button type="button" className="doc-mark" aria-label="Open outside" title="Open outside" onClick={() => onOutside(version.path)}><ArtifactControlGlyph kind="open" /></button>}
-          <button type="button" className="doc-mark" aria-label="Close" title="Close (esc)" onClick={leave}><ArtifactControlGlyph kind="close" /></button>
+          {onBeside && version && <FocusControl style="corners-bare" focused onClick={() => onBeside(version.path)} />}
         </span>
       </header>
       <div className="av-body">
@@ -686,6 +686,15 @@ export function ArtifactView({ product, thread, shareThread, lines, numbers, mar
           {link && <FileLinkBrowser key={link} url={link} product={product} backTo={kind ? `the ${KIND_WORD[kind].toLowerCase()}` : 'the file'} onClose={closeLink} />}
         </div>
         {(foundNow === 'looking' || offers.comment || openNotes.length > 0 || settled.length > 0) && <aside className="av-side" aria-label="Comments">
+          {(offers.approve || othersApproved.length > 0 || earlier) && (
+            <div className="av-verdict">
+              <span className="av-verdict-who" title={earlier ? approvalSince(family, at!.vi, marks.approvals, nameOf) ?? undefined : undefined}>
+                {othersApproved.length > 0 ? `${othersApproved.map((a) => nameOf(a.by)).join(', ')} approved`
+                  : earlier ? (version?.edited ? approvalSince(family, at!.vi, marks.approvals, nameOf) : `v${earlier.n} approved, this version is not`) : null}
+              </span>
+              {offers.approve && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{mineApproved ? 'Approved' : 'Approve'}</button>}
+            </div>
+          )}
           <div className="av-list">
             {openNotes.map(card)}
             {settled.length > 0 && (

@@ -5,12 +5,25 @@
   background: var(--bg); color: var(--text); -webkit-app-region: no-drag;
 }
 .av-top {
-  flex: none; height: 44px; padding: 0 12px 0 16px; display: flex; align-items: center; gap: 14px;
+  flex: none; height: 44px; padding: 0 10px 0 16px; display: flex; align-items: center; gap: 14px;
   border-bottom: 1px solid var(--line); font-size: 13px; min-width: 0;
   /* Past the Mac window's buttons, which sit over this corner. */
   padding-left: 84px;
 }
 :root[data-window="flat"] .av-top { padding-left: 16px; }
+/* The side pane's corner marks (direct-review.css), which only reach inside the main layout. */
+.av-top .doc-marks { gap: 6px; }
+.av-top :is(.doc-mark, .focus-bare) {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 28px; min-width: 28px; height: 28px; padding: 0;
+  border: 0; border-radius: var(--radius); background: transparent; box-shadow: none;
+  color: var(--text-dim); cursor: pointer;
+}
+.av-top :is(.doc-mark, .focus-bare):is(:hover, :active) { background: transparent; color: var(--text); }
+.av-top :is(.doc-mark, .focus-bare):focus-visible { outline: 2px solid var(--underline); outline-offset: 2px; }
+.av-top :is(.doc-mark, .focus-bare) svg { display: block; width: 16px; height: 16px; flex: none; }
+/* The glyph, not its hit area, lines up with the content edge. */
+.av-top > .av-back { margin: 0 -4px 0 -6px; }
 .av-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
 .av-versions { flex: none; display: inline-flex; align-items: center; gap: 4px; color: var(--text-dim); }
 .av-of { font: 11.5px var(--mono); font-variant-numeric: tabular-nums; padding: 0 2px; white-space: nowrap; }
@@ -29,9 +42,6 @@
 .av-btn:hover:not(:disabled) { background: var(--wash); }
 .av-glyph { flex: none; }
 .av-btn.is-on { background: var(--wash-strong); }
-.av-approved { flex: none; display: inline-flex; align-items: center; gap: 7px; font: 11.5px var(--mono); color: var(--text-dim); white-space: nowrap; }
-.av-approved i { width: 6px; height: 6px; background: var(--code-plus); }
-.av-approved.is-old { color: var(--text-faint); }
 
 .av-body { flex: 1; min-height: 0; display: flex; }
 .av-stage { flex: 1; min-width: 0; position: relative; display: flex; }
@@ -119,6 +129,8 @@
 
 
 .av-side { flex: none; width: 340px; display: flex; flex-direction: column; border-left: 1px solid var(--line); min-height: 0; }
+.av-verdict { flex: none; display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.av-verdict-who { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--text-dim); }
 .av-list { flex: 1; min-height: 0; overflow: auto; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
 .av-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px 32px; text-align: center; font-size: 13.5px; line-height: 1.45; color: var(--text-dim); }
 .av-empty .av-glyph { width: 20px; height: 20px; color: var(--text-faint); }
