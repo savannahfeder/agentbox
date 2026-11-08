@@ -120,6 +120,7 @@ export type TeamBackend = Omit<SyncBackend, 'me' | 'personId'> & RoomsBackend & 
   putFileFolder?(teamId: string, row: unknown): Promise<unknown>;
   placeFile?(owner: string, threadId: string, row: unknown): Promise<unknown>;
   addFileVersion?(teamId: string, row: unknown): Promise<unknown>;
+  liveToken?(): Promise<string | null>;
   fileVersions?(teamId: string): Promise<unknown>;
   cancelInvite(teamId: string, email: string): Promise<void>;
   acceptInvite(teamId: string): Promise<unknown>;
@@ -1230,6 +1231,11 @@ export function createTeamService({
         putFolder: (row: unknown) => backend!.putFileFolder!(teamId, row),
         place: (owner: string, threadId: string, row: unknown) => backend!.placeFile!(owner, threadId, row),
       };
+    },
+
+    /** What the live relay is shown to let this person into their team's rooms. Null signed out. */
+    async liveToken(): Promise<string | null> {
+      return (await backend?.liveToken?.().catch(() => null)) ?? null;
     },
 
     /** The team's version line (main/version-line.mjs). Null with no team to reach. */

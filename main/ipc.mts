@@ -2709,7 +2709,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   });
 
   // The live room a document or table opens in, when teammates can open it too.
-  ipcMain.handle('zero:live-room', (_e, { product, project, name }: { product?: unknown; project?: unknown; name?: unknown }) => {
+  ipcMain.handle('zero:live-room', async (_e, { product, project, name }: { product?: unknown; project?: unknown; name?: unknown }) => {
     if (!team || typeof name !== 'string') return null;
     const state = team.state() as { signedIn?: boolean; me?: { id: string; name?: string }; team?: { id: string }; cards?: { project?: string | null }[] };
     const own = store.listProducts().find((p) => p.slug === product && !p.team?.direct);
@@ -2719,7 +2719,10 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     const shared = mine
       ? !!mine.team?.projectId && projectSeenBy(mine).who !== 'private'
       : (state.cards ?? []).some((c) => key(c.project) === key(named));
-    return liveRoomFor({ address: liveAt, state, multiplayer: alphaFeatures(config).multiplayer, project: named, name: name.split('/').pop(), shared, owner: !!own && own === mine });
+    const room = liveRoomFor({ address: liveAt, state, multiplayer: alphaFeatures(config).multiplayer, project: named, name: name.split('/').pop(), shared, owner: !!own && own === mine });
+    if (!room) return null;
+    const token = await team.liveToken?.();
+    return token ? { ...room, url: `${room.url}?t=${encodeURIComponent(token)}` } : room;
   });
 
   ipcMain.handle('zero:write-doc', async (_e, { product, src, text, mtime, thread }: { product: string; src?: unknown; text: unknown; mtime?: number; thread?: unknown }) => {
