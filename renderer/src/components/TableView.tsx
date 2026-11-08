@@ -700,8 +700,11 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   // a row typed into does not jump out from under the caret.
   const seed = useMemo(() => { const looks = readLooks(store); return { looks, table: withLooks(base, looks) }; }, [base, store]);
   const [doc, setDoc] = useState<Doc>(() => ({ from: base, table: seed.table, order: ids(base.rows.length), looks: seed.looks }));
-  let live = doc;
-  if (doc.from !== base) { live = { from: base, table: seed.table, looks: seed.looks, order: viewOrder(seed.table, searched, picked, sort) }; setDoc(live); }
+  // A new table is drawn at once and kept just after the paint. Kept during the
+  // draw instead, it never settled when the message around it redrew in the same paint.
+  const fresh = useMemo<Doc | null>(() => (doc.from === base ? null : { from: base, table: seed.table, looks: seed.looks, order: viewOrder(seed.table, searched, picked, sort) }), [base, doc.from, seed]); // eslint-disable-line react-hooks/exhaustive-deps
+  const live = fresh ?? doc;
+  useLayoutEffect(() => { if (fresh) setDoc(fresh); }, [fresh]);
   const { table, order } = live;
   const rowH = hands && table.columns.some(wraps) ? ROW_WRAPPED : ROW_H;
   const docRef = useRef(live);
