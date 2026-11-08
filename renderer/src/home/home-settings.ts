@@ -34,3 +34,15 @@ export function useHomeSettings(): HomeSettings {
   }, []);
   return s;
 }
+
+/** Whether the window is wearing a dark look, following `data-theme` on <html>. */
+export function useDarkWindow(): boolean {
+  const read = () => document.documentElement.dataset.theme !== 'light';
+  const [dark, set] = useState(read);
+  useEffect(() => {
+    const mo = new MutationObserver(() => set(read()));
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => mo.disconnect();
+  }, []);
+  return dark;
+}
