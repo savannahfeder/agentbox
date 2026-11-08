@@ -38,7 +38,9 @@ const config: ExpoConfig = {
   owner: process.env.EAS_OWNER || 'agentbox-app',
   scheme: nameSlug,
   version: '0.1.0',
-  orientation: 'portrait',
+  // Not 'portrait': iOS caps the full-screen film player by this too. The
+  // screens hold themselves upright (orientation in the Stacks' screenOptions).
+  orientation: 'default',
   icon: './assets/icon.png',
   // Automatic so Match system can read the phone's own light or dark (state/look.tsx).
   userInterfaceStyle: 'automatic',

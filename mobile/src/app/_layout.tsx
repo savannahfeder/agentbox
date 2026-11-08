@@ -49,7 +49,7 @@ function App() {
     <CloudProvider>
       <GroupsProvider>
         <StatusBar style={worn === 'light' ? 'dark' : 'light'} />
-        <Stack screenLayout={redrawn} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg }, animation: 'slide_from_right' }} />
+        <Stack screenLayout={redrawn} screenOptions={{ headerShown: false, orientation: 'portrait', contentStyle: { backgroundColor: color.bg }, animation: 'slide_from_right' }} />
         <Approvals />
         <Toast />
       </GroupsProvider>
