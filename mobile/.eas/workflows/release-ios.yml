@@ -1,0 +1,37 @@
+# The one way an iPhone build reaches TestFlight: the store build and a
+# simulator build run side by side, the simulator build is opened, and the
+# store build is sent only if the app opened (w-a68a52a026).
+#   npx eas-cli@latest workflow:run .eas/workflows/release-ios.yml
+name: iPhone release to TestFlight
+
+jobs:
+  simulator_build:
+    name: Build for the iPhone simulator
+    type: build
+    params:
+      platform: ios
+      profile: launch-test
+
+  testflight_build:
+    name: Build for TestFlight
+    type: build
+    params:
+      platform: ios
+      profile: production
+
+  launch_test:
+    name: Open the app
+    needs: [simulator_build]
+    type: maestro
+    params:
+      build_id: ${{ needs.simulator_build.outputs.build_id }}
+      flow_path: ['.maestro/opens.yml']
+      retries: 1
+      record_screen: true
+
+  send_to_testflight:
+    name: Send to TestFlight
+    needs: [launch_test, testflight_build]
+    type: submit
+    params:
+      build_id: ${{ needs.testflight_build.outputs.build_id }}
