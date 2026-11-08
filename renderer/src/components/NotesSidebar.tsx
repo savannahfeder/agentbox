@@ -11,7 +11,7 @@ import { notedFilesInLines, threadFiles, versionForPath, whoseIsTheFile } from '
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { notePictures, noteWithPictures } from '../note-pictures';
 import { canPaintQuotes, paintQuotes } from '../paint-quotes';
-import { notesCanPoint, noteAttachments, sidebarNotes } from '../notes-sidebar';
+import { notesCanPoint, noteAttachments, sentTimes, sidebarNotes } from '../notes-sidebar';
 import { pinLabel, pinsToDraw } from '../artifact-pins';
 import { AttachRow } from './AttachRow';
 import { NotePictureShown } from './FileNoteCard';
@@ -37,8 +37,8 @@ export function NotesToggle({ open, waiting, onToggle }: { open: boolean; waitin
   );
 }
 
-function SidebarNote({ note, product, on, who, person, me, onGo }: {
-  note: FileNote; product: string; on: boolean; who: string; person: Person | null; me: boolean; onGo: () => void;
+function SidebarNote({ note, product, on, who, person, me, sentAt, onGo }: {
+  note: FileNote; product: string; on: boolean; who: string; person: Person | null; me: boolean; sentAt?: number; onGo: () => void;
 }) {
   const said = notePictures(note.text);
   const { words, files } = noteAttachments(said.words);
@@ -48,7 +48,7 @@ function SidebarNote({ note, product, on, who, person, me, onGo }: {
         <Face person={person} name={person ? undefined : who} me={me} />
         <span className="sb-who">{who}</span>
         {note.place.kind === 'pin' && <span className="av-pin-tag sb-pin">{pinLabel(note)}</span>}
-        <span className="sb-when">{note.sent && <NoteGlyph name="check" />}{clock(note.ts)}</span>
+        <span className="sb-when">{note.sent && <NoteGlyph name="check" />}{note.sent && sentAt ? `Sent ${clock(sentAt)}` : clock(note.ts)}</span>
       </span>
       {note.place.kind === 'quote' && <span className="sb-quote">{note.place.text}</span>}
       {words && <span className="sb-text">{words}</span>}
@@ -91,6 +91,7 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
   const all = [...stored, ...pending.filter((p) => !stored.some((n) => n.id === p.id))];
   const { waiting, said } = sidebarNotes(all, fileIds, people);
   const canSend = typeof version?.agent === 'string';
+  const sentAt = useMemo(() => sentTimes(lines), [lines]);
   const authors = [...new Set([...waiting, ...said].map((n) => n.by))].slice(0, 3);
 
   const aside = useRef<HTMLElement | null>(null);
@@ -231,7 +232,7 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
   };
 
   const note = (n: FileNote) => (
-    <SidebarNote key={n.id} note={n} product={item.product} on={n.id === activeId} who={whoSaid(n.by)} person={person(n.by)} me={!!me && n.by === me} onGo={() => goTo(n)} />
+    <SidebarNote key={n.id} note={n} product={item.product} on={n.id === activeId} who={whoSaid(n.by)} person={person(n.by)} me={!!me && n.by === me} sentAt={sentAt.get(n.id)} onGo={() => goTo(n)} />
   );
 
   return (

@@ -5,6 +5,7 @@ import type { FileNote } from './types';
 import { isLocalPreview } from './artifact-layout';
 import { docKind, isPlainText } from './doc-pane';
 import { isTablePath } from './table-file';
+export { notesStillHeld, sentTimes } from './held-notes';
 
 /** Stored when someone closes the notes sidebar; every window reads the same key. */
 export const NOTES_CLOSED_KEY = 'agentbox.notesSidebar.closed';

@@ -18,6 +18,7 @@
 // how the machinery keeps its place, not things that happened to her.
 
 import { hasSpot } from './artifact-pins';
+import { notesStillHeld } from './held-notes';
 import { readNotes, type Notes, type TraceSession } from './notes';
 import { commandPrompt } from '../../shared/claude-commands.mts';
 import { DEFAULT_ENGINE } from '../../shared/engines.mjs';
@@ -263,6 +264,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
   // they could not think why they had (w-2b0cd0f741).
   let replied: { at: number; by: string | undefined; index?: number } | null = null;
   const pinsSoFar = new Map<string, number>();
+  const held = notesStillHeld(lines);
   // A version is called by its file's one name and its number, as the big view counts them.
   const versionWords = new Map<string, string>();
   for (const family of threadFiles(filesInLines(lines), numbers)) {
@@ -311,7 +313,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
         pinsSoFar.set(mark.file ?? '', n);
         events.push({
           at, who: 'you', said: 'Commented', words: mark.text ?? '', message: true,
-          fileMark: { kind: 'note', file: mark.file ?? '', id: mark.id, place: placeWords({ place: mark.place, pin: n }), ...(versionWords.has(mark.file ?? '') ? { shown: versionWords.get(mark.file ?? '') } : {}) },
+          fileMark: { kind: 'note', file: mark.file ?? '', id: mark.id, place: placeWords({ place: mark.place, pin: n }), ...(versionWords.has(mark.file ?? '') ? { shown: versionWords.get(mark.file ?? '') } : {}), ...(held.has(mark.id) ? { held: true as const } : {}) },
         });
       } else if (mark.do === 'reply' && typeof mark.on === 'string') {
         events.push({ at, who: 'you', said: 'Replied', words: mark.text ?? '', message: true, fileMark: { kind: 'note', file: mark.file ?? '', id: mark.on } });
