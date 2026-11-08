@@ -111,3 +111,11 @@
   background: linear-gradient(to bottom, rgba(24, 21, 26, 0), rgba(24, 21, 26, .9)); }
 :root[data-theme="light"] .hm-card::after { background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, .94)); }
 .hm-scroll { padding-bottom: 28px; }
+
+/* The Inbox under a sky: a long list scrolls up out of the sky's band at the foot
+   rather than across it, so no row is read over the dots. */
+.app.sky-shown:not(.home-shown) .list-pane {
+  padding-bottom: 200px;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 290px), transparent calc(100% - 190px));
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 290px), transparent calc(100% - 190px));
+}
