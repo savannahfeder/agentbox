@@ -178,7 +178,7 @@ import { NAME, Name, envName, nameSlug, isOurSlug } from '../shared/product-name
 import { signInFiles, signInStamp } from './sign-in-files.mts';
 import { runsOn } from './runs-on.mts';
 import { MemoryGateServer, defaultSocketPath as memoryGateSocketPath, readMacPressure } from './memory-gate-server.mts';
-import { startDecision, readMacPressureNow, SETTLE_MS } from './start-hold.mts';
+import { startDecision, readMacPressureNow, SETTLE_MS, STALE_MS } from './start-hold.mts';
 import { MemoryLog } from './memory-log.mts';
 import { StartBudget } from './cloud/start-budget.mjs';
 import { isPlainMerge, mergeHome, mergedSentence } from './cloud/merge-home.mjs';
@@ -4674,7 +4674,7 @@ export class Supervisor {
    *   row behind it waited for good (tests/a-row-is-named-on-an-account-that-has-room).
    */
   nameTheRows(items: WorkItem[], now = Date.now()) {
-    if (this._naming) return undefined;
+    if (this._naming || this._memoryCritical(now)) return undefined;
     this._nameMisses ??= new Map();
     const key = (i: WorkItem) => `${i.product}:${i.id}`;
     const next = items
@@ -4699,6 +4699,7 @@ export class Supervisor {
    * agent's own last message.
    */
   catchUpTheImports(items: WorkItem[], now = Date.now()) {
+    if (this._memoryCritical(now)) return Promise.resolve([]);
     this._catchingUp ??= new Set();
     this._catchUpMisses ??= new Map();
     const key = (i: WorkItem) => `${i.product}:${i.id}`;
@@ -4756,6 +4757,18 @@ export class Supervisor {
    * getting nothing is the row keeping its own title, which is what every row
    * had before the namer existed.
    */
+  /**
+   * Whether the Mac reads critical now (main/start-hold.mts's reading). Naming,
+   * sorting and catching up are tidying that nothing waits on, and each is a
+   * 200 to 300 MB process, so they wait while it does. A missing or stale
+   * reading is not a reason to wait.
+   */
+  _memoryCritical(now = Date.now()) {
+    const r = this._memReading;
+    if (!r || !(Math.abs(now - Number(r.at)) <= STALE_MS)) return false;
+    return pressureFrom(r) === 'critical';
+  }
+
   async _askSmall<T>(ask: (opts: SmallModelAsk) => Promise<T> | T, { product = null }: { product?: string | null } = {}): Promise<T | ''> {
     const home = this._homeEngine();
     const engines = this._projectProfile(product)
@@ -4796,7 +4809,7 @@ export class Supervisor {
    * every fifteen seconds.
    */
   sortTheMessages(items: WorkItem[], me: string | null | undefined) {
-    if (this._sortingMessages || !me) return undefined;
+    if (this._sortingMessages || !me || this._memoryCritical()) return undefined;
     this._sortedMessages ??= new Set();
     const products = new Map((this.store.listProducts?.() ?? []).map((p) => [p.slug, p]));
     const next = items
