@@ -148,15 +148,18 @@ function measure(table: Table, cap: number, only?: number): { px: Map<string, nu
   return { px, wide: wide >= 0 ? table.columns[wide].name : null };
 }
 
-function tracks(table: Table, natural: ReturnType<typeof measure>, sized: Record<string, number>): string {
+// In a message, no column may be wider than 60% of the message (`cqi`, the
+// `.tbl-inline` container), so beside an open file the next column still shows.
+function tracks(table: Table, natural: ReturnType<typeof measure>, sized: Record<string, number>, inline = false): string {
   const shown = table.columns.filter((_, i) => !(table.ranked && i === 0));
   const fills = natural.wide && !sized[natural.wide] && shown.some((c) => c.name === natural.wide) ? natural.wide : null;
+  const px = (w: number) => (inline ? `min(${w}px, 60cqi)` : `${w}px`);
   return shown.map((c, i) => {
     if (sized[c.name]) return `${sized[c.name]}px`;
     const w = natural.px.get(c.name) ?? 160;
-    if (c.name === fills) return `minmax(${Math.min(w, 180)}px, ${w}fr)`;
-    if (!fills && i === shown.length - 1) return `minmax(${w}px, 1fr)`;
-    return `${w}px`;
+    if (c.name === fills) return `minmax(${px(Math.min(w, 180))}, ${w}fr)`;
+    if (!fills && i === shown.length - 1) return `minmax(${px(w)}, 1fr)`;
+    return px(w);
   }).join(' ');
 }
 
@@ -738,7 +741,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   useEffect(() => { setPick(null); setEditing(null); setSheet(null); setFloat(null); setRenaming(null); setProblem(null); }, [base]);
 
   const natural = useMemo(() => measure(seed.table, mode === 'full' || inline ? 300 : 220), [seed, mode, inline]);
-  const template = useMemo(() => tracks(table, natural, sized), [table, natural, sized]);
+  const template = useMemo(() => tracks(table, natural, sized, inline), [table, natural, sized, inline]);
   const root = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const keys = useRef<HTMLTextAreaElement>(null);

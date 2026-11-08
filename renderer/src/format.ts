@@ -1,6 +1,7 @@
 import { ruleLabel, type RepeatShape as RepeatRuleValue } from '../../shared/repeats.mjs';
 import { isShippedNote } from '../../shared/shipped-note.mjs';
 import { readMoment } from './when-words';
+import { localDate } from './local-dates';
 // Time and grouping, Superhuman-style: terse, scannable, never a full date
 // where "3m" will do.
 
@@ -13,7 +14,7 @@ export function ago(ts: number, now = Date.now()): string {
   if (h < 24) return `${h}h`;
   const d = Math.floor(h / 24);
   if (d < 7) return `${d}d`;
-  return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return localDate(ts, { month: 'short', day: 'numeric' });
 }
 
 // THE PANEL CLOCK, AND IT ONLY EVER MOVES ON THE MINUTE. Under a minute this
@@ -28,17 +29,16 @@ export function agoQuiet(ts: number, now = Date.now()): string {
 }
 
 export function stamp(ts: number, now = Date.now()): string {
-  const d = new Date(ts);
   const days = Math.floor((startOfDay(now) - startOfDay(ts)) / 86_400_000);
-  if (days === 0) return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }).toUpperCase();
+  if (days === 0) return localDate(ts, { hour: 'numeric', minute: '2-digit' });
+  return localDate(ts, { month: 'short', day: 'numeric' }).toUpperCase();
 }
 
 export function dayLabel(ts: number, now = Date.now()): string {
   const days = Math.floor((startOfDay(now) - startOfDay(ts)) / 86_400_000);
   if (days === 0) return 'Today';
   if (days === -1) return 'Tomorrow';
-  if (days < 0) return new Date(ts).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+  if (days < 0) return localDate(ts, { weekday: 'long', month: 'short', day: 'numeric' });
   if (days === 1) return 'Yesterday';
   if (days < 7) return `Last 7 days`;
   return 'Earlier';
@@ -408,11 +408,10 @@ function repeatRule(rule: RepeatRuleValue): RepeatParse {
 }
 
 function stamp2(ts: number, now: number): { ts: number; label: string } {
-  const d = new Date(ts);
   const days = Math.floor((ts - startOfDay(now)) / 86_400_000);
-  const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const time = localDate(ts, { hour: 'numeric', minute: '2-digit' });
   const day = days === 0 ? 'today' : days === 1 ? 'tomorrow'
-    : d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    : localDate(ts, { weekday: 'short', month: 'short', day: 'numeric' });
   return { ts, label: `${day}, ${time}` };
 }
 
@@ -425,7 +424,7 @@ function stamp2(ts: number, now: number): { ts: number; label: string } {
 export function dayAndTime(ts: number, now = Date.now()): string {
   const days = Math.round((startOfDay(ts) - startOfDay(now)) / 86_400_000);
   const dated = days < 0 || days >= 7;
-  return new Date(ts).toLocaleString(undefined, {
+  return localDate(ts, {
     weekday: 'short', ...(dated ? { month: 'short', day: 'numeric' } : {}), hour: 'numeric', minute: '2-digit',
   });
 }
