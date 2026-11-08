@@ -516,6 +516,7 @@ async function createWindow() {
       // The Settings pages' model, read through the window's own handler.
       readSettings: () => phoneSettings?.() ?? null,
       pins: () => supervisor.threadPins,
+      onMac: () => supervisor.threadOnMac,
       repeats: () => store.listRepeats(),
       teammates: () => (teammatesOn(config) ? store.teammatesView() : null),
       version: app.getVersion(),

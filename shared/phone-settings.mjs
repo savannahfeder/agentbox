@@ -51,9 +51,36 @@ const PROJECT = {
 };
 
 // A pin is one person's list on one computer (main/supervisor.mts
-// threadPins), so it travels as a setting of that computer, not a thread command.
-const THREAD = { pinned: bool };
+// threadPins), so it travels as a setting of that computer, not a thread
+// command. The rest of the desktop's thread menu rides here too, so the
+// cloud's command table needs no new kind.
+const yes = (v) => v === true;
+const THREAD = {
+  pinned: bool,
+  label: (v) => typeof v === 'string' && v.trim().length > 0 && v.length <= 200,
+  priority: (v) => v === null || (Number.isInteger(v) && v >= 0 && v <= 9),
+  shippedAt: (v) => v === null || (Number.isInteger(v) && v >= 0),
+  visibility: oneOf(['team', 'private']),
+  onMac: (v) => v === true || v === null,
+  resume: yes,
+  redeliver: yes,
+  moveTo: (v) => typeof v === 'string' && SLUG.test(v),
+};
 const THREAD_ID = /^[\w-]{1,120}$/;
+
+function threadRoute(p) {
+  const at = { product: p.product, id: p.item };
+  switch (p.key) {
+    case 'pinned': return ['zero:set-thread-pins', { pins: { [p.item]: p.value === true ? true : null } }];
+    case 'onMac': return ['zero:set-thread-on-mac', { onMac: { [p.item]: p.value === true ? true : null } }];
+    case 'resume': return ['zero:resume-items', { ids: [p.item] }];
+    case 'redeliver': return ['zero:redeliver', at];
+    case 'moveTo': return ['zero:move-item', { ...at, to: p.value }];
+    // The desktop's "Not shipped after all" writes 0.
+    case 'shippedAt': return ['zero:thread-edit', { ...at, patch: { shippedAt: p.value ?? 0 } }];
+    default: return ['zero:thread-edit', { ...at, patch: { [p.key]: p.value } }];
+  }
+}
 
 /** Why the Mac should not carry out this change, or null. */
 export function checkSetting(p) {
@@ -155,7 +182,7 @@ function profileFor(model, engine, id) {
 
 /** The window's own handler for a checked change, and what to hand it. */
 export function settingRoute(p, model) {
-  if (p.scope === 'thread') return ['zero:set-thread-pins', { pins: { [p.item]: p.value === true ? true : null } }];
+  if (p.scope === 'thread') return threadRoute(p);
   if (p.scope === 'repeat') return repeatRoute(p);
   if (p.scope === 'teammate') return teammateRoute(p);
   if (p.scope === 'project') {

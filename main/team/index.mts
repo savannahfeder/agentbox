@@ -220,6 +220,7 @@ export interface TeamPhone {
   approvals?: PhoneInboxOptions['approvalsOf'];
   readSettings?: PhoneInboxOptions['readSettings'];
   pins?: PhoneInboxOptions['pinsOf'];
+  onMac?: PhoneInboxOptions['onMacOf'];
   repeats?: PhoneInboxOptions['repeatsOf'];
   teammates?: PhoneInboxOptions['teammatesOf'];
   version?: string;
@@ -653,6 +654,7 @@ export function createTeamService({
       approvalsOf: () => phone.approvals?.() ?? [],
       readSettings: phone.readSettings ?? null,
       pinsOf: () => phone.pins?.() ?? {},
+      onMacOf: () => phone.onMac?.() ?? {},
       repeatsOf: phone.repeats ?? null,
       teammatesOf: phone.teammates ?? null,
       version: phone.version ?? '',
