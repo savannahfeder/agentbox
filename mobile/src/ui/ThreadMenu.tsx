@@ -19,7 +19,7 @@ import { color, corner, font } from './theme';
 type Page = 'menu' | 'priority' | 'rename' | 'move';
 
 export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = false, pinned, onPin, onUnread, onLater, onBack, onRunNow, onMoveToCloud, onClose, closed = false,
-  tryAgain = false, onTryAgain, restart = false, onRestart, reopen = false, onReopen, priority = null, onPriority, name = null, onRename,
+  tryAgain = false, onTryAgain, restart = false, onRestart, resume = null, onResume, reopen = false, onReopen, priority = null, onPriority, name = null, onRename,
   projects = [], onMove, place = null, onPlace, repeats = false, onEndRepeat }: {
   open: boolean; close: () => void; now: number;
   /** Closed already: the lists never put it in Later, so neither Later nor Close is offered. */
@@ -41,6 +41,7 @@ export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = f
   onClose: () => void;
   tryAgain?: boolean; onTryAgain?: () => void;
   restart?: boolean; onRestart?: () => void;
+  resume?: 'open' | 'done' | null; onResume?: () => void;
   reopen?: boolean; onReopen?: () => void;
   /** The level it runs at; null where the menu offers none. */
   priority?: number | null; onPriority?: (value: number) => void;
@@ -116,6 +117,7 @@ export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = f
       {runNow && <SheetRow label="Run now" onPress={() => { done(); onRunNow(); }} />}
       {tryAgain && <SheetRow label="Try again" onPress={act(onTryAgain)} />}
       {restart && <SheetRow label="Restart the agent (it stopped)" onPress={act(onRestart)} />}
+      {resume && <SheetRow label={resume === 'done' ? 'Resume this agent (reopen and carry on)' : 'Resume this agent'} onPress={act(onResume)} />}
       {reopen && <SheetRow label="Reopen" onPress={act(onReopen)} />}
       {priority !== null && <SheetRow label="Priority" aside={priorityLabelOf(priorityIdOf(priority))} onPress={() => setPage('priority')} />}
       {name !== null && <SheetRow label="Rename" onPress={() => { setNaming(name); setPage('rename'); }} />}

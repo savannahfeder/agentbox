@@ -39,6 +39,7 @@ export type Press =
   | { kind: 'priority'; value: number }
   | { kind: 'reopen' }
   | { kind: 'try-again' }
+  | { kind: 'resume' }
   | { kind: 'restart' }
   /** True keeps it on the computer; false lets the cloud have it again. */
   | { kind: 'keep-here'; keep: boolean }
@@ -212,6 +213,9 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
       return { steps: [{ door: 'reopen', payload: on }], toast: `Reopened: ${clipToSentence(item.title ?? '', TOAST_TITLE)}` };
     case 'try-again':
       return { steps: [{ door: 'resumeItems', payload: { ids: [item.id] } }], toast: waits ? 'Up next once your computer is back.' : tryAgainWords({ resumed: 1 }) };
+    case 'resume':
+      // App.tsx `putAgentBackOn`'s toast.
+      return { steps: [{ door: 'resumeItems', payload: { ids: [item.id] } }], toast: waits ? 'Up next once your computer is back.' : '1 resumed' };
     case 'restart':
       // App.tsx `redeliver`'s toast.
       return { steps: [{ door: 'redeliver', payload: on }], toast: `A fresh agent is picking this up → ${to}` };

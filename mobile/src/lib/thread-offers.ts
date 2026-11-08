@@ -66,6 +66,8 @@ export function offersOf(item: any, { session, inProgress, now, cloud = false, .
     tryAgain,
     // ⌘K's "Restart the agent (it stopped)".
     restart: made && !!waits.stalled && !tryAgain,
+    // ⌘K's "Resume this agent", which Try again stands in for where it applies.
+    resume: (made && !tryAgain && !session && !inProgress ? (item.status === 'done' ? 'done' : 'open') : null) as 'open' | 'done' | null,
     place: open ? placeOf(item, session, cloud) : null,
     move: made && whyItCannotMove(item, { live: !!session }) === null,
     // In the open reply box's send slot while nothing is typed (Focus.tsx `stopButton`).

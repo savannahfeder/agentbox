@@ -7,7 +7,7 @@ import type { PlaceId } from './groups';
 import type { PhoneLook } from './look';
 import type { Change } from './settings-view';
 
-export type Act = { go: PlaceId; menu?: boolean } | { push: string } | { look: PhoneLook } | { group: string } | { setting: Change & { value: unknown } };
+export type Act = { go: PlaceId; menu?: boolean } | { push: string } | { look: PhoneLook } | { group: string } | { setting: Change & { value: unknown } } | { teammate: string; paused: boolean };
 export interface PhoneCommand { id: string; label: string; keywords?: string; aside?: string; act: Act }
 
 /** The copy's projects, already in the computer's running order, with an order still on its way laid over them. */
@@ -38,7 +38,7 @@ function computerCommands(c: ComputerFacts): PhoneCommand[] {
 export function phoneCommands({ team, mates = [], groups = [], looks = [], pages = [], computer = null }: {
   /** A team is on: In progress, Later and Done sit under Everything else. */
   team: boolean;
-  mates?: readonly { id: string; name: string }[];
+  mates?: readonly { id: string; name: string; paused?: boolean }[];
   groups?: readonly { id: string; name: string }[];
   looks?: readonly { id: PhoneLook; name: string }[];
   pages?: readonly { id: string; label: string }[];
@@ -58,6 +58,7 @@ export function phoneCommands({ team, mates = [], groups = [], looks = [], pages
     { id: 'filter', label: 'View and filters', keywords: 'board list sort', act: { go: 'inbox', menu: true } },
     ...(mates.length ? [{ id: 'new-mate', label: 'New teammate', keywords: 'hire ai', act: { push: '/teammate/new' } }] : []),
     ...mates.map((t) => ({ id: `mate-${t.id}`, label: t.name, aside: 'Teammate', keywords: 'chat message ai', act: { push: `/teammate/${t.id}` } })),
+    ...mates.map((t) => ({ id: `teammate-pause-${t.id}`, label: `${t.paused ? 'Resume' : 'Pause'} ${t.name}`, keywords: 'teammate pause resume stop hold', act: { teammate: t.id, paused: !t.paused } })),
     ...groups.map((g) => ({ id: `group-${g.id}`, label: g.name, aside: 'Group', keywords: 'chat room', act: { group: g.id } })),
     ...looks.map((l) => ({ id: `look-${l.id}`, label: l.name, aside: 'Appearance', keywords: 'theme look dark light', act: { look: l.id } })),
     ...pages.map((p) => ({ id: `page-${p.id}`, label: p.label, aside: 'Settings', keywords: 'settings', act: { push: `/settings/${p.id}` } })),

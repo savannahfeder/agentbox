@@ -95,6 +95,16 @@ describe('Try again and Restart', () => {
     expect(o.tryAgain).toBe(false);
     expect(o.restart).toBe(true);
   });
+  it('Resume this agent on a thread nothing runs on and Try again does not fit, as ⌘K offers it', () => {
+    expect(offersOf(item(), facts()).resume).toBe('open');
+    expect(offersOf(item({ status: 'done' }), facts()).resume).toBe('done');
+    expect(offersOf(item({ status: 'open' }), facts({ stalled: true })).resume).toBe(null);
+    expect(offersOf(item({ status: 'claimed' }), facts({ session: session(), inProgress: true })).resume).toBe(null);
+    expect(offersOf(item({ status: 'open' }), facts({ inProgress: true })).resume).toBe(null);
+    expect(offersOf(item({ agent: { id: 'x' } }), facts()).resume).toBe(null);
+    expect(planFor({ kind: 'resume' }, item(), NOW).steps).toEqual([{ door: 'resumeItems', payload: { ids: ['w-1'] } }]);
+    expect(planFor({ kind: 'resume' }, item(), NOW).toast).toBe('1 resumed');
+  });
   it('the stopped line says what the desktop\'s bar says, with no send a message', () => {
     const live = liveOf(item({ status: 'open' }), facts({ stalled: true }));
     expect(live.line).toBe('The agent stopped without finishing this.');

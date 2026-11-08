@@ -578,6 +578,7 @@ export default function ThreadScreen() {
         onUnread={() => { c.markUnseen(item); back(); }}
         tryAgain={offers.tryAgain} onTryAgain={() => void press({ kind: 'try-again' })}
         restart={offers.restart} onRestart={() => void press({ kind: 'restart' })}
+        resume={offers.resume} onResume={() => void press({ kind: 'resume' })}
         reopen={offers.reopen} onReopen={() => void press({ kind: 'reopen' })}
         priority={offers.priority ? priorityValueOf(shownLevel(item)) : null} onPriority={(value) => void press({ kind: 'priority', value })}
         name={offers.rename ? thread.title : null} onRename={(label) => void press({ kind: 'rename', label })}

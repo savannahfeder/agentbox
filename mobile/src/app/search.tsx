@@ -110,6 +110,16 @@ function SearchScreen() {
     if ('look' in act) { pickLook(act.look); leave(); return; }
     if ('push' in act) { if (router.canGoBack()) router.replace(act.push as never); else router.push(act.push as never); return; }
     if ('group' in act) { g.setLast(act.group); c.goTo({ place: 'chats', group: true }); leave(); return; }
+    if ('teammate' in act) {
+      const { teammate: id, paused } = act;
+      const name = c.team?.view.list.find((t) => t.id === id)?.name ?? 'your teammate';
+      try {
+        await c.askTeammate('pause', { id, paused });
+        c.say(`${paused ? 'Pausing' : 'Resuming'} ${name}`, async () => { await c.askTeammate('pause', { id, paused: !paused }); c.say(`${paused ? 'Not pausing' : 'Not resuming'} ${name}`); });
+      } catch (err) { c.say(err instanceof Error ? err.message : String(err)); }
+      leave();
+      return;
+    }
     c.goTo({ place: act.go, menu: act.menu });
     leave();
   };
