@@ -146,6 +146,13 @@ export function runInstancesArgs({ ami, securityGroup, keyName, userData, expire
   ];
 }
 
+// A role made a moment ago is refused for some seconds while IAM catches up.
+export async function retried(fn, { tries = 6, waitMs = 10_000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
+  for (let i = 1; ; i++) {
+    try { return await fn(); } catch (err) { if (i >= tries) throw err; await sleep(waitMs); }
+  }
+}
+
 /** Guard two: AWS deletes the machine at the end date, once, then forgets the schedule. */
 export function scheduleArgs({ instanceId, expiresAt, roleArn }) {
   return [
@@ -206,7 +213,8 @@ async function on(days) {
   fs.writeFileSync(stateFile, JSON.stringify(state, null, 2), { mode: 0o600 });
   console.log(`Started ${instanceId}. It deletes itself on ${expiresAt} at the latest.`);
   try {
-    aws(scheduleArgs({ instanceId, expiresAt, roleArn: ensureRole() }));
+    const roleArn = ensureRole();
+    await retried(() => aws(scheduleArgs({ instanceId, expiresAt, roleArn })));
     console.log('AWS will also delete it then, whatever it is doing.');
   } catch (err) {
     console.error(`The AWS schedule could not be made (${String(err.message).split('\n')[0]}); the machine still shuts itself down then.`);

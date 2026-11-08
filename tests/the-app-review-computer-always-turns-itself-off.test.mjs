@@ -12,7 +12,7 @@
 // machine is doing, and `off` deletes it at once. It never makes a second
 // machine while one is on, and never keeps one longer than 30 days.
 import { describe, it, expect } from 'vitest';
-import { expiryOf, userDataOf, runInstancesArgs, scheduleArgs, envFileOf, hoursLeft, refuseSecond, secretsFrom, KEYCHAIN, CODEX_LOGIN, MAX_DAYS, DEFAULT_DAYS } from '../scripts/app-review-computer.mjs';
+import { expiryOf, userDataOf, runInstancesArgs, scheduleArgs, envFileOf, hoursLeft, refuseSecond, secretsFrom, retried, KEYCHAIN, CODEX_LOGIN, MAX_DAYS, DEFAULT_DAYS } from '../scripts/app-review-computer.mjs';
 
 const NOW = Date.parse('2026-11-09T12:00:00Z');
 
@@ -65,6 +65,21 @@ describe('guard two: an AWS schedule deletes it at the end date', () => {
     const target = JSON.parse(args[args.indexOf('--target') + 1]);
     expect(target.Arn).toBe('arn:aws:scheduler:::aws-sdk:ec2:terminateInstances');
     expect(JSON.parse(target.Input)).toEqual({ InstanceIds: ['i-0abc'] });
+  });
+});
+
+// The first real `on` (2026-11-08) made the scheduler's role and asked for the
+// schedule in the same second; AWS refused ("must allow AWS EventBridge
+// Scheduler to assume the role") because a new role takes seconds to take hold.
+describe('guard two, with a role made a moment ago', () => {
+  it('asks again until the role takes hold', async () => {
+    let n = 0;
+    const out = await retried(() => { n += 1; if (n < 3) throw new Error('must allow AWS EventBridge Scheduler to assume the role'); return 'made'; }, { tries: 6, sleep: async () => {} });
+    expect(out).toBe('made');
+    expect(n).toBe(3);
+  });
+  it('gives up after its tries, saying the last error', async () => {
+    await expect(retried(() => { throw new Error('still no'); }, { tries: 3, sleep: async () => {} })).rejects.toThrow('still no');
   });
 });
 
