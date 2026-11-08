@@ -120,3 +120,11 @@ describe('the phone app', () => {
     expect(read('platform/persist.ts')).toMatch(/'agentbox-cloud-link'/);
   });
 });
+
+describe('the Help page', () => {
+  it('sends a Google account to the sign-in link, not to making a password', () => {
+    const help = fs.readFileSync(new URL('../phone-legal/support.html', import.meta.url), 'utf8');
+    expect(help).toMatch(/Google, choose Email me a sign-in link/);
+    expect(help).not.toMatch(/Forgot password\? on the iPhone/);
+  });
+});
