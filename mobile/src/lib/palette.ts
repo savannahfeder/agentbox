@@ -32,6 +32,8 @@ export function phoneCommands({ team, mates = [], groups = [], looks = [], pages
     ...groups.map((g) => ({ id: `group-${g.id}`, label: g.name, aside: 'Group', keywords: 'chat room', act: { group: g.id } })),
     ...looks.map((l) => ({ id: `look-${l.id}`, label: l.name, aside: 'Appearance', keywords: 'theme look dark light', act: { look: l.id } })),
     ...pages.map((p) => ({ id: `page-${p.id}`, label: p.label, aside: 'Settings', keywords: 'settings', act: { push: `/settings/${p.id}` } })),
+    // The desktop's team list (Palette.tsx `team-list-shipped`).
+    ...(team ? [{ id: 'team-list-shipped', label: 'What shipped this week', keywords: 'shipped live released launched what went out this week', act: { push: '/shipped' } }] : []),
   ];
 }
 
