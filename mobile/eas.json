@@ -17,6 +17,16 @@
       "distribution": "store",
       "autoIncrement": true,
       "environment": "production"
+    },
+    "launch-test": {
+      "extends": "base",
+      "distribution": "internal",
+      "withoutCredentials": true,
+      "environment": "production",
+      "ios": {
+        "simulator": true,
+        "buildConfiguration": "Release"
+      }
     }
   },
   "submit": {
