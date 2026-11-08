@@ -47,7 +47,7 @@ export function SignInCard({ ask, cloud, open, answer, copy }: {
         </div>}
         <div className="need-acts">
           <button type="button" className="need-btn need-main" disabled={busy} onClick={() => open(ask.url)}>Open {ask.service}<span className="need-btn-arrow">{arrow}</span></button>
-          <button type="button" className="need-btn" disabled={busy} onClick={() => void send({ said: 'signed-in' })}>Done</button>
+          <button type="button" className="need-btn" disabled={busy} onClick={() => void send({ said: 'signed-in' })}>I've signed in</button>
           <button type="button" className="need-link need-skip" disabled={busy} onClick={() => void send({ said: 'skipped' })}>Not now</button>
         </div>
         {back && !pasting && <button type="button" className="need-link need-also" onClick={() => setPasting(true)}>Page did not load after signing in?</button>}

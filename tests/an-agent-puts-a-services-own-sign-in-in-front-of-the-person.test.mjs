@@ -145,6 +145,30 @@ describe('the sign_in tool', () => {
   });
 });
 
+// The way a real cloud run's tools are served (main/cloud/run.mts servedHere), which the stand-in cloud does not use.
+describe('a cloud run keeping its login', () => {
+  it('reaches the cloud\'s keys through the tools its relay serves', async () => {
+    const { servedHere } = await import('../main/cloud/run.mts');
+    const { askToSignIn } = await import('../mcp/core/sign-in.mjs');
+    const t = thread();
+    const ask = askToSignIn(t.id, { service: 'Vercel', url: LINK }, { product: product.id });
+    const kept = [];
+    const env = { STORE_ACCOUNT_ID: 'acct-sign-in', ZERO_ITEM: t.id, ZERO_PRODUCT: product.id };
+    const proc = servedHere({ command: '/nowhere/mcp/agentbox-mcp.sh', env }, env, `keep-${t.id}`, { keepCloudKey: async (name, value) => { kept.push([name, value]); } });
+    const answers = new Promise((resolve) => {
+      const got = []; let buf = '';
+      proc.stdout.setEncoding('utf8');
+      proc.stdout.on('data', (d) => { buf += d; let i; while ((i = buf.indexOf('\n')) >= 0) { got.push(JSON.parse(buf.slice(0, i))); buf = buf.slice(i + 1); if (got.length === 2) resolve(got); } });
+    });
+    proc.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '1' } } })}\n`);
+    proc.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'sign_in', arguments: { ask: ask.id, finished: true, keep: { name: 'VERCEL_TOKEN', value: 'vt_x' } } } })}\n`);
+    const [, said] = await answers;
+    expect(JSON.parse(said.result.content[0].text).status).toBe('kept');
+    expect(kept).toEqual([['VERCEL_TOKEN', 'vt_x']]);
+    const closed = new Promise((r) => proc.on('close', r)); proc.stdin.end(); await closed;
+  });
+});
+
 // Found by a power tester: a thread moved to Codex kept the Vercel card and "waiting for you to sign in" for good.
 describe('a sign-in whose run has ended', () => {
   it('is closed, and an answered one is left as it was', async () => {
@@ -176,12 +200,14 @@ describe('the thread while it waits', () => {
 
 describe('the card', () => {
   const draw = (ask, cloud = false) => renderToStaticMarkup(h(SignInCard, { ask, cloud, open: () => {}, answer: async () => null, copy: () => {} }));
-  it('opens the service, shows its code, and offers Done and Not now', () => {
+  // Two power testers read the card's "Done" as the thread's own Done beside it.
+  it('opens the service, shows its code, and offers I\'ve signed in and Not now', () => {
     const html = draw({ id: 's-abcdef12', service: 'GitHub', url: LINK, code: 'ABCD-1234' });
     expect(html).toContain('Sign in to GitHub');
     expect(html).toContain('Open GitHub');
     expect(html).toContain('ABCD-1234');
-    expect(html).toContain('>Done<');
+    expect(html).toContain('>I&#x27;ve signed in<');
+    expect(html).not.toContain('>Done<');
     expect(html).toContain('>Not now<');
   });
   it('offers to take the landed address only for a cloud thread whose sign-in comes back to localhost', () => {
