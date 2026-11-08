@@ -48,7 +48,7 @@ export default function SignInLink() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Screen top={24} back={toSignIn} foot={foot}>
         <Head style={{ marginTop: 28 }}>{step === 'ask' ? 'Sign in with a link' : 'Check your email'}</Head>
-        <Lede>{step === 'ask' ? 'We will email you a link that signs you in. No password needed.' : `We sent a link to ${email.trim()}. Open it on this phone.`}</Lede>
+        <Lede>{step === 'ask' ? 'We will email you a link that signs you in.' : `We sent a link to ${email.trim()}. Open it on this phone.`}</Lede>
         {step === 'ask' && (
           <View style={{ marginTop: 28 }}>
             <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" textContentType="emailAddress" autoComplete="email" autoFocus={!email}
