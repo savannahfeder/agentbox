@@ -49,7 +49,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   vi.unstubAllEnvs();
-  await booted?.supervisor?.stopAll?.().catch?.(() => {});
+  try { booted?.supervisor.killAll(); booted?.supervisor.stop(); } catch { /* done */ }
   if (dir) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
