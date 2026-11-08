@@ -1260,7 +1260,9 @@ export function leftoverSettings({ config, supervisor }: { config: SettingsConfi
 }
 
 /**
- * COPIES OF A PROJECT THE APP DID NOT MAKE, SAID OUT LOUD (w-330eea6c66).
+ * WORKTREES OF A PROJECT THE APP DID NOT MAKE, SAID OUT LOUD (w-330eea6c66).
+ * Named as git names them: "copies of a project made by hand" was a phrase
+ * its own reader could not place (w-54c640f8da).
  *
  * MEASURED 2026-10-07: thirteen worktrees of one repository sat outside the
  * folder the app keeps its own in, about 740 MB, and nothing in the app could
@@ -1280,10 +1282,11 @@ export function strayFolderSettings({ supervisor }: { supervisor?: SettingsSuper
   const count = list.length;
   const one = count === 1;
   const projects = [...new Set(list.map((w) => w.project).filter(Boolean))];
-  const named = list.slice(0, 3).map((w) => shortPath(w.path as string, home));
-  const rest = count - named.length;
+  const named = list.slice(0, 2).map((w) => shortPath(w.path as string, home)).join(' and ');
   const of = projects.length ? ` of ${projects.slice(0, 2).join(' and ')}${projects.length > 2 ? ' and other projects' : ''}` : '';
-  const now = `${count} ${one ? 'copy' : 'copies'}${of} ${one ? 'was' : 'were'} made by hand outside the folder ${NAME} keeps its own in, and ${one ? 'is' : 'are'} holding disk until you remove ${one ? 'it' : 'them'}: ${named.join(', ')}${rest > 0 ? ` and ${rest} more` : ''}. ${NAME} never removes a folder it did not make.`;
+  const where = count > 2 ? `among them ${named}` : `at ${named}`;
+  const what = one ? 'delete it when you’re done with it' : 'delete the ones you’re done with';
+  const now = `${count} ${one ? 'worktree' : 'worktrees'}${of} ${one ? 'is' : 'are'} using disk space, ${where}. ${NAME} never deletes a worktree it didn’t make, so ${what}.`;
   return { count, now };
 }
 

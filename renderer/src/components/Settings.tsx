@@ -2411,7 +2411,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
             {/* HOLD HEAVY WORK WHEN MEMORY IS SHORT (w-3958c3753d). An agent
                 waiting on the model costs a few hundred MB; one running tests
                 or a build costs a gigabyte or more, so the number that runs
-                out is heavy commands, not agents. Off out of the box. */}
+                out is heavy commands, not agents. On out of the box. */}
               {w.memoryGate && (
                 <Row
                   label="Hold heavy work when memory is short"
@@ -2484,7 +2484,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
                   uncommitted inside it — so there is nothing here to decide,
                   only something to know. A permanent row saying "none" would be
                   bookkeeping on a page that is already long. */}
-              {w.strayFolders && <Row label="Copies of a project made by hand" desc={w.strayFolders.now} />}
+              {w.strayFolders && <Row label={`Worktrees ${NAME} didn’t make`} desc={w.strayFolders.now} />}
               {/* THE ONE LEVER NO READING REPLACES. She is sitting in front of
                   the Mac and the app is not: "If there are issues with that, the
                   user determines whether they can take some sort of more manual

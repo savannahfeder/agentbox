@@ -364,19 +364,19 @@ describe('the sentence the page carries about folders the app did not make', () 
     expect(out.count).toBe(1);
     expect(out.now).toContain('~/Desktop/dev/website-fontsize');
     expect(out.now).toContain('Website');
-    expect(out.now).toMatch(/^1 copy/);
+    expect(out.now).toMatch(/^1 worktree of/);
     // No account name in what the page draws.
     expect(out.now).not.toContain('/Users/you');
   });
 
-  it('counts several and names the first few', () => {
+  it('counts several and names the first two', () => {
     const out = page(Array.from({ length: 9 }, (_, i) => ({
       path: `/Users/you/Desktop/dev/website-${i}`, project: 'Website', branch: `b${i}`,
     })));
     expect(out.count).toBe(9);
-    expect(out.now).toMatch(/^9 copies/);
+    expect(out.now).toMatch(/^9 worktrees of/);
     expect(out.now).toContain('~/Desktop/dev/website-0');
-    expect(out.now).toContain('and 6 more');
-    expect(out.now).not.toContain('website-8');
+    expect(out.now).toContain('~/Desktop/dev/website-1');
+    expect(out.now).not.toContain('website-2');
   });
 });

@@ -72,7 +72,7 @@ describe('a login that is not on Max', () => {
     const config = loadConfig(appDir, { home });
     expect(config.maxConcurrentSessions).toBe(SIX);
     expect(config.planSlotsFrom ?? null).toBe(null);
-    expect(supervisorFor(config)._capacity()).toBe(autoAgents(MAC));
+    expect(supervisorFor(config)._capacity()).toBe(autoAgents({ ...MAC, gated: config.memoryGate }));
   });
 
   it('runs the same number as a Max login on the same computer', () => {
@@ -92,9 +92,10 @@ describe('a login that is not on Max', () => {
 
   it('gives Claude Code and Codex the same number', () => {
     layPlan(path.join(home, '.claude.json'), 'default_claude_pro');
-    const s = supervisorFor(loadConfig(appDir, { home }), ['claude', 'codex']);
+    const config = loadConfig(appDir, { home });
+    const s = supervisorFor(config, ['claude', 'codex']);
     expect(s._capacityFor('claude')).toBe(s._capacityFor('codex'));
-    expect(s._capacityFor('claude')).toBe(autoAgents(MAC));
+    expect(s._capacityFor('claude')).toBe(autoAgents({ ...MAC, gated: config.memoryGate }));
   });
 });
 

@@ -63,12 +63,12 @@ export const DEFAULTS = {
   // the menu writes, because that one was per login: two logins turned a 7 into
   // 14 agents on a 16 GB Mac, which then ran out of memory.
   agentsAtOnce: null,
-  // HOLD HEAVY WORK WHEN MEMORY IS SHORT (w-3958c3753d). Off until somebody
-  // turns it on from the Agents page. With it on, every shell command a worker
+  // HOLD HEAVY WORK WHEN MEMORY IS SHORT (w-3958c3753d). On unless somebody
+  // turns it off (w-54c640f8da). With it on, every shell command a worker
   // runs asks main/memory-gate-server.mts first, and heavy ones wait their turn
   // while the Mac is short of memory. `memoryGateSlots` is how many heavy
   // commands may run at once; null is Auto, one per 8 GB.
-  memoryGate: false,
+  memoryGate: true,
   memoryGateSlots: null,
   // RUN THE OVERFLOW IN THE CLOUD (docs/cloud/PLAN.md). Null is "when this Mac
   // has been set up for it": nothing happens anywhere until somebody has run
@@ -81,9 +81,10 @@ export const DEFAULTS = {
   cloudRuns: null,
   maxCloudSessions: null,
   // STOP WHAT FINISHED AGENTS LEAVE RUNNING (main/leftovers.mts). Its own
-  // switch, off until somebody turns it on; `cleanupLeftoversSince` is the
-  // moment they did, so nothing is stopped sooner than the idle time after it.
-  cleanupLeftovers: false,
+  // switch, on unless somebody turns it off (w-54c640f8da);
+  // `cleanupLeftoversSince` is the moment it was turned on, or the app's start
+  // when it never was, so nothing is stopped sooner than the idle time after it.
+  cleanupLeftovers: true,
   cleanupLeftoversSince: null,
   // What spawned sessions are allowed to do. Left unset on purpose, because the
   // right default now depends on whether a store MCP server is present: see
