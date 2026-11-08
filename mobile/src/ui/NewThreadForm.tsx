@@ -89,7 +89,7 @@ export function useNewThread(sent: () => void) {
       c.say('Your new teammate is on its way. It asks you what it needs in Chats.');
     } else {
       await c.askTeammate('post', { text: draft.text, to: [mate.id], fresh: true });
-      c.say(`Sent to ${mate.name}`);
+      c.say(mate.paused ? `Sent to ${mate.name}, who is paused. It waits until you resume it in Chats.` : `Sent to ${mate.name}`);
     }
   };
 
@@ -248,7 +248,7 @@ export function NewThreadSheets({ form, now }: { form: NewThread; now: number })
         {offered.map((a) => <SheetRow key={a.id} label={a.label} on={!form.onAuto && !form.mate && a.id === engine} onPress={() => { form.pickEngine(a.id); setSheet(null); }} />)}
         {form.reach && <><SheetSep /><SheetHead>Teammates</SheetHead></>}
         {form.mates.map((t) => (
-          <SheetRow key={t.id} label={t.name} lead={<TeammateMark t={t} />} aside={t.primary ? 'Primary' : roleOf(t) ?? undefined}
+          <SheetRow key={t.id} label={t.name} lead={<TeammateMark t={t} />} aside={t.paused ? 'Paused' : t.primary ? 'Primary' : roleOf(t) ?? undefined}
             on={form.mate !== 'new' && form.mate?.id === t.id} onPress={() => { form.pickMate(t.id); setSheet(null); }} />
         ))}
         {form.reach && <SheetRow label="Someone new" lead={<TeammateMark t={null} />} aside="makes a teammate for this" on={form.mate === 'new'} onPress={() => { form.pickMate('new'); setSheet(null); }} />}
