@@ -22,6 +22,7 @@ import { useDraft } from '../lib/drafts';
 import { appStore } from '../platform/persist';
 import { useCloud } from '../state/cloud';
 import { useComputerAgents } from '../state/computer-agents';
+import { useSendWhenOnline } from '../state/send-when-online';
 import { AttachSheet, Attached } from './Attach';
 import { DictationProblem, Listening, MicButton, useDictation } from './Dictation';
 import { Caret, Clip, Clock, Repeat } from './icons';
@@ -55,7 +56,7 @@ export function useNewThread(sent: () => void) {
   const codex = { codexModels: agents.codexModels, codexDefault: agents.codexDefault };
   const offered = agentChoices(agents.engines);
   const [pickedEngine, setPickedEngine] = useState<Harness | null>(null);
-  const engine: Harness = offered.some((e) => e.id === pickedEngine) ? (pickedEngine as Harness) : openingEngine(appStore, agents.engines);
+  const engine: Harness = offered.some((e) => e.id === pickedEngine) ? (pickedEngine as Harness) : openingEngine(appStore, agents.engines, agents.workspace);
   // Each agent's model and level kept apart, as the site's card keeps them.
   const [chosen, setChosen] = useState<Partial<Record<Harness, { model: string; effort: string | null }>>>(() => ({ claude: { model: opening.model, effort: opening.effort } }));
   const { model, effort } = chosen[engine] ?? openingFor(appStore, engine, agents.codexDefault);
@@ -108,13 +109,20 @@ export function useNewThread(sent: () => void) {
       await c.send({ kind: 'new', product, to: projectName, text: draft.text, saved, choices: { ...harness, ...later, ...(onAuto ? { labels: [AUTO_LABEL] } : {}) } }, null);
       // The draft goes only once the thread has: a failed send keeps every word on the page.
       draft.take();
+      offline.clear();
       sent();
-    } catch (err) { setError(`Not sent: ${String((err as Error)?.message ?? err)}`); } finally { setBusy(false); }
+    } catch (err) { setError(offline.failed(String((err as Error)?.message ?? err))); } finally { setBusy(false); }
   };
   // Busy is drawn a frame late; two quick presses must still send once.
   const latest = useRef(sendNow);
   latest.current = sendNow;
-  const [send] = useState(() => onceAtATime((later?: Choices) => latest.current(later)));
+  const lastLater = useRef<Choices | undefined>(undefined);
+  const [sendOnce] = useState(() => onceAtATime((later?: Choices) => latest.current(later)));
+  const offline = useSendWhenOnline(() => {
+    if (!canSend) { offline.clear(); setError(null); return; }
+    void sendOnce(lastLater.current);
+  });
+  const send = (later?: Choices) => { offline.clear(); lastLater.current = later; return sendOnce(later); };
   const talk = useDictation(draft, () => void send());
   return {
     draft, product, projectName, projects, model, effort, sheet, setSheet, busy, error, setError, canSend, send, talk,

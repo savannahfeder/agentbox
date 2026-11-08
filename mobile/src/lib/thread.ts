@@ -40,7 +40,7 @@ function receiptsFor(view: View, product: string, id: string) {
   }));
 }
 
-export function threadOf(rows: PhoneRows, view: View, product: string, id: string, { whole = false, tabs }: { whole?: boolean; tabs?: Record<TabId, Row[]> } = {}) {
+export function threadOf(rows: PhoneRows, view: View, product: string, id: string, { whole = false, tabs, me = null }: { whole?: boolean; tabs?: Record<TabId, Row[]>; me?: string | null } = {}) {
   const item = view.items.find((i: any) => i.product === product && i.id === id) ?? null;
   if (!item) return null;
   const { lines } = phoneHistory(rows, product, id, view.aliases);
@@ -55,7 +55,7 @@ export function threadOf(rows: PhoneRows, view: View, product: string, id: strin
   // Taken, and not in the thread's copy yet: sent, and drawn until the copy has it.
   const sentAt = new Set(mine.filter((w) => w.sent).map((w) => w.at));
   const session = view.running.find((r: { itemId: string; product: string }) => r.itemId === id && r.product === product) ?? null;
-  const built = itemThread(lines, [], null, { whole, pending });
+  const built = itemThread(lines, [], null, { whole, pending, me });
   // The offer's own list comes out of the text while it is drawn as buttons
   // (Focus.tsx `cleanMessage`); "## Gist" is a heading old workers wrote.
   const live = offerIsLive(item);

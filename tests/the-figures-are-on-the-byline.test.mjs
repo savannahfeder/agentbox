@@ -148,7 +148,7 @@ describe('that it survives a narrow card', () => {
     expect(focus).toMatch(/const changeFigures = figures \? \(\s*<span className="change-figures"/);
     // The corner's code button (w-c25aae4035) presses through to the same path.
     expect(focus).toMatch(/change=\{changeFigures\}\s*codeButton=\{codeButton\}[\s\S]{0,80}onViewChange=\{openChange\}/);
-    expect(focus).toContain('const openChange = () => onOpenDoc?.(changePathFor(item.id));');
+    expect(focus).toContain('const openChange = () => (changeOpen ? onCloseDoc?.() : onOpenDoc?.(changePathFor(item.id)));');
   });
 
   // NOT ONE NEW COLOUR. --code-plus and --code-minus are the code pane's own
