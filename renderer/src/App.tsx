@@ -8680,7 +8680,7 @@ export default function App() {
             setCloudSignInAs(email);
             setCloudSetupOpen(true);
           }}
-          cloudPlans={snap.cloud?.managed || snap.cloud?.offered ? { signedIn: !!snap.cloud?.managed, onSignIn: () => { setSettingsOpen(false); setCloudSetupOpen(true); } } : null}
+          cloudPlans={snap.cloud?.managed || snap.cloud?.offered ? { signedIn: !!snap.cloud?.managed, onSignIn: () => { setSettingsOpen(false); setCloudSetupOpen(true); }, people: snap.team?.people, meId: snap.team?.me?.id ?? null } : null}
           startPane={settingsPane}
           onNewProject={() => setNewProject(true)}
           // The Priority page: the same running order every project list

@@ -2114,7 +2114,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   });
   // PAYING FOR A CLOUD PLAN: Stripe's own pages, in the browser, as other
   // desktop apps do. An app window drew them badly and never offers Apple Pay.
-  const cloudCall = async (name: 'cloudPlan' | 'payForCloud' | 'openCloudBilling', args: Record<string, unknown> = {}) => {
+  const cloudCall = async (name: 'cloudPlan' | 'payForCloud' | 'openCloudBilling' | 'cloudTeamBilling', args: Record<string, unknown> = {}) => {
     try {
       const account = await import('./cloud/account.mts');
       const shell = await shellNow();
@@ -2130,6 +2130,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   });
   ipcMain.handle('zero:cloud-account-pay', (_e, { plan }: { plan?: string } = {}) => cloudCall('payForCloud', { plan }));
   ipcMain.handle('zero:cloud-account-billing', () => cloudCall('openCloudBilling'));
+  ipcMain.handle('zero:cloud-account-team-billing', () => cloudCall('cloudTeamBilling'));
 
   // THE CLOUD SETUP'S SIGN-IN for one account, made in the cloud
   // (main/cloud/logins.mts). The Mac relays the link and the code only.

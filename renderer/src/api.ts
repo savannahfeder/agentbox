@@ -4,6 +4,8 @@ import {updateFixture} from './agent-update-fixture';
 // bridge; fixtures mode (?fixtures=1) serves canned data so the UI can be
 // developed, reviewed, and screenshotted without a live store or any agents.
 
+import type { TeamBillingDetails } from './team/TeamBilling';
+import type { Person } from './types';
 import type { AccountUsageReading, AgentConversation, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, FilesUploaded, TeamMessageFile, ThreadEditPatch, UpdateState, Usage, UsageLimit, WorkItem } from './types';
 import type { LedgerLine } from './thread-history';
 import type { AgentFile as AgentFileRow } from './onboarding';
@@ -238,6 +240,17 @@ if (twoLogins) {
   if (accountTrouble === 'stale-limit' && first) {
     first.trouble = { cause: 'at-limit', since: Date.now() - 600_000, at: Date.now() - 600_000, note: accountSentence('at-limit') };
   }
+}
+
+// A team three seats in: next bill in 18 days, a Visa, two invoices paid. On the trial, nothing of Stripe yet.
+function fixtureTeamBilling(trial: boolean): TeamBillingDetails {
+  const day = 86_400_000;
+  if (trial) return { periodStart: null, periodEnd: null, nextAt: null, nextAmount: null, card: null, email: null, invoices: [] };
+  return {
+    periodStart: Date.now() - 12 * day, periodEnd: Date.now() + 18 * day, nextAt: Date.now() + 18 * day, nextAmount: 120,
+    card: { brand: 'Visa', last4: '4242' }, email: 'billing@example.com',
+    invoices: [0, 1].map((k) => ({ at: Date.now() - (12 + 30 * k) * day, amount: 120, status: 'paid' as const })),
+  };
 }
 
 function fixtureAccountUsage(): AccountUsageReading[] {
@@ -1649,19 +1662,16 @@ export const api = {
       // &cloudplan=team-trial|team: on a team of 3, its trial 9 days from its end, or 3 seats paid for.
       if (params.get('cloudplan') === 'team-trial' || params.get('cloudplan') === 'team') {
         const trial = params.get('cloudplan') === 'team-trial';
-        const team = { trial, endsAt: trial ? Date.now() + 9 * 86_400_000 : null, seats: trial ? 0 : 3, members: 3, owner: params.get('owner') !== '0', agents: trial ? 6 : 30, running: 2, hours: trial ? 30 : 1200, usedSeconds: (params.has('spent') ? (trial ? 30 : 1200) : trial ? 8.5 : 212) * 3600 };
-        const owner = team.owner;
-        const h = 3600;
-        const teamMembers = [
-          { id: 'p1', name: 'Sam Rivera', email: 'sam@example.com', role: (owner ? 'owner' : 'member') as 'owner' | 'member', usedSeconds: (trial ? 4.2 : 96) * h, running: 1, me: true },
-          { id: 'p2', name: 'Priya Natarajan', email: 'priya@example.com', role: (owner ? 'member' : 'owner') as 'owner' | 'member', usedSeconds: (trial ? 3.1 : 81) * h, running: 1 },
-          { id: 'p3', name: 'Leo Okafor', email: 'leo@example.com', role: 'member' as const, usedSeconds: (trial ? 1.2 : 35) * h, running: 0 },
+        // Each person's own hours: 10 on the trial, a seat's 400 a month once paid; &spent=1 has yours used up.
+        const each = trial ? 10 : 400;
+        const used = (mine: number) => (params.has('spent') ? each : mine) * 3600;
+        const people = [
+          { id: 'p1', name: 'Sam Rivera', usedSeconds: used(trial ? 4.2 : 96), running: 1 },
+          { id: 'p2', name: 'Priya Natarajan', usedSeconds: (trial ? 3.1 : 81) * 3600, running: 1 },
+          { id: 'p3', name: 'Leo Okafor', usedSeconds: (trial ? 1.2 : 35) * 3600, running: 0 },
         ];
-        const day = 86_400_000;
-        const teamBilling = trial
-          ? { periodStart: null, periodEnd: null, nextAt: null, nextAmount: null, card: null, email: owner ? 'sam@example.com' : null, invoices: [] }
-          : { periodStart: Date.now() - 12 * day, periodEnd: Date.now() + 18 * day, nextAt: Date.now() + 18 * day, nextAmount: 120, card: { brand: 'Visa', last4: '4242' }, email: 'billing@example.com', invoices: [1, 2].map((k) => ({ at: Date.now() - (12 + 30 * (k - 1)) * day, amount: 120, status: 'paid' as const })) };
-        return { signedIn: true, plan: 'team', unlimited: false, agents: team.agents, hoursPerMonth: team.hours, running: 2, usedSeconds: team.usedSeconds, billing: null, team, teamMembers, teamBilling };
+        const team = { trial, endsAt: trial ? Date.now() + 9 * 86_400_000 : null, seats: trial ? 0 : 3, members: 3, owner: params.get('owner') !== '0', agents: trial ? 2 : 10, running: 1, hours: each, usedSeconds: people[0].usedSeconds, people };
+        return { signedIn: true, plan: 'team', unlimited: false, agents: team.agents, hoursPerMonth: team.hours, running: 1, usedSeconds: team.usedSeconds, billing: null, team };
       }
       if (params.get('cloudplan') === 'spent') return { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0, billing: null, free: { agents: 2, hours: 5, usedSeconds: 5 * 3600 } };
       return { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0 };
@@ -1677,6 +1687,20 @@ export const api = {
     const zero = window.zero as any;
     if (!zero?.cloudAccountBilling) return { ok: false, message: RESTART_NOTE };
     return zero.cloudAccountBilling();
+  },
+  /** The preview's team as the app knows it, its first member being you. */
+  fixtureTeamPeople(): { people: Person[]; meId: string | null } {
+    if (!useFixtures) return { people: [], meId: null };
+    const owner = params.get('owner') !== '0';
+    const p = (id: string, name: string, role: 'owner' | 'member') => ({ id, name, email: `${name.split(' ')[0].toLowerCase()}@example.com`, avatarUrl: null, role });
+    return { meId: 'p1', people: [p('p1', 'Sam Rivera', owner ? 'owner' : 'member'), p('p2', 'Priya Natarajan', owner ? 'member' : 'owner'), p('p3', 'Leo Okafor', 'member')] };
+  },
+  /** What the team's owner sees of Stripe; `owner: false` for anyone else on the team. */
+  async cloudAccountTeamBilling(): Promise<{ ok: boolean; owner?: boolean } & Partial<TeamBillingDetails>> {
+    if (useFixtures) return { ok: true, owner: true, ...fixtureTeamBilling(params.get('cloudplan') === 'team-trial') };
+    const zero = window.zero as any;
+    if (!zero?.cloudAccountTeamBilling) return { ok: false };
+    return zero.cloudAccountTeamBilling();
   },
 
   /** Claude's sign-in code from the clipboard, while a sign-in waits for one; else null. */

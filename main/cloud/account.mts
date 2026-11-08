@@ -309,6 +309,14 @@ export async function cloudPlan({ env = process.env, home = os.homedir() }: Stor
   return me.status === 200 ? { signedIn: true, ...cloudPlanOf(me.body) } : { signedIn: me.status !== 401, error: me.body.error || 'refused', message: me.body.message };
 }
 
+/** What the team's owner sees of Stripe on Plan and Billing; `{ owner: false }` for anyone else. */
+export async function cloudTeamBilling({ env = process.env, home = os.homedir() }: StoreDirs = {}) {
+  const at = signedIn(env, home);
+  if (!at) return { ok: false, error: 'signed-out' };
+  const out = await ask(at.gateway, '/v1/team-billing', { key: at.key });
+  return out.status === 200 ? { ok: true, ...out.body } : { ok: false, error: out.body.error || 'refused', message: out.body.message };
+}
+
 /** End every other Mac's cloud key, for a Mac that was lost; this one stays signed in. */
 export async function signOutOtherMacs({ env = process.env, home = os.homedir() }: StoreDirs = {}) {
   const at = signedIn(env, home);

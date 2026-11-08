@@ -12,7 +12,10 @@ import { PLANS, TEAM } from '../cloud/gateway/plans.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
 import { supabaseRest, teamsFrom } from '../cloud/gateway/phone.mjs';
 import { cloudPlanOf } from '../main/cloud/account.mts';
-import { planKey, planSummary } from '../renderer/src/cloud-upgrade.ts';
+import { planKey } from '../renderer/src/cloud-upgrade.ts';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { TeamBilling, teamBillingView } from '../renderer/src/team/TeamBilling.tsx';
 
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';
@@ -248,56 +251,75 @@ describe('who is on a team, as the database says', () => {
 
 describe('what the app makes of it', () => {
   const NOW = MADE + 5 * DAY;
-  const trial = { trial: true, endsAt: MADE + 14 * DAY, seats: 0, members: 3, owner: true, agents: 6, running: 2, hours: 30, usedSeconds: 8.5 * 3600 };
-  const server = (team, over = {}) => ({ plan: 'none', agents: 0, hoursPerMonth: 0, running: 2, usedSeconds: 0, free: { agents: 2, hours: 5, usedSeconds: 0 }, team, ...over });
-  const seen = (team, over) => ({ signedIn: true, ...cloudPlanOf(server(team, over)) });
+  const people = [{ id: A, usedSeconds: 4.2 * 3600, running: 1 }, { id: B, usedSeconds: 3.1 * 3600, running: 0 }, { id: C, usedSeconds: 0, running: 0 }];
+  const trial = { trial: true, endsAt: MADE + 14 * DAY, seats: 0, members: 3, owner: true, agents: 2, running: 1, hours: 10, usedSeconds: 4.2 * 3600, people };
+  const server = (team, over = {}) => ({ plan: 'none', agents: 0, hoursPerMonth: 0, running: 1, usedSeconds: 0, free: { agents: 2, hours: 5, usedSeconds: 0 }, team, ...over });
+  const names = [
+    { id: A, name: 'Sam Rivera', email: 's@example.com', avatarUrl: null, role: 'owner' },
+    { id: B, name: 'Priya Natarajan', email: 'p@example.com', avatarUrl: null, role: 'member' },
+    { id: C, name: 'Leo Okafor', email: 'l@example.com', avatarUrl: null, role: 'member' },
+  ];
+  const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/&#x27;/g, "'").replace(/\s+/g, ' ');
+  const page = (team, me = A, billing = null) => text(renderToStaticMarkup(React.createElement(TeamBilling, { team, people: names, meId: me, billing, now: NOW })));
 
-  it('a team with hours left reads as the team plan, with its agents and hours', () => {
-    expect(cloudPlanOf(server(trial))).toMatchObject({ plan: 'team', agents: 6, hoursPerMonth: 30, usedSeconds: 8.5 * 3600 });
+  it('a team reads as the team plan, with your own agents and hours', () => {
+    expect(cloudPlanOf(server(trial))).toMatchObject({ plan: 'team', agents: 2, hoursPerMonth: 10, usedSeconds: 4.2 * 3600 });
   });
 
-  it('a team whose hours are spent still reads as the team, with none left, never as the free hours', () => {
-    const spent = seen({ ...trial, usedSeconds: 30 * 3600 });
-    expect(spent.plan).toBe('team');
-    expect(planSummary(spent, NOW)).toMatchObject({ name: 'Team trial', hours: { line: '0 of 30', percent: 0 }, teamPay: 'Pay for 3 seats · $120 a month' });
+  it('your hours spent still read as the team, never as the free hours', () => {
+    expect(cloudPlanOf(server({ ...trial, usedSeconds: 10 * 3600 })).plan).toBe('team');
   });
 
   it('a plan of one\'s own reads as that plan, team or no team', () => {
     expect(cloudPlanOf(server(trial, { plan: 'pro', agents: 10, hoursPerMonth: 400 })).plan).toBe('pro');
   });
 
-  it('the trial says the days left and the hours left, and the owner can pay for every seat', () => {
-    expect(planSummary(seen(trial), NOW)).toMatchObject({
-      name: 'Team trial', price: '9 days left', who: '30 cloud hours shared by your team', manage: false, change: null,
-      teamPay: 'Pay for 3 seats · $120 a month',
-      agents: { line: '2 of 6 running' }, hours: { label: 'Hours left', line: '21.5 of 30' },
-    });
+  it('the trial says its days, your hours now beside a seat after it, and the owner can pay for every seat', () => {
+    const t = page(trial);
+    expect(t).toContain('9 days left in your team\'s trial');
+    expect(t).toContain('Started Nov 17');
+    expect(t).toContain('Ends Dec 1');
+    expect(t).toContain('Pay for 3 seats now · $120 a month');
+    expect(t).toMatch(/Now, each person 5\.8 of 10 of your trial hours left 2 agents at once/);
+    expect(t).toMatch(/From Dec 1, each person \$40 a month 400 cloud hours a month, as on Pro 10 agents at once · you pay \$120 a month for 3/);
   });
 
-  // A power tester on a 0.36-hour team saw "0.4 of 0.36": rounding up passed the whole.
-  it('hours left never read as more than the whole', () => {
-    expect(planSummary(seen({ ...trial, hours: 0.36, usedSeconds: 0 }), NOW).hours.line).toBe('0.36 of 0.36');
+  it("each member's own hours left, you first, by the names the team knows", () => {
+    const rows = teamBillingView(trial, names, B, NOW).rows;
+    expect(rows.map((r) => [r.name, r.owner, Math.round(r.left / 360) / 10])).toEqual([['You', false, 6.9], ['Sam Rivera', true, 5.8], ['Leo Okafor', false, 10]]);
+  });
+
+  it('someone the team does not name yet is a teammate, not an id', () => {
+    expect(teamBillingView(trial, [], A, NOW).rows.map((r) => r.name)).toEqual(['You', 'A teammate', 'A teammate']);
+  });
+
+  it('anyone but the owner is not offered to pay, and is told who pays', () => {
+    const t = page({ ...trial, owner: false }, B);
+    expect(t).not.toContain('Pay for');
+    expect(t).toContain('paid by your team\'s owner');
   });
 
   it('on its last day it says 1 day, never 0', () => {
-    expect(planSummary(seen(trial), MADE + 14 * DAY - 60_000).price).toBe('1 day left');
+    expect(teamBillingView(trial, names, A, MADE + 14 * DAY - 60_000).days).toBe(1);
   });
 
-  // Two power testers on the team could not tell who pays, or what, after the trial.
-  it('anyone but the owner is not offered to pay, and is told the price and who pays it', () => {
-    const member = planSummary(seen({ ...trial, owner: false }), NOW);
-    expect(member.teamPay).toBeUndefined();
-    expect(member.who).toBe('Then $40 a person a month, paid by your team\'s owner');
-  });
-
-  it('a paid team says its seats and price, and only its owner manages billing', () => {
-    const paid = { ...trial, trial: false, endsAt: null, seats: 3, agents: 30, hours: 1200, usedSeconds: 212 * 3600 };
-    expect(planSummary(seen(paid), NOW)).toMatchObject({ name: 'Team', price: '$120 a month', who: '3 seats, billed monthly by Stripe', manage: true, change: null, hours: { line: '988 of 1,200' } });
-    expect(planSummary(seen({ ...paid, owner: false }), NOW)).toMatchObject({ manage: false });
-    expect(planSummary(seen(paid), NOW).teamPay).toBeUndefined();
+  it('a paying team shows its price, next bill, card and last invoice to its owner', () => {
+    const paid = { ...trial, trial: false, endsAt: null, seats: 3, agents: 10, hours: 400, usedSeconds: 96 * 3600, people: people.map((m) => ({ ...m, usedSeconds: m.usedSeconds * 20 })) };
+    const billing = { periodStart: NOW - 12 * DAY, periodEnd: NOW + 18 * DAY, nextAt: NOW + 18 * DAY, nextAmount: 120, card: { brand: 'Visa', last4: '4242' }, email: 'billing@example.com', invoices: [{ at: NOW - 12 * DAY, amount: 120, status: 'paid' }] };
+    const t = page(paid, A, billing);
+    expect(t).toContain('Team · $120 a month');
+    expect(t).toContain('3 seats · next bill $120 on Dec 10');
+    expect(t).toContain('Manage billing');
+    expect(t).toMatch(/This month, you 304 of 400 cloud hours left 10 agents at once/);
+    expect(t).toMatch(/Billing Visa 4242 Invoices go to billing@example.com Last Nov 10, \$120 · Paid/);
+    const member = page({ ...paid, owner: false }, B);
+    expect(member).toContain('Paid by your team\'s owner');
+    expect(member).not.toContain('Manage billing');
+    expect(member).not.toContain('Visa');
   });
 
   it('a trial becoming paid seats counts as a change, so the page reads again until it lands', () => {
+    const seen = (team) => ({ signedIn: true, ...cloudPlanOf(server(team)) });
     expect(planKey(seen(trial))).not.toBe(planKey(seen({ ...trial, trial: false, seats: 3 })));
   });
 });

@@ -43,10 +43,10 @@ import { EVERY } from '../instruction-scope';
 import type {AccountUsageReading, Usage, UsageLimit, WorkspaceSettings} from '../types';
 import { accountLabel, cloudAccountInUse, cloudToggleTarget, countedAccounts, type CloudStatus } from '../cloud-menu';
 import { cloudBilling, planKey, planSummary, type PaidPlan } from '../cloud-upgrade';
-import { TeamBilling, type TeamBillingLayout } from '../team/TeamBilling';
+import { TeamBilling, type TeamBillingDetails } from '../team/TeamBilling';
 import { keyLooksWrong } from '../key-asks';
 import { CloudPlanCards } from './CloudPlanCards';
-import type { CloudPlan } from '../types';
+import type { CloudPlan, Person } from '../types';
 import { cloudAccountState, hourWords, meterPair, resetWords } from '../account-words';
 import { accountReadingFor, accountsOnce, codexAccountsOnce, type HereLogin, type OneAccount } from '../accounts-once';
 import { LOOKS, lookMeans, SKINS, TUNE_DEFAULT, TUNE_LIMITS, type Look, type SkinId, type SkinTune } from '../skins';
@@ -957,7 +957,7 @@ function PhonePage({ onFeedback, macShut, onSignIn, web, onPhoneProjects }: { on
 // two meters, then the cards to change to (w-893c5fe268). Choosing opens
 // Stripe in the browser; the page reads the plan again until it changes
 // (../cloud-upgrade.ts).
-function CloudPlansPage({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: () => void }) {
+function CloudPlansPage({ signedIn, onSignIn, people = [], meId = null, onInvite }: { signedIn: boolean; onSignIn: () => void; people?: Person[]; meId?: string | null; onInvite?: () => void }) {
   const [plan, setPlan] = useState<CloudPlan | null>(null);
   const [said, setSaid] = useState<string | null>(null);
   const [waitingFor, setWaitingFor] = useState<string | null>(null);
@@ -1003,6 +1003,13 @@ function CloudPlansPage({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: (
     setSwitching(out.where === 'billing');
     setWaitingFor(planKey(plan));
   };
+  // A paying team's owner sees its card, next bill and last invoice, read from Stripe through the cloud.
+  const [teamBillingSeen, setTeamBillingSeen] = useState<TeamBillingDetails | null>(null);
+  const readsStripe = !!plan?.team?.owner && !plan.team.trial;
+  useEffect(() => {
+    if (!readsStripe) return;
+    void api.cloudAccountTeamBilling().then((out) => { if (out.ok && out.owner) setTeamBillingSeen(out as TeamBillingDetails); });
+  }, [readsStripe, plan?.team?.seats]);
   const [switching, setSwitching] = useState(false);
   const [billSaid, setBillSaid] = useState<string | null>(null);
   const billing = async () => {
@@ -1021,11 +1028,12 @@ function CloudPlansPage({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: (
     </>
   );
   if (plan?.plan === 'team' && plan.team) {
-    const layout = (new URLSearchParams(location.search).get('teambilling') || 'sections') as TeamBillingLayout;
+    // The preview has no team of its own; it draws one from api.ts.
+    const team = people.length ? { people, meId } : { ...api.fixtureTeamPeople(), ...(meId ? { meId } : {}) };
     return (
       <Page title="Plan and Billing">
-        <TeamBilling team={plan.team} members={plan.teamMembers ?? []} billing={plan.teamBilling ?? null} layout={layout}
-          onPay={() => void payForTeam()} onManage={() => void billing()} />
+        <TeamBilling team={plan.team} people={team.people} meId={team.meId} billing={teamBillingSeen} paying={teamOpening || !!waitingFor}
+          onPay={() => void payForTeam()} onManage={() => void billing()} onInvite={onInvite} />
         {lines}
       </Page>
     );
@@ -1049,7 +1057,6 @@ function CloudPlansPage({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: (
               <div className="bill-price">{sum.price} · {billSaid ?? sum.who}</div>
             </div>
             {sum.manage && <button type="button" className="set-ghost" onClick={() => void billing()}>Manage billing</button>}
-            {sum.teamPay && <button type="button" className="set-ghost" disabled={teamOpening || !!waitingFor} onClick={() => void payForTeam()}>{teamOpening ? 'Opening Stripe…' : sum.teamPay}</button>}
           </div>
         </Group>
         <Group id="cloud-use" label={sum.period} bare>
@@ -1708,7 +1715,8 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   /** Signs a Claude account in to the cloud (a login's key to sign it in again), on the cloud's own screen. */
   onCloudSignIn?: (key: string | null, email: string | null) => void;
   /** Agentbox Cloud's plans, where this copy offers it: the Cloud page. */
-  cloudPlans?: { signedIn: boolean; onSignIn: () => void } | null;
+  /** `people` and `meId`: the team, for the names on a team's plan. */
+  cloudPlans?: { signedIn: boolean; onSignIn: () => void; people?: Person[]; meId?: string | null } | null;
   // ONE control for the three of them. Light, dark and each picture are one
   // list, because a picture IS dark (skins.ts) and asking her to set a theme
   // and then a background is two decisions for one choice.
@@ -2235,7 +2243,8 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
 
         {/* TEAM MANAGEMENT (w-8415594d19). It does not wait on `model`, because
             nothing on it comes from the settings file. */}
-        {pane === 'cloud' && cloudPlans && <CloudPlansPage signedIn={cloudPlans.signedIn} onSignIn={cloudPlans.onSignIn} />}
+        {pane === 'cloud' && cloudPlans && <CloudPlansPage signedIn={cloudPlans.signedIn} onSignIn={cloudPlans.onSignIn} people={cloudPlans.people} meId={cloudPlans.meId}
+          onInvite={teamPane ? () => setPane('team') : undefined} />}
 
         {pane === 'rooms' && roomsPane && (
           <Page title="Rooms" lede="What people in your rooms see of you. Private threads never show.">
