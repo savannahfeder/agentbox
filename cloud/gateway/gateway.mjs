@@ -342,6 +342,10 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     };
   }
 
+  // Which hours a run spends: the person's plan, else their team's while it has a
+  // trial or seats (which replace the free hours, spent or not), else their free hours.
+  const paysFor = (rec, team) => (!onFree(rec) ? 'own' : team ? 'team' : 'free');
+
   // Why a run spending these hours cannot start now, or null when it can.
   function paysRefusal(rec, plan, pays, team, t) {
     if (pays === 'own') {
@@ -350,9 +354,13 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
         return { ok: false, error: 'agents', message: plan.unlimited ? `${plan.agents} cloud agents are running, the most one account can run at once.` : `All ${plan.agents} of your cloud agents are running.` };
       }
     } else if (pays === 'team') {
+      if (!teamLeft(team, rec, t)) {
+        const next = team.trial ? (team.owner ? ' Pay for the team on Plan and Billing to keep running agents there.' : ' Your team\'s owner can pay for the team to keep running agents there.') : '';
+        return { ok: false, error: 'hours', message: `Your team's ${team.trial ? 'trial' : 'cloud'} hours are used${team.trial ? '' : ' this month'}.${next}` };
+      }
       if (teamRunning(team, rec) >= team.agents) return { ok: false, error: 'agents', message: `All ${team.agents} of your team's cloud agents are running.` };
     } else {
-      if (freeSpent(rec, t)) return { ok: false, error: 'plan', message: `${team ? 'Your team\'s cloud hours and your' : 'Your'} ${free.hours} free cloud hours are used. Choose a cloud plan to keep running agents there.` };
+      if (freeSpent(rec, t)) return { ok: false, error: 'plan', message: `Your ${free.hours} free cloud hours are used. Choose a cloud plan to keep running agents there.` };
       if (live(rec, 'run').filter((s) => s.free).length >= free.agents) return { ok: false, error: 'agents', message: 'Both of your free cloud agents are running.' };
     }
     return null;
@@ -376,7 +384,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     if (kind === 'run') {
       const plan = planOf(rec);
       if (paused) return { ok: false, error: 'paused', message: 'The cloud is not starting new runs right now.' };
-      pays = !onFree(rec) ? 'own' : teamLeft(team, rec, t) ? 'team' : 'free';
+      pays = paysFor(rec, team);
       const refusal = paysRefusal(rec, plan, pays, team, t);
       if (refusal) return refusal;
     } else if (live(rec, 'signin').length >= SIGNINS_AT_ONCE) {
@@ -507,7 +515,9 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     if (op !== 'head' && key.startsWith('logins/') && !savesAKey) throw new Refusal(403, 'not-yours-to-touch', 'a sign-in is never read or written from a Mac');
     const s = Math.min(LINK_MAX_SECONDS, Math.max(60, Number(seconds) || LINK_MAX_SECONDS));
     if (op === 'put') {
-      if (onFree(rec) && freeSpent(rec, now()) && !teamLeft(await teamOrNone(person, now()), rec, now())) throw new Refusal(403, 'plan', `Your ${free.hours} free cloud hours are used. Choose a cloud plan to keep running agents there.`);
+      const team = onFree(rec) ? await teamOrNone(person, now()) : null;
+      const refusal = onFree(rec) && paysRefusal(rec, planOf(rec), paysFor(rec, team), team, now());
+      if (refusal && refusal.error !== 'agents') throw new Refusal(403, refusal.error, refusal.message);
       if (rec.storage?.full) throw new Refusal(403, 'storage', `Your cloud storage is full (${gib(storageBytes)} GB). It empties as runs older than a week are deleted.`);
       const until = now() + s * 1000;
       if (!(rec.linksUntil >= until)) await update(person, (r) => { r.linksUntil = Math.max(r.linksUntil || 0, until + LINK_NOTE_MS); });
@@ -788,7 +798,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     if (rec.terms?.version !== termsVersion) return { ok: false, error: 'terms' };
     if ((await readJson(SWITCH))?.paused) return { ok: false, error: 'paused' };
     const team = onFree(rec) ? await teamOrNone(person, t) : null;
-    const pays = !onFree(rec) ? 'own' : teamLeft(team, rec, t) ? 'team' : 'free';
+    const pays = paysFor(rec, team);
     const refusal = paysRefusal(rec, planOf(rec), pays, team, t);
     return refusal ? { ok: false, error: refusal.error } : { ok: true };
   }

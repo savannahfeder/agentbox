@@ -288,12 +288,13 @@ type TeamHours = FreeHours & { running: number };
 
 /**
  * No plan reads as the hours a run would spend next, so every screen draws them
- * like a plan: the team's (`team`) while it has some, then the free hours (`free`).
+ * like a plan: a team's (`team`), spent or not, since they replace the free
+ * hours; otherwise the free hours (`free`) while some are left.
  */
 export function cloudPlanOf<T extends { [field: string]: unknown }>(me: T): T | (T & { plan: 'free' | 'team'; agents: number; hoursPerMonth: number; usedSeconds: number }) {
   if (me.plan !== 'none') return me;
   const tm = me.team as TeamHours | undefined;
-  if (tm && tm.usedSeconds < tm.hours * 3600) return { ...me, plan: 'team', agents: tm.agents, hoursPerMonth: tm.hours, usedSeconds: tm.usedSeconds, running: tm.running };
+  if (tm) return { ...me, plan: 'team', agents: tm.agents, hoursPerMonth: tm.hours, usedSeconds: tm.usedSeconds, running: tm.running };
   const f = me.free as FreeHours | undefined;
   if (!f || f.usedSeconds >= f.hours * 3600) return me;
   return { ...me, plan: 'free', agents: f.agents, hoursPerMonth: f.hours, usedSeconds: f.usedSeconds };

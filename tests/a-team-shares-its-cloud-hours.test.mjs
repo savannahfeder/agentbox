@@ -86,20 +86,29 @@ describe('the trial', () => {
     await b.start(2);
     tick(5 * HOUR);
     await b.finish(2);
-    // 20 spent: B's next run falls to B's own free hours, which are untouched.
-    expect((await b.start(3)).body.ok).toBe(true);
-    tick(HOUR);
-    await b.finish(3);
-    expect((await b.me()).free.usedSeconds).toBe(3600);
+    expect((await b.me()).team.usedSeconds).toBe(20 * 3600);
   });
 
-  it('spent, with the free hours spent too, asks for a plan and says it was the team\'s', async () => {
+  // The trial replaces each member's 5 free hours (the owner's plan, 2026-11-06).
+  // A power tester whose team ran out was moved to "Free, 5 of 5" without a word.
+  it('spent, refuses the next run and says the team\'s hours are used, never falling to the free hours', async () => {
     const { as, tick } = setup({ members: [A] });
     const a = as(A);
     await a.start(1); await a.start(4); tick(5 * HOUR); await a.finish(1); await a.finish(4);
-    await a.start(2); tick(5 * HOUR); await a.finish(2);
     const refused = await a.start(3);
-    expect(refused.body).toMatchObject({ ok: false, error: 'plan' });
+    expect(refused.body).toMatchObject({ ok: false, error: 'hours' });
+    expect(refused.body.message).toMatch(/team's .*hours are used/);
+    const me = await a.me();
+    expect(me.free.usedSeconds).toBe(0);
+    expect(me.team.usedSeconds).toBe(10 * 3600);
+  });
+
+  it('spent, gives no upload link for a run, and no room to the phone', async () => {
+    const { gw, as, tick } = setup({ members: [A] });
+    const a = as(A);
+    await a.start(1); await a.start(4); tick(5 * HOUR); await a.finish(1); await a.finish(4);
+    expect((await a.call('POST', '/v1/link', { op: 'put', key: 'runs/r9/in.bundle', seconds: 600 })).status).toBe(403);
+    expect(await gw.room(A)).toMatchObject({ ok: false, error: 'hours' });
   });
 
   it('ends after 14 days: back to each member\'s own free hours', async () => {
@@ -219,8 +228,10 @@ describe('what the app makes of it', () => {
     expect(cloudPlanOf(server(trial))).toMatchObject({ plan: 'team', agents: 6, hoursPerMonth: 30, usedSeconds: 8.5 * 3600 });
   });
 
-  it('a team whose hours are spent reads as the free hours left', () => {
-    expect(cloudPlanOf(server({ ...trial, usedSeconds: 30 * 3600 })).plan).toBe('free');
+  it('a team whose hours are spent still reads as the team, with none left, never as the free hours', () => {
+    const spent = seen({ ...trial, usedSeconds: 30 * 3600 });
+    expect(spent.plan).toBe('team');
+    expect(planSummary(spent, NOW)).toMatchObject({ name: 'Team trial', hours: { line: '0 of 30', percent: 0 }, teamPay: 'Pay for 3 seats · $120 a month' });
   });
 
   it('a plan of one\'s own reads as that plan, team or no team', () => {
