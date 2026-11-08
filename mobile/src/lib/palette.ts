@@ -9,7 +9,8 @@ import type { PhoneLook } from './look';
 import type { Change } from './settings-view';
 
 export type Act = { go: PlaceId; menu?: boolean } | { push: string } | { look: PhoneLook } | { group: string } | { setting: Change & { value: unknown } } | { teammate: string; paused: boolean };
-export interface PhoneCommand { id: string; label: string; keywords?: string; aside?: string; act: Act }
+/** `typed`: one row of many alike (one per teammate, per project, per cloud mode), shown once something is typed. */
+export interface PhoneCommand { id: string; label: string; keywords?: string; aside?: string; act: Act; typed?: true }
 
 /** The copy's projects, already in the computer's running order, with an order still on its way laid over them. */
 export function inRunningOrder<P extends { slug: string }>(projects: readonly P[], order: readonly string[]): P[] {
@@ -34,13 +35,13 @@ function computerCommands(c: ComputerFacts): PhoneCommand[] {
     ...(c.cloud ? cloudCommands(c.cloud).map((r, i) => ({
       id: i === 0 ? 'cloud-toggle' : `cloud-${r.mode}`, label: r.label.replace('this Mac', 'your computer'),
       ...(r.hint ? { aside: r.hint } : {}),
-      keywords: 'cloud where threads run computer overflow everything move on off', act: set('cloudRuns', r.mode),
+      keywords: 'cloud where threads run computer overflow everything move on off', act: set('cloudRuns', r.mode), typed: true as const,
     })) : []),
     { id: 'usage', label: 'Usage and limits', aside: 'Settings', keywords: 'usage limit limits left remaining quota accounts week session', act: { push: '/settings/claude' } },
     ...c.projects.map((p, i) => ({
       id: `rank-${p.slug}`, label: `Rank ${p.name} first`,
       aside: c.order.includes(p.slug) ? `now #${i + 1} of ${c.projects.length}` : 'not ranked yet',
-      keywords: 'priority order top', act: set('productOrder', moveProduct(slugs, p.slug, 0)),
+      keywords: 'priority order top', act: set('productOrder', moveProduct(slugs, p.slug, 0)), typed: true as const,
     })),
   ];
 }
@@ -68,7 +69,7 @@ export function phoneCommands({ team, mates = [], groups = [], looks = [], pages
     { id: 'filter', label: 'View and filters', keywords: 'board list sort', act: { go: 'inbox', menu: true } },
     ...(mates.length ? [{ id: 'new-mate', label: 'New teammate', keywords: 'hire ai', act: { push: '/teammate/new' } }] : []),
     ...mates.map((t) => ({ id: `mate-${t.id}`, label: t.name, aside: 'Teammate', keywords: 'chat message ai', act: { push: `/teammate/${t.id}` } })),
-    ...mates.map((t) => ({ id: `teammate-pause-${t.id}`, label: `${t.paused ? 'Resume' : 'Pause'} ${t.name}`, keywords: 'teammate pause resume stop hold', act: { teammate: t.id, paused: !t.paused } })),
+    ...mates.map((t) => ({ id: `teammate-pause-${t.id}`, label: `${t.paused ? 'Resume' : 'Pause'} ${t.name}`, keywords: 'teammate pause resume stop hold', act: { teammate: t.id, paused: !t.paused }, typed: true as const })),
     ...groups.map((g) => ({ id: `group-${g.id}`, label: g.name, aside: 'Group', keywords: 'chat room', act: { group: g.id } })),
     ...looks.map((l) => ({ id: `look-${l.id}`, label: l.name, aside: 'Appearance', keywords: 'theme look dark light', act: { look: l.id } })),
     ...pages.map((p) => ({ id: `page-${p.id}`, label: p.label, aside: 'Settings', keywords: 'settings', act: { push: `/settings/${p.id}` } })),
@@ -81,7 +82,7 @@ export function phoneCommands({ team, mates = [], groups = [], looks = [], pages
 /** Every command, or those a query finds, best first. */
 export function commandsFor(query: string, commands: readonly PhoneCommand[]): PhoneCommand[] {
   const q = query.trim().toLowerCase();
-  if (!q) return [...commands];
+  if (!q) return commands.filter((c) => !c.typed);
   return rankMatches(q, commands.filter((c) => matchesQuery(q, c)));
 }
 
