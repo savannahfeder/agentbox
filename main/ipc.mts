@@ -6,7 +6,7 @@ import { whereTheWorkStands } from './git-change.mts';
 import { taskFolderPath } from './task-folders.mts';
 import { GROUPS } from '../shared/connections-catalog.mts';
 import { projectSeenBy } from '../shared/thread-cards.mts';
-import { createEngineSetup } from './engine-setup.mts';
+import { createEngineSetup, engineSetUpHere } from './engine-setup.mts';
 // IPC: a thin, typed-by-convention surface. The renderer asks; the main
 // process derives from files and answers. Pushes go one way: "state changed,
 // refetch." No state is cached on either side of the bridge.
@@ -1979,6 +1979,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // finder is the recheck, so what gets installed lands on the config and the
   // rest of the app runs on it without a restart.
   const engineSetup = createEngineSetup({
+    setUpHere: engineSetUpHere,
     find: (engine: string) => {
       const finders: Record<string, (() => Promise<{ found: boolean | undefined; path: string | null | undefined; certain: boolean | undefined }>) | undefined> = {
         // `certain` travels with the answer, so a search that established

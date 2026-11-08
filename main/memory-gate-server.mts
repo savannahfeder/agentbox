@@ -37,6 +37,7 @@ import type { GateAnswer, MemoryGateOptions, Pressure, PressureReading } from '.
 import { CommandHistory } from './memory-gate-history.mts';
 import type { Verdict } from './memory-gate-history.mts';
 import { etimeSeconds } from './leftovers.mts';
+import { readMacPressure } from './mac-pressure.mts';
 
 export const PROTOCOL = 1;
 export const DEFAULT_LOCK_PORT = 47263;
@@ -60,12 +61,7 @@ function run(cmd: string, args: string[]): Promise<string | null> {
   });
 }
 
-/** `kern.memorystatus_vm_pressure_level` and `kern.memorystatus_level`, or nulls. */
-export async function readMacPressure(): Promise<{ level: number | null; freePct: number | null }> {
-  const out = await run('/usr/sbin/sysctl', ['-n', 'kern.memorystatus_vm_pressure_level', 'kern.memorystatus_level']);
-  const [level, freePct] = String(out ?? '').trim().split(/\s+/).map(Number);
-  return { level: Number.isFinite(level) ? level : null, freePct: Number.isFinite(freePct) ? freePct : null };
-}
+export { readMacPressure };
 
 export { etimeSeconds };
 
@@ -520,7 +516,9 @@ export class MemoryGateServer {
     this.polling = true;
     try {
       this.reading = await this.readPressure();
-      this.gate.setPressure(pressureFrom(this.reading));
+      // Swapping alone is tight here, never critical: critical stops even an
+      // agent's `ls`, and an agent kept waiting keeps all of its memory.
+      this.gate.setPressure(pressureFrom(this.reading, { criticalSwap: Infinity }));
       // Processes are only looked at while something is granted: nothing
       // else needs them, and each look costs a `ps`.
       if (this.grants.size) this._sample(await this.sampleProcesses());

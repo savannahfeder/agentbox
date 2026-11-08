@@ -7683,7 +7683,7 @@ export class Supervisor {
       // short ones does not open the door (main/start-hold.mts).
       const at = Date.now();
       if (this._memReading) this._memRecent = [...(this._memRecent ?? []), this._memReading].filter((x) => at - x.at <= SETTLE_MS);
-      this._memReading = { level: r?.level ?? null, freePct: r?.freePct ?? null, at };
+      this._memReading = { level: r?.level ?? null, freePct: r?.freePct ?? null, swapInMbps: r?.swapInMbps ?? null, at };
     }, () => {}).finally(() => {
       if (this._memReadingSince === asked) this._memReadingSince = null;
     });
