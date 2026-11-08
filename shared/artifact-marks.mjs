@@ -283,7 +283,7 @@ export function threadFiles(files, numbers = null) {
       continue;
     }
     const id = f.newer && line !== undefined ? `${baseName(name)}@${line}` : same.length ? `${name}#${same.length + 1}` : name;
-    family.versions.push({ id, name, path, n: family.versions.length + 1, by: f.by ?? null, at: f.at ?? 0, ...(line !== undefined ? { line } : {}), ...(typeof f.agent === 'string' ? { agent: f.agent } : {}), ...(f.edited ? { edited: true } : {}), ...(f.newer ? { newer: true } : {}) });
+    family.versions.push({ id, name, path, n: family.versions.length + 1, by: f.by ?? null, at: f.at ?? 0, ...(line !== undefined ? { line } : {}), ...(typeof f.agent === 'string' ? { agent: f.agent } : {}), ...(f.edited ? { edited: true } : {}), ...(f.newer ? { newer: true } : {}), ...(f.made ? { made: true } : {}) });
   }
   const out = [...families.values()];
   for (const family of out) {
@@ -504,7 +504,7 @@ export function filesInLines(lines) {
         if (seen.has(path) || shorthand(path)) continue;
         seen.add(path);
         const agent = p.voice?.name ?? (l.source === 'agent' ? '' : null);
-        out.push({ path, by: l.by ?? null, at: l.ts, ...(agent !== null ? { agent } : {}), ...(edited ? { edited: true } : {}), ...(p.newer === true ? { newer: true } : {}) });
+        out.push({ path, by: l.by ?? null, at: l.ts, ...(agent !== null ? { agent } : {}), ...(edited ? { edited: true } : {}), ...(p.newer === true ? { newer: true } : {}), ...(p.made === true ? { made: true } : {}) });
       }
     }
   }
@@ -515,6 +515,7 @@ export function filesInLines(lines) {
 export function sharedByWords(v, { me, nameOf }) {
   const whose = !v?.by || v.by === me ? null : nameOf(v.by);
   if (v?.edited) return `Edited by ${whose ?? 'you'}`;
+  if (v?.made) return `Made by ${whose ?? 'you'}`;
   if (typeof v?.agent !== 'string') return `Shared by ${whose ?? 'you'}`;
   // A thread that is no AI teammate's speaks as plain "Agent", which names nobody.
   if (v.agent && v.agent !== PLAIN_AGENT) return `Shared by ${v.agent} for ${whose ?? 'you'}`;
