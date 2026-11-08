@@ -4,7 +4,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { fitMenu } from '../keep-in-window';
-import { laterHint, momentFromWords, mondayMorning, tomorrowMorning } from '../threads/composer-rules';
+import { laterHint, momentFromWords, mondayIsTomorrow, mondayMorning, tomorrowMorning } from '../threads/composer-rules';
 
 export function ReplyLater({ at, onPick, onClosed }: {
   /** The moment the reply is set for, or 0 for now. */
@@ -93,9 +93,11 @@ export function ReplyLater({ at, onPick, onClosed }: {
           <button type="button" data-item className={`tc-row ${at === tomorrow ? 'on' : ''}`} onPointerEnter={hover} onClick={() => pick(tomorrow)}>
             <ClockIcon /><span className="tc-row-label">Tomorrow morning</span><small>{laterHint(tomorrow)}</small>
           </button>
-          <button type="button" data-item className={`tc-row ${at === monday ? 'on' : ''}`} onPointerEnter={hover} onClick={() => pick(monday)}>
-            <ClockIcon /><span className="tc-row-label">Monday morning</span><small>{laterHint(monday)}</small>
-          </button>
+          {!mondayIsTomorrow(now) && (
+            <button type="button" data-item className={`tc-row ${at === monday ? 'on' : ''}`} onPointerEnter={hover} onClick={() => pick(monday)}>
+              <ClockIcon /><span className="tc-row-label">Monday morning</span><small>{laterHint(monday)}</small>
+            </button>
+          )}
           <span className="tc-pick">
             <ClockIcon />
             <input
