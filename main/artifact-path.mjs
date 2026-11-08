@@ -25,6 +25,7 @@
 // product at all.
 import fsDefault from 'node:fs';
 import path from 'node:path';
+import { performance } from 'node:perf_hooks';
 import { machineryDir } from './store/home.mjs';
 import { writtenFileNamed } from './store/written-elsewhere.mjs';
 import { readItemHistory } from './store/work-items.mjs';
@@ -59,52 +60,76 @@ const SKIP = new Set(['node_modules', '.git', 'dist', 'build', '.next', 'session
 // picture that lands later is found by the next look, which comes after this.
 export const HUNT_FRESH_MS = 5000;
 const walks = new Map();
+// How many of a walk's folder reads wait on the disk at once. The app's other
+// disk reads share four threads with these, and a walk that asked for every
+// folder at once kept them waiting for seconds.
+const READS_AT_ONCE = 2;
 // Every file name in one tree, read without holding the main process.
 async function walkNames(tree, fs) {
     const names = new Map();
-    const walk = async (dir, depth) => {
-        if (depth > 6)
-            return;
-        let entries;
-        try {
-            entries = await fs.promises.readdir(dir, { withFileTypes: true });
-        }
-        catch {
-            return;
-        }
-        const below = [];
-        for (const e of entries) {
-            if (e.name.startsWith('.'))
+    const queue = [{ dir: tree, depth: 0 }];
+    let reading = 0;
+    const waiting = [];
+    const reader = async () => {
+        for (;;) {
+            const next = queue.shift();
+            if (!next) {
+                if (!reading)
+                    return;
+                await new Promise((r) => waiting.push(r));
                 continue;
-            const full = path.join(dir, e.name);
-            if (e.isDirectory()) {
-                if (!SKIP.has(e.name))
-                    below.push(walk(full, depth + 1));
             }
-            else if (names.has(e.name))
-                names.get(e.name).push(full);
-            else
-                names.set(e.name, [full]);
+            reading += 1;
+            const { dir, depth } = next;
+            let entries = [];
+            try {
+                entries = await fs.promises.readdir(dir, { withFileTypes: true });
+            }
+            catch { /* gone or unreadable */ }
+            for (const e of entries) {
+                if (e.name.startsWith('.'))
+                    continue;
+                const full = path.join(dir, e.name);
+                if (e.isDirectory()) {
+                    if (!SKIP.has(e.name) && depth < 6)
+                        queue.push({ dir: full, depth: depth + 1 });
+                }
+                else if (names.has(e.name))
+                    names.get(e.name).push(full);
+                else
+                    names.set(e.name, [full]);
+            }
+            reading -= 1;
+            waiting.splice(0).forEach((r) => r());
         }
-        await Promise.all(below);
     };
-    await walk(tree, 0);
+    await Promise.all(Array.from({ length: READS_AT_ONCE }, reader));
     return names;
 }
 // The carried-file shelf and the written-elsewhere list take a whole `fs`, but
 // read only what a caller's fake supplies, which is why requests type it narrow.
 const whole = (fs) => fs;
-function freshly(key, fs, now, read) {
+// A walk that took long answers for this many times as long, so a slow disk is
+// not walked end to end without a pause.
+const SLOW_WALK_KEEPS = 10;
+// One walk per tree at a time: a name asked while it runs waits on it, even past
+// its window or when the look must be current.
+function freshly(key, fs, now, read, fresh = false) {
     const kept = walks.get(key);
-    if (kept && kept.fs === fs && now - kept.at < HUNT_FRESH_MS)
+    if (kept && kept.fs === fs && (kept.running || (!fresh && now - kept.at < Math.max(HUNT_FRESH_MS, kept.took * SLOW_WALK_KEEPS))))
         return kept.value;
-    const value = read();
-    walks.set(key, { at: now, fs, value });
+    const started = performance.now();
+    const entry = { at: now, fs, value: null, running: true, took: 0 };
+    entry.value = Promise.resolve(read()).finally(() => {
+        entry.running = false;
+        entry.took = performance.now() - started;
+    });
+    walks.set(key, entry);
     if (walks.size > 32)
         walks.delete(walks.keys().next().value);
-    return value;
+    return entry.value;
 }
-const namesIn = (tree, fs, now) => freshly(tree, fs, now, () => walkNames(tree, fs));
+const namesIn = (tree, fs, now, fresh) => freshly(tree, fs, now, () => walkNames(tree, fs), fresh);
 // Hunt the file down by NAME inside one product's trees, newest match wins.
 // Workers write links relative to whatever directory they were standing in, so
 // a fixed root list will always miss some of them, and every miss cost her a
@@ -114,7 +139,7 @@ async function huntByName(base, trees, fs, now, fresh, raw = base) {
     let best = null;
     const tail = raw.includes('/') ? `${path.sep}${raw.split('/').join(path.sep)}` : null;
     for (const tree of trees) {
-        for (const full of (await (fresh ? walkNames(tree, fs) : namesIn(tree, fs, now))).get(base) ?? []) {
+        for (const full of (await namesIn(tree, fs, now, fresh)).get(base) ?? []) {
             let m;
             try {
                 m = (await fs.promises.stat(full)).mtimeMs;
@@ -166,7 +191,7 @@ async function fileInCheckout(own, raw, thread, fs, now, fresh) {
             return mine.file;
     }
     const list = () => fs.promises.readdir(root).catch(() => []);
-    const ids = (await (fresh ? list() : freshly(`checkouts:${root}`, fs, now, list))).filter((id) => THREAD_ID.test(id));
+    const ids = (await freshly(`checkouts:${root}`, fs, now, list, fresh)).filter((id) => THREAD_ID.test(id));
     const hits = (await Promise.all(ids.map(within))).filter((hit) => hit !== null).sort((a, b) => b.at - a.at);
     return hits.find((hit) => threadNames(own.dir, hit.id, base))?.file ?? null;
 }
