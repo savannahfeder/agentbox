@@ -24,8 +24,8 @@ export function presenceLook(): PresenceLook {
 
 export interface LiveUser { name: string; color: string; kind?: 'person' | 'agent'; person?: string | null }
 
-const FRESH_MS = 3500;
-const MOST_FLAGS = 8;
+const FRESH_MS = 2500;
+const MOST_FLAGS = 5;
 // Past this many, more cursors are noise to read and cost every window a redraw of each on every move.
 const MOST_CARETS = 30;
 // When each cursor last moved, kept per room, so a cursor the editor draws again keeps its name showing.
