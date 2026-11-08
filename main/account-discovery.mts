@@ -221,8 +221,8 @@ export function effectiveProfiles(
  *
  *  Measured 2026-10-16: ~/.claude-3 hit a session limit at 3:15pm and the row
  *  for that subscription showed an "organization has turned Claude Code off"
- *  filed on ~/.claude five days earlier. Both folders hold accountUuid
- *  8fe4a357; the newest fact about the account was the invisible one.
+ *  filed on ~/.claude five days earlier. Both folders hold the same
+ *  accountUuid; the newest fact about the account was the invisible one.
  *
  *  THE NEWEST READING WINS, because that is the only honest answer when two
  *  folders of one subscription disagree: each entry is what was true when a

@@ -5,7 +5,7 @@
 // 1. THE WRONG ROW. Trouble is filed per FOLDER and the Accounts page lists one
 //    row per SUBSCRIPTION (`effectiveProfiles` drops a second folder holding an
 //    account it already has). ~/.claude-3 and ~/.claude hold one subscription,
-//    accountUuid 8fe4a357; the limit was filed on ~/.claude-3, which is on no
+//    one accountUuid; the limit was filed on ~/.claude-3, which is on no
 //    row, so it was drawn nowhere, while that subscription's row went on
 //    showing an "organization has turned Claude Code off" filed five days
 //    earlier on ~/.claude. The newest fact about the account was the invisible
