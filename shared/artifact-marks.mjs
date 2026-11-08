@@ -428,8 +428,10 @@ export const opensBigInAGroup = (name) => !!reviewKind(name) || otherKind(name) 
 const BARE_END = /\/[\w.-]+\.(?:html?|csv|tsv)(?![\w/-])/gi;
 const MAY_BE_BARE = new RegExp(BARE_END.source, 'i');
 const BARE_OTHER = /(?<![\w./:@~(\[-])((?:\.?\/)?[\w.-]+(?:\/[\w.-]+)+\.(?:html?|csv|tsv))$/i;
+// Alone on its line, a name is a claim even with no folder or for a script; inside a sentence it is not.
+const ALONE = /^[ \t]*((?:\.?\/)?[\w-][\w.-]*(?:\/[\w.-]+)*\.[A-Za-z0-9]+)[ \t]*$/gm;
 function bareOthers(text) {
-  const out = [];
+  const out = [...text.matchAll(ALONE)].map((m) => ({ at: m.index + m[0].indexOf(m[1]), path: m[1] }));
   for (const m of text.matchAll(BARE_END)) {
     const end = m.index + m[0].length;
     let start = m.index;
@@ -455,7 +457,7 @@ export function otherFilesInLines(lines) {
     for (const field of ['result', 'note', 'body', 'answer']) {
       if (typeof p[field] !== 'string') continue;
       const named = p[field].includes('](') || p[field].includes('`');
-      const bare = l.source !== 'founder' && MAY_BE_BARE.test(p[field]);
+      const bare = l.source !== 'founder' && (MAY_BE_BARE.test(p[field]) || new RegExp(ALONE.source, 'im').test(p[field]));
       if (!named && !bare) continue;
       const text = p[field].replace(FENCE, '');
       const hits = [

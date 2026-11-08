@@ -278,6 +278,8 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
             } : undefined}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void add(); }
+              // The app ignores Escape inside a box, so letting go of it is what lets the next one leave full screen.
+              else if (e.key === 'Escape') { e.preventDefault(); if (quote || spot || pinning) pointAt(null, null); else e.currentTarget.blur(); }
             }} />
           <AttachRow attachments={pictures} attaching={attaching} onRemove={(i) => setPictures((was) => was.filter((_, j) => j !== i))} />
           <div className="sb-write-foot">
