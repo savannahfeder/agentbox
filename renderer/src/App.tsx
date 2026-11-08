@@ -87,7 +87,7 @@ import {
 } from './drafts';
 import { approvalStage, approvalClickAllowed, cardChord, pressWithin } from './approval-stage';
 import { roomForTheCard } from './room-for-the-card';
-import { approvalAnswered, approvalAsker, approvalReads, approvalShown } from './approval-card';
+import { approvalAnswered, approvalAsker, approvalReads, approvalShown, approvalToolShown } from './approval-card';
 // The new task card's two sentences: why it will not take one, and where the
 // one it took went. Only the second is raised from here, because by the time
 // there is anything to confirm the card has closed.
@@ -9186,7 +9186,7 @@ export default function App() {
                       back, so the click and the chord land on one behaviour. */}
                   <button className="approval-allow" onPointerDown={() => { approvalPress.current = `${a.id}:true`; }} onPointerCancel={() => { approvalPress.current = null; }} onClick={(e) => clickCard(a.id, true, e.detail)}>Allow</button>
                   <button className="approval-deny" onPointerDown={() => { approvalPress.current = `${a.id}:false`; }} onPointerCancel={() => { approvalPress.current = null; }} onClick={(e) => clickCard(a.id, false, e.detail)}>Deny</button>
-                  <span className="approval-hint">{chord('⌘Y')} / {chord('⌘N')} · {a.tool}</span>
+                  <span className="approval-hint">{chord('⌘Y')} / {chord('⌘N')}{approvalToolShown(a.tool)}</span>
                 </div>
               </div>
             </div>

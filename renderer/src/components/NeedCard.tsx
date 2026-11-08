@@ -85,6 +85,8 @@ export function fileWhy(path: string, why: string, info: { ok: boolean; size?: n
 const fileName = (p: string) => p.split('/').filter(Boolean).pop() ?? p;
 const folderOf = (p: string) => { const parts = p.split('/').filter(Boolean); return parts.length > 1 ? parts[parts.length - 2] : null; };
 
+// The title is keyWords(what); a `what` that is no more than that is not said again under it.
+const saysOnlyTheTitle = (what: string) => (keyWords(what) ?? '').toLowerCase() === what.replace(/^\s*(your|an?|the)\s+/i, '').replace(/[.\s]+$/, '').toLowerCase();
 const placeName = (src: KeySource) => (src.place === 'keychain' ? 'your Keychain' : src.place === 'shell' ? 'your shell' : fileName(src.from));
 const placeItem = (src: KeySource) => (src.place === 'shell' ? `$${src.from}` : src.entry ? `${src.entry} in ${src.from}` : src.from);
 
@@ -223,7 +225,7 @@ export function NeedCard({ source, fallback }: { source: string; fallback: React
     return <div className="need" data-need={svc ? svc.id : key!.name} ref={box} onKeyDown={keepKeys}>
       <div className="need-body">{mark}<div className="need-col">
         <div className="need-title">{title}</div>
-        {why ? <div className="need-why">{why}</div> : key?.what && <div className="need-why">{withLinks(sentence(key.what), open)}</div>}
+        {why ? <div className="need-why">{why}</div> : key?.what && !saysOnlyTheTitle(key.what) && <div className="need-why">{withLinks(sentence(key.what), open)}</div>}
         {showFacts ? <div className="need-facts">
           {getIt && <div>{I.arrow}<span>{getIt}</span></div>}
           <div>{I.lock}<span>Kept encrypted in your {Name} Cloud</span></div>

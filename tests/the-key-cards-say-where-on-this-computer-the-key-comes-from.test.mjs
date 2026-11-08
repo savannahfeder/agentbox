@@ -17,7 +17,7 @@ import { createElement as h } from 'react';
 import { Supervisor } from '../main/supervisor.mts';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { NEED, needsIn } from '../shared/cloud-needs.mjs';
-import { approvalReads, UNREADABLE } from '../renderer/src/approval-card.ts';
+import { approvalReads, approvalToolShown, UNREADABLE } from '../renderer/src/approval-card.ts';
 import { NeedCard, NeedPlace } from '../renderer/src/components/NeedCard.tsx';
 
 const LINE = `${NEED} key POSTHOG_PERSONAL_KEY | the PostHog personal API key the daily report reads | keychain posthog-read-key`;
@@ -50,6 +50,11 @@ describe('the approval card a waiting run raises', () => {
 
   it('leaves every other card as it was', () => {
     expect(approvalReads({ command: 'echo hello' }, 'Bash')).toEqual({ what: 'asks to run', body: 'echo hello' });
+    expect(approvalToolShown('Bash')).toBe(' · Bash');
+  });
+
+  it('does not print its internal name beside the shortcuts', () => {
+    expect(approvalToolShown('cloud_key')).toBe('');
   });
 });
 
@@ -67,6 +72,12 @@ describe('the thread\'s card', () => {
   it('names a file or the shell by what it is', () => {
     expect(draw(`${NEED} key POSTHOG_KEY | the PostHog key | file ~/app/.env POSTHOG_KEY`)).toContain('Use the one in .env');
     expect(draw(`${NEED} key POSTHOG_KEY | the PostHog key | shell POSTHOG_KEY`)).toContain('Use the one in your shell');
+  });
+
+  it('does not say the title twice: the line under it is drawn only when it adds something', () => {
+    const shown = draw(LINE).replace(/<[^>]*>/g, ' ');
+    expect(shown.match(/personal API key the daily report reads/gi)).toHaveLength(1);
+    expect(draw(`${NEED} key SENTRY_AUTH_TOKEN | a Sentry auth token, from sentry.io/settings`)).toContain('A Sentry auth token, from');
   });
 
   it('offers no such press when the run did not say where the key is', () => {

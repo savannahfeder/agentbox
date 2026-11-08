@@ -69,6 +69,9 @@ export const approvalAnswered = (allow: boolean) =>
  * -- so a card carrying only a host is a real card now, and "asks to run" over
  * one would be the card lying about the question it is asking.
  */
+/** The tool's own name beside the shortcuts, where it means something to a person. */
+export const approvalToolShown = (tool?: string) => (tool && tool !== 'cloud_key' ? ` · ${tool}` : '');
+
 export function approvalReads(input: unknown, tool?: string): ApprovalReading {
   // A cloud run asking this computer for a key (main/cloud/key-asks.mts KEY_CARD).
   if (tool === 'cloud_key') {
