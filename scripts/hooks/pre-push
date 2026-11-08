@@ -180,6 +180,10 @@ else
       full_because="it deletes code something else may import"
       break
     fi
+    # A release's own commit moves the version number and nothing a test reads.
+    if node scripts/lib/only-the-version-moved.mjs "$base" "$local_sha"; then
+      continue
+    fi
     changed="$changed
 $(git diff --name-only --diff-filter=d "$base" "$local_sha")"
   done <<EOF
