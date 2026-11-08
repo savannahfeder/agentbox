@@ -40,7 +40,7 @@ export class SignInReturns {
     const take = (req: http.IncomingMessage, res: http.ServerResponse) => {
       const landed = `http://localhost:${back.port}${req.url ?? '/'}`;
       if (new URL(landed).pathname !== back.path) { res.writeHead(404).end(); return; }
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(PAGE);
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', Connection: 'close' }).end(PAGE);
       try { this.answer(a, landed); } catch (e) { this.log.warn?.('zero: a sign-in came back and could not be handed on:', (e as Error).message); }
       this.stop(a.ask);
     };
@@ -60,7 +60,7 @@ export class SignInReturns {
     const held = this.open.get(ask);
     if (!held) return;
     clearTimeout(held.timer);
-    for (const s of held.servers) s.close();
+    for (const s of held.servers) { s.close(); s.closeAllConnections(); }
     this.open.delete(ask);
     this.over.add(ask);
   }
