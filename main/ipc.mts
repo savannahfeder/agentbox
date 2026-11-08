@@ -2159,6 +2159,16 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       return { ok: false, error: String((err as Error).message) };
     }
   });
+  // What the person did with a sign-in link an agent is waiting on (shared/sign-in-ask.mjs).
+  ipcMain.handle('zero:sign-in-answer', (_e, { product, id, ask, said, url } = {}) => {
+    try {
+      store.answerSignIn(product, id, { id: ask, said, url });
+      push();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
   ipcMain.handle('zero:github-sign-in', async (_e, { token } = {}) => {
     try {
       if (!supervisor.gitHubSignIn) return { ok: false, error: `Signing in to GitHub needs the ${Name} app on this computer.` };

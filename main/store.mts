@@ -39,6 +39,7 @@ import { isEffortWord } from '../shared/effort-levels.mts';
 import { shippedNote } from '../shared/shipped-note.mjs';
 import { notShipped } from '../shared/not-shipped.mts';
 import { asksForGitHubSignIn, SHIPPING_AGAIN } from '../shared/github-push-sign-in.mts';
+import { cleanSignInAnswer, openSignIn } from '../shared/sign-in-ask.mjs';
 import { machineryPath, removeMachinery } from './store/home.mjs';
 import { Teammates } from './teammates.mts';
 import type { WorkItem } from './supervisor.mts';
@@ -669,6 +670,16 @@ export class Store {
     // their own Reopen outranks that (see `closedBeforeItShipped` below).
     const closed = this.readItem(slug, id)?.status === 'done';
     return workItemsDisk.updateWorkItem(dir, id, { status: 'open' }, { source: closed ? 'founder' : 'system' });
+  }
+
+  // The person's answer, or the app's when it caught the browser coming back, to the sign-in a thread is open on.
+  answerSignIn(slug: string, id: string, answer: { id: unknown; said: unknown; url?: unknown }, { source = 'founder', now = Date.now() }: { source?: 'founder' | 'system'; now?: number } = {}) {
+    const item = this.readItem(slug, id);
+    const ask = openSignIn(item);
+    if (!ask || ask.id !== answer.id) throw new Error('That sign-in is no longer open.');
+    const clean = cleanSignInAnswer({ ...answer, at: now });
+    if (!clean) throw new Error(answer.said === 'landed' ? 'That is not a web address. Paste the whole address from the browser.' : 'That answer is not one the agent can take.');
+    return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, { signInAnswer: clean }, { source, now });
   }
 
   // Every thread whose ship waited on a GitHub sign-in on this computer goes to the queue again.

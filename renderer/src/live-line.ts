@@ -32,6 +32,7 @@
 import { spanLabel } from './notes';
 import { Name } from '../../shared/product-name.mjs';
 import { resetDay } from '../../shared/usage.mts';
+import { openSignIn } from '../../shared/sign-in-ask.mjs';
 import { MAC } from './this-keyboard';
 import { whyWords, type WhyCard } from './where-why';
 import type { RunningSession, WhyNotCloud, WorkItem } from './types';
@@ -310,9 +311,10 @@ export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null
   // "Working" won. Above `stalled` and `scheduled` too — a card with Allow and
   // Deny on it outranks any news about the run behind it.
   if (facts.asking) {
+    const signIn = openSignIn(item);
     return {
       state: 'asking',
-      line: 'The agent stopped to ask your permission. Nothing happens on this thread until you answer.',
+      line: signIn ? `The agent is waiting for you to sign in to ${signIn.service}.` : 'The agent stopped to ask your permission. Nothing happens on this thread until you answer.',
     };
   }
 

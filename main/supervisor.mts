@@ -200,6 +200,8 @@ import type { LatestMessage } from './message-priority.mts';
 import type { ActiveTool } from './agent-activity.mts';
 import type { ShipItem, ShipProduct } from './ship-queue.mts';
 import type { GitHubPushSignIn } from './github-push-sign-in.mts';
+import { SignInReturns } from './sign-in-returns.mts';
+import { openSignIn } from '../shared/sign-in-ask.mjs';
 import type { CloudKit } from './cloud/kit.mts';
 import type { CatchUpCard } from './catch-up.mts';
 import type { QueuedLine, ReplyPayload } from './live-replies.mts';
@@ -712,6 +714,7 @@ export interface SupervisorStore {
   closedBeforeItShipped(slug: string, id: string, note: string): unknown;
   shipped(slug: string, id: string, result: { sha: string | null; labels: string[] }): unknown;
   shipFailed(slug: string, id: string, result: { note: string; labels: string[] }): unknown;
+  answerSignIn(slug: string, id: string, answer: { id: unknown; said: unknown; url?: unknown }, opts?: { source?: 'founder' | 'system' }): unknown;
   fileMainFix(slug: string, fields: { title: string; body: string; problem?: string; kind?: string; priority?: number; labels?: string[] }): { id: string };
   repeats?: {
     list?(dir: string, now?: number): RepeatRule[] | null;
@@ -1226,6 +1229,7 @@ export class Supervisor {
   declare shipQueue: ShipQueue;
   // Set by each door (main.mts, serve.mts), which knows how it can keep a sign-in.
   declare gitHubSignIn: GitHubPushSignIn | null;
+  declare signInReturns: SignInReturns;
   declare mainTests: MainTests;
   declare cloudServerWatch: Pick<CloudServerWatch, 'down' | 'up'>;
   declare sessions: Map<string, WorkerSession>;
@@ -1451,6 +1455,9 @@ export class Supervisor {
       pushSignIn: () => this.gitHubSignIn?.forPush() ?? null,
     });
     this.gitHubSignIn = null;
+    this.signInReturns = new SignInReturns({
+      answer: (r, landed) => { this.store.answerSignIn(r.product, r.id, { id: r.ask, said: 'landed', url: landed }, { source: 'system' }); this.onChange?.(); },
+    });
     // AND THEN SOMEBODY WATCHES THE RUN THAT SHIP STARTED. The whole suite runs
     // on GitHub for every push and takes about five minutes, which is after the
     // agent has ended its turn, so main was red for four days in October with
@@ -1996,6 +2003,7 @@ export class Supervisor {
     for (const session of this.sessions.values()) if (!this._letGoOfHostedRun(session)) this._kill(session, session.cloud && session.engine !== 'codex' ? 'SIGHUP' : undefined);
     this._closeCodex(`${Name} is quitting`);
     this.stopMemoryGate();
+    this.signInReturns?.stopAll();
     clearInterval(this._leftoverTimer);
     clearInterval(this._memoryLogTimer);
   }
@@ -8707,6 +8715,12 @@ export class Supervisor {
     this.bringBackWhatNeverShipped(items);
     // A task its agent marked ready goes out, one at a time, beside the tick.
     try { this.shipQueue.tick(items, this.store.listProducts()); } catch (e) { console.warn('zero: the ship queue:', (e as Error).message); }
+    try {
+      this.signInReturns.sync(items.flatMap((i) => {
+        const ask = openSignIn(i);
+        return ask && this.sessions.get(i.id)?.cloud ? [{ product: i.product, id: i.id, ask: ask.id, url: ask.url }] : [];
+      }));
+    } catch (e) { console.warn('zero: listening for a sign-in to come back:', (e as Error).message); }
 
     // A session that died without exiting still holds its row. Stopping it
     // here lets the passes below put a fresh worker on the row.

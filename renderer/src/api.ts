@@ -1648,6 +1648,13 @@ export const api = {
     return zero.gitHubSignIn(p);
   },
 
+  /** What the person did with a sign-in link an agent on this thread is waiting on. */
+  async signInAnswer(p: { product: string; id: string; ask: string; said: 'signed-in' | 'skipped' | 'landed'; url?: string }): Promise<{ ok: boolean; error?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.signInAnswer) return { ok: false, error: RESTART_NOTE };
+    return zero.signInAnswer(p);
+  },
+
   /** Signing in to Agentbox Cloud itself, on the app's sign-in page: Google, email, a new account and its link again, or a password reset. */
   async cloudAccountSignIn(p: { method: 'google' | 'email' | 'sign-up' | 'resend' | 'agree' | 'reset' | 'reset-wait' | 'new-password'; email?: string; password?: string; name?: string; acceptTerms?: boolean }): Promise<{ ok: boolean; confirm?: boolean; needsTerms?: boolean; sent?: boolean; opened?: boolean; error?: string; cancelled?: boolean }> {
     const zero = window.zero as any;

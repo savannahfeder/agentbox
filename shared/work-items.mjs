@@ -37,6 +37,7 @@ import { cleanVoice } from './agent-voice.mjs';
 import { cleanMark, isBookkeepingMark, marksOf } from './artifact-marks.mjs';
 import { isContinuedNote } from './thread-continued.mjs';
 import { wordWaits } from './answers.mjs';
+import { cleanSignIn, cleanSignInAnswer } from './sign-in-ask.mjs';
 
 export { wordWaits };
 
@@ -213,6 +214,9 @@ export const WORK_ITEM_FIELDS = [
   // until someone else writes, false takes that back. Never the task's status,
   // which both people share (`settledBy`); a pulled line may not carry it.
   'putAway',
+  // A SIGN-IN LINK A RUNNING AGENT IS WAITING ON, AND THE ANSWER TO IT
+  // (shared/sign-in-ask.mjs). Latest wins on both, whoever wrote it.
+  'signIn', 'signInAnswer',
 ];
 
 // THE SUMMARY IS SHARED BETWEEN THE PERSON AND THE AGENT. Everywhere else the
@@ -220,7 +224,7 @@ export const WORK_ITEM_FIELDS = [
 // of hers freezes the summary the agent is meant to keep up to date. So on
 // these fields the later write wins, whoever made it, and the source is still
 // recorded so the panel can say who touched it last.
-const SHARED_FIELDS = new Set(['problem', 'progress', 'solution', 'blockedBy', 'blocks']);
+const SHARED_FIELDS = new Set(['problem', 'progress', 'solution', 'blockedBy', 'blocks', 'signIn', 'signInAnswer']);
 const MAX_SUMMARY = 1200;
 
 const ROUTE_TO = /^(agent|mate:[A-Za-z0-9_-]{1,64})$/;
@@ -584,6 +588,8 @@ function coerceField(field, value) {
       return [...new Set(value.map(shortId).filter(Boolean))].slice(0, MAX_LABELS);
     }
     case 'routed': return cleanRouted(value);
+    case 'signIn': return cleanSignIn(value);
+    case 'signInAnswer': return cleanSignInAnswer(value);
     case 'putAway': return typeof value === 'boolean' ? value : undefined;
     case 'shippedAt': return Number.isFinite(value) && value >= 0 ? Math.trunc(value) : undefined;
     case 'linkComment': {

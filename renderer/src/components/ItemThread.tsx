@@ -39,6 +39,8 @@ import { ranWords } from '../byline';
 import { notShipped } from '../../../shared/not-shipped.mts';
 import { asksForGitHubSignIn } from '../../../shared/github-push-sign-in.mts';
 import { GitHubSignInCard } from './GitHubSignInCard';
+import { SignInCard } from './SignInCard';
+import { openSignIn } from '../../../shared/sign-in-ask.mjs';
 import type { ModelChoice } from '../models';
 import type { LedgerLine } from '../thread-history';
 import type { TraceSession } from '../notes';
@@ -382,6 +384,11 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
   );
   const askTurn = closeAsk ? askTurnOf(made) : -1;
   const askHere = closeAsk && <div ref={askRef} className="close-ask-at-task">{closeAsk.strip}</div>;
+  const signInAsk = onPhone() ? null : openSignIn(item);
+  const signInHere = signInAsk && <SignInCard key={signInAsk.id} ask={signInAsk} cloud={session?.where === 'cloud'}
+    open={(href) => { void api.openArtifactExternally({ product: item.product, src: href }); }}
+    copy={(text) => { void navigator.clipboard?.writeText(text).then(() => say('Copied'), () => say('That did not copy.')); }}
+    answer={async (said) => { const r = await api.signInAnswer({ product: item.product, id: item.id, ask: signInAsk.id, ...said }); return r.ok ? null : r.error ?? 'That did not reach the agent. Try again.'; }} />;
 
   // THE ANSWER, WHOLE, AT THE FOOT OF THE CONVERSATION.
   //
@@ -473,6 +480,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
         {queueHead}
         <p className="one-catching-up"><span className="live-word is-shimmering">Getting this chat ready. Its summary and options will appear here.</span></p>
         {newest && <QueueAnswer text={clean(newest.text)} md={md} name={pageTitle(item)} />}
+        {signInHere}
         {askHere}
       </>
     );
@@ -484,6 +492,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
         <QueueAnswer text={clean(newest.text)} md={md} name={pageTitle(item)} by={signer ? { t: signer, at: newest.at } : null} />
         {byApp && outcome && <p className="one-app-note">{clean(outcome.text)}</p>}
         {afterList}
+        {signInHere}
         {madeList(made.atFoot)}
         {askHere}
       </>
@@ -563,6 +572,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
       )}
       {answer}
       {afterList}
+      {signInHere}
       {/* AND WHAT THE NEWEST TURN FILED, under its own last word. */}
       {madeList(made.atFoot)}
       {askTurn < Math.max(from, 0) && askHere}
