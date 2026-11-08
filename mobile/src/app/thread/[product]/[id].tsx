@@ -155,6 +155,8 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
   const sendByHand = () => { offline.clear(); void send(picked); };
   const talk = useDictation(draft, sendByHand);
   const typing = useRef<ComponentRef<typeof TextInput>>(null);
+  // A tap on the box's own buttons blurs the field before it lands; the box must not fold under it.
+  const pressInside = useRef(false);
   // A box that only listened, and heard nothing, folds away as an empty one does on blur.
   useEffect(() => { if (!talk.on && !talk.problem && !ready && !sheet && !typing.current?.isFocused()) setOpen(false); }, [talk.on]);
   const foot = footRoom(inset);
@@ -178,11 +180,12 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
           <View style={{ marginRight: 4 }}><MicButton talk={{ ...talk, start: () => { setOpen(true); talk.start(); } }} /></View>
         </View>
       ) : (
-        <View style={{ ...card, borderColor: color.lineStrong }}>
+        <View style={{ ...card, borderColor: color.lineStrong }} onTouchStartCapture={() => { pressInside.current = true; }}
+          onTouchEnd={() => setTimeout(() => { pressInside.current = false; }, 400)}>
           {/* Typing stops dictation with the words kept; tapping the box does not (web-speech.ts). */}
           <TextInput ref={typing} autoFocus={!talk.active()} multiline value={draft.text} placeholder="What should the agent do next?" placeholderTextColor={color.faint}
             onChangeText={(t) => { if (talk.active()) talk.leave(); draft.setText(t); }}
-            onBlur={() => { if (!ready && !sheet && !talk.active()) setOpen(false); }}
+            onBlur={() => { if (!ready && !sheet && !talk.active() && !pressInside.current) setOpen(false); }}
             style={[{ minHeight: 92, maxHeight: 220, paddingTop: 12, paddingHorizontal: 16, paddingBottom: 6, fontFamily: font.regular, fontSize: 15.5, lineHeight: 24, color: color.text, textAlignVertical: 'top' }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
           {(draft.files.length > 0 || failed || draft.dropped > 0 || (!talk.on && !!talk.problem)) && (
             <View style={{ paddingHorizontal: 16, paddingBottom: 10, gap: 8 }}>
