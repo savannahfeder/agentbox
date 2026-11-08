@@ -130,6 +130,12 @@ describe('where the thread waits', () => {
     expect(belongsInInbox(asks, { hiddenUntil: hiddenUntil(asks), now: ANSWERED + 1 })).toBe(true);
   });
 
+  it('stays in Needs you when the agent paused it without an answer', () => {
+    const silent = row({ result: undefined, wrote: { ...row().wrote, result: undefined } });
+    expect(hiddenUntil(silent)).toBe(0);
+    expect(belongsInInbox(silent, { hiddenUntil: 0, now: ANSWERED + 1 })).toBe(true);
+  });
+
   it('still comes to Needs you for a task under it waiting a day for a yes', () => {
     const task = { id: 'w-task', parent: 'w-1', status: 'open', kind: 'bug', labels: ['bug'], createdAt: ANSWERED - PROPOSAL_PATIENCE };
     expect(threadsOwedAnAnswer([row(), task], ANSWERED + 1).has('w-1')).toBe(true);

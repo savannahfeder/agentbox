@@ -136,11 +136,11 @@ export function parkedByAgent(i: InboxItem, now = Date.now()): boolean {
 
 // EXCEPT A THREAD ITS AGENT WILL RUN AGAIN ITSELF, ASKING NOTHING MEANWHILE
 // (w-8b38137b7f). The next move is the agent's, so it waits in Scheduled until
-// the moment and is In progress after it. An answer that offers a choice keeps
-// it in Needs you, which is what stops an agent hiding its own question.
-// Returns the moment, or 0.
+// the moment and is In progress after it. No answer, or one that offers a
+// choice, keeps it in Needs you, which is what stops an agent hiding its own
+// question (tests/agent-defer-does-not-hide). Returns the moment, or 0.
 export function runsAgainOnItsOwn(i: InboxItem): number {
-  if (!hers(i) || offerIsLive(i)) return 0;
+  if (!hers(i) || !i.result?.trim() || offerIsLive(i)) return 0;
   return wakesItselfAt(i);
 }
 
