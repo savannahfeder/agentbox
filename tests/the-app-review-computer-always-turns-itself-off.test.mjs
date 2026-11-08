@@ -42,6 +42,11 @@ describe('guard one: the machine turns itself off, and AWS deletes it', () => {
     expect(ud).toMatch(/WantedBy=multi-user\.target/);
     expect(ud).toMatch(/systemctl enable --now agentbox-review-expiry/);
   });
+  // The public-repo check refused the first version, which piped NodeSource's script into bash.
+  it('runs nothing it downloads without checking it first', () => {
+    expect(ud).not.toMatch(/\|\s*(sudo\s+)?(ba)?sh\b/);
+    expect(ud).toMatch(/sha256sum -c -/);
+  });
   it('carries no password or token: those go over SSH to a file only root reads', () => {
     expect(ud).not.toMatch(/TEST_LOGIN=|OAUTH_TOKEN=/);
     expect(ud).toMatch(/EnvironmentFile=\/etc\/agentbox-review\.env/);

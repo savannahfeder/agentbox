@@ -80,8 +80,16 @@ EOF
 systemctl daemon-reload
 systemctl enable --now agentbox-review-expiry
 
-curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-apt-get install -y nodejs git
+apt-get update
+apt-get install -y git xz-utils
+# Node from nodejs.org, checked against its published checksum.
+NODE=v22.14.0
+cd /tmp
+curl -fsSLO https://nodejs.org/dist/$NODE/node-$NODE-linux-x64.tar.xz
+curl -fsSLO https://nodejs.org/dist/$NODE/SHASUMS256.txt
+grep " node-$NODE-linux-x64.tar.xz$" SHASUMS256.txt | sha256sum -c -
+tar -xJf node-$NODE-linux-x64.tar.xz -C /usr/local --strip-components=1
+cd /
 npm install -g agentbox-app @anthropic-ai/claude-code
 id agentbox || useradd -m -s /bin/bash agentbox
 
