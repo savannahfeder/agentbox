@@ -13,6 +13,20 @@
   .markdown pre, .markdown pre code { white-space: pre-wrap; overflow-wrap: anywhere; }
 }
 
+/* The desktop window only: the phone (phone.css) keeps its own title, choices and Send. */
+@media (min-width: 701px) and (min-height: 521px) {
+  @container talk (max-width: 560px) {
+    .one-sum .one-title { font-size: 21px; line-height: 1.3; }
+    /* One line here is about four words, too few to tell the choices apart. */
+    .one-choices .opt-text { -webkit-line-clamp: 2; }
+  }
+  @container reply (max-width: 460px) {
+    /* The key stays in Send's tooltip; its keycap is the room the mode and model need. */
+    .dock-bar .dock-send kbd { display: none; }
+    .dock-bar .dock-send { padding: 5px 12px; }
+  }
+}
+
 /* Under 460 the bar's words no longer fit one row ("Medium", "Auto", the
    model, the paperclip, "Stop" need about 425). The priority keeps its bars
    and Stop its square; both keep their names for the pointer and screen
