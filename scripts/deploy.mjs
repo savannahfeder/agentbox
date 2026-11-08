@@ -35,6 +35,9 @@ const repo = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const checkOnly = process.argv.includes('--check');
 const startedAt = Date.now();
 const NOTARY_PROFILE = 'agentbox-notary';
+// notarytool's default store is closed while the screen is locked, and the
+// build reads it about ten minutes in. The login keychain file stays open.
+const NOTARY_KEYCHAIN = path.join(os.homedir(), 'Library', 'Keychains', 'login.keychain-db');
 const PACKAGE = 'agentbox-app';
 const SERVER = 'agentbox-gateway';
 const REGION = 'us-east-1';
@@ -151,12 +154,12 @@ const signIns = [
   },
   {
     name: 'Apple, to notarise the app',
-    ok: () => quiet('xcrun', ['notarytool', 'history', '--keychain-profile', NOTARY_PROFILE], 60_000).ok,
+    ok: () => quiet('xcrun', ['notarytool', 'history', '--keychain', NOTARY_KEYCHAIN, '--keychain-profile', NOTARY_PROFILE], 60_000).ok,
     fix: () => {
       console.log('\n  Apple\'s own tool asks for your Apple ID and an app-specific password, once,');
       console.log('  and keeps them in your Keychain. Make the password at appleid.apple.com,');
       console.log('  under Sign-In and Security → App-Specific Passwords.\n');
-      return live('xcrun', ['notarytool', 'store-credentials', NOTARY_PROFILE, '--team-id', team]);
+      return live('xcrun', ['notarytool', 'store-credentials', NOTARY_PROFILE, '--keychain', NOTARY_KEYCHAIN, '--team-id', team]);
     },
   },
 ];
@@ -200,7 +203,7 @@ for (const [signal, code] of [['SIGINT', 130], ['SIGHUP', 129], ['SIGTERM', 143]
 // ---------------------------------------------------------------------------
 // 4. THE MAC APP. Nothing public changes until it is done.
 say(`building, signing and notarising Agentbox ${version} (about 15 minutes; nothing public changes yet)`);
-const appleEnv = { ...process.env, APPLE_KEYCHAIN_PROFILE: NOTARY_PROFILE, APPLE_TEAM_ID: team, AGENTBOX_RELEASE_COMMIT: commit, AGENTBOX_DEPLOY: '1' };
+const appleEnv = { ...process.env, APPLE_KEYCHAIN_PROFILE: NOTARY_PROFILE, APPLE_KEYCHAIN: NOTARY_KEYCHAIN, APPLE_TEAM_ID: team, AGENTBOX_RELEASE_COMMIT: commit, AGENTBOX_DEPLOY: '1' };
 // electron-builder prefers an Apple ID over a Keychain profile when both are set.
 delete appleEnv.APPLE_ID;
 delete appleEnv.APPLE_APP_SPECIFIC_PASSWORD;

@@ -208,7 +208,11 @@ import { namedCards } from './team/company';
 import { FaceHover } from './team/status';
 import { TeamPage } from './team/TeamPage';
 import { ProjectShare, ProjectWho } from './team/ProjectShare';
-import { ConnectComputer, EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, ItemsContext, LiveContext, CloudContext, SavedKeysContext, MoveToCloudContext, CloudOfferContext, FreeAgentContext, StateTabs, TryAgainContext, WaitingContext } from './threads/Pages';
+import { AskCard } from './threads/AskCard';
+import { inboxAsks, putOffKeys, readPutOff, writePutOff, type InboxAsk } from './threads/inbox-asks';
+import { focusNeedOnOpen } from './components/NeedCard';
+import { needId, needsLeft } from '../../shared/cloud-needs.mjs';
+import { ConnectComputer, EmptyTab,FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, ItemsContext, LiveContext, CloudContext, SavedKeysContext, MoveToCloudContext, CloudOfferContext, FreeAgentContext, StateTabs, TryAgainContext, WaitingContext } from './threads/Pages';
 import { offersTryAgain, tryAgainWords } from './try-again';
 import { cloudOffer, type OfferGo } from './cloud-upgrade';
 import { FleetContext, queuedWithHeld, type Fleet } from './fleet';
@@ -3509,6 +3513,12 @@ export default function App() {
     cardRoomUndo.current?.();
     cardRoomUndo.current = el ? roomForTheCard(el) : null;
   }, []);
+  const [asksPutOff, setAsksPutOff] = useState(readPutOff);
+  const putAskOff = useCallback((ask: InboxAsk) => setAsksPutOff((was) => {
+    const next = new Set([...was, ...putOffKeys(ask)]);
+    writePutOff(next);
+    return next;
+  }), []);
   // AND THE OPEN THREAD'S OWN CARD IS THE ONE IN FRONT. The order is decided in
   // the main process, because ⌘Y is answered there, ahead of this page; all
   // this says is which thread is being read (shared/which-card-is-in-front.mts).
@@ -7366,7 +7376,12 @@ export default function App() {
   // toast covered Allow and Deny. Read off the same stage the card is drawn
   // from below, so the class and the card cannot disagree about what is asked.
   const stage = approvalStage(snap?.approvals, answered, frontApproval.current, signInGate || phoneSignInSettling);
-  const cardOnScreen = !!stage.card;
+  // What cloud threads wait on takes the same corner, on the inbox only, and
+  // never over an approval: that one has an agent frozen behind it.
+  const onTheInbox = !focused && !focusedRepeat && !settingsOpen && !teamShown && !filesShown && !connectionsShown
+    && !teammatesShown && !roomShown && search === null && !modal && !inPractice && !onPhone();
+  const asksShown = !stage.card && !signInGate && onTheInbox ? inboxAsks(inbox, savedCloudKeys, asksPutOff) : [];
+  const cardOnScreen = !!stage.card || asksShown.length > 0;
   cardOnStage.current = stage.card && !stage.verdict ? stage.card.id : null;
   const mover = {
     ids: new Set([...(snap?.cloud?.movable ?? []), ...(snap?.supervisor.running ?? []).filter((r) => r.movable).map((r) => r.itemId)]),
@@ -9193,6 +9208,15 @@ export default function App() {
           </div>
         );
       })()}
+
+      <AskCard asks={asksShown} room={cardRoom} onLater={putAskOff} onGive={(ask) => {
+        const item = ask.items[0];
+        // A code waits for the sign-ins on its ask, so the cursor lands on the first of those.
+        const first = ask.need.startsWith('code:') ? needsLeft(item, savedCloudKeys).find((n) => n.kind === 'sign-in' || n.kind === 'key') : null;
+        focusNeedOnOpen(item.id, first ? needId(first) : ask.need);
+        setFocused(item);
+        markSeen(item);
+      }} />
 
       {modal === 'snooze' && snoozeItem && (
         <Snooze
