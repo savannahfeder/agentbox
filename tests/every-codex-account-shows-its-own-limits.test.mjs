@@ -40,10 +40,12 @@ describe('codexAccountReadings', () => {
     expect(spans(readings[0])).toEqual([['session', 12], ['week', 31]]);
   });
 
-  it('a window whose reset has gone past is dropped, and the week is kept', () => {
+  // The session keeps its row with no figure (a-session-that-reset-since-the-reading-says-so).
+  it('a window whose reset has gone past loses its figure, and the week is kept', () => {
     const now = (1_800_000_000 + 3600) * 1000;
     const readings = codexAccountReadings({ profiles: ['/h/.codex-2'], homeOf, readLog, now });
-    expect(spans(readings[0])).toEqual([['week', 31]]);
+    expect(spans(readings[0])).toEqual([['session', Number.NaN], ['week', 31]]);
+    expect(readings[0].limits[0].reset).toBe(true);
   });
 
   it('a log whose every window has reset counts as no reading', () => {

@@ -89,6 +89,7 @@ export interface ChatLine {
   viaProduct?: string | null;
   work?: string;
   run?: string;
+  options?: string[];
 }
 export interface ChatLike {
   messages: ChatLine[];
@@ -142,7 +143,8 @@ export type WakeAction =
   | (ActionBase & { type: 'release'; item: string; product: string })
   | (ActionBase & { type: 'limit' })
   | (ActionBase & { type: 'unread'; duty: string; what: string })
-  | (ActionBase & { type: 'hops'; msg: string; from: string });
+  | (ActionBase & { type: 'hops'; msg: string; from: string })
+  | (ActionBase & { type: 'replied'; item: string; product: string; labels: string[]; text: string; say: boolean });
 export interface RunLine {
   teammate: string;
   item: string;
@@ -173,6 +175,9 @@ export function cleanDuty(d: unknown): DutyLike | null;
 export function dutyStart(d: DutyLike, now?: number): string;
 export function dutyOf(item: { labels?: string[] } | null | undefined): string | null;
 export function letterFor(name: string | null | undefined, teammates?: { letter?: string | null }[]): string;
+export function asksSomething(text: string | null | undefined): boolean;
+export function replyMessageId(runId: string): string;
+export function projectNamedIn(text: string | null | undefined, products?: { slug: string; name?: string | null }[]): string | null;
 export function isQueued(item: RunItem | null | undefined): boolean;
 export function isActiveRun(item: RunItem | null | undefined): boolean;
 export function planWakes(input?: { teammates?: TeammateLike[]; chat?: ChatLike; items?: RunItem[]; now?: number; shipped?: Record<string, number> }): WakeAction[];

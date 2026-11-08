@@ -13,3 +13,5 @@ if ! command -v xauth >/dev/null 2>&1 || ! ldconfig -p 2>/dev/null | grep -q 'li
 fi
 # ffmpeg: design rounds film a flow drawn over the real app, frame by frame.
 command -v ffmpeg >/dev/null 2>&1 || { sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg; }
+# python3-venv: the pre-push hook installs semgrep into a venv (scripts/security-scan-the-push.mjs).
+python3 -c 'import ensurepip' >/dev/null 2>&1 || { sudo apt-get update -qq && sudo apt-get install -y -qq python3-venv; }

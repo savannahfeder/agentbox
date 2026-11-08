@@ -7,6 +7,7 @@ import {
   offerFrom, offerAnswer, OFFER_LABEL, OFFER_MAKE, OFFER_NOT_NOW, TEAMMATE_EFFORT, GREETING, starterAsks,
   dutyWhen, dutyOf, DUTY_LABEL_PREFIX, CHAT_LABEL, yesFirst, WORK_LABEL_PREFIX, isActiveRun, isQueued, STOPPED_NOTE,
   METHOD_CAP, recordOf, sourceText, pausedNow, WEEK_MS, workOf, UNREAD_HOLD, cleanDuty, dutyStart, howYouWrite, VOICES,
+  replyMessageId, projectNamedIn,
 } from '../shared/teammates.mjs';
 import { reachTick } from './teammate-reach.mjs';
 import { filesFoldersBrief } from '../shared/file-folders.mjs';
@@ -218,7 +219,7 @@ interface Opening { body: string; yours: boolean }
 
 const CHAT_FOR_SCREEN = 400;
 
-const TROUBLE_VERB: Record<string, string> = { run: 'start a run', answer: 'get your message', tell: 'take a hand-off', release: 'start its next run', seen: 'mark a message read', served: 'mark its round served', dutyServed: 'mark a duty done' };
+const TROUBLE_VERB: Record<string, string> = { run: 'start a run', answer: 'get your message', replied: 'put its answer in the chat', tell: 'take a hand-off', release: 'start its next run', seen: 'mark a message read', served: 'mark its round served', dutyServed: 'mark a duty done' };
 
 // When each project last shipped, from the note the ship queue leaves.
 function shippedByProduct(items?: TeamItem[] | null) {
@@ -480,7 +481,9 @@ export class Teammates {
     const said = answers && typeof answers === 'object' && !Array.isArray(answers)
       ? Object.fromEntries(Object.entries(answers).filter(([, a]) => typeof a === 'string' && a.trim()).map(([q, a]) => [q, a.trim().slice(0, 2000)]))
       : {};
-    return writeChat(this.dir(), { kind: 'msg', from: YOU, to: known, text: words.slice(0, 8000), ...(options ? { options } : {}), ...(fresh ? { fresh: true } : {}), ...(Object.keys(said).length ? { answers: said } : {}) }, now);
+    // Work you name a project for is done in that project, in a thread of its own there.
+    const product = projectNamedIn(words, this.store.listProducts().filter((p) => !p.practice && !p.personal));
+    return writeChat(this.dir(), { kind: 'msg', from: YOU, to: known, text: words.slice(0, 8000), ...(product ? { product } : {}), ...(options ? { options } : {}), ...(fresh ? { fresh: true } : {}), ...(Object.keys(said).length ? { answers: said } : {}) }, now);
   }
 
   // Your go-ahead for work held after too many hand-offs: the same work again,
@@ -622,6 +625,9 @@ export class Teammates {
         } else if (a.type === 'tell') {
           if (!tell) throw new Error('nothing here can hand work to a thread');
           await tell(a.product, a.item, { text: a.text, from: a.from, hold: a.hold, hop: a.hop });
+        } else if (a.type === 'replied') {
+          if (a.say) writeChat(this.dir(), { kind: 'msg', id: replyMessageId(a.item), from: a.teammate, to: [], text: a.text.slice(0, 4000), run: a.item }, now);
+          workItemsDisk.updateWorkItem(this.store.productDir(a.product), a.item, { status: 'done', labels: [...a.labels, 'clean'] }, { source: 'system', now });
         } else if (a.type === 'release') {
           const dir = this.store.productDir(a.product);
           workItemsDisk.updateWorkItem(dir, a.item, { start: 'now' }, { source: 'system', now });
@@ -803,7 +809,7 @@ export class Teammates {
       "## The person's projects",
       // No documents folder by path: a cloud run is sent every folder its brief names.
       ...products.map((p) => `- ${p.name}${p.slug === t.product ? ' (yours)' : ''}: ${p.repoPath ? `code at ${p.repoPath}` : 'no code'}`),
-      'Read any of them when your job needs it; list_documents and read_document open any project\'s documents by its name. Change files only in your own, unless the person asks.',
+      'Read any of them when your job needs it; list_documents and read_document open any project\'s documents by its name. Never change files, branches or commits in another project\'s folder, even when the person asks: those folders are their own working copies. This run has a folder of its own in this thread\'s project. Work in another project goes to a thread of its own there: team_pass with project set, to the teammate whose job it is, or to yourself.',
       '',
     ];
   }

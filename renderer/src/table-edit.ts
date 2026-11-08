@@ -2,7 +2,7 @@
 // over, copied and pasted the way a spreadsheet does it, rows and columns added
 // and taken away, and the file written back in the shape it came in.
 // TableView.tsx is the hands; nothing here touches a window.
-import { isMarkdownTable, parseDelimited, sepFor, tagTone, type Column, type ColumnKind, type Table } from './table-file';
+import { isMarkdownTable, parseDelimited, sepFor, tagTone, type Column, type ColumnKind, type Table, type Tone } from './table-file';
 
 export type At = { r: number; c: number };
 /** `a` is where the pick began and stays; `b` is the end that moves. Rows are places in the view, not in the file. */
@@ -86,8 +86,22 @@ export function pasteInto(values: string[][], box: Box, lastCol: number): Array<
 /** A tag column learns a value it has not seen, in the colour its word means or the next in turn. */
 export function learnTag(col: Column, value: string): Column {
   const v = value.trim();
-  if (col.kind !== 'tag' || !v || v.toLowerCase() in col.tones) return col;
-  return { ...col, values: [...col.values, v], tones: { ...col.tones, [v.toLowerCase()]: tagTone(v, col.values.length, col.name) } };
+  const key = v.toLowerCase();
+  if (col.kind !== 'tag' || !v || col.values.some((x) => x.toLowerCase() === key)) return col;
+  // A tag deleted and typed again keeps the colour it was given.
+  return { ...col, values: [...col.values, v], tones: { ...col.tones, [key]: col.tones[key] ?? newTone(col, v) } };
+}
+
+/**
+ * A new tag's colour: green or red when its word means done or lost; else the
+ * colour its word means if no other tag has it, or the first in turn no tag has.
+ */
+export function newTone(col: Column, value: string): Tone {
+  const used = new Set(col.values.map((x) => col.tones[x.toLowerCase()]));
+  const meant = [0, 1, 2, 3].map((p) => tagTone(value, p, col.name));
+  if (meant.every((t) => t === meant[0]) && (meant[0] === 'green' || meant[0] === 'rose' || !used.has(meant[0]))) return meant[0];
+  const turns: Tone[] = ['blue', 'purple', 'amber', 'teal', 'grey'];
+  return turns.find((t) => !used.has(t)) ?? turns[col.values.length % turns.length];
 }
 
 /** Cells written, by their row in the file. Only the rows touched are copied. */
@@ -185,6 +199,134 @@ export function showColumnAs(table: Table, at: number, kind: ColumnKind): Table 
   const columns = table.columns.slice();
   columns[at] = next;
   return { ...table, columns };
+}
+
+const sameTag = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/** A tag renamed in every cell that holds it. A name another tag has already merges the two. */
+export function renameTag(table: Table, at: number, from: string, want: string): Table {
+  const col = table.columns[at];
+  const to = want.trim();
+  if (!col || col.kind !== 'tag' || !to || to === from.trim()) return table;
+  const into = col.values.find((v) => sameTag(v, to) && !sameTag(v, from));
+  const written = into ?? to;
+  const rows = table.rows.map((r) => (sameTag(r[at] ?? '', from) ? Object.assign(r.slice(), { [at]: written }) : r));
+  const tones = { ...col.tones };
+  const was = tones[from.trim().toLowerCase()];
+  delete tones[from.trim().toLowerCase()];
+  if (!into && was) tones[to.toLowerCase()] = was;
+  const values = into ? col.values.filter((v) => !sameTag(v, from)) : col.values.map((v) => (sameTag(v, from) ? to : v));
+  const columns = table.columns.slice();
+  columns[at] = { ...col, values, tones };
+  return { ...table, rows, columns };
+}
+
+/** A tag taken out of the column, and out of every cell that holds it. */
+export function dropTag(table: Table, at: number, value: string): Table {
+  const col = table.columns[at];
+  if (!col || col.kind !== 'tag') return table;
+  const rows = table.rows.map((r) => (sameTag(r[at] ?? '', value) ? Object.assign(r.slice(), { [at]: '' }) : r));
+  const columns = table.columns.slice();
+  columns[at] = { ...col, values: col.values.filter((v) => !sameTag(v, value)) };
+  return { ...table, rows, columns };
+}
+
+// ---- What a person chose that a CSV cannot hold: a column's type and its tags'
+// colours. Kept on this computer by column name, beside the widths.
+
+/** `wrap`: the columns whose long text runs onto more lines rather than being cut off. */
+export type Looks = { kinds: Record<string, ColumnKind>; tones: Record<string, Record<string, Tone>>; wrap?: Record<string, boolean> };
+export const NO_LOOKS: Looks = { kinds: {}, tones: {} };
+
+export function withLooks(table: Table, looks: Looks): Table {
+  let t = table;
+  t.columns.forEach((c, i) => {
+    const kind = looks.kinds[c.name];
+    if (kind && kind !== c.kind && !(t.ranked && i === 0)) t = showColumnAs(t, i, kind);
+  });
+  const wrap = looks.wrap ?? {};
+  if (!t.columns.some((c) => (c.kind === 'tag' && looks.tones[c.name]) || !!wrap[c.name] !== !!c.wrap)) return t;
+  const columns = t.columns.map((c) => {
+    const next = c.kind === 'tag' && looks.tones[c.name] ? { ...c, tones: { ...c.tones, ...looks.tones[c.name] } } : c;
+    return !!wrap[c.name] === !!c.wrap ? next : { ...next, wrap: !!wrap[c.name] };
+  });
+  return { ...t, columns };
+}
+
+export const lookWrap = (looks: Looks, column: string, on: boolean): Looks => {
+  const { [column]: _, ...rest } = looks.wrap ?? {};
+  return { ...looks, wrap: on ? { ...rest, [column]: true } : rest };
+};
+
+/** Every tag's colour as drawn now, kept: the guess deals colours out in order of first row, so moving rows would deal them again. */
+export function pinTones(table: Table, looks: Looks): Looks {
+  let tones = looks.tones;
+  for (const c of table.columns) {
+    if (c.kind !== 'tag') continue;
+    const kept = tones[c.name] ?? {};
+    const fresh = Object.entries(c.tones).filter(([k]) => !(k in kept));
+    if (fresh.length) tones = { ...tones, [c.name]: { ...kept, ...Object.fromEntries(fresh) } };
+  }
+  return tones === looks.tones ? looks : { ...looks, tones };
+}
+
+export const lookKind =(looks: Looks, column: string, kind: ColumnKind): Looks => ({ ...looks, kinds: { ...looks.kinds, [column]: kind } });
+export const lookTone = (looks: Looks, column: string, tag: string, tone: Tone): Looks =>
+  ({ ...looks, tones: { ...looks.tones, [column]: { ...looks.tones[column], [tag.trim().toLowerCase()]: tone } } });
+
+export function lookRenameColumn(looks: Looks, from: string, to: string): Looks {
+  if (from === to || (!(from in looks.kinds) && !(from in looks.tones) && !(from in (looks.wrap ?? {})))) return looks;
+  const move = <T,>(m: Record<string, T>) => {
+    if (!(from in m)) return m;
+    const { [from]: kept, ...rest } = m;
+    return { ...rest, [to]: kept };
+  };
+  return { kinds: move(looks.kinds), tones: move(looks.tones), ...(looks.wrap ? { wrap: move(looks.wrap) } : {}) };
+}
+
+export function lookRenameTag(looks: Looks, column: string, from: string, to: string): Looks {
+  const set = looks.tones[column];
+  const key = from.trim().toLowerCase();
+  if (!set || !(key in set)) return looks;
+  const { [key]: tone, ...rest } = set;
+  return { ...looks, tones: { ...looks.tones, [column]: { ...rest, [to.trim().toLowerCase()]: tone } } };
+}
+
+// ---- Rows and columns moved. `to[i]` is where what stood at `i` stands now.
+
+/** The new order of places when those in `moving` go, in their order, just before place `before`. Null when nothing moves. */
+function movedPlaces(length: number, moving: number[], before: number): number[] | null {
+  const going = new Set(moving.filter((i) => i >= 0 && i < length));
+  if (!going.size) return null;
+  const stay = Array.from({ length }, (_, i) => i).filter((i) => !going.has(i));
+  const at = stay.filter((i) => i < before).length;
+  const places = [...stay.slice(0, at), ...[...going].sort((a, b) => a - b), ...stay.slice(at)];
+  return places.every((p, i) => p === i) ? null : places;
+}
+const whereEachWent = (places: number[]) => {
+  const to = places.slice();
+  places.forEach((old, now) => { to[old] = now; });
+  return to;
+};
+
+/** Rows of the file put just before the row at `before` (the row count puts them last). They need not stand together. */
+export function moveRows(table: Table, rows: number[], before: number): { table: Table; to: number[] } {
+  const places = movedPlaces(table.rows.length, rows, before);
+  if (!places) return { table, to: table.rows.map((_, i) => i) };
+  const list = places.map((i) => table.rows[i]);
+  return { table: { ...table, rows: countsUp(table) ? renumbered(list) : list }, to: whereEachWent(places) };
+}
+
+/** Columns that stand together, put just before the column at `before`. A ranked file's rank stays first. */
+export function moveColumns(table: Table, from: number, count: number, before: number): { table: Table; to: number[] } {
+  const first = table.ranked ? 1 : 0;
+  const places = from < first ? null : movedPlaces(table.columns.length, Array.from({ length: count }, (_, k) => from + k), Math.max(before, first));
+  if (!places) return { table, to: table.columns.map((_, i) => i) };
+  const to = whereEachWent(places);
+  return {
+    table: { ...table, columns: places.map((i) => table.columns[i]), rows: table.rows.map((r) => places.map((i) => r[i])), logoCol: table.logoCol < 0 ? -1 : to[table.logoCol] },
+    to,
+  };
 }
 
 /**

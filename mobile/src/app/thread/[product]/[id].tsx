@@ -35,6 +35,7 @@ import { appStore } from '../../../platform/persist';
 import { useCloud } from '../../../state/cloud';
 import { useComputerAgents } from '../../../state/computer-agents';
 import { replyModel } from '../../../lib/compose';
+import { useSendWhenOnline } from '../../../state/send-when-online';
 import { AttachSheet, Attached } from '../../../ui/Attach';
 import { SentFiles, ThreadFiles, useMessageFiles } from '../../../ui/Files';
 import { Back, Chevron, Clip, DoneMark, More, Panel } from '../../../ui/icons';
@@ -130,7 +131,7 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
   const priority = picked.priority ?? priorityValueOf(shownLevel(item));
   const agents = useComputerAgents();
   const codex = { codexModels: agents.codexModels, codexDefault: agents.codexDefault };
-  const { engine, model, label: modelLabel } = replyModel(item, picked, codex);
+  const { engine, model, label: modelLabel } = replyModel(item, picked, agents);
   const mode = picked.permissionMode ?? 'auto';
   const folded = foldedReply(draft.text, draft.files.map((f) => ({ name: f.name, image: isImageName(f.name) })));
   const deps = useRef<ReplyDeps | null>(null);
@@ -139,10 +140,17 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
     busy: setBusy,
     attach: (files) => c.attach(item.product, files),
     send: (text, choices, undone) => c.send({ kind: 'reply', text, choices }, item, { undone }),
-    failed: (m) => setError(`Not sent: ${m}`),
+    failed: (m) => setFailed(offline.failed(m)),
   };
-  const [send] = useState(() => replySender(() => deps.current!, (sent) => { if (sent) { setPicked({}); setOpen(false); } }));
-  const talk = useDictation(draft, () => void send(picked));
+  const [send] = useState(() => replySender(() => deps.current!, (sent) => { if (sent) { offline.clear(); setFailed(null); setPicked({}); setOpen(false); } }));
+  const pickedNow = useRef(picked);
+  pickedNow.current = picked;
+  const offline = useSendWhenOnline(() => {
+    if (!draft.text.trim() && !draft.files.length) { offline.clear(); setFailed(null); return; }
+    void send(pickedNow.current);
+  });
+  const sendByHand = () => { offline.clear(); void send(picked); };
+  const talk = useDictation(draft, sendByHand);
   const typing = useRef<ComponentRef<typeof TextInput>>(null);
   // A box that only listened, and heard nothing, folds away as an empty one does on blur.
   useEffect(() => { if (!talk.on && !talk.problem && !ready && !sheet && !typing.current?.isFocused()) setOpen(false); }, [talk.on]);
@@ -208,7 +216,7 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
                 <T style={{ fontSize: 13, fontFamily: font.medium, color: color.dim }}>Stop</T>
               </Pressable>
             ) : (
-              <Pressable disabled={busy || !ready} accessibilityRole="button" onPress={() => void send(picked)}
+              <Pressable disabled={busy || !ready} accessibilityRole="button" onPress={sendByHand}
                 style={({ pressed }) => ({ height: 29, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: busy || !ready ? 0.5 : 1 })}>
                 <T style={{ fontSize: 13, fontFamily: font.semibold }}>{busy ? 'Sending…' : 'Send'}</T>
               </Pressable>
@@ -298,7 +306,8 @@ export default function ThreadScreen() {
   const [contextWhole, setContextWhole] = useState(false);
   const [foldedRounds, setFoldedRounds] = useState(() => foldedKeys(appStore.getItem(CHOICES_FOLDED)));
   useEffect(() => { setWhole(false); setAsking(false); setCutting(false); setEarlierOpen(false); setContextWhole(false); }, [product, id]);
-  const thread = useMemo(() => threadOf(c.rows, c.view, String(product), String(id), { whole, tabs: c.tabs }), [c.rows, c.view, c.tabs, product, id, whole]);
+  const me = c.signedIn ? c.cloud?.session()?.user.id ?? null : null;
+  const thread = useMemo(() => threadOf(c.rows, c.view, String(product), String(id), { whole, tabs: c.tabs, me }), [c.rows, c.view, c.tabs, product, id, whole, me]);
   const { dir, files } = useMessageFiles(String(product), String(id));
   const inset = useSafeAreaInsets();
   const waiting = !!thread?.events.some((e: any) => e.kind !== 'work' && e.pending);

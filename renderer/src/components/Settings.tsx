@@ -91,15 +91,22 @@ export function shortPath(full: string, home?: string | null): string {
 
 /* --------------------------------- controls ------------------------------- */
 
-function Switch({ on, onChange, label, busy }: { on: boolean; onChange: (v: boolean) => void; label: string; busy?: boolean }) {
+// It flips on the click, not when the save answers: a slow answer read as a
+// click that did not land. Once the save settles it shows what was saved.
+export function Switch({ on, onChange, label, busy }: { on: boolean; onChange: (v: boolean) => void | Promise<unknown>; label: string; busy?: boolean }) {
+  const [want, setWant] = useState<boolean | null>(null);
+  const shown = want ?? on;
   return (
     <button
       type="button"
       role="switch"
-      aria-checked={on}
+      aria-checked={shown}
       aria-label={label}
-      className={`set-sw ${on ? 'on' : ''} ${busy ? 'busy' : ''}`}
-      onClick={() => onChange(!on)}
+      className={`set-sw ${shown ? 'on' : ''} ${busy ? 'busy' : ''}`}
+      onClick={() => {
+        setWant(!shown);
+        void Promise.resolve(onChange(!shown)).catch(() => {}).finally(() => setWant(null));
+      }}
     />
   );
 }
@@ -576,12 +583,13 @@ export function accountTile(a: OneAccount, { many, now, onUse, cloud = false, on
     // as well, because until somebody picked, every account took a share of
     // the work and none of them was the one; the supervisor answers `chosen`
     // now, so the tile with it is the account and the others offer the switch.
-    inUse: !!h?.chosen,
+    // The supervisor names one Codex login as the one that runs even before it is signed in.
+    inUse: !!h?.chosen && !signingIn,
     limits: a.limits, checkedAt: a.checkedAt, usageError: a.usageError,
     use: h?.signedIn && !h.chosen && many ? { word: 'Switch', onUse: () => onUse(h.profile) } : null,
     trouble,
     cmd: trouble && h?.dir ? `CLAUDE_CONFIG_DIR=${h.dir} claude` : null,
-    meters: !!(h || a.limits?.length),
+    meters: !!a.limits?.length || (!!h && !signingIn),
   };
 }
 
@@ -1032,10 +1040,10 @@ function CloudPlansPage({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: (
             {sum.manage && <button type="button" className="set-ghost" onClick={() => void billing()}>Manage billing</button>}
           </div>
         </Group>
-        <Group id="cloud-use" label="This month" bare>
-          <div className="bill-meters">{meter('Agents in the cloud', sum.agents)}{meter('Hours used', sum.hours)}</div>
+        <Group id="cloud-use" label={sum.period} bare>
+          <div className="bill-meters">{meter('Agents in the cloud', sum.agents)}{meter(sum.hours.label, sum.hours)}</div>
         </Group>
-        <Group id="cloud-plans" label="Change plan" bare><div className="bill-cards">{cards}</div></Group>
+        <Group id="cloud-plans" label={sum.change} bare><div className="bill-cards">{cards}</div></Group>
         {lines}
       </Page>
     );
@@ -1606,6 +1614,9 @@ function ProjectTitle({ project, onRename }: {
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditing(true); } }}
       >
         {project.name}
+        {/* Projects promises "open it to rename it", and a title that only
+            lights under the pointer was never found (QA batch 011, F-172). */}
+        <svg className="set-title-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /></svg>
       </h1>
     );
   }

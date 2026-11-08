@@ -231,10 +231,10 @@ export function phoneView(rows: PhoneRows, now = Date.now()) {
 }
 
 /** What one thread's live line is told of the computer's queue, off the view (the phone app's thread page). */
-export function waitFacts(view: Pick<ReturnType<typeof phoneView>, 'queued' | 'runNow' | 'stalled' | 'shipping' | 'signInNeeded' | 'atLimit' | 'paused'>, id: string) {
+export function waitFacts(view: Pick<ReturnType<typeof phoneView>, 'queued' | 'runNow' | 'stalled' | 'shipping' | 'signInNeeded' | 'atLimit' | 'paused' | 'approvals'>, id: string) {
   return {
     queued: view.queued, runNow: view.runNow, signInNeeded: view.signInNeeded, atLimit: view.atLimit, paused: view.paused,
-    stalled: view.stalled.includes(id), shipping: view.shipping.includes(id),
+    stalled: view.stalled.includes(id), shipping: view.shipping.includes(id), asking: view.approvals.some((a) => a.item === id),
   };
 }
 

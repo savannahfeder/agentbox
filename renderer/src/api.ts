@@ -4,7 +4,7 @@ import {updateFixture} from './agent-update-fixture';
 // bridge; fixtures mode (?fixtures=1) serves canned data so the UI can be
 // developed, reviewed, and screenshotted without a live store or any agents.
 
-import type { AccountUsageReading, AgentConversation, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, TeamMessageFile, ThreadEditPatch, UpdateState, Usage, UsageLimit, WorkItem } from './types';
+import type { AccountUsageReading, AgentConversation, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, FilesUploaded, TeamMessageFile, ThreadEditPatch, UpdateState, Usage, UsageLimit, WorkItem } from './types';
 import type { LedgerLine } from './thread-history';
 import type { AgentFile as AgentFileRow } from './onboarding';
 import type { AgentFolder, SessionThread } from './agent-import-card';
@@ -31,6 +31,7 @@ import { MOVE_SAY } from '../../shared/where-it-runs-from.mts';
 import { cardsInFront } from '../../shared/which-card-is-in-front.mts';
 import { snapshotReader } from '../../shared/snapshot-delta.mjs';
 import { traceReader } from '../../shared/trace-delta.mjs';
+import { withoutFileHomes } from '../../shared/file-home.mjs';
 // THE SECOND FRONT DOOR, AND IT HAS TO BE BUILT BEFORE THE LINE BELOW RUNS.
 // `useFixtures` reads `window.zero` once, at module load, and on the desktop
 // preload.cjs has already put it there. In a browser tab nothing has, so this
@@ -579,12 +580,24 @@ export const api = {
         base.supervisor.queued = queued;
         base.supervisor.capacity = base.supervisor.running.filter((r) => (r as { where?: string }).where !== 'cloud').length;
       }
+      // &usagestale: a Codex reading six hours old whose five hour window has ended.
+      if (params.has('usagestale')) {
+        const now = Date.now();
+        const limits = [
+          { span: 'session' as const, qualifier: null, name: 'This session', percent: 2, resetsText: null, resetsOn: null, resetsAt: now - 60 * 60_000, zone: null },
+          { span: 'week' as const, qualifier: null, name: 'This week', percent: 30, resetsText: null, resetsOn: null, resetsAt: now + (3 * 24 + 16) * 3_600_000, zone: null },
+        ];
+        base.usage = { engine: 'codex', limits, at: now - 6 * 3_600_000 };
+        base.usageByEngine = [base.usage];
+      }
       return fixtureSecondEngine(base, engineFixtures);
     }
+    // A document's holder thread is the app's, so no list of threads draws it.
+    const shown = (s: Snapshot) => ({ ...s, items: withoutFileHomes(s.items) });
     const got = snapshots.take(await window.zero!.snapshot({ ...snapshots.ask(), open: openThread }));
-    if (got) return got;
+    if (got) return shown(got);
     // Built on a list this window no longer holds: a whole one, which take() never refuses.
-    return snapshots.take(await window.zero!.snapshot({ open: openThread })) as Snapshot;
+    return shown(snapshots.take(await window.zero!.snapshot({ open: openThread })) as Snapshot);
   },
 
   // WHERE YOU ARE, FOR THE ONE THING THAT DEPENDS ON IT: the approval card in
@@ -982,6 +995,14 @@ export const api = {
   async filesPlaceFolder(p: FileFolderAct): Promise<{ ok: boolean; error?: string; folder?: string | null }> {
     if (!window.zero?.filesPlaceFolder) return { ok: false, error: `quit and reopen ${NAME} to use folders` };
     return window.zero.filesPlaceFolder(p);
+  },
+  async filesPlaceNew(p: { project: string; name: string; kind: 'document' | 'table'; folder: string | null }): Promise<{ ok: boolean; error?: string; key?: string }> {
+    if (!window.zero?.filesPlaceNew) return { ok: false, error: `Quit and reopen ${NAME} to make a document here.` };
+    return window.zero.filesPlaceNew(p);
+  },
+  async filesPlaceUpload(p: { project: string; folder: string | null }): Promise<FilesUploaded> {
+    if (!window.zero?.filesPlaceUpload) return { ok: false, error: `Quit and reopen ${NAME} to add files here.` };
+    return window.zero.filesPlaceUpload(p);
   },
   async filesPlaceOpen(p: { key: string }): Promise<FilesPlaceView | null> {
     return (await window.zero?.filesPlaceOpen?.(p).catch(() => null)) ?? null;
@@ -1455,8 +1476,10 @@ export const api = {
     }
     // AND THE MACHINE THAT MUST NOT BE SIGNED IN FOR: Codex on the disk, signed
     // out. `afterCheck` reads this as `found`, which draws and starts nothing.
+    // A press waits on the browser, so that screen can be photographed too.
     if (useFixtures && engineFixtures === 'signedout') {
-      return { engine, phase: 'idle', error: null, log: '', found: engine === 'codex', signedIn: false };
+      const waiting = engine === 'codex' && action !== 'ready' && action !== 'cancel';
+      return { engine, phase: waiting ? 'signing-in' : 'idle', error: null, log: '', found: engine === 'codex', signedIn: false };
     }
     const zero = window.zero as any;
     if (!zero?.engineSetup) return assumeReady;
@@ -1628,10 +1651,14 @@ export const api = {
   async cloudAccountReopen(): Promise<void> { await (window.zero as any)?.cloudAccountReopen?.(); },
   async cloudAccountSignOut(): Promise<void> { await (window.zero as any)?.cloudAccountSignOut?.(); },
   async cloudAccountPlan(): Promise<CloudPlan> {
-    // &cloudplan=pro draws someone on Pro, 6 running and 88 of 400 hours used.
-    if (useFixtures) return params.get('cloudplan') === 'pro'
-      ? { signedIn: true, plan: 'pro', unlimited: false, agents: 10, hoursPerMonth: 400, running: 6, usedSeconds: 88 * 3600 }
-      : { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0 };
+    // &cloudplan=pro draws someone on Pro, 6 running and 88 of 400 hours used;
+    // &cloudplan=free someone on the free hours, 1 running and 1.5 of 5 used.
+    if (useFixtures) {
+      if (params.get('cloudplan') === 'pro') return { signedIn: true, plan: 'pro', unlimited: false, agents: 10, hoursPerMonth: 400, running: 6, usedSeconds: 88 * 3600 };
+      if (params.get('cloudplan') === 'free') return { signedIn: true, plan: 'free', unlimited: false, agents: 2, hoursPerMonth: 5, running: 1, usedSeconds: 1.5 * 3600, billing: null };
+      if (params.get('cloudplan') === 'spent') return { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0, billing: null, free: { agents: 2, hours: 5, usedSeconds: 5 * 3600 } };
+      return { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0 };
+    }
     return (await (window.zero as any)?.cloudAccountPlan?.()) ?? { signedIn: false };
   },
   async cloudAccountPay(plan: 'pro' | 'plus' | 'max'): Promise<{ ok: boolean; where?: 'checkout' | 'billing'; error?: string; message?: string }> {

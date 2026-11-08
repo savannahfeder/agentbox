@@ -95,19 +95,24 @@ export function teamPass({ to, title, details, project: named } = {}, ctx = {}) 
   // The work is done where it is named, or for a thread handing it on, in that
   // thread's project; otherwise in the receiver's own.
   const where = named ? resolveProduct(named).id : me ? null : project.id;
-  const [target] = idsFor(to, team, me);
-  if (!target) throw new Error('pass work to another teammate, not to yourself');
+  // To yourself only for work in another project: it gets a thread of its own there.
+  const toSelf = !!me && !!where && where !== project.id && idsFor(to, team, null).includes(me.id);
+  const [target] = toSelf ? [me.id] : idsFor(to, team, me);
+  if (!target) throw new Error('pass work to another teammate, not to yourself. For work in another project, name it in project');
   const what = plain(title);
   if (!what) throw new Error('give the work a short title');
-  const yours = !!me?.primary && startedByYou(item);
+  const yours = toSelf ? startedByYou(item) : !!me?.primary && startedByYou(item);
   const m = writeChat(dir, { kind: 'pass', from: me?.id ?? YOU, to: target, title: what.slice(0, 200), details: String(details ?? '').slice(0, 6000), hop, ...writtenIn, ...(where ? { product: where } : {}), ...(yours ? { yours: true } : {}) }, ctx.now);
   const them = team.find((t) => t.id === target);
-  const held = me && !yours && them?.handoffsNeedYes !== false;
+  const held = me && !yours && (toSelf || them?.handoffsNeedYes !== false);
   return {
     passed: m.id, to: them?.name,
-    note: held
+    note: toSelf
+      ? (held ? 'The person did not ask for this, so it waits in their inbox for their yes. Say so in your answer.'
+        : 'It starts in a thread of its own in that project once this run ends. Do none of it here; say so in your answer and finish.')
+      : held
       ? `${them.name} takes work from teammates only with the person's yes, so this waits in their inbox until they reply. Say so in your answer.`
-      : yours ? `The person asked for this, so it starts now for ${them?.name ?? 'them'}, in the thread they already have on this work or a new one.`
+      : yours ?`The person asked for this, so it starts now for ${them?.name ?? 'them'}, in the thread they already have on this work or a new one.`
         : `It goes to the thread ${them?.name ?? 'they'} already has on this work, or starts one, and wakes them.`,
   };
 }
