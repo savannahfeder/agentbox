@@ -24,7 +24,7 @@ export const isKeyAsk = (line) => ASK_LINE.test(String(line ?? '').replace(/^`+|
 // What the agent said the key is, as a short name for Settings: "your Stripe
 // secret key, from dashboard.stripe.com/apikeys" is "Stripe secret key".
 export function keyWords(what) {
-  return String(what ?? '').split(/,\s*from\b|\s+from\s+\S+\.\w|\s*\(/i)[0].replace(/^\s*(your|an?|the)\s+/i, '').trim().slice(0, 80) || null;
+  return String(what ?? '').split(/,\s*from\b|\s+from\s+\S+\.\w|\s*\(|\.\s/i)[0].replace(/^\s*(your|an?|the)\s+/i, '').trim().slice(0, 80) || null;
 }
 export function keyLabel(what) {
   const t = keyWords(what);

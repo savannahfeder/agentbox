@@ -85,9 +85,13 @@ export function rememberOffered(store: Pick<Storage, 'setItem'>): void {
  *  the back of a failure.
  *
  *  `touring` is someone the new first run took through (../tour.ts): their
- *  tutorial is on their own inbox, so a practice round is never offered. */
-export function offerOnNewProject(p: { made: boolean; walking: boolean; offered: boolean; touring?: boolean }): boolean {
-  return p.made && !p.walking && !p.offered && !p.touring;
+ *  tutorial is on their own inbox, so a practice round is never offered.
+ *
+ *  `writing` is a project made from the task box's own menu with a task in
+ *  hand: the offer would take the keyboard, and the next key typed would start
+ *  the tutorial over their words (F-195). */
+export function offerOnNewProject(p: { made: boolean; walking: boolean; offered: boolean; touring?: boolean; writing?: boolean }): boolean {
+  return p.made && !p.walking && !p.offered && !p.touring && !p.writing;
 }
 
 /**

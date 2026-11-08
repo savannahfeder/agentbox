@@ -1,5 +1,5 @@
 // A FILE SHARED BY ITS LINK, as the web app reads it: <site>/f/<token>.
-// The database side is cloud/supabase/migrations/20261105000000_a_file_anyone_with_its_link_can_read.sql.
+// The database side is cloud/supabase/migrations/20261105000001_a_file_anyone_with_its_link_can_read.sql.
 
 export type Rpc = (name: string, args: Record<string, unknown>) => Promise<any>;
 export type FileKind = 'markdown' | 'page' | 'image' | 'pdf';

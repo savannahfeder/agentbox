@@ -20,6 +20,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
+import { emptyDatabase } from './an-empty-test-database.mjs';
 import {
   REPLY_MARK, KIT_VERSION, CLOUD_TAKES_AFTER_MS, cloudClaim, runOfClaim, cloudSessionId, kitKey, serverRunKey,
   replyFrame, replyPrompt, cloudUserLine, checkKit, startPayload, lastAnswerIn,
@@ -167,7 +168,7 @@ grant usage on schema public to anon, authenticated, service_role;
   };
   let id;
   beforeEach(async () => {
-    db = new PGlite();
+    db = new PGlite(await emptyDatabase());
     await db.exec(STAND_IN);
     await db.exec(migrations);
     await db.exec(`

@@ -21,8 +21,12 @@
  */
 export const PICK_SETTLES_MS = 800;
 
-/** The thread the app last moved you to, and when. */
-export type Arrival = { key: string; at: number } | null;
+/** Where the pointer stood, in screen pixels. */
+export type Point = { x: number; y: number };
+
+/** The thread the app last moved you to, when, and where the pointer stood
+ *  then. `from` goes back to null once a click has been refused for it. */
+export type Arrival = { key: string; at: number; from?: Point | null } | null;
 
 /**
  * Whether a number pressed now is aimed at the thread on screen. `here` and
@@ -65,3 +69,25 @@ export function clickLandsOnTheRowYouSaw(movedAt: number | null, now: number): b
 /** Said when one is refused, and it is true: the next click goes through. */
 export const THE_OPTIONS_MOVED =
   'The options moved under your pointer. Click the one you want again.';
+
+// A CLICK ON A THREAD THE APP JUST OPENED WANTS THE POINTER TO HAVE MOVED.
+// After a pick or a reply the next thread is drawn where the pointer already
+// stands, often with "Commit it and ship" under it (F-174). A key is guarded
+// for a moment; a second click meant for the card you left can come later than
+// that, and nothing about it is aimed at the new thread. So until the pointer
+// moves, the first click is refused and says so, and the one after it goes.
+
+/** How long after the app opened a thread a still pointer is suspect. */
+export const STILL_POINTER_MS = 10_000;
+
+/** Whether a click on this thread's options is aimed at it. `pointer` is
+ *  where the pointer stands now, null when it has never moved. */
+export function clickAimedHere(arrival: Arrival, here: string, now: number, pointer: Point | null): boolean {
+  if (!pickLandsHere(arrival, here, now)) return false;
+  if (!arrival || arrival.key !== here || !arrival.from || !pointer) return true;
+  if (now - arrival.at >= STILL_POINTER_MS) return true;
+  return Math.hypot(pointer.x - arrival.from.x, pointer.y - arrival.from.y) > MOVED_PX;
+}
+
+export const CLICK_FOR_THE_THREAD_YOU_LEFT =
+  'That click was for the thread you just left. Click again to answer this one.';

@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
+import { emptyDatabase } from './an-empty-test-database.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const migrationsDir = path.join(root, 'cloud/supabase/migrations');
@@ -58,7 +59,7 @@ const command = async (person = OWNER, extra = '') => (await rows(person,
    values ($1, 'alpha', 'w-1', 'reply', '{"text":"yes"}'${extra ? ', ' + extra.split('=')[1] : ''}) returning id, created_at, taken_at, outcome`, [DEV]))[0];
 
 beforeAll(async () => {
-  db = new PGlite();
+  db = new PGlite(await emptyDatabase());
   await db.exec(SUPABASE_STAND_IN);
   await db.exec(migration);
   await db.exec(GRANTS);
@@ -140,7 +141,7 @@ describe('nobody signed in', () => {
 // that were not there yet.
 describe('a database that ran either earlier draft', () => {
   it.each(['phone-inbox-first-draft.sql', 'phone-inbox-second-draft.sql', 'phone-inbox-third-draft.sql'])('%s ends with the tables as they are now, and the holes closed', async (fixture) => {
-    const old = new PGlite();
+    const old = new PGlite(await emptyDatabase());
     await old.exec(SUPABASE_STAND_IN);
     const draft = fs.readFileSync(path.join(root, 'tests/fixtures', fixture), 'utf8');
     const before = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql') && f < '20261014000000').sort().map((f) => fs.readFileSync(path.join(migrationsDir, f), 'utf8')).join('\n');

@@ -9,9 +9,10 @@ import type { BridgeStateEvent } from './task-remote-control.mts';
 import { taskFolderPath, real, restoreTaskFolder } from './task-folders.mts';
 import { SHIP_LABEL, ShipQueue, readShipSettings, shipScriptFor, shipSlot } from './ship-queue.mts';
 import { MainTests } from './main-went-red.mts';
+import { CloudServerWatch, serverError } from './cloud-server-down.mts';
 import { folderJob } from './task-folders-offthread.mts';
 import { gitJob } from './git-change-offthread.mts';
-import { queuedReplyText, submitReply, framedTeammate } from './live-replies.mts';
+import { queuedReplyText, submitReply, framedPick, framedTeammate } from './live-replies.mts';
 import { resolveAnsweredNotes, wakeForNotes } from './notes-wake.mjs';
 import { TEAM_LOOK, TEAM_LOOK_LINE } from '../shared/team-look.mjs';
 import { editedFilesLine } from '../shared/artifact-marks.mjs';
@@ -69,6 +70,7 @@ import { execFileSync } from 'node:child_process';
 import { holdUntilHome } from './cloud/codex-cloud.mts';
 import { hostSocketPath, perlRunsTheShim, HOST_ALREADY_THERE } from './cloud/host.mts';
 import { runHostSocket, spoolFiles, HOST_ALREADY_THERE as RUN_HOST_ALREADY_THERE } from './run-host.mjs';
+import { toolHostDir, readToolHost, shareToolServers, TOOL_HOST_ALREADY_THERE } from './tool-host.mjs';
 import { HostedRun, HOST_LOST } from './hosted-run.mjs';
 import { readCloudUsage, summarizeCloudUsage } from './cloud/usage.mts';
 import { buildSessionArgs, CLAUDE_MODES, parseSessionArgs, permissionMode } from './settings.mts';
@@ -521,6 +523,8 @@ export interface FruitlessRecord {
   saidTs?: number;
   saidWhy?: string;
   saidGaveUp?: boolean;
+  // The `endedAt` of the run the stranded pass read to its end and had nothing to say about.
+  quietAt?: number;
   resetsAt?: string;
   strandedSince?: number;
 }
@@ -906,6 +910,8 @@ const SWITCH_RESTARTS = 3;
 const SWITCH_WINDOW_MS = 30 * 60_000;
 // The reasons a queued thread's line names (`status().cannotStart`).
 const SAID_WHY_NOT_STARTED = new Set(['setup', 'asleep', 'cloud-carried', 'engine', 'login', 'memory', 'slow-folder', 'error', 'brake']);
+// Refusals that waiting will not fix, so Try again reports them instead of queueing the thread.
+const NEVER_CLEARS = new Set(['model', 'project', 'practice', 'folder']);
 // Making a thread's folder takes seconds; past this it is said to be slow.
 const SLOW_FOLDER_MS = 2 * 60_000;
 // A project's kit for a new thread from the phone: left again at most this
@@ -997,7 +1003,8 @@ const HUNG_QUIET_MS = 10 * 60_000;
 // missed passes: past any slow pass, well under the ten minutes above.
 const SLEPT_GAP_MS = 2 * 60_000;
 const PROFILES_KEPT_MS = 1000;
-const TRACES_KEPT = 500;
+// A tick may spend this long reading session logs it has never read.
+const NEW_TRACES_BUDGET_MS = 250;
 // Awake this long and not joined or taken back, a row handed to the cloud runs here (`_carriedHolds`).
 const PHONE_QUIET_MS = 10 * 60_000;
 // Two hangs on one row inside this window and the app stops restarting it and
@@ -1217,6 +1224,7 @@ export class Supervisor {
   declare onShipped: () => void;
   declare shipQueue: ShipQueue;
   declare mainTests: MainTests;
+  declare cloudServerWatch: Pick<CloudServerWatch, 'down' | 'up'>;
   declare sessions: Map<string, WorkerSession>;
   declare onChange: (() => void) | null;
   declare onRecovered: ((news: RecoveryNews) => void) | null;
@@ -1234,6 +1242,7 @@ export class Supervisor {
   declare idleMs: (() => number | null | undefined) | undefined;
   declare stalls: { take(): Record<string, unknown> | undefined; longestNow?(): number } | undefined;
   declare hostRuns: boolean | undefined;
+  declare shareTools: boolean | undefined;
   declare terminalOpen: ((id: string) => boolean) | undefined;
   declare runLedger: string | undefined;
   declare _remoteControls: Map<string, RemoteControlState> | undefined;
@@ -1250,6 +1259,9 @@ export class Supervisor {
   declare _runHostBroken: number | undefined;
   declare _runHostSock: string | undefined;
   declare _runHostProc: ChildProcess | undefined;
+  declare _toolHostDir: string | undefined;
+  declare _toolHostProc: ChildProcess | undefined;
+  declare _toolHostDeaths: number | undefined;
   declare _stateFile: string;
   declare _handledAnswers: Set<string>;
   declare _resumedWaits: Set<string>;
@@ -1439,6 +1451,7 @@ export class Supervisor {
     // agent has ended its turn, so main was red for four days in October with
     // nobody reading the cross (main/main-went-red.mts).
     this.mainTests = new MainTests({ store, userDir });
+    this.cloudServerWatch = new CloudServerWatch({ store, userDir, home: config?.home || undefined });
     this._compactionJobs = new Map();
     this.sessions = new Map(); // itemId -> {child, product, startedAt, tail, itemId}
     // Spawns waiting on their row's folder, and folders made for the spawn that
@@ -1726,6 +1739,7 @@ export class Supervisor {
     // meet the memory hold too rather than all arriving before the first
     // reading does (main/start-hold.mts). One sysctl, a few milliseconds.
     if (this.config.memoryGate) this._memReading = readMacPressureNow();
+    if (this.shareTools) this._toolHost();
     try { this.recoverInterrupted('startup'); } catch (e) { console.warn('zero: startup recovery:', (e as Error).message); }
     if (this.config.memoryGate) this.setMemoryGate(true).catch((e) => console.warn('zero: memory gate:', e.message));
     this.setLeftoverCleanup(!!this.config.cleanupLeftovers).catch((e) => console.warn('zero: leftovers:', e.message));
@@ -2037,8 +2051,13 @@ export class Supervisor {
       if (this._roomFor(this._engineFor(item), item, { asked: true })) {
         // A start that throws is said on the press, not lost with the rest of the selection.
         try {
-          this._spawnResume(item);
-          out.resumed += 1;
+          const turnedAway = this._spawnResume(item);
+          if (!turnedAway) out.resumed += 1;
+          else if (NEVER_CLEARS.has(turnedAway)) out.failed += 1;
+          else {
+            this._resumeQueue.add(item.id);
+            out.queued += 1;
+          }
         } catch (error) {
           this._noteNotStarting(item, 'error', this._engineFor(item));
           out.failed += 1;
@@ -2129,7 +2148,8 @@ export class Supervisor {
       // waits behind the OTHER subscription is a resume that never happens.
       if (!this._roomFor(this._engineFor(item), item, { asked: true })) continue;
       this._resumeQueue.delete(item.id);
-      this._spawnResume(item);
+      const turnedAway = this._spawnResume(item);
+      if (turnedAway && !NEVER_CLEARS.has(turnedAway)) this._resumeQueue.add(item.id);
     }
   }
 
@@ -2137,11 +2157,18 @@ export class Supervisor {
   // worker has not answered: that is what puts "the founder has answered" in
   // the brief instead of briefing a stranger about a thread she is mid-way
   // through. Otherwise it is an ordinary session on the item.
-  _spawnResume(item: WorkItem) {
+  //
+  // Returns the reason spawnWorker turned the row away (it does not throw for
+  // one), or null when a run is on it or on its way.
+  _spawnResume(item: WorkItem): string | null {
     const live = item.answer && item.answer !== '(withdrawn)';
     if (live) this._handledAnswers.add(this._answerKey(item));
+    const before = this._notStarting?.get(item.id);
     // She resumed it by name, and its launch asks memory the way its queue did.
     this.spawnWorker(item, { continuation: !!live, asked: true });
+    if (this.sessions.has(item.id) || this._preparing?.has(item.id)) return null;
+    const noted = this._notStarting?.get(item.id);
+    return noted && noted !== before ? noted.why : null;
   }
 
   // The recovery command. When every worker dies at once (the founder's plan
@@ -4783,7 +4810,7 @@ export class Supervisor {
       .finally(() => { this._routing = false; });
   }
 
-  sayItOnEveryStrandedRow(items: WorkItem[], now = Date.now()) {
+  sayItOnEveryStrandedRow(items: WorkItem[], now = Date.now(), { budgetMs = NEW_TRACES_BUDGET_MS } = {}) {
     let dirty = false;
     // AND THE SAME PASS COUNTS THEM, for the line above her list. The count
     // is taken here rather than in the snapshot because this is the one place
@@ -4796,6 +4823,12 @@ export class Supervisor {
     const byKey = new Map(items.map((i) => [`${i.product}:${i.id}`, i]));
     let dirs: Map<string, string> | null = null;
     const dirOf = (slug: string) => (dirs ??= new Map(this.store.listProducts().map((p) => [p.slug, p.dir]))).get(slug);
+    // How long this pass may spend on traces it has never read: the rest are
+    // read on later ticks, and one is always read so the queue cannot stall.
+    // hrtime, so a fake clock still leaves a budget.
+    const startedAt = process.hrtime.bigint();
+    let readOne = false;
+    const outOfTime = () => readOne && Number(process.hrtime.bigint() - startedAt) / 1e6 > budgetMs;
     for (const [key, seen] of Object.entries(this._fruitless)) {
       if (!seen?.runs) continue;
       try {
@@ -4843,11 +4876,31 @@ export class Supervisor {
           continue;
         }
 
+        // A run already read to its end is not looked at again, or every stuck
+        // thread costs a folder listing and a stamp every tick while it stays stuck.
+        if (seen.quietAt != null && seen.quietAt === (seen.endedAt ?? 0)) continue;
+
         // WHAT THE LAST RUN ACTUALLY DID, read off its own trace. The session
         // object is long gone by now — often the whole process is — and the
         // trace is the only thing left that knows.
+        const unread = !this._traces?.has(key);
+        if (unread && outOfTime()) continue;
+        if (unread) readOne = true;
         const trace = this._lastTrace(product, id, dirOf);
-        if (!trace || !traceShowsASilentDeath(trace)) continue;
+        if (!trace) continue;
+        if (!traceShowsASilentDeath(trace)) {
+          // Only a trace with its exit line is settled: that line is written
+          // after the run is recorded as ended, so the first read can land
+          // before it. No trace at all can mean a read that failed, and that
+          // must not silence the thread, so it is asked about again next tick.
+          // Another run ending moves `endedAt` and reopens the question.
+          if (trace.exitCode != null) {
+            seen.quietAt = seen.endedAt ?? 0;
+            this._traces?.delete(key);
+            dirty = true;
+          }
+          continue;
+        }
 
         const cause = troubleCause(trace.stderr);
         // THE HOUR THE LIMIT LETS GO, AND THIS PASS WAS DROPPING IT.
@@ -4920,13 +4973,18 @@ export class Supervisor {
       }
     }
     this._stranded = stranded;
+    // And the traces of rows nothing is stuck on any more go with them, so the
+    // map `_lastTrace` keeps is the size of this pass.
+    if (this._traces) for (const key of this._traces.keys()) if (!this._fruitless[key]) this._traces.delete(key);
     if (dirty) this._saveState();
   }
 
   // The newest trace a row has, read once. Null when the row has never been
   // spawned, which is the ordinary case for most of `_fruitless` and is not an
   // error.
-  // Kept per log until its size or time changes: the stranded pass asks every tick.
+  // Kept per row until its log changes, with no cap: the pass walks every row in
+  // the same order, so a cap below that count evicts each answer before the next
+  // tick reaches it. The pass drops the rows that are no longer stranded.
   _lastTrace(product: string, id: string, dirOf: (slug: string) => string | undefined = (slug) => this.store.listProducts().find((p) => p.slug === slug)?.dir) {
     const dir = dirOf(product);
     if (!dir) return null;
@@ -4941,14 +4999,12 @@ export class Supervisor {
     const file = path.join(sessions, logs[logs.length - 1]);
     try {
       const st = fs.statSync(file);
-      const stamp = `${st.size}:${st.mtimeMs}`;
+      const stamp = `${file}:${st.size}:${st.mtimeMs}`;
       this._traces ??= new Map();
-      const kept = this._traces.get(file);
+      const kept = this._traces.get(`${product}:${id}`);
       if (kept?.stamp === stamp) return kept.trace;
       const trace = readDeadRunTrace(fs.readFileSync(file, 'utf8'));
-      this._traces.delete(file);
-      if (this._traces.size >= TRACES_KEPT) this._traces.delete(this._traces.keys().next().value!);
-      this._traces.set(file, { stamp, trace });
+      this._traces.set(`${product}:${id}`, { stamp, trace });
       return trace;
     } catch { return null; }
   }
@@ -6626,6 +6682,7 @@ export class Supervisor {
     const h = (this._cloudHealth ??= { faults: 0, lastError: null, restUntil: 0 });
     if (session.sessionId != null || session.result != null) {
       Object.assign(h, { faults: 0, lastError: null, restUntil: 0 });
+      this.cloudServerWatch?.up();
       return;
     }
     if (!signal && code === 0) return;
@@ -6640,7 +6697,11 @@ export class Supervisor {
     h.faults += 1;
     this._startBudget.failed();
     h.lastError = said || `a cloud run ended (${signal || code}) before its agent started`;
-    if (h.faults >= CLOUD_FAULTS_TO_REST) h.restUntil = Date.now() + CLOUD_REST_MS;
+    if (h.faults >= CLOUD_FAULTS_TO_REST) {
+      h.restUntil = Date.now() + CLOUD_REST_MS;
+      const broke = serverError(session.tail);
+      if (broke) this.cloudServerWatch?.down(broke, h.faults);
+    }
     this.onChange?.();
   }
 
@@ -6661,7 +6722,8 @@ export class Supervisor {
       }
       const n = (this._cloudStartFails.get(item.id) ?? 0) + 1;
       this._cloudStartFails.set(item.id, n);
-      keep = n >= CLOUD_STARTS_TO_GIVE_UP;
+      // A server that errored is not mended by starting this thread there again.
+      keep = !!serverError(session.tail) || n >= CLOUD_STARTS_TO_GIVE_UP;
     }
     if (!keep) return false;
     this._cloudStartFails.delete(item.id);
@@ -7071,6 +7133,50 @@ export class Supervisor {
       console.warn(`${nameSlug}: the run host could not start, so runs start directly:`, (error as Error).message);
       return null;
     }
+  }
+
+  // The one process serving the store tools to every local run
+  // (main/tool-host.mjs), started with the app. Its folder, or null when there
+  // is none to use and runs start their own servers as before. After three
+  // deaths it is left alone for this launch.
+  _toolHost() {
+    if (!this.shareTools) return null;
+    this._toolHostDir ??= toolHostDir();
+    if (readToolHost(this._toolHostDir)) return this._toolHostDir;
+    const had = this._toolHostProc;
+    if (had && had.exitCode === null && had.signalCode === null) return null;
+    if ((this._toolHostDeaths ?? 0) >= 3) return null;
+    try {
+      fs.mkdirSync(this._toolHostDir, { recursive: true, mode: 0o700 });
+      const log = fs.openSync(path.join(this.userDir, 'tool-host.log'), 'a');
+      const proc = spawn(process.execPath, [...stripTypesFlags(), fileURLToPath(new URL('./tool-host.mjs', import.meta.url)), this._toolHostDir, String(process.pid)], {
+        env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+        detached: true,
+        stdio: ['ignore', log, log],
+      });
+      fs.closeSync(log);
+      proc.on('error', () => {});
+      proc.on('exit', (code) => {
+        if (code === TOOL_HOST_ALREADY_THERE || code === 0) return;
+        this._toolHostDeaths = (this._toolHostDeaths ?? 0) + 1;
+        console.warn(`${nameSlug}: the tool host stopped (${code}); runs start their own tool servers until it is back`);
+      });
+      proc.unref();
+      this._toolHostProc = proc;
+    } catch (error) {
+      this._toolHostDeaths = (this._toolHostDeaths ?? 0) + 1;
+      console.warn(`${nameSlug}: the tool host could not start, so runs start their own tool servers:`, (error as Error).message);
+    }
+    return null;
+  }
+
+  /** A local Claude Code run reaches the shared tool host instead of starting a store server of its own. */
+  _shareToolServers(plan: Pick<SpawnPlan, 'args'>, item: WorkItem, spawnFiles: SpawnFile[]) {
+    const at = plan.args.indexOf('--mcp-config');
+    const dir = at >= 0 ? this._toolHost() : null;
+    if (!dir) return;
+    const pass = shareToolServers(plan.args[at + 1], { dir, item: item.id, product: item.product, storeServer: STORE_SERVER });
+    if (pass) spawnFiles.push(pass);
   }
 
   // A LOCAL RUN THE RUN HOST HOLDS IS LET GO, NOT STOPPED, on a quit or a
@@ -9322,6 +9428,7 @@ export class Supervisor {
     } else if (continuation && toldBy(item)) {
       item = { ...item, answer: framedTeammate(toldBy(item)!.name, item.answer) };
     }
+    if (continuation && item.answer && !toldBy(item)) item = { ...item, answer: framedPick(item.answer) };
     let prompt: string;
     // THE TWO KINDS OF RESUME SAY DIFFERENT THINGS, and handing a finished
     // session the interrupted wording would tell it to go looking for a step it
@@ -11415,6 +11522,7 @@ export class Supervisor {
     // A LOCAL RUN IS HELD BY THE RUN HOST, so a quit or a restart leaves it
     // and its helpers going (main/run-host.mjs).
     const hosted = !!this.hostRuns && where !== 'cloud' && !remoteOnly && !plan.command;
+    if (hosted && !adopted && engineOf(engine) === 'claude') this._shareToolServers(plan, item, spawnFiles);
     const child: WorkerChild = adopted?.child ?? harness.spawn(this, plan, { cwd, item, profile, env, cloud: where === 'cloud', host: hosted ? this._runHost() : null }) as WorkerChild;
     if (child instanceof HostedRun && !adopted) child.once('exit', (code) => { if (code === HOST_LOST && !Number.isInteger(child.pid)) this._runHostBroken = Date.now(); });
 
