@@ -390,7 +390,8 @@ function TagPicker({ column, value, typed, onPick, onClose, hands }: {
           onChange={(e) => { setQ(e.target.value); setHi(0); }} /></div>
         <div className="tbl-pick-list" ref={list} role="listbox">
           {items.map((it, n) => (
-            <div key={`${it.kind}:${it.v}`} className={`tbl-pick-row${n === now ? ' hi' : ''}`} onMouseEnter={() => setHi(n)}>
+            // Moved, not entered: a list redrawn under a still pointer must not take the highlight from the keys.
+            <div key={`${it.kind}:${it.v}`} className={`tbl-pick-row${n === now ? ' hi' : ''}`} onMouseMove={() => { if (n !== now) setHi(n); }}>
               <button type="button" role="option" aria-selected={n === now} tabIndex={-1}
                 className={`when-row${n === now ? ' hi' : ''}${it.kind === 'tag' && it.v.toLowerCase() === value.trim().toLowerCase() ? ' on' : ''}`}
                 onPointerDown={(e) => e.preventDefault()} onClick={() => take(n)}>
@@ -538,9 +539,9 @@ function Field({ column, value, editable, onWrite, hands, cells }: {
 }
 
 /** The whole of one row, every field at full length, as Airtable opens a record. */
-function RowSheet({ table, row, place, count, editable, from, onWrite, onStep, onClose, tagHands }: {
+function RowSheet({ table, row, place, count, editable, from, onWrite, onStep, onClose, tagHands, onUndo }: {
   table: Table; row: string[]; place: number; count: number; editable: boolean; from?: number; tagHands?: (c: number) => TagHands;
-  onWrite: (c: number, v: string) => void; onStep: (d: number) => void; onClose: () => void;
+  onWrite: (c: number, v: string) => void; onStep: (d: number) => void; onClose: () => void; onUndo?: (redo: boolean) => void;
 }) {
   const sheet = useRef<HTMLDivElement>(null);
   useEffect(() => { sheet.current?.focus({ preventScroll: true }); }, []);
@@ -550,6 +551,7 @@ function RowSheet({ table, row, place, count, editable, from, onWrite, onStep, o
   const key = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onClose(); return; }
     if (typingIn(e.target as Element)) return;
+    if ((e.metaKey || e.ctrlKey) && /^[zy]$/i.test(e.key)) { e.preventDefault(); e.stopPropagation(); onUndo?.(e.shiftKey || /^y$/i.test(e.key)); return; }
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); e.stopPropagation(); onStep(e.key === 'ArrowDown' ? 1 : -1); }
   };
   return <div className="tbl-sheet" ref={sheet} tabIndex={-1} role="dialog" aria-label={row[nameAt] || 'Row'} data-own-escape="" onKeyDown={key}>
@@ -613,7 +615,8 @@ function viewOrder(table: Table, query: string, picked: Record<number, string[]>
   return rows.map((r) => place.get(r) ?? -1).filter((i) => i >= 0);
 }
 
-type Doc = { from: Table; table: Table; order: number[]; looks: Looks };
+/** `filter`: a change to the filter this step made (a tag it renamed or deleted was filtered on), so undo and redo take it too. */
+type Doc = { from: Table; table: Table; order: number[]; looks: Looks; filter?: { before: Record<number, string[]>; after: Record<number, string[]> } };
 type Editing = { r: number; c: number; draft: string; typed: boolean; pop: 'tag' | 'date' | null };
 type Float = { x: number; y: number; col?: number; page?: 'type' };
 type Drop = { kind: 'row' | 'col'; place: number; at: number };
@@ -727,7 +730,9 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     const was = docRef.current;
     if (given.table === was.table && given.order === was.order) return;
     // A tag added now keeps the colour it was drawn in; read again, the guess would deal it another.
-    const next = fileChanged(given.table, was.table) ? { ...given, looks: pinTones(given.table, given.looks) } : given;
+    let next = fileChanged(given.table, was.table) ? { ...given, looks: pinTones(given.table, given.looks) } : given;
+    // A step that spread the last one over did not change the filter itself.
+    if (next.filter && next.filter === was.filter) next = { ...next, filter: undefined };
     past.current.push(was);
     if (past.current.length > UNDO_DEPTH) past.current.shift();
     ahead.current = [];
@@ -740,7 +745,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
       timer.current = setTimeout(() => { void flush(); }, SAVE_MS);
     }
   }, [shape, flush, store]);
-  const travel = (from: React.MutableRefObject<Doc[]>, to: React.MutableRefObject<Doc[]>) => {
+  const travel = (from: React.MutableRefObject<Doc[]>, to: React.MutableRefObject<Doc[]>, back: boolean) => {
     const next = from.current.pop();
     if (!next) return;
     const was = docRef.current;
@@ -748,6 +753,9 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     docRef.current = next;
     setDoc(next);
     setPick((p) => (p ? clampPick(p, next) : p));
+    // The step undone, or the one redone, changed the filter: the view is worked out again from the filter it had.
+    const filter = back ? was.filter?.before : next.filter?.after;
+    if (filter) { setPicked(filter); return finishTravel(next, was); }
     // Undoing a column move takes the sort and the filters back with their columns, found by name.
     const at = (i: number) => { const n = next.table.columns.findIndex((c) => c.name === was.table.columns[i]?.name); return n < 0 ? i : n; };
     const sortMoves = !!sort && at(sort.col) !== sort.col;
@@ -757,6 +765,9 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
       if (sortMoves) setSort((s) => (s ? { ...s, col: at(s.col) } : s));
       if (pickedMoves) setPicked((p) => Object.fromEntries(Object.entries(p).map(([k, v]) => [at(Number(k)), v])));
     }
+    finishTravel(next, was);
+  };
+  const finishTravel = (next: Doc, was: Doc) => {
     if (next.looks !== was.looks) keepLooks(store, next.looks);
     if (fileChanged(next.table, was.table) && saveRef.current) {
       unsaved.current = writeTable(next.table, shape);
@@ -764,8 +775,8 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
       timer.current = setTimeout(() => { void flush(); }, SAVE_MS);
     }
   };
-  const undo = () => travel(past, ahead);
-  const redo = () => travel(ahead, past);
+  const undo = () => travel(past, ahead, true);
+  const redo = () => travel(ahead, past, false);
 
   const first = table.ranked ? 1 : 0;
   const last = table.columns.length - 1;
@@ -940,14 +951,12 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     changeColumns(withLooks(d.table, looks), col, looks);
   };
   /** A filter on a tag that was renamed follows the new name; one on a tag deleted is let go. */
-  const refilter = (col: number, from: string, to: string | null) => {
+  const refiltered = (col: number, from: string, to: string | null): Doc['filter'] => {
     const on = picked[col] ?? [];
-    if (!on.some((v) => v.toLowerCase() === from.trim().toLowerCase())) return;
+    if (!on.some((v) => v.toLowerCase() === from.trim().toLowerCase())) return undefined;
     const kept = on.filter((v) => v.toLowerCase() !== from.trim().toLowerCase());
     const next = to === null || kept.some((v) => v.toLowerCase() === to.toLowerCase()) ? kept : [...kept, to];
-    // A rename leaves the same rows in view, so the tag list stays open; a delete shows the rows it no longer hides.
-    if (to !== null) quiet.current = true;
-    setPicked((p) => ({ ...p, [col]: next }));
+    return { before: picked, after: { ...picked, [col]: next } };
   };
   const tagHands = (col: number): TagHands => ({
     rename: (from, to) => {
@@ -956,9 +965,11 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
       const t = renameTag(d.table, col, from, to);
       if (!c || t === d.table) return;
       const merges = c.values.some((v) => v.toLowerCase() === to.trim().toLowerCase() && v.toLowerCase() !== from.trim().toLowerCase());
-      commit({ ...d, table: t, looks: merges ? d.looks : lookRenameTag(d.looks, c.name, from, to) });
       const written = t.columns[col].values.find((v) => v.toLowerCase() === to.trim().toLowerCase()) ?? to.trim();
-      refilter(col, from, written);
+      const filter = refiltered(col, from, written);
+      commit({ ...d, table: t, looks: merges ? d.looks : lookRenameTag(d.looks, c.name, from, to), filter });
+      // The same rows stay in view, so the tag list stays open.
+      if (filter) { quiet.current = true; setPicked(filter.after); }
     },
     tone: (tag, tone) => {
       const d = docRef.current;
@@ -967,7 +978,12 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
       const looks = lookTone(d.looks, c.name, tag, tone);
       commit({ ...d, table: withLooks(d.table, looks), looks });
     },
-    drop: (tag) => { const d = docRef.current; commit({ ...d, table: dropTag(d.table, col, tag) }); refilter(col, tag, null); },
+    drop: (tag) => {
+      const d = docRef.current;
+      const filter = refiltered(col, tag, null);
+      commit({ ...d, table: dropTag(d.table, col, tag), filter });
+      if (filter) setPicked(filter.after);
+    },
     count: (tag) => docRef.current.table.rows.filter((r) => (r[col] ?? '').trim().toLowerCase() === tag.trim().toLowerCase()).length,
   });
 
@@ -1062,12 +1078,12 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     if (k === 'Escape' && (drag.current === 'moverows' || drag.current === 'movecols')) {
       stop(); drag.current = null; pressedPick.current = null; setDrop(null); return;
     }
-    // Alt and an arrow moves the rows or columns picked, as the menus' Move does.
+    // Alt and an arrow moves whole rows or columns picked, as the menus' Move does; on one cell it does nothing.
     if (e.altKey && !meta && editable && sel && /^Arrow(Up|Down|Left|Right)$/.test(k)) {
       stop();
-      if (k === 'ArrowUp') moveRowsTo(sel.r0 - 1);
-      else if (k === 'ArrowDown') moveRowsTo(sel.r1 + 2);
-      else if (sel.c0 >= first) moveColsTo(sel.c0, sel.c1, k === 'ArrowLeft' ? sel.c0 - 1 : sel.c1 + 2);
+      if (wholeRows && k === 'ArrowUp') moveRowsTo(sel.r0 - 1);
+      else if (wholeRows && k === 'ArrowDown') moveRowsTo(sel.r1 + 2);
+      else if (wholeCols && sel.c0 >= first && (k === 'ArrowLeft' || k === 'ArrowRight')) moveColsTo(sel.c0, sel.c1, k === 'ArrowLeft' ? sel.c0 - 1 : sel.c1 + 2);
       return;
     }
     if (meta && (k === 'z' || k === 'Z')) { stop(); if (e.shiftKey) redo(); else undo(); return; }
@@ -1532,7 +1548,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
         )}
       </div>
       {sheet !== null && sheetRow && (
-        <RowSheet table={table} row={sheetRow} place={sheet} count={order.length} editable={editable} from={pick?.a.c} tagHands={tagHands}
+        <RowSheet table={table} row={sheetRow} place={sheet} count={order.length} editable={editable} from={pick?.a.c} tagHands={tagHands} onUndo={(again) => (again ? redo() : undo())}
           onWrite={(c, v) => writeAt([{ r: sheet, c, v }])}
           onStep={(d) => { const r = Math.max(0, Math.min(order.length - 1, sheet + d)); setSheet(r); goTo({ a: { r, c: pick?.a.c ?? first }, b: { r, c: pick?.a.c ?? first } }); }}
           onClose={() => { setSheet(null); requestAnimationFrame(focusKeys); }} />
