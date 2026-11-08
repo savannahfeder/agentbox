@@ -34,11 +34,25 @@ function mtsThePhoneReaches() {
   return [...found];
 }
 
+// GitHub installs only the desktop's packages, so the checks that load Metro
+// and Babel run where mobile/node_modules is, and the ones on the config's
+// text run everywhere.
+const phonePackages = fs.existsSync(path.join(mobile, 'node_modules', 'expo'));
+
 describe('the phone build', () => {
   it('reaches shared .mts files, so the rest of this test means something', () => {
     expect(mtsThePhoneReaches().length).toBeGreaterThan(0);
   });
 
+  it('asks Metro for .mts and Babel to strip its types', () => {
+    expect(fs.readFileSync(path.join(mobile, 'metro.config.js'), 'utf8')).toMatch(/sourceExts\.push\('mts'\)/);
+    const babel = fs.readFileSync(path.join(mobile, 'babel.config.js'), 'utf8');
+    expect(babel).toMatch(/endsWith\('\.mts'\)/);
+    expect(babel).toContain('@babel/plugin-transform-typescript');
+  });
+});
+
+describe.skipIf(!phonePackages)('the phone build, with the phone app\'s packages installed', () => {
   it('lets Metro resolve .mts', () => {
     const config = need('./metro.config.js');
     expect(config.resolver.sourceExts).toContain('mts');

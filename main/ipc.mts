@@ -212,6 +212,8 @@ interface FilesPlace {
   makeFolder(ask: { project?: string; name?: string; parent: string | null }): Promise<{ id?: string }>;
   renameFolder(ask: { id: string; name?: string }): Promise<{ id?: string }>;
   moveFile(ask: { key: string; folder: string | null }): Promise<{ id?: string }>;
+  newDocument(ask: { project: string; name: string; kind: 'document' | 'table'; folder: string | null }): Promise<{ key: string }>;
+  addFiles(ask: { project: string; folder: string | null; paths: string[] }): Promise<{ added: number; refused: string[]; keys: string[] }>;
   open(key: string): Promise<unknown>;
   edit(key: string, text?: string): Promise<{ ok: boolean } & Record<string, unknown>>;
   editOnThread(ask: { product: string; id: string; path: string; baseId?: string; text: string; taken?: unknown; since?: unknown }): { ok: boolean } & Record<string, unknown>;

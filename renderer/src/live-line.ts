@@ -59,6 +59,17 @@ import type { RunningSession, WhyNotCloud, WorkItem } from './types';
 // not working, because nothing moves until you answer it.
 export type LiveState = 'asking' | 'working' | 'elsewhere' | 'shipping' | 'next' | 'queued' | 'cannot' | 'signin' | 'limit' | 'paused' | 'silent' | 'idle';
 
+/** How long a thread just sent reads Queued before the fleet has listed it. */
+const JUST_SENT_MS = 30_000;
+
+/** Sent or replied to moments ago, and no agent has claimed it or written on it since. */
+function justSent(item: WorkItem, now: number): boolean {
+  const sentAt = Math.max(item.createdAt ?? 0, item.wrote?.answer?.ts ?? 0);
+  if (now - sentAt >= JUST_SENT_MS) return false;
+  if (sentAt === item.createdAt && (item.epoch ?? 0) > 0) return false;
+  return !Object.values(item.wrote ?? {}).some((w) => w?.source === 'agent' && w.ts >= sentAt);
+}
+
 export interface CannotStart {
   why: 'setup' | 'asleep' | 'cloud-carried' | 'engine' | 'login' | 'memory' | 'slow-folder' | 'error' | 'brake' | string;
   /** "Claude Code" or "Codex". */
@@ -447,6 +458,15 @@ export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null
     return {
       state: 'paused',
       line: 'Agents are paused, so nothing will start on this.',
+    };
+  }
+
+  // The window draws a thread she has just sent before the fleet's next
+  // snapshot lists it, and idle there offered Try again on it.
+  if (justSent(item, now)) {
+    return {
+      state: 'queued',
+      line: 'Queued. An agent starts on it as soon as one is free.',
     };
   }
 
