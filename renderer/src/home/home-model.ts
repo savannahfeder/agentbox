@@ -1,7 +1,7 @@
 // What Home shows, worked out from data the app already has.
 
 export function greeting(hour: number, name?: string | null): string {
-  const part = hour < 5 ? 'Good evening' : hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const part = hour < 4 ? 'Good evening' : hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   const first = name?.trim().split(/\s+/)[0];
   return first ? `${part}, ${first}` : part;
 }
@@ -47,6 +47,11 @@ export function agoShort(at: number, now: number): string {
 
 export function engineName(engine: string | undefined): string {
   return engine === 'codex' ? 'Codex' : 'Claude Code';
+}
+
+/** The letter on a row's tile: C for Claude Code, X for Codex, so the two read apart. */
+export function engineLetter(engine: string | undefined): string {
+  return engine === 'codex' ? 'X' : 'C';
 }
 
 /** A Needs you row's second line: who it is from and which project. */

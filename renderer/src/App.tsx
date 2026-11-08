@@ -252,7 +252,7 @@ import { HomePage, type NeedsRow, type ProgressRow, type TeamRow } from './home/
 import { SkyBackdrop } from './home/SkyBackdrop';
 import { useDarkWindow, useHomeSettings } from './home/home-settings';
 import { skyFor } from './home/sky';
-import { engineName, greeting, needsLine, teamRowState, weekCounts } from './home/home-model';
+import { engineLetter, engineName, greeting, needsLine, teamRowState, weekCounts } from './home/home-model';
 import { sentFrom } from './team/company';
 import { reachAudienceOf } from '../../shared/teammate-reach.mjs';
 
@@ -7264,7 +7264,7 @@ export default function App() {
     const sent = team ? sentFrom(i, team.products.get(i.product), team.me) : null;
     const from = sent ? (team?.byId.get(sent.from)?.name?.split(/\s+/)[0] ?? 'Someone') : null;
     const { who, line } = needsLine({ from, engine: i.engine, stopped: false, project: i.productName });
-    return { key: `${i.product}/${i.id}`, letter: who.slice(0, 1).toUpperCase(), title: rowTitle(i), line, at: sentAtOf(i), unread: isUnread(i, seenAt, unreadSince, team?.me ?? null) };
+    return { key: `${i.product}/${i.id}`, letter: from ? who.slice(0, 1).toUpperCase() : engineLetter(i.engine), title: rowTitle(i), line, at: sentAtOf(i), unread: isUnread(i, seenAt, unreadSince, team?.me ?? null) };
   }) : [];
   const homeTeam: TeamRow[] | null = !homeShown || !teamMode ? null : members.filter((m) => m.kind === 'person' || (m.kind === 'mate' && m.key.startsWith('mate:'))).map((m) => {
     const id = m.key.slice(m.key.indexOf(':') + 1);
@@ -7279,7 +7279,7 @@ export default function App() {
       state: teamRowState({ agents: m.agents, waitingOnYou: waiting }), week, total: week.reduce((a, b) => a + b, 0),
     };
   });
-  const homeProgress: ProgressRow[] = homeShown && !teamMode ? progressTab.slice(0, 60).map((i) => ({ key: `${i.product}/${i.id}`, letter: engineName(i.engine).slice(0, 1), title: rowTitle(i), line: `${engineName(i.engine)} · ${i.productName}`, at: sentAtOf(i) })) : [];
+  const homeProgress: ProgressRow[] = homeShown && !teamMode ? progressTab.slice(0, 60).map((i) => ({ key: `${i.product}/${i.id}`, letter: engineLetter(i.engine), title: rowTitle(i), line: `${engineName(i.engine)} · ${i.productName}`, at: sentAtOf(i) })) : [];
   const homeOpenRow = (key: string) => {
     const item = items.find((i) => `${i.product}/${i.id}` === key);
     if (!item) return;
