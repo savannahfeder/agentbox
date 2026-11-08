@@ -399,6 +399,8 @@ export type RunState = {
   exitFailed?: boolean;
   accountFault?: AccountFault | null;
   lastOutputAt?: number;
+  /** Whether the run has put anything in its trace: said or done one thing. */
+  traced?: boolean;
   usedATool?: boolean;
   repoBefore?: ReturnType<typeof snapshotRepo> | null;
   cloudSentAt?: number;
@@ -997,7 +999,8 @@ const TROUBLE_QUIET_MS = 20 * 60_000;
 // store heartbeats stopped the same minute, and the turn never ended, so no
 // exit fired and the row sat in In progress for 50 minutes until the user
 // noticed it was stuck. Both signals together, never one: a long render is silent but its
-// store server keeps beating, and a session that never claimed has no lease.
+// store server keeps beating, and a session that never claimed has no lease
+// (so for one of those the second signal is that it has traced nothing).
 const HUNG_QUIET_MS = 10 * 60_000;
 // A pass this late was not late, the Mac was asleep (forgiveSleep). Eight
 // missed passes: past any slow pass, well under the ten minutes above.
@@ -4451,7 +4454,15 @@ export class Supervisor {
     for (const [id, session] of this.sessions) {
       if (session.stoppedByUs) continue;
       const item = byId.get(id);
-      if (!item?.claim || !item.claimExpired) continue;
+      if (!item) continue;
+      // With no claim there is no lease to lapse, so silence alone could be a
+      // long build. A run that has neither claimed its row (a worker's first
+      // step) nor traced one thing has not started, and nothing else ends it.
+      // One picked back up after a restart traced its start before it, and one
+      // holding its input for a remote turn is waiting on purpose.
+      const lapsed = !!item.claim && !!item.claimExpired;
+      const neverBegan = !item.claim && !session.traced && !session.cloud && !session.adopted && !session.remoteIdle;
+      if (!lapsed && !neverBegan) continue;
       const quietSince = session.lastOutputAt ?? session.startedAt ?? now;
       if (now - quietSince < HUNG_QUIET_MS) continue;
       this._hungReaps ??= {};
@@ -4460,7 +4471,7 @@ export class Supervisor {
       const count = last && now - last.at < HUNG_REPEAT_WINDOW_MS ? last.count + 1 : 1;
       this._hungReaps[key] = { count, at: now };
       const minutes = Math.round((now - quietSince) / 60_000);
-      console.warn(`zero: ${id} went quiet ${minutes}m ago with its claim lapsed; stopping it (hang ${count})`);
+      console.warn(`zero: ${id} went quiet ${minutes}m ago ${lapsed ? 'with its claim lapsed' : 'before it began'}; stopping it (hang ${count})`);
       if (count >= 2) {
         try {
           this.store.recordSessionResult(item.product, item.id, {
@@ -11817,6 +11828,7 @@ export class Supervisor {
       if (stream(session, ...frame)) this.onChange?.();
       onLine(summarize(...frame));
       const detail = traceOne(...frame);
+      if (detail) session.traced = true;
       if (detail && !session.usedATool && tracesAToolCall(detail)) session.usedATool = true;
       if (detail) try { trace?.write(detail + '\n'); } catch {}
     };
