@@ -224,7 +224,7 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
     case 'move':
       return { steps: [{ door: 'moveItem', payload: { ...on, to: press.to } }], toast: `Moved to ${press.name}`, goes: null };
     case 'approve-filed':
-      return reply('Approved. Run it.', {}, `Running → ${(item.title ?? '').slice(0, 40)}`, 'Approval withdrawn, back in your inbox');
+      return reply('Approved. Run it.', {}, `${waits ? 'Waiting for your computer' : 'Running'} → ${(item.title ?? '').slice(0, 40)}`, 'Approval withdrawn, back in your inbox');
     case 'do-here': {
       const writes = doItHereWrites(press.child, press.parent);
       if (!writes) return null;
