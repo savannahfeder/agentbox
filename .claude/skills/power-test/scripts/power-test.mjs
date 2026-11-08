@@ -11,9 +11,8 @@
 //     --free-hours 0.5                                 with --stand-in-cloud: start on the Free plan with that many hours
 //     --chaos none|light|normal|heavy                  what goes wrong around them (default normal)
 //     --round-minutes 20                               one tester session, before it is started again with its diary
-//     --model <alias>                                  the testers' model
-//     --tester-login inherit                           testers sign in with this session's variables
-//     --testers external                               the agent that started this runs each stretch itself
+//     --model <id>                                     the testers' Codex model
+//     --codex-home ~/.codex-2                          the Codex login testers spend (default: the one on the best plan)
 //     --keep                                           leave the copies up afterwards
 //     --files <dir>                                    copied into every project's documents in every copy (a table, a deck under test)
 //     --team <file> --room <name>                      one tester signs in to a real team (live.mjs --team) and talks in that room
@@ -21,19 +20,15 @@
 // For each person: a copy of the app of their own (live.mjs with
 // VERIFY_INSTANCE=power-<who>), shaped like their setup; a watcher reading it
 // every minute (watch.mjs); the stand-ins' world changing on the clock
-// (plan.mjs chaosPlan); and a Claude Code session playing them through two
+// (plan.mjs chaosPlan); and a Codex session playing them through two
 // commands in their folder, `app` (browse.mjs) and `diary` (diary.mjs),
 // started again with its diary until the clock runs out. Evidence and
 // report.md go to /tmp/agentbox-verify/runs/<time>-power/.
 //
-// --testers external is for where a Claude Code started from here cannot sign
-// in (the Agentbox cloud blanks the session's key for what it starts): each
-// stretch's prompt is written to round-NN.prompt.md, and the stretch ends when
-// round-NN.done appears, written by the agent that ran it as a subagent.
-//
-// The testers are not the app's workers. The copy and its workers get the
-// clean environment live.mjs gives them; only the testers' own Claude Code
-// signs in, with its own login, or with this session's under --tester-login.
+// Testers are always Codex, never Claude Code: the person keeps a Codex plan
+// for testing (codex-tester.mjs). They are not the app's workers. The copy and
+// its workers get the clean environment live.mjs gives them; only the testers'
+// Codex signs in, on the login codex-tester.mjs picks.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -44,6 +39,7 @@ import { createWatcher, freeMemoryMb, readAllLines, keepEvidence, sleepTargets }
 import { writeReport } from './report.mjs';
 import { seedArtifacts } from './artifacts.mjs';
 import { readDiary } from './diary.mjs';
+import { testerLogin, codexCanSandbox, codexTesterArgv, codexTesterEnv, lastMessage } from './codex-tester.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const VERIFY = path.resolve(here, '../../verify-agentbox/scripts');
@@ -52,7 +48,6 @@ const BROWSE = path.join(VERIFY, 'browse.mjs');
 const DIARY = path.join(here, 'diary.mjs');
 const { cleanEnv, RUNS, REPO, instanceDir } = await import(LIVE);
 const { machinery } = await import(path.join(VERIFY, 'drives.mjs'));
-const { findClaudeBin } = await import(path.join(REPO, 'main', 'claude-bin.mjs'));
 
 const MIN = 60_000;
 const args = process.argv.slice(2);
@@ -80,8 +75,7 @@ if (cloudAccounts && !cloud) stop('--cloud-accounts narrows the cloud\'s account
 const focus = opt('focus');
 const alpha = opt('alpha');
 const model = opt('model');
-const inherit = opt('tester-login') === 'inherit';
-const external = opt('testers') === 'external';
+if (opt('testers') || opt('tester-login')) stop('testers are always Codex now, started by this script: drop --testers and --tester-login, and name a Codex login with --codex-home if the best plan is not the one to spend.');
 const team = opt('team');
 const room = opt('room');
 const files = opt('files') ? path.resolve(opt('files')) : null;
@@ -94,15 +88,10 @@ try { chaosPlan(chaos, totalMs); } catch (err) { stop(err.message); }
 const need = people.length * (real && !cloud ? 2500 : 1200) + 1000;
 const free = freeMemoryMb();
 if (free < need) stop(`${people.length} ${people.length === 1 ? 'person needs' : 'people need'} about ${(need / 1024).toFixed(1)} GB free and this computer has ${(free / 1024).toFixed(1)} GB. Run fewer with --who.`);
-const claude = findClaudeBin({});
-if (!claude.found && !external) stop('there is no Claude Code on this computer for the testers to run on.');
-
-/** The testers' environment: clean, with this session's sign-in only when asked, and Bash allowed to wait out an away. */
-function testerEnv(extra = {}) {
-  const env = { ...cleanEnv(), BASH_DEFAULT_TIMEOUT_MS: '660000', BASH_MAX_TIMEOUT_MS: '660000', ...extra };
-  if (inherit) for (const k of ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL', 'CLAUDE_CODE_OAUTH_TOKEN', 'CLAUDE_CONFIG_DIR']) if (process.env[k]) env[k] = process.env[k];
-  return env;
-}
+const login = testerLogin({ given: opt('codex-home', process.env.CODEX_HOME || null) });
+if (!login) stop('there is no Codex login on this computer for the testers to run on. Sign Codex in (codex login), then run this again.');
+const sandboxed = codexCanSandbox();
+const testerEnv = () => codexTesterEnv(cleanEnv(), login.home);
 
 /** A child with a deadline, so nothing here waits for ever. */
 function run(cmd, argv, { env = process.env, timeoutMs = 10 * MIN, cwd = REPO } = {}) {
@@ -130,28 +119,15 @@ function layCommands(dir, name) {
   }
   return { browse: path.join(dir, 'app'), diary: path.join(dir, 'diary') };
 }
-const testerArgs = (prompt, dir) => [
-  '-p', prompt, '--output-format', 'stream-json', '--verbose',
-  '--allowedTools', `Bash(${path.join(dir, 'app')}:*)`, `Bash(${path.join(dir, 'diary')}:*)`, `Read(/${dir}/**)`,
-  '--disallowedTools', 'WebFetch', 'WebSearch', 'Task', 'Agent', 'Write', 'Edit', 'NotebookEdit',
-  '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
-  ...(model ? ['--model', model] : []),
-];
 
 const root = path.join(RUNS, `${new Date().toISOString().replace(/[:.]/g, '-')}-power`);
 fs.mkdirSync(root, { recursive: true });
 say(`power test: ${people.map((p) => p.name).join(', ')} for ${Math.round(totalMs / MIN)} min on ${cloud ? 'the real Claude Code and Codex in this Mac\'s cloud' : real ? 'the real Claude Code and Codex' : 'stand-ins'}, chaos ${chaos}.`);
 say(`evidence: ${root}  (progress.json there says how it is going)`);
 
-if (!external) {
-  const check = await run(claude.path, ['-p', 'Reply with the single word ready.', '--output-format', 'json', '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', ...(model ? ['--model', model] : [])],
-    { env: testerEnv(), timeoutMs: 2 * MIN, cwd: root });
-  let said = '';
-  try { said = String(JSON.parse(check.out.trim().split('\n').pop()).result ?? ''); } catch { said = ''; }
-  if (!/ready/i.test(said)) {
-    stop(`the testers' Claude Code did not answer a one-word check, so no tester could run: "${said || check.out.trim().slice(-300)}". Sign Claude Code in on this computer, try --tester-login inherit, or run the stretches yourself with --testers external.`);
-  }
-}
+say(`testers: Codex on ${login.home} (${login.plan ?? 'plan unknown'}, ${login.why})${sandboxed ? '' : ', without Codex\'s sandbox, which this machine refuses'}.`);
+const check = await run('codex', ['login', 'status'], { env: testerEnv(), timeoutMs: MIN, cwd: root });
+if (check.code !== 0) stop(`the testers' Codex is not signed in at ${login.home}: "${check.out.trim().slice(-300)}". Sign it in (CODEX_HOME=${login.home} codex login) or name another with --codex-home.`);
 
 /** The person's projects with real code in them, so real agents have work to do. */
 function seedCode(state) {
@@ -252,14 +228,6 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
   });
 }
 
-function lastWords(file) {
-  const events = readJsonl(file);
-  const result = events.filter((e) => e.type === 'result').pop();
-  if (result) return String(result.result ?? '');
-  const said = events.filter((e) => e.type === 'assistant').flatMap((e) => e.message?.content ?? []).filter((c) => c.type === 'text').pop();
-  return String(said?.text ?? '');
-}
-
 const since = (at) => { const m = Math.round((at - startedAt) / MIN); return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`; };
 function diaryTail(dir) {
   const { entries, issues } = readDiary(path.join(dir, 'diary.jsonl'));
@@ -269,21 +237,6 @@ function diaryTail(dir) {
     if (e.kind === 'issue') return `[${since(e.at)}] logged issue ${issues.findIndex((i) => i.at === e.at) + 1} (${e.severity}): ${text(e.title)}`;
     return `[${since(e.at)}] saw issue ${e.n} again: ${text(e.text)}`;
   });
-}
-
-/** One stretch run by the agent that started the test: its prompt on disk, over when round-NN.done appears. */
-async function externalStretch({ dir, round, prompt, endsAt, person }) {
-  const stem = path.join(dir, `round-${String(round).padStart(2, '0')}`);
-  fs.writeFileSync(`${stem}.prompt.md`, `${prompt}\n\nWhen diary time says this stretch is over, stop and answer with one line saying what you did.\n`);
-  progress[person.slug].waiting = `${stem}.prompt.md`;
-  writeProgress();
-  say(`${person.name}: stretch ${round} is waiting for its tester: run ${stem}.prompt.md as a subagent, then write ${stem}.done`);
-  // Grace for a subagent that overruns its stretch, but the clock still ends the test.
-  const giveUp = Math.min(endsAt + 15 * MIN, deadline + 2 * MIN);
-  while (!stopping && !fs.existsSync(`${stem}.done`) && Date.now() < giveUp) await new Promise((r) => setTimeout(r, 2000));
-  delete progress[person.slug].waiting;
-  const done = fs.existsSync(`${stem}.done`);
-  return { code: done ? 0 : null, words: done ? fs.readFileSync(`${stem}.done`, 'utf8').trim() : 'no tester ran this stretch' };
 }
 
 async function runPerson({ person, name, dir, stateFile, seeded, failed, cmds }) {
@@ -373,21 +326,20 @@ async function runPerson({ person, name, dir, stateFile, seeded, failed, cmds })
         fraction: (now - startedAt) / totalMs, diaryTail: diaryTail(dir),
         issues: issues.map((i) => `#${i.n} [${i.severity}] ${i.title} (seen ${i.seen})`), notYet: cov.notYet, stoppedEarlyMin: early,
       });
-      let code;
-      let words;
-      if (external) ({ code, words } = await externalStretch({ dir, round, prompt, endsAt: next.endsAt, person }));
-      else {
-        const transcript = path.join(dir, `round-${String(round).padStart(2, '0')}.jsonl`);
-        const fd = fs.openSync(transcript, 'a');
-        const child = spawn(claude.path, testerArgs(prompt, dir), { cwd: dir, detached: true, stdio: ['ignore', fd, fd], env: testerEnv() });
-        testers.add(child);
-        const timer = setTimeout(() => killGroup(child), Math.max(0, next.endsAt - Date.now()));
-        code = await new Promise((r) => child.on('exit', r));
-        clearTimeout(timer);
-        testers.delete(child);
-        fs.closeSync(fd);
-        words = lastWords(transcript);
-      }
+      const stem = path.join(dir, `round-${String(round).padStart(2, '0')}`);
+      // Opened here, outside the tester's sandbox, so its commands only ever connect.
+      await run(cmds.browse, ['open'], { env: process.env, timeoutMs: 2 * MIN, cwd: dir });
+      const fd = fs.openSync(`${stem}.log`, 'a');
+      const child = spawn('codex', codexTesterArgv({ dir, prompt, last: `${stem}.last.txt`, model, sandboxed }),
+        { cwd: dir, detached: true, stdio: ['ignore', fd, fd], env: testerEnv() });
+      testers.add(child);
+      const timer = setTimeout(() => killGroup(child), Math.max(0, next.endsAt - Date.now()));
+      const code = await new Promise((r) => child.on('exit', r));
+      clearTimeout(timer);
+      testers.delete(child);
+      fs.closeSync(fd);
+      // A sign-in or usage error never reaches the last message, only the log.
+      const words = lastMessage(`${stem}.last.txt`) || lastMessage(`${stem}.log`).slice(-2000);
       const ended = Date.now();
       const actions = readJsonl(path.join(dir, 'actions.jsonl')).filter((a) => a.at >= now).length;
       last = roundOutcome({ actions, text: words });
