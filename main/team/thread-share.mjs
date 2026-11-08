@@ -509,6 +509,7 @@ export function createThreadShare({
         if (!edit.text) continue;
         const saved = saveNextVersion({ dir: thread.product.dir, threadId: m.threadId, lines: historyOf(thread.product.slug, m.threadId), baseId: edit.file, text: edit.text, by: m.by });
         if (!saved.ok) { log(`team threads: an edit to ${edit.file} was not saved: ${saved.error}`); continue; }
+        if (saved.unchanged) continue;
         line.patch.artifact = { do: 'edit', file: saved.file, path: saved.path, ...(saved.over ? { over: saved.over } : {}) };
       }
       // On your thread the file is yours, whatever their copy said.

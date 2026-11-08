@@ -165,7 +165,7 @@ function useSpots(editor: Editor | null, column: HTMLElement | null, session: Li
         while (block && block.parentElement && !block.parentElement.classList.contains('ProseMirror')) block = block.parentElement;
         let section = '';
         for (let b: Element | null = block; b; b = b.previousElementSibling) {
-          if (/^H[1-3]$/.test(b.tagName)) { section = b.textContent ?? ''; break; }
+          if (/^H[1-3]$/.test(b.tagName)) { const c = b.cloneNode(true) as Element; for (const x of c.querySelectorAll('.lv-caret')) x.remove(); section = c.textContent ?? ''; break; }
         }
         out.push({
           name: el.dataset.name ?? '',
