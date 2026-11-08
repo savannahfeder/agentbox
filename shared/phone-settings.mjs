@@ -230,33 +230,53 @@ const short = (v) => (typeof v === 'string' ? v.slice(0, 60) : null);
 /** An account's last usage reading (shared/usage.mts UsageLimit), its numbers and reset times only. */
 function usageFor(readings, profile) {
   const hit = (Array.isArray(readings) ? readings : []).find((r) => r?.profile === profile);
-  const limits = (Array.isArray(hit?.limits) ? hit.limits : [])
+  return usageOf(hit?.limits, hit?.at);
+}
+
+function usageOf(list, at) {
+  const limits = (Array.isArray(list) ? list : [])
     .filter((l) => typeof l?.span === 'string' && (Number.isFinite(l.percent) || l.reset === true))
     .slice(0, 8)
     .map((l) => ({
       span: l.span, qualifier: short(l.qualifier), name: short(l.name) ?? l.span, percent: num(l.percent),
       resetsText: short(l.resetsText), resetsOn: short(l.resetsOn), resetsAt: num(l.resetsAt), reset: l.reset === true,
     }));
-  return limits.length ? { at: num(hit.at), limits } : null;
+  return limits.length ? { at: num(at), limits } : null;
 }
+
+const CLOUD_STATES = ['broken', 'renew', 'stale', 'limited', 'ready'];
 
 /**
  * The cloud as the desktop's agent pages decide it (Settings.tsx `cloudHere`):
- * set up, and which agents it has an account for. The account it runs on is
- * named only by an address the copy already carries.
+ * set up, which agents it has an account for, and each account it counts.
+ * `same` is the login here it is the same account as, paired as
+ * renderer/src/accounts-once.ts pairs them: Claude by folder, Codex by address too.
  */
-function cloudOf(cloud, emails) {
+function cloudOf(cloud, w) {
   if (!cloud?.setUp) return null;
   const all = Array.isArray(cloud.accounts) ? cloud.accounts : [];
-  const inUse = (engine) => {
-    const a = all.find((x) => x?.engine === engine && x.inUse && x.state !== 'duplicate');
-    return a && emails.has(a.name) ? a.name : null;
+  const counted = all.filter((a) => (a?.engine === 'claude' || a?.engine === 'codex') && a.state !== 'duplicate');
+  const inUse = (engine) => counted.find((x) => x.engine === engine && x.inUse)?.name ?? null;
+  const here = { claude: w.accounts ?? [], codex: w.codex?.accounts ?? [] };
+  const sameAs = (a) => {
+    const hit = here[a.engine].find((h) => (a.profile && h.profile === a.profile) || (a.engine === 'codex' && a.name && h.email === a.name));
+    return hit ? accountIdOf(hit.profile) : null;
   };
   return {
     mode: oneOf(['mac', 'full', 'all'])(cloud.mode) ? cloud.mode : 'mac',
     whenOn: cloud.whenOn === 'all' ? 'all' : 'full',
     engines: ['claude', 'codex'].filter((e) => all.some((a) => a?.engine === e)),
     inUse: { claude: inUse('claude'), codex: inUse('codex') },
+    accounts: counted.map((a) => ({
+      engine: a.engine,
+      email: typeof a.name === 'string' ? a.name : null,
+      inUse: a.inUse === true,
+      plan: short(a.plan),
+      state: CLOUD_STATES.includes(a.state) ? a.state : 'ready',
+      limitedUntil: num(a.limitedUntil),
+      same: sameAs(a),
+      usage: a.readAt ? usageOf(a.limits, a.readAt) : null,
+    })),
   };
 }
 
@@ -277,7 +297,6 @@ export function phoneSettingsOf(model, { version }) {
   if (!model?.ok || !model.workspace) return null;
   const w = model.workspace;
   const gate = w.memoryGate ?? {};
-  const emails = new Set([...(w.accounts ?? []), ...(w.codex?.accounts ?? [])].map((a) => a.email).filter(Boolean));
   const order = Array.isArray(w.productOrder) ? w.productOrder.filter((s) => typeof s === 'string') : [];
   return {
     v: SETTINGS_VERSION,
@@ -293,7 +312,7 @@ export function phoneSettingsOf(model, { version }) {
       outsideAgents: w.outsideAgents,
       permission: w.permission,
       codexMode: w.codexMode ?? null,
-      cloud: cloudOf(model.cloud, emails),
+      cloud: cloudOf(model.cloud, w),
       cloudPermission: typeof w.cloudPermission === 'string' ? w.cloudPermission : null,
       cloudCodexMode: typeof w.cloudCodexMode === 'string' ? w.cloudCodexMode : null,
       paused: w.agentsRunning === false,

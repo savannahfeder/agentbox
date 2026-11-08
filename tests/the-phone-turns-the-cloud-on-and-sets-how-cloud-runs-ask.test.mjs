@@ -54,7 +54,7 @@ describe('what the phone may ask', () => {
 describe('the copy the computer sends', () => {
   it('says where threads run and which agents the cloud has an account for', () => {
     const w = phoneSettingsOf(model(setUp([{ engine: 'claude', key: 'k1', name: 'me@example.com', inUse: true, state: 'ready' }])), { version: '1' }).workspace;
-    expect(w.cloud).toEqual({ mode: 'full', whenOn: 'full', engines: ['claude'], inUse: { claude: 'me@example.com', codex: null } });
+    expect(w.cloud).toMatchObject({ mode: 'full', whenOn: 'full', engines: ['claude'], inUse: { claude: 'me@example.com', codex: null } });
     expect(w.cloudPermission).toBe('bypassPermissions');
     expect(w.cloudCodexMode).toBe('same');
   });
@@ -70,10 +70,11 @@ describe('the copy the computer sends', () => {
     expect(phoneSettingsOf(model(dup), { version: '1' }).workspace.cloud.engines).toEqual(['codex']);
   });
 
-  it('carries no cloud key and no address the copy did not already have', () => {
+  // The cloud's own addresses ride since the phone lists its accounts
+  // (tests/the-phone-lists-the-clouds-accounts-as-the-desktop-does).
+  it('carries no cloud key', () => {
     const copy = phoneSettingsOf(model(setUp([{ engine: 'claude', key: 'k1', name: 'stranger@example.com', inUse: true }])), { version: '1' });
-    expect(copy.workspace.cloud.inUse.claude).toBeNull();
-    expect(JSON.stringify(copy)).not.toMatch(/STRIPE_KEY|stranger@|k1/);
+    expect(JSON.stringify(copy)).not.toMatch(/STRIPE_KEY|k1/);
   });
 });
 

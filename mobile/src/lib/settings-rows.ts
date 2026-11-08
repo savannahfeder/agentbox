@@ -1,6 +1,8 @@
 // The rows of the desktop's Settings index (renderer/src/settings-search.ts)
 // that the phone's own pages draw, so its search never opens a page without
 // the row it found.
+import { ROOMS_SEARCH_ROWS, roomsPageShown } from './rooms-settings';
+
 const ROWS = [
   'general/Your account', 'general/Counts and crash reports',
   'appearance/Theme',
@@ -14,8 +16,8 @@ const ROWS = [
   'team/Team',
 ];
 
-/** Every row the phone draws for this computer's copy; the cloud's only for an agent the cloud has, Public links only while there are some. */
-export function phoneSettingsRows(settings: { workspace?: { cloud?: { engines?: string[] } | null; publicLinks?: unknown[] } } | null | undefined): string[] {
+/** Every row the phone draws for this computer's copy; the cloud's only for an agent the cloud has, Public links only while there are some, Rooms' only while it is on. */
+export function phoneSettingsRows(settings: { workspace?: { cloud?: { engines?: string[] } | null; publicLinks?: unknown[]; alpha?: { rooms?: boolean } } } | null | undefined): string[] {
   const cloud = settings?.workspace?.cloud?.engines ?? [];
-  return [...ROWS, ...(settings?.workspace?.publicLinks?.length ? ['general/Public links'] : []), ...cloud.map((engine) => `${engine}/Cloud accounts`)];
+  return [...ROWS, ...(settings?.workspace?.publicLinks?.length ? ['general/Public links'] : []), ...cloud.map((engine) => `${engine}/Cloud accounts`), ...(roomsPageShown(settings) ? ROOMS_SEARCH_ROWS : [])];
 }

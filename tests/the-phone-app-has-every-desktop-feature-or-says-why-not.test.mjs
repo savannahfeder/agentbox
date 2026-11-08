@@ -38,6 +38,7 @@ const READS_ON_THE_PHONE = [
   'mobile/src/app/thread/[product]/[id].tsx',
   'mobile/src/lib/actions.ts',
   'mobile/src/lib/palette.ts',
+  'mobile/src/lib/rooms-settings.ts',
   'mobile/src/lib/thread-offers.ts',
   'mobile/src/lib/unread.ts',
   'mobile/src/ui/Filters.tsx',
