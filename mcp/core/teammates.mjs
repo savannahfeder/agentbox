@@ -12,7 +12,7 @@ import {
   teamDir, readTeammates, readChat, writeTeammate, writeChat, newMemoryId, newTeammateId,
   readPlaybooks, writePlaybook, newPlaybookId, newLessonId, newDutyId, methodFile, sourcesDir, writeMethod,
 } from '../../main/store/teammates-files.mjs';
-import { teammateIdOf, hopOf, workOf, setupTitle, isSetupTitle, mentionsIn, isWorks, letterFor, cleanDuty, dutyStart, isDate, tooLongForAChat, METHOD_CAP, VOICES, YOU, MAX_HOPS, HOP_LABEL_PREFIX } from '../../shared/teammates.mjs';
+import { teammateIdOf, hopOf, workOf, setupTitle, mentionsIn, isWorks, letterFor, cleanDuty, dutyStart, isDate, tooLongForAChat, METHOD_CAP, VOICES, YOU, MAX_HOPS, HOP_LABEL_PREFIX } from '../../shared/teammates.mjs';
 import { periodKey } from '../../shared/repeats.mjs';
 import { resolveProduct, resolveAccount } from './account.mjs';
 
@@ -264,8 +264,12 @@ export function teamSetup({ name, role, job, goal, counted, asksFirst, every, at
   }
   if (ready === true) patch.status = 'active';
   writeTeammate(dir, me.id, patch, now);
-  if (patch.name && me.status === 'draft' && isSetupTitle(item.title)) {
-    try { updateWorkItem(project.dir, item.id, { title: setupTitle(patch.name) }, { source: 'system', now }); } catch { /* the old title stands */ }
+  // Its owner may have named it already, in which case it saves no name. Only a
+  // title the app gave a setup run is replaced, not one a message happened to start with.
+  const titled = setupTitle(patch.name ?? me.name);
+  const given = ['Set up its job', setupTitle(null), setupTitle(me.name)];
+  if (me.status === 'draft' && given.includes(item.title) && titled !== item.title) {
+    try { updateWorkItem(project.dir, item.id, { title: titled }, { source: 'system', now }); } catch { /* the old title stands */ }
   }
   if (ready === true && me.status === 'draft') writeChat(dir, { kind: 'act', from: me.id, verb: 'started' }, now);
   const changed = Object.keys(SAID).filter((k) => k in patch && JSON.stringify(patch[k]) !== JSON.stringify(me[k] ?? null));
