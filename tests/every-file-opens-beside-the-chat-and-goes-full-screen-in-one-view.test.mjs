@@ -67,6 +67,14 @@ describe('the wiring', () => {
     const pane = read('renderer/src/components/DocPane.tsx');
     expect(pane).toMatch(/<FilmPlayer [^\n]*wide=\{!onMode\}/);
   });
+  // A power tester picked launch-plan.md under Files in the command bar, five
+  // times, and it opened full screen every time. A comment still opens there.
+  it('a file picked in the command bar or search opens beside its thread', () => {
+    const inside = app.slice(app.indexOf('const openInside = useCallback'), app.indexOf('const insideForPalette'));
+    expect(inside).toMatch(/!o\.note && whereAFileOpens\(o\.file\) === 'beside'/);
+    expect(inside).toMatch(/pendingDoc\.current = \{ id: o\.item\.id, doc \}/);
+    expect(inside).toMatch(/setFoundOpenAt\(big && !beside/);
+  });
   // A power tester played a film to 0:03 beside the chat, went full screen, and
   // found it stopped at 0:00.
   it('a film goes full screen at the moment it had reached beside the chat', () => {

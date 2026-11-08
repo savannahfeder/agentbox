@@ -9,7 +9,7 @@ import type {FocusControlStyle} from './focus-control';
 import {reviewLabEnabled} from './review-lab';
 import { deliverReply } from './deliver-reply.mjs';
 import { ArtifactSurface } from './components/ArtifactSurface';
-import { artifactPlacement, artifactFraction, fullScreenTakes, type ArtifactMode } from './artifact-layout';
+import { artifactPlacement, artifactFraction, fullScreenTakes, whereAFileOpens, type ArtifactMode } from './artifact-layout';
 import { besideDocument } from './message-artifacts';
 import { chromeIsUp, CHROME_HOLD, CHROME_REACH } from './full-screen-chrome';
 // the app's renderer: one state machine, keyboard-first. The Superhuman grammar:
@@ -4165,8 +4165,15 @@ export default function App() {
     if (o.type === 'room') { setFocused(null); roomsUi.pickGroup(`room:${o.roomId}`); revealLine(o.messageId); return; }
     const big: ArtifactOpen | null = o.file ? (o.note ? { file: o.note.file, note: o.note.id } : { path: o.file }) : null;
     if (o.type === 'thread') {
+      // A file opens beside its thread, as it does from the thread; a comment opens full screen at it.
+      const beside = !!o.file && !o.note && whereAFileOpens(o.file) === 'beside' && !o.item.agent && !onPhone();
+      if (beside) {
+        const doc = { product: o.item.product, src: o.file! };
+        pendingDoc.current = { id: o.item.id, doc };
+        setOpenDoc(doc);
+      }
       setFocused(o.item); markSeen(o.item);
-      setFoundOpenAt(big ? { key: `${o.item.product}/${o.item.id}`, open: big } : null);
+      setFoundOpenAt(big && !beside ? { key: `${o.item.product}/${o.item.id}`, open: big } : null);
       if (o.line) revealLine(o.line);
       return;
     }
