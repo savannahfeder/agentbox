@@ -70,6 +70,7 @@ import { loadCloudConfig } from '../main/team/session.mjs';
 const repo = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const noSign = process.argv.includes('--no-sign');
 const profile = process.env.APPLE_KEYCHAIN_PROFILE || null;
+const keychain = process.env.APPLE_KEYCHAIN || null;
 const pinned = process.env.AGENTBOX_RELEASE_COMMIT || null;
 const head = () => {
   try { return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim(); } catch { return null; }
@@ -348,7 +349,7 @@ if (!noSign) {
     run('notarytool', 'xcrun', [
       'notarytool', 'submit', dmg,
       ...(profile
-        ? ['--keychain-profile', profile]
+        ? ['--keychain-profile', profile, ...(keychain ? ['--keychain', keychain] : [])]
         : [
           '--apple-id', process.env.APPLE_ID,
           '--team-id', process.env.APPLE_TEAM_ID,
