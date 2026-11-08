@@ -347,7 +347,7 @@ function useCloudState() {
   }, [cloud, setRows, keepAlerts]);
 
   return {
-    cloud, opened, signedIn, rows, view, tabs, repeats, status, loading: read.first, now, refresh, send, closeAll, attach, fileOf, toast, say,
+    cloud, opened, signedIn, rows, view, tabs, repeats, status, loading: read.first, onlineAt: read.error ? 0 : read.fetchedAt, now, refresh, send, closeAll, attach, fileOf, toast, say,
     team, teamPending, watchTeam, askTeammate, wanted, goTo: setWanted, takeWanted: () => setWanted(null), minimizedApproval, setMinimizedApproval, approvalRoom, setApprovalRoom,
     dismissToast: () => setToast(null), signedInWith, signOut, preview: PREVIEW,
     notice, noticeRead, agreed, answerNotice, withdrawNotice: () => answerNotice(false),

@@ -12,11 +12,14 @@ export type PaidPlan = 'pro' | 'plus' | 'max';
 const ORDER: PaidPlan[] = ['pro', 'plus', 'max'];
 const NAME: Record<PaidPlan, string> = { pro: 'Pro', plus: 'Plus', max: 'Max' };
 const n = (x: number) => x.toLocaleString('en-US');
+const paidOf = (plan: CloudPlan | null): PaidPlan | null => (ORDER.includes(plan?.plan as PaidPlan) ? (plan!.plan as PaidPlan) : null);
+const onFree = (plan: CloudPlan | null) => plan?.plan === 'free';
 
 export interface OfferGo { label: string; act: 'sign-in' | 'plans' | 'cloud-on' | 'pay'; plan?: PaidPlan }
 export interface Offer { say: string; waiting: string; go: OfferGo | null }
 
 const nextUp = (plan: string | undefined): PaidPlan | null => {
+  if (plan === 'free') return ORDER[0];
   const i = ORDER.indexOf(plan as PaidPlan);
   return i >= 0 && i < ORDER.length - 1 ? ORDER[i + 1] : null;
 };
@@ -31,7 +34,10 @@ export function cloudOffer({ cloud, plan, waiting, macFull }: {
   const them = waiting === 1 ? 'it' : 'them';
   const waitingLine = waiting === 1 ? '1 thread is waiting.' : `${waiting} threads are waiting.`;
   const room = cloud.noRoom?.error;
-  const paid = plan?.plan && plan.plan !== 'none' ? plan.plan : null;
+  const paid = paidOf(plan);
+  if (onFree(plan) && room === 'agents') {
+    return { say: 'Both free cloud agents are running.', waiting: waitingLine, go: { label: `Move to Pro · ${PLANS.pro.agents} at once`, act: 'pay', plan: 'pro' } };
+  }
   if (paid && (room === 'hours' || room === 'agents')) {
     const up = nextUp(paid);
     const say = room === 'hours'
@@ -53,7 +59,7 @@ export function cloudOffer({ cloud, plan, waiting, macFull }: {
 export interface PlanCard { id: PaidPlan; name: string; price: string; slots: string; hours: string; current: boolean; button: string | null }
 
 export function planCards(plan: CloudPlan | null): PlanCard[] {
-  const mine = plan?.plan && plan.plan !== 'none' ? plan.plan : null;
+  const mine = paidOf(plan);
   // Off a plan set by hand, another plan is a first purchase, not a switch.
   const verb = mine && plan?.billing !== 'given' ? 'Switch to' : 'Choose';
   return ORDER.map((id) => {
@@ -70,13 +76,16 @@ export function planCards(plan: CloudPlan | null): PlanCard[] {
 
 export interface PlanSummary {
   name: string; price: string; who: string; manage: boolean;
+  /** Over the meters, and over the cards. */
+  period: string; change: string;
   agents: { line: string; percent: number };
-  hours: { line: string; percent: number };
+  hours: { label: string; line: string; percent: number };
 }
 
 /** The top of Settings › Plan and Billing: the plan paid for, and this month's agents and hours as meters. */
 export function planSummary(plan: CloudPlan | null): PlanSummary | null {
-  const mine = plan?.plan && plan.plan !== 'none' ? plan.plan : null;
+  if (plan && onFree(plan)) return freeSummary(plan);
+  const mine = paidOf(plan);
   if (!plan || !mine) return null;
   const running = plan.running ?? 0;
   const hoursAll = plan.hoursPerMonth ?? PLANS[mine].hoursPerMonth;
@@ -86,16 +95,34 @@ export function planSummary(plan: CloudPlan | null): PlanSummary | null {
     price: `$${PLANS[mine].dollarsPerMonth} a month`,
     who: manage ? 'Billed monthly by Stripe' : 'Set up for you, nothing to pay',
     manage,
+    period: 'This month', change: 'Change plan',
     agents: plan.unlimited
       ? { line: `${running} running, no limit`, percent: 0 }
       : { line: `${running} of ${plan.agents ?? 0} running`, percent: Math.min(100, Math.round((running / Math.max(1, plan.agents ?? 1)) * 100)) },
-    hours: { line: `${n(Math.floor((plan.usedSeconds ?? 0) / 3600))} of ${n(hoursAll)} hours`, percent: usedPercent(plan) },
+    hours: { label: 'Hours used', line: `${n(Math.floor((plan.usedSeconds ?? 0) / 3600))} of ${n(hoursAll)} hours`, percent: usedPercent(plan) },
+  };
+}
+
+// The Free plan's hours never renew, so it says what is left rather than the month's use.
+function freeSummary(plan: CloudPlan): PlanSummary {
+  const running = plan.running ?? 0;
+  const agents = plan.agents ?? 0;
+  const hours = plan.hoursPerMonth ?? 0;
+  const left = Math.max(0, hours * 3600 - (plan.usedSeconds ?? 0)) / 3600;
+  return {
+    name: 'Free',
+    price: '$0',
+    who: `${n(hours)} cloud hours to try it`,
+    manage: false,
+    period: 'Usage', change: 'Change plan',
+    agents: { line: `${running} of ${agents} running`, percent: Math.min(100, Math.round((running / Math.max(1, agents)) * 100)) },
+    hours: { label: 'Hours left', line: `${Math.floor(left * 10) / 10} of ${n(hours)}`, percent: Math.round((left / Math.max(1, hours)) * 100) },
   };
 }
 
 /** Whether Settings › Plan and Billing offers Stripe's billing page, and what it says instead. */
 export function cloudBilling(plan: CloudPlan | null): { row: boolean; says: string | null } {
-  const mine = plan?.plan && plan.plan !== 'none' ? plan.plan : null;
+  const mine = paidOf(plan);
   if (!mine) return { row: false, says: null };
   // The plan's own box already says it was set up for you.
   if (plan?.billing === 'given') return { row: false, says: 'Choosing a plan starts paying for it.' };
