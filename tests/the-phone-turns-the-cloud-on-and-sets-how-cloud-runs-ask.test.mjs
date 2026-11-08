@@ -11,6 +11,8 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { checkSetting, settingRoute, phoneSettingsOf } from '../shared/phone-settings.mjs';
 import { CODEX_MODE_ORDER } from '../shared/codex-modes.mjs';
+import { cloudRunsLine } from '../renderer/src/cloud-menu';
+import { sameAsHere } from '../renderer/src/cloud-permission-words';
 
 const ws = (key, value) => checkSetting({ scope: 'workspace', key, value });
 const HOME = '/Users/someone';
@@ -84,5 +86,13 @@ describe('the Claude Code and Codex pages on the phone', () => {
     expect(src).toMatch(/label="In the cloud"/);
     expect(src).toMatch(/w\.cloud\?\.engines\.includes\(engine\)/);
     for (const key of ['cloudRuns', 'cloudPermission', 'cloudCodexMode']) expect(src).toContain(`'${key}'`);
+  });
+
+  it('say "your computer", where the desktop says "this computer"', () => {
+    expect(cloudRunsLine('mac', null, 'your computer')).toBe('Every thread runs on your computer.');
+    expect(cloudRunsLine('full', null, 'your computer')).toBe('Threads start there when your computer is full, on your cloud account.');
+    expect(cloudRunsLine('full', null)).toBe('Threads start there when this computer is full, on your cloud account.');
+    expect(sameAsHere('your computer')).toBe('The same as on your computer.');
+    expect(src).toMatch(/const COMPUTER = 'your computer'/);
   });
 });

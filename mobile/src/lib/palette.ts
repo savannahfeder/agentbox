@@ -26,7 +26,7 @@ function computerCommands(c: ComputerFacts): PhoneCommand[] {
   return [
     { id: 'pause', label: c.paused ? 'Unpause agents' : 'Pause agents', keywords: 'stop hold sessions spawn', act: set('paused', !c.paused) },
     { id: 'resume-stopped', label: 'Resume interrupted agents', keywords: 'respawn stranded usage limit crash', act: set('resumeStopped', true) },
-    { id: 'usage', label: 'Usage and limits', aside: 'Settings', keywords: 'usage limit limits left remaining quota plan subscription accounts week', act: { push: '/settings/claude' } },
+    { id: 'usage', label: 'Usage and limits', aside: 'Settings', keywords: 'usage limit limits left remaining quota accounts week session', act: { push: '/settings/claude' } },
     ...c.projects.map((p, i) => ({
       id: `rank-${p.slug}`, label: `Rank ${p.name} first`,
       aside: c.order.includes(p.slug) ? `now #${i + 1} of ${c.projects.length}` : 'not ranked yet',

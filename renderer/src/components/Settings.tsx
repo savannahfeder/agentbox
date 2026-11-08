@@ -48,7 +48,7 @@ import { CloudPlanCards } from './CloudPlanCards';
 import type { CloudPlan } from '../types';
 import { cloudAccountState, hourWords, meterPair, resetWords } from '../account-words';
 import { runningFigures, type GateReading } from '../running-reading';
-import { CODEX_CLOUD_WHAT, SAME_AS_HERE } from '../cloud-permission-words';
+import { CODEX_CLOUD_WHAT, sameAsHere } from '../cloud-permission-words';
 import { accountReadingFor, accountsOnce, codexAccountsOnce, type HereLogin, type OneAccount } from '../accounts-once';
 import { LOOKS, lookMeans, SKINS, TUNE_DEFAULT, TUNE_LIMITS, type Look, type SkinId, type SkinTune } from '../skins';
 import { readySkin } from '../look-switch';
@@ -2057,7 +2057,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                   />
                 </Row>
                 {cloudHere && (
-                  <Row label="In the cloud" desc={w.cloudCodexMode && w.cloudCodexMode !== 'same' ? CODEX_CLOUD_WHAT[w.cloudCodexMode] : SAME_AS_HERE}>
+                  <Row label="In the cloud" desc={w.cloudCodexMode && w.cloudCodexMode !== 'same' ? CODEX_CLOUD_WHAT[w.cloudCodexMode] : sameAsHere()}>
                     <Picker
                       bare
                       label="Permission mode in the cloud"
@@ -2092,7 +2092,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                     with nobody there to approve anything, so by default it
                     does not ask (main/cloud-permission.mts). */}
                 {cloudHere && (
-                  <Row label="In the cloud" desc={w.cloudPermission && w.cloudPermission !== 'same' ? PERMISSION_SENTENCE[w.cloudPermission] : SAME_AS_HERE}>
+                  <Row label="In the cloud" desc={w.cloudPermission && w.cloudPermission !== 'same' ? PERMISSION_SENTENCE[w.cloudPermission] : sameAsHere()}>
                     <Picker
                       bare
                       label="Permission mode in the cloud"

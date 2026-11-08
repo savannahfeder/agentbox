@@ -9,7 +9,7 @@ import { useState, type ComponentType } from 'react';
 import { Pressable, View } from 'react-native';
 import { meterPair } from '../../../renderer/src/account-words';
 import { cloudRunsLine, cloudToggleTarget, type CloudMode } from '../../../renderer/src/cloud-menu';
-import { CODEX_CLOUD_WHAT, SAME_AS_HERE } from '../../../renderer/src/cloud-permission-words';
+import { CODEX_CLOUD_WHAT, sameAsHere } from '../../../renderer/src/cloud-permission-words';
 import { CODEX_MODES, CODEX_MODE_ORDER } from '../../../renderer/src/codex-modes';
 import { MODE_ORDER, MODE_SENTENCE, MODE_WORDS } from '../../../renderer/src/modes';
 import { runningFigures } from '../../../renderer/src/running-reading';
@@ -227,6 +227,8 @@ function Accounts({ engine, list }: { engine: 'claude' | 'codex'; list: Account[
   );
 }
 
+const COMPUTER = 'your computer';
+
 /** The desktop's rule (Settings.tsx `cloudHere`): set up for the cloud, with an account there for this agent. */
 const cloudHere = (w: any, engine: 'claude' | 'codex') => !!w.cloud?.engines.includes(engine);
 
@@ -237,19 +239,19 @@ function CloudGroup({ engine }: { engine: 'claude' | 'codex' }) {
   const mode = r.value as CloudMode;
   return (
     <Group label="Cloud">
-      <Row first label="Use the cloud" desc={cloudRunsLine(mode, cloud.inUse?.[engine] ?? null)} reading={r}
+      <Row first label="Use the cloud" desc={cloudRunsLine(mode, cloud.inUse?.[engine] ?? null, COMPUTER)} reading={r}
         control={<Switch label="Use the cloud" on={mode !== 'mac'} onChange={() => void s.change({ scope: 'workspace', key: 'cloudRuns', value: cloudToggleTarget({ mode, whenOn: cloud.whenOn }) })} />} />
     </Group>
   );
 }
 
-/** "In the cloud": the mode every cloud run starts in, or this computer's. */
+/** "In the cloud": the mode every cloud run starts in, or the computer's own. */
 function InTheCloud({ k, copy, options, says }: { k: 'cloudPermission' | 'cloudCodexMode'; copy: string | null; options: { value: string; label: string }[]; says: (mode: string) => string | undefined }) {
   const s = useSettings();
   const r = s.reading('workspace', k, copy ?? 'same');
   return (
-    <Row label="In the cloud" desc={r.value !== 'same' ? says(r.value as string) : SAME_AS_HERE} reading={r}
-      control={<Choice label="Permission mode in the cloud" value={r.value as string} options={[{ value: 'same', label: 'Same as this computer' }, ...options]} onChange={(v) => void s.change({ scope: 'workspace', key: k, value: v })} />} />
+    <Row label="In the cloud" desc={r.value !== 'same' ? says(r.value as string) : sameAsHere(COMPUTER)} reading={r}
+      control={<Choice label="Permission mode in the cloud" value={r.value as string} options={[{ value: 'same', label: 'Same as your computer' }, ...options]} onChange={(v) => void s.change({ scope: 'workspace', key: k, value: v })} />} />
   );
 }
 
@@ -267,7 +269,7 @@ function Claude() {
       <Group label="Permissions">
         {w.permission === 'custom'
           ? <Row first label="Permission mode" desc={MODE_SENTENCE.custom} />
-          : <Row first label={cloud ? 'On this computer' : 'Permission mode'} desc={MODE_SENTENCE[r.value as keyof typeof MODE_SENTENCE]} reading={r}
+          : <Row first label={cloud ? 'On your computer' : 'Permission mode'} desc={MODE_SENTENCE[r.value as keyof typeof MODE_SENTENCE]} reading={r}
             control={<Choice label="Permission mode" value={r.value as string} options={MODES} onChange={(v) => void s.change({ scope: 'workspace', key: 'permission', value: v })} />} />}
         {cloud ? <InTheCloud k="cloudPermission" copy={w.cloudPermission} options={MODES} says={(m) => MODE_SENTENCE[m as keyof typeof MODE_SENTENCE]} /> : null}
       </Group>
@@ -287,7 +289,7 @@ function Codex() {
       <Group label="Signed in"><Accounts engine="codex" list={w.codexAccounts} /></Group>
       {cloud ? <CloudGroup engine="codex" /> : null}
       <Group label="Permissions">
-        <Row first label={cloud ? 'On this computer' : 'Permission mode'} desc={CODEX_MODES[r.value as keyof typeof CODEX_MODES]?.what} reading={r}
+        <Row first label={cloud ? 'On your computer' : 'Permission mode'} desc={CODEX_MODES[r.value as keyof typeof CODEX_MODES]?.what} reading={r}
           control={<Choice label="Permission mode" value={r.value as string} options={CODEX} onChange={(v) => void s.change({ scope: 'workspace', key: 'codexMode', value: v })} />} />
         {cloud ? <InTheCloud k="cloudCodexMode" copy={w.cloudCodexMode} options={CODEX} says={(m) => CODEX_CLOUD_WHAT[m as keyof typeof CODEX_CLOUD_WHAT]} /> : null}
       </Group>

@@ -2,7 +2,8 @@
 import { CODEX_MODES, CODEX_MODE_ORDER } from './codex-modes';
 import type { CodexModeId } from './types';
 
-export const SAME_AS_HERE = 'The same as on this computer.';
+/** The phone says "your computer": there "this" is the phone. */
+export const sameAsHere = (computer = 'this computer') => `The same as on ${computer}.`;
 
 // Full access's own sentence says "on this computer", which a cloud run is not.
 export const CODEX_CLOUD_WHAT: Record<CodexModeId, string> = {
