@@ -4,12 +4,12 @@ import './home.css';
 
 export type NeedsRow = { key: string; letter: string; title: string; line: string; at: number; unread: boolean };
 export type TeamRow = { key: string; name: string; letter: string; ai: boolean; line: string; state: TeamRowState; week: number[]; total: number };
-export type ProgressRow = { key: string; title: string; line: string; at: number };
+export type ProgressRow = { key: string; letter: string; title: string; line: string; at: number };
 
 const ICONS: Record<DoorKey, JSX.Element> = {
   inbox: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9" /></svg>,
   progress: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="7.5" /><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor" stroke="none" /></svg>,
-  team: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3" /><path d="M6 19c0-3 2.7-5 6-5s6 2 6 5" /></svg>,
+  team: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="7.5" r="2.5" /><circle cx="6" cy="10" r="2" /><circle cx="18" cy="10" r="2" /><path d="M8 19c0-2.5 1.8-4.5 4-4.5s4 2 4 4.5" /><path d="M3 18c0-2 1.3-3.5 3-3.5M21 18c0-2-1.3-3.5-3-3.5" /></svg>,
 };
 
 function Bars({ week }: { week: number[] }) {
@@ -109,7 +109,7 @@ export function HomePage({ hello, now, needs, needsCount, progressCount, team, p
               {progress.length === 0 && <p className="hm-empty">No agent is working right now.</p>}
               {progress.map((r) => (
                 <button type="button" key={r.key} className="hm-row" onClick={() => onOpen(r.key)}>
-                  <span className="hm-face live">{r.title.slice(0, 1).toUpperCase()}</span>
+                  <span className="hm-face live">{r.letter}</span>
                   <span className="hm-text"><b>{r.title}</b><small>{r.line}</small></span>
                   <time>{agoShort(r.at, now)}</time>
                 </button>

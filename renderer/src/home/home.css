@@ -104,3 +104,10 @@
 .sky-swatch canvas { position: absolute; left: 16px; right: 16px; top: 28px; bottom: 0; width: calc(100% - 32px); height: calc(100% - 28px); border-radius: var(--radius) var(--radius) 0 0; }
 .sky-set-label { margin-top: 22px; font-size: 13px; color: var(--text-dim); }
 .sky-set-label + .look-row { margin-top: 10px; }
+
+/* More rows than fit fade out at the card's foot rather than stopping at a cut. */
+.hm-card { position: relative; }
+.hm-card::after { content: ''; position: absolute; left: 1px; right: 1px; bottom: 1px; height: 56px; pointer-events: none; border-radius: 0 0 var(--artifact-corner) var(--artifact-corner);
+  background: linear-gradient(to bottom, rgba(24, 21, 26, 0), rgba(24, 21, 26, .9)); }
+:root[data-theme="light"] .hm-card::after { background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, .94)); }
+.hm-scroll { padding-bottom: 28px; }

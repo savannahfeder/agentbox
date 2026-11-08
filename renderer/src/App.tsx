@@ -7277,7 +7277,7 @@ export default function App() {
       state: teamRowState({ agents: m.agents, waitingOnYou: waiting }), week, total: week.reduce((a, b) => a + b, 0),
     };
   });
-  const homeProgress: ProgressRow[] = homeShown && !teamMode ? progressTab.slice(0, 60).map((i) => ({ key: `${i.product}/${i.id}`, title: rowTitle(i), line: `${engineName(i.engine)} · ${i.productName}`, at: i.updatedAt })) : [];
+  const homeProgress: ProgressRow[] = homeShown && !teamMode ? progressTab.slice(0, 60).map((i) => ({ key: `${i.product}/${i.id}`, letter: engineName(i.engine).slice(0, 1), title: rowTitle(i), line: `${engineName(i.engine)} · ${i.productName}`, at: i.updatedAt })) : [];
   const homeOpenRow = (key: string) => {
     const item = items.find((i) => `${i.product}/${i.id}` === key);
     if (!item) return;
