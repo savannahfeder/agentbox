@@ -1,0 +1,47 @@
+{
+  "configVersion": 0,
+  "apple": {
+    "copyright": "2026 Astral AI Inc.",
+    "categories": ["DEVELOPER_TOOLS", "PRODUCTIVITY"],
+    "advisory": {
+      "alcoholTobaccoOrDrugUseOrReferences": "NONE",
+      "contests": "NONE",
+      "gambling": false,
+      "gamblingSimulated": "NONE",
+      "horrorOrFearThemes": "NONE",
+      "kidsAgeBand": null,
+      "matureOrSuggestiveThemes": "NONE",
+      "medicalOrTreatmentInformation": "NONE",
+      "profanityOrCrudeHumor": "NONE",
+      "sexualContentGraphicAndNudity": "NONE",
+      "sexualContentOrNudity": "NONE",
+      "unrestrictedWebAccess": false,
+      "violenceCartoonOrFantasy": "NONE",
+      "violenceRealistic": "NONE",
+      "violenceRealisticProlongedGraphicOrSadistic": "NONE",
+      "ageRatingOverride": "NONE",
+      "koreaAgeRatingOverride": "NONE"
+    },
+    "info": {
+      "en-US": {
+        "title": "Agentbox",
+        "subtitle": "Reply to your coding agents",
+        "promoText": "Read what your agents did, answer the ones waiting on you, and start new work from your phone.",
+        "description": "Agentbox is an inbox for the coding agents you run with Claude Code and Codex. The iPhone app shows the threads that need you, in the same order as Agentbox on your computer.\n\nRead an agent's answer, with the pictures, films and pages it made. Reply, pick one of the options it offers, or allow or deny what it asks to run. Start a new thread in any project. Put a thread off until later, or close it.\n\nYour agents run on your own Claude or ChatGPT account, on your computer or in Agentbox Cloud. Alerts tell you when a thread needs you, and you can dictate a reply instead of typing it.\n\nAgentbox for iPhone signs in to the account you make in Agentbox on your computer. Download it at agentbox.ac.",
+        "keywords": ["coding", "agents", "ai", "developer", "inbox", "code", "review", "terminal", "programming", "assistant", "notifications"],
+        "releaseNotes": "The first version on the App Store.",
+        "marketingUrl": "https://agentbox.ac",
+        "supportUrl": "https://app.agentbox.ac/support",
+        "privacyPolicyUrl": "https://app.agentbox.ac/privacy"
+      }
+    },
+    "release": {
+      "automaticRelease": true,
+      "phasedRelease": false
+    },
+    "review": {
+      "demoRequired": true,
+      "notes": "Agentbox for iPhone is the phone side of Agentbox, a desktop app for macOS and Linux that runs AI coding agents (Claude Code by Anthropic and Codex by OpenAI) on the user's own subscription. The phone shows the user's threads with their agents, and lets them reply, answer an agent's permission requests and start new threads.\n\nDEMO ACCOUNT\nSign in on the first screen with the email and password in the Sign-In Information fields. Nothing else is needed: no computer and no other login. This account runs on Agentbox Cloud, which runs its agents on our servers, so a reply is answered with no computer switched on. An answer takes one to three minutes.\n\nWHAT TO TRY\n1. Open a thread under Needs you and read the agent's answer. Tap a picture it names to open it.\n2. Reply to it and wait for the answer. If you turn on alerts, one arrives when it is ready.\n3. Tap the pen to start a new thread in the demo project.\n4. Settings, then General: where your messages go, the privacy policy, Help, and Delete account.\n\nWHERE MESSAGES GO (5.1.2(i))\nBefore the first message, the app names the companies that receive it (Anthropic or OpenAI, on the user's own account) and asks for an explicit yes. \"Not now, I'll just read\" leaves the app read-only, and Settings, then General turns it off again.\n\nPURCHASES (3.1)\nThe app sells nothing and shows no prices, plans or links to buy. Agentbox Cloud is a companion web service that is set up and paid for in the desktop app; every new account gets free cloud hours.\n\nACCOUNTS (5.1.1(v))\nAccounts are made in Agentbox on the computer, and the phone signs in to them with email and password. Delete account in Settings, then General deletes the account and everything it put online.\n\nNOT A REMOTE DESKTOP (4.2.7)\nThe app has its own native screens over the user's account. It does not show, mirror or control a computer's screen.\n\nCONTACT AND REPORTS (1.2)\nAgents' output is private to the account that ran them. Settings, then General, then Send feedback reaches the team, and Help gives an email address."
+    }
+  }
+}

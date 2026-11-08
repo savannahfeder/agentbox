@@ -104,6 +104,13 @@ for v in $(env | sed -n 's/^\(GIT_[A-Za-z0-9_]*\)=.*/\1/p'); do
   unset "$v"
 done
 
+# SEMGREP BEFORE THE SUITE, because it takes seconds: the scan main's security
+# run does on GitHub, over what this push changes. See the script.
+scan="$hookdir/../security-scan-the-push.mjs"
+if [ -f "$scan" ]; then
+  printf '%s\n' "$refs" | node "$scan" "${1:-origin}" || exit 1
+fi
+
 # vitest lives in node_modules, and a worktree without one would otherwise fail
 # in a way that reads like a broken test rather than a missing install.
 if [ ! -x "node_modules/.bin/vitest" ]; then

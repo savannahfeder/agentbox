@@ -311,7 +311,6 @@ function OpenFile({ fileKey, typing = false, onClose, onPlace, onNotice }: {
   return <ArtifactView
     product={product}
     draftsAcross="files"
-    threadName="Files"
     shareThread={view?.sentIn.find((p) => p.kind === 'thread' && p.product === product && p.id)?.id ?? undefined}
     lines={(view?.lines ?? []) as LedgerLine[]}
     marks={view?.marks ?? NO_MARKS}
