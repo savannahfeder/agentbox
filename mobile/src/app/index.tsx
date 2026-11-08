@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { readDisplay, writeDisplay, filteredEmptyWords, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
 import { InboxComposer } from '../ui/NewThreadForm';
-import { COUNT_GAP, filterCount, moreToTheRight, phoneBoard, shownTabs, TAB_GAP, TABS, tabsTighten, type Row, type TabId } from '../lib/tabs';
+import { closeWords, COUNT_GAP, filterCount, moreToTheRight, phoneBoard, shownTabs, TAB_GAP, TABS, tabsTighten, type Row, type TabId } from '../lib/tabs';
 import { evViewOf, keepEvView, myItems, type EvView } from '../lib/everything';
 import { EverythingPlace } from '../ui/Everything';
 import { bottomTabs, type PlaceId } from '../lib/groups';
@@ -454,7 +454,7 @@ export default function Threads() {
           </Pressable>
           <Pressable disabled={!picked.size || closing} onPress={() => void closePicked()} accessibilityRole="button"
             style={({ pressed }) => ({ height: 36, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: !picked.size || closing ? 0.5 : 1 })}>
-            <T style={{ fontSize: 14, fontFamily: font.semibold }}>{closing ? 'Closing…' : 'Close'}</T>
+            <T style={{ fontSize: 14, fontFamily: font.semibold }}>{closing ? 'Closing…' : closeWords(picked.size)}</T>
           </Pressable>
         </View>
       )}
