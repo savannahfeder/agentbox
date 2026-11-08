@@ -160,6 +160,7 @@ import { ChoicesFold, ChoicesShow, QueueNav } from './OneThingAtATime';
 import { InlineTable, gridFromHast } from './TableView';
 import { foldKey, foldedKeys, toggleFold } from '../one-thing-at-a-time';
 import { watchForBlank } from '../blank-check';
+import { FittedImg } from './FittedImg';
 const needName = (n: Need) => (n.kind === 'sign-in' ? n.service.name : n.kind === 'key' ? (keyWords(n.what) ? `the ${keyWords(n.what)}` : n.name) : n.kind === 'file' ? (n.path.split('/').pop() ?? n.path) : `the ${n.about} code`);
 
 // A relative product path is an artifact, however the worker wrote it:
@@ -329,18 +330,21 @@ export function ArtifactImg({ src, alt, roots, onOpen, find }: {
   // LETS A COPY CARRY THE PICTURE. Without it the picture taints a canvas and
   // ../copy-out.ts has nothing to inline, so a message pasted into an email
   // arrives with a dead url where it should be.
+  // A chat draws its pictures as previews (team/chat.css), a thread at reading width.
+  const maxHeight = direct ? 240 : undefined;
+  const minWidth = direct ? 360 : 760;
   if (/^file:\/\//.test(src) || src.startsWith('/')) {
     const file = src.startsWith('/') ? src : decodeURIComponent(src.slice(7));
-    if (found) return door(found, <img src={pictureUrl(found)} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" />);
+    if (found) return door(found, <FittedImg maxHeight={maxHeight} minWidth={minWidth} src={pictureUrl(found)} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" />);
     if (broken && direct) return <CarriedNote src={file} always />;
     if (broken) return <button type="button" className="missing-artifact" title="Look for it again" onClick={() => { setTries(tries + 1); setBroken(false); }}>missing image: {file}</button>;
-    return door(file, <img src={again(pictureUrl(file))} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" onError={() => setBroken(true)} />);
+    return door(file, <FittedImg maxHeight={maxHeight} minWidth={minWidth} src={again(pictureUrl(file))} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" onError={() => setBroken(true)} />);
   }
   const rel = src.replace(/^\.\//, '');
   const candidates = roots.map((r) => pictureUrl(`${r}/${rel}`));
   if (attempt >= candidates.length) {
     const asked = find ? found : null;
-    if (asked) return door(asked, <img src={pictureUrl(asked)} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" onError={() => setFound(null)} />);
+    if (asked) return door(asked, <FittedImg maxHeight={maxHeight} minWidth={minWidth} src={pictureUrl(asked)} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" onError={() => setFound(null)} />);
     // Still asking: a picture's box, rather than a "missing" that turns into a picture.
     if (asked === undefined) return <span className="inline-image arriving" aria-hidden="true" />;
     if (direct) return <CarriedNote src={rel} always />;
@@ -348,7 +352,7 @@ export function ArtifactImg({ src, alt, roots, onOpen, find }: {
     if (find) return <button type="button" className="missing-artifact" title="Look for it again" onClick={lookNow}>missing image: {rel}</button>;
     return <span className="missing-artifact">missing image: {rel}</span>;
   }
-  return door(rel, <img src={candidates[attempt]} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" onError={() => setAttempt(attempt + 1)} />);
+  return door(rel, <FittedImg maxHeight={maxHeight} minWidth={minWidth} src={candidates[attempt]} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" onError={() => setAttempt(attempt + 1)} />);
 }
 
 // A SOUND OR A FILM A WORKER NAMES PLAYS WHERE IT IS NAMED.
@@ -522,6 +526,8 @@ function CarriedNote({ src, always = false }: { src: string; always?: boolean })
 // it is pointing at, and the folder beside them also holds every older round,
 // so it stays one line rather than drawing the same pictures twice.
 const FOLDER_SHOWS = 6;
+// A third of the 760-point reading width, less the gaps (styles.css .folder-preview-grid).
+const FOLDER_SHOT_WIDTH = 247;
 // What each folder showed last, so a thread opened again draws it at once.
 const folderSeen = new Map<string, { pictures: string[]; total: number }>();
 //
@@ -582,7 +588,7 @@ export function FolderPreview({ product, folder, onOpen, quiet, thread }: {
           const base = file.split('/').pop() ?? file;
           return (
             <button key={file} type="button" className="folder-preview-shot" data-copy-file={file} data-picture={file} title={base} onClick={(e) => onOpen(file, e.currentTarget)}>
-              <img src={pictureUrl(file)} alt={base} crossOrigin="anonymous" loading="lazy" />
+              <FittedImg cover minWidth={FOLDER_SHOT_WIDTH} className="folder-preview-picture" src={pictureUrl(file)} alt={base} crossOrigin="anonymous" />
               <span className="folder-preview-label">{base}</span>
             </button>
           );
