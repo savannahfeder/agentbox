@@ -101,7 +101,8 @@ describe('the view', () => {
   it('saves on leaving rather than asking, and leaves only once it saved', () => {
     const leave = between('const leave = ()', 'const liveQuotes');
     expect(leave).not.toContain('setLeaveAsked');
-    expect(leave).toMatch(/endSitting\(\)\.then\(\(ok\) => \{ if \(ok\) onClose\(\); \}\)/);
+    // A live file's words are also in its room, so there a refused save keeps them as a draft and lets go.
+    expect(leave).toMatch(/endSitting\(\)\.then\(\(ok\) => \{ if \(ok\) onClose\(\); else if \(liveSession\) \{ dropSitting\(\); onClose\(\); \} \}\)/);
     expect(view).not.toContain('>Discard</button>');
   });
   it('saves before stepping to another file or version, or side by side', () => {

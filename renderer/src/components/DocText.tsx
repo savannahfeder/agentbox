@@ -118,8 +118,9 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
     editable: !readOnly && !(live && !collab),
     onUpdate: () => {
       const room = liveNow.current;
-      // Everyone else's words are in the room, and the keeper saves them.
-      if (room && !room.keeper) return;
+      // Everyone's words are in the room. The owner's copy saves them as they come; a
+      // teammate's copy keeping the room saves once, on leaving, through the owner.
+      if (room && (!room.keeper || !room.me.owner)) return;
       dirty.current = true;
       // In a busy room the typing never pauses, so a save is never put off, only spaced out.
       if (room) {
@@ -149,7 +150,7 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
   }, [editor, collab?.seed, collab?.doc]);
   // Becoming the keeper with words nobody saved yet: save them.
   useEffect(() => {
-    if (!editor || editor.isDestroyed || !collab?.keeper) return;
+    if (!editor || editor.isDestroyed || !collab?.keeper || !collab.me.owner) return;
     dirty.current = true;
     if (saveTimer.current != null) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(save, SAVE_DEBOUNCE_MS);

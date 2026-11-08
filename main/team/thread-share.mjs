@@ -46,7 +46,7 @@ const THREAD_ID = /^[\w-]{1,80}$/;
 const SHARED_PREFIX = 'shared-thread';
 
 // `.key` is left out on purpose: it is also what a private key is called.
-const KINDS = 'png|jpe?g|gif|webp|svg|md|markdown|html?|mp4|mov|m4v|webm|mp3|wav|m4a|aac|ogg|pdf|pptx?';
+const KINDS = 'png|jpe?g|gif|webp|svg|md|markdown|html?|csv|tsv|mp4|mov|m4v|webm|mp3|wav|m4a|aac|ogg|pdf|pptx?';
 const PICTURE = /\.(?:png|jpe?g|gif|webp|svg)$/i;
 const PATHISH = String.raw`(?:~\/|\.?\/)?[\w.-]+(?:\/[\w.-]+)*\.(?:${KINDS})`;
 const A_PATH = new RegExp(`^${PATHISH}$`, 'i');

@@ -458,15 +458,17 @@ export function ArtifactView({ product, project = null, thread, shareThread, thr
     setEditWord(null);
     setTold(null);
   };
+  // A live file's words are in the room as well, so a save that is refused keeps
+  // them as a draft here and lets the person go, rather than holding them in the file.
   const away = (go: () => void) => {
     if (!editingNow.current) { go(); return; }
     if (editWord === 'Not saved') { dropSitting(); go(); return; }
-    void endSitting().then((ok) => { if (ok) go(); });
+    void endSitting().then((ok) => { if (ok) go(); else if (liveSession) { dropSitting(); go(); } });
   };
   const leave = () => {
     if (!editing) { onClose(); return; }
     if (editWord === 'Not saved') { dropSitting(); onClose(); return; }
-    void endSitting().then((ok) => { if (ok) onClose(); });
+    void endSitting().then((ok) => { if (ok) onClose(); else if (liveSession) { dropSitting(); onClose(); } });
   };
   useEffect(() => {
     if (editing && family && editing.fam !== family.key) void endSitting();
