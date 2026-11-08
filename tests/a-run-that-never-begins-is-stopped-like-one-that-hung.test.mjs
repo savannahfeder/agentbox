@@ -19,6 +19,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
+import { spoolDir } from '../main/approvals.mjs';
 
 let tmp;
 beforeEach(() => { tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-never-began-')); });
@@ -109,6 +110,21 @@ describe('what the check still leaves alone', () => {
     const s = run(sup, 'w-remote', { quietFor: 45 * MIN, remoteIdle: true });
     expect(sup.reapHungSessions([unclaimed('w-remote')], NOW)).toEqual([]);
     expect(s.killed).toBe(0);
+  });
+
+  // A Codex run traces nothing until a step completes, so one stopped on its
+  // first permission card is silent and unclaimed while it waits for you.
+  it('a run waiting on your answer to the permission card it raised', () => {
+    const { sup } = makeSupervisor();
+    const dir = spoolDir(tmp);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'card-1.request.json'),
+      JSON.stringify({ id: 'card-1', at: NOW, product: 'payments', item: 'w-asks', tool: 'Bash', input: { command: 'npm test' } }));
+    const s = run(sup, 'w-asks', { quietFor: 25 * MIN });
+    const other = run(sup, 'w-hung', { quietFor: 25 * MIN });
+    expect(sup.reapHungSessions([unclaimed('w-asks'), unclaimed('w-hung')], NOW)).toEqual(['w-hung']);
+    expect(s.killed).toBe(0);
+    expect(other.killed).toBe(1);
   });
 
   it('a run in the cloud, which can be quiet while its machine starts', () => {

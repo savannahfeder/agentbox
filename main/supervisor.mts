@@ -4451,6 +4451,7 @@ export class Supervisor {
     if (!this.sessions.size) return [];
     const byId = new Map((items ?? []).map((i) => [i.id, i]));
     const reaped: string[] = [];
+    let asking: Set<unknown> | null = null;
     for (const [id, session] of this.sessions) {
       if (session.stoppedByUs) continue;
       const item = byId.get(id);
@@ -4465,6 +4466,8 @@ export class Supervisor {
       if (!lapsed && !neverBegan) continue;
       const quietSince = session.lastOutputAt ?? session.startedAt ?? now;
       if (now - quietSince < HUNG_QUIET_MS) continue;
+      // Silent because it waits on a card in front of the person.
+      if (!lapsed && (asking ??= new Set(listPending(this.config.storeRoot).map((r) => r?.item))).has(id)) continue;
       this._hungReaps ??= {};
       const key = `${item.product}:${id}`;
       const last = this._hungReaps[key];
