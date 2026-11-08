@@ -8,6 +8,9 @@ function Tile({ sky, on, onPick }: { sky: Sky; on: boolean; onPick: () => void }
   return <button type="button" className={`look sky-look${on ? ' on' : ''}`} aria-pressed={on} onClick={onPick}>
     <span className="look-swatch sky-swatch" style={sky.frame ? { background: sky.frame } : undefined}>
       <canvas ref={ref} />
+      <span className="look-tick" aria-hidden="true">
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1.6 5.7 4.2 8.3 9.4 2.7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      </span>
     </span>
     <span className="look-name">{sky.name}</span>
   </button>;
