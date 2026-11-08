@@ -151,14 +151,14 @@ function storeServer() {
 function httpSession(server) {
   let sid = null;
   let nextId = 1;
-  const call = async (method, params) => {
+  const call = async (method, params, ms = 20_000) => {
     const id = nextId++;
     try {
       const res = await fetch(server.url, {
         method: 'POST',
         headers: { ...server.headers, 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...(sid ? { 'mcp-session-id': sid } : {}) },
         body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
-        signal: AbortSignal.timeout(20_000),
+        signal: AbortSignal.timeout(ms),
       });
       sid = res.headers.get('mcp-session-id') ?? sid;
       if (!res.ok) return { error: { message: `${method} was refused (${res.status})` } };
@@ -166,12 +166,12 @@ function httpSession(server) {
         .map((e) => JSON.parse(e.slice(e.indexOf('data: ') + 6))).find((m) => m.id === id);
       return answer ?? { error: { message: `${method} had no answer` } };
     } catch (err) {
-      return { error: { message: `${method} had no answer in 20 s: ${err.message}` } };
+      return { error: { message: `${method} had no answer in ${ms / 1000} s: ${err.message}` } };
     }
   };
   const ready = call('initialize', { protocolVersion: '2025-06-18', clientInfo: { name: 'agentbox-proof-stub', version: '1.0.0' }, capabilities: {} });
   return {
-    call: async (name, args) => { await ready; return call('tools/call', { name, arguments: args }); },
+    call: async (name, args, ms) => { await ready; return call('tools/call', { name, arguments: args }, ms); },
     close: () => { if (sid) fetch(server.url, { method: 'DELETE', headers: { ...server.headers, 'mcp-session-id': sid }, signal: AbortSignal.timeout(5_000) }).catch(() => {}); },
   };
 }
@@ -198,16 +198,16 @@ function mcpSession(server) {
     }
   });
   let nextId = 1;
-  const call = (method, params) => new Promise((resolve) => {
+  const call = (method, params, ms = 20_000) => new Promise((resolve) => {
     const id = nextId++;
     waiting.set(id, resolve);
-    setTimeout(() => { if (waiting.delete(id)) resolve({ error: { message: `${method} had no answer in 20 s` } }); }, 20_000).unref();
+    setTimeout(() => { if (waiting.delete(id)) resolve({ error: { message: `${method} had no answer in ${ms / 1000} s` } }); }, ms).unref();
     child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
   });
 
   const ready = call('initialize', { protocolVersion: '2024-11-05', clientInfo: { name: 'agentbox-proof-stub', version: '1.0.0' }, capabilities: {} });
   return {
-    call: async (name, args) => { await ready; return call('tools/call', { name, arguments: args }); },
+    call: async (name, args, ms) => { await ready; return call('tools/call', { name, arguments: args }, ms); },
     close: () => { try { child.kill(); } catch { /* done with it */ } },
   };
 }
@@ -377,6 +377,34 @@ const COMPUTER_ASK = /\bxcode\b|simulator|testflight/i;
     said = lines.length
       ? [`**I need ${what.length > 1 ? `${what.slice(0, -1).join(', ')} and ${what.at(-1)}` : what[0]} to finish.**`, '', 'Everything that does not need it is done.', '', ...lines].join('\n')
       : `Finished "${title}" with ${[...services.map((x) => `your saved ${x[2]} sign-in`), ...(wantsFile ? [named ? `the ${named} you sent` : 'the film you sent'] : []), ...(wantsCode ? ['the code you sent'] : [])].join(', ')}. It is done.`;
+  }
+}
+// A TASK THAT SAYS TO SIGN IN OR CONNECT TO A SERVICE signs in the way a real
+// agent is told to: its login's own link, through the sign_in tool, waited on
+// (mcp/tools.mjs). The links are shaped like each service's real one.
+const BROWSER_SIGN_INS = [
+  [/github/i, 'GitHub', 'https://github.com/login/device', () => `${Math.random().toString(36).slice(2, 6)}-${Math.random().toString(36).slice(2, 6)}`.toUpperCase(), 'to open the pull request'],
+  [/vercel/i, 'Vercel', 'https://vercel.com/oauth/device', () => Math.random().toString(36).slice(2, 10).toUpperCase(), 'to deploy the site'],
+  [/linear/i, 'Linear', 'https://mcp.linear.app/authorize?response_type=code&client_id=stand-in&redirect_uri=http%3A%2F%2Flocalhost%3A54012%2Fcallback&state=s', null, 'to file the issues in your workspace'],
+  [/notion/i, 'Notion', 'https://mcp.notion.com/authorize?response_type=code&client_id=stand-in&redirect_uri=http%3A%2F%2Flocalhost%3A54013%2Fcallback&state=s', null, 'to read your pages'],
+  [/supabase/i, 'Supabase', 'https://supabase.com/dashboard/cli/login?session_id=stand-in', null, 'to apply the change to the database'],
+];
+{
+  const task = promptText.match(/^Title: [\s\S]*?(?=\n# |(?![\s\S]))/m)?.[0] ?? '';
+  const service = /\b(sign(ed)? in|log(ged)? in|connect(ed)?|authenticate)\b/i.test(task) && process.env.ZERO_ITEM ? BROWSER_SIGN_INS.find(([re]) => re.test(task)) : null;
+  const server = service && storeServer();
+  if (server) {
+    const [, name, url, code, why] = service;
+    const session = mcpSession(server);
+    try {
+      say({ type: 'assistant', session_id: sessionId, message: { content: [{ type: 'text', text: `Started the ${name} login. Waiting for you to sign in.` }] } });
+      const ask = async (args) => { const r = await session.call('sign_in', args, 70_000); if (r?.error || r?.result?.isError) throw new Error(r?.error?.message ?? r?.result?.content?.[0]?.text); return JSON.parse(r.result.content[0].text); };
+      let out = await ask({ service: name, url, ...(code ? { code: code() } : {}), why });
+      for (let i = 0; i < 12 && out.status === 'waiting' && !stopping; i += 1) out = await ask({ ask: out.ask });
+      said = out.status === 'signed_in' || out.status === 'landed' ? `Signed in to ${name} and finished "${titleIn(promptText) ?? 'this'}". It is done.`
+        : out.status === 'skipped' ? `**${name} is not signed in, so that part is left.**\n\nEverything that did not need ${name} is done. Reply when you want to sign in and I will ask again.`
+          : `**I am still waiting for you to sign in to ${name}.**\n\nReply when you have, and I will carry on.`;
+    } catch (e) { said = `Could not ask you to sign in to ${name}: ${e.message}`; } finally { session.close(); }
   }
 }
 const handsOver = directive('stub:file')?.[1];

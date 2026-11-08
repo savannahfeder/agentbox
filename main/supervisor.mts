@@ -13246,7 +13246,8 @@ export class Supervisor {
     const lines = ['## Connected tools', 'Each tool the owner can connect, as their Connections page shows it. Say it the same way, and never tell the owner to connect a tool that is connected.'];
     for (const t of tools.filter((x) => x.state !== 'not_connected')) lines.push(connectionLine(t, now));
     const missing = tools.filter((t) => t.state === 'not_connected');
-    if (missing.length) lines.push(`Not connected: ${missing.map((e) => e.name).join(', ')}. If the work needs one of them, or another tool, do not look for another way in. Say so in your message and give the owner the link: ${missing.map((e) => `[Connect ${e.name}](agentbox://connections/${e.id})`).join(' ')}, or [Connections](agentbox://connections) for anything else.`);
+    if (missing.length) lines.push(`Not connected: ${missing.map((e) => e.name).join(', ')}. If the work needs one of them as a tool, say so in your message and give the owner the link: ${missing.map((e) => `[Connect ${e.name}](agentbox://connections/${e.id})`).join(' ')}, or [Connections](agentbox://connections) for anything else.`);
+    lines.push('A command-line tool the work runs (gh, vercel, supabase and the like), or an MCP server of the project\'s own, signs in with its own login: start it and hand its link to the sign_in tool, which puts it in front of the owner while you wait. Look for no other way in.');
     let copies: ConnectionCopy[] = [];
     try { copies = this.connections.copiesNow?.() ?? []; } catch { /* told as none */ }
     if (copies.length || tools.some((t) => t.state !== 'not_connected')) lines.push('', filesComeFirst(copies, now));
