@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import { readTable, dateOf, dateWords, dayTyped } from '../renderer/src/table-file.ts';
 import {
   renameTag, dropTag, withLooks, lookKind, lookTone, lookRenameColumn, lookRenameTag, NO_LOOKS,
-  moveRows, moveColumns, writeTable, shapeOf, learnTag, writeCells, pinTones, newTone,
+  moveRows, moveColumns, writeTable, shapeOf, learnTag, writeCells, pinTones, newTone, lookWrap,
 } from '../renderer/src/table-edit.ts';
 
 const PLAN = [
@@ -122,6 +122,17 @@ describe('a colour and a type the person picked come back when the file is read 
     expect(newTone(leads, 'Negotiating')).not.toBe('purple');
     expect(newTone(leads, 'Lost')).toBe('rose');
   });
+  // Long notes were cut off with "..." and could only be read by opening the row.
+  it('a column set to wrap stays wrapped after reading the file again, follows a rename, and turns off', () => {
+    const t = readTable('Goal,Note\nA,a long note\nB,another\n', 'x.csv');
+    const on = lookWrap(NO_LOOKS, 'Note', true);
+    expect(withLooks(t, on).columns[1].wrap).toBe(true);
+    expect(withLooks(t, on).columns[0].wrap).toBeFalsy();
+    expect(lookRenameColumn(on, 'Note', 'Notes').wrap).toEqual({ Notes: true });
+    const off = lookWrap(on, 'Note', false);
+    expect(off.wrap).toEqual({});
+    expect(withLooks(withLooks(t, on), off).columns[1].wrap).toBe(false);
+  });
   it('nothing chosen leaves the table exactly as read', () => {
     const t = plan();
     expect(withLooks(t, NO_LOOKS)).toBe(t);
@@ -225,6 +236,14 @@ describe('the view wires these up', () => {
     expect(src).toMatch(/renameTag\(/);
     expect(src).toMatch(/dropTag\(/);
     expect(src).toMatch(/lookTone\(/);
+  });
+  it('each header and the Type list mark a column\'s type with its icon', () => {
+    expect(src).toMatch(/<KindIcon kind=\{c\.kind\} \/>\{c\.name\}/);
+    expect(src).toMatch(/<KindIcon kind=\{kind\} \/><span className="when-row-label">\{label\}/);
+  });
+  it('a cut-off cell picked shows its words whole, and a column can wrap', () => {
+    expect(src).toMatch(/className="tbl-peek"/);
+    expect(src).toMatch(/label="Wrap text"/);
   });
   it('rows and columns can be moved by drag and from the menu', () => {
     expect(src).toMatch(/moveRows\(/);

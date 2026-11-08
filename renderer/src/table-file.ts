@@ -4,7 +4,7 @@
 export type ColumnKind = 'name' | 'tag' | 'number' | 'date' | 'link' | 'email' | 'text';
 export type Tone = 'green' | 'blue' | 'purple' | 'amber' | 'rose' | 'teal' | 'grey';
 /** `head` is the header as the file has it; `name` is unique. `values` are a tag column's values as first written; `tones` is keyed by their lower case. */
-export type Column = { name: string; head: string; kind: ColumnKind; values: string[]; tones: Record<string, Tone> };
+export type Column = { name: string; head: string; kind: ColumnKind; values: string[]; tones: Record<string, Tone>; wrap?: boolean };
 /** `ranked`: the first column is the file's own rank, which stands in for the row number. */
 export type Table = { columns: Column[]; rows: string[][]; logoCol: number; ranked: boolean };
 export type Sort = { col: number; dir: 'asc' | 'desc' } | null;

@@ -15,7 +15,7 @@ import {
 import {
   addColumn, addRows, boxOf, filterChoices, likeItsColumn, cellsIn, dropColumn, dropRows, fromClipboard, inBox, moved, orderAfterAdd, orderAfterDrop,
   pasteInto, renameColumn, shapeOf, toClipboard, writeCells, writeTable, type At, type Box, type Pick,
-  dropTag, lookKind, lookRenameColumn, lookRenameTag, lookTone, moveColumns, moveRows, newTone, NO_LOOKS, pinTones, renameTag, withLooks, type Looks,
+  dropTag, lookKind, lookRenameColumn, lookRenameTag, lookTone, lookWrap, moveColumns, moveRows, newTone, NO_LOOKS, pinTones, renameTag, withLooks, type Looks,
 } from '../table-edit';
 import { api } from '../api';
 import { MAC } from '../this-keyboard';
@@ -28,7 +28,10 @@ export const PREVIEW_ROWS = 6;
 // Rows drawn above and below the ones in view, so a fast scroll does not show a gap.
 const SPARE = 12;
 // .tbl-td's height in table-view.css; the spacers above and below are counted in it.
+// With a column wrapped every row is three lines tall, so rows stay one height and
+// the rows in view can still be found by arithmetic on a table of 150,000.
 const ROW_H = 46;
+const ROW_WRAPPED = 86;
 // .tbl-rn's width; the first column sticks just right of it.
 const RN_W = 44;
 const RN_W_WIDE = 58;
@@ -96,7 +99,7 @@ const Row = memo(function Row({ table, row, r, n, c0, c1, at, whole, hands }: {
       const kind = table.columns[i].kind;
       const sel = i >= c0 && i <= c1;
       const link = cellLink(table, row, i);
-      return <div key={i} className={`tbl-td${cellClass(kind, !!link)}${sel ? ' sel' : ''}${i === at ? ' at' : ''}`} role="cell"
+      return <div key={i} className={`tbl-td${cellClass(kind, !!link)}${hands && table.columns[i].wrap ? ' wrap' : ''}${sel ? ' sel' : ''}${i === at ? ' at' : ''}`} role="cell"
         data-r={hands ? r : undefined} data-c={hands ? i : undefined} title={hoverText(kind, v, link)}>
         <CellBody table={table} col={i} row={row} value={v} link={link} />
         {hands && i === (table.ranked ? 1 : 0) && <button type="button" className="tbl-open" tabIndex={-1} aria-label="Open this row" title="Open this row (Space)">{OPEN}</button>}
@@ -194,7 +197,7 @@ function readLooks(path: string): Looks {
   if (path.startsWith('inline:')) return NO_LOOKS;
   try {
     const kept = JSON.parse(localStorage.getItem(looksKey(path)) ?? 'null') as Partial<Looks> | null;
-    return kept && typeof kept === 'object' ? { kinds: kept.kinds ?? {}, tones: kept.tones ?? {} } : NO_LOOKS;
+    return kept && typeof kept === 'object' ? { kinds: kept.kinds ?? {}, tones: kept.tones ?? {}, wrap: kept.wrap ?? {} } : NO_LOOKS;
   } catch { return NO_LOOKS; }
 }
 function keepLooks(path: string, looks: Looks) {
@@ -577,7 +580,7 @@ function RowSheet({ table, row, place, count, editable, from, onWrite, onStep, o
     <div className="tbl-sheet-body">
       {table.columns.map((c, i) => (
         <div key={`${place}:${i}`} className={`tbl-field${i === from ? ' from' : ''}`} data-field={i}>
-          <span className="tbl-field-name">{c.name}</span>
+          <span className="tbl-field-name"><KindIcon kind={c.kind} />{c.name}</span>
           <Field column={c} value={row[i] ?? ''} editable={editable && !(table.ranked && i === 0)} onWrite={(v) => onWrite(i, v)} hands={editable ? tagHands?.(i) : undefined}
             cells={() => table.rows.map((r) => r[i] ?? '')} />
         </div>
@@ -587,6 +590,17 @@ function RowSheet({ table, row, place, count, editable, from, onWrite, onStep, o
 }
 
 const glyph = (d: string) => <svg viewBox="0 0 16 16" aria-hidden="true"><path d={d} /></svg>;
+// What each column holds, drawn small before its name, as Notion marks a property.
+const KIND_PATH: Record<ColumnKind, string> = {
+  name: 'M3 4.5h10M3 8h10M3 11.5h6',
+  text: 'M3 4.5h10M3 8h10M3 11.5h6',
+  tag: 'M8.5 2.5h5v5l-6 6-5-5zM11 5h.01',
+  number: 'M6.5 2.5l-1.5 11M11 2.5l-1.5 11M3 6h10.5M2.5 10h10.5',
+  date: 'M3 3.5h10v10H3zM3 6.5h10M5.5 2v3M10.5 2v3',
+  link: 'M7 9a2.5 2.5 0 0 0 3.5 0l2-2A2.5 2.5 0 0 0 9 3.5l-.75.75M9 7a2.5 2.5 0 0 0-3.5 0l-2 2A2.5 2.5 0 0 0 7 12.5l.75-.75',
+  email: 'M2.5 4h11v8h-11zM2.5 4.5L8 8.5l5.5-4',
+};
+const KindIcon = ({ kind }: { kind: ColumnKind }) => <span className="tbl-kind" aria-hidden="true">{glyph(KIND_PATH[kind])}</span>;
 const SEARCH = <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5L14 14" /></svg>;
 const OPEN = glyph('M9.5 3H13v3.5M13 3L8.5 7.5M6.5 13H3V9.5M3 13l4.5-4.5');
 const CARET = glyph('M5 6.5l3 3 3-3');
@@ -686,6 +700,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   let live = doc;
   if (doc.from !== base) { live = { from: base, table: seed.table, looks: seed.looks, order: viewOrder(seed.table, searched, picked, sort) }; setDoc(live); }
   const { table, order } = live;
+  const rowH = hands && table.columns.some((c) => c.wrap) ? ROW_WRAPPED : ROW_H;
   const docRef = useRef(live);
   docRef.current = live;
   const past = useRef<Doc[]>([]);
@@ -862,9 +877,9 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     follow.current = false;
     const el = box.current;
     if (!el) return;
-    const top = headH() + pick.b.r * ROW_H;
+    const top = headH() + pick.b.r * rowH;
     if (top < el.scrollTop + headH()) el.scrollTop = top - headH();
-    else if (top + ROW_H > el.scrollTop + el.clientHeight) el.scrollTop = top + ROW_H - el.clientHeight;
+    else if (top + rowH > el.scrollTop + el.clientHeight) el.scrollTop = top + rowH - el.clientHeight;
     requestAnimationFrame(() => {
       const cell = el.querySelector(`[data-r="${pick.b.r}"][data-c="${pick.b.c}"]`) as HTMLElement | null;
       if (!cell) return;
@@ -1022,9 +1037,9 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     setPick({ a: { r: r0, c: first }, b: { r: r0 + s.r1 - s.r0, c: last }, rows: true });
     const el = box.current;
     if (el) {
-      const top = headH() + r0 * ROW_H;
+      const top = headH() + r0 * rowH;
       if (top < el.scrollTop + headH()) el.scrollTop = top - headH();
-      else if (top + ROW_H > el.scrollTop + el.clientHeight) el.scrollTop = top + ROW_H - el.clientHeight;
+      else if (top + rowH > el.scrollTop + el.clientHeight) el.scrollTop = top + rowH - el.clientHeight;
     }
   };
   const moveColsTo = (c0: number, c1: number, place: number) => {
@@ -1134,7 +1149,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     }
     if (/^(Arrow(Up|Down|Left|Right)|Home|End|PageUp|PageDown)$/.test(k)) {
       stop();
-      const page = Math.max(1, Math.floor((box.current?.clientHeight ?? 400) / ROW_H) - 1);
+      const page = Math.max(1, Math.floor((box.current?.clientHeight ?? 400) / rowH) - 1);
       if (e.shiftKey) goTo({ a: pick.a, b: moved(pick.b, k, edges, { jump: meta, page }) });
       else { const to = moved(pick.a, k, edges, { jump: meta, page }); goTo({ a: to, b: to }); }
       return;
@@ -1189,7 +1204,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   const onDown = (e: React.PointerEvent) => {
     if (!hands || e.button !== 0) return;
     const t = e.target as HTMLElement;
-    if (t.closest('.tbl-edit, .tbl-pick, .tbl-resize, .tbl-th-menu, .tbl-th input, .tbl-add')) return;
+    if (t.closest('.tbl-edit, .tbl-pick, .tbl-peek, .tbl-resize, .tbl-th-menu, .tbl-th input, .tbl-add')) return;
     const hit = atOf(t);
     if (!hit) return;
     pressed.current = true;
@@ -1230,7 +1245,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     if (!el) return null;
     if (!hit || !el.contains(hit)) {
       const rows = docRef.current.order.length;
-      if (kind === 'row' && y > el.getBoundingClientRect().top + headH()) return { kind, place: rows, at: headH() + rows * ROW_H };
+      if (kind === 'row' && y > el.getBoundingClientRect().top + headH()) return { kind, place: rows, at: headH() + rows * rowH };
       const end = el.querySelector(`[data-hc="${last}"]`) as HTMLElement | null;
       if (kind === 'col' && end && x > end.getBoundingClientRect().right) return { kind, place: last + 1, at: end.offsetLeft + end.offsetWidth };
       return null;
@@ -1239,7 +1254,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     if (kind === 'row') {
       const n = Number(hit.dataset.r ?? hit.dataset.rn);
       const place = y > r.top + r.height / 2 ? n + 1 : n;
-      return { kind, place, at: headH() + place * ROW_H };
+      return { kind, place, at: headH() + place * rowH };
     }
     const n = Number(hit.dataset.c ?? hit.dataset.hc);
     const after = x > r.left + r.width / 2;
@@ -1358,7 +1373,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
       const w = Math.max(Math.min(cell.offsetWidth, 200), Math.min(want, el.scrollLeft + el.clientWidth - from - 8));
       const left = Math.max(from, Math.min(cellLeft, el.scrollLeft + el.clientWidth - w));
       const top = cell.offsetTop;
-      const below = el.scrollTop + el.clientHeight - (top + ROW_H);
+      const below = el.scrollTop + el.clientHeight - (top + rowH);
       const tall = editing.pop === 'date' ? 340 : 300;
       const next = { left, top, w, up: !!editing.pop && below < tall && top - el.scrollTop > below };
       setPlace((p) => (p && p.left === next.left && p.top === next.top && p.w === next.w && p.up === next.up ? p : next));
@@ -1367,6 +1382,29 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     el.addEventListener('scroll', read, { passive: true });
     return () => el.removeEventListener('scroll', read);
   }, [editing?.r, editing?.c, editing?.pop, roomy, live, view, template]);
+
+  // ---- A cell picked whose words are cut off shows them whole, over the cell, without editing.
+  const [peek, setPeek] = useState<{ left: number; top: number; w: number; text: string } | null>(null);
+  const one = pick && pick.a.r === pick.b.r && pick.a.c === pick.b.c ? pick.a : null;
+  useLayoutEffect(() => {
+    const el = box.current;
+    const kind = one ? table.columns[one.c]?.kind : undefined;
+    if (!el || !one || !hands || editing || sheet !== null || float || drop || kind === 'tag') { setPeek(null); return undefined; }
+    const read = () => {
+      const cell = el.querySelector(`[data-r="${one.r}"][data-c="${one.c}"]`) as HTMLElement | null;
+      const words = cell?.querySelector('.tbl-ell') as HTMLElement | null;
+      if (!cell || !words || (words.scrollWidth <= words.clientWidth + 1 && words.scrollHeight <= words.clientHeight + 1)) { setPeek(null); return; }
+      const from = el.scrollLeft + stuckWidth(one.c);
+      const cellLeft = one.c === first ? from : cell.offsetLeft;
+      const w = Math.max(Math.min(cell.offsetWidth, 200), Math.min(Math.max(cell.offsetWidth, 420), el.scrollLeft + el.clientWidth - from - 8));
+      const left = Math.max(from, Math.min(cellLeft, el.scrollLeft + el.clientWidth - w));
+      const text = shownText(table.rows[order[one.r]]?.[one.c] ?? '');
+      setPeek((p) => (p && p.left === left && p.top === cell.offsetTop && p.w === w && p.text === text ? p : { left, top: cell.offsetTop, w, text }));
+    };
+    read();
+    el.addEventListener('scroll', read, { passive: true });
+    return () => el.removeEventListener('scroll', read);
+  }, [one?.r, one?.c, editing, sheet, float, drop, live, view, template, rowH]);
 
   // After a menu's choice the keys come back to the table, unless the choice opened a box of its own (Rename).
   const closeFloat = () => {
@@ -1378,6 +1416,18 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     });
   };
 
+  /** Wrap text, for a column of words: on, each row shows three lines of it; a second press turns it off. */
+  const wrapRow = (col: number) => {
+    const c = table.columns[col];
+    if (!c || !(c.kind === 'text' || c.kind === 'name' || c.kind === 'link' || c.kind === 'email')) return null;
+    return <MenuRow label="Wrap text" hint={c.wrap ? '✓' : undefined} onClick={() => {
+      const d = docRef.current;
+      const looks = lookWrap(d.looks, c.name, !c.wrap);
+      commit({ ...d, table: withLooks(d.table, looks), looks });
+      closeFloat();
+    }} />;
+  };
+
   const keysBack = () => requestAnimationFrame(() => (pickRef.current ? focusKeys() : rest()));
 
   // A table the focus left lets its pick go quiet, but keeps it.
@@ -1385,8 +1435,8 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
 
   if (!table.columns.length) return <div className="tbl-empty">This table has no rows yet.</div>;
 
-  const start = preview ? 0 : Math.max(0, Math.floor(view.top / ROW_H) - SPARE);
-  const end = inline ? order.length : preview ? Math.min(order.length, PREVIEW_ROWS) : Math.min(order.length, Math.ceil((view.top + view.height) / ROW_H) + SPARE);
+  const start = preview ? 0 : Math.max(0, Math.floor(view.top / rowH) - SPARE);
+  const end = inline ? order.length : preview ? Math.min(order.length, PREVIEW_ROWS) : Math.min(order.length, Math.ceil((view.top + view.height) / rowH) + SPARE);
   const choices = filterChoices(table);
   // Where the row number and the first column end, so a wide column's name stays in view beside them.
   const firstName = table.columns[first]?.name ?? '';
@@ -1465,7 +1515,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
       {hands && <textarea ref={keys} className="tbl-keys" aria-label="Table" inputMode="none" tabIndex={0} defaultValue=" " data-keys-only=""
         onKeyDown={onKeys} onCopy={(e) => onCopy(e)} onCut={(e) => (editable ? onCopy(e, true) : onCopy(e))} onPaste={onPaste}
         onChange={(e) => { e.target.value = ' '; }} />}
-      <div className="tbl-scroll" ref={box} style={{ ['--tbl-stuck' as string]: `${stuckAt}px`, ['--tbl-rn-w' as string]: `${rnW}px` }} onPointerDown={onDown} onDoubleClick={onDouble} onContextMenu={onContext}
+      <div className="tbl-scroll" ref={box} style={{ ['--tbl-stuck' as string]: `${stuckAt}px`, ['--tbl-rn-w' as string]: `${rnW}px`, ['--tbl-row-h' as string]: `${rowH}px` }} onPointerDown={onDown} onDoubleClick={onDouble} onContextMenu={onContext}
         onClickCapture={(e) => {
           if (hands && (e.target as HTMLElement).closest('.tbl-grid a') && !linkOpens.current) e.preventDefault();
           linkOpens.current = false;
@@ -1506,7 +1556,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
                       changeColumns(t, i, lookRenameColumn(d.looks, d.table.columns[i].name, t.columns[i].name));
                       requestAnimationFrame(focusKeys);
                     }} />
-                  : <><span className="tbl-ell">{c.name}</span>{arrow}</>}
+                  : <><span className="tbl-ell" title={typeName(c.kind)}><KindIcon kind={c.kind} />{c.name}</span>{arrow}</>}
                 <button type="button" className="tbl-th-menu" tabIndex={-1} aria-label={`${c.name} column`} onPointerDown={(e) => e.preventDefault()}
                   onClick={(e) => {
                     if (open.current) endEdit(open.current.pop === 'tag' ? null : open.current.draft);
@@ -1517,7 +1567,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
               </div>;
             })}
           </div>
-          {start > 0 && <div className="tbl-gap" style={{ height: start * ROW_H }} />}
+          {start > 0 && <div className="tbl-gap" style={{ height: start * rowH }} />}
           {order.slice(start, end).map((i, k) => {
             const r = start + k;
             const row = table.rows[i];
@@ -1526,7 +1576,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
             return <Row key={i} table={table} row={row} r={r} n={inline ? null : r + 1} hands={hands}
               c0={on ? sel!.c0 : -1} c1={on ? sel!.c1 : -2} at={pick && pick.a.r === r ? pick.a.c : -1} whole={on && wholeRows} />;
           })}
-          {!preview && end < order.length && <div className="tbl-gap" style={{ height: (order.length - end) * ROW_H }} />}
+          {!preview && end < order.length && <div className="tbl-gap" style={{ height: (order.length - end) * rowH }} />}
           {editable && end >= order.length && (
             <button type="button" className="tbl-add" onClick={() => addRowAt(order.length, true)} title={`New row (Shift+Enter)`}>
               <span className="tbl-add-in"><span className="tbl-add-plus" aria-hidden="true">+</span>New row</span>
@@ -1538,9 +1588,13 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
           style={drop.kind === 'row'
             ? { top: drop.at - 1, width: (box.current?.querySelector('.tbl-grid') as HTMLElement | null)?.offsetWidth }
             : { left: drop.at - 1, height: (box.current?.querySelector('.tbl-grid') as HTMLElement | null)?.offsetHeight }} />}
+        {peek && one && (
+          <div className="tbl-peek" style={{ left: peek.left, top: peek.top, width: peek.w }} title={editable ? 'Double-click or press Enter to edit' : undefined}
+            onDoubleClick={(e) => { e.stopPropagation(); startEdit(one); }}>{peek.text}</div>
+        )}
         {editing && place && editingRow && (
           editing.pop
-            ? <div className={`tbl-pop${place.up ? ' up' : ''}`} style={{ left: place.left, top: place.up ? undefined : place.top + ROW_H - 1, bottom: place.up ? `calc(100% - ${place.top + 1}px)` : undefined, width: place.w }}>
+            ? <div className={`tbl-pop${place.up ? ' up' : ''}`} style={{ left: place.left, top: place.up ? undefined : place.top + rowH - 1, bottom: place.up ? `calc(100% - ${place.top + 1}px)` : undefined, width: place.w }}>
               {editing.pop === 'tag'
                 ? <TagPicker column={table.columns[editing.c]} value={editingRow[editing.c] ?? ''} typed={editing.typed ? editing.draft : undefined}
                   hands={tagHands(editing.c)} onPick={(v, move) => endEdit(v, move)} onClose={() => endEdit(null)} />
@@ -1583,7 +1637,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
             const on = (floatCol.kind === 'name' ? 'text' : floatCol.kind) === kind;
             return <button key={kind} type="button" role="menuitemradio" aria-checked={on} className={`when-row${on ? ' on' : ''}`}
               onClick={() => { setKind(float.col!, kind); closeFloat(); }}>
-              <span className="when-row-label">{label}</span>{on && <span className="when-row-hint">✓</span>}
+              <KindIcon kind={kind} /><span className="when-row-label">{label}</span>{on && <span className="when-row-hint">✓</span>}
             </button>;
           })}
         </FloatMenu>
@@ -1600,10 +1654,12 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
             <MenuRow label={'Move left'} hint={`${ALT}←`} off={float.col! <= first} onClick={() => { const c = float.col!; closeFloat(); moveColsTo(c, c, c - 1); }} />
             <MenuRow label={'Move right'} hint={`${ALT}→`} off={float.col! >= last} onClick={() => { const c = float.col!; closeFloat(); moveColsTo(c, c, c + 2); }} />
             <MenuRow label="Fit to its contents" onClick={() => { fitColumn(float.col!); closeFloat(); }} />
+            {wrapRow(float.col!)}
             <span className="when-sep" />
             <MenuRow label="Delete column" off={table.columns.length - first <= 1} onClick={() => { changeColumns(dropColumn(docRef.current.table, float.col!)); closeFloat(); }} />
           </>}
           {!editable && <MenuRow label="Fit to its contents" onClick={() => { fitColumn(float.col!); closeFloat(); }} />}
+          {!editable && wrapRow(float.col!)}
         </FloatMenu>
         : <FloatMenu x={float.x} y={float.y} onClose={() => setFloat(null)}>
           <MenuRow label="Open row" hint="Space" onClick={() => { if (pick) setSheet(pick.a.r); closeFloat(); }} />

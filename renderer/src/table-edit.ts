@@ -234,7 +234,8 @@ export function dropTag(table: Table, at: number, value: string): Table {
 // ---- What a person chose that a CSV cannot hold: a column's type and its tags'
 // colours. Kept on this computer by column name, beside the widths.
 
-export type Looks = { kinds: Record<string, ColumnKind>; tones: Record<string, Record<string, Tone>> };
+/** `wrap`: the columns whose long text runs onto more lines rather than being cut off. */
+export type Looks = { kinds: Record<string, ColumnKind>; tones: Record<string, Record<string, Tone>>; wrap?: Record<string, boolean> };
 export const NO_LOOKS: Looks = { kinds: {}, tones: {} };
 
 export function withLooks(table: Table, looks: Looks): Table {
@@ -243,10 +244,19 @@ export function withLooks(table: Table, looks: Looks): Table {
     const kind = looks.kinds[c.name];
     if (kind && kind !== c.kind && !(t.ranked && i === 0)) t = showColumnAs(t, i, kind);
   });
-  if (!t.columns.some((c) => c.kind === 'tag' && looks.tones[c.name])) return t;
-  const columns = t.columns.map((c) => (c.kind === 'tag' && looks.tones[c.name] ? { ...c, tones: { ...c.tones, ...looks.tones[c.name] } } : c));
+  const wrap = looks.wrap ?? {};
+  if (!t.columns.some((c) => (c.kind === 'tag' && looks.tones[c.name]) || !!wrap[c.name] !== !!c.wrap)) return t;
+  const columns = t.columns.map((c) => {
+    const next = c.kind === 'tag' && looks.tones[c.name] ? { ...c, tones: { ...c.tones, ...looks.tones[c.name] } } : c;
+    return !!wrap[c.name] === !!c.wrap ? next : { ...next, wrap: !!wrap[c.name] };
+  });
   return { ...t, columns };
 }
+
+export const lookWrap = (looks: Looks, column: string, on: boolean): Looks => {
+  const { [column]: _, ...rest } = looks.wrap ?? {};
+  return { ...looks, wrap: on ? { ...rest, [column]: true } : rest };
+};
 
 /** Every tag's colour as drawn now, kept: the guess deals colours out in order of first row, so moving rows would deal them again. */
 export function pinTones(table: Table, looks: Looks): Looks {
@@ -265,13 +275,13 @@ export const lookTone = (looks: Looks, column: string, tag: string, tone: Tone):
   ({ ...looks, tones: { ...looks.tones, [column]: { ...looks.tones[column], [tag.trim().toLowerCase()]: tone } } });
 
 export function lookRenameColumn(looks: Looks, from: string, to: string): Looks {
-  if (from === to || (!(from in looks.kinds) && !(from in looks.tones))) return looks;
+  if (from === to || (!(from in looks.kinds) && !(from in looks.tones) && !(from in (looks.wrap ?? {})))) return looks;
   const move = <T,>(m: Record<string, T>) => {
     if (!(from in m)) return m;
     const { [from]: kept, ...rest } = m;
     return { ...rest, [to]: kept };
   };
-  return { kinds: move(looks.kinds), tones: move(looks.tones) };
+  return { kinds: move(looks.kinds), tones: move(looks.tones), ...(looks.wrap ? { wrap: move(looks.wrap) } : {}) };
 }
 
 export function lookRenameTag(looks: Looks, column: string, from: string, to: string): Looks {
