@@ -11,6 +11,8 @@ import { threadMessage } from '../../../renderer/src/threads/composer-rules';
 import { sentLine } from '../../../renderer/src/compose-says';
 import { attachmentLinks } from '../../../renderer/src/attachments';
 import { doItHereWrites } from '../../../renderer/src/threads-made';
+import { priorityIdOf, priorityLabelOf } from '../../../renderer/src/priority';
+import { tryAgainWords } from '../../../renderer/src/try-again';
 import type { PhoneSender } from '../../../renderer/src/phone-send';
 import type { WorkItem } from '../../../renderer/src/types';
 import { ruleLabel, type RepeatShape } from '../../../shared/repeats.mjs';
@@ -33,6 +35,15 @@ export type Press =
   | { kind: 'send-back' }
   | { kind: 'send-now' }
   | { kind: 'pin'; pinned: boolean }
+  | { kind: 'rename'; label: string }
+  | { kind: 'priority'; value: number }
+  | { kind: 'reopen' }
+  | { kind: 'try-again' }
+  | { kind: 'restart' }
+  /** True keeps it on the computer; false lets the cloud have it again. */
+  | { kind: 'keep-here'; keep: boolean }
+  /** `to` is the project as the phone names it (phone-rows.ts `phoneSlug`). */
+  | { kind: 'move'; to: string; name: string }
   | { kind: 'repeat-at'; rule: RuleRef; to: RepeatShape }
   | { kind: 'end-repeat'; rule: RuleRef }
   /** A proposal the thread filed, started as its own thread (App.tsx `resolve`); the item is the proposal. */
@@ -185,6 +196,24 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
     case 'pin':
       // App.tsx's toast for the menu's row, which has no Undo there either.
       return { steps: [{ door: 'setThreadPins', payload: { pins: { [item.id]: press.pinned ? true : null } } }], toast: press.pinned ? 'Pinned to the top of your list' : 'Unpinned' };
+    case 'rename': {
+      const label = press.label.replace(/\s+/g, ' ').trim();
+      return label ? { steps: [{ door: 'threadEdit', payload: { ...on, patch: { label } } }], toast: `Renamed: ${clipToSentence(label, TOAST_TITLE)}` } : null;
+    }
+    case 'priority':
+      // App.tsx `retag`'s toast.
+      return { steps: [{ door: 'threadEdit', payload: { ...on, patch: { priority: press.value } } }], toast: `Priority: ${priorityLabelOf(priorityIdOf(press.value)).toLowerCase()}` };
+    case 'reopen':
+      return { steps: [{ door: 'reopen', payload: on }], toast: `Reopened: ${clipToSentence(item.title ?? '', TOAST_TITLE)}` };
+    case 'try-again':
+      return { steps: [{ door: 'resumeItems', payload: { ids: [item.id] } }], toast: waits ? 'Up next once your computer is back.' : tryAgainWords({ resumed: 1 }) };
+    case 'restart':
+      // App.tsx `redeliver`'s toast.
+      return { steps: [{ door: 'redeliver', payload: on }], toast: `A fresh agent is picking this up → ${to}` };
+    case 'keep-here':
+      return { steps: [{ door: 'setThreadOnMac', payload: { onMac: { [item.id]: press.keep ? true : null } } }], toast: press.keep ? 'This thread now runs only on your computer' : 'This thread can run on the cloud again' };
+    case 'move':
+      return { steps: [{ door: 'moveItem', payload: { ...on, to: press.to } }], toast: `Moved to ${press.name}`, goes: null };
     case 'approve-filed':
       return reply('Approved. Run it.', {}, `Running → ${(item.title ?? '').slice(0, 40)}`, 'Approval withdrawn, back in your inbox');
     case 'do-here': {
