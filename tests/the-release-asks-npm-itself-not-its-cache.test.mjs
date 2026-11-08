@@ -22,7 +22,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { nextVersion, serverConfig, whatIsLive } from '../scripts/lib/deploy-rules.mjs';
+import { nextVersion, serverConfig, whatIsLive, withVersion } from '../scripts/lib/deploy-rules.mjs';
 
 const scriptUrl = new URL('../scripts/deploy.mjs', import.meta.url);
 const source = fs.readFileSync(scriptUrl, 'utf8')
@@ -42,7 +42,10 @@ function deploy() {
       existsSync: () => true,
       readFileSync: () => JSON.stringify({ name: 'agentbox-app', version: '1.0.0', posthogKey: 'phc_k', bucket: 'b', runtimeArn: 'r' }),
       writeFileSync: () => {},
+      mkdtempSync: (prefix) => `${prefix}x`,
+      symlinkSync: () => {},
     },
+    withVersion,
     console: { log: (...a) => said.push(a.join(' ')), error: (...a) => said.push(a.join(' ')) },
     process: { argv: ['node', 'deploy.mjs'], env: {}, on: () => {}, exit: (code) => { throw new Error(`exit:${code}`); } },
     execFileSync: () => JSON.stringify({ version: '1.0.0' }),

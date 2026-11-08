@@ -49,9 +49,11 @@ const ENDED = limit({ resetsAt: NOW - 3 * HOUR });
 const HERS = { engine: 'codex', at: NOW - 4 * HOUR, limits: [ENDED, week()] };
 
 describe('a window that has started over since we read it', () => {
+  // Its row stays, with no figure and no countdown, since QA batch 011
+  // (a-session-that-reset-since-the-reading-says-so).
   it('is not counted down to as though it were still running', () => {
-    expect(limitRows([ENDED, week()], NOW).map((r) => r.name)).toEqual(['This week']);
-    expect(usageSentence([ENDED, week()], NOW)).toBe('This week: 9% used, 6d 4h left.');
+    expect(limitRows([ENDED, week()], NOW).map((r) => [r.name, r.used, r.when])).toEqual([['This session', null, null], ['This week', 9, 'Resets in 6d 4h']]);
+    expect(usageSentence([ENDED, week()], NOW)).toBe('This session: reset since the last reading. This week: 9% used, 6d 4h left.');
     expect(usageSentence([ENDED], NOW)).toBe(null);
   });
 
@@ -82,12 +84,13 @@ describe('the corner on the reading from that screenshot', () => {
   // The whole reading, for whatever reads the corner aloud and for the tooltip.
   const aloud = (html) => html.match(/aria-label="([^"]*)"/)?.[1];
 
-  it('says nothing about a session that ended three hours ago', () => {
-    expect(aloud(row())).toBe('Codex. This week: 9% used, 6d 4h left.');
+  it('gives no figure for a session that ended three hours ago', () => {
+    expect(aloud(row())).toBe('Codex. This session: reset since the last reading. This week: 9% used, 6d 4h left.');
   });
 
-  it('names the week it can still answer for, rather than the spent session', () => {
-    expect(row()).toContain('>9%<');
+  it('shows no figure in the sidebar rather than the spent session’s or the week’s', () => {
+    expect(row()).not.toContain('>1%<');
+    expect(row()).not.toContain('>9%<');
     expect(agentsInUse([HERS], 'codex', HERS, NOW).map((a) => a.word)).toEqual(['Codex']);
   });
 

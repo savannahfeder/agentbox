@@ -7,7 +7,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { Product, View } from '../types';
 import { commandKeys } from '../palette-keys';
 import { keptPick, namesIt, pointerMoved, titleFirst } from '../palette-pick';
-import { emptyLine, lookRows, matchesQuery, pageRows, rankMatches } from '../palette-rows';
+import { emptyLine, escapeClosesThePalette, lookRows, matchesQuery, pageRows, rankMatches } from '../palette-rows';
 import { glyphFor } from '../palette-glyphs';
 import { markedWords } from '../found-inside';
 import { ago } from '../format';
@@ -445,6 +445,9 @@ function PaletteBox({ commands, findThreads, findChats, findInside, onSearchFor,
   const byKey = useRef(false);
 
   useEffect(() => inputRef.current?.focus(), []);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  useEffect(() => escapeClosesThePalette(window, () => closeRef.current()), []);
 
   const offered = useMemo(() => (phone ? commands.filter((c) => !NOT_ON_A_PHONE.includes(c.id)) : commands), [commands, phone]);
   const matched = useMemo(() => {
@@ -511,7 +514,6 @@ function PaletteBox({ commands, findThreads, findChats, findInside, onSearchFor,
             placeholder={phone ? 'Search' : findThreads ? 'Search threads or type a command…' : 'Type a command…'}
             enterKeyHint="go"
             onKeyDown={(e) => {
-              if (e.key === 'Escape') onClose();
               // Clamped at 0 as well as at the end, because with nothing matching
               // there is no last row to stop at and Math.min alone walks to -1.
               if (e.key === 'ArrowDown') { e.preventDefault(); byKey.current = true; pick(Math.max(0, Math.min(selected + 1, filtered.length - 1))); }

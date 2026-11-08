@@ -3648,6 +3648,9 @@ img.product-mark { object-fit: cover; opacity: 1; }
   place-items: center;
   padding-top: 0;
   padding-bottom: 25vh;
+  /* A click anywhere outside the box closes it, the title bar included. The
+     strip drawn after it stands down in workspace-navigation.css. */
+  -webkit-app-region: no-drag;
 }
 
 /* THE IMPORT CARD THAT ENDS SETUP WAS DRAWN DIMMED. Setup's veil is 299 and
@@ -5264,6 +5267,8 @@ img.product-mark { object-fit: cover; opacity: 1; }
   color: var(--text); background: none; outline: none;
 }
 .set-title-edit { cursor: text; }
+.set-title-pencil { width: 0.55em; height: 0.55em; margin-left: 0.35em; vertical-align: 0.02em; color: var(--text-faint); opacity: 0.7; }
+.set-title-edit:hover .set-title-pencil, .set-title-edit:focus-visible .set-title-pencil { color: var(--text); opacity: 1; }
 .set-title-edit:hover, .set-title-edit:focus-visible { background: var(--bg-hover); }
 .set-title-input { border-color: var(--accent); background: var(--bg); min-width: 12ch; }
 .set-title-row { display: flex; align-items: center; gap: 12px; }

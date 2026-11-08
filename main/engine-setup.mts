@@ -24,6 +24,9 @@ import { harnessFor } from './harnesses.mts';
 
 import { spawn as nodeSpawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { terminalEnv } from './task-terminals.mts';
 import { codexLaunchEnv } from './codex-launch-env.mts';
 
@@ -42,6 +45,23 @@ export interface EngineSetupOptions {
   env?: NodeJS.ProcessEnv;
   poll?: number;
   onSignIn?: (engine: string, signedIn: boolean) => void;
+  setUpHere?: (engine: string, env: NodeJS.ProcessEnv) => boolean;
+}
+
+/**
+ * Whether this engine was ever set up in this home. Running either program to
+ * ask about sign-in makes its config folder, so on a home with none the answer
+ * is "signed out" without running it; sign-in itself makes the folder.
+ */
+export function engineSetUpHere(engine: string, env: NodeJS.ProcessEnv, { exists = fs.existsSync }: { exists?: (p: string) => boolean } = {}): boolean {
+  const home = env.HOME || os.homedir();
+  if (engine === 'codex') {
+    if (env.OPENAI_API_KEY || env.CODEX_API_KEY) return true;
+    return exists(env.CODEX_HOME || path.join(home, '.codex'));
+  }
+  if (env.ANTHROPIC_API_KEY || env.ANTHROPIC_AUTH_TOKEN || env.CLAUDE_CODE_OAUTH_TOKEN) return true;
+  if (env.CLAUDE_CONFIG_DIR) return exists(env.CLAUDE_CONFIG_DIR);
+  return exists(path.join(home, '.claude.json')) || exists(path.join(home, '.claude'));
 }
 
 interface SetupJob {
@@ -112,7 +132,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * config so the rest of the app runs on what was just installed). `spawn` and
  * `wait` are seams for the tests; nothing in the app passes them.
  */
-export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env = process.env, poll = POLL, onSignIn = () => {} }: EngineSetupOptions = {} as EngineSetupOptions) {
+export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env = process.env, poll = POLL, onSignIn = () => {}, setUpHere = () => true }: EngineSetupOptions = {} as EngineSetupOptions) {
   const runEnv = terminalEnv(env);
   const toolEnv = (engine: string, bin: string | null | undefined) => engine === 'codex' ? codexLaunchEnv(bin, runEnv) : runEnv;
   const jobs = new Map<string, SetupJob>();
@@ -123,9 +143,11 @@ export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env =
   const lastLine = (text: string) => text.split('\n').map((l) => l.trim()).filter(Boolean).pop() ?? '';
 
   async function signedIn(j: Pick<SetupJob, 'engine' | 'log'>, bin: string | null | undefined) {
+    const env = toolEnv(j.engine, bin);
+    if (!setUpHere(j.engine, env)) { onSignIn(j.engine, false); return false; }
     const { file, args } = statusCommand(j.engine, bin!);
     let output = '';
-    const p = spawn(file, args, { env: toolEnv(j.engine, bin), onData: (d) => { output = (output + String(d).replace(ANSI, '')).slice(-LOG_LIMIT); } });
+    const p = spawn(file, args, { env, onData: (d) => { output = (output + String(d).replace(ANSI, '')).slice(-LOG_LIMIT); } });
     const TIMED_OUT = Symbol('no answer');
     const code = await Promise.race([p.exit, wait(STATUS_TIMEOUT).then((): typeof TIMED_OUT => { p.kill(); return TIMED_OUT; })]);
     // TOLD TO THE APP, which routes on it (w-d5d632e503): a Claude Code that
