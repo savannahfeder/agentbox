@@ -443,13 +443,6 @@ async function createWindow() {
   // request so a project made after launch is not a folder of broken images.
   imageRoots = () => [config.accountRoot, ...store.listProducts().map((p) => p.repoPath).filter(Boolean) as string[]];
   const supervisor = new Supervisor(config, store, appDir, dataDir, userDir);
-  supervisor.gitHubSignIn = gitHubPushSignIn({
-    file: path.join(userDir, 'github-sign-in.sealed'),
-    cipher: {
-      encrypt: (text: string) => (safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(text) : null),
-      decrypt: (buf: Buffer) => (safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(buf) : null),
-    },
-  });
   // Local runs outlive a quit or a restart of the app (main/run-host.mjs).
   supervisor.hostRuns = true;
   // And their store tools come from one shared process (main/tool-host.mjs).
@@ -908,6 +901,8 @@ async function createWindow() {
     encrypt: (text: string) => (safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(text) : null),
     decrypt: (buf: Buffer) => (safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(buf) : null),
   } : null;
+  // The GitHub sign-in a ship pushes with is sealed by the same keychain.
+  supervisor.gitHubSignIn = gitHubPushSignIn({ file: path.join(userDir, 'github-sign-in.sealed'), cipher: connectionsKeychain });
   const connected = startConnections({
     config, supervisor, appDir, userDir,
     cipher: connectionsKeychain,

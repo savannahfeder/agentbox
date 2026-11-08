@@ -141,7 +141,8 @@ describe('the thread', () => {
     expect(item.status).toBe('open');
     expect(notShipped(item).why).toBe(NO_GITHUB_SIGN_IN);
     expect(asksForGitHubSignIn(notShipped(item).why)).toBe(true);
-    expect(notShippedLine(item)).toBe('Not shipped. This computer could not sign in to GitHub to push it');
+    expect(item.note).toBe('It did not ship because this computer could not sign in to GitHub.');
+    expect(notShippedLine(item)).toBe('Not shipped. This computer could not sign in to GitHub');
   });
 
   it('ships again once the sign-in is saved, and only the threads that waited on it', () => {
@@ -207,6 +208,7 @@ describe('the card', () => {
   });
 
   it('says a saved token was refused', () => {
-    expect(draw(GITHUB_REFUSED_SIGN_IN)).toContain('refused the token saved on this computer');
+    expect(draw(GITHUB_REFUSED_SIGN_IN)).toContain('Sign in to GitHub again');
+    expect(draw(NO_GITHUB_SIGN_IN)).not.toContain('again<');
   });
 });

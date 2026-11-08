@@ -4,14 +4,15 @@
 // missing sign-in. The app asks for one on the thread instead
 // (renderer/src/components/GitHubSignInCard.tsx) and ships again once it is
 // saved (main/github-push-sign-in.mts).
+import { Name } from './product-name.mjs';
 
-export const NOT_PUSHED: string = 'It did not ship: ';
-export const NO_GITHUB_SIGN_IN: string = 'this computer could not sign in to GitHub to push it';
+export const NOT_PUSHED: string = 'It did not ship because ';
+export const NO_GITHUB_SIGN_IN: string = 'this computer could not sign in to GitHub';
 export const GITHUB_REFUSED_SIGN_IN: string = 'GitHub refused the sign-in saved on this computer';
 export const SHIPPING_AGAIN: string = 'Signed in to GitHub. Shipping it again.';
 
 // A classic token with the one box a push needs already ticked.
-export const GITHUB_TOKEN_PAGE: string = 'https://github.com/settings/tokens/new?scopes=repo&description=Agentbox';
+export const GITHUB_TOKEN_PAGE: string = `https://github.com/settings/tokens/new?scopes=repo&description=${encodeURIComponent(Name)}`;
 
 // Git's own words, at the start of a line, so a test run that quotes them in a diff does not count.
 const SAYS_SO: RegExp[] = [

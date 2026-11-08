@@ -51,7 +51,8 @@ import { createTeamService, teamStateFile } from './team/index.mts';
 import type { TeamSession } from './team/index.mts';
 import { startConnections } from './connections/start.mjs';
 import { ensurePersonalProject } from './team/projects.mts';
-import { loadCloudConfig, supabaseSession, headlessSessionFile } from './team/session.mjs';
+import { loadCloudConfig, supabaseSession, headlessSessionFile, sessionFileOutsideStore } from './team/session.mjs';
+import { gitHubPushSignIn } from './github-push-sign-in.mts';
 import { roomsSetup } from './team/room-setup.mts';
 import { matesForTheTeam } from './teammate-reach.mjs';
 import { appHome, carryMisplacedMachinery, storeRootEnv } from './store/home.mjs';
@@ -267,6 +268,11 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
   } catch (err) { console.warn(`zero: could not make My Workspace: ${(err as Error).message}`); }
   const store = await new Store(config).init();
   const supervisor = new Supervisor(config, store, appDir, dataDir, userDir);
+  // No keychain on this door: kept like its team session, plain and readable by this user only, outside the store.
+  supervisor.gitHubSignIn = gitHubPushSignIn({
+    file: sessionFileOutsideStore({ dir: userDir, name: 'github-sign-in.json', storeRoot: config.storeRoot }),
+    cipher: { encrypt: (text: string) => Buffer.from(text, 'utf8'), decrypt: (buf: Buffer) => buf.toString('utf8') },
+  });
   const window = broadcastingWindow();
   // A caller may bring its own three, which is how a test asks what the
   // handlers do with an answer only a real file dialog gives.

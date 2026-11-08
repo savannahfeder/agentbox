@@ -29,13 +29,10 @@ export function GitHubSignInCard({ why, save, openLink }: {
     <div className="need-body">
       <span className="need-mark need-mark-ink" aria-hidden="true"><img src={logoOf('github') ?? ''} alt="" draggable={false} /></span>
       <div className="need-col">
-        <div className="need-title">Sign in to GitHub</div>
-        <div className="need-why">{refused
-          ? 'GitHub refused the token saved on this computer, so the work was not pushed. Paste a new one.'
-          : 'This computer has no GitHub sign-in, so the work was not pushed. It is ready to go.'}</div>
+        <div className="need-title">{refused ? 'Sign in to GitHub again' : 'Sign in to GitHub'}</div>
         <div className="need-facts">
           <div>{arrow}<span>Get a token from <a href={GITHUB_TOKEN_PAGE} onClick={(e) => { e.preventDefault(); openLink(GITHUB_TOKEN_PAGE); }}>GitHub's own page</a></span></div>
-          <div>{lock}<span>Kept encrypted on this computer, for shipping only</span></div>
+          <div>{lock}<span>Kept on this computer, only for shipping</span></div>
           <div>{again}<span>Ships again as soon as it is saved</span></div>
         </div>
         <form className="need-form" onSubmit={(e) => { e.preventDefault(); if (token.trim() && !busy) void go(); }}>
