@@ -70,7 +70,7 @@ import { readImportableThreads, readSearchableThreads } from './importable-threa
 import { readChatEnds } from './agent-sessions.mts';
 import { markImported } from '../shared/agent-import.mts';
 import { codexIdOf, importChoice, isCodexImportRow, isNotImportedRow } from '../shared/codex-import.mts';
-import { checkProjectFolder, chooserStartsIn } from '../shared/project-folder-check.mts';
+import { checkProjectFolder, chooserStartsIn, folderFromChooser } from '../shared/project-folder-check.mts';
 import { openFreshUser } from './fresh-user.mts';
 import { openDemo } from './demo.mts';
 import { AgentSchedule } from './agent-schedule.mts';
@@ -1540,10 +1540,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     if (r.canceled || !r.filePaths?.length) return { path: null };
     // A chooser hands back whatever its location bar held, dots and all. The
     // folder a path names is what gets stored and what gets checked (F-123).
-    const picked = path.resolve(r.filePaths[0]);
-    const verdict = checkProjectFolder(picked, { home: os.homedir() });
-    if (!verdict.ok) return { path: null, refused: verdict.say };
-    return { path: picked };
+    return folderFromChooser(path.resolve(r.filePaths[0]), { home: os.homedir(), isDir });
   });
 
   // THE PICKER THE APP DRAWS ITSELF, for a tab that has no Mac dialog.
