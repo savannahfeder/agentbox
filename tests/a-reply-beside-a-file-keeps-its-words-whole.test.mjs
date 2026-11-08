@@ -6,6 +6,9 @@
 // the room. Every option read "Introducing Agent…", cut to one line, and the
 // title ran to six lines at 27px.
 //
+// Then the bar's padding: 16px on the left of the first chip and 12px on the
+// right of Send, read off the founder's screenshot of the fixed box.
+//
 // Rendered here with the app's own styles at 400 and at 900, with a draft typed.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { build } from 'esbuild';
@@ -77,7 +80,14 @@ async function measure(width, viewport = { width: 1200, height: 900 }) {
     const words = [...document.querySelectorAll('.dock-chips .tc-chip')].filter((e) => !e.querySelector('.tc-prio'));
     const lines = (e) => Math.round(e.clientHeight / parseFloat(getComputedStyle(e).lineHeight));
     const t = document.querySelector('.one-sum .one-title');
+    const send = document.querySelector('.dock-send');
+    const word = document.createRange();
+    word.selectNodeContents(send.firstChild);
+    const ends = bar.map(box);
     return {
+      edges: [Math.round(Math.min(...ends.map((r) => r.left)) - card.left), Math.round(card.right - Math.max(...ends.map((r) => r.right)))],
+      sendWord: word.getBoundingClientRect().width > 0,
+      sendArrow: !!send.querySelector('svg')?.getBoundingClientRect().width,
       barRows: new Set(bar.map((e) => Math.round(box(e).top + box(e).height / 2))).size,
       barFits: bar.every((e) => box(e).left >= card.left && box(e).right <= card.right),
       wordsCut: words.filter((e) => {
@@ -103,8 +113,13 @@ describe.skipIf(!browserAvailable)('a reply typed beside an open file, 400px wid
     expect(m.barRows).toBe(1);
     expect(m.barFits).toBe(true);
   });
-  it('drops the send key from the button but keeps it in its name', () => {
+  it('has as much room left of the first chip as right of Send', () => {
+    expect(Math.abs(m.edges[0] - m.edges[1])).toBeLessThanOrEqual(1);
+  });
+  it('shows Send as an arrow, with its word and key kept in its name', () => {
     expect(m.sendKey).toBe(false);
+    expect(m.sendWord).toBe(false);
+    expect(m.sendArrow).toBe(true);
     expect(m.sendName).toMatch(/^Send · /);
   });
   it('gives each long option a second line', () => {
@@ -118,11 +133,16 @@ describe.skipIf(!browserAvailable)('a reply typed beside an open file, 400px wid
 describe.skipIf(!browserAvailable)('the same reply with room, 900px wide', () => {
   let m;
   beforeAll(async () => { m = await measure(900); }, 30_000);
-  it('keeps the send key, one line per option and the full-size title', () => {
+  it('keeps the word Send and its key, one line per option and the full-size title', () => {
     expect(m.wordsCut).toEqual([]);
     expect(m.sendKey).toBe(true);
+    expect(m.sendWord).toBe(true);
+    expect(m.sendArrow).toBe(false);
     expect(m.optionLines.every((n) => n === 1)).toBe(true);
     expect(m.titleSize).toBe(27);
+  });
+  it('pads the bar evenly here too', () => {
+    expect(Math.abs(m.edges[0] - m.edges[1])).toBeLessThanOrEqual(1);
   });
 });
 
@@ -130,7 +150,8 @@ describe.skipIf(!browserAvailable)('the same reply with room, 900px wide', () =>
 describe.skipIf(!browserAvailable)('the same reply on a phone, 390px wide', () => {
   let m;
   beforeAll(async () => { m = await measure(390, { width: 390, height: 844 }); }, 30_000);
-  it('leaves the phone\'s title and choices as they were', () => {
+  it('leaves the phone\'s title, choices and Send as they were', () => {
+    expect(m.sendWord).toBe(true);
     expect(m.optionLines.every((n) => n === 1)).toBe(true);
     expect(m.titleSize).toBe(27);
   });

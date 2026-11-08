@@ -21,9 +21,12 @@
     .one-choices .opt-text { -webkit-line-clamp: 2; }
   }
   @container reply (max-width: 460px) {
-    /* The key stays in Send's tooltip; its keycap is the room the mode and model need. */
+    /* Send is an arrow here, with the word and its key in its tooltip: that is
+       the room the mode and the model need. font-size 0 hides "Send" and
+       "Sending…", which are bare text. */
+    .dock-bar .dock-send-pair > .dock-send { width: 32px; padding: 0; justify-content: center; font-size: 0; }
     .dock-bar .dock-send kbd { display: none; }
-    .dock-bar .dock-send { padding: 5px 12px; }
+    .dock-bar .dock-send .dock-send-arrow { display: block; }
   }
 }
 
