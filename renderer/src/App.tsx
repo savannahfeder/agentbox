@@ -102,6 +102,7 @@ import { keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
 import { modelCommands } from './thread-model-commands';
 import { MOVE_KEYWORDS, whyItCannotMove } from '../../shared/move-thread.mts';
 import { isUrgentRow, taskToReturnTo, urgentInterruption } from './interrupt';
+import { leavePlace, placeKey, placeToReturnTo } from './thread-place';
 import { DONE, manyOrOne } from './done-word';
 import { listedNow, type OpensWhenListed } from './opens-when-listed';
 import { oneToRepeat, repeatBody } from './repeat-from-thread';
@@ -3379,14 +3380,51 @@ export default function App() {
   // THE DOCUMENT THE RELOAD HAS TO PUT BACK. ⌘R leaves the pane it wants here
   // and the effect honours it once. `doc: null` is a real answer: a pane she
   // closed herself stays closed through the reload.
-  const pendingDoc = useRef<{ id: string; doc: OpenDoc | null } | null>(null);
+  const pendingDoc = useRef<{ id: string; doc: OpenDoc | null; mode?: ArtifactMode } | null>(null);
+  // WHERE SHE WAS IN THE THREAD SHE LEFT, and putting her back in the one she
+  // comes back to (./thread-place.ts). Above the pane effect, which takes the
+  // file this leaves in pendingDoc.
+  const scrolledTo = useRef<{ key: string; top: number } | null>(null);
+  const leftFrom = useRef<WorkItem | null>(null);
+  useEffect(() => {
+    const was = leftFrom.current;
+    leftFrom.current = focused;
+    const same = !!was && !!focused && placeKey(was) === placeKey(focused);
+    if (same) return;
+    const me = team?.me ?? null;
+    if (was) {
+      const key = placeKey(was);
+      const live = items.find((i) => i.id === was.id && i.product === was.product) ?? was;
+      const doc = openDocNow.current;
+      leavePlace(key, arrivedAt(live, me), {
+        top: scrolledTo.current?.key === key ? scrolledTo.current.top : undefined,
+        doc: doc && !doc.readOnly && doc.product === was.product
+          ? { product: doc.product, src: doc.src, ...(doc.auto ? { auto: true } : {}) }
+          : null,
+        mode: artifactMode,
+      });
+    }
+    scrolledTo.current = null;
+    if (!focused) return;
+    const back = placeToReturnTo(placeKey(focused), arrivedAt(focused, me));
+    if (!back) return;
+    if (back.top) {
+      scrolledTo.current = { key: placeKey(focused), top: back.top };
+      setResumeAt({ id: focused.id, top: back.top });
+    }
+    if (back.doc !== undefined) pendingDoc.current = { id: focused.id, doc: back.doc && { ...back.doc }, mode: back.mode };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focused?.id, focused?.product]);
   useEffect(() => {
     setOpenDoc(null);
     const card = focused;
     if (!card) return;
     const wanted = pendingDoc.current;
     pendingDoc.current = null;
-    if (wanted && wanted.id === card.id && !wanted.doc?.auto) setOpenDoc(wanted.doc);
+    if (wanted && wanted.id === card.id) {
+      setOpenDoc(wanted.doc);
+      if (wanted.doc && wanted.mode) setArtifactMode(wanted.mode);
+    }
     // The task she opened, not every edit to it: a worker writing a checkpoint
     // while she reads must not push a document back over a pane she closed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -7812,6 +7850,7 @@ export default function App() {
                   item={focused}
                   resumeAt={resumeAt}
                   onScrolled={(top) => {
+                    scrolledTo.current = { key: placeKey(focused), top };
                     const at = Date.now();
                     if (at - scrollWrittenAt.current < 250) return;
                     scrollWrittenAt.current = at;
