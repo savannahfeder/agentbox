@@ -151,7 +151,7 @@ export function Bars({ at }: { at: Setup }) {
 export function ComputerWait({ email, signOut }: { email: string | null; signOut: () => void }) {
   return (
     <Screen top={24} foot={<>
-      <Btn label="Settings" onPress={() => router.push('/settings')} />
+      <Btn kind="quiet" label="Settings" onPress={() => router.push('/settings')} />
       <Btn kind="quiet" label="Use another account" onPress={signOut} />
     </>}>
       <Bars at="computer" />
