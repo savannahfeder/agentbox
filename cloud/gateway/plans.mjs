@@ -17,6 +17,12 @@ export const PLANS = Object.freeze({
 // 2026-11-06). Two at once, because ten would spend five hours in thirty minutes.
 export const FREE = Object.freeze({ agents: 2, hours: 5 });
 
+// A team's cloud (the owner, 2026-11-06): 14 days free from the day it was
+// made, 10 hours a member shared by all; then $40 a seat a month, each seat
+// Pro's agents and hours, the hours one pool. Kept apart from PLANS, which are
+// one person's.
+export const TEAM = Object.freeze({ trialDays: 14, trialHoursPerMember: 10, trialAgentsPerMember: 2, hoursPerSeat: 400, agentsPerSeat: 10, dollarsPerSeat: 40 });
+
 export const RUN_CEILING_MS = 8 * 60 * 60_000;
 // The sandbox gives a sign-in 20 minutes, and checking it takes up to 4 more.
 export const SIGNIN_CEILING_MS = 30 * 60_000;

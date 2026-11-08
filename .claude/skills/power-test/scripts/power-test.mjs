@@ -73,6 +73,9 @@ const cloud = flag('cloud');
 const standInCloud = flag('stand-in-cloud');
 if (standInCloud && (cloud || flag('real'))) stop('--stand-in-cloud is the stand-ins\' own cloud; it cannot go with --real or --cloud.');
 const freeHours = opt('free-hours');
+// `owner:0.3,member:0.3`, one per person in --who order: each copy on a team's trial in that role.
+const cloudTeams = (opt('cloud-team') || '').split(',').filter(Boolean);
+if (cloudTeams.length && !standInCloud) stop('--cloud-team puts the stand-in cloud\'s account on a team: add --stand-in-cloud.');
 if (freeHours && !standInCloud) stop('--free-hours starts the stand-in cloud\'s account on the Free plan: add --stand-in-cloud.');
 const real = flag('real') || cloud;
 const cloudAccounts = opt('cloud-accounts');
@@ -211,7 +214,7 @@ for (const person of people) {
   fs.mkdirSync(dir, { recursive: true });
   const shape = real ? [] : ['--logins', String(person.logins), ...(person.codex ? [] : ['--no-codex'])];
   say(`${person.name}: starting a copy of the app shaped like their setup`);
-  const up = await live(name, 'up', ...(real ? ['--real'] : []), ...(cloud ? ['--cloud'] : []), ...(standInCloud ? ['--stand-in-cloud'] : []), ...(freeHours ? ['--free-hours', freeHours] : []), ...(cloudAccounts ? ['--cloud-accounts', cloudAccounts] : []), ...shape, '--projects', person.projects.join(','), ...(team ? ['--team', team] : []), ...(alpha ? ['--alpha', alpha] : []));
+  const up = await live(name, 'up', ...(real ? ['--real'] : []), ...(cloud ? ['--cloud'] : []), ...(standInCloud ? ['--stand-in-cloud'] : []), ...(freeHours ? ['--free-hours', freeHours] : []), ...(cloudTeams[people.indexOf(person)] ? ['--cloud-team', cloudTeams[people.indexOf(person)]] : []), ...(cloudAccounts ? ['--cloud-accounts', cloudAccounts] : []), ...shape, '--projects', person.projects.join(','), ...(team ? ['--team', team] : []), ...(alpha ? ['--alpha', alpha] : []));
   fs.writeFileSync(path.join(dir, 'up.log'), up.out);
   const stateFile = path.join(instanceDir(name), 'instance.json');
   const state = readJson(stateFile);

@@ -213,6 +213,9 @@ describe('the comments new to the owner', () => {
     await comment(ANA, tok, 'First');
     await comment(MAYA, tok, 'My own answer');
     await comment(SAM, tok, 'Second');
+    // PGlite's clock moves in whole milliseconds, so two comments can share a
+    // time and then come back in either order.
+    await db.query(`update public.file_link_comments set created_at = $2::timestamptz + interval '100 ms' * (case body when 'First' then 1 when 'My own answer' then 2 else 3 end) where token = $1`, [tok, before]);
     const seen = (await since(MAYA, before)).filter((c) => c.token === tok);
     expect(seen.map((c) => [c.source, c.name, c.by_name, c.body])).toEqual([
       ['agentbox-team/w-7/notes/roadmap', 'roadmap.md', 'Ana', 'First'],

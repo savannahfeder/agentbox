@@ -46,6 +46,8 @@ export interface ReplySession {
     interrupt?(): Promise<unknown> | undefined;
   };
   remoteIdle?: boolean;
+  /** A cloud session between turns, waiting for this reply. */
+  between?: boolean;
   engine?: string;
   sessionId?: string;
   lastLiveReply?: ReplyItem | null;
@@ -57,6 +59,8 @@ export interface ReplySupervisor {
   _replySends?: Map<string, Promise<unknown>>;
   sessions?: Map<string, ReplySession>;
   replyFiles?(product: string, answer: string, engine: string | undefined, id: string): { block?: string; pictures?: unknown[] } | null | undefined;
+  /** What a session that finished its turn is told with a reply, as a new run would be. */
+  nextReplyBrief?(product: string, id: string, answer: string): string;
   _handledAnswers: Set<string>;
   _answerKey(item: ReplyItem): string;
   _noteHeard?(item: ReplyItem, sessionId: string | undefined): unknown;
@@ -85,8 +89,12 @@ export function submitReply(supervisor: ReplySupervisor, payload: ReplyPayload, 
   const previous = sends.get(key) ?? Promise.resolve();
   const session = supervisor.sessions?.get(id);
   // A reply set for later waits in the ledger for its time, never in a session.
+  // Between turns a slash command, a new permission mode or a teammate's word
+  // is saved instead, and the tick ends the wait so a new run takes it.
+  const between = !!session?.between && typeof supervisor.nextReplyBrief === 'function';
   const live = !later && session?.product === product && typeof session.child?.steer === 'function'
-    && !(from && session.remoteIdle)
+    && !(from && (session.remoteIdle || session.between))
+    && !(session?.between && (permissionMode != null || String(answer ?? '').trimStart().startsWith('/')))
     && status !== 'done' && typeof answer === 'string' && answer.trim() && answer !== '(withdrawn)';
   // Observe rejections immediately, including when an earlier reply is still
   // waiting. The ordered commit below rethrows them to their own caller.
@@ -100,7 +108,9 @@ export function submitReply(supervisor: ReplySupervisor, payload: ReplyPayload, 
     const files = session.remoteIdle ? null : supervisor.replyFiles?.(product, answer, session.engine, id);
     const taken = session.remoteIdle
       ? session.child!.steer!(answer)
-      : session.child!.steer!(liveReplyBrief(answer, files?.block), files?.pictures ?? []);
+      : between
+        ? session.child!.steer!(supervisor.nextReplyBrief!(product, id, answer))
+        : session.child!.steer!(liveReplyBrief(answer, files?.block), files?.pictures ?? []);
     // SENT NOW: her words go in line first, then the step is cut, in the same
     // tick, so the cut turn's result can never close the input ahead of them.
     // A cut that fails leaves the message waiting its turn, which is still sent.
