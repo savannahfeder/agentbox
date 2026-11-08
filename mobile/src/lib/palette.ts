@@ -2,6 +2,7 @@
 // threads first as you type, then the commands. These are the ones a phone has;
 // the ones about a Mac or its keyboard were never offered here.
 import { matchesQuery, rankMatches } from '../../../renderer/src/palette-rows';
+import { cloudCommands, type CloudMode } from '../../../renderer/src/cloud-menu';
 import { moveProduct } from '../../../shared/rank.mjs';
 import type { PlaceId } from './groups';
 import type { PhoneLook } from './look';
@@ -17,7 +18,11 @@ export function inRunningOrder<P extends { slug: string }>(projects: readonly P[
 }
 
 /** What the computer's settings copy says, for the commands that change it. */
-export interface ComputerFacts { paused: boolean; projects: readonly { slug: string; name: string }[]; order: readonly string[] }
+export interface ComputerFacts {
+  paused: boolean; projects: readonly { slug: string; name: string }[]; order: readonly string[];
+  /** Null when the computer is not set up for the cloud. */
+  cloud?: { mode: CloudMode; whenOn?: Exclude<CloudMode, 'mac'> } | null;
+}
 
 /** The desktop's ⌘K rows for the computer (renderer/src/components/Palette.tsx), in its words. */
 function computerCommands(c: ComputerFacts): PhoneCommand[] {
@@ -26,6 +31,11 @@ function computerCommands(c: ComputerFacts): PhoneCommand[] {
   return [
     { id: 'pause', label: c.paused ? 'Unpause agents' : 'Pause agents', keywords: 'stop hold sessions spawn', act: set('paused', !c.paused) },
     { id: 'resume-stopped', label: 'Resume interrupted agents', keywords: 'respawn stranded usage limit crash', act: set('resumeStopped', true) },
+    ...(c.cloud ? cloudCommands(c.cloud).map((r, i) => ({
+      id: i === 0 ? 'cloud-toggle' : `cloud-${r.mode}`, label: r.label.replace('this Mac', 'your computer'),
+      ...(r.hint ? { aside: r.hint } : {}),
+      keywords: 'cloud where threads run computer overflow everything move on off', act: set('cloudRuns', r.mode),
+    })) : []),
     { id: 'usage', label: 'Usage and limits', aside: 'Settings', keywords: 'usage limit limits left remaining quota accounts week session', act: { push: '/settings/claude' } },
     ...c.projects.map((p, i) => ({
       id: `rank-${p.slug}`, label: `Rank ${p.name} first`,

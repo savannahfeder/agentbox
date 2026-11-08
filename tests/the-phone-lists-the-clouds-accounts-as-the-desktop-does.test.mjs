@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { phoneSettingsOf } from '../shared/phone-settings.mjs';
-import { cloudInUseName, cloudOnlyAccounts, placesOf, withPlaces } from '../mobile/src/lib/cloud-accounts';
+import { accountsAside, cloudInUseName, cloudOnlyAccounts, placesOf, withPlaces } from '../mobile/src/lib/cloud-accounts';
 
 const HOME = '/Users/someone';
 const model = (cloud) => ({
@@ -103,6 +103,17 @@ describe('the Claude Code and Codex pages on the phone', () => {
     expect(placesOf({ cloud: null }, 'claude', 'default')).toEqual([]);
     expect(withPlaces('Max 20x', ['Local', 'Cloud'])).toBe('Max 20x · Local · Cloud');
     expect(withPlaces('Max 20x', [])).toBe('Max 20x');
+  });
+
+  // A tester read "2 accounts" on Settings' front page and counted 3 on the page.
+  it('Settings\' front page counts the cloud\'s own accounts with this computer\'s', () => {
+    const local = [{ chosen: false, email: 'me@example.com' }, { chosen: false, email: 'work@example.com' }];
+    expect(accountsAside(local, 1)).toBe('3 accounts');
+    expect(accountsAside(local, 0)).toBe('2 accounts');
+    expect(accountsAside([{ chosen: true, email: 'me@example.com' }, local[1]], 1)).toBe('me@example.com');
+    expect(accountsAside([], 1)).toBe('1 account');
+    expect(accountsAside([], 0)).toBe(undefined);
+    expect(fs.readFileSync(new URL('../mobile/src/ui/SettingsHome.tsx', import.meta.url), 'utf8')).toMatch(/accountsAside\(w\.accounts, cloudOnlyAccounts\(w, 'claude'\)\.length\)/);
   });
 
   it('draws them on the pages', () => {

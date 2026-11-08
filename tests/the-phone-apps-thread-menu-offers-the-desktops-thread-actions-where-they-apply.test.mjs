@@ -190,6 +190,10 @@ describe('the thread page and its menu', () => {
       expect(menu).toContain(`label=${words}`);
     }
   });
+  // A tester could not tell Reopen from Resume this agent (reopen and carry on) on a closed thread.
+  it('Reopen says where the thread goes, so it reads apart from Resume', () => {
+    expect(menu).toContain('label="Reopen" aside="Back in your inbox"');
+  });
   // A tester typed " v1" after the name and the thread was renamed "v1": the whole name had been selected.
   it('Rename opens with the cursor after the name, not over it', () => {
     const field = menu.slice(menu.indexOf('<SheetHead>Rename</SheetHead>'), menu.indexOf("accessibilityLabel=\"The thread's name\""));

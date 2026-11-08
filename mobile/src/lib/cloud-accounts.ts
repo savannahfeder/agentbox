@@ -30,6 +30,14 @@ export function placesOf(w: Copy, engine: Engine, localId: string): string[] {
 
 export const withPlaces = (line: string, places: string[]) => [line, ...places].join(' · ');
 
+/** What Settings' front page says beside Claude Code or Codex: the login in use, or how many the page lists. */
+export function accountsAside(local: readonly { chosen: boolean; email: string | null }[] | undefined, cloudOnly: number): string | undefined {
+  const chosen = local?.find((a) => a.chosen)?.email;
+  if (chosen) return chosen;
+  const n = (local?.length ?? 0) + cloudOnly;
+  return n ? `${n} account${n === 1 ? '' : 's'}` : undefined;
+}
+
 /** The cloud's accounts signed in nowhere on this computer, each on a row of its own. */
 export function cloudOnlyAccounts(w: Copy, engine: Engine): { name: string; desc: string; usage: Usage }[] {
   const all = loginsOf(w, engine);

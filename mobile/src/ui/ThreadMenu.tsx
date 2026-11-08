@@ -118,7 +118,7 @@ export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = f
       {tryAgain && <SheetRow label="Try again" onPress={act(onTryAgain)} />}
       {restart && <SheetRow label="Restart the agent (it stopped)" onPress={act(onRestart)} />}
       {resume && <SheetRow label="Resume this agent (reopen and carry on)" onPress={act(onResume)} />}
-      {reopen && <SheetRow label="Reopen" onPress={act(onReopen)} />}
+      {reopen && <SheetRow label="Reopen" aside="Back in your inbox" onPress={act(onReopen)} />}
       {priority !== null && <SheetRow label="Priority" aside={priorityLabelOf(priorityIdOf(priority))} onPress={() => setPage('priority')} />}
       {name !== null && <SheetRow label="Rename" onPress={() => { setNaming(name); setPage('rename'); }} />}
       {projects.length > 0 && <SheetRow label="Move to another project" onPress={() => setPage('move')} />}

@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { groupName } from '../lib/groups';
 import { PHONE_LOOKS } from '../lib/look';
+import type { CloudMode } from '../../../renderer/src/cloud-menu';
 import { commandsFor, inRunningOrder, phoneCommands, THREADS_SHOWN, type ComputerFacts, type PhoneCommand } from '../lib/palette';
 import { phoneSearch, type Hit } from '../lib/tabs';
 import { useCloud } from '../state/cloud';
@@ -62,6 +63,7 @@ function computerFacts(s: SettingsState): ComputerFacts | null {
   const projects: { slug: string; name: string }[] = s.settings.projects;
   return {
     paused: !!s.reading('workspace', 'paused', !!w.paused).value,
+    cloud: w.cloud ? { mode: s.reading('workspace', 'cloudRuns', w.cloud.mode).value as CloudMode, whenOn: w.cloud.whenOn } : null,
     projects: inRunningOrder(projects, order),
     order,
   };
