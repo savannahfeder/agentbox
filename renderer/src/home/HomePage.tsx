@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { agoShort, doors, type DoorKey, type TeamRowState } from './home-model';
+import { PriorityMark } from '../threads/Pages';
+import { priorityLabelOf, type PriorityId } from '../priority';
 import './home.css';
 
-export type NeedsRow = { key: string; letter: string; title: string; line: string; at: number; unread: boolean };
+/** `from` is the teammate who asked, when one did; priority is null at Medium, as in the Inbox. */
+export type NeedsRow = { key: string; letter: string; title: string; from: string | null; priority: PriorityId | null; project: string; at: number; unread: boolean };
 export type TeamRow = { key: string; name: string; letter: string; ai: boolean; line: string; state: TeamRowState; week: number[]; total: number };
 export type ProgressRow = { key: string; letter: string; title: string; line: string; at: number };
 
@@ -76,7 +79,13 @@ export function HomePage({ hello, now, needs, needsCount, progressCount, team, p
             {needs.map((r, i) => (
               <button type="button" key={r.key} className={`hm-row${i === pick ? ' on' : ''}${r.unread ? ' unread' : ''}`} onClick={() => onOpen(r.key)} onMouseEnter={() => setPick(i)}>
                 <span className="hm-face">{r.letter}</span>
-                <span className="hm-text"><b>{r.title}</b><small>{r.line}</small></span>
+                <span className="hm-text"><b>{r.title}</b>
+                  <span className="hm-tags">
+                    {r.priority && <span className={`hm-tag hm-prio${r.priority === 'urgent' ? ' urgent' : ''}`}><PriorityMark id={r.priority} />{priorityLabelOf(r.priority)}</span>}
+                    {r.from && <span className="hm-tag">{r.from}</span>}
+                    <span className="hm-tag">{r.project}</span>
+                  </span>
+                </span>
                 <time>{agoShort(r.at, now)}</time>
               </button>
             ))}
