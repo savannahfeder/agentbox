@@ -12,15 +12,16 @@
 // It makes no second machine while one exists.
 //
 //   node scripts/app-review-computer.mjs on [--days 14]
-// The demo password and the Claude token come from REVIEW_PASSWORD and
-// CLAUDE_CODE_OAUTH_TOKEN, else from this Mac's Keychain (KEYCHAIN below), so
-// neither has to be typed anywhere but `security`'s own prompt.
+//   node scripts/app-review-computer.mjs login    (Codex, by a code typed into a browser)
 //   node scripts/app-review-computer.mjs status
 //   node scripts/app-review-computer.mjs off
 //
-// CLAUDE_CODE_OAUTH_TOKEN comes from `claude setup-token`. Needs the aws CLI
-// signed in. The password and token go over SSH to a file only root reads,
-// never into the machine's user data, which anyone with EC2 access can read.
+// The agents run on a Codex account kept for this, never the founder's own
+// (the founder, 2026-11-08: "we're not giving other people access to my
+// account?"). The demo password comes from REVIEW_PASSWORD, else this Mac's
+// Keychain. Needs the aws CLI signed in. The password goes over SSH to a file
+// only root reads, never into the machine's user data, which anyone with EC2
+// access can read.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -51,24 +52,24 @@ export function refuseSecond(instances) {
 }
 
 export const REVIEW_EMAIL = 'appreview@agentbox.ac';
-export const KEYCHAIN = { password: 'AGENTBOX_APP_REVIEW', claude: 'AGENTBOX_APP_REVIEW_CLAUDE' };
+export const KEYCHAIN = { password: 'AGENTBOX_APP_REVIEW' };
 
-/** The demo login and Claude token: from the environment, else this Mac's Keychain. */
+/** The demo login: from the environment, else this Mac's Keychain. */
 export function secretsFrom(env, keychain) {
   const email = env.REVIEW_EMAIL || REVIEW_EMAIL;
-  return {
-    email,
-    password: env.REVIEW_PASSWORD || keychain(KEYCHAIN.password, email),
-    claudeToken: env.CLAUDE_CODE_OAUTH_TOKEN || keychain(KEYCHAIN.claude, 'token'),
-  };
+  return { email, password: env.REVIEW_PASSWORD || keychain(KEYCHAIN.password, email) };
 }
 
-export function envFileOf({ email, password, claudeToken }) {
-  for (const [k, v] of Object.entries({ email, password, claudeToken })) {
+export function envFileOf({ email, password }) {
+  for (const [k, v] of Object.entries({ email, password })) {
     if (typeof v !== 'string' || !v || /[\r\n]/.test(v)) throw new Error(`${k} is missing or has a line break`);
   }
-  return `AGENTBOX_TEAM_TEST_LOGIN=${email}:${password}\nCLAUDE_CODE_OAUTH_TOKEN=${claudeToken}\n`;
+  return `AGENTBOX_TEAM_TEST_LOGIN=${email}:${password}\n`;
 }
+
+// The agents run on Codex, signed in on the machine itself with a code typed
+// into a browser, so no token ever leaves the person's own computer.
+export const CODEX_LOGIN = 'sudo -u agentbox -H codex login --device-auth';
 
 /** What the machine runs at its first boot. No secrets: those arrive over SSH. */
 export function userDataOf({ expiresAt }) {
@@ -106,7 +107,7 @@ curl -fsSLO https://nodejs.org/dist/$NODE/SHASUMS256.txt
 grep " node-$NODE-linux-x64.tar.xz$" SHASUMS256.txt | sha256sum -c -
 tar -xJf node-$NODE-linux-x64.tar.xz -C /usr/local --strip-components=1
 cd /
-npm install -g agentbox-app @anthropic-ai/claude-code
+npm install -g agentbox-app @openai/codex
 id agentbox || useradd -m -s /bin/bash agentbox
 
 # The demo project the reviewer's agents work in.
@@ -218,7 +219,17 @@ async function on(days) {
   }
   await ssh(state, 'cloud-init status --wait', { timeout: 30 * 60_000 });
   await ssh(state, 'sudo install -m 600 /dev/stdin /etc/agentbox-review.env && sudo systemctl enable --now agentbox-review', { input: login });
-  console.log(`Signed in and running. To open it from this Mac:\n  ssh -i ${keyFile} -N -L ${PORT}:127.0.0.1:${PORT} ubuntu@${state.ip}\nthen the address in: ssh -i ${keyFile} ubuntu@${state.ip} journalctl -u agentbox-review`);
+  console.log(`Running and signed in to the demo account. Next: \`login\` signs Codex in.\nTo open the app from this Mac:\n  ssh -i ${keyFile} -N -L ${PORT}:127.0.0.1:${PORT} ubuntu@${state.ip}\nthen the address in: ssh -i ${keyFile} ubuntu@${state.ip} journalctl -u agentbox-review`);
+}
+
+// Prints Codex's code and address; it waits until someone types the code in a
+// browser signed in to the Codex account kept for review.
+async function login() {
+  if (!fs.existsSync(stateFile)) throw new Error('No review computer made from this Mac. Run `on` first.');
+  const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+  execFileSync('ssh', ['-i', state.keyFile, '-o', 'StrictHostKeyChecking=accept-new', '-o', 'ConnectTimeout=10', '-o', 'BatchMode=yes', '-t', `ubuntu@${state.ip}`, CODEX_LOGIN], { stdio: 'inherit', timeout: 20 * 60_000 });
+  await ssh(state, 'sudo systemctl restart agentbox-review');
+  console.log('Codex is signed in on the review computer.');
 }
 
 function status() {
@@ -253,9 +264,10 @@ async function main() {
   const [cmd, ...rest] = process.argv.slice(2);
   const at = rest.indexOf('--days');
   if (cmd === 'on') await on(at === -1 ? DEFAULT_DAYS : Number(rest[at + 1]));
+  else if (cmd === 'login') await login();
   else if (cmd === 'status') status();
   else if (cmd === 'off') await off();
-  else { console.error('usage: app-review-computer.mjs on [--days N] | status | off'); process.exitCode = 2; }
+  else { console.error('usage: app-review-computer.mjs on [--days N] | login | status | off'); process.exitCode = 2; }
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) await main();

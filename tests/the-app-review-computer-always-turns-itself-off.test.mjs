@@ -12,7 +12,7 @@
 // machine is doing, and `off` deletes it at once. It never makes a second
 // machine while one is on, and never keeps one longer than 30 days.
 import { describe, it, expect } from 'vitest';
-import { expiryOf, userDataOf, runInstancesArgs, scheduleArgs, envFileOf, hoursLeft, refuseSecond, secretsFrom, KEYCHAIN, MAX_DAYS, DEFAULT_DAYS } from '../scripts/app-review-computer.mjs';
+import { expiryOf, userDataOf, runInstancesArgs, scheduleArgs, envFileOf, hoursLeft, refuseSecond, secretsFrom, KEYCHAIN, CODEX_LOGIN, MAX_DAYS, DEFAULT_DAYS } from '../scripts/app-review-computer.mjs';
 
 const NOW = Date.parse('2026-11-09T12:00:00Z');
 
@@ -92,24 +92,41 @@ describe('one at a time', () => {
 });
 
 describe('the sign-in file', () => {
-  it('holds the demo login and the Claude token', () => {
-    expect(envFileOf({ email: 'r@x.ac', password: 'p:w', claudeToken: 't' })).toBe('AGENTBOX_TEAM_TEST_LOGIN=r@x.ac:p:w\nCLAUDE_CODE_OAUTH_TOKEN=t\n');
+  it('holds the demo login and nothing else', () => {
+    expect(envFileOf({ email: 'r@x.ac', password: 'p:w' })).toBe('AGENTBOX_TEAM_TEST_LOGIN=r@x.ac:p:w\n');
   });
   it('refuses a value that would break the file', () => {
-    expect(() => envFileOf({ email: 'r@x.ac', password: 'p\nX=1', claudeToken: 't' })).toThrow();
-    expect(() => envFileOf({ email: '', password: 'p', claudeToken: 't' })).toThrow();
+    expect(() => envFileOf({ email: 'r@x.ac', password: 'p\nX=1' })).toThrow();
+    expect(() => envFileOf({ email: '', password: 'p' })).toThrow();
   });
 });
 
-// A Mac's permission check refused an agent catching a Claude token (2026-11-08),
-// so the person saves it in the Keychain and the command reads it there.
-describe('where the secrets come from', () => {
+// The founder, 2026-11-08: "why are we signing in? we're not giving other people
+// access to my account? if we need an account best to just use a $30 codex one".
+// So the agents run on Codex, signed in on the machine itself by a code typed
+// into a browser: no Claude token, and no token carried from the Mac.
+describe('whose account the agents run on', () => {
+  const ud = userDataOf({ expiresAt: '2026-11-23T12:00:00.000Z' });
+  it('Codex is installed, and Claude Code is not', () => {
+    expect(ud).toMatch(/npm install -g agentbox-app @openai\/codex/);
+    expect(ud).not.toMatch(/claude-code/);
+  });
+  it('Codex signs in on the machine with a device code, as the user the app runs as', () => {
+    expect(CODEX_LOGIN).toBe('sudo -u agentbox -H codex login --device-auth');
+  });
+  it('no Claude token is asked for anywhere', () => {
+    expect(envFileOf({ email: 'r@x.ac', password: 'p' })).not.toMatch(/CLAUDE/);
+    expect(KEYCHAIN).toEqual({ password: 'AGENTBOX_APP_REVIEW' });
+  });
+});
+
+describe('where the demo password comes from', () => {
   const keychain = (service, account) => `${service}/${account}`;
   it('the Keychain, when the environment has none', () => {
-    expect(secretsFrom({}, keychain)).toEqual({ email: 'appreview@agentbox.ac', password: `${KEYCHAIN.password}/appreview@agentbox.ac`, claudeToken: `${KEYCHAIN.claude}/token` });
+    expect(secretsFrom({}, keychain)).toEqual({ email: 'appreview@agentbox.ac', password: `${KEYCHAIN.password}/appreview@agentbox.ac` });
   });
   it('the environment first', () => {
-    expect(secretsFrom({ REVIEW_EMAIL: 'b@x.ac', REVIEW_PASSWORD: 'p', CLAUDE_CODE_OAUTH_TOKEN: 't' }, keychain)).toEqual({ email: 'b@x.ac', password: 'p', claudeToken: 't' });
+    expect(secretsFrom({ REVIEW_EMAIL: 'b@x.ac', REVIEW_PASSWORD: 'p' }, keychain)).toEqual({ email: 'b@x.ac', password: 'p' });
   });
   it('nothing in either is refused before any machine is made', () => {
     expect(() => envFileOf(secretsFrom({}, () => ''))).toThrow(/missing/);
