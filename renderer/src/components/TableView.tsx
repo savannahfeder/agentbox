@@ -32,6 +32,9 @@ const SPARE = 12;
 // the rows in view can still be found by arithmetic on a table of 150,000.
 const ROW_H = 46;
 const ROW_WRAPPED = 86;
+const wordy = (kind: ColumnKind) => kind === 'text' || kind === 'name' || kind === 'link' || kind === 'email';
+// Set to wrap and still a column of words: a column turned into tags or dates keeps the setting but draws one line.
+const wraps = (c: Column) => !!c.wrap && wordy(c.kind);
 // .tbl-rn's width; the first column sticks just right of it.
 const RN_W = 44;
 const RN_W_WIDE = 58;
@@ -99,7 +102,7 @@ const Row = memo(function Row({ table, row, r, n, c0, c1, at, whole, hands }: {
       const kind = table.columns[i].kind;
       const sel = i >= c0 && i <= c1;
       const link = cellLink(table, row, i);
-      return <div key={i} className={`tbl-td${cellClass(kind, !!link)}${hands && table.columns[i].wrap ? ' wrap' : ''}${sel ? ' sel' : ''}${i === at ? ' at' : ''}`} role="cell"
+      return <div key={i} className={`tbl-td${cellClass(kind, !!link)}${hands && wraps(table.columns[i]) ? ' wrap' : ''}${sel ? ' sel' : ''}${i === at ? ' at' : ''}`} role="cell"
         data-r={hands ? r : undefined} data-c={hands ? i : undefined} title={hoverText(kind, v, link)}>
         <CellBody table={table} col={i} row={row} value={v} link={link} />
         {hands && i === (table.ranked ? 1 : 0) && <button type="button" className="tbl-open" tabIndex={-1} aria-label="Open this row" title="Open this row (Space)">{OPEN}</button>}
@@ -700,7 +703,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   let live = doc;
   if (doc.from !== base) { live = { from: base, table: seed.table, looks: seed.looks, order: viewOrder(seed.table, searched, picked, sort) }; setDoc(live); }
   const { table, order } = live;
-  const rowH = hands && table.columns.some((c) => c.wrap) ? ROW_WRAPPED : ROW_H;
+  const rowH = hands && table.columns.some(wraps) ? ROW_WRAPPED : ROW_H;
   const docRef = useRef(live);
   docRef.current = live;
   const past = useRef<Doc[]>([]);
@@ -1144,6 +1147,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
       // With nothing picked the table itself keeps the keys, not a text box, so
       // undo still works and the next Escape goes on to close the view.
       if (sel && cellsIn(sel) > 1) setPick({ a: pick.a, b: pick.a });
+      else if (peek) setShut(`${pick.a.r}:${pick.a.c}`);
       else { setPick(null); rest(); }
       return;
     }
@@ -1384,27 +1388,40 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   }, [editing?.r, editing?.c, editing?.pop, roomy, live, view, template]);
 
   // ---- A cell picked whose words are cut off shows them whole, over the cell, without editing.
-  const [peek, setPeek] = useState<{ left: number; top: number; w: number; text: string } | null>(null);
+  type Peek = { left: number; top: number; w: number; text: string; up: boolean; most: number };
+  const [peek, setPeek] = useState<Peek | null>(null);
   const one = pick && pick.a.r === pick.b.r && pick.a.c === pick.b.c ? pick.a : null;
+  // Escape puts the box away and leaves the cell picked; the next cell picked shows its own again.
+  const [shut, setShut] = useState<string | null>(null);
+  const oneKey = one ? `${one.r}:${one.c}` : null;
+  useEffect(() => { if (shut && shut !== oneKey) setShut(null); }, [oneKey]);
   useLayoutEffect(() => {
     const el = box.current;
     const kind = one ? table.columns[one.c]?.kind : undefined;
-    if (!el || !one || !hands || editing || sheet !== null || float || drop || kind === 'tag') { setPeek(null); return undefined; }
+    if (!el || !one || !hands || editing || sheet !== null || float || drop || kind === 'tag' || shut === oneKey) { setPeek(null); return undefined; }
     const read = () => {
       const cell = el.querySelector(`[data-r="${one.r}"][data-c="${one.c}"]`) as HTMLElement | null;
       const words = cell?.querySelector('.tbl-ell') as HTMLElement | null;
       if (!cell || !words || (words.scrollWidth <= words.clientWidth + 1 && words.scrollHeight <= words.clientHeight + 1)) { setPeek(null); return; }
       const from = el.scrollLeft + stuckWidth(one.c);
       const cellLeft = one.c === first ? from : cell.offsetLeft;
-      const w = Math.max(Math.min(cell.offsetWidth, 200), Math.min(Math.max(cell.offsetWidth, 420), el.scrollLeft + el.clientWidth - from - 8));
+      // The editor's width, so pressing Enter does not move the words.
+      const w = Math.max(Math.min(cell.offsetWidth, 200), Math.min(Math.max(cell.offsetWidth, 380), el.scrollLeft + el.clientWidth - from - 8));
       const left = Math.max(from, Math.min(cellLeft, el.scrollLeft + el.clientWidth - w));
+      const top = cell.offsetTop;
+      // Near the foot of the view it rises from the cell's bottom edge, as the tag list does.
+      const below = el.scrollTop + el.clientHeight - top - 8;
+      const above = top + rowH - el.scrollTop - headH() - 8;
+      const up = below < 200 && above > below;
+      const most = Math.max(rowH, Math.min(320, up ? above : below));
       const text = shownText(table.rows[order[one.r]]?.[one.c] ?? '');
-      setPeek((p) => (p && p.left === left && p.top === cell.offsetTop && p.w === w && p.text === text ? p : { left, top: cell.offsetTop, w, text }));
+      const next = { left, top, w, text, up, most };
+      setPeek((p) => (p && p.left === left && p.top === top && p.w === w && p.text === text && p.up === up && p.most === most ? p : next));
     };
     read();
     el.addEventListener('scroll', read, { passive: true });
     return () => el.removeEventListener('scroll', read);
-  }, [one?.r, one?.c, editing, sheet, float, drop, live, view, template, rowH]);
+  }, [one?.r, one?.c, editing, sheet, float, drop, live, view, template, rowH, shut]);
 
   // After a menu's choice the keys come back to the table, unless the choice opened a box of its own (Rename).
   const closeFloat = () => {
@@ -1419,7 +1436,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   /** Wrap text, for a column of words: on, each row shows three lines of it; a second press turns it off. */
   const wrapRow = (col: number) => {
     const c = table.columns[col];
-    if (!c || !(c.kind === 'text' || c.kind === 'name' || c.kind === 'link' || c.kind === 'email')) return null;
+    if (!c || !wordy(c.kind)) return null;
     return <MenuRow label="Wrap text" hint={c.wrap ? '✓' : undefined} onClick={() => {
       const d = docRef.current;
       const looks = lookWrap(d.looks, c.name, !c.wrap);
@@ -1589,7 +1606,17 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
             ? { top: drop.at - 1, width: (box.current?.querySelector('.tbl-grid') as HTMLElement | null)?.offsetWidth }
             : { left: drop.at - 1, height: (box.current?.querySelector('.tbl-grid') as HTMLElement | null)?.offsetHeight }} />}
         {peek && one && (
-          <div className="tbl-peek" style={{ left: peek.left, top: peek.top, width: peek.w }} title={editable ? 'Double-click or press Enter to edit' : undefined}
+          <div className="tbl-peek" title={editable ? 'Double-click or press Enter to edit' : undefined}
+            style={{ left: peek.left, width: peek.w, minHeight: rowH, maxHeight: peek.most, ...(peek.up ? { top: peek.top + rowH, transform: 'translateY(-100%)' } : { top: peek.top }) }}
+            // A click that selected no words goes to the cell under it, so the box never stands in the way of the next row.
+            onClick={(e) => {
+              if (window.getSelection()?.toString()) return;
+              const at = e.currentTarget;
+              at.style.pointerEvents = 'none';
+              const hit = atOf(document.elementFromPoint(e.clientX, e.clientY));
+              at.style.pointerEvents = '';
+              if (hit?.kind === 'cell' && (hit.at.r !== one.r || hit.at.c !== one.c)) { goTo({ a: hit.at, b: hit.at }); focusKeys(); }
+            }}
             onDoubleClick={(e) => { e.stopPropagation(); startEdit(one); }}>{peek.text}</div>
         )}
         {editing && place && editingRow && (
