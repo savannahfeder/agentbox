@@ -118,6 +118,7 @@ export function PriorityPicker({ value, set = false, onChange, title, variant = 
           open ? 'open' : '',
         ].filter(Boolean).join(' ')}
         title={title ?? 'Priority'}
+        aria-label={asChip ? `Priority: ${priorityLabelOf(value)}` : undefined}
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
@@ -140,7 +141,7 @@ export function PriorityPicker({ value, set = false, onChange, title, variant = 
             sentence's whole job is that every glyph in it sits on one
             baseline at one size. */}
         {asChip ? <span className="tc-prio"><PriorityIcon id={value} /></span> : !asWord && <PriorityIcon id={value} />}
-        {priorityLabelOf(value)}
+        {asChip ? <span className="tc-chip-word">{priorityLabelOf(value)}</span> : priorityLabelOf(value)}
       </button>
     </span>
   );

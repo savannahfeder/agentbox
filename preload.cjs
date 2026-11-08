@@ -257,6 +257,8 @@ contextBridge.exposeInMainWorld('zero', {
   // One way, name/message/stack only, scrubbed on the far side before it is
   // written. The window never chooses what a crash report contains.
   crash: (payload) => ipcRenderer.invoke('zero:crash', payload),
+  // What an opened thread laid out, so the app can check it painted it (main/blank-page.mts).
+  blankCheck: (payload) => ipcRenderer.invoke('zero:blank-check', payload),
   // A COUNT, AND THE NAME IS THE WHOLE MESSAGE. There is no analytics SDK in
   // this window on purpose (a browser one autocaptures the text of what was
   // clicked, and here that text is task titles), so the page can say THAT

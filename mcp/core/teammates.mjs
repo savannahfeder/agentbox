@@ -12,7 +12,7 @@ import {
   teamDir, readTeammates, readChat, writeTeammate, writeChat, newMemoryId, newTeammateId,
   readPlaybooks, writePlaybook, newPlaybookId, newLessonId, newDutyId, methodFile, sourcesDir, writeMethod,
 } from '../../main/store/teammates-files.mjs';
-import { teammateIdOf, hopOf, workOf, setupTitle, isSetupTitle, mentionsIn, isWorks, letterFor, cleanDuty, dutyStart, isDate, tooLongForAChat, METHOD_CAP, VOICES, YOU, MAX_HOPS, HOP_LABEL_PREFIX } from '../../shared/teammates.mjs';
+import { teammateIdOf, hopOf, workOf, setupTitle, mentionsIn, isWorks, letterFor, cleanDuty, dutyStart, isDate, tooLongForAChat, METHOD_CAP, VOICES, YOU, MAX_HOPS, HOP_LABEL_PREFIX } from '../../shared/teammates.mjs';
 import { periodKey } from '../../shared/repeats.mjs';
 import { resolveProduct, resolveAccount } from './account.mjs';
 
@@ -95,19 +95,24 @@ export function teamPass({ to, title, details, project: named } = {}, ctx = {}) 
   // The work is done where it is named, or for a thread handing it on, in that
   // thread's project; otherwise in the receiver's own.
   const where = named ? resolveProduct(named).id : me ? null : project.id;
-  const [target] = idsFor(to, team, me);
-  if (!target) throw new Error('pass work to another teammate, not to yourself');
+  // To yourself only for work in another project: it gets a thread of its own there.
+  const toSelf = !!me && !!where && where !== project.id && idsFor(to, team, null).includes(me.id);
+  const [target] = toSelf ? [me.id] : idsFor(to, team, me);
+  if (!target) throw new Error('pass work to another teammate, not to yourself. For work in another project, name it in project');
   const what = plain(title);
   if (!what) throw new Error('give the work a short title');
-  const yours = !!me?.primary && startedByYou(item);
+  const yours = toSelf ? startedByYou(item) : !!me?.primary && startedByYou(item);
   const m = writeChat(dir, { kind: 'pass', from: me?.id ?? YOU, to: target, title: what.slice(0, 200), details: String(details ?? '').slice(0, 6000), hop, ...writtenIn, ...(where ? { product: where } : {}), ...(yours ? { yours: true } : {}) }, ctx.now);
   const them = team.find((t) => t.id === target);
-  const held = me && !yours && them?.handoffsNeedYes !== false;
+  const held = me && !yours && (toSelf || them?.handoffsNeedYes !== false);
   return {
     passed: m.id, to: them?.name,
-    note: held
+    note: toSelf
+      ? (held ? 'The person did not ask for this, so it waits in their inbox for their yes. Say so in your answer.'
+        : 'It starts in a thread of its own in that project once this run ends. Do none of it here; say so in your answer and finish.')
+      : held
       ? `${them.name} takes work from teammates only with the person's yes, so this waits in their inbox until they reply. Say so in your answer.`
-      : yours ? `The person asked for this, so it starts now for ${them?.name ?? 'them'}, in the thread they already have on this work or a new one.`
+      : yours ?`The person asked for this, so it starts now for ${them?.name ?? 'them'}, in the thread they already have on this work or a new one.`
         : `It goes to the thread ${them?.name ?? 'they'} already has on this work, or starts one, and wakes them.`,
   };
 }
@@ -119,21 +124,22 @@ function startedByYou(item) {
   return answeredInThread(item);
 }
 
-// The primary makes a teammate when the person said yes to one. It is a draft
-// that sets itself up by asking them, as one you made would.
+// Any thread makes a teammate when the person's own words on it asked for one.
+// It is a draft that sets itself up by asking them, as one you made would.
 export function teamHire({ name, job } = {}, ctx = {}) {
-  const { dir, me, team, item, project } = teammateContext(ctx);
-  if (!me.primary) throw new Error('only your primary employee makes new teammates; suggest one to the person instead');
-  if (!startedByYou(item)) throw new Error('make a teammate only in a run started by the person\'s words or answered by them: ask them first, with options');
+  const env = ctx.env ?? process.env;
+  if (!String(env.ZERO_ITEM ?? '').trim()) throw new Error('this session is not running for a thread, so nothing says the person asked for a teammate: ask them to make one on the Team page');
+  const { dir, me, team, item, project } = teammateContext({ ...ctx, outsider: true });
+  if (!startedByYou(item)) throw new Error('the person did not ask for a teammate on this thread, neither in its opening words nor in a reply: ask them first, with options, and make it once they say yes');
   const role = plain(name).slice(0, 40);
   const words = String(job ?? '').trim();
   if (!role || !words) throw new Error('give the new teammate a name that says its role, and its job in plain words');
   if (team.some((t) => t.name.toLowerCase() === role.toLowerCase())) throw new Error(`${role} is taken; pick another name`);
   const now = ctx.now ?? Date.now();
   const id = newTeammateId();
-  writeTeammate(dir, id, { name: role, role, letter: letterFor(role, team), job: words.slice(0, 2000), status: 'draft', product: me.product ?? project.id, createdAt: now, paused: false }, now);
+  writeTeammate(dir, id, { name: role, role, letter: letterFor(role, team), job: words.slice(0, 2000), status: 'draft', product: me?.product ?? project.id, createdAt: now, paused: false }, now);
   writeChat(dir, { kind: 'msg', from: YOU, to: [id], text: words.slice(0, 8000), setup: true }, now);
-  writeChat(dir, { kind: 'act', from: me.id, verb: 'hired', text: `${me.name} made ${role}, which is setting itself up.` }, now);
+  writeChat(dir, { kind: 'act', from: me?.id ?? YOU, verb: 'hired', text: `${me?.name ?? 'You'} made ${role}, which is setting itself up.` }, now);
   return { teammate: { id, name: role, status: 'draft' }, note: `${role} wakes now to set itself up, and asks the person what it cannot tell from the job.` };
 }
 
@@ -259,8 +265,12 @@ export function teamSetup({ name, role, job, goal, counted, asksFirst, every, at
   }
   if (ready === true) patch.status = 'active';
   writeTeammate(dir, me.id, patch, now);
-  if (patch.name && me.status === 'draft' && isSetupTitle(item.title)) {
-    try { updateWorkItem(project.dir, item.id, { title: setupTitle(patch.name) }, { source: 'system', now }); } catch { /* the old title stands */ }
+  // Its owner may have named it already, in which case it saves no name. Only a
+  // title the app gave a setup run is replaced, not one a message happened to start with.
+  const titled = setupTitle(patch.name ?? me.name);
+  const given = ['Set up its job', setupTitle(null), setupTitle(me.name)];
+  if (me.status === 'draft' && given.includes(item.title) && titled !== item.title) {
+    try { updateWorkItem(project.dir, item.id, { title: titled }, { source: 'system', now }); } catch { /* the old title stands */ }
   }
   if (ready === true && me.status === 'draft') writeChat(dir, { kind: 'act', from: me.id, verb: 'started' }, now);
   const changed = Object.keys(SAID).filter((k) => k in patch && JSON.stringify(patch[k]) !== JSON.stringify(me[k] ?? null));

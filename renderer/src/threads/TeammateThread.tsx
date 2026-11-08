@@ -125,7 +125,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   return (
     <div className="tp-page">
       {big && product && (
-        <ArtifactView product={product} threadName={card.title ?? 'Shared thread'} lines={work?.lines ?? []} marks={marks}
+        <ArtifactView product={product} draftsAcross={`teammate:${personId}:${threadId}`} lines={work?.lines ?? []} marks={marks}
           me={team?.me ?? null} people={people} open={big} ownerOfRow={personId}
           write={async (mark) => {
             const out = await api.teamMarkFile({ personId, threadId, mark });

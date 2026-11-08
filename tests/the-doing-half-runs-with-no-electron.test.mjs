@@ -72,7 +72,7 @@ describe('the doing half, booted with no Electron', () => {
 
   afterAll(async () => {
     if (server) await new Promise((done) => server.close(done));
-    await booted?.supervisor?.stopAll?.().catch?.(() => {});
+    try { booted?.supervisor.killAll(); booted?.supervisor.stop(); } catch { /* done */ }
     if (dir) fs.rmSync(dir, { recursive: true, force: true });
   });
 

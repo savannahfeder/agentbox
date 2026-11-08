@@ -56,7 +56,9 @@ export function processes() {
 
 // Deliberately narrow: a real Chrome binary AND one of our throwaway profiles.
 // Her own browsing Chrome runs from ~/Library and never matches.
-export const isOurChrome = (p) => p.command.startsWith(OURS) && p.command.includes(`--user-data-dir=${PREFIX}`);
+export const isOurChrome = (p) =>
+  (p.command.startsWith(OURS) || /^\/(?:(?! -).)*?\/Google Chrome for Testing\.app\/Contents\/MacOS\/Google Chrome for Testing /.test(p.command))
+  && p.command.includes(`--user-data-dir=${PREFIX}`);
 
 export const profileOf = (command) => command.match(/--user-data-dir=(\/tmp\/shot-profile-[A-Za-z0-9]+)/)?.[1];
 

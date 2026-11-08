@@ -306,7 +306,7 @@ export async function cloudPlan({ env = process.env, home = os.homedir() }: Stor
   if (!at) return { signedIn: false };
   const me = await ask(at.gateway, '/v1/me', { key: at.key });
   if (me.status === 401) forgetCloudKey(at.key, env, home);
-  return me.status === 200 ? { signedIn: true, ...cloudPlanOf(me.body) } : { signedIn: me.status !== 401, error: me.body.error || 'refused', message: me.body.message };
+  return me.status === 200 ? { signedIn: true, ...cloudPlanOf(me.body as GatewayBody & { free?: FreeHours }) } : { signedIn: me.status !== 401, error: me.body.error || 'refused', message: me.body.message };
 }
 
 /** What the team's owner sees of Stripe on Plan and Billing; `{ owner: false }` for anyone else. */

@@ -192,6 +192,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   stageAttachment: 'zero:stage-attachment',
   stageAttachmentPart: 'zero:stage-attachment-part',
   crash: 'zero:crash',
+  blankCheck: 'zero:blank-check',
   track: 'zero:track',
   sessionTrace: 'zero:session-trace',
   itemHistory: 'zero:item-history',

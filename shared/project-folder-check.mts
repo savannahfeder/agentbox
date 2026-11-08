@@ -30,7 +30,7 @@
 export interface FolderVerdict {
   ok: boolean;
   /** Why it was turned down. For tests and the log; never put on a screen. */
-  reason?: 'home' | 'guarded' | 'system' | 'volume';
+  reason?: 'home' | 'guarded' | 'system' | 'volume' | 'git';
   /** The sentence to show as it stands, when `ok` is false. */
   say?: string;
 }
@@ -74,6 +74,31 @@ export function tidyFolder(p: string | null | undefined): string {
   if (root === '~') return parts.length ? `~/${parts.join('/')}` : '~';
   if (root === '/') return `/${parts.join('/')}`;
   return parts.join('/');
+}
+
+/** Whether a path is a `.git` folder or anywhere inside one. */
+export function insideGitFolder(p: string | null | undefined): boolean {
+  return tidyFolder(String(p ?? '').replace(/\\/g, '/')).split('/').includes('.git');
+}
+
+/**
+ * WHAT A FOLDER CHOOSER'S ANSWER MEANS AS A PROJECT (F-157, F-158).
+ *
+ *  GTK autocompletes a typed repo path to `<repo>/.git/`, so a pick ending in
+ *  `.git` is taken as the repository above it. A pick further inside a .git
+ *  folder, or one that does not exist, is a mangled location bar: it is turned
+ *  down rather than guessed at, because the store would create it.
+ */
+export function folderFromChooser(
+  raw: string,
+  { home = '', isDir }: { home?: string; isDir: (p: string) => boolean },
+): { path: string | null; refused?: string } {
+  let picked = tidyFolder(raw);
+  if (picked.split('/').pop() === '.git') picked = picked.slice(0, -'/.git'.length) || '/';
+  const verdict = checkProjectFolder(picked, { home });
+  if (!verdict.ok) return { path: null, refused: verdict.say };
+  if (!isDir(picked)) return { path: null, refused: `${picked} does not exist. Pick the folder your project’s code is in.` };
+  return { path: picked };
 }
 
 function underHome(p: string, home: string | null | undefined): string | null {
@@ -123,6 +148,14 @@ export function checkProjectFolder(folder: string | null | undefined, { home = '
     };
   }
 
+  if (insideGitFolder(p)) {
+    return {
+      ok: false,
+      reason: 'git',
+      say: `${p} is inside a repository’s .git folder, which is git’s own bookkeeping. Pick the folder your project’s code is in.`,
+    };
+  }
+
   // A volume root: /Volumes/Whatever with nothing after it.
   if (/^\/Volumes\/[^/]+$/.test(p)) {
     return {
@@ -159,7 +192,8 @@ export function chooserStartsIn(startIn: string | null | undefined, { known = []
   const h = tidyFolder(home);
   const counts = new Map<string, number>();
   for (const f of known) {
-    const p = tidyFolder(f);
+    // A project stored as a .git folder (F-157) opens beside the repo, not in it.
+    const p = tidyFolder(f).replace(/\/\.git(\/.*)?$/, '');
     const cut = p.lastIndexOf('/');
     if (cut <= 0) continue;
     const parent = p.slice(0, cut);

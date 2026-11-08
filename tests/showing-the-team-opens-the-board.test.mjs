@@ -34,9 +34,10 @@ describe('the defaults that were approved, reachable again', () => {
     expect(readDisplay(pageFor(false), store()).view).toBe('list');
     expect(DEFAULT_DISPLAY.inbox.view).toBe('list');
   });
-  it('a page with the team on it opens as a board', () => {
-    expect(readDisplay(pageFor(true), store()).view).toBe('board');
-    expect(DEFAULT_DISPLAY.team.view).toBe('board');
+  // Each of In progress, Later and Done in a tab of its own, B for the board (2026-11-08).
+  it('a page with the team on it opens as a list too', () => {
+    expect(readDisplay(pageFor(true), store()).view).toBe('list');
+    expect(DEFAULT_DISPLAY.team.view).toBe('list');
   });
 });
 

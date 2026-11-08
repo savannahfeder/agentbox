@@ -59,16 +59,16 @@ describe('every install gets the narrow sidebar', () => {
   });
 });
 
-describe('without Groups it holds Threads, Feedback and Settings', () => {
+describe('without Groups it holds Inbox, Feedback and Settings', () => {
   it('draws exactly those three with no team, no teammates and no Groups', () => {
-    expect(labels(nav())).toEqual(['Threads', 'Feedback', 'Settings']);
+    expect(labels(nav())).toEqual(['Inbox', 'Feedback', 'Settings']);
   });
 
   it('puts no Groups row under Threads unless Groups is on, and Chats only for teammates', () => {
     expect(app).toContain(`groups={roomsUi.live ? roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown || chatsPlaceShown || cardFromPlace, teammatesUi.live || homeLayout === 'chats' ? openChats : undefined, homeLayout === 'chats' ? 'Team' : undefined) : teammatesUi.rail(teammatesShown)} />`);
   });
 
-  it('names the first row and the page Threads without Groups, and Inbox with them', () => {
+  it('names the first row and the page Inbox, with Groups or without', () => {
     expect(app).toContain("inboxLabel={roomsUi.live ? 'Inbox' : undefined}");
     expect(app).toContain('roomsUi.live && !roomShown ? <h1 className="workspace-title">Inbox</h1>');
   });

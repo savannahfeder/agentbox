@@ -59,10 +59,12 @@
 //
 // Branches are never deleted here. Every commit survives the folder, so the
 // worst this can do is make somebody run `git worktree add` again.
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { Name, nameSlug } from '../shared/product-name.mjs';
+import { insideGitFolder } from '../shared/project-folder-check.mts';
 import { carryLocalFiles, copyTree, onlyTrackedContent, trackedTopLevel } from './worktree-include.mts';
 import type { ExecFailure } from './worktree-include.mts';
 
@@ -256,6 +258,28 @@ export function safeTaskName(id: unknown): string {
  * every comparison in the supervisor is concerned.
  */
 export const real = (dir: string) => { try { return fs.realpathSync(dir); } catch { return dir; } };
+
+/**
+ * Marks the folder that holds a project's task folders for Time Machine to
+ * skip. Each task folder carries a copy of the project's packages, tens of
+ * thousands of files, and the work in it is committed to the project's own
+ * repository, which is backed up. Once per folder per run; a failure is no
+ * reason to stop a task.
+ */
+const keptOutOfBackups = new Set<string>();
+export function keepOutOfBackups(dir: string, {
+  platform = process.platform,
+  // Not waited on: nothing needs its answer, and a task folder is often made on the window's thread.
+  run = (cmd: string, args: string[]) => { execFile(cmd, args, { timeout: 5_000 }, () => { /* best effort */ }); },
+}: { platform?: string; run?: (cmd: string, args: string[]) => unknown } = {}): boolean {
+  if (platform !== 'darwin' || keptOutOfBackups.has(dir)) return false;
+  keptOutOfBackups.add(dir);
+  // Time Machine never backs up the temporary folder, where every test's checkout is.
+  // Either spelling: on a Mac /var is a link to /private/var, and a folder not made yet has no real path.
+  const temp = [os.tmpdir(), real(os.tmpdir())].map((t) => t + path.sep);
+  if ([dir, real(dir)].some((d) => temp.some((t) => d.startsWith(t)))) return false;
+  try { run('/usr/bin/tmutil', ['addexclusion', dir]); return true; } catch { return false; }
+}
 
 export function taskFolderPath(repoPath: string, id: unknown): string {
   return path.join(real(repoPath), ...WORKTREES, safeTaskName(id));
@@ -585,6 +609,11 @@ export function acquireTaskFolder(root: string, folder: string, { pid = process.
  */
 export function ensureTaskFolder(dir: string, id: unknown, { pid = process.pid, dependencies = true, again = false }: TaskFolderOptions = {}): TaskFolderTaken | TaskFolderRefused | null {
   const name = safeTaskName(id);
+  // Git reads a .git folder as "not a work tree", so without this the project
+  // below would `git init` inside somebody's repository internals (F-157).
+  if (insideGitFolder(path.resolve(dir))) {
+    throw Error(`this project's folder, ${dir}, is inside a repository's .git folder, so no task can run in it. Make a new project from the repository's own folder and send the task there`);
+  }
   const root = repoRoot(dir) ?? startRepository(dir);
   if (!root) return null;
   firstCommitIfNone(root);
@@ -642,6 +671,7 @@ export function ensureTaskFolder(dir: string, id: unknown, { pid = process.pid, 
   // ever drops registrations whose folder is already gone.
   tryGit(root, ['worktree', 'prune']);
   fs.mkdirSync(path.dirname(folder), { recursive: true });
+  keepOutOfBackups(path.dirname(folder));
 
   hideFromTheCheckout(root);
 

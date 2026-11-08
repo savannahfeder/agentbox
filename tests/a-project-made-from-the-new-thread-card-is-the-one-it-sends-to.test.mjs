@@ -37,6 +37,6 @@ describe('the slug of a project just made reaches the open card', () => {
 
   it('is picked by the card, not merely received', () => {
     expect(card).toMatch(/selectProject\?: string \| null/);
-    expect(card).toMatch(/if \(selectProject\) pickProject\(selectProject\)/);
+    expect(card).toMatch(/if \(selectProject\) \{ pickProject\(selectProject\);/);
   });
 });

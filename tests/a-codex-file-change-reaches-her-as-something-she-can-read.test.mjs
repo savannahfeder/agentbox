@@ -65,7 +65,7 @@ import {
 } from '../main/codex-approvals.mjs';
 import { REFUSAL_DECISION } from '../main/codex-app-server.mjs';
 import { listPending } from '../main/approvals.mjs';
-import { approvalReads, UNREADABLE } from '../renderer/src/approval-card.ts';
+import { approvalReads, approvalView, UNREADABLE } from '../renderer/src/approval-card.ts';
 
 const dirs = [];
 const root = () => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-filechange-')); dirs.push(d); return d; };
@@ -411,17 +411,13 @@ describe('the card her screen draws', () => {
     expect(app).not.toMatch(/JSON\.stringify\(a\.input\)/);
   });
 
-  // A command approval and a file-change approval are one card wearing two
-  // sentences, never two cards. `.approval-what` was the span that carried the
-  // verb until the four-block round merged it away (w-34b7b861b6); the verb is
-  // still `reads.what` and is still written in exactly two places, the lede's
-  // fallback and the quiet line, which are the two halves of one either/or.
+  // A command approval and a file-change approval are one card, never two:
+  // approvalView decides the words and the body for both, and the card draws a
+  // change as coloured lines in the same block a command sits in.
   it('draws both shapes through the one card the app already has', () => {
-    expect(app).toMatch(/approvalReads/);
-    // One <pre>, one card format.
-    expect(app.match(/approval-cmd/g) ?? []).toHaveLength(1);
-    expect(app.match(/reads\.what/g) ?? []).toHaveLength(2);
-    expect(app).toContain('{said ?? <>{product} {reads.what}</>}');
-    expect(app).toContain('said ? reads.what : null');
+    expect(app).toContain('const view = approvalView(a.input, a.tool);');
+    expect(app).toContain("{body.kind === 'text' && <pre className=\"approval-cmd\">{body.text}</pre>}");
+    expect(app).toContain('<div className="approval-cmd approval-diff">');
+    expect(approvalView({ changes: `Edit ${REPO}/math.js\n-a\n+b` }, 'Edit').title).toBe('Change math.js');
   });
 });

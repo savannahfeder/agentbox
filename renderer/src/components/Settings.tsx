@@ -65,6 +65,9 @@ import { searchSettings, SETTINGS_PAGES, type SettingsHit, type SettingsPageId }
 import type { Product } from '../types';
 import { CloudMark, MacMark } from '../threads/ThreadMenu';
 import './settings.css';
+import { SkyTile } from '../home/SkyPicker';
+import { HOME_KEY, setHomeSetting, useHomeSettings } from '../home/home-settings';
+import { SKY_THEMES } from '../home/sky';
 
 /* * TEAM IS A PANE HERE (w-8415594d19, 2026-10-01). The pane's CONTENT is
  handed in as `teamPane` rather than imported, so this screen, which is shared
@@ -89,15 +92,22 @@ export function shortPath(full: string, home?: string | null): string {
 
 /* --------------------------------- controls ------------------------------- */
 
-function Switch({ on, onChange, label, busy }: { on: boolean; onChange: (v: boolean) => void; label: string; busy?: boolean }) {
+// It flips on the click, not when the save answers: a slow answer read as a
+// click that did not land. Once the save settles it shows what was saved.
+export function Switch({ on, onChange, label, busy }: { on: boolean; onChange: (v: boolean) => void | Promise<unknown>; label: string; busy?: boolean }) {
+  const [want, setWant] = useState<boolean | null>(null);
+  const shown = want ?? on;
   return (
     <button
       type="button"
       role="switch"
-      aria-checked={on}
+      aria-checked={shown}
       aria-label={label}
-      className={`set-sw ${on ? 'on' : ''} ${busy ? 'busy' : ''}`}
-      onClick={() => onChange(!on)}
+      className={`set-sw ${shown ? 'on' : ''} ${busy ? 'busy' : ''}`}
+      onClick={() => {
+        setWant(!shown);
+        void Promise.resolve(onChange(!shown)).catch(() => {}).finally(() => setWant(null));
+      }}
     />
   );
 }
@@ -1635,6 +1645,9 @@ function ProjectTitle({ project, onRename }: {
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditing(true); } }}
       >
         {project.name}
+        {/* Projects promises "open it to rename it", and a title that only
+            lights under the pointer was never found (QA batch 011, F-172). */}
+        <svg className="set-title-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /></svg>
       </h1>
     );
   }
@@ -1708,7 +1721,7 @@ function paneFrom(want: string, has: { team: boolean }): Pane {
 
 /* --------------------------------- screen --------------------------------- */
 
-export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onPaneChange, onNewProject, ranked = [], onSetOrder, teamPane, projectShare, projectWho, account, phoneCloud, phoneWeb, onPhoneSignIn, update = null, onClose, onFeedback, cloud = null, onCloudSignIn, cloudPlans = null, roomsPane }: {
+export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onPaneChange, onNewProject, ranked = [], onSetOrder, teamPane, projectShare, projectWho, account, phoneCloud, phoneWeb, onPhoneSignIn, update = null, onClose, onFeedback, cloud = null, onCloudSignIn, cloudPlans = null, roomsPane }: {
   /** Opens the feedback card. A phone has no Feedback button in its corner,
    *  so its own Settings page offers it (2026-10-12). */
   onFeedback?: () => void;
@@ -1724,6 +1737,8 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   // and then a background is two decisions for one choice.
   look: Look;
   onSetLook: (l: Look) => void;
+  /** A sky theme (Alpha features, Home): its look and its sky together. */
+  onSkyTheme?: (id: string) => void;
   // The dials on whichever picture is on. They only ever show under a picture,
   // so there is no disabled control on this screen for her to wonder about.
   tune: SkinTune;
@@ -1780,6 +1795,8 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   roomsPane?: ReactNode;
   onClose: () => void;
 }) {
+  const homeSet = useHomeSettings();
+  const skyOn = homeSet.on ? homeSet.skyTheme : null;
   const sidebarShrinks = useSidebarShrinks();
   const [model, setModel] = useState<SettingsModel | null>(null);
   // ?settings=claude, or ?settings=project:kestrel. Anything else (including the
@@ -2297,6 +2314,9 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               <Row label="Multiplayer" desc="Share projects with your team and see their threads beside yours. Needs a sign-in.">
                 <Switch label="Multiplayer" on={!!w.alpha?.multiplayer} onChange={(v) => setWorkspace('alphaMultiplayer', v)} />
               </Row>
+              <Row label="Home" desc="A page to start from: what needs you, a box to start a thread, and your team's week. The Inbox gets a sky below its list. Pick the sky in Appearance.">
+                <Switch label="Home" on={homeSet.on} onChange={(v) => setHomeSetting(HOME_KEY, v)} />
+              </Row>
             </Group>
           </Page>
         )}
@@ -2547,8 +2567,8 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 {LOOKS.map((l) => (
                   <button
                     key={l.id}
-                    className={`look${look === l.id ? ' on' : ''}`}
-                    aria-pressed={look === l.id}
+                    className={`look${look === l.id && !skyOn ? ' on' : ''}`}
+                    aria-pressed={look === l.id && !skyOn}
                     onPointerEnter={() => void readySkin(lookMeans(l.id).skin)}
                     onFocus={() => void readySkin(lookMeans(l.id).skin)}
                     onClick={() => onSetLook(l.id)}
@@ -2564,6 +2584,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                     <span className="look-name">{l.name}</span>
                   </button>
                 ))}
+                {homeSet.on && SKY_THEMES.map((k) => <SkyTile key={k.id} sky={k} on={skyOn === k.id} onPick={() => onSkyTheme?.(k.id)} />)}
               </div>
             </Group>
             {/* THE DIALS, and only under a picture. Both move the window she is
