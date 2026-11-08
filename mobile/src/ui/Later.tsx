@@ -31,7 +31,7 @@ export function TimeBox({ value, onChange, placeholder, onSubmit, line, onLine, 
       {lead}
       <TextInput value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={color.faint}
         returnKeyType="done" onSubmitEditing={onSubmit} autoCorrect={false} autoCapitalize="none" accessibilityLabel="A time, in words"
-        style={[{ flex: 1, minWidth: 140, height: 40, paddingHorizontal: 10, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: color.field, fontFamily: font.regular, fontSize: 15, color: color.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
+        style={[{ flex: 1, minWidth: 110, height: 40, paddingHorizontal: 10, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: color.field, fontFamily: font.regular, fontSize: 15, color: color.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
       {line && (
         <Pressable disabled={!ok || !onLine} onPress={onLine} accessibilityRole={ok ? 'button' : 'text'} hitSlop={8}
           style={[{ flexShrink: 1 }, ok && { minHeight: 32, paddingHorizontal: 10, paddingVertical: 6, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong }]}>
