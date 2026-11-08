@@ -37,12 +37,12 @@ export function doors({ needs, progress, team }: { needs: number; progress: numb
 }
 
 export function agoShort(at: number, now: number): string {
-  const m = Math.max(0, Math.round((now - at) / 60_000));
+  const m = Math.max(0, Math.floor((now - at) / 60_000));
   if (m < 1) return 'now';
   if (m < 60) return `${m} min`;
-  const h = Math.round(m / 60);
+  const h = Math.floor(m / 60);
   if (h < 24) return `${h} hr`;
-  return `${Math.round(h / 24)} d`;
+  return `${Math.floor(h / 24)} d`;
 }
 
 export function engineName(engine: string | undefined): string {
