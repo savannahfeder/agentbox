@@ -718,7 +718,7 @@ export function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 /** Which threads' choices are folded, kept on this machine. */
 const CHOICES_FOLDED = 'one.choicesFoldedOn';
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, giveTo = [], onGive, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, giveTo = [], onGive, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null }: {
   /** One thing at a time (w-65bcefb857): this thread's place in Needs you and the arrows that walk it. */
   queue?: { spot: Spot; onStep: (dir: 1 | -1) => void } | null;
   /** Drawn on the one-at-a-time page outside Needs you too: every thread with an agent. */
@@ -813,6 +813,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // in whatever app owns the extension.
   openDoc?: string | null;
   onOpenDoc?: (src: string, at?: string) => void;
+  /** Puts down the file open beside the thread. */
+  onCloseDoc?: () => void;
   parent: WorkItem | null;
   blockedBy: WorkItem | null;
   // THE THREADS THIS ONE MADE, with where each stands (w-2e8aa16f0f). Drawn in
@@ -1843,7 +1845,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   ) : null;
   // THE CODE BUTTON, in the corner beside Done (w-c25aae4035): people never
   // found the change while it was only a row in the dots menu.
-  const openChange = () => onOpenDoc?.(changePathFor(item.id));
+  // Pressed again while lit, it puts the change away.
+  const changeOpen = openDoc === changePathFor(item.id);
+  const openChange = () => (changeOpen ? onCloseDoc?.() : onOpenDoc?.(changePathFor(item.id)));
   const codeButton = figures ? (
     <span className="ts-code-figures">
       {signed(figures).map(({ sign, text }) => (
@@ -1883,7 +1887,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       files={<ThreadFilesButton files={madeHere} onOpen={(f) => (opensBig(f.src) ? openBig(f.src) : onOpenDoc?.(f.src))} />}
       change={changeFigures}
       codeButton={codeButton}
-      codeOpen={openDoc === changePathFor(item.id)}
+      codeOpen={changeOpen}
       onViewChange={openChange}
       addPeople={cornerPeople}
       onAddPeople={onAddPeople ? (person) => onAddPeople(item, person) : undefined}

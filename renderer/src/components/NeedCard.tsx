@@ -40,7 +40,7 @@ export function setHeld(item: string, held: { need: string; words: string }[] | 
   try { globalThis.sessionStorage?.setItem(HELD_KEY, JSON.stringify([...HELD])); } catch { /* no storage */ }
 }
 
-// The ask a row atop Needs you was pressed for, so its card takes the keyboard when the thread opens (round seven).
+// The ask the inbox's card was pressed for, so its card in the thread takes the keyboard when the thread opens.
 let wanted: { item: string; need: string } | null = null;
 export const focusNeedOnOpen = (item: string, need: string) => { wanted = { item, need }; };
 

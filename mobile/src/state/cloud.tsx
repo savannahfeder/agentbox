@@ -32,6 +32,8 @@ import { onTheirWay, teamFrom, withPendingPauses, withPhoneAnswers } from '../li
 import { isUnread, markSeen as markSeenIn, markUnseen as markUnseenIn, readSeen } from '../lib/unread';
 import { alertToken, alertTokenIfAllowed, setIconCount } from '../platform/alerts';
 import { appStore, persist } from '../platform/persist';
+import { forgetCrash, keptCrash } from '../platform/crash';
+import { crashReport, reportsOn } from '../lib/crash-note';
 
 export type Cloud = Pick<CloudClient, 'session' | 'signedIn' | 'generation' | 'select' | 'insertCommand' | 'update' | 'putFile' | 'signFiles' | 'signInWithPassword' | 'signInWithIdToken' | 'signUp' | 'googleUrl' | 'finishGoogle' | 'askPasswordReset' | 'resetAsked' | 'finishReset' | 'setPassword' | 'signOut' | 'insert' | 'remove' | 'rpc' | 'listFiles' | 'removeFiles' | 'upsert'>;
 
@@ -321,6 +323,20 @@ function useCloudState() {
     if (!cfg?.url) return { ok: false, error: 'This build was made without the cloud’s address.' };
     return sendPhoneFeedback(cfg, { text, files, os: `${Platform.OS} app`, version: [APP_VERSION, BUILD && `(${BUILD})`].filter(Boolean).join(' ') }, withDeadline(fetch));
   }, []);
+
+  // Last launch's crash goes once a computer's settings are read; with crash reports off it is dropped unsent.
+  const crashSending = useRef(false);
+  useEffect(() => {
+    const allowed = reportsOn(settingsRows);
+    if (PREVIEW || allowed === null || crashSending.current) return;
+    const note = keptCrash();
+    if (!note) return;
+    if (!allowed) { forgetCrash(); return; }
+    crashSending.current = true;
+    void sendFeedback(crashReport(note), [])
+      .then((out) => { if (out.ok) forgetCrash(); }, () => {})
+      .finally(() => { crashSending.current = false; });
+  }, [settingsRows, sendFeedback]);
 
   const signedInWith = useCallback(async (how: () => Promise<unknown>) => {
     const out = await how();

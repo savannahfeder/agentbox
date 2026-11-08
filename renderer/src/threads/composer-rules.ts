@@ -612,6 +612,16 @@ export function keyOnTheNewThreadCard(
 }
 
 /**
+ * Whether ⌘↵ heard on the window sends the New thread card. The dialog owns
+ * the keyboard, so it always does. The box on the empty inbox shares the page,
+ * so only when nothing else has the keyboard and it holds words to send.
+ */
+export function modEnterSendsTheCard({ inline, on, hasWords }: { inline: boolean; on: Keyboard; hasWords: boolean }): boolean {
+  if (!inline) return true;
+  return on === 'nothing' && hasWords;
+}
+
+/**
  * Whether the box on the empty inbox moves into the New thread dialog. A
  * thread landing in Needs you takes the page away; if you were in the box, or
  * left words in it, the dialog opens on what it held, over the list.
