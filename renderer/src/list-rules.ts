@@ -150,11 +150,15 @@ export function runsAgainOnItsOwn(i: InboxItem): number {
 // `legacySnooze` is the old localStorage map, still honoured on read and never
 // written. Only the user could set it, so it counts.
 export function hiddenUntil(i: InboxItem, legacySnooze = 0): number {
+  return Math.max(putAwayByThem(i, legacySnooze), runsAgainOnItsOwn(i));
+}
+
+function putAwayByThem(i: InboxItem, legacySnooze = 0): number {
   // Something she said after scheduling it runs now, and its answer is hers to read now.
   const spokeSince = (i.wrote?.answer?.ts ?? 0) > (i.wrote?.runAt?.ts ?? 0);
   const mine = i.wrote?.runAt?.source === 'founder' && !spokeSince ? i.runAt ?? 0 : 0;
   const reminder = i.wrote?.snoozedUntil?.source === 'founder' ? i.snoozedUntil ?? 0 : 0;
-  return Math.max(mine, reminder, legacySnooze, runsAgainOnItsOwn(i));
+  return Math.max(mine, reminder, legacySnooze);
 }
 
 /** What a person said this thread waits on has ended, and they have not acted on it since. */
@@ -327,7 +331,9 @@ export function threadsOwedAnAnswer<T extends InboxItem & { id: string; parent?:
     const parent = i.parent ? byId.get(i.parent) : undefined;
     if (!parent) continue;
     if (parent.status === 'done' && parent.wrote?.status?.source === 'founder') continue;
-    if (hiddenUntil(parent) > now) continue; // in Later: it comes back when Later ends
+    // In Later: it comes back when Later ends. Only a person's put-off counts,
+    // so an agent's pause cannot hide a task waiting for their yes.
+    if (putAwayByThem(parent) > now) continue;
     if (parent.status === 'claimed' || (liveAnswer(parent) && !answerSettled(parent))) continue;
     owed.add(parent.id);
   }

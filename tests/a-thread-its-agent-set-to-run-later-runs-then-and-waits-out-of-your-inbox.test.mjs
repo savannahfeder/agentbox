@@ -20,7 +20,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Supervisor } from '../main/supervisor.mts';
 import { wakesItselfAt } from '../shared/answers.mjs';
-import { belongsInInbox, belongsInProgress, hiddenUntil, parkedByAgent } from '../renderer/src/list-rules.ts';
+import { belongsInInbox, belongsInProgress, hiddenUntil, parkedByAgent, PROPOSAL_PATIENCE, threadsOwedAnAnswer } from '../renderer/src/list-rules.ts';
 import { shipOfferLive } from '../renderer/src/ship-offer.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -128,6 +128,11 @@ describe('where the thread waits', () => {
     const asks = row({ result: `${ANSWER}\n\n## Options\n1. Wait for 1am (recommended)\n2. Run it on the cloud now` });
     expect(hiddenUntil(asks)).toBe(0);
     expect(belongsInInbox(asks, { hiddenUntil: hiddenUntil(asks), now: ANSWERED + 1 })).toBe(true);
+  });
+
+  it('still comes to Needs you for a task under it waiting a day for a yes', () => {
+    const task = { id: 'w-task', parent: 'w-1', status: 'open', kind: 'bug', labels: ['bug'], createdAt: ANSWERED - PROPOSAL_PATIENCE };
+    expect(threadsOwedAnAnswer([row(), task], ANSWERED + 1).has('w-1')).toBe(true);
   });
 
   it('stays in Needs you when an agent filed the thread, since nothing starts that without a yes', () => {
