@@ -9,6 +9,9 @@
 // The approved screen is "3 not sent" and Send at the top of the comments.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { appFilesPlace } from '../main/files-place.mjs';
 import { noteSendWords, notesToSendTheAgent } from '../renderer/src/artifact-pins.ts';
 import { notesForTheAgent, tagsYourAgent } from '../shared/artifact-marks.mjs';
 import * as wake from '../main/notes-wake.mjs';
@@ -78,6 +81,35 @@ describe("nobody starts somebody else's agent", () => {
   it("no tick tells your agent about a teammate's comment any more", () => {
     expect(wake.wakeForNotes).toBeUndefined();
     expect(read('main/supervisor.mts')).not.toMatch(/wakeForNotes/);
+  });
+});
+
+// Found by a power tester on 2026-11-08: a comment left from Files said
+// nothing and reached nobody, because Files never told the file view the agent
+// was yours, so there was no Send; and Send there passed on only the first.
+describe('from Files', () => {
+  const files = read('renderer/src/files/FilesPlace.tsx');
+  it('your own thread\'s agent is yours, so Send and @agent are there', () => {
+    expect(files).toMatch(/withAgent=\{[^}]*sentIn[^}]*kind === 'thread'/);
+  });
+  it('Send passes on every waiting comment, not only the first', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'files-send-'));
+    fs.writeFileSync(path.join(dir, 'plan.md'), '# Plan\n');
+    const note = (id, ts) => ({ id: 'w-1', ts, source: 'founder', patch: { artifact: { do: 'note', id, file: 'plan.md', place: { kind: 'whole' }, text: `say ${id}`, wait: true } } });
+    const lines = [{ id: 'w-1', ts: 1, source: 'agent', patch: { result: '[plan.md](plan.md)' } }, note('n1', 2), note('n2', 3)];
+    const marked = [];
+    const store = {
+      listProducts: () => [{ slug: 'company', name: 'Company', dir }],
+      listAllWorkItems: () => [{ id: 'w-1', product: 'company', title: 'Plan', updatedAt: 3 }],
+      readHistory: () => lines,
+      teammates: { dir: () => dir },
+      fileMark: (product, id, mark) => marked.push({ product, id, mark }),
+    };
+    const place = appFilesPlace({ store, team: null, accountRoot: dir, storeRoot: dir });
+    const { files: listed } = await place.list();
+    const out = await place.mark(listed.find((f) => f.name === 'plan.md').key, { do: 'toagent', on: ['n1', 'n2'] });
+    expect(out).toMatchObject({ ok: true, wrote: { product: 'company', id: 'w-1' } });
+    expect(marked.flatMap((m) => m.mark.on)).toEqual(['n1', 'n2']);
   });
 });
 
