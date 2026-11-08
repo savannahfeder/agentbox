@@ -104,8 +104,9 @@ describe('what a press leaves for your Mac', () => {
     expect(planFor({ kind: 'reply', text: '   ' }, item)).toBeNull();
   });
   it('a reply carries the priority, mode and model picked in its sentence, and only those', async () => {
-    expect(await leaves({ kind: 'reply', text: 'Go', choices: { priority: 9, permissionMode: 'plan', model: 'sonnet', effort: 'high', engine: 'codex' } })).toEqual(
-      [{ device: DEV, project: 'alpha', item: 'w-1', kind: 'reply', payload: { text: 'Go', priority: 9, permissionMode: 'plan', model: 'sonnet', effort: 'high' } }],
+    // A reply may move the thread to the other agent (2026-11-08), so the agent rides too; a field no reply takes does not.
+    expect(await leaves({ kind: 'reply', text: 'Go', choices: { priority: 9, permissionMode: 'plan', model: 'sonnet', effort: 'high', engine: 'codex', assignee: 'p-1' } })).toEqual(
+      [{ device: DEV, project: 'alpha', item: 'w-1', kind: 'reply', payload: { text: 'Go', priority: 9, permissionMode: 'plan', model: 'sonnet', effort: 'high', engine: 'codex' } }],
     );
   });
   it('a new thread goes to its project with what was picked for it', async () => {

@@ -396,6 +396,15 @@ made-up threads), not yet on a phone:
   not sent), and Settings search. A page or a note an answer names still opens
   from its tile rather than reading in place under the answer.
 
+- Everything the desktop does (2026-11-08): `mobile/parity.mjs` names each
+  feature the desktop offers by name (⌘K rows, thread commands, Settings
+  pages and rows) and says where the phone has it, why it should not, or what
+  it would take. `tests/the-phone-app-has-every-desktop-feature-or-says-why-not`
+  fails when the desktop gains one the file does not place, and its count
+  still to do only goes down. `node scripts/phone-parity.mjs` lists what is
+  left. The daily product loop builds the next one and has its testers try
+  what reached the phone that week (.claude/skills/product-loop).
+
 Tests: tests/the-phone-app-*.test.mjs pin the tabs, the thread and its
 commands, sign-in and the kept session, the request deadline and the
 markdown. The deadline test reads `mobile/src` too. The ship gate rates the

@@ -127,9 +127,11 @@ describe('the magnifier runs commands', () => {
     expect(none).not.toContain('new-mate');
   });
   it('finds by its words, and a word nothing has finds nothing', () => {
-    expect(commandsFor('', all)).toHaveLength(all.length);
+    // Rows one per teammate, project or cloud mode wait to be typed for.
+    expect(commandsFor('', all)).toEqual(all.filter((c) => !c.typed));
     expect(commandsFor('later', all)[0].label).toBe('Later');
-    expect(commandsFor('chief', all).map((c) => c.label)).toEqual(['Chief of staff']);
+    // Its chat first, then pausing it, as ⌘K offers both.
+    expect(commandsFor('chief', all).map((c) => c.label)).toEqual(['Chief of staff', 'Pause Chief of staff']);
     expect(commandsFor('zzz', all)).toEqual([]);
   });
   it('lists threads first, then See all, then the commands', () => {
