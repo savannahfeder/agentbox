@@ -13,7 +13,7 @@ import { CloudServerWatch, serverError } from './cloud-server-down.mts';
 import { folderJob } from './task-folders-offthread.mts';
 import { gitJob } from './git-change-offthread.mts';
 import { queuedReplyText, submitReply, framedPick, framedTeammate } from './live-replies.mts';
-import { resolveAnsweredNotes, wakeForNotes } from './notes-wake.mjs';
+import { resolveAnsweredNotes } from './notes-wake.mjs';
 import { TEAM_LOOK, TEAM_LOOK_LINE } from '../shared/team-look.mjs';
 import { editedFilesLine } from '../shared/artifact-marks.mjs';
 import { readItemHistory, updateWorkItem } from './store/work-items.mjs';
@@ -8691,7 +8691,6 @@ export class Supervisor {
     // Teammates next, for the same reason: a run a message or a schedule made
     // on this tick is picked up by the pass below.
     await this.serveTeammates(now);
-    await this.wakeForNotes(now);
     this.resolveAnsweredNotes(now);
     // And the folders of rows she has finished, put away. On a timer of its own
     // rather than every pass, because it is a walk of the disk and a tick is
@@ -9063,24 +9062,6 @@ export class Supervisor {
   // to Monday finds ONE period unserved, because four were never representable.
   // And nothing books the next run, so a run that dies costs one day rather
   // than costing the task.
-  // A teammate's note on a file an agent made is a turn for that agent
-  // (./notes-wake.mjs), live if a session is up, and never waited on for long.
-  async wakeForNotes(now: number = Date.now()) {
-    const team = this.store.teammates?.team;
-    if (!team) return;
-    const deadline = this.config.teammateReplyDeadlineMs ?? 30_000;
-    const tell = async (product: string, id: string, { text, from, fromNotes }: { text: string; from: { teammate: string; name: string }; fromNotes?: unknown[] | null }) => {
-      let timer: NodeJS.Timeout | undefined;
-      const late = new Promise((resolve) => { timer = setTimeout(() => resolve('late'), deadline); });
-      const sent = submitReply(this, { product, id, answer: text, from: from.name }, () => this.store.tellItem(product, id, { text, from, fromNotes }));
-      sent.catch((err: Error) => console.warn(`zero: notes on a file did not reach ${id}: ${err.message}`));
-      await Promise.race([sent, late]).finally(() => clearTimeout(timer));
-    };
-    try {
-      if (await wakeForNotes({ store: this.store, team, tell, now })) this.wake?.();
-    } catch (err) { console.warn('zero: notes on a file could not reach its agent:', (err as Error).message); }
-  }
-
   resolveAnsweredNotes(now: number = Date.now()) {
     try {
       resolveAnsweredNotes({ store: this.store, people: this.store.teammates?.team?.state?.()?.people ?? [], now });

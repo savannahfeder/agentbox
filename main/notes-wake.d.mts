@@ -16,16 +16,6 @@ interface NoteReplyStore extends Omit<NotesStore, 'listItems'> {
   answerItem(product: string, id: string, input: { answer: string; fromNotes: string[] }): unknown;
 }
 
-export type NotesTell = (product: string, id: string, line: { text: string; from: { teammate: string; name: string }; fromNotes: string[] }) => Promise<unknown>;
-
-/** Tells each agent the notes on its files once; resolves to how many were told. */
-export function wakeForNotes(opts: {
-  store: NotesStore;
-  team: { state?(): { me?: { id?: string } | null; people?: readonly Person[] } | null | undefined } | null | undefined;
-  tell: NotesTell | null | undefined;
-  now?: number;
-}): Promise<number>;
-
 /** Resolves the notes a newer version answered; returns how many. */
 export function resolveAnsweredNotes(opts: { store: NotesStore; people?: readonly Person[]; now?: number }): number;
 
