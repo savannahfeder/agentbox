@@ -299,6 +299,12 @@ describe('what the app makes of it', () => {
     expect(t).toContain('paid by your team\'s owner');
   });
 
+  // A power tester saw a member's bar a third full beside "0 of 0.1 h": the number was rounded down.
+  it('a member with a little left never reads as none', () => {
+    const t = page({ ...trial, people: [{ id: A, usedSeconds: 10 * 3600 - 120, running: 0 }] });
+    expect(t).toContain('0.1 of 10 h');
+  });
+
   it('on its last day it says 1 day, never 0', () => {
     expect(teamBillingView(trial, names, A, MADE + 14 * DAY - 60_000).days).toBe(1);
   });

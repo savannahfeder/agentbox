@@ -14,9 +14,10 @@ type Team = NonNullable<CloudPlan['team']>;
 const DAY = 86_400_000;
 const n = (x: number) => x.toLocaleString('en-US');
 const day = (t: number | null | undefined) => (t ? new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '');
+// Hours left, rounded up as the bar beside them is drawn: 0 only when none are left.
 const hours = (s: number) => {
   const h = s / 3600;
-  return h >= 10 ? n(Math.floor(h)) : String(Math.floor(h * 10) / 10);
+  return h >= 10 ? n(Math.ceil(h)) : String(Math.ceil(h * 10) / 10);
 };
 const seats = (k: number) => `${k} ${k === 1 ? 'seat' : 'seats'}`;
 
