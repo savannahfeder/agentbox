@@ -49,10 +49,13 @@ export function SkyBackdrop({ art, from, below, gap = 30, span = 220, band = 190
     paint();
     const ro = new ResizeObserver(later);
     ro.observe(host);
+    // The card moves when the sidebar opens or folds, which changes the window's classes, not its size.
+    const moved = new MutationObserver(later);
+    moved.observe(host, { attributes: true, attributeFilter: ['class'] });
     const pane = host.querySelector('.list-pane');
     const mo = below && pane ? new MutationObserver(later) : null;
     if (mo && pane) mo.observe(pane, { childList: true, subtree: true });
-    return () => { ro.disconnect(); mo?.disconnect(); if (frame) cancelAnimationFrame(frame); wrap.remove(); };
+    return () => { ro.disconnect(); moved.disconnect(); mo?.disconnect(); if (frame) cancelAnimationFrame(frame); wrap.remove(); };
   }, [art, from, below, gap, span, band]);
   return null;
 }
