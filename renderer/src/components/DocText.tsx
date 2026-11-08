@@ -139,6 +139,20 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
     },
   }, [extensions]);
 
+  // Others' edits wait while a press places the cursor: one landing between press
+  // and release put the cursor back where it was and the page jumped to it.
+  useEffect(() => {
+    const room = collab?.live;
+    const dom = editor && !editor.isDestroyed ? editor.view.dom : null;
+    if (!room || !dom) return undefined;
+    const down = () => room.hold(true);
+    const up = () => room.hold(false);
+    dom.addEventListener('pointerdown', down);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('blur', up);
+    return () => { dom.removeEventListener('pointerdown', down); window.removeEventListener('pointerup', up); window.removeEventListener('blur', up); room.hold(false); };
+  }, [editor, collab?.live]);
+
   // An empty room is filled once, by the copy the room picked, from the file.
   const seeded = useRef(false);
   useEffect(() => {

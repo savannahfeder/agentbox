@@ -568,6 +568,10 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   useEffect(() => () => { void flush(); }, [flush, base]);
 
   // ---- The live room: filled once from the file, then the cells everyone sees.
+  const viewNow = useRef({ searched, picked, sort });
+  viewNow.current = { searched, picked, sort };
+  const editingNow = useRef(editing);
+  editingNow.current = editing;
   const roomRef = useRef(room);
   roomRef.current = room;
   const shown = useRef<ReturnType<typeof gridOf> | null>(null);
@@ -587,9 +591,14 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
       const now = gridOf(room.doc);
       shown.current = now;
       const d = docRef.current;
-      const table = tableFromGrid(now.grid);
+      const read = tableFromGrid(now.grid);
+      // A column keeps what it is (tags stay tags) when someone types a value it has not had.
+      const table = { ...read, columns: read.columns.map((c, i) => (d.table.columns[i]?.head === c.head ? { ...c, kind: d.table.columns[i].kind, values: d.table.columns[i].values, tones: d.table.columns[i].tones } : c)) };
       if (writeTable(table, shape) === writeTable(d.table, shape)) return;
-      const order = table.rows.length === d.table.rows.length ? d.order : viewOrder(table, searched, picked, sort);
+      // A sort or filter stays true as others change cells, except under the cell being typed in.
+      const v = viewNow.current;
+      const order = table.rows.length === d.table.rows.length && (editingNow.current || (!v.sort && !Object.keys(v.picked).length && !v.searched))
+        ? d.order : viewOrder(table, v.searched, v.picked, v.sort);
       const next = { from: d.from, table, order };
       docRef.current = next;
       setDoc(next);

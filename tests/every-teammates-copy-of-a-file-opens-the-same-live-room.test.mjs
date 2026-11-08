@@ -18,6 +18,17 @@ describe('the room a file opens in', () => {
     expect(liveRoomId('t-1', 'Launch', 'launch-plan.md')).toBe(liveRoomId('t-1', 'Launch', 'launch-plan-v3.md'));
   });
 
+  it('is the same for a teammate\'s copy named after its bytes, and for a file in a folder', () => {
+    const one = liveRoomId('t-1', 'Launch', 'launch-leads.csv');
+    expect(liveRoomId('t-1', 'Launch', '09450eccb664-launch-leads.csv')).toBe(one);
+    expect(liveRoomId('t-1', 'Launch', 'attachments/09450eccb664-launch-leads.csv')).toBe(one);
+    expect(liveRoomId('t-1', 'Launch', 'designs/w-1/launch-leads.csv')).toBe(one);
+  });
+
+  it('keeps a name that only looks like it starts with bytes', () => {
+    expect(liveRoomId('t-1', 'Launch', 'cafe-plan.md')).not.toBe(liveRoomId('t-1', 'Launch', 'plan.md'));
+  });
+
   it('is another room for another file, another project or another team', () => {
     const one = liveRoomId('t-1', 'Launch', 'launch-plan.md');
     expect(liveRoomId('t-1', 'Launch', 'launch-leads.csv')).not.toBe(one);

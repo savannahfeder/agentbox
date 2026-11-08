@@ -9,6 +9,7 @@ export interface LiveConnection {
   room(): LiveRoomRoles;
   pending(): boolean;
   stats(): Record<string, number>;
+  hold(on: boolean): void;
   again(): void;
   close(): void;
 }

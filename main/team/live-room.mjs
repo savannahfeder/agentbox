@@ -15,8 +15,12 @@ export function liveAddress(cloudConfig) {
   return null;
 }
 
+// A teammate's copy of a shared thread's file is named after its bytes first
+// (main/team/thread-share.mjs), and it is still the same file.
+const ownName = (name) => String(name ?? '').split('/').pop().replace(/^[0-9a-f]{12}-(?=.)/, '');
+
 export const liveRoomId = (teamId, project, name) =>
-  `${teamId}.${crypto.createHash('sha256').update(fileKeyIn(project, name)).digest('hex').slice(0, 40)}`;
+  `${teamId}.${crypto.createHash('sha256').update(fileKeyIn(project, ownName(name))).digest('hex').slice(0, 40)}`;
 
 /**
  * The room for a file, or null when it is nobody else's to open: no relay, no

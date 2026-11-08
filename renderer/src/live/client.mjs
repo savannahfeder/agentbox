@@ -78,9 +78,10 @@ export function connectLive({ doc, hello = {}, open, flushMs = 50, awarenessMs =
     appliedAt = Date.now();
     Y.applyUpdate(doc, merged, FROM_ROOM);
   }
+  let holding = false;
   function takeIn(update) {
     incoming.push(update);
-    if (applyTimer) return;
+    if (applyTimer || holding) return;
     const wait = appliedAt + applyMs - Date.now();
     if (wait <= 0) applyIncoming();
     else applyTimer = setTimeout(applyIncoming, wait);
@@ -156,6 +157,11 @@ export function connectLive({ doc, hello = {}, open, flushMs = 50, awarenessMs =
     room: () => room,
     pending: () => queue.length > 0 || flushTimer !== null || incoming.length > 0,
     stats: () => ({ ...stats }),
+    /** Holds others' edits while a press is placing the cursor, so one landing mid-click cannot move it back. */
+    hold(on) {
+      holding = !!on;
+      if (!holding && incoming.length && !applyTimer) applyIncoming();
+    },
     /** Tries again now, for a copy that said it was off. */
     again() { if (closed || sock) return; if (retryTimer) clearTimeout(retryTimer); tries = 0; connect(); },
     close() {

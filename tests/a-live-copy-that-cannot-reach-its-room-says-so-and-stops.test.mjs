@@ -40,6 +40,22 @@ describe('a copy whose relay is gone', () => {
     live.close();
   });
 
+  it('holds others\' edits while a press places the cursor, then takes them all in', async () => {
+    const room = createRoom({ tickMs: 5 });
+    const mine = new Y.Doc();
+    const theirs = new Y.Doc();
+    const me = connectLive({ doc: mine, open: () => pairedSockets(room), flushMs: 5, applyMs: 0 });
+    const them = connectLive({ doc: theirs, open: () => pairedSockets(room), flushMs: 5, applyMs: 0 });
+    await new Promise((r) => setTimeout(r, 50));
+    me.hold(true);
+    theirs.getText('t').insert(0, 'typed during the click');
+    await new Promise((r) => setTimeout(r, 60));
+    expect(mine.getText('t').toString()).toBe('');
+    me.hold(false);
+    expect(mine.getText('t').toString()).toBe('typed during the click');
+    me.close(); them.close(); room.close();
+  });
+
   it('sends what was typed while away once it is back', async () => {
     const room = createRoom({ tickMs: 5 });
     let up = false;

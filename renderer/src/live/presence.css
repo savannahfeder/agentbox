@@ -59,3 +59,9 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-weight: 600; font-size: 9.5px; line-height: 12px; font-family: inherit; color: #0d1220; background: var(--lv); z-index: 3; pointer-events: none;
 }
+
+/* Your own cursor: the page's own ink and "You", shown as you move or type, then faded. */
+.lv-you { position: relative; pointer-events: none; }
+.lv-you .lv-flag { left: -1px; background: var(--text); color: var(--doc-page, var(--bg)); opacity: 1; animation: lv-you-fade 1.6s ease-out forwards; }
+@keyframes lv-you-fade { 0%, 60% { opacity: 1; } 100% { opacity: 0; } }
+.doc-sheet:is(.lv-look-rail, .lv-look-gutter, .lv-look-tint) .lv-you .lv-flag { display: block; }

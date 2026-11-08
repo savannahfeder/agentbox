@@ -5,7 +5,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import Collaboration from '@tiptap/extension-collaboration';
 import { Extension, type AnyExtension } from '@tiptap/core';
-import { yCursorPlugin } from '@tiptap/y-tiptap';
+import { yCursorPlugin, ySyncPluginKey } from '@tiptap/y-tiptap';
+import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { Awareness } from 'y-protocols/awareness';
 import { Face } from '../team/people';
 import type { LiveSession } from './live-session';
@@ -24,8 +26,8 @@ export function presenceLook(): PresenceLook {
 
 export interface LiveUser { name: string; color: string; kind?: 'person' | 'agent'; person?: string | null }
 
-const FRESH_MS = 2500;
-const MOST_FLAGS = 5;
+const FRESH_MS = 1500;
+const MOST_FLAGS = 3;
 // Past this many, more cursors are noise to read and cost every window a redraw of each on every move.
 const MOST_CARETS = 30;
 // When each cursor last moved, kept per room, so a cursor the editor draws again keeps its name showing.
@@ -59,8 +61,41 @@ export function liveExtensions(session: LiveSession): AnyExtension[] {
       awareness: session.live.awareness,
       user: { name: session.me.name, color: session.me.color, kind: session.me.kind, person: session.me.person },
     }),
+    YourCaret,
   ];
 }
+
+// With a dozen coloured cursors on the page a person lost their own and typed
+// into someone else's sentence. Theirs says "You" as they move or type, and is
+// never one of the colours the others wear.
+const youKey = new PluginKey<number>('liveYou');
+const YourCaret = Extension.create({
+  name: 'liveYou',
+  addProseMirrorPlugins() {
+    return [new Plugin<number>({
+      key: youKey,
+      state: {
+        init: () => 0,
+        apply: (tr, was) => (tr.getMeta(ySyncPluginKey) || !(tr.selectionSet || tr.docChanged) ? was : Date.now()),
+      },
+      props: {
+        decorations(state) {
+          const at = youKey.getState(state) ?? 0;
+          if (!at || !state.selection.empty) return null;
+          return DecorationSet.create(state.doc, [Decoration.widget(state.selection.head, () => {
+            const el = document.createElement('span');
+            el.className = 'lv-you';
+            const flag = document.createElement('span');
+            flag.className = 'lv-flag';
+            flag.textContent = 'You';
+            el.append(flag);
+            return el;
+          }, { key: `you-${at}`, side: 1 })]);
+        },
+      },
+    })];
+  },
+});
 
 // The cursor plugin itself rather than CollaborationCaret, which drops the
 // client id a cursor needs to say who moved last.
