@@ -67,6 +67,15 @@ export const SWAP_CRITICAL_MBPS = 16;
 
 export interface PressureLines { tightPct?: number; criticalPct?: number; tightSwap?: number; criticalSwap?: number }
 
+/**
+ * What swapping means to the command gate: only heavy swapping holds a test or
+ * a build, and swapping never stops light commands, because a waiting agent
+ * keeps all of its memory. The light line is an ordinary evening on 16 GB.
+ */
+export const GATE_LINES: PressureLines = { tightSwap: SWAP_CRITICAL_MBPS, criticalSwap: Infinity };
+/** Swapping never closes a terminal. */
+export const TERMINAL_LINES: PressureLines = { tightSwap: Infinity, criticalSwap: Infinity };
+
 export function pressureFrom(
   { level, freePct, swapInMbps }: PressureReading = {},
   { tightPct = 12, criticalPct = 5, tightSwap = SWAP_TIGHT_MBPS, criticalSwap = SWAP_CRITICAL_MBPS }: PressureLines = {},
