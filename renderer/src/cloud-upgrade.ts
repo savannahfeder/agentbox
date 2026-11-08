@@ -116,7 +116,8 @@ function freeSummary(plan: CloudPlan): PlanSummary {
     manage: false,
     period: 'Usage', change: 'Change plan',
     agents: { line: `${running} of ${agents} running`, percent: Math.min(100, Math.round((running / Math.max(1, agents)) * 100)) },
-    hours: { label: 'Hours left', line: `${Math.floor(left * 10) / 10} of ${n(hours)}`, percent: hours > 0 ? Math.round((left / hours) * 100) : 0 },
+    // Rounded up, so it reads 0 only when a run can no longer start.
+    hours: { label: 'Hours left', line: `${Math.ceil(left * 10) / 10} of ${n(hours)}`, percent: hours > 0 ? Math.round((left / hours) * 100) : 0 },
   };
 }
 

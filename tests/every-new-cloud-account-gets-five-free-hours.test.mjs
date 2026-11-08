@@ -188,6 +188,11 @@ describe('the screens, on the free hours', () => {
     expect(planSummary({ ...free, hoursPerMonth: 0.25, usedSeconds: 0 }).hours.percent).toBe(100);
   });
 
+  // A power tester saw "0 of 0.25" while runs still started, with two minutes left.
+  it('a few minutes left never reads as none', () => {
+    expect(planSummary({ ...free, usedSeconds: 5 * 3600 - 120 }).hours.line).toBe('0.1 of 5');
+  });
+
   it('every free hour used leaves none, never a negative', () => {
     expect(planSummary({ ...free, usedSeconds: 5 * 3600 }).hours).toMatchObject({ line: '0 of 5', percent: 0 });
     expect(planSummary({ ...free, usedSeconds: 6 * 3600 }).hours).toMatchObject({ line: '0 of 5', percent: 0 });
