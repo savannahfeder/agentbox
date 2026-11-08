@@ -33,7 +33,8 @@ beforeEach(async () => {
 
 const answered = (title) => {
   const made = store.composeItem('backend', { title, model: 'opus' });
-  store.modules.workItemsDisk.updateWorkItem(store.productDir('backend'), made.id, { result: 'There is no ./store in this repo.' }, { source: 'agent' });
+  // Later than your words, as a real answer is: in the same millisecond it is not news.
+  store.modules.workItemsDisk.updateWorkItem(store.productDir('backend'), made.id, { result: 'There is no ./store in this repo.' }, { source: 'agent', now: Date.now() + 1000 });
   return store.readItem('backend', made.id);
 };
 
