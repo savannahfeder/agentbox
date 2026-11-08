@@ -247,7 +247,10 @@ function FilteredEmpty({ tab, hidden, clear }: { tab: TabId; hidden: number; cle
 /** The board: a column a swipe, each scrolling on its own (phone.css `.th-board`). */
 function Board({ columns, foot, inset = 12 }: { columns: ReturnType<typeof phoneBoard>; foot: number; inset?: number }) {
   const { width } = useWindowDimensions();
-  const room = useCloud().approvalRoom;
+  const c0 = useCloud();
+  const room = c0.approvalRoom;
+  // Later's column leads with the repeating tasks, as the Later list does.
+  const repeatsIn = (state: string) => (state === 'scheduled' ? c0.repeats : []);
   const col = Math.round((width - inset * 2) * 0.86);
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={col + 12} decelerationRate="fast"
@@ -257,9 +260,23 @@ function Board({ columns, foot, inset = 12 }: { columns: ReturnType<typeof phone
           <View style={{ height: 38, paddingTop: 8, flexDirection: 'row', alignItems: 'center' }}>
             <StateGlyph state={c.state} />
             <T style={{ fontFamily: font.mono, fontSize: 11, letterSpacing: 0.88, textTransform: 'uppercase', color: color.dim }}>{c.label}</T>
-            <T style={{ fontFamily: font.mono, fontSize: 11, letterSpacing: 0.88, color: color.faint, marginLeft: 8 }}>{c.rows.length}</T>
+            <T style={{ fontFamily: font.mono, fontSize: 11, letterSpacing: 0.88, color: color.faint, marginLeft: 8 }}>{c.rows.length + repeatsIn(c.state).length}</T>
           </View>
-          {c.rows.length === 0 && <T style={{ fontSize: 13, color: color.faint, paddingVertical: 4, paddingHorizontal: 2 }}>Nothing here.</T>}
+          {repeatsIn(c.state).map((r) => (
+            <Pressable key={`${r.product}/${r.id}`} onPress={() => router.push({ pathname: '/repeat/[product]/[id]', params: { product: r.product, id: r.id } })}
+              style={({ pressed }) => ({ marginBottom: 10, paddingTop: 14, paddingHorizontal: 15, paddingBottom: 13, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill })}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14 }}>
+                <View style={{ marginRight: 8, marginTop: 2 }}><Repeat /></View>
+                <T numberOfLines={3} style={{ flex: 1, fontSize: 14, lineHeight: 20 }}>{r.title}</T>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {r.waiting && <T style={{ fontSize: 11, color: color.dim, marginRight: 8 }}>Queued</T>}
+                <T numberOfLines={1} style={{ flexShrink: 1, fontFamily: font.mono, fontSize: 11, letterSpacing: 0.55, textTransform: 'uppercase', color: color.faint }}>{r.productName}</T>
+                <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 11, color: color.faint, marginLeft: 8 }}>{`Next ${repeatRow(r, r.lastOccurrence ? c0.view.items.find((it: any) => it.id === r.lastOccurrence) ?? null : null, c0.now).when}`}</T>
+              </View>
+            </Pressable>
+          ))}
+          {c.rows.length + repeatsIn(c.state).length === 0 && <T style={{ fontSize: 13, color: color.faint, paddingVertical: 4, paddingHorizontal: 2 }}>Nothing here.</T>}
           {c.rows.map((e) => (
             <Pressable key={e.key} onPress={() => e.item && open(e.item.product, e.item.id)}
               style={({ pressed }) => ({ marginBottom: 10, paddingTop: 14, paddingHorizontal: 15, paddingBottom: 13, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill })}>
