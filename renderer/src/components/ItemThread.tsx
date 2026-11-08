@@ -20,7 +20,7 @@
 // NOTHING NEW IS STORED AND NOTHING IS WRITTEN. Two files that already exist
 // are read, and the marks a Z left on this Mac (../undo-marks).
 
-import { useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ThreadPanel } from '../team/ThreadPanel';
 import { TeamContext } from '../team/people';
@@ -29,7 +29,7 @@ import { api } from '../api';
 import { onPhone } from '../phone-screen';
 import { pollEvery, oneAtATime } from '../phone-polls';
 import { changePathFor, type Change } from '../code-artifact';
-import { filedOnTurn } from '../filed-in-thread';
+import { askTurnOf, filedOnTurn } from '../filed-in-thread';
 import { itemThread, type PendingSaid } from '../item-thread';
 import { useFileLine } from '../file-numbers';
 import { resultLeads } from '../recap';
@@ -82,7 +82,7 @@ const REFRESH_MS = 8_000;
 // screen is the kind of drift this row exists to end.
 const THEM = 'The agent';
 
-export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexModels = [], codexModelDefault = null, session, opening, sending, filed = [], onOpenFiled, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, onOpenOrigin, onSendNow, md, clean, onOpenDoc, chat = false, onQuote, onHandToAgent, thread, queue }: {
+export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexModels = [], codexModelDefault = null, session, opening, sending, filed = [], onOpenFiled, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk = null, onOpenOrigin, onSendNow, md, clean, onOpenDoc, chat = false, onQuote, onHandToAgent, thread, queue }: {
   /** What a "on onboarding-a.png, Pin 1" link in this thread opens. */
   onOpenFileMark?: (link: FileMarkLink) => void;
   /** One thing at a time (w-65bcefb857): the summary on top, the newest answer, the rest folded. */
@@ -123,6 +123,8 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
   // And the two on the count line that answer every proposal in one list (w-fe64f35bdd).
   onStartAllFiled?: (ids: string[]) => void;
   onDismissAllFiled?: (ids: string[]) => void;
+  /** The question a close asks while filed tasks wait, drawn under their rows. */
+  closeAsk?: { strip: ReactNode; raised: number } | null;
   // IN A CHAT ONLY: put a message's words in the reply box as a quote, and turn
   // this conversation into work. The second was a line under the whole
   // conversation and is an action on one message now (w-560647d4db).
@@ -222,6 +224,10 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
   }, [item.product, item.id, whole]);
   const [earlierOpen, setEarlierOpen] = useState(false);
   useEffect(() => { setEarlierOpen(false); }, [item.product, item.id]);
+  // A close asking about filed tasks unfolds the thread, so the turn that
+  // filed them is on screen with the question under it.
+  const askRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (closeAsk) { setEarlierOpen(true); setWhole(true); } }, [!!closeAsk, closeAsk?.raised]);
 
   // A REACTION SHOWS THE MOMENT IT IS PRESSED (w-45cbac227a), in the chat and in
   // the thread panel alike, rather than after the sync and the next snapshot.
@@ -305,6 +311,13 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
   // A note on a file names its version by the number Files gives it.
   const fileLine = useFileLine(item.product, item.id, ledger?.lines?.length ?? 0, false);
 
+  // The rows move as the unfolded thread loads, so it scrolls again as they land.
+  useEffect(() => {
+    if (!closeAsk) return;
+    const frame = requestAnimationFrame(() => askRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+    return () => cancelAnimationFrame(frame);
+  }, [!!closeAsk, closeAsk?.raised, earlierOpen, everyRun.length, ledger?.lines?.length]);
+
   if (!ledger) return <ThreadWaiting head="Reading this conversation…" />;
   if (ledger.error) return <div className="thread-wait">{ledger.error}</div>;
 
@@ -365,6 +378,8 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
   const madeList = (rows: typeof filed) => (
     <ThreadsMade rows={rows} label="Filed from this thread" onOpen={(id) => onOpenFiled?.(id)} onApprove={onApproveFiled} onHere={onHereFiled} onDismiss={onDismissFiled} onStartAll={onStartAllFiled} onDismissAll={onDismissAllFiled} />
   );
+  const askTurn = closeAsk ? askTurnOf(made) : -1;
+  const askHere = closeAsk && <div ref={askRef} className="close-ask-at-task">{closeAsk.strip}</div>;
 
   // THE ANSWER, WHOLE, AT THE FOOT OF THE CONVERSATION.
   //
@@ -453,6 +468,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
         {queueHead}
         <p className="one-catching-up"><span className="live-word is-shimmering">Getting this chat ready. Its summary and options will appear here.</span></p>
         {newest && <QueueAnswer text={clean(newest.text)} md={md} name={pageTitle(item)} />}
+        {askHere}
       </>
     );
   }
@@ -464,6 +480,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
         {byApp && outcome && <p className="one-app-note">{clean(outcome.text)}</p>}
         {afterList}
         {madeList(made.atFoot)}
+        {askHere}
       </>
     );
   }
@@ -496,7 +513,8 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
           const rows = made.onTurn.get(at);
           // Who Auto gave it to, under her opening words (./RouteLine).
           const route = at === routeAt && item.routed ? <RouteLine item={item} mates={teammates} /> : null;
-          return rows || route ? <>{route}{rows && madeList(rows)}</> : null;
+          const ask = at === askTurn ? askHere : null;
+          return rows || route ? <>{route}{rows && madeList(rows)}{ask}</> : null;
         }}
         {...(chat ? {
           // ONLY IN A CHAT. The chips, the bar on pointing and the quote are
@@ -542,6 +560,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
       {afterList}
       {/* AND WHAT THE NEWEST TURN FILED, under its own last word. */}
       {madeList(made.atFoot)}
+      {askTurn < Math.max(from, 0) && askHere}
     </FileMarkOpener.Provider>
   );
 }

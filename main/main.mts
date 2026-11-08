@@ -33,6 +33,7 @@ import { appSessionFolders } from './agent-homes.mts';
 import { registerIpc } from './ipc.mts';
 import { stallWatch } from './stall-watch.mts';
 import { startFreezeRecorder } from './freeze-recorder.mts';
+import { startMemoryRecorder } from './memory-recorder.mts';
 import { FreezeWatch } from './freeze-watch.mjs';
 import { applyThrough, phoneDevice } from './phone-inbox.mts';
 import type { PhoneChannel } from './phone-inbox.mts';
@@ -454,6 +455,12 @@ async function createWindow() {
     onFreeze: (f) => { stalls.noteFreeze(f); console.warn(`zero: the app froze for ${f.ms} ms in ${f.where}`); },
   });
   quitStep(app, 'before-quit', 'freezes.stop', () => freezes.stop());
+  const memory = startMemoryRecorder({
+    dir: path.join(userDir, 'memory-log'),
+    processes: () => app.getAppMetrics().map((m) => ({ type: m.type, mb: Math.round(m.memory.workingSetSize / 1024) })),
+    windowSnapshot: (file) => (window && !window.isDestroyed() ? window.webContents.takeHeapSnapshot(file) : Promise.reject(new Error('no window'))),
+  });
+  quitStep(app, 'before-quit', 'memory.stop', () => memory.stop());
   const freezeWatch = new FreezeWatch({ store, userDir, appDir });
   const checkFreezes = () => { try { freezeWatch.check(); } catch (err) { console.warn(`zero: could not read yesterday's freezes: ${(err as Error).message}`); } };
   const freezeFirst = setTimeout(checkFreezes, 60_000);

@@ -52,3 +52,5 @@
 
 /* The notes take the reply line's place while they are open. */
 .workspace-layout.notes-open[data-artifact-layout="focus"]:not(.workspace-settings) > .body > .list-pane { display: none; }
+/* Closing them is asking for the page alone; R still brings the box up. */
+.workspace-layout.notes-closed[data-artifact-layout="focus"]:not(.workspace-settings):not(.composing) > .body > .list-pane { display: none; }

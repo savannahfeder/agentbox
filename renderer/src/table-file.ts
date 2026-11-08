@@ -125,10 +125,29 @@ export function dateOf(v: string): number {
   return Number.isFinite(t) ? t : NaN;
 }
 
+export type CellLink = { text: string; href: string };
+// One level of brackets inside the address, as a Wikipedia page has.
+const MD_LINK = /^\[([^\]]*\S[^\]]*)\]\(((?:[^()\s]|\([^()\s]*\))+)\)$/;
+
+/** A cell that is wholly `[text](url)`, as an agent writes a link, or null. */
+export function markdownLink(value: string): CellLink | null {
+  const m = String(value ?? '').trim().match(MD_LINK);
+  if (!m) return null;
+  const to = m[2];
+  if (/^mailto:/i.test(to)) return EMAIL.test(to.slice(7)) ? { text: m[1].trim(), href: to } : null;
+  // `javascript:` and every other scheme stay text.
+  if (/^https?:\/\//i.test(to) ? !/\s/.test(to) : URLISH.test(to)) return { text: m[1].trim(), href: hrefOf(to) };
+  return null;
+}
+
+/** What a cell reads as: a markdown link's text, or the cell. */
+export const shownText = (value: string) => markdownLink(value)?.text ?? String(value ?? '').trim();
+
 function kindOf(name: string, values: string[], first: boolean): ColumnKind {
   if (first) return 'name';
   const filled = values.map((v) => v.trim()).filter((v) => v && !NOTHING.test(v));
   if (!filled.length) return 'text';
+  if (share(filled, (v) => markdownLink(v) !== null) >= 0.8) return 'link';
   if (share(filled, (v) => EMAIL.test(v)) >= 0.8) return 'email';
   if (share(filled, (v) => URLISH.test(v) && !NUMBER.test(v)) >= 0.8) return 'link';
   if (!(LABEL_NUMBER.test(name) && !AMOUNT_HEADER.test(name)) && share(filled, (v) => NUMBER.test(v) || Number.isFinite(amountOf(v))) >= 0.9) return 'number';
@@ -235,6 +254,8 @@ export function tableFromGrid(grid: string[][]): Table {
   return { columns, rows, logoCol: logoColumn(columns, rows), ranked };
 }
 
+// The address a cell holds, whether bare or as `[text](url)`.
+const addressOf = (raw: string | undefined) => markdownLink(raw ?? '')?.href ?? (raw ?? '').trim();
 const hostOf = (raw: string) => raw.trim().replace(/^https?:\/\//i, '').replace(/^www\./i, '').split(/[/:?#]/)[0].toLowerCase();
 
 // The column whose sites are each row's own: named for a website, or links that
@@ -242,7 +263,7 @@ const hostOf = (raw: string) => raw.trim().replace(/^https?:\/\//i, '').replace(
 function logoColumn(columns: Column[], rows: string[][]): number {
   const links = columns.flatMap((c, i) => (c.kind === 'link' && !/linkedin|twitter|github|crunchbase/i.test(c.name) ? [i] : []));
   const own = (i: number) => {
-    const hosts = rows.map((r) => r[i]).filter((v) => URLISH.test(v.trim())).map(hostOf);
+    const hosts = rows.map((r) => addressOf(r[i])).filter((v) => URLISH.test(v)).map(hostOf);
     return hosts.length > 0 && share(hosts, (h) => !SOCIAL.test(h)) >= 0.8;
   };
   return links.find((i) => /website|domain|site|homepage/i.test(columns[i].name) && own(i)) ?? links.find(own) ?? -1;
@@ -251,7 +272,7 @@ function logoColumn(columns: Column[], rows: string[][]): number {
 /** The host a row's logo comes from, or null. */
 export function logoFor(table: Table, row: string[]): string | null {
   if (table.logoCol < 0) return null;
-  const raw = (row[table.logoCol] ?? '').trim();
+  const raw = addressOf(row[table.logoCol]);
   if (!raw || !URLISH.test(raw)) return null;
   const host = hostOf(raw);
   return host && !SOCIAL.test(host) ? host : null;
@@ -261,6 +282,34 @@ export function logoFor(table: Table, row: string[]): string | null {
 export const hrefOf = (value: string) => (/^https?:\/\//i.test(value.trim()) ? value.trim() : `https://${value.trim()}`);
 /** A link cell as it is read: no scheme, no www, no trailing slash. */
 export const shownLink = (value: string) => value.trim().replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '');
+
+const nameLinks = new WeakMap<Column[], number>();
+/** The one link column a row's name opens, or -1 when there are none or several. */
+export function nameLinkColumn(table: Table): number {
+  let at = nameLinks.get(table.columns);
+  if (at === undefined) {
+    const links = table.columns.flatMap((c, i) => (c.kind === 'link' ? [i] : []));
+    at = links.length === 1 ? links[0] : -1;
+    nameLinks.set(table.columns, at);
+  }
+  return at;
+}
+
+/** Where a cell goes when it is opened, and the words it shows, or null. */
+export function cellLink(table: Table, row: string[], col: number): CellLink | null {
+  const v = (row[col] ?? '').trim();
+  if (!v) return null;
+  const own = markdownLink(v);
+  if (own) return own;
+  const kind = table.columns[col]?.kind;
+  if (kind === 'link') return URLISH.test(v) && !NUMBER.test(v) ? { text: shownLink(v), href: hrefOf(v) } : null;
+  if (kind === 'email') return EMAIL.test(v) ? { text: v, href: `mailto:${v}` } : null;
+  if (kind !== 'name') return null;
+  if (/^https?:\/\/\S+$/i.test(v) && URLISH.test(v)) return { text: shownLink(v), href: v };
+  const at = nameLinkColumn(table);
+  const to = at >= 0 ? cellLink(table, row, at) : null;
+  return to ? { text: v, href: to.href } : null;
+}
 
 /** Rows with the words searched for in any cell and, per column, only the tags picked. */
 // Each row's cells lower-cased once, so a search reads one string a row and
@@ -292,7 +341,7 @@ export function sortRows(table: Table, rows: string[][], sort: Sort): string[][]
   // Each row's key worked out once rather than twice per comparison. Blank, N/A
   // and anything that does not read as the column's kind go last, either way.
   const keyed = rows.map((r) => {
-    const v = (r[col] ?? '').trim();
+    const v = shownText(r[col] ?? '');
     const n = valueOf && v ? valueOf(v) : NaN;
     const empty = !v || NOTHING.test(v) || (valueOf ? !Number.isFinite(n) : false);
     return { r, v, n, empty };

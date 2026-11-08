@@ -2,13 +2,14 @@
 // last word, the threads it filed, the options it still offers, and the reply
 // box that opens into the desktop's sentence. A press leaves a command for the
 // Mac and shows at once as waiting for it.
-import { Redirect, router, useLocalSearchParams } from 'expo-router';
+import { Redirect, useLocalSearchParams } from 'expo-router';
+import { router } from '../../../lib/router';
 import { useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Rect } from 'react-native-svg';
 import { isImageName } from '../../../../../renderer/src/attachments';
-import { KEEP_OPEN, type CloseOption } from '../../../../../renderer/src/close-asks-first';
+import { type CloseOption } from '../../../../../renderer/src/close-asks-first';
 import { foldedReply } from '../../../../../renderer/src/folded-reply';
 import { closesTheTask, type ParsedOption } from '../../../../../renderer/src/format';
 import { MODE_WORDS } from '../../../../../renderer/src/modes';
@@ -34,6 +35,7 @@ import { appStore } from '../../../platform/persist';
 import { useCloud } from '../../../state/cloud';
 import { useComputerAgents } from '../../../state/computer-agents';
 import { replyModel } from '../../../lib/compose';
+import { useSendWhenOnline } from '../../../state/send-when-online';
 import { AttachSheet, Attached } from '../../../ui/Attach';
 import { SentFiles, ThreadFiles, useMessageFiles } from '../../../ui/Files';
 import { Back, Chevron, Clip, DoneMark, More, Panel } from '../../../ui/icons';
@@ -129,7 +131,7 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
   const priority = picked.priority ?? priorityValueOf(shownLevel(item));
   const agents = useComputerAgents();
   const codex = { codexModels: agents.codexModels, codexDefault: agents.codexDefault };
-  const { engine, model, label: modelLabel } = replyModel(item, picked, codex);
+  const { engine, model, label: modelLabel } = replyModel(item, picked, agents);
   const mode = picked.permissionMode ?? 'auto';
   const folded = foldedReply(draft.text, draft.files.map((f) => ({ name: f.name, image: isImageName(f.name) })));
   const deps = useRef<ReplyDeps | null>(null);
@@ -138,10 +140,17 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
     busy: setBusy,
     attach: (files) => c.attach(item.product, files),
     send: (text, choices, undone) => c.send({ kind: 'reply', text, choices }, item, { undone }),
-    failed: (m) => setError(`Not sent: ${m}`),
+    failed: (m) => setFailed(offline.failed(m)),
   };
-  const [send] = useState(() => replySender(() => deps.current!, (sent) => { if (sent) { setPicked({}); setOpen(false); } }));
-  const talk = useDictation(draft, () => void send(picked));
+  const [send] = useState(() => replySender(() => deps.current!, (sent) => { if (sent) { offline.clear(); setFailed(null); setPicked({}); setOpen(false); } }));
+  const pickedNow = useRef(picked);
+  pickedNow.current = picked;
+  const offline = useSendWhenOnline(() => {
+    if (!draft.text.trim() && !draft.files.length) { offline.clear(); setFailed(null); return; }
+    void send(pickedNow.current);
+  });
+  const sendByHand = () => { offline.clear(); void send(picked); };
+  const talk = useDictation(draft, sendByHand);
   const typing = useRef<ComponentRef<typeof TextInput>>(null);
   // A box that only listened, and heard nothing, folds away as an empty one does on blur.
   useEffect(() => { if (!talk.on && !talk.problem && !ready && !sheet && !typing.current?.isFocused()) setOpen(false); }, [talk.on]);
@@ -207,7 +216,7 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
                 <T style={{ fontSize: 13, fontFamily: font.medium, color: color.dim }}>Stop</T>
               </Pressable>
             ) : (
-              <Pressable disabled={busy || !ready} accessibilityRole="button" onPress={() => void send(picked)}
+              <Pressable disabled={busy || !ready} accessibilityRole="button" onPress={sendByHand}
                 style={({ pressed }) => ({ height: 29, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: busy || !ready ? 0.5 : 1 })}>
                 <T style={{ fontSize: 13, fontFamily: font.semibold }}>{busy ? 'Sending…' : 'Send'}</T>
               </Pressable>
@@ -359,6 +368,7 @@ export default function ThreadScreen() {
   const close = () => { if (thread.closeAsk) setAsking(true); else void press({ kind: 'close' }, item, back); };
   const answerAsk = async (option: CloseOption) => {
     setAsking(false);
+    if (option.act === 'keep') return;
     if (option.act === 'decide') { scroll.current?.scrollTo({ y: Math.max(0, footList.current - 80), animated: true }); return; }
     for (const kid of thread.waitingFiled) {
       if (!(await press(option.act === 'start' ? { kind: 'approve-filed' } : { kind: 'close' }, kid.item))) return;
@@ -507,8 +517,7 @@ export default function ThreadScreen() {
             <FiledList rows={thread.filedAtFoot} label="Filed from this thread" {...filedPresses} />
           </View>
           {asking && thread.closeAsk ? (
-            <OptionsCard ask={thread.closeAsk.ask} options={thread.closeAsk.options} busy={busy} pick={(o) => void answerAsk(o as CloseOption)}
-              keep={{ label: KEEP_OPEN, onKeep: () => setAsking(false) }} />
+            <OptionsCard ask={thread.closeAsk.ask} options={thread.closeAsk.options} busy={busy} pick={(o) => void answerAsk(o as CloseOption)} />
           ) : null}
           {live && <LiveLine live={live} />}
           <ThreadFiles item={item} product={item.product} />

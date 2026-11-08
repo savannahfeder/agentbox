@@ -146,7 +146,9 @@ describe('that it survives a narrow card', () => {
   // press. Everything above about what they say is unchanged.
   it('presses through to the same change the chip in the conversation opens', () => {
     expect(focus).toMatch(/const changeFigures = figures \? \(\s*<span className="change-figures"/);
-    expect(focus).toMatch(/change=\{changeFigures\}\s*onViewChange=\{\(\) => onOpenDoc\?\.\(changePathFor\(item\.id\)\)\}/);
+    // The corner's code button (w-c25aae4035) presses through to the same path.
+    expect(focus).toMatch(/change=\{changeFigures\}\s*codeButton=\{codeButton\}[\s\S]{0,80}onViewChange=\{openChange\}/);
+    expect(focus).toContain('const openChange = () => onOpenDoc?.(changePathFor(item.id));');
   });
 
   // NOT ONE NEW COLOUR. --code-plus and --code-minus are the code pane's own

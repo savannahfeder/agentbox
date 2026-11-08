@@ -232,6 +232,17 @@ export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decr
       return { backend: supabaseBackend(c) };
     },
 
+    // The session an Agentbox Cloud sign-in made (main/cloud/account.mts), so
+    // one sign-in connects the phone too. Null for another database's.
+    async adoptSession(s) {
+      const same = (u) => String(u ?? '').replace(/\/+$/, '');
+      if (!configured || !s?.access_token || !s.refresh_token || same(s.supabaseUrl) !== same(cloudConfig.url)) return null;
+      const c = await getClient();
+      const { error } = await c.auth.setSession({ access_token: s.access_token, refresh_token: s.refresh_token });
+      if (error) throw new Error(plainAuthError(error.message));
+      return supabaseBackend(c);
+    },
+
     cancelSignIn: () => cancelGoogleSignIn(),
     // Only ever the link this sign-in made; the window never names one.
     reopen: (url) => openExternal(url),
@@ -295,6 +306,7 @@ export function memorySession(backendFor) {
     async restore() { return signedIn; },
     async signIn() { signedIn = backendFor(); return signedIn; },
     async signInWithPassword() { signedIn = backendFor(); return signedIn; },
+    async adoptSession() { signedIn = backendFor(); return signedIn; },
     async signUp() { return { confirm: true }; },
     async signOut() { signedIn = null; },
   };

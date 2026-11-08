@@ -14,6 +14,7 @@ import { searchThreads } from '../../../renderer/src/threads/search';
 import { parseQuery, splitHits } from '../../../renderer/src/search';
 import { stamp } from '../../../renderer/src/format';
 import { isUrgentRow } from '../../../renderer/src/interrupt';
+import { priorityIdOf } from '../../../renderer/src/priority';
 import { toApproveWords, waitingCounts } from '../../../renderer/src/threads-made';
 import type { phoneView } from '../../../renderer/src/phone-rows';
 import type { ThreadStateWord } from '../../../renderer/src/types';
@@ -43,8 +44,29 @@ export interface Row {
   toApprove: string;
   /** Sent from a phone and not yet taken by the computer: "Queued" (renderer/src/status-word.ts). */
   queued: boolean;
+  /** High or Urgent, marked on the row; Low and Medium are most threads, so they go unmarked. */
+  priority: 'high' | 'urgent' | null;
   item: any;
 }
+
+/** The gaps between the inbox's tabs, and before a tab's count; tight when the loose ones do not fit. */
+export const TAB_GAP = { loose: 22, tight: 12 };
+export const COUNT_GAP = { loose: 13, tight: 6 };
+
+/**
+ * Whether the tabs take their tight gaps. `content` was measured with the gaps
+ * `tight` gave it, so it is put back to its loose width before asking whether
+ * that fits: the answer does not flip once the tight row fits.
+ */
+export function tabsTighten({ view, content }: { view: number; content: number }, tight: boolean, { tabs, counted }: { tabs: number; counted: number }) {
+  if (view <= 0 || content <= 0) return tight;
+  const saved = (tabs - 1) * (TAB_GAP.loose - TAB_GAP.tight) + counted * (COUNT_GAP.loose - COUNT_GAP.tight);
+  return content + (tight ? saved : 0) > view + 1;
+}
+
+/** Whether a sideways row runs on past its right edge (a 1px slack for rounding). */
+export const moreToTheRight = ({ view, content, x }: { view: number; content: number; x: number }) =>
+  view > 0 && content - (x + view) > 1;
 
 // The desktop stamps the moment it first knew to deliver an agent's answers
 // (App.tsx `deliveredThrough`), years before any phone. Zero is that, for
@@ -86,6 +108,7 @@ export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
     key: `${i.product}/${i.id}`, id: i.id, product: i.product, title: rowTitle(i), projectName: names.get(i.product) ?? '',
     when: updatedWords(i.status === 'done' ? i.wrote?.status?.ts ?? i.updatedAt : sentAt(i), now), running: live.has(i.id), cloud: inCloud.has(i.id),
     held: notStarted(i), toApprove: toApproveWords(toApprove.get(`${i.product}/${i.id}`)), queued: queued.has(i.id) && !live.has(i.id), item: i,
+    priority: ((p) => (p === 'high' || p === 'urgent' ? p : null))(priorityIdOf(i.priority)),
   });
   const drawn = (list: any[], tab: TabId) => sorted(list, DEFAULT_DISPLAY.inbox, tab, order).map(row);
   return { inbox: drawn(inbox, 'inbox'), progress: drawn(progress, 'progress'), snoozed: drawn(snoozed, 'snoozed'), done: drawn(done, 'done') };
