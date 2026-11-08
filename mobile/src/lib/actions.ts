@@ -11,13 +11,15 @@ import { threadMessage } from '../../../renderer/src/threads/composer-rules';
 import { sentLine } from '../../../renderer/src/compose-says';
 import { attachmentLinks } from '../../../renderer/src/attachments';
 import { doItHereWrites } from '../../../renderer/src/threads-made';
+import { priorityIdOf, priorityLabelOf } from '../../../renderer/src/priority';
+import { tryAgainWords } from '../../../renderer/src/try-again';
 import type { PhoneSender } from '../../../renderer/src/phone-send';
 import type { WorkItem } from '../../../renderer/src/types';
 import { ruleLabel, type RepeatShape } from '../../../shared/repeats.mjs';
 import type { Saved } from './attach';
 import { dayClock } from './back-at';
 
-export interface Choices { priority?: number; permissionMode?: string; model?: string; effort?: string; engine?: string; runAt?: number; start?: 'later' | 'now'; repeat?: RepeatShape; labels?: string[] }
+export interface Choices { priority?: number; permissionMode?: string; model?: string | null; effort?: string | null; engine?: string; runAt?: number; start?: 'later' | 'now'; repeat?: RepeatShape; labels?: string[] }
 export interface RuleRef { product: string; id: string; title: string }
 
 export type Press =
@@ -33,6 +35,15 @@ export type Press =
   | { kind: 'send-back' }
   | { kind: 'send-now' }
   | { kind: 'pin'; pinned: boolean }
+  | { kind: 'rename'; label: string }
+  | { kind: 'priority'; value: number }
+  | { kind: 'reopen' }
+  | { kind: 'try-again' }
+  | { kind: 'restart' }
+  /** True keeps it on the computer; false lets the cloud have it again. */
+  | { kind: 'keep-here'; keep: boolean }
+  /** `to` is the project as the phone names it (phone-rows.ts `phoneSlug`). */
+  | { kind: 'move'; to: string; name: string }
   | { kind: 'repeat-at'; rule: RuleRef; to: RepeatShape }
   | { kind: 'end-repeat'; rule: RuleRef }
   /** A proposal the thread filed, started as its own thread (App.tsx `resolve`); the item is the proposal. */
@@ -105,7 +116,9 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
     const runAt = Number(item.runAt) || 0;
     const snoozed = Number(item.snoozedUntil) || 0;
     const steps: Step[] = [{ door: 'answer', payload: { ...on, ...choices, answer, ...(status ? { status } : {}) } }];
-    if (runAt > now) steps.push({ door: 'schedule', payload: { ...on, runAt: 0 } });
+    // A reply set for later sets the thread's time itself (main/phone-inbox.mts ROUTES).
+    const later = Number(choices.runAt) > now;
+    if (runAt > now && !later) steps.push({ door: 'schedule', payload: { ...on, runAt: 0 } });
     if (snoozed > now) steps.push({ door: 'snooze', payload: { ...on, snoozedUntil: 0 } });
     return {
       steps,
@@ -139,8 +152,11 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
   });
 
   switch (press.kind) {
-    case 'reply':
-      return press.text.trim() ? reply(press.text, press.choices ?? {}, waits ? `Waiting for your computer${to ? ` → ${to}` : ''}` : to ? `Sent → ${to}` : 'Sent', 'Reply withdrawn, back in your inbox') : null;
+    case 'reply': {
+      const at = Number(press.choices?.runAt) || 0;
+      const said = at > now ? `Sends ${dayClock(at, now)}${to ? ` → ${to}` : ''}` : waits ? `Waiting for your computer${to ? ` → ${to}` : ''}` : to ? `Sent → ${to}` : 'Sent';
+      return press.text.trim() ? reply(press.text, press.choices ?? {}, said, 'Reply withdrawn, back in your inbox') : null;
+    }
     case 'pick':
       // "Close this task" is done, never sent: as a reply it would start a run to close it (App.tsx).
       if (closesTheTask(press.option.text)) return close();
@@ -185,6 +201,24 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
     case 'pin':
       // App.tsx's toast for the menu's row, which has no Undo there either.
       return { steps: [{ door: 'setThreadPins', payload: { pins: { [item.id]: press.pinned ? true : null } } }], toast: press.pinned ? 'Pinned to the top of your list' : 'Unpinned' };
+    case 'rename': {
+      const label = press.label.replace(/\s+/g, ' ').trim();
+      return label ? { steps: [{ door: 'threadEdit', payload: { ...on, patch: { label } } }], toast: `Renamed: ${clipToSentence(label, TOAST_TITLE)}` } : null;
+    }
+    case 'priority':
+      // App.tsx `retag`'s toast.
+      return { steps: [{ door: 'threadEdit', payload: { ...on, patch: { priority: press.value } } }], toast: `Priority: ${priorityLabelOf(priorityIdOf(press.value)).toLowerCase()}` };
+    case 'reopen':
+      return { steps: [{ door: 'reopen', payload: on }], toast: `Reopened: ${clipToSentence(item.title ?? '', TOAST_TITLE)}` };
+    case 'try-again':
+      return { steps: [{ door: 'resumeItems', payload: { ids: [item.id] } }], toast: waits ? 'Up next once your computer is back.' : tryAgainWords({ resumed: 1 }) };
+    case 'restart':
+      // App.tsx `redeliver`'s toast.
+      return { steps: [{ door: 'redeliver', payload: on }], toast: `A fresh agent is picking this up → ${to}` };
+    case 'keep-here':
+      return { steps: [{ door: 'setThreadOnMac', payload: { onMac: { [item.id]: press.keep ? true : null } } }], toast: press.keep ? 'This thread now runs only on your computer' : 'This thread can run on the cloud again' };
+    case 'move':
+      return { steps: [{ door: 'moveItem', payload: { ...on, to: press.to } }], toast: `Moved to ${press.name}`, goes: null };
     case 'approve-filed':
       return reply('Approved. Run it.', {}, `Running → ${(item.title ?? '').slice(0, 40)}`, 'Approval withdrawn, back in your inbox');
     case 'do-here': {

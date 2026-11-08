@@ -27,21 +27,24 @@ import { askUnderAnswer, CHOICES_FOLDED, foldKey, foldedKeys, pageOf, splitHeadl
 import { mateOf } from '../../../lib/teammates';
 import { TeammateMark } from '../../../ui/Teammates';
 import { screenGate } from '../../../lib/thread-gate';
-import { liveOf, offersOf, shownLevel, summaryParts, type Offers } from '../../../lib/thread-offers';
-import { waitFacts } from '../../../../../renderer/src/phone-rows';
+import { liveOf, moveChoices, offersOf, ruleFor, shownLevel, summaryParts, type Offers } from '../../../lib/thread-offers';
+import { phoneSlug, waitFacts } from '../../../../../renderer/src/phone-rows';
 import { replySender, type ReplyDeps } from '../../../lib/thread-reply';
 import { atEnd, keptPlace } from '../../../lib/thread-scroll';
 import { appStore } from '../../../platform/persist';
 import { useCloud } from '../../../state/cloud';
 import { useComputerAgents } from '../../../state/computer-agents';
-import { replyModel } from '../../../lib/compose';
+import { replyChoices, replyModel } from '../../../lib/compose';
 import { useSendWhenOnline } from '../../../state/send-when-online';
 import { AttachSheet, Attached } from '../../../ui/Attach';
 import { SentFiles, ThreadFiles, useMessageFiles } from '../../../ui/Files';
-import { Back, Chevron, Clip, DoneMark, More, Panel } from '../../../ui/icons';
+import { Back, Caret, Chevron, Clip, Clock, Cross, DoneMark, More, Panel } from '../../../ui/icons';
+import { TimeBox, TypingSheet } from '../../../ui/Later';
+import { replyLaterRows } from '../../../lib/later';
+import { agentChoices, laterHint, momentFromWords } from '../../../../../renderer/src/threads/composer-rules';
 import { Waiting } from '../../../ui/LogoOrbit';
 import { Markdown, type MessageFiles } from '../../../ui/Markdown';
-import { footRoom, IconButton, Pickable, PriorityBars, RunningMark, T, TopBar, Wall } from '../../../ui/parts';
+import { footRoom, IconButton, Pickable, PriorityBars, RunningMark, SheetHead, SheetRow, T, TopBar, Wall } from '../../../ui/parts';
 import { ModelSheet, ModeSheet, PrioritySheet, barsFor } from '../../../ui/Pickers';
 import { ThreadMenu } from '../../../ui/ThreadMenu';
 import { DictationProblem, Listening, MicButton, useDictation } from '../../../ui/Dictation';
@@ -126,12 +129,16 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
   const [open, setOpen] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const [picked, setPicked] = useState<Choices>({});
-  const [sheet, setSheet] = useState<'priority' | 'mode' | 'model' | 'attach' | null>(null);
+  const [sheet, setSheet] = useState<'priority' | 'mode' | 'model' | 'attach' | 'later' | null>(null);
+  const [typedLater, setTypedLater] = useState('');
   const ready = !!draft.text.trim() || draft.files.length > 0;
   const priority = picked.priority ?? priorityValueOf(shownLevel(item));
   const agents = useComputerAgents();
   const codex = { codexModels: agents.codexModels, codexDefault: agents.codexDefault };
   const { engine, model, label: modelLabel } = replyModel(item, picked, agents);
+  const sendsAt = Number(picked.runAt) || 0;
+  const typedAt = momentFromWords(typedLater, c.now);
+  const sendAt = (at: number) => { setTypedLater(''); setSheet(null); setPicked((p) => ({ ...p, runAt: at || undefined })); };
   const mode = picked.permissionMode ?? 'auto';
   const folded = foldedReply(draft.text, draft.files.map((f) => ({ name: f.name, image: isImageName(f.name) })));
   const deps = useRef<ReplyDeps | null>(null);
@@ -139,7 +146,7 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
     draft,
     busy: setBusy,
     attach: (files) => c.attach(item.product, files),
-    send: (text, choices, undone) => c.send({ kind: 'reply', text, choices }, item, { undone }),
+    send: (text, choices, undone) => c.send({ kind: 'reply', text, choices: replyChoices(item, choices, agents) }, item, { undone }),
     failed: (m) => setFailed(offline.failed(m)),
   };
   const [send] = useState(() => replySender(() => deps.current!, (sent) => { if (sent) { offline.clear(); setFailed(null); setPicked({}); setOpen(false); } }));
@@ -216,10 +223,19 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
                 <T style={{ fontSize: 13, fontFamily: font.medium, color: color.dim }}>Stop</T>
               </Pressable>
             ) : (
-              <Pressable disabled={busy || !ready} accessibilityRole="button" onPress={sendByHand}
-                style={({ pressed }) => ({ height: 29, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: busy || !ready ? 0.5 : 1 })}>
-                <T style={{ fontSize: 13, fontFamily: font.semibold }}>{busy ? 'Sending…' : 'Send'}</T>
-              </Pressable>
+              // Send and its Send later caret, which only sets the time; the caret says it (components/ReplyLater.tsx).
+              <View style={{ flexDirection: 'row', opacity: busy || !ready ? 0.5 : 1 }}>
+                <Pressable disabled={busy || !ready} accessibilityRole="button" onPress={sendByHand}
+                  style={({ pressed }) => ({ height: 29, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, borderTopLeftRadius: corner.small, borderBottomLeftRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
+                  <T style={{ fontSize: 13, fontFamily: font.semibold }}>{busy ? 'Sending…' : 'Send'}</T>
+                </Pressable>
+                <Pressable disabled={busy || !ready} onPress={() => setSheet('later')} accessibilityRole="button"
+                  accessibilityLabel={sendsAt ? `Sends ${laterHint(sendsAt)}. Change when` : 'Send later'}
+                  style={({ pressed }) => ({ height: 29, minWidth: 29, paddingHorizontal: sendsAt ? 8 : 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderWidth: 1, borderLeftWidth: 0, borderTopRightRadius: corner.small, borderBottomRightRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
+                  {sendsAt > 0 && <T style={{ fontSize: 12, color: color.dim }}>{laterHint(sendsAt)}</T>}
+                  <Caret tint={color.dim} />
+                </Pressable>
+              </View>
             )}
             </>
             )}
@@ -230,7 +246,17 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
       <PrioritySheet open={sheet === 'priority'} close={() => setSheet(null)} value={priority} pick={(v) => setPicked((p) => ({ ...p, priority: v }))} />
       <ModeSheet open={sheet === 'mode'} close={() => setSheet(null)} value={mode} pick={(v) => setPicked((p) => ({ ...p, permissionMode: v }))} />
       <ModelSheet open={sheet === 'model'} close={() => setSheet(null)} model={model} effort={picked.effort ?? item.effort ?? null} engine={engine} codex={codex}
-        pickModel={(v) => setPicked((p) => ({ ...p, model: v }))} pickEffort={(v) => setPicked((p) => ({ ...p, effort: v }))} />
+        pickModel={(v) => setPicked((p) => ({ ...p, model: v }))} pickEffort={(v) => setPicked((p) => ({ ...p, effort: v }))}
+        agents={agentChoices(agents.engines)} pickEngine={(id) => setPicked((p) => ({ ...p, engine: id, model: undefined, effort: undefined }))} />
+      <TypingSheet open={sheet === 'later'} close={() => { setTypedLater(''); setSheet(null); }}>
+        <SheetHead>Send later</SheetHead>
+        {replyLaterRows(c.now, sendsAt).map((r) => (
+          <SheetRow key={r.label} label={r.label} on={r.on} lead={r.ts ? <Clock /> : <Cross size={15} />} aside={r.hint} onPress={() => sendAt(r.ts)} />
+        ))}
+        <TimeBox lead={<Clock />} value={typedLater} onChange={setTypedLater} placeholder="Or type: 3h, fri 6pm, tomorrow 9am"
+          onSubmit={() => { if (typedAt) sendAt(typedAt.ts); }} onLine={() => { if (typedAt) sendAt(typedAt.ts); }}
+          line={!typedLater.trim() ? null : typedAt ? { text: typedAt.hint, tone: 'ok' } : { text: 'Not a time yet', tone: 'unread' }} />
+      </TypingSheet>
     </View>
   );
 }
@@ -357,10 +383,15 @@ export default function ThreadScreen() {
     setFoldedRounds(now);
     appStore.setItem(CHOICES_FOLDED, JSON.stringify(now));
   };
-  const facts = { session: thread.session, inProgress: thread.inProgress, now: c.now };
-  const offers = offersOf(item, facts);
   // With what the computer says of it while nothing runs, so waiting its turn reads Queued.
-  const live = liveOf(item, { ...facts, ...waitFacts(c.view, item.id) });
+  const facts = { session: thread.session, inProgress: thread.inProgress, now: c.now, ...waitFacts(c.view, item.id) };
+  const offers = offersOf(item, {
+    ...facts,
+    asking: c.view.approvals.some((a) => a.product === item.product && a.item === item.id),
+    cloud: c.rows.projects.some((p) => p.cloud === true && phoneSlug(p.device, p.project) === item.product),
+  });
+  const live = liveOf(item, facts);
+  const rule = ruleFor(item, c.repeats);
   const press = async (p: Press, on: any = item, then?: () => void) => {
     setBusy(true); setError(null);
     try { await c.send(p, on); then?.(); return true; } catch (err) { setError(String((err as Error)?.message ?? err)); return false; } finally { setBusy(false); }
@@ -388,6 +419,9 @@ export default function ThreadScreen() {
   const below = [
     ...(offers.back ? [{ label: offers.back.label, dim: offers.back.dim, onPress: () => void press({ kind: 'later', until: 0 }) }] : []),
     ...(offers.sendBack ? [{ label: 'send back to agent', onPress: () => void press({ kind: 'send-back' }) }] : []),
+    // The desktop's stopped bar ends "try again →" (Focus.tsx `stalled-bar`).
+    ...(live?.state === 'stalled' && (offers.tryAgain || offers.restart)
+      ? [{ label: 'try again', onPress: () => void press({ kind: offers.tryAgain ? 'try-again' : 'restart' }) }] : []),
   ];
 
   let prev: Kind | null = null;
@@ -542,6 +576,14 @@ export default function ThreadScreen() {
         pinned={item.status === 'done' || item.waitsForMac ? null : !!item.pinned}
         onPin={(pin) => void press({ kind: 'pin', pinned: pin })}
         onUnread={() => { c.markUnseen(item); back(); }}
+        tryAgain={offers.tryAgain} onTryAgain={() => void press({ kind: 'try-again' })}
+        restart={offers.restart} onRestart={() => void press({ kind: 'restart' })}
+        reopen={offers.reopen} onReopen={() => void press({ kind: 'reopen' })}
+        priority={offers.priority ? priorityValueOf(shownLevel(item)) : null} onPriority={(value) => void press({ kind: 'priority', value })}
+        name={offers.rename ? thread.title : null} onRename={(label) => void press({ kind: 'rename', label })}
+        projects={offers.move ? moveChoices(item, c.view.products) : []} onMove={(to) => void press({ kind: 'move', to: to.slug, name: to.name }, item, back)}
+        place={offers.place} onPlace={(keep) => void press({ kind: 'keep-here', keep })}
+        repeats={!!rule} onEndRepeat={() => { if (rule) void press({ kind: 'end-repeat', rule }); }}
         onClose={close} closed={threadState(item) === 'done'} />
       {summary && <Summary thread={thread} now={c.now} close={() => setSummary(false)} />}
     </Wall>

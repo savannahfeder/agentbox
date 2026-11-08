@@ -50,6 +50,7 @@ import { newUserWindow } from './new-user-window.mts';
 import { openFreshUser } from './fresh-user.mts';
 import { installCrashReports, report as reportCrash, reportFromRenderer, pending as pendingCrashes, setTransport } from './crash-report.mts';
 import { keepThePageAlive } from './when-the-page-stops.mts';
+import { recordBlankPages } from './blank-page.mts';
 import { createAnalytics, createDailyCount } from './analytics.mts';
 import { createUpdater } from './updater.mts';
 import { quitStep, flushBeforeQuit, quitThenExit } from './quit-sequence.mts';
@@ -515,6 +516,7 @@ async function createWindow() {
       // The Settings pages' model, read through the window's own handler.
       readSettings: () => phoneSettings?.() ?? null,
       pins: () => supervisor.threadPins,
+      onMac: () => supervisor.threadOnMac,
       repeats: () => store.listRepeats(),
       teammates: () => (teammatesOn(config) ? store.teammatesView() : null),
       version: app.getVersion(),
@@ -1151,6 +1153,20 @@ async function createWindow() {
   // itself (it has no disk and should not have one), and 'render-process-gone'
   // only fires when the process DIES, which a thrown React error does not.
   ipcMain.handle('zero:crash', (_e, payload) => { reportFromRenderer(payload ?? {}); });
+  recordBlankPages({
+    ipcMain,
+    window: () => window,
+    dir: path.join(userDir, 'memory-log'),
+    context: () => {
+      const runs = supervisor.runsGoing();
+      return {
+        upMinutes: Math.round(process.uptime() / 60),
+        running: runs.length,
+        inCloud: runs.filter((s) => s.cloud).length,
+        processes: app.getAppMetrics().map((m) => ({ type: m.type, mb: Math.round(m.memory.workingSetSize / 1024) })),
+      };
+    },
+  });
   ipcMain.handle('zero:take-join', () => { const token = pendingJoin; pendingJoin = null; return token; });
   // External links from markdown open in the real browser; local artifacts
   // (a demo page, a screenshot a worker saved) open in their default app, so
