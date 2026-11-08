@@ -47,6 +47,9 @@
 
 set -u
 
+# Git signed in with it before this hook ran; the tests below never need it.
+unset AGENTBOX_GITHUB_TOKEN
+
 # Where this hook lives, before anything changes directory, so the privacy
 # check beside it is found wherever the push runs from.
 hookdir=$(cd "$(dirname "$0")" && pwd)

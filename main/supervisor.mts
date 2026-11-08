@@ -199,6 +199,7 @@ import type { RouteDecision, RouteMate } from '../shared/auto-route.mjs';
 import type { LatestMessage } from './message-priority.mts';
 import type { ActiveTool } from './agent-activity.mts';
 import type { ShipItem, ShipProduct } from './ship-queue.mts';
+import type { GitHubPushSignIn } from './github-push-sign-in.mts';
 import type { CloudKit } from './cloud/kit.mts';
 import type { CatchUpCard } from './catch-up.mts';
 import type { QueuedLine, ReplyPayload } from './live-replies.mts';
@@ -1223,6 +1224,8 @@ export class Supervisor {
   declare userDir: string;
   declare onShipped: () => void;
   declare shipQueue: ShipQueue;
+  // Set by main.mts, which has the keychain.
+  declare gitHubSignIn: GitHubPushSignIn | null;
   declare mainTests: MainTests;
   declare cloudServerWatch: Pick<CloudServerWatch, 'down' | 'up'>;
   declare sessions: Map<string, WorkerSession>;
@@ -1445,7 +1448,9 @@ export class Supervisor {
       afterShip: (shipped) => { this.onShipped(); this.watchMainsTests(shipped); this.reclaimShippedFolder(shipped); },
       memoryGate: () => this._memoryGate?.gate ?? null,
       shipScore: (item) => this.memoryGateScore(item.product, item.id) ?? 0,
+      pushSignIn: () => this.gitHubSignIn?.forPush() ?? null,
     });
+    this.gitHubSignIn = null;
     // AND THEN SOMEBODY WATCHES THE RUN THAT SHIP STARTED. The whole suite runs
     // on GitHub for every push and takes about five minutes, which is after the
     // agent has ended its turn, so main was red for four days in October with

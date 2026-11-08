@@ -26,6 +26,7 @@ import { Store } from './store.mts';
 import { storeRootEnv } from './store/home.mjs';
 import { keepAnswerModesIn } from './answer-modes.mts';
 import { Supervisor } from './supervisor.mts';
+import { gitHubPushSignIn } from './github-push-sign-in.mts';
 import { startCodexWatch } from './codex-watch.mts';
 import { watchNewChatsFor } from './new-chats-watch.mts';
 import { readCodexThreadsOffThread } from './codex-threads.mts';
@@ -442,6 +443,13 @@ async function createWindow() {
   // request so a project made after launch is not a folder of broken images.
   imageRoots = () => [config.accountRoot, ...store.listProducts().map((p) => p.repoPath).filter(Boolean) as string[]];
   const supervisor = new Supervisor(config, store, appDir, dataDir, userDir);
+  supervisor.gitHubSignIn = gitHubPushSignIn({
+    file: path.join(userDir, 'github-sign-in.sealed'),
+    cipher: {
+      encrypt: (text: string) => (safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(text) : null),
+      decrypt: (buf: Buffer) => (safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(buf) : null),
+    },
+  });
   // Local runs outlive a quit or a restart of the app (main/run-host.mjs).
   supervisor.hostRuns = true;
   // And their store tools come from one shared process (main/tool-host.mjs).

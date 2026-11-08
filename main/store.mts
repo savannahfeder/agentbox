@@ -37,6 +37,8 @@ import {
 import { buildClaimLine, buildReleaseLine, GIVEN_TASK } from '../shared/work-items.mjs';
 import { isEffortWord } from '../shared/effort-levels.mts';
 import { shippedNote } from '../shared/shipped-note.mjs';
+import { notShipped } from '../shared/not-shipped.mts';
+import { asksForGitHubSignIn, SHIPPING_AGAIN } from '../shared/github-push-sign-in.mts';
 import { machineryPath, removeMachinery } from './store/home.mjs';
 import { Teammates } from './teammates.mts';
 import type { WorkItem } from './supervisor.mts';
@@ -667,6 +669,17 @@ export class Store {
     // their own Reopen outranks that (see `closedBeforeItShipped` below).
     const closed = this.readItem(slug, id)?.status === 'done';
     return workItemsDisk.updateWorkItem(dir, id, { status: 'open' }, { source: closed ? 'founder' : 'system' });
+  }
+
+  // Every thread whose ship waited on a GitHub sign-in on this computer goes to the queue again.
+  shipAgainAfterGitHubSignIn(now = Date.now()) {
+    const { workItemsDisk } = this.modules;
+    const again = this.listItems(now).filter((i) => i.status !== 'done' && asksForGitHubSignIn(notShipped(i)?.why));
+    for (const i of again) {
+      const labels = Array.isArray(i.labels) ? i.labels.filter((l) => l !== 'ship') : [];
+      workItemsDisk.updateWorkItem(this.productDir(i.product), i.id, { labels: [...labels, 'ship'], note: SHIPPING_AGAIN }, { source: 'system' });
+    }
+    return again.map((i) => i.id);
   }
 
   releaseRunClaim(slug: string, id: string, run?: Parameters<StoreModules['workItemsDisk']['releaseRunClaim']>[2]) {

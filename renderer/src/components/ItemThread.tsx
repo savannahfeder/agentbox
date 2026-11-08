@@ -37,6 +37,8 @@ import { withoutTrailingWork } from '../trailing-work';
 import { marksFor, readUndoMarks, UNDO_MARKS_EVENT, type UndoMark } from '../undo-marks';
 import { ranWords } from '../byline';
 import { notShipped } from '../../../shared/not-shipped.mts';
+import { asksForGitHubSignIn } from '../../../shared/github-push-sign-in.mts';
+import { GitHubSignInCard } from './GitHubSignInCard';
 import type { ModelChoice } from '../models';
 import type { LedgerLine } from '../thread-history';
 import type { TraceSession } from '../notes';
@@ -393,6 +395,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
   const ranSaid = outcome ? ranOf(outcome) : null;
   const answerAt = answerTurn(events, omitted, chat);
   const unshipped = outcome?.field === 'note' && !!notShipped(item);
+  const signInWhy = unshipped && !onPhone() && asksForGitHubSignIn(notShipped(item)?.why) ? notShipped(item)!.why : null;
   const answer = outcome && (
     resultLeads(item) && outcome.field === 'result'
       ? <div className="outcome" data-exchange={answerAt}>{md(clean(outcome.text))}</div>
@@ -406,6 +409,8 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
             {ranSaid && outcome.field !== 'result' && <span className="appendix-ran">{ranSaid}</span>}
           </div>
           {md(clean(outcome.text))}
+          {signInWhy && <GitHubSignInCard why={signInWhy} openLink={(href) => { void api.openArtifactExternally({ product: item.product, src: href }); }}
+            save={async (token) => { const r = await api.gitHubSignIn({ token }); if (!r.ok) return r.error ?? 'That did not save. Try again.'; say('GitHub connected. Shipping it again.'); return null; }} />}
         </div>
       )
   );

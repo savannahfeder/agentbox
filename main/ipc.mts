@@ -2159,6 +2159,18 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       return { ok: false, error: String((err as Error).message) };
     }
   });
+  ipcMain.handle('zero:github-sign-in', async (_e, { token } = {}) => {
+    try {
+      if (!supervisor.gitHubSignIn) return { ok: false, error: `Signing in to GitHub needs the ${Name} app on this computer.` };
+      await supervisor.gitHubSignIn.save(token);
+      const again = store.shipAgainAfterGitHubSignIn();
+      supervisor.wake();
+      push();
+      return { ok: true, again };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
   // A FILE A CLOUD RUN ASKED FOR, sent from this computer by the person's press,
   // or one they chose in the open panel instead. The thread carries on with it.
   // `hold` keeps the reply back: the file goes with the sign-in still open on the same ask, whose save sends both.
