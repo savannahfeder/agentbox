@@ -12,6 +12,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { appFilesPlace } from '../main/files-place.mjs';
+import { threadEvents } from '../renderer/src/thread-history.ts';
+import { messageKind } from '../renderer/src/threads/message-kind.ts';
 import { noteSendWords, notesToSendTheAgent } from '../renderer/src/artifact-pins.ts';
 import { notesForTheAgent, tagsYourAgent } from '../shared/artifact-marks.mjs';
 import * as wake from '../main/notes-wake.mjs';
@@ -110,6 +112,21 @@ describe('from Files', () => {
     const out = await place.mark(listed.find((f) => f.name === 'plan.md').key, { do: 'toagent', on: ['n1', 'n2'] });
     expect(out).toMatchObject({ ok: true, wrote: { product: 'company', id: 'w-1' } });
     expect(marked.flatMap((m) => m.mark.on)).toEqual(['n1', 'n2']);
+  });
+});
+
+// Found by the same tester on the retest: inside the thread a comment still
+// waiting for Send read "Note on pricing.html", exactly like a sent one, so she
+// believed the agent had it while it sat unsent.
+describe('in the thread', () => {
+  const note = (id, more = {}) => ({ id: 'w-1', ts: 2, source: 'founder', patch: { artifact: { do: 'note', id, file: 'pricing.html', place: { kind: 'whole' }, text: 'Fix the price', ...more } } });
+  const kindOf = (lines) => messageKind(threadEvents([{ id: 'w-1', ts: 1, source: 'agent', patch: { result: '[pricing.html](pricing.html)' } }, ...lines]).find((e) => e.fileMark?.kind === 'note'));
+  it('a comment waiting for Send says Not sent beside its file', () => {
+    expect(kindOf([note('n1', { wait: true })])).toEqual({ word: 'Note on pricing.html', file: true, why: 'Not sent' });
+  });
+  it('once Send hands it over, or it never waited, it says nothing more', () => {
+    expect(kindOf([note('n1', { wait: true }), { id: 'w-1', ts: 3, source: 'founder', patch: { artifact: { do: 'sent', on: ['n1'] } } }])).toEqual({ word: 'Note on pricing.html', file: true });
+    expect(kindOf([note('n1')])).toEqual({ word: 'Note on pricing.html', file: true });
   });
 });
 

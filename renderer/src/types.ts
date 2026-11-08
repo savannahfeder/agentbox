@@ -359,7 +359,7 @@ export interface FilesPlaceView {
 type LedgerLineShape = { ts: number; by?: string | null; source?: string; patch?: Record<string, unknown> };
 
 /** What a comment or approval in the thread links to. */
-export interface FileMarkLink { kind: 'note' | 'approved' | 'edited'; file: string; id?: string; place?: string; /** The file's one name and version, for the words. */ shown?: string }
+export interface FileMarkLink { kind: 'note' | 'approved' | 'edited'; file: string; id?: string; place?: string; /** The file's one name and version, for the words. */ shown?: string; /** A comment still waiting for Send. */ unsent?: true }
 
 /** A note naming you on a teammate's shared thread: a row in Needs you. */
 export interface SharedFileNews {
