@@ -2381,15 +2381,13 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
                   answers for the Mac and main/machine.mjs shares it out; the
                   per-account number is arithmetic nobody is asked to do.
 
-                  A PLAN THAT ALLOWS ONE AT A TIME STILL SAYS SO, because that is
-                  a fact about the subscription rather than about this Mac. */}
+                  THE CLAUDE PLAN HAS NO SAY (w-54c640f8da): its limit is a
+                  budget, and a spent one waits for its reset. */}
               <Row
                 label="How many run at once"
-                desc={w.sessionsAtOnceFromPlan
-                  ? `Your plan is ${w.sessionsAtOnceFromPlan}, so ${NAME} starts one ${twoEngines ? 'Claude Code agent ' : ''}at a time.`
-                  : w.agentsAuto
-                    ? 'From this computer’s memory, kept there as you add accounts or turn the memory check on.'
-                    : `You set this. Automatic would run ${w.agentsAutoTotal ?? w.sessionsAtOnce} on this computer.`}
+                desc={w.agentsAuto
+                  ? 'From this computer’s memory, kept there as you add accounts or turn the memory check on.'
+                  : `You set this. Automatic would run ${w.agentsAutoTotal ?? w.sessionsAtOnce} on this computer.`}
               >
                 {/* ONE DROPDOWN, NOT A CHOICE AND THEN A NUMBER (2026-10-05, her
                     note). Automatic and every number it could be are the same

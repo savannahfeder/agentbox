@@ -70,7 +70,6 @@ export interface SettingsConfig {
   agentsAtOnce?: unknown;
   agentsAuto?: boolean | null;
   agentsNudge?: number;
-  planSlotsFrom?: unknown;
   maxConcurrentSessions?: number | null;
   memoryGate?: boolean | null;
   memoryGateSlots?: number | null;
@@ -780,12 +779,6 @@ export function readSettings({ config, supervisor, store }: SettingsDeps, { sear
       // What Automatic would say right now, so a manual number can be compared
       // with it without turning Automatic back on to find out.
       agentsAutoTotal: autoAgents({ gated: !!config.memoryGate, nudge: config.agentsNudge }),
-      // THE PLAN THAT SET THE NUMBER ABOVE, when a plan set it. Null in the
-      // ordinary case: she picked the number herself, or it is the three every
-      // install has always had. It is only ever filled in when somebody would
-      // otherwise open this page, see one, and have nothing on the screen to
-      // explain it.
-      sessionsAtOnceFromPlan: config.planSlotsFrom ?? null,
       // WHAT WE SUGGEST FOR THIS MAC, AND WHY. Not a ceiling: `slotsMax` is the
       // control's own range and is the same number on every machine, while
       // `slotsSuggested` is what main worked out from the hardware
@@ -1354,10 +1347,6 @@ export function setWorkspaceSetting({ config, supervisor, store }: SettingsDeps,
       // FOR THE WHOLE COMPUTER (w-ec27ff1a51), under its own key, so a number
       // written per login before 5 Oct can never be read as this choice.
       saveConfig(config, { agentsAtOnce: n, agentsAuto: false });
-      // An explicit choice replaces the startup plan suggestion for BOTH
-      // engines. Leaving this marker set makes Codex ignore the new number
-      // until loadConfig runs again at restart. It is derived, not persisted.
-      config.planSlotsFrom = null;
       // Fill newly available slots through the usual queue and its guards.
       // Lowering the cap leaves existing work running and gates new starts.
       supervisor.wake?.();
