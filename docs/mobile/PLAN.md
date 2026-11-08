@@ -275,16 +275,34 @@ is asleep.
 | Guideline | What could go wrong | The answer |
 |---|---|---|
 | 5.1.1(v) deletion | The account is deleted but what the person shared stays. | Deletion takes what they wrote with it, shared or not (Sign-in and accounts). Apple tokens revoked. |
-| 1.2 user content | People message each other with no filter, report, block or contact. | A filter for objectionable text, report a message, block a person (enforced by the server, not only hidden on the phone), a contact address, and a queue of reports that somebody answers within a day. Messages going only between invited teammates is no exemption. |
+| 1.2 user content | People message each other with no filter, report, block or contact. | A filter for objectionable text, report a message, block a person (enforced by the server, not only hidden on the phone), a contact address, and a queue of reports that somebody answers within a day. Messages going only between invited teammates is no exemption. Until those exist, the `store` build profile leaves group chat out (`mobile/src/lib/store-build.ts`); TestFlight's `production` builds keep it. The Help page (phone-legal/support.html) is the contact address. |
 | 2.1 completeness | The reviewer signs in, replies, and nothing answers, because no Mac is paired or it is asleep. | A review account on a cloud plan whose threads have kits, so a reply is answered by Agentbox Cloud with no computer awake (docs/cloud/PHONE-PLAN.md step 2). The reviewer replies, gets a result and an alert, and opens its files. The notes explain the desktop app, that the cloud carries replies while the computer is shut, and where the AI notice and Delete account are. The account never expires and its threads are kept fresh (a kit lasts six days). Over 40% of unresolved issues are 2.1 (Apple, 2026); link a short film of the desktop pairing. |
-| 4.8 sign-in | Google sign-in with no equivalent private option. | Sign in with Apple, which meets the rule; Apple does not require it of every app. |
-| 5.1.1(i) privacy policy | No privacy policy, or one that says nothing is hosted. | w-7a670f07bb, linked in the listing and in Settings. |
+| 4.8 sign-in | Google sign-in with no equivalent private option. | Sign in with Apple was taken out on 2026-11-04 (8f06d530: the computer cannot sign in with it), so on the iPhone the sign-in is email and password only, which needs no second option; Google stays on Android. |
+| 5.1.1(i) privacy policy | No privacy policy, or one that says nothing is hosted. | phone-legal/privacy.html, linked in the listing and in Settings › General. It is published only once `contact`, `operator` and `governingLaw` are in the phone site's config; on 2026-11-08 they were not, so /privacy on the phone site served the web app. |
+| 5.1.1(v) deletion, reached | An account no computer has joined sees only "Waiting for your computer". | That screen opens Settings, whose General page has Delete account. |
 | 5.1.2(i) AI data | Personal data sent to third-party AI without explicit permission. | Before anything is sent, a screen names the provider (Claude by Anthropic, or Codex by OpenAI, on your own account) and what goes to it. An explicit Continue, recorded. Withdrawing it in Settings is checked when a command runs, queued ones included. The privacy policy names both. |
 | 4.2 minimum function | A repackaged website. | Native screens, lock-screen alerts, replies from the alert. |
 | 3.1 purchases | Selling or advertising the paid cloud. | The app sells nothing and shows no prices, upgrade prompts or links to buy; setup and payment happen on the computer (the founder, 2026-10-24: "we should never run into a situation where the app store tries to take a cut"). A test fails on purchase words in the phone app. Do not lean on 3.1.3(f) in the notes: it names VoIP, cloud storage, email and web hosting only. |
 | 4.5.4 alerts | The app needing alerts to work, or marketing. | It works with alerts off. An alert names its thread (the founder asked for titles, 2026-10-13 and 2026-10-23), and the privacy policy says so. No marketing alerts. |
-| 2.5.19 hidden features | A switch or flag that hides a feature from review (spelled out 2026-10-16). | Nothing in the phone app is behind a flag; what does not work yet is not in the build. |
+| 2.5.19 hidden features | A switch or flag that hides a feature from review (spelled out 2026-10-16). | Nothing in a store build can be switched on after review: the `store` profile's switch is written into the bundle at build time, and the Alpha features page is not in it. |
+| 2.2 beta | An "Alpha features" page in a store app. | Left out of the `store` build. |
 | 4.2.7 remote desktop | Read as a thin client for a computer. | The notes say it is not a screen mirror: the phone has its own screens over the person's account, and the cloud runs replies itself. |
+
+### The first submission's checks (2026-11-08, w-007ab2ab26)
+
+- Claude and Codex each read `mobile/` as an Apple reviewer. Both put 4.8
+  (Google alone), 5.1.1(v) (deletion out of reach), 1.2 (group chat) and 2.2
+  (Alpha features) first; Codex also found the AI yes shared across accounts
+  and a reset link that failed after the app restarted. All are fixed.
+- Greenlight (RevylAI/greenlight, offline, no Apple login) found no privacy
+  manifest; the app config now declares one, and it passes.
+- `npx expo-doctor`: 20 of 20 checks pass. It checks project health, not
+  review.
+- fastlane precheck needs an App Store Connect login; its rules are held by
+  `tests/the-app-store-listing-passes-apples-limits-and-prechecks-rules`.
+- Apple's own upload check runs only on a real upload.
+- The listing is `mobile/store.config.json`, pushed with `eas metadata:push`.
+  EAS cannot send the App Privacy answers or screenshots.
 
 ## Costs
 

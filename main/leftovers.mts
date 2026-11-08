@@ -63,7 +63,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { pressureFrom } from './memory-gate.mts';
-import type { Pressure } from './memory-gate.mts';
+import type { Pressure, PressureLines } from './memory-gate.mts';
 import { readMacPressure } from './mac-pressure.mts';
 
 const LSTART = String.raw`\w{3} \w{3} [ \d]\d \d\d:\d\d:\d\d \d{4}`;
@@ -247,8 +247,8 @@ export async function listProcesses(platform: string = process.platform): Promis
   return procs;
 }
 
-export async function readMacPressureWord(): Promise<Pressure> {
-  return pressureFrom(await readMacPressure());
+export async function readMacPressureWord(lines?: PressureLines): Promise<Pressure> {
+  return pressureFrom(await readMacPressure(), lines);
 }
 
 /**
