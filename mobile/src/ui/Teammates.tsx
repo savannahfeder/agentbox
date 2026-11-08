@@ -7,8 +7,10 @@ import { Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import type { Room, Teammate } from '../../../renderer/src/types';
 import { updatedWords } from '../../../renderer/src/threads/page-rules';
+import { mateDraft, useDraft } from '../lib/drafts';
 import { groupName, groupsInOrder } from '../lib/groups';
 import { asideOf, matesInOrder, nowLine, waitsOnYou } from '../lib/teammates';
+import { appStore } from '../platform/persist';
 import { useCloud } from '../state/cloud';
 import { useGroups } from '../state/groups';
 import { Face } from './Groups';
@@ -108,8 +110,9 @@ const SendGlyph = ({ tint }: { tint: string }) => (
 );
 
 /** The chat box at the foot, the one Groups uses. `send` answers whether the words went. */
-export function MateComposer({ placeholder, send, above }: { placeholder: string; send: (text: string) => Promise<boolean>; above?: ReactNode }) {
-  const [text, setText] = useState('');
+export function MateComposer({ mate, placeholder, send, above }: { mate: string | null; placeholder: string; send: (text: string) => Promise<boolean>; above?: ReactNode }) {
+  const draft = useDraft(mateDraft(mate), appStore);
+  const { text, setText } = draft;
   const [busy, setBusy] = useState(false);
   const go = async () => {
     const words = text.trim();
@@ -117,7 +120,7 @@ export function MateComposer({ placeholder, send, above }: { placeholder: string
     setBusy(true);
     const ok = await send(words);
     setBusy(false);
-    if (ok) setText('');
+    if (ok) draft.take();
   };
   return (
     <View style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 10 }}>

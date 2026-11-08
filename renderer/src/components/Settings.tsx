@@ -65,6 +65,8 @@ import { searchSettings, SETTINGS_PAGES, type SettingsHit, type SettingsPageId }
 import type { Product } from '../types';
 import { CloudMark, MacMark } from '../threads/ThreadMenu';
 import './settings.css';
+import { SkyPicker } from '../home/SkyPicker';
+import { HOME_KEY, setHomeSetting, useHomeSettings } from '../home/home-settings';
 
 /* * TEAM IS A PANE HERE (w-8415594d19, 2026-10-01). The pane's CONTENT is
  handed in as `teamPane` rather than imported, so this screen, which is shared
@@ -1759,6 +1761,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   roomsPane?: ReactNode;
   onClose: () => void;
 }) {
+  const homeSet = useHomeSettings();
   const sidebarShrinks = useSidebarShrinks();
   const [model, setModel] = useState<SettingsModel | null>(null);
   // ?settings=claude, or ?settings=project:kestrel. Anything else (including the
@@ -2275,6 +2278,9 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               <Row label="Multiplayer" desc="Share projects with your team and see their threads beside yours. Needs a sign-in.">
                 <Switch label="Multiplayer" on={!!w.alpha?.multiplayer} onChange={(v) => setWorkspace('alphaMultiplayer', v)} />
               </Row>
+              <Row label="Home" desc="A page to start from: what needs you, a box to start a thread, and your team's week. The Inbox gets a sky below its list. Pick the sky in Appearance.">
+                <Switch label="Home" on={homeSet.on} onChange={(v) => setHomeSetting(HOME_KEY, v)} />
+              </Row>
             </Group>
           </Page>
         )}
@@ -2544,6 +2550,9 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 ))}
               </div>
             </Group>
+            {homeSet.on && <Group id="sky" label="Sky">
+              <SkyPicker />
+            </Group>}
             {/* THE DIALS, and only under a picture. Both move the window she is
                 looking at as she drags. Dark is Ember Grid, which has no
                 picture to blur or dim, so they do not show for it
