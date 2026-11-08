@@ -248,7 +248,7 @@ import { usePointerHold, useHeldOrder } from './threads/steady-rows';
 import { inviteRows, leadRows, type InviteRow, type LeadRow } from './threads/needs-you-rows';
 import { InviteRows } from './threads/InviteRows';
 import { mentionRows } from './team/rooms/room-rules';
-import { SAYS_UNDO, oWaitsFor, oWaitsForTheSend, opensTheToast, saysWhereItWent, toastOpens, toastParts, type OWaits, type ToastGoes } from './toast-parts';
+import { SAYS_UNDO, oIsTheToasts, oWaitsFor, oWaitsForTheSend, opensTheToast, saysWhereItWent, toastOpens, toastParts, type OWaits, type ToastGoes } from './toast-parts';
 import { SentLine } from './components/SentLine';
 import { TickedBar } from './components/TickedBar';
 import { AgentSending } from './team/AgentSending';
@@ -6010,6 +6010,7 @@ export default function App() {
         setModal((m) => (m === 'palette' ? null : 'palette'));
         return;
       }
+      const toastsO = oIsTheToasts(e.key, toast, sentAt.current, Date.now());
       // A ROOM OWNS THE KEYBOARD WHILE IT IS OPEN, as Settings does: the list
       // behind it is not on the screen. Escape goes back to the threads and
       // Tab walks on along the tabs. N goes on to the room's branch below the
@@ -6027,7 +6028,7 @@ export default function App() {
         return;
       }
       // So does a teammates page, which has no list for J, K or E to act on.
-      if (teammatesShown && e.key !== 'n' && e.key !== 'N') {
+      if (teammatesShown && e.key !== 'n' && e.key !== 'N' && !toastsO) {
         // Escape in an open dropdown closes the dropdown, not the page.
         if (modal || inInput || target?.tagName === 'SELECT' || e.metaKey || e.ctrlKey || e.altKey) return;
         // A document open over its chat goes first, as its close button says.
@@ -6036,12 +6037,12 @@ export default function App() {
         if (e.key === 'g' || e.key === 'G') { const box = document.querySelector<HTMLInputElement>('.cx-search input'); if (box) { e.preventDefault(); box.focus(); } }
         return;
       }
-      if (connectionsShown && e.key !== 'n' && e.key !== 'N') {
+      if (connectionsShown && e.key !== 'n' && e.key !== 'N' && !toastsO) {
         if (modal || inInput || e.metaKey || e.ctrlKey || e.altKey) return;
         if (e.key === 'Escape') { e.preventDefault(); setConnectionsPage(null); }
         return;
       }
-      if (filesShown && e.key !== 'n' && e.key !== 'N') {
+      if (filesShown && e.key !== 'n' && e.key !== 'N' && !toastsO) {
         if (modal || inInput || e.metaKey || e.ctrlKey || e.altKey) return;
         if (e.key === 'Escape') { e.preventDefault(); setFilesPage(null); }
         else if (e.key === '/') { e.preventDefault(); document.querySelector<HTMLInputElement>('.fp-find input')?.focus(); }
