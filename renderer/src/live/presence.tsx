@@ -11,8 +11,8 @@ import { Face } from '../team/people';
 import type { LiveSession } from './live-session';
 import './presence.css';
 
-export type PresenceLook = 'flags' | 'rail' | 'gutter' | 'tint' | 'roster';
-export const PRESENCE_LOOKS: PresenceLook[] = ['flags', 'rail', 'gutter', 'tint', 'roster'];
+export type PresenceLook = 'flags' | 'rail' | 'gutter' | 'tint';
+export const PRESENCE_LOOKS: PresenceLook[] = ['flags', 'rail', 'gutter', 'tint'];
 
 export function presenceLook(): PresenceLook {
   try {
@@ -231,11 +231,10 @@ export function LivePresence({ session, editor, column, look }: { session: LiveS
     for (const s of spots) { const k = Math.round(s.block); m.set(k, [...(m.get(k) ?? []), s]); }
     return [...m];
   }, [spots]);
-  const roster = useRef<HTMLDivElement | null>(null);
   if (!others.length) return null;
   return (
     <>
-      {look !== 'roster' && <Faces here={here} />}
+      <Faces here={here} />
       {look === 'rail' && (
         <div className="lv-rail" aria-hidden="true">
           {spots.map((s, i) => <span key={i} className={`lv-tick${s.agent ? ' is-agent' : ''}`} style={{ top: `${(s.top / height) * 100}%`, ['--lv' as string]: s.color }} title={s.name} />)}
@@ -250,22 +249,6 @@ export function LivePresence({ session, editor, column, look }: { session: LiveS
       {look === 'tint' && byBlock.map(([top, list]) => (
         <div key={top} className={`lv-tint${list.some((s) => s.agent) ? ' is-agent' : ''}`} style={{ top, height: list[0].blockH, ['--lv' as string]: list[0].color }} aria-hidden="true" />
       ))}
-      {look === 'roster' && (
-        <div className="lv-roster" ref={roster}>
-          <div className="lv-roster-count">{here.length} here</div>
-          {here.slice(0, 14).map((h) => {
-            const at = spots.find((s) => s.name === h.name);
-            return (
-              <div key={h.id} className="lv-roster-row" style={{ ['--lv' as string]: h.color }}>
-                <span className="lv-roster-dot" />
-                <span className="lv-roster-name">{h.me ? 'You' : h.name}</span>
-                {at?.section && <span className="lv-roster-at">{at.section}</span>}
-              </div>
-            );
-          })}
-          {here.length > 14 && <div className="lv-roster-more">and {here.length - 14} more</div>}
-        </div>
-      )}
     </>
   );
 }

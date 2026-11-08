@@ -22,7 +22,7 @@
 .lv-sel { background: color-mix(in srgb, var(--lv) 22%, transparent); }
 
 /* Looks that draw the place elsewhere keep the cursor bare. */
-.doc-sheet:is(.lv-look-rail, .lv-look-gutter, .lv-look-tint, .lv-look-roster) .lv-flag { display: none; }
+.doc-sheet:is(.lv-look-rail, .lv-look-gutter, .lv-look-tint) .lv-flag { display: none; }
 
 /* Who is here: faces at the top right of the page. */
 .lv-faces { position: absolute; top: -34px; right: 0; display: flex; align-items: center; gap: 4px; }
@@ -48,16 +48,6 @@
 .lv-tint { position: absolute; left: -16px; width: 2px; height: 27px; background: var(--lv); transition: top .25s ease-out; }
 .lv-tint.is-agent { background: linear-gradient(180deg, transparent, var(--lv), transparent); background-size: 100% 200%; animation: lv-sheen 1.8s linear infinite; }
 @keyframes lv-sheen { from { background-position: 0 100%; } to { background-position: 0 -100%; } }
-
-/* Roster: who is here and the section they are in, in the right-hand track. */
-.lv-roster { position: absolute; top: 0; left: calc(100% + 40px); width: 200px; font-size: 12.5px; line-height: 18px; font-family: inherit; }
-.lv-roster-count { color: var(--text-faint); font-weight: 600; margin-bottom: 8px; font-variant-numeric: tabular-nums; }
-.lv-roster-row { display: grid; grid-template-columns: 8px auto 1fr; gap: 8px; align-items: baseline; padding: 2px 0; }
-.lv-roster-dot { width: 7px; height: 7px; background: var(--lv); align-self: center; }
-.lv-roster-name { color: var(--text-dim); white-space: nowrap; }
-.lv-roster-at { color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lv-roster-more { color: var(--text-faint); padding-top: 4px; }
-.doc-sheet.lv-look-roster .doc-outline { visibility: hidden; }
 
 /* A table: the cell someone else is on, outlined in their colour, their name on its corner. */
 .tbl-bar .lv-faces { position: static; margin-left: auto; padding-left: 12px; }
