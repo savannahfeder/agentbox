@@ -37,6 +37,7 @@ export function addressedTo(text: string | null | undefined, people: ReadonlyArr
 export function stillWaiting(note: { wait?: boolean; toAgent?: boolean; sent?: boolean } | null | undefined): boolean;
 export function noteGoesTo(note: { text?: string; mentions?: readonly string[]; toAgent?: boolean } | null | undefined, people?: ReadonlyArray<{ id: string; name?: string | null }>): { to: 'agent' } | { to: 'person'; person: string } | { to: 'nobody' };
 export function notesForTheAgent(marks: FileMarks | null | undefined, version: FileVersion, count: number, opts?: { nameOf?: (id: string | null) => string }): { text: string; ids: string[] };
+export function repliesForTheAgent(note: FileNote, replies: NonNullable<FileNote['replies']>, version: FileVersion, count: number, opts?: { nameOf?: (id: string | null) => string }): string;
 export const MAX_EDIT_BYTES: number;
 export function editedWords(name: string, path: string): string;
 export function editClash(family: Pick<FileFamily, 'versions'> | null | undefined, baseN: number, me: string | null, nameOf: (id: string | null) => string): string | null;

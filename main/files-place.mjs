@@ -944,6 +944,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
           const n = file.notes.find((x) => x.id === mark.on);
           if (!n) return { ok: false, error: 'that comment is gone' };
           await writeTo(n.thread, mark);
+          if (mark.do === 'reply' && n.thread.ref.kind !== 'shared' && n.thread.ref.kind !== 'room') return { ok: true, wrote: { product: n.thread.ref.product, id: n.thread.ref.id } };
         } else if (mark.do === 'seen') {
           const by = new Map();
           for (const id of mark.on ?? []) {

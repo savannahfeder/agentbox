@@ -155,7 +155,7 @@ export function marksOf(entries) {
   const answers = new Map();
   for (const r of [...replies.values()].sort((a, b) => a.ts - b.ts)) {
     if (!answers.has(r.on)) answers.set(r.on, []);
-    answers.get(r.on).push({ id: r.id, text: r.text, by: r.by, ts: r.ts });
+    answers.get(r.on).push({ id: r.id, text: r.text, by: r.by, ts: r.ts, ...(sent.has(r.id) ? { sent: true } : {}) });
   }
   const list = [...notes.values()].map((n) => {
     const s = settled.get(n.id);
@@ -687,22 +687,31 @@ export function nextVersionName(name, count) {
   return `${stem}-v${Math.max(count, named) + 1}${ext}`;
 }
 
+const spotWords = (n) => (unit(n.place.x)
+  ? `${placeWords(n)}, ${Math.round(n.place.x * 100)}% across and ${Math.round(n.place.y * 100)}% down`
+  : placeWords(n));
+const saveAsNext = (version, count) => `save the result as ${nextVersionName(version.name, count)} beside the original, keeping the original as it is. Name the new file in your reply so it opens as the next version of ${baseName(version.name)}. The app gives every version its number, the same for everyone, so call it the next version, not a number of your own.`;
+
 /** The open notes on this version not yet sent to the agent, as the words that send them. */
 export function notesForTheAgent(marks, version, count, { nameOf = () => 'Someone' } = {}) {
   const open = (marks?.notes ?? []).filter((n) => n.file === version.id && !n.resolved && !n.sent);
-  const say = (n) => {
-    const at = unit(n.place.x)
-      ?`${placeWords(n)}, ${Math.round(n.place.x * 100)}% across and ${Math.round(n.place.y * 100)}% down`
-      : placeWords(n);
-    return `- ${at}: ${n.text} (${nameOf(n.by)})`;
-  };
   const text = [
     `Notes on ${version.path}:`,
-    ...open.map(say),
+    ...open.map((n) => `- ${spotWords(n)}: ${n.text} (${nameOf(n.by)})`),
     '',
-    `Make these changes and save the result as ${nextVersionName(version.name, count)} beside the original, keeping the original as it is. Name the new file in your reply so it opens as the next version of ${baseName(version.name)}. The app gives every version its number, the same for everyone, so call it the next version, not a number of your own.`,
+    `Make these changes and ${saveAsNext(version, count)}`,
   ].join('\n');
   return { text, ids: open.map((n) => n.id) };
+}
+
+/** Replies on a note the agent was already sent, as the words that send them. */
+export function repliesForTheAgent(note, replies, version, count, { nameOf = () => 'Someone' } = {}) {
+  return [
+    `${replies.length === 1 ? 'A reply' : 'Replies'} on the note at ${spotWords(note)} on ${version.path}, "${note.text}":`,
+    ...replies.map((r) => `- ${r.text} (${nameOf(r.by)})`),
+    '',
+    `If this asks for changes, make them and ${saveAsNext(version, count)}`,
+  ].join('\n');
 }
 
 const escaped = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

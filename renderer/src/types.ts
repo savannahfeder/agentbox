@@ -244,7 +244,7 @@ export interface FileNote {
   from?: string;
   /** In the Files place, the thread or chat it was written in. */
   in?: string;
-  replies?: { id: string; text: string; by: string | null; ts: number }[];
+  replies?: { id: string; text: string; by: string | null; ts: number; sent?: boolean }[];
 }
 
 export interface FileApproval { file: string; by: string | null; ts: number; owner: string | null }

@@ -1,7 +1,7 @@
 // A teammate's note on a file an agent made wakes that agent's thread: it is
 // told the notes as a turn, once, the way a teammate's reply is
 // (shared/artifact-marks.mjs notesForItsAgent).
-import { answeredNotes, approvalId, notedFilesInLines, noteGoesTo, notesForItsAgent, notesForTheAgent, stillWaiting, threadFiles } from '../shared/artifact-marks.mjs';
+import { answeredNotes, approvalId, notedFilesInLines, noteGoesTo, notesForItsAgent, notesForTheAgent, repliesForTheAgent, stillWaiting, threadFiles } from '../shared/artifact-marks.mjs';
 import { heldByAPerson } from '../shared/team-rules.mjs';
 import { readItemHistory } from './store/work-items.mjs';
 import { submitReply } from './live-replies.mts';
@@ -55,6 +55,7 @@ export function resolveAnsweredNotes({ store, people = [], now = Date.now() }) {
 // mark), which tells the agent every note it names on a file in one reply.
 export async function noteToItsAgent({ store, supervisor, product, id, mark, nameOf = () => 'the person writing to you', people = [], handOffMs = 1500 }) {
   if (mark?.do === 'approve') return approvalToItsAgent({ store, supervisor, product, id, mark });
+  if (mark?.do === 'reply') return replyToItsAgent({ store, supervisor, product, id, mark, nameOf, people, handOffMs });
   if (mark?.do === 'note' && mark.wait) return false;
   const ids = mark?.do === 'note' ? [mark.id] : mark?.do === 'toagent' ? mark.on ?? [] : [];
   if (!ids.length || ids.some((n) => !n)) return false;
@@ -74,6 +75,26 @@ export async function noteToItsAgent({ store, supervisor, product, id, mark, nam
   if (!byVersion.size) return false;
   const text = [...byVersion.values()].map(({ version, count, notes }) => notesForTheAgent({ notes }, version, count, { nameOf }).text).join('\n\n');
   const sent = [...byVersion.values()].flatMap(({ notes }) => notes.map((n) => n.id));
+  return handOn({ store, supervisor, product, id, text, sent, handOffMs });
+}
+
+// A reply goes where its note went: only on a note the agent was sent, and not
+// when it is written to a teammate or only thanks.
+async function replyToItsAgent({ store, supervisor, product, id, mark, nameOf, people, handOffMs }) {
+  if (!mark.id || !mark.on || store.listProducts().find((p) => p.slug === product)?.team?.direct) return false;
+  const item = store.readItem(product, id);
+  if (!item || heldByAPerson(item)) return false;
+  const note = (item.artifacts?.notes ?? []).find((n) => n.id === mark.on);
+  const reply = note?.replies?.find((r) => r.id === mark.id);
+  if (!reply || note.resolved || !note.sent || reply.sent || noteGoesTo({ text: reply.text }, people).to !== 'agent') return false;
+  const family = threadFiles(notedFilesInLines(readItemHistory(store.productDir(product), id))).find((f) => f.versions.some((v) => v.id === note.file));
+  const version = family?.versions.find((v) => v.id === note.file);
+  if (typeof version?.agent !== 'string') return false;
+  const text = repliesForTheAgent(note, [reply], version, family.versions.length, { nameOf });
+  return handOn({ store, supervisor, product, id, text, sent: [reply.id], handOffMs });
+}
+
+async function handOn({ store, supervisor, product, id, text, sent, handOffMs }) {
   const going = submitReply(supervisor, { product, id, answer: text }, () => store.answerItem(product, id, { answer: text, fromNotes: sent }))
     .then(() => { supervisor.liftBrakeForHer?.(); supervisor.wake?.(); });
   // A running agent acknowledges a line at its next break, which can be minutes

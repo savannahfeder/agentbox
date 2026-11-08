@@ -29,7 +29,7 @@ export function wakeForNotes(opts: {
 /** Resolves the notes a newer version answered; returns how many. */
 export function resolveAnsweredNotes(opts: { store: NotesStore; people?: readonly Person[]; now?: number }): number;
 
-/** Sends your note on an agent's file to that agent as your reply; resolves false when nothing went. */
+/** Sends your note, or your reply on a note it was sent, on an agent's file to that agent as your reply; resolves false when nothing went. */
 export function noteToItsAgent(opts: {
   store: NoteReplyStore;
   supervisor: ReplySupervisor & { liftBrakeForHer?(): unknown; wake?(): unknown };

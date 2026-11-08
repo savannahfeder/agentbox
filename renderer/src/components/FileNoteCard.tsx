@@ -91,6 +91,7 @@ export function FileNoteCard({ note, answeredBy = null, wordsGone, product, acti
           <span className="av-note-when">{clockAt(r.ts)}</span>
         </span>
         <span className="av-note-text">{r.text}</span>
+        {r.sent && <span className="av-note-acts av-note-facts"><span className="av-note-sent"><NoteGlyph name="send" />Sent to the agent</span></span>}
       </div>
     ))}
     {replying && (
