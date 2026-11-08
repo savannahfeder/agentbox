@@ -372,7 +372,7 @@ export default function ThreadScreen() {
     return (
       <Wall>
         <TopBar left={<IconButton label="Back" onPress={back}><Back /></IconButton>} />
-        {c.loading || sentFromHere ? <Waiting list /> : <T style={{ padding: size.inset, color: color.dim }}>This thread is not on your phone.</T>}
+        {c.loading ? <Waiting list /> : sentFromHere ? <Waiting list /> : <T style={{ padding: size.inset, color: color.dim }}>This thread is not on your phone.</T>}
       </Wall>
     );
   }
