@@ -50,6 +50,18 @@ describe('a restart that resumes many threads saves its state once', () => {
     expect(saved.handledAnswers).toContain(`w-${THREADS - 1}:go`);
   });
 
+  it('resuming many ticked threads at once writes the state file once too', () => {
+    sup.spawnWorker = (item) => {
+      sup.sessions.set(item.id, { itemId: item.id });
+      sup._handledAnswers.add(`${item.id}:go`);
+      sup._saveState();
+    };
+    const spy = vi.spyOn(fs, 'writeFileSync');
+    const out = sup.resumeItems(items.map((i) => i.id));
+    expect(out.resumed).toBe(THREADS);
+    expect(writesOfState(spy)).toBe(1);
+  });
+
   it('a save outside a pass still writes at once', () => {
     const spy = vi.spyOn(fs, 'writeFileSync');
     sup._handledAnswers.add('w-x:hi');

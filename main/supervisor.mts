@@ -2303,7 +2303,7 @@ export class Supervisor {
   // done to it: no fresh worker, no cleared mark, no stranger briefed from
   // zero. It waits for the user, which is deliberately preferred over
   // restarting it.
-  // Every thread it puts back saves the whole state, so a restart with many saved once per thread in one hold.
+  // Each thread it puts back asks for a save of the whole state; one write covers them all.
   recoverInterrupted(reason = 'startup') {
     return this._savingOnce(() => this._recoverInterruptedNow(reason));
   }
