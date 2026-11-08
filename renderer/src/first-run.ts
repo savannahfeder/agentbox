@@ -18,30 +18,54 @@ export function previousScreen(screen: Screen): Screen | null {
  *  folder and the first task are now the tutorial's (./tour.ts), on the inbox. */
 export const FIRST_RUN_STEP = { welcome: 21, chats: 22, task: 23, where: 24 } as const;
 
-export function readyEngines(readings: Array<{ engine: Engine; found?: boolean; signedIn?: boolean } | null>): Engine[] {
+type Reading = { engine: Engine; found?: boolean; signedIn?: boolean } | null;
+
+export function readyEngines(readings: Reading[]): Engine[] {
   return (['claude', 'codex'] as const).filter((engine) => readings.some((r) => r?.engine === engine && r.found && r.signedIn));
+}
+
+/** Installed here but not signed in: its button signs in rather than installs. */
+export function signedOutEngines(readings: Reading[]): Engine[] {
+  return (['claude', 'codex'] as const).filter((engine) => readings.some((r) => r?.engine === engine && r.found && !r.signedIn));
 }
 
 export const ENGINE_NAME: Record<Engine, string> = { claude: 'Claude Code', codex: 'Codex' };
 
 export type EngineSetup = { engine: Engine; phase: string; error?: string | null } | null;
 
+/** What pressing an agent's button on the first screen does, in its own words. */
+export function setupWord(engine: Engine, signedOut: Engine[] = []): string {
+  return `${signedOut.includes(engine) ? 'Sign in to' : 'Install'} ${ENGINE_NAME[engine]}`;
+}
+
+/** The footer's line when nothing is ready yet. */
+export function foundLine(signedOut: Engine[]): [string, string] {
+  if (!signedOut.length) return ['No coding agent', 'found'];
+  return [signedOut.map((e) => ENGINE_NAME[e]).join(' and '), 'signed out'];
+}
+
 /**
- * THE FIRST SCREEN WHILE AN AGENT IS BEING INSTALLED (F-145).
+ * THE FIRST SCREEN WHILE AN AGENT IS BEING INSTALLED OR SIGNED IN (F-145, F-178).
  *
- *  The heading is the only line on that screen anybody reads, so it is the one
- *  that has to change: leaving it on "Install Claude Code or Codex to start"
- *  for the length of an install told a tester to press again. `running` holds
- *  both buttons, including the other agent's, because installing two at once
- *  is not something anybody asked for and the footer can only report one.
+ *  The heading is the only line on that screen anybody reads, so it names the
+ *  agent and what is happening. `running` swaps the two agent buttons for Back,
+ *  and, while signing in, a way to open the page again: a sign-in waits on its
+ *  browser tab for as long as the tool likes, so closing that tab must not
+ *  leave the screen with nothing to press.
  */
-export function installGate(setup: EngineSetup): { heading: string; running: boolean } {
+export function installGate(setup: EngineSetup, signedOut: Engine[] = []): { heading: string; running: boolean; again: boolean } {
   const running = !!setup && ['installing', 'checking', 'signing-in'].includes(setup.phase);
-  if (!running) return { heading: 'Install Claude Code or Codex to start', running: false };
+  if (!running) {
+    const heading = signedOut.length ? 'Set up Claude Code or Codex to start' : 'Install Claude Code or Codex to start';
+    return { heading, running: false, again: false };
+  }
   const named = ENGINE_NAME[setup!.engine];
+  const signingIn = setup!.phase === 'signing-in';
   return {
-    heading: setup!.phase === 'signing-in' ? `Finish signing in to ${named} in your browser` : `Installing ${named}`,
+    heading: signingIn ? `Finish signing in to ${named} in your browser`
+      : setup!.phase === 'checking' && signedOut.includes(setup!.engine) ? `Signing in to ${named}` : `Installing ${named}`,
     running: true,
+    again: signingIn,
   };
 }
 

@@ -208,7 +208,11 @@ import { namedCards } from './team/company';
 import { FaceHover } from './team/status';
 import { TeamPage } from './team/TeamPage';
 import { ProjectShare, ProjectWho } from './team/ProjectShare';
-import { ConnectComputer, EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, ItemsContext, LiveContext, CloudContext, SavedKeysContext, MoveToCloudContext, CloudOfferContext, FreeAgentContext, StateTabs, TryAgainContext, WaitingContext } from './threads/Pages';
+import { AskCard } from './threads/AskCard';
+import { inboxAsks, putOffKeys, readPutOff, writePutOff, type InboxAsk } from './threads/inbox-asks';
+import { focusNeedOnOpen } from './components/NeedCard';
+import { needId, needsLeft } from '../../shared/cloud-needs.mjs';
+import { ConnectComputer, EmptyTab,FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, ItemsContext, LiveContext, CloudContext, SavedKeysContext, MoveToCloudContext, CloudOfferContext, FreeAgentContext, StateTabs, TryAgainContext, WaitingContext } from './threads/Pages';
 import { offersTryAgain, tryAgainWords } from './try-again';
 import { cloudOffer, type OfferGo } from './cloud-upgrade';
 import { FleetContext, queuedWithHeld, type Fleet } from './fleet';
@@ -3509,6 +3513,12 @@ export default function App() {
     cardRoomUndo.current?.();
     cardRoomUndo.current = el ? roomForTheCard(el) : null;
   }, []);
+  const [asksPutOff, setAsksPutOff] = useState(readPutOff);
+  const putAskOff = useCallback((ask: InboxAsk) => setAsksPutOff((was) => {
+    const next = new Set([...was, ...putOffKeys(ask)]);
+    writePutOff(next);
+    return next;
+  }), []);
   // AND THE OPEN THREAD'S OWN CARD IS THE ONE IN FRONT. The order is decided in
   // the main process, because ⌘Y is answered there, ahead of this page; all
   // this says is which thread is being read (shared/which-card-is-in-front.mts).
@@ -6676,6 +6686,7 @@ export default function App() {
   const artifactView = artifactPlacement(artifactMode, artifactWidth);
   const notesHere = fullScreenDoc && !!focused && openDoc?.product === focused.product && !openDoc.readOnly && takesNotesSidebar(openDoc.src);
   const notesShown = notesHere && notesOpen;
+  const notesClosed = notesHere && !notesOpen;
   const [artifactHeader, setArtifactHeader] = useState<HTMLDivElement | null>(null);
   const readingWidth = 'balanced';
   const [taskHeader, setTaskHeader] = useState<HTMLDivElement | null>(null);
@@ -6815,6 +6826,7 @@ export default function App() {
   // THE FIRST RUN ENDS IN THE INBOX, where the tutorial takes over.
   const finishFresh = useCallback(() => {
     finishFirstRun(localStorage);
+    rememberOffered(localStorage);
     setTour(startTour());
     setFresh(false);
     setView('inbox');
@@ -6827,6 +6839,8 @@ export default function App() {
   const finishClassic = useCallback((sent: string | null, runAt = 0, draft?: string) => {
     const to = firstRunLanding(sent, runAt);
     finishFirstRun(localStorage);
+    // Onboarding was the moment to offer it; a project made later is mid-task (F-164).
+    rememberOffered(localStorage);
     setLessons(localStorage, ['open', 'pick']);
     setLessonList(['open', 'pick']);
     setFresh(false);
@@ -7362,7 +7376,12 @@ export default function App() {
   // toast covered Allow and Deny. Read off the same stage the card is drawn
   // from below, so the class and the card cannot disagree about what is asked.
   const stage = approvalStage(snap?.approvals, answered, frontApproval.current, signInGate || phoneSignInSettling);
-  const cardOnScreen = !!stage.card;
+  // What cloud threads wait on takes the same corner, on the inbox only, and
+  // never over an approval: that one has an agent frozen behind it.
+  const onTheInbox = !focused && !focusedRepeat && !settingsOpen && !teamShown && !filesShown && !connectionsShown
+    && !teammatesShown && !roomShown && search === null && !modal && !inPractice && !onPhone();
+  const asksShown = !stage.card && !signInGate && onTheInbox ? inboxAsks(inbox, savedCloudKeys, asksPutOff) : [];
+  const cardOnScreen = !!stage.card || asksShown.length > 0;
   cardOnStage.current = stage.card && !stage.verdict ? stage.card.id : null;
   const mover = {
     ids: new Set([...(snap?.cloud?.movable ?? []), ...(snap?.supervisor.running ?? []).filter((r) => r.movable).map((r) => r.itemId)]),
@@ -7394,7 +7413,7 @@ export default function App() {
     <FreeAgentContext.Provider value={freeWaitIds}>
     <TryAgainContext.Provider value={tryAgain}>
     <CloudOfferContext.Provider value={cloudOfferNow ? { offer: cloudOfferNow, onGo: (go) => void onCloudGo(go) } : null}>
-    <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app workspace-layout${narrowSidebar ? ` gt-rail gt-inset gt-sumleft${sideFolded ? '' : ' gt-rail-open'}` : ''}${focused && !settingsOpen && !inChats ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${sideFolded ? ' workspace-collapsed' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${notesShown ? ' notes-open' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}${cardOnScreen ? ' asking' : ''}${(queueSpot || onePage) && focused ? ' one-at-a-time' : ''}`}>
+    <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app workspace-layout${narrowSidebar ? ` gt-rail gt-inset gt-sumleft${sideFolded ? '' : ' gt-rail-open'}` : ''}${focused && !settingsOpen && !inChats ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${sideFolded ? ' workspace-collapsed' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${notesShown ? ' notes-open' : ''}${notesClosed ? ' notes-closed' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}${cardOnScreen ? ' asking' : ''}${(queueSpot || onePage) && focused ? ' one-at-a-time' : ''}`}>
 
       {/* At the end of <body>, so its drag rectangles are reported after the
           top bar's and this layout's ::after strip. Inside the app, those put
@@ -7584,6 +7603,7 @@ export default function App() {
               here, on a phone only (searchInTheList). It ended the tabs row
               (w-3c51d02de5) until an iPhone clipped it out of sight there,
               because that row scrolls sideways (w-33511040d7). */}
+          {filesShown && !focused && <div className="th-right" id="fp-head-slot" />}
           {!focused && !settingsOpen && !teamShown && !filesShown && !connectionsShown && (teammatesShown && !evOn ? teammatesUi.right : roomShown && roomsUi.heading?.right !== undefined ? roomsUi.heading.right : (
             <HeaderActions
               page="inbox"
@@ -9189,6 +9209,15 @@ export default function App() {
           </div>
         );
       })()}
+
+      <AskCard asks={asksShown} room={cardRoom} onLater={putAskOff} onGive={(ask) => {
+        const item = ask.items[0];
+        // A code waits for the sign-ins on its ask, so the cursor lands on the first of those.
+        const first = ask.need.startsWith('code:') ? needsLeft(item, savedCloudKeys).find((n) => n.kind === 'sign-in' || n.kind === 'key') : null;
+        focusNeedOnOpen(item.id, first ? needId(first) : ask.need);
+        setFocused(item);
+        markSeen(item);
+      }} />
 
       {modal === 'snooze' && snoozeItem && (
         <Snooze

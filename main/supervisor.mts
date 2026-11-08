@@ -9,6 +9,7 @@ import type { BridgeStateEvent } from './task-remote-control.mts';
 import { taskFolderPath, real, restoreTaskFolder } from './task-folders.mts';
 import { SHIP_LABEL, ShipQueue, readShipSettings, shipScriptFor, shipSlot } from './ship-queue.mts';
 import { MainTests } from './main-went-red.mts';
+import { CloudServerWatch, serverError } from './cloud-server-down.mts';
 import { folderJob } from './task-folders-offthread.mts';
 import { gitJob } from './git-change-offthread.mts';
 import { queuedReplyText, submitReply, framedPick, framedTeammate } from './live-replies.mts';
@@ -69,6 +70,7 @@ import { execFileSync } from 'node:child_process';
 import { holdUntilHome } from './cloud/codex-cloud.mts';
 import { hostSocketPath, perlRunsTheShim, HOST_ALREADY_THERE } from './cloud/host.mts';
 import { runHostSocket, spoolFiles, HOST_ALREADY_THERE as RUN_HOST_ALREADY_THERE } from './run-host.mjs';
+import { toolHostDir, readToolHost, shareToolServers, TOOL_HOST_ALREADY_THERE } from './tool-host.mjs';
 import { HostedRun, HOST_LOST } from './hosted-run.mjs';
 import { readCloudUsage, summarizeCloudUsage } from './cloud/usage.mts';
 import { buildSessionArgs, CLAUDE_MODES, parseSessionArgs, permissionMode } from './settings.mts';
@@ -1222,6 +1224,7 @@ export class Supervisor {
   declare onShipped: () => void;
   declare shipQueue: ShipQueue;
   declare mainTests: MainTests;
+  declare cloudServerWatch: Pick<CloudServerWatch, 'down' | 'up'>;
   declare sessions: Map<string, WorkerSession>;
   declare onChange: (() => void) | null;
   declare onRecovered: ((news: RecoveryNews) => void) | null;
@@ -1239,6 +1242,7 @@ export class Supervisor {
   declare idleMs: (() => number | null | undefined) | undefined;
   declare stalls: { take(): Record<string, unknown> | undefined; longestNow?(): number } | undefined;
   declare hostRuns: boolean | undefined;
+  declare shareTools: boolean | undefined;
   declare terminalOpen: ((id: string) => boolean) | undefined;
   declare runLedger: string | undefined;
   declare _remoteControls: Map<string, RemoteControlState> | undefined;
@@ -1255,6 +1259,9 @@ export class Supervisor {
   declare _runHostBroken: number | undefined;
   declare _runHostSock: string | undefined;
   declare _runHostProc: ChildProcess | undefined;
+  declare _toolHostDir: string | undefined;
+  declare _toolHostProc: ChildProcess | undefined;
+  declare _toolHostDeaths: number | undefined;
   declare _stateFile: string;
   declare _handledAnswers: Set<string>;
   declare _resumedWaits: Set<string>;
@@ -1444,6 +1451,7 @@ export class Supervisor {
     // agent has ended its turn, so main was red for four days in October with
     // nobody reading the cross (main/main-went-red.mts).
     this.mainTests = new MainTests({ store, userDir });
+    this.cloudServerWatch = new CloudServerWatch({ store, userDir, home: config?.home || undefined });
     this._compactionJobs = new Map();
     this.sessions = new Map(); // itemId -> {child, product, startedAt, tail, itemId}
     // Spawns waiting on their row's folder, and folders made for the spawn that
@@ -1731,6 +1739,7 @@ export class Supervisor {
     // meet the memory hold too rather than all arriving before the first
     // reading does (main/start-hold.mts). One sysctl, a few milliseconds.
     if (this.config.memoryGate) this._memReading = readMacPressureNow();
+    if (this.shareTools) this._toolHost();
     try { this.recoverInterrupted('startup'); } catch (e) { console.warn('zero: startup recovery:', (e as Error).message); }
     if (this.config.memoryGate) this.setMemoryGate(true).catch((e) => console.warn('zero: memory gate:', e.message));
     this.setLeftoverCleanup(!!this.config.cleanupLeftovers).catch((e) => console.warn('zero: leftovers:', e.message));
@@ -6673,6 +6682,7 @@ export class Supervisor {
     const h = (this._cloudHealth ??= { faults: 0, lastError: null, restUntil: 0 });
     if (session.sessionId != null || session.result != null) {
       Object.assign(h, { faults: 0, lastError: null, restUntil: 0 });
+      this.cloudServerWatch?.up();
       return;
     }
     if (!signal && code === 0) return;
@@ -6687,7 +6697,11 @@ export class Supervisor {
     h.faults += 1;
     this._startBudget.failed();
     h.lastError = said || `a cloud run ended (${signal || code}) before its agent started`;
-    if (h.faults >= CLOUD_FAULTS_TO_REST) h.restUntil = Date.now() + CLOUD_REST_MS;
+    if (h.faults >= CLOUD_FAULTS_TO_REST) {
+      h.restUntil = Date.now() + CLOUD_REST_MS;
+      const broke = serverError(session.tail);
+      if (broke) this.cloudServerWatch?.down(broke, h.faults);
+    }
     this.onChange?.();
   }
 
@@ -6709,8 +6723,7 @@ export class Supervisor {
       const n = (this._cloudStartFails.get(item.id) ?? 0) + 1;
       this._cloudStartFails.set(item.id, n);
       // A server that errored is not mended by starting this thread there again.
-      const serverBroke = (session.tail ?? []).some((l) => typeof l === 'string' && /agentbox cloud:.*the cloud server said 5\d\d\b/.test(l));
-      keep = serverBroke || n >= CLOUD_STARTS_TO_GIVE_UP;
+      keep = !!serverError(session.tail) || n >= CLOUD_STARTS_TO_GIVE_UP;
     }
     if (!keep) return false;
     this._cloudStartFails.delete(item.id);
@@ -7120,6 +7133,50 @@ export class Supervisor {
       console.warn(`${nameSlug}: the run host could not start, so runs start directly:`, (error as Error).message);
       return null;
     }
+  }
+
+  // The one process serving the store tools to every local run
+  // (main/tool-host.mjs), started with the app. Its folder, or null when there
+  // is none to use and runs start their own servers as before. After three
+  // deaths it is left alone for this launch.
+  _toolHost() {
+    if (!this.shareTools) return null;
+    this._toolHostDir ??= toolHostDir();
+    if (readToolHost(this._toolHostDir)) return this._toolHostDir;
+    const had = this._toolHostProc;
+    if (had && had.exitCode === null && had.signalCode === null) return null;
+    if ((this._toolHostDeaths ?? 0) >= 3) return null;
+    try {
+      fs.mkdirSync(this._toolHostDir, { recursive: true, mode: 0o700 });
+      const log = fs.openSync(path.join(this.userDir, 'tool-host.log'), 'a');
+      const proc = spawn(process.execPath, [...stripTypesFlags(), fileURLToPath(new URL('./tool-host.mjs', import.meta.url)), this._toolHostDir, String(process.pid)], {
+        env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+        detached: true,
+        stdio: ['ignore', log, log],
+      });
+      fs.closeSync(log);
+      proc.on('error', () => {});
+      proc.on('exit', (code) => {
+        if (code === TOOL_HOST_ALREADY_THERE || code === 0) return;
+        this._toolHostDeaths = (this._toolHostDeaths ?? 0) + 1;
+        console.warn(`${nameSlug}: the tool host stopped (${code}); runs start their own tool servers until it is back`);
+      });
+      proc.unref();
+      this._toolHostProc = proc;
+    } catch (error) {
+      this._toolHostDeaths = (this._toolHostDeaths ?? 0) + 1;
+      console.warn(`${nameSlug}: the tool host could not start, so runs start their own tool servers:`, (error as Error).message);
+    }
+    return null;
+  }
+
+  /** A local Claude Code run reaches the shared tool host instead of starting a store server of its own. */
+  _shareToolServers(plan: Pick<SpawnPlan, 'args'>, item: WorkItem, spawnFiles: SpawnFile[]) {
+    const at = plan.args.indexOf('--mcp-config');
+    const dir = at >= 0 ? this._toolHost() : null;
+    if (!dir) return;
+    const pass = shareToolServers(plan.args[at + 1], { dir, item: item.id, product: item.product, storeServer: STORE_SERVER });
+    if (pass) spawnFiles.push(pass);
   }
 
   // A LOCAL RUN THE RUN HOST HOLDS IS LET GO, NOT STOPPED, on a quit or a
@@ -11465,6 +11522,7 @@ export class Supervisor {
     // A LOCAL RUN IS HELD BY THE RUN HOST, so a quit or a restart leaves it
     // and its helpers going (main/run-host.mjs).
     const hosted = !!this.hostRuns && where !== 'cloud' && !remoteOnly && !plan.command;
+    if (hosted && !adopted && engineOf(engine) === 'claude') this._shareToolServers(plan, item, spawnFiles);
     const child: WorkerChild = adopted?.child ?? harness.spawn(this, plan, { cwd, item, profile, env, cloud: where === 'cloud', host: hosted ? this._runHost() : null }) as WorkerChild;
     if (child instanceof HostedRun && !adopted) child.once('exit', (code) => { if (code === HOST_LOST && !Number.isInteger(child.pid)) this._runHostBroken = Date.now(); });
 

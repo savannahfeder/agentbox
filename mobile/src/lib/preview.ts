@@ -296,6 +296,12 @@ export function previewCloud(now = () => Date.now()) {
   if (scene === 'queued') rows.commands.push({ id: 'c-preview-q', device: DEV, project: 'film', item: 'w-5e6f7a8b9c', kind: 'reply', payload: { text: 'Open on the inbox.' }, created_at: new Date(now() - 30_000).toISOString(), claimed_at: null, taken_at: null, outcome: null } as PhoneRows['commands'][number]);
   let signedIn = scene !== 'signed-out' && !walking;
   const settings = previewSettings(now());
+  // `?scene=codex`: a computer whose chosen agent is Codex, so a thread naming none runs on it.
+  if (scene === 'codex') (settings.settings.workspace as any).engine = 'codex';
+  // `previewOffline = true` on the page: reads and sends fail as they do on a phone with no signal.
+  const noSignal = () => {
+    if ((globalThis as any).previewOffline) throw new Error('fetch failed: java.net.UnknownHostException: Unable to resolve host "preview.supabase.co": No address associated with hostname');
+  };
   const team = { ...PREVIEW_TEAM, members: [...PREVIEW_TEAM.members], invites: [...PREVIEW_TEAM.invites] };
   // The Mac takes a change a moment later and sends its settings again.
   const takeSetting = (c: PhoneRows['commands'][number]) => setTimeout(() => {
@@ -341,6 +347,7 @@ export function previewCloud(now = () => Date.now()) {
     signedIn: () => signedIn,
     generation: () => 0,
     async select(table: string, query: string) {
+      noSignal();
       const group = groups.select(table, query);
       if (group) return group;
       joined();
@@ -384,6 +391,7 @@ export function previewCloud(now = () => Date.now()) {
       return new Map(paths.map((p) => [p, previewLink(p.slice(p.lastIndexOf('/') + 1))]));
     },
     async insertCommand(row: Record<string, any>) {
+      noSignal();
       const made = { id: `c-${rows.commands.length + 1}`, payload: {}, item: null, ...row, created_at: new Date(now()).toISOString(), claimed_at: null, taken_at: null, outcome: null } as PhoneRows['commands'][number];
       rows.commands.push(made);
       if (made.kind === 'setting') takeSetting(made);
