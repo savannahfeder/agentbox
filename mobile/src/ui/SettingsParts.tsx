@@ -49,8 +49,8 @@ export function Group({ label, children }: { label?: string; children: ReactNode
 }
 
 /** A row; `reading` adds the line a change from the phone is waiting or was refused on. */
-/** `stack` puts a wide control under the words rather than beside them. */
-export function Row({ label, desc, control, first = false, reading, badge, stack = false }: { label: string; desc?: string | null; control?: ReactNode; first?: boolean; reading?: Reading; badge?: string; stack?: boolean }) {
+/** `stack` puts a wide control under the words rather than beside them; `below` is drawn under the words either way. */
+export function Row({ label, desc, control, first = false, reading, badge, stack = false, below }: { label: string; desc?: string | null; control?: ReactNode; first?: boolean; reading?: Reading; badge?: string; stack?: boolean; below?: ReactNode }) {
   const note = reading?.waiting ? 'Waiting for your computer' : reading?.refused ? `Not changed (${reading.refused})` : null;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20, paddingVertical: 14, borderTopWidth: first ? 0 : 1, borderTopColor: color.line }}>
@@ -60,6 +60,7 @@ export function Row({ label, desc, control, first = false, reading, badge, stack
           {badge ? <T style={{ fontSize: 11, color: color.dim, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, paddingHorizontal: 6, paddingVertical: 1 }}>{badge}</T> : null}
         </View>
         {desc ? <T style={{ fontSize: 12.5, lineHeight: 18.75, color: color.faint, marginTop: 3 }}>{desc}</T> : null}
+        {below}
         {note ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 4 }}>
             {reading?.waiting ? <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: color.accent }} /> : null}
@@ -128,6 +129,28 @@ export function Stepper({ value, min, max, onChange, label }: { value: number; m
       {chip(value - 1, 'M2.5 6h7', value <= min, 'fewer')}
       <T style={{ width: 28, textAlign: 'center', fontSize: 13.5, fontFamily: font.medium }}>{value}</T>
       {chip(value + 1, 'M2.5 6h7M6 2.5v7', value >= max, 'more')}
+    </View>
+  );
+}
+
+/** An account's usage, the desktop's `MiniMeters`: each window's word, bar, percent and when it starts over. */
+export function Meters({ meters }: { meters: { key: string; word: string; percent: number | null; resets: string | null }[] }) {
+  if (!meters.length) return null;
+  return (
+    <View style={{ gap: 7, marginTop: 9 }}>
+      {meters.map((m) => {
+        const full = (m.percent ?? 0) >= 100;
+        return (
+          <View key={m.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+            <T numberOfLines={1} style={{ width: 54, fontSize: 12, color: color.dim }}>{m.word}</T>
+            <View style={{ flex: 1, height: 4, borderRadius: 2, overflow: 'hidden', backgroundColor: color.line }}>
+              <View style={{ height: 4, width: `${Math.min(100, m.percent ?? 0)}%`, backgroundColor: full ? color.accent : color.dim }} />
+            </View>
+            <T style={{ width: 34, textAlign: 'right', fontSize: 12, fontFamily: font.medium, color: full ? color.text : color.dim }}>{m.percent == null ? '–' : `${m.percent}%`}</T>
+            <T numberOfLines={1} style={{ width: 78, fontSize: 12, color: color.faint }}>{m.resets ?? ''}</T>
+          </View>
+        );
+      })}
     </View>
   );
 }

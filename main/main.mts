@@ -927,7 +927,13 @@ async function createWindow() {
   answerWhatOnlyTheWindowAnswered({ handle: (channel, fn) => { if (!phoneChannels.has(channel)) phoneChannels.set(channel, fn); } } as CollectingIpcMain);
   phoneApply = applyThrough(phoneChannels);
   // Every minute, so no engine search: that is a login shell on this thread.
-  phoneSettings = () => phoneChannels.get('zero:settings-read')?.({ sender: null }, { search: false }) ?? null;
+  // The cloud and the usage ride the snapshot, not the settings model, so the
+  // phone's copy takes them here.
+  phoneSettings = async () => {
+    const model = await phoneChannels.get('zero:settings-read')?.({ sender: null }, { search: false });
+    if (!model || typeof model !== 'object') return null;
+    return { ...model, cloud: supervisor.cloudStatus(), usage: ipc.usageForPhone() };
+  };
   updater.start();
   // A task the app just shipped moved main: look now rather than in half an
   // hour, so the restart is offered while she still remembers the task.

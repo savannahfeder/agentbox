@@ -113,6 +113,10 @@ export function previewRows(now = Date.now()): PhoneRows {
   };
 }
 
+const usage = (span: 'session' | 'week', percent: number, resetsAt: number) => ({
+  span, qualifier: span === 'week' ? 'all models' : null, name: span === 'week' ? 'This week' : 'This session', percent, resetsText: null, resetsOn: null, resetsAt, reset: false,
+});
+
 /** Settings as a Mac sends them (shared/phone-settings.mjs phoneSettingsOf). */
 export function previewSettings(now = Date.now()) {
   return {
@@ -124,13 +128,17 @@ export function previewSettings(now = Date.now()) {
         permission: 'auto', codexMode: 'auto', engines: ['claude', 'codex'], claude: { found: true }, codex: { found: true },
         codexModels: [{ id: 'gpt-5.6-sol', label: 'GPT-5.6-Sol', levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'medium' }, { id: 'gpt-5.6-terra', label: 'GPT-5.6-Terra', levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'medium' }, { id: 'gpt-5.6-luna', label: 'GPT-5.6-Luna', levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'medium' }], codexModelDefault: 'gpt-5.6-sol',
         agentsAuto: true, sessionsAtOnce: 4, agentsTotal: 6, agentsAutoTotal: 6, agentsNudge: 0, slotsMax: 12, slotsSuggested: 6, running: 3,
-        memoryGate: { on: true, slots: null, slotsAuto: 2, slotsMax: 8, now: 'Memory is fine. Nothing heavy running.' },
+        memoryGate: { on: true, slots: null, slotsAuto: 2, slotsMax: 8, now: 'Memory is fine. Nothing heavy running.', reading: { heavy: 1, waiting: 0, pressure: 'normal', usedPct: 58, asked: 14, waited: 2, refused: 0, holding: false } },
         leftovers: { on: false, now: null },
+        cloud: { mode: 'full', whenOn: 'full', engines: ['claude'], inUse: { claude: 'you@example.com', codex: null } },
+        cloudPermission: 'bypassPermissions', cloudCodexMode: 'same', paused: false, productOrder: ['agentbox', 'film'],
         accounts: [
-          { id: 'default', email: 'you@example.com', chosen: false, state: 'live', note: null, plan: 'Max 20x', running: 2 },
-          { id: '.claude-work', email: 'you@work.example', chosen: false, state: 'at-limit', note: 'At its limit. Agents start again on their own when it resets.', resetsAt: now + 19 * 60 * MIN, plan: 'Max 5x', running: 1 },
+          { id: 'default', email: 'you@example.com', chosen: false, state: 'live', note: null, plan: 'Max 20x', running: 2,
+            usage: { at: now - 4 * MIN, limits: [usage('session', 34, now + 3 * 60 * MIN), usage('week', 61, now + 3 * 24 * 60 * MIN)] } },
+          { id: '.claude-work', email: 'you@work.example', chosen: false, state: 'at-limit', note: 'At its limit. Agents start again on their own when it resets.', resetsAt: now + 19 * 60 * MIN, plan: 'Max 5x', running: 1,
+            usage: { at: now - 9 * MIN, limits: [usage('session', 100, now + 19 * 60 * MIN), usage('week', 88, now + 2 * 24 * 60 * MIN)] } },
         ],
-        codexAccounts: [{ id: 'default', email: 'you@example.com', name: 'You', plan: 'Plus', signedIn: true, chosen: false }],
+        codexAccounts: [{ id: 'default', email: 'you@example.com', name: 'You', plan: 'Plus', signedIn: true, chosen: false, usage: { at: now - 20 * MIN, limits: [usage('week', 12, now + 5 * 24 * 60 * MIN)] } }],
       },
       projects: [
         { slug: 'agentbox', name: 'Agentbox', onPhone: true, autonomous: true, permission: 'workspace', codexMode: 'workspace', account: 'any', running: 2 },
@@ -327,7 +335,13 @@ export function previewCloud(now = () => Date.now()) {
     else if (scope === 'repeat' && key === 'end') (settings.settings as any).repeats = repeats.filter((r) => !(r.product === product && r.id === c.payload.id));
     else if (scope === 'repeat' && key === 'change') Object.assign(repeats.find((r) => r.product === product && r.id === c.payload.id) ?? {}, value);
     else if (scope === 'repeat' && key === 'new') repeats.push({ product, id: `r-${c.id}`, priority: 5, createdAt: now(), served: '', ...value });
+    else if (scope === 'project' && key === 'archived') settings.settings.projects = settings.settings.projects.filter((p) => p.slug !== product);
     else if (scope === 'project') Object.assign(settings.settings.projects.find((p) => p.slug === product) ?? {}, { [key]: value });
+    else if (key === 'cloudRuns') Object.assign(w.cloud, value === 'mac' ? { mode: value } : { mode: value, whenOn: value });
+    else if (key === 'productOrder') {
+      w.productOrder = value;
+      settings.settings.projects.sort((a, b) => (value.indexOf(a.slug) + 1 || 1e9) - (value.indexOf(b.slug) + 1 || 1e9));
+    }
     else if (key === 'alphaRooms') w.alpha.rooms = value;
     else if (key === 'memoryGate') w.memoryGate.on = value;
     else if (key === 'memoryGateSlots') w.memoryGate.slots = value;
@@ -335,7 +349,7 @@ export function previewCloud(now = () => Date.now()) {
     else if (key === 'sessionsAtOnce') Object.assign(w, { sessionsAtOnce: value, agentsAuto: false });
     else if (key === 'activeAccount') (value.engine === 'codex' ? w.codexAccounts : w.accounts).forEach((a: any) => { a.chosen = a.id === value.account; });
     else if (key === 'phoneProjects') settings.settings.projects.forEach((p) => { p.onPhone = value.all && !value.except.includes(p.slug); });
-    else if (key !== 'agentsFeltSlow') w[key] = value;
+    else if (key !== 'agentsFeltSlow' && key !== 'resumeStopped') w[key] = value;
     Object.assign(c, { taken_at: new Date(now()).toISOString(), outcome: 'done' });
     settings.updated_at = new Date(now()).toISOString();
   }, 1500);
