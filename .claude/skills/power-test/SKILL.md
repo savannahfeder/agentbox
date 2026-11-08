@@ -16,7 +16,7 @@ Each person in `people/` gets:
 - **Their own copy of the app** (`live.mjs`, one per person), shaped like
   their setup: their number of Claude logins, Codex or not, their projects
   with real code in them (`fixtures/`), an inbox with weeks of old threads.
-- **A tester playing them**: a Claude Code session given who they are, their
+- **A tester playing them**: a Codex session given who they are, their
   day, their work, and two commands, `app` (the screen, through
   `browse.mjs`) and `diary` (notes and issues). It is stopped every
   `--round-minutes` and started again with its diary, the issues it logged,
@@ -54,9 +54,8 @@ node $P --who startup-engineer,founder --hours 2 --focus "replies after switchin
 | `--stand-in-cloud` | every thread runs in a stand-in Agentbox Cloud of the copy's own (the real cloud server and sandbox, here, with the stand-in agent); a task naming Supabase, Vercel, Stripe, Expo, AWS or Sentry asks for its key | no cloud |
 | `--chaos` | `none`, `light`, `normal`, `heavy` | `normal` |
 | `--round-minutes` | one tester session before it is restarted with its diary | 20 |
-| `--model` | the testers' model | Claude Code's default |
-| `--testers external` | you run each stretch yourself (below) | testers are `claude -p` |
-| `--tester-login inherit` | testers get this session's sign-in variables | their own login |
+| `--model` | the testers' Codex model | Codex's default |
+| `--codex-home` | the Codex login testers spend | the Codex login on the best plan |
 | `--keep` | leave the copies up afterwards | taken down |
 | `--files <dir>` | copied into every project's documents in every copy, so testers meet the thing under test (a table, a deck) as their own | none |
 | `--team <file>` / `--room <name>` | one tester on a real team, talking in that room (below) | no team |
@@ -84,21 +83,31 @@ you cite into the product's docs before you finish.
   app around the agents. `--real` puts real Claude Code and Codex behind the
   copies, in the fixture repositories, on this computer's subscriptions:
   this is the run for usage that would otherwise expire before a reset, and
-  the only way to meet a real login running out. Logins running out, hangs
+  the only way to meet a real login running out. The copy's own agents then
+  spend the Claude plan too, not only the testing plan, so ask before `--real`. Logins running out, hangs
   and deaths on a clock are stand-ins only; on real tools the clock only
   restarts and freezes the app.
 - **Chaos.** `normal` unless asked. `none` to test a feature in calm,
   `heavy` before a launch (adds a Control-C crash and an hour of slow agents).
 
+## Testers run on Codex, never Claude Code
+
+The person keeps a Codex plan for testing only (2026-11-08). Every tester is
+`codex exec`, started by the script, on the Codex login with the best plan
+(`~/.codex` or any `~/.codex-*`, read from its own sign-in) unless
+`--codex-home` names one. The script says which login and plan it chose when
+it starts. Never run a tester as a subagent or as `claude -p`: that spends the
+Claude plan the person keeps for real work. `scripts/codex-tester.mjs` is the
+one place that starts a tester, for this skill and the product loop.
+
 ## Where it runs
 
-- **On a Mac** the testers are `claude -p` on the Mac's own login. Each
-  person needs about 1.2 GB free (2.5 GB with `--real`), and the script
-  refuses to start more than fits. Check memory before more than two.
-- **In the Agentbox cloud** a Claude Code started from a session cannot sign
-  in (the session's key is blanked for what it starts), so the script stops
-  at its sign-in check. Run with `--testers external`, and the stretches
-  as your own subagents (below). This keeps a long run off the person's Mac.
+- **On a Mac** each person needs about 1.2 GB free (2.5 GB with `--real`),
+  and the script refuses to start more than fits. Check memory before more
+  than two. Testers run inside Codex's own sandbox with the local network open.
+- **In the Agentbox cloud** Codex signs in with the login the cloud carries,
+  but its sandbox cannot start there, so testers run without it: the machine
+  is the throwaway. This keeps a long run off the person's Mac.
 
 ## Waiting for it
 
@@ -109,22 +118,6 @@ until-loop. Read `progress.json` in the run folder and give the person a
 one-line update every half hour or so: stretch, issues so far, anything the
 watcher found. Ctrl-C (SIGTERM) still writes the report and takes the
 copies down.
-
-## Running the stretches yourself (`--testers external`)
-
-The script writes each stretch's prompt to `<person>/round-NN.prompt.md`,
-names it in `progress.json` under `waiting`, and waits for
-`<person>/round-NN.done`. For each person, in a loop until `progress.json`
-says `done`:
-
-1. Wait for `waiting` to name a prompt file.
-2. Start a subagent whose prompt is that file's contents, plus: "Run only the
-   `app` and `diary` commands it names, with Bash; Read only your own
-   pictures. Set the Bash timeout to 600000 for `app away`."
-3. When it returns, write its last line into the `.done` file.
-
-Run the people in parallel. Do not tell a tester about the chaos, and do not
-coach it: the point is what a person in their shoes notices.
 
 ## After it
 
