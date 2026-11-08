@@ -168,14 +168,15 @@ export function phoneView(rows: PhoneRows, now = Date.now()) {
   }
   const ordered = [...rows.commands].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
   for (const c of ordered) {
-    if (isPinSetting(c)) {
+    const shows = shownSetting(c);
+    if (shows) {
       const p = c.payload;
       const takenAt = c.taken_at ? Date.parse(c.taken_at) || 0 : null;
       const copyAt = Date.parse(rows.threads.find((t) => t.device === c.device && t.project === p.product && t.item === p.item)?.updated_at ?? '') || 0;
       const standing = takenAt === null ? !c.outcome : c.outcome === 'done' && copyAt < takenAt && now - takenAt < LANDING_SHOWN_MS;
       const key = `${phoneSlug(c.device, p.product)}/${p.item}`;
       const row = items.get(key);
-      if (standing && row) items.set(key, { ...row, pinned: p.value === true });
+      if (standing && row) items.set(key, { ...row, ...shows });
       continue;
     }
     // Her computer's own hand-over to the cloud is not something she sent.
@@ -285,8 +286,18 @@ export const readSettingsRows = (select: Select) => select('phone_settings', 'se
 export function settingCommand(device: string, change: { scope: 'workspace' | 'project' | 'thread' | 'repeat' | 'teammate'; key: string; value: unknown; product?: string; item?: string; id?: string }) {
   return { device, project: null, item: null, kind: 'setting', payload: change };
 }
-const isPinSetting = (c: PhoneRows['commands'][number]) => c.kind === 'setting' && c.payload?.scope === 'thread' && c.payload?.key === 'pinned'
-  && typeof c.payload?.product === 'string' && typeof c.payload?.item === 'string';
+// What a change to a thread the computer has not taken yet looks like on its row.
+const SHOWN: Record<string, (v: unknown) => Record<string, unknown>> = {
+  pinned: (v) => ({ pinned: v === true }),
+  onMac: (v) => ({ onMac: v === true }),
+  label: (v) => ({ label: v }),
+  priority: (v) => ({ priority: v }),
+};
+function shownSetting(c: PhoneRows['commands'][number]) {
+  const p = c.payload;
+  if (c.kind !== 'setting' || p?.scope !== 'thread' || typeof p?.product !== 'string' || typeof p?.item !== 'string') return null;
+  return Object.hasOwn(SHOWN, p.key) ? SHOWN[p.key](p.value) : null;
+}
 
 // Each card drawn on the phone: where it is, and the fingerprint her Mac drew it with.
 export type Cards = Record<string, { device: string; project: string; item: string; card: string }>;

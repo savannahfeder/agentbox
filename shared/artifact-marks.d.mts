@@ -36,12 +36,17 @@ export function nextVersionName(name: string, count: number): string;
 export function addressedTo(text: string | null | undefined, people: ReadonlyArray<{ id: string; name?: string | null }> | null | undefined): string | null;
 export function stillWaiting(note: { wait?: boolean; toAgent?: boolean; sent?: boolean } | null | undefined): boolean;
 export function noteGoesTo(note: { text?: string; mentions?: readonly string[]; toAgent?: boolean } | null | undefined, people?: ReadonlyArray<{ id: string; name?: string | null }>): { to: 'agent' } | { to: 'person'; person: string } | { to: 'nobody' };
+export function tagsYourAgent(text: string | null | undefined): boolean;
 export function notesForTheAgent(marks: FileMarks | null | undefined, version: FileVersion, count: number, opts?: { nameOf?: (id: string | null) => string }): { text: string; ids: string[] };
+export function unsentReplies(note: FileNote | null | undefined, people?: ReadonlyArray<{ id: string; name?: string | null }>): NonNullable<FileNote['replies']>;
+export function repliesForTheAgent(note: FileNote, replies: NonNullable<FileNote['replies']>, version: FileVersion, count: number, opts?: { nameOf?: (id: string | null) => string }): string;
 export const MAX_EDIT_BYTES: number;
 export function editedWords(name: string, path: string): string;
 export function editClash(family: Pick<FileFamily, 'versions'> | null | undefined, baseN: number, me: string | null, nameOf: (id: string | null) => string): string | null;
 /** What to ask before approving version `index`, or null. */
-export function approveAsk(family: Pick<FileFamily, 'versions'> | null | undefined, index: number, notes: readonly { file: string; resolved?: boolean }[] | null | undefined): { text: string; newest: FileFamily['versions'][number] | null } | null;
+export function approveAsk(family: Pick<FileFamily, 'versions'> | null | undefined, index: number, notes: readonly { file: string; resolved?: boolean }[] | null | undefined, offered?: ReadonlySet<string> | null): { text: string; newest: FileFamily['versions'][number] | null } | null;
+/** The ids of a family's versions that the newest message naming any of them names. */
+export function offeredTogether(lines: unknown[] | null | undefined, family: Pick<FileFamily, 'versions'> | null | undefined): Set<string>;
 /** `group-seat-picker-v3.png` as `group-seat-picker.png`. */
 export function baseName(name: string): string;
 /** The key of the family a path belongs to, with \0 as /. */

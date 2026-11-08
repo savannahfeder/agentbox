@@ -219,7 +219,7 @@ interface Opening { body: string; yours: boolean }
 
 const CHAT_FOR_SCREEN = 400;
 
-const TROUBLE_VERB: Record<string, string> = { run: 'start a run', answer: 'get your message', replied: 'put its answer in the chat', tell: 'take a hand-off', release: 'start its next run', seen: 'mark a message read', served: 'mark its round served', dutyServed: 'mark a duty done' };
+const TROUBLE_VERB: Record<string, string> = { run: 'start a run', answer: 'get your message', replied: 'put its answer in the chat', say: 'put its question in the chat',tell: 'take a hand-off', release: 'start its next run', seen: 'mark a message read', served: 'mark its round served', dutyServed: 'mark a duty done' };
 
 // When each project last shipped, from the note the ship queue leaves.
 function shippedByProduct(items?: TeamItem[] | null) {
@@ -628,6 +628,8 @@ export class Teammates {
         } else if (a.type === 'replied') {
           if (a.say) writeChat(this.dir(), { kind: 'msg', id: replyMessageId(a.item), from: a.teammate, to: [], text: a.text.slice(0, 4000), run: a.item }, now);
           workItemsDisk.updateWorkItem(this.store.productDir(a.product), a.item, { status: 'done', labels: [...a.labels, 'clean'] }, { source: 'system', now });
+        } else if (a.type === 'say') {
+          writeChat(this.dir(), { kind: 'msg', id: replyMessageId(a.item), from: a.teammate, to: [], text: a.text.slice(0, 4000), run: a.item }, now);
         } else if (a.type === 'release') {
           const dir = this.store.productDir(a.product);
           workItemsDisk.updateWorkItem(dir, a.item, { start: 'now' }, { source: 'system', now });

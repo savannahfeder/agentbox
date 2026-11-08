@@ -35,10 +35,25 @@ describe('a store build', () => {
   it('reads the switch the way Metro writes it into the bundle', () => {
     expect(read('mobile/src/lib/store-build.ts')).toMatch(/export const STORE_BUILD = process\.env\.EXPO_PUBLIC_STORE_BUILD === '1';/);
   });
+  // A reviewer on the board (2026-11-08) found AI teammates, also an Alpha
+  // feature, would still appear once a computer switched them on.
+  it('never shows AI teammates either, whatever the computer says', () => {
+    expect(read('mobile/src/state/cloud.tsx')).toMatch(/const team = useMemo\(\(\) => \(STORE_BUILD \? null : /);
+  });
   it('never turns group chat on, whatever the computer says', () => {
     expect(read('mobile/src/state/groups.tsx')).toMatch(/setOn\(!STORE_BUILD && groupsOn\(rows\)\)/);
   });
-  it('draws no Alpha features page', () => {
-    expect(read('mobile/src/ui/SettingsPages.tsx')).toMatch(/\{ id: 'alpha', [^}]*shown: \(s\) => !STORE_BUILD && hasComputer\(s\) \}/);
+  // The app review board (2026-11-08) still reached it through Search, which
+  // lists every page, so the page is left out of the list itself.
+  it('has no Alpha features page anywhere: Settings, Search, or its own address', () => {
+    const pages = read('mobile/src/ui/SettingsPages.tsx');
+    expect(pages).toMatch(/export const SETTINGS_PAGES = STORE_BUILD \? ALL_PAGES\.filter\(\(p\) => !NOT_IN_STORE\.has\(p\.id\)\) : ALL_PAGES;/);
+    // The Team page too: shared projects come with multiplayer (round three, 2026-11-08).
+    expect(pages).toMatch(/const NOT_IN_STORE = new Set\(\['alpha', 'team'\]\);/);
+    for (const reader of ['mobile/src/app/search.tsx', 'mobile/src/app/settings/[page].tsx', 'mobile/src/app/settings/index.tsx', 'mobile/src/ui/SettingsHome.tsx']) {
+      const text = read(reader);
+      expect(text, reader).toMatch(/SETTINGS_PAGES/);
+      expect(text, reader).not.toMatch(/ALL_PAGES/);
+    }
   });
 });

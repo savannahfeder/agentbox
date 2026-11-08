@@ -155,7 +155,7 @@ export function marksOf(entries) {
   const answers = new Map();
   for (const r of [...replies.values()].sort((a, b) => a.ts - b.ts)) {
     if (!answers.has(r.on)) answers.set(r.on, []);
-    answers.get(r.on).push({ id: r.id, text: r.text, by: r.by, ts: r.ts });
+    answers.get(r.on).push({ id: r.id, text: r.text, by: r.by, ts: r.ts, ...(sent.has(r.id) ? { sent: true } : {}) });
   }
   const list = [...notes.values()].map((n) => {
     const s = settled.get(n.id);
@@ -480,6 +480,25 @@ export function familyOfName(file) {
   return keyOf(name, name);
 }
 
+/** The reviewable paths one line's words name, repeats included. */
+function* pathsSaidOn(l) {
+  const p = l?.patch;
+  if (!p) return;
+  for (const field of ['body', 'answer', 'result', 'note']) {
+    if (typeof p[field] !== 'string' || !ANY_EXT.test(p[field])) continue;
+    filesInLinesInternals.searched += 1;
+    // A person's own words only count a file they attached. The notes sent to an
+    // agent name the file it should make, which does not exist yet.
+    const linksOnly = l.source === 'founder' && (field === 'answer' || field === 'body');
+    const edited = linksOnly && EDITED_WORDS.test(p[field]);
+    for (const m of p[field].replace(FENCE, '').matchAll(NAMED)) {
+      if (linksOnly && !m[1]) continue;
+      const path = (m[1] ?? m[2] ?? m[3]).replace(/^\.\//, '');
+      if (!shorthand(path)) yield { path, edited };
+    }
+  }
+}
+
 /** Every reviewable file a thread's lines name, in the order they name them. */
 export function filesInLines(lines) {
   const out = [];
@@ -491,24 +510,33 @@ export function filesInLines(lines) {
       seen.add(p.artifact.path);
       out.push({ path: p.artifact.path, by: l.by ?? null, at: l.ts, edited: true });
     }
-    for (const field of ['body', 'answer', 'result', 'note']) {
-      if (typeof p[field] !== 'string' || !ANY_EXT.test(p[field])) continue;
-      filesInLinesInternals.searched += 1;
-      // A person's own words only count a file they attached. The notes sent to an
-      // agent name the file it should make, which does not exist yet.
-      const linksOnly = l.source === 'founder' && (field === 'answer' || field === 'body');
-      const edited = linksOnly && EDITED_WORDS.test(p[field]);
-      for (const m of p[field].replace(FENCE, '').matchAll(NAMED)) {
-        if (linksOnly && !m[1]) continue;
-        const path = (m[1] ?? m[2] ?? m[3]).replace(/^\.\//, '');
-        if (seen.has(path) || shorthand(path)) continue;
-        seen.add(path);
-        const agent = p.voice?.name ?? (l.source === 'agent' ? '' : null);
-        out.push({ path, by: l.by ?? null, at: l.ts, ...(agent !== null ? { agent } : {}), ...(edited ? { edited: true } : {}), ...(p.newer === true ? { newer: true } : {}), ...(p.made === true ? { made: true } : {}) });
-      }
+    for (const { path, edited } of pathsSaidOn(l)) {
+      if (seen.has(path)) continue;
+      seen.add(path);
+      const agent = p.voice?.name ?? (l.source === 'agent' ? '' : null);
+      out.push({ path, by: l.by ?? null, at: l.ts, ...(agent !== null ? { agent } : {}), ...(edited ? { edited: true } : {}), ...(p.newer === true ? { newer: true } : {}), ...(p.made === true ? { made: true } : {}) });
     }
   }
   return out;
+}
+
+/**
+ * The ids of a family's versions that the newest message naming any of them
+ * names. An agent that offers sky.png and sky-v5.png side by side is offering
+ * two choices, and neither is the other's older copy.
+ */
+export function offeredTogether(lines, family) {
+  const versions = family?.versions ?? [];
+  const list = lines ?? [];
+  for (let i = list.length - 1; i >= 0; i--) {
+    const ids = new Set();
+    for (const { path } of pathsSaidOn(list[i])) {
+      const v = versions.find((x) => [x.path, ...(x.also ?? [])].some((p) => endsWithPath(p, path) || endsWithPath(path, p)));
+      if (v) ids.add(v.id);
+    }
+    if (ids.size) return ids;
+  }
+  return new Set();
 }
 
 /** "Shared by …" for a version: the agent and who it works for when an agent shared it. */
@@ -568,12 +596,16 @@ export function approvalSince(family, index, approvals, nameOf) {
   return `${nameOf(given.by)} approved v${old.n}. ${nameOf(here.by)} changed it since, so this version is not approved.`;
 }
 
-/** What to ask before approving version `index`, or null: a newer version, or comments still open on it. */
-export function approveAsk(family, index, notes) {
+/**
+ * What to ask before approving version `index`, or null: a newer version, or
+ * comments still open on it. A version in `offered` (offeredTogether) is a
+ * choice still on the table, so a newer one beside it is not asked about.
+ */
+export function approveAsk(family, index, notes, offered = null) {
   const versions = family?.versions ?? [];
   const here = versions[index];
   if (!here) return null;
-  const newest = index < versions.length - 1 ? versions.at(-1) : null;
+  const newest = index < versions.length - 1 && !offered?.has(here.id) ? versions.at(-1) : null;
   const open = (notes ?? []).filter((n) => n.file === here.id && !n.resolved).length + carriedNotes(family, index, notes).length;
   if (!newest && !open) return null;
   const said = [`Approve v${here.n}?`];
@@ -687,23 +719,40 @@ export function nextVersionName(name, count) {
   return `${stem}-v${Math.max(count, named) + 1}${ext}`;
 }
 
+const spotWords = (n) => (unit(n.place.x)
+  ? `${placeWords(n)}, ${Math.round(n.place.x * 100)}% across and ${Math.round(n.place.y * 100)}% down`
+  : placeWords(n));
+const saveAsNext = (version, count) => `save the result as ${nextVersionName(version.name, count)} beside the original, keeping the original as it is. Name the new file in your reply so it opens as the next version of ${baseName(version.name)}. The app gives every version its number, the same for everyone, so call it the next version, not a number of your own.`;
+
 /** The open notes on this version not yet sent to the agent, as the words that send them. */
 export function notesForTheAgent(marks, version, count, { nameOf = () => 'Someone' } = {}) {
   const open = (marks?.notes ?? []).filter((n) => n.file === version.id && !n.resolved && !n.sent);
-  const say = (n) => {
-    const at = unit(n.place.x)
-      ?`${placeWords(n)}, ${Math.round(n.place.x * 100)}% across and ${Math.round(n.place.y * 100)}% down`
-      : placeWords(n);
-    return `- ${at}: ${n.text} (${nameOf(n.by)})`;
-  };
   const text = [
     `Notes on ${version.path}:`,
-    ...open.map(say),
+    ...open.map((n) => [`- ${spotWords(n)}: ${n.text} (${nameOf(n.by)})`, ...(n.replies ?? []).map((r) => `  - ${r.text} (${nameOf(r.by)})`)].join('\n')),
     '',
-    `Make these changes and save the result as ${nextVersionName(version.name, count)} beside the original, keeping the original as it is. Name the new file in your reply so it opens as the next version of ${baseName(version.name)}. The app gives every version its number, the same for everyone, so call it the next version, not a number of your own.`,
+    `Make these changes and ${saveAsNext(version, count)}`,
   ].join('\n');
   return { text, ids: open.map((n) => n.id) };
 }
+
+/** Replies written for the agent under a comment it already has, which Send or @agent hands over next. */
+export const unsentReplies = (note, people = []) => (note?.sent && !note.resolved
+  ? (note.replies ?? []).filter((r) => !r.sent && noteGoesTo({ text: r.text }, people).to === 'agent')
+  : []);
+
+/** Replies on a note the agent was already sent, as the words that send them. */
+export function repliesForTheAgent(note, replies, version, count, { nameOf = () => 'Someone' } = {}) {
+  return [
+    `${replies.length === 1 ? 'A reply' : 'Replies'} on the note at ${spotWords(note)} on ${version.path}, "${note.text}":`,
+    ...replies.map((r) => `- ${r.text} (${nameOf(r.by)})`),
+    '',
+    `If this asks for changes, make them and ${saveAsNext(version, count)}`,
+  ].join('\n');
+}
+
+/** A comment that tags your own agent with @agent, which sends it now rather than waiting for Send. */
+export const tagsYourAgent = (text) => /(?:^|[\s(])@agent(?![\w'’@.-]?\w)/i.test(String(text ?? ''));
 
 const escaped = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const firstWord = (name) => String(name ?? '').trim().split(/\s+/)[0] ?? '';
@@ -754,28 +803,8 @@ export function noteGoesTo(note, people = []) {
 /** Every file a thread names that a note can be on: pictures, films and documents, then pages and scripts. */
 export const notedFilesInLines = (lines) => [...filesInLines(lines), ...otherFilesInLines(lines)];
 
-/**
- * A teammate's open notes on the files an agent made on this thread, one turn
- * per file, in the words "Send these notes to the agent" uses. Notes by `me`,
- * the owner, wait for the owner's own press.
- */
 /** A note held for Send that nobody has sent yet. */
 export const stillWaiting = (note) => !!note?.wait && !note.toAgent && !note.sent;
-
-export function notesForItsAgent(lines, marks,{ me, nameOf = () => 'Someone', people = [] } = {}) {
-  const out = [];
-  for (const family of threadFiles(notedFilesInLines(lines))) {
-    for (const version of family.versions) {
-      if (typeof version.agent !== 'string') continue;
-      const open = (marks?.notes ?? []).filter((n) => n.file === version.id && n.by && n.by !== me && !n.resolved && !n.sent && !stillWaiting(n) && noteGoesTo(n, people).to === 'agent');
-      if (!open.length) continue;
-      const first = (id) => String(nameOf(id)).split(/\s+/)[0];
-      const { text, ids } = notesForTheAgent({ notes: open }, version, family.versions.length, { nameOf: first });
-      out.push({ by: open[0].by, ids, text: `${nameOf(open[0].by)} left notes on ${version.name}, a file you made on this thread.\n\n${text}` });
-    }
-  }
-  return out;
-}
 
 /**
  * The open comments a later version of their file answered: one sent to the

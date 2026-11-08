@@ -510,6 +510,20 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     return { readings: await accountUsage.readAll(profiles.length ? profiles : ['default'], { refresh: !!refresh }) };
   });
 
+  // Last readings only: the phone pass runs every minute and must never start
+  // a `claude /usage` of its own (main/main.mts phoneSettings).
+  const usageForPhone = () => {
+    const current = usage.peek();
+    const newer = <R extends { at?: number }>(a: R | null, b: R | null) => (!a ? b : !b ? a : (b.at ?? 0) > (a.at ?? 0) ? b : a);
+    const profiles = effectiveProfiles(config.authProfiles, { home: config.home });
+    const claude = (profiles.length ? profiles : ['default'])
+      .map((profile) => newer(accountUsage.peek(profile), current?.profile === profile ? current : null))
+      .filter(Boolean);
+    let codex: unknown[] = [];
+    try { codex = supervisor.codexAccountUsage(); } catch { /* no Codex reading */ }
+    return { claude, codex };
+  };
+
   // Agents this run has already counted. In memory on purpose: a fresh launch
   // seeing the same agent again is a fresh fact about the app being used.
   const seenAgents = new Set<string>();
@@ -2125,7 +2139,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   });
   // PAYING FOR A CLOUD PLAN: Stripe's own pages, in the browser, as other
   // desktop apps do. An app window drew them badly and never offers Apple Pay.
-  const cloudCall = async (name: 'cloudPlan' | 'payForCloud' | 'openCloudBilling', args: Record<string, unknown> = {}) => {
+  const cloudCall = async (name: 'cloudPlan' | 'payForCloud' | 'openCloudBilling' | 'cloudTeamBilling', args: Record<string, unknown> = {}) => {
     try {
       const account = await import('./cloud/account.mts');
       const shell = await shellNow();
@@ -2141,6 +2155,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   });
   ipcMain.handle('zero:cloud-account-pay', (_e, { plan }: { plan?: string } = {}) => cloudCall('payForCloud', { plan }));
   ipcMain.handle('zero:cloud-account-billing', () => cloudCall('openCloudBilling'));
+  ipcMain.handle('zero:cloud-account-team-billing', () => cloudCall('cloudTeamBilling'));
 
   // THE CLOUD SETUP'S SIGN-IN for one account, made in the cloud
   // (main/cloud/logins.mts). The Mac relays the link and the code only.
@@ -2821,5 +2836,5 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // buttons do, rather than reaching past it into approvals.answer.
   // `push` goes with it so the updater can make the window refetch when a
   // download finishes, without holding the window itself.
-  return { answerApproval, pendingApprovals, cardSentAt, push };
+  return { answerApproval, pendingApprovals, cardSentAt, push, usageForPhone };
 }

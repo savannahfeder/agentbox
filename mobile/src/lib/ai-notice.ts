@@ -6,7 +6,7 @@ type By = { by?: string };
 export type Notice = ({ agreed: number } & By) | ({ declined: number } & By) | null;
 
 // What carries words you wrote to an agent; the rest acts on threads as they are.
-const CARRIES_WORDS = new Set(['reply', 'pick', 'new']);
+const CARRIES_WORDS = new Set(['reply', 'pick', 'new', 'approve-filed', 'do-here']);
 export const needsNotice = (kind: string) => CARRIES_WORDS.has(kind);
 
 export function readNotice(raw: string | null | undefined): Notice {

@@ -20,21 +20,24 @@ const nameOf = (id) => people.find((p) => p.id === id)?.name.split(' ')[0] ?? 'A
 const words = (text, more = {}) => noteSendWords({ text, people, me: 'u-me', nameOf, agentMade: true, toAgent: true, owner: 'u-me', ...more });
 
 describe('the send button names who the note goes to', () => {
-  it('a note on a file the agent made goes to the agent, before a word is typed too', () => {
-    expect(words('')).toBe('Send to the agent');
-    expect(words('Make the last bar orange')).toBe('Send to the agent');
+  // Since 2026-11-08 a comment waits for Send unless it tags your agent
+  // (a-comment-waits-until-you-send-it-or-tag-your-agent).
+  it('a note on a file the agent made is a comment until it tags the agent, before a word is typed too', () => {
+    expect(words('')).toBe('Comment');
+    expect(words('Make the last bar orange')).toBe('Comment');
+    expect(words('@agent make the last bar orange')).toBe('Send to your agent');
   });
   it('a note that opens on a teammate goes to them, not the agent', () => {
     expect(words('Sofia, can you check the numbers?')).toBe('Send to Sofia');
     expect(words('what do you think @Maya')).toBe('Send to Maya');
   });
-  it('a thank-you starts nothing, so it is only added', () => {
-    expect(words('Thanks, looks good')).toBe('Add note');
+  it('a thank-you starts nothing, so it is only a comment', () => {
+    expect(words('Thanks, looks good')).toBe('Comment');
   });
-  it('where no agent will hear it, a teammate\'s file goes to them and your own is only added', () => {
+  it('where no agent will hear it, a teammate\'s file goes to them and your own is only a comment', () => {
     expect(words('Tighten this', { agentMade: false, owner: 'u-sofia' })).toBe('Send to Sofia');
-    expect(words('Tighten this', { agentMade: false, owner: 'u-me' })).toBe('Add note');
-    expect(words('Tighten this', { agentMade: true, toAgent: false, owner: null })).toBe('Add note');
+    expect(words('Tighten this', { agentMade: false, owner: 'u-me' })).toBe('Comment');
+    expect(words('Tighten this', { agentMade: true, toAgent: false, owner: null })).toBe('Comment');
   });
 });
 
@@ -42,15 +45,15 @@ describe('Send this note to the agent', () => {
   const version = { id: 'chart.png', path: 'chart.png', name: 'chart.png', agent: '' };
   const note = (id, more = {}) => ({ id, file: 'chart.png', place: { kind: 'whole' }, text: 'Make it bigger', by: 'u-me', ts: 1, mentions: [], ...more });
   it('offers an open note the agent was not sent', () => {
-    expect(notesToSendTheAgent({ notes: [note('a')] }, version, 1, people)).toEqual(['a']);
+    expect(notesToSendTheAgent({ notes: [note('a')] }, version, 1, people, 'u-me')).toEqual(['a']);
   });
   it('leaves out one already sent, resolved, or written to a teammate', () => {
     const notes = [note('a', { sent: true }), note('b', { resolved: true }), note('c', { text: 'Sofia, look' })];
-    expect(notesToSendTheAgent({ notes }, version, 1, people)).toEqual([]);
+    expect(notesToSendTheAgent({ notes }, version, 1, people, 'u-me')).toEqual([]);
   });
   it('is never offered on a file the agent did not make, where pressing it would send nothing', () => {
     const attached = { ...version, agent: undefined };
-    expect(notesToSendTheAgent({ notes: [note('a')] }, attached, 1, people)).toEqual([]);
+    expect(notesToSendTheAgent({ notes: [note('a')] }, attached, 1, people, 'u-me')).toEqual([]);
   });
 });
 
@@ -74,9 +77,10 @@ describe('the card', () => {
     expect(html()).toMatch(/class="av-pin-tag[^"]*"[^>]*>1</);
     expect(html().replace(/<[^>]*>/g, ' ')).not.toContain('Pin 1');
   });
-  it('a note held back offers Send to the agent as a button with an icon', () => {
-    const h = html({ note: { ...base.note, sent: false, text: 'Thanks' }, held: { words: 'Not sent to the agent', went: false } });
-    expect(button(h, 'Send to the agent')).toMatch(/<svg/);
+  it('a note waiting for Send says Not sent, and Send itself is above the comments, not on each one', () => {
+    const h = html({ note: { ...base.note, sent: false, wait: true }, held: { words: 'Not sent', went: false } });
+    expect(h).toContain('Not sent');
+    expect(button(h, 'Send to the agent')).toBe('');
   });
   it('a resolved note offers Reopen, and one just resolved offers Undo, both as buttons with icons', () => {
     expect(button(html({ note: { ...base.note, resolved: true } }), 'Reopen')).toMatch(/<svg/);

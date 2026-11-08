@@ -266,6 +266,10 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
   // they could not think why they had (w-2b0cd0f741).
   let replied: { at: number; by: string | undefined; index?: number } | null = null;
   const pinsSoFar = new Map<string, number>();
+  const sentNotes = new Set(lines.flatMap((l) => {
+    const a = l.patch?.artifact as ArtifactMark | undefined;
+    return (a?.do === 'sent' || a?.do === 'toagent') && Array.isArray(a.on) ? a.on : [];
+  }));
   // A version is called by its file's one name and its number, as the big view counts them.
   const versionWords = new Map<string, string>();
   for (const family of threadFiles(filesInLines(lines), numbers)) {
@@ -314,7 +318,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
         pinsSoFar.set(mark.file ?? '', n);
         events.push({
           at, who: 'you', said: 'Commented', words: mark.text ?? '', message: true,
-          fileMark: { kind: 'note', file: mark.file ?? '', id: mark.id, place: placeWords({ place: mark.place, pin: n }), ...(versionWords.has(mark.file ?? '') ? { shown: versionWords.get(mark.file ?? '') } : {}) },
+          fileMark: { kind: 'note', file: mark.file ?? '', id: mark.id, place: placeWords({ place: mark.place, pin: n }), ...(versionWords.has(mark.file ?? '') ? { shown: versionWords.get(mark.file ?? '') } : {}), ...(mark.wait && !sentNotes.has(mark.id) ? { unsent: true as const } : {}) },
         });
       } else if (mark.do === 'reply' && typeof mark.on === 'string') {
         events.push({ at, who: 'you', said: 'Replied', words: mark.text ?? '', message: true, fileMark: { kind: 'note', file: mark.file ?? '', id: mark.on } });
