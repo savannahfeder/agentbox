@@ -29,7 +29,7 @@ const A = placeKey({ product: 'astral', id: 'w-1' });
 const B = placeKey({ product: 'astral', id: 'w-2' });
 
 describe('where she was in a thread', () => {
-  beforeEach(() => forgetPlaces());
+  beforeEach(() => forgetPlaces(null));
 
   it('comes back when nothing new was answered', () => {
     keepPlace(A, { earlier: true, whole: true, runs: ['run-3'] });
@@ -74,6 +74,47 @@ describe('where she was in a thread', () => {
     leavePlace(A, 5, { doc: { product: 'astral', src: 'a.md' } });
     leavePlace(A, 5, { doc: null });
     expect(placeToReturnTo(A, 5)?.doc).toBeNull();
+  });
+});
+
+// The power test (2026-11-08): two testers each reloaded or restarted the app
+// and came back to a thread folded again: "The thread itself was remembered, my
+// place in it was not."
+describe('where she was, across a reload', () => {
+  const storage = () => {
+    const m = new Map();
+    return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), m };
+  };
+
+  it('is read back from storage by a new window', () => {
+    const s = storage();
+    forgetPlaces(s);
+    leavePlace(A, 7, { earlier: true, top: 900 });
+    forgetPlaces(s); // the reload: memory gone, storage kept
+    expect(placeToReturnTo(A, 7)).toMatchObject({ earlier: true, top: 900 });
+  });
+
+  it('still gives way to an answer that arrived across the reload', () => {
+    const s = storage();
+    forgetPlaces(s);
+    leavePlace(A, 7, { earlier: true });
+    forgetPlaces(s);
+    expect(placeToReturnTo(A, 8)).toBeNull();
+  });
+
+  it('keeps only the most recent threads', () => {
+    const s = storage();
+    forgetPlaces(s);
+    for (let i = 0; i < 80; i++) leavePlace(placeKey({ product: 'p', id: `w-${i}` }), 1, { top: i + 1 });
+    forgetPlaces(s);
+    expect(placeToReturnTo(placeKey({ product: 'p', id: 'w-79' }), 1)?.top).toBe(80);
+    expect(placeToReturnTo(placeKey({ product: 'p', id: 'w-0' }), 1)).toBeNull();
+    expect(JSON.parse(s.m.get('zero.threadPlaces')).length).toBeLessThanOrEqual(50);
+  });
+
+  it('is left as the window goes, for the thread still open', () => {
+    const app = read('renderer/src/App.tsx');
+    expect(app).toMatch(/addEventListener\('pagehide', leaveOpenThread\)/);
   });
 });
 

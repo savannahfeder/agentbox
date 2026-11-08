@@ -3386,27 +3386,35 @@ export default function App() {
   // file this leaves in pendingDoc.
   const scrolledTo = useRef<{ key: string; top: number } | null>(null);
   const leftFrom = useRef<WorkItem | null>(null);
+  const leaveThread = (was: WorkItem) => {
+    const key = placeKey(was);
+    const live = items.find((i) => i.id === was.id && i.product === was.product) ?? was;
+    const doc = openDocNow.current;
+    leavePlace(key, arrivedAt(live, team?.me ?? null), {
+      top: scrolledTo.current?.key === key ? scrolledTo.current.top : undefined,
+      doc: doc && !doc.readOnly && doc.product === was.product
+        ? { product: doc.product, src: doc.src, ...(doc.auto ? { auto: true } : {}) }
+        : null,
+      mode: artifactMode,
+    });
+  };
+  const leaveThreadNow = useRef(leaveThread);
+  leaveThreadNow.current = leaveThread;
+  // A reload or a quit leaves the open thread too.
+  useEffect(() => {
+    const leaveOpenThread = () => { if (focusedNow.current) leaveThreadNow.current(focusedNow.current); };
+    window.addEventListener('pagehide', leaveOpenThread);
+    return () => window.removeEventListener('pagehide', leaveOpenThread);
+  }, []);
   useEffect(() => {
     const was = leftFrom.current;
     leftFrom.current = focused;
     const same = !!was && !!focused && placeKey(was) === placeKey(focused);
     if (same) return;
-    const me = team?.me ?? null;
-    if (was) {
-      const key = placeKey(was);
-      const live = items.find((i) => i.id === was.id && i.product === was.product) ?? was;
-      const doc = openDocNow.current;
-      leavePlace(key, arrivedAt(live, me), {
-        top: scrolledTo.current?.key === key ? scrolledTo.current.top : undefined,
-        doc: doc && !doc.readOnly && doc.product === was.product
-          ? { product: doc.product, src: doc.src, ...(doc.auto ? { auto: true } : {}) }
-          : null,
-        mode: artifactMode,
-      });
-    }
+    if (was) leaveThread(was);
     scrolledTo.current = null;
     if (!focused) return;
-    const back = placeToReturnTo(placeKey(focused), arrivedAt(focused, me));
+    const back = placeToReturnTo(placeKey(focused), arrivedAt(focused, team?.me ?? null));
     if (!back) return;
     if (back.top) {
       scrolledTo.current = { key: placeKey(focused), top: back.top };

@@ -27,32 +27,60 @@ export interface ThreadPlace {
 }
 
 type Parts = Partial<Omit<ThreadPlace, 'news'>>;
+type Kept = Parts & { news?: number };
 
-const places = new Map<string, Parts & { news?: number }>();
+// Kept in storage too, so a reload or a restart does not fold the thread she
+// was reading. The newest threads only.
+const STORED = 'zero.threadPlaces';
+const MOST = 50;
+interface Store { getItem(k: string): string | null; setItem(k: string, v: string): void }
+
+let store: Store | null = (globalThis as { localStorage?: Store }).localStorage ?? null;
+let places: Map<string, Kept> | null = null;
+
+function all(): Map<string, Kept> {
+  if (places) return places;
+  places = new Map();
+  try {
+    const read = JSON.parse(store?.getItem(STORED) ?? '[]') as [string, Kept][];
+    if (Array.isArray(read)) for (const [k, v] of read) if (typeof k === 'string' && v && typeof v === 'object') places.set(k, v);
+  } catch { /* unreadable: start empty */ }
+  return places;
+}
+
+function put(key: string, kept: Kept | null): void {
+  const m = all();
+  m.delete(key);
+  if (kept) m.set(key, kept);
+  while (m.size > MOST) m.delete(m.keys().next().value as string);
+  try { store?.setItem(STORED, JSON.stringify([...m])); } catch { /* full or private: memory only */ }
+}
 
 export const placeKey = (t: { product: string; id: string }): string => `${t.product}\n${t.id}`;
 
 /** A piece of where she is, written while she is still in the thread. */
 export function keepPlace(key: string, parts: Parts): void {
-  places.set(key, { ...places.get(key), ...parts });
+  put(key, { ...all().get(key), ...parts });
 }
 
 /** She has left the thread; `news` is its newest answer at that moment. */
 export function leavePlace(key: string, news: number, parts: Parts): void {
-  places.set(key, { ...places.get(key), ...parts, news });
+  put(key, { ...all().get(key), ...parts, news });
 }
 
 /** Where to put her back, or null to open the thread as new. */
 export function placeToReturnTo(key: string, news: number): ThreadPlace | null {
-  const kept = places.get(key);
+  const kept = all().get(key);
   if (!kept || kept.news === undefined) return null;
   if (kept.news !== news) {
-    places.delete(key);
+    put(key, null);
     return null;
   }
   return kept as ThreadPlace;
 }
 
-export function forgetPlaces(): void {
-  places.clear();
+/** Drops what is in memory; `to` swaps the storage behind it (tests). */
+export function forgetPlaces(to?: Store | null): void {
+  if (to !== undefined) store = to;
+  places = null;
 }
