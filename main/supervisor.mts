@@ -7070,8 +7070,7 @@ export class Supervisor {
     const env: NodeJS.ProcessEnv = { ...rest, ...this._cloudAccountEnv(),
       ...(this._phoneCarries?.slugs.has(given.ZERO_PRODUCT) ? { AGENTBOX_PHONE_DEVICE: this._phoneCarries.device } : {}),
       // Where a key the run asks this Mac for (main/cloud/key-asks.mts) puts its card, and the public half that checks the answer.
-      ZERO_APPROVALS_DIR: path.join(this.config.storeRoot, '.approvals'),
-      ZERO_APPROVALS_PUBKEY: approvalPublicKey(),
+      ...(this.config?.storeRoot ? { ZERO_APPROVALS_DIR: path.join(this.config.storeRoot, '.approvals'), ZERO_APPROVALS_PUBKEY: approvalPublicKey() } : {}),
     };
     const sent = given.ZERO_ITEM ? this._filesForCloud?.get(given.ZERO_ITEM) : null;
     if (sent?.length && given.ZERO_ITEM) { env.AGENTBOX_SEND_FILES = JSON.stringify(sent); this._filesForCloud?.delete(given.ZERO_ITEM); }

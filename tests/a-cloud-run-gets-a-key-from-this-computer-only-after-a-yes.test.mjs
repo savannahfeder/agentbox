@@ -20,6 +20,7 @@ import { readKeyFrom, keyIsThere } from '../main/cloud/key-source.mts';
 import { keySource, keySourceFromWords, keySourceWords } from '../shared/cloud-key-sources.mjs';
 import { answer, approvalPublicKey, listPending, spoolDir } from '../main/approvals.mjs';
 import { cloudKeyNames, keysCarried, saveCloudKey } from '../main/cloud/keys.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const SECRET = 'phx_stand-in-key-for-this-test-only-0000';
 let tmp; let home; let store; let objects;
@@ -248,6 +249,24 @@ describe('a cloud run asking for a key', () => {
     expect(said.message).toMatch(/next/);
     expect(delivered).toEqual([]);
     expect(cloudKeyNames({ home }).map((k) => k.name)).toEqual(['POSTHOG_PERSONAL_KEY']);
+  });
+
+  it('is handed where to put its card by the app that starts the run', () => {
+    const sup = new Supervisor({ storeRoot: store, home, authProfiles: ['default'] }, { listItems: () => [], listProducts: () => [], isDue: () => true }, store);
+    sup._cloudAccountEnv = () => ({});
+    const env = sup._cloudRelayEnv({ ZERO_ITEM: 'w-report' });
+    expect(env.ZERO_APPROVALS_DIR).toBe(spoolDir(store));
+    expect(env.ZERO_APPROVALS_PUBKEY).toBe(approvalPublicKey());
+  });
+
+  it('is a tool only a cloud run is offered', async () => {
+    const { appHome } = await import('../main/store/home.mjs');
+    process.env.STORE_ACCOUNT_ID = 'acct-keys';
+    fs.mkdirSync(path.join(appHome(), 'accounts', 'acct-keys'), { recursive: true });
+    const { buildTools } = await import('../mcp/tools.mjs');
+    const names = (o) => buildTools({ holder: 'test', ...o }).tools.map((t) => t.name);
+    expect(names({ requestCloudKey: async () => ({}) })).toContain('request_cloud_key');
+    expect(names({})).not.toContain('request_cloud_key');
   });
 
   it('stops waiting when the run ends', async () => {
