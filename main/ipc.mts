@@ -70,7 +70,7 @@ import { readImportableThreads, readSearchableThreads } from './importable-threa
 import { readChatEnds } from './agent-sessions.mts';
 import { markImported } from '../shared/agent-import.mts';
 import { codexIdOf, importChoice, isCodexImportRow, isNotImportedRow } from '../shared/codex-import.mts';
-import { checkProjectFolder, chooserStartsIn } from '../shared/project-folder-check.mts';
+import { checkProjectFolder, chooserStartsIn, folderFromChooser } from '../shared/project-folder-check.mts';
 import { openFreshUser } from './fresh-user.mts';
 import { openDemo } from './demo.mts';
 import { AgentSchedule } from './agent-schedule.mts';
@@ -88,6 +88,7 @@ import { saveAttachments } from './save-attachments.mts';
 import { stageAttachment, stageAttachmentPart } from './stage-attachment.mts';
 import type { StagedPart } from './stage-attachment.mts';
 import { readRunTraces } from './run-traces.mjs';
+import { openInBrowser } from './open-in-browser.mts';
 import type { AnswerInput, ComposeInput, Store, StoreConfig } from './store.mts';
 import type { Supervisor, SupervisorConfig } from './supervisor.mts';
 import type { SettingsConfig } from './settings.mts';
@@ -1539,10 +1540,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     if (r.canceled || !r.filePaths?.length) return { path: null };
     // A chooser hands back whatever its location bar held, dots and all. The
     // folder a path names is what gets stored and what gets checked (F-123).
-    const picked = path.resolve(r.filePaths[0]);
-    const verdict = checkProjectFolder(picked, { home: os.homedir() });
-    if (!verdict.ok) return { path: null, refused: verdict.say };
-    return { path: picked };
+    return folderFromChooser(path.resolve(r.filePaths[0]), { home: os.homedir(), isDir });
   });
 
   // THE PICKER THE APP DRAWS ITSELF, for a tab that has no Mac dialog.
@@ -2469,6 +2467,23 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       return { ok: true, folder: out.id ?? null };
     } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
   });
+  ipcMain.handle('zero:files-place-new', async (_e, { project, name, kind, folder }: { project?: unknown; name?: unknown; kind?: unknown; folder?: unknown } = {}) => {
+    try {
+      const out = await filesPlaceNow().newDocument({ project: String(project ?? ''), name: String(name ?? ''), kind: kind === 'table' ? 'table' : 'document', folder: typeof folder === 'string' ? folder : null });
+      push();
+      return { ok: true, key: out.key };
+    } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
+  });
+  ipcMain.handle('zero:files-place-upload', async (_e, { project, folder }: { project?: unknown; folder?: unknown } = {}) => {
+    try {
+      const r = await dialog.showOpenDialog(window as unknown as ElectronWindow, { title: `Add files to ${String(project ?? '')}`, buttonLabel: 'Add', properties: ['openFile', 'multiSelections'] });
+      if (r.noDialog) return { ok: false, error: `Adding files needs the ${Name} app on this computer.` };
+      if (r.canceled || !r.filePaths?.length) return { ok: true, added: 0, refused: [], keys: [] };
+      const out = await filesPlaceNow().addFiles({ project: String(project ?? ''), folder: typeof folder === 'string' ? folder : null, paths: r.filePaths });
+      if (out.added) push();
+      return { ok: true, ...out };
+    } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
+  });
   ipcMain.handle('zero:files-place-open', async (_e, { key }: { key?: unknown } = {}) => {
     try { return await filesPlaceNow().open(String(key ?? '')); } catch { return null; }
   });
@@ -2552,7 +2567,11 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   ipcMain.handle('zero:open-artifact', async (_e, { product, src, mode, thread }: { product: string; src?: unknown; mode?: string; thread?: unknown }) => {
     const shell = await shellNow();
     if (typeof src !== 'string' || !src) return { ok: false, error: 'no path' };
-    if (/^https?:/.test(src)) { if (mode !== 'resolve') shell.openExternal(src); return { ok: true, opened: src } }
+    if (/^https?:/.test(src)) {
+      if (mode === 'resolve') return { ok: true, opened: src };
+      const opened = await openInBrowser(src, { shell });
+      return opened.ok ? { ok: true, opened: src } : opened;
+    }
     let found = await resolveArtifact({
       src,
       product,
