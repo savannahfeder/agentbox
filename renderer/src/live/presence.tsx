@@ -16,15 +16,6 @@ import './presence.css';
 export type PresenceLook = 'flags' | 'rail' | 'gutter' | 'tint';
 export const PRESENCE_LOOKS: PresenceLook[] = ['flags', 'rail', 'gutter', 'tint'];
 
-export type PresenceTags = 'ink' | 'muted' | 'outline' | 'name';
-export function presenceTags(): PresenceTags {
-  try {
-    const v = localStorage.getItem('live-tag-style');
-    if (v === 'ink' || v === 'muted' || v === 'outline' || v === 'name') return v;
-  } catch { /* no storage */ }
-  return 'ink';
-}
-
 export function presenceLook(): PresenceLook {
   try {
     const v = localStorage.getItem('live-presence-look');

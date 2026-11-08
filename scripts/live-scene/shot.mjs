@@ -22,7 +22,7 @@ const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 await page.goto(arg('url'));
 await page.waitForTimeout(4000);
-await page.evaluate(([l, t]) => { localStorage.setItem('live-presence-look', l); localStorage.setItem('live-tag-style', t); }, [arg('look', 'flags'), arg('tags', 'ink')]);
+await page.evaluate((l) => localStorage.setItem('live-presence-look', l), arg('look', 'flags'));
 await page.reload();
 await page.waitForTimeout(3500);
 await page.getByText(THREAD).first().click();
