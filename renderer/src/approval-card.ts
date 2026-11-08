@@ -118,7 +118,10 @@ const capital = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 export function folderWords(cwd: string): string {
   const copy = /^(.*)\/\.claude\/worktrees\/[^/]+\/?$/.exec(cwd);
   if (copy) return `In this thread’s copy of ${base(copy[1])}`;
-  return `In ${cwd.replace(/^\/(?:Users|home)\/[^/]+(?=\/|$)/, '~')}`;
+  const short = cwd.replace(/^\/(?:Users|home)\/[^/]+(?=\/|$)/, '~');
+  // Past one line of the card, the end is kept: it is the part that says where.
+  if (short.length <= 53) return `In ${short}`;
+  return `In …/${short.replace(/\/+$/, '').split('/').slice(-2).join('/')}`;
 }
 
 // A string is shown as written unless something in it would not show (a tab,

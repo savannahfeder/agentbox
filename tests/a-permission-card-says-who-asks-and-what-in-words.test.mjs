@@ -83,6 +83,13 @@ describe('where, as a person names it', () => {
     expect(folderWords('/home/sam')).toBe('In ~');
     expect(folderWords('/tmp/ab-serve')).toBe('In /tmp/ab-serve');
   });
+  // Power test round one: "In /tmp/agentbox-verify/instances/3f5fdf16-power-founder/repos/webs…"
+  // lost the end, which is the part that says where.
+  it('keeps the end of a long folder, which is the part that says where', () => {
+    expect(folderWords('/tmp/agentbox-verify/instances/3f5fdf16-power-founder/repos/website')).toBe('In …/repos/website');
+    expect(folderWords('/Users/sam/Desktop/dev/agentbox-team/renderer/src/threads')).toBe('In ~/Desktop/dev/agentbox-team/renderer/src/threads');
+    expect(folderWords('/Users/sam/work/clients/northwind/infrastructure/terraform/modules/network')).toBe('In …/modules/network');
+  });
 });
 
 describe('⌘1 allows and ⌘2 denies, and never in the card’s first moment', () => {
