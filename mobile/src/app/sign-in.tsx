@@ -1,8 +1,8 @@
 // Sign in, the first screen and the first of the four steps. Nearly everyone
 // has an account from the computer already, so it opens on email and password,
-// with Google under them. Accounts are made on the computer: Sign up, and a
-// sign-in that fails, point there. Only ways the computer also signs in with,
-// so no account made here is one the computer cannot open.
+// with Google under them on Android. Accounts are made on the computer: Sign
+// up, and a sign-in that fails, point there. Only ways the computer also signs
+// in with, so no account made here is one the computer cannot open.
 import { Redirect } from 'expo-router';
 import { router } from '../lib/router';
 import { useState } from 'react';
@@ -16,6 +16,9 @@ import { T } from '../ui/parts';
 import { color, font } from '../ui/theme';
 
 const toNoAccount = () => router.push('/no-account');
+// On an iPhone, Google would need a second sign-in that hides your email
+// beside it (App Review 4.8); its own accounts alone need none.
+const GOOGLE = Platform.OS === 'android';
 
 export default function SignIn() {
   const c = useCloud();
@@ -43,12 +46,14 @@ export default function SignIn() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Screen top={24} foot={<>
         <Btn kind="primary" label={busy === 'email' ? 'Signing in…' : 'Sign in'} disabled={!canSubmit} onPress={signIn} />
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 4 }}>
-          <View style={{ flex: 1, height: 1, backgroundColor: color.line }} />
-          <Label>or</Label>
-          <View style={{ flex: 1, height: 1, backgroundColor: color.line }} />
-        </View>
-        <Btn label={busy === 'google' ? 'Signing in…' : 'Continue with Google'} lead={<GoogleMark />} disabled={!!busy} onPress={run('google', () => googleSignIn(c.cloud!))} />
+        {GOOGLE ? <>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 4 }}>
+            <View style={{ flex: 1, height: 1, backgroundColor: color.line }} />
+            <Label>or</Label>
+            <View style={{ flex: 1, height: 1, backgroundColor: color.line }} />
+          </View>
+          <Btn label={busy === 'google' ? 'Signing in…' : 'Continue with Google'} lead={<GoogleMark />} disabled={!!busy} onPress={run('google', () => googleSignIn(c.cloud!))} />
+        </> : null}
         <T style={{ fontSize: 14, lineHeight: 20, color: color.faint, textAlign: 'center', marginTop: 6 }}>
           {'No account? '}
           <T onPress={toNoAccount} accessibilityRole="link" style={{ fontSize: 14, color: color.text, textDecorationLine: 'underline', textDecorationColor: color.lineStrong }}>Sign up</T>

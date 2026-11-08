@@ -42,10 +42,6 @@ export function setHeld(item: string, held: { need: string; words: string }[] | 
   try { globalThis.sessionStorage?.setItem(HELD_KEY, JSON.stringify([...HELD])); } catch { /* no storage */ }
 }
 
-// The ask the inbox's card was pressed for, so its card in the thread takes the keyboard when the thread opens.
-let wanted: { item: string; need: string } | null = null;
-export const focusNeedOnOpen = (item: string, need: string) => { wanted = { item, need }; };
-
 /** True inside any of the agent's messages but its last unanswered one (Thread.tsx): those only say what they asked. */
 export const NeedOlder = createContext(false);
 
@@ -146,12 +142,6 @@ export function NeedCard({ source, fallback }: { source: string; fallback: React
   const taking = live || late;
   const reopen = () => { setLate(true); setTimeout(() => box.current?.querySelector<HTMLElement>('input, .need-main')?.focus(), 50); };
   const id = need ? needId(need) : '';
-  useEffect(() => {
-    if (!live || !place || wanted?.item !== place.itemId || wanted.need !== id) return;
-    wanted = null;
-    // After the thread's own focus has landed on the reply box; not cleared by a re-render, which comes at once.
-    setTimeout(() => box.current?.querySelector<HTMLElement>('input, .need-main')?.focus(), 250);
-  }, [live, id, place]);
   // Round nine: a file that was not on the computer said so only after Send.
   const [info, setInfo] = useState<{ ok: boolean; size?: number; error?: string } | null>(null);
   const asksFile = need?.kind === 'file' ? need.path : null;
