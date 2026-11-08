@@ -38,7 +38,7 @@ it('keeps the figures as the one way in, now a button in the corner', () => {
   // (2026-10-01), when viewing the code went into the thread's three-dot menu.
   // Nobody found it there, so on w-c25aae4035 they became a button in the
   // corner beside Done, which takes the menu's row: still one door, same path.
-  expect(focus).toContain('const openChange = () => onOpenDoc?.(changePathFor(item.id));');
+  expect(focus).toContain('const openChange = () => (changeOpen ? onCloseDoc?.() : onOpenDoc?.(changePathFor(item.id)));');
   expect(focus).toContain('onViewChange={openChange}');
   expect(focus).toMatch(/const codeButton = figures \?/);
 });

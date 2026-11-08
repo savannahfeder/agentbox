@@ -23,32 +23,7 @@ export function previousScreen(screen: Screen, { chats }: { chats: number }): Sc
   return screen === 'task' && chats > 0 ? 'chats' : 'welcome';
 }
 
-export function readyEngines(readings: Array<{ engine: Engine; found?: boolean; signedIn?: boolean } | null>): Engine[] {
-  return (['claude', 'codex'] as const).filter((engine) => readings.some((r) => r?.engine === engine && r.found && r.signedIn));
-}
-
-export const ENGINE_NAME: Record<Engine, string> = { claude: 'Claude Code', codex: 'Codex' };
-
-export type EngineSetup = { engine: Engine; phase: string; error?: string | null } | null;
-
-/**
- * THE FIRST SCREEN WHILE AN AGENT IS BEING INSTALLED (F-145).
- *
- *  The heading is the only line on that screen anybody reads, so it is the one
- *  that has to change: leaving it on "Install Claude Code or Codex to start"
- *  for the length of an install told a tester to press again. `running` holds
- *  both buttons, including the other agent's, because installing two at once
- *  is not something anybody asked for and the footer can only report one.
- */
-export function installGate(setup: EngineSetup): { heading: string; running: boolean } {
-  const running = !!setup && ['installing', 'checking', 'signing-in'].includes(setup.phase);
-  if (!running) return { heading: 'Install Claude Code or Codex to start', running: false };
-  const named = ENGINE_NAME[setup!.engine];
-  return {
-    heading: setup!.phase === 'signing-in' ? `Finish signing in to ${named} in your browser` : `Installing ${named}`,
-    running: true,
-  };
-}
+export { ENGINE_NAME, foundLine, installGate, readyEngines, setupWord, signedOutEngines, type EngineSetup } from './first-run';
 
 export type ListKey = 'up' | 'down' | 'toggle' | 'next' | 'skip' | null;
 
@@ -64,6 +39,19 @@ export function listKey(e: KeyLike): ListKey {
   if (e.key === 'ArrowDown') return 'down';
   if (e.key === 'Escape') return 'skip';
   return null;
+}
+
+export const TYPE_AHEAD_MS = 1500;
+
+/**
+ * A character typed on the project screen moments after the task screen left,
+ *  which belongs at the end of the task: that screen has no field, so it would
+ *  otherwise be dropped (F-162).
+ */
+export function typedAhead(e: KeyLike, sinceArrival: number): string | null {
+  if (sinceArrival < 0 || sinceArrival > TYPE_AHEAD_MS) return null;
+  if (e.metaKey || e.ctrlKey || e.altKey) return null;
+  return [...e.key].length === 1 ? e.key : null;
 }
 
 /** Whether a key press is ⌘↵ or Ctrl+Enter, which sends from a text field. */
