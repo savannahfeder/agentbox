@@ -5,18 +5,10 @@
 // Every member has hours of their own: a seat is the $40 cloud plan.
 import type { ReactNode } from 'react';
 import { TEAM } from '../../../cloud/gateway/plans.mjs';
-import type { CloudPlan, Person } from '../types';
+import type { CloudPlan, Person, TeamBillingDetails } from '../types';
 import { Face } from './people';
 import './team-billing.css';
 
-export interface TeamBillingInvoice { at: number; amount: number; status: 'paid' | 'open' | 'failed' }
-export interface TeamBillingDetails {
-  periodStart: number | null; periodEnd: number | null;
-  nextAt: number | null; nextAmount: number | null;
-  card: { brand: string; last4: string } | null;
-  email: string | null;
-  invoices: TeamBillingInvoice[];
-}
 type Team = NonNullable<CloudPlan['team']>;
 
 const DAY = 86_400_000;
@@ -80,7 +72,7 @@ export function TeamBilling({ team, people, meId, billing, now = Date.now(), pay
       </> : (
         <div className="tb-hero-sub">{team.owner
           ? `${v.seatsLine}${billing?.nextAt ? ` · next bill $${n(billing.nextAmount ?? 0)} on ${day(billing.nextAt)}` : ''}`
-          : "Paid by your team's owner"}</div>
+          : v.seatsLine}</div>
       )}
       {team.owner && (team.trial
         ? <button type="button" className="set-ghost" disabled={paying} onClick={onPay}>{paying ? 'Opening Stripe…' : `Pay for ${v.seatsLine} now · ${v.price}`}</button>

@@ -814,6 +814,16 @@ export interface UsageLimit {
   zone: string | null;
 }
 
+/** What a paying team's owner sees of Stripe on Plan and Billing (team/TeamBilling.tsx). */
+export interface TeamBillingInvoice { at: number; amount: number; status: 'paid' | 'open' | 'failed' }
+export interface TeamBillingDetails {
+  periodStart: number | null; periodEnd: number | null;
+  nextAt: number | null; nextAmount: number | null;
+  card: { brand: string; last4: string } | null;
+  email: string | null;
+  invoices: TeamBillingInvoice[];
+}
+
 /** The Agentbox Cloud plan this Mac is signed in to, as the cloud server counts it. */
 export interface CloudPlan {
   signedIn: boolean;

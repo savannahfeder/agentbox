@@ -43,10 +43,9 @@ import { EVERY } from '../instruction-scope';
 import type {AccountUsageReading, Usage, UsageLimit, WorkspaceSettings} from '../types';
 import { accountLabel, cloudAccountInUse, cloudToggleTarget, countedAccounts, type CloudStatus } from '../cloud-menu';
 import { cloudBilling, planKey, planSummary, type PaidPlan } from '../cloud-upgrade';
-import { TeamBilling, type TeamBillingDetails } from '../team/TeamBilling';
 import { keyLooksWrong } from '../key-asks';
 import { CloudPlanCards } from './CloudPlanCards';
-import type { CloudPlan, Person } from '../types';
+import type { CloudPlan, TeamBillingDetails } from '../types';
 import { cloudAccountState, hourWords, meterPair, resetWords } from '../account-words';
 import { accountReadingFor, accountsOnce, codexAccountsOnce, type HereLogin, type OneAccount } from '../accounts-once';
 import { LOOKS, lookMeans, SKINS, TUNE_DEFAULT, TUNE_LIMITS, type Look, type SkinId, type SkinTune } from '../skins';
@@ -957,7 +956,13 @@ function PhonePage({ onFeedback, macShut, onSignIn, web, onPhoneProjects }: { on
 // two meters, then the cards to change to (w-893c5fe268). Choosing opens
 // Stripe in the browser; the page reads the plan again until it changes
 // (../cloud-upgrade.ts).
-function CloudPlansPage({ signedIn, onSignIn, people = [], meId = null, onInvite }: { signedIn: boolean; onSignIn: () => void; people?: Person[]; meId?: string | null; onInvite?: () => void }) {
+/** What the team's page is handed to draw from. */
+export interface TeamPlanPage {
+  team: NonNullable<CloudPlan['team']>; billing: TeamBillingDetails | null; paying: boolean;
+  onPay: () => void; onManage: () => void; onInvite?: () => void;
+}
+
+function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite }: { signedIn: boolean; onSignIn: () => void; teamPlan?: (page: TeamPlanPage) => ReactNode; onInvite?: () => void }) {
   const [plan, setPlan] = useState<CloudPlan | null>(null);
   const [said, setSaid] = useState<string | null>(null);
   const [waitingFor, setWaitingFor] = useState<string | null>(null);
@@ -1027,13 +1032,10 @@ function CloudPlansPage({ signedIn, onSignIn, people = [], meId = null, onInvite
       {bill.says && !waitingFor && <p className="cloud-plans-say">{bill.says}</p>}
     </>
   );
-  if (plan?.plan === 'team' && plan.team) {
-    // The preview has no team of its own; it draws one from api.ts.
-    const team = people.length ? { people, meId } : { ...api.fixtureTeamPeople(), ...(meId ? { meId } : {}) };
+  if (plan?.plan === 'team' && plan.team && teamPlan) {
     return (
       <Page title="Plan and Billing">
-        <TeamBilling team={plan.team} people={team.people} meId={team.meId} billing={teamBillingSeen} paying={teamOpening || !!waitingFor}
-          onPay={() => void payForTeam()} onManage={() => void billing()} onInvite={onInvite} />
+        {teamPlan({ team: plan.team, billing: teamBillingSeen, paying: teamOpening || !!waitingFor, onPay: () => void payForTeam(), onManage: () => void billing(), onInvite })}
         {lines}
       </Page>
     );
@@ -1715,8 +1717,8 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   /** Signs a Claude account in to the cloud (a login's key to sign it in again), on the cloud's own screen. */
   onCloudSignIn?: (key: string | null, email: string | null) => void;
   /** Agentbox Cloud's plans, where this copy offers it: the Cloud page. */
-  /** `people` and `meId`: the team, for the names on a team's plan. */
-  cloudPlans?: { signedIn: boolean; onSignIn: () => void; people?: Person[]; meId?: string | null } | null;
+  /** `teamPlan`: a team's own Plan and Billing page, handed in like `teamPane` so this screen holds no team code. */
+  cloudPlans?: { signedIn: boolean; onSignIn: () => void; teamPlan?: (page: TeamPlanPage) => ReactNode } | null;
   // ONE control for the three of them. Light, dark and each picture are one
   // list, because a picture IS dark (skins.ts) and asking her to set a theme
   // and then a background is two decisions for one choice.
@@ -2243,7 +2245,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
 
         {/* TEAM MANAGEMENT (w-8415594d19). It does not wait on `model`, because
             nothing on it comes from the settings file. */}
-        {pane === 'cloud' && cloudPlans && <CloudPlansPage signedIn={cloudPlans.signedIn} onSignIn={cloudPlans.onSignIn} people={cloudPlans.people} meId={cloudPlans.meId}
+        {pane === 'cloud' && cloudPlans && <CloudPlansPage signedIn={cloudPlans.signedIn} onSignIn={cloudPlans.onSignIn} teamPlan={cloudPlans.teamPlan}
           onInvite={teamPane ? () => setPane('team') : undefined} />}
 
         {pane === 'rooms' && roomsPane && (
