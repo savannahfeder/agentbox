@@ -7,7 +7,8 @@
 // each reading the app as an App Store reviewer on 2026-11-08, rated it a
 // likely rejection. An app that signs in only with its own accounts is exempt,
 // so the iPhone offers email and password, and Google stays on Android. A
-// Google account sets a password once with Forgot password?.
+// Google account signs in on the iPhone with an emailed link instead
+// (a-google-account-signs-in-on-the-iphone-by-an-emailed-link).
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 
@@ -18,11 +19,10 @@ describe('the sign-in page', () => {
   it('draws Google only on Android', () => {
     expect(signIn).toMatch(/const GOOGLE = Platform\.OS === 'android';/);
     const before = signIn.slice(0, googleAt);
-    expect(before.slice(before.lastIndexOf('{GOOGLE'))).toMatch(/^\{GOOGLE \? </);
+    expect(before.slice(before.lastIndexOf('{GOOGLE'))).toMatch(/^\{GOOGLE\s*\?\s*</);
   });
-  it('draws the "or" between them only with Google', () => {
-    const gate = signIn.slice(signIn.indexOf('{GOOGLE'), googleAt);
-    expect(gate).toMatch(/<Label>or<\/Label>/);
+  it('offers no other outside sign-in in its place', () => {
+    expect(signIn).not.toMatch(/Apple|signInWithIdToken/);
   });
   it('still signs in with email and password everywhere, and keeps Forgot password?', () => {
     expect(signIn.slice(0, signIn.indexOf('{GOOGLE'))).toMatch(/kind="primary" label=\{busy === 'email'/);

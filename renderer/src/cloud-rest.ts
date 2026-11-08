@@ -19,6 +19,7 @@ type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 const SESSION_KEY = 'agentbox-cloud-session';
 const VERIFIER_KEY = 'agentbox-cloud-verifier';
 const RESET_KEY = 'agentbox-cloud-reset';
+const LINK_KEY = 'agentbox-cloud-link';
 
 const b64url = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
@@ -100,6 +101,7 @@ export function cloudClient(cfg: CloudConfig, { storage, fetchImpl, now = () => 
     return signIn('/auth/v1/token?grant_type=pkce', { auth_code: code, code_verifier: verifier });
   };
   const resetAsked = () => { try { return !!storage.getItem(RESET_KEY); } catch { return false; } };
+  const linkAsked = () => { try { return !!storage.getItem(LINK_KEY); } catch { return false; } };
 
   // A token good for at least another minute, renewed if it is not: one
   // renewal at a time, and one that is refused outright signs her out.
@@ -183,6 +185,7 @@ export function cloudClient(cfg: CloudConfig, { storage, fetchImpl, now = () => 
       const at = String(email ?? '').trim();
       if (!at) throw new Error('Type your email first.');
       storage.removeItem(RESET_KEY);
+      storage.removeItem(LINK_KEY);
       await call(`/auth/v1/recover?redirect_to=${encodeURIComponent(returnTo)}`, {
         method: 'POST', auth: false, body: JSON.stringify({ email: at, code_challenge: await challenge(), code_challenge_method: 's256' }),
       });
@@ -192,6 +195,29 @@ export function cloudClient(cfg: CloudConfig, { storage, fetchImpl, now = () => 
     async finishReset(code: string) {
       if (!resetAsked()) throw new Error('Ask for the reset email again.');
       storage.removeItem(RESET_KEY);
+      return tradeCode(code);
+    },
+    // A SIGN-IN LINK by email comes back the same way, for an account with no
+    // password (made with Google on the computer). It never makes an account.
+    async askSignInLink(email: string, returnTo: string) {
+      const at = String(email ?? '').trim();
+      if (!at) throw new Error('Type your email first.');
+      storage.removeItem(LINK_KEY);
+      storage.removeItem(RESET_KEY);
+      try {
+        await call(`/auth/v1/otp?redirect_to=${encodeURIComponent(returnTo)}`, {
+          method: 'POST', auth: false, body: JSON.stringify({ email: at, create_user: false, code_challenge: await challenge(), code_challenge_method: 's256' }),
+        });
+      } catch (err) {
+        if (/signups not allowed/i.test(String((err as Error)?.message))) throw Object.assign(new Error('No account uses that email.'), { code: 'no_account' });
+        throw err;
+      }
+      try { storage.setItem(LINK_KEY, at); } catch { /* the link will say so */ }
+    },
+    linkAsked,
+    async finishSignInLink(code: string) {
+      if (!linkAsked()) throw new Error('Ask for the sign-in email again.');
+      storage.removeItem(LINK_KEY);
       return tradeCode(code);
     },
     async setPassword(password: string) {

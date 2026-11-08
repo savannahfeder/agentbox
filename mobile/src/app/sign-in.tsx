@@ -1,6 +1,7 @@
 // Sign in, the first screen and the first of the four steps. Nearly everyone
 // has an account from the computer already, so it opens on email and password,
-// with Google under them on Android. Accounts are made on the computer: Sign
+// with Google under them on Android and an emailed sign-in link on the iPhone,
+// for the accounts Google made, which have no password. Accounts are made on the computer: Sign
 // up, and a sign-in that fails, point there. Only ways the computer also signs
 // in with, so no account made here is one the computer cannot open.
 import { Redirect } from 'expo-router';
@@ -46,14 +47,14 @@ export default function SignIn() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Screen top={24} foot={<>
         <Btn kind="primary" label={busy === 'email' ? 'Signing in…' : 'Sign in'} disabled={!canSubmit} onPress={signIn} />
-        {GOOGLE ? <>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 4 }}>
-            <View style={{ flex: 1, height: 1, backgroundColor: color.line }} />
-            <Label>or</Label>
-            <View style={{ flex: 1, height: 1, backgroundColor: color.line }} />
-          </View>
-          <Btn label={busy === 'google' ? 'Signing in…' : 'Continue with Google'} lead={<GoogleMark />} disabled={!!busy} onPress={run('google', () => googleSignIn(c.cloud!))} />
-        </> : null}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 4 }}>
+          <View style={{ flex: 1, height: 1, backgroundColor: color.line }} />
+          <Label>or</Label>
+          <View style={{ flex: 1, height: 1, backgroundColor: color.line }} />
+        </View>
+        {GOOGLE
+          ? <Btn label={busy === 'google' ? 'Signing in…' : 'Continue with Google'} lead={<GoogleMark />} disabled={!!busy} onPress={run('google', () => googleSignIn(c.cloud!))} />
+          : <Btn label="Email me a sign-in link" disabled={!!busy} onPress={() => router.push({ pathname: '/sign-in-link', params: { email: email.trim() } })} />}
         <T style={{ fontSize: 14, lineHeight: 20, color: color.faint, textAlign: 'center', marginTop: 6 }}>
           {'No account? '}
           <T onPress={toNoAccount} accessibilityRole="link" style={{ fontSize: 14, color: color.text, textDecorationLine: 'underline', textDecorationColor: color.lineStrong }}>Sign up</T>

@@ -1,5 +1,5 @@
 // Where things are kept. The sign-in: the keychain on a phone, the page's own
-// storage in the browser preview, only the two keys the sign-in client writes.
+// storage in the browser preview, only the keys the sign-in client writes.
 // Everything else (drafts, the last project, model and level): one file in the
 // app's documents folder, or the page's storage.
 import { File, Paths } from 'expo-file-system';
@@ -10,7 +10,7 @@ import { ALERTS_KEY } from '../lib/push-device';
 import { syncStore } from '../lib/drafts';
 import type { Persist } from '../lib/kept';
 
-const KEYS = ['agentbox-cloud-session', 'agentbox-cloud-verifier', 'agentbox-cloud-reset', ALERTS_KEY, NOTICE_KEY];
+const KEYS = ['agentbox-cloud-session', 'agentbox-cloud-verifier', 'agentbox-cloud-reset', 'agentbox-cloud-link', ALERTS_KEY, NOTICE_KEY];
 
 export const persist: Persist = Platform.OS === 'web'
   ? {
