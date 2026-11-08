@@ -156,16 +156,18 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   const freeUsedNow = (rec, t) => (rec.freeUsed || 0) + live(rec, 'run').filter((s) => s.free).reduce((sum, s) => sum + (t - s.at) / 1000, 0);
   const freeSpent = (rec, t) => freeUsedNow(rec, t) >= free.hours * 3600;
   const ownOver = (rec, t) => planOf(rec).hoursPerMonth != null && usedNow(rec, t) >= planOf(rec).hoursPerMonth * 3600;
-  // A team's runs are held to its hours by the sweep, which reads the other
-  // members; a run a cancelled plan started does not carry on.
-  const runOver = (rec, s, t) => (s.team ? false : s.free ? freeSpent(rec, t) : onFree(rec) || ownOver(rec, t));
-
-  // TEAMS. Each member's record keeps their share of the team's hours, and a
-  // team's use is the sum over its members, so no two members write one record.
+  // TEAMS. Each member has hours of their own, as a seat is one person's plan
+  // (the owner, 2026-11-08): the trial's, once, or a seat's, each month. They
+  // are kept in the member's own record, so a member is held to them as to a plan.
   const teamKey = (id) => `ledger/teams/${id}.json`;
+  const teamAllot = (trial) => (trial ? teamPlan.trialHoursPerMember : teamPlan.hoursPerSeat) * 3600;
+  const teamAgents = (trial) => (trial ? teamPlan.trialAgentsPerMember : teamPlan.agentsPerSeat);
   const teamUsedOf = (rec, id, trial, t) => (trial ? rec.teamTrialUsed?.[id] || 0 : rec.teamUsed?.[id]?.[month(t)] || 0)
     + live(rec, 'run').filter((s) => s.team === id && !!s.trial === trial).reduce((sum, s) => sum + (t - (trial ? s.at : Math.max(s.at, monthStart(t)))) / 1000, 0);
-  async function teamNow(person, t) {
+  // A team's run ends once its person's own hours are spent; the sweep ends it when the trial or the team does.
+  const runOver = (rec, s, t) => (s.team ? teamUsedOf(rec, s.team, !!s.trial, t) >= teamAllot(!!s.trial) : s.free ? freeSpent(rec, t) : onFree(rec) || ownOver(rec, t));
+  // `people`: every member's own use, for the owner's page; a start needs only this person's.
+  async function teamNow(person, t, { people = false } = {}) {
     if (!teams) return null;
     const team = await teams(person);
     if (!team?.id || !Array.isArray(team.members)) return null;
@@ -175,20 +177,18 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     const trial = !seats && t < endsAt;
     if (!seats && !trial) return null;
     const members = team.members.filter((m) => PERSON.test(m));
-    const others = await Promise.all(members.filter((m) => m !== person).map(recOf));
-    return {
+    const tm = {
       id: team.id, trial, seats, endsAt: trial ? endsAt : null, members: members.length, owner: (team.owners || []).includes(person),
-      agents: seats ? seats * teamPlan.agentsPerSeat : members.length * teamPlan.trialAgentsPerMember,
-      seconds: (seats ? seats * teamPlan.hoursPerSeat : members.length * teamPlan.trialHoursPerMember) * 3600,
-      othersUsed: others.reduce((sum, o) => sum + teamUsedOf(o, team.id, trial, t), 0),
-      othersRunning: others.reduce((sum, o) => sum + live(o, 'run').filter((s) => s.team === team.id).length, 0),
+      agents: teamAgents(trial), seconds: teamAllot(trial),
     };
+    if (!people) return tm;
+    const recs = await Promise.all(members.map(async (m) => [m, m === person ? null : await recOf(m).catch(() => fresh())]));
+    return { ...tm, people: recs.map(([m, rec]) => ({ id: m, rec })) };
   }
   // A team that cannot be read is no team for this start; the sweep leaves its runs alone.
-  const teamOrNone = (person, t) => teamNow(person, t).catch((err) => { log(`could not read ${person}'s team: ${err?.message || err}`); return null; });
-  const teamUsedAll = (tm, rec, t) => tm.othersUsed + teamUsedOf(rec, tm.id, tm.trial, t);
-  const teamLeft = (tm, rec, t) => !!tm && teamUsedAll(tm, rec, t) < tm.seconds;
-  const teamRunning = (tm, rec) => tm.othersRunning + live(rec, 'run').filter((s) => s.team === tm.id).length;
+  const teamOrNone = (person, t, opts) => teamNow(person, t, opts).catch((err) => { log(`could not read ${person}'s team: ${err?.message || err}`); return null; });
+  const teamLeft = (tm, rec, t) => !!tm && teamUsedOf(rec, tm.id, tm.trial, t) < tm.seconds;
+  const teamRunning = (tm, rec) => live(rec, 'run').filter((s) => s.team === tm.id).length;
 
   // Ending a session in the ledger: its time charged to each month it ran
   // in, and, in the same write, its stop and its record owed. `update` makes
@@ -335,9 +335,14 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       terms: { accepted: rec.terms?.version ?? null, current: termsVersion },
       // Apart from the plan, so an app from before the free hours still reads no plan.
       ...(onFree(rec) ? { free: { agents: free.agents, hours: free.hours, usedSeconds: Math.min(free.hours * 3600, Math.round(rec.freeUsed || 0)) } } : {}),
+      // Hours and agents are this person's own; `people` is every member's, this one's included.
       ...(tm ? { team: {
         trial: tm.trial, endsAt: tm.endsAt, seats: tm.seats, members: tm.members, owner: tm.owner, agents: tm.agents, running: teamRunning(tm, rec),
-        hours: tm.seconds / 3600, usedSeconds: Math.min(tm.seconds, Math.round(teamUsedAll(tm, rec, t))),
+        hours: tm.seconds / 3600, usedSeconds: Math.min(tm.seconds, Math.round(teamUsedOf(rec, tm.id, tm.trial, t))),
+        ...(tm.people ? { people: tm.people.map(({ id, rec: r }) => {
+          const of = r ?? rec;
+          return { id, usedSeconds: Math.min(tm.seconds, Math.round(teamUsedOf(of, tm.id, tm.trial, t))), running: teamRunning(tm, of) };
+        }) } : {}),
       } } : {}),
     };
   }
@@ -355,10 +360,11 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       }
     } else if (pays === 'team') {
       if (!teamLeft(team, rec, t)) {
+        const h = team.seconds / 3600;
         const next = team.trial ? (team.owner ? ' Pay for the team on Plan and Billing to keep running agents there.' : ' Your team\'s owner can pay for the team to keep running agents there.') : '';
-        return { ok: false, error: 'hours', message: `Your team's ${team.trial ? 'trial' : 'cloud'} hours are used${team.trial ? '' : ' this month'}.${next}` };
+        return { ok: false, error: 'hours', message: `${team.trial ? `Your ${h} trial hours` : `This month's ${h} cloud hours`} are used.${next}` };
       }
-      if (teamRunning(team, rec) >= team.agents) return { ok: false, error: 'agents', message: `All ${team.agents} of your team's cloud agents are running.` };
+      if (teamRunning(team, rec) >= team.agents) return { ok: false, error: 'agents', message: `All ${team.agents} of your cloud agents are running.` };
     } else {
       if (freeSpent(rec, t)) return { ok: false, error: 'plan', message: `Your ${free.hours} free cloud hours are used. Choose a cloud plan to keep running agents there.` };
       if (live(rec, 'run').filter((s) => s.free).length >= free.agents) return { ok: false, error: 'agents', message: 'Both of your free cloud agents are running.' };
@@ -760,7 +766,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
         return { status: 200, body: { ok: true, terms: termsVersion } };
       }
       if (route === 'GET /v1/me') {
-        const tm = await teamOrNone(person, now());
+        const tm = await teamOrNone(person, now(), { people: true });
         return { status: 200, body: await update(person, (rec, ctx) => { settle(rec, ctx, now()); return summary(rec, now(), tm); }) };
       }
       if (route === 'POST /v1/invoke') return { status: 200, body: await invoke(person, data) };
@@ -841,14 +847,15 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       const there = await objects.head(`runs/u-${person}/${s.runId}/done.json`).catch(() => null);
       if (there) finished.add(s.runId);
     }
-    // A team's runs end once its hours are spent or its trial is over. A team
-    // that cannot be read leaves them running until a sweep that can.
+    // A team's runs end once its trial is over, it stops paying or the person
+    // leaves it; their own spent hours end them in `settle`. A team that cannot
+    // be read leaves them running until a sweep that can.
     const teamRuns = live(before, 'run').filter((s) => s.team);
     let teamDone = false;
     if (teamRuns.length) {
       try {
         const tm = await teamNow(person, t);
-        teamDone = !tm || teamRuns.some((s) => s.team !== tm.id) || !teamLeft(tm, before, t);
+        teamDone = !tm || teamRuns.some((s) => s.team !== tm.id);
       } catch (err) { log(`could not read ${person}'s team: ${err?.message || err}`); }
     }
     const rec = await update(person, (r, ctx) => {

@@ -92,7 +92,8 @@ describe('Stripe\'s webhook', () => {
   it('puts the whole team on its seats, the trial over', async () => {
     const { owner, member, webhook } = setup();
     await webhook('sub_team', 'active', 3);
-    expect((await member('GET', '/v1/me')).body.team).toMatchObject({ trial: false, seats: 3, hours: 1200, agents: 30 });
+    // Each member's seat is the $40 cloud plan's: 400 hours and 10 agents at once of their own.
+    expect((await member('GET', '/v1/me')).body.team).toMatchObject({ trial: false, seats: 3, hours: 400, agents: 10 });
     expect((await owner('GET', '/v1/me')).body.team.owner).toBe(true);
   });
 
