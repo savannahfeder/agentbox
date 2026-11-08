@@ -125,7 +125,7 @@ describe('⌘1 allows and ⌘2 denies, and never in the card’s first moment', 
 
 describe('the card', () => {
   const app = read('renderer/src/App.tsx');
-  const card = app.slice(app.indexOf('const view = approvalView(a.input, a.tool);'), app.indexOf('<AskCard asks={asksShown}'));
+  const card = app.slice(app.indexOf('const view = approvalView(a.input, a.tool);'), app.indexOf("{modal === 'snooze' && snoozeItem && ("));
   it('names the agent and the thread first, and opens the thread from there', () => {
     expect(card).toContain("harnessOf(row) === 'codex' ? 'Codex' : 'Claude Code'");
     expect(card.indexOf('approval-from')).toBeLessThan(card.indexOf('approval-lede'));

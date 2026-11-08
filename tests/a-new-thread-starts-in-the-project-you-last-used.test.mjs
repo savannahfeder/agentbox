@@ -13,10 +13,11 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cardProject } from '../renderer/src/threads/composer-rules.ts';
+import { cardProject, projectOnScreen } from '../renderer/src/threads/composer-rules.ts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const card = fs.readFileSync(path.join(root, 'renderer/src/threads/ThreadComposer.tsx'), 'utf8');
+const app = fs.readFileSync(path.join(root, 'renderer/src/App.tsx'), 'utf8');
 
 const HERS = [
   { slug: 'company' }, { slug: 'launch' }, { slug: 'lumen-app' }, { slug: 'my-workspace' },
@@ -43,6 +44,16 @@ describe('a new thread starts in the project you last used', () => {
 
   it('a picked project that is gone gives way to the remembered one, not the first', () => {
     expect(on(HERS, { picked: 'deleted-project', remembered: 'lumen-app' })).toBe('lumen-app');
+  });
+
+  // QA batch 011, F-172: N pressed from inside a Leap Year JS thread opened the
+  // card on Clamp Num JS, the project last sent to. The open thread is on screen.
+  it('opens on the project of the thread you have open, under a filter', () => {
+    expect(projectOnScreen({ filter: null, open: { product: 'launch' } })).toBe('launch');
+    expect(projectOnScreen({ filter: 'company', open: { product: 'launch' } })).toBe('company');
+    expect(projectOnScreen({ filter: null, open: null })).toBe(null);
+    expect(on(HERS, { defaultProduct: projectOnScreen({ filter: null, open: { product: 'launch' } }), remembered: 'lumen-app' })).toBe('launch');
+    expect(app).toContain('projectOnScreen({ filter: productFilter, open: focused })');
   });
 
   it('the card reads the remembered project on every draw, not only the first', () => {

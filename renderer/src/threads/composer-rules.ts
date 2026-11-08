@@ -344,6 +344,15 @@ export function startingProject<T extends ProjectLike>(
 }
 
 /**
+ * The project on screen when the card opens: the one the list is filtered to,
+ * else the thread that is open. Null on a plain inbox, where the card falls back
+ * to the project last sent to.
+ */
+export function projectOnScreen({ filter, open }: { filter: string | null; open: { product?: string | null } | null }): string | null {
+  return filter ?? open?.product ?? null;
+}
+
+/**
  * The project the card shows now: the one picked on it, else the starting
  * rule. Asked on every draw, because the box on the page is drawn before the
  * team's projects arrive and a choice made then would miss the remembered one.

@@ -21,7 +21,7 @@ import { toastParts } from '../../../renderer/src/toast-parts';
 import type { Saved } from '../lib/attach';
 import type { Picked } from '../platform/pick';
 import { planFor, runSteps, type PressedItem, type Press, type Step } from '../lib/actions';
-import { needsNotice, NOTICE_KEY, readNotice, type Notice } from '../lib/ai-notice';
+import { needsNotice, NOTICE_KEY, noticeFor, readNotice, type Notice } from '../lib/ai-notice';
 import { withDeadline } from '../lib/deadline';
 import { keptStore } from '../lib/kept';
 import { previewCloud } from '../lib/preview';
@@ -32,6 +32,8 @@ import { onTheirWay, teamFrom, withPendingPauses, withPhoneAnswers } from '../li
 import { isUnread, markSeen as markSeenIn, markUnseen as markUnseenIn, readSeen } from '../lib/unread';
 import { alertToken, alertTokenIfAllowed, setIconCount } from '../platform/alerts';
 import { appStore, persist } from '../platform/persist';
+import { forgetCrash, keptCrash } from '../platform/crash';
+import { crashReport, reportsOn } from '../lib/crash-note';
 
 export type Cloud = Pick<CloudClient, 'session' | 'signedIn' | 'generation' | 'select' | 'insertCommand' | 'update' | 'putFile' | 'signFiles' | 'signInWithPassword' | 'signInWithIdToken' | 'signUp' | 'googleUrl' | 'finishGoogle' | 'askPasswordReset' | 'resetAsked' | 'finishReset' | 'setPassword' | 'signOut' | 'insert' | 'remove' | 'rpc' | 'listFiles' | 'removeFiles' | 'upsert'>;
 
@@ -175,15 +177,17 @@ function useCloudState() {
       setAlerts(alertsNow.current);
     }).catch(() => {}).finally(() => setNoticeRead(true));
   }, []);
-  const agreed = !!notice && 'agreed' in notice;
+  const me = signedIn ? cloud?.session()?.user.id ?? null : null;
+  const mine = noticeFor(notice, me);
+  const agreed = !!mine && 'agreed' in mine;
   // Sends waiting on the notice's answer: a yes lets them go on, a no drops them.
   const noticeWaiters = useRef<Array<(yes: boolean) => void>>([]);
   const answerNotice = useCallback((yes: boolean) => {
-    const v = yes ? { agreed: Date.now() } : { declined: Date.now() };
+    const v = yes ? { agreed: Date.now(), by: me ?? undefined } : { declined: Date.now(), by: me ?? undefined };
     setNotice(v);
     void persist.write(NOTICE_KEY, JSON.stringify(v));
     for (const go of noticeWaiters.current.splice(0)) go(yes);
-  }, []);
+  }, [me]);
   const askNotice = useCallback(async () => {
     router.push('/ai-notice');
     const yes = await new Promise<boolean>((resolve) => { noticeWaiters.current.push(resolve); });
@@ -322,6 +326,20 @@ function useCloudState() {
     return sendPhoneFeedback(cfg, { text, files, os: `${Platform.OS} app`, version: [APP_VERSION, BUILD && `(${BUILD})`].filter(Boolean).join(' ') }, withDeadline(fetch));
   }, []);
 
+  // Last launch's crash goes once a computer's settings are read; with crash reports off it is dropped unsent.
+  const crashSending = useRef(false);
+  useEffect(() => {
+    const allowed = reportsOn(settingsRows);
+    if (PREVIEW || allowed === null || crashSending.current) return;
+    const note = keptCrash();
+    if (!note) return;
+    if (!allowed) { forgetCrash(); return; }
+    crashSending.current = true;
+    void sendFeedback(crashReport(note), [])
+      .then((out) => { if (out.ok) forgetCrash(); }, () => {})
+      .finally(() => { crashSending.current = false; });
+  }, [settingsRows, sendFeedback]);
+
   const signedInWith = useCallback(async (how: () => Promise<unknown>) => {
     const out = await how();
     if (out !== null) { setSignedIn(!!cloud?.signedIn()); setRead({ error: null, fetchedAt: 0, first: true }); }
@@ -344,13 +362,14 @@ function useCloudState() {
     settingsAt.current = -Infinity;
     setToast(null);
     setSignedIn(false);
-  }, [cloud, setRows, keepAlerts]);
+    if (notice && !('by' in notice && notice.by)) { setNotice(null); void persist.write(NOTICE_KEY, null).catch(() => {}); }
+  }, [cloud, setRows, keepAlerts, notice]);
 
   return {
     cloud, opened, signedIn, rows, view, tabs, repeats, status, loading: read.first, onlineAt: read.error ? 0 : read.fetchedAt, now, refresh, send, closeAll, attach, fileOf, toast, say,
     team, teamPending, watchTeam, askTeammate, wanted, goTo: setWanted, takeWanted: () => setWanted(null), minimizedApproval, setMinimizedApproval, approvalRoom, setApprovalRoom,
     dismissToast: () => setToast(null), signedInWith, signOut, preview: PREVIEW,
-    notice, noticeRead, agreed, answerNotice, withdrawNotice: () => answerNotice(false),
+    notice: mine, noticeRead, agreed, answerNotice, withdrawNotice: () => answerNotice(false),
     alerts, turnOnAlerts, turnOffAlerts,
     connect, markSeen, markUnseen, unread, sendFeedback, version: APP_VERSION, build: BUILD,
     // The one map of her files' links, filled in place; `signedAt` moves when it does.

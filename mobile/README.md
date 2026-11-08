@@ -87,4 +87,17 @@ Without them the sign-in screen says the build cannot sign in.
 
 ## Builds for the stores
 
-Store builds go through EAS (`eas.json`): `npx eas-cli@latest build --profile production`.
+An iPhone build reaches TestFlight through one EAS workflow, from the
+repository's own folder brought up to `main`:
+
+```sh
+cd mobile
+npx eas-cli@latest workflow:run .eas/workflows/release-ios.yml
+```
+
+It builds the store build and a Release build for the iPhone simulator side
+by side, opens the simulator build with `.maestro/opens.yml`, and sends the
+store build to TestFlight only if the app opened. `launch-test-ios.yml` runs
+the open-the-app half alone and sends nothing. Do not send a build with
+`eas build --auto-submit`: builds 11 to 15 went out that way and none of them
+opened.

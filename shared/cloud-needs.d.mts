@@ -14,4 +14,5 @@ export declare function keysOf(need: Need): string[];
 export declare function needsLeft(item: unknown, saved?: Iterable<string>): Need[];
 export declare function needsWord(needs: Need[]): string | null;
 export declare function connectedReply(needs: Need[]): string;
+export declare function lateReply(needs: Need[]): string;
 export declare function threadsKeysFree(items: unknown[], saved: Iterable<string>): { product: string; id: string; answer: string }[];

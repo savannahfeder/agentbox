@@ -580,6 +580,16 @@ export const api = {
         base.supervisor.queued = queued;
         base.supervisor.capacity = base.supervisor.running.filter((r) => (r as { where?: string }).where !== 'cloud').length;
       }
+      // &usagestale: a Codex reading six hours old whose five hour window has ended.
+      if (params.has('usagestale')) {
+        const now = Date.now();
+        const limits = [
+          { span: 'session' as const, qualifier: null, name: 'This session', percent: 2, resetsText: null, resetsOn: null, resetsAt: now - 60 * 60_000, zone: null },
+          { span: 'week' as const, qualifier: null, name: 'This week', percent: 30, resetsText: null, resetsOn: null, resetsAt: now + (3 * 24 + 16) * 3_600_000, zone: null },
+        ];
+        base.usage = { engine: 'codex', limits, at: now - 6 * 3_600_000 };
+        base.usageByEngine = [base.usage];
+      }
       return fixtureSecondEngine(base, engineFixtures);
     }
     // A document's holder thread is the app's, so no list of threads draws it.
@@ -1646,6 +1656,7 @@ export const api = {
     if (useFixtures) {
       if (params.get('cloudplan') === 'pro') return { signedIn: true, plan: 'pro', unlimited: false, agents: 10, hoursPerMonth: 400, running: 6, usedSeconds: 88 * 3600 };
       if (params.get('cloudplan') === 'free') return { signedIn: true, plan: 'free', unlimited: false, agents: 2, hoursPerMonth: 5, running: 1, usedSeconds: 1.5 * 3600, billing: null };
+      if (params.get('cloudplan') === 'spent') return { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0, billing: null, free: { agents: 2, hours: 5, usedSeconds: 5 * 3600 } };
       return { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0 };
     }
     return (await (window.zero as any)?.cloudAccountPlan?.()) ?? { signedIn: false };

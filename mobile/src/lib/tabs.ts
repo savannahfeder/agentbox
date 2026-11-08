@@ -9,7 +9,7 @@
 import {
   belongsInInbox, belongsInProgress, hiddenUntil, inProgressTab, isProposal, notStarted, rowTitle, stillAsksYou, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd,
 } from '../../../renderer/src/list-rules';
-import { boardColumns, DEFAULT_DISPLAY, keeps, sentAt, sorted, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
+import { backWords, boardColumns, DEFAULT_DISPLAY, keeps, sentAt, sorted, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
 import { searchThreads } from '../../../renderer/src/threads/search';
 import { parseQuery, splitHits } from '../../../renderer/src/search';
 import { stamp } from '../../../renderer/src/format';
@@ -18,6 +18,7 @@ import { priorityIdOf } from '../../../renderer/src/priority';
 import { toApproveWords, waitingCounts } from '../../../renderer/src/threads-made';
 import type { phoneView } from '../../../renderer/src/phone-rows';
 import type { ThreadStateWord } from '../../../renderer/src/types';
+import { teammateIdOf } from '../../../shared/teammates.mjs';
 
 export type TabId = 'inbox' | 'progress' | 'snoozed' | 'done';
 export const TABS: { id: TabId; label: string }[] = [
@@ -104,13 +105,14 @@ export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
 
   const names = new Map(view.products.map((p: { slug: string; name: string }) => [p.slug, p.name]));
   const order = view.products.map((p: { slug: string }) => p.slug);
-  const row = (i: any): Row => ({
+  // Later says when a thread comes back, and leaves waiting a turn to In progress (Pages.tsx `back`).
+  const row = (i: any, tab: TabId): Row => ({
     key: `${i.product}/${i.id}`, id: i.id, product: i.product, title: rowTitle(i), projectName: names.get(i.product) ?? '',
-    when: updatedWords(i.status === 'done' ? i.wrote?.status?.ts ?? i.updatedAt : sentAt(i), now), running: live.has(i.id), cloud: inCloud.has(i.id),
-    held: notStarted(i), toApprove: toApproveWords(toApprove.get(`${i.product}/${i.id}`)), queued: queued.has(i.id) && !live.has(i.id), item: i,
+    when: (tab === 'snoozed' && backWords(i, now)) || updatedWords(i.status === 'done' ? i.wrote?.status?.ts ?? i.updatedAt : sentAt(i), now), running: live.has(i.id), cloud: inCloud.has(i.id),
+    held: notStarted(i), toApprove: toApproveWords(toApprove.get(`${i.product}/${i.id}`)), queued: tab !== 'snoozed' && queued.has(i.id) && !live.has(i.id), item: i,
     priority: ((p) => (p === 'high' || p === 'urgent' ? p : null))(priorityIdOf(i.priority)),
   });
-  const drawn = (list: any[], tab: TabId) => sorted(list, DEFAULT_DISPLAY.inbox, tab, order).map(row);
+  const drawn = (list: any[], tab: TabId) => sorted(list, DEFAULT_DISPLAY.inbox, tab, order).map((i) => row(i, tab));
   return { inbox: drawn(inbox, 'inbox'), progress: drawn(progress, 'progress'), snoozed: drawn(snoozed, 'snoozed'), done: drawn(done, 'done') };
 }
 
@@ -126,6 +128,23 @@ export function shownTabs(tabs: Record<TabId, Row[]>, display: Display, now: num
   };
 }
 
+/**
+ * View and filters' "Showing N of M": what the screen draws against what it
+ * would draw with no filter on. `above` is the rows drawn over the list that no
+ * filter hides (mentions, questions, repeating tasks).
+ */
+export function filterCount({ rows, whole, mineOnly = false, above = 0, board = null, wholeBoard = null }: {
+  rows: Pick<Row, 'item'>[]; whole: Pick<Row, 'item'>[]; mineOnly?: boolean; above?: number;
+  board?: { rows: unknown[] }[] | null; wholeBoard?: { rows: unknown[] }[] | null;
+}) {
+  if (board && wholeBoard) {
+    const cards = (b: { rows: unknown[] }[]) => b.reduce((n, c) => n + c.rows.length, 0);
+    return { shown: cards(board), total: cards(wholeBoard) };
+  }
+  const counted = (list: Pick<Row, 'item'>[]) => (mineOnly ? list.filter((r) => !teammateIdOf(r.item)) : list).length;
+  return { shown: counted(rows) + above, total: counted(whole) + above };
+}
+
 /** The board, column by column, as the site draws it (page-rules.ts `boardColumns`). */
 export function phoneBoard(view: View, tabs: Record<TabId, Row[]>, display: Display, now: number) {
   const state = new Map<string, ThreadStateWord>();
@@ -135,8 +154,13 @@ export function phoneBoard(view: View, tabs: Record<TabId, Row[]>, display: Disp
     items: view.items as any[], products: view.products as any[], display, now, me: null, live,
     stateOf: (i) => state.get(i.id) ?? null, projectOrder: view.products.map((p: { slug: string }) => p.slug),
   });
+  // A card waiting its turn says Queued where the running mark would be (Pages.tsx `saysOnCard`).
+  const queued = new Set(tabs.progress.filter((r) => r.queued).map((r) => r.id));
   // Your own board says what the tab says (Pages.tsx `InboxBoard`).
-  return columns.map((c) => ({ ...c, label: c.state === 'waiting' ? 'Needs you' : c.label }));
+  return columns.map((c) => ({
+    ...c, label: c.state === 'waiting' ? 'Needs you' : c.label,
+    rows: c.rows.map((e) => ({ ...e, queued: c.state === 'running' && !!e.item && queued.has(e.item.id) })),
+  }));
 }
 
 export interface Hit {

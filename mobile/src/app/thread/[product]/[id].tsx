@@ -306,7 +306,8 @@ export default function ThreadScreen() {
   const [contextWhole, setContextWhole] = useState(false);
   const [foldedRounds, setFoldedRounds] = useState(() => foldedKeys(appStore.getItem(CHOICES_FOLDED)));
   useEffect(() => { setWhole(false); setAsking(false); setCutting(false); setEarlierOpen(false); setContextWhole(false); }, [product, id]);
-  const thread = useMemo(() => threadOf(c.rows, c.view, String(product), String(id), { whole, tabs: c.tabs }), [c.rows, c.view, c.tabs, product, id, whole]);
+  const me = c.signedIn ? c.cloud?.session()?.user.id ?? null : null;
+  const thread = useMemo(() => threadOf(c.rows, c.view, String(product), String(id), { whole, tabs: c.tabs, me }), [c.rows, c.view, c.tabs, product, id, whole, me]);
   const { dir, files } = useMessageFiles(String(product), String(id));
   const inset = useSafeAreaInsets();
   const waiting = !!thread?.events.some((e: any) => e.kind !== 'work' && e.pending);
