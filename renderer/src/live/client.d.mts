@@ -18,6 +18,7 @@ export function connectLive(opts: {
   open: () => WebSocket;
   flushMs?: number;
   awarenessMs?: number;
+  applyMs?: number;
   onRoom?: (room: LiveRoomRoles) => void;
   onState?: (state: LiveState) => void;
 }): LiveConnection;

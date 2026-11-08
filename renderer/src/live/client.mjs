@@ -15,7 +15,7 @@ import { AWARENESS, HELLO, ROOM, SYNC, SYNC_REPLY, UPDATE, frame, jsonFrame, rea
 const RETRY_WAITS_MS = [500, 1000, 2000, 4000, 8000, 15000, 30000, 30000];
 const FROM_ROOM = 'live-room';
 
-export function connectLive({ doc, hello = {}, open, flushMs = 50, awarenessMs = 100, onRoom = () => {}, onState = () => {} }) {
+export function connectLive({ doc, hello = {}, open, flushMs = 50, awarenessMs = 100, applyMs = 100, onRoom = () => {}, onState = () => {} }) {
   const awareness = new aw.Awareness(doc);
   awareness.setLocalStateField('who', { name: hello.name ?? 'Someone', kind: hello.kind ?? 'person', color: hello.color ?? null, person: hello.person ?? null });
   let sock = null;
@@ -64,6 +64,28 @@ export function connectLive({ doc, hello = {}, open, flushMs = 50, awarenessMs =
   };
   awareness.on('update', onAwareness);
 
+  // A busy room's edits are taken in at most every `applyMs`, so a window
+  // redraws ten times a second rather than once per relay tick; a quiet
+  // room's first edit is taken in the moment it lands.
+  let incoming = [];
+  let applyTimer = null;
+  let appliedAt = 0;
+  function applyIncoming() {
+    applyTimer = null;
+    if (!incoming.length) return;
+    const merged = incoming.length === 1 ? incoming[0] : Y.mergeUpdates(incoming);
+    incoming = [];
+    appliedAt = Date.now();
+    Y.applyUpdate(doc, merged, FROM_ROOM);
+  }
+  function takeIn(update) {
+    incoming.push(update);
+    if (applyTimer) return;
+    const wait = appliedAt + applyMs - Date.now();
+    if (wait <= 0) applyIncoming();
+    else applyTimer = setTimeout(applyIncoming, wait);
+  }
+
   function forgetOthers() {
     const others = [...awareness.getStates().keys()].filter((id) => id !== doc.clientID);
     if (others.length) aw.removeAwarenessStates(awareness, others, FROM_ROOM);
@@ -97,7 +119,7 @@ export function connectLive({ doc, hello = {}, open, flushMs = 50, awarenessMs =
         awarenessOwed = true;
         sendAwareness();
       } else if (f.type === UPDATE) {
-        Y.applyUpdate(doc, f.body, FROM_ROOM);
+        takeIn(f.body);
       } else if (f.type === AWARENESS) {
         aw.applyAwarenessUpdate(awareness, f.body, FROM_ROOM);
       } else if (f.type === ROOM) {
@@ -132,7 +154,7 @@ export function connectLive({ doc, hello = {}, open, flushMs = 50, awarenessMs =
     awareness,
     state: () => state,
     room: () => room,
-    pending: () => queue.length > 0 || flushTimer !== null,
+    pending: () => queue.length > 0 || flushTimer !== null || incoming.length > 0,
     stats: () => ({ ...stats }),
     /** Tries again now, for a copy that said it was off. */
     again() { if (closed || sock) return; if (retryTimer) clearTimeout(retryTimer); tries = 0; connect(); },
@@ -140,7 +162,7 @@ export function connectLive({ doc, hello = {}, open, flushMs = 50, awarenessMs =
       if (closed) return;
       flush();
       closed = true;
-      for (const t of [flushTimer, awarenessTimer, retryTimer]) if (t) clearTimeout(t);
+      for (const t of [flushTimer, awarenessTimer, retryTimer, applyTimer]) if (t) clearTimeout(t);
       doc.off('update', onDocUpdate);
       awareness.off('update', onAwareness);
       const s = sock;

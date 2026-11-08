@@ -26,6 +26,8 @@ export interface LiveUser { name: string; color: string; kind?: 'person' | 'agen
 
 const FRESH_MS = 3500;
 const MOST_FLAGS = 8;
+// Past this many, more cursors are noise to read and cost every window a redraw of each on every move.
+const MOST_CARETS = 30;
 // When each cursor last moved, kept per room, so a cursor the editor draws again keeps its name showing.
 const movedIn = new WeakMap<Awareness, Map<number, number>>();
 function freshIn(moved: Map<number, number> | undefined): Set<number> {
@@ -77,7 +79,20 @@ const LiveCarets = Extension.create<{ awareness: Awareness | null; user: LiveUse
       for (const id of [...added, ...updated]) if (id !== awareness.clientID) moved.set(id, now);
       for (const id of removed) moved.delete(id);
     });
+    // The cursors drawn are the ones that moved last; everyone else is counted by the faces.
+    let drawn = new Set<number>();
+    let drawnAt = 0;
+    const isDrawn = (me: number, id: number) => {
+      if (id === me) return false;
+      const now = Date.now();
+      if (now - drawnAt > 100) {
+        drawnAt = now;
+        drawn = new Set([...moved].sort((a, b) => b[1] - a[1]).slice(0, MOST_CARETS).map(([c]) => c));
+      }
+      return moved.size <= MOST_CARETS || drawn.has(id);
+    };
     return [yCursorPlugin(awareness, {
+      awarenessStateFilter: isDrawn,
       cursorBuilder: (u: Record<string, unknown>, clientId: number) => caretFor(u, clientId, freshIn(moved).has(clientId)),
       selectionBuilder: (u: Record<string, unknown>) => ({ class: 'lv-sel', style: `--lv: ${String(u.color ?? '#7aa2ff')}` }),
     })];
@@ -123,10 +138,11 @@ function useHere(session: LiveSession): Here[] {
       }
       setHere([...seen.values()].sort((a, b) => Number(b.me) - Number(a.me)));
     };
-    const soon = () => { frame ||= requestAnimationFrame(read); };
+    // Hundreds of cursors move many times a second; who is here is read a few times a second.
+    const soon = () => { frame ||= window.setTimeout(read, HERE_EVERY_MS) as unknown as number; };
     read();
     awareness.on('change', soon);
-    return () => { awareness.off('change', soon); if (frame) cancelAnimationFrame(frame); };
+    return () => { awareness.off('change', soon); if (frame) window.clearTimeout(frame); };
   }, [session.live, session.doc]);
   return here;
 }
@@ -134,10 +150,10 @@ function useHere(session: LiveSession): Here[] {
 interface Spot { name: string; color: string; agent: boolean; top: number; block: number; blockH: number; section: string }
 
 /** Where each cursor is on the page, measured off the cursors the editor drew. */
-function useSpots(editor: Editor | null, column: HTMLElement | null, session: LiveSession): Spot[] {
+function useSpots(editor: Editor | null, column: HTMLElement | null, session: LiveSession, wanted: boolean): Spot[] {
   const [spots, setSpots] = useState<Spot[]>([]);
   useEffect(() => {
-    if (!editor || !column) return undefined;
+    if (!editor || !column || !wanted) { setSpots([]); return undefined; }
     let frame = 0;
     const measure = () => {
       frame = 0;
@@ -174,11 +190,12 @@ function useSpots(editor: Editor | null, column: HTMLElement | null, session: Li
       window.removeEventListener('resize', soon);
       if (frame) cancelAnimationFrame(frame);
     };
-  }, [editor, column, session.live]);
+  }, [editor, column, session.live, wanted]);
   return spots;
 }
 
 const MOST_FACES = 5;
+const HERE_EVERY_MS = 400;
 const MOST_SQUARES = 5;
 
 function Faces({ here }: { here: Here[] }) {
@@ -206,7 +223,7 @@ export function LiveFaces({ session }: { session: LiveSession }) {
 export function LivePresence({ session, editor, column, look }: { session: LiveSession; editor: Editor | null; column: HTMLElement | null; look: PresenceLook }) {
   const here = useHere(session);
   useFreshFlags(session, column);
-  const spots = useSpots(editor, column, session);
+  const spots = useSpots(editor, column, session, look !== 'flags');
   const others = here.filter((h) => !h.me);
   const height = column?.scrollHeight ?? 1;
   const byBlock = useMemo(() => {

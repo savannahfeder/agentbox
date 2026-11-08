@@ -4,6 +4,7 @@ import type { LiveSession } from './live-session';
 
 const FRESH_MS = 3500;
 const MOST_NAMES = 6;
+const MOST_MARKS = 30;
 
 /** Whether a copy that can write the file is in the room, this one included. */
 export function useRoomKept(room: LiveSession | null): boolean {
@@ -49,8 +50,11 @@ export function useCellMarks(box: RefObject<HTMLElement | null>, room: LiveSessi
     const at = Date.now();
     const fresh = new Set([...moved.current].filter(([, t]) => at - t < FRESH_MS).sort((a, b) => b[1] - a[1]).slice(0, MOST_NAMES).map(([id]) => id));
     const viewAt = new Map(order.map((row, place) => [row, place]));
-    for (const [client, s] of room.live.awareness.getStates()) {
-      if (client === room.doc.clientID) continue;
+    // The cells marked are the ones whose people moved last; everyone else is counted by the faces.
+    const states = [...room.live.awareness.getStates()].filter(([client]) => client !== room.doc.clientID);
+    const marked = states.length <= MOST_MARKS ? states
+      : states.sort((a, b) => (moved.current.get(b[0]) ?? 0) - (moved.current.get(a[0]) ?? 0)).slice(0, MOST_MARKS);
+    for (const [client, s] of marked) {
       const cell = (s.at as { cell?: string } | null | undefined)?.cell;
       const user = (s.user ?? s.who) as { name?: string; color?: string; kind?: string } | undefined;
       if (!cell || !user?.name) continue;

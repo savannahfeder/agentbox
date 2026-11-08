@@ -27,6 +27,7 @@ function setUp(n, { seedText = 'Start.' } = {}) {
       open: () => pairedSockets(room),
       flushMs: 5,
       awarenessMs: 5,
+      applyMs: 0,
     });
     return { doc, live, text: () => doc.getText('t') };
   });
