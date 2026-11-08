@@ -385,6 +385,7 @@ const ALL_PAGES: SettingsPageDef[] = [
   { id: 'projects', label: 'Projects', group: 'Workspace', Body: Projects, shown: hasComputer },
   { id: 'team', label: 'Team', group: 'Workspace', Body: TeamPage, shown: () => true },
 ];
-// Left out here, the store build's Settings, Search and page addresses never reach it.
-export const SETTINGS_PAGES = STORE_BUILD ? ALL_PAGES.filter((p) => p.id !== 'alpha') : ALL_PAGES;
+// Left out here, the store build's Settings, Search and page addresses never reach them.
+const NOT_IN_STORE = new Set(['alpha', 'team']);
+export const SETTINGS_PAGES = STORE_BUILD ? ALL_PAGES.filter((p) => !NOT_IN_STORE.has(p.id)) : ALL_PAGES;
 export const GROUPS = ['Personal', 'Agents', 'Workspace'] as const;

@@ -46,7 +46,10 @@ describe('a store build', () => {
   // The app review board (2026-11-08) still reached it through Search, which
   // lists every page, so the page is left out of the list itself.
   it('has no Alpha features page anywhere: Settings, Search, or its own address', () => {
-    expect(read('mobile/src/ui/SettingsPages.tsx')).toMatch(/export const SETTINGS_PAGES = STORE_BUILD \? ALL_PAGES\.filter\(\(p\) => p\.id !== 'alpha'\) : ALL_PAGES;/);
+    const pages = read('mobile/src/ui/SettingsPages.tsx');
+    expect(pages).toMatch(/export const SETTINGS_PAGES = STORE_BUILD \? ALL_PAGES\.filter\(\(p\) => !NOT_IN_STORE\.has\(p\.id\)\) : ALL_PAGES;/);
+    // The Team page too: shared projects come with multiplayer (round three, 2026-11-08).
+    expect(pages).toMatch(/const NOT_IN_STORE = new Set\(\['alpha', 'team'\]\);/);
     for (const reader of ['mobile/src/app/search.tsx', 'mobile/src/app/settings/[page].tsx', 'mobile/src/app/settings/index.tsx', 'mobile/src/ui/SettingsHome.tsx']) {
       const text = read(reader);
       expect(text, reader).toMatch(/SETTINGS_PAGES/);
