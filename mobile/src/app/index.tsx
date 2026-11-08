@@ -25,12 +25,14 @@ import type { RoomMention as MentionRowData, Teammate } from '../../../renderer/
 import { appStore } from '../platform/persist';
 import { useCloud } from '../state/cloud';
 import { Magnifier, StateGlyph, ViewButton, ViewMenu } from '../ui/Filters';
-import { Cloud, Gear, Pen, Pin, Repeat, Tick } from '../ui/icons';
+import { Cloud, Gear, More, Pen, Pin, Repeat, Tick } from '../ui/icons';
+import { LaterSheet } from '../ui/Later';
+import { inLater, pickedActs } from '../lib/picked';
 import { Waiting } from '../ui/LogoOrbit';
 import { repeatRow, repeatTag } from '../../../renderer/src/repeat-words';
 import type { PhoneRepeat } from '../../../renderer/src/phone-repeats';
 import { barsFor } from '../ui/Pickers';
-import { footRoom, IconButton, PriorityBars, RunningMark, T, TopBar, Wall } from '../ui/parts';
+import { footRoom, IconButton, PriorityBars, RunningMark, SheetRow, T, TopBar, Wall } from '../ui/parts';
 import { color, corner, font, size } from '../ui/theme';
 import { StatusNotice } from '../ui/StatusNotice';
 import { ComputerWait } from '../ui/Onboarding';
@@ -332,6 +334,7 @@ export default function Threads() {
   const rowOf = useMemo(() => new Map(Object.values(c.tabs).flat().map((r) => [r.key, r])), [c.tabs]);
   const [picked, setPicked] = useState<Set<string> | null>(null);
   const [closing, setClosing] = useState(false);
+  const [pickedMenu, setPickedMenu] = useState(false);
   useEffect(() => { setPicked(null); }, [place, tab]);
   if (!c.opened) return <Wall><Waiting /></Wall>;
   if (!c.signedIn) return <Redirect href="/sign-in" />;
@@ -357,6 +360,10 @@ export default function Threads() {
     setClosing(true);
     try { await c.closeAll(rows.filter((r) => picked?.has(r.key)).map((r) => r.item)); setPicked(null); } finally { setClosing(false); }
   };
+  const pickedItems = rows.filter((r) => picked?.has(r.key)).map((r) => r.item);
+  const acts = pickedActs(pickedItems, { tab, unread: c.unread });
+  const pickedDone = () => { setPickedMenu(false); setPicked(null); };
+  const laterPicked = (until: number, label?: string) => { pickedDone(); void c.laterAll(pickedItems, until, label); };
   const unfiltered: Display = { ...display, priorities: [], projects: [], updated: 'any', privacy: 'any' };
   const clear = () => { setDisplay(unfiltered); setAgent(null); };
   const agents = agentChoices(board || mineBoard ? Object.values(c.tabs).flat() : c.tabs[tab], display, c.now, agent);
@@ -436,15 +443,24 @@ export default function Threads() {
       {picked && (
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingBottom: foot, paddingTop: 8, paddingHorizontal: size.inset, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: color.bg, borderTopWidth: 1, borderTopColor: color.line }}>
           <T style={{ flex: 1, fontSize: 14, color: color.dim }}>{picked.size ? `${picked.size} selected` : 'Tap threads to select them'}</T>
+          {picked.size > 0 && <IconButton label="More" onPress={() => setPickedMenu(true)}><More /></IconButton>}
           <Pressable onPress={() => setPicked(null)} accessibilityRole="button" style={({ pressed }) => ({ height: 36, paddingHorizontal: 14, justifyContent: 'center', backgroundColor: pressed ? color.picked : 'transparent' })}>
             <T style={{ fontSize: 14, color: color.dim }}>Cancel</T>
           </Pressable>
-          <Pressable disabled={!picked.size || closing} onPress={() => void closePicked()} accessibilityRole="button"
-            style={({ pressed }) => ({ height: 36, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: !picked.size || closing ? 0.5 : 1 })}>
-            <T style={{ fontSize: 14, fontFamily: font.semibold }}>{closing ? 'Closing…' : 'Close'}</T>
-          </Pressable>
+          {acts.includes('close') && (
+            <Pressable disabled={!picked.size || closing} onPress={() => void closePicked()} accessibilityRole="button"
+              style={({ pressed }) => ({ height: 36, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: !picked.size || closing ? 0.5 : 1 })}>
+              <T style={{ fontSize: 14, fontFamily: font.semibold }}>{closing ? 'Closing…' : 'Close'}</T>
+            </Pressable>
+          )}
         </View>
       )}
+      {/* Later as one thread's More sheet has it, then the rest of the desktop's commands on ticked rows. */}
+      <LaterSheet visible={pickedMenu} onClose={() => setPickedMenu(false)} onPick={laterPicked}
+        onNow={inLater(pickedItems, c.now) ? () => laterPicked(0) : undefined}>
+        {acts.includes('read') && <SheetRow label="Mark read" onPress={() => { pickedItems.forEach((i) => c.markSeen(i)); pickedDone(); }} />}
+        {acts.includes('unread') && <SheetRow label="Mark unread" onPress={() => { pickedItems.forEach((i) => c.markUnseen(i)); pickedDone(); }} />}
+      </LaterSheet>
       {!picked && !penUp && !(inboxEmpty && !board) && <Pressable accessibilityLabel="New thread" accessibilityRole="button" onPress={() => router.push('/new')}
         style={({ pressed }) => ({
           position: 'absolute', right: 20, bottom: foot + 16, width: 56, height: 56, borderRadius: 28,
