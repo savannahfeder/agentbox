@@ -86,7 +86,7 @@ export function TeamBilling({ team, people, meId, billing, now = Date.now(), pay
       </Card>
       {team.trial ? (
         <Card name={`From ${v.ends}, each person`} big={`$${TEAM.dollarsPerSeat} a month`}>
-          <div className="tb-compare-small">{n(TEAM.hoursPerSeat)} cloud hours a month, as on Pro</div>
+          <div className="tb-compare-small">{n(TEAM.hoursPerSeat)} cloud hours a month</div>
           <div className="tb-compare-small">{TEAM.agentsPerSeat} agents at once · {team.owner ? `you pay ${v.price} for ${team.members}` : "paid by your team's owner"}</div>
         </Card>
       ) : team.owner ? (
@@ -96,7 +96,7 @@ export function TeamBilling({ team, people, meId, billing, now = Date.now(), pay
         </Card>
       ) : (
         <Card name="Your seat" big={`$${TEAM.dollarsPerSeat} a month`}>
-          <div className="tb-compare-small">{n(TEAM.hoursPerSeat)} cloud hours a month, as on Pro</div>
+          <div className="tb-compare-small">{n(TEAM.hoursPerSeat)} cloud hours a month</div>
           <div className="tb-compare-small">Paid by your team's owner</div>
         </Card>
       )}

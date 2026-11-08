@@ -281,7 +281,7 @@ describe('what the app makes of it', () => {
     expect(t).toContain('Ends Dec 1');
     expect(t).toContain('Pay for 3 seats now · $120 a month');
     expect(t).toMatch(/Now, each person 5\.8 of 10 of your trial hours left 2 agents at once/);
-    expect(t).toMatch(/From Dec 1, each person \$40 a month 400 cloud hours a month, as on Pro 10 agents at once · you pay \$120 a month for 3/);
+    expect(t).toMatch(/From Dec 1, each person \$40 a month 400 cloud hours a month 10 agents at once · you pay \$120 a month for 3/);
   });
 
   it("each member's own hours left, you first, by the names the team knows", () => {
