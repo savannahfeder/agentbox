@@ -223,6 +223,7 @@ export function answerWhatOnlyTheWindowAnswered(ipcMain: CollectingIpcMain) {
   // A room invite link only ever opens the desktop app.
   ipcMain.handle('zero:take-join', () => null);
   ipcMain.handle('zero:crash', (_e, payload) => { reportFromRenderer(payload ?? {}); return null; });
+  ipcMain.handle('zero:blank-check', () => null);
   // The phone door belongs to the desktop app (main/phone-link.mts); a tab is told there is none.
   ipcMain.handle('zero:phone-link', () => null);
 }

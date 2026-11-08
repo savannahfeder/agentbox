@@ -49,6 +49,13 @@ describe('which processes count as ours', () => {
     expect(isOurChrome({ pid: 2, ppid: 1, command: ours('/tmp/shot-profile-abc') })).toBe(true);
   });
 
+  it('claims a Chrome for Testing on a shot profile, which the drives start on a Mac that has one', () => {
+    const cft = '/Users/you/Library/Caches/ms-playwright/chromium-1248/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing';
+    expect(isOurChrome({ pid: 6, ppid: 1, command: `${cft} --headless=new --user-data-dir=/tmp/shot-profile-abc about:blank` })).toBe(true);
+    expect(isOurChrome({ pid: 7, ppid: 1, command: `${cft} --user-data-dir=/Users/you/elsewhere` })).toBe(false);
+    expect(isOurChrome({ pid: 8, ppid: 1, command: `/bin/zsh -c '${cft}' --user-data-dir=/tmp/shot-profile-abc` })).toBe(false);
+  });
+
   // The whole reason she suspected malware: her real browser must be untouchable.
   it('never claims the Chrome she browses in', () => {
     const hers = `${CHROME} --user-data-dir=/Users/you/Library/Application Support/Google/Chrome`;

@@ -12,10 +12,12 @@
 //
 // So the reading now carries the swap-in rate over the last minute, and a Mac
 // swapping in at SWAP_TIGHT_MBPS reads tight and at SWAP_CRITICAL_MBPS
-// critical. The command gate takes it as tight at most, because holding an
-// agent's `ls` frees nothing.
+// critical. The command gate takes only heavy swapping, and only as tight,
+// because holding an agent's `ls` frees nothing; a review against the Mac's
+// logs measured 1.6 to 3.5 MB/s, with 14 MB/s bursts, on an ordinary evening.
+// Swapping never closes a terminal.
 import { describe, it, expect } from 'vitest';
-import { pressureFrom, SWAP_TIGHT_MBPS, SWAP_CRITICAL_MBPS } from '../main/memory-gate.mts';
+import { pressureFrom, SWAP_TIGHT_MBPS, SWAP_CRITICAL_MBPS, GATE_LINES, TERMINAL_LINES } from '../main/memory-gate.mts';
 import { SwapMeter, readingFromSysctl } from '../main/mac-pressure.mts';
 import { startDecision } from '../main/start-hold.mts';
 import { summarizeMemory } from '../main/memory-log.mts';
@@ -37,6 +39,17 @@ describe('the pressure word', () => {
     expect(pressureFrom({ level: 1, freePct: 40, swapInMbps: null })).toBe('normal');
     expect(pressureFrom({ level: 1, freePct: 40 })).toBe('normal');
     expect(pressureFrom({ level: 1, freePct: 4 })).toBe('critical');
+  });
+
+  it('the command gate holds tests only on heavy swapping, and never stops light commands for it', () => {
+    expect(pressureFrom({ level: 1, freePct: 40, swapInMbps: SWAP_CRITICAL_MBPS - 0.1 }, GATE_LINES)).toBe('normal');
+    expect(pressureFrom({ level: 1, freePct: 40, swapInMbps: SWAP_CRITICAL_MBPS }, GATE_LINES)).toBe('tight');
+    expect(pressureFrom({ level: 1, freePct: 40, swapInMbps: 500 }, GATE_LINES)).toBe('tight');
+  });
+
+  it('swapping never closes a terminal', () => {
+    expect(pressureFrom({ level: 1, freePct: 40, swapInMbps: 500 }, TERMINAL_LINES)).toBe('normal');
+    expect(pressureFrom({ level: 4, freePct: 40, swapInMbps: 500 }, TERMINAL_LINES)).toBe('critical');
   });
 
   it('a caller can cap what swapping alone means', () => {
