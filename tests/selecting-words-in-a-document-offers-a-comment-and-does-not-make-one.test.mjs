@@ -74,6 +74,12 @@ describe('where the bar sits', () => {
     expect(barSpot({ top: 400, bottom: 420, left: 0, right: 20 }, { top: 400, bottom: 420, left: 0, right: 20 }, bar, view).left).toBe(8);
     expect(barSpot({ top: 400, bottom: 420, left: 1420, right: 1440 }, { top: 400, bottom: 420, left: 1420, right: 1440 }, bar, view).left).toBe(1440 - 160 - 8);
   });
+  // w-d18e699928: a line selected at the left edge of a full-screen text file put the bar over the app's left rail.
+  it('kept inside the file\'s own card when it says where its left edge is', () => {
+    const edge = { top: 400, bottom: 420, left: 100, right: 120 };
+    expect(barSpot(edge, edge, bar, { ...view, left: 83 }).left).toBe(91);
+    expect(barSpot({ ...edge, left: 600, right: 700 }, edge, bar, { ...view, left: 83 }).left).toBe(570);
+  });
 });
 
 describe('the comments are painted again only when they change', () => {

@@ -108,7 +108,8 @@ export function SelectionBar({ page, onComment }: { page: RefObject<HTMLElement 
     const el = bar.current;
     if (!el || !at) return;
     const top = page.current?.closest('.artifact-view')?.querySelector('.av-body')?.getBoundingClientRect().top ?? 0;
-    const spot = barSpot(at.first, at.all, { w: el.offsetWidth, h: el.offsetHeight }, { w: window.innerWidth, h: window.innerHeight, top });
+    const left = page.current?.closest('.doc-card')?.getBoundingClientRect().left ?? 0;
+    const spot = barSpot(at.first, at.all, { w: el.offsetWidth, h: el.offsetHeight }, { w: window.innerWidth, h: window.innerHeight, top, left });
     el.style.left = `${spot.left}px`;
     el.style.top = `${spot.top}px`;
   }, [at, copied]);
