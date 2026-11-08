@@ -1224,7 +1224,7 @@ export class Supervisor {
   declare userDir: string;
   declare onShipped: () => void;
   declare shipQueue: ShipQueue;
-  // Set by main.mts, which has the keychain.
+  // Set by each door (main.mts, serve.mts), which knows how it can keep a sign-in.
   declare gitHubSignIn: GitHubPushSignIn | null;
   declare mainTests: MainTests;
   declare cloudServerWatch: Pick<CloudServerWatch, 'down' | 'up'>;

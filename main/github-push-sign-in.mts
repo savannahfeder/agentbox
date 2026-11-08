@@ -1,4 +1,4 @@
-// THE GITHUB SIGN-IN A SHIP PUSHES WITH, kept sealed on this computer.
+// THE GITHUB SIGN-IN A SHIP PUSHES WITH, kept on this computer by the cipher its door has.
 //
 // Given to git only for the ship's own run, through config in its environment
 // (`pushSignIn`), so neither the person's git settings nor any worker sees it.
