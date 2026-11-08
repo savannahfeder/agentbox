@@ -694,7 +694,7 @@ export function notesForTheAgent(marks, version, count, { nameOf = () => 'Someon
     const at = unit(n.place.x)
       ?`${placeWords(n)}, ${Math.round(n.place.x * 100)}% across and ${Math.round(n.place.y * 100)}% down`
       : placeWords(n);
-    return `- ${at}: ${n.text} (${nameOf(n.by)})`;
+    return [`- ${at}: ${n.text} (${nameOf(n.by)})`, ...(n.replies ?? []).map((r) => `  - ${r.text} (${nameOf(r.by)})`)].join('\n');
   };
   const text = [
     `Notes on ${version.path}:`,
@@ -704,6 +704,9 @@ export function notesForTheAgent(marks, version, count, { nameOf = () => 'Someon
   ].join('\n');
   return { text, ids: open.map((n) => n.id) };
 }
+
+/** A comment that tags your own agent with @agent, which sends it now rather than waiting for Send. */
+export const tagsYourAgent = (text) => /(?:^|[\s(])@agent(?![\w'’@.-]?\w)/i.test(String(text ?? ''));
 
 const escaped = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const firstWord = (name) => String(name ?? '').trim().split(/\s+/)[0] ?? '';
@@ -754,28 +757,8 @@ export function noteGoesTo(note, people = []) {
 /** Every file a thread names that a note can be on: pictures, films and documents, then pages and scripts. */
 export const notedFilesInLines = (lines) => [...filesInLines(lines), ...otherFilesInLines(lines)];
 
-/**
- * A teammate's open notes on the files an agent made on this thread, one turn
- * per file, in the words "Send these notes to the agent" uses. Notes by `me`,
- * the owner, wait for the owner's own press.
- */
 /** A note held for Send that nobody has sent yet. */
 export const stillWaiting = (note) => !!note?.wait && !note.toAgent && !note.sent;
-
-export function notesForItsAgent(lines, marks,{ me, nameOf = () => 'Someone', people = [] } = {}) {
-  const out = [];
-  for (const family of threadFiles(notedFilesInLines(lines))) {
-    for (const version of family.versions) {
-      if (typeof version.agent !== 'string') continue;
-      const open = (marks?.notes ?? []).filter((n) => n.file === version.id && n.by && n.by !== me && !n.resolved && !n.sent && !stillWaiting(n) && noteGoesTo(n, people).to === 'agent');
-      if (!open.length) continue;
-      const first = (id) => String(nameOf(id)).split(/\s+/)[0];
-      const { text, ids } = notesForTheAgent({ notes: open }, version, family.versions.length, { nameOf: first });
-      out.push({ by: open[0].by, ids, text: `${nameOf(open[0].by)} left notes on ${version.name}, a file you made on this thread.\n\n${text}` });
-    }
-  }
-  return out;
-}
 
 /**
  * The open comments a later version of their file answered: one sent to the
