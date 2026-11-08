@@ -154,8 +154,13 @@ export function phoneBoard(view: View, tabs: Record<TabId, Row[]>, display: Disp
     items: view.items as any[], products: view.products as any[], display, now, me: null, live,
     stateOf: (i) => state.get(i.id) ?? null, projectOrder: view.products.map((p: { slug: string }) => p.slug),
   });
+  // A card waiting its turn says Queued where the running mark would be (Pages.tsx `saysOnCard`).
+  const queued = new Set(tabs.progress.filter((r) => r.queued).map((r) => r.id));
   // Your own board says what the tab says (Pages.tsx `InboxBoard`).
-  return columns.map((c) => ({ ...c, label: c.state === 'waiting' ? 'Needs you' : c.label }));
+  return columns.map((c) => ({
+    ...c, label: c.state === 'waiting' ? 'Needs you' : c.label,
+    rows: c.rows.map((e) => ({ ...e, queued: c.state === 'running' && !!e.item && queued.has(e.item.id) })),
+  }));
 }
 
 export interface Hit {
