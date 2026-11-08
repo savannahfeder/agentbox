@@ -142,7 +142,7 @@ export function phoneRepeatsOf(rules, slugs, { home = null } = {}) {
 // riding with the settings copy as the repeating tasks do. Named fields only;
 // the method, memory and playbooks stay on the computer.
 const MATE_FIELDS = ['id', 'name', 'letter', 'role', 'job', 'primary', 'paused', 'status', 'product', 'engine', 'model', 'now', 'queued', 'runsThisWeek', 'worksLabel', 'createdAt'];
-const CHAT_FIELDS = ['id', 'kind', 'from', 'to', 'text', 'title', 'details', 'verb', 'ref', 'options', 'ts', 'via', 'setup', 'start', 'product'];
+const CHAT_FIELDS = ['id', 'kind', 'from', 'to', 'text', 'title', 'details', 'verb', 'ref', 'options', 'ts', 'via', 'setup', 'start', 'product', 'run'];
 const RUN_FIELDS = ['id', 'kind', 'teammate', 'item', 'product', 'title', 'verb', 'by', 'byName', 'waiting', 'answered', 'text', 'ts', 'said'];
 export const TEAMMATES_LIMITS = { mates: 40, lines: 300, textChars: 3000, bytes: 120_000 };
 const ref = (r, ctx) => (r && typeof r.id === 'string' && typeof r.product === 'string' ? { id: r.id, product: r.product, title: clip(String(r.title ?? ''), 300, ctx) } : null);
