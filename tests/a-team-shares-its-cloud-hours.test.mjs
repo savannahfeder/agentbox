@@ -235,12 +235,20 @@ describe('what the app makes of it', () => {
     });
   });
 
+  // A power tester on a 0.36-hour team saw "0.4 of 0.36": rounding up passed the whole.
+  it('hours left never read as more than the whole', () => {
+    expect(planSummary(seen({ ...trial, hours: 0.36, usedSeconds: 0 }), NOW).hours.line).toBe('0.36 of 0.36');
+  });
+
   it('on its last day it says 1 day, never 0', () => {
     expect(planSummary(seen(trial), MADE + 14 * DAY - 60_000).price).toBe('1 day left');
   });
 
-  it('anyone but the owner is not offered to pay', () => {
-    expect(planSummary(seen({ ...trial, owner: false }), NOW).teamPay).toBeUndefined();
+  // Two power testers on the team could not tell who pays, or what, after the trial.
+  it('anyone but the owner is not offered to pay, and is told the price and who pays it', () => {
+    const member = planSummary(seen({ ...trial, owner: false }), NOW);
+    expect(member.teamPay).toBeUndefined();
+    expect(member.who).toBe('Then $40 a person a month, paid by your team\'s owner');
   });
 
   it('a paid team says its seats and price, and only its owner manages billing', () => {

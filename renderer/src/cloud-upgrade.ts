@@ -112,8 +112,8 @@ export function planSummary(plan: CloudPlan | null, now = Date.now()): PlanSumma
 
 const hoursLeft = (hours: number, usedSeconds: number) => {
   const left = Math.max(0, hours * 3600 - usedSeconds) / 3600;
-  // Rounded up, so it reads 0 only when a run can no longer start.
-  return { label: 'Hours left', line: `${Math.ceil(left * 10) / 10} of ${n(hours)}`, percent: hours > 0 ? Math.round((left / hours) * 100) : 0 };
+  // Rounded up, so it reads 0 only when a run can no longer start, and never past the whole.
+  return { label: 'Hours left', line: `${n(Math.min(hours, Math.ceil(left * 10) / 10))} of ${n(hours)}`, percent: hours > 0 ? Math.round((left / hours) * 100) : 0 };
 };
 
 // A team's hours are one pool for every member: its trial's, or its seats' this month.
@@ -123,7 +123,10 @@ function teamSummary(plan: CloudPlan, team: NonNullable<CloudPlan['team']>, now:
   return {
     name: team.trial ? 'Team trial' : 'Team',
     price: team.trial ? `${days} ${days === 1 ? 'day' : 'days'} left` : `$${n(TEAM.dollarsPerSeat * team.seats)} a month`,
-    who: team.trial ? `${n(team.hours)} cloud hours shared by your team` : `${seats(team.seats)}, billed monthly by Stripe`,
+    // The owner's button already says the price; a member is told it here, and who pays it.
+    who: team.trial
+      ? team.owner ? `${n(team.hours)} cloud hours shared by your team` : `Then $${TEAM.dollarsPerSeat} a person a month, paid by your team's owner`
+      : `${seats(team.seats)}, billed monthly by Stripe`,
     manage: !team.trial && team.owner,
     period: 'Usage', change: null,
     ...(team.trial && team.owner ? { teamPay: `Pay for ${seats(team.members)} · $${n(TEAM.dollarsPerSeat * team.members)} a month` } : {}),
@@ -137,7 +140,6 @@ function freeSummary(plan: CloudPlan): PlanSummary {
   const running = plan.running ?? 0;
   const agents = plan.agents ?? 0;
   const hours = plan.hoursPerMonth ?? 0;
-  const left = Math.max(0, hours * 3600 - (plan.usedSeconds ?? 0)) / 3600;
   return {
     name: 'Free',
     price: '$0',
@@ -145,8 +147,7 @@ function freeSummary(plan: CloudPlan): PlanSummary {
     manage: false,
     period: 'Usage', change: 'Change plan',
     agents: { line: `${running} of ${agents} running`, percent: Math.min(100, Math.round((running / Math.max(1, agents)) * 100)) },
-    // Rounded up, so it reads 0 only when a run can no longer start.
-    hours: { label: 'Hours left', line: `${Math.ceil(left * 10) / 10} of ${n(hours)}`, percent: hours > 0 ? Math.round((left / hours) * 100) : 0 },
+    hours: hoursLeft(hours, plan.usedSeconds ?? 0),
   };
 }
 
