@@ -98,7 +98,7 @@ import { filedByThePerson, wordWaits } from '../../shared/answers.mjs';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mjs';
 import { focusTheReplyBox } from './focus-at-end';
 import { strayLetters } from './stray-letters';
-import { keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
+import { keyWhileABoxIsOpen, opensATextField, slashSearchesAgain, takesTheListBack } from './keys';
 import { modelCommands } from './thread-model-commands';
 import { MOVE_KEYWORDS, whyItCannotMove } from '../../shared/move-thread.mts';
 import { isUrgentRow, taskToReturnTo, urgentInterruption } from './interrupt';
@@ -886,6 +886,8 @@ export default function App() {
   const searchOpen = search !== null;
   useEffect(() => { if (searchOpen) strayLetters.opening('search', Date.now()); }, [searchOpen]);
   const searchRef = useRef<HTMLInputElement>(null);
+  // Whether the words in the field were typed since it last got the keyboard.
+  const searchTyped = useRef(false);
   // ESC PUTS HER BACK WHERE SHE WAS. Searching crosses every tab, so leaving it
   // has to restore the one she came from AND the row she was on, or a search
   // that found nothing has quietly moved her.
@@ -2645,7 +2647,8 @@ export default function App() {
     setModal(null);
     setSelected(0);
     // The field is mounted by this same render, so focusing has to wait for it.
-    requestAnimationFrame(() => searchRef.current?.focus());
+    // A query kept from before is selected, so the next words start a new one.
+    requestAnimationFrame(() => { searchTyped.current = false; searchRef.current?.focus(); searchRef.current?.select(); });
   }, [view, selected]);
 
   const searchFor = useCallback((q: string) => {
@@ -6469,7 +6472,8 @@ export default function App() {
     docWasOpen.current = !!openDoc;
     if (search === null) return;
     if (focused || modal || settingsOpen || openDoc) searchRef.current?.blur();
-    else if (!docJustClosed) searchRef.current?.focus();
+    // Only when the field does not have the keyboard: this runs on every letter typed into it.
+    else if (!docJustClosed && document.activeElement !== searchRef.current) { searchTyped.current = false; searchRef.current?.focus(); }
   }, [search, focused, modal, settingsOpen, openDoc]);
 
   useEffect(() => { setSelected((s) => Math.min(s, Math.max(0, list.length - 1))); }, [list.length]);
@@ -7523,12 +7527,13 @@ export default function App() {
               spellCheck={false}
               autoComplete="off"
               aria-label="Search threads"
-              onChange={(e) => { setSearch(e.target.value); setSelected(0); }}
+              onChange={(e) => { searchTyped.current = true; setSearch(e.target.value); setSelected(0); }}
               onKeyDown={(e) => {
                 // The list's own keys, forwarded from inside the field, because
                 // every other key here is a character she is typing and the
                 // global handler has already stood down for that reason.
                 if (e.key === 'Escape') { e.preventDefault(); closeSearch(); }
+                else if (e.key === '/' && slashSearchesAgain({ query: e.currentTarget.value, typedSince: searchTyped.current })) { e.preventDefault(); e.currentTarget.select(); }
                 else if (e.key === 'ArrowDown') { e.preventDefault(); setSelected((s) => Math.min(s + 1, Math.max(0, list.length - 1))); }
                 else if (e.key === 'ArrowUp') { e.preventDefault(); setSelected((s) => Math.max(0, s - 1)); }
                 else if (e.key === 'Enter' && current && !e.metaKey && !e.ctrlKey) { e.preventDefault(); setFocused(current); markSeen(current); }
