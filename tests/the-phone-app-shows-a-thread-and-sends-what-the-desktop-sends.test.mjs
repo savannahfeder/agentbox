@@ -54,8 +54,8 @@ describe('a thread', () => {
     const t = open(rows());
     expect(t.options.map((o) => [o.n, o.text, o.recommended])).toEqual([[1, 'Ship it (recommended)', true], [2, 'Wait for Codex', false]]);
     expect(t.outcome?.text).not.toMatch(/Options|Wait for Codex/);
-    // Headed by the question it answers, as the desktop's options card is.
-    expect(t.ask).toBe('The plan is ready.');
+    // An answer that is only its one line is not repeated over the options, as the desktop's card does (askHeading).
+    expect(t.ask).toBe('');
   });
 
   it('offers nothing once you have answered it, and keeps the list in the text as the record', () => {

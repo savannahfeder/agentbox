@@ -52,6 +52,9 @@ export interface Row {
 }
 
 /** The gaps between the inbox's tabs, and before a tab's count; tight when the loose ones do not fit. */
+/** The select bar's button, which says what it closes so it does not read as closing the bar beside Cancel. */
+export const closeWords = (n: number) => (n === 1 ? 'Close 1 thread' : n > 1 ? `Close ${n} threads` : 'Close');
+
 export const TAB_GAP = { loose: 22, tight: 12 };
 export const COUNT_GAP = { loose: 13, tight: 6 };
 

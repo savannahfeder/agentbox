@@ -23,7 +23,7 @@ import type { Choices, Press } from '../../../lib/actions';
 import { useDraft } from '../../../lib/drafts';
 import { typedWords } from '../../../lib/files';
 import { threadOf, type FiledRow, type Thread } from '../../../lib/thread';
-import { askUnderAnswer, CHOICES_FOLDED, foldKey, foldedKeys, pageOf, splitHeadline, spotIn, stepIn, toggleFold } from '../../../lib/one-page';
+import { askUnderAnswer, CHOICES_FOLDED, foldKey, foldedKeys, pageOf, splitHeadline, spotIn, stepIn, toggleFold, walkKeeping } from '../../../lib/one-page';
 import { mateOf } from '../../../lib/teammates';
 import { TeammateMark } from '../../../ui/Teammates';
 import { screenGate } from '../../../lib/thread-gate';
@@ -116,8 +116,10 @@ function Said({ e, starts, ends, product, dir, files, sendNow, openOrigin, name 
 
 const StopMark = () => <Svg width={9} height={9} viewBox="0 0 12 12"><Rect x={1.5} y={1.5} width={9} height={9} fill={color.dim} /></Svg>;
 
-function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0, showChoices }: {
+function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0, showChoices, onTyped }: {
   thread: Thread; offers: Offers; busy: boolean; setBusy: (on: boolean) => void; stop: () => void; setError: (m: string | null) => void;
+  /** Whether the box holds anything to send, for the page's links that would send without it. */
+  onTyped?: (typed: boolean) => void;
   /** With the choices folded, how many there are and the way back to them (OneThingAtATime.tsx `ChoicesShow`). */
   foldedChoices?: number; showChoices?: () => void;
 }) {
@@ -132,6 +134,7 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
   const [sheet, setSheet] = useState<'priority' | 'mode' | 'model' | 'attach' | 'later' | null>(null);
   const [typedLater, setTypedLater] = useState('');
   const ready = !!draft.text.trim() || draft.files.length > 0;
+  useEffect(() => { onTyped?.(ready); }, [ready]);
   const priority = picked.priority ?? priorityValueOf(shownLevel(item));
   const agents = useComputerAgents();
   const codex = { codexModels: agents.codexModels, codexDefault: agents.codexDefault };
@@ -159,6 +162,8 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
   const sendByHand = () => { offline.clear(); void send(picked); };
   const talk = useDictation(draft, sendByHand);
   const typing = useRef<ComponentRef<typeof TextInput>>(null);
+  // A tap on the box's own buttons blurs the field before it lands; the box must not fold under it.
+  const pressInside = useRef(false);
   // A box that only listened, and heard nothing, folds away as an empty one does on blur.
   useEffect(() => { if (!talk.on && !talk.problem && !ready && !sheet && !typing.current?.isFocused()) setOpen(false); }, [talk.on]);
   const foot = footRoom(inset);
@@ -182,11 +187,12 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
           <View style={{ marginRight: 4 }}><MicButton talk={{ ...talk, start: () => { setOpen(true); talk.start(); } }} /></View>
         </View>
       ) : (
-        <View style={{ ...card, borderColor: color.lineStrong }}>
+        <View style={{ ...card, borderColor: color.lineStrong }} onTouchStartCapture={() => { pressInside.current = true; }}
+          onTouchEnd={() => setTimeout(() => { pressInside.current = false; }, 400)}>
           {/* Typing stops dictation with the words kept; tapping the box does not (web-speech.ts). */}
           <TextInput ref={typing} autoFocus={!talk.active()} multiline value={draft.text} placeholder="What should the agent do next?" placeholderTextColor={color.faint}
             onChangeText={(t) => { if (talk.active()) talk.leave(); draft.setText(t); }}
-            onBlur={() => { if (!ready && !sheet && !talk.active()) setOpen(false); }}
+            onBlur={() => { if (!ready && !sheet && !talk.active() && !pressInside.current) setOpen(false); }}
             style={[{ minHeight: 92, maxHeight: 220, paddingTop: 12, paddingHorizontal: 16, paddingBottom: 6, fontFamily: font.regular, fontSize: 15.5, lineHeight: 24, color: color.text, textAlignVertical: 'top' }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
           {(draft.files.length > 0 || failed || draft.dropped > 0 || (!talk.on && !!talk.problem)) && (
             <View style={{ paddingHorizontal: 16, paddingBottom: 10, gap: 8 }}>
@@ -327,6 +333,7 @@ export default function ThreadScreen() {
   const [asking, setAsking] = useState(false);
   // Send now was pressed and her Mac has not taken her words yet.
   const [cutting, setCutting] = useState(false);
+  const [typed, setTyped] = useState(false);
   // What came before the newest answer, opened from its fold (lib/one-page.ts).
   const [earlierOpen, setEarlierOpen] = useState(false);
   const [contextWhole, setContextWhole] = useState(false);
@@ -350,6 +357,7 @@ export default function ThreadScreen() {
   const footList = useRef(0);
   // A page opens on its name; only a conversation with no answer yet opens at its end, to follow it.
   const placedOn = useRef<string | null>(null);
+  const walked = useRef<typeof c.tabs.inbox>([]);
 
   const back =() => (router.canGoBack() ? router.back() : router.replace('/'));
   const gate = screenGate(c);
@@ -371,9 +379,12 @@ export default function ThreadScreen() {
     resting.current = !page.answer && !thread.outcome && page.from === 0;
   }
   // Its place in Needs you, with the arrows that walk it (OneThingAtATime.tsx `QueueNav`).
-  const spot = spotIn(c.tabs.inbox, { product: String(product), id: String(id) });
+  const here = { product: String(product), id: String(id) };
+  const walk = walkKeeping(c.tabs.inbox, here, walked.current);
+  walked.current = walk;
+  const spot = spotIn(walk, here);
   const step = (dir: 1 | -1) => {
-    const to = stepIn(c.tabs.inbox, { product: String(product), id: String(id) }, dir);
+    const to = stepIn(walk, here, dir);
     if (to) router.setParams({ product: to.product, id: to.id });
   };
   const roundKey = foldKey(item);
@@ -418,7 +429,8 @@ export default function ThreadScreen() {
   const openOrigin = () => { if (thread.parent) openThread(thread.parent); };
   const below = [
     ...(offers.back ? [{ label: offers.back.label, dim: offers.back.dim, onPress: () => void press({ kind: 'later', until: 0 }) }] : []),
-    ...(offers.sendBack ? [{ label: 'send back to agent', onPress: () => void press({ kind: 'send-back' }) }] : []),
+    // Sending back with words typed is Send; this link would leave them behind.
+    ...(offers.sendBack && !typed ? [{ label: 'send back to agent', onPress: () => void press({ kind: 'send-back' }) }] : []),
     // The desktop's stopped bar ends "try again →" (Focus.tsx `stalled-bar`).
     ...(live?.state === 'stalled' && (offers.tryAgain || offers.restart)
       ? [{ label: 'try again', onPress: () => void press({ kind: offers.tryAgain ? 'try-again' : 'restart' }) }] : []),
@@ -566,7 +578,7 @@ export default function ThreadScreen() {
           </ScrollView>
         )}
         <Dock thread={thread} offers={offers} busy={busy} setBusy={setBusy} setError={setError} stop={() => void press({ kind: 'stop' })}
-          foldedChoices={thread.options.length > 0 && !asking && choicesFolded ? thread.options.length : 0} showChoices={foldChoices} />
+          foldedChoices={thread.options.length > 0 && !asking && choicesFolded ? thread.options.length : 0} showChoices={foldChoices} onTyped={setTyped} />
       </KeyboardAvoidingView>
       <ThreadMenu open={menu} close={() => setMenu(false)} now={c.now} laterNow={offers.laterNow} runNow={offers.runNow} moveToCloud={offers.moveToCloud}
         onLater={(until, label) => void press({ kind: 'later', until, label, running: !!thread.running }, item, back)}

@@ -418,6 +418,12 @@ export function asksSomething(text) {
   return /\?(?=["'”’)\]*_`]*(\s|$))/.test(t);
 }
 
+const SAY_CLOSED_MS = 60 * 60_000;
+
+function questionsIn(text) {
+  return (String(text ?? '').match(/[^.!?\n]*\?(?=["'”’)\]*_`]*(\s|$))/g) ?? []).map((q) => q.trim()).filter(Boolean);
+}
+
 // The chat message that carries a run's answer, one per run, so writing it
 // again after a crash adds nothing (`foldChat` keeps the first of an id).
 export const replyMessageId = (runId) => `m-reply-${runId}`;
@@ -701,6 +707,26 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
       const posted = (chat.messages ?? []).some((x) => x.kind === 'msg' && x.from === t.id && x.run === i.id && !x.options?.length && x.ts > since && (x.to ?? []).every((y) => y === YOU));
       const said = (chat.messages ?? []).some((x) => x.id === replyMessageId(i.id));
       actions.push({ type: 'replied', teammate: t.id, item: i.id, product: i.product, labels: i.labels ?? [], text, say: !!text && !posted && !said });
+    }
+  }
+
+  // A run that closed itself on a question is in nobody's Needs you, so the
+  // question is said in the chat. Only a recent close, so an update does not
+  // bring back every old question at once.
+  for (const t of live) {
+    for (const i of runsOf(t.id, items)) {
+      const closedAt = i.wrote?.status?.ts ?? 0;
+      if (i.status !== 'done' || i.wrote?.status?.source !== 'agent' || now - closedAt > SAY_CLOSED_MS) continue;
+      const text = String(i.result ?? '').trim();
+      const since = i.wrote?.answer?.ts ?? 0;
+      if (!asksSomething(text) || (i.wrote?.result?.ts ?? 0) <= since) continue;
+      const fromRun = (chat.messages ?? []).filter((x) => x.kind === 'msg' && x.from === t.id && x.run === i.id && x.ts > since);
+      if ((chat.messages ?? []).some((x) => x.id === replyMessageId(i.id))) continue;
+      const questions = questionsIn(text);
+      const asked = questions.length
+        ? questions.every((q) => fromRun.some((x) => String(x.text ?? '').includes(q)))
+        : fromRun.some((x) => x.options?.length);
+      if (!asked) actions.push({ type: 'say', teammate: t.id, item: i.id, text });
     }
   }
 

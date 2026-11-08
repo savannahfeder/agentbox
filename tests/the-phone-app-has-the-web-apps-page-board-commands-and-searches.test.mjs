@@ -62,7 +62,7 @@ describe('a thread as one page', () => {
   });
   it('the screen walks Needs you, folds the choices and opens at the top', () => {
     const src = read('mobile/src/app/thread/[product]/[id].tsx');
-    expect(src).toMatch(/spotIn\(c\.tabs\.inbox/);
+    expect(src).toMatch(/walkKeeping\(c\.tabs\.inbox, here, walked\.current\)/);
     expect(src).toMatch(/label="Next thread"/);
     expect(src).toMatch(/foldedChoices=/);
     expect(src).toMatch(/resting\.current = !page\.answer && !thread\.outcome && page\.from === 0/);

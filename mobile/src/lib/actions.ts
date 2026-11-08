@@ -196,7 +196,12 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
     case 'move-to-cloud':
       return { steps: [{ door: 'moveToCloud', payload: { ...on, ids: [item.id] } }], toast: 'Moving to the cloud. It keeps working until the cloud has room.' };
     case 'send-back':
-      return { steps: [{ door: 'reopen', payload: on }], toast: `Back in the queue → ${to}` };
+      return {
+        steps: [{ door: 'reopen', payload: on }],
+        toast: `Back in the queue → ${to}${UNDO}`,
+        undo: () => [{ door: 'stopSession', payload: { ...on, withdraw: true } }, { door: 'answer', payload: { ...on, status: item.status } }],
+        undone: () => 'Back in your inbox',
+      };
     case 'send-now':
       return { steps: [{ door: 'sendNow', payload: on }] };
     case 'pin':

@@ -13,5 +13,5 @@ it('the reply box\'s underlined words carry the button role', () => {
   const src = fs.readFileSync(path.join(import.meta.dirname, '..', 'mobile', 'src', 'ui', 'parts.tsx'), 'utf8');
   const pickable = src.slice(src.indexOf('export function Pickable'), src.indexOf('export function Pickable') + 400);
   expect(pickable).toContain('onPress={onPress}');
-  expect(pickable).toContain('accessibilityRole="button"');
+  expect(pickable).toMatch(/\b(accessibilityRole|role)="button"/);
 });

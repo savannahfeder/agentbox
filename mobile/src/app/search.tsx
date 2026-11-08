@@ -1,7 +1,7 @@
 // Search, as the phone site draws it: the field takes the top bar, and every
 // thread in every tab is found, closed ones too (App.tsx `hits`, List.tsx's row).
 import { router } from '../lib/router';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState, type ComponentRef } from 'react';
 import { FlatList, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
@@ -94,6 +94,12 @@ function SearchScreen() {
   const { pick: pickLook } = useLook();
   const inset = useSafeAreaInsets();
   const [q, setQ] = useState('');
+  const box = useRef<ComponentRef<typeof TextInput>>(null);
+  // The cross empties the box first, so a new search does not start on the old words; empty, it closes search.
+  const cross = () => {
+    if (!q) { router.back(); return; }
+    setQ(''); setAll(false); box.current?.focus();
+  };
   // "See all" is the whole list of threads, as it was before there were commands.
   const [all, setAll] = useState(false);
   const hits = useMemo(() => phoneSearch(c.view, q, c.now, c.tabs), [c.view, q, c.now, c.tabs]);
@@ -131,10 +137,10 @@ function SearchScreen() {
         <View style={{ height: size.topBar, justifyContent: 'center', paddingLeft: size.inset, paddingRight: 48 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 11, borderBottomWidth: 1, borderBottomColor: color.lineStrong, paddingBottom: 9, marginTop: 8 }}>
             <Glass />
-            <TextInput value={q} onChangeText={(t) => { setQ(t); setAll(false); }} autoFocus placeholder="Search" placeholderTextColor={color.faint}
+            <TextInput ref={box} value={q} onChangeText={(t) => { setQ(t); setAll(false); }} autoFocus placeholder="Search" placeholderTextColor={color.faint}
               autoCorrect={false} autoCapitalize="none" spellCheck={false} returnKeyType="search" accessibilityLabel="Search threads"
               style={[{ flex: 1, minWidth: 0, padding: 0, fontFamily: font.medium, fontSize: 15, letterSpacing: -0.075, color: color.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
-            <Pressable onPress={() => router.back()} accessibilityLabel="Close search" accessibilityRole="button" hitSlop={10}
+            <Pressable onPress={cross} accessibilityLabel={q ? 'Clear search' : 'Close search'} accessibilityRole="button" hitSlop={10}
               style={{ width: 26, height: 26, alignItems: 'center', justifyContent: 'center' }}>
               <Out />
             </Pressable>
