@@ -10,6 +10,8 @@
 // until 2026-10-29, when "lots of stuff I can't do on mobile, like update the
 // appearance" put it on, for the phone's own look
 // (the-phone-app-changes-its-look-and-reaches-more-of-your-settings).
+// Rooms came on in 2026-11
+// (the-phone-sets-your-room-card-and-goes-invisible-as-the-desktop-does).
 // The screens are React Native, which these tests do not draw, so they read
 // the sources.
 import { describe, it, expect } from 'vitest';
@@ -18,7 +20,7 @@ import { SETTINGS_PAGES as DESKTOP } from '../renderer/src/settings-search';
 
 const pages = fs.readFileSync(new URL('../mobile/src/ui/SettingsPages.tsx', import.meta.url), 'utf8');
 const phone = [...pages.matchAll(/\{ id: '([\w-]+)', label: '([^']+)', group: '(\w+)'/g)].map(([, id, label, group]) => ({ id, label, group }));
-const OFF_THE_PHONE = ['shortcuts', 'cloud', 'rooms'];
+const OFF_THE_PHONE = ['shortcuts', 'cloud'];
 
 describe('the pages', () => {
   it('are the desktop\'s, in its order, under its groups, with its names', () => {
