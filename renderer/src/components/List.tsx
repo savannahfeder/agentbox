@@ -3,8 +3,6 @@
 // end, on the title's line, the things that are not the message: priority, the
 // product, and when (or that an agent is on it, or that one stopped).
 
-import { NeedsWaiting } from '../threads/NeedsWaiting';
-import './need-card.css';
 import { useContext, useEffect, useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import type { Product, RepeatRule, RunningSession, ThreadCard, View, WorkItem } from '../types';
 import { ago, dayAndTime, dayLabel, stamp } from '../format';
@@ -35,6 +33,7 @@ import type { MixedRow } from '../threads/people-rules';
 import { useRowDrag } from '../threads/row-drag';
 import { heldByAPerson } from '../../../shared/team-rules.mjs';
 import { catchUpDue } from '../../../shared/agent-import.mts';
+import { cutAt, firstRows, placeOf, useRowsDrawn } from '../rows-drawn';
 
 /**
  * THE AGENT A ROW WITH NOTHING RUNNING WOULD RUN ON.
@@ -251,6 +250,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
     walk ?? null,
     id,
   ));
+  const rowsNow = useRowsDrawn(`${keyView ?? view}|${table}|${(terms ?? []).join(' ')}|${phrase ?? ''}`, table && mixed ? mixed.length : items.length);
   // NO EMPTY PAGE ANYWHERE IN THE APP.A view with nothing in it draws the
   // background and nothing else. Two sentences died here: "Nothing here." on
   // the inbox, Scheduled and Closed, and "Nothing running. Compose (C) to
@@ -342,6 +342,10 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
     ? [{ key: 'mixed', label: '', items: mixed.flatMap((r): Entry[] => (r.card ? [{ card: r.card }] : at.has(r.item.id) ? [{ item: r.item, index: at.get(r.item.id)! }] : [])) }]
     : groups;
   const withPerson = table && !!mixed;
+  const total = shown.reduce((n, g) => n + g.items.length, 0);
+  const cut = cutAt(rowsNow, placeOf(shown, selected));
+  const allDrawn = cut >= total;
+  const drawn = allDrawn ? shown : firstRows(shown, cut);
 
   // A repeating rule's own state is its last run's: the mark turns only
   // where an agent really is on that one (w-ec2b04d449).
@@ -367,7 +371,6 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
 
   return (
     <div className={`list${table ? ' th-table' : ''}`} ref={drag.listRef} {...pointer}>
-      {view === 'inbox' && <NeedsWaiting items={items} onOpen={onOpen} />}
       {table && (!stack || stack.sections.every((x) => x.bare)) && <TableHead person={withPerson} tab={view} />}
       {!leadIn && lead}
       {/* Repeating tasks sit above the deferred rows, in the tab that already
@@ -411,7 +414,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
           })}
         </div>
       )}
-      {shown.map((group) => (
+      {drawn.map((group) => (
         <div key={group.key}>
           {group.section && !group.section.bare && <SectionHead label={group.section.label} count={group.section.count} tab={group.section.tab} folded={group.section.folded} onFold={() => stack?.onFold(group.section!.key)} />}
           {group.section?.key === 'later' && !group.section.folded && ruleRows(laterRules)}
@@ -779,9 +782,9 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
           {group.section?.key === 'progress' && !group.section.folded && !ranked && <CloudOfferRow />}
         </div>
       ))}
-      {foot}
-      {table && !stack && view === 'progress' && !ranked && <CloudOfferRow />}
-      {onEnd && <ListFoot onEnd={onEnd} />}
+      {allDrawn && foot}
+      {allDrawn && table && !stack && view === 'progress' && !ranked && <CloudOfferRow />}
+      {allDrawn && onEnd && <ListFoot onEnd={onEnd} />}
     </div>
   );
 }

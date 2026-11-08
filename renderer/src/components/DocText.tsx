@@ -65,6 +65,8 @@ export interface DocVersions {
   /** Words kept from a sitting that never got to save. */
   draft?: string;
   byline?: string | null;
+  /** Take the cursor on open: a document just made is there to write in. */
+  focus?: boolean;
 }
 
 export function DocText({ product, src, text, mtime, folder = null, onSaved, onNotice, readOnly = false, versions, live = null }: {
@@ -117,6 +119,7 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
     extensions,
     ...(collab ? {} : { content: mdToPmDoc(versions?.draft ?? text) }),
     editable: !readOnly && !(live && !collab),
+    autofocus: versions?.focus && !readOnly ? 'end' : false,
     onUpdate: () => {
       const room = liveNow.current;
       // Everyone's words are in the room. The owner's copy saves them as they come; a

@@ -22,7 +22,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { leftFromARelease, nextVersion, serverConfig, whatIsLive } from '../scripts/lib/deploy-rules.mjs';
+import { leftFromARelease, nextVersion, serverConfig, whatIsLive, withVersion } from '../scripts/lib/deploy-rules.mjs';
 
 const scriptUrl = new URL('../scripts/deploy.mjs', import.meta.url);
 const source = fs.readFileSync(scriptUrl, 'utf8')
@@ -49,7 +49,10 @@ function deploy({ pkg = text(MAIN), status = '', signalDuringBuild = null } = {}
       existsSync: () => true,
       readFileSync: (file) => files.get(file) ?? JSON.stringify({ posthogKey: 'phc_key', bucket: 'b', runtimeArn: 'r' }),
       writeFileSync: (file, t) => { files.set(file, String(t)); },
+      mkdtempSync: (prefix) => `${prefix}x`,
+      symlinkSync: () => {},
     },
+    withVersion,
     console: { log: (...a) => said.push(a.join(' ')), error: (...a) => said.push(a.join(' ')) },
     process: {
       argv: ['node', 'deploy.mjs'],

@@ -69,6 +69,9 @@ export interface ThreadEvent {
   // withRuns below hangs a whole session's diary off these and a wording
   // change must never quietly empty it.
   pickup?: true;
+  // A move in one person's own inbox (Later, back now, done, sent back). Only
+  // they see it; a teammate on the same thread never does.
+  personal?: true;
   // SOMEBODY SAID SOMETHING HERE, rather than something merely happening. The
   // ask, her reply, a checkpoint and a result are messages; a rename, a pause
   // and a close are events that carry a fragment ("was \"…\"", "until Tuesday")
@@ -516,7 +519,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
           continue;
         }
         if (mine && replied && replied.by === markBy && at - replied.at <= REPLY_LIFTS_MS) continue;
-        events.push({ at, who, said: mine ? 'You brought it back' : 'It let this run now' });
+        events.push({ at, who, said: mine ? 'You brought it back' : 'It let this run now', ...(mine ? { personal: true as const } : {}) });
       } else {
         // A reply set for later: its time is written a moment after its words
         // (main/ipc.mts), and is the reply's, not a move of the thread.
@@ -530,6 +533,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
           at, who,
           said: mine ? 'You moved it to Later' : 'It paused this',
           words: snoozeWords(runAt, at),
+          ...(mine ? { personal: true as const } : {}),
         });
       }
       continue;
@@ -541,7 +545,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
       // and the pickup above already said it.
       if (status === 'claimed') continue;
       if (status === 'done') {
-        events.push({ at, who, said: mine ? 'You marked it done' : 'It closed this' });
+        events.push({ at, who, said: mine ? 'You marked it done' : 'It closed this', ...(mine ? { personal: true as const } : {}) });
         continue;
       }
       if (status === 'blocked') {
@@ -571,7 +575,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
         // repeated once per attempt over a thread out of usage
         // (tests/an-out-of-usage-thread-does-not-say-it-handed-this-back).
         if (line.source === 'system' && events.at(-1)?.field === 'result') continue;
-        events.push({ at, who, said: mine ? 'You sent it back' : 'It handed this back' });
+        events.push({ at, who, said: mine ? 'You sent it back' : 'It handed this back', ...(mine ? { personal: true as const } : {}) });
         continue;
       }
     }

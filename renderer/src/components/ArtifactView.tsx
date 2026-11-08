@@ -19,18 +19,21 @@ import { quotesKey } from '../selection-bar';
 import { SelectionBar } from './SelectionBar';
 import { pressedInTheFindBox } from '../find-in-page';
 import { ArtifactStage, StageLink, StageProject, StageThread, type StageFiles, type StageGo } from './ArtifactStage';
-import { readCommentDraft, saveCommentDraft } from '../comment-drafts';
+import { keepCommentDraft, openCommentDraft, readLooseDraft, type Holding } from '../comment-drafts';
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { noteWithPictures } from '../note-pictures';
 import { AttachRow } from './AttachRow';
 import { FileLinkBrowser } from './FileLinkBrowser';
 import { OpeningWait } from './OpeningWait';
 import { CrossIcon } from './CrossIcon';
+import { ArtifactControlGlyph } from './ArtifactControlGlyph';
+import { FocusControl } from './FocusControl';
 import { DocText } from './DocText';
 import { useLiveSession, useLiveTicket } from '../live/live-session';
 import { FileNoteCard } from './FileNoteCard';
 import { NoteGlyph } from './NoteGlyphs';
 import { ShareLink, canShareFile } from './ShareLink';
+import { paneKey, staysOnNewest } from '../table-follows';
 import './artifact-view.css';
 
 /** `steps`: the paths the arrows step through, in order, when the press came from a turn of the thread. */
@@ -47,7 +50,7 @@ const KIND_WORD = { image: 'Picture', film: 'Film', pdf: 'PDF', deck: 'Slides', 
 
 const newId = () => `n${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
-export function ArtifactView({ product, project = null, thread, shareThread, threadName, lines, numbers, marks, me, people, open, ownerOfRow, write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, below, files: fromElsewhere }: {
+export function ArtifactView({ product, project = null, thread, draftsAcross, shareThread, lines, numbers, marks, me, people, open, ownerOfRow, write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, onBeside, below, files: fromElsewhere, typing = false }: {
   /** The project the file belongs to, when it is not `product`'s own (a teammate's thread). */
   project?: string | null;
   /** Each path's number on its file's version line, which every surface counts by. */
@@ -59,9 +62,10 @@ export function ArtifactView({ product, project = null, thread, shareThread, thr
   product: string;
   /** The thread whose files these are, so a name opens that thread's own file. */
   thread?: string;
+  /** Where words with no pin travel from file to file; the thread when unset. */
+  draftsAcross?: string;
   /** The thread a file opened from Files was sent in, for its link (ShareLink). */
   shareThread?: string;
-  threadName: string;
   lines: LedgerLine[];
   marks: FileMarks;
   me: string | null;
@@ -78,8 +82,12 @@ export function ArtifactView({ product, project = null, thread, shareThread, thr
   editGoes?: string;
   onClose: () => void;
   onOutside?: (path: string) => void;
+  /** Only where there is a chat to sit beside. */
+  onBeside?: (path: string) => void;
   /** A line under the file, the full width of the window. */
   below?: ReactNode;
+  /** Opened to write in, so the editor takes the cursor. */
+  typing?: boolean;
 }) {
   const files = useMemo(() => {
     const reviewed = filesInLines(lines);
@@ -104,8 +112,6 @@ export function ArtifactView({ product, project = null, thread, shareThread, thr
   const [named, setNamed] = useState<Person[]>([]);
   const [asking, setAsking] = useState<{ start: number; query: string; sel: number } | null>(null);
   const [showSettled, setShowSettled] = useState(false);
-  const [compare, setCompare] = useState(false);
-  const [leftVi, setLeftVi] = useState<number | null>(null);
   const [hold, setHold] = useState(0);
   const [sending, setSending] = useState(false);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
@@ -118,6 +124,7 @@ export function ArtifactView({ product, project = null, thread, shareThread, thr
   const box = useRef<HTMLTextAreaElement | null>(null);
   const placedFor = useRef<string | null>(null);
   const inHand = useRef<string | null>(null);
+  const newestInHand = useRef(false);
 
   // Where the press wants to land, once the thread's files are read. The picked
   // comment's file wins, then the file, then the path.
@@ -127,7 +134,8 @@ export function ArtifactView({ product, project = null, thread, shareThread, thr
     if (!flat.length) return;
     if (placedFor.current === press) {
       const same = flat.find((x) => x.v.id === inHand.current);
-      if (same) setAt({ fi: same.fi, vi: same.vi });
+      if (same && staysOnNewest({ kind: viewKind(same.v.path), wasNewest: newestInHand.current })) setAt({ fi: same.fi, vi: families[same.fi].versions.length - 1 });
+      else if (same) setAt({ fi: same.fi, vi: same.vi });
       return;
     }
     placedFor.current = press;
@@ -143,6 +151,8 @@ export function ArtifactView({ product, project = null, thread, shareThread, thr
   const family = at ? families[at.fi] : undefined;
   const version = family?.versions[at!.vi];
   useEffect(() => { inHand.current = version?.id ?? null; setLink(null); }, [version?.id]);
+  // Read by the placing effect above, which runs first, so it says what was true before a version arrived.
+  useEffect(() => { newestInHand.current = !!family && !!at && at.vi === family.versions.length - 1; });
   const kind = version ? viewKind(version.path) : null;
   const [savingNotes, setSavingNotes] = useState<FileNote[]>([]);
   const [settling, setSettling] = useState<Record<string, boolean>>({});
@@ -158,6 +168,7 @@ export function ArtifactView({ product, project = null, thread, shareThread, thr
   const { open: openNotes, resolved: settled } = commentsInList([...notesHere, ...carriedAll], undo);
   const approvalsHere = marks.approvals.filter((a) => a.file === version?.id);
   const mineApproved = approvalsHere.some((a) => a.by === me);
+  const othersApproved = approvalsHere.filter((a) => a.by !== me);
   const earlier = family && !approvalsHere.length
     ? family.versions.slice(0, at!.vi).reverse().find((v) => marks.approvals.some((a) => a.file === v.id)) : undefined;
 
@@ -167,15 +178,21 @@ export function ArtifactView({ product, project = null, thread, shareThread, thr
 
   // The version the comment box's words belong to. Saving waits for it, so the
   // words on screen are never written under the version just stepped onto.
-  const draftOf = useRef<string | null>(null);
+  const draftOf = useRef<{ file: string; holding: Holding } | null>(null);
+  const across = draftsAcross ?? `${product}:${thread ?? ''}`;
+  const wordsNow = useRef(words);
+  wordsNow.current = words;
   useEffect(() => {
-    const kept = readCommentDraft({ product, thread, file: version?.id ?? '' });
-    draftOf.current = version?.id ?? null;
+    const kept = openCommentDraft({ product, thread, file: version?.id ?? '', across });
+    draftOf.current = version?.id ? { file: version.id, holding: kept.holding } : null;
     setWords(kept.words); setDraftPlace(kept.place); setAsking(null);
     setNamed(people.filter((p) => kept.words.includes(`@${firstName(p)}`)));
-    setHere(null); setCompare(false); setLeftVi(null); setReplyingTo(null); setFound('looking');
+    setHere(null); setReplyingTo(null); setFound('looking');
   }, [version?.id]);
-  useEffect(() => { if (draftOf.current) saveCommentDraft({ product, thread, file: draftOf.current }, { words, place: draftPlace }); }, [words, draftPlace]);
+  useEffect(() => {
+    const d = draftOf.current;
+    if (d) d.holding = keepCommentDraft({ product, thread, file: d.file, across }, { words, place: draftPlace }, d.holding);
+  }, [words, draftPlace]);
   const [editing, setEditing] = useState<Editing | null>(null);
   // The editor read the file itself, so it is open while it is on screen.
   const foundNow: Found = editing ? 'open' : found;
@@ -272,6 +289,13 @@ export function ArtifactView({ product, project = null, thread, shareThread, thr
       return;
     }
     setNamed([]);
+    // A pinned comment was covering the notes you carried; they come back once it is sent.
+    const d = draftOf.current;
+    if (d?.file === version.id && d.holding === 'file' && !wordsNow.current.trim()) {
+      d.holding = 'loose';
+      const carried = readLooseDraft({ product, thread, file: version.id, across }).words;
+      if (carried) { setWords(carried); setNamed(people.filter((p) => carried.includes(`@${firstName(p)}`))); }
+    }
   };
 
   const settle = async (note: FileNote, resolved: boolean) => {
@@ -350,8 +374,8 @@ export function ArtifactView({ product, project = null, thread, shareThread, thr
     if (draft !== undefined) idle.current = window.setTimeout(() => { void postNow.current(); }, SAVE_AFTER_A_PAUSE_MS);
   };
   useEffect(() => {
-    if (opensForTyping({ canEdit, compare, editing: !!editing, unreadable, version: version?.id ?? null })) void startEdit();
-  }, [canEdit, compare, !!editing, unreadable, version?.id]);
+    if (opensForTyping({ canEdit, editing: !!editing, unreadable, version: version?.id ?? null })) void startEdit();
+  }, [canEdit, !!editing, unreadable, version?.id]);
   // Teammates with the same document open type into one live copy of it.
   const liveTicket = useLiveTicket(editing ? { product, project, name: editing.base.name } : null);
   const liveSession = useLiveSession(liveTicket);
@@ -367,7 +391,7 @@ export function ArtifactView({ product, project = null, thread, shareThread, thr
     void read.then((t) => { if (!gone && t !== null && t !== posted.current) setIncoming(t); });
     return () => { gone = true; };
   }, [newestNow?.id, liveSession?.keeper, !!editing]);
-  const waitingForEditor = opensForTyping({ canEdit, compare, editing: !!editing, unreadable, version: version?.id ?? null }) || (!!editing && liveTicket === undefined);
+  const waitingForEditor = opensForTyping({ canEdit, editing: !!editing, unreadable, version: version?.id ?? null }) || (!!editing && liveTicket === undefined);
 
   // A save asked for while one is on its way waits for it, then posts what is newer.
   const inFlight = useRef<Promise<boolean> | null>(null);
@@ -380,7 +404,7 @@ export function ArtifactView({ product, project = null, thread, shareThread, thr
       setEditWord('Saving…');
       const clash = editClash(family, sitting.base.n, me, nameOf);
       const why = await onNewVersion(sitting.base.name, out, sitting.base.path, sitting.base.id, posted.current).catch((err: Error) => err.message);
-      if (why) { setTold(`${why} Press back again to leave: your words come back when you open it again.`); setEditWord('Not saved'); return false; }
+      if (why) { setTold(`${why} Close it again to leave. Your words come back when you open it again.`); setEditWord('Not saved'); return false; }
       posted.current = out;
       try { if (localStorage.getItem(draftKey(sitting.base.path)) === out) localStorage.removeItem(draftKey(sitting.base.path)); } catch { /* nothing kept */ }
       setTold(clash ?? editGoes ?? null);
@@ -533,7 +557,6 @@ export function ArtifactView({ product, project = null, thread, shareThread, thr
       else if (asking) setAsking(null);
       else if (replyingTo) setReplyingTo(null);
       else if (draftPlace) setDraftPlace(null);
-      else if (compare) setCompare(false);
       else leave();
     };
     const rest = (e: KeyboardEvent) => {
@@ -613,28 +636,6 @@ export function ArtifactView({ product, project = null, thread, shareThread, thr
       held={heldFor(n)} onToAgent={() => void toAgent([n.id])} />
   );
 
-  const left = family && compare ? family.versions[leftVi ?? (at!.vi > 0 ? at!.vi - 1 : 1)] : undefined;
-
-  // Two versions of a film are compared moving, so Play on either plays both.
-  const split = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const el = split.current;
-    if (!el || !compare || kind !== 'film') return;
-    const others = (from: EventTarget | null) => [...el.querySelectorAll('video')].filter((v) => v !== from);
-    const play = (e: Event) => {
-      for (const v of others(e.target)) {
-        if (!v.paused) continue;
-        v.currentTime = (e.target as HTMLVideoElement).currentTime;
-        v.muted = true;
-        void v.play().catch(() => {});
-      }
-    };
-    const pause = (e: Event) => { for (const v of others(e.target)) if (!v.paused) v.pause(); };
-    el.addEventListener('play', play, true);
-    el.addEventListener('pause', pause, true);
-    return () => { el.removeEventListener('play', play, true); el.removeEventListener('pause', pause, true); };
-  }, [compare, kind]);
-
   const bylineOf = (v: { by: string | null; at: number; n: number; agent?: string }) => [
     sharedByWords(v, { me, nameOf }),
     v.at ? whenShared(v.at) : null,
@@ -650,7 +651,7 @@ export function ArtifactView({ product, project = null, thread, shareThread, thr
       go={editable ? go : null}
       hold={hold}
       showResolved={showSettled}
-      onPlace={editable && !compare ? (p) => { setWholeAsked(false); setDraftPlace(p); box.current?.focus(); } : undefined}
+      onPlace={editable ? (p) => { setWholeAsked(false); setDraftPlace(p); box.current?.focus(); } : undefined}
       onPick={editable ? (id2) => { const n = [...notesHere, ...carried].find((x) => x.id === id2); if (n) pickNote(n); } : undefined}
       onHere={editable ? (p) => {
         setHere(p); setWholeAsked(false);
@@ -671,31 +672,26 @@ export function ArtifactView({ product, project = null, thread, shareThread, thr
     <StageLink.Provider value={setLink}>
     <div className="artifact-view" data-find-layer role="dialog" aria-label={version?.name ?? 'File'}>
       <header className="av-top">
-        <button type="button" className="av-back" onClick={leave} title="Back (esc)"><span className="av-thread">{threadName}</span></button>
+        <button type="button" className="doc-mark av-back" aria-label="Back" title="Back to the thread (esc)" onClick={leave}><ArtifactControlGlyph><path d="M16 10H4m5-5-5 5 5 5" /></ArtifactControlGlyph></button>
         <span className="av-name">{familyName(family, editing?.base ?? version) || ((editing?.base ?? version)?.name ?? '')}</span>
-        {kind && <span className="av-kind">{KIND_WORD[kind]}</span>}
         {family && family.versions.length > 1 && (
           <span className="av-versions">
             <button type="button" className="av-chev" disabled={at!.vi === 0} onClick={() => stepVersion(-1)} aria-label="Older version">‹</button>
             <span className="av-of">v{version!.n} of {family.versions.length}</span>
             <button type="button" className="av-chev" disabled={at!.vi === family.versions.length - 1} onClick={() => stepVersion(1)} aria-label="Newer version">›</button>
             {!isNewest && <button type="button" className="av-newest" onClick={() => stepVersion(family.versions.length - 1 - at!.vi)}>Show v{family.versions[family.versions.length - 1].n}</button>}
-            <button type="button" className={`av-btn av-compare${compare ? ' is-on' : ''}`} aria-pressed={compare} onClick={() => (compare ? setCompare(false) : away(() => setCompare(true)))}><NoteGlyph name="sides" />Side by side</button>
           </span>
         )}
         <span className="av-spring" />
-        {approvalsHere.some((a) => a.by !== me) && (
-          <span className="av-approved"><i aria-hidden="true" />Approved by {approvalsHere.filter((a) => a.by !== me).map((a) => nameOf(a.by)).join(', ')}</span>
-        )}
-        {earlier && <span className="av-approved is-old" title={approvalSince(family, at!.vi, marks.approvals, nameOf) ?? undefined}>{version?.edited ? approvalSince(family, at!.vi, marks.approvals, nameOf) : `v${earlier.n} approved, this version is not`}</span>}
         {editing && editWord && <span className="av-saved" role="status">{editWord}</span>}
-        {offers.approve && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{mineApproved ? 'Approved' : 'Approve'}</button>}
-        {canRestore && !compare && !editing && <button type="button" className="av-btn" disabled={restoring} onClick={() => void restore()}><NoteGlyph name="undo" />Restore this version</button>}
-        {(thread ?? shareThread) && version && foundNow === 'open' && !compare && canShareFile(version.path) && (
-          <ShareLink product={product} thread={(thread ?? shareThread)!} src={version.path} signedIn={!!me} />
-        )}
-        {onOutside && version && foundNow === 'open' && <button type="button" className="av-btn" onClick={() => onOutside(version.path)}><NoteGlyph name="outside" />Open outside</button>}
-        <button type="button" className="av-btn av-leave" onClick={leave} title="Back (esc)"><NoteGlyph name="back" />Back</button>
+        {canRestore && !editing && <button type="button" className="av-btn" disabled={restoring} onClick={() => void restore()}><NoteGlyph name="undo" />Restore this version</button>}
+        <span className="doc-marks">
+          {(thread ?? shareThread) && version && foundNow === 'open' && canShareFile(version.path) && (
+            <ShareLink icon product={product} thread={(thread ?? shareThread)!} src={version.path} signedIn={!!me} />
+          )}
+          {onOutside && version && foundNow === 'open' && <button type="button" className="doc-mark" aria-label="Open outside" title="Open outside" onClick={() => onOutside(version.path)}><ArtifactControlGlyph kind="open" /></button>}
+          {onBeside && version && <FocusControl style="corners-bare" focused onClick={() => onBeside(version.path)} />}
+        </span>
       </header>
       <div className="av-body">
         <div className="av-stage">
@@ -709,39 +705,31 @@ export function ArtifactView({ product, project = null, thread, shareThread, thr
               <button type="button" className="av-btn" onClick={() => setApproveAsked(null)}>Not yet</button>
             </p>
           )}
-          {editing && !compare && (
+          {editing && (
             <div className="av-pane" key={`editing-${editing.base.id}`} ref={editPane} onClick={pickInEditor}>
               {liveTicket !== undefined && <DocText product={product} src={editing.base.path} text={incoming ?? editing.text} mtime={0} folder={editing.folder} onSaved={() => {}} onNotice={setTold} live={liveSession}
-                versions={{ onDraft, saveNow, flush: flushEdit, paint: paintEditor, draft: editing.draft, byline: bylineOf(version ?? editing.base) }} />}
+                versions={{ onDraft, saveNow, flush: flushEdit, paint: paintEditor, draft: editing.draft, byline: bylineOf(version ?? editing.base), focus: typing }} />}
               {offers.comment && <SelectionBar page={editPane} onComment={(quote) => { setWholeAsked(false); setDraftPlace({ kind: 'quote', text: quote }); box.current?.focus(); }} />}
             </div>
           )}
           {version && waitingForEditor && <OpeningWait name={version.name} kind="markdown" />}
-          {version && !compare && !editing && !waitingForEditor && <div className="av-pane" key={version.id}>{stage(version.path, version.id, version.name, true, version)}</div>}
-          {version && compare && left && !editing && (
-            <div className="av-split" ref={split}>
-              <div className="av-pane" key={`l-${left.id}`}>
-                <div className="av-pane-head">
-                  {family!.versions.filter((v) => v.id !== version.id).map((v) => (
-                    <button type="button" key={v.id} className={`av-pane-v${v.id === left.id ? ' is-on' : ''}`} onClick={() => setLeftVi(family!.versions.indexOf(v))}>{`v${v.n}`}</button>
-                  ))}
-                  <span className="av-pane-name">{left.name}</span>
-                </div>
-                {stage(left.path, left.id, left.name, false)}
-              </div>
-              <div className="av-pane" key={`r-${version.id}`}>
-                <div className="av-pane-head"><span className="av-pane-v is-on">{`v${version.n}`}</span><span className="av-pane-name">{version.name}</span></div>
-                {stage(version.path, version.id, version.name, true)}
-              </div>
-            </div>
-          )}
-          {!compare && (steps.length ? steps.length : families.length) > 1 && at && <>
+          {version && !editing && !waitingForEditor && <div className="av-pane" key={paneKey(kind, version)}>{stage(version.path, version.id, version.name, true, version)}</div>}
+          {(steps.length ? steps.length : families.length) > 1 && at && <>
             <button type="button" className="av-step av-prev" disabled={!stepTo(-1)} onClick={() => stepFile(-1)} aria-label="Previous file">‹</button>
             <button type="button" className="av-step av-next" disabled={!stepTo(1)} onClick={() => stepFile(1)} aria-label="Next file">›</button>
           </>}
           {link && <FileLinkBrowser key={link} url={link} product={product} backTo={kind ? `the ${KIND_WORD[kind].toLowerCase()}` : 'the file'} onClose={closeLink} />}
         </div>
-        {!compare && (foundNow === 'looking' || offers.comment || openNotes.length > 0 || settled.length > 0) && <aside className="av-side" aria-label="Comments">
+        {(foundNow === 'looking' || offers.comment || openNotes.length > 0 || settled.length > 0) && <aside className="av-side" aria-label="Comments">
+          {(offers.approve || othersApproved.length > 0 || earlier) && (
+            <div className="av-verdict">
+              <span className="av-verdict-who" title={earlier ? approvalSince(family, at!.vi, marks.approvals, nameOf) ?? undefined : undefined}>
+                {othersApproved.length > 0 ? `${othersApproved.map((a) => nameOf(a.by)).join(', ')} approved`
+                  : earlier ? (version?.edited ? approvalSince(family, at!.vi, marks.approvals, nameOf) : `v${earlier.n} approved, this version is not`) : null}
+              </span>
+              {offers.approve && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{mineApproved ? 'Approved' : 'Approve'}</button>}
+            </div>
+          )}
           <div className="av-list">
             {openNotes.map(card)}
             {settled.length > 0 && (

@@ -289,6 +289,8 @@ export interface PlacedFile {
   project: string | null;
   name: string;
   kind: FileKind | null;
+  /** Made in Files and nothing written in it yet. */
+  blank?: boolean;
   versions: number;
   at: number;
   by: string | null;
@@ -314,7 +316,8 @@ export type FileFolderAct =
   | { do: 'rename'; id: string; name: string }
   | { do: 'move'; key: string; folder: string | null };
 
-export interface FilesPlaceList { files: PlacedFile[]; projects: string[]; folders?: FileFolder[] }
+export interface FilesUploaded { ok: boolean; error?: string; added?: number; refused?: string[]; keys?: string[] }
+export interface FilesPlaceList { files: PlacedFile[]; projects: string[]; folders?: FileFolder[]; mine?: string[] }
 export type ConnectionState = 'not_connected' | 'works' | 'not_signed_in' | 'not_allowed' | 'nothing_to_read' | 'down' | 'unreachable' | 'choose_reads';
 export type ConnectionAccess = 'sign_in' | 'own_client' | 'key' | 'vendor_approval';
 export interface ConnectionFailure { at: number; tool: string; wrote: boolean; why: string }
@@ -809,18 +812,23 @@ export interface UsageLimit {
    *  Then the clock time is printed instead, or nothing. */
   resetsAt: number | null;
   zone: string | null;
+  /** A five hour window that started over after this reading (shared/usage.mts `limitsToShow`). */
+  reset?: boolean;
 }
 
 /** The Agentbox Cloud plan this Mac is signed in to, as the cloud server counts it. */
 export interface CloudPlan {
   signedIn: boolean;
-  plan?: 'none' | 'pro' | 'plus' | 'max';
+  /** 'free' is no plan with free hours left (main/cloud/account.mts cloudPlanOf). */
+  plan?: 'none' | 'free' | 'pro' | 'plus' | 'max';
   unlimited?: boolean;
   /** Agents at once; null when unlimited. */
   agents?: number | null;
   hoursPerMonth?: number;
   running?: number;
   usedSeconds?: number;
+  /** With no plan: the free hours, spent or not. */
+  free?: { agents: number; hours: number; usedSeconds: number };
   /** Who bills the plan: Stripe, or nobody because it was set by hand. Absent from older servers. */
   billing?: 'stripe' | 'given' | null;
   error?: string;
@@ -1658,6 +1666,7 @@ declare global {
       assistiveTech?(): Promise<boolean>;
       olderItems?(p: { offset: number; limit: number }): Promise<{ items: WorkItem[]; more: boolean }>;
       crash?(p: { name: string; message: string; stack: string }): Promise<unknown>;
+      blankCheck?(p: { thread: string; facts: Record<string, unknown>; lateMs: number; longTaskMs: number }): Promise<string | null>;
       // A count. The name is checked against the approved list in the main
       // process, which attaches everything else; nothing from this side rides along.
       track?(name: string, count?: number): Promise<boolean>;
@@ -1723,6 +1732,8 @@ declare global {
       filesPlaceEdit?(p: { key: string; text: string }): Promise<{ ok: boolean; error?: string; goes?: 'sent'; to?: string }>;
       filesPlaceMark?(p: { key: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }>;
       filesPlaceFolder?(p: FileFolderAct): Promise<{ ok: boolean; error?: string; folder?: string | null }>;
+      filesPlaceNew?(p: { project: string; name: string; kind: 'document' | 'table'; folder: string | null }): Promise<{ ok: boolean; error?: string; key?: string }>;
+      filesPlaceUpload?(p: { project: string; folder: string | null }): Promise<FilesUploaded>;
       fileElsewhere?(p: { product: string; id: string; copies: { path: string; file: string }[] }): Promise<FileElsewhere[]>;
       fileLine?(p: { product: string; id: string }): Promise<FileLine[]>;
       teamComment(p: { personId: string; threadId: string; text: string }): Promise<TeamCallResult>;

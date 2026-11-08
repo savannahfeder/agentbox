@@ -19,8 +19,10 @@ export const NeedPlace = createContext<{
   // Every need of the message, in order: the facts are said on its first
   // sign-in or key and the way out once, under its last card.
   needs: Need[];
-  saveKeys: (fields: { name: string; value: string; label: string }[], need: Need, words?: string) => Promise<string | null>;
-  sendFile: (path: string | null, need: Need) => Promise<string | null>;
+  // `late`: given from a card already answered in words, so the thread is told it came after all.
+  saveKeys: (fields: { name: string; value: string; label: string }[], need: Need, words?: string, late?: boolean) => Promise<string | null>;
+  // false: the person closed the file panel, so nothing was sent.
+  sendFile: (path: string | null, need: Need, late?: boolean) => Promise<string | null | false>;
   sendCode: (about: string, code: string) => Promise<string | null>;
   fileInfo?: (path: string) => Promise<{ ok: boolean; size?: number; error?: string }>;
   onComputer: () => void;
@@ -39,10 +41,6 @@ export function setHeld(item: string, held: { need: string; words: string }[] | 
   if (held?.length) HELD.set(item, held); else HELD.delete(item);
   try { globalThis.sessionStorage?.setItem(HELD_KEY, JSON.stringify([...HELD])); } catch { /* no storage */ }
 }
-
-// The ask a row atop Needs you was pressed for, so its card takes the keyboard when the thread opens (round seven).
-let wanted: { item: string; need: string } | null = null;
-export const focusNeedOnOpen = (item: string, need: string) => { wanted = { item, need }; };
 
 /** True inside any of the agent's messages but its last unanswered one (Thread.tsx): those only say what they asked. */
 export const NeedOlder = createContext(false);
@@ -84,7 +82,7 @@ const fileName = (p: string) => p.split('/').filter(Boolean).pop() ?? p;
 const folderOf = (p: string) => { const parts = p.split('/').filter(Boolean); return parts.length > 1 ? parts[parts.length - 2] : null; };
 
 /** Fields for a sign-in or a key, kept for every cloud thread. */
-function KeyFields({ need, fields, plain }: { need: Need; fields: { name: string; label: string }[]; plain: string }) {
+function KeyFields({ need, fields, plain, late }: { need: Need; fields: { name: string; label: string }[]; plain: string; late: boolean }) {
   const place = useContext(NeedPlace)!;
   const [values, setValues] = useState<Record<string, string>>({});
   const [said, setSaid] = useState<string | null>(null);
@@ -102,7 +100,7 @@ function KeyFields({ need, fields, plain }: { need: Need; fields: { name: string
     if (wrong && warned !== asked) { setWarned(asked); setSaid(wrong); return; }
     setBusy(true);
     setSaid(null);
-    const out = await place.saveKeys(fields.map((f) => ({ name: f.name, value: values[f.name], label: f.label })), need);
+    const out = await place.saveKeys(fields.map((f) => ({ name: f.name, value: values[f.name], label: f.label })), need, undefined, late);
     setBusy(false);
     if (out) { setSaid(out); return; }
     focusNextAsk();
@@ -137,25 +135,23 @@ export function NeedCard({ source, fallback }: { source: string; fallback: React
   const [said, setSaid] = useState<string | null>(null);
   const [code, setCode] = useState('');
   const [replacing, setReplacing] = useState(false);
+  const [late, setLate] = useState(false);
+  const [sentLate, setSentLate] = useState(false);
   const box = useRef<HTMLDivElement | null>(null);
   const live = !!place?.saved && !!need && place.live && !older;
+  const taking = live || late;
+  const reopen = () => { setLate(true); setTimeout(() => box.current?.querySelector<HTMLElement>('input, .need-main')?.focus(), 50); };
   const id = need ? needId(need) : '';
-  useEffect(() => {
-    if (!live || !place || wanted?.item !== place.itemId || wanted.need !== id) return;
-    wanted = null;
-    // After the thread's own focus has landed on the reply box; not cleared by a re-render, which comes at once.
-    setTimeout(() => box.current?.querySelector<HTMLElement>('input, .need-main')?.focus(), 250);
-  }, [live, id, place]);
   // Round nine: a file that was not on the computer said so only after Send.
   const [info, setInfo] = useState<{ ok: boolean; size?: number; error?: string } | null>(null);
   const asksFile = need?.kind === 'file' ? need.path : null;
   useEffect(() => {
-    if (!live || !asksFile || !place?.fileInfo) return;
+    if (!taking || !asksFile || !place?.fileInfo) return;
     let on = true;
     void place.fileInfo(asksFile).then((r) => { if (on) setInfo(r); });
     return () => { on = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [live, asksFile]);
+  }, [taking, asksFile]);
   if (!place?.saved || !need) return <>{fallback}</>;
   const open = place.openLink;
   const done = (n: Need) => { const k = keysOf(n); return k.length ? k.every((x) => place.saved!.includes(x)) : place.given.includes(needId(n)); };
@@ -186,12 +182,13 @@ export function NeedCard({ source, fallback }: { source: string; fallback: React
     const article = /^[aeiou]/i.test(plain) ? 'an' : 'a';
     const getIt = tokenUrl && <>Get {article} {plain} from <a href={tokenUrl} onClick={(e) => { e.preventDefault(); open(tokenUrl); }}>{name}'s own page</a></>;
     const mark = <Mark id={svc ? svc.id : null} fallback={I.key} />;
-    if ((saved && !replacing) || !live) {
+    if ((saved && !replacing) || !taking) {
       return <div className="need need-done" data-need={svc ? svc.id : key!.name} ref={box} onKeyDown={keepKeys}>
         <div className="need-body">{mark}<div className="need-col">
           <div className="need-title">{saved ? (signIn ? `${name} connected` : `${name} saved`) : title}</div>
           <div className="need-why">{saved ? 'Every cloud thread can use it.' : 'Answered below.'}</div>
-        </div>{saved && live && <button type="button" className="need-link" onClick={() => setReplacing(true)}>Replace</button>}</div>
+        </div>{saved && live && <button type="button" className="need-link" onClick={() => setReplacing(true)}>Replace</button>}
+          {!saved && <button type="button" className="need-link" onClick={reopen}>{signIn ? 'Connect it now' : 'Add it now'}</button>}</div>
         {saved && live && showFoot && <Footer />}
       </div>;
     }
@@ -204,9 +201,9 @@ export function NeedCard({ source, fallback }: { source: string; fallback: React
           <div>{I.lock}<span>Kept encrypted in your {Name} Cloud</span></div>
           <div>{I.cloud}<span>Every thread can use it from now on</span></div>
         </div> : getIt && <div className="need-why need-also">{getIt}. Kept the same way.</div>}
-        <KeyFields need={need} fields={fields} plain={plain} />
+        <KeyFields need={need} fields={fields} plain={plain} late={!live} />
       </div></div>
-      {showFoot && <Footer />}
+      {showFoot && live && <Footer />}
     </div>;
   }
 
@@ -214,15 +211,20 @@ export function NeedCard({ source, fallback }: { source: string; fallback: React
     const where = folderOf(need.path);
     const send = async (path: string | null) => {
       setBusy(true); setSaid(null);
-      const out = await place.sendFile(path, need);
+      // A prop handing a picked file to the thread, not Express's res.sendFile.
+      // nosemgrep: javascript.express.security.audit.express-res-sendfile.express-res-sendfile
+      const out = await place.sendFile(path, need, !live);
       setBusy(false);
-      if (out) setSaid(out); else focusNextAsk();
+      if (out === false) return;
+      if (out) setSaid(out);
+      else if (live) focusNextAsk();
+      else { setLate(false); setSentLate(true); }
     };
     if (live && place.given.includes(id)) return held(`${fileName(need.path)} is ready`, <Mark fallback={I.file} />);
-    if (!live) {
-      return <div className="need need-done"><div className="need-body"><Mark fallback={I.file} /><div className="need-col">
-        <div className="need-title">Send {fileName(need.path)}</div><div className="need-why">Answered below.</div>
-      </div></div></div>;
+    if (!taking) {
+      return <div className="need need-done" ref={box}><div className="need-body"><Mark fallback={I.file} /><div className="need-col">
+        <div className="need-title">{sentLate ? `${fileName(need.path)} sent` : `Send ${fileName(need.path)}`}</div><div className="need-why">{sentLate ? 'This thread has it now.' : 'Answered below.'}</div>
+      </div>{!sentLate && <button type="button" className="need-link" onClick={reopen}>Send it now</button>}</div></div>;
     }
     return <div className="need" data-need="file" ref={box} onKeyDown={keepKeys}>
       <div className="need-body"><Mark fallback={I.file} /><div className="need-col">
@@ -237,7 +239,7 @@ export function NeedCard({ source, fallback }: { source: string; fallback: React
         </div>
         {said && <p className="need-said" role="status">{said}</p>}
       </div></div>
-      {showFoot && <Footer />}
+      {showFoot && live && <Footer />}
     </div>;
   }
 

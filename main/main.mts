@@ -34,6 +34,7 @@ import { appSessionFolders } from './agent-homes.mts';
 import { registerIpc } from './ipc.mts';
 import { stallWatch } from './stall-watch.mts';
 import { startFreezeRecorder } from './freeze-recorder.mts';
+import { startMemoryRecorder } from './memory-recorder.mts';
 import { FreezeWatch } from './freeze-watch.mjs';
 import { applyThrough, phoneDevice } from './phone-inbox.mts';
 import type { PhoneChannel } from './phone-inbox.mts';
@@ -50,9 +51,11 @@ import { newUserWindow } from './new-user-window.mts';
 import { openFreshUser } from './fresh-user.mts';
 import { installCrashReports, report as reportCrash, reportFromRenderer, pending as pendingCrashes, setTransport } from './crash-report.mts';
 import { keepThePageAlive } from './when-the-page-stops.mts';
+import { recordBlankPages } from './blank-page.mts';
 import { createAnalytics, createDailyCount } from './analytics.mts';
 import { createUpdater } from './updater.mts';
 import { quitStep, flushBeforeQuit, quitThenExit } from './quit-sequence.mts';
+import { askBeforeClosingWhileWorking } from './close-while-working.mts';
 import { createPlace } from '../shared/where-it-runs-from.mts';
 import { createSourceUpdater } from './source-updater.mts';
 import { learnShellDataDirs, recoverShellPath } from './shell-path.mjs';
@@ -71,6 +74,7 @@ import { IS_SHE_TYPING_IN_THE_PAGE, theAppKeepsThisInput, theAppKeepsThisLetterI
 import { NAME, Name, WAS } from '../shared/product-name.mjs';
 import { JOIN_SCHEME, ourLink, tokenFromLink } from '../shared/room-links.mjs';
 import { getMic } from './mic.mts';
+import { openInBrowser } from './open-in-browser.mts';
 import type { IpcConfig } from './ipc.mts';
 import type { CornerTagConfig } from './corner-tag.mts';
 import type { AnalyticsConfig } from './analytics.mts';
@@ -441,6 +445,8 @@ async function createWindow() {
   const supervisor = new Supervisor(config, store, appDir, dataDir, userDir);
   // Local runs outlive a quit or a restart of the app (main/run-host.mjs).
   supervisor.hostRuns = true;
+  // And their store tools come from one shared process (main/tool-host.mjs).
+  supervisor.shareTools = true;
   // THAT agents start and stop work (main/analytics.mts checks the switch).
   supervisor.count = (name, props) => analytics.track(name, props);
   // Whether anyone has touched the Mac since a wake (Supervisor#asleep).
@@ -454,6 +460,12 @@ async function createWindow() {
     onFreeze: (f) => { stalls.noteFreeze(f); console.warn(`zero: the app froze for ${f.ms} ms in ${f.where}`); },
   });
   quitStep(app, 'before-quit', 'freezes.stop', () => freezes.stop());
+  const memory = startMemoryRecorder({
+    dir: path.join(userDir, 'memory-log'),
+    processes: () => app.getAppMetrics().map((m) => ({ type: m.type, mb: Math.round(m.memory.workingSetSize / 1024) })),
+    windowSnapshot: (file) => (window && !window.isDestroyed() ? window.webContents.takeHeapSnapshot(file) : Promise.reject(new Error('no window'))),
+  });
+  quitStep(app, 'before-quit', 'memory.stop', () => memory.stop());
   const freezeWatch = new FreezeWatch({ store, userDir, appDir });
   const checkFreezes = () => { try { freezeWatch.check(); } catch (err) { console.warn(`zero: could not read yesterday's freezes: ${(err as Error).message}`); } };
   const freezeFirst = setTimeout(checkFreezes, 60_000);
@@ -577,7 +589,7 @@ async function createWindow() {
   // fix missed the main window for exactly that reason, 2026-08-04).
   const openLink = (url: string) => {
     if (url.startsWith('file://')) shell.openPath(decodeURIComponent(url.replace('file://', '')));
-    else shell.openExternal(url);
+    else void openInBrowser(url, { shell });
   };
 
   // A PICTURE GOES ON THE CLIPBOARD AS A PICTURE AND AS NOTHING ELSE.
@@ -1142,12 +1154,26 @@ async function createWindow() {
   // itself (it has no disk and should not have one), and 'render-process-gone'
   // only fires when the process DIES, which a thrown React error does not.
   ipcMain.handle('zero:crash', (_e, payload) => { reportFromRenderer(payload ?? {}); });
+  recordBlankPages({
+    ipcMain,
+    window: () => window,
+    dir: path.join(userDir, 'memory-log'),
+    context: () => {
+      const runs = supervisor.runsGoing();
+      return {
+        upMinutes: Math.round(process.uptime() / 60),
+        running: runs.length,
+        inCloud: runs.filter((s) => s.cloud).length,
+        processes: app.getAppMetrics().map((m) => ({ type: m.type, mb: Math.round(m.memory.workingSetSize / 1024) })),
+      };
+    },
+  });
   ipcMain.handle('zero:take-join', () => { const token = pendingJoin; pendingJoin = null; return token; });
   // External links from markdown open in the real browser; local artifacts
   // (a demo page, a screenshot a worker saved) open in their default app, so
   // "see it working" is one click from the message.
   window.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:/.test(url)) shell.openExternal(url);
+    if (/^https?:/.test(url)) void openInBrowser(url, { shell });
     else if (url.startsWith('file://')) shell.openPath(decodeURIComponent(url.replace('file://', '')));
     return { action: 'deny' };
   });
@@ -1156,7 +1182,7 @@ async function createWindow() {
   window.webContents.on('will-navigate', (e, url) => {
     if (!leavesTheApp(window!.webContents.getURL(), url)) return;
     e.preventDefault();
-    if (/^https?:/.test(url)) shell.openExternal(url);
+    if (/^https?:/.test(url)) void openInBrowser(url, { shell });
   });
 
   // WHAT AN EMBEDDED PAGE MAY DO IS DECIDED HERE, NOT ON THE TAG THAT ASKED.
@@ -1188,7 +1214,7 @@ async function createWindow() {
     // browser we have not designed, and `allowpopups` is off anyway
     // (webview-guard.mts), so without this such a link does nothing at all.
     contents.setWindowOpenHandler(({ url }) => {
-      if (/^https?:/.test(url)) shell.openExternal(url);
+      if (/^https?:/.test(url)) void openInBrowser(url, { shell });
       return { action: 'deny' };
     });
 
@@ -1297,6 +1323,8 @@ async function createWindow() {
       quitThenExit(app, { what: 'the screenshot run' });
     }, Number(process.env.ZERO_SCREENSHOT_DELAY_MS ?? 2500));
   }
+
+  askBeforeClosingWhileWorking({ app, window, dialog, working: () => supervisor._load(), name: Name });
 
   window.on('closed', () => {
     supervisor.stop();

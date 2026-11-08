@@ -718,6 +718,6 @@ describe('the wire between the two halves', () => {
     // task they send themselves lands in their own project. The walk opens the
     // real new thread card since 2026-10-01, and that card is told which
     // project to open on rather than being handed a prefill with one inside it.
-    expect(app).toMatch(/defaultProduct=\{walkCard \? \(run!\.practice \?\? run!\.product\) : productFilter\}/);
+    expect(app).toMatch(/defaultProduct=\{walkCard \? \(run!\.practice \?\? run!\.product\) : projectOnScreen\(\{ filter: productFilter, open: focused \}\)\}/);
   });
 });

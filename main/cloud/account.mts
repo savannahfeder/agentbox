@@ -283,13 +283,22 @@ function signedIn(env: NodeJS.ProcessEnv, home: string) {
   return key ? { gateway, key } : null;
 }
 
+type FreeHours = { agents: number; hours: number; usedSeconds: number };
+
+/** No plan with free hours left reads as the `free` plan, so every screen draws it like a plan. */
+export function cloudPlanOf<T extends { plan?: unknown; free?: FreeHours }>(me: T): T | (T & { plan: 'free'; agents: number; hoursPerMonth: number; usedSeconds: number }) {
+  const f = me.free;
+  if (me.plan !== 'none' || !f || f.usedSeconds >= f.hours * 3600) return me;
+  return { ...me, plan: 'free', agents: f.agents, hoursPerMonth: f.hours, usedSeconds: f.usedSeconds };
+}
+
 /** The plan, its agents and hours, and what is used, as the server counts them. */
 export async function cloudPlan({ env = process.env, home = os.homedir() }: StoreDirs = {}) {
   const at = signedIn(env, home);
   if (!at) return { signedIn: false };
   const me = await ask(at.gateway, '/v1/me', { key: at.key });
   if (me.status === 401) forgetCloudKey(at.key, env, home);
-  return me.status === 200 ? { signedIn: true, ...me.body } : { signedIn: me.status !== 401, error: me.body.error || 'refused', message: me.body.message };
+  return me.status === 200 ? { signedIn: true, ...cloudPlanOf(me.body as GatewayBody & { free?: FreeHours }) } : { signedIn: me.status !== 401, error: me.body.error || 'refused', message: me.body.message };
 }
 
 /** End every other Mac's cloud key, for a Mac that was lost; this one stays signed in. */

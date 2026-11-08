@@ -73,11 +73,15 @@ export function summarizeMemory(procs: ProcessRecord[], { appPid = process.pid, 
   const sum = (list: ProcessRecord[]) => Math.round(list.reduce((n, p) => n + (Number(p.mb) || 0), 0));
   const level = Number.isFinite(reading?.level) ? reading.level : null;
   const freePct = Number.isFinite(reading?.freePct) ? reading.freePct : null;
+  const swapInMbps = Number.isFinite(reading?.swapInMbps) ? reading.swapInMbps : null;
+  const swapMb = Number.isFinite(reading?.swapMb) ? reading.swapMb : null;
   return {
     at: new Date(at).toISOString(),
-    pressure: level === null && freePct === null ? null : pressureFrom({ level, freePct }),
+    pressure: level === null && freePct === null && swapInMbps === null ? null : pressureFrom({ level, freePct, swapInMbps }),
     level,
     freePct,
+    swapInMbps,
+    swapMb,
     totalMb: sum(procs),
     app: { mb: sum(app), procs: app.length },
     tasks: [...tasks.values()]

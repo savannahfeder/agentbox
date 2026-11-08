@@ -1,8 +1,8 @@
 import type { ArtifactMark, FileApproval, FileMarks, FileNote, NotePlace } from '../renderer/src/types';
 
-export type ThreadFile = { path: string; by?: string | null; at?: number; agent?: string; edited?: boolean; newer?: boolean };
+export type ThreadFile = { path: string; by?: string | null; at?: number; agent?: string; edited?: boolean; newer?: boolean; made?: boolean };
 /** `agent` is set when an agent shared it: its name, or empty when it has none. */
-export type FileVersion = { id: string; name: string; path: string; n: number; by: string | null; at: number; agent?: string; edited?: boolean; also?: string[]; /** Made in another place after this thread's own. */ newer?: boolean };
+export type FileVersion = { id: string; name: string; path: string; n: number; by: string | null; at: number; agent?: string; edited?: boolean; made?: boolean; also?: string[]; /** Made in another place after this thread's own. */ newer?: boolean };
 export type FileFamily = { key: string; versions: FileVersion[] };
 export type FileNews = { kind: 'note' | 'named' | 'approved'; id: string; by: string; ts: number; file: string; text?: string };
 
