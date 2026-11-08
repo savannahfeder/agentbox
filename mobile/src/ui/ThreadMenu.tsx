@@ -41,7 +41,7 @@ export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = f
   onClose: () => void;
   tryAgain?: boolean; onTryAgain?: () => void;
   restart?: boolean; onRestart?: () => void;
-  resume?: 'open' | 'done' | null; onResume?: () => void;
+  resume?: 'done' | null; onResume?: () => void;
   reopen?: boolean; onReopen?: () => void;
   /** The level it runs at; null where the menu offers none. */
   priority?: number | null; onPriority?: (value: number) => void;
@@ -117,7 +117,7 @@ export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = f
       {runNow && <SheetRow label="Run now" onPress={() => { done(); onRunNow(); }} />}
       {tryAgain && <SheetRow label="Try again" onPress={act(onTryAgain)} />}
       {restart && <SheetRow label="Restart the agent (it stopped)" onPress={act(onRestart)} />}
-      {resume && <SheetRow label={resume === 'done' ? 'Resume this agent (reopen and carry on)' : 'Resume this agent'} onPress={act(onResume)} />}
+      {resume && <SheetRow label="Resume this agent (reopen and carry on)" onPress={act(onResume)} />}
       {reopen && <SheetRow label="Reopen" onPress={act(onReopen)} />}
       {priority !== null && <SheetRow label="Priority" aside={priorityLabelOf(priorityIdOf(priority))} onPress={() => setPage('priority')} />}
       {name !== null && <SheetRow label="Rename" onPress={() => { setNaming(name); setPage('rename'); }} />}

@@ -89,7 +89,7 @@ export const PARITY = {
   'thread:close-task': { missing: 'closing a given task for both people' },
   'thread:reply': { phone: ACTS, find: "kind: 'reply'" },
   'thread:try-again': { phone: MENU, find: 'label="Try again"' },
-  'thread:resume-any': { phone: MENU, find: "'Resume this agent'" },
+  'thread:resume-any': { phone: MENU, find: 'Resume this agent (reopen and carry on)' },
   'thread:move-refused': { phone: OFFERS, find: 'whyItCannotMove(item' },
   'thread:move-*': { phone: MENU, find: 'label="Move to another project"' },
   'thread:stop': { phone: THREAD, find: "'Stop this agent'" },

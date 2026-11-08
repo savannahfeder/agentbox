@@ -95,9 +95,9 @@ describe('Try again and Restart', () => {
     expect(o.tryAgain).toBe(false);
     expect(o.restart).toBe(true);
   });
-  it('Resume this agent on a thread nothing runs on and Try again does not fit, as ⌘K offers it', () => {
-    expect(offersOf(item(), facts()).resume).toBe('open');
+  it('Resume this agent on a closed thread nothing runs on, as ⌘K offers it, and not on one waiting for your answer', () => {
     expect(offersOf(item({ status: 'done' }), facts()).resume).toBe('done');
+    expect(offersOf(item(), facts()).resume).toBe(null);
     expect(offersOf(item({ status: 'open' }), facts({ stalled: true })).resume).toBe(null);
     expect(offersOf(item({ status: 'claimed' }), facts({ session: session(), inProgress: true })).resume).toBe(null);
     expect(offersOf(item({ status: 'open' }), facts({ inProgress: true })).resume).toBe(null);
