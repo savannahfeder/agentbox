@@ -128,9 +128,8 @@ export function attachClaudeInput<C extends PipedChild>(child: C & ClaudeInput):
   // Claude replays it only when that turn first speaks. Send now must not cut
   // that turn: it was the answer (w-0202576e73).
   let inTurn = false;
-  // BETWEEN TURNS, WAITING FOR THE NEXT MESSAGE (`waitAfterTurns`). A cloud
-  // run that closed its input here ended, and the next reply paid a whole new
-  // machine, about two minutes, before the agent read it.
+  // BETWEEN TURNS (`waitAfterTurns`): the input stays open so the next message
+  // reaches this session, rather than closing and leaving it to a new run.
   let waitMs = 0, between = false, betweenTimer: NodeJS.Timeout | null = null;
   // `end` answers false in the run host while an app is attached and closing is the app's to do.
   const closeInput = () => {
