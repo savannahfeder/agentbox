@@ -10,6 +10,7 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { isImagePath, referencedFiles } from '../../../renderer/src/referenced-files';
 import { pictureSource, shapeOfDrawn } from '../lib/files';
 import { inlineSpans, messageBlocks, type Block, type MentionKind, type Span } from '../lib/markdown';
+import { hasPictureMenu, PictureMenu } from '../../modules/picture-menu';
 import { offerLink } from './LinkMenu';
 import { T } from './parts';
 import { Player } from './Player';
@@ -23,6 +24,8 @@ export interface MessageFiles {
   open(src: string, among?: string[]): void;
   /** A long press: offer to open it in the browser or share it (LinkMenu.ts). */
   hold?(src: string): void;
+  /** Says a line on the toast, when a held picture could not be saved or loaded. */
+  say?(line: string): void;
   /** A folder's pictures as full paths on the phone, and what the folder goes by; null when the phone does not have it. */
   folder?(src: string): { title: string; pictures: string[]; total: number } | null;
   /** The link a film or a sound plays from, or null when the phone does not have it. */
@@ -134,7 +137,11 @@ function Picture({ src, alt }: { src: string; alt: string }) {
       style={{ width: '100%', maxWidth: size.w, aspectRatio: size.w / size.h, borderWidth: 1, borderRadius: corner.card, borderColor: color.line, backgroundColor: color.raised }} />
   );
   if (/^data:/i.test(src)) return drawn;
-  return <Pressable accessibilityRole="imagebutton" accessibilityLabel={alt || src} onPress={() => open(src, files, pictures)} onLongPress={() => hold(src, files)}>{drawn}</Pressable>;
+  return (
+    <PictureMenu uri={uri} corner={corner.card} say={(line) => files?.say?.(line)} style={{ width: '100%', maxWidth: size.w, aspectRatio: size.w / size.h }}>
+      <Pressable accessibilityRole="imagebutton" accessibilityLabel={alt || src} onPress={() => open(src, files, pictures)} onLongPress={hasPictureMenu ? undefined : () => hold(src, files)}>{drawn}</Pressable>
+    </PictureMenu>
+  );
 }
 
 // MentionIcon's folder at the folder line's 15px (`.folder-preview-name .mention-icon`).
@@ -188,12 +195,14 @@ function Shot({ file, all, width }: { file: string; all: string[]; width: number
   const base = file.split('/').pop() ?? file;
   return (
     <Pressable onPress={() => open(file, files, all)} accessibilityRole="imagebutton" accessibilityLabel={base} style={{ width }}>
-      <View style={{ width: '100%', aspectRatio: 16 / 10, borderWidth: 1, borderRadius: corner.card, borderColor: color.line, backgroundColor: color.raised, overflow: 'hidden' }}>
-        {!!uri && (
-          <Image source={pictureSource(uri)} cachePolicy="memory-disk" accessibilityLabel={base} contentFit="cover" contentPosition="top"
-            style={{ width: '100%', height: '100%' }} />
-        )}
-      </View>
+      <PictureMenu uri={uri} corner={corner.card} say={(line) => files?.say?.(line)} style={{ width: '100%', aspectRatio: 16 / 10 }}>
+        <View style={{ width: '100%', aspectRatio: 16 / 10, borderWidth: 1, borderRadius: corner.card, borderColor: color.line, backgroundColor: color.raised, overflow: 'hidden' }}>
+          {!!uri && (
+            <Image source={pictureSource(uri)} cachePolicy="memory-disk" accessibilityLabel={base} contentFit="cover" contentPosition="top"
+              style={{ width: '100%', height: '100%' }} />
+          )}
+        </View>
+      </PictureMenu>
       <T numberOfLines={1} style={{ marginTop: 4, fontSize: 13.12, lineHeight: 21, color: color.faint }}>{base}</T>
     </Pressable>
   );

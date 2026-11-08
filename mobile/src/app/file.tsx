@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { MAX_ZOOM, fitScale } from '../../../renderer/src/picture-view';
 import { docOnPhone, openingOf, pageOnPhone, pictureLink, pictureSource, shapeOfDrawn } from '../lib/files';
-import { keep } from '../platform/keep';
+import { PictureMenu } from '../../modules/picture-menu';
 import { useCloud } from '../state/cloud';
 import { readLink, useMessageFiles } from '../ui/Files';
 import { Back } from '../ui/icons';
@@ -98,8 +98,6 @@ const GROUND = '#0f1013';
 const paper = (a: number) => `rgba(250, 251, 252, ${a})`;
 const OUTSIDE = 'M13.5 4.5h6v6M19.5 4.5l-8 8M17.5 13.5v6h-13v-13h6';
 const CROSS = 'M6.6 6.6 17.4 17.4M17.4 6.6 6.6 17.4';
-const SAVE = 'M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14';
-const SHARE = 'M12 14.5V3.5M8 7.5l4-4 4 4M8.5 10.5h-3v10h13v-10h-3';
 const Glyph = ({ d }: { d: string }) => (
   <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={paper(0.62)} strokeWidth={1.1} strokeLinecap="round" strokeLinejoin="round"><Path d={d} /></Svg>
 );
@@ -116,7 +114,6 @@ function PictureRoom({ product, pictures, start }: { product: string; pictures: 
   const { width, height } = useWindowDimensions();
   const inset = useSafeAreaInsets();
   const [index, setIndex] = useState(start);
-  const [busy, setBusy] = useState<'photos' | 'share' | null>(null);
   const list = useRef<FlatList<string>>(null);
   const many = pictures.length > 1;
   const linkOf = (p: string) => pictureLink(c.view.places, c.links, product, p);
@@ -144,13 +141,6 @@ function PictureRoom({ product, pictures, start }: { product: string; pictures: 
           {many && <T style={{ fontFamily: 'GeistMono_500Medium', fontSize: 11, letterSpacing: 1.32, color: paper(0.42) }}>{`${index + 1} / ${pictures.length}`}</T>}
         </View>
         <View style={{ ...glass, padding: 4, flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-          {!!url && (['photos', 'share'] as const).map((how) => (
-            <Pressable key={how} disabled={!!busy} onPress={() => { setBusy(how); void keep({ link: url, name: nameOf(shown), photos: true }, how, c.say).finally(() => setBusy(null)); }}
-              accessibilityRole="button" accessibilityLabel={how === 'photos' ? 'Save to Photos' : 'Share'}
-              style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center', opacity: busy === how ? 0.4 : 1 }}>
-              <Glyph d={how === 'photos' ? SAVE : SHARE} />
-            </Pressable>
-          ))}
           {!!url && (
             <Pressable onPress={() => void WebBrowser.openBrowserAsync(url)} accessibilityRole="button" accessibilityLabel="Open in the browser" style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}>
               <Glyph d={OUTSIDE} />
@@ -185,6 +175,7 @@ function PictureRoom({ product, pictures, start }: { product: string; pictures: 
 
 /** One picture, fitted to the room and never drawn larger than it is; a pinch looks closer. */
 function Shown({ uri, name, width, height, stage }: { uri: string | null | undefined; name: string; width: number; height: number; stage: { top: number; bottom: number } }) {
+  const { say } = useCloud();
   const [natural, setNatural] = useState({ w: 0, h: 0 });
   useEffect(() => {
     if (!uri) return;
@@ -199,8 +190,10 @@ function Shown({ uri, name, width, height, stage }: { uri: string | null | undef
       <ScrollView style={{ position: 'absolute', top: stage.top, left: 16, width: box.w, height: box.h }} contentContainerStyle={{ width: box.w, height: box.h, alignItems: 'center', justifyContent: 'center' }}
         maximumZoomScale={MAX_ZOOM} minimumZoomScale={1} centerContent showsHorizontalScrollIndicator={false} showsVerticalScrollIndicator={false}>
         {!!uri && natural.w > 0 && (
-          <Image source={pictureSource(uri)} cachePolicy="memory-disk" accessibilityLabel={name} contentFit="contain"
-            style={{ width: natural.w * fit, height: natural.h * fit, borderWidth: 1, borderRadius: corner.card, borderColor: paper(0.08) }} />
+          <PictureMenu uri={uri} corner={corner.card} say={say} style={{ width: natural.w * fit, height: natural.h * fit }}>
+            <Image source={pictureSource(uri)} cachePolicy="memory-disk" accessibilityLabel={name} contentFit="contain"
+              style={{ width: natural.w * fit, height: natural.h * fit, borderWidth: 1, borderRadius: corner.card, borderColor: paper(0.08) }} />
+          </PictureMenu>
         )}
       </ScrollView>
     </View>
