@@ -24,9 +24,11 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), 0 12px 40px rgba(0, 0, 0, .3);
 }
 :root[data-theme="light"] .hm-glass {
-  background: linear-gradient(180deg, rgba(255, 255, 255, .88), rgba(255, 255, 255, .76));
-  border-color: rgba(30, 22, 36, .09);
-  box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(30, 22, 36, .05), 0 12px 36px rgba(30, 30, 60, .08);
+  /* Frosted: a deep blur turns the dots under it into soft colour, a white edge catches the light. */
+  background: linear-gradient(180deg, rgba(255, 255, 255, .72), rgba(255, 255, 255, .6));
+  backdrop-filter: blur(36px) saturate(1.05); -webkit-backdrop-filter: blur(36px) saturate(1.05);
+  border-color: rgba(255, 255, 255, .75);
+  box-shadow: 0 0 0 1px rgba(30, 22, 36, .06), inset 0 1px 0 #fff, 0 16px 40px rgba(30, 30, 60, .08);
 }
 
 .hm-doors { display: flex; gap: 8px; margin-top: 16px; }
@@ -36,7 +38,7 @@
 .hm-door svg { opacity: .65; }
 .hm-door .c { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--text-faint); }
 .hm-door.hot .c { color: var(--text); }
-:root[data-theme="light"] .hm-door { background: linear-gradient(180deg, rgba(255, 255, 255, .88), rgba(255, 255, 255, .76)); border-color: rgba(30, 22, 36, .1); box-shadow: 0 1px 2px rgba(30, 22, 36, .06); }
+:root[data-theme="light"] .hm-door { background: linear-gradient(180deg, rgba(255, 255, 255, .72), rgba(255, 255, 255, .6)); backdrop-filter: blur(36px) saturate(1.05); -webkit-backdrop-filter: blur(36px) saturate(1.05); border-color: rgba(30, 22, 36, .1); box-shadow: 0 1px 2px rgba(30, 22, 36, .06); }
 :root[data-theme="light"] .hm-door:hover { border-color: rgba(30, 22, 36, .2); }
 
 .hm-start { margin-top: 22px; position: relative; z-index: 3; }
@@ -49,7 +51,8 @@
 .hm-start .tc-inline .tc-text:focus { border-bottom-color: transparent; }
 .hm-start .tc-card.tc-inline:focus-within { border-color: rgba(255, 255, 255, .3); }
 :root[data-theme="light"] .hm-start .tc-card.tc-inline {
-  background: linear-gradient(180deg, rgba(255, 255, 255, .9), rgba(255, 255, 255, .8));
+  background: linear-gradient(180deg, rgba(255, 255, 255, .72), rgba(255, 255, 255, .6));
+  backdrop-filter: blur(36px) saturate(1.05); -webkit-backdrop-filter: blur(36px) saturate(1.05);
   border-color: rgba(30, 22, 36, .12); box-shadow: inset 0 1px 0 #fff, 0 12px 36px rgba(30, 30, 60, .08); }
 :root[data-theme="light"] .hm-start .tc-card.tc-inline:focus-within { border-color: rgba(30, 22, 36, .2); }
 
@@ -109,14 +112,21 @@
 .hm-card { position: relative; }
 .hm-card::after { content: ''; position: absolute; left: 1px; right: 1px; bottom: 1px; height: 56px; pointer-events: none; border-radius: 0 0 var(--artifact-corner) var(--artifact-corner);
   background: linear-gradient(to bottom, rgba(24, 21, 26, 0), rgba(24, 21, 26, .9)); }
-:root[data-theme="light"] .hm-card::after { background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, .94)); }
+:root[data-theme="light"] .hm-card::after { background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, .7)); }
 .hm-scroll { padding-bottom: 28px; }
 
-/* The Inbox under a sky: the list stops above a band of sky at the card's
-   foot and scrolls inside what is left, so a row is never read over the dots
-   and the keys never walk a row out of sight. */
-.app.sky-shown:not(.home-shown) .list-pane {
-  margin-bottom: 190px;
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
-}
+/* The Inbox under a sky (approved 2026-11-08, design 86): the sky at full
+   strength behind the header and nowhere else, so the list keeps the page. */
+.inbox-sky-head { transform: scaleY(-1);
+  -webkit-mask-image: linear-gradient(to top, #000 0, #000 70px, transparent 150px);
+  mask-image: linear-gradient(to top, #000 0, #000 70px, transparent 150px); }
+.app.sky-shown:not(.home-shown) > .topbar h1, .app.sky-shown:not(.home-shown) > .topbar button { text-shadow: 0 1px 3px rgba(0, 0, 0, .6); }
+
+/* A row's facts as tags in the Inbox's own column type, so they read as
+   settings of the thread rather than a sentence about it. */
+.hm-tags { display: flex; align-items: center; gap: 10px; margin-top: 3px; min-width: 0; overflow: hidden; }
+.hm-tag { display: inline-flex; align-items: center; gap: 6px; font: 10.5px/16px var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--text-faint); white-space: nowrap; }
+.hm-tag:last-child { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.hm-prio { display: inline-flex; align-items: center; color: var(--text-faint); }
+.hm-prio.urgent { color: var(--accent); }
+.hm-prio .th-prio-mark { margin: 0; }

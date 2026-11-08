@@ -144,6 +144,12 @@ export function writeReport(root, { people, dirs, stretch, minutes, engine, stat
   return ranked.length;
 }
 
+/** What the testers lean on: the person's own focus, then what reached the phone this week. */
+export function focusFor(given, reached) {
+  const week = reached.length ? `These reached the phone this week, so try each: ${reached.join(', ')}` : null;
+  return [given, week].filter(Boolean).join('. ') || null;
+}
+
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
   const args = process.argv.slice(2);
@@ -230,6 +236,11 @@ if (isMain) {
   });
   const diaries = () => Object.fromEntries(people.map((p) => [p.name, readDiary(path.join(dirs[p.slug], 'diary.jsonl')).issues]));
 
+  let reached = [];
+  try { reached = await (await import(path.join(REPO, 'scripts/phone-parity.mjs'))).newOnThePhone(7); } catch (err) { say(`could not read what reached the phone this week: ${err.message}`); }
+  const focus = focusFor(opt('focus'), reached);
+  if (reached.length) say(`${reached.length} features reached the phone this week; the testers are told to try each`);
+
   let stretch = 0;
   const report = (state) => writeReport(root, { people, dirs, stretch, minutes, engine, state });
   for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP']) {
@@ -268,7 +279,7 @@ if (isMain) {
       fs.writeFileSync(path.join(dir, 'clock.json'), JSON.stringify({ round: stretch, roundEnd: ends, deadline: Math.min(deadline, ends) }));
       const opened = await run(process.execPath, [PHONE, 'open'], { env: { ...process.env, PHONE_OUT: dir, PHONE_URL: url } });
       if (opened.code !== 0) { say(`${person.name}: the phone did not open: ${opened.out.slice(-300)}`); return; }
-      const prompt = phonePrompt(person, { dir, minutes, focus: opt('focus'), logged });
+      const prompt = phonePrompt(person, { dir, minutes, focus, logged });
       if (engine === 'external') {
         const file = path.join(dir, `stretch-${stretch}.prompt.md`);
         fs.writeFileSync(file, prompt);

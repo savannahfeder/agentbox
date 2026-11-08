@@ -7,7 +7,7 @@ import { itemThread } from '../../../renderer/src/item-thread';
 import { itemOptions, offerIsLive, optionsFrom, stripOptionsSection, type ParsedOption } from '../../../renderer/src/format';
 import { rowTitle } from '../../../renderer/src/list-rules';
 import { pageTitle } from '../../../renderer/src/one-thing-at-a-time';
-import { askLine } from '../../../renderer/src/ask-line';
+import { askHeading } from '../../../renderer/src/ask-line';
 import { phoneHistory, type PhoneRows, type phoneView } from '../../../renderer/src/phone-rows';
 import { approvalReads } from '../../../renderer/src/approval-card';
 import { recapFor, resultLeads } from '../../../renderer/src/recap';
@@ -116,7 +116,7 @@ export function threadOf(rows: PhoneRows, view: View, product: string, id: strin
     after: [...built.after, ...receiptsFor(view, product, id)].sort((a, b) => (a.at ?? 0) - (b.at ?? 0)),
     options: (live ? itemOptions(item) : []) as ParsedOption[],
     // The question the options answer, the options card's heading (OptionsOffer.tsx).
-    ask: live ? askLine(item) : '',
+    ask: live ? askHeading(item) : '',
     parent,
     filed,
     filedOnTurn: placed.onTurn,
