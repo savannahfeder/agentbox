@@ -32,11 +32,12 @@ import net from 'node:net';
 import path from 'node:path';
 import http from 'node:http';
 import { execFile } from 'node:child_process';
-import { MemoryGate, pressureFrom } from './memory-gate.mts';
+import { MemoryGate, pressureFrom, GATE_LINES } from './memory-gate.mts';
 import type { GateAnswer, MemoryGateOptions, Pressure, PressureReading } from './memory-gate.mts';
 import { CommandHistory } from './memory-gate-history.mts';
 import type { Verdict } from './memory-gate-history.mts';
 import { etimeSeconds } from './leftovers.mts';
+import { readMacPressure } from './mac-pressure.mts';
 
 export const PROTOCOL = 1;
 export const DEFAULT_LOCK_PORT = 47263;
@@ -60,12 +61,7 @@ function run(cmd: string, args: string[]): Promise<string | null> {
   });
 }
 
-/** `kern.memorystatus_vm_pressure_level` and `kern.memorystatus_level`, or nulls. */
-export async function readMacPressure(): Promise<{ level: number | null; freePct: number | null }> {
-  const out = await run('/usr/sbin/sysctl', ['-n', 'kern.memorystatus_vm_pressure_level', 'kern.memorystatus_level']);
-  const [level, freePct] = String(out ?? '').trim().split(/\s+/).map(Number);
-  return { level: Number.isFinite(level) ? level : null, freePct: Number.isFinite(freePct) ? freePct : null };
-}
+export { readMacPressure };
 
 export { etimeSeconds };
 
@@ -520,7 +516,7 @@ export class MemoryGateServer {
     this.polling = true;
     try {
       this.reading = await this.readPressure();
-      this.gate.setPressure(pressureFrom(this.reading));
+      this.gate.setPressure(pressureFrom(this.reading, GATE_LINES));
       // Processes are only looked at while something is granted: nothing
       // else needs them, and each look costs a `ps`.
       if (this.grants.size) this._sample(await this.sampleProcesses());

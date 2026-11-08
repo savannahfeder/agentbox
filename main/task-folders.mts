@@ -63,6 +63,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Name, nameSlug } from '../shared/product-name.mjs';
+import { insideGitFolder } from '../shared/project-folder-check.mts';
 import { carryLocalFiles, copyTree, onlyTrackedContent, trackedTopLevel } from './worktree-include.mts';
 import type { ExecFailure } from './worktree-include.mts';
 
@@ -585,6 +586,11 @@ export function acquireTaskFolder(root: string, folder: string, { pid = process.
  */
 export function ensureTaskFolder(dir: string, id: unknown, { pid = process.pid, dependencies = true, again = false }: TaskFolderOptions = {}): TaskFolderTaken | TaskFolderRefused | null {
   const name = safeTaskName(id);
+  // Git reads a .git folder as "not a work tree", so without this the project
+  // below would `git init` inside somebody's repository internals (F-157).
+  if (insideGitFolder(path.resolve(dir))) {
+    throw Error(`this project's folder, ${dir}, is inside a repository's .git folder, so no task can run in it. Make a new project from the repository's own folder and send the task there`);
+  }
   const root = repoRoot(dir) ?? startRepository(dir);
   if (!root) return null;
   firstCommitIfNone(root);

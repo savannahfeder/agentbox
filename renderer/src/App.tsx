@@ -55,7 +55,7 @@ import { Rail } from './components/Rail';
 import { ThreadComposer, type ComposeStart } from './threads/ThreadComposer';
 import { continueStart } from './threads/continue-thread';
 import { OpenTeammateThread } from './threads/ContinuedFrom';
-import { handOffStart, joinNames, laterHint, replyWaitsUntil, taskHandOff, tabAfterSending, writingMovesToTheDialog, projectsOffered, teammates } from './threads/composer-rules';
+import { handOffStart, joinNames, laterHint, replyWaitsUntil, taskHandOff, tabAfterSending, writingMovesToTheDialog, projectsOffered, projectOnScreen, teammates } from './threads/composer-rules';
 import { keyOnAnOpenThread, keyOnTheList, rowKey as actsOnARow, replyingTo, screenJustChanged, HELD_AFTER_A_CHANGE, NOWHERE_TO_TYPE, STILL_TYPING_MS } from './reply-keys';
 import { chosenNames, whoSees } from './threads/summary-rules';
 import { shownToPeople } from '../../shared/thread-cards.mjs';
@@ -208,11 +208,7 @@ import { namedCards } from './team/company';
 import { FaceHover } from './team/status';
 import { TeamPage } from './team/TeamPage';
 import { ProjectShare, ProjectWho } from './team/ProjectShare';
-import { AskCard } from './threads/AskCard';
-import { inboxAsks, putOffKeys, readPutOff, writePutOff, type InboxAsk } from './threads/inbox-asks';
-import { focusNeedOnOpen } from './components/NeedCard';
-import { needId, needsLeft } from '../../shared/cloud-needs.mjs';
-import { ConnectComputer, EmptyTab,FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, ItemsContext, LiveContext, CloudContext, SavedKeysContext, MoveToCloudContext, CloudOfferContext, FreeAgentContext, StateTabs, TryAgainContext, WaitingContext } from './threads/Pages';
+import { ConnectComputer, EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, ItemsContext, LiveContext, CloudContext, SavedKeysContext, MoveToCloudContext, CloudOfferContext, FreeAgentContext, StateTabs, TryAgainContext, WaitingContext } from './threads/Pages';
 import { offersTryAgain, tryAgainWords } from './try-again';
 import { cloudOffer, type OfferGo } from './cloud-upgrade';
 import { FleetContext, queuedWithHeld, type Fleet } from './fleet';
@@ -3513,12 +3509,6 @@ export default function App() {
     cardRoomUndo.current?.();
     cardRoomUndo.current = el ? roomForTheCard(el) : null;
   }, []);
-  const [asksPutOff, setAsksPutOff] = useState(readPutOff);
-  const putAskOff = useCallback((ask: InboxAsk) => setAsksPutOff((was) => {
-    const next = new Set([...was, ...putOffKeys(ask)]);
-    writePutOff(next);
-    return next;
-  }), []);
   // AND THE OPEN THREAD'S OWN CARD IS THE ONE IN FRONT. The order is decided in
   // the main process, because ⌘Y is answered there, ahead of this page; all
   // this says is which thread is being read (shared/which-card-is-in-front.mts).
@@ -4058,6 +4048,7 @@ export default function App() {
     items, view: snap?.teammates, asking: (snap?.approvals ?? []).map((a) => a.item), running: snap?.supervisor?.running ?? NO_RUNNING, queued: snap?.supervisor?.queued, products: snap?.products ?? [], engines: snap?.engines?.choices ?? [],
     models: teammateModels,
     onOpenFile: openTeammateFile,
+    onNewProject: () => setNewProject(true),
     me: team?.byId.get(team.me ?? '')?.name ?? '',
     mePic: team?.byId.get(team.me ?? '')?.avatarUrl ?? null,
     onEnter: () => { roomsUi.leave(); setChatsPlace(null); setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setFocusedRepeat(null); },
@@ -7365,12 +7356,9 @@ export default function App() {
   // toast covered Allow and Deny. Read off the same stage the card is drawn
   // from below, so the class and the card cannot disagree about what is asked.
   const stage = approvalStage(snap?.approvals, answered, frontApproval.current, signInGate || phoneSignInSettling);
-  // What cloud threads wait on takes the same corner, on the inbox only, and
-  // never over an approval: that one has an agent frozen behind it.
-  const onTheInbox = !focused && !focusedRepeat && !settingsOpen && !teamShown && !filesShown && !connectionsShown
-    && !teammatesShown && !roomShown && search === null && !modal && !inPractice && !onPhone();
-  const asksShown = !stage.card && !signInGate && onTheInbox ? inboxAsks(inbox, savedCloudKeys, asksPutOff) : [];
-  const cardOnScreen = !!stage.card || asksShown.length > 0;
+  // Only approvals stand here. A key or a sign-in is not a quick yes or no, so
+  // it is asked inside its thread (NeedCard).
+  const cardOnScreen = !!stage.card;
   cardOnStage.current = stage.card && !stage.verdict ? stage.card.id : null;
   const mover = {
     ids: new Set([...(snap?.cloud?.movable ?? []), ...(snap?.supervisor.running ?? []).filter((r) => r.movable).map((r) => r.itemId)]),
@@ -7925,6 +7913,7 @@ export default function App() {
                   onReopen={() => sendBack(focused)}
                   onReopenDone={() => reopenDone(focused)}
                   onMove={() => { setPaletteTyped('Move to '); setModal('palette'); }}
+                  onPriority={(value) => { void retag([focused], value); }}
                   session={snap.supervisor.running.find((r) => r.itemId === focused.id) ?? null}
                   // WHAT THE FLEET IS DOING ABOUT THIS ROW, through `factsFor`,
                   // which is the builder every row already reads. Written out
@@ -8170,7 +8159,7 @@ export default function App() {
           codexModelDefault={codexModelDefault}
           // THE TUTORIAL SENDS ITS TASK INTO THE PRACTICE PROJECT, so the card
           // opens on that project rather than on whatever was last used.
-          defaultProduct={walkCard ? (run!.practice ?? run!.product) : productFilter}
+          defaultProduct={walkCard ? (run!.practice ?? run!.product) : projectOnScreen({ filter: productFilter, open: focused })}
           /* THE WALK'S OWN TASK, ALREADY WRITTEN. The beat is about pressing
              send, not about thinking of something to ask, so the words are in
              the box when the card opens. `scripted` is what lets this one task
@@ -8780,6 +8769,7 @@ export default function App() {
                 walking: runRef.current !== null,
                 offered: !neverOffered(localStorage),
                 touring: tourRef.current !== null,
+                writing: modalNow.current === 'compose' || clearWriting,
               })) setOffer({ product: slug });
             } catch (err) {
               // Nothing is held open any more, because nothing was typed: the
@@ -9197,15 +9187,6 @@ export default function App() {
           </div>
         );
       })()}
-
-      <AskCard asks={asksShown} room={cardRoom} onLater={putAskOff} onGive={(ask) => {
-        const item = ask.items[0];
-        // A code waits for the sign-ins on its ask, so the cursor lands on the first of those.
-        const first = ask.need.startsWith('code:') ? needsLeft(item, savedCloudKeys).find((n) => n.kind === 'sign-in' || n.kind === 'key') : null;
-        focusNeedOnOpen(item.id, first ? needId(first) : ask.need);
-        setFocused(item);
-        markSeen(item);
-      }} />
 
       {modal === 'snooze' && snoozeItem && (
         <Snooze
