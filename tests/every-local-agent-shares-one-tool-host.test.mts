@@ -33,6 +33,10 @@ const until = async (check, ms = 10_000) => {
     await new Promise((r) => setTimeout(r, 25));
   }
 };
+// For waits on real processes starting one after another. A loaded macOS
+// runner took longer than 20 s to bring up the run host, the stub, its
+// approvals server and the shared host; only a hang should outlast this.
+const SPAWNS = 120_000;
 const TOKEN_A = 'a'.repeat(64);
 const TOKEN_B = 'b'.repeat(64);
 const givePass = (dir, token, pass) => fs.writeFileSync(path.join(dir, 'passes', token), JSON.stringify(pass));
@@ -259,7 +263,7 @@ describe('the real host, with the real store server', () => {
     let errText = '';
     proc.stderr.on('data', (d) => { errText += d; });
     cleanup.push(() => new Promise((r) => { if (proc.exitCode !== null) return r(); proc.on('exit', r); proc.kill('SIGTERM'); }));
-    const { port } = await until(() => readToolHost(dir), 20_000).catch((e) => { throw new Error(`${e.message}: ${errText}`); });
+    const { port } = await until(() => readToolHost(dir), SPAWNS).catch((e) => { throw new Error(`${e.message}: ${errText}`); });
 
     // A thread in a product, made the way the store makes one.
     const prev = process.env.STORE_ACCOUNT_ID;
@@ -289,8 +293,8 @@ describe('the real host, with the real store server', () => {
     fs.rmSync(path.join(dir, 'passes', token));
     const row = () => work.listWorkItems({ product: product.id, includeDone: true }).find((i) => i.id === item.id);
     expect(row().status).toBe('claimed');
-    await until(() => row().status !== 'claimed', 10_000);
-  }, 60_000);
+    await until(() => row().status !== 'claimed', SPAWNS);
+  }, 3 * SPAWNS);
 });
 
 describe('the real supervisor, with a stand-in agent', () => {
@@ -341,7 +345,7 @@ describe('the real supervisor, with a stand-in agent', () => {
     booted.supervisor._runHostSock = path.join(dir, 'r.sock');
     booted.supervisor._toolHostDir = hostDir;
     booted.supervisor.start();
-    expect(await until(() => readToolHost(hostDir), 20_000)).toBeTruthy();
+    expect(await until(() => readToolHost(hostDir), SPAWNS)).toBeTruthy();
 
     const item = booted.store.composeItem('sandbox', { title: 'Write a note and ask first [[stub:act:note]]' });
     fs.writeFileSync(path.join(dir, 'plan.json'), JSON.stringify({
@@ -352,19 +356,19 @@ describe('the real supervisor, with a stand-in agent', () => {
     process.env.STUB_CLAUDE_PLAN = path.join(dir, 'plan.json');
     booted.supervisor.wake?.();
 
-    const card = await until(() => approvals.listPending(storeRoot).find((p) => p.item === item.id), 20_000);
+    const card = await until(() => approvals.listPending(storeRoot).find((p) => p.item === item.id), SPAWNS);
     expect(card.tool).toBe('Bash');
     expect(fs.readdirSync(path.join(hostDir, 'passes'))).toHaveLength(1);
     expect(approvals.answer(storeRoot, card.id, true)).toBe(true);
 
-    const result = await until(() => /approval allow/.test(booted.store.readItem('sandbox', item.id)?.result ?? '') && booted.store.readItem('sandbox', item.id), 20_000);
+    const result = await until(() => /approval allow/.test(booted.store.readItem('sandbox', item.id)?.result ?? '') && booted.store.readItem('sandbox', item.id), SPAWNS);
     expect(result.note).toBe('written through the shared host');
     const receipt = JSON.parse(fs.readFileSync(path.join(receipts, `${item.id}.json`), 'utf8'));
     expect(receipt.mcp).toEqual({ 'zero-approvals': 'stdio', agentbox: 'http' });
-    await until(() => !booted.supervisor.sessions.has(item.id), 15_000);
-    await until(() => fs.readdirSync(path.join(hostDir, 'passes')).length === 0, 10_000);
+    await until(() => !booted.supervisor.sessions.has(item.id), SPAWNS);
+    await until(() => fs.readdirSync(path.join(hostDir, 'passes')).length === 0, SPAWNS);
     expect(fs.readdirSync(path.join(hostDir, 'passes'))).toEqual([]);
-  }, 90_000);
+  }, 4 * SPAWNS);
 });
 
 function execFileSyncQuiet(cmd, args, cwd) {
