@@ -303,6 +303,13 @@ is asleep.
 - Apple's own upload check runs only on a real upload.
 - The listing is `mobile/store.config.json`, pushed with `eas metadata:push`.
   EAS cannot send the App Privacy answers or screenshots.
+- The app review board (`scripts/app-review-board.mjs`, skill
+  `app-review-board`) is the gate before every submission. It runs fresh
+  Codex and Claude reviewers and live checks, and says submit only at 90% or
+  more with every check green. Its first round found consent skipped on
+  approving a filed task, Alpha features still reachable through Search, no
+  way to report an answer, a long video that could crash the app, and AI
+  teammates as a hidden feature. All are fixed.
 
 ## Costs
 
@@ -388,6 +395,15 @@ made-up threads), not yet on a phone:
   and Review on a permission card, files and pictures in group messages (read,
   not sent), and Settings search. A page or a note an answer names still opens
   from its tile rather than reading in place under the answer.
+
+- Everything the desktop does (2026-11-08): `mobile/parity.mjs` names each
+  feature the desktop offers by name (⌘K rows, thread commands, Settings
+  pages and rows) and says where the phone has it, why it should not, or what
+  it would take. `tests/the-phone-app-has-every-desktop-feature-or-says-why-not`
+  fails when the desktop gains one the file does not place, and its count
+  still to do only goes down. `node scripts/phone-parity.mjs` lists what is
+  left. The daily product loop builds the next one and has its testers try
+  what reached the phone that week (.claude/skills/product-loop).
 
 Tests: tests/the-phone-app-*.test.mjs pin the tabs, the thread and its
 commands, sign-in and the kept session, the request deadline and the

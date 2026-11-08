@@ -71,6 +71,25 @@ rules in the project's own instructions: fixes nobody sees ship, wide ones get
 taken with `phone shot`. The next workday's testers are told what
 was logged, so they check the fixes.
 
+## Then close one gap with the desktop
+
+The phone is meant to do everything the desktop does. `mobile/parity.mjs`
+names every desktop feature and says whether the phone has it, why it should
+not, or what it would take; `tests/the-phone-app-has-every-desktop-feature-or-says-why-not`
+fails when the desktop gains one the file does not place.
+
+`node scripts/phone-parity.mjs` prints the count and every feature still to
+do. Each day, after the fixes, build the first one on that list that needs
+no decision from the person, on its own branch: test first, mark it
+`{ phone, find }` in the ledger, and lower `STILL_TO_DO`. It ships by the
+project's instructions like any other change, which for a feature on screen
+means pictures to the person first. A gap whose entry says it needs a
+decision (instruction text on the phone, for one) waits for the person.
+
+The workday tells its testers what reached the phone in the last seven days
+(`node scripts/phone-parity.mjs --since 7`), so a new feature gets a day of
+real use before it is called done.
+
 ## The phone, three ways
 
 1. **The browser preview** (this skill). Runs anywhere, the cloud included.
@@ -117,7 +136,9 @@ end the day.
 >    ~/.agentbox/product-loop/<today> --who` with three people from
 >    .claude/skills/power-test/people chosen for what changed this week, or
 >    two if the Mac has under 3 GB free.
-> 3. Delete folders there older than two weeks.
+> 3. Build the first feature `node scripts/phone-parity.mjs` lists that
+>    needs no decision from me, as the skill's "close one gap" says.
+> 4. Delete folders there older than two weeks.
 >
 > If nothing in step 1 needs me, finish clean.
 

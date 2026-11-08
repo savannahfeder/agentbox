@@ -89,7 +89,7 @@ const Bubble = () => (
 );
 
 /** Over the open card's space: whose it is, how many agents, and its chat. */
-function Bar({ m, onMessage, tabs }: { m: Member; onMessage?: () => void; tabs?: ReactNode }) {
+function Bar({ m, onMessage, onShipped, tabs }: { m: Member; onMessage?: () => void; onShipped?: () => void; tabs?: ReactNode }) {
   return (
     <View style={{ height: 44, flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10, marginHorizontal: size.inset, borderBottomWidth: 1, borderBottomColor: color.line }}>
       <MemberFace m={m} s={22} />
@@ -106,6 +106,11 @@ function Bar({ m, onMessage, tabs }: { m: Member; onMessage?: () => void; tabs?:
         <Pressable onPress={onMessage} accessibilityRole="button" style={({ pressed }) => ({ height: 28, flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 10, paddingRight: 11, marginLeft: 4, borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
           <Bubble />
           <T style={{ fontSize: 13, color: color.dim }}>Message</T>
+        </Pressable>
+      )}
+      {onShipped && (
+        <Pressable onPress={onShipped} accessibilityRole="button" style={({ pressed }) => ({ height: 28, justifyContent: 'center', paddingHorizontal: 11, marginLeft: 4, borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
+          <T style={{ fontSize: 13, color: color.dim }}>Shipped this week</T>
         </Pressable>
       )}
     </View>
@@ -134,7 +139,7 @@ function CardRow({ card, who, first, now, open }: { card: ThreadCard; who?: stri
   );
 }
 
-function CardSheet({ card, who, close }: { card: ThreadCard | null; who: string; close: () => void }) {
+export function CardSheet({ card, who, close }: { card: ThreadCard | null; who: string; close: () => void }) {
   return (
     <Sheet open={!!card} close={close}>
       {card && (
@@ -244,7 +249,7 @@ export function EverythingPlace({ mine, mineTabs, row, openGroup }: {
           <T style={{ fontSize: 12.5, lineHeight: 18, color: color.faint }}>{line}</T>
         </Pressable>
       )}
-      {member && <Bar m={member} onMessage={onMessage} tabs={member.kind === 'me' ? mineTabs : undefined} />}
+      {member && <Bar m={member} onMessage={onMessage} onShipped={member.team ? () => router.push('/shipped') : undefined} tabs={member.kind === 'me' ? mineTabs : undefined} />}
       {trouble && <T style={{ marginTop: 8, marginHorizontal: size.inset, fontSize: 13, color: color.dim }}>{trouble}</T>}
       <View style={{ flex: 1, marginTop: 4 }}>{space}</View>
       <CardSheet card={open} who={open ? nameOf(open.personId) : ''} close={() => setOpen(null)} />

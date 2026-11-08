@@ -207,6 +207,7 @@ import { Face, TeamContext, firstName, teamView } from './team/people';
 import { namedCards } from './team/company';
 import { FaceHover } from './team/status';
 import { TeamPage } from './team/TeamPage';
+import { TeamBilling } from './team/TeamBilling';
 import { ProjectShare, ProjectWho } from './team/ProjectShare';
 import { ConnectComputer, EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, ItemsContext, LiveContext, CloudContext, SavedKeysContext, MoveToCloudContext, CloudOfferContext, FreeAgentContext, StateTabs, TryAgainContext, WaitingContext } from './threads/Pages';
 import { offersTryAgain, tryAgainWords } from './try-again';
@@ -250,6 +251,7 @@ import { TickedBar } from './components/TickedBar';
 import { AgentSending } from './team/AgentSending';
 import { HomePage, type NeedsRow, type ProgressRow, type TeamRow } from './home/HomePage';
 import { SkyBackdrop } from './home/SkyBackdrop';
+import { InboxSky } from './home/InboxSky';
 import { SKY_THEME_KEY, setHomeSetting, useDarkWindow, useHomeSettings } from './home/home-settings';
 import { SKY_THEMES, skyTheme } from './home/sky';
 import { engineLetter, engineName, greeting, teamRowState, weekCounts } from './home/home-model';
@@ -7302,7 +7304,8 @@ export default function App() {
     if (!item) return;
     setFocused(item); markSeen(item);
   };
-  const skyOnInbox = !!sky && !homeShown && (['inbox', 'progress', 'snoozed', 'done'] as string[]).includes(view) && !onBoard && !onPhone() && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
+  // Light themes keep the Inbox plain; only dark ones wear its sky.
+  const skyOnInbox = !!sky && sky.dark && !homeShown && (['inbox', 'progress', 'snoozed', 'done'] as string[]).includes(view) && !onBoard && !onPhone() && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
     && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown && !evOn;
   const tasksShown = teamMode && tasksOn && !!snap && view === 'inbox' && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused && !teammatesShown && !roomShown && !filesShown && !connectionsShown;
   const firstNameOf = (id: string) => team?.byId.get(id)?.name?.split(/\s+/)[0] ?? 'Someone';
@@ -7774,7 +7777,7 @@ export default function App() {
                   points here. */}
               {planWords && !snap.supervisor.running?.length && !run && !focused && !focusedRepeat && !teammatesShown && <PlanBar words={planWords} onSetup={setSetupPlan} />}
               {homeShown && sky && <SkyBackdrop art={sky.art} from={sky.dark ? 40 : 150} span={sky.dark ? 300 : 240} />}
-              {skyOnInbox && sky && <SkyBackdrop art={sky.art} below=".list-pane .row" span={200} />}
+              {skyOnInbox && sky && <InboxSky art={sky.art} />}
               {homeShown ? (
                 <HomePage hello={greeting(new Date(now).getHours(), snap.team?.me?.name ?? null)} now={now}
                   needs={homeNeeds} needsCount={needsYouCount.inbox} progressCount={mineShown ? shownCount(progressTab) : 0}
@@ -8743,7 +8746,14 @@ export default function App() {
             setCloudSignInAs(email);
             setCloudSetupOpen(true);
           }}
-          cloudPlans={snap.cloud?.managed || snap.cloud?.offered ? { signedIn: !!snap.cloud?.managed, onSignIn: () => { setSettingsOpen(false); setCloudSetupOpen(true); } } : null}
+          cloudPlans={snap.cloud?.managed || snap.cloud?.offered ? {
+            signedIn: !!snap.cloud?.managed, onSignIn: () => { setSettingsOpen(false); setCloudSetupOpen(true); },
+            // The preview has no team of its own, so it draws one from api.ts.
+            teamPlan: (page) => {
+              const known = snap.team?.people?.length ? { people: snap.team.people, meId: snap.team.me?.id ?? null } : api.fixtureTeamPeople();
+              return <TeamBilling {...page} people={known.people} meId={known.meId} />;
+            },
+          } : null}
           startPane={settingsPane}
           onNewProject={() => setNewProject(true)}
           // The Priority page: the same running order every project list

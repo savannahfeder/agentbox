@@ -517,6 +517,7 @@ async function createWindow() {
       // The Settings pages' model, read through the window's own handler.
       readSettings: () => phoneSettings?.() ?? null,
       pins: () => supervisor.threadPins,
+      onMac: () => supervisor.threadOnMac,
       repeats: () => store.listRepeats(),
       teammates: () => (teammatesOn(config) ? store.teammatesView() : null),
       version: app.getVersion(),
@@ -928,7 +929,15 @@ async function createWindow() {
   answerWhatOnlyTheWindowAnswered({ handle: (channel, fn) => { if (!phoneChannels.has(channel)) phoneChannels.set(channel, fn); } } as CollectingIpcMain);
   phoneApply = applyThrough(phoneChannels);
   // Every minute, so no engine search: that is a login shell on this thread.
-  phoneSettings = () => phoneChannels.get('zero:settings-read')?.({ sender: null }, { search: false }) ?? null;
+  // The cloud and the usage ride the snapshot, not the settings model, so the
+  // phone's copy takes them here.
+  phoneSettings = async () => {
+    const model = await phoneChannels.get('zero:settings-read')?.({ sender: null }, { search: false });
+    if (!model || typeof model !== 'object') return null;
+    // A cloud that does not answer leaves the list empty rather than holding the copy back.
+    const listed = (await Promise.resolve(phoneChannels.get('zero:file-links')?.({ sender: null }, {})).catch(() => null)) as { ok?: boolean; links?: unknown[] } | null | undefined;
+    return { ...model, cloud: supervisor.cloudStatus(), usage: ipc.usageForPhone(), links: listed?.ok ? listed.links : [] };
+  };
   updater.start();
   // A task the app just shipped moved main: look now rather than in half an
   // hour, so the restart is offered while she still remembers the task.
