@@ -23,6 +23,16 @@
       "env": {
         "EXPO_PUBLIC_STORE_BUILD": "1"
       }
+    },
+    "launch-test": {
+      "extends": "base",
+      "distribution": "internal",
+      "withoutCredentials": true,
+      "environment": "production",
+      "ios": {
+        "simulator": true,
+        "buildConfiguration": "Release"
+      }
     }
   },
   "submit": {
