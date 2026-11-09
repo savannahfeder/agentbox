@@ -297,7 +297,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         await claims.update(threadId, { status: 'blocked', blockedBy: [joined.causeId] });
         // The lead may already have named the threads behind it; this one is said on the row too.
         if (!joined.opened) updateItem(joined.causeId, { note: joinedWords(thread) }, { source: 'system' });
-        return json({ waitingOn: joined.causeId, opened: joined.opened, next: 'End your turn now with one line saying what this thread is waiting on. It carries on by itself when the cause is cleared, and you will be started again then.' });
+        return json({ waitingOn: joined.causeId, opened: joined.opened, next: `End your turn now with one line saying what this thread is waiting on, naming its row as ${joined.causeId} so the person can open it. It carries on by itself when the cause is cleared, and you will be started again then.` });
       },
     },
     {

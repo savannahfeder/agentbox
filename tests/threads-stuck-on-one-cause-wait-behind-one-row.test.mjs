@@ -74,6 +74,34 @@ describe('a thread behind a cause says so in Later', () => {
   });
 });
 
+// The third Codex power test (2026-11-09).
+describe('what the testers found in the third run', () => {
+  it('a thread the person replied to is no longer counted as waiting', () => {
+    const all = [cause('c1'), stuck('a', 'c1'), stuck('b', 'c1', { status: 'open' }), stuck('c', 'c1', { status: 'claimed' })];
+    expect(waitingOn(all[0], all).map((i) => i.id)).toEqual(['a']);
+    expect(causeOf(all[2], all)).toBeNull();
+  });
+
+  it('a closed cause row is filed, not left in Needs you beside a new one', async () => {
+    const { belongsInInbox } = await import('../renderer/src/list-rules.ts');
+    const closed = cause('c1', { status: 'done', labels: ['founder', CAUSE_LABEL], answer: 'Signed in', result: 'Checked.', wrote: { kind: { source: 'system' }, status: { ts: T, source: 'agent' }, answer: { ts: T - 1, source: 'founder' } } });
+    expect(belongsInInbox(closed, { now: T + 1 })).toBe(false);
+    // An ordinary row an agent closed after the person spoke on it still reaches them.
+    const ordinary = { ...closed, kind: 'task', labels: ['founder'] };
+    expect(belongsInInbox(ordinary, { now: T + 1 })).toBe(true);
+  });
+
+  it('the board says what a thread waits on, as the list does', () => {
+    const page = fs.readFileSync(new URL('../renderer/src/threads/Pages.tsx', import.meta.url), 'utf8');
+    expect(page).toMatch(/\?\? \(stuckOn \? `Waits on \$\{stuckOn\.title\}` : undefined\)/);
+  });
+
+  it('a waiting thread is told to name its cause row, which the app draws as a link', () => {
+    const tools = fs.readFileSync(new URL('../mcp/tools.mjs', import.meta.url), 'utf8');
+    expect(tools).toMatch(/naming its row as \$\{joined\.causeId\} so the person can open it/);
+  });
+});
+
 describe('a cause that comes back is fixed for good', () => {
   const closed = (at, title) => cause('c0', { status: 'done', updatedAt: at, ...(title ? { title } : {}) });
   it('notices the same cause closed in the last two weeks', () => {

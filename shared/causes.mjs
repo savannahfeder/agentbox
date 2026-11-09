@@ -18,13 +18,13 @@ export function isCause(item) {
 
 /** The threads still waiting on this cause, from every project. */
 export function waitingOn(cause, items) {
-  return (items ?? []).filter((i) => i.id !== cause.id && i.status !== 'done'
+  return (items ?? []).filter((i) => i.id !== cause.id && i.status === 'blocked'
     && Array.isArray(i.blockedBy) && i.blockedBy.includes(cause.id));
 }
 
 /** The open cause a thread waits behind, or null. */
 export function causeOf(item, items) {
-  if (!Array.isArray(item?.blockedBy) || !item.blockedBy.length || item.status === 'done') return null;
+  if (!Array.isArray(item?.blockedBy) || !item.blockedBy.length || item.status !== 'blocked') return null;
   return (items ?? []).find((c) => isCause(c) && c.status !== 'done' && item.blockedBy.includes(c.id)) ?? null;
 }
 

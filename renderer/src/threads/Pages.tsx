@@ -1105,8 +1105,9 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
           const pin = e.item?.pinned && e.item.status !== 'done' ? <PinMark size={13} className="th-pin" /> : null;
           const marks = who || pin ? <>{who}{pin}</> : null;
           const cardWaits = e.card && e.card.state !== 'done' ? linkWords(e.card.blockedBy, team?.byId) : null;
+          const stuckOn = e.item ? causeOf(e.item, allItems ?? []) : null;
           const waitWord = e.item
-            ? waitWords(e.item, { items: allItems, cards: team?.state.cards ?? [], nameOf: (id: string) => team?.byId.get(id)?.name ?? 'Someone' })?.word
+            ? waitWords(e.item, { items: allItems, cards: team?.state.cards ?? [], nameOf: (id: string) => team?.byId.get(id)?.name ?? 'Someone' })?.word ?? (stuckOn ? `Waits on ${stuckOn.title}` : undefined)
             : cardWaits && `Waits on ${cardWaits}`;
           const messageProduct = e.message && e.item ? products.find((p) => p.slug === e.item!.product) : null;
           const onThem = messageProduct && iSpokeLast(e.item!, messageProduct, team?.me ?? null)

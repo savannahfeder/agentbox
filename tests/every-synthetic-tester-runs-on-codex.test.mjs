@@ -117,6 +117,17 @@ describe('a sandboxed tester finds the browser the runner opened', () => {
   });
 });
 
+// Two sessions on one thread started a power test each on one checkout; both
+// drove the same copies, and most of the 84 issues logged were one tester's
+// presses landing in the other's window.
+describe('one power test per checkout', () => {
+  it('refuses to start while another one holds the copies', () => {
+    const runner = read('.claude/skills/power-test/scripts/power-test.mjs');
+    expect(runner).toMatch(/const lock = `\$\{instanceDir\('power'\)\}\.lock`/);
+    expect(runner).toMatch(/if \(alive\) stop\(`another power test/);
+  });
+});
+
 describe('neither runner can start a tester on Claude Code', () => {
   it('the product loop refuses a Claude engine', () => {
     expect(() => testerArgv('claude', { dir: '/d', prompt: 'go', last: '/d/l' })).toThrow(/codex/);

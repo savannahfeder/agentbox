@@ -248,6 +248,22 @@ async function actAsTeammate(brief, prompt, answer) {
 
 let said = plan.say ?? 'the stub worker ran';
 
+// A THREAD STUCK ON A CAUSE, PLAYED: it waits on the cause's row and names it,
+// as the tool tells a real agent to.
+async function actStuck(stuck) {
+  const server = storeServer();
+  if (!server || !process.env.ZERO_ITEM) return null;
+  const session = mcpSession(server);
+  try {
+    const out = await session.call('wait_on_cause', stuck);
+    let id = null;
+    try { id = JSON.parse(out?.result?.content?.[0]?.text ?? '{}').waitingOn ?? null; } catch { id = null; }
+    return id ? `Waiting on ${id}.` : `Waiting on: ${stuck.cause}.`;
+  } finally {
+    session.close();
+  }
+}
+
 // A LEAD ON A CAUSE ROW, PLAYED (shared/causes.mjs): asked first, it names the
 // threads waiting and asks the person once; started again after their reply,
 // it closes the row, which is what starts every thread behind it.
@@ -279,7 +295,6 @@ async function actAsLead(first) {
       '',
       '## Options',
       '1. Signed in, carry on',
-      '2. Check from my computer',
     ].join('\n');
   } finally {
     session.close();
@@ -459,9 +474,7 @@ try {
   if ((brief.includes(LEAD_MARK) || promptText.includes(LEAD_MARK)) && process.env.ZERO_ITEM) said = (await actAsLead(attempt === 1)) ?? said;
   else if (act && plan.acts?.[act]) said = await actFromPlan(plan.acts[act]);
   // A lead on a cause row is never itself stuck on the cause.
-  else if (turn.stuck) {
-    said = await actFromPlan({ calls: [{ tool: 'wait_on_cause', args: turn.stuck }], say: `Waiting on: ${turn.stuck.cause}.` });
-  }
+  else if (turn.stuck) said = (await actStuck(turn.stuck)) ?? said;
   if (plan.approval) {
     const decision = await askTheFounder(plan.approval);
     say({ type: 'assistant', message: { content: [{ type: 'text', text: `the founder said: ${decision.behavior}` }] } });

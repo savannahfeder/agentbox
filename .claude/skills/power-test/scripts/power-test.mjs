@@ -124,6 +124,20 @@ function layCommands(dir, name) {
   return { browse: path.join(dir, 'app'), diary: path.join(dir, 'diary') };
 }
 
+// ONE POWER TEST PER CHECKOUT: the copies are named per checkout and person, so
+// a second run drives the first one's apps and both testers' presses land in one
+// window (2026-11-09, two sessions on one thread, 80 issues mostly from that).
+const lock = `${instanceDir('power')}.lock`;
+const holder = Number(readJson(lock)?.pid);
+if (holder && holder !== process.pid) {
+  let alive = false;
+  try { process.kill(holder, 0); alive = true; } catch (e) { alive = e?.code === 'EPERM'; }
+  if (alive) stop(`another power test (pid ${holder}) is driving this checkout's copies. Wait for it to end, or stop it, then start again.`);
+}
+fs.mkdirSync(path.dirname(lock), { recursive: true });
+fs.writeFileSync(lock, JSON.stringify({ pid: process.pid }));
+process.on('exit', () => { try { if (Number(readJson(lock)?.pid) === process.pid) fs.rmSync(lock); } catch { /* gone */ } });
+
 const root = path.join(RUNS, `${new Date().toISOString().replace(/[:.]/g, '-')}-power`);
 fs.mkdirSync(root, { recursive: true });
 say(`power test: ${people.map((p) => p.name).join(', ')} for ${Math.round(totalMs / MIN)} min on ${cloud ? 'the real Claude Code and Codex in this Mac\'s cloud' : real ? 'the real Claude Code and Codex' : 'stand-ins'}, chaos ${chaos}.`);
