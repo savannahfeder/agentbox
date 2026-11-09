@@ -248,6 +248,44 @@ async function actAsTeammate(brief, prompt, answer) {
 
 let said = plan.say ?? 'the stub worker ran';
 
+// A LEAD ON A CAUSE ROW, PLAYED (shared/causes.mjs): asked first, it names the
+// threads waiting and asks the person once; started again after their reply,
+// it closes the row, which is what starts every thread behind it.
+const LEAD_MARK = 'You are the lead on this cause';
+async function actAsLead(first) {
+  const server = storeServer();
+  const me = process.env.ZERO_ITEM;
+  if (!server || !me) return null;
+  const session = mcpSession(server);
+  try {
+    if (!first) {
+      await session.call('update_work_item', { id: me, status: 'done' });
+      return 'Checked that a push works again. Every thread that was waiting on this carries on by itself.';
+    }
+    let rows = [];
+    try { rows = JSON.parse((await session.call('list_work_items', {}))?.result?.content?.[0]?.text ?? '[]'); } catch { rows = []; }
+    const behind = rows.filter((r) => Array.isArray(r.blockedBy) && r.blockedBy.includes(me));
+    const n = behind.length;
+    return [
+      `**Sign in to GitHub on your Mac once, and ${n === 1 ? 'one thread carries' : `${n} threads carry`} on.**`,
+      '',
+      'Git on your Mac can\'t sign in to GitHub, so nothing can be pushed. These are finished and waiting on it:',
+      '',
+      ...behind.map((r) => `- ${r.label || r.title}`),
+      '',
+      '1. In Terminal on your Mac, run `gh auth login` and follow its prompts.',
+      '2. Then run `gh auth setup-git`.',
+      '3. Reply "Signed in". I\'ll check a push works, then they all carry on.',
+      '',
+      '## Options',
+      '1. Signed in, carry on',
+      '2. Check from my computer',
+    ].join('\n');
+  } finally {
+    session.close();
+  }
+}
+
 // [[stub:act:<name>]] makes the store-tool calls its plan lists under
 // acts.<name> ({ calls: [{ tool, args }], say }), so a proof can have an agent
 // write a document or attach a file. A refused call is said in the answer.
@@ -418,9 +456,10 @@ try {
   // [[stub:act-first:<name>]] acts on the first start only, as a thread that got
   // stuck once and is fine when it is started again.
   const act = directive('stub:act')?.[1] ?? (attempt === 1 ? directive('stub:act-first')?.[1] : null);
-  if (act && plan.acts?.[act]) said = await actFromPlan(plan.acts[act]);
+  if ((brief.includes(LEAD_MARK) || promptText.includes(LEAD_MARK)) && process.env.ZERO_ITEM) said = (await actAsLead(attempt === 1)) ?? said;
+  else if (act && plan.acts?.[act]) said = await actFromPlan(plan.acts[act]);
   // A lead on a cause row is never itself stuck on the cause.
-  else if (turn.stuck && !brief.includes('You are the lead on this cause') && !promptText.includes('You are the lead on this cause')) {
+  else if (turn.stuck) {
     said = await actFromPlan({ calls: [{ tool: 'wait_on_cause', args: turn.stuck }], say: `Waiting on: ${turn.stuck.cause}.` });
   }
   if (plan.approval) {

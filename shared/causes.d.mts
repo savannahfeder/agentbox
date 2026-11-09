@@ -4,8 +4,11 @@ interface Row { id: string; product?: string; status?: string; kind?: string; ti
 
 export const CAUSE_LABEL: string;
 export const CAUSE_KIND: string;
+export const CAUSE_WAIT_WORD: string;
+export const CAUSE_BACK_WORDS: string;
 export function isCause(item: unknown): boolean;
 export function waitingOn<T extends Row>(cause: Row, items: readonly T[]): T[];
+export function causeOf<T extends Row>(item: Row, items: readonly T[]): T | null;
 export function causeWord(n: number): string;
 export function causeWhere(cause: Row, waiting: readonly Row[], ownName: string): string;
 export function openCauses<T extends Row>(items: readonly T[]): T[];

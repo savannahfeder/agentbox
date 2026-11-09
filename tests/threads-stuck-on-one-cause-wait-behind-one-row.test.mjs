@@ -13,7 +13,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { isCause, waitingOn, causeWord, causeWhere, openCauses, cameBack, leadBrief, withoutBrief, CAUSE_KIND, CAUSE_LABEL } from '../shared/causes.mjs';
+import { isCause, causeOf, waitingOn, causeWord, causeWhere, openCauses, cameBack, leadBrief, withoutBrief, CAUSE_KIND, CAUSE_LABEL, CAUSE_WAIT_WORD, CAUSE_BACK_WORDS } from '../shared/causes.mjs';
 import { filedByThePerson } from '../shared/answers.mjs';
 import { Supervisor } from '../main/supervisor.mts';
 
@@ -51,6 +51,26 @@ describe('the row says how many wait and where they are', () => {
   it('lists only open causes, newest first', () => {
     const rows = [cause('old', { createdAt: 1 }), cause('new', { createdAt: 2 }), cause('shut', { status: 'done' })];
     expect(openCauses(rows).map((i) => i.id)).toEqual(['new', 'old']);
+  });
+});
+
+// The first Codex power test (2026-11-09): both testers found the threads
+// behind a cause in Later saying "Scheduled" with an empty Back column, and
+// had to open one to learn why it was there.
+describe('a thread behind a cause says so in Later', () => {
+  const all = [cause('c1'), stuck('a', 'c1'), stuck('b', 'other'), cause('c2', { status: 'done' }), stuck('d', 'c2')];
+  it('finds the open cause it waits on', () => {
+    expect(causeOf(all[1], all)?.id).toBe('c1');
+  });
+  it('not a plain thread it waits on, nor a cause already closed', () => {
+    expect(causeOf(all[2], all)).toBeNull();
+    expect(causeOf(all[4], all)).toBeNull();
+  });
+  it('is drawn as waiting, with the cause beside its name, back when fixed', () => {
+    const page = fs.readFileSync(new URL('../renderer/src/threads/Pages.tsx', import.meta.url), 'utf8');
+    expect(page).toMatch(/causeOf\(item, allItems \?\? \[\]\)/);
+    expect(page).toMatch(/word: CAUSE_WAIT_WORD \}\} title=\{rowTitle\(item\)\} aside=\{stuckOn\.title\}/);
+    expect([CAUSE_WAIT_WORD, CAUSE_BACK_WORDS]).toEqual(['Waiting', 'When fixed']);
   });
 });
 

@@ -22,6 +22,16 @@ export function waitingOn(cause, items) {
     && Array.isArray(i.blockedBy) && i.blockedBy.includes(cause.id));
 }
 
+/** The open cause a thread waits behind, or null. */
+export function causeOf(item, items) {
+  if (!Array.isArray(item?.blockedBy) || !item.blockedBy.length || item.status === 'done') return null;
+  return (items ?? []).find((c) => isCause(c) && c.status !== 'done' && item.blockedBy.includes(c.id)) ?? null;
+}
+
+/** What a thread behind a cause says on Later, in the Status and Back columns. */
+export const CAUSE_WAIT_WORD = 'Waiting';
+export const CAUSE_BACK_WORDS = 'When fixed';
+
 /** "6 waiting", for the Status column. */
 export function causeWord(n) {
   return `${n} waiting`;

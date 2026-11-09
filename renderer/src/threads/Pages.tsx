@@ -49,7 +49,7 @@ import { api } from '../api';
 import { CLOUD_KEY, CLOUD_WHEN_ON, cloudButtonCount, cloudFootLine, cloudIsOn, cloudMonthLine, cloudMoveLine, countedAccounts, type CloudMode, type CloudStatus } from '../cloud-menu';
 import { brokenAccounts, buttonAsksSignIn, menuSetupLine, readBrokenSeen, seenAfter, SETUP, writeBrokenSeen } from '../cloud-setup';
 import type { Offer, OfferGo } from '../cloud-upgrade';
-import { isCause, waitingOn, causeWord, causeWhere } from '../../../shared/causes.mjs';
+import { isCause, causeOf, waitingOn, causeWord, causeWhere, CAUSE_WAIT_WORD, CAUSE_BACK_WORDS } from '../../../shared/causes.mjs';
 import './pages.css';
 
 // Before the frame is drawn in the app; a plain effect where there is no
@@ -808,6 +808,12 @@ export function ThreadCells({ item, product, now, person, tab }: {
   if (behind) {
     return <RowCells status={{ ...(status ?? cell), word: causeWord(behind.length) }} title={rowTitle(item)} pinned={!!item.pinned} where={causeWhere(item, behind, product?.name ?? '')} person={person}
       priority={shownPriority(item)} updatedAt={when} when={back} now={now} action={action} />;
+  }
+  // And a thread behind one says what it waits on, and that it comes back when that is fixed.
+  const stuckOn = tab === 'snoozed' ? causeOf(item, allItems ?? []) : null;
+  if (stuckOn) {
+    return <RowCells status={{ ...(status ?? cell), word: CAUSE_WAIT_WORD }} title={rowTitle(item)} aside={stuckOn.title} where={product?.name ?? ''} person={person}
+      priority={shownPriority(item)} updatedAt={when} when={CAUSE_BACK_WORDS} now={now} />;
   }
   return <RowCells status={status} retry={retry} lead={<TeammateLead item={item} />} title={rowTitle(item)} aside={asideBesides(rowTitle(item), commented ?? (toApproveWords(waiting.get(`${item.product}/${item.id}`)) || null)) ?? undefined} shared={seen === 'people'} chosen={chosen} lock={lock} held={notStarted(item)} pinned={!!item.pinned && item.status !== 'done'} where={product?.name ?? ''} person={person}
     priority={shownPriority(item)} updatedAt={when} when={back} now={now} action={action} />;
