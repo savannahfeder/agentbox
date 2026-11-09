@@ -218,7 +218,7 @@ export type PeoplePick = { everyone: Person[]; picked: string[]; me: string | nu
  * through the hint plate.
  */
 export function SearchButton({ onSearch }: { onSearch: () => void }) {
-  return <button type="button" className="th-search" data-hint="search" onClick={onSearch} title="Search threads (/)" aria-label="Search threads"><SearchGlyph /></button>;
+  return <button type="button" className="th-search" data-hint="search" onClick={onSearch} title="Search threads" aria-label="Search threads"><SearchGlyph /></button>;
 }
 
 /** New thread, the cloud and the Display icon (and Search on the board), at the right of the Inbox header. */

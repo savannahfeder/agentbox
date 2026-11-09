@@ -47,7 +47,7 @@ describe('the box on a phone', () => {
   });
 
   it('offers nothing about the Mac or its keyboard', () => {
-    for (const label of ['Keyboard shortcuts', 'Check for updates', 'Take the tutorial', 'Search threads']) {
+    for (const label of ['Keyboard shortcuts', 'Check for updates', 'Take the tutorial']) {
       expect(rows(desk)).toContain(label);
       expect(rows(phone)).not.toContain(label);
     }

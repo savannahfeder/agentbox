@@ -25,7 +25,7 @@ import { typedWords } from '../../../lib/files';
 import { threadOf, type FiledRow, type Thread, type ThreadEvent, type ThreadNode, type ThreadSaid } from '../../../lib/thread';
 import { askUnderAnswer, CHOICES_FOLDED, foldKey, foldedKeys, pageOf, splitHeadline, spotIn, stepIn, toggleFold, walkKeeping } from '../../../lib/one-page';
 import { mateOf } from '../../../lib/teammates';
-import { TeammateMark } from '../../../ui/Teammates';
+import { TeammateMark, ThreadQuestions } from '../../../ui/Teammates';
 import { screenGate } from '../../../lib/thread-gate';
 import { liveOf, moveChoices, offersOf, ruleFor, shownLevel, summaryParts, type Offers } from '../../../lib/thread-offers';
 import { madeThreadOf, phoneSlug, waitFacts } from '../../../../../renderer/src/phone-rows';
@@ -45,6 +45,7 @@ import { replyLaterRows } from '../../../lib/later';
 import { agentChoices, laterHint, momentFromWords } from '../../../../../renderer/src/threads/composer-rules';
 import { Waiting } from '../../../ui/LogoOrbit';
 import { Markdown, type MessageFiles } from '../../../ui/Markdown';
+import { Selectable } from '../../../ui/Selectable';
 import { footRoom, IconButton, Pickable, PriorityBars, RunningMark, SheetHead, SheetRow, T, TopBar, Wall } from '../../../ui/parts';
 import { ModelSheet, ModeSheet, PrioritySheet, barsFor } from '../../../ui/Pickers';
 import { ThreadMenu } from '../../../ui/ThreadMenu';
@@ -106,7 +107,7 @@ function Said({ e, starts, ends, product, dir, files, sendNow, openOrigin, name 
         {/* Her words as typed; the files the app wrote into them are drawn, not read out. */}
         {yours ? (
           <>
-            {!!words.trim() && <T selectable style={{ fontSize: 17, lineHeight: 26.35, fontFamily: font.medium }}>{words}</T>}
+            {!!words.trim() && <Selectable style={{ fontSize: 17, lineHeight: 26.35, fontFamily: font.medium }}>{words}</Selectable>}
             <SentFiles text={e.text ?? ''} product={product} />
           </>
         ) : <Markdown text={e.text ?? ''} dir={dir} files={files} />}
@@ -538,7 +539,7 @@ export default function ThreadScreen() {
                   <T style={{ fontFamily: font.mono, fontSize: 10.5, color: color.faint }}>{when(page.answer.at)}</T>
                 </View>
               )}
-              {page.answer.headline && <T selectable style={{ fontFamily: font.semibold, fontSize: 17, lineHeight: 24.65, marginBottom: 8 }}>{page.answer.headline}</T>}
+              {page.answer.headline && <Selectable style={{ fontFamily: font.semibold, fontSize: 17, lineHeight: 24.65, marginBottom: 8 }}>{page.answer.headline}</Selectable>}
               {!!page.answer.rest.trim() && <Markdown text={page.answer.rest} dir={dir} files={files} />}
               {page.appNote && <T style={{ fontSize: 13, lineHeight: 19, marginTop: 14, color: color.faint }}>{page.appNote}</T>}
             </View>
@@ -582,6 +583,7 @@ export default function ThreadScreen() {
             <OptionsCard foot onFold={foldChoices} ask={askUnderAnswer(thread.ask, page.answer?.headline ?? splitHeadline(thread.outcome?.text ?? '').headline)} options={thread.options} busy={busy} pick={pick} dir={dir} files={files} />
           </ScrollView>
         )}
+        {mate && <ThreadQuestions item={item} />}
         <Dock thread={thread} offers={offers} busy={busy} setBusy={setBusy} setError={setError} stop={() => void press({ kind: 'stop' })}
           foldedChoices={thread.options.length > 0 && !asking && choicesFolded ? thread.options.length : 0} showChoices={foldChoices} onTyped={setTyped} />
       </KeyboardAvoidingView>

@@ -182,6 +182,20 @@ export function openQuestions(view: TeammatesView, id: string, pending: readonly
   return chatWith(view, id).filter((e): e is TeamChatLine => e.kind === 'msg' && e.from === id && !!e.options?.length && !answerOf(view, e) && !answered.has(e.id) && !said);
 }
 
+/** The teammate's thread a question was asked in, when the phone has it. */
+export function questionThread(q: Pick<TeamChatLine, 'from' | 'run'>, items: readonly { id: string; product: string; labels?: string[] }[]): { product: string; id: string } | null {
+  if (!q.run) return null;
+  const item = items.find((i) => i.id === q.run && teammateIdOf(i) === q.from);
+  return item ? { product: item.product, id: item.id } : null;
+}
+
+/** A teammate's open questions asked in this thread (chat-lines.ts `openQuestionsIn`). */
+export function questionsInThread(view: TeammatesView | null | undefined, item: { id: string; labels?: string[] }, pending: readonly Pending[] = []): TeamChatLine[] {
+  const tid = teammateIdOf(item);
+  if (!view || !tid) return [];
+  return openQuestions(view, tid, pending).filter((q) => q.run === item.id);
+}
+
 export type ChatRow =
   | { kind: 'day'; key: string; label: string }
   | { kind: 'msg'; key: string; m: TeamChatLine; lead: boolean; mine: boolean; waiting: boolean; refused: string | null; answered: string | null }

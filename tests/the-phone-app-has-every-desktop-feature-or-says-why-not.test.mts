@@ -33,7 +33,6 @@ const READS_ON_THE_DESKTOP = [
 ];
 const READS_ON_THE_PHONE = [
   'mobile/src/app/index.tsx',
-  'mobile/src/app/search.tsx',
   'mobile/src/app/settings/project/[slug].tsx',
   'mobile/src/app/thread/[product]/[id].tsx',
   'mobile/src/lib/actions.ts',

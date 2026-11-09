@@ -233,8 +233,6 @@ export const SHORTCUTS: ShortcutGroup[] = [
       { keys: ['N'], what: 'Start a new thread.' },
       // cloudChord in the chords → toggleCloudRef: the cloud on or off.
       { keys: ['⌘C'], what: 'Turn the cloud on or off, when no text is selected.' },
-      // '/' above the focused branch → openSearch
-      { keys: ['/'], what: 'Search your threads.' },
       // main/main.mts before-input-event: ⌘1 / ⌘2 answer the card in front, and
       // the card prints them inside Allow and Deny. Under this heading because
       // it is answered from anywhere at all.
