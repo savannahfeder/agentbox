@@ -163,7 +163,8 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
     case 'pick':
       // "Close this task" is done, never sent: as a reply it would start a run to close it (App.tsx).
       if (closesTheTask(press.option.text)) return close();
-      return reply(`Option ${press.option.n}: ${press.option.text}`, press.choices ?? {}, `Option ${press.option.n} → ${to}`, `Option ${press.option.n} withdrawn, back in your inbox`);
+      return reply(`Option ${press.option.n}: ${press.option.text}`, press.choices ?? {},
+        `Picked: ${clipToSentence(press.option.text.replace(/\s*\(recommended\)\s*$/i, ''), TOAST_TITLE)}`, 'Pick withdrawn, back in your inbox');
     case 'close':
       return close();
     case 'later': {

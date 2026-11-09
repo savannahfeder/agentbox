@@ -8,7 +8,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type R
 import { FlatList, Pressable, RefreshControl, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import { readDisplay, writeDisplay, filteredEmptyWords, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
+import { backWords, readDisplay, writeDisplay, filteredEmptyWords, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
 import { InboxComposer } from '../ui/NewThreadForm';
 import { closeWords, COUNT_GAP, filterCount, moreToTheRight, phoneBoard, shownTabs, TAB_GAP, TABS, tabsTighten, type Row, type TabId } from '../lib/tabs';
 import { evViewOf, keepEvView, myItems, type EvView } from '../lib/everything';
@@ -40,6 +40,7 @@ import { ComputerWait } from '../ui/Onboarding';
 import { ALERTS_ASKED_KEY, FIRST_RUN, nextSetup } from '../lib/first-run';
 import { alertsHere } from '../platform/alerts';
 import { previewWalksFirstRun } from '../lib/preview';
+import { PEN } from '../lib/overlays';
 
 // The desktop's own words for an empty tab (renderer/src/threads/Pages.tsx `EmptyTab`).
 const EMPTY: Record<Exclude<TabId, 'inbox'>, string> = {
@@ -84,6 +85,7 @@ function ThreadRow({ row, first, unread, mate }: { row: Row; first: boolean; unr
         {/* Sent from the phone and not yet taken: the web app's status word (status-word.ts). */}
         {row.queued && <><T style={{ ...small, color: color.dim }}>Queued</T><T style={small}>·</T></>}
         {row.priority && <View accessibilityLabel={row.priority === 'urgent' ? 'Urgent' : 'High priority'}><PriorityBars level={row.priority === 'urgent' ? 4 : 3} /></View>}
+        {row.agent && <><T style={{ ...small, color: color.dim }}>{row.agent}</T><T style={small}>·</T></>}
         <T numberOfLines={1} style={{ fontFamily: font.mono, fontSize: 11, lineHeight: 20, letterSpacing: 0.55, textTransform: 'uppercase', color: color.dim, flexShrink: 1 }}>{row.projectName}</T>
         <T style={small}>·</T>
         <T style={small}>{row.when}</T>
@@ -289,6 +291,7 @@ function Board({ columns, foot, inset = 12 }: { columns: ReturnType<typeof phone
                 {e.queued ? <T style={{ fontSize: 11, color: color.dim, marginRight: 8 }}>Queued</T> : e.live && <View style={{ marginRight: 8 }}><RunningMark /></View>}
                 {e.priority !== null && <View style={{ marginRight: 8 }}><PriorityBars level={barsFor(e.priority)} /></View>}
                 <T numberOfLines={1} style={{ flexShrink: 1, fontFamily: font.mono, fontSize: 11, letterSpacing: 0.55, textTransform: 'uppercase', color: color.faint }}>{e.project}</T>
+                {c.state === 'scheduled' && e.item && !!backWords(e.item, c0.now) && <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 11, color: color.faint, marginLeft: 8 }}>{backWords(e.item, c0.now)}</T>}
               </View>
             </Pressable>
           ))}
@@ -416,9 +419,14 @@ export default function Threads() {
     );
   }
   // With a team on, List and Board in the View menu are Everything else's (App.tsx `headerDisplay`).
-  const headerDisplay = teamMode ? { ...display, view: evView } : display;
+  // Needs you is always a list, so it lights List; Board there opens Everything else's board.
+  const shownView = teamMode && !onEverything ? 'list' : evView;
+  const headerDisplay = teamMode ? { ...display, view: shownView } : display;
   const onHeaderDisplay = !teamMode ? setDisplay : (d: Display) => {
-    if (d.view !== evView) { setEvView(d.view as EvView); if (place === 'inbox') setPlace('everything'); }
+    if (d.view !== shownView) {
+      setEvView(d.view as EvView);
+      if (!onEverything && d.view === 'board') { setPlace('everything'); setMenu(false); }
+    }
     setDisplay({ ...d, view: display.view });
   };
   const threadRow = (i: WorkItem, first: boolean) => {
@@ -493,7 +501,7 @@ export default function Threads() {
       </LaterSheet>
       {!picked && !penUp && !(inboxEmpty && !board) && <Pressable accessibilityLabel="New thread" accessibilityRole="button" onPress={() => router.push('/new')}
         style={({ pressed }) => ({
-          position: 'absolute', right: 20, bottom: foot + 16, width: 56, height: 56, borderRadius: 28,
+          position: 'absolute', right: PEN.right, bottom: foot + PEN.lift, width: PEN.size, height: PEN.size, borderRadius: PEN.size / 2,
           alignItems: 'center', justifyContent: 'center', backgroundColor: color.graphite, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
           shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 8 }, opacity: pressed ? 0.85 : 1,
         })}>
