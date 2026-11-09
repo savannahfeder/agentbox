@@ -18,7 +18,7 @@ import { chromeIsUp, CHROME_HOLD, CHROME_REACH } from './full-screen-chrome';
 // followed by a refetch.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { cursorIndex, cursorMark, type CursorMark } from './cursor-follows';
+import { cursorAfterWait, cursorIndex, cursorMark, cursorWait, type CursorMark, type CursorWait } from './cursor-follows';
 import { createPortal, flushSync } from 'react-dom';
 import { readySkin, swapLook } from './look-switch';
 import type { AgentTurn, AnswerMode, Approval, CloudPlan, PermissionMode, Product, RepeatRule, RepeatShape, RunningSession, Snapshot, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
@@ -47,8 +47,8 @@ import { NOTES_CLOSED_KEY, notesSidebarOpen, rememberNotesSidebar, takesNotesSid
 import { docKind, EVEN_SPLIT, escapeClosesDoc, escapeInTheFileClosesIt, focusIsInTheFile, readSplit, writeSplit } from './doc-pane';
 import { changeOwnsKey } from './code-keys';
 import { askStillStands, bringsBack, closesAgain, graceUndoneLine, nextUndo, shownAfterUndo, ticksAfterUndo, undoAsk, HOLDS_A_KEY, NOTHING_TO_UNDO, UNDID_CLOSING } from './undo-window';
-import { answeredAlready, TOO_LATE_TO_WITHDRAW } from './withdraw-send';
-import { addUndoMark, UNDO_MARKS_EVENT, type UndidSpec } from './undo-marks';
+import { answeredAlready, TOO_LATE_TO_WITHDRAW, UNDID_SENDING, withoutWithdrawnSends } from './withdraw-send';
+import { addUndoMark, readUndoMarks, UNDO_MARKS_EVENT, type UndidSpec } from './undo-marks';
 import { whatTheFileSentUp } from '../../shared/artifact-keys.mts';
 import { ALIVE_EVERY_MS, markWindowAlive, type Place, placeIsSomewhere, readPlace, windowWasJustHere, writePlace, writeScroll } from './where-she-was';
 import { Rail } from './components/Rail';
@@ -93,15 +93,16 @@ import { approvalAnswered, approvalAsker, approvalView } from './approval-card';
 // there is anything to confirm the card has closed.
 import { sentLine, sendingLine } from './compose-says';
 import { wearJustMade, type JustMade } from './just-made';
-import { asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
+import { agentOnOrComing, asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
 import { filedByThePerson, wordWaits } from '../../shared/answers.mjs';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mjs';
 import { focusTheReplyBox } from './focus-at-end';
 import { strayLetters } from './stray-letters';
-import { keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
+import { keyWhileABoxIsOpen, opensATextField, slashSearchesAgain, takesTheListBack } from './keys';
 import { modelCommands } from './thread-model-commands';
 import { MOVE_KEYWORDS, whyItCannotMove } from '../../shared/move-thread.mts';
 import { isUrgentRow, taskToReturnTo, urgentInterruption } from './interrupt';
+import { leavePlace, placeKey, placeToReturnTo } from './thread-place';
 import { DONE, manyOrOne } from './done-word';
 import { listedNow, type OpensWhenListed } from './opens-when-listed';
 import { oneToRepeat, repeatBody } from './repeat-from-thread';
@@ -191,6 +192,7 @@ import { threadsMade, approvableFiled, doItHereWrites, answerAllWrites, RUN_IT }
 import { waitingCounts } from './threads-made';
 import { closeAsk, closeAskOwnsKey, unshippedAsk } from './close-asks-first';
 import { notShipped, shipItAsk } from '../../shared/not-shipped.mts';
+import { openSignIn } from '../../shared/sign-in-ask.mjs';
 import { ChatAgentsContext, type ChatAgentsValue } from './team/ChatAgents';
 import { agentLinks, askedInLabel, chatProjects, chatTaskSharing, chatTranscript, lastAskKeptOnMac, taskBrief, taskTitle, withTask } from './team/agent-mentions';
 import { answersInTheirChat } from './team/answers-in-the-chat';
@@ -245,7 +247,7 @@ import { usePointerHold, useHeldOrder } from './threads/steady-rows';
 import { inviteRows, leadRows, type InviteRow, type LeadRow } from './threads/needs-you-rows';
 import { InviteCards, InviteRows } from './threads/InviteRows';
 import { mentionRows } from './team/rooms/room-rules';
-import { SAYS_UNDO, oWaitsFor, oWaitsForTheSend, opensTheToast, saysWhereItWent, toastOpens, toastParts, type OWaits, type ToastGoes } from './toast-parts';
+import { SAYS_UNDO, oIsTheToasts, oWaitsFor, oWaitsForTheSend, opensTheToast, saysWhereItWent, toastOpens, toastParts, type OWaits, type ToastGoes } from './toast-parts';
 import { SentLine } from './components/SentLine';
 import { TickedBar } from './components/TickedBar';
 import { AgentSending } from './team/AgentSending';
@@ -890,6 +892,8 @@ export default function App() {
   const searchOpen = search !== null;
   useEffect(() => { if (searchOpen) strayLetters.opening('search', Date.now()); }, [searchOpen]);
   const searchRef = useRef<HTMLInputElement>(null);
+  // Whether the words in the field were typed since it last got the keyboard.
+  const searchTyped = useRef(false);
   // ESC PUTS HER BACK WHERE SHE WAS. Searching crosses every tab, so leaving it
   // has to restore the one she came from AND the row she was on, or a search
   // that found nothing has quietly moved her.
@@ -1989,7 +1993,14 @@ export default function App() {
       .finally(() => { olderAsking.current = false; });
   }, [older.length, olderMore]);
   const itemsWithOlder = useMemo(() => withOlder(snap?.items ?? [], older), [snap?.items, older]);
-  const items = walkRows(itemsWithOlder, run);
+  const [undoMarks, setUndoMarks] = useState(() => readUndoMarks());
+  useEffect(() => {
+    const reread = () => setUndoMarks(readUndoMarks());
+    window.addEventListener(UNDO_MARKS_EVENT, reread);
+    return () => window.removeEventListener(UNDO_MARKS_EVENT, reread);
+  }, []);
+  const listed = useMemo(() => withoutWithdrawnSends(itemsWithOlder, undoMarks), [itemsWithOlder, undoMarks]);
+  const items = walkRows(listed, run);
 
   /* --------------------- her agents, as rows in her list ------------------- */
   // EVERY CLAUDE CODE AGENT ON HER MACHINE THAT AGENTBOX DID NOT START. They are
@@ -2151,7 +2162,9 @@ export default function App() {
   // and what keeps a thread in In progress and out of Needs you, whatever its
   // status says, until its session exits (w-bc976fd247). Up here because every
   // list below reads it.
-  const liveIds = useMemo(() => new Set(runningRows.map((r) => r.itemId)), [runningRows]);
+  const runningIds = useMemo(() => new Set(runningRows.map((r) => r.itemId)), [runningRows]);
+  // The lists also hold a thread whose run is being started, so Try again moves it at once.
+  const liveIds = useMemo(() => agentOnOrComing({ running: runningRows, starting: snap?.supervisor.starting }), [runningRows, snap?.supervisor.starting]);
   // AND THE THREADS WHOSE AGENT IS STOPPED ON A PERMISSION REQUEST. Each
   // approval in the spool names the thread it came from, and that one fact
   // turns a Working row into a row that needs you, in both lists.
@@ -2159,12 +2172,13 @@ export default function App() {
   // process pushes, while its card is already leaving with a verdict on it
   // (`approvalStage`), and a row still reading Needs you behind that card is
   // the app disagreeing with itself.
+  // A sign-in link an agent is waiting on asks you just as a permission card does.
   const askingIds = useMemo(
-    () => new Set((snap?.approvals ?? [])
+    () => new Set([...(snap?.approvals ?? [])
       .filter((a) => a.id !== answered?.id)
       .map((a) => a.item)
-      .filter((id): id is string => !!id)),
-    [snap?.approvals, answered?.id],
+      .filter((id): id is string => !!id), ...items.filter((i) => openSignIn(i)).map((i) => i.id)]),
+    [snap?.approvals, answered?.id, items],
   );
   const asking = useCallback((i: { id: string }) => askingIds.has(i.id), [askingIds]);
   // EVERYTHING THE SUPERVISOR KNOWS ABOUT EVERY THREAD, in one context, so the
@@ -2658,7 +2672,8 @@ export default function App() {
     setModal(null);
     setSelected(0);
     // The field is mounted by this same render, so focusing has to wait for it.
-    requestAnimationFrame(() => searchRef.current?.focus());
+    // A query kept from before is selected, so the next words start a new one.
+    requestAnimationFrame(() => { searchTyped.current = false; searchRef.current?.focus(); searchRef.current?.select(); });
   }, [view, selected]);
 
   const searchFor = useCallback((q: string) => {
@@ -3021,8 +3036,8 @@ export default function App() {
   // (`boardSideways`), and they come in the order you dragged them to.
   const boardArgs = useMemo(
     () => ({ items: evBoard ? boardItems(items, evBoard, teammateIdOf) : items, products: snap?.products ?? [], display: inboxDisplay, now, stateOf: stateOfMine, cards,
-      picked: evBoard ? evBoard.picked : team ? picked : undefined, me: team?.me ?? null, since: team?.state.since ?? null, live: liveIds, projectOrder, waitingIsInProgress: !!evBoard && !evBoard.mate && !evBoard.mineOnly && evBoard.picked.length > 1 }),
-    [items, evBoard, snap?.products, inboxDisplay, now, stateOfMine, cards, team, picked, liveIds, projectOrder],
+      picked: evBoard ? evBoard.picked : team ? picked : undefined, me: team?.me ?? null, since: team?.state.since ?? null, live: runningIds, projectOrder, waitingIsInProgress: !!evBoard && !evBoard.mate && !evBoard.mineOnly && evBoard.picked.length > 1 }),
+    [items, evBoard, snap?.products, inboxDisplay, now, stateOfMine, cards, team, picked, runningIds, projectOrder],
   );
   const boardCols = useMemo(
     () => (onBoard ? boardColumns({ ...boardArgs, order: evBoard ? evColumns(columnOrder) : columnOrder }) : null),
@@ -3063,11 +3078,15 @@ export default function App() {
   // moved (./cursor-follows). Worked out here, in the render, so the board
   // never sees one frame of the wrong card and scrolls to it.
   const drawnAt = useRef<CursorMark | null>(null);
+  // The row a Z is putting back (`undo`).
+  const cursorBack = useRef<CursorWait | null>(null);
   // Not while the keyboard is on a teammate's card: moving `selected` would
   // take it off that card.
-  const cursor = cursorIndex({ list, selected, last: cardSel ? null : drawnAt.current });
+  const putBack = cursorAfterWait({ list, wait: cursorBack.current, moved: !!cardSel || (!!drawnAt.current && selected !== drawnAt.current.index), now });
+  const cursor = putBack.index >= 0 ? putBack.index : cursorIndex({ list, selected, last: cardSel ? null : drawnAt.current });
   const current: WorkItem | undefined = list[cursor];
   useLayoutEffect(() => {
+    cursorBack.current = putBack.keep;
     // A drop just moved this thread; the cursor goes with it (`keepPlaces`).
     const dropped = selectAfterDrop.current;
     const at = dropped ? list.findIndex((i) => i.id === dropped) : -1;
@@ -3410,14 +3429,59 @@ export default function App() {
   // THE DOCUMENT THE RELOAD HAS TO PUT BACK. ⌘R leaves the pane it wants here
   // and the effect honours it once. `doc: null` is a real answer: a pane she
   // closed herself stays closed through the reload.
-  const pendingDoc = useRef<{ id: string; doc: OpenDoc | null } | null>(null);
+  const pendingDoc = useRef<{ id: string; doc: OpenDoc | null; mode?: ArtifactMode } | null>(null);
+  // WHERE SHE WAS IN THE THREAD SHE LEFT, and putting her back in the one she
+  // comes back to (./thread-place.ts). Above the pane effect, which takes the
+  // file this leaves in pendingDoc.
+  const scrolledTo = useRef<{ key: string; top: number } | null>(null);
+  const leftFrom = useRef<WorkItem | null>(null);
+  const leaveThread = (was: WorkItem) => {
+    const key = placeKey(was);
+    const live = items.find((i) => i.id === was.id && i.product === was.product) ?? was;
+    const doc = openDocNow.current;
+    leavePlace(key, arrivedAt(live, team?.me ?? null), {
+      top: scrolledTo.current?.key === key ? scrolledTo.current.top : undefined,
+      doc: doc && !doc.readOnly && doc.product === was.product
+        ? { product: doc.product, src: doc.src, ...(doc.auto ? { auto: true } : {}) }
+        : null,
+      mode: artifactMode,
+    });
+  };
+  const leaveThreadNow = useRef(leaveThread);
+  leaveThreadNow.current = leaveThread;
+  // A reload or a quit leaves the open thread too.
+  useEffect(() => {
+    const leaveOpenThread = () => { if (focusedNow.current) leaveThreadNow.current(focusedNow.current); };
+    window.addEventListener('pagehide', leaveOpenThread);
+    return () => window.removeEventListener('pagehide', leaveOpenThread);
+  }, []);
+  useEffect(() => {
+    const was = leftFrom.current;
+    leftFrom.current = focused;
+    const same = !!was && !!focused && placeKey(was) === placeKey(focused);
+    if (same) return;
+    if (was) leaveThread(was);
+    scrolledTo.current = null;
+    if (!focused) return;
+    const back = placeToReturnTo(placeKey(focused), arrivedAt(focused, team?.me ?? null));
+    if (!back) return;
+    if (back.top) {
+      scrolledTo.current = { key: placeKey(focused), top: back.top };
+      setResumeAt({ id: focused.id, top: back.top });
+    }
+    if (back.doc !== undefined) pendingDoc.current = { id: focused.id, doc: back.doc && { ...back.doc }, mode: back.mode };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focused?.id, focused?.product]);
   useEffect(() => {
     setOpenDoc(null);
     const card = focused;
     if (!card) return;
     const wanted = pendingDoc.current;
     pendingDoc.current = null;
-    if (wanted && wanted.id === card.id && !wanted.doc?.auto) setOpenDoc(wanted.doc);
+    if (wanted && wanted.id === card.id) {
+      setOpenDoc(wanted.doc);
+      if (wanted.doc && wanted.mode) setArtifactMode(wanted.mode);
+    }
     // The task she opened, not every edit to it: a worker writing a checkpoint
     // while she reads must not push a document back over a pane she closed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -5842,6 +5906,7 @@ export default function App() {
       // thread that she did it and took it back.
       const now = Date.now();
       leaveUndoMarks(pending.undid, now, now);
+      cursorBack.current = cursorWait(pending.item, now);
       // Opened in the same case as the late Z below (./undo-window): from a
       // task, because the action moved her off it. From a list it is already
       // back in front of her.
@@ -5903,6 +5968,8 @@ export default function App() {
     leaveUndoMarks(last.undid, from, Date.now());
     const restored = last.restore?.();
     const item = restoredItem(restored ?? null);
+    const backTo = item ?? last.brings;
+    if (backTo) cursorBack.current = cursorWait(backTo, Date.now());
     const shown = shownAfterUndo(restored, last.brings, { onATask: !!focused });
     // Say what the undo actually did, AND WHERE THE WORDS WENT, because the two
     // boxes are different places and she has to be told which one to look in. A
@@ -6026,6 +6093,7 @@ export default function App() {
         setModal((m) => (m === 'palette' ? null : 'palette'));
         return;
       }
+      const toastsO = oIsTheToasts(e.key, toast, sentAt.current, Date.now());
       // A ROOM OWNS THE KEYBOARD WHILE IT IS OPEN, as Settings does: the list
       // behind it is not on the screen. Escape goes back to the threads and
       // Tab walks on along the tabs. N goes on to the room's branch below the
@@ -6043,7 +6111,7 @@ export default function App() {
         return;
       }
       // So does a teammates page, which has no list for J, K or E to act on.
-      if (teammatesShown && e.key !== 'n' && e.key !== 'N') {
+      if (teammatesShown && e.key !== 'n' && e.key !== 'N' && !toastsO) {
         // Escape in an open dropdown closes the dropdown, not the page.
         if (modal || inInput || target?.tagName === 'SELECT' || e.metaKey || e.ctrlKey || e.altKey) return;
         // A document open over its chat goes first, as its close button says.
@@ -6052,12 +6120,12 @@ export default function App() {
         if (e.key === 'g' || e.key === 'G') { const box = document.querySelector<HTMLInputElement>('.cx-search input'); if (box) { e.preventDefault(); box.focus(); } }
         return;
       }
-      if (connectionsShown && e.key !== 'n' && e.key !== 'N') {
+      if (connectionsShown && e.key !== 'n' && e.key !== 'N' && !toastsO) {
         if (modal || inInput || e.metaKey || e.ctrlKey || e.altKey) return;
         if (e.key === 'Escape') { e.preventDefault(); setConnectionsPage(null); }
         return;
       }
-      if (filesShown && e.key !== 'n' && e.key !== 'N') {
+      if (filesShown && e.key !== 'n' && e.key !== 'N' && !toastsO) {
         if (modal || inInput || e.metaKey || e.ctrlKey || e.altKey) return;
         if (e.key === 'Escape') { e.preventDefault(); setFilesPage(null); }
         else if (e.key === '/') { e.preventDefault(); document.querySelector<HTMLInputElement>('.fp-find input')?.focus(); }
@@ -6503,7 +6571,8 @@ export default function App() {
     docWasOpen.current = !!openDoc;
     if (search === null) return;
     if (focused || modal || settingsOpen || openDoc) searchRef.current?.blur();
-    else if (!docJustClosed) searchRef.current?.focus();
+    // Only when the field does not have the keyboard: this runs on every letter typed into it.
+    else if (!docJustClosed && document.activeElement !== searchRef.current) { searchTyped.current = false; searchRef.current?.focus(); }
   }, [search, focused, modal, settingsOpen, openDoc]);
 
   useEffect(() => { setSelected((s) => Math.min(s, Math.max(0, list.length - 1))); }, [list.length]);
@@ -7457,7 +7526,7 @@ export default function App() {
     <TeamContext.Provider value={team}>
     <OpenTeammateThread.Provider value={openContinuedFrom}>
     <ChatAgentsContext.Provider value={chatAgents}>
-    <LiveContext.Provider value={liveIds}>
+    <LiveContext.Provider value={runningIds}>
     <CloudContext.Provider value={cloudIds}>
     <SavedKeysContext.Provider value={savedCloudKeys}>
     <MoveToCloudContext.Provider value={mover}>
@@ -7587,12 +7656,13 @@ export default function App() {
               spellCheck={false}
               autoComplete="off"
               aria-label="Search threads"
-              onChange={(e) => { setSearch(e.target.value); setSelected(0); }}
+              onChange={(e) => { searchTyped.current = true; setSearch(e.target.value); setSelected(0); }}
               onKeyDown={(e) => {
                 // The list's own keys, forwarded from inside the field, because
                 // every other key here is a character she is typing and the
                 // global handler has already stood down for that reason.
                 if (e.key === 'Escape') { e.preventDefault(); closeSearch(); }
+                else if (e.key === '/' && slashSearchesAgain({ query: e.currentTarget.value, typedSince: searchTyped.current })) { e.preventDefault(); e.currentTarget.select(); }
                 else if (e.key === 'ArrowDown') { e.preventDefault(); setSelected((s) => Math.min(s + 1, Math.max(0, list.length - 1))); }
                 else if (e.key === 'ArrowUp') { e.preventDefault(); setSelected((s) => Math.max(0, s - 1)); }
                 else if (e.key === 'Enter' && current && !e.metaKey && !e.ctrlKey) { e.preventDefault(); setFocused(current); markSeen(current); }
@@ -7885,6 +7955,7 @@ export default function App() {
                   item={focused}
                   resumeAt={resumeAt}
                   onScrolled={(top) => {
+                    scrolledTo.current = { key: placeKey(focused), top };
                     const at = Date.now();
                     if (at - scrollWrittenAt.current < 250) return;
                     scrollWrittenAt.current = at;
@@ -8391,7 +8462,7 @@ export default function App() {
                 const row = rows.find((i) => i.id === one.id && i.product === one.product);
                 if (answeredAlready(row)) return { refused: TOO_LATE_TO_WITHDRAW, open: row };
                 await api.answer({ product: one.product, id: one.id, status: 'done' });
-              }, [{ ...one, words: 'Undid sending it' }]);
+              }, [{ ...one, words: UNDID_SENDING }]);
             }
             // Read before the line is said: a tool with no login left in
             // usage means nothing started, and the line has to say so.
@@ -8526,7 +8597,7 @@ export default function App() {
           const options = itemOptions(target);
           const recommended = options.find((o) => o.recommended) ?? options[0];
           const open = () => { setFocused(target); markSeen(target); };
-          const moveRefusal = whyItCannotMove(target as never, { live: liveIds.has(target.id) });
+          const moveRefusal = whyItCannotMove(target as never, { live: runningIds.has(target.id) });
           return [
             ...(focused
               ? [{id:'remote-control',label:'Remote control',keywords:'phone mobile continue claude rc',run:()=>{setModal(null);window.dispatchEvent(new Event('task-remote-control-open'));}}, {id:'open-terminal',label:'Open terminal',keywords:'shell command console',run:()=>{setModal(null);window.dispatchEvent(new Event('task-terminal-open'));}}]

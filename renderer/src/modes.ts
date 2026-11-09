@@ -9,6 +9,7 @@
 // read their words from here.
 
 import type { PermissionMode } from './types';
+import { Name } from '../../shared/product-name.mjs';
 
 /**
  * The mode a session is really running in. `custom` means flags set by hand
@@ -78,7 +79,7 @@ export const MODE_SENTENCE: Record<PermissionMode, string> = {
   auto: 'Runs without asking: everything, with background safety checks.',
   dontAsk: 'Runs without asking: only pre-approved tools. Nothing else is put in front of you, so nothing waits.',
   bypassPermissions: 'Runs without asking: everything.',
-  custom: 'Set by hand in zero.config.json. The screen leaves it exactly as it found it.',
+  custom: `Set by hand in ${Name}’s settings file on this computer, so it is not changed here.`,
 };
 
 /**

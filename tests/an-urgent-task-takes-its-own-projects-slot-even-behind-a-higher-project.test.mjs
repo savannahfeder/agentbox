@@ -54,7 +54,7 @@ const build = (items, slots) => {
   spawned = []; killed = [];
   sup.spawnWorker = (item) => {
     spawned.push(item.id);
-    sup.sessions.set(item.id, { itemId: item.id, product: item.product, startedAt: NOW });
+    sup.sessions.set(item.id, { itemId: item.id, product: item.product, startedAt: NOW, traced: true });
   };
   sup._kill = (session) => {
     killed.push(session.itemId);
@@ -67,7 +67,7 @@ const build = (items, slots) => {
 };
 
 const running = (id, product, startedAt = NOW) => {
-  sup.sessions.set(id, { itemId: id, product, startedAt });
+  sup.sessions.set(id, { itemId: id, product, startedAt, traced: true });
   sup._liveSessions[id] = { sessionId: `s-${id}`, product, cwd: '/tmp', profile: 'default' };
 };
 

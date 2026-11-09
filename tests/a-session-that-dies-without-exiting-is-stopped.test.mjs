@@ -8,7 +8,9 @@
 //
 // The rule is both signals at once: silent for ten minutes AND the claim's
 // lease lapsed. A long render is silent but still heartbeating; a session that
-// never claimed has no lease to lapse. Neither of those is touched.
+// never claimed has no lease to lapse. Neither of those is touched, unless the
+// session has not done one thing yet
+// (tests/a-run-that-never-begins-is-stopped-like-one-that-hung).
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
@@ -75,9 +77,10 @@ describe('a session that dies without exiting', () => {
     expect(s.killed).toBe(0);
   });
 
-  it('leaves a session that never claimed its row alone', () => {
+  it('leaves a session that never claimed its row alone once it is at work', () => {
     const { sup } = makeSupervisor();
     const s = liveSession(sup, 'w-personal', { quietFor: 90 * MIN });
+    s.traced = true;
     expect(sup.reapHungSessions([{ id: 'w-personal', product: 'astral', status: 'open' }], NOW)).toEqual([]);
     expect(s.killed).toBe(0);
   });
