@@ -143,7 +143,11 @@ async function askTheFounder({ tool_name: toolName, input }) {
 
 // The store server: one of its own carries the account, a shared one is reached by its address.
 function storeServer() {
-  return Object.entries(mcpServers()).find(([name, s]) => name !== 'zero-approvals' && (s?.env?.STORE_ACCOUNT_ID || (s?.type === 'http' && /\/store$/.test(s.url ?? ''))))?.[1];
+  // On a cloud machine the store is the computer's, over the bridge, which is where its cloud tools are.
+  // A stand-in cloud on this Mac hands the stand-in the computer's own config, so the bridge is named here.
+  if (process.env.AGENTBOX_BRIDGE_SOCK && mcpServers().agentbox) return { command: process.execPath, args: [IMAGE_STUB, 'agentbox'] };
+  return Object.entries(mcpServers()).find(([name, s]) => name !== 'zero-approvals' && (s?.env?.STORE_ACCOUNT_ID || (s?.type === 'http' && /\/store$/.test(s.url ?? ''))
+    || (name === 'agentbox' && s?.args?.[0] === IMAGE_STUB)))?.[1];
 }
 
 // A server the app shares between runs (main/tool-host.mjs), spoken to over
@@ -176,9 +180,14 @@ function httpSession(server) {
   };
 }
 
+// In a stand-in cloud the run's tools are named by the image's path; this checkout's copy is the same stub.
+const IMAGE_STUB = '/opt/agentbox/mcp-stub.mjs';
+const toolStub = (args = []) => (args[0] === IMAGE_STUB && !fs.existsSync(IMAGE_STUB)
+  ? [path.resolve(path.dirname(process.argv[1]), '..', '..', 'cloud', 'sandbox', 'mcp-stub.mjs'), ...args.slice(1)] : args);
+
 function mcpSession(server) {
   if (server.type === 'http') return httpSession(server);
-  const child = spawn(server.command, server.args ?? [], {
+  const child = spawn(server.command, toolStub(server.args ?? []), {
     env: { ...process.env, ...(server.env ?? {}) },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
@@ -198,17 +207,17 @@ function mcpSession(server) {
     }
   });
   let nextId = 1;
-  const call = (method, params) => new Promise((resolve) => {
+  const call = (method, params, waitMs = 20_000) => new Promise((resolve) => {
     const id = nextId++;
     waiting.set(id, resolve);
-    setTimeout(() => { if (waiting.delete(id)) resolve({ error: { message: `${method} had no answer in 20 s` } }); }, 20_000).unref();
+    setTimeout(() => { if (waiting.delete(id)) resolve({ error: { message: `${method} had no answer in ${Math.round(waitMs / 1000)} s` } }); }, waitMs).unref();
     child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
   });
 
   const ready = call('initialize', { protocolVersion: '2024-11-05', clientInfo: { name: 'agentbox-proof-stub', version: '1.0.0' }, capabilities: {} });
   return {
-    call: async (name, args) => { await ready; return call('tools/call', { name, arguments: args }); },
-    close: () => { try { child.kill(); } catch { /* done with it */ } },
+    // request_cloud_key waits up to 15 minutes for a person's answer.
+    call: async (name, args) => { await ready; return call('tools/call', { name, arguments: args }, name === 'request_cloud_key' ? 16 * 60_000 : 20_000); },    close: () => { try { child.kill(); } catch { /* done with it */ } },
   };
 }
 
@@ -339,6 +348,25 @@ const FILE_ASK = /\b(film|video|footage|recording|\.mov|\.mp4)\b|\bfrom my (movi
 const FILM = '~/Movies/launch-film-original.mov';
 const CODE_ASK = /\bnpm\b.*\bpublish|\bpublish\b.*\bnpm\b|one-time|\botp\b|\b2fa\b|verification code/i;
 const COMPUTER_ASK = /\bxcode\b|simulator|testflight/i;
+const KEYS = [
+  [/posthog/i, 'POSTHOG_PERSONAL_KEY', 'the PostHog personal API key'],
+  [/resend/i, 'RESEND_API_KEY', 'the Resend API key'],
+  [/openrouter/i, 'OPENROUTER_API_KEY', 'the OpenRouter API key'],
+  [/mixpanel/i, 'MIXPANEL_API_SECRET', 'the Mixpanel API secret'],
+];
+// Where the person said the key is: "in my Keychain as posthog-read-key", "~/.config/resend.key",
+// "POSTHOG_KEY in ~/app/.env", "$OPENROUTER_API_KEY in my shell".
+function keyPlaceIn(text) {
+  const kc = text.match(/keychain(?:\s+(?:item|entry))?(?:\s+(?:as|called|named|under))?\s*[:"“'`]?\s*([A-Za-z0-9][\w.@-]*)/i);
+  if (kc && !/^(as|called|named|under|item|entry|and|so|too)$/i.test(kc[1])) return { place: 'keychain', from: kc[1].replace(/\.$/, '') };
+  const sh = text.match(/\$([A-Z][A-Z0-9_]+)/);
+  if (sh && /shell|zshrc|bashrc|profile|environment|export/i.test(text)) return { place: 'shell', from: sh[1] };
+  const f = text.match(/(~\/[^\s"'`”),]+)/);
+  if (!f) return null;
+  const from = f[1].replace(/[.:;]$/, '');
+  const entry = /\.env\b/.test(from) ? text.match(/\b([A-Z][A-Z0-9_]{2,})\s+(?:in|from)\s+~\//)?.[1] : undefined;
+  return { place: 'file', from, ...(entry ? { entry } : {}) };
+}
 {
   const brief = (() => { const at = argv.indexOf('--append-system-prompt'); return at >= 0 ? argv[at + 1] ?? '' : ''; })();
   // Only a cloud run is told it may ask; on the computer the person's own sign-ins and files are there.
@@ -377,6 +405,23 @@ const COMPUTER_ASK = /\bxcode\b|simulator|testflight/i;
     said = lines.length
       ? [`**I need ${what.length > 1 ? `${what.slice(0, -1).join(', ')} and ${what.at(-1)}` : what[0]} to finish.**`, '', 'Everything that does not need it is done.', '', ...lines].join('\n')
       : `Finished "${title}" with ${[...services.map((x) => `your saved ${x[2]} sign-in`), ...(wantsFile ? [named ? `the ${named} you sent` : 'the film you sent'] : []), ...(wantsCode ? ['the code you sent'] : [])].join(', ')}. It is done.`;
+  }
+  // A KEY KEPT ON THEIR COMPUTER (main/cloud/key-asks.mts): asked of the computer
+  // with request_cloud_key when the task says where it is, and on the ask line,
+  // with that place, when that does not get it.
+  const key = told && !onComputer && !COMPUTER_ASK.test(task) ? KEYS.find(([re]) => re.test(task)) : null;
+  if (key) {
+    const [, name, what] = key;
+    const where = keyPlaceIn(`${task}\n${asked}`);
+    let answer = null;
+    if (!process.env[name] && where) {
+      const server = storeServer();
+      const session = server && mcpSession(server);
+      try { answer = JSON.parse((await session?.call('request_cloud_key', { name, what, ...where }))?.result?.content?.[0]?.text ?? 'null'); } catch { answer = null; } finally { session?.close(); }
+    }
+    if (process.env[name] || ['saved', 'already'].includes(answer?.status)) said = `Finished "${title}" with ${what}${answer?.path ? ', which your computer handed over' : ''}. It is done.`;
+    else if (answer?.status === 'denied') said = `**You said no to ${what}, so "${title}" stops short of it.**\n\nEverything that does not need it is done.`;
+    else said = [`**I need ${what} to finish.**`, '', 'Everything that does not need it is done.', '', `AGENTBOX-NEEDS: key ${name} | ${what}${where ? ` | ${[where.place, where.from, where.entry].filter(Boolean).join(' ')}` : ''}`].join('\n');
   }
 }
 const handsOver = directive('stub:file')?.[1];
