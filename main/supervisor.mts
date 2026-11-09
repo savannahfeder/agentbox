@@ -8209,6 +8209,9 @@ export class Supervisor {
       for (const id of this._recovering ?? []) if (heldBySweep(id) && !this._comingHome?.has(id) && !queued.includes(id)) queued.push(id);
     } catch {}
     if (this.paused) queued = [];
+    // Queued rows whose run is being set up or was asked for by name (Try
+    // again): no session yet, but the lists count them as In progress.
+    const starting = queued.filter((id) => settingUp(id) || this._resumeQueue.has(id));
     let signInNeeded: Record<string, string> = {};
     try {
       const productBySlug = new Map((this.store.listProducts?.() ?? []).map((p) => [p.slug, p]));
@@ -8315,6 +8318,7 @@ export class Supervisor {
       })),
       stalled,
       queued,
+      starting,
       // Left out of `running`, but their claim is ours, not an agent elsewhere
       // (renderer/src/live-line.ts).
       remoteHeld: [...this.sessions.values()].filter((s) => s.remoteIdle).map((s) => s.itemId),
