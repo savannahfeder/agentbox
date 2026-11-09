@@ -93,7 +93,7 @@ describe('board or list', () => {
 
   it('is the board when what was kept makes no sense', () => {
     const { box, store } = memory();
-    box.set('agentbox.everything.view', 'tall');
+    box.set('agentbox.inbox.view', 'tall');
     expect(readEvView(store)).toBe('board');
   });
 });

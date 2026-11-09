@@ -3027,14 +3027,14 @@ export default function App() {
     [onBoard, boardArgs, columnOrder, teamMode],
   );
   const boardOrder = useMemo(() => (boardCols ? boardWalk(boardCols) : null), [boardCols]);
-  // YOUR THREADS AS ONE LIST (./threads/stack-rules). With a team on, a tab
-  // other than Needs you is only reached under Everything else, as your threads.
+  // YOUR THREADS AS ONE LIST (./threads/stack-rules), on a phone with a team,
+  // where Everything else holds In progress, Later and Done.
   const [stackFolded, setStackFolded] = useState<Set<StackKey>>(() => readFolded());
   const shownAs = useCallback((rows: WorkItem[], tab: View) => (mineShown
     ? sortedByDisplay(filterBox(rows, boxFilter, directSlugs).filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i), directSlugs)), inboxDisplay, tab, projectOrder, directSlugs)
     : []), [mineShown, boxFilter, directSlugs, inboxDisplay, now, seenOf, projectOrder]);
   const stacked = useMemo(() => {
-    if (!(teamMode && view !== 'inbox' && search === null && !onBoard)) return null;
+    if (!(teamMode && onPhone() && view !== 'inbox' && search === null && !onBoard)) return null;
     return stackRows({ progress: shownAs(progressTab, 'progress'), later: shownAs(snoozed, 'snoozed'), done: shownAs(done, 'done'),
       dayStart: new Date(now).setHours(0, 0, 0, 0), folded: stackFolded, laterRules: repeats.length,
       isChat: (i) => directSlugs.has(i.product) && !isTaskRow(i) });
@@ -4326,6 +4326,11 @@ export default function App() {
     setTasksOn(false);
     roomsUi.leave(); teammatesUi.leave(); setEvPick(null); setFocused(null); setChatsDirect(null);
     setView('inbox'); setSelected(0); setMultiSel(new Set());
+  };
+  // In progress, Later or Done, your own, from a tab.
+  const goMine = (tab: View) => {
+    if (tab === 'inbox') { goNeedsYou(); return; }
+    goNeedsYou(); setEvTab('agents'); setView(tab);
   };
   // Cards put away (./team/everything/members `splitHidden`), and how tall the cards are over an open chat.
   const [evHidden] = useState<Hidden>(() => readHidden());
@@ -6116,8 +6121,9 @@ export default function App() {
         setHoveredId(null);
         (document.activeElement as HTMLElement | null)?.blur?.();
         setMultiSel(new Set());
-        // With a team on, the two tabs: Needs you and Everything else.
-        if (teamMode) { if (view === 'inbox' && !evPick) pickMember('me'); else goNeedsYou(); return; }
+        // With a team on a phone, the two tabs: Needs you and Everything else.
+        if (teamMode && onPhone()) { if (view === 'inbox' && !evPick) pickMember('me'); else goNeedsYou(); return; }
+        if (teamMode) { goMine(evPick ? 'inbox' : nextTab(stateTabOrder, view, e.shiftKey) as View); return; }
         setView(nextTab(stateTabOrder, view, e.shiftKey) as View);
         setSelected(0);
         return;
@@ -7228,7 +7234,7 @@ export default function App() {
     // w-33511040d7).
     corner: onPhone() ? null
       : <NeedsFaces members={evSplit.shown} picked={evOn ? evKey : null} waits={waits} onPick={(key) => pickMember(key)} onAdd={teammatesUi.live ? teammatesUi.onNew : undefined} />,
-    progress: !onPhone() ? { count: mineShown ? shownCount(progressTab) : 0, on: view !== 'done' && evOn && evKey === 'me' } : undefined,
+    states: !onPhone() ? { away: !!evPick, onTab: (v: View) => goMine(v) } : undefined,
     today: homeLayout === 'list' && !onPhone() ? { on: todayOn, onToday: () => { goNeedsYou(); setTodayOn(true); } } : undefined,
     tasks: homeLayout === 'list' && !onPhone() ? { on: tasksOn, onTasks: () => { goNeedsYou(); setTasksOn(true); } } : undefined,
   } : null;
@@ -7305,8 +7311,8 @@ export default function App() {
     setFocused(item); markSeen(item);
   };
   // Light themes keep the Inbox plain; only dark ones wear its sky.
-  const skyOnInbox = !!sky && sky.dark && !homeShown && (['inbox', 'progress', 'snoozed', 'done'] as string[]).includes(view) && !onBoard && !onPhone() && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
-    && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown && !evOn;
+  const skyOnInbox = !!sky && sky.dark && !homeShown && (['inbox', 'progress', 'snoozed', 'done'] as string[]).includes(view) && !onPhone() && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
+    && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown && !evPick;
   const tasksShown = teamMode && tasksOn && !!snap && view === 'inbox' && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused && !teammatesShown && !roomShown && !filesShown && !connectionsShown;
   const firstNameOf = (id: string) => team?.byId.get(id)?.name?.split(/\s+/)[0] ?? 'Someone';
   const tasksPage = (title?: string) => snap ? <TasksPage title={title} keys={!modal} me={team?.me ?? null} nameOf={firstNameOf} picked={tasksPick} onPicked={setTasksPick}

@@ -470,8 +470,9 @@ const COUNTED: TabView[] = ['inbox', 'progress', 'snoozed'];
 
 /** With a team on the page (w-b5f23cff71): two tabs, Needs you and Everything else, and the team's faces at the end. */
 export type TeamTabs = { on: boolean; onNeeds: () => void; onEverything: () => void; corner?: ReactNode;
-  /** The one-list home: the second word is your own In progress, not Everything else. */
-  progress?: { count: number; on: boolean };
+  /** On a computer: Needs you, In progress, Later and Done, each its own tab;
+   *  `away` while a teammate's place is open, so no tab is lit. */
+  states?: { away: boolean; onTab: (v: TabView) => void };
   /** The team's day (team/TodayPage.tsx). */
   today?: { on: boolean; onToday: () => void };
   /** Every task on the team (team/TasksPage.tsx). */
@@ -503,15 +504,17 @@ function StateTabsRow({ view, counts, onView, needs, onSearch, lit = false, afte
   view: TabView; counts: Partial<Record<TabView, number>>; onView: (v: TabView) => void; needs?: string;
   onSearch?: () => void; lit?: boolean; after?: ReactNode; dim?: boolean; team?: TeamTabs | null; keepLater?: boolean;
 }) {
-  // In progress, Later and Done are your own card's tabs on Everything else.
-  const tabs = team ? INBOX_TABS.filter((t) => t.view === 'inbox')
+  // On a phone with a team, In progress, Later and Done are under Everything else.
+  const states = team?.states;
+  const tabs = team && !states ? INBOX_TABS.filter((t) => t.view === 'inbox')
     : INBOX_TABS.filter((t) => t.view !== 'snoozed' || laterTabShown({ count: counts.snoozed ?? 0, view, walking: keepLater }));
-  const on = (t: TabView) => (team ? t === 'inbox' && !team.on && !team.today?.on && !team.tasks?.on && !team.done?.on : view === t && !dim);
+  const on = (t: TabView) => (states ? view === t && !states.away && !dim
+    : team ? t === 'inbox' && !team.on && !team.today?.on && !team.tasks?.on && !team.done?.on : view === t && !dim);
+  const press = (t: TabView) => (states ? (t === 'inbox' ? team!.onNeeds() : states.onTab(t)) : team ? team.onNeeds() : onView(t));
   return <div className="th-bar"><div className="tm-tabs">
     {/* Every tab wears the Tab plate (hint-plate.ts, 'state-tab'). */}
-    {tabs.map((t) => <button type="button" key={t.view} data-hint="state-tab" className={`tm-tab${on(t.view) ? ' on' : ''}${!team && t.view === 'inbox' && lit && view !== 'inbox' ? ' fresh' : ''}${team?.on && t.view === 'inbox' && lit ? ' fresh' : ''}`} onClick={() => (team ? team.onNeeds() : onView(t.view))}>{t.view === 'inbox' && needs ? needs : t.label}{COUNTED.includes(t.view) && !!counts[t.view] && <b>{counts[t.view]}</b>}</button>)}
-    {team && !team.progress && <button type="button" data-hint="state-tab" className={`tm-tab${team.on ? ' on' : ''}`} onClick={team.onEverything}>{EVERYTHING_ELSE}</button>}
-    {team?.progress && <button type="button" data-hint="state-tab" className={`tm-tab${team.progress.on ? ' on' : ''}`} onClick={team.onEverything}>In progress{team.progress.count > 0 && <b>{team.progress.count}</b>}</button>}
+    {tabs.map((t) => <button type="button" key={t.view} data-hint="state-tab" className={`tm-tab${on(t.view) ? ' on' : ''}${!team && t.view === 'inbox' && lit && view !== 'inbox' ? ' fresh' : ''}${team?.on && t.view === 'inbox' && lit ? ' fresh' : ''}`} onClick={() => press(t.view)}>{t.view === 'inbox' && needs ? needs : t.label}{COUNTED.includes(t.view) && !!counts[t.view] && <b>{counts[t.view]}</b>}</button>)}
+    {team && !states && <button type="button" data-hint="state-tab" className={`tm-tab${team.on ? ' on' : ''}`} onClick={team.onEverything}>{EVERYTHING_ELSE}</button>}
     {team?.today && <button type="button" data-hint="state-tab" className={`tm-tab${team.today.on ? ' on' : ''}`} onClick={team.today.onToday}>Today</button>}
     {team?.tasks && <button type="button" data-hint="state-tab" className={`tm-tab${team.tasks.on ? ' on' : ''}`} onClick={team.tasks.onTasks}>Tasks</button>}
     {team?.done && <button type="button" data-hint="state-tab" className={`tm-tab${team.done.on ? ' on' : ''}`} onClick={team.done.onDone}>{DONE.short}</button>}
