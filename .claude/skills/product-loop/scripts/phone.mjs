@@ -20,6 +20,9 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { rerunWithStripTypes } from '../../../../scripts/lib/rerun-with-strip-types.mjs';
+
+rerunWithStripTypes(import.meta.url);
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const { launchChrome, connect, freeProfile } = await import(path.resolve(here, '../../verify-agentbox/scripts/cdp.mjs'));

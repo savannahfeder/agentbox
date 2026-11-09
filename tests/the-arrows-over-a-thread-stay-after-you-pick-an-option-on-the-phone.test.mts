@@ -40,8 +40,8 @@ describe('the walk over an open thread', () => {
   });
   it('is what the thread page walks', () => {
     const page = fs.readFileSync('mobile/src/app/thread/[product]/[id].tsx', 'utf8');
-    expect(page).toMatch(/walkKeeping\(c\.tabs\.inbox, here, walked\.current\)/);
-    expect(page).toMatch(/spotIn\(walk, here\)/);
-    expect(page).toMatch(/stepIn\(walk, here, dir\)/);
+    expect(page).toMatch(/walkKeeping\(needsYouOrder\(asks, .*, inbox\), here, walked\.current\)/);
+    expect(page).toMatch(/needsYouSpot\(walk, here\)/);
+    expect(page).toMatch(/stepOver\(walk, here, dir\)/);
   });
 });

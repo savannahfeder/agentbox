@@ -69,8 +69,8 @@ export interface Plan {
   goes?: { product: string; id: string } | null;
 }
 export interface PressedItem { product: string; id: string; status: string; title?: string; productName?: string; runAt?: number | null; snoozedUntil?: number | null; waitsForMac?: boolean; body?: string; priority?: number; start?: string; engine?: string; model?: string; effort?: string }
-/** Where the computer is: away, and whether Agentbox Cloud starts what is sent meanwhile. */
-export interface Reach { away?: boolean; cloud?: boolean }
+/** Where the computer is: away, and whether Agentbox Cloud starts what is sent meanwhile; `inCloud` is the pressed thread running there now. */
+export interface Reach { away?: boolean; cloud?: boolean; inCloud?: boolean }
 
 // App.tsx's TOAST_TITLE.
 const TOAST_TITLE = 48;
@@ -157,7 +157,7 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
   switch (press.kind) {
     case 'reply': {
       const at = Number(press.choices?.runAt) || 0;
-      const said = at > now ? `Sends ${dayClock(at, now)}${to ? ` → ${to}` : ''}` : waits ? `Waiting for your computer${to ? ` → ${to}` : ''}` : to ? `Sent → ${to}` : 'Sent';
+      const said = at > now ? `Sends ${dayClock(at, now)}${to ? ` → ${to}` : ''}` : reach.inCloud ? `Waiting for Agentbox Cloud${to ? ` → ${to}` : ''}` : waits ? `Waiting for your computer${to ? ` → ${to}` : ''}` : to ? `Sent → ${to}` : 'Sent';
       return press.text.trim() ? reply(press.text, press.choices ?? {}, said, 'Reply withdrawn, back in your inbox') : null;
     }
     case 'pick':
