@@ -30,7 +30,7 @@ describe('a full-screen document whose notes are closed', () => {
   });
 
   it('leaves the reply line on a full-screen page that takes no notes', () => {
-    // A picture or an html page has no notes to close, so neither class is set
+    // A picture has no notes to close, so neither class is set
     // and the line stays, as a-tall-picture-in-full-screen… pins.
     expect(app).toContain('const notesHere = fullScreenDoc && !!focused && openDoc?.product === focused.product && !openDoc.readOnly && takesNotesSidebar(openDoc.src);');
     expect(css).not.toMatch(/\.workspace-layout\[data-artifact-layout="focus"\][^{]*> \.list-pane \{ display: none; \}/);

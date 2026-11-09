@@ -96,7 +96,7 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
     const card = aside.current?.closest('.doc-card');
     if (!card) return;
     const find = () => {
-      const found = card.querySelector<HTMLElement>('.doc-rich-content');
+      const found = card.querySelector<HTMLElement>('.doc-rich-content, .code-scroll');
       if (found !== page.current) { page.current = found; setPageAt((n) => n + 1); }
     };
     find();
@@ -224,7 +224,7 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
             </div>
           )}
           <textarea ref={box} rows={1} value={words} aria-label="Note"
-            placeholder={quote ? 'Your note on these words' : 'Add a note, or select words in the page'}
+            placeholder={quote ? 'Your note on these words' : page.current ? 'Add a note, or select words in the page' : 'Add a note'}
             onChange={(e) => setWords(e.target.value)}
             onPaste={canAttach ? async (e) => {
               if (![...e.clipboardData.items].some((i) => i.kind === 'file')) return;
