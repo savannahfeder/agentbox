@@ -13,7 +13,7 @@ import { canPaintQuotes, paintQuotes } from '../paint-quotes';
 import { firstName, Face } from '../team/people';
 import { clock, type LedgerLine } from '../thread-history';
 import type { ArtifactMark, FileMarks, FileNote, NotePlace, Person } from '../types';
-import { hasSpot, noteSendWords, notesToSendTheAgent, otherFilesOpen, pageSpot, PIN_FRAME_S, pinned, viewOffers, type Found } from '../artifact-pins';
+import { hasSpot, noteSendWords, notesToSendTheAgentAnywhere, otherFilesOpen, unsentWords, pageSpot, PIN_FRAME_S, pinned, viewOffers, type Found } from '../artifact-pins';
 import { commentsInList, notesWithSaving, settleLocally, UNDO_MS } from '../note-saving';
 import { keptDraft, opensForTyping, SAVE_AFTER_A_PAUSE_MS, savedVersionArrived, wordsToSave } from '../edit-sitting';
 import { quotesKey } from '../selection-bar';
@@ -34,6 +34,7 @@ import { FileNoteCard } from './FileNoteCard';
 import { NoteGlyph } from './NoteGlyphs';
 import { ShareLink, canShareFile } from './ShareLink';
 import { paneKey, staysOnNewest } from '../table-follows';
+import { SEND } from '../this-keyboard';
 import './artifact-view.css';
 
 /** `steps`: the paths the arrows step through, in order, when the press came from a turn of the thread. */
@@ -356,8 +357,8 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, lines
     if (!on.length) return;
     failed(await write({ do: 'toagent', on }), 'Those notes did not reach the agent.');
   };
-  const sendNotes = withAgent && version ? notesToSendTheAgent(marks, version, family!.versions.length, people, me) : [];
-  const pressSend = () => toAgent(sendNotes);
+  const unsent = withAgent ? notesToSendTheAgentAnywhere(marks, families, version?.id ?? null, people, me) : { ids: [], elsewhere: 0, elsewhereKind: 'picture' as const };
+  const sendAll = () => toAgent(unsent.ids);
 
   const isNewest = !!family && !!at && at.vi === family.versions.length - 1;
   const canEdit = !!(onNewVersion && kind === 'markdown' && version && isNewest && !version.newer);
@@ -559,10 +560,13 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, lines
       else leave();
     };
     const rest = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey) return;
-      e.stopPropagation();
       const at = e.target as HTMLElement | null;
       const typing = at?.tagName === 'TEXTAREA' || !!at?.isContentEditable;
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !typing && !e.defaultPrevented && unsent.ids.length) {
+        e.preventDefault(); e.stopPropagation(); void sendAll(); return;
+      }
+      if (e.metaKey || e.ctrlKey) return;
+      e.stopPropagation();
       if (typing || followsTheFile || pressedInTheFindBox(e.target)) return;
       if (e.key === 'ArrowRight') { e.preventDefault(); stepFile(1); }
       if (e.key === 'ArrowLeft') { e.preventDefault(); stepFile(-1); }
@@ -608,6 +612,7 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, lines
       if (e.key === 'ArrowUp') { e.preventDefault(); setAsking({ ...asking, sel: (asking.sel - 1 + askingFor.length) % askingFor.length }); return; }
       if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); nameInto(askingFor[asking.sel]); return; }
     }
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !words.trim() && !pictures.length && unsent.ids.length) { e.preventDefault(); void sendAll(); return; }
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); }
   };
 
@@ -722,6 +727,13 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, lines
             <button type="button" className="av-step av-prev" disabled={!stepTo(-1)} onClick={() => stepFile(-1)} aria-label="Previous file">‹</button>
             <button type="button" className="av-step av-next" disabled={!stepTo(1)} onClick={() => stepFile(1)} aria-label="Next file">›</button>
           </>}
+          {offers.comment && unsent.ids.length > 0 && !link && (
+            <div className="av-unsent-bar" role="status">
+              <span className="av-unsent-dot" aria-hidden="true" />
+              <span>{unsentWords(unsent.ids.length, unsent.elsewhere, unsent.elsewhereKind)}</span>
+              <button type="button" className="av-btn av-unsent-send" onClick={() => void sendAll()}>Send all<kbd>{SEND}</kbd></button>
+            </div>
+          )}
           {link && <FileLinkBrowser key={link} url={link} product={product} backTo={kind ? `the ${KIND_WORD[kind].toLowerCase()}` : 'the file'} onClose={closeLink} />}
         </div>
         {(foundNow === 'looking' || offers.comment || openNotes.length > 0 || settled.length > 0) && <aside className="av-side" aria-label="Comments">
@@ -732,12 +744,6 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, lines
                   : earlier ? (version?.edited ? approvalSince(family, at!.vi, marks.approvals, nameOf) : `v${earlier.n} approved, this version is not`) : null}
               </span>
               {offers.approve && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{mineApproved ? 'Approved' : 'Approve'}</button>}
-            </div>
-          )}
-          {offers.comment && sendNotes.length > 0 && (
-            <div className="av-unsent">
-              <span>{sendNotes.length} not sent</span>
-              <button type="button" className="av-btn av-unsent-send" title={`Send ${sendNotes.length === 1 ? 'this comment' : `these ${sendNotes.length} comments`} to your agent`} onClick={() => void pressSend()}><AgentFace />Send</button>
             </div>
           )}
           <div className="av-list">
