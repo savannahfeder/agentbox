@@ -1,7 +1,7 @@
 // The pure half of `npm run setup:feedback` (scripts/set-up-feedback.mjs):
 // everything it works out for you so the only things you type are the Resend
 // key and the address feedback should reach. Tested in
-// tests/setting-up-feedback-asks-for-the-key-and-finds-the-rest.test.mjs.
+// tests/setting-up-feedback-asks-for-the-key-and-finds-the-rest.test.mts.
 
 // "https://<ref>.supabase.co" is how the team cloud's config names the
 // project, so the ref is the first label of that host.

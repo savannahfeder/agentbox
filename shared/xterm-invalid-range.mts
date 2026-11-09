@@ -6,7 +6,7 @@
 // under its own comment "This should not happen unless we have some bugs". It
 // happens. Three ordinary selections reach it, measured against the published
 // bundle; the test beside this file
-// (tests/a-selection-that-covers-no-terminal-cells-is-not-a-crash.test.mjs)
+// (tests/a-selection-that-covers-no-terminal-cells-is-not-a-crash.test.mts)
 // lists them and says how.
 //
 // Only a screen reader user gets that handler at all, because the pane asks

@@ -1580,7 +1580,7 @@ export function Onboarding({
       className="back-esc fr-back"
       onClick={() => onStep(backTo)}
       // No key is named, since no key steps back. Pinned by
-      // tests/the-walk-promises-no-dead-keys.test.mjs.
+      // tests/the-walk-promises-no-dead-keys.test.mts.
       aria-label={COPY.back}
       title={COPY.back}
     >

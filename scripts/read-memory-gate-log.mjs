@@ -9,7 +9,7 @@
 // section ends with how to read it, because both are easy to read backwards.
 //
 // The reading is pure and the printing is not, so the arithmetic is pinned by
-// tests/the-gate-log-reading-adds-up.test.mjs.
+// tests/the-gate-log-reading-adds-up.test.mts.
 
 import fs from 'node:fs';
 import os from 'node:os';

@@ -3,10 +3,11 @@
 // tells real agents to write, so the fixtures double as a schema preview.
 
 import type { AgentSession, FolderListing, Snapshot, WorkspaceSettings } from './types';
+import type { LedgerLine } from './thread-history';
 // The engine ids, labels and the default are read off the one file that holds
 // them rather than typed again here. A fixture that spelled "Claude Code" for
 // itself is a fixture that could go on saying it after the app had stopped.
-import { DEFAULT_ENGINE, ENGINES } from '../../shared/engines.mjs';
+import { DEFAULT_ENGINE, ENGINES } from '../../shared/engines.mts';
 import { BUILT_MODELS } from './models';
 import { CODEX_DEFAULT_MODE } from './codex-modes';
 
@@ -442,11 +443,11 @@ export const fixtureSnapshot: Snapshot = {
     },
   ],
   // ONE CODING AGENT, WHICH IS THE MAC SHE RUNS. The capability gate in
-  // shared/engines.mjs is shut until she writes the moment into
+  // shared/engines.mts is shut until she writes the moment into
   // zero.config.json, so `Supervisor#engineChoices` hands over one entry on
   // every Mac that exists today, and the composer's clause, the byline's engine
   // word and the Settings row all draw nothing off it. That is the founder rule
-  // (tests/one-coding-agent-draws-nothing-new.test.mjs) and it is what the
+  // (tests/one-coding-agent-draws-nothing-new.test.mts) and it is what the
   // default world has to be a photograph of.
   //
   // THE SECOND ENGINE IS A URL MODIFIER, NOT A NEW DEFAULT. See
@@ -568,7 +569,7 @@ export const fixtureTraces: Record<string, Array<{ startedAt: number; text: stri
 // fixtures double as a schema preview and a history that contradicts the row it
 // belongs to would review nothing. The lease heartbeats are left out here for
 // the same reason the main process drops them: they are not events.
-export const fixtureHistory: Record<string, Array<Record<string, any>>> = {
+export const fixtureHistory: Record<string, LedgerLine[]> = {
   // the card whose one page was named in full. The ledger is here so the
   // MESSAGE is on screen beside its file row, because the whole point is that
   // the path she can read in the prose is the file she can press underneath
@@ -1013,7 +1014,7 @@ export const fixtureSettings = {
 // founder rule and not an implementation detail: on every Mac she has, and on
 // every Mac until she writes the opt-in moment into zero.config.json, the
 // screen must be exactly the screen it is today (the whole of
-// tests/one-coding-agent-draws-nothing-new.test.mjs). A two-engine world that
+// tests/one-coding-agent-draws-nothing-new.test.mts). A two-engine world that
 // was the ONLY world would make THAT unphotographable, which is the same defect
 // pointing the other way, and it would silently rewrite every existing
 // scripts/shot-*.mjs picture: two choices in the workspace turn on five
@@ -1093,7 +1094,7 @@ export const fixtureCodexModels: NonNullable<WorkspaceSettings['codexModels']> =
  *  to check the model list against. */
 export const fixtureCodexModelDefault = 'gpt-5.6-sol';
 
-// main/codex-bin.mjs's `INSTALL_URL`, typed rather than imported because the
+// main/codex-bin.mts's `INSTALL_URL`, typed rather than imported because the
 // renderer never imports from main/. The suite holds the two in step.
 const CODEX_INSTALL_URL = 'https://learn.chatgpt.com/docs/codex/cli';
 const CODEX_BIN = '/Users/you/.local/bin/codex';

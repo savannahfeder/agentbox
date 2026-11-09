@@ -7,7 +7,7 @@
 // go rather than what the page may reach, and flattening it would merge the
 // website pane's store into the default one (shared/websites.mts).
 //
-// Pinned by tests/a-website-in-the-pane-cannot-reach-the-app.test.mjs.
+// Pinned by tests/a-website-in-the-pane-cannot-reach-the-app.test.mts.
 
 import type { WebPreferences } from 'electron';
 

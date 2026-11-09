@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { guard, sweep, processes } from '../../../../scripts/lib/chrome-guard.mjs';
-import { MAC_CHROME, NO_HIDDEN_BROWSER, chromesForTesting, headlessShells } from '../../../../shared/hidden-browser.mjs';
+import { MAC_CHROME, NO_HIDDEN_BROWSER, chromesForTesting, headlessShells } from '../../../../shared/hidden-browser.mts';
 
 export { chromesForTesting, headlessShells };
 

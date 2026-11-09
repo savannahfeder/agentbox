@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { projectWritten } from '../store/projects-changed.mjs';
+import { projectWritten } from '../store/projects-changed.mts';
 
 const PROJECT_FILE = 'project.json';
 
@@ -72,7 +72,7 @@ export function teamOf(project: { team?: Record<string, unknown> } | null | unde
     visibility: t.visibility === 'people' ? 'people' : 'team',
     people: Array.isArray(t.people) ? t.people.filter((p) => typeof p === 'string') : [],
     // Who shared it. Runs the rows written before anyone signed in
-    // (shared/team-rules.mjs runnerOf).
+    // (shared/team-rules.mts runnerOf).
     sharedBy: typeof t.sharedBy === 'string' ? t.sharedBy : null,
     // A MESSAGE THREAD between two people (approved 2026-10-01): a shared
     // record the two of them only can see, kept out of every project list.
@@ -93,7 +93,7 @@ export function listSharedProjects(products: { team?: { projectId: string; direc
 
 // YOUR PERSONAL PROJECT (w-b989839656): one per person, made when they sign
 // in, where a thread with no visibility of its own is Only you
-// (shared/thread-cards.mjs visibilityOf). It says so about itself in
+// (shared/thread-cards.mts visibilityOf). It says so about itself in
 // project.json rather than by its name, because "personal" is a name somebody
 // may already have given a project of their own, and that one must stay as it
 // is. Never shared, never remade once it exists, archived or not.

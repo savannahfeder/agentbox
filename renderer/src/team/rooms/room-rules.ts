@@ -2,7 +2,7 @@
 // drawing so they can be tested. tests/a-room-reads-the-way-it-was-approved.
 import type { Person, Room, RoomCard, RoomMention, RoomProfile, ThreadCard } from '../../types';
 import { Name } from '../../../../shared/product-name.mjs';
-import { mentionsIn } from '../../../../shared/room-needs-you.mjs';
+import { mentionsIn } from '../../../../shared/room-needs-you.mts';
 
 type Shares = { me: boolean; teammate: boolean; showActivity: boolean; activity?: unknown[] | null; away?: boolean };
 /** Whose threads reach me as the team's thread cards: my own, or a teammate's who shares them. */

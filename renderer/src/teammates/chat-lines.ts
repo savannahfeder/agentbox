@@ -2,8 +2,8 @@
 // runs leave, in time order, seen whole or through one teammate.
 import type { RunningSession, Teammate, TeamChatLine, TeamRunLine, TeammatesView, WorkItem } from '../types';
 import { spanLabel } from '../notes';
-import { nextRunAt } from '../../../shared/repeats.mjs';
-import { teammateIdOf } from '../../../shared/teammates.mjs';
+import { nextRunAt } from '../../../shared/repeats.mts';
+import { teammateIdOf } from '../../../shared/teammates.mts';
 
 export type ChatEntry = TeamChatLine | TeamRunLine;
 

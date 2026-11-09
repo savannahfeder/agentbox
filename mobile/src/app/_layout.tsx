@@ -22,8 +22,8 @@ const PREVIEW_PHONE = process.env.EXPO_PUBLIC_PREVIEW === '1' && Platform.OS ===
 function useAlertsOpenThreads() {
   useEffect(() => {
     if (Platform.OS === 'web') return;
-    const open =(data: any) => { if (data?.product && data?.id) router.push({ pathname: '/thread/[product]/[id]', params: { product: data.product, id: data.id } }); };
-    const sub = Notifications.addNotificationResponseReceivedListener((r) => open(r.notification.request.content.data));
+    const open =(data: { product?: string; id?: string } | undefined) => { if (data?.product && data?.id) router.push({ pathname: '/thread/[product]/[id]', params: { product: data.product, id: data.id } }); };
+    const sub = Notifications.addNotificationResponseReceivedListener((r) => open(r.notification.request.content.data as { product?: string; id?: string } | undefined));
     return () => sub.remove();
   }, []);
 }

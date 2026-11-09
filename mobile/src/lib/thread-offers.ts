@@ -7,13 +7,14 @@ import { hiddenUntil, parkedByAgent } from '../../../renderer/src/list-rules';
 import { liveLine, livePlace, shortSpan, shortWord, type LiveFacts } from '../../../renderer/src/live-line';
 import { priorityIdOf, type PriorityId } from '../../../renderer/src/priority';
 import { offersRunNow } from '../../../renderer/src/run-now';
-import { splitSlug } from '../../../renderer/src/phone-rows';
+import { splitSlug, type PhoneItem } from '../../../renderer/src/phone-rows';
 import { updatedWord } from '../../../renderer/src/threads/summary-rules';
 import { offersTryAgain } from '../../../renderer/src/try-again';
 import { whyItCannotMove } from '../../../shared/move-thread.mts';
-import { shownPriority } from '../../../shared/rank.mjs';
-import { ruleIdOf } from '../../../shared/repeats.mjs';
-import { doneSteps, summaryOf } from '../../../shared/thread-cards.mjs';
+import { shownPriority } from '../../../shared/rank.mts';
+import { ruleIdOf } from '../../../shared/repeats.mts';
+import { doneSteps, summaryOf } from '../../../shared/thread-cards.mts';
+import type { RunningSession, WorkItem } from '../../../renderer/src/types';
 
 export interface Session { startedAt: number; activity?: { id: string; label: string; detail: string; startedAt?: number }[]; helpers?: number; engine?: string; where?: string; movable?: boolean }
 // What the computer said of the thread when nothing runs on it (phone-rows.ts `waitFacts`), so waiting reads Queued.
@@ -33,7 +34,7 @@ const STOPPED = { word: 'Stopped', line: 'The agent stopped without finishing th
  * computer, 'cloud' there now. A run the cloud could take now is Move to cloud.
  */
 export type Place = 'here' | 'kept' | 'cloud';
-function placeOf(item: any, session: Session | null, cloud: boolean): Place | null {
+function placeOf(item: Pick<WorkItem, 'onMac'>, session: Session | null, cloud: boolean): Place | null {
   if (!cloud || (session?.movable && session.where !== 'cloud')) return null;
   if (item.onMac) return 'kept';
   return session?.where === 'cloud' ? 'cloud' : 'here';
@@ -49,15 +50,15 @@ export const PLACE_ROW: Record<Place, { label: string; detail: string; keep: boo
 const whenLabel = (ts: number, now: number) => `${dayLabel(ts, now).toLowerCase()} ${new Date(ts).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
 
 /** When the thread comes back on its own: App.tsx `returnAt`. */
-export const returnAt = (item: any) => Math.max(Number(item.runAt) || 0, hiddenUntil(item));
+export const returnAt = (item: WorkItem) => Math.max(Number(item.runAt) || 0, hiddenUntil(item));
 
-export function offersOf(item: any, { session, inProgress, now, cloud = false, ...waits }: Facts) {
+export function offersOf(item: PhoneItem, { session, inProgress, now, cloud = false, ...waits }: Facts) {
   const back = returnAt(item);
   const byAgent = parkedByAgent(item, now);
   // A thread its computer has made, and not an agent's own session.
   const made = !item.agent && !item.waitsForMac;
   const open = made && item.status !== 'done';
-  const tryAgain = made && offersTryAgain(item, { ...waits, session: session as any, inProgress, now });
+  const tryAgain = made && offersTryAgain(item, { ...waits, session: session as RunningSession | null, inProgress, now });
   return {
     rename: made,
     // The desktop's menu offers a level and a move only while the thread is open (Focus.tsx `canFinish`).
@@ -73,7 +74,7 @@ export function offersOf(item: any, { session, inProgress, now, cloud = false, .
     move: made && whyItCannotMove(item, { live: !!session }) === null,
     // In the open reply box's send slot while nothing is typed (Focus.tsx `stopButton`).
     stop: inProgress && !item.agent,
-    runNow: offersRunNow(item, { session: session as any, queued: [], runNow: [], inProgress }),
+    runNow: offersRunNow(item, { session: session as RunningSession | null, queued: [], runNow: [], inProgress }),
     // A run on the computer the cloud could take now (Supervisor#liveFor).
     moveToCloud: !!session?.movable && session.where !== 'cloud' && !item.agent,
     // Only a running Claude Code step can be cut (ItemThread.tsx).
@@ -106,12 +107,12 @@ export function ruleFor(item: { product: string; labels?: string[] }, rules: rea
 }
 
 /** The line under the conversation while an agent is on it, or what is true instead. */
-export function liveOf(item: any, { session, inProgress, now, cloud: _cloud, ...waits }: Facts) {
+export function liveOf(item: WorkItem, { session, inProgress, now, cloud: _cloud, ...waits }: Facts) {
   if (waits.stalled && !session && item.status !== 'done' && !item.agent) {
     const line = item.answer && item.answer !== '(withdrawn)' ? STOPPED.waiting : STOPPED.line;
     return { state: 'stalled' as const, working: false, line, word: STOPPED.word, more: 0, span: null, rows: [] };
   }
-  const live = liveLine(item, { session: session as any, inProgress, now, ...waits });
+  const live = liveLine(item, { session: session as RunningSession | null, inProgress, now, ...waits });
   if (!live) return null;
   const working = live.state === 'working';
   const activity = session?.activity ?? [];
@@ -123,7 +124,7 @@ export function liveOf(item: any, { session, inProgress, now, cloud: _cloud, ...
     more: Math.max(0, activity.length - 1),
     span: session ? shortSpan(Math.max(0, now - session.startedAt)) : null,
     // "in the cloud" on a cloud run, as the web app's working line ends (live-line.ts `livePlace`).
-    place: livePlace({ session: session as any }, { tab: true })?.word ?? null,
+    place: livePlace({ session: session as RunningSession | null }, { tab: true })?.word ?? null,
     rows: activity.map((a) => ({ label: a.label, detail: a.detail })),
   };
 }
@@ -136,8 +137,8 @@ export const FILED_WORDS = { START_NEW: 'New thread', DO_HERE: 'Do here', DISMIS
 export const waitingWords = (n: number): string => `${n} proposal${n === 1 ? '' : 's'} waiting on you`;
 
 /** The level a thread shows is the level it runs at. */
-export const shownLevel = (item: any): PriorityId => priorityIdOf(shownPriority(item));
+export const shownLevel = (item: Pick<WorkItem, 'priority'>): PriorityId => priorityIdOf(shownPriority(item));
 
-export function summaryParts(item: any, now: number) {
+export function summaryParts(item: WorkItem, now: number) {
   return { steps: doneSteps(summaryOf(item).progress) as string[], updated: updatedWord(item, { me: null, now }) };
 }

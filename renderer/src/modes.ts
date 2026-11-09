@@ -133,7 +133,7 @@ export const MODE_TYPED: Record<PermissionMode, string[]> = {
  * registers it as `name:"plan"` with no slash in the string, so grepping the
  * binary for "/plan" finds nothing and proves nothing. The other five are
  * spelled from Claude Code's mode values. The wording of this comment is
- * pinned by tests/the-slash-picks-a-mode.test.mjs. */
+ * pinned by tests/the-slash-picks-a-mode.test.mts. */
 export const MODE_COMMAND: Record<PermissionMode, string> = {
   default: '/manual',
   acceptEdits: '/accept-edits',

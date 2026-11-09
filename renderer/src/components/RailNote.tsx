@@ -122,7 +122,7 @@ export function RailNote({ product, oneLiner, onNotice }: {
     // initials and shorthand, so it would rarely be anything else.
     editorProps: { attributes: { spellcheck: 'false' } },
     onUpdate: ({ editor: ed }) => {
-      pending.current = pmDocToMd(ed.getJSON() as any).trim();
+      pending.current = pmDocToMd(ed.getJSON()).trim();
       dirty.current = true;
       if (saveTimer.current != null) window.clearTimeout(saveTimer.current);
       saveTimer.current = window.setTimeout(() => { void save(); }, SAVE_DEBOUNCE_MS);

@@ -1,6 +1,6 @@
 // AN AGENT'S MESSAGE TO SOMEONE ALREADY ALLOWED, IN ITS TEN SECONDS. Once its
 // owner said "from now on" it asks no more, so this is the last look at the
-// words, and the only Undo (main/teammate-reach.mjs holds it).
+// words, and the only Undo (main/teammate-reach.mts holds it).
 import { useEffect, useState } from 'react';
 import { sendingWords } from './agent-sending';
 

@@ -1,6 +1,6 @@
 // WHERE THIS MACHINE KEEPS THE TEAM CLOUD'S ADDRESS, for the phone site's
 // build and deploy: the checkout's own cloud/team.config.json, else the one in
-// the home folder that main/team/session.mjs also reads. Neither is committed.
+// the home folder that main/team/session.mts also reads. Neither is committed.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

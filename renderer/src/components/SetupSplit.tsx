@@ -13,7 +13,7 @@ import type { Snapshot } from '../types';
 import type { SessionThread } from '../agent-import-card';
 import { ago } from '../format';
 import { MAC } from '../this-keyboard';
-import { starterAsks } from '../../../shared/teammates.mjs';
+import { starterAsks } from '../../../shared/teammates.mts';
 import { SKY_THEMES, drawSky } from '../home/sky';
 import { typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupStep } from '../setup-split';
 import FolderPicker from './FolderPicker';

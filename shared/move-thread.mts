@@ -30,13 +30,13 @@ export interface MovableThread {
   result?: string;
   note?: string;
   agent?: unknown;
-  [field: string]: unknown;
+  wrote?: NotedItem['wrote'];
 }
 
 // Every word somebody might type into ⌘K reaching for this. "file" and
 // "project" are in here because that is what the tester typed first: "pro"
 // offered New project… and Projects… and nothing else.
-import { notShipped } from './not-shipped.mts';
+import { notShipped, type NotedItem } from './not-shipped.mts';
 
 export const MOVE_KEYWORDS: string = 'move to project file refile wrong another switch put';
 
@@ -125,10 +125,11 @@ export const CARRIED_AFTERWARDS: string[] = ['parent', 'label', 'problem'];
 const RUN_LABEL = (label: string) => label === 'ship' || label === 'clean' || label.startsWith('repeat:');
 
 /** The content of `item`, machinery left behind. */
-export function whatMoves(item: MovableThread): Record<string, unknown> {
+export function whatMoves(item: object): Record<string, unknown> {
   const out: Record<string, unknown> = {};
+  const fields = item as Record<string, unknown>;
   for (const field of CARRIED) {
-    let value = item?.[field];
+    let value = fields?.[field];
     if (value === undefined || value === null) continue;
     if (field === 'labels' && Array.isArray(value)) value = value.filter((l) => typeof l === 'string' && !RUN_LABEL(l));
     if (Array.isArray(value) ? value.length : value !== '') out[field] = value;

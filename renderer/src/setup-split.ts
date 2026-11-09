@@ -84,10 +84,9 @@ export function typingInSetup(target: { closest(sel: string): unknown } | null):
   return field ? 'typing' : 'keys';
 }
 
-/** Where a new install's look starts: Home on and the dark orange sky, unless someone already chose. */
-export function setupStartsOn({ home, sky }: { home: string | null; sky: string | null }): { home: boolean; sky: string | null } {
-  const on = home !== '0';
-  return { home: on, sky: on && !sky ? 'ember' : null };
+/** The sky a new install starts in: the dark orange sky, unless someone already chose one. */
+export function setupStartsOn({ sky }: { sky: string | null }): string | null {
+  return sky ? null : 'ember';
 }
 
 /** The walkthrough's place: the lit row or one past what is done, whichever is further. TourList keeps it from going back. */

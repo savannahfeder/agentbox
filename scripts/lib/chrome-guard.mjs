@@ -27,7 +27,7 @@
 
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { MAC_CHROME, startableChrome } from '../../shared/hidden-browser.mjs';
+import { MAC_CHROME, startableChrome } from '../../shared/hidden-browser.mts';
 
 export { startableChrome };
 

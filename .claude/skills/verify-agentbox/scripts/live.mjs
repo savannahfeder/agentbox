@@ -42,10 +42,10 @@ export const REPO = path.resolve(here, '../../../..');
 // VERIFY_ROOT: a long-lived copy that must survive a restart, which empties /tmp.
 export const ROOT = process.env.VERIFY_ROOT || '/tmp/agentbox-verify';
 export const RUNS = path.join(ROOT, 'runs');
-const { FRESH_USER_ENV } = await import(path.join(REPO, 'shared', 'fresh-user-home.mjs'));
+const { FRESH_USER_ENV } = await import(path.join(REPO, 'shared', 'fresh-user-home.mts'));
 const { listCloudLogins } = await import(path.join(REPO, 'main', 'cloud', 'logins.mts'));
 const { stripTypesFlags } = await import(path.join(REPO, 'main', 'strip-types.mts'));
-const { accountIdentity, nameForOrganization } = await import(path.join(REPO, 'main', 'account-tooling.mjs'));
+const { accountIdentity, nameForOrganization } = await import(path.join(REPO, 'main', 'account-tooling.mts'));
 const KEY = crypto.createHash('sha1').update(REPO).digest('hex').slice(0, 8);
 /** One copy per checkout, or per name within it (`VERIFY_INSTANCE`), so a power test can run one copy per tester. */
 export function instanceDir(name = process.env.VERIFY_INSTANCE) {
@@ -178,7 +178,7 @@ export function teamEnv(file) {
 
 /** The Codex this Mac has, found the way the app finds it, or null. */
 async function realCodex() {
-  const { findCodexBin } = await import(path.join(REPO, 'main', 'codex-bin.mjs'));
+  const { findCodexBin } = await import(path.join(REPO, 'main', 'codex-bin.mts'));
   try { const f = findCodexBin({}); return f.found ? f.path : null; } catch { return null; }
 }
 
@@ -271,7 +271,7 @@ async function prepare(real, setupName = null, { logins = 2, codex = true, proje
     // The Claude Code this Mac has, found the way the app finds it, then
     // linked into the setup's home where the installer puts it. `claudeBin`
     // stays unset, so the copy finds it in that home as a person's would.
-    const { findClaudeBin } = await import(path.join(REPO, 'main', 'claude-bin.mjs'));
+    const { findClaudeBin } = await import(path.join(REPO, 'main', 'claude-bin.mts'));
     let mine = null;
     try { const f = findClaudeBin({}); mine = f.found ? fs.realpathSync(f.path) : null; } catch { /* none */ }
     if (!mine) stop('setups run the real Claude Code, and this Mac has none.');
@@ -439,7 +439,7 @@ async function start(state) {
     // The fresh-user flag is the app's own word for "this copy is nobody": no
     // team cloud even on a Mac that has a team key (so no sign-in screen and
     // nothing written to the shared project), and any counts go under the one
-    // id that names itself as not a person (shared/fresh-user-home.mjs).
+    // id that names itself as not a person (shared/fresh-user-home.mts).
     [FRESH_USER_ENV]: '1',
     ...(state.teamFile ? teamEnv(state.teamFile) : {}) };
   if (state.claudeModel) {
@@ -587,7 +587,7 @@ async function up(args) {
   const cloud = args.includes('--cloud');
   if (cloud && !real) stop('--cloud runs real agents on this Mac\'s cloud setup: add --real.');
   if (cloud) {
-    const { readCloudConfig } = await import(path.join(REPO, 'main', 'cloud', 'config.mjs'));
+    const { readCloudConfig } = await import(path.join(REPO, 'main', 'cloud', 'config.mts'));
     if (!readCloudConfig()) stop('--cloud needs a Mac set up for the cloud (~/.agentbox/cloud.json, made by scripts/cloud-setup.mjs).');
   }
   if (installed) {

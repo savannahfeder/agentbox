@@ -79,7 +79,7 @@ export function capWord(glyph: string, mac: boolean = MAC): string | null {
  *
  *  A component opts in by writing `data-hint="<id>"` on itself; the id is
  *  looked up here. Adding a component means adding it in both places, and
- *  `tests/the-hint-plate.test.mjs` holds the two lists to each other so a
+ *  `tests/the-hint-plate.test.mts` holds the two lists to each other so a
  *  `data-hint` with nothing to say cannot ship.
  */
 export const HINTS: Record<string, HintLine[]> = {
