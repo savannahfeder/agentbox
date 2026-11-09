@@ -5,7 +5,10 @@
 // invite your team, add AI teammates, pick a look, then the inbox. Most people
 // using it are not on a team, so a step that cannot apply on this build is not
 // shown at all rather than shown and skipped. Measured against the designs in
-// the thread's final-flow folder.
+// the thread's final-flow folder. Two synthetic testers then found the AI
+// teammates step offered after the folder was skipped, where it can only answer
+// "make a project first", and four sky looks offered on a copy with Home off,
+// where a sky is never drawn and picking one changed nothing on screen.
 import { describe, it, expect } from 'vitest';
 import {
   setupSteps, stepLabel, connectTiles, CONNECT_FIRST, lookChoices, starterChoices, inviteList, setUpLines, tourChecklist,
@@ -13,20 +16,26 @@ import {
 
 describe('which steps the setup shows', () => {
   it('shows every step on a team build with chats and teammates on', () => {
-    expect(setupSteps({ chats: 3, team: true, teammates: true })).toEqual(['chats', 'connect', 'invite', 'teammates', 'look']);
+    expect(setupSteps({ chats: 3, team: true, teammates: true, project: true })).toEqual(['chats', 'connect', 'invite', 'teammates', 'look']);
   });
   it('asks for a folder instead of chats when this computer has none', () => {
-    expect(setupSteps({ chats: 0, team: true, teammates: true })[0]).toBe('folder');
+    expect(setupSteps({ chats: 0, team: true, teammates: true, project: true })[0]).toBe('folder');
   });
   it('leaves out inviting on a build with no team cloud', () => {
-    expect(setupSteps({ chats: 2, team: false, teammates: true })).not.toContain('invite');
+    expect(setupSteps({ chats: 2, team: false, teammates: true, project: true })).not.toContain('invite');
   });
   it('leaves out AI teammates while they are off', () => {
-    expect(setupSteps({ chats: 2, team: true, teammates: false })).not.toContain('teammates');
+    expect(setupSteps({ chats: 2, team: true, teammates: false, project: true })).not.toContain('teammates');
   });
   it('counts steps from the list it shows', () => {
-    const steps = setupSteps({ chats: 1, team: false, teammates: false });
+    const steps = setupSteps({ chats: 1, team: false, teammates: false, project: true });
     expect(stepLabel(steps, 'connect')).toBe('Step 2 of 3');
+  });
+  it('leaves out AI teammates when there is no project for them to work in', () => {
+    expect(setupSteps({ chats: 0, team: false, teammates: true, project: false })).toEqual(['folder', 'connect', 'look']);
+  });
+  it('keeps AI teammates once a project exists, however it was made', () => {
+    expect(setupSteps({ chats: 0, team: false, teammates: true, project: true })).toContain('teammates');
   });
 });
 
@@ -46,15 +55,23 @@ describe('the tools offered first', () => {
 
 describe('the looks offered', () => {
   it('puts the look you have first, then the dark orange sky', () => {
-    expect(lookChoices('sage').slice(0, 2)).toEqual(['sage', 'ember']);
+    expect(lookChoices('sage', true).slice(0, 2)).toEqual(['sage', 'ember']);
   });
   it('does not offer the light pink sky unless you already wear it', () => {
-    expect(lookChoices('light')).not.toContain('dusk-light');
-    expect(lookChoices('dusk-light')[0]).toBe('dusk-light');
+    expect(lookChoices('light', true)).not.toContain('dusk-light');
+    expect(lookChoices('dusk-light', true)[0]).toBe('dusk-light');
   });
   it('lists each look once', () => {
-    const l = lookChoices('ember');
+    const l = lookChoices('ember', true);
     expect(new Set(l).size).toBe(l.length);
+  });
+  it('offers only Light and Dark where no sky is drawn, the one you have first', () => {
+    expect(lookChoices('dark', false)).toEqual(['dark', 'light']);
+    expect(lookChoices('light', false)).toEqual(['light', 'dark']);
+  });
+  it('counts a sky you wear without Home as its own light or dark', () => {
+    expect(lookChoices('dusk', false)).toEqual(['dark', 'light']);
+    expect(lookChoices('sage', false)).toEqual(['light', 'dark']);
   });
 });
 

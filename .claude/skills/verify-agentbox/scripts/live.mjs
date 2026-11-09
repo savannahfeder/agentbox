@@ -478,6 +478,8 @@ async function start(state) {
   if (state.toolsFixture) Object.assign(env, { AGENTBOX_TOOLS_FIXTURE: state.toolsFixture, AGENTBOX_TOOLS_FIXTURE_OPEN: path.join(INSTANCE, 'oauth-url.txt') });
   // `up --tool-standins <file>`: real tiles on the stand-ins in scripts/standin-tools.mjs.
   if (state.toolStandins) Object.assign(env, { AGENTBOX_TOOLS_STANDINS: fs.readFileSync(state.toolStandins, 'utf8'), AGENTBOX_TOOLS_FIXTURE_OPEN: path.join(INSTANCE, 'oauth-url.txt') });
+  // The tab draws its own folder picker; osascript's would open on the owner's screen.
+  env.AGENTBOX_NO_SYSTEM_WINDOWS = '1';
   if (state.cloudTmp) { fs.mkdirSync(state.cloudTmp, { recursive: true, mode: 0o700 }); env.TMPDIR = state.cloudTmp; }
   if (state.standInCloud) await startStandInCloud(state);
   if (state.cloudAccounts) env.AGENTBOX_CLOUD_ACCOUNTS = state.cloudAccounts;

@@ -18,6 +18,7 @@ import { SKY_THEMES, drawSky } from '../home/sky';
 import { connectTiles, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupStep } from '../setup-split';
 import { logoOf } from '../connections/logos';
 import FolderPicker from './FolderPicker';
+import { Name } from '../../../shared/product-name.mjs';
 import './setup-split.css';
 
 const CMD = MAC ? '⌘' : 'Ctrl';
@@ -71,6 +72,8 @@ export interface SetupSplitProps {
   projectFor: (folder: string) => Promise<{ slug: string; name: string } | null>;
   /** The look worn now, as a look id: a sky theme's id, light or dark. */
   look: string;
+  /** Whether a sky is drawn here (Home is on); without it the looks are Light and Dark. */
+  skies: boolean;
   onLook: (id: string) => void;
   onDone: (brought: number) => void;
 }
@@ -78,11 +81,15 @@ export interface SetupSplitProps {
 export function SetupSplit(p: SetupSplitProps) {
   const team = !!p.snap?.team?.configured;
   const teammatesOn = !!p.snap?.alpha?.teammates;
-  const steps = useMemo(() => setupSteps({ chats: p.chats.length, team, teammates: teammatesOn }), [p.chats.length, team, teammatesOn]);
   const [at, setAt] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState({ chats: 0, project: null as string | null, tools: 0, invited: 0, teammates: [] as string[] });
+  const hadProject = useRef((p.snap?.products?.length ?? 0) > 0).current;
+  const project = hadProject || !!done.project || done.chats > 0;
+  const steps = useMemo(() => setupSteps({ chats: p.chats.length, team, teammates: teammatesOn, project }), [p.chats.length, team, teammatesOn, project]);
+  // Picking a look must not reorder the list under the pointer.
+  const looks = useRef(lookChoices(p.look, p.skies)).current;
   const finished = at >= steps.length;
   const step: SetupStep | null = finished ? null : steps[at];
 
@@ -282,7 +289,6 @@ export function SetupSplit(p: SetupSplitProps) {
     </>;
   } else if (step === 'look') {
     head = ['Pick your look.', 'The app changes as you choose.'];
-    const looks = lookChoices(p.look);
     body = <>
       <div className="ss-list">
         {looks.map((id, i) => <Row key={id} face={<Strip look={id} />} name={LOOK_NAME(id)} sub={i === 0 && id === p.look ? 'What you’re using now' : undefined}
@@ -302,7 +308,7 @@ export function SetupSplit(p: SetupSplitProps) {
   return <>{createPortal(
     <div className="setup-split" role="dialog" aria-label="Set up">
       <div className="ss-left">
-        <div className="ss-brand"><Mark />Agentbox</div>
+        <div className="ss-brand"><Mark />{Name}</div>
         <div className="ss-steps">
           {steps.map((s, i) => <i key={s} className={i < at ? 'ss-was' : i === at ? 'ss-is' : ''} />)}
           <span>{step ? stepLabel(steps, step) : 'All set'}</span>
@@ -315,7 +321,7 @@ export function SetupSplit(p: SetupSplitProps) {
         </div>
       </div>
 
-      <div className="ss-right" aria-hidden="true"><div className="ss-cap">Your Agentbox so far</div></div>
+      <div className="ss-right" aria-hidden="true"><div className="ss-cap">Your {Name} so far</div></div>
     </div>,
     document.body,
   )}

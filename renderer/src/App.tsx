@@ -8900,7 +8900,7 @@ export default function App() {
           surfaces at once would photograph the welcome screen. */}
       {fresh && !modeDraft && arm === 'classic' && <ClassicFirstRun snap={snap} home={home} onDone={finishClassic} />}
       {fresh && !modeDraft && arm === 'tour' && <FirstRunFlow snap={snap} home={home} onDone={finishFresh}
-        look={homeSet.skyTheme ?? (resolveTheme(theme) === 'light' ? 'light' : 'dark')}
+        look={(homeSet.on && homeSet.skyTheme) || (resolveTheme(theme) === 'light' ? 'light' : 'dark')} skies={homeSet.on}
         onLook={(id) => { if (id === 'light') chooseLook('light'); else if (id === 'dark') chooseLook('ember-grid'); else chooseSkyTheme(id); }}
         onSetup={() => { setFocused(null); setView('inbox'); if (homeSet.on) setHomeOpen(true); }} />}
       <OpenLesson at={lessonAt} />

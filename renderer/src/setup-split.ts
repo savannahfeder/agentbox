@@ -4,11 +4,12 @@
 
 export type SetupStep = 'chats' | 'folder' | 'connect' | 'invite' | 'teammates' | 'look';
 
-/** Only the steps that can apply on this build: most people are not on a team. */
-export function setupSteps({ chats, team, teammates }: { chats: number; team: boolean; teammates: boolean }): SetupStep[] {
+/** Only the steps that can apply on this build: most people are not on a team,
+ *  and an AI teammate needs a project to work in. */
+export function setupSteps({ chats, team, teammates, project }: { chats: number; team: boolean; teammates: boolean; project: boolean }): SetupStep[] {
   const out: SetupStep[] = [chats > 0 ? 'chats' : 'folder', 'connect'];
   if (team) out.push('invite');
-  if (teammates) out.push('teammates');
+  if (teammates && project) out.push('teammates');
   out.push('look');
   return out;
 }
@@ -25,8 +26,14 @@ export function connectTiles<T extends TileLike>(tiles: T[]): T[] {
 
 /** Ids in shared sky themes and skins.ts: Light and Dark are the plain looks. */
 const LOOK_ORDER = ['ember', 'dusk', 'aurora', 'sage', 'light', 'dark'];
-/** The look you have first, then the dark orange sky; the light pink sky only if you already wear it. */
-export function lookChoices(current: string): string[] {
+const LIGHT_SKIES = ['sage', 'dusk-light'];
+/** The look you have first, then the dark orange sky; the light pink sky only if you already wear it.
+ *  A sky is drawn only on Home, so without it the choice is Light or Dark. */
+export function lookChoices(current: string, skies: boolean): string[] {
+  if (!skies) {
+    const plain = current === 'light' || LIGHT_SKIES.includes(current) ? 'light' : 'dark';
+    return [plain, plain === 'light' ? 'dark' : 'light'];
+  }
   return [current, ...LOOK_ORDER.filter((l) => l !== current)];
 }
 

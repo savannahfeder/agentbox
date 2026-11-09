@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import { MAC } from '../this-keyboard';
 import { tourChecklist } from '../setup-split';
 import type { Lesson, Tour } from '../tour';
+import { Name } from '../../../shared/product-name.mjs';
 import './setup-split.css';
 
 const Tick = () => <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3.5 8.4l3 3 6-6.6" /></svg>;
@@ -19,9 +20,9 @@ export function TourList({ tour, now, onSkip }: { tour: Tour; now: Lesson | null
   }, []);
   const rows = tourChecklist(tour.done, MAC ? '⌘' : 'Ctrl', now);
   return (
-    <aside className="tour-list" aria-label="How Agentbox works">
+    <aside className="tour-list" aria-label={`How ${Name} works`}>
       <div className="tl-body">
-        <h2 className="ss-h"><b>How Agentbox works.</b>Try each step on the real thing.</h2>
+        <h2 className="ss-h"><b>How {Name} works.</b>Try each step on the real thing.</h2>
         <div className="ss-list">
           {rows.map((r, i) => (
             <div key={r.label} className={`ss-row${r.state === 'now' ? ' ss-on' : ''}`}>

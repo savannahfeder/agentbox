@@ -115,6 +115,11 @@ export function holdersOf(profile, list = processes, chrome = CHROME) {
   return list().filter((p) => p.command.startsWith(bundle) && flag.test(p.command)).map((p) => p.pid);
 }
 
+/** EPERM is a process this one may not signal, such as a Chrome the harness opened outside a tester's sandbox: it is there. */
+export function isRunning(pid, kill = process.kill.bind(process)) {
+  try { kill(pid, 0); return true; } catch (e) { return e?.code === 'EPERM'; }
+}
+
 /** Stop any Chrome still on this profile: one that will not answer keeps its lock, and every Chrome after it exits. */
 export function freeProfile(profile, bin = CHROME) {
   const pids = holdersOf(profile, processes, bin);

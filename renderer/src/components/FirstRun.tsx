@@ -57,11 +57,12 @@ const said = (when: number) => {
   return /^\d/.test(a) ? `${a} ago` : a;
 };
 
-export function FirstRunFlow({ snap, home, onDone, look = 'light', onLook, onSetup }: {
+export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false, onLook, onSetup }: {
   snap: Snapshot | null;
   home: string;
   /** The look worn now and how to change it, for the setup's look step. */
   look?: string;
+  skies?: boolean;
   onLook?: (id: string) => void;
   /** Called as the setup beside the app opens, so the app behind it can show Home. */
   onSetup?: () => void;
@@ -236,7 +237,7 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', onLook, onSet
   if (screen === 'setup') {
     return <SetupSplit snap={snap} chats={chats} ticks={chatTicks} nameOf={nameOf}
       onToggle={(id) => setChatTicks((had) => { const n = new Set(had); if (n.has(id)) n.delete(id); else n.add(id); return n; })}
-      bringIn={bringIn} projectFor={(folder) => projectFor(folder)} look={look} onLook={(id) => onLook?.(id)} onDone={onDone} />;
+      bringIn={bringIn} projectFor={(folder) => projectFor(folder)} look={look} skies={skies} onLook={(id) => onLook?.(id)} onDone={onDone} />;
   }
 
   return (
