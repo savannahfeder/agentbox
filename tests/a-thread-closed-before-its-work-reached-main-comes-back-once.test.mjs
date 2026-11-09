@@ -82,7 +82,7 @@ describe('the sweep', () => {
 
   it('runs on the supervisor\'s tick, over the rows it already read', () => {
     const src = fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8');
-    expect(src).toMatch(/const items = this\.store\.listItems\(now\);\n\s*this\.bringBackWhatNeverShipped\(items\);/);
+    expect(src).toMatch(/const items = this\.resolveAnsweredNotes\(now, listed\) \? this\.store\.listItems\(now\) : listed;\n\s*this\.bringBackWhatNeverShipped\(items\);/);
   });
 });
 

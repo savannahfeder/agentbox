@@ -326,8 +326,10 @@ function linesUpTo(fd, end, ids) {
 
 // One item as of `now`: a copy, with the lease rule that `foldWorkItems` applies
 // at the end of its own pass applied here instead. The two mutable fields a
-// caller can reach through a spread are copied with it.
-function aged(item, now) {
+// caller can reach through a spread are copied with it. `also` is written over
+// it in the same copy, so a caller adding fields need not copy it again.
+/** @param {Record<string, unknown> | null} [also] */
+function aged(item, now, also = null) {
   const claimExpired = !!(item.claim && item.claim.leaseUntil < now);
   const out = {
     ...item,
@@ -335,15 +337,21 @@ function aged(item, now) {
     wrote: { ...item.wrote },
     claim: item.claim ? { ...item.claim } : item.claim,
     claimExpired,
+    ...also,
   };
   if (out.status === 'claimed' && (!out.claim || claimExpired)) out.status = 'open';
   return out;
 }
 
-/** Every work item in one product, folded. */
-export function readWorkItems(projectDir, now = Date.now()) {
+/**
+ * Every work item in one product, folded, each with `also` on it.
+ * @param {string} projectDir
+ * @param {number} [now]
+ * @param {Record<string, unknown> | null} [also]
+ */
+export function readWorkItems(projectDir, now = Date.now(), also = null) {
   const out = [];
-  for (const item of foldedLedger(ledgerPath(projectDir)).values()) out.push(aged(item, now));
+  for (const item of foldedLedger(ledgerPath(projectDir)).values()) out.push(aged(item, now, also));
   return out;
 }
 

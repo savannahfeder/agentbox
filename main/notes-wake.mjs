@@ -6,10 +6,10 @@ import { submitReply } from './live-replies.mts';
 // The next version from whoever a comment went to resolves it, so nobody presses
 // Resolve on what the agent or a teammate already fixed. Only the thread's own
 // copy writes it; a direct conversation has two.
-export function resolveAnsweredNotes({ store, people = [], now = Date.now() }) {
+export function resolveAnsweredNotes({ store, people = [], now = Date.now(), items = null }) {
   const direct = new Set(store.listProducts().filter((p) => p.team?.direct).map((p) => p.slug));
   let resolved = 0;
-  for (const item of store.listItems(now)) {
+  for (const item of items ?? store.listItems(now)) {
     if (direct.has(item.product)) continue;
     if (!(item.artifacts?.notes ?? []).some((n) => !n.resolved && (n.sent || people.length))) continue;
     const lines = readItemHistory(store.productDir(item.product), item.id, { max: Number.MAX_SAFE_INTEGER });

@@ -419,16 +419,15 @@ export class Store {
     // for the whole fold rather than a file read per row (main/answer-modes.mts).
     const modes = answerModes({ now });
     for (const product of this.listProducts()) {
-      let items: StoreItem[] = [];
+      let rows: (StoreItem & { product: string })[] = [];
       try {
-        items = workItemsDisk.readWorkItems(product.dir, now);
+        rows = workItemsDisk.readWorkItems(product.dir, now, { product: product.slug, productName: product.name });
       } catch (err) {
         console.warn(`zero: unreadable work items for ${product.slug}: ${(err as Error).message}`);
         continue;
       }
-      for (const item of items) {
-        const row = { ...item, product: product.slug, productName: product.name };
-        const key = `${product.slug}/${item.id}`;
+      for (const row of rows) {
+        const key = `${product.slug}/${row.id}`;
         if (key in modes) row.answerMode = modes[key];
         all.push(row);
       }

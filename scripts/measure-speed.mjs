@@ -14,7 +14,7 @@ import crypto from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { monitorEventLoopDelay, performance } from 'node:perf_hooks';
+import { PerformanceObserver, constants, monitorEventLoopDelay, performance } from 'node:perf_hooks';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -110,6 +110,8 @@ async function serve(port) {
   const loop = monitorEventLoopDelay({ resolution: 10 });
   loop.enable();
   setInterval(() => { log({ loopMax: Math.round(loop.max / 1e6) }); loop.reset(); }, 5000).unref();
+  // On a swapping Mac each collection pages the heap back in, so how often it runs matters.
+  new PerformanceObserver((list) => { for (const e of list.getEntries()) log({ gc: Math.round(e.duration * 10) / 10, major: e.detail?.kind === constants.NODE_PERFORMANCE_GC_MAJOR }); }).observe({ entryTypes: ['gc'] });
   sup.start();
   const token = newToken();
   createServer({ channels: booted.channels, token, listeners: booted.window.listeners, dist: path.join(repo, 'renderer', 'dist'), files: picturesTheAppOwns(booted) })
@@ -172,6 +174,9 @@ function report(lines) {
   const ticks = lines.filter((l) => l.tick != null).map((l) => l.tick);
   if (ticks.length) console.log(`\nAgents' clock: ${ticks.length} ticks, average ${Math.round(ticks.reduce((a, b) => a + b, 0) / ticks.length)} ms, longest ${Math.max(...ticks)} ms`);
   console.log(`Longest stall in any 5 s: ${Math.max(0, ...lines.filter((l) => l.loopMax != null).map((l) => l.loopMax))} ms`);
+  const gcs = lines.filter((l) => l.gc != null);
+  const majors = gcs.filter((l) => l.major);
+  console.log(`Garbage collections: ${gcs.length}, ${Math.round(gcs.reduce((a, l) => a + l.gc, 0))} ms in all; ${majors.length} full, ${Math.round(majors.reduce((a, l) => a + l.gc, 0))} ms`);
   const freezes = lines.filter((l) => l.freeze);
   console.log(`\nFreezes of 200 ms or more: ${freezes.length}`);
   let last = null;

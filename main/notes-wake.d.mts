@@ -17,7 +17,7 @@ interface NoteReplyStore extends Omit<NotesStore, 'listItems'> {
 }
 
 /** Resolves the notes a newer version answered; returns how many. */
-export function resolveAnsweredNotes(opts: { store: NotesStore; people?: readonly Person[]; now?: number }): number;
+export function resolveAnsweredNotes(opts: { store: NotesStore; people?: readonly Person[]; now?: number; items?: readonly { id: string; product: string; artifacts?: unknown }[] | null }): number;
 
 /** Sends your notes on an agent's file, or the replies under one it already has, to that agent as your reply; resolves false when nothing went. */
 export function noteToItsAgent(opts: {

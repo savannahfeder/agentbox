@@ -8798,13 +8798,15 @@ export class Supervisor {
     // Teammates next, for the same reason: a run a message or a schedule made
     // on this tick is picked up by the pass below.
     await this.serveTeammates(now);
-    this.resolveAnsweredNotes(now);
     // And the folders of rows she has finished, put away. On a timer of its own
     // rather than every pass, because it is a walk of the disk and a tick is
     // fifteen seconds: she closes rows while nothing at all is running, which
     // is exactly when no session exit is coming to do this.
     this.parkOnATimer(now);
-    const items = this.store.listItems(now);
+    // Every collection pages the heap back in on a swapping Mac, so the threads
+    // are read once a pass, and again only when resolving wrote a mark.
+    const listed = this.store.listItems(now);
+    const items = this.resolveAnsweredNotes(now, listed) ? this.store.listItems(now) : listed;
     this.bringBackWhatNeverShipped(items);
     // A task its agent marked ready goes out, one at a time, beside the tick.
     try { this.shipQueue.tick(items, this.store.listProducts()); } catch (e) { console.warn('zero: the ship queue:', (e as Error).message); }
@@ -9176,10 +9178,14 @@ export class Supervisor {
   // to Monday finds ONE period unserved, because four were never representable.
   // And nothing books the next run, so a run that dies costs one day rather
   // than costing the task.
-  resolveAnsweredNotes(now: number = Date.now()) {
+  // How many it resolved, so a pass handed `items` knows when its list went stale.
+  resolveAnsweredNotes(now: number = Date.now(), items: WorkItem[] | null = null): number {
     try {
-      resolveAnsweredNotes({ store: this.store, people: this.store.teammates?.team?.state?.()?.people ?? [], now });
-    } catch (err) { console.warn('zero: comments a new version answered could not be resolved:', (err as Error).message); }
+      return resolveAnsweredNotes({ store: this.store, people: this.store.teammates?.team?.state?.()?.people ?? [], now, items });
+    } catch (err) {
+      console.warn('zero: comments a new version answered could not be resolved:', (err as Error).message);
+      return 0;
+    }
   }
 
   // Your words to a teammate that is already on a run go into that run, the
