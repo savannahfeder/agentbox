@@ -121,6 +121,13 @@
   -webkit-mask-image: linear-gradient(to top, #000 0, #000 70px, transparent 150px);
   mask-image: linear-gradient(to top, #000 0, #000 70px, transparent 150px); }
 .app.sky-shown:not(.home-shown) > .topbar h1, .app.sky-shown:not(.home-shown) > .topbar button { text-shadow: 0 1px 3px rgba(0, 0, 0, .6); }
+/* The header's rule would cut the sky in two. */
+.app.sky-shown:not(.home-shown) > .topbar { border-bottom-color: transparent; }
+/* The board has no tabs, so the same sky sits 60px higher, its top cut off,
+   and is gone before the column headings. */
+.app.sky-board .inbox-sky-head { transform: scaleY(-1) translateY(60px); clip-path: inset(0 0 60px 0);
+  -webkit-mask-image: linear-gradient(to top, #000 0, #000 105px, transparent 150px);
+  mask-image: linear-gradient(to top, #000 0, #000 105px, transparent 150px); }
 
 /* A row's facts as tags in the Inbox's own column type, so they read as
    settings of the thread rather than a sentence about it. */
@@ -130,3 +137,5 @@
 .hm-prio { display: inline-flex; align-items: center; color: var(--text-faint); }
 .hm-prio.urgent { color: var(--accent); }
 .hm-prio .th-prio-mark { margin: 0; }
+/* The board has no tabs, so its column headings sit where the sky fades out. */
+.app.sky-shown:not(.home-shown) .th-col-h, .app.sky-shown:not(.home-shown) .th-col-empty { text-shadow: 0 1px 3px rgba(0, 0, 0, .8); }

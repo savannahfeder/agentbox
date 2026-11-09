@@ -23,6 +23,7 @@ export function whereAPressLands(families: FileFamily[] | null | undefined, pres
 export function versionForPath(families: FileFamily[] | null | undefined, path: string | null | undefined): FileVersion | null;
 export function stillInHand(families: FileFamily[] | null | undefined, at: { fi: number; vi: number } | null, held: { id: string; path: string } | null): { fi: number; vi: number } | null;
 export function stepsThrough(families: FileFamily[], paths: string[] | null | undefined): Array<{ fi: number; vi: number }>;
+export function latestPicturesSaid(lines: unknown[] | null | undefined): string[];
 export function nextStep(families: FileFamily[] | null | undefined, steps: Array<{ fi: number; vi: number }> | null | undefined, at: { fi: number; vi: number } | null, by: number): { fi: number; vi: number } | null;
 export function filesInLines(lines: unknown[] | null | undefined): Array<{ path: string; by: string | null; at: number; agent?: string }>;
 export function notedFilesInLines(lines: unknown[] | null | undefined): Array<{ path: string; by: string | null; at: number; agent?: string }>;
@@ -52,6 +53,8 @@ export function offeredTogether(lines: unknown[] | null | undefined, family: Pic
 export function baseName(name: string): string;
 /** The key of the family a path belongs to, with \0 as /. */
 export function familyKeyOf(path: string): string;
+/** A file's identity across its versions: the same for plan.md and plan-v3.md. */
+export function familyOfName(file: unknown): string;
 export function familyName(family: Pick<FileFamily, 'versions'> | null | undefined, version: FileFamily['versions'][number] | null | undefined): string;
 export function approvalSince(family: Pick<FileFamily, 'versions'> | null | undefined, index: number, approvals: Array<{ file: string; by: string | null }> | null | undefined, nameOf: (id: string | null) => string): string | null;
 export function newestOfFamily(path: string, edits: Array<{ path: string }> | null | undefined): string;

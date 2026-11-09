@@ -37,7 +37,7 @@ import { footRoom, IconButton, PriorityBars, RunningMark, SheetRow, T, TopBar, W
 import { color, corner, font, size } from '../ui/theme';
 import { StatusNotice } from '../ui/StatusNotice';
 import { ComputerWait } from '../ui/Onboarding';
-import { ALERTS_ASKED_KEY, nextSetup, type Setup } from '../lib/first-run';
+import { ALERTS_ASKED_KEY, FIRST_RUN, nextSetup } from '../lib/first-run';
 import { alertsHere } from '../platform/alerts';
 import { previewWalksFirstRun } from '../lib/preview';
 
@@ -306,12 +306,12 @@ export default function Threads() {
     signedIn: c.signedIn, started: !c.loading, connect: !!c.connect, noticeAnswered: !!c.notice,
     alertsOn: !!c.alerts, alertsAsked: !!appStore.getItem(ALERTS_ASKED_KEY), alertsHere: alertsHere || walking,
   });
-  const asked = useRef<Setup | null>(null);
   useEffect(() => {
-    if (!c.noticeRead || asked.current === next) return;
-    if (next === 'messages') { asked.current = next; router.push({ pathname: '/ai-notice', params: { first: '1' } }); }
-    else if (next === 'alerts') { asked.current = next; router.push('/alerts'); }
-  }, [next, c.noticeRead]);
+    if (!c.signedIn) { FIRST_RUN.reset(); return; }
+    if (!c.noticeRead || (next !== 'messages' && next !== 'alerts') || !FIRST_RUN.take(next)) return;
+    if (next === 'messages') router.push({ pathname: '/ai-notice', params: { first: '1' } });
+    else router.push('/alerts');
+  }, [next, c.noticeRead, c.signedIn]);
   const inset = useSafeAreaInsets();
   const groups = useGroups();
   const [place, setPlace] = useState<PlaceId>('inbox');
