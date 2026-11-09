@@ -239,6 +239,12 @@ if (standInTeam) {
   say(`${standInTeam}: formed, ${teamMade.shared ? `${teamMade.shared} shared` : 'nothing shared'}`);
 }
 
+// One at a time: three Chromes started in the same second all died before printing their address.
+for (const s of setups.filter((x) => !x.failed)) {
+  const r = await run(node, [BROWSE, 'open'], { env: { ...process.env, VERIFY_INSTANCE: s.name, BREAKER_OUT: s.dir }, timeoutMs: 2 * MIN });
+  if (r.code !== 0) say(`${s.person.name}: the browser did not open before the test (${r.out.trim().split('\n').pop()}); their first look opens it again`);
+}
+
 const startedAt = Date.now();
 const deadline = startedAt + totalMs;
 let stopping = false;

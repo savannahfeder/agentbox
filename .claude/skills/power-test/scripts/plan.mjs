@@ -271,6 +271,7 @@ You use the app through one command, run in your shell:
   ${browse} dblclick 7      (double-click it)        ${browse} rightclick 7   (right-click it)
   ${browse} drag 7 12       (press on 7, drag to 12, let go)
   ${browse} drag 7 +150     (drag the right edge of 7 that far across, as you widen a column)
+  ${browse} scroll down     (look lists only what is on screen; scroll down or up for the rest)
   ${browse} type "some text"
   ${browse} press n         (one key; add modifiers after: press Enter meta, press k meta)
   ${browse} shot name       (a picture; open it to see the screen: ${shots}/name.png)

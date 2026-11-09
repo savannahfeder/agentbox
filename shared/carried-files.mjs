@@ -4,7 +4,7 @@
 // take off the sender's computer: no key file, no script, no config.
 const PICTURE_EXT = 'png|jpe?g|gif|webp|svg|avif';
 const PLAYED_EXT = 'mp4|mov|m4v|webm|mp3|wav|m4a|aac|ogg';
-const EXT = `${PICTURE_EXT}|${PLAYED_EXT}|md|markdown|html?|pdf`;
+const EXT = `${PICTURE_EXT}|${PLAYED_EXT}|md|markdown|html?|pdf|csv|tsv|pptx?`;
 
 const KIND = new RegExp(String.raw`\.(?:${EXT})$`, 'i');
 const DRAWN_IN_A_DOCUMENT = new RegExp(String.raw`\.(?:${PICTURE_EXT}|${PLAYED_EXT})$`, 'i');
