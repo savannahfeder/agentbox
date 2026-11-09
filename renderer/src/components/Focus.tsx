@@ -90,8 +90,8 @@ import { PictureView, picturesFor, type Picture } from './PictureView';
 import { opensAsPicture } from '../picture-view';
 import { ThreadArtifacts } from './ThreadArtifacts';
 import type { ArtifactOpen } from './ArtifactView';
-import { fileNewsFor, shownName, viewKind } from '../../../shared/artifact-marks.mjs';
-import { opensInTheLargeViewer } from '../artifact-layout';
+import { fileNewsFor, shownName } from '../../../shared/artifact-marks.mjs';
+import { whereAFileOpens } from '../artifact-layout';
 import { carryLine, type CarryState } from '../../../shared/carried-files.mjs';
 import { watchScrollGutter } from '../scroll-gutter';
 import { CODE_PATH, artifactUrlTransform, isMediaPath, productPath, remarkArtifactPaths } from '../remark-artifact-paths';
@@ -1337,13 +1337,20 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // an `a` renderer remounts all its players and resets missing-file retries.
   const [picture, setPicture] = useState<{ pictures: Picture[]; start: number } | null>(null);
   const openPicture = (href: string, from?: HTMLElement) => setPicture(picturesFor(paneRef.current, href, from));
-  // A file opened big, with its comments. A phone keeps the picture view its fingers know.
+  // A file opened full screen, with its comments. A phone keeps the picture view its fingers know.
   const [artifact, setArtifact] = useState<ArtifactOpen | null>(null);
-  const opensBig = (path?: string | null) => !onPhone() && !item.agent && !previewSample && opensInTheLargeViewer(viewKind(path));
+  const bigView = !onPhone() && !item.agent && !previewSample;
+  const opensBig = (path?: string | null) => bigView && whereAFileOpens(path) === 'full';
+  const opensBeside = (path?: string | null) => bigView && !!onOpenDoc && whereAFileOpens(path) === 'beside';
   // A picture clicked in the thread steps through its own turn's pictures, as the small view does.
-  const openBig = (path: string, from?: HTMLElement) => setArtifact({
-    path, at: Date.now(), ...(from && opensAsPicture(path) ? { steps: picturesFor(paneRef.current, path, from).pictures.map((p) => p.path) } : {}),
-  });
+  const turnOf = (path: string, from?: HTMLElement) => (from && opensAsPicture(path) ? { steps: picturesFor(paneRef.current, path, from).pictures.map((p) => p.path) } : {});
+  const openBig = (path: string, from?: HTMLElement) => setArtifact({ path, at: Date.now(), ...turnOf(path, from) });
+  // Kept for when the file beside goes full screen.
+  const besideTurn = useRef<{ path: string; steps?: string[] } | null>(null);
+  const openBeside = (path: string, from?: HTMLElement) => {
+    besideTurn.current = { path, ...turnOf(path, from) };
+    onOpenDoc?.(path);
+  };
   const openFileMark = useCallback((link: FileMarkLink) => setArtifact({ file: link.file, note: link.id, at: Date.now() }), []);
   useEffect(() => watchForBlank(`${item.product}/${item.id}`), [item.product, item.id]);
   const [historyLines, setHistoryLines] = useState<unknown[]>([]);
@@ -1355,8 +1362,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     return () => { live = false; off?.(); };
   }, [item.product, item.id]);
   const madeHere = useMemo(() => filesMadeHere(historyLines, item.artifacts?.notes ?? []), [historyLines, item.artifacts?.notes]);
-  const markdownActions = useRef({ onOpenDoc, onNotice, openPicture, opensBig, openBig, edits: item.artifacts?.edits });
-  useLayoutEffect(() => { markdownActions.current = { onOpenDoc, onNotice, openPicture, opensBig, openBig, edits: item.artifacts?.edits }; });
+  const markdownActions = useRef({ onOpenDoc, onNotice, openPicture, opensBig, openBig, opensBeside, openBeside, edits: item.artifacts?.edits });
+  useLayoutEffect(() => { markdownActions.current = { onOpenDoc, onNotice, openPicture, opensBig, openBig, opensBeside, openBeside, edits: item.artifacts?.edits }; });
   // A row in Needs you for a comment or an approval opens the file at it.
   const fileNewsMe = teamCtx?.me ?? null;
   useEffect(() => {
@@ -1364,7 +1371,12 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     const last = news[news.length - 1];
     setArtifact(last && !onPhone() ? { file: last.file, ...(last.kind === 'approved' ? {} : { note: last.id }), at: Date.now() } : null);
   }, [item.product, item.id]);
-  useEffect(() => { if (openAt && !onPhone()) setArtifact({ ...openAt, at: Date.now() }); }, [openAt]);
+  useEffect(() => {
+    if (!openAt || onPhone()) return;
+    const kept = besideTurn.current;
+    const turn = kept && kept.path === openAt.path ? kept.steps : undefined;
+    setArtifact({ ...(turn ? { steps: turn } : {}), ...openAt, at: Date.now() });
+  }, [openAt]);
 
   // Everything the markdown renderer closes over, memoized as ONE stable
   // object. The component functions' identity is what React reconciles by:
@@ -1402,11 +1414,12 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     // A miss now SAYS SO.
     const openHref = (href?: string, from?: HTMLElement, click?: LinkClick) => {
       if (!href) return;
-      const { onOpenDoc, onNotice, openPicture, opensBig, openBig, edits } = markdownActions.current;
-      // A picture opens large over the thread, a page or a web address opens
-      // in the pane, and a ⌘-click sends any of them out (../link-click.ts).
+      const { onOpenDoc, onNotice, openPicture, opensBig, openBig, opensBeside, openBeside, edits } = markdownActions.current;
+      // A file opens beside the chat, a deck full screen, a web address in the
+      // pane, and a ⌘-click sends any of them out (../link-click.ts).
       const goes = whereALinkGoes(href, click, { pane: !!onOpenDoc });
       if (!asksForANewTab(click) && opensBig(href)) { openBig(href, from); return; }
+      if (!asksForANewTab(click) && opensBeside(href)) { openBeside(newestOfFamily(href, edits), from); return; }
       if (goes === 'picture') { openPicture(href, from); return; }
       if (goes === 'pane') { onOpenDoc?.(newestOfFamily(href, edits)); return; }
       // A reference like cart.mjs:2 is that file; its line number is only a label.
@@ -2088,7 +2101,12 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     {artifact && (
       <ThreadArtifacts item={item} open={artifact} withAgent={!direct && !heldByPerson && !item.agent}
         onClose={() => setArtifact(null)} onNotice={onNotice}
-        onBeside={onOpenArtifact ? (path) => { setArtifact(null); onOpenArtifact(path, 'beside'); } : undefined} />
+        onBeside={onOpenArtifact ? (path) => {
+          const steps = artifact.steps?.includes(path) ? artifact.steps : undefined;
+          setArtifact(null);
+          onOpenArtifact(path, 'beside');
+          besideTurn.current = { path, ...(steps ? { steps } : {}) };
+        } : undefined} />
     )}
     {picture && (
       <PictureView

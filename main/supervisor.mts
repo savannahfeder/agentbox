@@ -13351,6 +13351,9 @@ export class Supervisor {
     // A base address and token are left alone: a gateway is a choice.
     rules.env = { ...(rules.env ?? {}), ...NO_METERED_KEY.env };
     rules.apiKeyHelper = NO_METERED_KEY.apiKeyHelper;
+    // Blank, Claude Code tells the agent to add no co-author or "Generated with
+    // Claude Code" line; unset, it tells it to add both, over any CLAUDE.md.
+    rules.attribution = { commit: '', pr: '' };
     const gateHooks = this.memoryGateHooks();
     if (gateHooks) rules.hooks = { ...(rules.hooks ?? {}), ...gateHooks };
     // Beside the MCP config, and written the same way: a real file on disk,

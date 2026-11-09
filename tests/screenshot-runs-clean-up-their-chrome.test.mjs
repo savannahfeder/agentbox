@@ -171,7 +171,7 @@ describe('every script that starts a Chrome is guarded', () => {
     .readdirSync(dir)
     .filter((n) => n.endsWith('.mjs'))
     .map((n) => ({ name: n, src: fs.readFileSync(new URL(n, dir), 'utf8') }))
-    .filter((f) => f.src.includes("spawn('/Applications/Google Chrome.app"));
+    .filter((f) => f.src.includes('spawn(startableChrome()'));
 
   // A floor, not a count: it only has to prove the walk above found files at
   // all, so that the per-file checks below are not silently checking nothing.

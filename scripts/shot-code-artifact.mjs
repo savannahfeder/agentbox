@@ -30,7 +30,7 @@ import { resolveArtifact } from '../main/artifact-path.mjs';
 import { readDoc } from '../main/doc-file.mts';
 import { referencedFiles } from '../shared/referenced-files.mts';
 import { machineryPath } from '../main/store/home.mjs';
-import { guard, sweep } from './lib/chrome-guard.mjs';
+import { guard, sweep, startableChrome } from './lib/chrome-guard.mjs';
 import { ACCOUNT_ROOT } from './lib/machine-paths.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -134,7 +134,7 @@ if (process.env.SKIP_BUILD === '1' && fs.existsSync(page)) {
 /* -------------------------------- headless -------------------------------- */
 sweep();
 const profile = fs.mkdtempSync('/tmp/shot-profile-');
-const chrome = spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', [
+const chrome = spawn(startableChrome(), [
   '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
   '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run',
   '--allow-file-access-from-files', `--window-size=${W},${H}`, 'about:blank',

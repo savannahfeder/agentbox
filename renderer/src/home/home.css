@@ -125,7 +125,7 @@
 .app.sky-shown:not(.home-shown) > .topbar { border-bottom-color: transparent; }
 /* The board has no tabs, so the same sky sits 60px higher, its top cut off,
    and is gone before the column headings. */
-.app.sky-board .inbox-sky-head { transform: scaleY(-1) translateY(60px); clip-path: inset(0 0 60px 0);
+.app.sky-board .inbox-sky-head { transform: scaleY(-1) translateY(60px); clip-path: inset(0 0 60px 0 round var(--radius));
   -webkit-mask-image: linear-gradient(to top, #000 0, #000 105px, transparent 150px);
   mask-image: linear-gradient(to top, #000 0, #000 105px, transparent 150px); }
 

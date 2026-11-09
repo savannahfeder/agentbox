@@ -417,7 +417,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
         ) : kind === 'pdf' ? (
           resolved ? <PdfPages load={pdfBytes} name={docName(resolved)} /> : <PreviewLoading />
         ) : kind === 'film' ? (
-          resolved ? <FilmPlayer url={pictureUrl(resolved)} name={docName(resolved)} wide /> : <PreviewLoading />
+          resolved ? <FilmPlayer url={pictureUrl(resolved)} name={docName(resolved)} wide={!onMode} /> : <PreviewLoading />
         ) : kind === 'code' ? (
           change
             ? <CodeArtifact
