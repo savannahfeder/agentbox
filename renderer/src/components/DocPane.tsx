@@ -445,7 +445,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
           // page, which is exactly what she was looking at.
           // A local address nothing answers draws no frame at all, only the
           // words saying so: behind a refusal the frame holds an error page.
-          resolved ? (url
+          resolved ? <Beside aside={aside}>{url
             ? <div className="preview-frame" aria-busy={!frameReady}>
               {app.local
                 ? !frameReady && <LocalPreviewStatus status={liveStatus} onRetry={app.retry} />
@@ -462,7 +462,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
               />}</div>
             : text !== null
               ? <div className="preview-frame"><iframe className="doc-view" srcDoc={text} sandbox="allow-scripts" title={crumb.join('/')} /></div>
-              : <PreviewLoading />) : <PreviewLoading />
+              : <PreviewLoading />}</Beside> : <PreviewLoading />
         ) : text === null || (threadsFile && liveTicket === undefined) ? (
           <PreviewLoading />
         ) : kind === 'table' ? (
@@ -470,7 +470,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
             <TableView text={text} path={src} mode="pane" live={liveSession} onComment={onComment} onSave={doc.readOnly ? undefined : saveTable} onReload={() => setLooks((n) => n + 1)} onNotice={onNotice} storeKey={`${doc.product}/${src}`} />
           </Beside>
         ) : kind === 'text' ? (
-          <div className="code-scroll" ref={setCodeBox}><CodeFile text={text} /></div>
+          <Beside aside={aside}><div className="code-scroll" ref={setCodeBox}><CodeFile text={text} /></div></Beside>
         ) : (
           <Beside aside={aside}>
             <DocText

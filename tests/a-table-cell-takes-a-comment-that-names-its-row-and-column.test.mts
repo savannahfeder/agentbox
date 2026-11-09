@@ -53,15 +53,15 @@ describe('a table opened full screen takes notes', () => {
   it('a csv or tsv takes the sidebar, as markdown does', () => {
     for (const f of ['leads.csv', 'docs/out/leads.TSV', 'a.md']) expect(takesNotesSidebar(f), f).toBe(true);
   });
-  it('a page, a picture or a script still does not', () => {
-    for (const f of ['options.html', 'a.png', 'cart.mjs', 'leads.csv.png', '']) expect(takesNotesSidebar(f), f).toBe(false);
+  it('a picture, or nothing, still does not', () => {
+    for (const f of ['a.png', 'leads.csv.png', '']) expect(takesNotesSidebar(f), f).toBe(false);
   });
   it('the pane draws the sidebar beside the table and hands it the cell commented on', () => {
     const pane = read('components/DocPane.tsx');
     expect(pane).toMatch(/<Beside aside=\{aside\}>\s*<TableView[^>]*onComment=\{onComment\}/);
   });
   it('the sidebar takes words from the table as well as from a document', () => {
-    expect(read('components/NotesSidebar.tsx')).toContain(".doc-rich-content, .tbl");
+    expect(read('components/NotesSidebar.tsx')).toContain(".doc-rich-content, .code-scroll, .tbl");
   });
   it('the cell menu opens the sidebar with the cell in it, beside the thread or full screen', () => {
     const app = read('App.tsx');

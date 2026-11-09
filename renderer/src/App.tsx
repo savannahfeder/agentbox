@@ -44,6 +44,7 @@ import type { PendingSaid } from './item-thread';
 import { DocPane, type OpenDoc } from './components/DocPane';
 import { NotesSidebar, NotesToggle } from './components/NotesSidebar';
 import { NOTES_CLOSED_KEY, notesSidebarOpen, rememberNotesSidebar, takesNotesSidebar } from './notes-sidebar';
+import { putAwayTheNewest } from './escape-steps';
 import { docKind, EVEN_SPLIT, escapeClosesDoc, escapeInTheFileClosesIt, focusIsInTheFile, readSplit, writeSplit } from './doc-pane';
 import { changeOwnsKey } from './code-keys';
 import { askStillStands, bringsBack, closesAgain, graceUndoneLine, nextUndo, shownAfterUndo, ticksAfterUndo, undoAsk, HOLDS_A_KEY, NOTHING_TO_UNDO, UNDID_CLOSING } from './undo-window';
@@ -3310,6 +3311,9 @@ export default function App() {
   const besideKey = (card: WorkItem, src: string) => `${card.product}\n${card.id}\n${src}\n${card.result ?? ''}`;
   const openDocNow = useRef(openDoc);
   openDocNow.current = openDoc;
+  // Escape weighs the file against what was opened in the thread around it (./escape-steps).
+  const docOpenedAt = useRef(0);
+  useEffect(() => { docOpenedAt.current = Date.now(); }, [openDoc]);
   const putDocDown = () => {
     const card = focusedNow.current, doc = openDocNow.current;
     if (card && doc?.auto) closedBeside.current.add(besideKey(card, doc.src));
@@ -6370,8 +6374,10 @@ export default function App() {
         if (e.key === 'e' || e.key === 'E' || e.key === 'j' || e.key === 'J' || e.key === 'k' || e.key === 'K') movedByKeyAt.current = Date.now();
         // ESCAPE IS ONE WAY BACK, one step at a time: the document, then the
         // task, then the list. It has always meant "back" all the way out and
-        // the pane is one more level in.
-        if (e.key === 'Escape') { if (escapeClosesDoc(openDoc, fullScreenDoc)) closeArtifact(); else setFocused(null); }
+        // the pane is one more level in. Something opened in the thread itself
+        // (the terminal, an unfolded line) is a step too, newest first.
+        if (e.key === 'Escape' && putAwayTheNewest(escapeClosesDoc(openDoc, fullScreenDoc) ? (fullScreenDoc ? Infinity : docOpenedAt.current) : -Infinity)) e.preventDefault();
+        else if (e.key === 'Escape') { if (escapeClosesDoc(openDoc, fullScreenDoc)) closeArtifact(); else setFocused(null); }
         else if (e.key === 'ArrowDown' && opts.length) {
           e.preventDefault();
           setOptionSel((s) => {
@@ -6434,7 +6440,7 @@ export default function App() {
       // behind it. J and K walk on, Escape goes back to the page, N and Z mean
       // what they mean everywhere, and nothing else reaches the list.
       if (openCard && teamShown) {
-        if (e.key === 'Escape') { e.preventDefault(); if (openDoc) closeArtifact(); else { setOpenCard(null); setTeamOpen(false); } }
+        if (e.key === 'Escape') { e.preventDefault(); if (putAwayTheNewest(openDoc ? docOpenedAt.current : -Infinity)) return; if (openDoc) closeArtifact(); else { setOpenCard(null); setTeamOpen(false); } }
         else if (e.key === 'j' || e.key === 'J' || e.key === 'k' || e.key === 'K') {
           e.preventDefault();
           const target = stepStop(stops, { card: openCard }, (e.key === 'j' || e.key === 'J') ? 1 : -1, walkPlace);
