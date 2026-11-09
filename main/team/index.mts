@@ -296,7 +296,7 @@ interface ThreadShare {
   refreshComments(): Promise<void>;
 }
 const createThreadShare = createThreadShareJs as unknown as (args: {
-  backend: TeamBackend; me: string; myName: () => string | null; root: string; listCards: () => SyncCard[];
+  backend: TeamBackend; me: string; myName: () => string | null; nameOf: (personId: string) => string | null; root: string; listCards: () => SyncCard[];
   listThreads: () => Map<string, { item: PhoneItem; product: TeamProduct }>;
   historyOf: (slug: string, id: string) => (TeamHistoryLine | null)[];
   listProducts: () => TeamProduct[]; disk: TeamDisk; accountRoot: string; storeRoot?: string;
@@ -732,6 +732,7 @@ export function createTeamService({
       backend,
       me: me.id,
       myName: () => state.me?.name ?? null,
+      nameOf: (personId: string) => state.people.find((p) => p.id === personId)?.name ?? null,
       root: path.join(accountRoot, '_team-threads', me.id),
       listCards,
       listThreads: () => {

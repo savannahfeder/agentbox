@@ -150,7 +150,7 @@ function messageLines(lines, me) {
 
 export function createThreadShare({
   backend, me, root, listCards, listThreads, historyOf, disk, accountRoot, storeRoot, listProducts = () => [],
-  onChange = () => {}, log = () => {}, now = Date.now, home = os.homedir(), myName = () => null,
+  onChange = () => {}, log = () => {}, now = Date.now, home = os.homedir(), myName = () => null, nameOf = () => null,
 }) {
   // threadId -> { at, updatedAt, work, hash, files: Map name -> absolute path }
   const built = new Map();
@@ -491,8 +491,10 @@ export function createThreadShare({
     for (const c of unsaid) {
       const thread = threads.get(c.threadId);
       if (!thread) continue;
+      // The name is for the owner's agent, which has no team list to look it up in.
+      const name = nameOf(c.by);
       added += disk.appendForeignLines(thread.product.dir, [{
-        id: c.threadId, ts: c.at, source: 'system', by: c.by, uid: `comment-${c.id}`, patch: { comment: { text: c.text } },
+        id: c.threadId, ts: c.at, source: 'system', by: c.by, uid: `comment-${c.id}`, patch: { comment: { text: c.text, ...(name ? { name } : {}) } },
       }]);
       delivered.add(c.id);
     }
