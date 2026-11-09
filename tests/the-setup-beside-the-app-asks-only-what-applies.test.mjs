@@ -187,3 +187,24 @@ describe('the walkthrough counter', () => {
     expect(tourCount(tourChecklist(['start', 'compose', 'open', 'choose', 'close', 'palette']))).toBe('5 of 5');
   });
 });
+
+describe('the walkthrough highlight', () => {
+  // The founder: "highlights are buggy". The box round a row took in its words
+  // and icons but not the unread dot, which pages.css draws as the row's
+  // ::before, so the dot sat outside the box.
+  const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
+  it('takes in a mark the row draws as ::before', () => {
+    expect(tour).toMatch(/getComputedStyle\(el, '::before'\)/);
+  });
+});
+
+describe('the walkthrough teaches E in one press', () => {
+  // The founder: "why is it asking me to hit e twice?" The tour says press E to
+  // close, and the one-time warning about closing a thread whose agent waits on
+  // you took the first press.
+  const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
+  it('does not stop the close the tour is teaching', () => {
+    expect(app).toMatch(/const teachingClose = !!tour && tourLive\(tour\) && !tour\.done\.includes\('close'\)/);
+    expect(app).toMatch(/if \(!chosen && !teachingClose && nudgeOnStopped\(\[item\], 'E'\)\) return;/);
+  });
+});

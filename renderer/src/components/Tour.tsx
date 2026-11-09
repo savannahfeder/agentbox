@@ -117,6 +117,12 @@ function snug(el: HTMLElement): Box {
     if (r.width) { x0 = Math.min(x0, r.left); x1 = Math.max(x1, r.right); }
   }
   if (x0 === Infinity) { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; }
+  // The unread dot is the row's ::before, which no text or icon walk finds.
+  const mark = getComputedStyle(el, '::before');
+  if (mark.content && mark.content !== 'none' && mark.position === 'absolute') {
+    const at = el.getBoundingClientRect().left + parseFloat(mark.left);
+    if (!Number.isNaN(at)) x0 = Math.min(x0, at);
+  }
   return { x: x0 - 14, y: y0 - 12, w: x1 - x0 + 28, h: y1 - y0 + 24 };
 }
 
