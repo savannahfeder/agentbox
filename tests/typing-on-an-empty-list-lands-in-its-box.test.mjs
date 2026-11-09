@@ -21,7 +21,7 @@ describe('a letter on a list with no thread to act on', () => {
   });
 
   it('stays a shortcut when it needs no row', () => {
-    for (const key of ['z', 'n', '/', 'g', 'b', 'o', 'i', 'Enter', 'Escape']) {
+    for (const key of ['z', 'n', 'g', 'b', 'o', 'i', 'Enter', 'Escape']) {
       expect(keyOnTheList({ key, justChanged: false, nothingToActOn: true })).toBe('shortcut');
     }
   });

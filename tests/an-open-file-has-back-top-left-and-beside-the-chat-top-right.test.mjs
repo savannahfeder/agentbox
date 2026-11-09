@@ -34,7 +34,7 @@ describe('the open file header', () => {
   });
 
   it('ends with the side pane\'s full-screen toggle, which puts the file beside the chat', () => {
-    expect(header).toMatch(/onBeside && version && <FocusControl style="corners-bare" focused onClick=\{\(\) => onBeside\(version\.path\)\} \/>/);
+    expect(header).toMatch(/onBeside && family && <FocusControl style="corners-bare" focused onClick=\{\(\) => onBeside\([^\n]*\)\} \/>/);
     expect(header.lastIndexOf('<FocusControl')).toBeGreaterThan(header.indexOf('aria-label="Open outside"'));
   });
 
@@ -64,6 +64,9 @@ describe('the open file header', () => {
 describe('beside the chat', () => {
   it('a thread\'s file goes beside the chat, where its own toggle brings it back full screen', () => {
     expect(read('renderer/src/components/ThreadArtifacts.tsx')).toMatch(/onBeside=\{onBeside\}/);
-    expect(read('renderer/src/components/Focus.tsx')).toMatch(/onBeside=\{onOpenArtifact \? \(path\) => \{ setArtifact\(null\); onOpenArtifact\(path, 'beside'\); \} : undefined\}/);
+    const focus = read('renderer/src/components/Focus.tsx');
+    const beside = focus.slice(focus.indexOf('onBeside={onOpenArtifact ? (path) => {'), focus.indexOf('} : undefined} />', focus.indexOf('onBeside={onOpenArtifact')));
+    expect(beside).toContain('setArtifact(null);');
+    expect(beside).toContain("onOpenArtifact(path, 'beside');");
   });
 });

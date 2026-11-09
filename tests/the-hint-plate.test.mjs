@@ -215,7 +215,7 @@ describe('a button with a key never says nothing', () => {
   });
 
   it('runs the key the magnifier claims', () => {
-    expect(HINTS.search[0].key).toBe('/');
-    expect(app).toMatch(/if \(e\.key === '\/'\)/);
+    expect(HINTS.search[0].key).toBe('⌘K');
+    expect(app).toMatch(/\(e\.metaKey \|\| e\.ctrlKey\) && e\.key\.toLowerCase\(\) === 'k'/);
   });
 });

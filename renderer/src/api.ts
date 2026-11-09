@@ -5,7 +5,7 @@ import {updateFixture} from './agent-update-fixture';
 // developed, reviewed, and screenshotted without a live store or any agents.
 
 import type { Person, TeamBillingDetails } from './types';
-import type { AccountUsageReading, AgentConversation, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, FilesUploaded, TeamMessageFile, ThreadEditPatch, UpdateState, Usage, UsageLimit, WorkItem } from './types';
+import type { AccountUsageReading, AgentConversation, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, FilesUploaded, TeamMessageFile, ThreadEditPatch, LiveRoomTicket, UpdateState, Usage, UsageLimit, WorkItem } from './types';
 import type { LedgerLine } from './thread-history';
 import type { AgentFile as AgentFileRow } from './onboarding';
 import type { AgentFolder, SessionThread } from './agent-import-card';
@@ -818,6 +818,13 @@ export const api = {
     const zero = window.zero as any;
     if (!zero?.saveCodeFile) return { ok: false, error: `quit and reopen ${NAME} to save this file` };
     return zero.saveCodeFile(p);
+  },
+
+  /** The live room a file opens in with teammates, or null when nobody else can open it. */
+  async liveRoom(p: { product: string; project?: string | null; name: string }): Promise<LiveRoomTicket | null> {
+    const zero = window.zero as any;
+    if (!zero?.liveRoom) return null;
+    return zero.liveRoom(p).catch(() => null);
   },
 
   async writeDoc(p: { product: string; src: string; text: string; mtime: number; thread?: string }): Promise<{ ok: boolean; mtime?: number; error?: string; stale?: boolean }> {
@@ -1651,6 +1658,27 @@ export const api = {
     const zero = window.zero as any;
     if (!zero?.cloudKey) return { ok: false, error: RESTART_NOTE };
     return zero.cloudKey(p);
+  },
+
+  /** The GitHub token this computer's ships push with; the threads that waited on it ship again. */
+  async gitHubSignIn(p: { token: string }): Promise<{ ok: boolean; again?: string[]; error?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.gitHubSignIn) return { ok: false, error: RESTART_NOTE };
+    return zero.gitHubSignIn(p);
+  },
+
+  /** Starts GitHub's own sign-in for this computer's git; answers with its code and link. */
+  async gitHubBrowserSignIn(): Promise<{ ok: boolean; code?: string; url?: string; error?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.gitHubBrowserSignIn) return { ok: false, error: RESTART_NOTE };
+    return zero.gitHubBrowserSignIn();
+  },
+
+  /** What the person did with a sign-in link an agent on this thread is waiting on. */
+  async signInAnswer(p: { product: string; id: string; ask: string; said: 'signed-in' | 'skipped' | 'landed'; url?: string }): Promise<{ ok: boolean; error?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.signInAnswer) return { ok: false, error: RESTART_NOTE };
+    return zero.signInAnswer(p);
   },
 
   /** Signing in to Agentbox Cloud itself, on the app's sign-in page: Google, email, a new account and its link again, or a password reset. */

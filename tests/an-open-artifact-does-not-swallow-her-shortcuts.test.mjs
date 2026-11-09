@@ -169,7 +169,7 @@ describe('her letters, coming up out of a page', () => {
   });
 
   it('keeps the rest of her single-letter shortcuts with it', () => {
-    for (const key of ['j', 'k', 'r', 'c', 'n', 's', 'z', 'b', 'g', '/', '\\']) {
+    for (const key of ['j', 'k', 'r', 'c', 'n', 's', 'z', 'b', 'g', '\\']) {
       expect(theAppKeepsThisLetterInAPage({ key })).toBe(true);
       expect(whatTheFileSentUp({ key })).toBe('app');
     }

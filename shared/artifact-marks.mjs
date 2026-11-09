@@ -259,9 +259,11 @@ const endsWithPath = (whole, part) => whole === part || whole.endsWith(`/${part}
  *
  * `numbers` maps a path to its number on the file's version line
  * (shared/version-line.mjs). A family the line knows is numbered by it, in its
- * order, and a path the line does not know is no version of that family.
+ * order, and a path the line does not know is no version of that family,
+ * except `keep`: the path a person pressed, which Files may not have numbered yet.
  */
-export function threadFiles(files, numbers = null) {
+export function threadFiles(files, numbers = null, { keep = null } = {}) {
+  const kept = keep ? cleanAsked(keep) : null;
   const families = new Map();
   const seenPaths = new Set();
   for (const f of files ?? []) {
@@ -289,13 +291,19 @@ export function threadFiles(files, numbers = null) {
   for (const family of out) {
     if (!family.versions.some((v) => v.line !== undefined)) continue;
     const byLine = new Map();
+    const unknown = [];
     for (const v of family.versions) {
-      if (v.line === undefined) continue;
+      if (v.line === undefined) {
+        if (kept && [v.path, ...(v.also ?? [])].some((p) => endsWithPath(p, kept) || endsWithPath(kept, p))) unknown.push(v);
+        continue;
+      }
       const was = byLine.get(v.line);
       if (was) (was.also ??= []).push(v.path, ...(v.also ?? []));
       else byLine.set(v.line, v);
     }
-    family.versions = [...byLine.values()].sort((a, b) => a.line - b.line).map(({ line, ...v }) => ({ ...v, n: line }));
+    const numbered = [...byLine.values()].sort((a, b) => a.line - b.line).map(({ line, ...v }) => ({ ...v, n: line }));
+    const top = numbered.at(-1)?.n ?? 0;
+    family.versions = [...numbered, ...unknown.map((v, i) => ({ ...v, n: top + i + 1 }))];
   }
   return out;
 }
@@ -354,7 +362,8 @@ export function whereAPressLands(families, { path, file } = {}) {
 
 /**
  * Where the version in hand (`held`: its id and path) sits in `families` now,
- * else `at` if that still names a version, else null. `at` alone goes stale
+ * or null when it is gone. With nothing held, `at` if that still names a
+ * version, else null. `at` alone goes stale
  * when the list fills in and reorders or folds copies into one version.
  */
 export function stillInHand(families, at, held) {
@@ -364,7 +373,7 @@ export function stillInHand(families, at, held) {
     const flat = (families ?? []).flatMap((f, fi) => f.versions.map((v, vi) => ({ fi, vi, v })));
     const v = flat.find((x) => x.v.id === held.id)?.v ?? versionForPath(families, held.path);
     const hit = v && flat.find((x) => x.v === v);
-    if (hit) return { fi: hit.fi, vi: hit.vi };
+    return hit ? { fi: hit.fi, vi: hit.vi } : null;
   }
   return fits(at) ? at : null;
 }

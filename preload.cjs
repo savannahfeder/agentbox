@@ -223,6 +223,9 @@ contextBridge.exposeInMainWorld('zero', {
   setWorkspaceSetting: (payload) => ipcRenderer.invoke('zero:settings-set-workspace', payload),
   cloudSignIn: (payload) => ipcRenderer.invoke('zero:cloud-signin', payload),
   cloudKey: (payload) => ipcRenderer.invoke('zero:cloud-key', payload),
+  gitHubSignIn: (payload) => ipcRenderer.invoke('zero:github-sign-in', payload),
+  gitHubBrowserSignIn: () => ipcRenderer.invoke('zero:github-browser-sign-in'),
+  signInAnswer: (payload) => ipcRenderer.invoke('zero:sign-in-answer', payload),
   cloudSendFile: (payload) => ipcRenderer.invoke('zero:cloud-send-file', payload),
   cloudSendCode: (payload) => ipcRenderer.invoke('zero:cloud-send-code', payload),
   cloudFileInfo: (payload) => ipcRenderer.invoke('zero:cloud-file-info', payload),
@@ -288,6 +291,7 @@ contextBridge.exposeInMainWorld('zero', {
   codeFile: (payload) => ipcRenderer.invoke('zero:code-file', payload),
   saveCodeFile: (payload) => ipcRenderer.invoke('zero:save-code-file', payload),
   writeDoc: (payload) => ipcRenderer.invoke('zero:write-doc', payload),
+  liveRoom: (payload) => ipcRenderer.invoke('zero:live-room', payload),
   railNote: (payload) => ipcRenderer.invoke('zero:rail-note', payload),
   saveRailNote: (payload) => ipcRenderer.invoke('zero:save-rail-note', payload),
   // The shelf: what this product has made, and whether each thing is still the

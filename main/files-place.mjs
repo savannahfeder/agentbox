@@ -761,7 +761,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
         const stem = base.slice(0, base.length - ext.length).normalize('NFC').replace(/\s+/g, '-').replace(/[^\p{L}\p{N}._-]+/gu, '').replace(/^[-_.]+/, '').slice(0, 80) || 'file';
         const file = freeName(home, stem, ext.toLowerCase());
         fs.mkdirSync(path.join(home.dir, 'documents'), { recursive: true });
-        fs.copyFileSync(from, path.join(home.dir, 'documents', file), fs.constants.COPYFILE_EXCL);
+        fs.copyFileSync(from, path.join(home.dir, 'documents', file), fs.constants.COPYFILE_EXCL | fs.constants.COPYFILE_FICLONE);
         added.push(file);
       }
       if (added.length) {
@@ -843,6 +843,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       const names = taken ?? allFiles().find((f) => f.chain.some((v) => v.copies.some((c) => c.thread.ref.id === id && c.path === clean)))?.chain.map((v) => v.name) ?? [];
       const saved = saveNextVersion({ dir: here.dir, threadId: id, lines, basePath, baseId, text, since, taken: names });
       if (!saved.ok) return saved;
+      if (saved.unchanged) return { ok: true, path: saved.path };
       if (here.team?.direct) store.answerItem(product, id, { answer: editedWords(saved.shown, saved.path) });
       else store.fileMark(product, id, { do: 'edit', file: saved.file, path: saved.path, ...(saved.over ? { over: saved.over } : {}) });
       return { ok: true, path: saved.path };

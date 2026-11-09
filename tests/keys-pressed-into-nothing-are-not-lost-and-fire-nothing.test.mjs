@@ -24,7 +24,7 @@ describe('a key on an open thread with no box', () => {
     expect(keyOnAnOpenThread({ key: 'l', justChanged: true })).toBe('to the box');
   });
   it('walking and opening stay live, so J J J keeps walking', () => {
-    for (const key of ['j', 'k', 'r', 'n', 'z', '/', 'o', 'g', 's']) expect(keyOnAnOpenThread({ key, justChanged: true })).toBe('shortcut');
+    for (const key of ['j', 'k', 'r', 'n', 'z', 'o', 'g', 's']) expect(keyOnAnOpenThread({ key, justChanged: true })).toBe('shortcut');
   });
   it('a number with options on screen is the options, a number with none is typing', () => {
     expect(keyOnAnOpenThread({ key: '2', justChanged: false, hasOptions: true })).toBe('shortcut');
@@ -46,7 +46,7 @@ describe('a key on the list', () => {
     expect(keyOnTheList({ key: 'q', justChanged: true })).toBe('nowhere');
   });
   it('the keys the list has keep working', () => {
-    for (const key of ['j', 'k', 'r', 'n', 'z', 'b', '/', 'g', 'Enter', 'Escape', '1', '2', 'i', 'o']) expect(keyOnTheList({ key, justChanged: true })).toBe('shortcut');
+    for (const key of ['j', 'k', 'r', 'n', 'z', 'b', 'g', 'Enter', 'Escape', '1', '2', 'i', 'o']) expect(keyOnTheList({ key, justChanged: true })).toBe('shortcut');
   });
 });
 

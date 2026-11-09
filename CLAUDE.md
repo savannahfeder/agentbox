@@ -168,6 +168,13 @@ browser an agent may drive has to carry nothing; the app's own pane on the
 `persist:junk` partition is the only candidate. `--ide` is the user's to switch
 on, never ours.
 
+Nor does an agent start the person's Google Chrome headless: the Mac files that
+copy as their Chrome, and their own Chrome then opens no window. Every hidden
+browser comes from `shared/hidden-browser.mjs` (Chrome for Testing or
+Playwright's headless shell), and
+`tests/no-agent-browser-is-the-persons-own-chrome.test.mjs` fails if any other
+file names Google Chrome's binary.
+
 ## Billing
 
 Workers run on the user's own Claude or Codex subscription. Never pass an API

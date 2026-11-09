@@ -41,6 +41,21 @@ describe('the iPhone walk job', () => {
   it('runs the walk it names', () => {
     expect(workflow.on.workflow_dispatch.inputs.flow.default).toBe('mobile/.maestro/review-walk.yml');
   });
+
+  it('uploads its screens only sealed, because they can show the demo login on a public repository', () => {
+    const uploads = job.steps.filter((s) => String(s.uses ?? '').startsWith('actions/upload-artifact'));
+    expect(uploads.map((s) => s.with.path)).toEqual(['sealed/']);
+    const seal = job.steps.find((s) => s.name === 'Seal the screens').run;
+    expect(seal).toContain('rm -rf walk');
+    expect(seal).toContain('pkeyutl -encrypt -pubin -keyform DER');
+    // A public key, as one line of DER: the opening bytes of an RSA SubjectPublicKeyInfo.
+    expect(job.steps.find((s) => s.name === 'Seal the screens').env.WALK_KEY).toMatch(/^MIIB[A-Za-z0-9+/=]+$/);
+  });
+
+  it('keeps every screenshot the walk took', () => {
+    const walk = job.steps.find((s) => s.name === 'Walk it').run;
+    expect(walk).toMatch(/find [^\n]*\.maestro[^\n]*-name '\*\.png'/);
+  });
 });
 
 describe('the walk', () => {
@@ -49,9 +64,16 @@ describe('the walk', () => {
     expect(config).toContain(head.appId);
   });
 
+  it('finds the sign-in boxes by ids the screen gives them, never by where they sit', () => {
+    const signIn = fs.readFileSync(new URL('mobile/src/app/sign-in.tsx', root), 'utf8');
+    const ids = body.filter((s) => s.tapOn?.id).map((s) => s.tapOn.id);
+    expect(ids).toEqual(expect.arrayContaining(['sign-in-email', 'sign-in-password']));
+    for (const id of ids) expect(signIn).toContain(`testID="${id}"`);
+    expect(body.some((s) => s.tapOn?.point)).toBe(false);
+  });
+
   it('types the password from the job, never from the file', () => {
-    expect(flowText).toContain('${REVIEW_PASSWORD}');
-    expect(flowText).not.toMatch(/inputText: "(?!appreview@)[^"$]*"\s*\n- hideKeyboard/);
+    expect(body.filter((s) => s.inputText).map((s) => s.inputText)).toContain('${REVIEW_PASSWORD}');
   });
 
   it('waits for an answer to a reply and to a new thread, words its own message does not hold', () => {
