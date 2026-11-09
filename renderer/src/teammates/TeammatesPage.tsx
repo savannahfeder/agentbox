@@ -15,12 +15,13 @@ import { answerOf, answersMessage, chatEntries, chatWith, clockOf, dayOf, firstS
 import { ChatsColumn } from './ChatsColumn';
 import { nowLine, TeammateMark } from './TeammatesRail';
 import { AskBeforeDeleting } from '../team/MessageMore';
-import { FormatBar } from '../team/FormatBar';
-import { RichReply, type RichBox } from '../team/RichReply';
-import { sendKeyFor } from '../reply-keys';
+import { keyInTheReplyBox, sendKeyFor } from '../reply-keys';
 import { Face } from '../team/people';
 import { AttachRow } from '../components/AttachRow';
-import { attachProblem, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
+import { ClipGlyph, SendGlyph } from '../components/reply-glyphs';
+import { Listening, MicButton, useWebDictation } from '../components/WebDictation';
+import { applyDockHeight } from '../dock-height';
+import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { pictureUrl } from '../picture';
 import { attachedPath, filesProductOf, whereFilesGo, withFiles } from './chat-files';
 import './teammates.css';
@@ -504,9 +505,9 @@ function Activity({ e, view, team, only, sessions, call, onOpenThread }: { e: Ch
   return <div className="tq-act tq-note"><span>{c.text}</span>{time}</div>;
 }
 
-// The group chat's box: the same editor and formatting bar, growing as you
-// write, taking pasted, dropped and attached files. While it works, the Send
-// slot is Stop until you type, as in a thread's reply box.
+// A teammate is an agent, so this is the box you reply to an agent with in a
+// thread: the same field, ⌘↵ to send, and the clip, microphone and Send. While
+// it works, the Send slot is Stop until you type, as there.
 function Composer({ placeholder, filesIn, onSend, stop = null }: {
   placeholder: string;
   /** The project this message's files are saved in, from its words. */
@@ -520,7 +521,8 @@ function Composer({ placeholder, filesIn, onSend, stop = null }: {
   const [notice, setNotice] = useState<string | null>(null);
   const { attaching, collect } = useAttaching();
   const picker = useRef<HTMLInputElement>(null);
-  const box = useRef<RichBox | null>(null);
+  const box = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => { applyDockHeight(box.current); });
   const add = (got: PendingAttachment[]) => { if (got.length) setFiles((was) => [...was, ...got]); };
   const ready = !!text.trim() || files.length > 0;
   const send = async () => {
@@ -540,24 +542,30 @@ function Composer({ placeholder, filesIn, onSend, stop = null }: {
       setBusy(false);
     }
   };
+  const talk = useWebDictation({ text, setText, field: box }, () => void send());
   return <>
     {notice && <p className="tq-error" role="alert">{notice}</p>}
-    <div className="rm-compose tq-compose">
-      <RichReply className="rm-compose-input tq-input" boxRef={box} value={text} onChange={setText}
-        placeholder={placeholder} label={placeholder}
-        onFiles={async (got) => add(await collect(got))}
+    <div className="dock-card tq-compose">
+      <textarea ref={box} className="dock-input" value={text} placeholder={placeholder} aria-label={placeholder}
+        onChange={(e) => { talk.typed(); setText(e.target.value); }}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); return true; }
-          if (e.key === 'Escape') { box.current?.blur(); return true; }
-          return false;
-        }} />
-      <AttachRow attachments={files} attaching={attaching} onRemove={(i) => setFiles((was) => was.filter((_, j) => j !== i))} />
+          const pressed = keyInTheReplyBox({ toPeople: false, key: e.key, shift: e.shiftKey, meta: e.metaKey, ctrl: e.ctrlKey, composing: e.nativeEvent.isComposing });
+          if (pressed === 'send') { e.preventDefault(); void send(); return; }
+          if (e.key === 'Escape') { e.stopPropagation(); box.current?.blur(); }
+        }}
+        onPaste={async (e) => { const got = await fromPaste(e); if (got.length) { e.preventDefault(); add(got); } }}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={async (e) => { e.preventDefault(); add(await collect(e.dataTransfer.files)); }} />
       <input ref={picker} type="file" multiple hidden onChange={async (e) => { add(await collect(e.target.files ?? [])); e.target.value = ''; }} />
-      <div className="rm-compose-bar">
-        <FormatBar box={box as unknown as { current: HTMLTextAreaElement | null }} onChange={setText} mention={false}
-          onAttach={() => picker.current?.click()} onFromFiles={(f) => add([f])} onNotice={setNotice} />
-        {stop && !ready ? stop
-          : <button type="button" className="dock-send" disabled={!ready || busy || !!attachProblem(files)} onClick={() => void send()} title={`Send · ${sendKeyFor(true)}`}>Send <kbd>{sendKeyFor(true)}</kbd></button>}
+      <AttachRow attachments={files} attaching={attaching} onRemove={(i) => setFiles((was) => was.filter((_, j) => j !== i))} />
+      <div className="compose-sentence dock-bar">
+        {talk.on ? <Listening talk={talk} /> : <>
+          <button type="button" className="tc-icon dock-clip" title="Attach files" aria-label="Attach files" onClick={() => picker.current?.click()}><ClipGlyph /></button>
+          {talk.allowed && <MicButton talk={talk} />}
+          {stop && !ready ? stop
+            : <span className="dock-send-pair solo"><button type="button" className="dock-send" disabled={!ready || busy || !!attachProblem(files)} onClick={() => void send()} title={`Send · ${sendKeyFor(false)}`}>
+              {busy ? 'Sending…' : <>Send <kbd>{sendKeyFor(false)}</kbd></>}<SendGlyph /></button></span>}
+        </>}
       </div>
     </div>
   </>;

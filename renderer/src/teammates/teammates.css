@@ -60,9 +60,9 @@
 .tq-chip { height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none; font: inherit; font-size: 13.5px; color: var(--text); display: inline-flex; align-items: center; cursor: default; }
 .tq-chip:hover { background: var(--wash-strong); }
 
-.rm-compose.tq-compose { margin: 8px 32px 24px 32px; }
+.rm-compose.tq-compose, .dock-card.tq-compose { margin: 8px 32px 24px 32px; }
 .rm-compose-input.tq-input { padding: 11px 13px 4px; font-size: 15px; line-height: 22px; }/* Stop takes Send's slot while it works, so it has Send's edge and height. */
-.tq-compose .dock-stop { margin-right: 0; padding: 4px 12px; }
+.rm-compose.tq-compose .dock-stop { margin-right: 0; padding: 4px 12px; }
 /* The panel beside a teammate's chat */
 .gr-side.tq-side { padding: 18px 24px 24px; }
 /* The Log has no faces, so its lines start at its title. */
@@ -112,7 +112,7 @@ select.tq-in { height: 32px; padding: 0 6px; }
 .tq-heads { display: inline-flex; gap: 16px; }
 /* With Groups on the page's text edge is 44 points in (rooms.css .gt-inset). */
 .gt-inset .tq-lines { padding-left: 44px; }
-.gt-inset .rm-compose.tq-compose { margin-left: 44px; }
+.gt-inset .rm-compose.tq-compose, .gt-inset .dock-card.tq-compose { margin-left: 44px; }
 .gt-inset .tq-error { margin-left: 44px; }
 .tq-to.tq-link { color: var(--text-faint); font-size: 13.5px; }
 .tq-to.tq-link:hover { color: var(--text-dim); }
@@ -204,7 +204,7 @@ span.tq-link:focus-visible { outline: 1px solid var(--text-faint); outline-offse
 .tq-desc .dim { color: var(--text-faint); }
 /* Its method's own title repeats the name the bar above already shows. */
 .tq-method > h1:first-child { display: none; }
-.tq-doc .rm-compose.tq-compose { margin: 22px 0 0; }
+.tq-doc .rm-compose.tq-compose, .tq-doc .dock-card.tq-compose { margin: 22px 0 0; }
 .tq-doc .tq-error { margin-left: 0; }
 /* About: over the chat when you ask for it, gone with a click anywhere else. */
 .tq-chats .gr-body { position: relative; }

@@ -121,12 +121,13 @@ describe('the teammate chat box takes files the way every other box does', () =>
   const box = page.slice(page.indexOf('function Composer('), page.indexOf('/* ------------------------------------------------------------------- log */'));
 
   it('takes a pasted or dropped file', () => {
-    expect(box).toMatch(/<RichReply[^>]*onFiles=\{/);
+    expect(box).toMatch(/onPaste=\{async \(e\) => \{ const got = await fromPaste\(e\);/);
+    expect(box).toMatch(/onDrop=\{async \(e\) => \{ e\.preventDefault\(\); add\(await collect\(e\.dataTransfer\.files\)\); \}\}/);
   });
 
   it('shows what is attached before it goes, and offers the clip', () => {
     expect(box).toMatch(/<AttachRow /);
-    expect(box).toMatch(/<FormatBar[^>]*onAttach=\{/);
+    expect(box).toMatch(/className="tc-icon dock-clip"[^>]*onClick=\{\(\) => picker\.current\?\.click\(\)\}/);
     expect(box).toMatch(/<input [^>]*type="file"/);
   });
 
