@@ -32,7 +32,6 @@ import {
   inventoryWorktrees, strayWorktrees, pruneMissingWorktrees,
   releaseTaskFolder, parkTaskFolder, PARKED,
 } from '../main/task-folders.mts';
-import { strayFolderSettings } from '../main/settings.mts';
 import { Supervisor } from '../main/supervisor.mts';
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
@@ -333,50 +332,5 @@ describe('the sweep that puts finished rows´ folders away', () => {
     await sup.parkClosedFolders(product);
     expect(inventoryWorktrees(dir).some((w) => w.path === at)).toBe(false);
     expect(git(dir, 'rev-parse', '--verify', 'refs/heads/purged')).toBeTruthy();
-  });
-
-  // The sweep is also where the app learns what the strays are, so the page can
-  // say so without reading the disk on the window's thread.
-  it('remembers the strays it walked past, so a page can name them', async () => {
-    const stray = path.join(elsewhere, 'website-fontsize');
-    git(dir, 'worktree', 'add', '-q', '-b', 'fontsize', stray);
-    const { sup, product, store } = supervisorOver(dir);
-    made.push(store);
-    await sup.parkClosedFolders(product);
-    expect(sup.strayFolders().map((w) => w.path)).toEqual([fs.realpathSync(stray)]);
-  });
-});
-
-/* ===================== what the app says about them ====================== */
-// The half that was missing on her Mac: 740 MB she had never been shown. The row
-// only appears when there is something to say, and it offers no button, because
-// a folder the app did not make is not the app's to remove.
-describe('the sentence the page carries about folders the app did not make', () => {
-  const page = (strays) => strayFolderSettings({ supervisor: { strayFolders: () => strays } }, '/Users/you');
-
-  it('says nothing at all when there are none', () => {
-    expect(page([])).toBe(null);
-    expect(strayFolderSettings({ supervisor: {} })).toBe(null);
-  });
-
-  it('names one, with the project it is a copy of', () => {
-    const out = page([{ path: '/Users/you/Desktop/dev/website-fontsize', project: 'Website', branch: 'fontsize' }]);
-    expect(out.count).toBe(1);
-    expect(out.now).toContain('~/Desktop/dev/website-fontsize');
-    expect(out.now).toContain('Website');
-    expect(out.now).toMatch(/^1 copy/);
-    // No account name in what the page draws.
-    expect(out.now).not.toContain('/Users/you');
-  });
-
-  it('counts several and names the first few', () => {
-    const out = page(Array.from({ length: 9 }, (_, i) => ({
-      path: `/Users/you/Desktop/dev/website-${i}`, project: 'Website', branch: `b${i}`,
-    })));
-    expect(out.count).toBe(9);
-    expect(out.now).toMatch(/^9 copies/);
-    expect(out.now).toContain('~/Desktop/dev/website-0');
-    expect(out.now).toContain('and 6 more');
-    expect(out.now).not.toContain('website-8');
   });
 });

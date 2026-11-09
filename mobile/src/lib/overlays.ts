@@ -15,7 +15,8 @@ export const APPROVAL_EXIT_MS = 420;
 export interface Approval { id: string; at: number; product: string; item: string; tool: string; input: Record<string, unknown> }
 type Here = { product: string; id: string } | null;
 
-export const toastLife = (toast: { goes?: ToastGoes }) => (toast.goes ? TOAST_GOES_MS : TOAST_PLAIN_MS);
+// An Undo needs a thumb to reach it, so it stays the whole window the Mac holds for, where the desktop's Z needs no reach.
+export const toastLife = (toast: { goes?: ToastGoes; undo?: unknown }) => (toast.goes || toast.undo ? TOAST_GOES_MS : TOAST_PLAIN_MS);
 
 /** How far a toast is swiped down before it goes. */
 export const TOAST_SWIPE_PX = 24;

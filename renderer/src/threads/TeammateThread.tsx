@@ -8,7 +8,7 @@ import { ConnectionLink } from '../connections/ConnectionsPlace';
 import { connectionLinkOf } from '../connections/connections-shown';
 import remarkGfm from 'remark-gfm';
 import { api } from '../api';
-import { marksOf } from '../../../shared/artifact-marks.mjs';
+import { marksOf, opensBigInAGroup } from '../../../shared/artifact-marks.mjs';
 import { whereAFileOpens } from '../artifact-layout';
 import { ArtifactView, type ArtifactOpen } from '../components/ArtifactView';
 import { MAX_EDIT_BYTES } from '../../../shared/artifact-marks.mjs';
@@ -66,10 +66,10 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
 
   const product = work?.product ?? '';
   const dir = work?.dir ?? '';
-  // A file opens beside the chat and a deck full screen, as on your own thread.
   const open = useCallback((src?: string) => {
     if (!src || !product) return;
-    const goes = whereAFileOpens(src);
+    // Beside the chat a teammate's copy is read-only, so a document or table opens big, where it is edited live.
+    const goes = opensBigInAGroup(src) ? 'full' : whereAFileOpens(src);
     if (goes === 'full') setBig({ path: src, at: Date.now() });
     else if (goes === 'beside' || docKind(src)) onOpenDoc(product, src);
     else void api.openArtifactExternally({ product, src }).then((r) => { if (!r.ok) onNotice(r.error ?? `${src} could not be opened.`); });
@@ -126,7 +126,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   return (
     <div className="tp-page">
       {big && product && (
-        <ArtifactView product={product} draftsAcross={`teammate:${personId}:${threadId}`} lines={work?.lines ?? []} marks={marks}
+        <ArtifactView product={product} project={card.project ?? null} draftsAcross={`teammate:${personId}:${threadId}`} lines={work?.lines ?? []} marks={marks}
           me={team?.me ?? null} people={people} open={big} ownerOfRow={personId}
           write={async (mark) => {
             const out = await api.teamMarkFile({ personId, threadId, mark });

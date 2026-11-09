@@ -66,6 +66,11 @@ export class AccountUsage {
     return reader;
   }
 
+  /** The last reading of one account, or null; never starts a read. */
+  peek(profile: string) {
+    return this._readers.get(profile)?.peek() ?? null;
+  }
+
   _subscription(profile: string) {
     try { return this._identity(profile)?.accountUuid ?? `folder:${profile}`; } catch { return `folder:${profile}`; }
   }

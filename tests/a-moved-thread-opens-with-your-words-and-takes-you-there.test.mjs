@@ -44,13 +44,25 @@ describe('the moved thread’s first message', () => {
     expect(body).toBe(`The annual toggle shows monthly prices.\n\n${movedHere('Website')}`);
   });
 
-  it('carries what you added after, a reply still waiting included', () => {
+  it('carries what you added after as your replies, the one still waiting as the one owed an answer', () => {
     const made = store.composeItem('website', { title: 'Write a short help article' });
     agentSays('website', made.id, 'Draft one.');
     store.answerItem('website', made.id, { answer: 'Shorter, and link the pricing page.' });
     store.answerItem('website', made.id, { answer: 'Also add a screenshot.' });
+    const id = store.moveItem('website', made.id, 'company').item.id;
+    const landed = store.readItem('company', id);
+    expect(landed.body).toBe(['Write a short help article', movedHere('Website')].join('\n\n'));
+    expect(store.readThread('company', id).filter((t) => t.field === 'answer').map((t) => t.text))
+      .toEqual(['Shorter, and link the pricing page.', 'Also add a screenshot.']);
+    expect(landed.answer).toBe('Also add a screenshot.');
+    expect(landed.status).toBe('open');
+  });
+
+  it('folds your replies into the message of a thread nothing ran on, since the run starts from it', () => {
+    const made = store.composeItem('website', { title: 'Write a short help article' });
+    store.answerItem('website', made.id, { answer: 'Shorter, and link the pricing page.' });
     const body = store.readItem('company', store.moveItem('website', made.id, 'company').item.id).body;
-    expect(body).toBe(['Write a short help article', 'Shorter, and link the pricing page.', 'Also add a screenshot.', movedHere('Website')].join('\n\n'));
+    expect(body).toBe(['Write a short help article', 'Shorter, and link the pricing page.', movedHere('Website')].join('\n\n'));
   });
 
   it('a thread nothing ran on moves as before: its words, then where it came from', () => {

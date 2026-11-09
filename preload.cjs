@@ -233,6 +233,7 @@ contextBridge.exposeInMainWorld('zero', {
   cloudAccountPlan: () => ipcRenderer.invoke('zero:cloud-account-plan'),
   cloudAccountPay: (payload) => ipcRenderer.invoke('zero:cloud-account-pay', payload),
   cloudAccountBilling: () => ipcRenderer.invoke('zero:cloud-account-billing'),
+  cloudAccountTeamBilling: () => ipcRenderer.invoke('zero:cloud-account-team-billing'),
   cloudClipboardCode: () => ipcRenderer.invoke('zero:cloud-clipboard-code'),
   // What a project is CALLED, and the mark beside the name. Not settings: both
   // are written into the project's own project.json and travel with the folder.
@@ -287,6 +288,7 @@ contextBridge.exposeInMainWorld('zero', {
   codeFile: (payload) => ipcRenderer.invoke('zero:code-file', payload),
   saveCodeFile: (payload) => ipcRenderer.invoke('zero:save-code-file', payload),
   writeDoc: (payload) => ipcRenderer.invoke('zero:write-doc', payload),
+  liveRoom: (payload) => ipcRenderer.invoke('zero:live-room', payload),
   railNote: (payload) => ipcRenderer.invoke('zero:rail-note', payload),
   saveRailNote: (payload) => ipcRenderer.invoke('zero:save-rail-note', payload),
   // The shelf: what this product has made, and whether each thing is still the

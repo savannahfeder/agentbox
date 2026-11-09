@@ -202,7 +202,7 @@ export default function TeammateChat() {
             </Pressable>
           </View>
         )}
-        <MateComposer placeholder={t.status === 'draft' ? `Answer ${t.name === 'New teammate' ? 'your new teammate' : t.name}` : `Message ${t.name}`}
+        <MateComposer mate={t.id} placeholder={t.status === 'draft' ? `Answer ${t.name === 'New teammate' ? 'your new teammate' : t.name}` : `Message ${t.name}`}
           send={(text) => post({ text, to: [t.id] })}
           above={many ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingBottom: 8 }}>
