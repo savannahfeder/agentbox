@@ -7175,9 +7175,8 @@ export default function App() {
     }
   };
 
-  const [shareLast, setShareLast] = useState<string | null>(() => { try { return localStorage.getItem(SHARE_LAST); } catch { return null; } });
   const shareActs: ShareActs = {
-    last: shareLast,
+    last: (() => { try { return localStorage.getItem(SHARE_LAST); } catch { return null; } })(),
     copy: async (item) => {
       const link = threadLink(team?.me, item.id);
       if (!link) return false;
@@ -7195,7 +7194,7 @@ export default function App() {
       const out = await api.teamMessage(to.length === 1 ? to[0] : to, sentWords(rowTitle(item), link, note));
       const names = to.map((id) => firstName(team?.byId.get(id) ?? null) || 'them').join(' and ');
       showToast(out.ok ? `Sent to ${names}` : (out.error ?? `It did not reach ${names}.`));
-      if (out.ok && to.length === 1) { setShareLast(to[0]); try { localStorage.setItem(SHARE_LAST, to[0]); } catch { /* the menu just names the first */ } }
+      if (out.ok && to.length === 1) { try { localStorage.setItem(SHARE_LAST, to[0]); } catch { /* the menu just names the first */ } }
       void refresh();
     },
     see: (item, to) => {
@@ -7312,7 +7311,7 @@ export default function App() {
         still={evMember.kind === 'person' ? `${evMember.inProgress ?? 0} in progress` : undefined} />} />;
   const needsYouCount = { inbox: (mineShown ? shownCount(inbox) : 0) + theirCount('inbox') + leadCount + sharedFileNews.length + followingNews.length };
   const todayShown = teamMode && todayOn && !!snap && view === 'inbox' && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused && !teammatesShown && !roomShown && !filesShown && !connectionsShown;
-  const todayPage = (title?: string, onPerson?: (key: string) => void) => snap && team?.state.signedIn && !team.state.team ? <StartTeam me={team.byId.get(team.me ?? '') ?? null} onStarted={() => void refresh()} /> : snap ? <TodayPage title={title} onPerson={onPerson} range={todayRange} onRange={setTodayRange} onNeeds={goNeedsYou} picked={todayPick} onPicked={setTodayPick} keys={!modal}
+  const todayPage = (title?: string, onPerson?: (key: string) => void) => snap && team?.state.signedIn && !team.state.team ? <StartTeam me={team.state.me} onStarted={() => void refresh()} /> : snap ? <TodayPage title={title} onPerson={onPerson} range={todayRange} onRange={setTodayRange} onNeeds={goNeedsYou} picked={todayPick} onPicked={setTodayPick} keys={!modal}
     faces={new Map(members.map((m) => [m.key, m]))}
     day={teamToday({
       range: todayRange, now, me: team?.me ?? null, items, products: snap.products, cards: weekCards,
