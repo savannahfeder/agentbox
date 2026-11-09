@@ -35,7 +35,7 @@ import { addressYouTyped, canFrameAWebsite, isWebsiteAddress } from '../../../sh
 // doc-md / doc-html rather than off the theme.
 //
 // THE PANE HAS NO ZOOM OF ITS OWN, and it is not missing.
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from '../api';
 import { CodeFile } from './CodeFile';
@@ -44,7 +44,7 @@ import { isTablePath } from '../table-file';
 import { FilmPlayer } from './FilmPlayer';
 import { PdfPages } from './PdfPages';
 import { crumbParts, docKind, docName, isPlainText, splitFromPointer, OPENING_SPLIT, type PaneKind } from '../doc-pane';
-import { pictureUrl } from '../picture';
+import { opening, pictureUrl, seenAt } from '../picture';
 import { fetchableFileUrl } from '../phone-files';
 import { DocText } from './DocText';
 import { CodeArtifact } from './CodeArtifact';
@@ -152,6 +152,8 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
   // The file this really is, found by the app's own finder in the main process,
   // so the pane opens exactly what a click on the same path would have opened.
   const [resolved, setResolved] = useState<string | null>(null);
+  // Each look-up is a new opening (../picture.ts seenAt).
+  const pictureAt = useMemo(() => opening(), [resolved]);
   const [text, setText] = useState<string | null>(null);
   const [mtime, setMtime] = useState<number>(0);
   const saveTable = useTableSave({ product: doc.product, src: doc.src, mtime });
@@ -391,7 +393,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
           // the card rather than flush, because it is a thing to look at like a
           // page is, not a diff.
           resolved
-            ? <img className="doc-view doc-picture" src={pictureUrl(resolved)} alt={docName(resolved)} crossOrigin="anonymous" onError={() => setFailed('That picture could not be drawn.')} />
+            ? <img className="doc-view doc-picture" src={seenAt(pictureUrl(resolved), pictureAt)} alt={docName(resolved)} crossOrigin="anonymous" onError={() => setFailed('That picture could not be drawn.')} />
             : <PreviewLoading />
         ) : kind === 'pdf' ? (
           resolved ? <PdfPages load={pdfBytes} name={docName(resolved)} /> : <PreviewLoading />

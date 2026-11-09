@@ -1424,6 +1424,8 @@ if (!app.requestSingleInstanceLock()) {
         // this scheme.
         // No-store here too, for the same reason as the page scheme above: a
         // screenshot an agent retakes under the same name is still a new picture.
+        // It reaches a fetch; an <img> keeps the window's copy per address
+        // whatever this says, so viewers ask with seenAt (renderer/src/picture.ts).
         const out = noStore(res);
         out.headers.set('access-control-allow-origin', '*');
         return out;
