@@ -205,7 +205,7 @@ function dutiesFrom(list, me, now) {
   return { duties: out, served };
 }
 
-export function teamSetup({ name, role, job, goal, counted, asksFirst, every, at, on, duties, runsOn, handoffsNeedYes, pausedUntil, readsMessages, voice, voiceWords, ready } = {}, ctx = {}) {
+export function teamSetup({ name, role, job, goal, counted, asksFirst, every, at, on, duties, runsOn, handoffsNeedYes, pausedUntil, readsMessages, voice, voiceWords, ready, startNow } = {}, ctx = {}) {
   const { dir, me, team, item, project } = teammateContext(ctx);
   const now = ctx.now ?? Date.now();
   if (typeof asksFirst === 'string' && /\?\s*$/.test(asksFirst)) {
@@ -264,6 +264,7 @@ export function teamSetup({ name, role, job, goal, counted, asksFirst, every, at
     throw new Error('ask you first: post your questions with team_post, each with options, and finish; you can go ready once the person has answered');
   }
   if (ready === true) patch.status = 'active';
+  if (ready === true && me.status === 'draft') patch.firstRun = startNow === false ? 'waits' : 'owed';
   writeTeammate(dir, me.id, patch, now);
   // Its owner may have named it already, in which case it saves no name. Only a
   // title the app gave a setup run is replaced, not one a message happened to start with.

@@ -187,10 +187,8 @@ async function realCodex() {
  *
  * STAND-IN MODE (the default) gives the copy a HOME of its own, so what it
  * finds there is the same on every Mac and every run: two Claude logins
- * (`.claude` and `.claude-second`, each a `.claude.json` naming an account,
- * which is all main/account-discovery.mjs reads), the Claude stand-in behind a
- * tiny wrapper, and the real `codex` binary pointed at a scripted model on a
- * loopback port. REAL MODE keeps this Mac's own home, so the copy finds and
+ * (`layStandInLogins`), the Claude stand-in behind a tiny wrapper, and the
+ * real `codex` binary pointed at a scripted model on a loopback port. REAL MODE keeps this Mac's own home, so the copy finds and
  * runs the Claude Code and Codex installed here, signed in as they are.
  *
  * SETUP MODE (`--setup <name>`, setups.mjs) is the two at once: the REAL
@@ -273,11 +271,7 @@ async function prepare(real, setupName = null, { logins = 2, codex = true, proje
     codexBin = await realCodex();
     codexHome = process.env.VERIFY_CODEX_HOME;
   } else if (!real) {
-    const LOGINS = [['.claude', 'one'], ['.claude-second', 'two'], ['.claude-third', 'three'], ['.claude-fourth', 'four']];
-    for (const [dir, n] of LOGINS.slice(0, Math.min(Math.max(1, logins), LOGINS.length))) {
-      fs.mkdirSync(path.join(home, dir), { recursive: true });
-      fs.writeFileSync(path.join(home, dir, '.claude.json'), `${JSON.stringify({ oauthAccount: { emailAddress: `${n}@verify.invalid`, accountUuid: `verify-account-${n}` } })}\n`);
-    }
+    layStandInLogins(home, logins);
     // A wrapper, so the stand-in starts with an absolute node and does not
     // depend on what PATH the copy's shell recovers from an empty home. It runs
     // a COPY of the stand-in kept here under /tmp, never the one in this
@@ -304,6 +298,20 @@ async function prepare(real, setupName = null, { logins = 2, codex = true, proje
     setup: setup?.name ?? null, claudeModel, codexModel,
   };
   return state;
+}
+
+/**
+ * A stand-in copy's Claude logins, one to four, each a `.claude.json` naming an
+ * account. The default login's file sits beside `~/.claude`, not in it, as
+ * Claude Code keeps it and the app reads it (main/account-tooling.mjs).
+ */
+export function layStandInLogins(home, logins) {
+  const LOGINS = [['.claude', 'one'], ['.claude-second', 'two'], ['.claude-third', 'three'], ['.claude-fourth', 'four']];
+  for (const [dir, n] of LOGINS.slice(0, Math.min(Math.max(1, logins), LOGINS.length))) {
+    fs.mkdirSync(path.join(home, dir), { recursive: true });
+    const file = dir === '.claude' ? path.join(home, '.claude.json') : path.join(home, dir, '.claude.json');
+    fs.writeFileSync(file, `${JSON.stringify({ oauthAccount: { emailAddress: `${n}@verify.invalid`, accountUuid: `verify-account-${n}` } })}\n`);
+  }
 }
 
 /*
