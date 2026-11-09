@@ -17,8 +17,12 @@ appId: now.astral.agentbox
 - tapOn:
     below: "(?i)password"
 - inputText: ${REVIEW_PASSWORD}
-- hideKeyboard
-- tapOn: "Sign in"
+# The fields have no keyboard dismiss button; a tap off them closes it.
+- tapOn: "Use the account from .* on your computer."
+# The button, not the heading of the same words.
+- tapOn:
+    text: "Sign in"
+    below: "Forgot password.*"
 - extendedWaitUntil:
     visible: "Where your messages go"
     timeout: 60000
