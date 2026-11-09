@@ -15,7 +15,7 @@
 // so one word typed into ⌘K brings the whole set up.
 
 import { engineModelLabel, type ModelChoice } from './models';
-import { engineLabel, type Engine } from '../../shared/engines.mjs';
+import { engineLabel, type Engine } from '../../shared/engines.mts';
 import { recentModels, sameModel, type Harness, type ModelPick } from './threads/composer-rules';
 
 export interface ModelCommand {

@@ -2,8 +2,8 @@ import { matchedSentence, parseQuery, searchItems, searchScore } from '../search
 import { searchText } from '../format';
 import { isDirect, messageLine } from './page-rules';
 import type { Person, Product, WorkItem } from '../types';
-import { shownTitle } from '../../../shared/thread-title.mjs';
-import { isTaskRow } from '../../../shared/team-rules.mjs';
+import { shownTitle } from '../../../shared/thread-title.mts';
+import { isTaskRow } from '../../../shared/team-rules.mts';
 
 export interface SearchContext { products: Product[]; people: Person[]; me: string | null }
 

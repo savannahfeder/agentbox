@@ -1112,7 +1112,7 @@ const PERMISSION_OPTIONS: Array<{ value: PermissionMode; label: string }> = MODE
   (value) => ({ value, label: MODE_WORDS[value] }),
 );
 
-// CODEX'S THREE, in the order shared/codex-modes.mjs keeps them, which is
+// CODEX'S THREE, in the order shared/codex-modes.mts keeps them, which is
 // least to most an agent may do. That file is the only place the list lives.
 const CODEX_MODE_OPTIONS: Array<{ value: CodexModeId; label: string }> = CODEX_MODE_ORDER.map(
   (value) => ({ value, label: CODEX_MODES[value].label }),
@@ -2375,18 +2375,16 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
                   THE NUMBER SHOWN IS THE MACHINE'S, NOT THE ACCOUNT'S. The
                   stepper was per account while the sentence beside it talked
                   about the total, so this Mac showed 3 and said 6. Automatic
-                  answers for the Mac and main/machine.mjs shares it out; the
+                  answers for the Mac and main/machine.mts shares it out; the
                   per-account number is arithmetic nobody is asked to do.
 
-                  A PLAN THAT ALLOWS ONE AT A TIME STILL SAYS SO, because that is
-                  a fact about the subscription rather than about this Mac. */}
+                  THE CLAUDE PLAN HAS NO SAY (w-54c640f8da): its limit is a
+                  budget, and a spent one waits for its reset. */}
               <Row
                 label="How many run at once"
-                desc={w.sessionsAtOnceFromPlan
-                  ? `Your plan is ${w.sessionsAtOnceFromPlan}, so ${NAME} starts one ${twoEngines ? 'Claude Code agent ' : ''}at a time.`
-                  : w.agentsAuto
-                    ? 'From this computer’s memory, kept there as you add accounts or turn the memory check on.'
-                    : `You set this. Automatic would run ${w.agentsAutoTotal ?? w.sessionsAtOnce} on this computer.`}
+                desc={w.agentsAuto
+                  ? 'From this computer’s memory, kept there as you add accounts or turn the memory check on.'
+                  : `You set this. Automatic would run ${w.agentsAutoTotal ?? w.sessionsAtOnce} on this computer.`}
               >
                 {/* ONE DROPDOWN, NOT A CHOICE AND THEN A NUMBER (2026-10-05, her
                     note). Automatic and every number it could be are the same
@@ -2410,7 +2408,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
             {/* HOLD HEAVY WORK WHEN MEMORY IS SHORT (w-3958c3753d). An agent
                 waiting on the model costs a few hundred MB; one running tests
                 or a build costs a gigabyte or more, so the number that runs
-                out is heavy commands, not agents. Off out of the box. */}
+                out is heavy commands, not agents. On out of the box. */}
               {w.memoryGate && (
                 <Row
                   label="Hold heavy work when memory is short"
@@ -2483,7 +2481,6 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
                   uncommitted inside it — so there is nothing here to decide,
                   only something to know. A permanent row saying "none" would be
                   bookkeeping on a page that is already long. */}
-              {w.strayFolders && <Row label="Copies of a project made by hand" desc={w.strayFolders.now} />}
               {/* THE ONE LEVER NO READING REPLACES. She is sitting in front of
                   the Mac and the app is not: "If there are issues with that, the
                   user determines whether they can take some sort of more manual
@@ -2598,7 +2595,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
             CONTROL: it is the one page you read rather than set. What is here
             is what a person actually presses, grouped by the moment they would
             want it; ../shortcuts.ts holds the list. Every key on it works today
-            (`tests/the-shortcuts-page-lists-keys-that-work.test.mjs`). */}
+            (`tests/the-shortcuts-page-lists-keys-that-work.test.mts`). */}
         {pane === 'phone' && <PhonePage onFeedback={onFeedback} onSignIn={onPhoneSignIn} web={phoneWeb}
           onPhoneProjects={webComputer ? <WebPhoneProjects web={webComputer} onWorkspace={setWorkspace} /> : undefined} macShut={phoneCloud ? { ...phoneCloud, all: model?.workspace?.phoneAll !== false, projects: projects.filter((p) => p.slug !== 'practice'), onChoose: (all, except) => setWorkspace('phoneProjects', { all, except }) } : undefined} />}
         {pane === 'shortcuts' && (
@@ -2881,7 +2878,7 @@ function WebComputerPane({ pane, web, onWorkspace, onProject, onOpenProject }: {
             desc={`Tests and builds take turns, urgent first, and new agents wait to start until memory frees up.${two ? ' Claude Code and Codex both.' : ''}`}>
             <Switch label="Hold heavy work when memory is short" on={!!gate.value} onChange={(v) => onWorkspace('memoryGate', v)} />
           </ReadRow>
-          {gate.value && !isAuto && (
+          {(gate.value as boolean) && !isAuto && (
             <ReadRow label="Heavy commands at once" reading={slots}
               desc={slots.value === null ? `Auto: ${w.memoryGate.slotsAuto} on this computer, one for every 8 GB of memory.` : `You picked ${slots.value}. Auto is ${w.memoryGate.slotsAuto} on this computer.`}>
               <Stepper label="Heavy commands at once" value={(slots.value as number | null) ?? w.memoryGate.slotsAuto} min={1} max={w.memoryGate.slotsMax ?? 8}

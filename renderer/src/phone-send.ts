@@ -3,16 +3,16 @@
 // leaves, and taking one back while her Mac has not claimed it.
 
 import { REQUEST_CHANNELS } from '../../shared/bridge-map.mts';
-import { madeHere } from '../../shared/phone-snapshot.mjs';
+import { madeHere } from '../../shared/phone-snapshot.mts';
 import {
-  NOT_HERE, UNDONE, approvalCommand, commandFor, phoneSlug, phoneView, realItem, settingCommand, splitSlug, takeBack, type Aliases, type PhoneRows,
+  NOT_HERE, UNDONE, approvalCommand, commandFor, phoneSlug, phoneView, realItem, settingCommand, splitSlug, takeBack, type Aliases, type PhoneAsk, type PhoneRows,
 } from './phone-rows';
 
 type Command = PhoneRows['commands'][number];
 export interface SendClient {
   generation(): number;
   insertCommand(row: Record<string, unknown>): Promise<Command>;
-  update(table: string, query: string, patch: Record<string, unknown>): Promise<any[]>;
+  update(table: string, query: string, patch: Record<string, unknown>): Promise<readonly object[]>;
 }
 
 export function phoneSender({ client, rows, setRows, aliases, changed }: {
@@ -28,20 +28,20 @@ export function phoneSender({ client, rows, setRows, aliases, changed }: {
   // A reply to a thread put off clears the schedule on her Mac (phone-inbox.mts
   // ROUTES), so the window's clearing call right after it has nothing to do.
   const replied = new Map<string, number>();
-  const scheduled = (p: any) => {
+  const scheduled = (p: PhoneAsk) => {
     const item = realItem(aliases(), p?.product, p?.id);
     const t = rows().threads.find((r) => phoneSlug(r.device, r.project) === p?.product && r.item === item)?.snapshot?.item;
     return Math.max(Number(t?.runAt) || 0, Number(t?.snoozedUntil) || 0) > Date.now();
   };
 
-  const leave = async (channel: string, payload: any) => {
+  const leave = async (channel: string, payload: PhoneAsk) => {
     const back = takeBack(rows(), channel, payload, aliases());
     if (back) {
       const asked = client.generation();
       // Only while the computer has not claimed it (Codex's third review, finding 3).
       const done = await client.update('phone_commands', `id=eq.${encodeURIComponent(back.id)}&taken_at=is.null&claimed_at=is.null`, { taken_at: new Date().toISOString(), outcome: UNDONE });
       if (!done.length) throw new Error('Your computer already has it. Reopen it there.');
-      if (client.generation() === asked) setRows({ ...rows(), commands: rows().commands.map((c) => (c.id === back.id ? done[0] : c)) });
+      if (client.generation() === asked) setRows({ ...rows(), commands: rows().commands.map((c) => (c.id === back.id ? done[0] as Command : c)) });
       if (back.kind === 'reply') withdrawn.set(`${payload.product}/${payload.id}`, Date.now());
       changed();
       return { ok: true };
@@ -131,15 +131,15 @@ export function phoneSender({ client, rows, setRows, aliases, changed }: {
       await setting(where.device, { scope: 'repeat', key: 'end', product: where.project, id: p.id, value: true });
       return null;
     },
-    answer: (p: unknown) => leave(REQUEST_CHANNELS.answer, p),
-    stopSession: (p: unknown) => leave(REQUEST_CHANNELS.stopSession, p),
-    runNow: (p: unknown) => leave(REQUEST_CHANNELS.runNow, p),
-    moveToCloud: (p: unknown) => leave(REQUEST_CHANNELS.moveToCloud, p),
-    sendNow: (p: unknown) => leave(REQUEST_CHANNELS.sendNow, p),
-    reopen: (p: unknown) => leave(REQUEST_CHANNELS.reopen, p),
-    snooze: (p: unknown) => leave(REQUEST_CHANNELS.snooze, p),
-    compose: (p: unknown) => leave(REQUEST_CHANNELS.compose, p),
-    schedule: async (p: any) => {
+    answer: (p: PhoneAsk) => leave(REQUEST_CHANNELS.answer, p),
+    stopSession: (p: PhoneAsk) => leave(REQUEST_CHANNELS.stopSession, p),
+    runNow: (p: PhoneAsk) => leave(REQUEST_CHANNELS.runNow, p),
+    moveToCloud: (p: PhoneAsk) => leave(REQUEST_CHANNELS.moveToCloud, p),
+    sendNow: (p: PhoneAsk) => leave(REQUEST_CHANNELS.sendNow, p),
+    reopen: (p: PhoneAsk) => leave(REQUEST_CHANNELS.reopen, p),
+    snooze: (p: PhoneAsk) => leave(REQUEST_CHANNELS.snooze, p),
+    compose: (p: PhoneAsk) => leave(REQUEST_CHANNELS.compose, p),
+    schedule: async (p: PhoneAsk) => {
       if (p?.runAt === 0 && (replied.get(`${p.product}/${p.id}`) ?? 0) > Date.now() - 60_000) return { ok: true };
       return leave(REQUEST_CHANNELS.schedule, p);
     },

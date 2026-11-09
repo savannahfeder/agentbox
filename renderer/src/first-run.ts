@@ -1,9 +1,9 @@
 // THE FIRST RUN'S RULES, with no window in them (w-fadbbea8ef). The screens are
-// components/FirstRun.tsx; tests/the-first-run-starts-on-real-work.test.mjs
+// components/FirstRun.tsx; tests/the-first-run-starts-on-real-work.test.mts
 // holds what each rule is for.
 
 import { checkProjectFolder } from '../../shared/project-folder-check.mts';
-import { repeatLabel, type RepeatShape } from '../../shared/repeats.mjs';
+import { repeatLabel, type RepeatShape } from '../../shared/repeats.mts';
 import { projectNameFor } from './agent-import-card';
 
 export type Screen = 'welcome' | 'chats';

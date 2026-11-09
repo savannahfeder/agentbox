@@ -7,7 +7,7 @@ import remarkGfm from 'remark-gfm';
 import type { Playbook, Product, RunningSession, Teammate, TeammatesView, TeamChatLine, TeamRunLine, WorkItem } from '../types';
 import { type TabView } from '../threads/Pages';
 import { api } from '../api';
-import { GREETING, MAX_HOPS, STARTERS, TEAMMATE_EFFORT, VOICES, VOICE_WORDS_MOST, starterAsks, teammateIdOf, voiceOf, yesFirst } from '../../../shared/teammates.mjs';
+import { GREETING, MAX_HOPS, STARTERS, TEAMMATE_EFFORT, VOICES, VOICE_WORDS_MOST, starterAsks, teammateIdOf, voiceOf, yesFirst } from '../../../shared/teammates.mts';
 import { ModelPicker } from '../components/Model';
 import type { ModelChoice } from '../models';
 import { rememberedProject } from '../compose-project';
@@ -15,6 +15,9 @@ import { answerOf, answersMessage, chatEntries, chatWith, clockOf, dayOf, firstS
 import { ChatsColumn } from './ChatsColumn';
 import { nowLine, TeammateMark } from './TeammatesRail';
 import { AskBeforeDeleting } from '../team/MessageMore';
+import { FormatBar } from '../team/FormatBar';
+import { RichReply, type RichBox } from '../team/RichReply';
+import { sendKeyFor } from '../reply-keys';
 import { Face } from '../team/people';
 import './teammates.css';
 
@@ -477,11 +480,13 @@ function Activity({ e, view, team, only, sessions, call, onOpenThread }: { e: Ch
   return <div className="tq-act tq-note"><span>{c.text}</span>{time}</div>;
 }
 
-// The app's own chat box, the one groups use. While it works, the Send slot
-// is Stop until you type, as in a thread's reply box.
+// The group chat's box: the same editor and formatting bar, growing as you
+// write. While it works, the Send slot is Stop until you type, as in a
+// thread's reply box.
 function Composer({ placeholder, onSend, stop = null }: { placeholder: string; onSend: (text: string) => Promise<boolean>; stop?: ReactNode }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+  const box = useRef<RichBox | null>(null);
   const send = async () => {
     const words = text.trim();
     if (!words || busy) return;
@@ -491,12 +496,17 @@ function Composer({ placeholder, onSend, stop = null }: { placeholder: string; o
     if (ok) setText('');
   };
   return <div className="rm-compose tq-compose">
-    <textarea className="tq-input" value={text} placeholder={placeholder} rows={1} aria-label={placeholder}
-      onChange={(e) => setText(e.target.value)}
-      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }} />
-    <div className="rm-compose-bar"><span />
+    <RichReply className="rm-compose-input tq-input" boxRef={box} value={text} onChange={setText}
+      placeholder={placeholder} label={placeholder}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); return true; }
+        if (e.key === 'Escape') { box.current?.blur(); return true; }
+        return false;
+      }} />
+    <div className="rm-compose-bar">
+      <FormatBar box={box as unknown as { current: HTMLTextAreaElement | null }} onChange={setText} mention={false} />
       {stop && !text.trim() ? stop
-        : <button type="button" className="dock-send" disabled={!text.trim() || busy} onClick={() => void send()} title="Send · ↵">Send <kbd>↵</kbd></button>}
+        : <button type="button" className="dock-send" disabled={!text.trim() || busy} onClick={() => void send()} title={`Send · ${sendKeyFor(true)}`}>Send <kbd>{sendKeyFor(true)}</kbd></button>}
     </div>
   </div>;
 }

@@ -12,7 +12,8 @@ export type PhoneRepeat = RepeatRule & { waiting?: true };
 
 // As long as phone-rows.ts shows a reply that landed before its thread's new copy.
 const LANDING_SHOWN_MS = 2 * 3600_000;
-const isRepeatSetting = (c: Command) => c.kind === 'setting' && c.payload?.scope === 'repeat' && typeof c.payload?.product === 'string';
+type RepeatSetting = Command & { payload: Command['payload'] & { product: string } };
+const isRepeatSetting = (c: Command): c is RepeatSetting => c.kind === 'setting' && c.payload?.scope === 'repeat' && typeof c.payload?.product === 'string';
 
 export function phoneRepeats(settings: RepeatSettingsRow[], commands: Command[], projects: PhoneRows['projects'], now = Date.now()): PhoneRepeat[] {
   const names = new Map(projects.map((p) => [phoneSlug(p.device, p.project), p.name]));
@@ -22,7 +23,7 @@ export function phoneRepeats(settings: RepeatSettingsRow[], commands: Command[],
     // Newest first: an older row of the same computer is not read again.
     if (copyAt.has(row.device)) continue;
     copyAt.set(row.device, Date.parse(row.updated_at ?? '') || 0);
-    const list = Array.isArray(row.settings?.repeats) ? row.settings!.repeats as any[] : [];
+    const list = Array.isArray(row.settings?.repeats) ? row.settings!.repeats as RepeatRule[] : [];
     for (const r of list) {
       const product = phoneSlug(row.device, String(r?.product ?? ''));
       if (typeof r?.id !== 'string' || !names.has(product)) continue;
@@ -39,10 +40,10 @@ export function phoneRepeats(settings: RepeatSettingsRow[], commands: Command[],
     if (!names.has(product)) continue;
     const at = out.findIndex((r) => r.product === product && r.id === p.id);
     if (p.key === 'end') { if (at >= 0) out.splice(at, 1); continue; }
-    if (p.key === 'change') { if (at >= 0) out[at] = { ...out[at], ...p.value, waiting: true }; continue; }
+    if (p.key === 'change') { if (at >= 0) out[at] = { ...out[at], ...(p.value as Partial<RepeatRule>), waiting: true }; continue; }
     if (p.key === 'new') {
       const created = Date.parse(c.created_at) || now;
-      out.push({ priority: 5, ...p.value, id: `phone-${c.id}`, product, productName: names.get(product)!, createdAt: created, served: '', misses: 0, alerted: 0, waiting: true });
+      out.push({ priority: 5, ...(p.value as Pick<RepeatRule, 'title' | 'every' | 'at'> & Partial<RepeatRule>), id: `phone-${c.id}`, product, productName: names.get(product)!, createdAt: created, served: '', misses: 0, alerted: 0, waiting: true });
     }
   }
   return out;

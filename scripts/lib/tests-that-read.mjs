@@ -4,7 +4,7 @@
 // here read a source file with readFileSync instead and check what it says,
 // and those are invisible to it: on 2026-10-04 a359d81 shipped with three of
 // them red because a change to Thread.tsx ran one test file, not four
-// (tests/a-test-that-reads-a-file-runs-when-that-file-changes.test.mjs).
+// (tests/a-test-that-reads-a-file-runs-when-that-file-changes.test.mts).
 //
 // A test reads a file when its text names it the ways tests here do: the
 // repo path ('renderer/src/components/Thread.tsx'), a URL ending in it, or
@@ -14,11 +14,11 @@
 //
 // A test that runs `git ls-files` with no path reads every tracked file, so it
 // runs for any source change
-// (tests/a-test-that-reads-every-file-runs-on-every-change.test.mjs).
+// (tests/a-test-that-reads-every-file-runs-on-every-change.test.mts).
 //
 // A test that WALKS a folder in the repo reads every file under it, named or
 // not, so a file that appears in that folder runs it
-// (tests/a-test-that-walks-a-folder-runs-when-a-file-appears-in-it.test.mjs).
+// (tests/a-test-that-walks-a-folder-runs-when-a-file-appears-in-it.test.mts).
 //
 // Usage: node scripts/lib/tests-that-read.mjs <changed files...>
 //   prints one test file per line.
@@ -61,7 +61,7 @@ export function testsThatRead(changed, root = process.cwd()) {
     return new RegExp(`['"\`](?:[^'"\`\\n]*/)?${escape(name)}['"\`]`);
   });
   let files = [];
-  try { files = fs.readdirSync(path.join(root, 'tests')).filter((f) => f.endsWith('.test.mjs')); } catch { return []; }
+  try { files = fs.readdirSync(path.join(root, 'tests')).filter((f) => /\.test\.m[jt]s$/.test(f)); } catch { return []; }
   const out = [];
   for (const f of files) {
     let text = '';

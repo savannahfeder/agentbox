@@ -38,7 +38,7 @@ import { fileURLToPath } from 'node:url';
 import { readPeople, pickPeople, chaosPlan, worldAt, nextRound, restartAgain, roundOutcome, coverage, testerPrompt, projectNamedIn } from './plan.mjs';
 import { createWatcher, freeMemoryMb, readAllLines, keepEvidence, sleepTargets } from './watch.mjs';
 import { writeReport } from './report.mjs';
-import { seedArtifacts } from './artifacts.mjs';
+import { makeFilm, seedArtifacts } from './artifacts.mjs';
 import { readDiary } from './diary.mjs';
 import { testerLogin, codexCanSandbox, codexTesterArgv, codexTesterEnv, lastMessage } from './codex-tester.mjs';
 
@@ -67,6 +67,8 @@ const roundMs = Math.max(2, Number(opt('round-minutes', 20))) * MIN;
 const chaos = opt('chaos', 'normal');
 const cloud = flag('cloud');
 const standInCloud = flag('stand-in-cloud');
+// Every copy opens as a brand-new install, on the first run (live.mjs --fresh).
+const fresh = flag('fresh');
 if (standInCloud && (cloud || flag('real'))) stop('--stand-in-cloud is the stand-ins\' own cloud; it cannot go with --real or --cloud.');
 const freeHours = opt('free-hours');
 // `owner:0.3,member:0.3`, one per person in --who order: each copy on a team's trial in that role.
@@ -187,7 +189,12 @@ function seedHistory(state, person, count) {
     else if (r > 2) lines.push({ id, ts: at + 20 * MIN, source: 'founder', patch: { status: 'done' } });
   }
   const first = slugs[0];
-  const withFiles = seedArtifacts({ accountRoot: state.accountRoot, slug: first, picture: path.join(REPO, 'docs', 'readme', 'priority-palette.png'), now });
+  const withFiles = seedArtifacts({
+    accountRoot: state.accountRoot, slug: first, now,
+    picture: path.join(REPO, 'docs', 'readme', 'priority-palette.png'),
+    picture2: path.join(REPO, 'docs', 'readme', 'inbox-urgent.png'),
+    film: makeFilm(path.join(state.accountRoot, 'demo-film.mp4')),
+  });
   for (const l of withFiles) ids.add(l.id);
   byProject.get(first).push(...withFiles);
   for (const [slug, lines] of byProject) {
@@ -205,7 +212,7 @@ for (const person of people) {
   fs.mkdirSync(dir, { recursive: true });
   const shape = real ? [] : ['--logins', String(person.logins), ...(person.codex ? [] : ['--no-codex'])];
   say(`${person.name}: starting a copy of the app shaped like their setup`);
-  const up = await live(name, 'up', ...(real ? ['--real'] : []), ...(cloud ? ['--cloud'] : []), ...(standInCloud ? ['--stand-in-cloud'] : []), ...(freeHours ? ['--free-hours', freeHours] : []), ...(cloudTeams[people.indexOf(person)] ? ['--cloud-team', cloudTeams[people.indexOf(person)]] : []), ...(cloudAccounts ? ['--cloud-accounts', cloudAccounts] : []), ...shape, '--projects', person.projects.join(','), ...(team ? ['--team', team] : []), ...(alpha ? ['--alpha', alpha] : []));
+  const up = await live(name, 'up', ...(real ? ['--real'] : []), ...(cloud ? ['--cloud'] : []), ...(standInCloud ? ['--stand-in-cloud'] : []), ...(fresh ? ['--fresh'] : []), ...(freeHours ? ['--free-hours', freeHours] : []), ...(cloudTeams[people.indexOf(person)] ? ['--cloud-team', cloudTeams[people.indexOf(person)]] : []), ...(cloudAccounts ? ['--cloud-accounts', cloudAccounts] : []), ...shape, '--projects', person.projects.join(','), ...(team ? ['--team', team] : []), ...(alpha ? ['--alpha', alpha] : []));
   fs.writeFileSync(path.join(dir, 'up.log'), up.out);
   const stateFile = path.join(instanceDir(name), 'instance.json');
   const state = readJson(stateFile);

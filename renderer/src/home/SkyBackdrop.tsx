@@ -23,9 +23,9 @@ export function SkyBackdrop({ art, from = 0, span = 220 }: { art: SkyArt; from?:
     const paint = () => {
       frame = 0;
       const b = getComputedStyle(host, '::before');
-      const hr = host.getBoundingClientRect();
       const L = parseFloat(b.left) || 0, T = parseFloat(b.top) || 0, R = parseFloat(b.right) || 0, B = parseFloat(b.bottom) || 0;
-      const w = hr.width - L - R, h = hr.height - T - B;
+      // Laid-out size: the first-run setup draws the whole app scaled down.
+      const w = host.offsetWidth - L - R, h = host.offsetHeight - T - B;
       if (w <= 0 || h <= 0) return;
       const key = [L, T, w, h].join(',');
       if (key === last) return;

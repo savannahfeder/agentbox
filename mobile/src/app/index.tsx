@@ -20,8 +20,8 @@ import { GroupsPlace } from '../ui/Groups';
 import { ChatsPlace, TeammateMark, teammatesWaiting } from '../ui/Teammates';
 import { Face } from '../ui/Groups';
 import { mentionRows } from '../../../renderer/src/team/rooms/room-rules';
-import { mateOf, questionsForYou } from '../lib/teammates';
-import type { RoomMention as MentionRowData, Teammate } from '../../../renderer/src/types';
+import { mateOf, questionThread, questionsForYou } from '../lib/teammates';
+import type { RoomMention as MentionRowData, Teammate, WorkItem } from '../../../renderer/src/types';
 import { appStore } from '../platform/persist';
 import { useCloud } from '../state/cloud';
 import { Magnifier, StateGlyph, ViewButton, ViewMenu } from '../ui/Filters';
@@ -37,7 +37,7 @@ import { footRoom, IconButton, PriorityBars, RunningMark, SheetRow, T, TopBar, W
 import { color, corner, font, size } from '../ui/theme';
 import { StatusNotice } from '../ui/StatusNotice';
 import { ComputerWait } from '../ui/Onboarding';
-import { ALERTS_ASKED_KEY, nextSetup, type Setup } from '../lib/first-run';
+import { ALERTS_ASKED_KEY, FIRST_RUN, nextSetup } from '../lib/first-run';
 import { alertsHere } from '../platform/alerts';
 import { previewWalksFirstRun } from '../lib/preview';
 
@@ -141,7 +141,7 @@ function QuestionRow({ mate, text, at, first, now, open }: { mate: Teammate; tex
 }
 
 /** Repeating tasks above what is put off, as the desktop's Later tab has them (List.tsx). */
-function RepeatRows({ repeats, items, now }: { repeats: PhoneRepeat[]; items: any[]; now: number }) {
+function RepeatRows({ repeats, items, now }: { repeats: PhoneRepeat[]; items: WorkItem[]; now: number }) {
   const small = { fontSize: 11, lineHeight: 20, color: color.faint };
   return (
     <View style={{ paddingBottom: 8 }}>
@@ -306,12 +306,12 @@ export default function Threads() {
     signedIn: c.signedIn, started: !c.loading, connect: !!c.connect, noticeAnswered: !!c.notice,
     alertsOn: !!c.alerts, alertsAsked: !!appStore.getItem(ALERTS_ASKED_KEY), alertsHere: alertsHere || walking,
   });
-  const asked = useRef<Setup | null>(null);
   useEffect(() => {
-    if (!c.noticeRead || asked.current === next) return;
-    if (next === 'messages') { asked.current = next; router.push({ pathname: '/ai-notice', params: { first: '1' } }); }
-    else if (next === 'alerts') { asked.current = next; router.push('/alerts'); }
-  }, [next, c.noticeRead]);
+    if (!c.signedIn) { FIRST_RUN.reset(); return; }
+    if (!c.noticeRead || (next !== 'messages' && next !== 'alerts') || !FIRST_RUN.take(next)) return;
+    if (next === 'messages') router.push({ pathname: '/ai-notice', params: { first: '1' } });
+    else router.push('/alerts');
+  }, [next, c.noticeRead, c.signedIn]);
   const inset = useSafeAreaInsets();
   const groups = useGroups();
   const [place, setPlace] = useState<PlaceId>('inbox');
@@ -363,7 +363,11 @@ export default function Threads() {
   // Messages in your groups that name you lead Needs you, and count in it (App.tsx `MentionRows`).
   const mentions = groups.on ? mentionRows(groups.state.mentions) : [];
   // A teammate's question waits where you read, not only in Chats; counted on every tab.
-  const asks = questionsForYou(c.team, c.teamPending);
+  // One asked in a thread opens it, as the desktop answers it there; already in Needs you, its row is that thread's.
+  const inNeedsYou = new Set(shown.rows.inbox.map((r) => r.key));
+  const asks = questionsForYou(c.team, c.teamPending)
+    .map((q) => ({ ...q, thread: questionThread(q.question, c.view.items) }))
+    .filter((q) => !q.thread || !inNeedsYou.has(`${q.thread.product}/${q.thread.id}`));
   const openMention = (m: MentionRowData) => openGroup(m.roomId);
   const counts = { inbox: shown.rows.inbox.length + mentions.length + asks.length, progress: shown.rows.progress.length, snoozed: shown.rows.snoozed.length + c.repeats.length, done: shown.rows.done.length, everything: 0, chats: teammatesWaiting(c) + (groups.on ? groups.unread : 0) };
   const repeatsShown = tab === 'snoozed' && c.repeats.length > 0;
@@ -417,7 +421,7 @@ export default function Threads() {
     if (d.view !== evView) { setEvView(d.view as EvView); if (place === 'inbox') setPlace('everything'); }
     setDisplay({ ...d, view: display.view });
   };
-  const threadRow = (i: any, first: boolean) => {
+  const threadRow = (i: WorkItem, first: boolean) => {
     const r = rowOf.get(`${i.product}/${i.id}`);
     return r ? <ThreadRow key={r.key} row={r} first={first} unread={c.unread(i)} mate={mateOf(i, c.team)} /> : null;
   };
@@ -430,7 +434,7 @@ export default function Threads() {
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={repeatsShown ? <RepeatRows repeats={c.repeats} items={c.view.items} now={c.now} />
         : mentionsShown ? <View>
-          {asks.map((q, i) => <QuestionRow key={q.question.id} mate={q.mate} text={q.question.text ?? ''} at={q.question.ts} first={i === 0} now={c.now} open={() => router.push({ pathname: '/teammate/[id]', params: { id: q.mate.id } })} />)}
+          {asks.map((q, i) => <QuestionRow key={q.question.id} mate={q.mate} text={q.question.text ?? ''} at={q.question.ts} first={i === 0} now={c.now} open={() => (q.thread ? router.push({ pathname: '/thread/[product]/[id]', params: q.thread }) : router.push({ pathname: '/teammate/[id]', params: { id: q.mate.id } }))} />)}
           {mentions.map((m, i) => <MentionRow key={m.id} m={m} first={i === 0 && !asks.length} now={c.now} open={() => openMention(m)} />)}
         </View> : undefined}
       ListEmptyComponent={c.loading ? <Waiting list /> : repeatsShown || mentionsShown ? undefined : hidden > 0 ? <FilteredEmpty tab={tab} hidden={hidden} clear={clear} />

@@ -50,6 +50,7 @@ export function useMessageFiles(product: string, thread?: string): { dir: string
       const name = (id: string) => latest.current.items.find((i: { id: string; title?: string }) => i.id === id)?.title ?? null;
       return found && { title: folderTitle(src, { thread, name }), pictures: found.pictures, total: found.total };
     },
+    say: (line) => latest.current.say(line),
     hold: (src) => {
       const { places, links, say } = latest.current;
       offerLink(linkToShare(openingOf(places, links, product, src)), src.replace(/\/+$/, '').split('/').pop() || src, say);

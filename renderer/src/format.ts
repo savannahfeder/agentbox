@@ -1,5 +1,5 @@
-import { ruleLabel, type RepeatShape as RepeatRuleValue } from '../../shared/repeats.mjs';
-import { isShippedNote } from '../../shared/shipped-note.mjs';
+import { ruleLabel, type RepeatShape as RepeatRuleValue } from '../../shared/repeats.mts';
+import { isShippedNote } from '../../shared/shipped-note.mts';
 import { readMoment } from './when-words';
 import { localDate } from './local-dates';
 // Time and grouping, Superhuman-style: terse, scannable, never a full date
@@ -264,7 +264,7 @@ export function needsYourWords(option: string): boolean {
 // fall-through to whichever preset happens to be highlighted: that fall-through
 // is what scheduled an item for thirty minutes when the user typed "tomorrow", while
 // the preview beside the box was already admitting it did not understand
-// (tests/snooze-honours-what-she-typed.test.mjs).
+// (tests/snooze-honours-what-she-typed.test.mts).
 export type EnterMeans = 'typed' | 'refuse' | 'selected';
 
 export function enterMeans(text: string, parsed: unknown): EnterMeans {
@@ -365,7 +365,7 @@ export function repeatPresets(now = Date.now()): Array<{ label: string; rule: Re
  * as `parseRepeat`, with one difference. A box holds nothing but the rule, so a
  * time after the rhythm is the time even without "at": "every day 5pm" is
  * five, where at the top of a message the "5pm" would be the task and the
- * hour would default to eight (tests/repeat-it-takes-a-rule-in-words.test.mjs).
+ * hour would default to eight (tests/repeat-it-takes-a-rule-in-words.test.mts).
  */
 export function readRule(raw: string): RepeatParse {
   const phrase = (raw ?? '').trim().replace(/\s+/g, ' ');
@@ -420,7 +420,7 @@ function stamp2(ts: number, now: number): { ts: number; label: string } {
 // From seven days on, or once the moment has gone, it carries its date too:
 // "3 weeks" typed on a Thursday printed "THU 8:00 AM", which read as this
 // Thursday when it meant Thursday 5 Nov
-// (tests/a-later-time-weeks-away-says-its-date.test.mjs).
+// (tests/a-later-time-weeks-away-says-its-date.test.mts).
 export function dayAndTime(ts: number, now = Date.now()): string {
   const days = Math.round((startOfDay(ts) - startOfDay(now)) / 86_400_000);
   const dated = days < 0 || days >= 7;
@@ -451,7 +451,7 @@ function flatten(body: string, headings: 'drop' | 'keep'): string {
     .replace(/^#{1,4}\s.*$/gm, (line) => (headings === 'keep' ? line.replace(/^#{1,4}\s*/, '') : ''))
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-    // A cloud run's key ask reads as what it asks for (shared/cloud-keys.mjs).
+    // A cloud run's key ask reads as what it asks for (shared/cloud-keys.mts).
     // Its other asks are cards in the thread, and machine words anywhere else (round six: search showed them).
     .replace(/^\s*`?AGENTBOX-NEEDS:\s*(sign-in|key|file|code)\s.*$/gim, '')
     .replace(/^\s*`?AGENTBOX-NEEDS-A-KEY:\s*([A-Z][A-Z0-9_]+)\b[\s:\u2014\u2013-]*(.*?)`?\s*$/gm, (_l, name: string, what: string) => what || name)

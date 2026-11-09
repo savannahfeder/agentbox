@@ -19,6 +19,10 @@ import {
 } from '../table-edit';
 import { api } from '../api';
 import { MAC } from '../this-keyboard';
+import { gridOf, isSeeded, putGrid, seedGrid } from '../live/table-doc';
+import type { LiveSession } from '../live/live-session';
+import { LiveFaces } from '../live/presence';
+import { useCellMarks, useRoomKept } from '../live/table-presence';
 import './table-view.css';
 
 export type TableMode = 'preview' | 'pane' | 'full';
@@ -647,6 +651,9 @@ export function useTableSave({ product, src, mtime, thread }: { product: string;
   }, [product, src, thread]);
 }
 
+/** A table as the grid a live room keeps: the file's headers, then its rows. */
+const gridOfTable = (t: Table) => [t.columns.map((c) => c.head), ...t.rows.map((r) => [...r])];
+
 const ids = (n: number) => Array.from({ length: n }, (_, i) => i);
 function viewOrder(table: Table, query: string, picked: Record<number, string[]>, sort: Sort): number[] {
   const rows = sortRows(table, filterRows(table, query, picked), sort);
@@ -663,8 +670,10 @@ type Drop = { kind: 'row' | 'col'; place: number; at: number };
 // Only a change to the cells or the headers is a change to the file; a colour or a type is not.
 const fileChanged = (a: Table, b: Table) => a.rows !== b.rows || a.columns.length !== b.columns.length || a.columns.some((c, i) => c.head !== b.columns[i].head);
 
-export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload, onComment, onNotice, storeKey }: {
+export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload, onComment, onNotice, storeKey, live: inRoom = null }: {
   text: string; path: string; mode: TableMode | 'inline'; onShowAll?: () => void; grid?: string[][];
+  /** The table's live room: everyone's cells merge, and only a copy that can write the file saves. */
+  live?: LiveSession | null;
   /** Given, the table can be edited, and every change is written through it. */
   onSave?: TableSave;
   /** Reads the file again, for when it changed on disk under an edit. */
@@ -682,7 +691,10 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   const inline = mode === 'inline';
   const preview = mode === 'preview' || inline;
   const hands = !preview;
-  const editable = hands && !!onSave;
+  const room = inRoom?.synced ? inRoom : null;
+  const roomKept = useRoomKept(room);
+  // A teammate's copy edits while a copy that can write the file is there to keep it.
+  const editable = hands && (!!onSave || (!!room && roomKept));
 
   const [query, setQuery] = useState('');
   // The sort and the filter stay with the file, through another thread and a reload.
@@ -770,6 +782,62 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   }, []);
   useEffect(() => () => { void flush(); }, [flush, base]);
 
+  // ---- The live room: filled once from the file, then the cells everyone sees.
+  const viewNow = useRef({ searched, picked, sort });
+  viewNow.current = { searched, picked, sort };
+  const editingNow = useRef(editing);
+  editingNow.current = editing;
+  const roomRef = useRef(room);
+  roomRef.current = room;
+  const shown = useRef<ReturnType<typeof gridOf> | null>(null);
+  const intoRoom = (next: Table) => {
+    const r = roomRef.current;
+    if (!r || !shown.current) return;
+    putGrid(r.doc, shown.current, gridOfTable(next));
+    shown.current = gridOf(r.doc);
+  };
+  useEffect(() => {
+    if (!room) { shown.current = null; return undefined; }
+    if (room.seed && !isSeeded(room.doc)) seedGrid(room.doc, gridOfTable(base));
+    let frame = 0;
+    const take = () => {
+      frame = 0;
+      if (!isSeeded(room.doc)) return;
+      const now = gridOf(room.doc);
+      shown.current = now;
+      const d = docRef.current;
+      const read = tableFromGrid(now.grid);
+      // A column keeps what it is (tags stay tags) when someone types a value it has not had.
+      const table = { ...read, columns: read.columns.map((c, i) => (d.table.columns[i]?.head === c.head ? d.table.columns[i] : c)) };
+      if (writeTable(table, shape) === writeTable(d.table, shape)) return;
+      // A sort or filter stays true as others change cells, except under the cell being typed in.
+      const v = viewNow.current;
+      const order = table.rows.length === d.table.rows.length && (editingNow.current || (!v.sort && !Object.keys(v.picked).length && !v.searched))
+        ? d.order : viewOrder(table, v.searched, v.picked, v.sort);
+      const next: Doc = { ...d, table, order, filter: undefined };
+      docRef.current = next;
+      setDoc(next);
+      if (saveRef.current && room.keeper) {
+        unsaved.current = writeTable(table, shape);
+        if (timer.current) clearTimeout(timer.current);
+        timer.current = setTimeout(() => { void flush(); }, SAVE_MS);
+      }
+    };
+    const soon = () => { frame ||= requestAnimationFrame(take); };
+    take();
+    room.doc.on('update', soon);
+    return () => { room.doc.off('update', soon); if (frame) cancelAnimationFrame(frame); };
+  }, [room?.doc, room?.seed, room?.keeper]);
+  // Where this copy is, by row and column id, for everyone else's view.
+  useEffect(() => {
+    if (!room || !shown.current) return;
+    const at = pick ? { r: shown.current.rowIds[order[pick.b.r]], c: shown.current.colIds[pick.b.c] } : null;
+    room.live.awareness.setLocalStateField('at', at && at.r && at.c ? { cell: `${at.r}|${at.c}` } : null);
+    room.live.awareness.setLocalStateField('keeps', room.keeper && !!onSave);
+  }, [room?.live, room?.keeper, pick?.b.r, pick?.b.c, order]);
+
+  useCellMarks(box, room, shown, order, table);
+
   const commit = useCallback((given: Doc) => {
     const was = docRef.current;
     if (given.table === was.table && given.order === was.order) return;
@@ -782,8 +850,9 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     ahead.current = [];
     docRef.current = next;
     setDoc(next);
+    if (fileChanged(next.table, was.table)) intoRoom(next.table);
     if (next.looks !== was.looks) keepLooks(store, next.looks);
-    if (fileChanged(next.table, was.table) && saveRef.current) {
+    if (fileChanged(next.table, was.table) && saveRef.current && (!roomRef.current || roomRef.current.keeper)) {
       unsaved.current = writeTable(next.table, shape);
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => { void flush(); }, SAVE_MS);
@@ -812,8 +881,9 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     finishTravel(next, was);
   };
   const finishTravel = (next: Doc, was: Doc) => {
+    if (fileChanged(next.table, was.table)) intoRoom(next.table);
     if (next.looks !== was.looks) keepLooks(store, next.looks);
-    if (fileChanged(next.table, was.table) && saveRef.current) {
+    if (fileChanged(next.table, was.table) && saveRef.current && (!roomRef.current || roomRef.current.keeper)) {
       unsaved.current = writeTable(next.table, shape);
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => { void flush(); }, SAVE_MS);
@@ -1532,6 +1602,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
               {!problem.stale && <button type="button" className="tbl-btn" onClick={() => void flush()}>Try again</button>}
             </span>
             : <span className="tbl-count">{sel && cellsIn(sel) > 1 ? `${wholeRows ? rowsWord(n) : `${cellsIn(sel).toLocaleString()} cells`} picked · ` : ''}{count}{mode === 'full' ? ` · ${table.columns.length} ${table.columns.length === 1 ? 'column' : 'columns'}` : ''}</span>}
+          {room && <LiveFaces session={room} />}
         </div>
       )}
       <div className="tbl-frame">

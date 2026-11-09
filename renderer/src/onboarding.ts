@@ -434,7 +434,7 @@ export function stepTo(s: FirstRun, step: Step): FirstRun {
  *
  *  Anything else answers null, which is what both the key and the button read
  *  to decide whether they are drawn at all. A Back that leads nowhere is the
- *  dead key `tests/the-walk-promises-no-dead-keys.test.mjs` exists to forbid. */
+ *  dead key `tests/the-walk-promises-no-dead-keys.test.mts` exists to forbid. */
 export function stepBack(step: Step): Step | null {
   // Nothing has been written down on the plan screen either: a setup that is
   // running carries on in the background, and the welcome asks again.
@@ -1006,7 +1006,7 @@ export const COPY = {
   //
   // Round four left a bare ↵ in that corner when the Command-Enter button came
   // off. Enter really did work, so it was not a dead key by the rule in
-  // `tests/the-walk-promises-no-dead-keys.test.mjs`, but it was drawn in a
+  // `tests/the-walk-promises-no-dead-keys.test.mts`, but it was drawn in a
   // bordered box the size and shape of a button and it did nothing when it was
   // clicked, which is the same broken promise read the other way round. Submit
   // is the chosen word, so it is the one on the screen, and it says the same
@@ -1112,7 +1112,7 @@ export const COPY = {
      its key, the cap still breathes when nobody presses it, and a wrong press still
      answers. The walk simply stops telling anyone to put their hand somewhere. `ruleHead`,
      `ruleLine` and `ruleGo` are in decisions.md, 08-24, verbatim.
-     `tests/the-practice-project-is-the-whole-app.test.mjs` fails if any of the three comes
+     `tests/the-practice-project-is-the-whole-app.test.mts` fails if any of the three comes
      back, and it greps the whole of COPY for the word rather than only the three keys, so
      it also catches the rule reappearing as a line somewhere quieter.
   */
@@ -1350,7 +1350,7 @@ export const COPY = {
    a condition inside a component, so the rule can be tested without a window.
 
    THE GATE ONLY EVER CLOSES ON A CERTAIN ANSWER, and that is the safety of it.
-   `missing` is true only after `main/engine-bin.mjs` has asked up to three
+   `missing` is true only after `main/engine-bin.mts` has asked up to three
    login shells and had every one of them exit properly, looked in sixteen
    places, read the version manager folders, looked inside the Claude desktop
    app, and found no trace of Claude Code anywhere
@@ -2129,7 +2129,7 @@ export function coach(
        label and keywords (palette-rows.ts), and the tutorial's row reads "Take
        the tutorial", so typing tutorial lands on exactly one row. If that label
        is ever reworded, this sentence is wrong, which is why
-       tests/the-tutorial-and-the-onboarding-are-two-things.test.mjs asserts the
+       tests/the-tutorial-and-the-onboarding-are-two-things.test.mts asserts the
        two against each other rather than each alone.
 
        AND THE LOUD LINE IS UNTOUCHED. What she does next is still her own first real task,
@@ -2242,7 +2242,7 @@ export function coach(
           // comes out to pay for it: the other half of this beat already says
           // `Every command in ${NAME} is in this list.` over the open list, and
           // the loud line has to stay ONE sentence
-          // (tests/the-coaching-card-is-two-lines.test.mjs).
+          // (tests/the-coaching-card-is-two-lines.test.mts).
           'Press ', '⌘K', ' or click the ⌘ button, or N for your first real thread.',
         );
       */
@@ -2882,7 +2882,7 @@ export function fitsBeside(left: number, view: { w: number }): boolean {
 
 /**
  * Draw the ring and place the sentence. Pure, so the geometry is tested rather
- *  than eyeballed: tests/the-coach-ring-lands-on-the-thing.test.mjs. */
+ *  than eyeballed: tests/the-coach-ring-lands-on-the-thing.test.mts. */
 export function ring(
   anchor: Rect,
   bounds: { left: number; right: number },
