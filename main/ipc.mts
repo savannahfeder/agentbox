@@ -1,7 +1,7 @@
 import { openSourceFile } from './open-source-file.mts';
 import {submitReply} from './live-replies.mts';
-import { noteToItsAgent } from './notes-wake.mjs';
-import { CHANGED_HERE, ranHere, whyItCannotMove } from '../shared/move-thread.mts';
+import { noteToItsAgent, replyWithWaitingNotes, waitingNotes } from './notes-wake.mjs';
+import { CHANGED_HERE, leftByAMove, ranHere, whyItCannotMove } from '../shared/move-thread.mts';
 import { whereTheWorkStands } from './git-change.mjs';
 import { taskFolderPath } from './task-folders.mts';
 import { GROUPS } from '../shared/connections-catalog.mjs';
@@ -53,6 +53,7 @@ import { readChange } from './code-change.mjs';
 import { findFile, readCodeFile, writeCodeFile } from './code-file.mts';
 import { readNote, writeNote } from './rail-note.mts';
 import { teamForWindow } from './team/index.mts';
+import { liveRoomFor } from './team/live-room.mjs';
 import { addClaudeAccount, addCodexAccount, alphaFeatures, cornerTagTurnedOff, countsTurnedOff, lookAgainFor, outsideAgentsMode, permissionMode, pointAtEngineBin, readSettings, searchForEngineBin, setProjectSetting, setWorkspaceSetting } from './settings.mts';
 import { ICON_KINDS, clearProjectIcon, setProjectIcon, setProjectName } from './project-identity.mts';
 import { ClaudeUsage } from './claude-usage.mts';
@@ -80,6 +81,8 @@ import { EVENT_NAMES } from '../shared/analytics-events.mts';
 import { appFinder } from './everything-found.mjs';
 import { appFilesPlace } from './files-place.mjs';
 import { Name } from '../shared/product-name.mjs';
+import { setUpGit, startGhLogin } from './github-browser-sign-in.mts';
+import type { GhLogin } from './github-browser-sign-in.mts';
 import { handedOnByReply, isGivenTask } from '../shared/team-rules.mjs';
 import { closeRefusal, closedAnywayNote } from '../shared/not-shipped.mts';
 import { lightRunning, snapshotSender } from '../shared/snapshot-delta.mjs';
@@ -187,6 +190,8 @@ export interface IpcDeps {
   connections?: IpcConnections | null;
   copies?: IpcCopies | null;
   onCount?: () => void;
+  /** The live relay's address, null when this cloud has none. */
+  liveAt?: string | null;
 }
 
 export interface TeammateArgs {
@@ -268,7 +273,7 @@ const NO_UPDATER: IpcUpdater = {
 const TEAMMATE_OPS = new Set(['create', 'describe', 'start', 'update', 'stop', 'remove', 'post', 'goAhead', 'remember', 'forget', 'method', 'unsend']);
 const ROOM_OPS = new Set(['refresh', 'send', 'markRead', 'markDone', 'markUnread', 'react', 'decide','edit', 'deleteMessage', 'putFile', 'putFileFrom', 'file', 'fileOnDisk', 'fileText', 'markFile', 'older', 'saveProfile', 'goInvisible', 'comeBack', 'link', 'revokeLink', 'preview', 'listed', 'invitesSent', 'joinByLink', 'joinListed', 'acceptInvite', 'invite', 'create', 'rename', 'leave', 'remove', 'pin', 'mute']);
 
-export function registerIpc({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null, connections = null, copies = null, onCount = () => {} }: IpcDeps) {
+export function registerIpc({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null, connections = null, copies = null, onCount = () => {}, liveAt = null }: IpcDeps) {
   // The three Electron things, or a plain Node stand-in for them. There is no
   // default: a caller that forgets says so here rather than throwing eighty
   // lines further down on `ipcMain.handle` of undefined.
@@ -688,7 +693,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     return snapshots.answer({
       products: store.listProducts(),
       // Each with the place she dragged it to, if she did (w-6e5b532a95).
-      items: supervisor.withPlaces(items),
+      items: supervisor.withPlaces(items.filter((i) => !leftByAMove(i))),
       // THE TEAM: who is signed in, their team and its people, and the
       // title-free activity of their private work. Null on a build with no
       // team cloud, which is the single-person app.
@@ -945,8 +950,14 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     // a thread's moment runs now (shared/answers.mjs wordWaits), and this one
     // must wait. Both writes are one synchronous step, so no pass reads between.
     const later = Number(runAt) > Date.now() && status !== 'done';
-    const out = await submitReply(supervisor,{product,id,answer,status,permissionMode,now:!!now,later},()=>{
-      const said = store.answerItem(product, id, { answer, status, priority, permissionMode, engine, model, effort, inReplyTo: thread, fromPhone });
+    const withNotes = product && id && !later && status !== 'done'
+      ? replyWithWaitingNotes({ store, product, id, answer, me: teamMe(), nameOf: noteBy, people: teamPeople() })
+      : null;
+    const out = await submitReply(supervisor,{product,id,answer:withNotes?.answer ?? answer,status,permissionMode,now:!!now,later},()=>{
+      const said = withNotes
+        ? store.answerItem(product, id, { answer: withNotes.answer, fromNotes: withNotes.fromNotes, typed: answer as string, status, priority, permissionMode, engine, model, effort, inReplyTo: thread, fromPhone })
+        : store.answerItem(product, id, { answer, status, priority, permissionMode, engine, model, effort, inReplyTo: thread, fromPhone });
+      if (withNotes) store.fileMark(product, id, { do: 'sent', on: withNotes.fromNotes });
       if (later) store.scheduleItem(product, id, Number(runAt));
       return said;
     });
@@ -1823,8 +1834,16 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   // Send a stopped/blocked item back to the queue; the fresh worker's brief
   // carries whatever the founder wrote on the item meanwhile.
-  ipcMain.handle('zero:reopen', (_e, { product, id }: { product: string; id: string }) => {
+  ipcMain.handle('zero:reopen', async (_e, { product, id }: { product: string; id: string }) => {
     if (isAgentRow(id)) return { ok: false };
+    // Sending it back hands over the comments still waiting, as Send would.
+    const waiting = waitingNotes({ store, product, id, me: teamMe(), people: teamPeople() });
+    if (waiting.length) {
+      const mark = { do: 'toagent', on: waiting };
+      store.fileMark(product, id, mark);
+      try { await noteToItsAgent({ store, supervisor, product, id, mark, nameOf: noteBy, people: teamPeople() }); }
+      catch (err) { console.warn(`[notes] sending ${id} back did not hand over its comments: ${(err as Error)?.message ?? err}`); }
+    }
     const out = store.answerItem(product, id, { status: 'open' });
     supervisor.liftBrakeForHer?.();
     supervisor.forgetDeadStarts?.({ product, id });
@@ -2180,6 +2199,47 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       if (freed.length) supervisor.wake();
       push();
       return { ok: true, keys, freed: freed.map((t) => t.id), cloudOff: supervisor.config.cloudRuns === false };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+  // What the person did with a sign-in link an agent is waiting on (shared/sign-in-ask.mjs).
+  ipcMain.handle('zero:sign-in-answer', (_e, { product, id, ask, said, url } = {}) => {
+    try {
+      store.answerSignIn(product, id, { id: ask, said, url });
+      push();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+  // GitHub's own sign-in for this computer's git, started from the card on a ship that could not push.
+  let ghLogin: GhLogin | null = null;
+  ipcMain.handle('zero:github-browser-sign-in', async () => {
+    try {
+      ghLogin?.cancel();
+      const login = ghLogin = await startGhLogin();
+      void login.done.then(async (ok) => {
+        if (ghLogin === login) ghLogin = null;
+        if (!ok || !await setUpGit()) return;
+        await supervisor.gitHubSignIn?.forget().catch(() => {});
+        store.shipAgainAfterGitHubSignIn();
+        supervisor.wake();
+        push();
+      });
+      return { ok: true, code: login.code, url: login.url };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+  ipcMain.handle('zero:github-sign-in', async (_e, { token } = {}) => {
+    try {
+      if (!supervisor.gitHubSignIn) return { ok: false, error: `Signing in to GitHub needs the ${Name} app on this computer.` };
+      await supervisor.gitHubSignIn.save(token);
+      const again = store.shipAgainAfterGitHubSignIn();
+      supervisor.wake();
+      push();
+      return { ok: true, again };
     } catch (err) {
       return { ok: false, error: String((err as Error).message) };
     }
@@ -2750,6 +2810,23 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     const found = findFile({ change: opened.change, product: opened.prod, filePath });
     if (!found.ok) return found;
     return writeCodeFile({ file: found.path, change: opened.change, product: opened.prod, text, mtime });
+  });
+
+  // The live room a document or table opens in, when teammates can open it too.
+  ipcMain.handle('zero:live-room', async (_e, { product, project, name }: { product?: unknown; project?: unknown; name?: unknown }) => {
+    if (!team || typeof name !== 'string') return null;
+    const state = team.state() as { signedIn?: boolean; me?: { id: string; name?: string }; team?: { id: string }; cards?: { project?: string | null }[] };
+    const own = store.listProducts().find((p) => p.slug === product && !p.team?.direct);
+    const key = (s: unknown) => String(s ?? '').trim().toLowerCase();
+    const named = typeof project === 'string' && project ? project : own?.name;
+    const mine = store.listProducts().find((p) => !p.team?.direct && key(p.name) === key(named));
+    const shared = mine
+      ? !!mine.team?.projectId && projectSeenBy(mine).who !== 'private'
+      : (state.cards ?? []).some((c) => key(c.project) === key(named));
+    const room = liveRoomFor({ address: liveAt, state, multiplayer: alphaFeatures(config).multiplayer, project: named, name: name.split('/').pop(), shared, owner: !!own && own === mine });
+    if (!room) return null;
+    const token = await team.liveToken?.();
+    return token ? { ...room, url: `${room.url}?t=${encodeURIComponent(token)}` } : room;
   });
 
   ipcMain.handle('zero:write-doc', async (_e, { product, src, text, mtime, thread }: { product: string; src?: unknown; text: unknown; mtime?: number; thread?: unknown }) => {

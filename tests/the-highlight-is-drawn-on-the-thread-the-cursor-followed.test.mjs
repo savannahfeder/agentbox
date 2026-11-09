@@ -45,7 +45,8 @@ describe('what the list is handed to draw the highlight on', () => {
 
   it('works the place out before the draw, in the render, not in an effect', () => {
     // An effect runs after the paint, which is the frame this is about.
-    expect(app).toMatch(/const cursor = cursorIndex\(\{ list, selected, last: cardSel \? null : drawnAt\.current \}\);/);
+    // A row a Z is putting back comes first (tests/z-puts-the-keyboard-on-the-thread-it-reopened).
+    expect(app).toMatch(/const cursor = (putBack\.index >= 0 \? putBack\.index : )?cursorIndex\(\{ list, selected, last: cardSel \? null : drawnAt\.current \}\);/);
   });
 });
 

@@ -28,7 +28,7 @@ const build = (items, slots = 1, order = []) => {
   sup = new Supervisor({ home: ONE_ACCOUNT_HOME, storeRoot: '/nonexistent-zero-root', maxConcurrentSessions: slots, authProfiles: ['default'] }, store(items), '/nonexistent-app');
   sup.productOrder = order;
   spawned = []; killed = [];
-  sup.spawnWorker = (item) => { spawned.push(item.id); sup.sessions.set(item.id, { itemId: item.id, product: item.product, startedAt: NOW, tail: [] }); };
+  sup.spawnWorker = (item) => { spawned.push(item.id); sup.sessions.set(item.id, { itemId: item.id, product: item.product, startedAt: NOW, tail: [], traced: true }); };
   sup._kill = (session) => { killed.push(session.itemId); sup.sessions.delete(session.itemId); return true; };
   sup._saveState = () => {};
 };
@@ -50,7 +50,7 @@ describe('the next free agent', () => {
 
   it('stops nothing that is already running to make room', async () => {
     build([row('w-busy'), mate('w-setup', [CHAT_LABEL])], 1);
-    sup.sessions.set('w-busy', { itemId: 'w-busy', product: 'agentbox', startedAt: NOW, tail: [] });
+    sup.sessions.set('w-busy', { itemId: 'w-busy', product: 'agentbox', startedAt: NOW, tail: [], traced: true });
     await sup.tick();
     expect(killed).toEqual([]);
     expect(spawned).toEqual([]);

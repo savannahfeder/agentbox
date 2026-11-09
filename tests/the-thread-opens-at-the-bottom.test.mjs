@@ -383,6 +383,34 @@ describe('the restore', () => {
     });
   });
 
+  // COMING BACK TO A THREAD (w-f55ea5cd53): the thread is already drawn, so the
+  // stick is armed BEFORE the restore, and the restore lands and lets go between
+  // two of its looks. Measured in the built app: placed at 400, then pinned to
+  // 1483 by the next fold settling, 24ms later.
+  it('does not take her to the end when a restore lands after the stick armed', () => {
+    const el = box({ scrollHeight: 2243, clientHeight: 760 });
+    withObserver(el, () => {
+      holdAtBottom(el);
+      expect(el.scrollTop).toBe(1483);
+      resumeTo(el, 400);
+      expect(el.scrollTop).toBe(400);
+      el.growsTo(2400);
+      expect(el.scrollTop).toBe(400);
+      el.growsTo(2600);
+      expect(el.scrollTop).toBe(400);
+    });
+  });
+
+  it('keeps sticking when a restore after the stick armed put her at the end', () => {
+    const el = box({ scrollHeight: 2243, clientHeight: 760 });
+    withObserver(el, () => {
+      holdAtBottom(el);
+      resumeTo(el, 1483);
+      el.growsTo(3000);
+      expect(gapToBottom(el)).toBe(0);
+    });
+  });
+
   it('does nothing for a box that is not there, or a place at the top', () => {
     expect(() => resumeTo(null, 400)()).not.toThrow();
     const el = box({ scrollHeight: 9154 });
