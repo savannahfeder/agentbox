@@ -13,7 +13,7 @@ import { CloudServerWatch, serverError } from './cloud-server-down.mts';
 import { folderJob } from './task-folders-offthread.mts';
 import { gitJob } from './git-change-offthread.mts';
 import { queuedReplyText, submitReply, framedPick, framedTeammate } from './live-replies.mts';
-import { resolveAnsweredNotes, wakeForNotes } from './notes-wake.mjs';
+import { resolveAnsweredNotes } from './notes-wake.mjs';
 import { TEAM_LOOK, TEAM_LOOK_LINE } from '../shared/team-look.mjs';
 import { editedFilesLine } from '../shared/artifact-marks.mjs';
 import { readItemHistory, updateWorkItem } from './store/work-items.mjs';
@@ -72,6 +72,8 @@ import { hostSocketPath, perlRunsTheShim, HOST_ALREADY_THERE } from './cloud/hos
 import { runHostSocket, spoolFiles, HOST_ALREADY_THERE as RUN_HOST_ALREADY_THERE } from './run-host.mjs';
 import { toolHostDir, readToolHost, shareToolServers, TOOL_HOST_ALREADY_THERE } from './tool-host.mjs';
 import { HostedRun, HOST_LOST } from './hosted-run.mjs';
+import { HELPERS_LOST, helpersLostAnswer } from './claude-input.mts';
+import type { BackgroundTask } from './claude-input.mts';
 import { readCloudUsage, summarizeCloudUsage } from './cloud/usage.mts';
 import { buildSessionArgs, CLAUDE_MODES, parseSessionArgs, permissionMode } from './settings.mts';
 import fs from 'node:fs';
@@ -177,7 +179,7 @@ import { NAME, Name, envName, nameSlug, isOurSlug } from '../shared/product-name
 import { signInFiles, signInStamp } from './sign-in-files.mts';
 import { runsOn } from './runs-on.mts';
 import { MemoryGateServer, defaultSocketPath as memoryGateSocketPath, readMacPressure } from './memory-gate-server.mts';
-import { startDecision, readMacPressureNow, SETTLE_MS } from './start-hold.mts';
+import { startDecision, readMacPressureNow, SETTLE_MS, STALE_MS } from './start-hold.mts';
 import { MemoryLog } from './memory-log.mts';
 import { StartBudget } from './cloud/start-budget.mjs';
 import { isPlainMerge, mergeHome, mergedSentence } from './cloud/merge-home.mjs';
@@ -330,13 +332,18 @@ export interface WorkerChild {
   on(event: 'input-turn', listener: () => void): unknown;
   on(event: 'remote-user', listener: (event: RemoteUserEvent) => void): unknown;
   on(event: 'bridge-state', listener: (event: BridgeStateEvent) => void): unknown;
+  on(event: 'turn-over' | 'next-turn', listener: () => void): unknown;
   once(event: 'spawn', listener: () => void): unknown;
   once(event: 'exit', listener: (code: number | null, signal: NodeJS.Signals | null) => void): unknown;
   holdInput?(value: unknown): void;
   steer?(text: string): Promise<unknown>;
   interrupt?(): Promise<{ interrupted: boolean }>;
   ranToTheEnd?(): boolean;
+  helpersLost?(): BackgroundTask[];
   waitingOn?(): unknown[];
+  waitAfterTurns?(ms: number): void;
+  waitingForNext?(): boolean;
+  stopWaiting?(): void;
   lastInterruptAt?: number;
   runId?: string;
   sockPath?: string;
@@ -394,6 +401,13 @@ export type RunState = {
   remoteIdle?: boolean;
   remoteHeld?: boolean;
   remoteResultRecorded?: boolean;
+  /** A cloud session between turns, waiting for the next reply (`_turnOver`). */
+  between?: boolean;
+  answerOnRow?: string | null;
+  spawnAnswerSettled?: boolean;
+  turnStartedAt?: number;
+  turnEpoch?: number;
+  ranOn?: { model: string | null; effort: string | null };
   exitFailed?: boolean;
   accountFault?: AccountFault | null;
   lastOutputAt?: number;
@@ -925,6 +939,9 @@ export interface CodexServerEntry {
 // carrying both still wrote 1,000 characters.
 const WORKER_REPORT_RULES = /This is about the LAST message you send[\s\S]*?(?=A PICTURE YOU SHOW)/;
 const POLL_MS = 15_000;
+// How long a cloud session stays open after answering, for a reply that then
+// reaches it in seconds rather than after a new machine's two minutes.
+export const WAIT_FOR_NEXT_REPLY_MS = 10 * 60_000;
 // How often an agent may restart its own thread on a model or effort it chose.
 const SWITCH_RESTARTS = 3;
 const SWITCH_WINDOW_MS = 30 * 60_000;
@@ -3754,6 +3771,14 @@ export class Supervisor {
     return parts.join('\n');
   }
 
+  // A reply to a cloud session between turns, worded as the run it saves would be.
+  nextReplyBrief(productSlug: string, id: string, answer: string) {
+    const row = this.store.readItem?.(productSlug, id) ?? ({ id, product: productSlug } as WorkItem);
+    const product = this.store.listProducts?.().find((p) => p.slug === productSlug) ?? null;
+    const { answer: _old, ...wrote } = row.wrote ?? {};
+    return this.replyBrief({ ...row, answer: framedPick(answer), wrote } as WorkItem, { product });
+  }
+
   /** Whether this Mac ships this project's tasks itself (main/ship-queue.mts). */
   shipsThroughTheApp(product: Product) {
     return !!shipScriptFor(product, readShipSettings(this.userDir));
@@ -4458,7 +4483,8 @@ export class Supervisor {
     const byId = new Map((items ?? []).map((i) => [i.id, i]));
     const reaped: string[] = [];
     for (const [id, session] of this.sessions) {
-      if (session.stoppedByUs) continue;
+      // Quiet between turns is waiting, not hung.
+      if (session.stoppedByUs || session.between) continue;
       const item = byId.get(id);
       if (!item?.claim || !item.claimExpired) continue;
       const quietSince = session.lastOutputAt ?? session.startedAt ?? now;
@@ -4639,7 +4665,7 @@ export class Supervisor {
    *   row behind it waited for good (tests/a-row-is-named-on-an-account-that-has-room).
    */
   nameTheRows(items: WorkItem[], now = Date.now()) {
-    if (this._naming) return undefined;
+    if (this._naming || this._memoryCritical(now)) return undefined;
     this._nameMisses ??= new Map();
     const key = (i: WorkItem) => `${i.product}:${i.id}`;
     const next = items
@@ -4664,6 +4690,7 @@ export class Supervisor {
    * agent's own last message.
    */
   catchUpTheImports(items: WorkItem[], now = Date.now()) {
+    if (this._memoryCritical(now)) return Promise.resolve([]);
     this._catchingUp ??= new Set();
     this._catchUpMisses ??= new Map();
     const key = (i: WorkItem) => `${i.product}:${i.id}`;
@@ -4721,6 +4748,18 @@ export class Supervisor {
    * getting nothing is the row keeping its own title, which is what every row
    * had before the namer existed.
    */
+  /**
+   * Whether the Mac reads critical now (main/start-hold.mts's reading). Naming,
+   * sorting and catching up are tidying that nothing waits on, and each is a
+   * 200 to 300 MB process, so they wait while it does. A missing or stale
+   * reading is not a reason to wait.
+   */
+  _memoryCritical(now = Date.now()) {
+    const r = this._memReading;
+    if (!r || !(Math.abs(now - Number(r.at)) <= STALE_MS)) return false;
+    return pressureFrom(r) === 'critical';
+  }
+
   async _askSmall<T>(ask: (opts: SmallModelAsk) => Promise<T> | T, { product = null }: { product?: string | null } = {}): Promise<T | ''> {
     const home = this._homeEngine();
     const engines = this._projectProfile(product)
@@ -4761,7 +4800,7 @@ export class Supervisor {
    * every fifteen seconds.
    */
   sortTheMessages(items: WorkItem[], me: string | null | undefined) {
-    if (this._sortingMessages || !me) return undefined;
+    if (this._sortingMessages || !me || this._memoryCritical()) return undefined;
     this._sortedMessages ??= new Set();
     const products = new Map((this.store.listProducts?.() ?? []).map((p) => [p.slug, p]));
     const next = items
@@ -7351,6 +7390,7 @@ export class Supervisor {
     };
     this._comingHome ??= new Map();
     let buffered = '';
+    let helpersLost: BackgroundTask[] = [];
     child.stdout?.on('data', (d) => {
       buffered += d;
       let i: number;
@@ -7358,6 +7398,10 @@ export class Supervisor {
         const line = buffered.slice(0, i);
         buffered = buffered.slice(i + 1);
         if (!line.trim()) continue;
+        if (line.includes(HELPERS_LOST)) {
+          try { const e = JSON.parse(line); if (e?.subtype === HELPERS_LOST && Array.isArray(e.tasks)) helpersLost = e.tasks; } catch { /* not ours */ }
+          continue;
+        }
         const first = this._comingHome.get(itemId) !== view;
         this._comingHome.set(itemId, view);
         capture(view, line);
@@ -7385,7 +7429,7 @@ export class Supervisor {
         if (trace) write(`\n# exited (${code}) ${new Date().toISOString()}${view.stoppedOnRequest ? STOPPED_ON_REQUEST : ''}\n`);
         // Finished only when its work is home: 75 is the app going again, or
         // results that did not come back, and a later homecoming tries again.
-        const session = { ...view, startedAt: rec.startedAt, child: { ranToTheEnd: () => code === 0 } };
+        const session = { ...view, startedAt: rec.startedAt, child: { ranToTheEnd: () => code === 0 && !helpersLost.length, helpersLost: () => [...helpersLost] } };
         // Same as a run the app started: its reply was marked heard when it was
         // joined, so it is released here or nothing would run it on this Mac.
         if (this.runFinished(session) && this._noteCloudHandBack(item, session, rec.cwd)) {
@@ -7397,6 +7441,7 @@ export class Supervisor {
         } else if (this.closingMessageIsTheAnswer(session)) {
           try { this.store.recordSessionResult(rec.product, itemId, { result: session.result, status: null }); } catch (e) { console.warn('zero: writing a joined run\'s answer failed:', (e as Error).message); }
         }
+        this.sayHelpersLost(item, session);
         // The reply this conversation heard is answered; one typed while it
         // was away is left for the next run.
         if (this.runFinished(session) && !session.handedBack) {
@@ -8041,13 +8086,13 @@ export class Supervisor {
     return [
       ...this.sessions.values(),
       ...[...(this._comingHome?.values() ?? [])].filter((v) => !this.sessions.has(v.itemId)),
-    ].filter((s) => !s.remoteIdle);
+    ].filter((s) => !s.remoteIdle && !s.between);
   }
 
   /** What the phone is told of the agent running on one thread: since, where, its current steps. Null when none is. */
   liveFor(product: string, itemId: string) {
     const s = this.sessions.get(itemId);
-    if (!s || s.product !== product || s.remoteIdle) return null;
+    if (!s || s.product !== product || s.remoteIdle || s.between) return null;
     const runId = s.cloud && s.cwd ? readMarker(this._cloudPlace(s.cwd, product, itemId))?.runId : null;
     let movable = false;
     try { movable = !s.cloud && this._movableNow().has(itemId); } catch { /* said as not movable */ }
@@ -8687,7 +8732,6 @@ export class Supervisor {
     // Teammates next, for the same reason: a run a message or a schedule made
     // on this tick is picked up by the pass below.
     await this.serveTeammates(now);
-    await this.wakeForNotes(now);
     this.resolveAnsweredNotes(now);
     // And the folders of rows she has finished, put away. On a timer of its own
     // rather than every pass, because it is a walk of the disk and a tick is
@@ -8702,6 +8746,7 @@ export class Supervisor {
     // A session that died without exiting still holds its row. Stopping it
     // here lets the passes below put a fresh worker on the row.
     this.reapHungSessions(items, now);
+    this.endWaitsOvertaken(items);
 
     // BEFORE ANY OF THE SPAWNING: is there a row sitting there silent because
     // the last thing that touched it died without a word? Ahead of the passes
@@ -9059,24 +9104,6 @@ export class Supervisor {
   // to Monday finds ONE period unserved, because four were never representable.
   // And nothing books the next run, so a run that dies costs one day rather
   // than costing the task.
-  // A teammate's note on a file an agent made is a turn for that agent
-  // (./notes-wake.mjs), live if a session is up, and never waited on for long.
-  async wakeForNotes(now: number = Date.now()) {
-    const team = this.store.teammates?.team;
-    if (!team) return;
-    const deadline = this.config.teammateReplyDeadlineMs ?? 30_000;
-    const tell = async (product: string, id: string, { text, from, fromNotes }: { text: string; from: { teammate: string; name: string }; fromNotes?: unknown[] | null }) => {
-      let timer: NodeJS.Timeout | undefined;
-      const late = new Promise((resolve) => { timer = setTimeout(() => resolve('late'), deadline); });
-      const sent = submitReply(this, { product, id, answer: text, from: from.name }, () => this.store.tellItem(product, id, { text, from, fromNotes }));
-      sent.catch((err: Error) => console.warn(`zero: notes on a file did not reach ${id}: ${err.message}`));
-      await Promise.race([sent, late]).finally(() => clearTimeout(timer));
-    };
-    try {
-      if (await wakeForNotes({ store: this.store, team, tell, now })) this.wake?.();
-    } catch (err) { console.warn('zero: notes on a file could not reach its agent:', (err as Error).message); }
-  }
-
   resolveAnsweredNotes(now: number = Date.now()) {
     try {
       resolveAnsweredNotes({ store: this.store, people: this.store.teammates?.team?.state?.()?.people ?? [], now });
@@ -11826,6 +11853,14 @@ export class Supervisor {
       try { trace?.write(`stderr: ${String(d).slice(0, 1000)}\n`); } catch {}
     });
     const answerAtSpawn = item.answer ?? null;
+    // A cloud turn's end is not the run's: the session waits for the next reply
+    // (`_turnOver`), which then goes straight in instead of starting a machine.
+    // Not a run picked back up after a restart: its host or the cloud closes it.
+    if (session.cloud && !remoteOnly && !plan.command && !adopted && typeof child.waitAfterTurns === 'function') {
+      child.waitAfterTurns(WAIT_FOR_NEXT_REPLY_MS);
+      child.on('turn-over', () => this._turnOver(item, session, { continuation, answerAtSpawn }));
+      child.on('next-turn', () => this._nextTurn(session));
+    }
     let exited = false;
     // `how` IS THE THIRD ARGUMENT ONLY THE CODEX FACADE SENDS, and it is
     // undefined for a real ChildProcess, which is every Claude Code worker.
@@ -11942,7 +11977,10 @@ export class Supervisor {
       // word, there is no worker inside it, it never reads a brief and it has
       // never heard of the store. So the supervisor speaks for it, exactly as
       // it does for a personal thread.
-      if (this.speaksForTheSession(session, { command: !!plan.command })) {
+      // Already on the row when a cloud session wrote it between turns (`_turnOver`).
+      const onRowAlready = session.answerOnRow != null && session.answerOnRow === session.result;
+      if (onRowAlready) { /* written once */ }
+      else if (this.speaksForTheSession(session, { command: !!plan.command })) {
         try {
           this.store.recordSessionResult(item.product, item.id, {
             result: session.result || '(the session ended with an empty reply)',
@@ -11957,6 +11995,7 @@ export class Supervisor {
           this.store.recordSessionResult(item.product, item.id, { result: session.result, status: null });
         } catch (e) { console.warn('zero: writing the closing message as the answer failed:', (e as Error).message); }
       }
+      this.sayHelpersLost(item, session);
       this.releaseFinishedClaim(item, session);
       // NOTHING HERE TOUCHES `_rowSessions`, and that is the whole change of. A
       // finished session has nothing left to RESCUE, which is what this line is
@@ -11968,7 +12007,7 @@ export class Supervisor {
       this._noteStoppedByAccount(item, session);
       if (session.cloud) this._sayCloudNews(cwd, item);
       const carryingAnswer = continuation && answerAtSpawn;
-      if (carryingAnswer) this.settleDeliveryAndSay(item, answerAtSpawn, session, signal, { command: !!plan.command });
+      if (carryingAnswer && !session.spawnAnswerSettled) this.settleDeliveryAndSay(item, answerAtSpawn, session, signal, { command: !!plan.command });
       // AND THE REPLY THE USER TYPED INTO A RUN THAT WAS NOT CARRYING ONE. Ordinary
       // fresh work never reached the line above, so a correction steered into a
       // working session was acted on, answered, and then remembered as owed
@@ -12507,6 +12546,20 @@ export class Supervisor {
   // (tests/a-worker-whose-helpers-are-still-working-does-not-come-back-to-you).
   // The input pipe knows: it only closes at a result with nothing out. A child
   // that cannot say (a Codex turn) keeps the old reading.
+  // A CLOUD RUN THAT ENDED WITH ITS HELPERS STILL WORKING LOST THEM: its
+  // machine went, or its time ran out. The last turn's "waiting on them" is
+  // not the answer, and nothing will start the thread again by itself, so the
+  // row says what was lost and waits in Needs you
+  // (tests/a-cloud-run-never-loses-its-helpers-in-silence). Not after her Stop.
+  sayHelpersLost(item: WorkItem, session: RunState) {
+    const lost = session.child?.helpersLost?.() ?? [];
+    if (!lost.length || session.stoppedOnRequest || session.handedBack) return false;
+    try {
+      this.store.recordSessionResult(item.product, item.id, { result: helpersLostAnswer(lost), status: 'blocked' });
+    } catch (e) { console.warn('zero: could not say what the run lost:', (e as Error).message); return false; }
+    return true;
+  }
+
   runFinished(session: RunState | null | undefined) {
     if (session?.result == null || session.resultIsError) return false;
     return session.child?.ranToTheEnd?.() !== false;
@@ -13072,7 +13125,7 @@ export class Supervisor {
       const fresh = this.store.readItem?.(session.product!, session.itemId!);
       if (!fresh) return false;
       const wrote = fresh.wrote?.result;
-      return !(wrote?.source === 'agent' && (wrote.ts ?? 0) >= (session.startedAt ?? 0));
+      return !(wrote?.source === 'agent' && (wrote.ts ?? 0) >= (session.turnStartedAt ?? session.startedAt ?? 0));
     } catch { return false; }
   }
 
@@ -13087,6 +13140,74 @@ export class Supervisor {
         afterEpoch: item.epoch ?? 0, startedAt: session.startedAt,
       });
     } catch (error) { console.warn('zero: could not release the finished run:', (error as Error).message); }
+  }
+
+  // A CLOUD SESSION BETWEEN TURNS (`WAIT_FOR_NEXT_REPLY_MS`). What the run's
+  // end does for the person happens now: the answer goes on the row, the claim
+  // goes back, the reply it carried is settled, and the row leaves In progress.
+  // The rest (the work coming home, shipping) waits for the run's real end.
+  _turnOver(item: WorkItem, session: WorkerSession, { continuation, answerAtSpawn }: { continuation: boolean; answerAtSpawn: string | null }) {
+    if (this.sessions.get(item.id) !== session || session.stoppedByUs) return;
+    const fresh = this.store.readItem?.(item.product, item.id) ?? null;
+    if (!this._mayWaitForNextReply(fresh, session)) { session.child.stopWaiting?.(); return; }
+    session.between = true;
+    session.saying = '';
+    try {
+      if (this.speaksForTheSession(session)) {
+        this.store.recordSessionResult(item.product, item.id, { result: session.result || '(the session ended with an empty reply)' });
+      } else if (this.closingMessageIsTheAnswer(session)) {
+        this.store.recordSessionResult(item.product, item.id, { result: session.result, status: null });
+      }
+      session.answerOnRow = session.result ?? null;
+    } catch (e) { console.warn('zero: writing a cloud turn\'s answer failed:', (e as Error).message); }
+    try {
+      this.store.releaseRunClaim?.(item.product, item.id, {
+        afterEpoch: session.turnEpoch ?? item.epoch ?? 0, startedAt: session.turnStartedAt ?? session.startedAt,
+      });
+    } catch (e) { console.warn('zero: could not release the cloud turn\'s claim:', (e as Error).message); }
+    if (continuation && answerAtSpawn && !session.spawnAnswerSettled) {
+      session.spawnAnswerSettled = true;
+      this.settleDeliveryAndSay(item, answerAtSpawn, session, null);
+    }
+    if (session.lastLiveReply) this.settleLiveReply(item, session);
+    this._saveState();
+    this.onChange?.();
+  }
+
+  // Their reply went in: a turn again, so In progress again.
+  _nextTurn(session: WorkerSession) {
+    if (!session.between) return;
+    session.between = false;
+    session.result = null;
+    session.resultIsError = false;
+    session.answerOnRow = null;
+    session.turnStartedAt = session.lastOutputAt = Date.now();
+    session.turnEpoch = this.store.readItem?.(session.product, session.itemId)?.epoch ?? session.turnEpoch;
+    this.onChange?.();
+  }
+
+  // Only a clean answer on a row nothing else wants: a closed row, one sent to
+  // ship, or one moved to another model wants the run's end now. So does a turn
+  // that hands the thread back: only the run's end moves it to this Mac.
+  _mayWaitForNextReply(row: WorkItem | null, session: WorkerSession) {
+    if (!row || row.status === 'done' || (row.labels ?? []).includes(SHIP_LABEL)) return false;
+    if (session.result == null || session.resultIsError || handsBack(session.result)) return false;
+    const ranOn = session.ranOn;
+    if (ranOn && ((row.model || null) !== ranOn.model || (row.effort || null) !== ranOn.effort)) return false;
+    return true;
+  }
+
+  // A wait that something on the row has overtaken ends here, on the tick: a
+  // reply saved rather than steered in (a teammate's, one sent for later), or
+  // anything `_mayWaitForNextReply` refuses.
+  endWaitsOvertaken(items: WorkItem[]) {
+    const byId = new Map(items.map((i) => [i.id, i]));
+    for (const session of this.sessions.values()) {
+      if (!session.between) continue;
+      const row = byId.get(session.itemId) ?? null;
+      const owed = !!row && this._isContinuation(row) && !answerSettled(row) && !this._answerDelivered(row);
+      if (owed || !this._mayWaitForNextReply(row, session)) session.child.stopWaiting?.();
+    }
   }
 
   // The permission rules handed to a worker, generated fresh at every spawn for
