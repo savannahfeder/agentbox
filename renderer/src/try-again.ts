@@ -3,7 +3,7 @@
 // Resume takes over a selection: it ends a rest, a hold and a delivery mark,
 // and starts the thread now or as soon as an agent is free.
 //
-// tests/a-stuck-thread-offers-try-again.test.mjs
+// tests/a-stuck-thread-offers-try-again.test.mts
 
 import { liveLine, type LiveFacts } from './live-line';
 import { saysARunGotNowhere } from '../../shared/spawn-trouble.mts';

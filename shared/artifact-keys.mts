@@ -119,7 +119,7 @@ export function whatTheFileSentUp(
 //                               app only ever happens deliberately (App.tsx
 //                               says so where E used to approve and burned
 //                               her). A forwarded digit is not deliberate.
-export const HER_LETTERS_IN_A_PAGE: Set<string> = new Set(['e', 'j', 'k', 'r', 'c', 'n', 's', 'z', 'b', 'g', '/', '\\']);
+export const HER_LETTERS_IN_A_PAGE: Set<string> = new Set(['e', 'j', 'k', 'r', 'c', 'n', 's', 'z', 'b', 'g', '\\']);
 
 /**
  * Is this one of her letters, arriving from inside a page where there is

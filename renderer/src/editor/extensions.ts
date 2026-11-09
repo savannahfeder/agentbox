@@ -5,6 +5,8 @@
    underline (Cmd+U — StarterKit omits it), and "type an arrow, get an arrow"
    (-> becomes →, one Backspace undoes it). */
 import { Mark, Node, Extension, mergeAttributes, textInputRule, type AnyExtension } from '@tiptap/core';
+import type { EditorState, Transaction } from '@tiptap/pm/state';
+import type { Node as PmNode } from '@tiptap/pm/model';
 import { StarterKit } from '@tiptap/starter-kit';
 import { Placeholder } from '@tiptap/extension-placeholder';
 import { TaskList } from '@tiptap/extension-task-list';
@@ -69,13 +71,13 @@ export const Underline = Mark.create({
 //
 // It is a plain ProseMirror command rather than a TipTap chain so it can be run
 // against a bare EditorState in a test, with no DOM and no editor view.
-export function unboldHeading(state: any, dispatch?: (tr: any) => void): boolean {
+export function unboldHeading(state: EditorState, dispatch?: (tr: Transaction) => void): boolean {
   const heading = state.schema.nodes.heading;
   const paragraph = state.schema.nodes.paragraph;
   if (!heading || !paragraph) return false;
   const { from, to } = state.selection;
-  const found: { node: any; pos: number }[] = [];
-  state.doc.nodesBetween(from, to, (node: any, pos: number) => {
+  const found: { node: PmNode; pos: number }[] = [];
+  state.doc.nodesBetween(from, to, (node: PmNode, pos: number) => {
     if (node.type === heading) found.push({ node, pos });
   });
   if (!found.length) return false;

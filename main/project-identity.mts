@@ -28,7 +28,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { patchProjectAt, loadProjectAt } from './store/project.mjs';
+import { patchProjectAt, loadProjectAt } from './store/project.mts';
 import { NAME } from '../shared/product-name.mjs';
 
 /**

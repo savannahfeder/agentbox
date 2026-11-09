@@ -1,6 +1,6 @@
 // Teammates in the main process: the files, the tick that carries out
 // `planWakes`, and the brief a teammate's run is given. The decisions are in
-// shared/teammates.mjs; this only reads, writes and starts.
+// shared/teammates.mts; this only reads, writes and starts.
 import {
   planWakes, teammateLabel, FROM_LABEL_PREFIX, HOP_LABEL_PREFIX, hopOf, teammateIdOf, YOU, mentionsIn,
   letterFor, statusOf, runLines, STARTERS, CHAT_TAIL, isWorks, DEFAULT_LIMIT, MAX_HOPS,
@@ -8,21 +8,23 @@ import {
   dutyWhen, dutyOf, DUTY_LABEL_PREFIX, CHAT_LABEL, yesFirst, WORK_LABEL_PREFIX, isActiveRun, isQueued, STOPPED_NOTE,
   METHOD_CAP, recordOf, sourceText, pausedNow, WEEK_MS, workOf, UNREAD_HOLD, cleanDuty, dutyStart, howYouWrite, VOICES,
   replyMessageId, projectNamedIn,
-} from '../shared/teammates.mjs';
-import { reachTick } from './teammate-reach.mjs';
-import { filesFoldersBrief } from '../shared/file-folders.mjs';
-import { audienceWords } from '../shared/teammate-reach.mjs';
-import { isShippedNote } from '../shared/shipped-note.mjs';
-import { ruleLabel, periodKey } from '../shared/repeats.mjs';
+} from '../shared/teammates.mts';
+import { reachTick } from './teammate-reach.mts';
+import { filesFoldersBrief } from '../shared/file-folders.mts';
+import { audienceWords } from '../shared/teammate-reach.mts';
+import { isShippedNote } from '../shared/shipped-note.mts';
+import { ruleLabel, periodKey } from '../shared/repeats.mts';
 import {
   teamDir, readTeammates, readChat, writeTeammate, writeChat, newTeammateId, newMemoryId, readPlaybooks,
   readMethod, methodFile, sourcesDir, readTeamView, readOutbox, writeOutbox,
-} from './store/teammates-files.mjs';
+} from './store/teammates-files.mts';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { RepeatShape } from '../shared/repeats.mjs';
-import type { RouteRecord } from '../shared/auto-route.mjs';
-import type { ItemRef, TeammateStatus, Offer, WakeTrigger, WakeAction } from '../shared/teammates.mjs';
+import type { RepeatShape } from '../shared/repeats.mts';
+import type { RouteRecord } from '../shared/auto-route.mts';
+import type { ItemRef, TeammateStatus, Offer, WakeTrigger, WakeAction, ChatLine, Playbook, TeamChat, Written } from '../shared/teammates.mts';
+import type { OutboxEntry, TeamView, ViewCard } from '../shared/teammate-reach.mts';
+import type { ReachTeam } from './teammate-reach.mts';
 
 export type { ItemRef, TeammateStatus, Offer, WakeTrigger, WakeAction };
 
@@ -73,11 +75,9 @@ export interface ThreadRef { product?: string; id: string; title?: string }
 
 export interface Turn { source?: string; field?: string; text?: string }
 
-interface Written { source?: string; ts?: number }
-
 export interface TeamItem {
   id: string;
-  product?: string;
+  product: string;
   status?: string;
   labels?: string[];
   routed?: RouteRecord | null;
@@ -93,63 +93,23 @@ export interface TeamItem {
   wrote?: Partial<Record<'note' | 'result' | 'answer' | 'status', Written>>;
 }
 
-export interface ChatMessage {
-  id: string;
-  kind: 'msg' | 'pass' | 'act';
-  from: string;
-  to?: string[];
-  text?: string;
-  ts: number;
-  title?: string;
-  details?: string;
-  product?: string;
-  setup?: boolean;
-  threads?: ThreadRef[];
-  verb?: string;
-  ref?: string;
-}
-
-export interface Chat {
-  messages: ChatMessage[];
-  seen: Set<string>;
-  into: Map<string, { ref: string; for: string; ts: number }[]>;
-}
-
-export interface Playbook {
-  id: string;
-  title: string;
-  readers: string[];
-  lessons: { id: string; text: string; ts: number; by: string | null; from: ThreadRef | null }[];
-  updatedAt: number;
-}
-
-export interface OutboxEntry {
-  id: string;
-  state?: string;
-  until?: number;
-  title?: unknown;
-  text?: unknown;
-  from?: { name?: string } | null;
-  room?: unknown;
-  names?: string[];
-  [field: string]: unknown;
-}
+// A setup message also names the threads it was made from, which the fold passes through.
+export interface Chat extends TeamChat { messages: (ChatLine & { threads?: ThreadRef[] })[] }
 
 export interface ReachInput {
-  team?: unknown;
+  team?: ReachTeam | null;
   items?: TeamItem[];
   now?: number;
   tell?: (product: string | undefined, run: string, line: { text: string; from: { teammate: string; name: string } }) => unknown;
 }
 
-interface TeamViewPerson { id: string; name: string }
-
-interface TeamViewCard { threadId: string; title: string; personId: string; state?: string }
+type TeamViewPerson = TeamView['people'][number];
 
 export interface TeammateStore {
-  config: { storeRoot?: string; accountId?: string };
+  config: { storeRoot?: string; accountId?: string; accountRoot?: string };
   listProducts(): { slug: string; name?: string; dir?: string | null; repoPath?: string | null; practice?: boolean | null; personal?: boolean | null }[];
   listItems(now?: number): TeamItem[];
+  readItem(slug: string, id: string): { status?: string; answer?: string; labels?: string[] } | null;
   productDir(slug: string | null | undefined): string;
   readHistory?(slug: string | undefined, id: string, opts?: { max?: number }): unknown[];
   modules: {
@@ -242,8 +202,7 @@ function lastRanOf(teammateId: string, dutyId: string, items: TeamItem[]) {
 }
 const TROUBLE_SHOWN_MS = 30 * 60_000;
 
-/** What a teammate reads off the team service it is handed (`bindTeam`). */
-export interface BoundTeam { state?(): { me?: { id?: string } | null; people?: { id: string; name?: string | null }[] } | null | undefined }
+export type BoundTeam = ReachTeam;
 
 export class Teammates {
   declare store: TeammateStore;
@@ -542,14 +501,15 @@ export class Teammates {
     return true;
   }
 
-  // The app's half of an agent reaching a person (./teammate-reach.mjs). The team
+  // The app's half of an agent reaching a person (./teammate-reach.mts). The team
   // service is handed in by whoever has one; a store without one reaches nobody.
   bindTeam(team: BoundTeam | null) {
     this.team = team;
   }
 
   reach({ team = this.team, items, now = Date.now(), tell }: ReachInput = {}) {
-    return reachTick({ mates: this, store: this.store, team, items, now, tell });
+    // The supervisor's tick always hands its items over.
+    return reachTick({ mates: this, store: this.store, team, items: items!, now, tell });
   }
 
   /* ----------------------------------------------------------------- tick */
@@ -627,7 +587,8 @@ export class Teammates {
         } else if (a.type === 'reopen') {
           workItemsDisk.updateWorkItem(this.store.productDir(a.product), a.item, { status: 'open', labels: a.labels }, { source: 'system', now });
         } else if (a.type === 'answer') {
-          await deliver?.(a.product, a.item, a.text);
+          // An answer is made from a message, and a message always carries its words.
+          await deliver?.(a.product, a.item, a.text as string);
         } else if (a.type === 'tell') {
           if (!tell) throw new Error('nothing here can hand work to a thread');
           await tell(a.product, a.item, { text: a.text, from: a.from, hold: a.hold, hop: a.hop });
@@ -871,7 +832,7 @@ export class Teammates {
     const told = this._toldInTheChat(item, t, chat);
     // What you said in the chat lately, to anyone: a stop, a change of plan.
     const yours = chat.messages.filter((m) => m.kind === 'msg' && m.from === YOU && now - m.ts < WEEK_MS).slice(-YOUR_CHAT_LINES)
-      .map((m) => `- [${when(m.ts)}]${(m.to ?? []).length ? ` to ${m.to!.map((x) => this.nameOf(x, team)).join(', ')}` : ''}: ${cut(String(m.text ?? '').replace(/\s+/g, ' ').trim(), 400)}`);
+      .map((m) => `- [${when(m.ts)}]${(m.to ?? []).length ? ` to ${(m.to as string[]).map((x) => this.nameOf(x, team)).join(', ')}` : ''}: ${cut(String(m.text ?? '').replace(/\s+/g, ' ').trim(), 400)}`);
     const lastSeen = Math.max(0, ...earlier.map((i) => (i.wrote?.answer?.source === 'founder' ? i.wrote.answer.ts ?? 0 : 0)));
     const untried = method && laterThan(method.changedAt, lastSeen);
     const toldLines = told.slice(-CHAT_TAIL).map((m) => {
@@ -979,7 +940,7 @@ export class Teammates {
     ].filter((x) => x !== null).join('\n');
   }
 
-  filesFoldersLine(project: unknown) {
+  filesFoldersLine(project: string) {
     return filesFoldersBrief(readTeamView(this.dir()), project);
   }
 
@@ -989,8 +950,8 @@ export class Teammates {
     const view = readTeamView(this.dir());
     if (!view?.me) return [];
     const nameOf = (id: string) => view.people.find((p: TeamViewPerson) => p.id === id)?.name ?? 'Someone';
-    const people: TeamViewPerson[] = view.people.filter((p: TeamViewPerson) => p.id !== view.me.id);
-    const going = (view.cards ?? []).filter((c: TeamViewCard) => c.threadId !== item.id && c.state !== 'done').slice(0, TEAM_THREADS_IN_BRIEF);
+    const people: TeamViewPerson[] = view.people.filter((p: TeamViewPerson) => p.id !== view.me!.id);
+    const going = (view.cards ?? []).filter((c: ViewCard) => c.threadId !== item.id && c.state !== 'done').slice(0, TEAM_THREADS_IN_BRIEF);
     return [
       `## The people on your owner's team`,
       `You are ${view.me.name}'s AI teammate. ${people.length ? `On the team: ${people.map((p) => p.name).join(', ')}.` : 'Nobody else is on the team yet.'}`,
@@ -1006,7 +967,7 @@ export class Teammates {
       ...(going.length ? [
         '## What the team is already on',
         'Before you start something, check this list. If someone is already on it, say so in your answer, and whose it is, rather than start a second. team_read has the rest of any of them.',
-        ...going.map((c: TeamViewCard) => `- "${c.title}", ${nameOf(c.personId)}${c.state === 'running' ? ', running now' : ''} (${c.threadId})`),
+        ...going.map((c: ViewCard) => `- "${c.title}", ${nameOf(c.personId)}${c.state === 'running' ? ', running now' : ''} (${c.threadId})`),
         '',
       ] : []),
     ];

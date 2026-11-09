@@ -12,10 +12,10 @@ import http from 'node:http';
 import path from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { foldWorkItems } from '../shared/work-items.mjs';
+import { foldWorkItems } from '../shared/work-items.mts';
 import * as reader from '../main/agents.mts';
 import { AgentSchedule } from '../main/agent-schedule.mts';
-import { agentKey } from '../shared/agents.mjs';
+import { agentKey } from '../shared/agents.mts';
 import { guard, sweep, startableChrome } from './lib/chrome-guard.mjs';
 import { HOME, STORE_ROOT } from './lib/machine-paths.mjs';
 

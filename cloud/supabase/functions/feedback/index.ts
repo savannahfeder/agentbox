@@ -16,7 +16,7 @@
 //
 // It takes no sign-in (config.toml, [functions.feedback]), because most
 // people sending feedback have no account. So it checks everything itself:
-// the same limits as shared/feedback.mjs, and a request too big to be one of
+// the same limits as shared/feedback.mts, and a request too big to be one of
 // ours is refused before it is read.
 
 const LIMITS = { text: 20_000, files: 10, bytes: 8 * 1024 * 1024 };

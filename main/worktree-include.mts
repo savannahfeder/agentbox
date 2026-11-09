@@ -162,7 +162,7 @@ function ignoredIn(cwd: string, paths: string[]): Set<string> {
  * A path that cannot be looked at is not a path with nothing at it. ENOENT and
  * ENOTDIR are real absences; any other error throws, because these answers
  * decide whether something may be written through a link nobody inspected.
- * Pinned by tests/a-file-the-app-cannot-look-at-is-not-a-file-that-is-missing.test.mjs.
+ * Pinned by tests/a-file-the-app-cannot-look-at-is-not-a-file-that-is-missing.test.mts.
  */
 function lookAt(p: string): fs.Stats | null {
   try { return fs.lstatSync(p); }

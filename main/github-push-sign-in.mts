@@ -2,7 +2,9 @@
 //
 // Given to git only for the ship's own run, through config in its environment
 // (`pushSignIn`), so neither the person's git settings nor any worker sees it.
-import { connectionVault, CANNOT_ENCRYPT } from './connections/vault.mjs';
+import { connectionVault, CANNOT_ENCRYPT, type VaultData } from './connections/vault.mts';
+
+type PushVault = VaultData & { token?: string; savedAt?: number };
 
 // A GIT_ name, because the push hook drops every GIT_ variable before its tests run.
 export const TOKEN_VAR = 'GIT_AGENTBOX_GITHUB_TOKEN';
@@ -58,7 +60,7 @@ export function gitHubPushSignIn({ file, cipher, fetchImpl, timeoutMs }: { file:
     },
     /** Drops the saved token, so git's own sign-in answers the push. */
     async forget() {
-      if (saved()) await vault.update((data: Record<string, unknown>) => { delete data.token; delete data.savedAt; });
+      if (saved()) await vault.update((data: PushVault) => { delete data.token; delete data.savedAt; });
     },
     /** Checks the token with GitHub and keeps it; throws with words for the card. */
     async save(value: unknown) {
@@ -68,7 +70,7 @@ export function gitHubPushSignIn({ file, cipher, fetchImpl, timeoutMs }: { file:
       if (!vault.canEncrypt()) throw new Error(CANNOT_ENCRYPT);
       const refused = await tokenRefused(token, { fetchImpl, timeoutMs });
       if (refused) throw new Error(refused);
-      await vault.update((data: Record<string, unknown>) => { data.token = token; data.savedAt = Date.now(); });
+      await vault.update((data: PushVault) => { data.token = token; data.savedAt = Date.now(); });
     },
   };
 }

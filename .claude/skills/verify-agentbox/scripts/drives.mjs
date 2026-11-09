@@ -9,11 +9,11 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
-const { foldWorkItems } = await import(path.join(REPO, 'shared/work-items.mjs'));
+const { foldWorkItems } = await import(path.join(REPO, 'shared/work-items.mts'));
 
 /**
  * The project's own folder of machinery: `<store>/projects/<the project's
- * folder, every non-alphanumeric character as "-">` (main/store/home.mjs). The
+ * folder, every non-alphanumeric character as "-">` (main/store/home.mts). The
  * ledger lives there, not beside project.json.
  */
 export function machinery(state, slug = 'sandbox') {

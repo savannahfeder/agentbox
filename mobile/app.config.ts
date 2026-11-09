@@ -3,7 +3,7 @@
 // The cloud's public address and key come from the same file the phone site
 // reads (scripts/phone-site-config.mjs), or from the environment on Expo's
 // build machines, which see only what git tracks, else from
-// shared/cloud-address.mjs. The
+// shared/cloud-address.mts. The
 // bundle id is permanent once a build uses it; the environment can name another
 // for a copy of the app built elsewhere.
 import fs from 'node:fs';
@@ -11,7 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { ExpoConfig } from 'expo/config';
 import { NAME, nameSlug } from '../shared/product-name.mjs';
-import { CLOUD_ADDRESS, PHONE_SITE } from '../shared/cloud-address.mjs';
+import { CLOUD_ADDRESS, PHONE_SITE } from '../shared/cloud-address.mts';
 
 // `phoneSite` is where a new account's email link lands (the phone website),
 // and where Settings' Privacy policy and Terms open. With nothing given, the
@@ -29,7 +29,7 @@ export function cloudConfig(env: Record<string, string | undefined> = process.en
     const c = JSON.parse(fs.readFileSync(file, 'utf8'));
     if (typeof c?.url === 'string' && typeof c?.anonKey === 'string') return { url: c.url, anonKey: c.anonKey, phoneSite: site(c.url, c.phoneSite) };
   }
-  return { url: CLOUD_ADDRESS.supabaseUrl, anonKey: CLOUD_ADDRESS.anonKey, phoneSite: PHONE_SITE };
+  return { url: CLOUD_ADDRESS.supabaseUrl, anonKey: CLOUD_ADDRESS.anonKey, phoneSite: env.EXPO_PUBLIC_PHONE_SITE || PHONE_SITE };
 }
 
 // The image picker gets the same words: its `false` would delete the
@@ -46,7 +46,9 @@ const config: ExpoConfig = {
   owner: process.env.EAS_OWNER || 'agentbox-app',
   scheme: nameSlug,
   version: '0.1.0',
-  orientation: 'portrait',
+  // Not 'portrait': iOS caps the full-screen film player by this too. The
+  // screens hold themselves upright (orientation in the Stacks' screenOptions).
+  orientation: 'default',
   icon: './assets/icon.png',
   // Automatic so Match system can read the phone's own light or dark (state/look.tsx).
   userInterfaceStyle: 'automatic',
@@ -58,6 +60,8 @@ const config: ExpoConfig = {
     usesAppleSignIn: true,
     // HTTPS through the system is exempt from export rules.
     config: { usesNonExemptEncryption: false },
+    // Save to Photos on a held picture (modules/picture-menu); without it the first save closes the app.
+    infoPlist: { NSPhotoLibraryAddUsageDescription: 'Save a picture from a thread to your Photos.' },
     // Repeats what the packages' own manifests declare, which Apple does not
     // always read from a static pod (docs.expo.dev/guides/apple-privacy).
     privacyManifests: {

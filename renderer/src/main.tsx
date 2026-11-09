@@ -56,7 +56,7 @@ window.addEventListener('error', (e) => {
   comeBack();
 });
 window.addEventListener('unhandledrejection', (e) => {
-  const r: any = (e as PromiseRejectionEvent).reason;
+  const r: { name?: string; message?: string; stack?: string } | null | undefined = (e as PromiseRejectionEvent).reason;
   sendCrash(r?.name ?? 'UnhandledRejection', r?.message ?? String(r ?? ''), r?.stack ?? '');
 });
 
@@ -104,7 +104,7 @@ const boot = () => {
 // pictures without leaving her inbox, it did its job, she picked her sixteen,
 // and it left with the round it belonged to. The seventeen candidates it
 // carried are recorded in decisions.md and their raw files are in designs/.
-// tests/the-theme-lab-is-gone.test.mjs holds the door shut.
+// tests/the-theme-lab-is-gone.test.mts holds the door shut.
 
 // A TAB THIS COMPUTER SERVED WITH NO KEY ON ITS ADDRESS DRAWS NOTHING. Without
 // a bridge the screen draws its fixtures, and an inbox of invented threads is

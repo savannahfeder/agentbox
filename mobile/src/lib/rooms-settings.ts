@@ -55,8 +55,8 @@ export function roomCardPatch(id: string, on: unknown, { me, fullName, now }: { 
 
 type Rest = {
   session: () => { user: { id: string } } | null;
-  select: (table: string, query: string) => Promise<any[]>;
-  update: (table: string, query: string, patch: Record<string, unknown>) => Promise<any[]>;
+  select: (table: string, query: string) => Promise<unknown[]>;
+  update: (table: string, query: string, patch: Record<string, unknown>) => Promise<unknown[]>;
 };
 
 const CHANGES = new Set(['display_name', 'show_working', 'show_agents', 'show_level', 'show_status', 'show_activity', 'invisible_until']);
@@ -74,7 +74,8 @@ export async function readMyRoomCard(c: Rest): Promise<{ me: RoomProfile | null;
     c.select('room_profiles', `select=${GROUP_COLS.profile}&person_id=eq.${id}&limit=1`),
     c.select('people', `select=name&id=eq.${id}&limit=1`),
   ]);
-  return { me: cards[0] ?? null, fullName: String(people[0]?.name ?? '') };
+  // The card's columns are GROUP_COLS.profile, the RoomProfile shape.
+  return { me: (cards[0] as RoomProfile | undefined) ?? null, fullName: String((people[0] as { name?: unknown } | undefined)?.name ?? '') };
 }
 
 export async function saveMyRoomCard(c: Rest, patch: Record<string, unknown>): Promise<RoomProfile> {
@@ -82,5 +83,5 @@ export async function saveMyRoomCard(c: Rest, patch: Record<string, unknown>): P
   if (!keys.length || keys.some((k) => !CHANGES.has(k))) throw new Error('That is not part of your room card.');
   const saved = await c.update('room_profiles', `person_id=eq.${encodeURIComponent(meOf(c))}`, patch);
   if (!saved[0]) throw new Error('Your room card is not made yet.');
-  return saved[0];
+  return saved[0] as RoomProfile;
 }

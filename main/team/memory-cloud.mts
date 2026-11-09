@@ -1,23 +1,23 @@
 // THE SHARED CLOUD, IN MEMORY, WITH THE SAME RULES AS THE REAL ONE.
 //
 // The team version talks to Supabase through one small set of calls (see
-// supabase-backend.mjs). This is the same set of calls over plain objects, so
+// supabase-backend.mts). This is the same set of calls over plain objects, so
 // the sync engine and the app can be tested without a network, and so two
 // stores in one test can be two teammates. Every rule the database's row level
 // security enforces is enforced here too, and tests/team-cloud-backends-agree
 // runs one scenario against both to keep them honest.
 import { EventEmitter } from 'node:events';
 import crypto from 'node:crypto';
-import { asPulled } from '../../shared/team-rules.mjs';
-import { cleanMates } from '../../shared/team-departures.mjs';
-import { cleanStatus } from '../../shared/team-status.mjs';
-import { cleanConnections } from '../../shared/team-connections.mjs';
-import { PHONE_COMMANDS } from '../../shared/phone-snapshot.mjs';
+import { asPulled } from '../../shared/team-rules.mts';
+import { cleanMates } from '../../shared/team-departures.mts';
+import { cleanStatus } from '../../shared/team-status.mts';
+import { cleanConnections } from '../../shared/team-connections.mts';
+import { PHONE_COMMANDS } from '../../shared/phone-snapshot.mts';
 import { roomsMemory } from './rooms-memory.mts';
 import type { MemoryRoomsFields } from './rooms-memory.mts';
 import type { LedgerLine } from './sync.mts';
 import type { FileLinkShare } from './index.mts';
-import { appendTo, cleanEntry, foldLine } from '../../shared/version-line.mjs';
+import { appendTo, cleanEntry, foldLine } from '../../shared/version-line.mts';
 
 // The database's own checks on a message's file (20261013000000_message_files.sql).
 const FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,159}$/;
@@ -133,7 +133,7 @@ export function createMemoryCloud(): MemoryCloud {
     projects: new Map(), // id -> { id, teamId, name, visibility, createdBy }
     projectPeople: [], // { projectId, personId }
     lines: [], // { seq, projectId, uid, byPerson, body, createdAt }
-    cards: new Map(), // `${personId}:${threadId}` -> a thread card, as shared/thread-cards.mjs makes them
+    cards: new Map(), // `${personId}:${threadId}` -> a thread card, as shared/thread-cards.mts makes them
     files: new Map(), // `${projectId}:${name}` -> { projectId, name, byPerson, data (base64) }
     pieces: new Map(), // `${projectId}/${name}` -> { projectId, name, byPerson, bytes }
     threadWork: new Map(), // `${personId}:${threadId}` -> { owner, threadId, teamId, hash, work, updatedAt }
