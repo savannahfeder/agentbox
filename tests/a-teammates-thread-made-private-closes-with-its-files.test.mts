@@ -27,7 +27,7 @@ describe('a file of a teammate\'s thread', () => {
   it('matches the folder the sync names', () => {
     const share = fs.readFileSync(new URL('../main/team/thread-share.mts', import.meta.url), 'utf8');
     expect(share).toContain("const SHARED_PREFIX = 'shared-thread';");
-    expect(share).toContain('const slugOf = (owner, threadId) => `${SHARED_PREFIX}:${owner}:${threadId}`;');
+    expect(share).toContain('const slugOf = (owner: string, threadId: string) => `${SHARED_PREFIX}:${owner}:${threadId}`;');
   });
 });
 
