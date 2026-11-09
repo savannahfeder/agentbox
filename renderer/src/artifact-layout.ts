@@ -11,10 +11,13 @@ export function artifactPlacement(mode: ArtifactMode, width: number): ArtifactMo
 export function fullScreenTakes(src: string | null | undefined): boolean {
   return !!src && !!viewKind(src) && !isWebsiteAddress(src) && !isLocalPreview(src);
 }
-/** A file pressed in a thread opens beside the chat when the pane draws it, and straight into full screen when only that view can (a deck). Null: its older way. */
+// Something to look at opens full screen; something to read and talk over opens beside the chat.
+const LOOKED_AT = new Set(['image', 'film', 'pdf', 'page', 'deck']);
+
+/** Where a file pressed in a thread opens first. Null: its older way. */
 export function whereAFileOpens(src: string | null | undefined): 'beside' | 'full' | null {
   if (!fullScreenTakes(src)) return null;
-  return opensInPane(src) ? 'beside' : 'full';
+  return LOOKED_AT.has(viewKind(src) as string) || !opensInPane(src) ? 'full' : 'beside';
 }
 export function artifactFraction(fraction: number, width: number): number {
   return Math.max(560 / width, Math.min(1 - 400 / width, fraction));

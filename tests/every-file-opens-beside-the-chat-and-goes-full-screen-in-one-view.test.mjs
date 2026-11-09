@@ -8,11 +8,13 @@
 // in the browser copy at 1440x900: a markdown file's full screen had no
 // "v1 of 2" and no Approve; a picture never showed beside the chat at all.
 //
-// Now any file the side pane can draw opens there first, its full-screen
-// button opens the one view with versions, notes and Approve, and that view's
-// top-right button puts the file back beside the chat. A deck, which the pane
-// cannot draw, still opens straight into full screen. A website, a local app
-// and a code change are not files that view reads, so they keep the pane's own.
+// Now the side pane's full-screen button opens the one view with versions,
+// notes and Approve, and that view's top-right button puts the file back beside
+// the chat. Which way a file opens first is the person's split (2026-11-09):
+// something to look at (a picture, a film, a PDF, a design page, a deck) opens
+// full screen, and something to read and talk over (a document, a table, a
+// script) opens beside the chat. A website, a local app and a code change are
+// not files that view reads, so they keep the pane's own full screen.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { fullScreenTakes, whereAFileOpens } from '../renderer/src/artifact-layout.ts';
@@ -20,13 +22,15 @@ import { fullScreenTakes, whereAFileOpens } from '../renderer/src/artifact-layou
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 
 describe('where a file pressed in a thread opens', () => {
-  it('beside the chat, for every kind the pane draws', () => {
-    for (const f of ['shot.png', 'designs/w-1/onboarding-v3.jpg', 'demo.mp4', 'brief.pdf', 'leads/fintech-leads.csv', 'notes.md', 'designs/w-1/options.html', 'cart.mjs']) {
-      expect(whereAFileOpens(f), f).toBe('beside');
+  it('full screen for a picture, a film, a PDF, a design page and a deck', () => {
+    for (const f of ['shot.png', 'designs/w-1/onboarding-v3.jpg', 'icon.svg', 'demo.mp4', 'clip.webm', 'brief.pdf', 'designs/w-1/options.html', 'page.htm', 'pitch.pptx']) {
+      expect(whereAFileOpens(f), f).toBe('full');
     }
   });
-  it('straight into full screen for a deck, which the pane cannot draw', () => {
-    expect(whereAFileOpens('pitch.pptx')).toBe('full');
+  it('beside the chat for a document, a table and a script', () => {
+    for (const f of ['notes.md', 'plan.markdown', 'leads/fintech-leads.csv', 'leads.tsv', 'cart.mjs', 'notes.txt']) {
+      expect(whereAFileOpens(f), f).toBe('beside');
+    }
   });
   it('the old way for what is not a file the full-screen view reads', () => {
     for (const f of ['https://example.com/report.html', 'https://example.com/shot.png', 'http://localhost:3000', 'run.change', 'model.xlsx', null, '']) {
@@ -50,7 +54,8 @@ describe('the wiring', () => {
   const threadView = read('renderer/src/components/ThreadArtifacts.tsx');
   const teammate = read('renderer/src/threads/TeammateThread.tsx');
 
-  it('a thread opens a file with the rule, and a picture goes beside rather than to the picture viewer', () => {
+  it('a thread opens a file with the rule, both ways', () => {
+    expect(focus).toMatch(/const opensBig = [^\n]*whereAFileOpens\(path\) === 'full'/);
     expect(focus).toMatch(/whereAFileOpens\(/);
     const openHref = focus.slice(focus.indexOf('const openHref'), focus.indexOf("if (goes === 'picture')"));
     expect(openHref).toMatch(/opensBeside\(href\)/);
@@ -68,8 +73,9 @@ describe('the wiring', () => {
     expect(pane).toMatch(/<FilmPlayer [^\n]*wide=\{!onMode\}/);
   });
   // A power tester picked launch-plan.md under Files in the command bar, five
-  // times, and it opened full screen every time. A comment still opens there.
-  it('a file picked in the command bar or search opens beside its thread', () => {
+  // times, and it opened full screen every time. A comment still opens there,
+  // and so does a file that opens full screen from the thread.
+  it('a file picked in the command bar or search opens the way it does from its thread', () => {
     const inside = app.slice(app.indexOf('const openInside = useCallback'), app.indexOf('const insideForPalette'));
     expect(inside).toMatch(/!o\.note && whereAFileOpens\(o\.file\) === 'beside'/);
     expect(inside).toMatch(/pendingDoc\.current = \{ id: o\.item\.id, doc \}/);
