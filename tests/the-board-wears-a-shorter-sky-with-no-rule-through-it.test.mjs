@@ -32,7 +32,7 @@ describe('on the board', () => {
   it('the same sky sits higher, cut at the card top, and is gone by the column headings', () => {
     const board = rule('.app.sky-board .inbox-sky-head');
     expect(board).toContain('transform: scaleY(-1) translateY(60px)');
-    expect(board).toContain('clip-path: inset(0 0 60px 0)');
+    expect(board).toContain('clip-path: inset(0 0 60px 0 round var(--radius))');
     // 150px of mask less the 60px lift: clear by 90px, where the headings start.
     expect(board).toMatch(/mask-image: linear-gradient\(to top, #000 0, #000 105px, transparent 150px\)/);
   });
