@@ -11,14 +11,16 @@ appId: now.astral.agentbox
     visible: "Use the account from .* on your computer."
     timeout: 120000
 - takeScreenshot: 01-sign-in
-# The two boxes carry no label of their own, so they are tapped where they
-# sit on an iPhone 16 Pro: email at 40% down, password at 50%.
-- tapOn:
-    point: "50%,40%"
-- inputText: "appreview@agentbox.ac"
+# The boxes carry no label of their own, so they are tapped where they sit on
+# an iPhone 16 Pro. The password goes first, while the keyboard is down: with
+# it up the password box scrolls out of sight, and a tap that misses then
+# types the password into nothing rather than into the email box.
 - tapOn:
     point: "40%,50%"
 - inputText: ${REVIEW_PASSWORD}
+- tapOn:
+    point: "50%,40%"
+- inputText: "appreview@agentbox.ac"
 # The fields have no keyboard dismiss button; a tap off them closes it.
 - tapOn: "Use the account from .* on your computer."
 # The button, not the heading of the same words.
