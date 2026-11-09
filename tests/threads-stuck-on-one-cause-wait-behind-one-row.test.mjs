@@ -202,7 +202,7 @@ describe('the person reads the lead, not the lead\'s brief', () => {
   });
   it('and the thread view only does it for a cause row', () => {
     const view = fs.readFileSync(new URL('../renderer/src/components/ItemThread.tsx', import.meta.url), 'utf8');
-    expect(view).toMatch(/isCause\(item\) \? withoutBrief\(ledger\.lines\) : ledger\.lines/);
+    expect(view).toMatch(/isCause\(item\) \? \{ \.\.\.fetched, lines: withoutBrief\(fetched\.lines\) \} : fetched/);
   });
 });
 

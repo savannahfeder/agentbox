@@ -196,7 +196,9 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
   // under this one's header (w-388be0a968).
   const rowKey = `${item.product}\n${item.id}`;
   const [loaded, setLedger] = useState<{ key: string; lines: LedgerLine[]; error?: string } | null>(null);
-  const ledger = loaded?.key === rowKey ? loaded : null;
+  const fetched = loaded?.key === rowKey ? loaded : null;
+  // A cause row's body is the brief its lead works from, not something said to her.
+  const ledger = fetched?.lines && isCause(item) ? { ...fetched, lines: withoutBrief(fetched.lines) } : fetched;
   const [sessions, setSessions] = useState<TraceSession[]>([]);
   // EVERY FILE THIS ROW'S RUNS CHANGED, so a line in the conversation that says
   // it edited one can become a chip into it. Empty on the great majority of
@@ -330,9 +332,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
   const saying = session?.saying && session.sayingAt
     ? { text: session.saying, at: session.sayingAt, run: session.startedAt }
     : null;
-  // A cause row's body is the brief its lead works from, not something said to her.
-  const lines = isCause(item) ? withoutBrief(ledger.lines) : ledger.lines;
-  const built = itemThread(lines, withEveryRun(everyRun, sessions), saying, { whole, engine, pending: sending, chat, undone: marksFor(undoMarks, item.product, item.id), numbers: fileLine.numbers, me });
+  const built = itemThread(ledger.lines, withEveryRun(everyRun, sessions), saying, { whole, engine, pending: sending, chat, undone: marksFor(undoMarks, item.product, item.id), numbers: fileLine.numbers, me });
   const said = built.events.map((e) => (e.kind === 'work' ? e : { ...e, text: clean(e.text ?? '') }));
   /* * WHILE AN AGENT IS WORKING, THE LAST THING ON THE PAGE IS THE THINKING
      COMPONENT, AND THE COMMANDS UNDER IT ARE ITS OWN.
