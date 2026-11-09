@@ -100,6 +100,11 @@ describe('the step list beside the tour', () => {
   it('counts answering by either a choice or a reply', () => {
     expect(tourChecklist(['start', 'compose', 'open', 'reply'])[2].state).toBe('done');
   });
+  it('lights the step the tour is pointing at, which is Open one when chats came in', () => {
+    const list = tourChecklist([], '⌘', 'open');
+    expect(list.find((r) => r.state === 'now').label).toBe('Open one');
+    expect(list.filter((r) => r.state === 'now')).toHaveLength(1);
+  });
   it('has every row done once the tour is over', () => {
     expect(tourChecklist(['start', 'compose', 'open', 'choose', 'close', 'palette']).every((r) => r.state === 'done')).toBe(true);
   });

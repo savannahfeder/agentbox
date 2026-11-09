@@ -56,20 +56,19 @@ export function setUpLines({ chats, project, tools, invited, teammates }: { chat
 
 type Lesson = 'start' | 'compose' | 'working' | 'open' | 'choose' | 'reply' | 'close' | 'palette' | 'busy' | 'urgent';
 export interface ChecklistRow { label: string; keys: string[]; state: 'done' | 'now' | 'todo' }
-/** The tour's lessons as the list beside it. Answering is either a choice or a reply. */
-export function tourChecklist(done: readonly Lesson[], cmd = '⌘'): ChecklistRow[] {
+/** The tour's lessons as the list beside it. Answering is either a choice or a reply.
+ *  `now` is the lesson the tour is pointing at; without one, the first not done is lit. */
+export function tourChecklist(done: readonly Lesson[], cmd = '⌘', now: Lesson | null = null): ChecklistRow[] {
   const has = (...l: Lesson[]) => l.some((x) => done.includes(x));
-  const rows: Array<[string, string[], boolean]> = [
-    ['Send a thread', ['N'], has('start', 'compose')],
-    ['Open one', ['↵'], has('open')],
-    ['Answer it', ['R'], has('choose', 'reply')],
-    ['Mark it done', ['E'], has('close')],
-    ['Find anything', [cmd, 'K'], has('palette')],
+  // Each row: its words, its keys, the lessons that tick it, and the tips that point at it.
+  const rows: Array<[string, string[], Lesson[], Lesson[]]> = [
+    ['Send a thread', ['N'], ['start', 'compose'], ['start', 'compose']],
+    ['Open one', ['↵'], ['open'], ['open', 'working']],
+    ['Answer it', ['R'], ['choose', 'reply'], ['choose', 'reply', 'busy']],
+    ['Mark it done', ['E'], ['close'], ['close']],
+    ['Find anything', [cmd, 'K'], ['palette'], ['palette', 'urgent']],
   ];
-  let lit = false;
-  return rows.map(([label, keys, isDone]) => {
-    if (isDone) return { label, keys, state: 'done' as const };
-    if (!lit) { lit = true; return { label, keys, state: 'now' as const }; }
-    return { label, keys, state: 'todo' as const };
-  });
+  const at = now ? rows.findIndex(([, , , by]) => by.includes(now)) : -1;
+  const lit = at >= 0 ? at : rows.findIndex(([, , ls]) => !has(...ls));
+  return rows.map(([label, keys, ls], i) => ({ label, keys, state: i === lit ? 'now' as const : has(...ls) ? 'done' as const : 'todo' as const }));
 }
