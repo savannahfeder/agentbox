@@ -2767,7 +2767,9 @@ export default function App() {
   const sharesThreads = useCallback((personId: string) => (snap?.team?.cards ?? []).some((c) => c.personId === personId && c.visible), [snap?.team?.cards]);
   // A person's or an AI teammate's place has no board of its own.
   const evPlace = evPick && pressOpensIn(evPick, evTeamKey ? `room:${evTeamKey}` : null) === 'place' ? evPick : null;
-  const evBoard = useMemo(() => (teamMode && view !== 'inbox' && evView === 'board' && !evPlace
+  // On a computer your own board is the one board, every column at once, as without a team.
+  const mineBoard = teamMode && !onPhone() && evView === 'board' && !evPick && search === null;
+  const evBoard = useMemo(() => (teamMode && (onPhone() ? view !== 'inbox' : !!evPick) && evView === 'board' && !evPlace
     ? whoseBoard(evPick, evTab, { me: team?.me ?? null, people: team ? [...team.byId.keys()] : [], team: evTeamKey ? `room:${evTeamKey}` : null, shares: sharesThreads })
     : null), [teamMode, view, evView, evPick, evTab, team, evTeamKey, sharesThreads, evPlace]);
   const displayPage = pageFor(withOthers);
@@ -3011,7 +3013,7 @@ export default function App() {
   // same call InboxBoard draws). Walking the tab's list instead stopped J
   // halfway down a full board, because a card from another column was not in
   // it (2026-10-02, tests/the-board-walks-in-the-order-it-is-drawn.test.mjs).
-  const onBoard = search === null && (teamMode ? !!evBoard : inboxDisplay.view === 'board');
+  const onBoard = search === null && (teamMode ? !!evBoard || mineBoard : inboxDisplay.view === 'board');
   // WHICH TAB THE OPEN THREAD'S BAR NAMES: the one holding it now, not the one
   // you were standing on when you opened it (`crumbTab`, w-474ac45a33).
   const crumbTabNow = focused ? crumbTab(stateOfMine(focused), view) : view;
@@ -3023,8 +3025,8 @@ export default function App() {
     [items, evBoard, snap?.products, inboxDisplay, now, stateOfMine, cards, team, picked, liveIds, projectOrder],
   );
   const boardCols = useMemo(
-    () => (onBoard ? boardColumns({ ...boardArgs, order: teamMode ? evColumns(columnOrder) : columnOrder }) : null),
-    [onBoard, boardArgs, columnOrder, teamMode],
+    () => (onBoard ? boardColumns({ ...boardArgs, order: evBoard ? evColumns(columnOrder) : columnOrder }) : null),
+    [onBoard, boardArgs, columnOrder, evBoard],
   );
   const boardOrder = useMemo(() => (boardCols ? boardWalk(boardCols) : null), [boardCols]);
   // YOUR THREADS AS ONE LIST (./threads/stack-rules), on a phone with a team,
@@ -6113,7 +6115,7 @@ export default function App() {
         const onTheTabs = !inInput && !modal && !focused && !focusedRepeat && !inFullScreen
           && !settingsOpen && !teamShown && !openCard && !roomsUi.dialogOpen
           && !walkScreenRef.current
-          && search === null && inboxDisplay.view === 'list' && !roomShown;
+          && search === null && inboxDisplay.view === 'list' && !onBoard && !roomShown;
         if (!onTheTabs) return;
         // Built, not left alone: the browser's own focus walk would otherwise
         // paint a ring on whatever it landed on behind the rotation.
@@ -6464,8 +6466,8 @@ export default function App() {
         // something else.
         case 'b': case 'B':
           if (teamMode) {
-            // Needs you is a list; B switches Everything else.
-            if (search === null && !teamShown && !openCard && view !== 'inbox') { e.preventDefault(); setEvView(flipEvView(evView)); setSelected(0); }
+            // On a phone Needs you is a list; B switches Everything else.
+            if (search === null && !teamShown && !openCard && (view !== 'inbox' || !onPhone())) { e.preventDefault(); setEvView(flipEvView(evView)); setSelected(0); }
             break;
           }
           if (search === null && !teamShown && !openCard) { e.preventDefault(); setInboxDisplay(flipView(inboxDisplay)); setSelected(0); }
@@ -6482,7 +6484,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [modal, newProject, focused, focusedRepeat, inFullScreen, current, pointed, list, view, markDone, openSnooze, pickOption, offerNow, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside, teamShown, openCard, inboxDisplay, setInboxDisplay, stateTabOrder, roomShown, roomsUi, teammatesShown, teammatesUi, filesShown, connectionsShown, boardCols, stops, pageStops, keyLead, keyCard, walkPlace, goToStop, openTeammateCard, closeAskOn, closeAskWhy, waitingFiled, answerCloseAsk, keepThreadOpen, toast, openToastRow, clearSlot, teamMode, evPick, pickMember, goNeedsYou, keyTab]);
+  }, [modal, newProject, focused, focusedRepeat, inFullScreen, current, pointed, list, view, markDone, openSnooze, pickOption, offerNow, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside, teamShown, openCard, inboxDisplay, setInboxDisplay, stateTabOrder, roomShown, roomsUi, teammatesShown, teammatesUi, filesShown, connectionsShown, boardCols, stops, pageStops, keyLead, keyCard, walkPlace, goToStop, openTeammateCard, closeAskOn, closeAskWhy, waitingFiled, answerCloseAsk, keepThreadOpen, toast, openToastRow, clearSlot, teamMode, evPick, evView, onBoard, pickMember, goNeedsYou, keyTab]);
 
   // WHO HOLDS THE KEYBOARD WHILE SEARCHING. The field is in the top bar and
   // stays mounted while a result is open, so without this the J and K that walk
@@ -7249,7 +7251,7 @@ export default function App() {
   // With a team on, List and Board in the View menu are Everything else's, as B is.
   const headerDisplay = teamMode ? { ...inboxDisplay, view: evView } : inboxDisplay;
   const onHeaderDisplay = !teamMode ? setInboxDisplay : (d: Display) => {
-    if (d.view !== evView) { setEvView(d.view); if (view === 'inbox') pickMember('me'); }
+    if (d.view !== evView) { setEvView(d.view); if (view === 'inbox' && onPhone()) pickMember('me'); }
     setInboxDisplay({ ...d, view: inboxDisplay.view });
   };
   // The lit card's work under the cards, drawn from the same columns J and K walk (`boardCols`).
@@ -8032,7 +8034,7 @@ export default function App() {
                     Scheduled, Done and All, on the Inbox itself. They replace
                     the sidebar places they used to be. With a team on, the
                     board is Everything else's, under the cards (evBoardEl). */}
-                {!teamMode && search === null && inboxDisplay.view === 'board' && !roomShown ? (<>
+                {(teamMode ? mineBoard : search === null && inboxDisplay.view === 'board') && !roomShown ? (<>
                   {leadCount > 0 && <div className="list th-table">{leadRowsDrawn(allLeads)}</div>}
                   <InboxBoard items={items} products={snap.products} display={inboxDisplay} now={now} stateOf={stateOfMine} projectOrder={projectOrder}
                     cards={cards} picked={team ? picked : undefined}

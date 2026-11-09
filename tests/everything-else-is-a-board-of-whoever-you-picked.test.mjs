@@ -107,8 +107,10 @@ describe('in the app', () => {
   });
 
   // "the things we said previously about there being the needs you and everything else still hold"
-  it('with a team on, B and the View menu switch Everything else, never the two tabs away', () => {
-    expect(app).toMatch(/!teamMode && search === null && inboxDisplay\.view === 'board' && !roomShown \? \(/);
+  // On a computer your own board is the whole board since 2026-11-09
+  // (with-a-team-each-inbox-state-is-a-tab-of-its-own); a teammate's is still this one.
+  it('with a team on, B and the View menu switch the team view, not the one without a team', () => {
+    expect(app).toMatch(/\(teamMode \? mineBoard : search === null && inboxDisplay\.view === 'board'\) && !roomShown \? \(/);
     expect(app).toMatch(/case 'b': case 'B':\s*if \(teamMode\) \{/);
   });
 
