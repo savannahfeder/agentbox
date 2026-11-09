@@ -77,7 +77,8 @@ const LOOK = `(() => {
     el.setAttribute('data-breaker-ref', String(i + 1));
     const words = (el.getAttribute('aria-label') || el.innerText || el.textContent || el.getAttribute('placeholder') || el.getAttribute('title') || '').replace(/\\s+/g, ' ').trim().slice(0, 70);
     const kind = el.tagName.toLowerCase() + (el.getAttribute('role') ? '[' + el.getAttribute('role') + ']' : '');
-    return (i + 1) + '. ' + kind + ' "' + words + '"' + (document.activeElement === el ? '  <- cursor here' : '');
+    const ticked = ['aria-current', 'aria-checked', 'aria-pressed', 'aria-selected'].some((a) => el.getAttribute(a) === 'true');
+    return (i + 1) + '. ' + kind + ' "' + words + '"' + (ticked ? '  (ticked)' : '') + (document.activeElement === el ? '  <- cursor here' : '');
   });
   // A thread's newest messages are at its foot, so a long screen keeps its end as well as its start.
   const all = document.body.innerText.replace(/\\n{3,}/g, '\\n\\n');
@@ -143,8 +144,10 @@ async function thingAt(t, which, clickIfCovered, scroll = true) {
     const el = /^\\d+$/.test(w) ? document.querySelector('[data-breaker-ref="' + w + '"]')
       : [...document.querySelectorAll('[data-breaker-ref]')].find((e) => (e.getAttribute('aria-label') || e.innerText || e.textContent || '').replace(/\\s+/g, ' ').trim().toLowerCase().startsWith(w.toLowerCase()));
     if (!el) return null;
-    const at = () => { const r = el.getBoundingClientRect(); const x = r.left + r.width / 2; const y = r.top + r.height / 2;
-      const top = document.elementFromPoint(x, y); return { r, x, y, reachable: !!top && (top === el || el.contains(top) || top.contains(el)) }; };
+    // A link that wraps has the sentence around it at the middle of its box.
+    const at = () => { const lines = el.getClientRects(); const r = el.getBoundingClientRect(); const aim = lines.length > 1 ? lines[0] : r;
+      const x = aim.left + aim.width / 2; const y = aim.top + aim.height / 2;
+      const top = document.elementFromPoint(x, y); return { r, x, y, reachable: !!top && (top === el || el.contains(top)) }; };
     if (${scroll}) el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     // Scrolled only to the nearest edge, a cell can sit under a table's frozen first column; a person would scroll it clear.
     let { r, x, y, reachable } = at();
