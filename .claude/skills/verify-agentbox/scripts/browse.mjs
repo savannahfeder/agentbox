@@ -85,7 +85,9 @@ const LOOK = `(() => {
   const max = 6000;
   const text = all.length <= max ? all
     : all.slice(0, 2000) + '\\n[' + (all.length - max) + ' characters in the middle left out]\\n' + all.slice(-(max - 2000));
-  return 'SCREEN TEXT:\\n' + text + '\\n\\nTHINGS TO PRESS (' + list.length + '):\\n' + list.join('\\n');
+  // A page opened beside a thread draws in a frame, whose words the screen text cannot read.
+  const frames = [...document.querySelectorAll('iframe')].filter(seen).map((f) => (f.title || decodeURIComponent((f.getAttribute('src') || '').split(/[?#]/)[0].split('/').pop() || 'a page')).slice(0, 80));
+  return 'SCREEN TEXT:\\n' + text + (frames.length ? '\\n\\nPAGES OPEN ON SCREEN (drawn, not read here; take a shot to see them): ' + frames.join(', ') : '') + '\\n\\nTHINGS TO PRESS (' + list.length + '):\\n' + list.join('\\n');
 })()`;
 
 /** The page loads before the app draws; a look straight after shows an empty screen. */
