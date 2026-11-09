@@ -94,10 +94,12 @@ export interface TeamState {
 
 /** A person's open work and AI teammates, handed on when they leave. */
 /** A file put in a link anyone can open. */
-export interface FileLinkShare { source: string; name: string; kind: string; type: string; body: string; version?: number; hash?: string }
+/** `path`: a film's own file, which goes up in pieces rather than in `body`. */
+export interface FileLinkShare { source: string; name: string; kind: string; type: string; body: string; version?: number; hash?: string; path?: string }
 /** This person's live link to one file. */
 export interface FileLinkRow { token: string; version: number; hash: string; createdAt: number; updatedAt: number; comments: number }
 export interface FileLinkListed { token: string; source: string; name: string; kind: string; createdAt: number; updatedAt: number; comments: number }
+export interface SharedLinkFile { name: string; kind: string; type: string; body: string; version: number; createdAt: number; updatedAt: number; ownerName: string | null; ownerAvatar: string | null; mine: boolean }
 export interface FileLinkComment { id: string; byName: string; byAvatar: string | null; text: string; at: number; mine: boolean; byOwner: boolean }
 
 export interface TeamHandover { handTo: string; name: string; mates: { id: string; name?: unknown; job?: unknown; to: string | null }[] }
@@ -141,6 +143,14 @@ export type TeamBackend = Omit<SyncBackend, 'me' | 'personId'> & RoomsBackend & 
   fileLinkFor?(source: string): Promise<FileLinkRow | null>;
   myFileLinks?(): Promise<FileLinkListed[]>;
   stopFileLink?(token: string): Promise<void>;
+  /** A film's pieces under its link (20261109120000_a_film_can_be_shared_by_its_link.sql). */
+  putLinkPiece?(name: string, bytes: Buffer): Promise<unknown>;
+  linkPiecesHeld?(token: string, hash: string): Promise<number[]>;
+  /** Clears a link's pieces of every copy but `keep`; null clears them all. */
+  clearLinkPieces?(token: string, keep: string | null): Promise<void>;
+  /** What anyone with the link reads, for bringing a shared file in. */
+  fileLinkView?(token: string): Promise<{ stopped: boolean; file: SharedLinkFile | null }>;
+  linkPiece?(name: string): Promise<Buffer | null>;
   fileLinkComments?(token: string): Promise<FileLinkComment[]>;
   commentOnFileLink?(token: string, text: string): Promise<unknown>;
   newLinkComments?(since: number): Promise<LinkComment[]>;
@@ -307,7 +317,7 @@ interface TaskInput {
 /** What rides along with a message: a voice note, the agent it is for, a subject that makes it its own thread. */
 interface MessageExtras { voice?: unknown; forAgent?: unknown; subject?: unknown }
 
-import { linkAddress, linkSiteFor } from '../file-link.mts';
+import { filmPiece, linkAddress, linkSiteFor } from '../file-link.mts';
 import { noticeLinkComments } from './link-comments.mts';
 import type { LinkComment } from './link-comments.mts';
 
@@ -1302,10 +1312,34 @@ export function createTeamService({
       return { site: linkSite, signedIn: true, link: { ...l, url: linkAddress(linkSite, l.token), current, ahead: !current && versionNow != null && l.version > versionNow } };
     },
     /** Shares the file, or puts this copy of it in its live link. */
-    async shareFile({ source, name, kind, type, body, version, hash }: FileLinkShare) {
+    async shareFile({ source, name, kind, type, body, version, hash, path: file }: FileLinkShare) {
       if (!linkSite) throw new Error('This cloud has no website to share files on.');
       if (!backend?.shareFile || !state.me) throw new Error('Sign in to share a link.');
-      await backend.shareFile({ source, name, kind, type, body, version, hash });
+      if (kind !== 'video') {
+        await backend.shareFile({ source, name, kind, type, body, version, hash });
+        return this.fileLink(source, hash);
+      }
+      if (!file || !hash || !backend.putLinkPiece || !backend.linkPiecesHeld || !backend.fileLinkFor) throw new Error('This copy cannot share films yet.');
+      const { pieces } = JSON.parse(body) as { pieces: number };
+      const { linkPiecesHeld, putLinkPiece } = backend;
+      const putAll = async (token: string) => {
+        const held = new Set(await linkPiecesHeld(token, hash));
+        for (let n = 0; n < pieces; n++) if (!held.has(n)) await putLinkPiece(`${token}/${hash}/${n}`, filmPiece(file, n));
+      };
+      // A live link moves to the new copy only once all of it is up, so nobody opening it meets half a film.
+      const had = await backend.fileLinkFor(source);
+      if (had) {
+        await putAll(had.token);
+        await backend.shareFile({ source, name, kind, type, body, version, hash });
+      } else {
+        const token = String(await backend.shareFile({ source, name, kind, type, body, version, hash }));
+        try { await putAll(token); } catch (err) {
+          await backend.stopFileLink?.(token).catch(() => {});
+          throw err;
+        }
+      }
+      const live = await backend.fileLinkFor(source);
+      if (live && backend.clearLinkPieces) await backend.clearLinkPieces(live.token, hash).catch((err: Error) => log(`file link: old pieces stay: ${err.message}`));
       return this.fileLink(source, hash);
     },
     /** Every live link of this person's, for the one list of what they made public. */
@@ -1317,6 +1351,7 @@ export function createTeamService({
     async stopFileLink(token: string) {
       if (!backend?.stopFileLink || !state.me) throw new Error('Sign in first.');
       await backend.stopFileLink(token);
+      if (backend.clearLinkPieces) await backend.clearLinkPieces(token, null).catch((err: Error) => log(`file link: a stopped film's pieces stay: ${err.message}`));
     },
     /** The comments people left on a link's page, and the owner's answer to them. */
     async fileLinkComments(token: string) {
