@@ -242,7 +242,9 @@ describe('what stays where it is', () => {
     await allSync();
     const brief = await dev.service.continueBrief(maya.personId, item.id);
     expect(Object.keys(brief).sort()).toEqual(['body', 'files', 'from', 'title']);
-    expect(Object.keys(continueStart(brief)).sort()).toEqual(['attachments', 'body', 'continueFrom', 'to']);
+    // `product` is one of your own projects, picked by the thread's project name (w-1fc102959f).
+    expect(Object.keys(continueStart(brief)).sort()).toEqual(['attachments', 'body', 'continueFrom', 'product', 'to']);
+    expect(continueStart(brief).product).toBeNull();
     expect(JSON.stringify(brief)).not.toMatch(/codex|gpt-5|api[_-]?key|token/i);
   });
 });
