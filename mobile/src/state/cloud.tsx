@@ -20,6 +20,9 @@ import { SEND_MAX_BYTES, sendFiles } from '../../../renderer/src/phone-sends-fil
 import { drawFromBytes } from '../lib/files';
 import { STORE_BUILD } from '../lib/store-build';
 import { toastParts } from '../../../renderer/src/toast-parts';
+import { clipToSentence } from '../../../renderer/src/list-rules';
+import { PHONE_UNDO_MS } from '../../../shared/phone-undo.mts';
+import { heldAnswers } from '../lib/held-answers';
 import type { Saved } from '../lib/attach';
 import type { Picked } from '../platform/pick';
 import { planFor, runSteps, type PressedItem, type Press, type Step } from '../lib/actions';
@@ -59,6 +62,7 @@ async function openCloud(): Promise<Cloud | null> {
 }
 
 const message = (err: unknown) => String((err as Error)?.message ?? err);
+const UNDO_WORDS = ' · press Z to undo';
 
 function useCloudState() {
   const [cloud, setCloud] = useState<Cloud | null>(null);
@@ -130,7 +134,10 @@ function useCloudState() {
     return () => { clearInterval(timer); sub.remove(); };
   }, [cloud, signedIn, refresh]);
 
-  const view = useMemo(() => phoneView(rows, now), [rows, now]);
+  const shown = useMemo(() => phoneView(rows, now), [rows, now]);
+  // A permission answered on the phone and still inside its Undo leaves every list at once.
+  const [heldIds, setHeldIds] = useState<ReadonlySet<string>>(() => new Set());
+  const view = useMemo(() => ({ ...shown, approvals: shown.approvals.filter((a) => !heldIds.has(a.id)) }), [shown, heldIds]);
   const tabs = useMemo(() => phoneTabs(view, now), [view, now]);
   const repeats = useMemo(() => phoneRepeats(settingsRows, rows.commands, rows.projects, now), [settingsRows, rows.commands, rows.projects, now]);
   const team = useMemo(() => (STORE_BUILD ? null : withPendingPauses(withPhoneAnswers(teamFrom(settingsRows), rows.commands), rows.commands)), [settingsRows, rows.commands]);
@@ -266,6 +273,25 @@ function useCloudState() {
     return made;
   }, [sender, say, agreed, askNotice]);
 
+  const sendNow = useRef(send);
+  sendNow.current = send;
+  const [answers] = useState(() => heldAnswers((id, allow) => {
+    void sendNow.current({ kind: 'approve', approval: id, allow }, null)
+      .catch((err) => say(`Not answered: ${message(err) || 'it did not go through'}`))
+      .finally(() => void refresh());
+  }, PHONE_UNDO_MS, () => setHeldIds(answers.held())));
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => { if (s !== 'active') answers.flush(); });
+    return () => sub.remove();
+  }, [answers]);
+  /** Allow or Deny on a card, held while its toast offers Undo; `what` is the card's lede. */
+  const answerApproval = useCallback((a: { id: string }, allow: boolean, what: string) => {
+    answers.hold(a.id, allow);
+    say(`${allow ? 'Allowed' : 'Denied'}: ${clipToSentence(what, 48)}${UNDO_WORDS}`, async () => {
+      say(answers.undo(a.id) ? 'Not answered yet. The card is back.' : 'Already sent. Your computer has the answer.');
+    });
+  }, [answers, say]);
+
   // Threads picked together and closed or put off in one go, each by the plan one thread's press sends, with one Undo for all of them.
   const pressAll = useCallback(async (items: PressedItem[], press: Extract<Press, { kind: 'close' | 'later' }>) => {
     if (!sender) return;
@@ -388,7 +414,7 @@ function useCloudState() {
   }, [cloud, setRows, keepAlerts, notice]);
 
   return {
-    cloud, opened, signedIn, rows, view, tabs, repeats, status, loading: read.first, onlineAt: read.error ? 0 : read.fetchedAt, now, refresh, send, closeAll, laterAll, pressPicked, attach, fileOf, toast, say,
+    cloud, opened, signedIn, rows, view, tabs, repeats, status, loading: read.first, onlineAt: read.error ? 0 : read.fetchedAt, now, refresh, send, answerApproval, closeAll, laterAll, pressPicked, attach, fileOf, toast, say,
     team, teamPending, watchTeam, askTeammate, wanted, goTo: setWanted, takeWanted: () => setWanted(null), minimizedApproval, setMinimizedApproval, approvalRoom, setApprovalRoom,
     dismissToast: () => setToast(null), signedInWith, signOut, preview: PREVIEW,
     notice: mine, noticeRead, agreed, answerNotice, leaveNotice, withdrawNotice: () => answerNotice(false),

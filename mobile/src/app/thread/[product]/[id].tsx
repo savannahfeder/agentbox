@@ -46,7 +46,7 @@ import { agentChoices, laterHint, momentFromWords } from '../../../../../rendere
 import { Waiting } from '../../../ui/LogoOrbit';
 import { Markdown, type MessageFiles } from '../../../ui/Markdown';
 import { Selectable } from '../../../ui/Selectable';
-import { footRoom, IconButton, Pickable, PriorityBars, RunningMark, SheetHead, SheetRow, T, TopBar, Wall } from '../../../ui/parts';
+import { footRoom, IconButton, Pickable, PriorityBars, RunningMark, Sheet, SheetHead, SheetRow, T, TopBar, Wall } from '../../../ui/parts';
 import { ModelSheet, ModeSheet, PrioritySheet, barsFor } from '../../../ui/Pickers';
 import { ThreadMenu } from '../../../ui/ThreadMenu';
 import { DictationProblem, Listening, MicButton, useDictation } from '../../../ui/Dictation';
@@ -133,8 +133,10 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
   const [open, setOpen] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const [picked, setPicked] = useState<Choices>({});
-  const [sheet, setSheet] = useState<'priority' | 'mode' | 'model' | 'attach' | 'later' | null>(null);
+  const [sheet, setSheet] = useState<'priority' | 'mode' | 'model' | 'attach' | 'later' | 'stop' | null>(null);
   const [typedLater, setTypedLater] = useState('');
+  const [stopping, setStopping] = useState(false);
+  useEffect(() => { if (!offers.stop) setStopping(false); }, [offers.stop]);
   const ready = !!draft.text.trim() || draft.files.length > 0;
   useEffect(() => { onTyped?.(ready); }, [ready]);
   const priority = picked.priority ?? priorityValueOf(shownLevel(item));
@@ -225,10 +227,10 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
             </T>
             {/* One slot: Stop while it is in progress and the box is empty, Send once anything is typed (Focus.tsx). */}
             {offers.stop && !ready ? (
-              <Pressable onPress={stop} accessibilityRole="button" accessibilityLabel={thread.running ? 'Stop this agent' : 'Stop this task'}
-                style={({ pressed }) => ({ height: 29, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
-                <StopMark />
-                <T style={{ fontSize: 13, fontFamily: font.medium, color: color.dim }}>Stop</T>
+              <Pressable onPress={() => setSheet('stop')} disabled={stopping} accessibilityRole="button" accessibilityLabel={thread.running ? 'Stop this agent' : 'Stop this task'}
+                style={({ pressed }) => ({ height: 29, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: stopping ? 0.5 : 1 })}>
+                {!stopping && <StopMark />}
+                <T style={{ fontSize: 13, fontFamily: font.medium, color: color.dim }}>{stopping ? 'Stopping…' : 'Stop'}</T>
               </Pressable>
             ) : (
               // Send and its Send later caret, which only sets the time; the caret says it (components/ReplyLater.tsx).
@@ -250,6 +252,12 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
           </View>
         </View>
       )}
+      {/* Stop takes Send's place the moment a reply goes, so a tap there asks first. */}
+      <Sheet open={sheet === 'stop'} close={() => setSheet(null)}>
+        <SheetHead>{thread.running ? 'Stop this agent?' : 'Stop this task?'}</SheetHead>
+        <SheetRow label="Stop the agent" onPress={() => { setSheet(null); setStopping(true); stop(); }} />
+        <SheetRow label="Keep it running" onPress={() => setSheet(null)} />
+      </Sheet>
       <AttachSheet open={sheet === 'attach'} close={() => setSheet(null)} add={(more) => { setFailed(null); draft.setFiles((f) => [...f, ...more]); }} fail={setFailed} />
       <PrioritySheet open={sheet === 'priority'} close={() => setSheet(null)} value={priority} pick={(v) => setPicked((p) => ({ ...p, priority: v }))} />
       <ModeSheet open={sheet === 'mode'} close={() => setSheet(null)} value={mode} pick={(v) => setPicked((p) => ({ ...p, permissionMode: v }))} />
