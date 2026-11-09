@@ -51,6 +51,15 @@ const titleOf = (file) => {
   return file.name;
 };
 
+// As renderer/src/shared-file/shared-file.ts filmOf reads it.
+const PIECE_DEADLINE_MS = 60_000;
+function filmOf(body) {
+  try {
+    const { pieces, size, hash } = JSON.parse(body);
+    return Number.isInteger(pieces) && pieces > 0 && Number.isInteger(size) && /^[0-9a-f]{40}$/.test(hash) ? { pieces, size, hash } : null;
+  } catch { return null; }
+}
+
 const pictureType = (t) => (/^image\/[a-z0-9.+-]{1,60}$/i.test(t ?? '') ? t : 'application/octet-stream');
 
 export function sharedFileWorker({ cloud, anonKey, headers = {} }, { fetchImpl = (u, i) => fetch(u, i) } = {}) {
@@ -115,6 +124,23 @@ export function sharedFileWorker({ cloud, anonKey, headers = {} }, { fetchImpl =
     if (file.kind === 'page') return new Response(file.body, { headers: { ...shared, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': PAGE_CSP } });
     if (isTable(file)) {
       return new Response(file.body, { headers: { ...shared, 'content-type': `${file.type.toLowerCase()}; charset=utf-8`, 'content-security-policy': TEXT_CSP, 'content-disposition': `attachment; filename="${String(file.name).replace(/[^\w.\- ]+/g, '_')}"` } });
+    }
+    if (file.kind === 'video') {
+      const film = filmOf(file.body);
+      if (!film) return plain(404, 'This link does not work.');
+      let n = 0;
+      const pieces = new ReadableStream({
+        async pull(out) {
+          if (n >= film.pieces) { out.close(); return; }
+          const res = await fetchImpl(`${base}/storage/v1/object/link-files/${tok}/${film.hash}/${n++}`, {
+            headers: { apikey: anonKey, authorization: `Bearer ${anonKey}` },
+            signal: AbortSignal.timeout(PIECE_DEADLINE_MS),
+          });
+          if (!res.ok) { out.error(new Error(`a piece answered ${res.status}`)); return; }
+          out.enqueue(new Uint8Array(await res.arrayBuffer()));
+        },
+      });
+      return new Response(request.method === 'HEAD' ? null : pieces, { headers: { ...shared, 'content-type': /^video\/[a-z0-9.+-]{1,40}$/i.test(file.type ?? '') ? file.type : 'application/octet-stream', 'content-length': String(film.size), 'content-security-policy': TEXT_CSP, 'content-disposition': `attachment; filename="${String(file.name).replace(/[^\w.\- ]+/g, '_')}"` } });
     }
     if (file.kind === 'markdown') return new Response(file.body, { headers: { ...shared, 'content-type': 'text/plain; charset=utf-8', 'content-security-policy': TEXT_CSP } });
     let bytes;

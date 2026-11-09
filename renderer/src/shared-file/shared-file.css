@@ -42,6 +42,11 @@
 .sf-pdf { height: calc(100vh - 230px); min-height: 520px; display: flex; }
 .sf-pdf > * { flex: 1; min-width: 0; }
 .sf-table { height: calc(100vh - 230px); min-height: 420px; display: flex; flex-direction: column; }
+.sf-video { display: grid; place-items: center; }
+.sf-video video { display: block; max-width: 100%; max-height: calc(100vh - 220px); border-radius: var(--artifact-corner); background: #000; }
+/* Its pieces arriving: the frame a film will fill, and a line across its foot. */
+.sf-video.is-loading { position: relative; width: 100%; aspect-ratio: 16 / 9; max-height: calc(100vh - 220px); overflow: hidden; border-radius: var(--artifact-corner); background: var(--bg-raised); }
+.sf-video.is-loading i { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--text-dim); transition: width 0.3s ease; }
 .sf-table > * { flex: 1; min-height: 0; }
 
 /* The comments: a panel over the page's right edge, opened from the bar. */
