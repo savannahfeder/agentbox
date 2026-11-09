@@ -43,7 +43,9 @@ export const penOnScreen = (segments: readonly string[]) => segments.length === 
  * Where the toast sits, from the foot's room. On the inbox it stops short of
  * the pen and sits level with it, so the next thread is one tap away.
  */
-export function toastPlace(screen: 'thread' | 'inbox' | 'other', foot: number) {
+export function toastPlace(screen: 'thread' | 'inbox' | 'other', foot: number, card = 0) {
+  // A permission card over the foot keeps its Allow and Deny clear; the pen is up in the bar then.
+  if (card > 0) return { bottom: card + PEN_GAP, right: TOAST_SIDE };
   if (screen === 'inbox') return { bottom: foot + PEN.lift + (PEN.size - TOAST_HIGH) / 2, right: PEN.right + PEN.size + PEN_GAP };
   return { bottom: foot + toastLift(screen === 'thread'), right: TOAST_SIDE };
 }

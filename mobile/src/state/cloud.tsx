@@ -23,6 +23,7 @@ import { toastParts } from '../../../renderer/src/toast-parts';
 import { clipToSentence } from '../../../renderer/src/list-rules';
 import { PHONE_UNDO_MS } from '../../../shared/phone-undo.mts';
 import { heldAnswers } from '../lib/held-answers';
+import { awayNext } from '../lib/computer-line';
 import type { Saved } from '../lib/attach';
 import type { Picked } from '../platform/pick';
 import { planFor, runSteps, type PressedItem, type Press, type Step } from '../lib/actions';
@@ -150,6 +151,7 @@ function useCloudState() {
     return () => { teamWatched.current -= 1; };
   }, [refresh]);
   const status = signedIn ? phoneStatusLine({ error: read.error, fetchedAt: read.fetchedAt, macSeen: macSeenOf(rows.projects), cloud: cloudCarriesOn(rows.projects) }, now) : null;
+  const statusNext = signedIn ? awayNext({ error: read.error, macSeen: macSeenOf(rows.projects), cloud: cloudCarriesOn(rows.projects) }, now) : null;
   // No computer has sent this account a project yet: the inbox says how to connect one.
   const connect = phoneConnectState({ signedIn, started: !read.first, error: read.error, projects: rows.projects, email: cloud?.session()?.user.email });
   const [seen, setSeen] = useState(() => readSeen(appStore));
@@ -414,7 +416,7 @@ function useCloudState() {
   }, [cloud, setRows, keepAlerts, notice]);
 
   return {
-    cloud, opened, signedIn, rows, view, tabs, repeats, status, loading: read.first, onlineAt: read.error ? 0 : read.fetchedAt, now, refresh, send, answerApproval, closeAll, laterAll, pressPicked, attach, fileOf, toast, say,
+    cloud, opened, signedIn, rows, view, tabs, repeats, status, statusNext, loading: read.first, onlineAt: read.error ? 0 : read.fetchedAt, now, refresh, send, answerApproval, closeAll, laterAll, pressPicked, attach, fileOf, toast, say,
     team, teamPending, watchTeam, askTeammate, wanted, goTo: setWanted, takeWanted: () => setWanted(null), minimizedApproval, setMinimizedApproval, approvalRoom, setApprovalRoom,
     dismissToast: () => setToast(null), signedInWith, signOut, preview: PREVIEW,
     notice: mine, noticeRead, agreed, answerNotice, leaveNotice, withdrawNotice: () => answerNotice(false),

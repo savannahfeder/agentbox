@@ -193,7 +193,7 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
       };
     }
     case 'stop':
-      return { steps: [{ door: 'stopSession', payload: on }], toast: 'Stop sent. Your computer stops the agent when it gets it.' };
+      return { steps: [{ door: 'stopSession', payload: on }], toast: 'Stopping the agent' };
     case 'run-now':
       return { steps: [{ door: 'runNow', payload: on }], toast: waits ? 'Up next once your computer is back.' : 'Up next. It starts as soon as an agent is free.' };
     case 'move-to-cloud':

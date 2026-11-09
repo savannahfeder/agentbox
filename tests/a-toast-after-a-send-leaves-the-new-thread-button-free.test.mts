@@ -49,3 +49,14 @@ describe('which screen has the pen', () => {
     expect(penOnScreen(['new'])).toBe(false);
   });
 });
+
+describe('over a permission card', () => {
+  // Seen in the preview: after Deny, the toast lay over the next card's Allow and Deny.
+  it('the toast sits above the card, full width, on any screen', () => {
+    expect(toastPlace('inbox', 34, 260)).toEqual({ bottom: 272, right: 12 });
+    expect(toastPlace('thread', 34, 260)).toEqual({ bottom: 272, right: 12 });
+  });
+  it('the toast reads how tall the card is', () => {
+    expect(toast).toMatch(/footRoom\(inset\), c\.approvalRoom\)/);
+  });
+});

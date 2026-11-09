@@ -470,7 +470,7 @@ export default function Threads() {
         <ViewButton display={display} agent={agent} open={menu} onPress={() => setMenu(!menu)} />
         <IconButton label="Settings" onPress={() => router.push('/settings')}><Gear /></IconButton>
       </>} below={board ? undefined : <Tabs on={onEverything ? 'everything' : tab} counts={counts} pick={setPlace} team={teamMode} />} />
-      <StatusNotice message={c.status} />
+      <StatusNotice message={c.status} next={c.statusNext} />
       {onEverything
         ? <EverythingPlace mine={mineBoard ? <Board columns={mineBoard} foot={foot} inset={size.inset} /> : list} mineTabs={mineTabs} row={threadRow} openGroup={openGroup} />
         : board ? <Board columns={board} foot={foot} /> : list}

@@ -105,7 +105,7 @@ export function Toast() {
     // By its key alone: the cloud redraws every few seconds, and a timer started over each time would never end.
   }, [toast?.key]);
   if (!toast) return null;
-  const { bottom, right } = toastPlace(threadOnScreen(segments, params) ? 'thread' : penOnScreen(segments) ? 'inbox' : 'other', footRoom(inset));
+  const { bottom, right } = toastPlace(threadOnScreen(segments, params) ? 'thread' : penOnScreen(segments) ? 'inbox' : 'other', footRoom(inset), c.approvalRoom);
   return (
     <View pointerEvents="box-none" style={{ position: 'absolute', left: 12, right, bottom }}>
       <Card key={toast.key} toast={toast} dismiss={dismiss} />

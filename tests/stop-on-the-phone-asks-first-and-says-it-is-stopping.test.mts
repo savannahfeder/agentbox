@@ -7,6 +7,7 @@
 // thread page's source, which these tests do not draw.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
+import { planFor } from '../mobile/src/lib/actions';
 
 const page = fs.readFileSync(new URL('../mobile/src/app/thread/[product]/[id].tsx', import.meta.url), 'utf8');
 
@@ -25,5 +26,14 @@ describe('Stop', () => {
   });
   it('and lets go of that once the thread no longer offers Stop', () => {
     expect(page).toMatch(/useEffect\(\(\) => \{ if \(!offers\.stop\) setStopping\(false\); \}, \[offers\.stop\]\)/);
+  });
+});
+
+describe('the toast after a stop', () => {
+  // It read "Stop sent. Your computer stops the agent when it gets it.", cut off on one line, and wrong for a cloud run.
+  it('is short enough for one line and true wherever the agent runs', () => {
+    const toast = planFor({ kind: 'stop' }, { product: 'p', id: 'w-1', status: 'claimed' })!.toast!;
+    expect(toast).toBe('Stopping the agent');
+    expect(toast).not.toMatch(/computer/);
   });
 });
