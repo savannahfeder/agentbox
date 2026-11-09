@@ -18,10 +18,9 @@ export interface CodexOpts { codexModels?: ModelChoice[]; codexDefault?: string 
 // The site's readers take the browser's Storage; they only ever call these three.
 const asStorage = (store: KeptStore) => store as unknown as Storage;
 
-// WHO A NEW THREAD GOES TO AND WHICH PROJECT are picked for that one thread
-// and forgotten after it. They were remembered, as the desktop card remembers
-// them, and the phone's testers sent their next task to the last one's agent
-// and project without noticing (2026-11-08). The model and level stay remembered.
+// WHO A NEW THREAD GOES TO AND WHICH PROJECT are picked for that one thread and
+// forgotten after it, so the next task never goes to the last one's agent or
+// project unnoticed. The model and level stay remembered.
 const NOTHING_KEPT = asStorage({ getItem: () => null, setItem: () => {}, removeItem: () => {} });
 
 export type Recipient = { to: string; mate: string | null; auto: boolean };
