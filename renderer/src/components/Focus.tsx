@@ -2748,9 +2748,11 @@ function SlashMenu({ rows, at, onPick, onHover }: {
  *  underline, no box and no icon. The menu is `.prio-menu`, the same list the
  *  priority and the engine already open. Nothing new is drawn.
  */
-function ModePicker({ value, options, label, onChange, onEscape, chip = false }: {
+function ModePicker({ value, options, label, onChange, onEscape, chip = false, folded = false }: {
   /** Drawn as the new thread card's chip. */
   chip?: boolean;
+  /** Out of sight in a reply bar too narrow for it; Shift+Tab still changes the mode. */
+  folded?: boolean;
   value: string;
   options: Array<{ value: string; label: string }>;
   label: string;
@@ -2772,7 +2774,7 @@ function ModePicker({ value, options, label, onChange, onEscape, chip = false }:
   useEffect(() => (open ? escapeClosesMenu(window, () => { setOpen(false); onEscape?.(); }) : undefined), [open]);
   const now = options.find((o) => o.value === value);
   return (
-    <span className="compose-word-wrap" ref={wrap}>
+    <span className={`compose-word-wrap mode-pick${folded ? ' folded' : ''}`} ref={wrap} aria-hidden={folded || undefined}>
       {open && (
         <span className="prio-menu model-menu" role="listbox" aria-label={label}>
           {options.map((o) => (
@@ -3293,6 +3295,20 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   // The level this thread is set to, for the footer, or null when it is set to
   // nothing and the engine is choosing.
   const levelSaid = effortSaid({ model, effort }, { engine: runningEngine, codexModels, codexDefault: codexModelDefault });
+  // The mode chip is the first thing a narrow bar gives up, before the model's
+  // name is shortened. Measured, not guessed from the width: the names differ.
+  const chipsRef = useRef<HTMLSpanElement>(null);
+  const [modeFolded, setModeFolded] = useState(false);
+  useLayoutEffect(() => {
+    const chips = chipsRef.current;
+    if (!chips || typeof ResizeObserver === 'undefined') return;
+    const check = () => setModeFolded(chipsOverflow(chips));
+    check();
+    const seen = new ResizeObserver(check);
+    seen.observe(chips);
+    document.fonts?.ready.then(check);
+    return () => seen.disconnect();
+  }, [running, model, effort, engineShown, levelSaid]);
   // The drawer has been open at least once, so a close is really a close and
   // not the first render reporting that it is shut.
   const drawerWasOpen = useRef(false);
@@ -3647,12 +3663,13 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             exactly the footer it had. */}
         {talkTo?.length ? <FormatBar box={ref} onChange={changeText} onAttach={pickFiles} onFromFiles={(f) => setAttachments((a) => [...a, f])} onVoice={addVoice} onNotice={onNotice}
           voiceKey={`direct:${item.product}:${item.id}`} voice={voiceCtl} onRecording={setRecording} /> : null}
-        {item.agent ? <span className="compose-clauses"><span className="dim">Goes straight into {item.agent.name}.</span></span> : talkTo?.length ? null : <span className="dock-chips">
+        {item.agent ? <span className="compose-clauses"><span className="dim">Goes straight into {item.agent.name}.</span></span> : talkTo?.length ? null : <span className="dock-chips" ref={chipsRef}>
             <PriorityPicker variant="chip" value={shown} set={!!prio} onChange={setPrio} title="Priority" />
             {repeat && <WhenPicker value={{ runAt: 0, repeat }} onChange={(v) => setRepeat(v.repeat)} only="repeat" empty="Runs once" />}
             {canSetMode && (
               <ModePicker
                 chip
+                folded={modeFolded}
                 label="What this message may do"
                 value={running}
                 options={claudeCode
@@ -3665,7 +3682,8 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             )}
             <ReplyModel
               chip
-              label={`${engineModelLabel(engineShown, model, modelOpts)}${levelSaid ? ` · ${levelSaid}` : ''}`}
+              label={engineModelLabel(engineShown, model, modelOpts)}
+              level={levelSaid}
               pick={pick}
               onPick={pickModel}
               recent={recent}
@@ -3737,9 +3755,6 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             rather than sitting side by side. A stop next to a live Send is two
             things to choose between; a stop INSTEAD of a dead Send is one
             thing that is always the thing she can do. */}
-        {/* One piece, so a narrow bar moves the paperclip and Send to a
-            second row together (narrow-conversation.css). */}
-        <span className="dock-actions">
         {!talkTo?.length && (
           <button type="button" className="tc-icon dock-clip" title="Attach files" aria-label="Attach files" onClick={pickFiles}><ClipGlyph /></button>
         )}
@@ -3755,11 +3770,21 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
         {canWait && <ReplyLater at={sendAt} onPick={pickSendAt} onClosed={() => ref.current?.focus()} />}
         </span>
         )}
-        </span>
         </>}
       </div>
     </>
   );
+}
+
+/** Whether the chips, every one at its full width, folded mode included, are wider than their room. */
+function chipsOverflow(chips: HTMLElement): boolean {
+  const kids = [...chips.children] as HTMLElement[];
+  const gap = parseFloat(getComputedStyle(chips).columnGap) || 0;
+  const whole = kids.reduce((sum, kid) => {
+    const cut = [...kid.querySelectorAll<HTMLElement>('.tc-chip-label')].reduce((c, l) => c + l.scrollWidth - l.clientWidth, 0);
+    return sum + kid.offsetWidth + cut;
+  }, 0) + gap * Math.max(0, kids.length - 1);
+  return whole > chips.clientWidth + 0.5;
 }
 
 const titleCase = (s: string) => s.replace(/(^|\s)\S/g, (c) => c.toUpperCase());

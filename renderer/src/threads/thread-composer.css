@@ -375,8 +375,10 @@
 .dock-chips .compose-word-wrap { display: inline-flex; }
 /* A chip's menu rises from the chip and starts on its left edge, as the card's do. */
 .dock-chips .compose-word-wrap .prio-menu.model-menu, .dock-chips .model-pick .tc-drop { left: 0; right: auto; }
-.dock-actions { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; flex: none; }
+.dock-bar .dock-clip { margin-left: auto; }
+.dock-bar .dock-chips + .dock-clip, .dock-bar .compose-clauses + .dock-clip { margin-left: 0; }
 .dock-send-pair { margin-left: 0; display: inline-flex; height: 32px; flex: none; position: relative; }
+.dock-bar > .dock-send-pair:first-child, .dock-bar .fmt-bar ~ .dock-send-pair { margin-left: auto; }
 .dock-send-pair > .dock-send, .dock-send-pair .dock-send-later {
   display: inline-flex; align-items: center; height: 32px; margin: 0;
   background: var(--send-fill); color: var(--text); border: 0; cursor: pointer;

@@ -31,17 +31,17 @@
 }
 
 /* Under 460 the priority keeps its bars and Stop its square; both keep their
-   names for the pointer and screen readers. When the chips still do not fit
-   beside the paperclip and Send, those two move to a second row, so every
-   chip is drawn whole. Only a box too narrow for the chips alone shortens a
-   name, with an ellipsis inside the chip: never sliced by its own border. */
+   names for the pointer and screen readers. The model's level goes to its
+   menu. When the chips still do not fit, the mode chip goes (Focus.tsx
+   chipsOverflow), and only then does the model's name end in an ellipsis:
+   a chip is never sliced by its own border. */
 @container reply (max-width: 460px) {
-  .compose-sentence.dock-bar { flex-wrap: wrap; row-gap: 10px; }
-  .dock-chips { flex: 1 0 auto; max-width: 100%; flex-wrap: nowrap; }
-  .dock-chips .tc-chip-word, .dock-bar .dock-stop-word { display: none; }
+  .dock-chips { flex-wrap: nowrap; }
+  .dock-chips .tc-chip-word, .dock-bar .dock-stop-word, .dock-chips .tc-chip-level { display: none; }
   .dock-chips > * { flex: none; }
-  .dock-chips > .compose-word-wrap:has(.tc-chip-label) { flex: 0 1 auto; min-width: 44px; }
-  .dock-chips > .model-pick { flex-shrink: 8; }
-  .dock-chips .tc-chip:has(.tc-chip-label) { min-width: 0; max-width: 100%; }
+  .dock-chips > .model-pick { flex: 0 1 auto; min-width: 44px; }
+  .dock-chips .model-pick .tc-chip { min-width: 0; max-width: 100%; }
   .compose-sentence.dock-bar .dock-stop { width: 32px; padding: 0; justify-content: center; }
 }
+/* Still laid out, so its width can be measured to bring it back. */
+.dock-chips .mode-pick.folded { position: absolute; visibility: hidden; pointer-events: none; }

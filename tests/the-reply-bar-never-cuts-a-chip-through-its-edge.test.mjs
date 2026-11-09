@@ -7,10 +7,11 @@
 // overflow hidden, so "Auto" lost its right padding and the model read
 // "Opus 5.5 · Ext" sliced by its own border; the priority chip lost 6px too.
 //
-// Now a chip is drawn whole: when the chips do not fit beside the paperclip and
-// Send, those two move to a row of their own. Every mode name is drawn against
-// short and long models, with and without a level, at that floor, wide, and on
-// a phone, in the app's own font.
+// Now the bar stays one row. A narrow box leaves the level to the model's menu;
+// when the chips still do not fit, the mode chip goes; only after that does the
+// model's name end in an ellipsis. Every mode name is drawn against short and
+// long models, with and without a level, at that floor, wide, and on a phone,
+// in the app's own font.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { build } from 'esbuild';
 import { createRequire } from 'node:module';
@@ -71,29 +72,23 @@ async function measure(page, setup) {
   await page.evaluate((s) => window.draw(s), { effort: null, ...setup });
   await page.locator('.dock-input').fill('??? waiting');
   await page.locator('.dock-send:not(:disabled)').waitFor();
-  await page.evaluate(() => document.fonts.ready);
+  await page.evaluate(() => document.fonts.ready.then(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))));
   return page.evaluate(() => {
     const box = (e) => e.getBoundingClientRect();
     const mid = (e) => Math.round(box(e).top + box(e).height / 2);
     const card = box(document.querySelector('.dock-card'));
-    const bar = document.querySelector('.dock-bar');
-    const inner = bar.clientWidth - parseFloat(getComputedStyle(bar).paddingLeft) - parseFloat(getComputedStyle(bar).paddingRight);
-    const chips = [...document.querySelectorAll('.dock-chips .tc-chip')];
+    const chips = [...document.querySelectorAll('.dock-chips .tc-chip')].filter((c) => getComputedStyle(c).visibility === 'visible');
     const actions = [...document.querySelectorAll('.dock-bar .dock-clip, .dock-bar .dock-send, .dock-bar .dock-send-later')];
     const ends = [...chips, ...actions].map(box);
     const labels = chips.flatMap((c) => [...c.querySelectorAll('.tc-chip-label')]);
-    const send = document.querySelector('.dock-send-pair');
     return {
       // A chip's content wider than the chip is what drew the slice.
       sliced: chips.filter((c) => c.scrollWidth > c.clientWidth + 1).map((c) => c.textContent),
       cutWithoutEllipsis: labels.filter((l) => l.scrollWidth > l.clientWidth + 1 && getComputedStyle(l).textOverflow !== 'ellipsis').map((l) => l.textContent),
       unevenPadding: chips.filter((c) => { const s = getComputedStyle(c); return s.paddingLeft !== s.paddingRight; }).map((c) => c.textContent),
       shortened: labels.filter((l) => l.scrollWidth > l.clientWidth + 1).map((l) => l.textContent),
-      chipsFillTheRow: box(document.querySelector('.dock-chips')).width >= inner - 1,
+      modeShown: !document.querySelector('.dock-chips .mode-pick.folded'),
       shown: chips.filter((c) => !c.querySelector('.tc-prio')).map((c) => c.innerText.trim()),
-      chipRows: new Set(chips.map(mid)).size,
-      actionRows: new Set(actions.map(mid)).size,
-      actionsBelow: box(send).top >= Math.max(...chips.map((c) => box(c).bottom)),
       rows: new Set([...chips, ...actions].map(mid)).size,
       fits: ends.every((r) => r.left >= card.left - 0.5 && r.right <= card.right + 0.5),
       edges: [Math.round(Math.min(...ends.map((r) => r.left)) - card.left), Math.round(card.right - Math.max(...ends.map((r) => r.right)))],
@@ -105,8 +100,7 @@ const holdsTogether = (m) => {
   expect(m.sliced).toEqual([]);
   expect(m.cutWithoutEllipsis).toEqual([]);
   expect(m.unevenPadding).toEqual([]);
-  expect(m.chipRows).toBe(1);
-  expect(m.actionRows).toBe(1);
+  expect(m.rows).toBe(1);
   expect(m.fits).toBe(true);
   expect(Math.abs(m.edges[0] - m.edges[1])).toBeLessThanOrEqual(1);
 };
@@ -116,20 +110,25 @@ describe.skipIf(!browserAvailable)('beside an open file, at the 400px conversati
   beforeAll(async () => { page = await open(400, { width: 1200, height: 900 }); }, 30_000);
   afterAll(async () => { await page?.close(); });
 
-  it('draws "Auto" and "Opus 5.5 · Extra" whole, with the paperclip and Send on the row below', async () => {
+  it('draws "Auto" and "Opus 5.5" whole on one row, the level left to the menu', async () => {
     const m = await measure(page, { mode: 'auto', model: 'opus', effort: 'xhigh' });
     holdsTogether(m);
     expect(m.shortened).toEqual([]);
-    expect(m.shown).toEqual(['Auto', 'Opus 5.5 · Extra']);
-    expect(m.rows).toBe(2);
-    expect(m.actionsBelow).toBe(true);
+    expect(m.shown).toEqual(['Auto', 'Opus 5.5']);
   });
 
-  it('keeps one row when everything fits on it', async () => {
-    const m = await measure(page, { mode: 'plan', model: 'haiku' });
+  it('lets the mode go, not the model, when the two do not fit', async () => {
+    const m = await measure(page, { mode: 'acceptEdits', model: 'sonnet', effort: 'xhigh' });
     holdsTogether(m);
-    expect(m.shown).toEqual(['Plan', 'Haiku 5.5']);
-    expect(m.rows).toBe(1);
+    expect(m.modeShown).toBe(false);
+    expect(m.shown).toEqual(['Sonnet 5.5']);
+    expect(m.shortened).toEqual([]);
+  });
+
+  it('brings the mode back when a shorter one fits again', async () => {
+    await measure(page, { mode: 'acceptEdits', model: 'sonnet', effort: 'xhigh' });
+    const m = await measure(page, { mode: 'plan', model: 'opus', effort: 'xhigh' });
+    expect(m.shown).toEqual(['Plan', 'Opus 5.5']);
   });
 
   for (const mode of MODES) {
@@ -137,22 +136,21 @@ describe.skipIf(!browserAvailable)('beside an open file, at the 400px conversati
       it(`never slices a chip with mode ${mode} and ${model}${effort ? ` at ${effort}` : ''}`, async () => {
         const m = await measure(page, { mode, model, effort });
         holdsTogether(m);
-        // A name is shortened only when the chips alone are wider than the box.
-        if (m.shortened.length) expect(m.chipsFillTheRow).toBe(true);
+        // The model's name is shortened only after the mode has gone.
+        if (m.shortened.length) expect(m.modeShown).toBe(false);
       });
     }
   }
 });
 
 describe.skipIf(!browserAvailable)('the same bar with room, 900px wide', () => {
-  it('is one row and shortens nothing', async () => {
+  it('shows the mode and the level, and shortens nothing', async () => {
     const page = await open(900, { width: 1200, height: 900 });
     const m = await measure(page, { mode: 'bypassPermissions', model: 'sonnet', effort: 'xhigh' });
     await page.close();
     holdsTogether(m);
     expect(m.shown).toEqual(['Bypass Permissions', 'Sonnet 5.5 · Extra']);
     expect(m.shortened).toEqual([]);
-    expect(m.rows).toBe(1);
   }, 30_000);
 });
 
