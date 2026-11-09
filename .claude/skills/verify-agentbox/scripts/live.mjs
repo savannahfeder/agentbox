@@ -200,7 +200,7 @@ async function realCodex() {
  * home, the stand-in layered into their config.toml and signed with their own
  * login, and the copy finding codex and the home as theirs would.
  */
-async function prepare(real, setupName = null, { logins = 2, codex = true, projectNames = null } = {}) {
+async function prepare(real, setupName = null, { logins = 2, codex = true, projectNames = null, fresh = false } = {}) {
   const data = path.join(INSTANCE, 'data');
   const storeRoot = path.join(INSTANCE, 'store');
   const accountRoot = path.join(storeRoot, 'accounts', ACCOUNT);
@@ -229,6 +229,30 @@ async function prepare(real, setupName = null, { logins = 2, codex = true, proje
     git('init', '-q', '-b', 'main');
     git('add', '-A');
     git('-c', 'user.email=verify@agentbox.invalid', '-c', 'user.name=verify', 'commit', '-qm', 'seed');
+    // --fresh: the folders and a few recent Claude Code chats are on this
+    // computer, but the app has no projects yet, so it opens on the first run.
+    if (fresh) {
+      const chatHome = home ?? path.join(INSTANCE, 'home');
+      const at = path.join(chatHome, '.claude', 'projects', repo.replace(/[^a-zA-Z0-9]/g, '-'));
+      fs.mkdirSync(at, { recursive: true });
+      const asks = [`Add input validation to the ${p.name} settings form`, `Why does the ${p.name} build warn about a missing env var?`];
+      asks.forEach((ask, i) => {
+        const when = Date.now() - (i + 1) * 47 * 60e3;
+        const iso = (d) => new Date(when - d).toISOString();
+        const file = path.join(at, `${p.slug}-chat-${i + 1}.jsonl`);
+        fs.writeFileSync(file, `${[
+          { type: 'user', cwd: repo, entrypoint: 'cli', timestamp: iso(60e3), message: { role: 'user', content: ask } },
+          { type: 'assistant', cwd: repo, entrypoint: 'cli', timestamp: iso(0), message: { role: 'assistant', content: [{ type: 'text', text: 'Done. I made the change and the tests pass.' }] } },
+        ].map((r) => JSON.stringify(r)).join('\n')}\n`);
+        fs.utimesSync(file, new Date(when), new Date(when));
+      });
+      // Where a person keeps code, so the folder picker opens on it.
+      const code = path.join(chatHome, 'code');
+      fs.mkdirSync(code, { recursive: true });
+      try { fs.symlinkSync(repo, path.join(code, p.slug)); } catch { /* there already */ }
+      repos[p.slug] = repo;
+      continue;
+    }
     fs.writeFileSync(path.join(accountRoot, p.slug, 'project.json'), `${JSON.stringify({
       schemaVersion: 2, id: p.slug, name: p.name, repoPath: repo, oneLiner: 'a throwaway project for verification',
     }, null, 1)}\n`);
@@ -466,6 +490,8 @@ async function start(state) {
   if (state.toolsFixture) Object.assign(env, { AGENTBOX_TOOLS_FIXTURE: state.toolsFixture, AGENTBOX_TOOLS_FIXTURE_OPEN: path.join(INSTANCE, 'oauth-url.txt') });
   // `up --tool-standins <file>`: real tiles on the stand-ins in scripts/standin-tools.mjs.
   if (state.toolStandins) Object.assign(env, { AGENTBOX_TOOLS_STANDINS: fs.readFileSync(state.toolStandins, 'utf8'), AGENTBOX_TOOLS_FIXTURE_OPEN: path.join(INSTANCE, 'oauth-url.txt') });
+  // The tab draws its own folder picker; osascript's would open on the owner's screen.
+  env.AGENTBOX_NO_SYSTEM_WINDOWS = '1';
   if (state.cloudTmp) { fs.mkdirSync(state.cloudTmp, { recursive: true, mode: 0o700 }); env.TMPDIR = state.cloudTmp; }
   if (state.standInCloud) await startStandInCloud(state);
   if (state.cloudAccounts) env.AGENTBOX_CLOUD_ACCOUNTS = state.cloudAccounts;
@@ -574,6 +600,7 @@ async function up(args) {
     logins: Number(value('logins')) || 2,
     codex: !args.includes('--no-codex'),
     projectNames: value('projects')?.split(',').map((s) => s.trim()).filter(Boolean) ?? null,
+    fresh: args.includes('--fresh'),
   };
   const emails = value('cloud-accounts');
   if (emails && !cloud) stop('--cloud-accounts narrows the cloud\'s accounts: add --cloud.');

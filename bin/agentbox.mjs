@@ -80,7 +80,8 @@ if (!fs.existsSync(path.join(dist, 'index.html'))) {
 // CODEX_HOME from reaching a worker by inheritance, so without this a copy's
 // workers signed in to ~/.claude and ~/.codex (w-6d8c543a43).
 await learnShellDataDirs();
-const booted = await bootHeadless({ dataDir, appDir, userDir: dataDir, osDialog: osOpenDialog });
+// A test copy's tester cannot see a window macOS puts on the owner's screen.
+const booted = await bootHeadless({ dataDir, appDir, userDir: dataDir, osDialog: process.env.AGENTBOX_NO_SYSTEM_WINDOWS ? null : osOpenDialog });
 // What held the thread each time it froze, as the desktop records it.
 startFreezeRecorder({
   dir: path.join(dataDir, 'memory-log'),

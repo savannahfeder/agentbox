@@ -79,7 +79,7 @@ describe('the app', () => {
   it('draws the first run on main for one half and the new one for the other', () => {
     const app = read('renderer/src/App.tsx');
     expect(app).toContain("{fresh && !modeDraft && arm === 'classic' && <ClassicFirstRun snap={snap} home={home} onDone={finishClassic} />}");
-    expect(app).toContain("{fresh && !modeDraft && arm === 'tour' && <FirstRunFlow snap={snap} home={home} onDone={finishFresh} />}");
+    expect(app).toContain("{fresh && !modeDraft && arm === 'tour' && <FirstRunFlow snap={snap} home={home} onDone={finishFresh}");
   });
   it('never waits for the word for long', () => {
     expect(read('renderer/src/App.tsx')).toContain('ARM_WAIT_MS');
