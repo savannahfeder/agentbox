@@ -58,6 +58,7 @@ import {
 import type { AgentEvent, AgentTurn, AgentVoice, AgentWork } from '../types';
 import type { ThreadPlace } from '../thread-place';
 import { voiceName } from '../../../shared/agent-voice.mjs';
+import { useEscapePutsAway } from '../escape-steps';
 
 // How much of an output stands open before she asks for the rest. The chosen
 // drawings show five or six lines: enough to see what came back, short
@@ -219,6 +220,21 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   const [open, setOpen] = useState<Map<string, number>>(new Map());
   // Which folded runs are open, by name, so a run stays open while the agent adds to the thread.
   const [runsOpen, setRunsOpen] = useState<Set<string>>(new Set());
+  // What she unfolded on this visit, which one Escape folds back (../escape-steps).
+  const unfolded = useRef({ runs: new Set<string>(), lines: new Set<string>() });
+  const [unfoldedAt, setUnfoldedAt] = useState<number | null>(null);
+  const noteFold = (kind: 'runs' | 'lines', k: string, opening: boolean) => {
+    if (opening) unfolded.current[kind].add(k); else unfolded.current[kind].delete(k);
+    if (opening) setUnfoldedAt(Date.now());
+    else if (!unfolded.current.runs.size && !unfolded.current.lines.size) setUnfoldedAt(null);
+  };
+  useEscapePutsAway(unfoldedAt, () => {
+    const { runs, lines } = unfolded.current;
+    setRunsOpen((was) => new Set([...was].filter((k) => !runs.has(k))));
+    setOpen((was) => new Map([...was].filter(([k]) => !lines.has(k))));
+    unfolded.current = { runs: new Set(), lines: new Set() };
+    setUnfoldedAt(null);
+  });
   const foot = useRef<HTMLDivElement>(null);
   const decide = useContext(DecideContext);
   // A TEAMMATE'S MESSAGE is theirs, not "You": drawn with their face and name.
@@ -238,6 +254,8 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   useEffect(() => {
     setOpen(new Map(kept?.lines ?? []));
     setRunsOpen(new Set(kept?.runs ?? []));
+    unfolded.current = { runs: new Set(), lines: new Set() };
+    setUnfoldedAt(null);
   }, [landOn]); // eslint-disable-line react-hooks/exhaustive-deps
   // Not keyed on landOn, for the reason ItemThread gives.
   useEffect(() => { onFolds?.([...runsOpen], [...open]); }, [open, runsOpen]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -394,11 +412,14 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
         // never find the seam, taking the door off the
         // screen on exactly the rows that need it.
         const ends = e.kind === 'run' ? (e.items[e.items.length - 1]?.i ?? -1) : e.i;
-        const stepLine = (k: string, next: number) => setOpen((was) => {
-          const map = new Map(was);
-          if (next === SHUT) map.delete(k); else map.set(k, next);
-          return map;
-        });
+        const stepLine = (k: string, next: number) => {
+          noteFold('lines', k, next !== SHUT);
+          setOpen((was) => {
+            const map = new Map(was);
+            if (next === SHUT) map.delete(k); else map.set(k, next);
+            return map;
+          });
+        };
         // WHAT THIS BLOCK HOLDS, SAID ON THE BLOCK ITSELF. The thread is a
         // flex column and every event was wrapped in an anonymous div, so
         // `.did + .did` and its neighbours never matched anything: a work line
@@ -420,11 +441,11 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
             ? <RunLine
                 items={e.items}
                 open={runsOpen.has(key)}
-                onToggle={() => setRunsOpen((was) => {
+                onToggle={() => { noteFold('runs', key, !runsOpen.has(key)); setRunsOpen((was) => {
                   const next = new Set(was);
                   if (next.has(key)) next.delete(key); else next.add(key);
                   return next;
-                })}
+                }); }}
                 nameOf={(i) => ids[i]}
                 lineState={(k) => open.get(k) ?? SHUT}
                 onStepLine={stepLine}
