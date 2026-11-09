@@ -2774,7 +2774,7 @@ function ModePicker({ value, options, label, onChange, onEscape, chip = false, f
   useEffect(() => (open ? escapeClosesMenu(window, () => { setOpen(false); onEscape?.(); }) : undefined), [open]);
   const now = options.find((o) => o.value === value);
   return (
-    <span className={`compose-word-wrap mode-pick${folded ? ' folded' : ''}`} ref={wrap} aria-hidden={folded || undefined}>
+    <span className={`compose-word-wrap mode-pick${folded ? ' folded' : ''}`} ref={wrap}>
       {open && (
         <span className="prio-menu model-menu" role="listbox" aria-label={label}>
           {options.map((o) => (
@@ -3778,6 +3778,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
 
 /** Whether the chips, every one at its full width, folded mode included, are wider than their room. */
 function chipsOverflow(chips: HTMLElement): boolean {
+  if (!chips.clientWidth) return false;
   const kids = [...chips.children] as HTMLElement[];
   const gap = parseFloat(getComputedStyle(chips).columnGap) || 0;
   const whole = kids.reduce((sum, kid) => {
