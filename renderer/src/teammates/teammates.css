@@ -32,6 +32,10 @@
 .rm-cm.tq-m .h > .tm-av { width: 32px; height: 32px; line-height: 30px; font-size: 10px; }
 .rm-cm.tq-m .tx { font-size: 16px; line-height: 25px; }
 .rm-cm.tq-m .tx p { white-space: pre-wrap; }
+/* Pictures at the room chat's preview size (team/chat.css), side by side when sent together. */
+.rm-cm.tq-m .tx p:has(> .inline-image-open) { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; margin: 8px 0; white-space: normal; }
+.rm-cm.tq-m .tx .inline-image-open { max-width: min(100%, 360px); }
+.rm-cm.tq-m .tx .inline-image { display: block; margin: 0; max-width: min(100%, 360px); max-height: 240px; }
 /* A pasted brief's headings are words in a message, not page titles. */
 .rm-cm.tq-m .tx :is(h1, h2, h3, h4) { font-size: 16px; line-height: 25px; font-weight: 500; margin: 0; }
 .rm-cm.tq-m .tx ul, .rm-cm.tq-m .tx ol { margin: 4px 0; padding-left: 22px; white-space: normal; }

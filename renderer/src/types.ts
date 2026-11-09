@@ -685,6 +685,8 @@ export interface TeamChatLine {
   setup?: boolean; threads?: { product: string; id: string; title: string }[];
   /** The teammate's thread it was written in. */
   run?: string;
+  /** The project the files it links were saved in. */
+  filesIn?: string;
   /** On an `act`: `learned` (kept something about you), `updated` (changed its own instructions),
    *  `lesson` (added to the playbook `ref`), and the older run and pause verbs. */
 }

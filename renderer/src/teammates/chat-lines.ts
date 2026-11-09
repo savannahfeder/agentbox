@@ -285,8 +285,13 @@ export function goalLine(goal: string, counted: string | null | undefined): stri
   return c ? `${g.replace(/[.,;:\s]+$/, '')}, counted as ${c.replace(/^./, (x) => x.toLowerCase())}.` : g;
 }
 
+const ATTACHED = /!?\[([^\]\n]*)\]\((?:\.\/)?attachments\/[^)\s]+\)/g;
+
+/** A message's first sentence, without the links to what was attached: their names when that is all it is. */
 export function firstSentence(text: string): string {
-  const one = String(text ?? '').replace(/\s+/g, ' ').trim();
+  const raw = String(text ?? '');
+  const one = raw.replace(ATTACHED, ' ').replace(/\s+/g, ' ').trim();
+  if (!one) return [...raw.matchAll(ATTACHED)].map((m) => m[1]).filter(Boolean).join(', ');
   return one.match(/^.+?[.!?](?=\s|$)/)?.[0] ?? one;
 }
 

@@ -200,6 +200,8 @@ export interface PostInput {
   options?: string[];
   fresh?: boolean;
   answers?: unknown;
+  /** The project the files it links were saved in. */
+  filesIn?: unknown;
 }
 
 export interface TickInput {
@@ -471,7 +473,7 @@ export class Teammates {
 
   // Your words in the team chat. On a teammate's page they go to that
   // teammate; in the team chat to whoever they name with @.
-  post({ text, to = [], options, fresh = false, answers }: PostInput = {}, now = Date.now()) {
+  post({ text, to = [], options, fresh = false, answers, filesIn }: PostInput = {}, now = Date.now()) {
     const words = String(text ?? '').trim();
     if (!words) throw new Error('Nothing to send.');
     const team = this.list(now);
@@ -482,8 +484,10 @@ export class Teammates {
       ? Object.fromEntries(Object.entries(answers).filter(([, a]) => typeof a === 'string' && a.trim()).map(([q, a]) => [q, a.trim().slice(0, 2000)]))
       : {};
     // Work you name a project for is done in that project, in a thread of its own there.
-    const product = projectNamedIn(words, this.store.listProducts().filter((p) => !p.practice && !p.personal));
-    return writeChat(this.dir(), { kind: 'msg', from: YOU, to: known, text: words.slice(0, 8000), ...(product ? { product } : {}), ...(options ? { options } : {}), ...(fresh ? { fresh: true } : {}), ...(Object.keys(said).length ? { answers: said } : {}) }, now);
+    const products = this.store.listProducts();
+    const product = projectNamedIn(words, products.filter((p) => !p.practice && !p.personal));
+    const files = typeof filesIn === 'string' && products.some((p) => p.slug === filesIn) ? filesIn : null;
+    return writeChat(this.dir(), { kind: 'msg', from: YOU, to: known, text: words.slice(0, 8000), ...(product ? { product } : {}), ...(files ? { filesIn: files } : {}), ...(options ? { options } : {}), ...(fresh ? { fresh: true } : {}), ...(Object.keys(said).length ? { answers: said } : {}) }, now);
   }
 
   // Your go-ahead for work held after too many hand-offs: the same work again,

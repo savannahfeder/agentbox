@@ -19,6 +19,10 @@ import { FormatBar } from '../team/FormatBar';
 import { RichReply, type RichBox } from '../team/RichReply';
 import { sendKeyFor } from '../reply-keys';
 import { Face } from '../team/people';
+import { AttachRow } from '../components/AttachRow';
+import { attachProblem, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
+import { pictureUrl } from '../picture';
+import { attachedPath, filesProductOf, whereFilesGo, withFiles } from './chat-files';
 import './teammates.css';
 
 const MD = [remarkGfm];
@@ -226,7 +230,9 @@ function ChatColumn({ view, items, products, team, t, me, mePic, call, sessions,
       prevFrom = '';
     } else if (e.kind === 'msg') {
       const lead = e.from !== prevFrom;
+      const kept = products.find((p) => p.slug === filesProductOf(e, team));
       rows.push(<Message key={e.id} m={e} team={team} me={me} mePic={mePic} lead={lead} onOpenThread={onOpenThread} onOpenFile={onOpenFile} answered={answerOf(view, e)}
+        files={kept ? { product: kept.slug, dir: kept.dir } : null}
         asking={open.some((q) => q.id === e.id) ? asking : null} />);
       prevFrom = e.from;
     } else if (e.kind === 'run' && e.verb === 'sent') {
@@ -247,7 +253,8 @@ function ChatColumn({ view, items, products, team, t, me, mePic, call, sessions,
     </div>
     {error && <p className="tq-error" role="alert">{error}</p>}
     {!error && (view?.trouble || view?.error) && <p className="tq-error" role="status">{view?.trouble ?? `Teammates could not be read: ${view?.error}`}</p>}
-    <Composer placeholder={placeholder} onSend={async (text) => (await call('post', { text, to: [t.id] })) !== false}
+    <Composer placeholder={placeholder} filesIn={(words) => whereFilesGo(words, t, placesToWork(products))}
+      onSend={async (text, filesIn) => (await call('post', { text, to: [t.id], ...(filesIn ? { filesIn } : {}) })) !== false}
       stop={t.running ? <button type="button" className="dock-stop" onClick={() => { void call('stop', { id: t.id }); }}
         aria-label={`Stop ${t.name}`} title={`Stop what ${t.name} is doing. It waits for your next message.`}>
         <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><rect x="1.5" y="1.5" width="9" height="9" fill="currentColor" /></svg>Stop
@@ -397,7 +404,24 @@ function Answers({ q, options, asking }: { q: string; options: string[]; asking:
   </>;
 }
 
-function Message({ m, team, me, mePic, lead, onOpenThread, onOpenFile, answered, asking }: { m: TeamChatLine; team: Teammate[]; me: string; mePic: string | null; lead: boolean; onOpenThread: (product: string, id: string) => void; onOpenFile: (product: string, src: string) => void; answered: { text: string; named: boolean } | null; asking: Asking | null }) {
+// A picture or file the message carries, drawn from the project it was saved
+// in, and opened beside the chat on a click.
+function filesDrawn(files: { product: string; dir: string } | null, onOpenFile: (product: string, src: string) => void) {
+  if (!files) return undefined;
+  const open = (src: string) => onOpenFile(files.product, src.replace(/^\.\//, ''));
+  return {
+    img: ({ src, alt }: { src?: string; alt?: string }) => {
+      const abs = attachedPath(src, files.dir);
+      if (!abs || !src) return <img src={src} alt={alt ?? ''} />;
+      return <button type="button" className="inline-image-open" onClick={() => open(src)} title={alt}><img className="inline-image" src={pictureUrl(abs)} alt={alt ?? ''} /></button>;
+    },
+    a: ({ href, children }: { href?: string; children?: ReactNode }) => (href && attachedPath(href, files.dir)
+      ? <button type="button" className="tq-doc-card" onClick={() => open(href)}>{ICON.doc}<span>{children}</span></button>
+      : <a href={href}>{children}</a>),
+  };
+}
+
+function Message({ m, team, me, mePic, lead, onOpenThread, onOpenFile, answered, asking, files = null }: { m: TeamChatLine; team: Teammate[]; me: string; mePic: string | null; lead: boolean; onOpenThread: (product: string, id: string) => void; onOpenFile: (product: string, src: string) => void; answered: { text: string; named: boolean } | null; asking: Asking | null; files?: { product: string; dir: string } | null }) {
   const t = team.find((x) => x.id === m.from) ?? null;
   const mine = m.from === 'you';
   const to = (Array.isArray(m.to) ? m.to : []).map((x) => nameOf(x, team));
@@ -409,7 +433,7 @@ function Message({ m, team, me, mePic, lead, onOpenThread, onOpenFile, answered,
       {mine && m.via && m.viaProduct && <button type="button" className="tq-to tq-link" onClick={() => onOpenThread(m.viaProduct!, m.via!)}>open it</button>}
       <em>{clockOf(m.ts)}</em>
     </div>}
-    <div className="tx"><Folded long={longMessage(m.text ?? '')}><ReactMarkdown remarkPlugins={MD}>{m.text ?? ''}</ReactMarkdown></Folded>
+    <div className="tx"><Folded long={longMessage(m.text ?? '')}><ReactMarkdown remarkPlugins={MD} components={filesDrawn(files, onOpenFile)}>{m.text ?? ''}</ReactMarkdown></Folded>
       {m.doc && <button type="button" className="tq-doc-card" onClick={() => onOpenFile(m.doc!.product, m.doc!.src)}>{ICON.doc}<span>{m.doc.name}</span></button>}
       {!mine && t && m.options?.length ? (asking && !answered
         ? <Answers q={m.id} options={m.options} asking={asking} />
@@ -481,34 +505,62 @@ function Activity({ e, view, team, only, sessions, call, onOpenThread }: { e: Ch
 }
 
 // The group chat's box: the same editor and formatting bar, growing as you
-// write. While it works, the Send slot is Stop until you type, as in a
-// thread's reply box.
-function Composer({ placeholder, onSend, stop = null }: { placeholder: string; onSend: (text: string) => Promise<boolean>; stop?: ReactNode }) {
+// write, taking pasted, dropped and attached files. While it works, the Send
+// slot is Stop until you type, as in a thread's reply box.
+function Composer({ placeholder, filesIn, onSend, stop = null }: {
+  placeholder: string;
+  /** The project this message's files are saved in, from its words. */
+  filesIn: (words: string) => string | null;
+  onSend: (text: string, filesIn: string | null) => Promise<boolean>;
+  stop?: ReactNode;
+}) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+  const [files, setFiles] = useState<PendingAttachment[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
+  const { attaching, collect } = useAttaching();
+  const picker = useRef<HTMLInputElement>(null);
   const box = useRef<RichBox | null>(null);
+  const add = (got: PendingAttachment[]) => { if (got.length) setFiles((was) => [...was, ...got]); };
+  const ready = !!text.trim() || files.length > 0;
   const send = async () => {
+    if (!ready || busy) return;
     const words = text.trim();
-    if (!words || busy) return;
     setBusy(true);
-    const ok = await onSend(words);
-    setBusy(false);
-    if (ok) setText('');
+    setNotice(null);
+    try {
+      const where = files.length ? filesIn(words) : null;
+      if (files.length && !where) throw new Error('it works in no project to keep them in');
+      const links = where ? await persistAttachments(where, files) : '';
+      if (files.length && !links) throw new Error('files cannot be saved from here');
+      if (await onSend(withFiles(words, links), where)) { setText(''); setFiles([]); }
+    } catch (e) {
+      setNotice(`Not sent: ${String((e as Error)?.message ?? e).replace(/\.$/, '')}. Your message is still in the box.`);
+    } finally {
+      setBusy(false);
+    }
   };
-  return <div className="rm-compose tq-compose">
-    <RichReply className="rm-compose-input tq-input" boxRef={box} value={text} onChange={setText}
-      placeholder={placeholder} label={placeholder}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); return true; }
-        if (e.key === 'Escape') { box.current?.blur(); return true; }
-        return false;
-      }} />
-    <div className="rm-compose-bar">
-      <FormatBar box={box as unknown as { current: HTMLTextAreaElement | null }} onChange={setText} mention={false} />
-      {stop && !text.trim() ? stop
-        : <button type="button" className="dock-send" disabled={!text.trim() || busy} onClick={() => void send()} title={`Send · ${sendKeyFor(true)}`}>Send <kbd>{sendKeyFor(true)}</kbd></button>}
+  return <>
+    {notice && <p className="tq-error" role="alert">{notice}</p>}
+    <div className="rm-compose tq-compose">
+      <RichReply className="rm-compose-input tq-input" boxRef={box} value={text} onChange={setText}
+        placeholder={placeholder} label={placeholder}
+        onFiles={async (got) => add(await collect(got))}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); return true; }
+          if (e.key === 'Escape') { box.current?.blur(); return true; }
+          return false;
+        }} />
+      <AttachRow attachments={files} attaching={attaching} onRemove={(i) => setFiles((was) => was.filter((_, j) => j !== i))} />
+      <input ref={picker} type="file" multiple hidden onChange={async (e) => { add(await collect(e.target.files ?? [])); e.target.value = ''; }} />
+      <div className="rm-compose-bar">
+        <FormatBar box={box as unknown as { current: HTMLTextAreaElement | null }} onChange={setText} mention={false}
+          onAttach={() => picker.current?.click()} onFromFiles={(f) => add([f])} onNotice={setNotice} />
+        {stop && !ready ? stop
+          : <button type="button" className="dock-send" disabled={!ready || busy || !!attachProblem(files)} onClick={() => void send()} title={`Send · ${sendKeyFor(true)}`}>Send <kbd>{sendKeyFor(true)}</kbd></button>}
+      </div>
     </div>
-  </div>;
+  </>;
 }
 
 /* ------------------------------------------------------------------- log */
@@ -686,8 +738,8 @@ function About({ t, call, error, onOpen }: { t: Teammate; call: Call; error: str
     </div>
     {error && <p className="tq-error" role="alert">{error}</p>}
     {/* What you send here is a message to it, so you are taken to the chat where it answers. */}
-    <Composer placeholder={`Tell ${t.name} what to change about its job`} onSend={async (text) => {
-      const sent = (await call('post', { text, to: [t.id] })) !== false;
+    <Composer placeholder={`Tell ${t.name} what to change about its job`} filesIn={() => t.product} onSend={async (text, filesIn) => {
+      const sent = (await call('post', { text, to: [t.id], ...(filesIn ? { filesIn } : {}) })) !== false;
       if (sent) onOpen(t.id);
       return sent;
     }} />
@@ -758,7 +810,7 @@ function NewTeammate({ team, products, call, error, onOpen, onNewProject }: { te
       </div>
       {!where && <p className="tq-error" role="alert">Make a project first. A teammate works in one of your projects.</p>}
       {error && <p className="tq-error" role="alert">{error}</p>}
-      <Composer placeholder="Answer your new teammate" onSend={(text) => make({ text })} />
+      <Composer placeholder="Answer your new teammate" filesIn={() => where?.slug ?? null} onSend={(text) => make({ text })} />
     </div>
   </>;
 }
