@@ -12,6 +12,8 @@ import { harnessFor } from './harnesses.mts';
 // A moved time is a reason to TRY again, not proof; the try is the proof.
 
 import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 
 
 /**
@@ -23,6 +25,27 @@ import fs from 'node:fs';
  */
 export function signInFiles({ engine = 'claude', folder = null, home }: { engine?: string; folder?: string | null; home: string }) {
   return harnessFor(engine).signInFiles({ folder, home });
+}
+
+/** The Keychain entry Claude Code keeps a login in on a Mac, named as the CLI names it. */
+export function claudeKeychainService(folder: string | null | undefined) {
+  return folder ? `Claude Code-credentials-${createHash('sha256').update(folder).digest('hex').slice(0, 8)}` : 'Claude Code-credentials';
+}
+
+type Run = (cmd: string, args: string[], opts: { encoding: 'utf8'; timeout: number; stdio: ['ignore', 'pipe', 'ignore'] }) => string;
+
+/**
+ * When that Keychain entry last changed, or null when there is none. Without
+ * -g or -w, `security` prints the entry's attributes and never its secret.
+ */
+export function keychainStamp(service: string, run: Run = execFileSync as unknown as Run, platform: string = process.platform): number | null {
+  if (platform !== 'darwin') return null;
+  let out: string;
+  try {
+    out = run('/usr/bin/security', ['find-generic-password', '-s', service], { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] });
+  } catch { return null; }
+  const m = /"mdat"<timedate>=\S*\s+"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})Z/.exec(String(out ?? ''));
+  return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) : null;
 }
 
 /** The newest modification time among them, or 0 when none can be read. */

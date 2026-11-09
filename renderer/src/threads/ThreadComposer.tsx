@@ -63,7 +63,7 @@ import { ModelMenu } from './ModelMenu';
 import { useThreadMentions } from '../components/ThreadMentions';
 import {
   agentChoices, agentWordFor, autoOffered,
-  allModels, findPeople, harnessFields, laterHint, momentFromWords, mondayMorning, moreCount,
+  allModels, findPeople, harnessFields, laterHint, momentFromWords, mondayIsTomorrow, mondayMorning, moreCount,
   joinNames, placeholderFor, projectsOffered, projectSwatch, recentModels,
   sharingFields, cardProject, startingVisibility, startingChosen, teammates, threadMessage, tomorrowMorning, chosenWords, VISIBILITY_ROWS,
   dueChoices, dueWords, headRows, NOT_BLOCKED, keyOnTheNewThreadCard, modEnterSendsTheCard, messageSubject, toSections, findInvited, type ToSection,
@@ -459,6 +459,8 @@ export function ThreadComposer({
     const find = e.currentTarget.querySelector<HTMLInputElement>('.tc-find, .tc-when');
     if (find && t !== find && e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) find.focus();
   };
+  // On pointermove, not pointerenter: Chrome sends enter when the page moves
+  // under a still pointer, and that took the row back from the arrow keys.
   const hover = (e: React.PointerEvent<HTMLElement>) => {
     if (document.activeElement !== e.currentTarget) e.currentTarget.focus({ preventScroll: true });
   };
@@ -843,7 +845,7 @@ export function ThreadComposer({
   };
 
   const toSection = (s: ToSection) => s === 'auto' ? (
-        <button key="auto" type="button" data-item className={`tc-row ${onAuto ? 'on' : ''}`} onPointerEnter={hover} onClick={chooseAuto}>
+        <button key="auto" type="button" data-item className={`tc-row ${onAuto ? 'on' : ''}`} onPointerMove={hover} onClick={chooseAuto}>
           <AutoFace /><span className="tc-row-label">Auto</span><small className="tc-row-aside">picks who when you send</small>
         </button>
       )
@@ -853,12 +855,12 @@ export function ThreadComposer({
       : s === 'agents' ? (agents.length
         ? agents.map((a) => (
           <button key={a.id} type="button" data-item className={`tc-row ${!person && !mate && !onAuto && pick.engine === a.id ? 'on' : ''}`}
-            onPointerEnter={hover} onClick={() => { chooseAgent(a.id); chooseTo('agent'); }}>
+            onPointerMove={hover} onClick={() => { chooseAgent(a.id); chooseTo('agent'); }}>
             <AgentFace /><span className="tc-row-label">{a.label}</span>
           </button>
         ))
         : (
-          <button key="agent" type="button" data-item className={`tc-row ${person || mate || onAuto ? '' : 'on'}`} onPointerEnter={hover} onClick={() => chooseTo('agent')}>
+          <button key="agent" type="button" data-item className={`tc-row ${person || mate || onAuto ? '' : 'on'}`} onPointerMove={hover} onClick={() => chooseTo('agent')}>
             <AgentFace /><span className="tc-row-label">Agent</span>
           </button>
         ))
@@ -866,11 +868,11 @@ export function ThreadComposer({
         <span className="tc-sep" />
         <span className="tc-menu-head">Teammates</span>
         {(agentMates ?? []).map((t) => (
-          <button key={t.id} type="button" data-item className={`tc-row ${mate === t.id ? 'on' : ''}`} onPointerEnter={hover} onClick={() => chooseMate(t.id)}>
+          <button key={t.id} type="button" data-item className={`tc-row ${mate === t.id ? 'on' : ''}`} onPointerMove={hover} onClick={() => chooseMate(t.id)}>
             <TeammateMark t={t} /><span className="tc-row-label">{t.name}</span>{t.role && <small className="tc-row-aside">{t.role}</small>}
           </button>
         ))}
-        <button type="button" data-item className={`tc-row ${mate === 'new' ? 'on' : ''}`} onPointerEnter={hover} onClick={() => chooseMate('new')}>
+        <button type="button" data-item className={`tc-row ${mate === 'new' ? 'on' : ''}`} onPointerMove={hover} onClick={() => chooseMate('new')}>
           <i className="tq tq-sm tq-hash" aria-hidden="true">+</i><span className="tc-row-label">Someone new</span><small className="tc-row-aside">makes a teammate for this</small>
         </button>
       </Fragment>)
@@ -885,7 +887,7 @@ export function ThreadComposer({
           onKeyDown={(e) => { if (e.key === 'Enter' && query.trim() && found[0]) { e.preventDefault(); chooseTo(found[0].id); } }}
         />
         {found.map((p) => (
-          <button key={p.id} type="button" data-item className={`tc-row ${to === p.id ? 'on' : ''}`} onPointerEnter={hover} onClick={() => chooseTo(p.id)}>
+          <button key={p.id} type="button" data-item className={`tc-row ${to === p.id ? 'on' : ''}`} onPointerMove={hover} onClick={() => chooseTo(p.id)}>
             <Face person={p} /><span className="tc-row-label">{p.name}</span>
           </button>
         ))}
@@ -950,7 +952,7 @@ export function ThreadComposer({
   const dueOnMenu = (
     <div className="tc-menu tc-drop" role="listbox" aria-label="Due On" onKeyDown={menuKeys}>
       {dueChoices().map((c) => (
-        <button key={c.key ?? 'none'} type="button" data-item className={`tc-row ${c.key === due?.slice(0, 10) || (!c.key && !due) ? 'on' : ''}`} onPointerEnter={hover}
+        <button key={c.key ?? 'none'} type="button" data-item className={`tc-row ${c.key === due?.slice(0, 10) || (!c.key && !due) ? 'on' : ''}`} onPointerMove={hover}
           onClick={() => pickDue(c.key)}>
           <span className="tc-row-label">{c.label}</span>
         </button>
@@ -975,7 +977,7 @@ export function ThreadComposer({
   const blockedByMenu = (
     <div className="tc-menu tc-drop" role="listbox" aria-label="Blocked By" onKeyDown={menuKeys}>
       {[{ id: null as string | null, label: NOT_BLOCKED }, ...blockOffers].map((c) => (
-        <button key={c.id ?? 'none'} type="button" data-item className={`tc-row ${c.id === blockedBy ? 'on' : ''}`} onPointerEnter={hover}
+        <button key={c.id ?? 'none'} type="button" data-item className={`tc-row ${c.id === blockedBy ? 'on' : ''}`} onPointerMove={hover}
           onClick={() => pickBlock(c.id)}>
           <span className="tc-row-label">{c.label}</span>
         </button>
@@ -1006,7 +1008,7 @@ export function ThreadComposer({
         </span>
       ) : <span className="tc-menu-head">Project</span>}
       {offered.map((p) => (
-        <button key={p.slug} type="button" data-item className={`tc-row ${p.slug === product?.slug ? 'on' : ''}`} onPointerEnter={hover}
+        <button key={p.slug} type="button" data-item className={`tc-row ${p.slug === product?.slug ? 'on' : ''}`} onPointerMove={hover}
           onClick={() => { pickProject(p.slug); setProjectChosen(true); close('text'); }}>
           <Swatch slug={p.slug} /><span className="tc-row-label">{p.name}</span>
           {!p.repoPath && <span className="tc-row-note">For personal tasks</span>}
@@ -1019,7 +1021,7 @@ export function ThreadComposer({
           keeps it from reading as a twelfth project. */}
       {onNewProject && (<>
         {offered.length > 0 && <span className="tc-menu-rule" />}
-        <button type="button" data-item className="tc-row tc-new-project" onPointerEnter={hover}
+        <button type="button" data-item className="tc-row tc-new-project" onPointerMove={hover}
           onClick={() => { close('text'); onNewProject(); }}>
           <PlusIcon /><span className="tc-row-label">New project</span>
         </button>
@@ -1031,7 +1033,7 @@ export function ThreadComposer({
     <div className="tc-menu tc-rise tc-narrow" role="listbox" aria-label="Priority" onKeyDown={menuKeys}>
       <span className="tc-menu-head">Priority</span>
       {PRIORITIES.map((p) => (
-        <button key={p.id} type="button" data-item className={`tc-row ${p.id === prioShown ? 'on' : ''}`} onPointerEnter={hover}
+        <button key={p.id} type="button" data-item className={`tc-row ${p.id === prioShown ? 'on' : ''}`} onPointerMove={hover}
           onClick={() => { pickPrio(p.id); close('text'); }}>
           <PrioGlyph id={p.id} /><span className="tc-row-label">{p.label}</span>
         </button>
@@ -1063,7 +1065,7 @@ export function ThreadComposer({
       {visPage === 'rows' ? (<>
         <span className="tc-menu-head">Who sees it</span>
         {VISIBILITY_ROWS.map((v) => (
-          <button key={v.id} type="button" data-item className={`tc-row tc-two ${v.id === (person && sendAs === 'task' ? taskSees : visibility) ? 'on' : ''}`} onPointerEnter={hover}
+          <button key={v.id} type="button" data-item className={`tc-row tc-two ${v.id === (person && sendAs === 'task' ? taskSees : visibility) ? 'on' : ''}`} onPointerMove={hover}
             onClick={() => {
               pickVisibility(v.id);
               if (v.id === 'people') setVisPage('people');
@@ -1079,7 +1081,7 @@ export function ThreadComposer({
           </button>
         ))}
       </>) : (<>
-        <button type="button" data-item className="tc-row" onPointerEnter={hover} onClick={() => setVisPage('rows')}>
+        <button type="button" data-item className="tc-row" onPointerMove={hover} onClick={() => setVisPage('rows')}>
           <span className="tc-row-label">‹ Who sees it</span>
         </button>
         <span className="tc-sep" />
@@ -1094,7 +1096,7 @@ export function ThreadComposer({
         />
         {visiblePeople.map((p) => (
           <button key={p.id} type="button" data-item role="option" aria-selected={chosen.includes(p.id)}
-            className={`tc-row ${chosen.includes(p.id) ? 'on' : ''}`} onPointerEnter={hover} onClick={() => toggleChosen(p.id)}>
+            className={`tc-row ${chosen.includes(p.id) ? 'on' : ''}`} onPointerMove={hover} onClick={() => toggleChosen(p.id)}>
             <Face person={p} /><span className="tc-row-label">{p.name}</span>{chosen.includes(p.id) && <small>✓</small>}
           </button>
         ))}
@@ -1116,19 +1118,21 @@ export function ThreadComposer({
       {laterPage === 'list' ? (<>
         <span className="tc-menu-head">Send later</span>
         {when && (
-          <button type="button" data-item className="tc-row" onPointerEnter={hover} onClick={() => pickWhen(null)}>
+          <button type="button" data-item className="tc-row" onPointerMove={hover} onClick={() => pickWhen(null)}>
             <ClearIcon /><span className="tc-row-label">Remove the time</span>
           </button>
         )}
-        <button type="button" data-item className={`tc-row ${when && 'start' in when ? 'on' : ''}`} onPointerEnter={hover} onClick={() => pickWhen({ start: 'later' })}>
+        <button type="button" data-item className={`tc-row ${when && 'start' in when ? 'on' : ''}`} onPointerMove={hover} onClick={() => pickWhen({ start: 'later' })}>
           <ClockIcon /><span className="tc-row-label">Add it to Later</span>
         </button>
-        <button type="button" data-item className={`tc-row ${isAt(tomorrow) ? 'on' : ''}`} onPointerEnter={hover} onClick={() => pickWhen({ runAt: tomorrow })}>
+        <button type="button" data-item className={`tc-row ${isAt(tomorrow) ? 'on' : ''}`} onPointerMove={hover} onClick={() => pickWhen({ runAt: tomorrow })}>
           <ClockIcon /><span className="tc-row-label">Tomorrow morning</span><small>{laterHint(tomorrow)}</small>
         </button>
-        <button type="button" data-item className={`tc-row ${isAt(monday) ? 'on' : ''}`} onPointerEnter={hover} onClick={() => pickWhen({ runAt: monday })}>
-          <ClockIcon /><span className="tc-row-label">Monday morning</span><small>{laterHint(monday)}</small>
-        </button>
+        {!mondayIsTomorrow(now) && (
+          <button type="button" data-item className={`tc-row ${isAt(monday) ? 'on' : ''}`} onPointerMove={hover} onClick={() => pickWhen({ runAt: monday })}>
+            <ClockIcon /><span className="tc-row-label">Monday morning</span><small>{laterHint(monday)}</small>
+          </button>
+        )}
         {/* A TIME IN WORDS, where a browser date field used to be: the same
             grammar as the Schedule box on a thread. Typing on any row above
             lands here (menuKeys). */}
@@ -1148,17 +1152,17 @@ export function ThreadComposer({
             : <small className="tc-when-no">Not a time yet</small>)}
         </span>
         <span className="tc-sep" />
-        <button type="button" data-item className="tc-row" onPointerEnter={hover} onClick={() => setLaterPage('repeat')}>
+        <button type="button" data-item className="tc-row" onPointerMove={hover} onClick={() => setLaterPage('repeat')}>
           <RepeatIcon /><span className="tc-row-label">Repeat it</span>
         </button>
       </>) : (<>
-        <button type="button" data-item className="tc-row" onPointerEnter={hover} onClick={() => setLaterPage('list')}>
+        <button type="button" data-item className="tc-row" onPointerMove={hover} onClick={() => setLaterPage('list')}>
           <span className="tc-row-label">‹ Send later</span>
         </button>
         <span className="tc-sep" />
         <span className="tc-menu-head">Repeat it</span>
         {repeatPresets(now).filter((r) => r.rule).map((r) => (
-          <button key={r.label} type="button" data-item className={`tc-row ${when && 'repeat' in when && sameRule(when.repeat, r.rule) ? 'on' : ''}`} onPointerEnter={hover} onClick={() => pickWhen({ repeat: r.rule! })}>
+          <button key={r.label} type="button" data-item className={`tc-row ${when && 'repeat' in when && sameRule(when.repeat, r.rule) ? 'on' : ''}`} onPointerMove={hover} onClick={() => pickWhen({ repeat: r.rule! })}>
             <RepeatIcon /><span className="tc-row-label">{r.label}</span>
           </button>
         ))}

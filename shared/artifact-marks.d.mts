@@ -17,11 +17,13 @@ export function opensBigInAGroup(name: string | null | undefined): boolean;
 export function otherFilesInLines(lines: unknown[] | null | undefined): Array<{ path: string; by: string | null; at: number; agent?: string }>;
 export function shownName(path: string | null | undefined): string;
 export function reviewKind(path: string | null | undefined): 'image' | 'film' | 'pdf' | 'markdown' | 'deck' | null;
-export function threadFiles(files: ThreadFile[] | null | undefined, numbers?: Record<string, number> | null): FileFamily[];
+export function threadFiles(files: ThreadFile[] | null | undefined, numbers?: Record<string, number> | null, opts?: { keep?: string | null }): FileFamily[];
 export function lineAsThread(line: ReadonlyArray<{ key: string; versions: ReadonlyArray<{ n: number; name: string; path: string | null; by: string | null; at: number; agent?: string; here: string[] }> }> | null | undefined): { numbers: Record<string, number>; lines: unknown[] };
 export function whereAPressLands(families: FileFamily[] | null | undefined, press?: { path?: string | null; file?: string | null }): { fi: number; vi: number } | null;
 export function versionForPath(families: FileFamily[] | null | undefined, path: string | null | undefined): FileVersion | null;
+export function stillInHand(families: FileFamily[] | null | undefined, at: { fi: number; vi: number } | null, held: { id: string; path: string } | null): { fi: number; vi: number } | null;
 export function stepsThrough(families: FileFamily[], paths: string[] | null | undefined): Array<{ fi: number; vi: number }>;
+export function latestPicturesSaid(lines: unknown[] | null | undefined): string[];
 export function nextStep(families: FileFamily[] | null | undefined, steps: Array<{ fi: number; vi: number }> | null | undefined, at: { fi: number; vi: number } | null, by: number): { fi: number; vi: number } | null;
 export function filesInLines(lines: unknown[] | null | undefined): Array<{ path: string; by: string | null; at: number; agent?: string }>;
 export function notedFilesInLines(lines: unknown[] | null | undefined): Array<{ path: string; by: string | null; at: number; agent?: string }>;
@@ -36,16 +38,23 @@ export function nextVersionName(name: string, count: number): string;
 export function addressedTo(text: string | null | undefined, people: ReadonlyArray<{ id: string; name?: string | null }> | null | undefined): string | null;
 export function stillWaiting(note: { wait?: boolean; toAgent?: boolean; sent?: boolean } | null | undefined): boolean;
 export function noteGoesTo(note: { text?: string; mentions?: readonly string[]; toAgent?: boolean } | null | undefined, people?: ReadonlyArray<{ id: string; name?: string | null }>): { to: 'agent' } | { to: 'person'; person: string } | { to: 'nobody' };
+export function tagsYourAgent(text: string | null | undefined): boolean;
 export function notesForTheAgent(marks: FileMarks | null | undefined, version: FileVersion, count: number, opts?: { nameOf?: (id: string | null) => string }): { text: string; ids: string[] };
+export function unsentReplies(note: FileNote | null | undefined, people?: ReadonlyArray<{ id: string; name?: string | null }>): NonNullable<FileNote['replies']>;
+export function repliesForTheAgent(note: FileNote, replies: NonNullable<FileNote['replies']>, version: FileVersion, count: number, opts?: { nameOf?: (id: string | null) => string }): string;
 export const MAX_EDIT_BYTES: number;
 export function editedWords(name: string, path: string): string;
 export function editClash(family: Pick<FileFamily, 'versions'> | null | undefined, baseN: number, me: string | null, nameOf: (id: string | null) => string): string | null;
 /** What to ask before approving version `index`, or null. */
-export function approveAsk(family: Pick<FileFamily, 'versions'> | null | undefined, index: number, notes: readonly { file: string; resolved?: boolean }[] | null | undefined): { text: string; newest: FileFamily['versions'][number] | null } | null;
+export function approveAsk(family: Pick<FileFamily, 'versions'> | null | undefined, index: number, notes: readonly { file: string; resolved?: boolean }[] | null | undefined, offered?: ReadonlySet<string> | null): { text: string; newest: FileFamily['versions'][number] | null } | null;
+/** The ids of a family's versions that the newest message naming any of them names. */
+export function offeredTogether(lines: unknown[] | null | undefined, family: Pick<FileFamily, 'versions'> | null | undefined): Set<string>;
 /** `group-seat-picker-v3.png` as `group-seat-picker.png`. */
 export function baseName(name: string): string;
 /** The key of the family a path belongs to, with \0 as /. */
 export function familyKeyOf(path: string): string;
+/** A file's identity across its versions: the same for plan.md and plan-v3.md. */
+export function familyOfName(file: unknown): string;
 export function familyName(family: Pick<FileFamily, 'versions'> | null | undefined, version: FileFamily['versions'][number] | null | undefined): string;
 export function approvalSince(family: Pick<FileFamily, 'versions'> | null | undefined, index: number, approvals: Array<{ file: string; by: string | null }> | null | undefined, nameOf: (id: string | null) => string): string | null;
 export function newestOfFamily(path: string, edits: Array<{ path: string }> | null | undefined): string;
