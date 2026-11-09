@@ -69,9 +69,9 @@ beforeAll(async () => {
 afterAll(() => db.close());
 
 describe('the bucket', () => {
-  it('is private, and no file in it is over 25 MB', async () => {
+  it('is private, and no file in it is over 500 MB, which a film may reach', async () => {
     const { rows } = await db.query(`select public, file_size_limit from storage.buckets where id = 'phone-files'`);
-    expect(rows.map((r) => [r.public, Number(r.file_size_limit)])).toEqual([[false, 26214400]]);
+    expect(rows.map((r) => [r.public, Number(r.file_size_limit)])).toEqual([[false, 524288000]]);
   });
 });
 

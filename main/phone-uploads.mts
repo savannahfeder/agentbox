@@ -63,7 +63,10 @@ interface Roots { docs?: string | null; repo?: string | null }
 
 // A tenth of the Pro plan's 100 GB, which the organization's projects share;
 // past it the oldest threads' files make way (`trimBelow`).
-export const UPLOAD_LIMITS = { fileBytes: 25 * 1024 * 1024, threadBytes: 100 * 1024 * 1024, totalBytes: 10 * 1024 ** 3, files: 60, days: 7 };
+// A film has its own bound and stays out of a thread's budget: a finished cut
+// is usually past 25 MB, and one cut alone would use up a thread's 100 MB.
+export const UPLOAD_LIMITS = { fileBytes: 25 * 1024 * 1024, filmBytes: 500 * 1024 * 1024, threadBytes: 100 * 1024 * 1024, totalBytes: 10 * 1024 ** 3, files: 60, days: 7 };
+const FILM = /\.(mp4|mov|m4v|webm)$/i;
 const KEEP_UNNAMED_MS = 3 * 24 * 3600_000;
 const LOOK_AGAIN_MS = 5 * 60_000;
 // After a refused upload (no bucket yet, offline, signed out of storage) the
@@ -354,6 +357,14 @@ export function createPhoneUploads({ backend, owner, device, alive = () => true,
   // taken until every thread has looked again and said how new its files are.
   const startedAt = now();
 
+  const capOf = (file: string) => (FILM.test(file) ? limits.filmBytes ?? limits.fileBytes : limits.fileBytes);
+  // Files the storage turned away for their size, as they were then: the
+  // phone says it is too big, and nothing sends it again until it changes.
+  const tooBig = new Map<string, { size: number; mtimeMs: number }>();
+  const refusedAsBig = (file: string, st: { size: number; mtimeMs: number }) => {
+    const was = tooBig.get(file);
+    return !!was && was.size === st.size && was.mtimeMs === st.mtimeMs;
+  };
   const known = (file: string, st: { size: number; mtimeMs: number }) => {
     const was = names.get(file);
     return was && was.size === st.size && was.mtimeMs === st.mtimeMs ? was.name : null;
@@ -438,8 +449,9 @@ export function createPhoneUploads({ backend, owner, device, alive = () => true,
       for (const [key, file] of [...all].slice(0, limits.files)) {
         let st: fs.Stats;
         try { st = fs.statSync(file); } catch { continue; }
-        if (st.size > limits.fileBytes || bytes + st.size > limits.threadBytes) { files[key] = { s: st.size, big: true }; continue; }
-        bytes += st.size;
+        const film = FILM.test(file);
+        if (st.size > capOf(file) || (!film && bytes + st.size > limits.threadBytes) || refusedAsBig(file, st)) { files[key] = { s: st.size, big: true }; continue; }
+        if (!film) bytes += st.size;
         const name = known(file, st);
         if (name && state.uploaded[name]) {
           const shape = shapeOf(file, st);
@@ -476,7 +488,7 @@ export function createPhoneUploads({ backend, owner, device, alive = () => true,
     try {
       const st = await fh.stat();
       const there = fs.statSync(file);
-      if (!st.isFile() || st.ino !== there.ino || st.dev !== there.dev || real(file) !== file || st.size > limits.fileBytes) return null;
+      if (!st.isFile() || st.ino !== there.ino || st.dev !== there.dev || real(file) !== file || st.size > capOf(file)) return null;
       const buf = Buffer.alloc(st.size + 1);
       let n = 0;
       for (let got; n <= st.size && (got = (await fh.read(buf, n, st.size + 1 - n, n)).bytesRead) > 0;) n += got;
@@ -507,7 +519,15 @@ export function createPhoneUploads({ backend, owner, device, alive = () => true,
         if (!state.uploaded[name]) {
           if (!roomFor(read.data.length, job.rank)) { full(); continue; }
           if (!alive()) return;
-          await backend.putPhoneFile({ owner, device, name, data: read.data, type: typeOf(file) });
+          try {
+            await backend.putPhoneFile({ owner, device, name, data: read.data, type: typeOf(file) });
+          } catch (err) {
+            if (!(err as { tooBig?: boolean })?.tooBig) throw err;
+            log(`phone: the storage turned away a file of ${Math.round(read.st.size / 1024 ** 2)} MB as too big`);
+            tooBig.set(file, { size: read.st.size, mtimeMs: read.st.mtimeMs });
+            for (const sk of job.threads) { const m = memo.get(sk); if (m) m.at = -Infinity; }
+            continue;
+          }
           state.uploaded[name] = { bytes: read.data.length, named: now(), rank: job.rank };
           saidFull = false;
           save();

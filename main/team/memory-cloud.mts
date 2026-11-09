@@ -689,7 +689,7 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
     async putPhoneFile({ owner, device, name, data, type }: { owner?: string; device: string; name: string; data: Buffer; type: string | null }) {
       if (owner && owner !== personId) refuse('write to somebody else\'s phone');
       if (!/^[0-9a-f]{64}\.[a-z0-9]{1,8}$/.test(name)) refuse('a file named that');
-      if (data.length > 26_214_400) refuse('a file that big');
+      if (data.length > 524_288_000) refuse('a file that big');
       const key = `${personId}/${device}/${name}`;
       if (!(cloud.phoneFiles ??= new Map()).has(key)) cloud.phoneFiles.set(key, { data: Buffer.from(data), type });
     },
