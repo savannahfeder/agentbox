@@ -62,6 +62,17 @@ export function SeeList({ seen, teamName, onPick }: { seen: SeenBy; teamName: st
   );
 }
 
+/** Chosen people…: the team, ticked where they can open it; a press adds or takes off. */
+export function ChooseList({ people, chosen, onPick }: { people: readonly Person[]; chosen: readonly string[]; onPick: (id: string) => void }) {
+  return (
+    <div className="th-menu ts-more-menu" role="menu" aria-label="Who can open it">
+      {people.map((p) => <button key={p.id} type="button" role="menuitem" aria-current={chosen.includes(p.id) ? 'true' : undefined} tabIndex={-1} className={row} onClick={() => onPick(p.id)}>
+        <span className="ico"><Face person={p} size={18} /></span><span className="ts-more-label">{p.name || firstName(p)}</span>{chosen.includes(p.id) && <Tick />}
+      </button>)}
+    </div>
+  );
+}
+
 /** To, a note, and Send to inbox; Copy link beside it for a link instead. */
 export function SendSheet({ people, start, link, onCopy, onSend }: {
   people: readonly Person[];

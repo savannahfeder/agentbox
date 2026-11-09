@@ -58,8 +58,8 @@ import { OpenTeammateThread } from './threads/ContinuedFrom';
 import { handOffStart, joinNames, laterHint, replyWaitsUntil, taskHandOff, tabAfterSending, writingMovesToTheDialog, projectsOffered, projectOnScreen, teammates } from './threads/composer-rules';
 import { keyOnAnOpenThread, keyOnTheList, rowKey as actsOnARow, replyingTo, screenJustChanged, HELD_AFTER_A_CHANGE, NOWHERE_TO_TYPE, STILL_TYPING_MS } from './reply-keys';
 import { chosenNames, whoSees } from './threads/summary-rules';
-import { shownToPeople, visibilityOf } from '../../shared/thread-cards.mts';
-import { openTo, sentWords, sharedThreadOfDoc, threadLink, type ShareActs } from './threads/share-rules';
+import { shownToPeople } from '../../shared/thread-cards.mts';
+import { choose, copyText, openTo, seenNow, sentWords, sharedThreadOfDoc, threadLink, type ShareActs } from './threads/share-rules';
 
 const SHARE_LAST = 'agentbox:share-last';
 import { changePathFor } from './code-artifact';
@@ -2933,6 +2933,7 @@ export default function App() {
     setCardOpenAt(at);
     setOpenCard(card); setTeamOpen(true); setCardSel(stopKey({ card }));
   }, [items]);
+  const linkWaiting = useRef<{ personId: string; threadId: string } | null>(null);
   const openContinuedFrom = useCallback((personId: string, threadId: string) => {
     // A link to a thread of your own opens it, wherever you are.
     if (personId === team?.me) {
@@ -2941,9 +2942,25 @@ export default function App() {
       return;
     }
     const card = weekCards.find((c) => c.personId === personId && c.threadId === threadId);
-    if (card) { setFocused(null); openTeammateCard(card); }
-    else showToast(`${firstName(team?.byId.get(personId) ?? null) || 'Your teammate'} no longer shares that thread with you.`);
+    if (card) { setFocused(null); openTeammateCard(card); return; }
+    // A link can come before its card: ask the cloud now, and open it if it comes.
+    linkWaiting.current = { personId, threadId };
+    void api.teamSync().catch(() => {}).then(() => setTimeout(() => {
+      const w = linkWaiting.current;
+      if (w?.personId !== personId || w.threadId !== threadId) return;
+      linkWaiting.current = null;
+      showToast(`${firstName(team?.byId.get(personId) ?? null) || 'Your teammate'} hasn't shared that thread with you.`);
+    }, 1500));
   }, [weekCards, openTeammateCard, team, items]);
+  useEffect(() => {
+    const w = linkWaiting.current;
+    if (!w) return;
+    const card = weekCards.find((c) => c.personId === w.personId && c.threadId === w.threadId);
+    if (!card) return;
+    linkWaiting.current = null;
+    setFocused(null);
+    openTeammateCard(card);
+  }, [weekCards, openTeammateCard]);
   const continueTeammateThread = useCallback((card: ThreadCard) => {
     void api.teamContinueBrief({ personId: card.personId, threadId: card.threadId })
       .then((b) => { setComposeInitial(continueStart(b)); setModal('compose'); })
@@ -7284,17 +7301,21 @@ export default function App() {
     copy: async (item) => {
       const link = threadLink(team?.me, item.id);
       if (!link) return false;
-      try { await navigator.clipboard.writeText(link); return true; } catch { showToast('The link could not be copied.'); return false; }
+      if (await copyText(link)) return true;
+      showToast('The link could not be copied.');
+      return false;
     },
     send: async (target, to, note) => {
       const item = items.find((i) => i.product === target.product && i.id === target.id);
       const link = threadLink(team?.me, target.id);
       if (!item || !link || !to.length) return;
-      const seen = visibilityOf(item, team?.products.get(item.product)) ?? 'team';
+      const seen = seenNow(item, team?.products.get(item.product), team?.state.since ?? null);
       if (seen !== 'team') {
         const opened = await api.threadEdit(item.product, item.id, openTo(seen, item.visibleTo, to));
         if (!opened.ok) { showToast(opened.error ?? 'It could not be shared.'); return; }
       }
+      // The card goes up first, or the link can arrive before there is anything to open.
+      await api.teamSync().catch(() => {});
       const out = await api.teamMessage(to.length === 1 ? to[0] : to, sentWords(rowTitle(item), link, note));
       const names = to.map((id) => firstName(team?.byId.get(id) ?? null) || 'them').join(' and ');
       showToast(out.ok ? `Sent to ${names}` : (out.error ?? `It did not reach ${names}.`));
@@ -7304,6 +7325,14 @@ export default function App() {
     see: (item, to) => {
       const it = items.find((i) => i.product === item.product && i.id === item.id);
       if (it && to !== 'people') void seeThread(it, to);
+    },
+    choose: async (target, id) => {
+      const item = items.find((i) => i.product === target.product && i.id === target.id);
+      if (!item) return;
+      const seen = seenNow(item, team?.products.get(item.product), team?.state.since ?? null);
+      const out = await api.threadEdit(item.product, item.id, choose(seen, item.visibleTo, id));
+      if (!out.ok) { showToast(out.error ?? 'That change did not save.'); return; }
+      await refresh();
     },
   };
   const addPeopleOnThread = async (item: WorkItem, person?: string) => {

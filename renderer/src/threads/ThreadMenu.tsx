@@ -45,7 +45,7 @@ import { PriorityIcon } from '../components/Priority';
 import { PRIORITIES, priorityLabelOf, type PriorityId } from '../priority';
 import { Face } from '../team/people';
 import type { Person } from '../types';
-import { CopiedSheet, SeeList, SendSheet, ShareList } from './SharePanel';
+import { ChooseList, CopiedSheet, SeeList, SendSheet, ShareList } from './SharePanel';
 import { sendFirst, type SeenBy } from './share-rules';
 
 export type ThreadMenuRowId = 'share' | 'run' | 'code' | 'terminal' | 'people' | 'later' | 'priority' | 'pin' | 'rename' | 'move' | 'give' | 'wait' | 'shipped' | 'close-task' | 'done';
@@ -244,13 +244,15 @@ function BlockWords({ onPick }: { onPick: (id: string) => void }) {
 
 /* ----------------------------------------------------------------- button */
 
-export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, change = null, codeButton = null, codeOpen = false, onViewChange, addPeople = null, onAddPeople, terminal = null, onToggleTerminal, onFinish = null, onCloseTask = null, onReopen = null, onRunNow = null, onLater = null, priority = null, onPriority, pinned = null, onPin, place = null, placeFacts = {}, onPlace, giveTo = [], onGive, onRename = null, onMove = null, shipped = null, onShipped, waitChoices = [], waitsNow = false, onWait, blocks = false, files = null }: {
+export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose, change = null, codeButton = null, codeOpen = false, onViewChange, addPeople = null, onAddPeople, terminal = null, onToggleTerminal, onFinish = null, onCloseTask = null, onReopen = null, onRunNow = null, onLater = null, priority = null, onPriority, pinned = null, onPin, place = null, placeFacts = {}, onPlace, giveTo = [], onGive, onRename = null, onMove = null, shipped = null, onShipped, waitChoices = [], waitsNow = false, onWait, blocks = false, files = null }: {
   /** What Share… offers, or null where the thread cannot be shared. */
-  share?: { link: string | null; people: readonly Person[]; last?: string | null; seen: SeenBy; seenWord: string; teamName: string } | null;
+  share?: { link: string | null; people: readonly Person[]; last?: string | null; seen: SeenBy; seenWord: string; teamName: string; chosen?: readonly string[] } | null;
   /** Puts the link on the clipboard; false when it could not. */
   onCopyLink?: () => Promise<boolean>;
   onSendTo?: (to: string[], note: string) => void;
   onSee?: (to: SeenBy) => void;
+  /** Chosen people…: adds the person to who can open it, or takes them off. */
+  onChoose?: (id: string) => void;
   /** Opens ⌘K on the Move to rows. */
   onMove?: (() => void) | null;
   /** Whether a person has said it shipped, or null where the team would not see that. */
@@ -311,7 +313,7 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, change =
   const [waiting, setWaiting] = useState(false);
   const [adding, setAdding] = useState(false);
   const [leveling, setLeveling] = useState(false);
-  const [sharing, setSharing] = useState<null | 'list' | 'send' | 'copied' | 'see'>(null);
+  const [sharing, setSharing] = useState<null | 'list' | 'send' | 'copied' | 'see' | 'choose'>(null);
   const [sendTo, setSendTo] = useState<string[]>([]);
   const wrap = useRef<HTMLSpanElement>(null);
   const button = useRef<HTMLButtonElement>(null);
@@ -493,7 +495,8 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, change =
       {open && share && sharing === 'copied' && share.link && <CopiedSheet link={share.link} people={share.people}
         onSend={(id) => { close(false); onSendTo?.([id], ''); }} />}
       {open && share && sharing === 'see' && <SeeList seen={share.seen} teamName={share.teamName}
-        onPick={(to) => { if (to === 'people' && addPeople && onAddPeople) { setSharing(null); askToAdd(); return; } close(false); if (to !== share.seen) onSee?.(to); }} />}
+        onPick={(to) => { if (to === 'people') { setSharing('choose'); return; } close(false); if (to !== share.seen) onSee?.(to); }} />}
+      {open && share && sharing === 'choose' && <ChooseList people={share.people} chosen={share.seen === 'people' ? share.chosen ?? [] : []} onPick={(id) => onChoose?.(id)} />}
       {open && !waiting && !adding && !leveling && !sharing && (giving
         ? <div className="th-menu ts-more-menu" role="menu" aria-label="Give it to">
           <p className="ts-menu-say">A person gets it as a task in their Needs you. An AI teammate starts on it.</p>

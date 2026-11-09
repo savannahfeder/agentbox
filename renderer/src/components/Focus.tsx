@@ -130,8 +130,7 @@ import { SidebarIcon } from './SidebarIcon';
 import { Byline, ConversationAside } from './Byline';
 import { ItemThread } from './ItemThread';
 import { ContinuedFrom, OpenTeammateThread } from '../threads/ContinuedFrom';
-import { threadLink, threadOfLink, seenWord, type SeenBy, type ShareActs } from '../threads/share-rules';
-import { visibilityOf } from '../../../shared/thread-cards.mts';
+import { threadLink, threadOfLink, seenWord, seenNow, type SeenBy, type ShareActs } from '../threads/share-rules';
 import { answerOnItsWay, type PendingSaid } from '../item-thread';
 import { isTroubleRow } from '../trouble-row';
 import { rowTitle } from '../list-rules';
@@ -1934,7 +1933,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const share = (() => {
     if (!teamCtx?.state.team || !onShare || !teamCtx.me || direct || agent || inChats) return null;
     if ((item.createdBy ?? teamCtx.me) !== teamCtx.me) return null;
-    const seen: SeenBy = visibilityOf(item, teamCtx.products.get(item.product)) ?? 'team';
+    const seen: SeenBy = seenNow(item, teamCtx.products.get(item.product), teamCtx.state.since ?? null);
     const teamName = teamCtx.state.team.name || 'your team';
     return {
       link: threadLink(teamCtx.me, item.id),
@@ -1943,6 +1942,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       seen,
       seenWord: seenWord(seen, teamName, item.visibleTo?.length ?? 0),
       teamName,
+      chosen: item.visibleTo ?? [],
     };
   })();
   const threadMenu = (
@@ -1951,6 +1951,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       onCopyLink={() => onShare!.copy(item)}
       onSendTo={(to, note) => onShare!.send(item, to, note)}
       onSee={(to) => onShare!.see(item, to)}
+      onChoose={(id) => onShare!.choose(item, id)}
       key={`${item.product}:${item.id}`}
       files={<ThreadFilesButton files={madeHere} onOpen={(f) => (opensBig(f.src) ? openBig(f.src) : onOpenDoc?.(f.src))} />}
       change={changeFigures}

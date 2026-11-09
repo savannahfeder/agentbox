@@ -1,5 +1,6 @@
 // SHARE… ON A THREAD: send it by link, put it in a teammate's inbox, and,
 // last and small, who can open it (w-d19fcb9309, approved send-0, -2, -3, -4).
+import { shownToTeam, visibilityOf, type ProjectSeen } from '../../../shared/thread-cards.mts';
 
 export type SeenBy = 'team' | 'people' | 'private';
 export interface SharePerson { id: string; name?: string | null; email?: string | null }
@@ -38,6 +39,34 @@ export function seenWord(seen: SeenBy, teamName: string | null | undefined, chos
   return String(teamName ?? '').trim() || 'Team';
 }
 
+/**
+ * Who can open it now, by the rule that publishes its card: a thread from
+ * before you began sharing that nobody marked is still only yours.
+ */
+export function seenNow(item: { createdAt?: number; visibility?: string; visibleTo?: readonly string[] } | null | undefined, product: ProjectSeen, since: number | null): SeenBy {
+  if (!shownToTeam(item as Parameters<typeof shownToTeam>[0], since, product)) return 'private';
+  return visibilityOf(item, product) ?? 'team';
+}
+
+interface CopyDoc {
+  createElement: (tag: 'textarea') => { value: string; style: object; setAttribute: (k: string, v: string) => void; select: () => void; remove: () => void };
+  body: { appendChild: (el: never) => unknown };
+  execCommand: (cmd: 'copy') => boolean;
+}
+
+/** Puts text on the clipboard; a browser that refuses the clipboard API still copies a selected field. */
+export async function copyText(text: string, { clipboard = globalThis.navigator?.clipboard, doc = globalThis.document as unknown as CopyDoc }: { clipboard?: { writeText: (t: string) => Promise<void> }; doc?: CopyDoc } = {}): Promise<boolean> {
+  try { if (clipboard) { await clipboard.writeText(text); return true; } } catch { /* refused: the field below */ }
+  if (!doc) return false;
+  const field = doc.createElement('textarea');
+  field.value = text;
+  field.setAttribute('readonly', '');
+  Object.assign(field.style, { position: 'fixed', opacity: '0', pointerEvents: 'none' });
+  doc.body.appendChild(field as never);
+  field.select();
+  try { return doc.execCommand('copy'); } catch { return false; } finally { field.remove(); }
+}
+
 /** Typed into To: the teammates whose name or email starts a word with it, not the ones already picked. */
 export function matchPeople<P extends SharePerson>(people: readonly P[], typed: string, picked: readonly string[]): P[] {
   const q = typed.trim().toLowerCase();
@@ -53,6 +82,13 @@ export function openTo(seen: SeenBy, visibleTo: readonly string[] | undefined, t
   return { visibility: seen === 'team' ? 'team' : 'people', visibleTo: [...new Set([...(visibleTo ?? []), ...to])] };
 }
 
+/** Chosen people…: the person picked is added to who can open it, or taken off; nobody left is Only you. */
+export function choose(seen: SeenBy, visibleTo: readonly string[] | undefined, id: string): { visibility: 'people' | 'private'; visibleTo: string[] } {
+  const now = seen === 'people' ? [...new Set(visibleTo ?? [])] : [];
+  const next = now.includes(id) ? now.filter((p) => p !== id) : [...now, id];
+  return next.length ? { visibility: 'people', visibleTo: next } : { visibility: 'private', visibleTo: [] };
+}
+
 /** What the window does for Share…, handed to the thread page. */
 export interface ShareActs {
   /** The teammate last sent a thread, named first in the menu. */
@@ -60,6 +96,7 @@ export interface ShareActs {
   copy: (item: { product: string; id: string }) => Promise<boolean>;
   send: (item: { product: string; id: string }, to: string[], note: string) => void;
   see: (item: { product: string; id: string }, to: SeenBy) => void;
+  choose: (item: { product: string; id: string }, id: string) => void;
 }
 
 /** The message a teammate gets in their Needs you: the thread's name as its link, then the note. */
