@@ -76,6 +76,8 @@ export function projectNamedIn(title, projects) {
 }
 
 export const CHAOS = ['none', 'light', 'normal', 'heavy'];
+export const STUCK_CAUSE = "Your Mac can't push to GitHub";
+const STUCK_ASK = 'The change is fine. Git on the Mac could not sign in to GitHub when the app pushed ("could not read Username for github.com"). Run gh auth login, then gh auth setup-git.';
 export const LOGIN_NAMES = ['default', '.claude-second', '.claude-third', '.claude-fourth'];
 
 /**
@@ -86,7 +88,7 @@ export const LOGIN_NAMES = ['default', '.claude-second', '.claude-third', '.clau
  * freeze, a Control-C. The tester is never told; a person learns of these from
  * the app, and whether the app says so is the test.
  */
-export function chaosPlan(level, totalMs, { real = false, cloud = false, logins = 2, codex = true } = {}) {
+export function chaosPlan(level, totalMs, { real = false, cloud = false, logins = 2, codex = true, stuck = false } = {}) {
   if (!CHAOS.includes(level)) throw new Error(`chaos is one of ${CHAOS.join(', ')}`);
   if (level === 'none') return [];
   const at = (f) => Math.round(totalMs * f);
@@ -100,6 +102,8 @@ export function chaosPlan(level, totalMs, { real = false, cloud = false, logins 
     if (names.length > 1) events.push({ kind: 'login-out', at: at(0.2), until: at(0.4), out: [names[1]], says: `The ${names[1]} login ran out of usage.` });
     if (codex && level !== 'light') events.push({ kind: 'codex-out', at: at(0.45), until: at(0.55), out: ['codex'], says: 'Codex ran out of usage.' });
     if (level !== 'light') events.push({ kind: 'all-out', at: at(0.62), until: at(0.7), out: names, says: 'Every Claude login ran out of usage.' });
+    // --stuck: one cause outside every agent's work, as on 2026-11-08 (shared/causes.mjs).
+    if (stuck) events.push({ kind: 'stuck', at: at(0.1), until: at(0.4), world: { stuck: { cause: STUCK_CAUSE, ask: STUCK_ASK, share: 0.7 } }, says: 'Git on the Mac could not sign in to GitHub, and 7 in 10 agents got stuck on it.' });
     if (level === 'heavy') events.push({ kind: 'slow-agents', at: at(0.8), until: at(0.9), world: { pace: { minMs: 60_000, maxMs: 300_000 } }, says: 'Agents slowed to 1 to 5 minutes an answer.' });
   }
   if (level !== 'light') {

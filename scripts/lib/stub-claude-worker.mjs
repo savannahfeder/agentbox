@@ -419,6 +419,10 @@ try {
   // stuck once and is fine when it is started again.
   const act = directive('stub:act')?.[1] ?? (attempt === 1 ? directive('stub:act-first')?.[1] : null);
   if (act && plan.acts?.[act]) said = await actFromPlan(plan.acts[act]);
+  // A lead on a cause row is never itself stuck on the cause.
+  else if (turn.stuck && !brief.includes('You are the lead on this cause') && !promptText.includes('You are the lead on this cause')) {
+    said = await actFromPlan({ calls: [{ tool: 'wait_on_cause', args: turn.stuck }], say: `Waiting on: ${turn.stuck.cause}.` });
+  }
   if (plan.approval) {
     const decision = await askTheFounder(plan.approval);
     say({ type: 'assistant', message: { content: [{ type: 'text', text: `the founder said: ${decision.behavior}` }] } });

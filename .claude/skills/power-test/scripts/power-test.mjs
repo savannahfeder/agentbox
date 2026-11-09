@@ -10,6 +10,7 @@
 //     --cloud-accounts a@x.com,b@y.com                 the cloud accounts the copies may spend, of those signed in (default all)
 //     --free-hours 0.5                                 with --stand-in-cloud: start on the Free plan with that many hours
 //     --chaos none|light|normal|heavy                  what goes wrong around them (default normal)
+//     --stuck                                          for a stretch, most stand-in agents get stuck on one shared cause
 //     --round-minutes 20                               one tester session, before it is started again with its diary
 //     --model <id>                                     the testers' Codex model
 //     --codex-home ~/.codex-2                          the Codex login testers spend (default: the one on the best plan)
@@ -247,7 +248,7 @@ async function runPerson({ person, name, dir, stateFile, seeded, failed, cmds })
   progress[person.slug] = { round: 0, stopped: result.stopped };
   if (failed) return result;
   const state = () => readJson(stateFile);
-  const events = chaosPlan(chaos, totalMs, { real, cloud, logins: person.logins, codex: person.codex });
+  const events = chaosPlan(chaos, totalMs, { real, cloud, logins: person.logins, codex: person.codex, stuck: flag('stuck') });
   const fired = new Set();
   let quietUntil = 0;
   let busy = false;
