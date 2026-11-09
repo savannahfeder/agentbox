@@ -3,8 +3,8 @@
 // phone can read, and whose work goes under the card that is lit.
 import { buildMembers, mateRunsOf, moreLine, orderMembers, personCardsOf, readOrder, rowsShown, teamRunsOf, type Member } from '../../../renderer/src/team/everything/members';
 import { flipEvView, readEvView, writeEvView, type EvView } from '../../../renderer/src/team/everything/whose-board';
-import { teammateIdOf } from '../../../shared/teammates.mjs';
-import type { Room, RoomMessage, Teammate, ThreadCard } from '../../../renderer/src/types';
+import { teammateIdOf } from '../../../shared/teammates.mts';
+import type { Room, RoomMessage, Teammate, ThreadCard, WorkItem } from '../../../renderer/src/types';
 import { groupName } from './groups';
 import type { KeptStore } from './compose';
 
@@ -16,7 +16,12 @@ export const keepEvView = (view: EvView, store: KeptStore) => writeEvView(view, 
 
 /** Everyone on the team's shared threads. Only what a teammate's line may carry is on them (20261001000400_thread_cards.sql). */
 export const THREAD_CARDS_SELECT = 'select=person_id,thread_id,visible,title,project,state,priority,problem,progress,solution,updated_at&order=updated_at.desc&limit=300';
-export function threadCardOf(r: any): ThreadCard {
+/** One `thread_cards` row as THREAD_CARDS_SELECT reads it. */
+export type ThreadCardRow = {
+  person_id: string; thread_id: string; visible?: boolean | null; title?: string | null; project?: string | null; state: ThreadCard['state'];
+  priority?: number | null; problem?: string | null; progress?: string | null; solution?: string | null; updated_at: string;
+};
+export function threadCardOf(r: ThreadCardRow): ThreadCard {
   return {
     personId: r.person_id, threadId: r.thread_id, visible: r.visible !== false, title: r.title ?? null, project: r.project ?? null, state: r.state,
     priority: r.priority ?? null, problem: r.problem ?? null, progress: r.progress ?? null, solution: r.solution ?? null, blockedBy: [], blocks: [], people: null, updatedAt: Date.parse(r.updated_at) || 0,
@@ -32,7 +37,7 @@ export function phoneMembers({ meId, rooms, messages, teamPeople = [], cards = [
   teamPeople?: readonly { id: string; name: string | null; email?: string | null }[];
   cards?: readonly ThreadCard[];
   mates?: readonly Teammate[];
-  items?: readonly any[];
+  items?: readonly WorkItem[];
   running?: readonly { itemId: string }[];
   store: KeptStore;
 }): Member[] {
@@ -40,7 +45,7 @@ export function phoneMembers({ meId, rooms, messages, teamPeople = [], cards = [
   const wall = teamRoom?.wall ?? null;
   const live = new Set(running.map((r) => r.itemId));
   const mateAgents = new Map<string, number>();
-  const mineRunning: any[] = [];
+  const mineRunning: WorkItem[] = [];
   for (const i of items) {
     if (!live.has(i.id)) continue;
     const mate = teammateIdOf(i);
@@ -62,13 +67,13 @@ export function phoneMembers({ meId, rooms, messages, teamPeople = [], cards = [
     last: messages[r.id]?.at(-1)?.body ?? '',
   }));
   return orderMembers(buildMembers({
-    me, people: named, wall: wall as any, cards: cards as any, teammates: mates as any, mateAgents, chats, personChats, teamRoomId: teamRoom?.id ?? null,
+    me, people: named, wall, cards, teammates: mates, mateAgents, chats, personChats, teamRoomId: teamRoom?.id ?? null,
     myAgents: mineRunning.length, myNow: mineRunning[0]?.title ?? null,
   }), readOrder(asStorage(store)));
 }
 
 /** Your own threads, without your AI teammates' runs: a phone card draws no teammate's name, so their cards hold them. */
-export const myItems = <T>(items: readonly T[]) => items.filter((i) => !teammateIdOf(i as any));
+export const myItems = <T extends { labels?: readonly string[] }>(items: readonly T[]) => items.filter((i) => !teammateIdOf(i));
 
 /** Two cards a row on a phone. One row usually, and the line that shows the rest (CardsArea.tsx). */
 export const CARDS_PER_ROW = 2;

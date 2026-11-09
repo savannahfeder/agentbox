@@ -3,7 +3,8 @@ import type { ChildProcess } from 'node:child_process';
 import { instructionsFor } from './instructions-file.mts';
 import type { InstructionsContext, InstructionsAnswer } from './instructions-file.mts';
 import type { OpenCodeProperties } from '../opencode.mts';
-import type { ToolingResult } from '../account-tooling.mjs';
+import type { ToolingResult } from '../account-tooling.mts';
+import type { CodexFrame } from '../codex.mts';
 
 export type Env = NodeJS.ProcessEnv;
 
@@ -128,13 +129,13 @@ export interface HarnessRecord {
 }
 
 export interface HarnessSession {
-  codexChange?: unknown[];
+  codexChange?: CodexFrame[];
   opencodeChange?: string[];
   [key: string]: unknown;
 }
 
 export interface HarnessSupervisor {
-  config: HarnessConfig;
+  config: HarnessConfig & { storeRoot: string };
   _profiles(): string[];
   _claudeConfigDir(profile: string | null | undefined): string;
   _cloudDocsEnv(item: HarnessItem): Env;

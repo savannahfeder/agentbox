@@ -13,7 +13,7 @@
 // READING THE VARIABLE IS NOT ENOUGH. An app opened from the Dock never sees
 // what a shell profile exports, so somebody with `export CLAUDE_CONFIG_DIR=...`
 // in their .zshrc gets an app whose environment has no such variable. The
-// folders are looked for instead, by the same rule main/account-discovery.mjs
+// folders are looked for instead, by the same rule main/account-discovery.mts
 // uses to find a second login: `.claude` or `.claude-<anything>` directly under
 // home. That module asks whether a folder holds a LOGIN; this one asks whether
 // it holds SESSIONS, which is a different question with a different answer. A
@@ -32,7 +32,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { shellDataDirsNow } from './shell-path.mjs';
+import { shellDataDirsNow } from './shell-path.mts';
 
 export interface DataDirOptions {
   home?: string;
@@ -144,7 +144,7 @@ export function appSessionFolders({ config = null, supervisor = null, env = proc
   let claudeProfiles: string[] | string = [];
   try { claudeProfiles = config?.authProfiles ?? []; } catch { claudeProfiles = []; }
   if (!Array.isArray(claudeProfiles)) claudeProfiles = [claudeProfiles];
-  // AND WHAT THE LOGIN SHELL EXPORTS (main/shell-path.mjs), which an app opened
+  // AND WHAT THE LOGIN SHELL EXPORTS (main/shell-path.mts), which an app opened
   // from the Dock never sees in its own environment.
   return sessionFolders({
     claudeProfiles: [...claudeProfiles, shellEnv?.CLAUDE_CONFIG_DIR],

@@ -7,9 +7,9 @@ import { holdsReplies, writeHeldWhenHidden } from './phone-holds';
 import { pollEvery } from './phone-polls';
 import type {FocusControlStyle} from './focus-control';
 import {reviewLabEnabled} from './review-lab';
-import { deliverReply } from './deliver-reply.mjs';
+import { deliverReply } from './deliver-reply.ts';
 import { ArtifactSurface } from './components/ArtifactSurface';
-import { artifactPlacement, artifactFraction, type ArtifactMode } from './artifact-layout';
+import { artifactPlacement, artifactFraction, fullScreenTakes, whereAFileOpens, type ArtifactMode } from './artifact-layout';
 import { besideDocument } from './message-artifacts';
 import { chromeIsUp, CHROME_HOLD, CHROME_REACH } from './full-screen-chrome';
 // the app's renderer: one state machine, keyboard-first. The Superhuman grammar:
@@ -21,7 +21,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { cursorAfterWait, cursorIndex, cursorMark, cursorWait, type CursorMark, type CursorWait } from './cursor-follows';
 import { createPortal, flushSync } from 'react-dom';
 import { readySkin, swapLook } from './look-switch';
-import type { AgentTurn, AnswerMode, Approval, CloudPlan, PermissionMode, Product, RepeatRule, RepeatShape, RunningSession, Snapshot, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
+import type { AgentTurn, AnswerMode, Approval, ApprovalInput, CloudPlan, PermissionMode, Product, RepeatRule, RepeatShape, RunningSession, Snapshot, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
 import type { ReplyPick } from './reply-pick';
 import { api } from './api';
 import { setClaudeModels, setCodexFreePlan } from './models';
@@ -58,7 +58,7 @@ import { OpenTeammateThread } from './threads/ContinuedFrom';
 import { handOffStart, joinNames, laterHint, replyWaitsUntil, taskHandOff, tabAfterSending, writingMovesToTheDialog, projectsOffered, projectOnScreen, teammates } from './threads/composer-rules';
 import { keyOnAnOpenThread, keyOnTheList, rowKey as actsOnARow, replyingTo, screenJustChanged, HELD_AFTER_A_CHANGE, NOWHERE_TO_TYPE, STILL_TYPING_MS } from './reply-keys';
 import { chosenNames, whoSees } from './threads/summary-rules';
-import { shownToPeople } from '../../shared/thread-cards.mjs';
+import { shownToPeople } from '../../shared/thread-cards.mts';
 import { changePathFor } from './code-artifact';
 import { teamRouteChoices } from './team/TeamFocus';
 import { SEE_SAID, giveRows, threadCommands, type GiveTo, type ThreadCommand } from './thread-commands';
@@ -94,11 +94,11 @@ import { approvalAnswered, approvalAsker, approvalView } from './approval-card';
 import { sentLine, sendingLine } from './compose-says';
 import { wearJustMade, type JustMade } from './just-made';
 import { agentOnOrComing, asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
-import { filedByThePerson, wordWaits } from '../../shared/answers.mjs';
-import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mjs';
+import { filedByThePerson, wordWaits } from '../../shared/answers.mts';
+import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mts';
 import { focusTheReplyBox } from './focus-at-end';
 import { strayLetters } from './stray-letters';
-import { keyWhileABoxIsOpen, opensATextField, slashSearchesAgain, takesTheListBack } from './keys';
+import { keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
 import { modelCommands } from './thread-model-commands';
 import { MOVE_KEYWORDS, whyItCannotMove } from '../../shared/move-thread.mts';
 import { isUrgentRow, taskToReturnTo, urgentInterruption } from './interrupt';
@@ -128,8 +128,8 @@ import { ConnectionsPlace } from './connections/ConnectionsPlace';
 import { TeammatesContext } from './teammates/row-lead';
 import { ChatsContext, ChatsFrame, LAST_CHAT_KEY, type ChatsValue } from './teammates/ChatsColumn';
 import { queuedTeammateRun } from './teammates/chat-lines';
-import { teammateIdOf } from '../../shared/teammates.mjs';
-import { asksWho } from '../../shared/auto-route.mjs';
+import { teammateIdOf } from '../../shared/teammates.mts';
+import { asksWho } from '../../shared/auto-route.mts';
 import { RoomBoard } from './team/rooms/RoomBoard';
 import { directConversations } from './team/rooms/conversations';
 import { isPresenceCard, roomMateCards, roomMatesById } from './team/rooms/room-rules';
@@ -144,7 +144,7 @@ import { buildMembers, mateRunsOf, orderMembers, personCardsOf, readHidden, read
 import { boardItems, cardOpens, evColumns, flipEvView, readEvView, whoseBoard, writeEvView, type EvTab, type EvView } from './team/everything/whose-board';
 import { needsByWho, readFolded, readNeedsGroup, stackRows, toggleFolded, whoIsWaiting, writeNeedsGroup, type NeedsGroup, type StackKey } from './threads/stack-rules';
 import { FeedbackCard } from './components/FeedbackCard';
-import { searchFieldInStrip, workspaceDestinations, workspacePageTitle } from './workspace-navigation.mjs';
+import { searchFieldInStrip, workspaceDestinations, workspacePageTitle } from './workspace-navigation.ts';
 import { UsagePill } from './components/UsagePill';
 import { engineWordFor } from './byline';
 import { lastUsedEngine } from './usage-last-used';
@@ -166,13 +166,14 @@ import { TutorialOffer } from './components/TutorialOffer';
 import { holdForStoppedAgent, neverWarned, rememberWarned } from './stopped-agent';
 import { comeBackTo, neverOffered, offerOnNewProject, rememberOffered } from './tutorial';
 import { FirstRunFlow } from './components/FirstRun';
+import { TourList } from './components/TourList';
 import { ClassicFirstRun, OpenLesson } from './components/FirstRunClassic';
 import { landing as firstRunLanding, lessonsLeft, setLessons, showsOpenLesson, type Lesson } from './first-run-classic';
 import { useLessonPlace } from './lesson-position';
 import { ideasFor, runOfRule } from './first-run';
 import { Tour } from './components/Tour';
 import { laterTabShown } from './later-tab';
-import { THREAD_CLOSED, finishLesson, firstTask, madeUrgent, noteSent, readTour, saveTour, showIdeas, skipTour, startTour, tourLive, type Tour as TourState } from './tour';
+import { type Lesson as TourLesson, THREAD_CLOSED, finishLesson, firstTask, madeUrgent, noteSent, readTour, saveTour, showIdeas, skipTour, startTour, tourLive, type Tour as TourState } from './tour';
 import {
   ANSWER_AFTER_MS, COACHED, COPY as WALK_COPY, FIRST_RUN_LABEL, advance as advanceRun, afterCommand, beatRows, coach, closingRefused, firstRunDone,
   finishedCleared, firstRunNeeded, projectsOfTheirOwn, inboxCleared, laterCleared, laterId, laterIndex,
@@ -186,24 +187,25 @@ import { priorityCommands, priorityIdOf, priorityLabelOf, type PriorityId } from
 import { runNowCommands } from './run-now';
 import { withOlder } from './older-threads';
 import { NO_FILTER, filterBox, harnessOf, isFiltering, type BoxFilter as BoxFilterState, type Harness } from './box-filter';
-import { URGENT_PRIORITY, itemPriority, shownPriority, moveProduct, placeScore, placedScore } from '../../shared/rank.mjs';
+import { URGENT_PRIORITY, itemPriority, shownPriority, moveProduct, placeScore, placedScore } from '../../shared/rank.mts';
 import { rankProducts } from './project-priority';
 import { threadsMade, approvableFiled, doItHereWrites, answerAllWrites, RUN_IT } from './threads-made';
 import { waitingCounts } from './threads-made';
 import { closeAsk, closeAskOwnsKey, unshippedAsk } from './close-asks-first';
 import { notShipped, shipItAsk } from '../../shared/not-shipped.mts';
+import { openSignIn } from '../../shared/sign-in-ask.mts';
 import { ChatAgentsContext, type ChatAgentsValue } from './team/ChatAgents';
 import { agentLinks, askedInLabel, chatProjects, chatTaskSharing, chatTranscript, lastAskKeptOnMac, taskBrief, taskTitle, withTask } from './team/agent-mentions';
 import { answersInTheirChat } from './team/answers-in-the-chat';
 import type { LedgerLine } from './thread-history';
-import { dateKey, ruleIdOf, ruleLabel, runToOpen } from '../../shared/repeats.mjs';
+import { dateKey, ruleIdOf, ruleLabel, runToOpen } from '../../shared/repeats.mts';
 import { lastUsedByMate, readMateOrder, settleMateOrder, writeMateOrder, type MateOrder } from './team/everything/mate-order';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import { NOT_ANSWERING, NOT_ANSWERING_MS, RESTART_IT, RESTART_IT_MS, SEND_NOT_TAKEN } from './not-answering';
 import { TEAM_WAIT_MS } from './boot-waits';
 import { signInAsk, SIGN_IN_SKIPPED } from './sign-in-ask';
-import { isNew } from '../../shared/notify-rules.mjs';
-import { closedByTheOther, closedOverWords, inMyInbox, isGivenTask, isShared, isTaskRow, heldByAPerson, runnerOf, iSpokeLast } from '../../shared/team-rules.mjs';
+import { isNew } from '../../shared/notify-rules.mts';
+import { closedByTheOther, closedOverWords, inMyInbox, isGivenTask, isShared, isTaskRow, heldByAPerson, runnerOf, iSpokeLast } from '../../shared/team-rules.mts';
 import { Face, TeamContext, firstName, teamView } from './team/people';
 import { namedCards } from './team/company';
 import { FaceHover } from './team/status';
@@ -226,11 +228,11 @@ import { teamToday, type TodayRange } from './team/today';
 import { TodayPage } from './team/TodayPage';
 import { TasksPage } from './team/TasksPage';
 import { teamTasks } from './team/tasks';
-import { shippedAtOf, shownToTeam } from '../../shared/thread-cards.mjs';
-import { setByPerson, waitChoices as waitChoicesOf, waitWords } from '../../shared/thread-waits.mjs';
-import { blockChoices, blockedWords, dayDeadline, dueSaid, lateForMe } from '../../shared/team-tasks.mjs';
+import { shippedAtOf, shownToTeam } from '../../shared/thread-cards.mts';
+import { setByPerson, waitChoices as waitChoicesOf, waitWords } from '../../shared/thread-waits.mts';
+import { blockChoices, blockedWords, dayDeadline, dueSaid, lateForMe } from '../../shared/team-tasks.mts';
 import type { ArtifactOpen } from './components/ArtifactView';
-import { fileNewsFor, newestOfFamily, stillWaiting } from '../../shared/artifact-marks.mjs';
+import { fileNewsFor, newestOfFamily, stillWaiting } from '../../shared/artifact-marks.mts';
 import { teammateThreadsFound } from './threads/teammate-thread';
 import { chatsFound } from './team/chats-found';
 import { insideGroups, type InsideGroup, type InsideGroupKey, type InsideRow } from './found-inside';
@@ -257,7 +259,7 @@ import { SKY_THEME_KEY, setHomeSetting, useDarkWindow, useHomeSettings } from '.
 import { SKY_THEMES, skyTheme } from './home/sky';
 import { engineLetter, engineName, greeting, teamRowState, weekCounts } from './home/home-model';
 import { sentFrom } from './team/company';
-import { reachAudienceOf } from '../../shared/teammate-reach.mjs';
+import { reachAudienceOf } from '../../shared/teammate-reach.mts';
 
 const FIRST_IDEAS = ideasFor();
 
@@ -891,8 +893,6 @@ export default function App() {
   const searchOpen = search !== null;
   useEffect(() => { if (searchOpen) strayLetters.opening('search', Date.now()); }, [searchOpen]);
   const searchRef = useRef<HTMLInputElement>(null);
-  // Whether the words in the field were typed since it last got the keyboard.
-  const searchTyped = useRef(false);
   // ESC PUTS HER BACK WHERE SHE WAS. Searching crosses every tab, so leaving it
   // has to restore the one she came from AND the row she was on, or a search
   // that found nothing has quietly moved her.
@@ -1184,6 +1184,7 @@ export default function App() {
   }), []);
   // The tutorial on the inbox that follows it (components/Tour.tsx).
   const [tour, setTourState] = useState<TourState | null>(() => readTour(localStorage));
+  const [tourNow, setTourNow] = useState<TourLesson | null>(null);
   const setTour = useCallback((t: TourState) => { saveTour(localStorage, t); setTourState(t); }, []);
   const tourRef = useRef(tour);
   tourRef.current = tour;
@@ -2089,7 +2090,7 @@ export default function App() {
   const multiplayer = snap?.alpha?.multiplayer !== false;
   // "Maya", "Maya and Jun": who a message from the new thread card went to.
   const firstNames = (ids: string[]) => joinNames(ids.map((id) => team?.byId.get(id)?.name?.split(/\s+/)[0]).filter(Boolean) as string[]);
-  // A SHARED ROW IS IN ONE INBOX AT A TIME (shared/team-rules.mjs). A row given
+  // A SHARED ROW IS IN ONE INBOX AT A TIME (shared/team-rules.mts). A row given
   // to a person is theirs while it is open, whatever its kind, because a task a
   // teammate handed you is waiting on you the moment it arrives. Null means
   // "not a team question", and the inbox's ordinary rules decide.
@@ -2171,12 +2172,13 @@ export default function App() {
   // process pushes, while its card is already leaving with a verdict on it
   // (`approvalStage`), and a row still reading Needs you behind that card is
   // the app disagreeing with itself.
+  // A sign-in link an agent is waiting on asks you just as a permission card does.
   const askingIds = useMemo(
-    () => new Set((snap?.approvals ?? [])
+    () => new Set([...(snap?.approvals ?? [])
       .filter((a) => a.id !== answered?.id)
       .map((a) => a.item)
-      .filter((id): id is string => !!id)),
-    [snap?.approvals, answered?.id],
+      .filter((id): id is string => !!id), ...items.filter((i) => openSignIn(i)).map((i) => i.id)]),
+    [snap?.approvals, answered?.id, items],
   );
   const asking = useCallback((i: { id: string }) => askingIds.has(i.id), [askingIds]);
   // EVERYTHING THE SUPERVISOR KNOWS ABOUT EVERY THREAD, in one context, so the
@@ -2330,7 +2332,7 @@ export default function App() {
     //
     // IT HAS TO BE A LIFT AND NOT A HIGHER SCORE, for the reason the import
     // above is one. The score is her order over her PROJECTS and a place in
-    // that order is worth a hundred item points (RANK_STEP, shared/rank.mjs),
+    // that order is worth a hundred item points (RANK_STEP, shared/rank.mts),
     // so an urgent row on her fifth project sits below an ordinary row on her
     // first, and no number she can put on one item ever changes that. That is
     // why this row exists: higher priority tasks were easy to miss.
@@ -2434,7 +2436,7 @@ export default function App() {
   // her waiting on work nothing was going to start. AND AN AGENT SHE HAS
   // REPLIED TO IS IN IT.An agent row had never been in any list but the inbox,
   // so the user's words went into somebody's terminal and their own screen was identical
-  // afterwards. The rule is `progressAfterReply` in shared/agents.mjs and it is
+  // afterwards. The rule is `progressAfterReply` in shared/agents.mts and it is
   // the same promise this list makes about everything else in it: something is
   // on this right now. It ends when the session stops, and the row is back here
   // in the inbox — the two rules read the one fact, because "one row, two tabs"
@@ -2671,7 +2673,7 @@ export default function App() {
     setSelected(0);
     // The field is mounted by this same render, so focusing has to wait for it.
     // A query kept from before is selected, so the next words start a new one.
-    requestAnimationFrame(() => { searchTyped.current = false; searchRef.current?.focus(); searchRef.current?.select(); });
+    requestAnimationFrame(() => { searchRef.current?.focus(); searchRef.current?.select(); });
   }, [view, selected]);
 
   const searchFor = useCallback((q: string) => {
@@ -3025,7 +3027,7 @@ export default function App() {
   // reading order, down each column and on to the next (`boardColumns`, the
   // same call InboxBoard draws). Walking the tab's list instead stopped J
   // halfway down a full board, because a card from another column was not in
-  // it (2026-10-02, tests/the-board-walks-in-the-order-it-is-drawn.test.mjs).
+  // it (2026-10-02, tests/the-board-walks-in-the-order-it-is-drawn.test.mts).
   const onBoard = search === null && (teamMode ? !!evBoard || mineBoard : inboxDisplay.view === 'board');
   // WHICH TAB THE OPEN THREAD'S BAR NAMES: the one holding it now, not the one
   // you were standing on when you opened it (`crumbTab`, w-474ac45a33).
@@ -3197,6 +3199,9 @@ export default function App() {
   useEffect(()=>{document.documentElement.dataset.reviewStyle=reviewLab ? reviewStyle : 'header-tools-open';},[reviewLab,reviewStyle]);
   const [artifactMode, setArtifactMode] = useState<ArtifactMode>('beside');
   const [artifactReturnBeside, setArtifactReturnBeside] = useState(false);
+  // The file beside the chat asked to go full screen, for that one thread.
+  const [fullAt, setFullAt] = useState<{ key: string; open: ArtifactOpen } | null>(null);
+  useEffect(() => { setFullAt(null); }, [focused?.product, focused?.id]);
   // Open unless someone closed it, in this window or another.
   const [notesOpen, setNotesOpen] = useState(() => notesSidebarOpen(localStorage));
   useEffect(() => {
@@ -3303,6 +3308,13 @@ export default function App() {
     if (card && doc?.auto) closedBeside.current.add(besideKey(card, doc.src));
     setOpenDoc(null);
   };
+  // The full-screen view opens over the pane, which would otherwise play on under it.
+  // Paused, and the moment it had reached, which full screen takes up.
+  const filmBeside = () => {
+    let s: number | undefined;
+    for (const film of document.querySelectorAll<HTMLVideoElement>('.doc-pane video')) { film.pause(); if (film.currentTime > 0) s = film.currentTime; }
+    return s;
+  };
   const closeArtifact = () => {
     if (artifactMode === 'focus' && artifactReturnBeside) setArtifactMode('beside');
     else putDocDown();
@@ -3333,7 +3345,7 @@ export default function App() {
   const [split, setSplit] = useState<number>(() => readSplit(window.localStorage));
   // The folders the open document's own product owns, so the breadcrumb reads
   // "astral › designs ›" and not the account plumbing above it. The same list
-  // main/artifact-path.mjs guesses against.
+  // main/artifact-path.mts guesses against.
   const docRoots = useMemo(() => {
     const prod = snap?.products.find((p) => p.slug === openDoc?.product) ?? null;
     if (!prod) return [];
@@ -3366,7 +3378,7 @@ export default function App() {
   // still in the page and every letter she types goes into the file instead of
   // into the palette's field.
   useEffect(() => {
-    const off = (window.zero as any)?.onKeyInTheFile?.((k: { key: string; meta?: boolean; ctrl?: boolean; fromGuest?: boolean }) => {
+    const off = window.zero?.onKeyInTheFile?.((k: { key: string; meta?: boolean; ctrl?: boolean; fromGuest?: boolean }) => {
       // A KEY OUT OF A WEBVIEW NEEDS NO FOCUS CHECK, and must not be given
       // one. The check below exists to stop a key being answered twice when
       // the window's own handler also heard it. The window never hears a
@@ -3555,7 +3567,7 @@ export default function App() {
       ...fresh.map((i) => ({ id: i.id, title: rowTitle(i), product: i.product, productName: i.productName, kind: 'item' })),
       ...freshAsks.map((a) => ({
         id: a.id,
-        title: String((a.input as any)?.description ?? (a.input as any)?.command ?? a.tool ?? 'a command'),
+        title: String((a.input as ApprovalInput)?.description ?? (a.input as ApprovalInput)?.command ?? a.tool ?? 'a command'),
         // The thread that is asking, which heads the phone's alert.
         thread: (() => { const of = a.item ? snap.items.find((i) => i.id === a.item) : null; return of ? rowTitle(of) : null; })(),
         item: a.item ?? null,
@@ -4255,8 +4267,15 @@ export default function App() {
     if (o.type === 'room') { setFocused(null); roomsUi.pickGroup(`room:${o.roomId}`); revealLine(o.messageId); return; }
     const big: ArtifactOpen | null = o.file ? (o.note ? { file: o.note.file, note: o.note.id } : { path: o.file }) : null;
     if (o.type === 'thread') {
+      // A file opens beside its thread, as it does from the thread; a comment opens full screen at it.
+      const beside = !!o.file && !o.note && whereAFileOpens(o.file) === 'beside' && !o.item.agent && !onPhone();
+      if (beside) {
+        const doc = { product: o.item.product, src: o.file! };
+        pendingDoc.current = { id: o.item.id, doc };
+        setOpenDoc(doc);
+      }
       setFocused(o.item); markSeen(o.item);
-      setFoundOpenAt(big ? { key: `${o.item.product}/${o.item.id}`, open: big } : null);
+      setFoundOpenAt(big && !beside ? { key: `${o.item.product}/${o.item.id}`, open: big } : null);
       if (o.line) revealLine(o.line);
       return;
     }
@@ -4585,7 +4604,7 @@ export default function App() {
   ) => {
     // A new action commits the previous one immediately, without waiting for
     // it, so E moves on however busy main is
-    // (tests/e-never-waits-for-the-app.test.mjs). This action's write goes after it.
+    // (tests/e-never-waits-for-the-app.test.mts). This action's write goes after it.
     const flushed = flushPending().catch((err) => console.warn('a held action was not written', err));
     if (!stay) leaveResolved(item);
     setModal(null);
@@ -4625,7 +4644,7 @@ export default function App() {
   // It closes the ROW and touches nothing else — no message, no signal, and the
   // session goes on waiting exactly as it was. The way back is the undo below,
   // which sends the same close with 0. The rule is `putAway` in
-  // shared/agents.mjs.
+  // shared/agents.mts.
   const closeAgentRow = useCallback(async (item: WorkItem) => {
     const agent = item.agent!;
     const key = agentKey(agent);
@@ -4780,7 +4799,7 @@ export default function App() {
         // two stop toasts and the resume toast. Everything else was comment
         // prose, which she never reads.
         pushUndo({ label: 'Approval withdrawn, back in your inbox', undoes: 'take back that approval and stop the agent', brings: item, undid, run: async () => {
-          await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id });
+          await window.zero?.stopSession?.({ product: item.product, id: item.id });
           await api.answer({ product: item.product, id: item.id, answer: '(withdrawn)', status: 'open' });
         } });
       }, toast, undefined, stay, { product: item.product, id: item.id }, undid);
@@ -4831,7 +4850,7 @@ export default function App() {
       undoes: start ? `take back those ${n} approvals and stop their agents` : `reopen those ${n} proposals`,
       undid: kids.map((k) => ({ product: k.product, id: k.id, words: start ? 'Undid your approval' : 'Undid closing it' })),
       run: async () => {
-        if (start) for (const k of kids) await (window.zero as any)?.stopSession?.({ product: k.product, id: k.id });
+        if (start) for (const k of kids) await window.zero?.stopSession?.({ product: k.product, id: k.id });
         for (const w of undo) await api.answer(w);
       },
     });
@@ -5070,7 +5089,7 @@ export default function App() {
           await refresh();
           setTimeout(() => setSending((q) => q.filter((s) => s !== mine && s !== gone)), LANDED_MS);
         },
-        failed: (error: Error) => {
+        failed: (error: unknown) => {
           setSending((q) => q.filter((s) => s !== mine && s !== gone));
           setUndoStack((u) => u.filter((e) => e !== alreadyGone));
           putBack(error);
@@ -5218,7 +5237,7 @@ export default function App() {
         if (later || waiting) await api.schedule({ product: item.product, id: item.id, runAt: priorRunAt });
         if (wasScheduled && priorSnooze) await api.snooze({ product: item.product, id: item.id, snoozedUntil: priorSnooze });
         // `withdraw`: on the phone, take back the reply itself if her Mac has not taken it.
-        if (!runStays) await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id, withdraw: true });
+        if (!runStays) await window.zero?.stopSession?.({ product: item.product, id: item.id, withdraw: true });
         // Put the thread back exactly where the reply found it. The rule and
         // what it cost are in list-rules (`withdrawReply`): restoring the
         // status only when the reply had changed one left an already-open row
@@ -5404,7 +5423,7 @@ export default function App() {
       catch (error) { letGo(); throw error; }
       setTimeout(letGo, LANDED_MS);
       pushUndo({ label: `Option ${option.n} withdrawn, back in your inbox`, undoes: `take back option ${option.n}`, brings: item, undid, restore: takeBack, run: async () => {
-        await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id });
+        await window.zero?.stopSession?.({ product: item.product, id: item.id });
         // Back exactly where the pick found it, the same one write a typed
         // reply's undo makes. Hardcoding 'open' was right while a pick could
         // only ever happen on an open row; a pick on a finished one would have
@@ -5722,7 +5741,7 @@ export default function App() {
   // It is NOT the question the stop asks. See `stoppable` in list-rules: this is
   // a fact about a process, and In progress is a promise about a row.
   const working = useCallback(
-    (item: WorkItem) => !!snap?.supervisor.running?.some((s: any) => s.itemId === item.id),
+    (item: WorkItem) => !!snap?.supervisor.running?.some((s) => s.itemId === item.id),
     [snap?.supervisor.running],
   );
 
@@ -5746,20 +5765,20 @@ export default function App() {
     // A MESSAGE STILL IN ITS THREE SECONDS IS WRITTEN BEFORE THE STOP. Held, it
     // landed after the kill, read as a reply sent after stopping, reopened the
     // row and started a fresh run on it two minutes later (2026-10-05).
-    // tests/a-message-still-sending-lands-before-the-stop.test.mjs
+    // tests/a-message-still-sending-lands-before-the-stop.test.mts
     await flushPending();
     // FROM THE PHONE WITH THE COMPUTER CLOSED the stop goes to her Mac, and the
     // toast says it went rather than that it stopped (Codex's review of step 1,
     // finding 7).
     if (onCloudPhone()) {
-      try { await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id }); } catch (err) { showToast(`Not sent: ${String((err as Error)?.message ?? err)}`); return; }
+      try { await window.zero?.stopSession?.({ product: item.product, id: item.id }); } catch (err) { showToast(`Not sent: ${String((err as Error)?.message ?? err)}`); return; }
       showToast('Stop sent. Your computer stops the agent when it gets it.');
       await refresh();
       return;
     }
     const wasRunning = working(item);
     setFollowing({ product: item.product, id: item.id });
-    await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id });
+    await window.zero?.stopSession?.({ product: item.product, id: item.id });
     // Three sentences rather than two and a dash. See the approval label above.
     showToast(wasRunning
       ? 'Agent stopped. Back in your inbox. Reply to redirect it.'
@@ -5795,7 +5814,7 @@ export default function App() {
     // these would be a write into nothing. Both behave like a task in every way
     // she can see and in none that she cannot.
     if (item.agent || isTroubleRow(item) || isUpdateRow(item)) return;
-    const r = await (window.zero as any)?.redeliver?.({ product: item.product, id: item.id });
+    const r = await window.zero?.redeliver?.({ product: item.product, id: item.id });
     showToast(r?.ok ? `A fresh agent is picking this up → ${item.productName}` : 'Nothing here to restart',
       r?.ok ? { product: item.product, id: item.id } : undefined);
     await refresh();
@@ -5812,7 +5831,7 @@ export default function App() {
     // these would be a write into nothing. Both behave like a task in every way
     // she can see and in none that she cannot.
     if (item.agent || isTroubleRow(item) || isUpdateRow(item)) return;
-    await (window.zero as any)?.reopen?.({ product: item.product, id: item.id });
+    await window.zero?.reopen?.({ product: item.product, id: item.id });
     showToast(`Back in the queue → ${item.productName}`, { product: item.product, id: item.id });
     // Back in the queue is out of her inbox, so it hands her the next task
     // too.
@@ -5835,7 +5854,7 @@ export default function App() {
 
   // Resume: `ids` for the rows she ticked, null for everything stranded.
   const resumeAgents = useCallback(async (ids: string[] | null) => {
-    const r = await (window.zero as any)?.resumeAgents?.(ids ? { ids } : undefined);
+    const r = await window.zero?.resumeAgents?.(ids ? { ids } : undefined);
     setMultiSel(new Set());
     showToast(r?.cleared
       ? `Resuming: ${r.cleared} interrupted ${r.cleared === 1 ? 'agent' : 'agents'} respawning`
@@ -5848,7 +5867,7 @@ export default function App() {
   // nothing else can, the ones a worker already filed as done.
   const putAgentBackOn = useCallback(async (list: WorkItem[]) => {
     const ids = list.map((i) => i.id);
-    const r = await (window.zero as any)?.resumeItems?.({ ids });
+    const r = await window.zero?.resumeItems?.({ ids });
     setMultiSel(new Set());
     const started = r?.resumed ?? 0;
     const queued = r?.queued ?? 0;
@@ -5881,7 +5900,7 @@ export default function App() {
   // path, from the row, the thread and ⌘K. It leaves you where you are.
   const tryAgain = useCallback(async (item: WorkItem) => {
     if (item.agent || isTroubleRow(item) || isUpdateRow(item)) return;
-    const r = await Promise.resolve((window.zero as any)?.resumeItems?.({ ids: [item.id] }))
+    const r = await Promise.resolve(window.zero?.resumeItems?.({ ids: [item.id] }))
       .catch((err: Error) => ({ failed: 1, why: err?.message }));
     showToast(tryAgainWords(r));
     await refresh();
@@ -6172,7 +6191,7 @@ export default function App() {
       //
       // ONLY WHERE THOSE TABS ARE ON THE SCREEN WITH NOTHING OVER THEM: not
       // from inside a field, not with a card or a menu open, not on an opened
-      // task (pinned next door in tab-does-nothing-on-an-open-task.test.mjs),
+      // task (pinned next door in tab-does-nothing-on-an-open-task.test.mts),
       // not while a search is up, and not in board view or on a rooms page,
       // which draw no tabs.
       // Everywhere else Tab goes on walking browser focus as it has since
@@ -6246,17 +6265,6 @@ export default function App() {
       // (keys.ts). Here, above the split, because Escape leaves a thread in
       // one branch and the list in another and both hand the list back.
       if (takesTheListBack(e.key)) setHoveredId(null);
-      // SEARCH OPENS FROM ANYWHERE, which is why it sits above the branch that
-      // splits the list from an open task: `/` means
-      // the same thing in both, and a shortcut written twice is one edit away
-      // from meaning two things. Its keystroke is swallowed up at the guard
-      // above (keys.ts), because it opens a text field and would otherwise type
-      // itself into it.
-      if (e.key === '/') {
-        e.preventDefault();
-        openSearch();
-        return;
-      }
       // O OPENS THE TASK THE TOAST IS ABOUT (w-f0bfe32859): "I very often,
       // after submitting a task, click 'Open it' in the toast." Z takes back
       // what the toast announced; O goes into it. Here, above the split, because
@@ -6570,7 +6578,7 @@ export default function App() {
     if (search === null) return;
     if (focused || modal || settingsOpen || openDoc) searchRef.current?.blur();
     // Only when the field does not have the keyboard: this runs on every letter typed into it.
-    else if (!docJustClosed && document.activeElement !== searchRef.current) { searchTyped.current = false; searchRef.current?.focus(); }
+    else if (!docJustClosed && document.activeElement !== searchRef.current) searchRef.current?.focus();
   }, [search, focused, modal, settingsOpen, openDoc]);
 
   useEffect(() => { setSelected((s) => Math.min(s, Math.max(0, list.length - 1))); }, [list.length]);
@@ -6931,10 +6939,11 @@ export default function App() {
     rememberOffered(localStorage);
     setTour(startTour());
     setFresh(false);
+    setHomeOpen(false);
     setView('inbox');
     setFocused(null);
     setSelected(0);
-  }, [setTour]);
+  }, [setTour, setHomeOpen]);
 
   // THE FIRST RUN ON MAIN ENDS IN THE INBOX, on the task just sent when there is one, with its two lessons left to give.
   const [landOn, setLandOn] = useState<string | null>(null);
@@ -7090,7 +7099,7 @@ export default function App() {
   openRepeatRef.current = openRepeat;
   // HER MESSAGE, SPLIT THE SAME WAY IT WAS SPLIT WHEN SHE TYPED IT. The label is
   // derived rather than kept, so the Later row and the instruction cannot drift
-  // apart, and the next run reads the new body (main/repeats.mjs briefs it with
+  // apart, and the next run reads the new body (main/repeats.mts briefs it with
   // `rule.body`). Null when the write was refused, so the box that sent it can
   // keep her words.
   const saveRule = async (rule: RepeatRule, message: string): Promise<RepeatRule | null> => {
@@ -7149,7 +7158,7 @@ export default function App() {
   const waitsFor = (item: WorkItem) => {
     const product = team?.products.get(item.product);
     if (!team || !product || item.agent || item.status === 'done' || isTroubleRow(item) || isUpdateRow(item)) return [];
-    // A task's block has to be one its holder's Mac can look up (shared/team-tasks.mjs).
+    // A task's block has to be one its holder's Mac can look up (shared/team-tasks.mts).
     if (isTaskRow(item)) return taskBlockChoices(item.assignee ?? null, item);
     if (isDirect(product)) return [];
     return waitChoicesOf({ item, me: team.me, people: team.state.people ?? [], items, cards, nameOf: nameOfPerson });
@@ -7635,7 +7644,7 @@ export default function App() {
             become what she is typing, in the tab row's own size and weight, and
             escape puts them back. */}
         {/* AND IT STEPS ASIDE FOR AN OPENED TASK (w-d883b38446, 2026-09-18).
-            `searchFieldInStrip` in workspace-navigation.mjs is the rule and
+            `searchFieldInStrip` in workspace-navigation.ts is the rule and
             carries the measurement: this strip is where an opened task's header
             is drawn, and the field was tested before it, so opening a result
             left her with an empty 88 point bar and a second header inside the
@@ -7654,13 +7663,12 @@ export default function App() {
               spellCheck={false}
               autoComplete="off"
               aria-label="Search threads"
-              onChange={(e) => { searchTyped.current = true; setSearch(e.target.value); setSelected(0); }}
+              onChange={(e) => { setSearch(e.target.value); setSelected(0); }}
               onKeyDown={(e) => {
                 // The list's own keys, forwarded from inside the field, because
                 // every other key here is a character she is typing and the
                 // global handler has already stood down for that reason.
                 if (e.key === 'Escape') { e.preventDefault(); closeSearch(); }
-                else if (e.key === '/' && slashSearchesAgain({ query: e.currentTarget.value, typedSince: searchTyped.current })) { e.preventDefault(); e.currentTarget.select(); }
                 else if (e.key === 'ArrowDown') { e.preventDefault(); setSelected((s) => Math.min(s + 1, Math.max(0, list.length - 1))); }
                 else if (e.key === 'ArrowUp') { e.preventDefault(); setSelected((s) => Math.max(0, s - 1)); }
                 else if (e.key === 'Enter' && current && !e.metaKey && !e.ctrlKey) { e.preventDefault(); setFocused(current); markSeen(current); }
@@ -7893,7 +7901,7 @@ export default function App() {
                      TYPED IT. The label is derived rather than kept, so the
                      Scheduled row and the instruction cannot drift apart, and
                      the run served tomorrow morning reads the new body
-                     (main/repeats.mjs briefs it with `rule.body`). */
+                     (main/repeats.mts briefs it with `rule.body`). */
                   onSave={async (message) => {
                     const fresh = await saveRule(focusedRepeat, message);
                     // The pane is holding a copy, so it has to be handed the
@@ -7948,7 +7956,7 @@ export default function App() {
                   inlineArtifacts
                   previewSample={api.isFixtures && (reviewLab || new URLSearchParams(location.search).has('artifactTweaks')) ? artifactPreviewSample : undefined}
                   artifactView={openDoc ? artifactView : undefined}
-                  openAt={foundOpenAt?.key === `${focused.product}/${focused.id}` ? foundOpenAt.open : null}
+                  openAt={fullAt?.key === `${focused.product}/${focused.id}` ? fullAt.open : foundOpenAt?.key === `${focused.product}/${focused.id}` ? foundOpenAt.open : null}
                   onOpenArtifact={(src, mode) => { setArtifactReturnBeside(false); setArtifactMode(mode); setOpenDoc({product: focused.product, src}); }}
                   item={focused}
                   resumeAt={resumeAt}
@@ -8268,6 +8276,15 @@ export default function App() {
               mode={artifactMode}
                 onMode={mode => {
                   if (mode === 'beside' && !roomBeside) { putDocDown(); return; }
+                  // Full screen is the one view with versions, notes and Approve, wherever the file is a thread's.
+                  if (mode === 'focus' && fullScreenTakes(openDoc.src) && !onPhone()) {
+                    const thread = !!focused && !focused.agent && !openDoc.readOnly && openDoc.product === focused.product;
+                    if (thread || (openCard && openDoc.readOnly)) {
+                      const open = { path: openDoc.src, at: Date.now(), time: filmBeside() };
+                      if (thread) setFullAt({ key: `${focused!.product}/${focused!.id}`, open }); else setCardOpenAt(open);
+                      return;
+                    }
+                  }
                   setArtifactReturnBeside(artifactMode === 'beside'); setArtifactMode(mode);
                 }}
                 split={artifactFraction(split, artifactWidth)}
@@ -8536,7 +8553,6 @@ export default function App() {
           : undefined}
         keyHints={keyHints}
         onSetKeyHints={(v) => { setModal(null); setHints(v); }}
-        onSearch={openSearch}
         findThreads={findThreads}
         findChats={findChats}
         findInside={insideForPalette}
@@ -8767,7 +8783,7 @@ export default function App() {
           // order is not something to type your way through one step at a
           // time. Fine grained ordering is the drag in the composer.
           const next = moveProduct(rankedProducts.map((p) => p.slug), slug, 0);
-          await (window.zero as any)?.setProductOrder?.({ order: next });
+          await window.zero?.setProductOrder?.({ order: next });
           const name = snap.products.find((p) => p.slug === slug)?.name ?? slug;
           showToast(`${name} is now first`);
           await refresh();
@@ -8839,7 +8855,7 @@ export default function App() {
           // reads, written the one way it is always written.
           ranked={rankedProducts}
           onSetOrder={async (slugs) => {
-            await (window.zero as any)?.setProductOrder?.({ order: slugs });
+            await window.zero?.setProductOrder?.({ order: slugs });
             await refresh();
           }}
           /* TEAM MANAGEMENT, handed to Settings rather than imported by it
@@ -8975,12 +8991,18 @@ export default function App() {
           A ?modes= drawing stands INSTEAD of it, never over it: two full
           surfaces at once would photograph the welcome screen. */}
       {fresh && !modeDraft && arm === 'classic' && <ClassicFirstRun snap={snap} home={home} onDone={finishClassic} />}
-      {fresh && !modeDraft && arm === 'tour' && <FirstRunFlow snap={snap} home={home} onDone={finishFresh} />}
+      {fresh && !modeDraft && arm === 'tour' && <FirstRunFlow snap={snap} home={home} onDone={finishFresh}
+        look={(homeSet.on && homeSet.skyTheme) || (resolveTheme(theme) === 'light' ? 'light' : 'dark')} skies={homeSet.on}
+        onLook={(id) => { if (id === 'light') chooseLook('light'); else if (id === 'dark') chooseLook('ember-grid'); else chooseSkyTheme(id); }}
+        onProject={(slug) => { rememberProject(slug); setPickProject(slug); }}
+        onSetup={() => { setFocused(null); setView('inbox'); if (homeSet.on) setHomeOpen(true); }} />}
       <OpenLesson at={lessonAt} />
+      {!fresh && tour && tourLive(tour) && <TourList tour={tour} now={tourNow} onSkip={() => setTour(skipTour(tour))} />}
       {!fresh && <Tour tour={tour} view={view} thread={!!focused}
         covered={!!run || settingsOpen || teamOpen || newProject || (modal !== null && modal !== 'compose' && modal !== 'palette')}
         palette={modal === 'palette'}
         onChange={setTour}
+        onStep={setTourNow}
         onPoint={(id) => { const at = list.findIndex((i) => i.id === id); if (at >= 0) setSelected(at); }} />}
       {run && !modeDraft && !walkWaitsForSignIn && (
         <Onboarding
@@ -9239,14 +9261,15 @@ export default function App() {
                 {/* Who is asking (the agent and its thread, which opens behind
                     the card), what it wants in words, the exact thing being
                     authorised, then where. The exact thing is never cut here:
-                    the one cap is in main/codex-approvals.mjs, which says how
+                    the one cap is in main/codex-approvals.mts, which says how
                     much it dropped, and the block scrolls. */}
                 {(() => {
                   const row = approvalRow(a.item);
                   const mcp = a.tool.startsWith('mcp__');
                   const agent = row ? (harnessOf(row) === 'codex' ? 'Codex' : 'Claude Code') : null;
                   const asker = approvalAsker(row ? rowTitle(row) : null, snap.products.find((p) => p.slug === a.product)?.name ?? a.product ?? 'An agent');
-                  const cwd = !mcp && (a.input as any)?.cwd ? String((a.input as any).cwd) : null;
+                  const input = a.input as ApprovalInput | undefined;
+                  const cwd = !mcp && input?.cwd ? String(input.cwd) : null;
                   const body = view.body;
                   return (
                     <>
@@ -9273,11 +9296,11 @@ export default function App() {
                         </div>
                       )}
                       {/* What else the yes opens stays with the exact thing, above the folder. */}
-                      {!mcp && (a.input as any)?.host && body.kind === 'text' && body.text !== String((a.input as any).host) && (
-                        <div className="approval-opens">Opens the network to {String((a.input as any).host)}</div>
+                      {!mcp && input?.host && body.kind === 'text' && body.text !== String(input.host) && (
+                        <div className="approval-opens">Opens the network to {String(input.host)}</div>
                       )}
-                      {!mcp && (a.input as any)?.grantRoot && (
-                        <div className="approval-opens">And asks to write anywhere under {String((a.input as any).grantRoot)} for the rest of this run</div>
+                      {!mcp && input?.grantRoot && (
+                        <div className="approval-opens">And asks to write anywhere under {String(input.grantRoot)} for the rest of this run</div>
                       )}
                       {(view.where || body.kind === 'diff') && (
                         <div className="approval-where" title={cwd ?? undefined}>

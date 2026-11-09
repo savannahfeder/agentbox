@@ -27,13 +27,13 @@
 
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { MAC_CHROME, startableChrome } from '../../shared/hidden-browser.mts';
+
+export { startableChrome };
 
 const PREFIX = '/tmp/shot-profile-';
-// The Linux box the QA sessions run on has no Chrome at a Mac path, so the
-// binary is an env override there. Everything below still only ever touches a
-// browser running on one of our own throwaway profiles.
-export const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const OURS = process.env.CHROME || '/Applications/Google Chrome.app';
+// Earlier runs started the person's Google Chrome; the sweep still reaps those.
+const OURS = process.env.CHROME || MAC_CHROME.split('/Contents/')[0];
 
 // Every process on the box, as {pid, ppid, command}. `ps` is the only thing that
 // sees processes this one did not start, which is the whole point of the sweep.

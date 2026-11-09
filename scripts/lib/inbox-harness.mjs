@@ -7,8 +7,8 @@ import http from 'node:http';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { CHROME, guard, sweep } from './chrome-guard.mjs';
-import { foldWorkItems } from '../../shared/work-items.mjs';
+import { startableChrome, guard, sweep } from './chrome-guard.mjs';
+import { foldWorkItems } from '../../shared/work-items.mts';
 import { STORE_ROOT } from './machine-paths.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -62,9 +62,7 @@ export async function openInbox({ dist, width = 1440, height = 944, snapshot }) 
 
   sweep();
   const profile = fs.mkdtempSync('/tmp/shot-profile-');
-  // The browser the shot scripts share, which is an env override off this
-  // Mac's path (./chrome-guard.mjs).
-  const chrome = spawn(CHROME, [
+  const chrome = spawn(startableChrome(), [
     '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-sandbox',
     '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run',
     `--window-size=${width},${height}`, 'about:blank',

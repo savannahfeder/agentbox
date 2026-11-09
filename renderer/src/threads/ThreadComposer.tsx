@@ -35,13 +35,13 @@ import { SEND } from '../this-keyboard';
 import { Fragment, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import { PRACTICE_TASK } from '../../../shared/first-run-practice.mts';
 import type { Product, WorkItem } from '../types';
-import type { Engine } from '../../../shared/engines.mjs';
-import { ENGINES } from '../../../shared/engines.mjs';
+import type { Engine } from '../../../shared/engines.mts';
+import { ENGINES } from '../../../shared/engines.mts';
 import { api } from '../api';
 import { TeamContext, Face, firstName } from '../team/people';
 import { AgentFace } from '../components/AgentFace';
 import { AutoFace } from '../components/AutoFace';
-import { AUTO_LABEL } from '../../../shared/auto-route.mjs';
+import { AUTO_LABEL } from '../../../shared/auto-route.mts';
 import { readLastRecipient, writeLastRecipient } from './recipient';
 import { conversationWith } from './page-rules';
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
@@ -71,14 +71,14 @@ import {
   startingWhen, whenOnDraft, whenToSend, whenWords,
   type AtOffer, type HandFrom, type Harness, type Keyboard, type ModelPick, type SendAs, type SendWhen, type Visibility,
 } from './composer-rules';
-import { sameRule } from '../../../shared/repeats.mjs';
+import { sameRule } from '../../../shared/repeats.mts';
 import { heldKeyThatOpenedTheBox } from '../reply-keys';
 import './thread-composer.css';
 import { TeammateMark } from '../teammates/TeammatesRail';
-import { shownTitle } from '../../../shared/thread-title.mjs';
-import { dayDeadline, dueFromWords, dueSaid } from '../../../shared/team-tasks.mjs';
-import { nameWait } from '../../../shared/thread-waits.mjs';
-import { continuedFromLabel } from '../../../shared/thread-continued.mjs';
+import { shownTitle } from '../../../shared/thread-title.mts';
+import { dayDeadline, dueFromWords, dueSaid } from '../../../shared/team-tasks.mts';
+import { nameWait } from '../../../shared/thread-waits.mts';
+import { continuedFromLabel } from '../../../shared/thread-continued.mts';
 
 /** What went out, so the caller can say so and offer the way back. */
 export interface ThreadSent {
@@ -141,7 +141,7 @@ export function ThreadComposer({
   ideas?: Idea[] | null;
   /** The tutorial's first task: the folder is asked for before the suggestions. */
   askFolder?: boolean;
-  /** What a task to this person can be blocked by (shared/team-tasks.mjs blockChoices). */
+  /** What a task to this person can be blocked by (shared/team-tasks.mts blockChoices). */
   blockChoicesFor?: (holder: string) => readonly { id: string; label: string }[];
   statusLine?: string | null;
   /** Hands the words to the agent already on this work, instead of starting another. */

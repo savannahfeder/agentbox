@@ -12,7 +12,7 @@ import { isUrgentRow } from '../interrupt';
 // the pane disagreeing about one fact on one screen is what this import fixes.
 import { cameBackEmpty, cannotStartLine, runningSince } from '../live-line';
 import { agentAtWork, engineWordFor } from '../byline';
-import { DEFAULT_ENGINE } from '../../../shared/engines.mjs';
+import { DEFAULT_ENGINE } from '../../../shared/engines.mts';
 import { isTroubleRow, TROUBLE_ID } from '../trouble-row';
 import { isUpdateRow, UPDATE_ID } from '../update-row';
 import { IMPORT_KEYS, JUST_IMPORTED_WORD, NOT_IMPORTED_HEADING, NOT_IMPORTED_KEYS, isImportRow, isNotImportedRow, justImported, type ImportChoice } from '../import-row';
@@ -21,7 +21,7 @@ import type { ThreadSearchDetails } from '../threads/search';
 import { nextRunWords, repeatRow, repeatTag } from '../repeat-words';
 import { Face, TeamRowEnd, firstName, type TeamView } from '../team/people';
 import { commentLine } from '../threads/teammate-thread';
-import { fileNewsFor, fileNewsLine } from '../../../shared/artifact-marks.mjs';
+import { fileNewsFor, fileNewsLine } from '../../../shared/artifact-marks.mts';
 import { CloudOfferRow, RepeatMark, RowCells, SectionHead, TableHead, ThreadCells, WaitingContext } from '../threads/Pages';
 import type { StackKey, StackSection } from '../threads/stack-rules';
 import { cardPlace } from '../threads/page-rules';
@@ -31,7 +31,7 @@ import { opensOnKey } from '../repeat-from-thread';
 import { toApproveWords } from '../threads-made';
 import type { MixedRow } from '../threads/people-rules';
 import { useRowDrag } from '../threads/row-drag';
-import { heldByAPerson } from '../../../shared/team-rules.mjs';
+import { heldByAPerson } from '../../../shared/team-rules.mts';
 import { catchUpDue } from '../../../shared/agent-import.mts';
 import { cutAt, firstRows, placeOf, useRowsDrawn } from '../rows-drawn';
 
@@ -556,7 +556,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                       rows' usual openings is a list of rows that look unrelated
                       to what was typed. */}
                   <div className="preview">
-                    <Hits text={summaries?.get(item.id) ?? fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string) => firstName(team?.byId.get(id) ?? null)) ?? commentLine(item.waitingComments, (id) => firstName(team?.byId.get(id) ?? null)) ?? rowSummary(item, tab)} terms={terms} phrase={phrase} />
+                    <Hits text={summaries?.get(item.id) ?? fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string | null) => firstName(team?.byId.get(id ?? '') ?? null)) ?? commentLine(item.waitingComments, (id) => firstName(team?.byId.get(id) ?? null)) ?? rowSummary(item, tab)} terms={terms} phrase={phrase} />
                   </div>
                 </div>
                 {/* Everything that is not the message itself lives at the right end, on the
@@ -646,7 +646,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                       turned down, the word Urgent in small capitals, is in
                       decisions.md if it ever needs to come back.
 
-                      The predicate is `isUrgent` in shared/rank.mjs, reached
+                      The predicate is `isUrgent` in shared/rank.mts, reached
                       through interrupt.ts, and not the inline `item.agent ?
                       null : priority >= 9` that used to be on this line: that
                       one unmarked the user's urgent row the moment a worker claimed

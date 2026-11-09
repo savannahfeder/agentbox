@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { readRule, repeatPresets, stamp } from '../../../../../renderer/src/format';
 import { repeatRow, repeatTag } from '../../../../../renderer/src/repeat-words';
-import { isCleanRun, ruleIdOf, ruleLabel } from '../../../../../shared/repeats.mjs';
+import { isCleanRun, ruleIdOf, ruleLabel } from '../../../../../shared/repeats.mts';
 import { useCloud } from '../../../state/cloud';
 import { Back, Repeat } from '../../../ui/icons';
 import { TimeBox, TypingSheet } from '../../../ui/Later';
@@ -32,7 +32,7 @@ export default function RepeatPage() {
       </Wall>
     );
   }
-  const items = c.view.items as any[];
+  const items = c.view.items;
   const last = rule.lastOccurrence ? items.find((i) => i.id === rule.lastOccurrence) ?? null : null;
   const runs = items.filter((i) => i.product === rule.product && ruleIdOf(i) === rule.id).sort((a, b) => b.createdAt - a.createdAt).slice(0, 20);
   const read = readRule(typed);

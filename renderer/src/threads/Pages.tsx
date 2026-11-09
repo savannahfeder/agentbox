@@ -18,12 +18,12 @@ import { taskWords } from '../team/company';
 import { agentSaidLast } from '../team/answers-in-the-chat';
 import { PriorityIcon } from '../components/Priority';
 import { asideBesides, notStarted, rowTitle, waitCameBack } from '../list-rules';
-import { deadlineOf, dueSaid } from '../../../shared/team-tasks.mjs';
-import { waitWords } from '../../../shared/thread-waits.mjs';
-import { needsLeft, needsWord } from '../../../shared/cloud-needs.mjs';
-import { closedOverWords, iSpokeLast, isWorkThread } from '../../../shared/team-rules.mjs';
+import { deadlineOf, dueSaid } from '../../../shared/team-tasks.mts';
+import { waitWords } from '../../../shared/thread-waits.mts';
+import { needsLeft, needsWord } from '../../../shared/cloud-needs.mts';
+import { closedOverWords, iSpokeLast, isWorkThread } from '../../../shared/team-rules.mts';
 import { commentLine } from './teammate-thread';
-import { fileNewsFor, fileNewsLine } from '../../../shared/artifact-marks.mjs';
+import { fileNewsFor, fileNewsLine } from '../../../shared/artifact-marks.mts';
 import { toApproveWords } from '../threads-made';
 import { DONE } from '../done-word';
 import {
@@ -37,14 +37,14 @@ import { facesOnButton, peopleWorthADot, togglePicked, whoseWord } from './peopl
 import { stopKey } from './walk-rules';
 import { PinMark } from './ThreadMenu';
 import { bandDrag, cardClickIntent, clickMarks, marqueeMarks, type Box } from './board-select';
-import { shownToPeople } from '../../../shared/thread-cards.mjs';
+import { shownToPeople } from '../../../shared/thread-cards.mts';
 import { Name } from '../../../shared/product-name.mjs';
 import { FleetContext } from '../fleet';
 import { TeammateLead } from '../teammates/row-lead';
 import { factsFor, laterCell, saysOnCard, statusCell, type StatusCell } from '../status-word';
 import { offersTryAgain } from '../try-again';
-import { voiceName } from '../../../shared/agent-voice.mjs';
-import { shownPriority } from '../../../shared/rank.mjs';
+import { voiceName } from '../../../shared/agent-voice.mts';
+import { shownPriority } from '../../../shared/rank.mts';
 import { api } from '../api';
 import { CLOUD_KEY, CLOUD_WHEN_ON, cloudButtonCount, cloudFootLine, cloudIsOn, cloudMonthLine, cloudMoveLine, countedAccounts, type CloudMode, type CloudStatus } from '../cloud-menu';
 import { brokenAccounts, buttonAsksSignIn, menuSetupLine, readBrokenSeen, seenAfter, SETUP, writeBrokenSeen } from '../cloud-setup';
@@ -218,7 +218,7 @@ export type PeoplePick = { everyone: Person[]; picked: string[]; me: string | nu
  * through the hint plate.
  */
 export function SearchButton({ onSearch }: { onSearch: () => void }) {
-  return <button type="button" className="th-search" data-hint="search" onClick={onSearch} title="Search threads (/)" aria-label="Search threads"><SearchGlyph /></button>;
+  return <button type="button" className="th-search" data-hint="search" onClick={onSearch} title="Search threads" aria-label="Search threads"><SearchGlyph /></button>;
 }
 
 /** New thread, the cloud and the Display icon (and Search on the board), at the right of the Inbox header. */
@@ -783,7 +783,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
       priority={shownPriority(item)} updatedAt={task.at} when={back} now={now} />;
   }
   if (said) {
-    const fileNews = fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string) => (said.people.length > 1 ? firstName(team?.byId.get(id) ?? null) : ''))?.trim();
+    const fileNews = fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string | null) => (said.people.length > 1 ? firstName(team?.byId.get(id ?? '') ?? null) : ''))?.trim();
     const agent = fileNews ? null : agentSaidLast(item, allItems);
     return <RowCells status={status} title={<MessageTitle people={said.people} fromMe={!fileNews && !agent && said.fromMe} text={fileNews ?? (agent ? `${agent.who}: ${agent.text}` : said.text)} name={item.label || (isWorkThread(item) ? item.title : null)} />} aside={due?.word} late={!!due?.late} pinned={!!item.pinned && item.status !== 'done'} where="" person={person}
       priority={messagePriority(item)} updatedAt={when} when={back} now={now} action={action} />;
@@ -801,7 +801,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
   // the Status column says Queued on exactly those rows, and one fact in two
   // places on one row is what the column was drawn to end. `FreeAgentContext`
   // is untouched and still decides whether the cloud offers itself.
-  const commented = fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string) => firstName(team?.byId.get(id) ?? null))
+  const commented = fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string | null) => firstName(team?.byId.get(id ?? '') ?? null))
     ?? commentLine(item.waitingComments, (id) => firstName(team?.byId.get(id) ?? null))
     ?? (waitCameBack(item) ? item.waitEnded?.said : null)
     ?? item.handedOver?.said;

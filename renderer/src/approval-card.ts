@@ -56,7 +56,7 @@ export const approvalAnswered = (allow: boolean) =>
  * One approval's `input`, as the two lines her eye actually lands on.
  *
  * `changes` is first because it is the only key that says the question is about
- * files rather than a command; main/codex-approvals.mjs is the one place that
+ * files rather than a command; main/codex-approvals.mts is the one place that
  * writes it, already capped and already marked where it was cut.
  *
  * `host` IS BEHIND `command`, AND THE ORDER IS THE POINT. A network approval

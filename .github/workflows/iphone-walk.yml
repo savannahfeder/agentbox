@@ -32,7 +32,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install Maestro
         run: |
-          curl -fsSL --max-time 300 -o "$RUNNER_TEMP/maestro.zip" https://github.com/mobile-dev-inc/maestro/releases/latest/download/maestro.zip
+          curl -fsSL --retry 4 --retry-all-errors --max-time 300 -o "$RUNNER_TEMP/maestro.zip" https://github.com/mobile-dev-inc/maestro/releases/latest/download/maestro.zip
           unzip -q "$RUNNER_TEMP/maestro.zip" -d "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/maestro/bin" >> "$GITHUB_PATH"
       - name: Start an iPhone
@@ -46,7 +46,7 @@ jobs:
           BUILD_URL: ${{ inputs.build_url }}
         run: |
           mkdir -p "$RUNNER_TEMP/app"
-          curl -fsSL --max-time 600 -o "$RUNNER_TEMP/app.tar.gz" "$BUILD_URL"
+          curl -fsSL --retry 4 --retry-all-errors --max-time 600 -o "$RUNNER_TEMP/app.tar.gz" "$BUILD_URL"
           tar -xzf "$RUNNER_TEMP/app.tar.gz" -C "$RUNNER_TEMP/app"
           xcrun simctl install "$UDID" "$(find "$RUNNER_TEMP/app" -maxdepth 2 -name '*.app' | head -1)"
       - name: Walk it
@@ -69,7 +69,7 @@ jobs:
         env:
           WALK_KEY: MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEA144NTLukP5ihrH+ZU3pcMmVz6188Owt3HZFU32rJ5bQ4+yrz92k93VZ6wz0eMX7N7jraJ7Ejwu3OliIE6nJjT+GbL+YUQGgkRIC9jl+D7m1ZpsyCSyYLbSWKISylJNiVvWH9FH3+Y8Gv8QHy0guX/Z0aB7cG7XNeTZlJmltd22vqPcBm9t9D/Lx7n5Wqr/dXdWC7nqkkac+JmMVm0YuiLL+rmvRKlR7+PPi6E93cWjLC/xOPVyAwzu3b6FkUFAS0NqNATQsRP353GNkaw3BLZYK40nVHvD8BBTxvPgJZpo5pMRgZUVppyEAdqQE/ufGbE4kLyGuUgz2rD1WcCbKRbDgKpMPD/1ifN/go+vqr8nFcCVGq8MNe5nP8QBAAlNROlBEKP1dUvjFJTDatxeVEZPm8EsL4jncGR5j/scBob8sGe+iPNLKaAUJcHthtncG35ELBm+Mrezda/TG8TVvNexCVryNMaNd4+y/whrseHwguK/bv8haHLJm/Aq9pg6/jAgMBAAE= # public-check: allow (a public key)
         run: |
-          mkdir -p sealed
+          mkdir -p sealed walk
           ssl="$(brew --prefix openssl@3)/bin/openssl"
           tar -czf "$RUNNER_TEMP/walk.tgz" walk
           rm -rf walk

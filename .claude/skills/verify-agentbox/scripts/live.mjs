@@ -42,10 +42,10 @@ export const REPO = path.resolve(here, '../../../..');
 // VERIFY_ROOT: a long-lived copy that must survive a restart, which empties /tmp.
 export const ROOT = process.env.VERIFY_ROOT || '/tmp/agentbox-verify';
 export const RUNS = path.join(ROOT, 'runs');
-const { FRESH_USER_ENV } = await import(path.join(REPO, 'shared', 'fresh-user-home.mjs'));
+const { FRESH_USER_ENV } = await import(path.join(REPO, 'shared', 'fresh-user-home.mts'));
 const { listCloudLogins } = await import(path.join(REPO, 'main', 'cloud', 'logins.mts'));
 const { stripTypesFlags } = await import(path.join(REPO, 'main', 'strip-types.mts'));
-const { accountIdentity, nameForOrganization } = await import(path.join(REPO, 'main', 'account-tooling.mjs'));
+const { accountIdentity, nameForOrganization } = await import(path.join(REPO, 'main', 'account-tooling.mts'));
 const KEY = crypto.createHash('sha1').update(REPO).digest('hex').slice(0, 8);
 /** One copy per checkout, or per name within it (`VERIFY_INSTANCE`), so a power test can run one copy per tester. */
 export function instanceDir(name = process.env.VERIFY_INSTANCE) {
@@ -178,7 +178,7 @@ export function teamEnv(file) {
 
 /** The Codex this Mac has, found the way the app finds it, or null. */
 async function realCodex() {
-  const { findCodexBin } = await import(path.join(REPO, 'main', 'codex-bin.mjs'));
+  const { findCodexBin } = await import(path.join(REPO, 'main', 'codex-bin.mts'));
   try { const f = findCodexBin({}); return f.found ? f.path : null; } catch { return null; }
 }
 
@@ -200,7 +200,7 @@ async function realCodex() {
  * home, the stand-in layered into their config.toml and signed with their own
  * login, and the copy finding codex and the home as theirs would.
  */
-async function prepare(real, setupName = null, { logins = 2, codex = true, projectNames = null } = {}) {
+async function prepare(real, setupName = null, { logins = 2, codex = true, projectNames = null, fresh = false } = {}) {
   const data = path.join(INSTANCE, 'data');
   const storeRoot = path.join(INSTANCE, 'store');
   const accountRoot = path.join(storeRoot, 'accounts', ACCOUNT);
@@ -229,6 +229,30 @@ async function prepare(real, setupName = null, { logins = 2, codex = true, proje
     git('init', '-q', '-b', 'main');
     git('add', '-A');
     git('-c', 'user.email=verify@agentbox.invalid', '-c', 'user.name=verify', 'commit', '-qm', 'seed');
+    // --fresh: the folders and a few recent Claude Code chats are on this
+    // computer, but the app has no projects yet, so it opens on the first run.
+    if (fresh) {
+      const chatHome = home ?? path.join(INSTANCE, 'home');
+      const at = path.join(chatHome, '.claude', 'projects', repo.replace(/[^a-zA-Z0-9]/g, '-'));
+      fs.mkdirSync(at, { recursive: true });
+      const asks = [`Add input validation to the ${p.name} settings form`, `Why does the ${p.name} build warn about a missing env var?`];
+      asks.forEach((ask, i) => {
+        const when = Date.now() - (i + 1) * 47 * 60e3;
+        const iso = (d) => new Date(when - d).toISOString();
+        const file = path.join(at, `${p.slug}-chat-${i + 1}.jsonl`);
+        fs.writeFileSync(file, `${[
+          { type: 'user', cwd: repo, entrypoint: 'cli', timestamp: iso(60e3), message: { role: 'user', content: ask } },
+          { type: 'assistant', cwd: repo, entrypoint: 'cli', timestamp: iso(0), message: { role: 'assistant', content: [{ type: 'text', text: 'Done. I made the change and the tests pass.' }] } },
+        ].map((r) => JSON.stringify(r)).join('\n')}\n`);
+        fs.utimesSync(file, new Date(when), new Date(when));
+      });
+      // Where a person keeps code, so the folder picker opens on it.
+      const code = path.join(chatHome, 'code');
+      fs.mkdirSync(code, { recursive: true });
+      try { fs.symlinkSync(repo, path.join(code, p.slug)); } catch { /* there already */ }
+      repos[p.slug] = repo;
+      continue;
+    }
     fs.writeFileSync(path.join(accountRoot, p.slug, 'project.json'), `${JSON.stringify({
       schemaVersion: 2, id: p.slug, name: p.name, repoPath: repo, oneLiner: 'a throwaway project for verification',
     }, null, 1)}\n`);
@@ -247,7 +271,7 @@ async function prepare(real, setupName = null, { logins = 2, codex = true, proje
     // The Claude Code this Mac has, found the way the app finds it, then
     // linked into the setup's home where the installer puts it. `claudeBin`
     // stays unset, so the copy finds it in that home as a person's would.
-    const { findClaudeBin } = await import(path.join(REPO, 'main', 'claude-bin.mjs'));
+    const { findClaudeBin } = await import(path.join(REPO, 'main', 'claude-bin.mts'));
     let mine = null;
     try { const f = findClaudeBin({}); mine = f.found ? fs.realpathSync(f.path) : null; } catch { /* none */ }
     if (!mine) stop('setups run the real Claude Code, and this Mac has none.');
@@ -418,7 +442,7 @@ async function start(state) {
     // The fresh-user flag is the app's own word for "this copy is nobody": no
     // team cloud even on a Mac that has a team key (so no sign-in screen and
     // nothing written to the shared project), and any counts go under the one
-    // id that names itself as not a person (shared/fresh-user-home.mjs).
+    // id that names itself as not a person (shared/fresh-user-home.mts).
     [FRESH_USER_ENV]: '1',
     ...(state.teamFile ? teamEnv(state.teamFile) : {}) };
   if (state.claudeModel) {
@@ -469,6 +493,8 @@ async function start(state) {
   if (state.toolsFixture) Object.assign(env, { AGENTBOX_TOOLS_FIXTURE: state.toolsFixture, AGENTBOX_TOOLS_FIXTURE_OPEN: path.join(INSTANCE, 'oauth-url.txt') });
   // `up --tool-standins <file>`: real tiles on the stand-ins in scripts/standin-tools.mjs.
   if (state.toolStandins) Object.assign(env, { AGENTBOX_TOOLS_STANDINS: fs.readFileSync(state.toolStandins, 'utf8'), AGENTBOX_TOOLS_FIXTURE_OPEN: path.join(INSTANCE, 'oauth-url.txt') });
+  // The tab draws its own folder picker; osascript's would open on the owner's screen.
+  env.AGENTBOX_NO_SYSTEM_WINDOWS = '1';
   if (state.cloudTmp) { fs.mkdirSync(state.cloudTmp, { recursive: true, mode: 0o700 }); env.TMPDIR = state.cloudTmp; }
   if (state.standInCloud) await startStandInCloud(state);
   if (state.cloudAccounts) env.AGENTBOX_CLOUD_ACCOUNTS = state.cloudAccounts;
@@ -564,7 +590,7 @@ async function up(args) {
   const cloud = args.includes('--cloud');
   if (cloud && !real) stop('--cloud runs real agents on this Mac\'s cloud setup: add --real.');
   if (cloud) {
-    const { readCloudConfig } = await import(path.join(REPO, 'main', 'cloud', 'config.mjs'));
+    const { readCloudConfig } = await import(path.join(REPO, 'main', 'cloud', 'config.mts'));
     if (!readCloudConfig()) stop('--cloud needs a Mac set up for the cloud (~/.agentbox/cloud.json, made by scripts/cloud-setup.mjs).');
   }
   if (installed) {
@@ -577,6 +603,7 @@ async function up(args) {
     logins: Number(value('logins')) || 2,
     codex: !args.includes('--no-codex'),
     projectNames: value('projects')?.split(',').map((s) => s.trim()).filter(Boolean) ?? null,
+    fresh: args.includes('--fresh'),
   };
   const emails = value('cloud-accounts');
   if (emails && !cloud) stop('--cloud-accounts narrows the cloud\'s accounts: add --cloud.');

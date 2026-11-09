@@ -1,4 +1,4 @@
-import type {CarryState} from '../../shared/carried-files.mjs';
+import type {CarryState} from '../../shared/carried-files.mts';
 
 /** What a file under a message says at a glance, as plain words: its own
  * title, the first thing it says, and its opening blocks for a miniature page.

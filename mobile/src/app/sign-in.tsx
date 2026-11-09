@@ -33,9 +33,9 @@ export default function SignIn() {
   const run = (which: string, how: () => Promise<unknown>) => async () => {
     if (!c.cloud) return;
     setBusy(which); setError(null); setFailed(false);
-    try { await c.signedInWith(how); } catch (err: any) {
-      if (err?.code === 'ERR_REQUEST_CANCELED') return;
-      setError(String(err?.message ?? '') || 'That did not work. Try again.');
+    try { await c.signedInWith(how); } catch (err) {
+      if ((err as { code?: string })?.code === 'ERR_REQUEST_CANCELED') return;
+      setError(String((err as Error)?.message ?? '') || 'That did not work. Try again.');
       setFailed(which === 'email');
     } finally { setBusy(null); }
   };
@@ -64,8 +64,8 @@ export default function SignIn() {
         <Lede>Use the account from Agentbox on your computer.</Lede>
         {!c.cloud && !c.preview && <Lede>This build was made without the cloud's address, so it cannot sign in.</Lede>}
         <View style={{ gap: 16, marginTop: 28 }}>
-          <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" textContentType="emailAddress" autoComplete="email" />
-          <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry textContentType="password" autoComplete="password"
+          <Field label="Email" testID="sign-in-email" value={email} onChangeText={setEmail} keyboardType="email-address" textContentType="emailAddress" autoComplete="email" />
+          <Field label="Password" testID="sign-in-password" value={password} onChangeText={setPassword} secureTextEntry textContentType="password" autoComplete="password"
             returnKeyType="go" onSubmitEditing={() => { if (canSubmit) void signIn(); }} />
         </View>
         <T onPress={() => router.push({ pathname: '/reset-password', params: { email: email.trim() } })} accessibilityRole="link" suppressHighlighting

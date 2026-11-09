@@ -14,7 +14,7 @@
 // the names do not number themselves, when two share a number, and when the
 // version line numbers the family.
 import { describe, it, expect } from 'vitest';
-import { threadFiles, whereAPressLands } from '../shared/artifact-marks.mjs';
+import { threadFiles, whereAPressLands } from '../shared/artifact-marks.mts';
 
 const files = (...paths) => paths.map((path) => ({ path }));
 const names = (family) => family.versions.map((v) => `${v.n}:${v.name}`);

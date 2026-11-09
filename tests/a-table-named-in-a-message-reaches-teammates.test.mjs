@@ -4,7 +4,7 @@
 // engineers, and the backend one works in tables (an agent's list of endpoints
 // that skip auth, saved as .csv) and sends them to teammates. Messages, groups,
 // rooms and shared-project lines carry the files they name through
-// shared/carried-files.mjs, and that list had no .csv, .tsv or deck, while a
+// shared/carried-files.mts, and that list had no .csv, .tsv or deck, while a
 // shared thread (main/team/thread-share.mjs) carried all three. So the table
 // opened from a teammate's thread and was dead text in a message about it. The
 // app tells agents a list belongs in a .csv, so tables are among the files
@@ -13,7 +13,7 @@
 // Pinned: .csv, .tsv and a deck are carried, written any of the ways a message
 // names a file, and a script or a key file still is not.
 import { describe, it, expect } from 'vitest';
-import { isCarriedKind, filesNamedInWords } from '../shared/carried-files.mjs';
+import { isCarriedKind, filesNamedInWords } from '../shared/carried-files.mts';
 
 describe('the files a shared project carries', () => {
   it('include tables and decks, as shared threads do', () => {

@@ -7,7 +7,7 @@ import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { turnedName } from '../shared/picture-formats.mts';
-import { MAX_SENT_BYTES, MAX_SENT_WORDS } from '../shared/carried-files.mjs';
+import { MAX_SENT_BYTES, MAX_SENT_WORDS } from '../shared/carried-files.mts';
 
 const WEEK = 7 * 24 * 60 * 60 * 1000;
 const SIPS_MS = 30_000;
@@ -34,7 +34,7 @@ export async function stageAttachment(dir: string, { name, dataBase64, srcPath }
   // from is left alone: copying it would only make a second file to sweep.
   if (typeof srcPath === 'string' && srcPath) {
     if (path.resolve(srcPath) === path.resolve(path.join(dir, path.basename(srcPath)))) return { path: srcPath };
-    fs.copyFileSync(srcPath, abs);
+    fs.copyFileSync(srcPath, abs, fs.constants.COPYFILE_FICLONE);
   } else {
     fs.writeFileSync(abs, Buffer.from(String(dataBase64 ?? ''), 'base64'));
   }

@@ -7,7 +7,7 @@ Status: step 1 built 2026-10-14 (commits on w-1dc7ee2408), reviewed by Codex twi
 Everything should work from your mobile app with your computer completely
 closed." So:
 - After each turn of a Claude Code thread on the phone, a computer on the
-  managed cloud leaves a KIT in the person's storage (shared/cloud-kit.mjs,
+  managed cloud leaves a KIT in the person's storage (shared/cloud-kit.mts,
   main/cloud/kit.mts): the reply run's own arguments with the reply's place
   marked, the folder's bundle, the files a run takes, the sign-in by name.
 - The cloud server (cloud/gateway/phone.mjs), every minute, starts a reply
@@ -55,7 +55,7 @@ with the Mac shut.
 ## What exists to build on (mapped 2026-10-14)
 
 - **Accounts and a hosted database**, from the team version: Supabase (Postgres,
-  Auth, Realtime), Google or email sign-in (main/team/sign-in.mjs, session.mjs),
+  Auth, Realtime), Google or email sign-in (main/team/sign-in.mts, session.mjs),
   row-level security on every table, and a two-way sync of a project's ledger
   lines (`lines`, main/team/sync.mts: push by byte offset, pull by `seq`, every
   5 s and on Realtime). A work item online is exactly its ledger lines, and the
@@ -165,7 +165,7 @@ leaves the ship shipped and says so.
 
 - A copy is built from named fields only, with keys hidden and the home folder
   written `~`, and kept under the size limit in UTF-8 bytes
-  (shared/phone-snapshot.mjs).
+  (shared/phone-snapshot.mts).
 - Each computer has its own id; its projects online carry it, and it takes only
   the commands left on them, so two computers on one account never take each
   other's commands or overwrite a project of the same name.

@@ -133,7 +133,7 @@ export function sleepTargets(state, table = processTable()) {
   return [...pids];
 }
 
-/** Whether a run's session log carries a result its engine did not mark ERROR (main/codex.mjs, harnesses/claude-stream.mts). */
+/** Whether a run's session log carries a result its engine did not mark ERROR (main/codex.mts, harnesses/claude-stream.mts). */
 export function answeredRun(log) {
   return /== RESULT \((?![^)]*\bERROR\b)[^)]*\) ==/.test(log);
 }
