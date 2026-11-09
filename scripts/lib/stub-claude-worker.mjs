@@ -357,6 +357,8 @@ const KEYS = [
 // Where the person said the key is: "in my Keychain as posthog-read-key", "~/.config/resend.key",
 // "POSTHOG_KEY in ~/app/.env", "$OPENROUTER_API_KEY in my shell".
 function keyPlaceIn(text) {
+  const before = text.match(/([A-Za-z0-9][\w.@-]{2,})\s+(?:in|from)\s+(?:my\s+|your\s+|the\s+)?keychain/i);
+  if (before && !/^(key|it|one|token)$/i.test(before[1])) return { place: 'keychain', from: before[1] };
   const kc = text.match(/keychain(?:\s+(?:item|entry))?(?:\s+(?:as|called|named|under))?\s*[:"“'`]?\s*([A-Za-z0-9][\w.@-]*)/i);
   if (kc && !/^(as|called|named|under|item|entry|and|so|too)$/i.test(kc[1])) return { place: 'keychain', from: kc[1].replace(/\.$/, '') };
   const sh = text.match(/\$([A-Z][A-Z0-9_]+)/);

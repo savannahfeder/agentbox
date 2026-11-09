@@ -19,6 +19,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { NEED, needsIn } from '../shared/cloud-needs.mjs';
 import { approvalView, UNREADABLE } from '../renderer/src/approval-card.ts';
 import { NeedCard, NeedPlace } from '../renderer/src/components/NeedCard.tsx';
+import { keyFromReply } from '../renderer/src/key-asks.ts';
 
 const LINE = `${NEED} key POSTHOG_PERSONAL_KEY | the PostHog personal API key the daily report reads | keychain posthog-read-key`;
 
@@ -81,6 +82,20 @@ describe('the thread\'s card', () => {
     const html = draw(`${NEED} key SENTRY_AUTH_TOKEN | a Sentry auth token`);
     expect(html).not.toContain('Use the one');
     expect(html).toContain('Paste the key');
+  });
+});
+
+// Power test 2026-11-09: a tester answered the key card "use posthog-read-key
+// from keychain for the cloud thread", and the item's name was saved as the key.
+describe('a reply that says where the key is', () => {
+  const asks = ['POSTHOG_PERSONAL_KEY'];
+  it('goes to the agent as words, not as a key', () => {
+    for (const reply of ['use posthog-read-key from keychain for the cloud thread', 'posthog-read-key in my Keychain', 'it is RESEND_API_KEY in ~/app/.env', 'use $MIXPANEL_API_SECRET from my shell']) {
+      expect(keyFromReply(reply, asks, [])).toBeNull();
+    }
+  });
+  it('still takes a key pasted with a few words', () => {
+    expect(keyFromReply('here you go phx_abc123def456ghi789', asks, [])).toMatchObject({ name: 'POSTHOG_PERSONAL_KEY', value: 'phx_abc123def456ghi789' });
   });
 });
 
