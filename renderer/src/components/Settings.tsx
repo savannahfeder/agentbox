@@ -2282,6 +2282,9 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
               <Row label="Home" desc="A page to start from: what needs you, a box to start a thread, and your team's week. The Inbox gets a sky below its list. Pick the sky in Appearance.">
                 <Switch label="Home" on={homeSet.on} onChange={(v) => setHomeSetting(HOME_KEY, v)} />
               </Row>
+              <Row label="Back and forward" desc={sayKeys("Arrows before each page's title take you back to where you just were, and forward again. ⌘[ and ⌘] do the same.")}>
+                <Switch label="Back and forward" on={!!w.alpha?.backForward} onChange={(v) => setWorkspace('alphaBackForward', v)} />
+              </Row>
             </Group>
           </Page>
         )}

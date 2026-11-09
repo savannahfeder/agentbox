@@ -901,6 +901,25 @@ body {
 }
 .topbar button { -webkit-app-region: no-drag; }
 
+/* BACK AND FORWARD (Alpha features). The arrows lead the header and whatever
+   follows them keeps its place at the left, not the middle the bar's
+   space-between would give a third item. */
+.back-forward { display: inline-flex; align-items: center; gap: 2px; margin-right: 12px; flex: none; }
+.topbar > .back-forward + * { margin-right: auto; }
+.back-forward button {
+  width: 26px; height: 26px; padding: 0; display: grid; place-items: center;
+  border: 0; border-radius: var(--tag-radius); background: none; color: var(--text-dim); cursor: pointer;
+}
+.back-forward button:not(:disabled) { background: var(--film-strong); color: var(--text); }
+.back-forward button:disabled { color: var(--text-faint); opacity: .45; cursor: default; }
+.back-forward svg { width: 15px; height: 15px; }
+/* Home hides its header bar but keeps the arrows. */
+.app.home-shown > .topbar .back-forward { visibility: visible; }
+/* The arrows replace the one back arrow a thread and Settings already had. */
+.app.back-forward-on .thread-crumb-back svg,
+.app.back-forward-on .workspace-page-heading .workspace-back { display: none; }
+.app.back-forward-on .thread-crumb-back { padding-left: 0; }
+
 /* WHAT AN OPENED TASK HAS INSTEAD OF A TOP BAR. Nothing is drawn here. It
    exists for two things only, and both are invisible: 1. THE THREE BUTTONS
    MACOS PAINTS ON TOP OF US. titleBarStyle hiddenInset puts close, minimise and
