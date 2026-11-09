@@ -105,6 +105,13 @@ describe('how a tester starts', () => {
 // "process.kill(<pid>, 0)"`), which read as not running, so `app open` started
 // a second Chrome on the same profile and it died.
 describe('a sandboxed tester finds the browser the runner opened', () => {
+  // The second run: the CTO tester's Chrome died mid-morning and every open
+  // from inside the sandbox failed for twenty minutes.
+  it('and the runner opens it again from outside the sandbox when it dies', () => {
+    const runner = read('.claude/skills/power-test/scripts/power-test.mjs');
+    expect(runner).toMatch(/if \(!browserAlive\(state\(\)\)\) await run\(cmds\.browse, \['open'\]/);
+  });
+
   it('counts a process it may not signal as running', () => {
     expect(read('.claude/skills/verify-agentbox/scripts/browse.mjs')).toMatch(/catch \(e\) \{ return e\?\.code === 'EPERM'; \}/);
   });
