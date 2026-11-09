@@ -8154,7 +8154,7 @@ export class Supervisor {
     const runId = s.cloud && s.cwd ? readMarker(this._cloudPlace(s.cwd, product, itemId))?.runId : null;
     let movable = false;
     try { movable = !s.cloud && this._movableNow().has(itemId); } catch { /* said as not movable */ }
-    return { since: s.startedAt, where: s.cloud ? 'cloud' : 'mac', ...(runId ? { runId } : {}), ...(movable ? { movable } : {}), doing: currentActivity(s).map((a) => ({ label: a.label, startedAt: a.startedAt })) };
+    return { since: s.turnStartedAt ?? s.startedAt, where: s.cloud ? 'cloud' : 'mac', ...(runId ? { runId } : {}), ...(movable ? { movable } : {}), doing: currentActivity(s).map((a) => ({ label: a.label, startedAt: a.startedAt })) };
   }
 
   // The phone asks for each running thread on every pass, so one read serves a few seconds.
@@ -8348,6 +8348,7 @@ export class Supervisor {
         itemId: s.itemId,
         product: s.product,
         startedAt: s.startedAt,
+        ...('turnStartedAt' in s && s.turnStartedAt ? { turnStartedAt: s.turnStartedAt } : {}),
         // WHICH CODING AGENT REALLY STARTED THIS ONE. `engineFacts` below is the
         // answer for the NEXT spawn on a row; this is the one that happened, so
         // the byline says what is in front of her rather than what would be next
