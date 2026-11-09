@@ -10,6 +10,7 @@ import type { TeamSession } from './team/index.mts';
 import { startConnections } from './connections/start.mjs';
 import { roomsSetup } from './team/room-setup.mts';
 import { matesForTheTeam } from './teammate-reach.mjs';
+import { alphaFeatures } from './settings.mts';
 import { loadCloudConfig, supabaseSession } from './team/session.mjs';
 // MY WORKSPACE IS NOT A TEAM FEATURE ANY MORE (w-f8d123be62), even though it
 // still lives in the team folder next to the sharing rules it has to obey.
@@ -507,6 +508,7 @@ async function createWindow() {
     log: (line) => console.log(line),
     runningIds: () => supervisor.runsGoing().map((s) => s.itemId),
     ownMates: () => matesForTheTeam(store, config),
+    sharing: () => alphaFeatures(config).multiplayer,
     // HER PHONE WITH THE MAC SHUT (main/phone-inbox.mts). What it left is done
     // through the window's own handlers, filed below once the window exists.
     phone: {

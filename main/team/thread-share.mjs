@@ -107,7 +107,13 @@ function messageLines(lines, me) {
   };
   for (const l of all) {
     const p = l?.patch;
-    if (!p || l.claim || l.heartbeat || l.release || p.comment) continue;
+    if (!p || l.claim || l.heartbeat || l.release) continue;
+    // Taking a card down deletes its comments from the cloud, so the owner's
+    // copy is what brings them back when the thread is shared again.
+    if (p.comment) {
+      if (l.by && String(l.uid ?? '').startsWith('comment-') && said(p.comment.text)) out.push({ id: l.id, ts: l.ts, source: 'system', by: l.by, uid: l.uid, patch: { comment: { text: p.comment.text } } });
+      continue;
+    }
     // Readers only get files that a message links, so an edit goes out as one.
     if (p.artifact?.do === 'edit' && p.artifact.path) {
       out.push({ id: l.id, ts: l.ts, source: 'founder', by: l.by || me, ...(l.uid ? { uid: l.uid } : {}), patch: { answer: editedWords(callEdit(p.artifact.path), p.artifact.path) } });
@@ -315,6 +321,7 @@ export function createThreadShare({
       const patch = {};
       for (const f of ['body', 'answer', 'result', 'note']) if (text(l.patch[f])) patch[f] = l.patch[f];
       if (l.patch.from?.name) patch.from = { teammate: String(l.patch.from.teammate ?? ''), name: String(l.patch.from.name) };
+      if (text(l.patch.comment?.text) && text(l.by) && String(l.uid ?? '').startsWith('comment-')) patch.comment = { text: l.patch.comment.text };
       return {
         id: String(l.id ?? ''), ts: Number(l.ts) || 0, source: l.source === 'founder' ? 'founder' : l.source === 'system' ? 'system' : 'agent',
         ...(text(l.by) ? { by: l.by } : {}), ...(text(l.uid) ? { uid: l.uid } : {}), patch,
@@ -540,7 +547,8 @@ export function createThreadShare({
     read(owner, threadId) {
       const ok = THREAD_ID.test(String(owner)) && THREAD_ID.test(String(threadId));
       const local = ok ? readLocal(owner, threadId) : null;
-      const theirs = comments.filter((c) => c.owner === owner && c.threadId === threadId).map((c) => ({
+      const carried = new Set((local?.lines ?? []).map((l) => l.uid).filter(Boolean));
+      const theirs = comments.filter((c) => c.owner === owner && c.threadId === threadId && !carried.has(`comment-${c.id}`)).map((c) => ({
         id: threadId, ts: c.at, source: 'system', by: c.by, uid: `comment-${c.id}`, patch: { comment: { text: c.text } },
       }));
       return {

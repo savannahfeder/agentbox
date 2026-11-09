@@ -263,6 +263,8 @@ export interface TeamServiceOptions {
   /** Where a file's link opens; the phone site when undefined, no links when null. */
   shareSite?: string | null;
   rooms?: TeamRoomsSetup | null;
+  /** Settings › Alpha features › Multiplayer. Off, no thread of this person's is shared. */
+  sharing?: () => boolean;
 }
 
 /** A file handed to a task; one with a `rel` is a file the words name. */
@@ -339,6 +341,7 @@ export function createTeamService({
   runningIds = () => [],
   // This person's AI teammates, which the team sees on its board.
   ownMates = () => [],
+  sharing = () => true,
 }: TeamServiceOptions) {
   // The phone site's address, only an https one, and its code for Settings.
   const site = typeof phone?.site === 'string' && /^https:\/\/[^\s/]+(\/[^\s]*)?$/.test(phone.site) ? phone.site : null;
@@ -724,10 +727,12 @@ export function createTeamService({
     void publishConnections();
     if (state.settling) set({ settling: false });
     phoneInbox = makePhoneInbox();
-    const listCards = () => [
+    // Off, the window shows no team and no Team / Private choice, so nothing
+    // goes up, and what was up comes down as a private thread's card does.
+    const listCards = () => (!sharing() ? [] : [
       ...cardsFor({ products: products(), readItems: (p) => disk.readWorkItems(p.dir), since: state.me ? kept().getSince(state.me.id) : null, me: state.me?.id ?? null, running: runningIds() }),
       ...(ownMates() ?? []).map((t) => mateCard(t, { now: t.now ?? null, running: !!t.running, at: t.updatedAt ?? t.createdAt ?? 0 })),
-    ];
+    ]);
     threadShare = createThreadShare({
       backend,
       me: me.id,

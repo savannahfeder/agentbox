@@ -54,6 +54,7 @@ import { ensurePersonalProject } from './team/projects.mts';
 import { loadCloudConfig, supabaseSession, headlessSessionFile } from './team/session.mjs';
 import { roomsSetup } from './team/room-setup.mts';
 import { matesForTheTeam } from './teammate-reach.mjs';
+import { alphaFeatures } from './settings.mts';
 import { appHome, carryMisplacedMachinery, storeRootEnv } from './store/home.mjs';
 import { keepAnswerModesIn } from './answer-modes.mts';
 
@@ -290,6 +291,7 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
     onChange: () => ipc?.push?.(),
     shareSite: cloudConfig.phoneSite ?? null,
     ownMates: () => matesForTheTeam(store, config),
+    sharing: () => alphaFeatures(config).multiplayer,
     rooms: roomsSetup({ config, store, supervisor, userDir }),
   }) : null;
   if (team) store.teammates?.bindTeam(team);
