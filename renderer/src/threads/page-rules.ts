@@ -18,6 +18,7 @@ import { plainWords } from '../team/agent-mentions';
 import { heldByAPerson, iSpokeLast, isTaskRow, isWorkThread, lastSpeaker, nameIsAPersons, whatWaits } from '../../../shared/team-rules.mjs';
 import { taskWords } from '../team/company';
 import { shownTitle } from '../../../shared/thread-title.mjs';
+import { localDate } from '../local-dates';
 
 export type PageId = 'inbox' | 'team';
 export type UpdatedWindow = 'today' | 'week' | 'any';
@@ -33,11 +34,11 @@ export interface Display {
   privacy?: Privacy;
 }
 
-// Your own page opens as a list and the team page as a board, by default, and
-// either is remembered once changed.
+// Both pages open as a list, each tab on its own, and B turns either into a
+// board; the choice is remembered once changed.
 export const DEFAULT_DISPLAY: Record<PageId, Display> = {
   inbox: { view: 'list', sort: 'priority', priorities: [], projects: [], updated: 'any', privacy: 'any' },
-  team: { view: 'board', sort: 'priority', priorities: [], projects: [], updated: 'any', privacy: 'any' },
+  team: { view: 'list', sort: 'priority', priorities: [], projects: [], updated: 'any', privacy: 'any' },
 };
 
 /**
@@ -485,7 +486,7 @@ export function updatedWords(ts: number, now = Date.now()): string {
   const hours = Math.floor(min / 60);
   if (ts >= startOfDay(now)) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
   if (ts >= startOfDay(now) - 86_400_000) return 'Yesterday';
-  return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return localDate(ts, { month: 'short', day: 'numeric' });
 }
 
 /** A product that is a message record between two people, which no project list shows. */

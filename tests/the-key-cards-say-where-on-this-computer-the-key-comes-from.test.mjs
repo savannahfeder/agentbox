@@ -17,7 +17,7 @@ import { createElement as h } from 'react';
 import { Supervisor } from '../main/supervisor.mts';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { NEED, needsIn } from '../shared/cloud-needs.mjs';
-import { approvalReads, approvalToolShown, UNREADABLE } from '../renderer/src/approval-card.ts';
+import { approvalView, UNREADABLE } from '../renderer/src/approval-card.ts';
 import { NeedCard, NeedPlace } from '../renderer/src/components/NeedCard.tsx';
 
 const LINE = `${NEED} key POSTHOG_PERSONAL_KEY | the PostHog personal API key the daily report reads | keychain posthog-read-key`;
@@ -36,25 +36,22 @@ describe('the ask line', () => {
 
 describe('the approval card a waiting run raises', () => {
   it('says which key, where it is read from, and that every cloud thread gets it', () => {
-    expect(approvalReads({ name: 'POSTHOG_PERSONAL_KEY', what: 'the PostHog personal API key the daily report reads', place: 'keychain', from: 'posthog-read-key' }, 'cloud_key')).toEqual({
-      what: 'asks for a key from this computer',
-      body: 'PostHog personal API key the daily report reads\nFrom your Keychain, as posthog-read-key\nKept for every cloud thread as POSTHOG_PERSONAL_KEY',
+    expect(approvalView({ name: 'POSTHOG_PERSONAL_KEY', what: 'the PostHog personal API key the daily report reads', place: 'keychain', from: 'posthog-read-key' }, 'cloud_key')).toEqual({
+      title: 'Give the cloud a key from this computer',
+      body: { kind: 'fields', rows: [['Key', 'PostHog personal API key the daily report reads'], ['From', 'Your Keychain, as posthog-read-key'], ['Saved as', 'POSTHOG_PERSONAL_KEY']] },
+      where: 'Every cloud thread can use it from now on',
     });
-    expect(approvalReads({ name: 'POSTHOG_KEY', what: '', place: 'file', from: '~/app/.env', entry: 'POSTHOG_KEY' }, 'cloud_key').body).toBe('POSTHOG_KEY\nFrom POSTHOG_KEY in ~/app/.env\nKept for every cloud thread as POSTHOG_KEY');
+    expect(approvalView({ name: 'POSTHOG_KEY', what: '', place: 'file', from: '~/app/.env', entry: 'POSTHOG_KEY' }, 'cloud_key').body.rows)
+      .toEqual([['Key', 'POSTHOG_KEY'], ['From', 'POSTHOG_KEY in ~/app/.env'], ['Saved as', 'POSTHOG_KEY']]);
   });
 
   it('shows nothing it could not read as a place', () => {
-    expect(approvalReads({ name: 'X_KEY', place: 'browser', from: 'cookies' }, 'cloud_key').body).toBe(UNREADABLE);
-    expect(approvalReads({ name: 'not a name', place: 'keychain', from: 'k' }, 'cloud_key').body).toBe(UNREADABLE);
+    expect(approvalView({ name: 'X_KEY', place: 'browser', from: 'cookies' }, 'cloud_key').body).toEqual({ kind: 'text', text: UNREADABLE });
+    expect(approvalView({ name: 'not a name', place: 'keychain', from: 'k' }, 'cloud_key').body).toEqual({ kind: 'text', text: UNREADABLE });
   });
 
   it('leaves every other card as it was', () => {
-    expect(approvalReads({ command: 'echo hello' }, 'Bash')).toEqual({ what: 'asks to run', body: 'echo hello' });
-    expect(approvalToolShown('Bash')).toBe(' · Bash');
-  });
-
-  it('does not print its internal name beside the shortcuts', () => {
-    expect(approvalToolShown('cloud_key')).toBe('');
+    expect(approvalView({ command: 'echo hello' }, 'Bash')).toEqual({ title: 'Run a command', body: { kind: 'text', text: 'echo hello' }, where: null });
   });
 });
 

@@ -52,7 +52,8 @@ describe('a teammate\'s chat', () => {
   it('draws no column on a new teammate\'s page either, and still asks where it works', () => {
     const fresh = fn('NewTeammate');
     expect(fresh).not.toMatch(/<aside/);
-    expect(fresh).toMatch(/real\.length > 1 && [^\n]*Where does it work\?/);
+    // One project is enough to ask when a new one can be added from the list.
+    expect(fresh).toMatch(/\(real\.length > 1 \|\| \(real\.length > 0 && onNewProject\)\) && [^\n]*Where does it work\?/);
     expect(fresh).toMatch(/<PickOne value=\{where\?\.slug \?\? ''\} label="Works in"/);
   });
 

@@ -77,7 +77,7 @@ import { diagramSource } from '../diagram-fence';
 import { DiagramBlock } from './DiagramBlock';
 import { NeedCard, NeedPlace, HELD, setHeld } from './NeedCard';
 import { NEED_BLOCK, isNewestAnswer, keyFromReply, keyLooksWrong, keySavedWords, needsAsBlocks } from '../key-asks';
-import { connectedReply, needsIn, needId, keysOf, type Need } from '../../../shared/cloud-needs.mjs';
+import { connectedReply, lateReply, needsIn, needId, keysOf, type Need } from '../../../shared/cloud-needs.mjs';
 import type { KeySource } from '../../../shared/cloud-key-sources.mjs';
 import { keyLabel, keyWords } from '../../../shared/cloud-keys.mjs';
 import { referencedFiles, isImagePath } from '../referenced-files';
@@ -160,6 +160,8 @@ import type { Spot } from '../one-thing-at-a-time';
 import { ChoicesFold, ChoicesShow, QueueNav } from './OneThingAtATime';
 import { InlineTable, gridFromHast } from './TableView';
 import { foldKey, foldedKeys, toggleFold } from '../one-thing-at-a-time';
+import { watchForBlank } from '../blank-check';
+import { FittedImg } from './FittedImg';
 const needName = (n: Need) => (n.kind === 'sign-in' ? n.service.name : n.kind === 'key' ? (keyWords(n.what) ? `the ${keyWords(n.what)}` : n.name) : n.kind === 'file' ? (n.path.split('/').pop() ?? n.path) : `the ${n.about} code`);
 
 // A relative product path is an artifact, however the worker wrote it:
@@ -329,18 +331,21 @@ export function ArtifactImg({ src, alt, roots, onOpen, find }: {
   // LETS A COPY CARRY THE PICTURE. Without it the picture taints a canvas and
   // ../copy-out.ts has nothing to inline, so a message pasted into an email
   // arrives with a dead url where it should be.
+  // A chat draws its pictures as previews (team/chat.css), a thread at reading width.
+  const maxHeight = direct ? 240 : undefined;
+  const minWidth = direct ? 360 : 760;
   if (/^file:\/\//.test(src) || src.startsWith('/')) {
     const file = src.startsWith('/') ? src : decodeURIComponent(src.slice(7));
-    if (found) return door(found, <img src={pictureUrl(found)} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" />);
+    if (found) return door(found, <FittedImg maxHeight={maxHeight} minWidth={minWidth} src={pictureUrl(found)} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" />);
     if (broken && direct) return <CarriedNote src={file} always />;
     if (broken) return <button type="button" className="missing-artifact" title="Look for it again" onClick={() => { setTries(tries + 1); setBroken(false); }}>missing image: {file}</button>;
-    return door(file, <img src={again(pictureUrl(file))} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" onError={() => setBroken(true)} />);
+    return door(file, <FittedImg maxHeight={maxHeight} minWidth={minWidth} src={again(pictureUrl(file))} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" onError={() => setBroken(true)} />);
   }
   const rel = src.replace(/^\.\//, '');
   const candidates = roots.map((r) => pictureUrl(`${r}/${rel}`));
   if (attempt >= candidates.length) {
     const asked = find ? found : null;
-    if (asked) return door(asked, <img src={pictureUrl(asked)} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" onError={() => setFound(null)} />);
+    if (asked) return door(asked, <FittedImg maxHeight={maxHeight} minWidth={minWidth} src={pictureUrl(asked)} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" onError={() => setFound(null)} />);
     // Still asking: a picture's box, rather than a "missing" that turns into a picture.
     if (asked === undefined) return <span className="inline-image arriving" aria-hidden="true" />;
     if (direct) return <CarriedNote src={rel} always />;
@@ -348,7 +353,7 @@ export function ArtifactImg({ src, alt, roots, onOpen, find }: {
     if (find) return <button type="button" className="missing-artifact" title="Look for it again" onClick={lookNow}>missing image: {rel}</button>;
     return <span className="missing-artifact">missing image: {rel}</span>;
   }
-  return door(rel, <img src={candidates[attempt]} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" onError={() => setAttempt(attempt + 1)} />);
+  return door(rel, <FittedImg maxHeight={maxHeight} minWidth={minWidth} src={candidates[attempt]} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" onError={() => setAttempt(attempt + 1)} />);
 }
 
 // A SOUND OR A FILM A WORKER NAMES PLAYS WHERE IT IS NAMED.
@@ -522,6 +527,8 @@ function CarriedNote({ src, always = false }: { src: string; always?: boolean })
 // it is pointing at, and the folder beside them also holds every older round,
 // so it stays one line rather than drawing the same pictures twice.
 const FOLDER_SHOWS = 6;
+// A third of the 760-point reading width, less the gaps (styles.css .folder-preview-grid).
+const FOLDER_SHOT_WIDTH = 247;
 // What each folder showed last, so a thread opened again draws it at once.
 const folderSeen = new Map<string, { pictures: string[]; total: number }>();
 //
@@ -582,7 +589,7 @@ export function FolderPreview({ product, folder, onOpen, quiet, thread }: {
           const base = file.split('/').pop() ?? file;
           return (
             <button key={file} type="button" className="folder-preview-shot" data-copy-file={file} data-picture={file} title={base} onClick={(e) => onOpen(file, e.currentTarget)}>
-              <img src={pictureUrl(file)} alt={base} crossOrigin="anonymous" loading="lazy" />
+              <FittedImg cover minWidth={FOLDER_SHOT_WIDTH} className="folder-preview-picture" src={pictureUrl(file)} alt={base} crossOrigin="anonymous" />
               <span className="folder-preview-label">{base}</span>
             </button>
           );
@@ -719,7 +726,7 @@ export function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 /** Which threads' choices are folded, kept on this machine. */
 const CHOICES_FOLDED = 'one.choicesFoldedOn';
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, giveTo = [], onGive, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, giveTo = [], onGive, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null }: {
   /** One thing at a time (w-65bcefb857): this thread's place in Needs you and the arrows that walk it. */
   queue?: { spot: Spot; onStep: (dir: 1 | -1) => void } | null;
   /** Drawn on the one-at-a-time page outside Needs you too: every thread with an agent. */
@@ -814,6 +821,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // in whatever app owns the extension.
   openDoc?: string | null;
   onOpenDoc?: (src: string, at?: string) => void;
+  /** Puts down the file open beside the thread. */
+  onCloseDoc?: () => void;
   parent: WorkItem | null;
   blockedBy: WorkItem | null;
   // THE THREADS THIS ONE MADE, with where each stands (w-2e8aa16f0f). Drawn in
@@ -905,6 +914,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   onReopenDone?: () => void;
   /** Opens ⌘K on its Move to rows. */
   onMove?: () => void;
+  /** Sets the thread's level, from the thread's own menu. */
+  onPriority?: (value: number) => void;
   // Putting something off had no button anywhere in the app: S, and only S.
   // Every other verb in this footer is clickable, so the one verb that is not
   // is the one a hand that has never read a shortcut list cannot reach.
@@ -1334,6 +1345,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     path, at: Date.now(), ...(from && opensAsPicture(path) ? { steps: picturesFor(paneRef.current, path, from).pictures.map((p) => p.path) } : {}),
   });
   const openFileMark = useCallback((link: FileMarkLink) => setArtifact({ file: link.file, note: link.id, at: Date.now() }), []);
+  useEffect(() => watchForBlank(`${item.product}/${item.id}`), [item.product, item.id]);
   const [historyLines, setHistoryLines] = useState<unknown[]>([]);
   useEffect(() => {
     let live = true;
@@ -1535,7 +1547,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     const held = (HELD.get(item.id) ?? []).map((h) => h.words).join(' ');
     return [connected, held].filter(Boolean).join(' ');
   };
-  const saveKeys = async (fields: { name: string; value: string; label: string; from?: KeySource }[], need: Need, words?: string) => {
+  const saveKeys = async (fields: { name: string; value: string; label: string; from?: KeySource }[], need: Need, words?: string, late = false) => {
+    if (late) return saveLate(fields, need);
     let out: Awaited<ReturnType<typeof api.cloudKey>> = { ok: true };
     const savedAfter = [...(savedKeys ?? []), ...fields.map((f) => f.name)];
     const left = openAfter(savedAfter, heldHere.map((h) => h.need));
@@ -1557,7 +1570,28 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     onNotice(keySavedWords(said, { asks: latestAsks, saved, freed: out.freed ?? [], thread: item.id, cloudOff: !!out.cloudOff, done: need.kind === 'sign-in' ? 'connected' : 'saved', left: left.map(needName) }));
     return null;
   };
-  const sendFile = async (path: string | null, need: Need) => {
+  // A key from a card already answered in words: nothing is held for it, and the thread hears it came after all.
+  const saveLate = async (fields: { name: string; value: string; label: string; from?: KeySource }[], need: Need) => {
+    let out: Awaited<ReturnType<typeof api.cloudKey>> = { ok: true };
+    for (const [i, f] of fields.entries()) {
+      const reply = i === fields.length - 1 ? { product: item.product, id: item.id, answer: lateReply([need]) } : undefined;
+      out = await api.cloudKey({ action: 'save', name: f.name, value: f.value, label: f.label, ...(f.from ? { from: f.from } : {}), ...(reply ? { reply } : {}) });
+      if (!out.ok) return out.error || 'The cloud did not take the key. Try again.';
+    }
+    const names = fields.map((f) => f.name);
+    setKeysJustSaved((was) => [...was, ...names]);
+    const said = need.kind === 'sign-in' ? need.service.name : fields[0].label;
+    onNotice(keySavedWords(said, { asks: names, saved: names, freed: out.freed ?? [], thread: item.id, cloudOff: !!out.cloudOff, done: need.kind === 'sign-in' ? 'connected' : 'saved' }));
+    return null;
+  };
+  const sendFile = async (path: string | null, need: Need, late = false) => {
+    if (late) {
+      const out = await api.cloudSendFile({ product: item.product, id: item.id, ...(path ? { path } : { choose: true }), hold: false });
+      if (out.canceled) return false;
+      if (!out.ok) return out.error || 'The file could not be sent. Try again.';
+      onNotice(`Sent ${out.path?.split('/').pop()}. This thread has it now.`);
+      return null;
+    }
     const waitFor = openAfter(savedKeys ?? [], [...heldHere.map((h) => h.need), needId(need)]);
     const also = heldWords();
     const out = await api.cloudSendFile({ product: item.product, id: item.id, ...(path ? { path } : { choose: true }), hold: waitFor.length > 0, ...(also && !waitFor.length ? { also } : {}) });
@@ -1842,7 +1876,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   ) : null;
   // THE CODE BUTTON, in the corner beside Done (w-c25aae4035): people never
   // found the change while it was only a row in the dots menu.
-  const openChange = () => onOpenDoc?.(changePathFor(item.id));
+  // Pressed again while lit, it puts the change away.
+  const changeOpen = openDoc === changePathFor(item.id);
+  const openChange = () => (changeOpen ? onCloseDoc?.() : onOpenDoc?.(changePathFor(item.id)));
   const codeButton = figures ? (
     <span className="ts-code-figures">
       {signed(figures).map(({ sign, text }) => (
@@ -1882,7 +1918,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       files={<ThreadFilesButton files={madeHere} onOpen={(f) => (opensBig(f.src) ? openBig(f.src) : onOpenDoc?.(f.src))} />}
       change={changeFigures}
       codeButton={codeButton}
-      codeOpen={openDoc === changePathFor(item.id)}
+      codeOpen={changeOpen}
       onViewChange={openChange}
       addPeople={cornerPeople}
       onAddPeople={onAddPeople ? (person) => onAddPeople(item, person) : undefined}
@@ -1916,6 +1952,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       blocks={(item.labels ?? []).includes('given-task')}
       onRename={crumbFrom && !agent ? () => setRenameAt(Date.now()) : null}
       onMove={canFinish && !agent && !direct ? onMove ?? null : null}
+      priority={priorityIdOf(shownPriority(item))}
+      onPriority={canFinish && !agent && !direct && onPriority ? (id) => onPriority(priorityValueOf(id)) : undefined}
     />
   );
 
@@ -1943,7 +1981,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
         <rect x="1.5" y="1.5" width="9" height="9" fill="currentColor" />
       </svg>
-      Stop
+      <span className="dock-stop-word">Stop</span>
     </button>
   ) : null;
 
@@ -2049,7 +2087,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     {cornerHeaderTarget && createPortal(<span className="ts-top">{sentUp && aboveDock}{queue && <QueueNav spot={queue.spot} onStep={queue.onStep} />}{crumbFrom && !inChats && (direct || summarised) && <ConversationAside item={item} />}{threadMenu}</span>, cornerHeaderTarget)}
     {artifact && (
       <ThreadArtifacts item={item} open={artifact} withAgent={!direct && !heldByPerson && !item.agent}
-        onClose={() => setArtifact(null)} onNotice={onNotice} />
+        onClose={() => setArtifact(null)} onNotice={onNotice}
+        onBeside={onOpenArtifact ? (path) => { setArtifact(null); onOpenArtifact(path, 'beside'); } : undefined} />
     )}
     {picture && (
       <PictureView
@@ -3708,7 +3747,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
           onClick={() => send()}
           disabled={!hasDraft || saving}
           title={`Send · ${sendKeyFor(enterSends)}`}
-        >{saving ? 'Sending…' : <>Send <kbd>{sendKeyFor(enterSends)}</kbd></>}</button>
+        >{saving ? 'Sending…' : <>Send <kbd>{sendKeyFor(enterSends)}</kbd></>}<SendGlyph /></button>
         {canWait && <ReplyLater at={sendAt} onPick={pickSendAt} onClosed={() => ref.current?.focus()} />}
         </span>
         )}
@@ -3721,5 +3760,12 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
 const ClipGlyph = () => (
   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
     <path d="m20 11.5-8.2 8.2a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.4 8.4a1.7 1.7 0 0 1-2.4-2.4l7.7-7.7" />
+  </svg>
+);
+
+// Drawn only when the reply box is too narrow for the word (narrow-conversation.css).
+const SendGlyph = () => (
+  <svg className="dock-send-arrow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 19V5M6 11l6-6 6 6" />
   </svg>
 );

@@ -217,6 +217,9 @@ export function mondayMorning(now = Date.now()): number {
   return d.getTime();
 }
 
+/** On a Sunday the two presets are one time, and a list shows only Tomorrow morning. */
+export const mondayIsTomorrow = (now = Date.now()) => mondayMorning(now) === tomorrowMorning(now);
+
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -341,6 +344,15 @@ export function startingProject<T extends ProjectLike>(
     ?? offered.find((p) => !p.practice)
     ?? offered[0]
     ?? null;
+}
+
+/**
+ * The project on screen when the card opens: the one the list is filtered to,
+ * else the thread that is open. Null on a plain inbox, where the card falls back
+ * to the project last sent to.
+ */
+export function projectOnScreen({ filter, open }: { filter: string | null; open: { product?: string | null } | null }): string | null {
+  return filter ?? open?.product ?? null;
 }
 
 /**
@@ -600,6 +612,16 @@ export function keyOnTheNewThreadCard(
   if (menuOpen || on === 'a field' || on === 'away') return 'leave it';
   if (inline && on === 'nothing') return 'leave it';
   return 'the message';
+}
+
+/**
+ * Whether ⌘↵ heard on the window sends the New thread card. The dialog owns
+ * the keyboard, so it always does. The box on the empty inbox shares the page,
+ * so only when nothing else has the keyboard and it holds words to send.
+ */
+export function modEnterSendsTheCard({ inline, on, hasWords }: { inline: boolean; on: Keyboard; hasWords: boolean }): boolean {
+  if (!inline) return true;
+  return on === 'nothing' && hasWords;
 }
 
 /**

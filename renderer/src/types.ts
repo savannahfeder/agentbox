@@ -244,7 +244,7 @@ export interface FileNote {
   from?: string;
   /** In the Files place, the thread or chat it was written in. */
   in?: string;
-  replies?: { id: string; text: string; by: string | null; ts: number }[];
+  replies?: { id: string; text: string; by: string | null; ts: number; sent?: boolean }[];
 }
 
 export interface FileApproval { file: string; by: string | null; ts: number; owner: string | null }
@@ -359,7 +359,7 @@ export interface FilesPlaceView {
 type LedgerLineShape = { ts: number; by?: string | null; source?: string; patch?: Record<string, unknown> };
 
 /** What a comment or approval in the thread links to. */
-export interface FileMarkLink { kind: 'note' | 'approved' | 'edited'; file: string; id?: string; place?: string; /** The file's one name and version, for the words. */ shown?: string }
+export interface FileMarkLink { kind: 'note' | 'approved' | 'edited'; file: string; id?: string; place?: string; /** The file's one name and version, for the words. */ shown?: string; /** A comment still waiting for Send. */ unsent?: true }
 
 /** A note naming you on a teammate's shared thread: a row in Needs you. */
 export interface SharedFileNews {
@@ -812,19 +812,39 @@ export interface UsageLimit {
    *  Then the clock time is printed instead, or nothing. */
   resetsAt: number | null;
   zone: string | null;
+  /** A five hour window that started over after this reading (shared/usage.mts `limitsToShow`). */
+  reset?: boolean;
+}
+
+/** What a paying team's owner sees of Stripe on Plan and Billing (team/TeamBilling.tsx). */
+export interface TeamBillingInvoice { at: number; amount: number; status: 'paid' | 'open' | 'failed' }
+export interface TeamBillingDetails {
+  periodStart: number | null; periodEnd: number | null;
+  nextAt: number | null; nextAmount: number | null;
+  card: { brand: string; last4: string } | null;
+  email: string | null;
+  invoices: TeamBillingInvoice[];
 }
 
 /** The Agentbox Cloud plan this Mac is signed in to, as the cloud server counts it. */
 export interface CloudPlan {
   signedIn: boolean;
-  /** 'free' is no plan with free hours left (main/cloud/account.mts cloudPlanOf). */
-  plan?: 'none' | 'free' | 'pro' | 'plus' | 'max';
+  /** 'team' and 'free' are no plan of one's own, with the team's or the free hours left (main/cloud/account.mts cloudPlanOf). */
+  plan?: 'none' | 'free' | 'team' | 'pro' | 'plus' | 'max';
   unlimited?: boolean;
   /** Agents at once; null when unlimited. */
   agents?: number | null;
   hoursPerMonth?: number;
   running?: number;
   usedSeconds?: number;
+  /** With no plan: the free hours, spent or not. */
+  free?: { agents: number; hours: number; usedSeconds: number };
+  /** The team's shared hours: a trial until `endsAt`, or `seats` paid for. */
+  /** Hours and agents are this person's own; `people` is every member's own use (names come from the team). */
+  team?: {
+    trial: boolean; endsAt: number | null; seats: number; members: number; owner: boolean; agents: number; running: number; hours: number; usedSeconds: number;
+    people?: { id: string; usedSeconds: number; running: number; name?: string }[];
+  };
   /** Who bills the plan: Stripe, or nobody because it was set by hand. Absent from older servers. */
   billing?: 'stripe' | 'given' | null;
   error?: string;
@@ -1662,6 +1682,7 @@ declare global {
       assistiveTech?(): Promise<boolean>;
       olderItems?(p: { offset: number; limit: number }): Promise<{ items: WorkItem[]; more: boolean }>;
       crash?(p: { name: string; message: string; stack: string }): Promise<unknown>;
+      blankCheck?(p: { thread: string; facts: Record<string, unknown>; lateMs: number; longTaskMs: number }): Promise<string | null>;
       // A count. The name is checked against the approved list in the main
       // process, which attaches everything else; nothing from this side rides along.
       track?(name: string, count?: number): Promise<boolean>;

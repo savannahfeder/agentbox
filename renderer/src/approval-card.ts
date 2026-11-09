@@ -69,18 +69,7 @@ export const approvalAnswered = (allow: boolean) =>
  * -- so a card carrying only a host is a real card now, and "asks to run" over
  * one would be the card lying about the question it is asking.
  */
-/** The tool's own name beside the shortcuts, where it means something to a person. */
-export const approvalToolShown = (tool?: string) => (tool && tool !== 'cloud_key' ? ` · ${tool}` : '');
-
 export function approvalReads(input: unknown, tool?: string): ApprovalReading {
-  // A cloud run asking this computer for a key (main/cloud/key-asks.mts KEY_CARD).
-  if (tool === 'cloud_key') {
-    const it = (input ?? {}) as Record<string, unknown>;
-    const name = String(it.name ?? '');
-    const src = keySource(it);
-    if (!src || !/^[A-Z][A-Z0-9_]{1,79}$/.test(name)) return { what: 'asks for a key from this computer', body: UNREADABLE };
-    return { what: 'asks for a key from this computer', body: [keyLabel(String(it.what ?? '')) ?? name, `From ${keySourceWords(src)}`, `Kept for every cloud thread as ${name}`].join('\n') };
-  }
   // MCP argument names are arbitrary: "command" or "host" is not native
   // permission metadata. Keep the existing card, name the server/tool, and
   // show each argument separately with lossless JSON escaping for its value.
@@ -106,4 +95,110 @@ export function approvalReads(input: unknown, tool?: string): ApprovalReading {
   if (typeof it.host === 'string' && it.host) return { what: 'asks to reach', body: it.host };
   if (typeof it.file_path === 'string') return { what: 'asks to run', body: it.file_path };
   return { what: 'asks to run', body: UNREADABLE };
+}
+
+export type DiffLine = { mark: 'add' | 'del' | 'head' | 'same'; text: string };
+export type ApprovalView = {
+  /** What it wants, in words: the worker's own description when it sent one. */
+  title: string;
+  body:
+    | { kind: 'text'; text: string }
+    | { kind: 'diff'; lines: DiffLine[]; added: number; removed: number }
+    | { kind: 'fields'; rows: [string, string][] };
+  /** Where, or with what, in one quiet line; null when there is nothing to add. */
+  where: string | null;
+};
+
+const base = (p: string) => p.replace(/\/+$/, '').split('/').pop() || p;
+const words = (name: string) => name.replace(/[_-]+/g, ' ').trim();
+const capital = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
+
+/**
+ * A folder as a person names it. A thread's own task folder is a copy of its
+ * repository, and the home folder is ~. The full path stays on the card's hover.
+ */
+export function folderWords(cwd: string): string {
+  const copy = /^(.*)\/\.claude\/worktrees\/[^/]+\/?$/.exec(cwd);
+  if (copy) return `In this thread’s copy of ${base(copy[1])}`;
+  const short = cwd.replace(/^\/(?:Users|home)\/[^/]+(?=\/|$)/, '~');
+  // Past one line of the card, the end is kept: it is the part that says where.
+  if (short.length <= 53) return `In ${short}`;
+  return `In …/${short.replace(/\/+$/, '').split('/').slice(-2).join('/')}`;
+}
+
+// A string is shown as written unless something in it would not show (a tab,
+// a control character): then it is shown escaped, so a yes is about what it says.
+const shown = (v: unknown): string => {
+  if (typeof v === 'string') return /[\u0000-\u0008\u000b-\u001f\u007f]/.test(v) ? JSON.stringify(v) : v;
+  if (Array.isArray(v) && v.every((x) => typeof x === 'string' && !x.includes(','))) return v.join(', ');
+  const out = JSON.stringify(v, null, 2);
+  if (out === undefined) throw new Error('Unreadable argument');
+  return out;
+};
+
+const FILE_HEAD = /^(Edit|Write|Delete|Update|Add|Move) (.+)$/;
+
+function changeView(changes: string): ApprovalView {
+  const lines: DiffLine[] = [];
+  const files: { verb: string; path: string }[] = [];
+  let added = 0;
+  let removed = 0;
+  for (const line of changes.split('\n')) {
+    const head = FILE_HEAD.exec(line);
+    // A block starts at a verb line, which follows the start or a blank line (main/codex-approvals.mjs).
+    if (head && (lines.length === 0 || lines[lines.length - 1].text === '')) {
+      files.push({ verb: head[1], path: head[2] });
+      lines.push({ mark: 'head', text: line });
+    } else if (line.startsWith('@@')) continue;
+    else if (line.startsWith('+') && !line.startsWith('+++')) { added += 1; lines.push({ mark: 'add', text: line.slice(1) }); }
+    else if (line.startsWith('-') && !line.startsWith('---')) { removed += 1; lines.push({ mark: 'del', text: line.slice(1) }); }
+    else lines.push({ mark: 'same', text: line });
+  }
+  const one = files.length === 1 ? files[0] : null;
+  const moved = one?.verb === 'Move' ? one.path.split(' -> ') : null;
+  const title = !one ? `Change ${files.length || 'some'} files`
+    : moved ? `Move ${base(moved[0])} to ${base(moved[1] ?? '')}`
+      : `${one.verb === 'Write' || one.verb === 'Add' ? 'Write' : one.verb === 'Delete' ? 'Delete' : 'Change'} ${base(one.path)}`;
+  const dir = one && !moved ? one.path.replace(/\/[^/]*$/, '') : '';
+  return { title, body: { kind: 'diff', lines: files.length > 1 ? lines : lines.filter((l) => l.mark !== 'head'), added, removed }, where: dir ? folderWords(dir) : null };
+}
+
+/** One approval as the card draws it: what it wants in words, the exact thing, and where. */
+export function approvalView(input: unknown, tool?: string): ApprovalView {
+  const it = (input ?? {}) as Record<string, unknown>;
+  // A cloud run asking this computer for a key (main/cloud/key-asks.mts KEY_CARD).
+  if (tool === 'cloud_key') {
+    const title = 'Give the cloud a key from this computer';
+    const name = String(it.name ?? '');
+    const src = keySource(it);
+    if (!src || !/^[A-Z][A-Z0-9_]{1,79}$/.test(name)) return { title, body: { kind: 'text', text: UNREADABLE }, where: null };
+    const rows: [string, string][] = [['Key', keyLabel(String(it.what ?? '')) ?? name], ['From', capital(keySourceWords(src))], ['Saved as', name]];
+    return { title, body: { kind: 'fields', rows }, where: 'Every cloud thread can use it from now on' };
+  }
+  const said = typeof it.description === 'string' && it.description.trim() ? it.description.trim().slice(0, 200) : null;
+  const cwd = typeof it.cwd === 'string' && it.cwd ? folderWords(it.cwd) : null;
+  const mcp = /^mcp__(.+)__(.+)$/.exec(tool ?? '');
+  if (mcp) {
+    const server = capital(words(mcp[1]));
+    const where = `With the ${server} tool ${mcp[2]}`;
+    const title = `Use ${words(mcp[2])} in ${server}`;
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return { title, body: { kind: 'text', text: UNREADABLE }, where };
+    try {
+      const rows = Object.entries(input).map(([k, v]): [string, string] => [k, shown(v)]);
+      return { title, body: rows.length ? { kind: 'fields', rows } : { kind: 'text', text: 'No arguments.' }, where };
+    } catch {
+      return { title, body: { kind: 'text', text: UNREADABLE }, where };
+    }
+  }
+  if (typeof it.changes === 'string' && it.changes) {
+    const view = changeView(it.changes);
+    return said ? { ...view, title: said } : view;
+  }
+  if (typeof it.command === 'string') return { title: said ?? 'Run a command', body: { kind: 'text', text: it.command }, where: cwd };
+  if (typeof it.host === 'string' && it.host) return { title: said ?? `Reach ${it.host}`, body: { kind: 'text', text: it.host }, where: cwd };
+  if (typeof it.file_path === 'string') {
+    const title = tool === 'Read' ? `Read ${base(it.file_path)}` : `${capital(words(tool ?? 'Use'))} ${base(it.file_path)}`;
+    return { title: said ?? title, body: { kind: 'text', text: it.file_path }, where: cwd };
+  }
+  return { title: said ?? `${Name} could not read this ask`, body: { kind: 'text', text: UNREADABLE }, where: cwd };
 }

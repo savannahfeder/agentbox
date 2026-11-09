@@ -52,6 +52,7 @@ export declare class HostedRun extends EventEmitter {
   on(event: 'close', listener: (code: number | null, signal: NodeJS.Signals | null) => void): this;
   on(event: 'spawn', listener: () => void): this;
   on(event: 'input-state', listener: (state: HostedRunState) => void): this;
+  on(event: 'turn-over' | 'next-turn', listener: () => void): this;
   once(event: 'spawn', listener: () => void): this;
   once(event: 'exit', listener: (code: number | null, signal: NodeJS.Signals | null) => void): this;
   once(event: 'close', listener: (code: number | null, signal: NodeJS.Signals | null) => void): this;

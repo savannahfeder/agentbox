@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { installNotifier } from './notify.mts';
 import { mayOpenOutside, sameHub } from './hub-rules.mjs';
+import { openInBrowser } from './open-in-browser.mts';
 import { NAME } from '../shared/product-name.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -46,13 +47,13 @@ export function startHubClient(hub) {
     });
     const { webContents } = window;
     webContents.setWindowOpenHandler(({ url }) => {
-      if (mayOpenOutside(url)) shell.openExternal(url);
+      if (mayOpenOutside(url)) void openInBrowser(url, { shell });
       return { action: 'deny' };
     });
     webContents.on('will-navigate', (event, url) => {
       if (sameHub(url, hub.url)) return;
       event.preventDefault();
-      if (mayOpenOutside(url)) shell.openExternal(url);
+      if (mayOpenOutside(url)) void openInBrowser(url, { shell });
     });
     webContents.on('did-fail-load', (_e, code, _why, url, isMain) => {
       // -3 is a load this window itself replaced.
@@ -70,10 +71,9 @@ export function startHubClient(hub) {
   ipcMain.handle('zero:badge', (_e, count) => {
     if (process.platform === 'darwin') app.dock.setBadge(count > 0 ? String(count) : '');
   });
-  ipcMain.handle('hub:open', (_e, address) => {
+  ipcMain.handle('hub:open', async (_e, address) => {
     if (!mayOpenOutside(address)) return false;
-    shell.openExternal(address);
-    return true;
+    return (await openInBrowser(address, { shell })).ok;
   });
   app.on('second-instance', () => { if (window) { if (window.isMinimized()) window.restore(); window.focus(); } });
   // Quits like the whole app (main/main.mts): with no window there is nothing to

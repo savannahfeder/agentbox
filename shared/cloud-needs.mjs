@@ -15,7 +15,8 @@ import { keyAsks, keyWords } from './cloud-keys.mjs';
 import { keySourceFromWords } from './cloud-key-sources.mjs';
 
 export const NEED = 'AGENTBOX-NEEDS:';
-const NEED_LINE = /^\s*`?AGENTBOX-NEEDS:\s*(sign-in|key|file|code)\s+([^|`]+?)\s*(?:\|\s*([^`]*?))?\s*`?\s*$/i;
+// A closing backtick is taken off only when the line opened with one: the reason may hold inline code.
+const NEED_LINE = /^\s*(`?)AGENTBOX-NEEDS:\s*(sign-in|key|file|code)\s+([^|`]+?)\s*(?:\|\s*(.*?))?\s*\1\s*$/i;
 
 // The services a sign-in can name, each with the variables its tools read and
 // the page where a person makes a token.
@@ -49,9 +50,9 @@ export function needsIn(text) {
   for (const line of String(text ?? '').split('\n')) {
     const m = NEED_LINE.exec(line);
     if (!m) continue;
-    const kind = m[1].toLowerCase();
-    const arg = m[2].trim();
-    const why = tidy(m[3]);
+    const kind = m[2].toLowerCase();
+    const arg = m[3].trim();
+    const why = tidy(m[4]);
     if (kind === 'sign-in') {
       const service = serviceById(arg);
       if (service) add({ kind, service, why }, `sign-in:${service.id}`);
@@ -113,6 +114,11 @@ export function connectedReply(needs) {
   const keys = needs.filter((n) => n.kind === 'key').map((n) => (keyWords(n.what) ? `the ${keyWords(n.what)}` : n.name));
   const said = [signIns.length ? `connected ${listed(signIns)}` : null, keys.length ? `saved ${listed(keys)}` : null].filter(Boolean).join(' and ');
   return `I ${said}. Carry on.`;
+}
+
+/** The reply for a key given after the person answered its ask in words: the thread may have moved on, so no "Carry on". */
+export function lateReply(needs) {
+  return `${connectedReply(needs).replace(/\. Carry on\.$/, '')} after all, so you can use it now.`;
 }
 
 /**

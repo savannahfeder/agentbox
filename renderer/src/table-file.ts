@@ -4,7 +4,7 @@
 export type ColumnKind = 'name' | 'tag' | 'number' | 'date' | 'link' | 'email' | 'text';
 export type Tone = 'green' | 'blue' | 'purple' | 'amber' | 'rose' | 'teal' | 'grey';
 /** `head` is the header as the file has it; `name` is unique. `values` are a tag column's values as first written; `tones` is keyed by their lower case. */
-export type Column = { name: string; head: string; kind: ColumnKind; values: string[]; tones: Record<string, Tone> };
+export type Column = { name: string; head: string; kind: ColumnKind; values: string[]; tones: Record<string, Tone>; wrap?: boolean };
 /** `ranked`: the first column is the file's own rank, which stands in for the row number. */
 export type Table = { columns: Column[]; rows: string[][]; logoCol: number; ranked: boolean };
 export type Sort = { col: number; dir: 'asc' | 'desc' } | null;
@@ -106,24 +106,65 @@ export function amountOf(v: string): number {
   return Number.isFinite(oneAmount(low)) ? oneAmount(low) : oneAmount(s);
 }
 
+// Date.UTC rolls 2026-13-40 over into February; a day that is not on the calendar is not a date.
+const realDay = (y: number, m: number, d: number) => {
+  const t = Date.UTC(y, m - 1, d);
+  const at = new Date(t);
+  return at.getUTCMonth() === m - 1 && at.getUTCDate() === d ? t : NaN;
+};
+
 /** When a cell is, in ms, or NaN. A bare number is not a date. */
 export function dateOf(v: string): number {
   const s = v.trim();
   if (!s || NUMBER.test(s)) return NaN;
   const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if (iso) return Date.UTC(+iso[1], +iso[2] - 1, +iso[3]);
+  if (iso) return realDay(+iso[1], +iso[2], +iso[3]);
   const us = s.match(/^(\d{1,2})[/.](\d{1,2})[/.](\d{2,4})$/);
   if (us) {
     const year = us[3].length === 2 ? 2000 + +us[3] : +us[3];
     // 25/03/2025 can only be day first; 03/04/2025 is read the American way.
     const [month, day] = +us[1] > 12 ? [+us[2], +us[1]] : [+us[1], +us[2]];
-    return Date.UTC(year, month - 1, day);
+    return realDay(year, month, day);
   }
   if (!MONTH.test(s)) return NaN;
   // "Jan 5" has no year, and Date.parse would put it in 2001.
   const t = Date.parse(/\b\d{4}\b/.test(s) ? s : `${s} ${new Date().getFullYear()}`);
-  return Number.isFinite(t) ? t : NaN;
+  if (!Number.isFinite(t)) return NaN;
+  // Date.parse gives local midnight and the ISO path UTC midnight; one day must be one number.
+  const d = new Date(t);
+  return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
 }
+
+const NEAR: Record<string, number> = { yesterday: -1, today: 0, tomorrow: 1 };
+/** A day as a person types one into a date cell: what dateOf reads, and today, tomorrow and yesterday. */
+export function dayTyped(v: string, now = new Date()): number {
+  const near = NEAR[v.trim().toLowerCase()];
+  if (near !== undefined) return Date.UTC(now.getFullYear(), now.getMonth(), now.getDate() + near);
+  // "12/3" typed into a date cell is this year's; in a file it could as well be a fraction.
+  const short = v.trim().match(/^(\d{1,2})\/(\d{1,2})$/);
+  return short ? dateOf(`${short[1]}/${short[2]}/${now.getFullYear()}`) : dateOf(v);
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** A day picked from the calendar, written the way the column already writes its dates. */
+export function dateWords(day: number, column: string[]): string {
+  const d = new Date(day);
+  const y = d.getUTCFullYear(), m = d.getUTCMonth() + 1, n = d.getUTCDate();
+  const filled = column.map((v) => v.trim()).filter((v) => Number.isFinite(dateOf(v)));
+  const most = (re: RegExp) => filled.length > 0 && filled.filter((v) => re.test(v)).length / filled.length >= 0.6;
+  if (most(/^\d{4}-\d{1,2}-\d{1,2}$/)) return `${y}-${String(m).padStart(2, '0')}-${String(n).padStart(2, '0')}`;
+  if (most(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) return `${m}/${n}/${y}`;
+  // "Mon Nov 9" in a column of those; a year only where the column writes one.
+  const weekday = most(/\b(mon|tue|wed|thu|fri|sat|sun)[a-z]*\b/i) ? `${DAYS[d.getUTCDay()]} ` : '';
+  const year = !filled.length || most(/\b\d{4}\b/) ? `, ${y}` : '';
+  return `${weekday}${MONTHS[m - 1]} ${n}${year}`;
+}
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+// "Cloud Thu Nov 12" names a launch and its day; picking a new day would lose the name.
+const DATE_PARTS = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec|mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)[a-z]*\b|\d+(st|nd|rd|th)?\b|\b(of|at|am|pm)\b|(?<=\d)t(?=\d)|(?<=\d)z\b|[\s,./:+-]/gi;
+const onlyADate = (v: string) => !/[a-z]/i.test(v.replace(DATE_PARTS, ''));
 
 export type CellLink = { text: string; href: string };
 // One level of brackets inside the address, as a Wikipedia page has.
@@ -151,7 +192,9 @@ function kindOf(name: string, values: string[], first: boolean): ColumnKind {
   if (share(filled, (v) => EMAIL.test(v)) >= 0.8) return 'email';
   if (share(filled, (v) => URLISH.test(v) && !NUMBER.test(v)) >= 0.8) return 'link';
   if (!(LABEL_NUMBER.test(name) && !AMOUNT_HEADER.test(name)) && share(filled, (v) => NUMBER.test(v) || Number.isFinite(amountOf(v))) >= 0.9) return 'number';
-  if (share(filled, (v) => Number.isFinite(dateOf(v))) >= 0.8 && (DATE_HEADER.test(name) || filled.some((v) => MONTH.test(v) || v.includes('/') || /^\d{4}-/.test(v)))) return 'date';
+  // Names with a day in them read as words, not as dates and not as tags.
+  if (share(filled, (v) => Number.isFinite(dateOf(v))) >= 0.8 && share(filled, onlyADate) < 0.8) return 'text';
+  if (share(filled, (v) => Number.isFinite(dateOf(v)) && onlyADate(v)) >= 0.8 && (DATE_HEADER.test(name) || filled.some((v) => MONTH.test(v) || v.includes('/') || /^\d{4}-/.test(v)))) return 'date';
   const short = filled.every((v) => v.length <= 28 && v.split(/\s+/).length <= 4);
   const distinct = new Set(filled.map((v) => v.toLowerCase())).size;
   if (short && distinct <= 30 && TAG_HEADER.test(name)) return 'tag';

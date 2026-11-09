@@ -78,13 +78,12 @@ describe('what a save posts', () => {
 });
 
 describe('opening for typing', () => {
-  const base = { canEdit: true, compare: false, editing: false, unreadable: null, version: 'a.md' };
+  const base = { canEdit: true, editing: false, unreadable: null, version: 'a.md' };
   it('the newest document opens ready to type', () => {
     expect(opensForTyping(base)).toBe(true);
   });
-  it('not an older version, side by side, or one already open', () => {
+  it('not an older version, or one already open', () => {
     expect(opensForTyping({ ...base, canEdit: false })).toBe(false);
-    expect(opensForTyping({ ...base, compare: true })).toBe(false);
     expect(opensForTyping({ ...base, editing: true })).toBe(false);
   });
   it('not a version that could not be read, though the next one can', () => {
@@ -104,10 +103,9 @@ describe('the view', () => {
     expect(leave).toMatch(/endSitting\(\)\.then\(\(ok\) => \{ if \(ok\) onClose\(\); \}\)/);
     expect(view).not.toContain('>Discard</button>');
   });
-  it('saves before stepping to another file or version, or side by side', () => {
+  it('saves before stepping to another file or version', () => {
     expect(between('const stepFile', 'const stepVersion')).toContain('away(');
     expect(between('const stepVersion', '// Escape first')).toContain('away(');
-    expect(view).toMatch(/away\(\(\) => setCompare\(true\)\)/);
   });
   it('saves when the window loses focus', () => {
     expect(view).toMatch(/addEventListener\('blur', saveNow\)/);
@@ -118,6 +116,6 @@ describe('the view', () => {
     expect(css).toMatch(/\.av-told \.av-btn \{[^}]*pointer-events: auto/);
   });
   it('words typed into the document can still be commented on', () => {
-    expect(between('{editing && !compare && (', '{version && !compare && !editing')).toContain('<SelectionBar');
+    expect(between('{editing && (', '{version && !editing')).toContain('<SelectionBar');
   });
 });
