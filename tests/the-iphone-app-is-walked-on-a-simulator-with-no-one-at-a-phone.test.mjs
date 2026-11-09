@@ -47,8 +47,9 @@ describe('the iPhone walk job', () => {
     expect(uploads.map((s) => s.with.path)).toEqual(['sealed/']);
     const seal = job.steps.find((s) => s.name === 'Seal the screens').run;
     expect(seal).toContain('rm -rf walk');
-    expect(seal).toContain('pkeyutl -encrypt -pubin -inkey .github/iphone-walk-key.pub.pem');
-    expect(fs.readFileSync(new URL('.github/iphone-walk-key.pub.pem', root), 'utf8')).toMatch(/^-----BEGIN PUBLIC KEY-----/);
+    expect(seal).toContain('pkeyutl -encrypt -pubin -keyform DER');
+    // A public key, as one line of DER: the opening bytes of an RSA SubjectPublicKeyInfo.
+    expect(job.steps.find((s) => s.name === 'Seal the screens').env.WALK_KEY).toMatch(/^MIIB[A-Za-z0-9+/=]+$/);
   });
 
   it('keeps every screenshot the walk took', () => {
