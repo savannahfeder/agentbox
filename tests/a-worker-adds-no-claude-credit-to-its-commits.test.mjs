@@ -1,6 +1,6 @@
 // A WORKER ADDS NO CLAUDE CREDIT TO ITS COMMITS — w-29159aea05.
 //
-// WHAT BROKE. Commits made by workers kept showing "savannahfeder and claude
+// WHAT BROKE. Commits made by workers kept showing "<person> and claude
 // committed" on GitHub after a personal instruction said never to add the
 // credit. Claude Code injects its own reminder to end every commit with
 // `Co-Authored-By: Claude ...` and every pull request with a "Generated with
