@@ -273,7 +273,11 @@ async function actAsLead(first) {
   if (!server || !me) return null;
   const session = mcpSession(server);
   try {
-    if (!first) {
+    // Started again by a thread joining: answer again with everyone. By the
+    // person's reply: check, as a real lead must, and close only if it is fixed.
+    const joinedNow = promptText.includes('is waiting on this too');
+    if (!first && !joinedNow) {
+      if (world.stuck?.cause) return 'Checked, and a push still fails, so nothing has gone out yet. Run `gh auth status` to see which account git is using, then reply again.\n\n## Options\n1. Signed in, carry on';
       await session.call('update_work_item', { id: me, status: 'done' });
       return 'Checked that a push works again. Every thread that was waiting on this carries on by itself.';
     }

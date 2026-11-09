@@ -96,6 +96,14 @@ describe('what the testers found in the third run', () => {
     expect(page).toMatch(/\?\? \(stuckOn \? `Waits on \$\{stuckOn\.title\}` : undefined\)/);
   });
 
+  it('search reads what was said on a cause row, not its lead\'s brief', () => {
+    expect(fs.readFileSync(new URL('../renderer/src/search.ts', import.meta.url), 'utf8')).toMatch(/const body = isCause\(i\) \? '' : searchText\(i\.body\)/);
+  });
+
+  it('the board names every project a cause\'s threads are in, as the list does', () => {
+    expect(fs.readFileSync(new URL('../renderer/src/threads/page-rules.ts', import.meta.url), 'utf8')).toMatch(/project: isCause\(item\) && item\.status !== 'done' \? causeWhere\(item, waitingOn\(item, items\), product\.name\) : product\.name/);
+  });
+
   it('the board card of a cause says how many wait, as its list row does', () => {
     const page = fs.readFileSync(new URL('../renderer/src/threads/Pages.tsx', import.meta.url), 'utf8');
     expect(page).toMatch(/isCause\(e\.item\) && e\.item\.status !== 'done' \? \{ \.\.\.drawn, word: causeWord\(waitingOn\(e\.item, allItems \?\? \[\]\)\.length\) \}/);
@@ -183,14 +191,31 @@ describe('a stuck thread waits on its cause through the store tool', () => {
     expect(waitingOn(read(first.waitingOn), work.listWorkItems({ includeDone: true })).map((i) => i.id).sort()).toEqual([a.id, b.id].sort());
   });
 
-  // The fourth Codex run: a note on the row after the lead answered took away
-  // its answer's buttons, so a join is said nowhere but the count.
-  it('a thread that joins later leaves the lead\'s answer as the last word', async () => {
+  // The fourth Codex run: an app note after the lead's answer took its buttons
+  // away. The fifth: with no note, the lead's list said six after a seventh
+  // joined. So a thread joining after the lead answered starts the lead again,
+  // in its own words, and the lead's new answer is the last word.
+  it('a thread that joins after the lead answered starts the lead again', async () => {
     const a = thread(product, 'Write the on-call runbook');
     const first = await call(a.id, { cause: "Your Mac can't push to GitHub", new: true });
+    work.updateItem(first.waitingOn, { result: '**Sign in once, and one thread carries on.**' }, { source: 'agent' });
     const b = thread(other, 'Why did last night\'s deploy take 40 minutes');
     await call(b.id, { causeId: first.waitingOn });
-    expect(read(first.waitingOn).note).toBeUndefined();
+    const row = read(first.waitingOn);
+    expect(row.answer).toBe("Why did last night's deploy take 40 minutes is waiting on this too.");
+    expect(row.labels).toContain('hop:1');
+  });
+
+  it('not one that joins before the lead has said anything, which lists it anyway', async () => {
+    const a = thread(product, 'Write the on-call runbook');
+    const first = await call(a.id, { cause: "Your Mac can't push to GitHub", new: true });
+    const b = thread(other, 'Audit the API');
+    await call(b.id, { causeId: first.waitingOn });
+    expect(read(first.waitingOn).answer).toBeUndefined();
+  });
+
+  it('and the lead is told to answer again in full', () => {
+    expect(leadBrief({ cause: 'x', ask: 'y', from: 'z' })).toMatch(/is waiting on this too, answer again in full, naming every thread waiting now/);
   });
 
   it('a thread naming an open cause in the same words joins it at once, whatever the case', async () => {

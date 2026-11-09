@@ -39,6 +39,12 @@ export function keeperOf(title, open) {
     .sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0) || String(a.id).localeCompare(String(b.id)))[0] ?? null;
 }
 
+/** What a lead that already answered is told when another thread joins its cause. */
+export const JOINED_TOO = 'is waiting on this too.';
+export function joinedWords(thread) {
+  return `${thread?.label || thread?.title || 'Another thread'} ${JOINED_TOO}`;
+}
+
 /** "6 waiting", for the Status column. */
 export function causeWord(n) {
   return `${n} waiting`;
@@ -81,6 +87,8 @@ export function leadBrief({ cause, ask, from, again = false }) {
     again
       ? '3. This cause was closed in the last two weeks and has come back. Besides clearing it, file one thread under this row (create_work_item with parent) to stop it happening again, saying what keeps causing it.'
       : '3. Keep to this cause. Do not do the waiting threads\' own work.',
+    '',
+    `When you are started again because a thread ${JOINED_TOO.replace(/\.$/, '')}, answer again in full, naming every thread waiting now.`,
   ].join('\n');
 }
 

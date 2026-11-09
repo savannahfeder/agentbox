@@ -19,6 +19,7 @@ import { listDocuments, nameOnThread, noteWrittenForRun, readDocument, writeDocu
 import { listSkills, fetchSkill, fetchReference } from './core/skills.mjs';
 import { listWorkItems, updateItem, createClaimRegistry } from './core/work.mjs';
 import { joinCause } from './core/causes.mjs';
+import { joinedWords } from '../shared/causes.mjs';
 import { readStandingInstruction, setStandingInstruction } from './core/repeats.mjs';
 import { teamPost, teamPass, teamRemember, teamSetup, teamRoster, teamPlaybook, teamMethod, teamHire, noteToAnotherThread } from './core/teammates.mjs';
 import { documentVersion, documentsWithFolders, fileWrittenDocument, teamFile, teamTell, teamTask, teamThreads, teamRead, waitsNamed } from './core/reach.mjs';
@@ -294,6 +295,8 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         const joined = joinCause({ thread, cause, ask, causeId, isNew });
         if (joined.choose) return json({ open: joined.choose, next: 'If one of these is what this thread is stuck on, call again with its causeId. If none is, call again with new: true.' });
         await claims.update(threadId, { status: 'blocked', blockedBy: [joined.causeId] });
+        // A lead that already answered is started again, so its answer names everyone waiting.
+        if (!joined.opened) noteToAnotherThread(joined.causeId, { note: joinedWords(thread) }, { ownItem: threadId });
         return json({ waitingOn: joined.causeId, opened: joined.opened, next: 'End your turn now with one line saying what this thread is waiting on. It carries on by itself when the cause is cleared, and you will be started again then.' });
       },
     },
