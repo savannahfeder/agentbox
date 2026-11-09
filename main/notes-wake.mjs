@@ -1,4 +1,4 @@
-import { answeredNotes, approvalId, notedFilesInLines, noteGoesTo, notesForTheAgent, repliesForTheAgent, threadFiles, unsentReplies } from '../shared/artifact-marks.mjs';
+import { answeredNotes, approvalId, notedFilesInLines, noteGoesTo, notesForTheAgent, repliesForTheAgent, stillWaiting, threadFiles, unsentReplies } from '../shared/artifact-marks.mjs';
 import { heldByAPerson } from '../shared/team-rules.mjs';
 import { readItemHistory } from './store/work-items.mjs';
 import { submitReply } from './live-replies.mts';
@@ -35,6 +35,33 @@ export async function noteToItsAgent({ store, supervisor, product, id, mark, nam
   if (store.listProducts().find((p) => p.slug === product)?.team?.direct) return false;
   const item = store.readItem(product, id);
   if (!item || heldByAPerson(item)) return false;
+  const { words, sent } = notesWords({ store, product, id, item, ids, nameOf, people });
+  if (!words.length) return false;
+  return handOn({ store, supervisor, product, id, text: words.join('\n\n'), sent, handOffMs });
+}
+
+// A reply typed in the thread takes every comment of yours still waiting for
+// Send with it, so the agent hears them in the same turn. Null when none wait.
+export function replyWithWaitingNotes({ store, product, id, answer, me = null, nameOf = () => 'the person writing to you', people = [] }) {
+  if (typeof answer !== 'string' || !answer.trim() || answer === '(withdrawn)' || answer.trimStart().startsWith('/')) return null;
+  const ids = waitingNotes({ store, product, id, me, people });
+  if (!ids.length) return null;
+  const { words, sent } = notesWords({ store, product, id, item: store.readItem(product, id), ids, nameOf, people });
+  return words.length ? { answer: [...words, answer].join('\n\n'), fromNotes: sent } : null;
+}
+
+/** Your comments still waiting for Send on this thread, and those with a reply of yours waiting under them. */
+export function waitingNotes({ store, product, id, me = null, people = [] }) {
+  if (store.listProducts().find((p) => p.slug === product)?.team?.direct) return [];
+  const item = store.readItem(product, id);
+  if (!item || heldByAPerson(item)) return [];
+  const mine = (by) => (by ?? null) === (me ?? null);
+  return (item.artifacts?.notes ?? [])
+    .filter((n) => !n.resolved && ((mine(n.by) && stillWaiting(n)) || unsentReplies(n, people).some((r) => mine(r.by))))
+    .map((n) => n.id);
+}
+
+function notesWords({ store, product, id, item, ids, nameOf, people }) {
   const families = threadFiles(notedFilesInLines(readItemHistory(store.productDir(product), id)));
   const byVersion = new Map();
   const words = [];
@@ -57,8 +84,7 @@ export async function noteToItsAgent({ store, supervisor, product, id, mark, nam
     words.push(notesForTheAgent({ notes }, version, count, { nameOf }).text);
     sent.push(...notes.flatMap((n) => [n.id, ...(n.replies ?? []).map((r) => r.id)]));
   }
-  if (!words.length) return false;
-  return handOn({ store, supervisor, product, id, text: words.join('\n\n'), sent, handOffMs });
+  return { words, sent };
 }
 
 async function handOn({ store, supervisor, product, id, text, sent, handOffMs }) {

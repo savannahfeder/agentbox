@@ -130,7 +130,9 @@ if (isMain) {
     else if (verb === 'look') { const t = await tab(); await look(t); t.detach(); }
     else if (verb === 'tap') {
       const t = await tab();
-      const at = await t.evaluate(targetScript(args.join(' ')));
+      let at = await t.evaluate(targetScript(args.join(' ')));
+      // Re-applying the phone's screen on connect can redraw the page and drop the last look's numbers.
+      if (!at) { await t.evaluate(LOOK); at = await t.evaluate(targetScript(args.join(' '))); }
       if (!at) { console.log(`Nothing to tap called ${args.join(' ')}. Look again.`); t.detach(); process.exit(1); }
       if (at.covered) { console.log(`${args.join(' ')} is under something else on the screen. Close what covers it, then tap again.`); t.detach(); process.exit(1); }
       await touch(t, 'touchStart', at.x, at.y); await touch(t, 'touchEnd', at.x, at.y);

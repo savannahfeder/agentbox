@@ -717,6 +717,8 @@ export interface RunningSession {
   itemId: string;
   product: string;
   startedAt: number;
+  /** When the reply this cloud run is working on went in; absent on its first turn. Timers read `runningSince`. */
+  turnStartedAt?: number;
   /**
    * WHICH CODING AGENT REALLY STARTED THIS RUN, written at the spawn — a fact,
    *  where `snapshot.engines.byItem` is the supervisor's answer for the NEXT

@@ -108,6 +108,8 @@ export interface AnswerInput {
   voice?: unknown;
   forAgent?: unknown;
   fromNotes?: unknown[];
+  /** On an answer that carries notes, the words the person typed after them. */
+  typed?: string;
   putAway?: unknown;
 }
 
@@ -559,7 +561,7 @@ export class Store {
   // `inReplyTo` makes the answer a reply in a thread (w-920461cbe6): the uid
   // of the message it answers, on THE SAME LINE as the words, so the reply's
   // own uid (what its reactions hang off) is the line that says where it goes.
-  answerItem(slug: string, id: string, { answer, status, priority, permissionMode, engine, model, effort, inReplyTo, fromPhone, voice, forAgent, fromNotes, putAway }: AnswerInput) {
+  answerItem(slug: string, id: string, { answer, status, priority, permissionMode, engine, model, effort, inReplyTo, fromPhone, voice, forAgent, fromNotes, typed, putAway }: AnswerInput) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
     let item: (StoreItem & { product: string }) | null = null;
@@ -582,7 +584,7 @@ export class Store {
     if (engine !== undefined) item = workItemsDisk.updateWorkItem(dir, id, { engine: engine ?? '' }, { source: 'founder' });
     if (model !== undefined) item = workItemsDisk.updateWorkItem(dir, id, { model: model ?? '' }, { source: 'founder' });
     if (effort !== undefined) item = workItemsDisk.updateWorkItem(dir, id, { effort: effort ?? '' }, { source: 'founder' });
-    if (answer) item = workItemsDisk.updateWorkItem(dir, id, { answer, ...(inReplyTo ? { inReplyTo } : {}), ...(fromPhone ? { fromPhone } : {}), ...(voice ? { voice } : {}), ...(forAgent ? { forAgent } : {}), ...(fromNotes?.length ? { fromNotes } : {}) }, { source: 'founder' });
+    if (answer) item = workItemsDisk.updateWorkItem(dir, id, { answer, ...(inReplyTo ? { inReplyTo } : {}), ...(fromPhone ? { fromPhone } : {}), ...(voice ? { voice } : {}), ...(forAgent ? { forAgent } : {}), ...(fromNotes?.length ? { fromNotes } : {}), ...(fromNotes?.length && typed ? { typed } : {}) }, { source: 'founder' });
     // A REPLY ON A RUN THAT FINISHED QUIETLY MAKES IT NEWS AGAIN (w-5e3f2e047f).
     // A quiet run is kept out of her inbox, and a repeating task now opens on
     // its latest run, so without this the answer to what she just asked there

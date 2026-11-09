@@ -95,8 +95,7 @@ function General() {
   return (
     <>
       <Group label="Account">
-        <Row first label={`Signed in as ${c.cloud?.session()?.user.email ?? ''}`} control={<Button title="Sign out" onPress={() => { c.signOut(); router.replace('/sign-in'); }} />} />
-        <Row label="Delete account" desc={said ?? 'Your account and everything you put online, here and in shared projects.'} control={<Button title="Delete" disabled={busy} onPress={() => setDeleting(true)} />} />
+        <Row first label="Delete account" desc={said ?? 'Your account and everything you put online, here and in shared projects.'} control={<Button title="Delete" disabled={busy} onPress={() => setDeleting(true)} />} />
       </Group>
       {w?.publicLinks?.length ? <PublicLinks links={w.publicLinks} now={c.now} /> : null}
       <Group label="Claude Code and Codex">
