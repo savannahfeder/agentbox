@@ -1,4 +1,4 @@
-import { noteGoesTo } from '../../shared/artifact-marks.mjs';
+import { noteGoesTo } from '../../shared/artifact-marks.mts';
 import type { FileNote } from './types';
 
 /** Stored when someone closes the notes sidebar; every window reads the same key. */

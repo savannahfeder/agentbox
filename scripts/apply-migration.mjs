@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { loadCloudConfig } from '../main/team/session.mjs';
+import { loadCloudConfig } from '../main/team/session.mts';
 
 const CALL_MS = 60_000;
 

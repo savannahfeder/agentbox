@@ -35,7 +35,7 @@ const teamRole = process.env.STUB_CLOUD_TEAM || '';
 const teamHours = Number(process.env.STUB_CLOUD_TEAM_HOURS) || TEAM.trialHoursPerMember;
 const { createSandbox, pickBaseEnv } = await import(path.join(REPO, 'cloud', 'sandbox', 'server.mjs'));
 const { recordCloudLogin, loginObjectKey } = await import(path.join(REPO, 'main', 'cloud', 'logins.mts'));
-const { noteImageCaps } = await import(path.join(REPO, 'main', 'cloud', 'config.mjs'));
+const { noteImageCaps } = await import(path.join(REPO, 'main', 'cloud', 'config.mts'));
 
 const PERSON = '5a5a5a5a-1111-4111-8111-111111111111';
 const vmRoot = path.join(instance, 'cloud-vm');

@@ -24,15 +24,15 @@ import type { Product, RepeatShape } from '../types';
 import { SEND } from '../this-keyboard';
 import { TeamContext, firstName } from '../team/people';
 import { WhoPicker, DuePicker } from '../team/WhoPicker';
-import { isShared } from '../../../shared/team-rules.mjs';
+import { isShared } from '../../../shared/team-rules.mts';
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { AttachRow } from './AttachRow';
 import { PriorityPicker, priorityIdOf, priorityValueOf, type PriorityId } from './Priority';
 import { parseRepeat } from '../format';
 import { splitMessage } from '../message-split';
 import { WhenPicker, WHEN_NOW, type WhenValue } from './When';
-import { sameRule, type RepeatShape as RepeatRuleValue } from '../../../shared/repeats.mjs';
-import { landingIndex } from '../../../shared/rank.mjs';
+import { sameRule, type RepeatShape as RepeatRuleValue } from '../../../shared/repeats.mts';
+import { landingIndex } from '../../../shared/rank.mts';
 import { resolveProject, stepProject } from '../compose-project';
 import { readComposeDraft, saveComposeDraft, clearComposeDraft } from '../drafts';
 import { startingPriority } from '../priority';
@@ -41,7 +41,7 @@ import { DEFAULT_MODEL, engineModelPicked, readLastModel, writeLastModel, type M
 import { effortChoicesFor, effortPicked, readLastEffort, writeLastEffort } from '../effort';
 import { EnginePicker } from './EnginePicker';
 import { engineThisMacOffers, readLastEngine, writeLastEngine } from '../engines';
-import { DEFAULT_ENGINE, ENGINES, type Engine } from '../../../shared/engines.mjs';
+import { DEFAULT_ENGINE, ENGINES, type Engine } from '../../../shared/engines.mts';
 import { footerIsOpen, restingClause } from '../compose-footer';
 import { practiceRefusal } from '../compose-says';
 

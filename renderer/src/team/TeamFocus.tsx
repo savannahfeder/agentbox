@@ -5,14 +5,14 @@
 import { useContext, useEffect, useRef, useState } from 'react';
 import type { Product, WorkItem } from '../types';
 import { api } from '../api';
-import { isGivenTask, isShared, heldByAPerson, taskGiver } from '../../../shared/team-rules.mjs';
+import { isGivenTask, isShared, heldByAPerson, taskGiver } from '../../../shared/team-rules.mts';
 import { isDirect, peopleInConversation, peopleToAdd } from '../threads/page-rules';
-import { shownPriority } from '../../../shared/rank.mjs';
+import { shownPriority } from '../../../shared/rank.mts';
 import { priorityIdOf, priorityLabelOf } from '../priority';
 import { Face, TeamContext, dueWords, firstName, type TeamView } from './people';
 import { agentOnTask } from './tasks';
 import { TeammatesContext } from '../teammates/row-lead';
-import { shownTitle } from '../../../shared/thread-title.mjs';
+import { shownTitle } from '../../../shared/thread-title.mts';
 
 /** Is this a shared row given to a person? Then the team draws its header. */
 export function teamHeld(item: WorkItem, team: TeamView | null): boolean {

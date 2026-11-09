@@ -1,6 +1,6 @@
 import { hookFailure } from '../../shared/hook-failure.mts';
-import { SAYING_CAP } from '../codex.mjs';
-import { WORK_CHARS } from '../../shared/agents.mjs';
+import { SAYING_CAP } from '../codex.mts';
+import { WORK_CHARS } from '../../shared/agents.mts';
 
 export interface StreamBlock {
   type?: string;

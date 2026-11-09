@@ -2,7 +2,7 @@
 # Launcher for this app's own store server.
 #
 # It exists because node is installed through nvm on this machine and is NOT on
-# a login shell's PATH, so an MCP client spawning `node mcp/stdio.mjs` gets
+# a login shell's PATH, so an MCP client spawning `node mcp/stdio.mts` gets
 # "command not found" and reports the server as failed with nothing useful in
 # it. Hard-coding the current nvm path would work until the next node upgrade
 # silently moved it, so resolve it at launch instead.
@@ -31,4 +31,9 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
-exec node "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/stdio.mjs" "$@"
+# The server is TypeScript, which node loads by itself from 22.18; an older 22 needs the flag.
+strip=""
+node -e 'process.exit(process.features.typescript ? 0 : 1)' >/dev/null 2>&1 || strip="--experimental-strip-types --disable-warning=ExperimentalWarning"
+
+# shellcheck disable=SC2086
+exec node $strip "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/stdio.mts" "$@"

@@ -27,7 +27,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { CLOUD_ADDRESS } from '../shared/cloud-address.mjs';
+import { CLOUD_ADDRESS } from '../shared/cloud-address.mts';
 
 export const DEFAULT_DAYS = 14;
 export const MAX_DAYS = 30;

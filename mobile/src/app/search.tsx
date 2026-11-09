@@ -60,7 +60,7 @@ function computerFacts(s: SettingsState): ComputerFacts | null {
   const w = s.settings?.workspace;
   if (!w) return null;
   const order = s.reading('workspace', 'productOrder', w.productOrder ?? []).value as string[];
-  const projects: { slug: string; name: string }[] = s.settings.projects;
+  const projects: { slug: string; name: string }[] = s.settings?.projects ?? [];
   return {
     paused: !!s.reading('workspace', 'paused', !!w.paused).value,
     cloud: w.cloud ? { mode: s.reading('workspace', 'cloudRuns', w.cloud.mode).value as CloudMode, whenOn: w.cloud.whenOn } : null,

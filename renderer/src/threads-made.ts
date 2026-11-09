@@ -3,7 +3,7 @@
 // and meant for the agent that answers in a chat with the tasks it opened.
 import type { ThreadStateWord, WorkItem } from './types';
 import { notStarted, statusForReply } from './list-rules';
-import { filedByThePerson } from '../../shared/answers.mjs';
+import { filedByThePerson } from '../../shared/answers.mts';
 
 type Row = Pick<WorkItem, 'id' | 'product' | 'createdAt'> & { parent?: string };
 

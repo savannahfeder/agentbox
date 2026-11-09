@@ -2,7 +2,7 @@
 // and the phone app's Later tab alike.
 import type { RepeatRule, WorkItem } from './types';
 import { ago, dayLabel, previewText, stamp } from './format';
-import { clockLabel, isCleanRun, nextRunAt } from '../../shared/repeats.mjs';
+import { clockLabel, isCleanRun, nextRunAt } from '../../shared/repeats.mts';
 
 // The two things she opened this tab for: when it runs next, and how the last
 // one went. Pure, so the wording is pinned by a test rather than read off a

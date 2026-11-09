@@ -1,8 +1,8 @@
 // THE CLOUD'S OWN PERMISSION MODE, put on a cloud run's arguments. Its own file
 // because the Claude harness and the settings both need it, and the settings
 // already import the harnesses.
-import { CLAUDE_PERMISSION_MODES } from '../shared/work-items.mjs';
-import { isCodexMode } from '../shared/codex-modes.mjs';
+import { CLAUDE_PERMISSION_MODES } from '../shared/work-items.mts';
+import { isCodexMode } from '../shared/codex-modes.mts';
 
 const SKIP_FLAGS = ['--dangerously-skip-permissions'];
 

@@ -352,7 +352,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     // The tutorial practises and keeps nothing; the onboarding row below sets
     // up and leaves a project. The walk's last card says "type tutorial", so
     // this label must contain that word
-    // (tests/the-tutorial-and-the-onboarding-are-two-things.test.mjs). The
+    // (tests/the-tutorial-and-the-onboarding-are-two-things.test.mts). The
     // keywords are split so each word finds only one of the two rows.
     {
       id: 'tutorial',
