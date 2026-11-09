@@ -514,6 +514,9 @@ export function createSandbox({
       try { e = JSON.parse(line); } catch { continue; }
       if (e?.type === 'result') {
         t.atResult = true;
+        // A turn that ends after the last job did is the wake it was given
+        // time for, as on the Mac (main/claude-input.mts).
+        t.lastJobEndedAt = 0;
         for (const [id, m] of t.unread) { m.results += 1; if (m.results >= 2) t.unread.delete(id); }
         continue;
       }
@@ -544,8 +547,10 @@ export function createSandbox({
   function watchWhileAway(r) {
     if (r.awayTimer) return;
     r.awayTimer = setInterval(() => {
-      if (!macAway(r) || DONE_STATES.has(r.state)) return;
-      for (const [k, c] of r.calls) {
+      if (DONE_STATES.has(r.state)) return;
+      const away = macAway(r);
+      if (!away && !r.endWhenDone) return;
+      if (away) for (const [k, c] of r.calls) {
         if (c.state !== 'sent' && c.state !== 'claimed') continue;
         // A held server's call waits for an answer from the phone, or the Mac's when it is back.
         if (c.msg.method === 'tools/call' && heldServer(r, r.connServer.get(c.conn))) { hold(r, k); continue; }
@@ -1662,9 +1667,15 @@ export function createSandbox({
           // Closed here while the Mac was away: a reply written now is the
           // app's to keep for the next run, and it learns that from this.
           if (r.inputClosed === 'cloud') return { ok: false, error: 'turn-closed', consumed: true };
-          if (req.end) r.inputClosed = 'mac';
+          // An app that is leaving says no more is coming (`whenDone`). Closed
+          // at once, Claude Code ends after its turn and takes every helper
+          // still running with it, so it is closed here once the turn is over
+          // and nothing it started is still out, as while the Mac is away.
+          const whenDone = !!req.end && req.whenDone === true && r.offline?.endTurn === 'claude-stream-json';
+          if (req.end && !whenDone) r.inputClosed = 'mac';
+          if (whenDone) r.endWhenDone = true;
           noteInput(r, req.data);
-          writeStdin(r, req);
+          writeStdin(r, whenDone ? { data: req.data } : req);
           return { ok: true };
         });
       case 'files':

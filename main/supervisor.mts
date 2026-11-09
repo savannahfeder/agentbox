@@ -72,6 +72,8 @@ import { hostSocketPath, perlRunsTheShim, HOST_ALREADY_THERE } from './cloud/hos
 import { runHostSocket, spoolFiles, HOST_ALREADY_THERE as RUN_HOST_ALREADY_THERE } from './run-host.mjs';
 import { toolHostDir, readToolHost, shareToolServers, TOOL_HOST_ALREADY_THERE } from './tool-host.mjs';
 import { HostedRun, HOST_LOST } from './hosted-run.mjs';
+import { HELPERS_LOST, helpersLostAnswer } from './claude-input.mts';
+import type { BackgroundTask } from './claude-input.mts';
 import { readCloudUsage, summarizeCloudUsage } from './cloud/usage.mts';
 import { buildSessionArgs, CLAUDE_MODES, parseSessionArgs, permissionMode } from './settings.mts';
 import fs from 'node:fs';
@@ -339,6 +341,7 @@ export interface WorkerChild {
   steer?(text: string): Promise<unknown>;
   interrupt?(): Promise<{ interrupted: boolean }>;
   ranToTheEnd?(): boolean;
+  helpersLost?(): BackgroundTask[];
   waitingOn?(): unknown[];
   waitAfterTurns?(ms: number): void;
   waitingForNext?(): boolean;
@@ -7454,6 +7457,7 @@ export class Supervisor {
     };
     this._comingHome ??= new Map();
     let buffered = '';
+    let helpersLost: BackgroundTask[] = [];
     child.stdout?.on('data', (d) => {
       buffered += d;
       let i: number;
@@ -7461,6 +7465,10 @@ export class Supervisor {
         const line = buffered.slice(0, i);
         buffered = buffered.slice(i + 1);
         if (!line.trim()) continue;
+        if (line.includes(HELPERS_LOST)) {
+          try { const e = JSON.parse(line); if (e?.subtype === HELPERS_LOST && Array.isArray(e.tasks)) helpersLost = e.tasks; } catch { /* not ours */ }
+          continue;
+        }
         const first = this._comingHome.get(itemId) !== view;
         this._comingHome.set(itemId, view);
         capture(view, line);
@@ -7488,7 +7496,7 @@ export class Supervisor {
         if (trace) write(`\n# exited (${code}) ${new Date().toISOString()}${view.stoppedOnRequest ? STOPPED_ON_REQUEST : ''}\n`);
         // Finished only when its work is home: 75 is the app going again, or
         // results that did not come back, and a later homecoming tries again.
-        const session = { ...view, startedAt: rec.startedAt, child: { ranToTheEnd: () => code === 0 } };
+        const session = { ...view, startedAt: rec.startedAt, child: { ranToTheEnd: () => code === 0 && !helpersLost.length, helpersLost: () => [...helpersLost] } };
         // Same as a run the app started: its reply was marked heard when it was
         // joined, so it is released here or nothing would run it on this Mac.
         if (this.runFinished(session) && this._noteCloudHandBack(item, session, rec.cwd)) {
@@ -7500,6 +7508,7 @@ export class Supervisor {
         } else if (this.closingMessageIsTheAnswer(session)) {
           try { this.store.recordSessionResult(rec.product, itemId, { result: session.result, status: null }); } catch (e) { console.warn('zero: writing a joined run\'s answer failed:', (e as Error).message); }
         }
+        this.sayHelpersLost(item, session);
         // The reply this conversation heard is answered; one typed while it
         // was away is left for the next run.
         if (this.runFinished(session) && !session.handedBack) {
@@ -12053,6 +12062,7 @@ export class Supervisor {
           this.store.recordSessionResult(item.product, item.id, { result: session.result, status: null });
         } catch (e) { console.warn('zero: writing the closing message as the answer failed:', (e as Error).message); }
       }
+      this.sayHelpersLost(item, session);
       this.releaseFinishedClaim(item, session);
       // NOTHING HERE TOUCHES `_rowSessions`, and that is the whole change of. A
       // finished session has nothing left to RESCUE, which is what this line is
@@ -12603,6 +12613,20 @@ export class Supervisor {
   // (tests/a-worker-whose-helpers-are-still-working-does-not-come-back-to-you).
   // The input pipe knows: it only closes at a result with nothing out. A child
   // that cannot say (a Codex turn) keeps the old reading.
+  // A CLOUD RUN THAT ENDED WITH ITS HELPERS STILL WORKING LOST THEM: its
+  // machine went, or its time ran out. The last turn's "waiting on them" is
+  // not the answer, and nothing will start the thread again by itself, so the
+  // row says what was lost and waits in Needs you
+  // (tests/a-cloud-run-never-loses-its-helpers-in-silence). Not after her Stop.
+  sayHelpersLost(item: WorkItem, session: RunState) {
+    const lost = session.child?.helpersLost?.() ?? [];
+    if (!lost.length || session.stoppedOnRequest || session.handedBack) return false;
+    try {
+      this.store.recordSessionResult(item.product, item.id, { result: helpersLostAnswer(lost), status: 'blocked' });
+    } catch (e) { console.warn('zero: could not say what the run lost:', (e as Error).message); return false; }
+    return true;
+  }
+
   runFinished(session: RunState | null | undefined) {
     if (session?.result == null || session.resultIsError) return false;
     return session.child?.ranToTheEnd?.() !== false;
