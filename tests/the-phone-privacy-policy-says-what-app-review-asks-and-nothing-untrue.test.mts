@@ -18,8 +18,13 @@ describe('the phone privacy policy', () => {
     expect(policy).toMatch(/When the app crashes, it sends us a report/);
     expect(policy).toMatch(/Counts and crash reports/);
   });
-  it('describes no sign-in with Apple', () => {
-    expect(policy).not.toMatch(/sign in with (Google or )?Apple|Google or Apple/i);
+  // Apple sign-in left the app in 8f06d530 and came back with the sign-in
+  // screen's Apple and Google buttons; the policy follows the screen.
+  it('describes sign-in with Apple and Google exactly when the iPhone offers them', () => {
+    const screen = fs.readFileSync(new URL('../mobile/src/app/sign-in.tsx', import.meta.url), 'utf8');
+    const says = /sign in with Apple/i.test(policy);
+    expect(says).toBe(/appleSignIn\(/.test(screen));
+    expect(/with Apple or Google/.test(policy)).toBe(/googleSignIn\(/.test(screen) && /appleSignIn\(/.test(screen));
   });
   it('still says how to delete the account and names the AI companies', () => {
     for (const words of ['Delete account', 'Anthropic', 'OpenAI', 'Supabase', 'Expo']) expect(policy).toContain(words);
