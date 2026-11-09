@@ -503,6 +503,68 @@ export function runsThisWeek(teammateId, items, now = Date.now()) {
   return runsOf(teammateId, items).filter((i) => (i.createdAt ?? 0) > now - WEEK_MS).length;
 }
 
+// ------------------------------------------------------------ looking back
+// A run that rereads the threads you replied on and tightens the method. It
+// spends the person's plan on no work they asked for, so each rule below is
+// there to keep it rare and cheap.
+export const LOOK_BACK_LABEL = 'look-back';
+export const LOOK_BACK_AFTER = 3;
+const LOOK_BACK_EVERY_MS = 24 * 60 * 60 * 1000;
+const LOOK_BACK_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+const LOOK_BACK_LEAVES = 3;
+const LOOK_BACK_THREADS = 6;
+const USAGE_FRESH_MS = 6 * 60 * 60 * 1000;
+const ROOM_SESSION = 50;
+const ROOM_WEEK = 60;
+
+export const isLookBack = (item) => (item?.labels ?? []).includes(LOOK_BACK_LABEL);
+
+function yourLastWordAt(item) {
+  const w = item?.wrote ?? {};
+  const answered = w.answer?.source === 'founder' ? w.answer.ts ?? 0 : 0;
+  const closed = item?.status === 'done' && w.status?.source === 'founder' ? w.status.ts ?? 0 : 0;
+  return Math.max(answered, closed);
+}
+
+/** When the teammate last looked back, before `before`; 0 if it never has. */
+export function lookBackSince(teammateId, items, before = Infinity) {
+  let at = 0;
+  for (const i of runsOf(teammateId, items)) {
+    const c = i.createdAt ?? 0;
+    if (isLookBack(i) && c < before && c > at) at = c;
+  }
+  return at;
+}
+
+/** Its runs you replied on or closed since `since`, in the last two weeks, oldest first. */
+export function taughtRuns(teammateId, items, since, now = Date.now()) {
+  return runsOf(teammateId, items)
+    .filter((i) => !isLookBack(i) && (i.createdAt ?? 0) >= now - LOOK_BACK_WINDOW_MS && yourLastWordAt(i) > since)
+    .sort((a, b) => yourLastWordAt(a) - yourLastWordAt(b));
+}
+
+/** The threads a look-back rereads: the newest few you replied on since the last one. */
+export function lookBackThreads(teammateId, items, item, now = Date.now()) {
+  const since = lookBackSince(teammateId, items, item?.createdAt ?? now);
+  return taughtRuns(teammateId, items, since, item?.createdAt ?? now).slice(-LOOK_BACK_THREADS);
+}
+
+/**
+ * Whether a plan's usage reading leaves room for a look-back: known, read in
+ * the last six hours, and every limit well under its line. Unknown is no.
+ */
+export function roomToLookBack(reading, now = Date.now()) {
+  const limits = reading?.limits ?? [];
+  if (!limits.length || !(now - (reading.at ?? 0) < USAGE_FRESH_MS)) return false;
+  return limits.every((l) => {
+    const p = Number(l?.percent);
+    if (!Number.isFinite(p)) return false;
+    return p < (l.span === 'session' ? ROOM_SESSION : ROOM_WEEK);
+  });
+}
+
+export const lookBackEffort = (effort) => (effort === 'low' ? 'low' : 'medium');
+
 // Deterministic, so a tick that dies after creating the run and before marking
 // the message seen finds the same row next time rather than making a second.
 export function runIdFor(seed) {
@@ -556,6 +618,7 @@ export const isSetupTitle = (title) => title === 'Set up its job' || /^Set up /.
 export function runTitle(trigger, teammate) {
   if (trigger.kind === 'schedule') return trigger.label === 'week' ? "This week's round" : "Today's round";
   if (trigger.kind === 'duty') return clip(trigger.what, 120);
+  if (trigger.kind === 'look-back') return 'Learn from your recent replies';
   if (trigger.kind === 'pass') return clip(trigger.title || 'Work passed on', 120);
   if (trigger.opening === 'setup') return setupTitle(teammate?.name);
   if (trigger.opening === 'start') return 'Introduce itself and begin';
@@ -594,7 +657,7 @@ function partFor(text, name) {
 // - One run at a time: a new run behind an active one is made queued, and a
 //   teammate with nothing active gets its oldest queued run released.
 // - A teammate past its weekly runs takes nothing new except your own words.
-export function planWakes({ teammates = [], chat = { messages: [], seen: new Set() }, items = [], now = Date.now(), shipped = {} } = {}) {
+export function planWakes({ teammates = [], chat = { messages: [], seen: new Set() }, items = [], now = Date.now(), shipped = {}, lookBack = null } = {}) {
   const actions = [];
   const live = teammates.filter((t) => !t.endedAt);
   const byId = new Map(live.map((t) => [t.id, t]));
@@ -762,6 +825,20 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
       const id = newRun(t, { kind: 'duty', duty: d.id, what: d.what, ...(d.tell ? { tell: d.tell } : {}), key }, `${t.id}#${d.id}@${key}`);
       if (id) actions.push({ type: 'dutyServed', teammate: t.id, duty: d.id, key });
     }
+  }
+
+  // Last, so it never takes a place real work wanted this tick.
+  for (const t of live) {
+    if (!lookBack?.ok?.(t) || t.paused || t.status !== 'active' || pausedNow(t, now)) continue;
+    if (active(t) || runsOf(t.id, items).some(isQueued) || pendingNew.get(t.id)) continue;
+    if (runsThisWeek(t.id, items, now) >= (t.limit ?? DEFAULT_LIMIT) - LOOK_BACK_LEAVES) continue;
+    const since = lookBackSince(t.id, items);
+    if (since && now - since < LOOK_BACK_EVERY_MS) continue;
+    if (taughtRuns(t.id, items, since, now).length < LOOK_BACK_AFTER) continue;
+    const trigger = { kind: 'look-back', since };
+    actions.push({ type: 'run', teammate: t.id, id: runIdFor(`${t.id}~look-back~${since}`), trigger, title: runTitle(trigger, t), start: 'now' });
+    pendingNew.set(t.id, 1);
+    startsNow.set(t.id, true);
   }
 
   for (const t of live) {

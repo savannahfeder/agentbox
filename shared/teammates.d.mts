@@ -131,7 +131,8 @@ export type WakeTrigger =
   | (TriggerBase & { kind: 'schedule'; key: string; label: string })
   | (TriggerBase & { kind: 'duty'; duty: string; what: string; tell?: string; key: string })
   | (TriggerBase & { kind: 'pass'; fromName?: string; title?: string; details?: string })
-  | (TriggerBase & { kind: 'message'; text?: string; opening?: 'start' | 'setup' });
+  | (TriggerBase & { kind: 'message'; text?: string; opening?: 'start' | 'setup' })
+  | (TriggerBase & { kind: 'look-back'; since: number });
 interface ActionBase { teammate: string; msg?: string; trigger?: WakeTrigger }
 export type WakeAction =
   | (ActionBase & { type: 'run'; id: string; trigger: WakeTrigger; title: string; start: 'now' | 'later' })
@@ -181,7 +182,15 @@ export function replyMessageId(runId: string): string;
 export function projectNamedIn(text: string | null | undefined, products?: { slug: string; name?: string | null }[]): string | null;
 export function isQueued(item: RunItem | null | undefined): boolean;
 export function isActiveRun(item: RunItem | null | undefined): boolean;
-export function planWakes(input?: { teammates?: TeammateLike[]; chat?: ChatLike; items?: RunItem[]; now?: number; shipped?: Record<string, number> }): WakeAction[];
+export function planWakes(input?: { teammates?: TeammateLike[]; chat?: ChatLike; items?: RunItem[]; now?: number; shipped?: Record<string, number>; lookBack?: { ok: (t: TeammateLike) => boolean } | null }): WakeAction[];
+export const LOOK_BACK_LABEL: 'look-back';
+export const LOOK_BACK_AFTER: number;
+export function isLookBack(item: { labels?: string[] } | null | undefined): boolean;
+export function lookBackSince(teammateId: string, items: RunItem[] | null | undefined, before?: number): number;
+export function taughtRuns(teammateId: string, items: RunItem[] | null | undefined, since: number, now?: number): RunItem[];
+export function lookBackThreads(teammateId: string, items: RunItem[] | null | undefined, item: { createdAt?: number } | null | undefined, now?: number): RunItem[];
+export function roomToLookBack(reading: { at?: number; limits?: { span?: string; percent?: number | null }[] | null } | null | undefined, now?: number): boolean;
+export function lookBackEffort(effort: string | null | undefined): 'low' | 'medium';
 export function runLines(items: RunItem[] | null | undefined, teammates?: { id: string; name?: string }[]): RunLine[];
 export function statusOf(teammate: { id: string; paused?: boolean }, items: RunItem[] | null | undefined, now?: number): TeammateStatus;
 export function offerFrom(input?: { items?: RunItem[]; offered?: ReadonlySet<unknown>; now?: number }): Offer | null;
