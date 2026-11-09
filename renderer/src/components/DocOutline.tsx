@@ -18,7 +18,7 @@ export function DocOutline({ scroller, page }: { scroller: HTMLElement | null; p
     const read = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
-        const next = outlineOf(headingsIn(page).map((el) => ({ level: Number(el.tagName[1]), text: el.textContent ?? '' })));
+        const next = outlineOf(headingsIn(page).map((el) => ({ level: Number(el.tagName[1]), text: headingWords(el) })));
         setEntries((was) => (JSON.stringify(was) === JSON.stringify(next) ? was : next));
       });
     };
@@ -62,4 +62,11 @@ export function DocOutline({ scroller, page }: { scroller: HTMLElement | null; p
       </ol>
     </div>
   </nav>;
+}
+
+/** A heading's own words, without the name on a teammate's cursor standing in it. */
+function headingWords(el: Element): string {
+  const copy = el.cloneNode(true) as Element;
+  for (const c of copy.querySelectorAll('.lv-caret, .lv-you')) c.remove();
+  return copy.textContent ?? '';
 }

@@ -121,8 +121,8 @@ describe('from Files', () => {
 describe('in the thread', () => {
   const note = (id, more = {}) => ({ id: 'w-1', ts: 2, source: 'founder', patch: { artifact: { do: 'note', id, file: 'pricing.html', place: { kind: 'whole' }, text: 'Fix the price', ...more } } });
   const kindOf = (lines) => messageKind(threadEvents([{ id: 'w-1', ts: 1, source: 'agent', patch: { result: '[pricing.html](pricing.html)' } }, ...lines]).find((e) => e.fileMark?.kind === 'note'));
-  it('a comment waiting for Send says Not sent beside its file', () => {
-    expect(kindOf([note('n1', { wait: true })])).toEqual({ word: 'Note on pricing.html', file: true, why: 'Not sent' });
+  it('a comment waiting for Send says it goes with your next reply, beside its file', () => {
+    expect(kindOf([note('n1', { wait: true })])).toEqual({ word: 'Note on pricing.html', file: true, why: 'Goes with your next reply' });
   });
   it('once Send hands it over, or it never waited, it says nothing more', () => {
     expect(kindOf([note('n1', { wait: true }), { id: 'w-1', ts: 3, source: 'founder', patch: { artifact: { do: 'sent', on: ['n1'] } } }])).toEqual({ word: 'Note on pricing.html', file: true });
@@ -138,11 +138,8 @@ describe('the file view', () => {
   it('a tagged reply sends the comment it answers', () => {
     expect(view).toMatch(/tagsYourAgent\(text\)[\s\S]{0,200}toAgent\(\[note\.id\]\)/);
   });
-  it('shows how many are not sent, with Send, above the comments and outside the box', () => {
-    const side = view.slice(view.indexOf('className="av-side"'));
-    expect(side.indexOf('av-unsent')).toBeGreaterThan(-1);
-    expect(side.indexOf('av-unsent')).toBeLessThan(side.indexOf('className="av-list"'));
-    expect(view).toMatch(/not sent/);
-    expect(view).not.toMatch(/Send \{sendNotes\.length === 1 \? 'this note' : 'these notes'\} to the agent/);
+  it('shows how many are not sent, with Send all, on a bar under the file (comments-you-have-not-sent-show-under-every-picture)', () => {
+    expect(view).toMatch(/className="av-unsent-bar"/);
+    expect(view).toMatch(/Send all/);
   });
 });

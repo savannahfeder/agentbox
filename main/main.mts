@@ -11,6 +11,7 @@ import { startConnections } from './connections/start.mjs';
 import { roomsSetup } from './team/room-setup.mts';
 import { matesForTheTeam } from './teammate-reach.mjs';
 import { loadCloudConfig, supabaseSession } from './team/session.mjs';
+import { liveAddress } from './team/live-room.mjs';
 // MY WORKSPACE IS NOT A TEAM FEATURE ANY MORE (w-f8d123be62), even though it
 // still lives in the team folder next to the sharing rules it has to obey.
 import { ensurePersonalProject } from './team/projects.mts';
@@ -917,6 +918,7 @@ async function createWindow() {
     team,
     connections: connected.connections,
     copies: connected.copies,
+    liveAt: liveAddress(cloudConfig),
   });
   // The Agents menu's Allow/Deny, bound to the real door now that there is one.
   // See the `installMenu` call above for what writing the file instead did to a

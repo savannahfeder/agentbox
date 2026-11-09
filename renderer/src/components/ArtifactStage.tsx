@@ -17,6 +17,7 @@ import type { FileNote, NotePlace } from '../types';
 import { quotesKey } from '../selection-bar';
 import { CodeFile } from './CodeFile';
 import { TableView, useTableSave } from './TableView';
+import { useLiveSession, useLiveTicket } from '../live/live-session';
 import { SelectionBar } from './SelectionBar';
 import { DeckSlides } from './DeckSlides';
 import { PinMarks, spotIn } from './PinMarks';
@@ -105,6 +106,8 @@ export interface StageFiles {
 
 /** The thread whose files the stage reads, so a name finds that thread's file first. */
 export const StageThread = createContext<string | undefined>(undefined);
+/** The project the files belong to, when it is not the product's own. */
+export const StageProject = createContext<string | null>(null);
 
 function useResolved(product: string, path: string, files?: StageFiles) {
   const thread = useContext(StageThread);
@@ -502,8 +505,12 @@ function TableStage({ product, path, name, notes, draft, activeId, onPlace, onFo
   onPlace?: (place: NotePlace | null) => void; onFound?: (found: Found) => void; readText?: (path: string) => Promise<string | null>; onAgain: () => void;
 }) {
   const thread = useContext(StageThread);
+  const project = useContext(StageProject);
   const [text, setText] = useState<string | null | undefined>(undefined);
   const [mtime, setMtime] = useState(0);
+  // Teammates with the table open edit one live copy; a teammate's own copy cannot write the file.
+  const ticket = useLiveTicket({ product, project, name });
+  const liveSession = useLiveSession(ticket ? { ...ticket, me: { ...ticket.me, canSave: !readText } } : ticket);
   const [reads, setReads] = useState(0);
   const page = useRef<HTMLDivElement | null>(null);
   // A teammate's file comes through `readText` and is theirs; only a file of this project's can be saved.
@@ -530,7 +537,7 @@ function TableStage({ product, path, name, notes, draft, activeId, onPlace, onFo
   if (text === null) return <div className="doc-missing">{name} could not be opened.</div>;
   if (text === undefined) return <OpeningWait name={name} kind={null} onAgain={onAgain} />;
   return <div className="av-table" ref={page}>
-    <TableView text={text} path={path} mode="full" onSave={readText ? undefined : save} onReload={() => setReads((n) => n + 1)}
+    <TableView text={text} path={path} mode="full" onSave={readText ? undefined : save} onReload={() => setReads((n) => n + 1)} live={liveSession}
       onComment={onPlace ? (quote) => onPlace({ kind: 'quote', text: quote }) : undefined} storeKey={`${product}/${path}`} />
     {onPlace && <SelectionBar page={page} onComment={(quote) => onPlace({ kind: 'quote', text: quote })} />}
   </div>;
