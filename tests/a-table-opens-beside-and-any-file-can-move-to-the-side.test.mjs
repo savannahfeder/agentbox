@@ -24,9 +24,9 @@ it('a picture, a film, a pdf and a deck still open big first', () => {
 
 it('the big viewer offers to open the file on the side when the thread can', () => {
   const view = read('components/ArtifactView.tsx');
-  expect(view).toMatch(/onBeside && version[^\n]*onBeside\(version\.path\)[^\n]*Open on the side/);
+  expect(view).toMatch(/onBeside && version[^\n]*onClick=\{\(\) => onBeside\(version\.path\)\}/);
   const wrap = read('components/ThreadArtifacts.tsx');
   expect(wrap).toMatch(/onBeside=\{onBeside\}/);
   const focus = read('components/Focus.tsx');
-  expect(focus).toMatch(/<ThreadArtifacts[^>]*onBeside=\{onOpenDoc \? \(src\) => \{ setArtifact\(null\); onOpenDoc\(src\); \} : undefined\}/);
+  expect(focus).toMatch(/onBeside=\{onOpenArtifact \? \(path\) => \{ setArtifact\(null\); onOpenArtifact\(path, 'beside'\); \} : undefined\}/);
 });

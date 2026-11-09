@@ -7,7 +7,6 @@ import type { LedgerLine } from '../thread-history';
 import type { ArtifactMark, FileElsewhere, FileMarks, Person, WorkItem } from '../types';
 import { ArtifactView, NO_MARKS, type ArtifactOpen } from './ArtifactView';
 import { useFileLine } from '../file-numbers';
-import { shownTitle } from '../../../shared/thread-title.mjs';
 import { filesInLines, threadFiles } from '../../../shared/artifact-marks.mjs';
 
 /** This thread's marks with those from the other copies, every pin numbered in the order it was made. */
@@ -74,7 +73,6 @@ export function ThreadArtifacts({ item, open, withAgent, onClose, onBeside, onNo
   return <ArtifactView
     product={item.product}
     thread={item.id}
-    threadName={shownTitle(item)}
     lines={allLines}
     numbers={numbered.numbers}
     marks={marks}

@@ -161,7 +161,7 @@ function writeConversation(file, bytes) {
   return Buffer.from(text);
 }
 
-function launch({ message = 'please do it', resume = SESSION, onOut = () => {}, via = transport } = {}) {
+function launch({ message = 'please do it', resume = SESSION, onOut = () => {}, via = transport, store = storage, caps = ['offline', 'setup', 'kept', 'base'] } = {}) {
   fs.mkdirSync(configDir(), { recursive: true });
   const mcpFile = path.join(tmp, 'mac', 'mcp.json');
   fs.writeFileSync(mcpFile, JSON.stringify({ mcpServers: { agentbox: { command: process.execPath, args: [FAKE_STORE], env: { FAKE_STORE_LOG: path.join(tmp, 'store.log') } } } }));
@@ -174,10 +174,10 @@ function launch({ message = 'please do it', resume = SESSION, onOut = () => {}, 
   const done = cloudRun({
     argv: [FAKE_CLAUDE, '-p', '--output-format', 'stream-json', '--mcp-config', mcpFile, ...(resume ? ['--resume', resume] : [])],
     env: { ...process.env, ZERO_ITEM: 'w-1', ZERO_PRODUCT: 'p', CLAUDE_CONFIG_DIR: configDir(), AGENTBOX_HOME: path.join(tmp, 'mac') },
-    cwd: mac, transport: via, storage, login: CLAUDE_LOGIN,
+    cwd: mac, transport: via, storage: store, login: CLAUDE_LOGIN,
     stdin, stdout, stderr, remoteCommand: process.execPath, stubPath: STUB, pollWaitMs: 200, resultsWaitMs: 8000, watchParent: false, signals: new EventEmitter(),
     homeDir: path.join(tmp, 'home'),
-    imageCaps: ['offline', 'setup', 'kept', 'base'],
+    imageCaps: caps,
   });
   stdin.write(JSON.stringify({ type: 'user', message: { role: 'user', content: message } }) + '\n');
   return { done, err: () => err };
@@ -311,6 +311,34 @@ describe('a reply on a long Claude Code conversation', () => {
     expect(broughtHome()[0].size).toBeLessThan(64 * 1024);
     expect(fs.readFileSync(transcript()).equals(Buffer.concat([before, Buffer.from(resumedLineFor('a reply'))]))).toBe(true);
     expect(run.err()).toMatch(/gone from this Mac/);
+    expect(leftovers()).toEqual([]);
+  });
+
+  // Through the cloud server the copy sent is in pieces (w-1fd4046a29).
+  it('is laid whole from every piece this Mac sent when its own was deleted while the run was away', async () => {
+    const { extend: _join, ...noJoin } = storage;
+    const caps = ['offline', 'setup', 'kept', 'base', 'pieces'];
+    const before = writeConversation(transcript(), 6 * MB);
+    const first = launch({ message: 'first reply', store: noJoin, caps });
+    expect(await first.done, first.err()).toBe(0);
+    const afterFirst = Buffer.concat([before, Buffer.from(resumedLineFor('first reply'))]);
+    expect(fs.readFileSync(transcript()).equals(afterFirst)).toBe(true);
+
+    puts.length = 0;
+    freshMachine();
+    let deleted = false;
+    const second = launch({
+      message: 'second reply', store: noJoin, caps,
+      onOut: (out) => {
+        if (deleted || !out.includes('"type":"assistant"')) return;
+        fs.rmSync(transcript());
+        deleted = true;
+      },
+    });
+    expect(await second.done, second.err()).toBe(0);
+    expect(deleted).toBe(true);
+    expect(conversationPuts()).toHaveLength(0);
+    expect(fs.readFileSync(transcript()).equals(Buffer.concat([afterFirst, Buffer.from(resumedLineFor('second reply'))]))).toBe(true);
     expect(leftovers()).toEqual([]);
   });
 });

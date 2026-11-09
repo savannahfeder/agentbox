@@ -6,6 +6,7 @@ import { clickZoom, isDoubleTap, lowestZoom, panLimits, panToKeep, pictureFit, p
 import { doubleTapScale, onPhone } from '../phone-screen';
 import { CrossIcon } from './CrossIcon';
 import { focusTheReplyBox } from '../focus-at-end';
+import { opening, seenAt } from '../picture';
 
 export type { Picture };
 
@@ -35,7 +36,8 @@ export function picturesFor(root: ParentNode | null, href: string, from?: Elemen
   if (at < 0) return { pictures: [{ path: href, url: null }], start: 0 };
   return picturesBeside(doors.map((d) => {
     const img = d.querySelector('img')!;
-    return { path: d.dataset.picture!, url: img.currentSrc || img.src || null, section: d.closest<HTMLElement>('[data-exchange]')?.dataset.exchange ?? null };
+    // A thread draws a picture from a shrunk copy (FittedImg); the viewer opens the whole one.
+    return { path: d.dataset.picture!, url: img.dataset.full || img.currentSrc || img.src || null, section: d.closest<HTMLElement>('[data-exchange]')?.dataset.exchange ?? null };
   }), at);
 }
 
@@ -101,14 +103,15 @@ export function PictureView({ pictures, start, resolve, onClose, onBeside, onPre
   const drag = useRef<{ px: number; py: number; x: number; y: number; moved: boolean } | null>(null);
   const idleTimer = useRef<number | undefined>(undefined);
   const ready = useRef(new Map<string, Promise<Ready>>());
+  const [at] = useState(opening);
 
   // The url the thread drew it from first; if that fails, the file is looked
   // for by its path, the way a click on it outside this view would.
   const read = (p: Picture): Promise<Ready> => {
     const had = ready.current.get(p.path);
     if (had) return had;
-    const found = () => resolve(p.path).then((u) => (u ? decoded(u) : Promise.reject(new Error('missing'))));
-    const got = p.url ? decoded(p.url).catch(found) : found();
+    const found = () => resolve(p.path).then((u) => (u ? decoded(seenAt(u, at)) : Promise.reject(new Error('missing'))));
+    const got = p.url ? decoded(seenAt(p.url, at)).catch(found) : found();
     ready.current.set(p.path, got);
     got.catch(() => ready.current.delete(p.path));
     return got;
@@ -375,7 +378,7 @@ export function PictureView({ pictures, start, resolve, onClose, onBeside, onPre
         <div ref={strip} className="pv-strip pv-chrome">
           {pictures.map((p, i) => (
             <button key={p.path} type="button" className={`pv-thumb${i === index ? ' is-on' : ''}`} aria-current={i === index || undefined} onClick={() => setIndex(i)} title={p.path.split('/').pop()}>
-              {p.url && <img src={p.url} alt="" crossOrigin="anonymous" decoding="async" />}
+              {p.url && <img src={seenAt(p.url, at)} alt="" crossOrigin="anonymous" decoding="async" />}
             </button>
           ))}
         </div>

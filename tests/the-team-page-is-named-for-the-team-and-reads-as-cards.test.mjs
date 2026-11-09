@@ -62,7 +62,7 @@ describe('the list beside it', () => {
   });
   it('nor does a board column or a section of threads', () => {
     const pages = read('renderer/src/threads/Pages.tsx');
-    expect(pages).toContain('{rows.length > 0 && <b>{rows.length}</b>}');
+    expect(pages).toContain("{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}{count > 0 && <b>{count}</b>}");
     expect(pages).toContain('{label}{count > 0 && <b>{count}</b>}');
   });
 });
@@ -89,10 +89,10 @@ describe('a teammate’s thread opened from their page in Team', () => {
   const app = read('renderer/src/App.tsx');
   it('stays titled Team, with Team lit in the sidebar', () => {
     expect(app).toContain("const cardFromPlace = homeLayout === 'chats' && !!chatsPlace && !!openCard;");
-    expect(app).toContain("<h1 className=\"workspace-title\">{openCard ? (cardFromPlace ? 'Team' : 'Threads') : 'Team'}</h1>");
+    expect(app).toContain("<h1 className=\"workspace-title\">{openCard ? (cardFromPlace ? 'Team' : 'Inbox') : 'Team'}</h1>");
     expect(app).toContain('roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown || chatsPlaceShown || cardFromPlace,');
   });
   it('goes back to the page it came from, by name', () => {
-    expect(app).toContain("backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Everyone' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Threads')}");
+    expect(app).toContain("backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Everyone' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Inbox')}");
   });
 });

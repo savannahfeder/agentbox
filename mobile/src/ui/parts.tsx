@@ -149,7 +149,7 @@ export function RunningMark({ cloud, children }: { cloud?: boolean; children?: R
 /** A word that opens a picker, dotted under, as the desktop's sentence words are. */
 export function Pickable({ children, onPress, style }: { children: ReactNode; onPress: () => void; style?: object }) {
   return (
-    <T onPress={onPress} suppressHighlighting
+    <T onPress={onPress} suppressHighlighting role="button"
       style={[{ textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: color.faint }, style]}>{children}</T>
   );
 }
