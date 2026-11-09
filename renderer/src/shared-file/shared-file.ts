@@ -109,11 +109,16 @@ export function sharedLine(file: Pick<SharedFile, 'ownerName' | 'updatedAt'> & {
   return `Shared by ${who} · ${updated ? 'updated ' : ''}${sharedOn(file.updatedAt, now)}`;
 }
 
+/** A table goes up as text, as a document does (main/file-link.mts); its type tells them apart. */
+export const isTable = (file: { kind: string; type?: string }): boolean =>
+  file.kind === 'markdown' && /^text\/(csv|tab-separated-values)$/i.test(file.type ?? '');
+
 /**
  * The words over the file. A document's own first heading is its title, so the
  * page does not lead with "competitor-research.md"; `body` is the rest of it.
  */
-export function titleOf(file: Pick<SharedFile, 'name' | 'kind' | 'body'>): { title: string; body: string } {
+export function titleOf(file: Pick<SharedFile, 'name' | 'kind' | 'body'> & { type?: string }): { title: string; body: string } {
+  if (isTable(file)) return { title: file.name, body: file.body };
   if (file.kind === 'markdown') {
     const m = /^\s*#[ \t]+(.+?)[ \t]*#*[ \t]*(?:\r?\n|$)/.exec(file.body);
     if (m) return { title: m[1], body: file.body.slice(m[0].length) };

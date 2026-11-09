@@ -21,6 +21,8 @@ export interface LinkCopy extends LinkFile { name: string; version: number }
 
 const KINDS: Record<string, readonly [LinkKind, string] | undefined> = {
   '.md': ['markdown', 'text/markdown'], '.markdown': ['markdown', 'text/markdown'],
+  // A table rides as text like a document; its type is what draws it as a table.
+  '.csv': ['markdown', 'text/csv'], '.tsv': ['markdown', 'text/tab-separated-values'],
   '.html': ['page', 'text/html'], '.htm': ['page', 'text/html'],
   '.png': ['image', 'image/png'], '.jpg': ['image', 'image/jpeg'], '.jpeg': ['image', 'image/jpeg'],
   '.gif': ['image', 'image/gif'], '.webp': ['image', 'image/webp'], '.svg': ['image', 'image/svg+xml'],

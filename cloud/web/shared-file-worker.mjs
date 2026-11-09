@@ -43,7 +43,9 @@ function pageTitle(html) {
     return n > 0 && n < 0x110000 ? String.fromCodePoint(n) : whole;
   }).replace(/\s+/g, ' ').trim().slice(0, 120);
 }
+const isTable = (file) => file.kind === 'markdown' && /^text\/(csv|tab-separated-values)$/i.test(file.type ?? '');
 const titleOf = (file) => {
+  if (isTable(file)) return file.name;
   if (file.kind === 'markdown') return /^\s*#[ \t]+(.+?)[ \t]*#*[ \t]*(?:\r?\n|$)/.exec(file.body ?? '')?.[1] ?? String(file.name).replace(/\.(md|markdown)$/i, '');
   if (file.kind === 'page') return pageTitle(file.body) || file.name;
   return file.name;
@@ -111,6 +113,9 @@ export function sharedFileWorker({ cloud, anonKey, headers = {} }, { fetchImpl =
     }
     const shared = { 'cache-control': preview ? 'public, max-age=300' : 'no-store', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' };
     if (file.kind === 'page') return new Response(file.body, { headers: { ...shared, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': PAGE_CSP } });
+    if (isTable(file)) {
+      return new Response(file.body, { headers: { ...shared, 'content-type': `${file.type.toLowerCase()}; charset=utf-8`, 'content-security-policy': TEXT_CSP, 'content-disposition': `attachment; filename="${String(file.name).replace(/[^\w.\- ]+/g, '_')}"` } });
+    }
     if (file.kind === 'markdown') return new Response(file.body, { headers: { ...shared, 'content-type': 'text/plain; charset=utf-8', 'content-security-policy': TEXT_CSP } });
     let bytes;
     try { bytes = bytesOf(file.body); } catch { return plain(404, 'This link does not work.'); }

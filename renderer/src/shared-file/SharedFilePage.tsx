@@ -7,10 +7,11 @@ import { AppMark } from '../components/AppMark';
 import { PdfPages } from '../components/PdfPages';
 import type { CloudClient } from '../cloud-rest';
 import {
-  commentWhen, fileBytes, initialOf, postComment, readComments, readSharedFile, removeComment, saidOf, sharedLine, titleOf,
+  commentWhen, fileBytes, initialOf, isTable, postComment, readComments, readSharedFile, removeComment, saidOf, sharedLine, titleOf,
   type FileComment, type Rpc, type SharedFile, type Shown,
 } from './shared-file';
 import { SharedSignIn } from './SharedSignIn';
+import { TableView } from '../components/TableView';
 import { Name } from '../../../shared/product-name.mjs';
 import '../components/doc-reading.css';
 import '../components/file-views.css';
@@ -169,9 +170,10 @@ export function TopBar({ count, open, onComments }: { count: number | null; open
 
 /** The file on its own: its title, who shared it, and the file. */
 export function FilePage({ token, file }: { token: string; file: SharedFile }) {
-  const kept = file.kind === 'image' || file.kind === 'pdf';
+  const table = isTable(file);
+  const kept = table || file.kind === 'image' || file.kind === 'pdf';
   return (
-    <main className={`sf-main is-${file.kind}`}>
+    <main className={`sf-main is-${table ? 'table' : file.kind}`}>
       <div className="sf-head">
         <h1>{titleOf(file).title}</h1>
         <p>
@@ -193,6 +195,7 @@ export function FileBody({ token, file }: { token: string; file: SharedFile }) {
   useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
   const [unreadable, setUnreadable] = useState(false);
   const pdf = useCallback(async () => bytes ?? new Uint8Array(), [bytes]);
+  if (isTable(file)) return <div className="sf-table"><TableView text={file.body} path={file.name} mode="full" storeKey={`link:${token}`} /></div>;
   if (file.kind === 'markdown') {
     return <div className="sf-doc"><div className="markdown doc-prose"><ReactMarkdown remarkPlugins={MD_PLUGINS} components={MD_PARTS}>{titleOf(file).body}</ReactMarkdown></div></div>;
   }
