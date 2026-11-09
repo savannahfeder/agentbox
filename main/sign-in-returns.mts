@@ -2,10 +2,10 @@
 // COMPUTER, NOT THE CLOUD MACHINE WAITING FOR IT. While such a sign-in is open
 // on a cloud thread, this computer listens at that address, takes the browser's
 // return, and hands its address to the agent as the person's answer
-// (shared/sign-in-ask.mjs), which gives it to the login on its own machine.
+// (shared/sign-in-ask.mts), which gives it to the login on its own machine.
 // A run on this computer needs none of this: its login is listening itself.
 import http from 'node:http';
-import { comesBackTo } from '../shared/sign-in-ask.mjs';
+import { comesBackTo } from '../shared/sign-in-ask.mts';
 import { Name } from '../shared/product-name.mjs';
 
 export interface OpenReturn { product: string; id: string; ask: string; url: string }

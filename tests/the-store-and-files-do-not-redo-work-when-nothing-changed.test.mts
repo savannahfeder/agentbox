@@ -16,7 +16,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { foldLine, foldOnto } from '../shared/version-line.mjs';
+import { foldLine, foldOnto } from '../shared/version-line.mts';
 import { ensureMachineryDir, machineryDir, machineryPath } from '../main/store/home.mts';
 
 describe('a version folded on', () => {
