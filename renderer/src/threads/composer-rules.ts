@@ -217,6 +217,9 @@ export function mondayMorning(now = Date.now()): number {
   return d.getTime();
 }
 
+/** On a Sunday the two presets are one time, and a list shows only Tomorrow morning. */
+export const mondayIsTomorrow = (now = Date.now()) => mondayMorning(now) === tomorrowMorning(now);
+
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const pad = (n: number) => String(n).padStart(2, '0');
 

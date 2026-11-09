@@ -151,7 +151,8 @@ describe('what her screen does with it', () => {
   // so it asks the same question of the markup that actually exists.
   it('draws the folder it would run in', () => {
     expect(app).toMatch(/approval-where/);
-    expect(app).toMatch(/cwd \? `in \$\{cwd\}` : null/);
+    const card = fs.readFileSync(new URL('../renderer/src/approval-card.ts', import.meta.url), 'utf8');
+    expect(card).toContain("const cwd = typeof it.cwd === 'string' && it.cwd ? folderWords(it.cwd) : null;");
   });
 });
 

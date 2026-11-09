@@ -114,10 +114,12 @@ describe('a picture can be read back out of the window', () => {
     expect(main).toMatch(/headers\.set\('access-control-allow-origin', '\*'\)/);
   });
 
+  // A thread's pictures are drawn through FittedImg, which hands crossOrigin
+  // on to the <img> it draws (tests/a-picture-is-drawn-from-a-copy-the-size-it-is-shown-at).
   it('asks for every picture with crossOrigin', () => {
-    const imgs = focus.match(/<img[^>]*pictureUrl|<img[^>]*candidates\[attempt\]/g) ?? [];
+    const imgs = focus.match(/<(?:img|FittedImg)[^>]*pictureUrl|<(?:img|FittedImg)[^>]*candidates\[attempt\]/g) ?? [];
     expect(imgs.length).toBeGreaterThan(0);
-    for (const tag of focus.match(/<img[^/]*\/>/g) ?? []) {
+    for (const tag of focus.match(/<(?:img|FittedImg)[^/]*\/>/g) ?? []) {
       if (/pictureUrl|candidates\[attempt\]/.test(tag)) expect(tag).toMatch(/crossOrigin="anonymous"/);
     }
   });

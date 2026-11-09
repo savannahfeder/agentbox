@@ -40,7 +40,7 @@ describe('your list and its count', () => {
   });
 
   it('count the same rows the list draws', () => {
-    expect(app).toMatch(/progress: !onPhone\(\) \? \{ count: mineShown \? shownCount\(progressTab\) : 0/);
+    expect(app).toMatch(/progress: \(mineShown \? shownCount\(progressTab\) : 0\) \+ theirCount\('progress'\)/);
   });
 
   it('give your card the same number', () => {

@@ -20,11 +20,12 @@ import { listSkills, fetchSkill, fetchReference } from './core/skills.mjs';
 import { listWorkItems, updateItem, createClaimRegistry } from './core/work.mjs';
 import { readStandingInstruction, setStandingInstruction } from './core/repeats.mjs';
 import { teamPost, teamPass, teamRemember, teamSetup, teamRoster, teamPlaybook, teamMethod, teamHire, noteToAnotherThread } from './core/teammates.mjs';
-import { documentVersion, documentsWithFolders, fileWrittenDocument, teamFile, teamTell, teamTask, teamThreads, teamRead, waitsNamed } from './core/reach.mjs';
+import { documentVersion, documentsWithFolders, keepAsWritten, fileWrittenDocument, teamFile, teamTell, teamTask, teamThreads, teamRead, waitsNamed } from './core/reach.mjs';
 import { readTeammates, readTeamView, teamDir } from '../main/store/teammates-files.mjs';
 import { legacyRoot } from '../main/store/project.mjs';
 import { listProductChats, readProductChat } from './core/chat.mjs';
 import { lookAtPage } from './core/page.mjs';
+import { askToSignIn, waitForSignIn, WAIT_MS } from './core/sign-in.mjs';
 import { WORK_ITEM_STATUSES } from '../shared/work-items.mjs';
 import { CONTEXT_WORDS, DONE_STEPS, DONE_STEP_WORDS, SUMMARY_WORDS } from '../shared/thread-cards.mjs';
 import { AGENT_CREATION_KINDS } from '../shared/contracts.mjs';
@@ -73,7 +74,7 @@ const guard = (fn) => async (args) => {
 
 // `ownItem` is the row this server's session was started for, if any, and
 // `ownProduct` its project.
-export function buildTools({ holder, ownItem: givenItem, ownProduct = process.env.ZERO_PRODUCT || null, requestCloudResource = null } = {}) {
+export function buildTools({ holder, ownItem: givenItem, ownProduct = process.env.ZERO_PRODUCT || null, requestCloudResource = null, keepCloudKey = null } = {}) {
   const ownItem = givenItem === undefined ? process.env.ZERO_ITEM || null : givenItem;
   const account = resolveAccount();
   // Cloud runs share one process, whose own ZERO_ITEM belongs to no run or to
@@ -171,6 +172,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         const written = await writeDocument(into, version ? { ...doc, id: undefined, path: version.path, title: doc.title ?? version.title, ...(version.content != null ? { content: version.content } : {}) } : doc);
         if (doc.content == null) return json(written);
         noteWrittenForRun(into, written.path, thisRun());
+        if (ownItem) keepAsWritten(into, written.path, version?.content ?? doc.content);
         const named = await nameOnThread(written, { ownItem, env: env(), update: (id, patch) => claims.update(id, patch), note: version?.note });
         if (replacesEdits && version && named.onThread) await claims.update(ownItem, { artifact: { do: 'reconcile', file: path.basename(written.path), replace: true } });
         return json({ ...written, ...named, ...(version ? { versionOf: version.of } : {}), ...(version?.merged ? { merged: version.merged, note: version.note } : {}), ...fileWrittenDocument({ path: written.path, folder }) });
@@ -343,7 +345,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
     },
     {
       name: 'team_hire',
-      description: 'Your primary employee only: make a new teammate the person said yes to, in a run their words started or answered. It wakes as a draft and sets itself up by asking them. Ask the person first, with options; never make one they did not agree to.',
+      description: 'Make a new teammate the person asked for or said yes to, in a thread their words started or answered. It wakes as a draft and sets itself up by asking them. Ask the person first, with options; never make one they did not agree to.',
       schema: {
         name: z.string().describe('a name that says its role, like Support lead'),
         job: z.string().describe('its job in plain words'),
@@ -386,6 +388,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         voice: z.string().optional().describe('how you write: blunt, warm, dry, careful or curious'),
         voiceWords: z.string().optional().describe('how you write, in one sentence of your own, instead of voice'),
         ready: z.boolean().optional(),
+        startNow: z.boolean().optional().describe('with ready true: false only when the person said when to start, so your first run waits for your first duty\'s time; otherwise it starts as soon as this run ends'),
       },
       run: (args) => json(teamSetup(args, thisRun())),
     },
@@ -493,6 +496,33 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
       run: async ({ product, url, width, height }) => json(await lookAtPage({ product, url, width, height })),
     },
   ];
+
+  if (ownItem) tools.push({
+    name: 'sign_in',
+    description: `Put a service's own sign-in link in front of the person, on this thread, while you wait: the way they would click it in Claude Code or Codex. Use it whenever a service needs them to sign in, before asking for a pasted key. The link comes from the service's own login: an MCP server's authenticate tool (then pass what comes back to its complete_authentication), \`codex mcp login <name> --no-browser\`, or a command-line login that prints a link and a code (\`gh auth login --web\`, \`vercel login\`, \`supabase login\`, \`npx wrangler login\`, \`fly auth login\`, \`netlify login\`, \`stripe login\`). Start that login in the background first so it keeps waiting, then call this with its link and any code it printed. The thread moves to their Needs you with a card that opens the link in their own browser. Each call waits up to ${Math.round(WAIT_MS / 1000)} seconds and answers signed_in, landed (with the address their browser was sent back to, for a login waiting on another machine; ${Name} catches it for you when the link sends the browser to localhost), skipped, or waiting (call again with the ask it gives).`,
+    schema: {
+      service: z.string().optional().describe('the service as they know it: GitHub, Vercel, Linear'),
+      url: z.string().optional().describe('the sign-in link the login printed or the authenticate tool returned'),
+      code: z.string().optional().describe('the one-time code the login printed, when it gave one to enter on that page'),
+      why: z.string().optional().describe('what the sign-in is for, in a few plain words'),
+      ask: z.string().optional().describe('to keep waiting on a sign-in already asked: the ask an earlier call answered with'),
+      finished: z.boolean().optional().describe('with ask: the login finished by itself, so take the card away'),
+      keep: z.object({ name: z.string(), value: z.string() }).optional().describe('with ask, on a cloud machine, once the login worked: the token it made, under the variable its tool reads (GH_TOKEN from `gh auth token`), so every later cloud run is signed in too. A cloud machine forgets its logins when the run ends'),
+    },
+    run: async ({ service, url, code, why, ask, finished, keep }) => {
+      const id = env().ZERO_ITEM;
+      const product = env().ZERO_PRODUCT || null;
+      const asked = askToSignIn(id, { service, url, code, why, ask, finished }, { product });
+      if (keep) {
+        if (!ask) throw new Error('keep goes with the ask of a sign-in that worked');
+        if (typeof keepCloudKey !== 'function') return json({ status: 'kept_here', message: 'On this computer the login keeps its own sign-in, so there is nothing to keep.' });
+        await keepCloudKey(keep.name, keep.value);
+        return json({ status: 'kept', message: `Kept as ${keep.name} for every later cloud run.` });
+      }
+      if (finished) return json({ status: 'closed', message: 'The card is gone. Carry on.' });
+      return json(await waitForSignIn(id, asked.id, { product }));
+    },
+  });
 
   if (typeof requestCloudResource === 'function') tools.push({
     name: 'request_cloud_resource',

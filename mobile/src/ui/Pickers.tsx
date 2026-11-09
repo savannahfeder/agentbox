@@ -13,12 +13,21 @@ import { color, font } from './theme';
 const LEVEL: Record<PriorityId, 1 | 2 | 3 | 4> = { urgent: 4, high: 3, medium: 2, low: 1 };
 export const barsFor = (priority: number | null | undefined) => LEVEL[priorityIdOf(priority)];
 
+/** The four levels under their head, for a sheet of its own or the thread's menu; none marked for ticked threads that disagree. */
+export function PriorityRows({ value, pick }: { value: number | null; pick: (v: number) => void }) {
+  const on = value === null ? null : priorityIdOf(value);
+  return (
+    <>
+      <SheetHead>Priority</SheetHead>
+      {PRIORITIES.map((p) => <SheetRow key={p.id} label={p.label} on={p.id === on} lead={<PriorityBars level={LEVEL[p.id]} />} onPress={() => pick(p.value)} />)}
+    </>
+  );
+}
+
 export function PrioritySheet({ open, close, value, pick }: { open: boolean; close: () => void; value: number; pick: (v: number) => void }) {
-  const on = priorityIdOf(value);
   return (
     <Sheet open={open} close={close}>
-      <SheetHead>Priority</SheetHead>
-      {PRIORITIES.map((p) => <SheetRow key={p.id} label={p.label} on={p.id === on} lead={<PriorityBars level={LEVEL[p.id]} />} onPress={() => { pick(p.value); close(); }} />)}
+      <PriorityRows value={value} pick={(v) => { pick(v); close(); }} />
     </Sheet>
   );
 }
@@ -37,9 +46,11 @@ export function ModeSheet({ open, close, value, pick }: { open: boolean; close: 
 // `engine` and `codex` only on the new-thread page, where To can be Codex: its
 // models and their own levels are the computer's (w-24119e8784). A Codex model
 // the computer has no levels for draws no strip, as the desktop's drawer does.
-export function ModelSheet({ open, close, model, effort, pickModel, pickEffort, clearEffort, engine = 'claude', codex = {} }: {
+export function ModelSheet({ open, close, model, effort, pickModel, pickEffort, clearEffort, engine = 'claude', codex = {}, agents = [], pickEngine }: {
   open: boolean; close: () => void; model: string | null; effort: string | null; pickModel: (id: string) => void; pickEffort: (id: string) => void; clearEffort?: () => void;
   engine?: Harness; codex?: CodexOpts;
+  /** The agents a reply can move the thread between, on a computer with two (composer-rules.ts `agentChoices`). */
+  agents?: readonly { id: Harness; label: string }[]; pickEngine?: (id: Harness) => void;
 }) {
   const rows = engine === 'claude' ? modelChoices(model) : engineModelChoices(engine, model, codex);
   const current = model ?? rows[0]?.id;
@@ -47,6 +58,11 @@ export function ModelSheet({ open, close, model, effort, pickModel, pickEffort, 
   const lit = litEffort(effort, current ?? DEFAULT_MODEL, engine, codex);
   return (
     <Sheet open={open} close={close}>
+      {agents.length > 1 && pickEngine && <>
+        <SheetHead>Agent</SheetHead>
+        {agents.map((a) => <SheetRow key={a.id} label={a.label} on={a.id === engine} onPress={() => pickEngine(a.id)} />)}
+        <SheetSep />
+      </>}
       <SheetHead>Model</SheetHead>
       {rows.map((m) => <SheetRow key={m.id} label={m.label} on={m.id === current} onPress={() => { pickModel(m.id); close(); }} />)}
       {levels.length > 0 && <SheetSep />}

@@ -23,7 +23,7 @@ import { stripTypesFlags } from '../main/strip-types.mts';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cleanup = [];
 afterEach(async () => { while (cleanup.length) await cleanup.pop()(); });
-const tempDir = (name = 'tools-') => { const d = fs.mkdtempSync(path.join(os.tmpdir(), name)); cleanup.push(() => fs.rmSync(d, { recursive: true, force: true })); return d; };
+const tempDir = (name = 'tools-') => { const d = fs.mkdtempSync(path.join(os.tmpdir(), name)); cleanup.push(() => fs.rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })); return d; };
 const until = async (check, ms = 10_000) => {
   const end = Date.now() + ms;
   for (;;) {
@@ -33,6 +33,10 @@ const until = async (check, ms = 10_000) => {
     await new Promise((r) => setTimeout(r, 25));
   }
 };
+// For waits on real processes starting one after another. A loaded macOS
+// runner took longer than 20 s to bring up the run host, the stub, its
+// approvals server and the shared host; only a hang should outlast this.
+const SPAWNS = 120_000;
 const TOKEN_A = 'a'.repeat(64);
 const TOKEN_B = 'b'.repeat(64);
 const givePass = (dir, token, pass) => fs.writeFileSync(path.join(dir, 'passes', token), JSON.stringify(pass));
@@ -65,7 +69,7 @@ const echo = (seen) => ({ input, output, ownItem, ownProduct, env }) => {
 };
 
 async function host(opts = {}) {
-  const dir = tempDir();
+  const dir = opts.dir ?? tempDir();
   const seen = [];
   const h = serveTools({ dir, appPid: process.pid, servers: { store: echo(seen) }, checkMs: 20, ...opts });
   cleanup.push(() => h.close());
@@ -153,8 +157,12 @@ describe('the tool host', () => {
     let idle = 0;
     const dead = spawn(process.execPath, ['-e', '']);
     await new Promise((r) => dead.on('exit', r));
-    const { dir } = await host({ appPid: dead.pid, idleMs: 60, onIdle: () => { idle += 1; } });
+    // The pass is there before the host starts: given after, a pause longer
+    // than idleMs would let the host stop first.
+    const dir = tempDir();
+    fs.mkdirSync(path.join(dir, 'passes'));
     givePass(dir, TOKEN_A, { item: 'w-aaaaaaaaaa', env: {} });
+    await host({ dir, appPid: dead.pid, idleMs: 60, onIdle: () => { idle += 1; } });
     await new Promise((r) => setTimeout(r, 250));
     expect(idle).toBe(0);
     fs.rmSync(path.join(dir, 'passes', TOKEN_A));
@@ -176,14 +184,16 @@ describe('a host whose app has gone', () => {
 
   it('stops after a quiet spell even with passes a crashed app left, but not while a call waits', async () => {
     let idle = 0;
-    const { dir, port } = await host({ appPid: await deadPid(), idleMs: 60, orphanMs: 300, onIdle: () => { idle += 1; } });
+    // orphanMs is the room a busy runner has to pause between the test's
+    // requests before the host rightly calls it quiet.
+    const { dir, port } = await host({ appPid: await deadPid(), idleMs: 60, orphanMs: 2_000, onIdle: () => { idle += 1; } });
     givePass(dir, TOKEN_A, { item: 'w-aaaaaaaaaa', env: {} });
     const a = await post(port, 'store', TOKEN_A, INIT);
-    const waiting = post(port, 'store', TOKEN_A, { jsonrpc: '2.0', id: 9, method: 'tools/call', params: { waitMs: 700 } }, a.sid);
-    await new Promise((r) => setTimeout(r, 600));
+    const waiting = post(port, 'store', TOKEN_A, { jsonrpc: '2.0', id: 9, method: 'tools/call', params: { waitMs: 2_600 } }, a.sid);
+    await new Promise((r) => setTimeout(r, 2_300));
     expect(idle).toBe(0);
     expect((await waiting).events[0].id).toBe(9);
-    await until(() => idle > 0, 5_000);
+    await until(() => idle > 0, 10_000);
   });
 });
 
@@ -259,7 +269,7 @@ describe('the real host, with the real store server', () => {
     let errText = '';
     proc.stderr.on('data', (d) => { errText += d; });
     cleanup.push(() => new Promise((r) => { if (proc.exitCode !== null) return r(); proc.on('exit', r); proc.kill('SIGTERM'); }));
-    const { port } = await until(() => readToolHost(dir), 20_000).catch((e) => { throw new Error(`${e.message}: ${errText}`); });
+    const { port } = await until(() => readToolHost(dir), SPAWNS).catch((e) => { throw new Error(`${e.message}: ${errText}`); });
 
     // A thread in a product, made the way the store makes one.
     const prev = process.env.STORE_ACCOUNT_ID;
@@ -289,8 +299,8 @@ describe('the real host, with the real store server', () => {
     fs.rmSync(path.join(dir, 'passes', token));
     const row = () => work.listWorkItems({ product: product.id, includeDone: true }).find((i) => i.id === item.id);
     expect(row().status).toBe('claimed');
-    await until(() => row().status !== 'claimed', 10_000);
-  }, 60_000);
+    await until(() => row().status !== 'claimed', SPAWNS);
+  }, 3 * SPAWNS);
 });
 
 describe('the real supervisor, with a stand-in agent', () => {
@@ -309,7 +319,8 @@ describe('the real supervisor, with a stand-in agent', () => {
       sock.once('data', (d) => { sock.destroy(); try { resolve(JSON.parse(d).pid); } catch { resolve(null); } });
     }) : null;
     if (runHost) try { process.kill(runHost, 'SIGKILL'); } catch { /* gone */ }
-    if (copy) fs.rmSync(copy.dir, { recursive: true, force: true });
+    // A process just killed can still be writing here; macOS then refuses the delete.
+    if (copy) fs.rmSync(copy.dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     app = null;
     copy = null;
   });
@@ -341,7 +352,7 @@ describe('the real supervisor, with a stand-in agent', () => {
     booted.supervisor._runHostSock = path.join(dir, 'r.sock');
     booted.supervisor._toolHostDir = hostDir;
     booted.supervisor.start();
-    expect(await until(() => readToolHost(hostDir), 20_000)).toBeTruthy();
+    expect(await until(() => readToolHost(hostDir), SPAWNS)).toBeTruthy();
 
     const item = booted.store.composeItem('sandbox', { title: 'Write a note and ask first [[stub:act:note]]' });
     fs.writeFileSync(path.join(dir, 'plan.json'), JSON.stringify({
@@ -352,19 +363,19 @@ describe('the real supervisor, with a stand-in agent', () => {
     process.env.STUB_CLAUDE_PLAN = path.join(dir, 'plan.json');
     booted.supervisor.wake?.();
 
-    const card = await until(() => approvals.listPending(storeRoot).find((p) => p.item === item.id), 20_000);
+    const card = await until(() => approvals.listPending(storeRoot).find((p) => p.item === item.id), SPAWNS);
     expect(card.tool).toBe('Bash');
     expect(fs.readdirSync(path.join(hostDir, 'passes'))).toHaveLength(1);
     expect(approvals.answer(storeRoot, card.id, true)).toBe(true);
 
-    const result = await until(() => /approval allow/.test(booted.store.readItem('sandbox', item.id)?.result ?? '') && booted.store.readItem('sandbox', item.id), 20_000);
+    const result = await until(() => /approval allow/.test(booted.store.readItem('sandbox', item.id)?.result ?? '') && booted.store.readItem('sandbox', item.id), SPAWNS);
     expect(result.note).toBe('written through the shared host');
     const receipt = JSON.parse(fs.readFileSync(path.join(receipts, `${item.id}.json`), 'utf8'));
     expect(receipt.mcp).toEqual({ 'zero-approvals': 'stdio', agentbox: 'http' });
-    await until(() => !booted.supervisor.sessions.has(item.id), 15_000);
-    await until(() => fs.readdirSync(path.join(hostDir, 'passes')).length === 0, 10_000);
+    await until(() => !booted.supervisor.sessions.has(item.id), SPAWNS);
+    await until(() => fs.readdirSync(path.join(hostDir, 'passes')).length === 0, SPAWNS);
     expect(fs.readdirSync(path.join(hostDir, 'passes'))).toEqual([]);
-  }, 90_000);
+  }, 4 * SPAWNS);
 });
 
 function execFileSyncQuiet(cmd, args, cwd) {

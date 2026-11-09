@@ -30,6 +30,21 @@ export function foldLine(entries) {
   return new Map([...files].map(([k, f]) => [k, [...f.values()].sort((a, b) => a.n - b.n)]));
 }
 
+/**
+ * `files` (a foldLine result) with one more entry folded on, in place: what
+ * foldLine would give for the entries plus this one, without folding them all
+ * again. Recording thousands of files one by one used to refold the whole line
+ * for each.
+ */
+export function foldOnto(files, raw) {
+  const e = cleanEntry(raw);
+  if (!e) return files;
+  const versions = files.get(e.file) ?? [];
+  if (versions.some((x) => x.n === e.n || x.hash === e.hash)) return files;
+  files.set(e.file, [...versions, { ...raw, ...e }].sort((a, b) => a.n - b.n));
+  return files;
+}
+
 /** What a holder appends for these bytes: their own entry if the line has them, else the next number. */
 export function appendTo(versions, { file, hash, name = null, by = null, at = 0 }) {
   const had = (versions ?? []).find((v) => v.hash === hash);

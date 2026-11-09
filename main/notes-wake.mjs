@@ -1,34 +1,7 @@
-// A teammate's note on a file an agent made wakes that agent's thread: it is
-// told the notes as a turn, once, the way a teammate's reply is
-// (shared/artifact-marks.mjs notesForItsAgent).
-import { answeredNotes, approvalId, notedFilesInLines, noteGoesTo, notesForItsAgent, notesForTheAgent, stillWaiting, threadFiles } from '../shared/artifact-marks.mjs';
+import { answeredNotes, approvalId, notedFilesInLines, noteGoesTo, notesForTheAgent, repliesForTheAgent, stillWaiting, threadFiles, unsentReplies } from '../shared/artifact-marks.mjs';
 import { heldByAPerson } from '../shared/team-rules.mjs';
 import { readItemHistory } from './store/work-items.mjs';
 import { submitReply } from './live-replies.mts';
-
-const hasNews = (item, me, people) => (item.artifacts?.notes ?? []).some((n) => n.by && n.by !== me && !n.resolved && !n.sent && !stillWaiting(n) && noteGoesTo(n, people).to === 'agent');
-
-export async function wakeForNotes({ store, team, tell, now = Date.now() }) {
-  const state = team?.state?.();
-  const me = state?.me?.id;
-  if (!me || !tell) return 0;
-  const people = state.people ?? [];
-  const nameOf = (id) => people.find((p) => p.id === id)?.name ?? 'Someone';
-  const direct = new Set(store.listProducts().filter((p) => p.team?.direct).map((p) => p.slug));
-  let told = 0;
-  for (const item of store.listItems(now)) {
-    if (direct.has(item.product) || !hasNews(item, me, people)) continue;
-    if (item.status === 'done' && item.wrote?.status?.source === 'founder') continue;
-    const lines = readItemHistory(store.productDir(item.product), item.id);
-    for (const ask of notesForItsAgent(lines, item.artifacts, { me, nameOf, people })) {
-      // Marked first, so a tell that fails is not told again on every tick.
-      store.fileMark(item.product, item.id, { do: 'sent', on: ask.ids });
-      await tell(item.product, item.id, { text: ask.text, from: { teammate: ask.by, name: nameOf(ask.by) }, fromNotes: ask.ids });
-      told++;
-    }
-  }
-  return told;
-}
 
 // The next version from whoever a comment went to resolves it, so nobody presses
 // Resolve on what the agent or a teammate already fixed. Only the thread's own
@@ -52,7 +25,8 @@ export function resolveAnsweredNotes({ store, people = [], now = Date.now() }) {
 // agent, so it goes as your reply, the way a typed one does: a thread waiting
 // on its question opens and the next tick starts the run. A note written to a
 // teammate, a thank-you, or one marked `wait` waits for Send (a `toagent`
-// mark), which tells the agent every note it names on a file in one reply.
+// mark), which tells the agent every note it names on a file in one reply. A
+// note it already has is named again for the replies written under it since.
 export async function noteToItsAgent({ store, supervisor, product, id, mark, nameOf = () => 'the person writing to you', people = [], handOffMs = 1500 }) {
   if (mark?.do === 'approve') return approvalToItsAgent({ store, supervisor, product, id, mark });
   if (mark?.do === 'note' && mark.wait) return false;
@@ -61,19 +35,59 @@ export async function noteToItsAgent({ store, supervisor, product, id, mark, nam
   if (store.listProducts().find((p) => p.slug === product)?.team?.direct) return false;
   const item = store.readItem(product, id);
   if (!item || heldByAPerson(item)) return false;
+  const { words, sent } = notesWords({ store, product, id, item, ids, nameOf, people });
+  if (!words.length) return false;
+  return handOn({ store, supervisor, product, id, text: words.join('\n\n'), sent, handOffMs });
+}
+
+// A reply typed in the thread takes every comment of yours still waiting for
+// Send with it, so the agent hears them in the same turn. Null when none wait.
+export function replyWithWaitingNotes({ store, product, id, answer, me = null, nameOf = () => 'the person writing to you', people = [] }) {
+  if (typeof answer !== 'string' || !answer.trim() || answer === '(withdrawn)' || answer.trimStart().startsWith('/')) return null;
+  const ids = waitingNotes({ store, product, id, me, people });
+  if (!ids.length) return null;
+  const { words, sent } = notesWords({ store, product, id, item: store.readItem(product, id), ids, nameOf, people });
+  return words.length ? { answer: [...words, answer].join('\n\n'), fromNotes: sent } : null;
+}
+
+/** Your comments still waiting for Send on this thread, and those with a reply of yours waiting under them. */
+export function waitingNotes({ store, product, id, me = null, people = [] }) {
+  if (store.listProducts().find((p) => p.slug === product)?.team?.direct) return [];
+  const item = store.readItem(product, id);
+  if (!item || heldByAPerson(item)) return [];
+  const mine = (by) => (by ?? null) === (me ?? null);
+  return (item.artifacts?.notes ?? [])
+    .filter((n) => !n.resolved && ((mine(n.by) && stillWaiting(n)) || unsentReplies(n, people).some((r) => mine(r.by))))
+    .map((n) => n.id);
+}
+
+function notesWords({ store, product, id, item, ids, nameOf, people }) {
   const families = threadFiles(notedFilesInLines(readItemHistory(store.productDir(product), id)));
   const byVersion = new Map();
+  const words = [];
+  const sent = [];
   for (const note of (item.artifacts?.notes ?? []).filter((n) => ids.includes(n.id))) {
-    if (note.resolved || note.sent || noteGoesTo(note, people).to !== 'agent') continue;
+    const later = unsentReplies(note, people);
+    if (note.resolved || (note.sent && !later.length) || noteGoesTo(note, people).to !== 'agent') continue;
     const family = families.find((f) => f.versions.some((v) => v.id === note.file));
     const version = family?.versions.find((v) => v.id === note.file);
     if (typeof version?.agent !== 'string') continue;
+    if (note.sent) {
+      words.push(repliesForTheAgent(note, later, version, family.versions.length, { nameOf }));
+      sent.push(...later.map((r) => r.id));
+      continue;
+    }
     if (!byVersion.has(version.id)) byVersion.set(version.id, { version, count: family.versions.length, notes: [] });
     byVersion.get(version.id).notes.push(note);
   }
-  if (!byVersion.size) return false;
-  const text = [...byVersion.values()].map(({ version, count, notes }) => notesForTheAgent({ notes }, version, count, { nameOf }).text).join('\n\n');
-  const sent = [...byVersion.values()].flatMap(({ notes }) => notes.map((n) => n.id));
+  for (const { version, count, notes } of byVersion.values()) {
+    words.push(notesForTheAgent({ notes }, version, count, { nameOf }).text);
+    sent.push(...notes.flatMap((n) => [n.id, ...(n.replies ?? []).map((r) => r.id)]));
+  }
+  return { words, sent };
+}
+
+async function handOn({ store, supervisor, product, id, text, sent, handOffMs }) {
   const going = submitReply(supervisor, { product, id, answer: text }, () => store.answerItem(product, id, { answer: text, fromNotes: sent }))
     .then(() => { supervisor.liftBrakeForHer?.(); supervisor.wake?.(); });
   // A running agent acknowledges a line at its next break, which can be minutes

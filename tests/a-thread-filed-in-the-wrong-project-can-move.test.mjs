@@ -37,8 +37,8 @@ describe('which threads may move', () => {
     expect(whyItCannotMove({ status: 'open', epoch: 0 })).toBe(null);
   });
 
-  // One an agent has had moves too since w-8b637c7802, and starts over there
-  // (tests/a-thread-that-already-ran-can-move-and-starts-over-there).
+  // One an agent has had moves too since w-8b637c7802, with its conversation
+  // (tests/a-moved-thread-keeps-its-answer-and-leaves-no-copy-in-done).
   it('one an agent has had', () => {
     expect(whyItCannotMove({ status: 'open', epoch: 1 })).toBe(null);
     expect(whyItCannotMove({ status: 'open', epoch: 0, result: 'Done.' })).toBe(null);

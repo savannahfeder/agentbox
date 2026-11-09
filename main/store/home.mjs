@@ -96,17 +96,28 @@ export function isMachineryDir(dir, home = appHome()) {
   return path.resolve(dir).startsWith(root + path.sep);
 }
 
+// Every read of a ledger asks for its folder, thousands of times a minute, and
+// each ask read `.origin` off the disk. A folder's `.origin` is written once,
+// so an answer it decided is kept; one with no `.origin` yet is asked again.
+const decided = new Map();
+const DECIDED_HELD = 512;
+
 /** `<home>/projects/<encoded>` for this project directory. Creates nothing. */
 export function machineryDir(projectDir, home = appHome()) {
   const real = path.resolve(projectDir);
   // Already a machinery directory: return it as is, so a caller that passed
   // one still gets the right ledger rather than a nested one.
   if (isMachineryDir(real, home)) return real;
+  const key = `${home}\0${real}`;
+  const known = decided.get(key);
+  if (known) return known;
   const base = path.join(home, 'projects', encodeProjectPath(real));
   const claimed = readOrigin(base);
-  if (claimed === null || claimed === real) return base;
-  const tag = crypto.createHash('sha256').update(real).digest('hex').slice(0, 8);
-  return `${base}-${tag}`;
+  if (claimed === null) return base;
+  const dir = claimed === real ? base : `${base}-${crypto.createHash('sha256').update(real).digest('hex').slice(0, 8)}`;
+  if (decided.size >= DECIDED_HELD) decided.delete(decided.keys().next().value);
+  decided.set(key, dir);
+  return dir;
 }
 
 // Every name that is ours. All of them move together when a product is first
@@ -120,21 +131,41 @@ const LOGS = new Set(['work-items.jsonl', 'repeats.jsonl']);
 
 /**
  * The machinery directory for a project, created, with its `.origin` written
- * once and every stray record of ours carried in. The sweep runs on every
- * call, not once per process, because a file of ours can turn up in the
- * product folder after the first move. It costs one stat per name.
+ * once and every stray record of ours carried in. The sweep is not once per
+ * process, because a file of ours can turn up in the product folder after the
+ * first move. A name of ours arriving in the product folder changes the
+ * folder's modified time, so the sweep runs again whenever that has moved, and
+ * otherwise an ask costs two stats instead of nine reads and writes. A time
+ * within RACY_MS of the sweep is not trusted, as git does: a disk stamps times
+ * coarsely, so a file landing just after the sweep can leave the time as it was.
  */
+const swept = new Map();
+const RACY_MS = 2000n;
+
 export function ensureMachineryDir(projectDir, home = appHome()) {
   const dir = machineryDir(projectDir, home);
-  fs.mkdirSync(dir, { recursive: true });
   // A directory that is already ours is not swept, and its `.origin` is left
   // alone: overwritten with its own path, it would claim itself.
-  if (dir === path.resolve(projectDir)) return dir;
+  if (dir === path.resolve(projectDir)) { fs.mkdirSync(dir, { recursive: true }); return dir; }
+  const key = `${home}\0${path.resolve(projectDir)}`;
+  const changed = modifiedAt(projectDir);
+  const last = swept.get(key);
+  if (last && last.settled && last.dir === dir && changed !== null && last.changed === changed && fs.existsSync(dir)) return dir;
+  fs.mkdirSync(dir, { recursive: true });
   if (readOrigin(dir) === null) {
     try { fs.writeFileSync(path.join(dir, ORIGIN), `${path.resolve(projectDir)}\n`); } catch { /* best effort */ }
   }
   for (const rel of MACHINERY) foldStray(path.join(projectDir, rel), path.join(dir, rel), rel);
+  // Read after the sweep, which moves things out of the folder and so changes it.
+  if (swept.size >= DECIDED_HELD) swept.delete(swept.keys().next().value);
+  const after = modifiedAt(projectDir);
+  const settled = after !== null && BigInt(Date.now()) * 1_000_000n - after > RACY_MS * 1_000_000n;
+  swept.set(key, { dir, changed: after, settled });
   return dir;
+}
+
+function modifiedAt(dir) {
+  try { return fs.statSync(dir, { bigint: true }).mtimeNs; } catch { return null; }
 }
 
 /**

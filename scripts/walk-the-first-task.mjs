@@ -17,7 +17,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { guard, sweep } from './lib/chrome-guard.mjs';
+import { guard, sweep, startableChrome } from './lib/chrome-guard.mjs';
 import { answerFor } from '../main/first-run.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -67,7 +67,7 @@ const origin = `http://127.0.0.1:${server.address().port}`;
 
 sweep();
 const profile = fs.mkdtempSync('/tmp/shot-profile-');
-const chrome = spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', [
+const chrome = spawn(startableChrome(), [
   '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
   '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run',
   `--window-size=${W},${H}`, 'about:blank',

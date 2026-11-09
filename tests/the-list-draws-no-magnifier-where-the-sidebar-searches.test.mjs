@@ -37,9 +37,8 @@ describe('the list and the board leave search to the sidebar', () => {
     expect(header).toMatch(/onSearch=\{searchInTheList\}/);
   });
 
-  it('still opens the full search from ⌘K and the / key', () => {
+  it('still opens the full search from ⌘K', () => {
     const palette = elements('Palette')[0];
-    expect(palette).toMatch(/onSearch=\{openSearch\}/);
     expect(palette).toMatch(/onSearchFor=\{searchFor\}/);
   });
 });

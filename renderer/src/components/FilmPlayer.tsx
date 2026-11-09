@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { filmClickDoes, filmPinsAt, pinLean, type FilmMark, type FilmPin } from '../artifact-pins';
 import { useFilmPoster } from '../film-poster';
+import { keepFilmTime, keptFilmTime } from '../kept-scroll';
 import { OPEN_WITHIN_MS, didNotOpen } from '../opening-wait';
 import './file-views.css';
 
@@ -161,6 +162,14 @@ export function FilmPlayer({ url, name, onTime, marks, pins = [], draft, seek, h
     onTime?.(seek.s);
   }, [seek?.at, !!el]);
   useEffect(() => { if (hold) el?.pause(); }, [hold]);
+  // Where it was left, for the next time this film opens.
+  useEffect(() => {
+    if (!el) return undefined;
+    const note = () => { if (el.getAttribute('src')) keepFilmTime(url, el.currentTime, el.ended); };
+    const events = ['timeupdate', 'seeked', 'pause', 'ended'] as const;
+    for (const name of events) el.addEventListener(name, note);
+    return () => { for (const name of events) el.removeEventListener(name, note); };
+  }, [el, url]);
   useLayoutEffect(() => {
     const box = frame.current;
     if (!box) return undefined;
@@ -196,6 +205,8 @@ export function FilmPlayer({ url, name, onTime, marks, pins = [], draft, seek, h
           onLoadedMetadata={(e) => {
             const { videoWidth: w, videoHeight: h } = e.currentTarget;
             if (w && h) setShape({ w, h });
+            const left = keptFilmTime(url);
+            if (left && !seek) e.currentTarget.currentTime = left;
             onFound?.('open');
           }}
           onError={() => { setFailed(true); onFound?.('unplayable'); }}

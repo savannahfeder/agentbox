@@ -233,13 +233,10 @@ export const SHORTCUTS: ShortcutGroup[] = [
       { keys: ['N'], what: 'Start a new thread.' },
       // cloudChord in the chords → toggleCloudRef: the cloud on or off.
       { keys: ['⌘C'], what: 'Turn the cloud on or off, when no text is selected.' },
-      // '/' above the focused branch → openSearch
-      { keys: ['/'], what: 'Search your threads.' },
-      // main/main.mts before-input-event: ⌘Y / ⌘N answer the oldest approval.
-      // Its own card prints "⌘Y / ⌘N" beside Allow and Deny, so the words here
-      // are the card's words. It lives under this heading rather than under an
-      // open task because it is answered from anywhere at all.
-      { keys: ['⌘Y', '⌘N'], join: 'or', what: 'Allow or deny a card asking to run something.' },
+      // main/main.mts before-input-event: ⌘1 / ⌘2 answer the card in front, and
+      // the card prints them inside Allow and Deny. Under this heading because
+      // it is answered from anywhere at all.
+      { keys: ['⌘1', '⌘2'], join: 'or', what: 'Allow or deny a card asking to run something.' },
     ],
   },
 ];

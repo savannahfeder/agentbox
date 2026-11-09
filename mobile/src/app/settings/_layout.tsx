@@ -15,7 +15,7 @@ export default function SettingsLayout() {
   if (gate === 'sign-in') return <Redirect href="/sign-in" />;
   return (
     <SettingsProvider>
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg }, animation: 'slide_from_right' }} />
+      <Stack screenOptions={{ headerShown: false, orientation: 'portrait', contentStyle: { backgroundColor: color.bg }, animation: 'slide_from_right' }} />
     </SettingsProvider>
   );
 }

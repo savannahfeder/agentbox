@@ -30,7 +30,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
 import { cloudRun } from '../main/cloud/run.mts';
-import { pickBase, periodOf, CACHE_PERIOD_MS, sendConversation, sentRecordPath, MIN_JOIN_BYTES } from '../main/cloud/reuse.mts';
+import { pickBase, periodOf, CACHE_PERIOD_MS, sendConversation, sentRecordPath, MIN_JOIN_BYTES, MAX_PIECES } from '../main/cloud/reuse.mts';
 import { transcriptFolderName } from '../main/cloud/run.mts';
 import { copyRanges } from '../main/cloud/aws.mjs';
 import { imageCaps, noteImageCaps } from '../main/cloud/config.mjs';
@@ -110,7 +110,7 @@ const storage = {
 
 const configDir = () => path.join(tmp, 'mac', 'claude-home');
 
-function launch({ message = 'please do it', caps = TAKES_A_BASE, args = [] } = {}) {
+function launch({ message = 'please do it', caps = TAKES_A_BASE, args = [], store = storage } = {}) {
   fs.mkdirSync(configDir(), { recursive: true });
   const mcpFile = path.join(tmp, 'mac', 'mcp.json');
   fs.writeFileSync(mcpFile, JSON.stringify({ mcpServers: { agentbox: { command: process.execPath, args: [FAKE_STORE], env: { FAKE_STORE_LOG: path.join(tmp, 'store.log') } } } }));
@@ -123,7 +123,7 @@ function launch({ message = 'please do it', caps = TAKES_A_BASE, args = [] } = {
   const done = cloudRun({
     argv: [FAKE_CLAUDE, '-p', '--output-format', 'stream-json', '--mcp-config', mcpFile, ...args],
     env: { ...process.env, ZERO_ITEM: 'w-1', ZERO_PRODUCT: 'p', CLAUDE_CONFIG_DIR: configDir(), AGENTBOX_HOME: path.join(tmp, 'mac') },
-    cwd: mac, transport, storage, login: LOGIN,
+    cwd: mac, transport, storage: store, login: LOGIN,
     stdin, stdout, stderr, remoteCommand: process.execPath, stubPath: STUB, pollWaitMs: 200, resultsWaitMs: 8000, watchParent: false, signals: new EventEmitter(),
     homeDir: path.join(tmp, 'home'),
     imageCaps: caps,
@@ -404,6 +404,139 @@ describe('sending a conversation', () => {
   it('keeps its note beside the folder\'s cloud marker', () => {
     expect(sentRecordPath(mac)).toBe(path.join(mac, '.git', 'agentbox-cloud-sent.json'));
     expect(sentRecordPath({ folder: '/docs', file: '/data/cloud-runs/p--w-1.json' })).toBe('/data/cloud-runs/p--w-1-sent.json');
+  });
+});
+
+// THROUGH THE CLOUD SERVER NOTHING IS JOINED IN THE BUCKET (2026-11-08,
+// w-1fd4046a29). The server's client has no `extend`: the server may only
+// sign links, so a 391 MB conversation went up whole on every reply, about
+// five minutes at 16 Mbps. An image that says `pieces` is sent what was added
+// as a piece of its own, and joins the pieces itself.
+const pieceKeys = () => puts.filter((p) => /^runs\/cache\/\d+\/conversation-[0-9a-f]{64}-from-\d+\.jsonl$/.test(p.key));
+
+describe('a conversation sent in pieces, to an image that joins them', () => {
+  const { extend: _join, ...noJoin } = storage;
+  const record = () => sentRecordPath(mac);
+  const write = (bytes, fill = 'a') => { const f = path.join(tmp, 'c.jsonl'); fs.writeFileSync(f, Buffer.alloc(bytes, fill)); return f; };
+  const send = (f, opts = {}) => sendConversation(noJoin, f, { record: record(), pieces: true, ...opts });
+  const joined = (keys) => Buffer.concat(keys.map((k) => objects.get(k)));
+
+  it('sends only what was added, as a piece after the copy already there', async () => {
+    const f = write(6 * MB);
+    const first = await send(f);
+    expect(first.sent).toBe(6 * MB);
+    fs.appendFileSync(f, 'more\n');
+    const second = await send(f);
+    expect(second.sent).toBe(5);
+    expect(second.pieces).toHaveLength(2);
+    expect(second.pieces[0]).toBe(first.key);
+    expect(joined(second.pieces).equals(fs.readFileSync(f))).toBe(true);
+    fs.appendFileSync(f, 'and more\n');
+    const third = await send(f);
+    expect(third.sent).toBe(9);
+    expect(third.pieces.slice(0, 2)).toEqual(second.pieces);
+    expect(joined(third.pieces).equals(fs.readFileSync(f))).toBe(true);
+  });
+
+  it('sends nothing when nothing was added, and names the same pieces', async () => {
+    const f = write(6 * MB);
+    await send(f);
+    fs.appendFileSync(f, 'more\n');
+    const second = await send(f);
+    const again = await send(f);
+    expect(again.sent).toBe(0);
+    expect(again.pieces).toEqual(second.pieces);
+  });
+
+  it('is sent whole to an image that has not said it joins pieces', async () => {
+    const f = write(6 * MB);
+    await send(f, { pieces: false });
+    fs.appendFileSync(f, 'more\n');
+    const second = await send(f, { pieces: false });
+    expect(second.sent).toBe(6 * MB + 5);
+    expect(second.pieces).toBeUndefined();
+  });
+
+  it('is sent whole when it was changed rather than added to', async () => {
+    const f = write(6 * MB);
+    await send(f);
+    const fd = fs.openSync(f, 'r+');
+    fs.writeSync(fd, 'b', 0);
+    fs.closeSync(fd);
+    fs.appendFileSync(f, 'more\n');
+    const second = await send(f);
+    expect(second.sent).toBe(6 * MB + 5);
+    expect(second.pieces).toBeUndefined();
+    expect(objects.get(second.key).equals(fs.readFileSync(f))).toBe(true);
+  });
+
+  it('is sent whole when the bucket lost any piece', async () => {
+    const f = write(6 * MB);
+    await send(f);
+    fs.appendFileSync(f, 'more\n');
+    const second = await send(f);
+    objects.delete(second.pieces[1]);
+    fs.appendFileSync(f, 'and more\n');
+    const third = await send(f);
+    expect(third.sent).toBe(fs.statSync(f).size);
+    expect(third.pieces).toBeUndefined();
+  });
+
+  // A piece is read by the cloud, so none may be one the bucket is about to drop.
+  it('is sent whole when a piece is from an earlier period', async () => {
+    const now = (periodOf(Date.now()) + 0.9) * CACHE_PERIOD_MS;
+    const f = write(6 * MB);
+    await send(f, { now });
+    fs.appendFileSync(f, 'more\n');
+    const later = now + 0.2 * CACHE_PERIOD_MS;
+    const second = await send(f, { now: later });
+    expect(second.sent).toBe(6 * MB + 5);
+    expect(second.key.startsWith(`runs/cache/${periodOf(later)}/`)).toBe(true);
+    expect(second.pieces).toBeUndefined();
+  });
+
+  it('starts over whole once it has MAX_PIECES pieces', async () => {
+    const f = write(6 * MB);
+    await send(f);
+    let last;
+    for (let i = 1; i < MAX_PIECES; i += 1) { fs.appendFileSync(f, `${i}\n`); last = await send(f); }
+    expect(last.pieces).toHaveLength(MAX_PIECES);
+    fs.appendFileSync(f, 'one too many\n');
+    const over = await send(f);
+    expect(over.sent).toBe(fs.statSync(f).size);
+    expect(over.pieces).toBeUndefined();
+  });
+
+  it('goes up whole once, then only what was added, and the cloud resumes all of it', async () => {
+    const SESSION = 'c0ffee00-0000-4000-8000-000000000002';
+    const file = path.join(configDir(), 'projects', transcriptFolderName(mac), `${SESSION}.jsonl`);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, '{"type":"user","text":"an old screenshot"}\n'.repeat(Math.ceil((6 * MB) / 40)));
+    const firstSize = fs.statSync(file).size;
+    const caps = [...TAKES_A_BASE, 'pieces'];
+    const first = launch({ args: ['--resume', SESSION], caps, store: noJoin });
+    expect(await first.done, first.err()).toBe(0);
+    expect(conversations().map((p) => p.size)).toEqual([firstSize]);
+
+    fs.appendFileSync(file, '{"type":"user","text":"said on the Mac"}\n');
+    const before = fs.readFileSync(file);
+    puts.length = 0;
+    freshMachine();
+    fs.rmSync(path.join(tmp, 'vm', configDir()), { recursive: true, force: true });
+    const second = launch({ args: ['--resume', SESSION], message: 'and the next thing', caps, store: noJoin });
+    expect(await second.done, second.err()).toBe(0);
+    expect(conversations()).toHaveLength(0);
+    expect(pieceKeys().map((p) => p.size)).toEqual([before.length - firstSize]);
+    const after = fs.readFileSync(file);
+    expect(after.subarray(0, before.length).equals(before)).toBe(true);
+    expect(after.subarray(before.length).toString()).toContain('and the next thing');
+  });
+});
+
+describe('the cloud image', () => {
+  it('says it joins pieces', async () => {
+    const r = await transport.invoke('s1', { action: 'start', runId: 'r1', cwd: '/x/y', branch: 'b', argv: ['true'], base: { url: `${s3Url}/missing`, sha: 'a'.repeat(40) }, refs: { 'refs/heads/b': 'a'.repeat(40) } });
+    expect(r.caps).toContain('pieces');
   });
 });
 

@@ -197,7 +197,7 @@ describe('on a phone, the Superhuman way', () => {
     expect(card).toMatch(/left:\s*8px/);
     expect(card).toMatch(/right:\s*8px/);
     expect(card).toMatch(/var\(--phone-tabs/);
-    expect(hidden('.approvals .approval-hint')).toBe(true);
+    expect(hidden('.approvals .approval-key')).toBe(true);
   });
 
   it('Settings leaves out what is about the Mac\'s own screen', () => {

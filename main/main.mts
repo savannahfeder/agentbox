@@ -10,7 +10,9 @@ import type { TeamSession } from './team/index.mts';
 import { startConnections } from './connections/start.mjs';
 import { roomsSetup } from './team/room-setup.mts';
 import { matesForTheTeam } from './teammate-reach.mjs';
+import { alphaFeatures } from './settings.mts';
 import { loadCloudConfig, supabaseSession } from './team/session.mjs';
+import { liveAddress } from './team/live-room.mjs';
 // MY WORKSPACE IS NOT A TEAM FEATURE ANY MORE (w-f8d123be62), even though it
 // still lives in the team folder next to the sharing rules it has to obey.
 import { ensurePersonalProject } from './team/projects.mts';
@@ -26,6 +28,7 @@ import { Store } from './store.mts';
 import { storeRootEnv } from './store/home.mjs';
 import { keepAnswerModesIn } from './answer-modes.mts';
 import { Supervisor } from './supervisor.mts';
+import { gitHubPushSignIn } from './github-push-sign-in.mts';
 import { startCodexWatch } from './codex-watch.mts';
 import { watchNewChatsFor } from './new-chats-watch.mts';
 import { readCodexThreadsOffThread } from './codex-threads.mts';
@@ -42,6 +45,7 @@ import type { CollectingIpcMain, IpcHandler } from './serve.mts';
 import { carryHerBriefsAcross, joinMessageRules, setAsideShippedMessageRules, unifyAgentInstructions } from './instruction-settings.mts';
 import * as approvals from './approvals.mjs';
 import { recoveryToast } from '../shared/recovery.mts';
+import { CHORD_ANSWERS, chordLands } from '../shared/card-settles.mts';
 import { phoneWaitsOf } from '../shared/phone-snapshot.mjs';
 import { teammatesOn } from '../shared/teammates.mjs';
 import { dataFolderName, isNewUserBuild } from '../shared/side-build.mjs';
@@ -506,6 +510,7 @@ async function createWindow() {
     log: (line) => console.log(line),
     runningIds: () => supervisor.runsGoing().map((s) => s.itemId),
     ownMates: () => matesForTheTeam(store, config),
+    sharing: () => alphaFeatures(config).multiplayer,
     // HER PHONE WITH THE MAC SHUT (main/phone-inbox.mts). What it left is done
     // through the window's own handlers, filed below once the window exists.
     phone: {
@@ -516,6 +521,7 @@ async function createWindow() {
       // The Settings pages' model, read through the window's own handler.
       readSettings: () => phoneSettings?.() ?? null,
       pins: () => supervisor.threadPins,
+      onMac: () => supervisor.threadOnMac,
       repeats: () => store.listRepeats(),
       teammates: () => (teammatesOn(config) ? store.teammatesView() : null),
       version: app.getVersion(),
@@ -900,6 +906,8 @@ async function createWindow() {
     encrypt: (text: string) => (safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(text) : null),
     decrypt: (buf: Buffer) => (safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(buf) : null),
   } : null;
+  // The GitHub sign-in a ship pushes with is sealed by the same keychain.
+  supervisor.gitHubSignIn = gitHubPushSignIn({ file: path.join(userDir, 'github-sign-in.sealed'), cipher: connectionsKeychain });
   const connected = startConnections({
     config, supervisor, appDir, userDir,
     cipher: connectionsKeychain,
@@ -915,6 +923,7 @@ async function createWindow() {
     team,
     connections: connected.connections,
     copies: connected.copies,
+    liveAt: liveAddress(cloudConfig),
   });
   // The Agents menu's Allow/Deny, bound to the real door now that there is one.
   // See the `installMenu` call above for what writing the file instead did to a
@@ -927,7 +936,15 @@ async function createWindow() {
   answerWhatOnlyTheWindowAnswered({ handle: (channel, fn) => { if (!phoneChannels.has(channel)) phoneChannels.set(channel, fn); } } as CollectingIpcMain);
   phoneApply = applyThrough(phoneChannels);
   // Every minute, so no engine search: that is a login shell on this thread.
-  phoneSettings = () => phoneChannels.get('zero:settings-read')?.({ sender: null }, { search: false }) ?? null;
+  // The cloud and the usage ride the snapshot, not the settings model, so the
+  // phone's copy takes them here.
+  phoneSettings = async () => {
+    const model = await phoneChannels.get('zero:settings-read')?.({ sender: null }, { search: false });
+    if (!model || typeof model !== 'object') return null;
+    // A cloud that does not answer leaves the list empty rather than holding the copy back.
+    const listed = (await Promise.resolve(phoneChannels.get('zero:file-links')?.({ sender: null }, {})).catch(() => null)) as { ok?: boolean; links?: unknown[] } | null | undefined;
+    return { ...model, cloud: supervisor.cloudStatus(), usage: ipc.usageForPhone(), links: listed?.ok ? listed.links : [] };
+  };
   updater.start();
   // A task the app just shipped moved main: look now rather than in half an
   // hour, so the restart is offered while she still remembers the task.
@@ -1047,14 +1064,16 @@ async function createWindow() {
       event.preventDefault();
       return;
     }
-    if (key !== 'y' && key !== 'n') return;
+    const allow = CHORD_ANSWERS[key];
+    if (allow === undefined) return;
     const front = cardInFront();
     if (!front) return;
+    event.preventDefault(); // the page never sees the chord; no double-answer
+    if (!chordLands(ipc.cardSentAt(front.id), Date.now())) return;
     // Through the ipc layer's own door, so the renderer is told what was
     // decided and can acknowledge it. Answering the file directly from here is
     // what made the chord feel like nothing had happened (2026-08-06).
-    ipc.answerApproval(front.id, key === 'y');
-    event.preventDefault(); // the page never sees the chord; no double-answer
+    ipc.answerApproval(front.id, allow);
   });
 
   // ---- END OF THE CHORD WIRING ----
@@ -1412,6 +1431,8 @@ if (!app.requestSingleInstanceLock()) {
         // this scheme.
         // No-store here too, for the same reason as the page scheme above: a
         // screenshot an agent retakes under the same name is still a new picture.
+        // It reaches a fetch; an <img> keeps the window's copy per address
+        // whatever this says, so viewers ask with seenAt (renderer/src/picture.ts).
         const out = noStore(res);
         out.headers.set('access-control-allow-origin', '*');
         return out;

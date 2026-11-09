@@ -165,6 +165,11 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   cloudSignIn: 'zero:cloud-signin',
   // A key kept in the cloud for every cloud run (main/cloud/keys.mjs).
   cloudKey: 'zero:cloud-key',
+  // The GitHub sign-in this computer's ships push with (main/github-push-sign-in.mts).
+  gitHubSignIn: 'zero:github-sign-in',
+  gitHubBrowserSignIn: 'zero:github-browser-sign-in',
+  // The answer to a sign-in link an agent is waiting on (shared/sign-in-ask.mjs).
+  signInAnswer: 'zero:sign-in-answer',
   // A file or a one-time code a cloud run asked for (shared/cloud-needs.mjs).
   cloudSendFile: 'zero:cloud-send-file',
   cloudSendCode: 'zero:cloud-send-code',
@@ -179,6 +184,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   cloudAccountPlan: 'zero:cloud-account-plan',
   cloudAccountPay: 'zero:cloud-account-pay',
   cloudAccountBilling: 'zero:cloud-account-billing',
+  cloudAccountTeamBilling: 'zero:cloud-account-team-billing',
   projectRename: 'zero:project-rename',
   projectArchive: 'zero:project-archive',
   projectSeenBy: 'zero:project-seen-by',
@@ -208,6 +214,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   codeFile: 'zero:code-file',
   saveCodeFile: 'zero:save-code-file',
   writeDoc: 'zero:write-doc',
+  liveRoom: 'zero:live-room',
   railNote: 'zero:rail-note',
   saveRailNote: 'zero:save-rail-note',
   agentReply: 'zero:agent-reply',
