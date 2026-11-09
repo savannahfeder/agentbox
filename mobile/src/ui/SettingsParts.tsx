@@ -7,12 +7,14 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import type { Reading } from '../lib/settings-view';
+import { useCloud } from '../state/cloud';
 import { Back, Caret } from './icons';
 import { Sheet, SheetHead, SheetRow, T, Wall } from './parts';
 import { color, corner, font, size } from './theme';
 
 export function Page({ title, lede, back = 'Settings', right, head, children }: { title: string; lede?: string; back?: string; /** At the right of the Back row. */ right?: ReactNode; /** Takes the Back row's place (Settings' search field). */ head?: ReactNode; children: ReactNode }) {
   const inset = useSafeAreaInsets();
+  const { approvalRoom } = useCloud();
   const leave = () => (router.canGoBack() ? router.back() : router.replace('/'));
   return (
     <Wall>
@@ -30,7 +32,7 @@ export function Page({ title, lede, back = 'Settings', right, head, children }: 
           )}
         </View>
       </View>
-      <ScrollView contentContainerStyle={{ paddingTop: 20, paddingHorizontal: size.inset, paddingBottom: 40 + inset.bottom }}>
+      <ScrollView contentContainerStyle={{ paddingTop: 20, paddingHorizontal: size.inset, paddingBottom: Math.max(40 + inset.bottom, approvalRoom + 16) }}>
         <T style={{ fontSize: 24, lineHeight: 31, letterSpacing: -0.84 }}>{title}</T>
         {lede ? <T style={{ fontSize: 13.5, lineHeight: 20, color: color.faint, marginTop: 8 }}>{lede}</T> : null}
         {children}

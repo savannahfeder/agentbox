@@ -5,7 +5,7 @@ import {updateFixture} from './agent-update-fixture';
 // developed, reviewed, and screenshotted without a live store or any agents.
 
 import type { Person, TeamBillingDetails } from './types';
-import type { AccountUsageReading, AgentConversation, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, FilesUploaded, TeamMessageFile, ThreadEditPatch, UpdateState, Usage, UsageLimit, WorkItem } from './types';
+import type { AccountUsageReading, AgentConversation, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, FilesUploaded, TeamMessageFile, ThreadEditPatch, LiveRoomTicket, UpdateState, Usage, UsageLimit, WorkItem } from './types';
 import type { LedgerLine } from './thread-history';
 import type { AgentFile as AgentFileRow } from './onboarding';
 import type { AgentFolder, SessionThread } from './agent-import-card';
@@ -818,6 +818,13 @@ export const api = {
     const zero = window.zero as any;
     if (!zero?.saveCodeFile) return { ok: false, error: `quit and reopen ${NAME} to save this file` };
     return zero.saveCodeFile(p);
+  },
+
+  /** The live room a file opens in with teammates, or null when nobody else can open it. */
+  async liveRoom(p: { product: string; project?: string | null; name: string }): Promise<LiveRoomTicket | null> {
+    const zero = window.zero as any;
+    if (!zero?.liveRoom) return null;
+    return zero.liveRoom(p).catch(() => null);
   },
 
   async writeDoc(p: { product: string; src: string; text: string; mtime: number; thread?: string }): Promise<{ ok: boolean; mtime?: number; error?: string; stale?: boolean }> {

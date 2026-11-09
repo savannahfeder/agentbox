@@ -40,6 +40,8 @@ import { createPortal } from 'react-dom';
 import { api } from '../api';
 import { CodeFile } from './CodeFile';
 import { TableView, useTableSave } from './TableView';
+import { useLiveSession, useLiveTicket } from '../live/live-session';
+import { familyOfName } from '../../../shared/artifact-marks.mjs';
 import { isTablePath } from '../table-file';
 import { FilmPlayer } from './FilmPlayer';
 import { PdfPages } from './PdfPages';
@@ -95,14 +97,17 @@ const CloseGlyph = () => (
 // changes on every press and is the whole reason it exists.
 export type OpenDoc = { product: string; src: string; auto?: boolean; at?: string; atFrom?: number; readOnly?: boolean };
 
+// The same element with or without notes: a different one would rebuild the
+// editor inside it, from the text the pane first read, whenever Focus opens or closes.
+const Beside = ({ aside, children }: { aside?: ReactNode; children: ReactNode }) =>
+  <div className={aside ? 'doc-notes-split' : undefined} style={aside ? undefined : { display: 'contents' }}>{children}{aside}</div>;
+
 // A website carries doc-html for what that class means: a card holding a
 // page whose colour the app cannot see into, so the header keeps its own dark
 // in every theme. It carries doc-website for the one thing only true here. A
 // `<webview>` is a separate compositing layer and paints over everything the
 // card draws, so the hover-reveal toolbar doc-html normally gets would be
 // painted under the page and could never be pressed.
-const Beside = ({ aside, children }: { aside?: ReactNode; children: ReactNode }) =>
-  aside ? <div className="doc-notes-split">{children}{aside}</div> : <>{children}</>;
 
 function paneKindClass(kind: PaneKind): string {
   if (kind === 'html') return 'doc-html';
@@ -155,6 +160,15 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
   const [text, setText] = useState<string | null>(null);
   const [mtime, setMtime] = useState<number>(0);
   const saveTable = useTableSave({ product: doc.product, src: doc.src, mtime });
+  // A thread's own file is the team's when the thread is: teammates with it open type into one live copy.
+  // A project's other documents are each person's own and stay out of it.
+  const threadsFile = /^(?:\.\/)?designs\/[\w-]+\/[^/]+$/.test(src) && (kind === 'markdown' || kind === 'table') && !doc.readOnly;
+  const liveTicket = useLiveTicket(threadsFile ? { product: doc.product, name: src.split('/').pop() ?? src } : null);
+  const liveSession = useLiveSession(liveTicket);
+  const liveRef = useRef(liveSession);
+  liveRef.current = liveSession;
+  const family = familyOfName(src.split('/').pop() ?? src);
+  const shownFamily = useRef<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   // The address the frame points at, minted by main when it resolved the file.
   // An html page is served from its own origin so its pictures load; see
@@ -186,9 +200,14 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
 
   useEffect(() => {
     let live = true;
-    setResolved(null); setText(null); setMtime(0); setUrl(null); setChange(null);
-    setHere({ url: src, canBack: false, canForward: false, loading: true });
-    setWebFailed(null); setWebReady(false);
+    // A newer version of a live file is the same room: the words stay up and the editor keeps its place.
+    const sameLiveFile = !!liveRef.current && shownFamily.current === family;
+    shownFamily.current = family;
+    if (!sameLiveFile) {
+      setResolved(null); setText(null); setMtime(0); setUrl(null); setChange(null);
+      setHere({ url: src, canBack: false, canForward: false, loading: true });
+      setWebFailed(null); setWebReady(false);
+    }
     // A website is not looked for on disk: the address is the document.
     if (kind === 'website') { setFailed(null); setResolved(src); setUrl(src); return () => { live = false; }; }
     if (isLocalPreview(src)) { setFailed(null); setResolved(src); setUrl(src); return () => { live = false; }; }
@@ -439,16 +458,16 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
             : text !== null
               ? <div className="preview-frame"><iframe className="doc-view" srcDoc={text} sandbox="allow-scripts" title={crumb.join('/')} /></div>
               : <PreviewLoading />) : <PreviewLoading />
-        ) : text === null ? (
+        ) : text === null || (threadsFile && liveTicket === undefined) ? (
           <PreviewLoading />
         ) : kind === 'table' ? (
-          <TableView text={text} path={src} mode="pane" onSave={doc.readOnly ? undefined : saveTable} onReload={() => setLooks((n) => n + 1)} onNotice={onNotice} storeKey={`${doc.product}/${src}`} />
+          <TableView text={text} path={src} mode="pane" live={liveSession} onSave={doc.readOnly ? undefined : saveTable} onReload={() => setLooks((n) => n + 1)} onNotice={onNotice} storeKey={`${doc.product}/${src}`} />
         ) : kind === 'text' ? (
           <div className="code-scroll" ref={setCodeBox}><CodeFile text={text} /></div>
         ) : (
           <Beside aside={aside}>
             <DocText
-              key={resolved ?? doc.src}
+              key={liveSession ? `live:${family}` : (resolved ?? doc.src)}
               product={doc.product}
               src={doc.src}
               folder={resolved ? resolved.replace(/\/[^/]*$/, '') : null}
@@ -457,6 +476,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
               onSaved={(at) => setMtime(at)}
               onNotice={onNotice}
               readOnly={doc.readOnly}
+              live={liveSession}
             />
           </Beside>
         )}
