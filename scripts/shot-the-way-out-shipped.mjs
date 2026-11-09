@@ -17,7 +17,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { foldWorkItems } from '../shared/work-items.mjs';
 import { resolveArtifact } from '../main/artifact-path.mjs';
-import { guard, sweep } from './lib/chrome-guard.mjs';
+import { guard, sweep, startableChrome } from './lib/chrome-guard.mjs';
 import { ACCOUNT_ROOT } from './lib/machine-paths.mjs';
 
 const EXT = 'png|jpe?g|gif|webp|svg|html?|pdf|md|markdown|csv|txt|json|ya?ml|sql|sh|css|jsx?|tsx?|mjs|cjs|py|rb|go|rs|toml';
@@ -90,7 +90,7 @@ if (process.env.SKIP_BUILD === '1' && fs.existsSync(page)) {
 /* -------------------------------- headless -------------------------------- */
 sweep();
 const profile = fs.mkdtempSync('/tmp/shot-profile-');
-const chrome = spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', [
+const chrome = spawn(startableChrome(), [
   '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
   '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run',
   '--allow-file-access-from-files', '--window-size=1440,900', 'about:blank',
