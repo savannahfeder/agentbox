@@ -46,7 +46,7 @@ const THREAD_ID = /^[\w-]{1,80}$/;
 const SHARED_PREFIX = 'shared-thread';
 
 // `.key` is left out on purpose: it is also what a private key is called.
-const KINDS = 'png|jpe?g|gif|webp|svg|md|markdown|html?|mp4|mov|m4v|webm|mp3|wav|m4a|aac|ogg|pdf|pptx?';
+const KINDS = 'png|jpe?g|gif|webp|svg|md|markdown|html?|csv|tsv|mp4|mov|m4v|webm|mp3|wav|m4a|aac|ogg|pdf|pptx?';
 const PICTURE = /\.(?:png|jpe?g|gif|webp|svg)$/i;
 const PATHISH = String.raw`(?:~\/|\.?\/)?[\w.-]+(?:\/[\w.-]+)*\.(?:${KINDS})`;
 const A_PATH = new RegExp(`^${PATHISH}$`, 'i');
@@ -107,7 +107,13 @@ function messageLines(lines, me) {
   };
   for (const l of all) {
     const p = l?.patch;
-    if (!p || l.claim || l.heartbeat || l.release || p.comment) continue;
+    if (!p || l.claim || l.heartbeat || l.release) continue;
+    // Taking a card down deletes its comments from the cloud, so the owner's
+    // copy is what brings them back when the thread is shared again.
+    if (p.comment) {
+      if (l.by && String(l.uid ?? '').startsWith('comment-') && said(p.comment.text)) out.push({ id: l.id, ts: l.ts, source: 'system', by: l.by, uid: l.uid, patch: { comment: { text: p.comment.text } } });
+      continue;
+    }
     // Readers only get files that a message links, so an edit goes out as one.
     if (p.artifact?.do === 'edit' && p.artifact.path) {
       out.push({ id: l.id, ts: l.ts, source: 'founder', by: l.by || me, ...(l.uid ? { uid: l.uid } : {}), patch: { answer: editedWords(callEdit(p.artifact.path), p.artifact.path) } });
@@ -150,7 +156,7 @@ function messageLines(lines, me) {
 
 export function createThreadShare({
   backend, me, root, listCards, listThreads, historyOf, disk, accountRoot, storeRoot, listProducts = () => [],
-  onChange = () => {}, log = () => {}, now = Date.now, home = os.homedir(), myName = () => null,
+  onChange = () => {}, log = () => {}, now = Date.now, home = os.homedir(), myName = () => null, nameOf = () => null,
 }) {
   // threadId -> { at, updatedAt, work, hash, files: Map name -> absolute path }
   const built = new Map();
@@ -315,6 +321,7 @@ export function createThreadShare({
       const patch = {};
       for (const f of ['body', 'answer', 'result', 'note']) if (text(l.patch[f])) patch[f] = l.patch[f];
       if (l.patch.from?.name) patch.from = { teammate: String(l.patch.from.teammate ?? ''), name: String(l.patch.from.name) };
+      if (text(l.patch.comment?.text) && text(l.by) && String(l.uid ?? '').startsWith('comment-')) patch.comment = { text: l.patch.comment.text };
       return {
         id: String(l.id ?? ''), ts: Number(l.ts) || 0, source: l.source === 'founder' ? 'founder' : l.source === 'system' ? 'system' : 'agent',
         ...(text(l.by) ? { by: l.by } : {}), ...(text(l.uid) ? { uid: l.uid } : {}), patch,
@@ -491,8 +498,10 @@ export function createThreadShare({
     for (const c of unsaid) {
       const thread = threads.get(c.threadId);
       if (!thread) continue;
+      // The name is for the owner's agent, which has no team list to look it up in.
+      const name = nameOf(c.by);
       added += disk.appendForeignLines(thread.product.dir, [{
-        id: c.threadId, ts: c.at, source: 'system', by: c.by, uid: `comment-${c.id}`, patch: { comment: { text: c.text } },
+        id: c.threadId, ts: c.at, source: 'system', by: c.by, uid: `comment-${c.id}`, patch: { comment: { text: c.text, ...(name ? { name } : {}) } },
       }]);
       delivered.add(c.id);
     }
@@ -509,6 +518,7 @@ export function createThreadShare({
         if (!edit.text) continue;
         const saved = saveNextVersion({ dir: thread.product.dir, threadId: m.threadId, lines: historyOf(thread.product.slug, m.threadId), baseId: edit.file, text: edit.text, by: m.by });
         if (!saved.ok) { log(`team threads: an edit to ${edit.file} was not saved: ${saved.error}`); continue; }
+        if (saved.unchanged) continue;
         line.patch.artifact = { do: 'edit', file: saved.file, path: saved.path, ...(saved.over ? { over: saved.over } : {}) };
       }
       // On your thread the file is yours, whatever their copy said.
@@ -538,7 +548,8 @@ export function createThreadShare({
     read(owner, threadId) {
       const ok = THREAD_ID.test(String(owner)) && THREAD_ID.test(String(threadId));
       const local = ok ? readLocal(owner, threadId) : null;
-      const theirs = comments.filter((c) => c.owner === owner && c.threadId === threadId).map((c) => ({
+      const carried = new Set((local?.lines ?? []).map((l) => l.uid).filter(Boolean));
+      const theirs = comments.filter((c) => c.owner === owner && c.threadId === threadId && !carried.has(`comment-${c.id}`)).map((c) => ({
         id: threadId, ts: c.at, source: 'system', by: c.by, uid: `comment-${c.id}`, patch: { comment: { text: c.text } },
       }));
       return {
