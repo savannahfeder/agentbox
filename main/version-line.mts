@@ -196,7 +196,7 @@ export function versionLine({ dir, cloud = () => null, onMoved = () => {} }: { d
     }
     const { entry } = appendTo(lineOf(id), asked);
     entries.push({ ...entry, local: true });
-    if (folded) foldOnto(folded, { ...entry, local: true });
+    if (folded) foldOnto<StoredEntry>(folded, { ...entry, local: true });
     append({ ...entry, local: true });
     return shown(entry);
   }

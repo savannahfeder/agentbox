@@ -899,7 +899,8 @@ export function phoneDevice(appDataDir: string, storeRoot: string): string {
 // (main/ipc.mts), reached the way the phone link reaches them: the Map
 // main/main.mts files every channel in. A handler that answers `ok: false`
 // turned it down, and that is what the phone is told.
-type Route = [string, Record<string, unknown>, ([string, Record<string, unknown>] | null)?];
+// A setting's route can hand its channel a bare value (Pause sends the boolean).
+type Route = [string, unknown, ([string, unknown] | null)?];
 type RouteCommand = PhoneCommand & { payload: CommandPayload };
 export type PhoneChannel = { bivarianceHack(event: { sender: null }, args?: unknown): unknown }['bivarianceHack'];
 

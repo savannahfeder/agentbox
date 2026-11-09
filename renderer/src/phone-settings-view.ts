@@ -2,7 +2,15 @@
 // its way: the copy the computer sent (shared/phone-settings.mts), with the
 // commands left for it laid over it until a newer copy arrives.
 import type { PhoneRows } from './phone-rows';
-import type { AgentMode, CodexModeId, PermissionMode, RepeatRule, TeamChatLine, Teammate, TeamRunLine } from './types';
+import type { AgentMode, CodexModeId, PermissionMode, RepeatRule, TeamChatLine, Teammate, TeamRunLine, UsageLimit } from './types';
+import type { CloudMode } from './cloud-menu';
+
+type Engine = 'claude' | 'codex';
+type UsageCopy = { at: number | null; limits: UsageLimit[] } | null;
+/** One cloud login as shared/phone-settings.mts cloudOf sends it. */
+export interface CloudLoginCopy { engine: Engine; email: string | null; inUse: boolean; plan: string | null; state: string; limitedUntil: number | null; same: string | null; usage: UsageCopy }
+export interface CloudCopy { mode: CloudMode; whenOn: 'all' | 'full'; engines: Engine[]; inUse: Partial<Record<Engine, string | null>>; accounts: CloudLoginCopy[] }
+export interface PublicLinkCopy { token: string; name: string; url: string; createdAt: number; updatedAt: number; comments: number }
 
 export interface Change { scope: 'workspace' | 'project'; key: string; value?: unknown; product?: string }
 
@@ -37,6 +45,12 @@ export interface PhoneWorkspaceCopy {
   leftovers: { on: boolean; now: string | null };
   accounts: { id: string; email: string | null; chosen: boolean; state?: string; note: string | null; resetsAt: number | null; plan: string | null; running: number }[];
   codexAccounts: { id: string; email: string | null; name: string | null; plan: string | null; signedIn: boolean; chosen: boolean }[];
+  cloud?: CloudCopy | null;
+  cloudPermission?: string | null;
+  cloudCodexMode?: string | null;
+  paused?: boolean;
+  productOrder?: string[];
+  publicLinks?: PublicLinkCopy[];
 }
 export interface PhoneProjectCopy { slug: string; name: string; onPhone: boolean; autonomous: boolean; permission: PermissionMode | 'workspace'; codexMode: CodexModeId | 'workspace'; account: string; running: number }
 /** The whole copy, with the repeating tasks and teammates main/phone-inbox.mts adds beside it. */

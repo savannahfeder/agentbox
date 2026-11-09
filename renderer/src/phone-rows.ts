@@ -92,13 +92,13 @@ export const phoneSlug = (device: string, project: string) => `${project}@${devi
 export function madeThreadOf(rows: PhoneRows, product: string, id: string): string | null {
   const cmd = rows.commands.find((c) => c.kind === 'new' && madeHere(c.id) === id && c.project && phoneSlug(c.device, c.project) === product);
   if (!cmd || !cmd.taken_at) return null;
-  const mine = rows.threads.filter((t) => t.device === cmd.device && t.project === cmd.project && t.snapshot?.item);
-  const named = mine.find((t) => t.snapshot.item.fromPhone === cmd.id);
-  if (named) return named.item;
+  const mine = rows.threads.flatMap((t) => (t.device === cmd.device && t.project === cmd.project && t.snapshot?.item ? [{ row: t, made: t.snapshot.item }] : []));
+  const named = mine.find(({ made }) => made.fromPhone === cmd.id);
+  if (named) return named.row.item;
   const title = String(cmd.payload?.title || cmd.payload?.body || '').slice(0, 200).trim();
   const sentAt = Date.parse(cmd.created_at) || 0;
-  const match = mine.filter((t) => !t.snapshot.item.fromPhone && String(t.snapshot.item.title ?? '').trim() === title && Number(t.snapshot.item.createdAt) >= sentAt - 60_000);
-  return match.length === 1 ? match[0].item : null;
+  const match = mine.filter(({ made }) => !made.fromPhone && String(made.title ?? '').trim() === title && Number(made.createdAt) >= sentAt - 60_000);
+  return match.length === 1 ? match[0].row.item : null;
 }
 export function splitSlug(slug: string): { device: string; project: string } | null {
   const m = /^(.+)@([0-9a-f]{12})$/.exec(String(slug));

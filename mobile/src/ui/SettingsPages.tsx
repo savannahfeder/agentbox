@@ -274,9 +274,10 @@ const cloudHere = (w: any, engine: 'claude' | 'codex') => !!w.cloud?.engines.inc
 
 function CloudGroup({ engine }: { engine: 'claude' | 'codex' }) {
   const s = useSettings();
-  const cloud = s.settings!.workspace.cloud;
-  const r = s.reading('workspace', 'cloudRuns', cloud.mode);
+  const cloud = s.settings?.workspace.cloud;
+  const r = s.reading('workspace', 'cloudRuns', cloud?.mode ?? 'mac');
   const mode = r.value as CloudMode;
+  if (!cloud) return null;
   return (
     <Group label="Cloud">
       <Row first label="Use the cloud" desc={cloudRunsLine(mode, cloudInUseName(s.settings!.workspace, engine), COMPUTER)} reading={r}
@@ -311,7 +312,7 @@ function Claude() {
           ? <Row first label="Permission mode" desc={MODE_SENTENCE.custom} />
           : <Row first label={cloud ? 'On your computer' : 'Permission mode'} desc={MODE_SENTENCE[r.value as keyof typeof MODE_SENTENCE]} reading={r}
             control={<Choice label="Permission mode" value={r.value as string} options={MODES} onChange={(v) => void s.change({ scope: 'workspace', key: 'permission', value: v })} />} />}
-        {cloud ? <InTheCloud k="cloudPermission" copy={w.cloudPermission} options={MODES} says={(m) => MODE_SENTENCE[m as keyof typeof MODE_SENTENCE]} /> : null}
+        {cloud ? <InTheCloud k="cloudPermission" copy={w.cloudPermission ?? null}options={MODES} says={(m) => MODE_SENTENCE[m as keyof typeof MODE_SENTENCE]} /> : null}
       </Group>
     </>
   );
@@ -331,7 +332,7 @@ function Codex() {
       <Group label="Permissions">
         <Row first label={cloud ? 'On your computer' : 'Permission mode'} desc={CODEX_MODES[r.value as keyof typeof CODEX_MODES]?.what} reading={r}
           control={<Choice label="Permission mode" value={r.value as string} options={CODEX} onChange={(v) => void s.change({ scope: 'workspace', key: 'codexMode', value: v })} />} />
-        {cloud ? <InTheCloud k="cloudCodexMode" copy={w.cloudCodexMode} options={CODEX} says={(m) => CODEX_CLOUD_WHAT[m as keyof typeof CODEX_CLOUD_WHAT]} /> : null}
+        {cloud ? <InTheCloud k="cloudCodexMode" copy={w.cloudCodexMode ?? null}options={CODEX} says={(m) => CODEX_CLOUD_WHAT[m as keyof typeof CODEX_CLOUD_WHAT]} /> : null}
       </Group>
     </>
   );

@@ -17,6 +17,8 @@ export interface WorkItem {
   id: string;
   product: string;
   productName: string;
+  /** The phone command that asked for this thread (shared/work-items.mts). */
+  fromPhone?: string;
   // WHERE SHE DRAGGED IT IN THE LIST (w-6e5b532a95), on the scale of the score
   // it would otherwise sort by, which it replaces. Kept by the supervisor, on
   // this Mac; absent on every row nobody has dragged.

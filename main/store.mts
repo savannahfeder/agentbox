@@ -1009,7 +1009,7 @@ export class Store {
     // gave must not read as a reply still waiting for one.
     const replied = !!landed.answer && landed.answer !== '(withdrawn)';
     if (replied && agentSpokeSince(landed, answerTs(landed))) {
-      landed = workItemsDisk.updateWorkItem(dir, created.id, { answeredThrough: answerTs(landed) }, { source: 'system' });
+      landed = { ...workItemsDisk.updateWorkItem(dir, created.id, { answeredThrough: answerTs(landed) }, { source: 'system' }), product: toSlug };
     }
     try {
       const traces = this.machineryFile(fromSlug, path.join('sessions', id));

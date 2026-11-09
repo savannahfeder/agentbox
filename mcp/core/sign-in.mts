@@ -31,11 +31,11 @@ export interface SignInWait { status: 'closed' | 'waiting' | 'signed_in' | 'land
 const askOn = (item: WorkItem): SignInAsk | undefined => item.signIn as SignInAsk | undefined;
 
 /** Puts the ask on the thread, or closes it when the login finished by itself. */
-export function askToSignIn(id: string, { service, url, code, why, ask, finished }: SignInRequest, { product = null, now = Date.now() }: { product?: string | null; now?: number } = {}): SignInAsk | undefined {
+export function askToSignIn(id: string, { service, url, code, why, ask, finished }: SignInRequest, { product = null, now = Date.now() }: { product?: string | null; now?: number } = {}): SignInAsk {
   const { dir, item } = own(id, product);
   if (ask) {
     const open = askOn(item);
-    if (open?.id !== ask) throw new Error(`there is no sign-in ${ask} open on this thread`);
+    if (!open || open.id !== ask) throw new Error(`there is no sign-in ${ask} open on this thread`);
     if (finished) updateWorkItem(dir, id, { signIn: { ...open, done: true } }, { source: 'agent', now });
     return open;
   }

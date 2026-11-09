@@ -12,7 +12,7 @@ const THREAD_ID = /^[\w-]{1,64}$/;
 
 export type SavedVersion =
   | { ok: false; error: string }
-  | { ok: true; path: string; name: string; shown: string; file: string; over?: string; merged?: boolean; clashes?: number };
+  | { ok: true; path: string; name: string; shown: string; file: string; over?: string; merged?: boolean; clashes?: number; unchanged?: true };
 
 type VersionFs = Pick<typeof fsDefault, 'readFileSync' | 'writeFileSync' | 'mkdirSync'>;
 
