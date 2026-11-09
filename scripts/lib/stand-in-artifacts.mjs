@@ -47,7 +47,7 @@ export function madeBefore(promptText, item) {
 
 function body(kind, name, title, version) {
   if (kind === 'html') return `<!doctype html><meta charset="utf-8"><title>${title}</title><body style="font-family:system-ui;background:#111;color:#eee;padding:40px"><h1>${title}</h1><p>Prototype${version ? ` v${version}` : ''} made by the stand-in agent.</p><button style="padding:12px 20px;border-radius:8px">Pay now</button></body>\n`;
-  if (kind === 'csv') return `endpoint,method,problem,owner\n/payments,POST,no idempotency key,payments\n/refunds,POST,skips auth check,payments\n/appointments,GET,no pagination,web\n`;
+  if (kind === 'csv') return `endpoint,method,problem,owner\n/payments,POST,no idempotency key,payments\n/refunds,POST,skips auth check,payments\n/appointments,GET,no pagination,web\n${version ? `/version-${version},GET,added in version ${version},web\n` : ''}`;
   return `# ${title}\n\n${version ? `Version ${version}. ` : ''}A short write-up made by the stand-in agent.\n\n1. What it found.\n2. What to do next.\n`;
 }
 
@@ -63,7 +63,8 @@ export function makeArtifacts({ docsDir, item, task, asked = '', promptText = ''
   return wanted.map(({ name, kind }, i) => {
     const file = path.join(dir, name);
     const version = Number(name.match(/-v(\d+)\./)?.[1] ?? 0);
-    if (kind === 'png') fs.copyFileSync(PICTURES[(i + version) % PICTURES.length], file);
+    // Bytes after a PNG's end are ignored when it is drawn, and make each version a different file, as a real redraw is.
+    if (kind === 'png') fs.writeFileSync(file, Buffer.concat([fs.readFileSync(PICTURES[(i + version) % PICTURES.length]), Buffer.from(`\nversion ${version} option ${i + 1}\n`)]));
     else fs.writeFileSync(file, body(kind, name, title, version));
     return file;
   });

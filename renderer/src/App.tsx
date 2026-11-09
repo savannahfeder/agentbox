@@ -2933,9 +2933,9 @@ export default function App() {
   }, [weekCards, openTeammateCard, team]);
   const continueTeammateThread = useCallback((card: ThreadCard) => {
     void api.teamContinueBrief({ personId: card.personId, threadId: card.threadId })
-      .then((b) => { setComposeInitial(continueStart(b)); setModal('compose'); })
+      .then((b) => { setComposeInitial(continueStart(b, card, snap?.products ?? [])); setModal('compose'); })
       .catch((err) => showToast(String(err?.message ?? err)));
-  }, []);
+  }, [snap?.products]);
   const [teamBody, setTeamBody] = useState<HTMLElement | null>(null);
   // The card on screen is the newest one, and once its owner takes it back it
   // is not on screen at all: words they made private must not stay up.

@@ -48,6 +48,18 @@ describe('what a stand-in makes', () => {
     expect(madeBefore(files.join('\n'), 'w-other')).toEqual([]);
   });
 
+  // The second team run (2026-11-09) read v1, v2 and v3 of one table as the same bytes, which no real redraw is.
+  it('makes each version a different file, pictures and tables alike', () => {
+    const docs = fs.mkdtempSync(path.join(os.tmpdir(), 'stand-in-docs-'));
+    for (const t of ['mock up a screen', 'put the endpoints in a table']) {
+      const [v1] = makeArtifacts({ docsDir: docs, item: 'w-v', task: task(t) });
+      const [v2] = makeArtifacts({ docsDir: docs, item: 'w-v', task: task(t), asked: 'again', promptText: v1 });
+      const [v3] = makeArtifacts({ docsDir: docs, item: 'w-v', task: task(t), asked: 'again', promptText: v2 });
+      const bytes = [v1, v2, v3].map((f) => fs.readFileSync(f).toString('base64'));
+      expect(new Set(bytes).size, t).toBe(3);
+    }
+  });
+
   it('makes nothing without a documents folder or a task id', () => {
     expect(makeArtifacts({ docsDir: null, item: 'w-abc', task: task('mock up a screen') })).toEqual([]);
     expect(makeArtifacts({ docsDir: os.tmpdir(), item: null, task: task('mock up a screen') })).toEqual([]);

@@ -362,6 +362,8 @@ async function runPerson({ person, name, dir, stateFile, seeded, failed, cmds })
       const next = nextRound({ now: Date.now(), deadline, roundMs, idleInARow: idle, lastOutcome: last });
       if (!next.go) { if (next.why !== 'time is up') result.stopped = next.why; break; }
       const round = ++result.rounds;
+      // A sandboxed tester cannot start Chrome, and the last stretch's may have gone with it; open it from here.
+      await run(node, [BROWSE, 'open'], { env: { ...process.env, VERIFY_INSTANCE: name, BREAKER_OUT: dir }, timeoutMs: 2 * MIN });
       const now = Date.now();
       const { issues } = readDiary(path.join(dir, 'diary.jsonl'));
       const cov = coverage({ actions: readJsonl(path.join(dir, 'actions.jsonl')), lines: readAllLines(state()), seeded, maxAtOnce: watcher.maxAtOnce, person });

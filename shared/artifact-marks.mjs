@@ -231,6 +231,15 @@ function baseStem(name) {
 }
 const stemOf = (name) => baseStem(name).toLowerCase();
 
+/** 3 for `rows-v3.csv`, 1 for a name with no tail, null for any other tail (final, (2)). */
+function numberInName(name) {
+  const dot = name.lastIndexOf('.');
+  const stem = dot > 0 ? name.slice(0, dot) : name;
+  const v = stem.match(/[-_ ]v(\d+)$/i);
+  if (v) return Number(v[1]);
+  return VERSION_TAIL.test(stem) ? null : 1;
+}
+
 /** `group-seat-picker-v3.png` as `group-seat-picker.png`. */
 export function baseName(name) {
   const dot = name.lastIndexOf('.');
@@ -287,7 +296,14 @@ export function threadFiles(files, numbers = null) {
   }
   const out = [...families.values()];
   for (const family of out) {
-    if (!family.versions.some((v) => v.line !== undefined)) continue;
+    if (!family.versions.some((v) => v.line !== undefined)) {
+      // A handoff names the newest first; names that number themselves, each once, say the order.
+      const nums = family.versions.map((v) => numberInName(v.name));
+      if (family.versions.length > 1 && nums.every(Boolean) && new Set(nums).size === nums.length) {
+        family.versions = family.versions.map((v, i) => [nums[i], v]).sort((a, b) => a[0] - b[0]).map(([, v], i) => ({ ...v, n: i + 1 }));
+      }
+      continue;
+    }
     const byLine = new Map();
     for (const v of family.versions) {
       if (v.line === undefined) continue;
