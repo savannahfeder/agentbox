@@ -25,6 +25,6 @@ export const STORE_ROOT = process.env.ASTRAL_HOME || config.storeRoot || path.jo
 export const ACCOUNT_ID = process.env.STORE_ACCOUNT_ID || config.accountId || '00000000-0000-4000-8000-000000000000';
 export const ACCOUNT_ROOT = path.join(STORE_ROOT, 'accounts', ACCOUNT_ID);
 // The store's per-product machinery folder is `projects/<product dir, every
-// non-alphanumeric character as "-">` (main/store/home.mjs, encodeProjectPath).
+// non-alphanumeric character as "-">` (main/store/home.mts, encodeProjectPath).
 // This is that name up to the product slug, so `${MACHINERY_PREFIX}agentbox`.
 export const MACHINERY_PREFIX = `${path.join(STORE_ROOT, 'projects')}/${ACCOUNT_ROOT.replace(/[^A-Za-z0-9]/g, '-')}-`;

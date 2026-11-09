@@ -30,7 +30,7 @@ export interface Speech {
 
 export type Phase = 'idle' | 'asking' | 'starting' | 'listening' | 'finishing';
 export interface Listening { phase: Phase; level: number; problem: string | null; settings: boolean }
-interface Timers { setTimeout(fn: () => void, ms: number): unknown; clearTimeout(id: any): void }
+interface Timers { setTimeout(fn: () => void, ms: number): unknown; clearTimeout(id: unknown): void }
 
 export const START_MS = 5000;
 export const FINISH_MS = 2000;

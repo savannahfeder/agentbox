@@ -10,8 +10,10 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { isImagePath, referencedFiles } from '../../../renderer/src/referenced-files';
 import { pictureSource, shapeOfDrawn } from '../lib/files';
 import { inlineSpans, messageBlocks, type Block, type MentionKind, type Span } from '../lib/markdown';
+import { hasPictureMenu, PictureMenu } from '../../modules/picture-menu';
 import { offerLink } from './LinkMenu';
 import { T } from './parts';
+import { Selectable } from './Selectable';
 import { Player } from './Player';
 import { color, corner, font } from './theme';
 
@@ -23,6 +25,8 @@ export interface MessageFiles {
   open(src: string, among?: string[]): void;
   /** A long press: offer to open it in the browser or share it (LinkMenu.ts). */
   hold?(src: string): void;
+  /** Says a line on the toast, when a held picture could not be saved or loaded. */
+  say?(line: string): void;
   /** A folder's pictures as full paths on the phone, and what the folder goes by; null when the phone does not have it. */
   folder?(src: string): { title: string; pictures: string[]; total: number } | null;
   /** The link a film or a sound plays from, or null when the phone does not have it. */
@@ -134,7 +138,11 @@ function Picture({ src, alt }: { src: string; alt: string }) {
       style={{ width: '100%', maxWidth: size.w, aspectRatio: size.w / size.h, borderWidth: 1, borderRadius: corner.card, borderColor: color.line, backgroundColor: color.raised }} />
   );
   if (/^data:/i.test(src)) return drawn;
-  return <Pressable accessibilityRole="imagebutton" accessibilityLabel={alt || src} onPress={() => open(src, files, pictures)} onLongPress={() => hold(src, files)}>{drawn}</Pressable>;
+  return (
+    <PictureMenu uri={uri} corner={corner.card} say={(line) => files?.say?.(line)} style={{ width: '100%', maxWidth: size.w, aspectRatio: size.w / size.h }}>
+      <Pressable accessibilityRole="imagebutton" accessibilityLabel={alt || src} onPress={() => open(src, files, pictures)} onLongPress={hasPictureMenu ? undefined : () => hold(src, files)}>{drawn}</Pressable>
+    </PictureMenu>
+  );
 }
 
 // MentionIcon's folder at the folder line's 15px (`.folder-preview-name .mention-icon`).
@@ -188,12 +196,14 @@ function Shot({ file, all, width }: { file: string; all: string[]; width: number
   const base = file.split('/').pop() ?? file;
   return (
     <Pressable onPress={() => open(file, files, all)} accessibilityRole="imagebutton" accessibilityLabel={base} style={{ width }}>
-      <View style={{ width: '100%', aspectRatio: 16 / 10, borderWidth: 1, borderRadius: corner.card, borderColor: color.line, backgroundColor: color.raised, overflow: 'hidden' }}>
-        {!!uri && (
-          <Image source={pictureSource(uri)} cachePolicy="memory-disk" accessibilityLabel={base} contentFit="cover" contentPosition="top"
-            style={{ width: '100%', height: '100%' }} />
-        )}
-      </View>
+      <PictureMenu uri={uri} corner={corner.card} say={(line) => files?.say?.(line)} style={{ width: '100%', aspectRatio: 16 / 10 }}>
+        <View style={{ width: '100%', aspectRatio: 16 / 10, borderWidth: 1, borderRadius: corner.card, borderColor: color.line, backgroundColor: color.raised, overflow: 'hidden' }}>
+          {!!uri && (
+            <Image source={pictureSource(uri)} cachePolicy="memory-disk" accessibilityLabel={base} contentFit="cover" contentPosition="top"
+              style={{ width: '100%', height: '100%' }} />
+          )}
+        </View>
+      </PictureMenu>
       <T numberOfLines={1} style={{ marginTop: 4, fontSize: 13.12, lineHeight: 21, color: color.faint }}>{base}</T>
     </Pressable>
   );
@@ -302,7 +312,7 @@ function Table({ block }: { block: Extract<Block, { kind: 'table' }> }) {
                     // `th`: half the raised grey.
                     ...(r === 0 ? { backgroundColor: color.film } : {}),
                   }}>
-                    <T selectable style={cellText(r, c)}><Words spans={row[c] ?? []} /></T>
+                    <Selectable style={cellText(r, c)} spans={row[c] ?? []}><Words spans={row[c] ?? []} /></Selectable>
                   </View>
                 ))}
               </View>
@@ -365,15 +375,14 @@ function One({ block: b, tone, depth }: { block: Block; tone?: string; depth: nu
   const ink = tone ? { color: tone } : null;
   const headings = doc ? DOC_HEADING : HEADING;
   switch (b.kind) {
-    // Selectable, so a hold selects words to copy (from the phone app, 2026-10-29: "I can't select text").
-    case 'p': return <T selectable style={[body, ink]}><Words spans={b.spans} /></T>;
-    case 'h': return <T selectable style={[body, ink, headings[b.depth] ?? headings[4]]}><Words spans={b.spans} /></T>;
+    case 'p': return <Selectable style={[body, ink]} spans={b.spans}><Words spans={b.spans} /></Selectable>;
+    case 'h': return <Selectable style={[body, ink, headings[b.depth] ?? headings[4]]} spans={b.spans}><Words spans={b.spans} /></Selectable>;
     case 'code':
       return (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
           style={{ backgroundColor: color.raised, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: color.line }}
           contentContainerStyle={{ paddingVertical: 12, paddingHorizontal: 14, flexGrow: 1 }}>
-          <T selectable style={{ fontFamily: font.mono, fontSize: 13, lineHeight: 20.8, color: color.text }}>{b.text}</T>
+          <Selectable style={{ fontFamily: font.mono, fontSize: 13, lineHeight: 20.8, color: color.text }}>{b.text}</Selectable>
         </ScrollView>
       );
     case 'quote':

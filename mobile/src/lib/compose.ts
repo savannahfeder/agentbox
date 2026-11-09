@@ -9,7 +9,7 @@ import { priorityValueOf, type PriorityId } from '../../../renderer/src/priority
 import { harnessFields, harnessOf, projectsOffered, startingProject, type Harness } from '../../../renderer/src/threads/composer-rules';
 import { readLastRecipient, writeLastRecipient } from '../../../renderer/src/threads/recipient';
 import { pickToSend } from '../../../renderer/src/reply-pick';
-import type { Engine } from '../../../shared/engines.mjs';
+import type { Engine } from '../../../shared/engines.mts';
 import type { Choices } from './actions';
 
 export interface KeptStore { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void }
@@ -100,7 +100,7 @@ export function newThreadChoices({ priority, engine = 'claude', model, effort, e
 }
 
 /**
- * The agent a thread runs on, by the computer's rule (shared/engines.mjs
+ * The agent a thread runs on, by the computer's rule (shared/engines.mts
  * `engineFor`): Codex on a computer with only Codex, else the row's own, else
  * its model's, else the computer's chosen agent where it still has it. A row
  * names its agent only when the computer offers two.

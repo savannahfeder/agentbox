@@ -8,14 +8,14 @@
 // which carries the same place, so the thread's card still takes it in one press.
 import fs from 'node:fs';
 import crypto from 'node:crypto';
-import { answerIsHers, appendSpoolLine, cardDigest, readSpoolJson, removeSpoolEntry, spoolEntryExists, writeSpoolFile } from '../approvals.mjs';
-import { keyNameRefused, keyLabel } from '../../shared/cloud-keys.mjs';
-import { NEED } from '../../shared/cloud-needs.mjs';
-import { keySource, keySourceLine } from '../../shared/cloud-key-sources.mjs';
+import { answerIsHers, appendSpoolLine, cardDigest, readSpoolJson, removeSpoolEntry, spoolEntryExists, writeSpoolFile } from '../approvals.mts';
+import { keyNameRefused, keyLabel } from '../../shared/cloud-keys.mts';
+import { NEED } from '../../shared/cloud-needs.mts';
+import { keySource, keySourceLine } from '../../shared/cloud-key-sources.mts';
 import { readKeyFrom, keyIsThere } from './key-source.mts';
 import type { KeySource, ReadOptions } from './key-source.mts';
-import { cloudKeyNames, keysCarried, saveCloudKey } from './keys.mjs';
-import type { KeyStorage } from './keys.mjs';
+import { cloudKeyNames, keysCarried, saveCloudKey } from './keys.mts';
+import type { KeyStorage } from './keys.mts';
 
 /** The `tool` of a key card in the approvals spool; renderer/src/approval-card.ts draws it. */
 export const KEY_CARD = 'cloud_key';

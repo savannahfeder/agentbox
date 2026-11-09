@@ -1,5 +1,5 @@
 import type { WorkItem } from './types';
-import { isTaskRow, taskNewsAt } from '../../shared/team-rules.mjs';
+import { isTaskRow, taskNewsAt } from '../../shared/team-rules.mts';
 
 type Dated = Pick<WorkItem, 'id' | 'createdAt' | 'wrote'> & Partial<Pick<WorkItem, 'labels' | 'talk'>>;
 

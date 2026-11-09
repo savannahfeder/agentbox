@@ -2,14 +2,14 @@
 // cards, and nothing else.
 //
 // The names, the default and the rule about which engine a row runs on live in
-// ../../shared/engines.mjs, because main and the renderer both need them and a
+// ../../shared/engines.mts, because main and the renderer both need them and a
 // second copy is a copy that can disagree with the running fleet. WHETHER THERE
 // IS A CHOICE AT ALL is not here either: that needs the capability gate and is
 // answered by main, on the snapshot. This file is only the localStorage, and it
 // is the exact shape ../models.ts uses for the model, on purpose: two controls
 // that behave the same in her hand should be two files that read the same.
 
-import { DEFAULT_ENGINE, isEngine, type Engine } from '../../shared/engines.mjs';
+import { DEFAULT_ENGINE, isEngine, type Engine } from '../../shared/engines.mts';
 
 export const LAST_ENGINE_KEY = 'zero.lastEngine';
 
@@ -42,7 +42,7 @@ export const LAST_ENGINE_KEY = 'zero.lastEngine';
  * what the picker uses for Claude Code. That is the one
  * comparison this file makes on its own, against the same constant the two
  * functions below already compare against, and it is deliberately NOT
- * `enginePicked`: tests/a-codex-row-from-august-still-runs-on-claude.test.mjs
+ * `enginePicked`: tests/a-codex-row-from-august-still-runs-on-claude.test.mts
  * holds an exact list of that helper's callers so that the renderer cannot grow
  * a second opinion about what is on this Mac, and there is no reason to spend
  * that line on a comparison the file already spells twice.

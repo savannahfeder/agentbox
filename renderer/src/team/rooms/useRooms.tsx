@@ -16,7 +16,7 @@ import { I } from './icons';
 import type { Conversation } from './MessagesPage';
 import { roomConversations } from './conversations';
 import { MembersMenu } from './RoomDialogs';
-import { tokenFromLink } from '../../../../shared/room-links.mjs';
+import { tokenFromLink } from '../../../../shared/room-links.mts';
 import { RoomsNotReady, RoomsSettings } from './RoomsSettings';
 import { GroupPage, GroupWaits, PeoplePanel } from './GroupPage';
 import { GroupMenuButton, groupChoices, type GroupMenuAction } from './GroupList';

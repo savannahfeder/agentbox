@@ -2,10 +2,10 @@
 // it (w-c110f2371d). A message names one as `[Its name](w-…)` (# in a text
 // box) or as a bare id; the store has no way to read one thread by id, so
 // without this the agent holds a name and nothing behind it.
-import { doneSteps, shownToPeople, visibilityOf } from './thread-cards.mjs';
+import { doneSteps, shownToPeople, visibilityOf, type CardItem, type ProjectSeen } from './thread-cards.mts';
 
-type Row = Parameters<typeof visibilityOf>[0];
-type Seen = Parameters<typeof visibilityOf>[1];
+type Row = CardItem & { product?: string };
+type Seen = ProjectSeen;
 type Reach = { rank: number; people: string[] };
 export interface FoundThread { item: Row; product?: (NonNullable<Seen> & { name?: string }) | null }
 
@@ -41,7 +41,7 @@ function summed(id: string, found: FoundThread | null | undefined, rowReach: Rea
   }
   const name = (item.label ?? '').trim() || item.title || id;
   const moved = day(item.updatedAt);
-  const lines = [`## ${name} (${id})`, '', [product?.name ?? item.product, STATE[item.status] ?? item.status, moved ? `last moved ${moved} UTC` : null].filter(Boolean).join(', ')];
+  const lines = [`## ${name} (${id})`, '', [product?.name ?? item.product, STATE[item.status as string] ?? item.status, moved ? `last moved ${moved} UTC` : null].filter(Boolean).join(', ')];
   if (item.problem) lines.push('', `Context: ${item.problem}`);
   const steps = doneSteps(item.progress);
   if (steps.length) lines.push('', 'Done so far:', ...steps.map((s) => `- ${s}`));

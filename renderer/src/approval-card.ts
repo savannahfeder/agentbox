@@ -22,8 +22,8 @@
 /** What is drawn when there is nothing readable to draw. Not JSON, and not a
  *  blank box either: it is a sentence, and the honest answer to it is Deny. */
 import { Name } from '../../shared/product-name.mjs';
-import { keyLabel } from '../../shared/cloud-keys.mjs';
-import { keySource, keySourceWords } from '../../shared/cloud-key-sources.mjs';
+import { keyLabel } from '../../shared/cloud-keys.mts';
+import { keySource, keySourceWords } from '../../shared/cloud-key-sources.mts';
 export const UNREADABLE = `${Name} could not read what this asks for.`;
 
 export type ApprovalReading = {
@@ -58,7 +58,7 @@ export const approvalAnswered = (allow: boolean) =>
  * One approval's `input`, as the two lines her eye actually lands on.
  *
  * `changes` is first because it is the only key that says the question is about
- * files rather than a command; main/codex-approvals.mjs is the one place that
+ * files rather than a command; main/codex-approvals.mts is the one place that
  * writes it, already capped and already marked where it was cut.
  *
  * `host` IS BEHIND `command`, AND THE ORDER IS THE POINT. A network approval

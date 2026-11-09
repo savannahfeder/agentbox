@@ -7,7 +7,7 @@ import { FlatList, Pressable, View } from 'react-native';
 import { readTeam } from '../../../renderer/src/phone-team';
 import type { ThreadCard } from '../../../renderer/src/types';
 import { router } from '../lib/router';
-import { phoneShipped, shippedCardOf, shippedCardsQuery, shippedName, shippedWords, type ShippedRow } from '../lib/shipped';
+import { phoneShipped, shippedCardOf, shippedCardsQuery, shippedName, shippedWords, type ShippedCardRow, type ShippedRow } from '../lib/shipped';
 import { screenGate } from '../lib/thread-gate';
 import { useCloud } from '../state/cloud';
 import { CardSheet } from '../ui/Everything';
@@ -29,7 +29,7 @@ export default function Shipped() {
   const [open, setOpen] = useState<ThreadCard | null>(null);
   useEffect(() => {
     if (!cloud) return;
-    cloud.select('thread_cards', shippedCardsQuery(Date.now())).then((rows) => { setCards(rows.map(shippedCardOf)); setTrouble(null); }, (err) => setTrouble(message(err)));
+    cloud.select('thread_cards', shippedCardsQuery(Date.now())).then((rows) => { setCards((rows as ShippedCardRow[]).map(shippedCardOf)); setTrouble(null); }, (err) => setTrouble(message(err)));
     readTeam(cloud).then((got) => setPeople(got.team?.people ?? []), () => { /* a card still says Someone */ });
   }, [cloud]);
   const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
@@ -39,7 +39,7 @@ export default function Shipped() {
   const rows = cards ? phoneShipped({ cards, me, now: c.now }) : [];
   // Your own opens as your thread when this phone has it; a teammate's as what they share of it.
   const openRow = (r: ShippedRow) => {
-    const mine = r.ownerId === me ? c.view.items.find((i: any) => i.id === r.card?.threadId) : null;
+    const mine = r.ownerId === me ? c.view.items.find((i) => i.id === r.card?.threadId) : null;
     if (mine) router.push({ pathname: '/thread/[product]/[id]', params: { product: mine.product, id: mine.id } });
     else if (r.card) setOpen(r.card);
   };

@@ -6,9 +6,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { execFile } from 'node:child_process';
-import { KEY_VALUE_MAX } from '../../shared/cloud-keys.mjs';
-import { keySourceWords } from '../../shared/cloud-key-sources.mjs';
-import { shellProbes, shellRunnerLater } from '../engine-bin.mjs';
+import { KEY_VALUE_MAX } from '../../shared/cloud-keys.mts';
+import { keySourceWords } from '../../shared/cloud-key-sources.mts';
+import { shellProbes, shellRunnerLater } from '../engine-bin.mts';
 
 export interface KeySource { place: 'keychain' | 'file' | 'shell'; from: string; entry?: string }
 export type KeyRead = { value: string } | { error: string; missing: boolean };

@@ -1,5 +1,5 @@
 // THE TWO JUDGEMENTS SHIPPING HAS TO MAKE, kept pure so they can be tested
-// without pushing anything (tests/one-ship-command-every-agent-runs.test.mjs).
+// without pushing anything (tests/one-ship-command-every-agent-runs.test.mts).
 
 /**
  * Did this push fail because somebody else pushed first?

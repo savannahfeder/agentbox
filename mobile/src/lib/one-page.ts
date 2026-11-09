@@ -5,6 +5,8 @@
 import {
   appWrote, drawnWhole, earlierCount, earlierThan, foldKey, foldedKeys, newestAnswer, pageTitle, spotIn, splitHeadline, standsAt, stepIn, toggleFold,
 } from '../../../renderer/src/one-thing-at-a-time';
+import type { ItemOutcome } from '../../../renderer/src/item-thread';
+import type { AgentEvent, WorkItem } from '../../../renderer/src/types';
 
 export { foldKey, foldedKeys, splitHeadline, spotIn, stepIn, toggleFold };
 
@@ -25,12 +27,12 @@ export interface PageOf {
   from: number;
 }
 
-export function pageOf(item: any, events: any[], outcome: { at: number; text: string; field: 'result' | 'note' } | null, after: readonly unknown[], earlierOpen: boolean): PageOf {
-  const byApp = appWrote(outcome as any, item.wrote);
+export function pageOf(item: WorkItem, events: AgentEvent[], outcome: ItemOutcome | null, after: readonly unknown[], earlierOpen: boolean): PageOf {
+  const byApp = appWrote(outcome, item.wrote);
   const lead = byApp ? null : outcome;
-  const newest = newestAnswer(events, lead as any);
+  const newest = newestAnswer(events, lead);
   const stands = newest && !earlierOpen ? standsAt(events, newest) : -1;
-  const behind = stands >= 0 ? earlierThan(events, stands) : newest ? earlierCount(events, lead as any) : 0;
+  const behind = stands >= 0 ? earlierThan(events, stands) : newest ? earlierCount(events, lead) : 0;
   const short = !earlierOpen && drawnWhole(behind);
   const from = short ? -1 : stands;
   const earlier = short ? 0 : behind;

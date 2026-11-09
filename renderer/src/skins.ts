@@ -3,7 +3,7 @@ import { THEME_KEY, type ThemeChoice } from './theme';
 // The picture themes, and which one the window is wearing.
 //
 // A skin is a second axis laid over the light and dark token sets in theme.ts
-// (pinned by tests/theme-tokens.test.mjs), carried on its own `data-skin`
+// (pinned by tests/theme-tokens.test.mts), carried on its own `data-skin`
 // attribute so nothing under it moves. A third value of `theme` would have
 // made every token block a three-way answer.
 
@@ -186,7 +186,7 @@ export const TUNE_LIMITS = {
 
 export const TUNE_DEFAULT: Record<SkinId, SkinTune> = {
   // Several of these follow reference screenshots, pinned by
-  // tests/her-theme-screenshots-set-the-defaults.test.mjs. The Lake's 0.63 was
+  // tests/her-theme-screenshots-set-the-defaults.test.mts. The Lake's 0.63 was
   // fitted per channel against a reference drawing, and the Lake is also the
   // fallback in resolveTune.
   lake: { blur: 8, backgroundBlur: 5, dim: 0.63 },
