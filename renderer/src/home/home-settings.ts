@@ -1,27 +1,22 @@
 import { useEffect, useState } from 'react';
 
-// Home is an alpha feature, switched on in Settings, Alpha features. It and
-// the sky chosen for each look are kept on this machine only.
-export const HOME_KEY = 'zero.alpha.home';
+// The sky chosen for each look is kept on this machine only.
 /** The sky theme picked, if any; Light, Dark and Match system clear it. */
 export const SKY_THEME_KEY = 'zero.sky.theme';
 const CHANGED = 'agentbox:home-settings';
 
-export type HomeSettings = { on: boolean; skyTheme: string | null };
+export type HomeSettings = { skyTheme: string | null };
 
 function read(): HomeSettings {
   try {
-    return {
-      on: localStorage.getItem(HOME_KEY) === '1',
-      skyTheme: localStorage.getItem(SKY_THEME_KEY) || null,
-    };
-  } catch { return { on: false, skyTheme: null }; }
+    return { skyTheme: localStorage.getItem(SKY_THEME_KEY) || null };
+  } catch { return { skyTheme: null }; }
 }
 
-export function setHomeSetting(key: typeof HOME_KEY | typeof SKY_THEME_KEY, value: string | boolean | null) {
+export function setHomeSetting(key: typeof SKY_THEME_KEY, value: string | null) {
   try {
     if (value === null) localStorage.removeItem(key);
-    else localStorage.setItem(key, value === true ? '1' : value === false ? '0' : value);
+    else localStorage.setItem(key, value);
   } catch { /* private window */ }
   window.dispatchEvent(new Event(CHANGED));
 }
