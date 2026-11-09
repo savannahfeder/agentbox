@@ -9,7 +9,6 @@ import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { build } from 'esbuild';
-import electron from 'electron';
 
 const dir = '/Users/example/Projects/demo';
 function links(value) {
@@ -78,6 +77,10 @@ describe('quoted filenames keep every word', () => {
 // checks that nothing happened keep their fixed wait, where waiting too little
 // can only let them pass.
 it.skipIf(process.platform !== 'darwin')('keeps mounted links and exhausted previews through five parent updates', async () => {
+  // Loaded here, not at the top: importing 'electron' downloads its binary
+  // when it is missing, and a failed download would fail the parser tests on
+  // every platform this test skips.
+  const { default: electron } = await import('electron');
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'inline-links-'));
   try {
     fs.writeFileSync(path.join(temp, 'index.html'), '<!doctype html><div id="root"></div>');
