@@ -65,7 +65,8 @@ export const rowKey = (key: string): boolean => ROW_KEYS.has(key.toLowerCase());
 export const STILL_TYPING_MS = 1000;
 
 /** With a thread open and no box holding the keyboard. */
-export function keyOnAnOpenThread({ key, justChanged, hasOptions = false, stillTyping = false }: { key: string; justChanged: boolean; hasOptions?: boolean; stillTyping?: boolean }): 'shortcut' | 'to the box' {
+export function keyOnAnOpenThread({ key, justChanged, hasOptions = false, stillTyping = false, boxOnScreen = true }: { key: string; justChanged: boolean; hasOptions?: boolean; stillTyping?: boolean; boxOnScreen?: boolean }): 'shortcut' | 'to the box' {
+  if (!boxOnScreen) return 'shortcut';
   if (stillTyping && key.length === 1) return 'to the box';
   if (!printable(key)) return 'shortcut';
   const k = key.toLowerCase();

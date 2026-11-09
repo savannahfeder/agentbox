@@ -167,9 +167,12 @@ describe('the wiring in App.tsx', () => {
   });
 
   it('every undo on a task says what it undid', () => {
-    for (const words of ['Undid closing it', 'Undid your approval', 'Undid your reply', 'Undid picking', 'Undid sending it', 'Undid moving it to Later']) {
+    for (const words of ['Undid closing it', 'Undid your approval', 'Undid your reply', 'Undid picking', 'Undid moving it to Later']) {
       expect(app).toContain(`'${words}'`);
     }
+    // The send's words are shared with the rule that keeps a taken-back send out of the lists.
+    expect(read('renderer/src/withdraw-send.ts')).toContain("UNDID_SENDING = 'Undid sending it'");
+    expect(app).toMatch(/words: UNDID_SENDING/);
   });
 
   it('the thread is handed the marks for its own task', () => {

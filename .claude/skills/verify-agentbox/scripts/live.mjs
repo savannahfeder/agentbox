@@ -187,10 +187,8 @@ async function realCodex() {
  *
  * STAND-IN MODE (the default) gives the copy a HOME of its own, so what it
  * finds there is the same on every Mac and every run: two Claude logins
- * (`.claude` and `.claude-second`, each a `.claude.json` naming an account,
- * which is all main/account-discovery.mjs reads), the Claude stand-in behind a
- * tiny wrapper, and the real `codex` binary pointed at a scripted model on a
- * loopback port. REAL MODE keeps this Mac's own home, so the copy finds and
+ * (`layStandInLogins`), the Claude stand-in behind a tiny wrapper, and the
+ * real `codex` binary pointed at a scripted model on a loopback port. REAL MODE keeps this Mac's own home, so the copy finds and
  * runs the Claude Code and Codex installed here, signed in as they are.
  *
  * SETUP MODE (`--setup <name>`, setups.mjs) is the two at once: the REAL
@@ -273,11 +271,7 @@ async function prepare(real, setupName = null, { logins = 2, codex = true, proje
     codexBin = await realCodex();
     codexHome = process.env.VERIFY_CODEX_HOME;
   } else if (!real) {
-    const LOGINS = [['.claude', 'one'], ['.claude-second', 'two'], ['.claude-third', 'three'], ['.claude-fourth', 'four']];
-    for (const [dir, n] of LOGINS.slice(0, Math.min(Math.max(1, logins), LOGINS.length))) {
-      fs.mkdirSync(path.join(home, dir), { recursive: true });
-      fs.writeFileSync(path.join(home, dir, '.claude.json'), `${JSON.stringify({ oauthAccount: { emailAddress: `${n}@verify.invalid`, accountUuid: `verify-account-${n}` } })}\n`);
-    }
+    layStandInLogins(home, logins);
     // A wrapper, so the stand-in starts with an absolute node and does not
     // depend on what PATH the copy's shell recovers from an empty home. It runs
     // a COPY of the stand-in kept here under /tmp, never the one in this
@@ -304,6 +298,20 @@ async function prepare(real, setupName = null, { logins = 2, codex = true, proje
     setup: setup?.name ?? null, claudeModel, codexModel,
   };
   return state;
+}
+
+/**
+ * A stand-in copy's Claude logins, one to four, each a `.claude.json` naming an
+ * account. The default login's file sits beside `~/.claude`, not in it, as
+ * Claude Code keeps it and the app reads it (main/account-tooling.mjs).
+ */
+export function layStandInLogins(home, logins) {
+  const LOGINS = [['.claude', 'one'], ['.claude-second', 'two'], ['.claude-third', 'three'], ['.claude-fourth', 'four']];
+  for (const [dir, n] of LOGINS.slice(0, Math.min(Math.max(1, logins), LOGINS.length))) {
+    fs.mkdirSync(path.join(home, dir), { recursive: true });
+    const file = dir === '.claude' ? path.join(home, '.claude.json') : path.join(home, dir, '.claude.json');
+    fs.writeFileSync(file, `${JSON.stringify({ oauthAccount: { emailAddress: `${n}@verify.invalid`, accountUuid: `verify-account-${n}` } })}\n`);
+  }
 }
 
 /*
@@ -508,7 +516,7 @@ async function startStandInCloud(state) {
   // It imports .mts files; Node before 22.18 reads those only with the flag.
   const server = spawn(process.execPath, ['--experimental-strip-types', '--no-warnings', path.join(here, 'stub-cloud-server.mjs')], {
     detached: true, stdio: ['ignore', log, log],
-    env: { ...cleanEnv(), STUB_CLOUD_INSTANCE: INSTANCE, STUB_CLOUD_HOME: state.home, STUB_CLAUDE_PLAN: state.plan, ...(state.freeHours ? { STUB_CLOUD_FREE_HOURS: String(state.freeHours) } : {}) },
+    env: { ...cleanEnv(), STUB_CLOUD_INSTANCE: INSTANCE, STUB_CLOUD_HOME: state.home, STUB_CLAUDE_PLAN: state.plan, ...(state.freeHours ? { STUB_CLOUD_FREE_HOURS: String(state.freeHours) } : {}), ...(state.cloudTeam ? { STUB_CLOUD_TEAM: state.cloudTeam, ...(state.cloudTeamHours ? { STUB_CLOUD_TEAM_HOURS: String(state.cloudTeamHours) } : {}) } : {}) },
   });
   server.unref();
   const deadline = Date.now() + 20_000;
@@ -546,6 +554,10 @@ async function up(args) {
   const freeAt = args.indexOf('--free-hours');
   const freeHours = freeAt >= 0 ? Number(args[freeAt + 1]) : 0;
   if (freeAt >= 0 && !(freeHours > 0 && standInCloud)) stop('--free-hours takes a number of hours, with --stand-in-cloud.');
+  // `--cloud-team owner:0.3`: the stand-in account is on a team's trial, as its owner or a member, with that many hours a member.
+  const cloudTeamAt = args.indexOf('--cloud-team');
+  const [cloudTeam, cloudTeamHours] = cloudTeamAt >= 0 ? String(args[cloudTeamAt + 1] ?? '').split(':') : [];
+  if (cloudTeamAt >= 0 && !(standInCloud && ['owner', 'member'].includes(cloudTeam))) stop('--cloud-team takes owner or member (and :hours), with --stand-in-cloud.');
   const cloud = args.includes('--cloud');
   if (cloud && !real) stop('--cloud runs real agents on this Mac\'s cloud setup: add --real.');
   if (cloud) {
@@ -574,7 +586,7 @@ async function up(args) {
   const alpha = value('alpha');
   const toolsFixture = value('tools-fixture');
   const toolStandins = value('tool-standins');
-  const prepared = { ...(await prepare(real, setupName, shape)), teamFile, ...(toolsFixture ? { toolsFixture } : {}), ...(toolStandins ? { toolStandins } : {}), ...(alpha ? { alpha: alpha.split(',').map((f) => f.trim()).filter(Boolean) } : {}), ...(cloud ? { cloud: true, cloudTmp: cloudTmpFor(INSTANCE), cloudAccounts } : {}), ...(standInCloud ? { standInCloud: true, cloudTmp: cloudTmpFor(INSTANCE), ...(freeHours ? { freeHours } : {}) } : {}) };
+  const prepared = { ...(await prepare(real, setupName, shape)), teamFile, ...(toolsFixture ? { toolsFixture } : {}), ...(toolStandins ? { toolStandins } : {}), ...(alpha ? { alpha: alpha.split(',').map((f) => f.trim()).filter(Boolean) } : {}), ...(cloud ? { cloud: true, cloudTmp: cloudTmpFor(INSTANCE), cloudAccounts } : {}), ...(standInCloud ? { standInCloud: true, cloudTmp: cloudTmpFor(INSTANCE), ...(freeHours ? { freeHours } : {}), ...(cloudTeam ? { cloudTeam, cloudTeamHours: Number(cloudTeamHours) || null } : {}) } : {}) };
   const next = await start(installed ? { ...prepared, installed: true } : prepared);
   say(installed ? `up: the installed app, pid ${next.pid}, window on debugging port ${next.cdpPort}` : `up: ${next.url}`);
   say(setupName

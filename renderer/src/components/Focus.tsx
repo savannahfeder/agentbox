@@ -160,6 +160,7 @@ import { ChoicesFold, ChoicesShow, QueueNav } from './OneThingAtATime';
 import { InlineTable, gridFromHast } from './TableView';
 import { foldKey, foldedKeys, toggleFold } from '../one-thing-at-a-time';
 import { watchForBlank } from '../blank-check';
+import { FittedImg } from './FittedImg';
 const needName = (n: Need) => (n.kind === 'sign-in' ? n.service.name : n.kind === 'key' ? (keyWords(n.what) ? `the ${keyWords(n.what)}` : n.name) : n.kind === 'file' ? (n.path.split('/').pop() ?? n.path) : `the ${n.about} code`);
 
 // A relative product path is an artifact, however the worker wrote it:
@@ -329,18 +330,21 @@ export function ArtifactImg({ src, alt, roots, onOpen, find }: {
   // LETS A COPY CARRY THE PICTURE. Without it the picture taints a canvas and
   // ../copy-out.ts has nothing to inline, so a message pasted into an email
   // arrives with a dead url where it should be.
+  // A chat draws its pictures as previews (team/chat.css), a thread at reading width.
+  const maxHeight = direct ? 240 : undefined;
+  const minWidth = direct ? 360 : 760;
   if (/^file:\/\//.test(src) || src.startsWith('/')) {
     const file = src.startsWith('/') ? src : decodeURIComponent(src.slice(7));
-    if (found) return door(found, <img src={pictureUrl(found)} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" />);
+    if (found) return door(found, <FittedImg maxHeight={maxHeight} minWidth={minWidth} src={pictureUrl(found)} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" />);
     if (broken && direct) return <CarriedNote src={file} always />;
     if (broken) return <button type="button" className="missing-artifact" title="Look for it again" onClick={() => { setTries(tries + 1); setBroken(false); }}>missing image: {file}</button>;
-    return door(file, <img src={again(pictureUrl(file))} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" onError={() => setBroken(true)} />);
+    return door(file, <FittedImg maxHeight={maxHeight} minWidth={minWidth} src={again(pictureUrl(file))} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" onError={() => setBroken(true)} />);
   }
   const rel = src.replace(/^\.\//, '');
   const candidates = roots.map((r) => pictureUrl(`${r}/${rel}`));
   if (attempt >= candidates.length) {
     const asked = find ? found : null;
-    if (asked) return door(asked, <img src={pictureUrl(asked)} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" onError={() => setFound(null)} />);
+    if (asked) return door(asked, <FittedImg maxHeight={maxHeight} minWidth={minWidth} src={pictureUrl(asked)} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" onError={() => setFound(null)} />);
     // Still asking: a picture's box, rather than a "missing" that turns into a picture.
     if (asked === undefined) return <span className="inline-image arriving" aria-hidden="true" />;
     if (direct) return <CarriedNote src={rel} always />;
@@ -348,7 +352,7 @@ export function ArtifactImg({ src, alt, roots, onOpen, find }: {
     if (find) return <button type="button" className="missing-artifact" title="Look for it again" onClick={lookNow}>missing image: {rel}</button>;
     return <span className="missing-artifact">missing image: {rel}</span>;
   }
-  return door(rel, <img src={candidates[attempt]} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" onError={() => setAttempt(attempt + 1)} />);
+  return door(rel, <FittedImg maxHeight={maxHeight} minWidth={minWidth} src={candidates[attempt]} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" onError={() => setAttempt(attempt + 1)} />);
 }
 
 // A SOUND OR A FILM A WORKER NAMES PLAYS WHERE IT IS NAMED.
@@ -522,6 +526,8 @@ function CarriedNote({ src, always = false }: { src: string; always?: boolean })
 // it is pointing at, and the folder beside them also holds every older round,
 // so it stays one line rather than drawing the same pictures twice.
 const FOLDER_SHOWS = 6;
+// A third of the 760-point reading width, less the gaps (styles.css .folder-preview-grid).
+const FOLDER_SHOT_WIDTH = 247;
 // What each folder showed last, so a thread opened again draws it at once.
 const folderSeen = new Map<string, { pictures: string[]; total: number }>();
 //
@@ -582,7 +588,7 @@ export function FolderPreview({ product, folder, onOpen, quiet, thread }: {
           const base = file.split('/').pop() ?? file;
           return (
             <button key={file} type="button" className="folder-preview-shot" data-copy-file={file} data-picture={file} title={base} onClick={(e) => onOpen(file, e.currentTarget)}>
-              <img src={pictureUrl(file)} alt={base} crossOrigin="anonymous" loading="lazy" />
+              <FittedImg cover minWidth={FOLDER_SHOT_WIDTH} className="folder-preview-picture" src={pictureUrl(file)} alt={base} crossOrigin="anonymous" />
               <span className="folder-preview-label">{base}</span>
             </button>
           );
@@ -1159,26 +1165,27 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // sticks itself to the bottom (../thread-bottom), and an effect here writing
   // 0 was a second hand on the same box pulling the other way.
   //
-  // WHERE SHE WAS, BUT ONLY ACROSS A RELOAD. Clicking into a task is never a
-  // reload, so clicking into a task always ends at the bottom.
+  // WHERE SHE WAS, across a reload or on coming back to a thread with no new
+  // answer since she left it (../thread-place.ts). Otherwise it ends at the bottom.
   //
   // It is not one write. The conversation is read off her disk AFTER the pane is
-  // drawn, so at the moment a reload finishes the box is a few hundred pixels
+  // drawn, so at the moment the thread opens the box is a few hundred pixels
   // tall and a scrollTop of four thousand clamps to whatever fits; resumeTo
   // keeps reaching for the place while the page grows into it.
   const scrollRef = useRef<HTMLDivElement>(null);
   // The box the message is drawn in, so a copy out of it can be rewritten
   // before it reaches the clipboard (../copy-out.ts).
   const bodyRef = useRef<HTMLDivElement>(null);
-  const resumed = useRef<string>('');
+  // Each place is spent once; coming back to the same thread again is a new one.
+  const resumed = useRef<object | null>(null);
   useEffect(() => {
-    if (!resumeAt || resumeAt.id !== item.id || resumed.current === item.id) return;
+    if (!resumeAt || resumeAt.id !== item.id || resumed.current === resumeAt) return;
     // Spent only once the box was actually there to spend it on. Marking it
     // before this check burned the restore on the render where the pane had not
     // mounted yet, and it never came back: the reload landed at the bottom with
     // her place sitting in localStorage unread.
     if (!scrollRef.current) return;
-    resumed.current = item.id;
+    resumed.current = resumeAt;
     return resumeTo(scrollRef.current, resumeAt.top);
   }, [item.id, resumeAt]);
 

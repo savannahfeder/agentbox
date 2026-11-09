@@ -57,8 +57,8 @@ describe('in the list', () => {
 describe('the way back from a task opened on the board', () => {
   const crumb = app.slice(app.indexOf('crumbFrom={'), app.indexOf('inlineArtifacts=', app.indexOf('crumbFrom={')));
 
-  it('says Threads, not the tab the list was last on', () => {
-    expect(crumb).toMatch(/onBoard \? 'Threads'/);
+  it('says Inbox, not the tab the list was last on', () => {
+    expect(crumb).toMatch(/onBoard \? 'Inbox'/);
   });
 
   // In the list it still names a tab, as w-922f66bb06 approved. Which tab is
@@ -66,7 +66,7 @@ describe('the way back from a task opened on the board', () => {
   // not the one the list happens to be on.
   it('still names the tab in the list', () => {
     expect(crumb).toContain("INBOX_TABS.find((t) => t.view === crumbTabNow)?.label");
-    expect(crumb.indexOf("onBoard ? 'Threads'")).toBeLessThan(crumb.indexOf('INBOX_TABS.find'));
+    expect(crumb.indexOf("onBoard ? 'Inbox'")).toBeLessThan(crumb.indexOf('INBOX_TABS.find'));
   });
 });
 

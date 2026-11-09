@@ -27,8 +27,10 @@ const nameAt = (s) => families[s.fi].versions[s.vi].path;
 const turn = ['designs/r2/tag-other-icon.png', 'designs/r2/tag-other-icon-v2.png', 'designs/r1/mock.png'];
 
 describe('the pictures the big view steps through', () => {
-  it('are each version the turn draws, the v1 and the v2 as two steps', () => {
-    expect(stepsThrough(families, turn).map(nameAt)).toEqual(turn);
+  // Since 2026-11-08 versions are one step, at the newest the turn drew
+  // (the-arrows-in-a-picture-walk-the-agents-latest-pictures-never-their-versions).
+  it('are each picture the turn draws, its v1 and v2 as one step', () => {
+    expect(stepsThrough(families, turn).map(nameAt)).toEqual(['designs/r2/tag-other-icon-v2.png', 'designs/r1/mock.png']);
   });
 
   it('follow the turn, not the order the thread first named each file', () => {
@@ -54,10 +56,8 @@ describe('an arrow press', () => {
   const steps = stepsThrough(families, turn);
   const opened = whereAPressLands(families, { path: 'designs/r2/tag-other-icon.png' });
 
-  it('goes from the v1 to the v2 beside it, then on to the next picture', () => {
-    const second = nextStep(families, steps, opened, 1);
-    expect(nameAt(second)).toBe('designs/r2/tag-other-icon-v2.png');
-    expect(nameAt(nextStep(families, steps, second, 1))).toBe('designs/r1/mock.png');
+  it('goes from the v1 past the v2 beside it, on to the next picture', () => {
+    expect(nameAt(nextStep(families, steps, opened, 1))).toBe('designs/r1/mock.png');
   });
 
   it('goes back the same way, and stops at either end', () => {
@@ -68,7 +68,7 @@ describe('an arrow press', () => {
   });
 
   it('keeps its place in the turn after the version arrows moved off it', () => {
-    const mockFamily = steps[2].fi;
+    const mockFamily = steps[1].fi;
     expect(nameAt(nextStep(families, steps, { fi: mockFamily, vi: 99 }, -1))).toBe('designs/r2/tag-other-icon-v2.png');
   });
 
@@ -106,8 +106,8 @@ describe('a link in the words opens the picture its own turn draws', () => {
 
   it('steps through that turn, even when a later turn draws the same file', () => {
     const { pictures, start } = picturesFor(page, 'designs/r1/mock.png', link);
-    expect(pictures.map((p) => p.path)).toEqual(['designs/r2/tag-other-icon.png', 'designs/r2/tag-other-icon-v2.png', 'designs/r1/mock.png']);
-    expect(start).toBe(2);
+    expect(pictures.map((p) => p.path)).toEqual(['designs/r2/tag-other-icon-v2.png', 'designs/r1/mock.png']);
+    expect(start).toBe(1);
   });
 
   it('still finds the picture in another turn when its own draws none', () => {

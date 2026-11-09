@@ -37,8 +37,8 @@ describe('the browser a hidden drive starts on a Mac', () => {
     expect(findChrome('darwin', {}, undefined, () => [exe])).toBe(exe);
   });
 
-  it('is Google Chrome when there is no Chrome for Testing', () => {
-    expect(findChrome('darwin', {}, undefined, () => [])).toBe(MAC);
+  it('is Google Chrome when there is no Chrome for Testing or headless shell', () => {
+    expect(findChrome('darwin', {}, undefined, () => [], () => [])).toBe(MAC);
   });
 
   it('is not changed on Linux by a Chrome for Testing on disk', () => {

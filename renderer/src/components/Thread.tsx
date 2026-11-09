@@ -56,6 +56,7 @@ import {
   conversationGap, fileInChange, gapIndex, groupWork, outputCut, runFailures, runOverflow, runSummary,
 } from '../../../shared/agents.mjs';
 import type { AgentEvent, AgentTurn, AgentVoice, AgentWork } from '../types';
+import type { ThreadPlace } from '../thread-place';
 import { voiceName } from '../../../shared/agent-voice.mjs';
 
 // How much of an output stands open before she asks for the rest. The chosen
@@ -113,7 +114,10 @@ export interface CodeInThread {
   open: (path: string) => void;
 }
 
-export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, name, nameOf, landOn, md, code, tail, chat = false, reactions, onReact, onQuote, onHandToAgent, replies, openThread = null, onOpenThread, freshThreads, onEdit, onMarkUnread, onCopied, onMove, seenUnder = null }: {
+export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, name, nameOf, landOn, kept = null, onFolds, md, code, tail, chat = false, reactions, onReact, onQuote, onHandToAgent, replies, openThread = null, onOpenThread, freshThreads, onEdit, onMarkUnread, onCopied, onMove, seenUnder = null }: {
+  /** The steps she had open when she left this conversation, to open again. */
+  kept?: Pick<ThreadPlace, 'runs' | 'lines'> | null;
+  onFolds?: (runs: string[], lines: [string, number][]) => void;
   // CUT THE AGENT'S CURRENT STEP so a message of hers that is waiting on it is
   // answered now (w-f37a34def6). Absent where nothing can be cut.
   onSendNow?: () => unknown;
@@ -232,9 +236,11 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   };
 
   useEffect(() => {
-    setOpen(new Map());
-    setRunsOpen(new Set());
-  }, [landOn]);
+    setOpen(new Map(kept?.lines ?? []));
+    setRunsOpen(new Set(kept?.runs ?? []));
+  }, [landOn]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Not keyed on landOn, for the reason ItemThread gives.
+  useEffect(() => { onFolds?.([...runsOpen], [...open]); }, [open, runsOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A found line that is not drawn is in the middle this thread left out.
   useEffect(() => {
