@@ -1,0 +1,110 @@
+/* THE SETUP BESIDE THE APP (SetupSplit.tsx). Every colour is the app's own
+   token; every class is ss- prefixed. */
+
+/* The app itself, moved into the right panel and running off its edges. */
+:root[data-setup] #root {
+  position: fixed; z-index: 2147482999;
+  left: calc(var(--ss-left) + 56px); top: 92px;
+  width: 1120px; height: 1300px;
+  transform: scale(var(--ss-scale, .8)); transform-origin: 0 0;
+  border-radius: 16px; overflow: hidden; pointer-events: none;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 10%, transparent), 0 30px 80px rgba(30, 40, 40, .16), 0 4px 14px rgba(30, 40, 40, .06);
+}
+
+.setup-split {
+  position: fixed; inset: 0; z-index: 2147482998;
+  font-family: 'Geist', 'Avenir Next', -apple-system, BlinkMacSystemFont, 'DejaVu Sans', sans-serif; font-size: 15px; line-height: 1.4;
+  color: var(--text); background: var(--bg); -webkit-font-smoothing: antialiased;
+  --ss-ground: var(--bg);
+}
+/* Light is white, not the app's off-white: the approved design has no grey anywhere. */
+:root[data-theme="light"] .setup-split { --ss-ground: #fff; background: #fff; }
+.setup-split * { box-sizing: border-box; }
+.setup-split button, .setup-split input { font: inherit; color: inherit; }
+.setup-split .ss-left { position: absolute; left: 0; top: 0; bottom: 0; width: var(--ss-left); z-index: 2147483001; background: var(--ss-ground); }
+.setup-split .ss-right { position: absolute; left: var(--ss-left); right: 16px; top: 16px; bottom: 16px; border-radius: 16px;
+  background: var(--sky-frame, color-mix(in srgb, #5f8f74 14%, var(--bg))); }
+/* The light green sky's own frame, so a window without a sky still sits on the approved green. */
+:root[data-theme="light"] .setup-split .ss-right { background: var(--sky-frame, #e3e8e5); }
+.setup-split .ss-cap { position: absolute; left: 56px; top: 40px; font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); }
+
+.setup-split .ss-brand { position: absolute; left: 48px; top: 40px; display: flex; align-items: center; gap: 10px; font-size: 15px; letter-spacing: -0.01em; }
+.setup-split .ss-steps { position: absolute; right: 48px; top: 45px; display: flex; align-items: center; gap: 5px; }
+.setup-split .ss-steps i { width: 16px; height: 2px; background: color-mix(in srgb, var(--text) 12%, transparent); }
+.setup-split .ss-steps i.ss-was { background: color-mix(in srgb, var(--text) 40%, transparent); }
+.setup-split .ss-steps i.ss-is { background: var(--text); }
+.setup-split .ss-steps span { margin-left: 12px; font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); }
+
+.setup-split .ss-body { position: absolute; left: clamp(48px, 8vw, 136px); right: clamp(40px, 7vw, 136px); max-width: 560px; top: 50%; transform: translateY(-50%);
+  animation: ss-in .4s cubic-bezier(.2, .7, .2, 1) both; }
+@keyframes ss-in { from { opacity: 0; transform: translateY(calc(-50% + 8px)); } to { opacity: 1; transform: translateY(-50%); } }
+.setup-split .ss-h { margin: 0 0 28px; font-size: 28px; line-height: 36px; letter-spacing: -0.014em; font-weight: 400; color: var(--text-faint); }
+.setup-split .ss-h b { display: block; font-weight: 500; color: var(--text); }
+
+.setup-split .ss-list { border: 1px solid color-mix(in srgb, var(--text) 10%, transparent); border-radius: 10px; background: var(--ss-ground); overflow: hidden;
+  box-shadow: 0 1px 2px rgba(30, 22, 36, .04); max-height: 52vh; overflow-y: auto; }
+.setup-split .ss-row { display: grid; grid-template-columns: 32px 1fr auto; column-gap: 14px; align-items: center; min-height: 62px; padding: 12px 18px; }
+.setup-split .ss-row + .ss-row { border-top: 1px solid color-mix(in srgb, var(--text) 6%, transparent); }
+.setup-split .ss-row.ss-press { cursor: pointer; }
+.setup-split .ss-row.ss-press:hover, .setup-split .ss-row.ss-on { background: color-mix(in srgb, var(--text) 3%, transparent); }
+.setup-split .ss-face { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 500;
+  background: color-mix(in srgb, var(--text) 6%, transparent); color: var(--text); }
+.setup-split .ss-face.ss-dash, .setup-split .ss-ai.ss-dash { background: transparent; border: 1px dashed color-mix(in srgb, var(--text) 22%, transparent); color: var(--text-faint); }
+.setup-split .ss-ai { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; background: var(--ss-ground); border: 1px solid color-mix(in srgb, var(--text) 14%, transparent); }
+.setup-split .ss-logo { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; background: var(--ss-ground); border: 1px solid color-mix(in srgb, var(--text) 12%, transparent); }
+.setup-split .ss-ok { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--text); color: var(--bg); }
+.setup-split .ss-text { min-width: 0; }
+.setup-split .ss-name { display: block; font-size: 14.5px; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.setup-split .ss-sub { display: block; font-size: 13px; line-height: 18px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.setup-split .ss-end { display: flex; align-items: center; gap: 7px; font-size: 13px; white-space: nowrap; }
+.setup-split .ss-end > span { display: inline-flex; align-items: center; gap: 7px; }
+.setup-split .ss-dim { color: var(--text-dim); }
+.setup-split .ss-faint { color: var(--text-faint); }
+.setup-split .ss-check { width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid color-mix(in srgb, var(--text) 22%, transparent); display: grid; place-items: center; }
+.setup-split .ss-check.ss-on { background: var(--text); border-color: var(--text); color: var(--bg); }
+.setup-split .ss-input { grid-column: 2 / -1; border: 0; outline: 0; background: transparent; font-size: 14.5px; min-width: 0; }
+.setup-split .ss-input::placeholder { color: var(--text-faint); }
+.setup-split .ss-strip { width: 64px; height: 32px; border-radius: 7px; overflow: hidden; display: block; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 10%, transparent); }
+.setup-split .ss-strip canvas { width: 100%; height: 100%; display: block; }
+.setup-split .ss-strip-light { background: #fff; }
+.setup-split .ss-strip-dark { background: radial-gradient(ellipse 80% 70% at 75% 25%, rgba(238, 96, 24, .18), transparent 70%), #1a1817; }
+.setup-split .ss-row:has(.ss-strip) { grid-template-columns: 64px 1fr auto; }
+.ss-picker { position: fixed; inset: 0; z-index: 2147483005; }
+.setup-split .ss-empty { padding: 16px 18px; color: var(--text-faint); font-size: 13.5px; }
+
+.setup-split .ss-acts { display: flex; align-items: center; gap: 22px; margin-top: 28px; }
+.setup-split .ss-go { display: inline-flex; align-items: center; gap: 12px; height: 40px; padding: 0 12px 0 18px; border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
+  border-radius: 8px; background: var(--ss-ground); font-size: 14.5px; cursor: pointer; box-shadow: 0 1px 2px rgba(30, 22, 36, .06); }
+.setup-split .ss-go:hover:not(:disabled) { background: color-mix(in srgb, var(--text) 3%, var(--bg)); }
+.setup-split .ss-go:disabled { color: var(--text-faint); cursor: default; box-shadow: none; }
+.setup-split .ss-quiet, .setup-split .ss-back { border: 0; background: none; padding: 0; font-size: 14.5px; color: var(--text-dim); cursor: pointer; }
+.setup-split .ss-quiet:hover, .setup-split .ss-back:hover { color: var(--text); }
+.setup-split .ss-back { position: absolute; left: 0; bottom: -64px; }
+.setup-split .ss-note { margin: 14px 0 0 2px; font-size: 13px; color: var(--text-faint); }
+.setup-split .ss-error { margin: 14px 0 0 2px; font-size: 13px; color: var(--text); }
+.setup-split .ss-keys { display: inline-flex; gap: 4px; }
+.setup-split .ss-key { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 6px; font-size: 12px; font-weight: 500; color: var(--text-dim);
+  background: var(--ss-ground); border: 1px solid color-mix(in srgb, var(--text) 14%, transparent); box-shadow: 0 1px 0 color-mix(in srgb, var(--text) 12%, transparent); }
+
+/* THE TOUR'S STEP LIST, beside the app while the tutorial runs (TourList in Tour.tsx). */
+:root[data-tour-list] #root { margin-left: var(--tl-w); width: calc(100vw - var(--tl-w)); }
+.tour-list { position: fixed; left: 0; top: 0; bottom: 0; width: var(--tl-w); z-index: 50; background: var(--bg);
+  border-right: 1px solid color-mix(in srgb, var(--text) 8%, transparent); color: var(--text);
+  font-family: 'Geist', 'Avenir Next', -apple-system, BlinkMacSystemFont, 'DejaVu Sans', sans-serif; }
+:root[data-theme="light"] .tour-list { background: #fff; border-right-color: transparent; }
+.tour-list .tl-brand { position: absolute; left: 36px; top: 40px; display: flex; align-items: center; gap: 10px; font-size: 15px; letter-spacing: -0.01em; }
+.tour-list .tl-count { position: absolute; right: 32px; top: 44px; font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); }
+.tour-list .tl-body { position: absolute; left: 36px; right: 32px; top: 50%; transform: translateY(-50%); }
+.tour-list .ss-h { margin: 0 0 22px; font-size: 22px; line-height: 29px; letter-spacing: -0.012em; font-weight: 400; color: var(--text-faint); }
+.tour-list .ss-h b { display: block; font-weight: 500; color: var(--text); }
+.tour-list .ss-list { border: 1px solid color-mix(in srgb, var(--text) 10%, transparent); border-radius: 10px; overflow: hidden; }
+.tour-list .ss-row { display: grid; grid-template-columns: 26px 1fr auto; column-gap: 12px; align-items: center; min-height: 50px; padding: 8px 16px; font-size: 14px; }
+.tour-list .ss-row + .ss-row { border-top: 1px solid color-mix(in srgb, var(--text) 6%, transparent); }
+.tour-list .ss-row.ss-on { background: color-mix(in srgb, var(--text) 3%, transparent); }
+.tour-list .ss-face { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; background: color-mix(in srgb, var(--text) 6%, transparent); }
+.tour-list .ss-face.ss-ok { background: var(--text); color: var(--bg); }
+.tour-list .ss-keys { display: inline-flex; gap: 4px; }
+.tour-list .ss-key { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 6px; font-size: 12px; font-weight: 500; color: var(--text-dim);
+  border: 1px solid color-mix(in srgb, var(--text) 14%, transparent); box-shadow: 0 1px 0 color-mix(in srgb, var(--text) 12%, transparent); }
+.tour-list .tl-skip { margin-top: 22px; border: 0; background: none; padding: 0; font: inherit; font-size: 14px; color: var(--text-dim); cursor: pointer; }
+.tour-list .tl-skip:hover { color: var(--text); }

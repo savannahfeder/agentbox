@@ -5,7 +5,7 @@ import {updateFixture} from './agent-update-fixture';
 // developed, reviewed, and screenshotted without a live store or any agents.
 
 import type { Person, TeamBillingDetails } from './types';
-import type { AccountUsageReading, AgentConversation, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, FilesUploaded, TeamMessageFile, ThreadEditPatch, UpdateState, Usage, UsageLimit, WorkItem } from './types';
+import type { AccountUsageReading, AgentConversation, AgentUpdate, AgentUpdateAction, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, ProductDashboard, ProjectSettings, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, TerminalAction, TerminalAnswer, TerminalAsk, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, FilesUploaded, TeamMessageFile, ThreadEditPatch, LiveRoomTicket, UpdateState, Usage, UsageLimit, WorkItem, WorkspaceSettings } from './types';
 import type { LedgerLine } from './thread-history';
 import type { AgentFile as AgentFileRow } from './onboarding';
 import type { AgentFolder, SessionThread } from './agent-import-card';
@@ -14,7 +14,18 @@ import { fixtureAgents, fixtureSnapshot, fixtureDashboards, fixtureRepeats, fixt
 import { fixtureEngineWorld, fixtureEngineSettings, fixtureSecondEngine } from './fixtures';
 import { fixtureFolders } from './fixtures';
 import { NAME, Name } from '../../shared/product-name.mjs';
-import type { CarryState } from '../../shared/carried-files.mjs';
+import type { CarryState } from '../../shared/carried-files.mts';
+
+// Preload calls the bridge type in types.ts does not list yet.
+interface LaterBridge {
+  liveRoom?(p: { product: string; project?: string | null; name: string }): Promise<LiveRoomTicket | null>;
+  gitHubSignIn?(p: { token: string }): Promise<{ ok: boolean; again?: string[]; error?: string }>;
+  gitHubBrowserSignIn?(): Promise<{ ok: boolean; code?: string; url?: string; error?: string }>;
+  signInAnswer?(p: { product: string; id: string; ask: string; said: 'signed-in' | 'skipped' | 'landed'; url?: string }): Promise<{ ok: boolean; error?: string }>;
+  cloudAccountPay?(p: { plan: 'pro' | 'plus' | 'max' | 'team' }): Promise<{ ok: boolean; where?: 'checkout' | 'billing'; error?: string; message?: string }>;
+  cloudAccountTeamBilling?(): Promise<{ ok: boolean; owner?: boolean } & Partial<TeamBillingDetails>>;
+}
+const laterBridge = () => window.zero as (Omit<NonNullable<Window['zero']>, keyof LaterBridge> & LaterBridge) | undefined;
 
 export interface FileLinkAsk { product: string; thread: string; src: string }
 /** `current`: the link holds the copy of the file on screen now. */
@@ -30,9 +41,9 @@ import { USAGE_SAME_AS_ANOTHER, USAGE_UNREADABLE } from '../../shared/usage.mts'
 import { accountSentence } from '../../shared/spawn-trouble.mts';
 import { MOVE_SAY } from '../../shared/where-it-runs-from.mts';
 import { cardsInFront } from '../../shared/which-card-is-in-front.mts';
-import { snapshotReader } from '../../shared/snapshot-delta.mjs';
-import { traceReader } from '../../shared/trace-delta.mjs';
-import { withoutFileHomes } from '../../shared/file-home.mjs';
+import { snapshotReader } from '../../shared/snapshot-delta.mts';
+import { traceReader } from '../../shared/trace-delta.mts';
+import { withoutFileHomes } from '../../shared/file-home.mts';
 // THE SECOND FRONT DOOR, AND IT HAS TO BE BUILT BEFORE THE LINE BELOW RUNS.
 // `useFixtures` reads `window.zero` once, at module load, and on the desktop
 // preload.cjs has already put it there. In a browser tab nothing has, so this
@@ -143,7 +154,9 @@ const emptySettings: Settings = {
 // moves stays moved while she looks at the rest of the screen. It is memory and
 // nothing else: there is no disk under fixtures, and no answer from here ever
 // claims a save.
-const fixtureSettingsState: any = structuredClone(fixtureSettings);
+// Read as Settings, though the fixture leaves out fields a real read carries
+// (codexMode, diagnostics, a project's logo, an account's state and trouble).
+const fixtureSettingsState: Settings = structuredClone<object>(fixtureSettings) as Settings;
 // AND WHICH OF THE FOUR MACHINES THOSE SETTINGS BELONG TO. Applied once, here,
 // so that a switch she moves on the screen moves against the world she asked
 // for -- including the Coding agent row itself, which is a real control in
@@ -193,7 +206,7 @@ if (params.get('memory')) {
       heavy: held ? 0 : 1, waiting: held ? 3 : 0, pressure: held ? 'tight' : 'normal', usedPct: held ? 74 : 48,
       asked: 488, waited: 36, refused: 0, holding: held,
     },
-  } as any;
+  } as WorkspaceSettings['memoryGate'];
 }
 // ?account=org-blocked or ?account=subscription-ended: the second account
 // picked as In use and unable to run, so the usage box that says why can be seen.
@@ -292,7 +305,8 @@ function fixtureCodexAccountUsage(): AccountUsageReading[] {
   ];
 }
 
-function fixtureWrite(scope: 'project' | 'workspace', p: any): Settings {
+type AccountPick = { engine?: string; profile?: string };
+function fixtureWrite(scope: 'project' | 'workspace', p: { product?: string; key: string; value: unknown }): Settings {
   const w = fixtureSettingsState.workspace;
   if (scope === 'workspace') {
     if (p.key === 'sessionsAtOnce') {
@@ -308,15 +322,15 @@ function fixtureWrite(scope: 'project' | 'workspace', p: any): Settings {
     } else if (p.key === 'activeAccount') {
       // The account picked is the one marked chosen, as main/settings.mts
       // answers it, so the In use row can be seen in a preview.
-      const list = p.value?.engine === 'codex' ? w.codex?.accounts ?? [] : w.accounts;
-      for (const a of list) a.chosen = a.profile === p.value?.profile;
-    } else w[p.key] = p.value;
+      const list = (p.value as AccountPick | null)?.engine === 'codex' ? w.codex?.accounts ?? [] : w.accounts;
+      for (const a of list) a.chosen = a.profile === (p.value as AccountPick | null)?.profile;
+    } else (w as WorkspaceSettings & Record<string, unknown>)[p.key] = p.value;
   } else {
-    const project = fixtureSettingsState.projects.find((x: any) => x.slug === p.product);
-    if (project) project[p.key] = p.value;
+    const project = fixtureSettingsState.projects.find((x) => x.slug === p.product);
+    if (project) (project as ProjectSettings & Record<string, unknown>)[p.key] = p.value;
   }
   fixtureSettingsState.workspace.projectsWithInstructions =
-    fixtureSettingsState.projects.filter((x: any) => x.instructions.trim()).length;
+    fixtureSettingsState.projects.filter((x) => x.instructions.trim()).length;
   return structuredClone(fixtureSettingsState) as Settings;
 }
 
@@ -463,7 +477,7 @@ export const api = {
       // be looked at.
       if (params.has('stale')) {
         base.restartNeeded = {
-          files: ['main/supervisor.mts', 'main/ipc.mts', 'preload.cjs', 'shared/rank.mjs'],
+          files: ['main/supervisor.mts', 'main/ipc.mts', 'preload.cjs', 'shared/rank.mts'],
           since: Date.now() - 2.9 * 24 * 3_600_000,
         };
       }
@@ -495,7 +509,7 @@ export const api = {
           accounts: [
             {
               // Read two hours ago, as the reported screenshot's was; the same login here was read since.
-              engine: 'claude', key: 'a1', name: read ? 'you@example.com' : null, plan: read ? 'Max 20x' : null, ready: false, state: 'limited' as any, limitedUntil: until.getTime(),
+              engine: 'claude', key: 'a1', name: read ? 'you@example.com' : null, plan: read ? 'Max 20x' : null, ready: false, state: 'limited' as const, limitedUntil: until.getTime(),
               profile: read ? fixtureSettingsState.workspace.accounts[0]?.profile ?? null : null, readAt: read ? Date.now() - 2 * 3_600_000 : null,
               limits: read ? [
                 { span: 'session', qualifier: null, name: 'This session', percent: 100, resetsText: null, resetsOn: null, resetsAt: until.getTime(), zone: null },
@@ -690,12 +704,12 @@ export const api = {
       if (params.has('agentUnsure')) return { ok: false, reason: 'That agent is not listening any more.' };
       return { ok: true, delivered: true, working: true };
     }
-    return (window.zero as any)?.agentReply?.(p) ?? { ok: false, reason: 'The message could not be handed over.' };
+    return window.zero?.agentReply?.(p) ?? { ok: false, reason: 'The message could not be handed over.' };
   },
 
   async agentReveal(p: { pid: number }): Promise<{ ok: boolean; name?: string; reason?: string }> {
     if (useFixtures) return { ok: true, name: 'CNVS' };
-    return (window.zero as any)?.agentReveal?.(p) ?? { ok: false, reason: `${Name} cannot tell which window it is running in.` };
+    return window.zero?.agentReveal?.(p) ?? { ok: false, reason: `${Name} cannot tell which window it is running in.` };
   },
 
   // WHAT THE TWO OF THEM SAID, read only when she presses the line. The main
@@ -704,15 +718,15 @@ export const api = {
   // middle back too.
   async agentConversation(p: { pid: number; sessionId: string | null; cwd: string; whole?: boolean }): Promise<AgentConversation> {
     if (useFixtures) return fixtureConversation();
-    return (window.zero as any)?.agentConversation?.(p) ?? { ok: false, reason: 'That conversation could not be read.' };
+    return window.zero?.agentConversation?.(p) ?? { ok: false, reason: 'That conversation could not be read.' };
   },
 
   // The session traces behind the working notes. It comes through the seam
   // like everything else, so the notes can be built, reviewed and screenshotted
   // from fixtures instead of only against a live fleet.
   async sessionTrace(p: { product: string; id: string; whole?: boolean }):Promise<{ sessions: Array<{ startedAt: number; text: string }> }> {
-    if (useFixtures) return { sessions: (fixtureTraces as any)[p.id] ?? [] };
-    const zero = window.zero as any;
+    if (useFixtures) return { sessions: fixtureTraces[p.id] ?? [] };
+    const zero = window.zero;
     if (!zero?.sessionTrace) return { sessions: [] };
     // Read once and kept by the thread page, so the newest logs' copy stays as it is.
     if (p.whole) return (await zero.sessionTrace(p)) ?? { sessions: [] };
@@ -740,7 +754,7 @@ export const api = {
     if (useFixtures && p.src === 'artifact-layout-sample.md') return { ok: true, opened: p.src };
     if (useFixtures && p.src === tableSamplePath) return { ok: true, opened: p.src };
     if (useFixtures && p.product === 'onboard' && ['designs/w-n13/the-first-row.html', '/fixtures/onboard/designs/w-n13/the-first-row.html'].includes(p.src)) return { ok: true, opened: p.src, url: '/fixtures/onboard/designs/w-n13/the-first-row.html' };
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.openArtifact) return { ok: false, error: `quit and reopen ${NAME} to open documents here` };
     return zero.openArtifact({ ...p, mode: 'resolve' });
   },
@@ -748,47 +762,47 @@ export const api = {
   async readDoc(p: { product: string; src: string; thread?: string }): Promise<{ ok: boolean; text?: string; mtime?: number; error?: string; coming?: boolean; waits?: boolean; carry?: CarryState }> {
     if (useFixtures && p.src === 'artifact-layout-sample.md') return {ok:true,text:artifactSampleNotes,mtime:0};
     if (useFixtures && p.src === tableSamplePath) return { ok: true, text: tableSample, mtime: 0 };
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.readDoc) return { ok: false, error: `quit and reopen ${NAME} to open documents here` };
     return zero.readDoc(p);
   },
 
-  /** A link anyone can open, to one of this person's files (main/file-link.mjs). */
+  /** A link anyone can open, to one of this person's files (main/file-link.mts). */
   async fileLink(p: FileLinkAsk): Promise<FileLinkState> {
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.fileLink) return { ok: false, error: 'not here' };
     return zero.fileLink(p);
   },
   async fileLinkShare(p: FileLinkAsk): Promise<FileLinkState> {
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.fileLinkShare) return { ok: false, error: `quit and reopen ${NAME} to share files` };
     return zero.fileLinkShare(p);
   },
   async fileLinkStop(p: { token: string }): Promise<{ ok: boolean; error?: string }> {
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.fileLinkStop) return { ok: false, error: `quit and reopen ${NAME} to share files` };
     return zero.fileLinkStop(p);
   },
   /** Every live link of this person's, for the list of what they made public. */
   async fileLinks(): Promise<{ ok: boolean; error?: string; links?: PublicLink[] }> {
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.fileLinks) return { ok: false, error: 'not here' };
     return zero.fileLinks();
   },
   async fileLinkComments(p: { token: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }> {
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.fileLinkComments) return { ok: false, error: 'not here' };
     return zero.fileLinkComments(p);
   },
   async fileLinkComment(p: { token: string; text: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }> {
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.fileLinkComment) return { ok: false, error: `quit and reopen ${NAME} to answer comments` };
     return zero.fileLinkComment(p);
   },
 
   /** "Try again" on a file in a conversation that was not delivered. */
   async retryFile(p: { product: string; src: string }): Promise<boolean> {
-    const zero = window.zero as any;
+    const zero = window.zero;
     return zero?.retryFile ? !!(await zero.retryFile(p)) : false;
   },
 
@@ -800,7 +814,7 @@ export const api = {
   async codeChange(p: { product: string; src: string }): Promise<{ ok: boolean; change?: unknown; error?: string }> {
     if (useFixtures && p.src === 'review-bundle.change') return {ok:true,change:reviewSampleChange};
     if (useFixtures && p.src === 'artifact-layout-sample.change') return {ok:true,change:artifactSampleChange};
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.codeChange) return { ok: false, error: `quit and reopen ${NAME} to open changes here` };
     return zero.codeChange(p);
   },
@@ -809,19 +823,26 @@ export const api = {
   // hunks, so the whole file comes back here and the splice happens in
   // renderer/src/code-edit.ts before anything is written.
   async codeFile(p: { product: string; src: string; path: string }): Promise<{ ok: boolean; text?: string; mtime?: number; path?: string; error?: string }> {
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.codeFile) return { ok: false, error: `quit and reopen ${NAME} to edit files here` };
     return zero.codeFile(p);
   },
 
   async saveCodeFile(p: { product: string; src: string; path: string; text: string; mtime: number }): Promise<{ ok: boolean; mtime?: number; path?: string; stale?: boolean; error?: string }> {
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.saveCodeFile) return { ok: false, error: `quit and reopen ${NAME} to save this file` };
     return zero.saveCodeFile(p);
   },
 
+  /** The live room a file opens in with teammates, or null when nobody else can open it. */
+  async liveRoom(p: { product: string; project?: string | null; name: string }): Promise<LiveRoomTicket | null> {
+    const zero = laterBridge();
+    if (!zero?.liveRoom) return null;
+    return zero.liveRoom(p).catch(() => null);
+  },
+
   async writeDoc(p: { product: string; src: string; text: string; mtime: number; thread?: string }): Promise<{ ok: boolean; mtime?: number; error?: string; stale?: boolean }> {
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.writeDoc) return { ok: false, error: `quit and reopen ${NAME} to save this file` };
     return zero.writeDoc(p);
   },
@@ -831,13 +852,13 @@ export const api = {
   // preload has neither, and then the panel simply does not draw the note
   // rather than offering a box that quietly throws the user's words away.
   async railNote(product: string): Promise<{ ok: boolean; text?: string; mtime?: number; error?: string }> {
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.railNote) return { ok: false, error: `quit and reopen ${NAME} to keep a note here` };
     return zero.railNote({ product });
   },
 
   async saveRailNote(p: { product: string; text: string }): Promise<{ ok: boolean; mtime?: number; error?: string }> {
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.saveRailNote) return { ok: false, error: `quit and reopen ${NAME} to save this note` };
     return zero.saveRailNote(p);
   },
@@ -845,7 +866,7 @@ export const api = {
   // Hand a file to the operating system, the way every link on a card already
   // does. The pane's first mark, and what a png or a pdf still does.
   async openArtifactExternally(p: { product: string; src: string }): Promise<{ ok: boolean; error?: string }> {
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.openArtifact) { window.open(p.src, '_blank'); return { ok: true }; }
     return zero.openArtifact(p);
   },
@@ -862,25 +883,26 @@ export const api = {
   // thread's history as it stood when another was filed from it is not cut off
   // by the 400 newest lines (renderer/src/recap.ts, recapFor).
   async itemHistory(p: { product: string; id: string; before?: number }): Promise<{ ok: boolean; lines: LedgerLine[]; error?: string }> {
-    if (useFixtures) return { ok: true, lines: (fixtureHistory as any)[p.id] ?? [] };
-    const zero = window.zero as any;
+    if (useFixtures) return { ok: true, lines: fixtureHistory[p.id] ?? [] };
+    const zero = window.zero;
     if (!zero?.itemHistory) return { ok: false, lines: [], error: `quit and reopen ${NAME} to see this` };
     return zero.itemHistory(p);
   },
 
-  async dashboard(slug: string): Promise<any> {
-    if (mockFixtures) return (fixtureMockDashboards as any)[slug] ?? null;
-    if (useFixtures) return (fixtureDashboards as any)[slug] ?? null;
+  async dashboard(slug: string): Promise<ProductDashboard | null> {
+    if (mockFixtures) return (fixtureMockDashboards as Record<string, ProductDashboard>)[slug] ?? null;
+    if (useFixtures) return (fixtureDashboards as Record<string, ProductDashboard>)[slug] ?? null;
     return window.zero!.dashboard(slug);
   },
 
-  async agentUpdate(engine:string,action:'check'|'recheck'|'start'|'status'|'refresh'):Promise<any>{
+  // Not quite true: `refresh` answers `true`, and the phone's site null, which AgentUpdates.tsx reads inside a try.
+  async agentUpdate(engine:string,action:AgentUpdateAction):Promise<AgentUpdate>{
     if(useFixtures)return params.has('modelUpdates')?modelUpdateFixture.action(engine,action):{engine,state:'current'};
     if(!window.zero?.agentUpdate)return {engine,state:'unknown'};
-    return window.zero.agentUpdate({engine,action});
+    return window.zero.agentUpdate({engine,action}) as Promise<AgentUpdate>;
   },
-  async terminal(p: Parameters<NonNullable<Window['zero']>['terminal']>[0]): Promise<any> {
-    if(useFixtures&&p.product==='@agent-update'&&params.has('modelUpdates'))return modelUpdateFixture.terminal(p);
+  async terminal<A extends TerminalAction>(p: TerminalAsk<A>): Promise<TerminalAnswer<A>> {
+    if(useFixtures&&p.product==='@agent-update'&&params.has('modelUpdates'))return modelUpdateFixture.terminal(p) as TerminalAnswer<A>;
     if(useFixtures) throw new Error('Terminal requires the desktop app and a real task.');
     if(!window.zero?.terminal) throw new Error(`Restart ${NAME} to use the terminal.`);
     return window.zero.terminal(p);
@@ -962,7 +984,7 @@ export const api = {
     if (!window.zero?.teamThreadWork) return { shared: false, lines: [], earlier: 0, product: null, dir: null };
     return window.zero.teamThreadWork(p);
   },
-  // Lines, files and comments inside threads (main/everything-found.mjs).
+  // Lines, files and comments inside threads (main/everything-found.mts).
   async findInThreads(p: { query: string; limit?: { lines?: number; files?: number; comments?: number } }): Promise<FoundInThreads> {
     const none: FoundInThreads = { lines: [], files: [], comments: [], total: { lines: 0, files: 0, comments: 0 } };
     if (!window.zero?.findInThreads) return none;
@@ -1133,7 +1155,7 @@ export const api = {
     return window.zero!.compose(p);
   },
 
-  /** Who takes a thread sent to Auto: 'agent' or a teammate as 'mate:<id>' (shared/auto-route.mjs). */
+  /** Who takes a thread sent to Auto: 'agent' or a teammate as 'mate:<id>' (shared/auto-route.mts). */
   async routeThread(p: { product: string; id: string; to: string }): Promise<void> {
     if (useFixtures || !window.zero?.routeThread) return;
     await window.zero.routeThread(p);
@@ -1159,9 +1181,7 @@ export const api = {
   // handed back by id so the walk knows which three rows are its own.
   async firstRunExamples(p: { product: string }): Promise<{ ids: string[] } | null> {
     if (useFixtures) return null;
-    const zero = (window as unknown as {
-      zero?: { firstRunExamples?: (p: { product: string }) => Promise<{ ids: string[] }> };
-    }).zero;
+    const zero = window.zero;
     if (!zero?.firstRunExamples) return null;
     return zero.firstRunExamples(p);
   },
@@ -1175,9 +1195,7 @@ export const api = {
   // walk carries on in the project they made rather than stopping.
   async firstRunPractice(): Promise<{ slug: string; examples: string[]; backdrop?: string[] } | null> {
     if (useFixtures) return null;
-    const zero = (window as unknown as {
-      zero?: { firstRunPractice?: () => Promise<{ slug: string; examples: string[]; backdrop?: string[] }> };
-    }).zero;
+    const zero = window.zero;
     if (!zero?.firstRunPractice) return null;
     return zero.firstRunPractice();
   },
@@ -1187,9 +1205,7 @@ export const api = {
   // remove directories from somebody's store.
   async firstRunPracticeEnd(): Promise<void> {
     if (useFixtures) return;
-    const zero = (window as unknown as {
-      zero?: { firstRunPracticeEnd?: () => Promise<unknown> };
-    }).zero;
+    const zero = window.zero;
     try { await zero?.firstRunPracticeEnd?.(); } catch { /* the walk still ends */ }
   },
 
@@ -1260,10 +1276,10 @@ export const api = {
   // ledger. Nothing is sent and no process is touched — the moment says when
   // her inbox raises the agent again, and 0 brings it back now. The key is the
   // agent's, not the row's, because the row's id carries a pid and a pid is not
-  // an identity (shared/agents.mjs).
+  // an identity (shared/agents.mts).
   async scheduleAgent(p: { key: string; runAt: number }): Promise<{ ok: boolean; runAt: number }> {
     if (useFixtures) return { ok: true, runAt: p.runAt };
-    const out = await (window.zero as any)?.scheduleAgent?.(p);
+    const out = await window.zero?.scheduleAgent?.(p);
     // The picker announces AFTER the write, so a bridge that is not there has
     // to fail loudly rather than let a toast promise a moment nobody kept.
     if (!out?.ok) throw new Error('the app could not keep that moment');
@@ -1274,13 +1290,13 @@ export const api = {
   // is in somebody else's terminal — and the toast says so.
   async unreplyAgent(p: { key: string }): Promise<{ ok: boolean; repliedAt: number }> {
     if (useFixtures) return { ok: true, repliedAt: 0 };
-    const out = await (window.zero as any)?.unreplyAgent?.(p);
+    const out = await window.zero?.unreplyAgent?.(p);
     return out ?? { ok: false, repliedAt: 0 };
   },
 
   async closeAgent(p: { key: string; through: number }): Promise<{ ok: boolean; doneThrough: number }> {
     if (useFixtures) return { ok: true, doneThrough: p.through };
-    const out = await (window.zero as any)?.closeAgent?.(p);
+    const out = await window.zero?.closeAgent?.(p);
     if (!out?.ok) throw new Error('the app could not close that row');
     return out;
   },
@@ -1298,7 +1314,7 @@ export const api = {
   // the draft: a refused rule that also eats what the user typed is two failures.
   // `engine` and `model` ride beside the rule rather than inside it: they are
   // hers about the WORK, not about the schedule, and `isRepeatRule` in
-  // shared/repeats.mjs validates the schedule shape and would refuse a rule
+  // shared/repeats.mts validates the schedule shape and would refuse a rule
   // object carrying anything else.
   async composeRepeat(p: {
     product: string; title: string; body?: string; priority?: number; rule: RepeatShape;
@@ -1314,7 +1330,7 @@ export const api = {
     // answer null, so in the fixture app the box would take the words, close,
     // and redraw the old instruction — a demo of the fix that showed the bug.
     // There is no store behind this and nothing claims there is; the fold is
-    // the same one main/repeats.mjs does.
+    // the same one main/repeats.mts does.
     if (useFixtures) {
       const rule = (fixtureRepeats as unknown as RepeatRule[]).find((r) => r.id === p.id);
       if (!rule) return null;
@@ -1336,7 +1352,7 @@ export const api = {
   // the one failure a settings screen can have.
   async settings(): Promise<Settings> {
     if (useFixtures) return structuredClone(fixtureSettingsState) as Settings;
-    const zero = window.zero as any;
+    const zero = window.zero;
     // ⌘R keeps the running main process, so a page built after these channels
     // existed can be attached to one that has never heard of them. Say what to
     // do about it rather than repeating Electron's sentence.
@@ -1357,7 +1373,7 @@ export const api = {
       const w = fixtureSettingsState.workspace;
       return { found: !!w.claudeFound, certain: !!w.claudeCertain, url: w.claudeInstallUrl || url };
     }
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.claudeRecheck) return { found: false, certain: false, url };
     try {
       const r = await zero.claudeRecheck();
@@ -1387,7 +1403,7 @@ export const api = {
   */
   async addCodexAccount(): Promise<{ ok: boolean; command?: string; home?: string; error?: string }> {
     if (useFixtures) return { ok: true, command: 'CODEX_HOME=/tmp/.codex-2 codex login', home: '/tmp/.codex-2' };
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.codexAddAccount) return { ok: false, error: RESTART_NOTE };
     try {
       const r = await zero.codexAddAccount();
@@ -1404,7 +1420,7 @@ export const api = {
   */
   async addClaudeAccount(): Promise<{ ok: boolean; command?: string; home?: string; error?: string }> {
     if (useFixtures) return { ok: true, command: 'CLAUDE_CONFIG_DIR=/tmp/.claude-2 claude auth login', home: '/tmp/.claude-2' };
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.claudeAddAccount) return { ok: false, error: RESTART_NOTE };
     try {
       const r = await zero.claudeAddAccount();
@@ -1419,7 +1435,7 @@ export const api = {
       const codex = fixtureSettingsState.workspace.codex;
       return { found: !!codex?.found, certain: !!codex?.certain };
     }
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.codexRecheck) return { found: false, certain: false };
     try {
       const r = await zero.codexRecheck();
@@ -1444,7 +1460,7 @@ export const api = {
   */
   async engineBin(engine: 'claude' | 'codex', action?: 'search'): Promise<Settings & { canceled?: boolean; refused?: string }> {
     if (useFixtures) return { ...emptySettings, ok: true, canceled: true };
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.engineBin) return { ...emptySettings, ok: false, error: RESTART_NOTE };
     try {
       return await whileSystemWindowIsOpen(() => zero.engineBin({ engine, ...(action ? { action } : {}) }));
@@ -1493,7 +1509,7 @@ export const api = {
       const waiting = engine === 'codex' && action !== 'ready' && action !== 'cancel';
       return { engine, phase: waiting ? 'signing-in' : 'idle', error: null, log: '', found: engine === 'codex', signedIn: false };
     }
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.engineSetup) return assumeReady;
     try {
       const r = await zero.engineSetup({ action, engine });
@@ -1515,7 +1531,7 @@ export const api = {
     // Fixtures have no disk. The control still works and the page still
     // redraws; nothing claims anything was saved.
     if (useFixtures) return fixtureWrite('project', p);
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.setProjectSetting) return { ...emptySettings, ok: false, error: RESTART_NOTE };
     return zero.setProjectSetting(p);
   },
@@ -1529,7 +1545,7 @@ export const api = {
   // RESTART_NOTE exists: this app gets edited while it is running.
   async renameProject(p: { product: string; name: string }): Promise<Settings> {
     if (useFixtures) return fixtureWrite('project', { product: p.product, key: 'name', value: p.name });
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.projectRename) return { ...emptySettings, ok: false, error: RESTART_NOTE };
     return zero.projectRename(p);
   },
@@ -1539,14 +1555,14 @@ export const api = {
   // tell "she closed the panel" from "it worked", and say neither wrongly.
   async pickProjectIcon(p: { product: string }): Promise<Settings & { canceled?: boolean }> {
     if (useFixtures) return { ...emptySettings, ok: true, canceled: true };
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.projectIcon) return { ...emptySettings, ok: false, error: RESTART_NOTE };
     return whileSystemWindowIsOpen(() => zero.projectIcon(p));
   },
 
   async clearProjectIcon(p: { product: string }): Promise<Settings> {
     if (useFixtures) return { ...emptySettings, ok: true };
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.projectIconClear) return { ...emptySettings, ok: false, error: RESTART_NOTE };
     return zero.projectIconClear(p);
   },
@@ -1555,7 +1571,7 @@ export const api = {
   // snapshot that follows carries it back, so this answers only whether it
   // landed.
   async setProjectSeenBy(p: { product: string; who: 'private' | 'team' | 'people'; people?: string[] }): Promise<{ ok: boolean; error?: string }> {
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.projectSeenBy) return { ok: false, error: RESTART_NOTE };
     return zero.projectSeenBy(p);
   },
@@ -1572,20 +1588,20 @@ export const api = {
         const crowded = CROWDED_NAMES
           .map((name) => ({ slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''), name, dir: `/fixtures/${name}` }))
           .find((x) => x.slug === p.product);
-        const project = s.projects.find((x: any) => x.slug === p.product) ?? crowded;
-        if (project && !s.archivedProjects.some((x: any) => x.slug === p.product)) {
-          s.projects = s.projects.filter((x: any) => x.slug !== p.product);
+        const project = s.projects.find((x) => x.slug === p.product) ?? crowded;
+        if (project && !s.archivedProjects.some((x) => x.slug === p.product)) {
+          s.projects = s.projects.filter((x) => x.slug !== p.product);
           s.archivedProjects.push({ slug: project.slug, name: project.name, dir: project.dir });
         }
       } else {
-        const back = s.archivedProjects.find((x: any) => x.slug === p.product);
-        const original = fixtureSettings.projects.find((x: any) => x.slug === p.product);
-        s.archivedProjects = s.archivedProjects.filter((x: any) => x !== back);
-        if (back && original) s.projects.push(structuredClone(original));
+        const back = s.archivedProjects.find((x) => x.slug === p.product);
+        const original = fixtureSettings.projects.find((x) => x.slug === p.product);
+        s.archivedProjects = s.archivedProjects.filter((x) => x !== back);
+        if (back && original) s.projects.push(structuredClone<object>(original) as ProjectSettings);
       }
       return structuredClone(s) as Settings;
     }
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.projectArchive) return { ...emptySettings, ok: false, error: RESTART_NOTE };
     return zero.projectArchive(p);
   },
@@ -1605,7 +1621,7 @@ export const api = {
   // the import had before 2026-08-23.
   async importAgents(p: { product: string; agents: string[] }): Promise<{ added: number; already: number }> {
     if (useFixtures) return { added: p.agents.length, already: 0 };
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.importAgents) {
       if (zero?.setProjectSetting) {
         try { await zero.setProjectSetting({ product: p.product, key: 'agents', value: p.agents }); } catch { /* nothing here is worth stopping the walk for */ }
@@ -1622,46 +1638,67 @@ export const api = {
 
   /** The cloud menu's sign-in for one account, made in the cloud: start, paste Claude's code, or cancel. */
   async cloudSignIn(p: { action: 'start' | 'code' | 'cancel' | 'remove'; engine: 'claude' | 'codex'; key?: string | null; code?: string }): Promise<{ ok: boolean; key?: string | null; error?: string }> {
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.cloudSignIn) return { ok: false, error: RESTART_NOTE };
     return zero.cloudSignIn(p);
   },
 
   /** A file a cloud run asked for, sent from this computer (or one picked instead) to the thread's next cloud turn. */
   async cloudSendFile(p: { product: string; id: string; path?: string; choose?: boolean; hold?: boolean; also?: string }): Promise<{ ok: boolean; path?: string; canceled?: boolean; held?: boolean; words?: string; error?: string }> {
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.cloudSendFile) return { ok: false, error: RESTART_NOTE };
     return zero.cloudSendFile(p);
   },
   /** A one-time code a cloud run asked for, sent as the reply that carries it on. */
   /** Whether a file a cloud run asked for is on this computer to send, and its size. */
   async cloudFileInfo(p: { path: string }): Promise<{ ok: boolean; size?: number; error?: string }> {
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.cloudFileInfo) return { ok: true };
     return zero.cloudFileInfo(p);
   },
   async cloudSendCode(p: { product: string; id: string; about: string; code: string; also?: string }): Promise<{ ok: boolean; error?: string }> {
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.cloudSendCode) return { ok: false, error: RESTART_NOTE };
     return zero.cloudSendCode(p);
   },
 
   /** A key kept in the cloud for every cloud run: saved under its name, or removed. */
   async cloudKey(p: { action: 'save' | 'remove'; name: string; value?: string; label?: string; reply?: { product: string; id: string; answer: string } }): Promise<{ ok: boolean; keys?: { name: string; savedAt: number | null; label?: string | null }[]; freed?: string[]; cloudOff?: boolean; error?: string }> {
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.cloudKey) return { ok: false, error: RESTART_NOTE };
     return zero.cloudKey(p);
   },
 
+  /** The GitHub token this computer's ships push with; the threads that waited on it ship again. */
+  async gitHubSignIn(p: { token: string }): Promise<{ ok: boolean; again?: string[]; error?: string }> {
+    const zero = laterBridge();
+    if (!zero?.gitHubSignIn) return { ok: false, error: RESTART_NOTE };
+    return zero.gitHubSignIn(p);
+  },
+
+  /** Starts GitHub's own sign-in for this computer's git; answers with its code and link. */
+  async gitHubBrowserSignIn(): Promise<{ ok: boolean; code?: string; url?: string; error?: string }> {
+    const zero = laterBridge();
+    if (!zero?.gitHubBrowserSignIn) return { ok: false, error: RESTART_NOTE };
+    return zero.gitHubBrowserSignIn();
+  },
+
+  /** What the person did with a sign-in link an agent on this thread is waiting on. */
+  async signInAnswer(p: { product: string; id: string; ask: string; said: 'signed-in' | 'skipped' | 'landed'; url?: string }): Promise<{ ok: boolean; error?: string }> {
+    const zero = laterBridge();
+    if (!zero?.signInAnswer) return { ok: false, error: RESTART_NOTE };
+    return zero.signInAnswer(p);
+  },
+
   /** Signing in to Agentbox Cloud itself, on the app's sign-in page: Google, email, a new account and its link again, or a password reset. */
   async cloudAccountSignIn(p: { method: 'google' | 'email' | 'sign-up' | 'resend' | 'agree' | 'reset' | 'reset-wait' | 'new-password'; email?: string; password?: string; name?: string; acceptTerms?: boolean }): Promise<{ ok: boolean; confirm?: boolean; needsTerms?: boolean; sent?: boolean; opened?: boolean; error?: string; cancelled?: boolean }> {
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.cloudAccountSignIn) return { ok: false, error: RESTART_NOTE };
     return zero.cloudAccountSignIn(p);
   },
-  async cloudAccountCancel(): Promise<void> { await (window.zero as any)?.cloudAccountCancel?.(); },
-  async cloudAccountReopen(): Promise<void> { await (window.zero as any)?.cloudAccountReopen?.(); },
-  async cloudAccountSignOut(): Promise<void> { await (window.zero as any)?.cloudAccountSignOut?.(); },
+  async cloudAccountCancel(): Promise<void> { await window.zero?.cloudAccountCancel?.(); },
+  async cloudAccountReopen(): Promise<void> { await window.zero?.cloudAccountReopen?.(); },
+  async cloudAccountSignOut(): Promise<void> { await window.zero?.cloudAccountSignOut?.(); },
   async cloudAccountPlan(): Promise<CloudPlan> {
     // &cloudplan=pro draws someone on Pro, 6 running and 88 of 400 hours used;
     // &cloudplan=free someone on the free hours, 1 running and 1.5 of 5 used.
@@ -1685,15 +1722,15 @@ export const api = {
       if (params.get('cloudplan') === 'spent') return { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0, billing: null, free: { agents: 2, hours: 5, usedSeconds: 5 * 3600 } };
       return { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0 };
     }
-    return (await (window.zero as any)?.cloudAccountPlan?.()) ?? { signedIn: false };
+    return (await window.zero?.cloudAccountPlan?.()) ?? { signedIn: false };
   },
   async cloudAccountPay(plan: 'pro' | 'plus' | 'max' | 'team'): Promise<{ ok: boolean; where?: 'checkout' | 'billing'; error?: string; message?: string }> {
-    const zero = window.zero as any;
+    const zero = laterBridge();
     if (!zero?.cloudAccountPay) return { ok: false, message: RESTART_NOTE };
     return zero.cloudAccountPay({ plan });
   },
   async cloudAccountBilling(): Promise<{ ok: boolean; error?: string; message?: string }> {
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.cloudAccountBilling) return { ok: false, message: RESTART_NOTE };
     return zero.cloudAccountBilling();
   },
@@ -1707,42 +1744,42 @@ export const api = {
   /** What the team's owner sees of Stripe; `owner: false` for anyone else on the team. */
   async cloudAccountTeamBilling(): Promise<{ ok: boolean; owner?: boolean } & Partial<TeamBillingDetails>> {
     if (useFixtures) return { ok: true, owner: true, ...fixtureTeamBilling(params.get('cloudplan') === 'team-trial') };
-    const zero = window.zero as any;
+    const zero = laterBridge();
     if (!zero?.cloudAccountTeamBilling) return { ok: false };
     return zero.cloudAccountTeamBilling();
   },
 
   /** Claude's sign-in code from the clipboard, while a sign-in waits for one; else null. */
   async cloudClipboardCode(): Promise<string | null> {
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.cloudClipboardCode) return null;
     try { return (await zero.cloudClipboardCode())?.code ?? null; } catch { return null; }
   },
 
   async setWorkspaceSetting(p: { key: string; value: unknown }): Promise<Settings> {
     if (useFixtures) return fixtureWrite('workspace', p);
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.setWorkspaceSetting) return { ...emptySettings, ok: false, error: RESTART_NOTE };
     return zero.setWorkspaceSetting(p);
   },
 
   async projectInstructions(product: string): Promise<{ ok: boolean; text: string; error?: string }> {
     if (useFixtures) {
-      const p = fixtureSettingsState.projects.find((x: any) => x.slug === product);
+      const p = fixtureSettingsState.projects.find((x) => x.slug === product);
       return { ok: true, text: p?.instructions ?? '' };
     }
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.projectInstructionsRead) return { ok: false, text: '', error: RESTART_NOTE };
     return zero.projectInstructionsRead({ product });
   },
 
   async writeProjectInstructions(product: string, text: string): Promise<{ ok: boolean; error?: string }> {
     if (useFixtures) {
-      const p = fixtureSettingsState.projects.find((x: any) => x.slug === product);
+      const p = fixtureSettingsState.projects.find((x) => x.slug === product);
       if (p) p.instructions = text;
       return { ok: false, error: 'fixtures have nowhere to save this' };
     }
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.projectInstructionsWrite) return { ok: false, error: RESTART_NOTE };
     return zero.projectInstructionsWrite({ product, text });
   },
@@ -1775,12 +1812,12 @@ export const api = {
       if (params.has('drawnPicker')) return { path: null, browse: true };
       return { path: '/Users/you/Desktop/dev/house' };
     }
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.chooseFolder) return { path: null };
     // Nothing typed at the chooser is typed into the screen behind it. See
     // renderer/src/system-window.ts: on Linux the keys came through.
     const r = await whileSystemWindowIsOpen<{ path?: string | null; refused?: string; browse?: boolean }>(
-      () => zero.chooseFolder({ startIn }),
+      () => zero.chooseFolder!({ startIn }),
     );
     // `browse` is a tab with no Mac dialog behind it. It is not a refusal and
     // it is not a cancel: the screen opens <FolderPicker> instead, which walks
@@ -1796,7 +1833,7 @@ export const api = {
   // its own button rather than let her press it and be told no afterwards.
   async listFolders(at?: string | null, showHidden = false): Promise<FolderListing> {
     if (useFixtures) return fixtureFolders(at ?? '~');
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.listFolders) {
       return { at: at ?? '~', parent: null, home: '~', folders: [], unreadable: RESTART_NOTE };
     }
@@ -1816,7 +1853,7 @@ export const api = {
   // make a folder that turns out to exist is the mistake worth avoiding.
   async folderExists(p: string): Promise<boolean> {
     if (useFixtures) return false;
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.folderExists) return true;
     const r = await zero.folderExists({ path: p });
     return !!r?.exists;
@@ -1841,7 +1878,7 @@ export const api = {
       if (params.has('noProjectAgents')) return { ...f, project: [] };
       return f;
     }
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.agentFiles) return { user: [], project: [], chosen: null };
     try {
       const r = await zero.agentFiles(p);
@@ -1876,7 +1913,7 @@ export const api = {
         })),
       }];
     }
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.agentFolders) return [];
     try {
       const r = await zero.agentFolders();
@@ -1895,7 +1932,7 @@ export const api = {
       if (emptyFixtures || params.has('noThreads')) return [];
       return fixtureSessionThreads();
     }
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.agentThreads) return [];
     try {
       const r = await zero.agentThreads();
@@ -1916,7 +1953,7 @@ export const api = {
       if (emptyFixtures || params.has('noThreads')) return { threads: [], reached: 0 };
       return { threads: fixtureSearchableThreads(), reached: 0 };
     }
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.searchAgentThreads) return { threads: [], reached: 0 };
     try {
       const r = await zero.searchAgentThreads(p);
@@ -1928,7 +1965,7 @@ export const api = {
   // names a conversation off a screen that has been open since this morning.
   async importThreads(p: { product: string; threads: string[]; land?: 'sorted' | 'inbox' }): Promise<{ added: number; already: number; done: number }> {
     if (useFixtures) return { added: p.threads.length, already: 0, done: 0 };
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.importThreads) return { added: 0, already: 0, done: 0 };
     try {
       const r = await zero.importThreads(p);
@@ -1951,13 +1988,13 @@ export const api = {
    *  fixtures, and a browser tab, whose server has no such channel. */
   async phoneLink(p: { action: 'status' | 'on' | 'off' | 'reset' | 'via' | 'stop-alerts'; via?: PhoneRoute; device?: string }): Promise<PhoneLink | null> {
     if (useFixtures) return null;
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (!zero?.phoneLink) return null;
     try { return await zero.phoneLink(p); } catch { return null; }
   },
 
   onPhoneChanged(fn: () => void): () => void {
-    const zero = window.zero as any;
+    const zero = window.zero;
     if (useFixtures || !zero?.onPhoneChanged) return () => {};
     return zero.onPhoneChanged(fn);
   },

@@ -1,6 +1,6 @@
-import { isKeyAsk, keyAsks, keyWords, savedReply } from '../../shared/cloud-keys.mjs';
+import { isKeyAsk, keyAsks, keyWords, savedReply } from '../../shared/cloud-keys.mts';
 import { stripOptionsSection } from './format';
-import { needsIn } from '../../shared/cloud-needs.mjs';
+import { needsIn } from '../../shared/cloud-needs.mts';
 
 export const NEED_BLOCK = 'agentbox-need';
 

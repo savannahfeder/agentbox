@@ -10,7 +10,7 @@ import { runClaudeUsage } from './claude-usage-process.mts';
 import type { UsageRunner } from './claude-usage-process.mts';
 import type { UsageLimit } from '../shared/usage.mts';
 import { NO_METERED_KEY } from './harnesses/claude.mts';
-import { CERTIFICATES, LOCALE, PROXIES } from './shell-path.mjs';
+import { CERTIFICATES, LOCALE, PROXIES } from './shell-path.mts';
 
 // WHAT A USAGE CHECK MAY INHERIT, BY NAME. Claude Code picks its login from
 // more than CLAUDE_CONFIG_DIR (CLAUDE_SECURESTORAGE_CONFIG_DIR outranks it, set

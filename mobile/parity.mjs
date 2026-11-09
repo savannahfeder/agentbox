@@ -39,7 +39,6 @@ export const PARITY = {
   'palette:clear-filter': { phone: FILTERS, find: 'Clear filters' },
   'palette:end-tutorial': { desktopOnly: 'the tutorial runs on the computer only' },
   'palette:projects-page': { phone: PROJECT, find: 'title="Rank first"', still: 'no new project, and no bringing an archived one back' },
-  'palette:search': { phone: 'mobile/src/app/search.tsx', find: 'placeholder="Search"' },
   'palette:cloud-toggle': { phone: SET, find: 'label="Use the cloud"' },
   'palette:cloud-*': { phone: SET, find: 'label="Use the cloud"' },
   'palette:view-groups': { phone: P, find: "id: 'chats'" },
@@ -133,7 +132,7 @@ export const PARITY = {
   'settings-page:cloud': { desktopOnly: SELLS },
 
   // Rows Settings search finds
-  'settings:general/Your account': { phone: SET, find: 'Signed in as' },
+  'settings:general/Your account': { phone: 'mobile/src/ui/SettingsHome.tsx', find: 'title="Sign out"' },
   'settings:general/Public links': { phone: SET, find: '<Group label="Public links">' },
   'settings:general/Show keyboard shortcut hints': { desktopOnly: KEYS },
   'settings:general/Shrink the sidebar to icons': { desktopOnly: MAC },

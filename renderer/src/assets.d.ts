@@ -22,5 +22,5 @@ declare module '*.webp' {
 // Declared rather than pulled in from vite/client because this project does not
 // take Vite's ambient types.
 interface ImportMeta {
-  glob(pattern: string, options?: { eager?: boolean; query?: string; import?: string }): Record<string, any>;
+  glob<T = unknown>(pattern: string, options?: { eager?: boolean; query?: string; import?: string }): Record<string, T>;
 }

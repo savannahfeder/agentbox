@@ -6,7 +6,7 @@ import { Name } from '../../../shared/product-name.mjs';
 import { ALERTS_SAY, alertsState, testAlert, turnOffAlerts, turnOnAlerts, type AlertsState } from '../phone-alerts';
 
 const STEPS = ['In Safari, tap Share.', 'Tap Add to Home Screen.', `Open ${Name} from your home screen and turn alerts on here.`];
-// Sent by the computer while nobody is at it (main/phone-alerts.mjs), and by
+// Sent by the computer while nobody is at it (main/phone-alerts.mts), and by
 // the cloud while it is off (cloud/gateway/phone.mjs).
 const SAY: Partial<Record<AlertsState, string>> = {
   off: 'Get an alert when an agent needs you.',

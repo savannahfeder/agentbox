@@ -20,7 +20,7 @@
 // NOTHING NEW IS STORED AND NOTHING IS WRITTEN. Two files that already exist
 // are read, and the marks a Z left on this Mac (../undo-marks).
 
-import { useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ThreadPanel } from '../team/ThreadPanel';
 import { TeamContext } from '../team/people';
@@ -37,17 +37,23 @@ import { withoutTrailingWork } from '../trailing-work';
 import { marksFor, readUndoMarks, UNDO_MARKS_EVENT, type UndoMark } from '../undo-marks';
 import { ranWords } from '../byline';
 import { notShipped } from '../../../shared/not-shipped.mts';
+import { asksForGitHubSignIn } from '../../../shared/github-push-sign-in.mts';
+import { GitHubSignInCard } from './GitHubSignInCard';
+import { SignInCard } from './SignInCard';
+import { openSignIn } from '../../../shared/sign-in-ask.mts';
 import type { ModelChoice } from '../models';
 import type { LedgerLine } from '../thread-history';
 import type { TraceSession } from '../notes';
 import { withEveryRun } from '../every-run';
+import { keepPlace, placeKey, placeToReturnTo } from '../thread-place';
+import { arrivedAt } from '../unread';
 import type { AgentTurn, FileMarkLink, RunningSession, WorkItem } from '../types';
 import { ActLine, Thread, ThreadWaiting, answerTurn } from './Thread';
 import { FileMarkOpener } from './FileMarkLine';
 import { QueueAnswer, QueueSummary } from './OneThingAtATime';
 import { catchUpDue } from '../../../shared/agent-import.mts';
 import { appWrote, broughtIn, drawnWhole, earlierCount, earlierThan, newestAnswer, pageTitle, standsAt, workingContext, workingFrom } from '../one-thing-at-a-time';
-import { gapIndex } from '../../../shared/agents.mjs';
+import { gapIndex } from '../../../shared/agents.mts';
 import { askMarkUnread, say } from '../team/chat-events';
 import { seenLine } from '../team/seen-line';
 import { conversationName } from '../threads/page-rules';
@@ -56,8 +62,8 @@ import { ThreadsMade, type MadeRow } from './ThreadsMade';
 import { TeammatesContext } from '../teammates/row-lead';
 import { RouteLine } from './RouteLine';
 import { withoutLoneQuoteMark } from '../typed-message';
-import { teammateIdOf, OFFER_LABEL } from '../../../shared/teammates.mjs';
-import { REACH_LABEL } from '../../../shared/teammate-reach.mjs';
+import { teammateIdOf, OFFER_LABEL } from '../../../shared/teammates.mts';
+import { REACH_LABEL } from '../../../shared/teammate-reach.mts';
 import { Name } from '../../../shared/product-name.mjs';
 
 // THE BACKSTOP, NOT THE HEARTBEAT.
@@ -203,14 +209,19 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
   // at all; then nothing in the thread is a chip and the conversation is
   // exactly what it was.
   const [changed, setChanged] = useState<string[]>([]);
+  const team = useContext(TeamContext);
+  const me = team?.me ?? null;
+  // Where she was in this thread, when she is coming back to it (../thread-place.ts).
+  const place = placeKey(item);
+  const kept = useMemo(() => placeToReturnTo(place, arrivedAt(item, me)), [place]); // eslint-disable-line react-hooks/exhaustive-deps
   // WHETHER THE MIDDLE OF THIS CONVERSATION WAS ASKED BACK. Held per row and
-  // dropped when she leaves it, so no thread is ever born at full length: the
-  // window is still what a long row opens with, and this is the door out of it.
-  // It survives the poll while a worker writes, because losing the messages she
-  // just went looking for every eight seconds is the same fault wearing a
-  // timer.
+  // dropped when she leaves it, unless she comes back to it unchanged, so no
+  // thread is ever born at full length: the window is still what a long row
+  // opens with, and this is the door out of it. It survives the poll while a
+  // worker writes, because losing the messages she just went looking for every
+  // eight seconds is the same fault wearing a timer.
   const [whole, setWhole] = useState(false);
-  useEffect(() => { setWhole(false); }, [item.product, item.id]);
+  useEffect(() => { setWhole(!!kept?.whole); }, [item.product, item.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // The regular read below has only the newest runs; the middle needs them all.
   const [everyRun, setEveryRun] = useState<TraceSession[]>([]);
   useEffect(() => {
@@ -223,7 +234,10 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
     return () => { live = false; };
   }, [item.product, item.id, whole]);
   const [earlierOpen, setEarlierOpen] = useState(false);
-  useEffect(() => { setEarlierOpen(false); }, [item.product, item.id]);
+  useEffect(() => { setEarlierOpen(!!kept?.earlier); }, [item.product, item.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Not keyed on the thread: on the render that changes thread these still hold
+  // the last one's, and writing them then would file them under the new one.
+  useEffect(() => { keepPlace(place, { earlier: earlierOpen, whole }); }, [earlierOpen, whole]); // eslint-disable-line react-hooks/exhaustive-deps
   // A close asking about filed tasks unfolds the thread, so the turn that
   // filed them is on screen with the question under it.
   const askRef = useRef<HTMLDivElement>(null);
@@ -231,8 +245,6 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
 
   // A REACTION SHOWS THE MOMENT IT IS PRESSED (w-45cbac227a), in the chat and in
   // the thread panel alike, rather than after the sync and the next snapshot.
-  const team = useContext(TeamContext);
-  const me = team?.me ?? null;
   const sendReaction = useCallback((p: Press) => api.teamReact({ product: item.product, id: item.id, ...p })
     .then((r) => { if (!r?.ok) throw new Error(r?.error ?? 'that reaction did not save'); }), [item.product, item.id]);
   const chips = useReactionsNow(item.reactions, me, sendReaction);
@@ -380,6 +392,11 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
   );
   const askTurn = closeAsk ? askTurnOf(made) : -1;
   const askHere = closeAsk && <div ref={askRef} className="close-ask-at-task">{closeAsk.strip}</div>;
+  const signInAsk = onPhone() ? null : openSignIn(item);
+  const signInHere = signInAsk && <SignInCard key={signInAsk.id} ask={signInAsk} cloud={session?.where === 'cloud'}
+    open={(href) => { void api.openArtifactExternally({ product: item.product, src: href }); }}
+    copy={(text) => { void navigator.clipboard?.writeText(text).then(() => say('Copied'), () => say('That did not copy.')); }}
+    answer={async (said) => { const r = await api.signInAnswer({ product: item.product, id: item.id, ask: signInAsk.id, ...said }); return r.ok ? null : r.error ?? 'That did not reach the agent. Try again.'; }} />;
 
   // THE ANSWER, WHOLE, AT THE FOOT OF THE CONVERSATION.
   //
@@ -393,6 +410,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
   const ranSaid = outcome ? ranOf(outcome) : null;
   const answerAt = answerTurn(events, omitted, chat);
   const unshipped = outcome?.field === 'note' && !!notShipped(item);
+  const signInWhy = unshipped && !onPhone() && asksForGitHubSignIn(notShipped(item)?.why) ? notShipped(item)!.why : null;
   const answer = outcome && (
     resultLeads(item) && outcome.field === 'result'
       ? <div className="outcome" data-exchange={answerAt}>{md(clean(outcome.text))}</div>
@@ -406,6 +424,10 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
             {ranSaid && outcome.field !== 'result' && <span className="appendix-ran">{ranSaid}</span>}
           </div>
           {md(clean(outcome.text))}
+          {signInWhy && <GitHubSignInCard why={signInWhy} openLink={(href) => { void api.openArtifactExternally({ product: item.product, src: href }); }}
+            copy={(text) => { void navigator.clipboard?.writeText(text).then(() => say('Copied'), () => say('That did not copy.')); }}
+            signIn={async () => { const r = await api.gitHubBrowserSignIn(); return r.ok && r.code && r.url ? { code: r.code, url: r.url } : { error: r.error ?? 'GitHub\'s sign-in did not start.' }; }}
+            save={async (token) => { const r = await api.gitHubSignIn({ token }); if (!r.ok) return r.error ?? 'That did not save. Try again.'; say('GitHub connected. Shipping it again.'); return null; }} />}
         </div>
       )
   );
@@ -468,6 +490,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
         {queueHead}
         <p className="one-catching-up"><span className="live-word is-shimmering">Getting this chat ready. Its summary and options will appear here.</span></p>
         {newest && <QueueAnswer text={clean(newest.text)} md={md} name={pageTitle(item)} />}
+        {signInHere}
         {askHere}
       </>
     );
@@ -479,6 +502,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
         <QueueAnswer text={clean(newest.text)} md={md} name={pageTitle(item)} by={signer ? { t: signer, at: newest.at } : null} />
         {byApp && outcome && <p className="one-app-note">{clean(outcome.text)}</p>}
         {afterList}
+        {signInHere}
         {madeList(made.atFoot)}
         {askHere}
       </>
@@ -497,6 +521,8 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
         // teammate's run is signed with its name.
         nameOf={teammate ? () => teammate.name : ranOf}
         landOn={item.id}
+        kept={kept}
+        onFolds={(runs, lines) => keepPlace(place, { runs, lines })}
         onWhole={() => setWhole(true)}
         onOpenOrigin={onOpenOrigin}
         // Only a running Claude Code step can be cut; Codex takes her message
@@ -558,6 +584,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
       )}
       {answer}
       {afterList}
+      {signInHere}
       {/* AND WHAT THE NEWEST TURN FILED, under its own last word. */}
       {madeList(made.atFoot)}
       {askTurn < Math.max(from, 0) && askHere}

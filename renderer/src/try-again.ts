@@ -3,7 +3,7 @@
 // Resume takes over a selection: it ends a rest, a hold and a delivery mark,
 // and starts the thread now or as soon as an agent is free.
 //
-// tests/a-stuck-thread-offers-try-again.test.mjs
+// tests/a-stuck-thread-offers-try-again.test.mts
 
 import { liveLine, type LiveFacts } from './live-line';
 import { saysARunGotNowhere } from '../../shared/spawn-trouble.mts';
@@ -23,8 +23,10 @@ export function offersTryAgain(item: WorkItem, facts: LiveFacts & { practice?: b
   if (facts.stalled) return true;
   const live = liveLine(item, facts);
   if (live) return STUCK.has(live.state);
-  // Out of In progress, the newest word on it is the app's own note that a run stopped.
-  return item.status === 'open' && item.wrote?.result?.source === 'agent' && saysARunGotNowhere(item.result);
+  // Out of In progress, the newest word on it is the app's own note that a run
+  // stopped, and no start is queued for it yet.
+  return item.status === 'open' && !facts.queued.includes(item.id)
+    && item.wrote?.result?.source === 'agent' && saysARunGotNowhere(item.result);
 }
 
 export interface TryAgainOutcome { resumed?: number; queued?: number; working?: number; missing?: number; failed?: number; why?: string }

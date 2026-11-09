@@ -1,12 +1,12 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { keysOf, needId, type Need } from '../../../shared/cloud-needs.mjs';
+import { keysOf, needId, type Need } from '../../../shared/cloud-needs.mts';
 import { Name } from '../../../shared/product-name.mjs';
-import { keyLabel, keyWords } from '../../../shared/cloud-keys.mjs';
+import { keyLabel, keyWords } from '../../../shared/cloud-keys.mts';
 import { codeLooksWrong, keyLooksWrong } from '../key-asks';
 import { DARK_INK, logoOf } from '../connections/logos';
 import './need-card.css';
 
-// What a message that asks for things knows (shared/cloud-needs.mjs): the keys
+// What a message that asks for things knows (shared/cloud-needs.mts): the keys
 // saved for cloud runs (null when this computer has no cloud), whether it is
 // the thread's newest answer (only that one takes anything), and how to give
 // each kind. Each `give` answers with what went wrong, or null.

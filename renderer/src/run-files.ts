@@ -76,7 +76,7 @@ function relativeTo(roots: string[], abs: string): string | null {
  * Every file the runs on one item made for her, in the order they made them.
  *
  * Paths come back product-relative, which is the only shape the opener can
- * resolve (main/artifact-path.mjs), and deduped by path so a file written and
+ * resolve (main/artifact-path.mts), and deduped by path so a file written and
  * then edited four times is one chip. Order is first-write, not last: the run
  * reads top to bottom and so does she.
  */

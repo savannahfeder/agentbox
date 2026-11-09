@@ -1,4 +1,4 @@
-import { noteGoesTo } from '../../shared/artifact-marks.mjs';
+import { noteGoesTo } from '../../shared/artifact-marks.mts';
 import { docKind, isPlainText } from './doc-pane';
 import type { FileNote } from './types';
 

@@ -19,8 +19,8 @@
 // The words are what anyone reads; the address is what the app reads. Nothing
 // new is stored anywhere: a message is still one answer in the conversation's
 // ledger, and it syncs to the other person exactly as before.
-import { ENGINES } from '../../../shared/engines.mjs';
-import { projectSeenBy } from '../../../shared/thread-cards.mjs';
+import { ENGINES } from '../../../shared/engines.mts';
+import { projectSeenBy } from '../../../shared/thread-cards.mts';
 
 export interface ChatAgent { engine: string; label: string }
 export interface Project { slug: string; name: string }

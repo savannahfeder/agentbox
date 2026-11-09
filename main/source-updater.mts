@@ -35,7 +35,7 @@ import fs from 'node:fs';
 import type { PathLike } from 'node:fs';
 import { describe } from './updater.mts';
 import type { UpdaterState, UpdaterView } from './updater.mts';
-import { loginShell } from './shell-path.mjs';
+import { loginShell } from './shell-path.mts';
 
 const FIRST_CHECK_MS = 20_000;
 const EVERY_MS = 30 * 60 * 1000;
@@ -66,13 +66,13 @@ const SAY = {
 // rewrites shared/*.generated.mjs with the version and date of the Claude Code
 // on this Mac, and the restart below runs that build. Counted as her changes,
 // they made every update after the first say "changes of your own" for good
-// (tests/a-build-does-not-stop-the-next-update.test.mjs).
+// (tests/a-build-does-not-stop-the-next-update.test.mts).
 //
 // THE LOCKFILE IS NPM'S, TOO (2026-10-07). The restart's `npm install` rewrote
 // package-lock.json (this npm drops its `libc` lines), and the card never came
 // back while main ran 21 commits ahead. An edit to the dependencies themselves
 // is in package.json, which still blocks
-// (tests/a-package-install-does-not-stop-the-next-update.test.mjs).
+// (tests/a-package-install-does-not-stop-the-next-update.test.mts).
 const isBuildOutput = (file: string) => file === 'package-lock.json' || /^shared\/[^/]+\.generated\.[cm]?[jt]s$/.test(file);
 // The status code is one or two letters and `gitIn` trims the output, which
 // takes the leading space off the first line, so it is matched, not sliced.
@@ -116,7 +116,7 @@ function collect(bin: string, args: string[], { cwd, timeout }: { cwd: string; t
 // WHICH npm. Started with `npm start`, the process carries npm's own path in
 // its environment, so that one is used and nvm or a version manager never
 // matters. Started any other way, their login shell is asked, the way
-// main/claude-bin.mjs finds Claude Code, and only a shell this machine has: a
+// main/claude-bin.mts finds Claude Code, and only a shell this machine has: a
 // Linux launcher start carries no SHELL, so the old `|| '/bin/zsh'` was a path
 // to nothing and every update on a box without zsh failed in two seconds. With
 // no shell at all, npm on PATH is the better guess. The arguments are fixed
@@ -283,7 +283,7 @@ export function createSourceUpdater({
     }
     // Packages changed when either file's object id moved. Compared by id
     // rather than by asking git for a diff, which this process does in exactly
-    // one file (tests/the-old-git-diff-screen-stays-gone.test.mjs).
+    // one file (tests/the-old-git-diff-screen-stays-gone.test.mts).
     let depsMoved = false;
     for (const file of ['package.json', 'package-lock.json']) {
       const was = await git(['rev-parse', '--verify', '--quiet', `${bootHead}:${file}`]);

@@ -1,12 +1,12 @@
 // Notes beside a document opened full screen from its thread: you select words,
 // write as much as you like, attach files, and Send hands every waiting note
-// to the agent at once (main/notes-wake.mjs noteToItsAgent).
+// to the agent at once (main/notes-wake.mts noteToItsAgent).
 import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api } from '../api';
 import { Face, TeamContext } from '../team/people';
 import { clock, type LedgerLine } from '../thread-history';
 import type { FileNote, NotePlace, Person, WorkItem } from '../types';
-import { notedFilesInLines, threadFiles, versionForPath, whoseIsTheFile } from '../../../shared/artifact-marks.mjs';
+import { notedFilesInLines, threadFiles, versionForPath, whoseIsTheFile } from '../../../shared/artifact-marks.mts';
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { notePictures, noteWithPictures } from '../note-pictures';
 import { canPaintQuotes, paintQuotes } from '../paint-quotes';
