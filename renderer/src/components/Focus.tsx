@@ -3665,8 +3665,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             )}
             <ReplyModel
               chip
-              label={engineModelLabel(engineShown, model, modelOpts)}
-              level={levelSaid}
+              label={`${engineModelLabel(engineShown, model, modelOpts)}${levelSaid ? ` · ${levelSaid}` : ''}`}
               pick={pick}
               onPick={pickModel}
               recent={recent}
@@ -3738,6 +3737,9 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             rather than sitting side by side. A stop next to a live Send is two
             things to choose between; a stop INSTEAD of a dead Send is one
             thing that is always the thing she can do. */}
+        {/* One piece, so a narrow bar moves the paperclip and Send to a
+            second row together (narrow-conversation.css). */}
+        <span className="dock-actions">
         {!talkTo?.length && (
           <button type="button" className="tc-icon dock-clip" title="Attach files" aria-label="Attach files" onClick={pickFiles}><ClipGlyph /></button>
         )}
@@ -3753,6 +3755,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
         {canWait && <ReplyLater at={sendAt} onPick={pickSendAt} onClosed={() => ref.current?.focus()} />}
         </span>
         )}
+        </span>
         </>}
       </div>
     </>

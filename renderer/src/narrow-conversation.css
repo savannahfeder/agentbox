@@ -30,15 +30,15 @@
   }
 }
 
-/* Under 460 the bar's words no longer fit one row ("Medium", "Auto", the
-   model, the paperclip, "Stop" need about 425). The priority keeps its bars
-   and Stop its square; both keep their names for the pointer and screen
-   readers. The model's level goes to its menu. If a mode and a model still
-   do not fit, their names end in an ellipsis inside the chip, the model's
-   first: a chip is never sliced by its own border. */
+/* Under 460 the priority keeps its bars and Stop its square; both keep their
+   names for the pointer and screen readers. When the chips still do not fit
+   beside the paperclip and Send, those two move to a second row, so every
+   chip is drawn whole. Only a box too narrow for the chips alone shortens a
+   name, with an ellipsis inside the chip: never sliced by its own border. */
 @container reply (max-width: 460px) {
-  .dock-chips { flex-wrap: nowrap; }
-  .dock-chips .tc-chip-word, .dock-bar .dock-stop-word, .dock-chips .tc-chip-level { display: none; }
+  .compose-sentence.dock-bar { flex-wrap: wrap; row-gap: 10px; }
+  .dock-chips { flex: 1 0 auto; max-width: 100%; flex-wrap: nowrap; }
+  .dock-chips .tc-chip-word, .dock-bar .dock-stop-word { display: none; }
   .dock-chips > * { flex: none; }
   .dock-chips > .compose-word-wrap:has(.tc-chip-label) { flex: 0 1 auto; min-width: 44px; }
   .dock-chips > .model-pick { flex-shrink: 8; }
