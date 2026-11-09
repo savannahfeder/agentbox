@@ -79,6 +79,8 @@ describe('the app', () => {
   });
   it('merges what arrives into the rows every tab reads', () => {
     expect(app).toMatch(/withOlder\(snap\?\.items \?\? \[\], older\)/);
-    expect(app).toMatch(/walkRows\(itemsWithOlder, run\)/);
+    // Less any send taken back with Z (tests/a-send-taken-back-with-z-leaves-no-thread-behind).
+    expect(app).toMatch(/withoutWithdrawnSends\(itemsWithOlder, undoMarks\)/);
+    expect(app).toMatch(/walkRows\(listed, run\)/);
   });
 });

@@ -843,6 +843,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       const names = taken ?? allFiles().find((f) => f.chain.some((v) => v.copies.some((c) => c.thread.ref.id === id && c.path === clean)))?.chain.map((v) => v.name) ?? [];
       const saved = saveNextVersion({ dir: here.dir, threadId: id, lines, basePath, baseId, text, since, taken: names });
       if (!saved.ok) return saved;
+      if (saved.unchanged) return { ok: true, path: saved.path };
       if (here.team?.direct) store.answerItem(product, id, { answer: editedWords(saved.shown, saved.path) });
       else store.fileMark(product, id, { do: 'edit', file: saved.file, path: saved.path, ...(saved.over ? { over: saved.over } : {}) });
       return { ok: true, path: saved.path };

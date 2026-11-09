@@ -12,7 +12,7 @@ import { describe, it, expect, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { findChrome, headlessShells, launchChrome } from '../.claude/skills/verify-agentbox/scripts/cdp.mjs';
+import { canDrive, findChrome, headlessShells, launchChrome } from '../.claude/skills/verify-agentbox/scripts/cdp.mjs';
 import { isOurChrome } from '../scripts/lib/chrome-guard.mjs';
 import { MAC_CHROME as MAC } from '../shared/hidden-browser.mjs';
 
@@ -87,6 +87,27 @@ describe('starting a hidden drive', () => {
     roots.push(profile);
     await expect(launchChrome({ bin: '/nowhere/chrome-headless-shell', profile, platform: 'darwin', start: noBrowser }))
       .rejects.toThrow(/No browser at \/nowhere/);
+  });
+});
+
+// A Mac runner with Google Chrome and no Playwright browser (GitHub's macOS
+// image) used to run the real-browser tests, which then hit this refusal and
+// failed main. They skip on what launchChrome would refuse.
+describe('whether a browser can be driven here', () => {
+  it('is no for the person\'s own Chrome on a Mac', () => {
+    expect(canDrive(MAC, 'darwin', () => true)).toBe(false);
+  });
+
+  it('is yes for a test browser on a Mac', () => {
+    expect(canDrive(`/cache/chromium_headless_shell-1254/chrome-headless-shell-mac-arm64/${SHELL}`, 'darwin', () => true)).toBe(true);
+  });
+
+  it('is yes for Google Chrome on Linux, where nothing takes its clicks', () => {
+    expect(canDrive(MAC, 'linux', () => true)).toBe(true);
+  });
+
+  it('is no for a browser that is not installed', () => {
+    expect(canDrive('/usr/bin/chromium', 'linux', () => false)).toBe(false);
   });
 });
 

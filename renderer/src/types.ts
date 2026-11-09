@@ -891,6 +891,8 @@ export interface SupervisorStatus {
   // Items a tick will spawn as soon as a slot frees: waiting their turn, not
   // forgotten. The row says "queued" so the two are never confused.
   queued?: string[];
+  // Of those, the ones being set up or asked for by name, which count as In progress.
+  starting?: string[];
   // Sessions this app holds open between Remote Control turns, which `running` leaves out.
   remoteHeld?: string[];
   // With the cloud on Everything, why a thread runs locally or waits (Supervisor#status).
@@ -1908,3 +1910,9 @@ export type ThreadEditPatch = Partial<{
   visibility: 'team' | 'people' | 'private'; visibleTo: string[]; priority: number;
   blockedBy: string[]; blocks: string[];
 }>;
+
+/** Where a file's live room is, and who this copy is in it (main/team/live-room.mjs). */
+export interface LiveRoomTicket {
+  url: string;
+  me: { name: string; person: string; color: string; kind: 'person' | 'agent'; canSave: boolean; owner: boolean };
+}

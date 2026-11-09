@@ -104,6 +104,11 @@ export function stopChrome(chrome, profile, { bin = CHROME } = {}) {
   if (profile) fs.rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 }
 
+/** Whether launchChrome would start this browser here, for tests that need a real one. */
+export function canDrive(bin = CHROME, platform = process.platform, exists = fs.existsSync) {
+  return !(platform === 'darwin' && bin === MAC_CHROME) && exists(bin);
+}
+
 /**
  * Start a headless Chrome on a throwaway profile and wait for its devtools
  * address. `detached` leaves it running after this process ends (the breaker's
