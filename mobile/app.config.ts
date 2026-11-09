@@ -29,7 +29,7 @@ export function cloudConfig(env: Record<string, string | undefined> = process.en
     const c = JSON.parse(fs.readFileSync(file, 'utf8'));
     if (typeof c?.url === 'string' && typeof c?.anonKey === 'string') return { url: c.url, anonKey: c.anonKey, phoneSite: site(c.url, c.phoneSite) };
   }
-  return { url: CLOUD_ADDRESS.supabaseUrl, anonKey: CLOUD_ADDRESS.anonKey, phoneSite: PHONE_SITE };
+  return { url: CLOUD_ADDRESS.supabaseUrl, anonKey: CLOUD_ADDRESS.anonKey, phoneSite: env.EXPO_PUBLIC_PHONE_SITE || PHONE_SITE };
 }
 
 // The image picker gets the same words: its `false` would delete the

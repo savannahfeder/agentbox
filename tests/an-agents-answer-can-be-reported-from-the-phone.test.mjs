@@ -32,7 +32,7 @@ describe('the screens', () => {
     expect(menu.slice(menu.indexOf('Report this thread') - 40, menu.indexOf('Report this thread'))).not.toMatch(/!closed &&/);
   });
   it('the thread opens the feedback page naming itself', () => {
-    expect(read('app/thread/[product]/[id].tsx')).toMatch(/onReport=\{\(\) => router\.push\(\{ pathname: '\/settings\/feedback', params: \{ report: `\$\{product\}\/\$\{id\}`, title: item\.title \?\? '' \} \}\)\}/);
+    expect(read('app/thread/[product]/[id].tsx')).toMatch(/onReport=\{\(\) => router\.push\(\{ pathname: '\/settings\/feedback', params: \{ report: `\$\{product\}\/\$\{id\}`, title: item\.title \?\? '', answer: /);
   });
   it('the feedback page says it is a report and sends it as one', () => {
     expect(read('app/settings/feedback.tsx')).toMatch(/title=\{report \? 'Report this thread' : 'Send feedback'\}/);

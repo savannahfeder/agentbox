@@ -603,7 +603,7 @@ export default function ThreadScreen() {
         projects={offers.move ? moveChoices(item, c.view.products) : []} onMove={(to) => void press({ kind: 'move', to: to.slug, name: to.name }, item, back)}
         place={offers.place} onPlace={(keep) => void press({ kind: 'keep-here', keep })}
         repeats={!!rule} onEndRepeat={() => { if (rule) void press({ kind: 'end-repeat', rule }); }}
-        onReport={() => router.push({ pathname: '/settings/feedback', params: { report: `${product}/${id}`, title: item.title ?? '' } })}
+        onReport={() => router.push({ pathname: '/settings/feedback', params: { report: `${product}/${id}`, title: item.title ?? '', answer: (page.answer ? [page.answer.headline, page.answer.rest].filter(Boolean).join('\n\n') : thread.outcome?.text ?? '').slice(0, 4000) } })}
         onClose={close} closed={threadState(item) === 'done'} />
       {summary && <Summary thread={thread} now={c.now} close={() => setSummary(false)} />}
     </Wall>
