@@ -179,7 +179,11 @@
 .av-reply-write textarea:focus { border-color: var(--text-faint); }
 .av-reply-write textarea::placeholder { color: var(--text-faint); }
 .av-settled { align-self: flex-start; margin: 6px 10px; }
-/* Lined up with the comments' own text and their Resolve buttons (.av-list 8px + .av-note 10px). */
+/* The sidebar's head leaves room for a document's corner marks; here the marks are in the bar above. */
+.av-side .sb-head { padding: 0 18px; }
+/* On the notes' own left edge (.av-list 8px + .av-note 10px). */
+.av-list > .sb-sec { flex: none; padding: 0 10px; }
+.av-write-send:not(:has(.av-glyph)) { width: 28px; padding: 0; }
 .av-unsent-bar {
   position: absolute; left: 50%; bottom: 72px; transform: translateX(-50%); z-index: 5;
   display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 14px; white-space: nowrap;

@@ -45,7 +45,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   // one that changes what the window shows (palette-rows.ts).
   machine?: ThemeChoice;
   onSetLook: (look: Look) => void;
-  /** The sky themes (Alpha features, Home), each a theme of its own; `on` is the one worn. */
+  /** The sky themes, each a theme of its own; `on` is the one worn. */
   skyThemes?: { id: string; name: string; on: boolean }[];
   onSkyTheme?: (id: string) => void;
   // Main-process files that changed since this process read them.
