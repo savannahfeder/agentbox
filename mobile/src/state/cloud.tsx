@@ -257,7 +257,8 @@ function useCloudState() {
     if (!sender) return null;
     if (needsNotice(press.kind) && !agreed) await askNotice();
     const at = Date.now();
-    const plan = planFor(press, item, at, { away: macAway(macSeenOf(rowsNow.current.projects), at), cloud: cloudCarriesOn(rowsNow.current.projects) });
+    const inCloud = !!item && phoneView(rowsNow.current, at).running.some((r: { itemId: string; product: string; where?: string }) => r.itemId === item.id && r.product === item.product && r.where === 'cloud');
+    const plan = planFor(press, item, at, { away: macAway(macSeenOf(rowsNow.current.projects), at), cloud: cloudCarriesOn(rowsNow.current.projects), inCloud });
     if (!plan) return null;
     const made = await runSteps(sender, plan.steps);
     if (made && typeof made === 'object' && 'ok' in made && made.ok === false) throw new Error(String((made as { error?: string }).error ?? 'Not sent.'));

@@ -40,8 +40,9 @@ describe('which documents take it', () => {
   it('a markdown document', () => {
     for (const f of ['answers.md', 'docs/plan.markdown', 'designs/w-1/plan-v2.md?x=1']) expect(takesNotesSidebar(f), f).toBe(true);
   });
-  it('not a page, a picture, a script or nothing', () => {
-    for (const f of ['options.html', 'a.png', 'cart.mjs', 'notes.md.png', '', null]) expect(takesNotesSidebar(f), String(f)).toBe(false);
+  // Pages and scripts take it too since w-858a033e54: a-page-or-script-full-screen-has-the-notes-sidebar-too.
+  it('not a picture or nothing', () => {
+    for (const f of ['a.png', 'notes.md.png', '', null]) expect(takesNotesSidebar(f), String(f)).toBe(false);
   });
   it('only full screen, on the thread you are in, and never a teammate\'s read-only copy', () => {
     const app = read('App.tsx');

@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   planWakes, foldTeammates, foldChat, mentionsIn, letterFor, runIdFor, waitingOnYou,
-  isActiveRun, statusOf, runLines, teammateLabel, seenKey, DEFAULT_LIMIT, MAX_HOPS,
+  isActiveRun, statusOf, runLines, teammateLabel, seenKey, DEFAULT_LIMIT, MAX_HOPS, CHAT_LABEL,
 } from '../shared/teammates.mts';
 
 const NOW = new Date(2026, 9, 26, 9, 30).getTime(); // a Monday, after 9am
@@ -62,7 +62,7 @@ describe('what wakes a teammate', () => {
   });
 
   it('your message goes into the run already waiting on you rather than starting a second', () => {
-    const waiting = run(felix, { id: 'w-222222', result: 'Ship it?', wrote: { result: { ts: NOW - 500, source: 'agent' } } });
+    const waiting = run(felix, { id: 'w-222222', labels: ['founder', teammateLabel(felix.id), CHAT_LABEL], result: 'Ship it?', wrote: { result: { ts: NOW - 500, source: 'agent' } } });
     expect(waitingOnYou(waiting)).toBe(true);
     const m = { id: 'm-2', kind: 'msg', from: 'you', to: [felix.id], text: 'Yes, ship it', ts: NOW };
     const acts = planWakes({ teammates: [felix], chat: chat([m]), items: [waiting], now: NOW });
