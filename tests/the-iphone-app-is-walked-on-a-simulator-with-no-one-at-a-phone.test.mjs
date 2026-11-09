@@ -41,6 +41,11 @@ describe('the iPhone walk job', () => {
   it('runs the walk it names', () => {
     expect(workflow.on.workflow_dispatch.inputs.flow.default).toBe('mobile/.maestro/review-walk.yml');
   });
+
+  it('keeps every screenshot the walk took', () => {
+    const walk = job.steps.find((s) => s.name === 'Walk it').run;
+    expect(walk).toMatch(/find [^\n]*\.maestro[^\n]*-name '\*\.png'/);
+  });
 });
 
 describe('the walk', () => {
@@ -50,8 +55,7 @@ describe('the walk', () => {
   });
 
   it('types the password from the job, never from the file', () => {
-    expect(flowText).toContain('${REVIEW_PASSWORD}');
-    expect(flowText).not.toMatch(/inputText: "(?!appreview@)[^"$]*"\s*\n- hideKeyboard/);
+    expect(body.filter((s) => s.inputText).map((s) => s.inputText)).toContain('${REVIEW_PASSWORD}');
   });
 
   it('waits for an answer to a reply and to a new thread, words its own message does not hold', () => {

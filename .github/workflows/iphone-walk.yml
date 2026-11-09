@@ -14,6 +14,9 @@ on:
       flow:
         description: Maestro flow to run
         default: mobile/.maestro/review-walk.yml
+      flow_b64:
+        description: Or a flow's text, base64, to try one before it ships
+        required: false
 
 permissions:
   contents: read
@@ -47,13 +50,16 @@ jobs:
         env:
           REVIEW_PASSWORD: ${{ secrets.REVIEW_PASSWORD }}
           FLOW: ${{ inputs.flow }}
+          FLOW_B64: ${{ inputs.flow_b64 }}
         run: |
           mkdir -p walk
+          if [ -n "$FLOW_B64" ]; then FLOW=mobile/.maestro/tried.yml; echo "$FLOW_B64" | base64 -d > "$FLOW"; fi
           xcrun simctl io "$UDID" recordVideo --codec=h264 walk/walk.mp4 & rec=$!
           cd walk
           status=0
           maestro test "$GITHUB_WORKSPACE/$FLOW" -e REVIEW_PASSWORD="$REVIEW_PASSWORD" -e RUN="$GITHUB_RUN_NUMBER" || status=$?
           kill -INT $rec; wait $rec || true
+          find "$GITHUB_WORKSPACE/mobile/.maestro" "$HOME/.maestro/tests" -name '*.png' -exec cp {} . \; 2>/dev/null || true
           exit $status
       - name: Keep the screens
         if: always()
