@@ -192,6 +192,7 @@ import { threadsMade, approvableFiled, doItHereWrites, answerAllWrites, RUN_IT }
 import { waitingCounts } from './threads-made';
 import { closeAsk, closeAskOwnsKey, unshippedAsk } from './close-asks-first';
 import { notShipped, shipItAsk } from '../../shared/not-shipped.mts';
+import { openSignIn } from '../../shared/sign-in-ask.mjs';
 import { ChatAgentsContext, type ChatAgentsValue } from './team/ChatAgents';
 import { agentLinks, askedInLabel, chatProjects, chatTaskSharing, chatTranscript, lastAskKeptOnMac, taskBrief, taskTitle, withTask } from './team/agent-mentions';
 import { answersInTheirChat } from './team/answers-in-the-chat';
@@ -2171,12 +2172,13 @@ export default function App() {
   // process pushes, while its card is already leaving with a verdict on it
   // (`approvalStage`), and a row still reading Needs you behind that card is
   // the app disagreeing with itself.
+  // A sign-in link an agent is waiting on asks you just as a permission card does.
   const askingIds = useMemo(
-    () => new Set((snap?.approvals ?? [])
+    () => new Set([...(snap?.approvals ?? [])
       .filter((a) => a.id !== answered?.id)
       .map((a) => a.item)
-      .filter((id): id is string => !!id)),
-    [snap?.approvals, answered?.id],
+      .filter((id): id is string => !!id), ...items.filter((i) => openSignIn(i)).map((i) => i.id)]),
+    [snap?.approvals, answered?.id, items],
   );
   const asking = useCallback((i: { id: string }) => askingIds.has(i.id), [askingIds]);
   // EVERYTHING THE SUPERVISOR KNOWS ABOUT EVERY THREAD, in one context, so the
