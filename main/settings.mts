@@ -29,7 +29,6 @@ import { accountSentence, engineTroubleNote, refineCause } from '../shared/spawn
 import { readPlan } from './claude-plan.mjs';
 import { effectiveProfiles, troubleForProfile } from './account-discovery.mjs';
 import { machineSlots, machineNote, autoAgents, MAX_SLOTS } from './machine.mjs';
-import { shortPath } from './agent-files.mts';
 import { NAME, Name } from '../shared/product-name.mjs';
 import { autoSlots } from './memory-gate.mts';
 import { accountIdentity, claudeLoginCommand, duplicateAccountNote, linkAccountTooling, makeClaudeHome } from './account-tooling.mjs';
@@ -139,7 +138,6 @@ export interface SettingsSupervisor {
   memoryGateStatus?(): MemoryGateReading | null | undefined;
   startHoldStatus?(): { holding?: boolean } | null | undefined;
   leftoverStatus?(): LeftoverReading | null | undefined;
-  strayFolders?(): { project?: string; path?: unknown }[] | null | undefined;
   onChange?: (() => void) | null;
   wake?(): void;
   accountChosen?(engine: string, profile: string | null): void;
@@ -789,7 +787,6 @@ export function readSettings({ config, supervisor, store }: SettingsDeps, { sear
       machineNote: machineNote(slotsHere, config.maxConcurrentSessions as number | undefined),
       memoryGate: memoryGateSettings({ config, supervisor }),
       leftovers: leftoverSettings({ config, supervisor }),
-      strayFolders: strayFolderSettings({ supervisor }),
       capacity: status.capacity,
       running: sessions.length,
       model: parseSessionArgs(workspaceArgs).model,
@@ -1257,37 +1254,6 @@ export function leftoverSettings({ config, supervisor }: { config: SettingsConfi
     }
   }
   return { on, now };
-}
-
-/**
- * WORKTREES OF A PROJECT THE APP DID NOT MAKE, SAID OUT LOUD (w-330eea6c66).
- * Named as git names them: "copies of a project made by hand" was a phrase
- * its own reader could not place (w-54c640f8da).
- *
- * MEASURED 2026-10-07: thirteen worktrees of one repository sat outside the
- * folder the app keeps its own in, about 740 MB, and nothing in the app could
- * list, show or sweep one. That is the same invisibility that stranded 26 GB on
- * 2026-09-22, and the half that fixes it for a person is being told.
- *
- * NO BUTTON, DELIBERATELY. A folder the app did not make is not the app's to
- * remove: it is the only copy of whatever is uncommitted inside it, and somebody
- * made it on purpose. So this is a sentence and nothing else, and it is absent
- * entirely when there is nothing to say, because a row that is usually quiet
- * trains the reaction it exists to prevent.
- */
-export function strayFolderSettings({ supervisor }: { supervisor?: SettingsSupervisor }, home = os.homedir()) {
-  let list: { project?: string; path?: unknown }[] = [];
-  try { list = supervisor?.strayFolders?.() ?? []; } catch { list = []; }
-  if (!list.length) return null;
-  const count = list.length;
-  const one = count === 1;
-  const projects = [...new Set(list.map((w) => w.project).filter(Boolean))];
-  const named = list.slice(0, 2).map((w) => shortPath(w.path as string, home)).join(' and ');
-  const of = projects.length ? ` of ${projects.slice(0, 2).join(' and ')}${projects.length > 2 ? ' and other projects' : ''}` : '';
-  const where = count > 2 ? `among them ${named}` : `at ${named}`;
-  const what = one ? 'delete it when you’re done with it' : 'delete the ones you’re done with';
-  const now = `${count} ${one ? 'worktree' : 'worktrees'}${of} ${one ? 'is' : 'are'} using disk space, ${where}. ${NAME} never deletes a worktree it didn’t make, so ${what}.`;
-  return { count, now };
 }
 
 export function cornerTagTurnedOff({ key, value }: { key?: string; value?: unknown } = {}) {

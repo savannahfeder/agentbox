@@ -877,12 +877,6 @@ export interface RemoteControlState {
   [fact: string]: unknown;
 }
 
-/** A folder in a project's checkout that no row owns. */
-export interface StrayFolder {
-  project: string;
-  [fact: string]: unknown;
-}
-
 /** One cloud sign-in being walked through (`cloudSignIn`). */
 export interface CloudSignInFlow {
   status(): { state: string; url?: string | null; code?: string | null; message?: string | null; attempt?: string };
@@ -1370,9 +1364,7 @@ export class Supervisor {
   declare _oldChoiceSaid: Set<string> | undefined;
   declare _folderRefused: Set<string> | undefined;
   declare _countedNotStarting: Set<string> | undefined;
-  declare _notStarting: Map<string, { why: string; engine: string | null; at: number }> | undefined;
-  declare _strayFolders: Map<string | null, StrayFolder[]> | undefined;
-  declare _handedBack: Set<string> | undefined;
+  declare _notStarting: Map<string, { why: string; engine: string | null; at: number }> | undefined;  declare _handedBack: Set<string> | undefined;
   declare _mergingHome: Map<string, Promise<void>> | undefined;
   declare _mergeHomeSaid: Record<string, MergeOutcome> | undefined;
   declare _moveAsked: Set<string> | undefined;
@@ -3496,11 +3488,10 @@ export class Supervisor {
     if (!product?.repoPath || base !== product.repoPath) return 0;
     const busy = (id: string) => this.sessions.has(id) || !!this._preparing?.has(id) || this._folderInUse(id);
     let put = 0;
-    // AND WHILE WE ARE HERE, WHAT ELSE IS HOLDING THE DISK (w-330eea6c66). This
-    // is the only place that already walks a project's folders on a clock, and
-    // the strays are deliberately not in the list below: they are nobody's row,
-    // so they are shown and never swept.
-    await this.lookOverTheProjectsFolders(product, base);
+    // This is the only place that already walks a project's folders on a clock.
+    // Worktrees the app did not make are not in the list below, so they are
+    // never swept.
+    await this.lookOverTheProjectsFolders(base);
     for (const folder of await folderJob('listTaskFolders', base)) {
       // OUR OWN PID IS NOT SOMEBODY ELSE. Every folder is locked by the process
       // that made it, which is this one, so treating any lock as a live holder
@@ -3551,41 +3542,17 @@ export class Supervisor {
   }
 
   /**
-   * EVERY COPY OF A PROJECT ON THE DISK, INCLUDING THE ONES THE APP DID NOT MAKE
-   * (w-330eea6c66).
-   *
-   * MEASURED 2026-10-07: thirteen worktrees of one repository sat outside the
-   * app's own home holding about 740 MB, made by hand by sessions rather than by
-   * the app, and nothing in the app could list, show or sweep one. This is the
-   * showing half: the strays are remembered here so a page can name them without
-   * reading the disk on the window's thread.
-   *
-   * IT ONLY EVER LOOKS. Removing a folder somebody made on purpose is not the
-   * app's to do, and the folder is the only copy of whatever is uncommitted in
-   * it. The one thing it does change is bookkeeping with nothing behind it: a
-   * registration whose folder has gone, which is what refuses the next
-   * `worktree add` at that path (one of the thirteen was under `/private/tmp`,
-   * which macOS purges).
+   * DROPS WORKTREE REGISTRATIONS WHOSE FOLDER HAS GONE (w-330eea6c66), which is
+   * what refuses the next `worktree add` at that path. It never touches a folder
+   * that exists: a worktree somebody made on purpose is not the app's to remove.
    */
-  async lookOverTheProjectsFolders(product: Product, base: string) {
+  async lookOverTheProjectsFolders(base: string) {
     try {
       const dropped = await folderJob('pruneMissingWorktrees', base);
       if (dropped.length) console.warn(`zero: dropped ${dropped.length} worktree registration(s) in ${base} pointing at nothing`);
-      const strays = await folderJob('strayWorktrees', base);
-      this._strayFolders ??= new Map();
-      // By checkout rather than by product, so two products registering the same
-      // one do not count its folders twice.
-      this._strayFolders.set(product.repoPath, strays.map((w) => ({ ...w, project: product.name || product.slug })));
     } catch (error) {
       console.warn('zero: could not look over the project´s folders:', (error as Error).message);
     }
-  }
-
-  /** Copies of a project on this disk the app did not make, as the last sweep found them. */
-  strayFolders() {
-    const out: StrayFolder[] = [];
-    for (const list of this._strayFolders?.values() ?? []) out.push(...list);
-    return out;
   }
 
   profileHoldingSession(sessionId: string | null | undefined, itemId: string, product: Product | null | undefined) {

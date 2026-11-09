@@ -898,11 +898,6 @@ export const fixtureSettings = {
     sessionsAtOnce: 3,
     memoryGate: { on: true, slots: null, slotsAuto: 2, slotsMax: 12, now: null },
     leftovers: { on: true, now: 'Finished agents have left 40 programs running. 40 stop when you close their tasks.' },
-    // WORKTREES NOBODY'S TASK OWNS (main/settings.mts, `strayFolderSettings`).
-    // A fixture because the row is absent whenever there are none, which is most
-    // of the time and all of a fresh install: without one there is no way to
-    // look at the sentence before it is true for somebody.
-    strayFolders: { count: 11, now: `11 worktrees of Kestrel are using disk space, among them ~/Desktop/dev/kestrel-fontsize and ~/Desktop/dev/kestrel-cardart. ${NAME} never deletes a worktree it didn’t make, so delete the ones you’re done with.` },
     capacity: 6,
     running: 2,
     model: 'claude-opus-5',
