@@ -248,8 +248,7 @@ async function actAsTeammate(brief, prompt, answer) {
 
 let said = plan.say ?? 'the stub worker ran';
 
-// A THREAD STUCK ON A CAUSE, PLAYED: it waits on the cause's row and names it,
-// as the tool tells a real agent to.
+// A THREAD STUCK ON A CAUSE, PLAYED: it waits on the cause's row and says so.
 async function actStuck(stuck) {
   const server = storeServer();
   if (!server || !process.env.ZERO_ITEM) return null;
@@ -258,7 +257,7 @@ async function actStuck(stuck) {
     const out = await session.call('wait_on_cause', stuck);
     let id = null;
     try { id = JSON.parse(out?.result?.content?.[0]?.text ?? '{}').waitingOn ?? null; } catch { id = null; }
-    return id ? `Waiting on ${id}.` : `Waiting on: ${stuck.cause}.`;
+    return id ? `Waiting on: ${stuck.cause}.` : `Could not wait on: ${stuck.cause}.`;
   } finally {
     session.close();
   }

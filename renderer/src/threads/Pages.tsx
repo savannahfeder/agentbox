@@ -1098,7 +1098,9 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
           const on = pick && !!marked?.has(e.item!.id);
           const edge = isSelected(e) && !marked?.size;
           // A teammate's card carries their summary and never our agents.
-          const status = e.item ? statusCell(e.item, { ...factsFor(fleet, e.item.id), state: e.state, inProgress: e.state === 'running', now, practice: !!products.find((p) => p.slug === e.item!.product)?.practice }) : null;
+          const drawn = e.item ? statusCell(e.item, { ...factsFor(fleet, e.item.id), state: e.state, inProgress: e.state === 'running', now, practice: !!products.find((p) => p.slug === e.item!.product)?.practice }) : null;
+          // A cause card says how many wait behind it, as its list row does.
+          const status = drawn && e.item && isCause(e.item) && e.item.status !== 'done' ? { ...drawn, word: causeWord(waitingOn(e.item, allItems ?? []).length) } : drawn;
           const prio = rowPriorityId(e.priority);
           const seen = e.item ? sharing(e.item) : null;
           const who = seen === 'people' ? <SharedMark label="Visible to the people on it" /> : seen === 'private' ? <LockMark /> : null;
@@ -1141,7 +1143,7 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
             : onThem ? <span className="s">{onThem}</span>
             : waitWord ? <span className="s">{waitWord}</span>
             : e.card?.shippedAt ? <span className="s">Shipped</span>
-            : status && saysOnCard(status, e.item!, e.state)
+            : status && (saysOnCard(status, e.item!, e.state) || (status !== drawn))
             ? <span className="s"><StatusMark status={status} />{status.word}</span>
             : e.live && <RunningMark cloud={!!e.item && cloudIds.has(e.item.id)} />}{prio && <PriorityMark id={prio} />}{e.project && <span className="p">{e.project}</span>}
             {withOthers && <Face person={personOf(team, e.ownerId)} me={e.ownerId === me} />}</div>

@@ -1,8 +1,8 @@
 // A thread stuck on something outside its own work joins the one row for that
 // cause, or opens it (shared/causes.mjs). Which open cause is the same one is
 // the stuck agent's call: it is told every open cause and picks.
-import { listWorkItems, createItem } from './work.mjs';
-import { CAUSE_KIND, CAUSE_LABEL, openCauses, waitingOn, cameBack, leadBrief } from '../../shared/causes.mjs';
+import { listWorkItems, createItem, updateItem } from './work.mjs';
+import { CAUSE_KIND, CAUSE_LABEL, openCauses, waitingOn, cameBack, leadBrief, keeperOf } from '../../shared/causes.mjs';
 
 const TITLE_CHARS = 80;
 
@@ -32,5 +32,12 @@ export function joinCause({ thread, cause, ask = '', causeId = null, isNew = fal
     labels: ['founder', CAUSE_LABEL],
     priority: from?.priority ?? 5,
   }, { source: 'system' });
+  // Two threads stuck at the same moment both find no open cause and both open
+  // one (fourth Codex power test). The oldest is kept and the other closes itself.
+  const first = keeperOf(title, openCauses(listWorkItems({ now })));
+  if (first && first.id !== row.id) {
+    updateItem(row.id, { status: 'done' }, { source: 'system' });
+    return { causeId: first.id, opened: false };
+  }
   return { causeId: row.id, opened: true };
 }

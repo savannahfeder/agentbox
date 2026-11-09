@@ -13,7 +13,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { isCause, causeOf, waitingOn, causeWord, causeWhere, openCauses, cameBack, leadBrief, withoutBrief, CAUSE_KIND, CAUSE_LABEL, CAUSE_WAIT_WORD, CAUSE_BACK_WORDS } from '../shared/causes.mjs';
+import { isCause, causeOf, keeperOf, waitingOn, causeWord, causeWhere, openCauses, cameBack, leadBrief, withoutBrief, CAUSE_KIND, CAUSE_LABEL, CAUSE_WAIT_WORD, CAUSE_BACK_WORDS } from '../shared/causes.mjs';
 import { filedByThePerson } from '../shared/answers.mjs';
 import { Supervisor } from '../main/supervisor.mts';
 
@@ -96,14 +96,32 @@ describe('what the testers found in the third run', () => {
     expect(page).toMatch(/\?\? \(stuckOn \? `Waits on \$\{stuckOn\.title\}` : undefined\)/);
   });
 
-  it('a waiting thread is told to name its cause row, which the app draws as a link', () => {
-    const tools = fs.readFileSync(new URL('../mcp/tools.mjs', import.meta.url), 'utf8');
-    expect(tools).toMatch(/naming its row as \$\{joined\.causeId\} so the person can open it/);
+  it('the board card of a cause says how many wait, as its list row does', () => {
+    const page = fs.readFileSync(new URL('../renderer/src/threads/Pages.tsx', import.meta.url), 'utf8');
+    expect(page).toMatch(/isCause\(e\.item\) && e\.item\.status !== 'done' \? \{ \.\.\.drawn, word: causeWord\(waitingOn\(e\.item, allItems \?\? \[\]\)\.length\) \}/);
+  });
+});
+
+// The fourth Codex power test: two threads stuck at the same moment each
+// opened a row for the same cause.
+describe('two threads stuck at once keep one row', () => {
+  const rows = [cause('w-b', { createdAt: 2 }), cause('w-a', { createdAt: 2 }), cause('w-c', { createdAt: 1, title: 'Main is broken' })];
+  it('both keep the oldest, and on a tie the lowest id', () => {
+    expect(keeperOf("your mac can't push to github", rows)?.id).toBe('w-a');
+    expect(keeperOf("Your Mac can't push to GitHub", [cause('w-z', { createdAt: 1 }), ...rows])?.id).toBe('w-z');
+  });
+  it('a cause of another name is never the keeper', () => {
+    expect(keeperOf('Cloud runs have no GitHub sign-in', rows)).toBeNull();
+  });
+  it('the twin that closed itself unanswered is not a cause that came back', () => {
+    const twin = cause('w-b', { status: 'done', updatedAt: T - 1000 });
+    expect(cameBack("Your Mac can't push to GitHub", [twin], T)).toBe(false);
+    expect(cameBack("Your Mac can't push to GitHub", [{ ...twin, result: 'Checked.' }], T)).toBe(true);
   });
 });
 
 describe('a cause that comes back is fixed for good', () => {
-  const closed = (at, title) => cause('c0', { status: 'done', updatedAt: at, ...(title ? { title } : {}) });
+  const closed = (at, title) => cause('c0', { status: 'done', updatedAt: at, result: 'Checked.', ...(title ? { title } : {}) });
   it('notices the same cause closed in the last two weeks', () => {
     expect(cameBack("Your Mac can't push to GitHub", [closed(T - 3 * DAY)], T)).toBe(true);
   });
@@ -165,21 +183,13 @@ describe('a stuck thread waits on its cause through the store tool', () => {
     expect(waitingOn(read(first.waitingOn), work.listWorkItems({ includeDone: true })).map((i) => i.id).sort()).toEqual([a.id, b.id].sort());
   });
 
-  // The third Codex run: the lead answered naming two threads, a third joined
-  // after, and the opened row went on saying two.
-  it('a thread that joins later is named on the cause row, by the app', async () => {
+  // The fourth Codex run: a note on the row after the lead answered took away
+  // its answer's buttons, so a join is said nowhere but the count.
+  it('a thread that joins later leaves the lead\'s answer as the last word', async () => {
     const a = thread(product, 'Write the on-call runbook');
     const first = await call(a.id, { cause: "Your Mac can't push to GitHub", new: true });
     const b = thread(other, 'Why did last night\'s deploy take 40 minutes');
     await call(b.id, { causeId: first.waitingOn });
-    const row = read(first.waitingOn);
-    expect(row.note).toBe("Why did last night's deploy take 40 minutes is waiting on this too.");
-    expect(row.wrote.note.source).toBe('system');
-  });
-
-  it('the thread that opens the row is not named twice', async () => {
-    const a = thread(product, 'Write the on-call runbook');
-    const first = await call(a.id, { cause: "Your Mac can't push to GitHub", new: true });
     expect(read(first.waitingOn).note).toBeUndefined();
   });
 

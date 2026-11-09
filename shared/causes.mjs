@@ -32,9 +32,11 @@ export function causeOf(item, items) {
 export const CAUSE_WAIT_WORD = 'Waiting';
 export const CAUSE_BACK_WORDS = 'When fixed';
 
-/** What a cause row is told when another thread joins it. */
-export function joinedWords(thread) {
-  return `${thread?.label || thread?.title || 'Another thread'} is waiting on this too.`;
+/** Of the open causes named `title`, the one every racer keeps: the oldest, then the lowest id. */
+export function keeperOf(title, open) {
+  const same = String(title ?? '').trim().toLowerCase();
+  return (open ?? []).filter((c) => String(c.title ?? '').trim().toLowerCase() === same)
+    .sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0) || String(a.id).localeCompare(String(b.id)))[0] ?? null;
 }
 
 /** "6 waiting", for the Status column. */
@@ -58,7 +60,8 @@ const DAY = 86_400_000;
 /** A closed cause of the same name in the last two weeks: it came back. */
 export function cameBack(title, items, now = Date.now()) {
   const same = String(title ?? '').trim().toLowerCase();
-  return (items ?? []).some((i) => isCause(i) && i.status === 'done'
+  // A twin that closed itself the moment it opened (mcp/core/causes.mjs) was never answered.
+  return (items ?? []).some((i) => isCause(i) && i.status === 'done' && i.result
     && String(i.title ?? '').trim().toLowerCase() === same && now - (i.updatedAt ?? 0) < 14 * DAY);
 }
 
