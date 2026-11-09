@@ -15,7 +15,7 @@ import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { starterAsks } from '../../../shared/teammates.mjs';
 import { SKY_THEMES, drawSky } from '../home/sky';
-import { connectTiles, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupStep } from '../setup-split';
+import { connectTiles, toolUse, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupStep } from '../setup-split';
 import { logoOf } from '../connections/logos';
 import FolderPicker from './FolderPicker';
 import { Name } from '../../../shared/product-name.mjs';
@@ -30,7 +30,7 @@ const Tick = () => <svg width="13" height="13" viewBox="0 0 16 16" fill="none" s
 const Plus = () => <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true"><path d="M8 2.5v11M2.5 8h11" /></svg>;
 const Folder = () => <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" aria-hidden="true"><path d="M2 4.5c0-.6.4-1 1-1h3.2l1.4 1.5H13c.6 0 1 .4 1 1V12c0 .6-.4 1-1 1H3c-.6 0-1-.4-1-1z" /></svg>;
 
-function Mark() {
+export function Mark() {
   const at = [21, 50, 79];
   return <svg viewBox="10 10 80 80" width="13" height="13" aria-hidden="true">{at.map((cy, r) => at.map((cx, c) => (
     <circle key={`${r}${c}`} cx={cx} cy={cy} r="10.5" fill={r === 0 && c === 2 ? 'var(--accent)' : 'currentColor'} fillOpacity={r === 0 && c === 2 ? 1 : 0.38} />
@@ -86,8 +86,13 @@ export function SetupSplit(p: SetupSplitProps) {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState({ chats: 0, project: null as string | null, tools: 0, invited: 0, teammates: [] as string[] });
   const hadProject = useRef((p.snap?.products?.length ?? 0) > 0).current;
-  const project = hadProject || !!done.project || done.chats > 0;
-  const steps = useMemo(() => setupSteps({ chats: p.chats.length, team, teammates: teammatesOn, project }), [p.chats.length, team, teammatesOn, project]);
+  // Until the first step is answered a project may still come, so the count does not jump.
+  const project = hadProject || at === 0 || !!done.project || done.chats > 0;
+  // Asked as the setup opens, so a computer that cannot keep a sign-in never sees the tools step.
+  const [tiles, setTiles] = useState<ConnectionTile[] | null>(null);
+  const [tools, setTools] = useState(true);
+  useEffect(() => { void api.connections().then((l) => { setTiles(connectTiles(l.tiles)); setTools(l.canEncrypt !== false); }).catch(() => setTools(false)); }, []);
+  const steps = useMemo(() => setupSteps({ chats: p.chats.length, team, teammates: teammatesOn, project, tools }), [p.chats.length, team, teammatesOn, project, tools]);
   // Picking a look must not reorder the list under the pointer.
   const looks = useRef(lookChoices(p.look, p.skies)).current;
   const finished = at >= steps.length;
@@ -113,10 +118,8 @@ export function SetupSplit(p: SetupSplitProps) {
   const back = at > 0 && !finished ? () => { setError(null); setAt((i) => i - 1); } : null;
 
   // ---- connect
-  const [tiles, setTiles] = useState<ConnectionTile[] | null>(null);
   const [keyFor, setKeyFor] = useState<string | null>(null);
   const [keyText, setKeyText] = useState('');
-  useEffect(() => { if (step === 'connect' && !tiles) void api.connections().then((l) => setTiles(connectTiles(l.tiles))); }, [step, tiles]);
   const connect = useCallback(async (id: string, key?: string) => {
     setBusy(true); setError(null);
     const r = await api.connectionsConnect(key ? { id, key } : { id }).catch((e) => ({ ok: false, error: String(e) } as const));
@@ -253,7 +256,7 @@ export function SetupSplit(p: SetupSplitProps) {
           </div>
         ) : (
           <Row key={t.id} face={<span className="ss-logo">{connectionLogo(t.id)}</span>} name={t.name}
-            sub={t.connected ? (t.access === 'key' ? 'Connected with a personal token' : 'Connected') : t.said?.reads ?? t.word}
+            sub={t.connected ? (t.access === 'key' ? 'Connected with a personal token' : 'Connected') : toolUse(t.id)}
             end={t.connected ? <span className="ss-dim"><Tick />Connected</span> : <span className="ss-faint"><Plus />Connect</span>}
             onClick={t.connected ? undefined : () => void connect(t.id)} />
         ))}

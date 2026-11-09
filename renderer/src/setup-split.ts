@@ -5,9 +5,10 @@
 export type SetupStep = 'chats' | 'folder' | 'connect' | 'invite' | 'teammates' | 'look';
 
 /** Only the steps that can apply on this build: most people are not on a team,
- *  and an AI teammate needs a project to work in. */
-export function setupSteps({ chats, team, teammates, project }: { chats: number; team: boolean; teammates: boolean; project: boolean }): SetupStep[] {
-  const out: SetupStep[] = [chats > 0 ? 'chats' : 'folder', 'connect'];
+ *  an AI teammate needs a project to work in, and a tool needs somewhere safe to keep its sign-in. */
+export function setupSteps({ chats, team, teammates, project, tools }: { chats: number; team: boolean; teammates: boolean; project: boolean; tools: boolean }): SetupStep[] {
+  const out: SetupStep[] = [chats > 0 ? 'chats' : 'folder'];
+  if (tools) out.push('connect');
   if (team) out.push('invite');
   if (teammates && project) out.push('teammates');
   out.push('look');
@@ -18,6 +19,13 @@ export const stepLabel = (steps: SetupStep[], step: SetupStep) => `Step ${steps.
 
 /** The tools an engineering team reaches for first, in the order offered. */
 export const CONNECT_FIRST = ['github', 'linear', 'sentry', 'notion', 'vercel'];
+
+const USE: Record<string, string> = {
+  github: 'Issues and pull requests', linear: 'Issues and projects', sentry: 'Errors from production',
+  notion: 'Docs and specs', vercel: 'Deploys and previews',
+};
+/** What a tool is for, in the setup's words; one line each, all the same length. */
+export const toolUse = (id: string) => USE[id] ?? '';
 
 type TileLike = { id: string; access?: string };
 export function connectTiles<T extends TileLike>(tiles: T[]): T[] {
@@ -71,11 +79,12 @@ export function tourChecklist(done: readonly Lesson[], cmd = '⌘', now: Lesson 
   const rows: Array<[string, string[], Lesson[], Lesson[]]> = [
     ['Send a thread', ['N'], ['start', 'compose'], ['start', 'compose']],
     ['Open one', ['↵'], ['open'], ['open', 'working']],
-    ['Answer it', ['R'], ['choose', 'reply'], ['choose', 'reply', 'busy']],
+    ['Write back', ['R'], ['choose', 'reply'], ['choose', 'reply', 'busy']],
     ['Mark it done', ['E'], ['close'], ['close']],
     ['Find anything', [cmd, 'K'], ['palette'], ['palette', 'urgent']],
   ];
-  const at = now ? rows.findIndex(([, , , by]) => by.includes(now)) : -1;
+  // A row already done keeps its tick; the tour pointing back at it lights the next one to do.
+  const at = now ? rows.findIndex(([, , ls, by]) => by.includes(now) && !has(...ls)) : -1;
   const lit = at >= 0 ? at : rows.findIndex(([, , ls]) => !has(...ls));
   return rows.map(([label, keys, ls], i) => ({ label, keys, state: i === lit ? 'now' as const : has(...ls) ? 'done' as const : 'todo' as const }));
 }

@@ -8902,6 +8902,7 @@ export default function App() {
       {fresh && !modeDraft && arm === 'tour' && <FirstRunFlow snap={snap} home={home} onDone={finishFresh}
         look={(homeSet.on && homeSet.skyTheme) || (resolveTheme(theme) === 'light' ? 'light' : 'dark')} skies={homeSet.on}
         onLook={(id) => { if (id === 'light') chooseLook('light'); else if (id === 'dark') chooseLook('ember-grid'); else chooseSkyTheme(id); }}
+        onProject={(slug) => { rememberProject(slug); setPickProject(slug); }}
         onSetup={() => { setFocused(null); setView('inbox'); if (homeSet.on) setHomeOpen(true); }} />}
       <OpenLesson at={lessonAt} />
       {!fresh && tour && tourLive(tour) && <TourList tour={tour} now={tourNow} onSkip={() => setTour(skipTour(tour))} />}

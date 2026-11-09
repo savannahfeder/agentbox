@@ -57,13 +57,15 @@ const said = (when: number) => {
   return /^\d/.test(a) ? `${a} ago` : a;
 };
 
-export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false, onLook, onSetup }: {
+export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false, onLook, onSetup, onProject }: {
   snap: Snapshot | null;
   home: string;
   /** The look worn now and how to change it, for the setup's look step. */
   look?: string;
   skies?: boolean;
   onLook?: (id: string) => void;
+  /** The project the setup made, so the composer behind it is addressed to it. */
+  onProject?: (slug: string) => void;
   /** Called as the setup beside the app opens, so the app behind it can show Home. */
   onSetup?: () => void;
   /** Called once, when the first run hands over to the inbox, with how many chats it brought in. */
@@ -194,11 +196,11 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
       if (!p) continue;
       await api.importThreads({ product: p.slug, threads: ids, land: 'inbox' }).catch(() => null);
       // The first thread goes to where the newest chat ran, not to My Workspace.
-      if (n === 1) try { localStorage.setItem(LAST_PRODUCT_KEY, p.slug); } catch { /* the box asks instead */ }
+      if (n === 1) { try { localStorage.setItem(LAST_PRODUCT_KEY, p.slug); } catch { /* the box asks instead */ } onProject?.(p.slug); }
     }
     setBusy(false);
     return picked.length;
-  }, [busy, picked, projectFor]);
+  }, [busy, picked, projectFor, onProject]);
 
   // THE KEYBOARD, for both screens.
   useEffect(() => {
@@ -237,7 +239,7 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
   if (screen === 'setup') {
     return <SetupSplit snap={snap} chats={chats} ticks={chatTicks} nameOf={nameOf}
       onToggle={(id) => setChatTicks((had) => { const n = new Set(had); if (n.has(id)) n.delete(id); else n.add(id); return n; })}
-      bringIn={bringIn} projectFor={(folder) => projectFor(folder)} look={look} skies={skies} onLook={(id) => onLook?.(id)} onDone={onDone} />;
+      bringIn={bringIn} projectFor={async (folder) => { const p = await projectFor(folder); if (p) onProject?.(p.slug); return p; }} look={look} skies={skies} onLook={(id) => onLook?.(id)} onDone={onDone} />;
   }
 
   return (

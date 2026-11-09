@@ -248,6 +248,10 @@ async function prepare(real, setupName = null, { logins = 2, codex = true, proje
         ].map((r) => JSON.stringify(r)).join('\n')}\n`);
         fs.utimesSync(file, new Date(when), new Date(when));
       });
+      // Where a person keeps code, so the folder picker opens on it.
+      const code = path.join(chatHome, 'code');
+      fs.mkdirSync(code, { recursive: true });
+      try { fs.symlinkSync(repo, path.join(code, p.slug)); } catch { /* there already */ }
       repos[p.slug] = repo;
       continue;
     }
