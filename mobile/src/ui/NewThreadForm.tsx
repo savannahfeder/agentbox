@@ -24,6 +24,7 @@ import { useCloud } from '../state/cloud';
 import { useComputerAgents } from '../state/computer-agents';
 import { useSendWhenOnline } from '../state/send-when-online';
 import { AttachSheet, Attached } from './Attach';
+import { withPicked } from '../lib/attach';
 import { DictationProblem, Listening, MicButton, useDictation } from './Dictation';
 import { Caret, Clip, Clock, Repeat } from './icons';
 import { TimeBox, TypingSheet } from './Later';
@@ -261,7 +262,7 @@ export function NewThreadSheets({ form, now }: { form: NewThread; now: number })
       <ModelSheet open={sheet === 'model'} close={() => setSheet(null)} model={model} effort={effort} engine={engine} codex={codex}
         pickModel={form.pickModel} pickEffort={form.pickEffort} />
       <PrioritySheet open={sheet === 'priority'} close={() => setSheet(null)} value={priorityValueOf(draft.priority ?? 'medium')} pick={(v) => draft.setPriority(priorityIdOf(v))} />
-      <AttachSheet open={sheet === 'attach'} close={() => setSheet(null)} add={(more) => draft.setFiles((f) => [...f, ...more])} fail={setError} />
+      <AttachSheet open={sheet === 'attach'} close={() => setSheet(null)} add={(more) => draft.setFiles((f) => withPicked(f, more))} fail={setError} />
       <Sheet open={sheet === 'project'} close={() => setSheet(null)}>
         <SheetHead>Project</SheetHead>
         {projects.map((p) => <SheetRow key={p.slug} label={p.name} on={p.slug === product} lead={<Swatch slug={p.slug} />} onPress={() => { form.pickProject(p.slug); setSheet(null); }} />)}
