@@ -122,9 +122,8 @@ export const HINTS: Record<string, HintLine[]> = {
   // lists it.
   // The cloud button (threads/Pages.tsx): ⌘C turns the cloud on or off.
   cloud: [{ key: '⌘C', what: 'Cloud on or off' }],
-  // THE MAGNIFIER GETS A PLATE although the search field prints / at its right
-  // end: nothing about a magnifier says what pressing it costs.
-  search: [{ key: '/', what: 'Search your tasks' }],
+  // THE MAGNIFIER GETS A PLATE: nothing about a magnifier says what pressing it costs.
+  search: [{ key: '⌘K', what: 'Search your threads' }],
   // A task she has opened.
   // THE MARK THAT FINISHED IT IS A ROW NOW (w-e731ca9376, 2026-10-01): Mark
   // done, in the thread's menu, which prints E beside its words. A component

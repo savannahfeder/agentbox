@@ -165,7 +165,6 @@ const HANDLED = {
   '⌘C': [[chords, 'if (cloudChord(e, { inInput'], [chords, 'toggleCloudRef.current?.();']],
   // And a new thread, in both the open task and the list.
   'N': [[focused, "else if (e.key === 'n' || e.key === 'N') { e.preventDefault(); setModal('compose'); }"], [list, "case 'n': case 'N': e.preventDefault(); startThread(); break;"]],
-  '/': [[chords, "if (e.key === '/')"], [chords, 'openSearch();']],
   // Into the task the toast is about, on the list and inside a task alike
   // (w-f0bfe32859). Gated on the toast in toast-parts.ts, which has its own test.
   'O': [[chords, 'const goesTo = opensTheToast(e.key, toast, focused ? { product: focused.product, id: focused.id } : null);'], [chords, 'openToastRow(goesTo);']],
