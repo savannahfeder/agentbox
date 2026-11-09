@@ -208,3 +208,13 @@ describe('the walkthrough teaches E in one press', () => {
     expect(app).toMatch(/if \(!chosen && !teachingClose && nudgeOnStopped\(\[item\], 'E'\)\) return;/);
   });
 });
+
+describe('the app preview in its panel', () => {
+  // The founder: the borders were "all blending in (our background) with the
+  // other background". Clipping the app at the panel's edges cut off its
+  // outline and shadow on every side, top and left included.
+  const split = fs.readFileSync(new URL('../renderer/src/components/SetupSplit.tsx', import.meta.url), 'utf8');
+  it('is cut only at the right and bottom edges, so its outline shows', () => {
+    expect(split).toMatch(/--ss-clip', `inset\(-\d+px \$\{right\}px \$\{bottom\}px -\d+px/);
+  });
+});

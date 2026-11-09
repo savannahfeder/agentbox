@@ -25,7 +25,7 @@
 .setup-split .ss-right { position: absolute; left: var(--ss-left); right: 16px; top: 16px; bottom: 16px; border-radius: 16px;
   background: var(--sky-frame, color-mix(in srgb, var(--text) 5%, var(--bg))); }
 /* The light green sky's own frame, so a window without a sky still sits on the approved green. */
-:root[data-theme="light"] .setup-split .ss-right { background: var(--sky-frame, #e3e8e5); }
+:root[data-theme="light"] .setup-split .ss-right { background: color-mix(in srgb, var(--sky-frame, #e3e8e5) 93%, var(--text)); }
 .setup-split .ss-cap { position: absolute; left: 56px; top: 40px; font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); }
 
 .setup-split .ss-brand { position: absolute; left: 48px; top: 40px; display: flex; align-items: center; gap: 10px; font-size: 15px; letter-spacing: -0.01em; }

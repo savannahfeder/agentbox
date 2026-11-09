@@ -104,7 +104,8 @@ export function SetupSplit(p: SetupSplitProps) {
       // Cut at the panel's right and bottom edges, in the app's own unscaled pixels.
       const right = Math.max(0, 1120 - (innerWidth - 16 - (left + 56)) / scale);
       const bottom = Math.max(0, 1300 - (innerHeight - 16 - 92) / scale);
-      root.style.setProperty('--ss-clip', `inset(0 ${right}px ${bottom}px 0 round 16px 0 ${16 / scale}px 0)`);
+      // Negative top and left keep the window's outline and shadow, which a clip would otherwise cut.
+      root.style.setProperty('--ss-clip', `inset(-80px ${right}px ${bottom}px -80px round 0 0 ${16 / scale}px 0)`);
     };
     fit();
     // The preview's new-thread box must not keep the keyboard behind the setup.
