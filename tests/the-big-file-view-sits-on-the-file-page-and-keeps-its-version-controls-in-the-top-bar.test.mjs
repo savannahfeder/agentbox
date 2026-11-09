@@ -38,7 +38,7 @@ describe('the big file view', () => {
     expect(view).not.toMatch(/`Version \$\{v\.n\}`/);
   });
 
-  it('draws only the counter in the tag font, so Side by side is in the button font', () => {
+  it('draws only the counter in the tag font', () => {
     expect(rule('.av-versions')).not.toMatch(/--mono/);
     expect(rule('.av-of')).toMatch(/--mono/);
   });

@@ -54,8 +54,8 @@ describe('a thread', () => {
     const t = open(rows());
     expect(t.options.map((o) => [o.n, o.text, o.recommended])).toEqual([[1, 'Ship it (recommended)', true], [2, 'Wait for Codex', false]]);
     expect(t.outcome?.text).not.toMatch(/Options|Wait for Codex/);
-    // Headed by the question it answers, as the desktop's options card is.
-    expect(t.ask).toBe('The plan is ready.');
+    // An answer that is only its one line is not repeated over the options, as the desktop's card does (askHeading).
+    expect(t.ask).toBe('');
   });
 
   it('offers nothing once you have answered it, and keeps the list in the text as the record', () => {
@@ -104,8 +104,9 @@ describe('what a press leaves for your Mac', () => {
     expect(planFor({ kind: 'reply', text: '   ' }, item)).toBeNull();
   });
   it('a reply carries the priority, mode and model picked in its sentence, and only those', async () => {
-    expect(await leaves({ kind: 'reply', text: 'Go', choices: { priority: 9, permissionMode: 'plan', model: 'sonnet', effort: 'high', engine: 'codex' } })).toEqual(
-      [{ device: DEV, project: 'alpha', item: 'w-1', kind: 'reply', payload: { text: 'Go', priority: 9, permissionMode: 'plan', model: 'sonnet', effort: 'high' } }],
+    // A reply may move the thread to the other agent (2026-11-08), so the agent rides too; a field no reply takes does not.
+    expect(await leaves({ kind: 'reply', text: 'Go', choices: { priority: 9, permissionMode: 'plan', model: 'sonnet', effort: 'high', engine: 'codex', assignee: 'p-1' } })).toEqual(
+      [{ device: DEV, project: 'alpha', item: 'w-1', kind: 'reply', payload: { text: 'Go', priority: 9, permissionMode: 'plan', model: 'sonnet', effort: 'high', engine: 'codex' } }],
     );
   });
   it('a new thread goes to its project with what was picked for it', async () => {

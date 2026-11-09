@@ -410,6 +410,59 @@ export function waitingOnYou(item) {
   return r.ts > a;
 }
 
+// Whether a teammate's last word asks you anything: a question, or options to
+// pick from. A plain answer is said in the chat and asks nothing back.
+export function asksSomething(text) {
+  const t = String(text ?? '');
+  if (/^#{1,6}\s*options\b/im.test(t)) return true;
+  return /\?(?=["'”’)\]*_`]*(\s|$))/.test(t);
+}
+
+const SAY_CLOSED_MS = 60 * 60_000;
+
+function questionsIn(text) {
+  return (String(text ?? '').match(/[^.!?\n]*\?(?=["'”’)\]*_`]*(\s|$))/g) ?? []).map((q) => q.trim()).filter(Boolean);
+}
+
+// The chat message that carries a run's answer, one per run, so writing it
+// again after a crash adds nothing (`foldChat` keeps the first of an id).
+export const replyMessageId = (runId) => `m-reply-${runId}`;
+
+const bareWords = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+// The one project your words name, by its name or its folder name, else null.
+// A one-word name needs "project" or "repo" beside it, so "git status" does not
+// name a project called Git.
+export function projectNamedIn(text, products = []) {
+  const said = ` ${bareWords(text)} `;
+  const hits = new Set();
+  for (const p of products) {
+    for (const n of [p.name, p.slug]) {
+      const w = bareWords(n);
+      if (!w) continue;
+      const found = w.includes(' ')
+        ? said.includes(` ${w} `)
+        : new RegExp(` (project|repo|repository) ${w} | ${w} (project|repo|repository) `).test(said);
+      if (found) hits.add(p.slug);
+    }
+  }
+  return hits.size === 1 ? [...hits][0] : null;
+}
+
+// A teammate's question in the chat, with answers to tap, asked on this run and
+// not answered by any word of yours to it since.
+function openQuestionOn(item, tid, chat, except = null) {
+  const msgs = chat?.messages ?? [];
+  return msgs.some((q) => q.kind === 'msg' && q.from === tid && q.run === item.id && q.options?.length
+    && !msgs.some((m) => m.kind === 'msg' && m.from === YOU && m.id !== except && m.ts > q.ts && (m.to ?? []).includes(tid)));
+}
+
+// A waiting run your next words answer: one that asked you something. A run
+// that only answered is finished talking, and your next words are new work.
+function asksYouStill(item, tid, chat, except = null) {
+  return item.status === 'blocked' || asksSomething(item.result) || openQuestionOn(item, tid, chat, except);
+}
+
 // A duty stops waking once this many of its results in a row reached you and
 // sat a day unanswered; your answer or close on any of them starts it again.
 export const UNREAD_HOLD = 3;
@@ -587,7 +640,9 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
     for (const tid of targets) {
       const t = byId.get(tid);
       if (!t || chat.seen.has(seenKey(m.id, tid))) continue;
-      if (m.from === tid) { actions.push({ type: 'seen', msg: m.id, teammate: tid }); continue; }
+      // Its own pass to another project is the one word of its own that wakes it.
+      const selfPass = m.kind === 'pass' && !!m.product;
+      if (m.from === tid && !selfPass) { actions.push({ type: 'seen', msg: m.id, teammate: tid }); continue; }
       if (t.paused && m.from !== YOU) continue;
       const fromYou = m.from === YOU;
       if (!fromYou && m.kind === 'msg') { actions.push({ type: 'seen', msg: m.id, teammate: tid }); continue; }
@@ -600,7 +655,7 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
       // A new thread to a teammate is new work, never an answer to its last question.
       if (fromYou && m.kind === 'msg' && !m.fresh) {
         const runs = runsOf(tid, items);
-        const waiting = runs.filter(waitingOnYou).sort((a, b) => (b.wrote?.result?.ts ?? 0) - (a.wrote?.result?.ts ?? 0))[0];
+        const waiting = runs.filter((i) => waitingOnYou(i) && asksYouStill(i, tid, chat, m.id)).sort((a, b) => (b.wrote?.result?.ts ?? 0) - (a.wrote?.result?.ts ?? 0))[0];
         // A running run hears your words only if your words started it;
         // anything else is new work, queued behind it.
         const yours = new Set((chat.messages ?? []).filter((x) => x.kind === 'msg' && x.from === YOU && x.id !== m.id).map((x) => runIdFor(`${x.id}>${tid}`)));
@@ -613,7 +668,7 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
         }
       }
       // `yours`: the primary passing on what your own words asked of it.
-      const hold = !fromYou && !m.yours && t.handoffsNeedYes !== false;
+      const hold = !fromYou && !m.yours && (selfPass || t.handoffsNeedYes !== false);
       const home = fromYou ? null : homeOf(t, m);
       if (home && !closedByYou(home)) {
         const from = { teammate: m.from, name: byId.get(m.from)?.name ?? 'A teammate' };
@@ -637,6 +692,41 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
           talking.get(m.run).set(id, now);
         }
       }
+    }
+  }
+
+  // A run your chat words started that answered without asking anything: its
+  // answer is said in the chat, and the run closes quietly rather than sitting
+  // in Needs you. A run still being set up asks through its setup instead.
+  for (const t of live) {
+    if (t.status !== 'active') continue;
+    for (const i of runsOf(t.id, items)) {
+      if (!(i.labels ?? []).includes(CHAT_LABEL) || !waitingOnYou(i) || asksYouStill(i, t.id, chat)) continue;
+      const text = String(i.result ?? '').trim();
+      const since = i.wrote?.answer?.ts ?? 0;
+      const posted = (chat.messages ?? []).some((x) => x.kind === 'msg' && x.from === t.id && x.run === i.id && !x.options?.length && x.ts > since && (x.to ?? []).every((y) => y === YOU));
+      const said = (chat.messages ?? []).some((x) => x.id === replyMessageId(i.id));
+      actions.push({ type: 'replied', teammate: t.id, item: i.id, product: i.product, labels: i.labels ?? [], text, say: !!text && !posted && !said });
+    }
+  }
+
+  // A run that closed itself on a question is in nobody's Needs you, so the
+  // question is said in the chat. Only a recent close, so an update does not
+  // bring back every old question at once.
+  for (const t of live) {
+    for (const i of runsOf(t.id, items)) {
+      const closedAt = i.wrote?.status?.ts ?? 0;
+      if (i.status !== 'done' || i.wrote?.status?.source !== 'agent' || now - closedAt > SAY_CLOSED_MS) continue;
+      const text = String(i.result ?? '').trim();
+      const since = i.wrote?.answer?.ts ?? 0;
+      if (!asksSomething(text) || (i.wrote?.result?.ts ?? 0) <= since) continue;
+      const fromRun = (chat.messages ?? []).filter((x) => x.kind === 'msg' && x.from === t.id && x.run === i.id && x.ts > since);
+      if ((chat.messages ?? []).some((x) => x.id === replyMessageId(i.id))) continue;
+      const questions = questionsIn(text);
+      const asked = questions.length
+        ? questions.every((q) => fromRun.some((x) => String(x.text ?? '').includes(q)))
+        : fromRun.some((x) => x.options?.length);
+      if (!asked) actions.push({ type: 'say', teammate: t.id, item: i.id, text });
     }
   }
 

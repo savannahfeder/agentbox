@@ -8,6 +8,7 @@ import './styles.css';
 import './workspace-navigation.css';
 import './phone.css';
 import './soft-corners.css';
+import './narrow-conversation.css';
 import { applyTheme, machineTheme, resolvePick, resolveTheme, THEME_KEY } from './theme';
 import { applySkin, applyTune, normalizeSavedLook, resolveSkin, resolveTune, SKIN_KEY, TUNE_KEY, wornSkin } from './skins';
 // The shape an opened task is, while that is still an open question on.

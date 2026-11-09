@@ -310,7 +310,7 @@ function OpenFile({ fileKey, typing = false, onClose, onPlace, onNotice }: {
   </footer>;
   return <ArtifactView
     product={product}
-    threadName="Files"
+    draftsAcross="files"
     shareThread={view?.sentIn.find((p) => p.kind === 'thread' && p.product === product && p.id)?.id ?? undefined}
     lines={(view?.lines ?? []) as LedgerLine[]}
     marks={view?.marks ?? NO_MARKS}
@@ -318,6 +318,7 @@ function OpenFile({ fileKey, typing = false, onClose, onPlace, onNotice }: {
     people={team ? [...team.byId.values()] : []}
     open={opened}
     ownerOfRow={null}
+    withAgent={!!view?.sentIn.some((p) => p.kind === 'thread' && p.product === product)}
     write={(mark) => api.filesPlaceMark({ key: fileKey, mark })}
     onNewVersion={editsTo ? async (_name, text) => {
       const out = await api.filesPlaceEdit({ key: fileKey, text });

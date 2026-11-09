@@ -546,14 +546,18 @@ export function itemThread(
   //
   // `undone`: THE Zs PRESSED ON THIS TASK (./undo-marks). Each is drawn as one
   // of her actions, and the ledger lines that Z wrote itself fold under it.
-  opts: { whole?: boolean; engine?: string | null; pending?: PendingSaid[]; chat?: boolean; undone?: UndoMark[]; numbers?: Record<string, number> } = {},
+  //
+  // `me`: who is reading. A teammate's personal moves (Later, done, sent back)
+  // are theirs alone and are left out.
+  opts: { whole?: boolean; engine?: string | null; pending?: PendingSaid[]; chat?: boolean; undone?: UndoMark[]; numbers?: Record<string, number>; me?: string | null } = {},
 ): ItemThread {
   // The pickup-to-run match is thread-history's, not a second copy of it: it is
   // the part that can be wrong while the screen still looks perfect (a run
   // credited to the wrong pickup reads exactly like one credited to the right
   // one), and it is pinned in tests/one-door-one-list.test.mjs. `readNotes` is
   // given one session at a time there, so a run's `raw` IS that session's text.
-  const events = withEdits(withRuns(threadEvents(lines, opts.engine, opts.numbers), sessions), lines);
+  const events = withEdits(withRuns(threadEvents(lines, opts.engine, opts.numbers), sessions), lines)
+    .filter((e) => !(e.personal && e.by && opts.me && e.by !== opts.me));
   const out: AgentEvent[] = [];
   // Where the newest thing SAID sits, and which ledger message it was. A run's
   // narration is a message on the screen too, so it counts here: a row picked

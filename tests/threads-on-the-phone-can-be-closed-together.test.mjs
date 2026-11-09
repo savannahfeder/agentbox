@@ -7,6 +7,7 @@
 // Each close is the one Done sends, so each is a close the computer takes.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
+import { batchWords } from '../mobile/src/lib/picked';
 
 const inbox = fs.readFileSync('mobile/src/app/index.tsx', 'utf8');
 const filters = fs.readFileSync('mobile/src/ui/Filters.tsx', 'utf8');
@@ -25,11 +26,14 @@ describe('picking threads on the phone', () => {
   });
   it('closes each with the plan Done uses, with one toast and one Undo for all of them (round 1 of the 2026-11-03 testers asked for Undo)', () => {
     expect(inbox).toMatch(/await c\.closeAll\(rows\.filter\(\(r\) => picked\?\.has\(r\.key\)\)\.map\(\(r\) => r\.item\)\)/);
-    expect(cloud).toMatch(/const plan = planFor\(\{ kind: 'close' \}, item, at,/);
+    expect(cloud).toMatch(/const closeAll = useCallback\(\(items: PressedItem\[\]\) => pressAll\(items, \{ kind: 'close' \}\)/);
+    expect(cloud).toMatch(/const plan = planFor\(press, item, at,/);
     expect(cloud).toMatch(/if \(plan\.undo\) undo\.push\(\.\.\.plan\.undo\(made\)\)/);
-    expect(cloud).toMatch(/Closed \$\{done\} \$\{done === 1 \? 'thread' : 'threads'\}\$\{undo\.length \? ' · press Z to undo' : ''\}/);
+    expect(cloud).toMatch(/say\(`\$\{words\.did\(done\)\}\$\{undo\.length \? ' · press Z to undo' : ''\}`/);
+    expect(batchWords({ kind: 'close' }, []).did(2)).toBe('Closed 2 threads');
   });
   it('says how far it got if one fails', () => {
-    expect(cloud).toMatch(/Closed \$\{done\} of \$\{items\.length\}/);
+    expect(cloud).toMatch(/say\(`\$\{words\.partial\(done, items\.length\)\} \$\{message\(err\)\}`\)/);
+    expect(batchWords({ kind: 'close' }, []).partial(1, 3)).toBe('Closed 1 of 3.');
   });
 });

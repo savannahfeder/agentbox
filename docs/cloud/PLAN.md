@@ -419,11 +419,32 @@ at AgentCore's published rates. The plan limits are set from these.
   what it uses, so packing agents onto one machine would not save money.
 - AWS lets this account run 5,000 sessions at once and start 25 a second
   (checked 2026-10-13; both can be raised).
-- No free cloud (the owner's call, 2026-10-20, replacing "Free: 5 hours,
-  no card"): five hours go in half an hour with ten agents, which sells the
-  cloud short, and the moment someone reaches for it is the moment they will
-  pay. The app itself is the free part. Sign-in is the app's own sign-in
-  page.
+- Free: 5 hours once per account, no card, two agents at once (the owner,
+  2026-11-06, for the cloud launch; it replaces 2026-10-20's "no free cloud").
+  Two at once answers that call's worry, five hours gone in half an hour with
+  ten agents. The hours never come back, and a paid plan never spends them
+  (`FREE` in cloud/gateway/plans.mjs). Sign-in is the app's own sign-in page.
+
+### The team plan (the owner, 2026-11-06; to build for 2026-11-17)
+
+- **Trial:** every team gets 14 days from the day it was made. Each member
+  has 10 cloud hours and 2 agents at once of their own. No card. It replaces
+  each member's own 5 free hours while it lasts; it does not add to them.
+- **Paying:** $40 a member a month (Stripe price `agentbox_cloud_team_monthly`,
+  quantity = members). Each seat is the $40 cloud plan for its person: 400
+  hours and 10 agents at once a month (the owner, 2026-11-08, replacing one
+  pool for the team after three power testers ran a pool dry).
+- **Which hours a run spends:** the person's own paid plan first, then the
+  team's (paid or trial), then their free hours.
+- **How it is counted:** in the person's own ledger, as a plan is: the run
+  carries its team, and its seconds go to `teamTrialUsed` or `teamUsed` by
+  month in that same record. The team's ledger, `ledger/teams/<team>.json`,
+  holds only what Stripe says it pays for. The page reads every member's
+  record to show who used what.
+- **Who is on the team** is read from the database (`team_members`,
+  `teams.created_at`) with the service key, cached for a minute.
+- Risk at full use: a seat that spends all 400 hours costs about $28 of the
+  $40 (measured $0.07 an agent-hour).
 
 ## Phases
 

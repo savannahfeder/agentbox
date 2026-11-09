@@ -22,7 +22,7 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
 // A row an agent was on and released, which is how every practice row is
 // written (main/store.mts stagePracticeBackdrop): claimed, released, no result.
-const ran = { id: 'w-bd1', status: 'open', createdAt: 1_000, wrote: { body: { ts: 1_000, source: 'founder' } }, runs: 1 };
+const ran = { id: 'w-bd1', status: 'open', createdAt: 1_000, epoch: 1, wrote: { body: { ts: 1_000, source: 'founder' }, status: { ts: 1_500, source: 'agent' } }, runs: 1 };
 // The fleet, read and holding nothing, under the In progress column: the state
 // that produced the sentence.
 const FLEET = { queued: [], session: null, now: 2_000, inProgress: true, state: 'running' };

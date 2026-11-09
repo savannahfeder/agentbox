@@ -21,11 +21,12 @@ describe('the picker turns it down before the renderer ever sees it', () => {
   const ipc = read('main/ipc.mts');
 
   it('checks what the Mac dialog handed back', () => {
-    expect(ipc).toMatch(/checkProjectFolder\(picked, \{ home: os\.homedir\(\) \}\)/);
+    expect(ipc).toMatch(/return folderFromChooser\(path\.resolve\(r\.filePaths\[0\]\), \{ home: os\.homedir\(\), isDir \}\)/);
   });
 
   it('sends back the sentence and NOT the path', () => {
-    expect(ipc).toMatch(/if \(!verdict\.ok\) return \{ path: null, refused: verdict\.say \}/);
+    const chooser = read('shared/project-folder-check.mts');
+    expect(chooser).toMatch(/if \(!verdict\.ok\) return \{ path: null, refused: verdict\.say \}/);
   });
 });
 

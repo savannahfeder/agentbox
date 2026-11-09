@@ -49,7 +49,7 @@ export function previewRows(now = Date.now()): PhoneRows {
         { ts: at(70), source: 'founder', patch: { body: roundAsk } },
         { ts: at(9), source: 'agent', patch: { status: 'blocked', note: roundNote } },
       ], { attached }),
-      thread('site', { id: 'w-3c4d5e6f7a', title: 'Show when each account limit resets', status: 'done', priority: 0, body: 'I need to see when my limits reset.', result: meterResult, createdAt: at(200), updatedAt: at(52), wrote: { body: her(at(200)), status: agent(at(52)), result: agent(at(52)) } }, [
+      thread('site', { id: 'w-3c4d5e6f7a', title: 'Show when each account limit resets', status: 'done', priority: 0, engine: 'codex', body: 'I need to see when my limits reset.', result: meterResult, createdAt: at(200), updatedAt: at(52), wrote: { body: her(at(200)), status: agent(at(52)), result: agent(at(52)) } }, [
         { ts: at(200), source: 'founder', patch: { body: 'I need to see when my limits reset.' } },
         { ts: at(52), source: 'agent', patch: { status: 'done', result: meterResult } },
       ]),
@@ -113,6 +113,10 @@ export function previewRows(now = Date.now()): PhoneRows {
   };
 }
 
+const usage = (span: 'session' | 'week', percent: number, resetsAt: number) => ({
+  span, qualifier: span === 'week' ? 'all models' : null, name: span === 'week' ? 'This week' : 'This session', percent, resetsText: null, resetsOn: null, resetsAt, reset: false,
+});
+
 /** Settings as a Mac sends them (shared/phone-settings.mjs phoneSettingsOf). */
 export function previewSettings(now = Date.now()) {
   return {
@@ -124,13 +128,27 @@ export function previewSettings(now = Date.now()) {
         permission: 'auto', codexMode: 'auto', engines: ['claude', 'codex'], claude: { found: true }, codex: { found: true },
         codexModels: [{ id: 'gpt-5.6-sol', label: 'GPT-5.6-Sol', levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'medium' }, { id: 'gpt-5.6-terra', label: 'GPT-5.6-Terra', levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'medium' }, { id: 'gpt-5.6-luna', label: 'GPT-5.6-Luna', levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'medium' }], codexModelDefault: 'gpt-5.6-sol',
         agentsAuto: true, sessionsAtOnce: 4, agentsTotal: 6, agentsAutoTotal: 6, agentsNudge: 0, slotsMax: 12, slotsSuggested: 6, running: 3,
-        memoryGate: { on: true, slots: null, slotsAuto: 2, slotsMax: 8, now: 'Memory is fine. Nothing heavy running.' },
+        memoryGate: { on: true, slots: null, slotsAuto: 2, slotsMax: 8, now: 'Memory is fine. Nothing heavy running.', reading: { heavy: 1, waiting: 0, pressure: 'normal', usedPct: 58, asked: 14, waited: 2, refused: 0, holding: false } },
         leftovers: { on: false, now: null },
+        cloud: {
+          mode: 'full', whenOn: 'full', engines: ['claude'], inUse: { claude: 'you@example.com', codex: null },
+          accounts: [
+            { engine: 'claude', email: 'you@example.com', inUse: true, plan: 'Max 20x', state: 'ready', limitedUntil: null, same: 'default', usage: { at: now - 2 * MIN, limits: [usage('session', 36, now + 3 * 60 * MIN), usage('week', 61, now + 3 * 24 * 60 * MIN)] } },
+            { engine: 'claude', email: 'cloud@example.com', inUse: false, plan: 'Pro', state: 'ready', limitedUntil: null, same: null, usage: { at: now - 30 * MIN, limits: [usage('session', 8, now + 4 * 60 * MIN), usage('week', 22, now + 6 * 24 * 60 * MIN)] } },
+          ],
+        },
+        cloudPermission: 'bypassPermissions', cloudCodexMode: 'same', paused: false, productOrder: ['agentbox', 'film'],
         accounts: [
-          { id: 'default', email: 'you@example.com', chosen: false, state: 'live', note: null, plan: 'Max 20x', running: 2 },
-          { id: '.claude-work', email: 'you@work.example', chosen: false, state: 'at-limit', note: 'At its limit. Agents start again on their own when it resets.', resetsAt: now + 19 * 60 * MIN, plan: 'Max 5x', running: 1 },
+          { id: 'default', email: 'you@example.com', chosen: false, state: 'live', note: null, plan: 'Max 20x', running: 2,
+            usage: { at: now - 4 * MIN, limits: [usage('session', 34, now + 3 * 60 * MIN), usage('week', 61, now + 3 * 24 * 60 * MIN)] } },
+          { id: '.claude-work', email: 'you@work.example', chosen: false, state: 'at-limit', note: 'At its limit. Agents start again on their own when it resets.', resetsAt: now + 19 * 60 * MIN, plan: 'Max 5x', running: 1,
+            usage: { at: now - 9 * MIN, limits: [usage('session', 100, now + 19 * 60 * MIN), usage('week', 88, now + 2 * 24 * 60 * MIN)] } },
         ],
-        codexAccounts: [{ id: 'default', email: 'you@example.com', name: 'You', plan: 'Plus', signedIn: true, chosen: false }],
+        codexAccounts: [{ id: 'default', email: 'you@example.com', name: 'You', plan: 'Plus', signedIn: true, chosen: false, usage: { at: now - 20 * MIN, limits: [usage('week', 12, now + 5 * 24 * 60 * MIN)] } }],
+        publicLinks: [
+          { token: 'preview-launch-plan', name: 'launch-plan.md', url: 'https://example.com/f/preview-launch-plan', createdAt: now - 26 * 60 * MIN, updatedAt: now - 40 * MIN, comments: 2 },
+          { token: 'preview-pricing-page', name: 'pricing.html', url: 'https://example.com/f/preview-pricing-page', createdAt: now - 3 * 24 * 60 * MIN, updatedAt: now - 3 * 24 * 60 * MIN, comments: 0 },
+        ],
       },
       projects: [
         { slug: 'agentbox', name: 'Agentbox', onPhone: true, autonomous: true, permission: 'workspace', codexMode: 'workspace', account: 'any', running: 2 },
@@ -234,6 +252,12 @@ export function previewGroups(now = Date.now()) {
     { person_id: 'p-3', thread_id: 'w-card-1', title: 'Fix the login meter', project: 'Agentbox', state: 'running', priority: 5, problem: 'The meter shows the wrong reset time on Max accounts.', progress: 'Found where the time is read.', solution: null, visible: true, updated_at: at(10) },
     { person_id: 'p-2', thread_id: 'w-card-2', title: 'Pick the sign-in screen', project: 'Website', state: 'waiting', priority: 5, problem: 'Two sign-in screens are left.', progress: null, solution: null, visible: true, updated_at: at(25) },
   ];
+  // What shipped this week: two teammates' threads and one of yours.
+  const shipped = [
+    { person_id: 'p-2', thread_id: 'w-card-3', title: 'Put the new sign-in screen live', project: 'Website', state: 'done', priority: 5, visible: true, people: null, shipped_at: at(2 * 24 * 60), updated_at: at(2 * 24 * 60) },
+    { person_id: 'preview', thread_id: 'w-7a8b9c0d1e', title: 'Rename the Display menu', project: 'Agentbox', state: 'done', priority: 5, visible: true, people: null, shipped_at: at(1500), updated_at: at(1500) },
+    { person_id: 'p-3', thread_id: 'w-card-4', title: 'Show when each login resets', project: 'Agentbox', state: 'done', priority: 5, visible: true, people: null, shipped_at: at(40), updated_at: at(40) },
+  ];
   const names: Record<string, string> = { preview: 'Ada Lovelace', 'p-2': 'Sam Rivera', 'p-3': 'Kai Ito', 'p-4': 'Maya Chen', 'p-5': 'Lee Park' };
   return {
     rpc(name: string, args: Record<string, any>) {
@@ -245,10 +269,14 @@ export function previewGroups(now = Date.now()) {
     },
     select(table: string, query: string) {
       const q = new URLSearchParams(query);
-      if (table === 'room_profiles') return profiles;
+      if (table === 'room_profiles') {
+        const one = q.get('person_id');
+        return one?.startsWith('eq.') ? profiles.filter((p) => p.person_id === one.slice(3)) : profiles;
+      }
+      if (table === 'people' && q.get('id') === 'eq.preview') return [{ name: names.preview }];
       if (table === 'room_presence') return presence;
       if (table === 'room_reads') return reads;
-      if (table === 'thread_cards') return cards;
+      if (table === 'thread_cards') return q.has('shipped_at') ? shipped : cards;
       // A small drawing of a screen, as a stored file comes back.
       if (table === 'room_files') return [{ data: 'iVBORw0KGgoAAAANSUhEUgAAADAAAAAkCAIAAABAJy5dAAAAXElEQVR42u3VsQ0AEBBAUWNYQcRORlGoLKqQsIJGIdpDJH7y68srLnfKWfNUChAgQIBGreSjAQIEiDsESApKMQibp1WvlwBtB+0N0AWQfIfmAF0A8ToAAQL0K6gDciTequifOckAAAAASUVORK5CYII=' }];
       if (table !== 'room_messages') return null;
@@ -260,6 +288,11 @@ export function previewGroups(now = Date.now()) {
       if (when?.startsWith('gt.')) rows = rows.filter((m) => m.created_at > when.slice(3));
       if (when?.startsWith('lt.')) rows = rows.filter((m) => m.created_at < when.slice(3));
       return rows.sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, Number(q.get('limit') ?? 200));
+    },
+    saveProfile(patch: Record<string, unknown>) {
+      const mine = profiles.find((p) => p.person_id === 'preview')!;
+      Object.assign(mine, patch);
+      return [mine];
     },
     send(row: Record<string, any>) {
       const made = msg(row.room_id, 'preview', new Date().toISOString(), row.body, { in_reply_to: row.in_reply_to ?? null, mentions: row.mentions ?? [] });
@@ -296,6 +329,12 @@ export function previewCloud(now = () => Date.now()) {
   if (scene === 'queued') rows.commands.push({ id: 'c-preview-q', device: DEV, project: 'film', item: 'w-5e6f7a8b9c', kind: 'reply', payload: { text: 'Open on the inbox.' }, created_at: new Date(now() - 30_000).toISOString(), claimed_at: null, taken_at: null, outcome: null } as PhoneRows['commands'][number]);
   let signedIn = scene !== 'signed-out' && !walking;
   const settings = previewSettings(now());
+  // `?scene=codex`: a computer whose chosen agent is Codex, so a thread naming none runs on it.
+  if (scene === 'codex') (settings.settings.workspace as any).engine = 'codex';
+  // `previewOffline = true` on the page: reads and sends fail as they do on a phone with no signal.
+  const noSignal = () => {
+    if ((globalThis as any).previewOffline) throw new Error('fetch failed: java.net.UnknownHostException: Unable to resolve host "preview.supabase.co": No address associated with hostname');
+  };
   const team = { ...PREVIEW_TEAM, members: [...PREVIEW_TEAM.members], invites: [...PREVIEW_TEAM.invites] };
   // The Mac takes a change a moment later and sends its settings again.
   const takeSetting = (c: PhoneRows['commands'][number]) => setTimeout(() => {
@@ -317,11 +356,26 @@ export function previewCloud(now = () => Date.now()) {
       if (m) Object.assign(m, { paused: value.paused, now: value.paused ? 'Paused' : m.nowBeforePause ?? null, nowBeforePause: value.paused ? m.now : undefined });
     } else if (scope === 'teammate' && key === 'describe') {
       mates.list.push({ id: `t-${c.id}`, name: 'New teammate', letter: 'N', role: null, job: value.text ?? value.starter, primary: false, paused: false, status: 'draft', product: value.product, waiting: [], running: null, duties: [], runsThisWeek: 0 });
-    } else if (scope === 'thread') { const t = rows.threads.find((r) => r.project === product && r.item === c.payload.item); if (t) { t.snapshot.item.pinned = value || undefined; t.updated_at = new Date(now() + 1).toISOString(); } }
+    } else if (scope === 'thread') {
+      const t = rows.threads.find((r) => r.project === product && r.item === c.payload.item);
+      const item = t?.snapshot.item;
+      if (item && key === 'pinned') item.pinned = value || undefined;
+      else if (item && key === 'onMac') item.onMac = value || undefined;
+      else if (item && (key === 'label' || key === 'priority')) item[key] = value;
+      else if (item && key === 'moveTo') t.project = value;
+      else if (item && (key === 'resume' || key === 'redeliver')) Object.assign(item, { status: 'claimed', updatedAt: now() });
+      if (t) t.updated_at = new Date(now() + 1).toISOString();
+    }
     else if (scope === 'repeat' && key === 'end') (settings.settings as any).repeats = repeats.filter((r) => !(r.product === product && r.id === c.payload.id));
     else if (scope === 'repeat' && key === 'change') Object.assign(repeats.find((r) => r.product === product && r.id === c.payload.id) ?? {}, value);
     else if (scope === 'repeat' && key === 'new') repeats.push({ product, id: `r-${c.id}`, priority: 5, createdAt: now(), served: '', ...value });
+    else if (scope === 'project' && key === 'archived') settings.settings.projects = settings.settings.projects.filter((p) => p.slug !== product);
     else if (scope === 'project') Object.assign(settings.settings.projects.find((p) => p.slug === product) ?? {}, { [key]: value });
+    else if (key === 'cloudRuns') Object.assign(w.cloud, value === 'mac' ? { mode: value } : { mode: value, whenOn: value });
+    else if (key === 'productOrder') {
+      w.productOrder = value;
+      settings.settings.projects.sort((a, b) => (value.indexOf(a.slug) + 1 || 1e9) - (value.indexOf(b.slug) + 1 || 1e9));
+    }
     else if (key === 'alphaRooms') w.alpha.rooms = value;
     else if (key === 'memoryGate') w.memoryGate.on = value;
     else if (key === 'memoryGateSlots') w.memoryGate.slots = value;
@@ -329,7 +383,8 @@ export function previewCloud(now = () => Date.now()) {
     else if (key === 'sessionsAtOnce') Object.assign(w, { sessionsAtOnce: value, agentsAuto: false });
     else if (key === 'activeAccount') (value.engine === 'codex' ? w.codexAccounts : w.accounts).forEach((a: any) => { a.chosen = a.id === value.account; });
     else if (key === 'phoneProjects') settings.settings.projects.forEach((p) => { p.onPhone = value.all && !value.except.includes(p.slug); });
-    else if (key !== 'agentsFeltSlow') w[key] = value;
+    else if (key === 'stopLink') w.publicLinks = w.publicLinks.filter((l: { token: string }) => l.token !== value);
+    else if (key !== 'agentsFeltSlow' && key !== 'resumeStopped') w[key] = value;
     Object.assign(c, { taken_at: new Date(now()).toISOString(), outcome: 'done' });
     settings.updated_at = new Date(now()).toISOString();
   }, 1500);
@@ -341,6 +396,7 @@ export function previewCloud(now = () => Date.now()) {
     signedIn: () => signedIn,
     generation: () => 0,
     async select(table: string, query: string) {
+      noSignal();
       const group = groups.select(table, query);
       if (group) return group;
       joined();
@@ -373,7 +429,8 @@ export function previewCloud(now = () => Date.now()) {
     async rpc(name: string, args: Record<string, any> = {}) { return groups.rpc(name, args); },
     async listFiles() { return []; },
     async removeFiles() {},
-    async update(_table: string, query: string, patch: Record<string, unknown>) {
+    async update(table: string, query: string, patch: Record<string, unknown>) {
+      if (table === 'room_profiles') return groups.saveProfile(patch);
       const id = decodeURIComponent(/id=eq\.([^&]+)/.exec(query)?.[1] ?? '');
       const at = rows.commands.findIndex((c) => c.id === id && !c.taken_at && !c.claimed_at);
       if (at < 0) return [];
@@ -384,6 +441,7 @@ export function previewCloud(now = () => Date.now()) {
       return new Map(paths.map((p) => [p, previewLink(p.slice(p.lastIndexOf('/') + 1))]));
     },
     async insertCommand(row: Record<string, any>) {
+      noSignal();
       const made = { id: `c-${rows.commands.length + 1}`, payload: {}, item: null, ...row, created_at: new Date(now()).toISOString(), claimed_at: null, taken_at: null, outcome: null } as PhoneRows['commands'][number];
       rows.commands.push(made);
       if (made.kind === 'setting') takeSetting(made);

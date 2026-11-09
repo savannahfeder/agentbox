@@ -15,3 +15,5 @@ fi
 command -v ffmpeg >/dev/null 2>&1 || { sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg; }
 # Inter: the launch-film work draws mockup text in it.
 fc-list 2>/dev/null | grep -qi "Inter" || { sudo apt-get update -qq && sudo apt-get install -y -qq fonts-inter; }
+# python3-venv: the pre-push hook installs semgrep into a venv (scripts/security-scan-the-push.mjs).
+python3 -c 'import ensurepip' >/dev/null 2>&1 || { sudo apt-get update -qq && sudo apt-get install -y -qq python3-venv; }

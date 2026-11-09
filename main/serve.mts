@@ -40,6 +40,9 @@ import { Supervisor } from './supervisor.mts';
 import type { SupervisorConfig } from './supervisor.mts';
 import { carryHerBriefsAcross, joinMessageRules, setAsideShippedMessageRules, unifyAgentInstructions } from './instruction-settings.mts';
 import { registerIpc } from './ipc.mts';
+import type { OsDialogAnswer, OsDialogOptions } from './os-folder-window.mts';
+
+type OsDialog = (options: OsDialogOptions) => Promise<OsDialogAnswer | null>;
 import { reportFromRenderer } from './crash-report.mts';
 import { createAnalytics, createDailyCount } from './analytics.mts';
 import type { AnalyticsConfig } from './analytics.mts';
@@ -87,7 +90,7 @@ export interface NodeHost {
     on(event: string, fn: (event: { preventDefault(): void }) => void): void;
     quit(): void;
   };
-  dialog: { showOpenDialog(): Promise<{ canceled: boolean; noDialog: boolean; filePaths: string[] }> };
+  dialog: { showOpenDialog(window?: unknown, options?: OsDialogOptions): Promise<{ canceled: boolean; noDialog?: boolean; filePaths: string[] }> };
 }
 
 export interface PictureRule { allows(kind: string, file: string): boolean }
@@ -100,6 +103,8 @@ export interface BootOptions {
   userDir?: string;
   openExternal?: (url: string) => void;
   host?: NodeHost | null;
+  /** The system's own file window; only bin/agentbox.mjs passes the real one. */
+  osDialog?: OsDialog | null;
   countClient?: Parameters<typeof createAnalytics>[0] extends infer O ? O extends { client?: infer C } ? C : never : never;
   now?: () => number;
 }
@@ -160,7 +165,7 @@ export function broadcastingWindow() {
  *  back with a real absolute path. `noDialog` is the flag that tells it to.
  *  See main/folders.mts.
  */
-export function nodeHost({ onQuit = () => {}, openExternal = openInBrowser }: { onQuit?: () => void; openExternal?: (url: string) => void } = {}): NodeHost {
+export function nodeHost({ onQuit = () => {}, openExternal = openInBrowser, osDialog = null }: { onQuit?: () => void; openExternal?: (url: string) => void; osDialog?: OsDialog | null } = {}): NodeHost {
   const quitHooks: ((event: { preventDefault(): void }) => void)[] = [];
   return {
     ipcMain: collectingIpcMain(),
@@ -172,7 +177,9 @@ export function nodeHost({ onQuit = () => {}, openExternal = openInBrowser }: { 
       quit() { for (const fn of quitHooks) { try { fn({ preventDefault() {} }); } catch {} } onQuit(); },
     },
     dialog: {
-      showOpenDialog: async () => ({ canceled: true, noDialog: true, filePaths: [] }),
+      showOpenDialog: async (_window?: unknown, options: OsDialogOptions = {}) => (
+        (osDialog ? await osDialog(options) : null) ?? { canceled: true, noDialog: true, filePaths: [] }
+      ),
     },
   };
 }
@@ -216,6 +223,7 @@ export function answerWhatOnlyTheWindowAnswered(ipcMain: CollectingIpcMain) {
   // A room invite link only ever opens the desktop app.
   ipcMain.handle('zero:take-join', () => null);
   ipcMain.handle('zero:crash', (_e, payload) => { reportFromRenderer(payload ?? {}); return null; });
+  ipcMain.handle('zero:blank-check', () => null);
   // The phone door belongs to the desktop app (main/phone-link.mts); a tab is told there is none.
   ipcMain.handle('zero:phone-link', () => null);
 }
@@ -230,7 +238,7 @@ export function answerWhatOnlyTheWindowAnswered(ipcMain: CollectingIpcMain) {
  *  writes into it, and a checkout carries none and sends nothing.
  *  `countClient` and `now` are for tests.
  */
-export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, userDir = dataDir, openExternal = openInBrowser, host = null, countClient = null, now = Date.now }: BootOptions = {}) {
+export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, userDir = dataDir, openExternal = openInBrowser, host = null, osDialog = null, countClient = null, now = Date.now }: BootOptions = {}) {
   const config = loadConfig(dataDir) as unknown as HeadlessConfig;
   // The browser editor uses the same user files as the desktop. Finish the
   // older migrations first so only user content enters the combined file.
@@ -262,7 +270,7 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
   const window = broadcastingWindow();
   // A caller may bring its own three, which is how a test asks what the
   // handlers do with an answer only a real file dialog gives.
-  host = host ?? nodeHost({ openExternal });
+  host = host ?? nodeHost({ openExternal, osDialog });
   // THE TEAM, as on the desktop (main/main.mts), with no Electron: the session
   // file is plain JSON readable only by this user, kept in this copy's own
   // folder and not in the store (headlessSessionFile), and Google sign-in opens

@@ -27,7 +27,14 @@ export function chatEntries(view: TeammatesView | null | undefined, only: string
   const all: ChatEntry[] = [...view.chat, ...view.runs];
   // What you wrote in the chat reaches a waiting run as its answer; the chat
   // already shows it, so only answers typed in the thread itself get a line.
-  const saidInChat = new Set(view.chat.filter((m) => m.kind === 'msg' && m.from === 'you').map((m) => String(m.text ?? '').trim()));
+  // The run keeps your words folded onto one line and cut at 400 characters.
+  const folded = (s: unknown) => String(s ?? '').replace(/\s+/g, ' ').trim();
+  const saidInChat = view.chat.filter((m) => m.kind === 'msg' && m.from === 'you').map((m) => folded(m.text));
+  const alreadySaid = (text: unknown) => {
+    const t = folded(text);
+    const cut = t.endsWith('…') ? t.slice(0, -1).trimEnd() : null;
+    return saidInChat.some((s) => s === t || (!!cut && s.length > t.length && s.startsWith(cut)));
+  };
   // The team chat says a run finished and leaves out that it was picked up;
   // a teammate's own page keeps both.
   const finished = new Set(view.runs.filter((r) => r.verb === 'finished' || r.verb === 'stopped').map((r) => r.item));
@@ -35,7 +42,7 @@ export function chatEntries(view: TeammatesView | null | undefined, only: string
     if (!only && e.kind === 'run' && e.verb === 'picked' && finished.has(e.item)) return false;
     // A run's own start line repeats the pass that made it, so the pass speaks for it.
     if (e.kind === 'run' && e.verb === 'passed') return false;
-    if (e.kind === 'run' && e.verb === 'answered' && saidInChat.has(String(e.text ?? '').trim())) return false;
+    if (e.kind === 'run' && e.verb === 'answered' && alreadySaid(e.text)) return false;
     if (e.kind === 'msg' && (e as TeamChatLine & { start?: boolean }).start) return false;
     return only ? involves(e, only) : true;
   });
