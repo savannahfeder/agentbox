@@ -59,6 +59,7 @@ import { withoutLoneQuoteMark } from '../typed-message';
 import { teammateIdOf, OFFER_LABEL } from '../../../shared/teammates.mjs';
 import { REACH_LABEL } from '../../../shared/teammate-reach.mjs';
 import { Name } from '../../../shared/product-name.mjs';
+import { isCause, withoutBrief } from '../../../shared/causes.mjs';
 
 // THE BACKSTOP, NOT THE HEARTBEAT.
 //
@@ -329,7 +330,9 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
   const saying = session?.saying && session.sayingAt
     ? { text: session.saying, at: session.sayingAt, run: session.startedAt }
     : null;
-  const built = itemThread(ledger.lines, withEveryRun(everyRun, sessions), saying, { whole, engine, pending: sending, chat, undone: marksFor(undoMarks, item.product, item.id), numbers: fileLine.numbers, me });
+  // A cause row's body is the brief its lead works from, not something said to her.
+  const lines = isCause(item) ? withoutBrief(ledger.lines) : ledger.lines;
+  const built = itemThread(lines, withEveryRun(everyRun, sessions), saying, { whole, engine, pending: sending, chat, undone: marksFor(undoMarks, item.product, item.id), numbers: fileLine.numbers, me });
   const said = built.events.map((e) => (e.kind === 'work' ? e : { ...e, text: clean(e.text ?? '') }));
   /* * WHILE AN AGENT IS WORKING, THE LAST THING ON THE PAGE IS THE THINKING
      COMPONENT, AND THE COMMANDS UNDER IT ARE ITS OWN.

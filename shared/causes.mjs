@@ -65,3 +65,12 @@ export function leadBrief({ cause, ask, from, again = false }) {
       : '3. Keep to this cause. Do not do the waiting threads\' own work.',
   ].join('\n');
 }
+
+/** A cause row's history without the brief the app wrote for its lead, for drawing to the person. */
+export function withoutBrief(lines) {
+  return (lines ?? []).map((l) => {
+    if (l?.source !== 'system' || typeof l.patch?.body !== 'string') return l;
+    const { body, ...rest } = l.patch;
+    return { ...l, patch: rest };
+  });
+}

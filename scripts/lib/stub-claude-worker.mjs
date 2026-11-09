@@ -415,7 +415,9 @@ if (slow > 0) {
 try {
   const brief = (() => { const at = argv.indexOf('--append-system-prompt'); return at >= 0 ? argv[at + 1] ?? '' : ''; })();
   if (brief.includes('team_post') && process.env.ZERO_ITEM) await actAsTeammate(brief, promptText, said);
-  const act = directive('stub:act')?.[1];
+  // [[stub:act-first:<name>]] acts on the first start only, as a thread that got
+  // stuck once and is fine when it is started again.
+  const act = directive('stub:act')?.[1] ?? (attempt === 1 ? directive('stub:act-first')?.[1] : null);
   if (act && plan.acts?.[act]) said = await actFromPlan(plan.acts[act]);
   if (plan.approval) {
     const decision = await askTheFounder(plan.approval);

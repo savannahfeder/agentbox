@@ -13,7 +13,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { isCause, waitingOn, causeWord, causeWhere, openCauses, cameBack, leadBrief, CAUSE_KIND, CAUSE_LABEL } from '../shared/causes.mjs';
+import { isCause, waitingOn, causeWord, causeWhere, openCauses, cameBack, leadBrief, withoutBrief, CAUSE_KIND, CAUSE_LABEL } from '../shared/causes.mjs';
 import { filedByThePerson } from '../shared/answers.mjs';
 import { Supervisor } from '../main/supervisor.mts';
 
@@ -117,6 +117,13 @@ describe('a stuck thread waits on its cause through the store tool', () => {
     expect(waitingOn(read(first.waitingOn), work.listWorkItems({ includeDone: true })).map((i) => i.id).sort()).toEqual([a.id, b.id].sort());
   });
 
+  it('a thread naming an open cause in the same words joins it at once, whatever the case', async () => {
+    const a = thread(product, 'Who acts on comments');
+    const first = await call(a.id, { cause: "Your Mac can't push to GitHub", new: true });
+    const b = thread(other, 'Agentbox redesign');
+    expect(await call(b.id, { cause: "your mac can't push to github " })).toMatchObject({ waitingOn: first.waitingOn, opened: false });
+  });
+
   it('refuses a cause id that is not an open cause', async () => {
     const a = thread(product, 'Improve code quality');
     const out = await (await import('../mcp/tools.mjs')).buildTools({ holder: 'x', ownItem: a.id }).tools.find((t) => t.name === 'wait_on_cause').run({ causeId: a.id });
@@ -139,12 +146,13 @@ describe('a stuck thread waits on its cause through the store tool', () => {
 });
 
 describe('closing the cause starts every thread behind it, in any project', () => {
-  let sup; let items;
+  let sup; let items; let notes;
   beforeEach(() => {
     items = [];
+    notes = [];
     sup = new Supervisor(
       { home: '/nonexistent-home-with-no-second-account', storeRoot: '/nonexistent-zero-root', maxConcurrentSessions: 2, authProfiles: ['default'] },
-      { listItems: () => items, listProducts: () => [], isDue: () => true, answerItem: (p, id, patch) => { const i = items.find((x) => x.id === id); if (i && patch.status) i.status = patch.status; return i; } },
+      { listItems: () => items, listProducts: () => [], isDue: () => true, noteItem: (p, id, note) => notes.push({ id, note }), answerItem: (p, id, patch) => { const i = items.find((x) => x.id === id); if (i && patch.status) i.status = patch.status; return i; } },
       '/nonexistent-app',
     );
     sup.spawnWorker = () => {};
@@ -156,6 +164,18 @@ describe('closing the cause starts every thread behind it, in any project', () =
     expect(sup.resumeFinishedWaits(items).sort()).toEqual(['a', 'b']);
   });
 
+  it('tells each one the cause is cleared, since its own last words say it waits', () => {
+    items = [cause('c1', { status: 'done', wrote: { kind: { source: 'system' }, status: { ts: T + 1000, source: 'agent' } } }), stuck('a', 'c1')];
+    sup.resumeFinishedWaits(items);
+    expect(notes).toEqual([{ id: 'a', note: "Your Mac can't push to GitHub is cleared. Carry on from where this stopped." }]);
+  });
+
+  it('says nothing like it when a plain thread it waited on finished', () => {
+    items = [{ id: 't1', product: 'agentbox', status: 'done', kind: 'task', wrote: { status: { ts: T + 1000, source: 'agent' } } }, stuck('a', 't1')];
+    expect(sup.resumeFinishedWaits(items)).toEqual(['a']);
+    expect(notes).toEqual([]);
+  });
+
   it('starts nothing while the cause is open', () => {
     items = [cause('c1'), stuck('a', 'c1'), stuck('b', 'c1', { product: 'website' })];
     expect(sup.resumeFinishedWaits(items)).toEqual([]);
@@ -165,6 +185,24 @@ describe('closing the cause starts every thread behind it, in any project', () =
     const plain = { id: 't1', product: 'website', status: 'done', kind: 'task', wrote: { status: { ts: T + 1000, source: 'agent' } } };
     items = [plain, stuck('a', 't1')];
     expect(sup.resumeFinishedWaits(items)).toEqual([]);
+  });
+});
+
+describe('the person reads the lead, not the lead\'s brief', () => {
+  it('leaves out the body the app wrote, and keeps everything else', () => {
+    const lines = [
+      { id: 'c1', ts: 1, source: 'system', patch: { title: 'X', body: 'You are the lead on this cause.', kind: CAUSE_KIND } },
+      { id: 'c1', ts: 2, source: 'agent', patch: { result: '**Sign in once, and six changes ship.**' } },
+      { id: 'c1', ts: 3, source: 'founder', patch: { answer: 'Signed in', body: 'her own words' } },
+    ];
+    const shown = withoutBrief(lines);
+    expect(shown[0].patch).toEqual({ title: 'X', kind: CAUSE_KIND });
+    expect(shown[1]).toBe(lines[1]);
+    expect(shown[2]).toBe(lines[2]);
+  });
+  it('and the thread view only does it for a cause row', () => {
+    const view = fs.readFileSync(new URL('../renderer/src/components/ItemThread.tsx', import.meta.url), 'utf8');
+    expect(view).toMatch(/isCause\(item\) \? withoutBrief\(ledger\.lines\) : ledger\.lines/);
   });
 });
 

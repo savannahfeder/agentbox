@@ -2173,6 +2173,10 @@ export class Supervisor {
       if (this._resumedWaits.has(key)) continue;
       if (!mayRunHere(item, productBySlug.get(item.product), me)) continue;
       this._resumedWaits.add(key);
+      // Its own last words say it is waiting, so it is told the cause is gone.
+      for (const b of blockers) {
+        if (isCause(b)) try { this.store.noteItem?.(item.product, item.id, `${b!.title} is cleared. Carry on from where this stopped.`); } catch { /* the resume still goes ahead */ }
+      }
       this.store.answerItem(item.product, item.id, { status: 'open' });
       this._resumeQueue.add(item.id);
       resumed.push(item.id);

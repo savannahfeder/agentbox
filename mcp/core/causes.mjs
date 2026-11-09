@@ -17,6 +17,8 @@ export function joinCause({ thread, cause, ask = '', causeId = null, isNew = fal
     if (!found) throw new Error(`${causeId} is not an open cause. Open causes: ${open.map((c) => `${c.id} "${c.title}"`).join(', ') || 'none'}.`);
     return { causeId: found.id, opened: false };
   }
+  const same = open.find((c) => String(c.title ?? '').trim().toLowerCase() === String(cause ?? '').trim().toLowerCase());
+  if (same) return { causeId: same.id, opened: false };
   if (open.length && !isNew) {
     return { choose: open.map((c) => ({ id: c.id, title: c.title, waiting: waitingOn(c, all).length })) };
   }
