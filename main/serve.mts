@@ -33,7 +33,7 @@ import { spawn } from 'node:child_process';
 import { Readable } from 'node:stream';
 import { MEDIA_PIECE_BYTES, mediaResponse, mediaType, servable } from './img-scheme.mts';
 import { readPictureShape } from './picture-shape.mts';
-import { loadConfig } from './config.mjs';
+import { loadConfig } from './config.mts';
 import { Store } from './store.mts';
 import type { StoreConfig, StoreProduct } from './store.mts';
 import { Supervisor } from './supervisor.mts';
@@ -46,15 +46,18 @@ type OsDialog = (options: OsDialogOptions) => Promise<OsDialogAnswer | null>;
 import { reportFromRenderer } from './crash-report.mts';
 import { createAnalytics, createDailyCount } from './analytics.mts';
 import type { AnalyticsConfig } from './analytics.mts';
-import * as workItemsDisk from './store/work-items.mjs';
+import * as workItemsDisk from './store/work-items.mts';
 import { createTeamService, teamStateFile } from './team/index.mts';
 import type { TeamSession } from './team/index.mts';
-import { startConnections } from './connections/start.mjs';
+import { startConnections } from './connections/start.mts';
 import { ensurePersonalProject } from './team/projects.mts';
-import { loadCloudConfig, supabaseSession, headlessSessionFile } from './team/session.mjs';
+import { loadCloudConfig, supabaseSession, headlessSessionFile, sessionFileOutsideStore } from './team/session.mts';
+import { gitHubPushSignIn } from './github-push-sign-in.mts';
+import { liveAddress } from './team/live-room.mts';
 import { roomsSetup } from './team/room-setup.mts';
-import { matesForTheTeam } from './teammate-reach.mjs';
-import { appHome, carryMisplacedMachinery, storeRootEnv } from './store/home.mjs';
+import { matesForTheTeam } from './teammate-reach.mts';
+import { alphaFeatures } from './settings.mts';
+import { appHome, carryMisplacedMachinery, storeRootEnv } from './store/home.mts';
 import { keepAnswerModesIn } from './answer-modes.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -207,7 +210,7 @@ function readVersion() {
  *  files them and a tab asking got a 404. That was not harmless: a failed
  *  `badge` became an uncaught error, the screen reported it on `crash`, that
  *  failed too, and the tab sent thousands of requests a second.
- *  tests/a-browser-tab-gets-an-answer-on-every-channel.test.mjs.
+ *  tests/a-browser-tab-gets-an-answer-on-every-channel.test.mts.
  *
  *  A tab has no dock and no ⌘R of ours to report, and nothing here decides
  *  banners yet, so three of them answer with nothing. A crash goes through the
@@ -239,7 +242,7 @@ export function answerWhatOnlyTheWindowAnswered(ipcMain: CollectingIpcMain) {
  *  `countClient` and `now` are for tests.
  */
 export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, userDir = dataDir, openExternal = openInBrowser, host = null, osDialog = null, countClient = null, now = Date.now }: BootOptions = {}) {
-  const config = loadConfig(dataDir) as unknown as HeadlessConfig;
+  const config = loadConfig(dataDir) as HeadlessConfig;
   // The browser editor uses the same user files as the desktop. Finish the
   // older migrations first so only user content enters the combined file.
   carryHerBriefsAcross(appDir, userDir);
@@ -252,7 +255,7 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
   // that same variable. Without this line the two disagreed: the copy wrote its
   // rows wherever an inherited variable pointed (or a dot-folder in $HOME), each worker
   // looked under `storeRoot`, and every store call answered "no work item".
-  // tests/an-agent-in-a-browser-copy-can-reach-its-own-work-item.test.mjs.
+  // tests/an-agent-in-a-browser-copy-can-reach-its-own-work-item.test.mts.
   // Rows already written under the old home come along, or they would vanish.
   const inheritedHome = appHome();
   Object.assign(process.env, storeRootEnv(config.storeRoot));
@@ -267,6 +270,11 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
   } catch (err) { console.warn(`zero: could not make My Workspace: ${(err as Error).message}`); }
   const store = await new Store(config).init();
   const supervisor = new Supervisor(config, store, appDir, dataDir, userDir);
+  // No keychain on this door: kept like its team session, plain and readable by this user only, outside the store.
+  supervisor.gitHubSignIn = gitHubPushSignIn({
+    file: sessionFileOutsideStore({ dir: userDir, name: 'github-sign-in.json', storeRoot: config.storeRoot }),
+    cipher: { encrypt: (text: string) => Buffer.from(text, 'utf8'), decrypt: (buf: Buffer) => buf.toString('utf8') },
+  });
   const window = broadcastingWindow();
   // A caller may bring its own three, which is how a test asks what the
   // handlers do with an answer only a real file dialog gives.
@@ -290,6 +298,7 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
     onChange: () => ipc?.push?.(),
     shareSite: cloudConfig.phoneSite ?? null,
     ownMates: () => matesForTheTeam(store, config),
+    sharing: () => alphaFeatures(config).multiplayer,
     rooms: roomsSetup({ config, store, supervisor, userDir }),
   }) : null;
   if (team) store.teammates?.bindTeam(team);
@@ -312,7 +321,7 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
   host.app.on('before-quit', () => analytics.track('app_quit', { seconds: Math.round(process.uptime()) }));
   const connected = startConnections({ config, supervisor, appDir, userDir, openExternal: host.shell.openExternal, onChange: () => ipc?.push?.() });
   host.app.on('before-quit', () => { void connected.stop(); });
-  ipc = registerIpc({ store, supervisor, config, window, analytics, host, team, connections: connected.connections, copies: connected.copies, onCount: () => usedToday(now()) });
+  ipc = registerIpc({ store, supervisor, config, window, analytics, host, team, connections: connected.connections, copies: connected.copies, onCount: () => usedToday(now()), liveAt: liveAddress(cloudConfig) });
   answerWhatOnlyTheWindowAnswered(host.ipcMain);
   return { config, store, supervisor, window, host, ipc, team, analytics, channels: host.ipcMain.handlers };
 }

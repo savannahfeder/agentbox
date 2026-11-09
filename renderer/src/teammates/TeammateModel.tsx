@@ -9,7 +9,7 @@ import { defaultEffortFor, effortChoicesFor, effortShown } from '../effort';
 import { effortSaid } from '../reply-pick';
 import { allModels, moreCount, recentModels, type Harness, type ModelPick } from '../threads/composer-rules';
 import { ReplyModel } from '../components/ReplyModel';
-import { ENGINES } from '../../../shared/engines.mjs';
+import { ENGINES } from '../../../shared/engines.mts';
 
 export type ModelSetting = { engine: string | null; model: string | null; effort: string | null };
 

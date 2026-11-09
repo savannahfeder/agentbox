@@ -1,7 +1,7 @@
 // Files in a chat with an AI teammate. They are saved into the project its run
 // works in, because a run reads only pictures inside its own project
 // (main/supervisor.mts `attachedFiles`).
-import { projectNamedIn } from '../../../shared/teammates.mjs';
+import { projectNamedIn } from '../../../shared/teammates.mts';
 
 type Place = { slug: string; name?: string | null };
 type Mate = { id: string; product: string };

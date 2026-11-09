@@ -7,7 +7,7 @@ import remarkGfm from 'remark-gfm';
 import type { Playbook, Product, RunningSession, Teammate, TeammatesView, TeamChatLine, TeamRunLine, WorkItem } from '../types';
 import { type TabView } from '../threads/Pages';
 import { api } from '../api';
-import { GREETING, MAX_HOPS, STARTERS, TEAMMATE_EFFORT, VOICES, VOICE_WORDS_MOST, starterAsks, teammateIdOf, voiceOf, yesFirst } from '../../../shared/teammates.mjs';
+import { GREETING, MAX_HOPS, STARTERS, TEAMMATE_EFFORT, VOICES, VOICE_WORDS_MOST, starterAsks, teammateIdOf, voiceOf, yesFirst } from '../../../shared/teammates.mts';
 import { ModelPicker } from '../components/Model';
 import type { ModelChoice } from '../models';
 import { rememberedProject } from '../compose-project';

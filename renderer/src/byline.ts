@@ -28,9 +28,9 @@
 // itself, the supervisor's live sessions and queue, and the list rule in
 // list-rules.ts that decides which tab a row is on.
 
-import { liveLine, shortSpan, shortWord, type LiveFacts, type LiveState } from './live-line';
+import { liveLine, runningSince, shortSpan, shortWord, type LiveFacts, type LiveState } from './live-line';
 import { ago } from './format';
-import { engineLabel } from '../../shared/engines.mjs';
+import { engineLabel } from '../../shared/engines.mts';
 import { engineModelLabel, type ModelChoice } from './models';
 import type { WorkItem } from './types';
 
@@ -79,7 +79,7 @@ export const WHERE_LINE: Record<Where, string> = {
 // It indicated nothing. `item.updatedAt` is the timestamp of the NEWEST LINE in
 // the ledger for that row, and the MCP server appends a keep-alive line every
 // hundred seconds for as long as a worker holds the claim (`buildClaimLine` and
-// LEASE_MS in shared/work-items.mjs; the fold in that file bumps `updatedAt`
+// LEASE_MS in shared/work-items.mts; the fold in that file bumps `updatedAt`
 // for a heartbeat exactly as it does for a real write). MEASURED on her own
 // Agentbox ledger, 2026-08-28, on this very row: 215 lines, 161 of them
 // heartbeats, median gap 100.0 seconds over 148 gaps. So "last moved 1m ago"
@@ -132,7 +132,7 @@ export function lastChange(item: WorkItem): number {
 // NEITHER FACT IS WORKED OUT HERE. Whether a choice is real needs the
 // capability gate and the staleness rule, both of which live in main and are
 // pinned to one file there by
-// tests/a-codex-row-from-august-still-runs-on-claude.test.mjs. A byline that
+// tests/a-codex-row-from-august-still-runs-on-claude.test.mts. A byline that
 // derived its own answer could print "Codex" over a row the supervisor was
 // about to run on Claude Code, which is worse than saying nothing: it is the
 // app telling her something it knows is not true. Both arrive already answered,
@@ -249,7 +249,7 @@ export function bylineFacts(
   // choice, because here it is not a choice.
   const codexRow = (item.labels ?? []).some((l) => l === 'codex' || l === 'codex-import' || l === 'not-imported');
   const engineWord = codexRow ? engineLabel('codex') : agentAtWork(facts);
-  const span = facts.session ? shortSpan(Math.max(0, now - facts.session.startedAt)) : null;
+  const span = facts.session ? shortSpan(Math.max(0, now - runningSince(facts.session))) : null;
   const stateWord = live ? shortWord(live.state, facts.session?.helpers ?? 0) : null;
 
   const project = item.productName?.trim() || null;

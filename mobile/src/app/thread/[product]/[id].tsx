@@ -16,20 +16,25 @@ import { MODE_WORDS } from '../../../../../renderer/src/modes';
 import { priorityLabelOf, priorityValueOf } from '../../../../../renderer/src/priority';
 import { clock, dayHeading } from '../../../../../renderer/src/thread-history';
 import { stateWordOf } from '../../../../../renderer/src/threads/summary-rules';
-import { summaryOf, threadState } from '../../../../../shared/thread-cards.mjs';
+import { summaryOf, threadState } from '../../../../../shared/thread-cards.mts';
 import { arrivedAt } from '../../../../../renderer/src/unread';
 import { dayClock } from '../../../lib/back-at';
-import type { Choices, Press } from '../../../lib/actions';
+import type { Choices, Press, PressedItem } from '../../../lib/actions';
 import { useDraft } from '../../../lib/drafts';
 import { typedWords } from '../../../lib/files';
-import { threadOf, type FiledRow, type Thread } from '../../../lib/thread';
-import { askUnderAnswer, CHOICES_FOLDED, foldKey, foldedKeys, pageOf, splitHeadline, spotIn, stepIn, toggleFold, walkKeeping } from '../../../lib/one-page';
-import { mateOf } from '../../../lib/teammates';
-import { TeammateMark } from '../../../ui/Teammates';
+import { threadOf, type FiledRow, type Thread, type ThreadEvent, type ThreadNode, type ThreadSaid } from '../../../lib/thread';
+import { askUnderAnswer, CHOICES_FOLDED, foldKey, foldedKeys, pageOf, splitHeadline, toggleFold, walkKeeping } from '../../../lib/one-page';
+import { needsYouOrder, needsYouSpot, stepOver } from '../../../lib/needs-you';
+import { shownTabs } from '../../../lib/tabs';
+import { readDisplay } from '../../../../../renderer/src/threads/page-rules';
+import { mentionRows } from '../../../../../renderer/src/team/rooms/room-rules';
+import { useGroups } from '../../../state/groups';
+import { mateOf, questionThread, questionsForYou } from '../../../lib/teammates';
+import { TeammateMark, ThreadQuestions } from '../../../ui/Teammates';
 import { screenGate } from '../../../lib/thread-gate';
 import { liveOf, moveChoices, offersOf, ruleFor, shownLevel, summaryParts, type Offers } from '../../../lib/thread-offers';
 import { madeThreadOf, phoneSlug, waitFacts } from '../../../../../renderer/src/phone-rows';
-import { madeHere } from '../../../../../shared/phone-snapshot.mjs';
+import { madeHere } from '../../../../../shared/phone-snapshot.mts';
 import { replySender, type ReplyDeps } from '../../../lib/thread-reply';
 import { atEnd, keptPlace } from '../../../lib/thread-scroll';
 import { appStore } from '../../../platform/persist';
@@ -45,6 +50,7 @@ import { replyLaterRows } from '../../../lib/later';
 import { agentChoices, laterHint, momentFromWords } from '../../../../../renderer/src/threads/composer-rules';
 import { Waiting } from '../../../ui/LogoOrbit';
 import { Markdown, type MessageFiles } from '../../../ui/Markdown';
+import { Selectable } from '../../../ui/Selectable';
 import { footRoom, IconButton, Pickable, PriorityBars, RunningMark, SheetHead, SheetRow, T, TopBar, Wall } from '../../../ui/parts';
 import { ModelSheet, ModeSheet, PrioritySheet, barsFor } from '../../../ui/Pickers';
 import { ThreadMenu } from '../../../ui/ThreadMenu';
@@ -65,7 +71,7 @@ function StateDot({ state }: { state: string }) {
 }
 
 type Kind = 'msg' | 'same' | 'act' | 'work';
-const kindOf = (n: any): Kind => (n.kind === 'run' ? 'work' : n.kind === 'work' ? (n.yours ? 'act' : 'work') : n.same && !n.resumed ? 'same' : 'msg');
+const kindOf = (n: ThreadNode): Kind => (n.kind === 'run' ? 'work' : n.kind === 'work' ? (n.yours ? 'act' : 'work') : n.same && !n.resumed ? 'same' : 'msg');
 // The thread's 22px column and the pulls between its blocks (styles.css `.thread-block`).
 function gapBefore(prev: Kind, cur: Kind, afterGap: boolean) {
   if (cur === 'same') return 8;
@@ -78,7 +84,7 @@ function gapBefore(prev: Kind, cur: Kind, afterGap: boolean) {
 }
 
 function Said({ e, starts, ends, product, dir, files, sendNow, openOrigin, name }: {
-  e: any; starts: boolean; ends: boolean; product: string; dir: string | null; files: MessageFiles; sendNow?: () => void; openOrigin: () => void;
+  e: ThreadSaid; starts: boolean; ends: boolean; product: string; dir: string | null; files: MessageFiles; sendNow?: () => void; openOrigin: () => void;
   /** A teammate's run is signed with its name. */
   name?: string;
 }) {
@@ -106,7 +112,7 @@ function Said({ e, starts, ends, product, dir, files, sendNow, openOrigin, name 
         {/* Her words as typed; the files the app wrote into them are drawn, not read out. */}
         {yours ? (
           <>
-            {!!words.trim() && <T selectable style={{ fontSize: 17, lineHeight: 26.35, fontFamily: font.medium }}>{words}</T>}
+            {!!words.trim() && <Selectable style={{ fontSize: 17, lineHeight: 26.35, fontFamily: font.medium }}>{words}</Selectable>}
             <SentFiles text={e.text ?? ''} product={product} />
           </>
         ) : <Markdown text={e.text ?? ''} dir={dir} files={files} />}
@@ -130,6 +136,9 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
   // Her words and files outlive the screen, a draft per thread (lib/drafts.ts).
   const draft = useDraft({ product: item.product, id: item.id }, appStore);
   const [open, setOpen] = useState(false);
+  // A kept draft opens with the cursor after its words, then the cursor is the person's again.
+  const [caret, setCaret] = useState<{ start: number; end: number } | undefined>(undefined);
+  const openReply = () => { setCaret({ start: draft.text.length, end: draft.text.length }); setOpen(true); };
   const [failed, setFailed] = useState<string | null>(null);
   const [picked, setPicked] = useState<Choices>({});
   const [sheet, setSheet] = useState<'priority' | 'mode' | 'model' | 'attach' | 'later' | null>(null);
@@ -173,7 +182,7 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
     <View style={{ paddingHorizontal: 12, paddingBottom: 16 + foot, paddingTop: 8 }}>
       {!open ? (
         <View style={{ ...card, borderColor: color.line, height: 43, flexDirection: 'row', alignItems: 'center' }}>
-          <Pressable onPress={() => setOpen(true)} accessibilityRole="button" accessibilityLabel="Reply" style={{ flex: 1, height: '100%', flexDirection: 'row', alignItems: 'center' }}>
+          <Pressable onPress={openReply} accessibilityRole="button" accessibilityLabel="Reply" style={{ flex: 1, height: '100%', flexDirection: 'row', alignItems: 'center' }}>
             <T numberOfLines={1} style={{ flex: 1, fontSize: 14.5, color: folded.draft ? color.dim : color.faint, paddingHorizontal: 16 }}>{folded.text}</T>
             {!!folded.files && <T style={{ fontSize: 12, color: color.faint, paddingRight: 12 }}>{folded.files}</T>}
             <T style={{ fontSize: 13, color: color.dim, marginRight: 4, textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: color.faint }}>{modelLabel}</T>
@@ -192,6 +201,7 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
           onTouchEnd={() => setTimeout(() => { pressInside.current = false; }, 400)}>
           {/* Typing stops dictation with the words kept; tapping the box does not (web-speech.ts). */}
           <TextInput ref={typing} autoFocus={!talk.active()} multiline value={draft.text} placeholder="What should the agent do next?" placeholderTextColor={color.faint}
+            selection={caret} onFocus={() => setTimeout(() => setCaret(undefined), 0)}
             onChangeText={(t) => { if (talk.active()) talk.leave(); draft.setText(t); }}
             onBlur={() => { if (!ready && !sheet && !talk.active() && !pressInside.current) setOpen(false); }}
             style={[{ minHeight: 92, maxHeight: 220, paddingTop: 12, paddingHorizontal: 16, paddingBottom: 6, fontFamily: font.regular, fontSize: 15.5, lineHeight: 24, color: color.text, textAlignVertical: 'top' }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
@@ -344,7 +354,7 @@ export default function ThreadScreen() {
   const thread = useMemo(() => threadOf(c.rows, c.view, String(product), String(id), { whole, tabs: c.tabs, me }), [c.rows, c.view, c.tabs, product, id, whole, me]);
   const { dir, files } = useMessageFiles(String(product), String(id));
   const inset = useSafeAreaInsets();
-  const waiting = !!thread?.events.some((e: any) => e.kind !== 'work' && e.pending);
+  const waiting = !!thread?.events.some((e: ThreadEvent) => e.kind !== 'work' && e.pending);
   useEffect(() => { if (!waiting) setCutting(false); }, [waiting]);
   // Read once opened, and again when an answer lands while it is open (App.tsx `focusedArrival`).
   const arrived = thread ? arrivedAt(thread.item) : 0;
@@ -358,7 +368,8 @@ export default function ThreadScreen() {
   const footList = useRef(0);
   // A page opens on its name; only a conversation with no answer yet opens at its end, to follow it.
   const placedOn = useRef<string | null>(null);
-  const walked = useRef<typeof c.tabs.inbox>([]);
+  const walked = useRef<{ product: string; id: string }[]>([]);
+  const groups = useGroups();
 
   const back =() => (router.canGoBack() ? router.back() : router.replace('/'));
   // A thread sent from here, now made by the computer under its own id.
@@ -385,11 +396,16 @@ export default function ThreadScreen() {
   }
   // Its place in Needs you, with the arrows that walk it (OneThingAtATime.tsx `QueueNav`).
   const here = { product: String(product), id: String(id) };
-  const walk = walkKeeping(c.tabs.inbox, here, walked.current);
+  const inbox = shownTabs(c.tabs, readDisplay('inbox', appStore), c.now, c.view.products.map((p) => p.slug)).rows.inbox;
+  const inNeedsYou = new Set(inbox.map((r) => r.key));
+  const asks = questionsForYou(c.team, c.teamPending)
+    .map((q) => ({ ...q, thread: questionThread(q.question, c.view.items) }))
+    .filter((q) => !q.thread || !inNeedsYou.has(`${q.thread.product}/${q.thread.id}`));
+  const walk = walkKeeping(needsYouOrder(asks, groups.on ? mentionRows(groups.state.mentions) : [], inbox), here, walked.current);
   walked.current = walk;
-  const spot = spotIn(walk, here);
+  const spot = needsYouSpot(walk, here);
   const step = (dir: 1 | -1) => {
-    const to = stepIn(walk, here, dir);
+    const to = stepOver(walk, here, dir);
     if (to) router.setParams({ product: to.product, id: to.id });
   };
   const roundKey = foldKey(item);
@@ -408,7 +424,7 @@ export default function ThreadScreen() {
   });
   const live = liveOf(item, facts);
   const rule = ruleFor(item, c.repeats);
-  const press = async (p: Press, on: any = item, then?: () => void) => {
+  const press = async (p: Press, on: PressedItem = item, then?: () => void) => {
     setBusy(true); setError(null);
     try { await c.send(p, on); then?.(); return true; } catch (err) { setError(String((err as Error)?.message ?? err)); return false; } finally { setBusy(false); }
   };
@@ -443,7 +459,7 @@ export default function ThreadScreen() {
 
   let prev: Kind | null = null;
   let afterGap = false;
-  const blocks = page.answer ? [] : thread.nodes.map((n: any, k: number) => {
+  const blocks = page.answer ? [] : thread.nodes.map((n: ThreadNode, k: number) => {
     // Answered since: the page is drawn from that answer down.
     if ((n.kind === 'run' ? n.items[n.items.length - 1]?.i : n.i) < page.from) return null;
     const kind = kindOf(n);
@@ -478,8 +494,8 @@ export default function ThreadScreen() {
           {spot && (
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <T style={{ fontFamily: font.mono, fontSize: 11, letterSpacing: 0.99, textTransform: 'uppercase', color: color.dim, marginRight: 2 }}>{`${spot.pos} of ${spot.total}`}</T>
-              <IconButton label="Previous thread" width={32} onPress={() => step(-1)}><View style={{ opacity: spot.index <= 0 ? 0.35 : 1 }}><Chevron up /></View></IconButton>
-              <IconButton label="Next thread" width={32} onPress={() => step(1)}><View style={{ opacity: spot.pos >= spot.total ? 0.35 : 1 }}><Chevron /></View></IconButton>
+              <IconButton label="Previous thread" width={32} onPress={() => step(-1)}><View style={{ opacity: stepOver(walk, here, -1) ? 1 : 0.35 }}><Chevron up /></View></IconButton>
+              <IconButton label="Next thread" width={32} onPress={() => step(1)}><View style={{ opacity: stepOver(walk, here, 1) ? 1 : 0.35 }}><Chevron /></View></IconButton>
             </View>
           )}
           <IconButton label="Show the summary" width={spot ? 36 : 44} onPress={() => setSummary(true)}><Panel /></IconButton>
@@ -538,7 +554,7 @@ export default function ThreadScreen() {
                   <T style={{ fontFamily: font.mono, fontSize: 10.5, color: color.faint }}>{when(page.answer.at)}</T>
                 </View>
               )}
-              {page.answer.headline && <T selectable style={{ fontFamily: font.semibold, fontSize: 17, lineHeight: 24.65, marginBottom: 8 }}>{page.answer.headline}</T>}
+              {page.answer.headline && <Selectable style={{ fontFamily: font.semibold, fontSize: 17, lineHeight: 24.65, marginBottom: 8 }}>{page.answer.headline}</Selectable>}
               {!!page.answer.rest.trim() && <Markdown text={page.answer.rest} dir={dir} files={files} />}
               {page.appNote && <T style={{ fontSize: 13, lineHeight: 19, marginTop: 14, color: color.faint }}>{page.appNote}</T>}
             </View>
@@ -562,7 +578,7 @@ export default function ThreadScreen() {
           )}
           {thread.after.length > 0 && (
             <View style={{ marginTop: 22, gap: 9 }}>
-              {thread.after.map((a: any, k: number) => <ActLine key={`${a.at}-${k}`} act={a} joined={k > 0} />)}
+              {thread.after.map((a, k: number) => <ActLine key={`${a.at}-${k}`} act={a} joined={k > 0} />)}
             </View>
           )}
           <View onLayout={(e) => { footList.current = e.nativeEvent.layout.y; }}>
@@ -582,6 +598,7 @@ export default function ThreadScreen() {
             <OptionsCard foot onFold={foldChoices} ask={askUnderAnswer(thread.ask, page.answer?.headline ?? splitHeadline(thread.outcome?.text ?? '').headline)} options={thread.options} busy={busy} pick={pick} dir={dir} files={files} />
           </ScrollView>
         )}
+        {mate && <ThreadQuestions item={item} />}
         <Dock thread={thread} offers={offers} busy={busy} setBusy={setBusy} setError={setError} stop={() => void press({ kind: 'stop' })}
           foldedChoices={thread.options.length > 0 && !asking && choicesFolded ? thread.options.length : 0} showChoices={foldChoices} onTyped={setTyped} />
       </KeyboardAvoidingView>
@@ -602,7 +619,7 @@ export default function ThreadScreen() {
         projects={offers.move ? moveChoices(item, c.view.products) : []} onMove={(to) => void press({ kind: 'move', to: to.slug, name: to.name }, item, back)}
         place={offers.place} onPlace={(keep) => void press({ kind: 'keep-here', keep })}
         repeats={!!rule} onEndRepeat={() => { if (rule) void press({ kind: 'end-repeat', rule }); }}
-        onReport={() => router.push({ pathname: '/settings/feedback', params: { report: `${product}/${id}`, title: item.title ?? '' } })}
+        onReport={() => router.push({ pathname: '/settings/feedback', params: { report: `${product}/${id}`, title: item.title ?? '', answer: (page.answer ? [page.answer.headline, page.answer.rest].filter(Boolean).join('\n\n') : thread.outcome?.text ?? '').slice(0, 4000) } })}
         onClose={close} closed={threadState(item) === 'done'} />
       {summary && <Summary thread={thread} now={c.now} close={() => setSummary(false)} />}
     </Wall>

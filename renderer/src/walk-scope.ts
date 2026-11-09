@@ -39,7 +39,7 @@
 /**
  * Everything the app can have drawn OVER the inbox. One name per `{x && (…)}`
  *  overlay in App.tsx, so the list can be checked total against the file:
- *  `tests/nothing-the-app-had-open-outlives-the-walk.test.mjs` fails on an
+ *  `tests/nothing-the-app-had-open-outlives-the-walk.test.mts` fails on an
  *  overlay that has been added and not sorted. */
 export const FLOATS_OVER_THE_APP = ['modal', 'settings', 'importAgents', 'newProject', 'teamShown', 'setupPlan'] as const;
 

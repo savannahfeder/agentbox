@@ -9,7 +9,7 @@ import { gfmFromMarkdown } from 'mdast-util-gfm';
 import { gfm } from 'micromark-extension-gfm';
 import { CODE_PATH, isMediaPath, linkArtifactPaths, productPath } from '../../../renderer/src/artifact-paths';
 import { mentionKind, mentionLabel, mentionName, type MentionKind } from '../../../renderer/src/mentions';
-import { sourceReference } from '../../../renderer/src/source-reference.mjs';
+import { sourceReference } from '../../../renderer/src/source-reference.ts';
 
 export type { MentionKind };
 
@@ -51,7 +51,7 @@ const ADDRESS = /^(https?|data):/i;
 
 function parse(text: string, place: Place) {
   const tree = fromMarkdown(String(text ?? ''), { extensions: [gfm()], mdastExtensions: [gfmFromMarkdown()] });
-  linkArtifactPaths(tree as any, { dir: place.dir ?? null });
+  linkArtifactPaths(tree as Parameters<typeof linkArtifactPaths>[0], { dir: place.dir ?? null });
   return tree;
 }
 
