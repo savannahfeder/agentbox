@@ -449,15 +449,17 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
     // on the same line; an agent's finished word outranks its progress.
     // A TEAMMATE'S HAND-OFF, which the app wrote as a reply on this thread
     // (main/store.mts, `tellItem`). It is theirs, and never drawn as yours.
-    // Notes on a file handed to the agent: the notes are already drawn, as themselves.
-    if (has(patch, 'answer') && Array.isArray(patch!.fromNotes)) continue;
+    // Notes on a file handed to the agent: the notes are already drawn, as
+    // themselves, and only the words typed with them are drawn as a reply.
+    const typed = has(patch, 'answer') && Array.isArray(patch!.fromNotes) ? words(patch!.typed) : undefined;
+    if (has(patch, 'answer') && Array.isArray(patch!.fromNotes) && !typed) continue;
     const from = line.source === 'system' && has(patch, 'answer') ? (patch!.from as { name?: string } | undefined)?.name : undefined;
     if (from && words(patch.answer)) {
       events.push({ at, who: 'agent', said: `${from} handed this over`, words: words(patch.answer)!, message: true, field: 'answer', from });
       continue;
     }
     if (has(patch, 'answer')) {
-      const said = words(patch.answer);
+      const said = typed ?? words(patch.answer);
       replied = mine && said ? { at, by: markBy, index: events.length } : null;
       // WAS THE LAST THING SHE SENT ONE OF CLAUDE CODE'S COMMANDS. The blocked
       // line below reads differently after one, and this is the only place that
