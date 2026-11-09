@@ -10,6 +10,7 @@ import type { TeamSession } from './team/index.mts';
 import { startConnections } from './connections/start.mjs';
 import { roomsSetup } from './team/room-setup.mts';
 import { matesForTheTeam } from './teammate-reach.mjs';
+import { alphaFeatures } from './settings.mts';
 import { loadCloudConfig, supabaseSession } from './team/session.mjs';
 import { liveAddress } from './team/live-room.mjs';
 // MY WORKSPACE IS NOT A TEAM FEATURE ANY MORE (w-f8d123be62), even though it
@@ -508,6 +509,7 @@ async function createWindow() {
     log: (line) => console.log(line),
     runningIds: () => supervisor.runsGoing().map((s) => s.itemId),
     ownMates: () => matesForTheTeam(store, config),
+    sharing: () => alphaFeatures(config).multiplayer,
     // HER PHONE WITH THE MAC SHUT (main/phone-inbox.mts). What it left is done
     // through the window's own handlers, filed below once the window exists.
     phone: {
@@ -1426,6 +1428,8 @@ if (!app.requestSingleInstanceLock()) {
         // this scheme.
         // No-store here too, for the same reason as the page scheme above: a
         // screenshot an agent retakes under the same name is still a new picture.
+        // It reaches a fetch; an <img> keeps the window's copy per address
+        // whatever this says, so viewers ask with seenAt (renderer/src/picture.ts).
         const out = noStore(res);
         out.headers.set('access-control-allow-origin', '*');
         return out;
