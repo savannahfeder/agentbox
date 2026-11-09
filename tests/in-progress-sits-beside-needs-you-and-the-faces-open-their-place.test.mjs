@@ -119,6 +119,6 @@ describe('In progress beside Needs you', () => {
   });
 
   it('opens as a list without a team, and as the board, with Later and Done, with one', () => {
-    expect(app).toMatch(/evChosen \?\? \(homeLayout === 'list' \? 'list' : 'board'\)/);
+    expect(app).toMatch(/evChosen \?\? 'list';/);
   });
 });

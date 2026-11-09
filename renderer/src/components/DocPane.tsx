@@ -97,14 +97,17 @@ const CloseGlyph = () => (
 // changes on every press and is the whole reason it exists.
 export type OpenDoc = { product: string; src: string; auto?: boolean; at?: string; atFrom?: number; readOnly?: boolean };
 
+// The same element with or without notes: a different one would rebuild the
+// editor inside it, from the text the pane first read, whenever Focus opens or closes.
+const Beside = ({ aside, children }: { aside?: ReactNode; children: ReactNode }) =>
+  <div className={aside ? 'doc-notes-split' : undefined} style={aside ? undefined : { display: 'contents' }}>{children}{aside}</div>;
+
 // A website carries doc-html for what that class means: a card holding a
 // page whose colour the app cannot see into, so the header keeps its own dark
 // in every theme. It carries doc-website for the one thing only true here. A
 // `<webview>` is a separate compositing layer and paints over everything the
 // card draws, so the hover-reveal toolbar doc-html normally gets would be
 // painted under the page and could never be pressed.
-const Beside = ({ aside, children }: { aside?: ReactNode; children: ReactNode }) =>
-  aside ? <div className="doc-notes-split">{children}{aside}</div> : <>{children}</>;
 
 function paneKindClass(kind: PaneKind): string {
   if (kind === 'html') return 'doc-html';

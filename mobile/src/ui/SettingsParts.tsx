@@ -7,12 +7,14 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import type { Reading } from '../lib/settings-view';
+import { useCloud } from '../state/cloud';
 import { Back, Caret } from './icons';
 import { Sheet, SheetHead, SheetRow, T, Wall } from './parts';
 import { color, corner, font, size } from './theme';
 
 export function Page({ title, lede, back = 'Settings', right, head, children }: { title: string; lede?: string; back?: string; /** At the right of the Back row. */ right?: ReactNode; /** Takes the Back row's place (Settings' search field). */ head?: ReactNode; children: ReactNode }) {
   const inset = useSafeAreaInsets();
+  const { approvalRoom } = useCloud();
   const leave = () => (router.canGoBack() ? router.back() : router.replace('/'));
   return (
     <Wall>
@@ -30,7 +32,7 @@ export function Page({ title, lede, back = 'Settings', right, head, children }: 
           )}
         </View>
       </View>
-      <ScrollView contentContainerStyle={{ paddingTop: 20, paddingHorizontal: size.inset, paddingBottom: 40 + inset.bottom }}>
+      <ScrollView contentContainerStyle={{ paddingTop: 20, paddingHorizontal: size.inset, paddingBottom: Math.max(40 + inset.bottom, approvalRoom + 16) }}>
         <T style={{ fontSize: 24, lineHeight: 31, letterSpacing: -0.84 }}>{title}</T>
         {lede ? <T style={{ fontSize: 13.5, lineHeight: 20, color: color.faint, marginTop: 8 }}>{lede}</T> : null}
         {children}
@@ -49,26 +51,30 @@ export function Group({ label, children }: { label?: string; children: ReactNode
 }
 
 /** A row; `reading` adds the line a change from the phone is waiting or was refused on. */
-/** `stack` puts a wide control under the words rather than beside them. */
-export function Row({ label, desc, control, first = false, reading, badge, stack = false }: { label: string; desc?: string | null; control?: ReactNode; first?: boolean; reading?: Reading; badge?: string; stack?: boolean }) {
+/** `stack` puts a wide control under the words rather than beside them; `below` is drawn under the words either way. */
+export function Row({ label, desc, control, first = false, reading, badge, stack = false, below }: { label: string; desc?: string | null; control?: ReactNode; first?: boolean; reading?: Reading; badge?: string; stack?: boolean; below?: ReactNode }) {
   const note = reading?.waiting ? 'Waiting for your computer' : reading?.refused ? `Not changed (${reading.refused})` : null;
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20, paddingVertical: 14, borderTopWidth: first ? 0 : 1, borderTopColor: color.line }}>
-      <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <T style={{ fontSize: 13.5, fontFamily: font.medium, letterSpacing: -0.04 }}>{label}</T>
-          {badge ? <T style={{ fontSize: 11, color: color.dim, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, paddingHorizontal: 6, paddingVertical: 1 }}>{badge}</T> : null}
-        </View>
-        {desc ? <T style={{ fontSize: 12.5, lineHeight: 18.75, color: color.faint, marginTop: 3 }}>{desc}</T> : null}
-        {note ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 4 }}>
-            {reading?.waiting ? <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: color.accent }} /> : null}
-            <T style={{ fontSize: 12.5, lineHeight: 18.75, color: color.dim }}>{note}</T>
+    <View style={{ paddingVertical: 14, borderTopWidth: first ? 0 : 1, borderTopColor: color.line }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20 }}>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <T style={{ fontSize: 13.5, fontFamily: font.medium, letterSpacing: -0.04 }}>{label}</T>
+            {badge ? <T style={{ fontSize: 11, color: color.dim, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, paddingHorizontal: 6, paddingVertical: 1 }}>{badge}</T> : null}
           </View>
-        ) : null}
-        {stack && control ? <View style={{ flexDirection: 'row', marginTop: 10 }}>{control}</View> : null}
+          {desc ? <T style={{ fontSize: 12.5, lineHeight: 18.75, color: color.faint, marginTop: 3 }}>{desc}</T> : null}
+          {note ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 4 }}>
+              {reading?.waiting ? <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: color.accent }} /> : null}
+              <T style={{ fontSize: 12.5, lineHeight: 18.75, color: color.dim }}>{note}</T>
+            </View>
+          ) : null}
+          {stack && control ? <View style={{ flexDirection: 'row', marginTop: 10 }}>{control}</View> : null}
+        </View>
+        {stack ? null : control}
       </View>
-      {stack ? null : control}
+      {/* Full width, under the control too, so a meter beside a button keeps its bar. */}
+      {below}
     </View>
   );
 }
@@ -128,6 +134,28 @@ export function Stepper({ value, min, max, onChange, label }: { value: number; m
       {chip(value - 1, 'M2.5 6h7', value <= min, 'fewer')}
       <T style={{ width: 28, textAlign: 'center', fontSize: 13.5, fontFamily: font.medium }}>{value}</T>
       {chip(value + 1, 'M2.5 6h7M6 2.5v7', value >= max, 'more')}
+    </View>
+  );
+}
+
+/** An account's usage, the desktop's `MiniMeters`: each window's word, bar, percent and when it starts over. */
+export function Meters({ meters }: { meters: { key: string; word: string; percent: number | null; resets: string | null }[] }) {
+  if (!meters.length) return null;
+  return (
+    <View style={{ gap: 7, marginTop: 9 }}>
+      {meters.map((m) => {
+        const full = (m.percent ?? 0) >= 100;
+        return (
+          <View key={m.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+            <T numberOfLines={1} style={{ width: 54, fontSize: 12, color: color.dim }}>{m.word}</T>
+            <View style={{ flex: 1, height: 4, borderRadius: 2, overflow: 'hidden', backgroundColor: color.line }}>
+              <View style={{ height: 4, width: `${Math.min(100, m.percent ?? 0)}%`, backgroundColor: full ? color.accent : color.dim }} />
+            </View>
+            <T style={{ width: 34, textAlign: 'right', fontSize: 12, fontFamily: font.medium, color: full ? color.text : color.dim }}>{m.percent == null ? '–' : `${m.percent}%`}</T>
+            <T numberOfLines={1} style={{ width: 78, fontSize: 12, color: color.faint }}>{m.resets ?? ''}</T>
+          </View>
+        );
+      })}
     </View>
   );
 }

@@ -1,6 +1,6 @@
 import { openSourceFile } from './open-source-file.mts';
 import {submitReply} from './live-replies.mts';
-import { noteToItsAgent } from './notes-wake.mjs';
+import { noteToItsAgent, replyWithWaitingNotes, waitingNotes } from './notes-wake.mjs';
 import { CHANGED_HERE, ranHere, whyItCannotMove } from '../shared/move-thread.mts';
 import { whereTheWorkStands } from './git-change.mjs';
 import { taskFolderPath } from './task-folders.mts';
@@ -405,6 +405,16 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // the one on screen means ⌘Y allows a command nobody was reading.
   let looking: { product: string | null; id: string } | null = null;
   const pendingApprovals = () => cardsInFront(approvals.listPending(config.storeRoot), looking);
+  // When each card was first sent to the window, so a chord in its first moment answers nothing (shared/card-settles.mts).
+  const sentAt = new Map<string, number>();
+  const sendingApprovals = () => {
+    const cards = pendingApprovals();
+    const now = Date.now();
+    for (const id of [...sentAt.keys()]) if (!cards.some((c) => c.id === id)) sentAt.delete(id);
+    for (const c of cards) if (!sentAt.has(c.id)) sentAt.set(c.id, now);
+    return cards;
+  };
+  const cardSentAt = (id: string) => sentAt.get(id) ?? null;
   ipcMain.handle('zero:looking', (event, { product = null, id = null }: { product?: string | null; id?: string | null } = {}) => {
     // The window's own top frame and nothing else, the guard
     // `zero:refresh-usage` carries: this moves which card ⌘Y answers. A page
@@ -502,6 +512,20 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     void supervisor.lookAtCloudLogins({ force: !!refresh });
     return { readings: await accountUsage.readAll(profiles.length ? profiles : ['default'], { refresh: !!refresh }) };
   });
+
+  // Last readings only: the phone pass runs every minute and must never start
+  // a `claude /usage` of its own (main/main.mts phoneSettings).
+  const usageForPhone = () => {
+    const current = usage.peek();
+    const newer = <R extends { at?: number }>(a: R | null, b: R | null) => (!a ? b : !b ? a : (b.at ?? 0) > (a.at ?? 0) ? b : a);
+    const profiles = effectiveProfiles(config.authProfiles, { home: config.home });
+    const claude = (profiles.length ? profiles : ['default'])
+      .map((profile) => newer(accountUsage.peek(profile), current?.profile === profile ? current : null))
+      .filter(Boolean);
+    let codex: unknown[] = [];
+    try { codex = supervisor.codexAccountUsage(); } catch { /* no Codex reading */ }
+    return { claude, codex };
+  };
 
   // Agents this run has already counted. In memory on purpose: a fresh launch
   // seeing the same agent again is a fresh fact about the app being used.
@@ -679,7 +703,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       agents: liveAgents(),
       // The open thread's own card first, which is the order the chord and the
       // Agents menu answer in too (shared/which-card-is-in-front.mts).
-      approvals: pendingApprovals(),
+      approvals: sendingApprovals(),
       // A screen that says which thread it has open is sent only that thread's
       // live detail.
       supervisor: ask && 'open' in ask ? { ...running, running: lightRunning(running.running, ask.open) } : running,
@@ -924,8 +948,14 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     // a thread's moment runs now (shared/answers.mjs wordWaits), and this one
     // must wait. Both writes are one synchronous step, so no pass reads between.
     const later = Number(runAt) > Date.now() && status !== 'done';
-    const out = await submitReply(supervisor,{product,id,answer,status,permissionMode,now:!!now,later},()=>{
-      const said = store.answerItem(product, id, { answer, status, priority, permissionMode, engine, model, effort, inReplyTo: thread, fromPhone });
+    const withNotes = product && id && !later && status !== 'done'
+      ? replyWithWaitingNotes({ store, product, id, answer, me: teamMe(), nameOf: noteBy, people: teamPeople() })
+      : null;
+    const out = await submitReply(supervisor,{product,id,answer:withNotes?.answer ?? answer,status,permissionMode,now:!!now,later},()=>{
+      const said = withNotes
+        ? store.answerItem(product, id, { answer: withNotes.answer, fromNotes: withNotes.fromNotes, typed: answer as string, status, priority, permissionMode, engine, model, effort, inReplyTo: thread, fromPhone })
+        : store.answerItem(product, id, { answer, status, priority, permissionMode, engine, model, effort, inReplyTo: thread, fromPhone });
+      if (withNotes) store.fileMark(product, id, { do: 'sent', on: withNotes.fromNotes });
       if (later) store.scheduleItem(product, id, Number(runAt));
       return said;
     });
@@ -1802,8 +1832,16 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   // Send a stopped/blocked item back to the queue; the fresh worker's brief
   // carries whatever the founder wrote on the item meanwhile.
-  ipcMain.handle('zero:reopen', (_e, { product, id }: { product: string; id: string }) => {
+  ipcMain.handle('zero:reopen', async (_e, { product, id }: { product: string; id: string }) => {
     if (isAgentRow(id)) return { ok: false };
+    // Sending it back hands over the comments still waiting, as Send would.
+    const waiting = waitingNotes({ store, product, id, me: teamMe(), people: teamPeople() });
+    if (waiting.length) {
+      const mark = { do: 'toagent', on: waiting };
+      store.fileMark(product, id, mark);
+      try { await noteToItsAgent({ store, supervisor, product, id, mark, nameOf: noteBy, people: teamPeople() }); }
+      catch (err) { console.warn(`[notes] sending ${id} back did not hand over its comments: ${(err as Error)?.message ?? err}`); }
+    }
     const out = store.answerItem(product, id, { status: 'open' });
     supervisor.liftBrakeForHer?.();
     supervisor.forgetDeadStarts?.({ product, id });
@@ -2118,7 +2156,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   });
   // PAYING FOR A CLOUD PLAN: Stripe's own pages, in the browser, as other
   // desktop apps do. An app window drew them badly and never offers Apple Pay.
-  const cloudCall = async (name: 'cloudPlan' | 'payForCloud' | 'openCloudBilling', args: Record<string, unknown> = {}) => {
+  const cloudCall = async (name: 'cloudPlan' | 'payForCloud' | 'openCloudBilling' | 'cloudTeamBilling', args: Record<string, unknown> = {}) => {
     try {
       const account = await import('./cloud/account.mts');
       const shell = await shellNow();
@@ -2134,6 +2172,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   });
   ipcMain.handle('zero:cloud-account-pay', (_e, { plan }: { plan?: string } = {}) => cloudCall('payForCloud', { plan }));
   ipcMain.handle('zero:cloud-account-billing', () => cloudCall('openCloudBilling'));
+  ipcMain.handle('zero:cloud-account-team-billing', () => cloudCall('cloudTeamBilling'));
 
   // THE CLOUD SETUP'S SIGN-IN for one account, made in the cloud
   // (main/cloud/logins.mts). The Mac relays the link and the code only.
@@ -2831,5 +2870,5 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // buttons do, rather than reaching past it into approvals.answer.
   // `push` goes with it so the updater can make the window refetch when a
   // download finishes, without holding the window itself.
-  return { answerApproval, pendingApprovals, push };
+  return { answerApproval, pendingApprovals, cardSentAt, push, usageForPhone };
 }

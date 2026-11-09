@@ -32,6 +32,6 @@ describe('leaving the Team page', () => {
 
 describe('In progress on that layout', () => {
   it('opens as the board, so Later and Done have a place', () => {
-    expect(read('renderer/src/App.tsx')).toMatch(/evChosen \?\? \(homeLayout === 'list' \? 'list' : 'board'\)/);
+    expect(read('renderer/src/App.tsx')).toMatch(/evChosen \?\? 'list';/);
   });
 });

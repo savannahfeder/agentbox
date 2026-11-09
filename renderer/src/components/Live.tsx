@@ -6,7 +6,7 @@
 // This draws them and keeps the clock moving.
 
 import { useEffect, useId, useState } from 'react';
-import { liveLine, livePlace, shortSpan, shortWord, type LiveFacts } from '../live-line';
+import { liveLine, livePlace, runningSince, shortSpan, shortWord, type LiveFacts } from '../live-line';
 import { keepActivityKeyLocal, LIVE_STEPS_SHOWN, previousActivity, stepsSinceLastSaid } from '../activity-summary';
 import { LiveMark } from './LiveMark';
 import { api } from '../api';
@@ -84,7 +84,7 @@ export function Live({ item, facts, onTryAgain }: { item: WorkItem; facts: LiveF
   // nothing to count on a queued or a paused row, so nothing is printed there
   // rather than a number that would have to be invented.
   const span = facts.session
-    ? shortSpan(Math.max(0, now - facts.session.startedAt))
+    ? shortSpan(Math.max(0, now - runningSince(facts.session)))
     : live.state === 'silent' && facts.silent?.endedAt
       ? shortSpan(Math.max(0, now - facts.silent.endedAt))
       : null;
