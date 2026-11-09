@@ -236,6 +236,7 @@ contextBridge.exposeInMainWorld('zero', {
   cloudAccountPlan: () => ipcRenderer.invoke('zero:cloud-account-plan'),
   cloudAccountPay: (payload) => ipcRenderer.invoke('zero:cloud-account-pay', payload),
   cloudAccountBilling: () => ipcRenderer.invoke('zero:cloud-account-billing'),
+  cloudAccountTeamBilling: () => ipcRenderer.invoke('zero:cloud-account-team-billing'),
   cloudClipboardCode: () => ipcRenderer.invoke('zero:cloud-clipboard-code'),
   // What a project is CALLED, and the mark beside the name. Not settings: both
   // are written into the project's own project.json and travel with the folder.

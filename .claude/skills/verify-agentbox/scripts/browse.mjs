@@ -120,7 +120,8 @@ async function tab() {
   if (b.url && b.url !== state.url) {
     await t.goto(state.url);
     await drawn(t);
-    fs.writeFileSync(FILE, JSON.stringify({ ...b, url: state.url }));
+    // A sandboxed tester cannot write here; the next look just goes to the new address again.
+    try { fs.writeFileSync(FILE, JSON.stringify({ ...b, url: state.url })); } catch { /* read-only for this tester */ }
     console.log('(The app restarted since you last looked, and you opened it again.)');
   }
   return t;

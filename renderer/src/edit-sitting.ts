@@ -39,8 +39,8 @@ export function keptDraft<V extends { path: string }>(versions: V[], open: V, re
 }
 
 /** Whether to open an editor on this version now. */
-export function opensForTyping({ canEdit, compare, editing, unreadable, version }: {
-  canEdit: boolean; compare: boolean; editing: boolean; unreadable: string | null; version: string | null;
+export function opensForTyping({ canEdit, editing, unreadable, version }: {
+  canEdit: boolean; editing: boolean; unreadable: string | null; version: string | null;
 }): boolean {
-  return canEdit && !compare && !editing && !!version && unreadable !== version;
+  return canEdit && !editing && !!version && unreadable !== version;
 }

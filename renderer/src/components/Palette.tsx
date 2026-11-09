@@ -32,7 +32,7 @@ export interface Command {
 /** What was found inside things, a labelled group of rows each (renderer/src/found-inside.ts). */
 export interface InsideSection { key: string; label: string; rows: Command[] }
 
-export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, machine = 'dark', onSetLook, staleFiles = [], updateReady = null, onInstallUpdate, onCheckUpdate, moveToApplications = false, onMoveToApplications, filtering = false, onOpenFilter, onClearFilter, onView, teamLayout = false, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onNewThread, onStanding, onSettings, onUsage, onShortcuts, roomsOn = false, groups = [], onGroups, onPickGroup, teamLists, filePages, onConnections, teammates = null, onTeammates, onPauseTeammate, boardUp = false, onFlipView, keyHints, onSetKeyHints, onSearch, findThreads, findChats, findInside, onSearchFor, onFirstRun, onTutorial, onEndTutorial, onImportAgents, onClose, cloud = null, onCloudMode, open = true, phone = false, typed = '' }: {
+export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, machine = 'dark', onSetLook, skyThemes = [], onSkyTheme, staleFiles = [], updateReady = null, onInstallUpdate, onCheckUpdate, moveToApplications = false, onMoveToApplications, filtering = false, onOpenFilter, onClearFilter, onView, teamLayout = false, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onNewThread, onStanding, onSettings, onUsage, onShortcuts, roomsOn = false, groups = [], onGroups, onPickGroup, teamLists, filePages, onConnections, teammates = null, onTeammates, onPauseTeammate, boardUp = false, onFlipView, keyHints, onSetKeyHints, onSearch, findThreads, findChats, findInside, onSearchFor, onFirstRun, onTutorial, onEndTutorial, onImportAgents, onClose, cloud = null, onCloudMode, open = true, phone = false, typed = '' }: {
   products: Product[];
   supervisorPaused: boolean;
   itemCommands?: Command[];
@@ -45,6 +45,9 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   // one that changes what the window shows (palette-rows.ts).
   machine?: ThemeChoice;
   onSetLook: (look: Look) => void;
+  /** The sky themes (Alpha features, Home), each a theme of its own; `on` is the one worn. */
+  skyThemes?: { id: string; name: string; on: boolean }[];
+  onSkyTheme?: (id: string) => void;
   // Main-process files that changed since this process read them.
   staleFiles?: string[];
   /** The version of an update that has downloaded and is waiting for a
@@ -223,12 +226,22 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     ] : []),
     // Every appearance row is built in ../palette-rows, which is pure so a test
     // can type into every look.
-    ...lookRows(look, machine).map((r) => ({
+    // While a sky theme is worn every plain theme is somewhere else to go.
+    ...(skyThemes.some((k) => k.on)
+      ? [...new Map([...lookRows('light', machine), ...lookRows('ember-grid', machine)].map((r) => [r.id, r])).values()]
+      : lookRows(look, machine)).map((r) => ({
       id: r.id,
       label: r.label,
       hint: r.hint,
       keywords: r.keywords,
       run: () => onSetLook(r.to!),
+    })),
+    ...skyThemes.filter((k) => !k.on).map((k) => ({
+      id: `theme-sky-${k.id}`,
+      label: `Theme: ${k.name}`,
+      hint: 'theme',
+      keywords: `theme themes sky ${k.name.toLowerCase()}`,
+      run: () => onSkyTheme?.(k.id),
     })),
     // Above the stale-files row, which only concerns a build on this machine.
     // Shown only once the download has finished (main/updater.mts).
@@ -368,7 +381,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       run: () => onSetKeyHints(!keyHints),
     },
 
-  ], [itemCommands, batch, products, supervisorPaused, order, onNewProject, onNewThread, filtering, onOpenFilter, onClearFilter, onView, teamLayout, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, look, machine, onSetLook, staleFiles, updateReady, onInstallUpdate, moveToApplications, onMoveToApplications, boardUp, onFlipView, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onEndTutorial, onImportAgents, cloud, onCloudMode]);
+  ], [itemCommands, batch, products, supervisorPaused, order, onNewProject, onNewThread, filtering, onOpenFilter, onClearFilter, onView, teamLayout, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, look, machine, onSetLook, skyThemes, onSkyTheme, staleFiles, updateReady, onInstallUpdate, moveToApplications, onMoveToApplications, boardUp, onFlipView, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onEndTutorial, onImportAgents, cloud, onCloudMode]);
   return open ? <PaletteBox commands={commands} findThreads={findThreads} findChats={findChats} findInside={findInside} onSearchFor={onSearchFor} onClose={onClose} phone={phone} typed={typed} /> : null;
 }
 

@@ -43,6 +43,7 @@ import type { CollectingIpcMain, IpcHandler } from './serve.mts';
 import { carryHerBriefsAcross, joinMessageRules, setAsideShippedMessageRules, unifyAgentInstructions } from './instruction-settings.mts';
 import * as approvals from './approvals.mjs';
 import { recoveryToast } from '../shared/recovery.mts';
+import { CHORD_ANSWERS, chordLands } from '../shared/card-settles.mts';
 import { phoneWaitsOf } from '../shared/phone-snapshot.mjs';
 import { teammatesOn } from '../shared/teammates.mjs';
 import { dataFolderName, isNewUserBuild } from '../shared/side-build.mjs';
@@ -517,6 +518,7 @@ async function createWindow() {
       // The Settings pages' model, read through the window's own handler.
       readSettings: () => phoneSettings?.() ?? null,
       pins: () => supervisor.threadPins,
+      onMac: () => supervisor.threadOnMac,
       repeats: () => store.listRepeats(),
       teammates: () => (teammatesOn(config) ? store.teammatesView() : null),
       version: app.getVersion(),
@@ -930,7 +932,15 @@ async function createWindow() {
   answerWhatOnlyTheWindowAnswered({ handle: (channel, fn) => { if (!phoneChannels.has(channel)) phoneChannels.set(channel, fn); } } as CollectingIpcMain);
   phoneApply = applyThrough(phoneChannels);
   // Every minute, so no engine search: that is a login shell on this thread.
-  phoneSettings = () => phoneChannels.get('zero:settings-read')?.({ sender: null }, { search: false }) ?? null;
+  // The cloud and the usage ride the snapshot, not the settings model, so the
+  // phone's copy takes them here.
+  phoneSettings = async () => {
+    const model = await phoneChannels.get('zero:settings-read')?.({ sender: null }, { search: false });
+    if (!model || typeof model !== 'object') return null;
+    // A cloud that does not answer leaves the list empty rather than holding the copy back.
+    const listed = (await Promise.resolve(phoneChannels.get('zero:file-links')?.({ sender: null }, {})).catch(() => null)) as { ok?: boolean; links?: unknown[] } | null | undefined;
+    return { ...model, cloud: supervisor.cloudStatus(), usage: ipc.usageForPhone(), links: listed?.ok ? listed.links : [] };
+  };
   updater.start();
   // A task the app just shipped moved main: look now rather than in half an
   // hour, so the restart is offered while she still remembers the task.
@@ -1050,14 +1060,16 @@ async function createWindow() {
       event.preventDefault();
       return;
     }
-    if (key !== 'y' && key !== 'n') return;
+    const allow = CHORD_ANSWERS[key];
+    if (allow === undefined) return;
     const front = cardInFront();
     if (!front) return;
+    event.preventDefault(); // the page never sees the chord; no double-answer
+    if (!chordLands(ipc.cardSentAt(front.id), Date.now())) return;
     // Through the ipc layer's own door, so the renderer is told what was
     // decided and can acknowledge it. Answering the file directly from here is
     // what made the chord feel like nothing had happened (2026-08-06).
-    ipc.answerApproval(front.id, key === 'y');
-    event.preventDefault(); // the page never sees the chord; no double-answer
+    ipc.answerApproval(front.id, allow);
   });
 
   // ---- END OF THE CHORD WIRING ----

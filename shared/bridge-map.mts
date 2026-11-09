@@ -184,6 +184,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   cloudAccountPlan: 'zero:cloud-account-plan',
   cloudAccountPay: 'zero:cloud-account-pay',
   cloudAccountBilling: 'zero:cloud-account-billing',
+  cloudAccountTeamBilling: 'zero:cloud-account-team-billing',
   projectRename: 'zero:project-rename',
   projectArchive: 'zero:project-archive',
   projectSeenBy: 'zero:project-seen-by',

@@ -1,0 +1,40 @@
+# The App Store build's way to TestFlight, as release-ios.yml is the
+# production build's: built for the simulator with the store switch set,
+# opened, and sent only if the app opened. App Review gets this build.
+#   npx eas-cli@latest workflow:run .eas/workflows/release-ios-store.yml
+# Expo runs maestro jobs only on a paid plan (checked 2026-11-08). On the free
+# plan, build both profiles, open the store-launch-test build in the iOS
+# simulator on a Mac, and submit the store build only if it opened.
+name: App Store build to TestFlight
+
+jobs:
+  simulator_build:
+    name: Build the store build for the iPhone simulator
+    type: build
+    params:
+      platform: ios
+      profile: store-launch-test
+
+  store_build:
+    name: Build the store build
+    type: build
+    params:
+      platform: ios
+      profile: store
+
+  launch_test:
+    name: Open the app
+    needs: [simulator_build]
+    type: maestro
+    params:
+      build_id: ${{ needs.simulator_build.outputs.build_id }}
+      flow_path: ['.maestro/opens.yml']
+      retries: 1
+      record_screen: true
+
+  send_to_testflight:
+    name: Send to TestFlight
+    needs: [launch_test, store_build]
+    type: submit
+    params:
+      build_id: ${{ needs.store_build.outputs.build_id }}

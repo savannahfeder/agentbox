@@ -159,7 +159,9 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
   };
   const localTasks = new Set(items.filter((i) => isTaskRow(i)).map((i) => i.id));
   for (const i of items) {
-    if (i.agent || isSetupTitle(i.title) && (i.title === 'Set up its job' || i.labels?.some((l) => l.startsWith('teammate:')))) continue;
+    // A teammate's "Set up …" thread is often its first day of work; its title says nothing of that work, its progress does.
+    if (i.agent || i.title === 'Set up its job') continue;
+    const setupSays = isSetupTitle(i.title) && i.labels?.some((l) => l.startsWith('teammate:')) ? howFar(i.progress) : undefined;
     const task = isTaskRow(i);
     if (direct.has(i.product) && !task) continue;
     // A task someone gave you is theirs to say finished; open, it is one of yours.
@@ -169,7 +171,7 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
     }
     const k = owner.get(i.id) ?? 'me';
     const who = byKey.get(k)!;
-    const line = (at: number, on?: string | null): TodayLine => ({ key: `${i.product}/${i.id}`, title: '', at, item: i, ...(on !== undefined ? { on } : {}) });
+    const line = (at: number, on?: string | null): TodayLine => ({ key: `${i.product}/${i.id}`, title: '', at, item: i, ...(on !== undefined ? { on } : {}), ...(setupSays ? { says: setupSays } : {}) });
     const shipped = shippedAtOf(i);
     if (inRange(shipped)) { who.shipped.push(line(shipped!)); continue; }
     if (i.status === 'done') {

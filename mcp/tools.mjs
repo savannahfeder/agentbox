@@ -20,7 +20,7 @@ import { listSkills, fetchSkill, fetchReference } from './core/skills.mjs';
 import { listWorkItems, updateItem, createClaimRegistry } from './core/work.mjs';
 import { readStandingInstruction, setStandingInstruction } from './core/repeats.mjs';
 import { teamPost, teamPass, teamRemember, teamSetup, teamRoster, teamPlaybook, teamMethod, teamHire, noteToAnotherThread } from './core/teammates.mjs';
-import { documentVersion, documentsWithFolders, fileWrittenDocument, teamFile, teamTell, teamTask, teamThreads, teamRead, waitsNamed } from './core/reach.mjs';
+import { documentVersion, documentsWithFolders, keepAsWritten, fileWrittenDocument, teamFile, teamTell, teamTask, teamThreads, teamRead, waitsNamed } from './core/reach.mjs';
 import { readTeammates, readTeamView, teamDir } from '../main/store/teammates-files.mjs';
 import { legacyRoot } from '../main/store/project.mjs';
 import { listProductChats, readProductChat } from './core/chat.mjs';
@@ -172,6 +172,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         const written = await writeDocument(into, version ? { ...doc, id: undefined, path: version.path, title: doc.title ?? version.title, ...(version.content != null ? { content: version.content } : {}) } : doc);
         if (doc.content == null) return json(written);
         noteWrittenForRun(into, written.path, thisRun());
+        if (ownItem) keepAsWritten(into, written.path, version?.content ?? doc.content);
         const named = await nameOnThread(written, { ownItem, env: env(), update: (id, patch) => claims.update(id, patch), note: version?.note });
         if (replacesEdits && version && named.onThread) await claims.update(ownItem, { artifact: { do: 'reconcile', file: path.basename(written.path), replace: true } });
         return json({ ...written, ...named, ...(version ? { versionOf: version.of } : {}), ...(version?.merged ? { merged: version.merged, note: version.note } : {}), ...fileWrittenDocument({ path: written.path, folder }) });
@@ -344,7 +345,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
     },
     {
       name: 'team_hire',
-      description: 'Your primary employee only: make a new teammate the person said yes to, in a run their words started or answered. It wakes as a draft and sets itself up by asking them. Ask the person first, with options; never make one they did not agree to.',
+      description: 'Make a new teammate the person asked for or said yes to, in a thread their words started or answered. It wakes as a draft and sets itself up by asking them. Ask the person first, with options; never make one they did not agree to.',
       schema: {
         name: z.string().describe('a name that says its role, like Support lead'),
         job: z.string().describe('its job in plain words'),

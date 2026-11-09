@@ -20,10 +20,13 @@ import { letTheTerminalFallBehind, DROP_PAST_BYTES } from '../main/terminal-outp
 const ROOT = path.resolve(import.meta.dirname, '..');
 
 // A program that logs constantly and counts timer ticks, run on a terminal
-// whose reader never reads, for three seconds.
-function ticksOnAStuckTerminal(fix) {
+// whose reader never reads. The clock starts once it has started, and it runs
+// for `seconds`, or until it has ticked `enough` times: a starved runner ticks
+// slowly but gets there, and a frozen program never does.
+function ticksOnAStuckTerminal(fix, { seconds = 3, enough = Infinity } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stuck-terminal-'));
   const out = path.join(dir, 'ticks');
+  const started = path.join(dir, 'started');
   const child = path.join(dir, 'child.mts');
   fs.writeFileSync(child, `
     import fs from 'node:fs';
@@ -31,6 +34,7 @@ function ticksOnAStuckTerminal(fix) {
     if (${fix}) letTheTerminalFallBehind(process.stdout);
     let ticks = 0;
     setInterval(() => fs.writeFileSync(${JSON.stringify(out)}, String(++ticks)), 100);
+    fs.writeFileSync(${JSON.stringify(started)}, '');
     const line = 'x'.repeat(200);
     const spam = () => { for (let k = 0; k < 200; k++) console.log(line); setTimeout(spam, 10); };
     spam();
@@ -40,11 +44,20 @@ import os, pty, sys, time, signal
 pid, fd = pty.fork()
 if pid == 0:
     os.execv(sys.argv[1], [sys.argv[1], '--experimental-strip-types', '--disable-warning=ExperimentalWarning', sys.argv[2]])
-time.sleep(3)
+deadline = time.time() + 15
+while not os.path.exists(sys.argv[3]) and time.time() < deadline:
+    time.sleep(0.02)
+until = time.time() + float(sys.argv[5])
+while time.time() < until:
+    try:
+        if int(open(sys.argv[4]).read() or 0) >= float(sys.argv[6]): break
+    except (OSError, ValueError):
+        pass
+    time.sleep(0.05)
 os.kill(pid, signal.SIGKILL)
 os.waitpid(pid, 0)
 `;
-  spawnSync('python3', ['-I', '-c', py, process.execPath, child], { timeout: 20_000 });
+  spawnSync('python3', ['-I', '-c', py, process.execPath, child, started, out, String(seconds), String(enough)], { timeout: (seconds + 20) * 1000 });
   const ticks = fs.existsSync(out) ? Number(fs.readFileSync(out, 'utf8')) : 0;
   fs.rmSync(dir, { recursive: true, force: true });
   return ticks;
@@ -54,8 +67,8 @@ const hasPty = process.platform !== 'win32' && spawnSync('python3', ['-c', 'impo
 
 describe.skipIf(!hasPty)('on a real terminal that stops reading', () => {
   it('the app keeps running', () => {
-    expect(ticksOnAStuckTerminal(true)).toBeGreaterThan(20);
-  }, 30_000);
+    expect(ticksOnAStuckTerminal(true, { seconds: 20, enough: 21 })).toBeGreaterThan(20);
+  }, 45_000);
 
   it('without it, the program froze, which is what this guards', () => {
     expect(ticksOnAStuckTerminal(false)).toBeLessThan(5);
