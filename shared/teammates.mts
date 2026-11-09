@@ -680,6 +680,19 @@ function asksYouStill(item: RunItem, tid: string, chat: ChatLike, except: string
     || (isSetupRun(item, tid, chat) && leavesSomethingOpen(item.result));
 }
 
+// A run whose question reached you in the chat, so your next chat words can be
+// its answer. A run made by a duty or a hand-off asks in its own thread, and
+// chat words to its teammate are new work.
+function talksInChat(item: RunItem, tid: string, chat: ChatLike, except: string | null): boolean {
+  return (item.labels ?? []).includes(CHAT_LABEL) || openQuestionOn(item, tid, chat, except) || isSetupRun(item, tid, chat);
+}
+
+// The run whose chat question your message answers by name, from its options.
+function runAnswered(m: ChatLine, chat: ChatLike): string | null {
+  const ids = Object.keys(m.answers ?? {});
+  return (chat?.messages ?? []).find((q) => ids.includes(q.id) && typeof q.run === 'string')?.run ?? null;
+}
+
 function isSetupRun(item: RunItem, tid: string, chat: ChatLike | null | undefined): boolean {
   return (chat?.messages ?? []).some((m) => m.kind === 'msg' && m.from === YOU && m.setup && (m.to ?? []).includes(tid) && runIdFor(`${m.id}>${tid}`) === item.id);
 }
@@ -933,7 +946,9 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
       // A new thread to a teammate is new work, never an answer to its last question.
       if (fromYou && m.kind === 'msg' && !m.fresh) {
         const runs = runsOf(tid, items);
-        const waiting = runs.filter((i) => waitingOnYou(i) && asksYouStill(i, tid, chat, m.id)).sort((a, b) => (b.wrote?.result?.ts ?? 0) - (a.wrote?.result?.ts ?? 0))[0];
+        const named = runAnswered(m, chat);
+        const waiting = runs.find((i) => i.id === named && waitingOnYou(i))
+          ?? runs.filter((i) => waitingOnYou(i) && asksYouStill(i, tid, chat, m.id) && talksInChat(i, tid, chat, m.id)).sort((a, b) => (b.wrote?.result?.ts ?? 0) - (a.wrote?.result?.ts ?? 0))[0];
         // A running run hears your words only if your words started it;
         // anything else is new work, queued behind it.
         const yours = new Set((chat.messages ?? []).filter((x) => x.kind === 'msg' && x.from === YOU && x.id !== m.id).map((x) => runIdFor(`${x.id}>${tid}`)));

@@ -20,6 +20,7 @@ import type { phoneView } from '../../../renderer/src/phone-rows';
 import type { ThreadStateWord, WorkItem } from '../../../renderer/src/types';
 import { teammateIdOf } from '../../../shared/teammates.mts';
 import { keepsAgent, type Harness } from './agent-filter';
+import { harnessOf } from '../../../renderer/src/box-filter';
 
 export type TabId = 'inbox' | 'progress' | 'snoozed' | 'done';
 export const TABS: { id: TabId; label: string }[] = [
@@ -48,6 +49,8 @@ export interface Row {
   queued: boolean;
   /** High or Urgent, marked on the row; Low and Medium are most threads, so they go unmarked. */
   priority: 'high' | 'urgent' | null;
+  /** "Claude Code" or "Codex", only when a row of the same title runs on the other one. */
+  agent: string | null;
   item: WorkItem;
 }
 
@@ -108,13 +111,19 @@ export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
   const toApprove = waitingCounts(items, (i) => state.get(i.id) ?? null);
 
   const names = new Map(view.products.map((p: { slug: string; name: string }) => [p.slug, p.name]));
+  const agentsByTitle = new Map<string, Set<string>>();
+  for (const i of items) {
+    const t = rowTitle(i);
+    agentsByTitle.set(t, (agentsByTitle.get(t) ?? new Set()).add(harnessOf(i)));
+  }
+  const agentOf = (i: WorkItem) => ((agentsByTitle.get(rowTitle(i))?.size ?? 0) > 1 ? (harnessOf(i) === 'codex' ? 'Codex' : 'Claude Code') : null);
   const order = view.products.map((p: { slug: string }) => p.slug);
   // Later says when a thread comes back, and leaves waiting a turn to In progress (Pages.tsx `back`).
   const row = (i: WorkItem, tab: TabId): Row => ({
     key: `${i.product}/${i.id}`, id: i.id, product: i.product, title: rowTitle(i), projectName: names.get(i.product) ?? '',
     when: (tab === 'snoozed' && backWords(i, now)) || updatedWords(i.status === 'done' ? i.wrote?.status?.ts ?? i.updatedAt : sentAt(i), now), running: live.has(i.id), cloud: inCloud.has(i.id),
     held: notStarted(i), toApprove: toApproveWords(toApprove.get(`${i.product}/${i.id}`)), queued: tab !== 'snoozed' && queued.has(i.id) && !live.has(i.id), item: i,
-    priority: ((p) => (p === 'high' || p === 'urgent' ? p : null))(priorityIdOf(i.priority)),
+    priority: ((p) => (p === 'high' || p === 'urgent' ? p : null))(priorityIdOf(i.priority)), agent: agentOf(i),
   });
   const drawn = (list: WorkItem[], tab: TabId) => sorted(list, DEFAULT_DISPLAY.inbox, tab, order).map((i) => row(i, tab));
   return { inbox: drawn(inbox, 'inbox'), progress: drawn(progress, 'progress'), snoozed: drawn(snoozed, 'snoozed'), done: drawn(done, 'done') };
@@ -160,10 +169,11 @@ export function phoneBoard(view: View, tabs: Record<TabId, Row[]>, display: Disp
   });
   // A card waiting its turn says Queued where the running mark would be (Pages.tsx `saysOnCard`).
   const queued = new Set(tabs.progress.filter((r) => r.queued).map((r) => r.id));
+  const agentOf = new Map(Object.values(tabs).flat().map((r) => [r.id, r.agent]));
   // Your own board says what the tab says (Pages.tsx `InboxBoard`).
   return columns.map((c) => ({
     ...c, label: c.state === 'waiting' ? 'Needs you' : c.label,
-    rows: c.rows.map((e) => ({ ...e, queued: c.state === 'running' && !!e.item && queued.has(e.item.id) })),
+    rows: c.rows.map((e) => ({ ...e, queued: c.state === 'running' && !!e.item && queued.has(e.item.id), agent: (e.item && agentOf.get(e.item.id)) ?? null })),
   }));
 }
 
