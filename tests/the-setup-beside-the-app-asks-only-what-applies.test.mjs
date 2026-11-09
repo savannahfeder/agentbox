@@ -12,7 +12,7 @@
 // every tool's Connect failing on a computer that cannot keep a sign-in.
 import { describe, it, expect } from 'vitest';
 import {
-  setupSteps, stepLabel, connectTiles, CONNECT_FIRST, toolUse, lookChoices, starterChoices, inviteList, setUpLines, tourChecklist,
+  setupSteps, stepLabel, connectTiles, CONNECT_FIRST, toolUse, typingInSetup, lookChoices, starterChoices, inviteList, setUpLines, tourChecklist,
 } from '../renderer/src/setup-split.ts';
 
 describe('which steps the setup shows', () => {
@@ -135,5 +135,21 @@ describe('the step list beside the tour', () => {
   });
   it('has every row done once the tour is over', () => {
     expect(tourChecklist(['start', 'compose', 'open', 'choose', 'close', 'palette']).every((r) => r.state === 'done')).toBe(true);
+  });
+});
+
+describe('the keyboard while the setup is open', () => {
+  // After the folder picker closed, focus went back to the composer drawn
+  // behind the setup: Enter did nothing and letters went into a hidden box.
+  const el = (inSetup, field) => ({ closest: (sel) => (sel.includes('.setup-split') ? inSetup : sel.includes('input') ? field : false) });
+  it('counts a box in the setup as typing', () => {
+    expect(typingInSetup(el(true, true))).toBe('typing');
+  });
+  it('counts the rest of the setup as keys for its buttons', () => {
+    expect(typingInSetup(el(true, false))).toBe('keys');
+  });
+  it('takes keys aimed at the hidden app behind it for the setup', () => {
+    expect(typingInSetup(el(false, true))).toBe('behind');
+    expect(typingInSetup(null)).toBe('keys');
   });
 });

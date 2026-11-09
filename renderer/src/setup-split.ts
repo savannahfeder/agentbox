@@ -88,3 +88,12 @@ export function tourChecklist(done: readonly Lesson[], cmd = '⌘', now: Lesson 
   const lit = at >= 0 ? at : rows.findIndex(([, , ls]) => !has(...ls));
   return rows.map(([label, keys, ls], i) => ({ label, keys, state: i === lit ? 'now' as const : has(...ls) ? 'done' as const : 'todo' as const }));
 }
+
+/** Where a key pressed during the setup is aimed: a box in the setup, the setup's buttons,
+ *  or a box in the app drawn behind it, which must never take the keys. */
+export function typingInSetup(target: { closest(sel: string): unknown } | null): 'typing' | 'keys' | 'behind' {
+  if (!target || typeof target.closest !== 'function') return 'keys';
+  const field = !!target.closest('input, textarea, [contenteditable]');
+  if (!target.closest('.setup-split, .ss-picker')) return field ? 'behind' : 'keys';
+  return field ? 'typing' : 'keys';
+}

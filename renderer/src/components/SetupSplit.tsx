@@ -15,7 +15,7 @@ import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { starterAsks } from '../../../shared/teammates.mjs';
 import { SKY_THEMES, drawSky } from '../home/sky';
-import { connectTiles, toolUse, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupStep } from '../setup-split';
+import { connectTiles, toolUse, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupStep } from '../setup-split';
 import { logoOf } from '../connections/logos';
 import FolderPicker from './FolderPicker';
 import { Name } from '../../../shared/product-name.mjs';
@@ -208,7 +208,9 @@ export function SetupSplit(p: SetupSplitProps) {
     const onKey = (e: KeyboardEvent) => {
       // The folder picker hears its own keys.
       if (browsing) return;
-      const typing = (e.target as Element | null)?.closest('input, textarea');
+      const where = typingInSetup(e.target as Element | null);
+      if (where === 'behind') { e.preventDefault(); (e.target as HTMLElement).blur?.(); }
+      const typing = where === 'typing';
       e.stopPropagation();
       if (e.key === 'Enter' && !e.shiftKey && !busy) {
         const enter = (e.target as Element).getAttribute('data-ss-enter');
