@@ -3,6 +3,9 @@
 # GitHub's Macs carry Xcode and the simulators; Expo's own Maestro runs need a
 # paid plan. Give it a simulator build of the store profile:
 #   gh workflow run iphone-walk.yml -f build_url=<the store-launch-test build's .tar.gz>
+# The screens can show the demo login and this repository is public, so they
+# are sealed to .github/iphone-walk-key.pub.pem; the private half stays on the
+# Mac that reads them (scripts/open-iphone-walk.sh).
 name: iPhone walk
 
 on:
@@ -61,10 +64,21 @@ jobs:
           kill -INT $rec; wait $rec || true
           find "$GITHUB_WORKSPACE/mobile/.maestro" "$HOME/.maestro/tests" -name '*.png' -exec cp {} . \; 2>/dev/null || true
           exit $status
-      - name: Keep the screens
+      - name: Seal the screens
+        if: always()
+        run: |
+          mkdir -p sealed
+          ssl="$(brew --prefix openssl@3)/bin/openssl"
+          tar -czf "$RUNNER_TEMP/walk.tgz" walk
+          rm -rf walk
+          key=$("$ssl" rand -hex 32)
+          "$ssl" enc -aes-256-cbc -pbkdf2 -pass "pass:$key" -in "$RUNNER_TEMP/walk.tgz" -out sealed/walk.tgz.enc
+          printf %s "$key" | "$ssl" pkeyutl -encrypt -pubin -inkey .github/iphone-walk-key.pub.pem -pkeyopt rsa_padding_mode:oaep -out sealed/key.enc
+          rm -f "$RUNNER_TEMP/walk.tgz"
+      - name: Keep the sealed screens
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: iphone-walk
-          path: walk/
-          retention-days: 7
+          path: sealed/
+          retention-days: 3

@@ -42,6 +42,15 @@ describe('the iPhone walk job', () => {
     expect(workflow.on.workflow_dispatch.inputs.flow.default).toBe('mobile/.maestro/review-walk.yml');
   });
 
+  it('uploads its screens only sealed, because they can show the demo login on a public repository', () => {
+    const uploads = job.steps.filter((s) => String(s.uses ?? '').startsWith('actions/upload-artifact'));
+    expect(uploads.map((s) => s.with.path)).toEqual(['sealed/']);
+    const seal = job.steps.find((s) => s.name === 'Seal the screens').run;
+    expect(seal).toContain('rm -rf walk');
+    expect(seal).toContain('pkeyutl -encrypt -pubin -inkey .github/iphone-walk-key.pub.pem');
+    expect(fs.readFileSync(new URL('.github/iphone-walk-key.pub.pem', root), 'utf8')).toMatch(/^-----BEGIN PUBLIC KEY-----/);
+  });
+
   it('keeps every screenshot the walk took', () => {
     const walk = job.steps.find((s) => s.name === 'Walk it').run;
     expect(walk).toMatch(/find [^\n]*\.maestro[^\n]*-name '\*\.png'/);
