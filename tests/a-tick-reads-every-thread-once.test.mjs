@@ -14,6 +14,7 @@ import * as disk from '../main/store/work-items.mjs';
 import { Store } from '../main/store.mts';
 import { Supervisor } from '../main/supervisor.mts';
 import { noteToItsAgent, resolveAnsweredNotes } from '../main/notes-wake.mjs';
+import * as modes from '../main/answer-modes.mts';
 
 let store, dir, thread, reads;
 
@@ -78,17 +79,69 @@ describe('one tick', () => {
   });
 });
 
-describe('a row from the list is its own copy, made once', () => {
-  it('carries its project, and editing it changes no later read', () => {
+// Idle with the screen refreshing every 3 s, the whole-inbox read was 126 of the
+// 342 MB a minute the main process allocated, all of it fresh copies of rows
+// that had not changed. So the list hands out the same frozen row until its
+// thread changes.
+describe('a row from the list', () => {
+  it('carries its project, and cannot be edited', () => {
     const [row] = store.listItems();
     expect(row).toMatchObject({ product: 'website', productName: 'Website', id: thread.id });
+    expect(() => row.labels.push('edited')).toThrow(TypeError);
+    expect(() => { row.wrote.title = { ts: 1, source: 'nobody' }; }).toThrow(TypeError);
+    expect(() => { row.title = 'edited'; }).toThrow(TypeError);
+    expect(store.listItems()[0].title).toBe('Plan');
+  });
+
+  it('is the same row on the next read while its thread is unchanged', () => {
+    const other = store.composeItem('website', { title: 'Other', body: 'x' });
+    const first = store.listItems();
+    const again = store.listItems();
+    expect(again.find((i) => i.id === thread.id)).toBe(first.find((i) => i.id === thread.id));
+    expect(again.find((i) => i.id === other.id)).toBe(first.find((i) => i.id === other.id));
+  });
+
+  it('is made again when its thread changes, and only that one', () => {
+    const other = store.composeItem('website', { title: 'Other', body: 'x' });
+    const first = store.listItems();
+    disk.updateWorkItem(dir, thread.id, { title: 'Plan v2' }, { source: 'founder' });
+    const again = store.listItems();
+    expect(again.find((i) => i.id === thread.id).title).toBe('Plan v2');
+    expect(again.find((i) => i.id === other.id)).toBe(first.find((i) => i.id === other.id));
+  });
+
+  it('reads as open once its lease lapses, with nothing written', async () => {
+    const now = Date.now();
+    await disk.claimWorkItem(dir, { id: thread.id, holder: 'w1', leaseMs: 60_000, now });
+    expect(store.listItems(now)[0]).toMatchObject({ status: 'claimed', claimExpired: false });
+    expect(store.listItems(now + 61_000)[0]).toMatchObject({ status: 'open', claimExpired: true });
+    expect(store.listItems(now)[0]).toMatchObject({ status: 'claimed', claimExpired: false });
+  });
+
+  it('follows a project renamed with nothing else changed', () => {
+    expect(store.listItems()[0].productName).toBe('Website');
+    const read = store.listProducts.bind(store);
+    store.listProducts = (...a) => read(...a).map((p) => ({ ...p, name: 'Site' }));
+    expect(store.listItems()[0].productName).toBe('Site');
+  });
+
+  it('a thread with an answer mode gets a copy of its own, and the shared row is untouched', () => {
+    modes._internals.useFile(path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'one-read-modes-')), 'answer-modes.json'));
+    try {
+      modes.setAnswerMode('website', thread.id, 'plan');
+      expect(store.listItems()[0].answerMode).toBe('plan');
+      expect(disk.readWorkItemRows(dir, Date.now(), { product: 'website', productName: 'Website' })[0].answerMode).toBeUndefined();
+      modes.setAnswerMode('website', thread.id, 'acceptEdits');
+      expect(store.listItems()[0].answerMode).toBe('acceptEdits');
+    } finally { modes._internals.useFile(null); }
+  });
+
+  it('readWorkItems still hands each caller a copy it may edit', () => {
+    const [row] = disk.readWorkItems(dir);
     row.labels.push('edited');
-    row.wrote.title = { ts: 1, source: 'nobody' };
     row.title = 'edited';
-    const [again] = store.listItems();
-    expect(again.labels).not.toContain('edited');
-    expect(again.wrote.title.source).not.toBe('nobody');
-    expect(again.title).toBe('Plan');
+    expect(disk.readWorkItems(dir)[0].title).toBe('Plan');
+    expect(disk.readWorkItems(dir)[0].labels).not.toContain('edited');
   });
 
   it('a project field on the ledger never overrides the project it was read from', () => {

@@ -421,15 +421,16 @@ export class Store {
     for (const product of this.listProducts()) {
       let rows: (StoreItem & { product: string })[] = [];
       try {
-        rows = workItemsDisk.readWorkItems(product.dir, now, { product: product.slug, productName: product.name });
+        rows = workItemsDisk.readWorkItemRows(product.dir, now, { product: product.slug, productName: product.name });
       } catch (err) {
         console.warn(`zero: unreadable work items for ${product.slug}: ${(err as Error).message}`);
         continue;
       }
+      // The rows are shared and frozen (`readWorkItemRows`); the few with an
+      // answer mode get a copy of their own.
       for (const row of rows) {
         const key = `${product.slug}/${row.id}`;
-        if (key in modes) row.answerMode = modes[key];
-        all.push(row);
+        all.push(key in modes ? { ...row, answerMode: modes[key] } : row);
       }
     }
     return all;

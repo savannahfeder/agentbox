@@ -355,6 +355,39 @@ export function readWorkItems(projectDir, now = Date.now(), also = null) {
   return out;
 }
 
+const sharedRows = new WeakMap();
+const differs = (row, also) => { for (const k in also) if (row[k] !== also[k]) return true; return false; };
+
+/**
+ * THE SAME ROWS, FROZEN AND HANDED OUT AGAIN until their thread changes, for the
+ * whole-inbox read that the screen and the agents' clock make every few
+ * seconds. A fresh copy of every thread per read was over a third of all the
+ * main process allocated, and on a swapping Mac each collection that garbage
+ * causes pages the heap back in. The fold makes a new object for a thread that
+ * changed, so a row is kept against that object and made again when it is
+ * replaced, when its lease lapses, or when `also` differs. Frozen, so a caller
+ * that writes into one throws instead of changing every later read.
+ * @param {string} projectDir
+ * @param {number} [now]
+ * @param {Record<string, unknown> | null} [also]
+ */
+export function readWorkItemRows(projectDir, now = Date.now(), also = null) {
+  const out = [];
+  for (const item of foldedLedger(ledgerPath(projectDir)).values()) {
+    const lapsed = !!(item.claim && item.claim.leaseUntil < now);
+    let row = sharedRows.get(item);
+    if (!row || row.claimExpired !== lapsed || (also && differs(row, also))) {
+      row = aged(item, now, also);
+      if (Array.isArray(row.labels)) Object.freeze(row.labels);
+      Object.freeze(row.wrote);
+      if (row.claim) Object.freeze(row.claim);
+      sharedRows.set(item, Object.freeze(row));
+    }
+    out.push(row);
+  }
+  return out;
+}
+
 /**
  * THE FINISHED THREADS THE 8 MB READ CUT OFF, read only when somebody asks.
  *
