@@ -8,6 +8,7 @@ import { readLastEngine, startingEngine, writeLastEngine } from '../../../render
 import { priorityValueOf, type PriorityId } from '../../../renderer/src/priority';
 import { harnessFields, harnessOf, projectsOffered, startingProject, type Harness } from '../../../renderer/src/threads/composer-rules';
 import { readLastRecipient, writeLastRecipient } from '../../../renderer/src/threads/recipient';
+import { pickToSend } from '../../../renderer/src/reply-pick';
 import type { Engine } from '../../../shared/engines.mjs';
 import type { Choices } from './actions';
 
@@ -112,11 +113,27 @@ function threadEngine(item: { engine?: string; model?: string }, agents: Partial
   return agents.workspace === 'codex' && has('codex') ? 'codex' : 'claude';
 }
 
-/** The model a thread's reply box shows and lists: that thread's own agent's, not always Claude's. */
-export function replyModel(item: { engine?: string; model?: string }, picked: Pick<Choices, 'model'>, codex: CodexOpts & Partial<Agents> = {}) {
-  const engine = threadEngine(item, codex);
-  const model = picked.model ?? item.model ?? defaultModelFor(engine, codex.codexDefault ?? null);
+/** The model a thread's reply box shows and lists: the agent picked in the box, else the thread's own. */
+export function replyModel(item: { engine?: string; model?: string }, picked: Pick<Choices, 'model' | 'engine'>, codex: CodexOpts & Partial<Agents> = {}) {
+  const own = threadEngine(item, codex);
+  const engine: Harness = picked.engine === 'claude' || picked.engine === 'codex' ? picked.engine : own;
+  const model = picked.model ?? (engine === own ? item.model : undefined) ?? defaultModelFor(engine, codex.codexDefault ?? null);
   return { engine, model, label: engineModelLabel(engine, model, codex) };
+}
+
+/**
+ * What a reply names, by the desktop's reply rule (reply-pick.ts `pickToSend`):
+ * the agent only when the pick moves the thread to the other one on a computer
+ * that has both, and then the model and level too, so the old agent's are not
+ * left on the row. Codex's model is null for its own default.
+ */
+export function replyChoices(item: { engine?: string; model?: string }, picked: Choices, agents: CodexOpts & Partial<Agents> = {}): Choices {
+  const { engine: _picked, ...rest } = picked;
+  const was = threadEngine(item, agents);
+  const { engine } = replyModel(item, picked, agents);
+  if (engine === was || (agents.engines?.length ?? 0) < 2) return rest;
+  const sent = pickToSend({ model: picked.model ?? null, effort: picked.effort ?? null }, { engine, was, engineCount: agents.engines!.length });
+  return { ...rest, engine, model: sent.model, effort: sent.effort };
 }
 
 /** `fn`, ignoring a call while the last one is still going. */

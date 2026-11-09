@@ -2,8 +2,8 @@
 // ONE WORKDAY OF SYNTHETIC USERS ON THE PHONE APP.
 //
 //   node workday.mjs --who founder,new-user [--minutes 30] [--stretches 2 | --pace [--hours 10]]
-//                    [--engine codex|claude|external] [--model <id>] [--focus "what to lean on"]
-//                    [--codex-home ~/.codex] [--claude-home ~/.claude-2] [--target 90] [--url <preview address>]
+//                    [--engine codex|external] [--model <id>] [--focus "what to lean on"]
+//                    [--codex-home ~/.codex-2] [--target 90] [--url <preview address>]
 //                    [--out <folder>] [--detach]
 //
 // Each person (../../power-test/people) gets a folder with two commands,
@@ -14,9 +14,9 @@
 // stretches while pace.mjs says the tester login's week is behind its line,
 // waits out a full 5-hour window, and stops at --hours. report.md ranks every issue.
 //
-// --engine external writes each stretch's prompt to <person>/stretch-N.prompt.md
-// and waits for stretch-N.done, for an agent that runs testers as subagents
-// (the Agentbox cloud, where nothing it starts can sign in).
+// Testers are always Codex, on the login codex-tester.mjs picks. --engine
+// external only writes each stretch's prompt to <person>/stretch-N.prompt.md
+// and waits for stretch-N.done, for whoever starts that Codex by hand.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -25,6 +25,7 @@ import crypto from 'node:crypto';
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readDiary } from '../../power-test/scripts/diary.mjs';
+import { codexTesterArgv, codexTesterEnv, codexCanSandbox, testerLogin } from '../../power-test/scripts/codex-tester.mjs';
 import { rerunWithStripTypes } from '../../../../scripts/lib/rerun-with-strip-types.mjs';
 
 rerunWithStripTypes(import.meta.url);
@@ -36,19 +37,10 @@ const DIARY = path.resolve(here, '../../power-test/scripts/diary.mjs');
 const MIN = 60_000;
 const SEVERITY = ['broken', 'wrong', 'slow', 'confusing'];
 
-/** How a tester session starts on each engine. Codex keeps its session log, which is what the pacer reads. */
-export function testerArgv(engine, { dir, prompt, model = null, last }) {
-  if (engine === 'codex') {
-    return ['exec', '-C', dir, '-s', 'workspace-write', '-c', 'sandbox_workspace_write.network_access=true',
-      '--skip-git-repo-check', '-o', last, ...(model ? ['-m', model] : []), prompt];
-  }
-  if (engine === 'claude') {
-    return ['-p', prompt, '--output-format', 'json',
-      '--allowedTools', `Bash(${path.join(dir, 'phone')}:*)`, `Bash(${path.join(dir, 'diary')}:*)`, `Read(/${dir}/**)`,
-      '--disallowedTools', 'WebFetch', 'WebSearch', 'Task', 'Agent', 'Write', 'Edit', 'NotebookEdit',
-      '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', ...(model ? ['--model', model] : [])];
-  }
-  throw new Error(`no tester engine called ${engine}: codex, claude or external`);
+/** How a tester session starts. Synthetic testers run on Codex only. */
+export function testerArgv(engine, { dir, prompt, model = null, last, sandboxed = true }) {
+  if (engine === 'codex') return codexTesterArgv({ dir, prompt, model, last, sandboxed });
+  throw new Error(`no tester engine called ${engine}: synthetic testers run on codex (or external, started by hand)`);
 }
 
 /** What a tester is told: who they are, the phone in their hand, and what others already found. */
@@ -64,7 +56,7 @@ export function phonePrompt(person, { dir, minutes, focus = null, logged = [] })
     `- \`${path.join(dir, 'phone')}\`: open, look, tap <n|"words">, type "<text>", press <key>, swipe up|down|left|right, shot <name>, away <minutes>, reload. The phone is already open; start with look.`,
     `- \`${path.join(dir, 'diary')}\`: note "<what you did and how it felt>", issue --severity broken|wrong|slow|confusing --title "…" --steps "…" --expected "…" --actual "…" --shot <name>, again <n> "<what you saw>", time.`,
     '',
-    'Write in the diary as you go, not at the end: a session can be stopped at any moment. Take a shot before logging an issue and name it in --shot. Read a shot with the Read tool when you need to see the screen rather than its words.',
+    'Write in the diary as you go, not at the end: a session can be stopped at any moment. Take a shot before logging an issue and name it in --shot. Open a shot when you need to see the screen rather than its words.',
     'Log what a person in your shoes would notice: broken (it does not work), wrong (it works and says or does the wrong thing), slow, or confusing (you had to read twice or guess). Not a code review: you cannot see the code.',
     ...(logged.length ? ['', '## Already logged by you or others', 'If you meet one of these again, use `diary again <n>` with what you saw, and spend your time somewhere else.', ...logged.map((i) => `${i.n}. [${i.severity}] ${i.title}`)] : []),
     '',
@@ -72,15 +64,9 @@ export function phonePrompt(person, { dir, minutes, focus = null, logged = [] })
   ].join('\n');
 }
 
-/** What a tester starts with: the named login, and for Claude the scrub the app runs before every spawn. */
-export function testerEnv(engine, base, { codexHome = null, claudeHome = 'default' } = {}) {
-  if (engine !== 'claude') return { ...base, ...(codexHome ? { CODEX_HOME: codexHome } : {}) };
-  const env = {};
-  for (const [key, value] of Object.entries(base)) {
-    if (!/^(ANTHROPIC_|CLAUDE_CODE_|CLAUDECODE$|CLAUDE_PID$|CLAUDE_EFFORT$|CLAUDE_CONFIG_DIR$|CLAUDE_SECURESTORAGE_CONFIG_DIR$)/.test(key)) env[key] = value;
-  }
-  if (claudeHome && claudeHome !== 'default') env.CLAUDE_CONFIG_DIR = claudeHome;
-  return env;
+/** What a tester starts with: the chosen Codex login and no API key. */
+export function testerEnv(engine, base, { codexHome = null } = {}) {
+  return codexTesterEnv(base, codexHome);
 }
 
 /** The sweeper's own mark for a program meant to outlive its run; the day still ends at --hours. */
@@ -158,23 +144,31 @@ export function writeReport(root, { people, dirs, stretch, minutes, engine, stat
   return ranked.length;
 }
 
+/** What the testers lean on: the person's own focus, then what reached the phone this week. */
+export function focusFor(given, reached) {
+  const week = reached.length ? `These reached the phone this week, so try each: ${reached.join(', ')}` : null;
+  return [given, week].filter(Boolean).join('. ') || null;
+}
+
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
   const args = process.argv.slice(2);
   const opt = (n, f = null) => { const i = args.indexOf(`--${n}`); return i >= 0 ? args[i + 1] : f; };
   const say = (s) => console.log(`[${new Date().toTimeString().slice(0, 8)}] ${s}`);
   const { readPeople, pickPeople } = await import(path.resolve(here, '../../power-test/scripts/plan.mjs'));
-  const { paceFor, readingFor, claudeProfile } = await import(path.join(here, 'pace.mjs'));
+  const { paceFor, readingFor } = await import(path.join(here, 'pace.mjs'));
   const { readMacPressureWord } = await import(path.join(REPO, 'main/leftovers.mts'));
   const { stripTypesFlags } = await import(path.join(REPO, 'main/strip-types.mts'));
   const people = pickPeople(opt('who', 'random:2'), readPeople(path.resolve(here, '../../power-test/people')));
   const engine = opt('engine', 'codex');
+  if (engine !== 'codex' && engine !== 'external') { console.error(`workday: synthetic testers run on Codex only, not ${engine}.`); process.exit(1); }
   const minutes = Number(opt('minutes', 30));
   const pace = args.includes('--pace');
   const deadline = Date.now() + Number(opt('hours', pace ? 10 : 24)) * 60 * MIN;
   const maxStretches = pace ? Infinity : Number(opt('stretches', 1));
-  const codexHome = String(opt('codex-home', process.env.CODEX_HOME || path.join(os.homedir(), '.codex'))).replace(/^~(?=\/)/, os.homedir());
-  const claudeHome = claudeProfile(opt('claude-home', process.env.CLAUDE_CONFIG_DIR || 'default'));
+  const login = testerLogin({ given: opt('codex-home', process.env.CODEX_HOME || null) });
+  if (!login && engine === 'codex') { console.error('workday: there is no Codex login on this computer for the testers.'); process.exit(1); }
+  const codexHome = login?.home ?? null;
   const root = path.resolve(opt('out', path.join(os.tmpdir(), 'agentbox-product-loop', `${new Date().toISOString().replace(/[:.]/g, '-')}-phone`)));
   fs.mkdirSync(root, { recursive: true });
 
@@ -218,7 +212,8 @@ if (isMain) {
       }).listen(0, '127.0.0.1', () => resolve(`http://127.0.0.1:${server.address().port}/`));
     });
   }
-  say(`${people.map((p) => p.name).join(', ')} on the phone app at ${url}, ${minutes}-minute stretches on ${engine}. Evidence: ${root}`);
+  const sandboxed = engine === 'codex' && codexCanSandbox();
+  say(`${people.map((p) => p.name).join(', ')} on the phone app at ${url}, ${minutes}-minute stretches on ${engine === 'codex' ? `Codex at ${codexHome} (${login.plan ?? 'plan unknown'}, ${login.why})${sandboxed ? '' : ', without Codex\'s sandbox, which this machine refuses'}` : 'testers started by hand'}. Evidence: ${root}`);
 
   const dirs = Object.fromEntries(people.map((p) => {
     const dir = path.join(root, p.slug);
@@ -241,6 +236,11 @@ if (isMain) {
   });
   const diaries = () => Object.fromEntries(people.map((p) => [p.name, readDiary(path.join(dirs[p.slug], 'diary.jsonl')).issues]));
 
+  let reached = [];
+  try { reached = await (await import(path.join(REPO, 'scripts/phone-parity.mjs'))).newOnThePhone(7); } catch (err) { say(`could not read what reached the phone this week: ${err.message}`); }
+  const focus = focusFor(opt('focus'), reached);
+  if (reached.length) say(`${reached.length} features reached the phone this week; the testers are told to try each`);
+
   let stretch = 0;
   const report = (state) => writeReport(root, { people, dirs, stretch, minutes, engine, state });
   for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP']) {
@@ -254,8 +254,8 @@ if (isMain) {
   }
   while (stretch < maxStretches && Date.now() < deadline) {
     if (pace && engine !== 'external') {
-      const reading = await readingFor(engine, engine === 'claude' ? claudeHome : codexHome);
-      const p = paceFor(reading, { target: Number(opt('target', 90)), needsReading: engine === 'claude' });
+      const reading = await readingFor(codexHome);
+      const p = paceFor(reading, { target: Number(opt('target', 90)) });
       say(`pace: ${p.verdict}. ${p.why}`);
       if (p.verdict === 'stop') break;
       if (p.verdict === 'wait' || p.verdict === 'hold') {
@@ -279,7 +279,7 @@ if (isMain) {
       fs.writeFileSync(path.join(dir, 'clock.json'), JSON.stringify({ round: stretch, roundEnd: ends, deadline: Math.min(deadline, ends) }));
       const opened = await run(process.execPath, [PHONE, 'open'], { env: { ...process.env, PHONE_OUT: dir, PHONE_URL: url } });
       if (opened.code !== 0) { say(`${person.name}: the phone did not open: ${opened.out.slice(-300)}`); return; }
-      const prompt = phonePrompt(person, { dir, minutes, focus: opt('focus'), logged });
+      const prompt = phonePrompt(person, { dir, minutes, focus, logged });
       if (engine === 'external') {
         const file = path.join(dir, `stretch-${stretch}.prompt.md`);
         fs.writeFileSync(file, prompt);
@@ -288,8 +288,7 @@ if (isMain) {
         return;
       }
       const last = path.join(dir, `stretch-${stretch}.last.txt`);
-      const bin = engine === 'codex' ? 'codex' : 'claude';
-      const r = await run(bin, testerArgv(engine, { dir, prompt, model: opt('model'), last }), { cwd: dir, env: testerEnv(engine, process.env, { codexHome, claudeHome }) });
+      const r = await run('codex', testerArgv(engine, { dir, prompt, model: opt('model'), last, sandboxed }), { cwd: dir, env: testerEnv(engine, process.env, { codexHome }) });
       fs.writeFileSync(path.join(dir, `stretch-${stretch}.log`), r.out);
       say(`${person.name}: stretch ${stretch} ended (${r.code === 0 ? 'ok' : `exit ${r.code}`})`);
     }));

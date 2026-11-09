@@ -49,7 +49,11 @@ function App() {
     <CloudProvider>
       <GroupsProvider>
         <StatusBar style={worn === 'light' ? 'dark' : 'light'} />
-        <Stack screenLayout={redrawn} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg }, animation: 'slide_from_right' }} />
+        <Stack screenLayout={redrawn} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg }, animation: 'slide_from_right' }}>
+          {/* First-run steps: beneath them is an inbox not reached yet. */}
+          <Stack.Screen name="ai-notice" options={{ gestureEnabled: false }} />
+          <Stack.Screen name="alerts" options={{ gestureEnabled: false }} />
+        </Stack>
         <Approvals />
         <Toast />
       </GroupsProvider>

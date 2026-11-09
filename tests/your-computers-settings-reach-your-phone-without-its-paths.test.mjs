@@ -54,7 +54,10 @@ describe('what the phone is sent', () => {
     expect(sent.v).toBe(SETTINGS_VERSION);
     expect(sent.version).toBe('1.2.3');
     expect(sent.workspace).toMatchObject({ cornerTag: true, diagnostics: true, adhdMode: true, alpha: { rooms: true }, outsideAgents: 'waiting', permission: 'auto', codexMode: 'auto', agentsAuto: true, sessionsAtOnce: 4, agentsTotal: 5, slotsMax: 12, running: 2 });
-    expect(sent.workspace.memoryGate).toEqual({ on: true, slots: null, slotsAuto: 3, slotsMax: 8, now: 'Memory is fine. Nothing heavy running.' });
+    expect(sent.workspace.memoryGate).toEqual({
+      on: true, slots: null, slotsAuto: 3, slotsMax: 8, now: 'Memory is fine. Nothing heavy running.',
+      reading: { heavy: 0, waiting: null, pressure: null, usedPct: null, asked: null, waited: null, refused: null, holding: false },
+    });
     expect(sent.workspace.engines).toEqual(['claude', 'codex']);
     expect(sent.workspace.claude).toEqual({ found: true });
     expect(sent.workspace.accounts.map((a) => [a.id, a.email, a.chosen, a.state])).toEqual([['default', 'me@example.com', false, 'live'], ['.claude-2', 'work@example.com', true, 'limited']]);
@@ -103,7 +106,7 @@ describe('a change the phone may ask for', () => {
   it('refuses a key it has no page for, however the window would take it', () => {
     refused({ scope: 'workspace', key: 'claudeBin', value: '/tmp/evil' });
     refused({ scope: 'workspace', key: 'model', value: 'opus' });
-    refused({ scope: 'workspace', key: 'cloudRuns', value: 'all' });
+    refused({ scope: 'workspace', key: 'cornerTag', value: false });
     refused({ scope: 'project', product: 'site', key: 'agents', value: ['x'] });
     refused({ scope: 'team', key: 'adhdMode', value: true });
     refused(null);

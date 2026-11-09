@@ -32,15 +32,17 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 const code = (p) => read(p).replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
 const numberChord = /⌘[1-4]/;
 
-describe('⌘1 to ⌘4 do nothing and are offered nowhere', () => {
+// ⌘1 and ⌘2 came back for one job only, the permission card (w-78be9e67e8).
+describe('⌘1 to ⌘4 go to no section and no tab', () => {
   it('has no handler for them', () => {
     expect(nav.sidebarSlot).toBeUndefined();
     expect(code('renderer/src/App.tsx')).not.toContain('sidebarSlot');
   });
 
-  it('is not on the shortcuts page', () => {
-    const keys = SHORTCUTS.flatMap((g) => g.keys.flatMap((k) => k.keys));
-    expect(keys.filter((k) => numberChord.test(k))).toEqual([]);
+  it('is on the shortcuts page only as Allow and Deny on a permission card', () => {
+    const rows = SHORTCUTS.flatMap((g) => g.keys).filter((k) => k.keys.some((c) => numberChord.test(c)));
+    expect(rows.map((k) => k.keys)).toEqual([['⌘1', '⌘2']]);
+    expect(rows[0].what).toMatch(/^Allow or deny a card/);
   });
 
   it('is not on any hover plate, and the sidebar Threads row wears none', () => {

@@ -178,6 +178,7 @@ export interface PhoneInboxOptions {
   approvalsOf?: () => PhoneApprovalAsk[];
   readSettings?: (() => unknown) | null;
   pinsOf?: () => Record<string, boolean>;
+  onMacOf?: () => Record<string, boolean>;
   repeatsOf?: (() => unknown) | null;
   teammatesOf?: (() => unknown) | null;
   version?: string;
@@ -267,6 +268,8 @@ export function createPhoneInbox({
   readSettings = null,
   // () -> { [threadId]: true }, the threads pinned on this computer.
   pinsOf = () => ({}),
+  // () -> { [threadId]: true }, the threads kept on this computer whatever the cloud is set to.
+  onMacOf = () => ({}),
   // () -> every project's repeating tasks (store.listRepeats); they ride with the settings.
   repeatsOf = null,
   // () -> the teammates view (main/teammates.mts `view`) while they are on, else null; it rides with the settings too.
@@ -383,6 +386,8 @@ export function createPhoneInbox({
     const known = new Set(chosen.map((p) => p.slug));
     let pins: Record<string, boolean> = {};
     try { pins = pinsOf() ?? {}; } catch { /* the supervisor's trouble, not the phone's */ }
+    let kept: Record<string, boolean> = {};
+    try { kept = onMacOf() ?? {}; } catch { /* the supervisor's trouble, not the phone's */ }
     for (const p of chosen) {
       await breathe();
       const key = `project:${p.slug}`;
@@ -400,7 +405,9 @@ export function createPhoneInbox({
       const batch: { item: string; snapshot: unknown; key: string }[] = [];
       const here = new Set<string>();
       for (const raw of rows) {
-        const item = pins[raw.id] === true ? { ...raw, pinned: true } : raw;
+        const item = pins[raw.id] === true || kept[raw.id] === true
+          ? { ...raw, ...(pins[raw.id] === true ? { pinned: true } : {}), ...(kept[raw.id] === true ? { onMac: true } : {}) }
+          : raw;
         if (here.size && here.size % THREADS_PER_TURN === 0) await breathe();
         here.add(item.id);
         const sk = `${p.slug}:${item.id}`;
@@ -926,7 +933,11 @@ export function applyThrough(channels: Map<string, PhoneChannel>) {
     if (cmd.kind !== 'setting') return ROUTES[cmd.kind]?.(cmd) ?? [];
     const read = channels.get('zero:settings-read');
     if (!read) return [];
-    return settingRoute(cmd.payload, await read({ sender: null }));
+    const model = (await read({ sender: null })) as Record<string, unknown> | null;
+    if (cmd.payload?.key !== 'stopLink') return settingRoute(cmd.payload, model);
+    // Checked against the cloud's list now, not the copy the phone last saw.
+    const listed = (await channels.get('zero:file-links')?.({ sender: null }, {})) as { ok?: boolean; links?: unknown[] } | null | undefined;
+    return settingRoute(cmd.payload, { ...model, links: listed?.ok ? listed.links : [] });
   };
   return async (cmd: PhoneCommand): Promise<ChannelResult | null | undefined> => {
     const [channel, args, then] = await routeOf({ ...cmd, payload: cmd.payload || {} });

@@ -63,7 +63,7 @@ import { ModelMenu } from './ModelMenu';
 import { useThreadMentions } from '../components/ThreadMentions';
 import {
   agentChoices, agentWordFor, autoOffered,
-  allModels, findPeople, harnessFields, laterHint, momentFromWords, mondayMorning, moreCount,
+  allModels, findPeople, harnessFields, laterHint, momentFromWords, mondayIsTomorrow, mondayMorning, moreCount,
   joinNames, placeholderFor, projectsOffered, projectSwatch, recentModels,
   sharingFields, cardProject, startingVisibility, startingChosen, teammates, threadMessage, tomorrowMorning, chosenWords, VISIBILITY_ROWS,
   dueChoices, dueWords, headRows, NOT_BLOCKED, keyOnTheNewThreadCard, modEnterSendsTheCard, messageSubject, toSections, findInvited, type ToSection,
@@ -1128,9 +1128,11 @@ export function ThreadComposer({
         <button type="button" data-item className={`tc-row ${isAt(tomorrow) ? 'on' : ''}`} onPointerMove={hover} onClick={() => pickWhen({ runAt: tomorrow })}>
           <ClockIcon /><span className="tc-row-label">Tomorrow morning</span><small>{laterHint(tomorrow)}</small>
         </button>
-        <button type="button" data-item className={`tc-row ${isAt(monday) ? 'on' : ''}`} onPointerMove={hover} onClick={() => pickWhen({ runAt: monday })}>
-          <ClockIcon /><span className="tc-row-label">Monday morning</span><small>{laterHint(monday)}</small>
-        </button>
+        {!mondayIsTomorrow(now) && (
+          <button type="button" data-item className={`tc-row ${isAt(monday) ? 'on' : ''}`} onPointerMove={hover} onClick={() => pickWhen({ runAt: monday })}>
+            <ClockIcon /><span className="tc-row-label">Monday morning</span><small>{laterHint(monday)}</small>
+          </button>
+        )}
         {/* A TIME IN WORDS, where a browser date field used to be: the same
             grammar as the Schedule box on a thread. Typing on any row above
             lands here (menuKeys). */}

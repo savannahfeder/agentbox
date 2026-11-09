@@ -16,7 +16,7 @@ import path from 'node:path';
 import * as disk from '../main/store/work-items.mjs';
 import { Store } from '../main/store.mts';
 import { noteToItsAgent } from '../main/notes-wake.mjs';
-import { cleanMark, marksOf, noteGoesTo, notesForItsAgent } from '../shared/artifact-marks.mjs';
+import { cleanMark, marksOf, noteGoesTo } from '../shared/artifact-marks.mjs';
 
 const SOFIA = 'p-sofia';
 const MAYA = 'p-maya';
@@ -120,25 +120,9 @@ describe("the owner's note on her agent's file", () => {
   });
 });
 
-describe("a teammate's note on an agent's file", () => {
-  const lines = [{ source: 'agent', patch: { result: 'Here: designs/w/seat.png' }, ts: 1 }];
-  const marks = (text, extra = {}) => ({ notes: [{ id: 'n1', file: 'seat.png', place: { kind: 'whole' }, text, by: SOFIA, ts: 2, mentions: [], ...extra }] });
-
-  it('is told to the agent when it asks for something', () => {
-    expect(notesForItsAgent(lines, marks('Tighter gap'), { me: MAYA, people })).toHaveLength(1);
-  });
-
-  it('is not when it is written to the owner or is a thank-you', () => {
-    expect(notesForItsAgent(lines, marks('Maya, this one is ready for you'), { me: MAYA, people })).toHaveLength(0);
-    expect(notesForItsAgent(lines, marks('Love it'), { me: MAYA, people })).toHaveLength(0);
-  });
-
-  it('is, once the owner or the teammate presses Send to the agent', () => {
-    expect(notesForItsAgent(lines, marks('Love it', { toAgent: true }), { me: MAYA, people })).toHaveLength(1);
-  });
-});
-
 it('both doors pass the team\'s people to the rule', () => {
   const ipc = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
-  expect(ipc.match(/noteToItsAgent\(\{[^}]*people/g)?.length).toBe(2);
+  const doors = ipc.match(/noteToItsAgent\(\{[^}]*\}/g) ?? [];
+  expect(doors.length).toBeGreaterThanOrEqual(2);
+  for (const door of doors) expect(door).toMatch(/people/);
 });

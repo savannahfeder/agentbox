@@ -35,7 +35,8 @@ export function picturesFor(root: ParentNode | null, href: string, from?: Elemen
   if (at < 0) return { pictures: [{ path: href, url: null }], start: 0 };
   return picturesBeside(doors.map((d) => {
     const img = d.querySelector('img')!;
-    return { path: d.dataset.picture!, url: img.currentSrc || img.src || null, section: d.closest<HTMLElement>('[data-exchange]')?.dataset.exchange ?? null };
+    // A thread draws a picture from a shrunk copy (FittedImg); the viewer opens the whole one.
+    return { path: d.dataset.picture!, url: img.dataset.full || img.currentSrc || img.src || null, section: d.closest<HTMLElement>('[data-exchange]')?.dataset.exchange ?? null };
   }), at);
 }
 

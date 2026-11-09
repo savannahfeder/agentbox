@@ -1,0 +1,64 @@
+# Walks the store app on an iPhone simulator against the real cloud, as App
+# Review would, with no one at a phone (mobile/.maestro/review-walk.yml).
+# GitHub's Macs carry Xcode and the simulators; Expo's own Maestro runs need a
+# paid plan. Give it a simulator build of the store profile:
+#   gh workflow run iphone-walk.yml -f build_url=<the store-launch-test build's .tar.gz>
+name: iPhone walk
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_url:
+        description: Simulator build (.tar.gz) from `eas build --profile store-launch-test`
+        required: true
+      flow:
+        description: Maestro flow to run
+        default: mobile/.maestro/review-walk.yml
+
+permissions:
+  contents: read
+
+jobs:
+  walk:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Maestro
+        run: |
+          curl -fsSL --max-time 300 -o "$RUNNER_TEMP/maestro.zip" https://github.com/mobile-dev-inc/maestro/releases/latest/download/maestro.zip
+          unzip -q "$RUNNER_TEMP/maestro.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/maestro/bin" >> "$GITHUB_PATH"
+      - name: Start an iPhone
+        run: |
+          udid=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; print(next(x['udid'] for k in sorted(d, reverse=True) if 'iOS' in k for x in d[k] if x['name'].startswith('iPhone 16')))")
+          echo "UDID=$udid" >> "$GITHUB_ENV"
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid" -b
+      - name: Install the build
+        env:
+          BUILD_URL: ${{ inputs.build_url }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/app"
+          curl -fsSL --max-time 600 -o "$RUNNER_TEMP/app.tar.gz" "$BUILD_URL"
+          tar -xzf "$RUNNER_TEMP/app.tar.gz" -C "$RUNNER_TEMP/app"
+          xcrun simctl install "$UDID" "$(find "$RUNNER_TEMP/app" -maxdepth 2 -name '*.app' | head -1)"
+      - name: Walk it
+        env:
+          REVIEW_PASSWORD: ${{ secrets.REVIEW_PASSWORD }}
+          FLOW: ${{ inputs.flow }}
+        run: |
+          mkdir -p walk
+          xcrun simctl io "$UDID" recordVideo --codec=h264 walk/walk.mp4 & rec=$!
+          cd walk
+          status=0
+          maestro test "$GITHUB_WORKSPACE/$FLOW" -e REVIEW_PASSWORD="$REVIEW_PASSWORD" -e RUN="$GITHUB_RUN_NUMBER" || status=$?
+          kill -INT $rec; wait $rec || true
+          exit $status
+      - name: Keep the screens
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iphone-walk
+          path: walk/
+          retention-days: 7

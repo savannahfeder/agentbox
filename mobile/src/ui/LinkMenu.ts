@@ -8,7 +8,7 @@ const OPEN = 'Open in browser';
 const SHARE = 'Share or copy link';
 
 const openOutside = (link: string) => void (/^mailto:/i.test(link) ? Linking.openURL(link) : Linking.openURL(link).catch(() => WebBrowser.openBrowserAsync(link)));
-const share = (link: string) => void Share.share(Platform.OS === 'ios' ? { url: link } : { message: link }).catch(() => {});
+export const share = (link: string) => void Share.share(Platform.OS === 'ios' ? { url: link } : { message: link }).catch(() => {});
 
 export function offerLink(link: string | null, name: string, say: (line: string) => void) {
   if (!link) { say('This file is on your computer, so there is no link to open.'); return; }

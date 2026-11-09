@@ -25,10 +25,10 @@
 // IT NEVER REACHES INTO ANOTHER CHECKOUT. The folder the app runs from follows
 // the public main by fast-forward, on its own; a script writing into it is the
 // habit that put unshipped work there.
-import { execFileSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { racedWithAnotherPush, notReadyToShip } from './lib/ship-rules.mjs';
+import { racedWithAnotherPush, notReadyToShip, startedWhenBusy } from './lib/ship-rules.mjs';
 import { deployAfterShip } from './lib/web-app-deploy.mjs';
 
 // THE FOLDER IT SHIPS IS THE ONE IT RUNS IN. `npm run ship` runs in the
@@ -36,7 +36,14 @@ import { deployAfterShip } from './lib/web-app-deploy.mjs';
 // before; Agentbox runs the copy in the app folder (which only ever
 // fast-forwards to the remote) against a task's folder, so a branch cannot
 // change the code that ships it (main/ship-queue.mts).
-const root = (() => { try { return execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: process.cwd(), encoding: 'utf8' }).trim(); } catch { return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'); } })();
+const runGit = (args, opts) => startedWhenBusy(() => spawnSync('git', args, { encoding: 'utf8', ...opts }));
+const gitOrThrow = (args, opts) => {
+  const r = runGit(args, opts);
+  if (r.error) throw r.error;
+  if (r.status !== 0) throw new Error(`git ${args.join(' ')} failed (${r.status}):\n${r.stderr ?? ''}`);
+  return r.stdout.trim();
+};
+const root = (() => { try { return gitOrThrow(['rev-parse', '--show-toplevel'], { cwd: process.cwd() }); } catch { return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'); } })();
 const PUBLIC = 'origin';
 const ATTEMPTS = 3;
 // The ship queue stops a ship at 20 minutes (main/ship-queue.mts); the web app's deploy ends before that.
@@ -44,8 +51,8 @@ const began = Date.now();
 const SHIP_ENDS_BY = began + 18 * 60_000;
 
 const say = (msg) => console.log(`ship: ${msg}`);
-const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
-const gitSoft = (...args) => spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+const git = (...args) => gitOrThrow(args, { cwd: root });
+const gitSoft = (...args) => runGit(args, { cwd: root });
 // process.exit drops whatever a pipe has not yet taken, and the ship queue
 // reads this script through one: the end of the hook's output, where the
 // failing test is named, was what got dropped. Exits once both have drained.
@@ -85,7 +92,7 @@ for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
   // ship has is the hook's, inside this push, so this buffer now carries every
   // failure anybody will read: node's default is a megabyte, and a truncated
   // one returns no status at all and would be read as a refusal with no reason.
-  const pushed = spawnSync('git', ['push', PUBLIC, 'HEAD:main'], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  const pushed = runGit(['push', PUBLIC, 'HEAD:main'], { cwd: root, maxBuffer: 64 * 1024 * 1024 });
   // In that order, so git's own refusal and this script's come after the test run.
   process.stdout.write(pushed.stdout ?? '');
   await drained(process.stdout);

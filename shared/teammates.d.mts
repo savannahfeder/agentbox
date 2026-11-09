@@ -144,7 +144,8 @@ export type WakeAction =
   | (ActionBase & { type: 'limit' })
   | (ActionBase & { type: 'unread'; duty: string; what: string })
   | (ActionBase & { type: 'hops'; msg: string; from: string })
-  | (ActionBase & { type: 'replied'; item: string; product: string; labels: string[]; text: string; say: boolean });
+  | (ActionBase & { type: 'replied'; item: string; product: string; labels: string[]; text: string; say: boolean })
+  | (ActionBase & { type: 'say'; item: string; text: string });
 export interface RunLine {
   teammate: string;
   item: string;
