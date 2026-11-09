@@ -36,7 +36,7 @@ const at = (p: string, spec: string): boolean => {
 // A test's source text written to a file at the repo's root (to bundle or run there) names
 // paths from the root; a build's own output is there only after a build.
 const resolves = (from: string, spec: string): boolean =>
-  spec.includes('/dist/') || at(path.resolve(root, path.dirname(from), spec), spec) || at(path.resolve(root, spec), spec);
+  spec.includes('/dist/') || at(path.resolve(root, path.dirname(from), spec), spec) || (spec.startsWith('./') && at(path.resolve(root, spec), spec));
 
 export function missingImports(list: string[]): string[] {
   const out: string[] = [];
@@ -63,6 +63,12 @@ describe('the check', () => {
 
   it('finds an import of a .mjs that is now .mts', () => {
     expect(run("import { comesBackTo } from '../shared/sign-in-ask.mjs';\n")).toHaveLength(1);
+  });
+  it('finds one that climbs out of the folder to a copy that still has the old name', () => {
+    fs.mkdirSync(path.join(root, 'renderer/src/components'), { recursive: true });
+    const deep = path.join(root, 'renderer/src/components', `.import-check-${process.pid}.tsx`);
+    fs.writeFileSync(deep, "import { starterAsks } from '../../../shared/teammates.mjs';\n");
+    try { expect(missingImports([path.relative(root, deep)])).toHaveLength(1); } finally { fs.rmSync(deep, { force: true }); }
   });
   it('finds a dynamic import of a name that is gone', () => {
     expect(run("const m = await import('../main/no-such-file.mts');\n")).toHaveLength(1);
