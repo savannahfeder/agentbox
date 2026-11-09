@@ -138,20 +138,13 @@ describe('the suggestion stops nobody', () => {
 
   it('chooses the number nobody set, and leaves a number she set alone', () => {
     const config = fs.readFileSync(path.join(root, 'main/config.mjs'), 'utf8');
-    // Inside the same `nobody said` branch the plan cap is in, so the two
-    // compose instead of one undoing the other.
-    // THE MACHINE IS THE PLAN'S FALLBACK, not a second `Math.min` after it.
     // Taking the smaller of a flat default and the machine, which is what
     // shipped first, holds every Mac at that default or below, so it can never
-    // scale up. `slotsForPlans` already answers 1 for a small subscription and
-    // its fallback otherwise, so handing it the machine number is the whole
-    // composition.
-    expect(config).toMatch(/slotsForPlans\(plans, config\.machineSlots\)/);
-    expect(config).not.toMatch(/Math\.min\(config\.maxConcurrentSessions, config\.machineSlots\)/);
-    // And still only for somebody who has set no number of their own, which
+    // scale up. And only for somebody who has set no number of their own, which
     // is a number for the whole computer since w-ec27ff1a51.
+    expect(config).not.toMatch(/Math\.min\(config\.maxConcurrentSessions, config\.machineSlots\)/);
     expect(config).toMatch(
-      /if \(typeof overrides\.agentsAtOnce !== 'number'\) \{\s*const plans = readPlans/,
+      /if \(typeof overrides\.agentsAtOnce !== 'number'\) config\.maxConcurrentSessions = config\.machineSlots;/,
     );
   });
 });

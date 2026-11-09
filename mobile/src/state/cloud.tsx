@@ -23,7 +23,7 @@ import type { Saved } from '../lib/attach';
 import type { Picked } from '../platform/pick';
 import { planFor, runSteps, type PressedItem, type Press, type Step } from '../lib/actions';
 import { needsNotice, NOTICE_KEY, noticeFor, readNotice, type Notice } from '../lib/ai-notice';
-import { withDeadline } from '../lib/deadline';
+import { fresh, withDeadline } from '../lib/deadline';
 import { keptStore } from '../lib/kept';
 import { previewCloud } from '../lib/preview';
 import { ALERTS_KEY, leaveAddress, readAlerts, takeAddressBack, type KeptAlerts } from '../lib/push-device';
@@ -54,7 +54,7 @@ async function openCloud(): Promise<Cloud | null> {
   if (PREVIEW) return previewCloud();
   const cfg = Constants.expoConfig?.extra?.cloud;
   if (!cfg?.url || !cfg?.anonKey) return null;
-  return cloudClient(cfg, { storage: await keptStore(persist), fetchImpl: withDeadline(fetch) });
+  return cloudClient(cfg, { storage: await keptStore(persist), fetchImpl: fresh(withDeadline(fetch)) });
 }
 
 const message = (err: unknown) => String((err as Error)?.message ?? err);

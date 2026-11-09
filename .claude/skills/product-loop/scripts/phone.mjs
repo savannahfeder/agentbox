@@ -152,7 +152,7 @@ if (isMain) {
       const name = `${String(args[0] || `phone-${Date.now()}`).replace(/[^\w.-]+/g, '-').replace(/\.png$/, '')}.png`;
       const { data } = await t.call('Page.captureScreenshot', { format: 'png' });
       fs.writeFileSync(path.join(out, name), Buffer.from(data, 'base64'));
-      console.log(`Saved ${name}. Read it with the Read tool at ${path.join(out, name)}.`); t.detach();
+      console.log(`Saved ${name}. Open it at ${path.join(out, name)} to see the screen.`); t.detach();
     } else if (verb === 'away') {
       await new Promise((r) => setTimeout(r, awayMs));
       const t = await tab(); console.log(`You put the phone down for ${Math.round(awayMs / 60_000)} minutes.`); await look(t); t.detach();

@@ -57,13 +57,8 @@
 .tq-chip:hover { background: var(--wash-strong); }
 
 .rm-compose.tq-compose { margin: 8px 32px 24px 32px; }
-.tq-input { min-height: 40px; max-height: 200px; resize: none; padding: 11px 13px 4px; box-sizing: border-box; border: 0; outline: 0; background: none; font: inherit; color: var(--text); font-size: 15px; line-height: 22px; }
-.tq-input::placeholder { color: var(--text-faint); }
-.tq-compose .rm-compose-bar { justify-content: space-between; }
-/* Stop takes Send's slot while it works, so it has Send's edge and height. */
+.rm-compose-input.tq-input { padding: 11px 13px 4px; font-size: 15px; line-height: 22px; }/* Stop takes Send's slot while it works, so it has Send's edge and height. */
 .tq-compose .dock-stop { margin-right: 0; padding: 4px 12px; }
-.tq-compose .dock-send kbd { font: 400 10.5px/1 var(--mono); color: var(--text-faint); margin-left: 6px; }
-
 /* The panel beside a teammate's chat */
 .gr-side.tq-side { padding: 18px 24px 24px; }
 /* The Log has no faces, so its lines start at its title. */
