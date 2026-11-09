@@ -93,7 +93,7 @@ import { approvalAnswered, approvalAsker, approvalView } from './approval-card';
 // there is anything to confirm the card has closed.
 import { sentLine, sendingLine } from './compose-says';
 import { wearJustMade, type JustMade } from './just-made';
-import { asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
+import { agentOnOrComing, asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
 import { filedByThePerson, wordWaits } from '../../shared/answers.mjs';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mjs';
 import { focusTheReplyBox } from './focus-at-end';
@@ -192,6 +192,7 @@ import { threadsMade, approvableFiled, doItHereWrites, answerAllWrites, RUN_IT }
 import { waitingCounts } from './threads-made';
 import { closeAsk, closeAskOwnsKey, unshippedAsk } from './close-asks-first';
 import { notShipped, shipItAsk } from '../../shared/not-shipped.mts';
+import { openSignIn } from '../../shared/sign-in-ask.mjs';
 import { ChatAgentsContext, type ChatAgentsValue } from './team/ChatAgents';
 import { agentLinks, askedInLabel, chatProjects, chatTaskSharing, chatTranscript, lastAskKeptOnMac, taskBrief, taskTitle, withTask } from './team/agent-mentions';
 import { answersInTheirChat } from './team/answers-in-the-chat';
@@ -2161,7 +2162,9 @@ export default function App() {
   // and what keeps a thread in In progress and out of Needs you, whatever its
   // status says, until its session exits (w-bc976fd247). Up here because every
   // list below reads it.
-  const liveIds = useMemo(() => new Set(runningRows.map((r) => r.itemId)), [runningRows]);
+  const runningIds = useMemo(() => new Set(runningRows.map((r) => r.itemId)), [runningRows]);
+  // The lists also hold a thread whose run is being started, so Try again moves it at once.
+  const liveIds = useMemo(() => agentOnOrComing({ running: runningRows, starting: snap?.supervisor.starting }), [runningRows, snap?.supervisor.starting]);
   // AND THE THREADS WHOSE AGENT IS STOPPED ON A PERMISSION REQUEST. Each
   // approval in the spool names the thread it came from, and that one fact
   // turns a Working row into a row that needs you, in both lists.
@@ -2169,12 +2172,13 @@ export default function App() {
   // process pushes, while its card is already leaving with a verdict on it
   // (`approvalStage`), and a row still reading Needs you behind that card is
   // the app disagreeing with itself.
+  // A sign-in link an agent is waiting on asks you just as a permission card does.
   const askingIds = useMemo(
-    () => new Set((snap?.approvals ?? [])
+    () => new Set([...(snap?.approvals ?? [])
       .filter((a) => a.id !== answered?.id)
       .map((a) => a.item)
-      .filter((id): id is string => !!id)),
-    [snap?.approvals, answered?.id],
+      .filter((id): id is string => !!id), ...items.filter((i) => openSignIn(i)).map((i) => i.id)]),
+    [snap?.approvals, answered?.id, items],
   );
   const asking = useCallback((i: { id: string }) => askingIds.has(i.id), [askingIds]);
   // EVERYTHING THE SUPERVISOR KNOWS ABOUT EVERY THREAD, in one context, so the
@@ -3032,8 +3036,8 @@ export default function App() {
   // (`boardSideways`), and they come in the order you dragged them to.
   const boardArgs = useMemo(
     () => ({ items: evBoard ? boardItems(items, evBoard, teammateIdOf) : items, products: snap?.products ?? [], display: inboxDisplay, now, stateOf: stateOfMine, cards,
-      picked: evBoard ? evBoard.picked : team ? picked : undefined, me: team?.me ?? null, since: team?.state.since ?? null, live: liveIds, projectOrder, waitingIsInProgress: !!evBoard && !evBoard.mate && !evBoard.mineOnly && evBoard.picked.length > 1 }),
-    [items, evBoard, snap?.products, inboxDisplay, now, stateOfMine, cards, team, picked, liveIds, projectOrder],
+      picked: evBoard ? evBoard.picked : team ? picked : undefined, me: team?.me ?? null, since: team?.state.since ?? null, live: runningIds, projectOrder, waitingIsInProgress: !!evBoard && !evBoard.mate && !evBoard.mineOnly && evBoard.picked.length > 1 }),
+    [items, evBoard, snap?.products, inboxDisplay, now, stateOfMine, cards, team, picked, runningIds, projectOrder],
   );
   const boardCols = useMemo(
     () => (onBoard ? boardColumns({ ...boardArgs, order: evBoard ? evColumns(columnOrder) : columnOrder }) : null),
@@ -7539,7 +7543,7 @@ export default function App() {
     <TeamContext.Provider value={team}>
     <OpenTeammateThread.Provider value={openContinuedFrom}>
     <ChatAgentsContext.Provider value={chatAgents}>
-    <LiveContext.Provider value={liveIds}>
+    <LiveContext.Provider value={runningIds}>
     <CloudContext.Provider value={cloudIds}>
     <SavedKeysContext.Provider value={savedCloudKeys}>
     <MoveToCloudContext.Provider value={mover}>
@@ -8619,7 +8623,7 @@ export default function App() {
           const options = itemOptions(target);
           const recommended = options.find((o) => o.recommended) ?? options[0];
           const open = () => { setFocused(target); markSeen(target); };
-          const moveRefusal = whyItCannotMove(target as never, { live: liveIds.has(target.id) });
+          const moveRefusal = whyItCannotMove(target as never, { live: runningIds.has(target.id) });
           return [
             ...(focused
               ? [{id:'remote-control',label:'Remote control',keywords:'phone mobile continue claude rc',run:()=>{setModal(null);window.dispatchEvent(new Event('task-remote-control-open'));}}, {id:'open-terminal',label:'Open terminal',keywords:'shell command console',run:()=>{setModal(null);window.dispatchEvent(new Event('task-terminal-open'));}}]

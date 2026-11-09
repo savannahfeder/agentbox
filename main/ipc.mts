@@ -81,6 +81,8 @@ import { EVENT_NAMES } from '../shared/analytics-events.mts';
 import { appFinder } from './everything-found.mjs';
 import { appFilesPlace } from './files-place.mjs';
 import { Name } from '../shared/product-name.mjs';
+import { setUpGit, startGhLogin } from './github-browser-sign-in.mts';
+import type { GhLogin } from './github-browser-sign-in.mts';
 import { handedOnByReply, isGivenTask } from '../shared/team-rules.mjs';
 import { closeRefusal, closedAnywayNote } from '../shared/not-shipped.mts';
 import { lightRunning, snapshotSender } from '../shared/snapshot-delta.mjs';
@@ -673,7 +675,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   ipcMain.handle('zero:snapshot', (_e, ask?: { since?: string; open?: { id?: string; product?: string } | null }) => {
     const now = Date.now();
     const items = store.listItems(now);
-    const running = supervisor.status();
+    const running = supervisor.status(items);
     const engines = supervisor.engineFacts(items);
     // WHICH CODING AGENT THE CORNER IS ABOUT, ANSWERED ONCE, HERE.
     // `usageEngine` is the rule (shared/usage.mts) and it is the byline's own
@@ -739,7 +741,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       restartNeeded: restartNeeded(supervisor.appDir),
       // WHERE THREADS RUN, for the cloud button beside the filters
       // (renderer/src/cloud-menu.ts). `setUp` false draws no button at all.
-      cloud: supervisor.cloudStatus(),
+      cloud: supervisor.cloudStatus(items),
       // HER RATE LIMIT, WHICH IS WHAT ACTUALLY CAPS THE FLEET. Null until the
       // first reading lands, and the corner draws nothing at all until then
       // rather than a pill full of dashes.
@@ -2197,6 +2199,47 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       if (freed.length) supervisor.wake();
       push();
       return { ok: true, keys, freed: freed.map((t) => t.id), cloudOff: supervisor.config.cloudRuns === false };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+  // What the person did with a sign-in link an agent is waiting on (shared/sign-in-ask.mjs).
+  ipcMain.handle('zero:sign-in-answer', (_e, { product, id, ask, said, url } = {}) => {
+    try {
+      store.answerSignIn(product, id, { id: ask, said, url });
+      push();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+  // GitHub's own sign-in for this computer's git, started from the card on a ship that could not push.
+  let ghLogin: GhLogin | null = null;
+  ipcMain.handle('zero:github-browser-sign-in', async () => {
+    try {
+      ghLogin?.cancel();
+      const login = ghLogin = await startGhLogin();
+      void login.done.then(async (ok) => {
+        if (ghLogin === login) ghLogin = null;
+        if (!ok || !await setUpGit()) return;
+        await supervisor.gitHubSignIn?.forget().catch(() => {});
+        store.shipAgainAfterGitHubSignIn();
+        supervisor.wake();
+        push();
+      });
+      return { ok: true, code: login.code, url: login.url };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+  ipcMain.handle('zero:github-sign-in', async (_e, { token } = {}) => {
+    try {
+      if (!supervisor.gitHubSignIn) return { ok: false, error: `Signing in to GitHub needs the ${Name} app on this computer.` };
+      await supervisor.gitHubSignIn.save(token);
+      const again = store.shipAgainAfterGitHubSignIn();
+      supervisor.wake();
+      push();
+      return { ok: true, again };
     } catch (err) {
       return { ok: false, error: String((err as Error).message) };
     }
