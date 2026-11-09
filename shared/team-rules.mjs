@@ -261,7 +261,7 @@ const A_TEAMMATE_MAY_SET = ['problem', 'progress', 'solution', 'blockedBy', 'blo
 // AND WHICH AGENT WROTE A MESSAGE, OR WHICH AI TEAMMATE IT IS FOR, OR WHICH
 // NOTES ON A FILE IT HANDS AN AGENT. All only say how the words are drawn; the
 // owner they name is always the line's own writer.
-const IN_A_MESSAGE_ALSO = ['title', 'body', 'answer', 'note', 'result', 'people', 'status', 'react', 'inReplyTo', 'edit', 'due', 'artifact', 'voice', 'forAgent', 'fromNotes'];
+const IN_A_MESSAGE_ALSO = ['title', 'body', 'answer', 'note', 'result', 'people', 'status', 'react', 'inReplyTo', 'edit', 'due', 'artifact', 'voice', 'forAgent', 'fromNotes', 'typed'];
 // AND THE LEVEL THE SENDER PICKED, ON THE OPENING LINE ALONE (w-7ba439c883).
 // A message now carries how urgent its sender thought it was, and that number
 // decides where it sits in the inbox it lands in, so it has to survive the

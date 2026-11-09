@@ -62,7 +62,7 @@ describe('the list beside it', () => {
   });
   it('nor does a board column or a section of threads', () => {
     const pages = read('renderer/src/threads/Pages.tsx');
-    expect(pages).toContain('{rows.length > 0 && <b>{rows.length}</b>}');
+    expect(pages).toContain("{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}{count > 0 && <b>{count}</b>}");
     expect(pages).toContain('{label}{count > 0 && <b>{count}</b>}');
   });
 });

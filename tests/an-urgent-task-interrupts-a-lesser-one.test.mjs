@@ -59,7 +59,7 @@ const build = (items, slots = 1) => {
   sup.spawnWorker = (item, opts = {}) => {
     spawned.push(item.id);
     if (opts.resumeSessionId) resumed.push({ id: item.id, sessionId: opts.resumeSessionId });
-    sup.sessions.set(item.id, { itemId: item.id, product: item.product, startedAt: NOW });
+    sup.sessions.set(item.id, { itemId: item.id, product: item.product, startedAt: NOW, traced: true });
   };
   // The real _kill signals a child and waits for an exit. Here it does what
   // the exit handler would do: the session leaves the running map, and the
@@ -78,7 +78,7 @@ const build = (items, slots = 1) => {
 
 /** Put a running session on the fleet, as if a worker were mid-task on it. */
 const running = (id, { product = 'agentbox', startedAt = NOW, session = `s-${id}` } = {}) => {
-  sup.sessions.set(id, { itemId: id, product, startedAt });
+  sup.sessions.set(id, { itemId: id, product, startedAt, traced: true });
   if (session) sup._liveSessions[id] = { sessionId: session, product, cwd: '/tmp', profile: 'default' };
 };
 
