@@ -138,11 +138,8 @@ describe('the file view', () => {
   it('a tagged reply sends the comment it answers', () => {
     expect(view).toMatch(/tagsYourAgent\(text\)[\s\S]{0,200}toAgent\(\[note\.id\]\)/);
   });
-  it('shows how many are not sent, with Send, above the comments and outside the box', () => {
-    const side = view.slice(view.indexOf('className="av-side"'));
-    expect(side.indexOf('av-unsent')).toBeGreaterThan(-1);
-    expect(side.indexOf('av-unsent')).toBeLessThan(side.indexOf('className="av-list"'));
-    expect(view).toMatch(/not sent/);
-    expect(view).not.toMatch(/Send \{sendNotes\.length === 1 \? 'this note' : 'these notes'\} to the agent/);
+  it('shows how many are not sent, with Send all, on a bar under the file (comments-you-have-not-sent-show-under-every-picture)', () => {
+    expect(view).toMatch(/className="av-unsent-bar"/);
+    expect(view).toMatch(/Send all/);
   });
 });
