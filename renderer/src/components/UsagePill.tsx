@@ -29,7 +29,7 @@
 // about status lines.
 
 import { useEffect, useId, useRef, useState } from 'react';
-import { headlineLimit, limitRows, limitsStillRunning, usageSentence } from '../../../shared/usage.mts';
+import { headlineLimit, limitRows, limitsStillRunning, limitsToShow, usageSentence } from '../../../shared/usage.mts';
 import { agoQuiet } from '../format';
 import type { Usage } from '../types';
 import { engineLabel } from '../../../shared/engines.mjs';
@@ -95,8 +95,9 @@ function UsageOne({ usage, now, engineWord = null, onOpen, sidebar = false, fold
   /** In the sidebar, a press opens this agent's Settings page instead of pinning the panel. */
   onOpen?: (engine: string) => void;
 }) {
-  // Only the windows this reading can still answer for (`limitsStillRunning`).
-  const limits = limitsStillRunning(usage?.limits, now);
+  // The windows this reading can still answer for, and a five hour one that
+  // reset since, without a figure (`limitsToShow`).
+  const limits = limitsToShow(usage?.limits, now);
   // OPEN BECAUSE SHE CLICKED, which outlives the pointer leaving. Hover is held
   // separately, so moving away closes a hovered panel and leaves a clicked one
   // exactly where it is.
@@ -163,7 +164,9 @@ function UsageOne({ usage, now, engineWord = null, onOpen, sidebar = false, fold
   const session = headlineLimit(limits);
   if (!session) return null;
 
-  const used = Math.max(0, Math.min(100, session.percent));
+  // A session that reset since the reading has no figure, and the sidebar
+  // shows none rather than the week's.
+  const used = session.reset ? null : Math.max(0, Math.min(100, session.percent));
   const rows = limitRows(limits, now);
   const joint = agents.length > 1;
   const sentence = joint
@@ -197,7 +200,7 @@ function UsageOne({ usage, now, engineWord = null, onOpen, sidebar = false, fold
       <button
         type="button"
         ref={bar}
-        className={`usage-pill ${used >= CLOSE ? 'is-close' : ''}`}
+        className={`usage-pill ${used != null && used >= CLOSE ? 'is-close' : ''}`}
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         // THE WHOLE TRUTH GOES TO WHATEVER READS THIS ALOUD. The corner has no
@@ -209,9 +212,9 @@ function UsageOne({ usage, now, engineWord = null, onOpen, sidebar = false, fold
         onFocus={sidebar ? undefined : enter}
         onBlur={sidebar ? undefined : leave}
       >
-        {sidebar && <><GaugeIcon /><span className="usage-row-label">{engineWord ?? 'Usage'}</span><span className="usage-row-num">{used}%</span></>}
+        {sidebar && <><GaugeIcon /><span className="usage-row-label">{engineWord ?? 'Usage'}</span>{used != null && <span className="usage-row-num">{used}%</span>}</>}
         {!sidebar && <span className="usage-meter" aria-hidden="true">
-          <i style={{ width: `${used}%` }} />
+          <i style={{ width: `${used ?? 0}%` }} />
         </span>}
       </button>
       {open && (
@@ -226,11 +229,11 @@ function UsageOne({ usage, now, engineWord = null, onOpen, sidebar = false, fold
             <div className="usage-lim" key={r.key}>
               <div className="usage-lim-top">
                 <span className="usage-lim-name">{r.name}</span>
-                <span className="usage-lim-used">{r.used}% used</span>
+                <span className="usage-lim-used">{r.used == null ? 'Reset' : `${r.used}% used`}</span>
               </div>
-              <span className="usage-meter wide" aria-hidden="true">
+              {r.used != null && <span className="usage-meter wide" aria-hidden="true">
                 <i style={{ width: `${r.used}%` }} />
-              </span>
+              </span>}
               {r.when && <div className="usage-lim-when">{r.when}</div>}
             </div>
           ))}
@@ -241,9 +244,9 @@ function UsageOne({ usage, now, engineWord = null, onOpen, sidebar = false, fold
               <div className="usage-lim" key={r.key}>
                 <div className="usage-lim-top">
                   <span className="usage-lim-name">{r.name}</span>
-                  <span className="usage-lim-used">{r.used}% used</span>
+                  <span className="usage-lim-used">{r.used == null ? 'Reset' : `${r.used}% used`}</span>
                 </div>
-                <span className="usage-meter wide" aria-hidden="true"><i style={{ width: `${r.used}%` }} /></span>
+                {r.used != null && <span className="usage-meter wide" aria-hidden="true"><i style={{ width: `${r.used}%` }} /></span>}
                 {r.when && <div className="usage-lim-when">{r.when}</div>}
               </div>
             ))}

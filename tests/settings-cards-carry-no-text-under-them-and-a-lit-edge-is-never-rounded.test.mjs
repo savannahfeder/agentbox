@@ -62,7 +62,9 @@ describe('the text', () => {
      on the page, which is all this ever asked. */
   it('keeps the running count, now as a figure the page leads with', () => {
     expect(settings).toContain('<Reading running={w.running}');
-    expect(settings).toContain("cells.push({ n: String(running)");
+    // The figures are worked out in running-reading.ts, which the phone's Running page reads too.
+    expect(settings).toContain('runningFigures(');
+    expect(read('renderer/src/running-reading.ts')).toContain("cells.push({ n: String(running)");
     expect(settings).not.toContain('${w.running} running now.');
   });
 });

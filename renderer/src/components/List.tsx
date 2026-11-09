@@ -10,7 +10,7 @@ import { REST_HEADING, URGENT_HEADING, clickIntent, rowKeys, rowSummary, rowTitl
 import { isUrgentRow } from '../interrupt';
 // THE SAME PREDICATE THE PANE USES, not a second copy of the rule. The row and
 // the pane disagreeing about one fact on one screen is what this import fixes.
-import { cameBackEmpty, cannotStartLine } from '../live-line';
+import { cameBackEmpty, cannotStartLine, runningSince } from '../live-line';
 import { agentAtWork, engineWordFor } from '../byline';
 import { DEFAULT_ENGINE } from '../../../shared/engines.mjs';
 import { isTroubleRow, TROUBLE_ID } from '../trouble-row';
@@ -33,6 +33,7 @@ import type { MixedRow } from '../threads/people-rules';
 import { useRowDrag } from '../threads/row-drag';
 import { heldByAPerson } from '../../../shared/team-rules.mjs';
 import { catchUpDue } from '../../../shared/agent-import.mts';
+import { cutAt, firstRows, placeOf, useRowsDrawn } from '../rows-drawn';
 
 /**
  * THE AGENT A ROW WITH NOTHING RUNNING WOULD RUN ON.
@@ -249,6 +250,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
     walk ?? null,
     id,
   ));
+  const rowsNow = useRowsDrawn(`${keyView ?? view}|${table}|${(terms ?? []).join(' ')}|${phrase ?? ''}`, table && mixed ? mixed.length : items.length);
   // NO EMPTY PAGE ANYWHERE IN THE APP.A view with nothing in it draws the
   // background and nothing else. Two sentences died here: "Nothing here." on
   // the inbox, Scheduled and Closed, and "Nothing running. Compose (C) to
@@ -340,6 +342,10 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
     ? [{ key: 'mixed', label: '', items: mixed.flatMap((r): Entry[] => (r.card ? [{ card: r.card }] : at.has(r.item.id) ? [{ item: r.item, index: at.get(r.item.id)! }] : [])) }]
     : groups;
   const withPerson = table && !!mixed;
+  const total = shown.reduce((n, g) => n + g.items.length, 0);
+  const cut = cutAt(rowsNow, placeOf(shown, selected));
+  const allDrawn = cut >= total;
+  const drawn = allDrawn ? shown : firstRows(shown, cut);
 
   // A repeating rule's own state is its last run's: the mark turns only
   // where an agent really is on that one (w-ec2b04d449).
@@ -408,7 +414,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
           })}
         </div>
       )}
-      {shown.map((group) => (
+      {drawn.map((group) => (
         <div key={group.key}>
           {group.section && !group.section.bare && <SectionHead label={group.section.label} count={group.section.count} tab={group.section.tab} folded={group.section.folded} onFold={() => stack?.onFold(group.section!.key)} />}
           {group.section?.key === 'later' && !group.section.folded && ruleRows(laterRules)}
@@ -747,7 +753,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                   {justImported(item, seen)
                     ? <span className="time imported">{JUST_IMPORTED_WORD}</span>
                     : session
-                    ? <span className="time working">working · {ago(session.startedAt)}</span>
+                    ? <span className="time working">working · {ago(runningSince(session))}</span>
                     : stalled?.includes(item.id)
                       ? <span className="time stalled">stopped · {ago(item.updatedAt)}</span>
                       : cameBackEmpty(item, silent?.[item.id])
@@ -776,9 +782,9 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
           {group.section?.key === 'progress' && !group.section.folded && !ranked && <CloudOfferRow />}
         </div>
       ))}
-      {foot}
-      {table && !stack && view === 'progress' && !ranked && <CloudOfferRow />}
-      {onEnd && <ListFoot onEnd={onEnd} />}
+      {allDrawn && foot}
+      {allDrawn && table && !stack && view === 'progress' && !ranked && <CloudOfferRow />}
+      {allDrawn && onEnd && <ListFoot onEnd={onEnd} />}
     </div>
   );
 }

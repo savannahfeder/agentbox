@@ -4,7 +4,8 @@ import {updateFixture} from './agent-update-fixture';
 // bridge; fixtures mode (?fixtures=1) serves canned data so the UI can be
 // developed, reviewed, and screenshotted without a live store or any agents.
 
-import type { AccountUsageReading, AgentConversation, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, FilesUploaded, TeamMessageFile, ThreadEditPatch, UpdateState, Usage, UsageLimit, WorkItem } from './types';
+import type { Person, TeamBillingDetails } from './types';
+import type { AccountUsageReading, AgentConversation, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, FilesUploaded, TeamMessageFile, ThreadEditPatch, LiveRoomTicket, UpdateState, Usage, UsageLimit, WorkItem } from './types';
 import type { LedgerLine } from './thread-history';
 import type { AgentFile as AgentFileRow } from './onboarding';
 import type { AgentFolder, SessionThread } from './agent-import-card';
@@ -238,6 +239,17 @@ if (twoLogins) {
   if (accountTrouble === 'stale-limit' && first) {
     first.trouble = { cause: 'at-limit', since: Date.now() - 600_000, at: Date.now() - 600_000, note: accountSentence('at-limit') };
   }
+}
+
+// A team three seats in: next bill in 18 days, a Visa, two invoices paid. On the trial, nothing of Stripe yet.
+function fixtureTeamBilling(trial: boolean): TeamBillingDetails {
+  const day = 86_400_000;
+  if (trial) return { periodStart: null, periodEnd: null, nextAt: null, nextAmount: null, card: null, email: null, invoices: [] };
+  return {
+    periodStart: Date.now() - 12 * day, periodEnd: Date.now() + 18 * day, nextAt: Date.now() + 18 * day, nextAmount: 120,
+    card: { brand: 'Visa', last4: '4242' }, email: 'billing@example.com',
+    invoices: [0, 1].map((k) => ({ at: Date.now() - (12 + 30 * k) * day, amount: 120, status: 'paid' as const })),
+  };
 }
 
 function fixtureAccountUsage(): AccountUsageReading[] {
@@ -580,6 +592,16 @@ export const api = {
         base.supervisor.queued = queued;
         base.supervisor.capacity = base.supervisor.running.filter((r) => (r as { where?: string }).where !== 'cloud').length;
       }
+      // &usagestale: a Codex reading six hours old whose five hour window has ended.
+      if (params.has('usagestale')) {
+        const now = Date.now();
+        const limits = [
+          { span: 'session' as const, qualifier: null, name: 'This session', percent: 2, resetsText: null, resetsOn: null, resetsAt: now - 60 * 60_000, zone: null },
+          { span: 'week' as const, qualifier: null, name: 'This week', percent: 30, resetsText: null, resetsOn: null, resetsAt: now + (3 * 24 + 16) * 3_600_000, zone: null },
+        ];
+        base.usage = { engine: 'codex', limits, at: now - 6 * 3_600_000 };
+        base.usageByEngine = [base.usage];
+      }
       return fixtureSecondEngine(base, engineFixtures);
     }
     // A document's holder thread is the app's, so no list of threads draws it.
@@ -796,6 +818,13 @@ export const api = {
     const zero = window.zero as any;
     if (!zero?.saveCodeFile) return { ok: false, error: `quit and reopen ${NAME} to save this file` };
     return zero.saveCodeFile(p);
+  },
+
+  /** The live room a file opens in with teammates, or null when nobody else can open it. */
+  async liveRoom(p: { product: string; project?: string | null; name: string }): Promise<LiveRoomTicket | null> {
+    const zero = window.zero as any;
+    if (!zero?.liveRoom) return null;
+    return zero.liveRoom(p).catch(() => null);
   },
 
   async writeDoc(p: { product: string; src: string; text: string; mtime: number; thread?: string }): Promise<{ ok: boolean; mtime?: number; error?: string; stale?: boolean }> {
@@ -1646,12 +1675,26 @@ export const api = {
     if (useFixtures) {
       if (params.get('cloudplan') === 'pro') return { signedIn: true, plan: 'pro', unlimited: false, agents: 10, hoursPerMonth: 400, running: 6, usedSeconds: 88 * 3600 };
       if (params.get('cloudplan') === 'free') return { signedIn: true, plan: 'free', unlimited: false, agents: 2, hoursPerMonth: 5, running: 1, usedSeconds: 1.5 * 3600, billing: null };
+      // &cloudplan=team-trial|team: on a team of 3, its trial 9 days from its end, or 3 seats paid for.
+      if (params.get('cloudplan') === 'team-trial' || params.get('cloudplan') === 'team') {
+        const trial = params.get('cloudplan') === 'team-trial';
+        // Each person's own hours: 10 on the trial, a seat's 400 a month once paid; &spent=1 has yours used up.
+        const each = trial ? 10 : 400;
+        const used = (mine: number) => (params.has('spent') ? each : mine) * 3600;
+        const people = [
+          { id: 'p1', name: 'Sam Rivera', usedSeconds: used(trial ? 4.2 : 96), running: params.has('spent') ? 0 : 1 },
+          { id: 'p2', name: 'Priya Natarajan', usedSeconds: (trial ? 3.1 : 81) * 3600, running: 1 },
+          { id: 'p3', name: 'Leo Okafor', usedSeconds: (trial ? 1.2 : 35) * 3600, running: 0 },
+        ];
+        const team = { trial, endsAt: trial ? Date.now() + 9 * 86_400_000 : null, seats: trial ? 0 : 3, members: 3, owner: params.get('owner') !== '0', agents: trial ? 2 : 10, running: people[0].running, hours: each, usedSeconds: people[0].usedSeconds, people };
+        return { signedIn: true, plan: 'team', unlimited: false, agents: team.agents, hoursPerMonth: team.hours, running: team.running, usedSeconds: team.usedSeconds, billing: null, team };
+      }
       if (params.get('cloudplan') === 'spent') return { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0, billing: null, free: { agents: 2, hours: 5, usedSeconds: 5 * 3600 } };
       return { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0 };
     }
     return (await (window.zero as any)?.cloudAccountPlan?.()) ?? { signedIn: false };
   },
-  async cloudAccountPay(plan: 'pro' | 'plus' | 'max'): Promise<{ ok: boolean; where?: 'checkout' | 'billing'; error?: string; message?: string }> {
+  async cloudAccountPay(plan: 'pro' | 'plus' | 'max' | 'team'): Promise<{ ok: boolean; where?: 'checkout' | 'billing'; error?: string; message?: string }> {
     const zero = window.zero as any;
     if (!zero?.cloudAccountPay) return { ok: false, message: RESTART_NOTE };
     return zero.cloudAccountPay({ plan });
@@ -1660,6 +1703,20 @@ export const api = {
     const zero = window.zero as any;
     if (!zero?.cloudAccountBilling) return { ok: false, message: RESTART_NOTE };
     return zero.cloudAccountBilling();
+  },
+  /** The preview's team as the app knows it, its first member being you. */
+  fixtureTeamPeople(): { people: Person[]; meId: string | null } {
+    if (!useFixtures) return { people: [], meId: null };
+    const owner = params.get('owner') !== '0';
+    const p = (id: string, name: string, role: 'owner' | 'member') => ({ id, name, email: `${name.split(' ')[0].toLowerCase()}@example.com`, avatarUrl: null, role });
+    return { meId: 'p1', people: [p('p1', 'Sam Rivera', owner ? 'owner' : 'member'), p('p2', 'Priya Natarajan', owner ? 'member' : 'owner'), p('p3', 'Leo Okafor', 'member')] };
+  },
+  /** What the team's owner sees of Stripe; `owner: false` for anyone else on the team. */
+  async cloudAccountTeamBilling(): Promise<{ ok: boolean; owner?: boolean } & Partial<TeamBillingDetails>> {
+    if (useFixtures) return { ok: true, owner: true, ...fixtureTeamBilling(params.get('cloudplan') === 'team-trial') };
+    const zero = window.zero as any;
+    if (!zero?.cloudAccountTeamBilling) return { ok: false };
+    return zero.cloudAccountTeamBilling();
   },
 
   /** Claude's sign-in code from the clipboard, while a sign-in waits for one; else null. */

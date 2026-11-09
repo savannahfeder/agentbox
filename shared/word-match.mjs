@@ -13,11 +13,15 @@ export function fold(text) {
   return String(text ?? '').toLowerCase().replace(/[‘’ʼ“”–—]/g, (c) => FOLDED[c]);
 }
 
-/** Unfolded text with its camelCase names also written split ("toKebab" adds "to Kebab"), for haystacks that are matched and never sliced. */
+/**
+ * Unfolded text with its camelCase names also written split ("toKebab" adds
+ * "to Kebab") and its hyphenated words joined ("sign-up" adds "signup"), for
+ * haystacks that are matched and never sliced.
+ */
 export function withHumps(text) {
   const raw = String(text ?? '');
-  const split = raw.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
-  return split === raw ? raw : `${raw} . ${split}`;
+  const extra = [raw.replace(/([a-z0-9])([A-Z])/g, '$1 $2'), raw.replace(/([A-Za-z0-9])-(?=[A-Za-z0-9])/g, '$1')].filter((t) => t !== raw);
+  return [raw, ...extra].join(' . ');
 }
 
 export function isWordChar(c) {

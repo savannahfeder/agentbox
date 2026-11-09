@@ -1,12 +1,12 @@
 import { openSourceFile } from './open-source-file.mts';
 import {submitReply} from './live-replies.mts';
-import { noteToItsAgent } from './notes-wake.mjs';
-import { CHANGED_HERE, ranHere, whyItCannotMove } from '../shared/move-thread.mts';
+import { noteToItsAgent, replyWithWaitingNotes, waitingNotes } from './notes-wake.mjs';
+import { CHANGED_HERE, leftByAMove, ranHere, whyItCannotMove } from '../shared/move-thread.mts';
 import { whereTheWorkStands } from './git-change.mjs';
 import { taskFolderPath } from './task-folders.mts';
 import { GROUPS } from '../shared/connections-catalog.mjs';
 import { projectSeenBy } from '../shared/thread-cards.mjs';
-import { createEngineSetup } from './engine-setup.mts';
+import { createEngineSetup, engineSetUpHere } from './engine-setup.mts';
 // IPC: a thin, typed-by-convention surface. The renderer asks; the main
 // process derives from files and answers. Pushes go one way: "state changed,
 // refetch." No state is cached on either side of the bridge.
@@ -53,6 +53,7 @@ import { readChange } from './code-change.mjs';
 import { findFile, readCodeFile, writeCodeFile } from './code-file.mts';
 import { readNote, writeNote } from './rail-note.mts';
 import { teamForWindow } from './team/index.mts';
+import { liveRoomFor } from './team/live-room.mjs';
 import { addClaudeAccount, addCodexAccount, alphaFeatures, cornerTagTurnedOff, countsTurnedOff, lookAgainFor, outsideAgentsMode, permissionMode, pointAtEngineBin, readSettings, searchForEngineBin, setProjectSetting, setWorkspaceSetting } from './settings.mts';
 import { ICON_KINDS, clearProjectIcon, setProjectIcon, setProjectName } from './project-identity.mts';
 import { ClaudeUsage } from './claude-usage.mts';
@@ -70,7 +71,7 @@ import { readImportableThreads, readSearchableThreads } from './importable-threa
 import { readChatEnds } from './agent-sessions.mts';
 import { markImported } from '../shared/agent-import.mts';
 import { codexIdOf, importChoice, isCodexImportRow, isNotImportedRow } from '../shared/codex-import.mts';
-import { checkProjectFolder, chooserStartsIn } from '../shared/project-folder-check.mts';
+import { checkProjectFolder, chooserStartsIn, folderFromChooser } from '../shared/project-folder-check.mts';
 import { openFreshUser } from './fresh-user.mts';
 import { openDemo } from './demo.mts';
 import { AgentSchedule } from './agent-schedule.mts';
@@ -88,6 +89,7 @@ import { saveAttachments } from './save-attachments.mts';
 import { stageAttachment, stageAttachmentPart } from './stage-attachment.mts';
 import type { StagedPart } from './stage-attachment.mts';
 import { readRunTraces } from './run-traces.mjs';
+import { openInBrowser } from './open-in-browser.mts';
 import type { AnswerInput, ComposeInput, Store, StoreConfig } from './store.mts';
 import type { Supervisor, SupervisorConfig } from './supervisor.mts';
 import type { SettingsConfig } from './settings.mts';
@@ -186,6 +188,8 @@ export interface IpcDeps {
   connections?: IpcConnections | null;
   copies?: IpcCopies | null;
   onCount?: () => void;
+  /** The live relay's address, null when this cloud has none. */
+  liveAt?: string | null;
 }
 
 export interface TeammateArgs {
@@ -211,6 +215,8 @@ interface FilesPlace {
   makeFolder(ask: { project?: string; name?: string; parent: string | null }): Promise<{ id?: string }>;
   renameFolder(ask: { id: string; name?: string }): Promise<{ id?: string }>;
   moveFile(ask: { key: string; folder: string | null }): Promise<{ id?: string }>;
+  newDocument(ask: { project: string; name: string; kind: 'document' | 'table'; folder: string | null }): Promise<{ key: string }>;
+  addFiles(ask: { project: string; folder: string | null; paths: string[] }): Promise<{ added: number; refused: string[]; keys: string[] }>;
   open(key: string): Promise<unknown>;
   edit(key: string, text?: string): Promise<{ ok: boolean } & Record<string, unknown>>;
   editOnThread(ask: { product: string; id: string; path: string; baseId?: string; text: string; taken?: unknown; since?: unknown }): { ok: boolean } & Record<string, unknown>;
@@ -265,7 +271,7 @@ const NO_UPDATER: IpcUpdater = {
 const TEAMMATE_OPS = new Set(['create', 'describe', 'start', 'update', 'stop', 'remove', 'post', 'goAhead', 'remember', 'forget', 'method', 'unsend']);
 const ROOM_OPS = new Set(['refresh', 'send', 'markRead', 'markDone', 'markUnread', 'react', 'decide','edit', 'deleteMessage', 'putFile', 'putFileFrom', 'file', 'fileOnDisk', 'fileText', 'markFile', 'older', 'saveProfile', 'goInvisible', 'comeBack', 'link', 'revokeLink', 'preview', 'listed', 'invitesSent', 'joinByLink', 'joinListed', 'acceptInvite', 'invite', 'create', 'rename', 'leave', 'remove', 'pin', 'mute']);
 
-export function registerIpc({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null, connections = null, copies = null, onCount = () => {} }: IpcDeps) {
+export function registerIpc({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null, connections = null, copies = null, onCount = () => {}, liveAt = null }: IpcDeps) {
   // The three Electron things, or a plain Node stand-in for them. There is no
   // default: a caller that forgets says so here rather than throwing eighty
   // lines further down on `ipcMain.handle` of undefined.
@@ -399,6 +405,16 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // the one on screen means ⌘Y allows a command nobody was reading.
   let looking: { product: string | null; id: string } | null = null;
   const pendingApprovals = () => cardsInFront(approvals.listPending(config.storeRoot), looking);
+  // When each card was first sent to the window, so a chord in its first moment answers nothing (shared/card-settles.mts).
+  const sentAt = new Map<string, number>();
+  const sendingApprovals = () => {
+    const cards = pendingApprovals();
+    const now = Date.now();
+    for (const id of [...sentAt.keys()]) if (!cards.some((c) => c.id === id)) sentAt.delete(id);
+    for (const c of cards) if (!sentAt.has(c.id)) sentAt.set(c.id, now);
+    return cards;
+  };
+  const cardSentAt = (id: string) => sentAt.get(id) ?? null;
   ipcMain.handle('zero:looking', (event, { product = null, id = null }: { product?: string | null; id?: string | null } = {}) => {
     // The window's own top frame and nothing else, the guard
     // `zero:refresh-usage` carries: this moves which card ⌘Y answers. A page
@@ -496,6 +512,20 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     void supervisor.lookAtCloudLogins({ force: !!refresh });
     return { readings: await accountUsage.readAll(profiles.length ? profiles : ['default'], { refresh: !!refresh }) };
   });
+
+  // Last readings only: the phone pass runs every minute and must never start
+  // a `claude /usage` of its own (main/main.mts phoneSettings).
+  const usageForPhone = () => {
+    const current = usage.peek();
+    const newer = <R extends { at?: number }>(a: R | null, b: R | null) => (!a ? b : !b ? a : (b.at ?? 0) > (a.at ?? 0) ? b : a);
+    const profiles = effectiveProfiles(config.authProfiles, { home: config.home });
+    const claude = (profiles.length ? profiles : ['default'])
+      .map((profile) => newer(accountUsage.peek(profile), current?.profile === profile ? current : null))
+      .filter(Boolean);
+    let codex: unknown[] = [];
+    try { codex = supervisor.codexAccountUsage(); } catch { /* no Codex reading */ }
+    return { claude, codex };
+  };
 
   // Agents this run has already counted. In memory on purpose: a fresh launch
   // seeing the same agent again is a fresh fact about the app being used.
@@ -661,7 +691,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     return snapshots.answer({
       products: store.listProducts(),
       // Each with the place she dragged it to, if she did (w-6e5b532a95).
-      items: supervisor.withPlaces(items),
+      items: supervisor.withPlaces(items.filter((i) => !leftByAMove(i))),
       // THE TEAM: who is signed in, their team and its people, and the
       // title-free activity of their private work. Null on a build with no
       // team cloud, which is the single-person app.
@@ -673,7 +703,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       agents: liveAgents(),
       // The open thread's own card first, which is the order the chord and the
       // Agents menu answer in too (shared/which-card-is-in-front.mts).
-      approvals: pendingApprovals(),
+      approvals: sendingApprovals(),
       // A screen that says which thread it has open is sent only that thread's
       // live detail.
       supervisor: ask && 'open' in ask ? { ...running, running: lightRunning(running.running, ask.open) } : running,
@@ -918,8 +948,14 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     // a thread's moment runs now (shared/answers.mjs wordWaits), and this one
     // must wait. Both writes are one synchronous step, so no pass reads between.
     const later = Number(runAt) > Date.now() && status !== 'done';
-    const out = await submitReply(supervisor,{product,id,answer,status,permissionMode,now:!!now,later},()=>{
-      const said = store.answerItem(product, id, { answer, status, priority, permissionMode, engine, model, effort, inReplyTo: thread, fromPhone });
+    const withNotes = product && id && !later && status !== 'done'
+      ? replyWithWaitingNotes({ store, product, id, answer, me: teamMe(), nameOf: noteBy, people: teamPeople() })
+      : null;
+    const out = await submitReply(supervisor,{product,id,answer:withNotes?.answer ?? answer,status,permissionMode,now:!!now,later},()=>{
+      const said = withNotes
+        ? store.answerItem(product, id, { answer: withNotes.answer, fromNotes: withNotes.fromNotes, typed: answer as string, status, priority, permissionMode, engine, model, effort, inReplyTo: thread, fromPhone })
+        : store.answerItem(product, id, { answer, status, priority, permissionMode, engine, model, effort, inReplyTo: thread, fromPhone });
+      if (withNotes) store.fileMark(product, id, { do: 'sent', on: withNotes.fromNotes });
       if (later) store.scheduleItem(product, id, Number(runAt));
       return said;
     });
@@ -1539,10 +1575,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     if (r.canceled || !r.filePaths?.length) return { path: null };
     // A chooser hands back whatever its location bar held, dots and all. The
     // folder a path names is what gets stored and what gets checked (F-123).
-    const picked = path.resolve(r.filePaths[0]);
-    const verdict = checkProjectFolder(picked, { home: os.homedir() });
-    if (!verdict.ok) return { path: null, refused: verdict.say };
-    return { path: picked };
+    return folderFromChooser(path.resolve(r.filePaths[0]), { home: os.homedir(), isDir });
   });
 
   // THE PICKER THE APP DRAWS ITSELF, for a tab that has no Mac dialog.
@@ -1799,8 +1832,16 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   // Send a stopped/blocked item back to the queue; the fresh worker's brief
   // carries whatever the founder wrote on the item meanwhile.
-  ipcMain.handle('zero:reopen', (_e, { product, id }: { product: string; id: string }) => {
+  ipcMain.handle('zero:reopen', async (_e, { product, id }: { product: string; id: string }) => {
     if (isAgentRow(id)) return { ok: false };
+    // Sending it back hands over the comments still waiting, as Send would.
+    const waiting = waitingNotes({ store, product, id, me: teamMe(), people: teamPeople() });
+    if (waiting.length) {
+      const mark = { do: 'toagent', on: waiting };
+      store.fileMark(product, id, mark);
+      try { await noteToItsAgent({ store, supervisor, product, id, mark, nameOf: noteBy, people: teamPeople() }); }
+      catch (err) { console.warn(`[notes] sending ${id} back did not hand over its comments: ${(err as Error)?.message ?? err}`); }
+    }
     const out = store.answerItem(product, id, { status: 'open' });
     supervisor.liftBrakeForHer?.();
     supervisor.forgetDeadStarts?.({ product, id });
@@ -1974,6 +2015,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // finder is the recheck, so what gets installed lands on the config and the
   // rest of the app runs on it without a restart.
   const engineSetup = createEngineSetup({
+    setUpHere: engineSetUpHere,
     find: (engine: string) => {
       const finders: Record<string, (() => Promise<{ found: boolean | undefined; path: string | null | undefined; certain: boolean | undefined }>) | undefined> = {
         // `certain` travels with the answer, so a search that established
@@ -2114,7 +2156,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   });
   // PAYING FOR A CLOUD PLAN: Stripe's own pages, in the browser, as other
   // desktop apps do. An app window drew them badly and never offers Apple Pay.
-  const cloudCall = async (name: 'cloudPlan' | 'payForCloud' | 'openCloudBilling', args: Record<string, unknown> = {}) => {
+  const cloudCall = async (name: 'cloudPlan' | 'payForCloud' | 'openCloudBilling' | 'cloudTeamBilling', args: Record<string, unknown> = {}) => {
     try {
       const account = await import('./cloud/account.mts');
       const shell = await shellNow();
@@ -2130,6 +2172,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   });
   ipcMain.handle('zero:cloud-account-pay', (_e, { plan }: { plan?: string } = {}) => cloudCall('payForCloud', { plan }));
   ipcMain.handle('zero:cloud-account-billing', () => cloudCall('openCloudBilling'));
+  ipcMain.handle('zero:cloud-account-team-billing', () => cloudCall('cloudTeamBilling'));
 
   // THE CLOUD SETUP'S SIGN-IN for one account, made in the cloud
   // (main/cloud/logins.mts). The Mac relays the link and the code only.
@@ -2568,7 +2611,11 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   ipcMain.handle('zero:open-artifact', async (_e, { product, src, mode, thread }: { product: string; src?: unknown; mode?: string; thread?: unknown }) => {
     const shell = await shellNow();
     if (typeof src !== 'string' || !src) return { ok: false, error: 'no path' };
-    if (/^https?:/.test(src)) { if (mode !== 'resolve') shell.openExternal(src); return { ok: true, opened: src } }
+    if (/^https?:/.test(src)) {
+      if (mode === 'resolve') return { ok: true, opened: src };
+      const opened = await openInBrowser(src, { shell });
+      return opened.ok ? { ok: true, opened: src } : opened;
+    }
     let found = await resolveArtifact({
       src,
       product,
@@ -2722,6 +2769,23 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     return writeCodeFile({ file: found.path, change: opened.change, product: opened.prod, text, mtime });
   });
 
+  // The live room a document or table opens in, when teammates can open it too.
+  ipcMain.handle('zero:live-room', async (_e, { product, project, name }: { product?: unknown; project?: unknown; name?: unknown }) => {
+    if (!team || typeof name !== 'string') return null;
+    const state = team.state() as { signedIn?: boolean; me?: { id: string; name?: string }; team?: { id: string }; cards?: { project?: string | null }[] };
+    const own = store.listProducts().find((p) => p.slug === product && !p.team?.direct);
+    const key = (s: unknown) => String(s ?? '').trim().toLowerCase();
+    const named = typeof project === 'string' && project ? project : own?.name;
+    const mine = store.listProducts().find((p) => !p.team?.direct && key(p.name) === key(named));
+    const shared = mine
+      ? !!mine.team?.projectId && projectSeenBy(mine).who !== 'private'
+      : (state.cards ?? []).some((c) => key(c.project) === key(named));
+    const room = liveRoomFor({ address: liveAt, state, multiplayer: alphaFeatures(config).multiplayer, project: named, name: name.split('/').pop(), shared, owner: !!own && own === mine });
+    if (!room) return null;
+    const token = await team.liveToken?.();
+    return token ? { ...room, url: `${room.url}?t=${encodeURIComponent(token)}` } : room;
+  });
+
   ipcMain.handle('zero:write-doc', async (_e, { product, src, text, mtime, thread }: { product: string; src?: unknown; text: unknown; mtime?: number; thread?: unknown }) => {
     const prod = store.listProducts().find((p) => p.slug === product) ?? null;
     const found = await resolveArtifact({
@@ -2806,5 +2870,5 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // buttons do, rather than reaching past it into approvals.answer.
   // `push` goes with it so the updater can make the window refetch when a
   // download finishes, without holding the window itself.
-  return { answerApproval, pendingApprovals, push };
+  return { answerApproval, pendingApprovals, cardSentAt, push, usageForPhone };
 }

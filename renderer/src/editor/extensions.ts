@@ -4,7 +4,7 @@
    (## headings, **bold**, - bullets, 1. numbered), task lists ([ ] / [x]),
    underline (Cmd+U — StarterKit omits it), and "type an arrow, get an arrow"
    (-> becomes →, one Backspace undoes it). */
-import { Mark, Node, Extension, mergeAttributes, textInputRule } from '@tiptap/core';
+import { Mark, Node, Extension, mergeAttributes, textInputRule, type AnyExtension } from '@tiptap/core';
 import { StarterKit } from '@tiptap/starter-kit';
 import { Placeholder } from '@tiptap/extension-placeholder';
 import { TaskList } from '@tiptap/extension-task-list';
@@ -156,12 +156,15 @@ export const STARTER_KIT_EXTRAS_OFF = { link: false, underline: false, trailingN
    only two ways that ends are a panel wider than its own words or a row of
    cells running off the edge. Nothing else about the set changes: the same
    markdown, the same input rules, the same file on disk either way. */
-export function buildExtensions(placeholder: string, { tables = true, drawnFrom = null }: { tables?: boolean; drawnFrom?: ((src: string) => string) | null } = {}) {
+export function buildExtensions(placeholder: string, { tables = true, drawnFrom = null, live = null }: { tables?: boolean; drawnFrom?: ((src: string) => string) | null; live?: AnyExtension[] | null } = {}) {
   return [
     StarterKit.configure({
       heading: { levels: [1, 2, 3] },
       ...STARTER_KIT_EXTRAS_OFF,
+      // A shared document has its own undo, which takes back only your own typing.
+      ...(live ? { undoRedo: false } : {}),
     }),
+    ...(live ?? []),
     Underline,
     UnboldHeading,
     Arrows,

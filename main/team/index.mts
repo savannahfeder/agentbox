@@ -120,6 +120,7 @@ export type TeamBackend = Omit<SyncBackend, 'me' | 'personId'> & RoomsBackend & 
   putFileFolder?(teamId: string, row: unknown): Promise<unknown>;
   placeFile?(owner: string, threadId: string, row: unknown): Promise<unknown>;
   addFileVersion?(teamId: string, row: unknown): Promise<unknown>;
+  liveToken?(): Promise<string | null>;
   fileVersions?(teamId: string): Promise<unknown>;
   cancelInvite(teamId: string, email: string): Promise<void>;
   acceptInvite(teamId: string): Promise<unknown>;
@@ -220,6 +221,7 @@ export interface TeamPhone {
   approvals?: PhoneInboxOptions['approvalsOf'];
   readSettings?: PhoneInboxOptions['readSettings'];
   pins?: PhoneInboxOptions['pinsOf'];
+  onMac?: PhoneInboxOptions['onMacOf'];
   repeats?: PhoneInboxOptions['repeatsOf'];
   teammates?: PhoneInboxOptions['teammatesOf'];
   version?: string;
@@ -262,6 +264,8 @@ export interface TeamServiceOptions {
   /** Where a file's link opens; the phone site when undefined, no links when null. */
   shareSite?: string | null;
   rooms?: TeamRoomsSetup | null;
+  /** Settings › Alpha features › Multiplayer. Off, no thread of this person's is shared. */
+  sharing?: () => boolean;
 }
 
 /** A file handed to a task; one with a `rel` is a file the words name. */
@@ -295,7 +299,7 @@ interface ThreadShare {
   refreshComments(): Promise<void>;
 }
 const createThreadShare = createThreadShareJs as unknown as (args: {
-  backend: TeamBackend; me: string; myName: () => string | null; root: string; listCards: () => SyncCard[];
+  backend: TeamBackend; me: string; myName: () => string | null; nameOf: (personId: string) => string | null; root: string; listCards: () => SyncCard[];
   listThreads: () => Map<string, { item: PhoneItem; product: TeamProduct }>;
   historyOf: (slug: string, id: string) => (TeamHistoryLine | null)[];
   listProducts: () => TeamProduct[]; disk: TeamDisk; accountRoot: string; storeRoot?: string;
@@ -338,6 +342,7 @@ export function createTeamService({
   runningIds = () => [],
   // This person's AI teammates, which the team sees on its board.
   ownMates = () => [],
+  sharing = () => true,
 }: TeamServiceOptions) {
   // The phone site's address, only an https one, and its code for Settings.
   const site = typeof phone?.site === 'string' && /^https:\/\/[^\s/]+(\/[^\s]*)?$/.test(phone.site) ? phone.site : null;
@@ -653,6 +658,7 @@ export function createTeamService({
       approvalsOf: () => phone.approvals?.() ?? [],
       readSettings: phone.readSettings ?? null,
       pinsOf: () => phone.pins?.() ?? {},
+      onMacOf: () => phone.onMac?.() ?? {},
       repeatsOf: phone.repeats ?? null,
       teammatesOf: phone.teammates ?? null,
       version: phone.version ?? '',
@@ -722,14 +728,17 @@ export function createTeamService({
     void publishConnections();
     if (state.settling) set({ settling: false });
     phoneInbox = makePhoneInbox();
-    const listCards = () => [
+    // Off, the window shows no team and no Team / Private choice, so nothing
+    // goes up, and what was up comes down as a private thread's card does.
+    const listCards = () => (!sharing() ? [] : [
       ...cardsFor({ products: products(), readItems: (p) => disk.readWorkItems(p.dir), since: state.me ? kept().getSince(state.me.id) : null, me: state.me?.id ?? null, running: runningIds() }),
       ...(ownMates() ?? []).map((t) => mateCard(t, { now: t.now ?? null, running: !!t.running, at: t.updatedAt ?? t.createdAt ?? 0 })),
-    ];
+    ]);
     threadShare = createThreadShare({
       backend,
       me: me.id,
       myName: () => state.me?.name ?? null,
+      nameOf: (personId: string) => state.people.find((p) => p.id === personId)?.name ?? null,
       root: path.join(accountRoot, '_team-threads', me.id),
       listCards,
       listThreads: () => {
@@ -1230,6 +1239,11 @@ export function createTeamService({
         putFolder: (row: unknown) => backend!.putFileFolder!(teamId, row),
         place: (owner: string, threadId: string, row: unknown) => backend!.placeFile!(owner, threadId, row),
       };
+    },
+
+    /** What the live relay is shown to let this person into their team's rooms. Null signed out. */
+    async liveToken(): Promise<string | null> {
+      return (await backend?.liveToken?.().catch(() => null)) ?? null;
     },
 
     /** The team's version line (main/version-line.mjs). Null with no team to reach. */

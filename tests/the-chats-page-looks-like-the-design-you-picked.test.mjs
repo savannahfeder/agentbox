@@ -53,7 +53,7 @@ describe('the Chats list and a teammate\'s details', () => {
 
   it('picks where it works from a short menu, not a row of buttons', () => {
     const details = page.slice(page.indexOf('function Details('), page.indexOf('\nfunction ', page.indexOf('function Details(') + 10));
-    expect(details).toMatch(/<dt>Works in<\/dt>\s*<dd>\{real\.length > 1\s*\? <PickOne /);
+    expect(details).toMatch(/<dt>Works in<\/dt>\s*<dd>\{real\.length > 1 \|\| onNewProject\s*\? <PickOne /);
     expect(page).toMatch(/function PickOne\(/);
   });
 
