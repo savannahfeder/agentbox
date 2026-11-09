@@ -1660,6 +1660,27 @@ export const api = {
     return zero.cloudKey(p);
   },
 
+  /** The GitHub token this computer's ships push with; the threads that waited on it ship again. */
+  async gitHubSignIn(p: { token: string }): Promise<{ ok: boolean; again?: string[]; error?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.gitHubSignIn) return { ok: false, error: RESTART_NOTE };
+    return zero.gitHubSignIn(p);
+  },
+
+  /** Starts GitHub's own sign-in for this computer's git; answers with its code and link. */
+  async gitHubBrowserSignIn(): Promise<{ ok: boolean; code?: string; url?: string; error?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.gitHubBrowserSignIn) return { ok: false, error: RESTART_NOTE };
+    return zero.gitHubBrowserSignIn();
+  },
+
+  /** What the person did with a sign-in link an agent on this thread is waiting on. */
+  async signInAnswer(p: { product: string; id: string; ask: string; said: 'signed-in' | 'skipped' | 'landed'; url?: string }): Promise<{ ok: boolean; error?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.signInAnswer) return { ok: false, error: RESTART_NOTE };
+    return zero.signInAnswer(p);
+  },
+
   /** Signing in to Agentbox Cloud itself, on the app's sign-in page: Google, email, a new account and its link again, or a password reset. */
   async cloudAccountSignIn(p: { method: 'google' | 'email' | 'sign-up' | 'resend' | 'agree' | 'reset' | 'reset-wait' | 'new-password'; email?: string; password?: string; name?: string; acceptTerms?: boolean }): Promise<{ ok: boolean; confirm?: boolean; needsTerms?: boolean; sent?: boolean; opened?: boolean; error?: string; cancelled?: boolean }> {
     const zero = window.zero as any;

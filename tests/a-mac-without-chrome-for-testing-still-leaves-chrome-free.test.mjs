@@ -14,10 +14,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { canDrive, findChrome, headlessShells, launchChrome } from '../.claude/skills/verify-agentbox/scripts/cdp.mjs';
 import { isOurChrome } from '../scripts/lib/chrome-guard.mjs';
+import { MAC_CHROME as MAC } from '../shared/hidden-browser.mjs';
 
-const MAC = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const SHELL = 'chrome-headless-shell';
 const roots = [];
+// Before the refusal existed, a red run of these tests started a real headless Chrome that outlived it.
+const noBrowser = () => { throw new Error('a browser was started'); };
 afterAll(() => { for (const r of roots) fs.rmSync(r, { recursive: true, force: true }); });
 
 function cache(layout) {
@@ -76,14 +78,14 @@ describe('starting a hidden drive', () => {
   it('refuses the person\'s own Chrome on a Mac and says what to install', async () => {
     const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'refused-'));
     roots.push(profile);
-    await expect(launchChrome({ bin: MAC, profile, platform: 'darwin' }))
+    await expect(launchChrome({ bin: MAC, profile, platform: 'darwin', start: noBrowser }))
       .rejects.toThrow(/npx playwright install chromium-headless-shell/);
   });
 
   it('does not refuse a test browser on a Mac', async () => {
     const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'refused-'));
     roots.push(profile);
-    await expect(launchChrome({ bin: '/nowhere/chrome-headless-shell', profile, platform: 'darwin' }))
+    await expect(launchChrome({ bin: '/nowhere/chrome-headless-shell', profile, platform: 'darwin', start: noBrowser }))
       .rejects.toThrow(/No browser at \/nowhere/);
   });
 });

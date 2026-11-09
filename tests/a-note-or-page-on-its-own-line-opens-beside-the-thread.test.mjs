@@ -29,6 +29,13 @@ describe('which file an answer opens beside the thread', () => {
     expect(besideDocument('Those are approved, see designs/w-1/options.html for the record.')).toBeNull();
   });
 
+  // w-375c72d32e (2026-11-08): a PDF draws nothing inline, only its name, so a
+  // power tester saw the page open beside on one thread and the PDF not on the next.
+  it('opens a PDF on its own line too, and leaves one in a sentence', () => {
+    expect(besideDocument('One page.\n\nreports/q3-summary.pdf')).toBe('reports/q3-summary.pdf');
+    expect(besideDocument('The deck is in reports/q3.pdf.')).toBeNull();
+  });
+
   it('never opens a picture, a code file or our own bookkeeping', () => {
     expect(besideDocument('designs/w-1/the-row.png')).toBeNull();
     expect(besideDocument('renderer/src/App.tsx')).toBeNull();

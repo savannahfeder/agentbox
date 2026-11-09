@@ -26,7 +26,15 @@ export interface TraceLine {
   // What the agent said, what it ran, or the reason it stopped.
   kind: 'say' | 'tool' | 'stopped';
   text: string;
+  // A tool line's call id and what came back from it, when the log kept them.
+  id?: string;
+  output?: string;
+  outputLines?: number;
+  failed?: boolean;
 }
+
+const CALL_ID = /^#id (\S+)$/;
+const OUTPUT_HEAD = /^#out (\S+) (\d+)( error)?$/;
 
 const STAMPED = /^(\d\d):(\d\d):(\d\d) {2}(.*)$/;
 const EXIT = /^# exited \((-?\d+)\)/;
@@ -108,9 +116,33 @@ export function traceLines(session: TraceSession): TraceLine[] {
   const failure = errorResultText(session?.text ?? '');
   const failureLine = failure ? said(failure.split('\n')[0]) : '';
 
+  // The tool line an `#out` block is being read into.
+  let outputOf: TraceLine | null = null;
+  let outputRead: string[] = [];
+
   for (const raw of (session?.text ?? '').split('\n')) {
     const stamped = STAMPED.exec(raw);
     if (!stamped) {
+      if (raw.startsWith('#| ')) {
+        if (outputOf) { outputRead.push(raw.slice(3)); outputOf.output = outputRead.join('\n'); }
+        continue;
+      }
+      const head = OUTPUT_HEAD.exec(raw);
+      if (head) {
+        outputOf = null;
+        outputRead = [];
+        for (let i = lines.length - 1; i >= 0; i -= 1) {
+          if (lines[i].kind === 'tool' && lines[i].id === head[1]) { outputOf = lines[i]; break; }
+        }
+        if (outputOf) Object.assign(outputOf, { output: '', outputLines: Number(head[2]), failed: !!head[3] });
+        continue;
+      }
+      const id = CALL_ID.exec(raw);
+      if (id) {
+        const call = lines[lines.length - 1];
+        if (call?.kind === 'tool' && !call.id) call.id = id[1];
+        continue;
+      }
       if (EXIT.test(raw)) { exited = true; inResult = false; continue; }
       if (raw.startsWith('#')) continue;
       if (inResult || exited) continue;
@@ -127,6 +159,7 @@ export function traceLines(session: TraceSession): TraceLine[] {
     }
 
     blanks = 0;
+    outputOf = null;
     const body = stamped[4];
     const at = momentOf(session.startedAt, Number(stamped[1]), Number(stamped[2]), Number(stamped[3]));
     const time = hers(session.startedAt, Number(stamped[1]), Number(stamped[2]), Number(stamped[3]));

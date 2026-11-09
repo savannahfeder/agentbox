@@ -54,6 +54,7 @@ describe('the top-right corner', () => {
   });
 
   it('keeps "beside the chat" as its own button, just left of the cross', () => {
-    expect(header).toMatch(/onBeside && version && <FocusControl style="corners-bare" focused onClick=\{\(\) => onBeside\(version\.path\)\} \/>/);
+    expect(header).toMatch(/onBeside && family && <FocusControl style="corners-bare" focused onClick=\{\(\) => onBeside\([^\n]*\)\} \/>/);
+    expect(header.lastIndexOf('<FocusControl')).toBeLessThan(header.indexOf('aria-label="Close"'));
   });
 });

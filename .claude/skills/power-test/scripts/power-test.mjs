@@ -37,7 +37,7 @@ import { fileURLToPath } from 'node:url';
 import { readPeople, pickPeople, chaosPlan, worldAt, nextRound, restartAgain, roundOutcome, coverage, testerPrompt, projectNamedIn } from './plan.mjs';
 import { createWatcher, freeMemoryMb, readAllLines, keepEvidence, sleepTargets } from './watch.mjs';
 import { writeReport } from './report.mjs';
-import { seedArtifacts } from './artifacts.mjs';
+import { makeFilm, seedArtifacts } from './artifacts.mjs';
 import { readDiary } from './diary.mjs';
 import { testerLogin, codexCanSandbox, codexTesterArgv, codexTesterEnv, lastMessage } from './codex-tester.mjs';
 
@@ -172,7 +172,12 @@ function seedHistory(state, person, count) {
     else if (r > 2) lines.push({ id, ts: at + 20 * MIN, source: 'founder', patch: { status: 'done' } });
   }
   const first = slugs[0];
-  const withFiles = seedArtifacts({ accountRoot: state.accountRoot, slug: first, picture: path.join(REPO, 'docs', 'readme', 'priority-palette.png'), now });
+  const withFiles = seedArtifacts({
+    accountRoot: state.accountRoot, slug: first, now,
+    picture: path.join(REPO, 'docs', 'readme', 'priority-palette.png'),
+    picture2: path.join(REPO, 'docs', 'readme', 'inbox-urgent.png'),
+    film: makeFilm(path.join(state.accountRoot, 'demo-film.mp4')),
+  });
   for (const l of withFiles) ids.add(l.id);
   byProject.get(first).push(...withFiles);
   for (const [slug, lines] of byProject) {

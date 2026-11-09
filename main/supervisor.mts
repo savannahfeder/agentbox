@@ -176,7 +176,7 @@ import { catchUpRow, catchUpResult } from './catch-up.mts';
 import { isAuto, asksWho, routeCandidates, routePrompt, readRoute, routedPatch, orPrimary, NOBODY_WHY } from '../shared/auto-route.mjs';
 import { LEVELS, latestMessage, sortMessage, wantsPriority } from './message-priority.mts';
 import { NAME, Name, envName, nameSlug, isOurSlug } from '../shared/product-name.mjs';
-import { signInFiles, signInStamp } from './sign-in-files.mts';
+import { signInFiles, signInStamp, claudeKeychainService, keychainStamp } from './sign-in-files.mts';
 import { runsOn } from './runs-on.mts';
 import { MemoryGateServer, defaultSocketPath as memoryGateSocketPath, readMacPressure } from './memory-gate-server.mts';
 import { startDecision, readMacPressureNow, SETTLE_MS, STALE_MS } from './start-hold.mts';
@@ -200,6 +200,9 @@ import type { RouteDecision, RouteMate } from '../shared/auto-route.mjs';
 import type { LatestMessage } from './message-priority.mts';
 import type { ActiveTool } from './agent-activity.mts';
 import type { ShipItem, ShipProduct } from './ship-queue.mts';
+import type { GitHubPushSignIn } from './github-push-sign-in.mts';
+import { SignInReturns } from './sign-in-returns.mts';
+import { openSignIn } from '../shared/sign-in-ask.mjs';
 import type { CloudKit } from './cloud/kit.mts';
 import type { CatchUpCard } from './catch-up.mts';
 import type { QueuedLine, ReplyPayload } from './live-replies.mts';
@@ -753,6 +756,7 @@ export interface SupervisorStore {
   closedBeforeItShipped(slug: string, id: string, note: string): unknown;
   shipped(slug: string, id: string, result: { sha: string | null; labels: string[] }): unknown;
   shipFailed(slug: string, id: string, result: { note: string; labels: string[] }): unknown;
+  answerSignIn(slug: string, id: string, answer: { id: unknown; said: unknown; url?: unknown }, opts?: { source?: 'founder' | 'system' }): unknown;
   fileMainFix(slug: string, fields: { title: string; body: string; problem?: string; kind?: string; priority?: number; labels?: string[] }): { id: string };
   repeats?: {
     list?(dir: string, now?: number): RepeatRule[] | null;
@@ -1263,6 +1267,9 @@ export class Supervisor {
   declare userDir: string;
   declare onShipped: () => void;
   declare shipQueue: ShipQueue;
+  // Set by each door (main.mts, serve.mts), which knows how it can keep a sign-in.
+  declare gitHubSignIn: GitHubPushSignIn | null;
+  declare signInReturns: SignInReturns;
   declare mainTests: MainTests;
   declare cloudServerWatch: Pick<CloudServerWatch, 'down' | 'up'>;
   declare sessions: Map<string, WorkerSession>;
@@ -1487,6 +1494,11 @@ export class Supervisor {
       afterShip: (shipped) => { this.onShipped(); this.watchMainsTests(shipped); this.reclaimShippedFolder(shipped); },
       memoryGate: () => this._memoryGate?.gate ?? null,
       shipScore: (item) => this.memoryGateScore(item.product, item.id) ?? 0,
+      pushSignIn: () => this.gitHubSignIn?.forPush() ?? null,
+    });
+    this.gitHubSignIn = null;
+    this.signInReturns = new SignInReturns({
+      answer: (r, landed) => { this.store.answerSignIn(r.product, r.id, { id: r.ask, said: 'landed', url: landed }, { source: 'system' }); this.onChange?.(); },
     });
     // AND THEN SOMEBODY WATCHES THE RUN THAT SHIP STARTED. The whole suite runs
     // on GitHub for every push and takes about five minutes, which is after the
@@ -1882,7 +1894,7 @@ export class Supervisor {
     let lifted = false;
     for (const [key, trouble] of Object.entries(this._profileTrouble ?? {})) {
       if (trouble?.cause !== 'signed-out') continue;
-      const stamp = signInStamp(this._signInFilesFor(key));
+      const stamp = this._signInMoment(key);
       if (!stamp || stamp <= (trouble.stamp ?? trouble.at ?? 0)) continue;
       trouble.stamp = stamp;
       if (this._profileCooldown) this._profileCooldown[key] = 0;
@@ -1897,6 +1909,26 @@ export class Supervisor {
     }
     if (lifted) this._saveState();
     return lifted;
+  }
+
+  /**
+   * When one account last signed in, as far as can be seen. A Claude login on a
+   * Mac lives in the Keychain, and `.claude.json` is rewritten by every Claude
+   * session on it, so while the Keychain has an entry that file says nothing.
+   */
+  _signInMoment(key: string) {
+    const files = this._signInFilesFor(key);
+    if (key.startsWith('codex:')) return signInStamp(files);
+    const folder = key === 'default' ? null : key;
+    const home = this.config.home || os.homedir();
+    // The default login's entry is the real home's, not a stand-in home's.
+    const keychain = folder || home === os.homedir() ? this._keychainStamp(claudeKeychainService(folder)) : null;
+    if (keychain == null) return signInStamp(files);
+    return Math.max(keychain, signInStamp(files.filter((f) => path.basename(f) !== '.claude.json')));
+  }
+
+  _keychainStamp(service: string) {
+    return keychainStamp(service);
   }
 
   /** Which files one account's login writes, by the key its trouble is kept under. */
@@ -2036,6 +2068,7 @@ export class Supervisor {
     for (const session of this.sessions.values()) if (!this._letGoOfHostedRun(session)) this._kill(session, session.cloud && session.engine !== 'codex' ? 'SIGHUP' : undefined);
     this._closeCodex(`${Name} is quitting`);
     this.stopMemoryGate();
+    this.signInReturns?.stopAll();
     clearInterval(this._leftoverTimer);
     clearInterval(this._memoryLogTimer);
   }
@@ -5746,7 +5779,7 @@ export class Supervisor {
     // What the login files looked like when it was found out, so that
     // `_noticeSignIns` can tell a login landing afterwards from one before.
     if (cause === 'signed-out') {
-      const stamp = signInStamp(this._signInFilesFor(profile));
+      const stamp = this._signInMoment(profile);
       this._profileTrouble[profile].stamp = Math.max(stamp, had?.stamp ?? 0);
     }
     // When the limit says it resets, so `_forgetResetLimits` can let it go then.
@@ -6190,7 +6223,7 @@ export class Supervisor {
   // now, this month's use from the runs' own measurements, the accounts she
   // added for the cloud, and any sign-in going on. The usage file is read at
   // most every 30 seconds; the snapshot asks on every change.
-  cloudStatus() {
+  cloudStatus(handed?: WorkItem[]) {
     const config = readCloudConfig(process.env, this.config.home);
     const setUp = !!config;
     // Offered to a Mac whose app carries Agentbox Cloud's settings, until
@@ -6218,7 +6251,7 @@ export class Supervisor {
       // The Agentbox Cloud plan the server last said ('none' is no plan).
       plan: this.cloudPlan ?? null,
       // Runs on this Mac it could take now (`_movableToCloud`).
-      movable: setUp && this.sessions.size && this._cloudUsable('claude') ? this._movableIds(this.store.listItems(now)) : [],
+      movable: setUp && this.sessions.size && this._cloudUsable('claude') ? this._movableIds(handed ?? this.store.listItems(now)) : [],
     };
   }
 
@@ -6790,6 +6823,15 @@ export class Supervisor {
       // A quit or an update cut it off; the worker did not fail.
       failed: !!session.exitFailed && !session.cutOffByQuit,
     }, { file: this.runLedger ?? runLedgerPath() });
+  }
+
+  // Nobody is waiting on a sign-in once the run that asked has ended, so its card goes.
+  _closeSignInItWaitedOn(item: WorkItem) {
+    try {
+      const now = this.store.readItem(item.product, item.id) ?? item;
+      const ask = openSignIn(now);
+      if (ask) this.store.modules.workItemsDisk.updateWorkItem(this.store.productDir(item.product), item.id, { signIn: { ...ask, done: true } }, { source: 'system' });
+    } catch (e) { console.warn('zero: could not close a sign-in its run left open:', (e as Error).message); }
   }
 
   _noteHowTheRunStarted(item: WorkItem, session: RunState) {
@@ -8125,11 +8167,12 @@ export class Supervisor {
     return ids;
   }
 
-  status() {
+  /** `handed`: the threads a caller already read, so this reads none of its own. */
+  status(handed?: WorkItem[]) {
     // One read of the threads for the whole answer: this runs for every
     // request the window makes.
     const readAt = Date.now();
-    let threads: WorkItem[] | null = null;
+    let threads: WorkItem[] | null = handed ?? null;
     const allThreads = () => (threads ??= this.store.listItems(readAt));
     // Stalled: the founder's answer is marked delivered, but nobody is on the
     // item and it never moved. A worker ran and exited without finishing (a
@@ -8227,6 +8270,9 @@ export class Supervisor {
       for (const id of this._recovering ?? []) if (heldBySweep(id) && !this._comingHome?.has(id) && !queued.includes(id)) queued.push(id);
     } catch {}
     if (this.paused) queued = [];
+    // Queued rows whose run is being set up or was asked for by name (Try
+    // again): no session yet, but the lists count them as In progress.
+    const starting = queued.filter((id) => settingUp(id) || this._resumeQueue.has(id));
     let signInNeeded: Record<string, string> = {};
     try {
       const productBySlug = new Map((this.store.listProducts?.() ?? []).map((p) => [p.slug, p]));
@@ -8334,6 +8380,7 @@ export class Supervisor {
       })),
       stalled,
       queued,
+      starting,
       // Left out of `running`, but their claim is ours, not an agent elsewhere
       // (renderer/src/live-line.ts).
       remoteHeld: [...this.sessions.values()].filter((s) => s.remoteIdle).map((s) => s.itemId),
@@ -8761,6 +8808,12 @@ export class Supervisor {
     this.bringBackWhatNeverShipped(items);
     // A task its agent marked ready goes out, one at a time, beside the tick.
     try { this.shipQueue.tick(items, this.store.listProducts()); } catch (e) { console.warn('zero: the ship queue:', (e as Error).message); }
+    try {
+      this.signInReturns.sync(items.flatMap((i) => {
+        const ask = openSignIn(i);
+        return ask && this.sessions.get(i.id)?.cloud ? [{ product: i.product, id: i.id, ask: ask.id, url: ask.url }] : [];
+      }));
+    } catch (e) { console.warn('zero: listening for a sign-in to come back:', (e as Error).message); }
 
     // A session that died without exiting still holds its row. Stopping it
     // here lets the passes below put a fresh worker on the row.
@@ -11902,6 +11955,7 @@ export class Supervisor {
       this._noteCloudOutcome(session, code, signal);
       this._leaveKitForThePhone(item, session);
       this._noteHowTheRunStarted(item, session);
+      this._closeSignInItWaitedOn(item);
       onLine(`session exited (${code})`);
       if (this._noteCloudHandBack(item, session, cwd)) onLine('the cloud handed this request back to this computer; the next one goes to the cloud');
       else if (this._cloudKeptOnMac(item, session, code, signal)) onLine('the cloud could not run this thread, so this request runs on this computer');
@@ -13297,6 +13351,9 @@ export class Supervisor {
     // A base address and token are left alone: a gateway is a choice.
     rules.env = { ...(rules.env ?? {}), ...NO_METERED_KEY.env };
     rules.apiKeyHelper = NO_METERED_KEY.apiKeyHelper;
+    // Blank, Claude Code tells the agent to add no co-author or "Generated with
+    // Claude Code" line; unset, it tells it to add both, over any CLAUDE.md.
+    rules.attribution = { commit: '', pr: '' };
     const gateHooks = this.memoryGateHooks();
     if (gateHooks) rules.hooks = { ...(rules.hooks ?? {}), ...gateHooks };
     // Beside the MCP config, and written the same way: a real file on disk,
@@ -13389,7 +13446,8 @@ export class Supervisor {
     const lines = ['## Connected tools', 'Each tool the owner can connect, as their Connections page shows it. Say it the same way, and never tell the owner to connect a tool that is connected.'];
     for (const t of tools.filter((x) => x.state !== 'not_connected')) lines.push(connectionLine(t, now));
     const missing = tools.filter((t) => t.state === 'not_connected');
-    if (missing.length) lines.push(`Not connected: ${missing.map((e) => e.name).join(', ')}. If the work needs one of them, or another tool, do not look for another way in. Say so in your message and give the owner the link: ${missing.map((e) => `[Connect ${e.name}](agentbox://connections/${e.id})`).join(' ')}, or [Connections](agentbox://connections) for anything else.`);
+    if (missing.length) lines.push(`Not connected: ${missing.map((e) => e.name).join(', ')}. If the work needs one of them as a tool, say so in your message and give the owner the link: ${missing.map((e) => `[Connect ${e.name}](agentbox://connections/${e.id})`).join(' ')}, or [Connections](agentbox://connections) for anything else.`);
+    lines.push('A command-line tool the work runs (gh, vercel, supabase and the like), or an MCP server of the project\'s own, signs in with its own login: start it and hand its link to the sign_in tool, which puts it in front of the owner while you wait. Look for no other way in.');
     let copies: ConnectionCopy[] = [];
     try { copies = this.connections.copiesNow?.() ?? []; } catch { /* told as none */ }
     if (copies.length || tools.some((t) => t.state !== 'not_connected')) lines.push('', filesComeFirst(copies, now));

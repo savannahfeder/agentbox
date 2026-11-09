@@ -39,7 +39,7 @@ import { SEND } from '../this-keyboard';
 import './artifact-view.css';
 
 /** `steps`: the paths the arrows step through, in order, when the press came from a turn of the thread. */
-export interface ArtifactOpen { path?: string; file?: string; note?: string; at?: number; steps?: string[] }
+export interface ArtifactOpen { path?: string; file?: string; note?: string; at?: number; steps?: string[]; /** Where a film beside the chat had got to, in seconds. */ time?: number }
 
 type Editing = { fam: string; text: string; draft?: string; folder: string | null; base: ReturnType<typeof threadFiles>[number]['versions'][number] };
 
@@ -103,7 +103,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     const path = open.path?.replace(/^\.\//, '') ?? (noted && !/[#@]\d+$/.test(noted) ? noted : undefined);
     return path && !versionForPath(threadFiles(said), path) && viewKind(path) ? [...said, { path, by: null, at: 0 }] : said;
   }, [lines, open.path, open.note, marks.notes]);
-  const families = useMemo(() => threadFiles(files, numbers), [files, numbers]);
+  const families = useMemo(() => threadFiles(files, numbers, { keep: open.path }), [files, numbers, open.path]);
   const flat = useMemo(() => families.flatMap((f, fi) => f.versions.map((v, vi) => ({ fi, vi, v }))), [families]);
   const handedSteps = useMemo(() => stepsThrough(families, open.steps), [families, open.steps]);
   const latestSteps = useMemo(() => stepsThrough(families, latestPicturesSaid(lines)), [families, lines]);
@@ -159,6 +159,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     setAt(hit);
     const note = open.note ? marks.notes.find((n) => n.id === open.note) : null;
     if (note) { setActiveId(note.id); if (note.resolved) setShowSettled(true); setGo({ place: note.place, at: Date.now() }); }
+    else if (open.time) setGo({ place: { kind: 'time', s: open.time }, at: Date.now() });
   }, [flat.length, open.at, open.note, open.file, open.path, !!marks.notes.find((n) => n.id === open.note)]);
 
   const family = at ? families[at.fi] : undefined;
@@ -725,7 +726,8 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
             <ShareLink icon product={product} thread={(thread ?? shareThread)!} src={version.path} signedIn={!!me} />
           )}
           {onOutside && version && foundNow === 'open' && <button type="button" className="doc-mark" aria-label="Open outside" title="Open outside" onClick={() => onOutside(version.path)}><ArtifactControlGlyph kind="open" /></button>}
-          {onBeside && version && <FocusControl style="corners-bare" focused onClick={() => onBeside(version.path)} />}
+          {/* The side pane has no versions to step, so it shows the newest. */}
+          {onBeside && family && <FocusControl style="corners-bare" focused onClick={() => onBeside(family.versions[family.versions.length - 1].path)} />}
           <button type="button" className="doc-mark av-close" aria-label="Close" title="Close (esc)" onClick={leave}><ArtifactControlGlyph kind="close" /></button>
         </span>
       </header>
