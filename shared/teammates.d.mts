@@ -65,6 +65,7 @@ export interface TeammateLike {
   primary?: boolean;
   endedAt?: number | null;
   handoffsNeedYes?: boolean;
+  firstRun?: string;
   works?: unknown;
   served?: string;
   duties?: DutyLike[];
@@ -131,7 +132,8 @@ export type WakeTrigger =
   | (TriggerBase & { kind: 'schedule'; key: string; label: string })
   | (TriggerBase & { kind: 'duty'; duty: string; what: string; tell?: string; key: string })
   | (TriggerBase & { kind: 'pass'; fromName?: string; title?: string; details?: string })
-  | (TriggerBase & { kind: 'message'; text?: string; opening?: 'start' | 'setup' });
+  | (TriggerBase & { kind: 'message'; text?: string; opening?: 'start' | 'setup' })
+  | (TriggerBase & { kind: 'first'; key: string });
 interface ActionBase { teammate: string; msg?: string; trigger?: WakeTrigger }
 export type WakeAction =
   | (ActionBase & { type: 'run'; id: string; trigger: WakeTrigger; title: string; start: 'now' | 'later' })
@@ -145,7 +147,9 @@ export type WakeAction =
   | (ActionBase & { type: 'unread'; duty: string; what: string })
   | (ActionBase & { type: 'hops'; msg: string; from: string })
   | (ActionBase & { type: 'replied'; item: string; product: string; labels: string[]; text: string; say: boolean })
-  | (ActionBase & { type: 'say'; item: string; text: string });
+  | (ActionBase & { type: 'say'; item: string; text: string })
+  | (ActionBase & { type: 'firstServed' })
+  | (ActionBase & { type: 'reopen'; item: string; product: string; labels: string[] });
 export interface RunLine {
   teammate: string;
   item: string;
@@ -177,6 +181,7 @@ export function dutyStart(d: DutyLike, now?: number): string;
 export function dutyOf(item: { labels?: string[] } | null | undefined): string | null;
 export function letterFor(name: string | null | undefined, teammates?: { letter?: string | null }[]): string;
 export function asksSomething(text: string | null | undefined): boolean;
+export function leavesSomethingOpen(text: string | null | undefined): boolean;
 export function replyMessageId(runId: string): string;
 export function projectNamedIn(text: string | null | undefined, products?: { slug: string; name?: string | null }[]): string | null;
 export function isQueued(item: RunItem | null | undefined): boolean;
