@@ -1845,6 +1845,8 @@ declare global {
       bootInfo?(): Promise<{ reloaded: boolean; builtAt: number; recovered?: string | null; revived?: string | null; screenDetail?: string }>;
       onJoinRoom?(fn: () => void): () => void;
       takeJoin?(): Promise<string | null>;
+      takeThreadLink?(): Promise<{ owner: string; id: string } | null>;
+      onThreadLink?(fn: () => void): () => void;
       // Keeping Agentbox current (main/updater.mts). Look again now, and restart
       // onto the version that already downloaded itself.
       updateCheck(): Promise<UpdateState>;

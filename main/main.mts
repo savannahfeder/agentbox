@@ -74,7 +74,7 @@ import { hotWindowVerdict, storeHasWork } from './dev-window.mjs';
 import { writeHeldThenReload } from './write-before-reload.mts';
 import { IS_SHE_TYPING_IN_THE_PAGE, theAppKeepsThisInput, theAppKeepsThisLetterInAPage } from '../shared/artifact-keys.mts';
 import { NAME, Name, WAS } from '../shared/product-name.mjs';
-import { JOIN_SCHEME, ourLink, tokenFromLink } from '../shared/room-links.mjs';
+import { JOIN_SCHEME, ourLink, threadFromAppLink, tokenFromLink } from '../shared/room-links.mjs';
 import { getMic } from './mic.mts';
 import { openInBrowser } from './open-in-browser.mts';
 import type { IpcConfig } from './ipc.mts';
@@ -280,7 +280,15 @@ function showWindow() {
   if (window.isMinimized()) window.restore();
   window.focus();
 }
+// And a thread's link (agentbox://t/<owner>/<thread>), which its web page opens: held the same way.
+let pendingThread = threadFromAppLink(process.argv.find((a) => a.startsWith(`${JOIN_SCHEME}://`)) ?? '');
 function openJoinLink(url: string) {
+  const thread = threadFromAppLink(url);
+  if (thread) {
+    pendingThread = thread;
+    if (window && !window.isDestroyed()) { window.webContents.send('zero:thread-link'); showWindow(); }
+    return;
+  }
   const token = tokenFromLink(url);
   if (!token) return;
   pendingJoin = token;
@@ -1183,6 +1191,7 @@ async function createWindow() {
     },
   });
   ipcMain.handle('zero:take-join', () => { const token = pendingJoin; pendingJoin = null; return token; });
+  ipcMain.handle('zero:take-thread-link', () => { const thread = pendingThread; pendingThread = null; return thread; });
   // External links from markdown open in the real browser; local artifacts
   // (a demo page, a screenshot a worker saved) open in their default app, so
   // "see it working" is one click from the message.

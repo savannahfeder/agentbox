@@ -4444,6 +4444,19 @@ export default function App() {
   // She opened the lid. The app put the agents back on their work while she was
   // away from the screen, and this is the whole of what it says about it.
   useEffect(() => window.zero?.onRecovered?.((r) => { if (r?.text) showToast(r.text); }), [showToast]);
+  // A THREAD'S LINK opened the app (its web page sends agentbox://t/<owner>/<thread>):
+  // opened once the team has loaded, so a teammate's card is there to find.
+  const [threadWanted, setThreadWanted] = useState<{ owner: string; id: string } | null>(null);
+  useEffect(() => {
+    const take = () => { void window.zero?.takeThreadLink?.().then((t) => { if (t) setThreadWanted(t); }).catch(() => {}); };
+    take();
+    return window.zero?.onThreadLink?.(take);
+  }, []);
+  useEffect(() => {
+    if (!threadWanted || !snap || !team?.state.signedIn || (threadWanted.owner !== team.me && !weekCards.length)) return;
+    setThreadWanted(null);
+    openContinuedFrom(threadWanted.owner, threadWanted.id);
+  }, [threadWanted, snap, team, weekCards, openContinuedFrom]);
   // A ROOM INVITE LINK (Rooms, alpha): the room is shown first, and joined on a yes.
   const joinWaiting = useRef<string | null>(null);
   const [joinTick, setJoinTick] = useState(0);
