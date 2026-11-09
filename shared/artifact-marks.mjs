@@ -35,7 +35,10 @@ function cleanPlace(place) {
     }
     case 'quote': {
       const text = typeof place.text === 'string' ? place.text.trim().slice(0, MAX_QUOTE_CHARS) : '';
-      return text ? { kind: 'quote', text } : undefined;
+      if (!text) return undefined;
+      const row = place.cell?.row;
+      const column = typeof place.cell?.column === 'string' ? place.cell.column.trim().slice(0, 200) : '';
+      return Number.isInteger(row) && row >= 1 && column ? { kind: 'quote', text, cell: { row, column } } : { kind: 'quote', text };
     }
     case 'whole': return { kind: 'whole' };
     default: return undefined;
@@ -185,7 +188,7 @@ export function placeWords(note) {
     case 'pin': return `Pin ${note.pin ?? 1}`;
     case 'time': return unit(place.x) ? `Pin ${note.pin ?? 1} at ${clock(place.s)}` : clock(place.s);
     case 'page': return unit(place.x) ? `Pin ${note.pin ?? 1} on ${place.word ?? 'Page'} ${place.n}` : `${place.word ?? 'Page'} ${place.n}`;
-    case 'quote': return `“${place.text}”`;
+    case 'quote': return place.cell ? `“${place.text}” in row ${place.cell.row}, ${place.cell.column}` : `“${place.text}”`;
     default: return 'Whole file';
   }
 }

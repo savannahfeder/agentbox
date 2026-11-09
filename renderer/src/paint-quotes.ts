@@ -1,9 +1,16 @@
 import { findQuote } from '../../shared/artifact-marks.mjs';
+import type { TableCell } from './types';
 
 export const canPaintQuotes = () => !!(CSS as unknown as { highlights?: unknown }).highlights;
 
+const attr = (v: string) => `"${v.replace(/["\\]/g, '\\$&')}"`;
+/** The drawn cell TableView marks with its file row and column. */
+export const cellSelector = (cell: TableCell) => `[data-row="${cell.row}"][data-col=${attr(cell.column)}]`;
+
+type Quoted = { text: string; cell?: TableCell };
+
 /** Paints each quoted passage without touching the page, which React or the editor drew. */
-export function paintQuotes(root: HTMLElement | null, quotes: { id: string; text: string }[], activeId: string | null, draft: string | null) {
+export function paintQuotes(root: HTMLElement | null, quotes: ({ id: string } & Quoted)[], activeId: string | null, draft: string | Quoted | null) {
   const highlights = (CSS as unknown as { highlights?: Map<string, unknown> }).highlights;
   const Highlight = (window as unknown as { Highlight?: new (...r: Range[]) => unknown }).Highlight;
   const found = new Map<string, Range>();
@@ -31,15 +38,24 @@ export function paintQuotes(root: HTMLElement | null, quotes: { id: string; text
     range.setEnd(b.node, Math.min(b.offset, b.node.length));
     return range;
   };
+  // A row out of view is not drawn, so its cell is not lit until it scrolls in.
+  const placeOf = (q: Quoted) => {
+    if (!q.cell) return rangeOf(q.text);
+    const el = root.querySelector(cellSelector(q.cell));
+    if (!el) return null;
+    const range = new Range();
+    range.selectNodeContents(el);
+    return range;
+  };
   const rest: Range[] = [];
   const on: Range[] = [];
   for (const q of quotes) {
-    const range = rangeOf(q.text);
+    const range = placeOf(q);
     if (!range) continue;
     found.set(q.id, range);
     if (q.id === activeId) on.push(range); else rest.push(range);
   }
-  if (draft) { const range = rangeOf(draft); if (range) on.push(range); }
+  if (draft) { const range = placeOf(typeof draft === 'string' ? { text: draft } : draft); if (range) on.push(range); }
   highlights.set('av-quote', new Highlight(...rest));
   highlights.set('av-quote-on', new Highlight(...on));
   return found;

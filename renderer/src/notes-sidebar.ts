@@ -17,8 +17,8 @@ export function rememberNotesSidebar(storage: Storage, open: boolean): void {
   } catch { /* no storage: it opens next time */ }
 }
 
-/** A thread's markdown document is the one kind the sidebar sits beside. */
-export const takesNotesSidebar = (src: string | null | undefined) => /\.(md|markdown)$/i.test(String(src ?? '').split(/[?#]/)[0]);
+/** A thread's markdown document or table is what the sidebar sits beside. */
+export const takesNotesSidebar = (src: string | null | undefined) => /\.(md|markdown|csv|tsv)$/i.test(String(src ?? '').split(/[?#]/)[0]);
 
 /** The open notes on one document, split into those Send would tell the agent and the rest. */
 export function sidebarNotes(notes: readonly FileNote[], fileIds: readonly string[], people: ReadonlyArray<{ id: string; name?: string | null }> = []) {

@@ -19,6 +19,7 @@ import {
 } from '../table-edit';
 import { api } from '../api';
 import { MAC } from '../this-keyboard';
+import type { TableCell } from '../types';
 import './table-view.css';
 
 export type TableMode = 'preview' | 'pane' | 'full';
@@ -88,8 +89,8 @@ const hoverText = (kind: ColumnKind, v: string, link: CellLink | null) => {
 
 // One row, told only what of the pick touches it, so a move redraws two rows and not fifty.
 // A ranked file's own rank stands where the row number goes, so a list is not numbered twice.
-const Row = memo(function Row({ table, row, r, n, c0, c1, at, whole, hands }: {
-  table: Table; row: string[]; r: number; n: number | null; c0: number; c1: number; at: number; whole: boolean; hands: boolean;
+const Row = memo(function Row({ table, row, r, fileRow, n, c0, c1, at, whole, hands }: {
+  table: Table; row: string[]; r: number; fileRow: number; n: number | null; c0: number; c1: number; at: number; whole: boolean; hands: boolean;
 }) {
   return <div className="tbl-tr" role="row">
     {(n !== null || table.ranked) && (
@@ -103,7 +104,8 @@ const Row = memo(function Row({ table, row, r, n, c0, c1, at, whole, hands }: {
       const sel = i >= c0 && i <= c1;
       const link = cellLink(table, row, i);
       return <div key={i} className={`tbl-td${cellClass(kind, !!link)}${hands && wraps(table.columns[i]) ? ' wrap' : ''}${sel ? ' sel' : ''}${i === at ? ' at' : ''}`} role="cell"
-        data-r={hands ? r : undefined} data-c={hands ? i : undefined} title={hoverText(kind, v, link)}>
+        data-r={hands ? r : undefined} data-c={hands ? i : undefined}
+        data-row={hands ? fileRow + 1 : undefined} data-col={hands ? table.columns[i].name : undefined} title={hoverText(kind, v, link)}>
         <CellBody table={table} col={i} row={row} value={v} link={link} />
         {hands && i === (table.ranked ? 1 : 0) && <button type="button" className="tbl-open" tabIndex={-1} aria-label="Open this row" title="Open this row (Space)">{OPEN}</button>}
       </div>;
@@ -670,7 +672,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   /** Reads the file again, for when it changed on disk under an edit. */
   onReload?: () => void;
   /** Comments on a cell's words, where the view takes comments. */
-  onComment?: (quote: string) => void;
+  onComment?: (quote: string, cell: TableCell) => void;
   /** Says a save failed after the table was closed, when there is no table left to say it. */
   onNotice?: (text: string) => void;
   /** What the widths, sort and filter are kept under: two projects can each have a lists/leads.csv. */
@@ -1596,7 +1598,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
             const row = table.rows[i];
             if (!row) return null;
             const on = !!sel && r >= sel.r0 && r <= sel.r1;
-            return <Row key={i} table={table} row={row} r={r} n={inline ? null : r + 1} hands={hands}
+            return <Row key={i} table={table} row={row} r={r} fileRow={i} n={inline ? null : r + 1} hands={hands}
               c0={on ? sel!.c0 : -1} c1={on ? sel!.c1 : -2} at={pick && pick.a.r === r ? pick.a.c : -1} whole={on && wholeRows} />;
           })}
           {!preview && end < order.length && <div className="tbl-gap" style={{ height: (order.length - end) * rowH }} />}
@@ -1708,7 +1710,10 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
               window.open(atLink.href, '_blank', 'noreferrer');
             }} />
           )}
-          {onComment && atValue.trim() && <MenuRow label="Comment" onClick={() => { onComment(atValue.trim()); closeFloat(); }} />}
+          {onComment && pick && atValue.trim() && <MenuRow label="Comment" onClick={() => {
+            onComment(atValue.trim(), { row: order[pick.a.r] + 1, column: table.columns[pick.a.c].name });
+            closeFloat();
+          }} />}
           {editable && sel && <>
             <span className="when-sep" />
             <MenuRow label="Insert row above" onClick={() => { closeFloat(); addRowAt(sel.r0); }} />

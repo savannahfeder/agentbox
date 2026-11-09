@@ -27,4 +27,5 @@ export function barSpot(first: Box, all: Box, bar: { w: number; h: number }, vie
   return { left, top: Math.round(top) };
 }
 
-export const quotesKey = (quotes: { id: string; text: string }[]) => JSON.stringify(quotes.map((q) => [q.id, q.text]));
+export const quotesKey = (quotes: { id: string; text: string; cell?: { row: number; column: string } }[]) =>
+  JSON.stringify(quotes.map((q) => (q.cell ? [q.id, q.text, q.cell.row, q.cell.column] : [q.id, q.text])));

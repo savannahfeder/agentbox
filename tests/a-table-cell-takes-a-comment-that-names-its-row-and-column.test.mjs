@@ -1,0 +1,82 @@
+// A TABLE CELL TAKES A COMMENT THAT NAMES ITS ROW AND COLUMN (w-2e26d0fb44).
+//
+// What broke: a table opened full screen from its thread had no way to comment
+// on it. The notes sidebar was only offered for markdown, the sidebar only
+// looked for a markdown page to take words from, and the grid cannot be
+// selected, so there was nothing to quote. In Files, where a cell's menu did
+// offer Comment, the note held only the cell's words, so a comment on one "TBD"
+// among forty reached the agent as just “TBD”, and lit the first "TBD" in the
+// table rather than the cell it was written on. Measured by reading the
+// sidebar's file rule, the pane's table branch and the words the agent is sent.
+import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
+import { cleanMark, notesForTheAgent, placeWords } from '../shared/artifact-marks.mjs';
+import { takesNotesSidebar } from '../renderer/src/notes-sidebar.ts';
+import { cellSelector } from '../renderer/src/paint-quotes.ts';
+
+const read = (p) => fs.readFileSync(new URL(`../renderer/src/${p}`, import.meta.url), 'utf8');
+const note = (place) => ({ do: 'note', id: 'n1', file: 'leads.csv', place, text: 'Chase this one' });
+
+describe('a comment on a cell keeps its cell', () => {
+  it('keeps the row and the column', () => {
+    expect(cleanMark(note({ kind: 'quote', text: 'TBD', cell: { row: 4, column: 'Status' } })).place)
+      .toEqual({ kind: 'quote', text: 'TBD', cell: { row: 4, column: 'Status' } });
+  });
+  it('keeps the quote and drops a cell that does not name one', () => {
+    for (const cell of [{ row: 0, column: 'Status' }, { row: 1.5, column: 'Status' }, { row: 3, column: '  ' }, { row: 3 }, 'row 3', null]) {
+      expect(cleanMark(note({ kind: 'quote', text: 'TBD', cell })).place, JSON.stringify(cell)).toEqual({ kind: 'quote', text: 'TBD' });
+    }
+  });
+  it('words picked in a document stay a plain quote', () => {
+    expect(cleanMark(note({ kind: 'quote', text: 'Set-up is three steps' })).place).toEqual({ kind: 'quote', text: 'Set-up is three steps' });
+  });
+});
+
+describe('the agent is told which cell', () => {
+  it('says the row and the column after the words', () => {
+    expect(placeWords({ place: { kind: 'quote', text: 'TBD', cell: { row: 4, column: 'Status' } } })).toBe('“TBD” in row 4, Status');
+  });
+  it('a quote with no cell reads as it did', () => {
+    expect(placeWords({ place: { kind: 'quote', text: 'TBD' } })).toBe('“TBD”');
+  });
+  it('the notes it is sent carry it', () => {
+    const n = { id: 'n1', file: 'v1', place: { kind: 'quote', text: 'TBD', cell: { row: 4, column: 'Status' } }, text: 'Chase this one', by: 'me', replies: [] };
+    const { text } = notesForTheAgent({ notes: [n] }, { id: 'v1', path: 'leads.csv', name: 'leads.csv', agent: 'a' }, 1);
+    expect(text).toContain('- “TBD” in row 4, Status: Chase this one');
+  });
+});
+
+describe('a table opened full screen takes notes', () => {
+  it('a csv or tsv takes the sidebar, as markdown does', () => {
+    for (const f of ['leads.csv', 'docs/out/leads.TSV', 'a.md']) expect(takesNotesSidebar(f), f).toBe(true);
+  });
+  it('a page, a picture or a script still does not', () => {
+    for (const f of ['options.html', 'a.png', 'cart.mjs', 'leads.csv.png', '']) expect(takesNotesSidebar(f), f).toBe(false);
+  });
+  it('the pane draws the sidebar beside the table and hands it the cell commented on', () => {
+    const pane = read('components/DocPane.tsx');
+    expect(pane).toMatch(/<Beside aside=\{aside\}>\s*<TableView[^>]*onComment=\{onComment\}/);
+  });
+  it('the sidebar takes words from the table as well as from a document', () => {
+    expect(read('components/NotesSidebar.tsx')).toContain(".doc-rich-content, .tbl");
+  });
+  it('the cell menu opens the sidebar with the cell in it', () => {
+    const app = read('App.tsx');
+    expect(app).toMatch(/onComment=\{notesHere \? commentOnTable : undefined\}/);
+    expect(app).toMatch(/const commentOnTable = [^\n]*setNotesOpen\(true\)/);
+  });
+});
+
+describe('the cell, not the first matching words, is lit', () => {
+  it('every cell drawn says its file row and its column', () => {
+    const view = read('components/TableView.tsx');
+    expect(view).toContain('data-row={hands ? fileRow + 1 : undefined} data-col={hands ? table.columns[i].name : undefined}');
+  });
+  it('the menu hands over the cell under the pick', () => {
+    expect(read('components/TableView.tsx')).toMatch(/onComment\(atValue\.trim\(\), \{ row: order\[pick\.a\.r\] \+ 1, column: table\.columns\[pick\.a\.c\]\.name \}\)/);
+  });
+  it('finds the cell by those two', () => {
+    expect(cellSelector({ row: 4, column: 'Status' })).toBe('[data-row="4"][data-col="Status"]');
+    expect(cellSelector({ row: 12, column: 'Say "hi"\\' })).toBe('[data-row="12"][data-col="Say \\"hi\\"\\\\"]');
+  });
+});
