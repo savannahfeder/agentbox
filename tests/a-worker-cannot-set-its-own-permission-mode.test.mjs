@@ -212,7 +212,7 @@ describe('both ways the app starts say where, before the store opens', () => {
       expect(fs.existsSync(path.join(store, FILE))).toBe(false);
       expect(answerModes()).toEqual({ 'acme/w-1': 'acceptEdits' });
     } finally {
-      await booted.supervisor?.stopAll?.().catch?.(() => {});
+      try { booted.supervisor.killAll(); booted.supervisor.stop(); } catch { /* done */ }
     }
   }, 30_000);
 

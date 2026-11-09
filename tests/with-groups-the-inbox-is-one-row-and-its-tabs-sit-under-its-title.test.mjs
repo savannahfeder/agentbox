@@ -36,8 +36,8 @@ describe('the sidebar', () => {
   it('has one row, Inbox, while Groups is on', () => {
     expect(rows(draw({ inboxLabel: 'Inbox' }))).toEqual(['Inbox']);
   });
-  it('says Threads while Groups is off', () => {
-    expect(rows(draw({}))).toEqual(['Threads']);
+  it('says Inbox while Groups is off too', () => {
+    expect(rows(draw({}))).toEqual(['Inbox']);
   });
   it('is told Inbox only while Groups is on, and is handed no rows of rooms', () => {
     expect(app).toContain("inboxLabel={roomsUi.live ? 'Inbox' : undefined}");
@@ -59,7 +59,7 @@ describe('the tabs', () => {
     expect(css).not.toContain('.tabs-top');
   });
   it('a page of its own, a person or Find groups, still has its back arrow there instead', () => {
-    expect(app).toMatch(/roomShown && roomsUi\.heading \? roomsUi\.heading\.title : <h1 className="workspace-title">Threads<\/h1>/);
+    expect(app).toMatch(/roomShown && roomsUi\.heading \? roomsUi\.heading\.title : <h1 className="workspace-title">Inbox<\/h1>/);
   });
 });
 

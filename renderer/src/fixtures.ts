@@ -896,13 +896,8 @@ export const fixtureSettings = {
   workspace: {
     agentsRunning: true,
     sessionsAtOnce: 3,
-    memoryGate: { on: false, slots: null, slotsAuto: 2, slotsMax: 12, now: null },
-    leftovers: { on: false, now: 'Right now finished agents have left 40 programs running; turning this on stops them when you close their tasks.' },
-    // COPIES OF A PROJECT NOBODY'S TASK OWNS (main/settings.mts,
-    // `strayFolderSettings`). A fixture because the row is absent whenever there
-    // are none, which is most of the time and all of a fresh install: without
-    // one there is no way to look at the sentence before it is true for somebody.
-    strayFolders: { count: 11, now: `11 copies of Kestrel were made by hand outside the folder ${NAME} keeps its own in, and are holding disk until you remove them: ~/Desktop/dev/kestrel-fontsize, ~/Desktop/dev/kestrel-cardart, ~/Desktop/dev/wt-w-34eb858714 and 8 more. ${NAME} never removes a folder it did not make.` },
+    memoryGate: { on: true, slots: null, slotsAuto: 2, slotsMax: 12, now: null },
+    leftovers: { on: true, now: 'Finished agents have left 40 programs running. 40 stop when you close their tasks.' },
     capacity: 6,
     running: 2,
     model: 'claude-opus-5',

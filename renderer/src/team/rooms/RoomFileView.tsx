@@ -36,7 +36,6 @@ export function RoomFileView({ room, messages, people, meId, opening, files, onN
     ...(opening.file ? { file: opening.file } : {}),
     at: opening.at,
   }), [opening]);
-  const others = people.filter((p) => !p.me).map((p) => p.name.split(' ')[0]).join(', ');
-  return <ArtifactView product="" threadName={room.name || others || 'Group'} lines={lines} marks={marks} me={meId} people={named}
+  return <ArtifactView product="" draftsAcross={`room:${room.id}`} lines={lines} marks={marks} me={meId} people={named}
     open={open} ownerOfRow={null} write={files.write} onNewVersion={onNewVersion} onClose={onClose} files={stage} />;
 }

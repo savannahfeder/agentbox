@@ -86,7 +86,7 @@ describe('the toast', () => {
 describe('the layout draws both over every screen', () => {
   const layout = fs.readFileSync(new URL('../mobile/src/app/_layout.tsx', import.meta.url), 'utf8');
   it('inside the cloud, after the screens, so they sit on top', () => {
-    expect(layout).toMatch(/<Stack[^>]*\/>\s*<Approvals \/>\s*<Toast \/>[\s\S]*<\/CloudProvider>/);
+    expect(layout).toMatch(/<Stack(?:[^>]*\/>|[\s\S]*?<\/Stack>)\s*<Approvals \/>\s*<Toast \/>[\s\S]*<\/CloudProvider>/);
   });
 });
 

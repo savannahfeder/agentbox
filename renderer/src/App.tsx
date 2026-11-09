@@ -55,7 +55,7 @@ import { Rail } from './components/Rail';
 import { ThreadComposer, type ComposeStart } from './threads/ThreadComposer';
 import { continueStart } from './threads/continue-thread';
 import { OpenTeammateThread } from './threads/ContinuedFrom';
-import { handOffStart, joinNames, laterHint, replyWaitsUntil, taskHandOff, tabAfterSending, writingMovesToTheDialog, projectsOffered, teammates } from './threads/composer-rules';
+import { handOffStart, joinNames, laterHint, replyWaitsUntil, taskHandOff, tabAfterSending, writingMovesToTheDialog, projectsOffered, projectOnScreen, teammates } from './threads/composer-rules';
 import { keyOnAnOpenThread, keyOnTheList, rowKey as actsOnARow, replyingTo, screenJustChanged, HELD_AFTER_A_CHANGE, NOWHERE_TO_TYPE, STILL_TYPING_MS } from './reply-keys';
 import { chosenNames, whoSees } from './threads/summary-rules';
 import { shownToPeople } from '../../shared/thread-cards.mjs';
@@ -87,7 +87,7 @@ import {
 } from './drafts';
 import { approvalStage, approvalClickAllowed, cardChord, pressWithin } from './approval-stage';
 import { roomForTheCard } from './room-for-the-card';
-import { approvalAnswered, approvalAsker, approvalReads, approvalShown } from './approval-card';
+import { approvalAnswered, approvalAsker, approvalView } from './approval-card';
 // The new task card's two sentences: why it will not take one, and where the
 // one it took went. Only the second is raised from here, because by the time
 // there is anything to confirm the card has closed.
@@ -184,8 +184,8 @@ import {
 import { priorityCommands, priorityIdOf, priorityLabelOf, type PriorityId } from './priority';
 import { runNowCommands } from './run-now';
 import { withOlder } from './older-threads';
-import { NO_FILTER, filterBox, isFiltering, type BoxFilter as BoxFilterState, type Harness } from './box-filter';
-import { URGENT_PRIORITY, itemPriority, moveProduct, placeScore, placedScore } from '../../shared/rank.mjs';
+import { NO_FILTER, filterBox, harnessOf, isFiltering, type BoxFilter as BoxFilterState, type Harness } from './box-filter';
+import { URGENT_PRIORITY, itemPriority, shownPriority, moveProduct, placeScore, placedScore } from '../../shared/rank.mjs';
 import { rankProducts } from './project-priority';
 import { threadsMade, approvableFiled, doItHereWrites, answerAllWrites, RUN_IT } from './threads-made';
 import { waitingCounts } from './threads-made';
@@ -207,6 +207,7 @@ import { Face, TeamContext, firstName, teamView } from './team/people';
 import { namedCards } from './team/company';
 import { FaceHover } from './team/status';
 import { TeamPage } from './team/TeamPage';
+import { TeamBilling } from './team/TeamBilling';
 import { ProjectShare, ProjectWho } from './team/ProjectShare';
 import { ConnectComputer, EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, ItemsContext, LiveContext, CloudContext, SavedKeysContext, MoveToCloudContext, CloudOfferContext, FreeAgentContext, StateTabs, TryAgainContext, WaitingContext } from './threads/Pages';
 import { offersTryAgain, tryAgainWords } from './try-again';
@@ -237,7 +238,7 @@ import { FoundInside } from './components/FoundInside';
 import type { PlaceAct } from './threads/ThreadMenu';
 import { SignInPage } from './team/SignInPage';
 import { SIGN_IN_TO_SHARE, ShareLink, canShareFile } from './components/ShareLink';
-import { DEFAULT_DISPLAY, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, crumbTab, flipView, isDirect, nextTab, pageDisplay, pageFor, peopleInConversation, peopleToAdd, readDisplay, readPrivacy, rowSharing, whatAddPeopleDoes, writeDisplay, writePrivacy, keeps as keepsDisplay, overlayPins, overlayPlaces, dropWithPins, rankScore, sorted as sortedByDisplay, tabOfState, type Display, type Privacy, type Unsaved, type UnsavedPins } from './threads/page-rules';
+import { DEFAULT_DISPLAY, rowPriorityId, sentAt as sentAtOf, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, crumbTab, flipView, isDirect, nextTab, pageDisplay, pageFor, peopleInConversation, peopleToAdd, readDisplay, readPrivacy, rowSharing, whatAddPeopleDoes, writeDisplay, writePrivacy, keeps as keepsDisplay, overlayPins, overlayPlaces, dropWithPins, rankScore, sorted as sortedByDisplay, tabOfState, type Display, type Privacy, type Unsaved, type UnsavedPins } from './threads/page-rules';
 import { inboxEveryone, mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
 import { boardStops, leadStops, listStops, stepFromPlace, stepStop, stopKey, type PageStop, type Stop } from './threads/walk-rules';
 import { usePointerHold, useHeldOrder } from './threads/steady-rows';
@@ -248,6 +249,13 @@ import { SAYS_UNDO, oWaitsFor, oWaitsForTheSend, opensTheToast, saysWhereItWent,
 import { SentLine } from './components/SentLine';
 import { TickedBar } from './components/TickedBar';
 import { AgentSending } from './team/AgentSending';
+import { HomePage, type NeedsRow, type ProgressRow, type TeamRow } from './home/HomePage';
+import { SkyBackdrop } from './home/SkyBackdrop';
+import { InboxSky } from './home/InboxSky';
+import { SKY_THEME_KEY, setHomeSetting, useDarkWindow, useHomeSettings } from './home/home-settings';
+import { SKY_THEMES, skyTheme } from './home/sky';
+import { engineLetter, engineName, greeting, teamRowState, weekCounts } from './home/home-model';
+import { sentFrom } from './team/company';
 import { reachAudienceOf } from '../../shared/teammate-reach.mjs';
 
 const FIRST_IDEAS = ideasFor();
@@ -951,6 +959,14 @@ export default function App() {
       }));
     });
   }, []);
+  // Light, Dark and Match system take any sky theme off; a sky theme brings its own look.
+  const chooseLook = useCallback((next: Look) => { setHomeSetting(SKY_THEME_KEY, null); setLook(next); }, [setLook]);
+  const chooseSkyTheme = useCallback((id: string) => {
+    const k = skyTheme(id);
+    if (!k) return;
+    setLook(k.dark ? 'ember-grid' : 'light');
+    setHomeSetting(SKY_THEME_KEY, id);
+  }, [setLook]);
 
   const setTune = useCallback((next: SkinTune) => {
     const sk = resolveSkin(localStorage.getItem(SKIN_KEY));
@@ -1081,6 +1097,7 @@ export default function App() {
   const answerCardRef = useRef(answerCard);
   answerCardRef.current = answerCard;
   const cardOnStage = useRef<string | null>(null);
+  const cardDrawnAt = useRef<{ id: string; at: number } | null>(null);
   // The card that held the stage when she pressed: the store push usually beats
   // the animation, and a card cannot finish leaving once the snapshot has
   // forgotten it exists.
@@ -2744,7 +2761,7 @@ export default function App() {
   // "In progress" on the one-list home is a list until someone picks the board.
   const [evChosen, setEvChosen] = useState<EvView | null>(() => readEvView(undefined, null));
   // On the layout with only two tabs, In progress is your board, so Later and Done have a place.
-  const evView: EvView = evChosen ?? (homeLayout === 'list' ? 'list' : 'board');
+  const evView: EvView = evChosen ?? 'list';
   const setEvView = (v: EvView) => { setEvChosen(v); writeEvView(v); };
   const evTeamKey = roomsOn ? (snap?.team?.rooms?.rooms ?? []).find((r) => r.teamId)?.id ?? null : null;
   const sharesThreads = useCallback((personId: string) => (snap?.team?.cards ?? []).some((c) => c.personId === personId && c.visible), [snap?.team?.cards]);
@@ -2861,6 +2878,20 @@ export default function App() {
   const [shippedOpen, setShippedOpen] = useState(false);
   // The Files place, on a project's page or (null) on every file.
   const [filesPage, setFilesPage] = useState<{ project: string | null } | null>(null);
+  // Home (Alpha features) is where the app opens while it is on; any other
+  // page put in front of it hides it, and closing that page brings it back.
+  const homeSet = useHomeSettings();
+  const [homeOpen, setHomeOpen] = useState(homeSet.on);
+  useEffect(() => { setHomeOpen(homeSet.on); }, [homeSet.on]);
+  const darkWindow = useDarkWindow();
+  // A sky theme is worn only while the window wears its look.
+  const skyPicked = homeSet.on ? skyTheme(homeSet.skyTheme) : null;
+  const sky = skyPicked && skyPicked.dark === darkWindow ? skyPicked : null;
+  useEffect(() => {
+    const root = document.documentElement;
+    if (sky?.frame) { root.dataset.skyFrame = sky.id; root.style.setProperty('--sky-frame', sky.frame); }
+    else { delete root.dataset.skyFrame; root.style.removeProperty('--sky-frame'); }
+  }, [sky]);
   const [connectionsPage, setConnectionsPage] = useState<{ focus: string | null } | null>(null);
   const sharedFileNews = snap?.team?.sharedFileNews ?? [];
   const theirRows = useMemo(
@@ -3260,6 +3291,8 @@ export default function App() {
   // Full screen is for one look. Once the file is put down, the next one opens beside.
   useEffect(() => { if (!openDoc) setArtifactMode('beside'); }, [openDoc]);
   const openTeammateFile = useCallback((product: string, src: string) => { setOpenDoc({ product, src, readOnly: true }); }, []);
+  // An AI teammate of yours writes into your own project, so its files are yours to edit.
+  const openMateFile = useCallback((product: string, src: string) => { setOpenDoc({ product, src }); }, []);
   // A copy of a teammate's file does not outlive their thread on the screen.
   useEffect(() => { setOpenDoc((doc) => (doc?.readOnly ? null : doc)); }, [openCard?.personId, openCard?.threadId]);
   const [artifactBody, setArtifactBody] = useState<HTMLDivElement | null>(null);
@@ -4047,7 +4080,8 @@ export default function App() {
   const teammatesUi = useTeammates({
     items, view: snap?.teammates, asking: (snap?.approvals ?? []).map((a) => a.item), running: snap?.supervisor?.running ?? NO_RUNNING, queued: snap?.supervisor?.queued, products: snap?.products ?? [], engines: snap?.engines?.choices ?? [],
     models: teammateModels,
-    onOpenFile: openTeammateFile,
+    onOpenFile: openMateFile,
+    onNewProject: () => setNewProject(true),
     me: team?.byId.get(team.me ?? '')?.name ?? '',
     mePic: team?.byId.get(team.me ?? '')?.avatarUrl ?? null,
     onEnter: () => { roomsUi.leave(); setChatsPlace(null); setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setFocusedRepeat(null); },
@@ -5974,7 +6008,7 @@ export default function App() {
       // window, so the palette this opened was drawn where nobody could see it,
       // and the Escape after it closed that rather than anything visible. The
       // beat that teaches ⌘K is the last one, standing on the real app.
-      const chord = cardChord(e, cardOnStage.current);
+      const chord = cardChord(e, cardOnStage.current, cardDrawnAt.current?.id === cardOnStage.current ? cardDrawnAt.current.at : null);
       if (chord) { e.preventDefault(); void answerCardRef.current(chord.id, chord.allow); return; }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         if (walkScreenRef.current) return;
@@ -6232,7 +6266,7 @@ export default function App() {
         // What is typed with no box under it goes in the box of the thread on
         // screen, and a key that closes things waits out a change of screen.
         if (!e.defaultPrevented && !runRef.current && !focused.agent
-          && keyOnAnOpenThread({ key: e.key, justChanged: screenJustChanged(screenChangedAt.current, Date.now()), hasOptions: opts.length > 0, stillTyping: Date.now() - typedIntoBoxAt.current < STILL_TYPING_MS }) === 'to the box') {
+          && keyOnAnOpenThread({ key: e.key, justChanged: screenJustChanged(screenChangedAt.current, Date.now()), hasOptions: opts.length > 0, stillTyping: Date.now() - typedIntoBoxAt.current < STILL_TYPING_MS, boxOnScreen: !fullScreenDoc }) === 'to the box') {
           e.preventDefault();
           typedIntoBoxAt.current = Date.now();
           saveDraft(focused, `${readDraft(focused)}${e.key}`);
@@ -6676,6 +6710,7 @@ export default function App() {
   const artifactView = artifactPlacement(artifactMode, artifactWidth);
   const notesHere = fullScreenDoc && !!focused && openDoc?.product === focused.product && !openDoc.readOnly && takesNotesSidebar(openDoc.src);
   const notesShown = notesHere && notesOpen;
+  const notesClosed = notesHere && !notesOpen;
   const [artifactHeader, setArtifactHeader] = useState<HTMLDivElement | null>(null);
   const readingWidth = 'balanced';
   const [taskHeader, setTaskHeader] = useState<HTMLDivElement | null>(null);
@@ -6815,6 +6850,7 @@ export default function App() {
   // THE FIRST RUN ENDS IN THE INBOX, where the tutorial takes over.
   const finishFresh = useCallback(() => {
     finishFirstRun(localStorage);
+    rememberOffered(localStorage);
     setTour(startTour());
     setFresh(false);
     setView('inbox');
@@ -6827,6 +6863,8 @@ export default function App() {
   const finishClassic = useCallback((sent: string | null, runAt = 0, draft?: string) => {
     const to = firstRunLanding(sent, runAt);
     finishFirstRun(localStorage);
+    // Onboarding was the moment to offer it; a project made later is mid-task (F-164).
+    rememberOffered(localStorage);
     setLessons(localStorage, ['open', 'pick']);
     setLessonList(['open', 'pick']);
     setFresh(false);
@@ -6935,7 +6973,7 @@ export default function App() {
 
   // Leaving Chats forgets which conversation was open there, or the same row
   // opened from Needs you lands back on the Chats screen with another reply box.
-  const openView = (next: View) => { roomsUi.leave(); setChatsDirect(null); teammatesUi.leave(); setFilesPage(null); setConnectionsPage(null); setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); setEvPick(null); setTodayOn(false); setTasksOn(false); setChatsPlace(null); };
+  const openView = (next: View) => { roomsUi.leave(); setChatsDirect(null); teammatesUi.leave(); setFilesPage(null); setConnectionsPage(null); setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); setEvPick(null); setTodayOn(false); setTasksOn(false); setChatsPlace(null); setHomeOpen(false); };
   useEffect(() => {
     if (!onPhone()) return;
     if (signInGate) {
@@ -7137,7 +7175,7 @@ export default function App() {
   // empty inbox: the page is kept for the one render it takes to read the box,
   // and the dialog opens on it before anything paints.
   const clearWaiting = view === 'inbox' ? list.length + leadCount + sharedFileNews.length + followingNews.length : 0;
-  const clearMoves = view === 'inbox' && search === null && !focused && !focusedRepeat && modal !== 'compose'
+  const clearMoves = view === 'inbox' && !(homeSet.on && homeOpen) && search === null && !focused && !focusedRepeat && modal !== 'compose'
     && writingMovesToTheDialog({ waiting: clearWaiting, onScreen: clearSlot !== null, writing: clearWriting });
   clearMovesNow.current = clearMoves;
   // ONE SURFACE ON AN OPENED TASK (design C): no card, hairlines
@@ -7194,6 +7232,8 @@ export default function App() {
     today: homeLayout === 'list' && !onPhone() ? { on: todayOn, onToday: () => { goNeedsYou(); setTodayOn(true); } } : undefined,
     tasks: homeLayout === 'list' && !onPhone() ? { on: tasksOn, onTasks: () => { goNeedsYou(); setTasksOn(true); } } : undefined,
   } : null;
+  // Home's Team card and the Team page say what the faces at the end of the tab bar did.
+  if (teamTabs && homeSet.on) teamTabs.corner = null;
   const dayStart = new Date(now).setHours(0, 0, 0, 0);
   const evItems = evMember?.kind === 'mate' ? (mateRunsOf(items, evMember.key.slice('mate:'.length), dayStart)) : [];
   const evCards = evMember?.kind === 'person' ? personCardsOf(cards, evMember.key.slice('person:'.length), dayStart) : [];
@@ -7237,6 +7277,36 @@ export default function App() {
     })}
     onOpen={(l) => { if (l.item) { setFocused(l.item); markSeen(l.item); } else if (l.card) openTeammateCard(l.card); else if (l.mention) roomsUi.openMention(l.mention); else if (l.roomId) roomsUi.open(l.roomId); else if (l.file) openFiles(filesForToday?.files.find((f) => f.key === l.file)?.project ?? null); }} /> : null;
   const todayEl = todayShown ? todayPage() : null;
+  const homeShown = homeSet.on && homeOpen && !!snap && !onPhone() && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
+    && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown;
+  const goHome = () => { openView('inbox'); setHomeOpen(true); };
+  const homeNeeds: NeedsRow[] = homeShown ? inbox.slice(0, 80).map((i) => {
+    const sent = team ? sentFrom(i, team.products.get(i.product), team.me) : null;
+    const from = sent ? (team?.byId.get(sent.from)?.name?.split(/\s+/)[0] ?? 'Someone') : null;
+    return { key: `${i.product}/${i.id}`, letter: from ? from.slice(0, 1).toUpperCase() : engineLetter(i.engine), title: rowTitle(i), from, priority: rowPriorityId(shownPriority(i)), project: i.productName, at: sentAtOf(i), unread: isUnread(i, seenAt, unreadSince, team?.me ?? null) };
+  }) : [];
+  const homeTeam: TeamRow[] | null = !homeShown || !teamMode ? null : members.filter((m) => m.kind === 'person' || (m.kind === 'mate' && m.key.startsWith('mate:'))).map((m) => {
+    const id = m.key.slice(m.key.indexOf(':') + 1);
+    const done = m.kind === 'person'
+      ? weekCards.filter((c) => c.personId === id && c.state === 'done').map((c) => c.updatedAt)
+      : items.filter((i) => i.status === 'done' && i.labels?.includes(`teammate:${id}`)).map((i) => i.updatedAt);
+    const week = weekCounts(done, now);
+    const waiting = (waits.get(m.key) ?? 0) > 0;
+    return {
+      key: m.key, name: m.name, letter: (m.letter || m.name).slice(0, 1).toUpperCase(), ai: m.kind === 'mate',
+      line: waiting ? 'Waiting on you' : m.now ?? (m.agents ? 'Working' : 'Nothing running'),
+      state: teamRowState({ agents: m.agents, waitingOnYou: waiting }), week, total: week.reduce((a, b) => a + b, 0),
+    };
+  });
+  const homeProgress: ProgressRow[] = homeShown && !teamMode ? progressTab.slice(0, 60).map((i) => ({ key: `${i.product}/${i.id}`, letter: engineLetter(i.engine), title: rowTitle(i), line: `${engineName(i.engine)} · ${i.productName}`, at: sentAtOf(i) })) : [];
+  const homeOpenRow = (key: string) => {
+    const item = items.find((i) => `${i.product}/${i.id}` === key);
+    if (!item) return;
+    setFocused(item); markSeen(item);
+  };
+  // Light themes keep the Inbox plain; only dark ones wear its sky.
+  const skyOnInbox = !!sky && sky.dark && !homeShown && (['inbox', 'progress', 'snoozed', 'done'] as string[]).includes(view) && !onBoard && !onPhone() && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
+    && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown && !evOn;
   const tasksShown = teamMode && tasksOn && !!snap && view === 'inbox' && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused && !teammatesShown && !roomShown && !filesShown && !connectionsShown;
   const firstNameOf = (id: string) => team?.byId.get(id)?.name?.split(/\s+/)[0] ?? 'Someone';
   const tasksPage = (title?: string) => snap ? <TasksPage title={title} keys={!modal} me={team?.me ?? null} nameOf={firstNameOf} picked={tasksPick} onPicked={setTasksPick}
@@ -7362,8 +7432,11 @@ export default function App() {
   // toast covered Allow and Deny. Read off the same stage the card is drawn
   // from below, so the class and the card cannot disagree about what is asked.
   const stage = approvalStage(snap?.approvals, answered, frontApproval.current, signInGate || phoneSignInSettling);
+  // Only approvals stand here. A key or a sign-in is not a quick yes or no, so
+  // it is asked inside its thread (NeedCard).
   const cardOnScreen = !!stage.card;
   cardOnStage.current = stage.card && !stage.verdict ? stage.card.id : null;
+  if (cardOnStage.current && cardDrawnAt.current?.id !== cardOnStage.current) cardDrawnAt.current = { id: cardOnStage.current, at: Date.now() };
   const mover = {
     ids: new Set([...(snap?.cloud?.movable ?? []), ...(snap?.supervisor.running ?? []).filter((r) => r.movable).map((r) => r.itemId)]),
     move: (id: string, product: string) => { void moveToCloud([id], product); },
@@ -7394,7 +7467,7 @@ export default function App() {
     <FreeAgentContext.Provider value={freeWaitIds}>
     <TryAgainContext.Provider value={tryAgain}>
     <CloudOfferContext.Provider value={cloudOfferNow ? { offer: cloudOfferNow, onGo: (go) => void onCloudGo(go) } : null}>
-    <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app workspace-layout${narrowSidebar ? ` gt-rail gt-inset gt-sumleft${sideFolded ? '' : ' gt-rail-open'}` : ''}${focused && !settingsOpen && !inChats ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${sideFolded ? ' workspace-collapsed' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${notesShown ? ' notes-open' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}${cardOnScreen ? ' asking' : ''}${(queueSpot || onePage) && focused ? ' one-at-a-time' : ''}`}>
+    <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app workspace-layout${narrowSidebar ? ` gt-rail gt-inset gt-sumleft${sideFolded ? '' : ' gt-rail-open'}` : ''}${focused && !settingsOpen && !inChats ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${sideFolded ? ' workspace-collapsed' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${notesShown ? ' notes-open' : ''}${notesClosed ? ' notes-closed' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}${cardOnScreen ? ' asking' : ''}${(queueSpot || onePage) && focused ? ' one-at-a-time' : ''}${homeShown ? ' home-shown sky-shown' : skyOnInbox ? ' sky-shown' : ''}`}>
 
       {/* At the end of <body>, so its drag rectangles are reported after the
           top bar's and this layout's ::after strip. Inside the app, those put
@@ -7455,7 +7528,7 @@ export default function App() {
         onAccount={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(false); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
         onSignOut={() => { void api.teamSignOut().then(() => refresh()); }}
         onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setOpenCard(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }} inboxCount={inbox.length + leadCount} scheduledCount={scheduledCount} view={view} collapsed={sideFolded} onSearch={openSearch} onCompose={() => setModal('compose')} onView={openView}
-        onTeammatesPage={teammatesShown} onFiles={() => openFiles(null)} filesPage={filesShown} tasksPage={tasksShown} onConnections={() => openConnectionsPage(null)} connectionsPage={connectionsShown} rail={narrowSidebar} onHover={setRailOpen} onGroupsPage={roomShown || directOpen}
+        onHome={homeSet.on && !onPhone() ? goHome : undefined} homePage={homeShown} onTeammatesPage={teammatesShown} onFiles={() => openFiles(null)} filesPage={filesShown} tasksPage={tasksShown} onConnections={() => openConnectionsPage(null)} connectionsPage={connectionsShown} rail={narrowSidebar} onHover={setRailOpen} onGroupsPage={roomShown || directOpen}
         /* Without Groups the one row under Threads is Chats, and only while there are teammates. */
         groups={roomsUi.live ? roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown || chatsPlaceShown || cardFromPlace, teammatesUi.live || homeLayout === 'chats' ? openChats : undefined, homeLayout === 'chats' ? 'Team' : undefined) : teammatesUi.rail(teammatesShown)} />
       {/* THE REACH (w-5dcff78971). The corner is transparent and it is the
@@ -7528,7 +7601,7 @@ export default function App() {
               <CrossIcon />
             </button>
           </nav>
-        ) : (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : settingsPage === 'team' ? 'Team' : 'Settings'}</h1></div> : focused ? (inChats ? <><div className="gc-head"><div className="gc-head-col"><span className="workspace-title gc-col-title">{homeLayout === 'chats' ? 'Team' : 'Chats'}</span></div><div className="workspace-task-header cx-task-header" ref={setTaskHeader} /></div><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></>) : (filesShown ? <h1 className="workspace-title">Files</h1> : connectionsShown ? <h1 className="workspace-title">Connections</h1> : chatsPlaceShown ? <h1 className="workspace-title">Team</h1> : teamShown ? <h1 className="workspace-title">{openCard ? (cardFromPlace ? 'Team' : 'Threads') : 'Team'}</h1> : evOn ? <h1 className="workspace-title">{roomsUi.live ? 'Inbox' : 'Threads'}</h1> : teammatesShown ? teammatesUi.title : roomsUi.live && !roomShown ? <h1 className="workspace-title">Inbox</h1> : roomShown && roomsUi.heading ? roomsUi.heading.title : <h1 className="workspace-title">Threads</h1>))}
+        ) : (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : settingsPage === 'team' ? 'Team' : 'Settings'}</h1></div> : focused ? (inChats ? <><div className="gc-head"><div className="gc-head-col"><span className="workspace-title gc-col-title">{homeLayout === 'chats' ? 'Team' : 'Chats'}</span></div><div className="workspace-task-header cx-task-header" ref={setTaskHeader} /></div><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></>) : (filesShown ? <h1 className="workspace-title">Files</h1> : connectionsShown ? <h1 className="workspace-title">Connections</h1> : chatsPlaceShown ? <h1 className="workspace-title">Team</h1> : teamShown ? <h1 className="workspace-title">{openCard ? (cardFromPlace ? 'Team' : 'Inbox') : 'Team'}</h1> : evOn ? <h1 className="workspace-title">Inbox</h1> : teammatesShown ? teammatesUi.title : roomsUi.live && !roomShown ? <h1 className="workspace-title">Inbox</h1> : roomShown && roomsUi.heading ? roomsUi.heading.title : <h1 className="workspace-title">Inbox</h1>))}
         {/* THE PLUS, THE COMMAND MARK AND THE COG STEP OFF WHILE SHE IS
             SEARCHING, and that is the half of the chosen design that is not the
             cross. It is forced, not chosen: .topbar and .body carry the same 22px
@@ -7584,6 +7657,7 @@ export default function App() {
               here, on a phone only (searchInTheList). It ended the tabs row
               (w-3c51d02de5) until an iPhone clipped it out of sight there,
               because that row scrolls sideways (w-33511040d7). */}
+          {filesShown && !focused && <div className="th-right" id="fp-head-slot" />}
           {!focused && !settingsOpen && !teamShown && !filesShown && !connectionsShown && (teammatesShown && !evOn ? teammatesUi.right : roomShown && roomsUi.heading?.right !== undefined ? roomsUi.heading.right : (
             <HeaderActions
               page="inbox"
@@ -7679,7 +7753,7 @@ export default function App() {
                     was opened from. */}
                 <TeammateThread card={openCard} person={team?.byId.get(openCard.personId) ?? null} now={now}
                   syncedAt={snap.team.lastSyncAt ?? null} onNotice={showToast} onOpenDoc={openTeammateFile} openAt={cardOpenAt}
-                  backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Everyone' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Threads')}
+                  backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Everyone' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Inbox')}
                   onBack={() => { setOpenCard(null); setTeamOpen(false); }}
                   onContinue={() => continueTeammateThread(openCard)}
                   onMessage={() => {
@@ -7702,7 +7776,15 @@ export default function App() {
                   running, which is when a row's line about what stopped it
                   points here. */}
               {planWords && !snap.supervisor.running?.length && !run && !focused && !focusedRepeat && !teammatesShown && <PlanBar words={planWords} onSetup={setSetupPlan} />}
-              {chatsPlaceShown ? <ChatsFrame current={chatsListKey}>{chatsPlace === 'team' ? <div className="team-page">{todayPage('Everyone', homeLayout === 'chats' ? (key) => openChatsPlace(key) : undefined)}</div> : placeEl}</ChatsFrame>
+              {homeShown && sky && <SkyBackdrop art={sky.art} from={sky.dark ? 40 : 150} span={sky.dark ? 300 : 240} />}
+              {skyOnInbox && sky && <InboxSky art={sky.art} />}
+              {homeShown ? (
+                <HomePage hello={greeting(new Date(now).getHours(), snap.team?.me?.name ?? null)} now={now}
+                  needs={homeNeeds} needsCount={needsYouCount.inbox} progressCount={mineShown ? shownCount(progressTab) : 0}
+                  team={homeTeam} progress={homeProgress} slot={setClearSlot}
+                  onDoor={(d) => { if (d === 'inbox') openView('inbox'); else if (d === 'progress') { openView(teamMode ? 'inbox' : 'progress'); if (teamMode) pickMember('me'); } else openChatsPlace('team'); }}
+                  onOpen={homeOpenRow} onMember={(key) => openChatsPlace(key)} onTeam={() => openChatsPlace('team')} />
+              ) : chatsPlaceShown ? <ChatsFrame current={chatsListKey}>{chatsPlace === 'team' ? <div className="team-page">{todayPage('Everyone', homeLayout === 'chats' ? (key) => openChatsPlace(key) : undefined)}</div> : placeEl}</ChatsFrame>
               : connectionsShown ? (
                 <ConnectionsPlace now={now} focus={connectionsPage!.focus} onNotice={showToast} corner={connectionsCorner} cloudKeys={savedCloudKeyList} />
               ) : filesShown ? (
@@ -7780,7 +7862,7 @@ export default function App() {
                   // On the board there is no tab: the page Esc goes back to
                   // is headed Threads (w-34eb858714).
                   crumbFrom={teamOpen ? 'Team' : search !== null ? 'Search'
-                    : onBoard ? 'Threads'
+                    : onBoard ? 'Inbox'
                     : directOpen && roomsUi.openId ? 'Groups'
                     : crumbTabNow === 'inbox' && team ? needsWord(picked, team.me)
                       : INBOX_TABS.find((t) => t.view === crumbTabNow)?.label}
@@ -7806,6 +7888,7 @@ export default function App() {
                     // time lands a second time (OpenDoc, DocPane.tsx).
                     ...(at ? { atFrom: Date.now() } : {}),
                   })}
+                  onCloseDoc={putDocDown}
                   parent={focused.parent ? items.find((i) => i.id === focused.parent && i.product === focused.product) ?? null : null}
                   blockedBy={items.find((i) => i.parent === focused.id && i.product === focused.product && i.status !== 'done') ?? null}
                   filed={threadsMade(items, focused).map((i) => ({ id: i.id, title: rowTitle(i), state: stateOfMine(i), approve: approvableFiled(i, stateOfMine(i)), item: i }))}
@@ -7915,6 +7998,7 @@ export default function App() {
                   onReopen={() => sendBack(focused)}
                   onReopenDone={() => reopenDone(focused)}
                   onMove={() => { setPaletteTyped('Move to '); setModal('palette'); }}
+                  onPriority={(value) => { void retag([focused], value); }}
                   session={snap.supervisor.running.find((r) => r.itemId === focused.id) ?? null}
                   // WHAT THE FLEET IS DOING ABOUT THIS ROW, through `factsFor`,
                   // which is the builder every row already reads. Written out
@@ -8160,7 +8244,7 @@ export default function App() {
           codexModelDefault={codexModelDefault}
           // THE TUTORIAL SENDS ITS TASK INTO THE PRACTICE PROJECT, so the card
           // opens on that project rather than on whatever was last used.
-          defaultProduct={walkCard ? (run!.practice ?? run!.product) : productFilter}
+          defaultProduct={walkCard ? (run!.practice ?? run!.product) : projectOnScreen({ filter: productFilter, open: focused })}
           /* THE WALK'S OWN TASK, ALREADY WRITTEN. The beat is about pressing
              send, not about thinking of something to ask, so the words are in
              the box when the card opens. `scripted` is what lets this one task
@@ -8214,7 +8298,7 @@ export default function App() {
             // SHOW WHERE IT WENT (2026-10-01: a new thread looked as if it
             // was never made, since it was not in the inbox). Alone, the tab
             // moves to where it landed; on a team, the toast and its O say so.
-            const landsOn = tabAfterSending({ team: teamMode, kind: how.kind, first, later, view, covered: teamOpen || !!focused });
+            const landsOn = tabAfterSending({ team: teamMode, kind: how.kind, first, later, view, covered: teamOpen || !!focused || homeShown });
             if (landsOn) {
               setView(landsOn);
               setSelected(0);
@@ -8330,7 +8414,9 @@ export default function App() {
         batch={multiSel.size > 0}
         look={look}
         machine={machine}
-        onSetLook={(l) => { setLook(l); setModal(null); }}
+        onSetLook={(l) => { chooseLook(l); setModal(null); }}
+        skyThemes={homeSet.on ? SKY_THEMES.map((k) => ({ id: k.id, name: k.name, on: homeSet.skyTheme === k.id })) : []}
+        onSkyTheme={(id) => { chooseSkyTheme(id); setModal(null); }}
         staleFiles={snap.restartNeeded?.files ?? []}
         /*
          * A newer Agentbox that has already downloaded itself. The palette is
@@ -8647,8 +8733,9 @@ export default function App() {
           onSectionChange={setSettingsPage}
           onPaneChange={setSettingsAt}
           look={pickedLook ?? look}
-          onSetLook={setLook}
+          onSetLook={chooseLook}
           keyHints={keyHints}
+          onSkyTheme={chooseSkyTheme}
           onSetKeyHints={setHints}
           tune={tune}
           onSetTune={setTune}
@@ -8659,7 +8746,14 @@ export default function App() {
             setCloudSignInAs(email);
             setCloudSetupOpen(true);
           }}
-          cloudPlans={snap.cloud?.managed || snap.cloud?.offered ? { signedIn: !!snap.cloud?.managed, onSignIn: () => { setSettingsOpen(false); setCloudSetupOpen(true); } } : null}
+          cloudPlans={snap.cloud?.managed || snap.cloud?.offered ? {
+            signedIn: !!snap.cloud?.managed, onSignIn: () => { setSettingsOpen(false); setCloudSetupOpen(true); },
+            // The preview has no team of its own, so it draws one from api.ts.
+            teamPlan: (page) => {
+              const known = snap.team?.people?.length ? { people: snap.team.people, meId: snap.team.me?.id ?? null } : api.fixtureTeamPeople();
+              return <TeamBilling {...page} people={known.people} meId={known.meId} />;
+            },
+          } : null}
           startPane={settingsPane}
           onNewProject={() => setNewProject(true)}
           // The Priority page: the same running order every project list
@@ -8771,6 +8865,7 @@ export default function App() {
                 walking: runRef.current !== null,
                 offered: !neverOffered(localStorage),
                 touring: tourRef.current !== null,
+                writing: modalNow.current === 'compose' || clearWriting,
               })) setOffer({ product: slug });
             } catch (err) {
               // Nothing is held open any more, because nothing was typed: the
@@ -9046,10 +9141,8 @@ export default function App() {
         const { card: a, verdict, waiting } = stage;
         if (!a) return null;
         if (onPhone() && minimizedApproval === a.id) return null;
-        // WHAT IT IS ASKING AND WHAT IT IS ASKING ABOUT, and neither is
-        // hardcoded any more: "asks to run" over a diff is a lie, and it is the
-        // first thing she reads. approval-card.ts is the only copy.
-        const reads = approvalReads(a.input, a.tool);
+        // What it wants in words, the exact thing, and where: approval-card.ts is the only copy.
+        const view = approvalView(a.input, a.tool);
         return (
           <div className="approvals" ref={cardRoom}>
             <div className="approval-stack">
@@ -9064,112 +9157,53 @@ export default function App() {
                     <span className="approval-verdict-word">{verdict === 'allow' ? 'Allowed' : 'Denied'}</span>
                   </div>
                 )}
-                {/* THE ORDER OF THIS CARD. The most important thing to see is
-                    what the command will do; the chat and the folder are lower
-                    in the hierarchy; and too many stacked lines of text are
-                    hard to process, so anything unnecessary is cut.
-
-                    So the card is four blocks and was six:
-
-                      1. WHAT WILL HAPPEN, in words. The worker's own
-                         description of the command, which is the most
-                         important thing on the card.
-                      2. THE COMMAND ITSELF, which is the thing being
-                         authorised and the only part that has to be exact.
-                      3. ONE quiet line carrying the two lower things, the
-                         chat and the folder, plus the verb.
-                      4. Allow and Deny.
-
-                    "<Product> asks to run" is no longer a block of its own. It
-                    is the fallback for block 1 and appears only when there is
-                    no description, which is the only case where it is the best
-                    sentence the card has. The verb is never lost: with a
-                    description it rides the quiet line, because "asks to run"
-                    over a patch would still be a lie and approval-card.ts is
-                    still the only place that decides it.
-
-                    The transparency is not touched; it was already right. */}
+                {/* Who is asking (the agent and its thread, which opens behind
+                    the card), what it wants in words, the exact thing being
+                    authorised, then where. The exact thing is never cut here:
+                    the one cap is in main/codex-approvals.mjs, which says how
+                    much it dropped, and the block scrolls. */}
                 {(() => {
                   const row = approvalRow(a.item);
                   const mcp = a.tool.startsWith('mcp__');
-                  const product = approvalAsker(row ? rowTitle(row) : null, snap.products.find((p) => p.slug === a.product)?.name ?? a.product ?? 'an agent');
-                  const said = !mcp && (a.input as any)?.description
-                    ? String((a.input as any).description).slice(0, 200)
-                    : null;
+                  const agent = row ? (harnessOf(row) === 'codex' ? 'Codex' : 'Claude Code') : null;
+                  const asker = approvalAsker(row ? rowTitle(row) : null, snap.products.find((p) => p.slug === a.product)?.name ?? a.product ?? 'An agent');
                   const cwd = !mcp && (a.input as any)?.cwd ? String((a.input as any).cwd) : null;
-                  // WITH a description the verb goes quiet and keeps the folder
-                  // company. WITHOUT one it is already the loudest line on the
-                  // card, and repeating it underneath would be the card saying
-                  // one thing twice, which is the clutter this card cuts.
-                  const where = [said ? reads.what : null, cwd ? `in ${cwd}` : null]
-                    .filter(Boolean).join(' ');
+                  const body = view.body;
                   return (
                     <>
-                      <div className="approval-lede">
-                        <span className="approval-lede-text">
-                          {said ?? <>{product} {reads.what}</>}
-                        </span>
-                        {waiting > 0 && <span className="approval-count">+{waiting} waiting</span>}
+                      <div className="approval-from">
+                        {row ? (
+                          <button type="button" className="approval-task" title="Open this thread. The card stays where it is." onClick={() => openApprovalRow(a.item)}>
+                            <span className="approval-task-title">{agent} · {asker}</span>
+                            <span className="approval-task-go" aria-hidden="true">↗</span>
+                          </button>
+                        ) : <span className="approval-task-title">{asker}</span>}
+                        {waiting > 0 && <span className="approval-count">{waiting} more waiting</span>}
                         {onPhone() && <button type="button" className="approval-minimize" onClick={() => setMinimizedApproval(a.id)}>Minimize</button>}
                       </div>
-                      {/* THE WHOLE THING SHE IS ANSWERING ABOUT, AND THE CAP IS
-                          NOT HERE. This sliced to 400 characters with no mark on
-                          it while nothing capped the card at the source, so she
-                          read four hundred characters and authorised however
-                          many there were. The display boundary and the
-                          enforcement boundary must not differ, and on Codex they
-                          differ constantly: it reads, searches and edits by
-                          running shell commands, so a long one is the ordinary
-                          case, and a patch is longer again. The one cap left is
-                          in main/codex-approvals.mjs, which says out loud how
-                          much it dropped, and this <pre> scrolls (styles.css). */}
-                      <pre className="approval-cmd">{approvalShown(reads.body, a.tool)}</pre>
-                      {/* AND WHAT ELSE THE YES OPENS, which is the half a card
-                          can be silent about while still looking complete. A
-                          command approval carries the host the sandbox would be
-                          opened to, and a patch approval can carry a root it
-                          asks to write anywhere under for the rest of the run.
-                          Both were on the params and neither reached her.
-
-                          THEY STAY WITH THE COMMAND, ABOVE THE QUIET LINE. They
-                          are not the same kind of fact as the folder any more:
-                          the folder is context that belongs lower, and these two
-                          widen what the yes does. A round that cut the card to
-                          four blocks left these below the chat for one commit,
-                          which put the most dangerous sentence on the card
-                          under the least important one. */}
-                      {!mcp && (a.input as any)?.host && (
-                        <div className="approval-opens">opens the network to {String((a.input as any).host)}</div>
+                      <div className="approval-lede">{view.title}</div>
+                      {body.kind === 'text' && <pre className="approval-cmd">{body.text}</pre>}
+                      {body.kind === 'diff' && (
+                        <div className="approval-cmd approval-diff">
+                          {body.lines.map((l, i) => <div key={i} className={`approval-dl ${l.mark}`}><span className="approval-dm" aria-hidden="true">{l.mark === 'add' ? '+' : l.mark === 'del' ? '−' : ''}</span><span>{l.text}</span></div>)}
+                        </div>
+                      )}
+                      {body.kind === 'fields' && (
+                        <div className="approval-cmd approval-fields">
+                          {body.rows.map(([k, v]) => <div key={k} className="approval-fr"><span className="approval-fk">{k}</span><span className="approval-fv">{v}</span></div>)}
+                        </div>
+                      )}
+                      {/* What else the yes opens stays with the exact thing, above the folder. */}
+                      {!mcp && (a.input as any)?.host && body.kind === 'text' && body.text !== String((a.input as any).host) && (
+                        <div className="approval-opens">Opens the network to {String((a.input as any).host)}</div>
                       )}
                       {!mcp && (a.input as any)?.grantRoot && (
-                        <div className="approval-opens">and asks to write anywhere under {String((a.input as any).grantRoot)} for the rest of this run</div>
+                        <div className="approval-opens">And asks to write anywhere under {String((a.input as any).grantRoot)} for the rest of this run</div>
                       )}
-                      {/* THE TWO THINGS SHE PUT AT THE BOTTOM, on one line
-                          between them. The folder is still here and still
-                          matters: `cat auth.json` in a scratch clone and in her
-                          home directory are the same eleven characters and two
-                          different questions. It is simply no longer a stack of
-                          its own.
-
-                          The chat is the way into the agent, and pressing it
-                          opens that row BEHIND the card without answering
-                          anything. A row that has gone draws no button: a title
-                          she cannot click through to is a caption pretending to
-                          be a door. */}
-                      {(where || row) && (
-                        <div className="approval-meta">
-                          {where && <span className="approval-where">{where}</span>}
-                          {row && (
-                            <button
-                              type="button"
-                              className="approval-task"
-                              title="Open this agent. The card stays where it is."
-                              onClick={() => openApprovalRow(a.item)}
-                            >
-                              <span className="approval-task-title">{row.title}</span>
-                              <span className="approval-task-go" aria-hidden="true">↗</span>
-                            </button>
-                          )}
+                      {(view.where || body.kind === 'diff') && (
+                        <div className="approval-where" title={cwd ?? undefined}>
+                          {view.where}
+                          {body.kind === 'diff' && (body.added || body.removed) ? <>{view.where ? ' · ' : ''}<span className="approval-add">+{body.added}</span> <span className="approval-del">−{body.removed}</span></> : null}
                         </div>
                       )}
                     </>
@@ -9179,9 +9213,8 @@ export default function App() {
                   {/* The acknowledgement starts on the press, not on the round
                       trip: main answers the file and echoes the same verdict
                       back, so the click and the chord land on one behaviour. */}
-                  <button className="approval-allow" onPointerDown={() => { approvalPress.current = `${a.id}:true`; }} onPointerCancel={() => { approvalPress.current = null; }} onClick={(e) => clickCard(a.id, true, e.detail)}>Allow</button>
-                  <button className="approval-deny" onPointerDown={() => { approvalPress.current = `${a.id}:false`; }} onPointerCancel={() => { approvalPress.current = null; }} onClick={(e) => clickCard(a.id, false, e.detail)}>Deny</button>
-                  <span className="approval-hint">{chord('⌘Y')} / {chord('⌘N')} · {a.tool}</span>
+                  <button className="approval-allow" onPointerDown={() => { approvalPress.current = `${a.id}:true`; }} onPointerCancel={() => { approvalPress.current = null; }} onClick={(e) => clickCard(a.id, true, e.detail)}>Allow<span className="approval-key">{chord('⌘1')}</span></button>
+                  <button className="approval-deny" onPointerDown={() => { approvalPress.current = `${a.id}:false`; }} onPointerCancel={() => { approvalPress.current = null; }} onClick={(e) => clickCard(a.id, false, e.detail)}>Deny<span className="approval-key">{chord('⌘2')}</span></button>
                 </div>
               </div>
             </div>

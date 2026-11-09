@@ -43,6 +43,10 @@ export const RERUN_POLLS = 30;
 
 const STATE = 'main-tests.json';
 const WORKFLOW = 'tests';
+// Its own file, so the two watches, which run at once, never write over each other.
+const SECURITY_STATE = 'main-security.json';
+const SECURITY = 'security';
+const RUN_FIELDS = 'databaseId,headSha,status,conclusion,displayTitle,url';
 const LOG_BYTES = 16 * 1024 * 1024;
 
 export interface RedRecord {
@@ -269,8 +273,14 @@ export function redContext({ sha, machines }: { sha: unknown; machines: MachineR
   ].join(' ');
 }
 
+const TESTS_FIX = [
+  'Make main green again. Run the failing tests by name and watch them fail,',
+  'then fix whichever is wrong, the code or the test. If you cannot make them',
+  'pass in this run, undo the commit that broke them with `git revert` instead.',
+];
+
 /** What the row asks of whoever picks it up: an agent on its own, or a person once the fixes have failed. */
-function whatToDo({ tries, before }: { tries: number; before: string | null }) {
+function whatToDo({ tries, before, fix = TESTS_FIX }: { tries: number; before: string | null; fix?: string[] }) {
   const after = before ? [`The fix in ${before} shipped and main is still red, so this is try ${tries}.`, ''] : [];
   if (tries > FIX_TRIES) {
     return [
@@ -281,9 +291,7 @@ function whatToDo({ tries, before }: { tries: number; before: string | null }) {
   }
   return [
     ...after,
-    'Make main green again. Run the failing tests by name and watch them fail,',
-    'then fix whichever is wrong, the code or the test. If you cannot make them',
-    'pass in this run, undo the commit that broke them with `git revert` instead.',
+    ...fix,
     '',
     'This fix ships without waiting for approval: on 2026-10-29 it was agreed',
     '(w-73e6011de3) that a fix for a red main ships on its own. When the tests',
@@ -344,6 +352,81 @@ export function noRunnerRow({ sha, subject, url, machines }: { sha: unknown; sub
   };
 }
 
+// Semgrep's text output: a file path alone on a line, then `❯❱ rule` per rule,
+// then `224┆ code` per matched line, with `⋮┆----` between matches. Only the
+// first line of each match counts. scripts/audit-packages.mjs prints
+// `  high pkg range: title` per advisory it refuses.
+const SEMGREP_FILE = /^[\w@.-]+(?:\/[\w@.-]+)*\.\w+$/;
+const SEMGREP_RULE = /^❯+❱\s+(\S+)/;
+const SEMGREP_LINE = /^(\d+)┆/;
+const SEMGREP_NEXT = /^⋮┆/;
+const ADVISORY = /^(critical|high)\s+(\S+)\s+([^:]*):\s*(.+)$/;
+
+/** Each semgrep finding and refused advisory a security log names, once each. */
+export function securityFindingsIn(log: unknown): string[] {
+  const found: string[] = [];
+  const keep = (f: string) => { if (!found.includes(f)) found.push(f); };
+  let file = '';
+  let rule = '';
+  let fresh = false;
+  for (const raw of String(log ?? '').split('\n')) {
+    const line = clean(raw);
+    const advisory = ADVISORY.exec(line);
+    const ruled = SEMGREP_RULE.exec(line);
+    const at = SEMGREP_LINE.exec(line);
+    if (advisory) keep(`${advisory[2]} ${advisory[3].trim()}: ${advisory[4]} (${advisory[1]})`);
+    else if (ruled) { rule = ruled[1]; fresh = true; }
+    else if (SEMGREP_NEXT.test(line)) fresh = true;
+    else if (at) {
+      if (fresh && file && rule) keep(`${file}:${at[1]} ${rule}`);
+      fresh = false;
+    } else if (SEMGREP_FILE.test(line)) { file = line; rule = ''; }
+  }
+  return found;
+}
+
+const SECURITY_RED = "main's security run went red on GitHub";
+// `renderer/src/x/NeedCard.tsx:224 javascript.express....express-res-sendfile`
+// is `NeedCard.tsx:224 express-res-sendfile` in a title.
+const shortFinding = (f: string) => {
+  const m = /^(\S+:\d+) (\S+)$/.exec(f);
+  return m ? `${m[1].split('/').pop()} ${m[2].split('.').pop()}` : f;
+};
+
+/** The row for a red security run: what it found, the commit, and what to do. */
+export function securityRow({ sha, subject, url, found, tries = 1, before = null }: { sha: unknown; subject?: string | null; url?: string | null; found: string[]; tries?: number; before?: string | null }) {
+  let title = `${SECURITY_RED}, and its log names no finding`;
+  if (found.length === 1) title = `${SECURITY_RED}: ${shortFinding(found[0])}`;
+  if (found.length > 1) title = `${SECURITY_RED}: ${found.length} findings`;
+  return {
+    title: tries > 1 ? title.replace(SECURITY_RED, "main's security run is still red after a fix") : title,
+    problem: found.length
+      ? `main's security run went red on GitHub at ${shortSha(sha)}: ${found.slice(0, 3).join('; ')}${found.length > 3 ? `, and ${found.length - 3} more` : ''}.`
+      : `main's security run went red on GitHub at ${shortSha(sha)}, and its log names no finding. The run itself is in the task.`,
+    body: [
+      "main's `security` run went red on GitHub, at this commit:",
+      '',
+      `    ${shortSha(sha)}  ${subject || 'no title'}`,
+      '',
+      ...(found.length ? found.map((f) => `- ${f}`) : ['- its log names no finding']),
+      '',
+      ...(url ? [`The whole run: ${url}`, ''] : []),
+      ...whatToDo({
+        tries,
+        before,
+        fix: [
+          'Make main green again. The checks are in .github/workflows/security.yml:',
+          'run its semgrep command, or `node scripts/audit-packages.mjs`, and watch',
+          'it fail. Fix the code. A semgrep finding you have read and know is a',
+          'false alarm gets `// nosemgrep: <rule id>` on the line above it, with a',
+          'comment saying why. If neither works, undo the commit that caused it with',
+          '`git revert`.',
+        ],
+      }),
+    ].join('\n'),
+  };
+}
+
 /** What that row hears when main comes back. */
 export function greenAgain({ sha, subject }: { sha: unknown; subject?: string | null }): string {
   return `main's tests are green again on GitHub, as of ${shortSha(sha)}${subject ? ` (${subject})` : ''}.`;
@@ -394,20 +477,20 @@ export class MainTests {
 
   stop() { this.stopped = true; }
 
-  stateFile() { return path.join(this.userDir, STATE); }
+  stateFile(name = STATE) { return path.join(this.userDir, name); }
 
-  read(): MainTestsState {
+  read(name = STATE): MainTestsState {
     try {
-      const raw = JSON.parse(fs.readFileSync(this.stateFile(), 'utf8')) as MainTestsState | null;
+      const raw = JSON.parse(fs.readFileSync(this.stateFile(name), 'utf8')) as MainTestsState | null;
       return raw && typeof raw === 'object' ? raw : {};
     } catch { return {}; }
   }
 
-  write(state: MainTestsState) {
+  write(state: MainTestsState, name = STATE) {
     try {
-      const tmp = `${this.stateFile()}.${process.pid}.tmp`;
+      const tmp = `${this.stateFile(name)}.${process.pid}.tmp`;
       fs.writeFileSync(tmp, `${JSON.stringify(state)}\n`);
-      fs.renameSync(tmp, this.stateFile());
+      fs.renameSync(tmp, this.stateFile(name));
     } catch (e) { this.log.warn?.(`main-tests: could not record where main stands: ${(e as Error).message}`); }
   }
 
@@ -426,7 +509,7 @@ export class MainTests {
     while (!this.stopped) {
       const runs = await this.ask<GhRun[]>(
         ['run', 'list', '--branch', 'main', '--workflow', WORKFLOW, '-L', '20',
-          '--json', 'databaseId,headSha,status,conclusion,displayTitle,url'],
+          '--json', RUN_FIELDS],
         cwd,
       );
       // No gh, signed out, or no access to this repository: nothing, quietly.
@@ -574,6 +657,70 @@ export class MainTests {
     this.write({ ...state, red: { product: product.slug, id: filed.id, sha: run.headSha, tests: known, tries } });
     this.log.info?.(`main-tests: main went red at ${shortSha(run.headSha)}; filed ${filed.id}, try ${tries}.`);
     return filed;
+  }
+
+  /**
+   * The same watch over the `security` run (semgrep and the package audit):
+   * one row per red spell, a fix that starts on its own, and the green again
+   * on that row. A starved runner is not chased here; it ends `cancelled`,
+   * which says nothing, as it does for the tests.
+   */
+  async watchSecurity({ product, sha, item }: { product?: MainTestsProduct; sha?: string; item?: { id?: string } | null } = {}) {
+    const cwd = product?.repoPath;
+    if (!cwd || !sha || !fs.existsSync(cwd)) return null;
+    const until = this.now() + GIVE_UP_MS;
+    while (!this.stopped) {
+      const runs = await this.ask<GhRun[]>(['run', 'list', '--branch', 'main', '--workflow', SECURITY, '-L', '20', '--json', RUN_FIELDS], cwd);
+      if (!runs) return null;
+      const run = runFor(runs, sha);
+      const says = verdict(run);
+      if (says === 'ignore') return null;
+      if (says === 'passing') return this.securityGreen(run!);
+      if (says === 'failing') return this.securityRed(product!, run!, cwd, item);
+      if (this.now() >= until) {
+        this.log.info?.(`main-tests: ${shortSha(sha)}'s security run has not finished in half an hour; leaving it.`);
+        return null;
+      }
+      await this.wait(POLL_MS);
+    }
+    return null;
+  }
+
+  async securityRed(product: MainTestsProduct, run: GhRun, cwd: string, shipped: { id?: string } | null | undefined) {
+    const found: string[] = [];
+    for (const job of await this.jobsIn(run, cwd)) {
+      if (String(job?.conclusion ?? '') !== 'failure') continue;
+      const { code, out } = await this.gh(['api', `repos/{owner}/{repo}/actions/jobs/${job.id}/logs`], { cwd });
+      if (code === 0) found.push(...securityFindingsIn(out).filter((f) => !found.includes(f)));
+    }
+    const state = this.read(SECURITY_STATE);
+    if (state.red && !(shipped?.id && shipped.id === state.red.id)) return null;
+    const tries = state.red ? (state.red.tries ?? 1) + 1 : 1;
+    const row = { ...securityRow({ sha: run.headSha, subject: run.displayTitle, url: run.url, found, tries, before: state.red?.id ?? null }), kind: 'task' };
+    let filed: { id: string };
+    try {
+      filed = tries > FIX_TRIES
+        ? this.store.fileItem(product.slug, row)
+        : this.store.fileMainFix(product.slug, { ...row, labels: [MAIN_RED_LABEL] });
+    } catch (e) {
+      this.log.warn?.(`main-tests: could not file the red security run: ${(e as Error).message}`);
+      return null;
+    }
+    this.write({ red: { product: product.slug, id: filed.id, sha: run.headSha, tests: [], tries } }, SECURITY_STATE);
+    this.log.info?.(`main-tests: main's security run went red at ${shortSha(run.headSha)}; filed ${filed.id}, try ${tries}.`);
+    return filed;
+  }
+
+  securityGreen(run: GhRun) {
+    const { red } = this.read(SECURITY_STATE);
+    if (!red) return null;
+    try {
+      this.store.noteItem(red.product, red.id, `main's security run is green again on GitHub, as of ${shortSha(run.headSha)}${run.displayTitle ? ` (${run.displayTitle})` : ''}.`);
+    } catch (e) {
+      this.log.warn?.(`main-tests: could not say the security run is green again: ${(e as Error).message}`);
+    }
+    this.write({ red: null }, SECURITY_STATE);
+    return null;
   }
 
   /** The green again, on the row that reported the red. */

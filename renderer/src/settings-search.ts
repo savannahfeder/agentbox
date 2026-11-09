@@ -60,7 +60,6 @@ const ENTRIES: Entry[] = [
   { page: 'appearance', label: 'Blur and darkness', anchor: 'tune', words: 'tint dim glass transparency' },
   { page: 'shortcuts', label: 'Keyboard shortcuts', words: 'keys hotkeys keybindings' },
   { page: 'phone', label: 'Use it on your phone', anchor: 'phone', words: 'phone mobile qr code scan remote tailscale wifi home screen app' },
-  { page: 'phone', label: 'Connected devices', anchor: 'phone-devices', words: 'devices phones connected who reset key' },
   { page: 'alpha', label: 'Rooms', anchor: 'alpha', words: 'alpha beta early try team teammates friends multiplayer people chat' },
   { page: 'rooms', label: 'Show my full name', anchor: 'rooms-name', words: 'name last surname initial' },
   { page: 'rooms', label: 'What you are working on', anchor: 'rooms-card', words: 'card thread private wall' },
@@ -102,17 +101,21 @@ const words = (s: string) => s.toLowerCase().split(/[^a-z0-9.]+/).filter(Boolean
 // Every typed word has to be the start of some word in the text.
 const covers = (have: string[], want: string[]) => want.every((w) => have.some((h) => h.startsWith(w)));
 
-export function searchSettings(query: string, { pages, projects = [] }: {
+/** `rows` is `page/label` for each row a screen draws, when it draws fewer than the desktop (the phone app). */
+export function searchSettings(query: string, { pages, projects = [], rows }: {
   pages: readonly string[];
   projects?: Array<{ slug: string; name: string }>;
+  rows?: readonly string[];
 }): SettingsHit[] {
   const want = words(query);
   if (!want.length) return [];
   const open = new Set(pages);
+  const drawn = rows ? new Set(rows) : null;
   const named: SettingsHit[] = [];
   const hidden: SettingsHit[] = [];
   for (const e of ENTRIES) {
     if (!open.has(e.page)) continue;
+    if (drawn && !drawn.has(`${e.page}/${e.label}`)) continue;
     const page = pageLabel(e.page);
     const hit = { page: e.page, label: e.label, pageLabel: page, anchor: e.anchor };
     // The name, with the page's own name, so "codex permission" finds the Codex

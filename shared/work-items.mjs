@@ -179,6 +179,9 @@ export const WORK_ITEM_FIELDS = [
   // THE NOTES ON A FILE THIS ANSWER HANDS THE AGENT, by note id. A mark on one
   // line: the thread draws the notes themselves, not the instruction made of them.
   'fromNotes',
+  // On an answer with `fromNotes`, the words the person typed after the notes:
+  // the thread draws these as their reply, the agent gets the whole answer.
+  'typed',
   // WHICH COMMAND FROM HER PHONE WROTE THIS LINE (docs/cloud/PHONE-PLAN.md):
   // the command's id, on the line of the reply or the new thread it made. It
   // is how the computer, starting again after stopping half way through a
@@ -455,7 +458,7 @@ function coerceField(field, value) {
     // rule about how the app writes, and it lives with the writer in
     // main/row-label.mts. This module holds no taxonomy, only storage.
     case 'label': return str(value, MAX_TITLE);
-    case 'body': case 'result': case 'note': case 'answer': return str(value, MAX_TEXT_BYTES);
+    case 'body': case 'result': case 'note': case 'answer': case 'typed': return str(value, MAX_TEXT_BYTES);
     // kind and product are free strings on purpose: the taxonomy of work is the
     // caller's to invent and change without a migration here.
     //
@@ -671,6 +674,7 @@ export function finishItem(raw, now = Date.now()) {
     delete item.artifactLines;
   }
   delete item.closedFrom;
+  delete item.snoozedFrom;
   const closes = item.closes;
   delete item.closes;
   const editLines = item.editLines;
@@ -769,12 +773,13 @@ export function foldRawInto(items, lines, touched = null) {
     // who spoke last in the chat itself and in each thread. Only a person's own
     // words count (a line with a writer), and only rows with people on them keep
     // the result (see the end of the fold).
-    const words = typeof patch.answer === 'string' && patch.answer !== WITHDRAWN ? patch.answer
-      : typeof patch.body === 'string' ? patch.body : null;
+    const words = patch.fromNotes ? (typeof patch.typed === 'string' ? patch.typed : null)
+      : typeof patch.answer === 'string' && patch.answer !== WITHDRAWN ? patch.answer
+        : typeof patch.body === 'string' ? patch.body : null;
     // A teammate's reply, written by the app on this Mac and so stamped with
     // this person's `by`, is not something this person said.
     const told = line.source === 'system' && patch.from && typeof patch.answer === 'string' ? patch.from : null;
-    if (line.by && words && words.trim() && !told && !patch.fromNotes) {
+    if (line.by && words && words.trim() && !told) {
       const close = item.status === 'done' ? item.wrote.status : null;
       const crossed = close?.by && close.by !== line.by && line.ts < close.ts && !item.said?.some((s) => s.uid && s.uid === line.uid);
       (item.said ??= []).push({ uid: line.uid ?? null, by: line.by, ts: line.ts, text: words.trim().slice(0, TALK_TEXT), inReplyTo: patch.inReplyTo ?? null, body: typeof patch.answer !== 'string', ...(crossed ? { crossed: close.ts } : {}), ...(patch.voice ? { voice: patch.voice } : {}), ...(patch.forAgent ? { forAgent: patch.forAgent } : {}) });
@@ -805,7 +810,7 @@ export function foldRawInto(items, lines, touched = null) {
       }
       // WHICH MESSAGE A REPLY ANSWERS belongs to that reply's line alone. Held
       // as a value, the row would carry the newest reply's parent forever.
-      if (field === 'inReplyTo' || field === 'from' || field === 'voice' || field === 'forAgent' || field === 'fromNotes' || field === 'putAway') continue;
+      if (field === 'inReplyTo' || field === 'from' || field === 'voice' || field === 'forAgent' || field === 'fromNotes' || field === 'typed' || field === 'putAway') continue;
       if (field === 'comment') {
         if (line.by && String(line.uid ?? '').startsWith('comment-') && !isContinuedNote(value.text)) (item.waitingComments ??= []).push({ by: line.by, ts: line.ts, text: value.text });
         continue;
@@ -851,13 +856,21 @@ export function foldRawInto(items, lines, touched = null) {
     // by whoever closed it, with no news between, sets `placedAt` to where the
     // close found the row, and the lists sort on it. `updatedAt` still only
     // moves forward: team sync and the caches read it as "something changed".
-    const bareStatus = line.source === 'founder' && Object.keys(patch).length === 1 ? patch.status : undefined;
+    // Later taken straight back is the same: a bare `snoozedUntil` of 0.
+    const bare = line.source === 'founder' && Object.keys(patch).length === 1;
+    const bareStatus = bare ? patch.status : undefined;
+    const bareLater = bare && 'snoozedUntil' in patch ? Number(patch.snoozedUntil) || 0 : undefined;
     if (bareStatus === 'open' && item.closedFrom && item.closedFrom.by === line.by) {
       item.placedAt = item.closedFrom.at;
       delete item.closedFrom;
+    } else if (bareLater === 0 && item.snoozedFrom && item.snoozedFrom.by === line.by) {
+      item.placedAt = item.snoozedFrom.at;
+      delete item.snoozedFrom;
     } else if (!isNotNews(line)) {
       if (bareStatus === 'done') item.closedFrom ??= { at: item.placedAt ?? item.updatedAt, by: line.by };
       else delete item.closedFrom;
+      if (bareLater > 0 && !item.snoozedFrom) item.snoozedFrom = { at: item.placedAt ?? item.updatedAt, by: line.by };
+      else delete item.snoozedFrom;
       delete item.placedAt;
     }
     if (!isNotNews(line)) item.updatedAt = Math.max(item.updatedAt, line.ts);
