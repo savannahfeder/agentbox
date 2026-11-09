@@ -59,7 +59,7 @@ import { handOffStart, joinNames, laterHint, replyWaitsUntil, taskHandOff, tabAf
 import { keyOnAnOpenThread, keyOnTheList, rowKey as actsOnARow, replyingTo, screenJustChanged, HELD_AFTER_A_CHANGE, NOWHERE_TO_TYPE, STILL_TYPING_MS } from './reply-keys';
 import { chosenNames, whoSees } from './threads/summary-rules';
 import { shownToPeople, visibilityOf } from '../../shared/thread-cards.mjs';
-import { openTo, sentWords, threadLink, type ShareActs } from './threads/share-rules';
+import { openTo, sentWords, sharedThreadOfDoc, threadLink, type ShareActs } from './threads/share-rules';
 
 const SHARE_LAST = 'agentbox:share-last';
 import { changePathFor } from './code-artifact';
@@ -208,6 +208,7 @@ import { isNew } from '../../shared/notify-rules.mjs';
 import { closedByTheOther, closedOverWords, inMyInbox, isGivenTask, isShared, isTaskRow, heldByAPerson, runnerOf, iSpokeLast } from '../../shared/team-rules.mjs';
 import { Face, TeamContext, firstName, teamView } from './team/people';
 import { StartTeam } from './team/StartTeam';
+import { inboxBadge } from './needs-count';
 import { namedCards } from './team/company';
 import { FaceHover } from './team/status';
 import { TeamPage } from './team/TeamPage';
@@ -3174,6 +3175,20 @@ export default function App() {
   // it takes. The pane belongs to the task: leaving the task closes it, which
   // is why this is cleared below rather than carried around the app.
   const [openDoc, setOpenDoc] = useState<OpenDoc | null>(null);
+  // A TEAMMATE'S THREAD THAT STOPS BEING SHARED CLOSES, with any file of it open,
+  // rather than staying on screen with files that still open. Only a card seen
+  // on the team's list: a room-mate's card is never on it.
+  const openCardListed = useRef(false);
+  useEffect(() => {
+    if (!openCard) { openCardListed.current = false; return; }
+    const listed = weekCards.some((c) => c.personId === openCard.personId && c.threadId === openCard.threadId);
+    if (listed) { openCardListed.current = true; return; }
+    if (!openCardListed.current) return;
+    openCardListed.current = false;
+    setOpenDoc((d) => (d && sharedThreadOfDoc(d.product, openCard) ? null : d));
+    setOpenCard(null);
+    showToastRef.current?.(`${firstName(team?.byId.get(openCard.personId) ?? null) || 'Your teammate'} no longer shares that thread with you.`);
+  }, [openCard, weekCards, team]);
   const [artifactPreviewSample, setArtifactPreviewSample] = useState(new URLSearchParams(location.search).has('reviewLab') ? 'code' : 'multiple');
   const [reviewStyle,setReviewStyle] = useState('header-tools-open');
   const [focusControlStyle,setFocusControlStyle] = useState<FocusControlStyle>('corners-bare');
@@ -7588,7 +7603,7 @@ export default function App() {
         statuses={multiplayer}
         onAccount={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(false); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
         onSignOut={() => { void api.teamSignOut().then(() => refresh()); }}
-        onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setOpenCard(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }} inboxCount={inbox.length + leadCount} scheduledCount={scheduledCount} view={view} collapsed={sideFolded} onSearch={openSearch} onCompose={() => setModal('compose')} onView={openView}
+        onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setOpenCard(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }} inboxCount={inboxBadge({ rows: inbox.length, leads: leadCount, fileNews: sharedFileNews.length, follows: followingNews.length })} scheduledCount={scheduledCount} view={view} collapsed={sideFolded} onSearch={openSearch} onCompose={() => setModal('compose')} onView={openView}
         onHome={homeSet.on && !onPhone() ? goHome : undefined} homePage={homeShown} onTeammatesPage={teammatesShown} onFiles={() => openFiles(null)} filesPage={filesShown} tasksPage={tasksShown} onConnections={() => openConnectionsPage(null)} connectionsPage={connectionsShown} rail={narrowSidebar} onHover={setRailOpen} onGroupsPage={roomShown || directOpen}
         /* Without Groups the one row under Threads is Chats, and only while there are teammates. */
         groups={roomsUi.live ? roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown || chatsPlaceShown || cardFromPlace, teammatesUi.live || homeLayout === 'chats' ? openChats : undefined, homeLayout === 'chats' ? 'Team' : undefined) : teammatesUi.rail(teammatesShown)} />

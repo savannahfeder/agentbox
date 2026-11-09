@@ -468,18 +468,27 @@ async function start(state) {
   fs.writeFileSync(file, `${JSON.stringify({ ...had, ...copyConfig(state, had) }, null, 2)}\n`);
 
   const fd = fs.openSync(state.log, 'a');
-  const before = fs.existsSync(state.log) ? fs.statSync(state.log).size : 0;
-  const child = spawn(process.execPath, [...stripTypesFlags(), path.join(REPO, 'bin', 'agentbox.mjs'), '--dir', state.data, '--no-open'], {
-    cwd: REPO, detached: true, stdio: ['ignore', fd, fd], env,
-  });
-  child.unref();
-  const deadline = Date.now() + 30_000;
-  let url = null;
-  while (!url && Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, 200));
-    url = fs.readFileSync(state.log, 'utf8').slice(before).match(/http:\/\/127\.0\.0\.1:\d+\/\?token=\S+/)?.[0] ?? null;
-    if (!alive(child.pid)) break;
-  }
+  // A restart keeps its port: a new port is a new origin, and the window's own
+  // storage (threads followed, drafts) would read as wiped to a tester.
+  const kept = state.url ? new URL(state.url).port : '';
+  const launch = async (port) => {
+    const from = fs.statSync(state.log).size;
+    const child = spawn(process.execPath, [...stripTypesFlags(), path.join(REPO, 'bin', 'agentbox.mjs'), '--dir', state.data, '--no-open', ...(port ? ['--port', port] : [])], {
+      cwd: REPO, detached: true, stdio: ['ignore', fd, fd], env,
+    });
+    child.unref();
+    const deadline = Date.now() + 30_000;
+    let found = null;
+    while (!found && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 200));
+      found = fs.readFileSync(state.log, 'utf8').slice(from).match(/http:\/\/127\.0\.0\.1:\d+\/\?token=\S+/)?.[0] ?? null;
+      if (!alive(child.pid)) break;
+    }
+    return { child, found };
+  };
+  let { child, found: url } = await launch(kept);
+  // Somebody else took the old port meanwhile: a new one, as before.
+  if (!url && kept && !alive(child.pid)) ({ child, found: url } = await launch(''));
   if (!url) {
     try { process.kill(-child.pid, 'SIGKILL'); } catch { /* already gone */ }
     stop(`the copy never printed its address. Its log:\n${fs.readFileSync(state.log, 'utf8').slice(-3000)}`);

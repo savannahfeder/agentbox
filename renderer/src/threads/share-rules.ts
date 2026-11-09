@@ -67,3 +67,6 @@ export function sentWords(title: string, link: string, note: string): string {
   const name = String(title || 'A thread').replace(/[[\]]/g, '').trim();
   return note.trim() ? `[${name}](${link})\n\n${note.trim()}` : `[${name}](${link})`;
 }
+
+/** Whether an open file is one of this teammate thread's copies (main/team/thread-share.mjs names their folder). */
+export const sharedThreadOfDoc = (product: string | null | undefined, card: { personId: string; threadId: string }) => product === `shared-thread:${card.personId}:${card.threadId}`;

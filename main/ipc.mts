@@ -81,7 +81,7 @@ import { EVENT_NAMES } from '../shared/analytics-events.mts';
 import { appFinder } from './everything-found.mjs';
 import { appFilesPlace } from './files-place.mjs';
 import { Name } from '../shared/product-name.mjs';
-import { handedOnByReply, isGivenTask } from '../shared/team-rules.mjs';
+import { handedOnByReply, isGivenTask, visibilityWhenMade } from '../shared/team-rules.mjs';
 import { closeRefusal, closedAnywayNote } from '../shared/not-shipped.mts';
 import { lightRunning, snapshotSender } from '../shared/snapshot-delta.mjs';
 import { traceAnswer } from '../shared/trace-delta.mjs';
@@ -1309,7 +1309,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       // WHO DOES IT, when it is a person (the team version): the teammate it
       // goes to and the day it is due, and the two of you as the conversation,
       // so a reply can hand it back. An agent's row carries none of these.
-      assignee, due, visibility,
+      assignee, due, visibility: visibilityWhenMade(visibility, alphaFeatures(config).multiplayer),
       // AND WHO MAY SEE IT, when she chose people rather than the team
       // (w-41ff964775). The store keeps the list only beside 'people'.
       visibleTo,

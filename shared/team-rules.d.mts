@@ -31,3 +31,4 @@ export type PulledLine = Record<string, unknown>;
 export function asPulled(body: Record<string, unknown>, from: { by: string; at: number; me: string | null }): PulledLine;
 export function whatATeammateMaySet(line: unknown, opts?: { direct?: boolean }): { id: unknown; ts: unknown; source: unknown; by: unknown; uid: unknown; patch: Record<string, unknown> } | null;
 export function whatYourOtherCopyMaySet(line: unknown, opts?: { direct?: boolean }): PulledLine | null;
+export function visibilityWhenMade<V extends string | undefined | null>(asked: V, sharing: boolean): V | 'private' | undefined;
