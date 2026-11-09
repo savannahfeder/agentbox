@@ -8,7 +8,7 @@ import { findQuote, viewKind } from '../../../shared/artifact-marks.mjs';
 import { api } from '../api';
 import { canPaintQuotes, paintQuotes } from '../paint-quotes';
 import { fetchableFileUrl } from '../phone-files';
-import { pictureUrl } from '../picture';
+import { opening, pictureUrl, seenAt } from '../picture';
 import { MAX_ZOOM, lowestZoom } from '../picture-view';
 import { filmMarks, filmPins, hasSpot, keepUnder, marksOnPages, nextZoom, pagePins, pageSpot, pictureFit, pinned, pinsToDraw, realZoom, roomInside, wheelZoom, zoomAnchor, zoomWords, type Found } from '../artifact-pins';
 
@@ -555,6 +555,7 @@ function OpenedFile({ product, path, name, byline, notes, carried = [], draft, a
   const opened = found?.opened ?? null;
   const commented = useMemo(() => marksOnPages([...notes, ...carried]), [notes, carried]);
   const url = opened ? pictureUrl(opened) : null;
+  const [at] = useState(opening);
   const bytes = useCallback(async () => {
     const res = await fetch(fetchableFileUrl(url as string));
     if (!res.ok) throw new Error(`${res.status}`);
@@ -574,7 +575,7 @@ function OpenedFile({ product, path, name, byline, notes, carried = [], draft, a
   if (!opened) {
     return <div className="doc-missing">{found.coming ? `${name} is on its way.` : missingSays ? `${name}: ${missingSays}` : `${name} could not be found.`}</div>;
   }
-  if (kind === 'image') return <PictureStage url={url as string} name={name} notes={notes} carried={carried} draft={draft} activeId={activeId} go={go} showResolved={showResolved} keep={keep} onPlace={onPlace} onPick={onPick} onFound={onFound} onAgain={onAgain} />;
+  if (kind === 'image') return <PictureStage url={seenAt(url as string, at)} name={name} notes={notes} carried={carried} draft={draft} activeId={activeId} go={go} showResolved={showResolved} keep={keep} onPlace={onPlace} onPick={onPick} onFound={onFound} onAgain={onAgain} />;
   if (kind === 'film') {
     return <FilmPlayer key={url} url={url as string} name={name} hold={hold} onAgain={onAgain}
       seek={go?.place.kind === 'time' ? { s: go.place.s, at: go.at } : null}

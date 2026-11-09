@@ -140,6 +140,11 @@ export function stopChrome(chrome, profile, { bin = CHROME } = {}) {
  * browser, which lives across many short commands); then its profile should sit
  * inside the instance folder, so `live.mjs down` finds and stops it.
  */
+/** Whether launchChrome would start this browser here, for tests that need a real one. */
+export function canDrive(bin = CHROME, platform = process.platform, exists = fs.existsSync) {
+  return !(platform === 'darwin' && bin === MAC_CHROME) && exists(bin);
+}
+
 export async function launchChrome({ width = 1440, height = 900, profile, detached = false, bin = CHROME, waitMs = 20_000, platform = process.platform } = {}) {
   if (platform === 'darwin' && bin === MAC_CHROME) {
     throw new Error('No test browser on this Mac, and a hidden Google Chrome would stop your own Chrome opening a window. Run `npx playwright install chromium-headless-shell`, then try again.');

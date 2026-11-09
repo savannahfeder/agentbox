@@ -50,3 +50,16 @@ export function pictureUrl(file: string): string {
   const parts = file.split('/').filter(Boolean).map(encodeURIComponent);
   return `${SCHEME}/${parts.join('/')}`;
 }
+
+// Chromium keeps one picture per address for the life of the window, whatever
+// the reply's cache headers say, so a picture redrawn under the same name
+// opened as its old self. Each opening of a viewer asks under its own address.
+let openings = 0;
+/** A new mark for one opening of a viewer. */
+export const opening = () => ++openings;
+
+/** `url` as one opening reads it: the app's own pictures get the opening's mark, any other address is left as it is. */
+export function seenAt(url: string, at: number): string {
+  if (!url?.startsWith(`${SCHEME}/`)) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}seen=${at}`;
+}
