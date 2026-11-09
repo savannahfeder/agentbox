@@ -4,7 +4,7 @@
 // thread page wears it whole; the empty inbox draws it open on the page, as
 // the web app does (Pages.tsx `InboxClear`).
 import { router } from '../lib/router';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { Platform, Pressable, TextInput, View } from 'react-native';
 import { readRule, repeatPresets } from '../../../renderer/src/format';
 import { engineModelLabel } from '../../../renderer/src/models';
@@ -62,6 +62,17 @@ export function useNewThread(sent: () => void) {
   const { model, effort } = chosen[engine] ?? openingFor(appStore, engine, agents.codexDefault);
   const choose = (next: Partial<{ model: string; effort: string | null }>) => setChosen((was) => ({ ...was, [engine]: { model, effort, ...next } }));
   const [sheet, setSheet] = useState<'to' | 'model' | 'project' | 'priority' | 'attach' | 'later' | null>(null);
+  const box = useRef<ComponentRef<typeof TextInput>>(null);
+  const lastSheet = useRef(sheet);
+  // A picked project, agent, model or priority hands the cursor back to the
+  // message, once the sheet's fade is over: until then the sheet holds focus.
+  useEffect(() => {
+    const was = lastSheet.current;
+    lastSheet.current = sheet;
+    if (sheet !== null || !was || was === 'later') return;
+    const t = setTimeout(() => box.current?.focus(), 350);
+    return () => clearTimeout(t);
+  }, [sheet]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const projectName = useMemo(() => projects.find((p) => p.slug === product)?.name ?? '', [projects, product]);
@@ -125,7 +136,7 @@ export function useNewThread(sent: () => void) {
   const send = (later?: Choices) => { offline.clear(); lastLater.current = later; return sendOnce(later); };
   const talk = useDictation(draft, () => void send());
   return {
-    draft, product, projectName, projects, model, effort, sheet, setSheet, busy, error, setError, canSend, send, talk,
+    draft, box, product, projectName, projects, model, effort, sheet, setSheet, busy, error, setError, canSend, send, talk,
     agents, offered, engine, codex, mates, reach, autoHere, onAuto, mate, toWord,
     pickProject: (slug: string) => { setPicked(slug); pickProject(appStore, slug); },
     pickAuto: () => chooseTo({ to: 'agent', mate: null, auto: true }),
@@ -159,7 +170,7 @@ export function SendButtons({ form }: { form: NewThread }) {
 
 /** The four rows and the message. `inline` is the empty inbox's: a shorter box that does not take the keyboard on its own. */
 export function NewThreadFields({ form, inline = false, onFocus, onBlur }: { form: NewThread; inline?: boolean; onFocus?: () => void; onBlur?: () => void }) {
-  const { draft, talk, product, projectName, model, setSheet, error, agents, offered, engine, codex, mate, onAuto, toWord } = form;
+  const { draft, box, talk, product, projectName, model, setSheet, error, agents, offered, engine, codex, mate, onAuto, toWord } = form;
   // A teammate keeps its own model and project; someone new needs only the project it works in.
   const toMate = !!mate && mate !== 'new';
   return (
@@ -193,7 +204,7 @@ export function NewThreadFields({ form, inline = false, onFocus, onBlur }: { for
         </Field>
       )}
       {/* Typing stops dictation with the words kept; tapping the box does not (web-speech.ts). */}
-      <TextInput multiline autoFocus={!inline} value={draft.text} placeholder={toMate ? `Message ${(mate as Teammate).name}` : 'What do you need done?'} placeholderTextColor={color.faint}
+      <TextInput ref={box} multiline autoFocus={!inline} value={draft.text} placeholder={toMate ? `Message ${(mate as Teammate).name}` : 'What do you need done?'} placeholderTextColor={color.faint}
         onChangeText={(t) => { if (talk.active()) talk.leave(); draft.setText(t); }} onFocus={onFocus} onBlur={onBlur}
         style={[{ flex: inline ? undefined : 1, minHeight: inline ? 120 : 160, padding: 16, fontFamily: font.regular, fontSize: 16, lineHeight: 24.8, color: color.text, textAlignVertical: 'top' }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
       <View style={{ paddingHorizontal: 16, paddingBottom: draft.files.length || error || draft.dropped ? 14 : 0, gap: 10 }}>
