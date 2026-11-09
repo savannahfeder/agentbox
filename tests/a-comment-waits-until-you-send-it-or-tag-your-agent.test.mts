@@ -6,7 +6,8 @@
 // main on 2026-11-08: storeItem.tellItem reopened the thread and the next tick
 // spawned it. The person asked for comments that collect and go in one press,
 // to save tokens, and for nobody to be able to spend somebody else's plan.
-// The approved screen is "3 not sent" and Send at the top of the comments.
+// The approved screen was "3 not sent" and Send at the top of the comments; it is now
+// the notes sidebar's Unsent line with Send N (w-858a033e54).
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -141,5 +142,13 @@ describe('the file view', () => {
   it('shows how many are not sent, with Send all, on a bar under the file (comments-you-have-not-sent-show-under-every-picture)', () => {
     expect(view).toMatch(/className="av-unsent-bar"/);
     expect(view).toMatch(/Send all/);
+  });
+  // Since w-858a033e54 this file's waiting notes also sit under Unsent with Send N, as in the notes sidebar:
+  // the-big-viewer-lists-notes-the-way-the-notes-sidebar-does.
+  it('shows Send with how many above this file\'s waiting notes, outside the box', () => {
+    const side = view.slice(view.indexOf('className="av-side"'));
+    expect(side.indexOf('<NotesSection word="Unsent"')).toBeGreaterThan(-1);
+    expect(side.indexOf('<NotesSection word="Unsent"')).toBeLessThan(side.indexOf('{waitingHere.map(card)}'));
+    expect(side.indexOf('<NotesSection word="Unsent"')).toBeLessThan(side.indexOf('className="av-foot"'));
   });
 });
