@@ -13,9 +13,9 @@ import { it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { CHROME, launchChrome, connect, stopChrome } from '../.claude/skills/verify-agentbox/scripts/cdp.mjs';
+import { CHROME, canDrive, launchChrome, connect, stopChrome } from '../.claude/skills/verify-agentbox/scripts/cdp.mjs';
 
-it.skipIf(!fs.existsSync(CHROME))('the next command finds the driven tab visible after the page opened another tab', async () => {
+it.skipIf(!canDrive())('the next command finds the driven tab visible after the page opened another tab', async () => {
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'front-profile-'));
   const { chrome, wsUrl } = await launchChrome({ profile, width: 400, height: 300 });
   try {
@@ -26,8 +26,11 @@ it.skipIf(!fs.existsSync(CHROME))('the next command finds the driven tab visible
     // Whether a popup takes the screen is Chrome's own policy and differs by
     // build, so the sign-in tab is put in front here the way a person's screen
     // puts it there. What the driven tab was left as for the rest of the day:
+    // Google Chrome and Chrome for Testing hide it; the headless shell a Mac
+    // falls back to never hides a tab.
     const signin = await connect(wsUrl, { width: 400, height: 300 });
-    expect(await first.evaluate('document.visibilityState')).toBe('hidden');
+    const shell = CHROME.endsWith('/chrome-headless-shell');
+    expect(await first.evaluate('document.visibilityState')).toBe(shell ? 'visible' : 'hidden');
     signin.detach();
     first.detach();
 

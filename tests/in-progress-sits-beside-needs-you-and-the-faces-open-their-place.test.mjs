@@ -108,14 +108,16 @@ describe('In progress beside Needs you', () => {
     expect(s.rows.map((i) => i.id)).toEqual(['running', 'waits-on-dev', 'a-mates-run', 'l']);
   });
 
-  it('is the second word on the line, and is the same number the list draws', () => {
-    expect(pages).toMatch(/team\?\.progress && <button.*onClick=\{team\.onEverything\}>In progress/);
-    expect(app).toMatch(/progress: !onPhone\(\) \? \{ count: mineShown \? shownCount\(progressTab\) : 0/);
+  // Since 2026-11-09 In progress, Later and Done are tabs of their own on a
+  // computer (with-a-team-each-inbox-state-is-a-tab-of-its-own); the stacked
+  // list and this Tab key are the phone's.
+  it('is the phone\'s one list, and is the same number the list draws', () => {
+    expect(app).toMatch(/progress: \(mineShown \? shownCount\(progressTab\) : 0\) \+ theirCount\('progress'\)/);
     expect(app).toMatch(/stackRows\(\{ progress: shownAs\(progressTab, 'progress'\)/);
   });
 
-  it('is what Tab goes to from Needs you, and Tab comes back', () => {
-    expect(app).toMatch(/if \(teamMode\) \{ if \(view === 'inbox' && !evPick\) pickMember\('me'\); else goNeedsYou\(\); return; \}/);
+  it('is what Tab goes to from Needs you on a phone, and Tab comes back', () => {
+    expect(app).toMatch(/if \(teamMode && onPhone\(\)\) \{ if \(view === 'inbox' && !evPick\) pickMember\('me'\); else goNeedsYou\(\); return; \}/);
   });
 
   it('opens as a list without a team, and as the board, with Later and Done, with one', () => {

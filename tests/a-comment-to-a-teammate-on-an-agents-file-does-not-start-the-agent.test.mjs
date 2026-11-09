@@ -122,5 +122,7 @@ describe("the owner's note on her agent's file", () => {
 
 it('both doors pass the team\'s people to the rule', () => {
   const ipc = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
-  expect(ipc.match(/noteToItsAgent\(\{[^}]*people/g)?.length).toBe(2);
+  const doors = ipc.match(/noteToItsAgent\(\{[^}]*\}/g) ?? [];
+  expect(doors.length).toBeGreaterThanOrEqual(2);
+  for (const door of doors) expect(door).toMatch(/people/);
 });
