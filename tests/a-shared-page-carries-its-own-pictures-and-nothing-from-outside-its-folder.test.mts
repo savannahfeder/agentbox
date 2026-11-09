@@ -64,7 +64,7 @@ describe('what can be shared', () => {
     expect(linkKindOf('s.jpeg')).toEqual({ kind: 'image', type: 'image/jpeg' });
     expect(linkKindOf('r.pdf')).toEqual({ kind: 'pdf', type: 'application/pdf' });
     expect(linkKindOf('f.mp4')).toBeNull();
-    expect(linkKindOf('t.csv')).toBeNull();
+    expect(linkKindOf('t.xlsx')).toBeNull();
   });
   it('sends a picture as base64 and a document as its words', () => {
     expect(fileForLink(path.join(dir, 'designs/w-1/shot.png')).body).toBe(Buffer.from('PNG').toString('base64'));
