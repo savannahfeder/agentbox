@@ -85,7 +85,7 @@ describe('single-key shortcuts', () => {
       .map((m) => m.index)
       .filter((at) => at > start && at < end);
 
-    expect(openers.length).toBeGreaterThan(2); // both L branches, plus r, c and /
+    expect(openers.length).toBeGreaterThan(2); // both L branches, plus r and c
     expect(openers.filter((at) => at < guardAt)).toEqual([]);
   });
 
@@ -97,13 +97,10 @@ describe('single-key shortcuts', () => {
     expect([...inHandler.matchAll(/openSnooze\(/g)].length).toBe(3); // focus mode, batch, single
   });
 
-  // `/` joined the set when task search was built. It is the same rule and the
-  // same cost: the field it opens is the tab row, and without the swallow
-  // every search she starts begins with a stray slash in it and returns
-  // nothing.
+  // `/` left the set when ⌘K became the one search (w-30e94db8cf).
   it('the keys the guard covers are the ones the branches actually use', () => {
     // N opens the same new task box as C (w-fb9051e597). L replaced S on
     // 2026-10-01 when S became the summary's key everywhere in the app.
-    expect([...OPENS_A_TEXT_FIELD].sort()).toEqual(['/', 'c', 'l', 'n', 'r']);
+    expect([...OPENS_A_TEXT_FIELD].sort()).toEqual(['c', 'l', 'n', 'r']);
   });
 });

@@ -1,6 +1,6 @@
 ---
 name: product-loop
-description: Run Agentbox's own product loop. Synthetic power users test the phone app for a workday on the person's Claude Code or Codex plan, paced to use about 90% of that plan's week by its reset, and the run fixes and ships what they find under the project's own instructions. Use when asked for the product loop, the self-improving loop, a workday of testers, testing the phone or iOS app with synthetic users, or spending the Codex week on testing.
+description: Run Agentbox's own product loop. Synthetic power users test the phone app for a workday on the person's Codex plan (never Claude Code), paced to use about 90% of that plan's week by its reset, and the run fixes and ships what they find under the project's own instructions. Use when asked for the product loop, the self-improving loop, a workday of testers, testing the phone or iOS app with synthetic users, or spending the Codex week on testing.
 ---
 
 # The product loop
@@ -8,49 +8,48 @@ description: Run Agentbox's own product loop. Synthetic power users test the pho
 Thread w-e5f506ccb3 is the model: a synthetic team used the multiplayer
 build for whole workdays, logged what broke, agents fixed it, and the same
 team tested the fixes the next day. The person only chose between finished
-screens. This skill runs that loop on its own, one workday per day, on a
-Claude Code or Codex plan, starting with the phone app.
+screens. This skill runs that loop on its own, one workday per day, on the
+Codex plan the person keeps for testing, starting with the phone app.
+
+Testers run on Codex, never Claude Code (2026-11-08): every one is `codex
+exec` on the Codex login with the best plan, unless `--codex-home` names one.
+Never run a tester as a subagent. `../power-test/scripts/codex-tester.mjs`
+starts them for both skills.
 
 ## One workday
 
 ```sh
 L=.claude/skills/product-loop/scripts
-node $L/pace.mjs --engine claude --home ~/.claude-2   # run, hold, wait or stop, and why
-node $L/workday.mjs --who founder,startup-engineer,new-user --minutes 30 --pace --hours 10 \
-  --engine claude --claude-home ~/.claude-2
+node $L/pace.mjs                    # run, hold, wait or stop, and why
+node $L/workday.mjs --who founder,startup-engineer,new-user --minutes 30 --pace --hours 10
 ```
 
 `workday.mjs` builds the phone app's browser preview (`EXPO_PUBLIC_PREVIEW=1`,
 made-up threads, nothing signed in), serves it, and gives each person from
 `../power-test/people` a folder with two commands: `phone` (the app at an
 iPhone's size, touch on: look, tap, type, swipe, shot, away) and `diary`. A
-Claude tester is `claude -p` allowed only those two commands and reading its
-own folder, on the login `--claude-home` names, with every API key stripped.
-A Codex tester is `codex exec` in a sandbox with the local network open.
-Each stretch after the first is told what was already logged. `--pace` keeps
-starting stretches while that login's week is behind its line, waits out a
-full 5-hour window, and stops at the target or at `--hours`. Claude reports
-several weeks (all models, Opus, Sonnet) and the fullest is paced; a Claude
-day whose usage cannot be read does not start, since nothing else would pace it. `report.md` in the run
-folder ranks every issue, worst first, with pictures.
+tester is `codex exec` with every API key stripped, in Codex's sandbox with
+the local network open, or without the sandbox on a machine that refuses it
+(the Agentbox cloud). Each stretch after the first is told what was already
+logged. `--pace` keeps starting stretches while that login's week is behind
+its line, waits out a full 5-hour window, and stops at the target or at
+`--hours`. `report.md` in the run folder ranks every issue, worst first, with
+pictures.
 
 | flag | what | default |
 |---|---|---|
 | `--who` | names from `../power-test/people`, `random:N` or `all` | `random:2` |
 | `--minutes` | one stretch | 30 |
 | `--stretches` / `--pace` | how many, or as many as the week allows | 1 |
-| `--engine` | `claude`, `codex`, or `external` (you run each stretch as a subagent) | `codex` |
-| `--claude-home` | the Claude Code login the week is read from and spent on | `$CLAUDE_CONFIG_DIR` or `~/.claude` |
-| `--codex-home` | the Codex login the week is read from and spent on | `$CODEX_HOME` or `~/.codex` |
+| `--engine` | `codex`, or `external` (it only writes each stretch's prompt, for a Codex you start by hand) | `codex` |
+| `--codex-home` | the Codex login the week is read from and spent on | `$CODEX_HOME`, else the Codex login on the best plan |
 | `--target` | how much of the week to have used at its reset | 90 |
 | `--focus` | what shipped and wants leaning on | none |
 | `--out` | the run folder; on the cloud, the thread's designs folder, which outlives the machine | a folder under `/tmp` |
 | `--detach` | start in the background, in a session of its own, logging to `workday.log` in the run folder | off |
 
-In the Agentbox cloud nothing a session starts can sign in: use
-`--engine external`, read each `stretch-N.prompt.md` the runner writes, run
-it as a subagent allowed only its `phone` and `diary`, and write
-`stretch-N.done` when it returns.
+In the Agentbox cloud Codex signs in with the login the cloud carries and
+runs without its sandbox, so the workday runs there as it does on a Mac.
 
 ## Then fix what they found
 
@@ -70,6 +69,25 @@ rules in the project's own instructions: fixes nobody sees ship, wide ones get
 `handoff` first, and anything on screen goes to the person with screenshots
 taken with `phone shot`. The next workday's testers are told what
 was logged, so they check the fixes.
+
+## Then close one gap with the desktop
+
+The phone is meant to do everything the desktop does. `mobile/parity.mjs`
+names every desktop feature and says whether the phone has it, why it should
+not, or what it would take; `tests/the-phone-app-has-every-desktop-feature-or-says-why-not`
+fails when the desktop gains one the file does not place.
+
+`node scripts/phone-parity.mjs` prints the count and every feature still to
+do. Each day, after the fixes, build the first one on that list that needs
+no decision from the person, on its own branch: test first, mark it
+`{ phone, find }` in the ledger, and lower `STILL_TO_DO`. It ships by the
+project's instructions like any other change, which for a feature on screen
+means pictures to the person first. A gap whose entry says it needs a
+decision (instruction text on the phone, for one) waits for the person.
+
+The workday tells its testers what reached the phone in the last seven days
+(`node scripts/phone-parity.mjs --since 7`), so a new feature gets a day of
+real use before it is called done.
 
 ## The phone, three ways
 
@@ -102,7 +120,7 @@ ends. `--detach` puts it in a session of its own, so the run ending does not
 end the day.
 
 > Run the product loop on the phone app (.claude/skills/product-loop).
-> Testers spend the ENGINE login at HOME.
+> Testers run on Codex only, on the Codex login with the best plan.
 >
 > 1. Fix yesterday's. Take the newest folder under ~/.agentbox/product-loop/
 >    with no `handled` file. If it has a report.md, fix and ship what its
@@ -111,13 +129,15 @@ end the day.
 >    workday.log and fix the cause. Bring me only the changes those
 >    instructions send to me, with pictures.
 > 2. Start today's, unless `pgrep -f product-loop/scripts/workday.mjs` finds
->    one running or `pace.mjs --engine ENGINE --home HOME` says stop. Fast-forward the app
+>    one running or `pace.mjs` says stop. Fast-forward the app
 >    folder to public main if it has no tracked changes, then from there run
->    `workday.mjs --detach --pace --hours 10 --engine ENGINE --ENGINE-home HOME --out
+>    `workday.mjs --detach --pace --hours 10 --out
 >    ~/.agentbox/product-loop/<today> --who` with three people from
 >    .claude/skills/power-test/people chosen for what changed this week, or
 >    two if the Mac has under 3 GB free.
-> 3. Delete folders there older than two weeks.
+> 3. Build the first feature `node scripts/phone-parity.mjs` lists that
+>    needs no decision from me, as the skill's "close one gap" says.
+> 4. Delete folders there older than two weeks.
 >
 > If nothing in step 1 needs me, finish clean.
 

@@ -15,3 +15,15 @@ export function withDeadline(fetchImpl: Fetch, ms = CLOUD_DEADLINE_MS): Fetch {
     return fetchImpl(url, { ...init, signal: stop.signal }).finally(() => clearTimeout(timer));
   };
 }
+
+/**
+ * The cloud sends no caching headers, and iOS answers a GET it has seen
+ * before from its own copy, so the thread list asked every 5 seconds can stay
+ * old.
+ */
+export function fresh(fetchImpl: Fetch): Fetch {
+  return (url, init = {}) => fetchImpl(url, {
+    ...init,
+    headers: { ...(init.headers as Record<string, string> | undefined), 'Cache-Control': 'no-cache, no-store', Pragma: 'no-cache' },
+  });
+}

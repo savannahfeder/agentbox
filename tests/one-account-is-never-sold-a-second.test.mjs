@@ -223,21 +223,15 @@ describe('the Agents page explains parallelism without teaching the multiplier',
     expect(said).not.toMatch(/run together/);
   });
 
-  it('keeps the sentence that says a smaller plan chose the number', () => {
-    expect(said).toMatch(/sessionsAtOnceFromPlan/);
-  });
-
-  // THIS USED TO ASSERT THE OPPOSITE, before the rows moved to General. The
-  // check here was that the account rows sat on this page, directly under the
-  // sentence naming the plan, so one screen read top to bottom answered why
-  // the number was what it was.
+  // THIS USED TO ASSERT THE OPPOSITE, before the rows moved to General.
   it('no longer carries the account rows at all', () => {
     expect(said).not.toMatch(/label="Signed in to Claude"/);
     expect(said).not.toMatch(/w\.accounts\.map/);
   });
 
   it('still explains its own number without them', () => {
-    expect(said).toMatch(/sessionsAtOnceFromPlan/);
+    expect(said).toMatch(/From this computer’s memory/);
+    expect(said).toMatch(/Automatic would run \$\{w\.agentsAutoTotal/);
   });
 });
 

@@ -14,6 +14,8 @@ const NAME: Record<PaidPlan, string> = { pro: 'Pro', plus: 'Plus', max: 'Max' };
 const n = (x: number) => x.toLocaleString('en-US');
 const paidOf = (plan: CloudPlan | null): PaidPlan | null => (ORDER.includes(plan?.plan as PaidPlan) ? (plan!.plan as PaidPlan) : null);
 const onFree = (plan: CloudPlan | null) => plan?.plan === 'free';
+/** What a payment changes: a plan, or a team's trial becoming paid seats. */
+export const planKey = (plan: CloudPlan | null) => `${plan?.plan ?? 'none'}${plan?.team?.trial ? ':trial' : ''}`;
 
 export interface OfferGo { label: string; act: 'sign-in' | 'plans' | 'cloud-on' | 'pay'; plan?: PaidPlan }
 export interface Offer { say: string; waiting: string; go: OfferGo | null }
@@ -76,8 +78,8 @@ export function planCards(plan: CloudPlan | null): PlanCard[] {
 
 export interface PlanSummary {
   name: string; price: string; who: string; manage: boolean;
-  /** Over the meters, and over the cards. */
-  period: string; change: string;
+  /** Over the meters, and over the cards. A team's plan has a page of its own (team/TeamBilling.tsx). */
+  period: string; change: string | null;
   agents: { line: string; percent: number };
   hours: { label: string; line: string; percent: number };
 }
@@ -105,12 +107,18 @@ export function planSummary(plan: CloudPlan | null): PlanSummary | null {
   };
 }
 
+const hoursLeft = (hours: number, usedSeconds: number) => {
+  const left = Math.max(0, hours * 3600 - usedSeconds) / 3600;
+  // Rounded up, so it reads 0 only when a run can no longer start, and never past the whole.
+  return { label: 'Hours left', line: `${n(Math.min(hours, Math.ceil(left * 10) / 10))} of ${n(hours)}`, percent: hours > 0 ? Math.round((left / hours) * 100) : 0 };
+};
+
+
 // The Free plan's hours never renew, so it says what is left rather than the month's use.
 function freeSummary(plan: CloudPlan): PlanSummary {
   const running = plan.running ?? 0;
   const agents = plan.agents ?? 0;
   const hours = plan.hoursPerMonth ?? 0;
-  const left = Math.max(0, hours * 3600 - (plan.usedSeconds ?? 0)) / 3600;
   return {
     name: 'Free',
     price: '$0',
@@ -118,8 +126,7 @@ function freeSummary(plan: CloudPlan): PlanSummary {
     manage: false,
     period: 'Usage', change: 'Change plan',
     agents: { line: `${running} of ${agents} running`, percent: Math.min(100, Math.round((running / Math.max(1, agents)) * 100)) },
-    // Rounded up, so it reads 0 only when a run can no longer start.
-    hours: { label: 'Hours left', line: `${Math.ceil(left * 10) / 10} of ${n(hours)}`, percent: hours > 0 ? Math.round((left / hours) * 100) : 0 },
+    hours: hoursLeft(hours, plan.usedSeconds ?? 0),
   };
 }
 

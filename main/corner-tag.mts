@@ -65,6 +65,10 @@ export const TONE_EVERY_MS = 500;
 // it was left at an old size by something that was never reproduced; this is
 // the longest that can now last.
 export const MEASURE_EVERY_MS = 2000;
+// How often the real cursor is checked against the glass while the tray lets
+// clicks through, and how far off it may go before that stops.
+export const AIM_EVERY_MS = 30;
+export const AIM_NEAR_PX = 120;
 
 type Part = 'tag' | 'card';
 type Point = { x: number; y: number };
@@ -521,6 +525,7 @@ export function createCornerTag({
     if (until > now()) wake = setTimer(refresh, until - now() + 50);
     if (!shouldShow()) {
       stopTones();
+      stopAiming();
       if (alive('tag') && wins.tag!.isVisible()) { wins.tag!.hide(); reset(); }
       else if (open) closeCard();
       return;
@@ -535,6 +540,7 @@ export function createCornerTag({
       readTone();
       watchTones();
     }
+    if (wins.tag!.isVisible() && clickable === false) watchAim();
   }
 
   const bringAppForward = () => {
@@ -706,8 +712,32 @@ export function createCornerTag({
     if (clickable === on) return;
     clickable = on;
     try { wins.tag!.setIgnoreMouseEvents?.(!on, { forward: true }); } catch { /* an older Electron: the band stays clickable */ }
+    if (!on) watchAim();
   };
   ipcMain.handle('corner-tag:clickable', (_e, p: { on?: boolean } | null | undefined) => { letClicksThrough(!!p?.on); return null; });
+
+  // The page's word is not enough on its own: while the window lets clicks
+  // through, macOS forwards it pointer moves only when it is the focused
+  // window, which the tray almost never is, and Linux never does. So while it
+  // lets clicks through, the real cursor is read here: on the glass, the
+  // window takes the press; gone far, it takes clicks again, the page hears
+  // the next approach itself, and nothing is read until then.
+  let aimTimer: Timer | null = null;
+  const stopAiming = () => { if (aimTimer) { clearTimer(aimTimer); aimTimer = null; } };
+  function watchAim() {
+    if (aimTimer || gone) return;
+    const tick = () => {
+      aimTimer = null;
+      if (gone || !alive('tag') || !wins.tag!.isVisible() || clickable !== false) return;
+      const pt = screen.getCursorScreenPoint?.();
+      if (!pt || !tag) return;
+      const g = glassOf(tag);
+      const off = Math.hypot(Math.max(g.x - pt.x, 0, pt.x - (g.x + g.width)), Math.max(g.y - pt.y, 0, pt.y - (g.y + g.height)));
+      if (within(pt, g) || off > AIM_NEAR_PX) { letClicksThrough(true); return; }
+      aimTimer = setTimer(tick, AIM_EVERY_MS);
+    };
+    aimTimer = setTimer(tick, AIM_EVERY_MS);
+  }
 
   // A notch bigger or smaller, from the list's foot. The list stays open and
   // is placed again as the tag changes size, because the whole point of
@@ -781,6 +811,7 @@ export function createCornerTag({
     if (wake) { clearTimer(wake); wake = null; }
     if (watching) { clearTimer(watching); watching = null; }
     stopTones();
+    stopAiming();
     cancelOpen();
     for (const part of ['tag', 'card'] as const) if (alive(part)) wins[part]!.destroy();
     for (const ch of CHANNELS) { try { ipcMain.removeHandler?.(ch); } catch {} }
