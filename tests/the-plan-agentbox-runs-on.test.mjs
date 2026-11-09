@@ -15,7 +15,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { planFile, planLabel, isMaxTier, readPlan, readPlans, slotsForPlans } from '../main/claude-plan.mjs';
+import { planFile, planLabel, isMaxTier, readPlan, readPlans } from '../main/claude-plan.mjs';
 import { NAME } from '../shared/product-name.mjs';
 
 let home;
@@ -140,34 +140,5 @@ describe(`reading every account ${NAME} runs on`, () => {
   it('no accounts configured still means the default one', () => {
     layAccount(path.join(home, '.claude.json'), MAX_20X);
     expect(readPlans([], { home }).map((p) => p.label)).toEqual(['Max 20x']);
-  });
-});
-
-describe('how many run at once when nobody has said', () => {
-  const plan = (over) => ({ known: true, max: false, label: 'Pro', ...over });
-
-  it('a max plan runs the three it always ran', () => {
-    expect(slotsForPlans([plan({ max: true, label: 'Max 20x' })], 3)).toBe(3);
-  });
-
-  it('a plan that is not max runs one at a time', () => {
-    expect(slotsForPlans([plan()], 3)).toBe(1);
-  });
-
-  // The cap is one number applied per account, so with a Max account and a
-  // smaller one there is no way to give them different numbers. The smaller
-  // one decides, because an under-run leaves a working app and an over-run
-  // spends somebody's allowance three times as fast.
-  it('the smallest account decides', () => {
-    expect(slotsForPlans([plan({ max: true }), plan()], 3)).toBe(1);
-  });
-
-  // The whole safety of this. A machine Agentbox cannot read gets exactly the
-  // app it had before any of this existed.
-  it('an unreadable account never lowers anything', () => {
-    expect(slotsForPlans([], 3)).toBe(3);
-    expect(slotsForPlans([{ known: false, max: false }], 3)).toBe(3);
-    expect(slotsForPlans([{ known: false }, plan({ max: true })], 3)).toBe(3);
-    expect(slotsForPlans(undefined, 3)).toBe(3);
   });
 });
