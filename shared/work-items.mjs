@@ -552,7 +552,8 @@ function coerceField(field, value) {
     case 'inReplyTo': return shortId(value) ?? undefined;
     case 'comment': {
       const text = value && typeof value === 'object' ? str(value.text, MAX_TEXT_BYTES) : undefined;
-      return text ? { text } : undefined;
+      const name = text ? str(value.name, MAX_SHORT) : undefined;
+      return text ? { text, ...(name ? { name } : {}) } : undefined;
     }
     case 'artifact': return cleanMark(value);
     case 'from': {
@@ -818,7 +819,7 @@ export function foldRawInto(items, lines, touched = null) {
       // as a value, the row would carry the newest reply's parent forever.
       if (field === 'inReplyTo' || field === 'from' || field === 'voice' || field === 'forAgent' || field === 'fromNotes' || field === 'typed' || field === 'putAway') continue;
       if (field === 'comment') {
-        if (line.by && String(line.uid ?? '').startsWith('comment-') && !isContinuedNote(value.text)) (item.waitingComments ??= []).push({ by: line.by, ts: line.ts, text: value.text });
+        if (teammateComment(line)) (item.waitingComments ??= []).push({ by: line.by, ts: line.ts, text: value.text });
         continue;
       }
       if (field === 'artifact') {
@@ -988,6 +989,13 @@ function talkOf(said) {
 // claims are how the row moves, not anything anyone said.
 const THREAD_FIELDS = ['body', 'note', 'result', 'answer'];
 
+/** A teammate's words on a shared thread, as the sync writes them (main/team/thread-share.mjs), or null. */
+function teammateComment(line) {
+  const c = line?.patch?.comment;
+  if (!line.by || !String(line.uid ?? '').startsWith('comment-') || typeof c?.text !== 'string' || !c.text.trim() || isContinuedNote(c.text)) return null;
+  return { text: c.text, name: typeof c.name === 'string' ? c.name.trim() : '' };
+}
+
 export function threadOf(lines, id) {
   const turns = [];
   for (const raw of Array.isArray(lines) ? lines : []) {
@@ -1002,6 +1010,8 @@ export function threadOf(lines, id) {
       const from = field === 'answer' && line.source === 'system' ? line.patch.from?.name : null;
       turns.push({ ts: line.ts, source: authorityOf(line, field, text), field, text, ...(from ? { from } : {}) });
     }
+    const said = teammateComment(line);
+    if (said) turns.push({ ts: line.ts, source: 'system', field: 'comment', text: said.text, from: said.name || 'A teammate' });
   }
   // Stable by time. Within one millisecond THREAD_FIELDS order decides, so an
   // append that sets a body and a result reads body-then-result rather than in

@@ -388,6 +388,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         voice: z.string().optional().describe('how you write: blunt, warm, dry, careful or curious'),
         voiceWords: z.string().optional().describe('how you write, in one sentence of your own, instead of voice'),
         ready: z.boolean().optional(),
+        startNow: z.boolean().optional().describe('with ready true: false only when the person said when to start, so your first run waits for your first duty\'s time; otherwise it starts as soon as this run ends'),
       },
       run: (args) => json(teamSetup(args, thisRun())),
     },

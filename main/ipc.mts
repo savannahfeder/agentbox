@@ -1,7 +1,7 @@
 import { openSourceFile } from './open-source-file.mts';
 import {submitReply} from './live-replies.mts';
 import { noteToItsAgent, replyWithWaitingNotes, waitingNotes } from './notes-wake.mjs';
-import { CHANGED_HERE, ranHere, whyItCannotMove } from '../shared/move-thread.mts';
+import { CHANGED_HERE, leftByAMove, ranHere, whyItCannotMove } from '../shared/move-thread.mts';
 import { whereTheWorkStands } from './git-change.mjs';
 import { taskFolderPath } from './task-folders.mts';
 import { GROUPS } from '../shared/connections-catalog.mjs';
@@ -53,6 +53,7 @@ import { readChange } from './code-change.mjs';
 import { findFile, readCodeFile, writeCodeFile } from './code-file.mts';
 import { readNote, writeNote } from './rail-note.mts';
 import { teamForWindow } from './team/index.mts';
+import { liveRoomFor } from './team/live-room.mjs';
 import { addClaudeAccount, addCodexAccount, alphaFeatures, cornerTagTurnedOff, countsTurnedOff, lookAgainFor, outsideAgentsMode, permissionMode, pointAtEngineBin, readSettings, searchForEngineBin, setProjectSetting, setWorkspaceSetting } from './settings.mts';
 import { ICON_KINDS, clearProjectIcon, setProjectIcon, setProjectName } from './project-identity.mts';
 import { ClaudeUsage } from './claude-usage.mts';
@@ -189,6 +190,8 @@ export interface IpcDeps {
   connections?: IpcConnections | null;
   copies?: IpcCopies | null;
   onCount?: () => void;
+  /** The live relay's address, null when this cloud has none. */
+  liveAt?: string | null;
 }
 
 export interface TeammateArgs {
@@ -270,7 +273,7 @@ const NO_UPDATER: IpcUpdater = {
 const TEAMMATE_OPS = new Set(['create', 'describe', 'start', 'update', 'stop', 'remove', 'post', 'goAhead', 'remember', 'forget', 'method', 'unsend']);
 const ROOM_OPS = new Set(['refresh', 'send', 'markRead', 'markDone', 'markUnread', 'react', 'decide','edit', 'deleteMessage', 'putFile', 'putFileFrom', 'file', 'fileOnDisk', 'fileText', 'markFile', 'older', 'saveProfile', 'goInvisible', 'comeBack', 'link', 'revokeLink', 'preview', 'listed', 'invitesSent', 'joinByLink', 'joinListed', 'acceptInvite', 'invite', 'create', 'rename', 'leave', 'remove', 'pin', 'mute']);
 
-export function registerIpc({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null, connections = null, copies = null, onCount = () => {} }: IpcDeps) {
+export function registerIpc({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null, connections = null, copies = null, onCount = () => {}, liveAt = null }: IpcDeps) {
   // The three Electron things, or a plain Node stand-in for them. There is no
   // default: a caller that forgets says so here rather than throwing eighty
   // lines further down on `ipcMain.handle` of undefined.
@@ -690,7 +693,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     return snapshots.answer({
       products: store.listProducts(),
       // Each with the place she dragged it to, if she did (w-6e5b532a95).
-      items: supervisor.withPlaces(items),
+      items: supervisor.withPlaces(items.filter((i) => !leftByAMove(i))),
       // THE TEAM: who is signed in, their team and its people, and the
       // title-free activity of their private work. Null on a build with no
       // team cloud, which is the single-person app.
@@ -2807,6 +2810,23 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     const found = findFile({ change: opened.change, product: opened.prod, filePath });
     if (!found.ok) return found;
     return writeCodeFile({ file: found.path, change: opened.change, product: opened.prod, text, mtime });
+  });
+
+  // The live room a document or table opens in, when teammates can open it too.
+  ipcMain.handle('zero:live-room', async (_e, { product, project, name }: { product?: unknown; project?: unknown; name?: unknown }) => {
+    if (!team || typeof name !== 'string') return null;
+    const state = team.state() as { signedIn?: boolean; me?: { id: string; name?: string }; team?: { id: string }; cards?: { project?: string | null }[] };
+    const own = store.listProducts().find((p) => p.slug === product && !p.team?.direct);
+    const key = (s: unknown) => String(s ?? '').trim().toLowerCase();
+    const named = typeof project === 'string' && project ? project : own?.name;
+    const mine = store.listProducts().find((p) => !p.team?.direct && key(p.name) === key(named));
+    const shared = mine
+      ? !!mine.team?.projectId && projectSeenBy(mine).who !== 'private'
+      : (state.cards ?? []).some((c) => key(c.project) === key(named));
+    const room = liveRoomFor({ address: liveAt, state, multiplayer: alphaFeatures(config).multiplayer, project: named, name: name.split('/').pop(), shared, owner: !!own && own === mine });
+    if (!room) return null;
+    const token = await team.liveToken?.();
+    return token ? { ...room, url: `${room.url}?t=${encodeURIComponent(token)}` } : room;
   });
 
   ipcMain.handle('zero:write-doc', async (_e, { product, src, text, mtime, thread }: { product: string; src?: unknown; text: unknown; mtime?: number; thread?: unknown }) => {

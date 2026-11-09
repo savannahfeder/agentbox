@@ -1165,26 +1165,27 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // sticks itself to the bottom (../thread-bottom), and an effect here writing
   // 0 was a second hand on the same box pulling the other way.
   //
-  // WHERE SHE WAS, BUT ONLY ACROSS A RELOAD. Clicking into a task is never a
-  // reload, so clicking into a task always ends at the bottom.
+  // WHERE SHE WAS, across a reload or on coming back to a thread with no new
+  // answer since she left it (../thread-place.ts). Otherwise it ends at the bottom.
   //
   // It is not one write. The conversation is read off her disk AFTER the pane is
-  // drawn, so at the moment a reload finishes the box is a few hundred pixels
+  // drawn, so at the moment the thread opens the box is a few hundred pixels
   // tall and a scrollTop of four thousand clamps to whatever fits; resumeTo
   // keeps reaching for the place while the page grows into it.
   const scrollRef = useRef<HTMLDivElement>(null);
   // The box the message is drawn in, so a copy out of it can be rewritten
   // before it reaches the clipboard (../copy-out.ts).
   const bodyRef = useRef<HTMLDivElement>(null);
-  const resumed = useRef<string>('');
+  // Each place is spent once; coming back to the same thread again is a new one.
+  const resumed = useRef<object | null>(null);
   useEffect(() => {
-    if (!resumeAt || resumeAt.id !== item.id || resumed.current === item.id) return;
+    if (!resumeAt || resumeAt.id !== item.id || resumed.current === resumeAt) return;
     // Spent only once the box was actually there to spend it on. Marking it
     // before this check burned the restore on the render where the pane had not
     // mounted yet, and it never came back: the reload landed at the bottom with
     // her place sitting in localStorage unread.
     if (!scrollRef.current) return;
-    resumed.current = item.id;
+    resumed.current = resumeAt;
     return resumeTo(scrollRef.current, resumeAt.top);
   }, [item.id, resumeAt]);
 
