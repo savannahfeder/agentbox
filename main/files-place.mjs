@@ -7,12 +7,13 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { resolveArtifact } from './artifact-path.mjs';
-import { approvalId, baseName, editedWords, familyName, familyOfName, filesInLines, marksOf, MAX_EDIT_BYTES, otherFilesInLines, otherKind, reviewKind, shownName, threadFiles } from '../shared/artifact-marks.mjs';
+import { approvalId, baseName, editedWords, familyName, familyOfName, filesInLines, marksOf, MAX_EDIT_BYTES, otherFilesInLines, otherKind, reviewKind, shownName, threadFiles, viewKind } from '../shared/artifact-marks.mjs';
 import { saveNextVersion } from './file-version.mjs';
 import { versionLine } from './version-line.mjs';
 import { cleanFolderName, fileKeyIn, folderNamed, foldFolders, newFolderId, readFolderLog, writeFolderLog } from '../shared/file-folders.mjs';
 import { projectSeenBy } from '../shared/thread-cards.mjs';
 import { shownTitle } from '../shared/thread-title.mjs';
+import { FILE_HOME, isFileHome } from '../shared/file-home.mjs';
 
 const entriesOf = (lines) => (lines ?? []).filter((l) => l?.patch?.artifact)
   .map((l) => ({ ...l.patch.artifact, by: l.by ?? null, ts: l.ts, uid: l.uid ?? null }));
@@ -22,6 +23,17 @@ const projectKey = (name) => String(name ?? '').trim().toLowerCase();
 const toCloudFamily = (family) => family.split('\0').map(encodeURIComponent).join('/');
 const fromCloudFamily = (family) => String(family).split('/').map(decodeURIComponent).join('\0');
 const CROSS_EVERY_MS = 10_000;
+// What New makes, and what it starts with: a table needs its columns to be typed into.
+const MADE = { document: { ext: '.md', seed: '' }, table: { ext: '.csv', seed: 'Name,Notes\n' } };
+const SEED_OF = new Map(Object.values(MADE).map((m) => [m.ext, m.seed]));
+/** Whether the file at `src` is still exactly what New started it with. */
+async function untouched(src) {
+  const seed = SEED_OF.get(path.extname(src).toLowerCase());
+  if (seed === undefined) return false;
+  const st = await fs.promises.stat(src).catch(() => null);
+  if (!st || st.size !== Buffer.byteLength(seed)) return false;
+  return (await fs.promises.readFile(src, 'utf8').catch(() => null)) === seed;
+}
 const FILES_FOR_AGENTS = 40;
 
 /**
@@ -184,7 +196,7 @@ function summary(f) {
     const ownerOf = c.thread.ref.kind === 'shared' ? c.thread.ref.ownerId : null;
     for (const v of c.family.versions) {
       const was = versions.get(v.id);
-      if (!was) versions.set(v.id, { id: v.id, name: v.name, at: v.at, by: v.by ?? ownerOf, ...(typeof v.agent === 'string' ? { agent: v.agent } : {}), ...(v.edited ? { edited: true } : {}), copies: [{ thread: c.thread, path: v.path, at: v.at || 0 }] });
+      if (!was) versions.set(v.id, { id: v.id, name: v.name, at: v.at, by: v.by ?? ownerOf, ...(typeof v.agent === 'string' ? { agent: v.agent } : {}), ...(v.edited ? { edited: true } : c.thread.home ? { made: true } : {}), copies: [{ thread: c.thread, path: v.path, at: v.at || 0 }] });
       else { was.copies.push({ thread: c.thread, path: v.path, at: v.at || 0 }); if (v.at && (!was.at || v.at < was.at)) was.at = v.at; }
     }
     // `deck.pdf@3` is a version by its number on the line, which a thread may not hold itself.
@@ -211,7 +223,7 @@ function summary(f) {
     approvedBy: [...new Set(approvals.filter((a) => a.file === newest.id).map((a) => a.by))],
     approved: newestEach(approvals),
     ...(stoodApproved ? { changedSinceApproval: { by: newest.by ?? null, approvedBy: stoodApproved.by ?? null } } : {}),
-    sentIn: places.map((t) => ({ ...t.ref, title: t.title })),
+    sentIn: places.filter((t) => !t.home).map((t) => ({ ...t.ref, title: t.title })),
     chain, notes, approvals, seen,
   };
 }
@@ -222,7 +234,7 @@ function viewOf(file, opened) {
     ? { ts: v.at, by: v.by, source: 'founder', patch: { artifact: { do: 'edit', file: v.id, path: opened.get(v.id) } } }
     : {
       ts: v.at, by: v.by, source: typeof v.agent === 'string' ? 'agent' : 'system',
-      patch: { note: `[${v.name}](${opened.get(v.id)})`, ...(v.agent ? { voice: { name: v.agent } } : {}) },
+      patch: { note: `[${v.name}](${opened.get(v.id)})`, ...(v.agent ? { voice: { name: v.agent } } : {}), ...(v.made ? { made: true } : {}) },
     }));
   const many = file.sentIn.length > 1;
   // Each copy numbers its own pins from 1; here they are one file's pins.
@@ -385,6 +397,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
         project: chat ? null : product.name,
         dirs: chat ? [] : [product.dir, product.repoPath, product.repoPath ? path.join(product.repoPath, '.claude', 'worktrees', item.id) : null].filter(Boolean),
         lines,
+        ...(isFileHome(item) ? { home: true } : {}),
       };
       if (!chat) {
         sigs.set(entry, sigOf(entry));
@@ -487,10 +500,13 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
   async function lineChain(f, shared = audienceOf(f.project) !== 'private', products = readable()) {
     const line = lineNow();
     const mine = [];
+    // A file nothing was ever written in is no version yet: its first words are v1.
+    const unwritten = f.chain.length === 1 && !line.of(f.key).length;
     for (const v of f.chain) {
       const src = await openedOf(f, v, { products });
-      const entry = src ? await line.add({ file: f.key, src, name: v.name, by: v.by ?? null, at: v.at || Date.now(), shared }) : null;
-      mine.push({ v, src, entry });
+      const blank = !!src && unwritten && await untouched(src);
+      const entry = src && !blank ? await line.add({ file: f.key, src, name: v.name, by: v.by ?? null, at: v.at || Date.now(), shared }) : null;
+      mine.push({ v, src, entry, blank });
     }
     const fallback = familyName({ versions: f.chain }, f.chain.at(-1));
     const chain = [];
@@ -507,7 +523,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       chain.push({
         id, name, n: e.n, at: first?.at || e.at || 0, by: first?.by ?? e.by ?? null,
         ...(typeof first?.agent === 'string' ? { agent: first.agent } : {}),
-        ...(first?.edited ? { edited: true } : {}),
+        ...(first?.edited ? { edited: true } : first?.made ? { made: true } : {}),
         copies: held.flatMap((m) => m.v.copies).concat(first ? [] : overwritten?.copies ?? []),
         opened: held.find((m) => m.src && m.entry?.hash === e.hash)?.src ?? e.kept ?? null,
         ...(e.pending ? { pending: true } : {}),
@@ -516,6 +532,8 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     // A group's file not fetched yet is in the cloud's keeping: a version still to be numbered.
     const waiting = mine.filter((m) => !m.entry && !chain.some((v) => v.id === m.v.id || same.has(m.v.id)) && m.v.copies.some((c) => c.thread.ref.kind === 'room'));
     for (const { v } of waiting) chain.push({ ...v, n: chain.length + 1, opened: null, pending: true });
+    const blank = mine.find((m) => m.blank);
+    if (blank && !chain.length) chain.push({ ...blank.v, n: 1, opened: blank.src, blank: true });
     for (const v of chain) same.set(`${baseName(v.name)}@${v.n}`, v.id);
     return { chain, same };
   }
@@ -529,6 +547,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       versions: chain.length, at: newest.at || 0, by: newest.by ?? null,
       ...(typeof newest.agent === 'string' ? { agent: newest.agent } : {}),
       approvedBy: [...new Set(row.approvals.filter((a) => a.file === newest.id).map((a) => a.by))],
+      ...(newest.blank ? { blank: true } : {}),
       chain,
     };
   };
@@ -628,7 +647,43 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     for (const name of [...rows.map((f) => f.project), ...lib.folders.map((f) => f.project)]) {
       if (name && !projects.some((p) => projectKey(p) === projectKey(name))) projects.push(name);
     }
-    return { files: rows, projects: projects.sort((a, b) => a.localeCompare(b)), folders: lib.folders };
+    // The projects a new document can go in: only this computer's own.
+    const mine = store.listProducts().filter((p) => !p.team?.direct).map((p) => p.name).sort((a, b) => a.localeCompare(b));
+    return { files: rows, projects: projects.sort((a, b) => a.localeCompare(b)), folders: lib.folders, mine };
+  }
+
+  /** The project a new file goes in, which must be this computer's own, and the folder, which must be in it. */
+  function whereNew(project, folder) {
+    const home = store.listProducts().find((p) => !p.team?.direct && projectKey(p.name) === projectKey(project));
+    if (!home) throw new Error('a new file goes in one of your own projects');
+    const lib = shelf();
+    const into = folder ? lib.folders.find((f) => f.id === lib.canon(folder)) : null;
+    if (folder && !into) throw new Error('that folder is gone');
+    if (into && projectKey(into.project) !== projectKey(home.name)) throw new Error('that folder is in another project');
+    return { home, into };
+  }
+
+  /** `stem` + `ext`, or with -2, -3 when the project has a file of that name already. */
+  function freeName(home, stem, ext) {
+    const keys = new Set(allFiles().map((f) => f.key));
+    const taken = (file) => keys.has(fileKeyIn(home.name, file)) || fs.existsSync(path.join(home.dir, 'documents', file));
+    let file = `${stem}${ext}`;
+    for (let n = 2; taken(file); n += 1) file = `${stem}-${n}${ext}`;
+    return file;
+  }
+
+  // Files lists only what a thread names, so new files get a thread of their
+  // own, made closed by the person so no agent starts on it.
+  function holdIn(home, title, files) {
+    const body = files.map((f) => `[${f}](documents/${f})`).join('\n');
+    store.modules.workItemsDisk.createWorkItem(home.dir, { title, kind: 'directive', labels: ['founder', FILE_HOME], status: 'done', body }, { source: 'founder' });
+  }
+
+  function placeIn(home, into, files, by) {
+    if (!into) return;
+    const at = Date.now();
+    for (const f of files) writeFolderLog(logDir(), { op: 'place', key: fileKeyIn(home.name, f), project: home.name, family: familyOfName(f), folder: into.id, by, at });
+    void crossing();
   }
 
   return {
@@ -674,6 +729,48 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       return { ok: true };
     },
 
+    /**
+     * An empty document, made by the person rather than an agent. Files lists
+     * only what a thread names, so it gets a thread of its own, made closed so
+     * no agent starts on it.
+     */
+    async newDocument({ project, name, kind = 'document', folder = null, by = team?.state?.().me?.id ?? null }) {
+      const title = cleanFolderName(name);
+      if (!title) throw new Error(`a ${kind} needs a name`);
+      const made = MADE[kind];
+      if (!made) throw new Error('New makes a document or a table');
+      const { home, into } = whereNew(project, folder);
+      const stem = title.toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 60) || kind;
+      const file = freeName(home, stem, made.ext);
+      fs.mkdirSync(path.join(home.dir, 'documents'), { recursive: true });
+      fs.writeFileSync(path.join(home.dir, 'documents', file), made.seed, { flag: 'wx' });
+      holdIn(home, title, [file]);
+      placeIn(home, into, [file], by);
+      return { key: fileKeyIn(home.name, file) };
+    },
+
+    /** Copies of files from this computer, into the project's documents. A kind Files cannot show is left out and named. */
+    async addFiles({ project, paths = [], folder = null, by = team?.state?.().me?.id ?? null }) {
+      const { home, into } = whereNew(project, folder);
+      const refused = [];
+      const added = [];
+      for (const from of paths) {
+        const base = path.basename(String(from));
+        if (!viewKind(base)) { refused.push(base); continue; }
+        const ext = path.extname(base);
+        const stem = base.slice(0, base.length - ext.length).normalize('NFC').replace(/\s+/g, '-').replace(/[^\p{L}\p{N}._-]+/gu, '').replace(/^[-_.]+/, '').slice(0, 80) || 'file';
+        const file = freeName(home, stem, ext.toLowerCase());
+        fs.mkdirSync(path.join(home.dir, 'documents'), { recursive: true });
+        fs.copyFileSync(from, path.join(home.dir, 'documents', file), fs.constants.COPYFILE_EXCL);
+        added.push(file);
+      }
+      if (added.length) {
+        holdIn(home, added.length === 1 ? added[0] : `${added.length} files`, added);
+        placeIn(home, into, added, by);
+      }
+      return { added: added.length, refused, keys: added.map((f) => fileKeyIn(home.name, f)) };
+    },
+
     /** Files named on a thread, into a project's folder by that name, made if it is not there. */
     async fileIn({ project, names, folder, by = team?.state?.().me?.id ?? null }) {
       const lib = shelf();
@@ -713,6 +810,11 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       const base = thread && threadFiles(filesInLines(thread.lines)).find((f) => f.key === familyIn(file.key))?.versions.at(-1);
       if (!base) return refuse('No thread holds that file now.');
       try {
+        const { chain } = await lineChain(file);
+        if (thread.ref.kind === 'thread' && chain.length === 1 && chain[0].blank) {
+          await fs.promises.writeFile(chain[0].opened, text);
+          return { ok: true };
+        }
         if (thread.ref.kind === 'shared') {
           if (new TextEncoder().encode(text).length > MAX_EDIT_BYTES) return refuse('This document is too long to send from here. Whoever made it can edit it on their own thread.');
           await team.markSharedFile(thread.ref.ownerId, thread.ref.threadId, { do: 'edit', file: base.id, text });
@@ -741,6 +843,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       const names = taken ?? allFiles().find((f) => f.chain.some((v) => v.copies.some((c) => c.thread.ref.id === id && c.path === clean)))?.chain.map((v) => v.name) ?? [];
       const saved = saveNextVersion({ dir: here.dir, threadId: id, lines, basePath, baseId, text, since, taken: names });
       if (!saved.ok) return saved;
+      if (saved.unchanged) return { ok: true, path: saved.path };
       if (here.team?.direct) store.answerItem(product, id, { answer: editedWords(saved.shown, saved.path) });
       else store.fileMark(product, id, { do: 'edit', file: saved.file, path: saved.path, ...(saved.over ? { over: saved.over } : {}) });
       return { ok: true, path: saved.path };
@@ -850,10 +953,16 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
           }
           for (const [thread, on] of by) await writeTo(thread, { do: 'seen', on });
         } else if (mark.do === 'toagent') {
-          const n = file.notes.find((x) => x.id === mark.on?.[0]);
-          if (!n) return { ok: false, error: 'that comment is gone' };
-          await writeTo(n.thread, { do: 'toagent', on: [n.id] });
-          if (n.thread.ref.kind !== 'shared' && n.thread.ref.kind !== 'room') return { ok: true, wrote: { product: n.thread.ref.product, id: n.thread.ref.id } };
+          // Send hands over every waiting comment at once, each on the thread it was written in.
+          const by = new Map();
+          for (const id of mark.on ?? []) {
+            const thread = file.notes.find((x) => x.id === id)?.thread;
+            if (thread) by.set(thread, [...(by.get(thread) ?? []), id]);
+          }
+          if (!by.size) return { ok: false, error: 'that comment is gone' };
+          for (const [thread, on] of by) await writeTo(thread, { do: 'toagent', on });
+          const own = [...by.keys()].find((t) => t.ref.kind !== 'shared' && t.ref.kind !== 'room');
+          if (own) return { ok: true, wrote: { product: own.ref.product, id: own.ref.id } };
         } else if (mark.do === 'note' || mark.do === 'approve' || mark.do === 'unapprove') {
           const { chain } = await lineChain(file);
           const v = chain.find((x) => x.id === mark.file);

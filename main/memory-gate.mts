@@ -55,12 +55,35 @@ import { NAME } from '../shared/product-name.mjs';
  */
 export type Pressure = 'normal' | 'tight' | 'critical';
 
-export interface PressureReading { level?: number | null; freePct?: number | null }
+export interface PressureReading { level?: number | null; freePct?: number | null; swapInMbps?: number | null; swapMb?: number | null }
 
-export function pressureFrom({ level, freePct }: PressureReading = {}, { tightPct = 12, criticalPct = 5 }: { tightPct?: number; criticalPct?: number } = {}): Pressure {
+/**
+ * Swapping in, MB a second over the last minute (main/mac-pressure.mts). The
+ * free share can read 40% while the Mac swaps itself to a standstill, so how
+ * fast memory comes back off the disk is what says short.
+ */
+export const SWAP_TIGHT_MBPS = 4;
+export const SWAP_CRITICAL_MBPS = 16;
+
+export interface PressureLines { tightPct?: number; criticalPct?: number; tightSwap?: number; criticalSwap?: number }
+
+/**
+ * What swapping means to the command gate: only heavy swapping holds a test or
+ * a build, and swapping never stops light commands, because a waiting agent
+ * keeps all of its memory. The light line is an ordinary evening on 16 GB.
+ */
+export const GATE_LINES: PressureLines = { tightSwap: SWAP_CRITICAL_MBPS, criticalSwap: Infinity };
+/** Swapping never closes a terminal. */
+export const TERMINAL_LINES: PressureLines = { tightSwap: Infinity, criticalSwap: Infinity };
+
+export function pressureFrom(
+  { level, freePct, swapInMbps }: PressureReading = {},
+  { tightPct = 12, criticalPct = 5, tightSwap = SWAP_TIGHT_MBPS, criticalSwap = SWAP_CRITICAL_MBPS }: PressureLines = {},
+): Pressure {
   const free = typeof freePct === 'number' && Number.isFinite(freePct) ? freePct : null;
-  if (level! >= 4 || (free !== null && free < criticalPct)) return 'critical';
-  if (level! >= 2 || (free !== null && free < tightPct)) return 'tight';
+  const swap = typeof swapInMbps === 'number' && Number.isFinite(swapInMbps) ? swapInMbps : null;
+  if (level! >= 4 || (free !== null && free < criticalPct) || (swap !== null && swap >= criticalSwap)) return 'critical';
+  if (level! >= 2 || (free !== null && free < tightPct) || (swap !== null && swap >= tightSwap)) return 'tight';
   return 'normal';
 }
 

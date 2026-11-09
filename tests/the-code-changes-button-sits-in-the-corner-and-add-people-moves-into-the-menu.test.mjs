@@ -39,6 +39,16 @@ describe('the code changes button in the corner', () => {
     expect(draw({ change: figures, codeButton: figures, codeOpen: false })).toContain('aria-pressed="false"');
   });
 
+  // Pressed while lit, it did nothing: it only ever opened the change, so the
+  // change stayed open (reported with a screenshot after it shipped).
+  it('closes the change when pressed while it is open, and opens it otherwise', () => {
+    const focus = read('renderer/src/components/Focus.tsx');
+    expect(focus).toMatch(/const openChange = \(\) => \(changeOpen \? onCloseDoc\?\.\(\) : onOpenDoc\?\.\(changePathFor\(item\.id\)\)\);/);
+    expect(focus).toMatch(/const changeOpen = openDoc === changePathFor\(item\.id\);/);
+    expect(focus).toContain('codeOpen={changeOpen}');
+    expect(read('renderer/src/App.tsx')).toMatch(/onCloseDoc=\{putDocDown\}/);
+  });
+
   // The case that must not match: a run that changed no code.
   it('draws no button when the run changed no code', () => {
     expect(draw({ change: null, codeButton: null })).not.toContain('ts-code');

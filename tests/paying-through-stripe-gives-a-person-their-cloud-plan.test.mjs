@@ -54,6 +54,8 @@ function setup({ billing = true } = {}) {
     whoIs: async (t) => (t === 'session-of-a' ? { id: A } : null),
     now: () => clock,
     plans: PLANS,
+    // As someone whose free hours are spent, so no plan runs nothing.
+    free: { agents: 2, hours: 0 },
     ...(billing ? { stripe: stripeClient({ key: 'sk_test_x', webhookSecret: SECRET, fetchImpl: stripe.fetchImpl }) } : {}),
   });
   let key;

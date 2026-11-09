@@ -19,7 +19,7 @@ import { WhenPicker, WHEN_NOW, type WhenValue } from './When';
 import FolderPicker from './FolderPicker';
 import { checkProjectFolder } from '../../../shared/project-folder-check.mts';
 import {
-  ENGINE_NAME, chatChoices, chatsHeadline, FIRST_RUN_STEP, firstRunOf, folderChoices, ideasFor, installGate, isSend, listKey, previousScreen, projectsToMake, readyEngines, stepsFor,
+  ENGINE_NAME, chatChoices, chatsHeadline, FIRST_RUN_STEP, firstRunOf, folderChoices, foundLine, ideasFor, installGate, isSend, listKey, previousScreen, projectsToMake, readyEngines, setupWord, signedOutEngines, stepsFor, typedAhead,
   type Engine, type FolderChoice, type Screen, type Step,
 } from '../first-run-classic';
 import './first-run.css';
@@ -107,8 +107,9 @@ export function ClassicFirstRun({ snap, home, onDone }: {
   const [leaving, setLeaving] = useState(false);
   const [ready, setReady] = useState<Engine[] | undefined>(undefined);
   const hasReady = !!ready?.length;
+  const [signedOut, setSignedOut] = useState<Engine[]>([]);
   const [setup, setSetup] = useState<{ engine: Engine; phase: string; error: string | null } | null>(null);
-  const gate = installGate(setup);
+  const gate = installGate(setup, signedOut);
   const [threads, setThreads] = useState<SessionThread[] | null>(null);
   const [chatTicks, setChatTicks] = useState<Set<string>>(new Set());
   const [cursor, setCursor] = useState(0);
@@ -124,6 +125,7 @@ export function ClassicFirstRun({ snap, home, onDone }: {
   const [idea, setIdea] = useState(-1);
   const [busy, setBusy] = useState(false);
   const field = useRef<HTMLTextAreaElement | null>(null);
+  const arrivedAt = useRef(0);
 
   useEffect(() => {
     try { window.zero?.track?.('first_run_step', FIRST_RUN_STEP[screen]); } catch {}
@@ -139,6 +141,7 @@ export function ClassicFirstRun({ snap, home, onDone }: {
       ]);
       if (!live) return;
       setReady(readyEngines([claude, codex]));
+      setSignedOut(signedOutEngines([claude, codex]));
     })();
     api.agentThreads().then((t) => { if (live) setThreads(t); }).catch(() => { if (live) setThreads([]); });
     return () => { live = false; };
@@ -202,7 +205,7 @@ export function ClassicFirstRun({ snap, home, onDone }: {
     setProblem(null);
     setIdea(-1);
     setLeaving(true);
-    setTimeout(() => { setScreen(next); setCursor(0); setLeaving(false); }, LEAVE_MS);
+    setTimeout(() => { arrivedAt.current = Date.now(); setScreen(next); setCursor(0); setLeaving(false); }, LEAVE_MS);
   }, []);
   const leave = useCallback((sent: string | null) => {
     // Sending the first task is finishing; leaving without one is not.
@@ -219,6 +222,13 @@ export function ClassicFirstRun({ snap, home, onDone }: {
     const s = await api.engineSetup('start', engine).catch(() => null);
     setSetup({ engine, phase: s?.phase ?? 'installing', error: s?.error ?? null });
   }, []);
+  const stopSetup = useCallback(() => {
+    if (setup) void api.engineSetup('cancel', setup.engine).catch(() => null);
+    setSetup(null);
+  }, [setup]);
+  const signInAgain = useCallback(() => {
+    if (setup) void api.engineSetup('again', setup.engine).catch(() => null);
+  }, [setup]);
 
   /** The folder's project, made now if it has none. `counted` says this press was already counted once. */
   const projectFor = useCallback(async (folder: string, counted = false): Promise<Project | null> => {
@@ -328,6 +338,8 @@ export function ClassicFirstRun({ snap, home, onDone }: {
       if ((e.target as Element | null)?.closest('.ob-back') && (e.key === 'Enter' || e.key === ' ')) return;
       if (screen === 'welcome') {
         if (e.key === 'Enter' && hasReady) { e.preventDefault(); start(); }
+        else if (!hasReady && gate.running && e.key === 'Escape') { e.preventDefault(); stopSetup(); }
+        else if (!hasReady && gate.again && e.key === 'Enter') { e.preventDefault(); signInAgain(); }
         else if (!hasReady && !gate.running && e.key === '1') startSetup('claude');
         else if (!hasReady && !gate.running && e.key === '2') startSetup('codex');
         return;
@@ -347,6 +359,8 @@ export function ClassicFirstRun({ snap, home, onDone }: {
         return;
       }
       if (screen === 'where') {
+        const late = busy ? null : typedAhead(e, Date.now() - arrivedAt.current);
+        if (late) { e.preventDefault(); setText((t) => t + late); return; }
         if (busy || opening) return;
         if (e.key === 'ArrowDown') { e.preventDefault(); setCursor((c) => Math.min(places.length, c + 1)); }
         else if (e.key === 'ArrowUp') { e.preventDefault(); setCursor((c) => Math.max(0, c - 1)); }
@@ -371,7 +385,7 @@ export function ClassicFirstRun({ snap, home, onDone }: {
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [screen, leaving, hasReady, gate.running, chats, cursor, busy, opening, places, idea, text, browsing, go, start, startSetup, bringIn, next, skip, pickPlace, pickIdea]);
+  }, [screen, leaving, hasReady, gate.running, gate.again, stopSetup, signInAgain, chats, cursor, busy, opening, places, idea, text, browsing, go, start, startSetup, bringIn, next, skip, pickPlace, pickIdea]);
 
   useEffect(() => {
     if (browsing) document.querySelector<HTMLInputElement>('.first-run .fp-path')?.focus();
@@ -403,8 +417,13 @@ export function ClassicFirstRun({ snap, home, onDone }: {
               <>
                 <h1 className="ob-big ob-in" style={{ animationDelay: '1.3s' }}>{gate.heading}</h1>
                 <div className="ob-actions ob-in" style={{ animationDelay: '1.6s', marginTop: 40 }}>
-                  <button type="button" className="ob-btn" disabled={gate.running} onClick={() => startSetup('claude')}>Install Claude Code <Key k="1" /></button>
-                  <button type="button" className="ob-btn" disabled={gate.running} onClick={() => startSetup('codex')}>Install Codex <Key k="2" /></button>
+                  {gate.running ? <>
+                    {gate.again && <button type="button" className="ob-btn" onClick={signInAgain}>Open the page again <Key k="↵" /></button>}
+                    <button type="button" className="ob-btn ob-quiet" onClick={stopSetup}>Back <Key k="esc" /></button>
+                  </> : <>
+                    <button type="button" className="ob-btn" onClick={() => startSetup('claude')}>{setupWord('claude', signedOut)} <Key k="1" /></button>
+                    <button type="button" className="ob-btn" onClick={() => startSetup('codex')}>{setupWord('codex', signedOut)} <Key k="2" /></button>
+                  </>}
                 </div>
               </>
             ) : (
@@ -425,7 +444,7 @@ export function ClassicFirstRun({ snap, home, onDone }: {
             ) : ready?.length ? (
               <><span className="ob-sq" />{ready.map((engine) => ENGINE_NAME[engine]).join(' and ')} <b>ready</b></>
             ) : ready ? (
-              <><span className="ob-sq ob-off" />No coding agent <b>found</b></>
+              <><span className="ob-sq ob-off" />{foundLine(signedOut)[0]} <b>{foundLine(signedOut)[1]}</b></>
             ) : (
               <><span className="ob-sq ob-off" />Checking this computer</>
             )}

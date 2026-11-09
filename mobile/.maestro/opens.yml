@@ -1,0 +1,14 @@
+# A fresh install opens on the sign-in screen. Builds 11 to 15 died before it
+# drew (w-a68a52a026); this fails any build that does the same.
+appId: now.astral.agentbox
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Use the account from .* on your computer."
+    timeout: 120000
+- assertNotVisible: "This build was made without the cloud.*"
+- waitForAnimationToEnd:
+    timeout: 10000
+# Still there once it settles: a crash just after the first screen fails here.
+- assertVisible: "Use the account from .* on your computer."

@@ -90,6 +90,7 @@
    3 clears the panel and stays under the app's modals at 40. */
 .workspace-layout > .topbar:has(.ts-more-menu) { z-index: 3; }
 .ts-more-menu .ts-more-row { width: 100%; white-space: nowrap; }
+.ts-more-menu .ts-more-tick { margin-left: auto; color: var(--text-faint); }
 .ts-more-menu .ts-more-row:focus-visible { outline: none; background: rgba(255,255,255,.07); color: var(--text); }
 :root[data-theme="light"] .ts-more-menu .ts-more-row:focus-visible { background: var(--wash-strong); }
 .ts-more-label { flex: 1; }

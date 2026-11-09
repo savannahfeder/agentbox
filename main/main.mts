@@ -10,7 +10,9 @@ import type { TeamSession } from './team/index.mts';
 import { startConnections } from './connections/start.mjs';
 import { roomsSetup } from './team/room-setup.mts';
 import { matesForTheTeam } from './teammate-reach.mjs';
+import { alphaFeatures } from './settings.mts';
 import { loadCloudConfig, supabaseSession } from './team/session.mjs';
+import { liveAddress } from './team/live-room.mjs';
 // MY WORKSPACE IS NOT A TEAM FEATURE ANY MORE (w-f8d123be62), even though it
 // still lives in the team folder next to the sharing rules it has to obey.
 import { ensurePersonalProject } from './team/projects.mts';
@@ -33,6 +35,7 @@ import { appSessionFolders } from './agent-homes.mts';
 import { registerIpc } from './ipc.mts';
 import { stallWatch } from './stall-watch.mts';
 import { startFreezeRecorder } from './freeze-recorder.mts';
+import { startMemoryRecorder } from './memory-recorder.mts';
 import { FreezeWatch } from './freeze-watch.mjs';
 import { applyThrough, phoneDevice } from './phone-inbox.mts';
 import type { PhoneChannel } from './phone-inbox.mts';
@@ -41,6 +44,7 @@ import type { CollectingIpcMain, IpcHandler } from './serve.mts';
 import { carryHerBriefsAcross, joinMessageRules, setAsideShippedMessageRules, unifyAgentInstructions } from './instruction-settings.mts';
 import * as approvals from './approvals.mjs';
 import { recoveryToast } from '../shared/recovery.mts';
+import { CHORD_ANSWERS, chordLands } from '../shared/card-settles.mts';
 import { phoneWaitsOf } from '../shared/phone-snapshot.mjs';
 import { teammatesOn } from '../shared/teammates.mjs';
 import { dataFolderName, isNewUserBuild } from '../shared/side-build.mjs';
@@ -49,9 +53,11 @@ import { newUserWindow } from './new-user-window.mts';
 import { openFreshUser } from './fresh-user.mts';
 import { installCrashReports, report as reportCrash, reportFromRenderer, pending as pendingCrashes, setTransport } from './crash-report.mts';
 import { keepThePageAlive } from './when-the-page-stops.mts';
+import { recordBlankPages } from './blank-page.mts';
 import { createAnalytics, createDailyCount } from './analytics.mts';
 import { createUpdater } from './updater.mts';
 import { quitStep, flushBeforeQuit, quitThenExit } from './quit-sequence.mts';
+import { askBeforeClosingWhileWorking } from './close-while-working.mts';
 import { createPlace } from '../shared/where-it-runs-from.mts';
 import { createSourceUpdater } from './source-updater.mts';
 import { learnShellDataDirs, recoverShellPath } from './shell-path.mjs';
@@ -70,6 +76,7 @@ import { IS_SHE_TYPING_IN_THE_PAGE, theAppKeepsThisInput, theAppKeepsThisLetterI
 import { NAME, Name, WAS } from '../shared/product-name.mjs';
 import { JOIN_SCHEME, ourLink, tokenFromLink } from '../shared/room-links.mjs';
 import { getMic } from './mic.mts';
+import { openInBrowser } from './open-in-browser.mts';
 import type { IpcConfig } from './ipc.mts';
 import type { CornerTagConfig } from './corner-tag.mts';
 import type { AnalyticsConfig } from './analytics.mts';
@@ -440,6 +447,8 @@ async function createWindow() {
   const supervisor = new Supervisor(config, store, appDir, dataDir, userDir);
   // Local runs outlive a quit or a restart of the app (main/run-host.mjs).
   supervisor.hostRuns = true;
+  // And their store tools come from one shared process (main/tool-host.mjs).
+  supervisor.shareTools = true;
   // THAT agents start and stop work (main/analytics.mts checks the switch).
   supervisor.count = (name, props) => analytics.track(name, props);
   // Whether anyone has touched the Mac since a wake (Supervisor#asleep).
@@ -453,6 +462,12 @@ async function createWindow() {
     onFreeze: (f) => { stalls.noteFreeze(f); console.warn(`zero: the app froze for ${f.ms} ms in ${f.where}`); },
   });
   quitStep(app, 'before-quit', 'freezes.stop', () => freezes.stop());
+  const memory = startMemoryRecorder({
+    dir: path.join(userDir, 'memory-log'),
+    processes: () => app.getAppMetrics().map((m) => ({ type: m.type, mb: Math.round(m.memory.workingSetSize / 1024) })),
+    windowSnapshot: (file) => (window && !window.isDestroyed() ? window.webContents.takeHeapSnapshot(file) : Promise.reject(new Error('no window'))),
+  });
+  quitStep(app, 'before-quit', 'memory.stop', () => memory.stop());
   const freezeWatch = new FreezeWatch({ store, userDir, appDir });
   const checkFreezes = () => { try { freezeWatch.check(); } catch (err) { console.warn(`zero: could not read yesterday's freezes: ${(err as Error).message}`); } };
   const freezeFirst = setTimeout(checkFreezes, 60_000);
@@ -494,6 +509,7 @@ async function createWindow() {
     log: (line) => console.log(line),
     runningIds: () => supervisor.runsGoing().map((s) => s.itemId),
     ownMates: () => matesForTheTeam(store, config),
+    sharing: () => alphaFeatures(config).multiplayer,
     // HER PHONE WITH THE MAC SHUT (main/phone-inbox.mts). What it left is done
     // through the window's own handlers, filed below once the window exists.
     phone: {
@@ -504,6 +520,7 @@ async function createWindow() {
       // The Settings pages' model, read through the window's own handler.
       readSettings: () => phoneSettings?.() ?? null,
       pins: () => supervisor.threadPins,
+      onMac: () => supervisor.threadOnMac,
       repeats: () => store.listRepeats(),
       teammates: () => (teammatesOn(config) ? store.teammatesView() : null),
       version: app.getVersion(),
@@ -576,7 +593,7 @@ async function createWindow() {
   // fix missed the main window for exactly that reason, 2026-08-04).
   const openLink = (url: string) => {
     if (url.startsWith('file://')) shell.openPath(decodeURIComponent(url.replace('file://', '')));
-    else shell.openExternal(url);
+    else void openInBrowser(url, { shell });
   };
 
   // A PICTURE GOES ON THE CLIPBOARD AS A PICTURE AND AS NOTHING ELSE.
@@ -903,6 +920,7 @@ async function createWindow() {
     team,
     connections: connected.connections,
     copies: connected.copies,
+    liveAt: liveAddress(cloudConfig),
   });
   // The Agents menu's Allow/Deny, bound to the real door now that there is one.
   // See the `installMenu` call above for what writing the file instead did to a
@@ -915,7 +933,15 @@ async function createWindow() {
   answerWhatOnlyTheWindowAnswered({ handle: (channel, fn) => { if (!phoneChannels.has(channel)) phoneChannels.set(channel, fn); } } as CollectingIpcMain);
   phoneApply = applyThrough(phoneChannels);
   // Every minute, so no engine search: that is a login shell on this thread.
-  phoneSettings = () => phoneChannels.get('zero:settings-read')?.({ sender: null }, { search: false }) ?? null;
+  // The cloud and the usage ride the snapshot, not the settings model, so the
+  // phone's copy takes them here.
+  phoneSettings = async () => {
+    const model = await phoneChannels.get('zero:settings-read')?.({ sender: null }, { search: false });
+    if (!model || typeof model !== 'object') return null;
+    // A cloud that does not answer leaves the list empty rather than holding the copy back.
+    const listed = (await Promise.resolve(phoneChannels.get('zero:file-links')?.({ sender: null }, {})).catch(() => null)) as { ok?: boolean; links?: unknown[] } | null | undefined;
+    return { ...model, cloud: supervisor.cloudStatus(), usage: ipc.usageForPhone(), links: listed?.ok ? listed.links : [] };
+  };
   updater.start();
   // A task the app just shipped moved main: look now rather than in half an
   // hour, so the restart is offered while she still remembers the task.
@@ -1035,14 +1061,16 @@ async function createWindow() {
       event.preventDefault();
       return;
     }
-    if (key !== 'y' && key !== 'n') return;
+    const allow = CHORD_ANSWERS[key];
+    if (allow === undefined) return;
     const front = cardInFront();
     if (!front) return;
+    event.preventDefault(); // the page never sees the chord; no double-answer
+    if (!chordLands(ipc.cardSentAt(front.id), Date.now())) return;
     // Through the ipc layer's own door, so the renderer is told what was
     // decided and can acknowledge it. Answering the file directly from here is
     // what made the chord feel like nothing had happened (2026-08-06).
-    ipc.answerApproval(front.id, key === 'y');
-    event.preventDefault(); // the page never sees the chord; no double-answer
+    ipc.answerApproval(front.id, allow);
   });
 
   // ---- END OF THE CHORD WIRING ----
@@ -1140,12 +1168,26 @@ async function createWindow() {
   // itself (it has no disk and should not have one), and 'render-process-gone'
   // only fires when the process DIES, which a thrown React error does not.
   ipcMain.handle('zero:crash', (_e, payload) => { reportFromRenderer(payload ?? {}); });
+  recordBlankPages({
+    ipcMain,
+    window: () => window,
+    dir: path.join(userDir, 'memory-log'),
+    context: () => {
+      const runs = supervisor.runsGoing();
+      return {
+        upMinutes: Math.round(process.uptime() / 60),
+        running: runs.length,
+        inCloud: runs.filter((s) => s.cloud).length,
+        processes: app.getAppMetrics().map((m) => ({ type: m.type, mb: Math.round(m.memory.workingSetSize / 1024) })),
+      };
+    },
+  });
   ipcMain.handle('zero:take-join', () => { const token = pendingJoin; pendingJoin = null; return token; });
   // External links from markdown open in the real browser; local artifacts
   // (a demo page, a screenshot a worker saved) open in their default app, so
   // "see it working" is one click from the message.
   window.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:/.test(url)) shell.openExternal(url);
+    if (/^https?:/.test(url)) void openInBrowser(url, { shell });
     else if (url.startsWith('file://')) shell.openPath(decodeURIComponent(url.replace('file://', '')));
     return { action: 'deny' };
   });
@@ -1154,7 +1196,7 @@ async function createWindow() {
   window.webContents.on('will-navigate', (e, url) => {
     if (!leavesTheApp(window!.webContents.getURL(), url)) return;
     e.preventDefault();
-    if (/^https?:/.test(url)) shell.openExternal(url);
+    if (/^https?:/.test(url)) void openInBrowser(url, { shell });
   });
 
   // WHAT AN EMBEDDED PAGE MAY DO IS DECIDED HERE, NOT ON THE TAG THAT ASKED.
@@ -1186,7 +1228,7 @@ async function createWindow() {
     // browser we have not designed, and `allowpopups` is off anyway
     // (webview-guard.mts), so without this such a link does nothing at all.
     contents.setWindowOpenHandler(({ url }) => {
-      if (/^https?:/.test(url)) shell.openExternal(url);
+      if (/^https?:/.test(url)) void openInBrowser(url, { shell });
       return { action: 'deny' };
     });
 
@@ -1296,6 +1338,8 @@ async function createWindow() {
     }, Number(process.env.ZERO_SCREENSHOT_DELAY_MS ?? 2500));
   }
 
+  askBeforeClosingWhileWorking({ app, window, dialog, working: () => supervisor._load(), name: Name });
+
   window.on('closed', () => {
     supervisor.stop();
     store.unwatch();
@@ -1384,6 +1428,8 @@ if (!app.requestSingleInstanceLock()) {
         // this scheme.
         // No-store here too, for the same reason as the page scheme above: a
         // screenshot an agent retakes under the same name is still a new picture.
+        // It reaches a fetch; an <img> keeps the window's copy per address
+        // whatever this says, so viewers ask with seenAt (renderer/src/picture.ts).
         const out = noStore(res);
         out.headers.set('access-control-allow-origin', '*');
         return out;
