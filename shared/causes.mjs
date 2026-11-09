@@ -32,6 +32,11 @@ export function causeOf(item, items) {
 export const CAUSE_WAIT_WORD = 'Waiting';
 export const CAUSE_BACK_WORDS = 'When fixed';
 
+/** What a cause row is told when another thread joins it. */
+export function joinedWords(thread) {
+  return `${thread?.label || thread?.title || 'Another thread'} is waiting on this too.`;
+}
+
 /** "6 waiting", for the Status column. */
 export function causeWord(n) {
   return `${n} waiting`;

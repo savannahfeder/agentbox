@@ -137,6 +137,24 @@ describe('a stuck thread waits on its cause through the store tool', () => {
     expect(waitingOn(read(first.waitingOn), work.listWorkItems({ includeDone: true })).map((i) => i.id).sort()).toEqual([a.id, b.id].sort());
   });
 
+  // The third Codex run: the lead answered naming two threads, a third joined
+  // after, and the opened row went on saying two.
+  it('a thread that joins later is named on the cause row, by the app', async () => {
+    const a = thread(product, 'Write the on-call runbook');
+    const first = await call(a.id, { cause: "Your Mac can't push to GitHub", new: true });
+    const b = thread(other, 'Why did last night\'s deploy take 40 minutes');
+    await call(b.id, { causeId: first.waitingOn });
+    const row = read(first.waitingOn);
+    expect(row.note).toBe("Why did last night's deploy take 40 minutes is waiting on this too.");
+    expect(row.wrote.note.source).toBe('system');
+  });
+
+  it('the thread that opens the row is not named twice', async () => {
+    const a = thread(product, 'Write the on-call runbook');
+    const first = await call(a.id, { cause: "Your Mac can't push to GitHub", new: true });
+    expect(read(first.waitingOn).note).toBeUndefined();
+  });
+
   it('a thread naming an open cause in the same words joins it at once, whatever the case', async () => {
     const a = thread(product, 'Who acts on comments');
     const first = await call(a.id, { cause: "Your Mac can't push to GitHub", new: true });
