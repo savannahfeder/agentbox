@@ -11,38 +11,21 @@ appId: now.astral.agentbox
     visible: "Use the account from .* on your computer."
     timeout: 120000
 - takeScreenshot: 01-sign-in
-# The boxes carry no label of their own, so they are tapped where they sit on
-# an iPhone 16 Pro. The password goes first, while the keyboard is down: with
-# it up the password box scrolls out of sight, and a tap that misses then
-# types the password into nothing rather than into the email box.
+# By their test ids, so a password is never typed into the email box, and
+# signed in with the keyboard's Go key rather than a button the keyboard
+# can push out of reach.
 - tapOn:
-    point: "40%,50%"
-- inputText: ${REVIEW_PASSWORD}
-- tapOn:
-    point: "50%,40%"
+    id: "sign-in-email"
 - inputText: "appreview@agentbox.ac"
-# The fields have no keyboard dismiss button; a tap off them closes it.
-- tapOn: "Use the account from .* on your computer."
-# The button, not the heading of the same words.
+- scrollUntilVisible:
+    element:
+      id: "sign-in-password"
+    direction: DOWN
+    timeout: 10000
 - tapOn:
-    text: "Sign in"
-    below: "Forgot password.*"
-- extendedWaitUntil:
-    notVisible: "Forgot password.*"
-    timeout: 30000
-    optional: true
-# Still on sign-in: empty both boxes before the failure screenshot, so a
-# password typed into the wrong box is not in it.
-- runFlow:
-    when:
-      visible: "Forgot password.*"
-    commands:
-      - tapOn:
-          point: "50%,40%"
-      - eraseText: 200
-      - tapOn:
-          point: "40%,50%"
-      - eraseText: 200
+    id: "sign-in-password"
+- inputText: ${REVIEW_PASSWORD}
+- pressKey: Enter
 - extendedWaitUntil:
     visible: "Where your messages go"
     timeout: 60000

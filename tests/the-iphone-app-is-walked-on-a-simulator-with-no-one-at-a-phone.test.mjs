@@ -64,6 +64,14 @@ describe('the walk', () => {
     expect(config).toContain(head.appId);
   });
 
+  it('finds the sign-in boxes by ids the screen gives them, never by where they sit', () => {
+    const signIn = fs.readFileSync(new URL('mobile/src/app/sign-in.tsx', root), 'utf8');
+    const ids = body.filter((s) => s.tapOn?.id).map((s) => s.tapOn.id);
+    expect(ids).toEqual(expect.arrayContaining(['sign-in-email', 'sign-in-password']));
+    for (const id of ids) expect(signIn).toContain(`testID="${id}"`);
+    expect(body.some((s) => s.tapOn?.point)).toBe(false);
+  });
+
   it('types the password from the job, never from the file', () => {
     expect(body.filter((s) => s.inputText).map((s) => s.inputText)).toContain('${REVIEW_PASSWORD}');
   });
