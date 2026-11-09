@@ -1,7 +1,7 @@
 // PURE. How the big file view (components/ArtifactView.tsx) draws its pins,
 // zooms a picture, and what it offers for the file it found.
-import { noteGoesTo, notesForTheAgent, placeWords, tagsYourAgent, unsentReplies } from '../../shared/artifact-marks.mjs';
-import type { FileVersion } from '../../shared/artifact-marks.mjs';
+import { noteGoesTo, notesForTheAgent, placeWords, tagsYourAgent, unsentReplies, viewKind } from '../../shared/artifact-marks.mts';
+import type { FileVersion } from '../../shared/artifact-marks.mts';
 import { MAX_ZOOM } from './picture-view';
 import type { FileMarks, FileNote, NotePlace } from './types';
 
@@ -207,6 +207,32 @@ export function notesToSendTheAgent(marks: FileMarks, version: FileVersion, coun
   const mine = (id: string) => marks.notes.find((n) => n.id === id);
   const replied = marks.notes.filter((n) => n.file === version.id && unsentReplies(n, people).some((r) => r.by === me)).map((n) => n.id);
   return [...notesForTheAgent(marks, version, count).ids.filter((id) => mine(id)?.by === me && noteGoesTo(mine(id), people).to === 'agent'), ...replied];
+}
+
+/** notesToSendTheAgent over every file of the thread, and how many of them are not on the open one. */
+export function notesToSendTheAgentAnywhere(marks: FileMarks, families: ReadonlyArray<{ versions: FileVersion[] }>, here: string | null, people: Named, me: string | null): { ids: string[]; elsewhere: number; elsewhereKind: 'picture' | 'file' } {
+  const ids: string[] = [];
+  let elsewhere = 0;
+  let allPictures = true;
+  for (const family of families) {
+    const open = family.versions.some((v) => v.id === here);
+    for (const v of family.versions) {
+      const got = notesToSendTheAgent(marks, v, family.versions.length, people, me);
+      ids.push(...got);
+      if (open || !got.length) continue;
+      elsewhere += got.length;
+      if (viewKind(v.path) !== 'image') allPictures = false;
+    }
+  }
+  return { ids, elsewhere, elsewhereKind: allPictures ? 'picture' : 'file' };
+}
+
+/** The bar under the file: how many comments wait, and how many of them are on another file. */
+export function unsentWords(total: number, elsewhere: number, kind: 'picture' | 'file'): string {
+  const head = `${total} ${total === 1 ? 'comment' : 'comments'} not sent to your agent`;
+  if (!elsewhere) return head;
+  const where = elsewhere === 1 ? `another ${kind}` : `other ${kind}s`;
+  return elsewhere >= total ? `${head}, on ${where}` : `${head}, ${elsewhere} on ${where}`;
 }
 
 /**

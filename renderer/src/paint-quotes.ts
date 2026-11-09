@@ -1,4 +1,4 @@
-import { findQuote } from '../../shared/artifact-marks.mjs';
+import { findQuote } from '../../shared/artifact-marks.mts';
 import type { TableCell } from './types';
 
 export const canPaintQuotes = () => !!(CSS as unknown as { highlights?: unknown }).highlights;

@@ -18,12 +18,12 @@ import { taskWords } from '../team/company';
 import { agentSaidLast } from '../team/answers-in-the-chat';
 import { PriorityIcon } from '../components/Priority';
 import { asideBesides, notStarted, rowTitle, waitCameBack } from '../list-rules';
-import { deadlineOf, dueSaid } from '../../../shared/team-tasks.mjs';
-import { waitWords } from '../../../shared/thread-waits.mjs';
-import { needsLeft, needsWord } from '../../../shared/cloud-needs.mjs';
-import { closedOverWords, iSpokeLast, isWorkThread } from '../../../shared/team-rules.mjs';
+import { deadlineOf, dueSaid } from '../../../shared/team-tasks.mts';
+import { waitWords } from '../../../shared/thread-waits.mts';
+import { needsLeft, needsWord } from '../../../shared/cloud-needs.mts';
+import { closedOverWords, iSpokeLast, isWorkThread } from '../../../shared/team-rules.mts';
 import { commentLine } from './teammate-thread';
-import { fileNewsFor, fileNewsLine } from '../../../shared/artifact-marks.mjs';
+import { fileNewsFor, fileNewsLine } from '../../../shared/artifact-marks.mts';
 import { toApproveWords } from '../threads-made';
 import { DONE } from '../done-word';
 import {
@@ -37,14 +37,14 @@ import { facesOnButton, peopleWorthADot, togglePicked, whoseWord } from './peopl
 import { stopKey } from './walk-rules';
 import { PinMark } from './ThreadMenu';
 import { bandDrag, cardClickIntent, clickMarks, marqueeMarks, type Box } from './board-select';
-import { shownToPeople } from '../../../shared/thread-cards.mjs';
+import { shownToPeople } from '../../../shared/thread-cards.mts';
 import { Name } from '../../../shared/product-name.mjs';
 import { FleetContext } from '../fleet';
 import { TeammateLead } from '../teammates/row-lead';
 import { factsFor, laterCell, saysOnCard, statusCell, type StatusCell } from '../status-word';
 import { offersTryAgain } from '../try-again';
-import { voiceName } from '../../../shared/agent-voice.mjs';
-import { shownPriority } from '../../../shared/rank.mjs';
+import { voiceName } from '../../../shared/agent-voice.mts';
+import { shownPriority } from '../../../shared/rank.mts';
 import { api } from '../api';
 import { CLOUD_KEY, CLOUD_WHEN_ON, cloudButtonCount, cloudFootLine, cloudIsOn, cloudMonthLine, cloudMoveLine, countedAccounts, type CloudMode, type CloudStatus } from '../cloud-menu';
 import { brokenAccounts, buttonAsksSignIn, menuSetupLine, readBrokenSeen, seenAfter, SETUP, writeBrokenSeen } from '../cloud-setup';
@@ -218,7 +218,7 @@ export type PeoplePick = { everyone: Person[]; picked: string[]; me: string | nu
  * through the hint plate.
  */
 export function SearchButton({ onSearch }: { onSearch: () => void }) {
-  return <button type="button" className="th-search" data-hint="search" onClick={onSearch} title="Search threads (/)" aria-label="Search threads"><SearchGlyph /></button>;
+  return <button type="button" className="th-search" data-hint="search" onClick={onSearch} title="Search threads" aria-label="Search threads"><SearchGlyph /></button>;
 }
 
 /** New thread, the cloud and the Display icon (and Search on the board), at the right of the Inbox header. */
@@ -470,8 +470,9 @@ const COUNTED: TabView[] = ['inbox', 'progress', 'snoozed'];
 
 /** With a team on the page (w-b5f23cff71): two tabs, Needs you and Everything else, and the team's faces at the end. */
 export type TeamTabs = { on: boolean; onNeeds: () => void; onEverything: () => void; corner?: ReactNode;
-  /** The one-list home: the second word is your own In progress, not Everything else. */
-  progress?: { count: number; on: boolean };
+  /** On a computer: Needs you, In progress, Later and Done, each its own tab;
+   *  `away` while a teammate's place is open, so no tab is lit. */
+  states?: { away: boolean; onTab: (v: TabView) => void };
   /** The team's day (team/TodayPage.tsx). */
   today?: { on: boolean; onToday: () => void };
   /** Every task on the team (team/TasksPage.tsx). */
@@ -503,15 +504,17 @@ function StateTabsRow({ view, counts, onView, needs, onSearch, lit = false, afte
   view: TabView; counts: Partial<Record<TabView, number>>; onView: (v: TabView) => void; needs?: string;
   onSearch?: () => void; lit?: boolean; after?: ReactNode; dim?: boolean; team?: TeamTabs | null; keepLater?: boolean;
 }) {
-  // In progress, Later and Done are your own card's tabs on Everything else.
-  const tabs = team ? INBOX_TABS.filter((t) => t.view === 'inbox')
+  // On a phone with a team, In progress, Later and Done are under Everything else.
+  const states = team?.states;
+  const tabs = team && !states ? INBOX_TABS.filter((t) => t.view === 'inbox')
     : INBOX_TABS.filter((t) => t.view !== 'snoozed' || laterTabShown({ count: counts.snoozed ?? 0, view, walking: keepLater }));
-  const on = (t: TabView) => (team ? t === 'inbox' && !team.on && !team.today?.on && !team.tasks?.on && !team.done?.on : view === t && !dim);
+  const on = (t: TabView) => (states ? view === t && !states.away && !dim
+    : team ? t === 'inbox' && !team.on && !team.today?.on && !team.tasks?.on && !team.done?.on : view === t && !dim);
+  const press = (t: TabView) => (states ? (t === 'inbox' ? team!.onNeeds() : states.onTab(t)) : team ? team.onNeeds() : onView(t));
   return <div className="th-bar"><div className="tm-tabs">
     {/* Every tab wears the Tab plate (hint-plate.ts, 'state-tab'). */}
-    {tabs.map((t) => <button type="button" key={t.view} data-hint="state-tab" className={`tm-tab${on(t.view) ? ' on' : ''}${!team && t.view === 'inbox' && lit && view !== 'inbox' ? ' fresh' : ''}${team?.on && t.view === 'inbox' && lit ? ' fresh' : ''}`} onClick={() => (team ? team.onNeeds() : onView(t.view))}>{t.view === 'inbox' && needs ? needs : t.label}{COUNTED.includes(t.view) && !!counts[t.view] && <b>{counts[t.view]}</b>}</button>)}
-    {team && !team.progress && <button type="button" data-hint="state-tab" className={`tm-tab${team.on ? ' on' : ''}`} onClick={team.onEverything}>{EVERYTHING_ELSE}</button>}
-    {team?.progress && <button type="button" data-hint="state-tab" className={`tm-tab${team.progress.on ? ' on' : ''}`} onClick={team.onEverything}>In progress{team.progress.count > 0 && <b>{team.progress.count}</b>}</button>}
+    {tabs.map((t) => <button type="button" key={t.view} data-hint="state-tab" className={`tm-tab${on(t.view) ? ' on' : ''}${!team && t.view === 'inbox' && lit && view !== 'inbox' ? ' fresh' : ''}${team?.on && t.view === 'inbox' && lit ? ' fresh' : ''}`} onClick={() => press(t.view)}>{t.view === 'inbox' && needs ? needs : t.label}{COUNTED.includes(t.view) && !!counts[t.view] && <b>{counts[t.view]}</b>}</button>)}
+    {team && !states && <button type="button" data-hint="state-tab" className={`tm-tab${team.on ? ' on' : ''}`} onClick={team.onEverything}>{EVERYTHING_ELSE}</button>}
     {team?.today && <button type="button" data-hint="state-tab" className={`tm-tab${team.today.on ? ' on' : ''}`} onClick={team.today.onToday}>Today</button>}
     {team?.tasks && <button type="button" data-hint="state-tab" className={`tm-tab${team.tasks.on ? ' on' : ''}`} onClick={team.tasks.onTasks}>Tasks</button>}
     {team?.done && <button type="button" data-hint="state-tab" className={`tm-tab${team.done.on ? ' on' : ''}`} onClick={team.done.onDone}>{DONE.short}</button>}
@@ -780,7 +783,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
       priority={shownPriority(item)} updatedAt={task.at} when={back} now={now} />;
   }
   if (said) {
-    const fileNews = fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string) => (said.people.length > 1 ? firstName(team?.byId.get(id) ?? null) : ''))?.trim();
+    const fileNews = fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string | null) => (said.people.length > 1 ? firstName(team?.byId.get(id ?? '') ?? null) : ''))?.trim();
     const agent = fileNews ? null : agentSaidLast(item, allItems);
     return <RowCells status={status} title={<MessageTitle people={said.people} fromMe={!fileNews && !agent && said.fromMe} text={fileNews ?? (agent ? `${agent.who}: ${agent.text}` : said.text)} name={item.label || (isWorkThread(item) ? item.title : null)} />} aside={due?.word} late={!!due?.late} pinned={!!item.pinned && item.status !== 'done'} where="" person={person}
       priority={messagePriority(item)} updatedAt={when} when={back} now={now} action={action} />;
@@ -798,7 +801,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
   // the Status column says Queued on exactly those rows, and one fact in two
   // places on one row is what the column was drawn to end. `FreeAgentContext`
   // is untouched and still decides whether the cloud offers itself.
-  const commented = fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string) => firstName(team?.byId.get(id) ?? null))
+  const commented = fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string | null) => firstName(team?.byId.get(id ?? '') ?? null))
     ?? commentLine(item.waitingComments, (id) => firstName(team?.byId.get(id) ?? null))
     ?? (waitCameBack(item) ? item.waitEnded?.said : null)
     ?? item.handedOver?.said;
@@ -814,10 +817,12 @@ export function ThreadCells({ item, product, now, person, tab }: {
  *  it, the private ones included; with a teammate in view, those wear a lock
  *  and every card names its person. Whose threads is picked on the header's
  *  filters button (w-14bb56c833), so the columns start right under it. */
-export function InboxBoard({ items, products, display, now, onOpenItem, stateOf, cards = [], picked, onOpenCard, selected, selectedCard = null, columnOrder = DEFAULT_COLUMN_ORDER, onReorderColumns, projectOrder, onPlaces, marked, onMark, waitingIsInProgress = false }: {
+export function InboxBoard({ items, products, display, now, onOpenItem, stateOf, cards = [], picked, onOpenCard, selected, selectedCard = null, columnOrder = DEFAULT_COLUMN_ORDER, onReorderColumns, projectOrder, onPlaces, marked, onMark, waitingIsInProgress = false, lead }: {
   items: WorkItem[]; products: Product[]; display: Display; now: number; onOpenItem: (item: WorkItem) => void;
   /** The whole team's board, whose count matches what the team's cards say. */
   waitingIsInProgress?: boolean;
+  /** Group messages and invitations to you, as cards at the top of Needs you. */
+  lead?: { count: number; cards: ReactNode };
   /** The column each thread sits in, by the Inbox tabs' rule (App.tsx). */
   stateOf?: (item: WorkItem) => ThreadStateWord | null;
   cards?: ThreadCard[]; picked?: string[]; onOpenCard?: (card: ThreadCard) => void;
@@ -1038,6 +1043,8 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
     <div className={`th-board${dragging ? ' dragging' : ''}`} ref={boardRef}>
     {columns.map((col) => {
       const rows = col.rows;
+      const ahead = col.state === 'waiting' ? lead : undefined;
+      const count = rows.length + (ahead?.count ?? 0);
       const movable = !!onPlaces && col.state !== 'done' && col.state !== 'running' && display.sort === 'priority';
       return <div key={col.state} className={`th-col${dragging === col.state ? ' lifted' : ''}`} data-drag-scope=""
         ref={(el) => { if (el) colEls.current.set(col.state, el); else colEls.current.delete(col.state); }}>
@@ -1066,11 +1073,12 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
             window.addEventListener('pointermove', move);
             window.addEventListener('pointerup', up);
             window.addEventListener('pointercancel', cancel);
-          }}><StateGlyph state={col.state} />{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}{rows.length > 0 && <b>{rows.length}</b>}
+          }}><StateGlyph state={col.state} />{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}{count > 0 && <b>{count}</b>}
           {/* THE HANDLE COMES UP WHEN YOU ARE OVER THE COLUMN: "a little drag
               icon comes up subtly". Only where a drag does something. */}
           {onReorderColumns && <GripIcon />}</div>
-        {rows.length === 0 && <div className="th-col-empty">Nothing here.</div>}
+        {count === 0 && <div className="th-col-empty">Nothing here.</div>}
+        {ahead?.cards}
         {/* A card says who can see it the way a row does: the lock on what
             only you can see, the people mark on what a few chosen people
             can, and nothing on what the whole team can, the default. */}

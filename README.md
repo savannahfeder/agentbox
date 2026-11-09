@@ -225,7 +225,7 @@ nothing new to pay for.
 <br>
 
 `zero.config.json` in the repo root, gitignored and machine-specific. Every
-default works unset and they all live in `main/config.mjs`. The ones that
+default works unset and they all live in `main/config.mts`. The ones that
 matter:
 
 - `storeRoot`: where the store lives. On macOS this defaults to a folder
@@ -329,7 +329,7 @@ in exactly one place. The app can crash, restart or be rewritten without any
 agent noticing.
 
 - `main/` the Electron main process: config, the store
-  (`main/store/work-items.mjs` is the single write path), the supervisor that
+  (`main/store/work-items.mts` is the single write path), the supervisor that
   spawns one headless session per work item, and IPC.
 - `mcp/` the store server handed to those sessions.
 - `renderer/` the inbox: list, focus mode, rail, compose, palette, browser.
@@ -348,7 +348,13 @@ agent noticing.
 ```
 npm run dev        # vite HMR plus electron
 npm test
+npm run typecheck  # strict tsc over the back end and the renderer
 ```
+
+The app is TypeScript throughout. `main/`, `shared/` and `mcp/` are `.mts` that
+Node runs as they are, stripping the types at load, so there is no build step
+for the back end; the renderer and the phone app are `.ts` and `.tsx` built
+by Vite and Expo. CI runs the strict type check beside the tests on every push.
 
 Useful modes:
 

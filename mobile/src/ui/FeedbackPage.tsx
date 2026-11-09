@@ -3,7 +3,7 @@
 // the same inbox the Mac's card and the web app's go to.
 import { useState } from 'react';
 import { Platform, Pressable, TextInput, View } from 'react-native';
-import { checkFeedback } from '../../../shared/feedback.mjs';
+import { checkFeedback } from '../../../shared/feedback.mts';
 import type { Picked } from '../platform/pick';
 import { reportText, type ReportAbout } from '../lib/report';
 import { useCloud } from '../state/cloud';

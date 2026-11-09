@@ -43,7 +43,7 @@ one file per commit, with no behaviour change in that commit.
 - **An ordering or timing need** that no rename or restructure can make
   obvious.
 - **A pointer to the test that guards a rule**:
-  "pinned by tests/no-worker-drives-her-own-browser.test.mjs".
+  "pinned by tests/no-worker-drives-her-own-browser.test.mts".
 - **The opening comment of a test file.** Required here.
 - License headers, lint suppressions that give their reason, and doc comments
   on an exported function whose contract is not clear from its name and types.

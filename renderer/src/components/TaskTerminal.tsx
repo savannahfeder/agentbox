@@ -1,6 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {api} from '../api';
+import type {TerminalScreen} from '../types';
 import {MAC} from '../this-keyboard';
 import {commandRunning,whenACommandFinishes} from '../../../shared/terminal-state.mts';
 import {linksAtRow} from '../../../shared/terminal-links.mts';
@@ -133,7 +134,7 @@ export function TaskTerminal({product,id,headerTarget,startOpen=false,commandSes
         const mac=MAC;
         terminal.attachCustomKeyEventHandler(event=>{const sequence=optionWordKey(event,mac);if(sequence===undefined)return true;if(sequence)input.push(sequence);event.preventDefault();return false;});
         dispose=()=>{if(ready)screenCache.set(key,{token,screen:serializer.serialize({scrollback:1000}),offset,cols:terminal.cols,rows:terminal.rows});observer.disconnect();subscription.dispose();terminal.dispose();};
-        const consume=async(state:any)=>{if(cancelled)return;setCwd(state.cwd);setProcessName(state.process);setExited(state.exited);watch(state.process,state.exited);if(state.truncated){terminal.reset();terminal.writeln('[Earlier terminal output omitted]');}await new Promise<void>(resolve=>terminal.write(state.data,resolve));offset=state.offset;};
+        const consume=async(state:TerminalScreen)=>{if(cancelled)return;setCwd(state.cwd);setProcessName(state.process);setExited(state.exited);watch(state.process,state.exited);if(state.truncated){terminal.reset();terminal.writeln('[Earlier terminal output omitted]');}await new Promise<void>(resolve=>terminal.write(state.data,resolve));offset=state.offset;};
         let initial=await api.terminal({product,id,action:'open'});
         if(cancelled)return;
         token=initial.token;const cached=screenCache.get(key);

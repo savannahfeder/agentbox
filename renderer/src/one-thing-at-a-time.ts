@@ -5,9 +5,9 @@
 import type { AgentEvent, AgentTurn } from './types';
 import type { ItemOutcome } from './item-thread';
 import { optionsFrom } from './format';
-import { instructionOf } from '../../shared/repeats.mjs';
+import { instructionOf } from '../../shared/repeats.mts';
 import { rowTitle } from './list-rules';
-import { teammateIdOf } from '../../shared/teammates.mjs';
+import { teammateIdOf } from '../../shared/teammates.mts';
 
 export interface Spot { pos: number; total: number; index: number }
 

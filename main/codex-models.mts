@@ -8,7 +8,7 @@
 // AND THE LIST IS NOT OURS TO KEEP. Claude Code's four are safe to generate
 // once into a committed file because `--model` there takes an ALIAS (`opus` is
 // whatever Opus is on the day the task runs, resolved by the CLI at spawn), so
-// `shared/claude-models.generated.mjs` cannot silently point at an old model.
+// `shared/claude-models.generated.mts` cannot silently point at an old model.
 // Codex has no aliases: `-m` and `thread/start`'s `model` want the exact slug
 // of one specific model, and OpenAI ships new ones on their own schedule. A
 // hardcoded Codex list is a list that is wrong the week after it is written,
@@ -59,7 +59,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { shellDataDirsNow } from './shell-path.mjs';
+import { shellDataDirsNow } from './shell-path.mts';
 
 /** One reasoning level in Codex's own cache file. */
 interface LevelRow { effort?: string; description?: unknown }
@@ -113,7 +113,7 @@ const catalogRows=(home: string,read: ReadJson): ModelRow[]=>liveCatalogs.get(ho
  * `CODEX_HOME` falls through exactly as `${VAR:-default}` does, so an
  * exported-but-blank one cannot turn this into a read at the root of the disk.
  *
- * main/codex-bin.mjs looks under BOTH `CODEX_HOME` and `~/.codex` for signs of
+ * main/codex-bin.mts looks under BOTH `CODEX_HOME` and `~/.codex` for signs of
  * an install, and that is not this rule rather than a contradiction of it: its
  * job is to make an ABSENCE hard to claim, so two homes is the right answer
  * there. This one has to name the single home a specific Codex reads, because
@@ -134,7 +134,7 @@ export function codexHome({ configured = null, env = process.env, home = os.home
  *
  * `{ id, label, description, defaultLevel, levels }`, where `levels` is the
  * model's own `[{ id, description }]`. Every word in it is Codex's; nothing is
- * typed here, for the reason `shared/claude-models.generated.mjs` gives about
+ * typed here, for the reason `shared/claude-models.generated.mts` gives about
  * its own labels -- a name typed into a file of ours looks authoritative while
  * being a guess.
  *

@@ -2,8 +2,8 @@
 // over the cards the team's computers publish (20261031000050_threads_say_when_they_shipped.sql).
 import { firstName } from '../../../renderer/src/team/company';
 import { shippedThisWeek, shippedWords, type ShippedRow } from '../../../renderer/src/team/shipped';
-import type { ThreadCard } from '../../../renderer/src/types';
-import { threadCardOf } from './everything';
+import type { Person, ThreadCard } from '../../../renderer/src/types';
+import { threadCardOf, type ThreadCardRow } from './everything';
 
 export { shippedWords, type ShippedRow };
 
@@ -13,7 +13,10 @@ const WEEK = 7 * 86_400_000;
 export const shippedCardsQuery = (now: number) =>
   `select=person_id,thread_id,visible,title,project,state,priority,people,shipped_at,updated_at&shipped_at=gte.${encodeURIComponent(new Date(now - WEEK).toISOString())}&order=shipped_at.desc&limit=200`;
 
-export function shippedCardOf(r: any): ThreadCard {
+/** One `thread_cards` row as shippedCardsQuery reads it. */
+export type ShippedCardRow = ThreadCardRow & { people?: unknown; shipped_at?: string | null };
+
+export function shippedCardOf(r: ShippedCardRow): ThreadCard {
   const at = r.shipped_at ? Date.parse(r.shipped_at) : NaN;
   return { ...threadCardOf(r), people: Array.isArray(r.people) && r.people.length ? r.people : null, ...(at > 0 ? { shippedAt: at } : {}) };
 }
@@ -30,4 +33,4 @@ export function phoneShipped({ cards, me, now }: { cards: readonly ThreadCard[];
 }
 
 export const shippedName = (id: string | null, me: string | null, people: readonly { id: string; name: string | null; email?: string | null }[]) =>
-  (id && id === me ? 'You' : firstName((people.find((p) => p.id === id) ?? null) as any));
+  (id && id === me ? 'You' : firstName((people.find((p) => p.id === id) ?? null) as Person | null));

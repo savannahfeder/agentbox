@@ -1,6 +1,6 @@
 // WHAT THE CONNECTIONS PAGE SAYS, apart from drawing it, so a test can read it.
 import { defaultUrlTransform } from 'react-markdown';
-import { clockAt } from '../../../shared/connections-catalog.mjs';
+import { clockAt } from '../../../shared/connections-catalog.mts';
 import type { ConnectionTile, Person } from '../types';
 
 function agoWords(ms: number): string {
