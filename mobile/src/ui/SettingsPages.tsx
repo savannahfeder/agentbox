@@ -28,6 +28,7 @@ import { STORE_BUILD } from '../lib/store-build';
 import { PHONE_LOOKS } from '../lib/look';
 import { alertsHere, sendTestAlert } from '../platform/alerts';
 import { useCloud } from '../state/cloud';
+import type { PhoneWorkspaceCopy } from '../../../renderer/src/phone-settings-view';
 import { useLook } from '../state/look';
 import { useSettings, type SettingsState } from '../state/settings';
 import { Tick } from './icons';
@@ -270,7 +271,7 @@ function Accounts({ engine, list }: { engine: 'claude' | 'codex'; list: Account[
 const COMPUTER = 'your computer';
 
 /** The desktop's rule (Settings.tsx `cloudHere`): set up for the cloud, with an account there for this agent. */
-const cloudHere = (w: any, engine: 'claude' | 'codex') => !!w.cloud?.engines.includes(engine);
+const cloudHere = (w: PhoneWorkspaceCopy, engine: 'claude' | 'codex') => !!w.cloud?.engines.includes(engine);
 
 function CloudGroup({ engine }: { engine: 'claude' | 'codex' }) {
   const s = useSettings();
