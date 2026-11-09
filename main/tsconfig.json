@@ -18,5 +18,5 @@
     "checkJs": false,
     "skipLibCheck": true
   },
-  "include": ["**/*.mts", "../shared/**/*.mts"]
+  "include": ["**/*.mts", "../shared/**/*.mts", "../mcp/**/*.mts"]
 }

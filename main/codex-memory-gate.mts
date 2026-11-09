@@ -48,7 +48,7 @@
 // there is one environment for all of them and an item id on it would label
 // every thread as whichever row started first. The thread names itself instead:
 // `session_id` in the payload is the app-server's own `thread.id`, which
-// main/codex.mjs already keeps as `session.sessionId`. The lookup lives in
+// main/codex.mts already keeps as `session.sessionId`. The lookup lives in
 // main/memory-gate-server.mts (`ownerOf`).
 
 import fsNode from 'node:fs';

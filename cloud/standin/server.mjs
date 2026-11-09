@@ -3,7 +3,7 @@
 //
 //   node cloud/standin/server.mjs --port 54900 --file /tmp/lumen/cloud.json
 //
-// The in-memory cloud (main/team/memory-cloud.mjs) behind a small HTTP door, so
+// The in-memory cloud (main/team/memory-cloud.mts) behind a small HTTP door, so
 // several copies of the app can be different people on one team without the
 // hosted database. It listens on loopback only and trusts whoever knocks: a
 // person's token is their id.
@@ -13,6 +13,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { createMemoryCloud, memoryBackend, signUpMemory } from '../../main/team/memory-cloud.mts';
+import { attachLiveRooms } from '../live/server.mjs';
 
 const BIG = 100_000;
 
@@ -140,6 +141,9 @@ export function startStandinCloud({ port = 0, file = null, saveEveryMs = 3000 } 
     }
   });
 
+  // Every open file's live room, on the same door: the copies find it from the cloud's address.
+  const live = attachLiveRooms(server);
+
   return new Promise((resolve) => {
     server.listen(port, '127.0.0.1', () => {
       resolve({
@@ -151,6 +155,7 @@ export function startStandinCloud({ port = 0, file = null, saveEveryMs = 3000 } 
           if (saver) clearInterval(saver);
           save();
           for (const l of listeners.values()) l.wake?.();
+          live.close();
           server.closeAllConnections?.();
           server.close(() => done());
         }),

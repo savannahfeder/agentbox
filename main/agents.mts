@@ -1,6 +1,6 @@
 import { hookFailure } from '../shared/hook-failure.mts';
 // Reads the Claude Code sessions running on this machine, and replies to one.
-// What the readings mean is decided in shared/agents.mjs; this file only
+// What the readings mean is decided in shared/agents.mts; this file only
 // measures and delivers. Everything here is read-only except `reply`, which
 // writes one line into the socket a live session already listens on.
 
@@ -15,7 +15,7 @@ import { NAME, Name, WAS } from '../shared/product-name.mjs';
 import { findTranscript, transcriptSearch } from './transcript-search.mts';
 import {
   WORK_CHARS, agentKey, changedFile, commandWork, fullSubject, isBookkeeping, saidCount, sameInstant, threadWindow, workSubject, workVerb,
-} from '../shared/agents.mjs';
+} from '../shared/agents.mts';
 
 const run = promisify(execFile);
 
@@ -173,7 +173,7 @@ async function processTable() {
 }
 
 // Is the process at that pid still the session the record describes? The rule,
-// and the timezone trap behind it, are in `sameInstant` in shared/agents.mjs.
+// and the timezone trap behind it, are in `sameInstant` in shared/agents.mts.
 function stillTheSame(rec: SessionRecord, proc: ProcessRow | undefined): proc is ProcessRow {
   if (!proc) return false;
   if (!/claude/i.test(proc.command)) return false;
@@ -314,7 +314,7 @@ function remember(acc: Facts, line: string) {
       const open = acc.saidOpen;
       acc.lastSaid = open ? `${acc.lastSaid}\n\n${said}` : said;
       // A long reply keeps its end, because that is where the answer is. See
-      // `howItEnded` in shared/agents.mjs.
+      // `howItEnded` in shared/agents.mts.
       if (acc.lastSaid.length > SAID_CHARS) acc.lastSaid = acc.lastSaid.slice(-SAID_CHARS);
       acc.saidOpen = true;
       // Stamped when the reply began, not when it ended. A reply that started
@@ -399,7 +399,7 @@ function readHistory(sessionId: string, cwd: string | undefined) {
   return { ...entry, transcript: file };
 }
 
-// Exported for tests/one-inbox-no-agents-tab.test.mjs. The fields it reads are
+// Exported for tests/one-inbox-no-agents-tab.test.mts. The fields it reads are
 // Claude Code's, so an upstream rename would blank the card without an error.
 export { readHistory as __readTail, readHistory as __readHistory };
 export const __transcriptSearch = transcriptSearch;
@@ -590,7 +590,7 @@ export async function reply(pid: number, text: unknown, { timeoutMs = 3000 }: { 
   }
   cache = { ...cache, at: 0 };   // the agent has moved; the next look re-measures
   // The key is worked out here, where the agent record is, because a pid alone
-  // is not an identity (`agentKey`, shared/agents.mjs).
+  // is not an identity (`agentKey`, shared/agents.mts).
   return { ok: true, delivered: true, working: moved, name: agent.name, key: agentKey(agent), at: Date.now() };
 }
 
@@ -711,7 +711,7 @@ function heldNotice(agent: Agent, sinceSize: number, message: string) {
   return null;
 }
 
-// Exported for tests/a-held-message-is-not-delivered.test.mjs.
+// Exported for tests/a-held-message-is-not-delivered.test.mts.
 export const __heldNotice = heldNotice;
 
 function readState(pid: number) {

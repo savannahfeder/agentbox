@@ -36,7 +36,9 @@ export function workersFor({ memBytes, cpus }) {
   return Math.max(1, Math.min(byMemory, (Number(cpus) || 1) - 1));
 }
 
-export const SUITE_INCLUDE = ['tests/**/*.test.mjs'];
+// .test.mjs still runs so a test written the old way is not skipped in silence;
+// tests/every-test-is-typescript fails until it is renamed.
+export const SUITE_INCLUDE = ['tests/**/*.test.mts', 'tests/**/*.test.mjs'];
 
 export const SUITE_EXCLUDE = [
   ...configDefaults.exclude,
@@ -52,8 +54,8 @@ export default defineConfig({
     include: SUITE_INCLUDE,
     exclude: SUITE_EXCLUDE,
     // Every test file gets its own throwaway ~/.astral, so nothing in the suite
-    // can touch the real one. See tests/agentbox-home.setup.mjs.
-    setupFiles: ['tests/agentbox-home.setup.mjs'],
+    // can touch the real one. See tests/agentbox-home.setup.mts.
+    setupFiles: ['tests/agentbox-home.setup.mts'],
     // `--maxWorkers`, `--no-file-parallelism` and VITEST_MAX_FORKS still win.
     maxWorkers: workersFor({ memBytes: os.totalmem(), cpus: os.availableParallelism?.() ?? os.cpus().length }),
     minWorkers: 1,
@@ -67,7 +69,7 @@ export default defineConfig({
     //
     // Nothing fast is slowed by this: a test that finishes in 40 ms still
     // finishes in 40 ms, and only a test that is genuinely stuck pays the
-    // wait. Tests that wait on real work should wait with tests/waiting.mjs,
+    // wait. Tests that wait on real work should wait with tests/waiting.mts,
     // whose deadline sits under these so that its message — which names what
     // the test was waiting for — is the one that gets shown.
     testTimeout: 60_000,

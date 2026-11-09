@@ -6,7 +6,7 @@
 //
 // He was right that nothing said. The app finds whichever coding agent is
 // already signed in on the computer and runs every worker on that subscription
-// (main/claude-plan.mjs, main/codex-account.mts), and the walk is SILENT about
+// (main/claude-plan.mts, main/codex-account.mts), and the walk is SILENT about
 // it by design: `needsPlan` in renderer/src/plan-setup.ts skips the plan
 // question entirely when one tool is found and signed in, which is the right
 // call and leaves nobody told.

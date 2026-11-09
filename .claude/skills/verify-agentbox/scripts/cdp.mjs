@@ -14,36 +14,20 @@
 // The Chrome and its profile go through scripts/lib/chrome-guard.mjs, so a
 // drive that throws or is killed leaves no orphan behind.
 import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { guard, sweep, processes } from '../../../../scripts/lib/chrome-guard.mjs';
+import { MAC_CHROME, NO_HIDDEN_BROWSER, chromesForTesting, headlessShells } from '../../../../shared/hidden-browser.mts';
 
-const MAC_CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const FOR_TESTING = 'Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing';
-
-/** Playwright's Chrome for Testing builds on this Mac, newest first. */
-export function chromesForTesting(root = path.join(os.homedir(), 'Library/Caches/ms-playwright')) {
-  let dirs;
-  try { dirs = fs.readdirSync(root); } catch { return []; }
-  return dirs
-    .map((d) => ({ d, n: Number(d.match(/^chromium-(\d+)$/)?.[1]) }))
-    .filter((x) => x.n)
-    .sort((a, b) => b.n - a.n)
-    .flatMap(({ d }) => ['chrome-mac-arm64', 'chrome-mac', 'chrome-mac-x64'].map((arch) => path.join(root, d, arch, FOR_TESTING)))
-    .filter((exe) => fs.existsSync(exe));
-}
+export { chromesForTesting, headlessShells };
 
 /**
- * On a Mac, Chrome for Testing when Playwright installed it, else Google Chrome; elsewhere
- * `VERIFY_CHROME`, or the Chromium Playwright installed (the Linux cloud has it).
- *
- * A headless Google Chrome registers with the Mac as Google Chrome, and a Dock click on
- * Chrome then goes to it and opens nothing. Chrome for Testing has its own app id.
+ * On a Mac, the hidden browser (shared/hidden-browser.mjs), and Google Chrome only as a
+ * name launchChrome refuses; elsewhere `VERIFY_CHROME`, or the Chromium Playwright
+ * installed (the Linux cloud has it).
  */
-export function findChrome(platform = process.platform, env = process.env, playwright = () => createRequire(import.meta.url)('playwright'), forTesting = chromesForTesting) {
-  if (platform === 'darwin') return forTesting()[0] ?? MAC_CHROME;
+export function findChrome(platform = process.platform, env = process.env, playwright = () => createRequire(import.meta.url)('playwright'), forTesting = chromesForTesting, shells = headlessShells) {
+  if (platform === 'darwin') return forTesting()[0] ?? shells()[0] ?? MAC_CHROME;
   if (env.VERIFY_CHROME) return env.VERIFY_CHROME;
   try { return playwright().chromium.executablePath(); } catch { return MAC_CHROME; }
 }
@@ -101,6 +85,11 @@ export function holdersOf(profile, list = processes, chrome = CHROME) {
   return list().filter((p) => p.command.startsWith(bundle) && flag.test(p.command)).map((p) => p.pid);
 }
 
+/** EPERM is a process this one may not signal, such as a Chrome the harness opened outside a tester's sandbox: it is there. */
+export function isRunning(pid, kill = process.kill.bind(process)) {
+  try { kill(pid, 0); return true; } catch (e) { return e?.code === 'EPERM'; }
+}
+
 /** Stop any Chrome still on this profile: one that will not answer keeps its lock, and every Chrome after it exits. */
 export function freeProfile(profile, bin = CHROME) {
   const pids = holdersOf(profile, processes, bin);
@@ -120,15 +109,21 @@ export function stopChrome(chrome, profile, { bin = CHROME } = {}) {
   if (profile) fs.rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 }
 
+/** Whether launchChrome would start this browser here, for tests that need a real one. */
+export function canDrive(bin = CHROME, platform = process.platform, exists = fs.existsSync) {
+  return !(platform === 'darwin' && bin === MAC_CHROME) && exists(bin);
+}
+
 /**
  * Start a headless Chrome on a throwaway profile and wait for its devtools
  * address. `detached` leaves it running after this process ends (the breaker's
  * browser, which lives across many short commands); then its profile should sit
  * inside the instance folder, so `live.mjs down` finds and stops it.
  */
-export async function launchChrome({ width = 1440, height = 900, profile, detached = false, bin = CHROME, waitMs = 20_000 } = {}) {
-  if (!fs.existsSync(bin)) throw new Error(`No Google Chrome at ${bin}. The live drive needs it.`);
-  const chrome = spawn(bin, [
+export async function launchChrome({ width = 1440, height = 900, profile, detached = false, bin = CHROME, waitMs = 20_000, platform = process.platform, start = spawn } = {}) {
+  if (platform === 'darwin' && bin === MAC_CHROME) throw new Error(NO_HIDDEN_BROWSER);
+  if (!fs.existsSync(bin)) throw new Error(`No browser at ${bin}. The live drive needs it.`);
+  const chrome = start(bin, [
     '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
     '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run',
     `--window-size=${width},${height}`, 'about:blank',

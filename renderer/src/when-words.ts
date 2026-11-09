@@ -15,7 +15,7 @@
 //
 // Before 2026-10-04 this was a list of exact shapes, and it refused "one week",
 // "tomorrow at noon", "3pm tomorrow", "friday afternoon", "oct 10" and "eod"
-// (tests/the-schedule-box-reads-what-people-actually-type.test.mjs).
+// (tests/the-schedule-box-reads-what-people-actually-type.test.mts).
 //
 // The defaults, so nobody re-derives them:
 // - A unit alone is a count of one: "week" is a week, "hour" an hour.

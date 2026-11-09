@@ -17,7 +17,7 @@
 // document" steps), and the old message leaves and the new one arrives inside one
 // commit. The resume below is for anything slower than that.
 //
-// tests/a-film-keeps-playing-while-the-thread-moves.test.mjs
+// tests/a-film-keeps-playing-while-the-thread-moves.test.mts
 
 /** A film's address asking for its first frame: iPhone Safari draws no frame for metadata alone. */
 export const firstFrameSrc = (url: string) => (url.includes('#') ? url : `${url}#t=0.001`);

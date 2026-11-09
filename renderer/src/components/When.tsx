@@ -32,7 +32,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { dayAndTime, parseWhen, readRule, repeatPresets } from '../format';
 import { useKeepInWindow } from '../keep-in-window';
-import { ruleLabel, type RepeatShape as RepeatRuleValue } from '../../../shared/repeats.mjs';
+import { ruleLabel, type RepeatShape as RepeatRuleValue } from '../../../shared/repeats.mts';
 
 export interface WhenValue {
   // A moment to start at, or 0 for now. Never both this and a rule.

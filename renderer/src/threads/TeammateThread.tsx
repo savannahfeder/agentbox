@@ -8,9 +8,10 @@ import { ConnectionLink } from '../connections/ConnectionsPlace';
 import { connectionLinkOf } from '../connections/connections-shown';
 import remarkGfm from 'remark-gfm';
 import { api } from '../api';
-import { marksOf, reviewKind } from '../../../shared/artifact-marks.mjs';
+import { marksOf, opensBigInAGroup } from '../../../shared/artifact-marks.mts';
+import { whereAFileOpens } from '../artifact-layout';
 import { ArtifactView, type ArtifactOpen } from '../components/ArtifactView';
-import { MAX_EDIT_BYTES } from '../../../shared/artifact-marks.mjs';
+import { MAX_EDIT_BYTES } from '../../../shared/artifact-marks.mts';
 import { ArtifactImg, ArtifactLink, ArtifactMedia } from '../components/Focus';
 import { Thread } from '../components/Thread';
 import { FileMarkOpener } from '../components/FileMarkLine';
@@ -65,12 +66,12 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
 
   const product = work?.product ?? '';
   const dir = work?.dir ?? '';
-  // The pane draws pages, documents and pictures. A film plays where it is, and
-  // pressing its name or a deck's hands the copy to the app that reads it.
   const open = useCallback((src?: string) => {
     if (!src || !product) return;
-    if (reviewKind(src)) setBig({ path: src, at: Date.now() });
-    else if (docKind(src)) onOpenDoc(product, src);
+    // Beside the chat a teammate's copy is read-only, so a document or table opens big, where it is edited live.
+    const goes = opensBigInAGroup(src) ? 'full' : whereAFileOpens(src);
+    if (goes === 'full') setBig({ path: src, at: Date.now() });
+    else if (goes === 'beside' || docKind(src)) onOpenDoc(product, src);
     else void api.openArtifactExternally({ product, src }).then((r) => { if (!r.ok) onNotice(r.error ?? `${src} could not be opened.`); });
   }, [product, onOpenDoc, onNotice]);
   const md = useMemo(() => {
@@ -119,13 +120,13 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   const owner = firstName(person) || 'Someone';
   const openMark = useCallback((link: FileMarkLink) => setBig({ file: link.file, note: link.id, at: Date.now() }), []);
   const files = useMemo(() => filesOnThread(work?.lines ?? [], marks.notes).map((f) => ({
-    ...f, open: () => (reviewKind(f.src) ? setBig({ path: f.src, at: Date.now() }) : open(f.src)),
+    ...f, open: () => open(f.src),
   })), [work?.lines, marks, open]);
 
   return (
     <div className="tp-page">
       {big && product && (
-        <ArtifactView product={product} draftsAcross={`teammate:${personId}:${threadId}`} lines={work?.lines ?? []} marks={marks}
+        <ArtifactView product={product} project={card.project ?? null} draftsAcross={`teammate:${personId}:${threadId}`} lines={work?.lines ?? []} marks={marks}
           me={team?.me ?? null} people={people} open={big} ownerOfRow={personId}
           write={async (mark) => {
             const out = await api.teamMarkFile({ personId, threadId, mark });
@@ -139,6 +140,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
             return out?.ok ? null : out?.error ?? 'That did not save.';
           }}
           editGoes={`Sent to ${owner}.`}
+          onBeside={(path) => { setBig(null); onOpenDoc(product, path); }}
           onClose={() => setBig(null)} />
       )}
       <div className="tp-bar">

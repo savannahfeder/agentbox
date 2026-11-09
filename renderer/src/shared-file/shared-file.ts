@@ -1,8 +1,12 @@
 // A FILE SHARED BY ITS LINK, as the web app reads it: <site>/f/<token>.
 // The database side is cloud/supabase/migrations/20261105000001_a_file_anyone_with_its_link_can_read.sql.
 
-export type Rpc = (name: string, args: Record<string, unknown>) => Promise<any>;
+export type Rpc = (name: string, args: Record<string, unknown>) => Promise<unknown>;
 export type FileKind = 'markdown' | 'page' | 'image' | 'pdf';
+
+// The rows the database's functions answer with, as JSON; checked field by field below.
+interface LinkRow { name?: string; kind: FileKind; type?: string; body?: string; version?: number; created_at: string; updated_at: string; owner_name?: unknown; owner_avatar?: unknown; mine?: boolean }
+interface CommentRow { id: string; by_name?: unknown; by_avatar?: unknown; body?: string; created_at: string; mine?: boolean; by_owner?: boolean }
 
 export interface SharedFile {
   name: string;
@@ -43,7 +47,7 @@ const KINDS = new Set<FileKind>(['markdown', 'page', 'image', 'pdf']);
 
 export async function readSharedFile(rpc: Rpc, tok: string): Promise<Shown> {
   if (!/^[A-Za-z0-9_-]{16,64}$/.test(tok)) return { state: 'unknown' };
-  const rows = await rpc('file_link_view', { tok });
+  const rows = await rpc('file_link_view', { tok }) as LinkRow[] | null;
   const r = Array.isArray(rows) ? rows[0] : null;
   if (r && KINDS.has(r.kind)) {
     return {
@@ -62,7 +66,7 @@ export async function readSharedFile(rpc: Rpc, tok: string): Promise<Shown> {
 }
 
 export async function readComments(rpc: Rpc, tok: string): Promise<FileComment[]> {
-  const rows = await rpc('file_link_comments_of', { tok });
+  const rows = await rpc('file_link_comments_of', { tok }) as CommentRow[] | null;
   return (Array.isArray(rows) ? rows : []).map((r) => ({
     id: String(r.id), byName: (typeof r.by_name === 'string' && r.by_name.trim()) || 'Someone',
     byAvatar: typeof r.by_avatar === 'string' && /^https:/.test(r.by_avatar) ? r.by_avatar : null,
