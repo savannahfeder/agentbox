@@ -130,3 +130,5 @@
 .hm-prio { display: inline-flex; align-items: center; color: var(--text-faint); }
 .hm-prio.urgent { color: var(--accent); }
 .hm-prio .th-prio-mark { margin: 0; }
+/* The board has no tabs, so its column headings sit where the sky fades out. */
+.app.sky-shown:not(.home-shown) .th-col-h, .app.sky-shown:not(.home-shown) .th-col-empty { text-shadow: 0 1px 3px rgba(0, 0, 0, .8); }

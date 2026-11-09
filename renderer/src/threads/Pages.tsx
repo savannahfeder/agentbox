@@ -817,10 +817,12 @@ export function ThreadCells({ item, product, now, person, tab }: {
  *  it, the private ones included; with a teammate in view, those wear a lock
  *  and every card names its person. Whose threads is picked on the header's
  *  filters button (w-14bb56c833), so the columns start right under it. */
-export function InboxBoard({ items, products, display, now, onOpenItem, stateOf, cards = [], picked, onOpenCard, selected, selectedCard = null, columnOrder = DEFAULT_COLUMN_ORDER, onReorderColumns, projectOrder, onPlaces, marked, onMark, waitingIsInProgress = false }: {
+export function InboxBoard({ items, products, display, now, onOpenItem, stateOf, cards = [], picked, onOpenCard, selected, selectedCard = null, columnOrder = DEFAULT_COLUMN_ORDER, onReorderColumns, projectOrder, onPlaces, marked, onMark, waitingIsInProgress = false, lead }: {
   items: WorkItem[]; products: Product[]; display: Display; now: number; onOpenItem: (item: WorkItem) => void;
   /** The whole team's board, whose count matches what the team's cards say. */
   waitingIsInProgress?: boolean;
+  /** Group messages and invitations to you, as cards at the top of Needs you. */
+  lead?: { count: number; cards: ReactNode };
   /** The column each thread sits in, by the Inbox tabs' rule (App.tsx). */
   stateOf?: (item: WorkItem) => ThreadStateWord | null;
   cards?: ThreadCard[]; picked?: string[]; onOpenCard?: (card: ThreadCard) => void;
@@ -1041,6 +1043,8 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
     <div className={`th-board${dragging ? ' dragging' : ''}`} ref={boardRef}>
     {columns.map((col) => {
       const rows = col.rows;
+      const ahead = col.state === 'waiting' ? lead : undefined;
+      const count = rows.length + (ahead?.count ?? 0);
       const movable = !!onPlaces && col.state !== 'done' && col.state !== 'running' && display.sort === 'priority';
       return <div key={col.state} className={`th-col${dragging === col.state ? ' lifted' : ''}`} data-drag-scope=""
         ref={(el) => { if (el) colEls.current.set(col.state, el); else colEls.current.delete(col.state); }}>
@@ -1069,11 +1073,12 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
             window.addEventListener('pointermove', move);
             window.addEventListener('pointerup', up);
             window.addEventListener('pointercancel', cancel);
-          }}><StateGlyph state={col.state} />{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}{rows.length > 0 && <b>{rows.length}</b>}
+          }}><StateGlyph state={col.state} />{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}{count > 0 && <b>{count}</b>}
           {/* THE HANDLE COMES UP WHEN YOU ARE OVER THE COLUMN: "a little drag
               icon comes up subtly". Only where a drag does something. */}
           {onReorderColumns && <GripIcon />}</div>
-        {rows.length === 0 && <div className="th-col-empty">Nothing here.</div>}
+        {count === 0 && <div className="th-col-empty">Nothing here.</div>}
+        {ahead?.cards}
         {/* A card says who can see it the way a row does: the lock on what
             only you can see, the people mark on what a few chosen people
             can, and nothing on what the whole team can, the default. */}

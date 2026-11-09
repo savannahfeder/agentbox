@@ -135,7 +135,7 @@ import { isPresenceCard, roomMateCards, roomMatesById } from './team/rooms/room-
 import { MARK_UNREAD, SAY } from './team/chat-events';
 import { aVoiceNoteIsRecording } from './team/useVoiceRecorder';
 import { aBoxIsListening } from './dictation';
-import { MentionRows } from './team/rooms/MentionRows';
+import { MentionCards, MentionRows } from './team/rooms/MentionRows';
 import { AgentsLine, MateThreads, NeedsFaces, PersonThreads, SpaceBar, TeamThreads } from './team/everything/TeamStrip';
 import { EmptyChat, JobBlock, Place as MemberPlace, PlaceAction, PlaceList, PlaceMates, SendBox, type PlaceRow } from './team/everything/PlacePage';
 import { nowAndFinished, personChatOpens, pressOpensIn, waitsOnYou, youWaitOn, type HomeLayout } from './team/everything/place';
@@ -243,7 +243,7 @@ import { inboxEveryone, mergeRows, needsWord, normalizePicked, othersInView, rea
 import { boardStops, leadStops, listStops, stepFromPlace, stepStop, stopKey, type PageStop, type Stop } from './threads/walk-rules';
 import { usePointerHold, useHeldOrder } from './threads/steady-rows';
 import { inviteRows, leadRows, type InviteRow, type LeadRow } from './threads/needs-you-rows';
-import { InviteRows } from './threads/InviteRows';
+import { InviteCards, InviteRows } from './threads/InviteRows';
 import { mentionRows } from './team/rooms/room-rules';
 import { SAYS_UNDO, oWaitsFor, oWaitsForTheSend, opensTheToast, saysWhereItWent, toastOpens, toastParts, type OWaits, type ToastGoes } from './toast-parts';
 import { SentLine } from './components/SentLine';
@@ -3100,7 +3100,7 @@ export default function App() {
   // Anything else that moves the keyboard takes it off their row. The people
   // by name, since the list of them is a new array on every refresh.
   const pickedKey = picked.join(',');
-  useEffect(() => { setCardSel(null); }, [selected, view, search, inboxDisplay.view, pickedKey]);
+  useEffect(() => { setCardSel(null); }, [selected, view, search, inboxDisplay.view, evView, pickedKey]);
   // After the line above, so on arrival the mark lands on the top row rather than being cleared off it.
   const leadStartedOn = useRef<string | null>(null);
   useEffect(() => {
@@ -4077,6 +4077,9 @@ export default function App() {
   const leadRowsDrawn = (rows: LeadRow[]) => rows.map((l) => (l.invite
     ? <InviteRows key={l.key} rows={[l.invite]} onJoin={(r) => void joinInvite(r)} onOpen={openInvite} selected={keyLeadPicked?.key ?? null} />
     : <MentionRows key={l.key} mentions={[l.mention!]} faces={roomsUi.faces} now={now} onOpen={roomsUi.openMention} selected={keyLeadPicked?.key ?? null} />));
+  const leadCardsDrawn = (rows: LeadRow[]) => rows.map((l) => (l.invite
+    ? <InviteCards key={l.key} rows={[l.invite]} onJoin={(r) => void joinInvite(r)} onOpen={openInvite} selected={keyLeadPicked?.key ?? null} />
+    : <MentionCards key={l.key} mentions={[l.mention!]} onOpen={roomsUi.openMention} selected={keyLeadPicked?.key ?? null} />));
   const roomShown = !!roomsUi.openId && !settingsOpen && !teamShown && !focused && !focusedRepeat && search === null;
   const teammateModels = useMemo(() => ({ engine: snap?.engines?.workspace ?? null, codex: codexModels, codexDefault: codexModelDefault ?? null }), [snap?.engines?.workspace, codexModels, codexModelDefault]);
   const teammatesUi = useTeammates({
@@ -8035,8 +8038,7 @@ export default function App() {
                     the sidebar places they used to be. With a team on, the
                     board is Everything else's, under the cards (evBoardEl). */}
                 {(teamMode ? mineBoard : search === null && inboxDisplay.view === 'board') && !roomShown ? (<>
-                  {leadCount > 0 && <div className="list th-table">{leadRowsDrawn(allLeads)}</div>}
-                  <InboxBoard items={items} products={snap.products} display={inboxDisplay} now={now} stateOf={stateOfMine} projectOrder={projectOrder}
+                  <InboxBoard items={items} lead={leadCount ? { count: leadCount, cards: leadCardsDrawn(allLeads) } : undefined} products={snap.products} display={inboxDisplay} now={now} stateOf={stateOfMine} projectOrder={projectOrder}
                     cards={cards} picked={team ? picked : undefined}
                     onOpenCard={openTeammateCard}
                     selected={current} selectedCard={keyCard ? cardSel : null} columnOrder={columnOrder} onReorderColumns={reorderColumns}
