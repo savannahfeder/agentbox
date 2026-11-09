@@ -47,8 +47,9 @@ describe('hovering it still tells you the key', () => {
   it('carries the search hint', () => {
     expect(searchButton()).toMatch(/data-hint="search"/);
   });
-  it('and that hint is the / key', () => {
-    expect(plate).toMatch(/search:\s*\[\{\s*key:\s*'\/'/);
+  // ⌘K since `/` went (w-30e94db8cf).
+  it('and that hint is ⌘K', () => {
+    expect(plate).toMatch(/search:\s*\[\{\s*key:\s*'⌘K'/);
   });
 });
 

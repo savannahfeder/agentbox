@@ -28,6 +28,7 @@ import { Store } from './store.mts';
 import { storeRootEnv } from './store/home.mjs';
 import { keepAnswerModesIn } from './answer-modes.mts';
 import { Supervisor } from './supervisor.mts';
+import { gitHubPushSignIn } from './github-push-sign-in.mts';
 import { startCodexWatch } from './codex-watch.mts';
 import { watchNewChatsFor } from './new-chats-watch.mts';
 import { readCodexThreadsOffThread } from './codex-threads.mts';
@@ -905,6 +906,8 @@ async function createWindow() {
     encrypt: (text: string) => (safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(text) : null),
     decrypt: (buf: Buffer) => (safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(buf) : null),
   } : null;
+  // The GitHub sign-in a ship pushes with is sealed by the same keychain.
+  supervisor.gitHubSignIn = gitHubPushSignIn({ file: path.join(userDir, 'github-sign-in.sealed'), cipher: connectionsKeychain });
   const connected = startConnections({
     config, supervisor, appDir, userDir,
     cipher: connectionsKeychain,

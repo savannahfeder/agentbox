@@ -57,12 +57,14 @@ describe('a pass over every thread of a project', () => {
     expect(readsOf(spy, ledger())).toBe(0);
   });
 
-  it('a pass after a write reads it once again, and sees the write', () => {
+  // At most once: a ledger that only grew is read from where the last read
+  // stopped (a-thread-history-reads-only-what-was-added).
+  it('a pass after a write reads it at most once again, and sees the write', () => {
     for (const id of ids) store.readHistory('kestrel', id);
     store.answerItem('kestrel', ids[3], { answer: 'one more' });
     const spy = vi.spyOn(fs, 'readFileSync');
     const all = ids.map((id) => store.readHistory('kestrel', id));
-    expect(readsOf(spy, ledger())).toBe(1);
+    expect(readsOf(spy, ledger())).toBeLessThanOrEqual(1);
     expect(all[3].map((l) => l.patch?.answer).filter(Boolean)).toEqual(['reply to 3', 'one more']);
   });
 });

@@ -9,7 +9,7 @@ import type {FocusControlStyle} from './focus-control';
 import {reviewLabEnabled} from './review-lab';
 import { deliverReply } from './deliver-reply.mjs';
 import { ArtifactSurface } from './components/ArtifactSurface';
-import { artifactPlacement, artifactFraction, type ArtifactMode } from './artifact-layout';
+import { artifactPlacement, artifactFraction, fullScreenTakes, whereAFileOpens, type ArtifactMode } from './artifact-layout';
 import { besideDocument } from './message-artifacts';
 import { chromeIsUp, CHROME_HOLD, CHROME_REACH } from './full-screen-chrome';
 // the app's renderer: one state machine, keyboard-first. The Superhuman grammar:
@@ -98,7 +98,7 @@ import { filedByThePerson, wordWaits } from '../../shared/answers.mjs';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mjs';
 import { focusTheReplyBox } from './focus-at-end';
 import { strayLetters } from './stray-letters';
-import { keyWhileABoxIsOpen, opensATextField, slashSearchesAgain, takesTheListBack } from './keys';
+import { keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
 import { modelCommands } from './thread-model-commands';
 import { MOVE_KEYWORDS, whyItCannotMove } from '../../shared/move-thread.mts';
 import { isUrgentRow, taskToReturnTo, urgentInterruption } from './interrupt';
@@ -192,6 +192,7 @@ import { threadsMade, approvableFiled, doItHereWrites, answerAllWrites, RUN_IT }
 import { waitingCounts } from './threads-made';
 import { closeAsk, closeAskOwnsKey, unshippedAsk } from './close-asks-first';
 import { notShipped, shipItAsk } from '../../shared/not-shipped.mts';
+import { openSignIn } from '../../shared/sign-in-ask.mjs';
 import { ChatAgentsContext, type ChatAgentsValue } from './team/ChatAgents';
 import { agentLinks, askedInLabel, chatProjects, chatTaskSharing, chatTranscript, lastAskKeptOnMac, taskBrief, taskTitle, withTask } from './team/agent-mentions';
 import { answersInTheirChat } from './team/answers-in-the-chat';
@@ -891,8 +892,6 @@ export default function App() {
   const searchOpen = search !== null;
   useEffect(() => { if (searchOpen) strayLetters.opening('search', Date.now()); }, [searchOpen]);
   const searchRef = useRef<HTMLInputElement>(null);
-  // Whether the words in the field were typed since it last got the keyboard.
-  const searchTyped = useRef(false);
   // ESC PUTS HER BACK WHERE SHE WAS. Searching crosses every tab, so leaving it
   // has to restore the one she came from AND the row she was on, or a search
   // that found nothing has quietly moved her.
@@ -2171,12 +2170,13 @@ export default function App() {
   // process pushes, while its card is already leaving with a verdict on it
   // (`approvalStage`), and a row still reading Needs you behind that card is
   // the app disagreeing with itself.
+  // A sign-in link an agent is waiting on asks you just as a permission card does.
   const askingIds = useMemo(
-    () => new Set((snap?.approvals ?? [])
+    () => new Set([...(snap?.approvals ?? [])
       .filter((a) => a.id !== answered?.id)
       .map((a) => a.item)
-      .filter((id): id is string => !!id)),
-    [snap?.approvals, answered?.id],
+      .filter((id): id is string => !!id), ...items.filter((i) => openSignIn(i)).map((i) => i.id)]),
+    [snap?.approvals, answered?.id, items],
   );
   const asking = useCallback((i: { id: string }) => askingIds.has(i.id), [askingIds]);
   // EVERYTHING THE SUPERVISOR KNOWS ABOUT EVERY THREAD, in one context, so the
@@ -2671,7 +2671,7 @@ export default function App() {
     setSelected(0);
     // The field is mounted by this same render, so focusing has to wait for it.
     // A query kept from before is selected, so the next words start a new one.
-    requestAnimationFrame(() => { searchTyped.current = false; searchRef.current?.focus(); searchRef.current?.select(); });
+    requestAnimationFrame(() => { searchRef.current?.focus(); searchRef.current?.select(); });
   }, [view, selected]);
 
   const searchFor = useCallback((q: string) => {
@@ -3197,6 +3197,9 @@ export default function App() {
   useEffect(()=>{document.documentElement.dataset.reviewStyle=reviewLab ? reviewStyle : 'header-tools-open';},[reviewLab,reviewStyle]);
   const [artifactMode, setArtifactMode] = useState<ArtifactMode>('beside');
   const [artifactReturnBeside, setArtifactReturnBeside] = useState(false);
+  // The file beside the chat asked to go full screen, for that one thread.
+  const [fullAt, setFullAt] = useState<{ key: string; open: ArtifactOpen } | null>(null);
+  useEffect(() => { setFullAt(null); }, [focused?.product, focused?.id]);
   // Open unless someone closed it, in this window or another.
   const [notesOpen, setNotesOpen] = useState(() => notesSidebarOpen(localStorage));
   useEffect(() => {
@@ -3302,6 +3305,13 @@ export default function App() {
     const card = focusedNow.current, doc = openDocNow.current;
     if (card && doc?.auto) closedBeside.current.add(besideKey(card, doc.src));
     setOpenDoc(null);
+  };
+  // The full-screen view opens over the pane, which would otherwise play on under it.
+  // Paused, and the moment it had reached, which full screen takes up.
+  const filmBeside = () => {
+    let s: number | undefined;
+    for (const film of document.querySelectorAll<HTMLVideoElement>('.doc-pane video')) { film.pause(); if (film.currentTime > 0) s = film.currentTime; }
+    return s;
   };
   const closeArtifact = () => {
     if (artifactMode === 'focus' && artifactReturnBeside) setArtifactMode('beside');
@@ -4255,8 +4265,15 @@ export default function App() {
     if (o.type === 'room') { setFocused(null); roomsUi.pickGroup(`room:${o.roomId}`); revealLine(o.messageId); return; }
     const big: ArtifactOpen | null = o.file ? (o.note ? { file: o.note.file, note: o.note.id } : { path: o.file }) : null;
     if (o.type === 'thread') {
+      // A file opens beside its thread, as it does from the thread; a comment opens full screen at it.
+      const beside = !!o.file && !o.note && whereAFileOpens(o.file) === 'beside' && !o.item.agent && !onPhone();
+      if (beside) {
+        const doc = { product: o.item.product, src: o.file! };
+        pendingDoc.current = { id: o.item.id, doc };
+        setOpenDoc(doc);
+      }
       setFocused(o.item); markSeen(o.item);
-      setFoundOpenAt(big ? { key: `${o.item.product}/${o.item.id}`, open: big } : null);
+      setFoundOpenAt(big && !beside ? { key: `${o.item.product}/${o.item.id}`, open: big } : null);
       if (o.line) revealLine(o.line);
       return;
     }
@@ -6246,17 +6263,6 @@ export default function App() {
       // (keys.ts). Here, above the split, because Escape leaves a thread in
       // one branch and the list in another and both hand the list back.
       if (takesTheListBack(e.key)) setHoveredId(null);
-      // SEARCH OPENS FROM ANYWHERE, which is why it sits above the branch that
-      // splits the list from an open task: `/` means
-      // the same thing in both, and a shortcut written twice is one edit away
-      // from meaning two things. Its keystroke is swallowed up at the guard
-      // above (keys.ts), because it opens a text field and would otherwise type
-      // itself into it.
-      if (e.key === '/') {
-        e.preventDefault();
-        openSearch();
-        return;
-      }
       // O OPENS THE TASK THE TOAST IS ABOUT (w-f0bfe32859): "I very often,
       // after submitting a task, click 'Open it' in the toast." Z takes back
       // what the toast announced; O goes into it. Here, above the split, because
@@ -6570,7 +6576,7 @@ export default function App() {
     if (search === null) return;
     if (focused || modal || settingsOpen || openDoc) searchRef.current?.blur();
     // Only when the field does not have the keyboard: this runs on every letter typed into it.
-    else if (!docJustClosed && document.activeElement !== searchRef.current) { searchTyped.current = false; searchRef.current?.focus(); }
+    else if (!docJustClosed && document.activeElement !== searchRef.current) searchRef.current?.focus();
   }, [search, focused, modal, settingsOpen, openDoc]);
 
   useEffect(() => { setSelected((s) => Math.min(s, Math.max(0, list.length - 1))); }, [list.length]);
@@ -7654,13 +7660,12 @@ export default function App() {
               spellCheck={false}
               autoComplete="off"
               aria-label="Search threads"
-              onChange={(e) => { searchTyped.current = true; setSearch(e.target.value); setSelected(0); }}
+              onChange={(e) => { setSearch(e.target.value); setSelected(0); }}
               onKeyDown={(e) => {
                 // The list's own keys, forwarded from inside the field, because
                 // every other key here is a character she is typing and the
                 // global handler has already stood down for that reason.
                 if (e.key === 'Escape') { e.preventDefault(); closeSearch(); }
-                else if (e.key === '/' && slashSearchesAgain({ query: e.currentTarget.value, typedSince: searchTyped.current })) { e.preventDefault(); e.currentTarget.select(); }
                 else if (e.key === 'ArrowDown') { e.preventDefault(); setSelected((s) => Math.min(s + 1, Math.max(0, list.length - 1))); }
                 else if (e.key === 'ArrowUp') { e.preventDefault(); setSelected((s) => Math.max(0, s - 1)); }
                 else if (e.key === 'Enter' && current && !e.metaKey && !e.ctrlKey) { e.preventDefault(); setFocused(current); markSeen(current); }
@@ -7948,7 +7953,7 @@ export default function App() {
                   inlineArtifacts
                   previewSample={api.isFixtures && (reviewLab || new URLSearchParams(location.search).has('artifactTweaks')) ? artifactPreviewSample : undefined}
                   artifactView={openDoc ? artifactView : undefined}
-                  openAt={foundOpenAt?.key === `${focused.product}/${focused.id}` ? foundOpenAt.open : null}
+                  openAt={fullAt?.key === `${focused.product}/${focused.id}` ? fullAt.open : foundOpenAt?.key === `${focused.product}/${focused.id}` ? foundOpenAt.open : null}
                   onOpenArtifact={(src, mode) => { setArtifactReturnBeside(false); setArtifactMode(mode); setOpenDoc({product: focused.product, src}); }}
                   item={focused}
                   resumeAt={resumeAt}
@@ -8268,6 +8273,15 @@ export default function App() {
               mode={artifactMode}
                 onMode={mode => {
                   if (mode === 'beside' && !roomBeside) { putDocDown(); return; }
+                  // Full screen is the one view with versions, notes and Approve, wherever the file is a thread's.
+                  if (mode === 'focus' && fullScreenTakes(openDoc.src) && !onPhone()) {
+                    const thread = !!focused && !focused.agent && !openDoc.readOnly && openDoc.product === focused.product;
+                    if (thread || (openCard && openDoc.readOnly)) {
+                      const open = { path: openDoc.src, at: Date.now(), time: filmBeside() };
+                      if (thread) setFullAt({ key: `${focused!.product}/${focused!.id}`, open }); else setCardOpenAt(open);
+                      return;
+                    }
+                  }
                   setArtifactReturnBeside(artifactMode === 'beside'); setArtifactMode(mode);
                 }}
                 split={artifactFraction(split, artifactWidth)}
@@ -8536,7 +8550,6 @@ export default function App() {
           : undefined}
         keyHints={keyHints}
         onSetKeyHints={(v) => { setModal(null); setHints(v); }}
-        onSearch={openSearch}
         findThreads={findThreads}
         findChats={findChats}
         findInside={insideForPalette}

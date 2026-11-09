@@ -46,7 +46,9 @@ const config: ExpoConfig = {
   owner: process.env.EAS_OWNER || 'agentbox-app',
   scheme: nameSlug,
   version: '0.1.0',
-  orientation: 'portrait',
+  // Not 'portrait': iOS caps the full-screen film player by this too. The
+  // screens hold themselves upright (orientation in the Stacks' screenOptions).
+  orientation: 'default',
   icon: './assets/icon.png',
   // Automatic so Match system can read the phone's own light or dark (state/look.tsx).
   userInterfaceStyle: 'automatic',
@@ -58,6 +60,8 @@ const config: ExpoConfig = {
     usesAppleSignIn: true,
     // HTTPS through the system is exempt from export rules.
     config: { usesNonExemptEncryption: false },
+    // Save to Photos on a held picture (modules/picture-menu); without it the first save closes the app.
+    infoPlist: { NSPhotoLibraryAddUsageDescription: 'Save a picture from a thread to your Photos.' },
     // Repeats what the packages' own manifests declare, which Apple does not
     // always read from a static pod (docs.expo.dev/guides/apple-privacy).
     privacyManifests: {
