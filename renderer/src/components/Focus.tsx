@@ -2799,7 +2799,9 @@ function ModePicker({ value, options, label, onChange, onEscape, chip = false }:
       >
         {/* TITLE CASE, with "Mode" after it capitalised too: "In Auto Mode."
             Settled on w-86dd93ab0d. */}
-        {(now?.label ?? value).replace(/(^|\s)\S/g, (c) => c.toUpperCase())}
+        {chip
+          ? <span className="tc-chip-label">{titleCase(now?.label ?? value)}</span>
+          : titleCase(now?.label ?? value)}
       </button>
     </span>
   );
@@ -3663,7 +3665,8 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             )}
             <ReplyModel
               chip
-              label={`${engineModelLabel(engineShown, model, modelOpts)}${levelSaid ? ` · ${levelSaid}` : ''}`}
+              label={engineModelLabel(engineShown, model, modelOpts)}
+              level={levelSaid}
               pick={pick}
               onPick={pickModel}
               recent={recent}
@@ -3755,6 +3758,8 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
     </>
   );
 }
+
+const titleCase = (s: string) => s.replace(/(^|\s)\S/g, (c) => c.toUpperCase());
 
 const ClipGlyph = () => (
   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
