@@ -179,11 +179,11 @@
 .av-reply-write textarea:focus { border-color: var(--text-faint); }
 .av-reply-write textarea::placeholder { color: var(--text-faint); }
 .av-settled { align-self: flex-start; margin: 6px 10px; }
-/* Lined up with the comments' own text and their Resolve buttons (.av-list 8px + .av-note 10px). */
-.av-unsent { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 12px 18px 4px; font-size: 13px; color: var(--text-dim); }
-.av-unsent-send { background: var(--wash-strong); border-color: var(--text-faint); }
-.av-unsent-send .agent-face { width: 16px; height: 16px; }
-.av-unsent-send .agent-eyes { width: 14px; height: 14px; }
+/* The sidebar's head leaves room for a document's corner marks; here the marks are in the bar above. */
+.av-side .sb-head { padding: 0 18px; }
+/* On the notes' own left edge (.av-list 8px + .av-note 10px). */
+.av-list > .sb-sec { flex: none; padding: 0 10px; }
+.av-write-send:not(:has(.av-glyph)) { width: 28px; padding: 0; }
 .av-trouble { margin: 8px 16px 0; font-size: 12.5px; line-height: 1.4; color: var(--text); }
 .av-trouble::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 7px; background: var(--accent); vertical-align: 1px; }
 .av-foot { flex: none; display: flex; flex-direction: column; border-top: 1px solid var(--line); }

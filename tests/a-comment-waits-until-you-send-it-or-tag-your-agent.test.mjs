@@ -6,7 +6,8 @@
 // main on 2026-11-08: storeItem.tellItem reopened the thread and the next tick
 // spawned it. The person asked for comments that collect and go in one press,
 // to save tokens, and for nobody to be able to spend somebody else's plan.
-// The approved screen is "3 not sent" and Send at the top of the comments.
+// The approved screen was "3 not sent" and Send at the top of the comments; it is now
+// the notes sidebar's Unsent line with Send N (w-858a033e54).
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -138,11 +139,13 @@ describe('the file view', () => {
   it('a tagged reply sends the comment it answers', () => {
     expect(view).toMatch(/tagsYourAgent\(text\)[\s\S]{0,200}toAgent\(\[note\.id\]\)/);
   });
-  it('shows how many are not sent, with Send, above the comments and outside the box', () => {
+  // Since w-858a033e54 the count and Send sit on the Unsent line, as in the notes sidebar:
+  // the-big-viewer-lists-notes-the-way-the-notes-sidebar-does.
+  it('shows Send with how many, above the waiting notes and outside the box', () => {
     const side = view.slice(view.indexOf('className="av-side"'));
-    expect(side.indexOf('av-unsent')).toBeGreaterThan(-1);
-    expect(side.indexOf('av-unsent')).toBeLessThan(side.indexOf('className="av-list"'));
-    expect(view).toMatch(/not sent/);
+    expect(side.indexOf('<NotesSection word="Unsent"')).toBeGreaterThan(-1);
+    expect(side.indexOf('<NotesSection word="Unsent"')).toBeLessThan(side.indexOf('{unsent.map(card)}'));
+    expect(side.indexOf('<NotesSection word="Unsent"')).toBeLessThan(side.indexOf('className="av-foot"'));
     expect(view).not.toMatch(/Send \{sendNotes\.length === 1 \? 'this note' : 'these notes'\} to the agent/);
   });
 });

@@ -32,6 +32,7 @@ import { FocusControl } from './FocusControl';
 import { DocText } from './DocText';
 import { FileNoteCard } from './FileNoteCard';
 import { NoteGlyph } from './NoteGlyphs';
+import { NotesHead, NotesSection, ReturnGlyph } from './NotesSidebar';
 import { ShareLink, canShareFile } from './ShareLink';
 import { paneKey, staysOnNewest } from '../table-follows';
 import './artifact-view.css';
@@ -358,6 +359,9 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, lines
   };
   const sendNotes = withAgent && version ? notesToSendTheAgent(marks, version, family!.versions.length, people, me) : [];
   const pressSend = () => toAgent(sendNotes);
+  const unsent = offers.comment ? openNotes.filter((n) => sendNotes.includes(n.id)) : [];
+  const sentAlready = openNotes.filter((n) => !unsent.includes(n));
+  const authors = [...new Set(openNotes.map((n) => n.by))].slice(0, 3);
 
   const isNewest = !!family && !!at && at.vi === family.versions.length - 1;
   const canEdit = !!(onNewVersion && kind === 'markdown' && version && isNewest && !version.newer);
@@ -628,7 +632,7 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, lines
     if (n.sent || !offers.comment || typeof flat.find((x) => x.v.id === n.file)?.v.agent !== 'string') return null;
     const goes = noteGoesTo(n, people);
     if (goes.to === 'person') return { words: `Sent to ${goes.person === me ? 'you' : nameOf(goes.person)}`, went: true };
-    return withAgent && n.by === me && goes.to === 'agent' && stillWaiting(n) ? { words: 'Not sent', went: false } : null;
+    return withAgent && n.by === me && goes.to === 'agent' && stillWaiting(n) && !sendNotes.includes(n.id) ? { words: 'Not sent', went: false } : null;
   };
   const answeredBy = (n: FileNote): string | null => {
     const v = n.resolved && n.resolvedIn ? flat.find((x) => x.v.id === n.resolvedIn)?.v : undefined;
@@ -724,7 +728,8 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, lines
           </>}
           {link && <FileLinkBrowser key={link} url={link} product={product} backTo={kind ? `the ${KIND_WORD[kind].toLowerCase()}` : 'the file'} onClose={closeLink} />}
         </div>
-        {(foundNow === 'looking' || offers.comment || openNotes.length > 0 || settled.length > 0) && <aside className="av-side" aria-label="Comments">
+        {(foundNow === 'looking' || offers.comment || openNotes.length > 0 || settled.length > 0) && <aside className="av-side" aria-label="Notes">
+          <NotesHead count={openNotes.length} faces={authors.length > 0 && authors.map((id) => <Face key={id ?? 'me'} person={person(id)} name={person(id) ? undefined : nameOf(id)} me={!!me && id === me} />)} />
           {(offers.approve || othersApproved.length > 0 || earlier) && (
             <div className="av-verdict">
               <span className="av-verdict-who" title={earlier ? approvalSince(family, at!.vi, marks.approvals, nameOf) ?? undefined : undefined}>
@@ -734,14 +739,11 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, lines
               {offers.approve && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{mineApproved ? 'Approved' : 'Approve'}</button>}
             </div>
           )}
-          {offers.comment && sendNotes.length > 0 && (
-            <div className="av-unsent">
-              <span>{sendNotes.length} not sent</span>
-              <button type="button" className="av-btn av-unsent-send" title={`Send ${sendNotes.length === 1 ? 'this comment' : `these ${sendNotes.length} comments`} to your agent`} onClick={() => void pressSend()}><AgentFace />Send</button>
-            </div>
-          )}
           <div className="av-list">
-            {openNotes.map(card)}
+            {unsent.length > 0 && <NotesSection word="Unsent" send={{ count: sendNotes.length, onSend: () => void pressSend() }} />}
+            {unsent.map(card)}
+            {unsent.length > 0 && sentAlready.length > 0 && <NotesSection word="Sent" />}
+            {sentAlready.map(card)}
             {settled.length > 0 && (
               <button type="button" className="av-note-act av-settled" aria-expanded={showSettled} onClick={() => setShowSettled(!showSettled)}>
                 <NoteGlyph name={showSettled ? 'up' : 'down'} />{showSettled ? 'Hide resolved' : `Show resolved (${settled.length})`}
@@ -767,7 +769,7 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, lines
               <div className="av-write-box" onClick={(e) => { if (e.target === e.currentTarget) box.current?.focus(); }}
                 onDragOver={canAddPictures ? (e) => e.preventDefault() : undefined}
                 onDrop={canAddPictures ? (e) => { e.preventDefault(); void addPictures(e.dataTransfer.files); } : undefined}>
-                <textarea ref={box} rows={2} value={words} placeholder={canTag ? 'Comment, or @ your agent' : 'Write a comment'} aria-label="Comment"
+                <textarea ref={box} rows={2} value={words} placeholder={canTag ? 'Add a note, or @ your agent' : 'Add a note'} aria-label="Comment"
                   onChange={(e) => onWords(e.target.value, e.target.selectionStart)}
                   onFocus={() => setHold((n) => n + 1)}
                   onPaste={canAddPictures ? async (e) => {
@@ -792,7 +794,7 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, lines
                     </span>
                   )}
                   <button type="submit" className="av-btn av-write-send" disabled={(!words.trim() && !pictures.length) || sending || attaching.length > 0 || !!attachProblem(pictures)}>
-                    {sendWords === 'Comment' ? null : <NoteGlyph name="send" />}{sendWords}
+                    {sendWords === 'Comment' ? <ReturnGlyph /> : <><NoteGlyph name="send" />{sendWords}</>}
                   </button>
                 </div>
               </div>
