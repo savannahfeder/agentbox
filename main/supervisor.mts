@@ -6172,7 +6172,7 @@ export class Supervisor {
   // now, this month's use from the runs' own measurements, the accounts she
   // added for the cloud, and any sign-in going on. The usage file is read at
   // most every 30 seconds; the snapshot asks on every change.
-  cloudStatus() {
+  cloudStatus(handed?: WorkItem[]) {
     const config = readCloudConfig(process.env, this.config.home);
     const setUp = !!config;
     // Offered to a Mac whose app carries Agentbox Cloud's settings, until
@@ -6200,7 +6200,7 @@ export class Supervisor {
       // The Agentbox Cloud plan the server last said ('none' is no plan).
       plan: this.cloudPlan ?? null,
       // Runs on this Mac it could take now (`_movableToCloud`).
-      movable: setUp && this.sessions.size && this._cloudUsable('claude') ? this._movableIds(this.store.listItems(now)) : [],
+      movable: setUp && this.sessions.size && this._cloudUsable('claude') ? this._movableIds(handed ?? this.store.listItems(now)) : [],
     };
   }
 
@@ -8107,11 +8107,12 @@ export class Supervisor {
     return ids;
   }
 
-  status() {
+  /** `handed`: the threads a caller already read, so this reads none of its own. */
+  status(handed?: WorkItem[]) {
     // One read of the threads for the whole answer: this runs for every
     // request the window makes.
     const readAt = Date.now();
-    let threads: WorkItem[] | null = null;
+    let threads: WorkItem[] | null = handed ?? null;
     const allThreads = () => (threads ??= this.store.listItems(readAt));
     // Stalled: the founder's answer is marked delivered, but nobody is on the
     // item and it never moved. A worker ran and exited without finishing (a

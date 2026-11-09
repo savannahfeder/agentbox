@@ -670,7 +670,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   ipcMain.handle('zero:snapshot', (_e, ask?: { since?: string; open?: { id?: string; product?: string } | null }) => {
     const now = Date.now();
     const items = store.listItems(now);
-    const running = supervisor.status();
+    const running = supervisor.status(items);
     const engines = supervisor.engineFacts(items);
     // WHICH CODING AGENT THE CORNER IS ABOUT, ANSWERED ONCE, HERE.
     // `usageEngine` is the rule (shared/usage.mts) and it is the byline's own
@@ -736,7 +736,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       restartNeeded: restartNeeded(supervisor.appDir),
       // WHERE THREADS RUN, for the cloud button beside the filters
       // (renderer/src/cloud-menu.ts). `setUp` false draws no button at all.
-      cloud: supervisor.cloudStatus(),
+      cloud: supervisor.cloudStatus(items),
       // HER RATE LIMIT, WHICH IS WHAT ACTUALLY CAPS THE FLEET. Null until the
       // first reading lands, and the corner draws nothing at all until then
       // rather than a pill full of dashes.
