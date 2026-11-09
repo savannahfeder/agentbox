@@ -3187,7 +3187,12 @@ export default function App() {
   }, []);
   const toggleNotes = () => setNotesOpen((was) => { rememberNotesSidebar(localStorage, !was); return !was; });
   const [cellComment, setCellComment] = useState<{ text: string; cell: TableCell } | null>(null);
-  const commentOnTable = (text: string, cell: TableCell) => { setCellComment({ text, cell }); rememberNotesSidebar(localStorage, true); setNotesOpen(true); };
+  // Notes are only drawn full screen, so a Comment from a table beside the thread goes full screen first.
+  const commentOnTable = (text: string, cell: TableCell) => {
+    setCellComment({ text, cell });
+    rememberNotesSidebar(localStorage, true); setNotesOpen(true);
+    if (artifactMode !== 'focus') { setArtifactReturnBeside(artifactMode === 'beside'); setArtifactMode('focus'); }
+  };
 
   /**
    * FULL SCREEN, AND THE TWO THINGS THAT RIDE ON TOP OF IT.
@@ -6711,6 +6716,7 @@ export default function App() {
   ) : null;
   const artifactView = artifactPlacement(artifactMode, artifactWidth);
   const notesHere = fullScreenDoc && !!focused && openDoc?.product === focused.product && !openDoc.readOnly && takesNotesSidebar(openDoc.src);
+  const cellsTakeNotes = !!focused && openDoc?.product === focused.product && !openDoc.readOnly && takesNotesSidebar(openDoc.src);
   const notesShown = notesHere && notesOpen;
   const notesClosed = notesHere && !notesOpen;
   const [artifactHeader, setArtifactHeader] = useState<HTMLDivElement | null>(null);
@@ -8199,7 +8205,7 @@ export default function App() {
                 onNotice={showToast}
                 aside={notesShown && focused ? <NotesSidebar key={`${focused.id}\n${openDoc.src}`} item={focused} src={openDoc.src}
                   asked={cellComment} onAsked={() => setCellComment(null)} /> : undefined}
-                onComment={notesHere ? commentOnTable : undefined}
+                onComment={cellsTakeNotes ? commentOnTable : undefined}
                 firstMark={<>
                   {focused && focused.product === openDoc.product && canShareFile(openDoc.src) && <ShareLink icon product={openDoc.product} thread={focused.id} src={openDoc.src} signedIn={!!snap?.team?.signedIn} />}
                   {notesHere && focused && <NotesToggle open={notesOpen} waiting={(focused.artifacts?.notes ?? []).filter((n) => !n.resolved && stillWaiting(n)).length} onToggle={toggleNotes} />}

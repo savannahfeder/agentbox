@@ -38,7 +38,7 @@ export function NotesToggle({ open, waiting, onToggle }: { open: boolean; waitin
 type Quote = { text: string; cell?: TableCell };
 
 const Quoted = ({ quote }: { quote: Quote }) => (
-  <span className="sb-quote">{quote.cell && <span className="sb-cell">Row {quote.cell.row}, {quote.cell.column} · </span>}{quote.text}</span>
+  <span className="sb-quote">{quote.text}{quote.cell && <span className="sb-cell"> in row {quote.cell.row}, {quote.cell.column}</span>}</span>
 );
 
 function SidebarNote({ note, product, on, who, person, me, onGo }: {
