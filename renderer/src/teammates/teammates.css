@@ -33,7 +33,7 @@
 .rm-cm.tq-m .tx { font-size: 16px; line-height: 25px; }
 .rm-cm.tq-m .tx p { white-space: pre-wrap; }
 /* Pictures at the room chat's preview size (team/chat.css), side by side when sent together. */
-.rm-cm.tq-m .tx p:has(> .inline-image-open) { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; margin: 8px 0; white-space: normal; }
+.rm-cm.tq-m .tx p:has(> .inline-image-open) { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; margin: 0; white-space: normal; }
 .rm-cm.tq-m .tx .inline-image-open { max-width: min(100%, 360px); }
 .rm-cm.tq-m .tx .inline-image { display: block; margin: 0; max-width: min(100%, 360px); max-height: 240px; }
 /* A pasted brief's headings are words in a message, not page titles. */
