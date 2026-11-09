@@ -761,7 +761,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
         const stem = base.slice(0, base.length - ext.length).normalize('NFC').replace(/\s+/g, '-').replace(/[^\p{L}\p{N}._-]+/gu, '').replace(/^[-_.]+/, '').slice(0, 80) || 'file';
         const file = freeName(home, stem, ext.toLowerCase());
         fs.mkdirSync(path.join(home.dir, 'documents'), { recursive: true });
-        fs.copyFileSync(from, path.join(home.dir, 'documents', file), fs.constants.COPYFILE_EXCL);
+        fs.copyFileSync(from, path.join(home.dir, 'documents', file), fs.constants.COPYFILE_EXCL | fs.constants.COPYFILE_FICLONE);
         added.push(file);
       }
       if (added.length) {
