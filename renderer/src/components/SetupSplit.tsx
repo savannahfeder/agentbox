@@ -17,6 +17,7 @@ import { starterAsks } from '../../../shared/teammates.mjs';
 import { SKY_THEMES, drawSky } from '../home/sky';
 import { connectTiles, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupStep } from '../setup-split';
 import { logoOf } from '../connections/logos';
+import FolderPicker from './FolderPicker';
 import './setup-split.css';
 
 const CMD = MAC ? '⌘' : 'Ctrl';
@@ -173,21 +174,30 @@ export function SetupSplit(p: SetupSplitProps) {
     setDone((d) => ({ ...d, chats: n }));
     next();
   }, [ticked.length, p, next]);
-  const chooseFolder = useCallback(async () => {
-    const got = await api.chooseFolder().catch(() => ({ path: null }));
-    if (!got.path) return;
+  const [browsing, setBrowsing] = useState(false);
+  const takeFolder = useCallback(async (folder: string) => {
+    setBrowsing(false);
     setBusy(true);
-    const made = await p.projectFor(bare(got.path));
+    const made = await p.projectFor(bare(folder));
     setBusy(false);
     if (!made) { setError('That folder could not become a project.'); return; }
     setDone((d) => ({ ...d, project: made.name }));
     next();
   }, [p, next]);
+  const chooseFolder = useCallback(async () => {
+    const got = await api.chooseFolder().catch(() => ({ path: null, refused: undefined, browse: false }));
+    // A browser tab has no system dialog: the app's own picker stands in.
+    if (got.browse) { setBrowsing(true); return; }
+    if (got.refused) { setError(got.refused); return; }
+    if (got.path) void takeFolder(got.path);
+  }, [takeFolder]);
 
   // ---- the keyboard: Enter is always the primary button
   const primary = useRef<() => void>(() => {});
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // The folder picker hears its own keys.
+      if (browsing) return;
       const typing = (e.target as Element | null)?.closest('input, textarea');
       e.stopPropagation();
       if (e.key === 'Enter' && !e.shiftKey && !busy) {
@@ -289,7 +299,7 @@ export function SetupSplit(p: SetupSplitProps) {
     </>;
   }
 
-  return createPortal(
+  return <>{createPortal(
     <div className="setup-split" role="dialog" aria-label="Set up">
       <div className="ss-left">
         <div className="ss-brand"><Mark />Agentbox</div>
@@ -304,10 +314,14 @@ export function SetupSplit(p: SetupSplitProps) {
           {back && <button type="button" className="ss-back" onClick={back}>Back</button>}
         </div>
       </div>
+
       <div className="ss-right" aria-hidden="true"><div className="ss-cap">Your Agentbox so far</div></div>
     </div>,
     document.body,
-  );
+  )}
+  {/* Above the app in the right panel as well as the steps. */}
+  {browsing && createPortal(<div className="ss-picker"><FolderPicker startIn={null} onPick={(f: string) => void takeFolder(f)} onClose={() => setBrowsing(false)} /></div>, document.body)}
+  </>;
 }
 
 export { CMD as SETUP_CMD };

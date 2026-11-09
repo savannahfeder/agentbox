@@ -64,6 +64,7 @@
 .setup-split .ss-strip-light { background: #fff; }
 .setup-split .ss-strip-dark { background: radial-gradient(ellipse 80% 70% at 75% 25%, rgba(238, 96, 24, .18), transparent 70%), #1a1817; }
 .setup-split .ss-row:has(.ss-strip) { grid-template-columns: 64px 1fr auto; }
+.ss-picker { position: fixed; inset: 0; z-index: 2147483005; }
 .setup-split .ss-empty { padding: 16px 18px; color: var(--text-faint); font-size: 13.5px; }
 
 .setup-split .ss-acts { display: flex; align-items: center; gap: 22px; margin-top: 28px; }
