@@ -28,7 +28,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { launchChrome, connect, freeProfile, readModifiers } from './cdp.mjs';
+import { launchChrome, connect, freeProfile, readModifiers, isRunning } from './cdp.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const { readState, INSTANCE } = await import(path.join(here, 'live.mjs'));
@@ -87,7 +87,7 @@ const LOOK = `(() => {
   return 'SCREEN TEXT:\\n' + text + '\\n\\nTHINGS TO PRESS (' + list.length + '):\\n' + list.join('\\n');
 })()`;
 
-const running = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+const running = (pid) => isRunning(pid);
 /** The page loads before the app draws; a look straight after shows an empty screen. */
 const drawn = (t) => t.until('document.querySelectorAll("button").length > 0', { ms: 15_000 }).catch(() => {});
 

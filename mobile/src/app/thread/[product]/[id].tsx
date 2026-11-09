@@ -25,7 +25,7 @@ import { typedWords } from '../../../lib/files';
 import { threadOf, type FiledRow, type Thread } from '../../../lib/thread';
 import { askUnderAnswer, CHOICES_FOLDED, foldKey, foldedKeys, pageOf, splitHeadline, spotIn, stepIn, toggleFold, walkKeeping } from '../../../lib/one-page';
 import { mateOf } from '../../../lib/teammates';
-import { TeammateMark } from '../../../ui/Teammates';
+import { TeammateMark, ThreadQuestions } from '../../../ui/Teammates';
 import { screenGate } from '../../../lib/thread-gate';
 import { liveOf, moveChoices, offersOf, ruleFor, shownLevel, summaryParts, type Offers } from '../../../lib/thread-offers';
 import { madeThreadOf, phoneSlug, waitFacts } from '../../../../../renderer/src/phone-rows';
@@ -583,6 +583,7 @@ export default function ThreadScreen() {
             <OptionsCard foot onFold={foldChoices} ask={askUnderAnswer(thread.ask, page.answer?.headline ?? splitHeadline(thread.outcome?.text ?? '').headline)} options={thread.options} busy={busy} pick={pick} dir={dir} files={files} />
           </ScrollView>
         )}
+        {mate && <ThreadQuestions item={item} />}
         <Dock thread={thread} offers={offers} busy={busy} setBusy={setBusy} setError={setError} stop={() => void press({ kind: 'stop' })}
           foldedChoices={thread.options.length > 0 && !asking && choicesFolded ? thread.options.length : 0} showChoices={foldChoices} onTyped={setTyped} />
       </KeyboardAvoidingView>

@@ -23,6 +23,7 @@ describe('the permission card and the lists under it', () => {
   });
   it('a thread, a teammate and a group lift their reply box and buttons above it (round 2 of the 2026-11-03 testers, issues 11 and 12)', () => {
     expect(read('mobile/src/app/thread/[product]/[id].tsx')).toMatch(/<KeyboardAvoidingView style=\{\{ flex: 1, paddingBottom: c\.approvalRoom \? Math\.max\(0, c\.approvalRoom \+ 6 - footRoom\(inset\)\) : 0 \}\}/);
-    expect(read('mobile/src/app/teammate/[id].tsx')).toMatch(/<KeyboardAvoidingView style=\{\{ flex: 1, paddingBottom: c\.approvalRoom \}\}/);
+    // Its reply box keeps the home bar's room itself now, as the thread's does (w-4be5a160c7).
+    expect(read('mobile/src/app/teammate/[id].tsx')).toMatch(/<KeyboardAvoidingView style=\{\{ flex: 1, paddingBottom: c\.approvalRoom \? Math\.max\(0, c\.approvalRoom \+ 6 - footRoom\(inset\)\) : 0 \}\}/);
   });
 });

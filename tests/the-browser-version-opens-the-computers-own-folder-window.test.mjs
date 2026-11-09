@@ -79,6 +79,6 @@ describe('the browser server', () => {
   });
 
   it('is given the real one only by the command that starts it', () => {
-    expect(fs.readFileSync(new URL('../bin/agentbox.mjs', import.meta.url), 'utf8')).toMatch(/bootHeadless\(\{[^}]*osDialog: osOpenDialog/);
+    expect(fs.readFileSync(new URL('../bin/agentbox.mjs', import.meta.url), 'utf8')).toMatch(/bootHeadless\(\{[^}]*osDialog: (process\.env\.AGENTBOX_NO_SYSTEM_WINDOWS \? null : )?osOpenDialog/);
   });
 });

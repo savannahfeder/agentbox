@@ -190,6 +190,8 @@ export function previewTeammates(now = Date.now()) {
       { id: 'm-p4', kind: 'pass', from: 't-chief00001', to: 't-launch0001', title: 'Cut the launch film to 60 seconds', ts: Math.min(morning + 2 * MIN, at(40)) },
       { id: 'm-p5', kind: 'msg', from: 't-chief00001', to: ['you'], text: 'Morning check-in.\n\n- **Quality lead** found sign-ups failing on a slow connection. The fix needs your yes.\n- **Launch lead** is cutting the film to 60 seconds.\n\nNothing else needs you.', ts: Math.min(morning, at(42)) },
       { id: 'm-p6', kind: 'msg', from: 't-chief00001', to: ['you'], text: 'One question for the film: should it open on the inbox or on the phone?', options: ['The inbox', 'The phone'], ts: at(12) },
+      // Asked in its thread, so the phone answers it there (a-teammates-question-on-the-phone-opens-its-thread).
+      { id: 'm-p7', kind: 'msg', from: 't-quality001', to: ['you'], text: 'When the email step times out, should sign-up try again on its own or show a clear error?', options: ['Try again', 'Show an error'], run: 'w-t2b3c4d5e6', ts: at(29) },
     ],
     runs: [
       { id: 'run-p1', kind: 'run', teammate: 't-chief00001', item: 'w-t3c4d5e6f7', product: 'agentbox', title: 'Write the morning check-in', verb: 'finished', ts: Math.min(morning + MIN, at(41)) },

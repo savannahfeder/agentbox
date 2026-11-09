@@ -13,7 +13,8 @@ import { actWords, asideOf, chatRows, clockOf, openQuestions, pauseOnItsWay, run
 import { useCloud } from '../../state/cloud';
 import { Back, More } from '../../ui/icons';
 import { Markdown } from '../../ui/Markdown';
-import { IconButton, RunningMark, Sheet, SheetHead, T, TopBar, Wall } from '../../ui/parts';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { footRoom, IconButton, RunningMark, Sheet, SheetHead, T, TopBar, Wall } from '../../ui/parts';
 import { Chips, DayRule, MateComposer, TeammateMark, YouFace } from '../../ui/Teammates';
 import { color, corner, font, size } from '../../ui/theme';
 import { phoneSlug } from '../../../../renderer/src/phone-rows';
@@ -73,6 +74,7 @@ export default function TeammateChat() {
   const [picks, setPicks] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const inset = useSafeAreaInsets();
   const watchTeam = c.watchTeam;
   useEffect(() => watchTeam(), [watchTeam]);
   useEffect(() => { setPicks({}); setError(null); }, [id]);
@@ -177,7 +179,7 @@ export default function TeammateChat() {
     <Wall>
       <TopBar left={<IconButton label="Back" onPress={back}><Back size={18} /></IconButton>} title={name}
         right={<IconButton label={`About ${t.name}`} onPress={() => setAbout(true)}><More /></IconButton>} />
-      <KeyboardAvoidingView style={{ flex: 1, paddingBottom: c.approvalRoom }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1, paddingBottom: c.approvalRoom ? Math.max(0, c.approvalRoom + 6 - footRoom(inset)) : 0 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: size.inset, paddingBottom: 16 }} keyboardShouldPersistTaps="handled"
           onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: false })}>
           {rows.length ? rows.map(draw) : <T style={{ paddingTop: 24, fontSize: 14.5, lineHeight: 21, color: color.faint }}>{`Nothing yet. Say hello to ${t.name}.`}</T>}

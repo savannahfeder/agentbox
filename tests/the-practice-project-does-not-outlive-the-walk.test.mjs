@@ -168,8 +168,9 @@ describe('B: the app stops sending her back into Practice', () => {
     // out by hand in five places in this file and read in two more.
     expect(app).not.toMatch(/localStorage\.setItem\('zero\.lastProduct'/);
     // Five places that used to spell the key out, plus the hand-back above and
-    // the one that puts an already-wrong install right.
-    expect(app.match(/rememberProject\(/g) ?? []).toHaveLength(7);
+    // the one that puts an already-wrong install right, plus the project the
+    // first-run setup makes (w-fbe5e95dea).
+    expect(app.match(/rememberProject\(/g) ?? []).toHaveLength(8);
   });
 
   it('also puts right an install where the slot is ALREADY wrong', () => {
