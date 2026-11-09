@@ -17,7 +17,7 @@ export function opensBigInAGroup(name: string | null | undefined): boolean;
 export function otherFilesInLines(lines: unknown[] | null | undefined): Array<{ path: string; by: string | null; at: number; agent?: string }>;
 export function shownName(path: string | null | undefined): string;
 export function reviewKind(path: string | null | undefined): 'image' | 'film' | 'pdf' | 'markdown' | 'deck' | null;
-export function threadFiles(files: ThreadFile[] | null | undefined, numbers?: Record<string, number> | null): FileFamily[];
+export function threadFiles(files: ThreadFile[] | null | undefined, numbers?: Record<string, number> | null, opts?: { keep?: string | null }): FileFamily[];
 export function lineAsThread(line: ReadonlyArray<{ key: string; versions: ReadonlyArray<{ n: number; name: string; path: string | null; by: string | null; at: number; agent?: string; here: string[] }> }> | null | undefined): { numbers: Record<string, number>; lines: unknown[] };
 export function whereAPressLands(families: FileFamily[] | null | undefined, press?: { path?: string | null; file?: string | null }): { fi: number; vi: number } | null;
 export function versionForPath(families: FileFamily[] | null | undefined, path: string | null | undefined): FileVersion | null;
@@ -53,6 +53,8 @@ export function offeredTogether(lines: unknown[] | null | undefined, family: Pic
 export function baseName(name: string): string;
 /** The key of the family a path belongs to, with \0 as /. */
 export function familyKeyOf(path: string): string;
+/** A file's identity across its versions: the same for plan.md and plan-v3.md. */
+export function familyOfName(file: unknown): string;
 export function familyName(family: Pick<FileFamily, 'versions'> | null | undefined, version: FileFamily['versions'][number] | null | undefined): string;
 export function approvalSince(family: Pick<FileFamily, 'versions'> | null | undefined, index: number, approvals: Array<{ file: string; by: string | null }> | null | undefined, nameOf: (id: string | null) => string): string | null;
 export function newestOfFamily(path: string, edits: Array<{ path: string }> | null | undefined): string;

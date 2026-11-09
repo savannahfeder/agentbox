@@ -9,7 +9,6 @@ import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { build } from 'esbuild';
-import electron from 'electron';
 
 const dir = '/Users/example/Projects/demo';
 function links(value) {
@@ -78,6 +77,10 @@ describe('quoted filenames keep every word', () => {
 // checks that nothing happened keep their fixed wait, where waiting too little
 // can only let them pass.
 it.skipIf(process.platform !== 'darwin')('keeps mounted links and exhausted previews through five parent updates', async () => {
+  // Loaded here, not at the top: importing 'electron' downloads its binary
+  // when it is missing, and a failed download would fail the parser tests on
+  // every platform this test skips.
+  const { default: electron } = await import('electron');
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'inline-links-'));
   try {
     fs.writeFileSync(path.join(temp, 'index.html'), '<!doctype html><div id="root"></div>');
@@ -90,11 +93,10 @@ it.skipIf(process.platform !== 'darwin')('keeps mounted links and exhausted prev
     expect(result.exhausted).toBe(true);
     expect(result.retriesAfterUpdates).toBe(0);
     expect(result.mediaLabel).toBe('Sample Film.mp4');
-    // A page a thread names opens beside the chat, like an address, and nothing
-    // opens over it: feedback is typed in the chat while you read
+    // A design opens full screen first; an address still opens beside the chat
     // (tests/a-note-read-in-place-opens-beside-the-chat-when-clicked).
-    expect(result.bigView).toBeUndefined();
-    expect(result.calls).toEqual([{ round: 5, src: 'designs/demo.html' }, { round: 5, src: 'http://localhost:3002' }]);
+    expect(result.bigView).toBe('demo.html');
+    expect(result.calls).toEqual([{ round: 5, src: 'http://localhost:3002' }]);
     expect(result.notices).toEqual([{ round: 5, text: 'File could not be opened.' }]);
     expect(result.productChanged).toBe(true);
     expect(result.otherProductResolved).toBe(true);

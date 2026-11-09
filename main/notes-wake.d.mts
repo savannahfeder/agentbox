@@ -31,3 +31,23 @@ export function noteToItsAgent(opts: {
   /** How long to wait for a running agent to take the note before counting it as handed over. */
   handOffMs?: number;
 }): Promise<boolean>;
+
+/** Your reply with every comment of yours still waiting for Send before it, and the note and reply ids that go with it; null when none wait. */
+export function replyWithWaitingNotes(opts: {
+  store: Omit<NoteReplyStore, 'answerItem' | 'fileMark'>;
+  product: string;
+  id: string;
+  answer: unknown;
+  me?: string | null;
+  nameOf?: (by: string) => string;
+  people?: readonly Person[];
+}): { answer: string; fromNotes: string[] } | null;
+
+/** Your comments still waiting for Send on this thread, and those with a reply of yours waiting under them. */
+export function waitingNotes(opts: {
+  store: Omit<NoteReplyStore, 'answerItem' | 'fileMark'>;
+  product: string;
+  id: string;
+  me?: string | null;
+  people?: readonly Person[];
+}): string[];

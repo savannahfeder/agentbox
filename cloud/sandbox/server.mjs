@@ -120,7 +120,7 @@ export async function unpackFileArchive(file, destination) {
 }
 // What this server can do beyond the first version, said in a start's answer,
 // so a Mac knows rather than guesses whether its asks are honoured.
-const CAPS = ['offline', 'setup', 'kept', 'base', 'plain', 'hold', 'resources', 'keys'];
+const CAPS = ['offline', 'setup', 'kept', 'base', 'plain', 'hold', 'resources', 'keys', 'pieces'];
 // A conversation sent home as only what the run added is listed in this file
 // (the same name in main/cloud/run.mts).
 const TAILS = '.agentbox-tails.json';
@@ -851,7 +851,11 @@ export function createSandbox({
   // What a run was given is noted, so only what it adds goes home (`stageTails`).
   async function placeFile(f, r = null) {
     fs.mkdirSync(path.dirname(f.path), { recursive: true });
-    const body = await download(fetchImpl, f.url, f.path, stopping.signal);
+    if (f.more !== undefined && (!Array.isArray(f.more) || f.untar || !f.more.every((p) => typeof p?.url === 'string'))) throw new Error('more must be [{ url }] on a plain file');
+    // A file sent in pieces (`pieces`): the first at `url`, then each of `more`.
+    const body = f.more?.length
+      ? await downloadPieces(fetchImpl, [f.url, ...f.more.map((p) => p.url)], f.path, stopping.signal)
+      : await download(fetchImpl, f.url, f.path, stopping.signal);
     if (r && !f.untar) (r.placed ||= new Map()).set(f.path, { size: body.length, sha256: sha256(body) });
     if (f.untar) {
       await unpackFileArchive(f.path, f.untar);
@@ -2062,6 +2066,19 @@ async function download(fetchImpl, url, file, signal) {
   if (!res.ok) throw new Error(`fetch ${res.status} for ${redact(url)}`);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const body = Buffer.from(await res.arrayBuffer());
+  fs.writeFileSync(file, body);
+  return body;
+}
+
+async function downloadPieces(fetchImpl, urls, file, signal) {
+  const parts = [];
+  for (const url of urls) {
+    const res = await fetchImpl(url, signal ? { signal } : undefined);
+    if (!res.ok) throw new Error(`fetch ${res.status} for ${redact(url)}`);
+    parts.push(Buffer.from(await res.arrayBuffer()));
+  }
+  const body = Buffer.concat(parts);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, body);
   return body;
 }
