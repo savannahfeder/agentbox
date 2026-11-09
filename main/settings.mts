@@ -37,7 +37,6 @@ import { codexAccount, codexFreePlan, codexLoginCommand, makeCodexHome } from '.
 import { codexDefaultModel, codexModelsAcross } from './codex-models.mts';
 import { CODEX_DEFAULT_MODE, isCodexMode } from '../shared/codex-modes.mjs';
 import { CLOUD_SAME, CLOUD_CLAUDE_DEFAULT, CLOUD_CODEX_DEFAULT } from './cloud-permission.mts';
-import { isPackagedElectron } from './team/session.mjs';
 import { claudeModels } from './claude-models.mjs';
 import { forgetCodexBin, INSTALL_URL as CODEX_INSTALL_URL } from './codex-bin.mjs';
 
@@ -605,13 +604,13 @@ export function searchForEngineBin(config: SettingsConfig, engine: string) {
 }
 
 // THE ALPHA FEATURES SWITCHES (w-3d0fa23ffb). Off unless someone turned them
-// on in Settings; only a real `true` counts. Multiplayer, the team version, is
-// the exception in a checkout, where it was always on.
-export function alphaFeatures(config?: SettingsConfig | null, { packaged = isPackagedElectron() }: { packaged?: boolean } = {}) {
+// on in Settings; only a real `true` counts. Multiplayer is on unless turned off:
+// the first run offers a team, so it cannot wait behind a switch in Settings.
+export function alphaFeatures(config?: SettingsConfig | null, _opts: { packaged?: boolean } = {}) {
   return {
     rooms: config?.alphaRooms === true,
     teammates: teammatesOn(config),
-    multiplayer: packaged ? config?.alphaMultiplayer === true : config?.alphaMultiplayer !== false,
+    multiplayer: config?.alphaMultiplayer !== false,
   };
 }
 

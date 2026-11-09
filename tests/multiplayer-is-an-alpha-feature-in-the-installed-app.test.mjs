@@ -70,10 +70,12 @@ describe('the cloud an installed build signs in to', () => {
 });
 
 describe('the Multiplayer switch', () => {
-  it('is off in an installed build until someone turns it on', () => {
-    expect(alphaFeatures({}, { packaged: true }).multiplayer).toBe(false);
-    expect(alphaFeatures({ alphaMultiplayer: true }, { packaged: true }).multiplayer).toBe(true);
-    expect(alphaFeatures({ alphaMultiplayer: 'yes' }, { packaged: true }).multiplayer).toBe(false);
+  // 2026-11-09 (w-fbe5e95dea): the founder, on the new first run, "in the new
+  // versions it will be available so it's no longer just an alpha feature".
+  it('is on in an installed build until someone turns it off', () => {
+    expect(alphaFeatures({}, { packaged: true }).multiplayer).toBe(true);
+    expect(alphaFeatures({ alphaMultiplayer: false }, { packaged: true }).multiplayer).toBe(false);
+    expect(alphaFeatures({ alphaMultiplayer: 'no' }, { packaged: true }).multiplayer).toBe(true);
   });
 
   it('is on in a checkout until someone turns it off', () => {
