@@ -141,11 +141,17 @@ async function askTheFounder({ tool_name: toolName, input }) {
   try { return JSON.parse(text); } catch { return { behavior: 'deny', message: `unreadable answer: ${text}` }; }
 }
 
+function toldItIsInTheCloud() {
+  const at = argv.indexOf('--append-system-prompt');
+  return `${at >= 0 ? argv[at + 1] ?? '' : ''}\n${promptText}`.includes('# You are running on a cloud machine');
+}
+
 // The store server: one of its own carries the account, a shared one is reached by its address.
 function storeServer() {
   // On a cloud machine the store is the computer's, over the bridge, which is where its cloud tools are.
   // A stand-in cloud on this Mac hands the stand-in the computer's own config, so the bridge is named here.
-  if (process.env.AGENTBOX_BRIDGE_SOCK && mcpServers().agentbox) return { command: process.execPath, args: [IMAGE_STUB, 'agentbox'] };
+  // Only for a run told it is on one: a test suite run on a real cloud machine inherits that machine's bridge.
+  if (process.env.AGENTBOX_BRIDGE_SOCK && mcpServers().agentbox && toldItIsInTheCloud()) return { command: process.execPath, args: [IMAGE_STUB, 'agentbox'] };
   return Object.entries(mcpServers()).find(([name, s]) => name !== 'zero-approvals' && (s?.env?.STORE_ACCOUNT_ID || (s?.type === 'http' && /\/store$/.test(s.url ?? ''))
     || (name === 'agentbox' && s?.args?.[0] === IMAGE_STUB)))?.[1];
 }
