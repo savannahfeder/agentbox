@@ -10,7 +10,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { AppState, Platform } from 'react-native';
 import { cloudClient, type CloudClient } from '../../../renderer/src/cloud-rest';
 import { PROJECTS_SELECT, cloudCarriesOn, macAway, macSeenOf, phoneConnectState, phoneSlug, phoneStatusLine, phoneView, readCommands, readSettingsRows, readThreads, settingCommand, splitSlug, type PhoneRows } from '../../../renderer/src/phone-rows';
-import { phoneRepeats, type RepeatSettingsRow } from '../../../renderer/src/phone-repeats';
+import { phoneRepeats } from '../../../renderer/src/phone-repeats';
+import type { SettingsRow } from '../../../renderer/src/phone-settings-view';
 import { sendPhoneFeedback, type FeedbackFiles } from '../../../renderer/src/phone-feedback';
 import { phoneSender } from '../../../renderer/src/phone-send';
 import { fileOnPhone, objectsToSign, renewLinks, type Links } from '../../../renderer/src/phone-links';
@@ -73,7 +74,7 @@ function useCloudState() {
   const rowsNow = useRef<PhoneRows>(EMPTY);
   const setRows = useCallback((next: PhoneRows) => { rowsNow.current = next; setRowsNow(next); }, []);
   const links = useRef<Links>(new Map());
-  const [settingsRows, setSettingsRows] = useState<RepeatSettingsRow[]>([]);
+  const [settingsRows, setSettingsRows] = useState<SettingsRow[]>([]);
   const settingsAt = useRef(-Infinity);
   const teamWatched = useRef(0);
   const [signedAt, setSignedAt] = useState(0);
@@ -90,7 +91,7 @@ function useCloudState() {
       const select = (table: string, query: string) => cloud.select(table, query);
       try {
         const [projects, threads, commands] = await Promise.all([
-          select('phone_projects', PROJECTS_SELECT),
+          select('phone_projects', PROJECTS_SELECT) as Promise<PhoneRows['projects']>,
           readThreads(select, cache.current),
           readCommands(select),
         ]);
@@ -312,7 +313,7 @@ function useCloudState() {
   const [approvalRoom, setApprovalRoom] = useState(0);
 
   // A message to a teammate, someone new, or a go-ahead, left for the computer
-  // that sent the teammates (shared/phone-settings.mjs `teammate`).
+  // that sent the teammates (shared/phone-settings.mts `teammate`).
   const askTeammate = useCallback(async (key: 'post' | 'describe' | 'goAhead' | 'pause', value: Record<string, unknown>) => {
     if (!cloud || !team) throw new Error('Your computer has not sent your teammates yet.');
     // Only words for an agent need the yes; a go-ahead or a pause carries none.

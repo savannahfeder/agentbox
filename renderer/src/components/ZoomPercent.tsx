@@ -19,7 +19,7 @@ export function ZoomPercent() {
 
   useEffect(() => {
     let stamp = 0;
-    const off = (window.zero as any)?.onZoomPercent?.((payload: { percent?: number }) => {
+    const off = window.zero?.onZoomPercent?.((payload: { percent?: number }) => {
       const percent = Number(payload?.percent);
       if (!Number.isFinite(percent)) return;
       setShown({ percent, stamp: ++stamp });

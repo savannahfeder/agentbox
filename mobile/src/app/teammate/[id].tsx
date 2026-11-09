@@ -7,7 +7,7 @@ import { router } from '../../lib/router';
 import { useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { answersMessage } from '../../../../renderer/src/teammates/chat-lines';
-import type { TeamChatLine, TeamRunLine } from '../../../../renderer/src/types';
+import type { TeamChatLine, TeamRunLine, WorkItem } from '../../../../renderer/src/types';
 import { screenGate } from '../../lib/thread-gate';
 import { actWords, asideOf, chatRows, clockOf, openQuestions, pauseOnItsWay, runningThread, type ChatRow, type PhoneTeam } from '../../lib/teammates';
 import { useCloud } from '../../state/cloud';
@@ -41,7 +41,7 @@ function Act({ verb, text, onOpen, when, status, children }: { verb: string; tex
 }
 
 /** Threads it sent you one after another, as rows that open them (`SentCard`). */
-function Sent({ runs, team, items }: { runs: TeamRunLine[]; team: PhoneTeam; items: any[] }) {
+function Sent({ runs, team, items }: { runs: TeamRunLine[]; team: PhoneTeam; items: WorkItem[] }) {
   return (
     <View style={{ marginTop: 14, marginLeft: 44, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: color.line, backgroundColor: color.fill }}>
       <T style={{ paddingHorizontal: 14, paddingTop: 9, paddingBottom: 7, fontSize: 12.5, color: color.faint, borderBottomWidth: 1, borderBottomColor: color.line }}>{`Sent you · ${clockOf(runs[0].ts)}`}</T>

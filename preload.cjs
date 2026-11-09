@@ -278,7 +278,7 @@ contextBridge.exposeInMainWorld('zero', {
   // The document pane's own two: the text of a file it has open, and her edit
   // going back onto disk. Markdown only on the way back (main/doc-file.mts).
   readDoc: (payload) => ipcRenderer.invoke('zero:read-doc', payload),
-  // A link anyone can open, to one of her files (main/file-link.mjs).
+  // A link anyone can open, to one of her files (main/file-link.mts).
   fileLink: (payload) => ipcRenderer.invoke('zero:file-link', payload),
   fileLinkShare: (payload) => ipcRenderer.invoke('zero:file-link-share', payload),
   fileLinkStop: (payload) => ipcRenderer.invoke('zero:file-link-stop', payload),

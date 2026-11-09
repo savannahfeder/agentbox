@@ -1112,7 +1112,7 @@ const PERMISSION_OPTIONS: Array<{ value: PermissionMode; label: string }> = MODE
   (value) => ({ value, label: MODE_WORDS[value] }),
 );
 
-// CODEX'S THREE, in the order shared/codex-modes.mjs keeps them, which is
+// CODEX'S THREE, in the order shared/codex-modes.mts keeps them, which is
 // least to most an agent may do. That file is the only place the list lives.
 const CODEX_MODE_OPTIONS: Array<{ value: CodexModeId; label: string }> = CODEX_MODE_ORDER.map(
   (value) => ({ value, label: CODEX_MODES[value].label }),
@@ -2375,7 +2375,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
                   THE NUMBER SHOWN IS THE MACHINE'S, NOT THE ACCOUNT'S. The
                   stepper was per account while the sentence beside it talked
                   about the total, so this Mac showed 3 and said 6. Automatic
-                  answers for the Mac and main/machine.mjs shares it out; the
+                  answers for the Mac and main/machine.mts shares it out; the
                   per-account number is arithmetic nobody is asked to do.
 
                   THE CLAUDE PLAN HAS NO SAY (w-54c640f8da): its limit is a
@@ -2595,7 +2595,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
             CONTROL: it is the one page you read rather than set. What is here
             is what a person actually presses, grouped by the moment they would
             want it; ../shortcuts.ts holds the list. Every key on it works today
-            (`tests/the-shortcuts-page-lists-keys-that-work.test.mjs`). */}
+            (`tests/the-shortcuts-page-lists-keys-that-work.test.mts`). */}
         {pane === 'phone' && <PhonePage onFeedback={onFeedback} onSignIn={onPhoneSignIn} web={phoneWeb}
           onPhoneProjects={webComputer ? <WebPhoneProjects web={webComputer} onWorkspace={setWorkspace} /> : undefined} macShut={phoneCloud ? { ...phoneCloud, all: model?.workspace?.phoneAll !== false, projects: projects.filter((p) => p.slug !== 'practice'), onChoose: (all, except) => setWorkspace('phoneProjects', { all, except }) } : undefined} />}
         {pane === 'shortcuts' && (
@@ -2878,7 +2878,7 @@ function WebComputerPane({ pane, web, onWorkspace, onProject, onOpenProject }: {
             desc={`Tests and builds take turns, urgent first, and new agents wait to start until memory frees up.${two ? ' Claude Code and Codex both.' : ''}`}>
             <Switch label="Hold heavy work when memory is short" on={!!gate.value} onChange={(v) => onWorkspace('memoryGate', v)} />
           </ReadRow>
-          {gate.value && !isAuto && (
+          {(gate.value as boolean) && !isAuto && (
             <ReadRow label="Heavy commands at once" reading={slots}
               desc={slots.value === null ? `Auto: ${w.memoryGate.slotsAuto} on this computer, one for every 8 GB of memory.` : `You picked ${slots.value}. Auto is ${w.memoryGate.slotsAuto} on this computer.`}>
               <Stepper label="Heavy commands at once" value={(slots.value as number | null) ?? w.memoryGate.slotsAuto} min={1} max={w.memoryGate.slotsMax ?? 8}

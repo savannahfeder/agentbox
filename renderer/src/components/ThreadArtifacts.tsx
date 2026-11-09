@@ -7,7 +7,7 @@ import type { LedgerLine } from '../thread-history';
 import type { ArtifactMark, FileElsewhere, FileMarks, Person, WorkItem } from '../types';
 import { ArtifactView, NO_MARKS, type ArtifactOpen } from './ArtifactView';
 import { useFileLine } from '../file-numbers';
-import { filesInLines, threadFiles } from '../../../shared/artifact-marks.mjs';
+import { filesInLines, threadFiles } from '../../../shared/artifact-marks.mts';
 
 /** This thread's marks with those from the other copies, every pin numbered in the order it was made. */
 export function withElsewhere(own: FileMarks, elsewhere: FileElsewhere[]): FileMarks {

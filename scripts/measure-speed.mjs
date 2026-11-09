@@ -44,9 +44,9 @@ async function makeStore(projects, perProject, strandedCount) {
   fs.mkdirSync(data, { recursive: true });
   fs.mkdirSync(path.join(root, 'home'), { recursive: true });
   fs.writeFileSync(path.join(data, 'zero.config.json'), JSON.stringify({ storeRoot, accountId: 'speed', engineChoice: '2026-01-01T00:00:00.000Z', maxConcurrentSessions: 2 }, null, 2));
-  const { storeRootEnv, machineryPath } = await import('../main/store/home.mjs');
+  const { storeRootEnv, machineryPath } = await import('../main/store/home.mts');
   Object.assign(process.env, storeRootEnv(storeRoot));
-  const { buildLine } = await import('../shared/work-items.mjs');
+  const { buildLine } = await import('../shared/work-items.mts');
   const words = 'the app froze when she pressed E and the inbox moved on to the next task while a worker wrote its answer report.md into the store'.split(' ');
   const text = (n) => Array.from({ length: n }, () => words[Math.floor(Math.random() * words.length)]).join(' ');
   const now = Date.now();

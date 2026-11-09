@@ -1,7 +1,7 @@
 // A command is an operation, never prose asking a model to imitate a CLI.
 import { CLAUDE_COMMANDS, commandWords } from './claude-commands.mts';
 import type { ClaudeCommand } from './claude-commands.mts';
-import { harnessDefinition } from './harness-definitions.mjs';
+import { harnessDefinition } from './harness-definitions.mts';
 const command = (name: string, description: string, argumentHint: string | null = null, aliases: string[] = []): ClaudeCommand => ({ name, description, menuDescription: null, whole: true, argumentHint, aliases });
 export const CODEX_COMMANDS: ClaudeCommand[] = [
  command('model','Show models or change this task’s model','[model]'),

@@ -1,0 +1,449 @@
+// the app's config: one JSON file, all paths explicit, no discovery magic.
+//
+// The store's modules used to be another system's, loaded out of a private repo
+// by absolute path, and this file was where that coupling was declared. They are
+// Agentbox's own now (main/store/*), so the only outside thing left here is the
+// claude binary.
+
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import crypto from 'node:crypto';
+import { resolveClaudeBin, candidatePaths } from './claude-bin.mts';
+import { warmShellAnswers, type EngineFrom } from './engine-bin.mts';
+import { resolveCodexBin } from './codex-bin.mts';
+import { defaultStoreRoot } from './store/home.mts';
+import { machineSlots } from './machine.mts';
+import { runningAsAFreshUser } from '../shared/fresh-user-home.mts';
+import { runningAsADemo } from '../shared/demo-world.mts';
+
+const CONFIG_NAME = 'zero.config.json';
+
+/**
+ * HOW MANY SESSIONS ONE ACCOUNT RUNS WHEN NOBODY HAS SAID ANYTHING AT ALL.
+ *
+ * Exported because two places need the same number and a second copy of it is a
+ * number that drifts: `DEFAULTS` below, and `Supervisor#_slotsPerAccount`, which
+ * reaches for it as CODEX's cap when the number on the config is one a CLAUDE
+ * plan lowered. A Claude plan's rate limit says nothing about an OpenAI
+ * subscription, and there is no plan tier for Codex anywhere to read, so the
+ * honest answer for Codex is the one every engine gets when nobody has said --
+ * this, rather than a Codex-shaped number nobody measured.
+ */
+export const DEFAULT_SESSIONS_AT_ONCE = 3;
+
+export interface ConfigDefaults {
+  accountId: string | null;
+  claudeBin: string | null;
+  maxConcurrentSessions: number;
+  agentsAuto: boolean;
+  agentsNudge: number;
+  agentsAtOnce: number | null;
+  memoryGate: boolean;
+  memoryGateSlots: number | null;
+  cloudRuns: boolean | string | null;
+  maxCloudSessions: number | null;
+  cleanupLeftovers: boolean;
+  cleanupLeftoversSince: number | null;
+  sessionArgs: string[] | null;
+  storeMcpCommand: string | string[] | null;
+  autonomousProducts: string[];
+  products: string[];
+  engineChoice: string | boolean | null;
+}
+
+/**
+ * The live config: `zero.config.json` over `DEFAULTS`, plus what `loadConfig`
+ * worked out about this machine. The file is written by hand, so any other key
+ * in it is carried through as it was written.
+ */
+export interface Config extends ConfigDefaults {
+  [key: string]: unknown;
+  accountId: string;
+  claudeBin: string;
+  freshInstall: boolean;
+  storeRoot: string;
+  accountRoot: string;
+  claudeBinConfigured: string | null;
+  claudeFound: boolean;
+  claudeCertain: boolean;
+  claudeFrom: EngineFrom | null;
+  codexBinConfigured: string | null;
+  codexBin: string | null;
+  codexFound: boolean;
+  codexCertain: boolean;
+  codexFrom: EngineFrom | null;
+  machineSlots: number;
+  authProfiles?: string[] | null;
+  home: string;
+  appDir: string;
+}
+
+export const DEFAULTS: ConfigDefaults = {
+  // ONE ACCOUNT FOLDER PER INSTALL, AND NOBODY ELSE'S.
+  //
+  // This was a literal id for most of the app's life, which meant every copy
+  // ever downloaded filed its work under a folder named after the machine the
+  // app was written on. `null` is the honest default: `loadConfig` mints a
+  // fresh one on first run and writes it into the config, so an id exists from
+  // then on and is this install's own. An id already in the config always wins,
+  // so nothing that is already running moves.
+  accountId: null,
+  // The brain. Sessions run headless on the founder's subscription. Left unset
+  // on purpose: where Claude Code lives depends on how it was installed, so the
+  // answer is searched for at load (main/claude-bin.mts) rather than assumed.
+  // Setting it here in zero.config.json still wins over the search.
+  claudeBin: null,
+  // How many sessions run at once. The queue absorbs the rest; when the plan
+  // window caps out, a longer queue is the visible, benign failure mode.
+  maxConcurrentSessions: DEFAULT_SESSIONS_AT_ONCE,
+  // LET AGENTBOX DECIDE HOW MANY RUN (w-e5225b62ba). On unless somebody has set
+  // a number themselves, which `loadConfig` works out below from whether one was
+  // ever written down. With it on, `maxConcurrentSessions` is not read at all:
+  // `Supervisor#_slotsPerAccount` asks main/machine.mts for what this Mac
+  // carries and shares that out across the live accounts. `agentsNudge` is how
+  // many times "Something felt slow" has been pressed, and only ever subtracts.
+  agentsAuto: true,
+  agentsNudge: 0,
+  // THE NUMBER PICKED ON THE MENU, FOR THE WHOLE COMPUTER (w-ec27ff1a51). Null
+  // until somebody picks one. It replaced `maxConcurrentSessions` as the thing
+  // the menu writes, because that one was per login: two logins turned a 7 into
+  // 14 agents on a 16 GB Mac, which then ran out of memory.
+  agentsAtOnce: null,
+  // HOLD HEAVY WORK WHEN MEMORY IS SHORT (w-3958c3753d). On unless somebody
+  // turns it off (w-54c640f8da). With it on, every shell command a worker
+  // runs asks main/memory-gate-server.mts first, and heavy ones wait their turn
+  // while the Mac is short of memory. `memoryGateSlots` is how many heavy
+  // commands may run at once; null is Auto, one per 8 GB.
+  memoryGate: true,
+  memoryGateSlots: null,
+  // RUN THE OVERFLOW IN THE CLOUD (docs/cloud/PLAN.md). Null is "when this Mac
+  // has been set up for it": nothing happens anywhere until somebody has run
+  // scripts/cloud-setup.mjs and an account has signed in from the cloud menu,
+  // and before that the app is exactly the app it was. `false` turns it off
+  // even then.
+  // `maxCloudSessions` is the cloud's own cap, apart from this Mac's. Null is
+  // what this Mac can carry: 50 through the shared host (about 11 MB a run),
+  // 20 where each run needs a relay of its own (about 110 MB a run).
+  cloudRuns: null,
+  maxCloudSessions: null,
+  // STOP WHAT FINISHED AGENTS LEAVE RUNNING (main/leftovers.mts). Its own
+  // switch, on unless somebody turns it off (w-54c640f8da);
+  // `cleanupLeftoversSince` is the moment it was turned on, or the app's start
+  // when it never was, so nothing is stopped sooner than the idle time after it.
+  cleanupLeftovers: true,
+  cleanupLeftoversSince: null,
+  // What spawned sessions are allowed to do. Left unset on purpose, because the
+  // right default now depends on whether a store MCP server is present: see
+  // Supervisor#sessionArgsFor. Setting it here still wins over that, which is
+  // how letting workers build stays the founder's explicit opt-in.
+  sessionArgs: null,
+  // An OPTIONAL stdio MCP server giving spawned workers tools to read and write
+  // the store. Agentbox ships none, so this is null and a worker runs with no store
+  // tools at all. Point it at an executable to give workers their hands back.
+  storeMcpCommand: null,
+  // Products where agent-filed TASK items spawn without waiting for the
+  // founder's approval (questions and reviews still hold for them). Empty by
+  // default: autonomy here is granted per product, deliberately, in the
+  // config file, the same way sessionArgs is.
+  autonomousProducts: [],
+  // PERSONAL PROJECTS AND THE DRIVE WERE BOTH DECLARED HERE AND BOTH ARE GONE
+  // (w-d19d6d387c, 2026-09-22). A personal project ran its sessions on the
+  // founder's message and nothing else, with no brief and no store; the drive
+  // asked "what next?" by itself on a project that had gone quiet. There is no
+  // case where a project should run without a brief and a store, and code that
+  // drives a product on its own does not belong in an open-source app.
+  //
+  // A config still carrying `personalProducts` or `driveEnabled` is not an
+  // error; nothing reads either key now.
+  // Products the app drives: slugs under the account root. Empty means all
+  // non-archived products found on disk.
+  products: [],
+  // WHETHER THE SECOND ENGINE MAY BE CHOSEN AT ALL, AND FROM WHEN. Null, so it
+  // may not, and that is the whole of the default: every row runs Claude Code,
+  // including one she marked `engine: "codex"` in August, exactly as it did
+  // before this key existed. There is no Settings row and no picker. This is a
+  // line somebody writes in zero.config.json on purpose, which is the point of
+  // it -- it is the config half of the capability gate in shared/engines.mts,
+  // and `main/supervisor.mts#_engineFor` is the one place that reads it and
+  // hands the gate's token over.
+  //
+  // IT IS THE MOMENT SHE OPENED IT AND NOT A `true`. The reasoning is in
+  // shared/engines.mts, beside the function that parses this key, and is not
+  // repeated here; in one sentence, `engine` survived the 2026-08-27 removal on
+  // the work-item contract, so her ledger may still carry rows marked `codex`
+  // from 08-25 to 08-27, and a boolean would put every one of them onto a
+  // second engine the instant it was written, with no picker, no byline naming
+  // the engine and no warning. A moment means "Codex may be chosen from now on"
+  // instead.
+  //
+  // Written as an ISO date or date-time: "2026-09-04", or
+  // "2026-09-04T09:30:00Z". Anything else -- true, "yes", "1", or a shape
+  // `Date.parse` would merely guess at -- is read as off.
+  engineChoice: null,
+};
+
+/**
+ * `home` is the machine's home folder and exists so a test can be run against
+ *  a laid-out one rather than against whoever is logged in. Nothing in the app
+ *  passes it. */
+export function loadConfig(appDir: string, { home = os.homedir() }: { home?: string } = {}): Config {
+  const file = path.join(appDir, CONFIG_NAME);
+  let overrides: Record<string, unknown> = {};
+  // WHETHER THIS MAC HAS EVER RUN AGENTBOX BEFORE. There is exactly one honest
+  // marker of that and this is it: no config file at all. A file that exists
+  // but happens not to mention a setting is somebody who has been here for
+  // weeks, and treating them as new is how a default silently changes under
+  // an install that was working.
+  //
+  // NOTHING DECIDES A DEFAULT ON THIS ANY MORE. It used to pick the
+  // `outsideAgents` default, and that split was the bug: the same machine got
+  // two different answers about the same setting depending on whether a file
+  // happened to exist. There is one default now, in main/settings.mts. This
+  // stays as a plain fact about the machine, read by nobody today, because the
+  // next thing that wants it will want it honest.
+  let fresh = false;
+  try {
+    overrides = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') fresh = true;
+    else console.warn(`zero: could not read ${file}: ${(err as Error).message}`);
+  }
+  // Filled in below before it is returned.
+  const config = { ...DEFAULTS, ...overrides, freshInstall: fresh } as Config;
+  // Where the inbox's own files live, when the file names no store. A path in
+  // the file always wins, including on Linux. The default is computed here, not
+  // at import: on Linux it is the XDG data directory, and on macOS a folder of
+  // the app's name. An import-time path cannot see the `home` a test passes,
+  // and it cannot see a blanked XDG_DATA_HOME.
+  //
+  // A stand-in home does not inherit this machine's XDG_DATA_HOME. That
+  // variable is an absolute path in the real home, and a throwaway asked with
+  // `{ home }` would otherwise open the real store.
+  if (typeof overrides.storeRoot !== 'string' || !overrides.storeRoot.trim()) {
+    const real = path.resolve(home) === path.resolve(os.homedir());
+    config.storeRoot = defaultStoreRoot({ home, env: real ? process.env : {} });
+  }
+  // An older alias for `storeRoot` was read here until 2026-09-22. A config
+  // still carrying only the old key falls through to the default now, which is
+  // why the key was renamed in zero.config.json in the same step and not after
+  // it: the two are one move, and doing them apart points the app at an empty
+  // folder.
+  // The account id, minted once per install. Written back immediately, because
+  // a generated id that is not saved is a different id next launch and the
+  // store would move out from under everything.
+  //
+  // AND A NEW INSTALL MAY CHOOSE CODEX FROM ITS FIRST LAUNCH (w-db6f5e331e).
+  // `engineChoice` is the moment from which a row may run on Codex; it exists
+  // so August rows in one old store never move engine unasked, and it could
+  // only be written by hand, so a new person with both engines never got
+  // Codex at all. A Mac with no config file has no old rows, so its first
+  // launch is that moment. An install with a config is left as it was.
+  const firstLaunch = fresh && !config.engineChoice ? new Date().toISOString() : null;
+  if (firstLaunch) config.engineChoice = firstLaunch;
+  if (typeof config.accountId !== 'string' || !config.accountId) {
+    config.accountId = crypto.randomUUID();
+    try {
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, `${JSON.stringify({ ...overrides, accountId: config.accountId, ...(firstLaunch ? { engineChoice: firstLaunch } : {}) }, null, 2)}\n`);
+    } catch (err) {
+      console.warn(`zero: could not write the new account id to ${file}: ${(err as Error).message}`);
+    }
+  }
+  config.accountRoot = path.join(config.storeRoot, 'accounts', config.accountId);
+  // Where Claude Code is on THIS machine. Her setting wins; otherwise we look
+  // (main/claude-bin.mts). What she SET is kept separately from what we FOUND,
+  // because `claudeBin` ends up filled in either way, and a later search that
+  // reads its own last answer back as a setting would never search again.
+  //
+  // When nothing is found at all, `claudeBin` falls back to the installer's
+  // path, so anything that tries to spawn it fails the way it always did, with
+  // a real path in the message, rather than on a null. `claudeFound` is the
+  // honest answer to whether it is there, and it is carried here so no screen
+  // has to re-derive it.
+  config.claudeBinConfigured = typeof overrides.claudeBin === 'string' && overrides.claudeBin
+    ? overrides.claudeBin
+    : null;
+  // ONE LOGIN SHELL FOR BOTH ENGINES, ASKED BEFORE EITHER SEARCH RUNS. This is
+  // on the boot path -- main/main.mts calls loadConfig inside createWindow and
+  // before the window exists -- and a login shell costs about 0.7 s to start
+  // whether it is asked about one program or six. Measured on this Mac
+  // 2026-10-11, the two searches together took 1.4 s cold and the shell was all
+  // of it. It seeds only what it positively found, so a shell that will not
+  // start leaves both searches exactly as they were (main/engine-bin.mts).
+  warmShellAnswers();
+  const claude = resolveClaudeBin(config.claudeBinConfigured);
+  config.claudeBin = claude.path ?? candidatePaths()[0];
+  config.claudeFound = claude.found;
+  config.claudeCertain = claude.certain !== false;
+  config.claudeFrom = claude.from;
+  // AND WHERE CODEX IS, THROUGH THE SAME DOOR AND FOR A SHARPER REASON.
+  //
+  // `codexBin` used to arrive on `config` by the unknown-key spread above: this
+  // file keeps whatever is in `zero.config.json` so a setting nobody has taught
+  // the app about survives a round trip, which is right for a setting and wrong
+  // for A PATH THAT GETS SPAWNED. `this.config.codexBin` reaches `spawn` in the
+  // supervisor raw, the file is gitignored and sits in the app directory, and
+  // every worker on this machine has a broad Bash allow. So the one path in the
+  // second engine that becomes a process was the one with no finder, no
+  // existence check and no `configured` split -- while `claudeBin`, three lines
+  // up, has had all three since it was written. main/codex-bin.mts is that
+  // finder; until now nothing imported it.
+  //
+  // THE ONE ASYMMETRY IS DELIBERATE. Claude Code is required, so a miss falls
+  // back to the installer's path and anything spawning it fails with a real
+  // path in the message. Codex is OPTIONAL, so a miss is null: null is exactly
+  // what `engineFor` and `_capacityFor` read as "this Mac cannot run the second
+  // engine", and inventing a path there would advertise an engine that is not
+  // installed and turn every Codex row into an ENOENT.
+  config.codexBinConfigured = typeof overrides.codexBin === 'string' && overrides.codexBin
+    ? overrides.codexBin
+    : null;
+  const codex = resolveCodexBin(config.codexBinConfigured);
+  config.codexBin = codex.found ? codex.path : null;
+  config.codexFound = codex.found;
+  config.codexCertain = codex.certain !== false;
+  config.codexFrom = codex.from;
+  // AND AN OLDER INSTALL WITH CODEX ON IT OPENS THE CHOICE TOO (w-d5d632e503).
+  // Only a Mac with no config file did, so a person who installed before
+  // that, or who added Codex later, never saw Codex anywhere. Written at the
+  // end, once `appDir` is on the config to save through.
+  const codexOpened = codexChoiceToOpen(config, codex.found);
+  // HOW MANY AGENTS AT ONCE, WHEN NOBODY HAS SAID, IS WHAT THIS COMPUTER
+  // CARRIES (main/machine.mts). The Claude plan has no say: its limit is a
+  // budget over hours and a week, and an account that spends it waits for the
+  // reset (w-54c640f8da). It is a suggestion, not a cap; the menu's range is
+  // the same on every machine.
+  config.machineSlots = machineSlots().slots;
+  // WHO IS DECIDING THE NUMBER, read off whether one was ever written down
+  // (w-e5225b62ba). A number in zero.config.json is somebody's own instruction
+  // about this Mac and keeps being obeyed; an install that never touched the
+  // stepper was already having its number filled in here, and Automatic is that
+  // same thing said out loud and kept up to date. An explicit `agentsAuto`
+  // outranks the guess, because turning Automatic back on after setting a number
+  // has to be possible.
+  //
+  // ONLY A NUMBER FOR THE WHOLE COMPUTER IS A CHOICE (w-ec27ff1a51). A
+  // `maxConcurrentSessions` in the file was written per login, by the stepper
+  // that was here before 5 Oct, and reading it as "you set this" is what ran
+  // 14 agents on a Mac Automatic would have run 6 on, with nobody having picked
+  // 14. So that install goes back to Automatic, even with `agentsAuto: false`
+  // written beside it, and a number picked on today's menu (`agentsAtOnce`)
+  // is kept as picked unless Automatic was chosen after it.
+  config.agentsAuto = typeof overrides.agentsAtOnce !== 'number' || overrides.agentsAuto === true;
+  if (typeof overrides.agentsAtOnce !== 'number') config.maxConcurrentSessions = config.machineSlots;
+  // WHOSE MACHINE THIS IS, carried so nothing downstream has to ask the OS a
+  // second time and so a test can lay out a home of its own. The accounts the
+  // fleet runs on are read from it (main/account-discovery.mts).
+  config.home = home;
+  // Where the file is, so anything that edits a setting can write it back
+  // without being handed appDir a second time.
+  config.appDir = appDir;
+  if (codexOpened) {
+    try {
+      saveConfig(config, { engineChoice: codexOpened });
+    } catch (err) {
+      console.warn(`zero: could not open the Codex choice in ${file}: ${(err as Error).message}`);
+    }
+  }
+  return config;
+}
+
+/**
+ * THE MOMENT TO OPEN THE CODEX CHOICE AT, OR NULL. Now, when Codex is found
+ *  and the key was never written. NOW is what keeps a row marked `codex` in
+ *  August on Claude Code: it was written before this moment, so it is stale
+ *  (`engineChoiceOnRowIsStale`). A moment already written is kept, and
+ *  `"engineChoice": false` written by hand keeps the choice shut. */
+export function codexChoiceToOpen(config: { engineChoice?: unknown }, codexFound: boolean | null | undefined): string | null {
+  if (!codexFound || config.engineChoice != null) return null;
+  return new Date().toISOString();
+}
+
+export function configFile(appDir: string): string {
+  return path.join(appDir, CONFIG_NAME);
+}
+
+/**
+ * WHICH FOLDER `zero.config.json` IS READ FROM, and the whole of it is one
+ * rule: A COPY PRETENDING TO BE SOMEBODY ELSE MAY NOT READ THE CHECKOUT'S
+ * CONFIG.
+ *
+ * Running from source the config is the checkout's, which is what every session
+ * and every test already assumes. Packaged it cannot be, because the bundle is
+ * signed and a write into it breaks the signature notarisation just bought, so
+ * it is the user data folder.
+ *
+ * THE THIRD CASE IS THE ONE THAT WAS MISSING, AND IT IS WHAT SHE SAW. She
+ * pressed the ⌘K new user row on 2026-09-27 and the second window opened on HER
+ * INBOX, the personal rows among them, with no first run in front of it. A
+ * throwaway home moves the user data folder and it does NOT move the checkout,
+ * so on a source-run app the copy that was meant to be a stranger read
+ * `<checkout>/zero.config.json` and took her store root, her account id, her
+ * PostHog key and her session arguments off it. `shared/fresh-user-home.mts`
+ * strips those names out of the child's ENVIRONMENT, which was the other half
+ * of the same leak; this is the half a file on disk causes, and no environment
+ * variable can fix it.
+ *
+ * The demo copy goes the same way, for the same reason rather than a second
+ * one: it seeds its own small store into the throwaway home and was then
+ * pointed straight past it at hers.
+ *
+ * Both marks are read off the environment the copy was launched with, so this
+ * answers correctly inside the child while staying a plain function a test can
+ * call with no Electron and no launch.
+ */
+export function configDir({ appDir, userData, packaged = false, env = process.env }: { appDir: string; userData: string; packaged?: boolean; env?: NodeJS.ProcessEnv }): string {
+  if (packaged) return userData;
+  return runningAsAFreshUser(env) || runningAsADemo(env) ? userData : appDir;
+}
+
+// Change settings from the app, on the founder's own file.
+//
+// Two halves, and both are required. The FILE is rewritten so the choice
+// survives a restart, merging into whatever is on disk right now rather than
+// into what this process read at boot: several sessions edit this repo, and a
+// whole-object overwrite from stale memory is how an unrelated key silently
+// reverts. The LIVE object is then mutated in place, because every consumer
+// (the supervisor's tick, spawnPlan's grants, the digest) reads
+// `config.*` per call, so a setting she changes takes effect on the next tick
+// rather than at the next restart. A running app that ignores its own settings
+// screen until relaunch is the same failure as a fix that is not running.
+//
+// Written through a rename, like the standing instructions: a half-written
+// config is a fleet that boots with no grants at all.
+export function saveConfig(config: object, patch: Record<string, unknown>): Record<string, unknown> {
+  const appDir = (config as { appDir?: string }).appDir;
+  if (!appDir) throw new Error('config has no appDir; cannot save');
+  const file = configFile(appDir);
+  let onDisk: Record<string, unknown> = {};
+  try {
+    onDisk = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+  }
+  const next = { ...onDisk };
+  // NOTHING IS PINNED HERE ANY MORE, and the deletion is the point. This used
+  // to write `outsideAgents` into a new install's first save, because the
+  // default flipped from "only the ones asking" to "every session" the moment a
+  // config file existed, and a stranger who had never opened the setting would
+  // have been flipped by it. There is one default now for every install, `off`
+  // in main/settings.mts, so there is no flip left to guard against and no
+  // setting to write on somebody's behalf.
+  for (const [key, value] of Object.entries(patch)) {
+    // An explicit undefined REMOVES the key, which is how a per-project
+    // override goes back to meaning "same as the workspace" rather than
+    // hardening into an empty list that means something else entirely.
+    if (value === undefined) delete next[key];
+    else next[key] = value;
+  }
+  const tmp = `${file}.tmp-${process.pid}`;
+  fs.writeFileSync(tmp, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
+  fs.renameSync(tmp, file);
+  const live = config as Record<string, unknown>;
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === undefined) delete live[key];
+    else live[key] = value;
+  }
+  return next;
+}

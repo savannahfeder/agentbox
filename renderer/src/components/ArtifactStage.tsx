@@ -4,7 +4,7 @@ import { createContext, memo, useCallback, useContext, useEffect, useLayoutEffec
 import { whereAFileLinkGoes } from '../file-links';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { findQuote, viewKind } from '../../../shared/artifact-marks.mjs';
+import { findQuote, viewKind } from '../../../shared/artifact-marks.mts';
 import { api } from '../api';
 import { canPaintQuotes, paintQuotes } from '../paint-quotes';
 import { fetchableFileUrl } from '../phone-files';

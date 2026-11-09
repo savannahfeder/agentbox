@@ -15,7 +15,7 @@ import { priorityIdOf, priorityLabelOf } from '../../../renderer/src/priority';
 import { tryAgainWords } from '../../../renderer/src/try-again';
 import type { PhoneSender } from '../../../renderer/src/phone-send';
 import type { WorkItem } from '../../../renderer/src/types';
-import { ruleLabel, type RepeatShape } from '../../../shared/repeats.mjs';
+import { ruleLabel, type RepeatShape } from '../../../shared/repeats.mts';
 import type { Saved } from './attach';
 import { dayClock } from './back-at';
 
@@ -55,14 +55,16 @@ export type Press =
 
 export type Door = keyof PhoneSender;
 export interface Step { door: Door; payload: Record<string, unknown> }
+/** What a plan's first step answered: the thread a compose made, or whatever another door says. */
+export type Made = { id: string; product: string; title?: string } | { id?: undefined; title?: undefined; ok?: boolean; error?: string } | null | undefined;
 export interface Plan {
   steps: Step[];
   /** What the toast says, ending " · press Z to undo" when it has an Undo (toast-parts.ts). */
   toast?: string;
   /** What Undo calls, given what the first step answered. */
-  undo?: (made: any) => Step[];
+  undo?: (made: Made) => Step[];
   /** What the toast says once Undo has worked. */
-  undone?: (made: any) => string;
+  undone?: (made: Made) => string;
   /** The thread a tap on the toast opens, when it is not the one pressed; null for none. */
   goes?: { product: string; id: string } | null;
 }
@@ -250,11 +252,11 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
 }
 
 /** Runs a plan's steps in order and answers what the first one answered. */
-export async function runSteps(sender: PhoneSender, steps: Step[]) {
-  let first: any;
+export async function runSteps(sender: PhoneSender, steps: Step[]): Promise<Made> {
+  let first: Made;
   for (const [i, s] of steps.entries()) {
     const out = await (sender[s.door] as (p: unknown) => Promise<unknown>)(s.payload);
-    if (i === 0) first = out;
+    if (i === 0) first = out as Made;
   }
   return first;
 }
