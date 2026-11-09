@@ -103,7 +103,7 @@ export function chaosPlan(level, totalMs, { real = false, cloud = false, logins 
     if (codex && level !== 'light') events.push({ kind: 'codex-out', at: at(0.45), until: at(0.55), out: ['codex'], says: 'Codex ran out of usage.' });
     if (level !== 'light') events.push({ kind: 'all-out', at: at(0.62), until: at(0.7), out: names, says: 'Every Claude login ran out of usage.' });
     // --stuck: one cause outside every agent's work, as on 2026-11-08 (shared/causes.mjs).
-    if (stuck) events.push({ kind: 'stuck', at: at(0.1), until: at(0.4), world: { stuck: { cause: STUCK_CAUSE, ask: STUCK_ASK, share: 0.7 } }, says: 'Git on the Mac could not sign in to GitHub, and 7 in 10 agents got stuck on it.' });
+    if (stuck) events.push({ kind: 'stuck', at: at(0.05), until: at(0.6), world: { stuck: { cause: STUCK_CAUSE, ask: STUCK_ASK, share: 0.7 } }, says: 'Git on the Mac could not sign in to GitHub, and 7 in 10 agents got stuck on it.' });
     if (level === 'heavy') events.push({ kind: 'slow-agents', at: at(0.8), until: at(0.9), world: { pace: { minMs: 60_000, maxMs: 300_000 } }, says: 'Agents slowed to 1 to 5 minutes an answer.' });
   }
   if (level !== 'light') {

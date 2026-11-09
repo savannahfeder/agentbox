@@ -2,8 +2,9 @@
 //
 // One row per cause (shared/causes.mjs) only shows when several threads hit
 // the same outside cause, and stand-in agents never did: nothing in their
-// world was outside their own work. --stuck adds a stretch, a tenth to four
-// tenths of the way in, where 7 in 10 stand-in starts call wait_on_cause on
+// world was outside their own work. --stuck adds a stretch, a twentieth to six
+// tenths of the way in (widened after the second Codex run, where testers
+// away on calls met none of it), where 7 in 10 stand-in starts call wait_on_cause on
 // "Your Mac can't push to GitHub", as ten threads did on 2026-11-08. Without
 // the flag the day is unchanged, and a real-tools day never has it.
 import { describe, it, expect } from 'vitest';
@@ -22,11 +23,11 @@ describe('the stretch where agents get stuck', () => {
     expect(chaosPlan('normal', HOUR, { stuck: true, real: true }).map((e) => e.kind)).not.toContain('stuck');
   });
 
-  it('runs from a tenth to four tenths of the way in, and not after', () => {
+  it('runs from a twentieth to six tenths of the way in, and not after', () => {
     const plan = chaosPlan('normal', HOUR, { stuck: true });
-    expect(worldAt(plan, 0.05 * HOUR).stuck).toBeUndefined();
-    expect(worldAt(plan, 0.2 * HOUR).stuck).toMatchObject({ cause: STUCK_CAUSE, share: 0.7 });
-    expect(worldAt(plan, 0.45 * HOUR).stuck).toBeUndefined();
+    expect(worldAt(plan, 0.04 * HOUR).stuck).toBeUndefined();
+    expect(worldAt(plan, 0.3 * HOUR).stuck).toMatchObject({ cause: STUCK_CAUSE, share: 0.7 });
+    expect(worldAt(plan, 0.61 * HOUR).stuck).toBeUndefined();
   });
 });
 

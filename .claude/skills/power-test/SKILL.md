@@ -53,7 +53,7 @@ node $P --who startup-engineer,founder --hours 2 --focus "replies after switchin
 | `--real` | the Claude Code and Codex this computer has, on their plans | stand-ins |
 | `--stand-in-cloud` | every thread runs in a stand-in Agentbox Cloud of the copy's own (the real cloud server and sandbox, here, with the stand-in agent); a task naming Supabase, Vercel, Stripe, Expo, AWS or Sentry asks for its key | no cloud |
 | `--chaos` | `none`, `light`, `normal`, `heavy` | `normal` |
-| `--stuck` | from a tenth to four tenths of the way in, 7 in 10 stand-in agents get stuck on one cause outside their work (git on the Mac cannot sign in to GitHub) and wait on its row | off |
+| `--stuck` | from a twentieth to six tenths of the way in, 7 in 10 stand-in agents get stuck on one cause outside their work (git on the Mac cannot sign in to GitHub) and wait on its row | off |
 | `--round-minutes` | one tester session before it is restarted with its diary | 20 |
 | `--model` | the testers' Codex model | Codex's default |
 | `--codex-home` | the Codex login testers spend | the Codex login on the best plan |

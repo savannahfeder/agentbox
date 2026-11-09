@@ -243,6 +243,13 @@ function diaryTail(dir) {
   });
 }
 
+/** Whether the tester's Chrome, as browse.mjs last wrote it down, is still there. */
+function browserAlive(st) {
+  const saved = st?.instance ? readJson(path.join(st.instance, 'browser.json')) : null;
+  if (!saved?.pid) return false;
+  try { process.kill(saved.pid, 0); return true; } catch (e) { return e?.code === 'EPERM'; }
+}
+
 async function runPerson({ person, name, dir, stateFile, seeded, failed, cmds }) {
   const result = { slug: person.slug, name: person.name, role: person.role, dir, rounds: 0, stopped: failed ?? null, coverage: null };
   progress[person.slug] = { round: 0, stopped: result.stopped };
@@ -256,12 +263,19 @@ async function runPerson({ person, name, dir, stateFile, seeded, failed, cmds })
   let worldText = null;
   const watcher = createWatcher({ state: state(), out: dir, seeded, afterMs: (real ? 30 : 10) * MIN, quiet: (now) => now < quietUntil, readState: state });
 
+  let browserCheckedAt = 0;
   const tick = async () => {
     if (busy || stopping) return;
     busy = true;
     try {
       const now = Date.now();
       const elapsed = now - startedAt;
+      // A sandboxed tester cannot start Chrome itself, so a browser that died is
+      // opened again from here, once a minute at most.
+      if (now - browserCheckedAt > MIN && !down) {
+        browserCheckedAt = now;
+        if (!browserAlive(state())) await run(cmds.browse, ['open'], { env: process.env, timeoutMs: 2 * MIN, cwd: dir });
+      }
       if (restartAgain({ down, now, deadline })) {
         down.tried = now;
         quietUntil = now + 2 * MIN;
