@@ -122,8 +122,8 @@
 /* Light enough that a whole quoted section does not read as an alarm. */
 ::highlight(av-quote) { background-color: color-mix(in srgb, var(--accent) 16%, transparent); }
 ::highlight(av-quote-on) { background-color: color-mix(in srgb, var(--accent) 30%, transparent); }
-/* Over .artifact-view, whose z-index is 9400. */
-.selection-bar { z-index: 9450; gap: 2px; padding: 4px; }
+/* Over .artifact-view, whose z-index is 9400. Two classes, so .link-pop's 60 cannot win by loading later. */
+.link-pop.selection-bar { z-index: 9450; gap: 2px; padding: 4px; }
 .selection-bar .link-pop-btn { padding: 4px 8px; color: var(--text-dim); }
 .selection-bar-comment { display: inline-flex; align-items: center; gap: 6px; }
 

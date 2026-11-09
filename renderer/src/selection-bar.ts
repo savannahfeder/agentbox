@@ -13,7 +13,18 @@ export function pickedIn(root: Pick<Node, 'contains'> | null, sel: Picked | null
   return words.trim() ? words : null;
 }
 
-export const quoteFrom = (words: string) => words.replace(/\s+/g, ' ').trim().slice(0, MAX_QUOTE_CHARS);
+type TextBox = { value: string; selectionStart: number | null; selectionEnd: number | null };
+
+/** The words selected inside a text box on the page. Chrome puts such a selection on the body, so pickedIn never sees it. */
+export function boxPickedIn(root: { contains(node: never): boolean } | null, el: unknown): string | null {
+  const box = el as TextBox | null;
+  if (!root || !box || typeof box.value !== 'string' || box.selectionStart == null || box.selectionEnd == null) return null;
+  if (!root.contains(el as never)) return null;
+  const words = box.value.slice(box.selectionStart, box.selectionEnd);
+  return words.trim() ? words : null;
+}
+
+export const quoteFrom =(words: string) => words.replace(/\s+/g, ' ').trim().slice(0, MAX_QUOTE_CHARS);
 
 const GAP = 8;
 

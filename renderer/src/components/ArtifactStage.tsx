@@ -6,7 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { findQuote, viewKind } from '../../../shared/artifact-marks.mts';
 import { api } from '../api';
-import { canPaintQuotes, paintQuotes } from '../paint-quotes';
+import { canPaintQuotes, cellAround, paintQuotes } from '../paint-quotes';
 import { fetchableFileUrl } from '../phone-files';
 import { opening, pictureUrl, seenAt } from '../picture';
 import { MAX_ZOOM, lowestZoom } from '../picture-view';
@@ -547,7 +547,7 @@ function TableStage({ product, path, name, notes, draft, activeId, onPlace, onFo
   return <div className="av-table" ref={page}>
     <TableView text={text} path={path} mode="full" onSave={readText ? undefined : save} onReload={() => setReads((n) => n + 1)} live={liveSession}
       onComment={onPlace ? (quote, cell) => onPlace({ kind: 'quote', text: quote, cell }) : undefined} storeKey={`${product}/${path}`} />
-    {onPlace && <SelectionBar page={page} onComment={(quote) => onPlace({ kind: 'quote', text: quote })} />}
+    {onPlace && <SelectionBar page={page} onComment={(quote, at) => onPlace({ kind: 'quote', text: quote, cell: cellAround(at) })} />}
   </div>;
 }
 

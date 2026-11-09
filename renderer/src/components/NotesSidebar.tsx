@@ -10,7 +10,7 @@ import { isTablePath } from '../table-file';
 import { notedFilesInLines, threadFiles, versionForPath, whoseIsTheFile } from '../../../shared/artifact-marks.mts';
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { notePictures, noteWithPictures } from '../note-pictures';
-import { canPaintQuotes, paintQuotes } from '../paint-quotes';
+import { canPaintQuotes, cellAround, paintQuotes } from '../paint-quotes';
 import { noteAttachments, sidebarNotes } from '../notes-sidebar';
 import { AttachRow } from './AttachRow';
 import { NotePictureShown } from './FileNoteCard';
@@ -239,7 +239,7 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
             </div>
           )}
           <textarea ref={box} rows={1} value={words} aria-label="Note"
-            placeholder={quote ? `Your note on ${quote.cell ? 'this cell' : 'these words'}` : table ? 'Add a note, or right-click a cell' : 'Add a note, or select words in the page'}
+            placeholder={quote ? 'Your note on these words' :table ? 'Add a note, or right-click a cell' : 'Add a note, or select words in the page'}
             onChange={(e) => setWords(e.target.value)}
             onPaste={canAttach ? async (e) => {
               if (![...e.clipboardData.items].some((i) => i.kind === 'file')) return;
@@ -264,7 +264,7 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
           </div>
         </div>
       </form>
-      <SelectionBar page={page} onComment={(q) => { setQuote({ text: q }); requestAnimationFrame(() => box.current?.focus()); }} />
+      <SelectionBar page={page} onComment={(q, at) => { setQuote({ text: q, cell: cellAround(at) }); requestAnimationFrame(() => box.current?.focus()); }} />
     </aside>
   );
 }

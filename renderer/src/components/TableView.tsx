@@ -1183,7 +1183,13 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
       goTo({ a: to, b: to });
     }
     // Not when a double click has already opened the next edit: the keys would take its focus and close it.
-    requestAnimationFrame(() => { if (!open.current) focusKeys(); });
+    // Nor when the box was left for one outside the table, such as a comment on the words picked in it.
+    requestAnimationFrame(() => {
+      if (open.current) return;
+      const at = document.activeElement;
+      if (at && at !== keys.current && typingIn(at) && !root.current?.contains(at)) return;
+      focusKeys();
+    });
   };
 
   // ---- The keys, while the table holds them.
@@ -1685,7 +1691,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
             ? { top: drop.at - 1, width: (box.current?.querySelector('.tbl-grid') as HTMLElement | null)?.offsetWidth }
             : { left: drop.at - 1, height: (box.current?.querySelector('.tbl-grid') as HTMLElement | null)?.offsetHeight }} />}
         {peek && one && (
-          <div className="tbl-peek" title={editable ? 'Double-click or press Enter to edit' : undefined}
+          <div className="tbl-peek" data-row={order[one.r] + 1} data-col={table.columns[one.c].name} title={editable ? 'Double-click or press Enter to edit' : undefined}
             style={{ left: peek.left, width: peek.w, minHeight: rowH, maxHeight: peek.most, ...(peek.up ? { top: peek.top + rowH, transform: 'translateY(-100%)' } : { top: peek.top }) }}
             // A click that selected no words goes to the cell under it, so the box never stands in the way of the next row.
             onClick={(e) => {
@@ -1708,7 +1714,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
                   onDraft={(v) => { if (open.current) open.current = { ...open.current, draft: v }; }}
                   onPick={(v, move) => endEdit(v, move)} onClose={() => endEdit(null)} />}
             </div>
-            : <div className="tbl-edit" style={{ left: place.left, top: place.top, width: place.w }}>
+            : <div className="tbl-edit" data-row={order[editing.r] + 1} data-col={table.columns[editing.c].name} style={{ left: place.left, top: place.top, width: place.w }}>
               <GrowingText className="tbl-edit-box" value={editing.draft} autoFocus caretAtEnd readOnly={!editable} label={table.columns[editing.c].name}
                 onChange={(v) => setEditing((x) => (x ? { ...x, draft: v } : x))}
                 // Rows copied from a spreadsheet into an empty cell go across the table, not into the one cell.

@@ -85,7 +85,7 @@ describe('the cell, not the first matching words, is lit', () => {
     expect(read('components/ArtifactView.tsx')).toContain("kind === 'table' ? 'Right-click a cell to note it'");
   });
   it('finds the cell by those two', () => {
-    expect(cellSelector({ row: 4, column: 'Status' })).toBe('[data-row="4"][data-col="Status"]');
-    expect(cellSelector({ row: 12, column: 'Say "hi"\\' })).toBe('[data-row="12"][data-col="Say \\"hi\\"\\\\"]');
+    expect(cellSelector({ row: 4, column: 'Status' })).toBe('.tbl-td[data-row="4"][data-col="Status"]');
+    expect(cellSelector({ row: 12, column: 'Say "hi"\\' })).toBe('.tbl-td[data-row="12"][data-col="Say \\"hi\\"\\\\"]');
   });
 });

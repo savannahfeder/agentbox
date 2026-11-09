@@ -5,9 +5,46 @@ export const canPaintQuotes = () => !!(CSS as unknown as { highlights?: unknown 
 
 const attr = (v: string) => `"${v.replace(/["\\]/g, '\\$&')}"`;
 /** The drawn cell TableView marks with its file row and column. */
-export const cellSelector = (cell: TableCell) => `[data-row="${cell.row}"][data-col=${attr(cell.column)}]`;
+export const cellSelector = (cell: TableCell) => `.tbl-td[data-row="${cell.row}"][data-col=${attr(cell.column)}]`;
+
+type Attrs = { getAttribute(name: string): string | null };
+
+/** The table cell, or a cell's open box, that holds this element. */
+export function cellAround(el: { closest(selector: string): Attrs | null } | null): TableCell | undefined {
+  const at = el?.closest('[data-row][data-col]');
+  const row = Number(at?.getAttribute('data-row'));
+  const column = at?.getAttribute('data-col') ?? '';
+  return Number.isInteger(row) && row >= 1 && column ? { row, column } : undefined;
+}
 
 type Quoted = { text: string; cell?: TableCell };
+
+function textIn(root: Node) {
+  const nodes: { node: Text; start: number }[] = [];
+  let words = '';
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) {
+    const node = walker.currentNode as Text;
+    nodes.push({ node, start: words.length });
+    words += node.data;
+  }
+  return { nodes, words };
+}
+
+function rangeOf({ nodes, words }: ReturnType<typeof textIn>, hit: { start: number; end: number }) {
+  const at = (offset: number) => {
+    let i = nodes.length - 1;
+    while (i > 0 && nodes[i].start > offset) i -= 1;
+    return { node: nodes[i].node, offset: offset - nodes[i].start };
+  };
+  if (!nodes.length || hit.end > words.length) return null;
+  const a = at(hit.start);
+  const b = at(hit.end);
+  const range = new Range();
+  range.setStart(a.node, Math.min(a.offset, a.node.length));
+  range.setEnd(b.node, Math.min(b.offset, b.node.length));
+  return range;
+}
 
 /** Paints each quoted passage without touching the page, which React or the editor drew. */
 export function paintQuotes(root: HTMLElement | null, quotes: ({ id: string } & Quoted)[], activeId: string | null, draft: string | Quoted | null) {
@@ -15,34 +52,15 @@ export function paintQuotes(root: HTMLElement | null, quotes: ({ id: string } & 
   const Highlight = (window as unknown as { Highlight?: new (...r: Range[]) => unknown }).Highlight;
   const found = new Map<string, Range>();
   if (!root || !highlights || !Highlight) return found;
-  const nodes: { node: Text; start: number }[] = [];
-  let all = '';
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  while (walker.nextNode()) {
-    const node = walker.currentNode as Text;
-    nodes.push({ node, start: all.length });
-    all += node.data;
-  }
-  const rangeOf = (text: string) => {
-    const hit = findQuote(all, text);
-    if (!hit) return null;
-    const at = (offset: number) => {
-      let i = nodes.length - 1;
-      while (i > 0 && nodes[i].start > offset) i -= 1;
-      return { node: nodes[i].node, offset: offset - nodes[i].start };
-    };
-    const a = at(hit.start);
-    const b = at(hit.end);
-    const range = new Range();
-    range.setStart(a.node, Math.min(a.offset, a.node.length));
-    range.setEnd(b.node, Math.min(b.offset, b.node.length));
-    return range;
-  };
+  const page = textIn(root);
   // A row out of view is not drawn, so its cell is not lit until it scrolls in.
   const placeOf = (q: Quoted) => {
-    if (!q.cell) return rangeOf(q.text);
+    if (!q.cell) { const hit = findQuote(page.words, q.text); return hit ? rangeOf(page, hit) : null; }
     const el = root.querySelector(cellSelector(q.cell));
     if (!el) return null;
+    const cell = textIn(el);
+    const hit = findQuote(cell.words, q.text);
+    if (hit) return rangeOf(cell, hit);
     const range = new Range();
     range.selectNodeContents(el);
     return range;
