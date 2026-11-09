@@ -17,3 +17,14 @@ export function InviteRows({ rows, onJoin, onOpen, selected }: {
       where="Team" priority={null} updatedAt={0} when="" now={0} />
   </div>)}</>;
 }
+
+/** The same invitation as a card at the top of the board's Needs you column. */
+export function InviteCards({ rows, onJoin, onOpen, selected }: {
+  rows: InviteRow[]; onJoin: (r: InviteRow) => void; onOpen: (r: InviteRow) => void; selected: string | null;
+}) {
+  return <>{rows.map((r) => <div key={r.key} className={`th-card${selected === r.key ? ' selected' : ''}`} role="button" tabIndex={0} data-invite={r.key}
+    onClick={() => onOpen(r)} onKeyDown={(e) => { if (e.key === 'Enter' && e.target === e.currentTarget) onJoin(r); }}>
+    <div className="t">{r.words}</div>
+    <div className="m"><span className="p">Team</span><button type="button" className="rm-btn inv-join" onClick={(e) => { e.stopPropagation(); onJoin(r); }}>Join</button></div>
+  </div>)}</>;
+}
