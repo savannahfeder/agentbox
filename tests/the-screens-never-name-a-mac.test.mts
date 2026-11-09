@@ -101,7 +101,7 @@ describe('the sentences a person reads', () => {
   });
 
   it('keeps the Chrome bundle path, which is a file and not a sentence', () => {
-    const page = fs.readFileSync(new URL('../mcp/core/page.mts', import.meta.url), 'utf8');
+    const page = fs.readFileSync(new URL('../shared/hidden-browser.mts', import.meta.url), 'utf8');
     expect(page).toContain('Contents/MacOS/Google Chrome');
     expect(literals(page).filter((s) => APPLE.test(s))).toEqual([]);
   });

@@ -1,7 +1,7 @@
 // THE MEMORY SWITCH IS SAVED AND TAKES EFFECT AT ONCE — w-3958c3753d.
 //
-// "Hold heavy work when memory is short" sits on the Agents page, off out of
-// the box. Turning it on must start the coordinator now, not at the next
+// "Hold heavy work when memory is short" sits on the Agents page, on out of
+// the box since w-54c640f8da. Turning it on must start the coordinator now, not at the next
 // launch, and be written to the config so the next launch starts it too. The
 // number of heavy commands at once is Auto (one per 8 GB) until somebody picks
 // one, and picking Auto again goes back to the machine's own number.
@@ -35,14 +35,14 @@ function fakeSupervisor() {
 }
 
 describe('the switch', () => {
-  it('is off when nobody has touched it', () => {
+  it('is on when nobody has touched it', () => {
     const { config } = withConfig({});
-    expect(config.memoryGate).toBe(false);
-    expect(memoryGateSettings({ config, supervisor: fakeSupervisor() }).on).toBe(false);
+    expect(config.memoryGate).toBe(true);
+    expect(memoryGateSettings({ config, supervisor: fakeSupervisor() }).on).toBe(true);
   });
 
   it('turning it on starts the coordinator now and is remembered', () => {
-    const { config, onDisk } = withConfig({});
+    const { config, onDisk } = withConfig({ memoryGate: false });
     const supervisor = fakeSupervisor();
     setWorkspaceSetting({ config, supervisor }, { key: 'memoryGate', value: true });
     expect(supervisor.calls).toEqual([['on', true]]);

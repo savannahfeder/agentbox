@@ -17,6 +17,15 @@ export function keepScroll(key: string, top: number): void {
 
 export const keptScroll = (key: string): number => kept.get(key) ?? 0;
 
+const filmAt = new Map<string, number>();
+
+/** A film watched to its end opens at its start again. */
+export function keepFilmTime(url: string, seconds: number, ended: boolean): void {
+  if (ended || !(seconds > 0)) filmAt.delete(url); else filmAt.set(url, seconds);
+}
+
+export const keptFilmTime = (url: string): number => filmAt.get(url) ?? 0;
+
 // The words of a file often arrive after its box, so the box is too short to
 // hold the place at first. It is put back each time the words grow, until the
 // person moves it or this long has passed.

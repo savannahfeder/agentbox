@@ -10,8 +10,8 @@
 //
 // THE RULES, agreed with Codex over four rounds (the first version, which
 // stopped anything tagged whenever memory was tight, was taken apart):
-//   - it is its own switch, off by default; with it off leftovers are only
-//     reported;
+//   - it is its own switch, on by default since w-54c640f8da; with it off
+//     leftovers are only reported;
 //   - a task's programs may be stopped only after its run has explicitly ended
 //     in this app (or its worker is verified gone), 2 minutes after the task is
 //     closed, or 10 minutes after the run while memory is tight, never earlier
@@ -367,7 +367,7 @@ describe('the Settings page', () => {
     const { setWorkspaceSetting, leftoverSettings } = await import('../main/settings.mts');
     const { loadConfig } = await import('../main/config.mts');
     const appDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cleaner-settings-'));
-    fs.writeFileSync(path.join(appDir, 'zero.config.json'), '{}');
+    fs.writeFileSync(path.join(appDir, 'zero.config.json'), '{"cleanupLeftovers":false}');
     const config = loadConfig(appDir);
     config.appDir = appDir;
     expect(config.cleanupLeftovers).toBe(false);

@@ -335,6 +335,11 @@ export function heldRowStarts(
   return !!goes && goes.id === row.id && goes.product === row.product;
 }
 
+/** The `live` the list rules take: threads with a run, or with one being started (Try again). */
+export function agentOnOrComing(fleet: { running?: readonly { itemId: string }[]; starting?: readonly string[] } | null | undefined): Set<string> {
+  return new Set([...(fleet?.running ?? []).map((r) => r.itemId), ...(fleet?.starting ?? [])]);
+}
+
 // In progress promises that a worker is on this row or about to be, so it
 // never holds a row whose moment has not arrived. The supervisor's spawn
 // passes gate on the same thing (`isDue`, main/supervisor.mts).

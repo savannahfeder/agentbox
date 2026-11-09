@@ -70,7 +70,37 @@ export function phoneSender({ client, rows, setRows, aliases, changed }: {
     changed();
   };
 
+  // A change to one thread, for the computer that copied it (shared/phone-settings.mjs THREAD).
+  const onThread = async (product: string | undefined, id: string, key: string, value: unknown) => {
+    const t = rows().threads.find((r) => r.item === id && (product === undefined || phoneSlug(r.device, r.project) === product));
+    if (!t) throw new Error('Only a thread your computer has made can be changed.');
+    await setting(t.device, { scope: 'thread', key, product: t.project, item: id, value });
+  };
+  const real = (p: { product: string; id: string }) => realItem(aliases(), p?.product, p?.id);
+
   return {
+    // The window's doors (api.ts) for the thread menu's rows.
+    threadEdit: async (p: { product: string; id: string; patch: Record<string, unknown> }) => {
+      for (const [key, value] of Object.entries(p?.patch ?? {})) await onThread(p.product, real(p), key, value);
+      return { ok: true };
+    },
+    setThreadOnMac: async (p: { onMac: Record<string, true | null> }) => {
+      for (const [id, keep] of Object.entries(p?.onMac ?? {})) await onThread(undefined, id, 'onMac', keep === true ? true : null);
+      return { ok: true };
+    },
+    resumeItems: async (p: { ids: string[] }) => {
+      for (const id of p?.ids ?? []) await onThread(undefined, id, 'resume', true);
+      return { ok: true };
+    },
+    redeliver: async (p: { product: string; id: string }) => { await onThread(p?.product, real(p), 'redeliver', true); return { ok: true }; },
+    // `to` as the phone names a project; a move never leaves the computer the thread is on.
+    moveItem: async (p: { product: string; id: string; to: string }) => {
+      const to = splitSlug(p?.to);
+      const from = splitSlug(p?.product);
+      if (to && from && to.device !== from.device) throw new Error('A thread moves only between projects on its own computer.');
+      await onThread(p?.product, real(p), 'moveTo', to?.project ?? p?.to);
+      return { ok: true };
+    },
     // The window's door (App.tsx `pinThread`): ids to true, or null to unpin.
     setThreadPins: async (p: { pins: Record<string, true | null> }) => {
       for (const [id, pin] of Object.entries(p?.pins ?? {})) {

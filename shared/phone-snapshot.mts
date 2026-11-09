@@ -155,7 +155,9 @@ const ROW_FIELDS = [
   'id', 'title', 'label', 'body', 'kind', 'labels', 'priority', 'parent', 'status',
   'result', 'note', 'answer', 'runAt', 'snoozedUntil', 'answeredThrough',
   'engine', 'model', 'start', 'due', 'problem', 'progress', 'solution',
-  'createdAt', 'updatedAt', 'pinned',
+  'createdAt', 'updatedAt', 'pinned', 'onMac',
+  // The phone command that made it, so the phone can follow its stand-in here.
+  'fromPhone',
 ];
 // The fields a line in a thread's history may carry in its patch: what the
 // thread view draws as the conversation and its state changes.
@@ -506,6 +508,8 @@ const CHOICES: Record<string, Record<string, Ok>> = {
     permissionMode: orNull((v) => word(v, 40)), model: orNull(word), effort: orNull((v) => word(v, 20)),
     priority: (v) => Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 10, now: (v) => v === true, unschedule: (v) => v === true,
     runAt: (v) => Number.isFinite(v) && (v as number) > 0,
+    // Only when the reply moves the thread to the other agent (renderer/src/reply-pick.ts).
+    engine: (v) => v === 'claude' || v === 'codex',
   },
   new: {
     runAt: (v) => Number.isFinite(v) && (v as number) > 0, start: (v) => v === 'later' || v === 'now',
@@ -524,7 +528,17 @@ export function phoneChoices(kind: string, p: Record<string, unknown> | null | u
 }
 export function checkCommand(cmd: PhoneCommandSeen | null | undefined, { projects, hasItem }: { projects: readonly (string | null | undefined)[]; hasItem: (project: string, id: string) => boolean }): string | null {
   if (!cmd || !PHONE_COMMANDS.includes(cmd.kind)) return 'not something the phone may do';
-  if (cmd.kind === 'setting') return cmd.project != null || cmd.item != null ? 'a setting names no project or thread' : checkSetting(cmd.payload as SettingChange | null | undefined);
+  if (cmd.kind === 'setting') {
+    if (cmd.project != null || cmd.item != null) return 'a setting names no project or thread';
+    const p = cmd.payload as SettingChange | null | undefined;
+    const why = checkSetting(p);
+    // A pin is only a mark in this computer's own list; every other thread change writes the thread.
+    // `checkSetting` let it through, so a thread change names its project and thread.
+    if (why || !p || p.scope !== 'thread' || p.key === 'pinned') return why;
+    if (!projects.includes(p.product) || !hasItem(p.product!, p.item!)) return 'that thread is not on your phone';
+    if (p.key === 'moveTo' && !projects.includes(p.value as string)) return 'that project is not on your phone';
+    return null;
+  }
   if (!projects.includes(cmd.project)) return 'that project is not on your phone';
   const p: Record<string, unknown> = cmd.payload || {};
   if (cmd.kind === 'new') {

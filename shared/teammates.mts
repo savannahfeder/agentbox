@@ -56,6 +56,10 @@ export interface Memory { id: string; text: string; from: string | null; at: num
 
 export type TeammateStatusWord = 'draft' | 'active';
 
+/** 'owed' from going ready until its first run starts, then 'served'; 'waits' for its first duty's time. */
+export type FirstRun = 'owed' | 'served' | 'waits';
+const FIRST_RUNS: readonly FirstRun[] = ['owed', 'served', 'waits'];
+
 /** A teammate as its file folds. */
 export interface Teammate {
   id: string;
@@ -82,6 +86,7 @@ export interface Teammate {
   paused: boolean;
   pausedUntil?: string | null;
   handoffsNeedYes?: boolean;
+  firstRun?: FirstRun;
   createdAt: number;
   updatedAt: number;
   endedAt?: number | null;
@@ -102,6 +107,7 @@ export interface TeammateLike {
   pausedUntil?: string | null;
   endedAt?: number | null;
   handoffsNeedYes?: boolean;
+  firstRun?: string;
   works?: unknown;
   served?: string;
   duties?: readonly DutyLike[];
@@ -178,6 +184,9 @@ const FIELDS: readonly string[] = [
   // anyone on the team may give it work, rather than asking its owner.
   'readsMessages', 'openToTeam',
   'voice', 'voiceText',
+  // 'owed' from going ready until its first run starts, then 'served'; 'waits'
+  // when its owner said to start at its first duty's time.
+  'firstRun',
 ];
 
 export const STATUSES: readonly TeammateStatusWord[] = ['draft', 'active'];
@@ -353,6 +362,7 @@ function coerce(field: string, value: unknown): unknown {
     case 'voice': return value === null ? null : VOICES.some((v) => v.id === value) ? value : undefined;
     case 'voiceText': return value === null ? null : cleanText(value, VOICE_WORDS_MOST);
     case 'endedAt': case 'createdAt': return Number.isFinite(value) ? value : value === null ? null : undefined;
+    case 'firstRun': return (FIRST_RUNS as readonly unknown[]).includes(value) ? value : undefined;
     case 'served': return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
     case 'pausedUntil': return value === null ? null : isDate(value) ? value : undefined;
     case 'duties': return Array.isArray(value) ? value.map(cleanDuty).filter(Boolean).slice(0, 12) : value === null ? [] : undefined;
@@ -607,6 +617,27 @@ export function asksSomething(text: string | null | undefined): boolean {
   return /\?(?=["'”’)\]*_`]*(\s|$))/.test(t);
 }
 
+// A question, options, or a guess it will act on until you say otherwise. Asked
+// of a setup's last answer, where a guess with no question mark is the most
+// common way to leave something for you.
+const LEFT_OPEN = [
+  /\b(until|unless) you (tell|say|let|give|send|confirm|decide|correct)\b/,
+  /\b(tell|let) me otherwise\b/,
+  /\bassum(e|ed|ing|ption)\b/,
+  /\b(can't|cannot|couldn't|could not|didn't|did not) find\b/,
+  /\bif (that's|this is|that is) (wrong|not right)\b/,
+];
+export function leavesSomethingOpen(text: string | null | undefined): boolean {
+  const t = String(text ?? '').replace(/[‘’]/g, "'").toLowerCase();
+  return asksSomething(t) || LEFT_OPEN.some((re) => re.test(t));
+}
+
+const SAY_CLOSED_MS = 60 * 60_000;
+
+function questionsIn(text: unknown): string[] {
+  return (String(text ?? '').match(/[^.!?\n]*\?(?=["'”’)\]*_`]*(\s|$))/g) ?? []).map((q) => q.trim()).filter(Boolean);
+}
+
 // The chat message that carries a run's answer, one per run, so writing it
 // again after a crash adds nothing (`foldChat` keeps the first of an id).
 export const replyMessageId = (runId: string): string => `m-reply-${runId}`;
@@ -645,7 +676,12 @@ function openQuestionOn(item: RunItem, tid: string, chat: ChatLike, except: stri
 // A waiting run your next words answer: one that asked you something. A run
 // that only answered is finished talking, and your next words are new work.
 function asksYouStill(item: RunItem, tid: string, chat: ChatLike, except: string | null = null): boolean {
-  return item.status === 'blocked' || asksSomething(item.result) || openQuestionOn(item, tid, chat, except);
+  return item.status === 'blocked' || asksSomething(item.result) || openQuestionOn(item, tid, chat, except)
+    || (isSetupRun(item, tid, chat) && leavesSomethingOpen(item.result));
+}
+
+function isSetupRun(item: RunItem, tid: string, chat: ChatLike | null | undefined): boolean {
+  return (chat?.messages ?? []).some((m) => m.kind === 'msg' && m.from === YOU && m.setup && (m.to ?? []).includes(tid) && runIdFor(`${m.id}>${tid}`) === item.id);
 }
 
 // A duty stops waking once this many of its results in a row reached you and
@@ -742,6 +778,7 @@ export function runTitle(trigger: WakeTrigger, teammate: { name?: string }): str
   if (trigger.kind === 'schedule') return trigger.label === 'week' ? "This week's round" : "Today's round";
   if (trigger.kind === 'duty') return clip(trigger.what, 120);
   if (trigger.kind === 'pass') return clip(trigger.title || 'Work passed on', 120);
+  if (trigger.kind === 'first') return 'Start on its first job';
   if (trigger.opening === 'setup') return setupTitle(teammate?.name);
   if (trigger.opening === 'start') return 'Introduce itself and begin';
   const said = partFor(trigger.text, teammate.name) || firstLine(trigger.text) || 'A message';
@@ -785,7 +822,8 @@ export type WakeTrigger =
   | (TriggerBase & { kind: 'schedule'; key: string; label: string })
   | (TriggerBase & { kind: 'duty'; duty: string; what: string; tell?: string; key: string })
   | (TriggerBase & { kind: 'pass'; fromName?: string; title?: string; details?: string })
-  | (TriggerBase & { kind: 'message'; text?: string; fromName?: string; opening?: 'start' | 'setup' });
+  | (TriggerBase & { kind: 'message'; text?: string; fromName?: string; opening?: 'start' | 'setup' })
+  | (TriggerBase & { kind: 'first'; key: string });
 
 interface ActionBase { teammate: string; msg?: string; trigger?: WakeTrigger }
 
@@ -801,7 +839,10 @@ export type WakeAction =
   | (ActionBase & { type: 'limit' })
   | (ActionBase & { type: 'unread'; duty: string; what: string })
   | (ActionBase & { type: 'hops'; msg: string; from: string })
-  | (ActionBase & { type: 'replied'; item: string; product: string; labels: readonly string[]; text: string; say: boolean });
+  | (ActionBase & { type: 'replied'; item: string; product: string; labels: readonly string[]; text: string; say: boolean })
+  | (ActionBase & { type: 'say'; item: string; text: string })
+  | (ActionBase & { type: 'firstServed' })
+  | (ActionBase & { type: 'reopen'; item: string; product: string; labels: readonly string[] });
 
 /** A run made earlier in the same tick, before any row for it exists. */
 type MadeRun = Omit<RunItem, 'product'> & { teammate: string; product: string | null };
@@ -947,6 +988,32 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
     }
   }
 
+  // A run that closed itself on a question is in nobody's Needs you, so the
+  // question is said in the chat. Only a recent close, so an update does not
+  // bring back every old question at once. A setup that closed leaving
+  // anything open goes back to Needs you instead, which is where its owner looks.
+  for (const t of live) {
+    for (const i of runsOf(t.id, items)) {
+      const closedAt = i.wrote?.status?.ts ?? 0;
+      if (i.status !== 'done' || i.wrote?.status?.source !== 'agent' || now - closedAt > SAY_CLOSED_MS) continue;
+      const text = String(i.result ?? '').trim();
+      const since = i.wrote?.answer?.ts ?? 0;
+      if ((i.wrote?.result?.ts ?? 0) <= since) continue;
+      if (isSetupRun(i, t.id, chat)) {
+        if (leavesSomethingOpen(text)) actions.push({ type: 'reopen', teammate: t.id, item: i.id, product: i.product, labels: (i.labels ?? []).filter((l) => l !== 'clean') });
+        continue;
+      }
+      if (!asksSomething(text)) continue;
+      const fromRun = (chat.messages ?? []).filter((x) => x.kind === 'msg' && x.from === t.id && x.run === i.id && x.ts > since);
+      if ((chat.messages ?? []).some((x) => x.id === replyMessageId(i.id))) continue;
+      const questions = questionsIn(text);
+      const asked = questions.length
+        ? questions.every((q) => fromRun.some((x) => String(x.text ?? '').includes(q)))
+        : fromRun.some((x) => x.options?.length);
+      if (!asked) actions.push({ type: 'say', teammate: t.id, item: i.id, text });
+    }
+  }
+
   for (const t of live) {
     if (t.paused || t.status !== 'active' || !isWorks(t.works) || pausedNow(t, now)) continue;
     const key = periodKey(t.works, now);
@@ -979,6 +1046,13 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
       const id = newRun(t, { kind: 'duty', duty: d.id, what: d.what, ...(d.tell ? { tell: d.tell } : {}), key }, `${t.id}#${d.id}@${key}`);
       if (id) actions.push({ type: 'dutyServed', teammate: t.id, duty: d.id, key });
     }
+  }
+
+  // Set up just now: its first job starts at once, not at its first duty's time.
+  for (const t of live) {
+    if (t.firstRun !== 'owed' || t.paused || t.status !== 'active' || pausedNow(t, now)) continue;
+    const id = newRun(t, { kind: 'first', key: 'first' }, `${t.id}#first`);
+    if (id) actions.push({ type: 'firstServed', teammate: t.id });
   }
 
   for (const t of live) {

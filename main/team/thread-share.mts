@@ -41,7 +41,7 @@ export type SharedPatch = {
   note?: string;
   // Passed on as the owner's line had it, and cleaned on the reader's side.
   from?: unknown;
-  comment?: { text: string };
+  comment?: { text: string; name?: string };
   artifact?: Mark;
 };
 
@@ -70,7 +70,7 @@ interface RawLine {
   source?: unknown;
   by?: unknown;
   uid?: unknown;
-  patch?: { [key: string]: unknown; from?: { teammate?: unknown; name?: unknown } | null; artifact?: unknown } | null;
+  patch?: { [key: string]: unknown; from?: { teammate?: unknown; name?: unknown } | null; comment?: { text?: unknown } | null; artifact?: unknown } | null;
 }
 
 interface LocalThread { hash: string; lines: SharedLine[]; earlier: number; files: string[]; big?: BigFile[]; marks: SharedLine[] }
@@ -119,6 +119,8 @@ export interface ThreadShareOptions {
   now?: () => number;
   home?: string;
   myName?: () => string | null;
+  /** A teammate's name by their id, carried on their comment for the owner's agent. */
+  nameOf?: (personId: string) => string | null | undefined;
 }
 
 export interface ThreadShare {
@@ -149,7 +151,7 @@ const THREAD_ID = /^[\w-]{1,80}$/;
 const SHARED_PREFIX = 'shared-thread';
 
 // `.key` is left out on purpose: it is also what a private key is called.
-const KINDS = 'png|jpe?g|gif|webp|svg|md|markdown|html?|mp4|mov|m4v|webm|mp3|wav|m4a|aac|ogg|pdf|pptx?';
+const KINDS = 'png|jpe?g|gif|webp|svg|md|markdown|html?|csv|tsv|mp4|mov|m4v|webm|mp3|wav|m4a|aac|ogg|pdf|pptx?';
 const PICTURE = /\.(?:png|jpe?g|gif|webp|svg)$/i;
 const PATHISH = String.raw`(?:~\/|\.?\/)?[\w.-]+(?:\/[\w.-]+)*\.(?:${KINDS})`;
 const A_PATH = new RegExp(`^${PATHISH}$`, 'i');
@@ -211,7 +213,14 @@ function messageLines(lines: TeamHistoryLine[], me: string): OutLine[] {
   };
   for (const l of all) {
     const p = l?.patch;
-    if (!p || l.claim || l.heartbeat || l.release || p.comment) continue;
+    if (!p || l.claim || l.heartbeat || l.release) continue;
+    // Taking a card down deletes its comments from the cloud, so the owner's
+    // copy is what brings them back when the thread is shared again.
+    if (p.comment) {
+      const text = said(p.comment.text);
+      if (l.by && String(l.uid ?? '').startsWith('comment-') && text) out.push({ id: l.id, ts: l.ts, source: 'system', by: l.by, uid: l.uid, patch: { comment: { text } } });
+      continue;
+    }
     // Readers only get files that a message links, so an edit goes out as one.
     if (p.artifact?.do === 'edit' && p.artifact.path) {
       out.push({ id: l.id, ts: l.ts, source: 'founder', by: l.by || me, ...(l.uid ? { uid: l.uid } : {}), patch: { answer: editedWords(callEdit(p.artifact.path), p.artifact.path) } });
@@ -254,7 +263,7 @@ function messageLines(lines: TeamHistoryLine[], me: string): OutLine[] {
 
 export function createThreadShare({
   backend, me, root, listCards, listThreads, historyOf, disk, accountRoot, storeRoot, listProducts = () => [],
-  onChange = () => {}, log = () => {}, now = Date.now, home = os.homedir(), myName = () => null,
+  onChange = () => {}, log = () => {}, now = Date.now, home = os.homedir(), myName = () => null, nameOf = () => null,
 }: ThreadShareOptions): ThreadShare {
   const built = new Map<string, Built>();
   const named = new Map<string, { mtimeMs: number; size: number; name: string }>();
@@ -419,6 +428,8 @@ export function createThreadShare({
       const patch: SharedPatch = {};
       for (const f of ['body', 'answer', 'result', 'note'] as const) if (text(l.patch![f])) patch[f] = l.patch![f] as string;
       if (l.patch!.from?.name) patch.from = { teammate: String(l.patch!.from.teammate ?? ''), name: String(l.patch!.from.name) };
+      const comment = text(l.patch!.comment?.text);
+      if (comment && text(l.by) && String(l.uid ?? '').startsWith('comment-')) patch.comment = { text: comment };
       return {
         id: String(l.id ?? ''), ts: Number(l.ts) || 0, source: l.source === 'founder' ? 'founder' : l.source === 'system' ? 'system' : 'agent',
         ...(text(l.by) ? { by: l.by as string } : {}), ...(text(l.uid) ? { uid: l.uid as string } : {}), patch,
@@ -595,8 +606,10 @@ export function createThreadShare({
     for (const c of unsaid) {
       const thread = threads.get(c.threadId);
       if (!thread) continue;
+      // The name is for the owner's agent, which has no team list to look it up in.
+      const name = nameOf(c.by);
       added += disk.appendForeignLines(thread.product.dir, [{
-        id: c.threadId, ts: c.at, source: 'system', by: c.by, uid: `comment-${c.id}`, patch: { comment: { text: c.text } },
+        id: c.threadId, ts: c.at, source: 'system', by: c.by, uid: `comment-${c.id}`, patch: { comment: { text: c.text, ...(name ? { name } : {}) } },
       }]);
       delivered.add(c.id);
     }
@@ -613,6 +626,7 @@ export function createThreadShare({
         if (!edit.text) continue;
         const saved = saveNextVersion({ dir: thread.product.dir, threadId: m.threadId, lines: historyOf(thread.product.slug, m.threadId), baseId: edit.file, text: edit.text, by: m.by });
         if (!saved.ok) { log(`team threads: an edit to ${edit.file} was not saved: ${saved.error}`); continue; }
+        if (saved.unchanged) continue;
         line.patch.artifact = { do: 'edit', file: saved.file, path: saved.path, ...(saved.over ? { over: saved.over } : {}) };
       }
       // On your thread the file is yours, whatever their copy said.
@@ -642,7 +656,8 @@ export function createThreadShare({
     read(owner, threadId) {
       const ok = THREAD_ID.test(String(owner)) && THREAD_ID.test(String(threadId));
       const local = ok ? readLocal(owner, threadId) : null;
-      const theirs = comments.filter((c) => c.owner === owner && c.threadId === threadId).map((c): SharedLine => ({
+      const carried = new Set((local?.lines ?? []).map((l) => l.uid).filter(Boolean));
+      const theirs = comments.filter((c) => c.owner === owner && c.threadId === threadId && !carried.has(`comment-${c.id}`)).map((c): SharedLine => ({
         id: threadId, ts: c.at, source: 'system', by: c.by, uid: `comment-${c.id}`, patch: { comment: { text: c.text } },
       }));
       return {

@@ -10,7 +10,7 @@ import { readRule, repeatPresets } from '../../../renderer/src/format';
 import { engineModelLabel } from '../../../renderer/src/models';
 import { ruleLabel } from '../../../shared/repeats.mts';
 import { priorityIdOf, priorityLabelOf, priorityValueOf } from '../../../renderer/src/priority';
-import { agentChoices, agentWordFor, autoOffered, laterHint, momentFromWords, mondayMorning, projectSwatch, tomorrowMorning, type Harness } from '../../../renderer/src/threads/composer-rules';
+import { agentChoices, agentWordFor, autoOffered, laterHint, momentFromWords, mondayIsTomorrow, mondayMorning, projectSwatch, tomorrowMorning, type Harness } from '../../../renderer/src/threads/composer-rules';
 import { splitSlug } from '../../../renderer/src/phone-rows';
 import { AUTO_LABEL } from '../../../shared/auto-route.mts';
 import type { Choices } from '../lib/actions';
@@ -89,7 +89,7 @@ export function useNewThread(sent: () => void) {
       c.say('Your new teammate is on its way. It asks you what it needs in Chats.');
     } else {
       await c.askTeammate('post', { text: draft.text, to: [mate.id], fresh: true });
-      c.say(`Sent to ${mate.name}`);
+      c.say(mate.paused ? `Sent to ${mate.name}, who is paused. It waits until you resume it in Chats.` : `Sent to ${mate.name}`);
     }
   };
 
@@ -169,7 +169,8 @@ export function NewThreadFields({ form, inline = false, onFocus, onBlur }: { for
           ? (
             <Pressable onPress={() => setSheet('to')} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               {mate && mate !== 'new' ? <TeammateMark t={mate} /> : mate === 'new' ? <TeammateMark t={null} /> : onAuto ? <AutoMark /> : null}
-              <Pickable style={{ fontSize: 15 }} onPress={() => setSheet('to')}>{toWord ?? agentWordFor(agents.engines, engine)}</Pickable>
+              {/* The row is the button; a second one inside it is a button in a button. */}
+              <T style={{ fontSize: 15, textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: color.faint }}>{toWord ?? agentWordFor(agents.engines, engine)}</T>
             </Pressable>
           )
           : <T style={{ fontSize: 15 }}>Agent</T>}
@@ -248,7 +249,7 @@ export function NewThreadSheets({ form, now }: { form: NewThread; now: number })
         {offered.map((a) => <SheetRow key={a.id} label={a.label} on={!form.onAuto && !form.mate && a.id === engine} onPress={() => { form.pickEngine(a.id); setSheet(null); }} />)}
         {form.reach && <><SheetSep /><SheetHead>Teammates</SheetHead></>}
         {form.mates.map((t) => (
-          <SheetRow key={t.id} label={t.name} lead={<TeammateMark t={t} />} aside={t.primary ? 'Primary' : roleOf(t) ?? undefined}
+          <SheetRow key={t.id} label={t.name} lead={<TeammateMark t={t} />} aside={t.paused ? 'Paused' : t.primary ? 'Primary' : roleOf(t) ?? undefined}
             on={form.mate !== 'new' && form.mate?.id === t.id} onPress={() => { form.pickMate(t.id); setSheet(null); }} />
         ))}
         {form.reach && <SheetRow label="Someone new" lead={<TeammateMark t={null} />} aside="makes a teammate for this" on={form.mate === 'new'} onPress={() => { form.pickMate('new'); setSheet(null); }} />}
@@ -266,7 +267,7 @@ export function NewThreadSheets({ form, now }: { form: NewThread; now: number })
         <SheetHead>Send later</SheetHead>
         <SheetRow label="Add it to Later" lead={<Clock />} onPress={() => void send({ start: 'later' })} />
         <SheetRow label="Tomorrow morning" lead={<Clock />} aside={laterHint(tomorrowMorning(now))} onPress={() => void send({ runAt: tomorrowMorning(now) })} />
-        <SheetRow label="Monday morning" lead={<Clock />} aside={laterHint(mondayMorning(now))} onPress={() => void send({ runAt: mondayMorning(now) })} />
+        {!mondayIsTomorrow(now) && <SheetRow label="Monday morning" lead={<Clock />} aside={laterHint(mondayMorning(now))} onPress={() => void send({ runAt: mondayMorning(now) })} />}
         {/* Repeat it, the desktop's own presets (format.ts `repeatPresets`): a rule whose runs are the threads. */}
         <SheetSep />
         {repeatPresets(now).flatMap((r) => (r.rule ? [r.rule] : []).map((rule) => (

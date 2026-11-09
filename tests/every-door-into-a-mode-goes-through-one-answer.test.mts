@@ -53,10 +53,8 @@ const composer = focus.slice(focus.indexOf('function DockComposer('));
  *
  * So it is derived once at the top of the component -- three surfaces need it
  * and one of them is a callback -- and the line is lifted out of the source and
- * RUN here, rather than matched as text. The same technique
- * tests/her-claude-plan-does-not-throttle-codex.test.mts uses on the plan
- * sentence, for the same reason: a `toContain` passes on an expression nothing
- * reaches. */
+ * RUN here, rather than matched as text: a `toContain` passes on an expression
+ * nothing reaches. */
 describe('which engine the pane says the open row is on', () => {
   const app = fs.readFileSync(path.join(root, 'renderer/src/App.tsx'), 'utf8');
   const derivation = (() => {

@@ -277,7 +277,7 @@ is asleep.
 | 5.1.1(v) deletion | The account is deleted but what the person shared stays. | Deletion takes what they wrote with it, shared or not (Sign-in and accounts). Apple tokens revoked. |
 | 1.2 user content | People message each other with no filter, report, block or contact. | A filter for objectionable text, report a message, block a person (enforced by the server, not only hidden on the phone), a contact address, and a queue of reports that somebody answers within a day. Messages going only between invited teammates is no exemption. Until those exist, the `store` build profile leaves group chat out (`mobile/src/lib/store-build.ts`); TestFlight's `production` builds keep it. The Help page (phone-legal/support.html) is the contact address. |
 | 2.1 completeness | The reviewer signs in, replies, and nothing answers, because no Mac is paired or it is asleep. | A review account on a cloud plan whose threads have kits, so a reply is answered by Agentbox Cloud with no computer awake (docs/cloud/PHONE-PLAN.md step 2). The reviewer replies, gets a result and an alert, and opens its files. The notes explain the desktop app, that the cloud carries replies while the computer is shut, and where the AI notice and Delete account are. The account never expires and its threads are kept fresh (a kit lasts six days). Over 40% of unresolved issues are 2.1 (Apple, 2026); link a short film of the desktop pairing. |
-| 4.8 sign-in | Google sign-in with no equivalent private option. | Sign in with Apple was taken out on 2026-11-04 (8f06d530: the computer cannot sign in with it), so on the iPhone the sign-in is email and password only, which needs no second option; Google stays on Android. |
+| 4.8 sign-in | Google sign-in with no equivalent private option. | Sign in with Apple was taken out on 2026-11-04 (8f06d530: the computer cannot sign in with it), then Google came off the iPhone on 2026-11-08, which left accounts made with Google no way in. On 2026-11-09 both came back: Google on every phone, with Sign in with Apple beside it as the private option. |
 | 5.1.1(i) privacy policy | No privacy policy, or one that says nothing is hosted. | phone-legal/privacy.html, linked in the listing and in Settings › General. It is published only once `contact`, `operator` and `governingLaw` are in the phone site's config; on 2026-11-08 they were not, so /privacy on the phone site served the web app. |
 | 5.1.1(v) deletion, reached | An account no computer has joined sees only "Waiting for your computer". | That screen opens Settings, whose General page has Delete account. |
 | 5.1.2(i) AI data | Personal data sent to third-party AI without explicit permission. | Before anything is sent, a screen names the provider (Claude by Anthropic, or Codex by OpenAI, on your own account) and what goes to it. An explicit Continue, recorded. Withdrawing it in Settings is checked when a command runs, queued ones included. The privacy policy names both. |
@@ -303,6 +303,13 @@ is asleep.
 - Apple's own upload check runs only on a real upload.
 - The listing is `mobile/store.config.json`, pushed with `eas metadata:push`.
   EAS cannot send the App Privacy answers or screenshots.
+- The app review board (`scripts/app-review-board.mjs`, skill
+  `app-review-board`) is the gate before every submission. It runs fresh
+  Codex and Claude reviewers and live checks, and says submit only at 90% or
+  more with every check green. Its first round found consent skipped on
+  approving a filed task, Alpha features still reachable through Search, no
+  way to report an answer, a long video that could crash the app, and AI
+  teammates as a hidden feature. All are fixed.
 
 ## Costs
 
@@ -388,6 +395,15 @@ made-up threads), not yet on a phone:
   and Review on a permission card, files and pictures in group messages (read,
   not sent), and Settings search. A page or a note an answer names still opens
   from its tile rather than reading in place under the answer.
+
+- Everything the desktop does (2026-11-08): `mobile/parity.mjs` names each
+  feature the desktop offers by name (⌘K rows, thread commands, Settings
+  pages and rows) and says where the phone has it, why it should not, or what
+  it would take. `tests/the-phone-app-has-every-desktop-feature-or-says-why-not`
+  fails when the desktop gains one the file does not place, and its count
+  still to do only goes down. `node scripts/phone-parity.mjs` lists what is
+  left. The daily product loop builds the next one and has its testers try
+  what reached the phone that week (.claude/skills/product-loop).
 
 Tests: tests/the-phone-app-*.test.mjs pin the tabs, the thread and its
 commands, sign-in and the kept session, the request deadline and the

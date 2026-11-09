@@ -234,3 +234,17 @@ export function moveProduct(order: readonly string[], slug: string, toIndex: num
   base.splice(at, 0, slug);
   return base;
 }
+
+/**
+ * Every project: the placed ones in the order they were placed, then the rest,
+ * OLDEST FIRST, so a project made today lands at the bottom and nothing above
+ * it moves. No `createdAt` predates the field and so sorts as old; the name
+ * settles a tie, which is what keeps the order the same every render.
+ */
+export function rankProducts<T extends { slug: string; name: string; createdAt?: number | null }>(list: readonly T[], order: readonly string[]): T[] {
+  const placed = order.map((slug) => list.find((p) => p.slug === slug)).filter((p): p is T => !!p);
+  const rest = list
+    .filter((p) => !order.includes(p.slug))
+    .sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0) || a.name.localeCompare(b.name));
+  return [...placed, ...rest];
+}

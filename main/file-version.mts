@@ -63,6 +63,8 @@ export function saveNextVersion({ dir, threadId, lines, basePath, baseId, text, 
   const head = started === null ? null : read(newest);
   const merge = head === null ? null : mergeText(started!, head, text, { overlap: 'mine' });
   const words = merge?.text ?? text;
+  // Everyone in a live file holds the same words, so whoever saves them next may change nothing.
+  if ((head ?? read(newest)) === words) return { ok: true, unchanged: true, path: newest.path, name: newest.name, shown: familyName(family, newest), file: base.id };
   const folder = path.join(dir, 'designs', threadId);
   fs.mkdirSync(folder, { recursive: true });
   const held = new Set(taken);

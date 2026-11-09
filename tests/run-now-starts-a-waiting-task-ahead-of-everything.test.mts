@@ -52,7 +52,7 @@ const build = (items, slots = 1, order = []) => {
   sup.spawnWorker = (item, opts = {}) => {
     spawned.push(item.id);
     if (opts.resumeSessionId) resumed.push({ id: item.id, sessionId: opts.resumeSessionId });
-    sup.sessions.set(item.id, { itemId: item.id, product: item.product, startedAt: NOW, tail: [] });
+    sup.sessions.set(item.id, { itemId: item.id, product: item.product, startedAt: NOW, tail: [], traced: true });
   };
   sup._kill = (session) => {
     killed.push(session.itemId);
@@ -67,7 +67,7 @@ const build = (items, slots = 1, order = []) => {
 };
 
 const running = (id, { product = 'agentbox', startedAt = NOW } = {}) => {
-  sup.sessions.set(id, { itemId: id, product, startedAt, tail: [] });
+  sup.sessions.set(id, { itemId: id, product, startedAt, tail: [], traced: true });
   sup._liveSessions[id] = { sessionId: `s-${id}`, product, cwd: '/tmp', profile: 'default' };
 };
 

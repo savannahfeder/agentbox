@@ -7,6 +7,8 @@
 // answered with its name, which the server turns into a link only inside a
 // call to the sandbox.
 import fs from 'node:fs';
+import http from 'node:http';
+import https from 'node:https';
 import crypto from 'node:crypto';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -95,6 +97,27 @@ export interface CloudCallError extends Error {
 
 const isLogin = (key: unknown) => String(key).startsWith('logins/');
 
+// An upload, by node:http rather than fetch: fetch gives up on any request
+// whose answer has not begun within 300 s, counted while the body is still
+// going up, so a conversation of a few hundred MB on a slow uplink could never
+// be sent. A file is streamed from disk. Resolves with the bucket's status.
+function upload(link: string, body: { buffer: Buffer } | { file: string }, timeoutMs: number): Promise<number> {
+  const url = new URL(link);
+  const length = 'file' in body ? fs.statSync(body.file).size : body.buffer.length;
+  return new Promise((resolve, reject) => {
+    const req = (url.protocol === 'https:' ? https : http).request(url, {
+      method: 'PUT', headers: { 'content-length': length }, signal: AbortSignal.timeout(timeoutMs),
+    }, (res) => {
+      res.resume();
+      res.on('end', () => resolve(res.statusCode ?? 0));
+      res.on('error', reject);
+    });
+    req.on('error', reject);
+    if ('file' in body) pipeline(fs.createReadStream(body.file), req).catch(reject);
+    else req.end(body.buffer);
+  });
+}
+
 export function managedClients({ url, key, timeoutMs = CALL_MS, fileTimeoutMs = FILE_MS, onSignedOut = () => {} }: ManagedOptions) {
   const base = String(url).replace(/\/+$/, '');
 
@@ -151,10 +174,13 @@ export function managedClients({ url, key, timeoutMs = CALL_MS, fileTimeoutMs = 
 
   const storage: CloudStorage = {
     async put(k: string, body: string | Buffer) {
-      const res = await object(await linkFor('put', k), { method: 'PUT', body });
-      if (!res.ok) throw new Error(`the bucket refused ${k}: ${res.status}`);
+      const status = await upload(await linkFor('put', k), { buffer: Buffer.from(body) }, fileTimeoutMs);
+      if (status < 200 || status > 299) throw new Error(`the bucket refused ${k}: ${status}`);
     },
-    async putFile(k: string, file: string) { await storage.put(k, fs.readFileSync(file)); },
+    async putFile(k: string, file: string) {
+      const status = await upload(await linkFor('put', k), { file }, fileTimeoutMs);
+      if (status < 200 || status > 299) throw new Error(`the bucket refused ${k}: ${status}`);
+    },
     async get(k: string) {
       refuseLogin(k);
       const res = await object(await linkFor('get', k));

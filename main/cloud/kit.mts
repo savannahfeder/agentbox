@@ -32,8 +32,8 @@ export function readKitCopy(file: string): CloudKit | null {
 // the app left going: the import path asks the sandbox which it is now, and
 // numbers this computer's input on from what the sandbox says it took
 // (`inSeq`), however many replies the server sent. Its input is closed when
-// joined (`unsent`), so the turn it is on ends and its work comes home; her
-// next reply is then an ordinary run here.
+// joined (`unsent`), once its turn and helpers are done, so its work comes
+// home; her next reply is then an ordinary run here.
 export function markerForCloudRun(kit: CloudKit, runId: string) {
   return {
     ...kit.marker,
@@ -41,7 +41,7 @@ export function markerForCloudRun(kit: CloudKit, runId: string) {
     sessionId: cloudSessionId(kit.item, runId),
     offline: true,
     state: 'detached', pid: null, cursor: 0, conns: {},
-    unsent: [{ action: 'stdin', end: true }],
+    unsent: [{ action: 'stdin', end: true, whenDone: true }],
   };
 }
 

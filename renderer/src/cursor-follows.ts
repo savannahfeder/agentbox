@@ -23,6 +23,23 @@ export function cursorMark(list: Row[], index: number): CursorMark | null {
   return r ? { index: at, key: keyOf(r) } : null;
 }
 
+/**
+ * A row a Z put back, which the keyboard goes to once the list shows it. The
+ * place had settled on the row that slid up when this one left, and would
+ * otherwise stay there. The row can take a refresh to come back, so the wait
+ * holds a few seconds, and a key you press meanwhile wins.
+ */
+export type CursorWait = { key: string; until: number };
+export const CURSOR_WAIT_MS = 5_000;
+export const cursorWait = (r: Row, now: number): CursorWait => ({ key: keyOf(r), until: now + CURSOR_WAIT_MS });
+
+/** The place the wait puts the cursor on (-1 for none yet), and the wait to keep for the next draw. */
+export function cursorAfterWait({ list, wait, moved, now }: { list: Row[]; wait: CursorWait | null; moved: boolean; now: number }): { index: number; keep: CursorWait | null } {
+  if (!wait || moved || now > wait.until) return { index: -1, keep: null };
+  const at = list.findIndex((r) => keyOf(r) === wait.key);
+  return at >= 0 ? { index: at, keep: null } : { index: -1, keep: wait };
+}
+
 /** Where the cursor belongs in `list`, given what was drawn last time. */
 export function cursorIndex({ list, selected, last }: { list: Row[]; selected: number; last: CursorMark | null }): number {
   const clamped = Math.min(selected, Math.max(0, list.length - 1));

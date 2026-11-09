@@ -18,17 +18,19 @@ import { fileOnPhone, objectsToSign, renewLinks, type Links } from '../../../ren
 import { BUCKET, cloudPlaces } from '../../../renderer/src/cloud-files';
 import { SEND_MAX_BYTES, sendFiles } from '../../../renderer/src/phone-sends-files';
 import { drawFromBytes } from '../lib/files';
+import { STORE_BUILD } from '../lib/store-build';
 import { toastParts } from '../../../renderer/src/toast-parts';
 import type { Saved } from '../lib/attach';
 import type { Picked } from '../platform/pick';
 import { planFor, runSteps, type PressedItem, type Press, type Step } from '../lib/actions';
 import { needsNotice, NOTICE_KEY, noticeFor, readNotice, type Notice } from '../lib/ai-notice';
-import { withDeadline } from '../lib/deadline';
+import { fresh, withDeadline } from '../lib/deadline';
 import { keptStore } from '../lib/kept';
 import { previewCloud } from '../lib/preview';
 import { ALERTS_KEY, leaveAddress, readAlerts, takeAddressBack, type KeptAlerts } from '../lib/push-device';
 import type { PlaceId } from '../lib/groups';
 import { phoneTabs } from '../lib/tabs';
+import { batchWords, pickedPlan, type PickedPress } from '../lib/picked';
 import { onTheirWay, teamFrom, withPendingPauses, withPhoneAnswers } from '../lib/teammates';
 import { isUnread, markSeen as markSeenIn, markUnseen as markUnseenIn, readSeen } from '../lib/unread';
 import { alertToken, alertTokenIfAllowed, setIconCount } from '../platform/alerts';
@@ -53,7 +55,7 @@ async function openCloud(): Promise<Cloud | null> {
   if (PREVIEW) return previewCloud();
   const cfg = Constants.expoConfig?.extra?.cloud;
   if (!cfg?.url || !cfg?.anonKey) return null;
-  return cloudClient(cfg, { storage: await keptStore(persist), fetchImpl: withDeadline(fetch) });
+  return cloudClient(cfg, { storage: await keptStore(persist), fetchImpl: fresh(withDeadline(fetch)) });
 }
 
 const message = (err: unknown) => String((err as Error)?.message ?? err);
@@ -131,7 +133,7 @@ function useCloudState() {
   const view = useMemo(() => phoneView(rows, now), [rows, now]);
   const tabs = useMemo(() => phoneTabs(view, now), [view, now]);
   const repeats = useMemo(() => phoneRepeats(settingsRows, rows.commands, rows.projects, now), [settingsRows, rows.commands, rows.projects, now]);
-  const team = useMemo(() => withPendingPauses(withPhoneAnswers(teamFrom(settingsRows), rows.commands), rows.commands), [settingsRows, rows.commands]);
+  const team = useMemo(() => (STORE_BUILD ? null : withPendingPauses(withPhoneAnswers(teamFrom(settingsRows), rows.commands), rows.commands)), [settingsRows, rows.commands]);
   const teamPending = useMemo(() => onTheirWay(rows.commands, team, now), [rows.commands, team, now]);
   /** A chat with a teammate is on screen until the returned function runs. */
   const watchTeam = useCallback(() => {
@@ -189,6 +191,8 @@ function useCloudState() {
     void persist.write(NOTICE_KEY, JSON.stringify(v));
     for (const go of noticeWaiters.current.splice(0)) go(yes);
   }, [me]);
+  // The notice left unanswered: what waited goes no further, and the next send asks again.
+  const leaveNotice = useCallback(() => { for (const go of noticeWaiters.current.splice(0)) go(false); }, []);
   const askNotice = useCallback(async () => {
     router.push('/ai-notice');
     const yes = await new Promise<boolean>((resolve) => { noticeWaiters.current.push(resolve); });
@@ -262,28 +266,45 @@ function useCloudState() {
     return made;
   }, [sender, say, agreed, askNotice]);
 
-  // Threads picked together and closed in one go, with one Undo for all of them.
-  const closeAll = useCallback(async (items: PressedItem[]) => {
+  // Threads picked together and closed or put off in one go, each by the plan one thread's press sends, with one Undo for all of them.
+  const pressAll = useCallback(async (items: PressedItem[], press: Extract<Press, { kind: 'close' | 'later' }>) => {
     if (!sender) return;
+    const words = batchWords(press, items);
     const undo: Step[] = [];
     let done = 0;
     try {
       for (const item of items) {
         const at = Date.now();
-        const plan = planFor({ kind: 'close' }, item, at, { away: macAway(macSeenOf(rowsNow.current.projects), at), cloud: cloudCarriesOn(rowsNow.current.projects) });
-        if (!plan) continue;
+        const plan = planFor(press, item, at, { away: macAway(macSeenOf(rowsNow.current.projects), at), cloud: cloudCarriesOn(rowsNow.current.projects) });
+        if (!plan?.steps.length) continue;
         const made = await runSteps(sender, plan.steps);
         if (made && typeof made === 'object' && 'ok' in made && made.ok === false) throw new Error(String((made as { error?: string }).error ?? 'Not sent.'));
         done += 1;
         if (plan.undo) undo.push(...plan.undo(made));
       }
-      const back = async () => { try { await runSteps(sender, undo); say(`Reopened ${done} ${done === 1 ? 'thread' : 'threads'}`); } catch (err) { say(message(err)); } };
-      say(`Closed ${done} ${done === 1 ? 'thread' : 'threads'}${undo.length ? ' · press Z to undo' : ''}`, undo.length ? back : undefined);
+      const back = async () => { try { await runSteps(sender, undo); say(words.undid(done)); } catch (err) { say(message(err)); } };
+      say(`${words.did(done)}${undo.length ? ' · press Z to undo' : ''}`, undo.length ? back : undefined);
     } catch (err) {
-      say(`Closed ${done} of ${items.length}. ${message(err)}`);
+      say(`${words.partial(done, items.length)} ${message(err)}`);
     }
     setNow(Date.now());
   }, [sender, say]);
+  const closeAll = useCallback((items: PressedItem[]) => pressAll(items, { kind: 'close' }), [pressAll]);
+  const laterAll = useCallback((items: PressedItem[], until: number, label?: string) => pressAll(items, { kind: 'later', until, label }), [pressAll]);
+  // Resume and Priority on ticked threads, one plan for all of them.
+  const running = view.running;
+  const pressPicked = useCallback(async (items: PressedItem[], press: PickedPress) => {
+    if (!sender) return;
+    const at = Date.now();
+    const working = (i: PressedItem) => running.some((r: { itemId: string; product: string }) => r.itemId === i.id && r.product === i.product);
+    const plan = pickedPlan(press, items, { working, waits: macAway(macSeenOf(rowsNow.current.projects), at) && !cloudCarriesOn(rowsNow.current.projects) });
+    if (!plan) return;
+    try {
+      await runSteps(sender, plan.steps);
+      if (plan.toast) say(plan.toast);
+    } catch (err) { say(message(err)); }
+    setNow(Date.now());
+  }, [sender, say, running]);
 
   // Where a command in Search sends the inbox page, and a permission card put aside (App.tsx `minimizedApproval`).
   const [wanted, setWanted] = useState<{ place: PlaceId; menu?: boolean; group?: boolean } | null>(null);
@@ -367,10 +388,10 @@ function useCloudState() {
   }, [cloud, setRows, keepAlerts, notice]);
 
   return {
-    cloud, opened, signedIn, rows, view, tabs, repeats, status, loading: read.first, onlineAt: read.error ? 0 : read.fetchedAt, now, refresh, send, closeAll, attach, fileOf, toast, say,
+    cloud, opened, signedIn, rows, view, tabs, repeats, status, loading: read.first, onlineAt: read.error ? 0 : read.fetchedAt, now, refresh, send, closeAll, laterAll, pressPicked, attach, fileOf, toast, say,
     team, teamPending, watchTeam, askTeammate, wanted, goTo: setWanted, takeWanted: () => setWanted(null), minimizedApproval, setMinimizedApproval, approvalRoom, setApprovalRoom,
     dismissToast: () => setToast(null), signedInWith, signOut, preview: PREVIEW,
-    notice: mine, noticeRead, agreed, answerNotice, withdrawNotice: () => answerNotice(false),
+    notice: mine, noticeRead, agreed, answerNotice, leaveNotice, withdrawNotice: () => answerNotice(false),
     alerts, turnOnAlerts, turnOffAlerts,
     connect, markSeen, markUnseen, unread, sendFeedback, version: APP_VERSION, build: BUILD,
     // The one map of her files' links, filled in place; `signedAt` moves when it does.

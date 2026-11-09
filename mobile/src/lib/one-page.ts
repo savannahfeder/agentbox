@@ -49,5 +49,23 @@ export function pageOf(item: WorkItem, events: AgentEvent[], outcome: ItemOutcom
   return { title, context: item.problem ?? null, answer, appNote: byApp && outcome ? outcome.text : null, toggle, from: Math.max(from, 0) };
 }
 
+type Keyed = { product: string; id: string };
+
+/**
+ * What the arrows over an open thread walk: Needs you as it is now, with the
+ * open thread kept where it was if it has just left (a pick, a reply), so the
+ * walk goes on from it. `before` is the last walk this returned.
+ */
+export function walkKeeping<T extends Keyed>(rows: T[], open: Keyed, before: readonly T[]): T[] {
+  const same = (r: Keyed) => r.product === open.product && r.id === open.id;
+  if (rows.some(same)) return rows;
+  const at = before.findIndex(same);
+  if (at < 0) return rows;
+  // Its old neighbour above, so it lands back between the same two rows.
+  const above = at > 0 ? rows.findIndex((r) => r.product === before[at - 1].product && r.id === before[at - 1].id) : -1;
+  const to = at === 0 ? 0 : above >= 0 ? above + 1 : Math.min(at, rows.length);
+  return [...rows.slice(0, to), before[at], ...rows.slice(to)];
+}
+
 /** The choices' heading, unless it only repeats the bold line right above them. */
 export const askUnderAnswer = (ask: string, headline: string | null | undefined) => (headline && ask && sameLine(ask, headline) ? '' : ask);

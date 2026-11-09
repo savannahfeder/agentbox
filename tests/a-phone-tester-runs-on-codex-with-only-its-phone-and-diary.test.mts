@@ -5,8 +5,8 @@
 // whether a day of that is worth anything, and each is pinned here:
 // - a Codex tester keeps its session log (no --ephemeral), because that log is
 //   where the pacer reads how much of the week is gone, and it may reach the
-//   local preview from its sandbox; a Claude tester can run only its two
-//   commands;
+//   local preview from its sandbox (testers never run on Claude Code:
+//   tests/every-synthetic-tester-runs-on-codex);
 // - every stretch after the first is told what was already logged, so testers
 //   confirm or move on instead of filing one bug six times;
 // - the report puts broken before confusing, and the most seen first.
@@ -28,15 +28,9 @@ describe('how a tester starts', () => {
     expect(argv.at(-1)).toBe('go');
   });
 
-  it('on Claude, with nothing but its phone and diary', () => {
-    const argv = testerArgv('claude', { dir, prompt: 'go' });
-    expect(argv).toContain(`Bash(${dir}/phone:*)`);
-    expect(argv).toContain(`Bash(${dir}/diary:*)`);
-    for (const tool of ['WebFetch', 'Write', 'Edit', 'Agent']) expect(argv).toContain(tool);
-  });
-
-  it('refuses an engine it does not know', () => {
-    expect(() => testerArgv('gemini', { dir, prompt: 'go' })).toThrow(/codex, claude or external/);
+  it('refuses any engine but Codex', () => {
+    expect(() => testerArgv('claude', { dir, prompt: 'go' })).toThrow(/synthetic testers run on codex/);
+    expect(() => testerArgv('gemini', { dir, prompt: 'go' })).toThrow(/synthetic testers run on codex/);
   });
 });
 

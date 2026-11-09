@@ -39,3 +39,10 @@
 .need-done .need-why { margin-top: 1px; font-size: 13px; }
 .need-link { flex: none; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; color: var(--text-dim); text-decoration: underline; text-underline-offset: 3px; cursor: default; }
 .need-link:hover { color: var(--text); }
+
+/* A service's own sign-in link (SignInCard.tsx): its code, then Open, I've signed in and Not now. */
+.need-code-box { margin-top: 12px; display: flex; align-items: center; gap: 14px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius); }
+.need-code-label { font-size: 13px; color: var(--text-dim); }
+.need-code-value { flex: 1; font-family: var(--mono); font-size: 16px; letter-spacing: .14em; color: var(--text); }
+.need-btn-arrow { display: inline-flex; margin-left: 6px; vertical-align: -1px; }
+.need-acts .need-skip { margin-left: 6px; align-self: center; }

@@ -9,11 +9,6 @@
 // that per-account number comes from: the machine, divided by the accounts,
 // instead of a number sitting in zero.config.json.
 //
-// A SMALL PLAN STILL WINS. `slotsForPlans` answers one at a time for a
-// subscription that is not Max, and that is a fact about the subscription rather
-// than about the Mac, so Automatic may never raise it. It may only ever come out
-// at or below what the plan allows.
-//
 // AND AN EXISTING INSTALL IS NOT QUIETLY CHANGED. Anybody who ever set the
 // number by hand keeps exactly the number they set; Automatic is for the people
 // who never touched it, which is what the old "fill it in once at load" was
@@ -94,14 +89,11 @@ describe('with Automatic on', () => {
     expect(s._slotsPerAccount('claude')).toBe(1);
   });
 
-  it('obeys a plan that allows one at a time, whatever the Mac could carry', () => {
-    const s = sup({ agentsAuto: true, memoryGate: true, maxConcurrentSessions: 1, planSlotsFrom: 'Pro' }, 1);
-    expect(s._slotsPerAccount('claude')).toBe(1);
-  });
-
-  it('is not raised by a plan either: a generous plan still leaves the Mac in charge', () => {
-    const s = sup({ agentsAuto: true, memoryGate: true, maxConcurrentSessions: 99, planSlotsFrom: 'Max' }, 1);
-    expect(s._slotsPerAccount('claude')).toBe(here(true));
+  it('ignores a leftover per-login number: the Mac is in charge', () => {
+    for (const left of [1, 99]) {
+      const s = sup({ agentsAuto: true, memoryGate: true, maxConcurrentSessions: left }, 1);
+      expect(s._slotsPerAccount('claude')).toBe(here(true));
+    }
   });
 });
 

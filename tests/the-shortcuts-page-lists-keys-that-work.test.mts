@@ -110,11 +110,12 @@ const HANDLED = {
     [focused, 'else pickOption(focused, Number(e.key));'],
   ],
   // The arrows walk the options, and Enter sends the one showing.
-  '⌘Y': [
-    [mainProc, "if (key !== 'y' && key !== 'n') return;"],
-    [mainProc, "ipc.answerApproval(front.id, key === 'y');"],
+  // ⌘1 and ⌘2 answer the permission card (shared/card-settles.mts CHORD_ANSWERS).
+  '⌘1': [
+    [mainProc, 'const allow = CHORD_ANSWERS[key];'],
+    [mainProc, 'ipc.answerApproval(front.id, allow);'],
   ],
-  '⌘N': [[mainProc, "if (key !== 'y' && key !== 'n') return;"]],
+  '⌘2': [[mainProc, 'const allow = CHORD_ANSWERS[key];']],
   // ⌘J shows and hides the open task's terminal (w-ef92663cb1). It sits ABOVE
   // the inInput gate, so it works with her cursor in the reply box, and it
   // toasts rather than going quiet when there is no task to have a terminal.
@@ -211,11 +212,13 @@ describe('what the page refuses to say', () => {
   // The chord does not fire. Two tooltips in Compose.tsx and Focus.tsx still
   // print it and are simply wrong; a shortcuts page repeating them would
   // promote a stale tooltip into a promise.
-  it('does not offer ⌘1 to ⌘4 at all, for priority or for sections', () => {
+  it('offers ⌘1 and ⌘2 only for the permission card, and ⌘3 and ⌘4 not at all', () => {
     // Priority was the first meaning and was removed on purpose. From
     // 2026-09-23 the chord went to a section of the sidebar, and that went on
     // 2026-10-02 (w-914b16eab6) for Tab. Neither may come back unexamined.
-    expect(everyKey().filter((c) => /^⌘[1-4]$/.test(c))).toEqual([]);
+    // Since w-78be9e67e8 ⌘1 and ⌘2 allow and deny a permission card.
+    const rows = SHORTCUTS.flatMap((g) => g.keys).filter((k) => k.keys.some((c) => /^⌘[1-4]$/.test(c)));
+    expect(rows.map((k) => [k.keys, k.what])).toEqual([[['⌘1', '⌘2'], 'Allow or deny a card asking to run something.']]);
     expect(app.replace(/^\s*\/\/ ?/gm, '').replace(/\s+/g, ' ')).toContain('it does not fire, so ⌘1..4 is free again');
   });
 

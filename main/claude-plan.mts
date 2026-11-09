@@ -1,15 +1,6 @@
-// WHICH CLAUDE PLAN THIS MACHINE IS SIGNED IN ON, and what Agentbox should do
-// about it. Written for, 2026-08-29, on the one bullet from a tester's
-// onboarding that no session had ever looked at: "not on max plan?"
-//
-// THE PROBLEM. Agentbox runs several Claude Code sessions at once and the number
-// is a flat default (`maxConcurrentSessions: 3`, main/config.mts) that was
-// chosen with the biggest plan in mind and has never been anything else. Nothing
-// anywhere in the app mentions a plan: not the walk, not the Accounts page, not
-// a row that dies. So a person on a smaller plan gets three sessions started on
-// their behalf, all three burn the same allowance, and what they see is agents
-// that are slow and rows that fail for a reason nobody named. That is what the
-// founder was asking out loud while she watched a tester use it.
+// WHICH CLAUDE PLAN THIS MACHINE IS SIGNED IN ON, so the Accounts page and a
+// row that dies can name it. It does not decide how many agents run: a plan's
+// limit is a budget, and a spent one waits for its reset (w-54c640f8da).
 //
 // THE ANSWER IS ALREADY ON THE DISK. Claude Code writes its own account profile
 // into its config file and refreshes it as it runs. On a machine with two
@@ -206,27 +197,4 @@ export function readPlans(
 ): (ClaudePlan & { profile: string })[] {
   const list = (Array.isArray(profiles) && profiles.length ? profiles : ['default']).map((p: string | null | undefined) => p || 'default');
   return list.map((profile) => ({ profile, ...readPlan(profile, { home }) }));
-}
-
-/**
- * HOW MANY SESSIONS AT ONCE, WHEN NOBODY HAS SAID.
- *
- *  `fallback` is the number the app has always used and is what comes back in
- *  every case except one: at least one account is readable and is NOT a Max
- *  plan. Then it is one at a time.
- *
- *  WHY THE SMALLEST ACCOUNT DECIDES. The cap is ONE number applied per account
- *  (main/supervisor.mts multiplies it by the live accounts), so there is no way
- *  here to give a Max account three and a smaller one fewer. Between over- and
- *  under-running somebody's allowance, the under-run is the one that still
- *  leaves them a working app, and the number is a stepper on the Agents page
- *  that they can put back up.
- *
- *  AND AN UNREADABLE ACCOUNT NEVER LOWERS IT. Somebody whose config file we
- *  cannot parse gets exactly the app they had before this existed. */
-export function slotsForPlans(plans: readonly Pick<ClaudePlan, 'known' | 'ended' | 'max'>[] | null | undefined, fallback: number = 3): number {
-  // An ended subscription runs nothing, so it has no say in how many run.
-  const known = (plans ?? []).filter((p) => p.known && !p.ended);
-  if (!known.length) return fallback;
-  return known.every((p) => p.max) ? fallback : 1;
 }

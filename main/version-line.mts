@@ -13,7 +13,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { appendTo, cleanEntry, foldLine } from '../shared/version-line.mts';
+import { appendTo, cleanEntry, foldLine, foldOnto } from '../shared/version-line.mts';
 import type { LineEntry } from '../shared/version-line.mts';
 
 export interface StoredEntry extends LineEntry { local?: boolean }
@@ -156,7 +156,7 @@ export function versionLine({ dir, cloud = () => null, onMoved = () => {} }: { d
       outFor = 0;
       if (!lineOf(row.file).some((v) => v.hash === row.hash)) {
         entries.push(row);
-        folded = null;
+        if (folded) foldOnto(folded, row);
         append(row);
       }
       pending.get(asked.file)?.delete(asked.hash);
@@ -196,7 +196,7 @@ export function versionLine({ dir, cloud = () => null, onMoved = () => {} }: { d
     }
     const { entry } = appendTo(lineOf(id), asked);
     entries.push({ ...entry, local: true });
-    folded = null;
+    if (folded) foldOnto(folded, { ...entry, local: true });
     append({ ...entry, local: true });
     return shown(entry);
   }
@@ -215,9 +215,11 @@ export function versionLine({ dir, cloud = () => null, onMoved = () => {} }: { d
       if (!holder) return false;
       const rows = ((await holder.read()) as unknown[]).map(cleanEntry).filter(Boolean) as LineEntry[];
       const was = JSON.stringify(entries);
-      entries = [...entries.filter((e) => e.local), ...rows];
+      const next = [...entries.filter((e) => e.local), ...rows];
+      // An unchanged line keeps its fold: this runs on every pass to the cloud.
+      if (JSON.stringify(next) === was) return false;
+      entries = next;
       folded = null;
-      if (JSON.stringify(entries) === was) return false;
       writeWhole(file, entries.map((e) => `${JSON.stringify(e)}\n`).join(''));
       return true;
     },

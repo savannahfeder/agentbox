@@ -19,6 +19,7 @@ import { toApproveWords, waitingCounts } from '../../../renderer/src/threads-mad
 import type { phoneView } from '../../../renderer/src/phone-rows';
 import type { ThreadStateWord, WorkItem } from '../../../renderer/src/types';
 import { teammateIdOf } from '../../../shared/teammates.mts';
+import { keepsAgent, type Harness } from './agent-filter';
 
 export type TabId = 'inbox' | 'progress' | 'snoozed' | 'done';
 export const TABS: { id: TabId; label: string }[] = [
@@ -51,6 +52,9 @@ export interface Row {
 }
 
 /** The gaps between the inbox's tabs, and before a tab's count; tight when the loose ones do not fit. */
+/** The select bar's button, which says what it closes so it does not read as closing the bar beside Cancel. */
+export const closeWords = (n: number) => (n === 1 ? 'Close 1 thread' : n > 1 ? `Close ${n} threads` : 'Close');
+
 export const TAB_GAP = { loose: 22, tight: 12 };
 export const COUNT_GAP = { loose: 13, tight: 6 };
 
@@ -117,10 +121,10 @@ export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
 }
 
 /** Each tab as View and filters leave it (App.tsx `displayedBox`), and how many it holds before them. */
-export function shownTabs(tabs: Record<TabId, Row[]>, display: Display, now: number, order: string[]) {
+export function shownTabs(tabs: Record<TabId, Row[]>, display: Display, now: number, order: string[], agent: Harness | null = null) {
   const pick = (tab: TabId) => {
     const byItem = new Map(tabs[tab].map((r) => [r.item, r]));
-    return sorted(tabs[tab].filter((r) => keeps(r.item, display, now)).map((r) => r.item), display, tab, order).map((i) => byItem.get(i)!);
+    return sorted(tabs[tab].filter((r) => keeps(r.item, display, now) && keepsAgent(r.item, agent)).map((r) => r.item), display, tab, order).map((i) => byItem.get(i)!);
   };
   return {
     rows: { inbox: pick('inbox'), progress: pick('progress'), snoozed: pick('snoozed'), done: pick('done') } as Record<TabId, Row[]>,
@@ -146,12 +150,12 @@ export function filterCount({ rows, whole, mineOnly = false, above = 0, board = 
 }
 
 /** The board, column by column, as the site draws it (page-rules.ts `boardColumns`). */
-export function phoneBoard(view: View, tabs: Record<TabId, Row[]>, display: Display, now: number) {
+export function phoneBoard(view: View, tabs: Record<TabId, Row[]>, display: Display, now: number, agent: Harness | null = null) {
   const state = new Map<string, ThreadStateWord>();
   for (const [tab, word] of [['done', 'done'], ['snoozed', 'scheduled'], ['progress', 'running'], ['inbox', 'waiting']] as const) for (const r of tabs[tab]) state.set(r.id, word);
   const live = new Set(view.running.map((r: { itemId: string }) => r.itemId));
   const columns = boardColumns({
-    items: view.items, products: view.products, display, now, me: null, live,
+    items: view.items.filter((i: WorkItem) => keepsAgent(i, agent)), products: view.products, display, now, me: null, live,
     stateOf: (i) => state.get(i.id) ?? null, projectOrder: view.products.map((p: { slug: string }) => p.slug),
   });
   // A card waiting its turn says Queued where the running mark would be (Pages.tsx `saysOnCard`).

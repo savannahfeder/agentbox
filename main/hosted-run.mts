@@ -41,6 +41,8 @@ interface HostedRunEvents {
   close: [code: number | null, signal: NodeJS.Signals | null];
   'input-state': [state: HostedRunState];
   'input-turn': [event?: unknown];
+  'turn-over': [];
+  'next-turn': [];
   'remote-user': [event: RemoteUserEvent];
   'bridge-state': [event: BridgeStateEvent];
 }

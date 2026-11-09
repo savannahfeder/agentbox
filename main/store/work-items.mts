@@ -436,8 +436,11 @@ export function readWorkItem(projectDir: string, id: string, now = Date.now()): 
  * the ledger is read once per change of the file, grouped by thread, and kept,
  * keyed on the file's identity exactly as the fold is. The lines handed out are
  * the kept ones, frozen, so no caller can edit what the next one reads.
+ *
+ * A ledger that only grew is read on from where the last read stopped, by the
+ * fold's own rule: every running agent's heartbeat grows it.
  */
-const histories = new Map<string, { stamp: string; byId: Map<string, LedgerLine[]> }>();
+const histories = new Map<string, { stamp: string; gen: number; offset: number; from: number; byId: Map<string, LedgerLine[]> }>();
 const HISTORIES_HELD = 8;
 function deepFreeze<T>(v: T): T {
   if (v && typeof v === 'object' && !Object.isFrozen(v)) {
@@ -446,24 +449,44 @@ function deepFreeze<T>(v: T): T {
   }
   return v;
 }
+function addHistoryLines(byId: Map<string, LedgerLine[]>, text: string): void {
+  for (const raw of text.split('\n')) {
+    if (!usable(raw)) continue;
+    let line: LedgerLine;
+    try { line = JSON.parse(raw); } catch { continue; }
+    if (!line || typeof line.id !== 'string' || line.heartbeat || line.release) continue;
+    let list = byId.get(line.id);
+    if (!list) byId.set(line.id, (list = []));
+    list.push(deepFreeze(line));
+  }
+}
 function historiesOf(file: string): Map<string, LedgerLine[]> {
-  const stamp = ledgerStamp(file);
+  const pin = ledgerPin(file);
+  const st = pin.st;
   const held = histories.get(file);
-  if (held && held.stamp === stamp) return held.byId;
+  if (held && held.stamp === pin.stamp) return held.byId;
+  const inWindow = held && st && (held.from === 0 ? st.size <= MAX_LEDGER_BYTES : st.size - held.from <= MAX_LEDGER_BYTES + REWINDOW_BYTES);
+  if (held && st && held.gen === pin.gen && st.size > held.offset && inWindow) {
+    const buf = Buffer.allocUnsafe(st.size - held.offset);
+    const n = fs.readSync(pin.fd!, buf, 0, buf.length, held.offset);
+    const end = n ? buf.lastIndexOf(0x0a, n - 1) + 1 : 0;
+    addHistoryLines(held.byId, buf.toString('utf8', 0, end));
+    held.offset += end;
+    held.stamp = pin.stamp;
+    return held.byId;
+  }
   const byId = new Map<string, LedgerLine[]>();
-  if (stamp !== 'absent') {
-    for (const raw of readLines(file)) {
-      let line: LedgerLine;
-      try { line = JSON.parse(raw); } catch { continue; }
-      if (!line || typeof line.id !== 'string' || line.heartbeat || line.release) continue;
-      let list = byId.get(line.id);
-      if (!list) byId.set(line.id, (list = []));
-      list.push(deepFreeze(line));
-    }
+  let offset = 0;
+  let from = 0;
+  if (st) {
+    const read = readWindow(file, st.size, pin.fd!);
+    addHistoryLines(byId, read.text);
+    offset = read.end;
+    from = read.from;
   }
   histories.delete(file);
   if (histories.size >= HISTORIES_HELD) histories.delete(histories.keys().next().value!);
-  histories.set(file, { stamp, byId });
+  histories.set(file, { stamp: pin.stamp, gen: pin.gen, offset, from, byId });
   return byId;
 }
 // `before` keeps the lines written at or before that moment, and the cap then

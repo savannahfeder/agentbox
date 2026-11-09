@@ -11,7 +11,7 @@
 import { S3Client, GetObjectCommand, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { awsTransport, awsStorage } from '../../main/cloud/aws.mts';
 import { createGateway } from './gateway.mjs';
-import { supabaseRest } from './phone.mjs';
+import { supabaseRest, teamsFrom } from './phone.mjs';
 import { sendToExpo } from '../../main/phone-alerts.mts';
 import { stripeClient } from './stripe.mjs';
 
@@ -129,6 +129,7 @@ export async function gatewayFromEnv(env = process.env, { readSecret = (arn) => 
     ...(billing ? { stripe: stripeClient({ key: billing.key, webhookSecret: billing.webhookSecret, managedPayments: !!billing.managedPayments }) } : {}),
     ...(db ? {
       db,
+      teams: teamsFrom(db),
       phone: {
         db,
         runFiles: linkedFiles({ links: { get: signer.getUrl, put: signer.putUrl } }),

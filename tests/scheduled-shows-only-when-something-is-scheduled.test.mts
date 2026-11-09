@@ -47,6 +47,6 @@ it('does not bounce out of an empty Scheduled page', () => {
   // and the lit state tab under it says which list she is on. Either way the
   // page she is standing on keeps its heading and its tab. The heading reads
   // Threads since w-05ff3d1438, when Inbox and Team became one page.
-  expect(app).toContain('<h1 className="workspace-title">Threads</h1>');
+  expect(app).toContain('<h1 className="workspace-title">Inbox</h1>');
   expect(app).not.toContain('className="workspace-title">{workspacePageTitle(');
 });

@@ -630,7 +630,7 @@
   /* AN AGENT ASKING PERMISSION is a card across the screen above the inboxes,
      with Allow and Deny big enough for a thumb. The desktop pins it to a
      corner at its desktop width, which on a phone hung it off the left edge
-     and over the inboxes; its ⌘Y / ⌘N are keys no phone has. */
+     and over the inboxes; its ⌘1 / ⌘2 are keys no phone has. */
   :root:root:root .approvals {
     left: 8px; right: 8px; bottom: calc(var(--phone-tabs, 0px) + 8px + var(--phone-foot)); top: auto;
     width: auto; max-width: none; transform: none; z-index: 90;
@@ -638,7 +638,7 @@
   :root:root:root .approvals .approval-stack, :root:root:root .approvals .approval-card { width: auto; max-width: none; }
   :root:root:root .approvals .approval-actions { display: flex; gap: 8px; }
   :root:root:root .approvals .approval-actions button { flex: 1; height: 44px; font-size: 16px; }
-  :root:root:root .approvals .approval-hint { display: none; }
+  :root:root:root .approvals .approval-key { display: none; }
   :root:root:root .approval-minimize {
     min-height: 44px; padding: 0 8px; border: 0; flex: none;
     border-radius: 0; background: none; color: var(--text-dim); font: inherit;

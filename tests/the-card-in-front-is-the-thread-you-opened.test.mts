@@ -81,7 +81,8 @@ describe('the screen, the chord and the Agents menu', () => {
   it('all read the one order, so ⌘Y answers the card being read', () => {
     // The snapshot the card is drawn from.
     expect(ipc).toMatch(/cardsInFront\(approvals\.listPending\(config\.storeRoot\), looking\)/);
-    expect(ipc).toMatch(/approvals: pendingApprovals\(\)/);
+    expect(ipc).toMatch(/approvals: sendingApprovals\(\)/);
+    expect(ipc).toMatch(/const sendingApprovals = \(\) => \{\n\s*const cards = pendingApprovals\(\);/);
     // And nothing that answers for this screen reaches past it for the spool's
     // own order. Two readings are left and neither is a card in front: the stub
     // that stands in until the IPC surface exists, before which nothing can

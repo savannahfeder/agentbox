@@ -27,6 +27,8 @@ export interface CloudConfig {
   phoneSite?: string;
   signInReturn?: string;
   standin?: boolean;
+  /** The live-file relay's ws:// or wss:// address (main/team/live-room.mts). */
+  live?: string;
   contact?: string;
   operator?: string;
   governingLaw?: string;

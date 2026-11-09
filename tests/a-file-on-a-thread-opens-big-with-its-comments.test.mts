@@ -45,6 +45,9 @@ describe('the wiring', () => {
     expect(read('renderer/src/threads/TeammateThread.tsx')).not.toContain('onSendToAgent');
   });
   it('keeps a phone on the picture view its fingers know', () => {
-    expect(read('renderer/src/components/Focus.tsx')).toMatch(/opensBig = \(path[^\n]*!onPhone\(\)/);
+    const focus = read('renderer/src/components/Focus.tsx');
+    expect(focus).toMatch(/const bigView = !onPhone\(\)/);
+    expect(focus).toMatch(/opensBig = \(path[^\n]*bigView &&/);
+    expect(focus).toMatch(/opensBeside = \(path[^\n]*bigView &&/);
   });
 });

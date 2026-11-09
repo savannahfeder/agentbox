@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createWorkItem, updateWorkItem, readWorkItem, setLineAuthor } from '../main/store/work-items.mts';
-import { sorted, DEFAULT_DISPLAY } from '../renderer/src/threads/page-rules.ts';
+import { sorted, sortedEntries, DEFAULT_DISPLAY } from '../renderer/src/threads/page-rules.ts';
 import { byRunningOrder, placedAt } from '../renderer/src/list-rules.ts';
 
 const MIN = 60_000;
@@ -55,6 +55,21 @@ describe('closing a thread and taking it back with Z', () => {
     expect(order([...ids, today])).toEqual(['Just now', 'Yesterday', 'Oct 27', 'Oct 22']);
     const running = [...ids, today].map(read).sort(byRunningOrder(() => 0)).map((i) => i.title);
     expect(running).toEqual(['Just now', 'Yesterday', 'Oct 27', 'Oct 22']);
+  });
+
+  // Power test round 2, #6: E then Z on a thread, then B. The list had it back
+  // in its place; the board drew it at the top of its column, because the
+  // board's sort was handed `updatedAt` and not `placedAt`. Seen on a stand-in
+  // copy: "Draft the launch plan" under "fix the flaky booking test" in the
+  // list and above it on the board.
+  it('on the board too, where the column is sorted from the same rows', () => {
+    const old = make('Old thread', NOW - 26 * 60 * MIN);
+    const today = make('Today thread', NOW - 5 * MIN);
+    write(old, { status: 'done' }, NOW - 2 * MIN);
+    write(old, { status: 'open' }, NOW - MIN);
+    const entry = (i) => ({ key: i.id, ownerId: null, state: 'waiting', title: i.title, project: null, projectSlug: null, priority: 5, updatedAt: i.updatedAt, item: i, card: null });
+    const column = sortedEntries([old, today].map(read).map(entry), DEFAULT_DISPLAY.inbox, 'waiting').map((e) => e.title);
+    expect(column).toEqual(['Today thread', 'Old thread']);
   });
 
   it('a line that is not news in between (a label) does not stop it', () => {

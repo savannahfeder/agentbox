@@ -112,11 +112,12 @@ describe('asking for the middle back', () => {
   });
 
   // A thread never OPENS at full length. The window is still what a long row is
-  // born with; this is only ever her decision, and it dies with the row.
+  // born with; this is only ever her decision. It comes back only with her place
+  // in a thread she returns to unchanged (coming-back-to-a-thread-puts-you-where-you-were).
   it('is her decision and it is dropped when she leaves the row', () => {
     const item = read('renderer/src/components/ItemThread.tsx');
     expect(item).toMatch(/const \[whole, setWhole\] = useState\(false\);/);
-    expect(item).toMatch(/useEffect\(\(\) => \{ setWhole\(false\); \}, \[item\.product, item\.id\]\);/);
+    expect(item).toMatch(/useEffect\(\(\) => \{ setWhole\(!!kept\?\.whole\); \}, \[item\.product, item\.id\]\);/);
     const agent = read('renderer/src/components/AgentThread.tsx');
     expect(agent).toMatch(/const \[whole, setWhole\] = useState\(false\);/);
     expect(agent).toMatch(/useEffect\(\(\) => \{ setWhole\(false\); \}, \[pid, sessionId, cwd\]\);/);

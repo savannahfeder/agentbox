@@ -25,6 +25,7 @@
 // product at all.
 import fsDefault from 'node:fs';
 import path from 'node:path';
+import { performance } from 'node:perf_hooks';
 import { machineryDir } from './store/home.mts';
 import { writtenFileNamed } from './store/written-elsewhere.mts';
 import { readItemHistory } from './store/work-items.mts';
@@ -91,54 +92,111 @@ const SKIP = new Set(['node_modules', '.git', 'dist', 'build', '.next', 'session
 // mentions the moment it opens, so the walk has to outlive that burst; a
 // picture that lands later is found by the next look, which comes after this.
 export const HUNT_FRESH_MS = 5000;
-const walks = new Map<string, { at: number; fs: ArtifactFs; value: unknown }>();
+interface WalkEntry { at: number; fs: ArtifactFs; value: Promise<unknown>; running: boolean; took: number; again?: Promise<unknown> }
+const walks = new Map<string, WalkEntry>();
+// How many of a walk's folder reads wait on the disk at once. The app's other
+// disk reads share four threads with these, and a walk that asked for every
+// folder at once kept them waiting for seconds.
+const READS_AT_ONCE = 2;
+// A folder read that never comes back (a hung mount) ends the walk here, with
+// what it found so far, rather than holding every lookup on the tree.
+export const WALK_GIVES_UP_MS = 60_000;
+// Folders whose read was still out when a walk gave up. Each such read holds one
+// of the four disk threads until it returns, so later walks skip the folder
+// rather than spending another thread on it.
+const stuck = new Set<string>();
 // Every file name in one tree, read without holding the main process.
 async function walkNames(tree: string, fs: ArtifactFs): Promise<Map<string, string[]>> {
     const names = new Map<string, string[]>();
-    const walk = async (dir: string, depth: number): Promise<void> => {
-        if (depth > 6)
-            return;
-        let entries: Dirent[];
-        try {
-            entries = await fs.promises.readdir(dir, { withFileTypes: true });
-        }
-        catch {
-            return;
-        }
-        const below: Promise<void>[] = [];
-        for (const e of entries) {
-            if (e.name.startsWith('.'))
+    const queue: { dir: string; depth: number }[] = [{ dir: tree, depth: 0 }];
+    const out = new Set<string>();
+    let reading = 0;
+    let stopped = false;
+    const waiting: ((value?: unknown) => void)[] = [];
+    const reader = async (): Promise<void> => {
+        for (;;) {
+            if (stopped)
+                return;
+            const next = queue.shift();
+            if (!next) {
+                if (!reading)
+                    return;
+                await new Promise((r) => waiting.push(r));
                 continue;
-            const full = path.join(dir, e.name);
-            if (e.isDirectory()) {
-                if (!SKIP.has(e.name))
-                    below.push(walk(full, depth + 1));
             }
-            else if (names.has(e.name))
-                names.get(e.name)!.push(full);
-            else
-                names.set(e.name, [full]);
+            const { dir, depth } = next;
+            if (stuck.has(dir))
+                continue;
+            reading += 1;
+            out.add(dir);
+            let entries: Dirent[] = [];
+            try {
+                entries = await fs.promises.readdir(dir, { withFileTypes: true });
+            }
+            catch { /* gone or unreadable */ }
+            out.delete(dir);
+            stuck.delete(dir);
+            for (const e of entries) {
+                if (e.name.startsWith('.'))
+                    continue;
+                const full = path.join(dir, e.name);
+                if (e.isDirectory()) {
+                    if (!SKIP.has(e.name) && depth < 6)
+                        queue.push({ dir: full, depth: depth + 1 });
+                }
+                else if (names.has(e.name))
+                    names.get(e.name)!.push(full);
+                else
+                    names.set(e.name, [full]);
+            }
+            reading -= 1;
+            waiting.splice(0).forEach((r) => r());
         }
-        await Promise.all(below);
     };
-    await walk(tree, 0);
+    let timer: NodeJS.Timeout | undefined;
+    const givenUp = new Promise((r) => { timer = setTimeout(r, WALK_GIVES_UP_MS); timer.unref?.(); });
+    await Promise.race([Promise.all(Array.from({ length: READS_AT_ONCE }, reader)), givenUp]);
+    clearTimeout(timer);
+    stopped = true;
+    for (const dir of out)
+        stuck.add(dir);
+    waiting.splice(0).forEach((r) => r());
     return names;
 }
 // The carried-file shelf and the written-elsewhere list take a whole `fs`, but
 // read only what a caller's fake supplies, which is why requests type it narrow.
 const whole = (fs: ArtifactFs): typeof fsDefault => fs as typeof fsDefault;
+// A walk that took long answers for this many times as long, so a slow disk is
+// not walked end to end without a pause, but never past the cap: a file written
+// in that time is not found.
+const SLOW_WALK_KEEPS = 10;
+export const HUNT_KEPT_AT_MOST_MS = 30_000;
+// One walk per tree at a time: a name asked while it runs waits on it, even past
+// its window. A look that must be current waits for it and then walks again,
+// since the running walk may have read a folder before the file was there.
 // Each key is only ever read by the one caller that wrote it, so its value comes back as that caller's T.
-function freshly<T>(key: string, fs: ArtifactFs, now: number, read: () => T): T {
+function freshly<T>(key: string, fs: ArtifactFs, now: number, read: () => T | Promise<T>, fresh = false): Promise<T> {
     const kept = walks.get(key);
-    if (kept && kept.fs === fs && now - kept.at < HUNT_FRESH_MS)
-        return kept.value as T;
-    const value = read();
-    walks.set(key, { at: now, fs, value });
+    if (kept && kept.fs === fs && kept.running && fresh) {
+        kept.again ??= kept.value.then(() => freshly(key, fs, now, read, true));
+        return kept.again as Promise<T>;
+    }
+    const keptFor = (k: WalkEntry) => Math.min(HUNT_KEPT_AT_MOST_MS, Math.max(HUNT_FRESH_MS, k.took * SLOW_WALK_KEEPS));
+    if (kept && kept.fs === fs && (kept.running || (!fresh && now - kept.at < keptFor(kept))))
+        return kept.value as Promise<T>;
+    const started = performance.now();
+    const entry: WalkEntry = { at: now, fs, value: Promise.resolve(), running: true, took: 0 };
+    const value = Promise.resolve(read()).finally(() => {
+        entry.running = false;
+        entry.took = performance.now() - started;
+    });
+    entry.value = value;
+    walks.set(key, entry);
     if (walks.size > 32)
         walks.delete(walks.keys().next().value!);
     return value;
 }
-const namesIn = (tree: string, fs: ArtifactFs, now: number): Promise<Map<string, string[]>> => freshly(tree, fs, now, () => walkNames(tree, fs));
+const namesIn = (tree: string, fs: ArtifactFs, now: number, fresh: boolean): Promise<Map<string, string[]>> => freshly(tree, fs, now, () => walkNames(tree, fs), fresh);
 // Hunt the file down by NAME inside one product's trees, newest match wins.
 // Workers write links relative to whatever directory they were standing in, so
 // a fixed root list will always miss some of them, and every miss cost her a
@@ -148,7 +206,7 @@ async function huntByName(base: string, trees: readonly string[], fs: ArtifactFs
     let best: { full: string; m: number; fits: boolean } | null = null;
     const tail = raw.includes('/') ? `${path.sep}${raw.split('/').join(path.sep)}` : null;
     for (const tree of trees) {
-        for (const full of (await (fresh ? walkNames(tree, fs) : namesIn(tree, fs, now))).get(base) ?? []) {
+        for (const full of (await namesIn(tree, fs, now, fresh)).get(base) ?? []) {
             let m;
             try {
                 m = (await fs.promises.stat(full)).mtimeMs;
@@ -200,7 +258,7 @@ async function fileInCheckout(own: Pick<ArtifactProduct, 'dir' | 'repoPath'>, ra
             return mine.file;
     }
     const list = (): Promise<string[]> => fs.promises.readdir(root).catch(() => []);
-    const ids = (await (fresh ? list() : freshly(`checkouts:${root}`, fs, now, list))).filter((id) => THREAD_ID.test(id));
+    const ids = (await freshly(`checkouts:${root}`, fs, now, list, fresh)).filter((id) => THREAD_ID.test(id));
     const hits = (await Promise.all(ids.map(within))).filter((hit) => hit !== null).sort((a, b) => b.at - a.at);
     return hits.find((hit) => threadNames(own.dir, hit.id, base))?.file ?? null;
 }

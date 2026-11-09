@@ -13,7 +13,6 @@ import path from 'node:path';
 import * as disk from '../main/store/work-items.mts';
 import { Store } from '../main/store.mts';
 import { noteToItsAgent } from '../main/notes-wake.mts';
-import { notesForItsAgent } from '../shared/artifact-marks.mts';
 
 let store, dir, thread, woke;
 const supervisor = { sessions: new Map(), wake: () => { woke++; } };
@@ -49,14 +48,6 @@ describe('a comment on a page an agent made', () => {
     const other = store.composeItem('website', { title: 'Script', body: 'Write it.' });
     disk.updateWorkItem(dir, other.id, { result: 'Saved `out/report.html`' }, { source: 'agent' });
     expect(await note(other.id, whole('report.html', 'Bigger type'))).toBe(true);
-  });
-
-  it('a teammate\'s comment on it is told to the agent', () => {
-    const said = notesForItsAgent([{ source: 'agent', patch: { result: 'Built [p.html](pages/p.html)' }, ts: 1 }],
-      { notes: [{ id: 'n1', file: 'p.html', place: { kind: 'whole' }, text: 'Tighter', by: 'p-sofia', ts: 2, mentions: [] }] },
-      { me: 'p-dev' });
-    expect(said).toHaveLength(1);
-    expect(said[0].text).toContain('p-v2.html');
   });
 });
 

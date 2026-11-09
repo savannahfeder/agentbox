@@ -34,7 +34,7 @@ export async function stageAttachment(dir: string, { name, dataBase64, srcPath }
   // from is left alone: copying it would only make a second file to sweep.
   if (typeof srcPath === 'string' && srcPath) {
     if (path.resolve(srcPath) === path.resolve(path.join(dir, path.basename(srcPath)))) return { path: srcPath };
-    fs.copyFileSync(srcPath, abs);
+    fs.copyFileSync(srcPath, abs, fs.constants.COPYFILE_FICLONE);
   } else {
     fs.writeFileSync(abs, Buffer.from(String(dataBase64 ?? ''), 'base64'));
   }

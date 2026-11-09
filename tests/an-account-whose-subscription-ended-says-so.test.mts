@@ -26,7 +26,7 @@ import {
   troubleCause, refineCause, needsHerHands, troubleSentence, troubleRemedy, accountSentence,
   deadRunSentence, deadRunCause, runStoppedLine, causeWord, causeWhat, causeNext, causeAct, causeBreakdown,
 } from '../shared/spawn-trouble.mts';
-import { readPlan, slotsForPlans } from '../main/claude-plan.mts';
+import { readPlan } from '../main/claude-plan.mts';
 import { Supervisor } from '../main/supervisor.mts';
 
 const REFUSAL = 'Your organization has disabled Claude subscription access for Claude Code · Use an Anthropic API key instead, or ask your admin to enable access';
@@ -59,12 +59,6 @@ describe('the plan line', () => {
     const plan = readPlan('x', { file: writeLogin(old) });
     expect(plan.ended).toBe(false);
     expect(plan.label).toBe('Max 20x');
-  });
-
-  it('does not let an ended account drop everybody else to one agent at a time', () => {
-    const max = readPlan('a', { file: writeLogin(paying) });
-    const ended = readPlan('b', { file: writeLogin(lapsed) });
-    expect(slotsForPlans([max, ended], 3)).toBe(3);
   });
 });
 

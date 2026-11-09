@@ -21,6 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { resolveAccount, resolveProduct } from './account.mts';
+import { MAC_CHROME, hiddenBrowser } from '../../shared/hidden-browser.mts';
 
 /** Where a captured picture lands, beside everything else she is shown. */
 const SHOTS = 'attachments';
@@ -48,12 +49,20 @@ export function localTarget(url: unknown): string {
   return parsed.href;
 }
 
-/** Chrome, wherever this Mac keeps it, or null when it has none. */
-export function findChrome(candidates: readonly string[] = [
-  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+/**
+ * The hidden test browser first, so the person's Chrome stays theirs
+ * (shared/hidden-browser.mts). Google Chrome comes last, for a Mac with
+ * nothing else: there it is held for one capture, a few seconds.
+ */
+export const browsersToTry = ({ hidden = hiddenBrowser }: { hidden?: () => string | null } = {}): string[] => [
+  hidden(),
   '/Applications/Chromium.app/Contents/MacOS/Chromium',
   '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
-]): string | null {
+  MAC_CHROME,
+].filter((bin): bin is string => Boolean(bin));
+
+/** A browser this Mac has, or null when it has none. */
+export function findChrome(candidates: readonly string[] = browsersToTry()): string | null {
   for (const bin of candidates) { try { if (fs.statSync(bin).isFile()) return bin; } catch { /* next */ } }
   return null;
 }

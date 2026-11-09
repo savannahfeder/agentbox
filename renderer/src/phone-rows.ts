@@ -82,6 +82,24 @@ export const UNDONE = 'refused: taken back on the phone';
 // step 1, finding 4): the screens know it by its name there and that
 // computer's id together, so two computers' projects of the same name stay two.
 export const phoneSlug = (device: string, project: string) => `${project}@${device}`;
+
+/**
+ * The thread a computer made from a "new" sent here, once it has taken it:
+ * the phone showed it under madeHere(command id), and the computer gives it an
+ * id of its own. Its copy names the command (`fromPhone`); a copy from before
+ * that is matched by project, title and time.
+ */
+export function madeThreadOf(rows: PhoneRows, product: string, id: string): string | null {
+  const cmd = rows.commands.find((c) => c.kind === 'new' && madeHere(c.id) === id && c.project && phoneSlug(c.device, c.project) === product);
+  if (!cmd || !cmd.taken_at) return null;
+  const mine = rows.threads.filter((t) => t.device === cmd.device && t.project === cmd.project && t.snapshot?.item);
+  const named = mine.find((t) => t.snapshot.item.fromPhone === cmd.id);
+  if (named) return named.item;
+  const title = String(cmd.payload?.title || cmd.payload?.body || '').slice(0, 200).trim();
+  const sentAt = Date.parse(cmd.created_at) || 0;
+  const match = mine.filter((t) => !t.snapshot.item.fromPhone && String(t.snapshot.item.title ?? '').trim() === title && Number(t.snapshot.item.createdAt) >= sentAt - 60_000);
+  return match.length === 1 ? match[0].item : null;
+}
 export function splitSlug(slug: string): { device: string; project: string } | null {
   const m = /^(.+)@([0-9a-f]{12})$/.exec(String(slug));
   return m ? { project: m[1], device: m[2] } : null;
@@ -198,14 +216,15 @@ export function phoneView(rows: PhoneRows, now = Date.now()) {
   }
   const ordered = [...rows.commands].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
   for (const c of ordered) {
-    if (isPinSetting(c)) {
+    const shows = shownSetting(c);
+    if (shows && isThreadSetting(c)) {
       const p = c.payload;
       const takenAt = c.taken_at ? Date.parse(c.taken_at) || 0 : null;
       const copyAt = Date.parse(rows.threads.find((t) => t.device === c.device && t.project === p.product && t.item === p.item)?.updated_at ?? '') || 0;
       const standing = takenAt === null ? !c.outcome : c.outcome === 'done' && copyAt < takenAt && now - takenAt < LANDING_SHOWN_MS;
       const key = `${phoneSlug(c.device, p.product)}/${p.item}`;
       const row = items.get(key);
-      if (standing && row) items.set(key, { ...row, pinned: p.value === true });
+      if (standing && row) items.set(key, { ...row, ...shows });
       continue;
     }
     // Her computer's own hand-over to the cloud is not something she sent.
@@ -315,9 +334,21 @@ export const readSettingsRows = (select: Select) => select('phone_settings', 'se
 export function settingCommand(device: string, change: { scope: 'workspace' | 'project' | 'thread' | 'repeat' | 'teammate'; key: string; value: unknown; product?: string; item?: string; id?: string }) {
   return { device, project: null, item: null, kind: 'setting', payload: change };
 }
-type PinSetting = PhoneRows['commands'][number] & { payload: CommandPayload & { product: string; item: string } };
-const isPinSetting = (c: PhoneRows['commands'][number]): c is PinSetting => c.kind === 'setting' && c.payload?.scope === 'thread' && c.payload?.key === 'pinned'
+type ThreadSetting = PhoneRows['commands'][number] & { payload: CommandPayload & { product: string; item: string } };
+const isThreadSetting = (c: PhoneRows['commands'][number]): c is ThreadSetting => c.kind === 'setting' && c.payload?.scope === 'thread'
   && typeof c.payload?.product === 'string' && typeof c.payload?.item === 'string';
+// What a change to a thread the computer has not taken yet looks like on its row.
+const SHOWN: Record<string, (v: unknown) => Record<string, unknown>> = {
+  pinned: (v) => ({ pinned: v === true }),
+  onMac: (v) => ({ onMac: v === true }),
+  label: (v) => ({ label: v }),
+  priority: (v) => ({ priority: v }),
+};
+function shownSetting(c: PhoneRows['commands'][number]): Record<string, unknown> | null {
+  if (!isThreadSetting(c)) return null;
+  const key = c.payload.key;
+  return typeof key === 'string' && Object.hasOwn(SHOWN, key) ? SHOWN[key](c.payload.value) : null;
+}
 
 // Each card drawn on the phone: where it is, and the fingerprint her Mac drew it with.
 export type Cards = Record<string, { device: string; project: string; item: string; card: string }>;

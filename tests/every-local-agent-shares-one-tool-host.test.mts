@@ -23,7 +23,7 @@ import { stripTypesFlags } from '../main/strip-types.mts';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cleanup = [];
 afterEach(async () => { while (cleanup.length) await cleanup.pop()(); });
-const tempDir = (name = 'tools-') => { const d = fs.mkdtempSync(path.join(os.tmpdir(), name)); cleanup.push(() => fs.rmSync(d, { recursive: true, force: true })); return d; };
+const tempDir = (name = 'tools-') => { const d = fs.mkdtempSync(path.join(os.tmpdir(), name)); cleanup.push(() => fs.rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })); return d; };
 const until = async (check, ms = 10_000) => {
   const end = Date.now() + ms;
   for (;;) {
@@ -69,7 +69,7 @@ const echo = (seen) => ({ input, output, ownItem, ownProduct, env }) => {
 };
 
 async function host(opts = {}) {
-  const dir = tempDir();
+  const dir = opts.dir ?? tempDir();
   const seen = [];
   const h = serveTools({ dir, appPid: process.pid, servers: { store: echo(seen) }, checkMs: 20, ...opts });
   cleanup.push(() => h.close());
@@ -157,8 +157,12 @@ describe('the tool host', () => {
     let idle = 0;
     const dead = spawn(process.execPath, ['-e', '']);
     await new Promise((r) => dead.on('exit', r));
-    const { dir } = await host({ appPid: dead.pid, idleMs: 60, onIdle: () => { idle += 1; } });
+    // The pass is there before the host starts: given after, a pause longer
+    // than idleMs would let the host stop first.
+    const dir = tempDir();
+    fs.mkdirSync(path.join(dir, 'passes'));
     givePass(dir, TOKEN_A, { item: 'w-aaaaaaaaaa', env: {} });
+    await host({ dir, appPid: dead.pid, idleMs: 60, onIdle: () => { idle += 1; } });
     await new Promise((r) => setTimeout(r, 250));
     expect(idle).toBe(0);
     fs.rmSync(path.join(dir, 'passes', TOKEN_A));
@@ -180,14 +184,16 @@ describe('a host whose app has gone', () => {
 
   it('stops after a quiet spell even with passes a crashed app left, but not while a call waits', async () => {
     let idle = 0;
-    const { dir, port } = await host({ appPid: await deadPid(), idleMs: 60, orphanMs: 300, onIdle: () => { idle += 1; } });
+    // orphanMs is the room a busy runner has to pause between the test's
+    // requests before the host rightly calls it quiet.
+    const { dir, port } = await host({ appPid: await deadPid(), idleMs: 60, orphanMs: 2_000, onIdle: () => { idle += 1; } });
     givePass(dir, TOKEN_A, { item: 'w-aaaaaaaaaa', env: {} });
     const a = await post(port, 'store', TOKEN_A, INIT);
-    const waiting = post(port, 'store', TOKEN_A, { jsonrpc: '2.0', id: 9, method: 'tools/call', params: { waitMs: 700 } }, a.sid);
-    await new Promise((r) => setTimeout(r, 600));
+    const waiting = post(port, 'store', TOKEN_A, { jsonrpc: '2.0', id: 9, method: 'tools/call', params: { waitMs: 2_600 } }, a.sid);
+    await new Promise((r) => setTimeout(r, 2_300));
     expect(idle).toBe(0);
     expect((await waiting).events[0].id).toBe(9);
-    await until(() => idle > 0, 5_000);
+    await until(() => idle > 0, 10_000);
   });
 });
 
@@ -313,7 +319,8 @@ describe('the real supervisor, with a stand-in agent', () => {
       sock.once('data', (d) => { sock.destroy(); try { resolve(JSON.parse(d).pid); } catch { resolve(null); } });
     }) : null;
     if (runHost) try { process.kill(runHost, 'SIGKILL'); } catch { /* gone */ }
-    if (copy) fs.rmSync(copy.dir, { recursive: true, force: true });
+    // A process just killed can still be writing here; macOS then refuses the delete.
+    if (copy) fs.rmSync(copy.dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     app = null;
     copy = null;
   });

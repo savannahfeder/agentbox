@@ -23,8 +23,10 @@ export function offersTryAgain(item: WorkItem, facts: LiveFacts & { practice?: b
   if (facts.stalled) return true;
   const live = liveLine(item, facts);
   if (live) return STUCK.has(live.state);
-  // Out of In progress, the newest word on it is the app's own note that a run stopped.
-  return item.status === 'open' && item.wrote?.result?.source === 'agent' && saysARunGotNowhere(item.result);
+  // Out of In progress, the newest word on it is the app's own note that a run
+  // stopped, and no start is queued for it yet.
+  return item.status === 'open' && !facts.queued.includes(item.id)
+    && item.wrote?.result?.source === 'agent' && saysARunGotNowhere(item.result);
 }
 
 export interface TryAgainOutcome { resumed?: number; queued?: number; working?: number; missing?: number; failed?: number; why?: string }

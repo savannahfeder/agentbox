@@ -19,6 +19,7 @@ import { installPictureWatch } from './phone-files';
 import { theDoorNeedsItsKey } from './browser-bridge';
 import { comeBackFromABlankScreen, writeHeldBeforeReload } from './after-a-crash';
 import { installStrayLetters } from './stray-letters';
+import { installFullScreenEscape } from './full-screen-escape';
 import { onASharedFilePage } from './shared-file/route';
 import { bootSharedFile } from './shared-file/boot';
 import { readCloudConfig } from './cloud-bridge';
@@ -91,6 +92,7 @@ const boot = () => {
   // A picture holds its place while it loads, in every window (phone.css).
   installPictureWatch();
   installStrayLetters();
+  installFullScreenEscape();
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       <ScreenCrash><AgentUpdates><App /></AgentUpdates></ScreenCrash>

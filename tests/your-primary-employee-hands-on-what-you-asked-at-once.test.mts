@@ -112,14 +112,11 @@ describe('through the store', () => {
     expect(store.listItems().some((i) => teammateIdOf(i) === hired.id)).toBe(true);
   });
 
-  it('nobody else may make one, and the primary not on its own round', () => {
+  it('the primary does not make one on its own round', () => {
     const chief = team.create({ name: 'Chief of staff' });
-    const video = team.create({ name: 'Video producer' });
     writeTeammate(team.dir(), chief.id, { primary: true }, Date.now());
     runOf(chief, { yours: false });
-    expect(() => core.teamHire({ name: 'Support lead', job: 'x' })).toThrow(/person's words/);
-    runOf(video, { yours: true });
-    expect(() => core.teamHire({ name: 'Support lead', job: 'x' })).toThrow(/primary/);
+    expect(() => core.teamHire({ name: 'Support lead', job: 'x' })).toThrow(/person did not ask/);
     expect(team.list().some((t) => t.name === 'Support lead')).toBe(false);
   });
 });

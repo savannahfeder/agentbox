@@ -10,7 +10,7 @@ import { REST_HEADING, URGENT_HEADING, clickIntent, rowKeys, rowSummary, rowTitl
 import { isUrgentRow } from '../interrupt';
 // THE SAME PREDICATE THE PANE USES, not a second copy of the rule. The row and
 // the pane disagreeing about one fact on one screen is what this import fixes.
-import { cameBackEmpty, cannotStartLine } from '../live-line';
+import { cameBackEmpty, cannotStartLine, runningSince } from '../live-line';
 import { agentAtWork, engineWordFor } from '../byline';
 import { DEFAULT_ENGINE } from '../../../shared/engines.mts';
 import { isTroubleRow, TROUBLE_ID } from '../trouble-row';
@@ -753,7 +753,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                   {justImported(item, seen)
                     ? <span className="time imported">{JUST_IMPORTED_WORD}</span>
                     : session
-                    ? <span className="time working">working · {ago(session.startedAt)}</span>
+                    ? <span className="time working">working · {ago(runningSince(session))}</span>
                     : stalled?.includes(item.id)
                       ? <span className="time stalled">stopped · {ago(item.updatedAt)}</span>
                       : cameBackEmpty(item, silent?.[item.id])

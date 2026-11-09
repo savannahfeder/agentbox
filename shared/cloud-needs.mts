@@ -14,7 +14,8 @@
 import { keyAsks, keyWords } from './cloud-keys.mts';
 
 export const NEED = 'AGENTBOX-NEEDS:';
-const NEED_LINE = /^\s*`?AGENTBOX-NEEDS:\s*(sign-in|key|file|code)\s+([^|`]+?)\s*(?:\|\s*([^`]*?))?\s*`?\s*$/i;
+// A closing backtick is taken off only when the line opened with one: the reason may hold inline code.
+const NEED_LINE = /^\s*(`?)AGENTBOX-NEEDS:\s*(sign-in|key|file|code)\s+([^|`]+?)\s*(?:\|\s*(.*?))?\s*\1\s*$/i;
 
 export interface Service {
   id: string;
@@ -72,9 +73,9 @@ export function needsIn(text: string | null | undefined): Need[] {
   for (const line of String(text ?? '').split('\n')) {
     const m = NEED_LINE.exec(line);
     if (!m) continue;
-    const kind = m[1].toLowerCase() as Need['kind'];
-    const arg = m[2].trim();
-    const why = tidy(m[3]);
+    const kind = m[2].toLowerCase() as Need['kind'];
+    const arg = m[3].trim();
+    const why = tidy(m[4]);
     if (kind === 'sign-in') {
       const service = serviceById(arg);
       if (service) add({ kind, service, why }, `sign-in:${service.id}`);

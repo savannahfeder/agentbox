@@ -149,6 +149,11 @@ export function supabaseBackend(client: SupabaseClient) {
   return {
     kind: 'supabase',
     get personId() { return personId; },
+    /** The sign-in the live relay checks against the team, refreshed by the client as it runs out. */
+    async liveToken() {
+      const { data } = await client.auth.getSession();
+      return data?.session?.access_token ?? null;
+    },
 
     async me() {
       const id = await myId();

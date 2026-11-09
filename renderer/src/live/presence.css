@@ -1,0 +1,84 @@
+/* Who is in a live file, and where. Square corners; each person's colour only
+   on a cursor, a square or an edge. */
+
+.doc-column { position: relative; }
+
+/* The cursor: a line in the person's colour with a small square cap, and
+   their name resting on the cap for a moment after they move. */
+.lv-caret {
+  position: relative; margin: 0 -1px; border-left: 2px solid var(--lv); pointer-events: none;
+  word-break: normal;
+}
+.lv-caret::before {
+  content: ''; position: absolute; left: -4px; top: -3px; width: 6px; height: 6px; background: var(--lv);
+}
+/* A dark tag; the person's colour only in the square before the name. */
+.lv-flag {
+  position: absolute; left: -4px; bottom: calc(100% + 3px); padding: 3px 7px 3px 6px; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 6px;
+  font-weight: 600; font-size: 11px; line-height: 14px; font-family: inherit; font-style: normal; letter-spacing: .005em;
+  max-width: 180px; overflow: hidden; text-overflow: ellipsis;
+  color: #e8e9ee; background: #24262c; border-radius: 0;
+  box-shadow: 0 8px 18px -8px rgba(0, 0, 0, .75), inset 0 0 0 1px rgba(255, 255, 255, .08);
+  opacity: 0; transform: translateY(3px); transition: opacity .45s ease-out, transform .45s ease-out;
+  user-select: none;
+}
+.lv-flag::before { content: ''; flex: none; width: 6px; height: 6px; background: var(--lv); }
+.lv-caret.is-fresh .lv-flag { opacity: 1; transform: none; transition-duration: .14s; }
+/* An agent: a dashed cursor and a hollow square. */
+.lv-caret.is-agent { border-left-style: dashed; }
+.lv-caret.is-agent::before { background: var(--doc-page, var(--bg)); box-shadow: inset 0 0 0 1.5px var(--lv); }
+.lv-caret.is-agent .lv-flag { color: #c9cbd3; }
+.lv-caret.is-agent .lv-flag::before { width: 5px; height: 5px; background: none; box-shadow: inset 0 0 0 1.5px var(--lv); }
+.lv-sel { background: color-mix(in srgb, var(--lv) 22%, transparent); }
+
+/* Looks that draw the place elsewhere keep the cursor bare. */
+.doc-sheet:is(.lv-look-rail, .lv-look-gutter, .lv-look-tint) .lv-flag { display: none; }
+
+/* Who is here: faces at the top right of the page. */
+.lv-faces { position: absolute; top: -34px; right: 0; display: flex; align-items: center; gap: 4px; }
+.lv-face { position: relative; display: inline-flex; }
+.lv-face::after {
+  content: ''; position: absolute; right: -1px; bottom: -1px; width: 7px; height: 7px; background: var(--lv);
+  box-shadow: 0 0 0 1.5px var(--doc-page, var(--bg));
+}
+.lv-more { margin-left: 4px; font-weight: 600; font-size: 11.5px; line-height: 22px; font-family: inherit; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+
+/* Rail: one square per person at their height, just right of the text. */
+.lv-rail { position: absolute; top: 0; bottom: 0; right: -22px; width: 6px; pointer-events: none; }
+.lv-tick { position: absolute; left: 0; width: 6px; height: 3px; background: var(--lv); opacity: .9; transition: top .25s ease-out; }
+.lv-tick.is-agent { height: 6px; background: transparent; box-shadow: inset 0 0 0 1.5px var(--lv); }
+
+/* Gutter: squares beside the paragraph each person is in. */
+.lv-gutter { position: absolute; right: calc(100% + 14px); display: flex; gap: 2px; align-items: center; height: 27px; transition: top .25s ease-out; }
+.lv-sq { width: 7px; height: 7px; background: var(--lv); }
+.lv-sq.is-agent { background: transparent; box-shadow: inset 0 0 0 1.5px var(--lv); }
+.lv-sq-more { margin-left: 3px; font-weight: 600; font-size: 10.5px; line-height: 1; font-family: inherit; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+
+/* Tint: the edge of the paragraph someone is in takes their colour. */
+.lv-tint { position: absolute; left: -16px; width: 2px; height: 27px; background: var(--lv); transition: top .25s ease-out; }
+.lv-tint.is-agent { background: linear-gradient(180deg, transparent, var(--lv), transparent); background-size: 100% 200%; animation: lv-sheen 1.8s linear infinite; }
+@keyframes lv-sheen { from { background-position: 0 100%; } to { background-position: 0 -100%; } }
+
+/* A table: the cell someone else is on, outlined in their colour, their name on its corner. */
+.tbl-bar .lv-faces { position: static; margin-left: auto; padding-left: 12px; }
+.lv-cell { box-shadow: inset 0 0 0 2px var(--lv); position: relative; }
+.lv-cell.is-agent { box-shadow: inset 0 0 0 1.5px var(--lv); background-image: linear-gradient(90deg, transparent, color-mix(in srgb, var(--lv) 14%, transparent), transparent); background-size: 200% 100%; animation: lv-cell-sheen 1.8s linear infinite; }
+@keyframes lv-cell-sheen { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.lv-cell.is-fresh::after {
+  content: attr(data-lv); position: absolute; top: 0; right: 0; padding: 0 5px 0 14px; max-width: 70%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-weight: 600; font-size: 9.5px; line-height: 14px; font-family: inherit; color: #e8e9ee; z-index: 3; pointer-events: none;
+  background: linear-gradient(var(--lv), var(--lv)) 5px 50% / 5px 5px no-repeat, #24262c;
+}
+.lv-cell.is-agent.is-fresh::after {
+  color: #c9cbd3;
+  background: linear-gradient(#24262c, #24262c) 6.5px 50% / 2px 2px no-repeat, linear-gradient(var(--lv), var(--lv)) 5px 50% / 5px 5px no-repeat, #24262c;
+}
+
+/* Your own cursor: the same tag in grey saying "You", shown as you move or type, then faded. */
+.lv-you { --lv: #b9bcc6; position: relative; pointer-events: none; }
+.lv-you::before { content: ''; position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; background: var(--lv); animation: lv-you-fade 1.6s ease-out forwards; }
+.lv-you .lv-flag { left: -3px; opacity: 1; transform: none; animation: lv-you-fade 1.6s ease-out forwards; }
+@keyframes lv-you-fade { 0%, 60% { opacity: 1; } 100% { opacity: 0; } }
+.doc-sheet:is(.lv-look-rail, .lv-look-gutter, .lv-look-tint) .lv-you .lv-flag { display: inline-flex; }

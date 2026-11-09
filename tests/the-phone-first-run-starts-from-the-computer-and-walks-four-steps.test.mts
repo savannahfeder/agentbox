@@ -10,8 +10,8 @@
 // signed in). Measured by drawing those screens in the phone preview.
 //
 // Now it opens on sign-in, since nearly everyone already has an account from
-// the computer: email and password first, then Google. No Apple, which the
-// computer cannot sign in with, so an Apple account would be stranded. Sign up,
+// the computer: email and password first, then Apple and Google (Apple is back
+// beside Google for App Review 4.8, google-on-the-iphone-sits-beside-sign-in-with-apple). Sign up,
 // or a sign-in that fails, says accounts are made in Agentbox on the computer.
 // Then four steps in order, each drawn with the same four bars: sign in, the
 // computer, where your messages go, alerts. A step already done is skipped.
@@ -56,7 +56,7 @@ describe('the screens', () => {
     expect(fs.existsSync(new URL('../mobile/src/app/welcome.tsx', import.meta.url))).toBe(false);
   });
 
-  it('sign-in leads with email and password, then Google, and offers no Apple', () => {
+  it('sign-in leads with email and password, then Apple and Google', () => {
     const signIn = read('mobile/src/app/sign-in.tsx');
     expect(signIn).toMatch(/signInWithPassword/);
     // The fields are always drawn, not behind a "Continue with email" button.
@@ -65,7 +65,7 @@ describe('the screens', () => {
     // The email Sign in is the main button, and Google comes after it.
     expect(signIn.indexOf('kind="primary"')).toBeGreaterThan(-1);
     expect(signIn.indexOf('kind="primary"')).toBeLessThan(signIn.indexOf('Continue with Google'));
-    expect(signIn).not.toMatch(/Apple/);
+    expect(signIn.indexOf('kind="primary"')).toBeLessThan(signIn.indexOf('Continue with Apple'));
   });
 
   it('the phone never makes an account; sign up and a failed sign-in point to the computer', () => {
