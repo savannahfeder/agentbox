@@ -58,8 +58,8 @@ describe('a call the cloud server turned away for load', () => {
 
   it('is not sent again when the server failed, since it may have done the work', async () => {
     const { url, seen } = await cloudServer([500, 200]);
-    const { storage } = managedClients({ url, key: 'k', throttleMs: 10_000 });
-    await expect(storage.getUrl('runs/r1/done.json')).rejects.toThrow(/500/);
+    const { transport } = managedClients({ url, key: 'k', throttleMs: 10_000 });
+    await expect(transport.invoke('s1', { action: 'start', runId: 'r1' })).rejects.toThrow(/500/);
     expect(seen).toEqual([500]);
   });
 

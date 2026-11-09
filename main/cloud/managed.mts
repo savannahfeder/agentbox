@@ -147,7 +147,18 @@ export function managedClients({ url, key, timeoutMs = CALL_MS, fileTimeoutMs = 
     }
     return out;
   }
-  const linkFor = async (op: string, k: string, seconds: number = LINK_SECONDS) => (await call('POST', '/v1/link', { op, key: k, seconds })).url as string;
+  // A link is only a signature, so one lost to a dropped connection or a
+  // server failure is asked for again; a refusal is an answer.
+  async function linkFor(op: string, k: string, seconds: number = LINK_SECONDS): Promise<string> {
+    const until = Date.now() + throttleMs;
+    for (let wait = 250; ; wait = Math.min(wait * 2, 8000)) {
+      try { return (await call('POST', '/v1/link', { op, key: k, seconds })).url as string; } catch (e) {
+        const err = e as CloudCallError;
+        if ((err.status && err.status < 500) || Date.now() >= until) throw err;
+        await new Promise((r) => setTimeout(r, Math.min(until - Date.now(), wait * (0.5 + Math.random()))));
+      }
+    }
+  }
   const object = (link: string, init: RequestInit = {}) => fetch(link, { ...init, signal: AbortSignal.timeout(fileTimeoutMs) });
   const refuseLogin = (k: string) => { if (isLogin(k)) throw new Error('a cloud sign-in is never read on this Mac'); };
 
