@@ -230,9 +230,9 @@ export function SetupSplit(p: SetupSplitProps) {
     return () => window.removeEventListener('keydown', onKey, true);
   });
 
-  const go = (label: string, run: () => void, enabled = true) => {
+  const go = (label: string, run: () => void, enabled = true, working?: string) => {
     primary.current = enabled ? run : () => {};
-    return <button type="button" className="ss-go" disabled={busy || !enabled} onClick={run}>{label}<Keys ks={['↵']} /></button>;
+    return <button type="button" className="ss-go" disabled={busy || !enabled} onClick={run}>{busy && working ? working : label}<Keys ks={['↵']} /></button>;
   };
   const quiet = (label: string, run: () => void) => <button type="button" className="ss-quiet" disabled={busy} onClick={run}>{label}</button>;
 
@@ -245,7 +245,7 @@ export function SetupSplit(p: SetupSplitProps) {
         {p.chats.map((t) => <Row key={t.id} face={t.source === 'codex' ? 'X' : 'C'} name={t.title} sub={`${t.source === 'codex' ? 'Codex' : 'Claude Code'} · ${p.nameOf(bare(t.folder))} · ${said(t.when)}`}
           end={<Check on={p.ticks.has(t.id)} />} on={p.ticks.has(t.id)} onClick={() => p.onToggle(t.id)} />)}
       </div>
-      <div className="ss-acts">{go(ticked.length ? `Add ${ticked.length} to your inbox` : 'Continue', () => void bring())}{quiet('Skip', next)}</div>
+      <div className="ss-acts">{go(ticked.length ? `Add ${ticked.length} to your inbox` : 'Continue', () => void bring(), true, 'Adding…')}{quiet('Skip', next)}</div>
     </>;
   } else if (step === 'folder') {
     head = ['Pick a folder for your first project.', 'Agents can read and change the files in it.'];
@@ -285,7 +285,7 @@ export function SetupSplit(p: SetupSplitProps) {
           <input className="ss-input" data-ss-enter="add" placeholder="Add by email…" value={typed} onChange={(e) => setTyped(e.target.value)} /></div>
       </div>
       <p className="ss-note">Free for 14 days.</p>
-      <div className="ss-acts">{go(emails.length || inviteList([typed]).length ? `Send ${inviteList([...emails, typed]).length === 1 ? '1 invite' : `${inviteList([...emails, typed]).length} invites`}` : 'Continue', () => void sendInvites())}{quiet('Just me for now', next)}</div>
+      <div className="ss-acts">{go(emails.length || inviteList([typed]).length ? `Send ${inviteList([...emails, typed]).length === 1 ? '1 invite' : `${inviteList([...emails, typed]).length} invites`}` : 'Continue', () => void sendInvites(), true, 'Sending…')}{quiet('Just me for now', next)}</div>
     </>;
   } else if (step === 'teammates') {
     head = ['Add AI teammates.', 'They work for you, on jobs you pick.'];
@@ -296,7 +296,7 @@ export function SetupSplit(p: SetupSplitProps) {
         {left.map((s) => <Row key={s.starter} face={<span className="ss-ai">{s.name[0]}</span>} name={s.name} sub={s.ask} end={<Check on={picked.has(s.starter)} />} on={picked.has(s.starter)} onClick={() => toggle(s.starter)} />)}
         <div className="ss-row"><span className="ss-face ss-ai ss-dash"><Plus /></span><input className="ss-input" placeholder="Describe another job…" value={own} onChange={(e) => setOwn(e.target.value)} /></div>
       </div>
-      <div className="ss-acts">{go(count ? `Make ${count === 1 ? '1 teammate' : `${count} teammates`}` : 'Continue', () => void makeTeammates())}{quiet('Skip for now', next)}</div>
+      <div className="ss-acts">{go(count ? `Make ${count === 1 ? '1 teammate' : `${count} teammates`}` : 'Continue', () => void makeTeammates(), true, 'Making…')}{quiet('Skip for now', next)}</div>
     </>;
   } else if (step === 'look') {
     head = ['Pick your look.', 'The app changes as you choose.'];

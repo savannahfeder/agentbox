@@ -103,3 +103,6 @@ export function setupStartsOn({ home, sky }: { home: string | null; sky: string 
   const on = home !== '0';
   return { home: on, sky: on && !sky ? 'ember' : null };
 }
+
+/** The walkthrough's place, from what is done: the tour can point back at a step, the counter never goes back. */
+export const tourCount = (rows: ChecklistRow[]) => `${Math.min(rows.filter((r) => r.state === 'done').length + 1, rows.length)} of ${rows.length}`;

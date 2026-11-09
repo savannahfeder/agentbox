@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import {
-  setupSteps, stepLabel, connectTiles, CONNECT_FIRST, toolUse, typingInSetup, setupStartsOn, lookChoices, starterChoices, inviteList, setUpLines, tourChecklist,
+  setupSteps, stepLabel, connectTiles, CONNECT_FIRST, toolUse, typingInSetup, setupStartsOn, tourCount, lookChoices, starterChoices, inviteList, setUpLines, tourChecklist,
 } from '../renderer/src/setup-split.ts';
 
 describe('which steps the setup shows', () => {
@@ -188,5 +188,17 @@ describe('the walkthrough list beside the app', () => {
   // ⌘K and the new-thread card centred on the whole window, half over the list.
   it('centres the dialogs on the app, not the window', () => {
     expect(css).toMatch(/:root\[data-tour-list\] \.modal-backdrop \{ left: var\(--tl-w\)/);
+  });
+});
+
+describe('the walkthrough counter', () => {
+  // A tester saw it go from 3 of 5 back to 2 of 5 when the tour pointed back at Open one.
+  it('counts what is done, so it never goes backwards', () => {
+    expect(tourCount(tourChecklist(['start', 'compose', 'open'], '⌘', 'working'))).toBe('3 of 5');
+    expect(tourCount(tourChecklist(['start', 'compose', 'open'], '⌘', 'open'))).toBe('3 of 5');
+  });
+  it('starts at 1 and stops at the last', () => {
+    expect(tourCount(tourChecklist([]))).toBe('1 of 5');
+    expect(tourCount(tourChecklist(['start', 'compose', 'open', 'choose', 'close', 'palette']))).toBe('5 of 5');
   });
 });
