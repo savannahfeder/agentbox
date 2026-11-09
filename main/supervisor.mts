@@ -176,7 +176,7 @@ import { catchUpRow, catchUpResult } from './catch-up.mts';
 import { isAuto, asksWho, routeCandidates, routePrompt, readRoute, routedPatch, orPrimary, NOBODY_WHY } from '../shared/auto-route.mjs';
 import { LEVELS, latestMessage, sortMessage, wantsPriority } from './message-priority.mts';
 import { NAME, Name, envName, nameSlug, isOurSlug } from '../shared/product-name.mjs';
-import { signInFiles, signInStamp } from './sign-in-files.mts';
+import { signInFiles, signInStamp, claudeKeychainService, keychainStamp } from './sign-in-files.mts';
 import { runsOn } from './runs-on.mts';
 import { MemoryGateServer, defaultSocketPath as memoryGateSocketPath, readMacPressure } from './memory-gate-server.mts';
 import { startDecision, readMacPressureNow, SETTLE_MS, STALE_MS } from './start-hold.mts';
@@ -1882,7 +1882,7 @@ export class Supervisor {
     let lifted = false;
     for (const [key, trouble] of Object.entries(this._profileTrouble ?? {})) {
       if (trouble?.cause !== 'signed-out') continue;
-      const stamp = signInStamp(this._signInFilesFor(key));
+      const stamp = this._signInMoment(key);
       if (!stamp || stamp <= (trouble.stamp ?? trouble.at ?? 0)) continue;
       trouble.stamp = stamp;
       if (this._profileCooldown) this._profileCooldown[key] = 0;
@@ -1897,6 +1897,26 @@ export class Supervisor {
     }
     if (lifted) this._saveState();
     return lifted;
+  }
+
+  /**
+   * When one account last signed in, as far as can be seen. A Claude login on a
+   * Mac lives in the Keychain, and `.claude.json` is rewritten by every Claude
+   * session on it, so while the Keychain has an entry that file says nothing.
+   */
+  _signInMoment(key: string) {
+    const files = this._signInFilesFor(key);
+    if (key.startsWith('codex:')) return signInStamp(files);
+    const folder = key === 'default' ? null : key;
+    const home = this.config.home || os.homedir();
+    // The default login's entry is the real home's, not a stand-in home's.
+    const keychain = folder || home === os.homedir() ? this._keychainStamp(claudeKeychainService(folder)) : null;
+    if (keychain == null) return signInStamp(files);
+    return Math.max(keychain, signInStamp(files.filter((f) => path.basename(f) !== '.claude.json')));
+  }
+
+  _keychainStamp(service: string) {
+    return keychainStamp(service);
   }
 
   /** Which files one account's login writes, by the key its trouble is kept under. */
@@ -5746,7 +5766,7 @@ export class Supervisor {
     // What the login files looked like when it was found out, so that
     // `_noticeSignIns` can tell a login landing afterwards from one before.
     if (cause === 'signed-out') {
-      const stamp = signInStamp(this._signInFilesFor(profile));
+      const stamp = this._signInMoment(profile);
       this._profileTrouble[profile].stamp = Math.max(stamp, had?.stamp ?? 0);
     }
     // When the limit says it resets, so `_forgetResetLimits` can let it go then.
