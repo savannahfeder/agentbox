@@ -6948,11 +6948,12 @@ export default function App() {
     rememberOffered(localStorage);
     setTour(startTour());
     setFresh(false);
-    setHomeOpen(false);
+    // Lands on Home when it is on, where the setup's preview already was.
+    setHomeOpen(homeSet.on);
     setView('inbox');
     setFocused(null);
     setSelected(0);
-  }, [setTour, setHomeOpen]);
+  }, [setTour, setHomeOpen, homeSet.on]);
 
   // THE FIRST RUN ON MAIN ENDS IN THE INBOX, on the task just sent when there is one, with its two lessons left to give.
   const [landOn, setLandOn] = useState<string | null>(null);

@@ -193,6 +193,10 @@ describe('the walkthrough counter', () => {
     expect(tourCount(tourChecklist(['start', 'compose', 'open'], '⌘', 'working'))).toBe('3 of 5');
     expect(tourCount(tourChecklist(['start', 'compose', 'open'], '⌘', 'open'))).toBe('3 of 5');
   });
+  // Then the founder saw "1 OF 5" with Open one, the second row, lit.
+  it('agrees with the lit row when the tour starts further down', () => {
+    expect(tourCount(tourChecklist([], '⌘', 'open'))).toBe('2 of 5');
+  });
   it('starts at 1 and stops at the last', () => {
     expect(tourCount(tourChecklist([]))).toBe('1 of 5');
     expect(tourCount(tourChecklist(['start', 'compose', 'open', 'choose', 'close', 'palette']))).toBe('5 of 5');
@@ -227,5 +231,13 @@ describe('the app preview in its panel', () => {
   const split = fs.readFileSync(new URL('../renderer/src/components/SetupSplit.tsx', import.meta.url), 'utf8');
   it('is cut only at the right and bottom edges, so its outline shows', () => {
     expect(split).toMatch(/--ss-clip', `inset\(-\d+px \$\{right\}px \$\{bottom\}px -\d+px/);
+  });
+});
+
+describe('the app beside the walkthrough', () => {
+  // The founder: "it went from being nice and curved to this (sharp borders)".
+  const css = fs.readFileSync(new URL('../renderer/src/components/setup-split.css', import.meta.url), 'utf8');
+  it('is a rounded window in a panel, as in the setup', () => {
+    expect(css).toMatch(/:root\[data-tour-list\] #root \{[^}]*border-radius: 14px/);
   });
 });
