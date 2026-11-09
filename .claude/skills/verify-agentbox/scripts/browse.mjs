@@ -87,7 +87,8 @@ const LOOK = `(() => {
   return 'SCREEN TEXT:\\n' + text + '\\n\\nTHINGS TO PRESS (' + list.length + '):\\n' + list.join('\\n');
 })()`;
 
-const running = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+// EPERM means it exists but this process may not signal it, as from inside a Codex tester's sandbox.
+const running = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e?.code === 'EPERM'; } };
 /** The page loads before the app draws; a look straight after shows an empty screen. */
 const drawn = (t) => t.until('document.querySelectorAll("button").length > 0', { ms: 15_000 }).catch(() => {});
 

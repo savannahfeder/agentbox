@@ -99,6 +99,17 @@ describe('how a tester starts', () => {
   });
 });
 
+// The first Codex power test (2026-11-09) logged "App does not open at the
+// start of the day": inside the sandbox, signalling the browser the runner had
+// opened answers EPERM (measured with `codex sandbox -- node -e
+// "process.kill(<pid>, 0)"`), which read as not running, so `app open` started
+// a second Chrome on the same profile and it died.
+describe('a sandboxed tester finds the browser the runner opened', () => {
+  it('counts a process it may not signal as running', () => {
+    expect(read('.claude/skills/verify-agentbox/scripts/browse.mjs')).toMatch(/catch \(e\) \{ return e\?\.code === 'EPERM'; \}/);
+  });
+});
+
 describe('neither runner can start a tester on Claude Code', () => {
   it('the product loop refuses a Claude engine', () => {
     expect(() => testerArgv('claude', { dir: '/d', prompt: 'go', last: '/d/l' })).toThrow(/codex/);
