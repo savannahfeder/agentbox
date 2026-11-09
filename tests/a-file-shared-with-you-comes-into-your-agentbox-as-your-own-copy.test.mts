@@ -90,7 +90,8 @@ describe('bringing it in', () => {
     const row = store.readItem(slug, out.id)!;
     expect(row.title).toBe('Pricing plan');
     expect(row.status).toBe('done');
-    expect(row.body).toContain(`Maya Chen shared this with me at https://app.agentbox.ac/f/${token}`);
+    expect(row.body.startsWith('Maya Chen shared this with me.\n')).toBe(true);
+    expect(row.body).not.toContain(token);
     expect(row.body).toContain(`[pricing.md](${out.src})`);
   });
 

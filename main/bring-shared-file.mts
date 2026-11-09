@@ -35,12 +35,12 @@ export interface BroughtIn { product: string; id: string; src: string }
 export async function bringSharedFile({ token, product, read, productDir, compose, close }: {
   token: string;
   product: string;
-  read: (token: string) => Promise<{ file: SharedLinkFile; bytes: Buffer; url: string | null }>;
+  read: (token: string) => Promise<{ file: SharedLinkFile; bytes: Buffer }>;
   productDir: string;
   compose: (fields: { title: string; body: string }) => { id: string } | null | undefined;
   close: (id: string) => void;
 }): Promise<BroughtIn> {
-  const { file, bytes, url } = await read(token);
+  const { file, bytes } = await read(token);
   // Through a file rather than base64, since a film is up to 200 MB.
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbox-shared-'));
   let saved;
@@ -54,7 +54,8 @@ export async function bringSharedFile({ token, product, read, productDir, compos
   if (!saved) throw new Error('This file could not be saved.');
   const who = file.ownerName?.trim() || 'Someone';
   const shown = saved.image ? `![${saved.name}](${saved.rel})` : `[${saved.name}](${saved.rel})`;
-  const body = [`${who} shared this with me${url ? ` at ${url}` : ''}. This is my own copy to change.`, '', shown].join('\n');
+  // The link stays off the message: a person's own message draws no markdown link, and a raw one fills it.
+  const body = [`${who} shared this with me.`, '', shown].join('\n');
   const made = compose({ title: sharedFileTitle(file), body });
   if (!made?.id) throw new Error('The thread for this file could not be made.');
   close(made.id);

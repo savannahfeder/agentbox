@@ -4537,7 +4537,7 @@ export default function App() {
   }, [joinTick, roomsUi.live, snap, showToast]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A FILE SOMEONE SHARED BY ITS LINK, from the link page's "Open in Agentbox":
-  // brought into the project on screen, then its thread opens with the file full screen.
+  // brought into the project on screen, then its thread opens with the file open.
   const projectNow = useRef<string | null>(null);
   projectNow.current = productFilter ?? focused?.product ?? null;
   const broughtIn = useRef<{ id: string; product: string; src: string } | null>(null);
@@ -4561,7 +4561,7 @@ export default function App() {
     const row = want && items.find((i) => i.id === want.id && i.product === want.product);
     if (!want || !row) return;
     broughtIn.current = null;
-    pendingDoc.current = { id: row.id, doc: { product: want.product, src: want.src }, mode: 'focus' };
+    pendingDoc.current = { id: row.id, doc: { product: want.product, src: want.src } };
     setSearch(null);
     setFocused(row);
     markSeen(row);

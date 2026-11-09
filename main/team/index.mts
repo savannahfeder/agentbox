@@ -1361,7 +1361,7 @@ export function createTeamService({
         }
         bytes = Buffer.concat(parts);
       } else bytes = Buffer.from(file.body, file.kind === 'image' || file.kind === 'pdf' ? 'base64' : 'utf8');
-      return { file, bytes, url: linkSite ? linkAddress(linkSite, token) : null };
+      return { file, bytes };
     },
     /** Every live link of this person's, for the one list of what they made public. */
     async fileLinks() {
