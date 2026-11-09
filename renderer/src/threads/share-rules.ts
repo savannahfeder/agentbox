@@ -79,7 +79,9 @@ export function matchPeople<P extends SharePerson>(people: readonly P[], typed: 
  * a Team thread stays Team, anything else adds them to its chosen people.
  */
 export function openTo(seen: SeenBy, visibleTo: readonly string[] | undefined, to: readonly string[]): { visibility: 'team' | 'people'; visibleTo: string[] } {
-  return { visibility: seen === 'team' ? 'team' : 'people', visibleTo: [...new Set([...(visibleTo ?? []), ...to])] };
+  // Whoever a private thread named before it went private is not let back in.
+  const kept = seen === 'private' ? [] : visibleTo ?? [];
+  return { visibility: seen === 'team' ? 'team' : 'people', visibleTo: [...new Set([...kept, ...to])] };
 }
 
 /** Chosen people…: the person picked is added to who can open it, or taken off; nobody left is Only you. */

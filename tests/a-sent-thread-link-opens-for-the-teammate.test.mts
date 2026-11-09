@@ -11,11 +11,14 @@
 // - Lena picked Who can open it › Chosen people… › Theo on a Team thread. It
 //   said "Theo is on this thread now" and the thread stayed open to everyone:
 //   the row opened Add people, which adds someone without narrowing anything.
+// - Maya made a checklist Only you after it had been open to Theo and Lena,
+//   then sent it to Theo alone. Lena could open it again: Send added Theo to
+//   the people the thread had named before it went private.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { seenNow, copyText, choose } from '../renderer/src/threads/share-rules.ts';
+import { seenNow, copyText, choose, openTo } from '../renderer/src/threads/share-rules.ts';
 import { ChooseList } from '../renderer/src/threads/SharePanel.tsx';
 globalThis.React = React;
 
@@ -69,6 +72,15 @@ describe('copying a link', () => {
   });
   it('says it failed only when both ways fail', async () => {
     expect(await copyText('x', { clipboard: undefined, doc: fakeDoc(false) })).toBe(false);
+  });
+});
+
+describe('sending a thread that is Only you', () => {
+  it('opens it to the people sent to and nobody it named before', () => {
+    expect(openTo('private', ['p-theo', 'p-lena'], ['p-theo'])).toEqual({ visibility: 'people', visibleTo: ['p-theo'] });
+  });
+  it('still adds to the people of a thread open to chosen people', () => {
+    expect(openTo('people', ['p-lena'], ['p-theo'])).toEqual({ visibility: 'people', visibleTo: ['p-lena', 'p-theo'] });
   });
 });
 
