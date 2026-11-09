@@ -32,7 +32,7 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
@@ -71,6 +71,7 @@ export function tallyStep(n, runs) {
     medianStartS: startMs.length ? +(startMs[startMs.length >> 1] / 1000).toFixed(1) : null,
     agentHours: +(agentSeconds / 3600).toFixed(2), dollars: +(agentSeconds / 3600 * DOLLARS_PER_AGENT_HOUR).toFixed(2),
     why: [...new Set(runs.filter((r) => !done.includes(r)).map((r) => r.why).filter(Boolean))].slice(0, 5),
+    threw: runs.filter((r) => r.threw).length,
   };
 }
 
@@ -110,13 +111,13 @@ async function oneRun({ clients, tag, seconds, chatty, dir, sandboxStarts, r }) 
     });
   } catch (e) {
     r.code = -1;
-    err += `\n${e?.stack || e}`;
+    r.threw = `${e?.message || e} ${String(e?.stack || '').split('\n').find((l) => /main\/cloud\//.test(l))?.trim() || ''}`;
   }
   r.endedAt = Date.now();
   r.sent = readSent(err);
   r.sandboxStarts = sandboxStarts?.get(tag);
   if (r.code !== 0 || r.starts !== 1 || r.ends !== 1) {
-    r.why = (err.split('\n').filter((l) => /cloud|could not|refused|error/i.test(l)).at(-1) || `exit ${r.code}, started ${r.starts}, ended ${r.ends}`).slice(0, 200);
+    r.why = r.threw || (err.split('\n').filter((l) => /cloud|could not|refused|error/i.test(l)).at(-1) || `exit ${r.code}, started ${r.starts}, ended ${r.ends}`).slice(0, 200);
   }
   return r;
 }
@@ -163,13 +164,12 @@ export async function runStep({ n, seconds, chatty = false, starting, clients, t
 // sandbox, one per session, and AgentCore's cold start as a wait.
 // `concurrency` is the function's reserved concurrency (scripts/cloud-gateway-setup.mjs): a call past it is
 // refused 429, as Lambda refuses it.
-export async function standinCloud({ tmp, chaos = false, concurrency = 200, coldStartMs = [1000, 4000], log = () => {} }) {
+export async function standinCloud({ tmp, chaos = false, concurrency = 200, hostCount = 5, coldStartMs = [1000, 4000], log = () => {} }) {
   const person = '55555555-5555-4555-8555-555555555555';
   const mem = memoryObjects();
   const ledger = { ...mem, get: async (k) => { await sleep(between(15, 40)); return mem.get(k); }, put: async (k, b, o) => { await sleep(between(25, 70)); return mem.put(k, b, o); } };
   const files = new Map();
   files.set(`logins/u-${person}/claude/load-test.json`, Buffer.from(JSON.stringify({ engine: 'claude', token: 'load-test-token-not-a-real-one' })));
-  const sandboxes = new Map();
   const sandboxStarts = new Map();
   let gw;
   const notices = [];
@@ -192,37 +192,24 @@ export async function standinCloud({ tmp, chaos = false, concurrency = 200, cold
   await new Promise((r) => bucket.listen(0, '127.0.0.1', r));
   const bucketUrl = `http://127.0.0.1:${bucket.address().port}`;
   const link = async (k) => `${bucketUrl}/${encodeURIComponent(k)}`;
-  const sandboxFor = async (sid) => {
-    if (!sandboxes.has(sid)) {
-      sandboxes.set(sid, (async () => {
-        await sleep(between(...coldStartMs));
-        const root = fs.mkdtempSync(path.join(tmp, 'vm-'));
-        const sb = createSandbox({ workRoot: path.join(root, 'work'), pathRoot: path.join(root, 'fs'), bridgeSocket: path.join(root, 'b.sock') });
-        const url = `http://127.0.0.1:${(await sb.listen(0, '127.0.0.1')).port}`;
-        return { sb, url, root };
-      })());
-    }
-    return sandboxes.get(sid);
+  // A machine a session is on: sessions are spread over a few processes, as
+  // one process may hold only 1024 files open.
+  const hosts = await Promise.all(Array.from({ length: hostCount }, () => sandboxHost(tmp, coldStartMs)));
+  const hostOf = (sid) => hosts[crypto.createHash('sha1').update(sid).digest()[0] % hosts.length];
+  const ask = async (sid, body) => {
+    const res = await fetch(`${hostOf(sid).url}/`, { method: 'POST', body: JSON.stringify({ sid, ...body }), headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(60_000) });
+    return res.json();
   };
   const agentcore = {
     async invoke(sid, payload) {
-      const { url } = await sandboxFor(sid);
-      const res = await fetch(`${url}/invocations`, { method: 'POST', body: JSON.stringify(payload), headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(60_000) });
-      const out = await res.json();
+      const out = await ask(sid, { payload });
       if (payload.action === 'start' && out.ok && !out.already) {
         const tag = /lt-start-(\S+);/.exec(payload.argv?.join(' ') || '')?.[1];
         if (tag) sandboxStarts.set(tag, (sandboxStarts.get(tag) || 0) + 1);
       }
       return out;
     },
-    async stop(sid) {
-      const s = sandboxes.get(sid);
-      sandboxes.delete(sid);
-      if (!s) return;
-      const { sb, root } = await s;
-      await sb.close();
-      fs.rmSync(root, { recursive: true, force: true });
-    },
+    async stop(sid) { await ask(sid, { stop: true }); },
   };
   const makeGateway = () => createGateway({
     agentcore, links: { get: link, put: link, head: link }, removeObject: async (k) => { files.delete(k); }, objects: ledger,
@@ -267,12 +254,58 @@ export async function standinCloud({ tmp, chaos = false, concurrency = 200, cold
     async restart(ms = 3000) { down = true; await sleep(ms); gw = makeGateway(); down = false; },
     async settle() { await Promise.all(notices); await gw.sweep(); },
     async live() { return Object.keys(JSON.parse((await mem.get(`ledger/people/${person}.json`)).body).live).length; },
-    machines: () => sandboxes.size,
+    async machines() { return (await Promise.all(hosts.map(async (h) => (await (await fetch(`${h.url}/`, { method: 'POST', body: '{"count":true}', signal: AbortSignal.timeout(10_000) })).json()).machines))).reduce((a, b) => a + b, 0); },
     async close() {
-      for (const sid of [...sandboxes.keys()]) await agentcore.stop(sid).catch(() => {});
+      for (const h of hosts) h.child.kill('SIGTERM');
       for (const s of [bucket, server]) { s.closeAllConnections(); await new Promise((r) => s.close(r)); }
     },
   };
+}
+
+/** A process holding sandboxes, one per session, made on a session's first call after a cold start. */
+async function sandboxHost(tmp, coldStartMs) {
+  const child = spawn(process.execPath, [fileURLToPath(import.meta.url), '--sandbox-host', tmp, JSON.stringify(coldStartMs)], { stdio: ['ignore', 'pipe', 'inherit'] });
+  const port = await new Promise((resolve, reject) => {
+    let buf = '';
+    child.stdout.on('data', (d) => { buf += d; const m = /port (\d+)/.exec(buf); if (m) resolve(Number(m[1])); });
+    child.on('exit', (code) => reject(new Error(`a sandbox host ended (${code})`)));
+  });
+  return { child, url: `http://127.0.0.1:${port}` };
+}
+
+async function hostSandboxes(tmp, coldStartMs) {
+  const sandboxes = new Map();
+  const sandboxFor = (sid) => {
+    if (!sandboxes.has(sid)) {
+      sandboxes.set(sid, (async () => {
+        await sleep(between(...coldStartMs));
+        const root = fs.mkdtempSync(path.join(tmp, 'vm-'));
+        const sb = createSandbox({ workRoot: path.join(root, 'work'), pathRoot: path.join(root, 'fs'), bridgeSocket: path.join(root, 'b.sock') });
+        return { sb, root };
+      })());
+    }
+    return sandboxes.get(sid);
+  };
+  const server = http.createServer((req, res) => {
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', async () => {
+      let out;
+      try {
+        const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        if (body.count) out = { machines: sandboxes.size };
+        else if (body.stop) {
+          const s = sandboxes.get(body.sid);
+          sandboxes.delete(body.sid);
+          if (s) { const { sb, root } = await s; await sb.close(); fs.rmSync(root, { recursive: true, force: true }); }
+          out = { ok: true };
+        } else out = await (await sandboxFor(body.sid)).sb.handle(body.payload);
+      } catch (err) { out = { ok: false, error: 'internal', message: err.message }; }
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(out));
+    });
+  });
+  server.listen(0, '127.0.0.1', () => console.log(`port ${server.address().port}`));
 }
 
 // THE REAL CLOUD. Everything AWS is asked of the `aws` command, signed in as an admin.
@@ -363,7 +396,7 @@ async function main() {
       const { tally } = await runStep({ n, seconds: secondsFor(n), chatty: o.chatty, starting: o.starting, clients, tmp, sandboxStarts: cloud.sandboxStarts, during, say });
       if (cloud.settle) await cloud.settle();
       if (cloud.live) tally.leftInLedger = await cloud.live();
-      if (cloud.machines) tally.machinesLeft = cloud.machines();
+      if (cloud.machines) tally.machinesLeft = await cloud.machines();
       if (cloud.me) tally.leftInLedger = (await cloud.me())?.running;
       if (cloud.dropped) tally.callsDropped = { ...cloud.dropped };
       if (cloud.callsTaken) tally.calls = cloud.callsTaken();
@@ -379,6 +412,8 @@ async function main() {
   for (const r of rows) say(`| ${ROW.map((k) => r[k] ?? '—').join(' | ')} |`);
 }
 
-if (path.resolve(process.argv[1] || '') === fileURLToPath(import.meta.url)) {
+if (path.resolve(process.argv[1] || '') === fileURLToPath(import.meta.url) && process.argv[2] === '--sandbox-host') {
+  hostSandboxes(process.argv[3], JSON.parse(process.argv[4]));
+} else if (path.resolve(process.argv[1] || '') === fileURLToPath(import.meta.url)) {
   main().catch((err) => { console.error(`cloud-load-test: ${err.stack || err.message}`); process.exit(1); });
 }
