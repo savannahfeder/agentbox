@@ -99,7 +99,7 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, lines
     const path = open.path?.replace(/^\.\//, '') ?? (noted && !/[#@]\d+$/.test(noted) ? noted : undefined);
     return path && !versionForPath(threadFiles(said), path) && viewKind(path) ? [...said, { path, by: null, at: 0 }] : said;
   }, [lines, open.path, open.note, marks.notes]);
-  const families = useMemo(() => threadFiles(files, numbers), [files, numbers]);
+  const families = useMemo(() => threadFiles(files, numbers, { keep: open.path }), [files, numbers, open.path]);
   const flat = useMemo(() => families.flatMap((f, fi) => f.versions.map((v, vi) => ({ fi, vi, v }))), [families]);
   const handedSteps = useMemo(() => stepsThrough(families, open.steps), [families, open.steps]);
   const latestSteps = useMemo(() => stepsThrough(families, latestPicturesSaid(lines)), [families, lines]);

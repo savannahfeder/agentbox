@@ -259,9 +259,11 @@ const endsWithPath = (whole, part) => whole === part || whole.endsWith(`/${part}
  *
  * `numbers` maps a path to its number on the file's version line
  * (shared/version-line.mjs). A family the line knows is numbered by it, in its
- * order, and a path the line does not know is no version of that family.
+ * order, and a path the line does not know is no version of that family,
+ * except `keep`: the path a person pressed, which Files may not have numbered yet.
  */
-export function threadFiles(files, numbers = null) {
+export function threadFiles(files, numbers = null, { keep = null } = {}) {
+  const kept = keep ? cleanAsked(keep) : null;
   const families = new Map();
   const seenPaths = new Set();
   for (const f of files ?? []) {
@@ -289,10 +291,12 @@ export function threadFiles(files, numbers = null) {
   for (const family of out) {
     if (!family.versions.some((v) => v.line !== undefined)) continue;
     const byLine = new Map();
-    // Files has not numbered it yet, so it goes after the versions it has.
     const unknown = [];
     for (const v of family.versions) {
-      if (v.line === undefined) { unknown.push(v); continue; }
+      if (v.line === undefined) {
+        if (kept && [v.path, ...(v.also ?? [])].some((p) => endsWithPath(p, kept) || endsWithPath(kept, p))) unknown.push(v);
+        continue;
+      }
       const was = byLine.get(v.line);
       if (was) (was.also ??= []).push(v.path, ...(v.also ?? []));
       else byLine.set(v.line, v);

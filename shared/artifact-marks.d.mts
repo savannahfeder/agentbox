@@ -17,7 +17,7 @@ export function opensBigInAGroup(name: string | null | undefined): boolean;
 export function otherFilesInLines(lines: unknown[] | null | undefined): Array<{ path: string; by: string | null; at: number; agent?: string }>;
 export function shownName(path: string | null | undefined): string;
 export function reviewKind(path: string | null | undefined): 'image' | 'film' | 'pdf' | 'markdown' | 'deck' | null;
-export function threadFiles(files: ThreadFile[] | null | undefined, numbers?: Record<string, number> | null): FileFamily[];
+export function threadFiles(files: ThreadFile[] | null | undefined, numbers?: Record<string, number> | null, opts?: { keep?: string | null }): FileFamily[];
 export function lineAsThread(line: ReadonlyArray<{ key: string; versions: ReadonlyArray<{ n: number; name: string; path: string | null; by: string | null; at: number; agent?: string; here: string[] }> }> | null | undefined): { numbers: Record<string, number>; lines: unknown[] };
 export function whereAPressLands(families: FileFamily[] | null | undefined, press?: { path?: string | null; file?: string | null }): { fi: number; vi: number } | null;
 export function versionForPath(families: FileFamily[] | null | undefined, path: string | null | undefined): FileVersion | null;
