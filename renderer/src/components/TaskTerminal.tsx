@@ -11,6 +11,7 @@ import {optionWordKey} from '../../../shared/terminal-keys.mts';
 import {dragSize,readSavedSize,SIZE_KEY} from '../../../shared/terminal-size.mts';
 import {terminalKeys} from '../../../shared/terminal-focus.mts';
 import {CrossIcon} from './CrossIcon';
+import {useEscapePutsAway} from '../escape-steps';
 import '@xterm/xterm/css/xterm.css';
 import './task-terminal.css';
 const screenCache=new Map<string,{token:string;screen:string;offset:number;cols:number;rows:number}>();
@@ -69,6 +70,12 @@ export function TaskTerminal({product,id,headerTarget,startOpen=false,commandSes
     grip.addEventListener('pointermove',move);grip.addEventListener('pointerup',up);grip.addEventListener('pointercancel',up);
   }
   useEffect(()=>{onOpenChange?.(open);},[open,onOpenChange]);
+  // Only a terminal opened on this visit: one remembered open from the last
+  // visit is not what she just opened, so Escape still leaves the thread.
+  const [openedAt,setOpenedAt]=useState<number|null>(null);
+  const wasOpen=useRef(open);
+  useEffect(()=>{if(open&&!wasOpen.current)setOpenedAt(Date.now());if(!open)setOpenedAt(null);wasOpen.current=open;},[open]);
+  useEscapePutsAway(openedAt,()=>setOpen(false));
   // ⌘K's "Open Terminal" row opens it; ⌘J is a switch, the way ⌘J is a switch
   // in every editor she already uses. The two events stay separate because a
   // menu row named "Open Terminal" that closed an open terminal would be

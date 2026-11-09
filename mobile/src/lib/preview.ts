@@ -346,6 +346,13 @@ export function previewCloud(now = () => Date.now()) {
   if (scene === 'connect') rows.projects = [];
   // `?scene=queued`: a reply on a thread nothing is running, which reads Queued.
   if (scene === 'queued') rows.commands.push({ id: 'c-preview-q', device: DEV, project: 'film', item: 'w-5e6f7a8b9c', kind: 'reply', payload: { text: 'Open on the inbox.' }, created_at: new Date(now() - 30_000).toISOString(), claimed_at: null, taken_at: null, outcome: null } as PhoneRows['commands'][number]);
+  // `?scene=away`: a computer last online three hours ago, with no cloud to carry on.
+  if (scene === 'away') rows.projects = rows.projects.map((p) => ({ ...p, updated_at: new Date(now() - 180 * 60_000).toISOString() }));
+  // `?scene=copies`: one task sent to Claude Code and again to Codex.
+  if (scene === 'copies') {
+    const stuck = rows.threads.find((t) => t.item === 'w-2b3c4d5e6f');
+    if (stuck) rows.threads.push({ ...stuck, item: 'w-2b3c4d5e70', snapshot: { ...stuck.snapshot, item: { ...stuck.snapshot.item, id: 'w-2b3c4d5e70', engine: 'codex' } as WorkItem } });
+  }
   let signedIn = scene !== 'signed-out' && !walking;
   const settings = previewSettings(now());
   // `?scene=codex`: a computer whose chosen agent is Codex, so a thread naming none runs on it.
