@@ -9,55 +9,40 @@
 // teammates step offered after the folder was skipped, where it can only answer
 // "make a project first", and four sky looks offered on a copy with Home off,
 // where a sky is never drawn and picking one changed nothing on screen, and
-// every tool's Connect failing on a computer that cannot keep a sign-in.
+// every tool's Connect failing on a computer that cannot keep a sign-in; the
+// founder then cut the tools step altogether.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import {
-  setupSteps, stepLabel, connectTiles, CONNECT_FIRST, toolUse, typingInSetup, setupStartsOn, tourCount, lookChoices, starterChoices, inviteList, setUpLines, tourChecklist,
+  setupSteps, stepLabel, typingInSetup, setupStartsOn, tourCount, lookChoices, starterChoices, inviteList, setUpLines, tourChecklist,
 } from '../renderer/src/setup-split.ts';
 
 describe('which steps the setup shows', () => {
   it('shows every step on a team build with chats and teammates on', () => {
-    expect(setupSteps({ chats: 3, team: true, teammates: true, project: true, tools: true })).toEqual(['chats', 'connect', 'invite', 'teammates', 'look']);
+    expect(setupSteps({ chats: 3, team: true, teammates: true, project: true })).toEqual(['chats', 'invite', 'teammates', 'look']);
   });
   it('asks for a folder instead of chats when this computer has none', () => {
-    expect(setupSteps({ chats: 0, team: true, teammates: true, project: true, tools: true })[0]).toBe('folder');
+    expect(setupSteps({ chats: 0, team: true, teammates: true, project: true })[0]).toBe('folder');
   });
   it('leaves out inviting on a build with no team cloud', () => {
-    expect(setupSteps({ chats: 2, team: false, teammates: true, project: true, tools: true })).not.toContain('invite');
+    expect(setupSteps({ chats: 2, team: false, teammates: true, project: true })).not.toContain('invite');
   });
   it('leaves out AI teammates while they are off', () => {
-    expect(setupSteps({ chats: 2, team: true, teammates: false, project: true, tools: true })).not.toContain('teammates');
+    expect(setupSteps({ chats: 2, team: true, teammates: false, project: true })).not.toContain('teammates');
   });
   it('counts steps from the list it shows', () => {
-    const steps = setupSteps({ chats: 1, team: false, teammates: false, project: true, tools: true });
-    expect(stepLabel(steps, 'connect')).toBe('Step 2 of 3');
+    const steps = setupSteps({ chats: 1, team: false, teammates: false, project: true });
+    expect(stepLabel(steps, 'look')).toBe('Step 2 of 2');
   });
   it('leaves out AI teammates when there is no project for them to work in', () => {
-    expect(setupSteps({ chats: 0, team: false, teammates: true, project: false, tools: true })).toEqual(['folder', 'connect', 'look']);
+    expect(setupSteps({ chats: 0, team: false, teammates: true, project: false })).toEqual(['folder', 'look']);
   });
-  it('leaves out connecting tools on a computer that cannot keep a sign-in', () => {
-    expect(setupSteps({ chats: 1, team: false, teammates: false, project: true, tools: false })).toEqual(['chats', 'look']);
+  // The founder (2026-11-09): "kill the connections page since their claude/codex will already have connections".
+  it('never asks to connect tools', () => {
+    expect(setupSteps({ chats: 1, team: true, teammates: true, project: true })).not.toContain('connect');
   });
   it('keeps AI teammates once a project exists, however it was made', () => {
-    expect(setupSteps({ chats: 0, team: false, teammates: true, project: true, tools: true })).toContain('teammates');
-  });
-});
-
-describe('the tools offered first', () => {
-  const tile = (id, connected = false, access = 'sign_in') => ({ id, name: id, connected, access });
-  it('offers the five tools an engineering team uses, in that order', () => {
-    const tiles = ['figma', 'vercel', 'linear', 'notion', 'github', 'sentry', 'slack'].map((id) => tile(id));
-    expect(connectTiles(tiles).map((t) => t.id)).toEqual(CONNECT_FIRST);
-  });
-  it('drops a tool this build does not carry instead of drawing an empty row', () => {
-    expect(connectTiles([tile('github'), tile('linear')]).map((t) => t.id)).toEqual(['github', 'linear']);
-  });
-  it('says what each tool is for in a few words, never "Not connected"', () => {
-    for (const id of CONNECT_FIRST) expect(toolUse(id)).toMatch(/^[A-Z][a-z]+( [a-z]+){1,3}$/);
-  });
-  it('never offers a tool its vendor has not opened to Agentbox', () => {
-    expect(connectTiles([tile('github'), tile('linear', false, 'vendor_approval')]).map((t) => t.id)).toEqual(['github']);
+    expect(setupSteps({ chats: 0, team: false, teammates: true, project: true })).toContain('teammates');
   });
 });
 
@@ -106,14 +91,14 @@ describe('the people invited', () => {
 
 describe('what the last screen says was set up', () => {
   it('says only what happened, in counts', () => {
-    expect(setUpLines({ chats: 4, project: null, tools: 2, invited: 3, teammates: ['Quality lead'] }))
-      .toEqual(['4 chats brought in', '2 tools connected', '3 teammates invited', 'Quality lead added']);
+    expect(setUpLines({ chats: 4, project: null, invited: 3, teammates: ['Quality lead'] }))
+      .toEqual(['4 chats brought in', '3 teammates invited', 'Quality lead added']);
   });
   it('names the project made from a folder, and says nothing of steps skipped', () => {
-    expect(setUpLines({ chats: 0, project: 'storefront', tools: 0, invited: 0, teammates: [] })).toEqual(['storefront is ready']);
+    expect(setUpLines({ chats: 0, project: 'storefront', invited: 0, teammates: [] })).toEqual(['storefront is ready']);
   });
   it('uses the singular for one', () => {
-    expect(setUpLines({ chats: 1, project: null, tools: 1, invited: 1, teammates: [] })).toEqual(['1 chat brought in', '1 tool connected', '1 teammate invited']);
+    expect(setUpLines({ chats: 1, project: null, invited: 1, teammates: [] })).toEqual(['1 chat brought in', '1 teammate invited']);
   });
 });
 

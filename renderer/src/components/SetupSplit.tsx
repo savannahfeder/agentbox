@@ -9,14 +9,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from '../api';
-import type { ConnectionTile, Snapshot } from '../types';
+import type { Snapshot } from '../types';
 import type { SessionThread } from '../agent-import-card';
 import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { starterAsks } from '../../../shared/teammates.mjs';
 import { SKY_THEMES, drawSky } from '../home/sky';
-import { connectTiles, toolUse, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupStep } from '../setup-split';
-import { logoOf } from '../connections/logos';
+import { typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupStep } from '../setup-split';
 import FolderPicker from './FolderPicker';
 import { Name } from '../../../shared/product-name.mjs';
 import './setup-split.css';
@@ -57,7 +56,6 @@ function Strip({ look }: { look: string }) {
   if (look === 'dark') return <span className="ss-strip ss-strip-dark" />;
   return <span className="ss-strip" style={sky?.frame ? { background: sky.frame } : undefined}><canvas ref={ref} /></span>;
 }
-const connectionLogo = (id: string) => { const src = logoOf(id); return src ? <img src={src} alt="" width={16} height={16} /> : <Plus />; };
 const LOOK_NAME = (id: string) => (id === 'light' ? 'Light' : id === 'dark' ? 'Dark' : SKY_THEMES.find((s) => s.id === id)?.name ?? id);
 
 export interface SetupSplitProps {
@@ -84,15 +82,11 @@ export function SetupSplit(p: SetupSplitProps) {
   const [at, setAt] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState({ chats: 0, project: null as string | null, tools: 0, invited: 0, teammates: [] as string[] });
+  const [done, setDone] = useState({ chats: 0, project: null as string | null, invited: 0, teammates: [] as string[] });
   const hadProject = useRef((p.snap?.products?.length ?? 0) > 0).current;
   // Until the first step is answered a project may still come, so the count does not jump.
   const project = hadProject || at === 0 || !!done.project || done.chats > 0;
-  // Asked as the setup opens, so a computer that cannot keep a sign-in never sees the tools step.
-  const [tiles, setTiles] = useState<ConnectionTile[] | null>(null);
-  const [tools, setTools] = useState(true);
-  useEffect(() => { void api.connections().then((l) => { setTiles(connectTiles(l.tiles)); setTools(l.canEncrypt !== false); }).catch(() => setTools(false)); }, []);
-  const steps = useMemo(() => setupSteps({ chats: p.chats.length, team, teammates: teammatesOn, project, tools }), [p.chats.length, team, teammatesOn, project, tools]);
+  const steps = useMemo(() => setupSteps({ chats: p.chats.length, team, teammates: teammatesOn, project }), [p.chats.length, team, teammatesOn, project]);
   // Read when the look step first shows, so picking does not reorder the list under the pointer.
   const looksAt = useRef<string[] | null>(null);
   const finished = at >= steps.length;
@@ -122,21 +116,6 @@ export function SetupSplit(p: SetupSplitProps) {
 
   const next = useCallback(() => { setError(null); setAt((i) => i + 1); }, []);
   const back = at > 0 && !finished ? () => { setError(null); setAt((i) => i - 1); } : null;
-
-  // ---- connect
-  const [keyFor, setKeyFor] = useState<string | null>(null);
-  const [keyText, setKeyText] = useState('');
-  const connect = useCallback(async (id: string, key?: string) => {
-    setBusy(true); setError(null);
-    const r = await api.connectionsConnect(key ? { id, key } : { id }).catch((e) => ({ ok: false, error: String(e) } as const));
-    setBusy(false);
-    if (r.ok && r.tile) {
-      setTiles((ts) => ts?.map((t) => (t.id === id ? r.tile! : t)) ?? ts);
-      if (r.tile.connected) setDone((d) => ({ ...d, tools: d.tools + 1 }));
-      setKeyFor(null); setKeyText('');
-    } else if ('needsKey' in r && r.needsKey) setKeyFor(id);
-    else setError(r.error ?? 'That did not connect.');
-  }, []);
 
   // ---- invite
   const me = p.snap?.team?.me;
@@ -221,7 +200,6 @@ export function SetupSplit(p: SetupSplitProps) {
       if (e.key === 'Enter' && !e.shiftKey && !busy) {
         const enter = (e.target as Element).getAttribute('data-ss-enter');
         if (typing && enter === 'add') { e.preventDefault(); addEmail(); return; }
-        if (typing && enter === 'key') { e.preventDefault(); if (keyFor && keyText.trim()) void connect(keyFor, keyText.trim()); return; }
         if (typing && !(e.metaKey || e.ctrlKey)) return;
         e.preventDefault(); primary.current();
       }
@@ -252,25 +230,6 @@ export function SetupSplit(p: SetupSplitProps) {
     body = <>
       <div className="ss-list"><Row face={<Folder />} name="Choose a folder on this computer" onClick={() => void chooseFolder()} end={<span className="ss-faint"><Plus />Choose</span>} /></div>
       <div className="ss-acts">{go('Choose a folder', () => void chooseFolder())}{quiet('Skip for now', next)}</div>
-    </>;
-  } else if (step === 'connect') {
-    head = ['Connect your tools.', 'Agents read and update them as they work.'];
-    body = <>
-      <div className="ss-list">
-        {(tiles ?? []).map((t) => keyFor === t.id ? (
-          <div key={t.id} className="ss-row ss-on">
-            <span className="ss-face ss-logo">{connectionLogo(t.id)}</span>
-            <input className="ss-input" data-ss-enter="key" autoFocus placeholder={`Paste a ${t.name} token, made in its settings`} value={keyText} onChange={(e) => setKeyText(e.target.value)} />
-          </div>
-        ) : (
-          <Row key={t.id} face={<span className="ss-logo">{connectionLogo(t.id)}</span>} name={t.name}
-            sub={t.connected ? (t.access === 'key' ? 'Connected with a personal token' : 'Connected') : toolUse(t.id)}
-            end={t.connected ? <span className="ss-dim"><Tick />Connected</span> : <span className="ss-faint"><Plus />Connect</span>}
-            onClick={t.connected ? undefined : () => void connect(t.id)} />
-        ))}
-        {tiles === null && <div className="ss-empty">Reading your connections…</div>}
-      </div>
-      <div className="ss-acts">{go('Continue', next)}</div>
     </>;
   } else if (step === 'invite') {
     head = ['Invite your team.', 'Add the people you work with.'];

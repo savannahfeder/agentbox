@@ -801,7 +801,12 @@ export default function App() {
   // nobody signed in, once the saved sign-in has been looked for, until it is
   // skipped (./sign-in-ask). Signing out lands on it, and it says so.
   const [signInSkipped, setSignInSkipped] = useState(() => localStorage.getItem(SIGN_IN_SKIPPED) === '1');
-  const signInAsked = signInAsk({ team: snap?.team, fixtures: api.isFixtures, skipped: signInSkipped, canSkip: !onCloudPhone() });
+  // Read once, from the first snapshot: the setup makes projects, and that must not bring the page back mid-setup.
+  const [newInstall, setNewInstall] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (newInstall === null && snap) setNewInstall(!firstRunDone(localStorage) && projectsOfTheirOwn(snap.products) === 0);
+  }, [snap, newInstall]);
+  const signInAsked = signInAsk({ team: snap?.team, fixtures: api.isFixtures, skipped: signInSkipped, canSkip: !onCloudPhone(), firstRun: newInstall !== false });
   const signInGate = signInAsked.page;
   const phoneWasSigningIn = useRef(signInGate);
   const [phoneSignInSettling, setPhoneSignInSettling] = useState(onPhone);
@@ -6937,6 +6942,9 @@ export default function App() {
   // THE FIRST RUN ENDS IN THE INBOX, where the tutorial takes over.
   const finishFresh = useCallback(() => {
     finishFirstRun(localStorage);
+    // The setup offered sign-in at its invite step; not taking it there is a skip.
+    skipSignIn();
+    setNewInstall(false);
     rememberOffered(localStorage);
     setTour(startTour());
     setFresh(false);
@@ -6944,7 +6952,7 @@ export default function App() {
     setView('inbox');
     setFocused(null);
     setSelected(0);
-  }, [setTour, setHomeOpen]);
+  }, [setTour, setHomeOpen, skipSignIn]);
 
   // THE FIRST RUN ON MAIN ENDS IN THE INBOX, on the task just sent when there is one, with its two lessons left to give.
   const [landOn, setLandOn] = useState<string | null>(null);

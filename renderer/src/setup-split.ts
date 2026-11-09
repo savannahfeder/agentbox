@@ -2,13 +2,13 @@
 // the right filling in. The rules, with no React, so
 // tests/the-setup-beside-the-app-asks-only-what-applies.test.mjs reads them.
 
-export type SetupStep = 'chats' | 'folder' | 'connect' | 'invite' | 'teammates' | 'look';
+export type SetupStep = 'chats' | 'folder' | 'invite' | 'teammates' | 'look';
 
 /** Only the steps that can apply on this build: most people are not on a team,
- *  an AI teammate needs a project to work in, and a tool needs somewhere safe to keep its sign-in. */
-export function setupSteps({ chats, team, teammates, project, tools }: { chats: number; team: boolean; teammates: boolean; project: boolean; tools: boolean }): SetupStep[] {
+ *  and an AI teammate needs a project to work in. Tools are not asked for: the
+ *  person's Claude Code and Codex already carry their connections. */
+export function setupSteps({ chats, team, teammates, project }: { chats: number; team: boolean; teammates: boolean; project: boolean }): SetupStep[] {
   const out: SetupStep[] = [chats > 0 ? 'chats' : 'folder'];
-  if (tools) out.push('connect');
   if (team) out.push('invite');
   if (teammates && project) out.push('teammates');
   out.push('look');
@@ -16,21 +16,6 @@ export function setupSteps({ chats, team, teammates, project, tools }: { chats: 
 }
 
 export const stepLabel = (steps: SetupStep[], step: SetupStep) => `Step ${steps.indexOf(step) + 1} of ${steps.length}`;
-
-/** The tools an engineering team reaches for first, in the order offered. */
-export const CONNECT_FIRST = ['github', 'linear', 'sentry', 'notion', 'vercel'];
-
-const USE: Record<string, string> = {
-  github: 'Issues and pull requests', linear: 'Issues and projects', sentry: 'Errors from production',
-  notion: 'Docs and specs', vercel: 'Deploys and previews',
-};
-/** What a tool is for, in the setup's words; one line each, all the same length. */
-export const toolUse = (id: string) => USE[id] ?? '';
-
-type TileLike = { id: string; access?: string };
-export function connectTiles<T extends TileLike>(tiles: T[]): T[] {
-  return CONNECT_FIRST.map((id) => tiles.find((t) => t.id === id)).filter((t): t is T => !!t && t.access !== 'vendor_approval');
-}
 
 /** Ids in shared sky themes and skins.ts: Light and Dark are the plain looks. */
 const LOOK_ORDER = ['ember', 'dusk', 'aurora', 'sage', 'light', 'dark'];
@@ -59,11 +44,10 @@ export function inviteList(raw: string[]): string[] {
 
 const n = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 /** What the last screen says was set up: only what happened. */
-export function setUpLines({ chats, project, tools, invited, teammates }: { chats: number; project: string | null; tools: number; invited: number; teammates: string[] }): string[] {
+export function setUpLines({ chats, project, invited, teammates }: { chats: number; project: string | null; invited: number; teammates: string[] }): string[] {
   const out: string[] = [];
   if (chats) out.push(`${n(chats, 'chat', 'chats')} brought in`);
   else if (project) out.push(`${project} is ready`);
-  if (tools) out.push(`${n(tools, 'tool', 'tools')} connected`);
   if (invited) out.push(`${n(invited, 'teammate', 'teammates')} invited`);
   for (const t of teammates) out.push(`${t} added`);
   return out;
