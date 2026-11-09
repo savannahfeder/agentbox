@@ -24,6 +24,8 @@ const ROW_FIELDS = [
   'result', 'note', 'answer', 'runAt', 'snoozedUntil', 'answeredThrough',
   'engine', 'model', 'start', 'due', 'problem', 'progress', 'solution',
   'createdAt', 'updatedAt', 'pinned', 'onMac',
+  // The phone command that made it, so the phone can follow its stand-in here.
+  'fromPhone',
 ];
 // The fields a line in a thread's history may carry in its patch: what the
 // thread view draws as the conversation and its state changes.

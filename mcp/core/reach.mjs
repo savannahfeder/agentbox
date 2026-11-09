@@ -205,6 +205,26 @@ export function documentVersion({ product, versionOf, path: rel = null, content 
   };
 }
 
+// Beside the product's documents, out of every listing (they skip dot folders).
+const AS_WRITTEN = '.as-written';
+const asWrittenFile = (dir, rel) => (!dir || !rel || path.isAbsolute(rel) || rel.split(/[\\/]/).includes('..') ? null : path.join(dir, AS_WRITTEN, rel));
+
+function asWritten(dir, rel) {
+  const file = asWrittenFile(dir, rel);
+  try { return file ? fs.readFileSync(file, 'utf8') : null; } catch { return null; }
+}
+
+/** Keeps the words a thread's agent wrote to a document, so an edit made over the file later can be told from them. */
+export function keepAsWritten(product, rel, content) {
+  if (typeof content !== 'string' || reviewKind(rel) !== 'markdown') return;
+  try {
+    const file = asWrittenFile(resolveProduct(product).dir, rel);
+    if (!file) return;
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, content);
+  } catch { /* the document itself is saved; only the merge loses its base */ }
+}
+
 const readVersion = (dir, v) => {
   try { return fs.readFileSync(path.isAbsolute(v.path) ? v.path : path.join(dir, v.path), 'utf8'); } catch { return null; }
 };
@@ -222,18 +242,22 @@ const readVersion = (dir, v) => {
 function keepWhatOthersWrote(known, content) {
   if (typeof content !== 'string' || !known.dir) return null;
   // Only when this thread can see every version: a copy elsewhere may hold one it cannot read.
-  if (known.chain.length < 2 || known.chain.length !== known.versions) return null;
+  if (!known.chain.length || known.chain.length !== known.versions) return null;
   const head = known.chain[known.chain.length - 1];
-  // A save this thread's own agent names carries no voice, teammate or not.
-  const itsOwn = !head.edited && (head.agent === '' || head.agent === known.voice);
-  if (itsOwn || reviewKind(head.path) !== 'markdown') return null;
+  if (reviewKind(head.path) !== 'markdown') return null;
   const headText = readVersion(known.dir, head);
   if (headText == null || headText === content) return null;
+  // A save this thread's own agent names carries no voice, teammate or not.
+  const itsOwn = !head.edited && (head.agent === '' || head.agent === known.voice);
+  // The document beside a thread saves typing over the file, so only the copy
+  // kept at write time tells the agent's words from the person's.
+  const wrote = itsOwn ? asWritten(known.dir, head.path) : null;
+  if (itsOwn && (wrote == null || wrote === headText)) return null;
+  const older = known.chain.slice(0, -1).map((v) => readVersion(known.dir, v));
   let baseText = null;
   // Nearer the newest than any older version: written from it, so nothing of theirs is missing.
   let gap = lineGap(headText, content);
-  for (const v of known.chain.slice(0, -1)) {
-    const was = readVersion(known.dir, v);
+  for (const was of wrote != null ? [...older, wrote] : older) {
     if (was == null) continue;
     // The newest of equals: a later version of the same words is the likelier copy.
     const far = lineGap(was, content);

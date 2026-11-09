@@ -43,6 +43,7 @@ const READS_ON_THE_PHONE = [
   'mobile/src/lib/unread.ts',
   'mobile/src/ui/Filters.tsx',
   'mobile/src/ui/Pickers.tsx',
+  'mobile/src/ui/SettingsHome.tsx',
   'mobile/src/ui/SettingsPages.tsx',
   'mobile/src/ui/TeamPage.tsx',
   'mobile/src/ui/ThreadMenu.tsx',

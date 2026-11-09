@@ -1,6 +1,4 @@
-// The settings writer saved a number without waking the queue. If a Claude
-// plan supplied the startup limit, Codex also kept using its old fallback
-// indefinitely. Exercise the settings writer and real scheduler together;
+// The settings writer saved a number without waking the queue. Exercise the settings writer and real scheduler together;
 // replace only worker launch so these tests never start a model.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
@@ -15,11 +13,11 @@ const task = (id, engine = 'codex') => ({
   labels: ['founder'], priority: 5, createdAt: 1, updatedAt: 1,
 });
 
-function setup({ limit = 3, plan = null, engine = 'codex', running = 3 } = {}) {
+function setup({ limit = 3, engine = 'codex', running = 3 } = {}) {
   config = {
     home: dir, appDir: dir, storeRoot: dir, authProfiles: ['default'],
     codexBin: '/nonexistent/codex', engineChoice: '2026-09-04',
-    maxConcurrentSessions: limit, planSlotsFrom: plan,
+    maxConcurrentSessions: limit,
   };
   const items = Array.from({ length: 6 }, (_, n) => task(`queued-${n}`, engine));
   supervisor = new Supervisor(config, {
@@ -64,22 +62,13 @@ describe('changing the agent limit starts waiting work', () => {
     expect(supervisor._loadFor(engine)).toBe(5);
   });
 
-  it.each([4, 5])('a new explicit limit of %i replaces the inherited plan limit for Codex', async limit => {
-    setup({ limit: 1, plan: 'Pro' });
+  it.each([4, 5])('a new explicit limit of %i replaces an inherited limit of one for Codex', async limit => {
+    setup({ limit: 1 });
     choose(limit);
     // A normal poll must honour the change too, independently of the wake.
     await supervisor.tick();
     expect(supervisor._loadFor('codex')).toBe(limit);
     expect(started).toHaveLength(limit - 3);
-    expect(config.planSlotsFrom).toBeNull();
-  });
-
-  it('keeps the plan default until the user changes the agent limit', () => {
-    setup({ limit: 1, plan: 'Pro' });
-    setWorkspaceSetting({ config, supervisor }, { key: 'diagnostics', value: false });
-    expect(config.planSlotsFrom).toBe('Pro');
-    expect(supervisor._slotsPerAccount('claude')).toBe(1);
-    expect(supervisor._slotsPerAccount('codex')).toBe(3);
   });
 
   it('uses the last number after rapid changes and starts each task once', async () => {
@@ -92,7 +81,7 @@ describe('changing the agent limit starts waiting work', () => {
   });
 
   it('lowering an inherited limit takes effect without cancelling running work', async () => {
-    setup({ limit: 1, plan: 'Pro' });
+    setup({ limit: 1 });
     const existing = [...supervisor.sessions.values()];
     choose(2);
     await supervisor.tick();
@@ -117,11 +106,10 @@ describe('changing the agent limit starts waiting work', () => {
   });
 
   it('a failed save leaves the effective limit and queue unchanged', async () => {
-    setup({ limit: 1, plan: 'Pro' });
+    setup({ limit: 1 });
     fs.writeFileSync(path.join(dir, 'zero.config.json'), '{invalid');
     expect(() => choose(5)).toThrow();
     expect(config.maxConcurrentSessions).toBe(1);
-    expect(config.planSlotsFrom).toBe('Pro');
     await vi.advanceTimersByTimeAsync(2_000);
     expect(started).toEqual([]);
   });

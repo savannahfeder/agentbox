@@ -28,7 +28,8 @@ import { mateOf } from '../../../lib/teammates';
 import { TeammateMark } from '../../../ui/Teammates';
 import { screenGate } from '../../../lib/thread-gate';
 import { liveOf, moveChoices, offersOf, ruleFor, shownLevel, summaryParts, type Offers } from '../../../lib/thread-offers';
-import { phoneSlug, waitFacts } from '../../../../../renderer/src/phone-rows';
+import { madeThreadOf, phoneSlug, waitFacts } from '../../../../../renderer/src/phone-rows';
+import { madeHere } from '../../../../../shared/phone-snapshot.mjs';
 import { replySender, type ReplyDeps } from '../../../lib/thread-reply';
 import { atEnd, keptPlace } from '../../../lib/thread-scroll';
 import { appStore } from '../../../platform/persist';
@@ -360,6 +361,10 @@ export default function ThreadScreen() {
   const walked = useRef<typeof c.tabs.inbox>([]);
 
   const back =() => (router.canGoBack() ? router.back() : router.replace('/'));
+  // A thread sent from here, now made by the computer under its own id.
+  const made = !thread ? madeThreadOf(c.rows, String(product), String(id)) : null;
+  const sentFromHere = !thread && c.rows.commands.some((cmd) => cmd.kind === 'new' && madeHere(cmd.id) === String(id));
+  useEffect(() => { if (made) router.replace({ pathname: '/thread/[product]/[id]', params: { product: String(product), id: made } }); }, [made]);
   const gate = screenGate(c);
   if (gate === 'wait') return <Wall><Waiting /></Wall>;
   if (gate === 'sign-in') return <Redirect href="/sign-in" />;
@@ -367,7 +372,7 @@ export default function ThreadScreen() {
     return (
       <Wall>
         <TopBar left={<IconButton label="Back" onPress={back}><Back /></IconButton>} />
-        {c.loading ? <Waiting list /> : <T style={{ padding: size.inset, color: color.dim }}>This thread is not on your phone.</T>}
+        {c.loading ? <Waiting list /> : sentFromHere ? <Waiting list /> : <T style={{ padding: size.inset, color: color.dim }}>This thread is not on your phone.</T>}
       </Wall>
     );
   }
