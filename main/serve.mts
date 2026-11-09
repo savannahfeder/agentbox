@@ -51,9 +51,12 @@ import { createTeamService, teamStateFile } from './team/index.mts';
 import type { TeamSession } from './team/index.mts';
 import { startConnections } from './connections/start.mjs';
 import { ensurePersonalProject } from './team/projects.mts';
-import { loadCloudConfig, supabaseSession, headlessSessionFile } from './team/session.mjs';
+import { loadCloudConfig, supabaseSession, headlessSessionFile, sessionFileOutsideStore } from './team/session.mjs';
+import { gitHubPushSignIn } from './github-push-sign-in.mts';
+import { liveAddress } from './team/live-room.mjs';
 import { roomsSetup } from './team/room-setup.mts';
 import { matesForTheTeam } from './teammate-reach.mjs';
+import { alphaFeatures } from './settings.mts';
 import { appHome, carryMisplacedMachinery, storeRootEnv } from './store/home.mjs';
 import { keepAnswerModesIn } from './answer-modes.mts';
 
@@ -267,6 +270,11 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
   } catch (err) { console.warn(`zero: could not make My Workspace: ${(err as Error).message}`); }
   const store = await new Store(config).init();
   const supervisor = new Supervisor(config, store, appDir, dataDir, userDir);
+  // No keychain on this door: kept like its team session, plain and readable by this user only, outside the store.
+  supervisor.gitHubSignIn = gitHubPushSignIn({
+    file: sessionFileOutsideStore({ dir: userDir, name: 'github-sign-in.json', storeRoot: config.storeRoot }),
+    cipher: { encrypt: (text: string) => Buffer.from(text, 'utf8'), decrypt: (buf: Buffer) => buf.toString('utf8') },
+  });
   const window = broadcastingWindow();
   // A caller may bring its own three, which is how a test asks what the
   // handlers do with an answer only a real file dialog gives.
@@ -290,6 +298,7 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
     onChange: () => ipc?.push?.(),
     shareSite: cloudConfig.phoneSite ?? null,
     ownMates: () => matesForTheTeam(store, config),
+    sharing: () => alphaFeatures(config).multiplayer,
     rooms: roomsSetup({ config, store, supervisor, userDir }),
   }) : null;
   if (team) store.teammates?.bindTeam(team);
@@ -312,7 +321,7 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
   host.app.on('before-quit', () => analytics.track('app_quit', { seconds: Math.round(process.uptime()) }));
   const connected = startConnections({ config, supervisor, appDir, userDir, openExternal: host.shell.openExternal, onChange: () => ipc?.push?.() });
   host.app.on('before-quit', () => { void connected.stop(); });
-  ipc = registerIpc({ store, supervisor, config, window, analytics, host, team, connections: connected.connections, copies: connected.copies, onCount: () => usedToday(now()) });
+  ipc = registerIpc({ store, supervisor, config, window, analytics, host, team, connections: connected.connections, copies: connected.copies, onCount: () => usedToday(now()), liveAt: liveAddress(cloudConfig) });
   answerWhatOnlyTheWindowAnswered(host.ipcMain);
   return { config, store, supervisor, window, host, ipc, team, analytics, channels: host.ipcMain.handlers };
 }

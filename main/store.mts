@@ -15,7 +15,8 @@ import type { Callout } from '../shared/dashboard.mts';
 import { CLEAN_LABEL, isCleanRun } from '../shared/repeats.mjs';
 import { answerFor, describeFor } from './first-run.mts';
 import { checkProjectFolder } from '../shared/project-folder-check.mts';
-import { SAME_PROJECT, movedAway, movedHere, splitForCompose, whatMoves, whyItCannotMove } from '../shared/move-thread.mts';
+import { SAME_PROJECT, carriedLines, leftByAMove, movedAway, movedHere, ranHere, splitForCompose, whatMoves, whyItCannotMove, type CarriedLine } from '../shared/move-thread.mts';
+import { agentSpokeSince, answerTs } from '../shared/answers.mjs';
 import { EXAMPLES, stampsFor } from '../shared/first-run-examples.mts';
 import {
   PRACTICE_ANSWER, PRACTICE_BACKDROP, PRACTICE_FLAG, PRACTICE_NAME, PRACTICE_NOTE, PRACTICE_ROWS, PRACTICE_SLUG,
@@ -37,6 +38,9 @@ import {
 import { buildClaimLine, buildReleaseLine, GIVEN_TASK } from '../shared/work-items.mjs';
 import { isEffortWord } from '../shared/effort-levels.mts';
 import { shippedNote } from '../shared/shipped-note.mjs';
+import { notShipped } from '../shared/not-shipped.mts';
+import { asksForGitHubSignIn, SHIPPING_AGAIN } from '../shared/github-push-sign-in.mts';
+import { cleanSignInAnswer, openSignIn } from '../shared/sign-in-ask.mjs';
 import { machineryPath, removeMachinery } from './store/home.mjs';
 import { Teammates } from './teammates.mts';
 import type { WorkItem } from './supervisor.mts';
@@ -105,6 +109,8 @@ export interface AnswerInput {
   voice?: unknown;
   forAgent?: unknown;
   fromNotes?: unknown[];
+  /** On an answer that carries notes, the words the person typed after them. */
+  typed?: string;
   putAway?: unknown;
 }
 
@@ -440,7 +446,7 @@ export class Store {
     for (const product of this.listProducts()) {
       let items: StoreItem[] = [];
       try { items = workItemsDisk.readOlderWorkItems(product.dir, now); } catch { continue; }
-      for (const item of items) all.push({ ...item, product: product.slug, productName: product.name });
+      for (const item of items) if (!leftByAMove(item)) all.push({ ...item, product: product.slug, productName: product.name });
     }
     const finished = (i: StoreItem) => i.wrote?.status?.ts || i.updatedAt;
     all.sort((a, b) => finished(b)! - finished(a)!);
@@ -556,7 +562,7 @@ export class Store {
   // `inReplyTo` makes the answer a reply in a thread (w-920461cbe6): the uid
   // of the message it answers, on THE SAME LINE as the words, so the reply's
   // own uid (what its reactions hang off) is the line that says where it goes.
-  answerItem(slug: string, id: string, { answer, status, priority, permissionMode, engine, model, effort, inReplyTo, fromPhone, voice, forAgent, fromNotes, putAway }: AnswerInput) {
+  answerItem(slug: string, id: string, { answer, status, priority, permissionMode, engine, model, effort, inReplyTo, fromPhone, voice, forAgent, fromNotes, typed, putAway }: AnswerInput) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
     let item: (StoreItem & { product: string }) | null = null;
@@ -579,7 +585,7 @@ export class Store {
     if (engine !== undefined) item = workItemsDisk.updateWorkItem(dir, id, { engine: engine ?? '' }, { source: 'founder' });
     if (model !== undefined) item = workItemsDisk.updateWorkItem(dir, id, { model: model ?? '' }, { source: 'founder' });
     if (effort !== undefined) item = workItemsDisk.updateWorkItem(dir, id, { effort: effort ?? '' }, { source: 'founder' });
-    if (answer) item = workItemsDisk.updateWorkItem(dir, id, { answer, ...(inReplyTo ? { inReplyTo } : {}), ...(fromPhone ? { fromPhone } : {}), ...(voice ? { voice } : {}), ...(forAgent ? { forAgent } : {}), ...(fromNotes?.length ? { fromNotes } : {}) }, { source: 'founder' });
+    if (answer) item = workItemsDisk.updateWorkItem(dir, id, { answer, ...(inReplyTo ? { inReplyTo } : {}), ...(fromPhone ? { fromPhone } : {}), ...(voice ? { voice } : {}), ...(forAgent ? { forAgent } : {}), ...(fromNotes?.length ? { fromNotes } : {}), ...(fromNotes?.length && typed ? { typed } : {}) }, { source: 'founder' });
     // A REPLY ON A RUN THAT FINISHED QUIETLY MAKES IT NEWS AGAIN (w-5e3f2e047f).
     // A quiet run is kept out of her inbox, and a repeating task now opens on
     // its latest run, so without this the answer to what she just asked there
@@ -667,6 +673,27 @@ export class Store {
     // their own Reopen outranks that (see `closedBeforeItShipped` below).
     const closed = this.readItem(slug, id)?.status === 'done';
     return workItemsDisk.updateWorkItem(dir, id, { status: 'open' }, { source: closed ? 'founder' : 'system' });
+  }
+
+  // The person's answer, or the app's when it caught the browser coming back, to the sign-in a thread is open on.
+  answerSignIn(slug: string, id: string, answer: { id: unknown; said: unknown; url?: unknown }, { source = 'founder', now = Date.now() }: { source?: 'founder' | 'system'; now?: number } = {}) {
+    const item = this.readItem(slug, id);
+    const ask = openSignIn(item);
+    if (!ask || ask.id !== answer.id) throw new Error('That sign-in is no longer open.');
+    const clean = cleanSignInAnswer({ ...answer, at: now });
+    if (!clean) throw new Error(answer.said === 'landed' ? 'That is not a web address. Paste the whole address from the browser.' : 'That answer is not one the agent can take.');
+    return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, { signInAnswer: clean }, { source, now });
+  }
+
+  // Every thread whose ship waited on a GitHub sign-in on this computer goes to the queue again.
+  shipAgainAfterGitHubSignIn(now = Date.now()) {
+    const { workItemsDisk } = this.modules;
+    const again = this.listItems(now).filter((i) => i.status !== 'done' && asksForGitHubSignIn(notShipped(i)?.why));
+    for (const i of again) {
+      const labels = Array.isArray(i.labels) ? i.labels.filter((l) => l !== 'ship') : [];
+      workItemsDisk.updateWorkItem(this.productDir(i.product), i.id, { labels: [...labels, 'ship'], note: SHIPPING_AGAIN }, { source: 'system' });
+    }
+    return again.map((i) => i.id);
   }
 
   releaseRunClaim(slug: string, id: string, run?: Parameters<StoreModules['workItemsDisk']['releaseRunClaim']>[2]) {
@@ -904,11 +931,7 @@ export class Store {
 
   /**
    * MOVE A THREAD TO ANOTHER PROJECT (w-c9da359466, power-test-1 issue 20).
-   *
-   * Only a thread nothing has ever run on, and shared/move-thread.mts carries
-   * the whole of why: the rest of a thread is its session traces, its task
-   * folder and the git branch named after it, and a branch cannot change
-   * repository.
+   * shared/move-thread.mts says what moves and what stays.
    *
    * THE RULE IS ASKED AGAIN HERE. ⌘K asked it to decide which rows to draw,
    * off a snapshot that can be seconds old, and a worker that picked the
@@ -927,31 +950,69 @@ export class Store {
     const why = whyItCannotMove(item, { live: false });
     if (why) throw new Error(why);
 
-    const { compose, after } = splitForCompose(whatMoves(item!));
     // Where it came from, in the thread rather than only in a toast, because a
     // thread that turns up in a project nobody filed it in is a thread nobody
     // can account for a week later. It goes after your words: a body is what
     // the thread shows as your first message, and a one-line ask lives only in
-    // the title. Your later replies come too, one still waiting included,
-    // since the run there starts over from this message.
+    // the title.
     const said = movedHere(from?.name ?? fromSlug);
-    const yours = this.readHistory(fromSlug, id, { max: 1e6 })
-      .filter((l: { source?: string; patch?: { answer?: unknown } }) => l.source === 'founder' && typeof l.patch?.answer === 'string' && l.patch.answer.trim())
-      .map((l: { patch?: { answer?: unknown } }) => (l.patch!.answer as string).trim());
-    const body = [compose.body || compose.title, ...yours, said].filter(Boolean).join('\n\n');
-    let made = this.composeItem(toSlug, { ...compose, body });
-    // The three `composeItem` has no argument for (shared/move-thread.mts).
-    if (Object.keys(after).length) {
-      made = { ...this.modules.workItemsDisk.updateWorkItem(this.productDir(toSlug), made.id, after, { source: 'founder' }), product: toSlug };
+    const history = this.readHistory(fromSlug, id, { max: 1e6 });
+    const carried = ranHere(item) ? carriedLines(history, said) : [];
+    let made: StoreItem & { product: string };
+    if (carried.length) made = this.carryThread(fromSlug, id, toSlug, carried);
+    else {
+      const { compose, after } = splitForCompose(whatMoves(item!));
+      // Your later replies come too, one still waiting included, since the run
+      // there starts from this message.
+      const yours = history
+        .filter((l: { source?: string; patch?: { answer?: unknown } }) => l.source === 'founder' && typeof l.patch?.answer === 'string' && l.patch.answer.trim())
+        .map((l: { patch?: { answer?: unknown } }) => (l.patch!.answer as string).trim());
+      const body = [compose.body || compose.title, ...yours, said].filter(Boolean).join('\n\n');
+      made = this.composeItem(toSlug, { ...compose, body });
+      // The three `composeItem` has no argument for (shared/move-thread.mts).
+      if (Object.keys(after).length) {
+        made = { ...this.modules.workItemsDisk.updateWorkItem(this.productDir(toSlug), made.id, after, { source: 'founder' }), product: toSlug };
+      }
     }
 
     // AND THE OLD ROW CLOSES SAYING WHERE ITS THREAD WENT. The words are the
     // app's; the close is the person's, because a thread of theirs closed by
     // the app reads as news and stayed in Needs you. Z reopens it as before.
+    // One moment for both is what `leftByAMove` reads.
     const note = movedAway(to.name ?? toSlug);
-    this.modules.workItemsDisk.updateWorkItem(this.productDir(fromSlug), id, { note }, { source: 'system' });
-    this.modules.workItemsDisk.updateWorkItem(this.productDir(fromSlug), id, { status: 'done' }, { source: 'founder' });
+    const now = Date.now();
+    this.modules.workItemsDisk.updateWorkItem(this.productDir(fromSlug), id, { note }, { source: 'system', now });
+    this.modules.workItemsDisk.updateWorkItem(this.productDir(fromSlug), id, { status: 'done' }, { source: 'founder', now });
     return { item: made, from: from?.name ?? fromSlug, to: to.name ?? toSlug, note };
+  }
+
+  /**
+   * A thread that ran, written into `toSlug` as it was said, with its traces,
+   * and standing as it stood: waiting for you where the agent spoke last, or
+   * owed a run where your words have no answer yet.
+   */
+  carryThread(fromSlug: string, id: string, toSlug: string, lines: CarriedLine[]) {
+    const { workItemsDisk } = this.modules;
+    const dir = this.productDir(toSlug);
+    const was = this.readItem(fromSlug, id)!;
+    const [first, ...rest] = lines;
+    const { title, ...opening } = first.patch;
+    const created = workItemsDisk.createWorkItem(dir, { title: title ?? was.title, ...opening }, { source: first.source, now: first.ts });
+    for (const line of rest) workItemsDisk.updateWorkItem(dir, created.id, line.patch, { source: line.source, now: line.ts });
+    const stood = was.wrote?.status;
+    if (was.status && stood?.ts) workItemsDisk.updateWorkItem(dir, created.id, { status: was.status }, { source: stood.source ?? 'system', now: stood.ts });
+    let landed = this.readItem(toSlug, created.id)!;
+    // The agent there cannot resume the old session, so an answer it already
+    // gave must not read as a reply still waiting for one.
+    const replied = !!landed.answer && landed.answer !== '(withdrawn)';
+    if (replied && agentSpokeSince(landed, answerTs(landed))) {
+      landed = workItemsDisk.updateWorkItem(dir, created.id, { answeredThrough: answerTs(landed) }, { source: 'system' });
+    }
+    try {
+      const traces = this.machineryFile(fromSlug, path.join('sessions', id));
+      if (fs.existsSync(traces)) fs.cpSync(traces, this.machineryFile(toSlug, path.join('sessions', created.id)), { recursive: true });
+    } catch (err) { console.warn(`zero: could not carry the traces of ${id}: ${(err as Error).message}`); }
+    return { ...landed, product: toSlug };
   }
 
   /* ------------------------------- teammates ------------------------------ */

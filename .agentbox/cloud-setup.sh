@@ -11,7 +11,9 @@ if ! command -v xauth >/dev/null 2>&1 || ! ldconfig -p 2>/dev/null | grep -q 'li
   sudo apt-get update -qq
   sudo apt-get install -y -qq xvfb xauth libgtk-3-0 libnss3 libasound2
 fi
-# ffmpeg: design rounds film a flow drawn over the real app, frame by frame.
+# ffmpeg: design rounds film a flow drawn over the real app, and the launch-film work cuts video and mixes sound.
 command -v ffmpeg >/dev/null 2>&1 || { sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg; }
+# Inter: the launch-film work draws mockup text in it.
+fc-list 2>/dev/null | grep -qi "Inter" || { sudo apt-get update -qq && sudo apt-get install -y -qq fonts-inter; }
 # python3-venv: the pre-push hook installs semgrep into a venv (scripts/security-scan-the-push.mjs).
 python3 -c 'import ensurepip' >/dev/null 2>&1 || { sudo apt-get update -qq && sudo apt-get install -y -qq python3-venv; }
