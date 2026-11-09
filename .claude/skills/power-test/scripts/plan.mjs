@@ -167,8 +167,8 @@ export function restartAgain({ down, now, deadline, everyMs = 60_000 }) {
  * ever.
  */
 export function nextRound({ now, deadline, roundMs, idleInARow = 0, lastOutcome = null, maxIdle = 3, minRoundMs = 60_000 }) {
-  if (lastOutcome === 'signed-out') return { go: false, why: 'the tester could not sign in to Claude Code' };
-  if (lastOutcome === 'tester-out') return { go: false, why: 'the tester\'s own Claude Code ran out of usage' };
+  if (lastOutcome === 'signed-out') return { go: false, why: 'the tester could not sign in to Codex' };
+  if (lastOutcome === 'tester-out') return { go: false, why: 'the tester\'s own Codex ran out of usage' };
   if (idleInARow >= maxIdle) return { go: false, why: `the tester did nothing in ${idleInARow} rounds in a row` };
   if (deadline - now < minRoundMs) return { go: false, why: 'time is up' };
   return { go: true, endsAt: Math.min(now + roundMs, deadline) };
@@ -176,8 +176,8 @@ export function nextRound({ now, deadline, roundMs, idleInARow = 0, lastOutcome 
 
 /** What a round amounted to, from the actions it took and the last words of its session. */
 export function roundOutcome({ actions, text = '' }) {
-  if (/not logged in|invalid api key|please run \/login|authentication_error|OAuth token has expired/i.test(text) && actions === 0) return 'signed-out';
-  if (/hit your (session |weekly )?limit|usage limit reached|rate_limit_error/i.test(text) && actions === 0) return 'tester-out';
+  if (/not logged in|invalid api key|please run \/login|authentication_error|OAuth token has expired|401 Unauthorized|Failed to authenticate|codex login/i.test(text) && actions === 0) return 'signed-out';
+  if (/hit your (session |weekly |usage )?limit|usage limit|rate_limit_error/i.test(text) && actions === 0) return 'tester-out';
   return actions >= 3 ? 'acted' : 'idle';
 }
 
@@ -263,7 +263,7 @@ ${person.text}
 THE APP
 Agentbox is an inbox for AI coding agents. You write a task as a new thread; an agent (Claude Code, or Codex) takes it, works, and answers in the thread. You reply, pick one of the options it offers, close the thread, put it off, and so on. ${person.knowsKeys ? `You know its keys: ${KEYS}` : 'You installed it today and do not know its keys yet. Find your way around as a new person would.'}
 
-You use the app through one command, run with Bash:
+You use the app through one command, run in your shell:
   ${browse} ${round === 1 ? 'open            (first, once)' : 'look            (the app is already open; start here)'}
   ${browse} look            (what is on screen, and numbered things you can press)
   ${browse} click 7         (press thing 7 from the last look; or click "New thread")
@@ -273,7 +273,7 @@ You use the app through one command, run with Bash:
   ${browse} drag 7 +150     (drag the right edge of 7 that far across, as you widen a column)
   ${browse} type "some text"
   ${browse} press n         (one key; add modifiers after: press Enter meta, press k meta)
-  ${browse} shot name       (a picture; you can open it with Read: ${shots}/name.png)
+  ${browse} shot name       (a picture; open it to see the screen: ${shots}/name.png)
   ${browse} away 5          (step away for up to 9 minutes, as you would between things, then look)
   ${browse} reload
 Run look after anything that changes the screen.
@@ -315,7 +315,7 @@ ${list(notYet, 'You have tried everything on the usual list; go deeper on today\
 Do the ones someone like you would do.
 
 RULES
-- Use only those two commands, and Read for your own pictures.
+- Use only those two commands, and open only your own pictures.
 - Report only what you saw happen, with the steps. Do not guess at causes.
 - Taste is not an issue unless it stopped you or confused you.`;
 }

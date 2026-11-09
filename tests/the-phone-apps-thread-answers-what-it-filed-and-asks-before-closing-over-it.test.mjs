@@ -144,6 +144,12 @@ describe('the presses on a filed thread', () => {
     expect(plan.toast).toBe('Running → Add a report button · press Z to undo');
   });
 
+  // A synthetic tester on 2026-11-08 read "Running" with the computer off, where every other send said it waits.
+  it('New thread says it waits while the computer is away and no cloud carries it', () => {
+    expect(planFor({ kind: 'approve-filed' }, child, NOW, { away: true }).toast).toBe('Waiting for your computer → Add a report button · press Z to undo');
+    expect(planFor({ kind: 'approve-filed' }, child, NOW, { away: true, cloud: true }).toast).toBe('Running → Add a report button · press Z to undo');
+  });
+
   it('Do here sends it to the thread that filed it, then closes it', async () => {
     const { plan, left } = await leaves({ kind: 'do-here', child, parent: above }, child);
     expect(left).toEqual([

@@ -4,8 +4,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  addressedTo, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, nextStep, noteGoesTo, otherFilesInLines, placeWords, resolvedInWords, reviewKind, sharedByWords, stepsThrough, threadFiles, versionForPath, viewKind, whereAPressLands, whoseIsTheFile,
+  addressedTo, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, latestPicturesSaid, nextStep, noteGoesTo, offeredTogether, otherFilesInLines, placeWords, resolvedInWords, reviewKind, sharedByWords, stepsThrough, stillInHand, stillWaiting, tagsYourAgent, threadFiles, versionForPath, viewKind, whereAPressLands, whoseIsTheFile,
 } from '../../../shared/artifact-marks.mjs';
+import { AgentFace } from './AgentFace';
 import type { FileVersion } from '../../../shared/artifact-marks.mjs';
 import { api } from '../api';
 import { canPaintQuotes, paintQuotes } from '../paint-quotes';
@@ -26,6 +27,8 @@ import { AttachRow } from './AttachRow';
 import { FileLinkBrowser } from './FileLinkBrowser';
 import { OpeningWait } from './OpeningWait';
 import { CrossIcon } from './CrossIcon';
+import { ArtifactControlGlyph } from './ArtifactControlGlyph';
+import { FocusControl } from './FocusControl';
 import { DocText } from './DocText';
 import { FileNoteCard } from './FileNoteCard';
 import { NoteGlyph } from './NoteGlyphs';
@@ -40,6 +43,8 @@ type Editing = { fam: string; text: string; draft?: string; folder: string | nul
 
 export const NO_MARKS: FileMarks = { notes: [], approvals: [], seen: {} };
 
+const YOUR_AGENT: Person = { id: '@agent', email: '', name: 'agent', avatarUrl: null };
+
 const clockAt = clock;
 const whenShared = (ts: number) => (new Date(ts).toDateString() === new Date().toDateString()
   ? `today at ${clockAt(ts)}` : new Date(ts).toLocaleDateString([], { month: 'short', day: 'numeric' }));
@@ -47,7 +52,7 @@ const KIND_WORD = { image: 'Picture', film: 'Film', pdf: 'PDF', deck: 'Slides', 
 
 const newId = () => `n${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
-export function ArtifactView({ product, thread, draftsAcross, shareThread, threadName, lines, numbers, marks, me, people, open, ownerOfRow, write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, below, files: fromElsewhere, typing = false }: {
+export function ArtifactView({ product, thread, draftsAcross, shareThread, lines, numbers, marks, me, people, open, ownerOfRow, write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, onBeside, below, files: fromElsewhere, typing = false }: {
   /** Each path's number on its file's version line, which every surface counts by. */
   numbers?: Record<string, number>;
   /** What to say of a version with no bytes on this computer, by who made it. */
@@ -61,7 +66,6 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
   draftsAcross?: string;
   /** The thread a file opened from Files was sent in, for its link (ShareLink). */
   shareThread?: string;
-  threadName: string;
   lines: LedgerLine[];
   marks: FileMarks;
   me: string | null;
@@ -78,6 +82,8 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
   editGoes?: string;
   onClose: () => void;
   onOutside?: (path: string) => void;
+  /** Only where there is a chat to sit beside. */
+  onBeside?: (path: string) => void;
   /** A line under the file, the full width of the window. */
   below?: ReactNode;
   /** Opened to write in, so the editor takes the cursor. */
@@ -95,9 +101,18 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
   }, [lines, open.path, open.note, marks.notes]);
   const families = useMemo(() => threadFiles(files, numbers), [files, numbers]);
   const flat = useMemo(() => families.flatMap((f, fi) => f.versions.map((v, vi) => ({ fi, vi, v }))), [families]);
-  const steps = useMemo(() => stepsThrough(families, open.steps), [families, open.steps]);
+  const handedSteps = useMemo(() => stepsThrough(families, open.steps), [families, open.steps]);
+  const latestSteps = useMemo(() => stepsThrough(families, latestPicturesSaid(lines)), [families, lines]);
 
-  const [at, setAt] = useState<{ fi: number; vi: number } | null>(null);
+  // The place carries its version's id and path, so a list that fills in later still finds it.
+  const [placed, setPlaced] = useState<{ fi: number; vi: number; held: { id: string; path: string } | null } | null>(null);
+  const familiesNow = useRef(families);
+  familiesNow.current = families;
+  const setAt = useCallback((p: { fi: number; vi: number }) => {
+    const v = familiesNow.current[p.fi]?.versions[p.vi];
+    setPlaced({ fi: p.fi, vi: p.vi, held: v ? { id: v.id, path: v.path } : null });
+  }, []);
+  const at = useMemo(() => stillInHand(families, placed && { fi: placed.fi, vi: placed.vi }, placed?.held ?? null), [families, placed]);
   const [activeId, setActiveId] = useState<string | null>(open.note ?? null);
   const [go, setGo] = useState<StageGo>(null);
   const [draftPlace, setDraftPlace] = useState<NotePlace | null>(null);
@@ -106,8 +121,6 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
   const [named, setNamed] = useState<Person[]>([]);
   const [asking, setAsking] = useState<{ start: number; query: string; sel: number } | null>(null);
   const [showSettled, setShowSettled] = useState(false);
-  const [compare, setCompare] = useState(false);
-  const [leftVi, setLeftVi] = useState<number | null>(null);
   const [hold, setHold] = useState(0);
   const [sending, setSending] = useState(false);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
@@ -129,7 +142,7 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
     const press = `${open.at ?? 0}:${!!marks.notes.find((n) => n.id === open.note)}:${lines.length > 0}`;
     if (!flat.length) return;
     if (placedFor.current === press) {
-      const same = flat.find((x) => x.v.id === inHand.current);
+      const same = placed?.held && at ? flat.find((x) => x.fi === at.fi && x.vi === at.vi) : undefined;
       if (same && staysOnNewest({ kind: viewKind(same.v.path), wasNewest: newestInHand.current })) setAt({ fi: same.fi, vi: families[same.fi].versions.length - 1 });
       else if (same) setAt({ fi: same.fi, vi: same.vi });
       return;
@@ -164,6 +177,7 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
   const { open: openNotes, resolved: settled } = commentsInList([...notesHere, ...carriedAll], undo);
   const approvalsHere = marks.approvals.filter((a) => a.file === version?.id);
   const mineApproved = approvalsHere.some((a) => a.by === me);
+  const othersApproved = approvalsHere.filter((a) => a.by !== me);
   const earlier = family && !approvalsHere.length
     ? family.versions.slice(0, at!.vi).reverse().find((v) => marks.approvals.some((a) => a.file === v.id)) : undefined;
 
@@ -182,7 +196,7 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
     draftOf.current = version?.id ? { file: version.id, holding: kept.holding } : null;
     setWords(kept.words); setDraftPlace(kept.place); setAsking(null);
     setNamed(people.filter((p) => kept.words.includes(`@${firstName(p)}`)));
-    setHere(null); setCompare(false); setLeftVi(null); setReplyingTo(null); setFound('looking');
+    setHere(null); setReplyingTo(null); setFound('looking');
   }, [version?.id]);
   useEffect(() => {
     const d = draftOf.current;
@@ -270,11 +284,13 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
     const owner = whoseIsTheFile(files, version.id);
     const id = newId();
     const place = placeNow;
+    // A comment waits for Send, so the agent starts once for all of them; @agent sends this one now.
+    const tagged = withAgent && typeof version.agent === 'string' && tagsYourAgent(typed);
     // It is in the list before the app has answered; a failure puts the words back.
-    setSavingNotes((was) => [...was, { id, file: version.id, place, text, by: me, ts: Date.now(), resolved: false, replies: [], saving: true, ...(pinned(place) ? { pin: nextPin } : {}) } as unknown as FileNote]);
+    setSavingNotes((was) => [...was, { id, file: version.id, place, text, by: me, ts: Date.now(), resolved: false, replies: [], saving: true, wait: !tagged, ...(pinned(place) ? { pin: nextPin } : {}) } as unknown as FileNote]);
     setWords(''); setDraftPlace(null); setWholeAsked(false); setAsking(null);
     setActiveId(id);
-    const out = await write({ do: 'note', id, file: version.id, place, text, ...(mentions.length ? { mentions } : {}), ...(owner ? { owner } : {}) })
+    const out = await write({ do: 'note', id, file: version.id, place, text, wait: !tagged, ...(mentions.length ? { mentions } : {}), ...(owner ? { owner } : {}) })
       .catch((err: Error) => ({ ok: false, error: err.message }));
     setSending(false);
     if (failed(out, 'That comment did not save.')) {
@@ -308,7 +324,10 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
 
   const reply = async (note: FileNote, text: string) => {
     const out = await write({ do: 'reply', id: newId(), on: note.id, file: note.file, text });
-    return !failed(out, 'That reply did not save.');
+    if (failed(out, 'That reply did not save.')) return false;
+    // @agent in a reply hands your agent the comment it answers, with the replies under it.
+    if (withAgent && tagsYourAgent(text)) await toAgent([note.id]);
+    return true;
   };
 
   // An older version, or one with comments open, is approved only once that is said.
@@ -323,7 +342,7 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
   const approve = async () => {
     if (!version || !family || !at) return;
     if (mineApproved) return approveNow(version, true);
-    const ask = approveAsk(family, at.vi, marks.notes);
+    const ask = approveAsk(family, at.vi, marks.notes, offeredTogether(lines, family));
     if (ask) { setApproveAsked(ask); return; }
     return approveNow(version);
   };
@@ -337,7 +356,7 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
     if (!on.length) return;
     failed(await write({ do: 'toagent', on }), 'Those notes did not reach the agent.');
   };
-  const sendNotes = withAgent && version ? notesToSendTheAgent(marks, version, family!.versions.length, people) : [];
+  const sendNotes = withAgent && version ? notesToSendTheAgent(marks, version, family!.versions.length, people, me) : [];
   const pressSend = () => toAgent(sendNotes);
 
   const isNewest = !!family && !!at && at.vi === family.versions.length - 1;
@@ -369,9 +388,9 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
     if (draft !== undefined) idle.current = window.setTimeout(() => { void postNow.current(); }, SAVE_AFTER_A_PAUSE_MS);
   };
   useEffect(() => {
-    if (opensForTyping({ canEdit, compare, editing: !!editing, unreadable, version: version?.id ?? null })) void startEdit();
-  }, [canEdit, compare, !!editing, unreadable, version?.id]);
-  const waitingForEditor = opensForTyping({ canEdit, compare, editing: !!editing, unreadable, version: version?.id ?? null });
+    if (opensForTyping({ canEdit, editing: !!editing, unreadable, version: version?.id ?? null })) void startEdit();
+  }, [canEdit, !!editing, unreadable, version?.id]);
+  const waitingForEditor = opensForTyping({ canEdit, editing: !!editing, unreadable, version: version?.id ?? null });
 
   // A save asked for while one is on its way waits for it, then posts what is newer.
   const inFlight = useRef<Promise<boolean> | null>(null);
@@ -384,7 +403,7 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
       setEditWord('Saving…');
       const clash = editClash(family, sitting.base.n, me, nameOf);
       const why = await onNewVersion(sitting.base.name, out, sitting.base.path, sitting.base.id, posted.current).catch((err: Error) => err.message);
-      if (why) { setTold(`${why} Press back again to leave: your words come back when you open it again.`); setEditWord('Not saved'); return false; }
+      if (why) { setTold(`${why} Close it again to leave. Your words come back when you open it again.`); setEditWord('Not saved'); return false; }
       posted.current = out;
       try { if (localStorage.getItem(draftKey(sitting.base.path)) === out) localStorage.removeItem(draftKey(sitting.base.path)); } catch { /* nothing kept */ }
       setTold(clash ?? editGoes ?? null);
@@ -503,6 +522,8 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
   };
   const othersSaved = editing ? editClash(family, editing.base.n, me, nameOf) : null;
 
+  // Opened from anywhere but a turn of the thread, a picture of the agent's latest answer steps through that answer.
+  const steps = handedSteps.length ? handedSteps : latestSteps.some((s) => s.fi === at?.fi) ? latestSteps : [];
   const stepTo = (by: number) => nextStep(families, steps, at, by);
   const stepFile = (by: number) => {
     const next = stepTo(by);
@@ -535,7 +556,6 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
       else if (asking) setAsking(null);
       else if (replyingTo) setReplyingTo(null);
       else if (draftPlace) setDraftPlace(null);
-      else if (compare) setCompare(false);
       else leave();
     };
     const rest = (e: KeyboardEvent) => {
@@ -552,20 +572,25 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
     return () => { window.removeEventListener('keydown', escape, true); document.removeEventListener('keydown', rest); };
   });
 
-  const askingFor = asking ? people.filter((p) => p.id !== me && firstName(p).toLowerCase().startsWith(asking.query.toLowerCase())).slice(0, 5) : [];
+  // Only your own agent is in the list, and only on a file it made on your thread.
+  const canTag = withAgent && typeof version?.agent === 'string';
+  const askingFor = asking ? [
+    ...(canTag && 'agent'.startsWith(asking.query.toLowerCase()) ? [YOUR_AGENT] : []),
+    ...people.filter((p) => p.id !== me && firstName(p).toLowerCase().startsWith(asking.query.toLowerCase())),
+  ].slice(0, 5) : [];
   const nameInto = (p: Person) => {
     if (!asking) return;
     const el = box.current;
     const caret = el?.selectionStart ?? words.length;
-    const name = `@${firstName(p)} `;
+    const name = p === YOUR_AGENT ? '@agent ' : `@${firstName(p)} `;
     setWords(`${words.slice(0, asking.start)}${name}${words.slice(caret)}`);
-    setNamed((was) => (was.some((x) => x.id === p.id) ? was : [...was, p]));
+    if (p !== YOUR_AGENT) setNamed((was) => (was.some((x) => x.id === p.id) ? was : [...was, p]));
     setAsking(null);
     requestAnimationFrame(() => { const to = asking.start + name.length; el?.focus(); el?.setSelectionRange(to, to); });
   };
   const onWords = (value: string, caret: number) => {
     setWords(value);
-    const m = people.length ? /(^|\s)@(\w*)$/.exec(value.slice(0, caret)) : null;
+    const m = people.length || canTag ? /(^|\s)@(\w*)$/.exec(value.slice(0, caret)) : null;
     setAsking(m ? { start: caret - m[2].length - 1, query: m[2], sel: 0 } : null);
   };
   // Rooms keep their files outside any project, so there is nowhere to save a picture.
@@ -595,7 +620,7 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
   const agentMade = typeof version?.agent === 'string';
   const sendWords = noteSendWords({
     text: words, people, me, nameOf, agentMade,
-    toAgent: withAgent || (!!me && !!ownerOfRow && ownerOfRow !== me),
+    toAgent: withAgent,
     owner: version ? whoseIsTheFile(files, version.id) : null,
   });
 
@@ -603,7 +628,7 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
     if (n.sent || !offers.comment || typeof flat.find((x) => x.v.id === n.file)?.v.agent !== 'string') return null;
     const goes = noteGoesTo(n, people);
     if (goes.to === 'person') return { words: `Sent to ${goes.person === me ? 'you' : nameOf(goes.person)}`, went: true };
-    return goes.to === 'nobody' ? { words: 'Not sent to the agent', went: false } : null;
+    return withAgent && n.by === me && goes.to === 'agent' && stillWaiting(n) ? { words: 'Not sent', went: false } : null;
   };
   const answeredBy = (n: FileNote): string | null => {
     const v = n.resolved && n.resolvedIn ? flat.find((x) => x.v.id === n.resolvedIn)?.v : undefined;
@@ -612,30 +637,8 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
   const card = (n: FileNote) => (
     <FileNoteCard key={n.id} note={n} product={product} answeredBy={answeredBy(n)} wordsGone={goneQuotes.includes(n.id)} active={n.id === activeId} settling={n.id === undo} person={person} me={me} onGo={() => pickNote(n)} onSettle={(r) => void settle(n, r)} nameOf={nameOf}
       canReply={offers.comment} replying={replyingTo === n.id} onReplying={(on) => setReplyingTo(on ? n.id : null)} onReply={(text) => reply(n, text)}
-      held={heldFor(n)} onToAgent={() => void toAgent([n.id])} />
+      held={heldFor(n)} />
   );
-
-  const left = family && compare ? family.versions[leftVi ?? (at!.vi > 0 ? at!.vi - 1 : 1)] : undefined;
-
-  // Two versions of a film are compared moving, so Play on either plays both.
-  const split = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const el = split.current;
-    if (!el || !compare || kind !== 'film') return;
-    const others = (from: EventTarget | null) => [...el.querySelectorAll('video')].filter((v) => v !== from);
-    const play = (e: Event) => {
-      for (const v of others(e.target)) {
-        if (!v.paused) continue;
-        v.currentTime = (e.target as HTMLVideoElement).currentTime;
-        v.muted = true;
-        void v.play().catch(() => {});
-      }
-    };
-    const pause = (e: Event) => { for (const v of others(e.target)) if (!v.paused) v.pause(); };
-    el.addEventListener('play', play, true);
-    el.addEventListener('pause', pause, true);
-    return () => { el.removeEventListener('play', play, true); el.removeEventListener('pause', pause, true); };
-  }, [compare, kind]);
 
   const bylineOf = (v: { by: string | null; at: number; n: number; agent?: string }) => [
     sharedByWords(v, { me, nameOf }),
@@ -652,7 +655,7 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
       go={editable ? go : null}
       hold={hold}
       showResolved={showSettled}
-      onPlace={editable && !compare ? (p) => { setWholeAsked(false); setDraftPlace(p); box.current?.focus(); } : undefined}
+      onPlace={editable ? (p) => { setWholeAsked(false); setDraftPlace(p); box.current?.focus(); } : undefined}
       onPick={editable ? (id2) => { const n = [...notesHere, ...carried].find((x) => x.id === id2); if (n) pickNote(n); } : undefined}
       onHere={editable ? (p) => {
         setHere(p); setWholeAsked(false);
@@ -673,31 +676,26 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
     <StageLink.Provider value={setLink}>
     <div className="artifact-view" data-find-layer role="dialog" aria-label={version?.name ?? 'File'}>
       <header className="av-top">
-        <button type="button" className="av-back" onClick={leave} title="Back (esc)"><span className="av-thread">{threadName}</span></button>
+        <button type="button" className="doc-mark av-back" aria-label="Back" title="Back to the thread (esc)" onClick={leave}><ArtifactControlGlyph><path d="M16 10H4m5-5-5 5 5 5" /></ArtifactControlGlyph></button>
         <span className="av-name">{familyName(family, editing?.base ?? version) || ((editing?.base ?? version)?.name ?? '')}</span>
-        {kind && <span className="av-kind">{KIND_WORD[kind]}</span>}
-        {family && family.versions.length > 1 && (
+        {family && version && family.versions.length > 1 && (
           <span className="av-versions">
             <button type="button" className="av-chev" disabled={at!.vi === 0} onClick={() => stepVersion(-1)} aria-label="Older version">‹</button>
-            <span className="av-of">v{version!.n} of {family.versions.length}</span>
+            <span className="av-of">v{version.n} of {family.versions.length}</span>
             <button type="button" className="av-chev" disabled={at!.vi === family.versions.length - 1} onClick={() => stepVersion(1)} aria-label="Newer version">›</button>
             {!isNewest && <button type="button" className="av-newest" onClick={() => stepVersion(family.versions.length - 1 - at!.vi)}>Show v{family.versions[family.versions.length - 1].n}</button>}
-            <button type="button" className={`av-btn av-compare${compare ? ' is-on' : ''}`} aria-pressed={compare} onClick={() => (compare ? setCompare(false) : away(() => setCompare(true)))}><NoteGlyph name="sides" />Side by side</button>
           </span>
         )}
         <span className="av-spring" />
-        {approvalsHere.some((a) => a.by !== me) && (
-          <span className="av-approved"><i aria-hidden="true" />Approved by {approvalsHere.filter((a) => a.by !== me).map((a) => nameOf(a.by)).join(', ')}</span>
-        )}
-        {earlier && <span className="av-approved is-old" title={approvalSince(family, at!.vi, marks.approvals, nameOf) ?? undefined}>{version?.edited ? approvalSince(family, at!.vi, marks.approvals, nameOf) : `v${earlier.n} approved, this version is not`}</span>}
         {editing && editWord && <span className="av-saved" role="status">{editWord}</span>}
-        {offers.approve && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{mineApproved ? 'Approved' : 'Approve'}</button>}
-        {canRestore && !compare && !editing && <button type="button" className="av-btn" disabled={restoring} onClick={() => void restore()}><NoteGlyph name="undo" />Restore this version</button>}
-        {(thread ?? shareThread) && version && foundNow === 'open' && !compare && canShareFile(version.path) && (
-          <ShareLink product={product} thread={(thread ?? shareThread)!} src={version.path} signedIn={!!me} />
-        )}
-        {onOutside && version && foundNow === 'open' && <button type="button" className="av-btn" onClick={() => onOutside(version.path)}><NoteGlyph name="outside" />Open outside</button>}
-        <button type="button" className="av-btn av-leave" onClick={leave} title="Back (esc)"><NoteGlyph name="back" />Back</button>
+        {canRestore && !editing && <button type="button" className="av-btn" disabled={restoring} onClick={() => void restore()}><NoteGlyph name="undo" />Restore this version</button>}
+        <span className="doc-marks">
+          {(thread ?? shareThread) && version && foundNow === 'open' && canShareFile(version.path) && (
+            <ShareLink icon product={product} thread={(thread ?? shareThread)!} src={version.path} signedIn={!!me} />
+          )}
+          {onOutside && version && foundNow === 'open' && <button type="button" className="doc-mark" aria-label="Open outside" title="Open outside" onClick={() => onOutside(version.path)}><ArtifactControlGlyph kind="open" /></button>}
+          {onBeside && version && <FocusControl style="corners-bare" focused onClick={() => onBeside(version.path)} />}
+        </span>
       </header>
       <div className="av-body">
         <div className="av-stage">
@@ -711,7 +709,7 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
               <button type="button" className="av-btn" onClick={() => setApproveAsked(null)}>Not yet</button>
             </p>
           )}
-          {editing && !compare && (
+          {editing && (
             <div className="av-pane" key={`editing-${editing.base.id}`} ref={editPane} onClick={pickInEditor}>
               <DocText product={product} src={editing.base.path} text={editing.text} mtime={0} folder={editing.folder} onSaved={() => {}} onNotice={setTold}
                 versions={{ onDraft, saveNow, flush: flushEdit, paint: paintEditor, draft: editing.draft, byline: bylineOf(version ?? editing.base), focus: typing }} />
@@ -719,31 +717,29 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
             </div>
           )}
           {version && waitingForEditor && <OpeningWait name={version.name} kind="markdown" />}
-          {version && !compare && !editing && !waitingForEditor && <div className="av-pane" key={paneKey(kind, version)}>{stage(version.path, version.id, version.name, true, version)}</div>}
-          {version && compare && left && !editing && (
-            <div className="av-split" ref={split}>
-              <div className="av-pane" key={`l-${left.id}`}>
-                <div className="av-pane-head">
-                  {family!.versions.filter((v) => v.id !== version.id).map((v) => (
-                    <button type="button" key={v.id} className={`av-pane-v${v.id === left.id ? ' is-on' : ''}`} onClick={() => setLeftVi(family!.versions.indexOf(v))}>{`v${v.n}`}</button>
-                  ))}
-                  <span className="av-pane-name">{left.name}</span>
-                </div>
-                {stage(left.path, left.id, left.name, false)}
-              </div>
-              <div className="av-pane" key={`r-${version.id}`}>
-                <div className="av-pane-head"><span className="av-pane-v is-on">{`v${version.n}`}</span><span className="av-pane-name">{version.name}</span></div>
-                {stage(version.path, version.id, version.name, true)}
-              </div>
-            </div>
-          )}
-          {!compare && (steps.length ? steps.length : families.length) > 1 && at && <>
+          {version && !editing && !waitingForEditor && <div className="av-pane" key={paneKey(kind, version)}>{stage(version.path, version.id, version.name, true, version)}</div>}
+          {(steps.length ? steps.length : families.length) > 1 && at && <>
             <button type="button" className="av-step av-prev" disabled={!stepTo(-1)} onClick={() => stepFile(-1)} aria-label="Previous file">‹</button>
             <button type="button" className="av-step av-next" disabled={!stepTo(1)} onClick={() => stepFile(1)} aria-label="Next file">›</button>
           </>}
           {link && <FileLinkBrowser key={link} url={link} product={product} backTo={kind ? `the ${KIND_WORD[kind].toLowerCase()}` : 'the file'} onClose={closeLink} />}
         </div>
-        {!compare && (foundNow === 'looking' || offers.comment || openNotes.length > 0 || settled.length > 0) && <aside className="av-side" aria-label="Comments">
+        {(foundNow === 'looking' || offers.comment || openNotes.length > 0 || settled.length > 0) && <aside className="av-side" aria-label="Comments">
+          {(offers.approve || othersApproved.length > 0 || earlier) && (
+            <div className="av-verdict">
+              <span className="av-verdict-who" title={earlier ? approvalSince(family, at!.vi, marks.approvals, nameOf) ?? undefined : undefined}>
+                {othersApproved.length > 0 ? `${othersApproved.map((a) => nameOf(a.by)).join(', ')} approved`
+                  : earlier ? (version?.edited ? approvalSince(family, at!.vi, marks.approvals, nameOf) : `v${earlier.n} approved, this version is not`) : null}
+              </span>
+              {offers.approve && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{mineApproved ? 'Approved' : 'Approve'}</button>}
+            </div>
+          )}
+          {offers.comment && sendNotes.length > 0 && (
+            <div className="av-unsent">
+              <span>{sendNotes.length} not sent</span>
+              <button type="button" className="av-btn av-unsent-send" title={`Send ${sendNotes.length === 1 ? 'this comment' : `these ${sendNotes.length} comments`} to your agent`} onClick={() => void pressSend()}><AgentFace />Send</button>
+            </div>
+          )}
           <div className="av-list">
             {openNotes.map(card)}
             {settled.length > 0 && (
@@ -757,16 +753,13 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
             )}
           </div>
           {(offers.comment || trouble) && <div className="av-foot">
-            {offers.comment && sendNotes.length > 0 && (
-              <button type="button" className="av-btn av-send" onClick={() => void pressSend()}><NoteGlyph name="send" />Send {sendNotes.length === 1 ? 'this note' : 'these notes'} to the agent</button>
-            )}
             {trouble && <p className="av-trouble" role="alert">{trouble}</p>}
             {offers.comment && <form className="av-write" onSubmit={(e) => { e.preventDefault(); void send(); }}>
               {asking && askingFor.length > 0 && (
                 <div className="av-names" role="listbox">
                   {askingFor.map((p, i) => (
                     <button type="button" role="option" aria-selected={i === asking.sel} key={p.id} className={`av-name-row${i === asking.sel ? ' is-on' : ''}`} onMouseDown={(e) => { e.preventDefault(); nameInto(p); }}>
-                      <Face person={p} />{p.name}
+                      {p === YOUR_AGENT ? <><AgentFace />Your agent</> : <><Face person={p} />{p.name}</>}
                     </button>
                   ))}
                 </div>
@@ -774,7 +767,7 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
               <div className="av-write-box" onClick={(e) => { if (e.target === e.currentTarget) box.current?.focus(); }}
                 onDragOver={canAddPictures ? (e) => e.preventDefault() : undefined}
                 onDrop={canAddPictures ? (e) => { e.preventDefault(); void addPictures(e.dataTransfer.files); } : undefined}>
-                <textarea ref={box} rows={2} value={words} placeholder="Write a note" aria-label="Note"
+                <textarea ref={box} rows={2} value={words} placeholder={canTag ? 'Comment, or @ your agent' : 'Write a comment'} aria-label="Comment"
                   onChange={(e) => onWords(e.target.value, e.target.selectionStart)}
                   onFocus={() => setHold((n) => n + 1)}
                   onPaste={canAddPictures ? async (e) => {
@@ -799,7 +792,7 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, threa
                     </span>
                   )}
                   <button type="submit" className="av-btn av-write-send" disabled={(!words.trim() && !pictures.length) || sending || attaching.length > 0 || !!attachProblem(pictures)}>
-                    <NoteGlyph name={sendWords === 'Add note' ? 'add' : 'send'} />{sendWords}
+                    {sendWords === 'Comment' ? null : <NoteGlyph name="send" />}{sendWords}
                   </button>
                 </div>
               </div>

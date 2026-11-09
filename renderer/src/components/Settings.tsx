@@ -36,17 +36,19 @@ import { lastAccountAsk, webProjectRow, webSettingsGroups, webSettingsPages } fr
 import { whatTakesEscape } from '../settings-escape';
 import { WebAlertsGroup } from './WebAlerts';
 import { api, RESTART_NOTE, type PublicLink } from '../api';
-import { shareWords } from './ShareLink';
+import { publicLinkLine, shareWords } from '../public-link-words';
 import { updateLook } from '../update-row';
 import { InstructionSettings, sizeLabel } from './InstructionSettings';
 import { EVERY } from '../instruction-scope';
 import type {AccountUsageReading, Usage, UsageLimit, WorkspaceSettings} from '../types';
-import { accountLabel, cloudAccountInUse, cloudToggleTarget, countedAccounts, type CloudStatus } from '../cloud-menu';
-import { cloudBilling, planSummary, type PaidPlan } from '../cloud-upgrade';
+import { accountLabel, cloudAccountInUse, cloudRunsLine, cloudToggleTarget, countedAccounts, type CloudStatus } from '../cloud-menu';
+import { cloudBilling, planKey, planSummary, type PaidPlan } from '../cloud-upgrade';
 import { keyLooksWrong } from '../key-asks';
 import { CloudPlanCards } from './CloudPlanCards';
-import type { CloudPlan } from '../types';
+import type { CloudPlan, TeamBillingDetails } from '../types';
 import { cloudAccountState, hourWords, meterPair, resetWords } from '../account-words';
+import { runningFigures, type GateReading } from '../running-reading';
+import { CODEX_CLOUD_WHAT, sameAsHere } from '../cloud-permission-words';
 import { accountReadingFor, accountsOnce, codexAccountsOnce, type HereLogin, type OneAccount } from '../accounts-once';
 import { LOOKS, lookMeans, SKINS, TUNE_DEFAULT, TUNE_LIMITS, type Look, type SkinId, type SkinTune } from '../skins';
 import { readySkin } from '../look-switch';
@@ -65,6 +67,9 @@ import { searchSettings, SETTINGS_PAGES, type SettingsHit, type SettingsPageId }
 import type { Product } from '../types';
 import { CloudMark, MacMark } from '../threads/ThreadMenu';
 import './settings.css';
+import { SkyTile } from '../home/SkyPicker';
+import { HOME_KEY, setHomeSetting, useHomeSettings } from '../home/home-settings';
+import { SKY_THEMES } from '../home/sky';
 
 /* * TEAM IS A PANE HERE (w-8415594d19, 2026-10-01). The pane's CONTENT is
  handed in as `teamPane` rather than imported, so this screen, which is shared
@@ -355,11 +360,7 @@ type Agent = ReturnType<typeof agentStory>;
 /** Whichever of two readings was taken later, either possibly absent. */
 const loadPublicLinks = () => api.fileLinks();
 
-/** One live link's row: its file, when it went up or was updated, and its comments. */
-export function publicLinkLine(l: PublicLink, now = Date.now()): string {
-  const when = shareWords.shared(l, now);
-  return l.comments ? `${when} · ${shareWords.comments(l.comments)}` : when;
-}
+export { publicLinkLine };
 
 /** WHAT THIS PERSON MADE PUBLIC, in one list, so it can be checked and stopped without finding each file. */
 export function PublicLinks({ load = loadPublicLinks, first = null, now = Date.now() }: {
@@ -591,18 +592,7 @@ export function accountTile(a: OneAccount, { many, now, onUse, cloud = false, on
   };
 }
 
-/**
- * The cloud row's sentence: when threads go there, and on which account.
- *
- * ONE ACCOUNT, HOWEVER MANY ARE SIGNED IN THERE (w-dac993a554). This listed
- * them and ended "in turn", which is what `pickCloudLogin` used to do; it takes
- * one account now and waits for it, so the sentence names that one.
- */
-export function cloudRunsLine(mode: CloudStatus['mode'], inUse: string | null): string {
-  if (mode === 'mac') return 'Every thread runs on this computer.';
-  const when = mode === 'all' ? 'Threads start there first' : 'Threads start there when this computer is full';
-  return `${when}, on ${inUse ?? 'your cloud account'}.`;
-}
+export { cloudRunsLine };
 
 /*
  * THE SETTINGS SHELL, which is the app's own terminal opened against the one
@@ -745,26 +735,11 @@ export function agentCountOptions(w: {
  */
 function Reading({ running, capacity, gate }: {
   running?: number; capacity?: number;
-  gate?: { on: boolean; reading?: { heavy: number | null; waiting: number | null; pressure: string | null; usedPct: number | null; asked: number | null; waited: number | null; refused: number | null; holding?: boolean } };
+  gate?: { on: boolean; reading?: GateReading };
 }) {
-  const r = gate?.on ? gate.reading : null;
-  if (!r) return null;
-  const word = r.pressure === 'critical' ? 'Very short' : r.pressure === 'tight' ? 'Tight' : r.pressure ? 'Fine' : null;
-  const cells: Array<{ n: string; of: string }> = [];
-  if (Number.isFinite(running)) cells.push({ n: String(running), of: capacity ? `of ${capacity} running` : 'running' });
-  if (r.heavy !== null) cells.push({ n: String(r.heavy), of: 'heavy at once' });
-  if (r.waiting !== null) cells.push({ n: String(r.waiting), of: 'waiting on memory' });
-  if (word) cells.push({ n: word, of: 'memory now' });
-  // The day's tally is one sentence and only where there is one to tell. "None
-  // turned away" is the part that answers "is this Mac coping", so it is said
-  // in full rather than left to a nought the eye skips.
-  const tally = r.asked
-    ? `Today: ${r.asked} commands asked, ${r.waited ?? 0} waited, ${r.refused ? `${r.refused} turned away` : 'none turned away'}.`
-    : null;
-  // NEW AGENTS HELD FOR MEMORY (w-ec27ff1a51) is said while it is happening,
-  // because a queue that is not moving and says nothing reads as broken.
-  const holding = r.holding ? 'New agents wait until memory frees up. Urgent tasks still start.' : null;
-  if (!cells.length && !tally && !holding) return null;
+  const f = runningFigures({ running, capacity, gate });
+  if (!f) return null;
+  const { cells, holding, tally } = f;
   return (
     <div className="set-group">
       <div className="set-plate">
@@ -773,9 +748,9 @@ function Reading({ running, capacity, gate }: {
             {cells.map((c) => <div key={c.of}><b>{c.n}</b><span>{c.of}</span></div>)}
           </div>
         )}
-        {r.usedPct !== null && (
+        {f.usedPct !== null && (
           <div className="set-row set-bar-row">
-            <i className="set-bar"><i className={r.pressure === 'normal' ? '' : 'hot'} style={{ width: `${r.usedPct}%` }} /></i>
+            <i className="set-bar"><i className={f.hot ? 'hot' : ''} style={{ width: `${f.usedPct}%` }} /></i>
           </div>
         )}
         {holding && <div className="set-row set-row-warn">{holding}</div>}
@@ -963,7 +938,13 @@ function PhonePage({ onFeedback, macShut, onSignIn, web, onPhoneProjects }: { on
 // two meters, then the cards to change to (w-893c5fe268). Choosing opens
 // Stripe in the browser; the page reads the plan again until it changes
 // (../cloud-upgrade.ts).
-function CloudPlansPage({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: () => void }) {
+/** What the team's page is handed to draw from. */
+export interface TeamPlanPage {
+  team: NonNullable<CloudPlan['team']>; billing: TeamBillingDetails | null; paying: boolean;
+  onPay: () => void; onManage: () => void; onInvite?: () => void;
+}
+
+function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite }: { signedIn: boolean; onSignIn: () => void; teamPlan?: (page: TeamPlanPage) => ReactNode; onInvite?: () => void }) {
   const [plan, setPlan] = useState<CloudPlan | null>(null);
   const [said, setSaid] = useState<string | null>(null);
   const [waitingFor, setWaitingFor] = useState<string | null>(null);
@@ -984,7 +965,7 @@ function CloudPlansPage({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: (
     const t = setInterval(async () => {
       n += 1;
       const p = await read();
-      if (p.plan !== was || n > 60) { setWaitingFor(null); setChosen(null); clearInterval(t); }
+      if (planKey(p) !== was || n > 60) { setWaitingFor(null); setChosen(null); clearInterval(t); }
     }, 5000);
     return () => clearInterval(t);
   }, [waitingFor]);
@@ -998,8 +979,24 @@ function CloudPlansPage({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: (
     if (!out.ok) { setSaid(out.message || 'Stripe could not be opened. Try again.'); return; }
     setChosen(id);
     setSwitching(out.where === 'billing');
-    setWaitingFor(plan?.plan ?? 'none');
+    setWaitingFor(planKey(plan));
   };
+  const [teamOpening, setTeamOpening] = useState(false);
+  const payForTeam = async () => {
+    setSaid(null); setTeamOpening(true);
+    const out = await api.cloudAccountPay('team');
+    setTeamOpening(false);
+    if (!out.ok) { setSaid(out.message || 'Stripe could not be opened. Try again.'); return; }
+    setSwitching(out.where === 'billing');
+    setWaitingFor(planKey(plan));
+  };
+  // A paying team's owner sees its card, next bill and last invoice, read from Stripe through the cloud.
+  const [teamBillingSeen, setTeamBillingSeen] = useState<TeamBillingDetails | null>(null);
+  const readsStripe = !!plan?.team?.owner && !plan.team.trial;
+  useEffect(() => {
+    if (!readsStripe) return;
+    void api.cloudAccountTeamBilling().then((out) => { if (out.ok && out.owner) setTeamBillingSeen(out as TeamBillingDetails); });
+  }, [readsStripe, plan?.team?.seats]);
   const [switching, setSwitching] = useState(false);
   const [billSaid, setBillSaid] = useState<string | null>(null);
   const billing = async () => {
@@ -1017,6 +1014,14 @@ function CloudPlansPage({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: (
       {bill.says && !waitingFor && <p className="cloud-plans-say">{bill.says}</p>}
     </>
   );
+  if (plan?.plan === 'team' && plan.team && teamPlan) {
+    return (
+      <Page title="Plan and Billing">
+        {teamPlan({ team: plan.team, billing: teamBillingSeen, paying: teamOpening || !!waitingFor, onPay: () => void payForTeam(), onManage: () => void billing(), onInvite })}
+        {lines}
+      </Page>
+    );
+  }
   // THE PLAN YOU PAY FOR, FOUND UNDER BILLING (the founder's pick of five, 2026-10-25).
   const sum = planSummary(plan);
   if (sum) {
@@ -1041,7 +1046,7 @@ function CloudPlansPage({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: (
         <Group id="cloud-use" label={sum.period} bare>
           <div className="bill-meters">{meter('Agents in the cloud', sum.agents)}{meter(sum.hours.label, sum.hours)}</div>
         </Group>
-        <Group id="cloud-plans" label={sum.change} bare><div className="bill-cards">{cards}</div></Group>
+        {sum.change && <Group id="cloud-plans" label={sum.change} bare><div className="bill-cards">{cards}</div></Group>}
         {lines}
       </Page>
     );
@@ -1113,13 +1118,6 @@ const CODEX_MODE_OPTIONS: Array<{ value: CodexModeId; label: string }> = CODEX_M
   (value) => ({ value, label: CODEX_MODES[value].label }),
 );
 
-const SAME_AS_HERE = 'The same as on this computer.';
-
-// Full access's own sentence says "on this computer", which a cloud run is not.
-const CODEX_CLOUD_WHAT: Record<CodexModeId, string> = {
-  ...Object.fromEntries(CODEX_MODE_ORDER.map((id) => [id, CODEX_MODES[id].what])) as Record<CodexModeId, string>,
-  'full-access': 'Anything on its own throwaway cloud machine, without asking.',
-};
 
 /* -------------------- the model is not asked here ------------------------- */
 // The new task card asks which model a run goes out on, keeps the answer
@@ -1688,7 +1686,7 @@ function paneFrom(want: string, has: { team: boolean }): Pane {
 
 /* --------------------------------- screen --------------------------------- */
 
-export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onPaneChange, onNewProject, ranked = [], onSetOrder, teamPane, projectShare, projectWho, account, phoneCloud, phoneWeb, onPhoneSignIn, update = null, onClose, onFeedback, cloud = null, onCloudSignIn, cloudPlans = null, roomsPane }: {
+export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onPaneChange, onNewProject, ranked = [], onSetOrder, teamPane, projectShare, projectWho, account, phoneCloud, phoneWeb, onPhoneSignIn, update = null, onClose, onFeedback, cloud = null, onCloudSignIn, cloudPlans = null, roomsPane }: {
   /** Opens the feedback card. A phone has no Feedback button in its corner,
    *  so its own Settings page offers it (2026-10-12). */
   onFeedback?: () => void;
@@ -1697,12 +1695,15 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   /** Signs a Claude account in to the cloud (a login's key to sign it in again), on the cloud's own screen. */
   onCloudSignIn?: (key: string | null, email: string | null) => void;
   /** Agentbox Cloud's plans, where this copy offers it: the Cloud page. */
-  cloudPlans?: { signedIn: boolean; onSignIn: () => void } | null;
+  /** `teamPlan`: a team's own Plan and Billing page, handed in like `teamPane` so this screen holds no team code. */
+  cloudPlans?: { signedIn: boolean; onSignIn: () => void; teamPlan?: (page: TeamPlanPage) => ReactNode } | null;
   // ONE control for the three of them. Light, dark and each picture are one
   // list, because a picture IS dark (skins.ts) and asking her to set a theme
   // and then a background is two decisions for one choice.
   look: Look;
   onSetLook: (l: Look) => void;
+  /** A sky theme (Alpha features, Home): its look and its sky together. */
+  onSkyTheme?: (id: string) => void;
   // The dials on whichever picture is on. They only ever show under a picture,
   // so there is no disabled control on this screen for her to wonder about.
   tune: SkinTune;
@@ -1759,6 +1760,8 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   roomsPane?: ReactNode;
   onClose: () => void;
 }) {
+  const homeSet = useHomeSettings();
+  const skyOn = homeSet.on ? homeSet.skyTheme : null;
   const sidebarShrinks = useSidebarShrinks();
   const [model, setModel] = useState<SettingsModel | null>(null);
   // ?settings=claude, or ?settings=project:kestrel. Anything else (including the
@@ -2088,7 +2091,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                   />
                 </Row>
                 {cloudHere && (
-                  <Row label="In the cloud" desc={w.cloudCodexMode && w.cloudCodexMode !== 'same' ? CODEX_CLOUD_WHAT[w.cloudCodexMode] : SAME_AS_HERE}>
+                  <Row label="In the cloud" desc={w.cloudCodexMode && w.cloudCodexMode !== 'same' ? CODEX_CLOUD_WHAT[w.cloudCodexMode] : sameAsHere()}>
                     <Picker
                       bare
                       label="Permission mode in the cloud"
@@ -2123,7 +2126,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                     with nobody there to approve anything, so by default it
                     does not ask (main/cloud-permission.mts). */}
                 {cloudHere && (
-                  <Row label="In the cloud" desc={w.cloudPermission && w.cloudPermission !== 'same' ? PERMISSION_SENTENCE[w.cloudPermission] : SAME_AS_HERE}>
+                  <Row label="In the cloud" desc={w.cloudPermission && w.cloudPermission !== 'same' ? PERMISSION_SENTENCE[w.cloudPermission] : sameAsHere()}>
                     <Picker
                       bare
                       label="Permission mode in the cloud"
@@ -2224,7 +2227,8 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
 
         {/* TEAM MANAGEMENT (w-8415594d19). It does not wait on `model`, because
             nothing on it comes from the settings file. */}
-        {pane === 'cloud' && cloudPlans && <CloudPlansPage signedIn={cloudPlans.signedIn} onSignIn={cloudPlans.onSignIn} />}
+        {pane === 'cloud' && cloudPlans && <CloudPlansPage signedIn={cloudPlans.signedIn} onSignIn={cloudPlans.onSignIn} teamPlan={cloudPlans.teamPlan}
+          onInvite={teamPane ? () => setPane('team') : undefined} />}
 
         {pane === 'rooms' && roomsPane && (
           <Page title="Rooms" lede="What people in your rooms see of you. Private threads never show.">
@@ -2274,6 +2278,9 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               </Row>
               <Row label="Multiplayer" desc="Share projects with your team and see their threads beside yours. Needs a sign-in.">
                 <Switch label="Multiplayer" on={!!w.alpha?.multiplayer} onChange={(v) => setWorkspace('alphaMultiplayer', v)} />
+              </Row>
+              <Row label="Home" desc="A page to start from: what needs you, a box to start a thread, and your team's week. The Inbox gets a sky below its list. Pick the sky in Appearance.">
+                <Switch label="Home" on={homeSet.on} onChange={(v) => setHomeSetting(HOME_KEY, v)} />
               </Row>
             </Group>
           </Page>
@@ -2525,8 +2532,8 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 {LOOKS.map((l) => (
                   <button
                     key={l.id}
-                    className={`look${look === l.id ? ' on' : ''}`}
-                    aria-pressed={look === l.id}
+                    className={`look${look === l.id && !skyOn ? ' on' : ''}`}
+                    aria-pressed={look === l.id && !skyOn}
                     onPointerEnter={() => void readySkin(lookMeans(l.id).skin)}
                     onFocus={() => void readySkin(lookMeans(l.id).skin)}
                     onClick={() => onSetLook(l.id)}
@@ -2542,6 +2549,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                     <span className="look-name">{l.name}</span>
                   </button>
                 ))}
+                {homeSet.on && SKY_THEMES.map((k) => <SkyTile key={k.id} sky={k} on={skyOn === k.id} onPick={() => onSkyTheme?.(k.id)} />)}
               </div>
             </Group>
             {/* THE DIALS, and only under a picture. Both move the window she is

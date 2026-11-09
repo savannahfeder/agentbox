@@ -13,7 +13,7 @@ export function MessageKind({ e }: { e: Pick<AgentTurn, 'says' | 'fileMark'> }) 
   if (!kind) return null;
   if (kind.file && open && e.fileMark) {
     const link = e.fileMark;
-    return <button type="button" className="msg-kind msg-kind-file" onClick={() => open(link)}>{kind.word}</button>;
+    return <button type="button" className="msg-kind msg-kind-file" onClick={() => open(link)}>{kind.word}{kind.why && <span className="msg-kind-why">{kind.why}</span>}</button>;
   }
   return <span className="msg-kind">{kind.word}{kind.why && <span className="msg-kind-why">{kind.why}</span>}</span>;
 }
