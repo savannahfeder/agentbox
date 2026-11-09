@@ -4,7 +4,7 @@
 // Electron invoke. renderer/src/browser-bridge.ts is the other half and turns
 // the same name into a POST to the local server. Both doors read this list, so
 // a channel added to one cannot go missing from the other, and
-// tests/both-front-doors-offer-the-same-bridge.test.mjs fails the suite if
+// tests/both-front-doors-offer-the-same-bridge.test.mts fails the suite if
 // preload.cjs and this file ever disagree.
 //
 // The keys are the screen's own vocabulary, the values are the channels
@@ -163,14 +163,14 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   setWorkspaceSetting: 'zero:settings-set-workspace',
   // The cloud setup's sign-in for one account, made in the cloud (main/cloud/logins.mts).
   cloudSignIn: 'zero:cloud-signin',
-  // A key kept in the cloud for every cloud run (main/cloud/keys.mjs).
+  // A key kept in the cloud for every cloud run (main/cloud/keys.mts).
   cloudKey: 'zero:cloud-key',
   // The GitHub sign-in this computer's ships push with (main/github-push-sign-in.mts).
   gitHubSignIn: 'zero:github-sign-in',
   gitHubBrowserSignIn: 'zero:github-browser-sign-in',
   // The answer to a sign-in link an agent is waiting on (shared/sign-in-ask.mjs).
   signInAnswer: 'zero:sign-in-answer',
-  // A file or a one-time code a cloud run asked for (shared/cloud-needs.mjs).
+  // A file or a one-time code a cloud run asked for (shared/cloud-needs.mts).
   cloudSendFile: 'zero:cloud-send-file',
   cloudSendCode: 'zero:cloud-send-code',
   cloudFileInfo: 'zero:cloud-file-info',

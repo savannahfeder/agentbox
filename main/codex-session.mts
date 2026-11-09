@@ -23,7 +23,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Name } from '../shared/product-name.mjs';
-import { codexPosture } from '../shared/codex-modes.mjs';
+import { codexPosture } from '../shared/codex-modes.mts';
 
 export interface McpServerEntry {
   enabled?: boolean;
@@ -162,7 +162,7 @@ export interface CodexWorker extends EventEmitter {
  * `workerThreadParams`, which names it on every start.
  *
  * When a file-change approval reaches the person, its request carries no path
- * or diff. main/codex-approvals.mjs reads `item/started` for the same itemId.
+ * or diff. main/codex-approvals.mts reads `item/started` for the same itemId.
  */
 export const WORKER_APPROVAL_POLICY = 'on-request';
 export const WORKER_SANDBOX = 'workspace-write';
@@ -352,7 +352,7 @@ function numericDesc(dir: string) {
 /**
  * One work item's thread, shaped like a child process.
  *
- * `server` is a main/codex-app-server.mjs client shared by every worker.
+ * `server` is a main/codex-app-server.mts client shared by every worker.
  * `ready` is the handshake (`initialize` must land before `thread/start`),
  * awaited here so the supervisor can start a worker with one synchronous call,
  * like `spawn`.
@@ -416,7 +416,7 @@ export function createCodexWorker({
    *
    * `troubleCause` matches "untrusted" and "connection", so the message must
    * contain neither. Pinned by
-   * tests/a-codex-worker-does-not-reach-her-connected-apps.test.mjs.
+   * tests/a-codex-worker-does-not-reach-her-connected-apps.test.mts.
    */
   const spoken = new Set<string>();
   const sayUnasked = (params: CodexParams) => {

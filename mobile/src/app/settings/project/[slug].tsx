@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Platform, TextInput } from 'react-native';
 import { CODEX_MODES } from '../../../../../renderer/src/codex-modes';
 import { MODE_SENTENCE, RULES_ALWAYS_APPLY } from '../../../../../renderer/src/modes';
-import { moveProduct } from '../../../../../shared/rank.mjs';
+import { moveProduct } from '../../../../../shared/rank.mts';
 import { router } from '../../../lib/router';
 import { useSettings } from '../../../state/settings';
 import { useRunningOrder } from '../../../ui/SettingsPages';

@@ -19,7 +19,7 @@ import {
 } from '../table-edit';
 import { api } from '../api';
 import { MAC } from '../this-keyboard';
-import { gridOf, isSeeded, putGrid, seedGrid } from '../live/table-doc.mjs';
+import { gridOf, isSeeded, putGrid, seedGrid } from '../live/table-doc';
 import type { LiveSession } from '../live/live-session';
 import { LiveFaces } from '../live/presence';
 import { useCellMarks, useRoomKept } from '../live/table-presence';

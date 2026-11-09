@@ -1,6 +1,6 @@
 // THE TUTORIAL ON YOUR OWN INBOX (w-31c71743b5): which thing glows, with no
 // window in it. components/Tour.tsx draws it; the test
-// tests/the-tutorial-walks-you-through-your-first-real-thread.test.mjs holds
+// tests/the-tutorial-walks-you-through-your-first-real-thread.test.mts holds
 // what each rule is for.
 
 export type TourStep = 'start' | 'folder' | 'pick' | 'write' | 'send' | 'working' | 'answered' | 'open' | 'choose' | 'reply' | 'close' | 'palette' | 'busy' | 'gettingReady' | 'inPalette' | 'startHere' | 'urgent';

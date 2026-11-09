@@ -146,7 +146,7 @@ function storeServer() {
   return Object.entries(mcpServers()).find(([name, s]) => name !== 'zero-approvals' && (s?.env?.STORE_ACCOUNT_ID || (s?.type === 'http' && /\/store$/.test(s.url ?? ''))))?.[1];
 }
 
-// A server the app shares between runs (main/tool-host.mjs), spoken to over
+// A server the app shares between runs (main/tool-host.mts), spoken to over
 // HTTP as Claude Code speaks to it.
 function httpSession(server) {
   let sid = null;
@@ -321,7 +321,7 @@ const world = argv.includes('-p') ? readWorld(plan.world) : {};
 const turn = worldTurn(world, loginName);
 if (Object.keys(world).length) said = worldAnswer(said, turn, titleIn(promptText), attempt);
 // WHAT ONLY THE PERSON CAN GIVE, ASKED FOR THE WAY A CLOUD RUN IS TOLD TO
-// (main/cloud/run.mjs cloudNote, shared/cloud-needs.mjs), and only by a run that
+// (main/cloud/run.mts cloudNote, shared/cloud-needs.mts), and only by a run that
 // was told it may. The task's own words say what it needs: a service names a
 // sign-in, found in the environment once saved; "the original film" a file;
 // "npm publish" a one-time code; Xcode or the simulator the computer itself.

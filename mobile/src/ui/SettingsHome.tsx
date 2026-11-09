@@ -24,7 +24,7 @@ function asideOf(id: PageId, s: SettingsState, look: PhoneLook) {
   if (id === 'codex') return accountsAside(w.codexAccounts, cloudOnlyAccounts(w, 'codex').length);
   if (id === 'running') return w.paused ? 'Paused' : w.agentsAuto ? `Automatic (${w.agentsTotal})` : `${w.sessionsAtOnce} at once`;
   if (id === 'instructions') return w.adhdMode ? 'ADHD mode' : undefined;
-  if (id === 'projects') return String(s.settings.projects.length);
+  if (id === 'projects') return String(s.settings!.projects.length);
   return undefined;
 }
 

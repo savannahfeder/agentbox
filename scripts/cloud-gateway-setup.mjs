@@ -37,7 +37,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { readCloudConfig } from '../main/cloud/config.mjs';
+import { readCloudConfig } from '../main/cloud/config.mts';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..');
@@ -52,7 +52,7 @@ export const GATEWAY_FUNCTION = NAMES.fn;
 // The most functions running at once: the ceiling on a burst of calls. It
 // does not stop machines already going; `admin pause` and the sweep do.
 const CONCURRENCY = 200;
-// Longer than its own 60 s wait on AgentCore (main/cloud/aws.mjs), shorter
+// Longer than its own 60 s wait on AgentCore (main/cloud/aws.mts), shorter
 // than the Mac's wait on it (main/cloud/managed.mts).
 export const FUNCTION_SECONDS = 90;
 export const HANDLER = 'index.handler';
@@ -308,7 +308,7 @@ async function main() {
   const cloud = readCloudConfig();
   if (!cloud?.bucket) throw new Error('run scripts/cloud-setup.mjs first: the server uses its bucket and runtime');
   const { region, bucket, runtimeArn } = cloud;
-  const { loadCloudConfig } = await import('../main/team/session.mjs');
+  const { loadCloudConfig } = await import('../main/team/session.mts');
   const db = loadCloudConfig(ROOT, { packaged: false });
   if (!db) throw new Error('no team.config.json on this Mac: the server checks sign-ins against that database');
 

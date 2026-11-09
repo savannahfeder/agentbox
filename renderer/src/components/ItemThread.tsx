@@ -40,7 +40,7 @@ import { notShipped } from '../../../shared/not-shipped.mts';
 import { asksForGitHubSignIn } from '../../../shared/github-push-sign-in.mts';
 import { GitHubSignInCard } from './GitHubSignInCard';
 import { SignInCard } from './SignInCard';
-import { openSignIn } from '../../../shared/sign-in-ask.mjs';
+import { openSignIn } from '../../../shared/sign-in-ask.mts';
 import type { ModelChoice } from '../models';
 import type { LedgerLine } from '../thread-history';
 import type { TraceSession } from '../notes';
@@ -53,7 +53,7 @@ import { FileMarkOpener } from './FileMarkLine';
 import { QueueAnswer, QueueSummary } from './OneThingAtATime';
 import { catchUpDue } from '../../../shared/agent-import.mts';
 import { appWrote, broughtIn, drawnWhole, earlierCount, earlierThan, newestAnswer, pageTitle, standsAt, workingContext, workingFrom } from '../one-thing-at-a-time';
-import { gapIndex } from '../../../shared/agents.mjs';
+import { gapIndex } from '../../../shared/agents.mts';
 import { askMarkUnread, say } from '../team/chat-events';
 import { seenLine } from '../team/seen-line';
 import { conversationName } from '../threads/page-rules';
@@ -62,8 +62,8 @@ import { ThreadsMade, type MadeRow } from './ThreadsMade';
 import { TeammatesContext } from '../teammates/row-lead';
 import { RouteLine } from './RouteLine';
 import { withoutLoneQuoteMark } from '../typed-message';
-import { teammateIdOf, OFFER_LABEL } from '../../../shared/teammates.mjs';
-import { REACH_LABEL } from '../../../shared/teammate-reach.mjs';
+import { teammateIdOf, OFFER_LABEL } from '../../../shared/teammates.mts';
+import { REACH_LABEL } from '../../../shared/teammate-reach.mts';
 import { Name } from '../../../shared/product-name.mjs';
 
 // THE BACKSTOP, NOT THE HEARTBEAT.

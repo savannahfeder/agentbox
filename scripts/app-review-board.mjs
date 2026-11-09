@@ -18,7 +18,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { CLOUD_ADDRESS } from '../shared/cloud-address.mjs';
+import { CLOUD_ADDRESS } from '../shared/cloud-address.mts';
 
 export const BAR = 0.9;
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
