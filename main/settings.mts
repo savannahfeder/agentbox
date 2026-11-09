@@ -29,7 +29,6 @@ import { accountSentence, engineTroubleNote, refineCause } from '../shared/spawn
 import { readPlan } from './claude-plan.mjs';
 import { effectiveProfiles, troubleForProfile } from './account-discovery.mjs';
 import { machineSlots, machineNote, autoAgents, MAX_SLOTS } from './machine.mjs';
-import { shortPath } from './agent-files.mts';
 import { NAME, Name } from '../shared/product-name.mjs';
 import { autoSlots } from './memory-gate.mts';
 import { accountIdentity, claudeLoginCommand, duplicateAccountNote, linkAccountTooling, makeClaudeHome } from './account-tooling.mjs';
@@ -70,7 +69,6 @@ export interface SettingsConfig {
   agentsAtOnce?: unknown;
   agentsAuto?: boolean | null;
   agentsNudge?: number;
-  planSlotsFrom?: unknown;
   maxConcurrentSessions?: number | null;
   memoryGate?: boolean | null;
   memoryGateSlots?: number | null;
@@ -141,7 +139,6 @@ export interface SettingsSupervisor {
   memoryGateStatus?(): MemoryGateReading | null | undefined;
   startHoldStatus?(): { holding?: boolean } | null | undefined;
   leftoverStatus?(): LeftoverReading | null | undefined;
-  strayFolders?(): { project?: string; path?: unknown }[] | null | undefined;
   onChange?: (() => void) | null;
   wake?(): void;
   accountChosen?(engine: string, profile: string | null): void;
@@ -784,12 +781,6 @@ export function readSettings({ config, supervisor, store }: SettingsDeps, { sear
       // What Automatic would say right now, so a manual number can be compared
       // with it without turning Automatic back on to find out.
       agentsAutoTotal: autoAgents({ gated: !!config.memoryGate, nudge: config.agentsNudge }),
-      // THE PLAN THAT SET THE NUMBER ABOVE, when a plan set it. Null in the
-      // ordinary case: she picked the number herself, or it is the three every
-      // install has always had. It is only ever filled in when somebody would
-      // otherwise open this page, see one, and have nothing on the screen to
-      // explain it.
-      sessionsAtOnceFromPlan: config.planSlotsFrom ?? null,
       // WHAT WE SUGGEST FOR THIS MAC, AND WHY. Not a ceiling: `slotsMax` is the
       // control's own range and is the same number on every machine, while
       // `slotsSuggested` is what main worked out from the hardware
@@ -800,7 +791,6 @@ export function readSettings({ config, supervisor, store }: SettingsDeps, { sear
       machineNote: machineNote(slotsHere, config.maxConcurrentSessions as number | undefined),
       memoryGate: memoryGateSettings({ config, supervisor }),
       leftovers: leftoverSettings({ config, supervisor }),
-      strayFolders: strayFolderSettings({ supervisor }),
       capacity: status.capacity,
       running: sessions.length,
       model: parseSessionArgs(workspaceArgs).model,
@@ -1270,34 +1260,6 @@ export function leftoverSettings({ config, supervisor }: { config: SettingsConfi
   return { on, now };
 }
 
-/**
- * COPIES OF A PROJECT THE APP DID NOT MAKE, SAID OUT LOUD (w-330eea6c66).
- *
- * MEASURED 2026-10-07: thirteen worktrees of one repository sat outside the
- * folder the app keeps its own in, about 740 MB, and nothing in the app could
- * list, show or sweep one. That is the same invisibility that stranded 26 GB on
- * 2026-09-22, and the half that fixes it for a person is being told.
- *
- * NO BUTTON, DELIBERATELY. A folder the app did not make is not the app's to
- * remove: it is the only copy of whatever is uncommitted inside it, and somebody
- * made it on purpose. So this is a sentence and nothing else, and it is absent
- * entirely when there is nothing to say, because a row that is usually quiet
- * trains the reaction it exists to prevent.
- */
-export function strayFolderSettings({ supervisor }: { supervisor?: SettingsSupervisor }, home = os.homedir()) {
-  let list: { project?: string; path?: unknown }[] = [];
-  try { list = supervisor?.strayFolders?.() ?? []; } catch { list = []; }
-  if (!list.length) return null;
-  const count = list.length;
-  const one = count === 1;
-  const projects = [...new Set(list.map((w) => w.project).filter(Boolean))];
-  const named = list.slice(0, 3).map((w) => shortPath(w.path as string, home));
-  const rest = count - named.length;
-  const of = projects.length ? ` of ${projects.slice(0, 2).join(' and ')}${projects.length > 2 ? ' and other projects' : ''}` : '';
-  const now = `${count} ${one ? 'copy' : 'copies'}${of} ${one ? 'was' : 'were'} made by hand outside the folder ${NAME} keeps its own in, and ${one ? 'is' : 'are'} holding disk until you remove ${one ? 'it' : 'them'}: ${named.join(', ')}${rest > 0 ? ` and ${rest} more` : ''}. ${NAME} never removes a folder it did not make.`;
-  return { count, now };
-}
-
 export function cornerTagTurnedOff({ key, value }: { key?: string; value?: unknown } = {}) {
   return key === 'cornerTag' && !value;
 }
@@ -1358,10 +1320,6 @@ export function setWorkspaceSetting({ config, supervisor, store }: SettingsDeps,
       // FOR THE WHOLE COMPUTER (w-ec27ff1a51), under its own key, so a number
       // written per login before 5 Oct can never be read as this choice.
       saveConfig(config, { agentsAtOnce: n, agentsAuto: false });
-      // An explicit choice replaces the startup plan suggestion for BOTH
-      // engines. Leaving this marker set makes Codex ignore the new number
-      // until loadConfig runs again at restart. It is derived, not persisted.
-      config.planSlotsFrom = null;
       // Fill newly available slots through the usual queue and its guards.
       // Lowering the cap leaves existing work running and gates new starts.
       supervisor.wake?.();

@@ -1424,12 +1424,6 @@ export interface WorkspaceSettings {
   agentsRunning: boolean;
   sessionsAtOnce: number;
   /**
-   * The Claude plan that set `sessionsAtOnce`, when a plan set it, so the
-   *  Agents page can say why the number is what it is. Null whenever the
-   *  number was chosen by hand or is the one every install has always had.
-   *  Optional so an older payload still typechecks. */
-  sessionsAtOnceFromPlan?: string | null;
-  /**
    * How many agents we SUGGEST for this Mac, worked out from its memory and its
    * cores (main/machine.mjs). It chooses the number somebody starts on and it
    * is what `machineNote` recommends. IT IS NOT A CEILING: these are developers
@@ -1472,11 +1466,6 @@ export interface WorkspaceSettings {
    * STOP WHAT FINISHED AGENTS LEAVE RUNNING (main/leftovers.mts). `now` is one
    * sentence about what is left right now, null while it is off. */
   leftovers?: { on: boolean; now: string | null };
-  /**
-   * COPIES OF A PROJECT THE APP DID NOT MAKE (main/task-folders.mts). Null, and
-   * so no row at all, whenever there are none: the app shows these and never
-   * removes one, so there is nothing on the row to decide. */
-  strayFolders?: { count: number; now: string } | null;
   capacity: number;
   running: number;
   model: string | null;
