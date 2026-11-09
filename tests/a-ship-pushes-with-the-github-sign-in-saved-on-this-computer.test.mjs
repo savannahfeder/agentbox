@@ -24,6 +24,8 @@ const TOKEN = 'ghp_the-right-one';
 let tmp; let task; let server; let site; let hookSaw; let globalConfig;
 
 const env = () => ({ ...process.env, GIT_CONFIG_GLOBAL: globalConfig, GIT_CONFIG_NOSYSTEM: '1', [TOKEN_VAR]: '' });
+// What the real push hook does before its tests (scripts/hooks/pre-push).
+const DROPS_GIT_VARIABLES = 'for v in $(env | sed -n \'s/^\\(GIT_[A-Za-z0-9_]*\\)=.*/\\1/p\'); do\n  unset "$v"\ndone';
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', env: { ...env(), GIT_CONFIG_GLOBAL: '/dev/null' } }).trim();
 
 // git's own http server behind a sign-in, asked for only to push, as GitHub asks for it.
@@ -90,11 +92,11 @@ beforeEach(async () => {
   fs.writeFileSync(path.join(task, 'notes.txt'), 'mine\n');
   git(task, 'add', '.');
   git(task, 'commit', '-q', '-m', 'A file of its own');
-  // Like the real hook: drops the token first, then says what it could still see.
+  // Like the real hook: drops git's variables first, then says what it could still see of the token.
   const hooks = path.join(base, 'scripts', 'hooks');
   fs.mkdirSync(hooks, { recursive: true });
   hookSaw = path.join(tmp, 'hook-saw');
-  fs.writeFileSync(path.join(hooks, 'pre-push'), `#!/bin/sh\nunset ${TOKEN_VAR}\necho "\${${TOKEN_VAR}:-nothing}" > ${JSON.stringify(hookSaw)}\nexit 0\n`, { mode: 0o755 });
+  fs.writeFileSync(path.join(hooks, 'pre-push'), `#!/bin/sh\n${DROPS_GIT_VARIABLES}\necho "\${${TOKEN_VAR}:-nothing}" > ${JSON.stringify(hookSaw)}\nexit 0\n`, { mode: 0o755 });
 });
 afterEach(async () => {
   await new Promise((r) => server.close(r));
@@ -135,6 +137,17 @@ describe('a ship with the sign-in saved on this computer', () => {
     expect(code).not.toBe(0);
     expect(pushed()).toBe('init');
   }, 60_000);
+});
+
+// A ship of this change once stopped at 20 minutes: it edited the push hook to drop the token,
+// and any change to scripts/hooks/ makes that hook run the whole suite.
+describe('the token a ship pushes with', () => {
+  it('is a name the push hook already drops before its tests run', () => {
+    const hook = fs.readFileSync(path.resolve(path.dirname(SHIP_SCRIPT), 'hooks', 'pre-push'), 'utf8');
+    expect(hook).toContain(DROPS_GIT_VARIABLES);
+    expect(TOKEN_VAR).toMatch(/^GIT_[A-Z0-9_]+$/);
+    expect(hook).not.toContain(TOKEN_VAR);
+  });
 });
 
 describe('the config a ship pushes with', () => {

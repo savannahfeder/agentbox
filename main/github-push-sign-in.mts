@@ -4,7 +4,8 @@
 // (`pushSignIn`), so neither the person's git settings nor any worker sees it.
 import { connectionVault, CANNOT_ENCRYPT } from './connections/vault.mjs';
 
-export const TOKEN_VAR = 'AGENTBOX_GITHUB_TOKEN';
+// A GIT_ name, because the push hook drops every GIT_ variable before its tests run.
+export const TOKEN_VAR = 'GIT_AGENTBOX_GITHUB_TOKEN';
 const CHECK_MS = 15_000;
 
 interface Cipher { encrypt(text: string): Buffer | null; decrypt(buf: Buffer): string | null; available?: () => boolean }
