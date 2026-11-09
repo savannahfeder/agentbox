@@ -168,6 +168,8 @@ export interface TeamSession {
   adoptSession?(session: { supabaseUrl: string; access_token: string; refresh_token: string } | null): Promise<TeamBackend | null>;
   signUp?(account: { email: string; password: string; name: string }): Promise<{ backend?: TeamBackend; confirm?: boolean } | null | undefined>;
   signOut?(): Promise<unknown>;
+  /** The cloud as nobody, for what anyone may read: a shared file's link. */
+  anyone?(): Promise<TeamBackend | null>;
 }
 
 /** A project as the team service reads it from the store. */
@@ -1341,6 +1343,25 @@ export function createTeamService({
       const live = await backend.fileLinkFor(source);
       if (live && backend.clearLinkPieces) await backend.clearLinkPieces(live.token, hash).catch((err: Error) => log(`file link: old pieces stay: ${err.message}`));
       return this.fileLink(source, hash);
+    },
+    /** A file someone shared by its link, as anyone with the link reads it, with its bytes. */
+    async readFileLink(token: string) {
+      const b = backend ?? (await session?.anyone?.()) ?? null;
+      if (!b?.fileLinkView) throw new Error('This copy has no cloud to read shared files from.');
+      const { stopped, file } = await b.fileLinkView(token);
+      if (!file) throw new Error(stopped ? 'This link was stopped. Ask whoever sent it for a new one.' : 'This link does not work. Check it with whoever sent it.');
+      let bytes: Buffer;
+      if (file.kind === 'video') {
+        const { pieces, hash } = JSON.parse(file.body) as { pieces: number; hash: string };
+        const parts: Buffer[] = [];
+        for (let n = 0; n < pieces; n++) {
+          const got = await b.linkPiece?.(`${token}/${hash}/${n}`);
+          if (!got) throw new Error('This film did not come through. Try again.');
+          parts.push(got);
+        }
+        bytes = Buffer.concat(parts);
+      } else bytes = Buffer.from(file.body, file.kind === 'image' || file.kind === 'pdf' ? 'base64' : 'utf8');
+      return { file, bytes, url: linkSite ? linkAddress(linkSite, token) : null };
     },
     /** Every live link of this person's, for the one list of what they made public. */
     async fileLinks() {

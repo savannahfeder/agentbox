@@ -109,9 +109,10 @@ export function startStandinCloud({ port = 0, file = null, saveEveryMs = 3000 } 
       if (!cloud.people.has(token)) throw new Error('nobody by that token');
       const backend = memoryBackend(cloud, token);
       if (typeof backend[method] !== 'function' || method.startsWith('subscribe')) throw new Error(`no call named ${method}`);
-      const value = await backend[method](...args);
+      // Bytes cross as { __bytes: base64 } both ways (main/team/standin-backend.mts).
+      const value = await backend[method](...args.map((a) => (a && typeof a === 'object' && typeof a.__bytes === 'string' ? Buffer.from(a.__bytes, 'base64') : a)));
       mark();
-      return { value: value === undefined ? null : value };
+      return { value: value === undefined ? null : Buffer.isBuffer(value) ? { __bytes: value.toString('base64') } : value };
     },
     async wait({ token, waitMs = 25_000 }) {
       if (!cloud.people.has(token)) throw new Error('nobody by that token');

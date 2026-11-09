@@ -13,6 +13,7 @@ import {
 import { SharedSignIn } from './SharedSignIn';
 import { TableView } from '../components/TableView';
 import { Name } from '../../../shared/product-name.mjs';
+import { JOIN_SCHEME } from '../../../shared/room-links.mts';
 import '../components/doc-reading.css';
 import '../components/file-views.css';
 import './shared-file.css';
@@ -114,7 +115,7 @@ export function SharedFilePage({ token, client, finishing = null }: {
 
   return (
     <div className={`sf-page${commentsOpen ? ' has-panel' : ''}`}>
-      <TopBar count={file ? comments?.length ?? 0 : null} open={commentsOpen} onComments={() => setCommentsOpen(!commentsOpen)} />
+      <TopBar count={file ? comments?.length ?? 0 : null} open={commentsOpen} onComments={() => setCommentsOpen(!commentsOpen)} openIn={file && !file.mine ? `${JOIN_SCHEME}://f/${token}` : null} />
       {body}
       {commentsOpen && (
         <aside className="sf-panel" aria-label="Comments">
@@ -153,7 +154,8 @@ export function SharedFilePage({ token, client, finishing = null }: {
 }
 
 /** The mark, the comments and the way to the app. `count` null: there is no file to comment on. */
-export function TopBar({ count, open, onComments }: { count: number | null; open: boolean; onComments: () => void }) {
+/** `openIn`: the app's own link to this file, which brings it into the viewer's Agentbox (main/bring-shared-file.mts). */
+export function TopBar({ count, open, onComments, openIn = null }: { count: number | null; open: boolean; onComments: () => void; openIn?: string | null }) {
   return (
     <header className="sf-bar">
       <a className="sf-brand" href={SITE}><AppMark size={14} />agentbox</a>
@@ -163,6 +165,7 @@ export function TopBar({ count, open, onComments }: { count: number | null; open
             {count === 0 ? 'Comment' : count === 1 ? '1 comment' : `${count} comments`}
           </button>
         )}
+        {openIn && <a href={openIn}>Open in {Name}</a>}
         <a href={SITE}>Get {Name}</a>
       </nav>
     </header>
