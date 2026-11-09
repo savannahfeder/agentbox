@@ -169,10 +169,11 @@ export function phoneBoard(view: View, tabs: Record<TabId, Row[]>, display: Disp
   });
   // A card waiting its turn says Queued where the running mark would be (Pages.tsx `saysOnCard`).
   const queued = new Set(tabs.progress.filter((r) => r.queued).map((r) => r.id));
+  const agentOf = new Map(Object.values(tabs).flat().map((r) => [r.id, r.agent]));
   // Your own board says what the tab says (Pages.tsx `InboxBoard`).
   return columns.map((c) => ({
     ...c, label: c.state === 'waiting' ? 'Needs you' : c.label,
-    rows: c.rows.map((e) => ({ ...e, queued: c.state === 'running' && !!e.item && queued.has(e.item.id) })),
+    rows: c.rows.map((e) => ({ ...e, queued: c.state === 'running' && !!e.item && queued.has(e.item.id), agent: (e.item && agentOf.get(e.item.id)) ?? null })),
   }));
 }
 

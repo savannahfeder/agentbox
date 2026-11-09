@@ -4,7 +4,8 @@
 // and once to Codex drew two identical rows, same title, same project, and the
 // only way to tell them apart was to open each. Read from phoneTabs' rows.
 import { describe, it, expect } from 'vitest';
-import { phoneTabs } from '../mobile/src/lib/tabs';
+import { phoneBoard, phoneTabs } from '../mobile/src/lib/tabs';
+import { DEFAULT_DISPLAY } from '../renderer/src/threads/page-rules';
 import type { WorkItem } from '../renderer/src/types';
 
 const NOW = 1_800_000_000_000;
@@ -33,5 +34,14 @@ describe('and says nothing when it would tell nothing apart', () => {
   it('two copies on the same agent', () => {
     const r = rows([thread('w-1', 'Fix the login bug', { engine: 'codex' }), thread('w-2', 'Fix the login bug', { engine: 'codex' })]);
     expect(r.map((x) => x.agent)).toEqual([null, null]);
+  });
+});
+
+describe('on the board', () => {
+  it('a card says its agent as its row does', () => {
+    const items = [thread('w-1', 'Fix the login bug', { engine: 'claude' }), thread('w-2', 'Fix the login bug', { engine: 'codex' })];
+    const view = { items, running: [], products: [{ slug: 'mac:alpha', name: 'Alpha' }] };
+    const cards = phoneBoard(view, phoneTabs(view, NOW), { ...DEFAULT_DISPLAY.inbox, view: 'board' }, NOW).flatMap((c) => c.rows);
+    expect(Object.fromEntries(cards.map((e) => [e.item!.id, e.agent]))).toEqual({ 'w-1': 'Claude Code', 'w-2': 'Codex' });
   });
 });

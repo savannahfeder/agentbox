@@ -351,7 +351,7 @@ export function previewCloud(now = () => Date.now()) {
   // `?scene=copies`: one task sent to Claude Code and again to Codex.
   if (scene === 'copies') {
     const stuck = rows.threads.find((t) => t.item === 'w-2b3c4d5e6f');
-    if (stuck) rows.threads.push({ ...stuck, item: 'w-2b3c4d5e70', snapshot: { ...stuck.snapshot, item: { ...stuck.snapshot.item, id: 'w-2b3c4d5e70', engine: 'codex' } } });
+    if (stuck) rows.threads.push({ ...stuck, item: 'w-2b3c4d5e70', snapshot: { ...stuck.snapshot, item: { ...stuck.snapshot.item, id: 'w-2b3c4d5e70', engine: 'codex' } as WorkItem } });
   }
   let signedIn = scene !== 'signed-out' && !walking;
   const settings = previewSettings(now());
