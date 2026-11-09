@@ -41,7 +41,7 @@ import { api } from '../api';
 import { CodeFile } from './CodeFile';
 import { TableView, useTableSave } from './TableView';
 import { useLiveSession, useLiveTicket } from '../live/live-session';
-import { familyOfName } from '../../../shared/artifact-marks.mjs';
+import { familyOfName } from '../../../shared/artifact-marks.mts';
 import { isTablePath } from '../table-file';
 import { FilmPlayer } from './FilmPlayer';
 import { PdfPages } from './PdfPages';
@@ -52,7 +52,7 @@ import { DocText } from './DocText';
 import { CodeArtifact } from './CodeArtifact';
 import type { Change } from '../code-artifact';
 import { NAME } from '../../../shared/product-name.mjs';
-import { shownName } from '../../../shared/artifact-marks.mjs';
+import { shownName } from '../../../shared/artifact-marks.mts';
 import { onPhone } from '../phone-screen';
 import { scrollKey, useKeptScroll } from '../kept-scroll';
 
@@ -417,7 +417,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
         ) : kind === 'pdf' ? (
           resolved ? <PdfPages load={pdfBytes} name={docName(resolved)} /> : <PreviewLoading />
         ) : kind === 'film' ? (
-          resolved ? <FilmPlayer url={pictureUrl(resolved)} name={docName(resolved)} wide /> : <PreviewLoading />
+          resolved ? <FilmPlayer url={pictureUrl(resolved)} name={docName(resolved)} wide={!onMode} /> : <PreviewLoading />
         ) : kind === 'code' ? (
           change
             ? <CodeArtifact

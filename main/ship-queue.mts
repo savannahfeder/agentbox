@@ -28,6 +28,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Name } from '../shared/product-name.mjs';
 import { SHIP_FAILED } from '../shared/not-shipped.mts';
+import { notPushedNote, pushNeedsGitHubSignIn } from '../shared/github-push-sign-in.mts';
 import { conflictBrief, earlyConflictNote } from './ship-conflict-brief.mts';
 import type { ConflictThread } from './ship-conflict-brief.mts';
 import { redOnMain } from './main-went-red.mts';
@@ -81,7 +82,9 @@ export interface ShipQueueOptions {
   isLive: (item: ShipItem) => boolean;
   liveSince?: (item: ShipItem) => number | null;
   handBack?: (item: ShipItem, reply: string) => void;
-  run?: (script: string, cwd: string, options?: { timeout?: number; env?: NodeJS.ProcessEnv }) => Promise<ShipRun>;
+  run?: (script: string, cwd: string, options?: { timeout?: number; env?: NodeJS.ProcessEnv; gitConfig?: [string, string][] }) => Promise<ShipRun>;
+  // The GitHub sign-in saved on this computer, for the push (main/github-push-sign-in.mts).
+  pushSignIn?: () => { env: Record<string, string>; config: [string, string][] } | null;
   afterShip?: (shipped: { item: ShipItem; product: ShipProduct; sha: string | null }) => void;
   memoryGate?: () => ShipGate | null;
   shipScore?: (item: ShipItem) => number;
@@ -169,7 +172,7 @@ export function waitingToShip(items: ShipItem[], products: ShipProduct[], settin
  * means nobody can say when the live work started — a cloud run whose folder
  * has not come home — and that waits, as it always did.
  *
- * Priority before age, the way `shared/work-items.mjs` orders the queue a
+ * Priority before age, the way `shared/work-items.mts` orders the queue a
  * puller sees: a thread the person is waiting on queued behind every older one.
  */
 export function nextToShip(items: ShipItem[], products: ShipProduct[], settings: ShipSettings, {
@@ -309,12 +312,18 @@ function baseHooksPath(cwd: string) {
   });
 }
 
-export async function runScript(script: string, cwd: string, { timeout = SHIP_MS, env = process.env }: { timeout?: number; env?: NodeJS.ProcessEnv } = {}): Promise<ShipRun> {
+/** `pairs` as git reads config from the environment. */
+export function gitConfigEnv(pairs: [string, string][]): Record<string, string> {
+  if (!pairs.length) return {};
+  const out: Record<string, string> = { GIT_CONFIG_COUNT: String(pairs.length) };
+  pairs.forEach(([key, value], i) => { out[`GIT_CONFIG_KEY_${i}`] = key; out[`GIT_CONFIG_VALUE_${i}`] = value; });
+  return out;
+}
+
+export async function runScript(script: string, cwd: string, { timeout = SHIP_MS, env = process.env, gitConfig = [] }: { timeout?: number; env?: NodeJS.ProcessEnv; gitConfig?: [string, string][] } = {}): Promise<ShipRun> {
   const node = env.npm_node_execpath && fs.existsSync(env.npm_node_execpath) ? env.npm_node_execpath : 'node';
   const hooks = await baseHooksPath(cwd);
-  const baseGate = hooks
-    ? { GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.hooksPath', GIT_CONFIG_VALUE_0: hooks }
-    : {};
+  const baseGate = gitConfigEnv([...(hooks ? [['core.hooksPath', hooks] as [string, string]] : []), ...gitConfig]);
   return new Promise<ShipRun>((resolve) => {
     let out = '';
     let child: ChildProcess;
@@ -369,12 +378,13 @@ export class ShipQueue {
   declare afterShip: NonNullable<ShipQueueOptions['afterShip']>;
   declare memoryGate: NonNullable<ShipQueueOptions['memoryGate']>;
   declare shipScore: NonNullable<ShipQueueOptions['shipScore']>;
+  declare pushSignIn: NonNullable<ShipQueueOptions['pushSignIn']>;
   declare log: ShipLog;
   declare busy: Promise<unknown> | null;
   declare earlyConflicts: Map<string, string>;
 
-  constructor({ store, userDir, folderFor, isLive, liveSince = () => null, handBack = () => {}, run = runScript, afterShip = () => {}, memoryGate = () => null, shipScore = () => 0, log = console }: ShipQueueOptions) {
-    Object.assign(this, { store, userDir, folderFor, isLive, liveSince, handBack, run, afterShip, memoryGate, shipScore, log });
+  constructor({ store, userDir, folderFor, isLive, liveSince = () => null, handBack = () => {}, run = runScript, afterShip = () => {}, memoryGate = () => null, shipScore = () => 0, pushSignIn = () => null, log = console }: ShipQueueOptions) {
+    Object.assign(this, { store, userDir, folderFor, isLive, liveSince, handBack, run, afterShip, memoryGate, shipScore, pushSignIn, log });
     this.busy = null;
     this.earlyConflicts = new Map();
   }
@@ -457,8 +467,11 @@ export class ShipQueue {
       onWait: () => { try { this.store.noteItem?.(item.product, item.id, 'Waiting for memory on this computer before shipping.'); } catch { /* the ship still waits */ } },
     });
     let ran;
+    let signIn: ReturnType<ShipQueue['pushSignIn']> = null;
+    try { signIn = this.pushSignIn(); } catch (e) { this.log.warn?.('zero: could not read the GitHub sign-in:', (e as Error).message); }
     try {
-      ran = await this.run(script, cwd, red.length ? { env: { ...process.env, AGENTBOX_RED_ON_MAIN: red.join('\n') } } : undefined);
+      const env = { ...(red.length ? { AGENTBOX_RED_ON_MAIN: red.join('\n') } : {}), ...signIn?.env };
+      ran = await this.run(script, cwd, Object.keys(env).length ? { env: { ...process.env, ...env }, ...(signIn ? { gitConfig: signIn.config } : {}) } : undefined);
     } finally {
       giveBack?.();
     }
@@ -475,6 +488,9 @@ export class ShipQueue {
         // five minutes after the agent ended.
         this.afterShip({ item, product, sha });
         await this._findNewConflicts(item, items, products);
+      } else if (pushNeedsGitHubSignIn(out)) {
+        // Nothing the agent can do: the thread asks for a sign-in and ships again once it is saved.
+        this.store.shipFailed(product.slug, item.id, { note: notPushedNote(!!signIn), labels: withoutShipLabel(item) });
       } else {
         this.store.shipFailed(product.slug, item.id, { note: failureNote(out), labels: withoutShipLabel(item) });
         let brief: string | null = null;

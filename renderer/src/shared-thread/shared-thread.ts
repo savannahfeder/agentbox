@@ -1,7 +1,7 @@
 // A THREAD'S LINK ON THE WEB APP: /t/<owner>/<thread>. It opens for whoever
 // can read the thread's card (the cloud's own rule on thread_work), and offers
 // the app, where the thread opens in full.
-import { threadAppLink } from '../../../shared/room-links.mjs';
+import { threadAppLink } from '../../../shared/room-links.mts';
 
 const PART = /^[\w-]{1,80}$/;
 

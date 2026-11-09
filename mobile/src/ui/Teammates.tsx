@@ -4,18 +4,22 @@
 import { router } from '../lib/router';
 import { useState, type ReactNode } from 'react';
 import { Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import type { Room, Teammate } from '../../../renderer/src/types';
 import { updatedWords } from '../../../renderer/src/threads/page-rules';
 import { mateDraft, useDraft } from '../lib/drafts';
 import { groupName, groupsInOrder } from '../lib/groups';
-import { asideOf, matesInOrder, nowLine, waitsOnYou } from '../lib/teammates';
+import { answersMessage } from '../../../renderer/src/teammates/chat-lines';
+import { teammateIdOf } from '../../../shared/teammates.mts';
+import { asideOf, matesInOrder, nowLine, questionsInThread, waitsOnYou } from '../lib/teammates';
 import { appStore } from '../platform/persist';
+import { Markdown } from './Markdown';
 import { useCloud } from '../state/cloud';
 import { useGroups } from '../state/groups';
 import { Face } from './Groups';
 import { Gear } from './icons';
-import { IconButton, T, TopBar } from './parts';
+import { footRoom, IconButton, T, TopBar } from './parts';
 import { color, corner, font, size } from './theme';
 
 /** The corner of an AI teammate's dashed mark, as `--mate-corner` is on the web: round, like a person. */
@@ -114,6 +118,7 @@ export function MateComposer({ mate, placeholder, send, above }: { mate: string 
   const draft = useDraft(mateDraft(mate), appStore);
   const { text, setText } = draft;
   const [busy, setBusy] = useState(false);
+  const inset = useSafeAreaInsets();
   const go = async () => {
     const words = text.trim();
     if (!words || busy) return;
@@ -123,7 +128,7 @@ export function MateComposer({ mate, placeholder, send, above }: { mate: string 
     if (ok) draft.take();
   };
   return (
-    <View style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 10 }}>
+    <View style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 16 + footRoom(inset) }}>
       {above}
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', borderWidth: 1, borderRadius: corner.small, borderColor: text ? color.lineStrong : color.line, backgroundColor: color.field }}>
         <TextInput value={text} onChangeText={setText} multiline placeholder={placeholder} placeholderTextColor={color.faint} editable={!busy}
@@ -131,6 +136,54 @@ export function MateComposer({ mate, placeholder, send, above }: { mate: string 
         {!!text.trim() && <IconButton label="Send" onPress={() => void go()}><SendGlyph tint={color.accent} /></IconButton>}
       </View>
     </View>
+  );
+}
+
+/** A teammate's open questions inside the thread that asked them, over its reply box (TeammatesPage.tsx `ThreadQuestions`).
+ *  With one question a tap sends; with several it picks, and one Send answers them all. */
+export function ThreadQuestions({ item }: { item: { id: string; labels?: string[] } }) {
+  const c = useCloud();
+  const [picks, setPicks] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const open = questionsInThread(c.team?.view, item, c.teamPending);
+  const tid = teammateIdOf(item);
+  if (!open.length || !tid) return null;
+  const many = open.length > 1;
+  const send = async (chosen: Record<string, string>) => {
+    const m = answersMessage(open, chosen);
+    if (!m.text || busy) return;
+    setBusy(true); setError(null);
+    try { await c.askTeammate('post', { text: m.text, to: [tid], answers: m.answers }); setPicks({}); }
+    catch (err) { setError(String((err as Error)?.message ?? err)); }
+    finally { setBusy(false); }
+  };
+  const tap = (q: string, o: string) => {
+    if (!many) { void send({ [q]: o }); return; }
+    setPicks((all) => ({ ...all, [q]: all[q] === o ? '' : o }));
+  };
+  const answered = open.filter((q) => picks[q.id]).length;
+  return (
+    <ScrollView style={{ flexGrow: 0, flexShrink: 0, maxHeight: 300, marginHorizontal: 12, marginTop: 8 }} keyboardShouldPersistTaps="handled">
+      <View style={{ borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: color.fill, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14, gap: 14 }}>
+        {open.map((q) => (
+          <View key={q.id}>
+            <Markdown text={q.text ?? ''} />
+            <Chips options={q.options ?? []} on={picks[q.id] || null} disabled={busy} tap={(o) => tap(q.id, o)} />
+          </View>
+        ))}
+        {many && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Pressable disabled={!answered || busy} onPress={() => void send(picks)} accessibilityRole="button"
+              style={({ pressed }) => ({ height: 32, paddingHorizontal: 14, justifyContent: 'center', backgroundColor: color.accent, borderRadius: corner.small, opacity: !answered || busy ? 0.45 : pressed ? 0.85 : 1 })}>
+              <T style={{ fontSize: 15, fontFamily: font.medium, color: '#fff' }}>Send answers</T>
+            </Pressable>
+            {answered < open.length && <T style={{ fontSize: 13, color: color.faint }}>{`${answered} of ${open.length} answered`}</T>}
+          </View>
+        )}
+        {error && <T style={{ fontSize: 13, color: color.dim }}>{error}</T>}
+      </View>
+    </ScrollView>
   );
 }
 

@@ -11,7 +11,7 @@
 //      person's, with an id made from its own bytes so it can never go twice.
 //   3. PULL. Every line the cloud has that this Mac has not seen comes in
 //      through the store's one write path (`appendForeignLines`), at most
-//      once, holding only what a teammate may set here (shared/team-rules.mjs
+//      once, holding only what a teammate may set here (shared/team-rules.mts
 //      whatATeammateMaySet). A line this person wrote comes back too, in a
 //      conversation and nowhere else (whatYourOtherCopyMaySet), because a
 //      second copy of the app signed in as them is a Mac that has not seen it
@@ -21,17 +21,17 @@
 //      (who, what state, when it moved), and only when that set changed.
 //
 //   And in a conversation, the files its messages link to (below, FILES) and
-//   every other file they name (./carry-files.mjs).
+//   every other file they name (./carry-files.mts).
 //
 // Everything outside this file is passed in, so two "Macs" can run in one test
 // over an in-memory cloud. The app wires the real ones in main/team/index.mts.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { whatATeammateMaySet, whatYourOtherCopyMaySet } from '../../shared/team-rules.mjs';
+import { whatATeammateMaySet, whatYourOtherCopyMaySet } from '../../shared/team-rules.mts';
 import type { CloudProject, SharedProjectRef } from './projects.mts';
-import { MAX_CARRIED_BYTES, namedFiles, wordsOfLine } from '../../shared/carried-files.mjs';
-import { createFileCarrier } from './carry-files.mjs';
+import { MAX_CARRIED_BYTES, namedFiles, wordsOfLine } from '../../shared/carried-files.mts';
+import { createFileCarrier } from './carry-files.mts';
 
 /** A ledger line as it is written and pushed; other keys pass through. */
 export interface LedgerLine {
@@ -105,7 +105,7 @@ export interface SyncBackend {
   getPiece?(projectId: string, name: string): Promise<unknown>;
 }
 
-/** What a conversation's file carrier answers to `send` (./carry-files.mjs). */
+/** What a conversation's file carrier answers to `send` (./carry-files.mts). */
 export interface CarrySent { sent?: boolean; entry?: object; looking?: boolean; working?: boolean; failed?: boolean }
 
 export interface FileCarrier {
@@ -155,7 +155,7 @@ export const MAX_SHARED_PROJECTS = 50;
 // missing until the thread is reopened).
 //
 // Only in a conversation: an ordinary shared project's words never cross
-// (shared/team-rules.mjs), so nothing they link to does either. And every file
+// (shared/team-rules.mts), so nothing they link to does either. And every file
 // call is best effort. A cloud without the table, or one file that will not
 // come, must never stop a message.
 export const MAX_MESSAGE_FILE_BYTES = MAX_CARRIED_BYTES;
@@ -235,13 +235,13 @@ export function fileSyncState(file: string, fs: FsForState): SyncState {
     getTeam: (personId) => data.teams?.[personId] ?? null,
     setTeam: (personId, teamId) => { data.teams = { ...(data.teams || {}), [personId]: teamId }; save(); },
     // WHEN THIS PERSON STARTED SHARING ON THIS MAC. Threads from before it stay
-    // theirs unless they share one (shared/thread-cards.mjs, `shownToTeam`).
+    // theirs unless they share one (shared/thread-cards.mts, `shownToTeam`).
     getSince: (personId) => data.since?.[personId] ?? null,
     setSince: (personId, at) => { data.since = { ...(data.since || {}), [personId]: at }; save(); },
-    // What this copy already moved for someone who left (main/team/departures.mjs).
+    // What this copy already moved for someone who left (main/team/departures.mts).
     handedOver: () => data.handedOver ?? [],
     markHandedOver: (key) => { data.handedOver = [...(data.handedOver ?? []), key]; save(); },
-    // The newest comment on this person's shared links already put on a thread (main/team/link-comments.mjs).
+    // The newest comment on this person's shared links already put on a thread (main/team/link-comments.mts).
     getLinkComments: (personId) => data.linkComments?.[personId] ?? null,
     setLinkComments: (personId, at) => { data.linkComments = { ...(data.linkComments || {}), [personId]: at }; save(); },
   };
@@ -445,7 +445,7 @@ export function createTeamSync({ backend, disk, state, listShared, joinProject, 
       }
       const bring = rows.map((r) => r.line).filter((l): l is LedgerLine => !!l && !l.patch?.carries)
         // A line of your own comes back only in a conversation, and a line of a
-        // teammate's keeps only what they may set here (shared/team-rules.mjs).
+        // teammate's keeps only what they may set here (shared/team-rules.mts).
         .map((l) => (l.by === me ? whatYourOtherCopyMaySet(l, { direct }) : whatATeammateMaySet(l, { direct })))
         .filter(Boolean) as LedgerLine[];
       // The pictures first, so no message lands without its own.

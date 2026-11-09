@@ -224,6 +224,9 @@ contextBridge.exposeInMainWorld('zero', {
   setWorkspaceSetting: (payload) => ipcRenderer.invoke('zero:settings-set-workspace', payload),
   cloudSignIn: (payload) => ipcRenderer.invoke('zero:cloud-signin', payload),
   cloudKey: (payload) => ipcRenderer.invoke('zero:cloud-key', payload),
+  gitHubSignIn: (payload) => ipcRenderer.invoke('zero:github-sign-in', payload),
+  gitHubBrowserSignIn: () => ipcRenderer.invoke('zero:github-browser-sign-in'),
+  signInAnswer: (payload) => ipcRenderer.invoke('zero:sign-in-answer', payload),
   cloudSendFile: (payload) => ipcRenderer.invoke('zero:cloud-send-file', payload),
   cloudSendCode: (payload) => ipcRenderer.invoke('zero:cloud-send-code', payload),
   cloudFileInfo: (payload) => ipcRenderer.invoke('zero:cloud-file-info', payload),
@@ -276,7 +279,7 @@ contextBridge.exposeInMainWorld('zero', {
   // The document pane's own two: the text of a file it has open, and her edit
   // going back onto disk. Markdown only on the way back (main/doc-file.mts).
   readDoc: (payload) => ipcRenderer.invoke('zero:read-doc', payload),
-  // A link anyone can open, to one of her files (main/file-link.mjs).
+  // A link anyone can open, to one of her files (main/file-link.mts).
   fileLink: (payload) => ipcRenderer.invoke('zero:file-link', payload),
   fileLinkShare: (payload) => ipcRenderer.invoke('zero:file-link-share', payload),
   fileLinkStop: (payload) => ipcRenderer.invoke('zero:file-link-stop', payload),

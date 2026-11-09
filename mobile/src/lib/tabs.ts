@@ -17,8 +17,8 @@ import { isUrgentRow } from '../../../renderer/src/interrupt';
 import { priorityIdOf } from '../../../renderer/src/priority';
 import { toApproveWords, waitingCounts } from '../../../renderer/src/threads-made';
 import type { phoneView } from '../../../renderer/src/phone-rows';
-import type { ThreadStateWord } from '../../../renderer/src/types';
-import { teammateIdOf } from '../../../shared/teammates.mjs';
+import type { ThreadStateWord, WorkItem } from '../../../renderer/src/types';
+import { teammateIdOf } from '../../../shared/teammates.mts';
 import { keepsAgent, type Harness } from './agent-filter';
 
 export type TabId = 'inbox' | 'progress' | 'snoozed' | 'done';
@@ -48,7 +48,7 @@ export interface Row {
   queued: boolean;
   /** High or Urgent, marked on the row; Low and Medium are most threads, so they go unmarked. */
   priority: 'high' | 'urgent' | null;
-  item: any;
+  item: WorkItem;
 }
 
 /** The gaps between the inbox's tabs, and before a tab's count; tight when the loose ones do not fit. */
@@ -79,13 +79,13 @@ export const moreToTheRight = ({ view, content, x }: { view: number; content: nu
 const DELIVERED_THROUGH = 0;
 
 export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
-  const items: any[] = view.items;
+  const items: WorkItem[] = view.items;
   const live = new Set(view.running.map((r: { itemId: string }) => r.itemId));
   const queued = new Set(view.queued ?? []);
   const inCloud = new Set(view.running.filter((r: { where?: string }) => r.where === 'cloud').map((r: { itemId: string }) => r.itemId));
   const byId = new Map(items.map((i) => [i.id, i]));
-  const waitingOn = (i: any) => waitsThatCanEnd(i, byId);
-  const hiddenAt = (i: any) => hiddenUntil(i);
+  const waitingOn = (i: WorkItem) => waitsThatCanEnd(i, byId);
+  const hiddenAt = (i: WorkItem) => hiddenUntil(i);
   const owed = threadsOwedAnAnswer(items, now);
 
   const inbox = items.filter((i) => {
@@ -110,13 +110,13 @@ export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
   const names = new Map(view.products.map((p: { slug: string; name: string }) => [p.slug, p.name]));
   const order = view.products.map((p: { slug: string }) => p.slug);
   // Later says when a thread comes back, and leaves waiting a turn to In progress (Pages.tsx `back`).
-  const row = (i: any, tab: TabId): Row => ({
+  const row = (i: WorkItem, tab: TabId): Row => ({
     key: `${i.product}/${i.id}`, id: i.id, product: i.product, title: rowTitle(i), projectName: names.get(i.product) ?? '',
     when: (tab === 'snoozed' && backWords(i, now)) || updatedWords(i.status === 'done' ? i.wrote?.status?.ts ?? i.updatedAt : sentAt(i), now), running: live.has(i.id), cloud: inCloud.has(i.id),
     held: notStarted(i), toApprove: toApproveWords(toApprove.get(`${i.product}/${i.id}`)), queued: tab !== 'snoozed' && queued.has(i.id) && !live.has(i.id), item: i,
     priority: ((p) => (p === 'high' || p === 'urgent' ? p : null))(priorityIdOf(i.priority)),
   });
-  const drawn = (list: any[], tab: TabId) => sorted(list, DEFAULT_DISPLAY.inbox, tab, order).map((i) => row(i, tab));
+  const drawn = (list: WorkItem[], tab: TabId) => sorted(list, DEFAULT_DISPLAY.inbox, tab, order).map((i) => row(i, tab));
   return { inbox: drawn(inbox, 'inbox'), progress: drawn(progress, 'progress'), snoozed: drawn(snoozed, 'snoozed'), done: drawn(done, 'done') };
 }
 
@@ -155,7 +155,7 @@ export function phoneBoard(view: View, tabs: Record<TabId, Row[]>, display: Disp
   for (const [tab, word] of [['done', 'done'], ['snoozed', 'scheduled'], ['progress', 'running'], ['inbox', 'waiting']] as const) for (const r of tabs[tab]) state.set(r.id, word);
   const live = new Set(view.running.map((r: { itemId: string }) => r.itemId));
   const columns = boardColumns({
-    items: (view.items as any[]).filter((i) => keepsAgent(i, agent)), products: view.products as any[], display, now, me: null, live,
+    items: view.items.filter((i: WorkItem) => keepsAgent(i, agent)), products: view.products, display, now, me: null, live,
     stateOf: (i) => state.get(i.id) ?? null, projectOrder: view.products.map((p: { slug: string }) => p.slug),
   });
   // A card waiting its turn says Queued where the running mark would be (Pages.tsx `saysOnCard`).
@@ -183,11 +183,11 @@ export interface Hit {
 
 /** Every thread in every tab, closed ones too, as the site's search finds them (App.tsx `hits`). */
 export function phoneSearch(view: View, query: string, now = Date.now(), tabs?: Record<TabId, Row[]>): Hit[] {
-  const items: any[] = view.items;
+  const items: WorkItem[] = view.items;
   const asks = new Map(Object.values(tabs ?? {}).flat().map((r) => [r.key, r.toApprove]));
   const { terms, phrase } = parseQuery(query);
   const runs = (text: string) => (terms.length ? splitHits(text, terms, phrase) : [{ text, hit: false }]);
-  return searchThreads(items, query, { products: view.products as any[], people: [], me: null }).map(({ item, summary }: { item: any; summary: string }) => {
+  return searchThreads(items, query, { products: view.products, people: [], me: null }).map(({ item, summary }: { item: WorkItem; summary: string }) => {
     const p = item.priority ?? 5;
     return {
       key: `${item.product}/${item.id}`, id: item.id, product: item.product,

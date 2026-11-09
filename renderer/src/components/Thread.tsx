@@ -54,9 +54,10 @@ import { AgentAnswers } from '../team/ChatAgents';
 import { NeedOlder } from './NeedCard';
 import {
   conversationGap, fileInChange, gapIndex, groupWork, outputCut, runFailures, runOverflow, runSummary,
-} from '../../../shared/agents.mjs';
+} from '../../../shared/agents.mts';
 import type { AgentEvent, AgentTurn, AgentVoice, AgentWork } from '../types';
-import { voiceName } from '../../../shared/agent-voice.mjs';
+import type { ThreadPlace } from '../thread-place';
+import { voiceName } from '../../../shared/agent-voice.mts';
 
 // How much of an output stands open before she asks for the rest. The chosen
 // drawings show five or six lines: enough to see what came back, short
@@ -113,7 +114,10 @@ export interface CodeInThread {
   open: (path: string) => void;
 }
 
-export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, name, nameOf, landOn, md, code, tail, chat = false, reactions, onReact, onQuote, onHandToAgent, replies, openThread = null, onOpenThread, freshThreads, onEdit, onMarkUnread, onCopied, onMove, seenUnder = null }: {
+export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, name, nameOf, landOn, kept = null, onFolds, md, code, tail, chat = false, reactions, onReact, onQuote, onHandToAgent, replies, openThread = null, onOpenThread, freshThreads, onEdit, onMarkUnread, onCopied, onMove, seenUnder = null }: {
+  /** The steps she had open when she left this conversation, to open again. */
+  kept?: Pick<ThreadPlace, 'runs' | 'lines'> | null;
+  onFolds?: (runs: string[], lines: [string, number][]) => void;
   // CUT THE AGENT'S CURRENT STEP so a message of hers that is waiting on it is
   // answered now (w-f37a34def6). Absent where nothing can be cut.
   onSendNow?: () => unknown;
@@ -163,7 +167,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   tail?: (index: number) => ReactNode;
   // WHAT PEOPLE PUT ON EACH MESSAGE (w-560647d4db), by the message's uid, then
   // by emoji, then the people on it. Straight off the row (`item.reactions`,
-  // shared/work-items.mjs); nothing is counted here.
+  // shared/work-items.mts); nothing is counted here.
   reactions?: Record<string, Record<string, string[]>>;
   // AND THE WAY TO PUT ONE ON OR TAKE IT OFF. Absent everywhere a chat is not
   // being drawn, which is also what decides whether a message gets the bar on
@@ -183,7 +187,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   openThread?: string | null;
   onOpenThread?: (uid: string) => void;
   // How many replies in each thread are waiting on you, by its message's uid
-  // (`whatWaits`, shared/team-rules.mjs). Absent or 0 reads as before.
+  // (`whatWaits`, shared/team-rules.mts). Absent or 0 reads as before.
   freshThreads?: Record<string, number>;
   /** New words for one of your messages, or `gone` to delete it. Absent where messages cannot be changed. */
   onEdit?: (uid: string, change: { text: string } | { gone: true }) => void;
@@ -232,9 +236,11 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   };
 
   useEffect(() => {
-    setOpen(new Map());
-    setRunsOpen(new Set());
-  }, [landOn]);
+    setOpen(new Map(kept?.lines ?? []));
+    setRunsOpen(new Set(kept?.runs ?? []));
+  }, [landOn]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Not keyed on landOn, for the reason ItemThread gives.
+  useEffect(() => { onFolds?.([...runsOpen], [...open]); }, [open, runsOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A found line that is not drawn is in the middle this thread left out.
   useEffect(() => {
@@ -283,7 +289,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   //
   // THE RULE IS `gapIndex`, BESIDE THE CUT ITSELF. It used to be a loop here
   // with a second, different count, and the two drifted: see the note on
-  // `gapIndex` in shared/agents.mjs for the 56 rows that put the line in the
+  // `gapIndex` in shared/agents.mts for the 56 rows that put the line in the
   // wrong place. One rule, one file, and they cannot disagree again.
   const gapAfter = chat ? -2 : gapIndex(events, omitted);
 
@@ -313,7 +319,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
 
   // CONSECUTIVE TOOL CALLS FOLD INTO ONE LINE, aggregated behind one toggle
   // rather than each drawn on its own. The rule and
-  // the threshold live in shared/work-lines.mjs with the histogram that set
+  // the threshold live in shared/work-lines.mts with the histogram that set
   // them. Each node keeps the index it had in the raw list, which the gap below
   // is measured against; what is open is kept by name instead.
   const nodes = groupWork(events.map((e, i) => ({ ...e, i })), { min: 1 }) as ThreadNode[];
@@ -636,7 +642,7 @@ const chevron = (
 // Measured over seven imported sessions the same day: 535 work lines in
 // 162 runs, three of them 20 lines long. Folding every run of three or more
 // takes 413 of those lines off the screen and leaves 204, and the threshold is
-// out of the histogram rather than out of taste (shared/work-lines.mjs).
+// out of the histogram rather than out of taste (shared/work-lines.mts).
 //
 // WHAT IS NEVER FOLDED IS A FAILURE. The closed line says how many of the calls
 // inside it failed, in the same colour a single failed line uses, because a

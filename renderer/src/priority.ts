@@ -12,7 +12,7 @@
 // hint. The levels are still in ⌘K by NAME, which is how people find them
 // anyway. DO NOT PUT THE CHORD BACK without a product decision.
 
-import { shownPriority } from '../../shared/rank.mjs';
+import { shownPriority } from '../../shared/rank.mts';
 
 /** Display order, top to bottom. */
 export const PRIORITIES = [
@@ -67,7 +67,7 @@ export function priorityCommands(
   direct?: ReadonlySet<string>,
 ): PriorityCommand[] {
   if (!targets.length) return [];
-  // The level each row runs at, which is the level it shows (shared/rank.mjs).
+  // The level each row runs at, which is the level it shows (shared/rank.mts).
   const levels = new Set(targets.map((t) => priorityIdOf(shownPriority(t, !!direct?.has(t.product ?? '')))));
   const shared = levels.size === 1 ? [...levels][0] : null;
   const many = targets.length > 1 ? ` (${targets.length} selected)` : '';

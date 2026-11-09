@@ -21,7 +21,7 @@
 // resolve something, because there are eight of those and fixing branches is
 // how the ninth gets missed (the same reason keys.ts exists).
 
-import { DONT_SEND } from '../../shared/teammate-reach.mjs';
+import { DONT_SEND } from '../../shared/teammate-reach.mts';
 
 /**
  * The slot to reopen once the resolved item is gone: its own place in the

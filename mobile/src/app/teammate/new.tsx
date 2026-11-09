@@ -7,7 +7,7 @@ import { router } from '../../lib/router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { splitSlug } from '../../../../renderer/src/phone-rows';
-import { GREETING, starterAsks } from '../../../../shared/teammates.mjs';
+import { GREETING, starterAsks } from '../../../../shared/teammates.mts';
 import { dayOf } from '../../../../renderer/src/teammates/chat-lines';
 import { projectNow } from '../../lib/compose';
 import { screenGate } from '../../lib/thread-gate';

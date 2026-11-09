@@ -10,7 +10,7 @@ const page = (name: string) => fileURLToPath(new URL(name, import.meta.url));
 // be a `define` here replacing __THEME_LAB__ with a literal so rollup could
 // delete the lab out of anything scripts/release.mjs built. She asked for the
 // strip to be removed outright, so there is nothing left to keep out and no
-// flag to get wrong. tests/the-theme-lab-is-gone.test.mjs checks.
+// flag to get wrong. tests/the-theme-lab-is-gone.test.mts checks.
 export default defineConfig({
   base: './',
   plugins: [react()],

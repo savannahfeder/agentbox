@@ -50,7 +50,7 @@ function publishLegal(legal, out, given, log) {
 }
 
 // THE PAGES ADDRESS SENDS A VISIT ON TO `phoneSite` when that is another address
-// (tests/the-web-apps-old-address-forwards-to-its-new-one.test.mjs). `_redirects`
+// (tests/the-web-apps-old-address-forwards-to-its-new-one.test.mts). `_redirects`
 // cannot match a host and the CSP refuses inline scripts, hence a file loaded first.
 function forwarderFor(given) {
   if (given.phoneSite == null) return null;

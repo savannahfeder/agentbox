@@ -24,8 +24,8 @@
 // so a week of demos reads as a week of demos.
 import fs from 'node:fs';
 import path from 'node:path';
-import { FRESH_INSTALL_ID, runningAsAFreshUser } from './fresh-user-home.mjs';
-import { DEMO_INSTALL_ID, runningAsADemo } from './demo-world.mjs';
+import { FRESH_INSTALL_ID, runningAsAFreshUser } from './fresh-user-home.mts';
+import { DEMO_INSTALL_ID, runningAsADemo } from './demo-world.mts';
 
 export function readInstallId(dir: string | null | undefined, env: NodeJS.ProcessEnv = process.env): string | null {
   if (runningAsADemo(env)) return DEMO_INSTALL_ID;

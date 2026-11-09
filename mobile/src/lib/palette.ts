@@ -3,7 +3,7 @@
 // the ones about a Mac or its keyboard were never offered here.
 import { matchesQuery, rankMatches } from '../../../renderer/src/palette-rows';
 import { cloudCommands, type CloudMode } from '../../../renderer/src/cloud-menu';
-import { moveProduct } from '../../../shared/rank.mjs';
+import { moveProduct } from '../../../shared/rank.mts';
 import type { PlaceId } from './groups';
 import type { PhoneLook } from './look';
 import type { Change } from './settings-view';
