@@ -260,6 +260,11 @@ contextBridge.exposeInMainWorld('zero', {
   // One way, name/message/stack only, scrubbed on the far side before it is
   // written. The window never chooses what a crash report contains.
   crash: (payload) => ipcRenderer.invoke('zero:crash', payload),
+  // Read once before the first screen, so it is the one call here that waits (renderer/src/draft-copy.ts).
+  draftCopy: {
+    read: () => ipcRenderer.sendSync('zero:draft-copy-read'),
+    write: (text) => ipcRenderer.send('zero:draft-copy-write', text),
+  },
   // What an opened thread laid out, so the app can check it painted it (main/blank-page.mts).
   blankCheck: (payload) => ipcRenderer.invoke('zero:blank-check', payload),
   // A COUNT, AND THE NAME IS THE WHOLE MESSAGE. There is no analytics SDK in

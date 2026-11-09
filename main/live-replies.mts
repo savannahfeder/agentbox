@@ -67,6 +67,8 @@ export interface ReplySupervisor {
   _saveState(): unknown;
   redeliverAnswer(item: ReplyItem, answer: string | null | undefined): unknown;
   deliverMidflightReply(item: ReplyItem, files: null): unknown;
+  /** Answer the sign-in card the run is waiting on, so the wait ends and the reply can be taken. */
+  endSignInWait?(product: string, id: string): unknown;
 }
 
 export interface ReplyPayload {
@@ -102,6 +104,9 @@ export function submitReply(supervisor: ReplySupervisor, payload: ReplyPayload, 
     if (!live) return;
     if (permissionMode != null) throw Error('A running turn keeps its current permissions. Stop it before sending with a different permission mode.');
     if (answer.trimStart().startsWith('/') && !session.remoteIdle) throw Error('Wait for the current turn to finish before running a slash command.');
+    // An agent waiting on a sign-in card calls sign_in again every 50 seconds,
+    // so its step never ends and a reply queued behind it is never taken.
+    if (!session.remoteIdle && !between && !from) supervisor.endSignInWait?.(product, id);
     // A held Remote Control conversation is sitting idle rather than working,
     // and the slash commands it takes stop being commands once prose is wrapped
     // round them. Both reach it exactly as typed.

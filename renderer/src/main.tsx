@@ -23,6 +23,7 @@ import { installFullScreenEscape } from './full-screen-escape';
 import { onASharedFilePage } from './shared-file/route';
 import { bootSharedFile } from './shared-file/boot';
 import { readCloudConfig } from './cloud-bridge';
+import { keepACopyOfTheDrafts } from './draft-copy';
 
 // A thrown React error takes the screen down without taking the process down,
 // so nothing in the main process ever hears about it. These two lines are the
@@ -88,6 +89,8 @@ const paintTheLook = () => {
 };
 
 const boot = () => {
+  // Before any box reads its draft.
+  keepACopyOfTheDrafts(localStorage, window.zero?.draftCopy);
   paintTheLook();
   // A picture holds its place while it loads, in every window (phone.css).
   installPictureWatch();
