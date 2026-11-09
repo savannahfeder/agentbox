@@ -20,7 +20,7 @@
 // NOTHING NEW IS STORED AND NOTHING IS WRITTEN. Two files that already exist
 // are read, and the marks a Z left on this Mac (../undo-marks).
 
-import { useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ThreadPanel } from '../team/ThreadPanel';
 import { TeamContext } from '../team/people';
@@ -41,6 +41,8 @@ import type { ModelChoice } from '../models';
 import type { LedgerLine } from '../thread-history';
 import type { TraceSession } from '../notes';
 import { withEveryRun } from '../every-run';
+import { keepPlace, placeKey, placeToReturnTo } from '../thread-place';
+import { arrivedAt } from '../unread';
 import type { AgentTurn, FileMarkLink, RunningSession, WorkItem } from '../types';
 import { ActLine, Thread, ThreadWaiting, answerTurn } from './Thread';
 import { FileMarkOpener } from './FileMarkLine';
@@ -203,14 +205,19 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
   // at all; then nothing in the thread is a chip and the conversation is
   // exactly what it was.
   const [changed, setChanged] = useState<string[]>([]);
+  const team = useContext(TeamContext);
+  const me = team?.me ?? null;
+  // Where she was in this thread, when she is coming back to it (../thread-place.ts).
+  const place = placeKey(item);
+  const kept = useMemo(() => placeToReturnTo(place, arrivedAt(item, me)), [place]); // eslint-disable-line react-hooks/exhaustive-deps
   // WHETHER THE MIDDLE OF THIS CONVERSATION WAS ASKED BACK. Held per row and
-  // dropped when she leaves it, so no thread is ever born at full length: the
-  // window is still what a long row opens with, and this is the door out of it.
-  // It survives the poll while a worker writes, because losing the messages she
-  // just went looking for every eight seconds is the same fault wearing a
-  // timer.
+  // dropped when she leaves it, unless she comes back to it unchanged, so no
+  // thread is ever born at full length: the window is still what a long row
+  // opens with, and this is the door out of it. It survives the poll while a
+  // worker writes, because losing the messages she just went looking for every
+  // eight seconds is the same fault wearing a timer.
   const [whole, setWhole] = useState(false);
-  useEffect(() => { setWhole(false); }, [item.product, item.id]);
+  useEffect(() => { setWhole(!!kept?.whole); }, [item.product, item.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // The regular read below has only the newest runs; the middle needs them all.
   const [everyRun, setEveryRun] = useState<TraceSession[]>([]);
   useEffect(() => {
@@ -223,7 +230,10 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
     return () => { live = false; };
   }, [item.product, item.id, whole]);
   const [earlierOpen, setEarlierOpen] = useState(false);
-  useEffect(() => { setEarlierOpen(false); }, [item.product, item.id]);
+  useEffect(() => { setEarlierOpen(!!kept?.earlier); }, [item.product, item.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Not keyed on the thread: on the render that changes thread these still hold
+  // the last one's, and writing them then would file them under the new one.
+  useEffect(() => { keepPlace(place, { earlier: earlierOpen, whole }); }, [earlierOpen, whole]); // eslint-disable-line react-hooks/exhaustive-deps
   // A close asking about filed tasks unfolds the thread, so the turn that
   // filed them is on screen with the question under it.
   const askRef = useRef<HTMLDivElement>(null);
@@ -231,8 +241,6 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
 
   // A REACTION SHOWS THE MOMENT IT IS PRESSED (w-45cbac227a), in the chat and in
   // the thread panel alike, rather than after the sync and the next snapshot.
-  const team = useContext(TeamContext);
-  const me = team?.me ?? null;
   const sendReaction = useCallback((p: Press) => api.teamReact({ product: item.product, id: item.id, ...p })
     .then((r) => { if (!r?.ok) throw new Error(r?.error ?? 'that reaction did not save'); }), [item.product, item.id]);
   const chips = useReactionsNow(item.reactions, me, sendReaction);
@@ -497,6 +505,8 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
         // teammate's run is signed with its name.
         nameOf={teammate ? () => teammate.name : ranOf}
         landOn={item.id}
+        kept={kept}
+        onFolds={(runs, lines) => keepPlace(place, { runs, lines })}
         onWhole={() => setWhole(true)}
         onOpenOrigin={onOpenOrigin}
         // Only a running Claude Code step can be cut; Codex takes her message

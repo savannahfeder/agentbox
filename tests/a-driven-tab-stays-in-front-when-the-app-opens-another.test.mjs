@@ -13,9 +13,9 @@ import { it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { CHROME, launchChrome, connect, stopChrome } from '../.claude/skills/verify-agentbox/scripts/cdp.mjs';
+import { CHROME, canDrive, launchChrome, connect, stopChrome } from '../.claude/skills/verify-agentbox/scripts/cdp.mjs';
 
-it.skipIf(!fs.existsSync(CHROME))('the next command finds the driven tab visible after the page opened another tab', async () => {
+it.skipIf(!canDrive())('the next command finds the driven tab visible after the page opened another tab', async () => {
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'front-profile-'));
   const { chrome, wsUrl } = await launchChrome({ profile, width: 400, height: 300 });
   try {

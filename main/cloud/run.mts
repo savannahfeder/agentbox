@@ -154,6 +154,8 @@ export interface PackedFile {
   key: string;
   untar?: string;
   mode?: number;
+  // Pieces the image appends after `url`, in order (cloud/sandbox `placeFile`).
+  more?: { url: string }[];
 }
 
 interface JsonRpc {
@@ -1176,8 +1178,10 @@ export async function cloudRun({
   let fileCount = 0;
   sendFile = async (localPath: string | null, remotePath: string = localPath!, body: Buffer | null = null, untar: string | null = null) => {
     if (!body && conversations.has(localPath!)) {
-      const { key: k } = await sendConversation(storage, localPath!, { record: sentRecordPath(here) });
-      return { path: remotePath, url: await storage.getUrl(k), key: k };
+      // A kit names its files by one key each, so a phone's run gets the whole.
+      const { key: k, pieces } = await sendConversation(storage, localPath!, { record: sentRecordPath(here), pieces: !kit && imageCaps.includes('pieces') });
+      const more = pieces ? await Promise.all(pieces.slice(1).map(async (p) => ({ url: await storage.getUrl(p) }))) : [];
+      return { path: remotePath, url: await storage.getUrl(k), key: k, ...(more.length ? { more } : {}) };
     }
     fileCount += 1;
     const k = key(`files/${fileCount}`);
@@ -2098,7 +2102,17 @@ export async function cloudRun({
     // The conversation as this Mac sent it, for one gone from here.
     const sentCopy = async (t: Tail, into: string) => {
       const had = JSON.parse(fs.readFileSync(sentRecordPath(here)!, 'utf8'));
-      return had?.sha === t.sha256 && had.size === t.from && fetchToFile(storage, had.key, into);
+      if (!(had?.sha === t.sha256 && had.size === t.from)) return false;
+      const keys: string[] = Array.isArray(had.pieces) ? had.pieces.map((p: { key: string }) => p.key) : [had.key];
+      if (!(await fetchToFile(storage, keys[0], into))) return false;
+      for (const k of keys.slice(1)) {
+        const part = `${into}.piece`;
+        try {
+          if (!(await fetchToFile(storage, k, part))) return false;
+          fs.appendFileSync(into, fs.readFileSync(part));
+        } finally { fs.rmSync(part, { force: true }); }
+      }
+      return true;
     };
     for (const c of conversations) {
       fs.mkdirSync(c.dir, { recursive: true });

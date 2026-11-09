@@ -52,8 +52,10 @@ import type { TeamSession } from './team/index.mts';
 import { startConnections } from './connections/start.mjs';
 import { ensurePersonalProject } from './team/projects.mts';
 import { loadCloudConfig, supabaseSession, headlessSessionFile } from './team/session.mjs';
+import { liveAddress } from './team/live-room.mjs';
 import { roomsSetup } from './team/room-setup.mts';
 import { matesForTheTeam } from './teammate-reach.mjs';
+import { alphaFeatures } from './settings.mts';
 import { appHome, carryMisplacedMachinery, storeRootEnv } from './store/home.mjs';
 import { keepAnswerModesIn } from './answer-modes.mts';
 
@@ -290,6 +292,7 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
     onChange: () => ipc?.push?.(),
     shareSite: cloudConfig.phoneSite ?? null,
     ownMates: () => matesForTheTeam(store, config),
+    sharing: () => alphaFeatures(config).multiplayer,
     rooms: roomsSetup({ config, store, supervisor, userDir }),
   }) : null;
   if (team) store.teammates?.bindTeam(team);
@@ -312,7 +315,7 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
   host.app.on('before-quit', () => analytics.track('app_quit', { seconds: Math.round(process.uptime()) }));
   const connected = startConnections({ config, supervisor, appDir, userDir, openExternal: host.shell.openExternal, onChange: () => ipc?.push?.() });
   host.app.on('before-quit', () => { void connected.stop(); });
-  ipc = registerIpc({ store, supervisor, config, window, analytics, host, team, connections: connected.connections, copies: connected.copies, onCount: () => usedToday(now()) });
+  ipc = registerIpc({ store, supervisor, config, window, analytics, host, team, connections: connected.connections, copies: connected.copies, onCount: () => usedToday(now()), liveAt: liveAddress(cloudConfig) });
   answerWhatOnlyTheWindowAnswered(host.ipcMain);
   return { config, store, supervisor, window, host, ipc, team, analytics, channels: host.ipcMain.handlers };
 }
