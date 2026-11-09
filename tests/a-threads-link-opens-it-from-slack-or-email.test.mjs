@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import { threadAppLink, threadFromAppLink, tokenFromLink, JOIN_SCHEME } from '../shared/room-links.mjs';
 import { sharedThreadOf, saidLine, whoSaid, readSharedThread } from '../renderer/src/shared-thread/shared-thread.ts';
 import { REQUEST_CHANNELS, PUSH_CHANNELS } from '../shared/bridge-map.mts';
+import { sharedFileWorker } from '../cloud/web/shared-file-worker.mjs';
 
 const MAYA = 'p-maya';
 const THEO = 'p-theo';
@@ -83,5 +84,22 @@ describe('the web app\'s page for a thread', () => {
     const main = fs.readFileSync(new URL('../renderer/src/main.tsx', import.meta.url), 'utf8');
     expect(main).toMatch(/sharedThreadOf\(location\.pathname, !!readCloudConfig\(document\)\)/);
     expect(main).toMatch(/else if \(sharedThread && cloud\) bootSharedThread\(sharedThread, cloud\)/);
+  });
+});
+
+describe('the site\'s edge for a thread\'s link', () => {
+  const SHELL = '<!doctype html><html><head><title>Agentbox</title><script type="module" src="./assets/main.js"></script><link rel="stylesheet" href="./assets/main.css"></head><body></body></html>';
+  const asked = [];
+  const worker = sharedFileWorker({ cloud: 'https://db.example', anonKey: 'anon', headers: { 'X-Frame-Options': 'SAMEORIGIN' } }, { fetchImpl: async (u) => { asked.push(u); return new Response('[]'); } });
+  const ASSETS = { fetch: async (u) => new Response(new URL(u instanceof Request ? u.url : String(u)).pathname === '/' ? SHELL : 'asset') };
+  it('answers /t/<owner>/<thread> with the app page, its files loaded from the root, and asks the cloud nothing', async () => {
+    const res = await worker.fetch(new Request(`https://app.example/t/${MAYA}/w-1`), { ASSETS });
+    const html = await res.text();
+    expect(res.status).toBe(200);
+    expect(html).toContain('src="/assets/main.js"');
+    expect(html).toContain('href="/assets/main.css"');
+    expect(html).not.toContain('"./assets');
+    expect(res.headers.get('x-frame-options')).toBe('SAMEORIGIN');
+    expect(asked).toEqual([]);
   });
 });
