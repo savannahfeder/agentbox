@@ -1697,6 +1697,14 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
           {!editable && wrapRow(float.col!)}
         </FloatMenu>
         : <FloatMenu x={float.x} y={float.y} onClose={() => setFloat(null)}>
+          {/* Not closeFloat: that hands the keys back to the table, away from the note box. */}
+          {onComment && pick && atValue.trim() && <>
+            <MenuRow label="Comment" onClick={() => {
+              setFloat(null);
+              onComment(atValue.trim(), { row: order[pick.a.r] + 1, column: table.columns[pick.a.c].name });
+            }} />
+            <span className="when-sep" />
+          </>}
           <MenuRow label="Open row" hint="Space" onClick={() => { if (pick) setSheet(pick.a.r); closeFloat(); }} />
           {pick && <MenuRow label={editable ? 'Edit cell' : 'Read cell'} hint="↵" onClick={() => { closeFloat(); startEdit(pick.a); }} />}
           <MenuRow label="Copy" hint={`${CMD}C`} onClick={() => { focusKeys(); document.execCommand('copy'); closeFloat(); }} />
@@ -1710,10 +1718,6 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
               window.open(atLink.href, '_blank', 'noreferrer');
             }} />
           )}
-          {onComment && pick && atValue.trim() && <MenuRow label="Comment" onClick={() => {
-            onComment(atValue.trim(), { row: order[pick.a.r] + 1, column: table.columns[pick.a.c].name });
-            closeFloat();
-          }} />}
           {editable && sel && <>
             <span className="when-sep" />
             <MenuRow label="Insert row above" onClick={() => { closeFloat(); addRowAt(sel.r0); }} />

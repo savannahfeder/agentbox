@@ -3,11 +3,14 @@
 // What broke: a table opened full screen from its thread had no way to comment
 // on it. The notes sidebar was only offered for markdown, the sidebar only
 // looked for a markdown page to take words from, and the grid cannot be
-// selected, so there was nothing to quote. In Files, where a cell's menu did
-// offer Comment, the note held only the cell's words, so a comment on one "TBD"
-// among forty reached the agent as just “TBD”, and lit the first "TBD" in the
-// table rather than the cell it was written on. Measured by reading the
-// sidebar's file rule, the pane's table branch and the words the agent is sent.
+// selected, so there was nothing to quote. In the file viewer a table named in
+// a message opens in, the empty sidebar said "Select words to note them", which
+// a grid cannot do; Comment sat mid-menu on a right-click; and choosing it gave
+// the keys back to the table, so the note typed next went nowhere. The note
+// held only the cell's words, so a comment on one "TBD" among forty reached the
+// agent as just “TBD” and lit the first "TBD" in the table. Measured in the
+// built app, driven by Playwright with a stand-in bridge: the typed note never
+// reached fileMark before, and reached it with { row: 4, column: 'Stage' } after.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { cleanMark, notesForTheAgent, placeWords } from '../shared/artifact-marks.mjs';
@@ -72,8 +75,11 @@ describe('the cell, not the first matching words, is lit', () => {
     const view = read('components/TableView.tsx');
     expect(view).toContain('data-row={hands ? fileRow + 1 : undefined} data-col={hands ? table.columns[i].name : undefined}');
   });
-  it('the menu hands over the cell under the pick', () => {
-    expect(read('components/TableView.tsx')).toMatch(/onComment\(atValue\.trim\(\), \{ row: order\[pick\.a\.r\] \+ 1, column: table\.columns\[pick\.a\.c\]\.name \}\)/);
+  it('Comment comes first in the menu, hands over the cell under the pick, and leaves the keys with the note box', () => {
+    expect(read('components/TableView.tsx')).toMatch(/setFloat\(null\);\s*onComment\(atValue\.trim\(\), \{ row: order\[pick\.a\.r\] \+ 1, column: table\.columns\[pick\.a\.c\]\.name \}\);\s*\}\} \/>\s*<span className="when-sep" \/>\s*<\/>\}\s*<MenuRow label="Open row"/);
+  });
+  it('an empty viewer says how to note a table', () => {
+    expect(read('components/ArtifactView.tsx')).toContain("kind === 'table' ? 'Right-click a cell to note it'");
   });
   it('finds the cell by those two', () => {
     expect(cellSelector({ row: 4, column: 'Status' })).toBe('[data-row="4"][data-col="Status"]');
