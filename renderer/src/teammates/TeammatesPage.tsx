@@ -24,6 +24,8 @@ import { applyDockHeight } from '../dock-height';
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { pictureUrl } from '../picture';
 import { attachedPath, filesProductOf, whereFilesGo, withFiles } from './chat-files';
+import { PriorityPicker, priorityValueOf, type PriorityId } from '../components/Priority';
+import { TeammateModel, type ModelSetting } from './TeammateModel';
 import './teammates.css';
 
 const MD = [remarkGfm];
@@ -49,6 +51,8 @@ const NO_SESSIONS: ReadonlyMap<string, RunningSession> = new Map();
 /** What the model menu needs: the engine a teammate with none runs on, and this Mac's Codex models. */
 export type TeammateModels = { engine: string | null; codex: ModelChoice[]; codexDefault: string | null };
 const NO_MODELS: TeammateModels = { engine: null, codex: [], codexDefault: null };
+type Engines = { id: string; label: string }[];
+const NO_ENGINES: Engines = [];
 const noTab = (): TabView | null => null;
 const noFile = (): void => {};
 
@@ -156,13 +160,13 @@ export function TeammatesPage({ view, items = [], open, products, engines, onOpe
   const shown = shownOf(open, team);
   const t = shown.kind === 'new' ? null : team.find((x) => x.id === shown.id) ?? null;
   let main: ReactNode;
-  if (shown.kind === 'new' || !t) main = <NewTeammate team={team} products={products} call={call} error={error} onOpen={onOpen} onNewProject={onNewProject} />;
-  else if (shown.kind === 'about') main = <About t={t} call={call} error={error} onOpen={onOpen} />;
+  if (shown.kind === 'new' || !t) main = <NewTeammate team={team} products={products} call={call} error={error} onOpen={onOpen} onNewProject={onNewProject} items={items} engines={engines} models={models} />;
+  else if (shown.kind === 'about') main = <About t={t} call={call} error={error} onOpen={onOpen} model={<ModelOf t={t} items={items} engines={engines} models={models} call={call} />} />;
   else if (shown.kind === 'book') main = <PlaybookPage t={t} book={view?.playbooks?.find((p) => p.id === shown.book) ?? null} team={team} onOpen={onOpen} onOpenThread={onOpenThread} />;
   else {
     main = <>
       <ChatColumn view={view} items={items} products={products} team={team} t={t} me={me} mePic={mePic} call={call} sessions={sessions} queued={queued} onOpen={onOpen} onOpenThread={onOpenThread} onOpenFile={onOpenFile} tabOf={tabOf}
-        placeholder={t.status === 'draft' ? `Answer ${t.name === 'New teammate' ? 'your new teammate' : t.name}` : `Message ${t.name}`} error={error} />
+        engines={engines} models={models} placeholder={t.status === 'draft' ? `Answer ${t.name === 'New teammate' ? 'your new teammate' : t.name}` : `Message ${t.name}`} error={error} />
       {shown.kind === 'log' && <LogPanel view={view} team={team} t={t} sessions={sessions} call={call} onClose={() => onOpen(t.id)} onOpenThread={onOpenThread} />}
       {shown.kind === 'sheet' && <Details t={t} view={view} products={products} engines={engines} models={models} call={call} onOpen={onOpen} onNewProject={onNewProject} />}
     </>;
@@ -174,7 +178,8 @@ export function TeammatesPage({ view, items = [], open, products, engines, onOpe
 }
 
 /** Your chat with one AI teammate, on its own, for a page that is not Chats: its place on the home. */
-export function TeammateChat({ view, items = [], products, t, me, mePic = null, sessions = NO_SESSIONS, queued = NO_QUEUE, onOpen, onOpenThread, onOpenFile = noFile, onChanged, tabOf = noTab }: {
+export function TeammateChat({ view, items = [], products, t, me, mePic = null, sessions = NO_SESSIONS, queued = NO_QUEUE, onOpen, onOpenThread, onOpenFile = noFile, onChanged, tabOf = noTab, engines = NO_ENGINES, models = NO_MODELS }: {
+  engines?: Engines; models?: TeammateModels;
   queued?: string[];
   onOpenFile?: (product: string, src: string) => void;
   view: TeammatesView | null; items?: WorkItem[]; products: Product[]; t: Teammate; me: string; mePic?: string | null;
@@ -191,11 +196,19 @@ export function TeammateChat({ view, items = [], products, t, me, mePic = null, 
     return r.value ?? true;
   };
   return <ChatColumn view={view} items={items} products={products} team={view?.list ?? []} t={t} me={me} mePic={mePic} call={call} sessions={sessions} queued={queued} onOpen={onOpen} onOpenThread={onOpenThread} onOpenFile={onOpenFile}
-    tabOf={tabOf} placeholder={t.status === 'draft' ? `Answer ${t.name === 'New teammate' ? 'your new teammate' : t.name}` : `Message ${t.name}`} error={error} />;
+    tabOf={tabOf} engines={engines} models={models} placeholder={t.status === 'draft' ? `Answer ${t.name === 'New teammate' ? 'your new teammate' : t.name}` : `Message ${t.name}`} error={error} />;
 }
 
 /* ------------------------------------------------------------------ chat */
-function ChatColumn({ view, items, products, team, t, me, mePic, call, sessions, queued = NO_QUEUE, onOpen, onOpenThread, onOpenFile, tabOf, placeholder, error }: {
+// A teammate's model chip, which sets the model of every run it starts from now.
+function ModelOf({ t, items, engines, models, call }: { t: Teammate; items: WorkItem[]; engines: Engines; models: TeammateModels; call: Call }) {
+  return <TeammateModel value={{ engine: t.engine, model: t.model, effort: t.effort ?? TEAMMATE_EFFORT }} items={items} engines={engines}
+    codexModels={models.codex} codexDefault={models.codexDefault} defaultEngine={models.engine}
+    onPick={(patch) => { void call('update', { id: t.id, patch }); }} />;
+}
+
+function ChatColumn({ view, items, products, team, t, me, mePic, call, sessions, queued = NO_QUEUE, onOpen, onOpenThread, onOpenFile, tabOf, placeholder, error, engines = NO_ENGINES, models = NO_MODELS }: {
+  engines?: Engines; models?: TeammateModels;
   view: TeammatesView | null; items: WorkItem[]; products: Product[]; team: Teammate[]; t: Teammate; me: string; mePic: string | null; call: Call; sessions: ReadonlyMap<string, RunningSession>; queued?: string[];
   onOpen: (open: string) => void; onOpenThread: (product: string, id: string) => void; onOpenFile: (product: string, src: string) => void; placeholder: string; error: string | null;
   tabOf: (item: WorkItem) => TabView | null;
@@ -255,7 +268,8 @@ function ChatColumn({ view, items, products, team, t, me, mePic, call, sessions,
     {error && <p className="tq-error" role="alert">{error}</p>}
     {!error && (view?.trouble || view?.error) && <p className="tq-error" role="status">{view?.trouble ?? `Teammates could not be read: ${view?.error}`}</p>}
     <Composer placeholder={placeholder} filesIn={(words) => whereFilesGo(words, t, placesToWork(products))}
-      onSend={async (text, filesIn) => (await call('post', { text, to: [t.id], ...(filesIn ? { filesIn } : {}) })) !== false}
+      model={<ModelOf t={t} items={items} engines={engines} models={models} call={call} />}
+      onSend={async (text, filesIn, priority) => (await call('post', { text, to: [t.id], priority, ...(filesIn ? { filesIn } : {}) })) !== false}
       stop={t.running ? <button type="button" className="dock-stop" onClick={() => { void call('stop', { id: t.id }); }}
         aria-label={`Stop ${t.name}`} title={`Stop what ${t.name} is doing. It waits for your next message.`}>
         <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><rect x="1.5" y="1.5" width="9" height="9" fill="currentColor" /></svg>Stop
@@ -508,14 +522,17 @@ function Activity({ e, view, team, only, sessions, call, onOpenThread }: { e: Ch
 // A teammate is an agent, so this is the box you reply to an agent with in a
 // thread: the same field, ⌘↵ to send, and the clip, microphone and Send. While
 // it works, the Send slot is Stop until you type, as there.
-function Composer({ placeholder, filesIn, onSend, stop = null }: {
+function Composer({ placeholder, filesIn, onSend, stop = null, model = null }: {
   placeholder: string;
   /** The project this message's files are saved in, from its words. */
   filesIn: (words: string) => string | null;
-  onSend: (text: string, filesIn: string | null) => Promise<boolean>;
+  onSend: (text: string, filesIn: string | null, priority: number) => Promise<boolean>;
   stop?: ReactNode;
+  /** The model chip, beside priority. */
+  model?: ReactNode;
 }) {
   const [text, setText] = useState('');
+  const [prio, setPrio] = useState<PriorityId | null>(null);
   const [busy, setBusy] = useState(false);
   const [files, setFiles] = useState<PendingAttachment[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
@@ -535,7 +552,7 @@ function Composer({ placeholder, filesIn, onSend, stop = null }: {
       if (files.length && !where) throw new Error('it works in no project to keep them in');
       const links = where ? await persistAttachments(where, files) : '';
       if (files.length && !links) throw new Error('files cannot be saved from here');
-      if (await onSend(withFiles(words, links), where)) { setText(''); setFiles([]); }
+      if (await onSend(withFiles(words, links), where, priorityValueOf(prio ?? 'medium'))) { setText(''); setFiles([]); setPrio(null); }
     } catch (e) {
       setNotice(`Not sent: ${String((e as Error)?.message ?? e).replace(/\.$/, '')}. Your message is still in the box.`);
     } finally {
@@ -560,6 +577,10 @@ function Composer({ placeholder, filesIn, onSend, stop = null }: {
       <AttachRow attachments={files} attaching={attaching} onRemove={(i) => setFiles((was) => was.filter((_, j) => j !== i))} />
       <div className="compose-sentence dock-bar">
         {talk.on ? <Listening talk={talk} /> : <>
+          <span className="dock-chips">
+            <PriorityPicker variant="chip" value={prio ?? 'medium'} set={!!prio} onChange={setPrio} title="Priority" />
+            {model}
+          </span>
           <button type="button" className="tc-icon dock-clip" title="Attach files" aria-label="Attach files" onClick={() => picker.current?.click()}><ClipGlyph /></button>
           {talk.allowed && <MicButton talk={talk} />}
           {stop && !ready ? stop
@@ -726,7 +747,7 @@ function EditJob({ job, shown, onSave, onRead }: { job: string | null; shown: st
 /* ----------------------------------------------------------------- about */
 // What it does, in its own words, and everything it knows about you. Its
 // name is in the bar above, and how it is set is beside its chat.
-function About({ t, call, error, onOpen }: { t: Teammate; call: Call; error: string | null; onOpen: (open: string) => void }) {
+function About({ t, call, error, onOpen, model }: { t: Teammate; call: Call; error: string | null; onOpen: (open: string) => void; model: ReactNode }) {
   // Its method: how it does the job, kept by it from what you said and showed.
   const [method, setMethod] = useState<string | null>(null);
   useEffect(() => {
@@ -746,8 +767,8 @@ function About({ t, call, error, onOpen }: { t: Teammate; call: Call; error: str
     </div>
     {error && <p className="tq-error" role="alert">{error}</p>}
     {/* What you send here is a message to it, so you are taken to the chat where it answers. */}
-    <Composer placeholder={`Tell ${t.name} what to change about its job`} filesIn={() => t.product} onSend={async (text, filesIn) => {
-      const sent = (await call('post', { text, to: [t.id], ...(filesIn ? { filesIn } : {}) })) !== false;
+    <Composer placeholder={`Tell ${t.name} what to change about its job`} filesIn={() => t.product} model={model} onSend={async (text, filesIn, priority) => {
+      const sent = (await call('post', { text, to: [t.id], priority, ...(filesIn ? { filesIn } : {}) })) !== false;
       if (sent) onOpen(t.id);
       return sent;
     }} />
@@ -776,7 +797,8 @@ function PlaybookPage({ t, book, team, onOpen, onOpenThread }: { t: Teammate; bo
 /* ----------------------------------------------------------- new teammate */
 // A new teammate starts as a chat: it asks what to take on, with the starters
 // as answers to tap, and the draft your answer makes asks you the rest.
-function NewTeammate({ team, products, call, error, onOpen, onNewProject }: { team: Teammate[]; products: Product[]; call: Call; error: string | null; onOpen: (id: string) => void; onNewProject?: () => void }) {
+function NewTeammate({ team, products, call, error, onOpen, onNewProject, items, engines, models }: { team: Teammate[]; products: Product[]; call: Call; error: string | null; onOpen: (id: string) => void; onNewProject?: () => void; items: WorkItem[]; engines: Engines; models: TeammateModels }) {
+  const [runsOn, setRunsOn] = useState<ModelSetting>({ engine: null, model: null, effort: TEAMMATE_EFFORT });
   const real = placesToWork(products);
   const [slug, setSlug] = useState<string | null>(() => {
     const last = rememberedProject();
@@ -792,7 +814,7 @@ function NewTeammate({ team, products, call, error, onOpen, onNewProject }: { te
   const make = async (args: Record<string, unknown>) => {
     if (busy || !where) return false;
     setBusy(true);
-    const made = await call('describe', { ...args, ...voice, greeted: true, product: where.slug });
+    const made = await call('describe', { ...args, ...voice, ...runsOn, greeted: true, product: where.slug });
     setBusy(false);
     const id = (made as { teammate?: { id?: unknown } })?.teammate?.id;
     if (typeof id !== 'string') return false;
@@ -818,7 +840,9 @@ function NewTeammate({ team, products, call, error, onOpen, onNewProject }: { te
       </div>
       {!where && <p className="tq-error" role="alert">Make a project first. A teammate works in one of your projects.</p>}
       {error && <p className="tq-error" role="alert">{error}</p>}
-      <Composer placeholder="Answer your new teammate" filesIn={() => where?.slug ?? null} onSend={(text) => make({ text })} />
+      <Composer placeholder="Answer your new teammate" filesIn={() => where?.slug ?? null} onSend={(text, _files, priority) => make({ text, priority })}
+        model={<TeammateModel value={runsOn} items={items} engines={engines} codexModels={models.codex} codexDefault={models.codexDefault} defaultEngine={models.engine}
+          onPick={(patch) => setRunsOn((was) => ({ ...was, ...patch }))} />} />
     </div>
   </>;
 }

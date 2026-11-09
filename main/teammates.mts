@@ -192,6 +192,9 @@ export interface DescribeInput {
   greeted?: boolean;
   voice?: string;
   voiceText?: string;
+  model?: string | null;
+  effort?: string | null;
+  priority?: unknown;
 }
 
 export interface PostInput {
@@ -202,7 +205,12 @@ export interface PostInput {
   answers?: unknown;
   /** The project the files it links were saved in. */
   filesIn?: unknown;
+  /** The priority of the run it starts or joins. */
+  priority?: unknown;
 }
+
+const PRIORITY_VALUES = new Set([2, 5, 7, 9]);
+const priorityOf = (p: unknown): number | null => (typeof p === 'number' && PRIORITY_VALUES.has(p) ? p : null);
 
 export interface TickInput {
   items?: TeamItem[];
@@ -326,19 +334,20 @@ export class Teammates {
   // team chat. Its first run is the setup.
   // `greeted` is the New teammate page: the greeting it drew goes in the chat
   // first, from the teammate, so your answer reads as one.
-  describe({ text, starter, product, engine, threads, greeted = false, voice, voiceText }: DescribeInput = {}, now = Date.now()) {
+  describe({ text, starter, product, engine, threads, greeted = false, voice, voiceText, model, effort, priority }: DescribeInput = {}, now = Date.now()) {
     const s = starter ? STARTERS.find((x) => x.starter === starter) : null;
     if (starter && !s) throw new Error('No such starter.');
     const words = String(s?.ask ?? text ?? '').trim();
     if (!words) throw new Error('Say what you need them to do.');
     const team = this.list(now);
     const offered = starterAsks(team).map((a) => a.ask);
-    const sounds = { ...(voice ? { voice } : {}), ...(voiceText ? { voiceText } : {}) };
+    const sounds = { ...(voice ? { voice } : {}), ...(voiceText ? { voiceText } : {}), ...(model ? { model } : {}), ...(effort ? { effort } : {}) };
+    const level = priorityOf(priority);
     const t = s
       ? this.create({ starter: s.starter, status: 'draft', product, engine, ...sounds, ...(team.some((x) => x.name === s.name) ? { name: 'New teammate' } : {}) }, now)
       : this.create({ name: 'New teammate', status: 'draft', job: words, product, engine, ...sounds }, now);
     if (greeted) writeChat(this.dir(), { kind: 'msg', from: t.id, to: [], text: GREETING, options: offered, ts: now - 1 }, now);
-    const m = writeChat(this.dir(), { kind: 'msg', from: YOU, to: [t.id], text: words, setup: true, ...(threads?.length ? { threads } : {}) }, now);
+    const m = writeChat(this.dir(), { kind: 'msg', from: YOU, to: [t.id], text: words, setup: true, ...(level ? { priority: level } : {}), ...(threads?.length ? { threads } : {}) }, now);
     return { teammate: this.get(t.id, now), message: m.id };
   }
 
@@ -473,7 +482,7 @@ export class Teammates {
 
   // Your words in the team chat. On a teammate's page they go to that
   // teammate; in the team chat to whoever they name with @.
-  post({ text, to = [], options, fresh = false, answers, filesIn }: PostInput = {}, now = Date.now()) {
+  post({ text, to = [], options, fresh = false, answers, filesIn, priority }: PostInput = {}, now = Date.now()) {
     const words = String(text ?? '').trim();
     if (!words) throw new Error('Nothing to send.');
     const team = this.list(now);
@@ -487,7 +496,8 @@ export class Teammates {
     const products = this.store.listProducts();
     const product = projectNamedIn(words, products.filter((p) => !p.practice && !p.personal));
     const files = typeof filesIn === 'string' && products.some((p) => p.slug === filesIn) ? filesIn : null;
-    return writeChat(this.dir(), { kind: 'msg', from: YOU, to: known, text: words.slice(0, 8000), ...(product ? { product } : {}), ...(files ? { filesIn: files } : {}), ...(options ? { options } : {}), ...(fresh ? { fresh: true } : {}), ...(Object.keys(said).length ? { answers: said } : {}) }, now);
+    const level = priorityOf(priority);
+    return writeChat(this.dir(), { kind: 'msg', from: YOU, to: known, text: words.slice(0, 8000), ...(product ? { product } : {}), ...(files ? { filesIn: files } : {}), ...(level ? { priority: level } : {}), ...(options ? { options } : {}), ...(fresh ? { fresh: true } : {}), ...(Object.keys(said).length ? { answers: said } : {}) }, now);
   }
 
   // Your go-ahead for work held after too many hand-offs: the same work again,
@@ -605,7 +615,7 @@ export class Teammates {
               title: a.title,
               ...(opening.yours ? {} : { body: opening.body }),
               kind: 'directive',
-              priority: 5,
+              priority: (a.trigger.kind === 'message' && a.trigger.priority) || 5,
               labels,
               ...(a.start === 'later' ? { start: 'later' } : {}),
               // Held for your yes: blocked until you reply on it.
@@ -626,6 +636,7 @@ export class Teammates {
           writeTeammate(this.dir(), a.teammate, { dutyServed: { [a.duty]: a.key } }, now);
         } else if (a.type === 'answer') {
           await deliver?.(a.product, a.item, a.text);
+          if (a.priority) workItemsDisk.updateWorkItem(this.store.productDir(a.product), a.item, { priority: a.priority }, { source: 'founder', now });
         } else if (a.type === 'tell') {
           if (!tell) throw new Error('nothing here can hand work to a thread');
           await tell(a.product, a.item, { text: a.text, from: a.from, hold: a.hold, hop: a.hop });

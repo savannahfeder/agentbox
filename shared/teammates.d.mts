@@ -131,14 +131,14 @@ export type WakeTrigger =
   | (TriggerBase & { kind: 'schedule'; key: string; label: string })
   | (TriggerBase & { kind: 'duty'; duty: string; what: string; tell?: string; key: string })
   | (TriggerBase & { kind: 'pass'; fromName?: string; title?: string; details?: string })
-  | (TriggerBase & { kind: 'message'; text?: string; opening?: 'start' | 'setup' });
+  | (TriggerBase & { kind: 'message'; text?: string; opening?: 'start' | 'setup'; priority?: number });
 interface ActionBase { teammate: string; msg?: string; trigger?: WakeTrigger }
 export type WakeAction =
   | (ActionBase & { type: 'run'; id: string; trigger: WakeTrigger; title: string; start: 'now' | 'later' })
   | (ActionBase & { type: 'seen'; msg: string; run?: string })
   | (ActionBase & { type: 'served'; key: string })
   | (ActionBase & { type: 'dutyServed'; duty: string; key: string })
-  | (ActionBase & { type: 'answer'; item: string; product: string; text: string; msg: string })
+  | (ActionBase & { type: 'answer'; item: string; product: string; text: string; msg: string; priority?: number })
   | (ActionBase & { type: 'tell'; item: string; product: string | null; text: string; from: { teammate: string; name: string }; hop: number; hold: boolean; msg: string })
   | (ActionBase & { type: 'release'; item: string; product: string })
   | (ActionBase & { type: 'limit' })

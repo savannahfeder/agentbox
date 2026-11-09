@@ -662,7 +662,7 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
         const running = runs.find((i) => isActiveRun(i) && i.status === 'claimed' && yours.has(i.id));
         const into = waiting ?? running;
         if (into) {
-          actions.push({ type: 'answer', teammate: tid, item: into.id, product: into.product, text: m.text, msg: m.id });
+          actions.push({ type: 'answer', teammate: tid, item: into.id, product: into.product, text: m.text, msg: m.id, ...(m.priority ? { priority: m.priority } : {}) });
           actions.push({ type: 'seen', msg: m.id, teammate: tid, run: into.id });
           continue;
         }
@@ -682,7 +682,7 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
       const work = fromYou ? m.via ?? null : m.work ?? null;
       const trigger = m.kind === 'pass'
         ? { kind: 'pass', from: m.from, ...(m.fromName ? { fromName: m.fromName } : {}), title: m.title, details: m.details, msg: m.id, hop, ...origin, ...(work ? { work } : {}), ...(hold ? { hold } : {}) }
-        : { kind: 'message', from: m.from, text: m.text, msg: m.id, hop, ...origin, ...(work ? { work } : {}), ...(fromYou && m.start ? { opening: 'start' } : fromYou && m.setup ? { opening: 'setup' } : {}) };
+        : { kind: 'message', from: m.from, text: m.text, msg: m.id, hop, ...origin, ...(work ? { work } : {}), ...(fromYou && m.priority ? { priority: m.priority } : {}), ...(fromYou && m.start ? { opening: 'start' } : fromYou && m.setup ? { opening: 'setup' } : {}) };
       const id = newRun(t, trigger, `${m.id}>${tid}`, { fromYou, hold });
       if (id) {
         actions.push({ type: 'seen', msg: m.id, teammate: tid, run: id });

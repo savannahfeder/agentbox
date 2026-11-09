@@ -63,6 +63,8 @@
 .rm-compose.tq-compose, .dock-card.tq-compose { margin: 8px 32px 24px 32px; }
 .rm-compose-input.tq-input { padding: 11px 13px 4px; font-size: 15px; line-height: 22px; }/* Stop takes Send's slot while it works, so it has Send's edge and height. */
 .rm-compose.tq-compose .dock-stop { margin-right: 0; padding: 4px 12px; }
+/* Set in from the box's edges and clear of the bar's line, at the field's own inset. */
+.dock-card.tq-compose .attach-row { padding: 0 16px 12px; }
 /* The panel beside a teammate's chat */
 .gr-side.tq-side { padding: 18px 24px 24px; }
 /* The Log has no faces, so its lines start at its title. */
