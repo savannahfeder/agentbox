@@ -6266,7 +6266,7 @@ export default function App() {
         // What is typed with no box under it goes in the box of the thread on
         // screen, and a key that closes things waits out a change of screen.
         if (!e.defaultPrevented && !runRef.current && !focused.agent
-          && keyOnAnOpenThread({ key: e.key, justChanged: screenJustChanged(screenChangedAt.current, Date.now()), hasOptions: opts.length > 0, stillTyping: Date.now() - typedIntoBoxAt.current < STILL_TYPING_MS }) === 'to the box') {
+          && keyOnAnOpenThread({ key: e.key, justChanged: screenJustChanged(screenChangedAt.current, Date.now()), hasOptions: opts.length > 0, stillTyping: Date.now() - typedIntoBoxAt.current < STILL_TYPING_MS, boxOnScreen: !fullScreenDoc }) === 'to the box') {
           e.preventDefault();
           typedIntoBoxAt.current = Date.now();
           saveDraft(focused, `${readDraft(focused)}${e.key}`);

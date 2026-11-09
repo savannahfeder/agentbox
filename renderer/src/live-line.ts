@@ -233,6 +233,11 @@ export function shortSpan(ms: number): string {
   return `${hours}h ${minutes % 60}m`;
 }
 
+/** When the work on screen began: the reply a cloud run took between turns, else the run's start. */
+export function runningSince(session: Pick<RunningSession, 'startedAt' | 'turnStartedAt'>): number {
+  return session.turnStartedAt || session.startedAt;
+}
+
 export interface LivePlace {
   /** Said after the time: "on this Mac", "in the cloud". */
   word: string;
@@ -317,7 +322,7 @@ export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null
   }
 
   if (session) {
-    const elapsed = Math.max(0, now - session.startedAt);
+    const elapsed = Math.max(0, now - runningSince(session));
     const helpers = session.helpers ?? 0;
     // The spoken sentence says the same fact at length. It has to move with
     // the word or the pane shows one number and says another. And it is the

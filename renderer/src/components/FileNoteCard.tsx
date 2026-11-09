@@ -65,7 +65,7 @@ export function FileNoteCard({ note, answeredBy = null, wordsGone, product, acti
     note.from && <span key="from" className="av-note-sent">{note.resolved ? <>From {note.from}</> : <>From {note.from}, still open</>}</span>,
     answeredBy && <span key="answered" className="av-note-done"><NoteGlyph name="check" />{answeredBy}</span>,
     note.sent && !answeredBy && <span key="sent" className="av-note-sent"><NoteGlyph name="send" />Sent to the agent</span>,
-    !note.sent && held && !note.resolved && <span key="held" className="av-note-sent">{held.went && <NoteGlyph name="send" />}{held.words}</span>,
+    !note.sent && held && !note.resolved && <span key="held" className={`av-note-sent${held.went ? '' : ' is-waiting'}`}>{held.went && <NoteGlyph name="send" />}{held.words}</span>,
   ].filter(Boolean);
   return <article className={`av-note${active ? ' is-on' : ''}${note.resolved ? ' is-settled' : ''}${settling ? ' is-just-settled' : ''}${note.saving ? ' is-saving' : ''}`} id={`av-note-${note.id}`}>
     <button type="button" className="av-note-go" onClick={onGo} aria-label={`Go to ${place}`}>
