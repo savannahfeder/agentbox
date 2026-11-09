@@ -64,6 +64,7 @@ export interface Teammate {
   memory: Memory[];
   duties: Duty[];
   dutyServed: Record<string, string>;
+  firstRun?: 'owed' | 'served' | 'waits';
 }
 
 export type TeammatePatch = Partial<Teammate> & { remember?: Memory; forget?: string };
@@ -219,7 +220,7 @@ interface Opening { body: string; yours: boolean }
 
 const CHAT_FOR_SCREEN = 400;
 
-const TROUBLE_VERB: Record<string, string> = { run: 'start a run', answer: 'get your message', replied: 'put its answer in the chat', say: 'put its question in the chat',tell: 'take a hand-off', release: 'start its next run', seen: 'mark a message read', served: 'mark its round served', dutyServed: 'mark a duty done' };
+const TROUBLE_VERB: Record<string, string> = { run: 'start a run', answer: 'get your message', replied: 'put its answer in the chat', say: 'put its question in the chat',tell: 'take a hand-off', release: 'start its next run', seen: 'mark a message read', served: 'mark its round served', dutyServed: 'mark a duty done', firstServed: 'mark its first run started', reopen: 'put its setup answer in your inbox' };
 
 // When each project last shipped, from the note the ship queue leaves.
 function shippedByProduct(items?: TeamItem[] | null) {
@@ -585,6 +586,7 @@ export class Teammates {
       if (a.type === 'seen' && failed.has(a.msg)) continue;
       if (a.type === 'served' && failed.has(`${a.teammate}@${a.key}`)) continue;
       if (a.type === 'dutyServed' && failed.has(`${a.teammate}#${a.duty}@${a.key}`)) continue;
+      if (a.type === 'firstServed' && failed.has(`${a.teammate}@first`)) continue;
       try {
         if (a.type === 'run') {
           const product = this._productIf(a.trigger.product) ?? this._product(t.product);
@@ -620,6 +622,10 @@ export class Teammates {
           writeTeammate(this.dir(), a.teammate, { served: a.key }, now);
         } else if (a.type === 'dutyServed') {
           writeTeammate(this.dir(), a.teammate, { dutyServed: { [a.duty]: a.key } }, now);
+        } else if (a.type === 'firstServed') {
+          writeTeammate(this.dir(), a.teammate, { firstRun: 'served' }, now);
+        } else if (a.type === 'reopen') {
+          workItemsDisk.updateWorkItem(this.store.productDir(a.product), a.item, { status: 'open', labels: a.labels }, { source: 'system', now });
         } else if (a.type === 'answer') {
           await deliver?.(a.product, a.item, a.text);
         } else if (a.type === 'tell') {
@@ -775,6 +781,13 @@ export class Teammates {
         tell,
       ].join('\n'), yours: false };
     }
+    if (trigger.kind === 'first') {
+      return { body: [
+        'You have just been set up. This is your first run, started now rather than at your first duty\'s time.',
+        '',
+        'Start on your first job: what you told the person you would do first, or the work they asked for when they made you. Your setup thread is in your recent work: if it already did that work, or nothing is worth doing until someone writes or a duty comes round, post nothing and close this run with one line saying so.',
+      ].join('\n'), yours: false };
+    }
     if (trigger.kind === 'pass') {
       const by = trigger.via ? 'One of your threads' : trigger.fromName ?? who;
       const opening = trigger.hold
@@ -928,6 +941,8 @@ export class Teammates {
           ? `3. When nothing is left open, or they have answered, put their answers in your method, save with team_setup and ready true, post one or two sentences saying what you will do first, then close this run yourself: update_work_item with status done and labels ["founder", "${teammateLabel(t.id)}", "${HOP_LABEL_PREFIX}${hop}", "clean"] in one call, so it no longer waits on them.`
           : `3. When they have answered, save what they said with team_setup and ready true (it refuses until they have written to you), post one or two sentences saying what you will do first, then close this run yourself: update_work_item with status done and labels ["founder", "${teammateLabel(t.id)}", "${HOP_LABEL_PREFIX}${hop}", "clean"] in one call, so it no longer waits on them.`,
         'If the opening is a piece of work rather than a description of a teammate, it is also your first job: set yourself up for work like it, and once team_setup has ready true, do it in this run and finish as any run does.',
+        'Your first run starts as soon as this one ends, not at your first duty\'s time, unless they said when to start: then pass startNow false with ready true. Never tell them nothing starts until a duty\'s time.',
+        'Do not close this run when your last answer leaves anything for them: a question, a guess you will work from until they say otherwise, or something you could not find. End with it and leave this run open, so it reaches their inbox.',
         ...(t.primary || t.starter === 'chief' ? ['Your owner chooses whether you read their direct messages. Ask in plain words, as one of your questions: "Can I read your direct messages, so my brief covers what people say there? Without them I only see shared threads." Options: "Yes, read what I can read", "No, only shared threads". Save the answer with team_setup readsMessages.'] : []),
       ] : [
         '- If the person wrote to you, the opening is their words from the team chat. Do what they ask if it is part of your job, and reply to them there with team_post.',

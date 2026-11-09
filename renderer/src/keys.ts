@@ -29,6 +29,13 @@ export function opensATextField(key: string): boolean {
   return OPENS_A_TEXT_FIELD.has(key.toLowerCase());
 }
 
+/** `/` with the caret already in the search field. On old words the field was
+ *  handed back with, it is the search key again and selects them, so the next
+ *  words replace them; in words typed since, or an empty field, it is a slash. */
+export function slashSearchesAgain({ query, typedSince }: { query: string; typedSince: boolean }): boolean {
+  return query !== '' && !typedSince;
+}
+
 // THE KEYBOARD TAKES THE LIST BACK, and Escape is one of the keys that does it.
 //
 // A pointer left sitting on a row owns R, E and Enter for as long as it sits

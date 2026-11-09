@@ -13,24 +13,26 @@
 import { it, expect } from 'vitest';
 import fs from 'node:fs';
 import { viewKind } from '../shared/artifact-marks.mjs';
-import { opensInTheLargeViewer } from '../renderer/src/artifact-layout.ts';
+import { whereAFileOpens } from '../renderer/src/artifact-layout.ts';
 
 const read = (p) => fs.readFileSync(new URL(`../renderer/src/${p}`, import.meta.url), 'utf8');
 const one = read('components/OneThingAtATime.tsx');
 const preview = read('components/DocumentPreview.tsx');
 const focus = read('components/Focus.tsx');
-const kindOpensBig = (path) => opensInTheLargeViewer(viewKind(path));
+const kindOpensBig = (path) => whereAFileOpens(path) === 'full';
 
 it('a thread decides with that rule', () => {
-  expect(focus).toMatch(/const opensBig = [^\n]*opensInTheLargeViewer\(viewKind\(path\)\)/);
+  expect(focus).toMatch(/const opensBig = [^\n]*whereAFileOpens\(path\) === 'full'/);
 });
 
-it('a note, a page or a script does not open in the large viewer', () => {
-  for (const f of ['answers.md', 'designs/w-1/options.html', 'cart.mjs']) expect(kindOpensBig(f), f).toBe(false);
+it('a note, a table or a script does not open in the large viewer', () => {
+  for (const f of ['answers.md', 'leads.csv', 'cart.mjs']) expect(kindOpensBig(f), f).toBe(false);
 });
 
-it('a picture, a film, a pdf and a deck still do', () => {
-  for (const f of ['a.png', 'a.mp4', 'a.pdf', 'a.pptx']) expect(kindOpensBig(f), f).toBe(true);
+// w-375c72d32e (2026-11-09): the person asked for designs to open full screen
+// first, like pictures and films, and for notes and tables to stay beside.
+it('a picture, a film, a pdf, a design page and a deck open big', () => {
+  for (const f of ['a.png', 'a.mp4', 'a.pdf', 'designs/w-1/options.html', 'a.pptx']) expect(kindOpensBig(f), f).toBe(true);
 });
 
 it('a click on a note named in an answer, or its button, opens it beside', () => {
