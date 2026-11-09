@@ -58,7 +58,10 @@ import { OpenTeammateThread } from './threads/ContinuedFrom';
 import { handOffStart, joinNames, laterHint, replyWaitsUntil, taskHandOff, tabAfterSending, writingMovesToTheDialog, projectsOffered, projectOnScreen, teammates } from './threads/composer-rules';
 import { keyOnAnOpenThread, keyOnTheList, rowKey as actsOnARow, replyingTo, screenJustChanged, HELD_AFTER_A_CHANGE, NOWHERE_TO_TYPE, STILL_TYPING_MS } from './reply-keys';
 import { chosenNames, whoSees } from './threads/summary-rules';
-import { shownToPeople } from '../../shared/thread-cards.mjs';
+import { shownToPeople, visibilityOf } from '../../shared/thread-cards.mjs';
+import { openTo, sentWords, threadLink, type ShareActs } from './threads/share-rules';
+
+const SHARE_LAST = 'agentbox:share-last';
 import { changePathFor } from './code-artifact';
 import { teamRouteChoices } from './team/TeamFocus';
 import { SEE_SAID, giveRows, threadCommands, type GiveTo, type ThreadCommand } from './thread-commands';
@@ -2914,10 +2917,16 @@ export default function App() {
     setOpenCard(card); setTeamOpen(true); setCardSel(stopKey({ card }));
   }, [items]);
   const openContinuedFrom = useCallback((personId: string, threadId: string) => {
+    // A link to a thread of your own opens it, wherever you are.
+    if (personId === team?.me) {
+      const own = items.find((i) => i.id === threadId);
+      if (own) { setTeamOpen(false); setOpenCard(null); setFocused(own); markSeen(own); } else showToast('That thread is not on this computer.');
+      return;
+    }
     const card = weekCards.find((c) => c.personId === personId && c.threadId === threadId);
     if (card) { setFocused(null); openTeammateCard(card); }
     else showToast(`${firstName(team?.byId.get(personId) ?? null) || 'Your teammate'} no longer shares that thread with you.`);
-  }, [weekCards, openTeammateCard, team]);
+  }, [weekCards, openTeammateCard, team, items]);
   const continueTeammateThread = useCallback((card: ThreadCard) => {
     void api.teamContinueBrief({ personId: card.personId, threadId: card.threadId })
       .then((b) => { setComposeInitial(continueStart(b)); setModal('compose'); })
@@ -7165,6 +7174,34 @@ export default function App() {
     }
   };
 
+  const [shareLast, setShareLast] = useState<string | null>(() => { try { return localStorage.getItem(SHARE_LAST); } catch { return null; } });
+  const shareActs: ShareActs = {
+    last: shareLast,
+    copy: async (item) => {
+      const link = threadLink(team?.me, item.id);
+      if (!link) return false;
+      try { await navigator.clipboard.writeText(link); return true; } catch { showToast('The link could not be copied.'); return false; }
+    },
+    send: async (target, to, note) => {
+      const item = items.find((i) => i.product === target.product && i.id === target.id);
+      const link = threadLink(team?.me, target.id);
+      if (!item || !link || !to.length) return;
+      const seen = visibilityOf(item, team?.products.get(item.product)) ?? 'team';
+      if (seen !== 'team') {
+        const opened = await api.threadEdit(item.product, item.id, openTo(seen, item.visibleTo, to));
+        if (!opened.ok) { showToast(opened.error ?? 'It could not be shared.'); return; }
+      }
+      const out = await api.teamMessage(to.length === 1 ? to[0] : to, sentWords(rowTitle(item), link, note));
+      const names = to.map((id) => firstName(team?.byId.get(id) ?? null) || 'them').join(' and ');
+      showToast(out.ok ? `Sent to ${names}` : (out.error ?? `It did not reach ${names}.`));
+      if (out.ok && to.length === 1) { setShareLast(to[0]); try { localStorage.setItem(SHARE_LAST, to[0]); } catch { /* the menu just names the first */ } }
+      void refresh();
+    },
+    see: (item, to) => {
+      const it = items.find((i) => i.product === item.product && i.id === item.id);
+      if (it && to !== 'people') void seeThread(it, to);
+    },
+  };
   const addPeopleOnThread = async (item: WorkItem, person?: string) => {
     const does = whatAddPeopleDoes({ product: team?.products.get(item.product), item, person, me: team?.me ?? null, company: team?.state.people ?? [] });
     if (!does) return;
@@ -7862,6 +7899,7 @@ export default function App() {
                   waitEndedWords={asideBesides(rowTitle(focused), (waitCameBack(focused) ? focused.waitEnded?.said : null) ?? focused.handedOver?.said)}
                   onWait={(on) => { void waitOn(focused, on); }}
                   onAddPeople={addPeopleOnThread}
+                  onShare={shareActs}
                   queue={queueSpot && !inChats ? { spot: spotIn(arrowsWalk, focused) ?? queueSpot, onStep: stepQueue } : null}
                   inChats={inChats}
                   onePage={onePage}

@@ -129,7 +129,9 @@ import { Live } from './Live';
 import { SidebarIcon } from './SidebarIcon';
 import { Byline, ConversationAside } from './Byline';
 import { ItemThread } from './ItemThread';
-import { ContinuedFrom } from '../threads/ContinuedFrom';
+import { ContinuedFrom, OpenTeammateThread } from '../threads/ContinuedFrom';
+import { threadLink, threadOfLink, seenWord, type SeenBy, type ShareActs } from '../threads/share-rules';
+import { visibilityOf } from '../../../shared/thread-cards.mjs';
 import { answerOnItsWay, type PendingSaid } from '../item-thread';
 import { isTroubleRow } from '../trouble-row';
 import { rowTitle } from '../list-rules';
@@ -725,7 +727,7 @@ export function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 /** Which threads' choices are folded, kept on this machine. */
 const CHOICES_FOLDED = 'one.choicesFoldedOn';
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, giveTo = [], onGive, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, onShare, giveTo = [], onGive, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null }: {
   /** One thing at a time (w-65bcefb857): this thread's place in Needs you and the arrows that walk it. */
   queue?: { spot: Spot; onStep: (dir: 1 | -1) => void } | null;
   /** Drawn on the one-at-a-time page outside Needs you too: every thread with an agent. */
@@ -769,6 +771,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
    *  in To, so adding one more starts the group's conversation and leaves this
    *  one alone. On an agent thread: puts the person on its chosen people. */
   onAddPeople?: (item: WorkItem, person?: string) => void;
+  /** Share…: copy the thread's link, put it in teammates' inboxes, change who can open it. */
+  onShare?: ShareActs;
   artifactSlot?: (node: HTMLDivElement | null) => void;
   inlineArtifacts?: boolean;
   artifactView?: 'beside' | 'focus';
@@ -1354,8 +1358,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     return () => { live = false; off?.(); };
   }, [item.product, item.id]);
   const madeHere = useMemo(() => filesMadeHere(historyLines, item.artifacts?.notes ?? []), [historyLines, item.artifacts?.notes]);
-  const markdownActions = useRef({ onOpenDoc, onNotice, openPicture, opensBig, openBig, edits: item.artifacts?.edits });
-  useLayoutEffect(() => { markdownActions.current = { onOpenDoc, onNotice, openPicture, opensBig, openBig, edits: item.artifacts?.edits }; });
+  const openLinkedThread = useContext(OpenTeammateThread);
+  const markdownActions = useRef({ onOpenDoc, onNotice, openPicture, opensBig, openBig, openLinkedThread, edits: item.artifacts?.edits });
+  useLayoutEffect(() => { markdownActions.current = { onOpenDoc, onNotice, openPicture, opensBig, openBig, openLinkedThread, edits: item.artifacts?.edits }; });
   // A row in Needs you for a comment or an approval opens the file at it.
   const fileNewsMe = teamCtx?.me ?? null;
   useEffect(() => {
@@ -1401,10 +1406,11 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     // A miss now SAYS SO.
     const openHref = (href?: string, from?: HTMLElement, click?: LinkClick) => {
       if (!href) return;
-      const { onOpenDoc, onNotice, openPicture, opensBig, openBig, edits } = markdownActions.current;
+      const { onOpenDoc, onNotice, openPicture, opensBig, openBig, openLinkedThread, edits } = markdownActions.current;
       // A picture opens large over the thread, a page or a web address opens
       // in the pane, and a ⌘-click sends any of them out (../link-click.ts).
       const goes = whereALinkGoes(href, click, { pane: !!onOpenDoc });
+      if (goes === 'thread' && openLinkedThread) { const t = threadOfLink(href)!; openLinkedThread(t.owner, t.id); return; }
       if (!asksForANewTab(click) && opensBig(href)) { openBig(href, from); return; }
       if (goes === 'picture') { openPicture(href, from); return; }
       if (goes === 'pane') { onOpenDoc?.(newestOfFamily(href, edits)); return; }
@@ -1911,8 +1917,26 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const waiting = offersRunNow(item, { session, queued: live.queued, runNow: live.runNow, inProgress: live.inProgress });
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [renameAt, setRenameAt] = useState(0);
+  const share = (() => {
+    if (!teamCtx?.state.team || !onShare || !teamCtx.me || direct || agent || inChats) return null;
+    if ((item.createdBy ?? teamCtx.me) !== teamCtx.me) return null;
+    const seen: SeenBy = visibilityOf(item, teamCtx.products.get(item.product)) ?? 'team';
+    const teamName = teamCtx.state.team.name || 'your team';
+    return {
+      link: threadLink(teamCtx.me, item.id),
+      people: teamCtx.state.people.filter((p) => p.id !== teamCtx.me),
+      last: onShare.last,
+      seen,
+      seenWord: seenWord(seen, teamName, item.visibleTo?.length ?? 0),
+      teamName,
+    };
+  })();
   const threadMenu = (
     <ThreadMenu
+      share={share}
+      onCopyLink={() => onShare!.copy(item)}
+      onSendTo={(to, note) => onShare!.send(item, to, note)}
+      onSee={(to) => onShare!.see(item, to)}
       key={`${item.product}:${item.id}`}
       files={<ThreadFilesButton files={madeHere} onOpen={(f) => (opensBig(f.src) ? openBig(f.src) : onOpenDoc?.(f.src))} />}
       change={changeFigures}

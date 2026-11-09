@@ -4,10 +4,24 @@
 export type SeenBy = 'team' | 'people' | 'private';
 export interface SharePerson { id: string; name?: string | null; email?: string | null }
 
-/** A thread's address on our web app; only someone who can read its card gets past it. */
-export function threadLink(site: string | null | undefined, owner: string | null | undefined, id: string): string | null {
-  if (!site || !owner || !/^[\w-]{1,80}$/.test(owner) || !/^[\w-]{1,80}$/.test(id)) return null;
+// The address people pass around reads as ours, as a file's link does (main/file-link.mjs).
+export const LINK_SITE = 'https://app.agentbox.ac';
+const OUR_HOSTS = new Set(['app.agentbox.ac', 'agentbox-phone.pages.dev']);
+const PART = /^[\w-]{1,80}$/;
+
+/** A thread's address; inside Agentbox it opens the thread, for whoever can read its card. */
+export function threadLink(owner: string | null | undefined, id: string, site = LINK_SITE): string | null {
+  if (!owner || !PART.test(owner) || !PART.test(id)) return null;
   return `${site.replace(/\/+$/, '')}/t/${owner}/${id}`;
+}
+
+/** Whose thread a link of ours names, or null for any other address. */
+export function threadOfLink(href: string | null | undefined): { owner: string; id: string } | null {
+  let u: URL;
+  try { u = new URL(String(href ?? '')); } catch { return null; }
+  if (u.protocol !== 'https:' || !OUR_HOSTS.has(u.hostname)) return null;
+  const m = /^\/t\/([^/]+)\/([^/]+)\/?$/.exec(u.pathname);
+  return m && PART.test(m[1]) && PART.test(m[2]) ? { owner: m[1], id: m[2] } : null;
 }
 
 export const firstName = (p: SharePerson | null | undefined) => String(p?.name || p?.email || '').trim().split(/[\s@]+/)[0] || 'them';
@@ -37,4 +51,19 @@ export function matchPeople<P extends SharePerson>(people: readonly P[], typed: 
  */
 export function openTo(seen: SeenBy, visibleTo: readonly string[] | undefined, to: readonly string[]): { visibility: 'team' | 'people'; visibleTo: string[] } {
   return { visibility: seen === 'team' ? 'team' : 'people', visibleTo: [...new Set([...(visibleTo ?? []), ...to])] };
+}
+
+/** What the window does for Share…, handed to the thread page. */
+export interface ShareActs {
+  /** The teammate last sent a thread, named first in the menu. */
+  last: string | null;
+  copy: (item: { product: string; id: string }) => Promise<boolean>;
+  send: (item: { product: string; id: string }, to: string[], note: string) => void;
+  see: (item: { product: string; id: string }, to: SeenBy) => void;
+}
+
+/** The message a teammate gets in their Needs you: the thread's name as its link, then the note. */
+export function sentWords(title: string, link: string, note: string): string {
+  const name = String(title || 'A thread').replace(/[[\]]/g, '').trim();
+  return note.trim() ? `[${name}](${link})\n\n${note.trim()}` : `[${name}](${link})`;
 }
