@@ -26,7 +26,7 @@ describe('leaving a document that did not save', () => {
   });
   it('Escape goes the way Close does, so after a failed save it leaves rather than try again', () => {
     // Since 2026-11-08 a dropped pin no longer holds Escape back
-    // (tests/escape-and-the-corner-cross-close-an-open-picture.test.mjs).
+    // (tests/escape-and-the-corner-cross-close-an-open-picture.test.mts).
     expect(view).toMatch(/else if \(replyingTo\) setReplyingTo\(null\);[^\n]*\n(?:\s*\/\/[^\n]*\n)*\s*else leave\(\);/);
   });
   it('the failure says what the next press does', () => {

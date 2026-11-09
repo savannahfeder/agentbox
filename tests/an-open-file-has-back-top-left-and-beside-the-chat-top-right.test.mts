@@ -30,7 +30,7 @@ describe('the open file header', () => {
 
   // A cross took the top-right corner on 2026-11-08: pressing the corner moved the
   // picture beside the chat when the person meant to close it
-  // (tests/escape-and-the-corner-cross-close-an-open-picture.test.mjs).
+  // (tests/escape-and-the-corner-cross-close-an-open-picture.test.mts).
   it('has no Back word', () => {
     expect(header).not.toMatch(/>Back</);
   });
