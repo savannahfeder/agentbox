@@ -179,6 +179,9 @@ export const WORK_ITEM_FIELDS = [
   // THE NOTES ON A FILE THIS ANSWER HANDS THE AGENT, by note id. A mark on one
   // line: the thread draws the notes themselves, not the instruction made of them.
   'fromNotes',
+  // On an answer with `fromNotes`, the words the person typed after the notes:
+  // the thread draws these as their reply, the agent gets the whole answer.
+  'typed',
   // WHICH COMMAND FROM HER PHONE WROTE THIS LINE (docs/cloud/PHONE-PLAN.md):
   // the command's id, on the line of the reply or the new thread it made. It
   // is how the computer, starting again after stopping half way through a
@@ -455,7 +458,7 @@ function coerceField(field, value) {
     // rule about how the app writes, and it lives with the writer in
     // main/row-label.mts. This module holds no taxonomy, only storage.
     case 'label': return str(value, MAX_TITLE);
-    case 'body': case 'result': case 'note': case 'answer': return str(value, MAX_TEXT_BYTES);
+    case 'body': case 'result': case 'note': case 'answer': case 'typed': return str(value, MAX_TEXT_BYTES);
     // kind and product are free strings on purpose: the taxonomy of work is the
     // caller's to invent and change without a migration here.
     //
@@ -545,7 +548,8 @@ function coerceField(field, value) {
     case 'inReplyTo': return shortId(value) ?? undefined;
     case 'comment': {
       const text = value && typeof value === 'object' ? str(value.text, MAX_TEXT_BYTES) : undefined;
-      return text ? { text } : undefined;
+      const name = text ? str(value.name, MAX_SHORT) : undefined;
+      return text ? { text, ...(name ? { name } : {}) } : undefined;
     }
     case 'artifact': return cleanMark(value);
     case 'from': {
@@ -770,12 +774,13 @@ export function foldRawInto(items, lines, touched = null) {
     // who spoke last in the chat itself and in each thread. Only a person's own
     // words count (a line with a writer), and only rows with people on them keep
     // the result (see the end of the fold).
-    const words = typeof patch.answer === 'string' && patch.answer !== WITHDRAWN ? patch.answer
-      : typeof patch.body === 'string' ? patch.body : null;
+    const words = patch.fromNotes ? (typeof patch.typed === 'string' ? patch.typed : null)
+      : typeof patch.answer === 'string' && patch.answer !== WITHDRAWN ? patch.answer
+        : typeof patch.body === 'string' ? patch.body : null;
     // A teammate's reply, written by the app on this Mac and so stamped with
     // this person's `by`, is not something this person said.
     const told = line.source === 'system' && patch.from && typeof patch.answer === 'string' ? patch.from : null;
-    if (line.by && words && words.trim() && !told && !patch.fromNotes) {
+    if (line.by && words && words.trim() && !told) {
       const close = item.status === 'done' ? item.wrote.status : null;
       const crossed = close?.by && close.by !== line.by && line.ts < close.ts && !item.said?.some((s) => s.uid && s.uid === line.uid);
       (item.said ??= []).push({ uid: line.uid ?? null, by: line.by, ts: line.ts, text: words.trim().slice(0, TALK_TEXT), inReplyTo: patch.inReplyTo ?? null, body: typeof patch.answer !== 'string', ...(crossed ? { crossed: close.ts } : {}), ...(patch.voice ? { voice: patch.voice } : {}), ...(patch.forAgent ? { forAgent: patch.forAgent } : {}) });
@@ -806,9 +811,9 @@ export function foldRawInto(items, lines, touched = null) {
       }
       // WHICH MESSAGE A REPLY ANSWERS belongs to that reply's line alone. Held
       // as a value, the row would carry the newest reply's parent forever.
-      if (field === 'inReplyTo' || field === 'from' || field === 'voice' || field === 'forAgent' || field === 'fromNotes' || field === 'putAway') continue;
+      if (field === 'inReplyTo' || field === 'from' || field === 'voice' || field === 'forAgent' || field === 'fromNotes' || field === 'typed' || field === 'putAway') continue;
       if (field === 'comment') {
-        if (line.by && String(line.uid ?? '').startsWith('comment-') && !isContinuedNote(value.text)) (item.waitingComments ??= []).push({ by: line.by, ts: line.ts, text: value.text });
+        if (teammateComment(line)) (item.waitingComments ??= []).push({ by: line.by, ts: line.ts, text: value.text });
         continue;
       }
       if (field === 'artifact') {
@@ -978,6 +983,13 @@ function talkOf(said) {
 // claims are how the row moves, not anything anyone said.
 const THREAD_FIELDS = ['body', 'note', 'result', 'answer'];
 
+/** A teammate's words on a shared thread, as the sync writes them (main/team/thread-share.mjs), or null. */
+function teammateComment(line) {
+  const c = line?.patch?.comment;
+  if (!line.by || !String(line.uid ?? '').startsWith('comment-') || typeof c?.text !== 'string' || !c.text.trim() || isContinuedNote(c.text)) return null;
+  return { text: c.text, name: typeof c.name === 'string' ? c.name.trim() : '' };
+}
+
 export function threadOf(lines, id) {
   const turns = [];
   for (const raw of Array.isArray(lines) ? lines : []) {
@@ -992,6 +1004,8 @@ export function threadOf(lines, id) {
       const from = field === 'answer' && line.source === 'system' ? line.patch.from?.name : null;
       turns.push({ ts: line.ts, source: authorityOf(line, field, text), field, text, ...(from ? { from } : {}) });
     }
+    const said = teammateComment(line);
+    if (said) turns.push({ ts: line.ts, source: 'system', field: 'comment', text: said.text, from: said.name || 'A teammate' });
   }
   // Stable by time. Within one millisecond THREAD_FIELDS order decides, so an
   // append that sets a body and a result reads body-then-result rather than in

@@ -133,7 +133,7 @@ export const PARITY = {
   'settings-page:cloud': { desktopOnly: SELLS },
 
   // Rows Settings search finds
-  'settings:general/Your account': { phone: SET, find: 'Signed in as' },
+  'settings:general/Your account': { phone: 'mobile/src/ui/SettingsHome.tsx', find: 'title="Sign out"' },
   'settings:general/Public links': { phone: SET, find: '<Group label="Public links">' },
   'settings:general/Show keyboard shortcut hints': { desktopOnly: KEYS },
   'settings:general/Shrink the sidebar to icons': { desktopOnly: MAC },
