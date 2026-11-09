@@ -456,9 +456,6 @@ export function previewCloud(now = () => Date.now()) {
     async askPasswordReset() {},
     resetAsked: () => false,
     async finishReset() { signedIn = true; signedInAt = now(); return session()!; },
-    async askSignInLink() {},
-    linkAsked: () => false,
-    async finishSignInLink() { signedIn = true; signedInAt = now(); return session()!; },
     async setPassword() {},
     signOut() { signedIn = false; },
   };

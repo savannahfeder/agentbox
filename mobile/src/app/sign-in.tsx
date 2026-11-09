@@ -1,25 +1,22 @@
 // Sign in, the first screen and the first of the four steps. Nearly everyone
 // has an account from the computer already, so it opens on email and password,
-// with Google under them on Android and an emailed sign-in link on the iPhone,
-// for the accounts Google made, which have no password. Accounts are made on the computer: Sign
-// up, and a sign-in that fails, point there. Only ways the computer also signs
-// in with, so no account made here is one the computer cannot open.
+// with Apple and Google under them. Apple sits beside Google because App Review
+// 4.8 asks for a sign-in that can keep the email private wherever Google is
+// offered. Accounts are made on the computer: Sign up, and a sign-in that
+// fails, point there.
 import { Redirect } from 'expo-router';
 import { router } from '../lib/router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, View } from 'react-native';
-import { googleSignIn } from '../platform/sign-in';
+import { appleAvailable, appleSignIn, googleSignIn } from '../platform/sign-in';
 import { useCloud } from '../state/cloud';
-import { AppMark, GoogleMark } from '../ui/icons';
+import { AppleMark, AppMark, GoogleMark } from '../ui/icons';
 import { Field } from '../ui/Field';
 import { Bars, Btn, Head, Label, Lede, Screen } from '../ui/Onboarding';
 import { T } from '../ui/parts';
 import { color, font } from '../ui/theme';
 
 const toNoAccount = () => router.push('/no-account');
-// On an iPhone, Google would need a second sign-in that hides your email
-// beside it (App Review 4.8); its own accounts alone need none.
-const GOOGLE = Platform.OS === 'android';
 
 export default function SignIn() {
   const c = useCloud();
@@ -29,6 +26,8 @@ export default function SignIn() {
   const [error, setError] = useState<string | null>(null);
   // An email sign-in that failed may be someone with no account yet.
   const [failed, setFailed] = useState(false);
+  const [apple, setApple] = useState(false);
+  useEffect(() => { void appleAvailable().then(setApple); }, []);
   if (c.signedIn) return <Redirect href="/" />;
 
   const run = (which: string, how: () => Promise<unknown>) => async () => {
@@ -52,9 +51,8 @@ export default function SignIn() {
           <Label>or</Label>
           <View style={{ flex: 1, height: 1, backgroundColor: color.line }} />
         </View>
-        {GOOGLE
-          ? <Btn label={busy === 'google' ? 'Signing in…' : 'Continue with Google'} lead={<GoogleMark />} disabled={!!busy} onPress={run('google', () => googleSignIn(c.cloud!))} />
-          : <Btn label="Email me a sign-in link" disabled={!!busy} onPress={() => router.push({ pathname: '/sign-in-link', params: { email: email.trim() } })} />}
+        {(apple || c.preview) && <Btn label={busy === 'apple' ? 'Signing in…' : 'Continue with Apple'} lead={<AppleMark />} disabled={!!busy} onPress={run('apple', () => appleSignIn(c.cloud!))} />}
+        <Btn label={busy === 'google' ? 'Signing in…' : 'Continue with Google'} lead={<GoogleMark />} disabled={!!busy} onPress={run('google', () => googleSignIn(c.cloud!))} />
         <T style={{ fontSize: 14, lineHeight: 20, color: color.faint, textAlign: 'center', marginTop: 6 }}>
           {'No account? '}
           <T onPress={toNoAccount} accessibilityRole="link" style={{ fontSize: 14, color: color.text, textDecorationLine: 'underline', textDecorationColor: color.lineStrong }}>Sign up</T>
