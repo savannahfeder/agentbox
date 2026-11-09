@@ -388,6 +388,25 @@ describe('a thread can be handed on', () => {
     expect(disk.readWorkItems(maya.productOf(t.slug).dir).find((i) => i.id === t.id).status).toBe('done');
   });
 
+  // The third team test on w-1fc102959f (2026-11-09): an agent names its file by
+  // full path, as the brief tells it to. Swapping the short path for the name
+  // cut the folder out of the middle of it, and the sender's computer then
+  // tried to send /…/lumen-app/final.html, which is nowhere: every tester saw
+  // "Not delivered: the file was not found on the sender's computer".
+  it('links a file the agent named by its full path, with no path of the sender\'s left', async () => {
+    const t = await aThread();
+    const whole = path.join(fs.realpathSync(t.dir), 'designs', 'final.html');
+    disk.updateWorkItem(t.dir, t.id, { result: `Finished.\n\n${whole}` }, { source: 'agent' });
+    await maya.on(() => maya.service.handOn({ product: t.slug, id: t.id, to: dev.personId }));
+    await dev.service.syncNow();
+    const { r, product } = dev.facts('Final booking design');
+    expect(r.body).not.toContain(path.sep + 'final.html\n');
+    expect(r.body).not.toMatch(/(^|\s)\/\S*final\.html/);
+    const linked = [...r.body.matchAll(/\[final\.html\]\(attachments\/([^)]+)\)/g)].map((m) => m[1]);
+    expect(linked).toHaveLength(1);
+    expect(fs.readFileSync(path.join(product.dir, 'attachments', linked[0]), 'utf8')).toBe('<h1>the design</h1>');
+  });
+
   it('says so when a file is too big to go', async () => {
     const t = await aThread();
     fs.writeFileSync(path.join(t.dir, 'designs', 'huge.html'), Buffer.alloc(11 * 1024 * 1024));

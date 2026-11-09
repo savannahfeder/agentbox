@@ -88,7 +88,6 @@ const LOOK = `(() => {
   return 'SCREEN TEXT:\\n' + text + '\\n\\nTHINGS TO PRESS (' + list.length + '):\\n' + list.join('\\n');
 })()`;
 
-const running = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
 /** The page loads before the app draws; a look straight after shows an empty screen. */
 const drawn = (t) => t.until('document.querySelectorAll("button").length > 0', { ms: 15_000 }).catch(() => {});
 
@@ -116,7 +115,8 @@ async function tab() {
   }
   // The browser is the tester's, not the app's: if it went, open it again rather than fail every command after.
   // A pid that answers can still be a dead Chrome nobody reaped, so the connection decides.
-  const t = running(b.pid) ? await connect(b.wsUrl, { targetId: b.targetId }).catch(() => null) : null;
+  // The connection alone decides: a sandboxed tester may not signal another process, so a live Chrome reads as gone.
+  const t = await connect(b.wsUrl, { targetId: b.targetId }).catch(() => null);
   if (!t) {
     console.log('(The browser had closed, so it was opened on the app again.)');
     return launch();
@@ -183,7 +183,8 @@ async function report(t, what) {
 
 if (verb === 'open') {
   const was = saved();
-  if (was && running(was.pid)) { console.log('Already open. Use: look'); process.exit(0); }
+  const live = was ? await connect(was.wsUrl, { targetId: was.targetId }).catch(() => null) : null;
+  if (live) { live.detach(); console.log('Already open. Use: look'); process.exit(0); }
   const t = await launch();
   console.log(await t.evaluate(LOOK));
   t.detach();
