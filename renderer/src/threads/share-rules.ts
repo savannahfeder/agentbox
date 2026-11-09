@@ -25,6 +25,11 @@ export function threadOfLink(href: string | null | undefined): { owner: string; 
   return m && PART.test(m[1]) && PART.test(m[2]) ? { owner: m[1], id: m[2] } : null;
 }
 
+/** The thread a plain click on this link opens in the app; a ⌘, Ctrl or Shift click is the browser's. */
+export function threadToOpen(href: string | null | undefined, keys: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean }): { owner: string; id: string } | null {
+  return keys.metaKey || keys.ctrlKey || keys.shiftKey ? null : threadOfLink(href);
+}
+
 export const firstName = (p: SharePerson | null | undefined) => String(p?.name || p?.email || '').trim().split(/[\s@]+/)[0] || 'them';
 
 /** The one teammate the menu names, the one you sent to last if they are still here, else the first. */
