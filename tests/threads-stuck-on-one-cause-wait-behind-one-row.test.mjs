@@ -96,6 +96,21 @@ describe('what the testers found in the third run', () => {
     expect(page).toMatch(/\?\? \(stuckOn \? `Waits on \$\{stuckOn\.title\}` : undefined\)/);
   });
 
+  // The sixth Codex run: the Lines results still showed the brief, as "You".
+  it('the Lines search leaves a cause row\'s brief out too, and keeps any other row\'s ask', async () => {
+    const { messagesOf } = await import('../main/everything-found.mjs');
+    const { isCauseLedger, withoutBrief: strip } = await import('../shared/causes.mjs');
+    const causeLines = [
+      { id: 'c1', ts: 1, source: 'system', patch: { title: 'X', kind: CAUSE_KIND, labels: ['founder', CAUSE_LABEL], body: 'You are the lead on this cause. (w-123)' } },
+      { id: 'c1', ts: 2, source: 'agent', patch: { result: 'Sign in once.' } },
+    ];
+    const plain = [{ id: 't1', ts: 1, source: 'system', patch: { title: 'Main went red', kind: 'task', labels: ['founder'], body: 'Fix the red tests.' } }];
+    expect(isCauseLedger(causeLines)).toBe(true);
+    expect(isCauseLedger(plain)).toBe(false);
+    expect(messagesOf(strip(causeLines)).map((m) => m.text)).toEqual(['Sign in once.']);
+    expect(fs.readFileSync(new URL('../main/everything-found.mjs', import.meta.url), 'utf8')).toMatch(/isCauseLedger\(loaded\.lines\) \? withoutBrief\(loaded\.lines\) : loaded\.lines/);
+  });
+
   it('search reads what was said on a cause row, not its lead\'s brief', () => {
     expect(fs.readFileSync(new URL('../renderer/src/search.ts', import.meta.url), 'utf8')).toMatch(/const body = isCause\(i\) \? '' : searchText\(i\.body\)/);
   });

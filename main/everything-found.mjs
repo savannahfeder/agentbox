@@ -15,6 +15,7 @@ import { filesInLines, marksOf, reviewKind, threadFiles } from '../shared/artifa
 import { editOfLine, resolveEdits } from '../shared/message-edits.mjs';
 import { firstHit, fold, holds, queryOf, windowAround } from '../shared/word-match.mjs';
 import { withoutFileHomes } from '../shared/file-home.mjs';
+import { isCauseLedger, withoutBrief } from '../shared/causes.mjs';
 
 export const SNIPPET_CHARS = 180;
 export const MARKDOWN_BYTES = 400_000;
@@ -95,7 +96,9 @@ export function createFinder({ listThreads, loadThread, readText = async () => n
   async function build(t) {
     const loaded = await loadThread(t);
     const { files, notes } = filesAndNotesOf(loaded.lines);
-    const messages = messagesOf(loaded.lines).map((m) => ({ ...m, f: fold(m.text) }));
+    // A cause row's body is its lead's brief, which nobody said.
+    const lines = isCauseLedger(loaded.lines) ? withoutBrief(loaded.lines) : loaded.lines;
+    const messages = messagesOf(lines).map((m) => ({ ...m, f: fold(m.text) }));
     const fileRows = [];
     for (const f of files) {
       const row = { ...f, f: fold(f.name), lines: [] };

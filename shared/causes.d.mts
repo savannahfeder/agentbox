@@ -18,3 +18,4 @@ export function openCauses<T extends Row>(items: readonly T[]): T[];
 export function cameBack(title: string, items: readonly Row[], now?: number): boolean;
 export function leadBrief(args: { cause: string; ask?: string; from: string; again?: boolean }): string;
 export function withoutBrief<T>(lines: readonly T[]): T[];
+export function isCauseLedger(lines: readonly unknown[]): boolean;

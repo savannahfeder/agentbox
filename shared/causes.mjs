@@ -92,6 +92,11 @@ export function leadBrief({ cause, ask, from, again = false }) {
   ].join('\n');
 }
 
+/** Whether a row's stored history is a cause row's: the app wrote its kind. */
+export function isCauseLedger(lines) {
+  return (lines ?? []).some((l) => l?.source === 'system' && l.patch?.kind === CAUSE_KIND && (l.patch?.labels ?? []).includes(CAUSE_LABEL));
+}
+
 /** A cause row's history without the brief the app wrote for its lead, for drawing to the person. */
 export function withoutBrief(lines) {
   return (lines ?? []).map((l) => {
