@@ -31,6 +31,7 @@ import {
   parkPendingWrite, readPendingWrites, collectPendingWrites,
 } from '../../main/store/pending-writes.mjs';
 import { resolveProduct } from './account.mjs';
+import { isCause } from '../../shared/causes.mjs';
 import { nameSlug } from '../../shared/product-name.mjs';
 
 // The log prefix, named from the one place the app is named. It was a literal
@@ -227,6 +228,8 @@ const plainly = (s) => String(s ?? '')
 export function herRow(item) {
   const labels = item?.labels ?? [];
   if (!labels.includes('founder')) return false;
+  // A cause row is the app's, and its lead closes it once the cause is cleared.
+  if (isCause(item)) return false;
   return !!item.routed || !labels.some((l) => String(l).startsWith('repeat:') || String(l).startsWith('teammate:'));
 }
 

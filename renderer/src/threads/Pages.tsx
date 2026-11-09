@@ -49,6 +49,7 @@ import { api } from '../api';
 import { CLOUD_KEY, CLOUD_WHEN_ON, cloudButtonCount, cloudFootLine, cloudIsOn, cloudMonthLine, cloudMoveLine, countedAccounts, type CloudMode, type CloudStatus } from '../cloud-menu';
 import { brokenAccounts, buttonAsksSignIn, menuSetupLine, readBrokenSeen, seenAfter, SETUP, writeBrokenSeen } from '../cloud-setup';
 import type { Offer, OfferGo } from '../cloud-upgrade';
+import { isCause, waitingOn, causeWord, causeWhere } from '../../../shared/causes.mjs';
 import './pages.css';
 
 // Before the frame is drawn in the app; a plain effect where there is no
@@ -802,6 +803,12 @@ export function ThreadCells({ item, product, now, person, tab }: {
     ?? commentLine(item.waitingComments, (id) => firstName(team?.byId.get(id) ?? null))
     ?? (waitCameBack(item) ? item.waitEnded?.said : null)
     ?? item.handedOver?.said;
+  // ONE ROW PER CAUSE (shared/causes.mjs): how many threads wait behind it, and from where.
+  const behind = isCause(item) && item.status !== 'done' ? waitingOn(item, allItems ?? []) : null;
+  if (behind) {
+    return <RowCells status={{ ...(status ?? cell), word: causeWord(behind.length) }} title={rowTitle(item)} pinned={!!item.pinned} where={causeWhere(item, behind, product?.name ?? '')} person={person}
+      priority={shownPriority(item)} updatedAt={when} when={back} now={now} action={action} />;
+  }
   return <RowCells status={status} retry={retry} lead={<TeammateLead item={item} />} title={rowTitle(item)} aside={asideBesides(rowTitle(item), commented ?? (toApproveWords(waiting.get(`${item.product}/${item.id}`)) || null)) ?? undefined} shared={seen === 'people'} chosen={chosen} lock={lock} held={notStarted(item)} pinned={!!item.pinned && item.status !== 'done'} where={product?.name ?? ''} person={person}
     priority={shownPriority(item)} updatedAt={when} when={back} now={now} action={action} />;
 }

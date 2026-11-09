@@ -18,6 +18,7 @@ import { listProducts, getProduct, createProduct, updateProduct } from './core/p
 import { listDocuments, nameOnThread, noteWrittenForRun, readDocument, writeDocument } from './core/documents.mjs';
 import { listSkills, fetchSkill, fetchReference } from './core/skills.mjs';
 import { listWorkItems, updateItem, createClaimRegistry } from './core/work.mjs';
+import { joinCause } from './core/causes.mjs';
 import { readStandingInstruction, setStandingInstruction } from './core/repeats.mjs';
 import { teamPost, teamPass, teamRemember, teamSetup, teamRoster, teamPlaybook, teamMethod, teamHire, noteToAnotherThread } from './core/teammates.mjs';
 import { documentVersion, documentsWithFolders, fileWrittenDocument, teamFile, teamTell, teamTask, teamThreads, teamRead, waitsNamed } from './core/reach.mjs';
@@ -273,6 +274,27 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         runWords(patch);
         if (patch.blockedBy) patch.blockedBy = waitsNamed(patch.blockedBy);
         return json(noteToAnotherThread(id, patch, { ownItem }) ?? await claims.update(id, patch));
+      },
+    },
+    {
+      name: 'wait_on_cause',
+      description: 'When this thread is stuck on something outside its own work that other threads could hit too (a sign-in or key missing, git or GitHub refusing, the computer offline or out of memory, main broken, a service down), wait on that cause instead of asking the person. Every thread stuck on one cause waits behind one row, whose lead clears it or asks the person once for all of them, and each thread carries on by itself once it is cleared. Pass cause (what is wrong, in a few plain words the person would use, such as "Your Mac can\'t push to GitHub") and ask (what you would otherwise have told them). If causes are already open you are shown them: call again with causeId when yours is one of them, or with new: true when it is not. Never use it for a question about this thread\'s own work, which is still yours to ask.',
+      schema: {
+        cause: z.string().optional(),
+        ask: z.string().optional(),
+        causeId: z.string().optional().describe('an open cause this thread is stuck on too'),
+        new: z.boolean().optional().describe('true when none of the open causes is this one'),
+        id: z.string().optional().describe('the stuck thread; defaults to the one this session runs'),
+      },
+      run: async ({ id, cause, ask, causeId, new: isNew }) => {
+        const threadId = id ?? ownItem;
+        if (!threadId) throw new Error('name the stuck thread with id');
+        const thread = listWorkItems({ includeDone: true }).find((i) => i.id === threadId);
+        if (!thread) throw new Error(`no thread ${threadId}`);
+        const joined = joinCause({ thread, cause, ask, causeId, isNew });
+        if (joined.choose) return json({ open: joined.choose, next: 'If one of these is what this thread is stuck on, call again with its causeId. If none is, call again with new: true.' });
+        await claims.update(threadId, { status: 'blocked', blockedBy: [joined.causeId] });
+        return json({ waitingOn: joined.causeId, opened: joined.opened, next: 'End your turn now with one line saying what this thread is waiting on. It carries on by itself when the cause is cleared, and you will be started again then.' });
       },
     },
     {

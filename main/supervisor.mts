@@ -114,6 +114,7 @@ function whoHasIt(made: { taken?: boolean; reason?: string; heldBy?: number | nu
   return `: its folder is ${made.reason}${made.heldBy ? ` by pid ${made.heldBy}` : ''}`;
 }
 import { agentSpokeSince, answerSettled, answerTs, stoppedByHer, heldForHer, toldBy, filedByThePerson } from '../shared/answers.mjs';
+import { isCause } from '../shared/causes.mjs';
 import { DEFAULT_SESSIONS_AT_ONCE } from './config.mjs';
 import { accountIdentity, nameForOrganization, profileForCloudLogin, isCloudLoginOf, toolingLine } from './account-tooling.mjs';
 import type { AccountIdentity } from './account-tooling.mjs';
@@ -2146,6 +2147,8 @@ export class Supervisor {
   // Anything this refuses stays where the lists put it, which is Needs you.
   resumeFinishedWaits(items: WorkItem[]) {
     const byId = new Map(items.map((i) => [`${i.product}:${i.id}`, i]));
+    // A cause row (shared/causes.mjs) holds threads from every project.
+    const causes = new Map(items.filter(isCause).map((i) => [i.id, i]));
     const productBySlug = new Map((this.store.listProducts?.() ?? []).map((p) => [p.slug, p]));
     const me = process.env.AGENTBOX_PERSON_ID || null;
     const resumed: string[] = [];
@@ -2154,7 +2157,7 @@ export class Supervisor {
       if (this.sessions.has(item.id) || stoppedByHer(item)) continue;
       // A wait a person set comes back to them; it starts nothing (shared/thread-waits.mjs).
       if (item.wrote?.blockedBy?.source === 'founder') continue;
-      const blockers = item.blockedBy.map((id) => byId.get(`${item.product}:${id}`));
+      const blockers = item.blockedBy.map((id) => byId.get(`${item.product}:${id}`) ?? causes.get(id));
       if (blockers.some((b) => !b || b.status !== 'done')) continue;
       const cleared = Math.max(...blockers.map((b) => b!.wrote?.status?.ts ?? 0));
       if (cleared <= (item.wrote?.blockedBy?.ts ?? 0) || cleared <= this._waitsSince) continue;
