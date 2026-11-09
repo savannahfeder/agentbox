@@ -72,6 +72,8 @@ import { hostSocketPath, perlRunsTheShim, HOST_ALREADY_THERE } from './cloud/hos
 import { runHostSocket, spoolFiles, HOST_ALREADY_THERE as RUN_HOST_ALREADY_THERE } from './run-host.mjs';
 import { toolHostDir, readToolHost, shareToolServers, TOOL_HOST_ALREADY_THERE } from './tool-host.mjs';
 import { HostedRun, HOST_LOST } from './hosted-run.mjs';
+import { HELPERS_LOST, helpersLostAnswer } from './claude-input.mts';
+import type { BackgroundTask } from './claude-input.mts';
 import { readCloudUsage, summarizeCloudUsage } from './cloud/usage.mts';
 import { buildSessionArgs, CLAUDE_MODES, parseSessionArgs, permissionMode } from './settings.mts';
 import fs from 'node:fs';
@@ -114,7 +116,6 @@ function whoHasIt(made: { taken?: boolean; reason?: string; heldBy?: number | nu
   return `: its folder is ${made.reason}${made.heldBy ? ` by pid ${made.heldBy}` : ''}`;
 }
 import { agentSpokeSince, answerSettled, answerTs, stoppedByHer, heldForHer, toldBy, filedByThePerson } from '../shared/answers.mjs';
-import { DEFAULT_SESSIONS_AT_ONCE } from './config.mjs';
 import { accountIdentity, nameForOrganization, profileForCloudLogin, isCloudLoginOf, toolingLine } from './account-tooling.mjs';
 import type { AccountIdentity } from './account-tooling.mjs';
 import { effectiveProfiles } from './account-discovery.mjs';
@@ -292,7 +293,6 @@ export interface SupervisorConfig {
   agentsAtOnce?: number | string | null;
   agentsAuto?: boolean | null;
   agentsNudge?: number;
-  planSlotsFrom?: unknown;
   authProfiles?: string[] | null;
   codexProfiles?: string[] | null;
   codexBin?: string | null;
@@ -342,6 +342,7 @@ export interface WorkerChild {
   steer?(text: string): Promise<unknown>;
   interrupt?(): Promise<{ interrupted: boolean }>;
   ranToTheEnd?(): boolean;
+  helpersLost?(): BackgroundTask[];
   waitingOn?(): unknown[];
   waitAfterTurns?(ms: number): void;
   waitingForNext?(): boolean;
@@ -894,12 +895,6 @@ export interface RemoteControlState {
   [fact: string]: unknown;
 }
 
-/** A folder in a project's checkout that no row owns. */
-export interface StrayFolder {
-  project: string;
-  [fact: string]: unknown;
-}
-
 /** One cloud sign-in being walked through (`cloudSignIn`). */
 export interface CloudSignInFlow {
   status(): { state: string; url?: string | null; code?: string | null; message?: string | null; attempt?: string };
@@ -1393,9 +1388,7 @@ export class Supervisor {
   declare _oldChoiceSaid: Set<string> | undefined;
   declare _folderRefused: Set<string> | undefined;
   declare _countedNotStarting: Set<string> | undefined;
-  declare _notStarting: Map<string, { why: string; engine: string | null; at: number }> | undefined;
-  declare _strayFolders: Map<string | null, StrayFolder[]> | undefined;
-  declare _handedBack: Set<string> | undefined;
+  declare _notStarting: Map<string, { why: string; engine: string | null; at: number }> | undefined;  declare _handedBack: Set<string> | undefined;
   declare _mergingHome: Map<string, Promise<void>> | undefined;
   declare _mergeHomeSaid: Record<string, MergeOutcome> | undefined;
   declare _moveAsked: Set<string> | undefined;
@@ -3525,11 +3518,10 @@ export class Supervisor {
     if (!product?.repoPath || base !== product.repoPath) return 0;
     const busy = (id: string) => this.sessions.has(id) || !!this._preparing?.has(id) || this._folderInUse(id);
     let put = 0;
-    // AND WHILE WE ARE HERE, WHAT ELSE IS HOLDING THE DISK (w-330eea6c66). This
-    // is the only place that already walks a project's folders on a clock, and
-    // the strays are deliberately not in the list below: they are nobody's row,
-    // so they are shown and never swept.
-    await this.lookOverTheProjectsFolders(product, base);
+    // This is the only place that already walks a project's folders on a clock.
+    // Worktrees the app did not make are not in the list below, so they are
+    // never swept.
+    await this.lookOverTheProjectsFolders(base);
     for (const folder of await folderJob('listTaskFolders', base)) {
       // OUR OWN PID IS NOT SOMEBODY ELSE. Every folder is locked by the process
       // that made it, which is this one, so treating any lock as a live holder
@@ -3580,41 +3572,17 @@ export class Supervisor {
   }
 
   /**
-   * EVERY COPY OF A PROJECT ON THE DISK, INCLUDING THE ONES THE APP DID NOT MAKE
-   * (w-330eea6c66).
-   *
-   * MEASURED 2026-10-07: thirteen worktrees of one repository sat outside the
-   * app's own home holding about 740 MB, made by hand by sessions rather than by
-   * the app, and nothing in the app could list, show or sweep one. This is the
-   * showing half: the strays are remembered here so a page can name them without
-   * reading the disk on the window's thread.
-   *
-   * IT ONLY EVER LOOKS. Removing a folder somebody made on purpose is not the
-   * app's to do, and the folder is the only copy of whatever is uncommitted in
-   * it. The one thing it does change is bookkeeping with nothing behind it: a
-   * registration whose folder has gone, which is what refuses the next
-   * `worktree add` at that path (one of the thirteen was under `/private/tmp`,
-   * which macOS purges).
+   * DROPS WORKTREE REGISTRATIONS WHOSE FOLDER HAS GONE (w-330eea6c66), which is
+   * what refuses the next `worktree add` at that path. It never touches a folder
+   * that exists: a worktree somebody made on purpose is not the app's to remove.
    */
-  async lookOverTheProjectsFolders(product: Product, base: string) {
+  async lookOverTheProjectsFolders(base: string) {
     try {
       const dropped = await folderJob('pruneMissingWorktrees', base);
       if (dropped.length) console.warn(`zero: dropped ${dropped.length} worktree registration(s) in ${base} pointing at nothing`);
-      const strays = await folderJob('strayWorktrees', base);
-      this._strayFolders ??= new Map();
-      // By checkout rather than by product, so two products registering the same
-      // one do not count its folders twice.
-      this._strayFolders.set(product.repoPath, strays.map((w) => ({ ...w, project: product.name || product.slug })));
     } catch (error) {
       console.warn('zero: could not look over the project´s folders:', (error as Error).message);
     }
-  }
-
-  /** Copies of a project on this disk the app did not make, as the last sweep found them. */
-  strayFolders() {
-    const out: StrayFolder[] = [];
-    for (const list of this._strayFolders?.values() ?? []) out.push(...list);
-    return out;
   }
 
   profileHoldingSession(sessionId: string | null | undefined, itemId: string, product: Product | null | undefined) {
@@ -6003,19 +5971,18 @@ export class Supervisor {
     // A NUMBER FOR THE WHOLE COMPUTER IS RUN EXACTLY (w-ec27ff1a51). Shared out
     // a login at a time it rounds up, so 7 on two logins is four and four, and
     // the computer's number is what stops it at 7 rather than 8.
-    const total = this._machineTotalFor(which);
+    const total = this._machineTotal();
     return total === null ? perLogin : Math.min(total, perLogin);
   }
 
   /**
    * THE NUMBER FOR THE WHOLE COMPUTER, or null when the number is still a
-   * per-login one (a Claude plan that allows one at a time, or a config
-   * written before `agentsAtOnce` existed and never loaded through
-   * main/config.mjs). Automatic's own answer, or the one picked on the menu.
+   * per-login one (a config written before `agentsAtOnce` existed and never
+   * loaded through main/config.mjs). Automatic's own answer, or the one picked
+   * on the menu.
    */
-  _machineTotalFor(engine: string = DEFAULT_ENGINE): number | null {
-    const planSpokeForClaude = engineOf(engine) !== DEFAULT_ENGINE && !!this.config.planSlotsFrom;
-    if (this.config.agentsAuto && !planSpokeForClaude) {
+  _machineTotal(): number | null {
+    if (this.config.agentsAuto) {
       return autoAgents({ ...this._machine(), gated: !!this.config.memoryGate, nudge: this.config.agentsNudge });
     }
     const picked = Number(this.config.agentsAtOnce);
@@ -6039,28 +6006,6 @@ export class Supervisor {
    * One slot is the floor rather than the default of three: a machine whose
    * setting cannot be read should run her work slowly, not at a number nobody
    * chose. Her own number, whenever it is a real one, is untouched.
-   *
-   * AND A CLAUDE PLAN'S ANSWER IS NOT AN ANSWER ABOUT CODEX. When nobody sets
-   * `maxConcurrentSessions`, main/config.mjs reads the tier out of Claude
-   * Code's own `.claude.json` and lowers the number for a plan that is not Max.
-   *
-   * The cap exists because ONE plan's rate limit is split between whatever is
-   * running on it, which is the argument in `_capacityFor` above; a Codex
-   * thread spends none of her Claude plan, so the Claude plan is not evidence
-   * about it.
-   *
-   * WHERE CODEX'S NUMBER COMES FROM INSTEAD, AND WHY IT IS NOT AN INVENTED ONE.
-   * There is no plan tier for Codex to read anywhere: `~/.codex/auth.json`
-   * carries `auth_mode` and an opaque `tokens.account_id`, no tier and no
-   * email (measured on this Mac 2026-09-05, codex-cli 0.148.0), and a number
-   * dressed up as a Codex plan would be exactly the authoritative-looking
-   * invention this codebase refuses. `config.planSlotsFrom` already records
-   * which of two cases produced the number: null when SHE set it -- an
-   * instruction about this Mac, on a stepper labelled "Agents at once", which
-   * both engines obey unchanged -- and the account's label when a Claude plan
-   * did. In the second case Codex falls back to the number the app has always
-   * used when nobody has said, which is also the number it already gets on
-   * every Mac whose Claude plan is Max or unreadable.
    */
   /**
    * THE MACHINE AUTOMATIC SIZES FOR. Empty means this one: `autoAgents` reads
@@ -6072,7 +6017,6 @@ export class Supervisor {
   }
 
   _slotsPerAccount(engine: string = DEFAULT_ENGINE) {
-    const planSpokeForClaude = engineOf(engine) !== DEFAULT_ENGINE && !!this.config.planSlotsFrom;
     // AUTOMATIC ASKS THE MACHINE (w-e5225b62ba), and the whole of the change is
     // where the number comes from: this still answers PER ACCOUNT and
     // `_capacityFor` still multiplies it by the live accounts, so nothing
@@ -6084,20 +6028,12 @@ export class Supervisor {
     // that out, so what the Mac is asked to do does not change when an account
     // is added.
     //
-    // A SMALL PLAN STILL WINS. `slotsForPlans` answers one at a time for a
-    // subscription that is not Max; that is a fact about the subscription and
-    // not about this Mac, so Automatic may only ever come out at or under it.
-    //
     // AND THE NUMBER PICKED ON THE MENU IS THE COMPUTER'S TOO (w-ec27ff1a51),
     // shared out the same way. A login's share rounds UP here, so an odd number
     // is not rounded away; `_capacityFor` holds the total to the number itself.
-    const total = this._machineTotalFor(engine);
-    if (total !== null) {
-      const per = Math.ceil(total / Math.max(1, this._liveProfilesFor(engineOf(engine)).length));
-      const plan = this.config.agentsAuto && this.config.planSlotsFrom ? Number(this.config.maxConcurrentSessions) : null;
-      return Number.isFinite(plan) && plan! >= 1 ? Math.min(Math.floor(plan!), per) : per;
-    }
-    const set = Number(planSpokeForClaude ? DEFAULT_SESSIONS_AT_ONCE : this.config.maxConcurrentSessions);
+    const total = this._machineTotal();
+    if (total !== null) return Math.ceil(total / Math.max(1, this._liveProfilesFor(engineOf(engine)).length));
+    const set = Number(this.config.maxConcurrentSessions);
     return Number.isFinite(set) && set >= 1 ? Math.floor(set) : 1;
   }
 
@@ -6115,7 +6051,7 @@ export class Supervisor {
   _capacity() {
     let n = 0;
     for (const id of ENGINE_IDS) n += this._capacityFor(id);
-    const whole = this._machineTotalFor(DEFAULT_ENGINE);
+    const whole = this._machineTotal();
     return whole === null ? n : Math.min(n, whole);
   }
 
@@ -7476,6 +7412,7 @@ export class Supervisor {
     };
     this._comingHome ??= new Map();
     let buffered = '';
+    let helpersLost: BackgroundTask[] = [];
     child.stdout?.on('data', (d) => {
       buffered += d;
       let i: number;
@@ -7483,6 +7420,10 @@ export class Supervisor {
         const line = buffered.slice(0, i);
         buffered = buffered.slice(i + 1);
         if (!line.trim()) continue;
+        if (line.includes(HELPERS_LOST)) {
+          try { const e = JSON.parse(line); if (e?.subtype === HELPERS_LOST && Array.isArray(e.tasks)) helpersLost = e.tasks; } catch { /* not ours */ }
+          continue;
+        }
         const first = this._comingHome.get(itemId) !== view;
         this._comingHome.set(itemId, view);
         capture(view, line);
@@ -7510,7 +7451,7 @@ export class Supervisor {
         if (trace) write(`\n# exited (${code}) ${new Date().toISOString()}${view.stoppedOnRequest ? STOPPED_ON_REQUEST : ''}\n`);
         // Finished only when its work is home: 75 is the app going again, or
         // results that did not come back, and a later homecoming tries again.
-        const session = { ...view, startedAt: rec.startedAt, child: { ranToTheEnd: () => code === 0 } };
+        const session = { ...view, startedAt: rec.startedAt, child: { ranToTheEnd: () => code === 0 && !helpersLost.length, helpersLost: () => [...helpersLost] } };
         // Same as a run the app started: its reply was marked heard when it was
         // joined, so it is released here or nothing would run it on this Mac.
         if (this.runFinished(session) && this._noteCloudHandBack(item, session, rec.cwd)) {
@@ -7522,6 +7463,7 @@ export class Supervisor {
         } else if (this.closingMessageIsTheAnswer(session)) {
           try { this.store.recordSessionResult(rec.product, itemId, { result: session.result, status: null }); } catch (e) { console.warn('zero: writing a joined run\'s answer failed:', (e as Error).message); }
         }
+        this.sayHelpersLost(item, session);
         // The reply this conversation heard is answered; one typed while it
         // was away is left for the next run.
         if (this.runFinished(session) && !session.handedBack) {
@@ -12082,6 +12024,7 @@ export class Supervisor {
           this.store.recordSessionResult(item.product, item.id, { result: session.result, status: null });
         } catch (e) { console.warn('zero: writing the closing message as the answer failed:', (e as Error).message); }
       }
+      this.sayHelpersLost(item, session);
       this.releaseFinishedClaim(item, session);
       // NOTHING HERE TOUCHES `_rowSessions`, and that is the whole change of. A
       // finished session has nothing left to RESCUE, which is what this line is
@@ -12632,6 +12575,20 @@ export class Supervisor {
   // (tests/a-worker-whose-helpers-are-still-working-does-not-come-back-to-you).
   // The input pipe knows: it only closes at a result with nothing out. A child
   // that cannot say (a Codex turn) keeps the old reading.
+  // A CLOUD RUN THAT ENDED WITH ITS HELPERS STILL WORKING LOST THEM: its
+  // machine went, or its time ran out. The last turn's "waiting on them" is
+  // not the answer, and nothing will start the thread again by itself, so the
+  // row says what was lost and waits in Needs you
+  // (tests/a-cloud-run-never-loses-its-helpers-in-silence). Not after her Stop.
+  sayHelpersLost(item: WorkItem, session: RunState) {
+    const lost = session.child?.helpersLost?.() ?? [];
+    if (!lost.length || session.stoppedOnRequest || session.handedBack) return false;
+    try {
+      this.store.recordSessionResult(item.product, item.id, { result: helpersLostAnswer(lost), status: 'blocked' });
+    } catch (e) { console.warn('zero: could not say what the run lost:', (e as Error).message); return false; }
+    return true;
+  }
+
   runFinished(session: RunState | null | undefined) {
     if (session?.result == null || session.resultIsError) return false;
     return session.child?.ranToTheEnd?.() !== false;
