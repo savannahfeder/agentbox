@@ -18,6 +18,24 @@ export function racedWithAnotherPush(stderr) {
     || /remote contains work that you do not have/.test(s);
 }
 
+const waitHere = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
+/**
+ * Run a spawnSync-shaped `start`, starting it again when the computer refused
+ * to start a process (EAGAIN: at its process limit for a moment). Waits about
+ * 31 s in all, then hands back the last answer. Any other answer is returned
+ * as it came: a git that ran and failed is not run twice.
+ */
+export function startedWhenBusy(start, { waits = [1_000, 2_000, 4_000, 8_000, 16_000], sleep = waitHere } = {}) {
+  let result = start();
+  for (const ms of waits) {
+    if (result?.error?.code !== 'EAGAIN') return result;
+    sleep(ms);
+    result = start();
+  }
+  return result;
+}
+
 /**
  * Why this branch cannot be shipped yet, as a sentence, or null when it can.
  *

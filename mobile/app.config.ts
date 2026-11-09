@@ -2,7 +2,8 @@
 //
 // The cloud's public address and key come from the same file the phone site
 // reads (scripts/phone-site-config.mjs), or from the environment on Expo's
-// build machines, which see only what git tracks. Neither is committed. The
+// build machines, which see only what git tracks, else from
+// shared/cloud-address.mjs. The
 // bundle id is permanent once a build uses it; the environment can name another
 // for a copy of the app built elsewhere.
 import fs from 'node:fs';
@@ -10,18 +11,25 @@ import os from 'node:os';
 import path from 'node:path';
 import type { ExpoConfig } from 'expo/config';
 import { NAME, nameSlug } from '../shared/product-name.mjs';
+import { CLOUD_ADDRESS, PHONE_SITE } from '../shared/cloud-address.mjs';
 
-// `phoneSite` is where a new account's email link lands (the phone website).
-function cloudConfig(): { url: string; anonKey: string; phoneSite: string | null } | null {
-  const url = process.env.EXPO_PUBLIC_CLOUD_URL;
-  const anonKey = process.env.EXPO_PUBLIC_CLOUD_KEY;
-  if (url && anonKey) return { url, anonKey, phoneSite: process.env.EXPO_PUBLIC_PHONE_SITE || null };
-  for (const file of [path.join(__dirname, '..', 'cloud', 'team.config.json'), path.join(os.homedir(), `.${nameSlug}`, 'team.config.json')]) {
+// `phoneSite` is where a new account's email link lands (the phone website),
+// and where Settings' Privacy policy and Terms open. With nothing given, the
+// build uses Agentbox Cloud's public address, so it can never ship unable to
+// sign in or without its privacy page.
+type Cloud = { url: string; anonKey: string; phoneSite: string | null };
+const TEAM_CONFIGS = [path.join(__dirname, '..', 'cloud', 'team.config.json'), path.join(os.homedir(), `.${nameSlug}`, 'team.config.json')];
+export function cloudConfig(env: Record<string, string | undefined> = process.env, files = TEAM_CONFIGS): Cloud {
+  const site = (url: string, given: unknown) => (typeof given === 'string' && given ? given : url === CLOUD_ADDRESS.supabaseUrl ? PHONE_SITE : null);
+  const url = env.EXPO_PUBLIC_CLOUD_URL;
+  const anonKey = env.EXPO_PUBLIC_CLOUD_KEY;
+  if (url && anonKey) return { url, anonKey, phoneSite: site(url, env.EXPO_PUBLIC_PHONE_SITE) };
+  for (const file of files) {
     if (!fs.existsSync(file)) continue;
     const c = JSON.parse(fs.readFileSync(file, 'utf8'));
-    if (typeof c?.url === 'string' && typeof c?.anonKey === 'string') return { url: c.url, anonKey: c.anonKey, phoneSite: typeof c.phoneSite === 'string' ? c.phoneSite : null };
+    if (typeof c?.url === 'string' && typeof c?.anonKey === 'string') return { url: c.url, anonKey: c.anonKey, phoneSite: site(c.url, c.phoneSite) };
   }
-  return null;
+  return { url: CLOUD_ADDRESS.supabaseUrl, anonKey: CLOUD_ADDRESS.anonKey, phoneSite: PHONE_SITE };
 }
 
 // The image picker gets the same words: its `false` would delete the
@@ -52,13 +60,26 @@ const config: ExpoConfig = {
     usesAppleSignIn: true,
     // HTTPS through the system is exempt from export rules.
     config: { usesNonExemptEncryption: false },
+    // Repeats what the packages' own manifests declare, which Apple does not
+    // always read from a static pod (docs.expo.dev/guides/apple-privacy).
+    privacyManifests: {
+      NSPrivacyTracking: false,
+      NSPrivacyTrackingDomains: [],
+      NSPrivacyAccessedAPITypes: [
+        { NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategoryUserDefaults', NSPrivacyAccessedAPITypeReasons: ['CA92.1'] },
+        { NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategorySystemBootTime', NSPrivacyAccessedAPITypeReasons: ['35F9.1'] },
+        { NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategoryFileTimestamp', NSPrivacyAccessedAPITypeReasons: ['0A2A.1', '3B52.1', 'C617.1'] },
+        { NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategoryDiskSpace', NSPrivacyAccessedAPITypeReasons: ['85F4.1', 'E174.1'] },
+      ],
+    },
   },
   // Android's own icon shapes wait for its phase (docs/mobile/PLAN.md).
   android: { package: bundleId },
   web: { favicon: './assets/favicon.png' },
   plugins: [
     'expo-router',
-    'expo-secure-store',
+    // The keychain holds the sign-in without Face ID, so the build asks for none.
+    ['expo-secure-store', { faceIDPermission: false }],
     'expo-apple-authentication',
     ['expo-notifications', { color: '#ee6018' }],
     'expo-video',

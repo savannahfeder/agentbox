@@ -28,7 +28,7 @@
 // itself, the supervisor's live sessions and queue, and the list rule in
 // list-rules.ts that decides which tab a row is on.
 
-import { liveLine, shortSpan, shortWord, type LiveFacts, type LiveState } from './live-line';
+import { liveLine, runningSince, shortSpan, shortWord, type LiveFacts, type LiveState } from './live-line';
 import { ago } from './format';
 import { engineLabel } from '../../shared/engines.mjs';
 import { engineModelLabel, type ModelChoice } from './models';
@@ -249,7 +249,7 @@ export function bylineFacts(
   // choice, because here it is not a choice.
   const codexRow = (item.labels ?? []).some((l) => l === 'codex' || l === 'codex-import' || l === 'not-imported');
   const engineWord = codexRow ? engineLabel('codex') : agentAtWork(facts);
-  const span = facts.session ? shortSpan(Math.max(0, now - facts.session.startedAt)) : null;
+  const span = facts.session ? shortSpan(Math.max(0, now - runningSince(facts.session))) : null;
   const stateWord = live ? shortWord(live.state, facts.session?.helpers ?? 0) : null;
 
   const project = item.productName?.trim() || null;

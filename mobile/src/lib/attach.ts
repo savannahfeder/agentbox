@@ -1,6 +1,13 @@
 // A message with files, as the desktop's reply box writes one: the words, a
 // blank line, then each file linked (attachments.ts `attachmentLinks`).
 import { attachmentLinks } from '../../../renderer/src/attachments';
+import { SEND_MAX_BYTES } from '../../../renderer/src/phone-sends-files';
+
+/** Why a picked file cannot go, before reading it: a long video read whole can end the app. */
+export function tooBigToSend(name: string, bytes: number | null | undefined): string | null {
+  if (typeof bytes !== 'number' || bytes <= SEND_MAX_BYTES) return null;
+  return `${name} is too big to send from your phone (${Math.floor(SEND_MAX_BYTES / 1024 / 1024)} MB at most).`;
+}
 
 export interface Saved { rel: string; name: string; image: boolean }
 
