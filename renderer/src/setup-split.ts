@@ -97,3 +97,9 @@ export function typingInSetup(target: { closest(sel: string): unknown } | null):
   if (!target.closest('.setup-split, .ss-picker')) return field ? 'behind' : 'keys';
   return field ? 'typing' : 'keys';
 }
+
+/** Where a new install's look starts: Home on and the dark orange sky, unless someone already chose. */
+export function setupStartsOn({ home, sky }: { home: string | null; sky: string | null }): { home: boolean; sky: string | null } {
+  const on = home !== '0';
+  return { home: on, sky: on && !sky ? 'ember' : null };
+}

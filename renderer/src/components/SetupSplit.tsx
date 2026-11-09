@@ -93,8 +93,8 @@ export function SetupSplit(p: SetupSplitProps) {
   const [tools, setTools] = useState(true);
   useEffect(() => { void api.connections().then((l) => { setTiles(connectTiles(l.tiles)); setTools(l.canEncrypt !== false); }).catch(() => setTools(false)); }, []);
   const steps = useMemo(() => setupSteps({ chats: p.chats.length, team, teammates: teammatesOn, project, tools }), [p.chats.length, team, teammatesOn, project, tools]);
-  // Picking a look must not reorder the list under the pointer.
-  const looks = useRef(lookChoices(p.look, p.skies)).current;
+  // Read when the look step first shows, so picking does not reorder the list under the pointer.
+  const looksAt = useRef<string[] | null>(null);
   const finished = at >= steps.length;
   const step: SetupStep | null = finished ? null : steps[at];
 
@@ -107,8 +107,14 @@ export function SetupSplit(p: SetupSplitProps) {
       const scale = Math.min(0.85, Math.max(0.55, (innerWidth - left - 56 + 60) / 1120));
       root.style.setProperty('--ss-left', `${left}px`);
       root.style.setProperty('--ss-scale', String(scale));
+      // Cut at the panel's right and bottom edges, in the app's own unscaled pixels.
+      const right = Math.max(0, 1120 - (innerWidth - 16 - (left + 56)) / scale);
+      const bottom = Math.max(0, 1300 - (innerHeight - 16 - 92) / scale);
+      root.style.setProperty('--ss-clip', `inset(0 ${right}px ${bottom}px 0 round 16px 0 ${16 / scale}px 0)`);
     };
     fit();
+    // The preview's new-thread box must not keep the keyboard behind the setup.
+    (document.activeElement as HTMLElement | null)?.blur();
     root.setAttribute('data-setup', '');
     addEventListener('resize', fit);
     return () => { removeEventListener('resize', fit); root.removeAttribute('data-setup'); };
@@ -294,6 +300,8 @@ export function SetupSplit(p: SetupSplitProps) {
     </>;
   } else if (step === 'look') {
     head = ['Pick your look.', 'The app changes as you choose.'];
+    if (!looksAt.current) looksAt.current = lookChoices(p.look, p.skies);
+    const looks = looksAt.current;
     body = <>
       <div className="ss-list">
         {looks.map((id, i) => <Row key={id} face={<Strip look={id} />} name={LOOK_NAME(id)} sub={i === 0 && id === p.look ? 'What you’re using now' : undefined}

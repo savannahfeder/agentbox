@@ -11,8 +11,9 @@
 // where a sky is never drawn and picking one changed nothing on screen, and
 // every tool's Connect failing on a computer that cannot keep a sign-in.
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
 import {
-  setupSteps, stepLabel, connectTiles, CONNECT_FIRST, toolUse, typingInSetup, lookChoices, starterChoices, inviteList, setUpLines, tourChecklist,
+  setupSteps, stepLabel, connectTiles, CONNECT_FIRST, toolUse, typingInSetup, setupStartsOn, lookChoices, starterChoices, inviteList, setUpLines, tourChecklist,
 } from '../renderer/src/setup-split.ts';
 
 describe('which steps the setup shows', () => {
@@ -151,5 +152,41 @@ describe('the keyboard while the setup is open', () => {
   it('takes keys aimed at the hidden app behind it for the setup', () => {
     expect(typingInSetup(el(false, true))).toBe('behind');
     expect(typingInSetup(null)).toBe('keys');
+  });
+});
+
+describe('the look a new install starts on', () => {
+  // The founder, on the first try of the real app: it opened on the inbox in
+  // plain dark, offered only Light and Dark, and should start on Home with the
+  // dark orange sky.
+  it('turns Home on and wears the dark orange sky when nothing was chosen', () => {
+    expect(setupStartsOn({ home: null, sky: null })).toEqual({ home: true, sky: 'ember' });
+  });
+  it('keeps a sky someone already chose', () => {
+    expect(setupStartsOn({ home: '1', sky: 'sage' })).toEqual({ home: true, sky: null });
+  });
+  it('leaves Home off when someone turned it off', () => {
+    expect(setupStartsOn({ home: '0', sky: null })).toEqual({ home: false, sky: null });
+  });
+});
+
+describe('the app behind the setup', () => {
+  const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
+  const split = fs.readFileSync(new URL('../renderer/src/components/SetupSplit.tsx', import.meta.url), 'utf8');
+  // Chats brought in landed in the inbox while the preview's new-thread box had
+  // the keyboard, and the app moved that box into its dialog over the preview.
+  it('never moves the new-thread box into its dialog during the first run', () => {
+    expect(app).toMatch(/const clearMoves = !fresh && view === 'inbox'/);
+  });
+  it('takes the keyboard off the app behind it when it opens', () => {
+    expect(split).toMatch(/document\.activeElement as HTMLElement \| null\)\?\.blur\(\)/);
+  });
+});
+
+describe('the walkthrough list beside the app', () => {
+  const css = fs.readFileSync(new URL('../renderer/src/components/setup-split.css', import.meta.url), 'utf8');
+  // ⌘K and the new-thread card centred on the whole window, half over the list.
+  it('centres the dialogs on the app, not the window', () => {
+    expect(css).toMatch(/:root\[data-tour-list\] \.modal-backdrop \{ left: var\(--tl-w\)/);
   });
 });

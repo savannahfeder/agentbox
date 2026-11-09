@@ -255,7 +255,8 @@ import { AgentSending } from './team/AgentSending';
 import { HomePage, type NeedsRow, type ProgressRow, type TeamRow } from './home/HomePage';
 import { SkyBackdrop } from './home/SkyBackdrop';
 import { InboxSky } from './home/InboxSky';
-import { SKY_THEME_KEY, setHomeSetting, useDarkWindow, useHomeSettings } from './home/home-settings';
+import { HOME_KEY, SKY_THEME_KEY, setHomeSetting, useDarkWindow, useHomeSettings } from './home/home-settings';
+import { setupStartsOn } from './setup-split';
 import { SKY_THEMES, skyTheme } from './home/sky';
 import { engineLetter, engineName, greeting, teamRowState, weekCounts } from './home/home-model';
 import { sentFrom } from './team/company';
@@ -7262,7 +7263,7 @@ export default function App() {
   // empty inbox: the page is kept for the one render it takes to read the box,
   // and the dialog opens on it before anything paints.
   const clearWaiting = view === 'inbox' ? list.length + leadCount + sharedFileNews.length + followingNews.length : 0;
-  const clearMoves = view === 'inbox' && !(homeSet.on && homeOpen) && search === null && !focused && !focusedRepeat && modal !== 'compose'
+  const clearMoves = !fresh && view === 'inbox' && !(homeSet.on && homeOpen) && search === null && !focused && !focusedRepeat && modal !== 'compose'
     && writingMovesToTheDialog({ waiting: clearWaiting, onScreen: clearSlot !== null, writing: clearWriting });
   clearMovesNow.current = clearMoves;
   // ONE SURFACE ON AN OPENED TASK (design C): no card, hairlines
@@ -8995,7 +8996,12 @@ export default function App() {
         look={(homeSet.on && homeSet.skyTheme) || (resolveTheme(theme) === 'light' ? 'light' : 'dark')} skies={homeSet.on}
         onLook={(id) => { if (id === 'light') chooseLook('light'); else if (id === 'dark') chooseLook('ember-grid'); else chooseSkyTheme(id); }}
         onProject={(slug) => { rememberProject(slug); setPickProject(slug); }}
-        onSetup={() => { setFocused(null); setView('inbox'); if (homeSet.on) setHomeOpen(true); }} />}
+        onSetup={() => {
+          setFocused(null); setView('inbox');
+          const start = setupStartsOn({ home: localStorage.getItem(HOME_KEY), sky: homeSet.skyTheme });
+          if (start.home) { setHomeSetting(HOME_KEY, true); setHomeOpen(true); }
+          if (start.sky) chooseSkyTheme(start.sky);
+        }} />}
       <OpenLesson at={lessonAt} />
       {!fresh && tour && tourLive(tour) && <TourList tour={tour} now={tourNow} onSkip={() => setTour(skipTour(tour))} />}
       {!fresh && <Tour tour={tour} view={view} thread={!!focused}
