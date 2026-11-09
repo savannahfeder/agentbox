@@ -13,9 +13,7 @@ import { resolveClaudeBin, candidatePaths } from './claude-bin.mjs';
 import { warmShellAnswers } from './engine-bin.mjs';
 import { resolveCodexBin } from './codex-bin.mjs';
 import { defaultStoreRoot } from './store/home.mjs';
-import { readPlans, slotsForPlans } from './claude-plan.mjs';
 import { machineSlots } from './machine.mjs';
-import { effectiveProfiles } from './account-discovery.mjs';
 import { runningAsAFreshUser } from '../shared/fresh-user-home.mjs';
 import { runningAsADemo } from '../shared/demo-world.mjs';
 
@@ -51,10 +49,6 @@ export const DEFAULTS = {
   claudeBin: null,
   // How many sessions run at once. The queue absorbs the rest; when the plan
   // window caps out, a longer queue is the visible, benign failure mode.
-  //
-  // THIS IS THE NUMBER FOR A MAX SUBSCRIPTION, the biggest plan. When nobody
-  // has set one, loadConfig below reads the plan
-  // Claude Code is signed in on and lowers this for a smaller one.
   maxConcurrentSessions: DEFAULT_SESSIONS_AT_ONCE,
   // LET AGENTBOX DECIDE HOW MANY RUN (w-e5225b62ba). On unless somebody has set
   // a number themselves, which `loadConfig` works out below from whether one was
@@ -69,12 +63,12 @@ export const DEFAULTS = {
   // the menu writes, because that one was per login: two logins turned a 7 into
   // 14 agents on a 16 GB Mac, which then ran out of memory.
   agentsAtOnce: null,
-  // HOLD HEAVY WORK WHEN MEMORY IS SHORT (w-3958c3753d). Off until somebody
-  // turns it on from the Agents page. With it on, every shell command a worker
+  // HOLD HEAVY WORK WHEN MEMORY IS SHORT (w-3958c3753d). On unless somebody
+  // turns it off (w-54c640f8da). With it on, every shell command a worker
   // runs asks main/memory-gate-server.mts first, and heavy ones wait their turn
   // while the Mac is short of memory. `memoryGateSlots` is how many heavy
   // commands may run at once; null is Auto, one per 8 GB.
-  memoryGate: false,
+  memoryGate: true,
   memoryGateSlots: null,
   // RUN THE OVERFLOW IN THE CLOUD (docs/cloud/PLAN.md). Null is "when this Mac
   // has been set up for it": nothing happens anywhere until somebody has run
@@ -87,9 +81,10 @@ export const DEFAULTS = {
   cloudRuns: null,
   maxCloudSessions: null,
   // STOP WHAT FINISHED AGENTS LEAVE RUNNING (main/leftovers.mts). Its own
-  // switch, off until somebody turns it on; `cleanupLeftoversSince` is the
-  // moment they did, so nothing is stopped sooner than the idle time after it.
-  cleanupLeftovers: false,
+  // switch, on unless somebody turns it off (w-54c640f8da);
+  // `cleanupLeftoversSince` is the moment it was turned on, or the app's start
+  // when it never was, so nothing is stopped sooner than the idle time after it.
+  cleanupLeftovers: true,
   cleanupLeftoversSince: null,
   // What spawned sessions are allowed to do. Left unset on purpose, because the
   // right default now depends on whether a store MCP server is present: see
@@ -266,37 +261,11 @@ export function loadConfig(appDir, { home = os.homedir() } = {}) {
   // that, or who added Codex later, never saw Codex anywhere. Written at the
   // end, once `appDir` is on the config to save through.
   const codexOpened = codexChoiceToOpen(config, codex.found);
-  // HOW MANY AGENTS AT ONCE, WHEN NOBODY HAS SAID, IS THE PLAN AND THE MACHINE
-  // TOGETHER. Somebody on a smaller plan gets several sessions started for them,
-  // they all spend the same allowance, and what they see is agents that are slow
-  // and rows that fail. The founder's own bullet off a tester's onboarding was
-  // "not on max plan?". So a plan that is not Max answers 1 and that stands
-  // whatever the hardware is.
-  //
-  // HER OWN NUMBER ALWAYS WINS, including when it is the same as the default:
-  // this only fills in a number nobody set. And a Mac whose plan cannot be read
-  // keeps whatever the hardware suggests, so this can make an install smaller
-  // but never breaks one. `planSlotsFrom` is the account it came from, or null,
-  // so the Agents page can say why the number is what it is instead of leaving
-  // somebody to wonder why theirs says one.
-  // AND WHAT THIS MAC SUGGESTS IS WHAT THE PLAN FALLS BACK TO. The arithmetic
-  // and the measurement behind it are in main/machine.mjs; the short version is
-  // one agent per 4 GB of memory, which is the founder's own two anchors.
-  //
-  // THE MACHINE IS THE FALLBACK RATHER THAN A SECOND CAP, and the difference is
-  // the whole reason this reads the way it does. `slotsForPlans` answers 1 for a
-  // small subscription and its fallback for everything else, so handing it the
-  // machine number composes the two correctly in one expression: a Pro plan gets
-  // one at a time whatever the hardware, and everybody else gets what the
-  // hardware suggests. Taking `Math.min` of a flat 3 and the machine instead,
-  // which is what shipped first, held every Mac at 3 or below and so could never
-  // do the thing she asked for, which is scale up: "For 24 GB, have it scale
-  // accordingly."
-  //
-  // IT IS NOT A CAP. Nothing downstream clamps to this; the stepper and the
-  // writer both use the control's own range, the same on every machine. A number
-  // already in zero.config.json is untouched, for the same reason the plan cap
-  // leaves it alone.
+  // HOW MANY AGENTS AT ONCE, WHEN NOBODY HAS SAID, IS WHAT THIS COMPUTER
+  // CARRIES (main/machine.mjs). The Claude plan has no say: its limit is a
+  // budget over hours and a week, and an account that spends it waits for the
+  // reset (w-54c640f8da). It is a suggestion, not a cap; the menu's range is
+  // the same on every machine.
   config.machineSlots = machineSlots().slots;
   // WHO IS DECIDING THE NUMBER, read off whether one was ever written down
   // (w-e5225b62ba). A number in zero.config.json is somebody's own instruction
@@ -314,18 +283,7 @@ export function loadConfig(appDir, { home = os.homedir() } = {}) {
   // written beside it, and a number picked on today's menu (`agentsAtOnce`)
   // is kept as picked unless Automatic was chosen after it.
   config.agentsAuto = typeof overrides.agentsAtOnce !== 'number' || overrides.agentsAuto === true;
-  // And the plan is read whenever the number is Automatic's, old per-login
-  // number or not, so a plan that allows one at a time still says so.
-  if (typeof overrides.agentsAtOnce !== 'number') {
-    const plans = readPlans(effectiveProfiles(config.authProfiles, { home }), { home });
-    const slots = slotsForPlans(plans, config.machineSlots);
-    config.maxConcurrentSessions = slots;
-    config.planSlotsFrom = slots === config.machineSlots
-      ? null
-      : (plans.find((p) => p.known && !p.max)?.label ?? null);
-  } else {
-    config.planSlotsFrom = null;
-  }
+  if (typeof overrides.agentsAtOnce !== 'number') config.maxConcurrentSessions = config.machineSlots;
   // WHOSE MACHINE THIS IS, carried so nothing downstream has to ask the OS a
   // second time and so a test can lay out a home of its own. The accounts the
   // fleet runs on are read from it (main/account-discovery.mjs).
