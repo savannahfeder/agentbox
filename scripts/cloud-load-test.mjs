@@ -32,13 +32,13 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { execFileSync, spawn } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
 import { managedClients } from '../main/cloud/managed.mts';
-import { cloudRun } from '../main/cloud/run.mts';
+import { cloudRun, IMPORT_FAILED } from '../main/cloud/run.mts';
 import { readSent } from '../shared/cloud-start.mts';
 import { CLOUD_ADDRESS } from '../shared/cloud-address.mts';
 
@@ -57,25 +57,33 @@ export const commandFor = (tag, seconds, { chatty = false } = {}) => ['-c', chat
 
 /** What one step's runs came to. */
 export function tallyStep(n, runs) {
-  const done = runs.filter((r) => r.code === 0 && r.starts === 1 && r.ends === 1);
-  const doubled = runs.filter((r) => r.starts > 1 || r.ends > 1 || (r.sandboxStarts ?? 1) > 1);
+  // Started twice: the sandbox took a fresh start of it twice, or, where that cannot be seen, its output says so.
+  const twice = (r) => (r.sandboxStarts != null ? r.sandboxStarts > 1 : r.starts > 1);
+  const done = runs.filter((r) => r.code === 0 && r.ends >= 1 && !twice(r));
+  const doubled = runs.filter(twice);
   const startMs = runs.map((r) => r.startMs).filter((x) => x != null).sort((a, b) => a - b);
   // The most commands running at the same moment, from when each said it began to when it ended.
-  const edges = runs.flatMap((r) => (r.ranFrom != null ? [[r.ranFrom, 1], [r.ranTo ?? Infinity, -1]] : [])).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const edges = runs.flatMap((r) => (r.ranFrom != null ? [[r.ranFrom, 1], [r.ranTo ?? r.endedAt ?? Infinity, -1]] : [])).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
   let peak = 0; let now = 0;
   for (const [, d] of edges) { now += d; peak = Math.max(peak, now); }
   const agentSeconds = runs.reduce((s, r) => s + Math.max(0, ((r.endedAt ?? r.begunAt) - r.begunAt) / 1000), 0);
   return {
-    n, peak, finished: done.length, lost: n - done.length - doubled.filter((r) => !done.includes(r)).length, doubled: doubled.length,
+    n, peak, finished: done.length, lost: runs.filter((r) => !done.includes(r) && !twice(r)).length, doubled: doubled.length,
     slowestStartS: startMs.length ? +(startMs.at(-1) / 1000).toFixed(1) : null,
     medianStartS: startMs.length ? +(startMs[startMs.length >> 1] / 1000).toFixed(1) : null,
     agentHours: +(agentSeconds / 3600).toFixed(2), dollars: +(agentSeconds / 3600 * DOLLARS_PER_AGENT_HOUR).toFixed(2),
+    // Runs that stopped early and were brought home by the app's next pass, as the supervisor's would.
+    broughtHomeLater: runs.filter((r) => done.includes(r) && r.attempts > 1).length,
     why: [...new Set(runs.filter((r) => !done.includes(r)).map((r) => r.why).filter(Boolean))].slice(0, 5),
-    threw: runs.filter((r) => r.threw).length,
   };
 }
 
-/** One run, as a thread's would go, through `clients`. */
+// The app tries a thread whose cloud work is not home again, and holds it
+// after six starts in ten minutes (main/supervisor.mts), so a run gets five more.
+const MORE_PASSES = 5;
+const PASS_GAP_MS = 10_000;
+
+/** One run, as a thread's would go, through `clients`, with the app's own passes to bring it home. */
 async function oneRun({ clients, tag, seconds, chatty, dir, sandboxStarts, r }) {
   const repo = path.join(dir, 'repo');
   fs.mkdirSync(repo, { recursive: true });
@@ -88,10 +96,9 @@ async function oneRun({ clients, tag, seconds, chatty, dir, sandboxStarts, r }) 
   git(repo, 'checkout', '-q', '-b', `agentbox/${tag}`);
   const configDir = path.join(dir, 'claude-home');
   fs.mkdirSync(configDir, { recursive: true });
-  const stdin = new PassThrough();
   const stdout = new PassThrough();
   const stderr = new PassThrough();
-  Object.assign(r, { tag, begunAt: Date.now(), starts: 0, ends: 0, code: null, startMs: null, ranFrom: null, ranTo: null, sentAt: null, endedAt: null, why: null });
+  Object.assign(r, { tag, begunAt: Date.now(), starts: 0, ends: 0, code: null, startMs: null, ranFrom: null, ranTo: null, sentAt: null, endedAt: null, why: null, attempts: 0, threw: null });
   let out = ''; let err = '';
   stdout.on('data', (d) => {
     out += d;
@@ -101,22 +108,41 @@ async function oneRun({ clients, tag, seconds, chatty, dir, sandboxStarts, r }) 
     if (r.ends && r.ranTo == null) r.ranTo = Date.now();
   });
   stderr.on('data', (d) => { err += d; if (r.sentAt == null && readSent(err)) r.sentAt = Date.now(); });
-  stdin.end();
-  try {
-    r.code = await cloudRun({
-      argv: commandFor(tag, seconds, { chatty }), remoteCommand: 'sh',
-      env: { ...process.env, ZERO_ITEM: tag, ZERO_PRODUCT: 'load-test', CLAUDE_CONFIG_DIR: configDir, AGENTBOX_HOME: path.join(dir, 'agentbox') },
-      cwd: repo, ...clients, login: LOGIN, stdin, stdout, stderr,
-      watchParent: false, signals: new EventEmitter(), homeDir: path.join(dir, 'home'), pollWaitMs: 20_000, resultsWaitMs: 60_000,
-    });
-  } catch (e) {
-    r.code = -1;
-    r.threw = `${e?.message || e} ${String(e?.stack || '').split('\n').find((l) => /main\/cloud\//.test(l))?.trim() || ''}`;
+  // As the app goes: work not home (exit 75, as a throw becomes) is brought
+  // home by a pass of its own; a thread whose command never began is started
+  // again, its answer handed over again.
+  let bringHome = false;
+  for (let pass = 0; pass <= MORE_PASSES; pass += 1) {
+    if (pass) await sleep(PASS_GAP_MS);
+    r.attempts += 1;
+    const stdin = new PassThrough();
+    stdin.end();
+    const importOnly = bringHome;
+    try {
+      r.code = await cloudRun({
+        argv: importOnly ? [] : commandFor(tag, seconds, { chatty }), remoteCommand: 'sh', importOnly,
+        env: { ...process.env, ZERO_ITEM: tag, ZERO_PRODUCT: 'load-test', CLAUDE_CONFIG_DIR: configDir, AGENTBOX_HOME: path.join(dir, 'agentbox') },
+        cwd: repo, ...clients, login: LOGIN, stdin, stdout, stderr,
+        // Each pass is its own process in the app, gone once it ends; here they share one.
+        pid: spawnSync('true').pid,
+        watchParent: false, signals: new EventEmitter(), homeDir: path.join(dir, 'home'), pollWaitMs: 20_000, resultsWaitMs: 60_000,
+      });
+      r.threw = null;
+    } catch (e) {
+      r.code = -1;
+      r.threw = `${e?.message || e} ${String(e?.stack || '').split('\n').find((l) => /main\/cloud\//.test(l))?.trim() || ''}`;
+      (r.threws ??= []).push(`pass ${pass}: ${e?.stack || e}`);
+    }
+    if (r.code === IMPORT_FAILED || r.threw) { bringHome = true; continue; }
+    const neverBegan = !r.starts && !sandboxStarts?.get(tag);
+    if (importOnly && r.code === 0 && !r.ends && neverBegan) { bringHome = false; continue; }
+    break;
   }
   r.endedAt = Date.now();
   r.sent = readSent(err);
   r.sandboxStarts = sandboxStarts?.get(tag);
-  if (r.code !== 0 || r.starts !== 1 || r.ends !== 1) {
+  if (r.code !== 0 || r.ends < 1) {
+    if (process.env.LT_DEBUG) { fs.mkdirSync(process.env.LT_DEBUG, { recursive: true }); fs.writeFileSync(path.join(process.env.LT_DEBUG, `${tag}.log`), `code ${r.code} attempts ${r.attempts} sandbox starts ${sandboxStarts?.get(tag)}\n${(r.threws || []).join('\n')}\n--- stdout\n${out}\n--- stderr\n${err}`); }
     r.why = r.threw || (err.split('\n').filter((l) => /cloud|could not|refused|error/i.test(l)).at(-1) || `exit ${r.code}, started ${r.starts}, ended ${r.ends}`).slice(0, 200);
   }
   return r;
