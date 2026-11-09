@@ -369,30 +369,46 @@ export function stillInHand(families, at, held) {
   return fits(at) ? at : null;
 }
 
-/** The versions `paths` name, in their order, each once: what the arrows step through. */
+/**
+ * What the arrows step through: one step per file `paths` name, in their order,
+ * at the newest version they name. Versions are the header's to step, never the arrows'.
+ */
 export function stepsThrough(families, paths) {
   const out = [];
-  const seen = new Set();
   for (const p of paths ?? []) {
     const v = versionForPath(families, p);
-    if (!v || seen.has(v)) continue;
-    seen.add(v);
+    if (!v) continue;
     const fi = families.findIndex((f) => f.versions.includes(v));
-    out.push({ fi, vi: families[fi].versions.indexOf(v) });
+    const vi = families[fi].versions.indexOf(v);
+    const had = out.find((s) => s.fi === fi);
+    if (!had) out.push({ fi, vi });
+    else had.vi = Math.max(had.vi, vi);
   }
   return out;
 }
 
+/** The pictures the agent drew since you last spoke, or in its last answer that drew any. */
+export function latestPicturesSaid(lines) {
+  const pictures = (turn) => filesInLines(turn).filter((f) => reviewKind(f.path) === 'image').map((f) => f.path);
+  let turn = [];
+  for (const l of [...(lines ?? [])].reverse()) {
+    if (l?.source === 'founder') {
+      if (pictures(turn).length) break;
+      turn = [];
+    } else if (l?.source === 'agent') turn.unshift(l);
+  }
+  return pictures(turn);
+}
+
 /**
  * Where an arrow press from `at` goes, or null at an end. With steps, the next
- * of them; a version picked off the list keeps its family's place. Without,
- * the next file at its newest version.
+ * file in them, whichever version of this one is open. Without, the next file
+ * at its newest version.
  */
 export function nextStep(families, steps, at, by) {
   if (!at) return null;
   if (steps?.length) {
-    let i = steps.findIndex((s) => s.fi === at.fi && s.vi === at.vi);
-    if (i < 0) i = steps.findIndex((s) => s.fi === at.fi);
+    const i = steps.findIndex((s) => s.fi === at.fi);
     return i < 0 ? null : steps[i + by] ?? null;
   }
   const fi = at.fi + by;

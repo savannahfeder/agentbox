@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  addressedTo, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, nextStep, noteGoesTo, offeredTogether, otherFilesInLines, placeWords, resolvedInWords, reviewKind, sharedByWords, stepsThrough, stillInHand, stillWaiting, tagsYourAgent, threadFiles, versionForPath, viewKind, whereAPressLands, whoseIsTheFile,
+  addressedTo, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, latestPicturesSaid, nextStep, noteGoesTo, offeredTogether, otherFilesInLines, placeWords, resolvedInWords, reviewKind, sharedByWords, stepsThrough, stillInHand, stillWaiting, tagsYourAgent, threadFiles, versionForPath, viewKind, whereAPressLands, whoseIsTheFile,
 } from '../../../shared/artifact-marks.mjs';
 import { AgentFace } from './AgentFace';
 import type { FileVersion } from '../../../shared/artifact-marks.mjs';
@@ -101,7 +101,8 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, lines
   }, [lines, open.path, open.note, marks.notes]);
   const families = useMemo(() => threadFiles(files, numbers), [files, numbers]);
   const flat = useMemo(() => families.flatMap((f, fi) => f.versions.map((v, vi) => ({ fi, vi, v }))), [families]);
-  const steps = useMemo(() => stepsThrough(families, open.steps), [families, open.steps]);
+  const handedSteps = useMemo(() => stepsThrough(families, open.steps), [families, open.steps]);
+  const latestSteps = useMemo(() => stepsThrough(families, latestPicturesSaid(lines)), [families, lines]);
 
   // The place carries its version's id and path, so a list that fills in later still finds it.
   const [placed, setPlaced] = useState<{ fi: number; vi: number; held: { id: string; path: string } | null } | null>(null);
@@ -521,6 +522,8 @@ export function ArtifactView({ product, thread, draftsAcross, shareThread, lines
   };
   const othersSaved = editing ? editClash(family, editing.base.n, me, nameOf) : null;
 
+  // Opened from anywhere but a turn of the thread, a picture of the agent's latest answer steps through that answer.
+  const steps = handedSteps.length ? handedSteps : latestSteps.some((s) => s.fi === at?.fi) ? latestSteps : [];
   const stepTo = (by: number) => nextStep(families, steps, at, by);
   const stepFile = (by: number) => {
     const next = stepTo(by);

@@ -13254,10 +13254,11 @@ export class Supervisor {
   }
 
   // Only a clean answer on a row nothing else wants: a closed row, one sent to
-  // ship, or one moved to another model wants the run's end now.
+  // ship, or one moved to another model wants the run's end now. So does a turn
+  // that hands the thread back: only the run's end moves it to this Mac.
   _mayWaitForNextReply(row: WorkItem | null, session: WorkerSession) {
     if (!row || row.status === 'done' || (row.labels ?? []).includes(SHIP_LABEL)) return false;
-    if (session.result == null || session.resultIsError) return false;
+    if (session.result == null || session.resultIsError || handsBack(session.result)) return false;
     const ranOn = session.ranOn;
     if (ranOn && ((row.model || null) !== ranOn.model || (row.effort || null) !== ranOn.effort)) return false;
     return true;
