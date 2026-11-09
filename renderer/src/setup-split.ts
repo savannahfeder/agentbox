@@ -2,13 +2,15 @@
 // the right filling in. The rules, with no React, so
 // tests/the-setup-beside-the-app-asks-only-what-applies.test.mjs reads them.
 
-export type SetupStep = 'chats' | 'folder' | 'invite' | 'teammates' | 'look';
+export type SetupStep = 'chats' | 'folder' | 'account' | 'invite' | 'teammates' | 'look';
 
 /** Only the steps that can apply on this build: most people are not on a team,
  *  and an AI teammate needs a project to work in. Tools are not asked for: the
  *  person's Claude Code and Codex already carry their connections. */
-export function setupSteps({ chats, team, teammates, project }: { chats: number; team: boolean; teammates: boolean; project: boolean }): SetupStep[] {
+export function setupSteps({ chats, team, teammates, project, signedIn = true }: { chats: number; team: boolean; teammates: boolean; project: boolean; signedIn?: boolean }): SetupStep[] {
   const out: SetupStep[] = [chats > 0 ? 'chats' : 'folder'];
+  // Signing in is required, so it is a step, and what needs it comes after.
+  if (team && !signedIn) out.push('account');
   if (team) out.push('invite');
   if (teammates && project) out.push('teammates');
   out.push('look');

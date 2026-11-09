@@ -17,6 +17,7 @@ import { starterAsks } from '../../../shared/teammates.mjs';
 import { SKY_THEMES, drawSky } from '../home/sky';
 import { typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupStep } from '../setup-split';
 import FolderPicker from './FolderPicker';
+import { SignInPage } from '../team/SignInPage';
 import { Name } from '../../../shared/product-name.mjs';
 import './setup-split.css';
 
@@ -86,7 +87,9 @@ export function SetupSplit(p: SetupSplitProps) {
   const hadProject = useRef((p.snap?.products?.length ?? 0) > 0).current;
   // Until the first step is answered a project may still come, so the count does not jump.
   const project = hadProject || at === 0 || !!done.project || done.chats > 0;
-  const steps = useMemo(() => setupSteps({ chats: p.chats.length, team, teammates: teammatesOn, project }), [p.chats.length, team, teammatesOn, project]);
+  // Read once: signing in during the setup must not take its own step out from under it.
+  const signedInAtStart = useRef(!!p.snap?.team?.signedIn).current;
+  const steps = useMemo(() => setupSteps({ chats: p.chats.length, team, teammates: teammatesOn, project, signedIn: signedInAtStart }), [p.chats.length, team, teammatesOn, project, signedInAtStart]);
   // Read when the look step first shows, so picking does not reorder the list under the pointer.
   const looksAt = useRef<string[] | null>(null);
   const finished = at >= steps.length;
@@ -116,6 +119,9 @@ export function SetupSplit(p: SetupSplitProps) {
   }, []);
 
   const next = useCallback(() => { setError(null); setAt((i) => i + 1); }, []);
+  // Google finishes in the browser, so the step moves on when the account arrives.
+  const signedIn = !!p.snap?.team?.signedIn;
+  useEffect(() => { if (step === 'account' && signedIn) next(); }, [step, signedIn, next]);
   const back = at > 0 && !finished ? () => { setError(null); setAt((i) => i - 1); } : null;
 
   // ---- invite
@@ -232,6 +238,9 @@ export function SetupSplit(p: SetupSplitProps) {
       <div className="ss-list"><Row face={<Folder />} name="Choose a folder on this computer" onClick={() => void chooseFolder()} end={<span className="ss-faint"><Plus />Choose</span>} /></div>
       <div className="ss-acts">{go('Choose a folder', () => void chooseFolder())}{quiet('Skip for now', next)}</div>
     </>;
+  } else if (step === 'account') {
+    // The app's own sign-in form, in this column: Google, email, or a new account. No skip; it is required.
+    body = <div className="ss-signin"><SignInPage purpose="team" onSignedIn={next} /></div>;
   } else if (step === 'invite') {
     head = ['Invite your team.', 'Add the people you work with.'];
     body = !p.snap?.team?.signedIn ? <>
@@ -287,7 +296,7 @@ export function SetupSplit(p: SetupSplitProps) {
           <span>{step ? stepLabel(steps, step) : 'All set'}</span>
         </div>
         <div className="ss-body" key={step ?? 'done'}>
-          <h1 className="ss-h"><b>{head[0]}</b>{head[1]}</h1>
+          {head[0] && <h1 className="ss-h"><b>{head[0]}</b>{head[1]}</h1>}
           {body}
           {error && <p className="ss-error" role="alert">{error}</p>}
           {back && <button type="button" className="ss-back" onClick={back}>Back</button>}

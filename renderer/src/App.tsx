@@ -6944,8 +6944,6 @@ export default function App() {
   // THE FIRST RUN ENDS IN THE INBOX, where the tutorial takes over.
   const finishFresh = useCallback(() => {
     finishFirstRun(localStorage);
-    // The setup offered sign-in at its invite step; not taking it there is a skip.
-    skipSignIn();
     setNewInstall(false);
     rememberOffered(localStorage);
     setTour(startTour());
@@ -6954,7 +6952,7 @@ export default function App() {
     setView('inbox');
     setFocused(null);
     setSelected(0);
-  }, [setTour, setHomeOpen, skipSignIn]);
+  }, [setTour, setHomeOpen]);
 
   // THE FIRST RUN ON MAIN ENDS IN THE INBOX, on the task just sent when there is one, with its two lessons left to give.
   const [landOn, setLandOn] = useState<string | null>(null);

@@ -108,9 +108,12 @@ describe('a new install, during its first run', () => {
   it('the phone with the computer shut still needs the account', () => {
     expect(ask(team({ configured: true }), { firstRun: true, canSkip: false }).page).toBe(true);
   });
-  it('the window asks the rule with whether this is a first run, and finishing it skips', () => {
-    const app = read('renderer/src/App.tsx');
-    expect(app).toMatch(/signInAsk\(\{[^}]*firstRun: newInstall/);
-    expect(app).toMatch(/const finishFresh[\s\S]{0,400}skipSignIn\(\)/);
+  it('the window asks the rule with whether this is a first run', () => {
+    expect(read('renderer/src/App.tsx')).toMatch(/signInAsk\(\{[^}]*firstRun: newInstall/);
+  });
+  // Then: "we are making login required". The setup's sign-in step cannot be
+  // skipped, and finishing the setup no longer counts as Skip for now.
+  it('finishing the first run is not a skip', () => {
+    expect(read('renderer/src/App.tsx')).not.toMatch(/const finishFresh[\s\S]{0,400}skipSignIn\(\)/);
   });
 });
