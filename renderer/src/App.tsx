@@ -8646,7 +8646,7 @@ export default function App() {
           onNewProject={() => setNewProject(true)}
           // And this is how the project just made reaches the open card, which
           // read the remembered slot before that project existed (w-abed8ae491).
-          selectProject={pickProject}
+          selectProject={tourTask ? null : pickProject}
           onClose={() => { setModal(null); setComposeInitial(null); setPickProject(null); }}
           // THE CARD CLOSES ON SEND, NOT ON THE ANSWER (w-461fbd8d2d). On the
           // web and on a phone the answer is a round trip away, and for that
