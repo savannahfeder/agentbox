@@ -1,4 +1,4 @@
-import { DOC_SCHEMES, isScheme } from '../shared/schemes.mts';
+import { DOC_SCHEMES, isScheme } from './schemes.mts';
 
 export function wantsDocumentHeight(url: string): boolean {
   try {
@@ -35,7 +35,8 @@ export function reportDocumentHeight(page: HeightPage): void {
   };
   const observer = new page.ResizeObserver(() => {
     // A viewport-sized page must not grow again because its frame just grew.
-    if (viewport !== page.innerHeight) { viewport = page.innerHeight; return; }
+    // A frame that loaded with no size has not reported yet, so its first layout still counts.
+    if (viewport !== page.innerHeight) { const had = viewport; viewport = page.innerHeight; if (had > 0) return; }
     measure();
   });
   observer.observe(doc.documentElement);

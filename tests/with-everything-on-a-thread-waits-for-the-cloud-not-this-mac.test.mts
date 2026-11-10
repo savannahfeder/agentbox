@@ -96,6 +96,72 @@ describe('with Everything on', () => {
     expect(sup._waitsForCloud(reply, 'codex')).toBe(true);
   });
 
+  // A power tester on the Free plan's 2 agents, 2026-11-09: a third thread said
+  // "Runs on Cloud · Queued", then WORKING LOCALLY, five times in 1.7 hours.
+  // The app's own cap is 20, so it sent the run, the server refused it for the
+  // plan's agents, and that refusal made the cloud read as unusable for half a
+  // minute, which sent the thread here.
+  const turnedAway = (sup) => { sup._cloudNoRoom = { error: 'agents', message: 'Both of your cloud agents are running.', until: Date.now() + 30_000 }; };
+
+  it('a thread the plan\'s cloud agents turned away waits for one of ours to finish, though this Mac has room', () => {
+    const { sup, product } = make();
+    live(sup, 2);
+    turnedAway(sup);
+    expect(sup._localSlotFor('claude')).toBe(true);
+    expect(sup._whereToRun({ item, product, cwd, engine: 'claude' })).toBe('cloud-wait');
+    expect(sup._whyWaitingForCloud('claude').why).toBe('cloud-full');
+  });
+
+  it('with none of ours in the cloud, slots taken elsewhere send it here as before, so it never waits on what it cannot see end', () => {
+    const { sup, product } = make();
+    turnedAway(sup);
+    expect(sup._whereToRun({ item, product, cwd, engine: 'claude' })).toBe('local');
+  });
+
+  it('turned away, it frees the oldest cloud run that has answered and only waits for a reply', () => {
+    const { sup } = make();
+    const stopped = [];
+    for (const [id, at, between] of [['w-a', 1, true], ['w-b', 2, true], ['w-c', 0, false]]) {
+      sup.sessions.set(id, { itemId: id, engine: 'claude', cloud: true, between, startedAt: at, child: { kill() {}, stopWaiting: () => stopped.push(id) }, tail: [] });
+    }
+    sup._noteCloudNoRoom({ cloud: true, tail: ['stderr: agentbox cloud: no room in the cloud (agents): Both are running.'] }, 79);
+    expect(stopped).toEqual(['w-a']);
+    stopped.length = 0;
+    sup._noteCloudNoRoom({ cloud: true, tail: ['stderr: agentbox cloud: no room in the cloud (hours): No hours left.'] }, 79);
+    expect(stopped).toEqual([]);
+  });
+
+  const turnedAwayEightTimes = (sup) => {
+    const row = { id: 'w-next', product: 'p' };
+    for (let i = 0; i < 8; i += 1) {
+      const s = { itemId: 'w-next', engine: 'claude', cloud: true, startedAt: Date.now(), tail: ['stderr: agentbox cloud: no room in the cloud (agents): Both are running.'] };
+      sup.sessions.set('w-next', s);
+      sup._noteCloudNoRoom(s, 79);
+      sup._noteHowTheRunStarted(row, s);
+      sup.sessions.delete('w-next');
+    }
+    return sup._heldStarts?.['p:w-next'];
+  };
+
+  it('a start turned away while our own cloud runs fill the plan is not a run that died, so waiting never holds the thread', () => {
+    const { sup } = make();
+    live(sup, 2);
+    expect(turnedAwayEightTimes(sup)).toBeUndefined();
+  });
+
+  it('turned away over and over with none of ours in the cloud, the thread is still held and said', () => {
+    const { sup } = make();
+    expect(turnedAwayEightTimes(sup)).toBeTruthy();
+  });
+
+  it('out of hours or with no plan, a thread still runs here', () => {
+    for (const error of ['hours', 'plan', 'paused']) {
+      const { sup, product } = make();
+      sup._cloudNoRoom = { error, message: null, until: Date.now() + 300_000 };
+      expect(sup._whereToRun({ item, product, cwd, engine: 'claude' })).toBe('local');
+    }
+  });
+
   it('an engine with no cloud sign-in at all runs here, as before', () => {
     const { sup, product } = make({ runnable: false, signedIn: false });
     expect(sup._whereToRun({ item, product, cwd, engine: 'claude' })).toBe('local');
@@ -105,6 +171,12 @@ describe('with Everything on', () => {
 describe('with "when this Mac is full"', () => {
   it('this Mac comes first, and the cloud takes the overflow', () => {
     const { sup, product } = make({ cloudRuns: null });
+    expect(sup._whereToRun({ item, product, cwd, engine: 'claude' })).toBe('local');
+  });
+
+  it('a thread the cloud agents turned away runs here', () => {
+    const { sup, product } = make({ cloudRuns: null });
+    sup._cloudNoRoom = { error: 'agents', message: null, until: Date.now() + 30_000 };
     expect(sup._whereToRun({ item, product, cwd, engine: 'claude' })).toBe('local');
   });
 });

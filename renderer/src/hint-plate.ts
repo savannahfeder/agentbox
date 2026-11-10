@@ -139,6 +139,10 @@ export const HINTS: Record<string, HintLine[]> = {
   // w-a3482b8c2c it hangs from the summary's rail and the icon that closes it.
   summary: [{ key: 'S', what: 'Show or hide the summary' }],
   back: [{ key: 'esc', what: 'Go back one level' }],
+  // The Inbox button left of the back arrow. Esc only goes to the inbox from
+  // a thread, so only there does its plate name the key.
+  'inbox-esc': [{ key: 'esc', what: 'Inbox' }],
+  inbox: [{ key: '', what: 'Inbox' }],
   // The up and down arrows on a thread in Needs you (w-65bcefb857).
   'previous-thread': [{ key: 'K', what: 'Previous thread' }],
   'next-thread': [{ key: 'J', what: 'Next thread' }],

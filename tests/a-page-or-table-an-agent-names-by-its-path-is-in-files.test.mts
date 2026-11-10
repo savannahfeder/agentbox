@@ -37,6 +37,16 @@ describe('a page or table an agent names bare', () => {
     expect(found('Built with node.js; index.html and data.csv are the usual names.')).toEqual([]);
   });
 
+  // w-d18e699928: an answer handing back `leads.csv` alone on its line drew a
+  // link that opened the sheet, but the notes beside it had no Send.
+  it('counts any file named alone on a line of its own, with or without a folder', () => {
+    expect(found('Cleaned it up.\n\nleads.csv\n')).toEqual(['leads.csv']);
+    expect(found('Here it is:\n  pricing.html  \nand more words')).toEqual(['pricing.html']);
+    expect(found('Done.\n\ndesigns/launch-checklist.txt\n')).toEqual(['designs/launch-checklist.txt']);
+    expect(found('leads.csv is ready')).toEqual([]);
+    expect(found('Can you clean up\n\nleads.csv', 'founder')).toEqual([]);
+  });
+
   it('counts no script named bare, which a sentence about code names all the time', () => {
     expect(found('I changed main/files-place.mts and scripts/ship.sh.')).toEqual([]);
   });

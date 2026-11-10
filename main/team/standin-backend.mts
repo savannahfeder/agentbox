@@ -25,7 +25,9 @@ export function standinBackend(url: string, { token, personId, kind, methods }: 
   const backend: Record<string, unknown> & Partial<TeamBackend> = { kind, personId };
   for (const method of methods) {
     backend[method] = async (...args: unknown[]) => {
-      const { value } = await post<{ value: unknown }>(url, 'call', { token, method, args });
+      const sent = args.map((a) => (Buffer.isBuffer(a) ? { __bytes: a.toString('base64') } : a));
+      const { value } = await post<{ value: unknown }>(url, 'call', { token, method, args: sent });
+      if (value && typeof value === 'object' && typeof (value as { __bytes?: unknown }).__bytes === 'string') return Buffer.from((value as { __bytes: string }).__bytes, 'base64');
       return value === null ? undefined : value;
     };
   }
@@ -88,5 +90,6 @@ export function standinSession({ cloudConfig, testLogin }: { cloudConfig: CloudC
     cancelSignIn: () => {},
     reopen: () => {},
     async signOut() { signedIn = null; },
+    async anyone() { return signedIn; },
   };
 }

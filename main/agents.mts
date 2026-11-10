@@ -217,7 +217,7 @@ async function fromCli(claudeBin: string | null | undefined): Promise<SessionRec
 function scrubbed(env: NodeJS.ProcessEnv) {
   const out = { ...env };
   for (const key of Object.keys(out)) {
-    if (/^(ANTHROPIC_|CLAUDE_CODE_|CLAUDECODE$|CLAUDE_PID$|CLAUDE_EFFORT$)/.test(key)) delete out[key];
+    if (/^(ANTHROPIC_|CLAUDE_CODE_(?!GIT_BASH_PATH$)|CLAUDECODE$|CLAUDE_PID$|CLAUDE_EFFORT$)/.test(key)) delete out[key];
   }
   return out;
 }
@@ -713,6 +713,7 @@ function heldNotice(agent: Agent, sinceSize: number, message: string) {
 
 // Exported for tests/a-held-message-is-not-delivered.test.mts.
 export const __heldNotice = heldNotice;
+export const __scrubbed = scrubbed;
 
 function readState(pid: number) {
   try {

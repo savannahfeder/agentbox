@@ -8,10 +8,11 @@ import { catalogFor, clockAt, onLoopback, type CatalogTool } from '../../shared/
 import type { Store } from '../store.mts';
 import type { Supervisor, SupervisorStore } from '../supervisor.mts';
 import { sessionFileOutsideStore } from '../team/session.mts';
-import { createBroker } from './broker.mts';
+import { createBroker, type BrokerChannel } from './broker.mts';
 import { createCopies, type Copies } from './copies.mts';
 import { createConnections, type Connections, type NeedsYouRow, type Recovered } from './index.mts';
 import type { ConnectionsCipher } from './vault.mts';
+import { channelDir } from '../local-channel.mts';
 
 export type { ConnectionsCipher };
 
@@ -38,6 +39,17 @@ export interface Connected {
 export function brokerSocketPath(storeRoot: string): string {
   const tag = crypto.createHash('sha256').update(path.resolve(storeRoot)).digest('hex').slice(0, 16);
   return path.join(os.tmpdir(), `agentbox-conn-${tag}.sock`);
+}
+
+/** Windows has no unix socket to listen on, so there the broker serves the local channel, one per store. Elsewhere null. */
+export function brokerChannel(
+  storeRoot: string,
+  { platform = process.platform, env = process.env, home = os.homedir() }: { platform?: NodeJS.Platform; env?: NodeJS.ProcessEnv; home?: string } = {},
+): BrokerChannel | null {
+  if (platform !== 'win32') return null;
+  const found = channelDir({ platform, env, home });
+  const stamp = crypto.createHash('sha256').update(path.win32.resolve(storeRoot)).digest('hex').slice(0, 16);
+  return found.dir !== null ? { dir: found.dir, stamp } : { dir: null, problem: found.reason };
 }
 
 // A browser copy has no keychain, so it refuses a real connection. A copy on the
@@ -128,6 +140,7 @@ export function startConnections({ config, supervisor, appDir, userDir, cipher =
   const broker = createBroker({
     connections, storeRoot: config.storeRoot, socketPath: brokerSocketPath(config.storeRoot),
     proxyFile: path.join(appDir, 'mcp', 'connection-proxy.mts'),
+    channel: brokerChannel(config.storeRoot, { env }),
   });
   // A run that starts before this is listening finds its tool says offline, and the next call finds it back.
   broker.listen().catch((err) => console.warn('zero: connections are not reachable by agents:', (err as Error | null)?.message ?? err));

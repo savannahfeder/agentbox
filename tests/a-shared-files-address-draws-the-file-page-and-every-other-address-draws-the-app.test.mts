@@ -79,9 +79,9 @@ describe('the boot', () => {
   it('draws the shared page in place of the app, and the app everywhere else', () => {
     const main = read('renderer/src/main.tsx');
     expect(main).toMatch(/const sharedFile = onASharedFilePage\(\);/);
-    expect(main).toMatch(/if \(sharedFile && cloud\) bootSharedFile\(sharedFile, cloud\);\nelse if \(!theDoorNeedsItsKey\(\)\) boot\(\);/);
+    expect(main).toMatch(/if \(sharedFile && cloud\) bootSharedFile\(sharedFile, cloud\);\nelse if \(sharedThread && cloud\) bootSharedThread\(sharedThread, cloud\);\nelse if \(!theDoorNeedsItsKey\(\)\) boot\(\);/);
     // A stranger's browser opens it dark, not in the look the app saves for its own people.
-    expect(main).toMatch(/if \(!sharedFile\) normalizeSavedLook\(localStorage, machineTheme\(\)\);/);
+    expect(main).toMatch(/if \(!sharedFile && !sharedThread\) normalizeSavedLook\(localStorage, machineTheme\(\)\);/);
   });
   // An open page kept the old copy after Update link (power test, round 3, 2026-11-04).
   it('reads the file again when its tab comes back into view', () => {

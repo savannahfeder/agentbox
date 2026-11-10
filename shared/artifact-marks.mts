@@ -11,7 +11,8 @@ export type NotePlace =
   | { kind: 'pin'; x: number; y: number }
   | { kind: 'time'; s: number; x?: number; y?: number }
   | { kind: 'page'; n: number; word?: 'Slide'; x?: number; y?: number }
-  | { kind: 'quote'; text: string; x?: undefined; y?: undefined }
+  /** `cell`: a table's row in the file, counted from 1 under the header, and its column's name. */
+  | { kind: 'quote'; text: string; cell?: { row: number; column: string }; x?: undefined; y?: undefined }
   | { kind: 'whole'; x?: undefined; y?: undefined };
 
 export type Mark =
@@ -172,7 +173,7 @@ const shortId = (v: unknown): string | null => (typeof v === 'string' && MARK_ID
 const fileId = (v: unknown): string | null => (typeof v === 'string' && FILE_ID.test(v) && v !== '.' && v !== '..' ? v : null);
 const unit = (v: unknown): v is number => typeof v === 'number' && v >= 0 && v <= 1;
 
-type RawPlace = { kind?: unknown; x?: unknown; y?: unknown; s?: unknown; n?: unknown; word?: unknown; text?: unknown };
+type RawPlace = { kind?: unknown; x?: unknown; y?: unknown; s?: unknown; n?: unknown; word?: unknown; text?: unknown; cell?: { row?: unknown; column?: unknown } | null };
 
 function cleanPlace(place: RawPlace | null | undefined): NotePlace | undefined {
   switch (place?.kind) {
@@ -186,7 +187,10 @@ function cleanPlace(place: RawPlace | null | undefined): NotePlace | undefined {
     }
     case 'quote': {
       const text = typeof place.text === 'string' ? place.text.trim().slice(0, MAX_QUOTE_CHARS) : '';
-      return text ? { kind: 'quote', text } : undefined;
+      if (!text) return undefined;
+      const row = place.cell?.row;
+      const column = typeof place.cell?.column === 'string' ? place.cell.column.trim().slice(0, 200) : '';
+      return typeof row === 'number' && Number.isInteger(row) && row >= 1 && column ? { kind: 'quote', text, cell: { row, column } } : { kind: 'quote', text };
     }
     case 'whole': return { kind: 'whole' };
     default: return undefined;
@@ -339,7 +343,7 @@ export function placeWords(note: { place?: NotePlace | null; pin?: number | stri
     case 'pin': return `Pin ${note!.pin ?? 1}`;
     case 'time': return unit(place.x) ? `Pin ${note!.pin ?? 1} at ${clock(place.s)}` : clock(place.s);
     case 'page': return unit(place.x) ? `Pin ${note!.pin ?? 1} on ${place.word ?? 'Page'} ${place.n}` : `${place.word ?? 'Page'} ${place.n}`;
-    case 'quote': return `“${place.text}”`;
+    case 'quote': return place.cell ? `“${place.text}” in row ${place.cell.row}, ${place.cell.column}` : `“${place.text}”`;
     default: return 'Whole file';
   }
 }
@@ -384,6 +388,15 @@ function baseStem(name: string): string {
   return stem;
 }
 const stemOf = (name: string): string => baseStem(name).toLowerCase();
+
+/** 3 for `rows-v3.csv`, 1 for a name with no tail, null for any other tail (final, (2)). */
+function numberInName(name: string): number | null {
+  const dot = name.lastIndexOf('.');
+  const stem = dot > 0 ? name.slice(0, dot) : name;
+  const v = stem.match(/[-_ ]v(\d+)$/i);
+  if (v) return Number(v[1]);
+  return VERSION_TAIL.test(stem) ? null : 1;
+}
 
 /** `group-seat-picker-v3.png` as `group-seat-picker.png`. */
 export function baseName(name: string): string {
@@ -443,7 +456,14 @@ export function threadFiles(files: readonly ThreadFile[] | null | undefined, num
   }
   const out = [...families.values()];
   for (const family of out) {
-    if (!family.versions.some((v) => v.line !== undefined)) continue;
+    if (!family.versions.some((v) => v.line !== undefined)) {
+      // A handoff names the newest first; names that number themselves, each once, say the order.
+      const nums = family.versions.map((v) => numberInName(v.name));
+      if (family.versions.length > 1 && nums.every((n): n is number => n !== null) && new Set(nums).size === nums.length) {
+        family.versions = family.versions.map((v, i) => ({ v, at: nums[i] as number })).sort((a, b) => a.at - b.at).map(({ v }, i) => ({ ...v, n: i + 1 }));
+      }
+      continue;
+    }
     const byLine = new Map<number, FileVersion & { line?: number }>();
     const unknown: Array<FileVersion & { line?: number }> = [];
     for (const v of family.versions) {
@@ -624,8 +644,10 @@ export const opensBigInAGroup = (name: string | null | undefined): boolean => !!
 const BARE_END = /\/[\w.-]+\.(?:html?|csv|tsv)(?![\w/-])/gi;
 const MAY_BE_BARE = new RegExp(BARE_END.source, 'i');
 const BARE_OTHER = /(?<![\w./:@~(\[-])((?:\.?\/)?[\w.-]+(?:\/[\w.-]+)+\.(?:html?|csv|tsv))$/i;
+// Alone on its line, a name is a claim even with no folder or for a script; inside a sentence it is not.
+const ALONE = /^[ \t]*((?:\.?\/)?[\w-][\w.-]*(?:\/[\w.-]+)*\.[A-Za-z0-9]+)[ \t]*$/gm;
 function bareOthers(text: string): Array<{ at: number; path: string }> {
-  const out: Array<{ at: number; path: string }> = [];
+  const out: Array<{ at: number; path: string }> = [...text.matchAll(ALONE)].map((m) => ({ at: m.index + m[0].indexOf(m[1]), path: m[1] }));
   for (const m of text.matchAll(BARE_END)) {
     const end = m.index + m[0].length;
     let start = m.index;
@@ -651,7 +673,7 @@ export function otherFilesInLines(lines: readonly ThreadLine[] | null | undefine
     for (const field of ['result', 'note', 'body', 'answer']) {
       if (typeof p[field] !== 'string') continue;
       const named = p[field].includes('](') || p[field].includes('`');
-      const bare = l.source !== 'founder' && MAY_BE_BARE.test(p[field]);
+      const bare = l.source !== 'founder' && (MAY_BE_BARE.test(p[field]) || new RegExp(ALONE.source, 'im').test(p[field]));
       if (!named && !bare) continue;
       const text = p[field].replace(FENCE, '');
       const hits = [
