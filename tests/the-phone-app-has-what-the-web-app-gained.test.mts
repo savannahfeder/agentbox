@@ -40,7 +40,7 @@ describe('the empty inbox', () => {
     expect(src).toMatch(/!\(inboxEmpty && !board\)/);
   });
   it('the page and the inbox share one form', () => {
-    expect(read('mobile/src/app/new.tsx')).toMatch(/useNewThread\(close\)/);
+    expect(read('mobile/src/app/new.tsx')).toMatch(/useNewThread\(close[,)]/);
     expect(read('mobile/src/ui/NewThreadForm.tsx')).toMatch(/export function InboxComposer/);
   });
 });

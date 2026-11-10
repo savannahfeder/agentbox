@@ -32,7 +32,7 @@ export interface Command {
 /** What was found inside things, a labelled group of rows each (renderer/src/found-inside.ts). */
 export interface InsideSection { key: string; label: string; rows: Command[] }
 
-export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, machine = 'dark', onSetLook, skyThemes = [], onSkyTheme, staleFiles = [], updateReady = null, onInstallUpdate, onCheckUpdate, moveToApplications = false, onMoveToApplications, filtering = false, onOpenFilter, onClearFilter, onView, teamLayout = false, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onNewThread, onStanding, onSettings, onUsage, onShortcuts, roomsOn = false, groups = [], onGroups, onPickGroup, teamLists, filePages, onConnections, teammates = null, onTeammates, onPauseTeammate, boardUp = false, onFlipView, keyHints, onSetKeyHints, findThreads, findChats, findInside, onSearchFor, onFirstRun, onTutorial, onEndTutorial, onImportAgents, onClose, cloud = null, onCloudMode, open = true, phone = false, typed = '' }: {
+export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, machine = 'dark', onSetLook, skyThemes = [], onSkyTheme, staleFiles = [], updateReady = null, onInstallUpdate, onCheckUpdate, moveToApplications = false, onMoveToApplications, filtering = false, onOpenFilter, onClearFilter, onView, teamLayout = false, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onNewThread, onStanding, onSettings, onUsage, onShortcuts, roomsOn = false, groups = [], onGroups, onPickGroup, teamLists, filePages, onConnections, onHome, teammates = null, onTeammates, onPauseTeammate, boardUp = false, onFlipView, keyHints, onSetKeyHints, findThreads, findChats, findInside, onSearchFor, onFirstRun, onTutorial, onEndTutorial, onImportAgents, onClose, cloud = null, onCloudMode, open = true, phone = false, typed = '' }: {
   products: Product[];
   supervisorPaused: boolean;
   itemCommands?: Command[];
@@ -95,6 +95,8 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   /** The Files place: every file, then each project's page. */
   filePages?: readonly { id: string; title: string; hint?: string; run: () => void }[];
   onConnections?: () => void;
+  /** Absent where there is no Home page, as on a phone. */
+  onHome?: () => void;
   /** Your teammates, or null where there are none to have. */
   teammates?: readonly { id: string; name: string; role: string | null; paused?: boolean }[] | null;
   /** 'team' for the team chat, 'roster' for the Teammates tab, or a teammate's id. */
@@ -178,6 +180,8 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     // Namespaced so they cannot share an id with an item command such as
     // 'done'. Ids become React keys, and a duplicate kept a stale row alive
     // through the filter (../palette-keys).
+    // Above Inbox, as in the sidebar, and so "home" lands here although Inbox answers to it too.
+    ...(onHome ? [{ id: 'view-home', label: 'Go to Home', keywords: 'start overview', run: onHome }] : []),
     ...pageRows({ team: teamLayout }).map((r) => ({ id: r.id, label: r.label, keywords: r.keywords, run: () => onView(r.view) })),
     // THE OTHER PAGE, AND EVERY GROUP ON IT (w-326fb83c0e). ⌘K found nothing
     // for "rooms", "groups" or "messages", so the only way onto the page was

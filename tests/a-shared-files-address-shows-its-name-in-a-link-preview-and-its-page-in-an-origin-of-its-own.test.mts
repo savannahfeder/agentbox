@@ -229,7 +229,7 @@ describe('the site as built for Pages', () => {
 
   it('sends only /f/* through the worker, which has the cloud and the site headers in it', async () => {
     build('https://abc.supabase.co');
-    expect(JSON.parse(fs.readFileSync(path.join(out, '_routes.json'), 'utf8'))).toEqual({ version: 1, include: ['/f/*', '/F/*'], exclude: [] });
+    expect(JSON.parse(fs.readFileSync(path.join(out, '_routes.json'), 'utf8'))).toEqual({ version: 1, include: ['/f/*', '/F/*', '/t/*'], exclude: [] });
     const source = fs.readFileSync(path.join(out, '_worker.js'), 'utf8');
     expect(source).not.toContain('const BAKED = null;');
     expect(source).toContain('"cloud":"https://abc.supabase.co"');

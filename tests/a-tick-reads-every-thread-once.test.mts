@@ -31,6 +31,10 @@ beforeEach(async () => {
   const n1 = { do: 'note', id: 'n1', file: 'plan.md', place: { kind: 'whole' }, text: 'Shorter intro' };
   store.fileMark('website', thread.id, n1);
   await noteToItsAgent({ store, supervisor: { sessions: new Map(), wake: () => {} }, product: 'website', id: thread.id, mark: n1 });
+  // Only a version made after the send answers the note, and a fast machine
+  // writes the next one in the same millisecond.
+  const sent = Date.now();
+  while (Date.now() <= sent);
   reads = 0;
   const list = store.listItems.bind(store);
   store.listItems = (...a) => { reads += 1; return list(...a); };

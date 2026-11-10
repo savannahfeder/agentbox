@@ -6,7 +6,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
 import { pickedName, tooBigToSend } from '../lib/attach';
 
-export interface Picked { name: string; dataBase64: string }
+// `uri` is the picked file on the phone, kept so its thumbnail is drawn from the file.
+export interface Picked { name: string; dataBase64: string; uri?: string }
 
 export async function pickPhotos(): Promise<Picked[]> {
   const got = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images', 'videos'], allowsMultipleSelection: true, quality: 0.9, base64: Platform.OS === 'web' });
@@ -16,7 +17,7 @@ export async function pickPhotos(): Promise<Picked[]> {
     const name = pickedName(a.fileName, a.type, out.length);
     const big = tooBigToSend(name, a.fileSize);
     if (big) throw new Error(big);
-    out.push({ name, dataBase64: a.base64 ?? await new File(a.uri).base64() });
+    out.push({ name, dataBase64: a.base64 ?? await new File(a.uri).base64(), ...onPhone(a.uri) });
   }
   return out;
 }
@@ -25,7 +26,11 @@ export async function pickFiles(): Promise<Picked[]> {
   const got = await DocumentPicker.getDocumentAsync({ multiple: true, copyToCacheDirectory: true });
   if (got.canceled) return [];
   for (const a of got.assets) { const big = tooBigToSend(a.name, a.size); if (big) throw new Error(big); }
-  return Promise.all(got.assets.map(async (a) => ({ name: a.name, dataBase64: await base64Of(a) })));
+  return Promise.all(got.assets.map(async (a) => ({ name: a.name, dataBase64: await base64Of(a), ...onPhone(a.uri) })));
+}
+
+function onPhone(uri: string): { uri?: string } {
+  return Platform.OS === 'web' ? {} : { uri };
 }
 
 // Expo's file reader is the phone's; the browser preview reads the picked file itself.
