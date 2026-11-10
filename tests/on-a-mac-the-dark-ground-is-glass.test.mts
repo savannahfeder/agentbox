@@ -81,16 +81,21 @@ describe('the page', () => {
     expect(card).toMatch(/background: linear-gradient\(var\(--skin-pane\), var\(--skin-pane\)\), var\(--skin-image\) center \/ cover no-repeat fixed var\(--bg\)/);
   });
 
-  it('sets the card 12px in from the right and the foot, with 14px corners', () => {
+  // At 12px the owner found the foot too tight; 20px, with the right kept even.
+  it('sets the card 20px in from the right and the foot, with 14px corners', () => {
     const card = rule(`${DARK_GLASS} .workspace-layout::before`);
-    expect(card).toMatch(/right: 12px/);
-    expect(card).toMatch(/bottom: 12px/);
+    expect(card).toMatch(/right: 20px/);
+    expect(card).toMatch(/bottom: 20px/);
     expect(card).toMatch(/border-radius: 14px/);
-    expect(rule(`${DARK_GLASS} .app.workspace-layout`)).toMatch(/padding-right: 12px; padding-bottom: 12px/);
+    expect(rule(`${DARK_GLASS} .app.workspace-layout`)).toMatch(/padding-right: 20px; padding-bottom: 20px/);
     expect(rule(`${DARK_GLASS} .home-sky`)).toMatch(/border-radius: 14px/);
     // The sidebar keeps the same place against the card that it has today:
     // 10px below the card's top, level with its foot.
-    expect(rule(`${DARK_GLASS} .workspace-navigation`)).toMatch(/top: 60px; bottom: 12px/);
+    expect(rule(`${DARK_GLASS} .workspace-navigation`)).toMatch(/top: 60px; bottom: 20px/);
+  });
+
+  it('tints the glass with the theme ground at 60%, the shade the owner kept', () => {
+    expect(rule(`${DARK_GLASS} body`)).toMatch(/color-mix\(in srgb, var\(--bg\) 60%, transparent\)/);
   });
 
   it('makes the top band twice the traffic lights\' centre, so they sit in its middle', () => {
