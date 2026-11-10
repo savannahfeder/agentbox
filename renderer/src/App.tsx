@@ -1350,7 +1350,14 @@ export default function App() {
       engine: x.engine, found: !!x.found, signedIn: !!x.signedIn, certain: x.certain,
     }))));
   }, []);
-  useEffect(() => { if (!run) void checkPlan(); }, [run, checkPlan]);
+  // Not while the first run is up: it may be signing in right now (F-198).
+  useEffect(() => { if (!run && !fresh) void checkPlan(); }, [run, fresh, checkPlan]);
+  useEffect(() => {
+    if (!planWords) return undefined;
+    const again = () => { void checkPlan(); };
+    window.addEventListener('focus', again);
+    return () => window.removeEventListener('focus', again);
+  }, [planWords, checkPlan]);
 
   const fire = useCallback((e: Parameters<typeof advanceRun>[1]) => {
     setRun((r) => (r ? advanceRun(r, e) : r));

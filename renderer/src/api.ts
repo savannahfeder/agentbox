@@ -817,7 +817,8 @@ export const api = {
   //
   // An older preload has never heard of it, and then the pane says so rather
   // than drawing an empty change.
-  async codeChange(p: { product: string; src: string }): Promise<{ ok: boolean; change?: unknown; error?: string }> {
+  // `summary` leaves out the diff's rows (main/code-change.mts readChangeSummary).
+  async codeChange(p: { product: string; src: string; summary?: boolean }): Promise<{ ok: boolean; change?: unknown; error?: string }> {
     if (useFixtures && p.src === 'review-bundle.change') return {ok:true,change:reviewSampleChange};
     if (useFixtures && p.src === 'artifact-layout-sample.change') return {ok:true,change:artifactSampleChange};
     const zero = window.zero;

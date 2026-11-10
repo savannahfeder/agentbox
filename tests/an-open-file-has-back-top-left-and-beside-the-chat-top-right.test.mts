@@ -28,14 +28,17 @@ describe('the open file header', () => {
     expect(first).toMatch(/title="Back to the thread \(esc\)"/);
   });
 
-  it('has no second way out: no cross and no Back word', () => {
-    expect(header).not.toMatch(/kind="close"/);
+  // A cross took the top-right corner on 2026-11-08: pressing the corner moved the
+  // picture beside the chat when the person meant to close it
+  // (tests/escape-and-the-corner-cross-close-an-open-picture.test.mts).
+  it('has no Back word', () => {
     expect(header).not.toMatch(/>Back</);
   });
 
-  it('ends with the side pane\'s full-screen toggle, which puts the file beside the chat', () => {
+  it('has the side pane\'s full-screen toggle, which puts the file beside the chat, just left of the cross', () => {
     expect(header).toMatch(/onBeside && family && <FocusControl style="corners-bare" focused onClick=\{\(\) => onBeside\([^\n]*\)\} \/>/);
     expect(header.lastIndexOf('<FocusControl')).toBeGreaterThan(header.indexOf('aria-label="Open outside"'));
+    expect(header.lastIndexOf('<FocusControl')).toBeLessThan(header.indexOf('aria-label="Close"'));
   });
 
   it('offers Open outside and Share as icons alone', () => {
