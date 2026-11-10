@@ -8814,6 +8814,7 @@ export default function App() {
           ...(filesForPalette?.projects ?? []).map((p) => ({ id: `project-${p}`, title: `Files in ${p}`, run: () => { setModal(null); openFiles(p); } })),
         ]}
         onConnections={() => { setModal(null); openConnectionsPage(null); }}
+        onHome={homeOn ? () => { setModal(null); goHome(); } : undefined}
         teammates={teammatesUi.live ? snap?.teammates?.list ?? [] : null}
         onTeammates={(which) => { setModal(null); teammatesUi.go(which); }}
         onPauseTeammate={(id, paused) => { setModal(null); void api.teammates('update', { id, patch: { paused } }).then(() => refresh()); }}
