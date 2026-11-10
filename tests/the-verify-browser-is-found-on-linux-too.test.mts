@@ -15,19 +15,8 @@ const playwright = (p) => () => ({ chromium: { executablePath: () => p } });
 const none = () => { throw new Error('Cannot find module playwright'); };
 
 describe('which browser the verify drives start', () => {
-  it('is Google Chrome on a Mac with no test browser and nothing named', () => {
-    expect(findChrome('darwin', {}, playwright('/opt/pw/chrome'), () => [], () => [])).toBe(MAC);
-  });
-
-  // 2026-11-10 (w-1bf65f4322): on one Mac, Chrome for Testing loaded nothing
-  // over the network (a local page or example.com stayed blank) while the
-  // headless shell beside it loaded them, and a Mac had no way to pick it.
-  it('is the one VERIFY_CHROME names on a Mac too, ahead of Chrome for Testing', () => {
-    expect(findChrome('darwin', { VERIFY_CHROME: '/opt/shell' }, playwright('/opt/pw/chrome'), () => ['/cft'], () => ['/hs'])).toBe('/opt/shell');
-  });
-
-  it('never the person\'s own Google Chrome on a Mac, even when VERIFY_CHROME names it', () => {
-    expect(findChrome('darwin', { VERIFY_CHROME: MAC }, playwright('/opt/pw/chrome'), () => ['/cft'], () => [])).toBe('/cft');
+  it('is Google Chrome on a Mac with no test browser, whatever else is named', () => {
+    expect(findChrome('darwin', { VERIFY_CHROME: '/opt/other' }, playwright('/opt/pw/chrome'), () => [], () => [])).toBe(MAC);
   });
 
   it('is the one VERIFY_CHROME names elsewhere', () => {

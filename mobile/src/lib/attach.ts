@@ -40,6 +40,26 @@ export function pickedName(fileName: string | null | undefined, type: string | n
   return type === 'image' ? fileName.replace(/\.(heic|heif)$/i, '.jpg') : fileName;
 }
 
+const PICTURE_TYPES: Record<string, string> = { jpg: 'jpeg', jpeg: 'jpeg', png: 'png', gif: 'gif', webp: 'webp' };
+
+/**
+ * What a waiting picture's thumbnail is drawn from: the file itself while the
+ * phone has it. iOS draws nothing, and says nothing, for a screenshot handed
+ * over as megabytes of base64; the bytes are the fallback for a draft read
+ * back from storage.
+ */
+export function thumbUri(f: { name: string; dataBase64: string; uri?: string }): string {
+  if (f.uri) return f.uri;
+  return `data:image/${PICTURE_TYPES[f.name.split('.').pop()!.toLowerCase()] ?? 'png'};base64,${f.dataBase64}`;
+}
+
+/** The waiting files with `more` added, leaving out a file already waiting. */
+export function withPicked<F extends { name: string; dataBase64: string }>(now: F[], more: F[]): F[] {
+  const out = [...now];
+  for (const f of more) if (!out.some((o) => o.name === f.name && o.dataBase64 === f.dataBase64)) out.push(f);
+  return out;
+}
+
 export function withAttachments(words: string, saved: Saved[]): string {
   return [words.trim() ? words : '', attachmentLinks(saved)].filter(Boolean).join('\n\n');
 }

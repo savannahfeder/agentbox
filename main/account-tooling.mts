@@ -164,7 +164,11 @@ function occupancy(target: string, source: string): Occupancy {
  *  would only hide that). */
 export function linkAccountTooling(
   dir: string | null | undefined,
-  { home = os.homedir(), source = null }: { home?: string; source?: string | null } = {},
+  { home = os.homedir(), source = null, symlink = fs.symlinkSync }: {
+    home?: string;
+    source?: string | null;
+    symlink?: (target: string, path: string, type: 'junction') => void;
+  } = {},
 ): ToolingResult {
   const src = source ?? defaultClaudeHome(home);
   const out: ToolingResult = { dir, linked: [], already: [], theirs: [], missing: [], skipped: null };
@@ -186,7 +190,9 @@ export function linkAccountTooling(
     if (held === 'ours') { out.already.push(name); continue; }
     if (held === 'theirs') { out.theirs.push(name); continue; }
     try {
-      fs.symlinkSync(from, to, 'dir');
+      // Windows refuses a 'dir' link without Developer Mode and allows a
+      // junction. Every other system ignores the type.
+      symlink(from, to, 'junction');
       out.linked.push(name);
     } catch {
       // A read-only folder, a race with another Agentbox, a permission the app

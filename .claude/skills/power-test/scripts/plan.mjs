@@ -95,7 +95,7 @@ export function chaosPlan(level, totalMs, { real = false, cloud = false, logins 
   const share = { light: 0.01, normal: 0.02, heavy: 0.05 }[level];
   const events = [];
   if (!real) {
-    events.push({ kind: 'agents', at: 0, until: totalMs, world: { pace: { minMs: 5_000, maxMs: 90_000 }, options: 0.3, hang: share, die: share },
+    events.push({ kind: 'agents', at: 0, until: totalMs, world: { pace: { minMs: 5_000, maxMs: 90_000 }, options: 0.3, hang: share, die: share, edits: true },
       says: `Agents answer in 5 to 90 seconds; ${Math.round(share * 100)}% hang and ${Math.round(share * 100)}% die mid-run, as real ones sometimes do.` });
     if (names.length > 1) events.push({ kind: 'login-out', at: at(0.2), until: at(0.4), out: [names[1]], says: `The ${names[1]} login ran out of usage.` });
     if (codex && level !== 'light') events.push({ kind: 'codex-out', at: at(0.45), until: at(0.55), out: ['codex'], says: 'Codex ran out of usage.' });
@@ -252,7 +252,7 @@ const PACE = {
   'between-meetings': 'You are in meetings or calls most of the day: step away for 15 to 40 minutes at a time (away 9, several in a row), then work in short bursts.',
 };
 
-const KEYS = 'N new thread; ⌘↵ (press Enter meta) sends; J/K or arrows move in the list; ↵ opens; esc goes back; R replies in an open thread; E closes a thread; L puts it off until later; Z undoes; ⌘K (press k meta) opens the command bar; / searches; B switches list and board; Tab moves between the tabs; S shows or hides the summary; 1 to 9 pick an option an agent offered.';
+const KEYS = 'N new thread; ⌘↵ (press Enter meta) sends; J/K or arrows move in the list; ↵ opens; esc goes back; R replies in an open thread; E closes a thread; L puts it off until later; Z undoes; ⌘K (press k meta) opens the command bar, which is also search; B switches list and board; Tab moves between the tabs; S shows or hides the summary; 1 to 9 pick an option an agent offered.';
 
 export function testerPrompt({ person, focus, room = null, team = null, browse, diary, shots, round, totalMinutes, minutesLeft, roundMinutes, fraction, diaryTail, issues, notYet, real, stoppedEarlyMin = 0 }) {
   const list = (xs, none) => (xs.length ? xs.map((x) => `- ${x}`).join('\n') : none);

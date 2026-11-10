@@ -45,8 +45,10 @@ import { PriorityIcon } from '../components/Priority';
 import { PRIORITIES, priorityLabelOf, type PriorityId } from '../priority';
 import { Face } from '../team/people';
 import type { Person } from '../types';
+import { ChooseList, CopiedSheet, SeeList, SendSheet, ShareList } from './SharePanel';
+import { sendFirst, type SeenBy } from './share-rules';
 
-export type ThreadMenuRowId = 'run' | 'code' | 'terminal' | 'people' | 'later' | 'priority' | 'pin' | 'rename' | 'move' | 'give' | 'wait' | 'shipped' | 'close-task' | 'done';
+export type ThreadMenuRowId = 'share' | 'run' | 'code' | 'terminal' | 'people' | 'later' | 'priority' | 'pin' | 'rename' | 'move' | 'give' | 'wait' | 'shipped' | 'close-task' | 'done';
 
 /**
  * WHERE THIS THREAD RUNS: in the cloud now (`cloud`), free to go there
@@ -88,7 +90,9 @@ export interface ThreadMenuRow { id: ThreadMenuRowId; label: string; key: string
  * door to one verb; on a phone there was no door at all and the Later tab
  * could not be filled. It names no key for the same reason.
  */
-export function threadMenuRows({ change, terminal, finish, runNow = false, people = false, later = false, priority = null, pin = null, rename = false, move = false, give = false, wait = false, shipped = null, closeTask = false }: {
+export function threadMenuRows({ change, terminal, finish, runNow = false, share = false, people = false, later = false, priority = null, pin = null, rename = false, move = false, give = false, wait = false, shipped = null, closeTask = false }: {
+  /** Share… opens the link, the inbox and who can open it; it takes Add people's place. */
+  share?: boolean;
   /** Someone could still be added to the thread. */
   people?: boolean;
   /** An open task between people: E only clears it from your Needs you, so closing it is its own row. */
@@ -111,10 +115,11 @@ export function threadMenuRows({ change, terminal, finish, runNow = false, peopl
   give?: boolean;
 }): ThreadMenuRow[] {
   const rows: ThreadMenuRow[] = [];
+  if (share) rows.push({ id: 'share', label: 'Share…', key: null });
   if (runNow) rows.push({ id: 'run', label: 'Run now', key: null });
   if (change) rows.push({ id: 'code', label: 'View code changes', key: null });
   if (terminal) rows.push({ id: 'terminal', label: terminal === 'open' ? 'Hide terminal' : 'Open terminal', key: '⌘J' });
-  if (people) rows.push({ id: 'people', label: 'Add people', key: null });
+  if (people && !share) rows.push({ id: 'people', label: 'Add people', key: null });
   if (later) rows.push({ id: 'later', label: 'Later', key: later === 'key' ? 'L' : null });
   if (priority) rows.push({ id: 'priority', label: 'Priority', key: null, detail: priorityLabelOf(priority) });
   if (rename) rows.push({ id: 'rename', label: 'Rename', key: null });
@@ -194,7 +199,7 @@ function MoveMark() {
 function PeopleMark() {
   return <svg {...mark}><circle cx="9" cy="8" r="3.5" /><path d="M3 20c0-3.5 2.7-5.5 6-5.5 1.4 0 2.7.4 3.7 1" /><path d="M18 13v7m-3.5-3.5h7" /></svg>;
 }
-const MARKS: Record<ThreadMenuRowId, typeof CodeMark> = { run: RunMark, code: CodeMark, terminal: TerminalMark, people: PeopleMark, later: LaterMark, priority: () => <PriorityIcon id="medium" />, pin: () => <PinMark />, rename: RenameMark, move: MoveMark, give: GiveMark, wait: WaitMark, shipped: ShippedMark, 'close-task': DoneMark, done: DoneMark };
+const MARKS: Record<ThreadMenuRowId, typeof CodeMark> = { share: PeopleMark, run: RunMark, code: CodeMark, terminal: TerminalMark, people: PeopleMark, later: LaterMark, priority: () => <PriorityIcon id="medium" />, pin: () => <PinMark />, rename: RenameMark, move: MoveMark, give: GiveMark, wait: WaitMark, shipped: ShippedMark, 'close-task': DoneMark, done: DoneMark };
 
 /** Three square dots, because every shape in this skin is square. */
 function Dots() {
@@ -239,7 +244,15 @@ function BlockWords({ onPick }: { onPick: (id: string) => void }) {
 
 /* ----------------------------------------------------------------- button */
 
-export function ThreadMenu({ change = null, codeButton = null, codeOpen = false, onViewChange, addPeople = null, onAddPeople, terminal = null, onToggleTerminal, onFinish = null, onCloseTask = null, onReopen = null, onRunNow = null, onLater = null, priority = null, onPriority, pinned = null, onPin, place = null, placeFacts = {}, onPlace, giveTo = [], onGive, onRename = null, onMove = null, shipped = null, onShipped, waitChoices = [], waitsNow = false, onWait, blocks = false, files = null }: {
+export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose, change = null, codeButton = null, codeOpen = false, onViewChange, addPeople = null, onAddPeople, terminal = null, onToggleTerminal, onFinish = null, onCloseTask = null, onReopen = null, onRunNow = null, onLater = null, priority = null, onPriority, pinned = null, onPin, place = null, placeFacts = {}, onPlace, giveTo = [], onGive, onRename = null, onMove = null, shipped = null, onShipped, waitChoices = [], waitsNow = false, onWait, blocks = false, files = null }: {
+  /** What Share… offers, or null where the thread cannot be shared. */
+  share?: { link: string | null; people: readonly Person[]; last?: string | null; seen: SeenBy; seenWord: string; teamName: string; chosen?: readonly string[] } | null;
+  /** Puts the link on the clipboard; false when it could not. */
+  onCopyLink?: () => Promise<boolean>;
+  onSendTo?: (to: string[], note: string) => void;
+  onSee?: (to: SeenBy) => void;
+  /** Chosen people…: adds the person to who can open it, or takes them off. */
+  onChoose?: (id: string) => void;
   /** Opens ⌘K on the Move to rows. */
   onMove?: (() => void) | null;
   /** Whether a person has said it shipped, or null where the team would not see that. */
@@ -294,12 +307,14 @@ export function ThreadMenu({ change = null, codeButton = null, codeOpen = false,
   /** True keeps it on this Mac (moving it here if it is in the cloud). */
   onPlace?: (keep: PlaceAct) => void;
 }) {
-  const { done, menu: rows } = splitDone(threadMenuRows({ change: !!change && !codeButton, people: !!addPeople && !!onAddPeople, terminal, finish: !!onFinish, runNow: !!onRunNow, later: onLater ? (onPhone() ? true : 'key') : false, priority: onPriority ? priority : null, rename: !!onRename, move: !!onMove, pin: pinned === null || !onPin ? null : pinned ? 'pinned' : 'unpinned', give: giveTo.length > 0 && !!onGive && !!onFinish, wait: waitChoices.length > 0 && !!onWait && !!onFinish ? (blocks ? 'blocked' : true) : false, shipped: shipped === null || !onShipped ? null : shipped ? 'marked' : 'unmarked', closeTask: !!onCloseTask }));
+  const { done, menu: rows } = splitDone(threadMenuRows({ change: !!change && !codeButton, share: !!share, people: !!addPeople && !!onAddPeople, terminal, finish: !!onFinish, runNow: !!onRunNow, later: onLater ? (onPhone() ? true : 'key') : false, priority: onPriority ? priority : null, rename: !!onRename, move: !!onMove, pin: pinned === null || !onPin ? null : pinned ? 'pinned' : 'unpinned', give: giveTo.length > 0 && !!onGive && !!onFinish, wait: waitChoices.length > 0 && !!onWait && !!onFinish ? (blocks ? 'blocked' : true) : false, shipped: shipped === null || !onShipped ? null : shipped ? 'marked' : 'unmarked', closeTask: !!onCloseTask }));
   const [open, setOpen] = useState(false);
   const [giving, setGiving] = useState(false);
   const [waiting, setWaiting] = useState(false);
   const [adding, setAdding] = useState(false);
   const [leveling, setLeveling] = useState(false);
+  const [sharing, setSharing] = useState<null | 'list' | 'send' | 'copied' | 'see' | 'choose'>(null);
+  const [sendTo, setSendTo] = useState<string[]>([]);
   const wrap = useRef<HTMLSpanElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const close = useCallback((refocus: boolean) => {
@@ -308,6 +323,7 @@ export function ThreadMenu({ change = null, codeButton = null, codeOpen = false,
     setWaiting(false);
     setAdding(false);
     setLeveling(false);
+    setSharing(null);
     if (refocus) button.current?.focus();
   }, []);
 
@@ -364,7 +380,7 @@ export function ThreadMenu({ change = null, codeButton = null, codeOpen = false,
   // The first row takes the focus as the menu opens, so the arrows work at once.
   useEffect(() => {
     if (open) wrap.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
-  }, [open, giving, waiting, adding, leveling]);
+  }, [open, giving, waiting, adding, leveling, sharing]);
 
   // Enter, Space or the down arrow on the dots opens the menu. Handled here and
   // stopped, because the window reads Enter on a thread as "send the picked
@@ -376,11 +392,14 @@ export function ThreadMenu({ change = null, codeButton = null, codeOpen = false,
     setOpen(true);
   };
 
+  const copyLink = () => { void onCopyLink?.().then((ok) => { if (ok) setSharing('copied'); else close(false); }); };
+
   const pick = (id: ThreadMenuRowId) => {
     if (id === 'give') { setGiving(true); return; }
     if (id === 'wait') { setWaiting(true); return; }
     if (id === 'people') { askToAdd(); return; }
     if (id === 'priority') { setLeveling(true); return; }
+    if (id === 'share') { setSharing('list'); return; }
     close(id === 'terminal');
     if (id === 'run') onRunNow?.();
     else if (id === 'code') onViewChange?.();
@@ -463,7 +482,22 @@ export function ThreadMenu({ change = null, codeButton = null, codeOpen = false,
           </button>)}
         </div>
       )}
-      {open && !waiting && !adding && !leveling && (giving
+      {open && share && sharing === 'list' && (() => {
+        const first = sendFirst(share.people, share.last);
+        return <ShareList link={!!share.link} first={first} others={share.people.length > (first ? 1 : 0)} seen={share.seenWord}
+          onCopy={copyLink}
+          onSendFirst={() => { close(false); if (first) onSendTo?.([first.id], ''); }}
+          onSendOther={() => { setSendTo([]); setSharing('send'); }}
+          onSee={() => setSharing('see')} />;
+      })()}
+      {open && share && sharing === 'send' && <SendSheet people={share.people} start={sendTo} link={!!share.link} onCopy={copyLink}
+        onSend={(to, note) => { close(false); onSendTo?.(to, note); }} />}
+      {open && share && sharing === 'copied' && share.link && <CopiedSheet link={share.link} people={share.people}
+        onSend={(id) => { close(false); onSendTo?.([id], ''); }} />}
+      {open && share && sharing === 'see' && <SeeList seen={share.seen} teamName={share.teamName}
+        onPick={(to) => { if (to === 'people') { setSharing('choose'); return; } close(false); if (to !== share.seen) onSee?.(to); }} />}
+      {open && share && sharing === 'choose' && <ChooseList people={share.people} chosen={share.seen === 'people' ? share.chosen ?? [] : []} onPick={(id) => onChoose?.(id)} />}
+      {open && !waiting && !adding && !leveling && !sharing && (giving
         ? <div className="th-menu ts-more-menu" role="menu" aria-label="Give it to">
           <p className="ts-menu-say">A person gets it as a task in their Needs you. An AI teammate starts on it.</p>
           {giveTo.map((p) => <button key={p.id} type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" onClick={() => { close(false); onGive?.(p); }}>

@@ -43,7 +43,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { readWorld, worldTurn, worldAnswer, titleIn, stepEvery, workStep } from './stand-in-world.mjs';
+import { readWorld, worldTurn, worldAnswer, titleIn, stepEvery, workStep, asksForAChange, standInEdit } from './stand-in-world.mjs';
 import { makeArtifacts } from './stand-in-artifacts.mjs';
 
 const argv = process.argv.slice(2);
@@ -478,6 +478,12 @@ try {
   if (plan.holdMs) {
     const until = Date.now() + plan.holdMs;
     while (!stopping && Date.now() < until) await wait(50);
+  }
+  const asked = titleIn(promptText);
+  const changed = world.edits && asksForAChange(asked) ? standInEdit(process.cwd(), asked) : null;
+  if (changed) {
+    say({ type: 'assistant', session_id: sessionId, message: { content: [{ type: 'tool_use', id: 'toolu_edit', name: 'Write', input: { file_path: changed } }] } });
+    said = `${said}\n\nChanged ${changed} and committed it.`;
   }
 } catch (err) {
   say({ type: 'result', subtype: 'error', result: String(err?.message ?? err), is_error: true, session_id: sessionId });

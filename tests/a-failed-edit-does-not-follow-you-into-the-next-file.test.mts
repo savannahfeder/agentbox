@@ -25,7 +25,9 @@ describe('leaving a document that did not save', () => {
     expect(leave).not.toMatch(/localStorage\.removeItem/);
   });
   it('Escape goes the way Close does, so after a failed save it leaves rather than try again', () => {
-    expect(view).toMatch(/else if \(draftPlace\) setDraftPlace\(null\);\s*else leave\(\);/);
+    // Since 2026-11-08 a dropped pin no longer holds Escape back
+    // (tests/escape-and-the-corner-cross-close-an-open-picture.test.mts).
+    expect(view).toMatch(/else if \(replyingTo\) setReplyingTo\(null\);[^\n]*\n(?:\s*\/\/[^\n]*\n)*\s*else leave\(\);/);
   });
   it('the failure says what the next press does', () => {
     expect(view).toContain('Close it again to leave');
