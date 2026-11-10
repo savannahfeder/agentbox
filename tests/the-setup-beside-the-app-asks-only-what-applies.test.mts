@@ -253,21 +253,20 @@ describe('the app beside the walkthrough', () => {
   });
 });
 
-describe('the chats step shows the problem', () => {
-  // The founder, of the 'Stop juggling terminals' design: "illustrates the
-  // problem beautifully. Would like to use it somewhere in onboarding". The
-  // step that brings in the agents already on this computer is where it is
-  // true: each of their sessions is a terminal, and each one ticked heads for
-  // the inbox.
+describe('the chats step', () => {
+  // A wall of the person's own sessions as terminals was tried here; the
+  // founder: "kill the terminals page it's too busy". The step shows the app
+  // filling in, like every other step.
   const split = fs.readFileSync(new URL('../renderer/src/components/SetupSplit.tsx', import.meta.url), 'utf8');
   const css = fs.readFileSync(new URL('../renderer/src/components/setup-split.css', import.meta.url), 'utf8');
-  it('says so', () => {
-    expect(split).toContain("'Stop juggling terminals.'");
+  it('draws no terminals', () => {
+    expect(split).not.toMatch(/<Terminal\b|ss-wall/);
+    expect(css).not.toMatch(/ss-wall|ss-term/);
   });
-  it('draws a terminal for each of their sessions, not invented ones', () => {
-    expect(split).toMatch(/p\.chats\.slice\(0, \d+\)\.map\(\(t\) => <Terminal /);
+  it('keeps the app beside it', () => {
+    expect(css).not.toMatch(/data-setup-step="chats"\] #root \{[^}]*opacity: 0/);
   });
-  it('puts the app away while the terminals show', () => {
-    expect(css).toMatch(/:root\[data-setup-step="chats"\] #root \{[^}]*opacity: 0/);
+  it('says what it does', () => {
+    expect(split).toContain("'Add the agents already on this computer.'");
   });
 });

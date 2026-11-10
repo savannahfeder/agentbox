@@ -6,7 +6,7 @@
 // It is portalled to <body> because #root is transformed while it shows, and a
 // fixed element inside a transformed one is placed against it, not the window.
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from '../api';
 import type { Snapshot } from '../types';
@@ -59,17 +59,6 @@ function Strip({ look }: { look: string }) {
 }
 const LOOK_NAME = (id: string) => (id === 'light' ? 'Light' : id === 'dark' ? 'Dark' : SKY_THEMES.find((s) => s.id === id)?.name ?? id);
 
-/** One of their sessions as the terminal it runs in; ticked, it is on its way to the inbox. */
-function Terminal({ t, project, going }: { t: SessionThread; project: string; going: boolean }) {
-  const tool = t.source === 'codex' ? 'codex' : 'claude';
-  return (
-    <div className={`ss-term${going ? ' ss-going' : ''}`}>
-      <div className="ss-term-bar"><i /><i /><i /><span>{tool} · {project}</span>{going && <b>To your inbox</b>}</div>
-      <pre>{`${bare(t.folder).split('/').filter(Boolean).pop() ?? '~'} $ ${tool}\n> ${t.title}\n\n${said(t.when)}`}<span className="ss-caret" /></pre>
-    </div>
-  );
-}
-
 export interface SetupSplitProps {
   snap: Snapshot | null;
   chats: SessionThread[];
@@ -105,11 +94,6 @@ export function SetupSplit(p: SetupSplitProps) {
   const looksAt = useRef<string[] | null>(null);
   const finished = at >= steps.length;
   const step: SetupStep | null = finished ? null : steps[at];
-  useEffect(() => {
-    const root = document.documentElement;
-    if (step) root.dataset.setupStep = step; else delete root.dataset.setupStep;
-    return () => { delete root.dataset.setupStep; };
-  }, [step]);
 
   // THE APP MOVES INTO THE RIGHT PANEL while this shows.
   useEffect(() => {
@@ -240,7 +224,7 @@ export function SetupSplit(p: SetupSplitProps) {
   let head: [string, string] = ['', ''];
   let body: ReactNode = null;
   if (step === 'chats') {
-    head = ['Stop juggling terminals.', 'Bring the agents already on this computer into one inbox.'];
+    head = ['Add the agents already on this computer.', 'What they send you lands in your inbox.'];
     body = <>
       <div className="ss-list">
         {p.chats.map((t) => <Row key={t.id} face={t.source === 'codex' ? 'X' : 'C'} name={t.title} sub={`${t.source === 'codex' ? 'Codex' : 'Claude Code'} · ${p.nameOf(bare(t.folder))} · ${said(t.when)}`}
@@ -319,12 +303,7 @@ export function SetupSplit(p: SetupSplitProps) {
         </div>
       </div>
 
-      <div className="ss-right" aria-hidden="true">
-        <div className="ss-cap">{step === 'chats' ? 'Your agents right now' : `Your ${Name} so far`}</div>
-        {step === 'chats' && <div className="ss-wall" style={{ '--ss-cols': p.chats.length > 4 ? 3 : 2 } as CSSProperties}>
-          {p.chats.slice(0, 9).map((t) => <Terminal key={t.id} t={t} project={p.nameOf(bare(t.folder))} going={p.ticks.has(t.id)} />)}
-        </div>}
-      </div>
+      <div className="ss-right" aria-hidden="true"><div className="ss-cap">Your {Name} so far</div></div>
     </div>,
     document.body,
   )}
