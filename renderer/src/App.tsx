@@ -9184,7 +9184,7 @@ export default function App() {
           onLeave={() => finishRun([], { celebrate: false })}
         />
       )}
-      {landing && <Landed agents={landing.agents} onGone={() => setLanding(null)} />}
+      {landing && <Landed agents={landing.agents || inbox.length + leadCount > 0} onGone={() => setLanding(null)} />}
       {/* THE BAR'S SETUP, on the walk's own screen so it is the card they would
           have seen in the walk. The arrow closes it; a setup that is running
           carries on, and the bar checks again when it does. */}
