@@ -1,7 +1,7 @@
 // THE TEAM PAGE FROM A PHONE, straight to the account with no computer between.
 // The database decides who may rename, remove and cancel
 // (20261001000600_team_settings.sql), as it does for the Mac
-// (main/team/supabase-backend.mjs), so these only ask.
+// (main/team/supabase-backend.mts), so these only ask.
 import type { cloudClient } from './cloud-rest';
 
 type Rest = Pick<ReturnType<typeof cloudClient>, 'session' | 'select' | 'insert' | 'remove' | 'rpc'>;
@@ -20,23 +20,23 @@ export const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /** Your team, or the invites waiting for you when you are on none. */
 export async function readTeam(c: Rest): Promise<{ team: PhoneTeam | null; invites: TeamInvite[] }> {
   const self = me(c);
-  const ids = (await c.select('team_members', `select=team_id&person_id=eq.${self}`)).map((m: any) => m.team_id);
+  const ids = (await c.select('team_members', `select=team_id&person_id=eq.${self}`) as { team_id: string }[]).map((m) => m.team_id);
   if (!ids.length) {
-    const rows = (await c.rpc('pending_invites')) ?? [];
-    return { team: null, invites: rows.map((r: any) => ({ teamId: r.team_id, teamName: r.team_name, invitedBy: r.invited_by_name ?? null })) };
+    const rows = (await c.rpc('pending_invites') as { team_id: string; team_name: string; invited_by_name?: string | null }[] | null) ?? [];
+    return { team: null, invites: rows.map((r) => ({ teamId: r.team_id, teamName: r.team_name, invitedBy: r.invited_by_name ?? null })) };
   }
-  const [t] = await c.select('teams', `select=id,name&id=${inList(ids)}&order=created_at&limit=1`);
+  const [t] = await c.select('teams', `select=id,name&id=${inList(ids)}&order=created_at&limit=1`) as { id: string; name: string }[];
   if (!t) return { team: null, invites: [] };
-  const members = await c.select('team_members', `select=person_id,role&team_id=eq.${t.id}`);
-  const roles = new Map<string, string>(members.map((m: any) => [m.person_id, m.role]));
-  const people = members.length ? await c.select('people', `select=id,email,name&id=${inList([...roles.keys()])}`) : [];
-  const invited = (await c.select('team_invites', `select=email&team_id=eq.${t.id}`)).map((i: any) => String(i.email));
+  const members = await c.select('team_members', `select=person_id,role&team_id=eq.${t.id}`) as { person_id: string; role: string }[];
+  const roles = new Map<string, string>(members.map((m) => [m.person_id, m.role]));
+  const people = members.length ? await c.select('people', `select=id,email,name&id=${inList([...roles.keys()])}`) as { id: string; email?: string | null; name?: string | null }[] : [];
+  const invited = (await c.select('team_invites', `select=email&team_id=eq.${t.id}`) as { email: string }[]).map((i) => String(i.email));
   const role = (id: string): TeamPerson['role'] => (roles.get(id) === 'owner' ? 'owner' : 'member');
   return {
     team: {
       id: t.id,
       name: t.name,
-      people: people.map((p: any) => ({ id: p.id, email: p.email ?? null, name: p.name ?? null, role: role(p.id) }))
+      people: people.map((p) => ({ id: p.id, email: p.email ?? null, name: p.name ?? null, role: role(p.id) }))
         .sort((a: TeamPerson, b: TeamPerson) => (a.role === b.role ? String(a.email).localeCompare(String(b.email)) : a.role === 'owner' ? -1 : 1)),
       invited,
       mine: role(self),

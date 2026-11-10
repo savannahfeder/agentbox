@@ -14,10 +14,11 @@ import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { LAST_PRODUCT_KEY } from '../compose-project';
 import {
-  ENGINE_NAME, FIRST_RUN_STEP, chatChoices, chatsHeadline, foundLine, installGate, listKey, previousScreen, projectsToMake, readyEngines, setupWord, signedOutEngines,
+  ENGINE_NAME, FIRST_RUN_STEP, chatChoices, chatsHeadline, foundLine, installGate, listKey, previousScreen, projectsToMake, readyEngines, setupWord, runningSetup, signedOutEngines,
   type Engine, type Screen,
   inHomeFolder,
 } from '../first-run';
+import { SetupSplit } from './SetupSplit';
 import './first-run.css';
 
 type Project = { slug: string; name: string };
@@ -56,13 +57,21 @@ const said = (when: number) => {
   return /^\d/.test(a) ? `${a} ago` : a;
 };
 
-export function FirstRunFlow({ snap, home, onDone }: {
+export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false, onLook, onSetup, onProject }: {
   snap: Snapshot | null;
   home: string;
+  /** The look worn now and how to change it, for the setup's look step. */
+  look?: string;
+  skies?: boolean;
+  onLook?: (id: string) => void;
+  /** The project the setup made, so the composer behind it is addressed to it. */
+  onProject?: (slug: string) => void;
+  /** Called as the setup beside the app opens, so the app behind it can show Home. */
+  onSetup?: () => void;
   /** Called once, when the first run hands over to the inbox, with how many chats it brought in. */
   onDone: (brought: number) => void;
 }) {
-  const [screen, setScreen] = useState<Screen>('welcome');
+  const [screen, setScreen] = useState<Screen | 'setup'>('welcome');
   const [leaving, setLeaving] = useState(false);
   const [ready, setReady] = useState<Engine[] | undefined>(undefined);
   const hasReady = !!ready?.length;
@@ -91,6 +100,7 @@ export function FirstRunFlow({ snap, home, onDone }: {
   }, []);
 
   useEffect(() => {
+    if (screen === 'setup') return;
     try { window.zero?.track?.('first_run_step', FIRST_RUN_STEP[screen]); } catch {}
   }, [screen]);
 
@@ -106,8 +116,22 @@ export function FirstRunFlow({ snap, home, onDone }: {
     return () => clearInterval(tick);
   }, [setup]);
 
+  // A setup the app is running that this screen did not see start.
+  useEffect(() => {
+    const look = async () => {
+      const found = runningSetup(await Promise.all([
+        api.engineSetup('status', 'claude').catch(() => null),
+        api.engineSetup('status', 'codex').catch(() => null),
+      ]));
+      if (found) setSetup((had) => (installGate(had).running ? had : found));
+    };
+    void look();
+    window.addEventListener('focus', look);
+    return () => window.removeEventListener('focus', look);
+  }, []);
+
   const chats = useMemo(() => chatChoices(threads ?? [], { home }), [threads, home]);
-  const backTo = previousScreen(screen);
+  const backTo = screen === 'setup' ? null : previousScreen(screen);
 
   // Every chat starts ticked, once the list has arrived.
   const seeded = useRef(false);
@@ -133,7 +157,7 @@ export function FirstRunFlow({ snap, home, onDone }: {
   }, [snap?.products]);
   const nameOf = useCallback((folder: string) => (inHomeFolder(folder) ? workspace?.name : null) ?? ownerOf(folder)?.name ?? naming.get(folder) ?? projectNameFor({ name: folder.split('/').pop() ?? '' }), [ownerOf, naming]);
 
-  const go = useCallback((next: Screen) => {
+  const go = useCallback((next: Screen | 'setup') => {
     setLeaving(true);
     setTimeout(() => { setScreen(next); setCursor(0); setLeaving(false); }, LEAVE_MS);
   }, []);
@@ -144,10 +168,12 @@ export function FirstRunFlow({ snap, home, onDone }: {
 
   const start = useCallback(() => {
     if (!hasReady || !threads) return;
-    if (chats.length) go('chats'); else leave(0);
-  }, [hasReady, threads, chats.length, go, leave]);
+    onSetup?.();
+    go('setup');
+  }, [hasReady, threads, go, onSetup]);
 
   const startSetup = useCallback(async (engine: Engine) => {
+    setSetup({ engine, phase: 'checking', error: null });
     const s = await api.engineSetup('start', engine).catch(() => null);
     setSetup({ engine, phase: s?.phase ?? 'installing', error: s?.error ?? null });
   }, []);
@@ -175,7 +201,7 @@ export function FirstRunFlow({ snap, home, onDone }: {
   // EACH CHAT GOES TO THE PROJECT FOR THE FOLDER IT RAN IN, made here when
   // there is none, so its next reply runs where it always did.
   const bringIn = useCallback(async () => {
-    if (busy || !picked.length) return;
+    if (busy || !picked.length) return 0;
     setBusy(true);
     const by = new Map<string, string[]>();
     for (const t of picked) by.set(bare(t.folder), [...(by.get(bare(t.folder)) ?? []), t.id]);
@@ -185,15 +211,17 @@ export function FirstRunFlow({ snap, home, onDone }: {
       if (!p) continue;
       await api.importThreads({ product: p.slug, threads: ids, land: 'inbox' }).catch(() => null);
       // The first thread goes to where the newest chat ran, not to My Workspace.
-      if (n === 1) try { localStorage.setItem(LAST_PRODUCT_KEY, p.slug); } catch { /* the box asks instead */ }
+      if (n === 1) { try { localStorage.setItem(LAST_PRODUCT_KEY, p.slug); } catch { /* the box asks instead */ } onProject?.(p.slug); }
     }
     setBusy(false);
-    leave(picked.length);
-  }, [busy, picked, projectFor, leave]);
+    return picked.length;
+  }, [busy, picked, projectFor, onProject]);
 
   // THE KEYBOARD, for both screens.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // The setup beside the app hears its own keys.
+      if (screen === 'setup') return;
       e.stopPropagation();
       if (leaving) return;
       if ((e.target as Element | null)?.closest('.ob-back') && (e.key === 'Enter' || e.key === ' ')) return;
@@ -214,7 +242,7 @@ export function FirstRunFlow({ snap, home, onDone }: {
         const id = chats[cursor].id;
         setChatTicks((had) => { const n = new Set(had); if (n.has(id)) n.delete(id); else n.add(id); return n; });
       }
-      if (k === 'next') bringIn();
+      if (k === 'next') void bringIn().then((n) => leave(n));
       if (k === 'skip') leave(0);
     };
     window.addEventListener('keydown', onKey, true);
@@ -222,6 +250,12 @@ export function FirstRunFlow({ snap, home, onDone }: {
   }, [screen, leaving, hasReady, gate.running, gate.again, chats, cursor, start, startSetup, stopSetup, signInAgain, bringIn, leave]);
 
   const cls = `ob-screen${leaving ? ' ob-leaving' : ''}`;
+
+  if (screen === 'setup') {
+    return <SetupSplit snap={snap} chats={chats} ticks={chatTicks} nameOf={nameOf}
+      onToggle={(id) => setChatTicks((had) => { const n = new Set(had); if (n.has(id)) n.delete(id); else n.add(id); return n; })}
+      bringIn={bringIn} projectFor={async (folder) => { const p = await projectFor(folder); if (p) onProject?.(p.slug); return p; }} look={look} skies={skies} onLook={(id) => onLook?.(id)} onDone={onDone} />;
+  }
 
   return (
     <div className="first-run" role="dialog" aria-label="Set up" onKeyDown={(e) => e.stopPropagation()}>
@@ -287,7 +321,7 @@ export function FirstRunFlow({ snap, home, onDone }: {
               ))}
             </div>
             <div className="ob-actions ob-in" style={{ marginTop: 28, animationDelay: '0.4s' }}>
-              <button type="button" className="ob-btn" disabled={busy || !picked.length} onClick={bringIn}>
+              <button type="button" className="ob-btn" disabled={busy || !picked.length} onClick={() => void bringIn().then((n) => leave(n))}>
                 {picked.length === 1 ? 'Bring in 1 chat' : `Bring in ${picked.length} chats`} <Keys ks={SEND} />
               </button>
               <button type="button" className="ob-btn ob-quiet" onClick={() => leave(0)}>Not now <Key k="esc" /></button>

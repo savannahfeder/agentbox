@@ -1,0 +1,225 @@
+// No em dash in any text the app shows.
+//
+// WHY THIS FILE EXISTS RATHER THAN JUST A ONE-TIME SWEEP. The sweep was true
+// about the tree it ran on. The onboarding work was being written on another
+// branch at the same time, and when it was folded in the next day it carried
+// THREE fresh em dashes into strings a user can read: the
+// practice-project refusal, the "the app could not check" line in Settings, and
+// the Shortcuts lede. Nothing failed. They were found by hand, and the next
+// round of parallel work would have put more back the same way.
+//
+// WHY A GREP CANNOT DO THIS. There are about five hundred em dashes in the
+// tree and almost every one is prose inside a `/* */` block, because this
+// codebase argues with itself in its comments. A grep for the character is
+// five hundred hits and zero signal. So this walks the source with a small
+// state machine and only ever looks at two places: inside a string literal,
+// and in the plain text between JSX tags. Comments are skipped, which is the
+// whole point, and they stay free to use the character as much as they like.
+//
+// 2026-10-31: the search fold table moved from renderer/src/search.ts to
+// shared/word-match.mts, and shared/thread-title.mts cuts a title at a dash,
+// so both are named in ALLOWED as strippers.
+
+import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+const EM_DASH = '—';
+
+// The surfaces that can reach her eye. Tests and scripts are excluded on
+// purpose: a script writes to a terminal, and a test's own prose is a comment
+// by another name. `fixtures.ts` IS included, because she never runs on
+// fixtures but every screenshot an agent sends her is drawn from them.
+const ROOTS = ['renderer/src', 'main', 'shared'];
+const EXTS = new Set(['.ts', '.tsx', '.mjs', '.mts', '.js']);
+
+// THE ONES THAT STAY, EACH A DECISION AND NOT AN OVERSIGHT. Matched on the
+// fragment rather than a line number, so the allowance cannot drift onto some
+// other line as the file moves underneath it.
+const ALLOWED = [
+  {
+    file: 'renderer/src/rail-metrics.ts',
+    fragment: "value: '—'",
+    why: 'A mark standing in for a figure that was never measured, so an absence '
+      + 'cannot be misread as a zero. Not punctuation in a sentence.',
+  },
+  {
+    file: 'shared/claude-commands.generated.mts',
+    fragment: 'Set a goal',
+    why: "Claude Code's own words, read out of the installed binary by the build "
+      + '(w-23a7b3f568). Editing it here is undone by the next build and makes '
+      + 'the record stop matching the binary. Stripped at the render boundary '
+      + 'instead, by commandHint in shared/claude-commands.mts.',
+  },
+  {
+    file: 'main/main.mts',
+    fragment: 'recovery',
+    why: 'A console.log to the terminal. She never sees it.',
+  },
+  // THE STRIPPERS. Every one is a regex literal rather than anything anybody
+  // reads, and every one exists to TAKE the character out. A guard that made
+  // them give up their dash would be a guard that switched the strippers off.
+  {
+    file: 'shared/claude-commands.mts',
+    fragment: 'menuDescription',
+    why: 'commandHint, which is what takes the dash out of the slash menu as it '
+      + 'draws each line. The dash in it is the thing being removed.',
+  },
+  {
+    file: 'shared/dashboard.mts',
+    fragment: '.replace(',
+    why: 'The same removal on the dashboard side. The dash in it is the pattern, '
+      + 'not a word.',
+  },
+  {
+    file: 'shared/teammates.mts',
+    fragment: 'const rest = words.slice',
+    why: "partFor, which trims the punctuation between a teammate's @name and "
+      + 'what was asked of it, so the run title starts on the words. '
+      + 'A dash is one of the marks it removes.',
+  },
+  {
+    file: 'shared/word-match.mts',
+    fragment: "'—': '-'",
+    why: "The fold table, so a search for a hyphen still finds a row somebody "
+      + 'else typed with a dash in it. Removing this would make search worse, '
+      + 'not cleaner.',
+  },
+  {
+    file: 'shared/word-match.mts',
+    fragment: 'toLowerCase',
+    why: 'The character class the fold table is applied through. Same reason.',
+  },
+  {
+    file: 'shared/thread-title.mts',
+    fragment: 't = t.split(',
+    why: 'shortTitle, which ends a fallback title at the first clause; a dash '
+      + 'between words is one of the marks a clause ends on, and is cut off.',
+  },
+  {
+    file: 'shared/cloud-keys.mts',
+    fragment: 'const ASK_LINE',
+    why: "The line a cloud run asks for a key on. The dash is in the class of "
+      + "marks allowed between the key's name and what it is for, so that an "
+      + 'agent that wrote one does not end up with it inside the field label.',
+  },
+  {
+    file: 'shared/cloud-needs.mts',
+    fragment: 'const tidy',
+    why: 'tidy, which takes the punctuation off the front of what a need says '
+      + 'it is for. A dash is one of the marks it removes.',
+  },
+  {
+    file: 'renderer/src/format.ts',
+    fragment: 'AGENTBOX-NEEDS-A-KEY',
+    why: 'flatten, which rewrites that marked line as the words it asks for. '
+      + 'Same class of marks as the pattern in shared/cloud-keys.mts, matched '
+      + 'here so the dash never reaches the row.',
+  },
+];
+
+function files(dir) {
+  const out = [];
+  for (const entry of fs.readdirSync(path.join(root, dir), { withFileTypes: true })) {
+    const rel = `${dir}/${entry.name}`;
+    if (entry.isDirectory()) {
+      if (entry.name === 'node_modules' || entry.name === 'dist') continue;
+      out.push(...files(rel));
+    } else if (EXTS.has(path.extname(entry.name))) {
+      out.push(rel);
+    }
+  }
+  return out;
+}
+
+/**
+ * Every em dash in `src` that is NOT inside a comment, with the line it sits on.
+ *
+ * IT HAS EXACTLY ONE JOB: TELL A COMMENT FROM EVERYTHING ELSE. It does not try
+ * to know a string from JSX text from a regex, because it does not need to.
+ * Anything outside a comment is either something the app says or one of the
+ * three regexes named in ALLOWED, and that is a small enough set to read.
+ *
+ * The first cut of this file DID try to track string state, and it was wrong
+ * within an hour. A template literal in `shared/agents.mts:564` interpolates a
+ * `join(', ')` inside `${}`, the tracker went out of step on the quotes inside
+ * the braces, and eleven COMMENT lines further down that file were reported as
+ * text she could see. Doing less is what makes this trustworthy.
+ *
+ * The one thing it can be fooled by is `//` inside a string, which is why a
+ * slash pair preceded by a colon does not open a comment: `https://` is the
+ * only form of it that actually occurs here. The cost of being fooled is a
+ * missed dash, never a false alarm.
+ */
+function saidOutLoud(src) {
+  const hits = [];
+  let line = 1;
+  let state = 'code'; // code | line-comment | block-comment
+  for (let i = 0; i < src.length; i += 1) {
+    const c = src[i];
+    const next = src[i + 1];
+    if (c === '\n') line += 1;
+
+    if (state === 'line-comment') {
+      if (c === '\n') state = 'code';
+      continue;
+    }
+    if (state === 'block-comment') {
+      if (c === '*' && next === '/') { state = 'code'; i += 1; }
+      continue;
+    }
+    if (c === '/' && next === '/' && src[i - 1] !== ':') { state = 'line-comment'; i += 1; continue; }
+    if (c === '/' && next === '*') { state = 'block-comment'; i += 1; continue; }
+    if (c === EM_DASH) hits.push(line);
+  }
+  return hits;
+}
+
+function offenders() {
+  const found = [];
+  for (const dir of ROOTS) {
+    for (const file of files(dir)) {
+      const src = fs.readFileSync(path.join(root, file), 'utf8');
+      if (!src.includes(EM_DASH)) continue;
+      const lines = src.split('\n');
+      for (const n of saidOutLoud(src)) {
+        const text = lines[n - 1];
+        const allowed = ALLOWED.some((a) => a.file === file && text.includes(a.fragment));
+        if (!allowed) found.push(`${file}:${n}  ${text.trim()}`);
+      }
+    }
+  }
+  return found;
+}
+
+describe('no em dash in anything the app says', () => {
+  it('finds none in any string or any line of JSX text', () => {
+    expect(offenders()).toEqual([]);
+  });
+
+  it('still catches one when it is put back', () => {
+    // The guard is only worth having if it fails. This is the Shortcuts lede as
+    // it actually arrived on 08-29, which the suite let through.
+    const putBack = `<p className="set-lede">You never need any of them ${EM_DASH} everything here can be clicked.</p>`;
+    expect(saidOutLoud(putBack)).toEqual([1]);
+    const inAString = `const say = 'Schedule canceled ${EM_DASH} back in the inbox';`;
+    expect(saidOutLoud(inAString)).toEqual([1]);
+  });
+
+  it('leaves the comments alone, which is why it is usable', () => {
+    // Roughly five hundred of these exist and every one of them is fine.
+    const prose = `// she picked it ${EM_DASH} on 2026-08-21\n/* and again ${EM_DASH} later */`;
+    expect(saidOutLoud(prose)).toEqual([]);
+  });
+
+  it('names a reason for each one it allows', () => {
+    for (const a of ALLOWED) {
+      expect(fs.existsSync(path.join(root, a.file))).toBe(true);
+      expect(fs.readFileSync(path.join(root, a.file), 'utf8')).toContain(a.fragment);
+      expect(a.why.length).toBeGreaterThan(40);
+    }
+  });
+});

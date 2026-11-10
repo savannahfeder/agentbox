@@ -68,7 +68,7 @@ import type { Product } from '../types';
 import { CloudMark, MacMark } from '../threads/ThreadMenu';
 import './settings.css';
 import { SkyTile } from '../home/SkyPicker';
-import { HOME_KEY, setHomeSetting, useHomeSettings } from '../home/home-settings';
+import { useHomeSettings } from '../home/home-settings';
 import { SKY_THEMES } from '../home/sky';
 
 /* * TEAM IS A PANE HERE (w-8415594d19, 2026-10-01). The pane's CONTENT is
@@ -1112,7 +1112,7 @@ const PERMISSION_OPTIONS: Array<{ value: PermissionMode; label: string }> = MODE
   (value) => ({ value, label: MODE_WORDS[value] }),
 );
 
-// CODEX'S THREE, in the order shared/codex-modes.mjs keeps them, which is
+// CODEX'S THREE, in the order shared/codex-modes.mts keeps them, which is
 // least to most an agent may do. That file is the only place the list lives.
 const CODEX_MODE_OPTIONS: Array<{ value: CodexModeId; label: string }> = CODEX_MODE_ORDER.map(
   (value) => ({ value, label: CODEX_MODES[value].label }),
@@ -1702,7 +1702,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
   // and then a background is two decisions for one choice.
   look: Look;
   onSetLook: (l: Look) => void;
-  /** A sky theme (Alpha features, Home): its look and its sky together. */
+  /** A sky theme: its look and its sky together. */
   onSkyTheme?: (id: string) => void;
   // The dials on whichever picture is on. They only ever show under a picture,
   // so there is no disabled control on this screen for her to wonder about.
@@ -1761,7 +1761,9 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
   onClose: () => void;
 }) {
   const homeSet = useHomeSettings();
-  const skyOn = homeSet.on ? homeSet.skyTheme : null;
+  // A phone has no skies (App.tsx's `homeOn`).
+  const skies = !onPhone();
+  const skyOn = skies ? homeSet.skyTheme : null;
   const sidebarShrinks = useSidebarShrinks();
   const [model, setModel] = useState<SettingsModel | null>(null);
   // ?settings=claude, or ?settings=project:kestrel. Anything else (including the
@@ -2279,9 +2281,6 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
               <Row label="Multiplayer" desc="Share projects with your team and see their threads beside yours. Needs a sign-in.">
                 <Switch label="Multiplayer" on={!!w.alpha?.multiplayer} onChange={(v) => setWorkspace('alphaMultiplayer', v)} />
               </Row>
-              <Row label="Home" desc="A page to start from: what needs you, a box to start a thread, and your team's week. The Inbox gets a sky below its list. Pick the sky in Appearance.">
-                <Switch label="Home" on={homeSet.on} onChange={(v) => setHomeSetting(HOME_KEY, v)} />
-              </Row>
             </Group>
           </Page>
         )}
@@ -2375,7 +2374,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
                   THE NUMBER SHOWN IS THE MACHINE'S, NOT THE ACCOUNT'S. The
                   stepper was per account while the sentence beside it talked
                   about the total, so this Mac showed 3 and said 6. Automatic
-                  answers for the Mac and main/machine.mjs shares it out; the
+                  answers for the Mac and main/machine.mts shares it out; the
                   per-account number is arithmetic nobody is asked to do.
 
                   THE CLAUDE PLAN HAS NO SAY (w-54c640f8da): its limit is a
@@ -2546,7 +2545,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
                     <span className="look-name">{l.name}</span>
                   </button>
                 ))}
-                {homeSet.on && SKY_THEMES.map((k) => <SkyTile key={k.id} sky={k} on={skyOn === k.id} onPick={() => onSkyTheme?.(k.id)} />)}
+                {skies && SKY_THEMES.map((k) => <SkyTile key={k.id} sky={k} on={skyOn === k.id} onPick={() => onSkyTheme?.(k.id)} />)}
               </div>
             </Group>
             {/* THE DIALS, and only under a picture. Both move the window she is
@@ -2595,7 +2594,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
             CONTROL: it is the one page you read rather than set. What is here
             is what a person actually presses, grouped by the moment they would
             want it; ../shortcuts.ts holds the list. Every key on it works today
-            (`tests/the-shortcuts-page-lists-keys-that-work.test.mjs`). */}
+            (`tests/the-shortcuts-page-lists-keys-that-work.test.mts`). */}
         {pane === 'phone' && <PhonePage onFeedback={onFeedback} onSignIn={onPhoneSignIn} web={phoneWeb}
           onPhoneProjects={webComputer ? <WebPhoneProjects web={webComputer} onWorkspace={setWorkspace} /> : undefined} macShut={phoneCloud ? { ...phoneCloud, all: model?.workspace?.phoneAll !== false, projects: projects.filter((p) => p.slug !== 'practice'), onChoose: (all, except) => setWorkspace('phoneProjects', { all, except }) } : undefined} />}
         {pane === 'shortcuts' && (
@@ -2878,7 +2877,7 @@ function WebComputerPane({ pane, web, onWorkspace, onProject, onOpenProject }: {
             desc={`Tests and builds take turns, urgent first, and new agents wait to start until memory frees up.${two ? ' Claude Code and Codex both.' : ''}`}>
             <Switch label="Hold heavy work when memory is short" on={!!gate.value} onChange={(v) => onWorkspace('memoryGate', v)} />
           </ReadRow>
-          {gate.value && !isAuto && (
+          {(gate.value as boolean) && !isAuto && (
             <ReadRow label="Heavy commands at once" reading={slots}
               desc={slots.value === null ? `Auto: ${w.memoryGate.slotsAuto} on this computer, one for every 8 GB of memory.` : `You picked ${slots.value}. Auto is ${w.memoryGate.slotsAuto} on this computer.`}>
               <Stepper label="Heavy commands at once" value={(slots.value as number | null) ?? w.memoryGate.slotsAuto} min={1} max={w.memoryGate.slotsMax ?? 8}

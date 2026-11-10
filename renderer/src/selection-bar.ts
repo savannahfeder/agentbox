@@ -1,4 +1,4 @@
-import { MAX_QUOTE_CHARS } from '../../shared/artifact-marks.mjs';
+import { MAX_QUOTE_CHARS } from '../../shared/artifact-marks.mts';
 
 export { MAX_QUOTE_CHARS };
 

@@ -1,4 +1,5 @@
-import { noteGoesTo } from '../../shared/artifact-marks.mjs';
+import { noteGoesTo } from '../../shared/artifact-marks.mts';
+import { docKind, isPlainText } from './doc-pane';
 import type { FileNote } from './types';
 
 /** Stored when someone closes the notes sidebar; every window reads the same key. */
@@ -17,8 +18,12 @@ export function rememberNotesSidebar(storage: Storage, open: boolean): void {
   } catch { /* no storage: it opens next time */ }
 }
 
-/** A thread's markdown document is the one kind the sidebar sits beside. */
-export const takesNotesSidebar = (src: string | null | undefined) => /\.(md|markdown)$/i.test(String(src ?? '').split(/[?#]/)[0]);
+/** A thread's file the pane draws as words, a table or a page. Pictures, PDFs and films have the big viewer's pins instead; a website and a change are not the thread's files. */
+export function takesNotesSidebar(src: string | null | undefined): boolean {
+  if (!src) return false;
+  const kind = docKind(src);
+  return kind === 'markdown' || kind === 'html' || (kind === null && isPlainText(src));
+}
 
 /** The open notes on one document, split into those Send would tell the agent and the rest. */
 export function sidebarNotes(notes: readonly FileNote[], fileIds: readonly string[], people: ReadonlyArray<{ id: string; name?: string | null }> = []) {

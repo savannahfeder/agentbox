@@ -1,4 +1,4 @@
-// Alerts on the lock screen. Your computer sends them (main/phone-alerts.mjs)
+// Alerts on the lock screen. Your computer sends them (main/phone-alerts.mts)
 // to the token this phone leaves online (lib/push-device.ts); a test alert
 // is sent from the phone itself, which proves the road from Expo's push
 // service to the lock screen.

@@ -21,13 +21,15 @@
     "store": {
       "extends": "production",
       "env": {
-        "EXPO_PUBLIC_STORE_BUILD": "1"
+        "EXPO_PUBLIC_STORE_BUILD": "1",
+        "EXPO_PUBLIC_PHONE_SITE": "https://app.agentbox.ac"
       }
     },
     "store-launch-test": {
       "extends": "launch-test",
       "env": {
-        "EXPO_PUBLIC_STORE_BUILD": "1"
+        "EXPO_PUBLIC_STORE_BUILD": "1",
+        "EXPO_PUBLIC_PHONE_SITE": "https://app.agentbox.ac"
       }
     },
     "launch-test": {

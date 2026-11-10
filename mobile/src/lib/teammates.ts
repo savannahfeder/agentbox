@@ -1,11 +1,11 @@
 // Your AI teammates on the phone: the copy the computer sends with its settings
-// (shared/phone-snapshot.mjs `phoneTeammatesOf`), read by the desktop's own
+// (shared/phone-snapshot.mts `phoneTeammatesOf`), read by the desktop's own
 // rules (renderer/src/teammates/chat-lines.ts), with your messages shown the
 // moment you send them.
 import {
   answerOf, asksYou, chatWith, clockOf, dayOf, heldFor, heldTitle, idleLine, matesInOrder, nameOf, SAVED_VERBS, type ChatEntry,
 } from '../../../renderer/src/teammates/chat-lines';
-import { MAX_HOPS, teammateIdOf } from '../../../shared/teammates.mjs';
+import { MAX_HOPS, teammateIdOf } from '../../../shared/teammates.mts';
 import { phoneSlug, type PhoneRows } from '../../../renderer/src/phone-rows';
 import type { Teammate, TeamChatLine, TeamRunLine, TeammatesView } from '../../../renderer/src/types';
 
@@ -20,25 +20,35 @@ export interface PhoneTeam {
 
 const blank = { role: null, job: null, goal: null, counted: null, asksFirst: null, works: null, worksLabel: null, engine: null, model: null, effort: null, limit: 0, paused: false, status: 'active', memory: [], createdAt: 0, waiting: [], now: null, running: null, queued: 0, done: [], runsThisWeek: 0 };
 
+/** As much of a computer's settings copy as its teammates ride in (shared/phone-snapshot.mts `phoneTeammatesOf`). */
+interface TeamSettings {
+  workspace?: { alpha?: { teammates?: boolean } };
+  teammates?: { list?: Partial<Teammate>[]; chat?: TeamChatLine[]; runs?: TeamRunLine[]; trouble?: string };
+}
+
 /** The computer with teammates on that was heard from last, and its teammates; null when none has them on. */
-export function teamFrom(rows: readonly { device: string; updated_at?: string; settings?: any }[]): PhoneTeam | null {
+export function teamFrom(rows: readonly { device: string; updated_at?: string; settings?: TeamSettings | null }[]): PhoneTeam | null {
   const at = (r: { updated_at?: string }) => Date.parse(r.updated_at ?? '') || 0;
   const on = rows
     .filter((r) => r.settings?.workspace?.alpha?.teammates && Array.isArray(r.settings?.teammates?.list))
     .sort((a, b) => at(b) - at(a))[0];
   if (!on) return null;
-  const t = on.settings.teammates;
+  const t = on.settings!.teammates!;
   return {
     device: on.device,
     copyAt: at(on),
     view: {
-      list: t.list.map((m: any) => ({ ...blank, ...m, letter: m.letter || String(m.name ?? '?').slice(0, 1) })),
+      list: t.list!.map((m: Partial<Teammate>) => ({ ...blank, ...m, letter: m.letter || String(m.name ?? '?').slice(0, 1) }) as Teammate),
       chat: Array.isArray(t.chat) ? t.chat : [],
       runs: Array.isArray(t.runs) ? t.runs : [],
       ...(t.trouble ? { trouble: t.trouble } : {}),
     },
   };
 }
+
+/** A teammate setting's value: a message (`post`) or a pause, as Teammates.tsx sends them. */
+interface TeammateSetting { to?: string[]; text?: string; answers?: Record<string, string>; id?: string; paused?: boolean }
+type TeammateCommand = PhoneRows['commands'][number] & { payload: { value?: TeammateSetting } };
 
 /** A command the computer's copy may not reflect yet: not taken, or taken after the copy was made, and not refused. */
 const notInCopy = (c: PhoneRows['commands'][number], copyAt: number) =>
@@ -55,7 +65,7 @@ export function withPhoneAnswers(team: PhoneTeam | null, commands: PhoneRows['co
     .map((c) => `${c.project}/${c.item}`));
   // A message to one that the copy does not have yet: it has not got your words.
   const told = new Set(commands
-    .filter((c) => c.kind === 'setting' && c.device === team.device && c.payload?.scope === 'teammate' && c.payload.key === 'post' && notInCopy(c, team.copyAt))
+    .filter((c): c is TeammateCommand => c.kind === 'setting' && c.device === team.device && c.payload?.scope === 'teammate' && c.payload.key === 'post' && notInCopy(c, team.copyAt))
     .flatMap((c) => (Array.isArray(c.payload.value?.to) ? c.payload.value.to : [])));
   if (!settled.size && !told.size) return team;
   const WAITS = 'Waiting for your computer';
@@ -135,7 +145,7 @@ export function onTheirWay(commands: PhoneRows['commands'], team: PhoneTeam | nu
   if (!team) return [];
   const out: Pending[] = [];
   for (const c of commands) {
-    const p = c.payload;
+    const p = c.payload as TeammateCommand['payload'];
     if (c.kind !== 'setting' || c.device !== team.device || p?.scope !== 'teammate' || p.key !== 'post') continue;
     const takenAt = c.taken_at ? Date.parse(c.taken_at) || 0 : null;
     const refused = c.outcome?.startsWith('refused') ? c.outcome.replace(/^refused:\s*/, '') : null;
@@ -150,10 +160,10 @@ export function onTheirWay(commands: PhoneRows['commands'], team: PhoneTeam | nu
 export function pauseOnItsWay(commands: PhoneRows['commands'], team: PhoneTeam | null, id: string): boolean | null {
   if (!team) return null;
   const asked = commands
-    .filter((c) => c.kind === 'setting' && c.device === team.device && notInCopy(c, team.copyAt) && c.payload?.scope === 'teammate' && c.payload.key === 'pause' && c.payload.value?.id === id)
+    .filter((c): c is TeammateCommand => c.kind === 'setting' && c.device === team.device && notInCopy(c, team.copyAt) && c.payload?.scope === 'teammate' && c.payload.key === 'pause' && (c.payload.value as TeammateSetting | undefined)?.id === id)
     .sort((a, b) => (Date.parse(a.created_at) || 0) - (Date.parse(b.created_at) || 0))
     .at(-1);
-  return asked ? asked.payload.value.paused === true : null;
+  return asked ? asked.payload.value!.paused === true : null;
 }
 
 /** Each teammate asking you something, with its newest open question, for the head of Needs you. */
@@ -170,6 +180,20 @@ export function openQuestions(view: TeammatesView, id: string, pending: readonly
   const answered = new Set(pending.filter((p) => !p.refused).flatMap((p) => Object.keys(p.answers ?? {})));
   const said = pending.some((p) => !p.refused && !p.answers && p.to.includes(id));
   return chatWith(view, id).filter((e): e is TeamChatLine => e.kind === 'msg' && e.from === id && !!e.options?.length && !answerOf(view, e) && !answered.has(e.id) && !said);
+}
+
+/** The teammate's thread a question was asked in, when the phone has it. */
+export function questionThread(q: Pick<TeamChatLine, 'from' | 'run'>, items: readonly { id: string; product: string; labels?: string[] }[]): { product: string; id: string } | null {
+  if (!q.run) return null;
+  const item = items.find((i) => i.id === q.run && teammateIdOf(i) === q.from);
+  return item ? { product: item.product, id: item.id } : null;
+}
+
+/** A teammate's open questions asked in this thread (chat-lines.ts `openQuestionsIn`). */
+export function questionsInThread(view: TeammatesView | null | undefined, item: { id: string; labels?: string[] }, pending: readonly Pending[] = []): TeamChatLine[] {
+  const tid = teammateIdOf(item);
+  if (!view || !tid) return [];
+  return openQuestions(view, tid, pending).filter((q) => q.run === item.id);
 }
 
 export type ChatRow =

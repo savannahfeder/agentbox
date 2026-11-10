@@ -4,10 +4,10 @@
 import { approvalReads } from '../../../renderer/src/approval-card';
 import { approvalStage, type Answered } from '../../../renderer/src/approval-stage';
 import { toastOpens, type ToastGoes } from '../../../renderer/src/toast-parts';
-import { PHONE_UNDO_MS } from '../../../shared/phone-undo.mjs';
+import { PHONE_UNDO_MS } from '../../../shared/phone-undo.mts';
 
 // App.tsx's TOAST_GOES_MS, its plain toast's 2500, and APPROVAL_EXIT_MS. The
-// toast's Undo lasts as long as her Mac waits for it, less a margin (shared/phone-undo.mjs).
+// toast's Undo lasts as long as her Mac waits for it, less a margin (shared/phone-undo.mts).
 export const TOAST_GOES_MS = PHONE_UNDO_MS;
 const TOAST_PLAIN_MS = 2500;
 export const APPROVAL_EXIT_MS = 420;
@@ -30,6 +30,25 @@ const OVER_THE_FOOT = 20;
  * pick of three placements (w-e08ebeb562, 2026-10-29): "toast-1 bottom bar".
  */
 export const toastLift = (onThread: boolean) => (onThread ? OVER_THE_REPLY_BOX : OVER_THE_FOOT);
+
+/** The inbox's round New thread button: its gap from the right edge, its size, and its lift over the foot. */
+export const PEN = { right: 20, size: 56, lift: 16 };
+const TOAST_HIGH = 40;
+const TOAST_SIDE = 12;
+const PEN_GAP = 12;
+/** The inbox is the one screen with the pen. */
+export const penOnScreen = (segments: readonly string[]) => segments.length === 0 || segments[0] === 'index';
+
+/**
+ * Where the toast sits, from the foot's room. On the inbox it stops short of
+ * the pen and sits level with it, so the next thread is one tap away.
+ */
+export function toastPlace(screen: 'thread' | 'inbox' | 'other', foot: number, card = 0) {
+  // A permission card over the foot keeps its Allow and Deny clear; the pen is up in the bar then.
+  if (card > 0) return { bottom: card + PEN_GAP, right: TOAST_SIDE };
+  if (screen === 'inbox') return { bottom: foot + PEN.lift + (PEN.size - TOAST_HIGH) / 2, right: PEN.right + PEN.size + PEN_GAP };
+  return { bottom: foot + toastLift(screen === 'thread'), right: TOAST_SIDE };
+}
 export const toastTapOpens = (toast: { goes?: ToastGoes }, here: Here) => toastOpens(toast, here);
 
 /** The thread the screen shows, read from the route. */
@@ -57,7 +76,8 @@ export function approvalCard(a: Approval, waiting: number, products: { slug: str
       ...(!mcp && input?.host ? [`opens the network to ${String(input.host)}`] : []),
       ...(!mcp && input?.grantRoot ? [`and asks to write anywhere under ${String(input.grantRoot)} for the rest of this run`] : []),
     ],
-    where: [said ? reads.what : null, cwd ? `in ${cwd}` : null].filter(Boolean).join(' '),
+    // With a description in the lede, the project would otherwise go unnamed.
+    where: [said ? reads.what : null, cwd ? `in ${cwd}` : said ? `in ${project}` : null].filter(Boolean).join(' '),
     task: row ? { title: String(row.title ?? ''), product: a.product, id: a.item } : null,
   };
 }

@@ -1,5 +1,5 @@
 // GROUPS FROM A PHONE, straight to the account with no computer between: the
-// reads and writes main/team/rooms-supabase.mjs makes, over the phones' plain
+// reads and writes main/team/rooms-supabase.mts makes, over the phones' plain
 // REST client (cloud-rest.ts). Row level security decides who sees and posts
 // what (20261021000000_rooms.sql and the room migrations after it), so these
 // only ask. A phone runs no agents, so it never publishes presence or hours,
@@ -7,7 +7,7 @@
 //
 // Both phone apps use it: the web app answers the desktop's `rooms` door with
 // it (cloud-bridge.ts), and the iPhone app draws its Groups tab from it.
-import type { cloudClient } from './cloud-rest';
+import type { cloudClient, CloudRow } from './cloud-rest';
 import type { Room, RoomCard, RoomMention, RoomMessage, RoomProfile, RoomsState } from './types';
 import { computerOf, type SettingsRow } from './phone-settings-view';
 import { displayNameOf, wallCards as wallCardsJs } from '../../shared/room-cards.mts';
@@ -17,7 +17,7 @@ const wallCards = wallCardsJs as unknown as (o: Record<string, unknown>) => Room
 
 export type GroupsRest = Pick<ReturnType<typeof cloudClient>, 'session' | 'select' | 'insert' | 'rpc'>;
 
-// The columns main/team/rooms-shape.mjs reads; the phone bundles cannot reach main/.
+// The columns main/team/rooms-shape.mts reads; the phone bundles cannot reach main/.
 const PROFILE_FIELDS = ['display_name', 'avatar_url', 'headline', 'bio', 'show_working', 'show_agents', 'show_level', 'show_status', 'show_activity', 'invisible_until', 'status_text', 'status_until'];
 const PRESENCE_FIELDS = ['gone', 'agents_running', 'working_on', 'working_private', 'working_at', 'hours_total', 'hours_week', 'week_start', 'hours_today', 'day', 'streak_days', 'active_days', 'hours_by_month', 'activity'];
 export const GROUP_COLS = {
@@ -46,12 +46,19 @@ function meOf(c: GroupsRest): string {
 
 export interface Group { id: string; name: string; kind: 'room' | 'group'; teamId: string | null; listed: boolean; inviteOnly: boolean; role: 'owner' | 'member'; members: number; createdAt: number }
 
-const groupOut = (r: any): Group => ({
+// The rows as the database answers them (20261021000000_rooms.sql and after).
+interface GroupRow { id: string; name: string; kind: Group['kind']; team_id?: string | null; listed?: boolean; invite_only?: boolean; role: Group['role']; members?: number; created_at: string }
+interface MessageRow { id: string; room_id: string; by_person?: string | null; body: string; in_reply_to?: string | null; mentions?: string[] | null; created_at: string; edited_at?: string | null; deleted_at?: string | null }
+type RoomPeopleRow = string | { room_people?: string; person_id?: string } | null;
+interface NameRow { person_id: string; name?: string | null; avatar_url?: string | null; has_card?: boolean }
+interface ThreadCardRow { person_id: string; title?: string | null; state: string; visible?: boolean | null; updated_at: string }
+
+const groupOut = (r: GroupRow): Group => ({
   id: r.id, name: r.name, kind: r.kind, teamId: r.team_id ?? null, listed: !!r.listed, inviteOnly: !!r.invite_only,
   role: r.role, members: Number(r.members) || 0, createdAt: Date.parse(r.created_at) || 0,
 });
 
-const messageOut = (r: any): RoomMessage => ({
+const messageOut = (r: MessageRow): RoomMessage => ({
   id: r.id, roomId: r.room_id, by: r.by_person ?? null, body: r.deleted_at ? '' : r.body, inReplyTo: r.in_reply_to ?? null,
   mentions: r.deleted_at ? [] : r.mentions ?? [], at: Date.parse(r.created_at),
   editedAt: r.edited_at ? Date.parse(r.edited_at) : null, deleted: !!r.deleted_at,
@@ -59,16 +66,16 @@ const messageOut = (r: any): RoomMessage => ({
 
 export async function myGroups(c: GroupsRest): Promise<Group[]> {
   meOf(c);
-  return ((await c.rpc('my_rooms', {})) ?? []).map(groupOut);
+  return ((await c.rpc('my_rooms', {}) as GroupRow[] | null) ?? []).map(groupOut);
 }
 
 /** Messages on the columns this cloud has; an old cloud is read without edits and deletes. */
 async function readMessages(c: GroupsRest, query: string): Promise<RoomMessage[]> {
   try {
-    return (await c.select('room_messages', `select=${GROUP_COLS.message}&${query}`)).map(messageOut);
+    return (await c.select('room_messages', `select=${GROUP_COLS.message}&${query}`) as MessageRow[]).map(messageOut);
   } catch (err) {
     if (!notThere(err)) throw err;
-    return (await c.select('room_messages', `select=${GROUP_COLS.oldMessage}&${query.replace('&deleted_at=is.null', '')}`)).map(messageOut);
+    return (await c.select('room_messages', `select=${GROUP_COLS.oldMessage}&${query.replace('&deleted_at=is.null', '')}`) as MessageRow[]).map(messageOut);
   }
 }
 
@@ -90,7 +97,7 @@ export async function sendToGroup(c: GroupsRest, roomId: string, { body, inReply
   const words = String(body ?? '').trim();
   if (!words) throw new Error('Write something first.');
   const row = await c.insert('room_messages', { room_id: roomId, by_person: me, body: words, in_reply_to: inReplyTo, mentions });
-  return messageOut(row);
+  return messageOut(row as MessageRow);
 }
 
 /** The cloud keeps the later of this and what any other device said. */
@@ -101,14 +108,14 @@ export async function markGroupRead(c: GroupsRest, roomId: string, at: number) {
 
 export async function groupReads(c: GroupsRest): Promise<Map<string, number>> {
   const me = meOf(c);
-  const rows = await c.select('room_reads', `select=room_id,read_at&person_id=eq.${encodeURIComponent(me)}`);
-  return new Map(rows.map((r: any) => [r.room_id, Date.parse(r.read_at) || 0]));
+  const rows = await c.select('room_reads', `select=room_id,read_at&person_id=eq.${encodeURIComponent(me)}`) as { room_id: string; read_at: string }[];
+  return new Map(rows.map((r) => [r.room_id, Date.parse(r.read_at) || 0]));
 }
 
 /** A file a message links, as base64, or null. */
 export async function groupFile(c: GroupsRest, roomId: string, name: string): Promise<string | null> {
   meOf(c);
-  const rows = await c.select('room_files', `select=data&room_id=eq.${encodeURIComponent(roomId)}&name=eq.${encodeURIComponent(name)}&limit=1`);
+  const rows = await c.select('room_files', `select=data&room_id=eq.${encodeURIComponent(roomId)}&name=eq.${encodeURIComponent(name)}&limit=1`) as { data?: string | null }[];
   return rows[0]?.data ?? null;
 }
 
@@ -116,8 +123,8 @@ type Named = { person_id: string; name: string; avatar_url: string | null; has_c
 export interface GroupPeople {
   people: Map<string, string[]>;
   names: Map<string, Named[] | null>;
-  profiles: any[];
-  presence: any[];
+  profiles: RoomProfile[];
+  presence: CloudRow[];
   teammates: string[];
   teamCards: { personId: string; title: string | null; state: string; visible: boolean; updatedAt: number }[];
   me: RoomProfile | null;
@@ -134,11 +141,11 @@ export async function groupPeople(c: GroupsRest, roomIds: readonly string[]): Pr
   const names = new Map<string, Named[] | null>();
   await Promise.all(roomIds.map(async (r) => {
     const [who, called] = await Promise.all([
-      c.rpc('room_people', { r }),
-      c.rpc('room_names', { r }).catch((err) => { if (notThere(err)) return null; throw err; }),
+      c.rpc('room_people', { r }) as Promise<RoomPeopleRow[] | null>,
+      (c.rpc('room_names', { r }) as Promise<NameRow[] | null>).catch((err) => { if (notThere(err)) return null; throw err; }),
     ]);
-    people.set(r, (who ?? []).map((x: any) => (typeof x === 'string' ? x : x?.room_people ?? x?.person_id)).filter(Boolean));
-    names.set(r, called ? called.map((n: any) => ({ person_id: n.person_id, name: n.name ?? '', avatar_url: n.avatar_url ?? null, has_card: !!n.has_card })) : null);
+    people.set(r, (who ?? []).map((x) => (typeof x === 'string' ? x : x?.room_people ?? x?.person_id)).filter(Boolean) as string[]);
+    names.set(r, called ? called.map((n) => ({ person_id: n.person_id, name: n.name ?? '', avatar_url: n.avatar_url ?? null, has_card: !!n.has_card })) : null);
   }));
   const everyone = [...new Set([me, ...[...people.values()].flat()])];
   const presence = async () => {
@@ -148,16 +155,16 @@ export async function groupPeople(c: GroupsRest, roomIds: readonly string[]): Pr
     }
   };
   const [profiles, present, mates, cards] = await Promise.all([
-    c.select('room_profiles', `select=${GROUP_COLS.profile}&person_id=${inList(everyone)}`),
+    c.select('room_profiles', `select=${GROUP_COLS.profile}&person_id=${inList(everyone)}`) as Promise<RoomProfile[]>,
     presence(),
-    c.select('team_members', 'select=person_id').catch(() => []),
-    c.select('thread_cards', 'select=person_id,title,state,visible,updated_at&state=eq.running').catch(() => []),
+    (c.select('team_members', 'select=person_id') as Promise<{ person_id: string }[]>).catch(() => []),
+    (c.select('thread_cards', 'select=person_id,title,state,visible,updated_at&state=eq.running') as Promise<ThreadCardRow[]>).catch(() => []),
   ]);
   return {
     people, names, profiles, presence: present,
-    teammates: [...new Set<string>(mates.map((m: any) => m.person_id))].filter((id) => id !== me),
-    teamCards: cards.map((r: any) => ({ personId: r.person_id, title: r.title ?? null, state: r.state, visible: r.visible !== false, updatedAt: Date.parse(r.updated_at) || 0 })),
-    me: (profiles.find((p: any) => p.person_id === me) as RoomProfile | undefined) ?? null,
+    teammates: [...new Set<string>(mates.map((m) => m.person_id))].filter((id) => id !== me),
+    teamCards: cards.map((r) => ({ personId: r.person_id, title: r.title ?? null, state: r.state, visible: r.visible !== false, updatedAt: Date.parse(r.updated_at) || 0 })),
+    me: (profiles.find((p: RoomProfile) => p.person_id === me) as RoomProfile | undefined) ?? null,
   };
 }
 
@@ -180,7 +187,7 @@ export function groupsState({ rooms, people, names, profiles, presence, teammate
     const wall = wallCards({ members: people.get(r.id) ?? [], profiles, presence, teammates, teamCards, meId, now, mine: null, names: called, listed: r.listed });
     return {
       ...r, pinned: false, muted: false, readAt, markedUnread: false, unread: unread.length,
-      lastAt: held.at(-1)?.at ?? r.createdAt, agents: wall.reduce((n: number, c: any) => n + (c.agents ?? 0), 0), wall, people: everyone,
+      lastAt: held.at(-1)?.at ?? r.createdAt, agents: wall.reduce((n: number, c: RoomCard) => n + (c.agents ?? 0), 0), wall, people: everyone,
     } as Room;
   });
   return {
@@ -281,7 +288,7 @@ export function phoneGroups(c: GroupsRest, { now = Date.now }: { now?: () => num
     return got.length;
   }
 
-  const ops: Record<string, (...a: any[]) => Promise<unknown>> = {
+  const ops: Record<string, (...a: never[]) => Promise<unknown>> = {
     refresh: async () => null,
     send: (roomId: string, body: string, opts?: { inReplyTo?: string | null; mentions?: string[] }) => send(roomId, body, opts),
     markRead: (roomId: string) => markRead(roomId),
@@ -297,7 +304,7 @@ export function phoneGroups(c: GroupsRest, { now = Date.now }: { now?: () => num
     if (!fn) return { ok: false as const, error: NOT_ON_PHONE, rooms: state };
     try {
       if (op === 'refresh' || !ready) await refresh();
-      const value = await fn(...(Array.isArray(args) ? args : [args]));
+      const value = await (fn as (...a: unknown[]) => Promise<unknown>)(...(Array.isArray(args) ? args : [args]));
       return { ok: true as const, value: value ?? null, rooms: state };
     } catch (err) {
       return { ok: false as const, error: String((err as Error)?.message ?? err), rooms: state };
@@ -307,7 +314,7 @@ export function phoneGroups(c: GroupsRest, { now = Date.now }: { now?: () => num
   return { state: () => state, refresh, send, markRead, older, door, forget: () => { held = null; ready = false; state = NO_GROUPS; } };
 }
 
-/** Groups is on when the computer heard from last says so in its settings copy (shared/phone-settings.mjs). */
+/** Groups is on when the computer heard from last says so in its settings copy (shared/phone-settings.mts). */
 export function groupsOn(rows: readonly SettingsRow[] | null | undefined): boolean {
   return computerOf([...(rows ?? [])])?.settings?.workspace?.alpha?.rooms === true;
 }

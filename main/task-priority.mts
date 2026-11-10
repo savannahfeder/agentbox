@@ -8,8 +8,8 @@
 // Never Urgent: Urgent takes a running session away from other work
 // (shared/rank.mjs isUrgent), and that is too much to hang on a guess.
 import { askSmallModel } from './row-label.mts';
-import { isTaskRow } from '../shared/team-rules.mjs';
-import { teammateIdOf } from '../shared/teammates.mjs';
+import { isTaskRow } from '../shared/team-rules.mts';
+import { teammateIdOf } from '../shared/teammates.mts';
 
 /** The three words the model may answer, onto the app's own values (renderer/src/priority.ts). */
 export const GUESSED_LEVELS: Record<string, number> = { high: 7, medium: 5, low: 2 };

@@ -28,6 +28,7 @@ import { STORE_BUILD } from '../lib/store-build';
 import { PHONE_LOOKS } from '../lib/look';
 import { alertsHere, sendTestAlert } from '../platform/alerts';
 import { useCloud } from '../state/cloud';
+import type { PhoneWorkspaceCopy } from '../../../renderer/src/phone-settings-view';
 import { useLook } from '../state/look';
 import { useSettings, type SettingsState } from '../state/settings';
 import { Tick } from './icons';
@@ -95,8 +96,7 @@ function General() {
   return (
     <>
       <Group label="Account">
-        <Row first label={`Signed in as ${c.cloud?.session()?.user.email ?? ''}`} control={<Button title="Sign out" onPress={() => { c.signOut(); router.replace('/sign-in'); }} />} />
-        <Row label="Delete account" desc={said ?? 'Your account and everything you put online, here and in shared projects.'} control={<Button title="Delete" disabled={busy} onPress={() => setDeleting(true)} />} />
+        <Row first label="Delete account" desc={said ?? 'Your account and everything you put online, here and in shared projects.'} control={<Button title="Delete" disabled={busy} onPress={() => setDeleting(true)} />} />
       </Group>
       {w?.publicLinks?.length ? <PublicLinks links={w.publicLinks} now={c.now} /> : null}
       <Group label="Claude Code and Codex">
@@ -125,7 +125,7 @@ function General() {
           <Group label={`What ${NAME} sends`}>
             <SettingSwitch first label="Counts and crash reports" desc={`That ${NAME} was opened, that a task was opened, that a reply was sent, and a report when something breaks. Never your code, your prompts, your keys or your paths, and never a title.`} k="diagnostics" copy={w.diagnostics} />
           </Group>
-          <Group label="Updates"><Row first label={`${NAME} ${s.settings.version}`} /></Group>
+          <Group label="Updates"><Row first label={`${NAME} ${s.settings!.version}`} /></Group>
         </>
       ) : <Aside>{NOT_YET}</Aside>}
     </>
@@ -271,13 +271,14 @@ function Accounts({ engine, list }: { engine: 'claude' | 'codex'; list: Account[
 const COMPUTER = 'your computer';
 
 /** The desktop's rule (Settings.tsx `cloudHere`): set up for the cloud, with an account there for this agent. */
-const cloudHere = (w: any, engine: 'claude' | 'codex') => !!w.cloud?.engines.includes(engine);
+const cloudHere = (w: PhoneWorkspaceCopy, engine: 'claude' | 'codex') => !!w.cloud?.engines.includes(engine);
 
 function CloudGroup({ engine }: { engine: 'claude' | 'codex' }) {
   const s = useSettings();
-  const cloud = s.settings!.workspace.cloud;
-  const r = s.reading('workspace', 'cloudRuns', cloud.mode);
+  const cloud = s.settings?.workspace.cloud;
+  const r = s.reading('workspace', 'cloudRuns', cloud?.mode ?? 'mac');
   const mode = r.value as CloudMode;
+  if (!cloud) return null;
   return (
     <Group label="Cloud">
       <Row first label="Use the cloud" desc={cloudRunsLine(mode, cloudInUseName(s.settings!.workspace, engine), COMPUTER)} reading={r}
@@ -312,7 +313,7 @@ function Claude() {
           ? <Row first label="Permission mode" desc={MODE_SENTENCE.custom} />
           : <Row first label={cloud ? 'On your computer' : 'Permission mode'} desc={MODE_SENTENCE[r.value as keyof typeof MODE_SENTENCE]} reading={r}
             control={<Choice label="Permission mode" value={r.value as string} options={MODES} onChange={(v) => void s.change({ scope: 'workspace', key: 'permission', value: v })} />} />}
-        {cloud ? <InTheCloud k="cloudPermission" copy={w.cloudPermission} options={MODES} says={(m) => MODE_SENTENCE[m as keyof typeof MODE_SENTENCE]} /> : null}
+        {cloud ? <InTheCloud k="cloudPermission" copy={w.cloudPermission ?? null}options={MODES} says={(m) => MODE_SENTENCE[m as keyof typeof MODE_SENTENCE]} /> : null}
       </Group>
     </>
   );
@@ -332,7 +333,7 @@ function Codex() {
       <Group label="Permissions">
         <Row first label={cloud ? 'On your computer' : 'Permission mode'} desc={CODEX_MODES[r.value as keyof typeof CODEX_MODES]?.what} reading={r}
           control={<Choice label="Permission mode" value={r.value as string} options={CODEX} onChange={(v) => void s.change({ scope: 'workspace', key: 'codexMode', value: v })} />} />
-        {cloud ? <InTheCloud k="cloudCodexMode" copy={w.cloudCodexMode} options={CODEX} says={(m) => CODEX_CLOUD_WHAT[m as keyof typeof CODEX_CLOUD_WHAT]} /> : null}
+        {cloud ? <InTheCloud k="cloudCodexMode" copy={w.cloudCodexMode ?? null}options={CODEX} says={(m) => CODEX_CLOUD_WHAT[m as keyof typeof CODEX_CLOUD_WHAT]} /> : null}
       </Group>
     </>
   );
@@ -344,7 +345,7 @@ function AgentsAtOnce() {
   const auto = s.reading('workspace', 'agentsAuto', w.agentsAuto);
   const count = s.reading('workspace', 'sessionsAtOnce', w.sessionsAtOnce);
   const isAuto = isAutoNow(s, w);
-  const say = (n: number) => `${n} ${n === 1 ? 'agent' : 'agents'}`;
+  const say = (n: number | undefined) => `${n} ${n === 1 ? 'agent' : 'agents'}`;
   const options = [{ value: 'auto', label: `Automatic (${say(w.agentsTotal)})` }, ...Array.from({ length: w.slotsMax ?? 12 }, (_, i) => ({ value: String(i + 1), label: say(i + 1) }))];
   return (
     <Row first stack label="How many run at once" reading={auto.waiting || auto.refused ? auto : count}
@@ -353,7 +354,7 @@ function AgentsAtOnce() {
         onChange={(v) => void (v === 'auto' ? s.change({ scope: 'workspace', key: 'agentsAuto', value: true }) : s.change({ scope: 'workspace', key: 'sessionsAtOnce', value: Number(v) }))} />} />
   );
 }
-const isAutoNow = (s: SettingsState, w: any) => {
+const isAutoNow = (s: SettingsState, w: Pick<NonNullable<SettingsState['settings']>['workspace'], 'agentsAuto' | 'sessionsAtOnce'>) => {
   const auto = s.reading('workspace', 'agentsAuto', w.agentsAuto);
   const count = s.reading('workspace', 'sessionsAtOnce', w.sessionsAtOnce);
   return auto.waiting ? !!auto.value : count.waiting ? false : !!auto.value;

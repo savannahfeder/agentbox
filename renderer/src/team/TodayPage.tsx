@@ -1,6 +1,6 @@
 // The Today page: the team's day in a few lines a person, in place of a standup.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { shownTitle } from '../../../shared/thread-title.mjs';
+import { shownTitle } from '../../../shared/thread-title.mts';
 import { MemberFace } from './everything/TeamStrip';
 import type { Member } from './everything/members';
 import { GROUPS, SHOWN, groupsOf, lineWhen, linesToStep, shownDay, stepLine, todayLine, type GroupLine, type TodayLine, type TodayPerson, type TodayRange, type TodayCounts } from './today';

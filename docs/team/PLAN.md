@@ -73,7 +73,7 @@ company, filterable by person. Nothing in the sidebar shows who is busy.
 ### Where it stands, 2026-09-30 night
 
 All seven are built, on `main` of this repo. Proven against the hosted
-project, not a stand-in: `tests/team-live-two-macs-through-the-cloud.test.mjs`
+project, not a stand-in: `tests/team-live-two-macs-through-the-cloud.test.mts`
 (needs `TEAM_SERVICE_KEY`) and `scripts/scratch/team-two-real-copies.mjs`, which
 runs two headless copies of the real app as two throwaway people, photographs
 both windows, and deletes everything it made. A visible Electron window was

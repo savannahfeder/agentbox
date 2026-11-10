@@ -8,7 +8,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type R
 import { FlatList, Pressable, RefreshControl, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import { readDisplay, writeDisplay, filteredEmptyWords, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
+import { backWords, readDisplay, writeDisplay, filteredEmptyWords, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
 import { InboxComposer } from '../ui/NewThreadForm';
 import { closeWords, COUNT_GAP, filterCount, moreToTheRight, phoneBoard, shownTabs, TAB_GAP, TABS, tabsTighten, type Row, type TabId } from '../lib/tabs';
 import { evViewOf, keepEvView, myItems, type EvView } from '../lib/everything';
@@ -20,8 +20,8 @@ import { GroupsPlace } from '../ui/Groups';
 import { ChatsPlace, TeammateMark, teammatesWaiting } from '../ui/Teammates';
 import { Face } from '../ui/Groups';
 import { mentionRows } from '../../../renderer/src/team/rooms/room-rules';
-import { mateOf, questionsForYou } from '../lib/teammates';
-import type { RoomMention as MentionRowData, Teammate } from '../../../renderer/src/types';
+import { mateOf, questionThread, questionsForYou } from '../lib/teammates';
+import type { RoomMention as MentionRowData, Teammate, WorkItem } from '../../../renderer/src/types';
 import { appStore } from '../platform/persist';
 import { useCloud } from '../state/cloud';
 import { Magnifier, StateGlyph, ViewButton, ViewMenu } from '../ui/Filters';
@@ -40,6 +40,7 @@ import { ComputerWait } from '../ui/Onboarding';
 import { ALERTS_ASKED_KEY, FIRST_RUN, nextSetup } from '../lib/first-run';
 import { alertsHere } from '../platform/alerts';
 import { previewWalksFirstRun } from '../lib/preview';
+import { PEN } from '../lib/overlays';
 
 // The desktop's own words for an empty tab (renderer/src/threads/Pages.tsx `EmptyTab`).
 const EMPTY: Record<Exclude<TabId, 'inbox'>, string> = {
@@ -84,6 +85,7 @@ function ThreadRow({ row, first, unread, mate }: { row: Row; first: boolean; unr
         {/* Sent from the phone and not yet taken: the web app's status word (status-word.ts). */}
         {row.queued && <><T style={{ ...small, color: color.dim }}>Queued</T><T style={small}>·</T></>}
         {row.priority && <View accessibilityLabel={row.priority === 'urgent' ? 'Urgent' : 'High priority'}><PriorityBars level={row.priority === 'urgent' ? 4 : 3} /></View>}
+        {row.agent && <><T style={{ ...small, color: color.dim }}>{row.agent}</T><T style={small}>·</T></>}
         <T numberOfLines={1} style={{ fontFamily: font.mono, fontSize: 11, lineHeight: 20, letterSpacing: 0.55, textTransform: 'uppercase', color: color.dim, flexShrink: 1 }}>{row.projectName}</T>
         <T style={small}>·</T>
         <T style={small}>{row.when}</T>
@@ -141,7 +143,7 @@ function QuestionRow({ mate, text, at, first, now, open }: { mate: Teammate; tex
 }
 
 /** Repeating tasks above what is put off, as the desktop's Later tab has them (List.tsx). */
-function RepeatRows({ repeats, items, now }: { repeats: PhoneRepeat[]; items: any[]; now: number }) {
+function RepeatRows({ repeats, items, now }: { repeats: PhoneRepeat[]; items: WorkItem[]; now: number }) {
   const small = { fontSize: 11, lineHeight: 20, color: color.faint };
   return (
     <View style={{ paddingBottom: 8 }}>
@@ -288,7 +290,9 @@ function Board({ columns, foot, inset = 12 }: { columns: ReturnType<typeof phone
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 {e.queued ? <T style={{ fontSize: 11, color: color.dim, marginRight: 8 }}>Queued</T> : e.live && <View style={{ marginRight: 8 }}><RunningMark /></View>}
                 {e.priority !== null && <View style={{ marginRight: 8 }}><PriorityBars level={barsFor(e.priority)} /></View>}
+                {e.agent && <T style={{ fontSize: 11, color: color.dim, marginRight: 8 }}>{e.agent}</T>}
                 <T numberOfLines={1} style={{ flexShrink: 1, fontFamily: font.mono, fontSize: 11, letterSpacing: 0.55, textTransform: 'uppercase', color: color.faint }}>{e.project}</T>
+                {c.state === 'scheduled' && e.item && !!backWords(e.item, c0.now) && <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 11, color: color.faint, marginLeft: 8 }}>{backWords(e.item, c0.now)}</T>}
               </View>
             </Pressable>
           ))}
@@ -363,7 +367,11 @@ export default function Threads() {
   // Messages in your groups that name you lead Needs you, and count in it (App.tsx `MentionRows`).
   const mentions = groups.on ? mentionRows(groups.state.mentions) : [];
   // A teammate's question waits where you read, not only in Chats; counted on every tab.
-  const asks = questionsForYou(c.team, c.teamPending);
+  // One asked in a thread opens it, as the desktop answers it there; already in Needs you, its row is that thread's.
+  const inNeedsYou = new Set(shown.rows.inbox.map((r) => r.key));
+  const asks = questionsForYou(c.team, c.teamPending)
+    .map((q) => ({ ...q, thread: questionThread(q.question, c.view.items) }))
+    .filter((q) => !q.thread || !inNeedsYou.has(`${q.thread.product}/${q.thread.id}`));
   const openMention = (m: MentionRowData) => openGroup(m.roomId);
   const counts = { inbox: shown.rows.inbox.length + mentions.length + asks.length, progress: shown.rows.progress.length, snoozed: shown.rows.snoozed.length + c.repeats.length, done: shown.rows.done.length, everything: 0, chats: teammatesWaiting(c) + (groups.on ? groups.unread : 0) };
   const repeatsShown = tab === 'snoozed' && c.repeats.length > 0;
@@ -412,12 +420,17 @@ export default function Threads() {
     );
   }
   // With a team on, List and Board in the View menu are Everything else's (App.tsx `headerDisplay`).
-  const headerDisplay = teamMode ? { ...display, view: evView } : display;
+  // Needs you is always a list, so it lights List; Board there opens Everything else's board.
+  const shownView = teamMode && !onEverything ? 'list' : evView;
+  const headerDisplay = teamMode ? { ...display, view: shownView } : display;
   const onHeaderDisplay = !teamMode ? setDisplay : (d: Display) => {
-    if (d.view !== evView) { setEvView(d.view as EvView); if (place === 'inbox') setPlace('everything'); }
+    if (d.view !== shownView) {
+      setEvView(d.view as EvView);
+      if (!onEverything && d.view === 'board') { setPlace('everything'); setMenu(false); }
+    }
     setDisplay({ ...d, view: display.view });
   };
-  const threadRow = (i: any, first: boolean) => {
+  const threadRow = (i: WorkItem, first: boolean) => {
     const r = rowOf.get(`${i.product}/${i.id}`);
     return r ? <ThreadRow key={r.key} row={r} first={first} unread={c.unread(i)} mate={mateOf(i, c.team)} /> : null;
   };
@@ -430,7 +443,7 @@ export default function Threads() {
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={repeatsShown ? <RepeatRows repeats={c.repeats} items={c.view.items} now={c.now} />
         : mentionsShown ? <View>
-          {asks.map((q, i) => <QuestionRow key={q.question.id} mate={q.mate} text={q.question.text ?? ''} at={q.question.ts} first={i === 0} now={c.now} open={() => router.push({ pathname: '/teammate/[id]', params: { id: q.mate.id } })} />)}
+          {asks.map((q, i) => <QuestionRow key={q.question.id} mate={q.mate} text={q.question.text ?? ''} at={q.question.ts} first={i === 0} now={c.now} open={() => (q.thread ? router.push({ pathname: '/thread/[product]/[id]', params: q.thread }) : router.push({ pathname: '/teammate/[id]', params: { id: q.mate.id } }))} />)}
           {mentions.map((m, i) => <MentionRow key={m.id} m={m} first={i === 0 && !asks.length} now={c.now} open={() => openMention(m)} />)}
         </View> : undefined}
       ListEmptyComponent={c.loading ? <Waiting list /> : repeatsShown || mentionsShown ? undefined : hidden > 0 ? <FilteredEmpty tab={tab} hidden={hidden} clear={clear} />
@@ -458,7 +471,7 @@ export default function Threads() {
         <ViewButton display={display} agent={agent} open={menu} onPress={() => setMenu(!menu)} />
         <IconButton label="Settings" onPress={() => router.push('/settings')}><Gear /></IconButton>
       </>} below={board ? undefined : <Tabs on={onEverything ? 'everything' : tab} counts={counts} pick={setPlace} team={teamMode} />} />
-      <StatusNotice message={c.status} />
+      <StatusNotice message={c.status} next={c.statusNext} />
       {onEverything
         ? <EverythingPlace mine={mineBoard ? <Board columns={mineBoard} foot={foot} inset={size.inset} /> : list} mineTabs={mineTabs} row={threadRow} openGroup={openGroup} />
         : board ? <Board columns={board} foot={foot} /> : list}
@@ -489,7 +502,7 @@ export default function Threads() {
       </LaterSheet>
       {!picked && !penUp && !(inboxEmpty && !board) && <Pressable accessibilityLabel="New thread" accessibilityRole="button" onPress={() => router.push('/new')}
         style={({ pressed }) => ({
-          position: 'absolute', right: 20, bottom: foot + 16, width: 56, height: 56, borderRadius: 28,
+          position: 'absolute', right: PEN.right, bottom: foot + PEN.lift, width: PEN.size, height: PEN.size, borderRadius: PEN.size / 2,
           alignItems: 'center', justifyContent: 'center', backgroundColor: color.graphite, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
           shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 8 }, opacity: pressed ? 0.85 : 1,
         })}>

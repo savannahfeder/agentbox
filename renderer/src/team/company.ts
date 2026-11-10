@@ -1,11 +1,11 @@
 // THE TEAM'S PURE RULES ON THE WINDOW SIDE: the company list the Team page
 // draws, due-day words, and who a row is from. No React and no styles, so
-// tests read them directly (tests/team-the-company-list.test.mjs).
+// tests read them directly (tests/team-the-company-list.test.mts).
 import type { Person, Product, TeamState, ThreadCard, WorkItem } from '../types';
-import { blockedWords, clockWords, dayDeadline } from '../../../shared/team-tasks.mjs';
-import { inMyInbox, isGivenTask, isShared, heldByAPerson, lastSpeaker, runnerOf, taskGiver } from '../../../shared/team-rules.mjs';
+import { blockedWords, clockWords, dayDeadline } from '../../../shared/team-tasks.mts';
+import { inMyInbox, isGivenTask, isShared, heldByAPerson, lastSpeaker, runnerOf, taskGiver } from '../../../shared/team-rules.mts';
 import { dayAndTime } from '../format';
-import { shownTitle } from '../../../shared/thread-title.mjs';
+import { shownTitle } from '../../../shared/thread-title.mts';
 
 export const firstName = (person: Person | undefined | null) => (person?.name || person?.email || 'Someone').split(/\s+/)[0];
 
