@@ -82,7 +82,10 @@ export function WayOut({ run, blocked, onLeave }: {
   useEffect(() => {
     if (!asking) return undefined;
     const on = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || e.metaKey || e.ctrlKey || e.altKey) return;
+      // Its own buttons need these; nothing else may reach the app behind it while it asks.
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Tab') return;
+      if (e.key !== 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); return; }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
