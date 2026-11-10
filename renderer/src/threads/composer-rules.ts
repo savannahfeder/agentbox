@@ -15,9 +15,9 @@ import { splitMessage } from '../message-split';
 import { parseWhen } from '../format';
 import { firstName } from '../team/company';
 import type { Person } from '../types';
-import { projectSeenBy } from '../../../shared/thread-cards.mjs';
-import { isRepeatRule, ruleLabel, type RepeatShape } from '../../../shared/repeats.mjs';
-import { clockWords, dayDeadline } from '../../../shared/team-tasks.mjs';
+import { projectSeenBy } from '../../../shared/thread-cards.mts';
+import { isRepeatRule, ruleLabel, type RepeatShape } from '../../../shared/repeats.mts';
+import { clockWords, dayDeadline } from '../../../shared/team-tasks.mts';
 
 export type Harness = 'claude' | 'codex';
 
@@ -36,7 +36,7 @@ type CodexRow = Pick<ModelChoice, 'id'> & Partial<ModelChoice>;
  * Where a model runs. Claude Code's own rows are asked first, by alias and by
  * full id, then the Codex list read off this Mac. A slug neither list knows is
  * read by its shape: a GPT name is Codex, anything else is Claude Code, which is
- * the default everywhere else in the app too (shared/engines.mjs says why).
+ * the default everywhere else in the app too (shared/engines.mts says why).
  */
 export function harnessOf(model: string, codexModels: readonly CodexRow[] = []): Harness {
   if (claudeModelRows().some((m) => m.id === model || m.model === model)) return 'claude';
@@ -217,6 +217,9 @@ export function mondayMorning(now = Date.now()): number {
   return d.getTime();
 }
 
+/** On a Sunday the two presets are one time, and a list shows only Tomorrow morning. */
+export const mondayIsTomorrow = (now = Date.now()) => mondayMorning(now) === tomorrowMorning(now);
+
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -230,7 +233,7 @@ export function laterHint(ts: number): string {
  * What a time typed into Send later means, or null. It reads the same words the
  * Schedule box on a thread reads ("3h", "fri 6pm", "tomorrow 3pm"), because a
  * browser date field was the harder of the two to use
- * (tests/send-later-takes-a-time-in-words.test.mjs). A moment already past is
+ * (tests/send-later-takes-a-time-in-words.test.mts). A moment already past is
  * refused rather than sent: the store would run it at once, and a card that
  * says "later" and starts now is a small lie about when an agent has it.
  */
@@ -344,6 +347,15 @@ export function startingProject<T extends ProjectLike>(
 }
 
 /**
+ * The project on screen when the card opens: the one the list is filtered to,
+ * else the thread that is open. Null on a plain inbox, where the card falls back
+ * to the project last sent to.
+ */
+export function projectOnScreen({ filter, open }: { filter: string | null; open: { product?: string | null } | null }): string | null {
+  return filter ?? open?.product ?? null;
+}
+
+/**
  * The project the card shows now: the one picked on it, else the starting
  * rule. Asked on every draw, because the box on the page is drawn before the
  * team's projects arrive and a choice made then would miss the remembered one.
@@ -373,7 +385,7 @@ export function teammates(people: readonly Person[], me: string | null): Person[
 }
 
 /**
- * "Find a person": any part of a name, or the start of an email, in any case.
+ * "Find a person" matches any part of a name, or the start of an email, in any case.
  * An email is matched from its start because the end of it is the domain the
  * whole team shares, so "th" used to keep everyone at northwind.test.
  */
@@ -500,7 +512,7 @@ export function writeVisibility(v: Visibility, store?: KeyStore, project?: strin
 // the same gesture gives one to a teammate. The store already knew how to hold
 // that — `assignee` means the person who has to act next, a row held by a
 // person never starts an agent, and it sits in that one person's inbox until
-// it is done (shared/team-rules.mjs). The card simply had no way to say it.
+// it is done (shared/team-rules.mts). The card simply had no way to say it.
 //
 // So a card addressed to a person asks one more question, SEND AS, and a task
 // gets one more row, DUE ON. Everything general stays on the bar: the project,
@@ -600,6 +612,16 @@ export function keyOnTheNewThreadCard(
   if (menuOpen || on === 'a field' || on === 'away') return 'leave it';
   if (inline && on === 'nothing') return 'leave it';
   return 'the message';
+}
+
+/**
+ * Whether ⌘↵ heard on the window sends the New thread card. The dialog owns
+ * the keyboard, so it always does. The box on the empty inbox shares the page,
+ * so only when nothing else has the keyboard and it holds words to send.
+ */
+export function modEnterSendsTheCard({ inline, on, hasWords }: { inline: boolean; on: Keyboard; hasWords: boolean }): boolean {
+  if (!inline) return true;
+  return on === 'nothing' && hasWords;
 }
 
 /**
@@ -716,7 +738,7 @@ export function agentOnThisWork<T extends { status?: string; labels?: string[]; 
 }
 
 /**
- * Whether To offers Auto (shared/auto-route.mjs): only with an AI teammate that
+ * Whether To offers Auto (shared/auto-route.mts): only with an AI teammate that
  * is working to give a thread to, and only where the box can reach teammates.
  * Auto keeps the Model row, so what it runs on is still yours to pick.
  */

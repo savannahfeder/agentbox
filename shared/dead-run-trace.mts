@@ -37,7 +37,9 @@ const EXITED = /^# exited \((-?\d+)\)/m;
 // Written after the exit line's time when the person stopped the run (Stop,
 // Z, closing or putting off the thread): that end is not a death to report.
 export const STOPPED_ON_REQUEST = ' · stopped on request';
-const STOPPED = /^# exited \([^)]*\) \S+ · stopped on request$/m;
+// Written when the person moved a cloud run to this Mac, which ends it on purpose.
+export const MOVED_HERE = ' · moved to this Mac';
+const STOPPED = /^# exited \([^)]*\) \S+ · (?:stopped on request|moved to this Mac)$/m;
 
 // A tool call, as every engine traces one: `HH:MM:SS  [Bash] ls`. Text lines
 // do not count, because the CLI types its own refusals as the agent's words,

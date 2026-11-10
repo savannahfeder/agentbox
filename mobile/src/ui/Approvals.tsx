@@ -137,13 +137,10 @@ export function Approvals() {
   // The first run's steps keep their buttons where the card would cover them.
   if (FIRST_RUN_SCREENS.has(pathname)) return null;
   if (!card || c.minimizedApproval === card.id) return null;
-  const answer = async (allow: boolean) => {
+  const words = approvalCard(card, 0, c.view.products, c.view.items).lede;
+  const answer = (allow: boolean) => {
     setAnswered({ id: card.id, allow });
-    try { await c.send({ kind: 'approve', approval: card.id, allow }, null); } catch (err) {
-      setAnswered(null);
-      c.say(`Not answered: ${String((err as Error)?.message || 'it did not go through')}`);
-    }
-    void c.refresh();
+    c.answerApproval(card, allow, words);
   };
   // 8pt over the home bar's room on every screen, as the site's `.approvals`
   // holds it. It sat above the inbox's tabs until they moved to the top (2026-10-28).

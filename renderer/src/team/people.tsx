@@ -4,10 +4,10 @@
 // The pure rules (names, due days, who a row is from) are in ./company.ts.
 import { createContext, type CSSProperties, type ReactNode } from 'react';
 import type { Person, Product, TeamState, WorkItem } from '../types';
-import { isShared } from '../../../shared/team-rules.mjs';
-import { visibilityOf } from '../../../shared/thread-cards.mjs';
+import { isShared } from '../../../shared/team-rules.mts';
+import { visibilityOf } from '../../../shared/thread-cards.mts';
 import { dueWords, firstName, personOf, sentFrom } from './company';
-import { deadlineOf, dueSaid } from '../../../shared/team-tasks.mjs';
+import { deadlineOf, dueSaid } from '../../../shared/team-tasks.mts';
 import { initialsOf } from './rooms/room-rules';
 import './team.css';
 

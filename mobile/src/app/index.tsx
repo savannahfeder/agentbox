@@ -8,10 +8,11 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type R
 import { FlatList, Pressable, RefreshControl, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import { readDisplay, writeDisplay, filteredEmptyWords, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
+import { backWords, readDisplay, writeDisplay, filteredEmptyWords, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
 import { InboxComposer } from '../ui/NewThreadForm';
-import { COUNT_GAP, moreToTheRight, phoneBoard, shownTabs, TAB_GAP, TABS, tabsTighten, type Row, type TabId } from '../lib/tabs';
+import { closeWords, COUNT_GAP, filterCount, moreToTheRight, phoneBoard, shownTabs, TAB_GAP, TABS, tabsTighten, type Row, type TabId } from '../lib/tabs';
 import { evViewOf, keepEvView, myItems, type EvView } from '../lib/everything';
+import { agentChoices, type Harness } from '../lib/agent-filter';
 import { EverythingPlace } from '../ui/Everything';
 import { bottomTabs, type PlaceId } from '../lib/groups';
 import { useGroups } from '../state/groups';
@@ -19,23 +20,27 @@ import { GroupsPlace } from '../ui/Groups';
 import { ChatsPlace, TeammateMark, teammatesWaiting } from '../ui/Teammates';
 import { Face } from '../ui/Groups';
 import { mentionRows } from '../../../renderer/src/team/rooms/room-rules';
-import { mateOf, questionsForYou } from '../lib/teammates';
-import type { RoomMention as MentionRowData, Teammate } from '../../../renderer/src/types';
+import { mateOf, questionThread, questionsForYou } from '../lib/teammates';
+import type { RoomMention as MentionRowData, Teammate, WorkItem } from '../../../renderer/src/types';
 import { appStore } from '../platform/persist';
 import { useCloud } from '../state/cloud';
 import { Magnifier, StateGlyph, ViewButton, ViewMenu } from '../ui/Filters';
-import { Cloud, Gear, Pen, Pin, Repeat, Tick } from '../ui/icons';
+import { Cloud, Gear, More, Pen, Pin, Repeat, Tick } from '../ui/icons';
+import { LaterSheet } from '../ui/Later';
+import { inLater, pickedActs, pickedPriority, pickedResume } from '../lib/picked';
+import { priorityIdOf, priorityLabelOf } from '../../../renderer/src/priority';
 import { Waiting } from '../ui/LogoOrbit';
 import { repeatRow, repeatTag } from '../../../renderer/src/repeat-words';
 import type { PhoneRepeat } from '../../../renderer/src/phone-repeats';
-import { barsFor } from '../ui/Pickers';
-import { footRoom, IconButton, PriorityBars, RunningMark, T, TopBar, Wall } from '../ui/parts';
+import { barsFor, PriorityRows } from '../ui/Pickers';
+import { footRoom, IconButton, PriorityBars, RunningMark, SheetRow, T, TopBar, Wall } from '../ui/parts';
 import { color, corner, font, size } from '../ui/theme';
 import { StatusNotice } from '../ui/StatusNotice';
 import { ComputerWait } from '../ui/Onboarding';
-import { ALERTS_ASKED_KEY, nextSetup, type Setup } from '../lib/first-run';
+import { ALERTS_ASKED_KEY, FIRST_RUN, nextSetup } from '../lib/first-run';
 import { alertsHere } from '../platform/alerts';
 import { previewWalksFirstRun } from '../lib/preview';
+import { PEN } from '../lib/overlays';
 
 // The desktop's own words for an empty tab (renderer/src/threads/Pages.tsx `EmptyTab`).
 const EMPTY: Record<Exclude<TabId, 'inbox'>, string> = {
@@ -80,6 +85,7 @@ function ThreadRow({ row, first, unread, mate }: { row: Row; first: boolean; unr
         {/* Sent from the phone and not yet taken: the web app's status word (status-word.ts). */}
         {row.queued && <><T style={{ ...small, color: color.dim }}>Queued</T><T style={small}>·</T></>}
         {row.priority && <View accessibilityLabel={row.priority === 'urgent' ? 'Urgent' : 'High priority'}><PriorityBars level={row.priority === 'urgent' ? 4 : 3} /></View>}
+        {row.agent && <><T style={{ ...small, color: color.dim }}>{row.agent}</T><T style={small}>·</T></>}
         <T numberOfLines={1} style={{ fontFamily: font.mono, fontSize: 11, lineHeight: 20, letterSpacing: 0.55, textTransform: 'uppercase', color: color.dim, flexShrink: 1 }}>{row.projectName}</T>
         <T style={small}>·</T>
         <T style={small}>{row.when}</T>
@@ -137,7 +143,7 @@ function QuestionRow({ mate, text, at, first, now, open }: { mate: Teammate; tex
 }
 
 /** Repeating tasks above what is put off, as the desktop's Later tab has them (List.tsx). */
-function RepeatRows({ repeats, items, now }: { repeats: PhoneRepeat[]; items: any[]; now: number }) {
+function RepeatRows({ repeats, items, now }: { repeats: PhoneRepeat[]; items: WorkItem[]; now: number }) {
   const small = { fontSize: 11, lineHeight: 20, color: color.faint };
   return (
     <View style={{ paddingBottom: 8 }}>
@@ -247,7 +253,10 @@ function FilteredEmpty({ tab, hidden, clear }: { tab: TabId; hidden: number; cle
 /** The board: a column a swipe, each scrolling on its own (phone.css `.th-board`). */
 function Board({ columns, foot, inset = 12 }: { columns: ReturnType<typeof phoneBoard>; foot: number; inset?: number }) {
   const { width } = useWindowDimensions();
-  const room = useCloud().approvalRoom;
+  const c0 = useCloud();
+  const room = c0.approvalRoom;
+  // Later's column leads with the repeating tasks, as the Later list does.
+  const repeatsIn = (state: string) => (state === 'scheduled' ? c0.repeats : []);
   const col = Math.round((width - inset * 2) * 0.86);
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={col + 12} decelerationRate="fast"
@@ -257,17 +266,33 @@ function Board({ columns, foot, inset = 12 }: { columns: ReturnType<typeof phone
           <View style={{ height: 38, paddingTop: 8, flexDirection: 'row', alignItems: 'center' }}>
             <StateGlyph state={c.state} />
             <T style={{ fontFamily: font.mono, fontSize: 11, letterSpacing: 0.88, textTransform: 'uppercase', color: color.dim }}>{c.label}</T>
-            <T style={{ fontFamily: font.mono, fontSize: 11, letterSpacing: 0.88, color: color.faint, marginLeft: 8 }}>{c.rows.length}</T>
+            <T style={{ fontFamily: font.mono, fontSize: 11, letterSpacing: 0.88, color: color.faint, marginLeft: 8 }}>{c.rows.length + repeatsIn(c.state).length}</T>
           </View>
-          {c.rows.length === 0 && <T style={{ fontSize: 13, color: color.faint, paddingVertical: 4, paddingHorizontal: 2 }}>Nothing here.</T>}
+          {repeatsIn(c.state).map((r) => (
+            <Pressable key={`${r.product}/${r.id}`} onPress={() => router.push({ pathname: '/repeat/[product]/[id]', params: { product: r.product, id: r.id } })}
+              style={({ pressed }) => ({ marginBottom: 10, paddingTop: 14, paddingHorizontal: 15, paddingBottom: 13, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill })}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14 }}>
+                <View style={{ marginRight: 8, marginTop: 2 }}><Repeat /></View>
+                <T numberOfLines={3} style={{ flex: 1, fontSize: 14, lineHeight: 20 }}>{r.title}</T>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {r.waiting && <T style={{ fontSize: 11, color: color.dim, marginRight: 8 }}>Queued</T>}
+                <T numberOfLines={1} style={{ flexShrink: 1, fontFamily: font.mono, fontSize: 11, letterSpacing: 0.55, textTransform: 'uppercase', color: color.faint }}>{r.productName}</T>
+                <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 11, color: color.faint, marginLeft: 8 }}>{`Next ${repeatRow(r, r.lastOccurrence ? c0.view.items.find((it: any) => it.id === r.lastOccurrence) ?? null : null, c0.now).when}`}</T>
+              </View>
+            </Pressable>
+          ))}
+          {c.rows.length + repeatsIn(c.state).length === 0 && <T style={{ fontSize: 13, color: color.faint, paddingVertical: 4, paddingHorizontal: 2 }}>Nothing here.</T>}
           {c.rows.map((e) => (
             <Pressable key={e.key} onPress={() => e.item && open(e.item.product, e.item.id)}
               style={({ pressed }) => ({ marginBottom: 10, paddingTop: 14, paddingHorizontal: 15, paddingBottom: 13, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill })}>
               <T numberOfLines={3} style={{ fontSize: 14, lineHeight: 20, marginBottom: 14 }}>{e.title}</T>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                {e.live && <View style={{ marginRight: 8 }}><RunningMark /></View>}
+                {e.queued ? <T style={{ fontSize: 11, color: color.dim, marginRight: 8 }}>Queued</T> : e.live && <View style={{ marginRight: 8 }}><RunningMark /></View>}
                 {e.priority !== null && <View style={{ marginRight: 8 }}><PriorityBars level={barsFor(e.priority)} /></View>}
+                {e.agent && <T style={{ fontSize: 11, color: color.dim, marginRight: 8 }}>{e.agent}</T>}
                 <T numberOfLines={1} style={{ flexShrink: 1, fontFamily: font.mono, fontSize: 11, letterSpacing: 0.55, textTransform: 'uppercase', color: color.faint }}>{e.project}</T>
+                {c.state === 'scheduled' && e.item && !!backWords(e.item, c0.now) && <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 11, color: color.faint, marginLeft: 8 }}>{backWords(e.item, c0.now)}</T>}
               </View>
             </Pressable>
           ))}
@@ -285,12 +310,12 @@ export default function Threads() {
     signedIn: c.signedIn, started: !c.loading, connect: !!c.connect, noticeAnswered: !!c.notice,
     alertsOn: !!c.alerts, alertsAsked: !!appStore.getItem(ALERTS_ASKED_KEY), alertsHere: alertsHere || walking,
   });
-  const asked = useRef<Setup | null>(null);
   useEffect(() => {
-    if (!c.noticeRead || asked.current === next) return;
-    if (next === 'messages') { asked.current = next; router.push({ pathname: '/ai-notice', params: { first: '1' } }); }
-    else if (next === 'alerts') { asked.current = next; router.push('/alerts'); }
-  }, [next, c.noticeRead]);
+    if (!c.signedIn) { FIRST_RUN.reset(); return; }
+    if (!c.noticeRead || (next !== 'messages' && next !== 'alerts') || !FIRST_RUN.take(next)) return;
+    if (next === 'messages') router.push({ pathname: '/ai-notice', params: { first: '1' } });
+    else router.push('/alerts');
+  }, [next, c.noticeRead, c.signedIn]);
   const inset = useSafeAreaInsets();
   const groups = useGroups();
   const [place, setPlace] = useState<PlaceId>('inbox');
@@ -320,15 +345,19 @@ export default function Threads() {
   // Remembered between launches, as the site keeps it in the page's storage.
   const [display, setDisplayRaw] = useState<Display>(() => readDisplay('inbox', appStore));
   const setDisplay = (d: Display) => { setDisplayRaw(d); writeDisplay('inbox', d, appStore); };
+  // Not kept between launches, as the desktop's filter is not.
+  const [agent, setAgent] = useState<Harness | null>(null);
   const order = useMemo(() => c.view.products.map((p) => p.slug), [c.view.products]);
-  const shown = useMemo(() => shownTabs(c.tabs, display, c.now, order), [c.tabs, display, c.now, order]);
-  const board = useMemo(() => (!teamMode && display.view === 'board' ? phoneBoard(c.view, c.tabs, display, c.now) : null), [teamMode, display, c.view, c.tabs, c.now]);
+  const shown = useMemo(() => shownTabs(c.tabs, display, c.now, order, agent), [c.tabs, display, c.now, order, agent]);
+  const board = useMemo(() => (!teamMode && display.view === 'board' ? phoneBoard(c.view, c.tabs, display, c.now, agent) : null), [teamMode, display, c.view, c.tabs, c.now, agent]);
   // Your card's board: your own threads, and what waits on you is Needs you, so it is no column (whose-board.ts).
   const mineBoard = useMemo(() => (onEverything && evView === 'board'
-    ? phoneBoard({ ...c.view, items: myItems(c.view.items) }, c.tabs, display, c.now).filter((col) => col.state !== 'waiting') : null), [onEverything, evView, display, c.view, c.tabs, c.now]);
+    ? phoneBoard({ ...c.view, items: myItems(c.view.items) }, c.tabs, display, c.now, agent).filter((col) => col.state !== 'waiting') : null), [onEverything, evView, display, c.view, c.tabs, c.now, agent]);
   const rowOf = useMemo(() => new Map(Object.values(c.tabs).flat().map((r) => [r.key, r])), [c.tabs]);
   const [picked, setPicked] = useState<Set<string> | null>(null);
   const [closing, setClosing] = useState(false);
+  const [pickedMenu, setPickedMenu] = useState(false);
+  const [pickingLevel, setPickingLevel] = useState(false);
   useEffect(() => { setPicked(null); }, [place, tab]);
   if (!c.opened) return <Wall><Waiting /></Wall>;
   if (!c.signedIn) return <Redirect href="/sign-in" />;
@@ -338,7 +367,11 @@ export default function Threads() {
   // Messages in your groups that name you lead Needs you, and count in it (App.tsx `MentionRows`).
   const mentions = groups.on ? mentionRows(groups.state.mentions) : [];
   // A teammate's question waits where you read, not only in Chats; counted on every tab.
-  const asks = questionsForYou(c.team, c.teamPending);
+  // One asked in a thread opens it, as the desktop answers it there; already in Needs you, its row is that thread's.
+  const inNeedsYou = new Set(shown.rows.inbox.map((r) => r.key));
+  const asks = questionsForYou(c.team, c.teamPending)
+    .map((q) => ({ ...q, thread: questionThread(q.question, c.view.items) }))
+    .filter((q) => !q.thread || !inNeedsYou.has(`${q.thread.product}/${q.thread.id}`));
   const openMention = (m: MentionRowData) => openGroup(m.roomId);
   const counts = { inbox: shown.rows.inbox.length + mentions.length + asks.length, progress: shown.rows.progress.length, snoozed: shown.rows.snoozed.length + c.repeats.length, done: shown.rows.done.length, everything: 0, chats: teammatesWaiting(c) + (groups.on ? groups.unread : 0) };
   const repeatsShown = tab === 'snoozed' && c.repeats.length > 0;
@@ -354,7 +387,24 @@ export default function Threads() {
     setClosing(true);
     try { await c.closeAll(rows.filter((r) => picked?.has(r.key)).map((r) => r.item)); setPicked(null); } finally { setClosing(false); }
   };
-  const clear = () => setDisplay({ ...display, priorities: [], projects: [], updated: 'any', privacy: 'any' });
+  const pickedItems = rows.filter((r) => picked?.has(r.key)).map((r) => r.item);
+  const acts = pickedActs(pickedItems, { tab, unread: c.unread });
+  const pickedDone = () => { setPickedMenu(false); setPickingLevel(false); setPicked(null); };
+  const laterPicked = (until: number, label?: string) => { pickedDone(); void c.laterAll(pickedItems, until, label); };
+  const working = (i: { id: string; product: string }) => c.view.running.some((r: { itemId: string; product: string }) => r.itemId === i.id && r.product === i.product);
+  const resumable = pickedResume(pickedItems, working);
+  const level = pickedPriority(pickedItems);
+  const unfiltered: Display = { ...display, priorities: [], projects: [], updated: 'any', privacy: 'any' };
+  const clear = () => { setDisplay(unfiltered); setAgent(null); };
+  const agents = agentChoices(board || mineBoard ? Object.values(c.tabs).flat() : c.tabs[tab], display, c.now, agent);
+  const menuCount = () => {
+    const drawnBoard = onEverything ? mineBoard : board;
+    const wholeBoard = !drawnBoard ? null : onEverything
+      ? phoneBoard({ ...c.view, items: myItems(c.view.items) }, c.tabs, unfiltered, c.now).filter((col) => col.state !== 'waiting')
+      : phoneBoard(c.view, c.tabs, unfiltered, c.now);
+    const above = mentionsShown ? mentions.length + asks.length : repeatsShown ? c.repeats.length : 0;
+    return filterCount({ rows: shown.rows[tab], whole: c.tabs[tab], mineOnly: onEverything, above, board: drawnBoard, wholeBoard });
+  };
   // A permission card sits over the corner the pen is in, so the pen moves up to the bar (8fa6c548).
   const penUp = c.view.approvals.length > 0;
   // The empty inbox draws the form itself, so it needs no pen.
@@ -370,12 +420,17 @@ export default function Threads() {
     );
   }
   // With a team on, List and Board in the View menu are Everything else's (App.tsx `headerDisplay`).
-  const headerDisplay = teamMode ? { ...display, view: evView } : display;
+  // Needs you is always a list, so it lights List; Board there opens Everything else's board.
+  const shownView = teamMode && !onEverything ? 'list' : evView;
+  const headerDisplay = teamMode ? { ...display, view: shownView } : display;
   const onHeaderDisplay = !teamMode ? setDisplay : (d: Display) => {
-    if (d.view !== evView) { setEvView(d.view as EvView); if (place === 'inbox') setPlace('everything'); }
+    if (d.view !== shownView) {
+      setEvView(d.view as EvView);
+      if (!onEverything && d.view === 'board') { setPlace('everything'); setMenu(false); }
+    }
     setDisplay({ ...d, view: display.view });
   };
-  const threadRow = (i: any, first: boolean) => {
+  const threadRow = (i: WorkItem, first: boolean) => {
     const r = rowOf.get(`${i.product}/${i.id}`);
     return r ? <ThreadRow key={r.key} row={r} first={first} unread={c.unread(i)} mate={mateOf(i, c.team)} /> : null;
   };
@@ -388,7 +443,7 @@ export default function Threads() {
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={repeatsShown ? <RepeatRows repeats={c.repeats} items={c.view.items} now={c.now} />
         : mentionsShown ? <View>
-          {asks.map((q, i) => <QuestionRow key={q.question.id} mate={q.mate} text={q.question.text ?? ''} at={q.question.ts} first={i === 0} now={c.now} open={() => router.push({ pathname: '/teammate/[id]', params: { id: q.mate.id } })} />)}
+          {asks.map((q, i) => <QuestionRow key={q.question.id} mate={q.mate} text={q.question.text ?? ''} at={q.question.ts} first={i === 0} now={c.now} open={() => (q.thread ? router.push({ pathname: '/thread/[product]/[id]', params: q.thread }) : router.push({ pathname: '/teammate/[id]', params: { id: q.mate.id } }))} />)}
           {mentions.map((m, i) => <MentionRow key={m.id} m={m} first={i === 0 && !asks.length} now={c.now} open={() => openMention(m)} />)}
         </View> : undefined}
       ListEmptyComponent={c.loading ? <Waiting list /> : repeatsShown || mentionsShown ? undefined : hidden > 0 ? <FilteredEmpty tab={tab} hidden={hidden} clear={clear} />
@@ -413,34 +468,47 @@ export default function Threads() {
       <TopBar title={teamMode ? 'Inbox' : 'Threads'} right={<>
         <IconButton label="Search threads" onPress={() => router.push('/search')}><Magnifier size={18} /></IconButton>
         {penUp && <IconButton label="New thread" onPress={() => router.push('/new')}><Pen size={18} tint={color.dim} /></IconButton>}
-        <ViewButton display={display} open={menu} onPress={() => setMenu(!menu)} />
+        <ViewButton display={display} agent={agent} open={menu} onPress={() => setMenu(!menu)} />
         <IconButton label="Settings" onPress={() => router.push('/settings')}><Gear /></IconButton>
       </>} below={board ? undefined : <Tabs on={onEverything ? 'everything' : tab} counts={counts} pick={setPlace} team={teamMode} />} />
-      <StatusNotice message={c.status} />
+      <StatusNotice message={c.status} next={c.statusNext} />
       {onEverything
         ? <EverythingPlace mine={mineBoard ? <Board columns={mineBoard} foot={foot} inset={size.inset} /> : list} mineTabs={mineTabs} row={threadRow} openGroup={openGroup} />
         : board ? <Board columns={board} foot={foot} /> : list}
       {picked && (
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingBottom: foot, paddingTop: 8, paddingHorizontal: size.inset, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: color.bg, borderTopWidth: 1, borderTopColor: color.line }}>
           <T style={{ flex: 1, fontSize: 14, color: color.dim }}>{picked.size ? `${picked.size} selected` : 'Tap threads to select them'}</T>
+          {picked.size > 0 && <IconButton label="More" onPress={() => setPickedMenu(true)}><More /></IconButton>}
           <Pressable onPress={() => setPicked(null)} accessibilityRole="button" style={({ pressed }) => ({ height: 36, paddingHorizontal: 14, justifyContent: 'center', backgroundColor: pressed ? color.picked : 'transparent' })}>
             <T style={{ fontSize: 14, color: color.dim }}>Cancel</T>
           </Pressable>
-          <Pressable disabled={!picked.size || closing} onPress={() => void closePicked()} accessibilityRole="button"
-            style={({ pressed }) => ({ height: 36, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: !picked.size || closing ? 0.5 : 1 })}>
-            <T style={{ fontSize: 14, fontFamily: font.semibold }}>{closing ? 'Closing…' : 'Close'}</T>
-          </Pressable>
+          {acts.includes('close') && (
+            <Pressable disabled={!picked.size || closing} onPress={() => void closePicked()} accessibilityRole="button"
+              style={({ pressed }) => ({ height: 36, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: !picked.size || closing ? 0.5 : 1 })}>
+              <T style={{ fontSize: 14, fontFamily: font.semibold }}>{closing ? 'Closing…' : closeWords(picked.size)}</T>
+            </Pressable>
+          )}
         </View>
       )}
+      {/* Later as one thread's More sheet has it, then the rest of the desktop's commands on ticked rows. */}
+      <LaterSheet visible={pickedMenu} onClose={() => { setPickedMenu(false); setPickingLevel(false); }} onPick={laterPicked}
+        onNow={inLater(pickedItems, c.now) ? () => laterPicked(0) : undefined}
+        instead={pickingLevel && level ? <PriorityRows value={level.value} pick={(value) => { pickedDone(); void c.pressPicked(pickedItems, { kind: 'priority', value }); }} /> : undefined}>
+        {resumable && <SheetRow label="Resume agents" aside={resumable.ids.length < resumable.of ? `${resumable.ids.length} of ${resumable.of}` : undefined}
+          onPress={() => { pickedDone(); void c.pressPicked(pickedItems, { kind: 'resume' }); }} />}
+        {level && <SheetRow label="Priority" aside={level.value === null ? undefined : priorityLabelOf(priorityIdOf(level.value))} onPress={() => setPickingLevel(true)} />}
+        {acts.includes('read') && <SheetRow label="Mark read" onPress={() => { pickedItems.forEach((i) => c.markSeen(i)); pickedDone(); }} />}
+        {acts.includes('unread') && <SheetRow label="Mark unread" onPress={() => { pickedItems.forEach((i) => c.markUnseen(i)); pickedDone(); }} />}
+      </LaterSheet>
       {!picked && !penUp && !(inboxEmpty && !board) && <Pressable accessibilityLabel="New thread" accessibilityRole="button" onPress={() => router.push('/new')}
         style={({ pressed }) => ({
-          position: 'absolute', right: 20, bottom: foot + 16, width: 56, height: 56, borderRadius: 28,
+          position: 'absolute', right: PEN.right, bottom: foot + PEN.lift, width: PEN.size, height: PEN.size, borderRadius: PEN.size / 2,
           alignItems: 'center', justifyContent: 'center', backgroundColor: color.graphite, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
           shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 8 }, opacity: pressed ? 0.85 : 1,
         })}>
         <Pen />
       </Pressable>}
-      {menu && <ViewMenu display={headerDisplay} onDisplay={onHeaderDisplay} products={c.view.products} items={c.view.items} shown={rows.length} total={shown.whole[tab]} tab={tab} close={() => setMenu(false)}
+      {menu && <ViewMenu display={headerDisplay} onDisplay={onHeaderDisplay} agent={agent} agents={agents} onAgent={setAgent} products={c.view.products} items={c.view.items} {...menuCount()} tab={tab} close={() => setMenu(false)}
         onSelect={rows.length && !board ? () => { setMenu(false); setPicked(new Set()); } : undefined} />}
     </Wall>
     </Picking.Provider>

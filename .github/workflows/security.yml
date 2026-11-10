@@ -1,8 +1,8 @@
-# SECURITY CHECKS ON EVERY SHIP, AND ONCE A WEEK.
+# SECURITY CHECKS ON EVERY SHIP, AND EVERY DAY.
 #
 # Shipping is a push to main (`npm run ship`), so that push is the deploy moment
 # this runs on. Pull requests run it too, so a fork's change is scanned before
-# anyone merges it. The Monday run catches what changes without a push: a new
+# anyone merges it. The daily run catches what changes without a push: a new
 # Semgrep rule, or a new advisory against a package the app already ships.
 #
 # semgrep: static rules for JavaScript, TypeScript and committed secrets, over
@@ -13,9 +13,9 @@
 #   dev packages included, failing on high or critical. An advisory with no fix
 #   yet is listed by id in scripts/audit-packages.mjs with why it reaches nobody.
 #
-# The deep agent-driven audit (Cloudflare's security-audit skill, or Anthropic's
-# /claude-security) is not here: it costs agent time and needs a person to read
-# what it finds. Run it monthly or before a release.
+# The agent-driven reviews are not here: they run on the person's own Claude
+# Code plan as repeating tasks in the app. docs/security-checks.md is what they
+# do, and it is where a red run of this workflow gets read.
 #
 # Same rules as tests.yml: a read-only token, no secrets, never pull_request_target.
 
@@ -26,7 +26,7 @@ on:
     branches: [main]
   pull_request:
   schedule:
-    - cron: '17 6 * * 1'
+    - cron: '17 6 * * *'
   workflow_dispatch:
 
 permissions:
@@ -42,7 +42,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - run: pip install semgrep==1.182.1
@@ -57,7 +57,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - run: node scripts/audit-packages.mjs

@@ -1,0 +1,87 @@
+# Walks the store app on an iPhone simulator against the real cloud, as App
+# Review would, with no one at a phone (mobile/.maestro/review-walk.yml).
+# GitHub's Macs carry Xcode and the simulators; Expo's own Maestro runs need a
+# paid plan. Give it a simulator build of the store profile:
+#   gh workflow run iphone-walk.yml -f build_url=<the store-launch-test build's .tar.gz>
+# The screens can show the demo login and this repository is public, so they
+# are sealed to the public key in WALK_KEY; the private half stays on the Mac
+# that reads them (scripts/open-iphone-walk.sh).
+name: iPhone walk
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_url:
+        description: Simulator build (.tar.gz) from `eas build --profile store-launch-test`
+        required: true
+      flow:
+        description: Maestro flow to run
+        default: mobile/.maestro/review-walk.yml
+      flow_b64:
+        description: Or a flow's text, base64, to try one before it ships
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  walk:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Maestro
+        run: |
+          curl -fsSL --retry 4 --retry-all-errors --max-time 300 -o "$RUNNER_TEMP/maestro.zip" https://github.com/mobile-dev-inc/maestro/releases/latest/download/maestro.zip
+          unzip -q "$RUNNER_TEMP/maestro.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/maestro/bin" >> "$GITHUB_PATH"
+      - name: Start an iPhone
+        run: |
+          udid=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; print(next(x['udid'] for k in sorted(d, reverse=True) if 'iOS' in k for x in d[k] if x['name'].startswith('iPhone 16')))")
+          echo "UDID=$udid" >> "$GITHUB_ENV"
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid" -b
+      - name: Install the build
+        env:
+          BUILD_URL: ${{ inputs.build_url }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/app"
+          curl -fsSL --retry 4 --retry-all-errors --max-time 600 -o "$RUNNER_TEMP/app.tar.gz" "$BUILD_URL"
+          tar -xzf "$RUNNER_TEMP/app.tar.gz" -C "$RUNNER_TEMP/app"
+          xcrun simctl install "$UDID" "$(find "$RUNNER_TEMP/app" -maxdepth 2 -name '*.app' | head -1)"
+      - name: Walk it
+        env:
+          REVIEW_PASSWORD: ${{ secrets.REVIEW_PASSWORD }}
+          FLOW: ${{ inputs.flow }}
+          FLOW_B64: ${{ inputs.flow_b64 }}
+        run: |
+          mkdir -p walk
+          if [ -n "$FLOW_B64" ]; then FLOW=mobile/.maestro/tried.yml; echo "$FLOW_B64" | base64 -d > "$FLOW"; fi
+          xcrun simctl io "$UDID" recordVideo --codec=h264 walk/walk.mp4 & rec=$!
+          cd walk
+          status=0
+          maestro test "$GITHUB_WORKSPACE/$FLOW" -e REVIEW_PASSWORD="$REVIEW_PASSWORD" -e RUN="$GITHUB_RUN_NUMBER" || status=$?
+          kill -INT $rec; wait $rec || true
+          find "$GITHUB_WORKSPACE/mobile/.maestro" "$HOME/.maestro/tests" -name '*.png' -exec cp {} . \; 2>/dev/null || true
+          exit $status
+      - name: Seal the screens
+        if: always()
+        env:
+          WALK_KEY: MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEA144NTLukP5ihrH+ZU3pcMmVz6188Owt3HZFU32rJ5bQ4+yrz92k93VZ6wz0eMX7N7jraJ7Ejwu3OliIE6nJjT+GbL+YUQGgkRIC9jl+D7m1ZpsyCSyYLbSWKISylJNiVvWH9FH3+Y8Gv8QHy0guX/Z0aB7cG7XNeTZlJmltd22vqPcBm9t9D/Lx7n5Wqr/dXdWC7nqkkac+JmMVm0YuiLL+rmvRKlR7+PPi6E93cWjLC/xOPVyAwzu3b6FkUFAS0NqNATQsRP353GNkaw3BLZYK40nVHvD8BBTxvPgJZpo5pMRgZUVppyEAdqQE/ufGbE4kLyGuUgz2rD1WcCbKRbDgKpMPD/1ifN/go+vqr8nFcCVGq8MNe5nP8QBAAlNROlBEKP1dUvjFJTDatxeVEZPm8EsL4jncGR5j/scBob8sGe+iPNLKaAUJcHthtncG35ELBm+Mrezda/TG8TVvNexCVryNMaNd4+y/whrseHwguK/bv8haHLJm/Aq9pg6/jAgMBAAE= # public-check: allow (a public key)
+        run: |
+          mkdir -p sealed walk
+          ssl="$(brew --prefix openssl@3)/bin/openssl"
+          tar -czf "$RUNNER_TEMP/walk.tgz" walk
+          rm -rf walk
+          key=$("$ssl" rand -hex 32)
+          "$ssl" enc -aes-256-cbc -pbkdf2 -pass "pass:$key" -in "$RUNNER_TEMP/walk.tgz" -out sealed/walk.tgz.enc
+          printf %s "$WALK_KEY" | base64 -d > "$RUNNER_TEMP/walk-key.der"
+          printf %s "$key" | "$ssl" pkeyutl -encrypt -pubin -keyform DER -inkey "$RUNNER_TEMP/walk-key.der" -pkeyopt rsa_padding_mode:oaep -out sealed/key.enc
+          rm -f "$RUNNER_TEMP/walk.tgz"
+      - name: Keep the sealed screens
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iphone-walk
+          path: sealed/
+          retention-days: 3

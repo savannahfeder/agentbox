@@ -2,7 +2,7 @@
 // when no box has the keyboard, and what the box says about its own words.
 import { chord } from './this-keyboard';
 import { PICK_SETTLES_MS } from './pick-settles';
-import { PLAIN_AGENT, voiceName } from '../../shared/agent-voice.mjs';
+import { PLAIN_AGENT, voiceName } from '../../shared/agent-voice.mts';
 
 export type BoxKey = 'send' | 'new line' | 'leave';
 
@@ -55,8 +55,8 @@ export const screenJustChanged = (changedAt: number | null, now: number): boolea
 const printable = (key: string) => key.length === 1 && key !== ' ';
 // These change something you may not have meant to change; the rest only move you.
 const ACTS = new Set(['e', 'l']);
-const OPEN_THREAD_KEYS = new Set(['j', 'k', 'r', 'n', 'z', '/', 'o', 'g', 's']);
-const LIST_KEYS = new Set(['j', 'k', 'r', 'n', 'z', '/', 'o', 'g', 'b', 'i', '1', '2']);
+const OPEN_THREAD_KEYS = new Set(['j', 'k', 'r', 'n', 'z', 'o', 'g', 's']);
+const LIST_KEYS = new Set(['j', 'k', 'r', 'n', 'z', 'o', 'g', 'b', 'i', '1', '2']);
 // With no row to act on these would do nothing, so on an empty list they are words.
 const ROW_KEYS = new Set(['e', 'l', 'j', 'k', 'r', '1', '2']);
 export const rowKey = (key: string): boolean => ROW_KEYS.has(key.toLowerCase());
@@ -65,7 +65,8 @@ export const rowKey = (key: string): boolean => ROW_KEYS.has(key.toLowerCase());
 export const STILL_TYPING_MS = 1000;
 
 /** With a thread open and no box holding the keyboard. */
-export function keyOnAnOpenThread({ key, justChanged, hasOptions = false, stillTyping = false }: { key: string; justChanged: boolean; hasOptions?: boolean; stillTyping?: boolean }): 'shortcut' | 'to the box' {
+export function keyOnAnOpenThread({ key, justChanged, hasOptions = false, stillTyping = false, boxOnScreen = true }: { key: string; justChanged: boolean; hasOptions?: boolean; stillTyping?: boolean; boxOnScreen?: boolean }): 'shortcut' | 'to the box' {
+  if (!boxOnScreen) return 'shortcut';
   if (stillTyping && key.length === 1) return 'to the box';
   if (!printable(key)) return 'shortcut';
   const k = key.toLowerCase();

@@ -71,6 +71,8 @@ export interface CloudStatus {
   accounts?: CloudAccount[];
   /** Engines whose account on this Mac has no working sign-in in the cloud, so their threads run here. */
   notInCloud?: Array<'claude' | 'codex'>;
+  /** Engines with no sign-in in the cloud at all, so the cloud can run none of their threads. */
+  noCloudSignIn?: Array<'claude' | 'codex'>;
   signIns?: CloudSignIn[];
   /** 'resting' after runs failed in a row before their agent started, until `restingUntil`. */
   health?: 'ok' | 'failing' | 'resting';
@@ -86,7 +88,7 @@ export interface CloudStatus {
   plan?: string | null;
   /** Runs on this Mac the cloud could take now (supervisor `_movableToCloud`). */
   movable?: string[];
-  /** The keys saved for cloud runs, by name only (main/cloud/keys.mjs). */
+  /** The keys saved for cloud runs, by name only (main/cloud/keys.mts). */
   keys?: { name: string; savedAt: number | null; label?: string | null }[];
 }
 
@@ -145,6 +147,19 @@ export const CLOUD_WHEN_ON: { id: Exclude<CloudMode, 'mac'>; label: string; note
 type OnOff = { mode: CloudMode; whenOn?: Exclude<CloudMode, 'mac'> } | null | undefined;
 
 export const cloudIsOn = (status: OnOff) => !!status && status.mode !== 'mac';
+
+/**
+ * The cloud row's sentence: when threads go there, and on which account.
+ *
+ * ONE ACCOUNT, HOWEVER MANY ARE SIGNED IN THERE (w-dac993a554). This listed
+ * them and ended "in turn", which is what `pickCloudLogin` used to do; it takes
+ * one account now and waits for it, so the sentence names that one.
+ */
+export function cloudRunsLine(mode: CloudMode, inUse: string | null, computer = 'this computer'): string {
+  if (mode === 'mac') return `Every thread runs on ${computer}.`;
+  const when = mode === 'all' ? 'Threads start there first' : `Threads start there when ${computer} is full`;
+  return `${when}, on ${inUse ?? 'your cloud account'}.`;
+}
 
 /** The accounts that count: one added twice counts once. */
 export const countedAccounts = (accounts: CloudAccount[]) => accounts.filter((a) => a.state !== 'duplicate');
@@ -263,6 +278,7 @@ export function threadPlace(
   item: { id: string; product: string; onMac?: boolean; needsMac?: string; labels?: string[] },
   session: { where?: string; movable?: boolean } | null,
   cloud: CloudStatus | null,
+  engine: string | null = null,
 ): 'cloud' | 'here' | 'kept' | 'move' | 'needs' | null {
   // The phone has no cloud status, only the computer's word on each run.
   if (session?.movable && session.where !== 'cloud') return 'move';
@@ -271,6 +287,7 @@ export function threadPlace(
   if (item.onMac) return 'kept';
   if (session?.where === 'cloud') return 'cloud';
   if (!cloudIsOn(cloud)) return null;
+  if (engine && cloud.noCloudSignIn?.includes(engine as 'claude' | 'codex')) return null;
   if (cloud.movable?.includes(item.id)) return 'move';
   return cloud.projects?.includes(item.product) ? 'here' : null;
 }

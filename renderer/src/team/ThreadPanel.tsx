@@ -15,7 +15,7 @@
 // The rules (which replies, the line, the width) are ./chat-threads.ts.
 import { useContext, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode, type SetStateAction } from 'react';
 import { Face, TeamContext } from './people';
-import { voiceName } from '../../../shared/agent-voice.mjs';
+import { voiceName } from '../../../shared/agent-voice.mts';
 import { ChatFold } from './ChatFold';
 import { MessageActions, Reactions } from './ChatActions';
 import { DeleteMessage, MessageEditor } from './MessageMore';

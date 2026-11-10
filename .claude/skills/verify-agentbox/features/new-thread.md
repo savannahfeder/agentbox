@@ -29,6 +29,6 @@ Preconditions: `live.mjs up` and a clean `live.mjs doctor`.
 
 ## Gotchas
 
-- The stand-in must speak Claude Code's streamed-input protocol (replay the prompt, then wait for its input to close). If it does not, every run reads as unfinished and no answer is written; `tests/the-stand-in-worker-speaks-claude-codes-input-protocol.test.mjs` guards it.
+- The stand-in must speak Claude Code's streamed-input protocol (replay the prompt, then wait for its input to close). If it does not, every run reads as unfinished and no answer is written; `tests/the-stand-in-worker-speaks-claude-codes-input-protocol.test.mts` guards it.
 - The thread's status stays open after the answer: on an install with the store tools, the worker owns its status and the stand-in never sets it. The answer is the claim, not the status.
 - The ledger is in the store's `projects/` folder, not beside `project.json`.

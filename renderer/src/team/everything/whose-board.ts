@@ -51,7 +51,8 @@ export function evColumns(order: readonly ThreadStateWord[]): ThreadStateWord[] 
 }
 
 export type EvView = 'board' | 'list';
-const VIEW_KEY = 'agentbox.everything.view';
+// A new name, so a board picked back when In progress held Later and Done starts as the list.
+const VIEW_KEY = 'agentbox.inbox.view';
 type Store = Pick<Storage, 'getItem' | 'setItem'> | null;
 const local = (): Store => { try { return globalThis.localStorage ?? null; } catch { return null; } };
 

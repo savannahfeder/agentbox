@@ -11,7 +11,10 @@ import { FlatList, Pressable, ScrollView, StyleSheet, useWindowDimensions, View 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { MAX_ZOOM, fitScale } from '../../../renderer/src/picture-view';
-import { docOnPhone, openingOf, pageOnPhone, pictureLink, pictureSource, shapeOfDrawn } from '../lib/files';
+import { docOnPhone, openingOf, pageOnPhone, pictureLink, pictureSource, shapeOfDrawn, tableOnPhone } from '../lib/files';
+import type { Table } from '../../../renderer/src/table-file';
+import { TableFile } from '../ui/TableFile';
+import { PictureMenu } from '../../modules/picture-menu';
 import { useCloud } from '../state/cloud';
 import { readLink, useMessageFiles } from '../ui/Files';
 import { Back } from '../ui/icons';
@@ -20,7 +23,7 @@ import { PageFrame } from '../ui/PageFrame';
 import { IconButton, T, TopBar, Wall } from '../ui/parts';
 import { Player } from '../ui/Player';
 import { Skeleton } from '../ui/Skeleton';
-import { color, corner } from '../ui/theme';
+import { color, corner, font } from '../ui/theme';
 
 const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
 const nameOf = (src: string) => src.split('/').pop() ?? src;
@@ -36,23 +39,29 @@ export default function FileScreen() {
 function OnItsOwn({ product, src }: { product: string; src: string }) {
   const c = useCloud();
   const inset = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
   const o = openingOf(c.view.places, c.links, product, src);
+  const film = o.kind === 'media' && /\.(mp4|mov|m4v|webm)$/i.test(src);
+  // The tree keeps its shape either way, so turning the phone never restarts the film.
+  const wide = film && width > height;
   const card = { flex: 1, margin: 12, marginBottom: 12 + inset.bottom };
   let body;
   if (o.kind === 'doc') body = <Doc product={product} src={src} style={{ ...card, borderWidth: 1, borderColor: color.lineStrong, borderRadius: 3 }} />;
+  else if (o.kind === 'table') body = <TableDoc product={product} src={src} style={{ flex: 1, marginTop: 4, marginBottom: inset.bottom }} />;
+  else if (o.kind === 'text') body = <TextDoc product={product} src={src} style={{ ...card, borderWidth: 1, borderColor: color.lineStrong, borderRadius: 3 }} />;
   else if (o.kind === 'page') body = <Page product={product} src={src} style={{ ...card, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: 'rgba(255, 255, 255, 0.1)', backgroundColor: PAGE }} />;
   else if (o.kind === 'media') {
-    const film = /\.(mp4|mov|m4v|webm)$/i.test(src);
     body = (
-      <View style={{ ...card, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: color.line, backgroundColor: RAISED, justifyContent: film ? undefined : 'center', padding: film ? 0 : 16 }}>
+      <View style={wide ? { flex: 1, backgroundColor: '#000' } : { ...card, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: color.line, backgroundColor: RAISED, justifyContent: film ? undefined : 'center', padding: film ? 0 : 16 }}>
         <Player link={o.link} film={film} style={film ? { flex: 1 } : { height: 36 }} />
       </View>
     );
   } else body = <Said words={o.kind === 'refused' ? o.error : 'This file is on your computer.'} />;
   return (
-    <Wall>
-      <TopBar left={<IconButton label="Back" width={34} onPress={back}><Back /></IconButton>}
-        title={<T numberOfLines={1} style={{ fontSize: 15, paddingLeft: 10, paddingRight: 6 }}>{nameOf(src)}</T>} />
+    <Wall style={wide ? { backgroundColor: '#000' } : undefined}>
+      {film && <Stack.Screen options={{ orientation: 'default' }} />}
+      {!wide && <TopBar left={<IconButton label="Back" width={34} onPress={back}><Back /></IconButton>}
+        title={<T numberOfLines={1} style={{ fontSize: 15, paddingLeft: 10, paddingRight: 6 }}>{nameOf(src)}</T>} />}
       {body}
     </Wall>
   );
@@ -75,6 +84,41 @@ function Doc({ product, src, style }: { product: string; src: string; style: obj
     <View style={style}>
       <ScrollView contentContainerStyle={{ paddingTop: 6, paddingHorizontal: 16, paddingBottom: 40 }}>
         {doc && ('text' in doc ? <Markdown doc text={doc.text} dir={dir} files={files} /> : <Said words={doc.error} />)}
+      </ScrollView>
+      {!doc && <View style={StyleSheet.absoluteFill}><Skeleton /></View>}
+    </View>
+  );
+}
+
+function TableDoc({ product, src, style }: { product: string; src: string; style: object }) {
+  const c = useCloud();
+  const [read, setRead] = useState<{ table: Table } | { error: string } | null>(null);
+  useEffect(() => {
+    let live = true;
+    tableOnPhone(c.view.places, c.links, product, src, readLink).then((r) => { if (live) setRead(r.ok ? { table: r.table } : { error: r.error }); });
+    return () => { live = false; };
+  }, [product, src, c.signedAt]);
+  return <View style={style}>{read ? ('table' in read ? <TableFile table={read.table} /> : <Said words={read.error} />) : <Skeleton />}</View>;
+}
+
+// A JSON file reads better laid out; one that does not parse is shown as written.
+const laidOut = (text: string, src: string) => {
+  if (!/\.json$/i.test(src)) return text;
+  try { return JSON.stringify(JSON.parse(text), null, 2); } catch { return text; }
+};
+
+function TextDoc({ product, src, style }: { product: string; src: string; style: object }) {
+  const c = useCloud();
+  const [doc, setDoc] = useState<{ text: string } | { error: string } | null>(null);
+  useEffect(() => {
+    let live = true;
+    docOnPhone(c.view.places, c.links, product, src, readLink).then((r) => { if (live) setDoc(r.ok ? { text: laidOut(r.text, src) } : { error: r.error }); });
+    return () => { live = false; };
+  }, [product, src, c.signedAt]);
+  return (
+    <View style={style}>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+        {doc && ('text' in doc ? <T selectable style={{ fontFamily: font.mono, fontSize: 12.5, lineHeight: 19, color: color.text }}>{doc.text}</T> : <Said words={doc.error} />)}
       </ScrollView>
       {!doc && <View style={StyleSheet.absoluteFill}><Skeleton /></View>}
     </View>
@@ -174,6 +218,7 @@ function PictureRoom({ product, pictures, start }: { product: string; pictures: 
 
 /** One picture, fitted to the room and never drawn larger than it is; a pinch looks closer. */
 function Shown({ uri, name, width, height, stage }: { uri: string | null | undefined; name: string; width: number; height: number; stage: { top: number; bottom: number } }) {
+  const { say } = useCloud();
   const [natural, setNatural] = useState({ w: 0, h: 0 });
   useEffect(() => {
     if (!uri) return;
@@ -188,8 +233,10 @@ function Shown({ uri, name, width, height, stage }: { uri: string | null | undef
       <ScrollView style={{ position: 'absolute', top: stage.top, left: 16, width: box.w, height: box.h }} contentContainerStyle={{ width: box.w, height: box.h, alignItems: 'center', justifyContent: 'center' }}
         maximumZoomScale={MAX_ZOOM} minimumZoomScale={1} centerContent showsHorizontalScrollIndicator={false} showsVerticalScrollIndicator={false}>
         {!!uri && natural.w > 0 && (
-          <Image source={pictureSource(uri)} cachePolicy="memory-disk" accessibilityLabel={name} contentFit="contain"
-            style={{ width: natural.w * fit, height: natural.h * fit, borderWidth: 1, borderRadius: corner.card, borderColor: paper(0.08) }} />
+          <PictureMenu uri={uri} corner={corner.card} say={say} style={{ width: natural.w * fit, height: natural.h * fit }}>
+            <Image source={pictureSource(uri)} cachePolicy="memory-disk" accessibilityLabel={name} contentFit="contain"
+              style={{ width: natural.w * fit, height: natural.h * fit, borderWidth: 1, borderRadius: corner.card, borderColor: paper(0.08) }} />
+          </PictureMenu>
         )}
       </ScrollView>
     </View>

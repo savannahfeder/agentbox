@@ -414,7 +414,8 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 /* ------------------------------------------------------------ a teammate's thread */
 /* The whole window: the name and what it waits on across the top, then the
    conversation on the left and what it is about on the right. */
-.tp-page { padding: 14px 40px 48px; }
+/* Measured by its own width: a file opened beside it narrows the page, not the window. */
+.tp-page { padding: 14px 40px 48px; container: tp / inline-size; }
 .tp-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 28px; }
 .tp-acts { display: flex; align-items: center; gap: 10px; }
 .tp-top { margin: 0 0 28px; padding: 0 0 24px; border-bottom: 1px solid var(--line); }
@@ -533,9 +534,14 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .th-comment button { height: 32px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
 .th-comment button:hover:not(:disabled) { background: var(--wash-strong, var(--wash)); }
 .th-comment button:disabled { color: var(--text-faint); border-color: var(--line); cursor: default; }
-@media (max-width: 1100px) {
+@container tp (max-width: 980px) {
   .tp-grid { grid-template-columns: minmax(0, 1fr); gap: 32px; }
   .tp-side { position: static; }
+}
+@container tp (max-width: 720px) {
+  .tp-bar { flex-wrap: wrap; }
+  .tp-acts { flex-wrap: wrap; }
+  .tp-acts > * { white-space: nowrap; }
 }
 /* Collapsed, the Inbox still says something is waiting: a dot where the
    number was (a persona lost the count when the sidebar was shut). */

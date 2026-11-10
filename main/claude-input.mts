@@ -25,11 +25,19 @@ export interface HostInputState { atResult?: boolean; waiting?: BackgroundTask[]
 export interface ClaudeInput {
   waitingOn(): BackgroundTask[];
   ranToTheEnd(): boolean;
+  /** Helpers a cloud run's relay said were lost as the run ended. */
+  helpersLost(): BackgroundTask[];
   holdInput(value: unknown): void;
   inputState(): HostInputState;
   control(request: Record<string, unknown>, timeoutMs?: number): Promise<ControlResult>;
   interrupt(): Promise<{ interrupted: boolean }>;
   steer(text: string): Promise<{ accepted: boolean }>;
+  /** Keep input open this long after each finished turn, for the next message. */
+  waitAfterTurns(ms: number): void;
+  /** Between turns, waiting for the next message. */
+  waitingForNext(): boolean;
+  /** End the wait now: input closes as it would have at the turn's end. */
+  stopWaiting(): void;
   lastInterruptAt?: number;
   endedInHost?: boolean;
 }
@@ -65,15 +73,51 @@ function turnClosed(message: string) {
 // before the session is closed anyway. Measured wakes arrive in about a second.
 const WAKE_GRACE_MS = 2 * 60 * 1000;
 
-// Said to the agent, never shown to the person: the trace keeps no user turns.
 // Paths are cut to their last part: a cloud run's relay uploads any file its
 // input names outside the task folder (main/cloud/run.mts `filesNamedIn`).
+const helperName = (t: BackgroundTask) => `"${String(t.description || t.task_id || 'a background job').replace(/(^|[\s"'`(=:])\/(?:[^\s"'`<>()[\]{},;\\]*\/)+/g, '$1').slice(0, 120)}"`;
+export const helperNames = (tasks: BackgroundTask[]) => tasks.map(helperName).join(', ');
+
+// Said to the agent, never shown to the person: the trace keeps no user turns.
 export function stillRunningNote(tasks: BackgroundTask[]) {
-  const plain = (text: unknown) => String(text).replace(/(^|[\s"'`(=:])\/(?:[^\s"'`<>()[\]{},;\\]*\/)+/g, '$1');
-  const names = tasks.map((t) => `"${plain(t.description || t.task_id).slice(0, 120)}"`).join(', ');
+  const names = helperNames(tasks);
   return `This is ${Name}, not the person. Your turn ended with ${tasks.length === 1 ? 'this' : 'these'} still running in the background: ${names}. `
     + 'Your run stays open, and your answer is not delivered, until nothing you started is still running. '
     + 'Stop any you no longer need. If you are waiting on one, say what for in one line and end your turn.';
+}
+
+// Said by a cloud run's relay as the run ends with helpers lost (main/cloud/run.mts).
+export const HELPERS_LOST = 'agentbox_helpers_lost';
+
+export interface HelperState { waiting: BackgroundTask[]; atResult: BackgroundTask[] }
+
+// What the thread says when its run ended with helpers lost.
+export function helpersLostAnswer(tasks: BackgroundTask[]) {
+  const one = tasks.length === 1;
+  const names = tasks.map(helperName);
+  const listed = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0];
+  return '**Reply to start the lost work again.**\n\n'
+    + `The cloud run ended while ${listed} ${one ? 'was' : 'were'} still running in the background. `
+    + `${one ? 'It' : 'They'} stopped before finishing, and anything ${one ? 'it' : 'they'} had not saved is gone. Your reply starts this thread again.`;
+}
+
+// WHAT A RUN LOSES IF IT ENDS NOW: the helpers still out, or, when the list is
+// empty, the ones that were out as its last turn ended, since Claude Code may
+// empty the list as it stops them on its way out. A turn that starts after
+// they finished clears them.
+export function helperWatch(saved?: Partial<HelperState> | null) {
+  let waiting = Array.isArray(saved?.waiting) ? saved.waiting : [];
+  let atResult = Array.isArray(saved?.atResult) ? saved.atResult : [];
+  return {
+    see(e: StreamEvent | null | undefined) {
+      if (!e || e.parent_tool_use_id) return;
+      if (e.type === 'system' && e.subtype === 'background_tasks_changed' && Array.isArray(e.tasks)) waiting = e.tasks;
+      else if (e.type === 'assistant') atResult = [];
+      else if (e.type === 'result') atResult = [...waiting];
+    },
+    lost: (): BackgroundTask[] => [...(waiting.length ? waiting : atResult)],
+    state: (): HelperState => ({ waiting: [...waiting], atResult: [...atResult] }),
+  };
 }
 
 // THE PROMPT LEAVES THE LINE WHEN REPLIES ARRIVE ON STDIN. Both the print flag
@@ -116,15 +160,38 @@ export function attachClaudeInput<C extends PipedChild>(child: C & ClaudeInput):
   // still open was stopped part-way, whatever its last turn said
   // (tests/a-worker-whose-helpers-are-still-working-does-not-come-back-to-you).
   let ended = false;
+  let lost: BackgroundTask[] = [];
   // A TURN IS RUNNING between its `system/init` and its result. A message
   // written while none is starts the next one, and a turn that starts while
   // one waits takes it with it, so either way it is being answered, though
   // Claude replays it only when that turn first speaks. Send now must not cut
   // that turn: it was the answer (w-0202576e73).
   let inTurn = false;
+  // BETWEEN TURNS (`waitAfterTurns`): the input stays open so the next message
+  // reaches this session, rather than closing and leaving it to a new run.
+  let waitMs = 0, between = false, betweenTimer: NodeJS.Timeout | null = null;
   // `end` answers false in the run host while an app is attached and closing is the app's to do.
-  const closeInput = () => { if ((child.stdin.end() as unknown) === false) return; closed = true; ended = true; clearTimeout(wakeTimer ?? undefined); };
+  const closeInput = () => {
+    if ((child.stdin.end() as unknown) === false) return;
+    closed = true; ended = true; between = false;
+    clearTimeout(wakeTimer ?? undefined); clearTimeout(betweenTimer ?? undefined);
+  };
   const mayClose = () => !held && atResult && !pending.size && !waiting.length;
+  const endTurn = () => {
+    if (!waitMs) { closeInput(); return; }
+    if (between) return;
+    between = true;
+    betweenTimer = setTimeout(() => { between = false; if (mayClose() && !closed) closeInput(); }, waitMs);
+    betweenTimer.unref?.();
+    // After this line's other readers, so the session already holds the result.
+    setImmediate(() => { if (between) child.emit('turn-over'); });
+  };
+  const nextTurn = () => {
+    if (!between) return;
+    between = false;
+    clearTimeout(betweenTimer ?? undefined);
+    child.emit('next-turn');
+  };
   // Not into a session she is driving, and not when her own message is about
   // to start the next turn. Kept out of `pending`, so it never holds input open.
   const nameWhatIsStillOut = () => {
@@ -138,6 +205,7 @@ export function attachClaudeInput<C extends PipedChild>(child: C & ClaudeInput):
   };
   const fail: (reason: string) => void = reason => {
     closed = true;
+    clearTimeout(betweenTimer ?? undefined);
     for (const request of pending.values()) {
       clearTimeout(request.timer);
       request.reject(turnClosed(reason));
@@ -169,11 +237,13 @@ export function attachClaudeInput<C extends PipedChild>(child: C & ClaudeInput):
       // while this Mac slept (main/cloud/run.mts): the end of the run, as if
       // closed here. A reply still waiting is kept for the next run.
       if (event.type === 'system' && event.subtype === 'agentbox_input_closed_in_cloud' && !closed) closeInput();
+      if (event.type === 'system' && event.subtype === HELPERS_LOST && Array.isArray(event.tasks)) lost = event.tasks;
       if (event.type === 'system' && event.subtype === 'init') {
         inTurn = true;
         for (const request of pending.values()) request.taken = true;
       }
-      if (event.type === 'assistant') { atResult = false; inTurn = true; }
+      // The agent speaking again unasked (a background job woke it) is a turn too.
+      if (event.type === 'assistant') { atResult = false; inTurn = true; nextTurn(); }
       if (event.type === 'user' && !event.parent_tool_use_id && typeof event.uuid === 'string' && !seenUsers.has(event.uuid)) {
         seenUsers.add(event.uuid);
         const content = event.message?.content;
@@ -195,19 +265,19 @@ export function attachClaudeInput<C extends PipedChild>(child: C & ClaudeInput):
         // wake that never comes, so a session cannot sit open forever.
         clearTimeout(wakeTimer ?? undefined);
         if (!waiting.length && atResult && !closed) {
-          wakeTimer = setTimeout(() => { if (mayClose() && !closed) closeInput(); }, WAKE_GRACE_MS);
+          wakeTimer = setTimeout(() => { if (mayClose() && !closed) endTurn(); }, WAKE_GRACE_MS);
           wakeTimer.unref?.();
         }
       }
       if (event.type === 'result') {
         atResult = true;
         inTurn = false;
-        if (mayClose()) closeInput();
+        if (mayClose()) endTurn();
         else if (waiting.length) nameWhatIsStillOut();
       }
     }
   });
-  // A run the app reattached to (main/hosted-run.mjs): the host has been
+  // A run the app reattached to (main/hosted-run.mts): the host has been
   // reading the stream meanwhile, and knows where the turn stands.
   child.on('input-state', (s: HostInputState | null | undefined) => {
     if (s?.closed) { closed = true; ended = true; return; }
@@ -216,7 +286,17 @@ export function attachClaudeInput<C extends PipedChild>(child: C & ClaudeInput):
   });
   child.inputState = () => ({ atResult, waiting: [...waiting], closed });
   child.waitingOn = () => [...waiting];
-  child.ranToTheEnd = () => ended || !!child.endedInHost;
+  // Between turns counts: the answer is out and nothing is left running.
+  child.ranToTheEnd = () => !lost.length && (ended || between || !!child.endedInHost);
+  child.helpersLost = () => [...lost];
+  child.waitAfterTurns = (ms) => { waitMs = Math.max(0, Number(ms) || 0); };
+  child.waitingForNext = () => between;
+  child.stopWaiting = () => {
+    if (!between) return;
+    between = false;
+    clearTimeout(betweenTimer ?? undefined);
+    if (mayClose() && !closed) closeInput();
+  };
   child.holdInput = value => {
     if (closed && value) throw Error('This session has ended. Open remote control again to resume it.');
     held = !!value;
@@ -258,6 +338,7 @@ export function attachClaudeInput<C extends PipedChild>(child: C & ClaudeInput):
     pending.set(uuid, { resolve, reject, taken: !inTurn });
     try {
       child.stdin.write(JSON.stringify({ type: 'user', uuid, message: { role: 'user', content: text }, parent_tool_use_id: null, session_id: '' }) + '\n');
+      nextTurn();
     } catch (error) {
       pending.delete(uuid);
       reject(turnClosed((error as Error)?.message || 'The agent input connection closed.'));

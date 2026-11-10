@@ -12,6 +12,8 @@
 // whack-a-mole that made one-card-at-a-time necessary in the first place, and
 // an exit animation is the exact moment it would happen again.
 
+import { CHORD_ANSWERS, chordLands } from '../../shared/card-settles.mts';
+
 export interface StagedApproval { id: string }
 
 export function approvalClickAllowed(phone: boolean, detail: number, pressed: string | null, target: string): boolean {
@@ -93,12 +95,14 @@ export function approvalStage<T extends StagedApproval>(
 }
 
 /**
- * ⌘Y or ⌘N as the page heard it, as an answer to the card on screen. Main answers
- * a key the window received and takes it from the page, so this hears only the
- * presses main never saw.
+ * ⌘1 or ⌘2 (⌘Y or ⌘N still work) as the page heard it, as an answer to the card
+ * on screen. Main answers a key the window received and takes it from the page,
+ * so this hears only the presses main never saw. A press in the card's first
+ * moment answers nothing (shared/card-settles.mts).
  */
-export function cardChord(e: { key: string; metaKey: boolean; ctrlKey: boolean; altKey: boolean; shiftKey: boolean }, cardId: string | null): Answered | null {
+export function cardChord(e: { key: string; metaKey: boolean; ctrlKey: boolean; altKey: boolean; shiftKey: boolean }, cardId: string | null, shownAt: number | null = null, now = Date.now()): Answered | null {
   if (!cardId || !(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return null;
-  const k = e.key.toLowerCase();
-  return k === 'y' || k === 'n' ? { id: cardId, allow: k === 'y' } : null;
+  const allow = CHORD_ANSWERS[e.key.toLowerCase()];
+  if (allow === undefined || !chordLands(shownAt, now)) return null;
+  return { id: cardId, allow };
 }

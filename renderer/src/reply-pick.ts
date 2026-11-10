@@ -4,7 +4,7 @@
 // TWO WORDS FOR NOTHING, AND THEY ARE NOT THE SAME NOTHING.
 //
 // The store says "nothing chosen" with the EMPTY STRING: `answerItem` writes
-// `model: ''` to clear, because `modelForEngine` (../../shared/engines.mjs)
+// `model: ''` to clear, because `modelForEngine` (../../shared/engines.mts)
 // reads '' as nothing and a JSON null would need a special case in both
 // engines' argument builders. Read with `??` it survives as a model id with no
 // label, which is a footer reading "On ." and a model word nought pixels wide.

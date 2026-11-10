@@ -16,12 +16,13 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { bootHeadless, createServer, newToken, picturesTheAppOwns } from '../main/serve.mts';
-import { appHome } from '../main/store/home.mjs';
+import { appHome } from '../main/store/home.mts';
 import { NO_TERMINAL, ptyIsHere } from '../main/pty.mts';
-import { learnShellDataDirs } from '../main/shell-path.mjs';
+import { learnShellDataDirs } from '../main/shell-path.mts';
 import { startFreezeRecorder } from '../main/freeze-recorder.mts';
-import { readHubAddress } from '../main/hub-address.mjs';
+import { readHubAddress } from '../main/hub-address.mts';
 import { watchNewChatsFor } from '../main/new-chats-watch.mts';
+import { osOpenDialog } from '../main/os-folder-window.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const appDir = path.dirname(here);
@@ -60,7 +61,7 @@ const dataDir = path.resolve(
   flag('dir', process.env.AGENTBOX_HOME ?? appHome()),
 );
 // A store has one owner: a machine that is a window onto a hub runs no agents,
-// whichever door it is opened through (main/hub-address.mjs).
+// whichever door it is opened through (main/hub-address.mts).
 const hub = readHubAddress();
 if (hub) {
   console.error(`This machine names a hub (${hub.url ?? hub.invalid}), so it will not run agents itself.`);
@@ -79,7 +80,8 @@ if (!fs.existsSync(path.join(dist, 'index.html'))) {
 // CODEX_HOME from reaching a worker by inheritance, so without this a copy's
 // workers signed in to ~/.claude and ~/.codex (w-6d8c543a43).
 await learnShellDataDirs();
-const booted = await bootHeadless({ dataDir, appDir, userDir: dataDir });
+// A test copy's tester cannot see a window macOS puts on the owner's screen.
+const booted = await bootHeadless({ dataDir, appDir, userDir: dataDir, osDialog: process.env.AGENTBOX_NO_SYSTEM_WINDOWS ? null : osOpenDialog });
 // What held the thread each time it froze, as the desktop records it.
 startFreezeRecorder({
   dir: path.join(dataDir, 'memory-log'),
