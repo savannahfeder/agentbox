@@ -597,7 +597,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
 
   if (typeof requestCloudKey === 'function') tools.push({
     name: 'request_cloud_key',
-    description: 'Ask this thread’s computer for a key the run needs when you know where it is kept there: their instructions, notes or memory name a Keychain item, a file under their home folder, or a variable in their shell. They get a card to allow it; once allowed it is saved for every cloud run and handed to this one. The call waits up to 15 minutes for their answer. Returns saved (with the file this run reads it from), already, denied, not_found, no_answer or unavailable, each with what to do next. When you do not know where the key is, do not guess: ask for it with the key line at the end of your turn.',
+    description: 'Ask this thread’s computer for a key the run needs when you know where it is kept there: their instructions, notes or memory name a Keychain item, a file under their home folder, or a variable in their shell. They get a card to allow it; once allowed it is saved for every cloud run and handed to this one. The call waits up to 15 minutes for their answer. Returns saved (with the file this run reads it from), already, denied, replied (their words instead of a yes), not_found, no_answer or unavailable, each with what to do next. When you do not know where the key is, do not guess: ask for it with the key line at the end of your turn.',
     schema: {
       name: z.string().describe('the environment variable its tools read, such as POSTHOG_PERSONAL_KEY'),
       what: z.string().describe('what it is, in plain words, such as "the PostHog personal API key the daily report reads"'),

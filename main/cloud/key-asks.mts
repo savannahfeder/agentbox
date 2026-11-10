@@ -23,7 +23,7 @@ const WAIT_MS = 15 * 60_000;
 const ASKS_PER_RUN = 10;
 
 export interface KeyAsk { name?: unknown; what?: unknown; place?: unknown; from?: unknown; entry?: unknown }
-export interface KeyAnswer { status: 'saved' | 'already' | 'denied' | 'not_found' | 'no_answer' | 'unavailable'; message: string; path?: string }
+export interface KeyAnswer { status: 'saved' | 'already' | 'denied' | 'replied' | 'not_found' | 'no_answer' | 'unavailable'; message: string; path?: string }
 
 export interface KeyAsksOptions extends ReadOptions {
   spool: string | null | undefined;
@@ -92,7 +92,7 @@ export function createKeyAsks(o: KeyAsksOptions) {
         const said = readSpoolJson(dir, answerName);
         if (!answerIsHers(request.id, said, publicKey!)) removeSpoolEntry(dir, answerName);
         else if (said.card !== cardDigest(request)) { finish({ allow: false, swapped: true }); return 'deny'; }
-        else { finish(said); return said.allow ? 'allow' : 'deny'; }
+        else { finish(said); return said.allow ? 'allow' : { words: typeof said.note === 'string' ? said.note.trim().slice(0, 2_000) : '' }; }
       } else if (savedMeanwhile()) { finish({ allow: false, savedElsewhere: true }); return 'saved'; }
       else if (!spoolEntryExists(dir, requestName)) writeSpoolFile(dir, requestName, JSON.stringify(request));
       await nap();
@@ -120,12 +120,14 @@ export function createKeyAsks(o: KeyAsksOptions) {
     const request = { id: crypto.randomUUID(), at: Date.now(), product, item, tool: KEY_CARD, input: { name, what, ...src } };
     // Another run's card for the same key may be allowed first.
     const verdict = await card(request, () => cloudKeyNames({ home }).some((k) => k.name === name));
-    log(`request_cloud_key ${name} from ${src.place}: ${verdict}`);
+    log(`request_cloud_key ${name} from ${src.place}: ${typeof verdict === 'object' ? (verdict.words ? 'replied' : 'deny') : verdict}`);
     if (verdict === 'gone') return ending;
     if (verdict === 'saved') return handOver(name, false);
+    // Their words instead of a yes: not a no, so the run may ask again as they say.
+    if (typeof verdict === 'object' && verdict.words) return { status: 'replied', message: `They answered your request for ${name} in words instead of allowing it: "${verdict.words}". Do what they say; if they point you at another place for the key, ask again with it.` };
     if (verdict === 'unasked') return { status: 'unavailable', message: `The card could not be shown. End your turn with the line ${askLine(name, what, src)}.` };
     if (verdict === 'unanswered') return { status: 'no_answer', message: `No answer in ${Math.round(waitMs / 60_000) || 1} minutes. Finish what you can without it, then end your turn with the line ${askLine(name, what, src)} so it waits for them on the thread.` };
-    if (verdict === 'deny') { refusedHere.add(name); return { status: 'denied', message: `They said no to ${name}. Do not ask for it again in this run; finish without it and say what it would have needed.` }; }
+    if (verdict === 'deny' || typeof verdict === 'object') { refusedHere.add(name); return { status: 'denied', message: `They said no to ${name}. Do not ask for it again in this run; finish without it and say what it would have needed.` }; }
     const read = await readKeyFrom(src, o);
     if (!('value' in read)) return { status: read.missing ? 'not_found' : 'unavailable', message: `${read.error} End your turn with the line ${NEED} key ${name} | ${what || name} so they can paste it.` };
     await saveCloudKey(name, read.value, { storage, home, label: keyLabel(what) });
