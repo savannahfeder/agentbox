@@ -32,7 +32,45 @@ describe('Team and Files under a sky', () => {
     expect(css).toMatch(/\.app\.sky-place \.cx-list \{ background: transparent; \}/);
   });
 
-  it('leave the Inbox sky as it was', () => {
+  it('keep the sky the shape the Inbox wears', () => {
+    expect(css).toMatch(/\.inbox-sky-head \{ transform: scaleY\(-1\);\n/);
+  });
+});
+
+// On the green and purple skies the Inbox's dim tabs, Team's Today / Yesterday
+// / This week and the board's New thread button sat on the bright streak:
+// measured against the brightest tenth of the sky pixels under each word
+// (scripts/scratch, text hidden, sky read off a screenshot), 12 of 213 words
+// were under 3:1 and the worst was 2.3. With the halo and the filled controls
+// none is under 4.5 and the worst is 4.6.
+describe('words over any sky', () => {
+  const inboxSky = fs.readFileSync(new URL('../renderer/src/home/InboxSky.tsx', import.meta.url), 'utf8');
+  const halo = css.match(/\.app\.sky-shown:not\(\.home-shown\) > \.topbar :is\(h1, button\)[^{]*\{([^}]*)\}/);
+
+  it('know the colour under the sky, and lose it when the sky goes', () => {
+    expect(inboxSky).toContain("host.style.setProperty('--sky-under', art.bg)");
+    expect(inboxSky).toContain("host.style.removeProperty('--sky-under')");
+  });
+
+  it('sit in a patch of that colour: the header, tabs, board headings, Team and Files', () => {
+    expect(halo).not.toBeNull();
+    for (const part of ['.tm-tab', '.th-col-h', '.td-top', '.fp-bar', '.fp-tools', '.cx-search', '.pl-head']) expect(halo![0]).toContain(part);
+    // A button does not inherit a text shadow, so each one is named.
+    expect(halo![0]).toContain(':is(button, input)');
+    expect(halo![1]).toMatch(/text-shadow:[^;]*var\(--sky-under/);
+  });
+
+  it('fill the buttons and search boxes with it, leaving hover and an open menu alone', () => {
+    expect(css).toMatch(/:is\(\.th-new, \.th-disp, \.fp-find, \.cx-search, \.pl-btn\):not\(:hover\):not\(\[aria-expanded="true"\]\) \{\s*background-color: color-mix\(in srgb, var\(--sky-under/);
+  });
+
+  it('only under a sky: Home and the plain looks are untouched', () => {
+    expect(halo![0]).toMatch(/^\.app\.sky-shown:not\(\.home-shown\)/);
+  });
+});
+
+describe('the Inbox sky itself', () => {
+  it('is the one approved', () => {
     expect(app).toContain('{skyOnInbox && sky && <InboxSky art={sky.art} />}');
     expect(app).toMatch(/const skyOnInbox = [\s\S]*?!filesShown && !connectionsShown && !chatsPlaceShown && !evPick;/);
   });
