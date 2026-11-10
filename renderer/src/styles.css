@@ -9399,3 +9399,10 @@ button.msg-kind { cursor: pointer; }
 button.msg-kind:hover { color: var(--text); border-color: var(--text-faint); }
 /* A comment is said beside the work, not to the agent: it reads at the size of what it answers. */
 .msg.yours:has(> .msg-head > .msg-kind) .msg-body { font-size: 15px; line-height: 1.6; font-weight: 400; }
+
+/* A thread a teammate gave you, above its title (team/HandedBy.tsx). */
+.handed-line { display: flex; align-items: center; gap: 9px; min-width: 0; margin: 4px 0 18px; padding: 10px 14px; background: var(--bg-raised); border: 1px solid var(--line); font-size: 14px; color: var(--text-dim); }
+.handed-line b { font-weight: 500; color: var(--text); }
+.handed-who { flex: 0 0 auto; white-space: nowrap; }
+.handed-when { color: var(--text-faint); margin-left: 4px; }
+.handed-note { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); margin-left: 6px; }

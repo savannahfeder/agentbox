@@ -147,6 +147,20 @@ export function sentFrom(item: WorkItem, product: Product | undefined, me: strin
   return { from, agent: !heldByAPerson(item) };
 }
 
+/** A thread a teammate handed you in a shared project: who, when it reached
+ *  you, and their newest note. Conversations and given tasks already lead with
+ *  the person, so they are not this. */
+export function handedBy(item: WorkItem, product: Product | undefined | null, me: string | null): { from: string; at: number; note: string | null } | null {
+  if (!me || !isShared(product) || (product as { team?: { direct?: boolean } } | null)?.team?.direct) return null;
+  if (item.assignee !== me) return null;
+  const from = (item.people ?? []).find((p) => p !== me) ?? item.createdBy;
+  if (!from || from === me) return null;
+  const wrote = item.wrote?.assignee;
+  const at = wrote?.by === from ? wrote.ts : item.createdAt;
+  const note = [...(item.waitingComments ?? [])].reverse().find((c) => c.by === from)?.text?.trim() || null;
+  return { from, at, note };
+}
+
 /**
  * How long since a task last moved, in the Team page's last column. Under a
  * minute is "now": the real copies read "0m" on a task given a moment earlier.
