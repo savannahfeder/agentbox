@@ -258,7 +258,7 @@ import { SkyBackdrop } from './home/SkyBackdrop';
 import { InboxSky } from './home/InboxSky';
 import { SKY_THEME_KEY, setHomeSetting, useDarkWindow, useHomeSettings } from './home/home-settings';
 import { SKY_THEMES, skyTheme } from './home/sky';
-import { engineLetter, engineName, greeting, teamRowState, weekCounts } from './home/home-model';
+import { engineLetter, engineName, greeting, homeCoversTheList, teamRowState, weekCounts } from './home/home-model';
 import { sentFrom } from './team/company';
 import { reachAudienceOf } from '../../shared/teammate-reach.mts';
 
@@ -3162,7 +3162,8 @@ export default function App() {
     : walkBeat.length ? (hoveredId && walkBeat.includes(hoveredId) ? hoveredId : walkBeat[0]) : null;
   const walkOwn = walkAim ? list.find((i) => i.id === walkAim) : undefined;
   const pointed: WorkItem | undefined = walkOwn
-    ?? (hoveredId && !multiSel.size ? list.find((i) => i.id === hoveredId) : undefined) ?? (keyCard || keyLeadPicked ? undefined : current);
+    ?? (hoveredId && !multiSel.size ? list.find((i) => i.id === hoveredId) : undefined)
+    ?? (keyCard || keyLeadPicked || homeCoversTheList({ homeOn, homeOpen, threadOpen: !!focused || !!focusedRepeat, searching: search !== null, settingsOpen, teamShown }) ? undefined : current);
   const keyTab = stacked && pointed ? stacked.tabOf(pointed) : view;
   // No row, card or tick on the list, so a row's keys are words for its box.
   const nothingToActOn = !focused && !pointed && !multiSel.size && !keyLead && !stops.length;
@@ -4570,10 +4571,11 @@ export default function App() {
 
   // Threads opened with O this session (openToastRow).
   const openedWithO = useRef(new Set<string>());
+  const openedFromHome = useRef(new Set<string>());
   // Whether a reply from inside this thread moves her on to the next (./advance).
   const movesOn = useCallback((item: WorkItem) => replyMovesOn({
     view, onBoard, index: shownInbox.findIndex((i) => i.id === item.id), searching: search !== null, phone: onPhone(),
-    cameBack: openedWithO.current.has(keyOf(item)),
+    cameBack: openedWithO.current.has(keyOf(item)), fromHome: openedFromHome.current.has(keyOf(item)),
   }), [view, onBoard, shownInbox, search]);
 
   // Every resolving action goes through here: the UI advances instantly, the
@@ -7396,6 +7398,7 @@ export default function App() {
   const homeOpenRow = (key: string) => {
     const item = items.find((i) => `${i.product}/${i.id}` === key);
     if (!item) return;
+    openedFromHome.current.add(keyOf(item));
     setFocused(item); markSeen(item);
   };
   // Light themes keep the Inbox plain; only dark ones wear its sky.
