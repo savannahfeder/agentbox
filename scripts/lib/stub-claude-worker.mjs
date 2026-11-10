@@ -90,6 +90,23 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 // never closed its input and never wrote the answer onto the row (found
 // 2026-10-11 by the verify-agentbox live drive). So: replay every user line, as
 // the CLI does, and wait for the first before working on it.
+// The usage corner asks with `get_usage` and sends no user line. The world's
+// `usage` ({ session, week } percents) sets the answer; a login it has out
+// reads full.
+function answerControl({ request_id, request }) {
+  const reply = (response) => say({ type: 'control_response', response: { subtype: 'success', request_id, response } });
+  if (request?.subtype !== 'get_usage') return reply({});
+  const world = readWorld(plan.world);
+  const login = process.env.CLAUDE_CONFIG_DIR ? path.basename(process.env.CLAUDE_CONFIG_DIR) : 'default';
+  const out = Array.isArray(world.out) && world.out.includes(login);
+  const pct = (span, fallback) => (out ? 100 : Number.isFinite(Number(world.usage?.[span])) ? Number(world.usage[span]) : fallback);
+  const resets = (h) => new Date(Date.now() + h * 3600_000).toISOString();
+  reply({ rate_limits_available: true, rate_limits: {
+    five_hour: { utilization: pct('session', 12), resets_at: resets(3) },
+    seven_day: { utilization: pct('week', 25), resets_at: resets(72) },
+  } });
+}
+
 const streamInput = argv.includes('--input-format');
 let firstUserLine = null;
 let stdinEnded = !streamInput;
@@ -105,6 +122,7 @@ const inputEnded = new Promise((resolve) => {
       buffer = buffer.slice(at + 1);
       let msg = null;
       try { msg = JSON.parse(line); } catch { continue; }
+      if (msg?.type === 'control_request') { answerControl(msg); continue; }
       if (msg?.type !== 'user') continue;
       say({ ...msg, session_id: sessionId });
       firstUserLine ??= msg;
@@ -238,6 +256,18 @@ async function actAsTeammate(brief, prompt, answer) {
       if (failed(named) && /taken/.test(text(named))) named = await session.call('team_setup', { ...fields, name: `${name} 2` });
       const go = await session.call('team_setup', { ready: true });
       if (failed(go)) await session.call('team_post', { text: 'Before I start: should I bring you everything I find, or only what needs a decision?', options: ['Everything', 'Only decisions'] });
+      return;
+    }
+    if (brief.includes('You have no method yet.')) {
+      await session.call('team_method', { text: '# How I work\n\n## What you have told me\n- (nothing yet)\n\n## What needs your yes first\n- Anything that goes out in public or costs money\n' });
+    }
+    // The look-back's own opening line (main/teammates.mts openingFor).
+    if (prompt.includes('Time to learn from what the person said on your recent work.')) {
+      const named = brief.split('## Threads named in what woke you')[1]?.split('\n## ')[0] ?? '';
+      const n = (named.match(/^- .*characters\)$/gm) ?? []).length || 'your recent';
+      const rule = `- (${new Date().toISOString().slice(0, 10)}) Reread ${n} threads you replied on; kept your corrections from them.`;
+      const r = await session.call('team_method', { old: '## What you have told me\n', new: `## What you have told me\n${rule}\n` });
+      if (!failed(r)) await session.call('team_post', { text: `I went back over ${n} threads you replied on and tightened my method.` });
       return;
     }
     await session.call('team_post', { text: answer });
