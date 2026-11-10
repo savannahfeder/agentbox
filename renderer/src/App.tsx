@@ -1736,7 +1736,6 @@ export default function App() {
   ) => {
     if (!mayOpenInbox(claudeRef.current)) return;
     closeWhatFloats();
-    if (practiceDraftLeft(readComposeDraft().text)) clearComposeDraft();
     if (practised) rememberOffered(localStorage);
     // THAT setup was finished, and nothing about it (./onboarding.ts).
     if (finishedTheFirstRun(runRef.current, { practised })) {
@@ -1752,6 +1751,7 @@ export default function App() {
     rememberProject(runRef.current?.product ?? null); // see above
     finishFirstRun(localStorage);
     setRun(null);
+    if (practiceDraftLeft(readComposeDraft().text)) clearComposeDraft();
     if (celebrate) setLanding({ agents: (filed ?? chosen.length) > 0 });
   }, [closeWhatFloats]);
 
@@ -7092,14 +7092,11 @@ export default function App() {
     finishFirstRun(localStorage);
     setNewInstall(false);
     rememberOffered(localStorage);
-    setTour(startTour());
     setFresh(false);
-    // Lands on Home when it is on, where the setup's preview already was.
-    setHomeOpen(homeOn);
-    setView('inbox');
-    setFocused(null);
     setSelected(0);
-  }, [setTour, setHomeOpen, homeOn]);
+    // The practice tutorial, on threads nothing real is behind; it ends on Home.
+    startTutorial(null);
+  }, [startTutorial]);
 
   // THE FIRST RUN ON MAIN ENDS IN THE INBOX, on the task just sent when there is one, with its two lessons left to give.
   const [landOn, setLandOn] = useState<string | null>(null);

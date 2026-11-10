@@ -22,11 +22,8 @@
 .setup-split * { box-sizing: border-box; }
 .setup-split button, .setup-split input { font: inherit; color: inherit; }
 .setup-split .ss-left { position: absolute; left: 0; top: 0; bottom: 0; width: var(--ss-left); z-index: 2147483001; background: var(--ss-ground); }
-.setup-split .ss-right { position: absolute; left: var(--ss-left); right: 16px; top: 16px; bottom: 16px; border-radius: 16px;
-  background: var(--sky-frame, color-mix(in srgb, var(--text) 5%, var(--bg))); }
-/* The light green sky's own frame, so a window without a sky still sits on the approved green. */
-:root[data-theme="light"] .setup-split .ss-right { background: color-mix(in srgb, var(--sky-frame, #e3e8e5) 93%, var(--text)); }
-.setup-split .ss-cap { position: absolute; left: 56px; top: 40px; font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); }
+.setup-split .ss-right { position: absolute; left: var(--ss-left); right: 16px; top: 16px; bottom: 16px; border-radius: 16px; background: none; }
+.setup-split .ss-cap { display: none; }
 
 .setup-split .ss-brand { position: absolute; left: 48px; top: 40px; display: flex; align-items: center; gap: 10px; font-size: 15px; letter-spacing: -0.01em; }
 .setup-split .ss-steps { position: absolute; right: 48px; top: 45px; display: flex; align-items: center; gap: 5px; }
