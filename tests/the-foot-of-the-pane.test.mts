@@ -129,8 +129,11 @@ describe('the stop is the send slot while the box is empty', () => {
   // THE MODEL, instead of a stop that sat on the box all the time: clicking
   // into the box shows a send control, and the stop appears there. Typing
   // anything turns it back into send, the way Codex works.
+  // The slot wraps the stop so a press hands focus back to the box
+  // (typing-after-stop-goes-into-the-reply-box).
+  const slotHoldsTheStop = /\{stop && !hasDraft \? <span style=\{\{ display: 'contents' \}\}.*?>\{stop\}<\/span> : \(/;
   it('puts the stop in the send slot and gives it back the moment she types', () => {
-    expect(focus).toContain('{stop && !hasDraft ? stop : (');
+    expect(focus).toMatch(slotHoldsTheStop);
     expect(focus).toContain('const stopButton = stoppable ?');
     expect(focus.match(/className="dock-stop"/g)).toHaveLength(1);
   });
@@ -144,7 +147,7 @@ describe('the stop is the send slot while the box is empty', () => {
     const dock = focus.slice(focus.indexOf('className="focus-dock"'));
     expect(dock.match(/stopButton/g)).toHaveLength(1);
     expect(dock).toContain('stop={stopButton} />');
-    expect(focus).toContain('{stop && !hasDraft ? stop : (');
+    expect(focus).toMatch(slotHoldsTheStop);
   });
 
   it('keeps the promise the old label carried, in the toast', () => {
