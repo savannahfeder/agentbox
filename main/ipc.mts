@@ -2320,8 +2320,8 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       if (countsTurnedOff(payload)) { analytics.track('counts_turned_off'); analytics.flush(); }
       setWorkspaceSetting({ config, supervisor, store }, payload ?? {});
       if (payload?.key === 'alphaRooms') team?.rooms?.tick().catch(() => {});
-      if (payload?.key === 'filesInCloud' || payload?.key === 'filesOffAfterDays') filesPlaceNow().considerNow();
       if (cornerTagTurnedOff(payload)) analytics.track('tag_turned_off');
+      if (payload?.key === 'filesInCloud' || payload?.key === 'filesOffAfterDays') filesPlaceNow().considerNow();
       push();
       return { ok: true, ...readSettings({ config, supervisor, store }) };
     } catch (err) {
@@ -2549,8 +2549,10 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   });
   ipcMain.handle('zero:warm-find-in-threads', () => { finderNow().warm().catch(() => {}); return true; });
   const cloudHome = () => ({ home: supervisor.config.home || os.homedir() });
-  const keeper = filesKeeper({
-    dir: path.join(config.storeRoot, 'files-cloud'),
+  let keeperMade: FilesKeeper | null = null;
+  const keeperNow = (): FilesKeeper | null => (!config.accountRoot ? null : keeperMade ??= filesKeeper({
+    // Inside the account, where the window may draw a kept file's poster from (main/img-scheme.mts).
+    dir: path.join(config.accountRoot, '.files-cloud'),
     storage: async () => {
       const s = await (await import('./cloud/account.mts')).cloudFilesStorage(cloudHome());
       return s?.putFile && s.getToFile && s.exists && s.del ? s as unknown as FilesStorage : null;
@@ -2566,12 +2568,12 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       await fsWatch.promises.writeFile(to, img.toJPEG(80));
       return true;
     },
-    freeBytes: async () => { const s = await fsWatch.promises.statfs(config.storeRoot); return s.bavail * s.bsize; },
+    freeBytes: async () => { const s = await fsWatch.promises.statfs(config.accountRoot); return s.bavail * s.bsize; },
     notify: () => push(),
-  });
+  }));
   let filesPlace: FilesPlace | null = null;
   const filesPlaceNow = () => (filesPlace ??= filesPlaceFor({
-    store, team, accountRoot: config.accountRoot, storeRoot: config.storeRoot, notify: () => push(), keeper,
+    store, team, accountRoot: config.accountRoot, storeRoot: config.storeRoot, notify: () => push(), keeper: keeperNow(),
     trashItem: async (file) => {
       const shell = await shellNow();
       if (!shell.trashItem) throw new Error('this computer has no Trash');
@@ -2580,8 +2582,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   }));
   supervisor.onStarting = (item) => { void filesPlaceNow().bringBackFor({ product: item.product, id: item.id }).catch(() => {}); };
   // Files is read when it is open; the keeper also passes while it is not.
-  const keeperTick = setInterval(() => { void filesPlaceNow().list().catch(() => {}); }, 15 * 60_000);
-  keeperTick.unref?.();
+  if (config.accountRoot) setInterval(() => { void filesPlaceNow().list().catch(() => {}); }, 15 * 60_000).unref?.();
   ipcMain.handle('zero:files-place-trash', async (_e, { keys, older }: { keys?: unknown; older?: unknown } = {}) => {
     try {
       const out = await filesPlaceNow().trash({ keys: Array.isArray(keys) ? keys.map(String) : [], older: older === true });
@@ -2589,7 +2590,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       return out;
     } catch (err) { return { ok: false, moved: 0, bytes: 0, error: String((err as Error)?.message ?? err) }; }
   });
-  ipcMain.handle('zero:files-cloud', () => keeper.look());
+  ipcMain.handle('zero:files-cloud', () => keeperNow()?.look() ?? null);
   // An agent's team_read reads folders from the view the reach tick writes.
   if (store.teammates) store.teammates.foldersForAgents = () => filesPlaceNow().forAgents();
   ipcMain.handle('zero:files-place', async () => {
@@ -2990,8 +2991,9 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // download finishes, without holding the window itself.
   // A picture or film asked for where it was, and kept in the cloud: brought back.
   const comeBackAt = (file: string): Promise<boolean> => {
-    const hash = keeper.hashAt(file);
-    return hash ? keeper.bringBack(hash) : Promise.resolve(false);
+    const keeper = keeperNow();
+    const hash = keeper?.hashAt(file);
+    return hash ? keeper!.bringBack(hash) : Promise.resolve(false);
   };
   return { answerApproval, pendingApprovals, cardSentAt, push, usageForPhone, comeBackAt };
 }
