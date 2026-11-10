@@ -118,11 +118,20 @@ const MAX_READS = 1200;
 // The card shows "Looking" while this runs.
 const READ_BUDGET_MS = 3000;
 
+/** How the Windows temp-folder rule is read; tests pass a Windows they made up. */
+export interface ScratchOptions {
+  platform?: NodeJS.Platform;
+  tmpdir?: string;
+  realpath?: (p: string) => string;
+}
+
 /** A temp folder, where nobody works. Agentbox's own scripts and workers run
  *  Claude Code sessions there, so a thread from one is not the person's. */
-export function isScratchFolder(folder: unknown, home = os.homedir()) {
+export function isScratchFolder(folder: unknown, home = os.homedir(), how: ScratchOptions = {}) {
   const p = String(folder ?? '');
   if (!p) return true;
+  const { platform = process.platform } = how;
+  if (platform === 'win32' && windowsScratch(winKey(p), winKey(home), windowsTemps(how).map(winKey), '\\')) return true;
   // A folder inside the home folder is the person's, whatever the path. This
   // check comes first because a Mac can put a home folder anywhere, and the
   // tests put one under `/var/folders`.
@@ -139,8 +148,9 @@ export function isScratchFolder(folder: unknown, home = os.homedir()) {
  *  Claude Code's desktop app makes worktrees in the same place, named
  *  `upbeat-matsumoto-588a8d`, so the `w-<hex>` id is what tells them apart. */
 const TASK_FOLDER = /\/\.claude\/worktrees\/w-[0-9a-f]{6,}(\/|$)/i;
-export function isTaskFolder(folder: unknown) {
-  return TASK_FOLDER.test(String(folder ?? ''));
+const WINDOWS_TASK_FOLDER = /[\\/]\.claude[\\/]worktrees[\\/]w-[0-9a-f]{6,}([\\/]|$)/i;
+export function isTaskFolder(folder: unknown, { platform = process.platform }: { platform?: NodeJS.Platform } = {}) {
+  return (platform === 'win32' ? WINDOWS_TASK_FOLDER : TASK_FOLDER).test(String(folder ?? ''));
 }
 // The same rule on the name Claude Code files a transcript under, where `/.`
 // and `/` both became `-`.
@@ -150,11 +160,45 @@ const TASK_PROJECT_DIR = /--claude-worktrees-w-[0-9a-f]{6,}(-|$)/i;
  *  a temp-folder transcript is refused without being opened. Claude Code names
  *  that folder after the working folder with every character that is not a
  *  letter or digit turned into `-`, so `/private/tmp/w-1` is `-private-tmp-w-1`. */
-export function isScratchProjectDir(name: unknown, home = os.homedir()) {
+export function isScratchProjectDir(name: unknown, home = os.homedir(), how: ScratchOptions = {}) {
   const n = String(name ?? '');
+  const { platform = process.platform } = how;
+  if (platform === 'win32') {
+    const asDir = (p: string) => winKey(p).replace(/[^a-z0-9]/g, '-');
+    if (windowsScratch(n.toLowerCase(), asDir(home), windowsTemps(how).map(asDir), '-')) return true;
+  }
   const here = path.resolve(String(home ?? '')).replace(/[^a-zA-Z0-9]/g, '-');
   if (here.length > 1 && (n === here || n.startsWith(`${here}-`))) return false;
   return /^-(private-)?(tmp|var-folders)(-|$)/.test(n);
+}
+
+/** A Windows path compared the way Windows compares it, without case. */
+function winKey(p: unknown) {
+  return path.win32.normalize(String(p ?? '')).replace(/[\\/]+$/, '').toLowerCase();
+}
+
+// os.tmpdir() can give the 8.3 short name, C:\Users\JANEDO~1, while a session
+// records the long one, so the temp folder is known by both.
+const tempNames = new Map<string, string[]>();
+function windowsTemps({ tmpdir = os.tmpdir(), realpath = fs.realpathSync.native }: ScratchOptions = {}): string[] {
+  const cached = realpath === fs.realpathSync.native;
+  const known = cached ? tempNames.get(tmpdir) : undefined;
+  if (known) return known;
+  let names = [tmpdir];
+  try { names.push(realpath(tmpdir)); } catch {}
+  // A TEMP set to a whole drive would hide every chat on it.
+  names = names.filter((n) => !/^[A-Za-z]:[\\/]*$/.test(String(n ?? '')));
+  if (cached) tempNames.set(tmpdir, names);
+  return names;
+}
+
+// On Windows the temp folder is inside the home folder, so of the two that hold
+// a path the deeper one decides, and a tie goes to her.
+function windowsScratch(p: string, home: string, temps: string[], sep: string) {
+  const under = (root: string) => !!root && (p === root || p.startsWith(`${root}${sep}`));
+  const temp = temps.filter(under).sort((a, b) => b.length - a.length)[0];
+  if (!temp) return false;
+  return !(under(home) && home.length >= temp.length);
 }
 
 /** Entrypoints a person starts. `cli` is a terminal, `claude-desktop` the
