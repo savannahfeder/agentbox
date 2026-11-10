@@ -55,6 +55,8 @@ export function FrameWordsBar({ frame, onComment }: { frame: HTMLIFrameElement |
   if (!picked) return null;
   const comment = () => {
     onComment(quoteFrom(picked.words));
+    // The page is a sandboxed frame with an opaque origin, which no target but '*' can name; the message carries nothing.
+    // nosemgrep: javascript.browser.security.wildcard-postmessage-configuration.wildcard-postmessage-configuration
     frame?.contentWindow?.postMessage({ type: 'agentbox-clear-selection' }, '*');
     setPicked(null);
   };
