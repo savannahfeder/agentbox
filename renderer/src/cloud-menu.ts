@@ -71,8 +71,6 @@ export interface CloudStatus {
   accounts?: CloudAccount[];
   /** Engines whose account on this Mac has no working sign-in in the cloud, so their threads run here. */
   notInCloud?: Array<'claude' | 'codex'>;
-  /** Engines with no sign-in in the cloud at all, so the cloud can run none of their threads. */
-  noCloudSignIn?: Array<'claude' | 'codex'>;
   signIns?: CloudSignIn[];
   /** 'resting' after runs failed in a row before their agent started, until `restingUntil`. */
   health?: 'ok' | 'failing' | 'resting';
@@ -278,7 +276,6 @@ export function threadPlace(
   item: { id: string; product: string; onMac?: boolean; needsMac?: string; labels?: string[] },
   session: { where?: string; movable?: boolean } | null,
   cloud: CloudStatus | null,
-  engine: string | null = null,
 ): 'cloud' | 'here' | 'kept' | 'move' | 'needs' | null {
   // The phone has no cloud status, only the computer's word on each run.
   if (session?.movable && session.where !== 'cloud') return 'move';
@@ -287,7 +284,6 @@ export function threadPlace(
   if (item.onMac) return 'kept';
   if (session?.where === 'cloud') return 'cloud';
   if (!cloudIsOn(cloud)) return null;
-  if (engine && cloud.noCloudSignIn?.includes(engine as 'claude' | 'codex')) return null;
   if (cloud.movable?.includes(item.id)) return 'move';
   return cloud.projects?.includes(item.product) ? 'here' : null;
 }
