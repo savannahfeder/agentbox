@@ -1,6 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {api} from '../api';
+import type {TerminalScreen} from '../types';
 import {MAC} from '../this-keyboard';
 import {commandRunning,whenACommandFinishes} from '../../../shared/terminal-state.mts';
 import {linksAtRow} from '../../../shared/terminal-links.mts';
@@ -10,6 +11,7 @@ import {optionWordKey} from '../../../shared/terminal-keys.mts';
 import {dragSize,readSavedSize,SIZE_KEY} from '../../../shared/terminal-size.mts';
 import {terminalKeys} from '../../../shared/terminal-focus.mts';
 import {CrossIcon} from './CrossIcon';
+import {useEscapePutsAway} from '../escape-steps';
 import '@xterm/xterm/css/xterm.css';
 import './task-terminal.css';
 const screenCache=new Map<string,{token:string;screen:string;offset:number;cols:number;rows:number}>();
@@ -68,6 +70,12 @@ export function TaskTerminal({product,id,headerTarget,startOpen=false,commandSes
     grip.addEventListener('pointermove',move);grip.addEventListener('pointerup',up);grip.addEventListener('pointercancel',up);
   }
   useEffect(()=>{onOpenChange?.(open);},[open,onOpenChange]);
+  // Only a terminal opened on this visit: one remembered open from the last
+  // visit is not what she just opened, so Escape still leaves the thread.
+  const [openedAt,setOpenedAt]=useState<number|null>(null);
+  const wasOpen=useRef(open);
+  useEffect(()=>{if(open&&!wasOpen.current)setOpenedAt(Date.now());if(!open)setOpenedAt(null);wasOpen.current=open;},[open]);
+  useEscapePutsAway(openedAt,()=>setOpen(false));
   // ⌘K's "Open Terminal" row opens it; ⌘J is a switch, the way ⌘J is a switch
   // in every editor she already uses. The two events stay separate because a
   // menu row named "Open Terminal" that closed an open terminal would be
@@ -133,7 +141,7 @@ export function TaskTerminal({product,id,headerTarget,startOpen=false,commandSes
         const mac=MAC;
         terminal.attachCustomKeyEventHandler(event=>{const sequence=optionWordKey(event,mac);if(sequence===undefined)return true;if(sequence)input.push(sequence);event.preventDefault();return false;});
         dispose=()=>{if(ready)screenCache.set(key,{token,screen:serializer.serialize({scrollback:1000}),offset,cols:terminal.cols,rows:terminal.rows});observer.disconnect();subscription.dispose();terminal.dispose();};
-        const consume=async(state:any)=>{if(cancelled)return;setCwd(state.cwd);setProcessName(state.process);setExited(state.exited);watch(state.process,state.exited);if(state.truncated){terminal.reset();terminal.writeln('[Earlier terminal output omitted]');}await new Promise<void>(resolve=>terminal.write(state.data,resolve));offset=state.offset;};
+        const consume=async(state:TerminalScreen)=>{if(cancelled)return;setCwd(state.cwd);setProcessName(state.process);setExited(state.exited);watch(state.process,state.exited);if(state.truncated){terminal.reset();terminal.writeln('[Earlier terminal output omitted]');}await new Promise<void>(resolve=>terminal.write(state.data,resolve));offset=state.offset;};
         let initial=await api.terminal({product,id,action:'open'});
         if(cancelled)return;
         token=initial.token;const cached=screenCache.get(key);

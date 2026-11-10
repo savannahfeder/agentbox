@@ -6,7 +6,7 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {TaskTerminals,terminalEnv} from './task-terminals.mts';
 import { harnessFor } from './harnesses.mts';
-import { harnessDefinition } from '../shared/harness-definitions.mjs';
+import { harnessDefinition } from '../shared/harness-definitions.mts';
 import type { HarnessConfig } from './harnesses/common.mts';
 const exec=promisify(execFile);
 export interface UpdatePlan { feed: string; format?: string; file?: string; args?: string[]; env?: NodeJS.ProcessEnv; name?: string; home?: string }

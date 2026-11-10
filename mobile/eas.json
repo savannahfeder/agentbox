@@ -17,6 +17,30 @@
       "distribution": "store",
       "autoIncrement": true,
       "environment": "production"
+    },
+    "store": {
+      "extends": "production",
+      "env": {
+        "EXPO_PUBLIC_STORE_BUILD": "1",
+        "EXPO_PUBLIC_PHONE_SITE": "https://app.agentbox.ac"
+      }
+    },
+    "store-launch-test": {
+      "extends": "launch-test",
+      "env": {
+        "EXPO_PUBLIC_STORE_BUILD": "1",
+        "EXPO_PUBLIC_PHONE_SITE": "https://app.agentbox.ac"
+      }
+    },
+    "launch-test": {
+      "extends": "base",
+      "distribution": "internal",
+      "withoutCredentials": true,
+      "environment": "production",
+      "ios": {
+        "simulator": true,
+        "buildConfiguration": "Release"
+      }
     }
   },
   "submit": {
@@ -24,6 +48,9 @@
       "ios": {
         "ascAppId": "6826402748"
       }
+    },
+    "store": {
+      "extends": "production"
     }
   }
 }

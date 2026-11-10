@@ -146,7 +146,9 @@ if (path.basename(process.argv[1] || '') === 'terminal-host.mts') {
   (await import('./pty.mts')).loadPty();
   const { TaskTerminals } = await import('./task-terminals.mts');
   const { readMacPressureWord } = await import('./leftovers.mts');
-  const terminals = new TaskTerminals({ readPressure: process.platform === 'darwin' ? readMacPressureWord : null });
+  const { TERMINAL_LINES } = await import('./memory-gate.mts');
+  const readPressure = () => readMacPressureWord(TERMINAL_LINES);
+  const terminals = new TaskTerminals({ readPressure: process.platform === 'darwin' ? readPressure : null });
   const host = serveTerminals({
     sockPath,
     terminals,

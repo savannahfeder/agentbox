@@ -28,6 +28,8 @@ export class StrayLetters {
   opening(box: BoxKind, now: number) { this.openedAt = now; this.openingBox = box; }
   /** Escape, a press or ⌘↵: the person chose to leave the box. */
   reset() { this.typedAt = -Infinity; this.openedAt = -Infinity; this.looseAt = -Infinity; }
+  /** A held letter turned out to be typing: it and the rest of the burst act on nothing. */
+  burst(now: number) { this.looseAt = now; this.inBurst = true; }
 
   decide({ key, inInput, chord, now, boxThere, openingThere }: {
     key: string; inInput: boolean; chord: boolean; now: number;
@@ -57,9 +59,16 @@ const shown = (el: HTMLElement | null): el is HTMLElement => !!el && el.isConnec
 // A chat's box is an editor: the keys go to the editable page inside `.dock-input`.
 const kindOf = (el: HTMLElement) => (Object.keys(BOXES) as BoxKind[]).find((k) => el.matches(BOXES[k]) || !!el.closest?.(BOXES[k])) ?? null;
 
+const MODIFIERS = ['Shift', 'Meta', 'Control', 'Alt'];
+type Replay = (e: KeyboardEvent) => KeyboardEvent;
+const copyKey: Replay = (e) => new KeyboardEvent('keydown', { key: e.key, code: e.code, shiftKey: e.shiftKey, bubbles: true, cancelable: true });
+
 /** Ahead of every other key listener, so no shortcut sees a letter that is typing. */
-export function installStrayLetters(win: Window = window) {
+export function installStrayLetters(win: Window = window, replay: Replay = copyKey) {
   let lastBox: HTMLElement | null = null;
+  // Z undoes a send at once, so it waits one burst to see whether it is the start of a word.
+  let held: ReturnType<typeof setTimeout> | null = null;
+  const replayed = new WeakSet<object>();
   // A re-render can swap the box for a new one of the same kind.
   const typedBox = () => {
     if (shown(lastBox)) return lastBox;
@@ -68,8 +77,15 @@ export function installStrayLetters(win: Window = window) {
     return shown(again) ? again : null;
   };
   const onKey = (e: KeyboardEvent) => {
+    if (replayed.has(e)) return;
     const now = Date.now();
     const chord = e.metaKey || e.ctrlKey || e.altKey;
+    if (held && !MODIFIERS.includes(e.key)) {
+      clearTimeout(held);
+      held = null;
+      strayLetters.burst(now);
+      if (!chord && e.key.length === 1 && !editable(e.target)) { e.stopImmediatePropagation(); e.preventDefault(); return; }
+    }
     if (e.key === 'Escape') { strayLetters.reset(); return; }
     // A table's key box takes arrows and Enter for the table; a letter pressed in it is handed on to the app, not typed.
     if ((e.target as HTMLElement | null)?.dataset?.keysOnly !== undefined) return;
@@ -83,7 +99,19 @@ export function installStrayLetters(win: Window = window) {
     const kind = strayLetters.openingBox;
     const opening = kind ? win.document.querySelector<HTMLElement>(BOXES[kind]) : null;
     const call = strayLetters.decide({ key: e.key, inInput: false, chord, now, boxThere: !!box, openingThere: shown(opening) });
-    if (call === 'shortcut') return;
+    if (call === 'shortcut') {
+      if (chord || (e.key !== 'z' && e.key !== 'Z')) return;
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      const target = e.target as (HTMLElement & { isConnected?: boolean }) | null;
+      const again = replay(e);
+      replayed.add(again);
+      held = setTimeout(() => {
+        held = null;
+        (target?.isConnected ? target : win.document.body).dispatchEvent(again);
+      }, BURST_MS);
+      return;
+    }
     // Focus moved inside keydown takes the letter with it, so it lands in the box.
     e.stopImmediatePropagation();
     if (call === 'drop') { e.preventDefault(); return; }

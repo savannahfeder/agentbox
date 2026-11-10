@@ -89,3 +89,29 @@ jobs:
       - run: npm ci
 
       - run: npx vitest run --reporter=basic
+
+  # Strict tsc over the renderer and the back end (main/, shared/, mcp/), and
+  # over the phone app, which imports shared/ too. Its own job so a type error
+  # shows as a red `typecheck` beside the tests.
+  typecheck:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            mobile/package-lock.json
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm ci --prefix mobile
+
+      - run: npm run typecheck --prefix mobile

@@ -67,14 +67,16 @@ export function stripeClient({ key, webhookSecret, managedPayments = false, fetc
   }
 
   return {
-    async checkout({ person, plan, customer, successUrl, cancelUrl }) {
+    // `team`: a team's seats, `quantity` of them, which the webhook gives the whole team.
+    async checkout({ person, plan, customer, successUrl, cancelUrl, team = null, quantity = 1 }) {
+      const metadata = { person, ...(team ? { team } : {}) };
       const session = await call('POST', '/v1/checkout/sessions', {
         mode: 'subscription',
-        line_items: [{ price: await priceOf(plan), quantity: 1 }],
+        line_items: [{ price: await priceOf(plan), quantity }],
         client_reference_id: person,
-        // The webhook finds the person on the subscription, whatever event it is.
-        subscription_data: { metadata: { person } },
-        metadata: { person },
+        // The webhook finds the person, or the team, on the subscription, whatever event it is.
+        subscription_data: { metadata },
+        metadata,
         ...(customer ? { customer } : {}),
         success_url: successUrl,
         cancel_url: cancelUrl,
@@ -106,6 +108,10 @@ export function stripeClient({ key, webhookSecret, managedPayments = false, fetc
       return (await call('POST', '/v1/billing_portal/sessions', { customer, return_url: returnUrl, ...flow })).url;
     },
     subscription: (id) => call('GET', `/v1/subscriptions/${encodeURIComponent(id)}`),
+    // For a team's billing page: its card, where invoices go, and the last few.
+    subscriptionWithCard: (id) => call('GET', `/v1/subscriptions/${encodeURIComponent(id)}`, { expand: ['default_payment_method'] }),
+    customer: (id) => call('GET', `/v1/customers/${encodeURIComponent(id)}`, { expand: ['invoice_settings.default_payment_method'] }),
+    invoices: (customer, limit = 4) => call('GET', '/v1/invoices', { customer, limit }),
     signed: (raw, header, nowMs) => stripeSigned(raw, header, webhookSecret, nowMs),
   };
 }

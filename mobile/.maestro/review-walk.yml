@@ -1,0 +1,90 @@
+# What App Review does first, on an iPhone simulator against the real cloud:
+# sign in as the demo account, reply in a thread and read the answer, then
+# start a thread and read its answer. The review computer
+# (scripts/app-review-computer.mjs) must be on to answer.
+# Run by .github/workflows/iphone-walk.yml; REVIEW_PASSWORD and RUN come from it.
+appId: now.astral.agentbox
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Use the account from .* on your computer."
+    timeout: 120000
+- takeScreenshot: 01-sign-in
+# By their test ids, so a password is never typed into the email box. The
+# password goes first, while the keyboard is down: once it is up, a tap on the
+# password box does not take the focus. A tap off the boxes drops the
+# keyboard, and the screen is back as it was for the Sign in button.
+- tapOn:
+    id: "sign-in-password"
+- inputText: ${REVIEW_PASSWORD}
+- tapOn:
+    id: "sign-in-email"
+- inputText: "appreview@agentbox.ac"
+- tapOn: "(?i)email"
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: "Sign in"
+    below:
+      id: "sign-in-password"
+- extendedWaitUntil:
+    visible: "Where your messages go"
+    timeout: 60000
+- takeScreenshot: 02-where-messages-go
+# iOS offers to save the password a few seconds later, over whatever screen
+# is up by then.
+- extendedWaitUntil:
+    visible: "Save Password.*"
+    timeout: 10000
+    optional: true
+- tapOn:
+    text: "Not Now"
+    optional: true
+- tapOn: "Allow and continue"
+- waitForAnimationToEnd:
+    timeout: 5000
+- runFlow:
+    when:
+      visible: "Turn on alerts"
+    commands:
+      - takeScreenshot: 03-alerts
+      # Matched without regard to case, so iOS's Save Password "Not Now"
+      # and this screen's "Not now" are one tap.
+      - tapOn:
+          text: "Not now"
+          optional: true
+- extendedWaitUntil:
+    visible: ".*Ember coffee shop one-page site.*"
+    timeout: 60000
+- assertNotVisible: "Where your messages go"
+- takeScreenshot: 04-needs-you
+
+# A reply in a thread the computer has answered before.
+- tapOn: ".*Ember coffee shop one-page site.*"
+- tapOn: "Reply"
+- inputText: "Walk ${RUN}: answer with one word, the capital of France, in capitals."
+- tapOn: "Send"
+- takeScreenshot: 05-reply-sent
+- extendedWaitUntil:
+    visible: ".*PARIS.*"
+    timeout: 240000
+- takeScreenshot: 06-reply-answered
+- tapOn: "Back"
+
+# A new thread from the pen.
+- tapOn: "New thread"
+- inputText: "Walk ${RUN}: answer with one word, the colour of a clear daytime sky, in capitals."
+- tapOn: "Send"
+- takeScreenshot: 07-thread-sent
+# A new thread goes back to the list, under In progress, and comes up in
+# Needs you once it is answered. Open it there and read the answer.
+- extendedWaitUntil:
+    visible: ".*Walk ${RUN}.*"
+    timeout: 300000
+- tapOn: ".*Walk ${RUN}.*"
+- extendedWaitUntil:
+    visible: ".*BLUE.*"
+    timeout: 30000
+- assertNotVisible: "This thread is not on your phone."
+- takeScreenshot: 08-thread-answered

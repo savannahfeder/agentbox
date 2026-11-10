@@ -2,6 +2,19 @@
 export type Setup = 'account' | 'computer' | 'messages' | 'alerts';
 export const SETUP_STEPS: Setup[] = ['account', 'computer', 'messages', 'alerts'];
 
+/**
+ * Which first-run step has been opened, once for the whole app: on iOS two
+ * inboxes can sit on the stack after sign-in, and each would open it.
+ */
+export function firstRunStep() {
+  let opened: Setup | null = null;
+  return {
+    take: (step: Setup) => (opened === step ? false : ((opened = step), true)),
+    reset: () => { opened = null; },
+  };
+}
+export const FIRST_RUN = firstRunStep();
+
 /** Kept once alerts were offered, so "Not now" is not asked again. */
 export const ALERTS_ASKED_KEY = 'agentbox-alerts-asked';
 

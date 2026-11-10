@@ -25,6 +25,8 @@
 // folded is a failure.
 
 import { useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Face, TeamContext, firstName } from '../team/people';
 import { Name } from '../../../shared/product-name.mjs';
 import { LINE_MISSING } from '../reveal-line';
@@ -32,6 +34,7 @@ import { activitySummary, keepActivityKeyLocal } from '../activity-summary';
 import { actWhen, actWords } from '../act-line';
 import { herTurnEnds, herTurnStarts, threadParts } from '../her-turns';
 import { holdAtBottom, lastMessageIn } from '../thread-bottom';
+import { blockKeys, lineIds } from '../thread-keys';
 import { NOT_ANSWERING_MS, THREAD_NOT_ANSWERING_MS, threadWaitWords } from '../not-answering';
 import { onCloudPhone, onPhone } from '../phone-screen';
 import { threadPieces, typedParts } from '../typed-message';
@@ -51,9 +54,11 @@ import { AgentAnswers } from '../team/ChatAgents';
 import { NeedOlder } from './NeedCard';
 import {
   conversationGap, fileInChange, gapIndex, groupWork, outputCut, runFailures, runOverflow, runSummary,
-} from '../../../shared/agents.mjs';
+} from '../../../shared/agents.mts';
 import type { AgentEvent, AgentTurn, AgentVoice, AgentWork } from '../types';
-import { voiceName } from '../../../shared/agent-voice.mjs';
+import type { ThreadPlace } from '../thread-place';
+import { voiceName } from '../../../shared/agent-voice.mts';
+import { useEscapePutsAway } from '../escape-steps';
 
 // How much of an output stands open before she asks for the rest. The chosen
 // drawings show five or six lines: enough to see what came back, short
@@ -110,7 +115,10 @@ export interface CodeInThread {
   open: (path: string) => void;
 }
 
-export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, name, nameOf, landOn, md, code, tail, chat = false, reactions, onReact, onQuote, onHandToAgent, replies, openThread = null, onOpenThread, freshThreads, onEdit, onMarkUnread, onCopied, onMove, seenUnder = null }: {
+export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, name, nameOf, landOn, kept = null, onFolds, md, code, tail, chat = false, reactions, onReact, onQuote, onHandToAgent, replies, openThread = null, onOpenThread, freshThreads, onEdit, onMarkUnread, onCopied, onMove, seenUnder = null }: {
+  /** The steps she had open when she left this conversation, to open again. */
+  kept?: Pick<ThreadPlace, 'runs' | 'lines'> | null;
+  onFolds?: (runs: string[], lines: [string, number][]) => void;
   // CUT THE AGENT'S CURRENT STEP so a message of hers that is waiting on it is
   // answered now (w-f37a34def6). Absent where nothing can be cut.
   onSendNow?: () => unknown;
@@ -160,7 +168,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   tail?: (index: number) => ReactNode;
   // WHAT PEOPLE PUT ON EACH MESSAGE (w-560647d4db), by the message's uid, then
   // by emoji, then the people on it. Straight off the row (`item.reactions`,
-  // shared/work-items.mjs); nothing is counted here.
+  // shared/work-items.mts); nothing is counted here.
   reactions?: Record<string, Record<string, string[]>>;
   // AND THE WAY TO PUT ONE ON OR TAKE IT OFF. Absent everywhere a chat is not
   // being drawn, which is also what decides whether a message gets the bar on
@@ -180,7 +188,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   openThread?: string | null;
   onOpenThread?: (uid: string) => void;
   // How many replies in each thread are waiting on you, by its message's uid
-  // (`whatWaits`, shared/team-rules.mjs). Absent or 0 reads as before.
+  // (`whatWaits`, shared/team-rules.mts). Absent or 0 reads as before.
   freshThreads?: Record<string, number>;
   /** New words for one of your messages, or `gone` to delete it. Absent where messages cannot be changed. */
   onEdit?: (uid: string, change: { text: string } | { gone: true }) => void;
@@ -208,11 +216,25 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
     window.addEventListener(EDIT_LAST, last);
     return () => window.removeEventListener(EDIT_LAST, last);
   });
-  // Which work lines are open, and how far. Kept per conversation, not globally.
-  const [open, setOpen] = useState<Map<number, number>>(new Map());
-  // Which folded RUNS she has opened, by the index of their first line. Runs
-  // are aggregated, and a run she opened stays open while she reads.
-  const [runsOpen, setRunsOpen] = useState<Set<number>>(new Set());
+  // Which work lines are open, and how far, by name (../thread-keys).
+  const [open, setOpen] = useState<Map<string, number>>(new Map());
+  // Which folded runs are open, by name, so a run stays open while the agent adds to the thread.
+  const [runsOpen, setRunsOpen] = useState<Set<string>>(new Set());
+  // What she unfolded on this visit, which one Escape folds back (../escape-steps).
+  const unfolded = useRef({ runs: new Set<string>(), lines: new Set<string>() });
+  const [unfoldedAt, setUnfoldedAt] = useState<number | null>(null);
+  const noteFold = (kind: 'runs' | 'lines', k: string, opening: boolean) => {
+    if (opening) unfolded.current[kind].add(k); else unfolded.current[kind].delete(k);
+    if (opening) setUnfoldedAt(Date.now());
+    else if (!unfolded.current.runs.size && !unfolded.current.lines.size) setUnfoldedAt(null);
+  };
+  useEscapePutsAway(unfoldedAt, () => {
+    const { runs, lines } = unfolded.current;
+    setRunsOpen((was) => new Set([...was].filter((k) => !runs.has(k))));
+    setOpen((was) => new Map([...was].filter(([k]) => !lines.has(k))));
+    unfolded.current = { runs: new Set(), lines: new Set() };
+    setUnfoldedAt(null);
+  });
   const foot = useRef<HTMLDivElement>(null);
   const decide = useContext(DecideContext);
   // A TEAMMATE'S MESSAGE is theirs, not "You": drawn with their face and name.
@@ -230,9 +252,13 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   };
 
   useEffect(() => {
-    setOpen(new Map());
-    setRunsOpen(new Set());
-  }, [landOn]);
+    setOpen(new Map(kept?.lines ?? []));
+    setRunsOpen(new Set(kept?.runs ?? []));
+    unfolded.current = { runs: new Set(), lines: new Set() };
+    setUnfoldedAt(null);
+  }, [landOn]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Not keyed on landOn, for the reason ItemThread gives.
+  useEffect(() => { onFolds?.([...runsOpen], [...open]); }, [open, runsOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A found line that is not drawn is in the middle this thread left out.
   useEffect(() => {
@@ -281,7 +307,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   //
   // THE RULE IS `gapIndex`, BESIDE THE CUT ITSELF. It used to be a loop here
   // with a second, different count, and the two drifted: see the note on
-  // `gapIndex` in shared/agents.mjs for the 56 rows that put the line in the
+  // `gapIndex` in shared/agents.mts for the 56 rows that put the line in the
   // wrong place. One rule, one file, and they cannot disagree again.
   const gapAfter = chat ? -2 : gapIndex(events, omitted);
 
@@ -311,10 +337,12 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
 
   // CONSECUTIVE TOOL CALLS FOLD INTO ONE LINE, aggregated behind one toggle
   // rather than each drawn on its own. The rule and
-  // the threshold live in shared/work-lines.mjs with the histogram that set
-  // them. Each node keeps the index it had in the raw list, because that is
-  // what the open-map is keyed on and what the gap below is measured against.
+  // the threshold live in shared/work-lines.mts with the histogram that set
+  // them. Each node keeps the index it had in the raw list, which the gap below
+  // is measured against; what is open is kept by name instead.
   const nodes = groupWork(events.map((e, i) => ({ ...e, i })), { min: 1 }) as ThreadNode[];
+  const ids = lineIds(events);
+  const keys = blockKeys(nodes, ids);
   // WHICH OF HER MESSAGES OPEN A CHAPTER, and so wear the rule above them. The
   // whole of when is in ../her-turns.ts; the cut middle counts as a break.
   const cutAt = cutIndex(nodes, gapAfter);
@@ -377,20 +405,21 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
         </button>
       )}
       {nodes.map((e, n) => {
-        // A folded run answers to the index of its first line, so opening one
-        // survives the thread reloading under her while an agent works.
-        const key = e.kind === 'run' ? (e.items[0]?.i ?? -1) : e.i;
+        const key = keys[n];
         // AND THE GAP ANSWERS TO THE LAST LINE IN THE NODE, not the first. The
         // seam can fall on work rather than on a message now, and consecutive
-        // work is folded into one run: matching on `key` would look for the seam
-        // at the run's opening line and never find it, taking the door off the
+        // work is folded into one run: matching on the run's opening line would
+        // never find the seam, taking the door off the
         // screen on exactly the rows that need it.
         const ends = e.kind === 'run' ? (e.items[e.items.length - 1]?.i ?? -1) : e.i;
-        const stepLine = (k: number, next: number) => setOpen((was) => {
-          const map = new Map(was);
-          if (next === SHUT) map.delete(k); else map.set(k, next);
-          return map;
-        });
+        const stepLine = (k: string, next: number) => {
+          noteFold('lines', k, next !== SHUT);
+          setOpen((was) => {
+            const map = new Map(was);
+            if (next === SHUT) map.delete(k); else map.set(k, next);
+            return map;
+          });
+        };
         // WHAT THIS BLOCK HOLDS, SAID ON THE BLOCK ITSELF. The thread is a
         // flex column and every event was wrapped in an anonymous div, so
         // `.did + .did` and its neighbours never matched anything: a work line
@@ -404,7 +433,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
           : slot && !slot.head ? 'is-msg is-chat-cont'
           : e.same ? 'is-msg-same' : 'is-msg';
         return (
-        <div key={`${e.at}-${key}-${n}`} className={`thread-block ${holds} ${ends === gapAfter ? 'has-gap' : ''}${chat && e.kind !== 'work' && e.kind !== 'run' && e.uid && e.uid === openThread ? ' is-thread-open' : ''}`} data-exchange={exchanges[n]} data-line={e.kind === 'work' || e.kind === 'run' ? undefined : e.uid ?? `at-${e.at}`}>
+        <div key={key} className={`thread-block ${holds} ${ends === gapAfter ? 'has-gap' : ''}${chat && e.kind !== 'work' && e.kind !== 'run' && e.uid && e.uid === openThread ? ' is-thread-open' : ''}`} data-exchange={exchanges[n]} data-line={e.kind === 'work' || e.kind === 'run' ? undefined : e.uid ?? `at-${e.at}`}>
           {slot?.day && <div className="chat-day">{slot.day}</div>}
           {e.kind === 'work' && e.yours
             ? <ActLine act={e} />
@@ -412,11 +441,12 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
             ? <RunLine
                 items={e.items}
                 open={runsOpen.has(key)}
-                onToggle={() => setRunsOpen((was) => {
+                onToggle={() => { noteFold('runs', key, !runsOpen.has(key)); setRunsOpen((was) => {
                   const next = new Set(was);
                   if (next.has(key)) next.delete(key); else next.add(key);
                   return next;
-                })}
+                }); }}
+                nameOf={(i) => ids[i]}
                 lineState={(k) => open.get(k) ?? SHUT}
                 onStepLine={stepLine}
                 code={code}
@@ -633,17 +663,18 @@ const chevron = (
 // Measured over seven imported sessions the same day: 535 work lines in
 // 162 runs, three of them 20 lines long. Folding every run of three or more
 // takes 413 of those lines off the screen and leaves 204, and the threshold is
-// out of the histogram rather than out of taste (shared/work-lines.mjs).
+// out of the histogram rather than out of taste (shared/work-lines.mts).
 //
 // WHAT IS NEVER FOLDED IS A FAILURE. The closed line says how many of the calls
 // inside it failed, in the same colour a single failed line uses, because a
 // fold she has to open to find bad news in is worse than the wall it replaced.
-function RunLine({ items, open, onToggle, lineState, onStepLine, code }: {
+function RunLine({ items, open, onToggle, nameOf, lineState, onStepLine, code }: {
   items: (AgentWork & { i: number })[];
   open: boolean;
   onToggle: () => void;
-  lineState: (key: number) => number;
-  onStepLine: (key: number, next: number) => void;
+  nameOf: (i: number) => string;
+  lineState: (key: string) => number;
+  onStepLine: (key: string, next: number) => void;
   code?: CodeInThread | null;
 }) {
   const failed = runFailures(items);
@@ -658,10 +689,10 @@ function RunLine({ items, open, onToggle, lineState, onStepLine, code }: {
         <div className="did-run-body">
           {items.map((w) => (
             <WorkLine
-              key={w.i}
+              key={nameOf(w.i)}
               work={w}
-              state={lineState(w.i)}
-              onStep={(next) => onStepLine(w.i, next)}
+              state={lineState(nameOf(w.i))}
+              onStep={(next) => onStepLine(nameOf(w.i), next)}
               code={code}
             />
           ))}
@@ -806,6 +837,9 @@ function WorkLine({ work, state, onStep, code }: {
  * seeing it. The first build was a grey sentence with a long time after it and
  * was turned down as ugly; this is the drawing chosen after (round4-single).
  */
+// A pick sits on one line, so a paragraph or a link in it is drawn as its words.
+const INLINE = ['strong', 'em', 'code', 'del'];
+
 export function ActLine({ act }: { act: AgentWork }) {
   // A TEAMMATE'S ACTION is theirs: their first name where "You" would be.
   const team = useContext(TeamContext);
@@ -818,7 +852,13 @@ export function ActLine({ act }: { act: AgentWork }) {
         {act.fileMark && openFile
           ? <button type="button" className="act-file-link" onClick={() => openFile(act.fileMark!)}>{words.lead}</button>
           : words.lead}
-        {words.choice && <span className="act-choice"> {words.choice}</span>}
+        {/* Drawn as the options card drew it, not as the markdown it was written in (F-170). */}
+        {words.choice && (
+          <span className="act-choice">
+            {' '}
+            <ReactMarkdown remarkPlugins={[remarkGfm]} allowedElements={INLINE} unwrapDisallowed>{words.choice}</ReactMarkdown>
+          </span>
+        )}
       </span>
       <span className="act-when">{actWhen(act.at)}</span>
     </div>

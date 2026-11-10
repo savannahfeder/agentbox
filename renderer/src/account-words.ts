@@ -41,12 +41,12 @@ export function meterPair(limits: UsageLimit[] | undefined | null, now = Date.no
   // A window that has reset since it was read: its number belongs to the old
   // window, and the new one has not been read, so it has none.
   const meter = (key: string, word: string, l: UsageLimit): Meter => {
-    const over = !!l.resetsAt && l.resetsAt <= now;
+    const over = !!l.reset || (!!l.resetsAt && l.resetsAt <= now);
     return { key, word, percent: over ? null : Math.round(l.percent), resets: over ? 'Reset' : resetWords(l, now) };
   };
   const models = all.filter((l) => l.span === 'week' && l !== week && l.qualifier && Number.isFinite(l.percent));
   return [
-    ...(session && Number.isFinite(session.percent) ? [meter('session', 'Session', session)] : []),
+    ...(session && (Number.isFinite(session.percent) || session.reset) ? [meter('session', 'Session', session)] : []),
     ...(week && Number.isFinite(week.percent) ? [meter('week', 'Week', week)] : []),
     ...models.map((l) => meter(`week:${l.qualifier}`, l.qualifier!, l)),
     // Codex's other windows (shared/codex-usage.mts `windowSpan`), which the

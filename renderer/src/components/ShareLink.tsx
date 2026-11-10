@@ -1,31 +1,14 @@
-// SHARE: a link anyone can open to the file on screen (main/file-link.mjs).
+// SHARE: a link anyone can open to the file on screen (main/file-link.mts).
 // Nothing leaves this computer until Copy link is pressed. Every version of
 // one file shares one link; Update link puts the copy on screen in it.
 import { useEffect, useRef, useState } from 'react';
 import { api, type FileLinkState, type LinkComment } from '../api';
-import { clock } from '../thread-history';
+import { shareWords } from '../public-link-words';
 import { NoteGlyph } from './NoteGlyphs';
 
 export const SIGN_IN_TO_SHARE = 'agentbox:sign-in-to-share';
 
-export const shareWords = {
-  signedOut: 'Sign in to share this file or see its link.',
-  fresh: 'Make a link anyone can open, without an account. Its comments are public too.',
-  stopped: 'Stopped. The old link no longer works.',
-  behind: 'The link shows an older copy.',
-  ahead: (v: number) => `The link shows version ${v}, newer than this one.`,
-  newComments: 'New comments on the link',
-  comments: (n: number) => (n === 1 ? '1 comment' : `${n} comments`),
-  stopAsk: (n: number) => (n > 0 ? `Stop, and delete ${n === 1 ? 'its comment' : `its ${n} comments`}` : 'Stop the link'),
-  shared: ({ createdAt, updatedAt }: { createdAt: number; updatedAt: number }, now = Date.now()) => {
-    const what = updatedAt - createdAt > 1000 ? 'Updated' : 'Shared';
-    return new Date(updatedAt).toDateString() === new Date(now).toDateString()
-      ? `${what} today at ${clock(updatedAt)}`
-      : `${what} ${new Date(updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
-  },
-  // "Shared" already means a teammate's thread, and a file your agent handed you.
-  live: 'Public link',
-};
+export { shareWords };
 
 /** A new link goes on the clipboard; updating one already sent leaves the clipboard alone. */
 export async function afterSharing(hadLink: boolean, copyIt: () => Promise<boolean>): Promise<string | null> {
@@ -33,7 +16,7 @@ export async function afterSharing(hadLink: boolean, copyIt: () => Promise<boole
   return (await copyIt()) ? 'Link copied' : null;
 }
 
-/** The kinds a link can draw, as main/file-link.mjs linkKindOf names them. */
+/** The kinds a link can draw, as main/file-link.mts linkKindOf names them. */
 export const canShareFile = (src: string) => /\.(md|markdown|html?|png|jpe?g|gif|webp|svg|pdf)$/i.test(String(src ?? '').split(/[?#]/)[0]);
 
 /** What the panel offers: the live link, and whether it holds an older copy than the one on screen. */

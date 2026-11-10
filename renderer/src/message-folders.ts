@@ -6,7 +6,7 @@
 // it, and the window drew "missing image: quiet-1.png" three times, because it
 // only ever looked for a bare name in five fixed folders and the one the
 // message had just named was never among them (her screenshot, 2026-10-04,
-// tests/a-picture-named-beside-its-folder-is-drawn.test.mjs).
+// tests/a-picture-named-beside-its-folder-is-drawn.test.mts).
 //
 // So the folders the message itself names come first, then the thread's own
 // designs folder, then the five it always tried. Only folders inside this
