@@ -129,6 +129,9 @@
   -webkit-mask-image: linear-gradient(to top, #000 0, #000 105px, transparent 150px);
   mask-image: linear-gradient(to top, #000 0, #000 105px, transparent 150px); }
 
+/* Team and Files wear the Inbox's sky; the Team list would cover it. */
+.app.sky-place .cx-list { background: transparent; }
+
 /* A row's facts as tags in the Inbox's own column type, so they read as
    settings of the thread rather than a sentence about it. */
 .hm-tags { display: flex; align-items: center; gap: 10px; margin-top: 3px; min-width: 0; overflow: hidden; }
