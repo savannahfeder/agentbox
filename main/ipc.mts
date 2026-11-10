@@ -57,6 +57,7 @@ import { readNote, writeNote } from './rail-note.mts';
 import { teamForWindow } from './team/index.mts';
 import { isOnTeam } from '../shared/rooms-on.mts';
 import { liveRoomFor } from './team/live-room.mts';
+import { openForThePerson } from './opens-a-program.mts';
 import { addClaudeAccount, addCodexAccount, alphaFeatures, cornerTagTurnedOff, countsTurnedOff, lookAgainFor, outsideAgentsMode, permissionMode, pointAtEngineBin, readSettings, searchForEngineBin, setProjectSetting, setWorkspaceSetting } from './settings.mts';
 import { ICON_KINDS, clearProjectIcon, setProjectIcon, setProjectName } from './project-identity.mts';
 import { ClaudeUsage } from './claude-usage.mts';
@@ -117,7 +118,7 @@ export interface IpcWindow {
   show?(): void;
 }
 
-export interface IpcShell { openExternal(url: string): unknown; openPath?(path: string): Promise<string> }
+export interface IpcShell { openExternal(url: string): unknown; openPath?(path: string): Promise<string>; showItemInFolder?(path: string): void }
 
 export interface IpcOpenDialog {
   title: string;
@@ -2709,7 +2710,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       try { await openSourceFile(found.path); return { ok: true, opened: found.path }; }
       catch (error) { return { ok: false, error: (error as Error).message || 'The text editor could not be opened.' }; }
     }
-    const err = await shell.openPath!(found.path);
+    const err = await openForThePerson(shell, found.path);
     return err ? { ok: false, error: err } : { ok: true, opened: found.path };
   });
 
