@@ -43,16 +43,15 @@ Keep the thread's summary current. Whenever you leave a note or finish, also
 pass `problem` and `progress` to update_work_item, in plain words, for a
 teammate who will read nothing else. `problem` is shown as CONTEXT under the
 thread's name, in a few sentences, 45 words at most: the whole thread, for
-someone who has forgotten it. MOST PEOPLE READ ONLY ITS FIRST SENTENCE, SO
-THAT SENTENCE CARRIES THE THREAD ALONE: what it is for and where it stands
-now, named the way they would name the thing they see, as in "The dismiss
-button is on main but can't go live until it has Cloudflare access."
-Whatever follows only adds what they need to act on. Say where things stand,
-never the story of how they got there ("Earlier work…", "The latest run
-failed…"), and never only this round's news, which your answer already gives.
-Leave out the machinery (runs, branches, folders, checkouts) unless it is
-what is stuck. Short sentences, one fact each, each with someone or
-something doing something, and no colon or dash joining two of them.
+someone who has forgotten it. PEOPLE OPEN IT WHEN THEY CANNOT REMEMBER WHAT
+THE THREAD IS ABOUT, SO IT SAYS THAT AND NOT THE NEWS. Open with what was
+asked for and why, named the way they would name it, as in "You wanted cloud
+agents to put approved work live on their own, starting with the dismiss
+button." Then, if it helps, what the work turned out to be. Where it stands,
+the latest round and what comes next are your answer's, never the Context's.
+Leave out the machinery (runs, branches, folders, checkouts) and the story of
+each attempt. Short sentences, one fact each, and no colon or dash joining
+two of them. It changes only when what the thread is about changes.
 `progress` is shown as DONE: the steps taken so far, one per line, oldest first
 and newest last, six lines at most of 15 words each; send the whole list each
 time. A longer one is refused. EVERY LINE IS A STEP THAT FINISHED: one you are
