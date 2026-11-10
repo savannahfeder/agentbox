@@ -8,6 +8,7 @@ import type { Picked } from '../platform/pick';
 import { reportText, type ReportAbout } from '../lib/report';
 import { useCloud } from '../state/cloud';
 import { AttachSheet, Attached } from './Attach';
+import { withPicked } from '../lib/attach';
 import { Clip } from './icons';
 import { T } from './parts';
 import { color, corner, font } from './theme';
@@ -64,7 +65,7 @@ export function FeedbackPage({ about = null }: { about?: ReportAbout } = {}) {
           <T style={{ fontSize: 13, fontFamily: font.semibold }}>{busy ? 'Sending…' : 'Send'}</T>
         </Pressable>
       </View>
-      <AttachSheet open={attaching} close={() => setAttaching(false)} add={(more) => setFiles((f) => [...f, ...more])} fail={setSaid} />
+      <AttachSheet open={attaching} close={() => setAttaching(false)} add={(more) => setFiles((f) => withPicked(f, more))} fail={setSaid} />
     </View>
   );
 }

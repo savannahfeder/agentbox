@@ -3812,7 +3812,8 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
           <button type="button" className="tc-icon dock-clip" title="Attach files" aria-label="Attach files" onClick={pickFiles}><ClipGlyph /></button>
         )}
         {!talkTo?.length && talk.allowed && <MicButton talk={talk} />}
-        {stop && !hasDraft ? stop : (
+        {/* Stop gives way to Send, which would leave focus on the page and the next words typed nowhere. */}
+        {stop && !hasDraft ? <span style={{ display: 'contents' }} onClick={() => requestAnimationFrame(() => ref.current?.focus())}>{stop}</span> : (
         <span className={`dock-send-pair${canWait ? '' : ' solo'}`}>
         <button
           className="dock-send"
