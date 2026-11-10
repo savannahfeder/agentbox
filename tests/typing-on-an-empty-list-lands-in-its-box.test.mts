@@ -32,8 +32,8 @@ describe('a letter on a list with no thread to act on', () => {
     expect(keyOnTheList({ key: 'j', justChanged: false })).toBe('shortcut');
   });
 
-  it('is told by the window when there is no row, card or tick', () => {
-    expect(app).toContain('const nothingToActOn = !focused && !pointed && !multiSel.size && !keyLead && !stops.length;');
+  it('is told by the window when there is no row, card or tick, or Home covers them', () => {
+    expect(app).toContain('const nothingToActOn = !focused && !pointed && (homeCovers || (!multiSel.size && !keyLead && !stops.length));');
     expect(app).toContain('keyOnTheList({ key: e.key, justChanged: screenJustChanged(screenChangedAt.current, Date.now()), nothingToActOn })');
   });
 

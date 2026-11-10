@@ -100,7 +100,7 @@ import { wearJustMade, type JustMade } from './just-made';
 import { agentOnOrComing, asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
 import { filedByThePerson, wordWaits } from '../../shared/answers.mts';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mts';
-import { focusTheReplyBox } from './focus-at-end';
+import { focusAtEnd, focusTheReplyBox } from './focus-at-end';
 import { strayLetters } from './stray-letters';
 import { keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
 import { modelCommands } from './thread-model-commands';
@@ -629,7 +629,7 @@ export default function App() {
   const startThread = () => {
     const box = clearSlot?.querySelector('textarea');
     // offsetParent is null where the page hides the box (a phone).
-    if (box?.offsetParent && modal !== 'compose') box.focus(); else setModal('compose');
+    if (box?.offsetParent && modal !== 'compose') focusAtEnd(box); else setModal('compose');
   };
   // Read by a send that lands after its card has closed, which must not close
   // or cover whatever has been opened since.
@@ -3196,12 +3196,13 @@ export default function App() {
     ? run.item
     : walkBeat.length ? (hoveredId && walkBeat.includes(hoveredId) ? hoveredId : walkBeat[0]) : null;
   const walkOwn = walkAim ? list.find((i) => i.id === walkAim) : undefined;
+  const homeCovers = homeCoversTheList({ homeOn, homeOpen, threadOpen: !!focused || !!focusedRepeat, searching: search !== null, settingsOpen, teamShown });
   const pointed: WorkItem | undefined = walkOwn
     ?? (hoveredId && !multiSel.size ? list.find((i) => i.id === hoveredId) : undefined)
-    ?? (keyCard || keyLeadPicked || homeCoversTheList({ homeOn, homeOpen, threadOpen: !!focused || !!focusedRepeat, searching: search !== null, settingsOpen, teamShown }) ? undefined : current);
+    ?? (keyCard || keyLeadPicked || homeCovers ? undefined : current);
   const keyTab = stacked && pointed ? stacked.tabOf(pointed) : view;
   // No row, card or tick on the list, so a row's keys are words for its box.
-  const nothingToActOn = !focused && !pointed && !multiSel.size && !keyLead && !stops.length;
+  const nothingToActOn = !focused && !pointed && (homeCovers || (!multiSel.size && !keyLead && !stops.length));
 
   /* ------------------------- a panel with a panel in it -------------------- */
   // NO HAIRLINE WITHOUT A SIDEBAR BEHIND IT.
@@ -6566,7 +6567,7 @@ export default function App() {
           if (means === 'nowhere') {
             const box = clearSlot?.querySelector('textarea');
             // Not prevented: the character lands in the box it has just focused.
-            if (box?.offsetParent) { box.focus(); return; }
+            if (box?.offsetParent) { focusAtEnd(box); return; }
             // A second letter soon after is somebody typing; one is a slip.
             if (Date.now() - nowhereAt.current < 2000) showToast(NOWHERE_TO_TYPE);
             nowhereAt.current = Date.now();

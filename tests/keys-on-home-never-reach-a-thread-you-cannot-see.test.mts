@@ -52,10 +52,28 @@ describe('with no row under the keys', () => {
 
 describe('App.tsx', () => {
   const pointed = app.slice(app.indexOf('const pointed: WorkItem | undefined'), app.indexOf('const keyTab ='));
+  it('asks once whether Home covers the list', () => {
+    expect(app).toMatch(/const homeCovers = homeCoversTheList\(/);
+  });
   it('puts no row under the keys while Home covers the list', () => {
-    expect(pointed).toMatch(/homeCoversTheList\(/);
+    expect(pointed).toMatch(/homeCovers \? undefined : current/);
   });
   it('still lets the tutorial aim at its own row', () => {
-    expect(pointed.indexOf('walkOwn')).toBeLessThan(pointed.indexOf('homeCoversTheList('));
+    expect(pointed.indexOf('walkOwn')).toBeLessThan(pointed.indexOf('homeCovers'));
+  });
+  // Measured after the first fix: R and E typed straight after a send still did
+  // nothing, because the Inbox's other rows still counted as places J and K walk.
+  // The retest (2026-11-10): back from Settings, the box is drawn again holding
+  // the draft with the caret at its start, so the waking letter and the rest of
+  // the sentence went in front of the draft.
+  it('wakes the box with the caret after the draft, for a letter and for N', () => {
+    const nowhere = app.slice(app.indexOf("if (means === 'nowhere')"), app.indexOf("if (means === 'nowhere')") + 300);
+    expect(nowhere).toMatch(/focusAtEnd\(box\)/);
+    const start = app.slice(app.indexOf('const startThread = () =>'), app.indexOf('const startThread = () =>') + 300);
+    expect(start).toMatch(/focusAtEnd\(box\)/);
+  });
+  it('counts nothing on the hidden Inbox as something to act on', () => {
+    const line = app.slice(app.indexOf('const nothingToActOn ='), app.indexOf('\n', app.indexOf('const nothingToActOn =')));
+    expect(line).toMatch(/homeCovers \|\|/);
   });
 });
