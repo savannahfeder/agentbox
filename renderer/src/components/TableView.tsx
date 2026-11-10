@@ -43,6 +43,8 @@ const wraps = (c: Column) => !!c.wrap && wordy(c.kind);
 // .tbl-rn's width; the first column sticks just right of it.
 const RN_W = 44;
 const RN_W_WIDE = 58;
+// Characters on one line of a wrapping header: "On people talking" fits.
+const HEAD_LINE = 18;
 const MIN_W = 64;
 const SAVE_MS = 400;
 const UNDO_DEPTH = 200;
@@ -120,8 +122,9 @@ const Row = memo(function Row({ table, row, r, fileRow, n, c0, c1, at, whole, ha
 // WIDTHS ARE MEASURED ONCE, FROM THE WHOLE FILE. Only the rows in view are
 // drawn, so a width the browser worked out from them would jump as you scroll.
 // Long text is capped at `cap` so the short columns after it stay in view, and
-// only the longest text column takes spare width.
-function measure(table: Table, cap: number, only?: number): { px: Map<string, number>; wide: string | null } {
+// only the longest text column takes spare width. With `wrapHead` (a table in a
+// message) a long header asks for about two lines' width, not one.
+export function columnWidths(table: Table, cap: number, only?: number, wrapHead = false): { px: Map<string, number>; wide: string | null } {
   const canvas = typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
   const family = typeof document === 'undefined' ? 'sans-serif' : getComputedStyle(document.body).fontFamily;
   const step = Math.max(1, Math.floor(table.rows.length / 3000));
@@ -146,7 +149,10 @@ function measure(table: Table, cap: number, only?: number): { px: Map<string, nu
       // Only strings near the longest can be the widest; measuring each would be slow.
       if (v.length >= longest[i].length * 0.7) w = Math.max(w, Math.min(cap, text(`14px ${family}`, c.kind === 'link' ? cellLink(table, table.rows[r], i)?.text ?? v : shownText(v))));
     }
-    const head = c.name.length * 7.6 + 20 + 24;
+    const words = Math.max(0, ...c.name.split(/\s+/).map((s) => s.length));
+    const head = wrapHead
+      ? Math.min(c.name.length, Math.max(words, HEAD_LINE)) * 7.6 + 14
+      : c.name.length * 7.6 + 20 + 24;
     px.set(c.name, Math.ceil(Math.max(head, w + (c.kind === 'name' && table.logoCol >= 0 ? 28 : 0)) + 34));
   });
   const texts = table.columns.flatMap((c, i) => (c.kind === 'text' ? [i] : []));
@@ -156,7 +162,7 @@ function measure(table: Table, cap: number, only?: number): { px: Map<string, nu
 
 // In a message, no column may be wider than 60% of the message (`cqi`, the
 // `.tbl-inline` container), so beside an open file the next column still shows.
-function tracks(table: Table, natural: ReturnType<typeof measure>, sized: Record<string, number>, inline = false): string {
+function tracks(table: Table, natural: ReturnType<typeof columnWidths>, sized: Record<string, number>, inline = false): string {
   const shown = table.columns.filter((_, i) => !(table.ranked && i === 0));
   const fills = natural.wide && !sized[natural.wide] && shown.some((c) => c.name === natural.wide) ? natural.wide : null;
   const px = (w: number) => (inline ? `min(${w}px, 60cqi)` : `${w}px`);
@@ -754,7 +760,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   }, [searched, picked, sort]);
   useEffect(() => { setPick(null); setEditing(null); setSheet(null); setFloat(null); setRenaming(null); setProblem(null); }, [base]);
 
-  const natural = useMemo(() => measure(seed.table, mode === 'full' || inline ? 300 : 220), [seed, mode, inline]);
+  const natural = useMemo(() => columnWidths(seed.table, mode === 'full' || inline ? 300 : 220, undefined, inline), [seed, mode, inline]);
   const template = useMemo(() => tracks(table, natural, sized, inline), [table, natural, sized, inline]);
   const root = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -1435,7 +1441,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   const fitColumn = (col: number) => {
     const name = table.columns[col].name;
     // Slack for a font the canvas measures a hair narrower than the cell draws it.
-    const w = (measure(table, 640, col).px.get(name) ?? 160) + 12;
+    const w = (columnWidths(table, 640, col).px.get(name) ?? 160) + 12;
     const next = { ...sized, [name]: w };
     setSized(next); keepWidths(store, next);
   };
@@ -1578,7 +1584,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   const floatCol = float?.col !== undefined ? table.columns[float.col] : null;
 
   return (
-    <div className={`tbl tbl-${mode}${holding ? ' holding' : ''}${editable && !sort ? ' rows-move' : ''}${editable ? ' cols-move' : ''}${drop ? ' moving' : ''}`} ref={root} onKeyDown={onRoot} data-own-escape={owns ? '' : undefined} tabIndex={hands ? -1 : undefined}
+    <div className={`tbl tbl-${mode}${table.ranked ? ' tbl-ranked' : ''}${holding ? ' holding' : ''}${editable && !sort ? ' rows-move' : ''}${editable ? ' cols-move' : ''}${drop ? ' moving' : ''}`} ref={root} onKeyDown={onRoot} data-own-escape={owns ? '' : undefined} tabIndex={hands ? -1 : undefined}
       onFocus={() => setHolding(false)}
       onBlur={(e) => { if (!root.current?.contains(e.relatedTarget as Node | null)) setHolding(true); }}>
       {!preview && (

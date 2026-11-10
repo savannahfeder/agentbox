@@ -2281,6 +2281,9 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
               <Row label="Multiplayer" desc="Share projects with your team and see their threads beside yours. Needs a sign-in.">
                 <Switch label="Multiplayer" on={!!w.alpha?.multiplayer} onChange={(v) => setWorkspace('alphaMultiplayer', v)} />
               </Row>
+              <Row label="Back and forward" desc={sayKeys("Arrows before each page's title take you back to where you just were, and forward again. ⌘[ and ⌘] do the same.")}>
+                <Switch label="Back and forward" on={!!w.alpha?.backForward} onChange={(v) => setWorkspace('alphaBackForward', v)} />
+              </Row>
             </Group>
           </Page>
         )}

@@ -7,7 +7,7 @@ import {
   offerFrom, offerAnswer, OFFER_LABEL, OFFER_MAKE, OFFER_NOT_NOW, TEAMMATE_EFFORT, GREETING, starterAsks,
   dutyWhen, dutyOf, DUTY_LABEL_PREFIX, CHAT_LABEL, yesFirst, WORK_LABEL_PREFIX, isActiveRun, isQueued, STOPPED_NOTE,
   METHOD_CAP, recordOf, sourceText, pausedNow, WEEK_MS, workOf, UNREAD_HOLD, cleanDuty, dutyStart, howYouWrite, VOICES,
-  replyMessageId, projectNamedIn,
+  replyMessageId, projectNamedIn, LOOK_BACK_LABEL, lookBackEffort, lookBackThreads, isLookBack,
 } from '../shared/teammates.mts';
 import { reachTick } from './teammate-reach.mts';
 import { filesFoldersBrief } from '../shared/file-folders.mts';
@@ -178,6 +178,8 @@ export interface TickInput {
   now?: number;
   deliver?: (product: string, item: string, text: string) => unknown;
   tell?: (product: string | null, item: string, hand: { text: string; from: { teammate: string; name: string }; hold: boolean; hop: number }) => unknown;
+  /** Whether the plan this engine bills has room for a look-back. Without it none runs. */
+  room?: (engine: string | null) => boolean;
 }
 
 export interface OfferInput { items?: TeamItem[]; chat?: Chat; now?: number }
@@ -530,7 +532,7 @@ export class Teammates {
   // Carries out what `planWakes` decided. Each action is written so a crash
   // between two of them redoes nothing twice: runs are created if absent under
   // the project lock, and the seen marker comes after the run it records.
-  async tick({ items, now = Date.now(), deliver, tell }: TickInput = {}) {
+  async tick({ items, now = Date.now(), deliver, tell, room }: TickInput = {}) {
     let team: Teammate[];
     let chat: Chat;
     try {
@@ -548,7 +550,8 @@ export class Teammates {
     if (!team.length) return [];
     team = this._namedByRole(team, now);
     const mine = (items ?? []).filter((i) => teammateIdOf(i));
-    const actions: WakeAction[] = planWakes({ teammates: team, chat, items: mine, now, shipped: shippedByProduct(items) });
+    const lookBack = room ? { ok: (t: { id: string; engine?: string | null }) => { try { return !!readMethod(this.dir(), t.id) && room(t.engine ?? null); } catch { return false; } } } : null;
+    const actions: WakeAction[] = planWakes({ teammates: team, chat, items: mine, now, shipped: shippedByProduct(items), lookBack });
     const byId = new Map(team.map((t) => [t.id, t]));
     const done: WakeAction[] = [];
     const { workItemsDisk, lock } = this.store.modules;
@@ -570,6 +573,7 @@ export class Teammates {
           const labels: string[] = ['founder', teammateLabel(t.id), `${HOP_LABEL_PREFIX}${hop}`, `${WORK_LABEL_PREFIX}${a.trigger.work ?? a.id}`];
           if (a.trigger.kind === 'pass' && a.trigger.from && a.trigger.from !== YOU) labels.push(`${FROM_LABEL_PREFIX}${a.trigger.from}`);
           if (a.trigger.kind === 'duty') labels.push(`${DUTY_LABEL_PREFIX}${a.trigger.duty}`);
+          if (a.trigger.kind === 'look-back') labels.push(LOOK_BACK_LABEL);
           if (a.trigger.kind === 'message' && a.trigger.from === YOU && !a.trigger.via) labels.push(CHAT_LABEL);
           await lock.withProjectLock(dir, async () => {
             const opening = this.openingFor(t, a.trigger, team);
@@ -584,7 +588,7 @@ export class Teammates {
               ...(a.trigger.hold ? { status: 'blocked' } : {}),
               ...(t.engine ? { engine: t.engine } : {}),
               ...(t.model ? { model: t.model } : {}),
-              effort: t.effort || TEAMMATE_EFFORT,
+              effort: a.trigger.kind === 'look-back' ? lookBackEffort(t.effort) : t.effort || TEAMMATE_EFFORT,
             }, { source: 'system', now });
             // Your words go in as yours, the way a task you type does, so the
             // thread opens on them under your name.
@@ -757,6 +761,17 @@ export class Teammates {
         tell,
       ].join('\n'), yours: false };
     }
+    if (trigger.kind === 'look-back') {
+      return { body: [
+        'Time to learn from what the person said on your recent work. The threads they replied on are written out whole in your brief, under "Threads named in what woke you".',
+        '',
+        '1. Read each one whole.',
+        '2. Check your method against them. Fix any rule their words since contradict or have moved past, merge rules that say the same thing, and add any correction, approval or turn-down it is missing, quoted with its date and thread.',
+        '3. Keep it tight. The newest word wins, a remark about one piece of work is not a rule for all of it, and the whole method stays under the cap.',
+        '',
+        'Do no other work in this run. If the method changed, save it with team_method and post one line in the team chat saying what changed. If nothing needed changing, post nothing. Either way, close this run yourself.',
+      ].join('\n'), yours: false };
+    }
     if (trigger.kind === 'first') {
       return { body: [
         'You have just been set up. This is your first run, started now rather than at your first duty\'s time.',
@@ -836,8 +851,10 @@ export class Teammates {
     const sources = method ? [] : this._writeSources(t, origin, earlier, said, everything);
     // A thread of yours named in what woke it ("learn from w-588787adb7") is
     // read whole, the way it would be if the teammate had been made from it.
-    const asked = yoursAmong(threadIdsIn([item.body, item.answer].filter((s) => typeof s === 'string').join('\n')), everything)
-      .filter((x) => x.id !== item.id).slice(0, 6);
+    const asked = isLookBack(item)
+      ? lookBackThreads(id, items, item, now).map((i) => ({ product: i.product, id: i.id, title: i.label || i.title }))
+      : yoursAmong(threadIdsIn([item.body, item.answer].filter((s) => typeof s === 'string').join('\n')), everything)
+        .filter((x) => x.id !== item.id).slice(0, 6);
     const named = asked.length ? this._writeThreads(sourcesDir(this.dir(), id), asked, said) : [];
     const record = recordOf(earlier, said, { now });
     let books: Playbook[] = [];
