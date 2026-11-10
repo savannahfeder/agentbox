@@ -1375,12 +1375,15 @@ body {
 }
 
 /* The last thread you were in. On the row itself, which runs the card's full
-   width, so the wash meets both edges instead of stopping at the hairlines. */
+   width, so the wash meets the card's left edge. The hairlines either side of
+   it start there too, or the wash's corners poke past them. */
 .row.recent {
-  --wash: rgb(255 255 255 / 0.045);
-  background: linear-gradient(180deg, transparent, var(--wash) 35%, var(--wash) 65%, transparent);
+  --wash: 255 255 255;
+  background: linear-gradient(90deg, rgb(var(--wash) / 0.055), rgb(var(--wash) / 0.012) 70%, transparent);
 }
-[data-theme="light"] .row.recent { --wash: rgb(0 0 0 / 0.04); }
+[data-theme="light"] .row.recent { --wash: 0 0 0; }
+.row.recent::after,
+.row.recent + .row::after { left: 0; }
 
 /* THE SELECTED ROW IS UNDERLINED. Chosen 2026-08-12, out of a family of six
    that were all text and a family of five before them that were all shapes.

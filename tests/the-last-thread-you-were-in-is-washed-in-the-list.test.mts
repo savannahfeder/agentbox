@@ -56,10 +56,16 @@ describe('its row', () => {
     const rule = css.match(/\.row\.recent\s*\{([^}]*)\}/);
     expect(rule, 'a .row.recent rule').toBeTruthy();
     expect(rule![1]).toMatch(/background/);
-    // An inset drawn as a pseudo-element or with margins is what stopped the
-    // mockup's wash short of the card's edges.
-    expect(css).not.toMatch(/\.row\.recent::(before|after)/);
+    // Margins or an inset are what stopped the mockup's wash short of the
+    // card's edges.
     expect(rule![1]).not.toMatch(/margin|inset|left:|right:/);
+  });
+
+  it('has the hairlines above and below it run to the card edge with the wash', () => {
+    // With the usual inset hairlines, the wash's top and bottom showed past
+    // the lines' ends at the card's left edge.
+    const css = read('renderer/src/styles.css');
+    expect(css).toMatch(/\.row\.recent::after,\s*\.row\.recent \+ \.row::after\s*\{\s*left:\s*0;\s*\}/);
   });
 
   it('only shows while back and forward is switched on', () => {
