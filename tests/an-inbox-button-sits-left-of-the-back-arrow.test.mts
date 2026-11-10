@@ -30,7 +30,7 @@ describe('the Inbox button', () => {
   });
 
   it('names esc on its plate only where esc goes to the inbox', () => {
-    expect(bf).toMatch(/data-hint=\{inboxOnEsc \? 'inbox-esc' : 'inbox'\}/);
+    expect(bf).toContain("inboxOnEsc ? { 'data-hint': 'inbox-esc' } : { 'data-hint': 'inbox' }");
     expect(HINTS['inbox-esc']).toEqual([{ key: 'esc', what: 'Inbox' }]);
     expect(HINTS.inbox).toEqual([{ key: '', what: 'Inbox' }]);
   });

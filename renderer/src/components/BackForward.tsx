@@ -18,7 +18,7 @@ export function BackForward({ backTo, forwardTo, onBack, onForward, onInbox, inb
 }) {
   return (
     <span className="back-forward">
-      <button type="button" className="back-forward-inbox" aria-label="Inbox" data-hint={inboxOnEsc ? 'inbox-esc' : 'inbox'} onClick={onInbox}>
+      <button type="button" className="back-forward-inbox" aria-label="Inbox" {...(inboxOnEsc ? { 'data-hint': 'inbox-esc' } : { 'data-hint': 'inbox' })} onClick={onInbox}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9" /></svg>
       </button>
       <button type="button" disabled={!backTo} onClick={onBack}
