@@ -126,9 +126,10 @@
 /* THE CHATS STEP: their sessions as the terminals they are, in place of the app. */
 :root[data-setup] #root { transition: opacity .35s ease; }
 :root[data-setup-step="chats"] #root { opacity: 0; }
-.setup-split .ss-wall { position: absolute; left: 56px; top: 104px; right: -120px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px;
-  transform: perspective(1600px) rotateY(-10deg) rotateX(3deg); transform-origin: left top; animation: ss-in .5s cubic-bezier(.2, .7, .2, 1) both; }
-.setup-split .ss-term { height: 176px; border-radius: 10px; overflow: hidden; background: color-mix(in srgb, var(--bg) 70%, black);
+.setup-split .ss-wall { position: absolute; left: 56px; right: 56px; top: 50%; display: grid; grid-template-columns: repeat(var(--ss-cols, 3), minmax(0, 1fr)); gap: 16px;
+  transform: translateY(-50%) perspective(1600px) rotateY(-8deg) rotateX(2deg); transform-origin: left center; animation: ss-wall-in .5s cubic-bezier(.2, .7, .2, 1) both; }
+@keyframes ss-wall-in { from { opacity: 0; } to { opacity: 1; } }
+.setup-split .ss-term { height: 168px; border-radius: 10px; overflow: hidden; background: color-mix(in srgb, var(--bg) 70%, black);
   border: 1px solid color-mix(in srgb, var(--text) 10%, transparent); transition: border-color .2s ease, box-shadow .2s ease; }
 :root[data-theme="light"] .setup-split .ss-term { background: #fff; }
 .setup-split .ss-term-bar { display: flex; align-items: center; gap: 5px; height: 24px; padding: 0 10px; border-bottom: 1px solid color-mix(in srgb, var(--text) 7%, transparent);

@@ -6,7 +6,7 @@
 // It is portalled to <body> because #root is transformed while it shows, and a
 // fixed element inside a transformed one is placed against it, not the window.
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from '../api';
 import type { Snapshot } from '../types';
@@ -65,7 +65,7 @@ function Terminal({ t, project, going }: { t: SessionThread; project: string; go
   return (
     <div className={`ss-term${going ? ' ss-going' : ''}`}>
       <div className="ss-term-bar"><i /><i /><i /><span>{tool} · {project}</span>{going && <b>To your inbox</b>}</div>
-      <pre>{`${t.short || t.folder} $ ${tool}\n> ${t.title}\n\n${said(t.when)}`}<span className="ss-caret" /></pre>
+      <pre>{`${bare(t.folder).split('/').filter(Boolean).pop() ?? '~'} $ ${tool}\n> ${t.title}\n\n${said(t.when)}`}<span className="ss-caret" /></pre>
     </div>
   );
 }
@@ -321,7 +321,7 @@ export function SetupSplit(p: SetupSplitProps) {
 
       <div className="ss-right" aria-hidden="true">
         <div className="ss-cap">{step === 'chats' ? 'Your agents right now' : `Your ${Name} so far`}</div>
-        {step === 'chats' && <div className="ss-wall">
+        {step === 'chats' && <div className="ss-wall" style={{ '--ss-cols': p.chats.length > 4 ? 3 : 2 } as CSSProperties}>
           {p.chats.slice(0, 9).map((t) => <Terminal key={t.id} t={t} project={p.nameOf(bare(t.folder))} going={p.ticks.has(t.id)} />)}
         </div>}
       </div>
