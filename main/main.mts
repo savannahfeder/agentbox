@@ -289,26 +289,18 @@ let pendingThread = threadFromAppLink(process.argv.find((a) => a.startsWith(`${J
 // A SHARED FILE'S APP LINK (agentbox://f/<token>), from the link page's
 // "Open in Agentbox", held the same way until the window takes it.
 let pendingSharedFile = fileLinkToken(process.argv.find((a) => a.startsWith(`${JOIN_SCHEME}://`)) ?? '');
+function tellWindow(channel: string) {
+  if (window && !window.isDestroyed()) { window.webContents.send(channel); showWindow(); }
+}
 function openJoinLink(url: string) {
   const thread = threadFromAppLink(url);
-  if (thread) {
-    pendingThread = thread;
-    if (window && !window.isDestroyed()) { window.webContents.send('zero:thread-link'); showWindow(); }
-    return;
-  }
+  if (thread) { pendingThread = thread; tellWindow('zero:thread-link'); return; }
   const file = fileLinkToken(url);
-  if (file) {
-    pendingSharedFile = file;
-    if (window && !window.isDestroyed()) { window.webContents.send('zero:shared-file'); showWindow(); }
-    return;
-  }
+  if (file) { pendingSharedFile = file; tellWindow('zero:shared-file'); return; }
   const token = tokenFromLink(url);
   if (!token) return;
   pendingJoin = token;
-  if (window && !window.isDestroyed()) {
-    window.webContents.send('zero:join-room');
-    showWindow();
-  }
+  tellWindow('zero:join-room');
 }
 // Set by ⌘R and read once by the renderer as it comes back up, so a reload can
 // say so. A reload that lands on an identical screen and a chord that did
