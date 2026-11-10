@@ -6277,6 +6277,7 @@ export class Supervisor {
       accounts: setUp ? this._cloudAccounts() : [],
       keys: setUp ? cloudKeyNames({ home: this.config.home }) : [],
       notInCloud: setUp ? this._cloudNotSignedInHere(now) : [],
+      noCloudSignIn: setUp ? this.engineChoices().map((e) => e.id).filter((id) => !this._cloudSignedInAtAll(id)) : [],
       signIns: setUp ? this._cloudSignInsNow() : [],
       projects: setUp ? (this.store.listProducts?.() ?? []).filter((p) => this._cloudTakesProject(p)).map((p) => p.slug) : [],
       // The Agentbox Cloud plan the server last said ('none' is no plan).

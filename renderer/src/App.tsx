@@ -8078,7 +8078,7 @@ export default function App() {
                   onStop={() => stopAgent(focused)}
                   onRunNow={() => runNow(focused)}
                   onPin={focused.agent ? undefined : (pin) => pinThread(focused.id, pin, true)}
-                  place={focused.agent ? null : threadPlace(focused, snap.supervisor.running.find((r) => r.itemId === focused.id) ?? null, snap.cloud ?? null)}
+                  place={focused.agent ? null : threadPlace(focused, snap.supervisor.running.find((r) => r.itemId === focused.id) ?? null, snap.cloud ?? null, runningEngine)}
                   onPlace={(keep) => placeThread(focused, keep, false)}
                   pageAsk={threadAsk?.key === keyOf(focused) ? threadAsk : null}
                   onAsked={() => setThreadAsk(null)}
@@ -8688,7 +8688,7 @@ export default function App() {
                 chosen: team ? chosenNames(shownToPeople(target, project), team.byId) : undefined,
                 teammates: !!team && teammates(team.state.people ?? [], team.me).length > 0,
                 pinned: live ? !!target.pinned : null,
-                place: live ? threadPlace(target, snap.supervisor.running.find((r) => r.itemId === target.id) ?? null, snap.cloud ?? null) : null,
+                place: live ? threadPlace(target, snap.supervisor.running.find((r) => r.itemId === target.id) ?? null, snap.cloud ?? null, snap.engines?.byItem?.[target.id] ?? snap.engines?.workspace ?? null) : null,
                 open: focused && keyOf(focused) === key && openShows?.key === key ? openShows : null,
                 rename: page || isDirect(project ?? undefined),
                 repeats: !!ruleOf(target),
