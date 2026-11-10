@@ -12,7 +12,7 @@ sweep();
 const profile = fs.mkdtempSync('/tmp/shot-profile-');
 const W = 1440, H = 1000;
 const chrome = spawn(startableChrome(), [
-  '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
+  '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--use-mock-keychain',
   '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run', `--window-size=${W},${H}`, 'about:blank',
 ], { stdio: ['ignore', 'ignore', 'pipe'] });
 guard(chrome, profile);

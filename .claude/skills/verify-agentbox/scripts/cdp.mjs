@@ -124,7 +124,7 @@ export async function launchChrome({ width = 1440, height = 900, profile, detach
   if (platform === 'darwin' && bin === MAC_CHROME) throw new Error(NO_HIDDEN_BROWSER);
   if (!fs.existsSync(bin)) throw new Error(`No browser at ${bin}. The live drive needs it.`);
   const chrome = start(bin, [
-    '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
+    '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--use-mock-keychain',
     '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run',
     `--window-size=${width},${height}`, 'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'], detached });

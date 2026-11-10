@@ -51,7 +51,7 @@ const VIEWPORTS = [
 sweep(); // reap anything an earlier run left behind
 const profile = fs.mkdtempSync('/tmp/shot-profile-');
 const chrome = spawn(startableChrome(), [
-  '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
+  '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--use-mock-keychain',
   '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run',
   '--window-size=1728,1030', 'about:blank',
 ], { stdio: ['ignore', 'ignore', 'pipe'] });

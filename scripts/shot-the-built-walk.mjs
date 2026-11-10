@@ -104,7 +104,7 @@ const origin = `http://127.0.0.1:${server.address().port}`;
 sweep();
 const profile = fs.mkdtempSync('/tmp/shot-profile-');
 const chrome = spawn(startableChrome(), [
-  '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-sandbox',
+  '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-sandbox', '--use-mock-keychain',
   '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run',
   `--window-size=${W},${H}`, 'about:blank',
 ], { stdio: ['ignore', 'ignore', 'pipe'] });
