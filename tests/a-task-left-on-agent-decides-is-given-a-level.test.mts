@@ -143,6 +143,8 @@ describe('the new task cards', () => {
   it('open on Agent decides and send it as untagged', () => {
     expect(startingPriority(undefined)).toBe(null);
     expect(choiceLabelOf(null)).toBe(AGENT_DECIDES.label);
+    // The approved wording, title case like the four levels under it.
+    expect(AGENT_DECIDES.label).toBe('Agent Decides');
     expect(sentPriority(null)).toBe(0);
     expect(sentPriority('medium')).toBe(5);
     expect(sentPriority('urgent')).toBe(9);

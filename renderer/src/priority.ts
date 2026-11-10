@@ -46,7 +46,7 @@ export function priorityLabelOf(id: PriorityId): string {
  * picks High, Medium or Low (main/task-priority.mts). Only the cards offer it;
  * once a thread has a level, the person changes it with the four words.
  */
-export const AGENT_DECIDES = { id: 'agent', label: 'Agent decides' } as const;
+export const AGENT_DECIDES = { id: 'agent', label: 'Agent Decides' } as const;
 
 /** A card's pick: one of the four, or null for Agent decides. */
 export type PriorityChoice = PriorityId | null;
