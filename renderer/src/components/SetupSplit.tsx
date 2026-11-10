@@ -163,6 +163,7 @@ export function SetupSplit(p: SetupSplitProps) {
     }
     setBusy(false);
     setDone((d) => ({ ...d, teammates: [...d.teammates, ...made] }));
+    setPicked(new Set()); setOwn('');
     if (made.length === asks.length) next();
   }, [picked, own, left, next]);
 
@@ -225,7 +226,10 @@ export function SetupSplit(p: SetupSplitProps) {
   let body: ReactNode = null;
   if (step === 'chats') {
     head = ['Add the agents already on this computer.', 'What they send you lands in your inbox.'];
-    body = <>
+    body = done.chats ? <>
+      <div className="ss-list"><Row face={<span className="ss-ok"><Tick /></span>} name={`${done.chats === 1 ? '1 chat' : `${done.chats} chats`} brought in`} sub="They are in your inbox" /></div>
+      <div className="ss-acts">{go('Continue', next)}</div>
+    </> : <>
       <div className="ss-list">
         {p.chats.map((t) => <Row key={t.id} face={t.source === 'codex' ? 'X' : 'C'} name={t.title} sub={`${t.source === 'codex' ? 'Codex' : 'Claude Code'} · ${p.nameOf(bare(t.folder))} · ${said(t.when)}`}
           end={<Check on={p.ticks.has(t.id)} />} on={p.ticks.has(t.id)} onClick={() => p.onToggle(t.id)} />)}
@@ -234,7 +238,10 @@ export function SetupSplit(p: SetupSplitProps) {
     </>;
   } else if (step === 'folder') {
     head = ['Pick a folder for your first project.', 'Agents can read and change the files in it.'];
-    body = <>
+    body = done.project ? <>
+      <div className="ss-list"><Row face={<span className="ss-ok"><Tick /></span>} name={done.project} sub="Your first project" /></div>
+      <div className="ss-acts">{go('Continue', next)}{quiet('Choose another', () => void chooseFolder())}</div>
+    </> : <>
       <div className="ss-list"><Row face={<Folder />} name="Choose a folder on this computer" onClick={() => void chooseFolder()} end={<span className="ss-faint"><Plus />Choose</span>} /></div>
       <div className="ss-acts">{go('Choose a folder', () => void chooseFolder())}{quiet('Skip for now', next)}</div>
     </>;
@@ -262,6 +269,7 @@ export function SetupSplit(p: SetupSplitProps) {
     const count = picked.size + (own.trim() ? 1 : 0);
     body = <>
       <div className="ss-list">
+        {done.teammates.map((n) => <Row key={`made-${n}`} face={<span className="ss-ai">{n[0]}</span>} name={n} end={<span className="ss-dim"><Tick />Added</span>} />)}
         {left.map((s) => <Row key={s.starter} face={<span className="ss-ai">{s.name[0]}</span>} name={s.name} sub={s.ask} end={<Check on={picked.has(s.starter)} />} on={picked.has(s.starter)} onClick={() => toggle(s.starter)} />)}
         <div className="ss-row"><span className="ss-face ss-ai ss-dash"><Plus /></span><input className="ss-input" placeholder="Describe another job…" value={own} onChange={(e) => setOwn(e.target.value)} /></div>
       </div>

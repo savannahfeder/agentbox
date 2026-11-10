@@ -281,3 +281,37 @@ describe('the walkthrough on Home', () => {
     expect(app).toMatch(/ideas=\{[^}]*!\(homeShown && modal !== 'compose'\)[^}]*\? FIRST_IDEAS : null\}/);
   });
 });
+
+describe('going back to a step already done', () => {
+  // Testers went Back and were asked to choose a folder again while the app
+  // behind showed the project it had made, and were offered "Make 1 teammate"
+  // for a teammate already made. A step done shows what it did.
+  const split = fs.readFileSync(new URL('../renderer/src/components/SetupSplit.tsx', import.meta.url), 'utf8');
+  it('shows the folder already chosen, with a way to choose another', () => {
+    expect(split).toMatch(/step === 'folder'[\s\S]{0,400}done\.project \?/);
+    expect(split).toContain("quiet('Choose another'");
+  });
+  it('shows the chats already brought in instead of bringing them in again', () => {
+    expect(split).toMatch(/step === 'chats'[\s\S]{0,300}done\.chats \?/);
+  });
+  it('clears the picks once teammates are made, and lists them as added', () => {
+    expect(split).toMatch(/setPicked\(new Set\(\)\); setOwn\(''\)/);
+    expect(split).toMatch(/done\.teammates\.map\(/);
+  });
+});
+
+describe('opening counts however the thread was opened', () => {
+  // Sending the first thread opens it, so the Open one tip never shows; a tester
+  // wrote back and the list still had Open one unticked and the count stuck at 3 of 5.
+  it('ticks Open one once a thread has been written back to', () => {
+    const list = tourChecklist(['start', 'compose', 'reply']);
+    expect(list[1].state).toBe('done');
+    expect(tourCount(list)).toBe('4 of 5');
+  });
+  it('ticks Open one once a thread has been closed', () => {
+    expect(tourChecklist(['close'])[1].state).toBe('done');
+  });
+  it('does not tick it for sending alone', () => {
+    expect(tourChecklist(['start', 'compose'])[1].state).not.toBe('done');
+  });
+});

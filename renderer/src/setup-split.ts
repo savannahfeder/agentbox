@@ -64,7 +64,8 @@ export function tourChecklist(done: readonly Lesson[], cmd = '⌘', now: Lesson 
   // Each row: its words, its keys, the lessons that tick it, and the tips that point at it.
   const rows: Array<[string, string[], Lesson[], Lesson[]]> = [
     ['Send a thread', ['N'], ['start', 'compose'], ['start', 'compose']],
-    ['Open one', ['↵'], ['open'], ['open', 'working']],
+    // Writing back to a thread or closing it means it was opened, whatever opened it.
+    ['Open one', ['↵'], ['open', 'choose', 'reply', 'close'], ['open', 'working']],
     ['Write back', ['R'], ['choose', 'reply'], ['choose', 'reply', 'busy']],
     ['Mark it done', ['E'], ['close'], ['close']],
     ['Find anything', [cmd, 'K'], ['palette'], ['palette', 'urgent']],
