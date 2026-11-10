@@ -78,7 +78,7 @@ describe('its row', () => {
     expect(css).toMatch(/\.row\.recent::after,\s*\.row\.recent \+ \.row::after\s*\{\s*left:\s*0;\s*\}/);
   });
 
-  it('only shows while back and forward is switched on', () => {
+  it('shows wherever the arrows do', () => {
     const app = read('renderer/src/App.tsx');
     expect(app).toMatch(/lastThread=\{backForwardOn \? trail\.lastThread : null\}/);
   });
