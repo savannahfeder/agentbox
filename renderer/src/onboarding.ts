@@ -752,8 +752,9 @@ export function clearIds(
   if (!run) return [];
   const there = new Set(rows.map((r) => r.id));
   const finished = run.examples.filter((id, i) => i !== waitingAt && i !== laterAt && there.has(id));
-  // Your own thread is in the inbox here only when Z brought it back.
-  return run.item && there.has(run.item) ? [...finished, run.item] : finished;
+  // Your own thread is in the inbox here only when Z brought it back. It is
+  // drawn at the top, so the ring and E start on it.
+  return run.item && there.has(run.item) ? [run.item, ...finished] : finished;
 }
 
 /**

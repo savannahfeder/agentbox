@@ -22,7 +22,7 @@ describe('the folder picker', () => {
     // Checked by hand on a copy: the picker opened with focus on the page, and
     // Escape reached nothing in it.
     const fp = fs.readFileSync(new URL('../renderer/src/components/FolderPicker.tsx', import.meta.url), 'utf8');
-    expect(fp).toMatch(/window\.addEventListener\('keydown', onEscape, true\)/);
+    expect(fp).toMatch(/window\.addEventListener\('keydown', onKey, true\)/);
   });
 });
 
@@ -43,5 +43,22 @@ describe('the folder picker sits in the middle of the window', () => {
   it('centres its card', () => {
     const css = fs.readFileSync(new URL('../renderer/src/styles.css', import.meta.url), 'utf8');
     expect(css).toMatch(/\.modal-backdrop\.fp-backdrop \{ place-items: center; padding-top: 0; \}/);
+  });
+});
+
+describe('the folder picker holds the keyboard while it is open', () => {
+  // Round seven: with the picker open over Home, ⌘↵ sent the draft in Home's
+  // box behind it, twice; and Tab moved focus onto the setup's Back and its
+  // choices behind the picker, four times between the two testers.
+  const fp = fs.readFileSync(new URL('../renderer/src/components/FolderPicker.tsx', import.meta.url), 'utf8');
+  it('takes ⌘↵ itself, wherever focus is', () => {
+    expect(fp).toMatch(/if \(\(e\.metaKey \|\| e\.ctrlKey\) && e\.key === 'Enter'\) \{ stop\(\); void useRef_\.current\(\); return; \}/);
+  });
+  it('keeps Tab among its own controls', () => {
+    expect(fp).toMatch(/if \(e\.key === 'Tab'\) \{/);
+    expect(fp).toMatch(/tabStop\(/);
+  });
+  it('lets nothing else reach what is behind it', () => {
+    expect(fp).toMatch(/if \(!inCard\) stop\(\);/);
   });
 });

@@ -44,8 +44,10 @@ describe('afterUnblock', () => {
 });
 
 describe('the clearing step', () => {
-  it('points at your own thread when Z brought it back, after the examples', () => {
-    expect(clearIds(rows('a', 'mine'), run, 2, 3)).toEqual(['a', 'mine']);
+  // Round seven: with it last, the ring and E sat on an example while the thread
+  // Z brought back was drawn above it.
+  it('points at your own thread first when Z brought it back', () => {
+    expect(clearIds(rows('a', 'mine'), run, 2, 3)).toEqual(['mine', 'a']);
     expect(clearIds(rows('mine', 'wait'), run, 2, 3)).toEqual(['mine']);
   });
   it('is not finished while your own thread is back', () => {

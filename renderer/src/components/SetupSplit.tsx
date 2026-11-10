@@ -62,6 +62,8 @@ const LOOK_NAME = (id: string) => (id === 'light' ? 'Light' : id === 'dark' ? 'D
 
 export interface SetupSplitProps {
   snap: Snapshot | null;
+  /** Back from the first step, to the welcome. */
+  onBack?: () => void;
   chats: SessionThread[];
   ticks: Set<string>;
   onToggle: (id: string) => void;
@@ -123,7 +125,7 @@ export function SetupSplit(p: SetupSplitProps) {
   // Google finishes in the browser, so the step moves on when the account arrives.
   const signedIn = !!p.snap?.team?.signedIn;
   useEffect(() => { if (step === 'account' && signedIn) next(); }, [step, signedIn, next]);
-  const back = at > 0 && !finished ? () => { setError(null); setAt((i) => i - 1); } : null;
+  const back = !finished && (at > 0 || p.onBack) ? () => { setError(null); if (at > 0) setAt((i) => i - 1); else p.onBack?.(); } : null;
 
   // ---- invite
   const me = p.snap?.team?.me;

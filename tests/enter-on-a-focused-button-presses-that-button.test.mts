@@ -57,3 +57,16 @@ describe("Home's keys", () => {
     expect(home).toMatch(/if \(enterIsTheButtons\(e\)\) return;/);
   });
 });
+
+describe("Home's J, K and Enter", () => {
+  // Round seven: Enter on the project menu of Home's New thread box opened an
+  // unrelated thread from Needs you, twice; with the folder picker open the
+  // same Enter would reach Home through it.
+  const home = fs.readFileSync(new URL('../renderer/src/home/HomePage.tsx', import.meta.url), 'utf8');
+  it('stand aside while a dialog, a menu or a list of choices is open', () => {
+    expect(home).toMatch(/document\.querySelector\('\.modal-backdrop, \.proj-menu, \[role="listbox"\], \[role="menu"\]'\)/);
+  });
+  it('stand aside for every control in the New thread box', () => {
+    expect(home).toMatch(/if \(t\?\.closest\('\.hm-start'\)\) return;/);
+  });
+});

@@ -1790,7 +1790,8 @@ export default function App() {
     setView('inbox');
     sawPalette.current = false;
     setupStartedAgain.current = true;
-    setTimeout(() => setRun({ ...RUN_START }), 0);
+    // The setup a new install meets, with a way back to the app (`leaveSetupAgain`).
+    setTimeout(() => { setArm('tour'); setFresh(true); }, 0);
   }, [closeWhatFloats]);
   // Asked for from ⌘K, so its screens must have a way back. A real first run has
   // no app behind it to go back to.
@@ -1798,6 +1799,7 @@ export default function App() {
     setupStartedAgain.current = false;
     finishFirstRun(localStorage);
     setRun(null);
+    setFresh(false);
   }, []);
 
   /* * THE TUTORIAL ON ITS OWN, WHICH IS THE OTHER HALF OF THE SPLIT (w-9a6ea066d6,
@@ -1822,6 +1824,8 @@ export default function App() {
     closeWhatFloats(); // see `walkAgain` above
     setFocused(null);
     setView('inbox');
+    // Its first card says "This is your inbox", so nothing else may be drawn there.
+    setTeamOpen(false); setChatsPlace(null); setEvPick(null); setTodayOn(false); setTasksOn(false); setHomeOpen(false);
     sawPalette.current = false;
     // The next tick, for the same reason `walkAgain` uses one: the palette
     // handles the Return that started this on the way down, and the hand-off
@@ -7083,6 +7087,7 @@ export default function App() {
 
   // THE FIRST RUN ENDS IN THE INBOX, where the tutorial takes over.
   const finishFresh = useCallback(() => {
+    setupStartedAgain.current = false;
     finishFirstRun(localStorage);
     setNewInstall(false);
     rememberOffered(localStorage);
@@ -9193,7 +9198,8 @@ export default function App() {
           if (homeOn) setHomeOpen(true);
           const sky = setupStartsOn({ sky: homeSet.skyTheme, dark: darkWindow });
           if (sky) chooseSkyTheme(sky);
-        }} />}
+        }}
+        onLeave={setupStartedAgain.current ? leaveSetupAgain : undefined} />}
       <OpenLesson at={lessonAt} />
       {!fresh && tour && tourLive(tour) && <TourList tour={tour} now={tourNow} onSkip={() => setTour(skipTour(tour))} />}
       {!fresh && <Tour tour={tour} view={view} thread={!!focused}
