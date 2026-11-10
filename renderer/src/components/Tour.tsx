@@ -50,8 +50,9 @@ const URGENT_MS = 6000;
 /** Inside ⌘K: one thing worth trying on the thread it acts on, and the way out. */
 function InPalette() {
   const urgent = [...document.querySelectorAll('.palette-label')].some((l) => /Priority: Urgent/.test(l.textContent ?? ''));
-  const here = document.querySelector('.focus-body') ? 'this thread' : 'the selected thread';
-  return urgent
+  // Home has no list on screen, so there is no selected thread to name there.
+  const here = document.querySelector('.focus-body') ? 'this thread' : document.querySelector('.list-pane .row.selected') ? 'the selected thread' : null;
+  return urgent && here
     ? <>Type <K k="urgent" /> and press <K k="↵" /> to make {here} urgent, or <K k="esc" /> to close</>
     : <>Type what you want to do and press <K k="↵" />, or <K k="esc" /> to close</>;
 }
