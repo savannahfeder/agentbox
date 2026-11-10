@@ -56,7 +56,7 @@ import { findFile, readCodeFile, writeCodeFile } from './code-file.mts';
 import { readNote, writeNote } from './rail-note.mts';
 import { teamForWindow } from './team/index.mts';
 import { isOnTeam } from '../shared/rooms-on.mts';
-import { liveRoomFor } from './team/live-room.mts';
+import { liveForTheWholeTeam, liveRoomFor } from './team/live-room.mts';
 import { openForThePerson } from './opens-a-program.mts';
 import { addClaudeAccount, addCodexAccount, alphaFeatures, cornerTagTurnedOff, countsTurnedOff, lookAgainFor, outsideAgentsMode, permissionMode, pointAtEngineBin, readSettings, searchForEngineBin, setProjectSetting, setWorkspaceSetting } from './settings.mts';
 import { ICON_KINDS, clearProjectIcon, setProjectIcon, setProjectName } from './project-identity.mts';
@@ -2855,14 +2855,12 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // The live room a document or table opens in, when teammates can open it too.
   ipcMain.handle('zero:live-room', async (_e, { product, project, name }: { product?: unknown; project?: unknown; name?: unknown }) => {
     if (!team || typeof name !== 'string') return null;
-    const state = team.state() as { signedIn?: boolean; me?: { id: string; name?: string }; team?: { id: string }; cards?: { project?: string | null }[] };
+    const state = team.state() as { signedIn?: boolean; me?: { id: string; name?: string }; team?: { id: string }; cards?: { project?: string | null; people?: string[] | null }[] };
     const own = store.listProducts().find((p) => p.slug === product && !p.team?.direct);
     const key = (s: unknown) => String(s ?? '').trim().toLowerCase();
     const named = typeof project === 'string' && project ? project : own?.name;
     const mine = store.listProducts().find((p) => !p.team?.direct && key(p.name) === key(named));
-    const shared = mine
-      ? !!mine.team?.projectId && projectSeenBy(mine).who !== 'private'
-      : (state.cards ?? []).some((c) => key(c.project) === key(named));
+    const shared = liveForTheWholeTeam({ mine, cards: state.cards, named });
     const room = liveRoomFor({ address: liveAt, state, multiplayer: alphaFeatures(config).multiplayer, project: named, name: name.split('/').pop(), shared, owner: !!own && own === mine });
     if (!room) return null;
     const token = await team.liveToken?.();
