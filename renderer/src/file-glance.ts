@@ -9,7 +9,7 @@ export type Glance = {title:string|null;line:string|null;blocks:{heading:boolean
 type Answer = {ok:boolean;coming?:boolean;waits?:boolean;error?:string;carry?:CarryState;opened?:string};
 type Reader = {
   readDoc:(p:{product:string;src:string})=>Promise<Answer&{text?:string}>;
-  codeChange:(p:{product:string;src:string})=>Promise<{ok:boolean;change?:unknown}>;
+  codeChange:(p:{product:string;src:string;summary?:boolean})=>Promise<{ok:boolean;change?:unknown}>;
   resolveDoc:(p:{product:string;src:string})=>Promise<Answer>;
 };
 
@@ -26,7 +26,7 @@ export async function glanceFile(reader:Reader, product:string, path:string):Pro
       return {...fileGlance(r.text ?? '', kind), ...(r.carry ? {carry:r.carry} : {})};
     }
     if (kind === 'code') {
-      const r = await reader.codeChange({product, src:path});
+      const r = await reader.codeChange({product, src:path, summary: true});
       return r.ok && r.change ? {title:'Code changes', line:null, blocks:[]} : null;
     }
     const r = await reader.resolveDoc({product, src:path});
