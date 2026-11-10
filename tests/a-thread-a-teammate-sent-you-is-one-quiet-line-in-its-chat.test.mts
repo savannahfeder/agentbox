@@ -43,7 +43,10 @@ describe('a thread a teammate sent you', () => {
   it('carries no inbox row, no tab and no row labels', () => {
     const html = draw();
     expect(html).not.toMatch(/tq-inrows|tq-sent-bar|class="tm-tab/);
-    expect(html).not.toMatch(/Medium|Kestrel/);
+    // The lines, not the box under them, whose priority chip says Medium.
+    const lines = html.slice(0, html.indexOf('class="dock-card tq-compose"'));
+    expect(lines).toMatch(/tq-sent/);
+    expect(lines).not.toMatch(/Medium|Kestrel/);
   });
   it('says where a thread stands when it no longer waits on you, with no dot', () => {
     expect(draw(() => 'progress')).toMatch(/<span class="v">In progress:<\/span>/);

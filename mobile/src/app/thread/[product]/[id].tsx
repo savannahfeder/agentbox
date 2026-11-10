@@ -43,6 +43,7 @@ import { useComputerAgents } from '../../../state/computer-agents';
 import { replyChoices, replyModel } from '../../../lib/compose';
 import { useSendWhenOnline } from '../../../state/send-when-online';
 import { AttachSheet, Attached } from '../../../ui/Attach';
+import { withPicked } from '../../../lib/attach';
 import { SentFiles, ThreadFiles, useMessageFiles } from '../../../ui/Files';
 import { Back, Caret, Chevron, Clip, Clock, Cross, DoneMark, More, Panel } from '../../../ui/icons';
 import { TimeBox, TypingSheet } from '../../../ui/Later';
@@ -267,7 +268,7 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
         <SheetRow label="Stop the agent" onPress={() => { setSheet(null); setStopping(true); stop(); }} />
         <SheetRow label="Keep it running" onPress={() => setSheet(null)} />
       </Sheet>
-      <AttachSheet open={sheet === 'attach'} close={() => setSheet(null)} add={(more) => { setFailed(null); draft.setFiles((f) => [...f, ...more]); }} fail={setFailed} />
+      <AttachSheet open={sheet === 'attach'} close={() => setSheet(null)} add={(more) => { setFailed(null); draft.setFiles((f) => withPicked(f, more)); }} fail={setFailed} />
       <PrioritySheet open={sheet === 'priority'} close={() => setSheet(null)} value={priority} pick={(v) => setPicked((p) => ({ ...p, priority: v }))} />
       <ModeSheet open={sheet === 'mode'} close={() => setSheet(null)} value={mode} pick={(v) => setPicked((p) => ({ ...p, permissionMode: v }))} />
       <ModelSheet open={sheet === 'model'} close={() => setSheet(null)} model={model} effort={picked.effort ?? item.effort ?? null} engine={engine} codex={codex}

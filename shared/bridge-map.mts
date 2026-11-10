@@ -104,6 +104,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   // Teammates: make, describe, start, edit, write to, and what they remember.
   teammates: 'zero:teammates',
   takeJoin: 'zero:take-join',
+  takeThreadLink: 'zero:take-thread-link',
   threadEdit: 'zero:thread-edit',
   // Move a thread to another project (shared/move-thread.mts).
   moveItem: 'zero:move-item',
@@ -249,6 +250,7 @@ export const PUSH_CHANNELS: Readonly<Record<string, string>> = {
   onZoomPercent: 'zero:zoom-percent',
   onRecovered: 'zero:recovered',
   onJoinRoom: 'zero:join-room',
+  onThreadLink: 'zero:thread-link',
   onSharedFile: 'zero:shared-file',
   onOpenItem: 'zero:open-item',
   onOpenSettings: 'zero:open-settings',

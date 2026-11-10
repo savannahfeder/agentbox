@@ -61,7 +61,7 @@ You control a copy of the app running in a browser with one command. Run it thro
   ${B} reload
 Run look after anything that changes the screen. Do not run any other command.
 
-The app's own keys: N new thread; ⌘↵ (press Enter meta) sends; J/K or arrows move in the list; ↵ opens; esc goes back; R replies in an open thread; E closes a thread; L snoozes; Z undoes; ⌘K (press k meta) opens the command bar; / searches; B switches list and board; tab moves between list tabs; S toggles the summary; 1-9 pick an option an agent offered.
+The app's own keys: N new thread; ⌘↵ (press Enter meta) sends; J/K or arrows move in the list; ↵ opens; esc goes back; R replies in an open thread; E closes a thread; L snoozes; Z undoes; ⌘K (press k meta) opens the command bar, which is also search; B switches list and board; tab moves between list tabs; S toggles the summary; 1-9 pick an option an agent offered.
 
 There are two projects, Sandbox and Second. ${stub
     ? `The agents here are stand-ins that obey words you put in the task text, so you can make agents misbehave on purpose:

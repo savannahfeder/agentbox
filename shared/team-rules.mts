@@ -392,3 +392,8 @@ export function whatYourOtherCopyMaySet<L extends PulledLine>(line: L | null | u
   if (!direct || !line || typeof line !== 'object') return null;
   return withoutALease(line);
 }
+
+// A THREAD MADE WITH MULTIPLAYER OFF IS PRIVATE. The window offers no Team or
+// Private choice then, so it was left to the project's default, and turning
+// Multiplayer back on published it to the team.
+export const visibilityWhenMade = <V extends string | undefined | null>(asked: V, sharing: boolean): V | 'private' | undefined => asked ?? (sharing ? undefined : 'private');

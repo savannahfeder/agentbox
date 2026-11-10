@@ -42,7 +42,7 @@ describe('the pane', () => {
 describe('the sidebar on a page with no words to select', () => {
   const side = read('components/NotesSidebar.tsx');
   it('finds a script\'s text as the page to select in', () => {
-    expect(side).toContain("card.querySelector<HTMLElement>('.doc-rich-content, .code-scroll')");
+    expect(side).toContain("card.querySelector<HTMLElement>('.doc-rich-content, .code-scroll, .tbl')");
   });
   it('asks only for a note where nothing can be selected', () => {
     expect(side).toContain("page.current ? 'Add a note, or select words in the page' : 'Add a note'");

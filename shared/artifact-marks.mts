@@ -11,7 +11,8 @@ export type NotePlace =
   | { kind: 'pin'; x: number; y: number }
   | { kind: 'time'; s: number; x?: number; y?: number }
   | { kind: 'page'; n: number; word?: 'Slide'; x?: number; y?: number }
-  | { kind: 'quote'; text: string; x?: undefined; y?: undefined }
+  /** `cell`: a table's row in the file, counted from 1 under the header, and its column's name. */
+  | { kind: 'quote'; text: string; cell?: { row: number; column: string }; x?: undefined; y?: undefined }
   | { kind: 'whole'; x?: undefined; y?: undefined };
 
 export type Mark =
@@ -172,7 +173,7 @@ const shortId = (v: unknown): string | null => (typeof v === 'string' && MARK_ID
 const fileId = (v: unknown): string | null => (typeof v === 'string' && FILE_ID.test(v) && v !== '.' && v !== '..' ? v : null);
 const unit = (v: unknown): v is number => typeof v === 'number' && v >= 0 && v <= 1;
 
-type RawPlace = { kind?: unknown; x?: unknown; y?: unknown; s?: unknown; n?: unknown; word?: unknown; text?: unknown };
+type RawPlace = { kind?: unknown; x?: unknown; y?: unknown; s?: unknown; n?: unknown; word?: unknown; text?: unknown; cell?: { row?: unknown; column?: unknown } | null };
 
 function cleanPlace(place: RawPlace | null | undefined): NotePlace | undefined {
   switch (place?.kind) {
@@ -186,7 +187,10 @@ function cleanPlace(place: RawPlace | null | undefined): NotePlace | undefined {
     }
     case 'quote': {
       const text = typeof place.text === 'string' ? place.text.trim().slice(0, MAX_QUOTE_CHARS) : '';
-      return text ? { kind: 'quote', text } : undefined;
+      if (!text) return undefined;
+      const row = place.cell?.row;
+      const column = typeof place.cell?.column === 'string' ? place.cell.column.trim().slice(0, 200) : '';
+      return typeof row === 'number' && Number.isInteger(row) && row >= 1 && column ? { kind: 'quote', text, cell: { row, column } } : { kind: 'quote', text };
     }
     case 'whole': return { kind: 'whole' };
     default: return undefined;
@@ -339,7 +343,7 @@ export function placeWords(note: { place?: NotePlace | null; pin?: number | stri
     case 'pin': return `Pin ${note!.pin ?? 1}`;
     case 'time': return unit(place.x) ? `Pin ${note!.pin ?? 1} at ${clock(place.s)}` : clock(place.s);
     case 'page': return unit(place.x) ? `Pin ${note!.pin ?? 1} on ${place.word ?? 'Page'} ${place.n}` : `${place.word ?? 'Page'} ${place.n}`;
-    case 'quote': return `“${place.text}”`;
+    case 'quote': return place.cell ? `“${place.text}” in row ${place.cell.row}, ${place.cell.column}` : `“${place.text}”`;
     default: return 'Whole file';
   }
 }

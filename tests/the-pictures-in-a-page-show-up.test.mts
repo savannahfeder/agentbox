@@ -24,26 +24,30 @@ const PAGE = '/Users/you/Zero/accounts/acct/astral/designs/w-74b0b5cd87/opens-it
 const SHOT = '/Users/you/Zero/accounts/acct/astral/designs/w-74b0b5cd87/opens-itself/card-w-9fa482b8ea.png';
 const DOCS = '/Users/you/Zero/accounts/acct/agentbox';
 
+// These are Mac paths, so they are read as a Mac reads them on any computer.
+// Windows has its own test, on-windows-a-picture-or-document-opens-from-its-drive.
+const MAC = 'darwin';
+
 describe('the address a page is served from', () => {
   it('gives a file one address, under one host, so a page and its pictures match', () => {
-    expect(docUrl(PAGE)).toBe(`${DOC_SCHEME}://file${PAGE}`);
+    expect(docUrl(PAGE, MAC)).toBe(`${DOC_SCHEME}://file${PAGE}`);
     // Same origin for both, which is the whole point: a relative src in the
     // page resolves to the picture beside it without leaving the origin.
-    expect(new URL(docUrl(PAGE)).origin).toBe(new URL(docUrl(SHOT)).origin);
+    expect(new URL(docUrl(PAGE, MAC)).origin).toBe(new URL(docUrl(SHOT, MAC)).origin);
   });
 
   it('survives a filename with a space, a hash or a question mark in it', () => {
     const odd = '/docs/round 3/what now? #2.html';
-    const url = docUrl(odd);
+    const url = docUrl(odd, MAC);
     expect(url).not.toContain(' ');
     // The '#' and '?' must not be read as url syntax, or the page requested is
     // a different one than the file on disk.
     expect(new URL(url).pathname).not.toContain('#');
-    expect(docPath(url)).toBe(odd);
+    expect(docPath(url, MAC)).toBe(odd);
   });
 
   it('reads its own addresses back and refuses anything else', () => {
-    expect(docPath(docUrl(PAGE))).toBe(PAGE);
+    expect(docPath(docUrl(PAGE, MAC), MAC)).toBe(PAGE);
     expect(docPath(`file://${PAGE}`)).toBeNull();
     expect(docPath('https://example.com/x.png')).toBeNull();
     expect(docPath('not a url')).toBeNull();
@@ -53,7 +57,7 @@ describe('the address a page is served from', () => {
     // Without this the grant check below would be asked about a path that
     // still says ../../.. and would resolve it differently than the disk does.
     const climbed = `${DOC_SCHEME}://file/Users/you/Zero/accounts/acct/astral/designs/../../../../.ssh/id_rsa`;
-    const landed = docPath(climbed);
+    const landed = docPath(climbed, MAC);
     expect(landed).not.toContain('..');
     expect(landed).toBe('/Users/you/Zero/.ssh/id_rsa');
     // And the flattened path is what the grant check then refuses.

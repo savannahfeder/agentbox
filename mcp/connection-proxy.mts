@@ -4,6 +4,8 @@
 // nothing worth reading (main/connections/broker.mts is the other end).
 //
 // Node's own modules only, so it starts on the app's own binary with no install.
+// On Windows it also loads main/local-channel.mts, which needs Node's own modules
+// and shared/product-name.mjs and nothing else.
 import net from 'node:net';
 import readline from 'node:readline';
 
@@ -12,6 +14,9 @@ const OFFLINE_TOOL = 'connection_status';
 
 const {
   AGENTBOX_CONNECTIONS_SOCK: SOCK,
+  AGENTBOX_CHANNEL_DIR: CHANNEL_DIR,
+  AGENTBOX_CHANNEL_KIND: CHANNEL_KIND,
+  AGENTBOX_CHANNEL_STAMP: CHANNEL_STAMP = '',
   AGENTBOX_CONNECTION_RUN: RUN,
   AGENTBOX_CONNECTION: CONNECTION,
   AGENTBOX_CONNECTION_NAME: NAME = 'This tool',
@@ -38,12 +43,34 @@ function gone() {
   waiting.clear();
 }
 
-const channel = () => new Promise<net.Socket | null>((resolve) => {
-  if (sock) { resolve(sock); return; }
-  if (!SOCK) { resolve(null); return; }
-  const s = net.createConnection(SOCK);
+// Calls made while the channel is still connecting wait for that one connection,
+// since every connection's answers feed the one buffer.
+let connecting: Promise<net.Socket | null> | null = null;
+
+const channel = (): Promise<net.Socket | null> => {
+  if (!sock && CHANNEL_DIR) return (connecting ??= overTheLocalChannel(CHANNEL_DIR).finally(() => { connecting = null; }));
+  return new Promise<net.Socket | null>((resolve) => {
+    if (sock) { resolve(sock); return; }
+    if (!SOCK) { resolve(null); return; }
+    const s = net.createConnection(SOCK);
+    s.once('connect', () => { sock = s; resolve(s); });
+    readAnswers(s, resolve);
+  });
+};
+
+// The app's server proves itself before this writes a byte. A refusal is said on
+// stderr and answered as offline.
+function overTheLocalChannel(dir: string): Promise<net.Socket | null> {
+  return import('../main/local-channel.mts')
+    .then(({ connectLocal }) => connectLocal({ kind: CHANNEL_KIND, stamp: CHANNEL_STAMP, dir }))
+    .then((s) => { readAnswers(s); sock = s; return s; }, (err: unknown) => {
+      process.stderr.write(`${NAME} could not reach the app: ${(err as Error | null)?.message ?? err}\n`);
+      return null;
+    });
+}
+
+function readAnswers(s: net.Socket, resolve: (s: net.Socket | null) => void = () => {}): void {
   s.setEncoding('utf8');
-  s.once('connect', () => { sock = s; resolve(s); });
   s.on('error', () => { resolve(null); });
   s.on('close', () => { if (sock === s) gone(); resolve(null); });
   s.on('data', (d) => {
@@ -58,7 +85,7 @@ const channel = () => new Promise<net.Socket | null>((resolve) => {
       waiting.delete(m.id);
     }
   });
-});
+}
 
 /** The app's answer, or null when the app cannot be reached. */
 async function ask(method: string, params: unknown): Promise<AppAnswer | null> {

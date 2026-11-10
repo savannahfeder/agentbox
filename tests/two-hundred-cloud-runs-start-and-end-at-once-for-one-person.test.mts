@@ -86,7 +86,8 @@ describe('one person on Max starting and ending runs all at once', () => {
     expect(out.status).toBe(500);
     expect(tries).toBeGreaterThan(8);
     expect(Date.now() - began).toBeGreaterThanOrEqual(2000);
-    expect(Date.now() - began).toBeLessThan(5000);
+    // 2.3 s alone, 5.1 s inside a busy push gate; for ever is what this rules out.
+    expect(Date.now() - began).toBeLessThan(10_000);
   }, 60_000);
 
   it('does not retry a write the bucket refused for any other reason', async () => {
