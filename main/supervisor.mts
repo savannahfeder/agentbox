@@ -129,7 +129,7 @@ import { readTranscriptHead } from './agent-sessions.mts';
 import { claudeSessionOpen } from './claude-session-open.mts';
 import { planStamp, readPlan } from './claude-plan.mts';
 import { troubleCause, refineCause, needsHerHands, troubleSentence, troubleRemedy, deadRunSentence, deadRunCause, deadRunPromisesARetry, undeliveredAnswerSentence, stoppedStartingSentence, limitResetsAt, limitResetMoment, strandedSentence, strandedRemedy, causeBreakdown } from '../shared/spawn-trouble.mts';
-import { readDeadRunTrace, traceShowsASilentDeath, tracesAToolCall, STOPPED_ON_REQUEST } from '../shared/dead-run-trace.mts';
+import { readDeadRunTrace, traceShowsASilentDeath, tracesAToolCall, STOPPED_ON_REQUEST, MOVED_HERE } from '../shared/dead-run-trace.mts';
 import { commandPrompt } from '../shared/claude-commands.mts';
 import { machineryPath, storeRootEnv } from './store/home.mts';
 import { answerModesFile } from './answer-modes.mts';
@@ -408,6 +408,8 @@ export type RunState = {
   handedBack?: unknown;
   /** The cloud turned the start away because the plan's agents were all busy. */
   cloudFull?: boolean;
+  /** Ended because the person moved its thread to this Mac. */
+  movedHere?: boolean;
   transportFault?: boolean;
   remoteIdle?: boolean;
   remoteHeld?: boolean;
@@ -5269,9 +5271,11 @@ export class Supervisor {
       // A cloud run picked back up after a restart is followed in `_comingHome`, not `sessions`.
       const joined = session ? null : this._comingHome?.get(id);
       if (keep === true && session?.cloud) {
+        session.movedHere = true;
         this._kill(session);
         this._recoverPending = true;
       } else if (keep === true && joined) {
+        joined.movedHere = true;
         joined.stop();
         this._recoverPending = true;
       }
@@ -6152,8 +6156,8 @@ export class Supervisor {
   /** The cloud runs In progress shows: the cap's count less runs that answered and wait for a reply. */
   _cloudRunsShown() {
     let n = 0;
-    for (const s of this.sessions.values()) if (s.cloud && !s.between && !s.remoteIdle) n += 1;
-    for (const v of this._comingHome?.values() ?? []) if (!this.sessions.has(v.itemId) && !v.between && !v.remoteIdle) n += 1;
+    for (const s of this.sessions.values()) if (s.cloud && !s.between && !s.remoteIdle && !s.stoppedOnRequest) n += 1;
+    for (const v of this._comingHome?.values() ?? []) if (!this.sessions.has(v.itemId) && !v.between && !v.remoteIdle && !v.stoppedOnRequest) n += 1;
     return n;
   }
 
@@ -7530,7 +7534,7 @@ export class Supervisor {
         if (over) return;
         over = true;
         if (this._comingHome.get(itemId) === view) this._comingHome.delete(itemId);
-        if (trace) write(`\n# exited (${code}) ${new Date().toISOString()}${view.stoppedOnRequest ? STOPPED_ON_REQUEST : ''}\n`);
+        if (trace) write(`\n# exited (${code}) ${new Date().toISOString()}${view.stoppedOnRequest ? STOPPED_ON_REQUEST : view.movedHere ? MOVED_HERE : ''}\n`);
         // Finished only when its work is home: 75 is the app going again, or
         // results that did not come back, and a later homecoming tries again.
         const session = { ...view, startedAt: rec.startedAt, child: { ranToTheEnd: () => code === 0 && !helpersLost.length, helpersLost: () => [...helpersLost] } };
@@ -8187,10 +8191,11 @@ export class Supervisor {
 
   /** Every run going: the sessions, and the cloud runs a restart picked back up. One list, so In progress and Groups count the same runs. */
   runsGoing() {
+    // Not one the person stopped: a cloud run winds down for minutes after the kill.
     return [
       ...this.sessions.values(),
       ...[...(this._comingHome?.values() ?? [])].filter((v) => !this.sessions.has(v.itemId)),
-    ].filter((s) => !s.remoteIdle && !s.between);
+    ].filter((s) => !s.remoteIdle && !s.between && !s.stoppedOnRequest);
   }
 
   /** What the phone is told of the agent running on one thread: since, where, its current steps. Null when none is. */
@@ -12065,7 +12070,7 @@ export class Supervisor {
         try { trace?.write(`${at}  [Write] ${wrote}\n`); } catch {}
         onLine(`saved what this run changed (${changePath(item.id)})`);
       }).catch((e) => console.warn('zero: could not save what the run changed:', e.message))
-        .finally(() => { try { trace?.write(`\n# exited (${code}) ${exitedAt}${session.stoppedOnRequest ? STOPPED_ON_REQUEST : ''}\n`); trace?.end(); } catch {} });
+        .finally(() => { try { trace?.write(`\n# exited (${code}) ${exitedAt}${session.stoppedOnRequest ? STOPPED_ON_REQUEST : session.movedHere ? MOVED_HERE : ''}\n`); trace?.end(); } catch {} });
       this.removeSpawnFiles(session);
       this.endSession(item, session, product, { after: changed });
       if (session.remoteIdle) {
