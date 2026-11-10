@@ -17,11 +17,11 @@ if (process.platform !== 'darwin') {
   else document.addEventListener('DOMContentLoaded', markFlat);
 }
 
-// The window has the Mac's blur behind it (main/window-glass.mts), so the
-// stylesheet may paint the dark ground see-through.
+// A Mac window can put the system's blur behind itself (main/window-glass.mts);
+// the page goes glass only while the Alpha switch is on.
 if ((process.argv ?? []).includes('--agentbox-glass')) {
   const markGlass = () => {
-    if (document.documentElement) document.documentElement.dataset.glass = '';
+    if (document.documentElement) document.documentElement.dataset.glassAble = '';
   };
   if (document.documentElement) markGlass();
   else document.addEventListener('DOMContentLoaded', markGlass);

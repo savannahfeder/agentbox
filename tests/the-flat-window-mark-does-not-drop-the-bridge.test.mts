@@ -81,20 +81,20 @@ describe('the flat-window mark does not drop the bridge', () => {
     expect(exposed).toContain('zero');
     doc.arrive();
     expect(html.dataset.window).toBeUndefined();
-    expect(html.dataset.glass).toBeUndefined();
+    expect(html.dataset.glassAble).toBeUndefined();
   });
 
-  // The glass mark (tests/on-a-mac-the-dark-ground-is-glass) is set the same
+  // The glass mark (tests/on-a-mac-the-ground-can-be-glass) is set the same
   // way, from the argument main/window-glass.mts gives a Mac window.
-  it('marks a window glass only when it was started with the glass argument, and keeps the bridge', () => {
+  it('marks a window able to go glass only when it was started with the glass argument, and keeps the bridge', () => {
     const glass = loadingDocument(false);
     expect(run({ platform: 'darwin', document: glass.doc, argv: ['electron', GLASS_ARG] })).toContain('zero');
-    expect(glass.html.dataset.glass).toBeUndefined();
+    expect(glass.html.dataset.glassAble).toBeUndefined();
     glass.doc.arrive();
-    expect(glass.html.dataset.glass).toBe('');
+    expect(glass.html.dataset.glassAble).toBe('');
 
     const plain = loadingDocument(true);
     expect(run({ platform: 'darwin', document: plain.doc, argv: ['electron'] })).toContain('zero');
-    expect(plain.html.dataset.glass).toBeUndefined();
+    expect(plain.html.dataset.glassAble).toBeUndefined();
   });
 });

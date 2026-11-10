@@ -52,7 +52,7 @@ import { teammatesOn } from '../shared/teammates.mts';
 import { dataFolderName, isNewUserBuild } from '../shared/side-build.mts';
 import { runningAsAFreshUser } from '../shared/fresh-user-home.mts';
 import { newUserWindow } from './new-user-window.mts';
-import { glassWindow } from './window-glass.mts';
+import { applyGlass, glassWindow } from './window-glass.mts';
 import { openFreshUser } from './fresh-user.mts';
 import { installCrashReports, report as reportCrash, reportFromRenderer, pending as pendingCrashes, setTransport } from './crash-report.mts';
 import { keepThePageAlive } from './when-the-page-stops.mts';
@@ -786,7 +786,7 @@ async function createWindow() {
     });
   });
 
-  const { additionalArguments, ...glass } = glassWindow(process.platform);
+  const { additionalArguments, ...glass } = glassWindow(process.platform, alphaFeatures(config).glass);
   window = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -934,6 +934,7 @@ async function createWindow() {
   quitStep(app, 'before-quit', 'connections.stop', () => connected.stop());
   const ipc = registerIpc({
     store, supervisor, config, window, analytics, docGrants, updater,
+    glass: (on) => applyGlass(window, process.platform, on),
     host: filingHost,
     team,
     connections: connected.connections,

@@ -2284,6 +2284,9 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
               <Row label="Back and forward" desc={sayKeys("Arrows before each page's title take you back to where you just were, and forward again. ⌘[ and ⌘] do the same.")}>
                 <Switch label="Back and forward" on={!!w.alpha?.backForward} onChange={(v) => setWorkspace('alphaBackForward', v)} />
               </Row>
+              <Row label="Glass" desc="The space around the page becomes frosted glass over your desktop.">
+                <Switch label="Glass" on={!!w.alpha?.glass} onChange={(v) => setWorkspace('alphaGlass', v)} />
+              </Row>
             </Group>
           </Page>
         )}
