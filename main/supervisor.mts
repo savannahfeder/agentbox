@@ -3348,6 +3348,10 @@ export class Supervisor {
       return Promise.resolve(null);
     }
     this.sessions.delete(item.id);
+    // Moved to this Mac: it carries on here now, not at the next tick, and
+    // reads as starting in between rather than as answered. Not one that had
+    // answered and only kept its machine for a reply: nothing is left to do.
+    if (session?.movedHere && !session.between) { this._resumeQueue.add(item.id); this.wake(); }
     // The run is over, said by the only app that runs this row; what it left
     // running may now be stopped on the cleaner's clock (main/leftovers.mts).
     this._leftoverCleaner?.ended(item.id);
