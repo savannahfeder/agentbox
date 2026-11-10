@@ -17,10 +17,16 @@ import { attachLiveRooms } from '../live/server.mjs';
 
 const BIG = 100_000;
 
-// Maps, Sets and large strings (every shared picture and film, in base64) out
-// of JSON. A big string goes in a file of its own named by its hash, so a save
-// never rewrites what it wrote last time.
+// Maps, Sets, bytes (a shared film's pieces) and large strings (every shared
+// picture, in base64) out of JSON. Bytes and a big string go in a file of their
+// own named by their hash, so a save never rewrites what it wrote last time.
 export function pack(value, blobs) {
+  if (Buffer.isBuffer(value)) {
+    const name = crypto.createHash('sha256').update(value).digest('hex');
+    const file = path.join(blobs, `${name}.bin`);
+    if (!fs.existsSync(file)) fs.writeFileSync(file, value);
+    return { $bytes: name };
+  }
   if (value instanceof Map) return { $map: [...value].map(([k, v]) => [k, pack(v, blobs)]) };
   if (value instanceof Set) return { $set: [...value].map((v) => pack(v, blobs)) };
   if (typeof value === 'string' && value.length > BIG) {
@@ -39,6 +45,7 @@ export function unpack(value, blobs) {
   if (!value || typeof value !== 'object') return value;
   if (value.$map) return new Map(value.$map.map(([k, v]) => [k, unpack(v, blobs)]));
   if (value.$set) return new Set(value.$set.map((v) => unpack(v, blobs)));
+  if (value.$bytes) return fs.readFileSync(path.join(blobs, `${value.$bytes}.bin`));
   if (value.$blob) return fs.readFileSync(path.join(blobs, value.$blob), 'utf8');
   return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, unpack(v, blobs)]));
 }
