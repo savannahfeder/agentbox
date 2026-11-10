@@ -40,25 +40,28 @@ export function keysMatch(given, expected) {
   return diff === 0;
 }
 
+// Owners are account ids rather than addresses, so the sender's own address
+// is never written into a setting.
+export const isPersonId = (s) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(String(s ?? ''));
+
 // Null until every secret is set, which is how the note is switched off.
 export function readNoteConfig(get) {
   const v = (name) => String(get(name) ?? '').trim();
   const config = {
     from: v('FOUNDER_NOTE_FROM'),
     signoff: v('FOUNDER_NOTE_NAME'),
-    owners: v('FOUNDER_NOTE_OWNERS').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
+    owners: v('FOUNDER_NOTE_OWNERS').split(',').map((s) => s.trim().toLowerCase()).filter(isPersonId),
     key: v('FOUNDER_NOTE_KEY'),
     resendKey: v('RESEND_API_KEY'),
   };
   return config.from && config.signoff && config.owners.length && config.key && config.resendKey ? config : null;
 }
 
-// The note as the sender's own inbox will show it. Only to one of the owners'
-// addresses, so the key alone cannot aim it at a stranger.
-export function previewFor(address, config) {
-  const to = String(address ?? '').trim().toLowerCase();
-  if (!config.owners.includes(to)) return null;
-  return noteFor({ name: config.signoff, email: to }, config);
+// The note as the sender's own inbox will show it. Only to an owner's
+// account, so the key alone cannot aim it at a stranger.
+export function previewFor(person, config) {
+  if (!person?.email || !config.owners.includes(String(person.id ?? '').toLowerCase())) return null;
+  return noteFor({ name: config.signoff, email: person.email }, config);
 }
 
 // The mark goes down before the send, so two runs at once cannot both write

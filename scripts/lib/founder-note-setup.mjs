@@ -11,6 +11,8 @@ export const newKey = () => crypto.randomBytes(32).toString('hex');
 
 export const looksLikeEmail = (s) => /^[^\s@,<>"]+@[^\s@,<>"]+\.[^\s@,<>"]{2,}$/.test(String(s ?? '').trim());
 
+export { isPersonId } from '../../cloud/supabase/functions/_shared/founder-note.mjs';
+
 export function ownersFrom(text) {
   return String(text ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
 }

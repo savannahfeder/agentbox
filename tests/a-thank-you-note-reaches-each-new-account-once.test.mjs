@@ -28,7 +28,8 @@ import {
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
-const config = { from: 'Sam from Agentbox <hello@example.com>', signoff: 'Sam', owners: ['sam@example.com'] };
+const OWNER = 'aaaaaaaa-0000-0000-0000-000000000001';
+const config = { from: 'Sam from Agentbox <hello@example.com>', signoff: 'Sam', owners: [OWNER] };
 
 describe('the name it opens with', () => {
   it('uses the first word of a real name', () => {
@@ -86,12 +87,12 @@ describe('the key the daily job knocks with', () => {
 });
 
 describe('the settings it needs', () => {
-  const env = { FOUNDER_NOTE_FROM: config.from, FOUNDER_NOTE_NAME: 'Sam', FOUNDER_NOTE_OWNERS: ' sam@example.com, Other@Example.com ', FOUNDER_NOTE_KEY: 'k'.repeat(40), RESEND_API_KEY: 're_x' };
+  const env = { FOUNDER_NOTE_FROM: config.from, FOUNDER_NOTE_NAME: 'Sam', FOUNDER_NOTE_OWNERS: ` ${OWNER}, BBBBBBBB-0000-0000-0000-000000000002 `, FOUNDER_NOTE_KEY: 'k'.repeat(40), RESEND_API_KEY: 're_x' };
   const get = (vars) => (name) => vars[name];
 
   it('reads every one from the function secrets', () => {
     expect(readNoteConfig(get(env))).toEqual({
-      from: config.from, signoff: 'Sam', owners: ['sam@example.com', 'other@example.com'], key: 'k'.repeat(40), resendKey: 're_x',
+      from: config.from, signoff: 'Sam', owners: [OWNER, 'bbbbbbbb-0000-0000-0000-000000000002'], key: 'k'.repeat(40), resendKey: 're_x',
     });
   });
 
@@ -126,7 +127,7 @@ describe('a day of notes', () => {
   it('asks for people 3 to 7 days old, leaving out the sender, at most 50', async () => {
     const w = world();
     await sendFounderNotes({ ...w, config });
-    expect(w.asked).toEqual([{ owners: ['sam@example.com'], oldestDays: 7, youngestDays: 3, limit: 50 }]);
+    expect(w.asked).toEqual([{ owners: [OWNER], oldestDays: 7, youngestDays: 3, limit: 50 }]);
     expect(NOTE_WINDOW).toEqual({ oldestDays: 7, youngestDays: 3 });
     expect(NOTES_PER_RUN).toBe(50);
   });
@@ -187,7 +188,7 @@ create publication supabase_realtime;
       [id(n), email, confirmed ? new Date() : null, name === null ? {} : { full_name: name }]);
     await db.query(`update public.people set created_at = now() - make_interval(days => $2::int) - interval '1 hour' where id = $1`, [id(n), daysAgo]);
   }
-  const due = async () => (await db.query(`select * from public.founder_note_due(array['Owner@Example.com'], 7, 3, 50)`)).rows;
+  const due = async () => (await db.query(`select * from public.founder_note_due($1::uuid[], 7, 3, 50)`, [[id(1)]])).rows;
 
   beforeAll(async () => {
     const { PGlite } = await import('@electric-sql/pglite');
@@ -219,7 +220,7 @@ create publication supabase_realtime;
   });
 
   it('stops at the number asked for, and never past 50', async () => {
-    expect((await db.query(`select * from public.founder_note_due(array['owner@example.com'], 7, 3, 1)`)).rows.map((r) => r.email)).toEqual(['six@x.dev']);
+    expect((await db.query(`select * from public.founder_note_due($1::uuid[], 7, 3, 1)`, [[id(1)]])).rows.map((r) => r.email)).toEqual(['six@x.dev']);
     expect(read('cloud/supabase/migrations/20261110000000_a_thank_you_note_from_the_founder.sql')).toMatch(/limit least\(how_many, 50\)/);
   });
 
@@ -233,8 +234,8 @@ create publication supabase_realtime;
   it('is closed to signed-in people and strangers', async () => {
     for (const role of ['authenticated', 'anon']) {
       await db.exec(`set role ${role}`);
-      await expect(db.query(`select * from public.founder_note_due(array['x'], 7, 3, 50)`)).rejects.toThrow();
-      await expect(db.query('select * from public.founder_notes')).rejects.toThrow();
+      await expect(db.query(`select * from public.founder_note_due($1::uuid[], 7, 3, 50)`, [[id(1)]])).rejects.toThrow(/permission denied/);
+      await expect(db.query('select * from public.founder_notes')).rejects.toThrow(/permission denied/);
       await db.exec('reset role');
     }
   });
@@ -285,14 +286,14 @@ describe('what is written down', () => {
 });
 
 describe('a preview', () => {
-  it('goes to one of the owners, greeting them by the name it is signed with', () => {
-    expect(previewFor(' SAM@example.com ', config)).toMatchObject({ to: ['sam@example.com'], subject: 'Thanks for trying Agentbox' });
-    expect(previewFor('sam@example.com', config).text.startsWith('Hey Sam,\n')).toBe(true);
+  it("goes to an owner's account, greeting them by the name it is signed with", () => {
+    expect(previewFor({ id: OWNER, email: 'sam@x.dev' }, config)).toMatchObject({ to: ['sam@x.dev'], subject: 'Thanks for trying Agentbox' });
+    expect(previewFor({ id: OWNER.toUpperCase(), email: 'sam@x.dev' }, config).text.startsWith('Hey Sam,\n')).toBe(true);
   });
 
   it('never goes to anyone else', () => {
-    expect(previewFor('stranger@example.com', config)).toBe(null);
-    expect(previewFor('', config)).toBe(null);
+    expect(previewFor({ id: 'bbbbbbbb-0000-0000-0000-000000000002', email: 'stranger@x.dev' }, config)).toBe(null);
+    expect(previewFor({ id: OWNER }, config)).toBe(null);
     expect(previewFor(undefined, config)).toBe(null);
   });
 });

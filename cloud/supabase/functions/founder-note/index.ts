@@ -10,14 +10,14 @@
 //
 //   FOUNDER_NOTE_FROM    "Name from Agentbox <the address replies go to>"
 //   FOUNDER_NOTE_NAME    the name it is signed with
-//   FOUNDER_NOTE_OWNERS  the sender's own sign-in addresses, comma separated:
-//                        they and their teammates never get it
+//   FOUNDER_NOTE_OWNERS  the sender's own account ids, comma separated: they
+//                        and their teammates never get it
 //   FOUNDER_NOTE_KEY     what the daily job knocks with
 //   RESEND_API_KEY       shared with the feedback function
 //
 // Until all five are set it refuses with "not configured", which is the off
 // switch. POST {"dryRun": true} says who is due and sends nothing;
-// {"previewTo": one of the owners} sends that one address the note.
+// {"previewTo": an owner's account id} sends that account the note.
 import { keysMatch, previewFor, readNoteConfig, sendFounderNotes } from '../_shared/founder-note.mjs';
 
 const CALL_MS = 20_000;
@@ -86,7 +86,11 @@ Deno.serve(async (req) => {
   };
 
   if (body.previewTo !== undefined) {
-    const note = previewFor(body.previewTo, config);
+    const id = String(body.previewTo);
+    const found = config.owners.includes(id)
+      ? await (await rest(`/people?select=id,email&id=eq.${encodeURIComponent(id)}`)).json().catch(() => [])
+      : [];
+    const note = previewFor(found[0], config);
     if (!note) return json({ ok: false, error: 'a preview only goes to an owner' }, 400);
     const res = await send(note, `preview-${Date.now()}`);
     return json(res.ok ? { ok: true, preview: true } : { ok: false, error: res.error }, res.ok ? 200 : 502);

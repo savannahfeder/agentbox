@@ -19,12 +19,10 @@ grant select, insert, delete on public.founder_notes to service_role;
 -- sender and anyone who shares a team with them are left out. The name is the
 -- one given at sign-up, since people.name falls back to the start of the
 -- address.
-create or replace function public.founder_note_due(owners text[], oldest_days int, youngest_days int, how_many int)
+create or replace function public.founder_note_due(owners uuid[], oldest_days int, youngest_days int, how_many int)
 returns table (id uuid, email text, name text)
 language sql stable security definer set search_path = '' as $$
-  with sender as (
-    select p.id from public.people p where lower(p.email) = any (select lower(o) from unnest(owners) o)
-  )
+  with sender as (select unnest(owners) as id)
   select p.id, u.email::text, coalesce(u.raw_user_meta_data->>'full_name', u.raw_user_meta_data->>'name', '')
   from public.people p
   join auth.users u on u.id = p.id
@@ -33,7 +31,6 @@ language sql stable security definer set search_path = '' as $$
     and p.created_at > now() - make_interval(days => oldest_days)
     and not exists (select 1 from public.founder_notes n where n.person_id = p.id)
     and not exists (select 1 from sender s where s.id = p.id)
-    and lower(u.email) <> all (select lower(o) from unnest(owners) o)
     and not exists (
       select 1 from public.team_members mine
       join public.team_members theirs on theirs.team_id = mine.team_id
@@ -42,8 +39,8 @@ language sql stable security definer set search_path = '' as $$
   order by p.created_at
   limit least(how_many, 50);
 $$;
-revoke all on function public.founder_note_due(text[], int, int, int) from public, anon, authenticated;
-grant execute on function public.founder_note_due(text[], int, int, int) to service_role;
+revoke all on function public.founder_note_due(uuid[], int, int, int) from public, anon, authenticated;
+grant execute on function public.founder_note_due(uuid[], int, int, int) to service_role;
 
 -- 17:00 UTC is the morning in the US. Scheduling the same name again
 -- replaces the job, so this file can be applied twice. The tests' database

@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // SWITCH ON THE FOUNDER'S THANK-YOU NOTE, IN ONE COMMAND (w-5efd743952).
 //
-//   node scripts/set-up-founder-note.mjs --name Sam --owners you@gmail.com [--address hello@agentbox.ac] [--preview]
+//   node scripts/set-up-founder-note.mjs --name Sam --owners <your account id> [--address hello@agentbox.ac] [--preview]
 //
 // --name     the name the note is signed with
-// --owners   your own sign-in addresses, comma separated: you and your
-//            teammates never get the note, and a preview goes to the first
+// --owners   your own account ids (public.people), comma separated: you and
+//            your teammates never get the note, and a preview goes to the first
 // --address  where it comes from and replies go (hello@agentbox.ac)
 // --preview  sends the note to the first owner instead of waiting a day
 //
@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url';
 import { CLOUD_ADDRESS } from '../shared/cloud-address.mjs';
 import { projectRefFrom } from './lib/feedback-setup.mjs';
 import { applyMigration, cliToken } from './apply-migration.mjs';
-import { DEFAULT_ADDRESS, noteUrl, senderLine, newKey, looksLikeEmail, ownersFrom, secretsFile, vaultSql } from './lib/founder-note-setup.mjs';
+import { DEFAULT_ADDRESS, noteUrl, senderLine, newKey, looksLikeEmail, isPersonId, ownersFrom, secretsFile, vaultSql } from './lib/founder-note-setup.mjs';
 
 const repo = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const MIGRATION = path.join(repo, 'cloud/supabase/migrations/20261110000000_a_thank_you_note_from_the_founder.sql');
@@ -40,7 +40,7 @@ const { values: flags } = parseArgs({ options: {
 } });
 const owners = ownersFrom(flags.owners);
 if (!flags.name?.trim()) stop('Say what the note is signed with: --name Sam');
-if (!owners.length || !owners.every(looksLikeEmail)) stop('Give your own sign-in addresses: --owners you@gmail.com');
+if (!owners.length || !owners.every(isPersonId)) stop('Give your own account ids: --owners <id from public.people>');
 if (!looksLikeEmail(flags.address)) stop(`${flags.address} is not an email address.`);
 
 const ref = projectRefFrom(CLOUD_ADDRESS.supabaseUrl);
@@ -87,7 +87,7 @@ if (!dry.ok) stop(`The function answered: ${dry.error}`);
 say(`   ${dry.due} ${dry.due === 1 ? 'person is' : 'people are'} due today. The job sends at 17:00 UTC each day.`);
 
 if (flags.preview) {
-  say(`5. Sending a preview to ${owners[0]}…`);
+  say('5. Sending a preview to your own account…');
   const sent = await call({ previewTo: owners[0] });
   if (!sent.ok) stop(`The preview did not send: ${sent.error}`);
   say('   Sent.');
