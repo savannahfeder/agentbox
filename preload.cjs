@@ -17,6 +17,16 @@ if (process.platform !== 'darwin') {
   else document.addEventListener('DOMContentLoaded', markFlat);
 }
 
+// The window has the Mac's blur behind it (main/window-glass.mts), so the
+// stylesheet may paint the dark ground see-through.
+if ((process.argv ?? []).includes('--agentbox-glass')) {
+  const markGlass = () => {
+    if (document.documentElement) document.documentElement.dataset.glass = '';
+  };
+  if (document.documentElement) markGlass();
+  else document.addEventListener('DOMContentLoaded', markGlass);
+}
+
 // EVERY ASK BEFORE A RELOAD IS ANSWERED, held write or not. main waits for
 // this before it reloads (main/write-before-reload.mts), so a page with
 // nothing held, or one that has not set a handler yet, says so at once rather

@@ -1021,6 +1021,23 @@ body {
   background: var(--skin-pane);
 }
 .panel-marks { display: none; }
+
+/* GLASS ON A MAC, in the dark look (w-b4dbfc0f31). The window blurs the
+   desktop behind it (main/window-glass.mts) and the ground lets about a fifth
+   of it through, under the theme's own ground colour, as in the reference the
+   owner picked. The card is drawn solid over the same ground it showed through
+   before, so nothing on it changes; it sits 8px in from the right and the foot
+   with the document card's corner, also as in the reference. Light stays
+   opaque, and phone.css comes later and keeps the phone's full-bleed card. */
+:root[data-glass]:not([data-theme="light"]) body { background: color-mix(in srgb, var(--bg) 70%, transparent); }
+:root[data-glass]:not([data-theme="light"]) body::before { content: none; }
+:root[data-glass]:not([data-theme="light"]) .app.workspace-layout { padding-right: 8px; padding-bottom: 8px; }
+:root[data-glass]:not([data-theme="light"]) .workspace-layout::before {
+  right: 8px; bottom: 8px; border-radius: var(--artifact-corner);
+  background: linear-gradient(var(--skin-pane), var(--skin-pane)), var(--skin-image) center / cover no-repeat fixed var(--bg);
+  box-shadow: inset 0 0 0 1px var(--skin-pane-line);
+}
+:root[data-glass]:not([data-theme="light"]) .home-sky { border-radius: var(--artifact-corner); }
 :root[data-skin="ember-grid"] .modal { background: var(--bg-raised); border-color: var(--line-strong); }
 /* Solid: at .97 a thread's text read through the box behind its rows. */
 :root[data-skin="ember-grid"] .modal.palette { background: rgb(38, 36, 34); border-color: rgba(255, 255, 255, .08); }

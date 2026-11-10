@@ -52,6 +52,7 @@ import { teammatesOn } from '../shared/teammates.mts';
 import { dataFolderName, isNewUserBuild } from '../shared/side-build.mts';
 import { runningAsAFreshUser } from '../shared/fresh-user-home.mts';
 import { newUserWindow } from './new-user-window.mts';
+import { glassWindow } from './window-glass.mts';
 import { openFreshUser } from './fresh-user.mts';
 import { installCrashReports, report as reportCrash, reportFromRenderer, pending as pendingCrashes, setTransport } from './crash-report.mts';
 import { keepThePageAlive } from './when-the-page-stops.mts';
@@ -785,6 +786,7 @@ async function createWindow() {
     });
   });
 
+  const { additionalArguments, ...glass } = glassWindow(process.platform);
   window = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -800,13 +802,14 @@ async function createWindow() {
       width: 1440,
       height: 900,
     }),
-    backgroundColor: '#1a1a1c',
+    ...glass,
     titleBarStyle: 'hiddenInset',
     webPreferences: {
       preload: path.join(appDir, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       webviewTag: true, // the inbox-zero browser
+      additionalArguments,
     },
   });
 
