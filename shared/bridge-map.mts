@@ -276,4 +276,8 @@ export const WRAPPED_ARGS: Readonly<Record<string, string[]>> = {
 // `onWriteHeld` is the desktop's ⌘R asking the page to write what the undo
 // window holds before it reloads (main/write-before-reload.mts). A browser
 // reload asks nobody; the page writes on `pagehide` there instead.
-export const DESKTOP_ONLY: readonly string[] = ['pathForFile', 'onWriteHeld'];
+//
+// `draftCopy` is the desktop's file copy of the drafts (main/draft-copy.mts),
+// kept because Chromium can throw its localStorage away. A tab has no such
+// file, and the page simply goes without the copy.
+export const DESKTOP_ONLY: readonly string[] = ['pathForFile', 'onWriteHeld', 'draftCopy'];

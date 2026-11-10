@@ -1140,6 +1140,9 @@ export function createTeamService({
       let text = words;
       // The links first, so what is left of a path is only ever prose.
       for (const [rel, copy] of moved) text = text.split(`](${rel})`).join(`](${copy.rel})`);
+      // A path of the sender's ending in the file is the file: the whole of it becomes the link, or a cut-down path is left to send.
+      const quoted = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      for (const [rel, copy] of moved) text = text.replace(new RegExp(`(?<![\\w(\\]])(?:~|/)[^\\s()\\[\\]\`]*/${quoted(rel)}(?![\\w/])`, 'g'), `[${copy.name}](${copy.rel})`);
       for (const [rel, copy] of moved) text = text.split(rel).join(copy.name);
       const unlinked = saved.filter((s) => !text.includes(`](${s.rel})`));
       const full = [text, attachmentMarkdown(unlinked)].filter(Boolean).join('\n\n') || named;

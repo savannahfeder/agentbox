@@ -73,6 +73,7 @@ import { leavesTheApp } from './app-window-stays.mts';
 import { IMG_SCHEMES, imgPath, mediaResponse, mediaType, servable } from './img-scheme.mts';
 import { hotWindowVerdict, storeHasWork } from './dev-window.mts';
 import { writeHeldThenReload } from './write-before-reload.mts';
+import { answerDraftCopy } from './draft-copy.mts';
 import { IS_SHE_TYPING_IN_THE_PAGE, theAppKeepsThisInput, theAppKeepsThisLetterInAPage } from '../shared/artifact-keys.mts';
 import { NAME, Name, WAS } from '../shared/product-name.mjs';
 import { JOIN_SCHEME, ourLink, tokenFromLink } from '../shared/room-links.mts';
@@ -1181,6 +1182,7 @@ async function createWindow() {
   // itself (it has no disk and should not have one), and 'render-process-gone'
   // only fires when the process DIES, which a thrown React error does not.
   ipcMain.handle('zero:crash', (_e, payload) => { reportFromRenderer(payload ?? {}); });
+  answerDraftCopy({ ipcMain, file: path.join(userDir, 'drafts-copy.json') });
   recordBlankPages({
     ipcMain,
     window: () => window,
