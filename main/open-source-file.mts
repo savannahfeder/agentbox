@@ -2,7 +2,7 @@ import {execFile,spawn as spawnChild} from 'node:child_process';
 import type {ChildProcess,SpawnOptions} from 'node:child_process';
 import {promisify} from 'node:util';
 import path from 'node:path';
-import {windowsRoot} from './shell-path.mjs';
+import {windowsRoot} from './shell-path.mts';
 const run = promisify(execFile);
 interface OpenSourceFileHow {
   platform?: NodeJS.Platform;
