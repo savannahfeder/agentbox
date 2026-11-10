@@ -8618,7 +8618,7 @@ export default function App() {
           const options = itemOptions(target);
           const recommended = options.find((o) => o.recommended) ?? options[0];
           const open = () => { setFocused(target); markSeen(target); };
-          const moveRefusal = whyItCannotMove(target as never, { live: runningIds.has(target.id) });
+          const moveRefusal = whyItCannotMove(target as never);
           return [
             ...(focused
               ? [{id:'remote-control',label:'Remote control',keywords:'phone mobile continue claude rc',run:()=>{setModal(null);window.dispatchEvent(new Event('task-remote-control-open'));}}, {id:'open-terminal',label:'Open terminal',keywords:'shell command console',run:()=>{setModal(null);window.dispatchEvent(new Event('task-terminal-open'));}}]
@@ -8717,10 +8717,9 @@ export default function App() {
             //
             // WHEN IT CANNOT MOVE, THE WORD STILL FINDS SOMETHING THAT SAYS SO,
             // and the reason is the row's own hint rather than a sentence you
-            // have to press for. Only a thread nothing has run on can go
-            // (shared/move-thread.mts), and a "move" that matched nothing is
-            // the complaint this answers. The press says it again because a
-            // narrow window cuts the hint and not the toast.
+            // have to press for (shared/move-thread.mts), and a "move" that
+            // matched nothing is the complaint this answers. The press says it
+            // again because a narrow window cuts the hint and not the toast.
             ...(moveRefusal
               ? [{ id: 'move-refused', label: 'Move to another project', keywords: MOVE_KEYWORDS, hint: moveRefusal, run: () => { setModal(null); showToast(moveRefusal); } }]
               // The same list the new thread card offers (projectsOffered): a

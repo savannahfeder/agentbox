@@ -1,7 +1,8 @@
 import { openSourceFile } from './open-source-file.mts';
 import {submitReply} from './live-replies.mts';
 import { noteToItsAgent, replyWithWaitingNotes, waitingNotes } from './notes-wake.mts';
-import { CHANGED_HERE, leftByAMove, ranHere, whyItCannotMove } from '../shared/move-thread.mts';
+import { leftByAMove } from '../shared/move-thread.mts';
+import { moveThread } from './move-thread.mts';
 import { whereTheWorkStands } from './git-change.mts';
 import { taskFolderPath } from './task-folders.mts';
 import { GROUPS } from '../shared/connections-catalog.mts';
@@ -1191,30 +1192,24 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       return { ok: false, error: String((err as Error)?.message ?? err) };
     }
   });
-  // MOVE A THREAD TO ANOTHER PROJECT (w-c9da359466). Only a thread nothing has
-  // ever run on: shared/move-thread.mts says why, and the store asks again.
-  // The one fact only this side has is whether a worker is inside it right
-  // now, which no field on the row can stand in for.
-  ipcMain.handle('zero:move-item', (_e, { product, id, to }: { product: string; id: string; to: string }) => {
+  // MOVE A THREAD TO ANOTHER PROJECT (main/move-thread.mts).
+  ipcMain.handle('zero:move-item', async (_e, { product, id, to }: { product: string; id: string; to: string }) => {
     try {
-      const live = supervisor.status().running.some((r) => r.itemId === id);
-      if (live) {
-        const why = whyItCannotMove(store.readItem(product, id), { live: true });
-        return { ok: false, error: why };
-      }
-      // Code it changed stays on its branch in this project, so it does not move.
-      const item = store.readItem(product, id);
-      if (ranHere(item)) {
-        const prod = store.listProducts().find((p) => p.slug === product);
-        let folder = null;
-        try { folder = prod?.repoPath ? taskFolderPath(supervisor.productFolder(prod), id) : null; } catch { folder = null; }
-        const stands = folder && fsWatch.existsSync(folder) ? whereTheWorkStands(folder) : null;
-        if (stands?.committed || stands?.uncommitted) return { ok: false, error: CHANGED_HERE };
-      }
-      const out = store.moveItem(product, id, to);
+      const out = await moveThread({
+        store,
+        isRunning: (itemId) => supervisor.status().running.some((r) => r.itemId === itemId),
+        stopSession: (itemId) => supervisor.stopSession(itemId),
+        changedCode: (slug, itemId) => {
+          const prod = store.listProducts().find((p) => p.slug === slug);
+          let folder = null;
+          try { folder = prod?.repoPath ? taskFolderPath(supervisor.productFolder(prod), itemId) : null; } catch { folder = null; }
+          const stands = folder && fsWatch.existsSync(folder) ? whereTheWorkStands(folder) : null;
+          return !!(stands?.committed || stands?.uncommitted);
+        },
+      }, { product, id, to });
       push();
-      supervisor.wake();
-      return { ok: true, ...out };
+      if (out.ok) supervisor.wake();
+      return out;
     } catch (err) {
       return { ok: false, error: String((err as Error)?.message ?? err) };
     }
