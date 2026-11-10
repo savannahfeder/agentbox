@@ -2799,6 +2799,8 @@ export default function App() {
   // holds when a teammate's face is lit, which is when somebody is looking.
   const [privacy, setPrivacyRaw] = useState<Privacy>(() => readPrivacy());
   const inboxDisplay = useMemo(() => pageDisplay(withOthers ? teamDisplay : mineDisplay, privacy, !!team), [withOthers, teamDisplay, mineDisplay, privacy, team]);
+  // Whether the inbox is drawn as a board, which the tutorial's board beat must read the same way.
+  const boardDrawn = teamMode ? mineBoard : search === null && inboxDisplay.view === 'board';
   const setInboxDisplay = useCallback((d: Display) => {
     const { privacy: p = 'any', ...rest } = d;
     setPrivacyRaw(p); writePrivacy(p);
@@ -2828,10 +2830,10 @@ export default function App() {
   const boardSeen = useRef(false);
   useEffect(() => {
     if (run?.step !== 'board') { boardSeen.current = false; return; }
-    if (inboxDisplay.view === 'board') { boardSeen.current = true; return; }
+    if (boardDrawn) { boardSeen.current = true; return; }
     if (!boardSeen.current) return;
     setRun((r) => (r ? stepTo(r, 'command') : r));
-  }, [run?.step, inboxDisplay.view]);
+  }, [run?.step, boardDrawn]);
   // Your own rows are on the page unless you took yourself off it.
   const mineShown = !team || picked.includes(team.me ?? '');
   // The tab goes in too: Done runs newest finished first whatever the sort
@@ -8131,7 +8133,7 @@ export default function App() {
                     Scheduled, Done and All, on the Inbox itself. They replace
                     the sidebar places they used to be. With a team on, the
                     board is Everything else's, under the cards (evBoardEl). */}
-                {(teamMode ? mineBoard : search === null && inboxDisplay.view === 'board') && !roomShown ? (<>
+                {boardDrawn && !roomShown ? (<>
                   <InboxBoard items={items} lead={leadCount ? { count: leadCount, cards: leadCardsDrawn(allLeads) } : undefined} products={snap.products} display={inboxDisplay} now={now} stateOf={stateOfMine} projectOrder={projectOrder}
                     cards={cards} picked={team ? picked : undefined}
                     onOpenCard={openTeammateCard}
@@ -9059,7 +9061,7 @@ export default function App() {
           palette={modal === 'palette'}
           // Whether the board is what the page is drawn as, for the board
           // beat's second half (2026-10-06).
-          board={inboxDisplay.view === 'board'}
+          board={boardDrawn}
           // And whether the reply box is open, so the answer beat stops saying
           // R over a box that R would type into (2026-10-06).
           replying={modal === 'reply'}
