@@ -14,12 +14,12 @@ import path from 'node:path';
 import { cloudRun, IMPORT_FAILED, LOGIN_TROUBLE } from './run.mts';
 import type { CloudKit, CodexAsk, NewThreadAsk, SignalSource } from './run.mts';
 import type { Readable, Writable } from 'node:stream';
-import { NEW_THREAD, NEW_THREAD_CODEX } from '../../shared/cloud-kit.mjs';
+import { NEW_THREAD, NEW_THREAD_CODEX } from '../../shared/cloud-kit.mts';
 import { cloudClients } from './clients.mts';
 import type { CloudConfig } from './clients.mts';
-import { readCloudConfig, readCloudKey, imageCapsToTry, noteImageCaps } from './config.mjs';
+import { readCloudConfig, readCloudKey, imageCapsToTry, noteImageCaps } from './config.mts';
 import { pickCloudLogin, markCloudLogin, loginObjectKey, cloudAccountsFrom, cloudAccountFrom, cloudLoginInUse, noCloudAccountSentence } from './logins.mts';
-import { keysCarried } from './keys.mjs';
+import { keysCarried } from './keys.mts';
 
 // SIGNED AS THE CLOUD RUNS' OWN USER AND NOBODY ELSE. AWS's libraries read
 // keys from the environment before they read a named profile, so an app
@@ -86,7 +86,7 @@ export async function cloudRunFromArgs({ args, env, cwd, stdin, stdout, stderr, 
   // in the sandbox, on the Codex login CODEX_HOME names.
   // `--agentbox-kit <claude's argv>`: leave this thread's next turn ready
   // for the cloud server to start with the computer shut, and start nothing
-  // (shared/cloud-kit.mjs, Supervisor#_writeKit).
+  // (shared/cloud-kit.mts, Supervisor#_writeKit).
   const importOnly = args[0] === '--agentbox-import-only';
   const kitOnly = args[0] === '--agentbox-kit';
   // A kit for a Codex thread: `--agentbox-kit --agentbox-codex app-server`.

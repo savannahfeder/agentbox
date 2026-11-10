@@ -157,7 +157,7 @@ Measured against a real OpenCode 1.18.35 on 2026-10-07. The code is
 `main/harnesses/opencode.mts`, `main/opencode.mts` and
 `main/opencode-server.mts`; it is registered and **not admitted**, so no row
 can choose it and no picker draws it (`admitted: false`,
-shared/harness-definitions.mjs, filtered in shared/engines.mjs).
+shared/harness-definitions.mts, filtered in shared/engines.mts).
 
 **Billing needs no key from us, and needs no sign-in at all.** Credentials live
 in OpenCode's own `~/.local/share/opencode/auth.json`, written by

@@ -17,7 +17,7 @@
 //     no way to reach the real store or anybody's threads.
 //   - The Chrome it drives is a throwaway on a profile inside the instance
 //     folder. Never `--chrome`: no worker of this app ever drives a person's own
-//     browser (tests/no-worker-drives-her-own-browser.test.mjs).
+//     browser (tests/no-worker-drives-her-own-browser.test.mts).
 //   - It runs on this Mac's Claude Code login like any session; no API key is
 //     passed (cleanEnv strips them).
 // It is stopped at --minutes whatever it is doing.
@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const { readState, doctor, cleanEnv, RUNS, REPO } = await import(path.join(here, 'live.mjs'));
-const { findClaudeBin } = await import(path.join(REPO, 'main', 'claude-bin.mjs'));
+const { findClaudeBin } = await import(path.join(REPO, 'main', 'claude-bin.mts'));
 
 const args = process.argv.slice(2);
 const opt = (name, fallback) => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[i + 1] : fallback; };
@@ -61,7 +61,7 @@ You control a copy of the app running in a browser with one command. Run it thro
   ${B} reload
 Run look after anything that changes the screen. Do not run any other command.
 
-The app's own keys: N new thread; ⌘↵ (press Enter meta) sends; J/K or arrows move in the list; ↵ opens; esc goes back; R replies in an open thread; E closes a thread; L snoozes; Z undoes; ⌘K (press k meta) opens the command bar; / searches; B switches list and board; tab moves between list tabs; S toggles the summary; 1-9 pick an option an agent offered.
+The app's own keys: N new thread; ⌘↵ (press Enter meta) sends; J/K or arrows move in the list; ↵ opens; esc goes back; R replies in an open thread; E closes a thread; L snoozes; Z undoes; ⌘K (press k meta) opens the command bar, which is also search; B switches list and board; tab moves between list tabs; S toggles the summary; 1-9 pick an option an agent offered.
 
 There are two projects, Sandbox and Second. ${stub
     ? `The agents here are stand-ins that obey words you put in the task text, so you can make agents misbehave on purpose:

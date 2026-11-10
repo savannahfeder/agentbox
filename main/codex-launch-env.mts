@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { candidatePaths, versionedPaths } from './codex-bin.mjs';
+import { candidatePaths, versionedPaths } from './codex-bin.mts';
 
 function executable(file: string): boolean {
   try {

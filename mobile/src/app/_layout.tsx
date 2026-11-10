@@ -22,8 +22,8 @@ const PREVIEW_PHONE = process.env.EXPO_PUBLIC_PREVIEW === '1' && Platform.OS ===
 function useAlertsOpenThreads() {
   useEffect(() => {
     if (Platform.OS === 'web') return;
-    const open =(data: any) => { if (data?.product && data?.id) router.push({ pathname: '/thread/[product]/[id]', params: { product: data.product, id: data.id } }); };
-    const sub = Notifications.addNotificationResponseReceivedListener((r) => open(r.notification.request.content.data));
+    const open =(data: { product?: string; id?: string } | undefined) => { if (data?.product && data?.id) router.push({ pathname: '/thread/[product]/[id]', params: { product: data.product, id: data.id } }); };
+    const sub = Notifications.addNotificationResponseReceivedListener((r) => open(r.notification.request.content.data as { product?: string; id?: string } | undefined));
     return () => sub.remove();
   }, []);
 }
@@ -49,7 +49,11 @@ function App() {
     <CloudProvider>
       <GroupsProvider>
         <StatusBar style={worn === 'light' ? 'dark' : 'light'} />
-        <Stack screenLayout={redrawn} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg }, animation: 'slide_from_right' }} />
+        <Stack screenLayout={redrawn} screenOptions={{ headerShown: false, orientation: 'portrait', contentStyle: { backgroundColor: color.bg }, animation: 'slide_from_right' }}>
+          {/* First-run steps: beneath them is an inbox not reached yet. */}
+          <Stack.Screen name="ai-notice" options={{ gestureEnabled: false }} />
+          <Stack.Screen name="alerts" options={{ gestureEnabled: false }} />
+        </Stack>
         <Approvals />
         <Toast />
       </GroupsProvider>

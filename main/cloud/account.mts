@@ -8,10 +8,10 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { cloudConfigPath, readCloudConfig, readCloudKey, writeCloudKey, cloudKeyPath, cloudAccountConfig, forgetCloudKey } from './config.mjs';
-import { withDeadline } from '../team/session.mjs';
-import { plainAuthError } from '../team/auth-words.mjs';
-import { signInWithGoogle, cancelGoogleSignIn, sendPasswordReset, waitForTheConfirmationLink } from '../team/sign-in.mjs';
+import { cloudConfigPath, readCloudConfig, readCloudKey, writeCloudKey, cloudKeyPath, cloudAccountConfig, forgetCloudKey } from './config.mts';
+import { withDeadline } from '../team/session.mts';
+import { plainAuthError } from '../team/auth-words.mts';
+import { signInWithGoogle, cancelGoogleSignIn, sendPasswordReset, waitForTheConfirmationLink } from '../team/sign-in.mts';
 import { Name } from '../../shared/product-name.mjs';
 import type { SupabaseClient, createClient as createSupabaseClient } from '@supabase/supabase-js';
 
@@ -31,6 +31,9 @@ export interface GatewayBody {
   message?: string;
   url?: unknown;
   where?: unknown;
+  /** On `/v1/me`: the plan, and the free hours a new account starts with. */
+  plan?: unknown;
+  free?: FreeHours;
   [field: string]: unknown;
 }
 
@@ -277,18 +280,26 @@ export async function signInToCloud({ config, acceptedTerms, name = os.hostname(
 }
 
 // The server's cloud and this Mac's key for it, or null when signed out.
-function signedIn(env: NodeJS.ProcessEnv, home: string) {
+function signedIn(env: NodeJS.ProcessEnv, home: string): { gateway: string; key: string } | null {
   const gateway = readCloudConfig(env, home)?.gateway;
   const key = gateway ? readCloudKey(env, home) : null;
-  return key ? { gateway, key } : null;
+  return key ? { gateway: gateway!, key } : null;
 }
 
 type FreeHours = { agents: number; hours: number; usedSeconds: number };
+type TeamHours = FreeHours & { running: number };
 
-/** No plan with free hours left reads as the `free` plan, so every screen draws it like a plan. */
-export function cloudPlanOf<T extends { plan?: unknown; free?: FreeHours }>(me: T): T | (T & { plan: 'free'; agents: number; hoursPerMonth: number; usedSeconds: number }) {
-  const f = me.free;
-  if (me.plan !== 'none' || !f || f.usedSeconds >= f.hours * 3600) return me;
+/**
+ * No plan reads as the hours a run would spend next, so every screen draws them
+ * like a plan: a team's (`team`), spent or not, since they replace the free
+ * hours; otherwise the free hours (`free`) while some are left.
+ */
+export function cloudPlanOf<T extends { [field: string]: unknown }>(me: T): T | (T & { plan: 'free' | 'team'; agents: number; hoursPerMonth: number; usedSeconds: number }) {
+  if (me.plan !== 'none') return me;
+  const tm = me.team as TeamHours | undefined;
+  if (tm) return { ...me, plan: 'team', agents: tm.agents, hoursPerMonth: tm.hours, usedSeconds: tm.usedSeconds, running: tm.running };
+  const f = me.free as FreeHours | undefined;
+  if (!f || f.usedSeconds >= f.hours * 3600) return me;
   return { ...me, plan: 'free', agents: f.agents, hoursPerMonth: f.hours, usedSeconds: f.usedSeconds };
 }
 
@@ -299,6 +310,14 @@ export async function cloudPlan({ env = process.env, home = os.homedir() }: Stor
   const me = await ask(at.gateway, '/v1/me', { key: at.key });
   if (me.status === 401) forgetCloudKey(at.key, env, home);
   return me.status === 200 ? { signedIn: true, ...cloudPlanOf(me.body as GatewayBody & { free?: FreeHours }) } : { signedIn: me.status !== 401, error: me.body.error || 'refused', message: me.body.message };
+}
+
+/** What the team's owner sees of Stripe on Plan and Billing; `{ owner: false }` for anyone else. */
+export async function cloudTeamBilling({ env = process.env, home = os.homedir() }: StoreDirs = {}) {
+  const at = signedIn(env, home);
+  if (!at) return { ok: false, error: 'signed-out' };
+  const out = await ask(at.gateway, '/v1/team-billing', { key: at.key });
+  return out.status === 200 ? { ok: true, ...out.body } : { ok: false, error: out.body.error || 'refused', message: out.body.message };
 }
 
 /** End every other Mac's cloud key, for a Mac that was lost; this one stays signed in. */

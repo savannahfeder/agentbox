@@ -1,7 +1,7 @@
 // HER MAC'S SIDE OF THE PHONE WITH THE MAC SHUT (docs/cloud/PHONE-PLAN.md, step 1).
 //
 // For each project she put on her phone, this writes a readable copy of every
-// thread worth carrying (shared/phone-snapshot.mjs) to her own rows in the
+// thread worth carrying (shared/phone-snapshot.mts) to her own rows in the
 // cloud, and takes the commands her phone left while the Mac was away: a
 // reply, a new thread, a snooze, a close. Each command goes through the very
 // handler the window uses for the same thing, so a reply from the phone is a
@@ -34,19 +34,21 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import os from 'node:os';
-import { threadSnapshot, threadsWorthCarrying, snapshotKey, checkCommand, madeHere, hideSecrets, bytesOf, phoneChoices, phoneApproval, phoneRepeatsOf, phoneTeammatesOf, SNAPSHOT_LIMITS, TEAMMATES_LIMITS } from '../shared/phone-snapshot.mjs';
-import { phoneSettingsOf, settingRoute } from '../shared/phone-settings.mjs';
+import { threadSnapshot, threadsWorthCarrying, snapshotKey, checkCommand, madeHere, hideSecrets, bytesOf, phoneChoices, phoneApproval, phoneRepeatsOf, phoneTeammatesOf, SNAPSHOT_LIMITS, TEAMMATES_LIMITS } from '../shared/phone-snapshot.mts';
+import { phoneSettingsOf, settingRoute } from '../shared/phone-settings.mts';
 import { createPhoneUploads, UPLOAD_LIMITS } from './phone-uploads.mts';
 import type { PhoneBackend, ThreadSnapshot, UploadedFile } from './phone-uploads.mts';
-import { createPhoneAlerts } from './phone-alerts.mjs';
-import { PHONE_FILES_MAX, phoneFilesIn, phoneFileSafeName, phoneAttachmentRel } from '../shared/phone-files.mjs';
-import { runOfClaim, cloudCard } from '../shared/cloud-kit.mjs';
-import { isCarried } from '../shared/cloud-carry.mjs';
-import { heldForUndo } from '../shared/phone-undo.mjs';
-import type { CarriedCommand } from '../shared/cloud-carry.mjs';
-import type { PhoneWait } from '../shared/phone-snapshot.mjs';
+import { createPhoneAlerts, type AlertsChange, type AlertsState } from './phone-alerts.mts';
+import { PHONE_FILES_MAX, phoneFilesIn, phoneFileSafeName, phoneAttachmentRel } from '../shared/phone-files.mts';
+import { runOfClaim, cloudCard } from '../shared/cloud-kit.mts';
+import { isCarried } from '../shared/cloud-carry.mts';
+import { heldForUndo } from '../shared/phone-undo.mts';
+import type { CarriedCommand } from '../shared/cloud-carry.mts';
+import type { PhoneWait, TeammatesViewSeen } from '../shared/phone-snapshot.mts';
+import type { SettingChange, SettingsModel } from '../shared/phone-settings.mts';
+import { leftByAMove } from '../shared/move-thread.mts';
 
-// A file her phone sent with a reply or a new thread (shared/phone-files.mjs).
+// A file her phone sent with a reply or a new thread (shared/phone-files.mts).
 export { phoneFilesIn };
 const HEARTBEAT_MS = 30_000;
 const SETTINGS_HEARTBEAT_MS = 5 * 60_000;
@@ -121,7 +123,7 @@ export interface PhoneLiveRun {
   doing?: { label?: unknown; startedAt?: unknown }[];
 }
 
-export interface PhoneApprovalAsk { id: string; product?: string; item?: string; card?: unknown; [key: string]: unknown }
+export interface PhoneApprovalAsk { id: string; product?: string | null; item?: string | null; card?: unknown; [key: string]: unknown }
 
 export interface AdoptArgs {
   project: string;
@@ -152,7 +154,8 @@ export interface PhoneBackendCalls extends Partial<PhoneBackend> {
   addPhoneCommand(command: object): Promise<unknown>;
   getPhoneFile?(file: { owner: string; device: string; name: string }): Promise<Buffer | null>;
   putPhoneSettings?(settings: { owner: string; device: string; name: string; settings: unknown }): Promise<unknown>;
-  pushDevices?: unknown;
+  pushDevices?(owner: string): Promise<{ token: string }[]>;
+  dropPushDevice?(token: string, owner: string): Promise<unknown>;
 }
 
 export interface ChannelResult { ok?: unknown; error?: string; reason?: string; id?: unknown; [key: string]: unknown }
@@ -175,10 +178,11 @@ export interface PhoneInboxOptions {
   liveOf?: (slug: string, id: string) => PhoneLiveRun | null;
   waitsOf?: () => { byId?: Record<string, PhoneWait>; paused?: boolean } | null;
   approvalsOf?: () => PhoneApprovalAsk[];
-  readSettings?: (() => unknown) | null;
+  readSettings?: (() => SettingsModel | null | Promise<SettingsModel | null>) | null;
   pinsOf?: () => Record<string, boolean>;
-  repeatsOf?: (() => unknown) | null;
-  teammatesOf?: (() => unknown) | null;
+  onMacOf?: () => Record<string, boolean>;
+  repeatsOf?: (() => Parameters<typeof phoneRepeatsOf>[0]) | null;
+  teammatesOf?: (() => TeammatesViewSeen | null) | null;
   version?: string;
   name?: string;
   idleMs?: (() => number) | null;
@@ -217,22 +221,15 @@ export interface PhoneState {
   doing: Record<string, { at: number }>;
   made: Record<string, { id: string; at: number }>;
   uploaded: Record<string, UploadedFile>;
-  alerted: Record<string, unknown>;
+  alerted: AlertsState['alerted'];
   adopted: Record<string, AdoptedRun>;
-  webAlerts: Record<string, unknown>;
+  webAlerts: AlertsState['webAlerts'];
 }
 
 type Snapshot = ReturnType<typeof threadSnapshot>;
 type Manifest = ReturnType<ReturnType<typeof createPhoneUploads>['manifest']>;
 type LiveCopy = { since: number; where: 'cloud' | 'mac'; doing: { label: string; startedAt: number }[]; at: number; movable?: boolean; runId?: string };
 type BuiltCopy = { inputs: string; key: string; live: LiveCopy | null; files: Manifest | null; askKey: string; waitKey: string; base: Snapshot | null };
-
-declare module '../shared/phone-snapshot.mjs' {
-  export function phoneApproval(request: { id: unknown; at?: unknown; tool?: unknown; input?: unknown }, card: unknown, ctx?: { home?: string | null }): Record<string, unknown>;
-  export function phoneRepeatsOf(rules: unknown, slugs: string[], opts?: { home?: string | null }): unknown[];
-  export function phoneTeammatesOf(view: unknown, opts?: { home?: string | null; limits?: typeof TEAMMATES_LIMITS }): Record<string, unknown> | null;
-  export const TEAMMATES_LIMITS: { mates: number; lines: number; textChars: number; bytes: number };
-}
 
 export function createPhoneInbox({
   backend,
@@ -249,7 +246,7 @@ export function createPhoneInbox({
   stateFile,
   home = os.homedir(),
   now = Date.now,
-  // How long a phone send her Undo can take back is left alone (shared/phone-undo.mjs).
+  // How long a phone send her Undo can take back is left alone (shared/phone-undo.mts).
   // The app passes PHONE_UNDO_HOLD_MS; none takes each one on sight.
   undoHoldMs = 0,
   log = () => {},
@@ -257,7 +254,7 @@ export function createPhoneInbox({
   build = threadSnapshot,
   // (slug, id) -> { since, where: 'mac' | 'cloud', doing: [{ label, startedAt }] } while an agent runs on it, else null.
   liveOf = () => null,
-  // () -> { byId: { [id]: { state, tool?, until? } }, paused } (shared/phone-snapshot.mjs phoneWaitsOf),
+  // () -> { byId: { [id]: { state, tool?, until? } }, paused } (shared/phone-snapshot.mts phoneWaitsOf),
   // why each thread nothing runs on is waiting, read once a pass; none says nothing.
   waitsOf = () => null,
   // The permission cards waiting on her, each with the fingerprint of the card as drawn: [{ ...request, card }].
@@ -266,6 +263,8 @@ export function createPhoneInbox({
   readSettings = null,
   // () -> { [threadId]: true }, the threads pinned on this computer.
   pinsOf = () => ({}),
+  // () -> { [threadId]: true }, the threads kept on this computer whatever the cloud is set to.
+  onMacOf = () => ({}),
   // () -> every project's repeating tasks (store.listRepeats); they ride with the settings.
   repeatsOf = null,
   // () -> the teammates view (main/teammates.mts `view`) while they are on, else null; it rides with the settings too.
@@ -273,13 +272,13 @@ export function createPhoneInbox({
   version = '',
   // This computer as her phone names it.
   name = os.hostname().replace(/\.local$/i, ''),
-  // How long since she last touched this Mac; none sends no alerts (main/phone-alerts.mjs).
+  // How long since she last touched this Mac; none sends no alerts (main/phone-alerts.mts).
   idleMs = null,
   // How an alert reaches Expo; a test stands in for it.
   sendPush,
   // And how a Web Push reaches the web app; a test stands in for it too.
   sendWebPush,
-  // THE PHONE WITH THE LID SHUT (shared/cloud-kit.mjs). Told which projects
+  // THE PHONE WITH THE LID SHUT (shared/cloud-kit.mts). Told which projects
   // are on her phone each pass; asked whether this computer leaves its
   // threads ready for the cloud (said on the project); and handed each run
   // the cloud server started for a reply, to make it the thread's own
@@ -295,7 +294,7 @@ export function createPhoneInbox({
   // to make its row and folder and join it (Supervisor#adoptCloudNewThread).
   newThreadKits = null,
   adoptNew = null,
-  // THE MAC'S OWN ROWS WITH THE LID SHUT (shared/cloud-carry.mjs): whether it
+  // THE MAC'S OWN ROWS WITH THE LID SHUT (shared/cloud-carry.mts): whether it
   // is in a dark wake, the rows it would have started, and the supervisor told
   // of each hand-over written and each taken back.
   asleep = () => false,
@@ -382,6 +381,8 @@ export function createPhoneInbox({
     const known = new Set(chosen.map((p) => p.slug));
     let pins: Record<string, boolean> = {};
     try { pins = pinsOf() ?? {}; } catch { /* the supervisor's trouble, not the phone's */ }
+    let kept: Record<string, boolean> = {};
+    try { kept = onMacOf() ?? {}; } catch { /* the supervisor's trouble, not the phone's */ }
     for (const p of chosen) {
       await breathe();
       const key = `project:${p.slug}`;
@@ -395,11 +396,13 @@ export function createPhoneInbox({
         beats.set(key, now());
         if (state.sent[key] !== said) { state.sent[key] = said; save(); }
       }
-      const rows = threadsWorthCarrying(listItems(p.slug), { now: now() });
+      const rows = threadsWorthCarrying(listItems(p.slug).filter((i) => !leftByAMove(i)), { now: now() });
       const batch: { item: string; snapshot: unknown; key: string }[] = [];
       const here = new Set<string>();
       for (const raw of rows) {
-        const item = pins[raw.id] === true ? { ...raw, pinned: true } : raw;
+        const item = pins[raw.id] === true || kept[raw.id] === true
+          ? { ...raw, ...(pins[raw.id] === true ? { pinned: true } : {}), ...(kept[raw.id] === true ? { onMac: true } : {}) }
+          : raw;
         if (here.size && here.size % THREADS_PER_TURN === 0) await breathe();
         here.add(item.id);
         const sk = `${p.slug}:${item.id}`;
@@ -561,7 +564,7 @@ export function createPhoneInbox({
 
   // What a command already did, if this computer did it before it stopped:
   // the line or the row that carries the command's own id (`fromPhone`,
-  // shared/work-items.mjs). Nothing else counts, however alike its words.
+  // shared/work-items.mts). Nothing else counts, however alike its words.
   function landed(cmd: PhoneCommand, item: string | null | undefined) {
     if (cmd.kind === 'reply') return historyOf(cmd.project, item!, { all: true }).some((l) => l?.patch?.fromPhone === cmd.id) ? item : null;
     if (cmd.kind === 'new') return listItems(cmd.project).find((i) => i.fromPhone === cmd.id)?.id ?? null;
@@ -626,7 +629,7 @@ export function createPhoneInbox({
             if (ready) {
               try {
                 const ownAlerts = cmd.kind === 'setting' && !!alerts?.takesSetting(ready.payload);
-                const out: ChannelResult | null | undefined = ownAlerts ? await alerts!.setting(ready.payload) : await apply(ready);
+                const out: ChannelResult | null | undefined = ownAlerts ? await alerts!.setting(ready.payload as AlertsChange) : await apply(ready);
                 if (cmd.kind === 'new' && typeof out?.id === 'string') state.made[madeHere(cmd.id)] = { id: out.id, at: now() };
                 if (cmd.kind === 'setting' && !ownAlerts) changedSettings = true;
                 outcome = 'done';
@@ -779,7 +782,7 @@ export function createPhoneInbox({
   }
 
   // EACH ROW A SLEEPING MAC WOULD HAVE STARTED, written as its own command for
-  // the cloud server to start (shared/cloud-carry.mjs). The supervisor is told
+  // the cloud server to start (shared/cloud-carry.mts). The supervisor is told
   // before the write, so a pass meanwhile cannot write it twice, and told it
   // is taken back when the write fails.
   async function handOver() {
@@ -896,7 +899,8 @@ export function phoneDevice(appDataDir: string, storeRoot: string): string {
 // (main/ipc.mts), reached the way the phone link reaches them: the Map
 // main/main.mts files every channel in. A handler that answers `ok: false`
 // turned it down, and that is what the phone is told.
-type Route = [string, Record<string, unknown>, ([string, Record<string, unknown>] | null)?];
+// A setting's route can hand its channel a bare value (Pause sends the boolean).
+type Route = [string, unknown, ([string, unknown] | null)?];
 type RouteCommand = PhoneCommand & { payload: CommandPayload };
 export type PhoneChannel = { bivarianceHack(event: { sender: null }, args?: unknown): unknown }['bivarianceHack'];
 
@@ -925,7 +929,13 @@ export function applyThrough(channels: Map<string, PhoneChannel>) {
     if (cmd.kind !== 'setting') return ROUTES[cmd.kind]?.(cmd) ?? [];
     const read = channels.get('zero:settings-read');
     if (!read) return [];
-    return settingRoute(cmd.payload, await read({ sender: null }));
+    // `checkCommand` checked the change; the channel answers with the settings model.
+    const change = cmd.payload as SettingChange;
+    const model = (await read({ sender: null })) as SettingsModel | null;
+    if (change.key !== 'stopLink') return settingRoute(change, model);
+    // Checked against the cloud's list now, not the copy the phone last saw.
+    const listed = (await channels.get('zero:file-links')?.({ sender: null }, {})) as { ok?: boolean; links?: unknown[] } | null | undefined;
+    return settingRoute(change, { ...model, links: listed?.ok ? listed.links : [] } as SettingsModel);
   };
   return async (cmd: PhoneCommand): Promise<ChannelResult | null | undefined> => {
     const [channel, args, then] = await routeOf({ ...cmd, payload: cmd.payload || {} });

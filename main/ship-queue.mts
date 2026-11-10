@@ -28,6 +28,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Name } from '../shared/product-name.mjs';
 import { SHIP_FAILED } from '../shared/not-shipped.mts';
+import { notPushedNote, pushNeedsGitHubSignIn } from '../shared/github-push-sign-in.mts';
 import { conflictBrief, earlyConflictNote } from './ship-conflict-brief.mts';
 import type { ConflictThread } from './ship-conflict-brief.mts';
 import { redOnMain } from './main-went-red.mts';
@@ -49,7 +50,7 @@ export interface ShipItem {
 
 export interface ShipProduct { slug: string; repoPath?: string | null }
 
-export type ShipSettings = Record<string, { script?: unknown } | undefined>;
+export type ShipSettings = Record<string, { script?: unknown; base?: unknown } | undefined>;
 
 export type ShipHandled = Record<string, number>;
 
@@ -81,7 +82,9 @@ export interface ShipQueueOptions {
   isLive: (item: ShipItem) => boolean;
   liveSince?: (item: ShipItem) => number | null;
   handBack?: (item: ShipItem, reply: string) => void;
-  run?: (script: string, cwd: string, options?: { timeout?: number; env?: NodeJS.ProcessEnv }) => Promise<ShipRun>;
+  run?: (script: string, cwd: string, options?: { timeout?: number; env?: NodeJS.ProcessEnv; gitConfig?: [string, string][] }) => Promise<ShipRun>;
+  // The GitHub sign-in saved on this computer, for the push (main/github-push-sign-in.mts).
+  pushSignIn?: () => { env: Record<string, string>; config: [string, string][] } | null;
   afterShip?: (shipped: { item: ShipItem; product: ShipProduct; sha: string | null }) => void;
   memoryGate?: () => ShipGate | null;
   shipScore?: (item: ShipItem) => number;
@@ -119,11 +122,47 @@ export function readShipSettings(userDir: string): ShipSettings {
   }
 }
 
+const realOrNull = (p: string) => { try { return fs.realpathSync(p); } catch { return null; } };
+const IN_A_TASK_FOLDER = /[\\/]\.claude[\\/]worktrees([\\/]|$)/;
+
+// THE CHECKOUT IS PINNED HERE, because repoPath lives in the store, which
+// workers can write: pointed at a folder a worker wrote, the queue ran that
+// folder's script with the push token. An entry without `base` takes the
+// project's checkout the first time the queue reads it, and keeps it.
+export function pinShipBases(userDir: string, products: ShipProduct[]) {
+  const settings = readShipSettings(userDir);
+  let changed = false;
+  for (const p of products ?? []) {
+    const entry = settings[p?.slug] as { script?: unknown; base?: unknown } | undefined;
+    if (!entry || typeof entry.base === 'string' || !p.repoPath) continue;
+    const real = realOrNull(p.repoPath);
+    if (!real || IN_A_TASK_FOLDER.test(real)) continue;
+    settings[p.slug] = { ...entry, base: real };
+    changed = true;
+  }
+  if (!changed) return settings;
+  try {
+    const tmp = `${shipSettingsFile(userDir)}.${process.pid}.tmp`;
+    fs.writeFileSync(tmp, `${JSON.stringify(settings, null, 2)}\n`);
+    fs.renameSync(tmp, shipSettingsFile(userDir));
+  } catch { /* unpinned, the entry ships from nowhere rather than from the store's word */ }
+  return settings;
+}
+
+/** The checkout this project's shipping is pinned to, when repoPath no longer is it. */
+export function movedFrom(product: ShipProduct | null | undefined, settings?: ShipSettings | null): string | null {
+  const base = (settings?.[product?.slug as string] as { base?: unknown } | undefined)?.base;
+  if (typeof base !== 'string') return null;
+  return product?.repoPath && realOrNull(product.repoPath) === base ? null : base;
+}
+
 /** The script that ships this project, inside its base checkout, or null. */
 export function shipScriptFor(product: ShipProduct | null | undefined, settings?: ShipSettings | null) {
   const rel = settings?.[product?.slug as string]?.script;
   if (!product?.repoPath || typeof rel !== 'string' || !rel || path.isAbsolute(rel)) return null;
+  if (movedFrom(product, settings)) return null;
   const base = path.resolve(product.repoPath);
+  if (IN_A_TASK_FOLDER.test(base)) return null;
   const script = path.resolve(base, rel);
   if (!script.startsWith(base + path.sep)) return null;
   return fs.existsSync(script) ? script : null;
@@ -169,7 +208,7 @@ export function waitingToShip(items: ShipItem[], products: ShipProduct[], settin
  * means nobody can say when the live work started — a cloud run whose folder
  * has not come home — and that waits, as it always did.
  *
- * Priority before age, the way `shared/work-items.mjs` orders the queue a
+ * Priority before age, the way `shared/work-items.mts` orders the queue a
  * puller sees: a thread the person is waiting on queued behind every older one.
  */
 export function nextToShip(items: ShipItem[], products: ShipProduct[], settings: ShipSettings, {
@@ -309,12 +348,18 @@ function baseHooksPath(cwd: string) {
   });
 }
 
-export async function runScript(script: string, cwd: string, { timeout = SHIP_MS, env = process.env }: { timeout?: number; env?: NodeJS.ProcessEnv } = {}): Promise<ShipRun> {
+/** `pairs` as git reads config from the environment. */
+export function gitConfigEnv(pairs: [string, string][]): Record<string, string> {
+  if (!pairs.length) return {};
+  const out: Record<string, string> = { GIT_CONFIG_COUNT: String(pairs.length) };
+  pairs.forEach(([key, value], i) => { out[`GIT_CONFIG_KEY_${i}`] = key; out[`GIT_CONFIG_VALUE_${i}`] = value; });
+  return out;
+}
+
+export async function runScript(script: string, cwd: string, { timeout = SHIP_MS, env = process.env, gitConfig = [] }: { timeout?: number; env?: NodeJS.ProcessEnv; gitConfig?: [string, string][] } = {}): Promise<ShipRun> {
   const node = env.npm_node_execpath && fs.existsSync(env.npm_node_execpath) ? env.npm_node_execpath : 'node';
   const hooks = await baseHooksPath(cwd);
-  const baseGate = hooks
-    ? { GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.hooksPath', GIT_CONFIG_VALUE_0: hooks }
-    : {};
+  const baseGate = gitConfigEnv([...(hooks ? [['core.hooksPath', hooks] as [string, string]] : []), ...gitConfig]);
   return new Promise<ShipRun>((resolve) => {
     let out = '';
     let child: ChildProcess;
@@ -369,20 +414,22 @@ export class ShipQueue {
   declare afterShip: NonNullable<ShipQueueOptions['afterShip']>;
   declare memoryGate: NonNullable<ShipQueueOptions['memoryGate']>;
   declare shipScore: NonNullable<ShipQueueOptions['shipScore']>;
+  declare pushSignIn: NonNullable<ShipQueueOptions['pushSignIn']>;
   declare log: ShipLog;
   declare busy: Promise<unknown> | null;
   declare earlyConflicts: Map<string, string>;
 
-  constructor({ store, userDir, folderFor, isLive, liveSince = () => null, handBack = () => {}, run = runScript, afterShip = () => {}, memoryGate = () => null, shipScore = () => 0, log = console }: ShipQueueOptions) {
-    Object.assign(this, { store, userDir, folderFor, isLive, liveSince, handBack, run, afterShip, memoryGate, shipScore, log });
+  constructor({ store, userDir, folderFor, isLive, liveSince = () => null, handBack = () => {}, run = runScript, afterShip = () => {}, memoryGate = () => null, shipScore = () => 0, pushSignIn = () => null, log = console }: ShipQueueOptions) {
+    Object.assign(this, { store, userDir, folderFor, isLive, liveSince, handBack, run, afterShip, memoryGate, shipScore, pushSignIn, log });
     this.busy = null;
     this.earlyConflicts = new Map();
   }
 
   tick(items: ShipItem[], products: ShipProduct[]) {
     if (this.busy) return null;
-    const settings = readShipSettings(this.userDir);
+    const settings = pinShipBases(this.userDir, products);
     if (!Object.keys(settings).length) return null;
+    this._refuseMoved(items, products, settings);
     const next = nextToShip(items, products, settings, {
       isLive: this.isLive, liveSince: this.liveSince, folderFor: this.folderFor, handled: readHandled(this.userDir),
     });
@@ -394,6 +441,21 @@ export class ShipQueue {
     const done = () => writeHandled(this.userDir, { ...readHandled(this.userDir), [keyOf(next.item)]: markedAt(next.item) });
     this.busy = this.ship(next, products, items).then(done, done).finally(() => { this.busy = null; });
     return this.busy;
+  }
+
+  // A row whose project no longer points at its pinned checkout is told so
+  // once for that marking, rather than waiting on a ship that never comes.
+  _refuseMoved(items: ShipItem[], products: ShipProduct[], settings: ShipSettings) {
+    const bySlug = new Map(products.map((p) => [p.slug, p]));
+    const handled = readHandled(this.userDir);
+    for (const item of items) {
+      const product = bySlug.get(item.product);
+      const base = product && owedAShip(item, handled) ? movedFrom(product, settings) : null;
+      if (!base) continue;
+      const note = `It did not ship: shipping for this project is set to the checkout at ${base}, and the project now points somewhere else. If you moved it, take its "base" out of ship.json in the app's data folder.`;
+      try { this.store.shipFailed(product!.slug, item.id, { note, labels: withoutShipLabel(item) }); } catch (e) { this.log.warn?.(`zero: could not refuse the ship of ${item.id}:`, (e as Error).message); }
+      writeHandled(this.userDir, { ...readHandled(this.userDir), [keyOf(item)]: markedAt(item) });
+    }
   }
 
   /** The ids of the rows still waiting on this queue, for the window. */
@@ -457,8 +519,11 @@ export class ShipQueue {
       onWait: () => { try { this.store.noteItem?.(item.product, item.id, 'Waiting for memory on this computer before shipping.'); } catch { /* the ship still waits */ } },
     });
     let ran;
+    let signIn: ReturnType<ShipQueue['pushSignIn']> = null;
+    try { signIn = this.pushSignIn(); } catch (e) { this.log.warn?.('zero: could not read the GitHub sign-in:', (e as Error).message); }
     try {
-      ran = await this.run(script, cwd, red.length ? { env: { ...process.env, AGENTBOX_RED_ON_MAIN: red.join('\n') } } : undefined);
+      const env = { ...(red.length ? { AGENTBOX_RED_ON_MAIN: red.join('\n') } : {}), ...signIn?.env };
+      ran = await this.run(script, cwd, Object.keys(env).length ? { env: { ...process.env, ...env }, ...(signIn ? { gitConfig: signIn.config } : {}) } : undefined);
     } finally {
       giveBack?.();
     }
@@ -475,6 +540,9 @@ export class ShipQueue {
         // five minutes after the agent ended.
         this.afterShip({ item, product, sha });
         await this._findNewConflicts(item, items, products);
+      } else if (pushNeedsGitHubSignIn(out)) {
+        // Nothing the agent can do: the thread asks for a sign-in and ships again once it is saved.
+        this.store.shipFailed(product.slug, item.id, { note: notPushedNote(!!signIn), labels: withoutShipLabel(item) });
       } else {
         this.store.shipFailed(product.slug, item.id, { note: failureNote(out), labels: withoutShipLabel(item) });
         let brief: string | null = null;

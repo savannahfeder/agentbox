@@ -1,14 +1,14 @@
 // THE NEW-THREAD PAGE'S CHOICES, by the phone site's card's rules
 // (renderer/src/threads/ThreadComposer.tsx): which project it opens on and
 // falls back to, the agent, model and level it remembers, and what a send names.
-import { LAST_PRODUCT_KEY } from '../../../renderer/src/compose-project';
 import { DEFAULT_MODEL, defaultModelFor, engineModelLabel, readLastModel, writeLastModel, type ModelChoice } from '../../../renderer/src/models';
 import { EFFORTS, defaultEffortFor, effortChoicesFor, effortPicked, effortShown, readLastEffort, writeLastEffort } from '../../../renderer/src/effort';
-import { readLastEngine, startingEngine, writeLastEngine } from '../../../renderer/src/engines';
+import { readLastEngine, startingEngine } from '../../../renderer/src/engines';
 import { priorityValueOf, type PriorityId } from '../../../renderer/src/priority';
 import { harnessFields, harnessOf, projectsOffered, startingProject, type Harness } from '../../../renderer/src/threads/composer-rules';
-import { readLastRecipient, writeLastRecipient } from '../../../renderer/src/threads/recipient';
-import type { Engine } from '../../../shared/engines.mjs';
+import { readLastRecipient } from '../../../renderer/src/threads/recipient';
+import { pickToSend } from '../../../renderer/src/reply-pick';
+import type { Engine } from '../../../shared/engines.mts';
 import type { Choices } from './actions';
 
 export interface KeptStore { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void }
@@ -17,22 +17,25 @@ interface ProjectLike { slug: string; practice?: boolean; team?: object | null }
 export interface CodexOpts { codexModels?: ModelChoice[]; codexDefault?: string | null }
 // The site's readers take the browser's Storage; they only ever call these three.
 const asStorage = (store: KeptStore) => store as unknown as Storage;
-const remembered = (store: KeptStore) => { try { return store.getItem(LAST_PRODUCT_KEY); } catch { return null; } };
 
-/** The project the page is on: her pick while it is there, else the one she last sent to, else the first. */
+// WHO A NEW THREAD GOES TO AND WHICH PROJECT are picked for that one thread and
+// forgotten after it, so the next task never goes to the last one's agent or
+// project unnoticed. The model and level stay remembered.
+const NOTHING_KEPT = asStorage({ getItem: () => null, setItem: () => {}, removeItem: () => {} });
+
 export type Recipient = { to: string; mate: string | null; auto: boolean };
-/** Who a new thread went to last, Auto, an agent or one of your teammates, kept as the desktop keeps it (renderer/src/threads/recipient.ts). */
-export const openingRecipient = (mates: readonly { id: string }[], reach: boolean, store: KeptStore): Recipient => readLastRecipient([], mates, reach, asStorage(store));
-export const pickRecipient = (store: KeptStore, r: Recipient) => writeLastRecipient(r, asStorage(store));
+/** Who a new thread opens addressed to: Auto, or the computer's agent (renderer/src/threads/recipient.ts). */
+export const openingRecipient = (mates: readonly { id: string }[], reach: boolean): Recipient => readLastRecipient([], mates, reach, NOTHING_KEPT);
 
-export function projectNow(products: readonly ProjectLike[], picked: string | null, store: KeptStore): string | null {
+/** The project the page is on: your pick while it is there, else the first in your running order. */
+export function projectNow(products: readonly ProjectLike[], picked: string | null): string | null {
   const offered = projectsOffered(products);
-  return offered.find((p) => p.slug === picked)?.slug ?? startingProject(offered, { remembered: remembered(store) })?.slug ?? null;
+  return offered.find((p) => p.slug === picked)?.slug ?? startingProject(offered, {})?.slug ?? null;
 }
 
 export function openingChoices(products: readonly ProjectLike[], store: KeptStore) {
   return {
-    product: projectNow(products, null, store),
+    product: projectNow(products, null),
     model: readLastModel(asStorage(store)) ?? DEFAULT_MODEL,
     effort: readLastEffort(asStorage(store)),
   };
@@ -46,9 +49,9 @@ export function openingFor(store: KeptStore, engine: Harness, codexDefault: stri
   };
 }
 
-/** The agent a new thread opens on: the one last picked, else the computer's own, where the computer offers it (engines.ts `startingEngine`). */
-export const openingEngine = (store: KeptStore, engines: Engine[], workspace: string | null = null): Harness =>
-  startingEngine(readLastEngine(asStorage(store), workspace), engines);
+/** The agent a new thread opens on: the computer's own, where the computer offers it (engines.ts `startingEngine`). */
+export const openingEngine = (engines: Engine[], workspace: string | null = null): Harness =>
+  startingEngine(readLastEngine(NOTHING_KEPT, workspace), engines);
 
 /** The computer's agents as the phone last read them, so a slow or failed read does not drop it to Claude Code alone. */
 export interface Agents { engines: Engine[]; workspace: string; codexModels: ModelChoice[]; codexDefault: string | null }
@@ -62,11 +65,6 @@ export function keptAgents(store: KeptStore): Agents | null {
 }
 export function keepAgents(store: KeptStore, agents: Agents) {
   try { store.setItem(AGENTS_KEY, JSON.stringify(agents)); } catch { /* read again next time */ }
-}
-export function pickEngine(store: KeptStore, engine: Harness) { writeLastEngine(engine, asStorage(store)); }
-
-export function pickProject(store: KeptStore, slug: string) {
-  try { store.setItem(LAST_PRODUCT_KEY, slug); } catch { /* still picked for this page */ }
 }
 export function pickModel(store: KeptStore, id: string, engine: Harness = 'claude', codexDefault: string | null = null) {
   writeLastModel(id, asStorage(store), engine, codexDefault);
@@ -99,7 +97,7 @@ export function newThreadChoices({ priority, engine = 'claude', model, effort, e
 }
 
 /**
- * The agent a thread runs on, by the computer's rule (shared/engines.mjs
+ * The agent a thread runs on, by the computer's rule (shared/engines.mts
  * `engineFor`): Codex on a computer with only Codex, else the row's own, else
  * its model's, else the computer's chosen agent where it still has it. A row
  * names its agent only when the computer offers two.
@@ -112,11 +110,27 @@ function threadEngine(item: { engine?: string; model?: string }, agents: Partial
   return agents.workspace === 'codex' && has('codex') ? 'codex' : 'claude';
 }
 
-/** The model a thread's reply box shows and lists: that thread's own agent's, not always Claude's. */
-export function replyModel(item: { engine?: string; model?: string }, picked: Pick<Choices, 'model'>, codex: CodexOpts & Partial<Agents> = {}) {
-  const engine = threadEngine(item, codex);
-  const model = picked.model ?? item.model ?? defaultModelFor(engine, codex.codexDefault ?? null);
+/** The model a thread's reply box shows and lists: the agent picked in the box, else the thread's own. */
+export function replyModel(item: { engine?: string; model?: string }, picked: Pick<Choices, 'model' | 'engine'>, codex: CodexOpts & Partial<Agents> = {}) {
+  const own = threadEngine(item, codex);
+  const engine: Harness = picked.engine === 'claude' || picked.engine === 'codex' ? picked.engine : own;
+  const model = picked.model ?? (engine === own ? item.model : undefined) ?? defaultModelFor(engine, codex.codexDefault ?? null);
   return { engine, model, label: engineModelLabel(engine, model, codex) };
+}
+
+/**
+ * What a reply names, by the desktop's reply rule (reply-pick.ts `pickToSend`):
+ * the agent only when the pick moves the thread to the other one on a computer
+ * that has both, and then the model and level too, so the old agent's are not
+ * left on the row. Codex's model is null for its own default.
+ */
+export function replyChoices(item: { engine?: string; model?: string }, picked: Choices, agents: CodexOpts & Partial<Agents> = {}): Choices {
+  const { engine: _picked, ...rest } = picked;
+  const was = threadEngine(item, agents);
+  const { engine } = replyModel(item, picked, agents);
+  if (engine === was || (agents.engines?.length ?? 0) < 2) return rest;
+  const sent = pickToSend({ model: picked.model ?? null, effort: picked.effort ?? null }, { engine, was, engineCount: agents.engines!.length });
+  return { ...rest, engine, model: sent.model, effort: sent.effort };
 }
 
 /** `fn`, ignoring a call while the last one is still going. */

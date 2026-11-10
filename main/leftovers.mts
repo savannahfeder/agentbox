@@ -14,8 +14,9 @@
 // switch; Codex took it apart (a tag is provenance, not ownership; silence is
 // not death; a timer is not consent), and this is what survived:
 //
-//   1. IT IS ITS OWN SWITCH, OFF BY DEFAULT. With it off nothing is stopped and
-//      leftovers are only reported. Its text states the whole policy.
+//   1. IT IS ITS OWN SWITCH, ON UNLESS SOMEBODY TURNS IT OFF (w-54c640f8da,
+//      main/config.mts). With it off nothing is stopped and leftovers are only
+//      reported. Its text states the whole policy.
 //   2. ONLY THIS APP'S OWN TASKS. A task only ever runs in the app whose store
 //      it is in, so the app knows for certain when its runs start and end: a
 //      run's start is registered here, synchronously, before the worker is
@@ -63,7 +64,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { pressureFrom } from './memory-gate.mts';
-import type { Pressure } from './memory-gate.mts';
+import type { Pressure, PressureLines } from './memory-gate.mts';
+import { readMacPressure } from './mac-pressure.mts';
 
 const LSTART = String.raw`\w{3} \w{3} [ \d]\d \d\d:\d\d:\d\d \d{4}`;
 
@@ -246,13 +248,8 @@ export async function listProcesses(platform: string = process.platform): Promis
   return procs;
 }
 
-export async function readMacPressureWord(): Promise<Pressure> {
-  const out = await new Promise<string>((resolve) => {
-    execFile('/usr/sbin/sysctl', ['-n', 'kern.memorystatus_vm_pressure_level', 'kern.memorystatus_level'], { timeout: 5_000 },
-      (err, stdout) => resolve(err ? '' : stdout));
-  });
-  const [level, freePct] = String(out).trim().split(/\s+/).map(Number);
-  return pressureFrom({ level: Number.isFinite(level) ? level : null, freePct: Number.isFinite(freePct) ? freePct : null });
+export async function readMacPressureWord(lines?: PressureLines): Promise<Pressure> {
+  return pressureFrom(await readMacPressure(), lines);
 }
 
 /**

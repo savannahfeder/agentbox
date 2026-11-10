@@ -7,7 +7,7 @@ import { itemThread } from '../../../renderer/src/item-thread';
 import { itemOptions, offerIsLive, optionsFrom, stripOptionsSection, type ParsedOption } from '../../../renderer/src/format';
 import { rowTitle } from '../../../renderer/src/list-rules';
 import { pageTitle } from '../../../renderer/src/one-thing-at-a-time';
-import { askLine } from '../../../renderer/src/ask-line';
+import { askHeading } from '../../../renderer/src/ask-line';
 import { phoneHistory, type PhoneRows, type phoneView } from '../../../renderer/src/phone-rows';
 import { approvalReads } from '../../../renderer/src/approval-card';
 import { recapFor, resultLeads } from '../../../renderer/src/recap';
@@ -16,14 +16,19 @@ import { herTurnEnds, herTurnStarts } from '../../../renderer/src/her-turns';
 import { filedOnTurn } from '../../../renderer/src/filed-in-thread';
 import { approvableFiled, doItHereWords, threadsMade } from '../../../renderer/src/threads-made';
 import { closeAsk } from '../../../renderer/src/close-asks-first';
-import { conversationGap, gapIndex } from '../../../shared/agents.mjs';
-import { groupWork } from '../../../shared/work-lines.mjs';
-import type { ThreadStateWord } from '../../../renderer/src/types';
+import { conversationGap, gapIndex } from '../../../shared/agents.mts';
+import { groupWork } from '../../../shared/work-lines.mts';
+import type { AgentSaid, AgentWork, ThreadStateWord, WorkItem } from '../../../renderer/src/types';
 import type { Row, TabId } from './tabs';
 
 type View = ReturnType<typeof phoneView>;
 
-export interface FiledRow { id: string; title: string; state: ThreadStateWord | null; approve: boolean; here: boolean; at: number; item: any }
+/** A line of the thread as the phone draws it: the desktop's event, with where a reply of hers went. */
+export type ThreadSaid = AgentSaid & { toCloud?: boolean; scheduled?: number };
+export type ThreadEvent = AgentWork | ThreadSaid;
+export type ThreadNode = (ThreadEvent & { i: number }) | { kind: 'run'; at: number; items: (AgentWork & { i: number })[] };
+
+export interface FiledRow { id: string; title: string; state: ThreadStateWord | null; approve: boolean; here: boolean; at: number; item: WorkItem }
 
 /** Which tab each thread is in, the later lists winning, as App.tsx's `tabState` has it. */
 export function tabStates(tabs: Record<TabId, Row[]>): Map<string, ThreadStateWord> {
@@ -41,7 +46,7 @@ function receiptsFor(view: View, product: string, id: string) {
 }
 
 export function threadOf(rows: PhoneRows, view: View, product: string, id: string, { whole = false, tabs, me = null }: { whole?: boolean; tabs?: Record<TabId, Row[]>; me?: string | null } = {}) {
-  const item = view.items.find((i: any) => i.product === product && i.id === id) ?? null;
+  const item = view.items.find((i: WorkItem) => i.product === product && i.id === id) ?? null;
   if (!item) return null;
   const { lines } = phoneHistory(rows, product, id, view.aliases);
   const mine = view.waiting.filter((w) => w.product === product && w.id === id);
@@ -50,7 +55,7 @@ export function threadOf(rows: PhoneRows, view: View, product: string, id: strin
   const message = String(item.body || item.title || '').trim();
   const sent = item.waitsForMac && message && message !== pageTitle(item).trim() ? [{ at: item.createdAt ?? 0, text: message }] : [];
   const pending = [...sent, ...mine.map((w) => ({ at: w.at, text: w.text, ...(w.refused ? { refused: w.refused } : {}) }))];
-  // A reply Agentbox Cloud took with the computer away says so (shared/cloud-kit.mjs).
+  // A reply Agentbox Cloud took with the computer away says so (shared/cloud-kit.mts).
   const inCloud = new Set(mine.filter((w) => w.cloud).map((w) => w.at));
   // Taken, and not in the thread's copy yet: sent, and drawn until the copy has it.
   const sentAt = new Set(mine.filter((w) => w.sent).map((w) => w.at));
@@ -73,20 +78,20 @@ export function threadOf(rows: PhoneRows, view: View, product: string, id: strin
     : said;
   const shown = session ? withoutTrailingWork(dated) : dated;
 
-  const parent = item.parent ? view.items.find((i: any) => i.product === product && i.id === item.parent) ?? null : null;
+  const parent = item.parent ? view.items.find((i: WorkItem) => i.product === product && i.id === item.parent) ?? null : null;
   const recap = recapFor(item, parent, parent ? phoneHistory(rows, product, parent.id, view.aliases).lines : undefined);
   const opening = recap?.kind === 'said' ? { at: recap.at, who: 'you' as const, text: recap.text, on: recap.on } : null;
-  const events: any[] = opening ? [opening, ...shown] : shown;
+  const events: ThreadEvent[] = opening ? [opening, ...shown] : shown;
 
   const gapAfter = gapIndex(events, built.omitted);
-  const nodes = groupWork(events.map((e, i) => ({ ...e, i })), { min: 1 }) as any[];
-  const lastOf = (n: any) => (n.kind === 'run' ? n.items[n.items.length - 1]?.i : n.i);
+  const nodes = groupWork(events.map((e, i) => ({ ...e, i })), { min: 1 }) as ThreadNode[];
+  const lastOf = (n: ThreadNode) => (n.kind === 'run' ? n.items[n.items.length - 1]?.i : n.i);
   const cutAt = nodes.findIndex((n) => lastOf(n) === gapAfter);
 
   const states = tabs ? tabStates(tabs) : new Map<string, ThreadStateWord>();
   // Do here closes the task and sends its words up here, so "done" would claim work nothing has run yet.
-  const saidHere = events.filter((e) => e.kind !== 'work' && e.who !== 'it' && typeof e.text === 'string').map((e) => e.text as string);
-  const filed: FiledRow[] = threadsMade(view.items, item).map((i: any) => {
+  const saidHere = events.filter((e): e is ThreadSaid => e.kind !== 'work' && e.who !== 'it' && typeof e.text === 'string').map((e) => e.text as string);
+  const filed: FiledRow[] = threadsMade(view.items, item).map((i: WorkItem) => {
     const state = states.get(`${i.product}/${i.id}`) ?? null;
     const head = doItHereWords({ id: i.id, title: String(i.title ?? '') }).split('\n')[0];
     const here = state === 'done' && saidHere.some((t) => t.startsWith(head));
@@ -116,7 +121,7 @@ export function threadOf(rows: PhoneRows, view: View, product: string, id: strin
     after: [...built.after, ...receiptsFor(view, product, id)].sort((a, b) => (a.at ?? 0) - (b.at ?? 0)),
     options: (live ? itemOptions(item) : []) as ParsedOption[],
     // The question the options answer, the options card's heading (OptionsOffer.tsx).
-    ask: live ? askLine(item) : '',
+    ask: live ? askHeading(item) : '',
     parent,
     filed,
     filedOnTurn: placed.onTurn,

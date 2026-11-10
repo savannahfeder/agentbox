@@ -21,7 +21,7 @@
 // resolve something, because there are eight of those and fixing branches is
 // how the ninth gets missed (the same reason keys.ts exists).
 
-import { DONT_SEND } from '../../shared/teammate-reach.mjs';
+import { DONT_SEND } from '../../shared/teammate-reach.mts';
 
 /**
  * The slot to reopen once the resolved item is gone: its own place in the
@@ -47,9 +47,10 @@ export function advanceAfter(p: { fromTask: boolean; index: number; id: string }
  * A thread you came back to with O is one you are working in, so it keeps you
  * too (tests/a-thread-you-came-back-to-with-o-keeps-you-after-a-reply).
  */
-export function replyMovesOn(p: { view: string; onBoard: boolean; index: number; searching?: boolean; phone?: boolean; cameBack?: boolean }): boolean {
+export function replyMovesOn(p: { view: string; onBoard: boolean; index: number; searching?: boolean; phone?: boolean; cameBack?: boolean; fromHome?: boolean }): boolean {
   // With search open, the tab under it is not where the work is happening.
-  return !p.phone && !p.searching && !p.cameBack && advanceLandsHere(p) && p.index >= 0;
+  // Home sits on the Inbox view, but a thread picked there is chosen, not cleared.
+  return !p.phone && !p.searching && !p.cameBack && !p.fromHome && advanceLandsHere(p) && p.index >= 0;
 }
 
 const MORE_COMING = /\?\s*$|\bask me\b|\bI(?:'ll| will) (?:explain|say|tell|describe)\b|\blet me (?:explain|say|describe)\b/i;

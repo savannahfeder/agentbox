@@ -6,9 +6,10 @@
 // This draws them and keeps the clock moving.
 
 import { useEffect, useId, useState } from 'react';
-import { liveLine, livePlace, shortSpan, shortWord, type LiveFacts } from '../live-line';
+import { liveLine, livePlace, runningSince, shortSpan, shortWord, type LiveFacts } from '../live-line';
 import { keepActivityKeyLocal, LIVE_STEPS_SHOWN, previousActivity, stepsSinceLastSaid } from '../activity-summary';
 import { LiveMark } from './LiveMark';
+import { useEscapePutsAway } from '../escape-steps';
 import { api } from '../api';
 import { onPhone } from '../phone-screen';
 import { pollEvery, oneAtATime } from '../phone-polls';
@@ -26,7 +27,8 @@ const TICK_MS = 15_000;
 // The task header repeats status in plain text, never another animation.
 
 export function Live({ item, facts, onTryAgain }: { item: WorkItem; facts: LiveFacts; onTryAgain?: () => void }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expandedAt, setExpandedAt] = useState<number | null>(null);
+  const expanded = expandedAt !== null;
   const detailId = useId();
   const [history, setHistory] = useState<AgentWork[]>([]);
   const [historyError, setHistoryError] = useState(false);
@@ -49,7 +51,7 @@ export function Live({ item, facts, onTryAgain }: { item: WorkItem; facts: LiveF
     const timer = setInterval(read, pollEvery(8000, onPhone()));
     return () => { active = false; off(); clearInterval(timer); };
   }, [expanded, item.id, item.product, facts.session?.startedAt]);
-  useEffect(() => setExpanded(false), [item.id, item.product, facts.session?.startedAt]);
+  useEffect(() => setExpandedAt(null), [item.id, item.product, facts.session?.startedAt]);
   const [now, setNow] = useState(() => Date.now());
   // A SILENT ROW HAS A CLOCK TOO. Its reading is how long ago the run that said
   // nothing ended, and a reading that froze at the minute the pane opened would
@@ -62,6 +64,8 @@ export function Live({ item, facts, onTryAgain }: { item: WorkItem; facts: LiveF
   }, [counting]);
 
   const live = liveLine(item, { ...facts, now });
+  // The steps only show while it works, so only then is there anything for Escape to fold.
+  useEscapePutsAway(live?.state === 'working' ? expandedAt : null, () => setExpandedAt(null));
   // TRY AGAIN where nothing will start this (../try-again.ts). A stopped
   // thread's bar above the conversation already carries it.
   const retry = onTryAgain && !facts.stalled && offersTryAgain(item, { ...facts, now })
@@ -84,7 +88,7 @@ export function Live({ item, facts, onTryAgain }: { item: WorkItem; facts: LiveF
   // nothing to count on a queued or a paused row, so nothing is printed there
   // rather than a number that would have to be invented.
   const span = facts.session
-    ? shortSpan(Math.max(0, now - facts.session.startedAt))
+    ? shortSpan(Math.max(0, now - runningSince(facts.session)))
     : live.state === 'silent' && facts.silent?.endedAt
       ? shortSpan(Math.max(0, now - facts.silent.endedAt))
       : null;
@@ -112,7 +116,7 @@ export function Live({ item, facts, onTryAgain }: { item: WorkItem; facts: LiveF
         <LiveMark still={!working && live.state !== 'elsewhere'} />
         {working ? (
           <button type="button" className="live-disclosure" onKeyDown={keepActivityKeyLocal} aria-expanded={expanded}
-            aria-controls={detailId} onClick={() => setExpanded(value => !value)}>
+            aria-controls={detailId} onClick={() => setExpandedAt(was => (was === null ? Date.now() : null))}>
             <span className="live-word is-shimmering">{word}</span>
             {activity.length > 1 && <span className="live-span">+{activity.length - 1}</span>}
             {span && <span className="live-span">{span}</span>}

@@ -5,19 +5,19 @@
 // the rows are ordered, how "Updated" is said, and what goes in each board
 // column for the Team, where your own threads come from this Mac and your
 // teammates' from the cards their Macs publish.
-import { shownToPeople, shownToTeam, visibilityOf } from '../../../shared/thread-cards.mjs';
+import { shownToPeople, shownToTeam, visibilityOf } from '../../../shared/thread-cards.mts';
 import type { Seen } from './summary-rules';
 import { hiddenUntil, placedAt } from '../list-rules';
 import type { AgentVoice, Product, ThreadCard, ThreadStateWord, View, WorkItem } from '../types';
-import { voiceName } from '../../../shared/agent-voice.mjs';
+import { voiceName } from '../../../shared/agent-voice.mts';
 import { priorityIdOf, priorityValueOf, type PriorityId } from '../priority';
 import { dayAndTime, firstRealLine } from '../format';
-import { threadState } from '../../../shared/thread-cards.mjs';
-import { dropPlaces, placeScore, placedScore, shownPriority } from '../../../shared/rank.mjs';
+import { threadState } from '../../../shared/thread-cards.mts';
+import { dropPlaces, placeScore, placedScore, shownPriority } from '../../../shared/rank.mts';
 import { plainWords } from '../team/agent-mentions';
-import { heldByAPerson, iSpokeLast, isTaskRow, isWorkThread, lastSpeaker, nameIsAPersons, whatWaits } from '../../../shared/team-rules.mjs';
+import { heldByAPerson, iSpokeLast, isTaskRow, isWorkThread, lastSpeaker, nameIsAPersons, whatWaits } from '../../../shared/team-rules.mts';
 import { taskWords } from '../team/company';
-import { shownTitle } from '../../../shared/thread-title.mjs';
+import { shownTitle } from '../../../shared/thread-title.mts';
 import { localDate } from '../local-dates';
 
 export type PageId = 'inbox' | 'team';
@@ -34,11 +34,11 @@ export interface Display {
   privacy?: Privacy;
 }
 
-// Your own page opens as a list and the team page as a board, by default, and
-// either is remembered once changed.
+// Both pages open as a list, each tab on its own, and B turns either into a
+// board; the choice is remembered once changed.
 export const DEFAULT_DISPLAY: Record<PageId, Display> = {
   inbox: { view: 'list', sort: 'priority', priorities: [], projects: [], updated: 'any', privacy: 'any' },
-  team: { view: 'board', sort: 'priority', priorities: [], projects: [], updated: 'any', privacy: 'any' },
+  team: { view: 'list', sort: 'priority', priorities: [], projects: [], updated: 'any', privacy: 'any' },
 };
 
 /**
@@ -170,7 +170,7 @@ export function keeps(item: Pick<WorkItem, 'priority' | 'product' | 'updatedAt'>
 // AND A THREAD YOU DRAGGED SITS WHERE YOU PUT IT (w-6e5b532a95). So the order
 // is one number: the project's place plus the value of the level the row
 // shows (9, 7, 5, 2, all under a project's 100), or the thread's own place,
-// which replaces it (`placedScore`, shared/rank.mjs). A drop works out that
+// which replaces it (`placedScore`, shared/rank.mts). A drop works out that
 // place from this same number (`dropPlaces`).
 //
 // A MESSAGE NOBODY LEVELLED CARRIES 0, which the sorter reads as no level and so
@@ -282,7 +282,7 @@ export function sorted<T extends Ranked & { product?: string }>(rows: T[], d: Di
 
 /** The same order, for the board's cards, which carry a level and a project
  *  slug. A card of yours is timed by its thread, so Done reads when it finished. */
-const timed = (e: BoardEntry): Ranked => ({ ...e, product: e.projectSlug, ...(e.item ? { status: e.item.status, wrote: e.item.wrote, createdAt: e.item.createdAt, start: e.item.start, place: e.item.place, pinned: e.item.pinned } : {}) });
+const timed = (e: BoardEntry): Ranked => ({ ...e, product: e.projectSlug, ...(e.item ? { status: e.item.status, wrote: e.item.wrote, createdAt: e.item.createdAt, start: e.item.start, place: e.item.place, pinned: e.item.pinned, placedAt: e.item.placedAt } : {}) });
 export function sortedEntries(entries: BoardEntry[], d: Display, column?: string, projectOrder: string[] = [], direct?: ReadonlySet<string>): BoardEntry[] {
   const by = order(d, column, projectOrder, direct);
   return entries.slice().sort((a, b) => by(timed(a), timed(b)));
@@ -570,7 +570,7 @@ export function whatAddPeopleDoes({ product, item, person, me, company }: {
  * WHO SEES A ROW, AS THE INBOX SAYS IT (2026-10-01). Her threads from before
  * she joined stay hers unless she shares them, so the inbox has to say which
  * ones the team can see and let her change it. 'team' or 'private' by the
- * Team page's own rule (shared/thread-cards.mjs shownToTeam), or null where
+ * Team page's own rule (shared/thread-cards.mts shownToTeam), or null where
  * the question does not arise: nobody signed in, a message between people, an
  * agent's own row, or a teammate's thread, which is theirs to share.
  */
@@ -777,7 +777,7 @@ export function teamEntries({ items, products, cards, me, now, since = null, sta
     // once under your name.
     if (me && item.createdBy && item.createdBy !== me) continue;
     // Your threads from before you joined are not on the team's board, any
-    // more than they are on anyone else's (shared/thread-cards.mjs). One you
+    // more than they are on anyone else's (shared/thread-cards.mts). One you
     // made private stays, with its lock, so you can see it is hidden.
     // ON YOUR OWN PAGE EVERY ONE OF YOURS STAYS (w-05ff3d1438): leaving them
     // out is how threads once went missing from the board.

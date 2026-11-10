@@ -31,7 +31,8 @@ export function saveAttachments(dir: string, files?: AttachmentFile[] | null) {
     const rel = `attachments/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}-${safe}`;
     const abs = path.join(dir, rel);
     if (file?.dataBase64) fs.writeFileSync(abs, Buffer.from(file.dataBase64, 'base64'));
-    else if (file?.srcPath) fs.copyFileSync(file.srcPath, abs);
+    // A clone on APFS shares the blocks, so a film attached costs no second copy of disk.
+    else if (file?.srcPath) fs.copyFileSync(file.srcPath, abs, fs.constants.COPYFILE_FICLONE);
     else continue;
     saved.push({ rel, name: safe, image: /\.(png|jpe?g|gif|webp)$/i.test(safe) });
   }

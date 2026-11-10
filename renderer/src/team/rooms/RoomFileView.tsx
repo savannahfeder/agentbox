@@ -2,7 +2,7 @@
 // opens in: its versions, comments, replies and Approve. The group's messages
 // stand in for a thread's lines, and its comments are kept in the room.
 import { useMemo } from 'react';
-import { marksOf } from '../../../../shared/artifact-marks.mjs';
+import { marksOf } from '../../../../shared/artifact-marks.mts';
 import { ArtifactView } from '../../components/ArtifactView';
 import type { LedgerLine } from '../../thread-history';
 import type { ArtifactMark, FileMarks, Person, Room, RoomMessage } from '../../types';
@@ -36,7 +36,6 @@ export function RoomFileView({ room, messages, people, meId, opening, files, onN
     ...(opening.file ? { file: opening.file } : {}),
     at: opening.at,
   }), [opening]);
-  const others = people.filter((p) => !p.me).map((p) => p.name.split(' ')[0]).join(', ');
-  return <ArtifactView product="" draftsAcross={`room:${room.id}`} threadName={room.name || others || 'Group'} lines={lines} marks={marks} me={meId} people={named}
+  return <ArtifactView product="" draftsAcross={`room:${room.id}`} lines={lines} marks={marks} me={meId} people={named}
     open={open} ownerOfRow={null} write={files.write} onNewVersion={onNewVersion} onClose={onClose} files={stage} />;
 }

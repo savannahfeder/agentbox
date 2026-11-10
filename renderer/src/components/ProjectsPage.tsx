@@ -22,7 +22,7 @@
 //     is the thing nobody discovers. Alt with the arrows moves the focused row.
 //
 // DRAWN IN THE INBOX'S IDIOM (./projects-page.css). The order's rules are
-// ../project-priority.ts and its worth is shared/rank.mjs.
+// ../project-priority.ts and its worth is shared/rank.mts.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';

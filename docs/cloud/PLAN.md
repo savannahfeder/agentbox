@@ -147,7 +147,7 @@ each vendor's own sign-in, kept between runs.
 ## Codex in the cloud (added 2026-10-13: "a fundamental requirement")
 
 On the Mac, every Codex thread of one login runs inside one shared
-`codex app-server`, spoken to over JSON-RPC (main/codex-app-server.mjs). A
+`codex app-server`, spoken to over JSON-RPC (main/codex-app-server.mts). A
 cloud Codex thread gets an app-server of its OWN, in its sandbox:
 
 - **The connection.** `createCodexAppServer` already takes any process that
@@ -427,22 +427,20 @@ at AgentCore's published rates. The plan limits are set from these.
 
 ### The team plan (the owner, 2026-11-06; to build for 2026-11-17)
 
-- **Trial:** every team gets 14 days from the day it was made, with 10 cloud
-  hours per member, shared by the whole team. No card. It replaces each
-  member's own 5 free hours while it lasts; it does not add to them.
+- **Trial:** every team gets 14 days from the day it was made. Each member
+  has 10 cloud hours and 2 agents at once of their own. No card. It replaces
+  each member's own 5 free hours while it lasts; it does not add to them.
 - **Paying:** $40 a member a month (Stripe price `agentbox_cloud_team_monthly`,
-  quantity = members). Each seat brings Pro's 10 agents at once and 400
-  hours, and the hours are one pool for the team.
+  quantity = members). Each seat is the $40 cloud plan for its person: 400
+  hours and 10 agents at once a month (the owner, 2026-11-08, replacing one
+  pool for the team after three power testers ran a pool dry).
 - **Which hours a run spends:** the person's own paid plan first, then the
   team's (paid or trial), then their free hours.
-- **How it is counted:** a run is still reserved in the person's own ledger,
-  so starts, stops, ceilings and the sweep work as they do. The run carries
-  its team, and when it ends its seconds go to `ledger/teams/<team>.json`
-  (`used` by month, `trialUsed`) through the same owed-write list as run
-  records, so a failed write is retried, not lost. A start reads the team
-  ledger and the members' live runs; members are few, so this costs a handful
-  of reads. Two members starting in the same instant can pass the at-once
-  limit by one; the hours still bound what it costs.
+- **How it is counted:** in the person's own ledger, as a plan is: the run
+  carries its team, and its seconds go to `teamTrialUsed` or `teamUsed` by
+  month in that same record. The team's ledger, `ledger/teams/<team>.json`,
+  holds only what Stripe says it pays for. The page reads every member's
+  record to show who used what.
 - **Who is on the team** is read from the database (`team_members`,
   `teams.created_at`) with the service key, cached for a minute.
 - Risk at full use: a seat that spends all 400 hours costs about $28 of the
@@ -548,7 +546,7 @@ input. In order:
    **Built for the Mac's own work, 2026-10-28 (w-10990b7de2).** Overnight on
    10-26 the lid was shut from 10:07pm to 12:23pm; the Mac woke for 2 to 21 s
    every quarter hour, started due rows in those wakes, and each died at the
-   next wake with a fetch timeout. Now (shared/cloud-carry.mjs):
+   next wake with a fetch timeout. Now (shared/cloud-carry.mts):
    - A pass after a two-minute gap counts as asleep until a minute passes or
      someone touches the keyboard or mouse. Asleep, nothing starts: the queue,
      `spawnWorker` and the wake sweep all hold.
@@ -576,7 +574,7 @@ input. In order:
 Replaces the machine-per-account design in "The hub" below. What survives from
 that section is the thin window, and the measurements of it.
 
-Today every cloud agent is a process on the Mac (main/cloud/run.mjs): it packs
+Today every cloud agent is a process on the Mac (main/cloud/run.mts): it packs
 the folder, pumps events, runs the agent's tools and brings the work home. The
 Mac is in charge and holds the record, so each agent costs it memory, and the
 cloud stops being useful when it sleeps. The gateway function already carries a
@@ -667,7 +665,7 @@ Settled, not to be reopened:
 - **The record.** Ordered messages and events, runs, file versions and approvals
   live in the database, and file bytes and transcripts in S3 under the person.
   `phone_threads` stays as a copy the function writes under its own device id for
-  phones not yet updated. It truncates (shared/phone-snapshot.mjs:16), so it cannot
+  phones not yet updated. It truncates (shared/phone-snapshot.mts:16), so it cannot
   be the truth. Clients write to it by device (`owner,device,project,item`), so an old
   app does not overwrite a cloud thread.
 - **Approvals.** The run holds a card for up to 15 minutes in `waiting`, with the
@@ -687,7 +685,7 @@ Settled, not to be reopened:
 - **The window.** A person with only cloud threads runs the Electron shell with the
   app's own bundled screens on `renderer/src/cloud-bridge.ts`, the bridge the phone
   site already uses to read rows and leave commands, extended to do everything a
-  cloud thread needs. main/hub-client.mjs today loads a page from a hub, and Lambda
+  cloud thread needs. main/hub-client.mts today loads a page from a hub, and Lambda
   hosts no page, so its window code changes but its shell stays. A person with both
   runs the full app, which shows cloud threads from the database as it shows phone
   rows today.
@@ -695,7 +693,7 @@ Settled, not to be reopened:
   it does not (mobile/src/state/cloud.tsx:127), and asks for a Claude or ChatGPT
   sign-in started from the app, through the function.
 - **Sign-ins renew in the cloud.** Codex's login lasts about ten days, and today the
-  Mac renews it (main/cloud/logins.mjs:465), which a person with no computer does not
+  Mac renews it (main/cloud/logins.mts:465), which a person with no computer does not
   have. The sweep takes this over: one renewal at a time per login, a fence written
   first, a new object per renewal, as the Mac does. Refresh secrets stay out of agent
   sandboxes, as they do today (cloud/sandbox/server.mjs:965).
@@ -704,7 +702,7 @@ Settled, not to be reopened:
 
 ### Asking for things: one tool, whatever is missing
 
-`request_cloud_resource` and the hand-back line (shared/cloud-hand-back.mjs) are
+`request_cloud_resource` and the hand-back line (shared/cloud-hand-back.mts) are
 the start of this. They become one tool the agent calls with what it needs and why:
 a file or folder, a saved sign-in, or (where allowed) running something on the
 computer. Every call answers within a deadline:
@@ -729,7 +727,7 @@ built, off by default, because people who only use the cloud need never connect
 anything. No sandbox waits on a person beyond the 15-minute approval hold, and no
 request waits for ever.
 
-Rules: a path keeps the checks in main/cloud/resources.mjs (real path, inside a
+Rules: a path keeps the checks in main/cloud/resources.mts (real path, inside a
 granted root, size limits). Grants name person, device, folder, read or write, and
 expiry. Whatever comes up is treated as untrusted input. The rule that no worker
 drives the person's browser is untouched.
@@ -741,7 +739,7 @@ files only:
 - **Move the turn.** The thread's placement moves to the computer for one turn
   (a new generation, from the last checkpoint), the worker runs there through the
   supervisor, then it goes back. Today's hand-back already sends the next reply to
-  the cloud (main/supervisor.mjs:4161), but with the computer in charge throughout;
+  the cloud (main/supervisor.mts:4161), but with the computer in charge throughout;
   moving the record is what is new.
 - **Borrow one command.** One bounded command runs in a dedicated task folder on
   the computer and its output comes back. Built after moving the turn.
@@ -813,7 +811,7 @@ The cloud lent each agent a computer and left the rest on the Mac: the store, a
 task folder per thread, a process per run, packing, bringing home, shipping. So
 every agent added to the Mac, shipping was one queue, and "Everything" still left
 most agent-hours there. Moving the hub, not rewriting it: `bootHeadless`
-(main/serve.mjs) already runs the store, the supervisor and every handler with no
+(main/serve.mts) already runs the store, the supervisor and every handler with no
 Electron, and the window already runs over http (renderer/src/browser-bridge.ts).
 
 - **The hub.** One dedicated EC2 Graviton machine per account, us-east-1,
@@ -828,10 +826,10 @@ Electron, and the window already runs over http (renderer/src/browser-bridge.ts)
   is refused. A Mac that names a hub never falls back to running agents. Rollback
   is the same protocol in reverse from the hub's current state.
 - **The window.** `main/start.mjs` picks: with `~/.agentbox/hub.json` the process
-  is main/hub-client.mjs and loads no store or supervisor. Alerts, the Dock count
+  is main/hub-client.mts and loads no store or supervisor. Alerts, the Dock count
   and web links stay on the Mac; the rest goes to the hub. Every door refuses to
   run agents on a machine that names a hub, a damaged file included. Still to do
-  before anyone runs on it: the client updating itself (main/main.mjs starts the
+  before anyone runs on it: the client updating itself (main/main.mts starts the
   updater; this does not).
 - **Documents.** The hub's are the truth, with `~/Zero` a synced mirror: version
   preconditions, tombstones, conflict copies. Agents get pinned versions.
@@ -848,11 +846,11 @@ Electron, and the window already runs over http (renderer/src/browser-bridge.ts)
   candidates; publishing stays serial per repository, by compare-and-swap against
   the tested main; a moved main means rebuilding and rerunning on the new merged
   tree; failing batches split. Policy, test selection and the script stay outside
-  the candidate (main/ship-queue.mjs). Five-change batches at 5 to 10 minutes
+  the candidate (main/ship-queue.mts). Five-change batches at 5 to 10 minutes
   suggest 30 to 60 changes an hour, not 200 instant ships.
 - **Hub limits.** Stream parsing and folding move to workers with bounded queues;
   one shared versioned projection, client deltas from it. Starts are earned
-  (main/cloud/start-budget.mjs). The hub talks to sandboxes over AgentCore
+  (main/cloud/start-budget.mts). The hub talks to sandboxes over AgentCore
   WebSockets with replay cursors, out of the Lambda path, whose reserved 200 would
   be filled by 200 long polls; the gateway keeps authorization, accounting and
   revocation. AgentCore stays the sandbox.
@@ -929,7 +927,7 @@ approved:
 
 A Lambda behind a function URL, in the same account and region as the
 runtime (`cloud/gateway/`). The Mac's two interfaces (transport and storage,
-`main/cloud/aws.mjs`) get a second implementation that talks to it
+`main/cloud/aws.mts`) get a second implementation that talks to it
 (`main/cloud/managed.mts`); `run.mts` and `logins.mts` do not change.
 
 - **Who is asking.** A Mac trades the person's signed-in session for a cloud

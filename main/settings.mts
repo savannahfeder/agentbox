@@ -12,35 +12,35 @@
 // place a grant is reviewed; what changed is that she edits them as fields on
 // the project they belong to instead of in a text editor.
 
-import { teammatesOn } from '../shared/teammates.mjs';
-import { phoneChoiceOf, phoneProjectsOf, withPhoneAll, withPhoneProject, phoneEligible } from '../shared/phone-snapshot.mjs';
+import { teammatesOn } from '../shared/teammates.mts';
+import { phoneChoiceOf, phoneProjectsOf, withPhoneAll, withPhoneProject, phoneEligible } from '../shared/phone-snapshot.mts';
 import fs from 'node:fs';
 import { harnessFor } from './harnesses.mts';
 import os from 'node:os';
 import path from 'node:path';
-import { codexChoiceToOpen, saveConfig } from './config.mjs';
-import { forgetClaudeBin, INSTALL_URL } from './claude-bin.mjs';
-import { lookAgain } from './engine-bin.mjs';
-import { AGENT_MODES } from '../shared/agents.mjs';
-import type { AgentMode } from '../shared/agents.mjs';
+import { codexChoiceToOpen, saveConfig } from './config.mts';
+import { forgetClaudeBin, INSTALL_URL } from './claude-bin.mts';
+import { lookAgain } from './engine-bin.mts';
+import { AGENT_MODES } from '../shared/agents.mts';
+import type { AgentMode } from '../shared/agents.mts';
+import type { ProfileTrouble } from './supervisor.mts';
 import { analyticsKey, diagnosticsOn } from './analytics.mts';
-import { CLAUDE_PERMISSION_MODES } from '../shared/work-items.mjs';
+import { CLAUDE_PERMISSION_MODES } from '../shared/work-items.mts';
 import { accountSentence, engineTroubleNote, refineCause } from '../shared/spawn-trouble.mts';
-import { readPlan } from './claude-plan.mjs';
-import { effectiveProfiles, troubleForProfile } from './account-discovery.mjs';
-import { machineSlots, machineNote, autoAgents, MAX_SLOTS } from './machine.mjs';
-import { shortPath } from './agent-files.mts';
+import { readPlan } from './claude-plan.mts';
+import { effectiveProfiles, troubleForProfile } from './account-discovery.mts';
+import { machineSlots, machineNote, autoAgents, MAX_SLOTS } from './machine.mts';
 import { NAME, Name } from '../shared/product-name.mjs';
 import { autoSlots } from './memory-gate.mts';
-import { accountIdentity, claudeLoginCommand, duplicateAccountNote, linkAccountTooling, makeClaudeHome } from './account-tooling.mjs';
-import { isEngine } from '../shared/engines.mjs';
+import { accountIdentity, claudeLoginCommand, duplicateAccountNote, linkAccountTooling, makeClaudeHome } from './account-tooling.mts';
+import { isEngine } from '../shared/engines.mts';
 import { codexAccount, codexFreePlan, codexLoginCommand, makeCodexHome } from './codex-account.mts';
 import { codexDefaultModel, codexModelsAcross } from './codex-models.mts';
-import { CODEX_DEFAULT_MODE, isCodexMode } from '../shared/codex-modes.mjs';
+import { CODEX_DEFAULT_MODE, isCodexMode } from '../shared/codex-modes.mts';
 import { CLOUD_SAME, CLOUD_CLAUDE_DEFAULT, CLOUD_CODEX_DEFAULT } from './cloud-permission.mts';
-import { isPackagedElectron } from './team/session.mjs';
-import { claudeModels } from './claude-models.mjs';
-import { forgetCodexBin, INSTALL_URL as CODEX_INSTALL_URL } from './codex-bin.mjs';
+import { isPackagedElectron } from './team/session.mts';
+import { claudeModels } from './claude-models.mts';
+import { forgetCodexBin, INSTALL_URL as CODEX_INSTALL_URL } from './codex-bin.mts';
 
 export interface SettingsConfig {
   home?: string;
@@ -57,6 +57,7 @@ export interface SettingsConfig {
   codexFrom?: string | null;
   codexMode?: string | null;
   codexModel?: string | null;
+  engineChoice?: unknown;
   outsideAgents?: unknown;
   sessionArgs?: string[] | null;
   projectSessionArgs?: Record<string, string[] | null | undefined> | null;
@@ -70,7 +71,6 @@ export interface SettingsConfig {
   agentsAtOnce?: unknown;
   agentsAuto?: boolean | null;
   agentsNudge?: number;
-  planSlotsFrom?: unknown;
   maxConcurrentSessions?: number | null;
   memoryGate?: boolean | null;
   memoryGateSlots?: number | null;
@@ -88,6 +88,7 @@ export interface SettingsConfig {
   posthogHost?: string;
   alphaTeammates?: unknown;
   alphaMultiplayer?: boolean | null;
+  alphaGlass?: boolean | null;
   [key: string]: unknown;
 }
 
@@ -98,6 +99,7 @@ export interface SettingsProduct {
   repoPath?: string | null;
   logo?: string | null;
   archived?: boolean;
+  createdAt?: number | null;
 }
 
 export interface SettingsSession { engine?: string | null; profile?: string | null; product?: string }
@@ -116,16 +118,20 @@ export interface LeftoverReading {
   survivors?: unknown[];
 }
 
+/** One account's trouble as `Supervisor#status` reports it. */
+export type AccountTroubleRow = Pick<ProfileTrouble, 'cause' | 'since' | 'at' | 'resetsAt'>;
+
 export interface SettingsSupervisor {
   sessions: Map<unknown, SettingsSession>;
   paused: boolean;
   cloudPlan?: unknown;
   _profileCooldown?: Record<string, number>;
-  status(): { capacity?: number; accountTrouble?: Record<string, unknown>; [fact: string]: unknown };
+  status(): { capacity?: number; accountTrouble?: Record<string, AccountTroubleRow | undefined>; [fact: string]: unknown };
   readStanding(): string;
   readMessageRules(): string;
   readProjectInstructions(slug: string): string;
   projectSessionArgs(slug: string): string[] | null | undefined;
+  defaultSessionArgs?(): string[];
   _projectProfile?(slug: string): string | null;
   _profilesFor?(engine: string): string[];
   _accountKey(engine: string | null | undefined, profile: string | null | undefined): string;
@@ -140,7 +146,6 @@ export interface SettingsSupervisor {
   memoryGateStatus?(): MemoryGateReading | null | undefined;
   startHoldStatus?(): { holding?: boolean } | null | undefined;
   leftoverStatus?(): LeftoverReading | null | undefined;
-  strayFolders?(): { project?: string; path?: unknown }[] | null | undefined;
   onChange?: (() => void) | null;
   wake?(): void;
   accountChosen?(engine: string, profile: string | null): void;
@@ -172,7 +177,7 @@ export interface SettingsDeps {
 //
 // SEPARATED IS NOT DELETED, and this is the half that makes it honest. An
 // outside session is still on the project's rail in the sidebar (`onTheRail`,
-// shared/agents.mjs), which no mode gates, and still opens in one click. It
+// shared/agents.mts), which no mode gates, and still opens in one click. It
 // just does not queue up beside the work she has to answer.
 //
 // WHAT SHE IMPORTS IS UNAFFECTED, and it never came through here. The agents
@@ -452,7 +457,7 @@ function takeClaude(config: SettingsConfig) {
  * THE SAME THREE FACTS ABOUT CODEX, AND ONE ASYMMETRY THAT IS NOT AN OVERSIGHT.
  *
  * `found`, `certain` and the path, read exactly as `claudeState` reads Claude
- * Code's, out of the sibling finder (main/codex-bin.mjs) that already computes
+ * Code's, out of the sibling finder (main/codex-bin.mts) that already computes
  * all three. Until now nothing on any screen read them: `engineSettings`
  * returned early without ever saying whether Codex was here, so a Mac where the
  * search missed it said nothing about Codex anywhere at all.
@@ -461,7 +466,7 @@ function takeClaude(config: SettingsConfig) {
  * `claudeState` falls back to a path because Claude Code is required and
  * anything spawning it should fail with a real path in the message; Codex is
  * optional and `config.codexBin` is deliberately null when it is missing
- * (main/config.mjs), so inventing one here would print a path to a file that is
+ * (main/config.mts), so inventing one here would print a path to a file that is
  * not there under a row that has just said it is not there.
  *
  * READ AT EVERY OPEN OF THE SCREEN, never taken from boot, for the reason
@@ -472,7 +477,7 @@ function takeClaude(config: SettingsConfig) {
  * read the answer.
  *
  * `where` IS THE FINDER'S OWN SEAM, PASSED THROUGH RATHER THAN INVENTED HERE.
- * main/codex-bin.mjs is "a pure function of its inputs so a test can put Codex
+ * main/codex-bin.mts is "a pure function of its inputs so a test can put Codex
  * anywhere without touching the machine it runs on", and the three states this
  * screen draws are its three answers; a card whose unsure state could only be
  * checked by uninstalling Codex from the machine running the suite is a card
@@ -482,7 +487,7 @@ export function codexState(config: SettingsConfig, where = {}, { search = true }
   const found = search ? harnessFor('codex').discover(config.codexBinConfigured ?? null, where) : knownEngine(config, 'codex');
   return {
     // Empty rather than a path when there is nothing there, which is the same
-    // asymmetry `config.codexBin` already keeps (main/config.mjs): a configured
+    // asymmetry `config.codexBin` already keeps (main/config.mts): a configured
     // path that does not exist is still `found: false`, and printing it under a
     // row that has just said Codex is not here would be the screen arguing with
     // itself.
@@ -518,7 +523,7 @@ function takeCodex(config: SettingsConfig) {
   config.codexBin = state.found ? state.bin : null;
   config.codexCertain = state.certain;
   // Found while the app is open, by this button or the plan setup: the choice
-  // opens now, as it would have at the next launch (main/config.mjs).
+  // opens now, as it would have at the next launch (main/config.mts).
   const opened = codexChoiceToOpen(config, state.found);
   if (opened && config.appDir) saveConfig(config, { engineChoice: opened });
   return state;
@@ -530,7 +535,7 @@ function takeCodex(config: SettingsConfig) {
  *
  * The note this came from: "It has a really hard time finding the install on the
  * person's computer, and we keep having bug reports and then patching that
- * specific case." Asking the login shell first (main/engine-bin.mjs) covers
+ * specific case." Asking the login shell first (main/engine-bin.mts) covers
  * every installer a person's own PATH knows about, which is most of them. It
  * cannot cover a wrapper script somewhere nobody would guess, a tool on a
  * volume, or a machine whose login shell will not start at all -- and for those,
@@ -549,7 +554,7 @@ function takeCodex(config: SettingsConfig) {
  * NO PATH FROM THE WINDOW IS EVER TRUSTED: main/ipc.mts opens the picker and
  * calls this in the same trip, so the only path that reaches here is one the
  * open panel itself produced. The sibling rule is
- * tests/where-codex-runs-from-is-not-a-file-a-worker-can-write.test.mjs.
+ * tests/where-codex-runs-from-is-not-a-file-a-worker-can-write.test.mts.
  */
 const BIN_KEY: Record<string, string> = { claude: 'claudeBin', codex: 'codexBin' };
 
@@ -593,7 +598,7 @@ export function pointAtEngineBin(config: SettingsConfig, engine: string, chosen:
  * Give the choice back, so the search is in charge again. The key is REMOVED
  * from the file rather than emptied: `saveConfig` reads an explicit undefined as
  * a deletion, and an empty string left behind would read as a setting that means
- * something else (main/config.mjs only treats a non-empty string as chosen).
+ * something else (main/config.mts only treats a non-empty string as chosen).
  */
 export function searchForEngineBin(config: SettingsConfig, engine: string) {
   const key = BIN_KEY[engine];
@@ -613,7 +618,15 @@ export function alphaFeatures(config?: SettingsConfig | null, { packaged = isPac
     rooms: config?.alphaRooms === true,
     teammates: teammatesOn(config),
     multiplayer: packaged ? config?.alphaMultiplayer === true : config?.alphaMultiplayer !== false,
+    glass: config?.alphaGlass === true,
   };
+}
+
+// With nothing saved, workers start on the supervisor's default (auto), so
+// that is what this screen reads and what a picked mode is built on.
+export function workspaceSessionArgs(config: SettingsConfig, supervisor?: SettingsSupervisor | null): string[] {
+  if (Array.isArray(config.sessionArgs)) return config.sessionArgs as string[];
+  return supervisor?.defaultSessionArgs?.() ?? [];
 }
 
 // `search: false` is for a read on a timer (`knownEngine`).
@@ -621,7 +634,7 @@ export function readSettings({ config, supervisor, store }: SettingsDeps, { sear
   const products = store.listProducts();
   const status = supervisor.status();
   const sessions = [...supervisor.sessions.values()];
-  const workspaceArgs = Array.isArray(config.sessionArgs) ? config.sessionArgs : [];
+  const workspaceArgs = workspaceSessionArgs(config, supervisor);
   // Read once and used twice below, so the ceiling the stepper offers and the
   // sentence explaining it cannot come from two different answers.
   const slotsHere = machineSlots();
@@ -634,7 +647,7 @@ export function readSettings({ config, supervisor, store }: SettingsDeps, { sear
   try { messageRules = supervisor.readMessageRules(); } catch {}
 
   // THE SAME LIST THE FLEET SPAWNS ON, from the one module that decides it
-  // (main/account-discovery.mjs): what she configured, plus any subscription
+  // (main/account-discovery.mts): what she configured, plus any subscription
   // signed in on this machine that none of hers already covers. A page that
   // derived its own list is how an account she had logged into could be
   // missing from the screen while she was looking straight at it.
@@ -657,14 +670,14 @@ export function readSettings({ config, supervisor, store }: SettingsDeps, { sear
     // A reason filed before an ended subscription had its own name still reads
     // as an admin's block; the login's file says which it is.
     // THE SUBSCRIPTION'S TROUBLE, not the folder's: one row stands for every
-    // folder holding this account (account-discovery.mjs says why).
+    // folder holding this account (account-discovery.mts says why).
     const filed = troubleForProfile(troubles, profile, { home: config.home });
     const trouble = filed ? { ...filed, cause: refineCause(filed.cause, plan) } : null;
     const resting = (supervisor._profileCooldown?.[profile] ?? 0) >= now;
     // WHOSE SUBSCRIPTION THIS ROW IS, not merely which folder it lives in.
     // The page named its rows after folders, so nothing on it could tell a
     // person that one of their accounts had been replaced by the other;
-    // main/account-tooling.mjs has how that happens. Null when the
+    // main/account-tooling.mts has how that happens. Null when the
     // folder holds no login, and then the row reads as it always did.
     const identity = accountIdentity(profile === 'default' ? null : profile, { home: config.home });
     return {
@@ -712,7 +725,7 @@ export function readSettings({ config, supervisor, store }: SettingsDeps, { sear
     };
   });
 
-  // On her phone: every project unless she kept it here (shared/phone-snapshot.mjs).
+  // On her phone: every project unless she kept it here (shared/phone-snapshot.mts).
   const phoneSlugs = new Set(phoneProjectsOf(config.phoneProducts, process.env.AGENTBOX_PERSON_ID, phoneEligible(products)));
   const projects = products.map((product) => {
     let instructions = '';
@@ -725,6 +738,8 @@ export function readSettings({ config, supervisor, store }: SettingsDeps, { sear
       repoPath: product.repoPath,
       // THE MARK, already a drawable url or null, resolved once by listProducts.
       logo: product.logo,
+      // What places an unranked project in the running order (shared/rank.mjs rankProducts).
+      createdAt: product.createdAt ?? null,
       // ONE SWITCH A PROJECT STILL HAS (w-d19d6d387c, 2026-09-22). It had five
       // controls, and what they did was not clear even after reading their
       // labels, so project-level instructions replace them. The drive, the
@@ -762,10 +777,11 @@ export function readSettings({ config, supervisor, store }: SettingsDeps, { sear
   return {
     archivedProjects,
     workspace: {
-      // THE PHONE AS A WHOLE: on unless she turned it off (shared/phone-snapshot.mjs).
+      // THE PHONE AS A WHOLE: on unless she turned it off (shared/phone-snapshot.mts).
       phoneAll: phoneChoiceOf(config.phoneProducts, process.env.AGENTBOX_PERSON_ID, phoneEligible(products)).all,
       cloudPlan: typeof supervisor.cloudPlan === 'string' ? supervisor.cloudPlan : null,
       agentsRunning: !supervisor.paused,
+      productOrder: Array.isArray(status.productOrder) ? status.productOrder as string[] : [],
       // The number picked on the menu, for the whole computer, or what is
       // running as the limit now when nothing was picked.
       sessionsAtOnce: typeof config.agentsAtOnce === 'number' ? config.agentsAtOnce : status.capacity,
@@ -780,23 +796,16 @@ export function readSettings({ config, supervisor, store }: SettingsDeps, { sear
       // What Automatic would say right now, so a manual number can be compared
       // with it without turning Automatic back on to find out.
       agentsAutoTotal: autoAgents({ gated: !!config.memoryGate, nudge: config.agentsNudge }),
-      // THE PLAN THAT SET THE NUMBER ABOVE, when a plan set it. Null in the
-      // ordinary case: she picked the number herself, or it is the three every
-      // install has always had. It is only ever filled in when somebody would
-      // otherwise open this page, see one, and have nothing on the screen to
-      // explain it.
-      sessionsAtOnceFromPlan: config.planSlotsFrom ?? null,
       // WHAT WE SUGGEST FOR THIS MAC, AND WHY. Not a ceiling: `slotsMax` is the
       // control's own range and is the same number on every machine, while
       // `slotsSuggested` is what main worked out from the hardware
-      // (main/machine.mjs). `machineNote` is the one sentence that says so, and
+      // (main/machine.mts). `machineNote` is the one sentence that says so, and
       // it goes quiet once somebody is at or under the suggestion.
       slotsSuggested: slotsHere.slots,
       slotsMax: MAX_SLOTS,
       machineNote: machineNote(slotsHere, config.maxConcurrentSessions as number | undefined),
       memoryGate: memoryGateSettings({ config, supervisor }),
       leftovers: leftoverSettings({ config, supervisor }),
-      strayFolders: strayFolderSettings({ supervisor }),
       capacity: status.capacity,
       running: sessions.length,
       model: parseSessionArgs(workspaceArgs).model,
@@ -867,12 +876,12 @@ export function readSettings({ config, supervisor, store }: SettingsDeps, { sear
       // reopens the app has to see the new model without waiting for a release
       // of Agentbox. Read off the binary, cached against its own mtime, and
       // falling back to the table committed at build time on a Mac that has no
-      // Claude Code on it (main/claude-models.mjs).
-      claudeModels: claudeModels({ bin: config.claudeBin as never }).models
+      // Claude Code on it (main/claude-models.mts).
+      claudeModels: claudeModels({ bin: config.claudeBin }).models
         // WITH THE LEVEL EACH ONE THINKS AT WHEN NOBODY PICKS, beside its name
         // rather than as a list of its own, the same shape the Codex rows
         // above already use. It is per model and it really differs.
-        .map((m: { alias: string; label: string; id: string; defaultLevel?: string }) => ({ id: m.alias, label: m.label, model: m.id, defaultLevel: m.defaultLevel })),
+        .map((m) => ({ id: m.alias, label: m.label, model: m.id, defaultLevel: m.defaultLevel })),
       standingLines: lineCount(standing),
       messageRulesLines: lineCount(messageRules),
       projectsWithInstructions: projects.filter((p) => p.instructions.trim()).length,
@@ -1026,7 +1035,7 @@ export function setProjectSetting({ config, supervisor, store }: SettingsDeps, {
       }
       const map = { ...(config.projectSessionArgs ?? {}) };
       if (value === 'workspace') delete map[product];
-      else map[product] = buildSessionArgs(config.sessionArgs ?? [], value);
+      else map[product] = buildSessionArgs(workspaceSessionArgs(config, supervisor), value);
       // An empty map is removed rather than written as `{}`: her config file is
       // read by people, and a key that means nothing is a key that gets asked
       // about.
@@ -1142,7 +1151,7 @@ export function addCodexAccount({ config, supervisor }: { config: SettingsConfig
  *
  * Main makes the folder and the terminal is left with the browser half, which
  * is genuinely hers. UNLIKE CODEX, NOTHING IS WRITTEN INTO THE CONFIG: the
- * folder is the shape main/account-discovery.mjs finds, so the account appears
+ * folder is the shape main/account-discovery.mts finds, so the account appears
  * the moment its sign-in lands and never before. Registering it first put an
  * abandoned sign-in in Settings as a "Not signed in" account and handed it
  * every other task (tests/an-account-shows-once-and-only-once-it-is-signed-in).
@@ -1266,34 +1275,6 @@ export function leftoverSettings({ config, supervisor }: { config: SettingsConfi
   return { on, now };
 }
 
-/**
- * COPIES OF A PROJECT THE APP DID NOT MAKE, SAID OUT LOUD (w-330eea6c66).
- *
- * MEASURED 2026-10-07: thirteen worktrees of one repository sat outside the
- * folder the app keeps its own in, about 740 MB, and nothing in the app could
- * list, show or sweep one. That is the same invisibility that stranded 26 GB on
- * 2026-09-22, and the half that fixes it for a person is being told.
- *
- * NO BUTTON, DELIBERATELY. A folder the app did not make is not the app's to
- * remove: it is the only copy of whatever is uncommitted inside it, and somebody
- * made it on purpose. So this is a sentence and nothing else, and it is absent
- * entirely when there is nothing to say, because a row that is usually quiet
- * trains the reaction it exists to prevent.
- */
-export function strayFolderSettings({ supervisor }: { supervisor?: SettingsSupervisor }, home = os.homedir()) {
-  let list: { project?: string; path?: unknown }[] = [];
-  try { list = supervisor?.strayFolders?.() ?? []; } catch { list = []; }
-  if (!list.length) return null;
-  const count = list.length;
-  const one = count === 1;
-  const projects = [...new Set(list.map((w) => w.project).filter(Boolean))];
-  const named = list.slice(0, 3).map((w) => shortPath(w.path as string, home));
-  const rest = count - named.length;
-  const of = projects.length ? ` of ${projects.slice(0, 2).join(' and ')}${projects.length > 2 ? ' and other projects' : ''}` : '';
-  const now = `${count} ${one ? 'copy' : 'copies'}${of} ${one ? 'was' : 'were'} made by hand outside the folder ${NAME} keeps its own in, and ${one ? 'is' : 'are'} holding disk until you remove ${one ? 'it' : 'them'}: ${named.join(', ')}${rest > 0 ? ` and ${rest} more` : ''}. ${NAME} never removes a folder it did not make.`;
-  return { count, now };
-}
-
 export function cornerTagTurnedOff({ key, value }: { key?: string; value?: unknown } = {}) {
   return key === 'cornerTag' && !value;
 }
@@ -1304,7 +1285,7 @@ export function countsTurnedOff({ key, value }: { key?: string; value?: unknown 
 
 export function setWorkspaceSetting({ config, supervisor, store }: SettingsDeps, { key, value }: { key: string; value?: unknown }) {
   switch (key) {
-    // EVERY PROJECT ON HER PHONE, or none (shared/phone-snapshot.mjs). Which
+    // EVERY PROJECT ON HER PHONE, or none (shared/phone-snapshot.mts). Which
     // ones she keeps here is remembered either way.
     case 'phoneAll':
       saveConfig(config, { phoneProducts: withPhoneAll(config.phoneProducts, process.env.AGENTBOX_PERSON_ID, !!value, phoneEligible(store?.listProducts?.() ?? [])) });
@@ -1335,7 +1316,7 @@ export function setWorkspaceSetting({ config, supervisor, store }: SettingsDeps,
       break;
     // SOMETHING FELT SLOW. The one lever a person has that no reading can
     // replace: they are sitting in front of the Mac and the app is not. It only
-    // ever subtracts, and main/machine.mjs refuses to take it below one.
+    // ever subtracts, and main/machine.mts refuses to take it below one.
     case 'agentsFeltSlow': {
       const now = Math.max(0, Math.round(Number(config.agentsNudge) || 0));
       saveConfig(config, { agentsNudge: value === 'reset' ? 0 : now + 1 });
@@ -1354,10 +1335,6 @@ export function setWorkspaceSetting({ config, supervisor, store }: SettingsDeps,
       // FOR THE WHOLE COMPUTER (w-ec27ff1a51), under its own key, so a number
       // written per login before 5 Oct can never be read as this choice.
       saveConfig(config, { agentsAtOnce: n, agentsAuto: false });
-      // An explicit choice replaces the startup plan suggestion for BOTH
-      // engines. Leaving this marker set makes Codex ignore the new number
-      // until loadConfig runs again at restart. It is derived, not persisted.
-      config.planSlotsFrom = null;
       // Fill newly available slots through the usual queue and its guards.
       // Lowering the cap leaves existing work running and gates new starts.
       supervisor.wake?.();
@@ -1460,6 +1437,10 @@ export function setWorkspaceSetting({ config, supervisor, store }: SettingsDeps,
       saveConfig(config, { alphaMultiplayer: !!value });
       supervisor.onChange?.();
       break;
+    case 'alphaGlass':
+      saveConfig(config, { alphaGlass: !!value });
+      supervisor.onChange?.();
+      break;
     // THE CORNER TAG (w-dafae58a23). Turning it back on also ends any hide, so
     // the switch does what it says the moment she flips it.
     case 'cornerTag':
@@ -1497,11 +1478,11 @@ export function setWorkspaceSetting({ config, supervisor, store }: SettingsDeps,
     }
     case 'permission':
       if (!CLAUDE_MODES.includes(value as string)) throw new Error(`unknown permission mode: ${value}`);
-      saveConfig(config, { sessionArgs: buildSessionArgs(config.sessionArgs ?? [], value) });
+      saveConfig(config, { sessionArgs: buildSessionArgs(workspaceSessionArgs(config, supervisor), value) });
       break;
     // THE SAME QUESTION FOR THE OTHER ENGINE, and it is a separate key because
     // it is a separate answer: a Claude Code mode and a Codex mode are not
-    // translations of each other and never round-trip. shared/codex-modes.mjs
+    // translations of each other and never round-trip. shared/codex-modes.mts
     // holds the three and why there are three.
     case 'codexMode':
       if (!isCodexMode(value)) throw new Error(`unknown codex mode: ${value}`);
@@ -1522,7 +1503,7 @@ export function setWorkspaceSetting({ config, supervisor, store }: SettingsDeps,
     // a workspace default with no date on it sat outside that promise: close the
     // gate, reopen it with a newer moment, and a `codex` default set weeks
     // earlier immediately routed every unmarked row to Codex again without her
-    // saying so. `engineDefaultIsStale` in shared/engines.mjs is the check, and
+    // saying so. `engineDefaultIsStale` in shared/engines.mts is the check, and
     // says why an ABSENT stamp still means honoured. This is the only place in
     // the app that writes either key, so the pair cannot be written half way,
     // and both ride in one `saveConfig` patch rather than two.
@@ -1558,7 +1539,7 @@ export function setWorkspaceSetting({ config, supervisor, store }: SettingsDeps,
     // null both mean the CLI's own default, which is the flag being absent.
     case 'model': {
       const model = value === null || value === undefined || value === '' ? null : String(value);
-      saveConfig(config, { sessionArgs: setModelArg(config.sessionArgs ?? [], model) });
+      saveConfig(config, { sessionArgs: setModelArg(workspaceSessionArgs(config, supervisor), model) });
       break;
     }
     default:

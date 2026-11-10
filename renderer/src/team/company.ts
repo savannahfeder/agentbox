@@ -1,11 +1,11 @@
 // THE TEAM'S PURE RULES ON THE WINDOW SIDE: the company list the Team page
 // draws, due-day words, and who a row is from. No React and no styles, so
-// tests read them directly (tests/team-the-company-list.test.mjs).
+// tests read them directly (tests/team-the-company-list.test.mts).
 import type { Person, Product, TeamState, ThreadCard, WorkItem } from '../types';
-import { blockedWords, clockWords, dayDeadline } from '../../../shared/team-tasks.mjs';
-import { inMyInbox, isGivenTask, isShared, heldByAPerson, lastSpeaker, runnerOf, taskGiver } from '../../../shared/team-rules.mjs';
+import { blockedWords, clockWords, dayDeadline } from '../../../shared/team-tasks.mts';
+import { inMyInbox, isGivenTask, isShared, heldByAPerson, lastSpeaker, runnerOf, taskGiver } from '../../../shared/team-rules.mts';
 import { dayAndTime } from '../format';
-import { shownTitle } from '../../../shared/thread-title.mjs';
+import { shownTitle } from '../../../shared/thread-title.mts';
 
 export const firstName = (person: Person | undefined | null) => (person?.name || person?.email || 'Someone').split(/\s+/)[0];
 
@@ -145,6 +145,20 @@ export function sentFrom(item: WorkItem, product: Product | undefined, me: strin
   const from = heldByAPerson(item) ? (item.people ?? []).find((p) => p !== me) ?? item.createdBy : runnerOf(item, product);
   if (!from || from === me) return null;
   return { from, agent: !heldByAPerson(item) };
+}
+
+/** A thread a teammate handed you in a shared project: who, when it reached
+ *  you, and their newest note. Conversations and given tasks already lead with
+ *  the person, so they are not this. */
+export function handedBy(item: WorkItem, product: Product | undefined | null, me: string | null): { from: string; at: number; note: string | null } | null {
+  if (!me || !isShared(product) || (product as { team?: { direct?: boolean } } | null)?.team?.direct) return null;
+  if (item.assignee !== me) return null;
+  const from = (item.people ?? []).find((p) => p !== me) ?? item.createdBy;
+  if (!from || from === me) return null;
+  const wrote = item.wrote?.assignee;
+  const at = wrote?.by === from ? wrote.ts : item.createdAt;
+  const note = [...(item.waitingComments ?? [])].reverse().find((c) => c.by === from)?.text?.trim() || null;
+  return { from, at, note };
 }
 
 /**

@@ -1,12 +1,12 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { keysOf, needId, type Need } from '../../../shared/cloud-needs.mjs';
+import { keysOf, needId, type Need } from '../../../shared/cloud-needs.mts';
 import { Name } from '../../../shared/product-name.mjs';
-import { keyLabel, keyWords } from '../../../shared/cloud-keys.mjs';
+import { keyLabel, keyWords } from '../../../shared/cloud-keys.mts';
 import { codeLooksWrong, keyLooksWrong } from '../key-asks';
 import { DARK_INK, logoOf } from '../connections/logos';
 import './need-card.css';
 
-// What a message that asks for things knows (shared/cloud-needs.mjs): the keys
+// What a message that asks for things knows (shared/cloud-needs.mts): the keys
 // saved for cloud runs (null when this computer has no cloud), whether it is
 // the thread's newest answer (only that one takes anything), and how to give
 // each kind. Each `give` answers with what went wrong, or null.
@@ -42,10 +42,6 @@ export function setHeld(item: string, held: { need: string; words: string }[] | 
   try { globalThis.sessionStorage?.setItem(HELD_KEY, JSON.stringify([...HELD])); } catch { /* no storage */ }
 }
 
-// The ask the inbox's card was pressed for, so its card in the thread takes the keyboard when the thread opens.
-let wanted: { item: string; need: string } | null = null;
-export const focusNeedOnOpen = (item: string, need: string) => { wanted = { item, need }; };
-
 /** True inside any of the agent's messages but its last unanswered one (Thread.tsx): those only say what they asked. */
 export const NeedOlder = createContext(false);
 
@@ -65,8 +61,9 @@ function Mark({ id, fallback }: { id?: string | null; fallback: ReactNode }) {
 
 const LINK = /(https?:\/\/[^\s)]+|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|io|dev|app|net|org|co|ai)\/[^\s),]*)/gi;
 function withLinks(text: string, open: (href: string) => void): ReactNode[] {
-  return text.split(LINK).map((part, i) => (i % 2 === 0 ? part
-    : <a key={i} href={part} onClick={(e) => { e.preventDefault(); open(/^https?:/i.test(part) ? part : `https://${part}`); }}>{part}</a>));
+  return text.split(/`([^`]+)`/).flatMap((run, j) => (j % 2 === 1 ? [<code key={`c${j}`}>{run}</code>]
+    : run.split(LINK).map((part, i) => (i % 2 === 0 ? part
+      : <a key={`${j}-${i}`} href={part} onClick={(e) => { e.preventDefault(); open(/^https?:/i.test(part) ? part : `https://${part}`); }}>{part}</a>))));
 }
 const lower = (s: string) => (/^[A-Z][a-z]/.test(s) ? s[0].toLowerCase() + s.slice(1) : s);
 const sentence = (s: string) => (s ? `${s[0].toUpperCase()}${s.slice(1)}${/[.!?]$/.test(s) ? '' : '.'}` : '');
@@ -146,12 +143,6 @@ export function NeedCard({ source, fallback }: { source: string; fallback: React
   const taking = live || late;
   const reopen = () => { setLate(true); setTimeout(() => box.current?.querySelector<HTMLElement>('input, .need-main')?.focus(), 50); };
   const id = need ? needId(need) : '';
-  useEffect(() => {
-    if (!live || !place || wanted?.item !== place.itemId || wanted.need !== id) return;
-    wanted = null;
-    // After the thread's own focus has landed on the reply box; not cleared by a re-render, which comes at once.
-    setTimeout(() => box.current?.querySelector<HTMLElement>('input, .need-main')?.focus(), 250);
-  }, [live, id, place]);
   // Round nine: a file that was not on the computer said so only after Send.
   const [info, setInfo] = useState<{ ok: boolean; size?: number; error?: string } | null>(null);
   const asksFile = need?.kind === 'file' ? need.path : null;
@@ -205,7 +196,7 @@ export function NeedCard({ source, fallback }: { source: string; fallback: React
     return <div className="need" data-need={svc ? svc.id : key!.name} ref={box} onKeyDown={keepKeys}>
       <div className="need-body">{mark}<div className="need-col">
         <div className="need-title">{title}</div>
-        {why ? <div className="need-why">{why}</div> : key?.what && <div className="need-why">{withLinks(sentence(key.what), open)}</div>}
+        {why ? <div className="need-why">{withLinks(why, open)}</div> : key?.what && <div className="need-why">{withLinks(sentence(key.what), open)}</div>}
         {showFacts ? <div className="need-facts">
           {getIt && <div>{I.arrow}<span>{getIt}</span></div>}
           <div>{I.lock}<span>Kept encrypted in your {Name} Cloud</span></div>
@@ -221,6 +212,8 @@ export function NeedCard({ source, fallback }: { source: string; fallback: React
     const where = folderOf(need.path);
     const send = async (path: string | null) => {
       setBusy(true); setSaid(null);
+      // A prop handing a picked file to the thread, not Express's res.sendFile.
+      // nosemgrep: javascript.express.security.audit.express-res-sendfile.express-res-sendfile
       const out = await place.sendFile(path, need, !live);
       setBusy(false);
       if (out === false) return;

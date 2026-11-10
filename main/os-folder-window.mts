@@ -4,7 +4,9 @@
 // computer and can. Answers null when this system has no chooser we know how
 // to open, and the screen then draws its own picker (main/folders.mts).
 
-import { execFile, execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 
 export interface OsDialogOptions {
   title?: string;
@@ -24,9 +26,10 @@ const runIt: Run = (cmd, args) => new Promise((resolve) => {
   });
 });
 
-const onPath = (cmd: string): boolean => {
-  try { execFileSync('which', [cmd], { stdio: 'ignore', timeout: 5000 }); return true; } catch { return false; }
-};
+const onPath = (cmd: string): boolean => (process.env.PATH ?? '').split(path.delimiter).some((dir) => {
+  if (!dir) return false;
+  try { fs.accessSync(path.join(dir, cmd), fs.constants.X_OK); return true; } catch { return false; }
+});
 
 const quoted = (s: string) => `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 

@@ -6,7 +6,7 @@ The owner asked for "Keep a copy in Files" after all, so point 6 below is replac
 file on a closed thread of a project, so the project decides who reads it and there is no second
 permissions system. A person starts it per tool and chooses the project.
 
-The catalogue is in `shared/connections-catalog.mjs`. Each address's public sign-in details were
+The catalogue is in `shared/connections-catalog.mts`. Each address's public sign-in details were
 read with no account on 2026-10-31. These can register themselves: Notion, Linear, Atlassian,
 Sentry, Stripe, Intercom, monday.com, Airtable, ClickUp, Vercel. These need a client made in the
 vendor's console: Slack, HubSpot, Google Drive, Gmail, Google Calendar, Salesforce, Asana. GitHub
@@ -19,13 +19,13 @@ Approved as a smaller, read-only first version. What changed, and it overrides a
 1. No token ever leaves the app. The proxy is a dumb stdio forwarder: it sends bounded MCP
    requests to the app over a run-scoped channel, tied to connection, person and run. Vendor
    HTTP, refresh and authorization all happen inside the app. There is no call that returns a
-   token (a worker can read whatever its children are handed, main/approvals.mjs says why).
+   token (a worker can read whatever its children are handed, main/approvals.mts says why).
 2. The app enforces the policy, not the engine: cloud defaults bypass engine approvals. Only
    tools on an explicit read list pass. Unknown tools are denied, and a changed tool list is
    flagged. Writes use the app's own card and signed decision, or wait. No heuristic for what
    writes, and no blanket "Agents may write".
 3. Say plainly that a connection needs its owner's app online. Reuse the cloud run's MCP relay
-   (main/cloud/run.mjs); stdio fits it. Test both engines, and resumed Codex threads.
+   (main/cloud/run.mts); stdio fits it. Test both engines, and resumed Codex threads.
 4. OAuth differs per vendor: Linear documents localhost OAuth, Slack does not support dynamic
    registration. Start with one real flow, Linear; the catalog records each vendor's needs. No
    six-vendor promise.
@@ -46,14 +46,14 @@ it works".
 ## Facts this is built on
 
 - Workers are Claude Code and Codex. Both speak MCP. Claude workers take `--mcp-config`
-  (main/supervisor.mjs `mcpServers()`, about line 11861, written per spawn) and also see the
+  (main/supervisor.mts `mcpServers()`, about line 11861, written per spawn) and also see the
   user's own MCP servers, since there is no `--strict-mcp-config`. Codex workers take
   `mcpServers` in thread params (`codexThreadParamsFor`).
 - Vendors ship official remote MCP servers over HTTP with OAuth: Notion, Linear, Slack,
   HubSpot, GitHub, Atlassian. Google Drive has none we can rely on from every engine.
 - Workers run headless, so they cannot finish an OAuth browser flow.
 - The store is readable by every worker, so no token may live in it. The team session already
-  lives outside the store for this reason (main/team/session.mjs).
+  lives outside the store for this reason (main/team/session.mts).
 - Agents run on the person's own subscription; each person has their own copy of the app.
 
 ## What to build
@@ -62,7 +62,7 @@ it works".
 
 A new `main/connections/` module, using the MCP SDK the app already depends on:
 
-- A short catalog in `shared/connections-catalog.mjs`: name, the vendor's MCP address,
+- A short catalog in `shared/connections-catalog.mts`: name, the vendor's MCP address,
   auth kind (oauth or token), a safe read tool to try for each (Linear `list_issues`, Notion
   `search`), and how to tell a write tool.
 - Sign in: the app runs the OAuth flow itself (dynamic client registration, PKCE, a loopback
@@ -77,7 +77,7 @@ A new `main/connections/` module, using the MCP SDK the app already depends on:
 ### 2. Workers get them through the app
 
 - `mcpServers()` and the Codex thread params add each connection that last checked Works,
-  over a small local proxy the app runs (a stdio MCP server, `mcp/connection-proxy.mjs`, that
+  over a small local proxy the app runs (a stdio MCP server, `mcp/connection-proxy.mts`, that
   takes the connection's name, gets the token from the app over its existing local socket and
   forwards to the vendor). So no token reaches a worker's environment, files or transcript,
   and Agentbox can log and gate each call.

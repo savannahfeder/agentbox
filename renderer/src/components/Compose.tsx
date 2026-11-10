@@ -24,24 +24,24 @@ import type { Product, RepeatShape } from '../types';
 import { SEND } from '../this-keyboard';
 import { TeamContext, firstName } from '../team/people';
 import { WhoPicker, DuePicker } from '../team/WhoPicker';
-import { isShared } from '../../../shared/team-rules.mjs';
+import { isShared } from '../../../shared/team-rules.mts';
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { AttachRow } from './AttachRow';
-import { PriorityPicker, priorityIdOf, priorityValueOf, type PriorityId } from './Priority';
+import { PriorityPicker } from './Priority';
 import { parseRepeat } from '../format';
 import { splitMessage } from '../message-split';
 import { WhenPicker, WHEN_NOW, type WhenValue } from './When';
-import { sameRule, type RepeatShape as RepeatRuleValue } from '../../../shared/repeats.mjs';
-import { landingIndex } from '../../../shared/rank.mjs';
+import { sameRule, type RepeatShape as RepeatRuleValue } from '../../../shared/repeats.mts';
+import { landingIndex } from '../../../shared/rank.mts';
 import { resolveProject, stepProject } from '../compose-project';
 import { readComposeDraft, saveComposeDraft, clearComposeDraft } from '../drafts';
-import { startingPriority } from '../priority';
+import { sentPriority, startingPriority, type PriorityChoice } from '../priority';
 import { ModelPicker } from './Model';
 import { DEFAULT_MODEL, engineModelPicked, readLastModel, writeLastModel, type ModelChoice } from '../models';
 import { effortChoicesFor, effortPicked, readLastEffort, writeLastEffort } from '../effort';
 import { EnginePicker } from './EnginePicker';
 import { engineThisMacOffers, readLastEngine, writeLastEngine } from '../engines';
-import { DEFAULT_ENGINE, ENGINES, type Engine } from '../../../shared/engines.mjs';
+import { DEFAULT_ENGINE, ENGINES, type Engine } from '../../../shared/engines.mts';
 import { footerIsOpen, restingClause } from '../compose-footer';
 import { practiceRefusal } from '../compose-says';
 
@@ -122,12 +122,12 @@ export function Compose({ products, hidden, onSend, onReorder, onHide, onNewProj
   // loses nothing. ../drafts.ts says what is kept and why the project is not.
   const opened = useRef(readComposeDraft());
   const [text, setText] = useState(() => opened.current.text);
-  // A new card opens on medium unless a saved draft has its own priority;
-  // ../priority.ts says why the last pick is not carried over.
-  const [prio, setPrio] = useState<PriorityId | null>(
+  // A new card opens on Agent decides unless a saved draft has its own
+  // priority; ../priority.ts says why the last pick is not carried over.
+  const [prio, setPrio] = useState<PriorityChoice>(
     () => startingPriority(opened.current.priority),
   );
-  const pickPrio = (id: PriorityId) => { setPrio(id); };
+  const pickPrio = (id: PriorityChoice) => { setPrio(id); };
   // The engine is remembered like the model, falling back to the workspace
   // agent; null means Claude Code. It is read before the model because model
   // memory is kept per engine. It is clamped to what this Mac offers, because
@@ -293,14 +293,12 @@ export function Compose({ products, hidden, onSend, onReorder, onHide, onNewProj
     const attachedMd = await persistAttachments(product.slug, attachments);
     const body = [written, attachedMd].filter(Boolean).join('\n\n');
     localStorage.setItem(LAST_PRODUCT_KEY, product.slug);
-    // Untagged sends medium, not 0, which would sort the user's own task below
-    // everything an agent had tagged.
     const stood = await onSend({
       product: product.slug,
       title,
       body: body || undefined,
       kind: 'directive',
-      priority: prio ? priorityValueOf(prio) : 5,
+      priority: sentPriority(prio),
       // The caller sends a repeat down a different path, because a repeating
       // task is not a work item.
       ...(repeat ? { repeat } : {}),
@@ -562,7 +560,8 @@ export function Compose({ products, hidden, onSend, onReorder, onHide, onNewProj
             <span className="clause clause-priority">
               <PriorityPicker
                 variant="word"
-                value={prio ?? priorityIdOf(5)}
+                agent
+                value={prio}
                 set={!!prio}
                 onChange={pickPrio}
                 onOpenChange={setPrioOpen}

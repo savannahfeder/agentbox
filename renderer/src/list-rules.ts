@@ -1,20 +1,20 @@
 // Pure rules for what each list shows, and what a click on a row or its select
 // box means.
-import { instructionOf, isCleanRun } from '../../shared/repeats.mjs';
-import { teammateIdOf } from '../../shared/teammates.mjs';
-import { answerSettled, filedByThePerson } from '../../shared/answers.mjs';
+import { instructionOf, isCleanRun } from '../../shared/repeats.mts';
+import { teammateIdOf } from '../../shared/teammates.mts';
+import { answerSettled, filedByThePerson, wakesItselfAt } from '../../shared/answers.mts';
 import { saysARunGotNowhere } from '../../shared/spawn-trouble.mts';
 import { notShippedLine } from '../../shared/not-shipped.mts';
-import { setByPerson } from '../../shared/thread-waits.mjs';
-import { isTaskRow } from '../../shared/team-rules.mjs';
-import { shownTitle } from '../../shared/thread-title.mjs';
-import { firstRealLine, previewText, searchText } from './format';
+import { setByPerson } from '../../shared/thread-waits.mts';
+import { isTaskRow } from '../../shared/team-rules.mts';
+import { shownTitle } from '../../shared/thread-title.mts';
+import { firstRealLine, offerIsLive, previewText, searchText } from './format';
 import { TROUBLE_ID } from './trouble-row';
 import { DONE } from './done-word';
 
 /**
  * A thread put in Later and not begun. The window's copy of `notStarted` in
- * shared/work-items.mjs, which is what stops a worker pulling it.
+ * shared/work-items.mts, which is what stops a worker pulling it.
  */
 export const notStarted = (i: Pick<InboxItem, 'start'> | null | undefined): boolean => i?.start === 'later';
 
@@ -27,7 +27,7 @@ export interface InboxItem {
   answeredThrough?: number;
   runAt?: number;
   snoozedUntil?: number;
-  /** Teammates' comments its owner has not yet dealt with (shared/work-items.mjs). */
+  /** Teammates' comments its owner has not yet dealt with (shared/work-items.mts). */
   waitingComments?: { by: string; ts: number; text: string }[];
   /** 'later' while a thread sits in Later, written down and not begun. */
   start?: 'later' | 'now';
@@ -125,13 +125,23 @@ export function gaveUpOnTheAnswer(i: InboxItem): boolean {
 }
 
 // Who deferred a row decides what the deferral means. A future runAt an agent
-// wrote stops workers respawning (`isDue` in shared/work-items.mjs) but does
+// wrote stops workers respawning (`isDue` in shared/work-items.mts) but does
 // not hide the row, or an agent could take its own question away from the
-// person it asked. An agent parking a row is a reason to show it, because what
+// person it asked (the one exception is `runsAgainOnItsOwn` below). An agent parking a row is a reason to show it, because what
 // happens next is the user's call.
 export function parkedByAgent(i: InboxItem, now = Date.now()): boolean {
   if (i.status === 'done') return false;
   return (i.runAt ?? 0) > now && i.wrote?.runAt?.source !== 'founder';
+}
+
+// EXCEPT A THREAD ITS AGENT WILL RUN AGAIN ITSELF, ASKING NOTHING MEANWHILE
+// (w-8b38137b7f). The next move is the agent's, so it waits in Scheduled until
+// the moment and is In progress after it. No answer, or one that offers a
+// choice, keeps it in Needs you, which is what stops an agent hiding its own
+// question (tests/agent-defer-does-not-hide). Returns the moment, or 0.
+export function runsAgainOnItsOwn(i: InboxItem): number {
+  if (!hers(i) || !i.result?.trim() || offerIsLive(i)) return 0;
+  return wakesItselfAt(i);
 }
 
 // The moment the user put this row away until. The inbox and Scheduled both
@@ -140,6 +150,10 @@ export function parkedByAgent(i: InboxItem, now = Date.now()): boolean {
 // `legacySnooze` is the old localStorage map, still honoured on read and never
 // written. Only the user could set it, so it counts.
 export function hiddenUntil(i: InboxItem, legacySnooze = 0): number {
+  return Math.max(putAwayByThem(i, legacySnooze), runsAgainOnItsOwn(i));
+}
+
+function putAwayByThem(i: InboxItem, legacySnooze = 0): number {
   // Something she said after scheduling it runs now, and its answer is hers to read now.
   const spokeSince = (i.wrote?.answer?.ts ?? 0) > (i.wrote?.runAt?.ts ?? 0);
   const mine = i.wrote?.runAt?.source === 'founder' && !spokeSince ? i.runAt ?? 0 : 0;
@@ -173,7 +187,7 @@ export function belongsInInbox(
   { deliveredThrough = 0, hiddenUntil = 0, now = Date.now(), live = false, shipping = false, asking = false, waitingOn = [] as readonly string[], stopped = false } = {},
 ): boolean {
   // A teammate's words wait for you whatever the thread is doing, a running
-  // agent included (`waitingComments`, shared/work-items.mjs).
+  // agent included (`waitingComments`, shared/work-items.mts).
   if (i.waitingComments?.length) return true;
   // In Later and not begun: it waits for a person, not a clock, so it is in
   // Later and nowhere else.
@@ -201,6 +215,7 @@ export function belongsInInbox(
   // that can end counts (`waitsThatCanEnd`), so a loop of waits stays here.
   if (waitsInLater(i, waitingOn)) return false;
   if (waitCameBack(i)) return true;
+  if (runsAgainOnItsOwn(i)) return false;
   if (parkedByAgent(i, now)) return true; // an agent stopped: what happens next is hers
   // The agent finished acting on her answer and left the thread open, as a
   // standing workstream thread does. That is news. The branches below would
@@ -316,7 +331,9 @@ export function threadsOwedAnAnswer<T extends InboxItem & { id: string; parent?:
     const parent = i.parent ? byId.get(i.parent) : undefined;
     if (!parent) continue;
     if (parent.status === 'done' && parent.wrote?.status?.source === 'founder') continue;
-    if (hiddenUntil(parent) > now) continue; // in Later: it comes back when Later ends
+    // In Later: it comes back when Later ends. Only a person's put-off counts,
+    // so an agent's pause cannot hide a task waiting for their yes.
+    if (putAwayByThem(parent) > now) continue;
     if (parent.status === 'claimed' || (liveAnswer(parent) && !answerSettled(parent))) continue;
     owed.add(parent.id);
   }
@@ -333,6 +350,11 @@ export function heldRowStarts(
   goes: { product: string; id: string } | null | undefined,
 ): boolean {
   return !!goes && goes.id === row.id && goes.product === row.product;
+}
+
+/** The `live` the list rules take: threads with a run, or with one being started (Try again). */
+export function agentOnOrComing(fleet: { running?: readonly { itemId: string }[]; starting?: readonly string[] } | null | undefined): Set<string> {
+  return new Set([...(fleet?.running ?? []).map((r) => r.itemId), ...(fleet?.starting ?? [])]);
 }
 
 // In progress promises that a worker is on this row or about to be, so it
@@ -359,6 +381,7 @@ export function belongsInProgress(
   // A session acted on her answer and finished, so nothing is coming and the
   // inbox shows it instead. Both lists read the same fact.
   if (answerSettled(i)) return false;
+  if (runsAgainOnItsOwn(i)) return true; // its moment has come: the queue starts it
   // Her ask is answered and she has not replied, so the next move is hers and
   // the inbox shows it.
   if (answeredHerAsk(i)) return false;
@@ -402,7 +425,7 @@ export function stoppable(
 // and the inbox, with no rule of its own, so there is never a fourth answer to
 // what is live.
 //
-// `onTheRail` in shared/agents.mjs still rules the user's own terminal
+// `onTheRail` in shared/agents.mts still rules the user's own terminal
 // sessions beside these rows, which have no work item.
 export function belongsOnTheRail(
   i: InboxItem,
@@ -431,7 +454,7 @@ export function withdrawReply(statusWhenReplied: string): { answer: string; stat
 }
 
 // A reply lifts a reminder, which only hides the row. A moment to run is left
-// alone: the reply runs now anyway (`wordWaits`, shared/work-items.mjs) and the
+// alone: the reply runs now anyway (`wordWaits`, shared/work-items.mts) and the
 // moment stays for the run it was set for.
 export function replyClearsSchedule(i: InboxItem, now = Date.now()): boolean {
   return (i.snoozedUntil ?? 0) > now;
@@ -480,7 +503,7 @@ export function rowSummary(
 
 // The name on the row: the written label when there is one, otherwise the
 // title. `label` is its own field because the fold refuses a rewrite of the
-// title on a row the user wrote (shared/work-items.mjs). It is written once,
+// title on a row the user wrote (shared/work-items.mts). It is written once,
 // when the thread is made (main/row-label.mts), because Claude Code names its
 // terminal tab but never saves that name to a transcript.
 //
@@ -514,7 +537,7 @@ export function rowTitle(i: {
 }
 
 // The schedule box names a thread the way the list does, not by its raw title
-// (tests/the-schedule-box-names-the-thread-not-the-prompt.test.mjs).
+// (tests/the-schedule-box-names-the-thread-not-the-prompt.test.mts).
 export function scheduleSubtitle(i: Parameters<typeof rowTitle>[0], count = 1): string {
   return count > 1 ? `${count} items` : rowTitle(i);
 }
@@ -543,17 +566,17 @@ export function clipToSentence(text: string, budget = SUMMARY_BUDGET): string {
 }
 
 // Every ordered list sorts through this, so the inbox, In progress and the
-// fleet agree on which row comes next. `score` is the one in shared/rank.mjs,
+// fleet agree on which row comes next. `score` is the one in shared/rank.mts,
 // passed in so this stays pure. Recency only breaks ties.
 export function byRunningOrder<T extends { updatedAt: number; placedAt?: number }>(score: (i: T) => number) {
   return (a: T, b: T) => score(b) - score(a) || placedAt(b) - placedAt(a);
 }
 
-/** Where a row sits by time: a close taken straight back leaves it where it was (shared/work-items.mjs). */
+/** Where a row sits by time: a close taken straight back leaves it where it was (shared/work-items.mts). */
 export const placedAt = (i: { updatedAt: number; placedAt?: number }): number => i.placedAt ?? i.updatedAt;
 
 // The heading urgent rows are lifted under. Which rows count is `isUrgent` in
-// shared/rank.mjs and nothing else, so the heading never sits over a row that
+// shared/rank.mts and nothing else, so the heading never sits over a row that
 // does not wear the urgent mark.
 export const URGENT_HEADING = 'Urgent';
 

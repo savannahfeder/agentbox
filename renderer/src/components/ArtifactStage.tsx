@@ -4,11 +4,11 @@ import { createContext, memo, useCallback, useContext, useEffect, useLayoutEffec
 import { whereAFileLinkGoes } from '../file-links';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { findQuote, viewKind } from '../../../shared/artifact-marks.mjs';
+import { findQuote, viewKind } from '../../../shared/artifact-marks.mts';
 import { api } from '../api';
-import { canPaintQuotes, paintQuotes } from '../paint-quotes';
+import { canPaintQuotes, cellAround, paintQuotes } from '../paint-quotes';
 import { fetchableFileUrl } from '../phone-files';
-import { pictureUrl } from '../picture';
+import { fileBeside, opening, pictureUrl, seenAt } from '../picture';
 import { MAX_ZOOM, lowestZoom } from '../picture-view';
 import { filmMarks, filmPins, hasSpot, keepUnder, marksOnPages, nextZoom, pagePins, pageSpot, pictureFit, pinned, pinsToDraw, realZoom, roomInside, wheelZoom, zoomAnchor, zoomWords, type Found } from '../artifact-pins';
 
@@ -17,6 +17,7 @@ import type { FileNote, NotePlace } from '../types';
 import { quotesKey } from '../selection-bar';
 import { CodeFile } from './CodeFile';
 import { TableView, useTableSave } from './TableView';
+import { useLiveSession, useLiveTicket } from '../live/live-session';
 import { SelectionBar } from './SelectionBar';
 import { DeckSlides } from './DeckSlides';
 import { PinMarks, spotIn } from './PinMarks';
@@ -57,7 +58,7 @@ const partsFor = (folder: string | null) => ({
     const from = src ?? '';
     if (/^https?:/.test(from)) return <img src={from} alt={alt ?? ''} />;
     if (!folder || !from || /^[a-z][a-z0-9+.-]*:/i.test(from)) return <em>{alt || from}</em>;
-    return <img src={pictureUrl(from.startsWith('/') ? from : new URL(from, `file://${folder}/`).pathname)} alt={alt ?? ''} crossOrigin="anonymous" />;
+    return <img src={pictureUrl(from.startsWith('/') ? from : fileBeside(from, folder))} alt={alt ?? ''} crossOrigin="anonymous" />;
   },
 });
 
@@ -105,6 +106,8 @@ export interface StageFiles {
 
 /** The thread whose files the stage reads, so a name finds that thread's file first. */
 export const StageThread = createContext<string | undefined>(undefined);
+/** The project the files belong to, when it is not the product's own. */
+export const StageProject = createContext<string | null>(null);
 
 function useResolved(product: string, path: string, files?: StageFiles) {
   const thread = useContext(StageThread);
@@ -502,8 +505,12 @@ function TableStage({ product, path, name, notes, draft, activeId, onPlace, onFo
   onPlace?: (place: NotePlace | null) => void; onFound?: (found: Found) => void; readText?: (path: string) => Promise<string | null>; onAgain: () => void;
 }) {
   const thread = useContext(StageThread);
+  const project = useContext(StageProject);
   const [text, setText] = useState<string | null | undefined>(undefined);
   const [mtime, setMtime] = useState(0);
+  // Teammates with the table open edit one live copy; a teammate's own copy cannot write the file.
+  const ticket = useLiveTicket({ product, project, name });
+  const liveSession = useLiveSession(ticket ? { ...ticket, me: { ...ticket.me, canSave: !readText } } : ticket);
   const [reads, setReads] = useState(0);
   const page = useRef<HTMLDivElement | null>(null);
   // A teammate's file comes through `readText` and is theirs; only a file of this project's can be saved.
@@ -517,22 +524,30 @@ function TableStage({ product, path, name, notes, draft, activeId, onPlace, onFo
     void reading.then((t) => { if (live) { setText(t); if (t === null) onFound?.('gone'); } }).catch(() => { if (live) { setText(null); onFound?.('gone'); } });
     return () => { live = false; };
   }, [product, path, reads]);
-  const quotes = useMemo(() => notes.flatMap((n) => (n.place.kind === 'quote' && !n.resolved ? [{ id: n.id, text: n.place.text }] : [])), [notes]);
-  const draftQuote = draft?.kind === 'quote' ? draft.text : null;
+  const quotes = useMemo(() => notes.flatMap((n) => (n.place.kind === 'quote' && !n.resolved ? [{ id: n.id, text: n.place.text, cell: n.place.cell }] : [])), [notes]);
+  const draftQuote = draft?.kind === 'quote' ? draft : null;
   const quotesNow = quotesKey(quotes);
+  const draftNow = JSON.stringify(draftQuote);
   useEffect(() => {
-    paintQuotes(page.current, quotes, activeId, draftQuote);
+    const root = page.current;
+    let frame = 0;
+    const paint = () => paintQuotes(root, quotes, activeId, draftQuote);
+    paint();
+    // Rows are drawn as they scroll into view, so a cell's light goes back on when they are.
+    const again = new MutationObserver(() => { cancelAnimationFrame(frame); frame = requestAnimationFrame(paint); });
+    if (root) again.observe(root, { childList: true, subtree: true });
     return () => {
+      again.disconnect(); cancelAnimationFrame(frame);
       const highlights = (CSS as unknown as { highlights?: Map<string, unknown> }).highlights;
       highlights?.delete('av-quote'); highlights?.delete('av-quote-on');
     };
-  }, [text, quotesNow, activeId, draftQuote]);
+  }, [text, quotesNow, activeId, draftNow]);
   if (text === null) return <div className="doc-missing">{name} could not be opened.</div>;
   if (text === undefined) return <OpeningWait name={name} kind={null} onAgain={onAgain} />;
   return <div className="av-table" ref={page}>
-    <TableView text={text} path={path} mode="full" onSave={readText ? undefined : save} onReload={() => setReads((n) => n + 1)}
-      onComment={onPlace ? (quote) => onPlace({ kind: 'quote', text: quote }) : undefined} storeKey={`${product}/${path}`} />
-    {onPlace && <SelectionBar page={page} onComment={(quote) => onPlace({ kind: 'quote', text: quote })} />}
+    <TableView text={text} path={path} mode="full" onSave={readText ? undefined : save} onReload={() => setReads((n) => n + 1)} live={liveSession}
+      onComment={onPlace ? (quote, cell) => onPlace({ kind: 'quote', text: quote, cell }) : undefined} storeKey={`${product}/${path}`} />
+    {onPlace && <SelectionBar page={page} onComment={(quote, at) => onPlace({ kind: 'quote', text: quote, cell: cellAround(at) })} />}
   </div>;
 }
 
@@ -548,6 +563,7 @@ function OpenedFile({ product, path, name, byline, notes, carried = [], draft, a
   const opened = found?.opened ?? null;
   const commented = useMemo(() => marksOnPages([...notes, ...carried]), [notes, carried]);
   const url = opened ? pictureUrl(opened) : null;
+  const [at] = useState(opening);
   const bytes = useCallback(async () => {
     const res = await fetch(fetchableFileUrl(url as string));
     if (!res.ok) throw new Error(`${res.status}`);
@@ -567,7 +583,7 @@ function OpenedFile({ product, path, name, byline, notes, carried = [], draft, a
   if (!opened) {
     return <div className="doc-missing">{found.coming ? `${name} is on its way.` : missingSays ? `${name}: ${missingSays}` : `${name} could not be found.`}</div>;
   }
-  if (kind === 'image') return <PictureStage url={url as string} name={name} notes={notes} carried={carried} draft={draft} activeId={activeId} go={go} showResolved={showResolved} keep={keep} onPlace={onPlace} onPick={onPick} onFound={onFound} onAgain={onAgain} />;
+  if (kind === 'image') return <PictureStage url={seenAt(url as string, at)} name={name} notes={notes} carried={carried} draft={draft} activeId={activeId} go={go} showResolved={showResolved} keep={keep} onPlace={onPlace} onPick={onPick} onFound={onFound} onAgain={onAgain} />;
   if (kind === 'film') {
     return <FilmPlayer key={url} url={url as string} name={name} hold={hold} onAgain={onAgain}
       seek={go?.place.kind === 'time' ? { s: go.place.s, at: go.at } : null}

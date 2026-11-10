@@ -26,12 +26,12 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { cloudConfigPath } from '../main/cloud/config.mjs';
+import { cloudConfigPath } from '../main/cloud/config.mts';
 
 const REGION = 'us-east-1';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SANDBOX = path.join(HERE, '..', 'cloud', 'sandbox');
-const IMAGE_FILES = ['Dockerfile', 'server.mjs', 'mcp-stub.mjs', 'usage.mjs', 'sudo.mjs', 'chromium.sh', 'key-names.mjs'];
+const IMAGE_FILES = ['Dockerfile', 'server.mjs', 'mcp-stub.mjs', 'usage.mjs', 'memory-guard.mjs', 'sudo.mjs', 'chromium.sh', 'key-names.mjs'];
 const NAMES = {
   repo: 'agentbox-sandbox',
   build: 'agentbox-sandbox-build',
