@@ -209,6 +209,11 @@ export function filesKeeper({ dir, storage, account, settings, now = Date.now, p
       return passing;
     },
     bringBack,
+    /** Whether a pass would send or take off anything, so a computer with no plan for files never weighs them. */
+    async wantsVersions(): Promise<boolean> {
+      const acct = await account().catch(() => null);
+      return !!acct?.cap && settings().on;
+    },
     /** True while `hash` is on its way back. */
     isComing: (hash: string): boolean => coming.has(hash),
     off: (hash: string): OffEntry | null => ledger.off[hash] ?? null,

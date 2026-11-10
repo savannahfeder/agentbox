@@ -788,7 +788,9 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
   function consider(force = false): void {
     if (!keeper || (!force && Date.now() - consideredAt < CONSIDER_EVERY_MS)) return;
     consideredAt = Date.now();
-    void keptVersions().then((vs) => keeper.pass(vs)).catch((err: Error) => { console.warn(`files: the cloud pass could not start: ${err.message}`); });
+    // Without a plan for files a pass needs no versions: it only brings back what an ended plan kept.
+    void keeper.wantsVersions().then(async (want) => keeper.pass(want ? await keptVersions() : []))
+      .catch((err: Error) => { console.warn(`files: the cloud pass could not start: ${err.message}`); });
   }
 
   // Shared and group threads are only listed with a team, and a group's only with its rooms.
@@ -1163,7 +1165,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       return { ok: true, moved, bytes };
     },
 
-    /** A thread's files kept in the cloud, brought back before its agent starts. False when one could not come. */
+    /** A thread's files kept in the cloud, brought back as its agent starts. False when one could not come in time. */
     async bringBackFor({ product, id, deadlineMs = 5 * 60_000 }: { product: string; id: string; deadlineMs?: number }): Promise<boolean> {
       if (!keeper || !keeper.status().offBytes) return true;
       const waits: Promise<boolean>[] = [];

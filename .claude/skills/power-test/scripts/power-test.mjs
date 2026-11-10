@@ -15,6 +15,7 @@
 //     --codex-home ~/.codex-2                          the Codex login testers spend (default: the one on the best plan)
 //     --keep                                           leave the copies up afterwards
 //     --files <dir>                                    copied into every project's documents in every copy (a table, a deck under test)
+//     --seed "<script> [args]"                         run with each copy's folder before its testers start (threads and files under test)
 //     --team <file> --room <name>                      one tester signs in to a real team (live.mjs --team) and talks in that room
 //     --stand-in-team "<name>"                         every tester on one team, through a stand-in team cloud of the run's own;
 //                                                      the first starts it, invites the rest and shares their first project
@@ -87,6 +88,8 @@ if (opt('testers') || opt('tester-login')) stop('testers are always Codex now, s
 const team = opt('team');
 const room = opt('room');
 const files = opt('files') ? path.resolve(opt('files')) : null;
+const [seedScript, ...seedArgs] = opt('seed') ? opt('seed').split(/\s+/) : [];
+if (seedScript && !fs.existsSync(seedScript)) stop(`--seed: there is no script at ${seedScript}.`);
 if (files && !fs.existsSync(files)) stop(`--files: there is no folder at ${files}.`);
 const standInTeam = opt('stand-in-team');
 if (standInTeam && team) stop('--stand-in-team makes a team of its own: leave out --team.');
@@ -222,7 +225,10 @@ for (const person of people) {
   await seedCode(state);
   if (files) layFiles(state, files);
   const seeded = person.history ? seedHistory(state, person, person.history) : new Set();
-  if (seeded.size) await live(name, 'restart');
+  // The copy's threads live under its store, which AGENTBOX_HOME names to the script.
+  const ran = seedScript ? await run(process.execPath, ['--experimental-strip-types', '--no-warnings', path.resolve(seedScript), instanceDir(name), ...seedArgs], { env: { ...process.env, AGENTBOX_HOME: path.join(instanceDir(name), 'store') }, timeoutMs: 10 * MIN, cwd: REPO }) : null;
+  if (ran && ran.code !== 0) say(`${person.name}: the seed failed: ${ran.out.trim().slice(-300)}`);
+  if (seeded.size || ran) await live(name, 'restart');
   setups.push({ person, name, dir, stateFile, seeded, cmds: layCommands(dir, name) });
 }
 

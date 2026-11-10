@@ -234,6 +234,20 @@ describe('when the plan stops keeping files', () => {
   });
 });
 
+describe('a computer with no plan for files', () => {
+  it('is never asked to weigh its files: only a plan that keeps them, switched on, wants them', async () => {
+    const w = world();
+    expect(await w.keeper.wantsVersions()).toBe(true);
+    w.settings.on = false;
+    expect(await w.keeper.wantsVersions()).toBe(false);
+    w.settings.on = true;
+    w.account.cap = 0;
+    expect(await w.keeper.wantsVersions()).toBe(false);
+    w.account.cap = null;
+    expect(await w.keeper.wantsVersions()).toBe(false);
+  });
+});
+
 describe('what it remembers', () => {
   it('survives a restart', async () => {
     const w = world({ days: 1 });
