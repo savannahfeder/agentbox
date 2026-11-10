@@ -7220,7 +7220,7 @@ export default function App() {
     : s.at === 'settings' ? 'Settings'
     : selectable.find((i) => i.id === s.id && i.product === s.product)?.title ?? 'the thread';
   const backForward = backForwardOn
-    ? <BackForward backTo={trail.backTo} forwardTo={trail.forwardTo} onBack={trail.back} onForward={trail.forward} name={stopName} />
+    ? <BackForward backTo={trail.backTo} forwardTo={trail.forwardTo} onBack={trail.back} onForward={trail.forward} onInbox={() => openView('inbox')} inboxOnEsc={!!focused} name={stopName} />
     : null;
   useEffect(() => {
     if (!onPhone()) return;
@@ -8159,7 +8159,7 @@ export default function App() {
                   crumbFrom={teamOpen ? 'Team' : search !== null ? 'Search'
                     : onBoard ? 'Inbox'
                     : directOpen && roomsUi.openId ? 'Groups'
-                    : crumbTabNow === 'inbox' && team ? needsWord(picked, team.me)
+                    : crumbTabNow === 'inbox' ? 'Inbox'
                       : INBOX_TABS.find((t) => t.view === crumbTabNow)?.label}
                   inlineArtifacts
                   previewSample={api.isFixtures && (reviewLab || new URLSearchParams(location.search).has('artifactTweaks')) ? artifactPreviewSample : undefined}

@@ -818,9 +818,11 @@ function fixBeforeReplying({ cause, engineWord, resetsAt, model, planEnded }: { 
 
 // NO SENTENCE HERE OFFERS ANOTHER ACCOUNT (w-dac993a554). There used to be an
 // `elsewhere` flag: another signed-in login had room, or had the model, so the
-// line promised the move instead of the wait. Nothing moves work between
-// accounts any more, so a limit is named with the hour it resets and a model no
-// plan includes is answered with another model.
+// line promised the move instead of the wait. The app moves off a Claude
+// account at its limit by itself when another has room
+// (`Supervisor#_moveOffALimitedAccount`), so a limit still on a row has nowhere
+// to go: it is named with the hour it resets. A model no plan includes is
+// answered with another model.
 //
 // `planEnded` is when the account's paid ChatGPT plan ended (main/codex-account.mts
 // `codexPlanEnded`), which is why its list lacks `model`.
