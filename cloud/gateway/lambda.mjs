@@ -9,10 +9,10 @@
 // credentials that signed it, and a role's last hours, where a run's results
 // link must outlive the run's 8.
 import { S3Client, GetObjectCommand, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { awsTransport, awsStorage } from '../../main/cloud/aws.mjs';
+import { awsTransport, awsStorage } from '../../main/cloud/aws.mts';
 import { createGateway } from './gateway.mjs';
-import { supabaseRest } from './phone.mjs';
-import { sendToExpo } from '../../main/phone-alerts.mjs';
+import { supabaseRest, teamsFrom } from './phone.mjs';
+import { sendToExpo } from '../../main/phone-alerts.mts';
 import { stripeClient } from './stripe.mjs';
 
 const TIMEOUT_MS = 20_000;
@@ -129,6 +129,7 @@ export async function gatewayFromEnv(env = process.env, { readSecret = (arn) => 
     ...(billing ? { stripe: stripeClient({ key: billing.key, webhookSecret: billing.webhookSecret, managedPayments: !!billing.managedPayments }) } : {}),
     ...(db ? {
       db,
+      teams: teamsFrom(db),
       phone: {
         db,
         runFiles: linkedFiles({ links: { get: signer.getUrl, put: signer.putUrl } }),

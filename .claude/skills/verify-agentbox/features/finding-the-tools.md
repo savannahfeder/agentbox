@@ -31,6 +31,6 @@ Preconditions: macOS. No instance needed; these run the app's modules directly.
 
 ## Gotchas
 
-- A shape passes against the fake root only. If a new finder reads an absolute path through plain `fs` instead of the injected `exists`/`readdir`, this Mac's own installs answer and the check proves nothing; the shape test in `tests/the-pre-deploy-check-runs-what-a-change-needs.test.mjs` catches the common case.
+- A shape passes against the fake root only. If a new finder reads an absolute path through plain `fs` instead of the injected `exists`/`readdir`, this Mac's own installs answer and the check proves nothing; the shape test in `tests/the-pre-deploy-check-runs-what-a-change-needs.test.mts` catches the common case.
 - The `slow-shell-profile` shape sleeps 8 s by design. On a loaded Mac other shapes' shell probes can also time out; rerun the one shape alone before believing a failure.
 - The stubs answer `--version` only. Anything beyond starting (auth, a real turn) is the live layer's job with `--real-claude`.

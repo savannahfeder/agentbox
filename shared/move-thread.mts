@@ -10,17 +10,19 @@
 // is a job of its own: a branch cannot change repository, and a running worker
 // cannot have the ground moved under it.
 //
-// So the message moves and the rest stays: the thread starts over in the new
-// project from what you typed, and the old row keeps its history in Closed. A
-// thread nothing has run on loses nothing that way. One that changed code in
-// its old project is refused, because that code would be left behind on a
-// branch nobody looks at (main/ipc.mts reads the folder; `notShipped` here).
+// So the conversation and its traces move and the folder stays. A thread
+// nothing has run on starts in the new project from what you typed. One an
+// agent has answered carries every message, in the order and the hands they
+// were written in, and waits for you there unless a reply of yours was still on
+// its way: the agent in the new project cannot resume the old session, so
+// whether to run it again is yours. One that changed code in its old project
+// is refused, because that code would be left behind on a branch nobody looks
+// at (main/ipc.mts reads the folder; `notShipped` here).
 //
-// IT GETS A NEW ID THERE, which is the one thing this does not pretend about.
-// Keeping the id would put two rows with the same id in one store, and the
-// lists draw rows keyed by id alone: in a search across projects the second
-// one is not drawn at all. The old row closes saying where its thread went, so
-// neither end of the move is a row that vanished.
+// IT GETS A NEW ID THERE. Keeping the id would put two rows with the same id
+// in one store, and the lists draw rows keyed by id alone. The old row closes
+// saying where its thread went and is left out of the lists (`leftByAMove`),
+// so the move reads as one thread, not a finished one beside a new one.
 
 export interface MovableThread {
   status?: string;
@@ -28,13 +30,13 @@ export interface MovableThread {
   result?: string;
   note?: string;
   agent?: unknown;
-  [field: string]: unknown;
+  wrote?: NotedItem['wrote'];
 }
 
 // Every word somebody might type into ⌘K reaching for this. "file" and
 // "project" are in here because that is what the tester typed first: "pro"
 // offered New project… and Projects… and nothing else.
-import { notShipped } from './not-shipped.mts';
+import { notShipped, type NotedItem } from './not-shipped.mts';
 
 export const MOVE_KEYWORDS: string = 'move to project file refile wrong another switch put';
 
@@ -88,10 +90,26 @@ export function movedHere(name: string): string {
   return `Moved here from ${name}.`;
 }
 
+// The move writes the old row's note and its close together; a close the
+// person makes after Z reopened it is theirs and is listed again.
+const MOVED_AWAY = /^Moved to .+\.$/;
+const CLOSED_BY_THE_MOVE_MS = 5_000;
+
+interface WroteStamp { ts?: number; source?: string }
+
+/** Whether this row is the closed half of a move, which no list draws. */
+export function leftByAMove(item: { status?: string; note?: string; wrote?: Record<string, WroteStamp | undefined> } | null | undefined): boolean {
+  if (item?.status !== 'done' || !MOVED_AWAY.test(item.note ?? '')) return false;
+  const note = item.wrote?.note;
+  const closed = item.wrote?.status;
+  if (note?.source !== 'system' || !note.ts || !closed?.ts) return false;
+  return closed.ts >= note.ts && closed.ts - note.ts <= CLOSED_BY_THE_MOVE_MS;
+}
+
 // THE FIELDS A MOVE CARRIES, and it is every field the person set and none of
-// the machinery. The lifecycle (status, epoch, claim, answeredThrough), the
-// times and anything an agent wrote are all about the life this thread had in
-// the old project, which is exactly the life that does not follow it.
+// the machinery: the lifecycle (status, epoch, claim) is about the life this
+// thread had in the old project. A thread that ran also carries what was said
+// on it (`carriedLines`).
 //
 // `parent` rides across so a thread filed under another one stays under it.
 export const CARRIED: string[] = ['title', 'body', 'kind', 'priority', 'labels', 'parent', 'model', 'engine', 'effort', 'runAt', 'start', 'label', 'problem', 'visibility', 'visibleTo'];
@@ -107,10 +125,11 @@ export const CARRIED_AFTERWARDS: string[] = ['parent', 'label', 'problem'];
 const RUN_LABEL = (label: string) => label === 'ship' || label === 'clean' || label.startsWith('repeat:');
 
 /** The content of `item`, machinery left behind. */
-export function whatMoves(item: MovableThread): Record<string, unknown> {
+export function whatMoves(item: object): Record<string, unknown> {
   const out: Record<string, unknown> = {};
+  const fields = item as Record<string, unknown>;
   for (const field of CARRIED) {
-    let value = item?.[field];
+    let value = fields?.[field];
     if (value === undefined || value === null) continue;
     if (field === 'labels' && Array.isArray(value)) value = value.filter((l) => typeof l === 'string' && !RUN_LABEL(l));
     if (Array.isArray(value) ? value.length : value !== '') out[field] = value;
@@ -127,4 +146,40 @@ export function splitForCompose(carried: Record<string, unknown>): { compose: Re
     (CARRIED_AFTERWARDS.includes(field) ? after : compose)[field] = value;
   }
   return { compose, after };
+}
+
+interface LedgerLine { ts?: number; source?: string; claim?: unknown; patch?: Record<string, unknown> | null }
+export interface CarriedLine { ts: number; source: string; patch: Record<string, unknown> }
+
+// What was said on the thread, beside what the person set (CARRIED).
+const SAID = ['result', 'note', 'answer', 'answeredThrough', 'from', 'voice', 'forAgent'];
+
+/**
+ * A thread that ran, as the new row writes it: the old row's lines oldest
+ * first, each at its own time and in its own hand, the first one making the
+ * row. `said` (`movedHere`) goes under your first message, where it goes on a
+ * thread that starts over.
+ */
+export function carriedLines(lines: readonly LedgerLine[], said: string): CarriedLine[] {
+  const out: CarriedLine[] = [];
+  for (const line of lines ?? []) {
+    if (!line?.patch || line.claim) continue;
+    const patch: Record<string, unknown> = {};
+    for (const field of [...CARRIED, ...SAID]) {
+      let value = line.patch[field];
+      if (value === undefined || value === null) continue;
+      if (field === 'labels' && Array.isArray(value)) value = value.filter((l) => typeof l === 'string' && !RUN_LABEL(l));
+      patch[field] = value;
+    }
+    if (!Object.keys(patch).length) continue;
+    out.push({ ts: Number(line.ts) || 0, source: String(line.source ?? 'agent'), patch });
+  }
+  if (!out.length) return out;
+  const first = out.find((l) => l.source === 'founder' && typeof l.patch.body === 'string' && l.patch.body.trim());
+  if (first) first.patch.body = `${String(first.patch.body).trim()}\n\n${said}`;
+  else {
+    const title = out.find((l) => typeof l.patch.title === 'string')?.patch.title ?? '';
+    (out.find((l) => l.source === 'founder') ?? out[0]).patch.body = [title, said].filter(Boolean).join('\n\n');
+  }
+  return out;
 }

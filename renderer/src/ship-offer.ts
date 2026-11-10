@@ -16,11 +16,11 @@
 // run touched and never said whether any of it reached a commit, so the offer
 // read the same over a branch with a commit on it, over loose edits nobody
 // committed, and over work that had just been thrown away. The folder is read
-// when the run ends (main/git-change.mjs) and `shipOfferFor` below answers off
+// when the run ends (main/git-change.mts) and `shipOfferFor` below answers off
 // that; `shipOfferLive` is unchanged and still decides whether the app asks at
 // all.
 import { offerIsLive, type ParsedOption } from './format';
-import { wakesItselfAt } from '../../shared/answers.mjs';
+import { wakesItselfAt } from '../../shared/answers.mts';
 
 /** The label the ship queue takes a thread by (main/ship-queue.mts). */
 export const SHIP_LABEL = 'ship';
@@ -67,7 +67,7 @@ const addFilesOffer = (many: boolean): ParsedOption[] => [
 
 export interface ChangedFile { path: string; abs?: string }
 
-/** The files a saved change touched (main/code-change.mjs, mergeChange). */
+/** The files a saved change touched (main/code-change.mts, mergeChange). */
 export function changedFiles(change: unknown): ChangedFile[] {
   const files = (change as { files?: unknown } | null | undefined)?.files;
   if (!Array.isArray(files)) return [];
@@ -96,7 +96,7 @@ export function onlyNamedFiles(changed: readonly ChangedFile[], named: readonly 
 
 /**
  * What the folder a run worked in holds, as the saved change records it
- * (main/git-change.mjs). Null on any of them is "could not be read", which is
+ * (main/git-change.mts). Null on any of them is "could not be read", which is
  * every product with no repository.
  */
 export interface Standing {

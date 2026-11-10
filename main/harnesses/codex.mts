@@ -1,14 +1,14 @@
 import path from 'node:path';
 import type { EventEmitter } from 'node:events';
-import { harnessDefinition } from '../../shared/harness-definitions.mjs';
-import { resolveCodexBin } from '../codex-bin.mjs';
+import { harnessDefinition } from '../../shared/harness-definitions.mts';
+import { resolveCodexBin } from '../codex-bin.mts';
 import { codexLaunchEnv } from '../codex-launch-env.mts';
 import { codexModels, codexDefaultModel, codexModelLevels } from '../codex-models.mts';
 import { codexTranscriptFile, workerThreadParams, refusedCodexWorker } from '../codex-session.mts';
 import { codexKeyRefusal } from '../codex-account.mts';
 import { compactCodexThread } from '../codex-compaction.mts';
 import type { CompactServer } from '../codex-compaction.mts';
-import { captureCodexEvent, codexStreamingText, summarizeCodexEvent, traceCodexEvent, rememberCodexChange, changeFromCodexTurn } from '../codex.mjs';
+import { captureCodexEvent, codexStreamingText, summarizeCodexEvent, traceCodexEvent, rememberCodexChange, changeFromCodexTurn } from '../codex.mts';
 import { codexActivity } from '../agent-activity.mts';
 import { runCodexCommand } from '../provider-commands.mts';
 import { definitionMethods, commonUpdatePlan } from './common.mts';

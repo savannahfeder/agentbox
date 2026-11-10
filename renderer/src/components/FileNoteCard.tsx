@@ -31,14 +31,14 @@ export function NotePictureShown({ product, picture }: { product: string; pictur
   return src ? <img className="av-note-picture" src={src} alt={picture.name} onError={() => setSrc(null)} /> : null;
 }
 
-export function FileNoteCard({ note, answeredBy = null, wordsGone, product, active, settling, person, me, onGo, onSettle, nameOf, replying, onReplying, onReply, canReply, held, onToAgent }: {
+export function FileNoteCard({ note, answeredBy = null, wordsGone, product, active, settling, person, me, onGo, onSettle, nameOf, replying, onReplying, onReply, canReply, held }: {
   note: FileNote; wordsGone: boolean; product: string;
   /** "Resolved by your agent in v15", when a newer version resolved it. */
   answeredBy?: string | null; active: boolean; person: (id: string | null) => Person | null; me: string | null;
   /** Just resolved: it stays in place, struck, with its Undo, before it folds away. */
   settling: boolean;
-  /** On an agent's file, where a note the agent was not sent went instead. */
-  held: { words: string; went: boolean } | null; onToAgent: () => void;
+  /** On an agent's file, where a note the agent was not sent went, or that it waits for Send. */
+  held: { words: string; went: boolean } | null;
   onGo: () => void; onSettle: (resolved: boolean) => void; nameOf: (id: string | null) => string;
   replying: boolean; onReplying: (on: boolean) => void; onReply: (text: string) => Promise<boolean>; canReply: boolean;
 }) {
@@ -65,7 +65,7 @@ export function FileNoteCard({ note, answeredBy = null, wordsGone, product, acti
     note.from && <span key="from" className="av-note-sent">{note.resolved ? <>From {note.from}</> : <>From {note.from}, still open</>}</span>,
     answeredBy && <span key="answered" className="av-note-done"><NoteGlyph name="check" />{answeredBy}</span>,
     note.sent && !answeredBy && <span key="sent" className="av-note-sent"><NoteGlyph name="send" />Sent to the agent</span>,
-    !note.sent && held && !note.resolved && <span key="held" className="av-note-sent">{held.went && <NoteGlyph name="send" />}{held.words}</span>,
+    !note.sent && held && !note.resolved && <span key="held" className={`av-note-sent${held.went ? '' : ' is-waiting'}`}>{held.went && <NoteGlyph name="send" />}{held.words}</span>,
   ].filter(Boolean);
   return <article className={`av-note${active ? ' is-on' : ''}${note.resolved ? ' is-settled' : ''}${settling ? ' is-just-settled' : ''}${note.saving ? ' is-saving' : ''}`} id={`av-note-${note.id}`}>
     <button type="button" className="av-note-go" onClick={onGo} aria-label={`Go to ${place}`}>
@@ -91,6 +91,7 @@ export function FileNoteCard({ note, answeredBy = null, wordsGone, product, acti
           <span className="av-note-when">{clockAt(r.ts)}</span>
         </span>
         <span className="av-note-text">{r.text}</span>
+        {r.sent && <span className="av-note-acts av-note-facts"><span className="av-note-sent"><NoteGlyph name="send" />Sent to the agent</span></span>}
       </div>
     ))}
     {replying && (
@@ -109,7 +110,6 @@ export function FileNoteCard({ note, answeredBy = null, wordsGone, product, acti
       <button type="button" className="av-note-act" onClick={() => onSettle(false)}><NoteGlyph name="undo" />Undo</button>
     </span> : <span className="av-note-acts">
       {!answered && facts}
-      {!note.sent && held && !note.resolved && <button type="button" className="av-note-act av-note-toagent" onClick={onToAgent}><NoteGlyph name="send" />Send to the agent</button>}
       {!replying && <span className="av-note-btns">
         {canReply && !note.resolved && <button type="button" className="av-note-act" onClick={() => onReplying(true)}><NoteGlyph name="reply" />Reply</button>}
         <button type="button" className="av-note-act" onClick={() => onSettle(!note.resolved)}><NoteGlyph name={note.resolved ? 'undo' : 'check'} />{note.resolved ? 'Reopen' : 'Resolve'}</button>

@@ -5,9 +5,9 @@
 // does when it is opened from the Dock, using the app's own modules and not a
 // copy of them:
 //
-//   1. recover the PATH from the login shell        main/shell-path.mjs
-//   2. ask the shell where the sessions live         main/shell-path.mjs
-//   3. find Claude Code and Codex                    main/claude-bin.mjs, main/codex-bin.mjs
+//   1. recover the PATH from the login shell        main/shell-path.mts
+//   2. ask the shell where the sessions live         main/shell-path.mts
+//   3. find Claude Code and Codex                    main/claude-bin.mts, main/codex-bin.mts
 //   4. build a worker's environment and launch it    main/harnesses.mts (workerEnv, launchEnv)
 //
 // and compare each answer with what a person on that machine needs. Step 4
@@ -26,10 +26,10 @@ import { fileURLToPath } from 'node:url';
 import { SHAPES, build, CLAUDE_VERSION, CODEX_VERSION } from './machines.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
-const { recoverShellPath, readShellSettings, launchAdditions } = await import(path.join(repo, 'main/shell-path.mjs'));
-const { findClaudeBin, askShell } = await import(path.join(repo, 'main/claude-bin.mjs'));
-const { shellRunner } = await import(path.join(repo, 'main/engine-bin.mjs'));
-const { findCodexBin } = await import(path.join(repo, 'main/codex-bin.mjs'));
+const { recoverShellPath, readShellSettings, launchAdditions } = await import(path.join(repo, 'main/shell-path.mts'));
+const { findClaudeBin, askShell } = await import(path.join(repo, 'main/claude-bin.mts'));
+const { shellRunner } = await import(path.join(repo, 'main/engine-bin.mts'));
+const { findCodexBin } = await import(path.join(repo, 'main/codex-bin.mts'));
 const { harnessFor } = await import(path.join(repo, 'main/harnesses.mts'));
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
@@ -41,7 +41,7 @@ const wanted = args.filter((a) => !a.startsWith('--'));
 
 const FINDERS = { claude: findClaudeBin, codex: findCodexBin };
 
-/** The app's own probe runner (main/engine-bin.mjs), with the fake machine's environment instead of ours. */
+/** The app's own probe runner (main/engine-bin.mts), with the fake machine's environment instead of ours. */
 const asTheMachine = (env) => shellRunner(env);
 const VERSIONS = { claude: CLAUDE_VERSION, codex: CODEX_VERSION };
 

@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { readPortableFile, snapshotSkills, filesInFolder, SKILL_LIMITS } from './skills.mts';
 import { run } from './exec.mts';
-import { HAND_BACK } from '../../shared/cloud-hand-back.mjs';
+import { HAND_BACK } from '../../shared/cloud-hand-back.mts';
 
 export interface ResourceAnswer {
   status: string;

@@ -4,8 +4,8 @@ import {docKind} from '../doc-pane';
 import {glanceFile,type Glance} from '../file-glance';
 import {ArtifactThumbnail} from './ArtifactThumbnail';
 import {FileCover} from './FileCover';
-import {shownName} from '../../../shared/artifact-marks.mjs';
-import {carryLine} from '../../../shared/carried-files.mjs';
+import {shownName} from '../../../shared/artifact-marks.mts';
+import {carryLine} from '../../../shared/carried-files.mts';
 import './message-files.css';
 
 const KIND_LABEL={html:'Design',image:'Picture',markdown:'Document',code:'Code',website:'Website',pdf:'PDF',film:'Film',deck:'Slides'} as const;

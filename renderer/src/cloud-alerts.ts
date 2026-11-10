@@ -1,8 +1,8 @@
 // ALERTS ON THE WEB APP: its own Web Push subscription and signing keys,
-// handed to every computer of the account as a setting (shared/web-alerts.mjs).
-// Each computer sends its alerts to it (main/phone-alerts.mjs).
+// handed to every computer of the account as a setting (shared/web-alerts.mts).
+// Each computer sends its alerts to it (main/phone-alerts.mts).
 
-import { makeVapidKeys, WEB_ALERTS_KEY, WEB_ALERTS_TEST_KEY } from '../../shared/web-alerts.mjs';
+import { makeVapidKeys, WEB_ALERTS_KEY, WEB_ALERTS_TEST_KEY } from '../../shared/web-alerts.mts';
 import { settingCommand } from './phone-rows';
 import type { AlertsVia } from './phone-alerts';
 

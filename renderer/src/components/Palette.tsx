@@ -7,7 +7,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { Product, View } from '../types';
 import { commandKeys } from '../palette-keys';
 import { keptPick, namesIt, pointerMoved, titleFirst } from '../palette-pick';
-import { emptyLine, lookRows, matchesQuery, pageRows, rankMatches } from '../palette-rows';
+import { emptyLine, escapeClosesThePalette, lookRows, matchesQuery, pageRows, rankMatches } from '../palette-rows';
 import { glyphFor } from '../palette-glyphs';
 import { markedWords } from '../found-inside';
 import { ago } from '../format';
@@ -32,7 +32,7 @@ export interface Command {
 /** What was found inside things, a labelled group of rows each (renderer/src/found-inside.ts). */
 export interface InsideSection { key: string; label: string; rows: Command[] }
 
-export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, machine = 'dark', onSetLook, staleFiles = [], updateReady = null, onInstallUpdate, onCheckUpdate, moveToApplications = false, onMoveToApplications, filtering = false, onOpenFilter, onClearFilter, onView, teamLayout = false, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onNewThread, onStanding, onSettings, onUsage, onShortcuts, roomsOn = false, groups = [], onGroups, onPickGroup, teamLists, filePages, onConnections, teammates = null, onTeammates, onPauseTeammate, boardUp = false, onFlipView, keyHints, onSetKeyHints, onSearch, findThreads, findChats, findInside, onSearchFor, onFirstRun, onTutorial, onEndTutorial, onImportAgents, onClose, cloud = null, onCloudMode, open = true, phone = false, typed = '' }: {
+export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, machine = 'dark', onSetLook, skyThemes = [], onSkyTheme, staleFiles = [], updateReady = null, onInstallUpdate, onCheckUpdate, moveToApplications = false, onMoveToApplications, filtering = false, onOpenFilter, onClearFilter, onView, teamLayout = false, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onNewThread, onStanding, onSettings, onUsage, onShortcuts, roomsOn = false, groups = [], onGroups, onPickGroup, teamLists, filePages, onConnections, onHome, teammates = null, onTeammates, onPauseTeammate, boardUp = false, onFlipView, keyHints, onSetKeyHints, findThreads, findChats, findInside, onSearchFor, onFirstRun, onTutorial, onEndTutorial, onImportAgents, onClose, cloud = null, onCloudMode, open = true, phone = false, typed = '' }: {
   products: Product[];
   supervisorPaused: boolean;
   itemCommands?: Command[];
@@ -45,6 +45,9 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   // one that changes what the window shows (palette-rows.ts).
   machine?: ThemeChoice;
   onSetLook: (look: Look) => void;
+  /** The sky themes, each a theme of its own; `on` is the one worn. */
+  skyThemes?: { id: string; name: string; on: boolean }[];
+  onSkyTheme?: (id: string) => void;
   // Main-process files that changed since this process read them.
   staleFiles?: string[];
   /** The version of an update that has downloaded and is waiting for a
@@ -92,6 +95,8 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   /** The Files place: every file, then each project's page. */
   filePages?: readonly { id: string; title: string; hint?: string; run: () => void }[];
   onConnections?: () => void;
+  /** Absent where there is no Home page, as on a phone. */
+  onHome?: () => void;
   /** Your teammates, or null where there are none to have. */
   teammates?: readonly { id: string; name: string; role: string | null; paused?: boolean }[] | null;
   /** 'team' for the team chat, 'roster' for the Teammates tab, or a teammate's id. */
@@ -103,7 +108,6 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   // then the row is absent too.
   boardUp?: boolean;
   onFlipView?: () => void;
-  onSearch: () => void;
   /** The threads a query finds, best first. Absent, the box finds commands only. */
   findThreads?: (query: string) => Command[];
   /** Groups, chats and AI teammates a query finds, shown before the threads. */
@@ -167,8 +171,6 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
         : 'not ranked yet',
       run: () => onRankFirst(p.slug),
     })),
-    // Prints its key, so someone who uses the corner magnifier learns `/`.
-    { id: 'search', label: 'Search threads', keyHint: '/', run: onSearch },
     // The cloud on or off, with its key, then each meaning of on (C).
     ...(cloud && onCloudMode ? cloudCommands(cloud).map((r, i) => ({
       id: i === 0 ? 'cloud-toggle' : `cloud-${r.mode}`, label: r.label, hint: r.hint, keyHint: r.keyHint,
@@ -178,6 +180,8 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     // Namespaced so they cannot share an id with an item command such as
     // 'done'. Ids become React keys, and a duplicate kept a stale row alive
     // through the filter (../palette-keys).
+    // Above Inbox, as in the sidebar, and so "home" lands here although Inbox answers to it too.
+    ...(onHome ? [{ id: 'view-home', label: 'Go to Home', keywords: 'start overview', run: onHome }] : []),
     ...pageRows({ team: teamLayout }).map((r) => ({ id: r.id, label: r.label, keywords: r.keywords, run: () => onView(r.view) })),
     // THE OTHER PAGE, AND EVERY GROUP ON IT (w-326fb83c0e). ⌘K found nothing
     // for "rooms", "groups" or "messages", so the only way onto the page was
@@ -223,12 +227,22 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     ] : []),
     // Every appearance row is built in ../palette-rows, which is pure so a test
     // can type into every look.
-    ...lookRows(look, machine).map((r) => ({
+    // While a sky theme is worn every plain theme is somewhere else to go.
+    ...(skyThemes.some((k) => k.on)
+      ? [...new Map([...lookRows('light', machine), ...lookRows('ember-grid', machine)].map((r) => [r.id, r])).values()]
+      : lookRows(look, machine)).map((r) => ({
       id: r.id,
       label: r.label,
       hint: r.hint,
       keywords: r.keywords,
       run: () => onSetLook(r.to!),
+    })),
+    ...skyThemes.filter((k) => !k.on).map((k) => ({
+      id: `theme-sky-${k.id}`,
+      label: `Theme: ${k.name}`,
+      hint: 'theme',
+      keywords: `theme themes sky ${k.name.toLowerCase()}`,
+      run: () => onSkyTheme?.(k.id),
     })),
     // Above the stale-files row, which only concerns a build on this machine.
     // Shown only once the download has finished (main/updater.mts).
@@ -342,7 +356,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     // The tutorial practises and keeps nothing; the onboarding row below sets
     // up and leaves a project. The walk's last card says "type tutorial", so
     // this label must contain that word
-    // (tests/the-tutorial-and-the-onboarding-are-two-things.test.mjs). The
+    // (tests/the-tutorial-and-the-onboarding-are-two-things.test.mts). The
     // keywords are split so each word finds only one of the two rows.
     {
       id: 'tutorial',
@@ -368,7 +382,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       run: () => onSetKeyHints(!keyHints),
     },
 
-  ], [itemCommands, batch, products, supervisorPaused, order, onNewProject, onNewThread, filtering, onOpenFilter, onClearFilter, onView, teamLayout, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, look, machine, onSetLook, staleFiles, updateReady, onInstallUpdate, moveToApplications, onMoveToApplications, boardUp, onFlipView, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onEndTutorial, onImportAgents, cloud, onCloudMode]);
+  ], [itemCommands, batch, products, supervisorPaused, order, onNewProject, onNewThread, filtering, onOpenFilter, onClearFilter, onView, teamLayout, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, look, machine, onSetLook, skyThemes, onSkyTheme, staleFiles, updateReady, onInstallUpdate, moveToApplications, onMoveToApplications, boardUp, onFlipView, keyHints, onSetKeyHints, onFirstRun, onTutorial, onEndTutorial, onImportAgents, cloud, onCloudMode]);
   return open ? <PaletteBox commands={commands} findThreads={findThreads} findChats={findChats} findInside={findInside} onSearchFor={onSearchFor} onClose={onClose} phone={phone} typed={typed} /> : null;
 }
 
@@ -389,9 +403,8 @@ export function threadRows(query: string, findThreads?: (q: string) => Command[]
 }
 
 // The box itself, mounted fresh each time ⌘K opens, so it starts empty and focused.
-/** Commands about the Mac or its keyboard, which a phone has neither of, and
- *  Search threads, which the phone's field already is. */
-export const NOT_ON_A_PHONE = ['search', 'keyhints', 'shortcuts', 'stale', 'update', 'update-check', 'update-move', 'first-run', 'tutorial', 'import-agents', 'open-terminal', 'remote-control', 'flip-view'];
+/** Commands about the Mac or its keyboard, which a phone has neither of. */
+export const NOT_ON_A_PHONE = ['keyhints', 'shortcuts', 'stale', 'update', 'update-check', 'update-move', 'first-run', 'tutorial', 'import-agents', 'open-terminal', 'remote-control', 'flip-view'];
 
 /** The rows in the order drawn, and the label over the row each section starts
  *  at. A phone searches threads more than it runs commands, so they go first. */
@@ -445,6 +458,9 @@ function PaletteBox({ commands, findThreads, findChats, findInside, onSearchFor,
   const byKey = useRef(false);
 
   useEffect(() => inputRef.current?.focus(), []);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  useEffect(() => escapeClosesThePalette(window, () => closeRef.current()), []);
 
   const offered = useMemo(() => (phone ? commands.filter((c) => !NOT_ON_A_PHONE.includes(c.id)) : commands), [commands, phone]);
   const matched = useMemo(() => {
@@ -511,7 +527,6 @@ function PaletteBox({ commands, findThreads, findChats, findInside, onSearchFor,
             placeholder={phone ? 'Search' : findThreads ? 'Search threads or type a command…' : 'Type a command…'}
             enterKeyHint="go"
             onKeyDown={(e) => {
-              if (e.key === 'Escape') onClose();
               // Clamped at 0 as well as at the end, because with nothing matching
               // there is no last row to stop at and Math.min alone walks to -1.
               if (e.key === 'ArrowDown') { e.preventDefault(); byKey.current = true; pick(Math.max(0, Math.min(selected + 1, filtered.length - 1))); }

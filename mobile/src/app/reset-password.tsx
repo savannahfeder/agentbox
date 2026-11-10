@@ -1,7 +1,8 @@
 // Forgot password, from the sign-in screen. The email's link opens the app
 // (app/signed-in.tsx), signed in, on the last step: the new password.
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
+import { router } from '../lib/router';
 import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { googleReturn } from '../lib/google-return';
 import { useCloud } from '../state/cloud';
@@ -23,7 +24,7 @@ export default function ResetPassword() {
   const attempt = (fn: () => Promise<void>) => async () => {
     if (busy || !c.cloud) return;
     setBusy(true); setError(null);
-    try { await fn(); } catch (err: any) { setError(String(err?.message ?? '') || 'That did not work. Try again.'); } finally { setBusy(false); }
+    try { await fn(); } catch (err) { setError(String((err as Error)?.message ?? '') || 'That did not work. Try again.'); } finally { setBusy(false); }
   };
   const ask = attempt(async () => { await c.cloud!.askPasswordReset(email, googleReturn); setStep('sent'); });
   const save = attempt(async () => { await c.cloud!.setPassword(password); router.replace('/'); });

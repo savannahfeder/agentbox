@@ -1,15 +1,16 @@
 // Notes beside a document opened full screen from its thread: you select words,
 // write as much as you like, attach files, and Send hands every waiting note
-// to the agent at once (main/notes-wake.mjs noteToItsAgent).
-import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+// to the agent at once (main/notes-wake.mts noteToItsAgent).
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api } from '../api';
 import { Face, TeamContext } from '../team/people';
 import { clock, type LedgerLine } from '../thread-history';
-import type { FileNote, NotePlace, Person, WorkItem } from '../types';
-import { notedFilesInLines, threadFiles, versionForPath, whoseIsTheFile } from '../../../shared/artifact-marks.mjs';
+import type { FileNote, NotePlace, Person, TableCell, WorkItem } from '../types';
+import { isTablePath } from '../table-file';
+import { notedFilesInLines, threadFiles, versionForPath, whoseIsTheFile } from '../../../shared/artifact-marks.mts';
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { notePictures, noteWithPictures } from '../note-pictures';
-import { canPaintQuotes, paintQuotes } from '../paint-quotes';
+import { canPaintQuotes, cellAround, paintQuotes } from '../paint-quotes';
 import { noteAttachments, sidebarNotes } from '../notes-sidebar';
 import { AttachRow } from './AttachRow';
 import { NotePictureShown } from './FileNoteCard';
@@ -23,6 +24,29 @@ const Glyph = ({ d }: { d: string }) => (
   <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>
 );
 
+/** "Notes 7" and the faces of who wrote them; the big viewer's column has the same one. */
+export function NotesHead({ count, faces }: { count: number; faces?: ReactNode }) {
+  return (
+    <div className="sb-head">
+      <span className="sb-title">Notes</span>
+      {count > 0 && <span className="sb-count">{count}</span>}
+      {faces && <span className="sb-faces">{faces}</span>}
+    </div>
+  );
+}
+
+/** A section's name over its notes, with Send on the Unsent line. */
+export function NotesSection({ word, send }: { word: string; send?: { count: number; onSend: () => void } }) {
+  return (
+    <div className="sb-sec">
+      <span className="doc-outline-head">{word}</span>
+      {send && <button type="button" className="sb-send" onClick={send.onSend}><Glyph d="M2.5 8h9M8 4.5 11.5 8 8 11.5" />Send {send.count}</button>}
+    </div>
+  );
+}
+
+export const ReturnGlyph = () => <Glyph d="M12.5 3.5v5h-9M6 5.5 3.5 8.5 6 11.5" />;
+
 /** The corner mark that opens and closes the sidebar; closed, it counts the notes not sent yet. */
 export function NotesToggle({ open, waiting, onToggle }: { open: boolean; waiting: number; onToggle: () => void }) {
   return (
@@ -33,6 +57,12 @@ export function NotesToggle({ open, waiting, onToggle }: { open: boolean; waitin
     </button>
   );
 }
+
+type Quote = { text: string; cell?: TableCell };
+
+const Quoted = ({ quote }: { quote: Quote }) => (
+  <span className="sb-quote">{quote.text}{quote.cell && <span className="sb-cell"> in row {quote.cell.row}, {quote.cell.column}</span>}</span>
+);
 
 function SidebarNote({ note, product, on, who, person, me, onGo }: {
   note: FileNote; product: string; on: boolean; who: string; person: Person | null; me: boolean; onGo: () => void;
@@ -46,7 +76,7 @@ function SidebarNote({ note, product, on, who, person, me, onGo }: {
         <span className="sb-who">{who}</span>
         <span className="sb-when">{note.sent && <NoteGlyph name="check" />}{note.sent ? 'Sent ' : ''}{clock(note.ts)}</span>
       </span>
-      {note.place.kind === 'quote' && <span className="sb-quote">{note.place.text}</span>}
+      {note.place.kind === 'quote' && <Quoted quote={note.place} />}
       {words && <span className="sb-text">{words}</span>}
       {said.pictures.length > 0 && <span className="sb-pictures">{said.pictures.map((p) => <NotePictureShown key={p.src} product={product} picture={p} />)}</span>}
       {files.length > 0 && <span className="sb-files">{files.map((f) => <span key={f.src} className="sb-file">{f.name}</span>)}</span>}
@@ -54,7 +84,8 @@ function SidebarNote({ note, product, on, who, person, me, onGo }: {
   );
 }
 
-export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
+/** `asked`: a table cell whose Comment was chosen, for the note box; `onAsked` says it was taken. */
+export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; src: string; asked?: Quote | null; onAsked?: () => void }) {
   const team = useContext(TeamContext);
   const me = team?.me ?? null;
   const people = useMemo<Person[]>(() => (team ? [...team.byId.values()] : []), [team]);
@@ -96,7 +127,7 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
     const card = aside.current?.closest('.doc-card');
     if (!card) return;
     const find = () => {
-      const found = card.querySelector<HTMLElement>('.doc-rich-content');
+      const found = card.querySelector<HTMLElement>('.doc-rich-content, .code-scroll, .tbl');
       if (found !== page.current) { page.current = found; setPageAt((n) => n + 1); }
     };
     find();
@@ -106,9 +137,10 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
   }, []);
 
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [quote, setQuote] = useState<string | null>(null);
+  const [quote, setQuote] = useState<Quote | null>(null);
+  const table = isTablePath(src);
   const ranges = useRef(new Map<string, Range>());
-  const quotes = [...waiting, ...said].filter((n) => n.place.kind === 'quote').map((n) => ({ id: n.id, text: (n.place as { text: string }).text }));
+  const quotes = [...waiting, ...said].flatMap((n) => (n.place.kind === 'quote' ? [{ id: n.id, text: n.place.text, cell: n.place.cell }] : []));
   const quotesKey = JSON.stringify(quotes);
   useEffect(() => {
     const root = page.current;
@@ -144,6 +176,12 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
     el.style.height = 'auto';
     el.style.height = `${Math.min(el.scrollHeight, Math.round(window.innerHeight * 0.45))}px`;
   }, [words]);
+  useEffect(() => {
+    if (!asked) return;
+    setQuote(asked);
+    onAsked?.();
+    requestAnimationFrame(() => box.current?.focus());
+  }, [asked]);
   const canAttach = !!window.zero?.saveAttachments;
   const addFiles = async (list: FileList | File[] | null) => {
     if (!list?.length) return;
@@ -162,7 +200,7 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
       return;
     }
     const text = noteWithPictures(typed, links);
-    const place: NotePlace = quote ? { kind: 'quote', text: quote } : { kind: 'whole' };
+    const place: NotePlace = quote ? { kind: 'quote', ...quote } : { kind: 'whole' };
     const id = newId();
     const owner = whoseIsTheFile(files, version.id);
     const kept = { words, quote, pictures };
@@ -193,21 +231,15 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
 
   return (
     <aside ref={aside} className="sb" aria-label="Notes">
-      <div className="sb-head">
-        <span className="sb-title">Notes</span>
-        {waiting.length + said.length > 0 && <span className="sb-count">{waiting.length + said.length}</span>}
-        {authors.length > 0 && <span className="sb-faces">{authors.map((id) => <Face key={id ?? 'me'} person={person(id)} name={person(id) ? undefined : whoSaid(id)} me={!!me && id === me} />)}</span>}
-      </div>
+      <NotesHead count={waiting.length + said.length}
+        faces={authors.length > 0 && authors.map((id) => <Face key={id ?? 'me'} person={person(id)} name={person(id) ? undefined : whoSaid(id)} me={!!me && id === me} />)} />
       <div className="sb-list">
         {waiting.length > 0 && <>
-          <div className="sb-sec">
-            <span className="doc-outline-head">{canSend ? 'Unsent' : 'Notes'}</span>
-            {canSend && <button type="button" className="sb-send" onClick={() => void send()}><Glyph d="M2.5 8h9M8 4.5 11.5 8 8 11.5" />Send {waiting.length}</button>}
-          </div>
+          <NotesSection word={canSend ? 'Unsent' : 'Notes'} send={canSend ? { count: waiting.length, onSend: () => void send() } : undefined} />
           {waiting.map(note)}
         </>}
         {said.length > 0 && <>
-          <div className="sb-sec"><span className="doc-outline-head">{canSend ? 'Sent' : 'Notes'}</span></div>
+          <NotesSection word={canSend ? 'Sent' : 'Notes'} />
           {said.map(note)}
         </>}
       </div>
@@ -219,12 +251,12 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
           onDrop={canAttach ? (e) => { e.preventDefault(); void addFiles(e.dataTransfer.files); } : undefined}>
           {quote && (
             <div className="sb-write-quote">
-              <span className="sb-quote">{quote}</span>
-              <button type="button" className="sb-icon" aria-label="Note the whole page instead" title="Note the whole page instead" onClick={() => setQuote(null)}><Glyph d="M4 4l8 8M12 4l-8 8" /></button>
+              <Quoted quote={quote} />
+              <button type="button" className="sb-icon" aria-label={`Note the whole ${table ? 'table' : 'page'} instead`} title={`Note the whole ${table ? 'table' : 'page'} instead`} onClick={() => setQuote(null)}><Glyph d="M4 4l8 8M12 4l-8 8" /></button>
             </div>
           )}
           <textarea ref={box} rows={1} value={words} aria-label="Note"
-            placeholder={quote ? 'Your note on these words' : 'Add a note, or select words in the page'}
+            placeholder={quote ? 'Your note on these words' : table ? 'Add a note, or right-click a cell' : page.current ? 'Add a note, or select words in the page' : 'Add a note'}
             onChange={(e) => setWords(e.target.value)}
             onPaste={canAttach ? async (e) => {
               if (![...e.clipboardData.items].some((i) => i.kind === 'file')) return;
@@ -244,12 +276,12 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
             <span className="sb-spring" />
             <button type="submit" className="sb-add" title="Add note (return)" aria-label="Add note"
               disabled={(!words.trim() && !pictures.length) || sending || attaching.length > 0 || !!attachProblem(pictures)}>
-              <Glyph d="M12.5 3.5v5h-9M6 5.5 3.5 8.5 6 11.5" />
+              <ReturnGlyph />
             </button>
           </div>
         </div>
       </form>
-      <SelectionBar page={page} onComment={(q) => { setQuote(q); requestAnimationFrame(() => box.current?.focus()); }} />
+      <SelectionBar page={page} onComment={(q, at) => { setQuote({ text: q, cell: cellAround(at) }); requestAnimationFrame(() => box.current?.focus()); }} />
     </aside>
   );
 }
