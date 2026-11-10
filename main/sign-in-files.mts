@@ -32,25 +32,52 @@ export function claudeKeychainService(folder: string | null | undefined) {
   return folder ? `Claude Code-credentials-${createHash('sha256').update(folder).digest('hex').slice(0, 8)}` : 'Claude Code-credentials';
 }
 
-type Run = (cmd: string, args: string[], opts: { encoding: 'utf8'; timeout: number }, done: (err: Error | null, out: string) => void) => unknown;
+function mdatOf(out: unknown): number | null {
+  const m = /"mdat"<timedate>=\S*\s+"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})Z/.exec(String(out ?? ''));
+  return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) : null;
+}
+
+type RunLater = (cmd: string, args: string[], opts: { encoding: 'utf8'; timeout: number }, done: (err: Error | null, out: string) => void) => void;
 
 /**
- * When that Keychain entry last changed, or null when there is none. Without
- * -g or -w, `security` prints the entry's attributes and never its secret.
- * Asynchronous: on a swapping Mac `security` can take minutes, far past its
- * timeout, and the main thread must not wait for it.
+ * When that Keychain entry last changed, or null when there is none, handed to
+ * `done` later: `security` takes 0.1 to 2 s on a busy Mac, so it is never
+ * waited on. Without -g or -w it prints the entry's attributes, never its secret.
  */
-export function keychainStamp(service: string, run: Run = execFile as unknown as Run, platform: string = process.platform): Promise<number | null> {
-  if (platform !== 'darwin') return Promise.resolve(null);
-  return new Promise((resolve) => {
-    try {
-      run('/usr/bin/security', ['find-generic-password', '-s', service], { encoding: 'utf8', timeout: 3000 }, (err, out) => {
-        if (err) return resolve(null);
-        const m = /"mdat"<timedate>=\S*\s+"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})Z/.exec(String(out ?? ''));
-        resolve(m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) : null);
-      });
-    } catch { resolve(null); }
-  });
+export function keychainStampLater(service: string, done: (at: number | null) => void, run: RunLater = execFile as unknown as RunLater, platform: string = process.platform) {
+  if (platform !== 'darwin') { done(null); return; }
+  try {
+    run('/usr/bin/security', ['find-generic-password', '-s', service], { encoding: 'utf8', timeout: 3000 }, (err, out) => done(err ? null : mdatOf(out)));
+  } catch { done(null); }
+}
+
+/**
+ * The last answer for each Keychain entry, asked again in the background at
+ * most once per `everyMs`. `undefined` means no answer yet; `null`, no entry.
+ */
+export class KeychainStamps {
+  _known = new Map<string, { at: number | null; known: boolean; askedAt: number; asking: boolean }>();
+  _read: typeof keychainStampLater;
+  _everyMs: number;
+  _now: () => number;
+
+  constructor(read: typeof keychainStampLater = keychainStampLater, everyMs = 10_000, now: () => number = () => Date.now()) {
+    this._read = read;
+    this._everyMs = everyMs;
+    this._now = now;
+  }
+
+  get(service: string): number | null | undefined {
+    let entry = this._known.get(service);
+    if (!entry) { entry = { at: null, known: false, askedAt: -Infinity, asking: false }; this._known.set(service, entry); }
+    if (!entry.asking && this._now() - entry.askedAt >= this._everyMs) {
+      entry.asking = true;
+      entry.askedAt = this._now();
+      const e = entry;
+      this._read(service, (at) => { e.at = at; e.known = true; e.asking = false; });
+    }
+    return entry.known ? entry.at : undefined;
+  }
 }
 
 /** The newest modification time among them, or 0 when none can be read. */

@@ -177,7 +177,7 @@ import { catchUpRow, catchUpResult } from './catch-up.mts';
 import { isAuto, asksWho, routeCandidates, routePrompt, readRoute, routedPatch, orPrimary, NOBODY_WHY } from '../shared/auto-route.mts';
 import { LEVELS, latestMessage, sortMessage, wantsPriority } from './message-priority.mts';
 import { NAME, Name, envName, nameSlug, isOurSlug } from '../shared/product-name.mjs';
-import { signInFiles, signInStamp, claudeKeychainService, keychainStamp } from './sign-in-files.mts';
+import { signInFiles, signInStamp, claudeKeychainService, KeychainStamps } from './sign-in-files.mts';
 import { runsOn } from './runs-on.mts';
 import { MemoryGateServer, defaultSocketPath as memoryGateSocketPath, readMacPressure } from './memory-gate-server.mts';
 import { startDecision, readMacPressureNow, SETTLE_MS, STALE_MS } from './start-hold.mts';
@@ -1338,6 +1338,7 @@ export class Supervisor {
   declare _carried: Record<string, CarriedMark>;
   declare _profileTrouble: Record<string, ProfileTrouble>;
   declare _profileCooldown: Record<string, number>;
+  declare _keychainStamps: KeychainStamps | undefined;
   declare _profileStrikes: Record<string, number> | undefined;
   declare _movedWhy: Record<string, MovedWhy>;
   declare _movedToCloudAt: Record<string, number> | undefined;
@@ -1904,7 +1905,7 @@ export class Supervisor {
     for (const [key, trouble] of Object.entries(this._profileTrouble ?? {})) {
       if (trouble?.cause !== 'signed-out') continue;
       const stamp = this._signInMoment(key);
-      if (!stamp || stamp <= (trouble.stamp || trouble.at || 0)) continue;
+      if (!stamp || stamp <= (trouble.stamp ?? trouble.at ?? 0)) continue;
       trouble.stamp = stamp;
       if (this._profileCooldown) this._profileCooldown[key] = 0;
       if (!key.startsWith('codex:')) this._spawnCooldownUntil = 0;
@@ -1932,31 +1933,16 @@ export class Supervisor {
     const home = this.config.home || os.homedir();
     // The default login's entry is the real home's, not a stand-in home's.
     const keychain = folder || home === os.homedir() ? this._keychainStamp(claudeKeychainService(folder)) : null;
-    // Not read yet: `.claude.json` alone would look like a sign-in, so wait a tick.
-    if (keychain === undefined) return 0;
+    // Not read yet: `.claude.json` would be a guess, and a wrong one lifts the login.
+    if (keychain === undefined) return null;
     if (keychain == null) return signInStamp(files);
     return Math.max(keychain, signInStamp(files.filter((f) => path.basename(f) !== '.claude.json')));
   }
 
-  _keychainStamps: Record<string, number | null> = {};
-  _keychainAsking = new Set<string>();
-  _keychainRead = (service: string) => keychainStamp(service, undefined, this._keychainPlatform);
-  _keychainPlatform: string = process.platform;
-
-  /**
-   * The entry's date as last read, undefined before the first read lands. Each
-   * call starts a fresh read in the background unless one is still out, so the
-   * main thread never waits on `security`.
-   */
+  // In the background: run on every pass, a synchronous `security` call held the whole app ~0.3 s.
   _keychainStamp(service: string): number | null | undefined {
-    if (this._keychainPlatform !== 'darwin') return null;
-    if (!this._keychainAsking.has(service)) {
-      this._keychainAsking.add(service);
-      this._keychainRead(service)
-        .then((at) => { this._keychainStamps[service] = at; }, () => {})
-        .finally(() => this._keychainAsking.delete(service));
-    }
-    return Object.hasOwn(this._keychainStamps, service) ? this._keychainStamps[service] : undefined;
+    this._keychainStamps = this._keychainStamps ?? new KeychainStamps();
+    return this._keychainStamps.get(service);
   }
 
   /** Which files one account's login writes, by the key its trouble is kept under. */
@@ -5821,7 +5807,8 @@ export class Supervisor {
     // `_noticeSignIns` can tell a login landing afterwards from one before.
     if (cause === 'signed-out') {
       const stamp = this._signInMoment(profile);
-      this._profileTrouble[profile].stamp = Math.max(stamp, had?.stamp ?? 0);
+      if (stamp != null) this._profileTrouble[profile].stamp = Math.max(stamp, had?.stamp ?? 0);
+      else if (had?.stamp != null) this._profileTrouble[profile].stamp = had.stamp;
     }
     // When the limit says it resets, so `_forgetResetLimits` can let it go then.
     if (cause === 'at-limit') {

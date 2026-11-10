@@ -21,6 +21,7 @@ export { LOGIN_NAME };
 // file of a few hundred MB on a slow network takes minutes.
 export const CALL_MS = 100_000;
 const FILE_MS = 15 * 60_000;
+export const UPLOAD_STALL_MS = 60_000;
 const LINK_SECONDS = 12 * 60 * 60;
 // Lambda takes at most 6 MB; a call past this goes through the bucket.
 const RELAY_BYTES = 4 * 1024 * 1024;
@@ -88,6 +89,7 @@ export interface ManagedOptions {
   key: string;
   timeoutMs?: number;
   fileTimeoutMs?: number;
+  stallMs?: number;
   throttleMs?: number;
   onSignedOut?: () => void;
 }
@@ -105,24 +107,39 @@ const isLogin = (key: unknown) => String(key).startsWith('logins/');
 // whose answer has not begun within 300 s, counted while the body is still
 // going up, so a conversation of a few hundred MB on a slow uplink could never
 // be sent. A file is streamed from disk. Resolves with the bucket's status.
-function upload(link: string, body: { buffer: Buffer } | { file: string }, timeoutMs: number): Promise<number> {
+// It also ends after `stallMs` with no byte going out and no answer: a dead
+// connection otherwise holds a thread's start for the whole `timeoutMs`.
+// `bytesWritten` counts bytes still queued in Node, so what the system has
+// taken is that less the handle's queue. The last few MB the system buffers
+// are not seen leaving; at 16 Mbps they take about two seconds.
+function upload(link: string, body: { buffer: Buffer } | { file: string }, timeoutMs: number, stallMs: number): Promise<number> {
   const url = new URL(link);
   const length = 'file' in body ? fs.statSync(body.file).size : body.buffer.length;
   return new Promise((resolve, reject) => {
     const req = (url.protocol === 'https:' ? https : http).request(url, {
       method: 'PUT', headers: { 'content-length': length }, signal: AbortSignal.timeout(timeoutMs),
     }, (res) => {
+      clearInterval(watch);
       res.resume();
       res.on('end', () => resolve(res.statusCode ?? 0));
       res.on('error', reject);
     });
+    let sent = -1;
+    let movedAt = Date.now();
+    const watch = setInterval(() => {
+      const socket = req.socket as (typeof req.socket & { _handle?: { writeQueueSize?: number } | null }) | null;
+      const now = (socket?.bytesWritten ?? 0) - (socket?._handle?.writeQueueSize ?? 0);
+      if (now !== sent) { sent = now; movedAt = Date.now(); return; }
+      if (Date.now() - movedAt >= stallMs) req.destroy(new Error(`the upload stalled: nothing went out for ${Math.round(stallMs / 1000)} s`));
+    }, Math.min(5000, Math.max(50, stallMs / 4)));
+    req.on('close', () => clearInterval(watch));
     req.on('error', reject);
     if ('file' in body) pipeline(fs.createReadStream(body.file), req).catch(reject);
     else req.end(body.buffer);
   });
 }
 
-export function managedClients({ url, key, timeoutMs = CALL_MS, fileTimeoutMs = FILE_MS, throttleMs = THROTTLE_MS, onSignedOut = () => {} }: ManagedOptions) {
+export function managedClients({ url, key, timeoutMs = CALL_MS, fileTimeoutMs = FILE_MS, stallMs = UPLOAD_STALL_MS, throttleMs = THROTTLE_MS, onSignedOut = () => {} }: ManagedOptions) {
   const base = String(url).replace(/\/+$/, '');
 
   async function call(method: string, path: string, body?: unknown): Promise<CloudReply> {
@@ -195,11 +212,11 @@ export function managedClients({ url, key, timeoutMs = CALL_MS, fileTimeoutMs = 
 
   const storage: CloudStorage = {
     async put(k: string, body: string | Buffer) {
-      const status = await upload(await linkFor('put', k), { buffer: Buffer.from(body) }, fileTimeoutMs);
+      const status = await upload(await linkFor('put', k), { buffer: Buffer.from(body) }, fileTimeoutMs, stallMs);
       if (status < 200 || status > 299) throw new Error(`the bucket refused ${k}: ${status}`);
     },
     async putFile(k: string, file: string) {
-      const status = await upload(await linkFor('put', k), { file }, fileTimeoutMs);
+      const status = await upload(await linkFor('put', k), { file }, fileTimeoutMs, stallMs);
       if (status < 200 || status > 299) throw new Error(`the bucket refused ${k}: ${status}`);
     },
     async get(k: string) {
