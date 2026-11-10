@@ -4,6 +4,10 @@ const NOT_AN_ITEM = /^(key|it|one|token|computer|mac|laptop|machine|as|called|na
 
 export function keyPlaceIn(text) {
   // Every mention, not the first: a thread's title is cut off mid-sentence ("in my Keychain as…").
+  // "Keychain as X" first: in "PostHog from my Keychain as posthog-read-key" the word before is the service.
+  for (const m of text.matchAll(/keychain(?:\s+(?:item|entry))?[\s,]*(?:(?:as|called|named|under|has|holds)[\s:"“'`]+|[:"“'`]\s*)([A-Za-z0-9][\w.@-]*)/gi)) {
+    if (!NOT_AN_ITEM.test(m[1])) return { place: 'keychain', from: m[1].replace(/\.$/, '') };
+  }
   for (const m of text.matchAll(/([A-Za-z0-9][\w.@-]{2,})\s+(?:in|from)\s+(?:my\s+|your\s+|the\s+)?keychain/gi)) {
     if (!NOT_AN_ITEM.test(m[1])) return { place: 'keychain', from: m[1] };
   }
