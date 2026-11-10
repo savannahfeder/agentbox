@@ -1039,6 +1039,9 @@ const SIGNED_OUT_REST_MS = 5 * 60_000;
 const AT_LIMIT_REST_MS = 5 * 60_000;
 // How long past a limit's printed reset hour the fleet waits before trying.
 const LIMIT_RESET_GRACE_MS = 30_000;
+// A run on a capped login that lives this long shows the login has room
+// (Claude reports a weekly limit in about 35 s, Codex in about two minutes).
+const LIMIT_TRY_PROVES_MS = 3 * 60_000;
 // HOW LONG NOTHING MAY WORK BEFORE THE APP SAYS SO OUT LOUD.
 //
 // Twenty minutes is chosen against the backoff ladder above, not picked round:
@@ -1371,6 +1374,7 @@ export class Supervisor {
   declare _quitting: boolean | undefined;
   declare _sleeps: { from: number; to: number | null }[] | undefined;
   declare _spawnCooldownUntil: number | undefined;
+  declare _limitTries: Map<string, RunState> | undefined;
   declare _fastExits: number | undefined;
   declare _fleetTroubleSince: number | undefined;
   declare _lastFastExit: { at: number; cause: string; raw: string } | null | undefined;
@@ -1868,7 +1872,37 @@ export class Supervisor {
     // still capped, the next run dies in seconds and benches it to the reset
     // again. That try is the guard against a reset hour we read wrong, which
     // would otherwise park the fleet with every screen reading normal.
-    for (const account of Object.keys(this._profileCooldown ?? {})) this._profileCooldown[account] = 0;
+    // One try, so a login whose try is still running stays benched.
+    for (const account of Object.keys(this._profileCooldown ?? {})) {
+      if (!this._limitTries?.has(account)) this._profileCooldown[account] = 0;
+    }
+  }
+
+  /**
+   * A LIMIT HER HAND LIFTED BUYS ONE START, NOT ONE PER WAITING THREAD. The
+   * first start on it benches the login to its reset again, until that run
+   * lives LIMIT_TRY_PROVES_MS (`_noticeLimitTryLived`) or dies on the limit.
+   */
+  _spendLimitTry(engine: string, profile: string | null | undefined, session: RunState) {
+    const key = this._accountKey(engine, profile || 'default');
+    const trouble = this._profileTrouble?.[key];
+    if (trouble?.cause !== 'at-limit') return;
+    const now = Date.now();
+    const resetsAt = trouble.resetsAt ?? limitResetMoment(trouble.raw, trouble.at);
+    if (!resetsAt || resetsAt <= now || (this._profileCooldown?.[key] ?? 0) >= now) return;
+    this._profileCooldown[key] = resetsAt + LIMIT_RESET_GRACE_MS;
+    (this._limitTries ??= new Map()).set(key, session);
+  }
+
+  _noticeLimitTryLived() {
+    for (const [key, session] of this._limitTries ?? []) {
+      if (this.sessions.get(session.itemId ?? '') !== session) { this._limitTries!.delete(key); continue; }
+      if (Date.now() - (session.startedAt ?? Date.now()) < LIMIT_TRY_PROVES_MS || accountRefusedTheRun(session)) continue;
+      this._limitTries!.delete(key);
+      this._clearProfileTrouble(key);
+      this._saveState();
+      this.wake?.();
+    }
   }
 
   /**
@@ -8828,6 +8862,7 @@ export class Supervisor {
     // Has a login landed since an account was found signed out? Ahead of the
     // brake below, which would otherwise hold the fleet past the sign-in.
     try { this._noticeSignIns(); } catch (e) { console.warn('zero: could not look for a sign-in:', (e as Error).message); }
+    try { this._noticeLimitTryLived(); } catch (e) { console.warn('zero: could not check a capped login\'s try:', (e as Error).message); }
     try { this._forgetResetLimits(); } catch (e) { console.warn('zero: could not let a reset limit go:', (e as Error).message); }
     try { this._forgetLimitsOfAnOldPlan(); } catch (e) { console.warn('zero: could not read a login for a new plan:', (e as Error).message); }
     try { this._forgetRenewedSubscriptions(); } catch (e) { console.warn('zero: could not let a renewed subscription back in:', (e as Error).message); }
@@ -11729,6 +11764,7 @@ export class Supervisor {
       whyLocal:where === 'cloud' || plan.command ? null : whyLocal ?? this._whyLocal({ item, product, cwd, engine, remoteOnly }),
     } as WorkerSession;
     this._noteRunCarrying(item, session, { continuation });
+    if (!adopted) this._spendLimitTry(engine, profile, session);
     if (session.cloud) this._rememberCloudStart(item, session, { continuation });
     // The memory gate's clock counts starts on this Mac only: a cloud start
     // uses none of its memory (Codex's review, 2026-10-13).
