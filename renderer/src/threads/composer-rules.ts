@@ -79,7 +79,7 @@ const WINDOW = 40;
  * always has three rows under it.
  */
 export function recentModels(
-  items: ReadonlyArray<{ createdAt?: number; model?: string; engine?: string }>,
+  items: ReadonlyArray<{ createdAt?: number; model?: string; engine?: string; wrote?: { model?: { ts: number } | undefined } }>,
   { codexModels = [], codexDefault = null, codexOffered, claudeOffered = true, limit = 3 }:
     { codexModels?: readonly CodexRow[]; codexDefault?: string | null; codexOffered: boolean; claudeOffered?: boolean; limit?: number },
 ): ModelPick[] {
@@ -90,15 +90,18 @@ export function recentModels(
     seen.add(keyOf(p));
     out.push(p);
   };
+  // Dated by when the model was last set, not when the thread began: a model
+  // picked on a reply to an older thread is the newest pick.
+  const pickedAt = (i: (typeof items)[number]) => Math.max(i.createdAt ?? 0, i.wrote?.model?.ts ?? 0);
   const used = items
     .filter((i) => typeof i.model === 'string' && i.model)
-    .slice()
-    .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
+    .map((i) => ({ i, at: pickedAt(i) }))
+    .sort((a, b) => b.at - a.at)
     .slice(0, WINDOW)
-    .map((i) => {
+    .map(({ i, at }) => {
       const model = i.model as string;
       const engine: Harness = i.engine === 'codex' || i.engine === 'claude' ? i.engine : harnessOf(model, codexModels);
-      return { pick: { engine, model: engine === 'claude' ? claudeAliasOf(model) : model }, at: i.createdAt ?? 0 };
+      return { pick: { engine, model: engine === 'claude' ? claudeAliasOf(model) : model }, at };
     })
     .filter(({ pick }) => (pick.engine === 'codex' ? codexOffered : claudeOffered));
   const tally = new Map<string, { pick: ModelPick; count: number; last: number }>();
