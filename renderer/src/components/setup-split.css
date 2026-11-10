@@ -131,6 +131,9 @@
 .setup-split .ss-signin .si-or { margin: 16px 0; }
 .setup-split .ss-signin .si-terms { text-align: left; margin-top: 16px; font-size: 13px; color: var(--text-faint); }
 .setup-split .ss-signin .si-setup-switch { margin-top: 18px; font-size: 14px; color: var(--text-faint); }
+:root .setup-split .ss-signin .si-card { max-width: none; }
+.setup-split .ss-signin .si-card h1.ss-h { margin: 0 0 28px; font-size: 28px; line-height: 36px; font-weight: 400; }
+.setup-split .ss-signin .si-pw-show { height: 38px; font-size: 13px; color: var(--text-faint); }
 
 .setup-split .ss-signin .si-card h1 { margin: 0 0 6px; font-size: 28px; line-height: 36px; letter-spacing: -0.014em; }
 .setup-split .ss-signin .si-lede { margin: 0 0 28px; font-size: 15px; line-height: 22px; }

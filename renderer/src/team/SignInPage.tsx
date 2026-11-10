@@ -234,8 +234,11 @@ export function SignInPage({ onSkip, signedOut = false, error: startError = null
       {onSkip && <button type="button" className="si-skip-corner" onClick={onSkip}>Skip for now</button>}
       <div className="si-card">
         <span className="si-mark"><AppMark size={28} /></span>
-        <h1>{heading}</h1>
-        {mode === 'agree'
+        {inSetup && (mode === 'sign-up' || mode === 'sign-in')
+          // The setup's own two-line heading, as every other step has.
+          ? <h1 className="ss-h"><b>{mode === 'sign-up' ? 'Create your account.' : 'Sign in.'}</b>{mode === 'sign-up' ? 'Your team sees this name on your threads.' : 'With the account you already have.'}</h1>
+          : <h1>{heading}</h1>}
+        {inSetup && (mode === 'sign-up' || mode === 'sign-in') ? null : mode === 'agree'
           ? <p className="si-lede">You&rsquo;re new to {Name} Cloud. Read <TermsLinks />, then agree to finish.</p>
           : lede && <p className="si-lede">{lede}</p>}
 

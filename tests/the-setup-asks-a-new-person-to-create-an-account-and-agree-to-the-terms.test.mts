@@ -50,3 +50,9 @@ describe("the setup's Back", () => {
     expect(split).toMatch(/className="ss-back" onClick=\{back\}><svg/);
   });
 });
+
+describe("the account step's heading", () => {
+  it('is two lines like every other step, not the sign-in page own', () => {
+    expect(page).toContain("<h1 className=\"ss-h\"><b>{mode === 'sign-up' ? 'Create your account.' : 'Sign in.'}</b>");
+  });
+});
