@@ -124,6 +124,8 @@ export interface ComposeStart {
   handFrom?: HandFrom;
   /** The teammate's thread this one carries on: labelled on the new thread, and its owner told once it is sent. */
   continueFrom?: { personId: string; threadId: string };
+  /** The project it starts in, ahead of the default. */
+  product?: string | null;
   /** The box on the page moving into the dialog: the plain card's draft, wherever it is addressed. */
   moved?: boolean;
   /** A message's subject: it starts a thread of its own with those people. */
@@ -280,7 +282,7 @@ export function ThreadComposer({
 
   /* ----------------------------- project -------------------------------- */
   const offered = useMemo(() => projectsOffered(products), [products]);
-  const [productSlug, setProductSlug] = useState<string | null>(null);
+  const [productSlug, setProductSlug] = useState<string | null>(initial?.product ?? null);
   const pointedAt = cardProject(offered, { picked: productSlug, defaultProduct, remembered: rememberedProject() });
   const toCode = !productSlug && pointedAt ? codeProjectFor(text, offered, pointedAt.slug) : null;
   const product = toCode ?? pointedAt;

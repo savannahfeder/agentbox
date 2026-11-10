@@ -163,7 +163,8 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
     case 'pick':
       // "Close this task" is done, never sent: as a reply it would start a run to close it (App.tsx).
       if (closesTheTask(press.option.text)) return close();
-      return reply(`Option ${press.option.n}: ${press.option.text}`, press.choices ?? {}, `Option ${press.option.n} → ${to}`, `Option ${press.option.n} withdrawn, back in your inbox`);
+      return reply(`Option ${press.option.n}: ${press.option.text}`, press.choices ?? {},
+        `Picked: ${clipToSentence(press.option.text.replace(/\s*\(recommended\)\s*$/i, ''), TOAST_TITLE)}`, 'Pick withdrawn, back in your inbox');
     case 'close':
       return close();
     case 'later': {
@@ -192,7 +193,7 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
       };
     }
     case 'stop':
-      return { steps: [{ door: 'stopSession', payload: on }], toast: 'Stop sent. Your computer stops the agent when it gets it.' };
+      return { steps: [{ door: 'stopSession', payload: on }], toast: 'Stopping the agent' };
     case 'run-now':
       return { steps: [{ door: 'runNow', payload: on }], toast: waits ? 'Up next once your computer is back.' : 'Up next. It starts as soon as an agent is free.' };
     case 'move-to-cloud':

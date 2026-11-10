@@ -69,7 +69,7 @@ import { ReplyModel } from './ReplyModel';
 import type { ModelChoice } from '../models';
 import { sameRule, type RepeatShape as RepeatRuleValue } from '../../../shared/repeats.mts';
 import { fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
-import { onPictureLinks, pictureLinksVersion, pictureUrl, sentPictureLink } from '../picture';
+import { onPictureLinks, pictureLinksVersion, pictureUrl, sentPictureLink, wholeMediaPath, wholePicturePath } from '../picture';
 import { Listening, MicButton, useWebDictation } from './WebDictation';
 import { firstFrameSrc, playerShelf } from '../player-shelf';
 import { handleCopyOut, blockCopyText } from '../copy-out';
@@ -112,7 +112,8 @@ import { RichReply, type RichBox } from '../team/RichReply';
 import { OptionsOffer } from './OptionsOffer';
 import { foldedReply } from '../folded-reply';
 import { applyDockHeight } from '../dock-height';
-import { resumeTo } from '../thread-bottom';
+import { ClipGlyph, SendGlyph } from './reply-glyphs';
+import { bringIntoView, resumeTo } from '../thread-bottom';
 import { optionIsClipped, optionPeek } from '../option-peek';
 import { changedFiles, FOLDER_SETTLES_MS, folderMayStillMove, onlyNamedFiles, shipOfferFor, shipOfferLive, standingFrom, UNREAD, type ChangedFile, type Standing } from '../ship-offer';
 import { MOVED_PX, THE_OPTIONS_MOVED, clickLandsOnTheRowYouSaw } from '../pick-settles';
@@ -265,7 +266,7 @@ export function ArtifactImg({ src, alt, roots, onOpen, find }: {
     return () => clearTimeout(timer);
   }, [broken, tries]);
   const again = (url: string) => (tries ? `${url}?look=${tries}` : url);
-  const relative = !!src && !/^(data|https?|file):/.test(src) && !src.startsWith('/');
+  const relative = !!src && !/^(data|https?|file):/.test(src) && wholePicturePath(src) === null;
   const exhausted = relative && attempt >= roots.length;
   useEffect(() => {
     // A whole path written on a teammate's computer is not on this one: the
@@ -334,8 +335,9 @@ export function ArtifactImg({ src, alt, roots, onOpen, find }: {
   // A chat draws its pictures as previews (team/chat.css), a thread at reading width.
   const maxHeight = direct ? 240 : undefined;
   const minWidth = direct ? 360 : 760;
-  if (/^file:\/\//.test(src) || src.startsWith('/')) {
-    const file = src.startsWith('/') ? src : decodeURIComponent(src.slice(7));
+  const whole = wholePicturePath(src);
+  if (whole !== null) {
+    const file = whole;
     if (found) return door(found, <FittedImg maxHeight={maxHeight} minWidth={minWidth} src={pictureUrl(found)} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" />);
     if (broken && direct) return <CarriedNote src={file} always />;
     if (broken) return <button type="button" className="missing-artifact" title="Look for it again" onClick={() => { setTries(tries + 1); setBroken(false); }}>missing image: {file}</button>;
@@ -426,7 +428,8 @@ export function ArtifactMedia({ src, label, roots, onOpen, find }: { src: string
   // or has still to come, and fills in when it lands.
   const [found, setFound] = useState<string | null>(null);
   const [looks, setLooks] = useState(0);
-  const candidates = found ? [pictureUrl(found)] : src.startsWith('/') ? [pictureUrl(src)] : roots.map((r) => pictureUrl(`${r}/${rel}`));
+  const whole = wholeMediaPath(src);
+  const candidates = found ? [pictureUrl(found)] : whole !== null ? [pictureUrl(whole)] : roots.map((r) => pictureUrl(`${r}/${rel}`));
   const looked = candidates.join('\n');
   const missing = attempt >= candidates.length;
   useEffect(() => {
@@ -1256,9 +1259,12 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
 
   // A close raises its question at the foot of the thread, which is off
   // screen whenever the reader has scrolled up (w-23de8a26c0).
+  // When it stands at the filed task instead, the conversation brings it.
   const closeAskRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (closeAsk) closeAskRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (!closeAsk || askAtTask) return;
+    const box = closeAskRef.current?.closest('.focus-scroll') as HTMLElement | null;
+    return bringIntoView(box, () => closeAskRef.current, { block: 'nearest' });
   }, [closeAsk?.raised]);
 
   // THE OPTION UNDER THE POINTER, IN FULL, IN A CARD OVER THE MESSAGE. The
@@ -1315,7 +1321,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     // a change for it, so there is nothing to ask for.
     if (agent) return () => { live = false; };
     const read = () => {
-      api.codeChange({ product: item.product, src: changePathFor(item.id) })
+      api.codeChange({ product: item.product, src: changePathFor(item.id), summary: true })
         .then((r) => {
           if (!live) return;
           setFigures(r?.ok ? figuresFrom(r.change) : null);
@@ -1482,7 +1488,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         const note = href && !/^(https?|data):/.test(href) ? voiceNoteOf(href) : null;
         if (href && note) {
           const rel = href.replace(/^\.\//, '');
-          const urls = href.startsWith('/') ? [pictureUrl(href)] : roots.map((r) => pictureUrl(`${r}/${rel}`));
+          const whole = wholeMediaPath(href);
+          const urls = whole !== null ? [pictureUrl(whole)] : roots.map((r) => pictureUrl(`${r}/${rel}`));
           return <VoiceNote key={href} id={`${product}:${rel}`} ms={note.ms} load={() => firstFound(urls)} />;
         }
         // A SOUND OR A FILM PLAYS IN PLACE (ArtifactMedia, above).
@@ -2792,9 +2799,11 @@ function SlashMenu({ rows, at, onPick, onHover }: {
  *  underline, no box and no icon. The menu is `.prio-menu`, the same list the
  *  priority and the engine already open. Nothing new is drawn.
  */
-function ModePicker({ value, options, label, onChange, onEscape, chip = false }: {
+function ModePicker({ value, options, label, onChange, onEscape, chip = false, folded = false }: {
   /** Drawn as the new thread card's chip. */
   chip?: boolean;
+  /** Out of sight in a reply bar too narrow for it; Shift+Tab still changes the mode. */
+  folded?: boolean;
   value: string;
   options: Array<{ value: string; label: string }>;
   label: string;
@@ -2816,7 +2825,7 @@ function ModePicker({ value, options, label, onChange, onEscape, chip = false }:
   useEffect(() => (open ? escapeClosesMenu(window, () => { setOpen(false); onEscape?.(); }) : undefined), [open]);
   const now = options.find((o) => o.value === value);
   return (
-    <span className="compose-word-wrap" ref={wrap}>
+    <span className={`compose-word-wrap mode-pick${folded ? ' folded' : ''}`} ref={wrap}>
       {open && (
         <span className="prio-menu model-menu" role="listbox" aria-label={label}>
           {options.map((o) => (
@@ -2843,7 +2852,9 @@ function ModePicker({ value, options, label, onChange, onEscape, chip = false }:
       >
         {/* TITLE CASE, with "Mode" after it capitalised too: "In Auto Mode."
             Settled on w-86dd93ab0d. */}
-        {(now?.label ?? value).replace(/(^|\s)\S/g, (c) => c.toUpperCase())}
+        {chip
+          ? <span className="tc-chip-label">{titleCase(now?.label ?? value)}</span>
+          : titleCase(now?.label ?? value)}
       </button>
     </span>
   );
@@ -3335,6 +3346,20 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   // The level this thread is set to, for the footer, or null when it is set to
   // nothing and the engine is choosing.
   const levelSaid = effortSaid({ model, effort }, { engine: runningEngine, codexModels, codexDefault: codexModelDefault });
+  // The mode chip is the first thing a narrow bar gives up, before the model's
+  // name is shortened. Measured, not guessed from the width: the names differ.
+  const chipsRef = useRef<HTMLSpanElement>(null);
+  const [modeFolded, setModeFolded] = useState(false);
+  useLayoutEffect(() => {
+    const chips = chipsRef.current;
+    if (!chips || typeof ResizeObserver === 'undefined') return;
+    const check = () => setModeFolded(chipsOverflow(chips));
+    check();
+    const seen = new ResizeObserver(check);
+    seen.observe(chips);
+    document.fonts?.ready.then(check);
+    return () => seen.disconnect();
+  }, [running, model, effort, engineShown, levelSaid]);
   // The drawer has been open at least once, so a close is really a close and
   // not the first render reporting that it is shut.
   const drawerWasOpen = useRef(false);
@@ -3689,12 +3714,13 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             exactly the footer it had. */}
         {talkTo?.length ? <FormatBar box={ref} onChange={changeText} onAttach={pickFiles} onFromFiles={(f) => setAttachments((a) => [...a, f])} onVoice={addVoice} onNotice={onNotice}
           voiceKey={`direct:${item.product}:${item.id}`} voice={voiceCtl} onRecording={setRecording} /> : null}
-        {item.agent ? <span className="compose-clauses"><span className="dim">Goes straight into {item.agent.name}.</span></span> : talkTo?.length ? null : <span className="dock-chips">
+        {item.agent ? <span className="compose-clauses"><span className="dim">Goes straight into {item.agent.name}.</span></span> : talkTo?.length ? null : <span className="dock-chips" ref={chipsRef}>
             <PriorityPicker variant="chip" value={shown} set={!!prio} onChange={setPrio} title="Priority" />
             {repeat && <WhenPicker value={{ runAt: 0, repeat }} onChange={(v) => setRepeat(v.repeat)} only="repeat" empty="Runs once" />}
             {canSetMode && (
               <ModePicker
                 chip
+                folded={modeFolded}
                 label="What this message may do"
                 value={running}
                 options={claudeCode
@@ -3707,7 +3733,8 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             )}
             <ReplyModel
               chip
-              label={`${engineModelLabel(engineShown, model, modelOpts)}${levelSaid ? ` · ${levelSaid}` : ''}`}
+              label={engineModelLabel(engineShown, model, modelOpts)}
+              level={levelSaid}
               pick={pick}
               onPick={pickModel}
               recent={recent}
@@ -3800,15 +3827,16 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   );
 }
 
-const ClipGlyph = () => (
-  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-    <path d="m20 11.5-8.2 8.2a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.4 8.4a1.7 1.7 0 0 1-2.4-2.4l7.7-7.7" />
-  </svg>
-);
+/** Whether the chips, every one at its full width, folded mode included, are wider than their room. */
+function chipsOverflow(chips: HTMLElement): boolean {
+  if (!chips.clientWidth) return false;
+  const kids = [...chips.children] as HTMLElement[];
+  const gap = parseFloat(getComputedStyle(chips).columnGap) || 0;
+  const whole = kids.reduce((sum, kid) => {
+    const cut = [...kid.querySelectorAll<HTMLElement>('.tc-chip-label')].reduce((c, l) => c + l.scrollWidth - l.clientWidth, 0);
+    return sum + kid.offsetWidth + cut;
+  }, 0) + gap * Math.max(0, kids.length - 1);
+  return whole > chips.clientWidth + 0.5;
+}
 
-// Drawn only when the reply box is too narrow for the word (narrow-conversation.css).
-const SendGlyph = () => (
-  <svg className="dock-send-arrow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M12 19V5M6 11l6-6 6 6" />
-  </svg>
-);
+const titleCase = (s: string) => s.replace(/(^|\s)\S/g, (c) => c.toUpperCase());

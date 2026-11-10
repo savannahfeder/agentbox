@@ -147,7 +147,7 @@ function SearchScreen() {
           </View>
         </View>
       </View>
-      <StatusNotice message={c.status} />
+      <StatusNotice message={c.status} next={c.statusNext} />
       <FlatList
         data={all ? found : found.slice(0, THREADS_SHOWN)}
         keyExtractor={(h) => h.key}

@@ -7,15 +7,15 @@
 //   own default answered instead (the card always names the Claude model);
 // - it chose a project once, on open, so a page opened before the projects
 //   arrived had none, and one whose project went stayed pointed at it;
-// - it forgot the project, model and level on every open, where the card
-//   remembers each the moment it is picked;
+// - it forgot the model and level on every open, where the card remembers
+//   each the moment it is picked (the project is now forgotten on purpose);
 // - a level, once picked, could not be cleared.
 // And a Send pressed twice while files upload could send twice. These pin the
 // app's rules (mobile/src/lib/compose.ts) to the card's, with the cases that
 // must not pass: a level the model does not take, and a remembered project
 // that is gone.
 import { describe, it, expect } from 'vitest';
-import { litEffort, newThreadChoices, onceAtATime, openingChoices, pickEffort, pickModel, pickProject, projectNow } from '../mobile/src/lib/compose';
+import { litEffort, newThreadChoices, onceAtATime, openingChoices, pickEffort, pickModel, projectNow } from '../mobile/src/lib/compose';
 import { DEFAULT_MODEL } from '../renderer/src/models';
 
 function memory(start = {}) {
@@ -44,32 +44,21 @@ describe('what a new thread sends', () => {
 });
 
 describe('which project it goes to', () => {
-  it('opens on the project you last sent to', () => {
+  // Changed 2026-11-08: the phone's testers sent their next task to the last
+  // one's project without noticing, so a pick is for that thread alone.
+  it('opens on the first project, whatever was sent to last', () => {
     const store = memory({ 'zero.lastProduct': 'beta' });
-    expect(openingChoices([P('alpha'), P('beta')], store).product).toBe('beta');
-  });
-
-  it('falls back to the first when the remembered one is gone', () => {
-    const store = memory({ 'zero.lastProduct': 'gone' });
     expect(openingChoices([P('alpha'), P('beta')], store).product).toBe('alpha');
   });
 
   it('has none until projects arrive, then the first, with nothing picked in between', () => {
-    const store = memory();
-    expect(projectNow([], null, store)).toBeNull();
-    expect(projectNow([P('alpha'), P('beta')], null, store)).toBe('alpha');
+    expect(projectNow([], null)).toBeNull();
+    expect(projectNow([P('alpha'), P('beta')], null)).toBe('alpha');
   });
 
   it('a pick stands while its project is there, and falls back when it goes', () => {
-    const store = memory();
-    expect(projectNow([P('alpha'), P('beta')], 'beta', store)).toBe('beta');
-    expect(projectNow([P('alpha')], 'beta', store)).toBe('alpha');
-  });
-
-  it('a pick is remembered for the next new thread', () => {
-    const store = memory();
-    pickProject(store, 'beta');
-    expect(openingChoices([P('alpha'), P('beta')], store).product).toBe('beta');
+    expect(projectNow([P('alpha'), P('beta')], 'beta')).toBe('beta');
+    expect(projectNow([P('alpha')], 'beta')).toBe('alpha');
   });
 });
 
