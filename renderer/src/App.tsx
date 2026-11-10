@@ -263,7 +263,7 @@ import { SkyBackdrop } from './home/SkyBackdrop';
 import { InboxSky } from './home/InboxSky';
 import { SKY_THEME_KEY, setHomeSetting, useDarkWindow, useHomeSettings } from './home/home-settings';
 import { setupStartsOn } from './setup-split';
-import { SKY_THEMES, skyTheme } from './home/sky';
+import { MATCH_SKY, SKY_THEMES, skyTheme, wornSky } from './home/sky';
 import { engineLetter, engineName, greeting, teamRowState, weekCounts } from './home/home-model';
 import { sentFrom } from './team/company';
 import { reachAudienceOf } from '../../shared/teammate-reach.mts';
@@ -977,6 +977,7 @@ export default function App() {
   // Light, Dark and Match system take any sky theme off; a sky theme brings its own look.
   const chooseLook = useCallback((next: Look) => { setHomeSetting(SKY_THEME_KEY, null); setLook(next); }, [setLook]);
   const chooseSkyTheme = useCallback((id: string) => {
+    if (id === MATCH_SKY) { setLook('match'); setHomeSetting(SKY_THEME_KEY, MATCH_SKY); return; }
     const k = skyTheme(id);
     if (!k) return;
     setLook(k.dark ? 'ember-grid' : 'light');
@@ -2957,8 +2958,7 @@ export default function App() {
   const [homeOpen, setHomeOpen] = useState(homeOn);
   const darkWindow = useDarkWindow();
   // A sky theme is worn only while the window wears its look.
-  const skyPicked = homeOn ? skyTheme(homeSet.skyTheme) : null;
-  const sky = skyPicked && skyPicked.dark === darkWindow ? skyPicked : null;
+  const sky = homeOn ? wornSky(homeSet.skyTheme, darkWindow) : null;
   useEffect(() => {
     const root = document.documentElement;
     if (sky?.frame) { root.dataset.skyFrame = sky.id; root.style.setProperty('--sky-frame', sky.frame); }

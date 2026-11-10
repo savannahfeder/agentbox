@@ -69,7 +69,7 @@ import { CloudMark, MacMark } from '../threads/ThreadMenu';
 import './settings.css';
 import { SkyTile } from '../home/SkyPicker';
 import { useHomeSettings } from '../home/home-settings';
-import { SKY_THEMES } from '../home/sky';
+import { MATCH_SKY, SKY_THEMES } from '../home/sky';
 
 /* * TEAM IS A PANE HERE (w-8415594d19, 2026-10-01). The pane's CONTENT is
  handed in as `teamPane` rather than imported, so this screen, which is shared
@@ -1763,7 +1763,8 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
   const homeSet = useHomeSettings();
   // A phone has no skies (App.tsx's `homeOn`).
   const skies = !onPhone();
-  const skyOn = skies ? homeSet.skyTheme : null;
+  // The pair that follows the Mac is Match my system's tile, not a sky of its own.
+  const skyOn = skies && homeSet.skyTheme !== MATCH_SKY ? homeSet.skyTheme : null;
   const sidebarShrinks = useSidebarShrinks();
   const [model, setModel] = useState<SettingsModel | null>(null);
   // ?settings=claude, or ?settings=project:kestrel. Anything else (including the

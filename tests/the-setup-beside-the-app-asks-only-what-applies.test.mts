@@ -154,11 +154,11 @@ describe('the keyboard while the setup is open', () => {
 describe('the look a new install starts on', () => {
   // The founder: "For macs in dark mode the onboarding will be default dark
   // orange and light mode will be the light green sky".
-  it('wears the dark orange sky on a Mac in dark mode', () => {
-    expect(setupStartsOn({ sky: null, dark: true })).toBe('ember');
-  });
-  it('wears the light green sky on a Mac in light mode', () => {
-    expect(setupStartsOn({ sky: null, dark: false })).toBe('sage');
+  // As the pair that follows the Mac since w-fbe5e95dea (2026-11-10): she
+  // switched macOS to light during the setup and it stayed dark.
+  it('wears the pair: dark orange on a dark Mac, light green on a light one', () => {
+    expect(setupStartsOn({ sky: null, dark: true })).toBe('match');
+    expect(setupStartsOn({ sky: null, dark: false })).toBe('match');
   });
   it('keeps a sky someone already chose', () => {
     expect(setupStartsOn({ sky: 'dusk', dark: false })).toBeNull();

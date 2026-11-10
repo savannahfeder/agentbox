@@ -2,6 +2,8 @@
 // the right filling in. The rules, with no React, so
 // tests/the-setup-beside-the-app-asks-only-what-applies.test.mjs reads them.
 
+import { MATCH_SKY } from './home/sky';
+
 export type SetupStep = 'chats' | 'folder' | 'account' | 'invite' | 'teammates' | 'look';
 
 /** Only the steps that can apply on this build: most people are not on a team,
@@ -92,9 +94,9 @@ export function tabStop(count: number, at: number, back: boolean): number {
   return (at + (back ? count - 1 : 1)) % count;
 }
 
-/** The sky a new install starts in: dark orange on a Mac in dark mode, light green in light, unless someone already chose. */
-export function setupStartsOn({ sky, dark }: { sky: string | null; dark: boolean }): string | null {
-  return sky ? null : dark ? 'ember' : 'sage';
+/** The sky a new install starts in, unless someone already chose one: the pair that follows the Mac. */
+export function setupStartsOn({ sky }: { sky: string | null; dark?: boolean }): string | null {
+  return sky ? null : MATCH_SKY;
 }
 
 /** The walkthrough's place: the lit row or one past what is done, whichever is further. */

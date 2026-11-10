@@ -99,9 +99,9 @@ export function normalizeSavedLook(store: {
     if (theme !== l.theme) store.setItem(THEME_KEY, l.theme);
     if (skin !== l.skin) store.setItem(SKIN_KEY, String(l.skin));
   };
-  // A new Mac gets the default, whatever its own light or dark setting says.
-  // A new install starts in the computer's own light or dark, then keeps it.
-  if (theme === null && skin === null) return put(machine === 'dark' ? DEFAULT_SKIN : 'light');
+  // A new install follows the computer's own light or dark until somebody picks a look.
+  void machine;
+  if (theme === null && skin === null) return put('match');
   if (skin && LIGHT_PICTURES.includes(skin)) return put('light');
   if (skin && skin !== 'none') return put('ember-grid');
   if (theme === 'light') return put('light');
@@ -292,7 +292,9 @@ export function seedFirstRunLook(store: {
   setItem(k: string, v: string): void;
 }, themeKey: string, machine: 'light' | 'dark' = 'dark'): { theme: 'light' | 'dark' | 'match'; skin: SkinChoice } | null {
   if (store.getItem(themeKey) !== null || store.getItem(SKIN_KEY) !== null) return null;
-  const look = lookMeans(machine === 'dark' ? DEFAULT_SKIN : 'light');
+  // Match, so the window follows the Mac until somebody picks a look.
+  void machine;
+  const look = lookMeans('match');
   store.setItem(themeKey, look.theme);
   store.setItem(SKIN_KEY, String(look.skin));
   return look;

@@ -14,7 +14,8 @@ import type { SessionThread } from '../agent-import-card';
 import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { starterAsks } from '../../../shared/teammates.mts';
-import { SKY_THEMES, drawSky } from '../home/sky';
+import { MATCH_SKY, SKY_THEMES, drawSky, wornSky } from '../home/sky';
+import { useDarkWindow } from '../home/home-settings';
 import { tabStop, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupStep } from '../setup-split';
 import FolderPicker from './FolderPicker';
 import { SignInPage } from '../team/SignInPage';
@@ -52,13 +53,14 @@ const Check = ({ on }: { on: boolean }) => <span className={`ss-check${on ? ' ss
 /** A sky drawn small on a strip, the way the window wears it. */
 function Strip({ look }: { look: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const sky = SKY_THEMES.find((s) => s.id === look);
+  const dark = useDarkWindow();
+  const sky = look === MATCH_SKY ? wornSky(MATCH_SKY, dark) : SKY_THEMES.find((s) => s.id === look);
   useEffect(() => { if (ref.current && sky) drawSky(ref.current, sky.art, { from: 0, span: 6 }); }, [sky]);
   if (look === 'light') return <span className="ss-strip ss-strip-light" />;
   if (look === 'dark') return <span className="ss-strip ss-strip-dark" />;
   return <span className="ss-strip" style={sky?.frame ? { background: sky.frame } : undefined}><canvas ref={ref} /></span>;
 }
-const LOOK_NAME = (id: string) => (id === 'light' ? 'Light' : id === 'dark' ? 'Dark' : SKY_THEMES.find((s) => s.id === id)?.name ?? id);
+const LOOK_NAME = (id: string) => (id === MATCH_SKY ? 'Match my system' : id === 'light' ? 'Light' : id === 'dark' ? 'Dark' : SKY_THEMES.find((s) => s.id === id)?.name ?? id);
 
 export interface SetupSplitProps {
   snap: Snapshot | null;

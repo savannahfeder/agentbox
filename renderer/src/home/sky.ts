@@ -59,6 +59,15 @@ export function skyTheme(id: string | null | undefined): Sky | null {
   return SKY_THEMES.find((s) => s.id === id) ?? null;
 }
 
+/** The pair a new install starts on: dark orange on a dark Mac, light green on a light one. */
+export const MATCH_SKY = 'match';
+
+/** The sky on screen: the pair follows the Mac, and any other sky shows only in its own light or dark. */
+export function wornSky(id: string | null | undefined, dark: boolean): Sky | null {
+  const k = id === MATCH_SKY ? skyTheme(dark ? 'ember' : 'sage') : skyTheme(id);
+  return k && k.dark === dark ? k : null;
+}
+
 const BAYER = [0, 32, 8, 40, 2, 34, 10, 42, 48, 16, 56, 24, 50, 18, 58, 26, 12, 44, 4, 36, 14, 46, 6, 38, 60, 28, 52, 20, 62, 30, 54, 22, 3, 35, 11, 43, 1, 33, 9, 41, 51, 19, 59, 27, 49, 17, 57, 25, 15, 47, 7, 39, 13, 45, 5, 37, 63, 31, 55, 23, 61, 29, 53, 21];
 
 /** Paints `art` into `canvas` at its CSS size. Dots start at `from` px and are
