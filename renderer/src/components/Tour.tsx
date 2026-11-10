@@ -150,7 +150,7 @@ function readScreen(view: string, thread: boolean, covered: boolean, palette: bo
     thread,
     preparing: stillPreparing({ thread, onPage: !!document.querySelector('.one-catching-up'), ready: document.querySelectorAll(ROWS).length, writing: document.querySelectorAll('.list-pane .row[data-catching-up]').length }),
     typing: thread && !!document.activeElement?.closest('.dock-card'),
-    busy: thread && !!document.querySelector('.live-word.is-shimmering'),
+    busy: thread && !!document.querySelector('.live-word.is-shimmering, .live-brief.live-queued'),
     menu: !!document.querySelector('.tc-menu'),
     options: !!document.querySelector('.opt-row'),
     palette,

@@ -207,7 +207,7 @@ export function SetupSplit(p: SetupSplitProps) {
       e.stopPropagation();
       if (e.key === 'Enter' && !e.shiftKey && !busy) {
         const enter = (e.target as Element).getAttribute('data-ss-enter');
-        if (typing && enter === 'add') { e.preventDefault(); addEmail(); return; }
+        if (typing && enter === 'add') { e.preventDefault(); if (typed.trim()) addEmail(); else primary.current(); return; }
         if (typing && !(e.metaKey || e.ctrlKey)) return;
         e.preventDefault(); primary.current();
       }
