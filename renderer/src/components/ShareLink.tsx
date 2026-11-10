@@ -17,7 +17,7 @@ export async function afterSharing(hadLink: boolean, copyIt: () => Promise<boole
 }
 
 /** The kinds a link can draw, as main/file-link.mts linkKindOf names them. */
-export const canShareFile = (src: string) => /\.(md|markdown|html?|png|jpe?g|gif|webp|svg|pdf)$/i.test(String(src ?? '').split(/[?#]/)[0]);
+export const canShareFile = (src: string) => /\.(md|markdown|csv|tsv|html?|png|jpe?g|gif|webp|svg|pdf|mp4|m4v|mov|webm)$/i.test(String(src ?? '').split(/[?#]/)[0]);
 
 /** What the panel offers: the live link, and whether it holds an older copy than the one on screen. */
 export function linkOffer(state: FileLinkState | null) {

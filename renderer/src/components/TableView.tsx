@@ -19,6 +19,7 @@ import {
 } from '../table-edit';
 import { api } from '../api';
 import { MAC } from '../this-keyboard';
+import type { TableCell } from '../types';
 import { gridOf, isSeeded, putGrid, seedGrid } from '../live/table-doc';
 import type { LiveSession } from '../live/live-session';
 import { LiveFaces } from '../live/presence';
@@ -92,8 +93,8 @@ const hoverText = (kind: ColumnKind, v: string, link: CellLink | null) => {
 
 // One row, told only what of the pick touches it, so a move redraws two rows and not fifty.
 // A ranked file's own rank stands where the row number goes, so a list is not numbered twice.
-const Row = memo(function Row({ table, row, r, n, c0, c1, at, whole, hands }: {
-  table: Table; row: string[]; r: number; n: number | null; c0: number; c1: number; at: number; whole: boolean; hands: boolean;
+const Row = memo(function Row({ table, row, r, fileRow, n, c0, c1, at, whole, hands }: {
+  table: Table; row: string[]; r: number; fileRow: number; n: number | null; c0: number; c1: number; at: number; whole: boolean; hands: boolean;
 }) {
   return <div className="tbl-tr" role="row">
     {(n !== null || table.ranked) && (
@@ -107,7 +108,8 @@ const Row = memo(function Row({ table, row, r, n, c0, c1, at, whole, hands }: {
       const sel = i >= c0 && i <= c1;
       const link = cellLink(table, row, i);
       return <div key={i} className={`tbl-td${cellClass(kind, !!link)}${hands && wraps(table.columns[i]) ? ' wrap' : ''}${sel ? ' sel' : ''}${i === at ? ' at' : ''}`} role="cell"
-        data-r={hands ? r : undefined} data-c={hands ? i : undefined} title={hoverText(kind, v, link)}>
+        data-r={hands ? r : undefined} data-c={hands ? i : undefined}
+        data-row={hands ? fileRow + 1 : undefined} data-col={hands ? table.columns[i].name : undefined} title={hoverText(kind, v, link)}>
         <CellBody table={table} col={i} row={row} value={v} link={link} />
         {hands && i === (table.ranked ? 1 : 0) && <button type="button" className="tbl-open" tabIndex={-1} aria-label="Open this row" title="Open this row (Space)">{OPEN}</button>}
       </div>;
@@ -679,7 +681,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   /** Reads the file again, for when it changed on disk under an edit. */
   onReload?: () => void;
   /** Comments on a cell's words, where the view takes comments. */
-  onComment?: (quote: string) => void;
+  onComment?: (quote: string, cell: TableCell) => void;
   /** Says a save failed after the table was closed, when there is no table left to say it. */
   onNotice?: (text: string) => void;
   /** What the widths, sort and filter are kept under: two projects can each have a lists/leads.csv. */
@@ -1181,7 +1183,13 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
       goTo({ a: to, b: to });
     }
     // Not when a double click has already opened the next edit: the keys would take its focus and close it.
-    requestAnimationFrame(() => { if (!open.current) focusKeys(); });
+    // Nor when the box was left for one outside the table, such as a comment on the words picked in it.
+    requestAnimationFrame(() => {
+      if (open.current) return;
+      const at = document.activeElement;
+      if (at && at !== keys.current && typingIn(at) && !root.current?.contains(at)) return;
+      focusKeys();
+    });
   };
 
   // ---- The keys, while the table holds them.
@@ -1667,7 +1675,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
             const row = table.rows[i];
             if (!row) return null;
             const on = !!sel && r >= sel.r0 && r <= sel.r1;
-            return <Row key={i} table={table} row={row} r={r} n={inline ? null : r + 1} hands={hands}
+            return <Row key={i} table={table} row={row} r={r} fileRow={i} n={inline ? null : r + 1} hands={hands}
               c0={on ? sel!.c0 : -1} c1={on ? sel!.c1 : -2} at={pick && pick.a.r === r ? pick.a.c : -1} whole={on && wholeRows} />;
           })}
           {!preview && end < order.length && <div className="tbl-gap" style={{ height: (order.length - end) * rowH }} />}
@@ -1683,7 +1691,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
             ? { top: drop.at - 1, width: (box.current?.querySelector('.tbl-grid') as HTMLElement | null)?.offsetWidth }
             : { left: drop.at - 1, height: (box.current?.querySelector('.tbl-grid') as HTMLElement | null)?.offsetHeight }} />}
         {peek && one && (
-          <div className="tbl-peek" title={editable ? 'Double-click or press Enter to edit' : undefined}
+          <div className="tbl-peek" data-row={order[one.r] + 1} data-col={table.columns[one.c].name} title={editable ? 'Double-click or press Enter to edit' : undefined}
             style={{ left: peek.left, width: peek.w, minHeight: rowH, maxHeight: peek.most, ...(peek.up ? { top: peek.top + rowH, transform: 'translateY(-100%)' } : { top: peek.top }) }}
             // A click that selected no words goes to the cell under it, so the box never stands in the way of the next row.
             onClick={(e) => {
@@ -1706,7 +1714,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
                   onDraft={(v) => { if (open.current) open.current = { ...open.current, draft: v }; }}
                   onPick={(v, move) => endEdit(v, move)} onClose={() => endEdit(null)} />}
             </div>
-            : <div className="tbl-edit" style={{ left: place.left, top: place.top, width: place.w }}>
+            : <div className="tbl-edit" data-row={order[editing.r] + 1} data-col={table.columns[editing.c].name} style={{ left: place.left, top: place.top, width: place.w }}>
               <GrowingText className="tbl-edit-box" value={editing.draft} autoFocus caretAtEnd readOnly={!editable} label={table.columns[editing.c].name}
                 onChange={(v) => setEditing((x) => (x ? { ...x, draft: v } : x))}
                 // Rows copied from a spreadsheet into an empty cell go across the table, not into the one cell.
@@ -1766,6 +1774,14 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
           {!editable && wrapRow(float.col!)}
         </FloatMenu>
         : <FloatMenu x={float.x} y={float.y} onClose={() => setFloat(null)}>
+          {/* Not closeFloat: that hands the keys back to the table, away from the note box. */}
+          {onComment && pick && atValue.trim() && <>
+            <MenuRow label="Comment" onClick={() => {
+              setFloat(null);
+              onComment(atValue.trim(), { row: order[pick.a.r] + 1, column: table.columns[pick.a.c].name });
+            }} />
+            <span className="when-sep" />
+          </>}
           <MenuRow label="Open row" hint="Space" onClick={() => { if (pick) setSheet(pick.a.r); closeFloat(); }} />
           {pick && <MenuRow label={editable ? 'Edit cell' : 'Read cell'} hint="↵" onClick={() => { closeFloat(); startEdit(pick.a); }} />}
           <MenuRow label="Copy" hint={`${CMD}C`} onClick={() => { focusKeys(); document.execCommand('copy'); closeFloat(); }} />
@@ -1779,7 +1795,6 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
               window.open(atLink.href, '_blank', 'noreferrer');
             }} />
           )}
-          {onComment && atValue.trim() && <MenuRow label="Comment" onClick={() => { onComment(atValue.trim()); closeFloat(); }} />}
           {editable && sel && <>
             <span className="when-sep" />
             <MenuRow label="Insert row above" onClick={() => { closeFloat(); addRowAt(sel.r0); }} />

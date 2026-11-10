@@ -46,6 +46,7 @@ import type { LedgerLine } from '../thread-history';
 import type { TraceSession } from '../notes';
 import { withEveryRun } from '../every-run';
 import { keepPlace, placeKey, placeToReturnTo } from '../thread-place';
+import { bringIntoView } from '../thread-bottom';
 import { arrivedAt } from '../unread';
 import type { AgentTurn, FileMarkLink, RunningSession, WorkItem } from '../types';
 import { ActLine, Thread, ThreadWaiting, answerTurn } from './Thread';
@@ -299,7 +300,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
       // writes it the moment it exits. Without this she would have to leave the
       // row and come back before a file she watched being edited became
       // pressable.
-      api.codeChange({ product: item.product, src: changePathFor(item.id) })
+      api.codeChange({ product: item.product, src: changePathFor(item.id), summary: true })
         .then((r) => {
           if (!live) return;
           const files = (r?.ok ? (r.change as Change | undefined)?.files : null) ?? [];
@@ -323,12 +324,17 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
   // A note on a file names its version by the number Files gives it.
   const fileLine = useFileLine(item.product, item.id, ledger?.lines?.length ?? 0, false);
 
-  // The rows move as the unfolded thread loads, so it scrolls again as they land.
+  // Once per raise, from the first render that has drawn the question; it
+  // follows the question while the unfolded thread loads above it.
+  const brought = useRef<{ raised: number; release: () => void } | null>(null);
   useEffect(() => {
-    if (!closeAsk) return;
-    const frame = requestAnimationFrame(() => askRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
-    return () => cancelAnimationFrame(frame);
+    if (!closeAsk || brought.current?.raised === closeAsk.raised) return;
+    const box = askRef.current?.closest('.focus-scroll') as HTMLElement | null;
+    if (!box) return;
+    brought.current?.release();
+    brought.current = { raised: closeAsk.raised, release: bringIntoView(box, () => askRef.current) };
   }, [!!closeAsk, closeAsk?.raised, earlierOpen, everyRun.length, ledger?.lines?.length]);
+  useEffect(() => () => { brought.current?.release(); brought.current = null; }, [item.product, item.id]);
 
   if (!ledger) return <ThreadWaiting head="Reading this conversation…" />;
   if (ledger.error) return <div className="thread-wait">{ledger.error}</div>;
