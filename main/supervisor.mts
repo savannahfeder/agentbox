@@ -84,7 +84,7 @@ import { isUrgent, itemPriority, normalizeOrder, orderFromTiers, placedScore, pr
 import { keysForAgents } from '../shared/shortcuts.mts';
 import { isCleanRun, ruleIdOf, nextRunAt, periodKey, occurrenceId } from '../shared/repeats.mts';
 import { occurrenceFields } from './repeats.mts';
-import { teammateIdOf, mentionsIn, teammatesOn, primaryOf, OFFER_LABEL, CHAT_LABEL, howYourRunEnds } from '../shared/teammates.mts';
+import { teammateIdOf, mentionsIn, teammatesOn, primaryOf, OFFER_LABEL, CHAT_LABEL, howYourRunEnds, roomToLookBack } from '../shared/teammates.mts';
 import { REACH_LABEL } from '../shared/teammate-reach.mts';
 import { mayRunHere } from '../shared/team-rules.mts';
 
@@ -1461,6 +1461,7 @@ export class Supervisor {
 
   declare _codexCards: ReturnType<typeof createCodexApprovals> | undefined;
   declare _codexLimits: CodexUsage | undefined;
+  declare _usageSeen: Record<string, { limits: { span?: string; percent?: number | null }[]; at: number }> | undefined;
   declare _codexServers: Map<string, CodexServerEntry> | undefined;
 
   constructor(config: SupervisorConfig, store: SupervisorStore, appDir: string, dataDir = appDir, userDir = dataDir) {
@@ -5964,6 +5965,7 @@ export class Supervisor {
     const key = this._accountKey(DEFAULT_ENGINE, profile || 'default');
     const trouble = this._profileTrouble?.[key];
     const limits = reading?.limits ?? [];
+    if (limits.length) (this._usageSeen ??= {})[profile || 'default'] = { limits, at: reading!.at ?? 0 };
     if (!trouble || !limits.length) return false;
     if ((reading!.at ?? 0) < (trouble.at ?? trouble.since ?? 0)) return false;
     const proven = (!onlyLimit && ['signed-out', 'org-blocked', 'subscription-ended', 'unknown'].includes(trouble.cause as string))
@@ -9337,7 +9339,7 @@ export class Supervisor {
       return out;
     };
     try {
-      const done = await teammates.tick({ items, now, deliver, tell });
+      const done = await teammates.tick({ items, now, deliver, tell, room: (engine: string | null) => this._roomToLookBack(engine, now) });
       if (done.length) this.onChange?.();
     } catch (err) {
       teammates.noteTrouble?.(`Teammates could not wake: ${(err as Error).message}`, now);
@@ -9348,6 +9350,14 @@ export class Supervisor {
         .catch((err: Error) => teammates.noteTrouble?.(`A message to a person could not be sent: ${err.message}`, now))
         .finally(() => { this._reaching = null; this.onChange?.(); });
     }
+  }
+
+  // The Claude reading is the picked login's (or the first), which is the one
+  // the usage corner reads; a look-back on a rotating Mac may bill another.
+  _roomToLookBack(engine: string | null, now = Date.now()) {
+    if (engineOf(this._engineFor({ engine } as WorkItem)) !== DEFAULT_ENGINE) return roomToLookBack(this.codexUsage(), now);
+    const profile = this._theOneAccount(DEFAULT_ENGINE, this._profiles())[0] ?? 'default';
+    return roomToLookBack(this._usageSeen?.[profile], now);
   }
 
   async serveRepeats(now = Date.now()) {
