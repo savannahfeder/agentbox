@@ -8,6 +8,10 @@
 // were being held (main/start-hold.mts), the app's own processes, every task's
 // programs with what they hold, and the biggest programs that are not ours.
 //
+// A program's size is its footprint (`top`'s MEM, what Activity Monitor
+// shows), not `ps` rss: rss leaves out compressed and swapped memory, and on
+// 2026-11-09 the log summed the whole Mac to 7 GB while it swapped 15 GB.
+//
 // It stays on this computer. Nothing here is sent anywhere.
 //
 // A program belongs to the task of the nearest process at or above it that
@@ -16,6 +20,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFile } from 'node:child_process';
 import { listProcesses } from './leftovers.mts';
 import type { ProcessRecord } from './leftovers.mts';
 import { readMacPressure } from './memory-gate-server.mts';
@@ -36,6 +41,32 @@ export interface MemoryLogOptions {
   now?: () => number;
   facts?: () => Record<string, unknown> | null | undefined;
   keepDays?: number;
+  footprints?: () => Promise<Map<number, number>> | Map<number, number>;
+}
+
+const UNIT: Record<string, number> = { B: 1 / 1048576, K: 1 / 1024, M: 1, G: 1024 };
+
+/** `top -l 1 -stats pid,mem` as MB by pid. Pure. */
+export function footprintsFromTop(out: string): Map<number, number> {
+  const fp = new Map<number, number>();
+  for (const line of String(out ?? '').split('\n')) {
+    const m = /^\s*(\d+)\s+([\d.]+)([BKMG])[+-]?\s*$/.exec(line);
+    if (m) fp.set(Number(m[1]), Number(m[2]) * UNIT[m[3]]);
+  }
+  return fp;
+}
+
+/**
+ * Each program's footprint, which is what Activity Monitor shows. `ps` rss
+ * leaves out compressed and swapped memory, so it reads lowest exactly when
+ * the Mac is shortest.
+ */
+export function readFootprints(platform: string = process.platform): Promise<Map<number, number>> {
+  if (platform !== 'darwin') return Promise.resolve(new Map());
+  return new Promise((resolve) => {
+    execFile('/usr/bin/top', ['-l', '1', '-stats', 'pid,mem'], { timeout: 15_000, maxBuffer: 8 * 1024 * 1024 },
+      (_err, stdout) => resolve(footprintsFromTop(String(stdout ?? ''))));
+  });
 }
 
 const name = (exe: unknown) => String(exe ?? '').split('/').filter(Boolean).pop() || String(exe ?? '');
@@ -104,14 +135,17 @@ export class MemoryLog {
   declare now: () => number;
   declare facts: NonNullable<MemoryLogOptions['facts']>;
   declare keepDays: number;
+  declare footprints: NonNullable<MemoryLogOptions['footprints']>;
   declare _pruned: string | null;
   declare _busy?: boolean;
 
   constructor({
     dir, appPid = process.pid, list = listProcesses, readPressure = readMacPressure,
     now = Date.now, facts = () => ({}), keepDays = KEEP_DAYS,
+    // Footprints are by pid of this Mac, so they only belong over its own listing.
+    footprints = list === listProcesses ? readFootprints : () => new Map(),
   }: MemoryLogOptions) {
-    Object.assign(this, { dir, appPid, list, readPressure, now, facts, keepDays });
+    Object.assign(this, { dir, appPid, list, readPressure, now, facts, keepDays, footprints });
     this._pruned = null;
   }
 
@@ -120,14 +154,16 @@ export class MemoryLog {
     if (this._busy) return;
     this._busy = true;
     try {
-      const [procs, reading] = await Promise.all([
+      const [listed, reading, fp] = await Promise.all([
         Promise.resolve().then(() => this.list()).catch(() => []),
         Promise.resolve().then(() => this.readPressure()).catch(() => ({})),
+        Promise.resolve().then(() => this.footprints()).catch(() => new Map<number, number>()),
       ]);
+      const procs = fp.size ? listed.map((p) => (fp.has(p.pid) ? { ...p, mb: fp.get(p.pid)! } : p)) : listed;
       const at = this.now();
       let facts: Record<string, unknown> = {};
       try { facts = this.facts() ?? {}; } catch { /* the line goes without them */ }
-      const line = { ...summarizeMemory(procs, { appPid: this.appPid, at, reading }), ...facts };
+      const line = { ...summarizeMemory(procs, { appPid: this.appPid, at, reading }), measure: fp.size ? 'footprint' : 'rss', ...facts };
       fs.mkdirSync(this.dir, { recursive: true });
       fs.appendFileSync(path.join(this.dir, `memory-${dayOf(at)}.jsonl`), `${JSON.stringify(line)}\n`);
       this._prune(at);

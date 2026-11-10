@@ -794,6 +794,12 @@ export const api = {
     if (!zero?.fileLinkComments) return { ok: false, error: 'not here' };
     return zero.fileLinkComments(p);
   },
+  /** A file someone shared by its link, brought into one of this person's projects as their own copy. */
+  async bringSharedFile(p: { link: string; product: string | null }): Promise<{ ok: boolean; error?: string; product?: string; id?: string; src?: string }> {
+    const zero = window.zero;
+    if (!zero?.bringSharedFile) return { ok: false, error: `quit and reopen ${NAME} to bring in shared files` };
+    return zero.bringSharedFile(p);
+  },
   async fileLinkComment(p: { token: string; text: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }> {
     const zero = window.zero;
     if (!zero?.fileLinkComment) return { ok: false, error: `quit and reopen ${NAME} to answer comments` };
@@ -811,7 +817,8 @@ export const api = {
   //
   // An older preload has never heard of it, and then the pane says so rather
   // than drawing an empty change.
-  async codeChange(p: { product: string; src: string }): Promise<{ ok: boolean; change?: unknown; error?: string }> {
+  // `summary` leaves out the diff's rows (main/code-change.mts readChangeSummary).
+  async codeChange(p: { product: string; src: string; summary?: boolean }): Promise<{ ok: boolean; change?: unknown; error?: string }> {
     if (useFixtures && p.src === 'review-bundle.change') return {ok:true,change:reviewSampleChange};
     if (useFixtures && p.src === 'artifact-layout-sample.change') return {ok:true,change:artifactSampleChange};
     const zero = window.zero;

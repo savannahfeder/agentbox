@@ -507,3 +507,25 @@ export function readChange(file: string): SavedChange {
   if (!parsed || !Array.isArray(parsed.files)) throw new Error('that file is not a change');
   return parsed;
 }
+
+export type ChangeSummary = Omit<SavedChange, 'files'> & { files: Omit<ChangedFile, 'hunks'>[] };
+
+const summaries = new Map<string, { mtimeMs: number; size: number; summary: ChangeSummary }>();
+const KEEP_SUMMARIES = 200;
+
+/**
+ * A saved change without its rows, for the readers that poll it while a run
+ * goes (file names, counts, the ship facts). A change can be tens of MB, so it
+ * is parsed once per version of the file, not once per ask.
+ */
+export function readChangeSummary(file: string): ChangeSummary {
+  const st = fs.statSync(file);
+  const hit = summaries.get(file);
+  if (hit && hit.mtimeMs === st.mtimeMs && hit.size === st.size) return hit.summary;
+  const { files, ...rest } = readChange(file);
+  const summary: ChangeSummary = { ...rest, files: files.map(({ hunks: _rows, ...f }) => f) };
+  summaries.delete(file);
+  summaries.set(file, { mtimeMs: st.mtimeMs, size: st.size, summary });
+  if (summaries.size > KEEP_SUMMARIES) summaries.delete(summaries.keys().next().value!);
+  return summary;
+}
