@@ -299,7 +299,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
       // writes it the moment it exits. Without this she would have to leave the
       // row and come back before a file she watched being edited became
       // pressable.
-      api.codeChange({ product: item.product, src: changePathFor(item.id) })
+      api.codeChange({ product: item.product, src: changePathFor(item.id), summary: true })
         .then((r) => {
           if (!live) return;
           const files = (r?.ok ? (r.change as Change | undefined)?.files : null) ?? [];

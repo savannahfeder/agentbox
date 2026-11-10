@@ -1312,7 +1312,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     // a change for it, so there is nothing to ask for.
     if (agent) return () => { live = false; };
     const read = () => {
-      api.codeChange({ product: item.product, src: changePathFor(item.id) })
+      api.codeChange({ product: item.product, src: changePathFor(item.id), summary: true })
         .then((r) => {
           if (!live) return;
           setFigures(r?.ok ? figuresFrom(r.change) : null);

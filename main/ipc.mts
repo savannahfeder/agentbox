@@ -49,7 +49,7 @@ import { readDoc, writeDoc } from './doc-file.mts';
 import { linkCopyOf, linkSource } from './file-link.mts';
 import { familyKeyOf, type Mark } from '../shared/artifact-marks.mts';
 import { readItemHistory } from './store/work-items.mts';
-import { readChange } from './code-change.mts';
+import { readChange, readChangeSummary } from './code-change.mts';
 import { findFile, readCodeFile, writeCodeFile } from './code-file.mts';
 import { readNote, writeNote } from './rail-note.mts';
 import { teamForWindow } from './team/index.mts';
@@ -2763,7 +2763,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
 
   // THE CHANGE A RUN MADE. Same finder as every other artifact, so a click on
   // the chip and a click on a path in her message open the same file.
-  ipcMain.handle('zero:code-change', async (_e, { product, src }: { product: string; src?: unknown }) => {
+  ipcMain.handle('zero:code-change', async (_e, { product, src, summary }: { product: string; src?: unknown; summary?: boolean }) => {
     const found = await resolveArtifact({
       src,
       product,
@@ -2773,7 +2773,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     });
     if (!found.ok) return found;
     try {
-      return { ok: true, change: readChange(found.path) };
+      return { ok: true, change: summary ? readChangeSummary(found.path) : readChange(found.path) };
     } catch (e) {
       return { ok: false, error: `that change could not be read (${(e as Error).message})` };
     }
