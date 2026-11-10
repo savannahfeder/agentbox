@@ -9,6 +9,7 @@ import type { BridgeStateEvent } from './task-remote-control.mts';
 import { taskFolderPath, real, restoreTaskFolder } from './task-folders.mts';
 import { SHIP_LABEL, ShipQueue, readShipSettings, shipScriptFor, shipSlot } from './ship-queue.mts';
 import { MainTests } from './main-went-red.mts';
+import { SecurityScan } from './the-security-scan-went-red.mts';
 import { folderJob } from './task-folders-offthread.mts';
 import { gitJob } from './git-change-offthread.mts';
 import { queuedReplyText, submitReply, framedPick, framedTeammate } from './live-replies.mts';
@@ -1222,6 +1223,7 @@ export class Supervisor {
   declare onShipped: () => void;
   declare shipQueue: ShipQueue;
   declare mainTests: MainTests;
+  declare securityScan: SecurityScan;
   declare sessions: Map<string, WorkerSession>;
   declare onChange: (() => void) | null;
   declare onRecovered: ((news: RecoveryNews) => void) | null;
@@ -1444,6 +1446,7 @@ export class Supervisor {
     // agent has ended its turn, so main was red for four days in October with
     // nobody reading the cross (main/main-went-red.mts).
     this.mainTests = new MainTests({ store, userDir });
+    this.securityScan = new SecurityScan({ store, userDir });
     this._compactionJobs = new Map();
     this.sessions = new Map(); // itemId -> {child, product, startedAt, tail, itemId}
     // Spawns waiting on their row's folder, and folders made for the spawn that
@@ -1897,6 +1900,7 @@ export class Supervisor {
     if (!shipped?.sha || !shipped?.product) return;
     try {
       this.mainTests.watch(shipped as ShippedNote & { sha: string }).catch(() => {});
+      this.securityScan.watch(shipped as ShippedNote & { sha: string }).catch(() => {});
     } catch { /* a watch that cannot start is not a ship that failed */ }
   }
 
@@ -1904,6 +1908,7 @@ export class Supervisor {
     clearInterval(this._timer ?? undefined);
     clearInterval(this._memoryLogTimer);
     this.mainTests?.stop();
+    this.securityScan?.stop();
     // The shared `codex app-server` goes with them. An orphaned one keeps every
     // thread it is holding alive after the supervisor that answers their
     // approvals has gone, which is the 2026-08-06 orphan incident in the other
