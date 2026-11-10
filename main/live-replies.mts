@@ -46,6 +46,8 @@ export interface ReplySession {
     interrupt?(): Promise<unknown> | undefined;
   };
   remoteIdle?: boolean;
+  /** A cloud session between turns, waiting for this reply. */
+  between?: boolean;
   engine?: string;
   sessionId?: string;
   lastLiveReply?: ReplyItem | null;
@@ -57,12 +59,16 @@ export interface ReplySupervisor {
   _replySends?: Map<string, Promise<unknown>>;
   sessions?: Map<string, ReplySession>;
   replyFiles?(product: string, answer: string, engine: string | undefined, id: string): { block?: string; pictures?: unknown[] } | null | undefined;
+  /** What a session that finished its turn is told with a reply, as a new run would be. */
+  nextReplyBrief?(product: string, id: string, answer: string): string;
   _handledAnswers: Set<string>;
   _answerKey(item: ReplyItem): string;
   _noteHeard?(item: ReplyItem, sessionId: string | undefined): unknown;
   _saveState(): unknown;
   redeliverAnswer(item: ReplyItem, answer: string | null | undefined): unknown;
   deliverMidflightReply(item: ReplyItem, files: null): unknown;
+  /** Answer the sign-in card the run is waiting on, so the wait ends and the reply can be taken. */
+  endSignInWait?(product: string, id: string): unknown;
 }
 
 export interface ReplyPayload {
@@ -85,8 +91,12 @@ export function submitReply(supervisor: ReplySupervisor, payload: ReplyPayload, 
   const previous = sends.get(key) ?? Promise.resolve();
   const session = supervisor.sessions?.get(id);
   // A reply set for later waits in the ledger for its time, never in a session.
+  // Between turns a slash command, a new permission mode or a teammate's word
+  // is saved instead, and the tick ends the wait so a new run takes it.
+  const between = !!session?.between && typeof supervisor.nextReplyBrief === 'function';
   const live = !later && session?.product === product && typeof session.child?.steer === 'function'
-    && !(from && session.remoteIdle)
+    && !(from && (session.remoteIdle || session.between))
+    && !(session?.between && (permissionMode != null || String(answer ?? '').trimStart().startsWith('/')))
     && status !== 'done' && typeof answer === 'string' && answer.trim() && answer !== '(withdrawn)';
   // Observe rejections immediately, including when an earlier reply is still
   // waiting. The ordered commit below rethrows them to their own caller.
@@ -94,13 +104,18 @@ export function submitReply(supervisor: ReplySupervisor, payload: ReplyPayload, 
     if (!live) return;
     if (permissionMode != null) throw Error('A running turn keeps its current permissions. Stop it before sending with a different permission mode.');
     if (answer.trimStart().startsWith('/') && !session.remoteIdle) throw Error('Wait for the current turn to finish before running a slash command.');
+    // An agent waiting on a sign-in card calls sign_in again every 50 seconds,
+    // so its step never ends and a reply queued behind it is never taken.
+    if (!session.remoteIdle && !between && !from) supervisor.endSignInWait?.(product, id);
     // A held Remote Control conversation is sitting idle rather than working,
     // and the slash commands it takes stop being commands once prose is wrapped
     // round them. Both reach it exactly as typed.
     const files = session.remoteIdle ? null : supervisor.replyFiles?.(product, answer, session.engine, id);
     const taken = session.remoteIdle
       ? session.child!.steer!(answer)
-      : session.child!.steer!(liveReplyBrief(answer, files?.block), files?.pictures ?? []);
+      : between
+        ? session.child!.steer!(supervisor.nextReplyBrief!(product, id, answer))
+        : session.child!.steer!(liveReplyBrief(answer, files?.block), files?.pictures ?? []);
     // SENT NOW: her words go in line first, then the step is cut, in the same
     // tick, so the cut turn's result can never close the input ahead of them.
     // A cut that fails leaves the message waiting its turn, which is still sent.

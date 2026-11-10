@@ -1,8 +1,12 @@
 // A FILE SHARED BY ITS LINK, as the web app reads it: <site>/f/<token>.
 // The database side is cloud/supabase/migrations/20261105000001_a_file_anyone_with_its_link_can_read.sql.
 
-export type Rpc = (name: string, args: Record<string, unknown>) => Promise<any>;
-export type FileKind = 'markdown' | 'page' | 'image' | 'pdf';
+export type Rpc = (name: string, args: Record<string, unknown>) => Promise<unknown>;
+export type FileKind = 'markdown' | 'page' | 'image' | 'pdf' | 'video';
+
+// The rows the database's functions answer with, as JSON; checked field by field below.
+interface LinkRow { name?: string; kind: FileKind; type?: string; body?: string; version?: number; created_at: string; updated_at: string; owner_name?: unknown; owner_avatar?: unknown; mine?: boolean }
+interface CommentRow { id: string; by_name?: unknown; by_avatar?: unknown; body?: string; created_at: string; mine?: boolean; by_owner?: boolean }
 
 export interface SharedFile {
   name: string;
@@ -39,11 +43,11 @@ export function sharedFileToken(pathname: string, onTheWebApp: boolean): string 
   return PATH.exec(pathname.replace(/^\/F\//, '/f/'))?.[1] ?? null;
 }
 
-const KINDS = new Set<FileKind>(['markdown', 'page', 'image', 'pdf']);
+const KINDS = new Set<FileKind>(['markdown', 'page', 'image', 'pdf', 'video']);
 
 export async function readSharedFile(rpc: Rpc, tok: string): Promise<Shown> {
   if (!/^[A-Za-z0-9_-]{16,64}$/.test(tok)) return { state: 'unknown' };
-  const rows = await rpc('file_link_view', { tok });
+  const rows = await rpc('file_link_view', { tok }) as LinkRow[] | null;
   const r = Array.isArray(rows) ? rows[0] : null;
   if (r && KINDS.has(r.kind)) {
     return {
@@ -62,7 +66,7 @@ export async function readSharedFile(rpc: Rpc, tok: string): Promise<Shown> {
 }
 
 export async function readComments(rpc: Rpc, tok: string): Promise<FileComment[]> {
-  const rows = await rpc('file_link_comments_of', { tok });
+  const rows = await rpc('file_link_comments_of', { tok }) as CommentRow[] | null;
   return (Array.isArray(rows) ? rows : []).map((r) => ({
     id: String(r.id), byName: (typeof r.by_name === 'string' && r.by_name.trim()) || 'Someone',
     byAvatar: typeof r.by_avatar === 'string' && /^https:/.test(r.by_avatar) ? r.by_avatar : null,
@@ -105,11 +109,41 @@ export function sharedLine(file: Pick<SharedFile, 'ownerName' | 'updatedAt'> & {
   return `Shared by ${who} · ${updated ? 'updated ' : ''}${sharedOn(file.updatedAt, now)}`;
 }
 
+/** A film's link holds the list of its pieces (main/file-link.mts); null for anything else. */
+export function filmOf(file: Pick<SharedFile, 'kind' | 'body'>): { pieces: number; size: number; hash: string } | null {
+  if (file.kind !== 'video') return null;
+  try {
+    const { pieces, size, hash } = JSON.parse(file.body) as { pieces?: unknown; size?: unknown; hash?: unknown };
+    if (!Number.isInteger(pieces) || (pieces as number) < 1 || !Number.isInteger(size) || typeof hash !== 'string' || !/^[0-9a-f]{40}$/.test(hash)) return null;
+    return { pieces: pieces as number, size: size as number, hash };
+  } catch { return null; }
+}
+
+/** A film's bytes, piece by piece in order; null when a piece is missing. */
+export async function readFilm(
+  piece: (name: string) => Promise<Uint8Array | null>, token: string, film: { pieces: number; hash: string },
+  onProgress: (done: number) => void = () => {},
+): Promise<Uint8Array[] | null> {
+  const parts: Uint8Array[] = [];
+  for (let n = 0; n < film.pieces; n++) {
+    const got = await piece(`${token}/${film.hash}/${n}`);
+    if (!got) return null;
+    parts.push(got);
+    onProgress((n + 1) / film.pieces);
+  }
+  return parts;
+}
+
+/** A table goes up as text, as a document does (main/file-link.mts); its type tells them apart. */
+export const isTable = (file: { kind: string; type?: string }): boolean =>
+  file.kind === 'markdown' && /^text\/(csv|tab-separated-values)$/i.test(file.type ?? '');
+
 /**
  * The words over the file. A document's own first heading is its title, so the
  * page does not lead with "competitor-research.md"; `body` is the rest of it.
  */
-export function titleOf(file: Pick<SharedFile, 'name' | 'kind' | 'body'>): { title: string; body: string } {
+export function titleOf(file: Pick<SharedFile, 'name' | 'kind' | 'body'> & { type?: string }): { title: string; body: string } {
+  if (isTable(file)) return { title: file.name, body: file.body };
   if (file.kind === 'markdown') {
     const m = /^\s*#[ \t]+(.+?)[ \t]*#*[ \t]*(?:\r?\n|$)/.exec(file.body);
     if (m) return { title: m[1], body: file.body.slice(m[0].length) };

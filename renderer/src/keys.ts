@@ -23,7 +23,7 @@
 // "later" and is the one key that schedules. The paragraph above still
 // describes what goes wrong, with L in place of S: it is the key that opens
 // the picker that has to be swallowed, whichever letter that is.
-export const OPENS_A_TEXT_FIELD = new Set(['r', 'l', 'c', 'n', '/']);
+export const OPENS_A_TEXT_FIELD = new Set(['r', 'l', 'c', 'n']);
 
 export function opensATextField(key: string): boolean {
   return OPENS_A_TEXT_FIELD.has(key.toLowerCase());

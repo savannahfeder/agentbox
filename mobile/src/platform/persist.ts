@@ -10,7 +10,7 @@ import { ALERTS_KEY } from '../lib/push-device';
 import { syncStore } from '../lib/drafts';
 import type { Persist } from '../lib/kept';
 
-const KEYS = ['agentbox-cloud-session', 'agentbox-cloud-verifier', ALERTS_KEY, NOTICE_KEY];
+const KEYS = ['agentbox-cloud-session', 'agentbox-cloud-verifier', 'agentbox-cloud-reset', ALERTS_KEY, NOTICE_KEY];
 
 export const persist: Persist = Platform.OS === 'web'
   ? {

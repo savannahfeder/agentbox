@@ -11,9 +11,10 @@
 import { catchUpDue } from '../../shared/agent-import.mts';
 import { liveLine, shortWord, type LiveFacts } from './live-line';
 import { STATE_WORD, stateWordOf } from './threads/summary-rules';
-import { threadState } from '../../shared/thread-cards.mjs';
+import { threadState } from '../../shared/thread-cards.mts';
 import { closedUnshipped, notShippedLine, shippedAs } from '../../shared/not-shipped.mts';
-import { asksWho, isAuto } from '../../shared/auto-route.mjs';
+import { asksWho, isAuto } from '../../shared/auto-route.mts';
+import { saysARunGotNowhere } from '../../shared/spawn-trouble.mts';
 import type { ThreadStateWord, WorkItem } from './types';
 import type { Fleet } from './fleet';
 import { whyWords, type WhyCard } from './where-why';
@@ -84,7 +85,7 @@ export function statusCell(item: WorkItem, facts: StatusFacts = {}): StatusCell 
     return plain(stateWordOf(item, state), 'done');
   }
   if (catchUpDue(item)) return says('Getting ready', 'queued', false, 'This chat is being summarized so you can answer it.');
-  // Sent to Auto and not given to anyone yet (shared/auto-route.mjs). Ahead of
+  // Sent to Auto and not given to anyone yet (shared/auto-route.mts). Ahead of
   // Stopped: a thread that asks her is on the supervisor's stalled list, and no
   // agent died on it.
   if (isAuto(item)) {
@@ -139,6 +140,10 @@ export function statusCell(item: WorkItem, facts: StatusFacts = {}): StatusCell 
     return waiting ? { ...cell, why } : cell;
   }
   if (state === 'waiting' && shipped) return shipped;
+  // The app's own note that a run got nowhere is not an answer.
+  if (state === 'waiting' && item.wrote?.result?.source === 'agent' && saysARunGotNowhere(item.result)) {
+    return says('Stopped', 'held', true, String(item.result).split('\n')[0]);
+  }
   return plain(stateWordOf(item, state), state === 'waiting' ? 'need' : 'queued');
 }
 

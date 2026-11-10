@@ -80,7 +80,7 @@ export function ModelMenu({
       type="button"
       data-item
       className={`tc-row ${same(p, pick) ? 'on' : ''}`}
-      onPointerEnter={onHover}
+      onPointerMove={onHover}
       onClick={() => onPick(p)}
     >
       <span className="tc-row-label">{labelOf(p)}</span>
@@ -93,12 +93,12 @@ export function ModelMenu({
         <span className="tc-menu-head">Recent</span>
         {recent.map((p) => row(p, engineTags))}
         <span className="tc-sep" />
-        <button type="button" data-item className="tc-row" onPointerEnter={onHover} onClick={() => onPage('all')}>
+        <button type="button" data-item className="tc-row" onPointerMove={onHover} onClick={() => onPage('all')}>
           <span className="tc-row-label">All models</span>
           {more > 0 && <small>{more} more ›</small>}
         </button>
       </>) : (<>
-        <button type="button" data-item className="tc-row" onPointerEnter={onHover} onClick={() => onPage('recent')}>
+        <button type="button" data-item className="tc-row" onPointerMove={onHover} onClick={() => onPage('recent')}>
           <span className="tc-row-label">‹ Recent</span>
         </button>
         <span className="tc-sep" />
@@ -131,7 +131,7 @@ export function ModelMenu({
               role="radio"
               aria-checked={e.id === effortLit}
               className={e.id === effortLit ? 'lit' : ''}
-              onPointerEnter={onHover}
+              onPointerMove={onHover}
               // The level stays in the menu: she may be here to set the model
               // and the level both, and closing on the first makes her reopen it.
               onClick={() => onEffort(e.id)}

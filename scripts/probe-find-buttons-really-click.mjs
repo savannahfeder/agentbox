@@ -45,7 +45,7 @@ const configFile = path.join(root, 'zero.config.json');
 const configBefore = fs.existsSync(configFile) ? fs.readFileSync(configFile, 'utf8') : null;
 const CHAT_ID = 'w-f1d0c0ffee';
 if (CHAT) {
-  const { ensureMachineryDir } = await import('../main/store/home.mjs');
+  const { ensureMachineryDir } = await import('../main/store/home.mts');
   const store = path.join(home, 'store');
   const accountId = '00000000-0000-4000-8000-00000000f1d0';
   const productDir = path.join(store, 'accounts', accountId, 'north');

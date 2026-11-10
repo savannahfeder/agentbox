@@ -1,5 +1,5 @@
 // THE PHONE'S REPLIES, CARRIED ON IN THE CLOUD WITH THE COMPUTER SHUT
-// (docs/cloud/PHONE-PLAN.md step 2; the kit is shared/cloud-kit.mjs).
+// (docs/cloud/PHONE-PLAN.md step 2; the kit is shared/cloud-kit.mts).
 //
 // Every minute: a reply no computer has claimed for a minute is claimed as
 // `cloud:<run id>` and started from the kit its computer left, through the
@@ -19,25 +19,25 @@ import crypto from 'node:crypto';
 import {
   CLOUD_TAKES_AFTER_MS, CLOUD_TAKES_UNTIL_MS, answersIn, checkKit, cloudClaim, cloudSessionId, cloudUserLine,
   kitKey, replyPrompt, resultsInLines, runKey, serverRunKey, startPayload,
-} from '../../shared/cloud-kit.mjs';
-import { withCloudTurn } from '../../shared/phone-snapshot.mjs';
+} from '../../shared/cloud-kit.mts';
+import { withCloudTurn } from '../../shared/phone-snapshot.mts';
 import { cloudRunSnapshot } from './phone-status.mjs';
-import { fillNewThreadKit, newThreadKitKey } from '../../shared/cloud-kit.mjs';
-import { madeHere, newThreadSnapshot } from '../../shared/phone-snapshot.mjs';
-import { codexOpenLines, codexTurnLines, codexReadLines, codexAnswersIn } from '../../shared/cloud-kit.mjs';
-import { phoneBanner } from '../../shared/notify-rules.mjs';
-import { handsBack, HAND_BACK } from '../../shared/cloud-hand-back.mjs';
-import { LOGIN_NAME } from '../../shared/cloud-login-name.mjs';
-import { askId, approvalAnswerLine } from '../../shared/cloud-kit.mjs';
-import { phoneApproval } from '../../shared/phone-snapshot.mjs';
-import { cardDigest } from '../../shared/approval-card.mjs';
-import { PHONE_FILES_MAX, PHONE_FILE_MAX_BYTES, phoneFilesIn, phoneAttachmentRel, linkPhoneFiles } from '../../shared/phone-files.mjs';
+import { fillNewThreadKit, newThreadKitKey } from '../../shared/cloud-kit.mts';
+import { madeHere, newThreadSnapshot } from '../../shared/phone-snapshot.mts';
+import { codexOpenLines, codexTurnLines, codexReadLines, codexAnswersIn } from '../../shared/cloud-kit.mts';
+import { phoneBanner } from '../../shared/notify-rules.mts';
+import { handsBack, HAND_BACK } from '../../shared/cloud-hand-back.mts';
+import { LOGIN_NAME } from '../../shared/cloud-login-name.mts';
+import { askId, approvalAnswerLine } from '../../shared/cloud-kit.mts';
+import { phoneApproval } from '../../shared/phone-snapshot.mts';
+import { cardDigest } from '../../shared/approval-card.mts';
+import { PHONE_FILES_MAX, PHONE_FILE_MAX_BYTES, phoneFilesIn, phoneAttachmentRel, linkPhoneFiles } from '../../shared/phone-files.mts';
 import { isOurSlug } from '../../shared/product-name.mjs';
-import { codexApprovalCard, fileChangeCard, isMcpToolCall, elicitationServer, REMEMBERED_CHANGES } from '../../main/codex-approvals.mjs';
-import { yesTo, refusalTo } from '../../main/codex-app-server.mjs';
-import { sendWebAlert, webPushOf, TEST_ALERT } from '../../main/phone-alerts.mjs';
-import { isCarried, notBeforeOf } from '../../shared/cloud-carry.mjs';
-import { WEB_ALERTS_KEY, WEB_ALERTS_TEST_KEY, webAlertsOn } from '../../shared/web-alerts.mjs';
+import { codexApprovalCard, fileChangeCard, isMcpToolCall, elicitationServer, REMEMBERED_CHANGES } from '../../main/codex-approvals.mts';
+import { yesTo, refusalTo } from '../../main/codex-app-server.mts';
+import { sendWebAlert, webPushOf, TEST_ALERT } from '../../main/phone-alerts.mts';
+import { isCarried, notBeforeOf } from '../../shared/cloud-carry.mts';
+import { WEB_ALERTS_KEY, WEB_ALERTS_TEST_KEY, webAlertsOn } from '../../shared/web-alerts.mts';
 
 export const PHONE_TRIES = 3;
 // A start the cloud refused is tried again no sooner than this.
@@ -151,7 +151,7 @@ export function supabaseRest({ url, serviceKey, fetchImpl = fetch, timeoutMs = D
       return { sha256: hash.digest('hex'), bytes };
     },
     pushDevices: (owner) => call('GET', `push_devices?select=token&owner=eq.${q(owner)}`),
-    // The web app's alerts are in the settings it left for its computers (shared/web-alerts.mjs).
+    // The web app's alerts are in the settings it left for its computers (shared/web-alerts.mts).
     webAlerts: (owner) => call('GET', `phone_commands?select=payload,created_at&owner=eq.${q(owner)}&kind=eq.setting&payload->>key=eq.${WEB_ALERTS_KEY}&order=created_at.desc&limit=200`),
     waitingWebTests: ({ after, before, limit }) => call('GET', `phone_commands?select=id,owner,device,payload,created_at&kind=eq.setting&payload->>key=eq.${WEB_ALERTS_TEST_KEY}&taken_at=is.null&claimed_at=is.null&created_at=gt.${q(iso(after))}&created_at=lt.${q(iso(before))}&order=created_at.asc&limit=${limit}`),
     dropPushDevice: (owner, token) => call('DELETE', `push_devices?owner=eq.${q(owner)}&token=eq.${q(token)}`),
@@ -167,6 +167,26 @@ export function supabaseRest({ url, serviceKey, fetchImpl = fetch, timeoutMs = D
       await call('POST', 'cloud_plans?on_conflict=person', { body: { person, ...row }, prefer: 'resolution=ignore-duplicates,return=minimal' });
     },
     takeGive: (person, give) => call('PATCH', `cloud_plans?person=eq.${q(person)}&give=eq.${q(give)}`, { body: { give: null } }),
+    // The team someone is on (the app has one a person), when it was made, and who is on it.
+    async teamOf(person) {
+      const mine = await call('GET', `team_members?select=team_id,teams(created_at)&person_id=eq.${q(person)}&order=joined_at.asc&limit=1`);
+      const row = mine?.[0];
+      if (!row?.team_id) return null;
+      const all = await call('GET', `team_members?select=person_id,role&team_id=eq.${q(row.team_id)}&limit=500`);
+      return { id: row.team_id, createdAt: Date.parse(row.teams?.created_at), members: (all ?? []).map((r) => r.person_id), owners: (all ?? []).filter((r) => r.role === 'owner').map((r) => r.person_id) };
+    },
+  };
+}
+
+/** `db.teamOf`, asked at most once a minute a person: every run start reads it. */
+export function teamsFrom(db, { ttlMs = 60_000, now = Date.now } = {}) {
+  const seen = new Map();
+  return async (person) => {
+    const had = seen.get(person);
+    if (had && now() - had.at < ttlMs) return had.team;
+    const team = await db.teamOf(person);
+    seen.set(person, { team, at: now() });
+    return team;
   };
 }
 
@@ -214,7 +234,7 @@ export function createPhoneCarry({ db, runFiles, links, objects, start, input, s
     if (n >= PHONE_TRIES) log(`phone: reply ${cmd.id} was tried ${n} times and is left to the computer`);
   }
 
-  // HER PHONE'S FILES IN HER WORDS (shared/phone-files.mjs), each checked to
+  // HER PHONE'S FILES IN HER WORDS (shared/phone-files.mts), each checked to
   // be what its name says and fetched by the sandbox into the project's
   // documents folder where her computer saves the same file: { said, files },
   // her words linked there and the files to place, or null to leave them to
@@ -483,7 +503,7 @@ export function createPhoneCarry({ db, runFiles, links, objects, start, input, s
     return db.taken(cmd.id, ANSWERED_OUTCOME, iso(now()));
   }
 
-  // A CODEX RUN (shared/cloud-kit.mjs): its thread is opened first, and her
+  // A CODEX RUN (shared/cloud-kit.mts): its thread is opened first, and her
   // words go as one `turn/start` each, the next only once the last has
   // answered, numbered on from the kit's first turn id.
   const busy = (rec) => (rec.codex ? rec.codex.read.resumed !== true || rec.relayed < rec.codex.turnsSent : rec.relayed < rec.turns.length);
@@ -660,7 +680,7 @@ export function createPhoneCarry({ db, runFiles, links, objects, start, input, s
     return usual === 'codex' ? codex : claude;
   }
 
-  // `carried`: a row of the computer's own (shared/cloud-carry.mjs), whose
+  // `carried`: a row of the computer's own (shared/cloud-carry.mts), whose
   // thread is already on the phone as the computer's copy.
   async function startNewRun(person, cmd, itemId, tries, { carried = false } = {}) {
     const project = await newThreadKitFor(person, cmd);

@@ -1,13 +1,13 @@
 // The Today page: what each person and AI teammate finished, shipped and
 // decided, what is blocked and on whom, and what waits on you, read from the
 // store with no agent.
-import { shippedAtOf, threadState } from '../../../shared/thread-cards.mjs';
-import { shownTitle, withoutFiles } from '../../../shared/thread-title.mjs';
-import { isTaskRow, taskNewsAt } from '../../../shared/team-rules.mjs';
-import { isSetupTitle } from '../../../shared/teammates.mjs';
-import { waitParts } from '../../../shared/thread-waits.mjs';
-import { blockedWords, deadlineOf, dueSaid } from '../../../shared/team-tasks.mjs';
-import { shownPriority } from '../../../shared/rank.mjs';
+import { shippedAtOf, threadState } from '../../../shared/thread-cards.mts';
+import { shownTitle, withoutFiles } from '../../../shared/thread-title.mts';
+import { isTaskRow, taskNewsAt } from '../../../shared/team-rules.mts';
+import { isSetupTitle } from '../../../shared/teammates.mts';
+import { waitParts } from '../../../shared/thread-waits.mts';
+import { blockedWords, deadlineOf, dueSaid } from '../../../shared/team-tasks.mts';
+import { shownPriority } from '../../../shared/rank.mts';
 import { priorityIdOf, priorityLabelOf } from '../priority';
 import { clock } from '../thread-history';
 import type { Product, RoomDecision, RoomMention, ThreadCard, WorkItem } from '../types';
@@ -127,7 +127,7 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
   const owner = new Map<string, string>();
   for (const c of cards) if (byKey.has(`person:${c.personId}`)) owner.set(c.threadId, `person:${c.personId}`);
 
-  // Whose it is, for an id in blockedBy: a thread, or what Waits on wrote (shared/thread-waits.mjs).
+  // Whose it is, for an id in blockedBy: a thread, or what Waits on wrote (shared/thread-waits.mts).
   const waitsOnKey = (id: string) => {
     const w = waitParts(id);
     return w.kind === 'thread' ? owner.get(w.thread) : w.kind === 'name' ? null : keyOfPerson(w.person);
@@ -159,7 +159,9 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
   };
   const localTasks = new Set(items.filter((i) => isTaskRow(i)).map((i) => i.id));
   for (const i of items) {
-    if (i.agent || isSetupTitle(i.title) && (i.title === 'Set up its job' || i.labels?.some((l) => l.startsWith('teammate:')))) continue;
+    // A teammate's "Set up …" thread is often its first day of work; its title says nothing of that work, its progress does.
+    if (i.agent || i.title === 'Set up its job') continue;
+    const setupSays = isSetupTitle(i.title) && i.labels?.some((l) => l.startsWith('teammate:')) ? howFar(i.progress) : undefined;
     const task = isTaskRow(i);
     if (direct.has(i.product) && !task) continue;
     // A task someone gave you is theirs to say finished; open, it is one of yours.
@@ -169,7 +171,7 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
     }
     const k = owner.get(i.id) ?? 'me';
     const who = byKey.get(k)!;
-    const line = (at: number, on?: string | null): TodayLine => ({ key: `${i.product}/${i.id}`, title: '', at, item: i, ...(on !== undefined ? { on } : {}) });
+    const line = (at: number, on?: string | null): TodayLine => ({ key: `${i.product}/${i.id}`, title: '', at, item: i, ...(on !== undefined ? { on } : {}), ...(setupSays ? { says: setupSays } : {}) });
     const shipped = shippedAtOf(i);
     if (inRange(shipped)) { who.shipped.push(line(shipped!)); continue; }
     if (i.status === 'done') {

@@ -5,7 +5,7 @@
 import crypto from 'node:crypto';
 import type { MemoryCloud } from './memory-cloud.mts';
 import type { RoomDecision, RoomEvent, RoomFileMark, RoomMessage, RoomPresenceRow, RoomProfile, RoomReaction } from './rooms.mts';
-import { PROFILE_FIELDS, PRESENCE_FIELDS, pick, roomOut, messageOut, reactionOut, decisionOut, ROOM_FILE_NAME, ROOM_FILE_MAX_DATA, ROOM_FILE_MAX_BYTES, fileExists } from './rooms-shape.mjs';
+import { PROFILE_FIELDS, PRESENCE_FIELDS, pick, roomOut, messageOut, reactionOut, decisionOut, ROOM_FILE_NAME, ROOM_FILE_MAX_DATA, ROOM_FILE_MAX_BYTES, fileExists } from './rooms-shape.mts';
 
 export const GENERAL_ROOM = '9e9e9e9e-0000-4000-8000-000000000001';
 const MIN = 60_000;

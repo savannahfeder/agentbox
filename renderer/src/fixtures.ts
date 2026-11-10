@@ -3,10 +3,11 @@
 // tells real agents to write, so the fixtures double as a schema preview.
 
 import type { AgentSession, FolderListing, Snapshot, WorkspaceSettings } from './types';
+import type { LedgerLine } from './thread-history';
 // The engine ids, labels and the default are read off the one file that holds
 // them rather than typed again here. A fixture that spelled "Claude Code" for
 // itself is a fixture that could go on saying it after the app had stopped.
-import { DEFAULT_ENGINE, ENGINES } from '../../shared/engines.mjs';
+import { DEFAULT_ENGINE, ENGINES } from '../../shared/engines.mts';
 import { BUILT_MODELS } from './models';
 import { CODEX_DEFAULT_MODE } from './codex-modes';
 
@@ -442,11 +443,11 @@ export const fixtureSnapshot: Snapshot = {
     },
   ],
   // ONE CODING AGENT, WHICH IS THE MAC SHE RUNS. The capability gate in
-  // shared/engines.mjs is shut until she writes the moment into
+  // shared/engines.mts is shut until she writes the moment into
   // zero.config.json, so `Supervisor#engineChoices` hands over one entry on
   // every Mac that exists today, and the composer's clause, the byline's engine
   // word and the Settings row all draw nothing off it. That is the founder rule
-  // (tests/one-coding-agent-draws-nothing-new.test.mjs) and it is what the
+  // (tests/one-coding-agent-draws-nothing-new.test.mts) and it is what the
   // default world has to be a photograph of.
   //
   // THE SECOND ENGINE IS A URL MODIFIER, NOT A NEW DEFAULT. See
@@ -505,10 +506,24 @@ export const fixtureTraces: Record<string, Array<{ startedAt: number; text: stri
       [4, '[mcp__agentbox__claim_work_item] w-p3'],
       [12, '[mcp__agentbox__read_document] strategy/art-style.md'],
       [26, 'You rejected all three frames and the idea behind them, so there is nothing here to merge.'],
-      [33, '[Bash] git log --oneline -5 main'],
+      [33, ['[Bash] git log --oneline -5 main', '#id p3-log', '#out p3-log 5',
+        '#| 8c1f2ae Deck builder remembers the last filter',
+        '#| 41d07b9 Card zoom keeps its place on resize',
+        '#| e93a6c0 Trade screen shows both hands',
+        '#| 1b7f5d2 Pack opening plays once per pack',
+        '#| 6a2c8e4 Rarity colours read in dark mode'].join('\n')],
       [39, '[Bash] git branch --contains kestrel/frames'],
       [48, 'Checked rather than assumed: the frame branch is on no other branch, and main has never carried it.'],
-      [57, '[Bash] npx vitest run'],
+      [57, ['[Bash] npx vitest run', '#id p3-test', '#out p3-test 9',
+        '#| ',
+        '#|  RUN  v3.2.4 /Users/you/Desktop/dev/kestrel',
+        '#| ',
+        '#|  ✓ tests/deck-builder.test.ts (41 tests) 212ms',
+        '#|  ✓ tests/card-zoom.test.ts (17 tests) 88ms',
+        '#|  ✓ tests/trade.test.ts (160 tests) 1.4s',
+        '#| ',
+        '#|  Test Files  3 passed (3)',
+        '#|       Tests  218 passed (218)'].join('\n')],
       [96, 'Suite green at 218 tests, so nothing half-merged is sitting in the tree.'],
       [104, '[Edit] docs/decisions.md'],
       [119, 'Recording the rejection where the next session will read it, not just on the row.'],
@@ -554,7 +569,7 @@ export const fixtureTraces: Record<string, Array<{ startedAt: number; text: stri
 // fixtures double as a schema preview and a history that contradicts the row it
 // belongs to would review nothing. The lease heartbeats are left out here for
 // the same reason the main process drops them: they are not events.
-export const fixtureHistory: Record<string, Array<Record<string, any>>> = {
+export const fixtureHistory: Record<string, LedgerLine[]> = {
   // the card whose one page was named in full. The ledger is here so the
   // MESSAGE is on screen beside its file row, because the whole point is that
   // the path she can read in the prose is the file she can press underneath
@@ -896,13 +911,8 @@ export const fixtureSettings = {
   workspace: {
     agentsRunning: true,
     sessionsAtOnce: 3,
-    memoryGate: { on: false, slots: null, slotsAuto: 2, slotsMax: 12, now: null },
-    leftovers: { on: false, now: 'Right now finished agents have left 40 programs running; turning this on stops them when you close their tasks.' },
-    // COPIES OF A PROJECT NOBODY'S TASK OWNS (main/settings.mts,
-    // `strayFolderSettings`). A fixture because the row is absent whenever there
-    // are none, which is most of the time and all of a fresh install: without
-    // one there is no way to look at the sentence before it is true for somebody.
-    strayFolders: { count: 11, now: `11 copies of Kestrel were made by hand outside the folder ${NAME} keeps its own in, and are holding disk until you remove them: ~/Desktop/dev/kestrel-fontsize, ~/Desktop/dev/kestrel-cardart, ~/Desktop/dev/wt-w-34eb858714 and 8 more. ${NAME} never removes a folder it did not make.` },
+    memoryGate: { on: true, slots: null, slotsAuto: 2, slotsMax: 12, now: null },
+    leftovers: { on: true, now: 'Finished agents have left 40 programs running. 40 stop when you close their tasks.' },
     capacity: 6,
     running: 2,
     model: 'claude-opus-5',
@@ -1004,7 +1014,7 @@ export const fixtureSettings = {
 // founder rule and not an implementation detail: on every Mac she has, and on
 // every Mac until she writes the opt-in moment into zero.config.json, the
 // screen must be exactly the screen it is today (the whole of
-// tests/one-coding-agent-draws-nothing-new.test.mjs). A two-engine world that
+// tests/one-coding-agent-draws-nothing-new.test.mts). A two-engine world that
 // was the ONLY world would make THAT unphotographable, which is the same defect
 // pointing the other way, and it would silently rewrite every existing
 // scripts/shot-*.mjs picture: two choices in the workspace turn on five
@@ -1084,7 +1094,7 @@ export const fixtureCodexModels: NonNullable<WorkspaceSettings['codexModels']> =
  *  to check the model list against. */
 export const fixtureCodexModelDefault = 'gpt-5.6-sol';
 
-// main/codex-bin.mjs's `INSTALL_URL`, typed rather than imported because the
+// main/codex-bin.mts's `INSTALL_URL`, typed rather than imported because the
 // renderer never imports from main/. The suite holds the two in step.
 const CODEX_INSTALL_URL = 'https://learn.chatgpt.com/docs/codex/cli';
 const CODEX_BIN = '/Users/you/.local/bin/codex';

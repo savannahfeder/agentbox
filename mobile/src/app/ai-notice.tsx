@@ -2,6 +2,7 @@
 // guideline 5.1.2(i)). Asked once, as the first run's third step, or by a
 // send after a no; Settings › General turns it off again.
 import { useLocalSearchParams } from 'expo-router';
+import { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import { useCloud } from '../state/cloud';
 import { Bars, Btn, Card, CardRow, Head, leaveSetup, Logo, Screen } from '../ui/Onboarding';
@@ -18,6 +19,10 @@ export default function AiNotice() {
   const c = useCloud();
   const { first } = useLocalSearchParams<{ first?: string }>();
   const answer = (yes: boolean) => { c.answerNotice(yes); leaveSetup(); };
+  // Swiped away unanswered, a send waiting on it would say "Sending…" for ever.
+  const leave = useRef(c.leaveNotice);
+  leave.current = c.leaveNotice;
+  useEffect(() => () => leave.current(), []);
   return (
     <Screen top={first ? 24 : 72} foot={<><Btn kind="primary" label="Allow and continue" onPress={() => answer(true)} /><Btn kind="quiet" label="Not now, I'll just read" onPress={() => answer(false)} /></>}>
       {first ? <Bars at="messages" /> : null}

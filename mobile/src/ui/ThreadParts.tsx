@@ -8,6 +8,7 @@ import Svg, { Path, Rect } from 'react-native-svg';
 import { actWhen, actWords } from '../../../renderer/src/act-line';
 import { activitySummary } from '../../../renderer/src/activity-summary';
 import type { ParsedOption } from '../../../renderer/src/format';
+import type { AgentWork } from '../../../renderer/src/types';
 import { stateWord } from '../../../renderer/src/threads-made';
 import type { FiledRow } from '../lib/thread';
 import { FILED_WORDS, waitingWords, type Live } from '../lib/thread-offers';
@@ -31,7 +32,7 @@ export const Chevron = ({ open, tint = color.faint, size = 8 }: { open?: boolean
 );
 
 /** Something you did: a ring on a short timeline, its words, its time (Thread.tsx `ActLine`). */
-export function ActLine({ act, joined }: { act: any; joined?: boolean }) {
+export function ActLine({ act, joined }: { act: { at: number; verb: string; subject?: string }; joined?: boolean }) {
   const words = actWords(act);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10, paddingLeft: 20, minWidth: 0 }}>
@@ -50,7 +51,7 @@ export function ActLine({ act, joined }: { act: any; joined?: boolean }) {
  * A line the agent's side wrote: its verb and what it acted on, on one line.
  * A line cut short opens onto the whole of it (Thread.tsx `WorkLine`).
  */
-export function WorkLine({ work }: { work: any }) {
+export function WorkLine({ work }: { work: AgentWork }) {
   const [open, setOpen] = useState(false);
   const [cut, setCut] = useState(false);
   const output = String(work.output ?? '').split('\n').filter((l: string, i: number, a: string[]) => !(i === a.length - 1 && l === ''));
@@ -81,7 +82,7 @@ export function WorkLine({ work }: { work: any }) {
 }
 
 /** Consecutive work folded into one line behind one toggle (Thread.tsx `RunLine`). */
-export function RunLine({ items }: { items: any[] }) {
+export function RunLine({ items }: { items: AgentWork[] }) {
   const [open, setOpen] = useState(false);
   const failed = items.filter((w) => w.failed).length;
   return (

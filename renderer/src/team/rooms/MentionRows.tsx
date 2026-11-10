@@ -26,3 +26,15 @@ export function MentionRows({ mentions, faces, now, onOpen, selected = null }: {
     </div>;
   })}</>;
 }
+
+/** The same message as a card at the top of the board's Needs you column. */
+export function MentionCards({ mentions, onOpen, selected = null }: {
+  mentions: RoomMention[]; onOpen: (m: RoomMention) => void; selected?: string | null;
+}) {
+  return <>{mentions.map((m) => (
+    <button type="button" key={m.id} className={`th-card rm-mention-card${selected === m.id ? ' selected' : ''}`} onClick={() => onOpen(m)}>
+      <div className="t"><b className="th-msg-who">{m.byName || 'Someone'}</b> {m.thread ? `in ${m.thread === 'yours' ? 'your' : 'a'} thread: ` : ''}{firstRealLine(m.body) || 'sent a file'}</div>
+      <div className="m"><span className="p">#{m.roomName}</span></div>
+    </button>
+  ))}</>;
+}

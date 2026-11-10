@@ -17,6 +17,7 @@ const BY_ID: Record<string, string> = {
   'projects-page': '▤',
   search: '/',
   'all-threads': '/',
+  'view-home': '→',
   'view-inbox': '→',
   'view-progress': '→',
   'view-later': '→',

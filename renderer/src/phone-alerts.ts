@@ -30,7 +30,7 @@ let openItem: ((id: string) => void) | null = null;
 
 const IOS = () => /iPhone|iPad/.test(navigator.userAgent);
 // iOS says whether the page was opened from the home screen; only iOS needs to.
-const standalone = () => (navigator as any).standalone === true;
+const standalone = () => (navigator as Navigator & { standalone?: boolean }).standalone === true;
 const pushable = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 
 async function ask(action: string, extra: Record<string, unknown> = {}) {
@@ -111,7 +111,7 @@ export const ALERTS_SAY: Record<AlertsState, string> = {
 /** The icon's count, while the app is open. The computer's alerts carry it
  *  while the app is closed. */
 export function setIconCount(n: number) {
-  const nav = navigator as any;
+  const nav = navigator as Navigator & { setAppBadge?: (n: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
   try {
     if (n > 0) void nav.setAppBadge?.(n)?.catch?.(() => {});
     else void nav.clearAppBadge?.()?.catch?.(() => {});

@@ -1,6 +1,9 @@
 node_modules/
 # A worktree's link to another checkout's packages is a file, which the line above misses.
 node_modules
+# Task folders. eas build copies the repository by .gitignore alone, and a task
+# closing mid-copy failed the iPhone build.
+/.claude/worktrees/
 renderer/dist/
 *.log
 .DS_Store

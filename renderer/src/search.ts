@@ -15,7 +15,7 @@
 // outranks a prose hit. Nothing is dropped for ranking low.
 
 import { searchText } from './format';
-import { fold, withHumps, wordStart } from '../../shared/word-match.mjs';
+import { fold, withHumps, wordStart } from '../../shared/word-match.mts';
 import { rowSummary, SUMMARY_BUDGET } from './list-rules';
 import { ticketQuery } from './ticket-references';
 
@@ -35,7 +35,7 @@ export interface Searchable {
 }
 
 // How well a row matched sets only the order. The list prints no headings for
-// it (tests/a-result-list-has-no-headings.test.mjs).
+// it (tests/a-result-list-has-no-headings.test.mts).
 export interface SearchHit<T> {
   item: T;
   // The sentence the query was found in, ready for the row's summary line.

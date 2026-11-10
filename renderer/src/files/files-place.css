@@ -26,11 +26,10 @@
 .fp-kind:hover { color: var(--text-dim); }
 .fp-kind.is-on { color: var(--text); background: var(--wash-strong); }
 .fp-view-icon { width: 26px; padding: 0; justify-content: center; }
-.fp-new {
-  height: 26px; padding: 0 10px; background: none; border: 1px solid var(--line); border-radius: var(--artifact-corner-small);
-  font: inherit; font-size: 12.5px; color: var(--text-dim); white-space: nowrap; cursor: pointer;
-}
-.fp-new:hover { color: var(--text); border-color: var(--line-strong); }
+.fp-new-box { position: relative; flex: none; }
+.fp-new-box .fp-menu { top: 38px; width: 180px; }
+.th-new[aria-expanded="true"] { background: var(--wash-strong); }
+.is-new .fp-name { overflow: visible; }
 
 .fp-empty { margin: 26px 0 0; font-size: 13.5px; line-height: 20px; color: var(--text-faint); }
 

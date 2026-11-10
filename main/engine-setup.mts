@@ -24,6 +24,9 @@ import { harnessFor } from './harnesses.mts';
 
 import { spawn as nodeSpawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { terminalEnv } from './task-terminals.mts';
 import { codexLaunchEnv } from './codex-launch-env.mts';
 
@@ -42,6 +45,24 @@ export interface EngineSetupOptions {
   env?: NodeJS.ProcessEnv;
   poll?: number;
   onSignIn?: (engine: string, signedIn: boolean) => void;
+  now?: () => number;
+  setUpHere?: (engine: string, env: NodeJS.ProcessEnv) => boolean;
+}
+
+/**
+ * Whether this engine was ever set up in this home. Running either program to
+ * ask about sign-in makes its config folder, so on a home with none the answer
+ * is "signed out" without running it; sign-in itself makes the folder.
+ */
+export function engineSetUpHere(engine: string, env: NodeJS.ProcessEnv, { exists = fs.existsSync }: { exists?: (p: string) => boolean } = {}): boolean {
+  const home = env.HOME || os.homedir();
+  if (engine === 'codex') {
+    if (env.OPENAI_API_KEY || env.CODEX_API_KEY) return true;
+    return exists(env.CODEX_HOME || path.join(home, '.codex'));
+  }
+  if (env.ANTHROPIC_API_KEY || env.ANTHROPIC_AUTH_TOKEN || env.CLAUDE_CODE_OAUTH_TOKEN) return true;
+  if (env.CLAUDE_CONFIG_DIR) return exists(env.CLAUDE_CONFIG_DIR);
+  return exists(path.join(home, '.claude.json')) || exists(path.join(home, '.claude'));
 }
 
 interface SetupJob {
@@ -82,6 +103,9 @@ export function statusCommand(engine: string, bin: string) {
 const LOG_LIMIT = 64 * 1024;
 const STATUS_TIMEOUT = 15_000;
 const POLL = 2_000;
+/** How long a sign-in may wait on the browser: long enough for a slow login
+ *  full of captchas, and not for ever. */
+export const SIGN_IN_WAIT = 30 * 60_000;
 const ANSI = /\x1b\[[0-9;?]*[A-Za-z]/g;
 
 function realSpawn(file: string, args: string[], { env, onData, keepStdin = false }: SetupSpawnOptions = {}): SetupProcess {
@@ -112,7 +136,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * config so the rest of the app runs on what was just installed). `spawn` and
  * `wait` are seams for the tests; nothing in the app passes them.
  */
-export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env = process.env, poll = POLL, onSignIn = () => {} }: EngineSetupOptions = {} as EngineSetupOptions) {
+export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env = process.env, poll = POLL, onSignIn = () => {}, setUpHere = () => true, now = Date.now }: EngineSetupOptions = {} as EngineSetupOptions) {
   const runEnv = terminalEnv(env);
   const toolEnv = (engine: string, bin: string | null | undefined) => engine === 'codex' ? codexLaunchEnv(bin, runEnv) : runEnv;
   const jobs = new Map<string, SetupJob>();
@@ -123,9 +147,11 @@ export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env =
   const lastLine = (text: string) => text.split('\n').map((l) => l.trim()).filter(Boolean).pop() ?? '';
 
   async function signedIn(j: Pick<SetupJob, 'engine' | 'log'>, bin: string | null | undefined) {
+    const env = toolEnv(j.engine, bin);
+    if (!setUpHere(j.engine, env)) { onSignIn(j.engine, false); return false; }
     const { file, args } = statusCommand(j.engine, bin!);
     let output = '';
-    const p = spawn(file, args, { env: toolEnv(j.engine, bin), onData: (d) => { output = (output + String(d).replace(ANSI, '')).slice(-LOG_LIMIT); } });
+    const p = spawn(file, args, { env, onData: (d) => { output = (output + String(d).replace(ANSI, '')).slice(-LOG_LIMIT); } });
     const TIMED_OUT = Symbol('no answer');
     const code = await Promise.race([p.exit, wait(STATUS_TIMEOUT).then((): typeof TIMED_OUT => { p.kill(); return TIMED_OUT; })]);
     // TOLD TO THE APP, which routes on it (w-d5d632e503): a Claude Code that
@@ -174,16 +200,28 @@ export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env =
     j.phase = 'signing-in';
     let login = startLogin(j, hit.path);
     let ended = false;
+    let since = now();
     const watchLogin = (loginProcess: SetupProcess) => loginProcess.exit.then(() => { if (loginProcess === j.login) ended = true; });
     watchLogin(login);
+    // A check that does not answer says nothing about a login still waiting on
+    // the browser, so it must not end that login: killing it closes the
+    // callback port the browser is about to come back to.
+    const signedInYet = async () => {
+      try { return await signedIn(j, hit!.path); } catch (error) { if (ended) throw error; return false; }
+    };
     for (;;) {
       await wait(poll);
       if (!live()) return;
-      if (await signedIn(j, hit.path)) { if (live()) ready(j); return; }
+      if (await signedInYet()) { if (live()) ready(j); return; }
+      if (!live()) return;
       if (j.login !== login) {
         login = j.login!;
         ended = false;
+        since = now();
         watchLogin(login);
+      }
+      if (!ended && now() - since >= SIGN_IN_WAIT) {
+        return fail(j, `The sign-in waited ${Math.round(SIGN_IN_WAIT / 60_000)} minutes and stopped. Try again.`);
       }
       // ASK ONCE MORE BEFORE CALLING IT CLOSED. A sign-in that finishes while
       // the check above is running exits before that check answers, and the
