@@ -24,6 +24,22 @@ export function secretsFile({ from, name, owners, key }) {
   return `FOUNDER_NOTE_FROM=${q(from)}\nFOUNDER_NOTE_NAME=${q(name)}\nFOUNDER_NOTE_OWNERS=${q(owners.join(','))}\nFOUNDER_NOTE_KEY=${q(key)}\n`;
 }
 
+// The migration with its daily job taken out, and an existing job stopped:
+// the function can be tried with a dry run and a preview before anything
+// goes out on its own.
+export function heldMigration(sql) {
+  const at = sql.indexOf('do $do$');
+  if (at < 0) throw new Error('the migration has no daily job to hold');
+  return `${sql.slice(0, at)}do $hold$
+begin
+  if exists (select 1 from pg_namespace where nspname = 'cron') then
+    perform cron.unschedule(jobid) from cron.job where jobname = 'founder-note';
+  end if;
+end
+$hold$;
+`;
+}
+
 // The daily job reads the function's address and key from the vault. Both
 // are checked to their exact shape first, since they go into SQL text.
 export function vaultSql({ url, key }) {

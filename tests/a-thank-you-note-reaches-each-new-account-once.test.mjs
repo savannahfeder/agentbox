@@ -23,7 +23,7 @@ import {
   NOTE_WINDOW, NOTES_PER_RUN, firstNameFor, noteFor, keysMatch, readNoteConfig, sendFounderNotes, previewFor,
 } from '../cloud/supabase/functions/_shared/founder-note.mjs';
 import {
-  DEFAULT_ADDRESS, noteUrl, senderLine, newKey, ownersFrom, secretsFile, vaultSql,
+  DEFAULT_ADDRESS, noteUrl, senderLine, newKey, ownersFrom, secretsFile, vaultSql, heldMigration,
 } from '../scripts/lib/founder-note-setup.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -347,4 +347,39 @@ describe('setting it up', () => {
       { name: 'founder_note_url', secret: url },
     ]);
   });
+
+  it('can hold the daily job: the table and query go in, a running job stops, nothing new is scheduled', async () => {
+    const { PGlite } = await import('@electric-sql/pglite');
+    const db = new PGlite();
+    await db.exec(STAND_IN_FOR_HOLD);
+    await db.exec(`
+      create schema cron;
+      create table cron.job (jobid serial primary key, jobname text);
+      create function cron.unschedule(id int) returns boolean language sql as $$ delete from cron.job where jobid = id returning true $$;
+      insert into cron.job (jobname) values ('founder-note'), ('something-else');
+    `);
+    const held = heldMigration(read('cloud/supabase/migrations/20261110000000_a_thank_you_note_from_the_founder.sql'));
+    expect(held).not.toMatch(/cron\.schedule/);
+    await db.exec(held);
+    await db.exec(held);
+    expect((await db.query('select jobname from cron.job')).rows).toEqual([{ jobname: 'something-else' }]);
+    expect((await db.query(`select count(*)::int as n from public.founder_note_due($1::uuid[], 7, 3, 50)`, [[]])).rows[0].n).toBe(0);
+  });
+
+  it('holds safely where there is no scheduler at all', async () => {
+    const { PGlite } = await import('@electric-sql/pglite');
+    const db = new PGlite();
+    await db.exec(STAND_IN_FOR_HOLD);
+    await expect(db.exec(heldMigration(read('cloud/supabase/migrations/20261110000000_a_thank_you_note_from_the_founder.sql')))).resolves.toBeDefined();
+    expect(() => heldMigration('select 1;')).toThrow();
+  });
 });
+
+// Just enough of the account database for the note's own migration.
+const STAND_IN_FOR_HOLD = `
+create schema auth;
+create table auth.users (id uuid primary key, email text, email_confirmed_at timestamptz, raw_user_meta_data jsonb default '{}'::jsonb);
+create role authenticated; create role anon; create role service_role;
+create table public.people (id uuid primary key references auth.users(id) on delete cascade, email text not null, name text not null default '', created_at timestamptz not null default now());
+create table public.team_members (team_id uuid not null, person_id uuid not null, primary key (team_id, person_id));
+`;

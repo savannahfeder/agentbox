@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 // SWITCH ON THE FOUNDER'S THANK-YOU NOTE, IN ONE COMMAND (w-5efd743952).
 //
-//   node scripts/set-up-founder-note.mjs --name Sam --owners <your account id> [--address hello@agentbox.ac] [--preview]
+//   node scripts/set-up-founder-note.mjs --name Sam --owners <your account id> [--address hello@agentbox.ac] [--preview] [--hold]
 //
 // --name     the name the note is signed with
 // --owners   your own account ids (public.people), comma separated: you and
 //            your teammates never get the note, and a preview goes to the first
 // --address  where it comes from and replies go (hello@agentbox.ac)
 // --preview  sends the note to the first owner instead of waiting a day
+// --hold     everything but the daily job, which is stopped if it was on
 //
 // It stores the secrets on the function, puts the function online, applies
 // its migration, gives the daily job the function's address and a fresh key,
@@ -27,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { CLOUD_ADDRESS } from '../shared/cloud-address.mjs';
 import { projectRefFrom } from './lib/feedback-setup.mjs';
 import { applyMigration, cliToken } from './apply-migration.mjs';
-import { DEFAULT_ADDRESS, noteUrl, senderLine, newKey, looksLikeEmail, isPersonId, ownersFrom, secretsFile, vaultSql } from './lib/founder-note-setup.mjs';
+import { DEFAULT_ADDRESS, noteUrl, senderLine, newKey, looksLikeEmail, isPersonId, ownersFrom, secretsFile, vaultSql, heldMigration } from './lib/founder-note-setup.mjs';
 
 const repo = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const MIGRATION = path.join(repo, 'cloud/supabase/migrations/20261110000000_a_thank_you_note_from_the_founder.sql');
@@ -36,7 +37,7 @@ const say = (s = '') => process.stdout.write(`${s}\n`);
 const stop = (s) => { say(`\n✗ ${s}`); process.exit(1); };
 
 const { values: flags } = parseArgs({ options: {
-  name: { type: 'string' }, owners: { type: 'string' }, address: { type: 'string', default: DEFAULT_ADDRESS }, preview: { type: 'boolean', default: false },
+  name: { type: 'string' }, owners: { type: 'string' }, address: { type: 'string', default: DEFAULT_ADDRESS }, preview: { type: 'boolean', default: false }, hold: { type: 'boolean', default: false },
 } });
 const owners = ownersFrom(flags.owners);
 if (!flags.name?.trim()) stop('Say what the note is signed with: --name Sam');
@@ -71,8 +72,10 @@ if (supabase(['functions', 'deploy', 'founder-note', '--project-ref', ref, '--wo
   stop('The function did not deploy. The message above says why.');
 }
 
-say('3. Adding the table and the daily job…');
-await applyMigration(MIGRATION, { ref, token });
+say(flags.hold ? '3. Adding the table, with the daily job held…' : '3. Adding the table and the daily job…');
+const held = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'founder-note-')), 'held.sql');
+if (flags.hold) fs.writeFileSync(held, heldMigration(fs.readFileSync(MIGRATION, 'utf8')));
+try { await applyMigration(flags.hold ? held : MIGRATION, { ref, token }); } finally { fs.rmSync(path.dirname(held), { recursive: true, force: true }); }
 const vault = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'founder-note-')), 'vault.sql');
 fs.writeFileSync(vault, vaultSql({ url, key }), { mode: 0o600 });
 try { await applyMigration(vault, { ref, token }); } finally { fs.rmSync(path.dirname(vault), { recursive: true, force: true }); }
@@ -84,7 +87,7 @@ const call = async (body) => {
 say('4. Asking who is due, sending nothing…');
 const dry = await call({ dryRun: true });
 if (!dry.ok) stop(`The function answered: ${dry.error}`);
-say(`   ${dry.due} ${dry.due === 1 ? 'person is' : 'people are'} due today. The job sends at 17:00 UTC each day.`);
+say(`   ${dry.due} ${dry.due === 1 ? 'person is' : 'people are'} due today. ${flags.hold ? 'The daily job is held: run again without --hold to start it.' : 'The job sends at 17:00 UTC each day.'}`);
 
 if (flags.preview) {
   say('5. Sending a preview to your own account…');
@@ -92,4 +95,4 @@ if (flags.preview) {
   if (!sent.ok) stop(`The preview did not send: ${sent.error}`);
   say('   Sent.');
 }
-say('\n✓ The thank-you note is on.');
+say(flags.hold ? '\n✓ The thank-you note is ready, and held.' : '\n✓ The thank-you note is on.');
