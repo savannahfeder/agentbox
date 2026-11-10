@@ -20,6 +20,8 @@ import {
 } from '../first-run';
 import { SetupSplit } from './SetupSplit';
 import './first-run.css';
+import { WelcomeSky } from './WelcomeSky';
+import { useDarkWindow } from '../home/home-settings';
 
 type Project = { slug: string; name: string };
 
@@ -72,6 +74,7 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
   onDone: (brought: number) => void;
 }) {
   const [screen, setScreen] = useState<Screen | 'setup'>('welcome');
+  const dark = useDarkWindow();
   const [leaving, setLeaving] = useState(false);
   const [ready, setReady] = useState<Engine[] | undefined>(undefined);
   const hasReady = !!ready?.length;
@@ -249,8 +252,9 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
         Back
       </button>}
       {screen === 'welcome' && (
-        <div className={cls} key="welcome">
-          <div className="ob-col ob-mid ob-center">
+        <div className={`${cls} ob-welcome`} key="welcome">
+          <WelcomeSky dark={dark} />
+          <div className="ob-col ob-mid ob-hero">
             <Mark />
             {ready && !hasReady ? (
               <>
@@ -267,7 +271,8 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
               </>
             ) : (
               <>
-                <h1 className="ob-big ob-in" style={{ animationDelay: '1.3s' }}>Give your agents an inbox</h1>
+                <h1 className="ob-big ob-in" style={{ animationDelay: '1.3s' }}>An inbox for hundreds of agents.</h1>
+                <p className="ob-lede ob-in" style={{ animationDelay: '1.45s' }}>Start as many as you like. Each works on its own, and comes back to you only when it needs you.</p>
                 <div className="ob-actions ob-in" style={{ animationDelay: '1.6s', marginTop: 40 }}>
                   <button type="button" className="ob-btn" disabled={!hasReady || !threads} onClick={start}>Get started <Key k="↵" /></button>
                 </div>

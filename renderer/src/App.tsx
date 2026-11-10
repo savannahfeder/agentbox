@@ -9015,7 +9015,7 @@ export default function App() {
         onSetup={() => {
           setFocused(null); setView('inbox');
           if (homeOn) setHomeOpen(true);
-          const sky = setupStartsOn({ sky: homeSet.skyTheme });
+          const sky = setupStartsOn({ sky: homeSet.skyTheme, dark: darkWindow });
           if (sky) chooseSkyTheme(sky);
         }} />}
       <OpenLesson at={lessonAt} />

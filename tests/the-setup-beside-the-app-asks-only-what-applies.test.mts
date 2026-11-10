@@ -152,13 +152,28 @@ describe('the keyboard while the setup is open', () => {
 });
 
 describe('the look a new install starts on', () => {
-  // The founder, on the first try of the real app: it should start "by default"
-  // in the dark orange sky. Home itself left Alpha on main the same day.
-  it('wears the dark orange sky when nothing was chosen', () => {
-    expect(setupStartsOn({ sky: null })).toBe('ember');
+  // The founder: "For macs in dark mode the onboarding will be default dark
+  // orange and light mode will be the light green sky".
+  it('wears the dark orange sky on a Mac in dark mode', () => {
+    expect(setupStartsOn({ sky: null, dark: true })).toBe('ember');
+  });
+  it('wears the light green sky on a Mac in light mode', () => {
+    expect(setupStartsOn({ sky: null, dark: false })).toBe('sage');
   });
   it('keeps a sky someone already chose', () => {
-    expect(setupStartsOn({ sky: 'sage' })).toBeNull();
+    expect(setupStartsOn({ sky: 'dusk', dark: false })).toBeNull();
+  });
+});
+
+describe('the first page', () => {
+  // The founder picked the sky design, "with a better title like 'An inbox for hundreds of agents'".
+  const first = fs.readFileSync(new URL('../renderer/src/components/FirstRun.tsx', import.meta.url), 'utf8');
+  it('says what the app is', () => {
+    expect(first).toContain('An inbox for hundreds of agents.');
+    expect(first).not.toContain('Give your agents an inbox');
+  });
+  it('stands on the sky the setup will wear', () => {
+    expect(first).toMatch(/<WelcomeSky dark=\{/);
   });
 });
 
@@ -235,5 +250,24 @@ describe('the app beside the walkthrough', () => {
   const css = fs.readFileSync(new URL('../renderer/src/components/setup-split.css', import.meta.url), 'utf8');
   it('is a rounded window in a panel, as in the setup', () => {
     expect(css).toMatch(/:root\[data-tour-list\] #root \{[^}]*border-radius: 14px/);
+  });
+});
+
+describe('the chats step shows the problem', () => {
+  // The founder, of the 'Stop juggling terminals' design: "illustrates the
+  // problem beautifully. Would like to use it somewhere in onboarding". The
+  // step that brings in the agents already on this computer is where it is
+  // true: each of their sessions is a terminal, and each one ticked heads for
+  // the inbox.
+  const split = fs.readFileSync(new URL('../renderer/src/components/SetupSplit.tsx', import.meta.url), 'utf8');
+  const css = fs.readFileSync(new URL('../renderer/src/components/setup-split.css', import.meta.url), 'utf8');
+  it('says so', () => {
+    expect(split).toContain("'Stop juggling terminals.'");
+  });
+  it('draws a terminal for each of their sessions, not invented ones', () => {
+    expect(split).toMatch(/p\.chats\.slice\(0, \d+\)\.map\(\(t\) => <Terminal /);
+  });
+  it('puts the app away while the terminals show', () => {
+    expect(css).toMatch(/:root\[data-setup-step="chats"\] #root \{[^}]*opacity: 0/);
   });
 });

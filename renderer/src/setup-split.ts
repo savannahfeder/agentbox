@@ -84,9 +84,9 @@ export function typingInSetup(target: { closest(sel: string): unknown } | null):
   return field ? 'typing' : 'keys';
 }
 
-/** The sky a new install starts in: the dark orange sky, unless someone already chose one. */
-export function setupStartsOn({ sky }: { sky: string | null }): string | null {
-  return sky ? null : 'ember';
+/** The sky a new install starts in: dark orange on a Mac in dark mode, light green in light, unless someone already chose. */
+export function setupStartsOn({ sky, dark }: { sky: string | null; dark: boolean }): string | null {
+  return sky ? null : dark ? 'ember' : 'sage';
 }
 
 /** The walkthrough's place: the lit row or one past what is done, whichever is further. TourList keeps it from going back. */
