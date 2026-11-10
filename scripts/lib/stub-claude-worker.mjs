@@ -45,6 +45,7 @@ import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { readWorld, worldTurn, worldAnswer, titleIn, stepEvery, workStep } from './stand-in-world.mjs';
 import { makeArtifacts } from './stand-in-artifacts.mjs';
+import { keyPlaceIn } from './stand-in-key-place.mjs';
 
 const argv = process.argv.slice(2);
 const say = (obj) => process.stdout.write(JSON.stringify(obj) + '\n');
@@ -362,21 +363,6 @@ const KEYS = [
   [/openrouter/i, 'OPENROUTER_API_KEY', 'the OpenRouter API key'],
   [/mixpanel/i, 'MIXPANEL_API_SECRET', 'the Mixpanel API secret'],
 ];
-// Where the person said the key is: "in my Keychain as posthog-read-key", "~/.config/resend.key",
-// "POSTHOG_KEY in ~/app/.env", "$OPENROUTER_API_KEY in my shell".
-function keyPlaceIn(text) {
-  const before = text.match(/([A-Za-z0-9][\w.@-]{2,})\s+(?:in|from)\s+(?:my\s+|your\s+|the\s+)?keychain/i);
-  if (before && !/^(key|it|one|token)$/i.test(before[1])) return { place: 'keychain', from: before[1] };
-  const kc = text.match(/keychain(?:\s+(?:item|entry))?(?:\s+(?:as|called|named|under))?\s*[:"“'`]?\s*([A-Za-z0-9][\w.@-]*)/i);
-  if (kc && !/^(as|called|named|under|item|entry|and|so|too)$/i.test(kc[1])) return { place: 'keychain', from: kc[1].replace(/\.$/, '') };
-  const sh = text.match(/\$([A-Z][A-Z0-9_]+)/);
-  if (sh && /shell|zshrc|bashrc|profile|environment|export/i.test(text)) return { place: 'shell', from: sh[1] };
-  const f = text.match(/(~\/[^\s"'`”),]+)/);
-  if (!f) return null;
-  const from = f[1].replace(/[.:;]$/, '');
-  const entry = /\.env\b/.test(from) ? text.match(/\b([A-Z][A-Z0-9_]{2,})\s+(?:in|from)\s+~\//)?.[1] : undefined;
-  return { place: 'file', from, ...(entry ? { entry } : {}) };
-}
 {
   const brief = (() => { const at = argv.indexOf('--append-system-prompt'); return at >= 0 ? argv[at + 1] ?? '' : ''; })();
   // Only a cloud run is told it may ask; on the computer the person's own sign-ins and files are there.
