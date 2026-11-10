@@ -21,7 +21,7 @@ export function CloudPlanCards({ plan, onChoose, opening = null, waiting = null 
           <div className="cloud-plan-slots">{c.slots}</div>
           <div className="cloud-plan-where">running in the cloud</div>
           <div className="cloud-plan-hours">{c.hours}</div>
-          <div className="cloud-plan-hours">{c.files}</div>
+          <div className="cloud-plan-files">{c.files}</div>
           {c.current && plan ? (
             <div className="cloud-plan-use">
               <span>{usageLine(plan)}</span>
