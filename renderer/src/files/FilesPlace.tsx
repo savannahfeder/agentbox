@@ -276,8 +276,8 @@ function Tile({ file, list, now, me, nameOf, onOpen, folders, act, onNewFolder, 
   const v = versionWord(file);
   const approved = file.approvedBy.length > 0;
   const words = [v, changedBy(file, { me, nameOf }), file.at ? ago(file.at, now) : null, !file.cloud && file.bytes != null ? sizeWords(file.bytes) : null].filter(Boolean).join('  ·  ');
+  const said = <>{words}{file.cloud && <>{words ? '  ·  ' : ''}<span className="fp-in-cloud"><CloudGlyph />In the cloud</span></>}</>;
   const marks = <>
-    {file.cloud && <span className="fp-in-cloud"><CloudGlyph />In the cloud</span>}
     {file.open > 0 && <span className="fp-open" title={`${file.open} open ${file.open === 1 ? 'comment' : 'comments'}`}><CommentGlyph />{file.open}</span>}
     {approved && <span className="fp-approved" title={`Approved by ${file.approvedBy.map((id) => (id === me ? 'you' : nameOf(id ?? ''))).join(', ')}`}><i aria-hidden="true" />Approved</span>}
     {!approved && file.changedSinceApproval && <span className="fp-open">Changed since approved</span>}
@@ -293,12 +293,12 @@ function Tile({ file, list, now, me, nameOf, onOpen, folders, act, onNewFolder, 
           <span className={`fp-face fp-thumb fp-face-${file.kind ?? 'file'}`}>{file.kind === 'image' || file.kind === 'film' ? <Face file={file} whose={whose} /> : <span className="fp-thumb-word">{file.kind === 'markdown' ? 'DOC' : file.kind === 'pdf' ? 'PDF' : file.kind === 'deck' ? 'DECK' : file.kind === 'page' ? 'PAGE' : file.kind === 'code' ? 'CODE' : file.kind === 'table' ? 'TABLE' : 'FILE'}</span>}</span>
           <span className="fp-name">{name}</span>
           <span className="fp-line-marks">{marks}</span>
-          <span className="fp-meta-words">{words}</span>
+          <span className="fp-meta-words">{said}</span>
         </>
         : <>
           <span className={`fp-face fp-face-${file.kind ?? 'file'}`}><Face file={file} whose={whose} /></span>
           <span className="fp-name">{name}</span>
-          <span className="fp-meta"><span className="fp-meta-words">{words}</span>{marks}</span>
+          <span className="fp-meta"><span className="fp-meta-words">{said}</span>{marks}</span>
         </>}
     </button>
     {file.project && !choosing && <MoveMenu file={file} folders={folders} act={act} onNewFolder={(n) => onNewFolder(file, n)} onTrash={file.movable ? () => onTrash(file) : undefined} />}

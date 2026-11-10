@@ -2559,14 +2559,18 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     },
     account: async () => (await import('./cloud/account.mts')).cloudFilesAccount(cloudHome()),
     settings: () => filesSettingsOf(config as { filesInCloud?: unknown; filesOffAfterDays?: unknown }),
-    // The Mac's Quick Look draws a film's or picture's poster; elsewhere a kept file has none.
+    // The Mac's Quick Look draws a film's or picture's poster, else ffmpeg where there is one; else none.
     poster: async (src, to) => {
-      if (process.platform !== 'darwin' && process.platform !== 'win32') return false;
-      const { nativeImage } = await import('electron');
-      const img = await nativeImage.createThumbnailFromPath(src, { width: 640, height: 640 });
-      if (img.isEmpty()) return false;
-      await fsWatch.promises.writeFile(to, img.toJPEG(80));
-      return true;
+      if (process.platform === 'darwin' || process.platform === 'win32') {
+        const img = await import('electron').then(({ nativeImage }) => nativeImage?.createThumbnailFromPath(src, { width: 640, height: 640 })).catch(() => null);
+        if (img && !img.isEmpty()) { await fsWatch.promises.writeFile(to, img.toJPEG(80)); return true; }
+      }
+      const { execFile } = await import('node:child_process');
+      return new Promise<boolean>((resolve) => {
+        const into = /\.(mp4|mov|m4v|webm|mkv)$/i.test(src) ? ['-ss', '1'] : [];
+        execFile('ffmpeg', ['-y', '-loglevel', 'error', ...into, '-i', src, '-frames:v', '1', '-vf', 'scale=640:-2', '-q:v', '4', to], { timeout: 30_000 },
+          (err) => resolve(!err && fsWatch.existsSync(to)));
+      });
     },
     freeBytes: async () => { const s = await fsWatch.promises.statfs(config.accountRoot); return s.bavail * s.bsize; },
     notify: () => push(),
@@ -2576,8 +2580,8 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     store, team, accountRoot: config.accountRoot, storeRoot: config.storeRoot, notify: () => push(), keeper: keeperNow(),
     trashItem: async (file) => {
       const shell = await shellNow();
-      if (!shell.trashItem) throw new Error('this computer has no Trash');
-      await shell.trashItem(file);
+      if (shell.trashItem) await shell.trashItem(file);
+      else await (await import('./trash-file.mts')).trashFile(file, { home: supervisor.config?.home || os.homedir() });
     },
   }));
   supervisor.onStarting = (item) => { void filesPlaceNow().bringBackFor({ product: item.product, id: item.id }).catch(() => {}); };
