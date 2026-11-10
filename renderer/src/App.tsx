@@ -1,6 +1,7 @@
 import { previewFocus } from './preview-focus';
 import { PhoneStatus } from './components/PhoneStatus';
 import { sidebarFolded, useSidebarShrinks } from './sidebar-shrinks';
+import { GlassBand } from './components/GlassBand';
 import { cloudChord, cloudToggleNote, cloudToggleTarget, threadPlace } from './cloud-menu';
 import { usePhoneBack, onCloudPhone, onPhone } from './phone-screen';
 import { holdsReplies, writeHeldWhenHidden } from './phone-holds';
@@ -266,6 +267,8 @@ import { PLAIN, SKY_THEMES, skyTheme } from './home/sky';
 import { engineLetter, engineName, greeting, homeCoversTheList, teamRowState, weekCounts } from './home/home-model';
 import { sentFrom } from './team/company';
 import { reachAudienceOf } from '../../shared/teammate-reach.mts';
+import { useBackAndForward, type Stop as TrailStop } from './back-and-forward';
+import { BackForward } from './components/BackForward';
 
 const FIRST_IDEAS = ideasFor();
 
@@ -2923,6 +2926,13 @@ export default function App() {
     if (sky?.frame) { root.dataset.skyFrame = sky.id; root.style.setProperty('--sky-frame', sky.frame); }
     else { delete root.dataset.skyFrame; root.style.removeProperty('--sky-frame'); }
   }, [sky]);
+  // GLASS (Alpha features): only a window main/window-glass.mts can blur behind goes see-through.
+  const glassOn = !!snap?.alpha?.glass && !onPhone();
+  useEffect(() => {
+    const root = document.documentElement;
+    if (glassOn && 'glassAble' in root.dataset) root.dataset.glass = '';
+    else delete root.dataset.glass;
+  }, [glassOn]);
   const [connectionsPage, setConnectionsPage] = useState<{ focus: string | null } | null>(null);
   const sharedFileNews = snap?.team?.sharedFileNews ?? [];
   const theirRows = useMemo(
@@ -7172,6 +7182,46 @@ export default function App() {
   // Leaving Chats forgets which conversation was open there, or the same row
   // opened from Needs you lands back on the Chats screen with another reply box.
   const openView = (next: View) => { roomsUi.leave(); setChatsDirect(null); teammatesUi.leave(); setFilesPage(null); setConnectionsPage(null); setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); setEvPick(null); setTodayOn(false); setTasksOn(false); setChatsPlace(null); setHomeOpen(false); };
+
+  // BACK AND FORWARD, on every computer. Above the early returns below, because
+  // it is a hook; `homeShown` is worked out again here for the same reason.
+  const backForwardOn = !onPhone();
+  const homeHere = homeOn && homeOpen && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
+    && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown;
+  const stopHere: TrailStop | null = settingsOpen ? { at: 'settings', pane: settingsAt }
+    : focused ? { at: 'thread', product: focused.product, id: focused.id }
+    : homeHere ? { at: 'home' }
+    : filesShown ? { at: 'files', project: filesPage?.project ?? null }
+    : connectionsShown ? { at: 'connections' }
+    : search !== null || teamShown || roomShown || teammatesShown || chatsPlaceShown || focusedRepeat || todayOn || tasksOn ? null
+    : { at: 'list', view };
+  const trail = useBackAndForward({
+    on: backForwardOn,
+    here: stopHere,
+    exists: (s) => s.at !== 'thread' || selectable.some((i) => i.id === s.id && i.product === s.product),
+    go: (s) => {
+      if (s.at === 'home') { openView('inbox'); setHomeOpen(true); }
+      else if (s.at === 'list') openView(s.view);
+      else if (s.at === 'files') openFiles(s.project);
+      else if (s.at === 'connections') openConnectionsPage(null);
+      else if (s.at === 'settings') {
+        setTeamOpen(false); closeSearch(); setFocused(null);
+        setSettingsPane(s.pane); setSettingsVisit((n) => n + 1); setSettingsOpen(true);
+      } else {
+        const card = selectable.find((i) => i.id === s.id && i.product === s.product);
+        if (card) { openView(view); setFocused(card); }
+      }
+    },
+  });
+  const stopName = (s: TrailStop): string => s.at === 'home' ? 'Home'
+    : s.at === 'list' ? (INBOX_TABS.find((t) => t.view === s.view)?.label ?? 'Inbox')
+    : s.at === 'files' ? 'Files'
+    : s.at === 'connections' ? 'Connections'
+    : s.at === 'settings' ? 'Settings'
+    : selectable.find((i) => i.id === s.id && i.product === s.product)?.title ?? 'the thread';
+  const backForward = backForwardOn
+    ? <BackForward backTo={trail.backTo} forwardTo={trail.forwardTo} onBack={trail.back} onForward={trail.forward} name={stopName} />
+    : null;
   useEffect(() => {
     if (!onPhone()) return;
     if (signInGate) {
@@ -7517,6 +7567,9 @@ export default function App() {
   const homeShown = homeOn && homeOpen && !!snap && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
     && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown;
   const goHome = () => { openView('inbox'); setHomeOpen(true); };
+  const inboxCount = inboxBadge({ rows: shownCount(inbox), leads: leadCount, fileNews: sharedFileNews.length, follows: followingNews.length });
+  const inboxHere = !homeShown && view === 'inbox' && search === null && !settingsOpen && !teamShown && !focused && !focusedRepeat
+    && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown;
   const homeNeeds: NeedsRow[] = homeShown ? inbox.slice(0, 80).map((i) => {
     const sent = team ? sentFrom(i, team.products.get(i.product), team.me) : null;
     const from = sent ? (team?.byId.get(sent.from)?.name?.split(/\s+/)[0] ?? 'Someone') : null;
@@ -7705,7 +7758,7 @@ export default function App() {
     <FreeAgentContext.Provider value={freeWaitIds}>
     <TryAgainContext.Provider value={tryAgain}>
     <CloudOfferContext.Provider value={cloudOfferNow ? { offer: cloudOfferNow, onGo: (go) => void onCloudGo(go) } : null}>
-    <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app workspace-layout${narrowSidebar ? ` gt-rail gt-inset gt-sumleft${sideFolded ? '' : ' gt-rail-open'}` : ''}${focused && !settingsOpen && !inChats ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${sideFolded ? ' workspace-collapsed' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${notesShown ? ' notes-open' : ''}${notesClosed ? ' notes-closed' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}${cardOnScreen ? ' asking' : ''}${(queueSpot || onePage) && focused ? ' one-at-a-time' : ''}${homeShown ? ' home-shown sky-shown' : skyOnInbox ? (onBoard ? ' sky-shown sky-board' : ' sky-shown') : ''}`}>
+    <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app workspace-layout${narrowSidebar ? ` gt-rail gt-inset gt-sumleft${sideFolded ? '' : ' gt-rail-open'}` : ''}${focused && !settingsOpen && !inChats ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${backForward ? ' back-forward-on' : ''}${sideFolded ? ' workspace-collapsed' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${notesShown ? ' notes-open' : ''}${notesClosed ? ' notes-closed' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}${cardOnScreen ? ' asking' : ''}${(queueSpot || onePage) && focused ? ' one-at-a-time' : ''}${homeShown ? ' home-shown sky-shown' : skyOnInbox ? (onBoard ? ' sky-shown sky-board' : ' sky-shown') : ''}`}>
 
       {/* At the end of <body>, so its drag rectangles are reported after the
           top bar's and this layout's ::after strip. Inside the app, those put
@@ -7765,7 +7818,7 @@ export default function App() {
         statuses={multiplayer}
         onAccount={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(false); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
         onSignOut={() => { void api.teamSignOut().then(() => refresh()); }}
-        onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setOpenCard(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }} inboxCount={inboxBadge({ rows: shownCount(inbox), leads: leadCount, fileNews: sharedFileNews.length, follows: followingNews.length })} scheduledCount={scheduledCount} view={view} collapsed={sideFolded} onSearch={openSearch} onCompose={() => setModal('compose')} onView={openView}
+        onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setOpenCard(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }} inboxCount={inboxCount} scheduledCount={scheduledCount} view={view} collapsed={sideFolded} onSearch={openSearch} onCompose={() => setModal('compose')} onView={openView}
         onHome={homeOn ? goHome : undefined} homePage={homeShown} onTeammatesPage={teammatesShown} onFiles={() => openFiles(null)} filesPage={filesShown} tasksPage={tasksShown} onConnections={() => openConnectionsPage(null)} connectionsPage={connectionsShown} rail={narrowSidebar} onHover={setRailOpen} onGroupsPage={roomShown || directOpen}
         /* Without Groups the one row under Threads is Chats, and only while there are teammates. */
         groups={roomsUi.live ? roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown || chatsPlaceShown || cardFromPlace, teammatesUi.live || homeLayout === 'chats' ? openChats : undefined, homeLayout === 'chats' ? 'Team' : undefined) : teammatesUi.rail(teammatesShown)} />
@@ -7776,7 +7829,10 @@ export default function App() {
       {fullScreenDoc && (
         <div className="chrome-reach" style={{ width: CHROME_REACH.width, height: CHROME_REACH.height }} aria-hidden="true" />
       )}
+      {glassOn && <GlassBand homeHere={homeShown} inboxHere={inboxHere} inboxCount={inboxCount}
+        onHome={homeOn ? goHome : undefined} onInbox={() => openView('inbox')} onSearch={openSearch} onCompose={() => setModal('compose')} />}
       <header className="topbar">
+        {backForward}
         {/* THE TAB KEY IS THE ONE SHORTCUT THE APP NEVER TOLD ANYONE ABOUT
             (w-64c76bfdad). Tab rotates Inbox, Scheduled, In progress and Closed
             and shift-Tab goes back, and on 2026-08-20 that was measured to be
@@ -8223,7 +8279,7 @@ export default function App() {
                   onStop={() => stopAgent(focused)}
                   onRunNow={() => runNow(focused)}
                   onPin={focused.agent ? undefined : (pin) => pinThread(focused.id, pin, true)}
-                  place={focused.agent ? null : threadPlace(focused, snap.supervisor.running.find((r) => r.itemId === focused.id) ?? null, snap.cloud ?? null)}
+                  place={focused.agent ? null : threadPlace(focused, snap.supervisor.running.find((r) => r.itemId === focused.id) ?? null, snap.cloud ?? null, runningEngine)}
                   onPlace={(keep) => placeThread(focused, keep, false)}
                   pageAsk={threadAsk?.key === keyOf(focused) ? threadAsk : null}
                   onAsked={() => setThreadAsk(null)}
@@ -8332,6 +8388,7 @@ export default function App() {
                   pointer={listPointer}
                   table={search === null}
                   unread={(item) => isUnread(item, seenAt, unreadSince, team?.me ?? null)}
+                  lastThread={backForwardOn ? trail.lastThread : null}
                   products={snap.products}
                   team={team}
                   mixed={search === null ? mixedRows : null}
@@ -8835,7 +8892,7 @@ export default function App() {
                 chosen: team ? chosenNames(shownToPeople(target, project), team.byId) : undefined,
                 teammates: !!team && teammates(team.state.people ?? [], team.me).length > 0,
                 pinned: live ? !!target.pinned : null,
-                place: live ? threadPlace(target, snap.supervisor.running.find((r) => r.itemId === target.id) ?? null, snap.cloud ?? null) : null,
+                place: live ? threadPlace(target, snap.supervisor.running.find((r) => r.itemId === target.id) ?? null, snap.cloud ?? null, snap.engines?.byItem?.[target.id] ?? snap.engines?.workspace ?? null) : null,
                 open: focused && keyOf(focused) === key && openShows?.key === key ? openShows : null,
                 rename: page || isDirect(project ?? undefined),
                 repeats: !!ruleOf(target),

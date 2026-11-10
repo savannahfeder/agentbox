@@ -21,7 +21,8 @@ describe('the Inbox badge', () => {
   });
   it('is what the sidebar draws, with the same parts Needs you adds', () => {
     const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
-    expect(app).toContain('inboxCount={inboxBadge({ rows: shownCount(inbox), leads: leadCount, fileNews: sharedFileNews.length, follows: followingNews.length })}');
+    expect(app).toContain('const inboxCount = inboxBadge({ rows: shownCount(inbox), leads: leadCount, fileNews: sharedFileNews.length, follows: followingNews.length });');
+    expect(app).toContain('inboxCount={inboxCount}');
     expect(app).toMatch(/inbox: \(mineShown \? shownCount\(inbox\) : 0\) \+ theirCount\('inbox'\) \+ leadCount \+ sharedFileNews\.length \+ followingNews\.length/);
   });
 });

@@ -87,6 +87,7 @@ import type { GhLogin } from './github-browser-sign-in.mts';
 import { handedOnByReply, isGivenTask, visibilityWhenMade } from '../shared/team-rules.mts';
 import { closeRefusal, closedAnywayNote } from '../shared/not-shipped.mts';
 import { lightRunning, snapshotSender } from '../shared/snapshot-delta.mts';
+import { wakesItselfAt } from '../shared/answers.mts';
 import { traceAnswer } from '../shared/trace-delta.mts';
 import { saveAttachments } from './save-attachments.mts';
 import { stageAttachment, stageAttachmentPart } from './stage-attachment.mts';
@@ -194,6 +195,8 @@ export interface IpcDeps<W extends IpcWindow = IpcWindow> {
   onCount?: () => void;
   /** The live relay's address, null when this cloud has none. */
   liveAt?: string | null;
+  /** Turns the window's glass on or off when the Alpha switch flips. */
+  glass?: (on: boolean) => void;
 }
 
 export interface TeammateArgs {
@@ -281,7 +284,7 @@ const TEAMMATE_OPS = new Set(['create', 'describe', 'start', 'update', 'stop', '
 const ROOM_OPS = new Set(['refresh', 'send', 'markRead', 'markDone', 'markUnread', 'react', 'decide','edit', 'deleteMessage', 'putFile', 'putFileFrom', 'file', 'fileOnDisk', 'fileText', 'markFile', 'older', 'saveProfile', 'goInvisible', 'comeBack', 'link', 'revokeLink', 'preview', 'listed', 'invitesSent', 'joinByLink', 'joinListed', 'acceptInvite', 'invite', 'create', 'rename', 'leave', 'remove', 'pin', 'mute'] as const);
 type RoomOp = typeof ROOM_OPS extends Set<infer O> ? O : never;
 
-export function registerIpc<W extends IpcWindow>({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null, connections = null, copies = null, onCount = () => {}, liveAt = null }: IpcDeps<W>) {
+export function registerIpc<W extends IpcWindow>({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null, connections = null, copies = null, onCount = () => {}, liveAt = null, glass = () => {} }: IpcDeps<W>) {
   // The three Electron things, or a plain Node stand-in for them. There is no
   // default: a caller that forgets says so here rather than throwing eighty
   // lines further down on `ipcMain.handle` of undefined.
@@ -1448,7 +1451,12 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   ipcMain.handle('zero:schedule', (_e, { product, id, runAt }: { product: string; id: string; runAt: number }) => {
     if (isAgentRow(id)) return { ok: false };
     if (runAt > Date.now()) supervisor.stopSession(id);
-    return store.scheduleItem(product, id, runAt);
+    const before = runAt > 0 ? null : store.readItem(product, id);
+    const out = store.scheduleItem(product, id, runAt);
+    // Let it run now: the queue walks past the agent's answer, so clearing the
+    // moment alone starts nothing.
+    if (before && wakesItselfAt(before) > Date.now()) supervisor.runNow(product, id);
+    return out;
   });
 
   // Snooze changes when a person sees the thread, never what an agent does.
@@ -2317,6 +2325,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       setWorkspaceSetting({ config, supervisor, store }, payload ?? {});
       if (payload?.key === 'alphaRooms') team?.rooms?.tick().catch(() => {});
       if (cornerTagTurnedOff(payload)) analytics.track('tag_turned_off');
+      if (payload?.key === 'alphaGlass') glass(alphaFeatures(config).glass);
       push();
       return { ok: true, ...readSettings({ config, supervisor, store }) };
     } catch (err) {

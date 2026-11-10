@@ -37,6 +37,8 @@ const TABLE_IN_A_MESSAGE = [
 ].join('\n');
 
 export const fixtureSnapshot: Snapshot = {
+  // As a checkout has it (main/settings.mts alphaFeatures).
+  alpha: { rooms: false },
   products: [
     { slug: 'kestrel', dir: '/fixtures/kestrel', name: 'Kestrel', oneLiner: 'Collectible card games, made beautiful', repoPath: '/Users/you/Desktop/dev/kestrel' },
     { slug: 'onboard', dir: '/fixtures/onboard', name: 'Onboard', oneLiner: 'Employee onboarding that runs itself', repoPath: null },

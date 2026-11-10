@@ -56,6 +56,7 @@ import { NAME } from '../../../shared/product-name.mjs';
 import { shownName } from '../../../shared/artifact-marks.mts';
 import { onPhone } from '../phone-screen';
 import { scrollKey, useKeptScroll } from '../kept-scroll';
+import { pageForNotes, pageTextForNotes } from '../notes-sidebar';
 
 const COMING_LOOKS_MS = 3000;
 
@@ -109,6 +110,9 @@ const Beside = ({ aside, children }: { aside?: ReactNode; children: ReactNode })
 // `<webview>` is a separate compositing layer and paints over everything the
 // card draws, so the hover-reveal toolbar doc-html normally gets would be
 // painted under the page and could never be pressed.
+// Pins go on a page only once it is drawn whole; until then it scrolls inside its frame and a pin would drift.
+const PinSheet = ({ on, height, children }: { on: boolean; height: number | null; children: ReactNode }) =>
+  on ? <div className="doc-pin-sheet" data-whole={height ? '' : undefined} style={height ? { height } : undefined}>{children}</div> : <>{children}</>;
 
 function paneKindClass(kind: PaneKind): string {
   if (kind === 'html') return 'doc-html';
@@ -185,6 +189,21 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
   // The key, not the address: a marker on the address would reach the app.
   const frameKey = url && app.local ? `${url} ${app.attempt}` : url;
   const [loaded, revealFrame] = usePreviewReveal(frameKey);
+  const pageFrame = useRef<HTMLIFrameElement | null>(null);
+  const [pageHeight, setPageHeight] = useState<number | null>(null);
+  const besideNotes = !!aside;
+  const fromText = !url && text !== null;
+  useEffect(() => {
+    setPageHeight(null);
+    if (!(url || fromText) || !besideNotes) return undefined;
+    const hear = (e: MessageEvent) => {
+      if (e.source !== pageFrame.current?.contentWindow || e.data?.type !== 'agentbox-document-height') return;
+      const h = e.data.height;
+      if (typeof h === 'number' && Number.isFinite(h) && h > 0 && h <= 1_000_000) setPageHeight(Math.ceil(h));
+    };
+    window.addEventListener('message', hear);
+    return () => window.removeEventListener('message', hear);
+  }, [url, fromText, besideNotes]);
   const frameReady = app.local ? previewShows(loaded, app.phase) : loaded;
   const liveStatus = app.local && url ? previewStatus(app.phase, url, app.waited) : null;
   // The change a run made, when the artifact is one.
@@ -446,22 +465,24 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
           // A local address nothing answers draws no frame at all, only the
           // words saying so: behind a refusal the frame holds an error page.
           resolved ? <Beside aside={aside}>{url
-            ? <div className="preview-frame" aria-busy={!frameReady}>
+            ? <div className={`preview-frame${aside ? ' doc-pin-scroll' : ''}`} aria-busy={!frameReady}>
               {app.local
                 ? !frameReady && <LocalPreviewStatus status={liveStatus} onRetry={app.retry} />
                 : <PreviewLoading ready={frameReady} />}
-              {(!app.local || app.phase !== 'down') && <iframe
-                key={frameKey} onLoad={revealFrame} onError={() => setFailed("This preview could not be loaded.")}
+              {(!app.local || app.phase !== 'down') && <PinSheet on={!!aside} height={pageHeight}><iframe
+                key={frameKey} ref={pageFrame} onLoad={revealFrame} onError={() => setFailed("This preview could not be loaded.")}
                 style={{opacity:frameReady ? 1 : 0}}
-                className="doc-view" src={url}
+                className="doc-view" src={aside ? pageForNotes(url) : url}
+                scrolling={aside && pageHeight ? 'no' : undefined}
                 // ON A PHONE THE PAGE IS SERVED FROM THE APP'S OWN ADDRESS
                 // (main/serve.mts answerFile), so same-origin would hand a page
                 // an agent wrote the app's storage and its key. Opaque, it still
                 // draws its pictures: they are plain http there, not a scheme.
                 sandbox={app.local ? LOCAL_APP_SANDBOX : onPhone() ? 'allow-scripts' : 'allow-scripts allow-same-origin'} title={crumb.join('/')}
-              />}</div>
+              /></PinSheet>}</div>
             : text !== null
-              ? <div className="preview-frame"><iframe className="doc-view" srcDoc={text} sandbox="allow-scripts" title={crumb.join('/')} /></div>
+              ? <div className={`preview-frame${aside ? ' doc-pin-scroll' : ''}`}><PinSheet on={!!aside} height={pageHeight}><iframe ref={pageFrame} className="doc-view"
+                srcDoc={aside ? pageTextForNotes(text) : text} scrolling={aside && pageHeight ? 'no' : undefined} sandbox="allow-scripts" title={crumb.join('/')} /></PinSheet></div>
               : <PreviewLoading />}</Beside> : <PreviewLoading />
         ) : text === null || (threadsFile && liveTicket === undefined) ? (
           <PreviewLoading />

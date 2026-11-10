@@ -50,7 +50,7 @@ export interface ShipItem {
 
 export interface ShipProduct { slug: string; repoPath?: string | null }
 
-export type ShipSettings = Record<string, { script?: unknown } | undefined>;
+export type ShipSettings = Record<string, { script?: unknown; base?: unknown } | undefined>;
 
 export type ShipHandled = Record<string, number>;
 
@@ -122,11 +122,47 @@ export function readShipSettings(userDir: string): ShipSettings {
   }
 }
 
+const realOrNull = (p: string) => { try { return fs.realpathSync(p); } catch { return null; } };
+const IN_A_TASK_FOLDER = /[\\/]\.claude[\\/]worktrees([\\/]|$)/;
+
+// THE CHECKOUT IS PINNED HERE, because repoPath lives in the store, which
+// workers can write: pointed at a folder a worker wrote, the queue ran that
+// folder's script with the push token. An entry without `base` takes the
+// project's checkout the first time the queue reads it, and keeps it.
+export function pinShipBases(userDir: string, products: ShipProduct[]) {
+  const settings = readShipSettings(userDir);
+  let changed = false;
+  for (const p of products ?? []) {
+    const entry = settings[p?.slug] as { script?: unknown; base?: unknown } | undefined;
+    if (!entry || typeof entry.base === 'string' || !p.repoPath) continue;
+    const real = realOrNull(p.repoPath);
+    if (!real || IN_A_TASK_FOLDER.test(real)) continue;
+    settings[p.slug] = { ...entry, base: real };
+    changed = true;
+  }
+  if (!changed) return settings;
+  try {
+    const tmp = `${shipSettingsFile(userDir)}.${process.pid}.tmp`;
+    fs.writeFileSync(tmp, `${JSON.stringify(settings, null, 2)}\n`);
+    fs.renameSync(tmp, shipSettingsFile(userDir));
+  } catch { /* unpinned, the entry ships from nowhere rather than from the store's word */ }
+  return settings;
+}
+
+/** The checkout this project's shipping is pinned to, when repoPath no longer is it. */
+export function movedFrom(product: ShipProduct | null | undefined, settings?: ShipSettings | null): string | null {
+  const base = (settings?.[product?.slug as string] as { base?: unknown } | undefined)?.base;
+  if (typeof base !== 'string') return null;
+  return product?.repoPath && realOrNull(product.repoPath) === base ? null : base;
+}
+
 /** The script that ships this project, inside its base checkout, or null. */
 export function shipScriptFor(product: ShipProduct | null | undefined, settings?: ShipSettings | null) {
   const rel = settings?.[product?.slug as string]?.script;
   if (!product?.repoPath || typeof rel !== 'string' || !rel || path.isAbsolute(rel)) return null;
+  if (movedFrom(product, settings)) return null;
   const base = path.resolve(product.repoPath);
+  if (IN_A_TASK_FOLDER.test(base)) return null;
   const script = path.resolve(base, rel);
   if (!script.startsWith(base + path.sep)) return null;
   return fs.existsSync(script) ? script : null;
@@ -391,8 +427,9 @@ export class ShipQueue {
 
   tick(items: ShipItem[], products: ShipProduct[]) {
     if (this.busy) return null;
-    const settings = readShipSettings(this.userDir);
+    const settings = pinShipBases(this.userDir, products);
     if (!Object.keys(settings).length) return null;
+    this._refuseMoved(items, products, settings);
     const next = nextToShip(items, products, settings, {
       isLive: this.isLive, liveSince: this.liveSince, folderFor: this.folderFor, handled: readHandled(this.userDir),
     });
@@ -404,6 +441,21 @@ export class ShipQueue {
     const done = () => writeHandled(this.userDir, { ...readHandled(this.userDir), [keyOf(next.item)]: markedAt(next.item) });
     this.busy = this.ship(next, products, items).then(done, done).finally(() => { this.busy = null; });
     return this.busy;
+  }
+
+  // A row whose project no longer points at its pinned checkout is told so
+  // once for that marking, rather than waiting on a ship that never comes.
+  _refuseMoved(items: ShipItem[], products: ShipProduct[], settings: ShipSettings) {
+    const bySlug = new Map(products.map((p) => [p.slug, p]));
+    const handled = readHandled(this.userDir);
+    for (const item of items) {
+      const product = bySlug.get(item.product);
+      const base = product && owedAShip(item, handled) ? movedFrom(product, settings) : null;
+      if (!base) continue;
+      const note = `It did not ship: shipping for this project is set to the checkout at ${base}, and the project now points somewhere else. If you moved it, take its "base" out of ship.json in the app's data folder.`;
+      try { this.store.shipFailed(product!.slug, item.id, { note, labels: withoutShipLabel(item) }); } catch (e) { this.log.warn?.(`zero: could not refuse the ship of ${item.id}:`, (e as Error).message); }
+      writeHandled(this.userDir, { ...readHandled(this.userDir), [keyOf(item)]: markedAt(item) });
+    }
   }
 
   /** The ids of the rows still waiting on this queue, for the window. */
