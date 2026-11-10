@@ -239,10 +239,10 @@ describe('no raw colour outside the token blocks', () => {
       // ../renderer/src/scroll-gutter.ts so the reply box centres in the same
       // width as the words. Geometry only the running window knows.
       '--scroll-gutter',
-      // How tall the approval card is, written onto the page by
-      // ../renderer/src/room-for-the-card.ts so the list ends above it.
-      // Geometry only the running window knows.
-      '--approval-room', '--approval-lift',
+      // How tall the approval card is, how high and how wide it stands, written
+      // onto the page by ../renderer/src/room-for-the-card.ts so the list ends
+      // above it and it keeps off the Reply box. Geometry only the running window knows.
+      '--approval-room', '--approval-lift', '--approval-width',
       // Where the open file's card sits in its pane, written by
       // ../renderer/src/components/DocPane.tsx so the divider lands on its edge.
       '--doc-card-x', '--doc-card-y', '--doc-card-h', '--doc-card-r',
