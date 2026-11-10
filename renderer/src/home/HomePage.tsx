@@ -43,6 +43,8 @@ export function HomePage({ hello, now, needs, needsCount, progressCount, team, p
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.closest('input, textarea, [contenteditable="true"], .modal'))) return;
+      // The New thread box's suggestions take ↓ and Enter themselves; the setup has its own keys.
+      if (t?.closest('.tc-card') || document.documentElement.hasAttribute('data-setup')) return;
       const down = e.key === 'j' || e.key === 'ArrowDown', up = e.key === 'k' || e.key === 'ArrowUp';
       if (!down && !up && !(e.key === 'Enter' && pick >= 0)) return;
       if (!needs.length) return;
