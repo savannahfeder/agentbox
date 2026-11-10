@@ -5,8 +5,8 @@
 // left, and no microphone. A teammate is an agent, so its box is now the one
 // you reply to an agent with: the same field that grows, ⌘↵ to send and Enter
 // for a new line, and the paperclip, microphone and Send at the right of the
-// bar. It replaces a-teammates-reply-box-is-the-group-chats-box, whose ask
-// (the box grows as you write) is kept below.
+// bar. Its ask that the box grows as you write is kept below; what still holds
+// for the group chat's own box is the-group-chats-box-grows-and-offers-no-at.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
