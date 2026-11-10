@@ -96,6 +96,7 @@ export interface CardToPut {
 }
 
 interface FileLinkRow { token: string; version: number; hash: string | null; created_at?: string; updated_at: string; comments: number }
+interface LinkViewRow { name: string; kind: string; type: string; body: string; version: number; created_at?: string; updated_at: string; owner_name: string | null; owner_avatar: string | null; mine: boolean }
 interface MyFileLinkRow { token: string; source: string; name: string; kind: string; created_at: string; updated_at: string; comments: number }
 interface LinkCommentRow { id: string; by_name: string; by_avatar: string | null; body: string; created_at: string; mine: boolean; by_owner: boolean }
 interface NewLinkCommentRow { token: string; source: string; name: string; by_name: string; body: string; created_at: string }
@@ -427,6 +428,54 @@ export function supabaseBackend(client: SupabaseClient) {
     async stopFileLink(token: string) {
       await myId();
       must(await client.rpc('stop_file_link', { tok: token }), 'stopping the link');
+    },
+
+    // A film's pieces, raw, in the private link-files bucket at <token>/<hash>/<n>
+    // (20261109120000_a_film_can_be_shared_by_its_link.sql).
+    async putLinkPiece(name: string, bytes: Buffer) {
+      await myId();
+      const { error }: { error: StorageFailure | null } = await client.storage.from('link-files').upload(name, bytes, { contentType: 'application/octet-stream', upsert: false });
+      if (!error || /exists|duplicate/i.test(`${error.message} ${error.error ?? ''}`) || String(error.statusCode ?? error.status) === '409') return;
+      throw new Error(`sending a piece of the film: ${error.message}`);
+    },
+
+    async linkPiecesHeld(token: string, hash: string) {
+      await myId();
+      const { data, error }: { data: { name: string }[] | null; error: StorageFailure | null } = await client.storage.from('link-files').list(`${token}/${hash}`, { limit: 1000 });
+      if (error) return [];
+      return (data ?? []).map((o) => Number(o.name)).filter((n) => Number.isInteger(n));
+    },
+
+    async clearLinkPieces(token: string, keep: string | null) {
+      await myId();
+      const bucket = client.storage.from('link-files');
+      const { data: copies }: { data: { name: string }[] | null } = await bucket.list(token, { limit: 100 });
+      for (const copy of copies ?? []) {
+        if (copy.name === keep) continue;
+        const { data: pieces }: { data: { name: string }[] | null } = await bucket.list(`${token}/${copy.name}`, { limit: 1000 });
+        const names = (pieces ?? []).map((p) => `${token}/${copy.name}/${p.name}`);
+        if (names.length) {
+          const { error }: { error: StorageFailure | null } = await bucket.remove(names);
+          if (error) throw new Error(`clearing a film's old pieces: ${error.message}`);
+        }
+      }
+    },
+
+    // What anyone with the link reads, so a file shared with this person can be brought in.
+    async fileLinkView(token: string) {
+      const rows = must<LinkViewRow[] | null>(await client.rpc('file_link_view', { tok: token }), 'reading the shared file');
+      const r = rows?.[0];
+      if (!r) return { stopped: must<boolean>(await client.rpc('file_link_stopped', { tok: token }), 'reading the shared file') === true, file: null };
+      return { stopped: false, file: { name: r.name, kind: r.kind, type: r.type, body: r.body, version: r.version, createdAt: msOf(r.created_at ?? r.updated_at), updatedAt: msOf(r.updated_at), ownerName: r.owner_name ?? null, ownerAvatar: r.owner_avatar ?? null, mine: !!r.mine } };
+    },
+
+    async linkPiece(name: string) {
+      const { data, error }: { data: Blob | null; error: StorageFailure | null } = await client.storage.from('link-files').download(name);
+      if (error) {
+        if (/not.?found/i.test(`${error.message} ${error.error ?? ''}`) || [400, 404].includes(Number(error.statusCode ?? error.status))) return null;
+        throw new Error(`taking a piece of the film: ${error.message}`);
+      }
+      return Buffer.from(await data!.arrayBuffer());
     },
 
     async fileLinkComments(token: string) {
