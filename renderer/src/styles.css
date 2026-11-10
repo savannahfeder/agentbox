@@ -910,7 +910,8 @@ body {
   width: 26px; height: 26px; padding: 0; display: grid; place-items: center;
   border: 0; border-radius: var(--tag-radius); background: none; color: var(--text-dim); cursor: pointer;
 }
-.back-forward button:not(:disabled) { background: var(--film-strong); color: var(--text); }
+.back-forward button:not(:disabled) { color: var(--text); }
+.back-forward button:not(:disabled):hover { background: var(--film-strong); }
 .back-forward button:disabled { color: var(--text-faint); opacity: .45; cursor: default; }
 .back-forward svg { width: 15px; height: 15px; }
 /* Home hides its header bar but keeps the arrows. */
