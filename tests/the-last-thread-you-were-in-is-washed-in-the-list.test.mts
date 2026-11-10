@@ -61,12 +61,14 @@ describe('its row', () => {
     expect(rule![1]).not.toMatch(/margin|inset|left:|right:/);
   });
 
-  it('fades in the light theme in the theme ink, over enough stops to show no steps', () => {
+  it('fades in the light theme in a whisper of the accent, over enough stops to show no steps', () => {
+    // Two greys were turned down on white: they read as a dirty slab.
     const css = read('renderer/src/styles.css');
     const light = css.match(/\[data-theme="light"\] \.row\.recent\s*\{([^}]*)\}/);
     expect(light, 'a light-theme rule').toBeTruthy();
-    expect(light![1]).toMatch(/rgb\(17 25 48/);
-    expect((light![1].match(/rgb\(/g) ?? []).length).toBeGreaterThanOrEqual(4);
+    expect(light![1]).toMatch(/rgb\(238 96 24 \/ 0\.0\d+\)/);
+    expect(light![1]).not.toMatch(/rgb\(17 25 48|rgb\(0 0 0/);
+    expect((light![1].match(/rgb\(/g) ?? []).length).toBeGreaterThanOrEqual(3);
   });
 
   it('has the hairlines above and below it run to the card edge with the wash', () => {
