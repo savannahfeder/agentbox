@@ -1,6 +1,7 @@
 // PURE. What the Files place shows of the list main/files-place.mts hands it.
 import type { FileFolder, FileKind, PlacedFile } from '../types';
 import { PLAIN_AGENT } from '../../../shared/agent-voice.mts';
+import { MAC } from '../this-keyboard';
 
 export const KIND_ORDER: FileKind[] = ['markdown', 'image', 'film', 'deck', 'pdf', 'page', 'table', 'code'];
 export const KIND_PLURAL: Record<FileKind, string> = { markdown: 'Documents', image: 'Pictures', film: 'Films', deck: 'Decks', pdf: 'PDFs', page: 'Pages', table: 'Tables', code: 'Code' };
@@ -106,7 +107,7 @@ export function sortFiles<T extends Pick<PlacedFile, 'name' | 'sentIn' | 'at' | 
 }
 
 // The app runs on Linux too, where "this Mac" would be untrue.
-export const MACHINE = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform) ? 'Mac' : 'computer';
+export const MACHINE = MAC ? 'Mac' : 'computer';
 
 /** A size as a person reads it: 625 MB, 2.1 MB, 4 KB, 4.8 GB. */
 export function sizeWords(bytes: number): string {
