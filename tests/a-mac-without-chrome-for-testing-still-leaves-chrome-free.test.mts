@@ -44,6 +44,17 @@ describe('the hidden browser on a Mac with no Chrome for Testing', () => {
     expect(findChrome('darwin', {}, undefined, () => [cft], () => ['/cache/shell'])).toBe(cft);
   });
 
+  // 2026-11-09: Chrome for Testing on this Mac stopped reaching any local
+  // address (Page.navigate never answered, a data: page loaded), while the
+  // headless shell beside it loaded the same address. Two power testers spent
+  // an hour of timeouts. VERIFY_CHROME may pick the shell, never another browser.
+  it('is the hidden browser VERIFY_CHROME names, and only a hidden one', () => {
+    const cft = '/cache/chromium-1248/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing';
+    expect(findChrome('darwin', { VERIFY_CHROME: '/cache/shell' }, undefined, () => [cft], () => ['/cache/shell'])).toBe('/cache/shell');
+    expect(findChrome('darwin', { VERIFY_CHROME: '/opt/other' }, undefined, () => [cft], () => ['/cache/shell'])).toBe(cft);
+    expect(findChrome('darwin', { VERIFY_CHROME: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' }, undefined, () => [cft], () => [])).toBe(cft);
+  });
+
   it('is not the headless shell on Linux', () => {
     expect(findChrome('linux', { VERIFY_CHROME: '/usr/bin/chromium' }, undefined, () => [], () => ['/x'])).toBe('/usr/bin/chromium');
   });

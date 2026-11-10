@@ -139,6 +139,7 @@ import { useKeepInWindow } from '../keep-in-window';
 import { escapeClosesMenu } from '../menu-escape';
 import { isUpdateRow } from '../update-row';
 import { TeamRouteStrip, TeamSaid, teamHeld } from '../team/TeamFocus';
+import { HandedLine } from '../team/HandedBy';
 import {
   PriorityPicker, priorityIdOf, priorityValueOf, type PriorityId,
 } from './Priority';
@@ -2299,6 +2300,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             thread head. For one it is which tasks are stopped and what each is
             waiting on (w-cf0e8821b3); for the other it is what restarting costs
             and which two versions this is between (w-86452550e5). */}
+        <HandedLine item={item} />
         <ContinuedFrom labels={item.labels} />
         {givenTask && <div className="focus-meta by-lead"><TeamSaid item={item} /></div>}
         {made
@@ -3810,7 +3812,8 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
           <button type="button" className="tc-icon dock-clip" title="Attach files" aria-label="Attach files" onClick={pickFiles}><ClipGlyph /></button>
         )}
         {!talkTo?.length && talk.allowed && <MicButton talk={talk} />}
-        {stop && !hasDraft ? stop : (
+        {/* Stop gives way to Send, which would leave focus on the page and the next words typed nowhere. */}
+        {stop && !hasDraft ? <span style={{ display: 'contents' }} onClick={() => requestAnimationFrame(() => ref.current?.focus())}>{stop}</span> : (
         <span className={`dock-send-pair${canWait ? '' : ' solo'}`}>
         <button
           className="dock-send"

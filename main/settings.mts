@@ -12,6 +12,7 @@
 // place a grant is reviewed; what changed is that she edits them as fields on
 // the project they belong to instead of in a text editor.
 
+import { isPackagedElectron } from './team/session.mts';
 import { teammatesOn } from '../shared/teammates.mts';
 import { phoneChoiceOf, phoneProjectsOf, withPhoneAll, withPhoneProject, phoneEligible } from '../shared/phone-snapshot.mts';
 import fs from 'node:fs';
@@ -87,6 +88,7 @@ export interface SettingsConfig {
   posthogHost?: string;
   alphaTeammates?: unknown;
   alphaMultiplayer?: boolean | null;
+  alphaBackForward?: boolean | null;
   [key: string]: unknown;
 }
 
@@ -611,11 +613,13 @@ export function searchForEngineBin(config: SettingsConfig, engine: string) {
 // THE ALPHA FEATURES SWITCHES (w-3d0fa23ffb). Off unless someone turned them
 // on in Settings; only a real `true` counts. Multiplayer is on unless turned off:
 // the first run offers a team, so it cannot wait behind a switch in Settings.
-export function alphaFeatures(config?: SettingsConfig | null, _opts: { packaged?: boolean } = {}) {
+// Back and forward is on where the app is being built, so its maker lives with it first.
+export function alphaFeatures(config?: SettingsConfig | null, { packaged = isPackagedElectron() }: { packaged?: boolean } = {}) {
   return {
     rooms: config?.alphaRooms === true,
     teammates: teammatesOn(config),
     multiplayer: config?.alphaMultiplayer !== false,
+    backForward: packaged ? config?.alphaBackForward === true : config?.alphaBackForward !== false,
   };
 }
 
@@ -1432,6 +1436,10 @@ export function setWorkspaceSetting({ config, supervisor, store }: SettingsDeps,
       break;
     case 'alphaMultiplayer':
       saveConfig(config, { alphaMultiplayer: !!value });
+      supervisor.onChange?.();
+      break;
+    case 'alphaBackForward':
+      saveConfig(config, { alphaBackForward: !!value });
       supervisor.onChange?.();
       break;
     // THE CORNER TAG (w-dafae58a23). Turning it back on also ends any hide, so

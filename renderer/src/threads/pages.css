@@ -150,6 +150,17 @@
    inline it ran on under the faint words on an urgent row. */
 .th-repeat { margin-right: 9px; vertical-align: -2px; color: var(--text-faint); flex: none; }
 .th-aside { display: inline-block; margin-left: 12px; color: var(--text-faint); }
+/* A long aside is cut short before the title is, rather than dropped whole by
+   the cell's ellipsis. It stays an inline-block inside its box, which keeps the
+   selected row's underline off it. */
+.th-cell-title.with-aside { display: flex; align-items: center; }
+.th-cell-title.with-aside > * { flex: none; }
+.th-cell-title.with-aside > .th-title-text { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.th-cell-title.with-aside > .th-aside-box { flex: 1 1 0; max-width: max-content; min-width: 0; overflow: hidden; }
+.th-aside-box > .th-aside { max-width: calc(100% - 12px); overflow: hidden; text-overflow: ellipsis; vertical-align: top; }
+/* Flex items take the cell's underline, so in this cell the title alone carries it. */
+.row .subject.with-aside { text-decoration-line: none; }
+.row .subject.with-aside > .th-title-text { text-decoration: underline solid 1.5px; text-decoration-color: inherit; text-underline-offset: 4px; }
 .th-aside.late { color: var(--text-dim); }
 .th-aside.late::before { content: ''; display: inline-block; width: 5px; height: 5px; margin-right: 6px; border-radius: 50%; background: var(--accent); vertical-align: 2px; }
 

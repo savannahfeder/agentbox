@@ -266,6 +266,8 @@ import { MATCH_SKY, SKY_THEMES, skyTheme, wornSky } from './home/sky';
 import { engineLetter, engineName, greeting, teamRowState, weekCounts } from './home/home-model';
 import { sentFrom } from './team/company';
 import { reachAudienceOf } from '../../shared/teammate-reach.mts';
+import { useBackAndForward, type Stop as TrailStop } from './back-and-forward';
+import { BackForward } from './components/BackForward';
 
 const FIRST_IDEAS = ideasFor();
 
@@ -7258,6 +7260,46 @@ export default function App() {
   // Leaving Chats forgets which conversation was open there, or the same row
   // opened from Needs you lands back on the Chats screen with another reply box.
   const openView = (next: View) => { roomsUi.leave(); setChatsDirect(null); teammatesUi.leave(); setFilesPage(null); setConnectionsPage(null); setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); setEvPick(null); setTodayOn(false); setTasksOn(false); setChatsPlace(null); setHomeOpen(false); };
+
+  // BACK AND FORWARD (Alpha features). Above the early returns below, because
+  // it is a hook; `homeShown` is worked out again here for the same reason.
+  const backForwardOn = !!snap?.alpha?.backForward && !onPhone();
+  const homeHere = homeOn && homeOpen && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
+    && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown;
+  const stopHere: TrailStop | null = settingsOpen ? { at: 'settings', pane: settingsAt }
+    : focused ? { at: 'thread', product: focused.product, id: focused.id }
+    : homeHere ? { at: 'home' }
+    : filesShown ? { at: 'files', project: filesPage?.project ?? null }
+    : connectionsShown ? { at: 'connections' }
+    : search !== null || teamShown || roomShown || teammatesShown || chatsPlaceShown || focusedRepeat || todayOn || tasksOn ? null
+    : { at: 'list', view };
+  const trail = useBackAndForward({
+    on: backForwardOn,
+    here: stopHere,
+    exists: (s) => s.at !== 'thread' || selectable.some((i) => i.id === s.id && i.product === s.product),
+    go: (s) => {
+      if (s.at === 'home') { openView('inbox'); setHomeOpen(true); }
+      else if (s.at === 'list') openView(s.view);
+      else if (s.at === 'files') openFiles(s.project);
+      else if (s.at === 'connections') openConnectionsPage(null);
+      else if (s.at === 'settings') {
+        setTeamOpen(false); closeSearch(); setFocused(null);
+        setSettingsPane(s.pane); setSettingsVisit((n) => n + 1); setSettingsOpen(true);
+      } else {
+        const card = selectable.find((i) => i.id === s.id && i.product === s.product);
+        if (card) { openView(view); setFocused(card); }
+      }
+    },
+  });
+  const stopName = (s: TrailStop): string => s.at === 'home' ? 'Home'
+    : s.at === 'list' ? (INBOX_TABS.find((t) => t.view === s.view)?.label ?? 'Inbox')
+    : s.at === 'files' ? 'Files'
+    : s.at === 'connections' ? 'Connections'
+    : s.at === 'settings' ? 'Settings'
+    : selectable.find((i) => i.id === s.id && i.product === s.product)?.title ?? 'the thread';
+  const backForward = backForwardOn
+    ? <BackForward backTo={trail.backTo} forwardTo={trail.forwardTo} onBack={trail.back} onForward={trail.forward} name={stopName} />
+    : null;
   useEffect(() => {
     if (!onPhone()) return;
     if (signInGate) {
@@ -7790,7 +7832,7 @@ export default function App() {
     <FreeAgentContext.Provider value={freeWaitIds}>
     <TryAgainContext.Provider value={tryAgain}>
     <CloudOfferContext.Provider value={cloudOfferNow ? { offer: cloudOfferNow, onGo: (go) => void onCloudGo(go) } : null}>
-    <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app workspace-layout${narrowSidebar ? ` gt-rail gt-inset gt-sumleft${sideFolded ? '' : ' gt-rail-open'}` : ''}${focused && !settingsOpen && !inChats ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${sideFolded ? ' workspace-collapsed' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${notesShown ? ' notes-open' : ''}${notesClosed ? ' notes-closed' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}${cardOnScreen ? ' asking' : ''}${(queueSpot || onePage) && focused ? ' one-at-a-time' : ''}${homeShown ? ' home-shown sky-shown' : skyOnInbox ? (onBoard ? ' sky-shown sky-board' : ' sky-shown') : ''}`}>
+    <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app workspace-layout${narrowSidebar ? ` gt-rail gt-inset gt-sumleft${sideFolded ? '' : ' gt-rail-open'}` : ''}${focused && !settingsOpen && !inChats ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${backForward ? ' back-forward-on' : ''}${sideFolded ? ' workspace-collapsed' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${notesShown ? ' notes-open' : ''}${notesClosed ? ' notes-closed' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}${cardOnScreen ? ' asking' : ''}${(queueSpot || onePage) && focused ? ' one-at-a-time' : ''}${homeShown ? ' home-shown sky-shown' : skyOnInbox ? (onBoard ? ' sky-shown sky-board' : ' sky-shown') : ''}`}>
 
       {/* At the end of <body>, so its drag rectangles are reported after the
           top bar's and this layout's ::after strip. Inside the app, those put
@@ -7862,6 +7904,7 @@ export default function App() {
         <div className="chrome-reach" style={{ width: CHROME_REACH.width, height: CHROME_REACH.height }} aria-hidden="true" />
       )}
       <header className="topbar">
+        {backForward}
         {/* THE TAB KEY IS THE ONE SHORTCUT THE APP NEVER TOLD ANYONE ABOUT
             (w-64c76bfdad). Tab rotates Inbox, Scheduled, In progress and Closed
             and shift-Tab goes back, and on 2026-08-20 that was measured to be
@@ -8308,7 +8351,7 @@ export default function App() {
                   onStop={() => stopAgent(focused)}
                   onRunNow={() => runNow(focused)}
                   onPin={focused.agent ? undefined : (pin) => pinThread(focused.id, pin, true)}
-                  place={focused.agent ? null : threadPlace(focused, snap.supervisor.running.find((r) => r.itemId === focused.id) ?? null, snap.cloud ?? null)}
+                  place={focused.agent ? null : threadPlace(focused, snap.supervisor.running.find((r) => r.itemId === focused.id) ?? null, snap.cloud ?? null, runningEngine)}
                   onPlace={(keep) => placeThread(focused, keep, false)}
                   pageAsk={threadAsk?.key === keyOf(focused) ? threadAsk : null}
                   onAsked={() => setThreadAsk(null)}
@@ -8417,6 +8460,7 @@ export default function App() {
                   pointer={listPointer}
                   table={search === null}
                   unread={(item) => isUnread(item, seenAt, unreadSince, team?.me ?? null)}
+                  lastThread={backForwardOn ? trail.lastThread : null}
                   products={snap.products}
                   team={team}
                   mixed={search === null ? mixedRows : null}
@@ -8929,7 +8973,7 @@ export default function App() {
                 chosen: team ? chosenNames(shownToPeople(target, project), team.byId) : undefined,
                 teammates: !!team && teammates(team.state.people ?? [], team.me).length > 0,
                 pinned: live ? !!target.pinned : null,
-                place: live ? threadPlace(target, snap.supervisor.running.find((r) => r.itemId === target.id) ?? null, snap.cloud ?? null) : null,
+                place: live ? threadPlace(target, snap.supervisor.running.find((r) => r.itemId === target.id) ?? null, snap.cloud ?? null, snap.engines?.byItem?.[target.id] ?? snap.engines?.workspace ?? null) : null,
                 open: focused && keyOf(focused) === key && openShows?.key === key ? openShows : null,
                 rename: page || isDirect(project ?? undefined),
                 repeats: !!ruleOf(target),

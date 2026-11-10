@@ -43,11 +43,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { readWorld, worldTurn, worldAnswer, titleIn, stepEvery, workStep } from './stand-in-world.mjs';
+import { readWorld, worldTurn, worldAnswer, titleIn, stepEvery, workStep, asksForAChange, standInEdit } from './stand-in-world.mjs';
 import { makeArtifacts } from './stand-in-artifacts.mjs';
 
 const argv = process.argv.slice(2);
-const say = (obj) => process.stdout.write(JSON.stringify(obj) + '\n');
+// The app's question about a task's level (main/task-priority.mts) passes no output
+// format, and real Claude Code answers that in plain text. Only that question, so the
+// namer keeps the answer it had.
+const asksLevel = argv.some((a) => /left for you to rank/.test(a));
+const plainText = asksLevel && !argv.includes('--output-format');
+const say = (obj) => {
+  if (!plainText) process.stdout.write(JSON.stringify(obj) + '\n');
+  else if (obj.type === 'result') process.stdout.write(`${obj.result}\n`);
+};
 const sessionId = `stub-${crypto.randomUUID()}`;
 
 const planFile = process.env.STUB_CLAUDE_PLAN ?? null;
@@ -91,6 +99,23 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 // never closed its input and never wrote the answer onto the row (found
 // 2026-10-11 by the verify-agentbox live drive). So: replay every user line, as
 // the CLI does, and wait for the first before working on it.
+// The usage corner asks with `get_usage` and sends no user line. The world's
+// `usage` ({ session, week } percents) sets the answer; a login it has out
+// reads full.
+function answerControl({ request_id, request }) {
+  const reply = (response) => say({ type: 'control_response', response: { subtype: 'success', request_id, response } });
+  if (request?.subtype !== 'get_usage') return reply({});
+  const world = readWorld(plan.world);
+  const login = process.env.CLAUDE_CONFIG_DIR ? path.basename(process.env.CLAUDE_CONFIG_DIR) : 'default';
+  const out = Array.isArray(world.out) && world.out.includes(login);
+  const pct = (span, fallback) => (out ? 100 : Number.isFinite(Number(world.usage?.[span])) ? Number(world.usage[span]) : fallback);
+  const resets = (h) => new Date(Date.now() + h * 3600_000).toISOString();
+  reply({ rate_limits_available: true, rate_limits: {
+    five_hour: { utilization: pct('session', 12), resets_at: resets(3) },
+    seven_day: { utilization: pct('week', 25), resets_at: resets(72) },
+  } });
+}
+
 const streamInput = argv.includes('--input-format');
 let firstUserLine = null;
 let stdinEnded = !streamInput;
@@ -106,6 +131,7 @@ const inputEnded = new Promise((resolve) => {
       buffer = buffer.slice(at + 1);
       let msg = null;
       try { msg = JSON.parse(line); } catch { continue; }
+      if (msg?.type === 'control_request') { answerControl(msg); continue; }
       if (msg?.type !== 'user') continue;
       say({ ...msg, session_id: sessionId });
       firstUserLine ??= msg;
@@ -241,6 +267,18 @@ async function actAsTeammate(brief, prompt, answer) {
       if (failed(go)) await session.call('team_post', { text: 'Before I start: should I bring you everything I find, or only what needs a decision?', options: ['Everything', 'Only decisions'] });
       return;
     }
+    if (brief.includes('You have no method yet.')) {
+      await session.call('team_method', { text: '# How I work\n\n## What you have told me\n- (nothing yet)\n\n## What needs your yes first\n- Anything that goes out in public or costs money\n' });
+    }
+    // The look-back's own opening line (main/teammates.mts openingFor).
+    if (prompt.includes('Time to learn from what the person said on your recent work.')) {
+      const named = brief.split('## Threads named in what woke you')[1]?.split('\n## ')[0] ?? '';
+      const n = (named.match(/^- .*characters\)$/gm) ?? []).length || 'your recent';
+      const rule = `- (${new Date().toISOString().slice(0, 10)}) Reread ${n} threads you replied on; kept your corrections from them.`;
+      const r = await session.call('team_method', { old: '## What you have told me\n', new: `## What you have told me\n${rule}\n` });
+      if (!failed(r)) await session.call('team_post', { text: `I went back over ${n} threads you replied on and tightened my method.` });
+      return;
+    }
     await session.call('team_post', { text: answer });
   } finally {
     session.close();
@@ -321,6 +359,13 @@ const limitOn = directive('stub:limit-on')?.[1];
 const world = argv.includes('-p') ? readWorld(plan.world) : {};
 const turn = worldTurn(world, loginName);
 if (Object.keys(world).length) said = worldAnswer(said, turn, titleIn(promptText), attempt);
+// The app asking for the level of a task left on Agent decides (main/task-priority.mts),
+// answered from the task's own words so a tester sees a level a person would agree with.
+if (asksLevel && !turn.limit) {
+  const task = promptText.split('--- task ---')[1] ?? '';
+  said = /\b(broken|down|crash\w*|block\w*|urgent|asap|today|fail\w*|error)\b/i.test(task) ? 'high'
+    : /\b(idea|clean ?up|someday|nice to have|maybe|tidy)\b/i.test(task) ? 'low' : 'medium';
+}
 // WHAT ONLY THE PERSON CAN GIVE, ASKED FOR THE WAY A CLOUD RUN IS TOLD TO
 // (main/cloud/run.mts cloudNote, shared/cloud-needs.mts), and only by a run that
 // was told it may. The task's own words say what it needs: a service names a
@@ -421,6 +466,7 @@ const BROWSER_SIGN_INS = [
 const handsOver = directive('stub:file')?.[1];
 if (handsOver) said = `${said}\n\n${handsOver}\n`;
 // A task that asks for something to look at gets real files, saved where a real agent saves them.
+let madeFiles = false;
 if (plan.makesFiles && process.env.ZERO_ITEM && argv.includes('-p')) {
   const brief = (() => { const at = argv.indexOf('--append-system-prompt'); return at >= 0 ? argv[at + 1] ?? '' : ''; })();
   const docsDir = `${brief}\n${promptText}`.match(/^Product docs live in: (.+)$/m)?.[1]?.trim();
@@ -428,8 +474,31 @@ if (plan.makesFiles && process.env.ZERO_ITEM && argv.includes('-p')) {
   const asked = promptText.match(/# The founder has answered[\s\S]*?\n> (.*)/)?.[1] ?? '';
   try {
     const files = makeArtifacts({ docsDir, item: process.env.ZERO_ITEM, task, asked, promptText });
-    if (files.length) said = `${said}\n\n${files.join('\n')}\n`;
+    if (files.length) { said = `${said}\n\n${files.join('\n')}\n`; madeFiles = true; }
   } catch { /* a stand-in's file is never worth its answer */ }
+}
+if (!handsOver && !madeFiles) {
+  // A file the task names that is in the project's documents comes back with the answer, as a real agent's would.
+  const docs = promptText.match(/^Product docs live in: (.+)$/m)?.[1]?.trim();
+  const task = promptText.match(/^Title: [\s\S]*?(?=\n# |(?![\s\S]))/m)?.[0] ?? '';
+  const names = [...new Set(task.match(/[\w./-]+\.(?:html?|md|png|jpe?g|svg|gif|webp|txt|csv|json|pdf|mp4)\b/gi) ?? [])];
+  const found = docs && names.length ? handBack(docs, names) : [];
+  if (found.length) said = `${said}\n\n${found.join('\n\n')}\n`;
+}
+
+function handBack(docs, names) {
+  const all = [];
+  const walk = (dir, depth) => {
+    let entries = [];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      if (e.name.startsWith('.') || e.name === 'node_modules') continue;
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) { if (depth < 4) walk(p, depth + 1); } else all.push(path.relative(docs, p));
+    }
+  };
+  walk(docs, 0);
+  return names.map((n) => all.find((rel) => rel === n) ?? all.find((rel) => path.basename(rel) === path.basename(n))).filter(Boolean);
 }
 if (directive('stub:limit') || (directive('stub:limit-first') && attempt === 1) || (limitOn && limitOn === loginName) || turn.limit) {
   say({ type: 'result', subtype: 'success', result: "You've hit your session limit · resets 11:59pm", is_error: true, session_id: sessionId });
@@ -478,6 +547,12 @@ try {
   if (plan.holdMs) {
     const until = Date.now() + plan.holdMs;
     while (!stopping && Date.now() < until) await wait(50);
+  }
+  const asked = titleIn(promptText);
+  const changed = world.edits && asksForAChange(asked) ? standInEdit(process.cwd(), asked) : null;
+  if (changed) {
+    say({ type: 'assistant', session_id: sessionId, message: { content: [{ type: 'tool_use', id: 'toolu_edit', name: 'Write', input: { file_path: changed } }] } });
+    said = `${said}\n\nChanged ${changed} and committed it.`;
   }
 } catch (err) {
   say({ type: 'result', subtype: 'error', result: String(err?.message ?? err), is_error: true, session_id: sessionId });

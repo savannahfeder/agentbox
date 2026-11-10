@@ -125,6 +125,18 @@ export function heldForHer(item: Item): boolean {
     return item?.status === 'blocked' && status?.source === 'system' && !!toldBy(item)
         && answerTs(item) <= (status.ts ?? 0);
 }
+// THE MOMENT AN AGENT SET FOR ITS OWN THREAD TO RUN AGAIN, or 0. It counts
+// while it is later than the thread's newest answer, so it wakes the thread
+// once, and a run that sets another moment wakes it again.
+export function wakesItselfAt(item: (AnsweredItem & { runAt?: number; kind?: string }) | null | undefined): number {
+    if (item?.status !== 'open' || item.kind === 'question' || item.kind === 'review')
+        return 0;
+    const set = item.wrote?.runAt;
+    if (!set || set.source === 'founder')
+        return 0;
+    const at = item.runAt ?? 0;
+    return at > (item.wrote?.result?.ts ?? 0) ? at : 0;
+}
 // A PERSON'S WORD WRITTEN AFTER THE MOMENT WAS SET, AND NOT YET ACTED ON, RUNS
 // NOW. The moment is for the run it was set for, not for everything said on
 // the thread, and it stays on the row for that run.

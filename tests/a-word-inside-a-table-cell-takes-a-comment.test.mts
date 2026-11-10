@@ -62,7 +62,7 @@ describe('wired through', () => {
     expect(read('components/TableView.tsx')).toMatch(/className="tbl-edit" data-row=\{order\[editing\.r\] \+ 1\} data-col=\{table\.columns\[editing\.c\]\.name\}/);
   });
   it('both tables\' comment boxes take the cell with the words', () => {
-    expect(read('components/NotesSidebar.tsx')).toContain('setQuote({ text: q, cell: cellAround(at) })');
+    expect(read('components/NotesSidebar.tsx')).toContain('pointAt({ text: q, cell: cellAround(at) }, null)');
     expect(read('components/ArtifactStage.tsx')).toContain("onPlace({ kind: 'quote', text: quote, cell: cellAround(at) })");
   });
   it('closing the box does not pull the keys back from the note box', () => {
