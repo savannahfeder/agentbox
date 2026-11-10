@@ -7,6 +7,7 @@
 // this page over the whole window: Google first, then email and password, and
 // a way to make an account. Signing out lands here too, saying so.
 import { useEffect, useRef, useState, type FormEvent, type MutableRefObject } from 'react';
+import { createPortal } from 'react-dom';
 import { api } from '../api';
 import { Name } from '../../../shared/product-name.mjs';
 import { AppMark } from '../components/AppMark';
@@ -59,7 +60,7 @@ export const checkEmailLede = (email: string, cloud: boolean) => (cloud
   : `We sent a link to ${email}. Follow it to confirm your address, then sign in here.`);
 const TermsLinks = () => <>the <a href={TERMS_URL} onClick={(e) => { e.preventDefault(); window.open(TERMS_URL, '_blank'); }}>Terms</a> and the <a href={PRIVACY_URL} onClick={(e) => { e.preventDefault(); window.open(PRIVACY_URL, '_blank'); }}>Privacy policy</a></>;
 
-export function SignInPage({ onSkip, signedOut = false, error: startError = null, waitingUrl = null, purpose = 'team', startOn = 'sign-in', inSetup = false, onBack, primaryRef, onClose, onSignedIn }: {
+export function SignInPage({ onSkip, signedOut = false, error: startError = null, waitingUrl = null, purpose = 'team', startOn = 'sign-in', inSetup = false, onBack, primaryRef, termsAt = null, onClose, onSignedIn }: {
   onSkip?: () => void; signedOut?: boolean; error?: string | null; waitingUrl?: string | null;
   purpose?: 'team' | 'cloud' | 'phone' | 'share'; startOn?: 'sign-in' | 'sign-up'; onClose?: () => void; onSignedIn?: () => void;
   /** Drawn as a step of the setup: no tabs, the setup's own buttons, one field at a time. */
@@ -68,6 +69,8 @@ export function SignInPage({ onSkip, signedOut = false, error: startError = null
   onBack?: () => void;
   /** In the setup: what Enter does when no field has the keyboard. */
   primaryRef?: MutableRefObject<(() => void) | null>;
+  /** In the setup: where the terms line goes, at the foot of the panel. */
+  termsAt?: HTMLElement | null;
 }) {
   const cloud = purpose === 'cloud';
   const closable = cloud || purpose === 'phone' || purpose === 'share';
@@ -207,10 +210,11 @@ export function SignInPage({ onSkip, signedOut = false, error: startError = null
     if (closable) onSignedIn?.();
   };
 
-  const passwordField = (autoComplete: string, label: string) => (
-    <label className={missing?.field === 'password' ? 'si-missing' : undefined}><span>{label}</span>
+  // `bare` is for a screen whose heading already names the field.
+  const passwordField = (autoComplete: string, label: string, bare = false) => (
+    <label className={missing?.field === 'password' ? 'si-missing' : undefined}>{!bare && <span>{label}</span>}
       <span className="si-pw">
-        <input ref={pwField} type={showPassword ? 'text' : 'password'} value={password} autoComplete={autoComplete} aria-invalid={missing?.field === 'password' || undefined} onChange={(e) => { setPassword(e.target.value); setMissing(null); setError(null); }} />
+        <input ref={pwField} type={showPassword ? 'text' : 'password'} value={password} autoComplete={autoComplete} aria-label={bare ? label : undefined} aria-invalid={missing?.field === 'password' || undefined} onChange={(e) => { setPassword(e.target.value); setMissing(null); setError(null); }} />
         <button type="button" className="si-pw-show" aria-pressed={showPassword} onClick={() => setShowPassword((on) => !on)}>{showPassword ? 'Hide' : 'Show'}</button>
       </span>
     </label>
@@ -260,23 +264,23 @@ export function SignInPage({ onSkip, signedOut = false, error: startError = null
       <div className="si-page si-steps" role="group" aria-label={ask}>
         <div className="si-card">
           {(part !== 'start' || onBack) && <button type="button" className="ss-back" onClick={() => step(-1)}>{backArrow}Back</button>}
-          <h1 className="ss-h"><b>{ask}</b>{part === 'start' ? 'Your team sees your name on your threads.' : null}</h1>
+          <h1 className="ss-h"><b>{ask}</b></h1>
           {part === 'start' ? (
             <>
               <button type="button" className="si-google" disabled={!!busy} onClick={google}><GoogleMark />Continue with Google</button>
               <button type="button" className="si-primary" onClick={() => step(1)}>Continue with email</button>
-              <p className="si-terms">By continuing, you agree to <TermsLinks />.</p>
               <p className="si-switch si-setup-switch">Have an account? <button type="button" onClick={() => { setMode('sign-in'); setPassword(''); setError(null); }}>Sign in</button></p>
             </>
           ) : (
             <form className="si-form" onSubmit={onward}>
               {part === 'name' && <input ref={nameField} value={name} autoComplete="name" aria-label="Name" aria-invalid={missing?.field === 'name' || undefined} onChange={(e) => { setName(e.target.value); setMissing(null); }} />}
               {part === 'email' && <input ref={emailField} type="email" value={email} autoComplete="email" aria-label="Email" aria-invalid={missing?.field === 'email' || undefined} onChange={(e) => { setEmail(e.target.value); setMissing(null); setError(null); }} />}
-              {part === 'password' && passwordField('new-password', 'Password')}
+              {part === 'password' && passwordField('new-password', 'Password', true)}
               <button type="submit" className="si-primary" disabled={!!busy}>{part === 'password' ? (busy === 'email' ? 'Creating…' : 'Create account') : 'Continue'}</button>
             </form>
           )}
           {fault}
+          {termsAt ? createPortal(<p className="si-terms">By continuing, you agree to <TermsLinks />.</p>, termsAt) : <p className="si-terms">By continuing, you agree to <TermsLinks />.</p>}
         </div>
       </div>
     );

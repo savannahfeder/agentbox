@@ -16,7 +16,7 @@ import { MAC } from '../this-keyboard';
 import { starterAsks } from '../../../shared/teammates.mts';
 import { MATCH_SKY, SKY_THEMES, drawSky, wornSky } from '../home/sky';
 import { useDarkWindow } from '../home/home-settings';
-import { tabStop, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupStep } from '../setup-split';
+import { setupPreview, tabStop, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupStep } from '../setup-split';
 import FolderPicker from './FolderPicker';
 import { SignInPage } from '../team/SignInPage';
 import { Name } from '../../../shared/product-name.mjs';
@@ -103,17 +103,14 @@ export function SetupSplit(p: SetupSplitProps) {
   // THE APP MOVES INTO THE RIGHT PANEL while this shows.
   useEffect(() => {
     const root = document.documentElement;
-    // The window runs a little past the panel's right and bottom edges, at any window size.
     const fit = () => {
-      const left = Math.round(Math.min(800, Math.max(520, innerWidth * 0.47)));
-      const scale = Math.min(0.85, Math.max(0.55, (innerWidth - left - 56 + 60) / 1120));
-      root.style.setProperty('--ss-left', `${left}px`);
-      root.style.setProperty('--ss-scale', String(scale));
-      // Cut at the panel's right and bottom edges, in the app's own unscaled pixels.
-      const right = Math.max(0, 1120 - (innerWidth - 16 - (left + 56)) / scale);
-      const bottom = Math.max(0, 1300 - (innerHeight - 16 - 92) / scale);
+      const at = setupPreview(innerWidth, innerHeight);
+      root.style.setProperty('--ss-left', `${at.left}px`);
+      root.style.setProperty('--ss-x', `${at.x}px`);
+      root.style.setProperty('--ss-y', `${at.y}px`);
+      root.style.setProperty('--ss-scale', String(at.scale));
       // Negative top and left keep the window's outline and shadow, which a clip would otherwise cut.
-      root.style.setProperty('--ss-clip', `inset(-80px ${right}px ${bottom}px -80px round 0 0 ${16 / scale}px 0)`);
+      root.style.setProperty('--ss-clip', `inset(-80px ${at.right}px ${at.bottom}px -80px round 0 0 ${16 / at.scale}px 0)`);
     };
     fit();
     // The preview's new-thread box must not keep the keyboard behind the setup.
@@ -203,6 +200,7 @@ export function SetupSplit(p: SetupSplitProps) {
   // ---- the keyboard: Enter is always the primary button
   const primary = useRef<() => void>(() => {});
   const accountPrimary = useRef<(() => void) | null>(null);
+  const [foot, setFoot] = useState<HTMLDivElement | null>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // The folder picker hears its own keys.
@@ -272,7 +270,7 @@ export function SetupSplit(p: SetupSplitProps) {
     </>;
   } else if (step === 'account') {
     // The app's own sign-in form, in this column: Google, email, or a new account. No skip; it is required.
-    body = <div className="ss-signin"><SignInPage purpose="team" startOn="sign-up" inSetup onSignedIn={next} onBack={back ?? undefined} primaryRef={accountPrimary} /></div>;
+    body = <div className="ss-signin"><SignInPage purpose="team" startOn="sign-up" inSetup onSignedIn={next} onBack={back ?? undefined} primaryRef={accountPrimary} termsAt={foot} /></div>;
   } else if (step === 'invite') {
     head = ['Invite your team.', 'Add the people you work with.'];
     body = !p.snap?.team?.signedIn ? <>
@@ -334,6 +332,7 @@ export function SetupSplit(p: SetupSplitProps) {
           {body}
           {error && <p className="ss-error" role="alert">{error}</p>}
         </div>
+        <div className="ss-foot" ref={setFoot} />
       </div>
 
       <div className="ss-right" aria-hidden="true"><div className="ss-cap">Your {Name} so far</div></div>

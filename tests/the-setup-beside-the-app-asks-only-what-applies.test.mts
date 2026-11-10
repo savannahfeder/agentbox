@@ -248,7 +248,7 @@ describe('the app preview in its panel', () => {
   // outline and shadow on every side, top and left included.
   const split = fs.readFileSync(new URL('../renderer/src/components/SetupSplit.tsx', import.meta.url), 'utf8');
   it('is cut only at the right and bottom edges, so its outline shows', () => {
-    expect(split).toMatch(/--ss-clip', `inset\(-\d+px \$\{right\}px \$\{bottom\}px -\d+px/);
+    expect(split).toMatch(/--ss-clip', `inset\(-\d+px \$\{at\.right\}px \$\{at\.bottom\}px -\d+px/);
   });
 });
 

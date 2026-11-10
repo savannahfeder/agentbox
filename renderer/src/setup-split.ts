@@ -4,6 +4,18 @@
 
 import { MATCH_SKY } from './home/sky';
 
+/** Where the app sits beside the setup, in window pixels: the steps panel's
+ *  width, the app's top-left corner and scale, and how much of the 1120 by
+ *  1300 app the panel cuts at its right and bottom edges, in the app's own pixels. */
+export function setupPreview(width: number, height: number) {
+  const left = Math.round(Math.min(720, Math.max(480, width * 0.41)));
+  const x = left + 24;
+  const y = 40;
+  // The app runs a little past the panel's right edge at any window size.
+  const scale = Math.min(0.85, Math.max(0.55, (width - x + 60) / 1120));
+  return { left, x, y, scale, right: Math.max(0, 1120 - (width - 16 - x) / scale), bottom: Math.max(0, 1300 - (height - 16 - y) / scale) };
+}
+
 export type SetupStep = 'chats' | 'folder' | 'account' | 'invite' | 'teammates' | 'look';
 
 /** Only the steps that can apply on this build: most people are not on a team,
