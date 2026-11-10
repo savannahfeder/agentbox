@@ -773,6 +773,15 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
     }
   }
 
+  // A finished look-back asks nothing of you, whatever its answer says; it
+  // posts its own line when the method changed. A blocked one stays to be seen.
+  for (const t of live) {
+    for (const i of runsOf(t.id, items)) {
+      if (!isLookBack(i) || i.status === 'blocked' || !waitingOnYou(i)) continue;
+      actions.push({ type: 'replied', teammate: t.id, item: i.id, product: i.product, labels: i.labels ?? [], text: '', say: false });
+    }
+  }
+
   // A run that closed itself on a question is in nobody's Needs you, so the
   // question is said in the chat. Only a recent close, so an update does not
   // bring back every old question at once.
