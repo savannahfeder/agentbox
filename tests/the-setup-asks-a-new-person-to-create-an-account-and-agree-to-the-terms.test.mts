@@ -19,7 +19,7 @@ const css = read('renderer/src/components/setup-split.css');
 
 describe("the setup's account step", () => {
   it('opens on Create account', () => {
-    expect(split).toMatch(/<SignInPage purpose="team" startOn="sign-up" inSetup onSignedIn=\{next\} \/>/);
+    expect(split).toMatch(/<SignInPage purpose="team" startOn="sign-up" inSetup onSignedIn=\{next\}/);
   });
   it('trades the tabs for one line that switches', () => {
     expect(page).toMatch(/\(mode === 'sign-in' \|\| mode === 'sign-up'\) && !inSetup && \(/);

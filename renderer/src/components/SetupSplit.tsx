@@ -202,6 +202,7 @@ export function SetupSplit(p: SetupSplitProps) {
 
   // ---- the keyboard: Enter is always the primary button
   const primary = useRef<() => void>(() => {});
+  const accountPrimary = useRef<(() => void) | null>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // The folder picker hears its own keys.
@@ -239,6 +240,8 @@ export function SetupSplit(p: SetupSplitProps) {
   };
   const quiet = (label: string, run: () => void) => <button type="button" className="ss-quiet" disabled={busy} onClick={run}>{label}</button>;
 
+  // A step that draws no button of its own must not keep the last step's Enter.
+  primary.current = step === 'account' ? () => accountPrimary.current?.() : () => {};
   let head: [string, string] = ['', ''];
   let body: ReactNode = null;
   if (step === 'chats') {
@@ -247,9 +250,14 @@ export function SetupSplit(p: SetupSplitProps) {
       <div className="ss-list"><Row face={<span className="ss-ok"><Tick /></span>} name={`${done.chats === 1 ? '1 chat' : `${done.chats} chats`} brought in`} sub="They are in your inbox" /></div>
       <div className="ss-acts">{go('Continue', next)}</div>
     </> : <>
-      <div className="ss-list">
-        {p.chats.map((t) => <Row key={t.id} face={t.source === 'codex' ? 'X' : 'C'} name={t.title} sub={`${t.source === 'codex' ? 'Codex' : 'Claude Code'} · ${p.nameOf(bare(t.folder))} · ${said(t.when)}`}
-          end={<Check on={p.ticks.has(t.id)} />} on={p.ticks.has(t.id)} onClick={() => p.onToggle(t.id)} />)}
+      <div className="ss-list ss-chats">
+        {p.chats.map((t) => (
+          <div key={t.id} className={`ss-row ss-press ss-chat${p.ticks.has(t.id) ? ' ss-on' : ''}`} role="button" onClick={() => p.onToggle(t.id)}>
+            <span className="ss-name">{t.title}</span>
+            <span className="ss-meta">{t.source === 'codex' ? 'Codex · ' : ''}{p.nameOf(bare(t.folder))} · {said(t.when)}</span>
+            <Check on={p.ticks.has(t.id)} />
+          </div>
+        ))}
       </div>
       <div className="ss-acts">{go(ticked.length ? `Add ${ticked.length} to your inbox` : 'Continue', () => void bring(), true, 'Adding…')}{quiet('Skip', next)}</div>
     </>;
@@ -264,7 +272,7 @@ export function SetupSplit(p: SetupSplitProps) {
     </>;
   } else if (step === 'account') {
     // The app's own sign-in form, in this column: Google, email, or a new account. No skip; it is required.
-    body = <div className="ss-signin"><SignInPage purpose="team" startOn="sign-up" inSetup onSignedIn={next} /></div>;
+    body = <div className="ss-signin"><SignInPage purpose="team" startOn="sign-up" inSetup onSignedIn={next} onBack={back ?? undefined} primaryRef={accountPrimary} /></div>;
   } else if (step === 'invite') {
     head = ['Invite your team.', 'Add the people you work with.'];
     body = !p.snap?.team?.signedIn ? <>
@@ -321,7 +329,7 @@ export function SetupSplit(p: SetupSplitProps) {
           <span>{step ? stepLabel(steps, step) : 'All set'}</span>
         </div>
         <div className="ss-body" key={step ?? 'done'}>
-          {back && <button type="button" className="ss-back" onClick={back}><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 3.5L5.5 8l4.5 4.5" /></svg>Back</button>}
+          {back && step !== 'account' && <button type="button" className="ss-back" onClick={back}><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 3.5L5.5 8l4.5 4.5" /></svg>Back</button>}
           {head[0] && <h1 className="ss-h"><b>{head[0]}</b>{head[1]}</h1>}
           {body}
           {error && <p className="ss-error" role="alert">{error}</p>}

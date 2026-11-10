@@ -6,13 +6,14 @@
 // app standing with nobody in it. Now a team build with nobody signed in shows
 // this page over the whole window: Google first, then email and password, and
 // a way to make an account. Signing out lands here too, saying so.
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type MutableRefObject } from 'react';
 import { api } from '../api';
 import { Name } from '../../../shared/product-name.mjs';
 import { AppMark } from '../components/AppMark';
 import { onCloudPhone } from '../phone-screen';
 import { agreedHere, rememberAgreed } from './cloud-agreed';
 import { whatIsMissing, type Missing } from './what-is-missing';
+import { nextSignUpPart, type SignUpPart } from './sign-up-parts';
 import './sign-in.css';
 
 export const GoogleMark = () => (
@@ -58,11 +59,15 @@ export const checkEmailLede = (email: string, cloud: boolean) => (cloud
   : `We sent a link to ${email}. Follow it to confirm your address, then sign in here.`);
 const TermsLinks = () => <>the <a href={TERMS_URL} onClick={(e) => { e.preventDefault(); window.open(TERMS_URL, '_blank'); }}>Terms</a> and the <a href={PRIVACY_URL} onClick={(e) => { e.preventDefault(); window.open(PRIVACY_URL, '_blank'); }}>Privacy policy</a></>;
 
-export function SignInPage({ onSkip, signedOut = false, error: startError = null, waitingUrl = null, purpose = 'team', startOn = 'sign-in', inSetup = false, onClose, onSignedIn }: {
+export function SignInPage({ onSkip, signedOut = false, error: startError = null, waitingUrl = null, purpose = 'team', startOn = 'sign-in', inSetup = false, onBack, primaryRef, onClose, onSignedIn }: {
   onSkip?: () => void; signedOut?: boolean; error?: string | null; waitingUrl?: string | null;
   purpose?: 'team' | 'cloud' | 'phone' | 'share'; startOn?: 'sign-in' | 'sign-up'; onClose?: () => void; onSignedIn?: () => void;
-  /** Drawn as a step of the setup: no tabs, the setup's own buttons. */
+  /** Drawn as a step of the setup: no tabs, the setup's own buttons, one field at a time. */
   inSetup?: boolean;
+  /** In the setup: Back from the first screen, to the step before. */
+  onBack?: () => void;
+  /** In the setup: what Enter does when no field has the keyboard. */
+  primaryRef?: MutableRefObject<(() => void) | null>;
 }) {
   const cloud = purpose === 'cloud';
   const closable = cloud || purpose === 'phone' || purpose === 'share';
@@ -81,6 +86,11 @@ export function SignInPage({ onSkip, signedOut = false, error: startError = null
   const emailField = useRef<HTMLInputElement | null>(null);
   const pwField = useRef<HTMLInputElement | null>(null);
   const fieldOf = { name: nameField, email: emailField, password: pwField };
+  const [part, setPart] = useState<SignUpPart>('start');
+  useEffect(() => {
+    if (!inSetup || mode !== 'sign-up' || part === 'start') return;
+    fieldOf[part].current?.focus();
+  }, [part, mode, inSetup]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     setMissing(null);
     (mode === 'sign-up' ? nameField : mode === 'new-password' ? pwField : emailField).current?.focus();
@@ -151,11 +161,11 @@ export function SignInPage({ onSkip, signedOut = false, error: startError = null
     );
   }
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
+  const submit = async (e?: FormEvent) => {
+    e?.preventDefault();
     if (busy) return;
     const gap = whatIsMissing({ mode: mode === 'sign-up' ? 'sign-up' : 'sign-in', name, email, password });
-    if (gap) { setMissing(gap); setError(null); fieldOf[gap.field].current?.focus(); return; }
+    if (gap) { setMissing(gap); setError(null); if (inSetup && mode === 'sign-up') setPart(gap.field); fieldOf[gap.field].current?.focus(); return; }
     setBusy('email'); setError(null);
     const out = cloud
       ? await api.cloudAccountSignIn(mode === 'sign-up' ? { method: 'sign-up', name, email, password } : { method: 'email', email, password, acceptTerms: agreedHere(email) })
@@ -228,12 +238,58 @@ export function SignInPage({ onSkip, signedOut = false, error: startError = null
         : onCloudPhone() ? 'Use the account your computer is signed in with. Your threads are here even when it is closed.'
         : 'Your threads, your agents and your team, in one inbox.';
 
+  const backArrow = <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 3.5L5.5 8l4.5 4.5" /></svg>;
+  const fault = (error || missing) && <p className="si-error" role="alert">{error || missing?.say}</p>;
+
+  if (inSetup && mode === 'sign-up') {
+    const step = (by: 1 | -1) => {
+      setMissing(null); setError(null);
+      const to = nextSignUpPart(part, by);
+      if (to) setPart(to); else if (by < 0) onBack?.();
+    };
+    const onward = (e?: FormEvent) => {
+      e?.preventDefault();
+      if (part === 'name' && !name.trim()) { setMissing({ field: 'name', say: 'Enter your name.' }); return; }
+      if (part === 'email' && !email.trim()) { setMissing({ field: 'email', say: 'Enter your email address.' }); return; }
+      if (part === 'password') { void submit(); return; }
+      step(1);
+    };
+    if (primaryRef) primaryRef.current = () => onward();
+    const ask = part === 'start' ? 'Create your account.' : part === 'name' ? 'What’s your name?' : part === 'email' ? 'What’s your email?' : 'Choose a password.';
+    return (
+      <div className="si-page si-steps" role="group" aria-label={ask}>
+        <div className="si-card">
+          {(part !== 'start' || onBack) && <button type="button" className="ss-back" onClick={() => step(-1)}>{backArrow}Back</button>}
+          <h1 className="ss-h"><b>{ask}</b>{part === 'start' ? 'Your team sees your name on your threads.' : null}</h1>
+          {part === 'start' ? (
+            <>
+              <button type="button" className="si-google" disabled={!!busy} onClick={google}><GoogleMark />Continue with Google</button>
+              <button type="button" className="si-primary" onClick={() => step(1)}>Continue with email</button>
+              <p className="si-terms">By continuing, you agree to <TermsLinks />.</p>
+              <p className="si-switch si-setup-switch">Have an account? <button type="button" onClick={() => { setMode('sign-in'); setPassword(''); setError(null); }}>Sign in</button></p>
+            </>
+          ) : (
+            <form className="si-form" onSubmit={onward}>
+              {part === 'name' && <input ref={nameField} value={name} autoComplete="name" aria-label="Name" aria-invalid={missing?.field === 'name' || undefined} onChange={(e) => { setName(e.target.value); setMissing(null); }} />}
+              {part === 'email' && <input ref={emailField} type="email" value={email} autoComplete="email" aria-label="Email" aria-invalid={missing?.field === 'email' || undefined} onChange={(e) => { setEmail(e.target.value); setMissing(null); setError(null); }} />}
+              {part === 'password' && passwordField('new-password', 'Password')}
+              <button type="submit" className="si-primary" disabled={!!busy}>{part === 'password' ? (busy === 'email' ? 'Creating…' : 'Create account') : 'Continue'}</button>
+            </form>
+          )}
+          {fault}
+        </div>
+      </div>
+    );
+  }
+  if (primaryRef) primaryRef.current = inSetup && mode === 'sign-in' ? () => void submit() : null;
+
   return (
     <div className="si-page" role="dialog" aria-modal="true" aria-label={heading}>
       {/* No key on purpose: a stray Escape would skip it without anyone meaning to. */}
       {onSkip && <button type="button" className="si-skip-corner" onClick={onSkip}>Skip for now</button>}
       <div className="si-card">
         <span className="si-mark"><AppMark size={28} /></span>
+        {inSetup && onBack && <button type="button" className="ss-back" onClick={() => { setMode('sign-up'); setPart('start'); setError(null); }}>{backArrow}Back</button>}
         {inSetup && (mode === 'sign-up' || mode === 'sign-in')
           // The setup's own two-line heading, as every other step has.
           ? <h1 className="ss-h"><b>{mode === 'sign-up' ? 'Create your account.' : 'Sign in.'}</b>{mode === 'sign-up' ? 'Your team sees this name on your threads.' : 'With the account you already have.'}</h1>
