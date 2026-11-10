@@ -40,6 +40,7 @@ import { pipeline } from 'node:stream/promises';
 import { spawn, execFile, execFileSync } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
 import { usageMeter } from './usage.mjs';
+import { memoryGuard } from './memory-guard.mjs';
 import { keyNameRefused, HIDE_FROM } from './key-names.mjs';
 
 // One stdout event at most this many bytes of output.
@@ -232,6 +233,9 @@ export function createSandbox({
   // Where the usage meter reads the machine (cloud/sandbox/usage.mjs); a
   // test points it at a fake /sys/fs/cgroup and /proc.
   usage = {},
+  // Free memory under which the run's biggest program is stopped
+  // (cloud/sandbox/memory-guard.mjs). 0: no guard.
+  memoryFloorBytes = 0,
   // How a command gets a terminal (`claude setup-token` needs one). A test on
   // a Mac, whose `script` takes other flags, passes a plain shell.
   terminal = linuxTerminal,
@@ -823,6 +827,12 @@ export function createSandbox({
     }
     r.child = child;
     r.meter = usageMeter(usage);
+    if (memoryFloorBytes > 0 && child.pid) {
+      r.guard = memoryGuard({
+        floorBytes: memoryFloorBytes, agentPid: child.pid, ownerUid: runAs?.uid ?? null,
+        onStop: (s) => emit({ kind: 'error', message: `this cloud machine was almost out of memory (${Math.round(s.availableBytes / 2 ** 20)} MB free), so ${s.name} (${(s.rssBytes / 2 ** 30).toFixed(1)} GB) was stopped to keep the run going` }, r),
+      });
+    }
     child.stdout.on('data', (d) => { emitChunks('stdout', d, r); readTurn(r, d); });
     child.stderr.on('data', (d) => emitChunks('stderr', d, r));
     child.stdin.on('error', () => {});
@@ -844,6 +854,8 @@ export function createSandbox({
       r.exitSignal = signal || null;
       r.usage = r.meter?.stop() ?? null;
       r.meter = null;
+      r.guard?.stop();
+      r.guard = null;
       r.child = null;
       // Anything the command left running in its group goes now: a dev
       // server holding stdout open would otherwise keep the run "running".
@@ -2166,6 +2178,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const home = execFileSync('getent', ['passwd', user], { encoding: 'utf8' }).split(':')[5];
     runAs = { uid: id('-u'), gid: id('-g'), home, user };
   }
-  const sandbox = createSandbox({ workRoot: '/var/lib/agentbox', bridgeSocket: '/tmp/agentbox-bridge.sock', rootSocket: '/run/agentbox-root.sock', runAs, reserveBytes: 256 * 2 ** 20, log: (line) => console.error(line) });
+  const sandbox = createSandbox({ workRoot: '/var/lib/agentbox', bridgeSocket: '/tmp/agentbox-bridge.sock', rootSocket: '/run/agentbox-root.sock', runAs, reserveBytes: 256 * 2 ** 20, memoryFloorBytes: 512 * 2 ** 20, log: (line) => console.error(line) });
   sandbox.listen(Number(process.env.PORT) || 8080).then((a) => console.error(`agentbox sandbox listening on ${a.port}`));
 }
