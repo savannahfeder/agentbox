@@ -176,7 +176,7 @@ import { catchUpRow, catchUpResult } from './catch-up.mts';
 import { isAuto, asksWho, routeCandidates, routePrompt, readRoute, routedPatch, orPrimary, NOBODY_WHY } from '../shared/auto-route.mts';
 import { LEVELS, latestMessage, sortMessage, wantsPriority } from './message-priority.mts';
 import { NAME, Name, envName, nameSlug, isOurSlug } from '../shared/product-name.mjs';
-import { signInFiles, signInStamp, claudeKeychainService, keychainStamp } from './sign-in-files.mts';
+import { signInFiles, signInStamp, claudeKeychainService, KeychainStamps } from './sign-in-files.mts';
 import { runsOn } from './runs-on.mts';
 import { MemoryGateServer, defaultSocketPath as memoryGateSocketPath, readMacPressure } from './memory-gate-server.mts';
 import { startDecision, readMacPressureNow, SETTLE_MS, STALE_MS } from './start-hold.mts';
@@ -1336,6 +1336,7 @@ export class Supervisor {
   declare _carried: Record<string, CarriedMark>;
   declare _profileTrouble: Record<string, ProfileTrouble>;
   declare _profileCooldown: Record<string, number>;
+  declare _keychainStamps: KeychainStamps | undefined;
   declare _profileStrikes: Record<string, number> | undefined;
   declare _movedWhy: Record<string, MovedWhy>;
   declare _movedToCloudAt: Record<string, number> | undefined;
@@ -1929,12 +1930,16 @@ export class Supervisor {
     const home = this.config.home || os.homedir();
     // The default login's entry is the real home's, not a stand-in home's.
     const keychain = folder || home === os.homedir() ? this._keychainStamp(claudeKeychainService(folder)) : null;
+    // Not read yet: `.claude.json` would be a guess, and a wrong one lifts the login.
+    if (keychain === undefined) return null;
     if (keychain == null) return signInStamp(files);
     return Math.max(keychain, signInStamp(files.filter((f) => path.basename(f) !== '.claude.json')));
   }
 
-  _keychainStamp(service: string) {
-    return keychainStamp(service);
+  // In the background: run on every pass, a synchronous `security` call held the whole app ~0.3 s.
+  _keychainStamp(service: string): number | null | undefined {
+    this._keychainStamps = this._keychainStamps ?? new KeychainStamps();
+    return this._keychainStamps.get(service);
   }
 
   /** Which files one account's login writes, by the key its trouble is kept under. */
@@ -5786,7 +5791,8 @@ export class Supervisor {
     // `_noticeSignIns` can tell a login landing afterwards from one before.
     if (cause === 'signed-out') {
       const stamp = this._signInMoment(profile);
-      this._profileTrouble[profile].stamp = Math.max(stamp, had?.stamp ?? 0);
+      if (stamp != null) this._profileTrouble[profile].stamp = Math.max(stamp, had?.stamp ?? 0);
+      else if (had?.stamp != null) this._profileTrouble[profile].stamp = had.stamp;
     }
     // When the limit says it resets, so `_forgetResetLimits` can let it go then.
     if (cause === 'at-limit') {
