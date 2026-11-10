@@ -195,6 +195,20 @@ describe('decisions', () => {
     await as(THEO, `select public.mark_room_decision($1, $2, 'decision', null, null, null, false)`, [room, m]);
     expect(await rows(MAYA, `select is_on from public.room_decisions where message_id = $1`, [m])).toEqual([{ is_on: false }]);
   });
+  // The 2026-11-10 security audit rewrote a marked message's words, still
+  // credited to its author, by sending a project name with the real message id.
+  it('a project name sent with a real message changes neither its words nor its author', async () => {
+    const m = await say(MAYA, 'We ship on Friday.');
+    await as(MAYA, mark, [room, m]);
+    await as(THEO, `select public.mark_room_decision($1, $2, 'decision', 'We cancel the launch.', $3, 'Lumen app')`, [room, m, MAYA]);
+    expect(await rows(MAYA, `select body, said_by, project from public.room_decisions where message_id = $1`, [m]))
+      .toEqual([{ body: 'We ship on Friday.', said_by: MAYA, project: null }]);
+  });
+  it('a decision filed from a conversation takes the caller’s words', async () => {
+    await as(THEO, `select public.mark_room_decision($1, 'chat:u-77', 'decision', 'Price stays at $20', $2, 'Lumen app')`, [room, THEO]);
+    expect(await rows(MAYA, `select body, said_by, project from public.room_decisions where message_id = 'chat:u-77'`, []))
+      .toEqual([{ body: 'Price stays at $20', said_by: THEO, project: 'Lumen app' }]);
+  });
   it('a project’s decision takes the caller’s words, since no message holds them', async () => {
     await as(THEO, `select public.mark_room_decision($1, 'item:w-1:5', 'decision', 'Ship on Render', $2, 'Lumen app')`, [room, THEO]);
     expect(await rows(MAYA, `select body, project from public.room_decisions where message_id = 'item:w-1:5'`, []))
