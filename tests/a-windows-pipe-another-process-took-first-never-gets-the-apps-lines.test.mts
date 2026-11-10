@@ -29,6 +29,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { connectLocal, pipeName, serveLocal } from '../main/local-channel.mts';
+import { stripTypesFlags } from '../main/strip-types.mts';
 
 const onWindows = it.runIf(process.platform === 'win32');
 const TIMEOUT = 500;
@@ -127,7 +128,7 @@ async function childServer(dir, k) {
       if (word === 'exit') process.exit(0);
       if (word === 'stall') { console.log('stalling'); const end = Date.now() + Number(ms); while (Date.now() < end) {} }
     });`;
-  const child = spawn(process.execPath, ['--input-type=module', '-e', script, dir, k], { stdio: ['pipe', 'pipe', 'inherit'] });
+  const child = spawn(process.execPath, [...stripTypesFlags(), '--input-type=module', '-e', script, dir, k], { stdio: ['pipe', 'pipe', 'inherit'] });
   const deadline = setTimeout(() => child.kill(), 30_000);
   const exited = new Promise((r) => child.on('exit', r));
   cleanups.push(async () => {

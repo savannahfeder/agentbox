@@ -23,6 +23,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { channelDir, connectLocal, leaveChallenge, loadKey, nonceFeed, pipeName, serveLocal } from '../main/local-channel.mts';
 import { nameSlug } from '../shared/product-name.mjs';
+import { stripTypesFlags } from '../main/strip-types.mts';
 
 const MODULE = pathToFileURL(path.resolve(import.meta.dirname, '../main/local-channel.mts')).href;
 
@@ -67,7 +68,7 @@ describe('the channel key', () => {
       process.stdout.write(loadKey(process.argv[1]).toString('hex'));`;
     const at = String(Date.now() + 2000);
     const run = () => new Promise((resolve, reject) => {
-      execFile(process.execPath, ['--input-type=module', '-e', script, dir, at], { timeout: 20_000 }, (err, out) => (err ? reject(err) : resolve(out)));
+      execFile(process.execPath, [...stripTypesFlags(), '--input-type=module', '-e', script, dir, at], { timeout: 20_000 }, (err, out) => (err ? reject(err) : resolve(out)));
     });
     const keys = await Promise.all([run(), run(), run(), run()]);
     expect(keys[0]).toMatch(/^[0-9a-f]{64}$/);
