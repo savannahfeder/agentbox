@@ -383,3 +383,14 @@ create role authenticated; create role anon; create role service_role;
 create table public.people (id uuid primary key references auth.users(id) on delete cascade, email text not null, name text not null default '', created_at timestamptz not null default now());
 create table public.team_members (team_id uuid not null, person_id uuid not null, primary key (team_id, person_id));
 `;
+
+// The first deploy of this function stopped on "open templates/confirm.html:
+// no such file or directory": the CLI reads content_path from the folder above
+// supabase/, so a path written from inside it breaks every deploy.
+describe('the function can be deployed from this repository', () => {
+  it('names every email template where the Supabase CLI looks for it', () => {
+    const paths = [...read('cloud/supabase/config.toml').matchAll(/^content_path = "([^"]+)"/gm)].map((m) => m[1]);
+    expect(paths.length).toBeGreaterThan(0);
+    for (const p of paths) expect(fs.existsSync(path.join(root, 'cloud', p)), p).toBe(true);
+  });
+});
