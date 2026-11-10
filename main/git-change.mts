@@ -374,8 +374,12 @@ export function changeFromRepo(snapshot: RepoSnapshot | null | undefined): RepoC
   //    we kept a copy of are cut out here and done properly below.
   if (head) {
     const excludes = [...before.keys()].map((rel) => `:(exclude,literal)${rel}`);
+    // Main merged into the branch during the run moves where the branch leaves
+    // main past the run's start; main's own work is not this run's.
+    const cut = cutFrom(root);
+    const mergedMain = !!cut && cut !== head && tryGit(root, ['merge-base', '--is-ancestor', cut, head]) === null;
     const patch = tryGit(root, [
-      'diff', '--no-color', '--no-ext-diff', '-U3', '-M', head, '--', '.', ...excludes,
+      'diff', '--no-color', '--no-ext-diff', '-U3', '-M', mergedMain ? cut : head, '--', '.', ...excludes,
     ]);
     for (const file of filesFromPatch(patch ?? '')) add(file);
   }
