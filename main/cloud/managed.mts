@@ -21,9 +21,13 @@ export { LOGIN_NAME };
 // file of a few hundred MB on a slow network takes minutes.
 export const CALL_MS = 100_000;
 const FILE_MS = 15 * 60_000;
+export const UPLOAD_STALL_MS = 60_000;
 const LINK_SECONDS = 12 * 60 * 60;
 // Lambda takes at most 6 MB; a call past this goes through the bucket.
 const RELAY_BYTES = 4 * 1024 * 1024;
+// Lambda answers 429 when the server has all the calls open it may, before
+// running this one, so it is sent again for this long.
+const THROTTLE_MS = 60_000;
 
 export interface CloudEvent {
   seq: number;
@@ -85,6 +89,8 @@ export interface ManagedOptions {
   key: string;
   timeoutMs?: number;
   fileTimeoutMs?: number;
+  stallMs?: number;
+  throttleMs?: number;
   onSignedOut?: () => void;
 }
 
@@ -101,24 +107,39 @@ const isLogin = (key: unknown) => String(key).startsWith('logins/');
 // whose answer has not begun within 300 s, counted while the body is still
 // going up, so a conversation of a few hundred MB on a slow uplink could never
 // be sent. A file is streamed from disk. Resolves with the bucket's status.
-function upload(link: string, body: { buffer: Buffer } | { file: string }, timeoutMs: number): Promise<number> {
+// It also ends after `stallMs` with no byte going out and no answer: a dead
+// connection otherwise holds a thread's start for the whole `timeoutMs`.
+// `bytesWritten` counts bytes still queued in Node, so what the system has
+// taken is that less the handle's queue. The last few MB the system buffers
+// are not seen leaving; at 16 Mbps they take about two seconds.
+function upload(link: string, body: { buffer: Buffer } | { file: string }, timeoutMs: number, stallMs: number): Promise<number> {
   const url = new URL(link);
   const length = 'file' in body ? fs.statSync(body.file).size : body.buffer.length;
   return new Promise((resolve, reject) => {
     const req = (url.protocol === 'https:' ? https : http).request(url, {
       method: 'PUT', headers: { 'content-length': length }, signal: AbortSignal.timeout(timeoutMs),
     }, (res) => {
+      clearInterval(watch);
       res.resume();
       res.on('end', () => resolve(res.statusCode ?? 0));
       res.on('error', reject);
     });
+    let sent = -1;
+    let movedAt = Date.now();
+    const watch = setInterval(() => {
+      const socket = req.socket as (typeof req.socket & { _handle?: { writeQueueSize?: number } | null }) | null;
+      const now = (socket?.bytesWritten ?? 0) - (socket?._handle?.writeQueueSize ?? 0);
+      if (now !== sent) { sent = now; movedAt = Date.now(); return; }
+      if (Date.now() - movedAt >= stallMs) req.destroy(new Error(`the upload stalled: nothing went out for ${Math.round(stallMs / 1000)} s`));
+    }, Math.min(5000, Math.max(50, stallMs / 4)));
+    req.on('close', () => clearInterval(watch));
     req.on('error', reject);
     if ('file' in body) pipeline(fs.createReadStream(body.file), req).catch(reject);
     else req.end(body.buffer);
   });
 }
 
-export function managedClients({ url, key, timeoutMs = CALL_MS, fileTimeoutMs = FILE_MS, onSignedOut = () => {} }: ManagedOptions) {
+export function managedClients({ url, key, timeoutMs = CALL_MS, fileTimeoutMs = FILE_MS, stallMs = UPLOAD_STALL_MS, throttleMs = THROTTLE_MS, onSignedOut = () => {} }: ManagedOptions) {
   const base = String(url).replace(/\/+$/, '');
 
   async function call(method: string, path: string, body?: unknown): Promise<CloudReply> {
@@ -127,7 +148,13 @@ export function managedClients({ url, key, timeoutMs = CALL_MS, fileTimeoutMs = 
       headers: { authorization: `Bearer ${key}`, ...(body ? { 'content-type': 'application/json' } : {}) },
       body: body ? JSON.stringify(body) : undefined,
     };
-    const res = await fetch(`${base}${path}`, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+    const until = Date.now() + throttleMs;
+    let res = await fetch(`${base}${path}`, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+    for (let wait = 250; res.status === 429 && Date.now() < until; wait = Math.min(wait * 2, 8000)) {
+      await res.body?.cancel();
+      await new Promise((r) => setTimeout(r, Math.min(until - Date.now(), wait * (0.5 + Math.random()))));
+      res = await fetch(`${base}${path}`, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+    }
     const out = await res.json().catch(() => ({})) as CloudReply;
     if (!res.ok) {
       if (res.status === 401) { try { onSignedOut(); } catch { /* the refusal below says it all the same */ } }
@@ -137,7 +164,18 @@ export function managedClients({ url, key, timeoutMs = CALL_MS, fileTimeoutMs = 
     }
     return out;
   }
-  const linkFor = async (op: string, k: string, seconds: number = LINK_SECONDS) => (await call('POST', '/v1/link', { op, key: k, seconds })).url as string;
+  // A link is only a signature, so one lost to a dropped connection or a
+  // server failure is asked for again; a refusal is an answer.
+  async function linkFor(op: string, k: string, seconds: number = LINK_SECONDS): Promise<string> {
+    const until = Date.now() + throttleMs;
+    for (let wait = 250; ; wait = Math.min(wait * 2, 8000)) {
+      try { return (await call('POST', '/v1/link', { op, key: k, seconds })).url as string; } catch (e) {
+        const err = e as CloudCallError;
+        if ((err.status && err.status < 500) || Date.now() >= until) throw err;
+        await new Promise((r) => setTimeout(r, Math.min(until - Date.now(), wait * (0.5 + Math.random()))));
+      }
+    }
+  }
   const object = (link: string, init: RequestInit = {}) => fetch(link, { ...init, signal: AbortSignal.timeout(fileTimeoutMs) });
   const refuseLogin = (k: string) => { if (isLogin(k)) throw new Error('a cloud sign-in is never read on this Mac'); };
 
@@ -174,11 +212,11 @@ export function managedClients({ url, key, timeoutMs = CALL_MS, fileTimeoutMs = 
 
   const storage: CloudStorage = {
     async put(k: string, body: string | Buffer) {
-      const status = await upload(await linkFor('put', k), { buffer: Buffer.from(body) }, fileTimeoutMs);
+      const status = await upload(await linkFor('put', k), { buffer: Buffer.from(body) }, fileTimeoutMs, stallMs);
       if (status < 200 || status > 299) throw new Error(`the bucket refused ${k}: ${status}`);
     },
     async putFile(k: string, file: string) {
-      const status = await upload(await linkFor('put', k), { file }, fileTimeoutMs);
+      const status = await upload(await linkFor('put', k), { file }, fileTimeoutMs, stallMs);
       if (status < 200 || status > 299) throw new Error(`the bucket refused ${k}: ${status}`);
     },
     async get(k: string) {

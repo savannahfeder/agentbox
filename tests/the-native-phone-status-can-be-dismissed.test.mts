@@ -30,7 +30,7 @@ it('keeps dismissal for this visit if storage fails', () => {
 
 it('uses one dismissible native component in inbox and search', () => {
   for (const file of ['index', 'search']) {
-    expect(readFileSync(new URL(`../mobile/src/app/${file}.tsx`, import.meta.url), 'utf8')).toContain('<StatusNotice message={c.status} />');
+    expect(readFileSync(new URL(`../mobile/src/app/${file}.tsx`, import.meta.url), 'utf8')).toContain('<StatusNotice message={c.status} next={c.statusNext} />');
   }
   const component = readFileSync(new URL('../mobile/src/ui/StatusNotice.tsx', import.meta.url), 'utf8');
   expect(component).toContain('accessibilityLabel="Dismiss notice"');

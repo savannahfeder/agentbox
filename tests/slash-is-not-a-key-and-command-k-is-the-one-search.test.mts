@@ -63,4 +63,14 @@ describe('slash is not a key and ⌘K is the one search', () => {
   it('no hover hint promises /', () => {
     for (const lines of Object.values(HINTS)) for (const l of lines) expect(l.key).not.toBe('/');
   });
+
+  // Two power testers (2026-11-09) logged "/ does not open search" as broken:
+  // their own brief still listed it.
+  it('no synthetic tester is told / searches', () => {
+    for (const brief of ['.claude/skills/power-test/scripts/plan.mjs', '.claude/skills/verify-agentbox/scripts/breaker.mjs']) {
+      const keys = read(brief);
+      expect(keys).toMatch(/⌘K \(press k meta\)/);
+      expect(keys).not.toMatch(/\/ searches/);
+    }
+  });
 });

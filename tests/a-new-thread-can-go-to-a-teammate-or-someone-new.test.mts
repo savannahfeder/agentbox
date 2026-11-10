@@ -62,9 +62,9 @@ describe('starting one from the Teammates page', () => {
   // own words both go through one call, in the project picked beside it. The
   // agent it runs on is chosen in its settings, with its model and effort.
   it('makes it in the project picked, from a tapped starter or your own words', () => {
-    expect(page).toMatch(/call\('describe', \{ \.\.\.args, \.\.\.voice, greeted: true, product: where\.slug \}\)/);
+    expect(page).toMatch(/call\('describe', \{ \.\.\.args, \.\.\.voice, \.\.\.runsOn, greeted: true, product: where\.slug \}\)/);
     expect(page).toMatch(/onClick=\{\(\) => \{ void make\(\{ starter: a\.starter \}\); \}\}/);
-    expect(page).toMatch(/onSend=\{\(text\) => make\(\{ text \}\)\}/);
+    expect(page).toMatch(/onSend=\{\(text, _files, priority\) => make\(\{ text, priority \}\)\}/);
     // The agent is picked in its About now, beside the model (round 6).
     expect(page).toMatch(/<dt>Runs on<\/dt>/);
   });

@@ -1,5 +1,5 @@
 // What Settings says over its pages about the computer, and the version under them.
-import { ago } from '../../../renderer/src/phone-rows';
+import { ago, macAway } from '../../../renderer/src/phone-rows';
 import { Name } from '../../../shared/product-name.mjs';
 
 // The computer sends its copy at least every five minutes (main/phone-inbox.mts).
@@ -17,3 +17,9 @@ export function computerLine(s: Computer, now: number, cloud = false) {
 
 /** "Version 0.1.0 (12)": the build number tells one TestFlight build from the next. */
 export const versionLine = (version?: string | null, build?: string | null) => `Version ${version ?? ''}${build ? ` (${build})` : ''}`;
+
+/** What to do while the computer is away and nothing carries on without it: the line under the inbox's notice. */
+export function awayNext({ error, macSeen, cloud }: { error: string | null; macSeen: number; cloud: boolean }, now: number): string | null {
+  if (error || cloud || !macAway(macSeen, now)) return null;
+  return `Wake it to carry on, or set up ${Name} Cloud on it.`;
+}

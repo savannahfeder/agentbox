@@ -531,6 +531,10 @@ export interface ChatLine {
   answers?: Record<string, string>;
   /** A document that goes with the words, drawn as a card to open. */
   doc?: { product: string; src: string; name: string };
+  /** The project the files it links were saved in. */
+  filesIn?: string;
+  /** On your message: the priority of the run it starts or joins. */
+  priority?: number;
 }
 
 /** A message read into a run, and when. */
@@ -680,6 +684,19 @@ function asksYouStill(item: RunItem, tid: string, chat: ChatLike, except: string
     || (isSetupRun(item, tid, chat) && leavesSomethingOpen(item.result));
 }
 
+// A run whose question reached you in the chat, so your next chat words can be
+// its answer. A run made by a duty or a hand-off asks in its own thread, and
+// chat words to its teammate are new work.
+function talksInChat(item: RunItem, tid: string, chat: ChatLike, except: string | null): boolean {
+  return (item.labels ?? []).includes(CHAT_LABEL) || openQuestionOn(item, tid, chat, except) || isSetupRun(item, tid, chat);
+}
+
+// The run whose chat question your message answers by name, from its options.
+function runAnswered(m: ChatLine, chat: ChatLike): string | null {
+  const ids = Object.keys(m.answers ?? {});
+  return (chat?.messages ?? []).find((q) => ids.includes(q.id) && typeof q.run === 'string')?.run ?? null;
+}
+
 function isSetupRun(item: RunItem, tid: string, chat: ChatLike | null | undefined): boolean {
   return (chat?.messages ?? []).some((m) => m.kind === 'msg' && m.from === YOU && m.setup && (m.to ?? []).includes(tid) && runIdFor(`${m.id}>${tid}`) === item.id);
 }
@@ -822,7 +839,7 @@ export type WakeTrigger =
   | (TriggerBase & { kind: 'schedule'; key: string; label: string })
   | (TriggerBase & { kind: 'duty'; duty: string; what: string; tell?: string; key: string })
   | (TriggerBase & { kind: 'pass'; fromName?: string; title?: string; details?: string })
-  | (TriggerBase & { kind: 'message'; text?: string; fromName?: string; opening?: 'start' | 'setup' })
+  | (TriggerBase & { kind: 'message'; text?: string; fromName?: string; opening?: 'start' | 'setup'; priority?: number })
   | (TriggerBase & { kind: 'first'; key: string });
 
 interface ActionBase { teammate: string; msg?: string; trigger?: WakeTrigger }
@@ -833,7 +850,7 @@ export type WakeAction =
   | (ActionBase & { type: 'seen'; msg: string; run?: string })
   | (ActionBase & { type: 'served'; key: string })
   | (ActionBase & { type: 'dutyServed'; duty: string; key: string })
-  | (ActionBase & { type: 'answer'; item: string; product: string; text: string | undefined; msg: string })
+  | (ActionBase & { type: 'answer'; item: string; product: string; text: string | undefined; msg: string; priority?: number })
   | (ActionBase & { type: 'tell'; item: string; product: string | null; text: string; from: { teammate: string; name: string }; hop: number; hold: boolean; msg: string })
   | (ActionBase & { type: 'release'; item: string; product: string })
   | (ActionBase & { type: 'limit' })
@@ -933,14 +950,16 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
       // A new thread to a teammate is new work, never an answer to its last question.
       if (fromYou && m.kind === 'msg' && !m.fresh) {
         const runs = runsOf(tid, items);
-        const waiting = runs.filter((i) => waitingOnYou(i) && asksYouStill(i, tid, chat, m.id)).sort((a, b) => (b.wrote?.result?.ts ?? 0) - (a.wrote?.result?.ts ?? 0))[0];
+        const named = runAnswered(m, chat);
+        const waiting = runs.find((i) => i.id === named && waitingOnYou(i))
+          ?? runs.filter((i) => waitingOnYou(i) && asksYouStill(i, tid, chat, m.id) && talksInChat(i, tid, chat, m.id)).sort((a, b) => (b.wrote?.result?.ts ?? 0) - (a.wrote?.result?.ts ?? 0))[0];
         // A running run hears your words only if your words started it;
         // anything else is new work, queued behind it.
         const yours = new Set((chat.messages ?? []).filter((x) => x.kind === 'msg' && x.from === YOU && x.id !== m.id).map((x) => runIdFor(`${x.id}>${tid}`)));
         const running = runs.find((i) => isActiveRun(i) && i.status === 'claimed' && yours.has(i.id));
         const into = waiting ?? running;
         if (into) {
-          actions.push({ type: 'answer', teammate: tid, item: into.id, product: into.product, text: m.text, msg: m.id });
+          actions.push({ type: 'answer', teammate: tid, item: into.id, product: into.product, text: m.text, msg: m.id, ...(m.priority ? { priority: m.priority } : {}) });
           actions.push({ type: 'seen', msg: m.id, teammate: tid, run: into.id });
           continue;
         }
@@ -960,7 +979,7 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
       const work = fromYou ? m.via ?? null : m.work ?? null;
       const trigger: WakeTrigger = m.kind === 'pass'
         ? { kind: 'pass', from: m.from, ...(m.fromName ? { fromName: m.fromName } : {}), title: m.title, details: m.details, msg: m.id, hop, ...origin, ...(work ? { work } : {}), ...(hold ? { hold } : {}) }
-        : { kind: 'message', from: m.from, text: m.text, msg: m.id, hop, ...origin, ...(work ? { work } : {}), ...(fromYou && m.start ? { opening: 'start' } : fromYou && m.setup ? { opening: 'setup' } : {}) };
+        : { kind: 'message', from: m.from, text: m.text, msg: m.id, hop, ...origin, ...(work ? { work } : {}), ...(fromYou && m.priority ? { priority: m.priority } : {}), ...(fromYou && m.start ? { opening: 'start' } : fromYou && m.setup ? { opening: 'setup' } : {}) };
       const id = newRun(t, trigger, `${m.id}>${tid}`, { fromYou, hold });
       if (id) {
         actions.push({ type: 'seen', msg: m.id, teammate: tid, run: id });

@@ -69,6 +69,16 @@ export function installGate(setup: EngineSetup, signedOut: Engine[] = []): { hea
   };
 }
 
+/**
+ * THE SETUP THE APP IS ALREADY RUNNING, if any (F-199). The screen kept its own
+ *  copy of the press, so a window that missed it drew no waiting state while a
+ *  sign-in page was open in the browser.
+ */
+export function runningSetup(statuses: Array<{ engine: Engine; phase?: string; error?: string | null } | null>): { engine: Engine; phase: string; error: string | null } | null {
+  const s = statuses.find((x) => x && installGate({ engine: x.engine, phase: x.phase ?? 'idle' }).running);
+  return s ? { engine: s.engine, phase: s.phase!, error: s.error ?? null } : null;
+}
+
 export type ListKey = 'up' | 'down' | 'toggle' | 'next' | 'skip' | null;
 
 type KeyLike = { key: string; metaKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean; altKey?: boolean };

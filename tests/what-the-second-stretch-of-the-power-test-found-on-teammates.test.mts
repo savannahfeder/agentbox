@@ -8,12 +8,12 @@
 //   the menu closed, and the same key went on to the app, which left the page.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { planWakes, runLines, teammateLabel, DEFAULT_LIMIT } from '../shared/teammates.mts';
+import { planWakes, runLines, teammateLabel, DEFAULT_LIMIT, CHAT_LABEL } from '../shared/teammates.mts';
 
 const NOW = new Date(2026, 9, 26, 9, 30).getTime();
 const felix = { id: 't-ffffff', name: 'Felix', letter: 'F', status: 'active', paused: false, served: '', limit: DEFAULT_LIMIT, works: null, product: 'kestrel', memory: [] };
 const chat = (messages) => ({ messages, seen: new Set() });
-const waiting = { id: 'w-222222', product: 'kestrel', title: 'Set up its job', status: 'open', labels: ['founder', teammateLabel(felix.id)], createdAt: NOW - 1000,
+const waiting = { id: 'w-222222', product: 'kestrel', title: 'Set up its job', status: 'open', labels: ['founder', teammateLabel(felix.id), CHAT_LABEL], createdAt: NOW - 1000,
   result: '**Should I bring you everything, or only what needs a decision?**\n\nMore words.', wrote: { result: { ts: NOW - 500, source: 'agent' } } };
 
 describe('a new thread to a teammate', () => {
