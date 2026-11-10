@@ -553,6 +553,9 @@ export function projectsOfTheirOwn(products: Array<{ personal?: boolean }>): num
 // read a folder: that path is what answers a task in a real project, and the
 // walk simply no longer sends one there.
 export const TASK_TITLE = PRACTICE_TASK.title;
+
+/** Whether a New thread draft is the tutorial's practice task, which must not outlive the tutorial. */
+export const practiceDraftLeft = (text: string): boolean => text.trim().startsWith(PRACTICE_TASK.title);
 export const TASK_BODY = PRACTICE_TASK.body;
 
 /** The line changes at fifteen seconds. Taken as recommended, round four. */

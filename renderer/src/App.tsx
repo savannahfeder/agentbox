@@ -184,7 +184,7 @@ import {
   mayOpenInbox, noCodingAgent, practising, restartFirstRun, snoozeRefused, tutorialRun,
   waitingId, waitingIndex,
   finishFirstRun, finishedTheFirstRun, setupStepCount, forcedStep, readFirstRun, resumableTutorial, walkRows,
-  saveFirstRun, START as RUN_START, stepTo, TASK_BODY, TASK_TITLE, whyNotMade, type FirstRun,
+  saveFirstRun, START as RUN_START, stepTo, TASK_BODY, TASK_TITLE, practiceDraftLeft, whyNotMade, type FirstRun,
   replyAnswered, replyWritten, skipStep, tabStop, walkCoversTheApp, walkMayOpen,
 } from './onboarding';
 import { priorityCommands, priorityIdOf, priorityLabelOf, type PriorityId } from './priority';
@@ -1736,6 +1736,7 @@ export default function App() {
   ) => {
     if (!mayOpenInbox(claudeRef.current)) return;
     closeWhatFloats();
+    if (practiceDraftLeft(readComposeDraft().text)) clearComposeDraft();
     if (practised) rememberOffered(localStorage);
     // THAT setup was finished, and nothing about it (./onboarding.ts).
     if (finishedTheFirstRun(runRef.current, { practised })) {
