@@ -20,10 +20,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
+const read = (rel: string) => fs.readFileSync(path.join(root, rel), 'utf8');
 const raw = read('briefs/worker.md');
 const brief = raw.replace(/\s+/g, ' ');
-const tools = read('mcp/tools.mjs');
+const tools = read('mcp/tools.mts');
 const catchUp = read('main/catch-up.mts');
 const defaults = JSON.parse(read('shared/instruction-defaults.json'));
 
