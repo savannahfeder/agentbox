@@ -36,7 +36,7 @@ describe('a picture named by its full path', () => {
   });
 
   it('looks again when it was not there, on the late-picture schedule, and can be pressed to look now', () => {
-    const full = picture.slice(picture.indexOf("if (/^file:\\/\\//.test(src) || src.startsWith('/'))"));
+    const full = picture.slice(picture.indexOf('if (whole !== null) {'));
     expect(full).toMatch(/onError=\{\(\) => setBroken\(true\)\}/);
     expect(full).toMatch(/again\(pictureUrl\(file\)\)/);
     expect(picture).toMatch(/const wait = lookAgainAfter\(tries\);/);
@@ -45,7 +45,7 @@ describe('a picture named by its full path', () => {
 
   it('is asked for again with a mark the picture scheme reads past, so the same file is fetched', () => {
     const url = `${pictureUrl('/Users/x/p/designs/w-1/a.png')}?look=3`;
-    expect(imgPath(url)).toBe('/Users/x/p/designs/w-1/a.png');
+    expect(imgPath(url, 'darwin')).toBe('/Users/x/p/designs/w-1/a.png');
   });
 });
 

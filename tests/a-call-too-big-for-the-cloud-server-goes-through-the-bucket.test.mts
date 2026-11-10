@@ -138,7 +138,7 @@ describe('a refusal the Mac gets back', () => {
   const refusing = async (status, error) => {
     const s = http.createServer((req, res) => { req.resume(); req.on('end', () => { res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error, message: 'no' })); }); });
     await new Promise((r) => s.listen(0, '127.0.0.1', r));
-    return { s, c: managedClients({ url: `http://127.0.0.1:${s.address().port}`, key: 'abk_x' }) };
+    return { s, c: managedClients({ url: `http://127.0.0.1:${s.address().port}`, key: 'abk_x', throttleMs: 300 }) };
   };
 
   it('is an answer, so a poll that is refused ends rather than asking for ever', async () => {
@@ -161,7 +161,8 @@ describe('a refusal the Mac gets back', () => {
     }
   });
 
-  // Lambda answers 429 when every function is busy: that passes.
+  // Lambda answers 429 when every function is busy: that passes, once the
+  // client's own tries at a throttled call are spent.
   it('a throttle or a server failure is thrown, so it is tried again', async () => {
     for (const status of [429, 500, 502]) {
       const { s, c } = await refusing(status, 'busy');

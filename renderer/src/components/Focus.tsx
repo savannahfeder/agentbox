@@ -69,7 +69,7 @@ import { ReplyModel } from './ReplyModel';
 import type { ModelChoice } from '../models';
 import { sameRule, type RepeatShape as RepeatRuleValue } from '../../../shared/repeats.mts';
 import { fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
-import { onPictureLinks, pictureLinksVersion, pictureUrl, sentPictureLink } from '../picture';
+import { onPictureLinks, pictureLinksVersion, pictureUrl, sentPictureLink, wholeMediaPath, wholePicturePath } from '../picture';
 import { Listening, MicButton, useWebDictation } from './WebDictation';
 import { firstFrameSrc, playerShelf } from '../player-shelf';
 import { handleCopyOut, blockCopyText } from '../copy-out';
@@ -113,7 +113,7 @@ import { OptionsOffer } from './OptionsOffer';
 import { foldedReply } from '../folded-reply';
 import { applyDockHeight } from '../dock-height';
 import { ClipGlyph, SendGlyph } from './reply-glyphs';
-import { resumeTo } from '../thread-bottom';
+import { bringIntoView, resumeTo } from '../thread-bottom';
 import { optionIsClipped, optionPeek } from '../option-peek';
 import { changedFiles, FOLDER_SETTLES_MS, folderMayStillMove, onlyNamedFiles, shipOfferFor, shipOfferLive, standingFrom, UNREAD, type ChangedFile, type Standing } from '../ship-offer';
 import { MOVED_PX, THE_OPTIONS_MOVED, clickLandsOnTheRowYouSaw } from '../pick-settles';
@@ -265,7 +265,7 @@ export function ArtifactImg({ src, alt, roots, onOpen, find }: {
     return () => clearTimeout(timer);
   }, [broken, tries]);
   const again = (url: string) => (tries ? `${url}?look=${tries}` : url);
-  const relative = !!src && !/^(data|https?|file):/.test(src) && !src.startsWith('/');
+  const relative = !!src && !/^(data|https?|file):/.test(src) && wholePicturePath(src) === null;
   const exhausted = relative && attempt >= roots.length;
   useEffect(() => {
     // A whole path written on a teammate's computer is not on this one: the
@@ -334,8 +334,9 @@ export function ArtifactImg({ src, alt, roots, onOpen, find }: {
   // A chat draws its pictures as previews (team/chat.css), a thread at reading width.
   const maxHeight = direct ? 240 : undefined;
   const minWidth = direct ? 360 : 760;
-  if (/^file:\/\//.test(src) || src.startsWith('/')) {
-    const file = src.startsWith('/') ? src : decodeURIComponent(src.slice(7));
+  const whole = wholePicturePath(src);
+  if (whole !== null) {
+    const file = whole;
     if (found) return door(found, <FittedImg maxHeight={maxHeight} minWidth={minWidth} src={pictureUrl(found)} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" />);
     if (broken && direct) return <CarriedNote src={file} always />;
     if (broken) return <button type="button" className="missing-artifact" title="Look for it again" onClick={() => { setTries(tries + 1); setBroken(false); }}>missing image: {file}</button>;
@@ -426,7 +427,8 @@ export function ArtifactMedia({ src, label, roots, onOpen, find }: { src: string
   // or has still to come, and fills in when it lands.
   const [found, setFound] = useState<string | null>(null);
   const [looks, setLooks] = useState(0);
-  const candidates = found ? [pictureUrl(found)] : src.startsWith('/') ? [pictureUrl(src)] : roots.map((r) => pictureUrl(`${r}/${rel}`));
+  const whole = wholeMediaPath(src);
+  const candidates = found ? [pictureUrl(found)] : whole !== null ? [pictureUrl(whole)] : roots.map((r) => pictureUrl(`${r}/${rel}`));
   const looked = candidates.join('\n');
   const missing = attempt >= candidates.length;
   useEffect(() => {
@@ -1254,9 +1256,12 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
 
   // A close raises its question at the foot of the thread, which is off
   // screen whenever the reader has scrolled up (w-23de8a26c0).
+  // When it stands at the filed task instead, the conversation brings it.
   const closeAskRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (closeAsk) closeAskRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (!closeAsk || askAtTask) return;
+    const box = closeAskRef.current?.closest('.focus-scroll') as HTMLElement | null;
+    return bringIntoView(box, () => closeAskRef.current, { block: 'nearest' });
   }, [closeAsk?.raised]);
 
   // THE OPTION UNDER THE POINTER, IN FULL, IN A CARD OVER THE MESSAGE. The
@@ -1313,7 +1318,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     // a change for it, so there is nothing to ask for.
     if (agent) return () => { live = false; };
     const read = () => {
-      api.codeChange({ product: item.product, src: changePathFor(item.id) })
+      api.codeChange({ product: item.product, src: changePathFor(item.id), summary: true })
         .then((r) => {
           if (!live) return;
           setFigures(r?.ok ? figuresFrom(r.change) : null);
@@ -1478,7 +1483,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         const note = href && !/^(https?|data):/.test(href) ? voiceNoteOf(href) : null;
         if (href && note) {
           const rel = href.replace(/^\.\//, '');
-          const urls = href.startsWith('/') ? [pictureUrl(href)] : roots.map((r) => pictureUrl(`${r}/${rel}`));
+          const whole = wholeMediaPath(href);
+          const urls = whole !== null ? [pictureUrl(whole)] : roots.map((r) => pictureUrl(`${r}/${rel}`));
           return <VoiceNote key={href} id={`${product}:${rel}`} ms={note.ms} load={() => firstFound(urls)} />;
         }
         // A SOUND OR A FILM PLAYS IN PLACE (ArtifactMedia, above).
