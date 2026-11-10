@@ -2105,7 +2105,7 @@ export function coach(
       // An undo can bring a practice thread back after the last one was cleared.
       if (ctx.unfinished) {
         return say(
-          `${ctx.unfinished === 1 ? 'One thread is' : `${ctx.unfinished} threads are`} still in your inbox. An empty inbox, inbox zero, is the goal.`,
+          `${ctx.unfinished === 1 ? 'One thread is' : `${ctx.unfinished} threads are`} still in your inbox. Inbox zero is the goal.`,
           'Press ', cap, `${or} to see where the rest went.`,
         );
       }
