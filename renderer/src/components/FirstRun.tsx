@@ -258,7 +258,7 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
   const cls = `ob-screen${leaving ? ' ob-leaving' : ''}`;
 
   if (screen === 'setup') {
-    return <SetupSplit snap={snap} chats={chats} ticks={chatTicks} nameOf={nameOf}
+    return <SetupSplit snap={snap} chats={chats} ticks={chatTicks}
       onToggle={(id) => setChatTicks((had) => { const n = new Set(had); if (n.has(id)) n.delete(id); else n.add(id); return n; })}
       bringIn={bringIn} projectFor={async (folder) => { const p = await projectFor(folder); if (p) onProject?.(p.slug); return p; }} look={look} skies={skies} onLook={(id) => onLook?.(id)} onDone={onDone} onBack={() => go('welcome')} />;
   }

@@ -69,7 +69,6 @@ export interface SetupSplitProps {
   chats: SessionThread[];
   ticks: Set<string>;
   onToggle: (id: string) => void;
-  nameOf: (folder: string) => string;
   /** Brings the ticked chats in, making their projects; resolves to how many came in. */
   bringIn: () => Promise<number>;
   /** Makes (or finds) the project for a folder chosen by hand. */
@@ -243,7 +242,7 @@ export function SetupSplit(p: SetupSplitProps) {
   let head: [string, string] = ['', ''];
   let body: ReactNode = null;
   if (step === 'chats') {
-    head = ['Add the agents already on this computer.', 'What they send you lands in your inbox.'];
+    head = ['Add your recent agents.', ''];
     body = done.chats ? <>
       <div className="ss-list"><Row face={<span className="ss-ok"><Tick /></span>} name={`${done.chats === 1 ? '1 chat' : `${done.chats} chats`} brought in`} sub="They are in your inbox" /></div>
       <div className="ss-acts">{go('Continue', next)}</div>
@@ -252,7 +251,7 @@ export function SetupSplit(p: SetupSplitProps) {
         {p.chats.map((t) => (
           <div key={t.id} className={`ss-row ss-press ss-chat${p.ticks.has(t.id) ? ' ss-on' : ''}`} role="button" onClick={() => p.onToggle(t.id)}>
             <span className="ss-name">{t.title}</span>
-            <span className="ss-meta">{t.source === 'codex' ? 'Codex · ' : ''}{p.nameOf(bare(t.folder))} · {said(t.when)}</span>
+            <span className="ss-meta">{said(t.when)}</span>
             <Check on={p.ticks.has(t.id)} />
           </div>
         ))}

@@ -274,7 +274,7 @@ describe('the chats step', () => {
     expect(css).not.toMatch(/data-setup-step="chats"\] #root \{[^}]*opacity: 0/);
   });
   it('says what it does', () => {
-    expect(split).toContain("'Add the agents already on this computer.'");
+    expect(split).toContain("'Add your recent agents.'");
   });
 });
 
