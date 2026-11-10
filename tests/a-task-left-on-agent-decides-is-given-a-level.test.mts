@@ -81,6 +81,17 @@ describe('the answer', () => {
     fs.writeFileSync(bin, '#!/bin/sh\nprintf "High\\n"\nexit 0\n', { mode: 0o755 });
     expect(await levelTask(task(), { claudeBin: bin })).toBe('high');
   });
+
+  it('gets a level from the stand-in the power test runs, by the task\'s own words', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'task-level-stub-'));
+    const bin = path.join(dir, 'claude');
+    const stub = new URL('../scripts/lib/stub-claude-worker.mjs', import.meta.url).pathname;
+    fs.writeFileSync(bin, `#!/bin/sh\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(stub)} "$@"\n`, { mode: 0o755 });
+    const ask = (title) => levelTask(task({ title }), { claudeBin: bin });
+    expect(await ask('The checkout page is down for everyone')).toBe('high');
+    expect(await ask('An idea: tidy the readme someday')).toBe('low');
+    expect(await ask('Add a CSV export to the tide table')).toBe('medium');
+  });
 });
 
 describe('the supervisor ranks one task at a time', () => {
