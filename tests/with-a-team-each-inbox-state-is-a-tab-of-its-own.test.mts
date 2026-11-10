@@ -67,7 +67,9 @@ describe('in the app', () => {
 
   it('draws your board as the one without a team: every column, Needs you too, and no tabs over it', () => {
     expect(app).toMatch(/const mineBoard = teamMode && !onPhone\(\) && evView === 'board' && !evPick && search === null;/);
-    expect(app).toMatch(/\{\(teamMode \? mineBoard : search === null && inboxDisplay\.view === 'board'\) && !roomShown \? \(<>/);
+    // `boardDrawn` holds this rule, which the tutorial's board beat reads too.
+    expect(app).toMatch(/const boardDrawn = teamMode \? mineBoard : search === null && inboxDisplay\.view === 'board';/);
+    expect(app).toMatch(/\{boardDrawn && !roomShown \? \(<>/);
     expect(app).toMatch(/order: evBoard \? evColumns\(columnOrder\) : columnOrder/);
     expect(app).toMatch(/teamMode && \(onPhone\(\) \? view !== 'inbox' : !!evPick\) && evView === 'board'/);
   });
