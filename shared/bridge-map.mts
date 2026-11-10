@@ -210,6 +210,9 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   fileLinks: 'zero:file-links',
   fileLinkComments: 'zero:file-link-comments',
   fileLinkComment: 'zero:file-link-comment',
+  // A file someone shared by its link, brought into one of your projects (main/bring-shared-file.mts).
+  bringSharedFile: 'zero:bring-shared-file',
+  takeSharedFile: 'zero:take-shared-file',
   codeChange: 'zero:code-change',
   codeFile: 'zero:code-file',
   saveCodeFile: 'zero:save-code-file',
@@ -246,6 +249,7 @@ export const PUSH_CHANNELS: Readonly<Record<string, string>> = {
   onZoomPercent: 'zero:zoom-percent',
   onRecovered: 'zero:recovered',
   onJoinRoom: 'zero:join-room',
+  onSharedFile: 'zero:shared-file',
   onOpenItem: 'zero:open-item',
   onOpenSettings: 'zero:open-settings',
   onScreenDetail: 'zero:screen-detail',

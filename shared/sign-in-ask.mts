@@ -13,13 +13,14 @@
 //   signInAnswer  { id, said, url?, at }                          the answer to it
 // `said` is 'signed-in' (they finished in the browser), 'landed' (with the
 // address the browser was sent back to, for a login waiting on another
-// machine) or 'skipped'.
+// machine), 'skipped', or 'replied' (they wrote on the thread instead, which
+// ends the wait so the agent can take what they wrote).
 
 export interface SignInAsk { id: string; service: string; url: string; code?: string; why?: string; at: number; done?: true }
-export type SignInSaid = 'signed-in' | 'landed' | 'skipped';
+export type SignInSaid = 'signed-in' | 'landed' | 'skipped' | 'replied';
 export interface SignInAnswer { id: string; said: SignInSaid; url?: string; at: number }
 
-const SAID: readonly string[] = ['signed-in', 'landed', 'skipped'];
+const SAID: readonly string[] = ['signed-in', 'landed', 'skipped', 'replied'];
 const ID = /^s-[a-z0-9]{6,24}$/;
 const text = (v: unknown, max: number): string | null => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null);
 const link = (v: unknown): string | null => {

@@ -1908,6 +1908,9 @@ declare global {
       fileLinks?(): Promise<{ ok: boolean; error?: string; links?: PublicLink[] }>;
       fileLinkComments?(p: { token: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
       fileLinkComment?(p: { token: string; text: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
+      bringSharedFile?(p: { link: string; product: string | null }): Promise<{ ok: boolean; error?: string; product?: string; id?: string; src?: string }>;
+      takeSharedFile?(): Promise<string | null>;
+      onSharedFile?(fn: () => void): () => void;
       retryFile?(p: { product: string; src: string }): Promise<unknown>;
       codeChange?(p: { product: string; src: string }): Promise<{ ok: boolean; change?: unknown; error?: string }>;
       codeFile?(p: { product: string; src: string; path: string }): Promise<{ ok: boolean; text?: string; mtime?: number; path?: string; error?: string }>;

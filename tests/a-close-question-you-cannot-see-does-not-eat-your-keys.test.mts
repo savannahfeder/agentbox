@@ -51,14 +51,15 @@ describe('where it is wired', () => {
   });
 
   it('brings the question into view each time it is raised', () => {
-    expect(focus).toMatch(/closeAskRef\.current\?\.scrollIntoView\(/);
+    expect(focus).toMatch(/bringIntoView\(box, \(\) => closeAskRef\.current, \{ block: 'nearest' \}\)/);
     expect(focus).toMatch(/\}, \[closeAsk\?\.raised\]\);/);
     expect(focus.match(/stripRef=\{closeAskRef\}/g)?.length).toBe(1);
   });
 
+  // How it stays there is tests/pressing-e-takes-you-to-the-close-question-not-the-bottom.
   it('and again as the unfolded thread loads, when the question stands under the task', () => {
     const thread = read('renderer/src/components/ItemThread.tsx');
-    expect(thread).toMatch(/askRef\.current\?\.scrollIntoView\(\{ block: 'center'/);
+    expect(thread).toMatch(/bringIntoView\(box, \(\) => askRef\.current\)/);
     expect(thread).toMatch(/\}, \[!!closeAsk, closeAsk\?\.raised, earlierOpen, everyRun\.length, ledger\?\.lines\?\.length\]\);/);
   });
 });

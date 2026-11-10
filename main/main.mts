@@ -77,6 +77,7 @@ import { answerDraftCopy } from './draft-copy.mts';
 import { IS_SHE_TYPING_IN_THE_PAGE, theAppKeepsThisInput, theAppKeepsThisLetterInAPage } from '../shared/artifact-keys.mts';
 import { NAME, Name, WAS } from '../shared/product-name.mjs';
 import { JOIN_SCHEME, ourLink, tokenFromLink } from '../shared/room-links.mts';
+import { fileLinkToken } from './bring-shared-file.mts';
 import { getMic } from './mic.mts';
 import { openInBrowser } from './open-in-browser.mts';
 import type { IpcConfig } from './ipc.mts';
@@ -282,7 +283,16 @@ function showWindow() {
   if (window.isMinimized()) window.restore();
   window.focus();
 }
+// A SHARED FILE'S APP LINK (agentbox://f/<token>), from the link page's
+// "Open in Agentbox", held the same way until the window takes it.
+let pendingSharedFile = fileLinkToken(process.argv.find((a) => a.startsWith(`${JOIN_SCHEME}://`)) ?? '');
 function openJoinLink(url: string) {
+  const file = fileLinkToken(url);
+  if (file) {
+    pendingSharedFile = file;
+    if (window && !window.isDestroyed()) { window.webContents.send('zero:shared-file'); showWindow(); }
+    return;
+  }
   const token = tokenFromLink(url);
   if (!token) return;
   pendingJoin = token;
@@ -1188,6 +1198,7 @@ async function createWindow() {
     },
   });
   ipcMain.handle('zero:take-join', () => { const token = pendingJoin; pendingJoin = null; return token; });
+  ipcMain.handle('zero:take-shared-file', () => { const token = pendingSharedFile; pendingSharedFile = null; return token; });
   // External links from markdown open in the real browser; local artifacts
   // (a demo page, a screenshot a worker saved) open in their default app, so
   // "see it working" is one click from the message.

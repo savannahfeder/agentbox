@@ -41,6 +41,13 @@
 .sf-frame { display: block; width: 100%; height: calc(100vh - 230px); min-height: 520px; border: 0; border-radius: var(--artifact-corner); background: #fff; }
 .sf-pdf { height: calc(100vh - 230px); min-height: 520px; display: flex; }
 .sf-pdf > * { flex: 1; min-width: 0; }
+.sf-table { height: calc(100vh - 230px); min-height: 420px; display: flex; flex-direction: column; }
+.sf-video { display: grid; place-items: center; }
+.sf-video video { display: block; max-width: 100%; max-height: calc(100vh - 220px); border-radius: var(--artifact-corner); background: #000; }
+/* Its pieces arriving: the frame a film will fill, and a line across its foot. */
+.sf-video.is-loading { position: relative; width: 100%; aspect-ratio: 16 / 9; max-height: calc(100vh - 220px); overflow: hidden; border-radius: var(--artifact-corner); background: var(--bg-raised); }
+.sf-video.is-loading i { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--text-dim); transition: width 0.3s ease; }
+.sf-table > * { flex: 1; min-height: 0; }
 
 /* The comments: a panel over the page's right edge, opened from the bar. */
 .sf-panel {
@@ -130,7 +137,7 @@
   .sf-main { padding: 24px 20px 64px; }
   .sf-head { margin-bottom: 28px; }
   .sf-head h1 { font-size: 26px; line-height: 32px; }
-  .sf-frame, .sf-pdf { height: calc(100svh - 150px); min-height: 420px; }
+  .sf-frame, .sf-pdf, .sf-table { height: calc(100svh - 150px); min-height: 420px; }
   .sf-panel { width: 100%; border-left: 0; }
   .sf-sign-in .si-card { width: auto; box-sizing: border-box; padding: 30px 22px 22px; }
   .sf-sign-in { grid-template-columns: minmax(0, 1fr); }

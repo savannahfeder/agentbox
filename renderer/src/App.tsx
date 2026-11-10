@@ -2937,9 +2937,9 @@ export default function App() {
   }, [weekCards, openTeammateCard, team]);
   const continueTeammateThread = useCallback((card: ThreadCard) => {
     void api.teamContinueBrief({ personId: card.personId, threadId: card.threadId })
-      .then((b) => { setComposeInitial(continueStart(b)); setModal('compose'); })
+      .then((b) => { setComposeInitial(continueStart(b, card, snap?.products ?? [])); setModal('compose'); })
       .catch((err) => showToast(String(err?.message ?? err)));
-  }, []);
+  }, [snap?.products]);
   const [teamBody, setTeamBody] = useState<HTMLElement | null>(null);
   // The card on screen is the newest one, and once its owner takes it back it
   // is not on screen at all: words they made private must not stay up.
@@ -4535,6 +4535,37 @@ export default function App() {
     joinWaiting.current = null;
     void roomsUi.join(token);
   }, [joinTick, roomsUi.live, snap, showToast]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A FILE SOMEONE SHARED BY ITS LINK, from the link page's "Open in Agentbox":
+  // brought into the project on screen, then its thread opens with the file open.
+  const projectNow = useRef<string | null>(null);
+  projectNow.current = productFilter ?? focused?.product ?? null;
+  const broughtIn = useRef<{ id: string; product: string; src: string } | null>(null);
+  const [broughtTick, setBroughtTick] = useState(0);
+  useEffect(() => {
+    const take = () => {
+      void window.zero?.takeSharedFile?.().then(async (token) => {
+        if (!token) return;
+        showToast('Bringing the file in');
+        const out = await api.bringSharedFile({ link: `agentbox://f/${token}`, product: projectNow.current });
+        if (!out.ok || !out.id || !out.product || !out.src) { showToast(out.error ?? 'That file did not come in.'); return; }
+        broughtIn.current = { id: out.id, product: out.product, src: out.src };
+        setBroughtTick((n) => n + 1);
+      }).catch(() => {});
+    };
+    take();
+    return window.zero?.onSharedFile?.(take);
+  }, [showToast]);
+  useEffect(() => {
+    const want = broughtIn.current;
+    const row = want && items.find((i) => i.id === want.id && i.product === want.product);
+    if (!want || !row) return;
+    broughtIn.current = null;
+    pendingDoc.current = { id: row.id, doc: { product: want.product, src: want.src } };
+    setSearch(null);
+    setFocused(row);
+    markSeen(row);
+  }, [broughtTick, items, markSeen]);
 
   // She dragged the window onto the other screen, or unplugged one. The picture
   // does not change, only which copy of it is painted, so there is nothing to
