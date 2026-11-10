@@ -8371,6 +8371,7 @@ export default function App() {
                   pointer={listPointer}
                   table={search === null}
                   unread={(item) => isUnread(item, seenAt, unreadSince, team?.me ?? null)}
+                  lastThread={backForwardOn ? trail.lastThread : null}
                   products={snap.products}
                   team={team}
                   mixed={search === null ? mixedRows : null}

@@ -18,7 +18,7 @@ import { listProducts, getProduct, createProduct, updateProduct, type ProductPat
 import { listDocuments, nameOnThread, noteWrittenForRun, readDocument, writeDocument } from './core/documents.mts';
 import { listSkills, fetchSkill, fetchReference } from './core/skills.mts';
 import { listWorkItems, updateItem, createClaimRegistry, type AgentPatch, type ClaimAsk, type ItemFields, type WorkListFilter } from './core/work.mts';
-import { readStandingInstruction, setStandingInstruction } from './core/repeats.mts';
+import { createRepeatingTask, readStandingInstruction, setStandingInstruction, type NewRepeatingTask } from './core/repeats.mts';
 import { teamPost, teamPass, teamRemember, teamSetup, teamRoster, teamPlaybook, teamMethod, teamHire, noteToAnotherThread } from './core/teammates.mts';
 import { documentVersion, documentsWithFolders, keepAsWritten, fileWrittenDocument, teamFile, teamTell, teamTask, teamThreads, teamRead, waitsNamed } from './core/reach.mts';
 import { readTeammates, readTeamView, teamDir } from '../main/store/teammates-files.mts';
@@ -52,7 +52,7 @@ function runWords(fields: { model?: string; effort?: string }) {
 const CAPABILITIES = [
   'products', 'documents (read and write, any path in the product)',
   'personas and transcripts (they are documents)', 'skills', 'work items', 'past chats (read only)',
-  'the standing instruction behind a repeating task, on a thread that is one of its runs',
+  'making a new repeating task; changing the standing instruction behind one, on a thread that is one of its runs',
   'the team chat and passing work to a teammate, from any thread; remembering and setting up, on a thread that is a teammate\'s run',
   'writing to people on the team and reading the team\'s threads, when your owner is on a team',
   'looking at a page running on this machine (look_at_page, local addresses only)',
@@ -359,6 +359,20 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         instruction: z.string().describe('the whole standing instruction, as the person would have typed it'),
       },
       run: ({ instruction }: { instruction: string }) => json(setStandingInstruction({ instruction }, thisRun())),
+    },
+    {
+      name: 'create_repeating_task',
+      description: 'Make a new repeating task, exactly as the person would with the When menu: every day, every weekday, or one day a week, at a local time. Each run is its own thread briefed with your instruction, so write it for an agent that has seen nothing of this conversation. Use it when the person asks for something to happen regularly, rather than telling them to set it up by hand. Every run spends their plan, so only make one they asked for or agreed to. It runs on the same coding agent and model as this thread. The first run starts within a minute unless startNow is false; then it waits for its next time.',
+      schema: {
+        product: z.string().optional().describe('which product it runs in; defaults to this thread\'s'),
+        title: z.string().describe('the short name it is listed under, such as "Daily security review"'),
+        instruction: z.string().describe('what every run is told to do'),
+        every: z.enum(['day', 'weekday', 'week']),
+        at: z.string().describe('local time, 24-hour "HH:MM", such as "09:00"'),
+        on: z.enum(['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']).optional().describe('the day, when every is week'),
+        startNow: z.boolean().optional().describe('false to wait for its first time instead of running now'),
+      },
+      run: (ask: NewRepeatingTask) => json(createRepeatingTask(ask, thisRun())),
     },
 
     /* ------------------------------- teammates ------------------------------ */
