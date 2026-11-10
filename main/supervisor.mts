@@ -116,7 +116,7 @@ function whoHasIt(made: { taken?: boolean; reason?: string; heldBy?: number | nu
   if (made?.taken !== false) return '';
   return `: its folder is ${made.reason}${made.heldBy ? ` by pid ${made.heldBy}` : ''}`;
 }
-import { agentSpokeSince, answerSettled, answerTs, stoppedByHer, heldForHer, toldBy, filedByThePerson } from '../shared/answers.mts';
+import { agentSpokeSince, answerSettled, answerTs, stoppedByHer, heldForHer, toldBy, filedByThePerson, wakesItselfAt } from '../shared/answers.mts';
 import { accountIdentity, nameForOrganization, profileForCloudLogin, isCloudLoginOf, toolingLine } from './account-tooling.mts';
 import type { AccountIdentity } from './account-tooling.mts';
 import { effectiveProfiles } from './account-discovery.mts';
@@ -176,6 +176,7 @@ import { nameRow, wantsName, askSmallModel } from './row-label.mts';
 import { catchUpRow, catchUpResult } from './catch-up.mts';
 import { isAuto, asksWho, routeCandidates, routePrompt, readRoute, routedPatch, orPrimary, NOBODY_WHY } from '../shared/auto-route.mts';
 import { LEVELS, latestMessage, sortMessage, wantsPriority } from './message-priority.mts';
+import { GUESSED_LEVELS, levelTask, wantsLevel } from './task-priority.mts';
 import { NAME, Name, envName, nameSlug, isOurSlug } from '../shared/product-name.mjs';
 import { signInFiles, signInStamp, claudeKeychainService, KeychainStamps } from './sign-in-files.mts';
 import { runsOn } from './runs-on.mts';
@@ -1012,6 +1013,8 @@ const DIGEST_RETRY_MS = 30 * 60_000;
 // How long a row the namer could not name waits before it is asked about again,
 // so it cannot hold the rows behind it (nameTheRows).
 const NAME_RETRY_MS = 10 * 60_000;
+// How many times a task on Agent decides is asked about before it stays Medium.
+const LEVEL_TRIES = 3;
 /** Rewrites of brought-in chats running at once (`catchUpTheImports`). */
 const CATCH_UP_AT_ONCE = 3;
 /** Someone is looking at these rows, so a miss is tried again far sooner than a name is. */
@@ -1404,6 +1407,8 @@ export class Supervisor {
   declare _routing: boolean | undefined;
   declare _sortedMessages: Set<string>;
   declare _sortingMessages: boolean | undefined;
+  declare _levelMisses: Map<string, { count: number; at: number }>;
+  declare _leveling: boolean | undefined;
   declare _crossModelSaid: Set<string> | undefined;
   declare _oldChoiceSaid: Set<string> | undefined;
   declare _folderRefused: Set<string> | undefined;
@@ -4391,7 +4396,8 @@ export class Supervisor {
     // the two cases a write-time cap would miss: the strikes a row earned
     // before she raised it, which is the usual way a row becomes urgent, and
     // the ones already sitting in the state file from before this landed.
-    const rungs = isUrgent(item) ? 1 : runs;
+    // Nor a thread at the moment its agent set: the agent chose the gap.
+    const rungs = isUrgent(item) || wakesItselfAt(item) ? 1 : runs;
     const rest = FRUITLESS_RESTS_MS[Math.min(rungs, FRUITLESS_RESTS_MS.length) - 1];
     return (seen.endedAt ?? 0) + rest;
   }
@@ -4942,6 +4948,43 @@ export class Supervisor {
 
   _askPriority(latest: LatestMessage, product: string | null = null) {
     return this._askSmall((opts) => sortMessage(latest, opts), { product });
+  }
+
+  /**
+   * GIVE A TASK LEFT ON "AGENT DECIDES" ITS LEVEL (main/task-priority.mts).
+   * Paced like the namer: one call at a time, newest first, never awaited by
+   * the tick. A miss waits ten minutes, and after three the task stays Medium.
+   */
+  levelTheTasks(items: WorkItem[], me: string | null | undefined, now = Date.now()) {
+    if (this._leveling || this._memoryCritical(now)) return undefined;
+    this._levelMisses ??= new Map();
+    const products = new Map((this.store.listProducts?.() ?? []).map((p) => [p.slug, p]));
+    const key = (i: WorkItem) => `${i.product}:${i.id}`;
+    const waiting = (i: WorkItem) => {
+      const miss = this._levelMisses.get(key(i));
+      return !!miss && (miss.count >= LEVEL_TRIES || now - miss.at < NAME_RETRY_MS);
+    };
+    const next = items
+      .filter((i) => wantsLevel(i, products.get(i.product), me) && !waiting(i))
+      .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))[0];
+    if (!next) return undefined;
+    this._leveling = true;
+    const missed = () => {
+      const was = this._levelMisses.get(key(next));
+      this._levelMisses.set(key(next), { count: (was?.count ?? 0) + 1, at: now });
+    };
+    return this._askLevel(next)
+      .then((level) => {
+        if (!level) return missed();
+        this._levelMisses.delete(key(next));
+        this.store.prioritizeItem(next.product, next.id, GUESSED_LEVELS[level]);
+      })
+      .catch((e) => { missed(); console.warn('zero: could not rank a task:', e.message); })
+      .finally(() => { this._leveling = false; });
+  }
+
+  _askLevel(item: WorkItem) {
+    return this._askSmall((opts) => levelTask(item, opts), { product: item.product });
   }
 
   /**
@@ -8850,7 +8893,9 @@ export class Supervisor {
       // from her moves `lastFounderWrite` past it and the row is fresh again.
       // EXCEPT when the words are OURS and promised a retry
       // (`_weSaidItRunsAgain`): those are not an answer to her.
-      && (!awaitingHer(item) || this._weSaidItRunsAgain(item))
+      // AND EXCEPT when the agent set a moment for the thread to run again
+      // and it has come: that answer said the thread would run then.
+      && (!awaitingHer(item) || this._weSaidItRunsAgain(item) || wakesDue(item, now))
       // A row a worker already took and gave nothing back rests before it is
       // handed to another one. This pass had no memory whatsoever, which is
       // the whole of the every-tick loop (FRUITLESS_RESTS_MS).
@@ -8938,6 +8983,8 @@ export class Supervisor {
     try { this.catchUpTheImports(items, now); } catch (e) { console.warn('zero: could not catch up a chat:', (e as Error).message); }
     // And has a teammate written something that needs sorting by urgency?
     try { this.sortTheMessages(items, process.env.AGENTBOX_PERSON_ID); } catch (e) { console.warn('zero: could not sort a message:', (e as Error).message); }
+    // And is there a task left on Agent decides that has no level yet?
+    try { this.levelTheTasks(items, process.env.AGENTBOX_PERSON_ID, now); } catch (e) { console.warn('zero: could not rank a task:', (e as Error).message); }
     // And is there a thread sent to Auto still waiting to be given to someone?
     try { this.routeTheThreads(items); } catch (e) { console.warn('zero: could not route a thread:', (e as Error).message); }
 
@@ -13971,6 +14018,11 @@ function lastFounderWrite(item: WorkItem | null | undefined) {
 // worker's finished word, and a finished word on a row still open is a thing
 // waiting on her by definition. See `isFresh` for what it costs and why it
 // costs her nothing.
+function wakesDue(item: WorkItem, now: number) {
+  const at = wakesItselfAt(item);
+  return at > 0 && at <= now;
+}
+
 export function awaitingHer(item: WorkItem | null | undefined) {
   const wrote = item?.wrote?.result;
   if (!wrote || wrote.source !== 'agent') return false;
