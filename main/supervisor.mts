@@ -406,6 +406,8 @@ export type RunState = {
   stoppedOnRequest?: boolean;
   lastLiveReply?: WorkItem | null;
   handedBack?: unknown;
+  /** The cloud turned the start away because the plan's agents were all busy. */
+  cloudFull?: boolean;
   transportFault?: boolean;
   remoteIdle?: boolean;
   remoteHeld?: boolean;
@@ -6140,10 +6142,18 @@ export class Supervisor {
 
   // Picked-back-up runs count: they hold a cloud slot, and their rows show
   // them working there.
-  _cloudLoad() {
+  _cloudLoad(except?: RunState) {
     let n = 0;
-    for (const s of this.sessions.values()) if (s.cloud) n += 1;
+    for (const s of this.sessions.values()) if (s.cloud && s !== except) n += 1;
     for (const v of this._comingHome?.values() ?? []) if (!this.sessions.has(v.itemId)) n += 1;
+    return n;
+  }
+
+  /** The cloud runs In progress shows: the cap's count less runs that answered and wait for a reply. */
+  _cloudRunsShown() {
+    let n = 0;
+    for (const s of this.sessions.values()) if (s.cloud && !s.between && !s.remoteIdle) n += 1;
+    for (const v of this._comingHome?.values() ?? []) if (!this.sessions.has(v.itemId) && !v.between && !v.remoteIdle) n += 1;
     return n;
   }
 
@@ -6254,7 +6264,7 @@ export class Supervisor {
       this._cloudMonth = { at: now, month: summarizeCloudUsage(readCloudUsage({ home: this.config.home }), { since }) };
     }
     return {
-      setUp, offered, managed: typeof config?.gateway === 'string', mode, running: this._cloudLoad(), month: this._cloudMonth.month,
+      setUp, offered, managed: typeof config?.gateway === 'string', mode, running: this._cloudRunsShown(), month: this._cloudMonth.month,
       ...this._cloudHealthNow(now),
       noRoom: (({ error, message }: { error?: string; message?: string | null } = {}) => (error ? { error, message } : null))(this._cloudNoRoomNow(now) ?? {}),
       versionGap: setUp ? this._cloudVersionGaps(now).sort((a, b) => Number(b.blocks) - Number(a.blocks))[0] ?? null : null,
@@ -6620,7 +6630,7 @@ export class Supervisor {
   // account is usually not the cloud's, so waiting meant nothing ran for the
   // hour. This Mac's own cap still bounds what starts here.
   _waitsForCloud(item: WorkItem | null | undefined, engine: string) {
-    return this._cloudFirst() && !!item?.id && this._cloudUsable(engine) && this._cloudSignedInAtAll(engine)
+    return this._cloudFirst() && !!item?.id && this._cloudUsable(engine, { full: true }) && this._cloudSignedInAtAll(engine)
       && this._cloudEligible(item) && !this._mustRunHere(item, engine) && !this._cloudSlotFor(engine)
       && this._cloudInUseState(engine) !== 'limited';
   }
@@ -6707,8 +6717,9 @@ export class Supervisor {
 
   // Not resting after failures of its own (`_noteCloudOutcome`), and not a
   // major version of this engine apart from this Mac (`_cloudVersionGaps`).
-  _cloudUsable(engine: string) {
-    if (this._cloudResting() || this._cloudNoRoomNow()) return false;
+  /** `full` true: the plan's agents all busy is a cloud to wait for, not one that cannot take the run. */
+  _cloudUsable(engine: string, { full = false } = {}) {
+    if (this._cloudResting() || (this._cloudNoRoomNow() && !(full && this._cloudFullOfOurs()))) return false;
     const which = engineOf(engine);
     return !this._cloudVersionGaps().some((g) => g.engine === which && g.blocks);
   }
@@ -6870,7 +6881,9 @@ export class Supervisor {
       return;
     }
     const now = Date.now();
-    if (session.stoppedByUs) return;
+    // Turned away while this Mac's other cloud runs fill the plan: it waits for
+    // one of them to end, and they all do.
+    if (session.stoppedByUs || (session.cloudFull && this._cloudFullOfOurs(session))) return;
     if (!refused && now - (session.startedAt ?? now) >= FAST_EXIT_MS) {
       if (held?.trying) { delete this._heldStarts[key]; this._saveState(); }
       return;
@@ -7020,12 +7033,25 @@ export class Supervisor {
       .flatMap((l) => l.split('\n')).map((l) => /no room in the cloud \((\w+)\):\s*(.*)$/.exec(l)).filter(Boolean).at(-1);
     const error = said?.[1] ?? 'plan';
     this._cloudNoRoom = { error, message: said?.[2]?.trim() || null, until: Date.now() + (error === 'agents' ? CLOUD_FULL_WAIT_MS : CLOUD_NO_ROOM_WAIT_MS) };
+    // A run that answered keeps its machine ten minutes for a quick reply; a
+    // thread with work to do needs the slot more.
+    session.cloudFull = error === 'agents';
+    if (error === 'agents') {
+      const idle = [...this.sessions.values()].filter((s) => s.cloud && s.between).sort((a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0))[0];
+      idle?.child?.stopWaiting?.();
+    }
     this.onChange?.();
   }
 
   _cloudNoRoomNow(now = Date.now()) {
     const r = this._cloudNoRoom;
     return r && r.until > now ? r : null;
+  }
+
+  // The plan's agents are all busy and some are this Mac's runs, which end.
+  // Slots taken by another Mac or the phone are not ours to wait on.
+  _cloudFullOfOurs(except?: RunState) {
+    return this._cloudNoRoomNow()?.error === 'agents' && this._cloudLoad(except) > 0;
   }
 
   /** The plan the cloud server says this Mac is on; a paid one ends a wait for a plan. */
@@ -7124,6 +7150,7 @@ export class Supervisor {
   _whyWaitingForCloud(engine: string) {
     if (this._cloudStarting() >= this._startBudget.now()) return { why: 'starting-in-turn' };
     if (this._cloudLoad() >= this._maxCloud()) return { why: 'cloud-full', detail: this._maxCloud() };
+    if (this._cloudFullOfOurs()) return { why: 'cloud-full' };
     if (!this._cloudReady(engine)) return { why: 'accounts-limited' };
     return { why: 'cloud-busy' };
   }
