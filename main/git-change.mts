@@ -152,6 +152,53 @@ function cutFrom(root: string): string | null {
   return null;
 }
 
+function isAncestor(root: string, older: string, newer: string): boolean {
+  return tryGit(root, ['merge-base', '--is-ancestor', older, newer]) !== null;
+}
+
+/** The newest commit the run brought in from elsewhere: the second parent of
+ *  a merge on its own line, or after a rebase, where it now sits on main. */
+function broughtIn(root: string, head: string, now: string): string | null {
+  if (isAncestor(root, head, now)) {
+    const merges = String(tryGit(root, ['rev-list', '--first-parent', '--merges', '--parents', `${head}..${now}`]) ?? '');
+    for (const line of merges.split('\n')) {
+      for (const parent of line.trim().split(' ').slice(2)) {
+        if (!isAncestor(root, parent, head)) return parent;
+      }
+    }
+    return null;
+  }
+  for (const ref of CUT_FROM) {
+    const sha = tryGit(root, ['rev-parse', '--verify', '--quiet', ref])?.trim();
+    if (!sha) continue;
+    const base = tryGit(root, ['merge-base', now, sha])?.trim();
+    // Main already pointing at this run's commit means the run shipped, not
+    // that main came in.
+    if (base && base !== now && !isAncestor(root, base, head)) return base;
+    return null;
+  }
+  return null;
+}
+
+/**
+ * What the run's diff is taken against: the commit it started on, or, when it
+ * merged or rebased main in, that commit with main merged into it, so main's
+ * own changes are not counted as the run's. Where that merge conflicts, main's
+ * commit is the base and only files both this run's window and the branch
+ * touched are kept.
+ */
+function startOfThisRun(root: string, head: string): { base: string; only: Set<string> | null } {
+  const now = tryGit(root, ['rev-parse', 'HEAD'])?.trim();
+  if (!now || now === head) return { base: head, only: null };
+  const came = broughtIn(root, head, now);
+  if (!came) return { base: head, only: null };
+  const tree = tryGit(root, ['merge-tree', '--write-tree', head, came])?.split('\n')[0]?.trim();
+  if (tree) return { base: tree, only: null };
+  const sinceStart = new Set(zList(tryGit(root, ['diff', '--name-only', '-z', head])));
+  const notOnMain = zList(tryGit(root, ['diff', '--name-only', '-z', came]));
+  return { base: came, only: new Set(notOnMain.filter((rel) => sinceStart.has(rel))) };
+}
+
 /**
  * WHETHER THERE IS ANYTHING HERE TO SHIP, read when the run ends.
  *
@@ -373,11 +420,12 @@ export function changeFromRepo(snapshot: RepoSnapshot | null | undefined): RepoC
   // 1. Everything tracked, against the commit the run started on. The files
   //    we kept a copy of are cut out here and done properly below.
   if (head) {
+    const { base, only } = startOfThisRun(root, head);
     const excludes = [...before.keys()].map((rel) => `:(exclude,literal)${rel}`);
     const patch = tryGit(root, [
-      'diff', '--no-color', '--no-ext-diff', '-U3', '-M', head, '--', '.', ...excludes,
+      'diff', '--no-color', '--no-ext-diff', '-U3', '-M', base, '--', '.', ...excludes,
     ]);
-    for (const file of filesFromPatch(patch ?? '')) add(file);
+    for (const file of filesFromPatch(patch ?? '')) if (!only || only.has(file.path)) add(file);
   }
 
   // 2. The files that were already changed when we arrived.
