@@ -51,6 +51,7 @@ import { fetchableFileUrl } from '../phone-files';
 import { DocText } from './DocText';
 import { CodeArtifact } from './CodeArtifact';
 import type { Change } from '../code-artifact';
+import type { TableCell } from '../types';
 import { NAME } from '../../../shared/product-name.mjs';
 import { shownName } from '../../../shared/artifact-marks.mts';
 import { onPhone } from '../phone-screen';
@@ -118,10 +119,12 @@ function paneKindClass(kind: PaneKind): string {
   return 'doc-md';
 }
 
-export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, onMode, headerTarget, focusControlStyle, aside, firstMark }: {
+export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, onMode, headerTarget, focusControlStyle, aside, onComment, firstMark }: {
   focusControlStyle?: FocusControlStyle;
   /** Drawn beside a document's words, inside the card: the notes sidebar. */
   aside?: ReactNode;
+  /** A table cell's Comment, for the notes sidebar. */
+  onComment?: (quote: string, cell: TableCell) => void;
   /** A mark before the pane's own ones in the corner. */
   firstMark?: ReactNode;
   headerTarget?: HTMLElement | null;
@@ -463,7 +466,9 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
         ) : text === null || (threadsFile && liveTicket === undefined) ? (
           <PreviewLoading />
         ) : kind === 'table' ? (
-          <Beside aside={aside}><TableView text={text} path={src} mode="pane" live={liveSession} onSave={doc.readOnly ? undefined : saveTable} onReload={() => setLooks((n) => n + 1)} onNotice={onNotice} storeKey={`${doc.product}/${src}`} /></Beside>
+          <Beside aside={aside}>
+            <TableView text={text} path={src} mode="pane" live={liveSession} onComment={onComment} onSave={doc.readOnly ? undefined : saveTable} onReload={() => setLooks((n) => n + 1)} onNotice={onNotice} storeKey={`${doc.product}/${src}`} />
+          </Beside>
         ) : kind === 'text' ? (
           <Beside aside={aside}><div className="code-scroll" ref={setCodeBox}><CodeFile text={text} /></div></Beside>
         ) : (

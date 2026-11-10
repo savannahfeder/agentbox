@@ -205,12 +205,15 @@ export interface Person {
 /** A file a message to a person carries: pasted bytes or a path on this Mac. */
 export interface TeamMessageFile { name: string; dataBase64?: string; srcPath?: string }
 
+export type TableCell = { row: number; column: string };
+
 /** Where a comment sits on a file (shared/artifact-marks.mts). */
 export type NotePlace =
   | { kind: 'pin'; x: number; y: number }
   | { kind: 'time'; s: number; x?: number; y?: number }
   | { kind: 'page'; n: number; word?: 'Slide'; x?: number; y?: number }
-  | { kind: 'quote'; text: string }
+  /** `cell`: a table's row in the file, counted from 1 under the header, and its column's name. */
+  | { kind: 'quote'; text: string; cell?: TableCell }
   | { kind: 'whole' };
 
 /** One `artifact` ledger field, as written. */

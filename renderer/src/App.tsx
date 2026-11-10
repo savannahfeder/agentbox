@@ -21,7 +21,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { cursorAfterWait, cursorIndex, cursorMark, cursorWait, type CursorMark, type CursorWait } from './cursor-follows';
 import { createPortal, flushSync } from 'react-dom';
 import { readySkin, swapLook } from './look-switch';
-import type { AgentTurn, AnswerMode, Approval, ApprovalInput, CloudPlan, PermissionMode, Product, RepeatRule, RepeatShape, RunningSession, Snapshot, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
+import type { AgentTurn, AnswerMode, Approval, ApprovalInput, CloudPlan, PermissionMode, Product, RepeatRule, RepeatShape, RunningSession, Snapshot, TableCell, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
 import type { ReplyPick } from './reply-pick';
 import { api } from './api';
 import { setClaudeModels, setCodexFreePlan } from './models';
@@ -3219,6 +3219,13 @@ export default function App() {
     return () => window.removeEventListener('storage', heard);
   }, []);
   const toggleNotes = () => setNotesOpen((was) => { rememberNotesSidebar(localStorage, !was); return !was; });
+  const [cellComment, setCellComment] = useState<{ text: string; cell: TableCell } | null>(null);
+  // Notes are only drawn full screen, so a Comment from a table beside the thread goes full screen first.
+  const commentOnTable = (text: string, cell: TableCell) => {
+    setCellComment({ text, cell });
+    rememberNotesSidebar(localStorage, true); setNotesOpen(true);
+    if (artifactMode !== 'focus') { setArtifactReturnBeside(artifactMode === 'beside'); setArtifactMode('focus'); }
+  };
 
   /**
    * FULL SCREEN, AND THE TWO THINGS THAT RIDE ON TOP OF IT.
@@ -6840,6 +6847,7 @@ export default function App() {
   ) : null;
   const artifactView = artifactPlacement(artifactMode, artifactWidth);
   const notesHere = fullScreenDoc && !!focused && openDoc?.product === focused.product && !openDoc.readOnly && takesNotesSidebar(openDoc.src);
+  const cellsTakeNotes = !!focused && openDoc?.product === focused.product && !openDoc.readOnly && takesNotesSidebar(openDoc.src);
   const notesShown = notesHere && notesOpen;
   const notesClosed = notesHere && !notesOpen;
   const [artifactHeader, setArtifactHeader] = useState<HTMLDivElement | null>(null);
@@ -8336,7 +8344,9 @@ export default function App() {
                 onSplit={resizeDoc}
                 onClose={closeArtifact}
                 onNotice={showToast}
-                aside={notesShown && focused ? <NotesSidebar key={`${focused.id}\n${openDoc.src}`} item={focused} src={openDoc.src} /> : undefined}
+                aside={notesShown && focused ? <NotesSidebar key={`${focused.id}\n${openDoc.src}`} item={focused} src={openDoc.src}
+                  asked={cellComment} onAsked={() => setCellComment(null)} /> : undefined}
+                onComment={cellsTakeNotes ? commentOnTable : undefined}
                 firstMark={<>
                   {focused && focused.product === openDoc.product && canShareFile(openDoc.src) && <ShareLink icon product={openDoc.product} thread={focused.id} src={openDoc.src} signedIn={!!snap?.team?.signedIn} />}
                   {notesHere && focused && <NotesToggle open={notesOpen} waiting={(focused.artifacts?.notes ?? []).filter((n) => !n.resolved && stillWaiting(n)).length} onToggle={toggleNotes} />}

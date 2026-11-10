@@ -650,7 +650,8 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   };
 
   const hint = kind === 'image' ? 'Click the picture to pin a note'
-    : kind === 'markdown' || kind === 'code' || kind === 'table' ? 'Select words to note them'
+    : kind === 'table' ? 'Right-click a cell to note it'
+    : kind === 'markdown' || kind === 'code' ? 'Select words to note them'
       : kind === 'deck' || kind === 'pdf' ? 'Click a spot to pin a note'
         : kind === 'page' ? 'Press Pin a spot, then click the page'
           : kind === 'film' ? 'Pause the film and click it to pin a note'
