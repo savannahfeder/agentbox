@@ -76,7 +76,7 @@ export function createKeyAsks(o: KeyAsksOptions) {
   }
 
   // The card, until a signed answer, the deadline, or the run's end.
-  async function card(request: { id: string; at: number; product: string | null; item: string | null; tool: string; input: Record<string, unknown> }) {
+  async function card(request: { id: string; at: number; product: string | null; item: string | null; tool: string; input: Record<string, unknown> }, savedMeanwhile: () => boolean) {
     const dir = spool!;
     fs.mkdirSync(dir, { recursive: true });
     const answerName = `${request.id}.answer.json`;
@@ -93,7 +93,8 @@ export function createKeyAsks(o: KeyAsksOptions) {
         if (!answerIsHers(request.id, said, publicKey!)) removeSpoolEntry(dir, answerName);
         else if (said.card !== cardDigest(request)) { finish({ allow: false, swapped: true }); return 'deny'; }
         else { finish(said); return said.allow ? 'allow' : 'deny'; }
-      } else if (!spoolEntryExists(dir, requestName)) writeSpoolFile(dir, requestName, JSON.stringify(request));
+      } else if (savedMeanwhile()) { finish({ allow: false, savedElsewhere: true }); return 'saved'; }
+      else if (!spoolEntryExists(dir, requestName)) writeSpoolFile(dir, requestName, JSON.stringify(request));
       await nap();
     }
     finish({ allow: false, gone: over(), unanswered: !over() });
@@ -117,9 +118,11 @@ export function createKeyAsks(o: KeyAsksOptions) {
     if (asked >= ASKS_PER_RUN) return { status: 'denied', message: 'This run has asked for as many keys as it may.' };
     asked += 1;
     const request = { id: crypto.randomUUID(), at: Date.now(), product, item, tool: KEY_CARD, input: { name, what, ...src } };
-    const verdict = await card(request);
+    // Another run's card for the same key may be allowed first.
+    const verdict = await card(request, () => cloudKeyNames({ home }).some((k) => k.name === name));
     log(`request_cloud_key ${name} from ${src.place}: ${verdict}`);
     if (verdict === 'gone') return ending;
+    if (verdict === 'saved') return handOver(name, false);
     if (verdict === 'unasked') return { status: 'unavailable', message: `The card could not be shown. End your turn with the line ${askLine(name, what, src)}.` };
     if (verdict === 'unanswered') return { status: 'no_answer', message: `No answer in ${Math.round(waitMs / 60_000) || 1} minutes. Finish what you can without it, then end your turn with the line ${askLine(name, what, src)} so it waits for them on the thread.` };
     if (verdict === 'deny') { refusedHere.add(name); return { status: 'denied', message: `They said no to ${name}. Do not ask for it again in this run; finish without it and say what it would have needed.` }; }

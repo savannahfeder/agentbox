@@ -22,6 +22,11 @@ describe('where the stand-in reads a key is kept', () => {
     expect(keyPlaceIn('It is on my Mac in the Keychain, called posthog-read-key')).toEqual({ place: 'keychain', from: 'posthog-read-key' });
   });
 
+  it('does not take the verb as the item', () => {
+    expect(keyPlaceIn('My Keychain has resend-api-key.')).toEqual({ place: 'keychain', from: 'resend-api-key' });
+    expect(keyPlaceIn('the Keychain is where posthog-read-key lives')).toBeNull();
+  });
+
   it('still reads an item named before the Keychain', () => {
     expect(keyPlaceIn('posthog-read-key in my Keychain')).toEqual({ place: 'keychain', from: 'posthog-read-key' });
     expect(keyPlaceIn('Keychain item: resend-api-key.')).toEqual({ place: 'keychain', from: 'resend-api-key' });

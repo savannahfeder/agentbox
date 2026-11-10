@@ -1,13 +1,13 @@
 // Where the person said the key is: "in my Keychain as posthog-read-key", "~/.config/resend.key",
 // "POSTHOG_KEY in ~/app/.env", "$OPENROUTER_API_KEY in my shell".
-const NOT_AN_ITEM = /^(key|it|one|token|computer|mac|laptop|machine|as|called|named|under|item|entry|and|so|too)$/i;
+const NOT_AN_ITEM = /^(key|it|one|token|computer|mac|laptop|machine|as|called|named|under|item|entry|and|so|too|is|has|holds|where)$/i;
 
 export function keyPlaceIn(text) {
   // Every mention, not the first: a thread's title is cut off mid-sentence ("in my Keychain as…").
   for (const m of text.matchAll(/([A-Za-z0-9][\w.@-]{2,})\s+(?:in|from)\s+(?:my\s+|your\s+|the\s+)?keychain/gi)) {
     if (!NOT_AN_ITEM.test(m[1])) return { place: 'keychain', from: m[1] };
   }
-  for (const m of text.matchAll(/keychain(?:\s+(?:item|entry))?[\s,:"“'`]*(?:(?:as|called|named|under)[\s:"“'`]+)?([A-Za-z0-9][\w.@-]*)/gi)) {
+  for (const m of text.matchAll(/keychain(?:\s+(?:item|entry))?[\s,:"“'`]*(?:(?:as|called|named|under|has|holds)[\s:"“'`]+)?([A-Za-z0-9][\w.@-]*)/gi)) {
     if (!NOT_AN_ITEM.test(m[1])) return { place: 'keychain', from: m[1].replace(/\.$/, '') };
   }
   const sh = text.match(/\$([A-Z][A-Z0-9_]+)/);

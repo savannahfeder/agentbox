@@ -1307,6 +1307,7 @@ export class Supervisor {
   declare _madeFolders: Map<string, string>;
   // Threads whose next turn goes to the cloud (a key saved or a file sent for it), and the files each sends.
   declare _cloudForKey: Set<string> | undefined;
+  declare _keyNamesSeen: Set<string> | undefined;
   declare _filesForCloud: Map<string, string[]> | undefined;
   declare _photos: Map<string, ReturnType<typeof snapshotRepo> | null> | undefined;
   declare _firstRunUntil: number;
@@ -6399,8 +6400,24 @@ export class Supervisor {
       for (const t of freed) (this._cloudForKey ??= new Set()).add(t.id);
     } else if (action === 'remove') await removeCloudKey(name, { storage, home: this.config.home });
     else throw new Error('a key is saved or removed');
+    const keys = cloudKeyNames({ home: this.config.home });
+    this._keyNamesSeen = new Set(keys.map((k) => k.name));
     this.onChange?.();
-    return { keys: cloudKeyNames({ home: this.config.home }), freed };
+    return { keys, freed };
+  }
+
+  // A key a cloud run saved after the person's yes on its card
+  // (main/cloud/key-asks.mts) frees the threads waiting on it, as one saved
+  // through cloudKey does. Only keys that appear while the app runs.
+  async _freeForKeysSavedByRuns() {
+    const names = cloudKeyNames({ home: this.config.home }).map((k) => k.name);
+    const seen = this._keyNamesSeen;
+    this._keyNamesSeen = new Set(names);
+    if (!seen || this.config.cloudRuns === false || !names.some((n) => !seen.has(n))) return;
+    for (const t of threadsKeysFree(this.store.listItems(Date.now()), names)) {
+      (this._cloudForKey ??= new Set()).add(t.id);
+      await submitReply(this, { product: t.product, id: t.id, answer: t.answer, status: 'open' }, () => this.store.answerItem(t.product, t.id, { answer: t.answer, status: 'open' }));
+    }
   }
 
   sendNextTurnToCloud(itemId: string) { (this._cloudForKey ??= new Set()).add(itemId); }
@@ -8798,6 +8815,7 @@ export class Supervisor {
     // _cloudReady reads the cloud's setup (at most once a minute) first.
     try { this._cloudReady('codex'); this._renewCloudLogins(); void this._noteCloudOrgs(); } catch (e) { console.warn('zero: could not check the cloud sign-ins:', (e as Error).message); }
     try { if (this._cloudConfig) this._forgetOldCloudTokens(); } catch { /* tried */ }
+    try { await this._freeForKeysSavedByRuns(); } catch (e) { console.warn('zero: could not carry on threads for a saved key:', (e as Error).message); }
     // A COOLDOWN STOPS THE SPAWNING AND IT MUST NOT STOP THE TELLING. The brake
     // goes on when there is no healthy account left anywhere, for up to half an
     // hour, which is precisely the half hour her tasks are all stuck and the
