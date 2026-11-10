@@ -20,7 +20,7 @@ import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { guard, sweep, processes } from '../../../../scripts/lib/chrome-guard.mjs';
 
-const MAC_CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+export const MAC_CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const FOR_TESTING = 'Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing';
 
 /** Playwright's Chrome for Testing builds on this Mac, newest first. */
@@ -48,6 +48,17 @@ export function findChrome(platform = process.platform, env = process.env, playw
   try { return playwright().chromium.executablePath(); } catch { return MAC_CHROME; }
 }
 export const CHROME = findChrome();
+
+/**
+ * The browsers to try, in order, with how long each may take to load the page.
+ * A Chrome for Testing build can crash every renderer on a new macOS
+ * (158.0.8127.18 on macOS 27.0.1), so a page that has not loaded in that time
+ * moves on to Google Chrome. The last one gets no deadline of its own.
+ */
+export function browsersToTry(chrome = CHROME, exists = fs.existsSync) {
+  const list = [...new Set([chrome, MAC_CHROME])].filter((bin) => bin === chrome || exists(bin));
+  return list.map((bin, i) => ({ bin, loadMs: i < list.length - 1 ? 20_000 : null }));
+}
 
 const KEYS = {
   Enter: { code: 'Enter', keyCode: 13 },

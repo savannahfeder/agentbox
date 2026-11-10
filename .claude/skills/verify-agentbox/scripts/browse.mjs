@@ -28,7 +28,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { launchChrome, connect, freeProfile, readModifiers } from './cdp.mjs';
+import { launchChrome, connect, freeProfile, readModifiers, browsersToTry } from './cdp.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const { readState, INSTANCE } = await import(path.join(here, 'live.mjs'));
@@ -96,14 +96,26 @@ async function launch() {
   fs.rmSync(FILE, { force: true });
   const profile = path.join(INSTANCE, 'chrome-profile');
   fs.mkdirSync(profile, { recursive: true });
-  if (freeProfile(profile)) await new Promise((r) => setTimeout(r, 500));
-  const { chrome, wsUrl } = await launchChrome({ profile, detached: true });
-  const t = await connect(wsUrl);
-  fs.writeFileSync(FILE, JSON.stringify({ wsUrl, targetId: t.targetId, pid: chrome.pid, url: state.url }));
-  await t.goto(state.url);
-  await t.evaluate(catchErrors);
-  await drawn(t);
-  return t;
+  for (const { bin, loadMs } of browsersToTry()) {
+    if (freeProfile(profile, bin)) await new Promise((r) => setTimeout(r, 500));
+    const { chrome, wsUrl } = await launchChrome({ profile, detached: true, bin });
+    const t = await connect(wsUrl);
+    const going = t.goto(state.url);
+    if (loadMs) {
+      const loaded = await Promise.race([going.then(() => true, () => false), new Promise((r) => setTimeout(() => r(false), loadMs))]);
+      if (!loaded) {
+        // An older Chrome refuses a profile a newer one wrote.
+        t.detach(); freeProfile(profile, bin);
+        fs.rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+        fs.mkdirSync(profile, { recursive: true });
+        continue;
+      }
+    } else await going;
+    fs.writeFileSync(FILE, JSON.stringify({ wsUrl, targetId: t.targetId, pid: chrome.pid, url: state.url }));
+    await t.evaluate(catchErrors);
+    await drawn(t);
+    return t;
+  }
 }
 
 async function tab() {
