@@ -1146,6 +1146,7 @@ async function createWindow() {
   let cornerTag: ReturnType<typeof createCornerTag> | null = null;
   const notifier = installNotifier({
     app, window, Notification, powerMonitor, ipcMain, nativeImage,
+    openExternal: (url: string) => shell.openExternal(url),
     onArrivals: (list, needsYou) => team?.phoneArrivals(list, needsYou),
     onChange: () => cornerTag?.refresh(),
   });

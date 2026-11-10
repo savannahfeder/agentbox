@@ -1952,6 +1952,7 @@ declare global {
       firstRunPracticeEnd?(): Promise<unknown>;
       onboardingArm?(): Promise<unknown>;
       notifyTest?(): Promise<unknown>;
+      notifySettings?(): Promise<unknown>;
       cloudSignIn?(p: { action: 'start' | 'code' | 'cancel' | 'remove'; engine: 'claude' | 'codex'; key?: string | null; code?: string }): Promise<{ ok: boolean; key?: string | null; error?: string }>;
       cloudSendFile?(p: { product: string; id: string; path?: string; choose?: boolean; hold?: boolean; also?: string }): Promise<{ ok: boolean; path?: string; canceled?: boolean; held?: boolean; words?: string; error?: string }>;
       cloudFileInfo?(p: { path: string }): Promise<{ ok: boolean; size?: number; error?: string }>;

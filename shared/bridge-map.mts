@@ -138,6 +138,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   updateMove: 'zero:update-move',
   notify: 'zero:notify',
   notifyTest: 'zero:notify-test',
+  notifySettings: 'zero:notify-settings',
   onboardingArm: 'zero:onboarding-arm',
   stopSession: 'zero:stop-session',
   runNow: 'zero:run-now',
