@@ -9,11 +9,11 @@
 // The trail (renderer/src/back-and-forward.ts) is what the arrows, ⌘[ and ⌘]
 // walk. These are the cases that decide whether it lands where you expect.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { arrive, stepBack, stepForward, sameStop, EMPTY_TRAIL, TRAIL_LIMIT, type Stop, type Trail } from '../renderer/src/back-and-forward';
+import { arrive, stepBack, stepForward, sameStop, settledPlaces, EMPTY_TRAIL, SETTLE_MS, TRAIL_LIMIT, type Stop, type Trail } from '../renderer/src/back-and-forward';
 import { alphaFeatures } from '../main/settings.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -87,6 +87,41 @@ describe('the trail', () => {
     expect(sameStop(thread('a'), thread('b'))).toBe(false);
     expect(sameStop(thread('a'), { at: 'thread', product: 'q', id: 'a' })).toBe(false);
     expect(sameStop(thread('a'), thread('a'))).toBe(true);
+  });
+});
+
+// Closing a thread with E passes through the list for a moment on its way to
+// the next thread. Driving the built app, that moment was recorded, and back
+// from the next thread went to the list instead of the thread just closed.
+describe('a place counts once it stays on screen', () => {
+  const recorded = () => {
+    const seen: Stop[] = [];
+    return { seen, rec: settledPlaces((s) => seen.push(s)) };
+  };
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('skips a place that flashed past on the way to the next thread', () => {
+    vi.useFakeTimers();
+    const { seen, rec } = recorded();
+    rec.see(thread('a')); vi.advanceTimersByTime(SETTLE_MS + 1);
+    rec.see(inbox); vi.advanceTimersByTime(20);
+    rec.see(thread('b')); vi.advanceTimersByTime(SETTLE_MS + 1);
+    expect(seen).toEqual([thread('a'), thread('b')]);
+  });
+
+  it('records a place you stayed on, however briefly you stayed after', () => {
+    vi.useFakeTimers();
+    const { seen, rec } = recorded();
+    rec.see(inbox); vi.advanceTimersByTime(SETTLE_MS + 1);
+    rec.see(files); vi.advanceTimersByTime(SETTLE_MS + 1);
+    expect(seen).toEqual([inbox, files]);
+  });
+
+  it('records nothing for a place it was told to forget before it settled', () => {
+    vi.useFakeTimers();
+    const { seen, rec } = recorded();
+    rec.see(inbox); rec.stop(); vi.advanceTimersByTime(SETTLE_MS * 2);
+    expect(seen).toEqual([]);
   });
 });
 

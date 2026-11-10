@@ -49,6 +49,23 @@ export const stepForward = (trail: Trail, exists: (s: Stop) => boolean = () => t
 
 const stopKey = (s: Stop | null) => (s ? JSON.stringify(s) : '');
 
+/** How long a place has to stay on screen before it counts as a visit. */
+export const SETTLE_MS = 300;
+
+/**
+ * Hands on each place once it has stayed `wait` ms. Closing a thread passes
+ * through the list on its way to the next one, and that is not somewhere you
+ * were.
+ */
+export function settledPlaces(onSettle: (s: Stop) => void, wait = SETTLE_MS) {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const stop = () => { if (timer) clearTimeout(timer); timer = null; };
+  return {
+    see(s: Stop) { stop(); timer = setTimeout(() => { timer = null; onSettle(s); }, wait); },
+    stop,
+  };
+}
+
 /**
  * Records each place `here` names and walks back and forward through them
  * with ⌘[ and ⌘] (Ctrl off a Mac) and a mouse's side buttons. `go` opens a
@@ -69,13 +86,21 @@ export function useBackAndForward({ on, here, go, exists }: {
   const live = useRef({ go, exists });
   live.current = { go, exists };
 
+  const recorder = useRef<ReturnType<typeof settledPlaces> | null>(null);
+  if (!recorder.current) {
+    recorder.current = settledPlaces((s) => {
+      const going = travelling.current;
+      travelling.current = null;
+      if (going && sameStop(going, s)) return;
+      setTrail((t) => arrive(t, s));
+    });
+  }
+  useEffect(() => () => recorder.current?.stop(), []);
+
   const key = stopKey(here);
   useEffect(() => {
-    if (!on || !here) return;
-    const going = travelling.current;
-    travelling.current = null;
-    if (going && sameStop(going, here)) return;
-    setTrail((t) => arrive(t, here));
+    if (!on || !here) { recorder.current?.stop(); return; }
+    recorder.current?.see(here);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [on, key]);
 
