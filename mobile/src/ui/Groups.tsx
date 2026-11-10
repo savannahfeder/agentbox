@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { AppState, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, Share, TextInput, View } from 'react-native';
 import { File, Paths } from 'expo-file-system';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 import type { Room, RoomMessage } from '../../../renderer/src/types';
 import { Name } from '../../../shared/product-name.mjs';
@@ -16,7 +17,7 @@ import { bodyParts, chatRoots, dayWords, groupName, groupsInOrder, groupToOpen, 
 import { useCloud } from '../state/cloud';
 import { useGroups } from '../state/groups';
 import { Back, Caret, Clip } from './icons';
-import { IconButton, RunningMark, Sheet, SheetHead, SheetRow, T, TopBar } from './parts';
+import { footRoom, IconButton, RunningMark, Sheet, SheetHead, SheetRow, T, TopBar } from './parts';
 import { color, corner, font, size } from './theme';
 
 /** A round face: two letters in mono on one grey ground for everyone (renderer/src/team/people.tsx). */
@@ -193,6 +194,7 @@ export function GroupsPlace({ tabs, onBack }: { tabs?: ReactNode; onBack?: () =>
   const [text, setText] = useState('');
   const [failed, setFailed] = useState<string | null>(null);
   const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
+  const inset = useSafeAreaInsets();
 
   useEffect(() => { g.setWatching(true); return () => g.setWatching(false); }, [g.setWatching]);
   useEffect(() => { if (room && room.id !== g.last) g.setLast(room.id); }, [room?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -279,7 +281,7 @@ export function GroupsPlace({ tabs, onBack }: { tabs?: ReactNode; onBack?: () =>
             );
           })}
         </ScrollView>
-        <View style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 10 }}>
+        <View style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 16 + footRoom(inset) }}>
           {failed && <T style={{ fontSize: 13, color: color.dim, paddingHorizontal: 4, paddingBottom: 6 }}>{failed}</T>}
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', borderWidth: 1, borderRadius: corner.small, borderColor: text ? color.lineStrong : color.line, backgroundColor: color.field }}>
             <TextInput value={text} onChangeText={setText} multiline placeholder={root ? 'Reply in thread' : `Message ${groupName(room)}`} placeholderTextColor={color.faint}

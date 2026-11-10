@@ -7,7 +7,7 @@ import { MAC } from '../this-keyboard';
 import { Name } from '../../../shared/product-name.mjs';
 import { FIRST_RUN_STEP } from '../first-run';
 import { ConfettiBurst } from './ConfettiBurst';
-import { THREAD_CLOSED, cursorOwed, stillPreparing, closeLessons, closesThread, finishLesson, keyLearns, learnedBy, lessonOf, tourLive, tourOver, tourStep, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
+import { THREAD_CLOSED, cursorOwed, stillPreparing, closeLessons, closesThread, finishLesson, keyLearns, learnedBy, lessonOf, tourLive, tourOver, tourStep, type Lesson, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
 import './tour.css';
 
 type Box = { x: number; y: number; w: number; h: number };
@@ -153,7 +153,7 @@ function readScreen(view: string, thread: boolean, covered: boolean, palette: bo
 
 const same = (a: Box | null, b: Box | null) => (!a || !b ? a === b : a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h);
 
-export function Tour({ tour, view, thread, covered, palette, onChange, onPoint }: {
+export function Tour({ tour, view, thread, covered, palette, onChange, onPoint, onStep }: {
   tour: TourState | null;
   view: string;
   thread: boolean;
@@ -164,8 +164,11 @@ export function Tour({ tour, view, thread, covered, palette, onChange, onPoint }
   onChange: (t: TourState) => void;
   /** Puts the list's cursor on this thread. */
   onPoint: (id: string) => void;
+  /** The lesson the tip on screen teaches, for the step list beside the app. */
+  onStep?: (lesson: Lesson | null) => void;
 }) {
   const [step, setStep] = useState<TourStep | null>(null);
+  useEffect(() => { onStep?.(step ? lessonOf(step) : null); }, [step, onStep]);
   const [box, setBox] = useState<Box | null>(null);
   const [cardAt, setCardAt] = useState<{ left: number; top: number } | null>(null);
   // What was last set, so the reading eight times a second sets nothing that did not move.

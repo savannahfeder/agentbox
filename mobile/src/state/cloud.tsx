@@ -10,7 +10,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { AppState, Platform } from 'react-native';
 import { cloudClient, type CloudClient } from '../../../renderer/src/cloud-rest';
 import { PROJECTS_SELECT, cloudCarriesOn, macAway, macSeenOf, phoneConnectState, phoneSlug, phoneStatusLine, phoneView, readCommands, readSettingsRows, readThreads, settingCommand, splitSlug, type PhoneRows } from '../../../renderer/src/phone-rows';
-import { phoneRepeats, type RepeatSettingsRow } from '../../../renderer/src/phone-repeats';
+import { phoneRepeats } from '../../../renderer/src/phone-repeats';
+import type { SettingsRow } from '../../../renderer/src/phone-settings-view';
 import { sendPhoneFeedback, type FeedbackFiles } from '../../../renderer/src/phone-feedback';
 import { phoneSender } from '../../../renderer/src/phone-send';
 import { fileOnPhone, objectsToSign, renewLinks, type Links } from '../../../renderer/src/phone-links';
@@ -19,11 +20,15 @@ import { SEND_MAX_BYTES, sendFiles } from '../../../renderer/src/phone-sends-fil
 import { drawFromBytes } from '../lib/files';
 import { STORE_BUILD } from '../lib/store-build';
 import { toastParts } from '../../../renderer/src/toast-parts';
+import { clipToSentence } from '../../../renderer/src/list-rules';
+import { PHONE_UNDO_MS } from '../../../shared/phone-undo.mts';
+import { heldAnswers } from '../lib/held-answers';
+import { awayNext } from '../lib/computer-line';
 import type { Saved } from '../lib/attach';
 import type { Picked } from '../platform/pick';
 import { planFor, runSteps, type PressedItem, type Press, type Step } from '../lib/actions';
 import { needsNotice, NOTICE_KEY, noticeFor, readNotice, type Notice } from '../lib/ai-notice';
-import { withDeadline } from '../lib/deadline';
+import { fresh, withDeadline } from '../lib/deadline';
 import { keptStore } from '../lib/kept';
 import { previewCloud } from '../lib/preview';
 import { ALERTS_KEY, leaveAddress, readAlerts, takeAddressBack, type KeptAlerts } from '../lib/push-device';
@@ -54,10 +59,11 @@ async function openCloud(): Promise<Cloud | null> {
   if (PREVIEW) return previewCloud();
   const cfg = Constants.expoConfig?.extra?.cloud;
   if (!cfg?.url || !cfg?.anonKey) return null;
-  return cloudClient(cfg, { storage: await keptStore(persist), fetchImpl: withDeadline(fetch) });
+  return cloudClient(cfg, { storage: await keptStore(persist), fetchImpl: fresh(withDeadline(fetch)) });
 }
 
 const message = (err: unknown) => String((err as Error)?.message ?? err);
+const UNDO_WORDS = ' · press Z to undo';
 
 function useCloudState() {
   const [cloud, setCloud] = useState<Cloud | null>(null);
@@ -73,7 +79,7 @@ function useCloudState() {
   const rowsNow = useRef<PhoneRows>(EMPTY);
   const setRows = useCallback((next: PhoneRows) => { rowsNow.current = next; setRowsNow(next); }, []);
   const links = useRef<Links>(new Map());
-  const [settingsRows, setSettingsRows] = useState<RepeatSettingsRow[]>([]);
+  const [settingsRows, setSettingsRows] = useState<SettingsRow[]>([]);
   const settingsAt = useRef(-Infinity);
   const teamWatched = useRef(0);
   const [signedAt, setSignedAt] = useState(0);
@@ -90,7 +96,7 @@ function useCloudState() {
       const select = (table: string, query: string) => cloud.select(table, query);
       try {
         const [projects, threads, commands] = await Promise.all([
-          select('phone_projects', PROJECTS_SELECT),
+          select('phone_projects', PROJECTS_SELECT) as Promise<PhoneRows['projects']>,
           readThreads(select, cache.current),
           readCommands(select),
         ]);
@@ -129,7 +135,10 @@ function useCloudState() {
     return () => { clearInterval(timer); sub.remove(); };
   }, [cloud, signedIn, refresh]);
 
-  const view = useMemo(() => phoneView(rows, now), [rows, now]);
+  const shown = useMemo(() => phoneView(rows, now), [rows, now]);
+  // A permission answered on the phone and still inside its Undo leaves every list at once.
+  const [heldIds, setHeldIds] = useState<ReadonlySet<string>>(() => new Set());
+  const view = useMemo(() => ({ ...shown, approvals: shown.approvals.filter((a) => !heldIds.has(a.id)) }), [shown, heldIds]);
   const tabs = useMemo(() => phoneTabs(view, now), [view, now]);
   const repeats = useMemo(() => phoneRepeats(settingsRows, rows.commands, rows.projects, now), [settingsRows, rows.commands, rows.projects, now]);
   const team = useMemo(() => (STORE_BUILD ? null : withPendingPauses(withPhoneAnswers(teamFrom(settingsRows), rows.commands), rows.commands)), [settingsRows, rows.commands]);
@@ -142,6 +151,7 @@ function useCloudState() {
     return () => { teamWatched.current -= 1; };
   }, [refresh]);
   const status = signedIn ? phoneStatusLine({ error: read.error, fetchedAt: read.fetchedAt, macSeen: macSeenOf(rows.projects), cloud: cloudCarriesOn(rows.projects) }, now) : null;
+  const statusNext = signedIn ? awayNext({ error: read.error, macSeen: macSeenOf(rows.projects), cloud: cloudCarriesOn(rows.projects) }, now) : null;
   // No computer has sent this account a project yet: the inbox says how to connect one.
   const connect = phoneConnectState({ signedIn, started: !read.first, error: read.error, projects: rows.projects, email: cloud?.session()?.user.email });
   const [seen, setSeen] = useState(() => readSeen(appStore));
@@ -247,7 +257,8 @@ function useCloudState() {
     if (!sender) return null;
     if (needsNotice(press.kind) && !agreed) await askNotice();
     const at = Date.now();
-    const plan = planFor(press, item, at, { away: macAway(macSeenOf(rowsNow.current.projects), at), cloud: cloudCarriesOn(rowsNow.current.projects) });
+    const inCloud = !!item && phoneView(rowsNow.current, at).running.some((r: { itemId: string; product: string; where?: string }) => r.itemId === item.id && r.product === item.product && r.where === 'cloud');
+    const plan = planFor(press, item, at, { away: macAway(macSeenOf(rowsNow.current.projects), at), cloud: cloudCarriesOn(rowsNow.current.projects), inCloud });
     if (!plan) return null;
     const made = await runSteps(sender, plan.steps);
     if (made && typeof made === 'object' && 'ok' in made && made.ok === false) throw new Error(String((made as { error?: string }).error ?? 'Not sent.'));
@@ -264,6 +275,25 @@ function useCloudState() {
     setNow(Date.now());
     return made;
   }, [sender, say, agreed, askNotice]);
+
+  const sendNow = useRef(send);
+  sendNow.current = send;
+  const [answers] = useState(() => heldAnswers((id, allow) => {
+    void sendNow.current({ kind: 'approve', approval: id, allow }, null)
+      .catch((err) => say(`Not answered: ${message(err) || 'it did not go through'}`))
+      .finally(() => void refresh());
+  }, PHONE_UNDO_MS, () => setHeldIds(answers.held())));
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => { if (s !== 'active') answers.flush(); });
+    return () => sub.remove();
+  }, [answers]);
+  /** Allow or Deny on a card, held while its toast offers Undo; `what` is the card's lede. */
+  const answerApproval = useCallback((a: { id: string }, allow: boolean, what: string) => {
+    answers.hold(a.id, allow);
+    say(`${allow ? 'Allowed' : 'Denied'}: ${clipToSentence(what, 48)}${UNDO_WORDS}`, async () => {
+      say(answers.undo(a.id) ? 'Not answered yet. The card is back.' : 'Already sent. Your computer has the answer.');
+    });
+  }, [answers, say]);
 
   // Threads picked together and closed or put off in one go, each by the plan one thread's press sends, with one Undo for all of them.
   const pressAll = useCallback(async (items: PressedItem[], press: Extract<Press, { kind: 'close' | 'later' }>) => {
@@ -312,7 +342,7 @@ function useCloudState() {
   const [approvalRoom, setApprovalRoom] = useState(0);
 
   // A message to a teammate, someone new, or a go-ahead, left for the computer
-  // that sent the teammates (shared/phone-settings.mjs `teammate`).
+  // that sent the teammates (shared/phone-settings.mts `teammate`).
   const askTeammate = useCallback(async (key: 'post' | 'describe' | 'goAhead' | 'pause', value: Record<string, unknown>) => {
     if (!cloud || !team) throw new Error('Your computer has not sent your teammates yet.');
     // Only words for an agent need the yes; a go-ahead or a pause carries none.
@@ -387,7 +417,7 @@ function useCloudState() {
   }, [cloud, setRows, keepAlerts, notice]);
 
   return {
-    cloud, opened, signedIn, rows, view, tabs, repeats, status, loading: read.first, onlineAt: read.error ? 0 : read.fetchedAt, now, refresh, send, closeAll, laterAll, pressPicked, attach, fileOf, toast, say,
+    cloud, opened, signedIn, rows, view, tabs, repeats, status, statusNext, loading: read.first, onlineAt: read.error ? 0 : read.fetchedAt, now, refresh, send, answerApproval, closeAll, laterAll, pressPicked, attach, fileOf, toast, say,
     team, teamPending, watchTeam, askTeammate, wanted, goTo: setWanted, takeWanted: () => setWanted(null), minimizedApproval, setMinimizedApproval, approvalRoom, setApprovalRoom,
     dismissToast: () => setToast(null), signedInWith, signOut, preview: PREVIEW,
     notice: mine, noticeRead, agreed, answerNotice, leaveNotice, withdrawNotice: () => answerNotice(false),

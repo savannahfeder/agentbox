@@ -2,7 +2,14 @@
 // browser and a phone's JavaScript does not have: random bytes, ids and a hash.
 import * as Crypto from 'expo-crypto';
 
-const g = globalThis as any;
+type Polyfilled = {
+  crypto?: {
+    getRandomValues?: (bytes: Uint8Array) => Uint8Array;
+    randomUUID?: () => string;
+    subtle?: { digest?: (alg: string, data: BufferSource) => Promise<ArrayBuffer> };
+  };
+};
+const g = globalThis as Polyfilled;
 g.crypto ??= {};
 g.crypto.getRandomValues ??= (bytes: Uint8Array) => Crypto.getRandomValues(bytes);
 g.crypto.randomUUID ??= () => Crypto.randomUUID();

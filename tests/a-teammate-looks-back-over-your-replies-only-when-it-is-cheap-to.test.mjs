@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   planWakes, teammateLabel, DEFAULT_LIMIT, LOOK_BACK_LABEL, LOOK_BACK_AFTER, roomToLookBack, taughtRuns, lookBackEffort,
-} from '../shared/teammates.mjs';
+} from '../shared/teammates.mts';
 
 const HOUR = 3600_000;
 const DAY = 24 * HOUR;
@@ -124,13 +124,13 @@ describe('a look-back run', () => {
   let product; let dir; let mods; let team; let store; let histories;
 
   beforeEach(async () => {
-    const { appHome } = await import('../main/store/home.mjs');
+    const { appHome } = await import('../main/store/home.mts');
     const home = appHome();
     process.env.STORE_ACCOUNT_ID = `acct-${Math.random().toString(36).slice(2, 8)}`;
     fs.mkdirSync(path.join(home, 'accounts', process.env.STORE_ACCOUNT_ID), { recursive: true });
-    const { resolveAccount } = await import('../mcp/core/account.mjs');
+    const { resolveAccount } = await import('../mcp/core/account.mts');
     resolveAccount();
-    const { createProduct } = await import('../mcp/core/products.mjs');
+    const { createProduct } = await import('../mcp/core/products.mts');
     product = createProduct(`Shop ${Math.random().toString(36).slice(2, 8)}`);
     dir = path.join(home, 'accounts', process.env.STORE_ACCOUNT_ID, product.id);
     const { loadStore } = await import('../main/store-modules.mts');
@@ -151,7 +151,7 @@ describe('a look-back run', () => {
   afterEach(() => { delete process.env.STORE_ACCOUNT_ID; });
 
   const setUp = async (t, { method = true } = {}) => {
-    const { methodFile, writeTeammate } = await import('../main/store/teammates-files.mjs');
+    const { methodFile, writeTeammate } = await import('../main/store/teammates-files.mts');
     writeTeammate(team.dir(), t.id, { status: 'active', product: product.id }, NOW - 10 * DAY);
     if (method) {
       const file = methodFile(team.dir(), t.id);

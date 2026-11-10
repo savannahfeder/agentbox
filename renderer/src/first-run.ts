@@ -1,9 +1,9 @@
 // THE FIRST RUN'S RULES, with no window in them (w-fadbbea8ef). The screens are
-// components/FirstRun.tsx; tests/the-first-run-starts-on-real-work.test.mjs
+// components/FirstRun.tsx; tests/the-first-run-starts-on-real-work.test.mts
 // holds what each rule is for.
 
 import { checkProjectFolder } from '../../shared/project-folder-check.mts';
-import { repeatLabel, type RepeatShape } from '../../shared/repeats.mjs';
+import { repeatLabel, type RepeatShape } from '../../shared/repeats.mts';
 import { projectNameFor } from './agent-import-card';
 
 export type Screen = 'welcome' | 'chats';
@@ -67,6 +67,16 @@ export function installGate(setup: EngineSetup, signedOut: Engine[] = []): { hea
     running: true,
     again: signingIn,
   };
+}
+
+/**
+ * THE SETUP THE APP IS ALREADY RUNNING, if any (F-199). The screen kept its own
+ *  copy of the press, so a window that missed it drew no waiting state while a
+ *  sign-in page was open in the browser.
+ */
+export function runningSetup(statuses: Array<{ engine: Engine; phase?: string; error?: string | null } | null>): { engine: Engine; phase: string; error: string | null } | null {
+  const s = statuses.find((x) => x && installGate({ engine: x.engine, phase: x.phase ?? 'idle' }).running);
+  return s ? { engine: s.engine, phase: s.phase!, error: s.error ?? null } : null;
 }
 
 export type ListKey = 'up' | 'down' | 'toggle' | 'next' | 'skip' | null;

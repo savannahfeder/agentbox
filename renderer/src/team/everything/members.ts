@@ -1,6 +1,6 @@
 // Everything else's cards: you, the team chat, the people on your team, your AI
 // teammates and your other chats, in the order you dragged them into.
-import { voiceName } from '../../../../shared/agent-voice.mjs';
+import { voiceName } from '../../../../shared/agent-voice.mts';
 
 export type MemberKind = 'me' | 'person' | 'mate' | 'chat';
 

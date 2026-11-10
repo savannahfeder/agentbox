@@ -1,6 +1,6 @@
-// PURE. What the Files place shows of the list main/files-place.mjs hands it.
+// PURE. What the Files place shows of the list main/files-place.mts hands it.
 import type { FileFolder, FileKind, PlacedFile } from '../types';
-import { PLAIN_AGENT } from '../../../shared/agent-voice.mjs';
+import { PLAIN_AGENT } from '../../../shared/agent-voice.mts';
 
 export const KIND_ORDER: FileKind[] = ['markdown', 'image', 'film', 'deck', 'pdf', 'page', 'table', 'code'];
 export const KIND_PLURAL: Record<FileKind, string> = { markdown: 'Documents', image: 'Pictures', film: 'Films', deck: 'Decks', pdf: 'PDFs', page: 'Pages', table: 'Tables', code: 'Code' };

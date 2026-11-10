@@ -11,7 +11,7 @@
 // says nothing in the chat for it: the run posts its own line when the method
 // changed. A look-back that is blocked stays, so a stuck one is still seen.
 import { describe, it, expect } from 'vitest';
-import { planWakes, teammateLabel, DEFAULT_LIMIT, LOOK_BACK_LABEL } from '../shared/teammates.mjs';
+import { planWakes, teammateLabel, DEFAULT_LIMIT, LOOK_BACK_LABEL } from '../shared/teammates.mts';
 
 const NOW = new Date(2026, 10, 10, 9, 0).getTime();
 const t = { id: 't-aaaaaa', name: 'Quality lead', letter: 'Q', status: 'active', paused: false, served: '', limit: DEFAULT_LIMIT, works: null, product: 'kestrel', memory: [], duties: [], dutyServed: {} };

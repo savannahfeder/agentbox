@@ -26,7 +26,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { cloudConfigPath } from '../main/cloud/config.mjs';
+import { cloudConfigPath } from '../main/cloud/config.mts';
 
 const REGION = 'us-east-1';
 const HERE = path.dirname(fileURLToPath(import.meta.url));

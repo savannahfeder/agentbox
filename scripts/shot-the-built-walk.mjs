@@ -26,7 +26,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { CHROME as BROWSER, guard, sweep } from './lib/chrome-guard.mjs';
+import { startableChrome, guard, sweep } from './lib/chrome-guard.mjs';
 import { answerFor } from '../main/first-run.mts';
 import { EXAMPLES } from '../shared/first-run-examples.mts';
 import {
@@ -74,7 +74,7 @@ const snapshot = {
   // The sessions Agentbox finds by itself, which are nothing to do with the
   // import on the finish card: they are Claude Code running elsewhere on the
   // machine. `startedByZero` absent means they are somebody else's, which is
-  // what `listed` in shared/agents.mjs asks.
+  // what `listed` in shared/agents.mts asks.
   agents: LIVE
     ? [
       { pid: 90101, name: 'agentbox-bb', product: 'agentbox', productName: 'Agentbox', startedAt: Date.now() - 90_000, lastActiveAt: Date.now() - 60_000 },
@@ -103,7 +103,7 @@ const origin = `http://127.0.0.1:${server.address().port}`;
 
 sweep();
 const profile = fs.mkdtempSync('/tmp/shot-profile-');
-const chrome = spawn(BROWSER, [
+const chrome = spawn(startableChrome(), [
   '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-sandbox',
   '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run',
   `--window-size=${W},${H}`, 'about:blank',

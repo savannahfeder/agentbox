@@ -2,15 +2,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { guard, CHROME } from './lib/chrome-guard.mjs';
+import { guard, sweep, startableChrome } from './lib/chrome-guard.mjs';
 const origin = process.argv[2];
 const outDir = path.resolve(process.argv[3] || 'phone-verification');
 const url = new URL(origin);
 if (url.protocol !== 'https:' && !(url.protocol === 'http:' && url.hostname === '127.0.0.1')) throw new Error('Expected an https site or a local test server');
 const snapshot = {products:[],items:[],approvals:[],phoneStatus:'Your computer is off. Replies carry on in Agentbox Cloud.',supervisor:{paused:false,running:[],stalled:[],queued:[],scheduled:[],productOrder:[],hiddenProducts:[],personalProducts:[],capacity:0},restartNeeded:null,config:{browserHome:'',browserPins:[]}};
+sweep();
 const profile = fs.mkdtempSync('/tmp/shot-profile-');
 const W = 1440, H = 1000;
-const chrome = spawn(CHROME, [
+const chrome = spawn(startableChrome(), [
   '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
   '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run', `--window-size=${W},${H}`, 'about:blank',
 ], { stdio: ['ignore', 'ignore', 'pipe'] });

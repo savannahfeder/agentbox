@@ -5,11 +5,11 @@
 // spawn ran `snapshotRepo` inline, which is four git commands and a read of
 // every untracked file, and on a busy Mac each git command costs half a second.
 // That is the "long delay" after pressing Send. The same shape as
-// main/task-folders-offthread.mts: main/git-change.mjs stays synchronous and
+// main/task-folders-offthread.mts: main/git-change.mts stays synchronous and
 // runs whole inside a worker thread, and if the thread cannot start the job
 // runs here, the old way.
 import { Worker } from 'node:worker_threads';
-import * as git from './git-change.mjs';
+import * as git from './git-change.mts';
 import { saveRunChange } from './run-change.mts';
 import { stripTypesFlags } from './strip-types.mts';
 
@@ -72,7 +72,7 @@ export async function __gitJobsIdle() {
   while (waiting.size) await new Promise((resolve) => { setTimeout(resolve, 10); });
 }
 
-/** Run one of git-change.mjs's exports without blocking this thread. */
+/** Run one of git-change.mts's exports without blocking this thread. */
 export function gitJob(name: string, ...args: unknown[]): Promise<unknown> {
   if (!JOBS.has(name)) return Promise.reject(new Error(`not a git job: ${name}`));
   return new Promise((resolve, reject) => {

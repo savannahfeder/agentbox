@@ -7,14 +7,15 @@ import path from 'node:path';
 import { wallCards, myPresence, displayNameOf, withoutHidden } from '../../shared/room-cards.mts';
 import type { WallCard, TeamCardLike } from '../../shared/room-cards.mts';
 import type { AgentHoursSummary } from '../../shared/agent-hours.mts';
-import { groupFileRow, groupRow } from '../../shared/room-needs-you.mjs';
-import type { GroupRow } from '../../shared/room-needs-you.mjs';
-import { ROOM_FILE_NAME, FILE_EXISTS } from './rooms-shape.mjs';
-import { carryIntoRoom } from './carry-files.mjs';
-import { readRoomMessage } from '../../shared/agent-voice.mjs';
-import { cleanMark } from '../../shared/artifact-marks.mjs';
-import { TEAM_LOOK, TEAM_LOOK_POSTED, TEAM_LOOK_TEMPLATE, newestTeamLook } from '../../shared/team-look.mjs';
-import { ROOM_MAX_BYTES, ROOM_PART_BYTES, partName, partList, partsOf, readPartList } from '../../shared/room-file-parts.mjs';
+import { groupFileRow, groupRow } from '../../shared/room-needs-you.mts';
+import type { GroupRow } from '../../shared/room-needs-you.mts';
+import { ROOM_FILE_NAME, FILE_EXISTS } from './rooms-shape.mts';
+import { carryIntoRoom } from './carry-files.mts';
+import type { FoundToSend } from './carry-files.mts';
+import { readRoomMessage } from '../../shared/agent-voice.mts';
+import { cleanMark } from '../../shared/artifact-marks.mts';
+import { TEAM_LOOK, TEAM_LOOK_POSTED, TEAM_LOOK_TEMPLATE, newestTeamLook } from '../../shared/team-look.mts';
+import { ROOM_MAX_BYTES, ROOM_PART_BYTES, partName, partList, partsOf, readPartList } from '../../shared/room-file-parts.mts';
 
 /** A room as `roomOut` shapes it. */
 export interface RoomRow {
@@ -121,7 +122,7 @@ export interface RoomNameRow {
 export interface RoomInviteRow {
   roomId: string;
   roomName: string;
-  invitedBy: string;
+  invitedBy: string | null;
   invitedByName: string | null;
 }
 
@@ -138,7 +139,7 @@ export interface RoomsBackend {
   roomProfiles(ids: string[]): Promise<RoomProfile[]>;
   roomPresence(ids: string[]): Promise<RoomPresenceRow[]>;
   myRoomProfile(): Promise<RoomProfile | null>;
-  saveRoomProfile(fields: Record<string, unknown>): Promise<RoomProfile>;
+  saveRoomProfile(fields: Record<string, unknown>): Promise<RoomProfile | null>;
   putPresence(device: string, fields: Record<string, unknown>): Promise<void>;
   roomMessages(roomId: string, options?: { before?: number | null; limit?: number }): Promise<RoomMessage[]>;
   roomMentions(options?: { limit?: number }): Promise<RoomMessage[]>;
@@ -217,7 +218,7 @@ export interface RoomsState {
 /** What this Mac knows to say about its own work, for the presence row. */
 export interface PresenceFacts {
   running?: { itemId: string; product: string; startedAt?: number }[];
-  items?: { id: string; label?: string; title?: string }[];
+  items?: { id: string; label?: string; title?: string; visibility?: string }[];
   products?: { slug?: string; personal?: boolean; seenBy?: string; seenByPeople?: string[] }[];
   summary?: AgentHoursSummary | null;
 }
@@ -230,11 +231,11 @@ export interface RoomsOptions {
   device: () => string;
   presenceFacts: () => PresenceFacts | null | undefined;
   prefsFile: string;
-  /** What a name in a message means on this computer (./carry-files.mjs). */
-  findFile?: ((ref: string, how?: { meant?: boolean }) => unknown) | null;
-  /** Writes the team's decisions where agents read (./decisions-doc.mjs). */
-  decisionDocs?: ((args: { teamName: string; rows: RoomDecision[]; nameOf: (id: string) => string }) => unknown) | null;
-  /** Writes the Team look where agents read (./team-look-doc.mjs). */
+  /** What a name in a message means on this computer (./carry-files.mts). */
+  findFile?: ((ref: string, how?: { meant?: boolean }) => FoundToSend | null | Promise<FoundToSend | null>) | null;
+  /** Writes the team's decisions where agents read (./decisions-doc.mts). */
+  decisionDocs?: ((args: { teamName: string; rows: RoomDecision[]; nameOf: (id: string | null) => string }) => unknown) | null;
+  /** Writes the Team look where agents read (./team-look-doc.mts). */
   teamLookDocs?: ((args: { text: string }) => unknown) | null;
   /** Where a room's file is put back together whole, inside a folder the window may draw from. */
   filesDir?: string | null;
@@ -304,9 +305,9 @@ export function createRooms({
   prefsFile,
   now = Date.now,
   log = () => {},
-  findFile = null, // (ref) => what a name in a message means on this computer (./carry-files.mjs)
-  decisionDocs = null, // ({ teamName, rows, nameOf }) => writes the team's decisions where agents read (./decisions-doc.mjs)
-  teamLookDocs = null, // ({ text }) => writes the Team look where agents read (./team-look-doc.mjs)
+  findFile = null, // (ref) => what a name in a message means on this computer (./carry-files.mts)
+  decisionDocs = null, // ({ teamName, rows, nameOf }) => writes the team's decisions where agents read (./decisions-doc.mts)
+  teamLookDocs = null, // ({ text }) => writes the Team look where agents read (./team-look-doc.mts)
   filesDir = null, // where a room's file is put back together whole, inside a folder the window may draw from
   onChange = () => {},
   timers = { setTimeout, clearTimeout },
@@ -404,7 +405,7 @@ export function createRooms({
   function writeDocs() {
     const room = (state.rooms ?? []).find((r) => r.teamId);
     if (!decisionDocs || !room) return;
-    const nameOf = (id: string) => room.people?.find((p) => p.id === id)?.name || (team()?.people ?? []).find((p) => p.id === id)?.name || 'Someone';
+    const nameOf = (id: string | null) => room.people?.find((p) => p.id === id)?.name || (team()?.people ?? []).find((p) => p.id === id)?.name || 'Someone';
     try { decisionDocs({ teamName: room.name, rows: state.decisions?.[room.id] ?? [], nameOf }); } catch (err) { log(`rooms: decisions document: ${(err as Error).message}`); }
   }
 

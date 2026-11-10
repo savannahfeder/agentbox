@@ -7,7 +7,7 @@
 // counted once.
 import fs from 'node:fs';
 import path from 'node:path';
-import { appHome, machineryDir } from './store/home.mjs';
+import { appHome, machineryDir } from './store/home.mts';
 import { dedupeRuns, runFromTrace } from '../shared/agent-hours.mts';
 
 const BACKFILL_DAYS = 400;

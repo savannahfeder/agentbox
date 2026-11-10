@@ -2,12 +2,12 @@
 // page draw: a line in a message, a file, a comment on a file, a decision.
 //
 // Threads, conversations and teammates' shared threads are searched in main
-// (main/everything-found.mjs) and arrive as `found`; lines in groups and
+// (main/everything-found.mts) and arrive as `found`; lines in groups and
 // decisions are already held by the screen and are searched here. A row is
 // kept only if the screen can open what it points at, so a result that main
 // found for a thread this copy does not list is dropped, not shown dead.
 import type { FoundInThreads, FoundWhere, ThreadCard, WorkItem } from './types';
-import { fold, firstHit, holds, queryOf, windowAround } from '../../shared/word-match.mjs';
+import { fold, firstHit, holds, queryOf, windowAround } from '../../shared/word-match.mts';
 import { parseQuery, splitHits, type Run } from './search';
 
 /** A found line as runs, the typed words marked, drawn the way the thread list draws its own. */
