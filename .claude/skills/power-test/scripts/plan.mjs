@@ -252,7 +252,7 @@ const PACE = {
   'between-meetings': 'You are in meetings or calls most of the day: step away for 15 to 40 minutes at a time (away 9, several in a row), then work in short bursts.',
 };
 
-const KEYS = 'N new thread; ⌘↵ (press Enter meta) sends; J/K or arrows move in the list; ↵ opens; esc goes back; R replies in an open thread; E closes a thread; L puts it off until later; Z undoes; ⌘K (press k meta) opens the command bar; / searches; B switches list and board; Tab moves between the tabs; S shows or hides the summary; 1 to 9 pick an option an agent offered.';
+const KEYS = 'N new thread; ⌘↵ (press Enter meta) sends; J/K or arrows move in the list; ↵ opens; esc goes back; R replies in an open thread; E closes a thread; L puts it off until later; Z undoes; ⌘K (press k meta) opens the command bar, which is also search; B switches list and board; Tab moves between the tabs; S shows or hides the summary; 1 to 9 pick an option an agent offered.';
 
 export function testerPrompt({ person, focus, room = null, team = null, browse, diary, shots, round, totalMinutes, minutesLeft, roundMinutes, fraction, diaryTail, issues, notYet, real, stoppedEarlyMin = 0 }) {
   const list = (xs, none) => (xs.length ? xs.map((x) => `- ${x}`).join('\n') : none);
