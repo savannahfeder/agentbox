@@ -138,6 +138,31 @@ copies down.
    not one per issue. Copy any picture you show into the product's docs
    folder under `designs/<task id>/`.
 
+## Testing a first run, or anything a person sees first
+
+Seven rounds of testers on the new first run (w-fbe5e95dea, 2026-11-10)
+logged 80 keyboard bugs. The founder then found a dozen worse problems in
+one sitting that no tester had reported. Two causes: the focus each round
+was given asked only about keys, and the copies were nothing like her computer.
+For a first run, a tutorial or any screen a person meets first:
+
+- **Ask for judgement, not only bugs.** Tell every tester, every round, to
+  stop on each screen and say what pulls their eye two ways, what the first
+  thing to do is, and whether it looks like the rest of the app. Give them
+  the design rules to judge against: rounded corners, accent only on a dot
+  or a key, no grey on grey, words that say one thing.
+- **Follow every promise to its end.** An invite sent: did an email arrive?
+  Notifications turned on: did one show? A tutorial step: is it acting on
+  practice work or on the person's real threads? Terms: are they named
+  before an account is made? A tester that only sees the screen cannot
+  tell, so you check these yourself.
+- **Make the copy look like a real computer**: 20 chats already on it, not
+  four; a dark Mac switched to light halfway through; a team with someone on
+  it. A browser copy cannot show the Mac's own windows, banners or
+  appearance, so before you show the person, open the desktop app
+  (`npm run fresh -- --with-agents`) and click through every screen
+  yourself, in dark and in light.
+
 ## What it does not cover yet
 
 - **More than one person on a team**: `--team <file> --room <name>` signs
