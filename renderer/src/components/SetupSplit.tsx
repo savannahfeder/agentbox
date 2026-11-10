@@ -271,7 +271,7 @@ export function SetupSplit(p: SetupSplitProps) {
     // The app's own sign-in form, in this column: Google, email, or a new account. No skip; it is required.
     body = <div className="ss-signin"><SignInPage purpose="team" startOn="sign-up" inSetup onSignedIn={next} onBack={back ?? undefined} primaryRef={accountPrimary} termsAt={foot} /></div>;
   } else if (step === 'invite') {
-    head = ['Invite your team.', 'Add the people you work with.'];
+    head = ['Invite your team.', ''];
     body = !p.snap?.team?.signedIn ? <>
       <div className="ss-list"><Row face={<Plus />} name="Sign in to invite people" sub="Your team shares projects, threads and messages" onClick={() => void api.teamSignIn()} /></div>
       <div className="ss-acts">{go('Sign in', () => void api.teamSignIn())}{quiet('Just me for now', next)}</div>
@@ -286,7 +286,7 @@ export function SetupSplit(p: SetupSplitProps) {
       <div className="ss-acts">{go(emails.length || inviteList([typed]).length ? `Send ${inviteList([...emails, typed]).length === 1 ? '1 invite' : `${inviteList([...emails, typed]).length} invites`}` : 'Continue', () => void sendInvites(), true, 'Sending…')}{quiet('Just me for now', next)}</div>
     </>;
   } else if (step === 'teammates') {
-    head = ['Add AI teammates.', 'They work for you, on jobs you pick.'];
+    head = ['Add your own AI teammates.', ''];
     const toggle = (s: string) => setPicked((had) => { const n = new Set(had); if (n.has(s)) n.delete(s); else n.add(s); return n; });
     const count = picked.size + (own.trim() ? 1 : 0);
     body = <>
@@ -298,7 +298,7 @@ export function SetupSplit(p: SetupSplitProps) {
       <div className="ss-acts">{go(count ? `Make ${count === 1 ? '1 teammate' : `${count} teammates`}` : 'Continue', () => void makeTeammates(), true, 'Making…')}{quiet('Skip for now', next)}</div>
     </>;
   } else if (step === 'look') {
-    head = ['Pick your look.', 'The app changes as you choose.'];
+    head = ['Pick your look.', ''];
     if (!looksAt.current) looksAt.current = lookChoices(p.look, p.skies);
     const looks = looksAt.current;
     body = <>
@@ -309,7 +309,7 @@ export function SetupSplit(p: SetupSplitProps) {
       <div className="ss-acts">{go('Continue', next)}</div>
     </>;
   } else {
-    head = ['You’re set up.', 'Your inbox is ready.'];
+    head = ['You’re set up.', ''];
     const lines = setUpLines(done);
     body = <>
       {lines.length > 0 && <div className="ss-list">{lines.map((l) => <Row key={l} face={<span className="ss-ok"><Tick /></span>} name={l} />)}</div>}
