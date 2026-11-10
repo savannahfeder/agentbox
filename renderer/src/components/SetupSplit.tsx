@@ -15,7 +15,7 @@ import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { starterAsks } from '../../../shared/teammates.mts';
 import { SKY_THEMES, drawSky } from '../home/sky';
-import { typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupStep } from '../setup-split';
+import { tabStop, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupStep } from '../setup-split';
 import FolderPicker from './FolderPicker';
 import { SignInPage } from '../team/SignInPage';
 import { Name } from '../../../shared/product-name.mjs';
@@ -206,8 +206,19 @@ export function SetupSplit(p: SetupSplitProps) {
       if (where === 'behind') { e.preventDefault(); (e.target as HTMLElement).blur?.(); }
       const typing = where === 'typing';
       e.stopPropagation();
+      const panel = document.querySelector('.setup-split');
+      const inSetup = !!(e.target as Element | null)?.closest?.('.setup-split, .ss-picker');
+      if (e.key === 'Tab') {
+        if (!panel) return;
+        const stops = [...panel.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+          .filter((el) => el.offsetParent !== null);
+        const to = tabStop(stops.length, stops.indexOf(document.activeElement as HTMLElement), e.shiftKey);
+        e.preventDefault();
+        stops[to]?.focus();
+        return;
+      }
       if (e.key === 'Enter' && !e.shiftKey && !busy) {
-        if (enterIsTheButtons(e)) return;
+        if (where !== 'behind' && inSetup && enterIsTheButtons(e)) return;
         const enter = (e.target as Element).getAttribute('data-ss-enter');
         if (typing && enter === 'add') { e.preventDefault(); if (typed.trim()) addEmail(); else primary.current(); return; }
         if (typing && !(e.metaKey || e.ctrlKey)) return;

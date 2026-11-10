@@ -85,6 +85,13 @@ export function typingInSetup(target: { closest(sel: string): unknown } | null):
   return field ? 'typing' : 'keys';
 }
 
+/** Which of `count` controls Tab lands on from `at` (-1 when focus is outside them), going round. */
+export function tabStop(count: number, at: number, back: boolean): number {
+  if (!count) return -1;
+  if (at < 0) return back ? count - 1 : 0;
+  return (at + (back ? count - 1 : 1)) % count;
+}
+
 /** The sky a new install starts in: dark orange on a Mac in dark mode, light green in light, unless someone already chose. */
 export function setupStartsOn({ sky, dark }: { sky: string | null; dark: boolean }): string | null {
   return sky ? null : dark ? 'ember' : 'sage';

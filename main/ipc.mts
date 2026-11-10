@@ -36,7 +36,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { looksLikeClaudeCode } from '../shared/claude-code-shape.mts';
 import fsWatch from 'node:fs';
-import { listFolders } from './folders.mts';
+import { listFolders, startFolder } from './folders.mts';
 import { feedbackUrl, sendFeedback } from './feedback.mts';
 import { feedbackPayload } from '../shared/feedback.mts';
 import * as approvals from './approvals.mts';
@@ -1601,7 +1601,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // of the two on the one thing that actually costs somebody an afternoon.
   ipcMain.handle('zero:list-folders', (_e, { at = null, showHidden = false }: { at?: string | null; showHidden?: boolean } = {}) => {
     const home = os.homedir();
-    const listed = listFolders({ at, home, showHidden });
+    const listed = listFolders({ at: at ?? startFolder(home), home, showHidden });
     const verdict = checkProjectFolder(listed.at, { home });
     return { ...listed, refused: verdict.ok ? null : verdict.say };
   });
