@@ -14001,10 +14001,13 @@ function accountRefusedTheRun(session: RunState) {
 // runAt also covers snoozes written before the inbox reminder had its own field.
 // visibleTo is Add people, and label a rename.
 const NOT_A_WORD = new Set(['visibility', 'visibleTo', 'label', 'priority', 'problem', 'progress', 'solution', 'blockedBy', 'blocks', 'runAt', 'snoozedUntil', 'shippedAt']);
-function lastFounderWrite(item: WorkItem | null | undefined) {
+// A teammate's pulled line keeps the source they gave it, so a "founder" line
+// written by somebody else is not your word.
+function lastFounderWrite(item: WorkItem | null | undefined, me: string | null = process.env.AGENTBOX_PERSON_ID || null) {
   let latest = 0;
   for (const [field, w] of Object.entries(item?.wrote ?? {})) {
     if (NOT_A_WORD.has(field)) continue;
+    if (w?.by && me && w.by !== me) continue;
     if (w?.source === 'founder' && w.ts > latest) latest = w.ts;
   }
   return latest;

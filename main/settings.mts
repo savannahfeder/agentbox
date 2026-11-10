@@ -88,7 +88,7 @@ export interface SettingsConfig {
   posthogHost?: string;
   alphaTeammates?: unknown;
   alphaMultiplayer?: boolean | null;
-  alphaBackForward?: boolean | null;
+  alphaGlass?: boolean | null;
   [key: string]: unknown;
 }
 
@@ -613,13 +613,12 @@ export function searchForEngineBin(config: SettingsConfig, engine: string) {
 // THE ALPHA FEATURES SWITCHES (w-3d0fa23ffb). Off unless someone turned them
 // on in Settings; only a real `true` counts. Multiplayer is on unless turned off:
 // the first run offers a team, so it cannot wait behind a switch in Settings.
-// Back and forward is on where the app is being built, so its maker lives with it first.
 export function alphaFeatures(config?: SettingsConfig | null, { packaged = isPackagedElectron() }: { packaged?: boolean } = {}) {
   return {
     rooms: config?.alphaRooms === true,
     teammates: teammatesOn(config),
     multiplayer: config?.alphaMultiplayer !== false,
-    backForward: packaged ? config?.alphaBackForward === true : config?.alphaBackForward !== false,
+    glass: config?.alphaGlass === true,
   };
 }
 
@@ -1438,8 +1437,8 @@ export function setWorkspaceSetting({ config, supervisor, store }: SettingsDeps,
       saveConfig(config, { alphaMultiplayer: !!value });
       supervisor.onChange?.();
       break;
-    case 'alphaBackForward':
-      saveConfig(config, { alphaBackForward: !!value });
+    case 'alphaGlass':
+      saveConfig(config, { alphaGlass: !!value });
       supervisor.onChange?.();
       break;
     // THE CORNER TAG (w-dafae58a23). Turning it back on also ends any hide, so
