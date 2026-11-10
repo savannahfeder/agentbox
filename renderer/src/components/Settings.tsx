@@ -1763,7 +1763,8 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
   const homeSet = useHomeSettings();
   // A phone has no skies (App.tsx's `homeOn`).
   const skies = !onPhone();
-  const skyOn = skies ? homeSet.skyTheme : null;
+  // Under Match system the sky is Match's default, so the Match tile is the one ticked.
+  const skyOn = skies && (homeSet.picked || look !== 'match') ? homeSet.skyTheme : null;
   const sidebarShrinks = useSidebarShrinks();
   const [model, setModel] = useState<SettingsModel | null>(null);
   // ?settings=claude, or ?settings=project:kestrel. Anything else (including the

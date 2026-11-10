@@ -59,6 +59,15 @@ export function skyTheme(id: string | null | undefined): Sky | null {
   return SKY_THEMES.find((s) => s.id === id) ?? null;
 }
 
+/** Stored when plain Light or Dark is picked, so the default sky never covers that choice. */
+export const PLAIN = 'none';
+
+/** The sky worn: the one picked, none for a plain look picked, and otherwise orange in the dark and green in the light. */
+export function shownSkyId(saved: string | null, dark: boolean): SkyId | null {
+  if (saved === PLAIN) return null;
+  return skyTheme(saved)?.id ?? (dark ? 'ember' : 'sage');
+}
+
 const BAYER = [0, 32, 8, 40, 2, 34, 10, 42, 48, 16, 56, 24, 50, 18, 58, 26, 12, 44, 4, 36, 14, 46, 6, 38, 60, 28, 52, 20, 62, 30, 54, 22, 3, 35, 11, 43, 1, 33, 9, 41, 51, 19, 59, 27, 49, 17, 57, 25, 15, 47, 7, 39, 13, 45, 5, 37, 63, 31, 55, 23, 61, 29, 53, 21];
 
 /** Paints `art` into `canvas` at its CSS size. Dots start at `from` px and are

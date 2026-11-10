@@ -262,7 +262,7 @@ import { HomePage, type NeedsRow, type ProgressRow, type TeamRow } from './home/
 import { SkyBackdrop } from './home/SkyBackdrop';
 import { InboxSky } from './home/InboxSky';
 import { SKY_THEME_KEY, setHomeSetting, useDarkWindow, useHomeSettings } from './home/home-settings';
-import { SKY_THEMES, skyTheme } from './home/sky';
+import { PLAIN, SKY_THEMES, skyTheme } from './home/sky';
 import { engineLetter, engineName, greeting, homeCoversTheList, teamRowState, weekCounts } from './home/home-model';
 import { sentFrom } from './team/company';
 import { reachAudienceOf } from '../../shared/teammate-reach.mts';
@@ -969,7 +969,7 @@ export default function App() {
     });
   }, []);
   // Light, Dark and Match system take any sky theme off; a sky theme brings its own look.
-  const chooseLook = useCallback((next: Look) => { setHomeSetting(SKY_THEME_KEY, null); setLook(next); }, [setLook]);
+  const chooseLook = useCallback((next: Look) => { setHomeSetting(SKY_THEME_KEY, next === 'match' ? null : PLAIN); setLook(next); }, [setLook]);
   const chooseSkyTheme = useCallback((id: string) => {
     const k = skyTheme(id);
     if (!k) return;
