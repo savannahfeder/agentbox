@@ -14,6 +14,7 @@ import { STATE_WORD, stateWordOf } from './threads/summary-rules';
 import { threadState } from '../../shared/thread-cards.mts';
 import { closedUnshipped, notShippedLine, shippedAs } from '../../shared/not-shipped.mts';
 import { asksWho, isAuto } from '../../shared/auto-route.mts';
+import { saysARunGotNowhere } from '../../shared/spawn-trouble.mts';
 import type { ThreadStateWord, WorkItem } from './types';
 import type { Fleet } from './fleet';
 import { whyWords, type WhyCard } from './where-why';
@@ -139,6 +140,10 @@ export function statusCell(item: WorkItem, facts: StatusFacts = {}): StatusCell 
     return waiting ? { ...cell, why } : cell;
   }
   if (state === 'waiting' && shipped) return shipped;
+  // The app's own note that a run got nowhere is not an answer.
+  if (state === 'waiting' && item.wrote?.result?.source === 'agent' && saysARunGotNowhere(item.result)) {
+    return says('Stopped', 'held', true, String(item.result).split('\n')[0]);
+  }
   return plain(stateWordOf(item, state), state === 'waiting' ? 'need' : 'queued');
 }
 
