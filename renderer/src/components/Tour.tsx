@@ -137,7 +137,7 @@ function boxOf(step: TourStep, els: HTMLElement[]): Box | null {
   return { x, y, w: Math.max(...rs.map((r) => r.right)) - x, h: Math.max(...rs.map((r) => r.bottom)) - y };
 }
 
-function readScreen(view: string, thread: boolean, covered: boolean, palette: boolean): TourScreen {
+function readScreen(view: string, thread: boolean, covered: boolean, palette: boolean, answering: boolean): TourScreen {
   const card = document.querySelector<HTMLElement>('.tc-card');
   return {
     composer: !card ? 'none' : card.classList.contains('tc-inline') ? 'inline' : 'card',
@@ -152,6 +152,7 @@ function readScreen(view: string, thread: boolean, covered: boolean, palette: bo
     preparing: stillPreparing({ thread, onPage: !!document.querySelector('.one-catching-up'), ready: document.querySelectorAll(ROWS).length, writing: document.querySelectorAll('.list-pane .row[data-catching-up]').length }),
     typing: thread && !!document.activeElement?.closest('.dock-card'),
     busy: thread && !!document.querySelector('.live-word.is-shimmering, .live-brief.live-queued'),
+    answering: thread && answering,
     menu: !!document.querySelector('.tc-menu'),
     options: !!document.querySelector('.opt-row'),
     palette,
@@ -161,10 +162,12 @@ function readScreen(view: string, thread: boolean, covered: boolean, palette: bo
 
 const same = (a: Box | null, b: Box | null) => (!a || !b ? a === b : a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h);
 
-export function Tour({ tour, practice = false, view, thread, covered, palette, onChange, onPoint, onStep }: {
+export function Tour({ tour, practice = false, answering = false, view, thread, covered, palette, onChange, onPoint, onStep }: {
   tour: TourState | null;
   /** Home's box holds the walkthrough's practice task. */
   practice?: boolean;
+  /** The practice thread on screen is waiting for its answer. */
+  answering?: boolean;
   view: string;
   thread: boolean;
   /** Settings, ⌘K or another card is over the window. */
@@ -227,7 +230,7 @@ export function Tour({ tour, practice = false, view, thread, covered, palette, o
   useEffect(() => {
     if (!live || !tour) { if (shown.current) { shown.current = null; setStep(null); } return undefined; }
     const read = () => {
-      const screen = readScreen(view, thread, covered, palette);
+      const screen = readScreen(view, thread, covered, palette, answering);
       const rawStep = tourStep(tour, screen);
       // Told to go and explore, nobody is then asked to come back and watch.
       const wanted = rawStep === 'working' && tried ? null : rawStep;
@@ -266,7 +269,7 @@ export function Tour({ tour, practice = false, view, thread, covered, palette, o
     read();
     const t = setInterval(read, 120);
     return () => clearInterval(t);
-  }, [live, tour, view, thread, covered, palette, onChange, tried]);
+  }, [live, tour, view, thread, covered, palette, answering, onChange, tried]);
 
   // THE CARD, beside the glow, kept inside the window.
   useEffect(() => {

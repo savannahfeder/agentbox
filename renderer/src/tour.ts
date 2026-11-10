@@ -51,6 +51,8 @@ export interface TourScreen {
   thread: boolean;
   /** The open thread's agent is still working on it. */
   busy?: boolean;
+  /** The open practice thread's answer for this round is still on its way; nothing runs to show it working. */
+  answering?: boolean;
   /** A menu is open over the page. */
   menu?: boolean;
   /** The thread's reply box has the keyboard. */
@@ -143,7 +145,7 @@ export function tourStep(t: Tour | null, s: TourScreen): TourStep | null {
   if (s.preparing && todo('close')) return null;
   if (s.preparing) return todo('palette') && (t.sent || !todo('start')) ? 'palette' : !t.sent && todo('start') ? 'startHere' : null;
   if (s.thread) {
-    if (s.typing) return null;
+    if (s.typing || s.answering) return null;
     if (s.busy) return todo('busy') ? 'busy' : null;
     if (s.options && todo('choose')) return 'choose';
     if (!s.options && todo('reply') && todo('choose')) return 'reply';
