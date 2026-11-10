@@ -705,7 +705,8 @@ describe('the wire between the two halves', () => {
       ['firstRunPracticeEnd', 'zero:first-run-practice-end', 'sweepPractice'],
     ]) {
       expect(api, fn).toMatch(new RegExp(`zero\\?\\.${fn}|zero\\.${fn}`));
-      expect(preload, fn).toMatch(new RegExp(`${fn}: \\(\\) => ipcRenderer\\.invoke\\('${channel}'`));
+      // The walkthrough asks for a bare one (w-fbe5e95dea), so this one takes options.
+      expect(preload, fn).toMatch(new RegExp(`${fn}: \\((opts)?\\) => ipcRenderer\\.invoke\\('${channel}'`));
       expect(ipc, channel).toMatch(new RegExp(`ipcMain\\.handle\\('${channel}'`));
       expect(ipc, method).toMatch(new RegExp(`store\\.${method}\\(`));
     }
@@ -719,6 +720,6 @@ describe('the wire between the two halves', () => {
     // task they send themselves lands in their own project. The walk opens the
     // real new thread card since 2026-10-01, and that card is told which
     // project to open on rather than being handed a prefill with one inside it.
-    expect(app).toMatch(/defaultProduct=\{walkCard \? \(run!\.practice \?\? run!\.product\) : projectOnScreen\(\{ filter: productFilter, open: focused \}\)\}/);
+    expect(app).toMatch(/defaultProduct=\{walkCard \? \(run!\.practice \?\? run!\.product\) : (tourTask \?\? )?projectOnScreen\(\{ filter: productFilter, open: focused \}\)\}/);
   });
 });

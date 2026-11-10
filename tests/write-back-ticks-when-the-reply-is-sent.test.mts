@@ -19,6 +19,6 @@ describe('the Write back lesson', () => {
     expect(tour).not.toMatch(/screen\.typing && !tour\.done\.includes\('reply'\)/);
   });
   it('is learned when a reply is sent', () => {
-    expect(app).toMatch(/const answerWith = useCallback\(async \([^)]*\) => \{\n\s*if \(tourLive\(tourRef\.current\)\) setTour\(finishLesson\(tourRef\.current!, 'reply'\)\);/);
+    expect(app).toMatch(/const answerWith = useCallback\(async \([^)]*\) => \{\n\s*if \(tourLive\(tourRef\.current\)\) \{\n\s*let t = finishLesson\(tourRef\.current!, 'reply'\);/);
   });
 });
