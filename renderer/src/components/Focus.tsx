@@ -1661,6 +1661,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const gitHubSignIn = {
     start: async () => { const r = await api.gitHubCloudSignIn({ action: 'start' }); return r.ok && r.code && r.url ? { code: r.code, url: r.url } : { error: r.error ?? 'GitHub\'s sign-in did not start.' }; },
     token: async () => { const r = await api.gitHubCloudSignIn({ action: 'token' }); return r.ok && r.token ? { token: r.token } : { error: r.error ?? 'GitHub\'s sign-in did not finish.' }; },
+    open: (url: string) => { void api.openArtifactExternally({ product: item.product, src: url }); },
   };
   const md = (text: string) => {
     const needs = needsIn(text);

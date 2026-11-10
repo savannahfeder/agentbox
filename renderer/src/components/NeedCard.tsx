@@ -31,6 +31,8 @@ export const NeedPlace = createContext<{
   gitHubSignIn?: {
     start: () => Promise<{ code: string; url: string } | { error: string }>;
     token: () => Promise<{ token: string } | { error: string }>;
+    // In the person's own browser, where they are already signed in to GitHub.
+    open: (url: string) => void;
   };
 } | null>(null);
 
@@ -137,7 +139,7 @@ function GitHubOwnSignIn({ need, late, paste }: { need: Need; late: boolean; pas
     setBusy(false);
     if ('error' in started) { setSaid(started.error); return; }
     setDevice(started);
-    place.openLink(started.url);
+    own.open(started.url);
     const got = await own.token();
     if ('error' in got) { setDevice(null); setSaid(got.error); return; }
     const out = await place.saveKeys([{ name: 'GH_TOKEN', value: got.token, label: 'GitHub token' }], need, undefined, late);
@@ -152,7 +154,7 @@ function GitHubOwnSignIn({ need, late, paste }: { need: Need; late: boolean; pas
         <button type="button" className="need-link" onClick={() => { void navigator.clipboard?.writeText(device.code); }}>Copy</button>
       </div>
       <div className="need-acts">
-        <button type="button" className="need-btn need-main" onClick={() => place.openLink(device.url)}>Open GitHub<span className="need-btn-arrow">{I.arrow}</span></button>
+        <button type="button" className="need-btn need-main" onClick={() => place.gitHubSignIn!.open(device.url)}>Open GitHub<span className="need-btn-arrow">{I.arrow}</span></button>
       </div>
     </> : <div className="need-acts">
       <button type="button" className="need-btn need-main" disabled={busy} onClick={() => void begin()}>{busy ? 'Starting' : 'Sign in with GitHub'}<span className="need-btn-arrow">{I.arrow}</span></button>

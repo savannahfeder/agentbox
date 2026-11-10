@@ -23,7 +23,7 @@ const needs = needsIn([
   `${NEED} sign-in sentry | to read the errors`,
 ].join('\n'));
 const base = { itemId: 'w-1', saved: [], given: [], live: true, needs, saveKeys: async () => null, sendFile: async () => null, sendCode: async () => null, onComputer: () => {}, openLink: () => {} };
-const signIn = { start: async () => ({ code: 'D12A-7D90', url: 'https://github.com/login/device' }), token: async () => ({ token: 'gho_x' }) };
+const signIn = { start: async () => ({ code: 'D12A-7D90', url: 'https://github.com/login/device' }), token: async () => ({ token: 'gho_x' }), open: () => {} };
 const draw = (n, o = {}) => renderToStaticMarkup(h(NeedPlace.Provider, { value: { ...base, ...o } }, h(NeedCard, { source: JSON.stringify(needs[n]), fallback: null })));
 
 describe('the card a cloud run draws for a GitHub sign-in', () => {
