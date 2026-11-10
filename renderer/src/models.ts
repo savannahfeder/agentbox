@@ -33,8 +33,8 @@
 //
 // A model set by hand outside this list still draws as itself; see modelChoices.
 
-import { CLAUDE_MODELS } from '../../shared/claude-models.generated.mjs';
-import { DEFAULT_CLAUDE_MODEL } from '../../shared/engines.mjs';
+import { CLAUDE_MODELS } from '../../shared/claude-models.generated.mts';
+import { DEFAULT_CLAUDE_MODEL } from '../../shared/engines.mts';
 
 export interface ModelChoice {
   /** What the CLI is sent. Always an alias, never a version. */
@@ -73,7 +73,7 @@ export const BUILT_MODELS: ModelChoice[] = CLAUDE_MODELS.map((m) => ({
  * only the WORD that was frozen, because it came out of a file written when
  * Agentbox was built. MEASURED that day: her Claude Code 2.1.270 resolves `opus`
  * to Opus 5, and 2.1.280 resolves it to Opus 5.5. Now main reads the installed
- * CLI and this is where the answer lands (`main/claude-models.mjs`).
+ * CLI and this is where the answer lands (`main/claude-models.mts`).
  *
  * WHY A MODULE-LEVEL VALUE AND NOT A PROP. Codex's list is threaded through
  * Compose, Focus and Settings as `codexModels`, and it has to be: it is drawn

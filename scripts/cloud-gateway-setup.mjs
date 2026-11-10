@@ -37,7 +37,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { readCloudConfig } from '../main/cloud/config.mjs';
+import { readCloudConfig } from '../main/cloud/config.mts';
+import { PLANS } from '../cloud/gateway/plans.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..');
@@ -50,9 +51,20 @@ const NAMES = {
 export const STRIPE_SECRET_NAME = NAMES.stripe;
 export const GATEWAY_FUNCTION = NAMES.fn;
 // The most functions running at once: the ceiling on a burst of calls. It
-// does not stop machines already going; `admin pause` and the sweep do.
-const CONCURRENCY = 200;
-// Longer than its own 60 s wait on AgentCore (main/cloud/aws.mjs), shorter
+// does not stop machines already going; `admin pause` and the sweep do. A
+// computer reads a cloud run's output with a call that waits up to 20 s, so
+// each run it watches holds about one: this is close to how many such runs the
+// whole cloud holds at once, for everyone. Lambda keeps 100 of an account's
+// limit unreserved.
+const CONCURRENCY_WANTED = 900;
+export const ONE_MAX_PERSON = PLANS.max.agents;
+export const reservedConcurrency = (accountLimit) => Math.max(0, Math.min(CONCURRENCY_WANTED, (Number(accountLimit) || 0) - 100));
+/** What to say when the account cannot hold one Max person's runs and anyone else's, else null. */
+export function concurrencyShortfall(accountLimit) {
+  if (reservedConcurrency(accountLimit) > ONE_MAX_PERSON) return null;
+  return `this AWS account lets Lambda run ${accountLimit} at once, so the cloud server holds only ${reservedConcurrency(accountLimit)} watched runs for everyone, and one Max person runs ${ONE_MAX_PERSON}: ask for more under Service Quotas, AWS Lambda, Concurrent executions`;
+}
+// Longer than its own 60 s wait on AgentCore (main/cloud/aws.mts), shorter
 // than the Mac's wait on it (main/cloud/managed.mts).
 export const FUNCTION_SECONDS = 90;
 export const HANDLER = 'index.handler';
@@ -308,7 +320,7 @@ async function main() {
   const cloud = readCloudConfig();
   if (!cloud?.bucket) throw new Error('run scripts/cloud-setup.mjs first: the server uses its bucket and runtime');
   const { region, bucket, runtimeArn } = cloud;
-  const { loadCloudConfig } = await import('../main/team/session.mjs');
+  const { loadCloudConfig } = await import('../main/team/session.mts');
   const db = loadCloudConfig(ROOT, { packaged: false });
   if (!db) throw new Error('no team.config.json on this Mac: the server checks sign-ins against that database');
 
@@ -401,7 +413,16 @@ async function main() {
     });
     say('the new cloud server answers');
   }
-  aws(['lambda', 'put-function-concurrency', '--function-name', NAMES.fn, '--reserved-concurrent-executions', String(CONCURRENCY)], { allowFail: true });
+  const accountLimit = aws(['lambda', 'get-account-settings']).AccountLimit?.ConcurrentExecutions;
+  const reserve = reservedConcurrency(accountLimit);
+  const short = concurrencyShortfall(accountLimit);
+  if (short) say(`WARNING: ${short}`);
+  if (reserve) {
+    const set = aws(['lambda', 'put-function-concurrency', '--function-name', NAMES.fn, '--reserved-concurrent-executions', String(reserve)], { allowFail: true });
+    say(set ? `the cloud server may run ${reserve} at once` : `WARNING: could not reserve ${reserve} at once for the cloud server; it shares what the account has left`);
+  } else {
+    aws(['lambda', 'delete-function-concurrency', '--function-name', NAMES.fn], { allowFail: true, json: false });
+  }
   const fnArn = aws(['lambda', 'get-function-configuration', '--function-name', NAMES.fn]).FunctionArn;
   const allow = (id, principal, extra = []) => aws(['lambda', 'add-permission', '--function-name', NAMES.fn, '--statement-id', id, '--action', 'lambda:InvokeFunction', '--principal', principal, ...extra], { allowFail: true });
 

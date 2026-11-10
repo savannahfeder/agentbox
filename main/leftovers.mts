@@ -14,8 +14,9 @@
 // switch; Codex took it apart (a tag is provenance, not ownership; silence is
 // not death; a timer is not consent), and this is what survived:
 //
-//   1. IT IS ITS OWN SWITCH, OFF BY DEFAULT. With it off nothing is stopped and
-//      leftovers are only reported. Its text states the whole policy.
+//   1. IT IS ITS OWN SWITCH, ON UNLESS SOMEBODY TURNS IT OFF (w-54c640f8da,
+//      main/config.mts). With it off nothing is stopped and leftovers are only
+//      reported. Its text states the whole policy.
 //   2. ONLY THIS APP'S OWN TASKS. A task only ever runs in the app whose store
 //      it is in, so the app knows for certain when its runs start and end: a
 //      run's start is registered here, synchronously, before the worker is

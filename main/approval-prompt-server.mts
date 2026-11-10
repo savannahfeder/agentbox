@@ -9,7 +9,7 @@
 // Deny is the default in every failure mode: timeout, spool error, malformed
 // answer. An approval can only come from the founder's explicit file.
 //
-// EVERY TOUCH OF THE SPOOL GOES THROUGH main/approvals.mjs, which is where the
+// EVERY TOUCH OF THE SPOOL GOES THROUGH main/approvals.mts, which is where the
 // rule that this directory is worker-writable is written down and enforced --
 // nothing opened through a link, nothing opened that is not a regular file,
 // every write landed by rename. It used to be bare `fs` here, and the audit

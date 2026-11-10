@@ -16,6 +16,8 @@
 //     --keep                                           leave the copies up afterwards
 //     --files <dir>                                    copied into every project's documents in every copy (a table, a deck under test)
 //     --team <file> --room <name>                      one tester signs in to a real team (live.mjs --team) and talks in that room
+//     --stand-in-team "<name>"                         every tester on one team, through a stand-in team cloud of the run's own;
+//                                                      the first starts it, invites the rest and shares their first project
 //
 // For each person: a copy of the app of their own (live.mjs with
 // VERIFY_INSTANCE=power-<who>), shaped like their setup; a watcher reading it
@@ -37,8 +39,9 @@ import { fileURLToPath } from 'node:url';
 import { readPeople, pickPeople, chaosPlan, worldAt, nextRound, restartAgain, roundOutcome, coverage, testerPrompt, projectNamedIn } from './plan.mjs';
 import { createWatcher, freeMemoryMb, readAllLines, keepEvidence, sleepTargets } from './watch.mjs';
 import { writeReport } from './report.mjs';
-import { seedArtifacts } from './artifacts.mjs';
+import { makeFilm, seedArtifacts } from './artifacts.mjs';
 import { readDiary } from './diary.mjs';
+import { writeTeamFiles, namePeople, doorOf, formTeam, teamWords } from './team.mjs';
 import { testerLogin, codexCanSandbox, codexTesterArgv, codexTesterEnv, lastMessage } from './codex-tester.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -66,6 +69,8 @@ const roundMs = Math.max(2, Number(opt('round-minutes', 20))) * MIN;
 const chaos = opt('chaos', 'normal');
 const cloud = flag('cloud');
 const standInCloud = flag('stand-in-cloud');
+// Every copy opens as a brand-new install, on the first run (live.mjs --fresh).
+const fresh = flag('fresh');
 if (standInCloud && (cloud || flag('real'))) stop('--stand-in-cloud is the stand-ins\' own cloud; it cannot go with --real or --cloud.');
 const freeHours = opt('free-hours');
 // `owner:0.3,member:0.3`, one per person in --who order: each copy on a team's trial in that role.
@@ -83,6 +88,9 @@ const team = opt('team');
 const room = opt('room');
 const files = opt('files') ? path.resolve(opt('files')) : null;
 if (files && !fs.existsSync(files)) stop(`--files: there is no folder at ${files}.`);
+const standInTeam = opt('stand-in-team');
+if (standInTeam && team) stop('--stand-in-team makes a team of its own: leave out --team.');
+if (standInTeam && people.length < 2) stop('--stand-in-team is two or more testers on one team: name them with --who.');
 if (team && people.length !== 1) stop('--team signs one account in, so it runs one tester: name them with --who.');
 if (room && !team) stop('--room needs --team: a copy with no team is in no room.');
 try { chaosPlan(chaos, totalMs); } catch (err) { stop(err.message); }
@@ -172,7 +180,12 @@ function seedHistory(state, person, count) {
     else if (r > 2) lines.push({ id, ts: at + 20 * MIN, source: 'founder', patch: { status: 'done' } });
   }
   const first = slugs[0];
-  const withFiles = seedArtifacts({ accountRoot: state.accountRoot, slug: first, picture: path.join(REPO, 'docs', 'readme', 'priority-palette.png'), now });
+  const withFiles = seedArtifacts({
+    accountRoot: state.accountRoot, slug: first, now,
+    picture: path.join(REPO, 'docs', 'readme', 'priority-palette.png'),
+    picture2: path.join(REPO, 'docs', 'readme', 'inbox-urgent.png'),
+    film: makeFilm(path.join(state.accountRoot, 'demo-film.mp4')),
+  });
   for (const l of withFiles) ids.add(l.id);
   byProject.get(first).push(...withFiles);
   for (const [slug, lines] of byProject) {
@@ -183,6 +196,17 @@ function seedHistory(state, person, count) {
   return ids;
 }
 
+let teamCloud = null;
+let teamFiles = {};
+if (standInTeam) {
+  const { startStandinCloud } = await import(path.join(REPO, 'cloud', 'standin', 'server.mjs'));
+  fs.mkdirSync(path.join(root, 'team-cloud'), { recursive: true });
+  teamCloud = await startStandinCloud({ file: path.join(root, 'team-cloud', 'cloud.json') });
+  teamFiles = writeTeamFiles({ root, url: teamCloud.url, people });
+  await namePeople({ url: teamCloud.url, people });
+  say(`${standInTeam}: a stand-in team cloud at ${teamCloud.url} for ${people.map((p) => p.name).join(', ')}`);
+}
+
 const setups = [];
 for (const person of people) {
   const name = `power-${person.slug}`;
@@ -190,7 +214,7 @@ for (const person of people) {
   fs.mkdirSync(dir, { recursive: true });
   const shape = real ? [] : ['--logins', String(person.logins), ...(person.codex ? [] : ['--no-codex'])];
   say(`${person.name}: starting a copy of the app shaped like their setup`);
-  const up = await live(name, 'up', ...(real ? ['--real'] : []), ...(cloud ? ['--cloud'] : []), ...(standInCloud ? ['--stand-in-cloud'] : []), ...(freeHours ? ['--free-hours', freeHours] : []), ...(cloudTeams[people.indexOf(person)] ? ['--cloud-team', cloudTeams[people.indexOf(person)]] : []), ...(cloudAccounts ? ['--cloud-accounts', cloudAccounts] : []), ...shape, '--projects', person.projects.join(','), ...(team ? ['--team', team] : []), ...(alpha ? ['--alpha', alpha] : []));
+  const up = await live(name, 'up', ...(real ? ['--real'] : []), ...(cloud ? ['--cloud'] : []), ...(standInCloud ? ['--stand-in-cloud'] : []), ...(fresh ? ['--fresh'] : []), ...(freeHours ? ['--free-hours', freeHours] : []), ...(cloudTeams[people.indexOf(person)] ? ['--cloud-team', cloudTeams[people.indexOf(person)]] : []), ...(cloudAccounts ? ['--cloud-accounts', cloudAccounts] : []), ...shape, '--projects', person.projects.join(','), ...(team ? ['--team', team] : []), ...(teamFiles[person.slug] ? ['--team', teamFiles[person.slug]] : []), ...(alpha ? ['--alpha', alpha] : []));
   fs.writeFileSync(path.join(dir, 'up.log'), up.out);
   const stateFile = path.join(instanceDir(name), 'instance.json');
   const state = readJson(stateFile);
@@ -200,6 +224,32 @@ for (const person of people) {
   const seeded = person.history ? seedHistory(state, person, person.history) : new Set();
   if (seeded.size) await live(name, 'restart');
   setups.push({ person, name, dir, stateFile, seeded, cmds: layCommands(dir, name) });
+}
+
+let teamMade = null;
+if (standInTeam) {
+  const ready = setups.filter((s) => !s.failed);
+  if (ready.length < 2) stop(`only ${ready.length} copy started, and a team needs two: ${setups.map((s) => s.failed).filter(Boolean).join('; ')}`);
+  try {
+    teamMade = await formTeam({
+      teamName: standInTeam,
+      copies: ready.map((s, i) => {
+        const st = readJson(s.stateFile);
+        return { person: s.person, call: doorOf(st), project: i === 0 ? Object.keys(st.repos)[0] : null };
+      }),
+    });
+  } catch (err) {
+    for (const s of setups) await live(s.name, 'down');
+    await teamCloud.stop();
+    stop(`the team did not form: ${err.message}`);
+  }
+  say(`${standInTeam}: formed, ${teamMade.shared ? `${teamMade.shared} shared` : 'nothing shared'}`);
+}
+
+// One at a time: three Chromes started in the same second all died before printing their address.
+for (const s of setups.filter((x) => !x.failed)) {
+  const r = await run(node, [BROWSE, 'open'], { env: { ...process.env, VERIFY_INSTANCE: s.name, BREAKER_OUT: s.dir }, timeoutMs: 2 * MIN });
+  if (r.code !== 0) say(`${s.person.name}: the browser did not open before the test (${r.out.trim().split('\n').pop()}); their first look opens it again`);
 }
 
 const startedAt = Date.now();
@@ -319,12 +369,14 @@ async function runPerson({ person, name, dir, stateFile, seeded, failed, cmds })
       const next = nextRound({ now: Date.now(), deadline, roundMs, idleInARow: idle, lastOutcome: last });
       if (!next.go) { if (next.why !== 'time is up') result.stopped = next.why; break; }
       const round = ++result.rounds;
+      // A sandboxed tester cannot start Chrome, and the last stretch's may have gone with it; open it from here.
+      await run(node, [BROWSE, 'open'], { env: { ...process.env, VERIFY_INSTANCE: name, BREAKER_OUT: dir }, timeoutMs: 2 * MIN });
       const now = Date.now();
       const { issues } = readDiary(path.join(dir, 'diary.jsonl'));
       const cov = coverage({ actions: readJsonl(path.join(dir, 'actions.jsonl')), lines: readAllLines(state()), seeded, maxAtOnce: watcher.maxAtOnce, person });
       fs.writeFileSync(path.join(dir, 'clock.json'), JSON.stringify({ round, deadline, roundEnd: next.endsAt }));
       const prompt = testerPrompt({
-        person, focus, room, browse: cmds.browse, diary: cmds.diary, shots: dir, round, real,
+        person, focus, room, team: standInTeam ? teamWords({ teamName: standInTeam, me: person, people, shared: teamMade?.shared }) : null, browse: cmds.browse, diary: cmds.diary, shots: dir, round, real,
         totalMinutes: Math.round(totalMs / MIN), minutesLeft: Math.round((deadline - now) / MIN), roundMinutes: Math.round((next.endsAt - now) / MIN),
         fraction: (now - startedAt) / totalMs, diaryTail: diaryTail(dir),
         issues: issues.map((i) => `#${i.n} [${i.severity}] ${i.title} (seen ${i.seen})`), notYet: cov.notYet, stoppedEarlyMin: early,
@@ -376,6 +428,7 @@ wake();
 
 const { file, counts } = writeReport({ root, startedAt, endedAt: Date.now(), focus, real, chaos, people: results });
 if (!flag('keep')) for (const s of setups) await live(s.name, 'down');
+if (teamCloud && !flag('keep')) await teamCloud.stop();
 say(`done: ${counts.issues} issue(s) from the testers (${counts.seenTwice} seen more than once), ${counts.machine} from the watcher.`);
 for (const r of results) if (r.stopped) say(`${r.name} stopped early: ${r.stopped}`);
 say(`report: ${file}`);

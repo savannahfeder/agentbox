@@ -4,17 +4,17 @@
 // thread page wears it whole; the empty inbox draws it open on the page, as
 // the web app does (Pages.tsx `InboxClear`).
 import { router } from '../lib/router';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { Platform, Pressable, TextInput, View } from 'react-native';
 import { readRule, repeatPresets } from '../../../renderer/src/format';
 import { engineModelLabel } from '../../../renderer/src/models';
-import { ruleLabel } from '../../../shared/repeats.mjs';
+import { ruleLabel } from '../../../shared/repeats.mts';
 import { priorityIdOf, priorityLabelOf, priorityValueOf } from '../../../renderer/src/priority';
 import { agentChoices, agentWordFor, autoOffered, laterHint, momentFromWords, mondayIsTomorrow, mondayMorning, projectSwatch, tomorrowMorning, type Harness } from '../../../renderer/src/threads/composer-rules';
 import { splitSlug } from '../../../renderer/src/phone-rows';
-import { AUTO_LABEL } from '../../../shared/auto-route.mjs';
+import { AUTO_LABEL } from '../../../shared/auto-route.mts';
 import type { Choices } from '../lib/actions';
-import { newThreadChoices, onceAtATime, openingChoices, openingEngine, openingFor, openingRecipient, pickEffort, pickEngine, pickModel, pickProject, pickRecipient, projectNow, type Recipient } from '../lib/compose';
+import { newThreadChoices, onceAtATime, openingChoices, openingEngine, openingFor, openingRecipient, pickEffort, pickModel, projectNow, type Recipient } from '../lib/compose';
 import { AutoMark, TeammateMark } from './Teammates';
 import { roleOf } from '../lib/teammates';
 import type { Teammate } from '../../../renderer/src/types';
@@ -46,22 +46,33 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 export function useNewThread(sent: () => void) {
   const c = useCloud();
   const projects = c.view.products;
-  // Her words, files and priority outlive the page (lib/drafts.ts); the
-  // project, model and level are the ones she last picked (lib/compose.ts).
+  // Your words, files and priority outlive the page (lib/drafts.ts); the
+  // model and level are the ones last picked, the To and project this thread's own (lib/compose.ts).
   const draft = useDraft('new', appStore);
   const [opening] = useState(() => openingChoices(projects, appStore));
   const [picked, setPicked] = useState<string | null>(null);
-  const product = projectNow(projects, picked, appStore) ?? '';
+  const product = projectNow(projects, picked) ?? '';
   const agents = useComputerAgents();
   const codex = { codexModels: agents.codexModels, codexDefault: agents.codexDefault };
   const offered = agentChoices(agents.engines);
   const [pickedEngine, setPickedEngine] = useState<Harness | null>(null);
-  const engine: Harness = offered.some((e) => e.id === pickedEngine) ? (pickedEngine as Harness) : openingEngine(appStore, agents.engines, agents.workspace);
+  const engine: Harness = offered.some((e) => e.id === pickedEngine) ? (pickedEngine as Harness) : openingEngine(agents.engines, agents.workspace);
   // Each agent's model and level kept apart, as the site's card keeps them.
   const [chosen, setChosen] = useState<Partial<Record<Harness, { model: string; effort: string | null }>>>(() => ({ claude: { model: opening.model, effort: opening.effort } }));
   const { model, effort } = chosen[engine] ?? openingFor(appStore, engine, agents.codexDefault);
   const choose = (next: Partial<{ model: string; effort: string | null }>) => setChosen((was) => ({ ...was, [engine]: { model, effort, ...next } }));
   const [sheet, setSheet] = useState<'to' | 'model' | 'project' | 'priority' | 'attach' | 'later' | null>(null);
+  const box = useRef<ComponentRef<typeof TextInput>>(null);
+  const lastSheet = useRef(sheet);
+  // A picked project, agent, model or priority hands the cursor back to the
+  // message, once the sheet's fade is over: until then the sheet holds focus.
+  useEffect(() => {
+    const was = lastSheet.current;
+    lastSheet.current = sheet;
+    if (sheet !== null || !was || was === 'later') return;
+    const t = setTimeout(() => box.current?.focus(), 350);
+    return () => clearTimeout(t);
+  }, [sheet]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const projectName = useMemo(() => projects.find((p) => p.slug === product)?.name ?? '', [projects, product]);
@@ -70,12 +81,12 @@ export function useNewThread(sent: () => void) {
   const mates = useMemo(() => (c.team?.view.list ?? []).filter((t) => t.status === 'active'), [c.team]);
   const reach = !!c.team;
   const [pickedTo, setPickedTo] = useState<Recipient | null>(null);
-  const recipient = pickedTo ?? openingRecipient(mates, reach, appStore);
+  const recipient = pickedTo ?? openingRecipient(mates, reach);
   const autoHere = autoOffered(mates, reach);
   const onAuto = recipient.auto && autoHere && !recipient.mate;
   const mate: Teammate | 'new' | null = reach && recipient.mate === 'new' ? 'new' : mates.find((m) => m.id === recipient.mate) ?? null;
   const toWord = mate === 'new' ? 'Someone new' : mate ? mate.name : onAuto ? 'Auto' : null;
-  const chooseTo = (r: Recipient) => { setPickedTo(r); pickRecipient(appStore, r); };
+  const chooseTo = (r: Recipient) => setPickedTo(r);
   const canSend = (!!draft.text.trim() || draft.files.length > 0) && !!product && !busy && (!mate || !!draft.text.trim());
 
   // A teammate takes your words in your chat with it, not as a thread.
@@ -96,7 +107,6 @@ export function useNewThread(sent: () => void) {
   const sendNow = async (later: Choices = {}) => {
     if (!canSend) return;
     setSheet(null); setBusy(true); setError(null);
-    pickProject(appStore, product);
     try {
       if (mate) {
         await sendToMate();
@@ -125,12 +135,12 @@ export function useNewThread(sent: () => void) {
   const send = (later?: Choices) => { offline.clear(); lastLater.current = later; return sendOnce(later); };
   const talk = useDictation(draft, () => void send());
   return {
-    draft, product, projectName, projects, model, effort, sheet, setSheet, busy, error, setError, canSend, send, talk,
+    draft, box, product, projectName, projects, model, effort, sheet, setSheet, busy, error, setError, canSend, send, talk,
     agents, offered, engine, codex, mates, reach, autoHere, onAuto, mate, toWord,
-    pickProject: (slug: string) => { setPicked(slug); pickProject(appStore, slug); },
+    pickProject: (slug: string) => setPicked(slug),
     pickAuto: () => chooseTo({ to: 'agent', mate: null, auto: true }),
     pickMate: (id: string) => chooseTo({ to: 'agent', mate: id, auto: false }),
-    pickEngine: (id: Harness) => { chooseTo({ to: 'agent', mate: null, auto: false }); setPickedEngine(id); pickEngine(appStore, id); },
+    pickEngine: (id: Harness) => { chooseTo({ to: 'agent', mate: null, auto: false }); setPickedEngine(id); },
     pickModel: (id: string) => { choose({ model: id }); pickModel(appStore, id, engine, agents.codexDefault); },
     pickEffort: (id: string) => choose({ effort: pickEffort(appStore, effort, id, engine) }),
   };
@@ -159,7 +169,7 @@ export function SendButtons({ form }: { form: NewThread }) {
 
 /** The four rows and the message. `inline` is the empty inbox's: a shorter box that does not take the keyboard on its own. */
 export function NewThreadFields({ form, inline = false, onFocus, onBlur }: { form: NewThread; inline?: boolean; onFocus?: () => void; onBlur?: () => void }) {
-  const { draft, talk, product, projectName, model, setSheet, error, agents, offered, engine, codex, mate, onAuto, toWord } = form;
+  const { draft, box, talk, product, projectName, model, setSheet, error, agents, offered, engine, codex, mate, onAuto, toWord } = form;
   // A teammate keeps its own model and project; someone new needs only the project it works in.
   const toMate = !!mate && mate !== 'new';
   return (
@@ -193,7 +203,7 @@ export function NewThreadFields({ form, inline = false, onFocus, onBlur }: { for
         </Field>
       )}
       {/* Typing stops dictation with the words kept; tapping the box does not (web-speech.ts). */}
-      <TextInput multiline autoFocus={!inline} value={draft.text} placeholder={toMate ? `Message ${(mate as Teammate).name}` : 'What do you need done?'} placeholderTextColor={color.faint}
+      <TextInput ref={box} multiline autoFocus={!inline} value={draft.text} placeholder={toMate ? `Message ${(mate as Teammate).name}` : 'What do you need done?'} placeholderTextColor={color.faint}
         onChangeText={(t) => { if (talk.active()) talk.leave(); draft.setText(t); }} onFocus={onFocus} onBlur={onBlur}
         style={[{ flex: inline ? undefined : 1, minHeight: inline ? 120 : 160, padding: 16, fontFamily: font.regular, fontSize: 16, lineHeight: 24.8, color: color.text, textAlignVertical: 'top' }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
       <View style={{ paddingHorizontal: 16, paddingBottom: draft.files.length || error || draft.dropped ? 14 : 0, gap: 10 }}>

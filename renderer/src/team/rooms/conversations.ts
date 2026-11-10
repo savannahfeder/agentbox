@@ -5,8 +5,8 @@ import { isDirect, messageLine } from '../../threads/page-rules';
 import type { Conversation } from './MessagesPage';
 import { cardName, chatPeople } from './room-rules';
 import { voiceSaid } from '../voice-note';
-import { isTaskRow, isWorkThread, nameIsAPersons } from '../../../../shared/team-rules.mjs';
-import { voiceName } from '../../../../shared/agent-voice.mjs';
+import { isTaskRow, isWorkThread, nameIsAPersons } from '../../../../shared/team-rules.mts';
+import { voiceName } from '../../../../shared/agent-voice.mts';
 
 const nameOf = (p: Person | undefined) => (p?.name ? shortName(p.name) : 'Someone');
 const shortName = (name: string) => { const w = name.trim().split(/\s+/); return w.length > 1 ? `${w[0]} ${w[w.length - 1][0]}.` : w[0] ?? ''; };

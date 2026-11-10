@@ -1,7 +1,7 @@
 // PURE. The picture that opens large over the thread (PictureView.tsx): which
 // clicks open it, how big it is drawn, and how it zooms and steps.
 import { docKind } from './doc-pane';
-import { familyKeyOf } from '../../shared/artifact-marks.mjs';
+import { familyKeyOf } from '../../shared/artifact-marks.mts';
 
 /** Zoom is counted from the fitted size, so 1 is "all of it on screen". */
 export const MAX_ZOOM = 8;

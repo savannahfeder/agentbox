@@ -195,7 +195,7 @@ export class CodexUsage {
   /**
    * A NOTIFICATION OFF THE APP-SERVER'S LOOSE CHANNEL, AND THE ONLY WAY A FIGURE
    * EVER GETS IN HERE. Everything that belongs to no thread arrives on it
-   * (main/codex-app-server.mjs `onNotification`), so this is handed every one of
+   * (main/codex-app-server.mts `onNotification`), so this is handed every one of
    * them and keeps the one it is about.
    *
    * IT MERGES. The update is documented sparse -- see shared/codex-usage.mts for

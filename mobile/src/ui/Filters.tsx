@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { PRIORITIES } from '../../../renderer/src/priority';
 import { projectChoices, type Display, type UpdatedWindow } from '../../../renderer/src/threads/page-rules';
-import type { ThreadStateWord } from '../../../renderer/src/types';
+import type { Product, ThreadStateWord, WorkItem } from '../../../renderer/src/types';
 import { phoneFiltered, type Harness } from '../lib/agent-filter';
 import { barsFor } from './Pickers';
 import { PriorityBars, T } from './parts';
@@ -74,7 +74,7 @@ const WINDOWS: [UpdatedWindow, string][] = [['today', 'Today'], ['week', 'This w
 
 /** The menu that drops from the sliders, the width of the screen, over the list (phone.css `.th-pop`). */
 export function ViewMenu({ display, onDisplay, agent = null, agents = [], onAgent, products, items, shown, total, tab, close, onSelect }: {
-  display: Display; onDisplay: (d: Display) => void; products: { slug: string; name: string }[]; items: any[];
+  display: Display; onDisplay: (d: Display) => void; products: Product[]; items: Pick<WorkItem, 'product' | 'updatedAt' | 'agent'>[];
   /** The Agent line's choices (lib/agent-filter.ts), empty where it is not offered. */
   agent?: Harness | null; agents?: { value: Harness; label: string }[]; onAgent?: (a: Harness | null) => void;
   shown: number; total: number; tab: string; close: () => void;
@@ -86,7 +86,7 @@ export function ViewMenu({ display, onDisplay, agent = null, agents = [], onAgen
   const [all, setAll] = useState(false);
   const set = (patch: Partial<Display>) => onDisplay({ ...display, ...patch });
   // The eight used most recently, the rest behind one button (`projectChoices`).
-  const { shown: top, rest } = projectChoices(products as any[], items, { picked: display.projects });
+  const { shown: top, rest } = projectChoices(products, items, { picked: display.projects });
   const projects = all ? [...top, ...rest] : top;
   return (
     <View style={{ position: 'absolute', top: inset.top + size.topBar, left: 0, right: 0, bottom: 0, zIndex: 30 }}>

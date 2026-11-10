@@ -1,4 +1,4 @@
-// SHARE: a link anyone can open to the file on screen (main/file-link.mjs).
+// SHARE: a link anyone can open to the file on screen (main/file-link.mts).
 // Nothing leaves this computer until Copy link is pressed. Every version of
 // one file shares one link; Update link puts the copy on screen in it.
 import { useEffect, useRef, useState } from 'react';
@@ -16,8 +16,8 @@ export async function afterSharing(hadLink: boolean, copyIt: () => Promise<boole
   return (await copyIt()) ? 'Link copied' : null;
 }
 
-/** The kinds a link can draw, as main/file-link.mjs linkKindOf names them. */
-export const canShareFile = (src: string) => /\.(md|markdown|html?|png|jpe?g|gif|webp|svg|pdf)$/i.test(String(src ?? '').split(/[?#]/)[0]);
+/** The kinds a link can draw, as main/file-link.mts linkKindOf names them. */
+export const canShareFile = (src: string) => /\.(md|markdown|csv|tsv|html?|png|jpe?g|gif|webp|svg|pdf|mp4|m4v|mov|webm)$/i.test(String(src ?? '').split(/[?#]/)[0]);
 
 /** What the panel offers: the live link, and whether it holds an older copy than the one on screen. */
 export function linkOffer(state: FileLinkState | null) {

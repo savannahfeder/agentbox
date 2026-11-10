@@ -6,8 +6,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { readEnv } from './product-name.mjs';
-import { runningAsAFreshUser } from './fresh-user-home.mjs';
-import { runningAsADemo } from './demo-world.mjs';
+import { runningAsAFreshUser } from './fresh-user-home.mts';
+import { runningAsADemo } from './demo-world.mts';
 
 export const ARMS: string[] = ['tour', 'classic'];
 const FILE = 'onboarding-arm';
