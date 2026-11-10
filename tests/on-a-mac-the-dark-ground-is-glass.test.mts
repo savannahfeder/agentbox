@@ -3,9 +3,11 @@
 // The owner could not settle on a colour for the ground the sidebar sits on,
 // and pointed at another Mac app whose ground is frosted glass over the
 // desktop. Measured off that picture: the ground is about four fifths a warm
-// dark tint and one fifth the blurred desktop; the card is solid, 8px in from
-// the window's right and bottom edges, with 10px corners. Nothing did this
-// before: the window was opaque #1a1a1c and the page painted an opaque ground.
+// dark tint and one fifth the blurred desktop; the card is solid. Nothing did
+// this before: the window was opaque #1a1a1c and the page painted an opaque
+// ground. On the first picture the owner found the glass edges uneven and too
+// thin (40px on top, 8px right and below) and the corners not round enough,
+// and asked for the back and forward arrows in the empty top band.
 //
 // Covered: a Mac window gets the system's blur and tells its page so; Linux and
 // Windows keep the opaque window and are never told; the page goes glass only
@@ -79,13 +81,36 @@ describe('the page', () => {
     expect(card).toMatch(/background: linear-gradient\(var\(--skin-pane\), var\(--skin-pane\)\), var\(--skin-image\) center \/ cover no-repeat fixed var\(--bg\)/);
   });
 
-  it('sets the card 8px in from the right and the foot, with the document card\'s corner', () => {
+  it('sets the card 12px in from the right and the foot, with 14px corners', () => {
     const card = rule(`${DARK_GLASS} .workspace-layout::before`);
-    expect(card).toMatch(/right: 8px/);
-    expect(card).toMatch(/bottom: 8px/);
-    expect(card).toMatch(/border-radius: var\(--artifact-corner\)/);
-    expect(rule(`${DARK_GLASS} .app.workspace-layout`)).toMatch(/padding-right: 8px; padding-bottom: 8px/);
-    expect(rule(`${DARK_GLASS} .home-sky`)).toMatch(/border-radius: var\(--artifact-corner\)/);
+    expect(card).toMatch(/right: 12px/);
+    expect(card).toMatch(/bottom: 12px/);
+    expect(card).toMatch(/border-radius: 14px/);
+    expect(rule(`${DARK_GLASS} .app.workspace-layout`)).toMatch(/padding-right: 12px; padding-bottom: 12px/);
+    expect(rule(`${DARK_GLASS} .home-sky`)).toMatch(/border-radius: 14px/);
+    // The sidebar keeps the same place against the card that it has today:
+    // 10px below the card's top, level with its foot.
+    expect(rule(`${DARK_GLASS} .workspace-navigation`)).toMatch(/top: 60px; bottom: 12px/);
+  });
+
+  it('makes the top band twice the traffic lights\' centre, so they sit in its middle', () => {
+    const { y } = glassWindow('darwin').trafficLightPosition!;
+    const band = 2 * (y + 7);
+    expect(band).toBe(50);
+    expect(rule(`${DARK_GLASS} .app.workspace-layout`)).toMatch(new RegExp(`padding-top: ${band}px;`));
+    expect(rule(`${DARK_GLASS} .workspace-layout::before`)).toMatch(new RegExp(`top: ${band}px;`));
+    // The whole band drags the window, as the 40px strip did.
+    expect(rule(`${DARK_GLASS} .workspace-layout::after`)).toMatch(new RegExp(`height: ${band}px`));
+  });
+
+  it('puts back and forward in the top band, centred on the lights and just past them', () => {
+    const { x, y } = glassWindow('darwin').trafficLightPosition!;
+    const arrows = rule(`${DARK_GLASS} .topbar > .back-forward`);
+    expect(arrows).toMatch(/position: fixed/);
+    // The buttons are 26px tall, so their top is 13px above the lights' centre.
+    expect(arrows).toMatch(new RegExp(`top: ${y + 7 - 13}px`));
+    // The third light ends at x + 60; the arrows start 16px after it.
+    expect(arrows).toMatch(new RegExp(`left: ${x + 60 + 16}px`));
   });
 
   it('leaves Light opaque: every glass rule is for the dark look only', () => {
