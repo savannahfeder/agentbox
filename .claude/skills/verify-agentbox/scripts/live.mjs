@@ -260,7 +260,7 @@ async function prepare(real, setupName = null, { logins = 2, codex = true, proje
   }
 
   const plan = path.join(INSTANCE, 'stub-plan.json');
-  fs.writeFileSync(plan, `${JSON.stringify({ say: 'The verify stand-in ran and answered.', receipts, world: path.join(INSTANCE, 'world.json') }, null, 1)}\n`);
+  fs.writeFileSync(plan, `${JSON.stringify({ say: 'The verify stand-in ran and answered.', receipts, makesFiles: true, world: path.join(INSTANCE, 'world.json') }, null, 1)}\n`);
 
   let claudeBin = null;
   let codexBin = null;
@@ -309,6 +309,9 @@ async function prepare(real, setupName = null, { logins = 2, codex = true, proje
     const stub = path.join(INSTANCE, 'bin', 'stub-claude-worker.mjs');
     fs.copyFileSync(STUB, stub);
     fs.copyFileSync(path.join(path.dirname(STUB), 'stand-in-world.mjs'), path.join(INSTANCE, 'bin', 'stand-in-world.mjs'));
+    fs.copyFileSync(path.join(path.dirname(STUB), 'stand-in-artifacts.mjs'), path.join(INSTANCE, 'bin', 'stand-in-artifacts.mjs'));
+    fs.mkdirSync(path.join(INSTANCE, 'bin', 'pictures'), { recursive: true });
+    for (const p of ['priority-palette.png', 'inbox-urgent.png']) fs.copyFileSync(path.join(REPO, 'docs', 'readme', p), path.join(INSTANCE, 'bin', 'pictures', p));
     fs.writeFileSync(claudeBin, `#!/bin/sh\nexec "${process.execPath}" "${stub}" "$@"\n`, { mode: 0o755 });
     codexBin = codex ? await realCodex() : null;
     if (codexBin) {
@@ -502,18 +505,27 @@ async function start(state) {
   fs.writeFileSync(file, `${JSON.stringify({ ...had, ...copyConfig(state, had) }, null, 2)}\n`);
 
   const fd = fs.openSync(state.log, 'a');
-  const before = fs.existsSync(state.log) ? fs.statSync(state.log).size : 0;
-  const child = spawn(process.execPath, [...stripTypesFlags(), path.join(REPO, 'bin', 'agentbox.mjs'), '--dir', state.data, '--no-open'], {
-    cwd: REPO, detached: true, stdio: ['ignore', fd, fd], env,
-  });
-  child.unref();
-  const deadline = Date.now() + 30_000;
-  let url = null;
-  while (!url && Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, 200));
-    url = fs.readFileSync(state.log, 'utf8').slice(before).match(/http:\/\/127\.0\.0\.1:\d+\/\?token=\S+/)?.[0] ?? null;
-    if (!alive(child.pid)) break;
-  }
+  // A restart keeps its port: a new port is a new origin, and the window's own
+  // storage (threads followed, drafts) would read as wiped to a tester.
+  const kept = state.url ? new URL(state.url).port : '';
+  const launch = async (port) => {
+    const from = fs.statSync(state.log).size;
+    const child = spawn(process.execPath, [...stripTypesFlags(), path.join(REPO, 'bin', 'agentbox.mjs'), '--dir', state.data, '--no-open', ...(port ? ['--port', port] : [])], {
+      cwd: REPO, detached: true, stdio: ['ignore', fd, fd], env,
+    });
+    child.unref();
+    const deadline = Date.now() + 30_000;
+    let found = null;
+    while (!found && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 200));
+      found = fs.readFileSync(state.log, 'utf8').slice(from).match(/http:\/\/127\.0\.0\.1:\d+\/\?token=\S+/)?.[0] ?? null;
+      if (!alive(child.pid)) break;
+    }
+    return { child, found };
+  };
+  let { child, found: url } = await launch(kept);
+  // Somebody else took the old port meanwhile: a new one, as before.
+  if (!url && kept && !alive(child.pid)) ({ child, found: url } = await launch(''));
   if (!url) {
     try { process.kill(-child.pid, 'SIGKILL'); } catch { /* already gone */ }
     stop(`the copy never printed its address. Its log:\n${fs.readFileSync(state.log, 'utf8').slice(-3000)}`);

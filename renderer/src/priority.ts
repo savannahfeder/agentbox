@@ -41,6 +41,25 @@ export function priorityLabelOf(id: PriorityId): string {
   return PRIORITIES.find((p) => p.id === id)!.label;
 }
 
+/**
+ * The choice the new task cards open on: no level, so the app's small model
+ * picks High, Medium or Low (main/task-priority.mts). Only the cards offer it;
+ * once a thread has a level, the person changes it with the four words.
+ */
+export const AGENT_DECIDES = { id: 'agent', label: 'Agent Decides' } as const;
+
+/** A card's pick: one of the four, or null for Agent decides. */
+export type PriorityChoice = PriorityId | null;
+
+export function choiceLabelOf(choice: PriorityChoice): string {
+  return choice ? priorityLabelOf(choice) : AGENT_DECIDES.label;
+}
+
+/** The number a card sends. 0 is untagged, which is what the model is asked about. */
+export function sentPriority(choice: PriorityChoice): number {
+  return choice ? priorityValueOf(choice) : 0;
+}
+
 export interface PriorityCommand {
   id: string;
   label: string;
@@ -79,7 +98,7 @@ export function priorityCommands(
   }));
 }
 
-/* ------------------- every new thread opens on Medium --------------------- */
+/* ---------------- every new thread opens on Agent decides ----------------- */
 
 // The new task card used to remember the last level picked, across sends, in
 // `zero.lastPriority`. So one Urgent thread made the next one Urgent too, and
@@ -89,7 +108,8 @@ export function priorityCommands(
 // spreads by itself stops meaning anything. The founder's call, 2026-10-05:
 // all new threads default to Medium. Unlike the project, the level is not
 // carried to the next card. Anything still sitting under `zero.lastPriority`
-// is simply never read.
+// is simply never read. Since 2026-11-10 the default is Agent decides: "I
+// leave most of my tasks on medium when I don't want to prioritize them."
 //
 // A level still holds for the card it was picked on: a half-written card that
 // comes back (../drafts.ts) keeps its own tag until it is sent.
@@ -103,7 +123,7 @@ export function priorityCommands(
 
 /**
  * The level a new task card opens on: its own draft's tag, or null for
- * untagged, which shows and sends as Medium.
+ * Agent decides, which sends the task untagged.
  *
  * Anything that is not one of the four words reads as null rather than
  * throwing. A card that refuses to open because of a stale string in storage is

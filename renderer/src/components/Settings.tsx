@@ -2069,7 +2069,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
               <div className="ac-adding">
                 <div className="ac-adding-top">
                   <span>{adding.error ? 'Could not add an account' : `Sign in to ${adding.name ?? 'your account'}`}</span>
-                  <button type="button" className="ac-adding-x" aria-label="Close" onClick={() => { setAdding(null); void load(); }}>&#215;</button>
+                  <button type="button" className="ac-adding-x" aria-label="Close" onClick={() => { setAdding(null); void api.terminal({ ...SETTINGS_TERMINAL, action: 'close' }); void load(); }}>&#215;</button>
                 </div>
                 {adding.error
                   ? <p>{adding.error}</p>
@@ -2280,6 +2280,9 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
               </Row>
               <Row label="Multiplayer" desc="Share projects with your team and see their threads beside yours. Needs a sign-in.">
                 <Switch label="Multiplayer" on={!!w.alpha?.multiplayer} onChange={(v) => setWorkspace('alphaMultiplayer', v)} />
+              </Row>
+              <Row label="Back and forward" desc={sayKeys("Arrows before each page's title take you back to where you just were, and forward again. ⌘[ and ⌘] do the same.")}>
+                <Switch label="Back and forward" on={!!w.alpha?.backForward} onChange={(v) => setWorkspace('alphaBackForward', v)} />
               </Row>
             </Group>
           </Page>

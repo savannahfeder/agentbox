@@ -901,6 +901,26 @@ body {
 }
 .topbar button { -webkit-app-region: no-drag; }
 
+/* BACK AND FORWARD (Alpha features). The arrows lead the header and whatever
+   follows them keeps its place at the left, not the middle the bar's
+   space-between would give a third item. */
+.back-forward { display: inline-flex; align-items: center; gap: 2px; margin-right: 12px; flex: none; }
+.topbar > .back-forward + * { margin-right: auto; }
+.back-forward button {
+  width: 26px; height: 26px; padding: 0; display: grid; place-items: center;
+  border: 0; border-radius: var(--tag-radius); background: none; color: var(--text-dim); cursor: pointer;
+}
+.back-forward button:not(:disabled) { color: var(--text); }
+.back-forward button:not(:disabled):hover { background: var(--film-strong); }
+.back-forward button:disabled { color: var(--text-faint); opacity: .45; cursor: default; }
+.back-forward svg { width: 15px; height: 15px; }
+/* Home hides its header bar but keeps the arrows. */
+.app.home-shown > .topbar .back-forward { visibility: visible; }
+/* The arrows replace the one back arrow a thread and Settings already had. */
+.app.back-forward-on .thread-crumb-back svg,
+.app.back-forward-on .workspace-page-heading .workspace-back { display: none; }
+.app.back-forward-on .thread-crumb-back { padding-left: 0; }
+
 /* WHAT AN OPENED TASK HAS INSTEAD OF A TOP BAR. Nothing is drawn here. It
    exists for two things only, and both are invisible: 1. THE THREE BUTTONS
    MACOS PAINTS ON TOP OF US. titleBarStyle hiddenInset puts close, minimise and
@@ -1353,6 +1373,17 @@ body {
      declared at :root. */
   opacity: var(--row-line);
 }
+
+/* The last thread you were in. On the row itself, which runs the card's full
+   width, so the wash meets the card's left edge. The hairlines either side of
+   it start there too, or the wash's corners poke past them. */
+.row.recent {
+  --wash: 255 255 255;
+  background: linear-gradient(90deg, rgb(var(--wash) / 0.055), rgb(var(--wash) / 0.012) 70%, transparent);
+}
+[data-theme="light"] .row.recent { --wash: 0 0 0; }
+.row.recent::after,
+.row.recent + .row::after { left: 0; }
 
 /* THE SELECTED ROW IS UNDERLINED. Chosen 2026-08-12, out of a family of six
    that were all text and a family of five before them that were all shapes.
@@ -9399,3 +9430,10 @@ button.msg-kind { cursor: pointer; }
 button.msg-kind:hover { color: var(--text); border-color: var(--text-faint); }
 /* A comment is said beside the work, not to the agent: it reads at the size of what it answers. */
 .msg.yours:has(> .msg-head > .msg-kind) .msg-body { font-size: 15px; line-height: 1.6; font-weight: 400; }
+
+/* A thread a teammate gave you, above its title (team/HandedBy.tsx). */
+.handed-line { display: flex; align-items: center; gap: 9px; min-width: 0; margin: 4px 0 18px; padding: 10px 14px; background: var(--bg-raised); border: 1px solid var(--line); font-size: 14px; color: var(--text-dim); }
+.handed-line b { font-weight: 500; color: var(--text); }
+.handed-who { flex: 0 0 auto; white-space: nowrap; }
+.handed-when { color: var(--text-faint); margin-left: 4px; }
+.handed-note { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); margin-left: 6px; }

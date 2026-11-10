@@ -47,9 +47,10 @@ import { folderPictures } from './folder-pictures.mts';
 import { docUrl } from './doc-scheme.mts';
 import { readDoc, writeDoc } from './doc-file.mts';
 import { linkCopyOf, linkSource } from './file-link.mts';
+import { bringSharedFile, fileLinkToken } from './bring-shared-file.mts';
 import { familyKeyOf, type Mark } from '../shared/artifact-marks.mts';
 import { readItemHistory } from './store/work-items.mts';
-import { readChange } from './code-change.mts';
+import { readChange, readChangeSummary } from './code-change.mts';
 import { findFile, readCodeFile, writeCodeFile } from './code-file.mts';
 import { readNote, writeNote } from './rail-note.mts';
 import { teamForWindow } from './team/index.mts';
@@ -83,9 +84,10 @@ import { appFilesPlace } from './files-place.mts';
 import { Name } from '../shared/product-name.mjs';
 import { setUpGit, startGhLogin } from './github-browser-sign-in.mts';
 import type { GhLogin } from './github-browser-sign-in.mts';
-import { handedOnByReply, isGivenTask } from '../shared/team-rules.mts';
+import { handedOnByReply, isGivenTask, visibilityWhenMade } from '../shared/team-rules.mts';
 import { closeRefusal, closedAnywayNote } from '../shared/not-shipped.mts';
 import { lightRunning, snapshotSender } from '../shared/snapshot-delta.mts';
+import { wakesItselfAt } from '../shared/answers.mts';
 import { traceAnswer } from '../shared/trace-delta.mts';
 import { saveAttachments } from './save-attachments.mts';
 import { stageAttachment, stageAttachmentPart } from './stage-attachment.mts';
@@ -204,6 +206,8 @@ export interface TeammateArgs {
   to?: PostInput['to'];
   fresh?: boolean;
   answers?: unknown;
+  filesIn?: unknown;
+  priority?: unknown;
   ref: string;
   memory: string;
 }
@@ -1151,7 +1155,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       else if (op === 'update') value = mates.update(a.id, { ...a.patch, ...(a.patch && 'engine' in a.patch ? { engine: supervisor.engineOffered(a.patch.engine) ?? null } : {}) });
       else if (op === 'stop') value = mates.stop(a.id, { kill });
       else if (op === 'remove') value = mates.remove(a.id, { kill });
-      else if (op === 'post') value = mates.post({ text: a.text, to: a.to, fresh: a.fresh === true, answers: a.answers });
+      else if (op === 'post') value = mates.post({ text: a.text, to: a.to, fresh: a.fresh === true, answers: a.answers, filesIn: a.filesIn, priority: a.priority });
       else if (op === 'goAhead') value = mates.goAhead(a.id, a.ref);
       else if (op === 'remember') value = mates.remember(a.id, a.text, { from: 'you' });
       else if (op === 'forget') value = mates.forget(a.id, a.memory);
@@ -1316,7 +1320,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       // WHO DOES IT, when it is a person (the team version): the teammate it
       // goes to and the day it is due, and the two of you as the conversation,
       // so a reply can hand it back. An agent's row carries none of these.
-      assignee, due, visibility,
+      assignee, due, visibility: visibilityWhenMade(visibility, alphaFeatures(config).multiplayer),
       // AND WHO MAY SEE IT, when she chose people rather than the team
       // (w-41ff964775). The store keeps the list only beside 'people'.
       visibleTo,
@@ -1445,7 +1449,12 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   ipcMain.handle('zero:schedule', (_e, { product, id, runAt }: { product: string; id: string; runAt: number }) => {
     if (isAgentRow(id)) return { ok: false };
     if (runAt > Date.now()) supervisor.stopSession(id);
-    return store.scheduleItem(product, id, runAt);
+    const before = runAt > 0 ? null : store.readItem(product, id);
+    const out = store.scheduleItem(product, id, runAt);
+    // Let it run now: the queue walks past the agent's answer, so clearing the
+    // moment alone starts nothing.
+    if (before && wakesItselfAt(before) > Date.now()) supervisor.runNow(product, id);
+    return out;
   });
 
   // Snooze changes when a person sees the thread, never what an agent does.
@@ -2758,12 +2767,34 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   ipcMain.handle('zero:file-link-comments', linkCall(async ({ token }, team) => ({ comments: await team.fileLinkComments(String(token ?? '')) })));
   ipcMain.handle('zero:file-link-comment', linkCall(async ({ token, text }, team) => ({ comments: await team.commentOnFileLink(String(token ?? ''), text) })));
 
+  // A FILE SOMEONE SHARED WITH THIS PERSON, brought into one of their projects
+  // as their own copy on a thread that runs nothing until they write to it.
+  ipcMain.handle('zero:bring-shared-file', async (_e, { link, product }: { link?: unknown; product?: unknown } = {}) => {
+    const token = fileLinkToken(link);
+    if (!token) return { ok: false, error: 'That is not a link to a shared file.' };
+    if (!team?.readFileLink) return { ok: false, error: 'This copy has no cloud to read shared files from.' };
+    const products = store.listProducts();
+    const slug = products.find((p) => p.slug === product)?.slug ?? products[0]?.slug;
+    if (!slug) return { ok: false, error: 'Make a project first, then open the link again.' };
+    try {
+      const out = await bringSharedFile({
+        token, product: slug, read: (t) => team.readFileLink(t), productDir: store.productDir(slug),
+        compose: (fields) => store.composeItem(slug, fields),
+        close: (id) => { store.answerItem(slug, id, { status: 'done' }); },
+      });
+      push();
+      return { ok: true, ...out };
+    } catch (err) {
+      return { ok: false, error: String((err as Error | undefined)?.message ?? err) };
+    }
+  });
+
   // "Try again" on a file in a conversation that was not delivered.
   ipcMain.handle('zero:retry-file', async (_e, { product, src } = {}) => (team?.retryFile ? team.retryFile({ product, src }) : false));
 
   // THE CHANGE A RUN MADE. Same finder as every other artifact, so a click on
   // the chip and a click on a path in her message open the same file.
-  ipcMain.handle('zero:code-change', async (_e, { product, src }: { product: string; src?: unknown }) => {
+  ipcMain.handle('zero:code-change', async (_e, { product, src, summary }: { product: string; src?: unknown; summary?: boolean }) => {
     const found = await resolveArtifact({
       src,
       product,
@@ -2773,7 +2804,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     });
     if (!found.ok) return found;
     try {
-      return { ok: true, change: readChange(found.path) };
+      return { ok: true, change: summary ? readChangeSummary(found.path) : readChange(found.path) };
     } catch (e) {
       return { ok: false, error: `that change could not be read (${(e as Error).message})` };
     }

@@ -16,7 +16,7 @@ export default function NewThread() {
   const c = useCloud();
   const inset = useSafeAreaInsets();
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
-  const form = useNewThread(close);
+  const form = useNewThread(close, () => router.push('/new'));
   const gate = screenGate(c);
   if (gate === 'wait') return <Wall><View /></Wall>;
   if (gate === 'sign-in') return <Redirect href="/sign-in" />;

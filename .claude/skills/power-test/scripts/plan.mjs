@@ -95,7 +95,7 @@ export function chaosPlan(level, totalMs, { real = false, cloud = false, logins 
   const share = { light: 0.01, normal: 0.02, heavy: 0.05 }[level];
   const events = [];
   if (!real) {
-    events.push({ kind: 'agents', at: 0, until: totalMs, world: { pace: { minMs: 5_000, maxMs: 90_000 }, options: 0.3, hang: share, die: share },
+    events.push({ kind: 'agents', at: 0, until: totalMs, world: { pace: { minMs: 5_000, maxMs: 90_000 }, options: 0.3, hang: share, die: share, edits: true },
       says: `Agents answer in 5 to 90 seconds; ${Math.round(share * 100)}% hang and ${Math.round(share * 100)}% die mid-run, as real ones sometimes do.` });
     if (names.length > 1) events.push({ kind: 'login-out', at: at(0.2), until: at(0.4), out: [names[1]], says: `The ${names[1]} login ran out of usage.` });
     if (codex && level !== 'light') events.push({ kind: 'codex-out', at: at(0.45), until: at(0.55), out: ['codex'], says: 'Codex ran out of usage.' });
@@ -252,9 +252,9 @@ const PACE = {
   'between-meetings': 'You are in meetings or calls most of the day: step away for 15 to 40 minutes at a time (away 9, several in a row), then work in short bursts.',
 };
 
-const KEYS = 'N new thread; ⌘↵ (press Enter meta) sends; J/K or arrows move in the list; ↵ opens; esc goes back; R replies in an open thread; E closes a thread; L puts it off until later; Z undoes; ⌘K (press k meta) opens the command bar; / searches; B switches list and board; Tab moves between the tabs; S shows or hides the summary; 1 to 9 pick an option an agent offered.';
+const KEYS = 'N new thread; ⌘↵ (press Enter meta) sends; J/K or arrows move in the list; ↵ opens; esc goes back; R replies in an open thread; E closes a thread; L puts it off until later; Z undoes; ⌘K (press k meta) opens the command bar, which is also search; B switches list and board; Tab moves between the tabs; S shows or hides the summary; 1 to 9 pick an option an agent offered.';
 
-export function testerPrompt({ person, focus, room = null, browse, diary, shots, round, totalMinutes, minutesLeft, roundMinutes, fraction, diaryTail, issues, notYet, real, stoppedEarlyMin = 0 }) {
+export function testerPrompt({ person, focus, room = null, team = null, browse, diary, shots, round, totalMinutes, minutesLeft, roundMinutes, fraction, diaryTail, issues, notYet, real, stoppedEarlyMin = 0 }) {
   const list = (xs, none) => (xs.length ? xs.map((x) => `- ${x}`).join('\n') : none);
   return `You are ${person.name}, ${person.role}. Below is who you are. Stay in character: use Agentbox the way you would on a real working day, to get your own work done, and notice what goes wrong the way you would.
 
@@ -271,6 +271,7 @@ You use the app through one command, run in your shell:
   ${browse} dblclick 7      (double-click it)        ${browse} rightclick 7   (right-click it)
   ${browse} drag 7 12       (press on 7, drag to 12, let go)
   ${browse} drag 7 +150     (drag the right edge of 7 that far across, as you widen a column)
+  ${browse} scroll down     (look lists only what is on screen; scroll down or up for the rest)
   ${browse} type "some text"
   ${browse} press n         (one key; add modifiers after: press Enter meta, press k meta)
   ${browse} shot name       (a picture; open it to see the screen: ${shots}/name.png)
@@ -287,6 +288,8 @@ ${focus ? `The team shipped a change and asked you to lean on it today: ${focus}
 
 ${room ? `YOUR ROOM
 You are signed in to a real team, and you are in the ${room} room, under Rooms in the sidebar. The person who asked for this test is in the room with you and reads it live, so it is like sharing an office: say hello when you start, tell them now and then what you are working on and how it is going, ask them when you are stuck or something in the app confused you, and answer when they write to you. Use the room the way you would with a coworker, not as a report. Look at their card, open their page, try what a room offers (a thread, a mention with @), and log anything about Rooms in your diary like anything else. Stay visible all day: they want to see you and what you are working on. Never go invisible, and if the menu under your name says you are, choose Come back.
+
+` : ''}${team ? `${team}
 
 ` : ''}YOUR DIARY
 You keep a diary while you work, and the person who asked you to test reads all of it.

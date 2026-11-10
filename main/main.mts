@@ -29,6 +29,7 @@ import { storeRootEnv } from './store/home.mts';
 import { keepAnswerModesIn } from './answer-modes.mts';
 import { Supervisor } from './supervisor.mts';
 import { gitHubPushSignIn } from './github-push-sign-in.mts';
+import { runHostWorksOn } from './run-host.mts';
 import { startCodexWatch } from './codex-watch.mts';
 import { watchNewChatsFor } from './new-chats-watch.mts';
 import { readCodexThreadsOffThread } from './codex-threads.mts';
@@ -76,7 +77,8 @@ import { writeHeldThenReload } from './write-before-reload.mts';
 import { answerDraftCopy } from './draft-copy.mts';
 import { IS_SHE_TYPING_IN_THE_PAGE, theAppKeepsThisInput, theAppKeepsThisLetterInAPage } from '../shared/artifact-keys.mts';
 import { NAME, Name, WAS } from '../shared/product-name.mjs';
-import { JOIN_SCHEME, ourLink, tokenFromLink } from '../shared/room-links.mts';
+import { JOIN_SCHEME, ourLink, threadFromAppLink, tokenFromLink } from '../shared/room-links.mts';
+import { fileLinkToken } from './bring-shared-file.mts';
 import { getMic } from './mic.mts';
 import { openInBrowser } from './open-in-browser.mts';
 import type { IpcConfig } from './ipc.mts';
@@ -282,14 +284,23 @@ function showWindow() {
   if (window.isMinimized()) window.restore();
   window.focus();
 }
+// And a thread's link (agentbox://t/<owner>/<thread>), which its web page opens: held the same way.
+let pendingThread = threadFromAppLink(process.argv.find((a) => a.startsWith(`${JOIN_SCHEME}://`)) ?? '');
+// A SHARED FILE'S APP LINK (agentbox://f/<token>), from the link page's
+// "Open in Agentbox", held the same way until the window takes it.
+let pendingSharedFile = fileLinkToken(process.argv.find((a) => a.startsWith(`${JOIN_SCHEME}://`)) ?? '');
+function tellWindow(channel: string) {
+  if (window && !window.isDestroyed()) { window.webContents.send(channel); showWindow(); }
+}
 function openJoinLink(url: string) {
+  const thread = threadFromAppLink(url);
+  if (thread) { pendingThread = thread; tellWindow('zero:thread-link'); return; }
+  const file = fileLinkToken(url);
+  if (file) { pendingSharedFile = file; tellWindow('zero:shared-file'); return; }
   const token = tokenFromLink(url);
   if (!token) return;
   pendingJoin = token;
-  if (window && !window.isDestroyed()) {
-    window.webContents.send('zero:join-room');
-    showWindow();
-  }
+  tellWindow('zero:join-room');
 }
 // Set by ⌘R and read once by the renderer as it comes back up, so a reload can
 // say so. A reload that lands on an identical screen and a chord that did
@@ -448,7 +459,7 @@ async function createWindow() {
   imageRoots = () => [config.accountRoot, ...store.listProducts().map((p) => p.repoPath).filter(Boolean) as string[]];
   const supervisor = new Supervisor(config, store, appDir, dataDir, userDir);
   // Local runs outlive a quit or a restart of the app (main/run-host.mts).
-  supervisor.hostRuns = true;
+  supervisor.hostRuns = runHostWorksOn();
   // And their store tools come from one shared process (main/tool-host.mts).
   supervisor.shareTools = true;
   // THAT agents start and stop work (main/analytics.mts checks the switch).
@@ -1188,6 +1199,8 @@ async function createWindow() {
     },
   });
   ipcMain.handle('zero:take-join', () => { const token = pendingJoin; pendingJoin = null; return token; });
+  ipcMain.handle('zero:take-thread-link', () => { const thread = pendingThread; pendingThread = null; return thread; });
+  ipcMain.handle('zero:take-shared-file', () => { const token = pendingSharedFile; pendingSharedFile = null; return token; });
   // External links from markdown open in the real browser; local artifacts
   // (a demo page, a screenshot a worker saved) open in their default app, so
   // "see it working" is one click from the message.

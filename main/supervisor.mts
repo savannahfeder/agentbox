@@ -9,6 +9,7 @@ import type { BridgeStateEvent } from './task-remote-control.mts';
 import { taskFolderPath, real, restoreTaskFolder } from './task-folders.mts';
 import { SHIP_LABEL, ShipQueue, readShipSettings, shipScriptFor, shipSlot } from './ship-queue.mts';
 import { MainTests } from './main-went-red.mts';
+import { SecurityScan } from './the-security-scan-went-red.mts';
 import { CloudServerWatch, serverError } from './cloud-server-down.mts';
 import { folderJob } from './task-folders-offthread.mts';
 import { gitJob } from './git-change-offthread.mts';
@@ -83,7 +84,7 @@ import { isUrgent, itemPriority, normalizeOrder, orderFromTiers, placedScore, pr
 import { keysForAgents } from '../shared/shortcuts.mts';
 import { isCleanRun, ruleIdOf, nextRunAt, periodKey, occurrenceId } from '../shared/repeats.mts';
 import { occurrenceFields } from './repeats.mts';
-import { teammateIdOf, mentionsIn, teammatesOn, primaryOf, OFFER_LABEL, CHAT_LABEL, howYourRunEnds } from '../shared/teammates.mts';
+import { teammateIdOf, mentionsIn, teammatesOn, primaryOf, OFFER_LABEL, CHAT_LABEL, howYourRunEnds, roomToLookBack } from '../shared/teammates.mts';
 import { REACH_LABEL } from '../shared/teammate-reach.mts';
 import { mayRunHere } from '../shared/team-rules.mts';
 
@@ -115,7 +116,7 @@ function whoHasIt(made: { taken?: boolean; reason?: string; heldBy?: number | nu
   if (made?.taken !== false) return '';
   return `: its folder is ${made.reason}${made.heldBy ? ` by pid ${made.heldBy}` : ''}`;
 }
-import { agentSpokeSince, answerSettled, answerTs, stoppedByHer, heldForHer, toldBy, filedByThePerson } from '../shared/answers.mts';
+import { agentSpokeSince, answerSettled, answerTs, stoppedByHer, heldForHer, toldBy, filedByThePerson, wakesItselfAt } from '../shared/answers.mts';
 import { accountIdentity, nameForOrganization, profileForCloudLogin, isCloudLoginOf, toolingLine } from './account-tooling.mts';
 import type { AccountIdentity } from './account-tooling.mts';
 import { effectiveProfiles } from './account-discovery.mts';
@@ -129,7 +130,7 @@ import { readTranscriptHead } from './agent-sessions.mts';
 import { claudeSessionOpen } from './claude-session-open.mts';
 import { planStamp, readPlan } from './claude-plan.mts';
 import { troubleCause, refineCause, needsHerHands, troubleSentence, troubleRemedy, deadRunSentence, deadRunCause, deadRunPromisesARetry, undeliveredAnswerSentence, stoppedStartingSentence, limitResetsAt, limitResetMoment, strandedSentence, strandedRemedy, causeBreakdown } from '../shared/spawn-trouble.mts';
-import { readDeadRunTrace, traceShowsASilentDeath, tracesAToolCall, STOPPED_ON_REQUEST } from '../shared/dead-run-trace.mts';
+import { readDeadRunTrace, traceShowsASilentDeath, tracesAToolCall, STOPPED_ON_REQUEST, MOVED_HERE } from '../shared/dead-run-trace.mts';
 import { commandPrompt } from '../shared/claude-commands.mts';
 import { machineryPath, storeRootEnv } from './store/home.mts';
 import { answerModesFile } from './answer-modes.mts';
@@ -175,8 +176,9 @@ import { nameRow, wantsName, askSmallModel } from './row-label.mts';
 import { catchUpRow, catchUpResult } from './catch-up.mts';
 import { isAuto, asksWho, routeCandidates, routePrompt, readRoute, routedPatch, orPrimary, NOBODY_WHY } from '../shared/auto-route.mts';
 import { LEVELS, latestMessage, sortMessage, wantsPriority } from './message-priority.mts';
+import { GUESSED_LEVELS, levelTask, wantsLevel } from './task-priority.mts';
 import { NAME, Name, envName, nameSlug, isOurSlug } from '../shared/product-name.mjs';
-import { signInFiles, signInStamp, claudeKeychainService, keychainStamp } from './sign-in-files.mts';
+import { signInFiles, signInStamp, claudeKeychainService, KeychainStamps } from './sign-in-files.mts';
 import { runsOn } from './runs-on.mts';
 import { MemoryGateServer, defaultSocketPath as memoryGateSocketPath, readMacPressure } from './memory-gate-server.mts';
 import { startDecision, readMacPressureNow, SETTLE_MS, STALE_MS } from './start-hold.mts';
@@ -406,6 +408,10 @@ export type RunState = {
   stoppedOnRequest?: boolean;
   lastLiveReply?: WorkItem | null;
   handedBack?: unknown;
+  /** The cloud turned the start away because the plan's agents were all busy. */
+  cloudFull?: boolean;
+  /** Ended because the person moved its thread to this Mac. */
+  movedHere?: boolean;
   transportFault?: boolean;
   remoteIdle?: boolean;
   remoteHeld?: boolean;
@@ -1007,6 +1013,8 @@ const DIGEST_RETRY_MS = 30 * 60_000;
 // How long a row the namer could not name waits before it is asked about again,
 // so it cannot hold the rows behind it (nameTheRows).
 const NAME_RETRY_MS = 10 * 60_000;
+// How many times a task on Agent decides is asked about before it stays Medium.
+const LEVEL_TRIES = 3;
 /** Rewrites of brought-in chats running at once (`catchUpTheImports`). */
 const CATCH_UP_AT_ONCE = 3;
 /** Someone is looking at these rows, so a miss is tried again far sooner than a name is. */
@@ -1034,6 +1042,9 @@ const SIGNED_OUT_REST_MS = 5 * 60_000;
 const AT_LIMIT_REST_MS = 5 * 60_000;
 // How long past a limit's printed reset hour the fleet waits before trying.
 const LIMIT_RESET_GRACE_MS = 30_000;
+// A run on a capped login that lives this long shows the login has room
+// (Claude reports a weekly limit in about 35 s, Codex in about two minutes).
+const LIMIT_TRY_PROVES_MS = 3 * 60_000;
 // HOW LONG NOTHING MAY WORK BEFORE THE APP SAYS SO OUT LOUD.
 //
 // Twenty minutes is chosen against the backoff ladder above, not picked round:
@@ -1277,6 +1288,7 @@ export class Supervisor {
   declare gitHubSignIn: GitHubPushSignIn | null;
   declare signInReturns: SignInReturns;
   declare mainTests: MainTests;
+  declare securityScan: SecurityScan;
   declare cloudServerWatch: Pick<CloudServerWatch, 'down' | 'up'>;
   declare sessions: Map<string, WorkerSession>;
   declare onChange: (() => void) | null;
@@ -1336,6 +1348,7 @@ export class Supervisor {
   declare _carried: Record<string, CarriedMark>;
   declare _profileTrouble: Record<string, ProfileTrouble>;
   declare _profileCooldown: Record<string, number>;
+  declare _keychainStamps: KeychainStamps | undefined;
   declare _profileStrikes: Record<string, number> | undefined;
   declare _movedWhy: Record<string, MovedWhy>;
   declare _movedToCloudAt: Record<string, number> | undefined;
@@ -1364,6 +1377,7 @@ export class Supervisor {
   declare _quitting: boolean | undefined;
   declare _sleeps: { from: number; to: number | null }[] | undefined;
   declare _spawnCooldownUntil: number | undefined;
+  declare _limitTries: Map<string, RunState> | undefined;
   declare _fastExits: number | undefined;
   declare _fleetTroubleSince: number | undefined;
   declare _lastFastExit: { at: number; cause: string; raw: string } | null | undefined;
@@ -1393,6 +1407,8 @@ export class Supervisor {
   declare _routing: boolean | undefined;
   declare _sortedMessages: Set<string>;
   declare _sortingMessages: boolean | undefined;
+  declare _levelMisses: Map<string, { count: number; at: number }>;
+  declare _leveling: boolean | undefined;
   declare _crossModelSaid: Set<string> | undefined;
   declare _oldChoiceSaid: Set<string> | undefined;
   declare _folderRefused: Set<string> | undefined;
@@ -1450,6 +1466,7 @@ export class Supervisor {
 
   declare _codexCards: ReturnType<typeof createCodexApprovals> | undefined;
   declare _codexLimits: CodexUsage | undefined;
+  declare _usageSeen: Record<string, { limits: { span?: string; percent?: number | null }[]; at: number }> | undefined;
   declare _codexServers: Map<string, CodexServerEntry> | undefined;
 
   constructor(config: SupervisorConfig, store: SupervisorStore, appDir: string, dataDir = appDir, userDir = dataDir) {
@@ -1511,6 +1528,7 @@ export class Supervisor {
     // agent has ended its turn, so main was red for four days in October with
     // nobody reading the cross (main/main-went-red.mts).
     this.mainTests = new MainTests({ store, userDir });
+    this.securityScan = new SecurityScan({ store, userDir });
     this.cloudServerWatch = new CloudServerWatch({ store, userDir, home: config?.home || undefined });
     this._compactionJobs = new Map();
     this.sessions = new Map(); // itemId -> {child, product, startedAt, tail, itemId}
@@ -1860,7 +1878,37 @@ export class Supervisor {
     // still capped, the next run dies in seconds and benches it to the reset
     // again. That try is the guard against a reset hour we read wrong, which
     // would otherwise park the fleet with every screen reading normal.
-    for (const account of Object.keys(this._profileCooldown ?? {})) this._profileCooldown[account] = 0;
+    // One try, so a login whose try is still running stays benched.
+    for (const account of Object.keys(this._profileCooldown ?? {})) {
+      if (!this._limitTries?.has(account)) this._profileCooldown[account] = 0;
+    }
+  }
+
+  /**
+   * A LIMIT HER HAND LIFTED BUYS ONE START, NOT ONE PER WAITING THREAD. The
+   * first start on it benches the login to its reset again, until that run
+   * lives LIMIT_TRY_PROVES_MS (`_noticeLimitTryLived`) or dies on the limit.
+   */
+  _spendLimitTry(engine: string, profile: string | null | undefined, session: RunState) {
+    const key = this._accountKey(engine, profile || 'default');
+    const trouble = this._profileTrouble?.[key];
+    if (trouble?.cause !== 'at-limit') return;
+    const now = Date.now();
+    const resetsAt = trouble.resetsAt ?? limitResetMoment(trouble.raw, trouble.at);
+    if (!resetsAt || resetsAt <= now || (this._profileCooldown?.[key] ?? 0) >= now) return;
+    this._profileCooldown[key] = resetsAt + LIMIT_RESET_GRACE_MS;
+    (this._limitTries ??= new Map()).set(key, session);
+  }
+
+  _noticeLimitTryLived() {
+    for (const [key, session] of this._limitTries ?? []) {
+      if (this.sessions.get(session.itemId ?? '') !== session) { this._limitTries!.delete(key); continue; }
+      if (Date.now() - (session.startedAt ?? Date.now()) < LIMIT_TRY_PROVES_MS || accountRefusedTheRun(session)) continue;
+      this._limitTries!.delete(key);
+      this._clearProfileTrouble(key);
+      this._saveState();
+      this.wake?.();
+    }
   }
 
   /**
@@ -1929,12 +1977,16 @@ export class Supervisor {
     const home = this.config.home || os.homedir();
     // The default login's entry is the real home's, not a stand-in home's.
     const keychain = folder || home === os.homedir() ? this._keychainStamp(claudeKeychainService(folder)) : null;
+    // Not read yet: `.claude.json` would be a guess, and a wrong one lifts the login.
+    if (keychain === undefined) return null;
     if (keychain == null) return signInStamp(files);
     return Math.max(keychain, signInStamp(files.filter((f) => path.basename(f) !== '.claude.json')));
   }
 
-  _keychainStamp(service: string) {
-    return keychainStamp(service);
+  // In the background: run on every pass, a synchronous `security` call held the whole app ~0.3 s.
+  _keychainStamp(service: string): number | null | undefined {
+    this._keychainStamps = this._keychainStamps ?? new KeychainStamps();
+    return this._keychainStamps.get(service);
   }
 
   /** Which files one account's login writes, by the key its trouble is kept under. */
@@ -1986,6 +2038,7 @@ export class Supervisor {
     if (!shipped?.sha || !shipped?.product) return;
     try {
       this.mainTests.watch(shipped as ShippedNote & { sha: string }).catch(() => {});
+      this.securityScan.watch(shipped as ShippedNote & { sha: string }).catch(() => {});
     } catch { /* a watch that cannot start is not a ship that failed */ }
     try {
       this.mainTests.watchSecurity(shipped as ShippedNote & { sha: string }).catch(() => {});
@@ -1996,6 +2049,7 @@ export class Supervisor {
     clearInterval(this._timer ?? undefined);
     clearInterval(this._memoryLogTimer);
     this.mainTests?.stop();
+    this.securityScan?.stop();
     // The shared `codex app-server` goes with them. An orphaned one keeps every
     // thread it is holding alive after the supervisor that answers their
     // approvals has gone, which is the 2026-08-06 orphan incident in the other
@@ -2056,6 +2110,17 @@ export class Supervisor {
     if (typeof session.child?.interrupt !== 'function') return { ok: true, interrupted: false };
     const { interrupted } = await session.child.interrupt();
     return { ok: true, interrupted };
+  }
+
+  // Their reply answers the card as "Not now" would, so the agent's sign_in
+  // wait returns and the reply queued behind it is taken.
+  endSignInWait(product: string, id: string) {
+    try {
+      const ask = openSignIn(this.store.readItem(product, id));
+      if (!ask) return;
+      this.store.answerSignIn(product, id, { id: ask.id, said: 'replied' }, { source: 'founder' });
+      this.onChange?.();
+    } catch (e) { console.warn('zero: could not end the sign-in wait for a reply:', (e as Error).message); }
   }
 
   // App quit: take the workers down with the supervisor. Killing the app used
@@ -3333,6 +3398,10 @@ export class Supervisor {
       return Promise.resolve(null);
     }
     this.sessions.delete(item.id);
+    // Moved to this Mac: it carries on here now, not at the next tick, and
+    // reads as starting in between rather than as answered. Not one that had
+    // answered and only kept its machine for a reply: nothing is left to do.
+    if (session?.movedHere && !session.between) { this._resumeQueue.add(item.id); this.wake(); }
     // The run is over, said by the only app that runs this row; what it left
     // running may now be stopped on the cleaner's clock (main/leftovers.mts).
     this._leftoverCleaner?.ended(item.id);
@@ -4327,7 +4396,8 @@ export class Supervisor {
     // the two cases a write-time cap would miss: the strikes a row earned
     // before she raised it, which is the usual way a row becomes urgent, and
     // the ones already sitting in the state file from before this landed.
-    const rungs = isUrgent(item) ? 1 : runs;
+    // Nor a thread at the moment its agent set: the agent chose the gap.
+    const rungs = isUrgent(item) || wakesItselfAt(item) ? 1 : runs;
     const rest = FRUITLESS_RESTS_MS[Math.min(rungs, FRUITLESS_RESTS_MS.length) - 1];
     return (seen.endedAt ?? 0) + rest;
   }
@@ -4881,6 +4951,43 @@ export class Supervisor {
   }
 
   /**
+   * GIVE A TASK LEFT ON "AGENT DECIDES" ITS LEVEL (main/task-priority.mts).
+   * Paced like the namer: one call at a time, newest first, never awaited by
+   * the tick. A miss waits ten minutes, and after three the task stays Medium.
+   */
+  levelTheTasks(items: WorkItem[], me: string | null | undefined, now = Date.now()) {
+    if (this._leveling || this._memoryCritical(now)) return undefined;
+    this._levelMisses ??= new Map();
+    const products = new Map((this.store.listProducts?.() ?? []).map((p) => [p.slug, p]));
+    const key = (i: WorkItem) => `${i.product}:${i.id}`;
+    const waiting = (i: WorkItem) => {
+      const miss = this._levelMisses.get(key(i));
+      return !!miss && (miss.count >= LEVEL_TRIES || now - miss.at < NAME_RETRY_MS);
+    };
+    const next = items
+      .filter((i) => wantsLevel(i, products.get(i.product), me) && !waiting(i))
+      .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))[0];
+    if (!next) return undefined;
+    this._leveling = true;
+    const missed = () => {
+      const was = this._levelMisses.get(key(next));
+      this._levelMisses.set(key(next), { count: (was?.count ?? 0) + 1, at: now });
+    };
+    return this._askLevel(next)
+      .then((level) => {
+        if (!level) return missed();
+        this._levelMisses.delete(key(next));
+        this.store.prioritizeItem(next.product, next.id, GUESSED_LEVELS[level]);
+      })
+      .catch((e) => { missed(); console.warn('zero: could not rank a task:', e.message); })
+      .finally(() => { this._leveling = false; });
+  }
+
+  _askLevel(item: WorkItem) {
+    return this._askSmall((opts) => levelTask(item, opts), { product: item.product });
+  }
+
+  /**
    * GIVE A THREAD SENT TO AUTO TO WHOEVER'S WORK IT IS (shared/auto-route.mts).
    * Paced like the namer: one call at a time, oldest thread first, never awaited
    * by the tick. Each thread gets one question. No teammate to give it to, no
@@ -5256,9 +5363,11 @@ export class Supervisor {
       // A cloud run picked back up after a restart is followed in `_comingHome`, not `sessions`.
       const joined = session ? null : this._comingHome?.get(id);
       if (keep === true && session?.cloud) {
+        session.movedHere = true;
         this._kill(session);
         this._recoverPending = true;
       } else if (keep === true && joined) {
+        joined.movedHere = true;
         joined.stop();
         this._recoverPending = true;
       }
@@ -5786,7 +5895,8 @@ export class Supervisor {
     // `_noticeSignIns` can tell a login landing afterwards from one before.
     if (cause === 'signed-out') {
       const stamp = this._signInMoment(profile);
-      this._profileTrouble[profile].stamp = Math.max(stamp, had?.stamp ?? 0);
+      if (stamp != null) this._profileTrouble[profile].stamp = Math.max(stamp, had?.stamp ?? 0);
+      else if (had?.stamp != null) this._profileTrouble[profile].stamp = had.stamp;
     }
     // When the limit says it resets, so `_forgetResetLimits` can let it go then.
     if (cause === 'at-limit') {
@@ -5897,6 +6007,7 @@ export class Supervisor {
     const key = this._accountKey(DEFAULT_ENGINE, profile || 'default');
     const trouble = this._profileTrouble?.[key];
     const limits = reading?.limits ?? [];
+    if (limits.length) (this._usageSeen ??= {})[profile || 'default'] = { limits, at: reading!.at ?? 0 };
     if (!trouble || !limits.length) return false;
     if ((reading!.at ?? 0) < (trouble.at ?? trouble.since ?? 0)) return false;
     const proven = (!onlyLimit && ['signed-out', 'org-blocked', 'subscription-ended', 'unknown'].includes(trouble.cause as string))
@@ -6129,10 +6240,18 @@ export class Supervisor {
 
   // Picked-back-up runs count: they hold a cloud slot, and their rows show
   // them working there.
-  _cloudLoad() {
+  _cloudLoad(except?: RunState) {
     let n = 0;
-    for (const s of this.sessions.values()) if (s.cloud) n += 1;
+    for (const s of this.sessions.values()) if (s.cloud && s !== except) n += 1;
     for (const v of this._comingHome?.values() ?? []) if (!this.sessions.has(v.itemId)) n += 1;
+    return n;
+  }
+
+  /** The cloud runs In progress shows: the cap's count less runs that answered and wait for a reply. */
+  _cloudRunsShown() {
+    let n = 0;
+    for (const s of this.sessions.values()) if (s.cloud && !s.between && !s.remoteIdle && !s.stoppedOnRequest) n += 1;
+    for (const v of this._comingHome?.values() ?? []) if (!this.sessions.has(v.itemId) && !v.between && !v.remoteIdle && !v.stoppedOnRequest) n += 1;
     return n;
   }
 
@@ -6243,7 +6362,7 @@ export class Supervisor {
       this._cloudMonth = { at: now, month: summarizeCloudUsage(readCloudUsage({ home: this.config.home }), { since }) };
     }
     return {
-      setUp, offered, managed: typeof config?.gateway === 'string', mode, running: this._cloudLoad(), month: this._cloudMonth.month,
+      setUp, offered, managed: typeof config?.gateway === 'string', mode, running: this._cloudRunsShown(), month: this._cloudMonth.month,
       ...this._cloudHealthNow(now),
       noRoom: (({ error, message }: { error?: string; message?: string | null } = {}) => (error ? { error, message } : null))(this._cloudNoRoomNow(now) ?? {}),
       versionGap: setUp ? this._cloudVersionGaps(now).sort((a, b) => Number(b.blocks) - Number(a.blocks))[0] ?? null : null,
@@ -6252,6 +6371,7 @@ export class Supervisor {
       accounts: setUp ? this._cloudAccounts() : [],
       keys: setUp ? cloudKeyNames({ home: this.config.home }) : [],
       notInCloud: setUp ? this._cloudNotSignedInHere(now) : [],
+      noCloudSignIn: setUp ? this.engineChoices().map((e) => e.id).filter((id) => !this._cloudSignedInAtAll(id)) : [],
       signIns: setUp ? this._cloudSignInsNow() : [],
       projects: setUp ? (this.store.listProducts?.() ?? []).filter((p) => this._cloudTakesProject(p)).map((p) => p.slug) : [],
       // The Agentbox Cloud plan the server last said ('none' is no plan).
@@ -6609,7 +6729,7 @@ export class Supervisor {
   // account is usually not the cloud's, so waiting meant nothing ran for the
   // hour. This Mac's own cap still bounds what starts here.
   _waitsForCloud(item: WorkItem | null | undefined, engine: string) {
-    return this._cloudFirst() && !!item?.id && this._cloudUsable(engine) && this._cloudSignedInAtAll(engine)
+    return this._cloudFirst() && !!item?.id && this._cloudUsable(engine, { full: true }) && this._cloudSignedInAtAll(engine)
       && this._cloudEligible(item) && !this._mustRunHere(item, engine) && !this._cloudSlotFor(engine)
       && this._cloudInUseState(engine) !== 'limited';
   }
@@ -6696,8 +6816,9 @@ export class Supervisor {
 
   // Not resting after failures of its own (`_noteCloudOutcome`), and not a
   // major version of this engine apart from this Mac (`_cloudVersionGaps`).
-  _cloudUsable(engine: string) {
-    if (this._cloudResting() || this._cloudNoRoomNow()) return false;
+  /** `full` true: the plan's agents all busy is a cloud to wait for, not one that cannot take the run. */
+  _cloudUsable(engine: string, { full = false } = {}) {
+    if (this._cloudResting() || (this._cloudNoRoomNow() && !(full && this._cloudFullOfOurs()))) return false;
     const which = engineOf(engine);
     return !this._cloudVersionGaps().some((g) => g.engine === which && g.blocks);
   }
@@ -6859,7 +6980,9 @@ export class Supervisor {
       return;
     }
     const now = Date.now();
-    if (session.stoppedByUs) return;
+    // Turned away while this Mac's other cloud runs fill the plan: it waits for
+    // one of them to end, and they all do.
+    if (session.stoppedByUs || (session.cloudFull && this._cloudFullOfOurs(session))) return;
     if (!refused && now - (session.startedAt ?? now) >= FAST_EXIT_MS) {
       if (held?.trying) { delete this._heldStarts[key]; this._saveState(); }
       return;
@@ -7009,12 +7132,25 @@ export class Supervisor {
       .flatMap((l) => l.split('\n')).map((l) => /no room in the cloud \((\w+)\):\s*(.*)$/.exec(l)).filter(Boolean).at(-1);
     const error = said?.[1] ?? 'plan';
     this._cloudNoRoom = { error, message: said?.[2]?.trim() || null, until: Date.now() + (error === 'agents' ? CLOUD_FULL_WAIT_MS : CLOUD_NO_ROOM_WAIT_MS) };
+    // A run that answered keeps its machine ten minutes for a quick reply; a
+    // thread with work to do needs the slot more.
+    session.cloudFull = error === 'agents';
+    if (error === 'agents') {
+      const idle = [...this.sessions.values()].filter((s) => s.cloud && s.between).sort((a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0))[0];
+      idle?.child?.stopWaiting?.();
+    }
     this.onChange?.();
   }
 
   _cloudNoRoomNow(now = Date.now()) {
     const r = this._cloudNoRoom;
     return r && r.until > now ? r : null;
+  }
+
+  // The plan's agents are all busy and some are this Mac's runs, which end.
+  // Slots taken by another Mac or the phone are not ours to wait on.
+  _cloudFullOfOurs(except?: RunState) {
+    return this._cloudNoRoomNow()?.error === 'agents' && this._cloudLoad(except) > 0;
   }
 
   /** The plan the cloud server says this Mac is on; a paid one ends a wait for a plan. */
@@ -7113,6 +7249,7 @@ export class Supervisor {
   _whyWaitingForCloud(engine: string) {
     if (this._cloudStarting() >= this._startBudget.now()) return { why: 'starting-in-turn' };
     if (this._cloudLoad() >= this._maxCloud()) return { why: 'cloud-full', detail: this._maxCloud() };
+    if (this._cloudFullOfOurs()) return { why: 'cloud-full' };
     if (!this._cloudReady(engine)) return { why: 'accounts-limited' };
     return { why: 'cloud-busy' };
   }
@@ -7492,7 +7629,7 @@ export class Supervisor {
         if (over) return;
         over = true;
         if (this._comingHome.get(itemId) === view) this._comingHome.delete(itemId);
-        if (trace) write(`\n# exited (${code}) ${new Date().toISOString()}${view.stoppedOnRequest ? STOPPED_ON_REQUEST : ''}\n`);
+        if (trace) write(`\n# exited (${code}) ${new Date().toISOString()}${view.stoppedOnRequest ? STOPPED_ON_REQUEST : view.movedHere ? MOVED_HERE : ''}\n`);
         // Finished only when its work is home: 75 is the app going again, or
         // results that did not come back, and a later homecoming tries again.
         const session = { ...view, startedAt: rec.startedAt, child: { ranToTheEnd: () => code === 0 && !helpersLost.length, helpersLost: () => [...helpersLost] } };
@@ -8149,10 +8286,11 @@ export class Supervisor {
 
   /** Every run going: the sessions, and the cloud runs a restart picked back up. One list, so In progress and Groups count the same runs. */
   runsGoing() {
+    // Not one the person stopped: a cloud run winds down for minutes after the kill.
     return [
       ...this.sessions.values(),
       ...[...(this._comingHome?.values() ?? [])].filter((v) => !this.sessions.has(v.itemId)),
-    ].filter((s) => !s.remoteIdle && !s.between);
+    ].filter((s) => !s.remoteIdle && !s.between && !s.stoppedOnRequest);
   }
 
   /** What the phone is told of the agent running on one thread: since, where, its current steps. Null when none is. */
@@ -8755,7 +8893,9 @@ export class Supervisor {
       // from her moves `lastFounderWrite` past it and the row is fresh again.
       // EXCEPT when the words are OURS and promised a retry
       // (`_weSaidItRunsAgain`): those are not an answer to her.
-      && (!awaitingHer(item) || this._weSaidItRunsAgain(item))
+      // AND EXCEPT when the agent set a moment for the thread to run again
+      // and it has come: that answer said the thread would run then.
+      && (!awaitingHer(item) || this._weSaidItRunsAgain(item) || wakesDue(item, now))
       // A row a worker already took and gave nothing back rests before it is
       // handed to another one. This pass had no memory whatsoever, which is
       // the whole of the every-tick loop (FRUITLESS_RESTS_MS).
@@ -8769,6 +8909,7 @@ export class Supervisor {
     // Has a login landed since an account was found signed out? Ahead of the
     // brake below, which would otherwise hold the fleet past the sign-in.
     try { this._noticeSignIns(); } catch (e) { console.warn('zero: could not look for a sign-in:', (e as Error).message); }
+    try { this._noticeLimitTryLived(); } catch (e) { console.warn('zero: could not check a capped login\'s try:', (e as Error).message); }
     try { this._forgetResetLimits(); } catch (e) { console.warn('zero: could not let a reset limit go:', (e as Error).message); }
     try { this._forgetLimitsOfAnOldPlan(); } catch (e) { console.warn('zero: could not read a login for a new plan:', (e as Error).message); }
     try { this._forgetRenewedSubscriptions(); } catch (e) { console.warn('zero: could not let a renewed subscription back in:', (e as Error).message); }
@@ -8842,6 +8983,8 @@ export class Supervisor {
     try { this.catchUpTheImports(items, now); } catch (e) { console.warn('zero: could not catch up a chat:', (e as Error).message); }
     // And has a teammate written something that needs sorting by urgency?
     try { this.sortTheMessages(items, process.env.AGENTBOX_PERSON_ID); } catch (e) { console.warn('zero: could not sort a message:', (e as Error).message); }
+    // And is there a task left on Agent decides that has no level yet?
+    try { this.levelTheTasks(items, process.env.AGENTBOX_PERSON_ID, now); } catch (e) { console.warn('zero: could not rank a task:', (e as Error).message); }
     // And is there a thread sent to Auto still waiting to be given to someone?
     try { this.routeTheThreads(items); } catch (e) { console.warn('zero: could not route a thread:', (e as Error).message); }
 
@@ -9240,7 +9383,7 @@ export class Supervisor {
       return out;
     };
     try {
-      const done = await teammates.tick({ items, now, deliver, tell });
+      const done = await teammates.tick({ items, now, deliver, tell, room: (engine: string | null) => this._roomToLookBack(engine, now) });
       if (done.length) this.onChange?.();
     } catch (err) {
       teammates.noteTrouble?.(`Teammates could not wake: ${(err as Error).message}`, now);
@@ -9251,6 +9394,14 @@ export class Supervisor {
         .catch((err: Error) => teammates.noteTrouble?.(`A message to a person could not be sent: ${err.message}`, now))
         .finally(() => { this._reaching = null; this.onChange?.(); });
     }
+  }
+
+  // The Claude reading is the picked login's (or the first), which is the one
+  // the usage corner reads; a look-back on a rotating Mac may bill another.
+  _roomToLookBack(engine: string | null, now = Date.now()) {
+    if (engineOf(this._engineFor({ engine } as WorkItem)) !== DEFAULT_ENGINE) return roomToLookBack(this.codexUsage(), now);
+    const profile = this._theOneAccount(DEFAULT_ENGINE, this._profiles())[0] ?? 'default';
+    return roomToLookBack(this._usageSeen?.[profile], now);
   }
 
   async serveRepeats(now = Date.now()) {
@@ -11670,6 +11821,7 @@ export class Supervisor {
       whyLocal:where === 'cloud' || plan.command ? null : whyLocal ?? this._whyLocal({ item, product, cwd, engine, remoteOnly }),
     } as WorkerSession;
     this._noteRunCarrying(item, session, { continuation });
+    if (!adopted) this._spendLimitTry(engine, profile, session);
     if (session.cloud) this._rememberCloudStart(item, session, { continuation });
     // The memory gate's clock counts starts on this Mac only: a cloud start
     // uses none of its memory (Codex's review, 2026-10-13).
@@ -12027,7 +12179,7 @@ export class Supervisor {
         try { trace?.write(`${at}  [Write] ${wrote}\n`); } catch {}
         onLine(`saved what this run changed (${changePath(item.id)})`);
       }).catch((e) => console.warn('zero: could not save what the run changed:', e.message))
-        .finally(() => { try { trace?.write(`\n# exited (${code}) ${exitedAt}${session.stoppedOnRequest ? STOPPED_ON_REQUEST : ''}\n`); trace?.end(); } catch {} });
+        .finally(() => { try { trace?.write(`\n# exited (${code}) ${exitedAt}${session.stoppedOnRequest ? STOPPED_ON_REQUEST : session.movedHere ? MOVED_HERE : ''}\n`); trace?.end(); } catch {} });
       this.removeSpawnFiles(session);
       this.endSession(item, session, product, { after: changed });
       if (session.remoteIdle) {
@@ -13849,10 +14001,13 @@ function accountRefusedTheRun(session: RunState) {
 // runAt also covers snoozes written before the inbox reminder had its own field.
 // visibleTo is Add people, and label a rename.
 const NOT_A_WORD = new Set(['visibility', 'visibleTo', 'label', 'priority', 'problem', 'progress', 'solution', 'blockedBy', 'blocks', 'runAt', 'snoozedUntil', 'shippedAt']);
-function lastFounderWrite(item: WorkItem | null | undefined) {
+// A teammate's pulled line keeps the source they gave it, so a "founder" line
+// written by somebody else is not your word.
+function lastFounderWrite(item: WorkItem | null | undefined, me: string | null = process.env.AGENTBOX_PERSON_ID || null) {
   let latest = 0;
   for (const [field, w] of Object.entries(item?.wrote ?? {})) {
     if (NOT_A_WORD.has(field)) continue;
+    if (w?.by && me && w.by !== me) continue;
     if (w?.source === 'founder' && w.ts > latest) latest = w.ts;
   }
   return latest;
@@ -13866,6 +14021,11 @@ function lastFounderWrite(item: WorkItem | null | undefined) {
 // worker's finished word, and a finished word on a row still open is a thing
 // waiting on her by definition. See `isFresh` for what it costs and why it
 // costs her nothing.
+function wakesDue(item: WorkItem, now: number) {
+  const at = wakesItselfAt(item);
+  return at > 0 && at <= now;
+}
+
 export function awaitingHer(item: WorkItem | null | undefined) {
   const wrote = item?.wrote?.result;
   if (!wrote || wrote.source !== 'agent') return false;

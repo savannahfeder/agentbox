@@ -41,6 +41,7 @@ export const PARITY = {
   'palette:projects-page': { phone: PROJECT, find: 'title="Rank first"', still: 'no new project, and no bringing an archived one back' },
   'palette:cloud-toggle': { phone: SET, find: 'label="Use the cloud"' },
   'palette:cloud-*': { phone: SET, find: 'label="Use the cloud"' },
+  'palette:view-home': { desktopOnly: 'the Home page is on the computer only' },
   'palette:view-groups': { phone: P, find: "id: 'chats'" },
   'palette:view-connections': { missing: 'the computer sending which connections are signed in' },
   'palette:view-teammates': { phone: P, find: 'mate-${t.id}', still: 'one chat per teammate, no shared team chat' },
