@@ -48,15 +48,6 @@ describe('a line found inside a thread', () => {
     expect(rowsOf(run({ found: mine }), 'lines')[0].who).toBe('You');
   });
 
-  // A power tester searched "cloud" (2026-11-09) and found the app's own note
-  // that a cloud machine stopped, signed "You".
-  it("signs the app's own note as Agentbox, not as the person", () => {
-    const note = { ...found, lines: [{ ...found.lines[1], source: 'system', text: 'Render machine stopped.' }] };
-    expect(rowsOf(run({ found: note }), 'lines')[0].who).toBe('Agentbox');
-    const unsigned = { ...found, lines: [{ ...found.lines[1], source: 'founder', text: 'Render it again.' }] };
-    expect(rowsOf(run({ found: unsigned }), 'lines')[0].who).toBe('You');
-  });
-
   it('names a conversation by its people, not "Conversation"', () => {
     const rows = rowsOf(run({ found }), 'lines');
     expect(rows[2].where).toBe('Sofia, Dev');

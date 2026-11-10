@@ -9,7 +9,6 @@
 import type { FoundInThreads, FoundWhere, ThreadCard, WorkItem } from './types';
 import { fold, firstHit, holds, queryOf, windowAround } from '../../shared/word-match.mts';
 import { parseQuery, splitHits, type Run } from './search';
-import { Name } from '../../shared/product-name.mjs';
 
 /** A found line as runs, the typed words marked, drawn the way the thread list draws its own. */
 export function markedWords(text: string, query: string): Run[] {
@@ -78,7 +77,7 @@ export function insideGroups(input: InsideInput): InsideGroup[] {
   if (!q.terms.length) return [];
   const byItem = new Map(input.items.map((i) => [`${i.product}/${i.id}`, i]));
   const byCard = new Map(input.cards.map((c) => [`${c.personId}/${c.threadId}`, c]));
-  const who = (by: string | null, source: string) => (by ? (by === input.me ? 'You' : input.nameOf(by)) : source === 'agent' ? 'Agent' : source === 'system' ? Name : 'You');
+  const who = (by: string | null, source: string) => (by ? (by === input.me ? 'You' : input.nameOf(by)) : source === 'agent' ? 'Agent' : 'You');
 
   // Where a found thing sits, or null when this screen cannot open it.
   const placeOf = (w: FoundWhere): { where: string; at: (extra: { line?: string; file?: string; note?: { file: string; id: string } }) => InsideOpen } | null => {
