@@ -1259,7 +1259,7 @@ export interface Snapshot {
   team?: TeamState | null;
   teammates?: TeammatesView | null;
   /** Which alpha features are switched on (Settings, Alpha features). */
-  alpha?: { rooms: boolean; teammates?: boolean; multiplayer?: boolean; backForward?: boolean; glass?: boolean };
+  alpha?: { rooms: boolean; teammates?: boolean; multiplayer?: boolean; glass?: boolean };
   agents?: AgentSession[];
   approvals?: Approval[];
   supervisor: SupervisorStatus;
@@ -1572,7 +1572,7 @@ export interface WorkspaceSettings {
   // New Claude Code and Codex chats come in on their own (w-62228098e6).
   importNew?: boolean;
   // Settings, Alpha features (w-3d0fa23ffb).
-  alpha?: { rooms: boolean; teammates?: boolean; multiplayer?: boolean; backForward?: boolean; glass?: boolean };
+  alpha?: { rooms: boolean; teammates?: boolean; multiplayer?: boolean; glass?: boolean };
   // The corner tag over other apps (w-dafae58a23). On unless she turned it off.
   cornerTag?: boolean;
   outsideAgents: AgentMode;

@@ -57,7 +57,7 @@ import { MODE_ORDER, MODE_SENTENCE, MODE_WORDS, RULES_ALWAYS_APPLY } from '../mo
 import { CODEX_MODES, CODEX_MODE_ORDER } from '../codex-modes';
 import { ProductMark } from './ProductMark';
 import { SHORTCUTS } from '../shortcuts';
-import { chord, chords, sayKeys } from '../this-keyboard';
+import { chord, chords } from '../this-keyboard';
 import { capWord } from '../hint-plate';
 import { NAME, Name } from '../../../shared/product-name.mjs';
 import { SETTINGS_TERMINAL } from '../../../shared/settings-terminal.mts';
@@ -2280,9 +2280,6 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
               </Row>
               <Row label="Multiplayer" desc="Share projects with your team and see their threads beside yours. Needs a sign-in.">
                 <Switch label="Multiplayer" on={!!w.alpha?.multiplayer} onChange={(v) => setWorkspace('alphaMultiplayer', v)} />
-              </Row>
-              <Row label="Back and forward" desc={sayKeys("Arrows before each page's title take you back to where you just were, and forward again. ⌘[ and ⌘] do the same.")}>
-                <Switch label="Back and forward" on={!!w.alpha?.backForward} onChange={(v) => setWorkspace('alphaBackForward', v)} />
               </Row>
               <Row label="Glass" desc="The space around the page becomes frosted glass over your desktop.">
                 <Switch label="Glass" on={!!w.alpha?.glass} onChange={(v) => setWorkspace('alphaGlass', v)} />

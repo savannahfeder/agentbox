@@ -1374,6 +1374,21 @@ body {
   opacity: var(--row-line);
 }
 
+/* The last thread you were in. On the row itself, which runs the card's full
+   width, so the wash meets the card's left edge. The hairlines either side of
+   it start there too, or the wash's corners poke past them. */
+.row.recent {
+  --wash: 255 255 255;
+  background: linear-gradient(90deg, rgb(var(--wash) / 0.055), rgb(var(--wash) / 0.012) 70%, transparent);
+}
+/* On white any grey read as dirt, so light mode takes the accent instead,
+   over enough stops that the fade shows no steps. */
+[data-theme="light"] .row.recent {
+  background: linear-gradient(90deg, rgb(238 96 24 / 0.07), rgb(238 96 24 / 0.045) 25%, rgb(238 96 24 / 0.015) 55%, transparent 85%);
+}
+.row.recent::after,
+.row.recent + .row::after { left: 0; }
+
 /* THE SELECTED ROW IS UNDERLINED. Chosen 2026-08-12, out of a family of six
    that were all text and a family of five before them that were all shapes.
    Hover is the same mechanism at a lower strength: one idea, two weights, so a
