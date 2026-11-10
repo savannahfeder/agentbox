@@ -1912,7 +1912,7 @@ declare global {
       takeSharedFile?(): Promise<string | null>;
       onSharedFile?(fn: () => void): () => void;
       retryFile?(p: { product: string; src: string }): Promise<unknown>;
-      codeChange?(p: { product: string; src: string }): Promise<{ ok: boolean; change?: unknown; error?: string }>;
+      codeChange?(p: { product: string; src: string; summary?: boolean }): Promise<{ ok: boolean; change?: unknown; error?: string }>;
       codeFile?(p: { product: string; src: string; path: string }): Promise<{ ok: boolean; text?: string; mtime?: number; path?: string; error?: string }>;
       saveCodeFile?(p: { product: string; src: string; path: string; text: string; mtime: number }): Promise<{ ok: boolean; mtime?: number; path?: string; stale?: boolean; error?: string }>;
       railNote?(p: { product: string }): Promise<{ ok: boolean; text?: string; mtime?: number; error?: string }>;
