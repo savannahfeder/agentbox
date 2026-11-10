@@ -1763,7 +1763,8 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
   const homeSet = useHomeSettings();
   // A phone has no skies (App.tsx's `homeOn`).
   const skies = !onPhone();
-  const skyOn = skies ? homeSet.skyTheme : null;
+  // Under Match system the sky is Match's default, so the Match tile is the one ticked.
+  const skyOn = skies && (homeSet.picked || look !== 'match') ? homeSet.skyTheme : null;
   const sidebarShrinks = useSidebarShrinks();
   const [model, setModel] = useState<SettingsModel | null>(null);
   // ?settings=claude, or ?settings=project:kestrel. Anything else (including the
@@ -2280,6 +2281,9 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
               </Row>
               <Row label="Multiplayer" desc="Share projects with your team and see their threads beside yours. Needs a sign-in.">
                 <Switch label="Multiplayer" on={!!w.alpha?.multiplayer} onChange={(v) => setWorkspace('alphaMultiplayer', v)} />
+              </Row>
+              <Row label="Glass" desc="The space around the page becomes frosted glass over your desktop.">
+                <Switch label="Glass" on={!!w.alpha?.glass} onChange={(v) => setWorkspace('alphaGlass', v)} />
               </Row>
             </Group>
           </Page>

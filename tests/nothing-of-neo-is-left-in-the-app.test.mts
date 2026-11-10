@@ -65,7 +65,7 @@ describe('nothing a person sees offers it', () => {
   });
 
   it('an old config that switched it on turns nothing on', () => {
-    expect(alphaFeatures({ alphaNeo: true }, { packaged: true })).toEqual({ rooms: false, teammates: false, multiplayer: false });
+    expect(alphaFeatures({ alphaNeo: true }, { packaged: true })).toEqual({ rooms: false, teammates: false, multiplayer: false, glass: false });
   });
 
   it('the switch can no longer be written', () => {
