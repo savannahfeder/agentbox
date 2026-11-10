@@ -18,7 +18,7 @@ import {
   type AgentLink, type Mention, type MentionPick, type Project,
 } from './agent-mentions';
 import './chat.css';
-import { shownTitle } from '../../../shared/thread-title.mjs';
+import { shownTitle } from '../../../shared/thread-title.mts';
 
 /** What a conversation needs from the app to bring an agent in and to draw
  *  its answer. Provided once, in App, beside TeamContext. */

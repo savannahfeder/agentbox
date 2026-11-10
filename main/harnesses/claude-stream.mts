@@ -1,5 +1,6 @@
 import { hookFailure } from '../../shared/hook-failure.mts';
-import { SAYING_CAP } from '../codex.mjs';
+import { SAYING_CAP } from '../codex.mts';
+import { WORK_CHARS } from '../../shared/agents.mts';
 
 export interface StreamBlock {
   type?: string;
@@ -207,14 +208,20 @@ export function traceStreamLine(line: string): string | null {
     if (obj.type === 'assistant' && obj.message?.content) {
       const parts: string[] = [];
       for (const c of obj.message.content) {
-        if (c.type === 'text' && c.text?.trim()) parts.push(c.text.trim());
+        if (c.type === 'text' && c.text?.trim()) parts.push(`${at}  ${c.text.trim()}`);
         if (c.type === 'tool_use') {
           const input = c.input ?? {};
           const hint = input.file_path ?? input.path ?? input.command ?? input.title ?? input.description ?? input.id ?? '';
-          parts.push(`[${c.name}] ${String(hint).slice(0, 200)}`);
+          parts.push(`${at}  [${c.name}] ${String(hint).slice(0, 200)}`);
+          // Unstamped `#` lines are skipped by readers that predate them.
+          if (c.id) parts.push(`#id ${c.id}`);
         }
       }
-      return parts.length ? parts.map((p) => `${at}  ${p}`).join('\n') : null;
+      return parts.length ? parts.join('\n') : null;
+    }
+    if (obj.type === 'user' && Array.isArray(obj.message?.content)) {
+      const parts = obj.message.content.flatMap((b) => (b?.type === 'tool_result' && b.tool_use_id ? traceToolResult(b) : []));
+      return parts.length ? parts.join('\n') : null;
     }
     if (obj.type === 'result') {
       const flavor = `${obj.subtype ?? 'ok'}${obj.is_error ? ' ERROR' : ''} · ${obj.num_turns ?? '?'} turns`;
@@ -224,6 +231,22 @@ export function traceStreamLine(line: string): string | null {
   } catch {
     return null;
   }
+}
+
+// What a tool call printed, under the id of the call it answers. Kept to its
+// first WORK_CHARS characters, with the full line count so the thread can say
+// what was cut.
+function traceToolResult(b: StreamBlock): string[] {
+  const text = typeof b.content === 'string' ? b.content
+    : Array.isArray(b.content) ? b.content.filter((x) => (x as StreamBlock)?.type === 'text').map((x) => x?.text ?? '').join('\n')
+      : '';
+  const all = String(text).replace(/\r/g, '').replace(/\s+$/, '');
+  const lines = all ? all.split('\n').length : 0;
+  const kept = all.length > WORK_CHARS ? all.slice(0, WORK_CHARS) : all;
+  return [
+    `#out ${b.tool_use_id} ${lines}${b.is_error === true ? ' error' : ''}`,
+    ...(kept ? kept.split('\n').map((l) => `#| ${l}`) : []),
+  ];
 }
 
 // Stream-json lines are verbose; the In Progress tail wants the gist.

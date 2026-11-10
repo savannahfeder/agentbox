@@ -4,7 +4,7 @@ import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {execFile,execFileSync} from 'node:child_process';
 import {commandRunning} from '../shared/terminal-state.mts';
-import {terminalShell,windowsRoot} from './shell-path.mjs';
+import {terminalShell,windowsRoot} from './shell-path.mts';
 import {loadPty} from './pty.mts';
 const LIMIT=262144;
 

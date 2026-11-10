@@ -81,6 +81,15 @@ export function oWaitsForTheSend(key: string, toast: { goes?: ToastGoes } | null
 }
 
 /**
+ * Whether this press is the toast's O, opening its thread or waiting for it.
+ * The pages that keep the keyboard to themselves (Files, Connections,
+ * Teammates) let it through, because the toast and its cap are drawn over them.
+ */
+export function oIsTheToasts(key: string, toast: { goes?: ToastGoes } | null, sentAt: number, now: number): boolean {
+  return !!opensTheToast(key, toast) || oWaitsForTheSend(key, toast, sentAt, now);
+}
+
+/**
  * What a held O does now: open its thread once that thread is in the lists
  * (`ready`), keep waiting, or let go. It lets go when the window is up or the
  * screen has moved since, so it never pulls you off something you opened.

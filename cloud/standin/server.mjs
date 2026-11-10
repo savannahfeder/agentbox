@@ -3,7 +3,7 @@
 //
 //   node cloud/standin/server.mjs --port 54900 --file /tmp/lumen/cloud.json
 //
-// The in-memory cloud (main/team/memory-cloud.mjs) behind a small HTTP door, so
+// The in-memory cloud (main/team/memory-cloud.mts) behind a small HTTP door, so
 // several copies of the app can be different people on one team without the
 // hosted database. It listens on loopback only and trusts whoever knocks: a
 // person's token is their id.
@@ -13,13 +13,20 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { createMemoryCloud, memoryBackend, signUpMemory } from '../../main/team/memory-cloud.mts';
+import { attachLiveRooms } from '../live/server.mjs';
 
 const BIG = 100_000;
 
-// Maps, Sets and large strings (every shared picture and film, in base64) out
-// of JSON. A big string goes in a file of its own named by its hash, so a save
-// never rewrites what it wrote last time.
+// Maps, Sets, bytes (a shared film's pieces) and large strings (every shared
+// picture, in base64) out of JSON. Bytes and a big string go in a file of their
+// own named by their hash, so a save never rewrites what it wrote last time.
 export function pack(value, blobs) {
+  if (Buffer.isBuffer(value)) {
+    const name = crypto.createHash('sha256').update(value).digest('hex');
+    const file = path.join(blobs, `${name}.bin`);
+    if (!fs.existsSync(file)) fs.writeFileSync(file, value);
+    return { $bytes: name };
+  }
   if (value instanceof Map) return { $map: [...value].map(([k, v]) => [k, pack(v, blobs)]) };
   if (value instanceof Set) return { $set: [...value].map((v) => pack(v, blobs)) };
   if (typeof value === 'string' && value.length > BIG) {
@@ -38,6 +45,7 @@ export function unpack(value, blobs) {
   if (!value || typeof value !== 'object') return value;
   if (value.$map) return new Map(value.$map.map(([k, v]) => [k, unpack(v, blobs)]));
   if (value.$set) return new Set(value.$set.map((v) => unpack(v, blobs)));
+  if (value.$bytes) return fs.readFileSync(path.join(blobs, `${value.$bytes}.bin`));
   if (value.$blob) return fs.readFileSync(path.join(blobs, value.$blob), 'utf8');
   return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, unpack(v, blobs)]));
 }
@@ -108,9 +116,10 @@ export function startStandinCloud({ port = 0, file = null, saveEveryMs = 3000 } 
       if (!cloud.people.has(token)) throw new Error('nobody by that token');
       const backend = memoryBackend(cloud, token);
       if (typeof backend[method] !== 'function' || method.startsWith('subscribe')) throw new Error(`no call named ${method}`);
-      const value = await backend[method](...args);
+      // Bytes cross as { __bytes: base64 } both ways (main/team/standin-backend.mts).
+      const value = await backend[method](...args.map((a) => (a && typeof a === 'object' && typeof a.__bytes === 'string' ? Buffer.from(a.__bytes, 'base64') : a)));
       mark();
-      return { value: value === undefined ? null : value };
+      return { value: value === undefined ? null : Buffer.isBuffer(value) ? { __bytes: value.toString('base64') } : value };
     },
     async wait({ token, waitMs = 25_000 }) {
       if (!cloud.people.has(token)) throw new Error('nobody by that token');
@@ -140,6 +149,9 @@ export function startStandinCloud({ port = 0, file = null, saveEveryMs = 3000 } 
     }
   });
 
+  // Every open file's live room, on the same door: the copies find it from the cloud's address.
+  const live = attachLiveRooms(server);
+
   return new Promise((resolve) => {
     server.listen(port, '127.0.0.1', () => {
       resolve({
@@ -151,6 +163,7 @@ export function startStandinCloud({ port = 0, file = null, saveEveryMs = 3000 } 
           if (saver) clearInterval(saver);
           save();
           for (const l of listeners.values()) l.wake?.();
+          live.close();
           server.closeAllConnections?.();
           server.close(() => done());
         }),

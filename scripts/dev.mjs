@@ -27,8 +27,8 @@ import { spawn } from 'node:child_process';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadConfig } from '../main/config.mjs';
-import { chooseDevPort } from '../main/dev-window.mjs';
+import { loadConfig } from '../main/config.mts';
+import { chooseDevPort } from '../main/dev-window.mts';
 import { brandElectron } from './brand-electron.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');

@@ -63,7 +63,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { pressureFrom } from './memory-gate.mts';
-import type { Pressure } from './memory-gate.mts';
+import type { Pressure, PressureLines } from './memory-gate.mts';
+import { readMacPressure } from './mac-pressure.mts';
 
 const LSTART = String.raw`\w{3} \w{3} [ \d]\d \d\d:\d\d:\d\d \d{4}`;
 
@@ -246,13 +247,8 @@ export async function listProcesses(platform: string = process.platform): Promis
   return procs;
 }
 
-export async function readMacPressureWord(): Promise<Pressure> {
-  const out = await new Promise<string>((resolve) => {
-    execFile('/usr/sbin/sysctl', ['-n', 'kern.memorystatus_vm_pressure_level', 'kern.memorystatus_level'], { timeout: 5_000 },
-      (err, stdout) => resolve(err ? '' : stdout));
-  });
-  const [level, freePct] = String(out).trim().split(/\s+/).map(Number);
-  return pressureFrom({ level: Number.isFinite(level) ? level : null, freePct: Number.isFinite(freePct) ? freePct : null });
+export async function readMacPressureWord(lines?: PressureLines): Promise<Pressure> {
+  return pressureFrom(await readMacPressure(), lines);
 }
 
 /**

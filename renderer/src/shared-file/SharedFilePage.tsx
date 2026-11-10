@@ -7,11 +7,13 @@ import { AppMark } from '../components/AppMark';
 import { PdfPages } from '../components/PdfPages';
 import type { CloudClient } from '../cloud-rest';
 import {
-  commentWhen, fileBytes, initialOf, postComment, readComments, readSharedFile, removeComment, saidOf, sharedLine, titleOf,
+  commentWhen, fileBytes, filmOf, initialOf, isTable, postComment, readFilm, readComments, readSharedFile, removeComment, saidOf, sharedLine, titleOf,
   type FileComment, type Rpc, type SharedFile, type Shown,
 } from './shared-file';
 import { SharedSignIn } from './SharedSignIn';
+import { TableView } from '../components/TableView';
 import { Name } from '../../../shared/product-name.mjs';
+import { JOIN_SCHEME } from '../../../shared/room-links.mts';
 import '../components/doc-reading.css';
 import '../components/file-views.css';
 import './shared-file.css';
@@ -45,6 +47,7 @@ export function SharedFilePage({ token, client, finishing = null }: {
   const [backError, setBackError] = useState<string | null>(null);
   const anyone: Rpc = useCallback((name, args) => client.rpc(name, args, { anyone: true }), [client]);
   const asMe: Rpc = useCallback((name, args) => client.rpc(name, args), [client]);
+  const piece = useCallback((name: string) => client.fileBytes('link-files', name), [client]);
 
   const readAll = useCallback(async () => {
     try {
@@ -108,11 +111,11 @@ export function SharedFilePage({ token, client, finishing = null }: {
   else if (load.state === 'failed') body = <div className="sf-state" role="alert"><p>This file did not load.</p><button type="button" className="sf-quiet-btn" onClick={() => { setLoad({ state: 'loading' }); void readAll(); }}>Try again</button></div>;
   else if (load.state === 'stopped') body = <div className="sf-state"><p>This link was stopped. Ask whoever sent it for a new one.</p></div>;
   else if (load.state === 'unknown') body = <div className="sf-state"><p>This link does not work. Check it with whoever sent it.</p></div>;
-  else body = <FilePage token={token} file={load.file} />;
+  else body = <FilePage token={token} file={load.file} piece={piece} />;
 
   return (
     <div className={`sf-page${commentsOpen ? ' has-panel' : ''}`}>
-      <TopBar count={file ? comments?.length ?? 0 : null} open={commentsOpen} onComments={() => setCommentsOpen(!commentsOpen)} />
+      <TopBar count={file ? comments?.length ?? 0 : null} open={commentsOpen} onComments={() => setCommentsOpen(!commentsOpen)} openIn={file && !file.mine ? `${JOIN_SCHEME}://f/${token}` : null} />
       {body}
       {commentsOpen && (
         <aside className="sf-panel" aria-label="Comments">
@@ -151,7 +154,8 @@ export function SharedFilePage({ token, client, finishing = null }: {
 }
 
 /** The mark, the comments and the way to the app. `count` null: there is no file to comment on. */
-export function TopBar({ count, open, onComments }: { count: number | null; open: boolean; onComments: () => void }) {
+/** `openIn`: the app's own link to this file, which brings it into the viewer's Agentbox (main/bring-shared-file.mts). */
+export function TopBar({ count, open, onComments, openIn = null }: { count: number | null; open: boolean; onComments: () => void; openIn?: string | null }) {
   return (
     <header className="sf-bar">
       <a className="sf-brand" href={SITE}><AppMark size={14} />agentbox</a>
@@ -161,17 +165,21 @@ export function TopBar({ count, open, onComments }: { count: number | null; open
             {count === 0 ? 'Comment' : count === 1 ? '1 comment' : `${count} comments`}
           </button>
         )}
+        {openIn && <a href={openIn}>Open in {Name}</a>}
         <a href={SITE}>Get {Name}</a>
       </nav>
     </header>
   );
 }
 
+type Piece = (name: string) => Promise<Uint8Array | null>;
+
 /** The file on its own: its title, who shared it, and the file. */
-export function FilePage({ token, file }: { token: string; file: SharedFile }) {
-  const kept = file.kind === 'image' || file.kind === 'pdf';
+export function FilePage({ token, file, piece }: { token: string; file: SharedFile; piece?: Piece }) {
+  const table = isTable(file);
+  const kept = table || file.kind === 'image' || file.kind === 'pdf' || file.kind === 'video';
   return (
-    <main className={`sf-main is-${file.kind}`}>
+    <main className={`sf-main is-${table ? 'table' : file.kind}`}>
       <div className="sf-head">
         <h1>{titleOf(file).title}</h1>
         <p>
@@ -179,12 +187,36 @@ export function FilePage({ token, file }: { token: string; file: SharedFile }) {
           {kept && <> · <a className="sf-download" href={`/f/${token}/raw`} download={file.name}>Download</a></>}
         </p>
       </div>
-      <section className="sf-file" aria-label={file.name}><FileBody token={token} file={file} /></section>
+      <section className="sf-file" aria-label={file.name}><FileBody token={token} file={file} piece={piece} /></section>
     </main>
   );
 }
 
-export function FileBody({ token, file }: { token: string; file: SharedFile }) {
+/** A film, its pieces read in order and played once they are all here. */
+function FilmBody({ token, file, piece }: { token: string; file: SharedFile; piece?: Piece }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [done, setDone] = useState(0);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    const film = filmOf(file);
+    if (!film || !piece) { setFailed(true); return; }
+    let live = true;
+    let made: string | null = null;
+    setUrl(null); setDone(0); setFailed(false);
+    readFilm(piece, token, film, (d) => { if (live) setDone(d); }).then((parts) => {
+      if (!live) return;
+      if (!parts) { setFailed(true); return; }
+      made = URL.createObjectURL(new Blob(parts as BlobPart[], { type: file.type || 'video/mp4' }));
+      setUrl(made);
+    }, () => { if (live) setFailed(true); });
+    return () => { live = false; if (made) URL.revokeObjectURL(made); };
+  }, [token, file.body, file.type, piece]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (failed) return <div className="sf-state"><p>This film did not load.</p></div>;
+  if (!url) return <div className="sf-video is-loading" aria-busy="true" aria-label="Loading"><i style={{ width: `${Math.round(done * 100)}%` }} /></div>;
+  return <div className="sf-video"><video src={url} controls playsInline preload="metadata" aria-label={file.name} /></div>;
+}
+
+export function FileBody({ token, file, piece }: { token: string; file: SharedFile; piece?: Piece }) {
   const bytes = useMemo(() => {
     if (file.kind !== 'image' && file.kind !== 'pdf') return null;
     try { return fileBytes(file); } catch { return null; }
@@ -193,6 +225,8 @@ export function FileBody({ token, file }: { token: string; file: SharedFile }) {
   useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
   const [unreadable, setUnreadable] = useState(false);
   const pdf = useCallback(async () => bytes ?? new Uint8Array(), [bytes]);
+  if (file.kind === 'video') return <FilmBody token={token} file={file} piece={piece} />;
+  if (isTable(file)) return <div className="sf-table"><TableView text={file.body} path={file.name} mode="full" storeKey={`link:${token}`} /></div>;
   if (file.kind === 'markdown') {
     return <div className="sf-doc"><div className="markdown doc-prose"><ReactMarkdown remarkPlugins={MD_PLUGINS} components={MD_PARTS}>{titleOf(file).body}</ReactMarkdown></div></div>;
   }

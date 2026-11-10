@@ -12,6 +12,9 @@ import { startingPriority, type PriorityId } from '../../../renderer/src/priorit
 import type { Picked } from '../platform/pick';
 
 export type DraftKey = ItemRef | 'new';
+
+/** An AI teammate's chat box; null is the new-teammate screen. No project is named "teammate:", so it cannot meet a thread's key. */
+export const mateDraft = (id: string | null): ItemRef => ({ product: 'teammate:', id: id ?? 'new' });
 export interface Draft { text: string; files: Picked[]; priority: PriorityId | null }
 
 const EMPTY: Draft = { text: '', files: [], priority: null };

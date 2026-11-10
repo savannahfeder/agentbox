@@ -20,8 +20,9 @@ export function waitingTooLong(lines, now, { afterMs, seeded = new Set() }) {
   const threads = new Map();
   for (const l of [...lines].sort((a, b) => a.ts - b.ts)) {
     if (seeded.has(l.id)) continue;
-    const t = threads.get(l.id) ?? { id: l.id, title: null, product: l.product ?? null, lastAsk: 0, lastTold: 0, closed: false, runAt: 0 };
+    const t = threads.get(l.id) ?? { id: l.id, title: null, product: l.product ?? null, lastAsk: 0, lastTold: 0, closed: false, runAt: 0, agent: false };
     const p = l.patch ?? {};
+    if (l.source === 'agent') t.agent = true;
     if (p.title && !t.title) t.title = p.title;
     if (l.source === 'founder' && (p.answer || (p.title && !t.lastAsk))) t.lastAsk = l.ts;
     if (l.source !== 'founder' && (p.result || p.note)) t.lastTold = Math.max(t.lastTold, l.ts);
@@ -30,6 +31,8 @@ export function waitingTooLong(lines, now, { afterMs, seeded = new Set() }) {
     threads.set(l.id, t);
   }
   return [...threads.values()]
+    // A conversation between people waits on a person, who answers when they answer; once an agent is in it, it counts.
+    .filter((t) => !(String(t.product ?? '').startsWith('direct-') && !t.agent))
     .filter((t) => t.lastAsk && !t.closed && t.runAt <= now && t.lastTold < t.lastAsk && now - t.lastAsk >= afterMs)
     .map((t) => ({ id: t.id, title: t.title, product: t.product, waitingMs: now - t.lastAsk }));
 }
@@ -130,7 +133,7 @@ export function sleepTargets(state, table = processTable()) {
   return [...pids];
 }
 
-/** Whether a run's session log carries a result its engine did not mark ERROR (main/codex.mjs, harnesses/claude-stream.mts). */
+/** Whether a run's session log carries a result its engine did not mark ERROR (main/codex.mts, harnesses/claude-stream.mts). */
 export function answeredRun(log) {
   return /== RESULT \((?![^)]*\bERROR\b)[^)]*\) ==/.test(log);
 }

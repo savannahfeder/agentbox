@@ -95,29 +95,81 @@ async function hashes(file: string, upTo: number) {
  * A copy from an earlier period is joined from, never read by the cloud: the
  * join is a new object under this period's name. `record` is where the last
  * send is noted.
+ *
+ * A storage that cannot join (the cloud server's) sends what was added as a
+ * piece of its own when the image joins pieces itself (`pieces`), and returns
+ * every piece's key in order. Every piece is read by the cloud, so all must be
+ * from this period.
  */
 export interface SentRecord {
   period?: number;
   key?: string;
   size?: number;
   sha?: string;
+  pieces?: { key: string; size: number }[];
 }
 
-export async function sendConversation(storage: CloudStorage, file: string, { record = null, now = Date.now() }: { record?: string | null; now?: number } = {}) {
+// A chain this long is sent whole once and starts again.
+export const MAX_PIECES = 24;
+
+async function chainHad(storage: CloudStorage, had: SentRecord, now: number) {
+  const chain = had.pieces ?? [{ key: had.key!, size: had.size! }];
+  const here = cacheKey('', now);
+  if (!chain.every((p) => typeof p?.key === 'string' && p.key.startsWith(here) && Number.isInteger(p.size))) return null;
+  if (chain.reduce((n, p) => n + p.size, 0) !== had.size) return null;
+  for (const p of chain) if (!(await has(storage, p.key))) return null;
+  return chain;
+}
+
+async function writeTail(from: string, start: number) {
+  const tail = `${from}.from-${start}`;
+  const { pipeline } = await import('node:stream/promises');
+  await pipeline(fs.createReadStream(from, { start }), fs.createWriteStream(tail));
+  return tail;
+}
+
+export async function sendConversation(storage: CloudStorage, file: string, { record = null, now = Date.now(), pieces = false }: { record?: string | null; now?: number; pieces?: boolean } = {}) {
   // Hashed and sent from one copy, so the key always names what was sent.
   const copy = path.join(os.tmpdir(), `agentbox-conversation-${crypto.randomUUID()}.jsonl`);
   try {
     fs.copyFileSync(file, copy, fs.constants.COPYFILE_FICLONE);
     let had: SentRecord | null = null;
     try { had = record ? JSON.parse(fs.readFileSync(record, 'utf8')) : null; } catch { /* none yet */ }
-    const joinable = !!storage.extend && Number.isInteger(had?.size)
+    const chaining = pieces && !storage.extend;
+    const joinable = (!!storage.extend || chaining) && Number.isInteger(had?.size)
       && had!.size! >= MIN_JOIN_BYTES && typeof had!.key === 'string' && typeof had!.sha === 'string';
     const { prefix, whole, size } = await hashes(copy, joinable ? had!.size! : 0);
     const key = cacheKey(`conversation-${whole}.jsonl`, now);
+    const note = (r: SentRecord) => {
+      if (!record) return;
+      try {
+        const tmp = `${record}.${process.pid}.tmp`;
+        fs.writeFileSync(tmp, JSON.stringify(r));
+        fs.renameSync(tmp, record);
+      } catch { /* the next send goes whole */ }
+    };
+    if (chaining && joinable && had!.pieces && had!.sha === whole && size === had!.size) {
+      const chain = await chainHad(storage, had!, now);
+      if (chain) return { key: chain[0].key, size, sent: 0, pieces: chain.map((p) => p.key) };
+    }
+    if (chaining && joinable && prefix === had!.sha && size > had!.size!) {
+      const chain = await chainHad(storage, had!, now);
+      if (chain && chain.length < MAX_PIECES) {
+        const tailKey = cacheKey(`conversation-${whole}-from-${had!.size}.jsonl`, now);
+        const tail = await writeTail(copy, had!.size!);
+        try {
+          if (storage.putFile) await storage.putFile(tailKey, tail);
+          else await storage.put(tailKey, fs.readFileSync(tail));
+        } finally { fs.rmSync(tail, { force: true }); }
+        const all = [...chain, { key: tailKey, size: size - had!.size! }];
+        note({ period: periodOf(now), key: tailKey, size, sha: whole, pieces: all });
+        return { key: all[0].key, size, sent: size - had!.size!, pieces: all.map((p) => p.key) };
+      }
+    }
     let sent = 0;
     if (!(await has(storage, key))) {
-      if (joinable && prefix === had!.sha && size > had!.size! && await has(storage, had!.key!)) {
-        try { await storage.extend!(key, had!.key!, copy, had!.size!); sent = size - had!.size!; } catch { /* sent whole below */ }
+      if (storage.extend && joinable && !had!.pieces && prefix === had!.sha && size > had!.size! && await has(storage, had!.key!)) {
+        try { await storage.extend(key, had!.key!, copy, had!.size!); sent = size - had!.size!; } catch { /* sent whole below */ }
       }
       if (!sent) {
         if (storage.putFile) await storage.putFile(key, copy);
@@ -125,13 +177,7 @@ export async function sendConversation(storage: CloudStorage, file: string, { re
         sent = size;
       }
     }
-    if (record) {
-      try {
-        const tmp = `${record}.${process.pid}.tmp`;
-        fs.writeFileSync(tmp, JSON.stringify({ period: periodOf(now), key, size, sha: whole }));
-        fs.renameSync(tmp, record);
-      } catch { /* the next send goes whole */ }
-    }
+    note({ period: periodOf(now), key, size, sha: whole });
     return { key, size, sent };
   } finally {
     fs.rmSync(copy, { force: true });

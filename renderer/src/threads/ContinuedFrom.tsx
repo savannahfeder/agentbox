@@ -1,7 +1,7 @@
 // The line on a thread of your own that carries on a teammate's: whose it was,
 // and the way back to it.
 import { createContext, useContext } from 'react';
-import { continuedFrom } from '../../../shared/thread-continued.mjs';
+import { continuedFrom } from '../../../shared/thread-continued.mts';
 import { firstName, TeamContext } from '../team/people';
 
 export const OpenTeammateThread = createContext<((personId: string, threadId: string) => void) | null>(null);

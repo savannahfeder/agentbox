@@ -13,7 +13,7 @@
 // the row is no longer in. That is the exception she names.
 
 import { commandPrompt } from '../../shared/claude-commands.mts';
-import { DEFAULT_ENGINE } from '../../shared/engines.mjs';
+import { DEFAULT_ENGINE } from '../../shared/engines.mts';
 
 /**
  * The row she is watching a command run on. Product and id, because two
@@ -114,7 +114,7 @@ export function wayOut(following: Followed, focused: unknown): 'inbox' | 'stay' 
  * Keep-on-this-Mac and a hand-back are laid over the row by the supervisor
  * without moving `updatedAt`, so a change to either counts too: the Runs on
  * button reads them (w-bac3eb6bd2). So does a rename: a `label` written alone
- * is not news and leaves `updatedAt` where it was (shared/work-items.mjs).
+ * is not news and leaves `updatedAt` where it was (shared/work-items.mts).
  *
  * Returns the copy to take, or null for leave it alone.
  */

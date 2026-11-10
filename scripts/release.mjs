@@ -64,12 +64,13 @@ import { fileURLToPath } from 'node:url';
 import { envName, readEnv } from '../shared/product-name.mjs';
 import { liveDownload, RELEASE_REPO, DOWNLOAD_ASSET } from './lib/live-download.mjs';
 import { whyNotToRelease } from './lib/ship-rules.mjs';
-import { cloudAccountConfig } from '../main/cloud/config.mjs';
-import { loadCloudConfig } from '../main/team/session.mjs';
+import { cloudAccountConfig } from '../main/cloud/config.mts';
+import { loadCloudConfig } from '../main/team/session.mts';
 
 const repo = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const noSign = process.argv.includes('--no-sign');
 const profile = process.env.APPLE_KEYCHAIN_PROFILE || null;
+const keychain = process.env.APPLE_KEYCHAIN || null;
 const pinned = process.env.AGENTBOX_RELEASE_COMMIT || null;
 const head = () => {
   try { return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim(); } catch { return null; }
@@ -167,12 +168,12 @@ function feedbackAddress() {
 
 const feedbackUrl = feedbackAddress();
 
-// WHERE AGENTBOX CLOUD IS (main/cloud/config.mjs): the server's address and
+// WHERE AGENTBOX CLOUD IS (main/cloud/config.mts): the server's address and
 // the database's public address and key, all public. A cloud.public.json in
 // cloud/ or ~/.agentbox points this build at another cloud; without one it is
-// the cloud every copy ships with (shared/cloud-address.mjs).
+// the cloud every copy ships with (shared/cloud-address.mts).
 const cloud = cloudAccountConfig(repo);
-// AND THE CLOUD SETTINGS › PHONE SIGNS IN TO (main/team/session.mjs
+// AND THE CLOUD SETTINGS › PHONE SIGNS IN TO (main/team/session.mts
 // loadCloudConfig): its address, public key and phone site, also public.
 const teamCloud = loadCloudConfig(repo, { packaged: false, env: {} });
 
@@ -348,7 +349,7 @@ if (!noSign) {
     run('notarytool', 'xcrun', [
       'notarytool', 'submit', dmg,
       ...(profile
-        ? ['--keychain-profile', profile]
+        ? ['--keychain-profile', profile, ...(keychain ? ['--keychain', keychain] : [])]
         : [
           '--apple-id', process.env.APPLE_ID,
           '--team-id', process.env.APPLE_TEAM_ID,

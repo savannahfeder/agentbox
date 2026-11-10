@@ -69,7 +69,7 @@ export function effortPicked(id: string | null, rows: EffortChoice[] = EFFORTS):
  * it does not claim to." It knows now. BOTH engines publish it per model and it
  * arrives beside the model's own name from each: `default_reasoning_level` out
  * of Codex's cache and `default_effort` out of Claude Code's catalog
- * (main/codex-models.mts, main/claude-models.mjs).
+ * (main/codex-models.mts, main/claude-models.mts).
  *
  * NULL IS A REAL ANSWER and it draws the strip exactly as it drew before. A
  * model whose catalog entry names no default gets no lit button rather than a

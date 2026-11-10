@@ -1,5 +1,5 @@
 .doc-notes-split { flex: 1; min-height: 0; display: flex; }
-.doc-notes-split > .doc-rich { flex: 1; min-width: 0; }
+.doc-notes-split > :not(.sb) { flex: 1; min-width: 0; min-height: 0; }
 
 .sb { flex: none; width: 380px; display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--line); background: color-mix(in srgb, var(--text) 2.5%, transparent); }
 /* The page's corner marks float over the right of this row. */
@@ -52,3 +52,5 @@
 
 /* The notes take the reply line's place while they are open. */
 .workspace-layout.notes-open[data-artifact-layout="focus"]:not(.workspace-settings) > .body > .list-pane { display: none; }
+/* Closing them is asking for the page alone; R still brings the box up. */
+.workspace-layout.notes-closed[data-artifact-layout="focus"]:not(.workspace-settings):not(.composing) > .body > .list-pane { display: none; }

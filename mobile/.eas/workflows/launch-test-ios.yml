@@ -1,0 +1,23 @@
+# Builds the app the way the store build is built, for the iPhone simulator,
+# and opens it. Sends nothing to TestFlight. release-ios.yml runs the same two
+# jobs before it submits.
+#   npx eas-cli@latest workflow:run .eas/workflows/launch-test-ios.yml
+name: iPhone launch test
+
+jobs:
+  simulator_build:
+    name: Build for the iPhone simulator
+    type: build
+    params:
+      platform: ios
+      profile: launch-test
+
+  launch_test:
+    name: Open the app
+    needs: [simulator_build]
+    type: maestro
+    params:
+      build_id: ${{ needs.simulator_build.outputs.build_id }}
+      flow_path: ['.maestro/opens.yml']
+      retries: 1
+      record_screen: true

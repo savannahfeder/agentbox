@@ -86,7 +86,7 @@ export interface CloudStatus {
   plan?: string | null;
   /** Runs on this Mac the cloud could take now (supervisor `_movableToCloud`). */
   movable?: string[];
-  /** The keys saved for cloud runs, by name only (main/cloud/keys.mjs). */
+  /** The keys saved for cloud runs, by name only (main/cloud/keys.mts). */
   keys?: { name: string; savedAt: number | null; label?: string | null }[];
 }
 
@@ -145,6 +145,19 @@ export const CLOUD_WHEN_ON: { id: Exclude<CloudMode, 'mac'>; label: string; note
 type OnOff = { mode: CloudMode; whenOn?: Exclude<CloudMode, 'mac'> } | null | undefined;
 
 export const cloudIsOn = (status: OnOff) => !!status && status.mode !== 'mac';
+
+/**
+ * The cloud row's sentence: when threads go there, and on which account.
+ *
+ * ONE ACCOUNT, HOWEVER MANY ARE SIGNED IN THERE (w-dac993a554). This listed
+ * them and ended "in turn", which is what `pickCloudLogin` used to do; it takes
+ * one account now and waits for it, so the sentence names that one.
+ */
+export function cloudRunsLine(mode: CloudMode, inUse: string | null, computer = 'this computer'): string {
+  if (mode === 'mac') return `Every thread runs on ${computer}.`;
+  const when = mode === 'all' ? 'Threads start there first' : `Threads start there when ${computer} is full`;
+  return `${when}, on ${inUse ?? 'your cloud account'}.`;
+}
 
 /** The accounts that count: one added twice counts once. */
 export const countedAccounts = (accounts: CloudAccount[]) => accounts.filter((a) => a.state !== 'duplicate');

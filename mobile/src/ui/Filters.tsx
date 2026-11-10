@@ -5,8 +5,9 @@ import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { PRIORITIES } from '../../../renderer/src/priority';
-import { isFiltered, projectChoices, type Display, type UpdatedWindow } from '../../../renderer/src/threads/page-rules';
-import type { ThreadStateWord } from '../../../renderer/src/types';
+import { projectChoices, type Display, type UpdatedWindow } from '../../../renderer/src/threads/page-rules';
+import type { Product, ThreadStateWord, WorkItem } from '../../../renderer/src/types';
+import { phoneFiltered, type Harness } from '../lib/agent-filter';
 import { barsFor } from './Pickers';
 import { PriorityBars, T } from './parts';
 import { color, size } from './theme';
@@ -21,12 +22,12 @@ export const Magnifier = ({ size: s = 15, tint = color.dim }: P) => (
 );
 
 /** The sliders, with the accent dot while a filter is on (pages.css `.th-disp > i`). */
-export function ViewButton({ display, onPress, open }: { display: Display; onPress: () => void; open: boolean }) {
+export function ViewButton({ display, agent = null, onPress, open }: { display: Display; agent?: Harness | null; onPress: () => void; open: boolean }) {
   return (
     <Pressable onPress={onPress} accessibilityLabel="View and filters" accessibilityRole="button" accessibilityState={{ expanded: open }} hitSlop={4}
       style={({ pressed }) => ({ width: 40, height: 40, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
       <Sliders />
-      {isFiltered(display) && <View style={{ position: 'absolute', top: 5, right: 5, width: 6, height: 6, borderRadius: 3, backgroundColor: color.accent }} />}
+      {phoneFiltered(display, agent) && <View style={{ position: 'absolute', top: 5, right: 5, width: 6, height: 6, borderRadius: 3, backgroundColor: color.accent }} />}
     </Pressable>
   );
 }
@@ -72,8 +73,10 @@ const toggle = <V,>(list: V[], v: V) => (list.includes(v) ? list.filter((x) => x
 const WINDOWS: [UpdatedWindow, string][] = [['today', 'Today'], ['week', 'This week'], ['any', 'Any time']];
 
 /** The menu that drops from the sliders, the width of the screen, over the list (phone.css `.th-pop`). */
-export function ViewMenu({ display, onDisplay, products, items, shown, total, tab, close, onSelect }: {
-  display: Display; onDisplay: (d: Display) => void; products: { slug: string; name: string }[]; items: any[];
+export function ViewMenu({ display, onDisplay, agent = null, agents = [], onAgent, products, items, shown, total, tab, close, onSelect }: {
+  display: Display; onDisplay: (d: Display) => void; products: Product[]; items: Pick<WorkItem, 'product' | 'updatedAt' | 'agent'>[];
+  /** The Agent line's choices (lib/agent-filter.ts), empty where it is not offered. */
+  agent?: Harness | null; agents?: { value: Harness; label: string }[]; onAgent?: (a: Harness | null) => void;
   shown: number; total: number; tab: string; close: () => void;
   /** Pick threads to close together; absent where there is nothing to pick. */
   onSelect?: () => void;
@@ -83,7 +86,7 @@ export function ViewMenu({ display, onDisplay, products, items, shown, total, ta
   const [all, setAll] = useState(false);
   const set = (patch: Partial<Display>) => onDisplay({ ...display, ...patch });
   // The eight used most recently, the rest behind one button (`projectChoices`).
-  const { shown: top, rest } = projectChoices(products as any[], items, { picked: display.projects });
+  const { shown: top, rest } = projectChoices(products, items, { picked: display.projects });
   const projects = all ? [...top, ...rest] : top;
   return (
     <View style={{ position: 'absolute', top: inset.top + size.topBar, left: 0, right: 0, bottom: 0, zIndex: 30 }}>
@@ -118,14 +121,19 @@ export function ViewMenu({ display, onDisplay, products, items, shown, total, ta
             )}
           </Line>
         )}
+        {agents.length > 0 && (
+          <Line label="Agent">
+            {agents.map((a) => <Choice key={a.value} label={a.label} on={agent === a.value} onPress={() => onAgent?.(agent === a.value ? null : a.value)} />)}
+          </Line>
+        )}
         <Line label="Sent">
           {WINDOWS.map(([w, label]) => <Choice key={w} label={label} on={display.updated === w} onPress={() => set({ updated: w })} />)}
         </Line>
         <Rule />
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, paddingHorizontal: size.inset, paddingBottom: 4 }}>
           <T style={{ fontSize: 13, color: color.faint }}>{`Showing ${shown} of ${total}`}</T>
-          {isFiltered(display) && (
-            <Pressable onPress={() => set({ priorities: [], projects: [], updated: 'any', privacy: 'any' })} accessibilityRole="button" hitSlop={8}>
+          {phoneFiltered(display, agent) && (
+            <Pressable onPress={() => { set({ priorities: [], projects: [], updated: 'any', privacy: 'any' }); onAgent?.(null); }} accessibilityRole="button" hitSlop={8}>
               <T style={{ fontSize: 13, color: color.dim }}>Clear filters</T>
             </Pressable>
           )}

@@ -167,8 +167,8 @@ export function restartAgain({ down, now, deadline, everyMs = 60_000 }) {
  * ever.
  */
 export function nextRound({ now, deadline, roundMs, idleInARow = 0, lastOutcome = null, maxIdle = 3, minRoundMs = 60_000 }) {
-  if (lastOutcome === 'signed-out') return { go: false, why: 'the tester could not sign in to Claude Code' };
-  if (lastOutcome === 'tester-out') return { go: false, why: 'the tester\'s own Claude Code ran out of usage' };
+  if (lastOutcome === 'signed-out') return { go: false, why: 'the tester could not sign in to Codex' };
+  if (lastOutcome === 'tester-out') return { go: false, why: 'the tester\'s own Codex ran out of usage' };
   if (idleInARow >= maxIdle) return { go: false, why: `the tester did nothing in ${idleInARow} rounds in a row` };
   if (deadline - now < minRoundMs) return { go: false, why: 'time is up' };
   return { go: true, endsAt: Math.min(now + roundMs, deadline) };
@@ -176,8 +176,8 @@ export function nextRound({ now, deadline, roundMs, idleInARow = 0, lastOutcome 
 
 /** What a round amounted to, from the actions it took and the last words of its session. */
 export function roundOutcome({ actions, text = '' }) {
-  if (/not logged in|invalid api key|please run \/login|authentication_error|OAuth token has expired/i.test(text) && actions === 0) return 'signed-out';
-  if (/hit your (session |weekly )?limit|usage limit reached|rate_limit_error/i.test(text) && actions === 0) return 'tester-out';
+  if (/not logged in|invalid api key|please run \/login|authentication_error|OAuth token has expired|401 Unauthorized|Failed to authenticate|codex login/i.test(text) && actions === 0) return 'signed-out';
+  if (/hit your (session |weekly |usage )?limit|usage limit|rate_limit_error/i.test(text) && actions === 0) return 'tester-out';
   return actions >= 3 ? 'acted' : 'idle';
 }
 
@@ -254,7 +254,7 @@ const PACE = {
 
 const KEYS = 'N new thread; ⌘↵ (press Enter meta) sends; J/K or arrows move in the list; ↵ opens; esc goes back; R replies in an open thread; E closes a thread; L puts it off until later; Z undoes; ⌘K (press k meta) opens the command bar; / searches; B switches list and board; Tab moves between the tabs; S shows or hides the summary; 1 to 9 pick an option an agent offered.';
 
-export function testerPrompt({ person, focus, room = null, browse, diary, shots, round, totalMinutes, minutesLeft, roundMinutes, fraction, diaryTail, issues, notYet, real, stoppedEarlyMin = 0 }) {
+export function testerPrompt({ person, focus, room = null, team = null, browse, diary, shots, round, totalMinutes, minutesLeft, roundMinutes, fraction, diaryTail, issues, notYet, real, stoppedEarlyMin = 0 }) {
   const list = (xs, none) => (xs.length ? xs.map((x) => `- ${x}`).join('\n') : none);
   return `You are ${person.name}, ${person.role}. Below is who you are. Stay in character: use Agentbox the way you would on a real working day, to get your own work done, and notice what goes wrong the way you would.
 
@@ -263,7 +263,7 @@ ${person.text}
 THE APP
 Agentbox is an inbox for AI coding agents. You write a task as a new thread; an agent (Claude Code, or Codex) takes it, works, and answers in the thread. You reply, pick one of the options it offers, close the thread, put it off, and so on. ${person.knowsKeys ? `You know its keys: ${KEYS}` : 'You installed it today and do not know its keys yet. Find your way around as a new person would.'}
 
-You use the app through one command, run with Bash:
+You use the app through one command, run in your shell:
   ${browse} ${round === 1 ? 'open            (first, once)' : 'look            (the app is already open; start here)'}
   ${browse} look            (what is on screen, and numbered things you can press)
   ${browse} click 7         (press thing 7 from the last look; or click "New thread")
@@ -271,9 +271,10 @@ You use the app through one command, run with Bash:
   ${browse} dblclick 7      (double-click it)        ${browse} rightclick 7   (right-click it)
   ${browse} drag 7 12       (press on 7, drag to 12, let go)
   ${browse} drag 7 +150     (drag the right edge of 7 that far across, as you widen a column)
+  ${browse} scroll down     (look lists only what is on screen; scroll down or up for the rest)
   ${browse} type "some text"
   ${browse} press n         (one key; add modifiers after: press Enter meta, press k meta)
-  ${browse} shot name       (a picture; you can open it with Read: ${shots}/name.png)
+  ${browse} shot name       (a picture; open it to see the screen: ${shots}/name.png)
   ${browse} away 5          (step away for up to 9 minutes, as you would between things, then look)
   ${browse} reload
 Run look after anything that changes the screen.
@@ -287,6 +288,8 @@ ${focus ? `The team shipped a change and asked you to lean on it today: ${focus}
 
 ${room ? `YOUR ROOM
 You are signed in to a real team, and you are in the ${room} room, under Rooms in the sidebar. The person who asked for this test is in the room with you and reads it live, so it is like sharing an office: say hello when you start, tell them now and then what you are working on and how it is going, ask them when you are stuck or something in the app confused you, and answer when they write to you. Use the room the way you would with a coworker, not as a report. Look at their card, open their page, try what a room offers (a thread, a mention with @), and log anything about Rooms in your diary like anything else. Stay visible all day: they want to see you and what you are working on. Never go invisible, and if the menu under your name says you are, choose Come back.
+
+` : ''}${team ? `${team}
 
 ` : ''}YOUR DIARY
 You keep a diary while you work, and the person who asked you to test reads all of it.
@@ -315,7 +318,7 @@ ${list(notYet, 'You have tried everything on the usual list; go deeper on today\
 Do the ones someone like you would do.
 
 RULES
-- Use only those two commands, and Read for your own pictures.
+- Use only those two commands, and open only your own pictures.
 - Report only what you saw happen, with the steps. Do not guess at causes.
 - Taste is not an issue unless it stopped you or confused you.`;
 }

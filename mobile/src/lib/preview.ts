@@ -3,6 +3,8 @@
 // stand-in for the cloud that keeps what the phone sends in memory.
 import { macAway, macSeenOf } from '../../../renderer/src/phone-rows';
 import type { PhoneRows } from '../../../renderer/src/phone-rows';
+import type { LedgerLine } from '../../../renderer/src/thread-history';
+import type { WorkItem } from '../../../renderer/src/types';
 import { PREVIEW_ATTACHED, previewLink } from './preview-files.mjs';
 
 const DEV = '0a1b2c3d4e5f';
@@ -15,16 +17,16 @@ export function previewRows(now = Date.now()): PhoneRows {
   const iso = (ms: number) => new Date(ms).toISOString();
   // No computer is behind the preview to say its runs are still going, so they say it for the whole session.
   const STILL_GOING = now + 24 * 60 * MIN;
-  const thread = (project: string, item: any, history: any[], extra: Record<string, unknown> = {}) => ({
+  const thread = (project: string, item: Partial<WorkItem> & Pick<WorkItem, 'id' | 'updatedAt'>, history: Omit<LedgerLine, 'id'>[], extra: Record<string, unknown> = {}) => ({
     device: DEV, project, item: item.id, updated_at: iso(item.updatedAt),
-    snapshot: { v: 3, item: { kind: 'directive', labels: ['founder'], priority: 0, ...item }, history: history.map((l) => ({ id: item.id, ...l })), olderLines: 0, ...extra },
+    snapshot: { v: 3, item: { kind: 'directive', labels: ['founder'], priority: 0, ...item } as WorkItem, history: history.map((l) => ({ id: item.id, ...l })), olderLines: 0, ...extra },
   });
   const planAsk = 'Plan the phone app. I want alerts that reach my lock screen and a way to reply without opening the Mac.';
   const planResult = 'The plan is ready and Codex has reviewed it.\n\nThe first version signs you in, shows your inbox and lets you reply. Alerts come next, then messages between people.\n\n![The inbox on the phone](designs/w-1a2b3c4d5e/inbox.png)\n\n**Getting it approved** is mostly about two things: deleting an account has to delete what you shared, and messages need a report button.\n\n## Options\n1. Start building the first version (recommended)\n2. Wait until the Apple account is checked';
   // The files a Mac lists for a project, as main/phone-inbox.mts sends them.
   const attached = PREVIEW_ATTACHED;
   const roundAsk = 'Draw three versions of the inbox for the phone.';
-  const roundNote = "Three versions of the inbox are in the folder below. I'd go with the quiet one: it reads fastest at arm's length.\n\n~/docs/agentbox/designs/w-8b9c0d1e2f/\n\nWhat each one changes is in `designs/w-8b9c0d1e2f/inbox-versions.md`, and `designs/w-8b9c0d1e2f/compare.html` sets them side by side.\n\nThe walk-through is a short film: `designs/w-8b9c0d1e2f/walkthrough.mp4`\n\nThe full recording, `recordings/session.mov`, is too big for the phone.\n\n## Options\n1. Go with the quiet one (recommended)\n2. Try a fourth version";
+  const roundNote = "Three versions of the inbox are in the folder below. I'd go with the quiet one: it reads fastest at arm's length.\n\n~/docs/agentbox/designs/w-8b9c0d1e2f/\n\nWhat each one changes is in `designs/w-8b9c0d1e2f/inbox-versions.md`, and `designs/w-8b9c0d1e2f/compare.html` sets them side by side.\n\nThe walk-through is a short film: `designs/w-8b9c0d1e2f/walkthrough.mp4`\n\nThe threads I drew them from are in `designs/w-8b9c0d1e2f/threads.csv`, and the counts in `designs/w-8b9c0d1e2f/counts.json`.\n\nThe full recording, `recordings/session.mov`, is too big for the phone.\n\n## Options\n1. Go with the quiet one (recommended)\n2. Try a fourth version";
   const stuckAsk = 'Threads stuck on a Codex limit should land in Needs you.';
   const stuckNote = 'I found where a run that hits its limit is put back. Two ways to fix it:\n\n- Mark it stopped, so it shows in Needs you with the reason.\n- Retry on another account first, and only then show it.\n\n## Options\n1. Mark it stopped (recommended)\n2. Retry on another account first';
   const meterResult = 'Shipped. Each account meter now ends with its reset time, like 6:19pm.\n\n## Options\n1. Close this task';
@@ -49,7 +51,7 @@ export function previewRows(now = Date.now()): PhoneRows {
         { ts: at(70), source: 'founder', patch: { body: roundAsk } },
         { ts: at(9), source: 'agent', patch: { status: 'blocked', note: roundNote } },
       ], { attached }),
-      thread('site', { id: 'w-3c4d5e6f7a', title: 'Show when each account limit resets', status: 'done', priority: 0, body: 'I need to see when my limits reset.', result: meterResult, createdAt: at(200), updatedAt: at(52), wrote: { body: her(at(200)), status: agent(at(52)), result: agent(at(52)) } }, [
+      thread('site', { id: 'w-3c4d5e6f7a', title: 'Show when each account limit resets', status: 'done', priority: 0, engine: 'codex', body: 'I need to see when my limits reset.', result: meterResult, createdAt: at(200), updatedAt: at(52), wrote: { body: her(at(200)), status: agent(at(52)), result: agent(at(52)) } }, [
         { ts: at(200), source: 'founder', patch: { body: 'I need to see when my limits reset.' } },
         { ts: at(52), source: 'agent', patch: { status: 'done', result: meterResult } },
       ]),
@@ -57,7 +59,7 @@ export function previewRows(now = Date.now()): PhoneRows {
         { ts: at(40), source: 'founder', patch: { body: 'Draw five sign-in screens on the real app.' } },
       ], {
         live: { since: at(12), at: STILL_GOING, where: 'cloud', doing: [{ label: 'Read the sign-in page', startedAt: at(9) }, { label: 'Wrote the five screens', startedAt: at(6) }, { label: 'Ran the screenshot script', startedAt: at(3) }, { label: 'Drawing the third screen', startedAt: at(1) }] },
-        // A permission it is waiting on, as main/phone-inbox.mts sends one (shared/phone-snapshot.mjs `phoneApproval`).
+        // A permission it is waiting on, as main/phone-inbox.mts sends one (shared/phone-snapshot.mts `phoneApproval`).
         approvals: [{ id: 'ap-preview-1', at: at(1), tool: 'Bash', input: { command: 'npx eas-cli init --non-interactive', description: 'Link this folder to the Expo project' }, card: 'cHJldmlldy1jYXJk' }],
       }),
       // Two threads the phone plan filed: one waiting on you, one finished.
@@ -113,7 +115,11 @@ export function previewRows(now = Date.now()): PhoneRows {
   };
 }
 
-/** Settings as a Mac sends them (shared/phone-settings.mjs phoneSettingsOf). */
+const usage = (span: 'session' | 'week', percent: number, resetsAt: number) => ({
+  span, qualifier: span === 'week' ? 'all models' : null, name: span === 'week' ? 'This week' : 'This session', percent, resetsText: null, resetsOn: null, resetsAt, reset: false,
+});
+
+/** Settings as a Mac sends them (shared/phone-settings.mts phoneSettingsOf). */
 export function previewSettings(now = Date.now()) {
   return {
     device: DEV, name: 'Studio', updated_at: new Date(now - MIN).toISOString(),
@@ -124,20 +130,34 @@ export function previewSettings(now = Date.now()) {
         permission: 'auto', codexMode: 'auto', engines: ['claude', 'codex'], claude: { found: true }, codex: { found: true },
         codexModels: [{ id: 'gpt-5.6-sol', label: 'GPT-5.6-Sol', levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'medium' }, { id: 'gpt-5.6-terra', label: 'GPT-5.6-Terra', levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'medium' }, { id: 'gpt-5.6-luna', label: 'GPT-5.6-Luna', levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'medium' }], codexModelDefault: 'gpt-5.6-sol',
         agentsAuto: true, sessionsAtOnce: 4, agentsTotal: 6, agentsAutoTotal: 6, agentsNudge: 0, slotsMax: 12, slotsSuggested: 6, running: 3,
-        memoryGate: { on: true, slots: null, slotsAuto: 2, slotsMax: 8, now: 'Memory is fine. Nothing heavy running.' },
+        memoryGate: { on: true, slots: null, slotsAuto: 2, slotsMax: 8, now: 'Memory is fine. Nothing heavy running.', reading: { heavy: 1, waiting: 0, pressure: 'normal', usedPct: 58, asked: 14, waited: 2, refused: 0, holding: false } },
         leftovers: { on: false, now: null },
+        cloud: {
+          mode: 'full', whenOn: 'full', engines: ['claude'], inUse: { claude: 'you@example.com', codex: null },
+          accounts: [
+            { engine: 'claude', email: 'you@example.com', inUse: true, plan: 'Max 20x', state: 'ready', limitedUntil: null, same: 'default', usage: { at: now - 2 * MIN, limits: [usage('session', 36, now + 3 * 60 * MIN), usage('week', 61, now + 3 * 24 * 60 * MIN)] } },
+            { engine: 'claude', email: 'cloud@example.com', inUse: false, plan: 'Pro', state: 'ready', limitedUntil: null, same: null, usage: { at: now - 30 * MIN, limits: [usage('session', 8, now + 4 * 60 * MIN), usage('week', 22, now + 6 * 24 * 60 * MIN)] } },
+          ],
+        },
+        cloudPermission: 'bypassPermissions', cloudCodexMode: 'same', paused: false, productOrder: ['agentbox', 'film'],
         accounts: [
-          { id: 'default', email: 'you@example.com', chosen: false, state: 'live', note: null, plan: 'Max 20x', running: 2 },
-          { id: '.claude-work', email: 'you@work.example', chosen: false, state: 'at-limit', note: 'At its limit. Agents start again on their own when it resets.', resetsAt: now + 19 * 60 * MIN, plan: 'Max 5x', running: 1 },
+          { id: 'default', email: 'you@example.com', chosen: false, state: 'live', note: null, plan: 'Max 20x', running: 2,
+            usage: { at: now - 4 * MIN, limits: [usage('session', 34, now + 3 * 60 * MIN), usage('week', 61, now + 3 * 24 * 60 * MIN)] } },
+          { id: '.claude-work', email: 'you@work.example', chosen: false, state: 'at-limit', note: 'At its limit. Agents start again on their own when it resets.', resetsAt: now + 19 * 60 * MIN, plan: 'Max 5x', running: 1,
+            usage: { at: now - 9 * MIN, limits: [usage('session', 100, now + 19 * 60 * MIN), usage('week', 88, now + 2 * 24 * 60 * MIN)] } },
         ],
-        codexAccounts: [{ id: 'default', email: 'you@example.com', name: 'You', plan: 'Plus', signedIn: true, chosen: false }],
+        codexAccounts: [{ id: 'default', email: 'you@example.com', name: 'You', plan: 'Plus', signedIn: true, chosen: false, usage: { at: now - 20 * MIN, limits: [usage('week', 12, now + 5 * 24 * 60 * MIN)] } }],
+        publicLinks: [
+          { token: 'preview-launch-plan', name: 'launch-plan.md', url: 'https://example.com/f/preview-launch-plan', createdAt: now - 26 * 60 * MIN, updatedAt: now - 40 * MIN, comments: 2 },
+          { token: 'preview-pricing-page', name: 'pricing.html', url: 'https://example.com/f/preview-pricing-page', createdAt: now - 3 * 24 * 60 * MIN, updatedAt: now - 3 * 24 * 60 * MIN, comments: 0 },
+        ],
       },
       projects: [
         { slug: 'agentbox', name: 'Agentbox', onPhone: true, autonomous: true, permission: 'workspace', codexMode: 'workspace', account: 'any', running: 2 },
         { slug: 'film', name: 'Launch film', onPhone: true, autonomous: false, permission: 'plan', codexMode: 'workspace', account: 'any', running: 1 },
         { slug: 'site', name: 'Website', onPhone: true, autonomous: false, permission: 'workspace', codexMode: 'workspace', account: 'any', running: 0 },
       ],
-      // The repeating tasks a Mac sends with its settings (shared/phone-snapshot.mjs phoneRepeatsOf).
+      // The repeating tasks a Mac sends with its settings (shared/phone-snapshot.mts phoneRepeatsOf).
       repeats: [
         { product: 'agentbox', id: 'r-preview-1', title: 'Daily report', body: 'Write the daily report: sign-ups, failed runs, and anything that needs me. Say "nothing new" if nothing changed.', priority: 5, every: 'weekday', at: '09:00', createdAt: now - 9 * 24 * 60 * MIN, served: '', lastOccurrence: 'w-r2b3c4d5e6' },
         { product: 'site', id: 'r-preview-2', title: 'Check the launch page numbers', body: 'Check the launch page numbers and tell me what moved.', priority: 5, every: 'week', on: 4, at: '08:00', createdAt: now - 20 * 24 * 60 * MIN, served: '' },
@@ -147,7 +167,7 @@ export function previewSettings(now = Date.now()) {
   };
 }
 
-/** Your AI teammates as a Mac sends them (shared/phone-snapshot.mjs phoneTeammatesOf). Every name is made up. */
+/** Your AI teammates as a Mac sends them (shared/phone-snapshot.mts phoneTeammatesOf). Every name is made up. */
 export function previewTeammates(now = Date.now()) {
   const at = (m: number) => now - m * MIN;
   const morning = new Date(now).setHours(9, 0, 0, 0);
@@ -172,6 +192,8 @@ export function previewTeammates(now = Date.now()) {
       { id: 'm-p4', kind: 'pass', from: 't-chief00001', to: 't-launch0001', title: 'Cut the launch film to 60 seconds', ts: Math.min(morning + 2 * MIN, at(40)) },
       { id: 'm-p5', kind: 'msg', from: 't-chief00001', to: ['you'], text: 'Morning check-in.\n\n- **Quality lead** found sign-ups failing on a slow connection. The fix needs your yes.\n- **Launch lead** is cutting the film to 60 seconds.\n\nNothing else needs you.', ts: Math.min(morning, at(42)) },
       { id: 'm-p6', kind: 'msg', from: 't-chief00001', to: ['you'], text: 'One question for the film: should it open on the inbox or on the phone?', options: ['The inbox', 'The phone'], ts: at(12) },
+      // Asked in its thread, so the phone answers it there (a-teammates-question-on-the-phone-opens-its-thread).
+      { id: 'm-p7', kind: 'msg', from: 't-quality001', to: ['you'], text: 'When the email step times out, should sign-up try again on its own or show a clear error?', options: ['Try again', 'Show an error'], run: 'w-t2b3c4d5e6', ts: at(29) },
     ],
     runs: [
       { id: 'run-p1', kind: 'run', teammate: 't-chief00001', item: 'w-t3c4d5e6f7', product: 'agentbox', title: 'Write the morning check-in', verb: 'finished', ts: Math.min(morning + MIN, at(41)) },
@@ -187,6 +209,21 @@ const PREVIEW_TEAM = {
   people: [{ id: 'preview', email: 'you@example.com', name: 'You' }, { id: 'p-2', email: 'sam@example.com', name: 'Sam Rivera' }, { id: 'p-3', email: 'kai@example.com', name: 'Kai Ito' }],
   invites: [{ email: 'lee@example.com' }],
 };
+
+/** A message the phone writes to `room_messages`. */
+type MessageRow = { room_id: string; body: string; in_reply_to?: string | null; mentions?: string[] };
+
+/** A setting the phone sent, with every field any of its keys carries: the preview trusts its own sends. */
+interface SentSetting {
+  scope: string; key: string; product?: string;
+  value: { to: string[]; text?: string; answers?: Record<string, string>; id?: string; paused: boolean; starter?: string; product?: string; engine?: string; account?: string; all: boolean; except: string[] };
+}
+type PreviewWorkspace = Record<string, unknown> & {
+  alpha: Record<string, unknown>; memoryGate: Record<string, unknown>; leftovers: Record<string, unknown>;
+  accounts: { id: string; chosen: boolean }[]; codexAccounts: { id: string; chosen: boolean }[];
+  cloud: Record<string, unknown>; publicLinks: { token: string }[];
+};
+type PreviewMate = Record<string, unknown> & { id: string; paused?: boolean; now?: unknown; nowBeforePause?: unknown };
 
 /** Groups as the cloud keeps them (20261021000000_rooms.sql), for the Groups tab. Every name is made up. */
 export function previewGroups(now = Date.now()) {
@@ -234,9 +271,15 @@ export function previewGroups(now = Date.now()) {
     { person_id: 'p-3', thread_id: 'w-card-1', title: 'Fix the login meter', project: 'Agentbox', state: 'running', priority: 5, problem: 'The meter shows the wrong reset time on Max accounts.', progress: 'Found where the time is read.', solution: null, visible: true, updated_at: at(10) },
     { person_id: 'p-2', thread_id: 'w-card-2', title: 'Pick the sign-in screen', project: 'Website', state: 'waiting', priority: 5, problem: 'Two sign-in screens are left.', progress: null, solution: null, visible: true, updated_at: at(25) },
   ];
+  // What shipped this week: two teammates' threads and one of yours.
+  const shipped = [
+    { person_id: 'p-2', thread_id: 'w-card-3', title: 'Put the new sign-in screen live', project: 'Website', state: 'done', priority: 5, visible: true, people: null, shipped_at: at(2 * 24 * 60), updated_at: at(2 * 24 * 60) },
+    { person_id: 'preview', thread_id: 'w-7a8b9c0d1e', title: 'Rename the Display menu', project: 'Agentbox', state: 'done', priority: 5, visible: true, people: null, shipped_at: at(1500), updated_at: at(1500) },
+    { person_id: 'p-3', thread_id: 'w-card-4', title: 'Show when each login resets', project: 'Agentbox', state: 'done', priority: 5, visible: true, people: null, shipped_at: at(40), updated_at: at(40) },
+  ];
   const names: Record<string, string> = { preview: 'Ada Lovelace', 'p-2': 'Sam Rivera', 'p-3': 'Kai Ito', 'p-4': 'Maya Chen', 'p-5': 'Lee Park' };
   return {
-    rpc(name: string, args: Record<string, any>) {
+    rpc(name: string, args: Record<string, string>) {
       if (name === 'my_rooms') return rooms;
       if (name === 'room_people') return members[args.r] ?? [];
       if (name === 'room_names') return (members[args.r] ?? []).map((id) => ({ person_id: id, name: profiles.find((p) => p.person_id === id)?.display_name ?? names[id], avatar_url: null, has_card: true }));
@@ -245,10 +288,14 @@ export function previewGroups(now = Date.now()) {
     },
     select(table: string, query: string) {
       const q = new URLSearchParams(query);
-      if (table === 'room_profiles') return profiles;
+      if (table === 'room_profiles') {
+        const one = q.get('person_id');
+        return one?.startsWith('eq.') ? profiles.filter((p) => p.person_id === one.slice(3)) : profiles;
+      }
+      if (table === 'people' && q.get('id') === 'eq.preview') return [{ name: names.preview }];
       if (table === 'room_presence') return presence;
       if (table === 'room_reads') return reads;
-      if (table === 'thread_cards') return cards;
+      if (table === 'thread_cards') return q.has('shipped_at') ? shipped : cards;
       // A small drawing of a screen, as a stored file comes back.
       if (table === 'room_files') return [{ data: 'iVBORw0KGgoAAAANSUhEUgAAADAAAAAkCAIAAABAJy5dAAAAXElEQVR42u3VsQ0AEBBAUWNYQcRORlGoLKqQsIJGIdpDJH7y68srLnfKWfNUChAgQIBGreSjAQIEiDsESApKMQibp1WvlwBtB+0N0AWQfIfmAF0A8ToAAQL0K6gDciTequifOckAAAAASUVORK5CYII=' }];
       if (table !== 'room_messages') return null;
@@ -261,7 +308,12 @@ export function previewGroups(now = Date.now()) {
       if (when?.startsWith('lt.')) rows = rows.filter((m) => m.created_at < when.slice(3));
       return rows.sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, Number(q.get('limit') ?? 200));
     },
-    send(row: Record<string, any>) {
+    saveProfile(patch: Record<string, unknown>) {
+      const mine = profiles.find((p) => p.person_id === 'preview')!;
+      Object.assign(mine, patch);
+      return [mine];
+    },
+    send(row: MessageRow) {
       const made = msg(row.room_id, 'preview', new Date().toISOString(), row.body, { in_reply_to: row.in_reply_to ?? null, mentions: row.mentions ?? [] });
       messages.push(made);
       return made;
@@ -294,46 +346,78 @@ export function previewCloud(now = () => Date.now()) {
   if (scene === 'connect') rows.projects = [];
   // `?scene=queued`: a reply on a thread nothing is running, which reads Queued.
   if (scene === 'queued') rows.commands.push({ id: 'c-preview-q', device: DEV, project: 'film', item: 'w-5e6f7a8b9c', kind: 'reply', payload: { text: 'Open on the inbox.' }, created_at: new Date(now() - 30_000).toISOString(), claimed_at: null, taken_at: null, outcome: null } as PhoneRows['commands'][number]);
+  // `?scene=away`: a computer last online three hours ago, with no cloud to carry on.
+  if (scene === 'away') rows.projects = rows.projects.map((p) => ({ ...p, updated_at: new Date(now() - 180 * 60_000).toISOString() }));
+  // `?scene=copies`: one task sent to Claude Code and again to Codex.
+  if (scene === 'copies') {
+    const stuck = rows.threads.find((t) => t.item === 'w-2b3c4d5e6f');
+    if (stuck) rows.threads.push({ ...stuck, item: 'w-2b3c4d5e70', snapshot: { ...stuck.snapshot, item: { ...stuck.snapshot.item, id: 'w-2b3c4d5e70', engine: 'codex' } as WorkItem } });
+  }
   let signedIn = scene !== 'signed-out' && !walking;
   const settings = previewSettings(now());
+  // `?scene=codex`: a computer whose chosen agent is Codex, so a thread naming none runs on it.
+  if (scene === 'codex') (settings.settings.workspace as PreviewWorkspace).engine = 'codex';
+  // `previewOffline = true` on the page: reads and sends fail as they do on a phone with no signal.
+  const noSignal = () => {
+    if ((globalThis as typeof globalThis & { previewOffline?: boolean }).previewOffline) throw new Error('fetch failed: java.net.UnknownHostException: Unable to resolve host "preview.supabase.co": No address associated with hostname');
+  };
   const team = { ...PREVIEW_TEAM, members: [...PREVIEW_TEAM.members], invites: [...PREVIEW_TEAM.invites] };
   // The Mac takes a change a moment later and sends its settings again.
   const takeSetting = (c: PhoneRows['commands'][number]) => setTimeout(() => {
-    const { scope, key, value, product } = c.payload ?? {};
+    const { scope, key, value, product } = (c.payload ?? {}) as SentSetting;
     // Away, as the banner says it is: a teammate does not get what you sent, as it would not from a real computer.
     if (scope === 'teammate' && macAway(macSeenOf(rows.projects), now())) return;
-    const w: any = settings.settings.workspace;
-    const repeats: any[] = (settings.settings as any).repeats;
-    const mates: any = (settings.settings as any).teammates;
+    const w: PreviewWorkspace = settings.settings.workspace;
+    const repeats: Record<string, unknown>[] = settings.settings.repeats;
+    const mates: { chat: Record<string, unknown>[]; list: PreviewMate[] } = settings.settings.teammates;
     if (scope === 'teammate' && key === 'post') {
       mates.chat.push({ id: `m-${c.id}`, kind: 'msg', from: 'you', to: value.to, text: value.text, ...(value.answers ? { answers: value.answers } : {}), ts: now() });
       // The teammate answers a moment later, as a run of it would; a paused one does not.
-      if (!mates.list.find((x: any) => x.id === value.to[0])?.paused) setTimeout(() => {
+      if (!mates.list.find((x: PreviewMate) => x.id === value.to[0])?.paused) setTimeout(() => {
         mates.chat.push({ id: `m-${c.id}-r`, kind: 'msg', from: value.to[0], to: ['you'], text: 'Got it. I will tell you when it is done.', ts: now() });
         settings.updated_at = new Date(now()).toISOString();
       }, 4000);
     } else if (scope === 'teammate' && key === 'pause') {
-      const m = mates.list.find((x: any) => x.id === value.id);
+      const m = mates.list.find((x: PreviewMate) => x.id === value.id);
       if (m) Object.assign(m, { paused: value.paused, now: value.paused ? 'Paused' : m.nowBeforePause ?? null, nowBeforePause: value.paused ? m.now : undefined });
     } else if (scope === 'teammate' && key === 'describe') {
       mates.list.push({ id: `t-${c.id}`, name: 'New teammate', letter: 'N', role: null, job: value.text ?? value.starter, primary: false, paused: false, status: 'draft', product: value.product, waiting: [], running: null, duties: [], runsThisWeek: 0 });
-    } else if (scope === 'thread') { const t = rows.threads.find((r) => r.project === product && r.item === c.payload.item); if (t) { t.snapshot.item.pinned = value || undefined; t.updated_at = new Date(now() + 1).toISOString(); } }
-    else if (scope === 'repeat' && key === 'end') (settings.settings as any).repeats = repeats.filter((r) => !(r.product === product && r.id === c.payload.id));
+    } else if (scope === 'thread') {
+      const t = rows.threads.find((r) => r.project === product && r.item === c.payload.item);
+      // Each key carries what that key takes; the preview trusts its own sends.
+      const item = t?.snapshot.item as { pinned?: unknown; onMac?: unknown; label?: unknown; priority?: unknown } | undefined;
+      const v: unknown = value;
+      if (item && key === 'pinned') item.pinned = v || undefined;
+      else if (item && key === 'onMac') item.onMac = v || undefined;
+      else if (item && (key === 'label' || key === 'priority')) item[key] = v;
+      else if (t && item && key === 'moveTo') t.project = String(v);
+      else if (item && (key === 'resume' || key === 'redeliver')) Object.assign(item, { status: 'claimed', updatedAt: now() });
+      if (t) t.updated_at = new Date(now() + 1).toISOString();
+    }
+    else if (scope === 'repeat' && key === 'end') (settings.settings as { repeats: unknown[] }).repeats = repeats.filter((r) => !(r.product === product && r.id === c.payload.id));
     else if (scope === 'repeat' && key === 'change') Object.assign(repeats.find((r) => r.product === product && r.id === c.payload.id) ?? {}, value);
     else if (scope === 'repeat' && key === 'new') repeats.push({ product, id: `r-${c.id}`, priority: 5, createdAt: now(), served: '', ...value });
+    else if (scope === 'project' && key === 'archived') settings.settings.projects = settings.settings.projects.filter((p) => p.slug !== product);
     else if (scope === 'project') Object.assign(settings.settings.projects.find((p) => p.slug === product) ?? {}, { [key]: value });
+    else if (key === 'cloudRuns') { const mode = value as unknown as string; Object.assign(w.cloud, mode === 'mac' ? { mode } : { mode, whenOn: mode }); }
+    else if (key === 'productOrder') {
+      const order = value as unknown as string[];
+      w.productOrder = order;
+      settings.settings.projects.sort((a, b) => (order.indexOf(a.slug) + 1 || 1e9) - (order.indexOf(b.slug) + 1 || 1e9));
+    }
     else if (key === 'alphaRooms') w.alpha.rooms = value;
     else if (key === 'memoryGate') w.memoryGate.on = value;
     else if (key === 'memoryGateSlots') w.memoryGate.slots = value;
     else if (key === 'cleanupLeftovers') w.leftovers.on = value;
     else if (key === 'sessionsAtOnce') Object.assign(w, { sessionsAtOnce: value, agentsAuto: false });
-    else if (key === 'activeAccount') (value.engine === 'codex' ? w.codexAccounts : w.accounts).forEach((a: any) => { a.chosen = a.id === value.account; });
+    else if (key === 'activeAccount') (value.engine === 'codex' ? w.codexAccounts : w.accounts).forEach((a: { id: string; chosen: boolean }) => { a.chosen = a.id === value.account; });
     else if (key === 'phoneProjects') settings.settings.projects.forEach((p) => { p.onPhone = value.all && !value.except.includes(p.slug); });
-    else if (key !== 'agentsFeltSlow') w[key] = value;
+    else if (key === 'stopLink') w.publicLinks = w.publicLinks.filter((l: { token: string }) => l.token !== (value as unknown as string));
+    else if (key !== 'agentsFeltSlow' && key !== 'resumeStopped') w[key] = value;
     Object.assign(c, { taken_at: new Date(now()).toISOString(), outcome: 'done' });
     settings.updated_at = new Date(now()).toISOString();
   }, 1500);
-  const devices = new Map<string, Record<string, any>>();
+  const devices = new Map<string, Record<string, unknown>>();
   const groups = previewGroups(now());
   const session = () => (signedIn ? { access_token: 'preview', refresh_token: 'preview', expires_at: now() + 3600_000, user: { id: 'preview', email: 'you@example.com' } } : null);
   return {
@@ -341,6 +425,7 @@ export function previewCloud(now = () => Date.now()) {
     signedIn: () => signedIn,
     generation: () => 0,
     async select(table: string, query: string) {
+      noSignal();
       const group = groups.select(table, query);
       if (group) return group;
       joined();
@@ -354,13 +439,13 @@ export function previewCloud(now = () => Date.now()) {
       if (table === 'team_invites') return team.invites;
       return [];
     },
-    async insert(table: string, row: Record<string, any>) {
-      if (table === 'room_messages') return groups.send(row);
-      if (table === 'team_invites' && !team.invites.some((i) => i.email === row.email)) team.invites.push({ email: row.email });
+    async insert(table: string, row: Record<string, unknown>) {
+      if (table === 'room_messages') return groups.send(row as MessageRow);
+      if (table === 'team_invites' && !team.invites.some((i) => i.email === row.email)) team.invites.push({ email: row.email as string });
       return row;
     },
-    async upsert(table: string, row: Record<string, any>) {
-      if (table === 'push_devices') devices.set(row.token, row);
+    async upsert(table: string, row: Record<string, unknown>) {
+      if (table === 'push_devices') devices.set(row.token as string, row);
       return row;
     },
     async remove(table: string, query: string) {
@@ -370,10 +455,11 @@ export function previewCloud(now = () => Date.now()) {
       if (table === 'team_members') { const gone = team.members.filter((m) => m.person_id === eq('person_id')); team.members = team.members.filter((m) => m.person_id !== eq('person_id')); return gone; }
       return [];
     },
-    async rpc(name: string, args: Record<string, any> = {}) { return groups.rpc(name, args); },
+    async rpc(name: string, args: Record<string, string> = {}) { return groups.rpc(name, args); },
     async listFiles() { return []; },
     async removeFiles() {},
-    async update(_table: string, query: string, patch: Record<string, unknown>) {
+    async update(table: string, query: string, patch: Record<string, unknown>) {
+      if (table === 'room_profiles') return groups.saveProfile(patch);
       const id = decodeURIComponent(/id=eq\.([^&]+)/.exec(query)?.[1] ?? '');
       const at = rows.commands.findIndex((c) => c.id === id && !c.taken_at && !c.claimed_at);
       if (at < 0) return [];
@@ -383,7 +469,8 @@ export function previewCloud(now = () => Date.now()) {
     async signFiles(_bucket: string, paths: string[]) {
       return new Map(paths.map((p) => [p, previewLink(p.slice(p.lastIndexOf('/') + 1))]));
     },
-    async insertCommand(row: Record<string, any>) {
+    async insertCommand(row: Record<string, unknown>) {
+      noSignal();
       const made = { id: `c-${rows.commands.length + 1}`, payload: {}, item: null, ...row, created_at: new Date(now()).toISOString(), claimed_at: null, taken_at: null, outcome: null } as PhoneRows['commands'][number];
       rows.commands.push(made);
       if (made.kind === 'setting') takeSetting(made);
@@ -395,6 +482,10 @@ export function previewCloud(now = () => Date.now()) {
     async putFile() {},
     async googleUrl() { return ''; },
     async finishGoogle() { signedIn = true; signedInAt = now(); return session()!; },
+    async askPasswordReset() {},
+    resetAsked: () => false,
+    async finishReset() { signedIn = true; signedInAt = now(); return session()!; },
+    async setPassword() {},
     signOut() { signedIn = false; },
   };
 }
