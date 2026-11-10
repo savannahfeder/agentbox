@@ -8365,7 +8365,7 @@ export default function App() {
              reads; everything else about the card is the card anybody uses. */
           initial={walkCard ? { body: `${TASK_TITLE}\n\n${TASK_BODY}` } : composeInitial}
           scripted={walkCard ? { labels: [FIRST_RUN_LABEL] } : null}
-          ideas={!walkCard && showIdeas(tour) ? FIRST_IDEAS : null}
+          ideas={!walkCard && showIdeas(tour) && !(homeShown && modal !== 'compose') ? FIRST_IDEAS : null}
           askFolder={firstTask(tour)}
           onOpenConversation={openConversation}
           blockChoicesFor={team ? (holder) => taskBlockChoices(holder) : undefined}

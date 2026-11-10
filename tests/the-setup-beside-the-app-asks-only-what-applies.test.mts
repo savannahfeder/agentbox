@@ -270,3 +270,14 @@ describe('the chats step', () => {
     expect(split).toContain("'Add the agents already on this computer.'");
   });
 });
+
+describe('the walkthrough on Home', () => {
+  // The founder, on the first walkthrough tip over Home: "this is far too
+  // cluttered, this shouldn't be here (the presets under this). doesnt look
+  // like our home screen". The suggestions stay in the New thread dialog and
+  // the empty inbox; Home keeps its own look and the tip asks for words.
+  const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
+  it('offers no suggestions in the box on Home', () => {
+    expect(app).toMatch(/ideas=\{[^}]*!\(homeShown && modal !== 'compose'\)[^}]*\? FIRST_IDEAS : null\}/);
+  });
+});
