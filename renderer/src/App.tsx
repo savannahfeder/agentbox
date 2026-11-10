@@ -2723,7 +2723,7 @@ export default function App() {
     // caller and the card on the screen are asking the same question of the
     // same function, which is the fault was opened about one layer down: two
     // callers, two ideas of what the strip holds.
-    ? coach(run.step, 0, { opened: !!focused, view, picking: modal === 'snooze', palette: modal === 'palette', tabs: tabOrder })?.key ?? null
+    ? coach(run.step, 0, { opened: !!focused, view, picking: modal === 'snooze', palette: modal === 'palette', composing: modal === 'compose', tabs: tabOrder })?.key ?? null
     : null;
 
   // THE WHOLE BOX, and then the box she is looking at. Her filter
@@ -9062,6 +9062,7 @@ export default function App() {
           // Whether the board is what the page is drawn as, for the board
           // beat's second half (2026-10-06).
           board={boardDrawn}
+          composing={modal === 'compose'}
           // And whether the reply box is open, so the answer beat stops saying
           // R over a box that R would type into (2026-10-06).
           replying={modal === 'reply'}

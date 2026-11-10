@@ -1128,7 +1128,7 @@ function Statement({ head, line, go, onNext, skip, onSkip }: {
 }
 
 export function Onboarding({
-  run, claude, home, opened, waiting, later, picking, palette, board, replying, view, tabs, products = [],
+  run, claude, home, opened, waiting, later, picking, palette, board, composing, replying, view, tabs, products = [],
   beat, pointed, runsOn = null,
   onEvent, onStep, onSkipToApp, onPractice, onDone, onFiled, onProjectMade, onRecheck, onLeave, onShut, onSkipStep,
   onType,
@@ -1157,6 +1157,8 @@ export function Onboarding({
   picking?: boolean;
   /** Whether the command palette is open, for the last beat's second half. */
   palette?: boolean;
+  /** The New thread box is open. */
+  composing?: boolean;
   /** Whether the page is drawn as the board, for the board beat's second half. */
   board?: boolean;
   /** Whether the reply box is open, for the answer beat's second half. */
@@ -1475,7 +1477,7 @@ export function Onboarding({
     const teamStrip = run.step === 'where' && typeof document !== 'undefined'
       && !!document.querySelector('.th-bar .tm-tabs');
     const say = coach(run.step, run.sentAt ? now - run.sentAt : 0, {
-      opened, view, picking, palette, board, replying: !!replying || inReply, left: beat?.length, tabs, replies: run.replies,
+      opened, view, picking, palette, board, composing, replying: !!replying || inReply, left: beat?.length, tabs, replies: run.replies,
       tabNames: teamStrip ? TEAM_TAB_NAMES : undefined, team: !!team, wrote,
     });
     if (!say) return null;

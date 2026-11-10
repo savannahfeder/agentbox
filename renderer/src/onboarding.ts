@@ -1642,6 +1642,8 @@ export function coach(
     opened?: boolean; view?: string; picking?: boolean; left?: number; palette?: boolean;
     /** Whether the page is drawn as the board, for the board beat's second half. */
     board?: boolean;
+    /** Whether the New thread box is open, for the send step. */
+    composing?: boolean;
     tabs?: readonly string[];
     /** The team strip's tab names, when that strip is what is drawn. */
     tabNames?: Readonly<Record<string, string>>;
@@ -1722,7 +1724,8 @@ export function coach(
     // new thread card is drawn as an email and its button says Send, so the
     // sentence says what is written on the button somebody is looking at.
     case 'task':
-      return say('', 'Press ', '⌘↵', ' or click Send.');
+      // Escape shut the box: N reopens it with the draft, so N is what the card asks for.
+      return ctx.composing === false ? say('', 'Press ', 'N', ' to open your thread again.') : say('', 'Press ', '⌘↵', ' or click Send.');
     case 'working':
       return sinceSent >= SLOW_AFTER_MS
         ? say('Your agent is running.',
