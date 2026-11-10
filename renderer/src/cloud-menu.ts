@@ -88,6 +88,8 @@ export interface CloudStatus {
   movable?: string[];
   /** The keys saved for cloud runs, by name only (main/cloud/keys.mts). */
   keys?: { name: string; savedAt: number | null; label?: string | null }[];
+  /** The app moved off a Claude account at its limit (supervisor `_moveOffALimitedAccount`). */
+  switched?: { from: string; to: string; until: number } | null;
 }
 
 const agentName = (engine: 'claude' | 'codex') => (engine === 'codex' ? 'Codex' : 'Claude Code');
@@ -178,6 +180,12 @@ export const cloudAccountInUse = (accounts: CloudAccount[], engine: 'claude' | '
  */
 const clock = (t: number) => new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(' ', '').toLowerCase();
 
+// A weekly limit lifts days away, so its hour alone would read as today's.
+const dayAndHour = (t: number, now: number) => {
+  const hour = clock(t).replace(':00', '');
+  return new Date(t).toDateString() === new Date(now).toDateString() ? hour : `${new Date(t).toLocaleDateString('en-US', { weekday: 'short' })} ${hour}`;
+};
+
 export function cloudFootLine(cloud: CloudStatus, now = Date.now()): string {
   if (cloud.health === 'resting' && cloud.restingUntil && cloud.restingUntil > now) {
     const why = String(cloud.lastError || 'its runs failed before they started').slice(0, 120);
@@ -192,6 +200,10 @@ export function cloudFootLine(cloud: CloudStatus, now = Date.now()): string {
   // EVERY account was at its limit, which was right while runs rotated over
   // all of them and is silence now: the cloud starts nothing the moment the
   // account in use is out, however many others are signed in.
+  const moved = cloud.switched;
+  if (cloudIsOn(cloud) && moved && moved.until > now) {
+    return `${moved.from} is at its limit until ${dayAndHour(moved.until, now)}, so threads run on ${moved.to}.`;
+  }
   const inUse = cloudAccountInUse(cloud.accounts || [], 'claude');
   const until = inUse?.limitedUntil && inUse.limitedUntil > now ? inUse.limitedUntil : null;
   if (cloudIsOn(cloud) && until) {

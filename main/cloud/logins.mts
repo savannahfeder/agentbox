@@ -302,9 +302,10 @@ export function cloudAccountFrom(env: NodeJS.ProcessEnv = process.env, engine = 
 // the cloud went on with the account she had just switched away from, at its
 // limit). `follow` says the Mac's account is known and is not in the cloud.
 // With neither, as in a copy that cannot yet tell whose a sign-in is, it is
-// the first one signed in. A usage limit is never a reason to reach for
-// another: `mayRunOn` turns a limited account down, and the cloud runs nothing
-// and the menu says until when (renderer/src/cloud-menu.ts).
+// the first one signed in. A usage limit is never a reason for the cloud to
+// reach for another: `mayRunOn` turns a limited account down. The Mac moves
+// to an account with room instead (`Supervisor#_moveOffALimitedAccount`) and
+// the cloud follows it; with none, the menu says until when.
 //
 // `only` (emails or keys) narrows it for a copy of the app under test, which
 // shares this list with the person's own app.
