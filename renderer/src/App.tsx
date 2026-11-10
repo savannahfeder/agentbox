@@ -2834,6 +2834,22 @@ export default function App() {
     if (!boardSeen.current) return;
     setRun((r) => (r ? stepTo(r, 'command') : r));
   }, [run?.step, boardDrawn]);
+  // The practice tutorial walks a plain list: a board or a filter left on hid its rows and broke its Tab beat.
+  const viewBeforePractice = useRef<{ display: Display; ev: EvView } | null>(null);
+  useEffect(() => {
+    if (inPractice && !viewBeforePractice.current) {
+      viewBeforePractice.current = { display: inboxDisplay, ev: evView };
+      setInboxDisplay({ ...inboxDisplay, view: 'list', projects: [], priorities: [] });
+      if (evView !== 'list') setEvView('list');
+    } else if (!inPractice && viewBeforePractice.current) {
+      const was = viewBeforePractice.current;
+      viewBeforePractice.current = null;
+      setInboxDisplay(was.display);
+      if (was.ev !== 'list') setEvView(was.ev);
+    }
+    // Only the start and the end of the walk; the board beat flips the view in between.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inPractice]);
   // Your own rows are on the page unless you took yourself off it.
   const mineShown = !team || picked.includes(team.me ?? '');
   // The tab goes in too: Done runs newest finished first whatever the sort

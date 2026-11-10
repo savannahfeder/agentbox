@@ -206,6 +206,8 @@ export function SetupSplit(p: SetupSplitProps) {
       const typing = where === 'typing';
       e.stopPropagation();
       if (e.key === 'Enter' && !e.shiftKey && !busy) {
+        // A focused button (Back, Skip) takes its own Enter.
+        if ((e.target as Element | null)?.closest('button')) return;
         const enter = (e.target as Element).getAttribute('data-ss-enter');
         if (typing && enter === 'add') { e.preventDefault(); if (typed.trim()) addEmail(); else primary.current(); return; }
         if (typing && !(e.metaKey || e.ctrlKey)) return;
