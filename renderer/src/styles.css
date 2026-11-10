@@ -1381,7 +1381,11 @@ body {
   --wash: 255 255 255;
   background: linear-gradient(90deg, rgb(var(--wash) / 0.055), rgb(var(--wash) / 0.012) 70%, transparent);
 }
-[data-theme="light"] .row.recent { --wash: 0 0 0; }
+/* On white, a two-stop grey fade showed its steps and read as a slab; more
+   stops in the theme's ink smooth it out. */
+[data-theme="light"] .row.recent {
+  background: linear-gradient(90deg, rgb(17 25 48 / 0.045), rgb(17 25 48 / 0.032) 20%, rgb(17 25 48 / 0.016) 45%, rgb(17 25 48 / 0.005) 70%, transparent 90%);
+}
 .row.recent::after,
 .row.recent + .row::after { left: 0; }
 

@@ -61,6 +61,14 @@ describe('its row', () => {
     expect(rule![1]).not.toMatch(/margin|inset|left:|right:/);
   });
 
+  it('fades in the light theme in the theme ink, over enough stops to show no steps', () => {
+    const css = read('renderer/src/styles.css');
+    const light = css.match(/\[data-theme="light"\] \.row\.recent\s*\{([^}]*)\}/);
+    expect(light, 'a light-theme rule').toBeTruthy();
+    expect(light![1]).toMatch(/rgb\(17 25 48/);
+    expect((light![1].match(/rgb\(/g) ?? []).length).toBeGreaterThanOrEqual(4);
+  });
+
   it('has the hairlines above and below it run to the card edge with the wash', () => {
     // With the usual inset hairlines, the wash's top and bottom showed past
     // the lines' ends at the card's left edge.
