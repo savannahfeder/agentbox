@@ -56,14 +56,9 @@ describe("the computer's agents, kept on the phone", () => {
 
 describe('the agent a new thread opens on', () => {
   it("is Codex when Codex is the computer's chosen agent and nothing was picked", () => {
-    expect(openingEngine(memory(), both, 'codex')).toBe('codex');
-  });
-  it('is the one picked last, over the computer\'s default', () => {
-    const store = memory();
-    store.setItem('zero.lastEngine', 'claude');
-    expect(openingEngine(store, both, 'codex')).toBe('claude');
+    expect(openingEngine(both, 'codex')).toBe('codex');
   });
   it('is Claude on a computer that runs Claude Code by default', () => {
-    expect(openingEngine(memory(), both, 'claude')).toBe('claude');
+    expect(openingEngine(both, 'claude')).toBe('claude');
   });
 });

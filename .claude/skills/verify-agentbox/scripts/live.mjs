@@ -260,7 +260,7 @@ async function prepare(real, setupName = null, { logins = 2, codex = true, proje
   }
 
   const plan = path.join(INSTANCE, 'stub-plan.json');
-  fs.writeFileSync(plan, `${JSON.stringify({ say: 'The verify stand-in ran and answered.', receipts, world: path.join(INSTANCE, 'world.json') }, null, 1)}\n`);
+  fs.writeFileSync(plan, `${JSON.stringify({ say: 'The verify stand-in ran and answered.', receipts, makesFiles: true, world: path.join(INSTANCE, 'world.json') }, null, 1)}\n`);
 
   let claudeBin = null;
   let codexBin = null;
@@ -309,6 +309,9 @@ async function prepare(real, setupName = null, { logins = 2, codex = true, proje
     const stub = path.join(INSTANCE, 'bin', 'stub-claude-worker.mjs');
     fs.copyFileSync(STUB, stub);
     fs.copyFileSync(path.join(path.dirname(STUB), 'stand-in-world.mjs'), path.join(INSTANCE, 'bin', 'stand-in-world.mjs'));
+    fs.copyFileSync(path.join(path.dirname(STUB), 'stand-in-artifacts.mjs'), path.join(INSTANCE, 'bin', 'stand-in-artifacts.mjs'));
+    fs.mkdirSync(path.join(INSTANCE, 'bin', 'pictures'), { recursive: true });
+    for (const p of ['priority-palette.png', 'inbox-urgent.png']) fs.copyFileSync(path.join(REPO, 'docs', 'readme', p), path.join(INSTANCE, 'bin', 'pictures', p));
     fs.writeFileSync(claudeBin, `#!/bin/sh\nexec "${process.execPath}" "${stub}" "$@"\n`, { mode: 0o755 });
     codexBin = codex ? await realCodex() : null;
     if (codexBin) {

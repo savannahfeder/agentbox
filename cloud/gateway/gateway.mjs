@@ -46,6 +46,11 @@ const PLAN_TELL_TRIES = 12;
 // function's own 90 s, so no late answer or late stop can reach a new run.
 const RETIRED_MS = 60 * 60_000;
 const SWEEP_AT_ONCE = 8;
+// Inside the function's 90 s with a cold start after it, and long enough for
+// 200 writes in a row at S3's pace (about ten a second).
+const LEDGER_WRITE_MS = 45_000;
+// A done.json notice has no Mac waiting on it, so it may wait longer.
+const NOTICE_WRITE_MS = 75_000;
 // What one person's runs/ may hold. At it, no new link writes; past twice it,
 // which only links handed out before the cap was reached can make, the newest
 // objects are deleted. Worst case about $9 a month of S3 per person.
@@ -130,7 +135,8 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   // by the people it is about. Without it the cloud runs as it always has.
   db = null,
   // The team someone is on, { id, createdAt, members, owners }, or null. Without it nobody is on a team.
-  teams = null }) {
+  teams = null,
+  ledgerWriteMs = LEDGER_WRITE_MS, noticeWriteMs = NOTICE_WRITE_MS }) {
   const termsRefusal = () => new Refusal(403, 'terms', `accept the terms of ${termsVersion} first`, { terms: termsVersion });
   const personKey = (person) => `ledger/people/${person}.json`;
   const deviceKey = (key) => `ledger/devices/${sha256(key)}.json`;
@@ -225,9 +231,16 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   const needsSettling = (rec, t) => Object.values(rec.live).some((s) => t - s.at >= ceilingOf(s)) || live(rec, 'run').some((s) => runOver(rec, s, t));
 
   // Read, change and write one person's record; a write that lost a race
-  // reads again, so two starts can never both take the last agent.
-  async function update(person, change) {
-    for (let i = 0; i < 8; i += 1) {
+  // reads again, so two starts can never both take the last agent. Every
+  // start, finish and stop of theirs queues on this one object, so a lost race
+  // waits a random, growing while and tries again until a deadline, on the
+  // real clock since `now` can be one a test holds still. `once` is for a
+  // write the sweep makes again anyway: one that loses its race is let go.
+  async function update(person, change, { once = false, waitMs = ledgerWriteMs } = {}) {
+    const until = Date.now() + waitMs;
+    for (let lost = 0; lost === 0 || Date.now() < until; lost += 1) {
+      if (lost && once) return undefined;
+      if (lost) await new Promise((r) => setTimeout(r, Math.random() * Math.min(4000, 10 * 2 ** Math.min(lost, 9))));
       const cur = await objects.get(personKey(person));
       const rec = { ...fresh(), ...(cur ? JSON.parse(cur.body) : {}) };
       const ctx = { ended: [], person };
@@ -306,10 +319,11 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     const stopped = new Set();
     for (const e of stops) if (await stopSession(person, e.sid)) stopped.add(e.sid);
     if (!written.size && !stopped.size) return { stops, stopped };
+    // Making a stop or a record twice is harmless, so the sweep clears what this misses.
     await update(person, (r) => {
       r.stopping = stoppingOf(r).filter((e) => !stopped.has(e.sid));
       r.unrecorded = (r.unrecorded || []).filter((x) => !written.has(x.key));
-    });
+    }, { once: true });
     return { stops, stopped };
   }
   // Older records kept bare session names.
@@ -836,7 +850,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       const t = now();
       settle(rec, ctx, t);
       for (const [sid, s] of Object.entries(rec.live)) if (s.kind === 'run' && s.runId === m[2]) end(rec, ctx, sid, t, 'done');
-    });
+    }, { waitMs: noticeWriteMs });
     if (carry) await carry.runEnded(m[1], m[2]).catch((err) => log(`phone: ${err?.message || err}`));
   }
 

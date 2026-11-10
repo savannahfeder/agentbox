@@ -2060,6 +2060,17 @@ export class Supervisor {
     return { ok: true, interrupted };
   }
 
+  // Their reply answers the card as "Not now" would, so the agent's sign_in
+  // wait returns and the reply queued behind it is taken.
+  endSignInWait(product: string, id: string) {
+    try {
+      const ask = openSignIn(this.store.readItem(product, id));
+      if (!ask) return;
+      this.store.answerSignIn(product, id, { id: ask.id, said: 'replied' }, { source: 'founder' });
+      this.onChange?.();
+    } catch (e) { console.warn('zero: could not end the sign-in wait for a reply:', (e as Error).message); }
+  }
+
   // App quit: take the workers down with the supervisor. Killing the app used
   // to orphan every running claude session; six orphans from before a restart
   // kept working under stale permission rules and flooded the founder with
