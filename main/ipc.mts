@@ -82,7 +82,7 @@ import { EVENT_NAMES } from '../shared/analytics-events.mts';
 import { appFinder } from './everything-found.mts';
 import { appFilesPlace } from './files-place.mts';
 import { Name } from '../shared/product-name.mjs';
-import { setUpGit, startGhLogin } from './github-browser-sign-in.mts';
+import { ghToken, setUpGit, startGhLogin } from './github-browser-sign-in.mts';
 import type { GhLogin } from './github-browser-sign-in.mts';
 import { handedOnByReply, isGivenTask } from '../shared/team-rules.mts';
 import { closeRefusal, closedAnywayNote } from '../shared/not-shipped.mts';
@@ -2234,6 +2234,27 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
         push();
       });
       return { ok: true, code: login.code, url: login.url };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+  // The same sign-in for a cloud thread that asked for GitHub: `start` answers with the code and link,
+  // `token` waits for the approval and answers with the token gh made, which the card saves as GH_TOKEN.
+  let ghCloudLogin: GhLogin | null = null;
+  ipcMain.handle('zero:github-cloud-sign-in', async (_e, { action }: { action?: string } = {}) => {
+    try {
+      if (action === 'start') {
+        ghCloudLogin?.cancel();
+        const login = ghCloudLogin = await startGhLogin();
+        return { ok: true, code: login.code, url: login.url };
+      }
+      const login = ghCloudLogin;
+      if (!login) return { ok: false, error: 'Start GitHub\'s sign-in again.' };
+      const approved = await login.done;
+      if (ghCloudLogin === login) ghCloudLogin = null;
+      if (!approved) return { ok: false, error: 'GitHub\'s sign-in ended before it was approved. Start it again.' };
+      const token = await ghToken();
+      return token ? { ok: true, token } : { ok: false, error: 'GitHub signed in, but gh gave no token back. Paste a token instead.' };
     } catch (err) {
       return { ok: false, error: String((err as Error).message) };
     }

@@ -41,6 +41,19 @@ export function startGhLogin({ gh = 'gh', spawn = nodeSpawn as Spawn, env = proc
   });
 }
 
+/** The token gh holds for github.com, or null when it holds none or is not there. */
+export function ghToken({ gh = 'gh', spawn = nodeSpawn as Spawn, env = process.env }: { gh?: string; spawn?: Spawn; env?: NodeJS.ProcessEnv } = {}): Promise<string | null> {
+  return new Promise((resolve) => {
+    let child;
+    try { child = spawn(gh, ['auth', 'token', '--hostname', 'github.com'], { env, stdio: ['ignore', 'pipe', 'ignore'] }); } catch { resolve(null); return; }
+    let out = '';
+    const timer = setTimeout(() => child.kill(), SETUP_MS);
+    child.stdout.on('data', (b: Buffer) => { out += b; });
+    child.on('error', () => { clearTimeout(timer); resolve(null); });
+    child.on('close', (code: number | null) => { clearTimeout(timer); const t = out.trim(); resolve(code === 0 && t && !/\s/.test(t) ? t : null); });
+  });
+}
+
 /** Lets git on this computer push with gh's sign-in. */
 export function setUpGit({ gh = 'gh', spawn = nodeSpawn as Spawn, env = process.env }: { gh?: string; spawn?: Spawn; env?: NodeJS.ProcessEnv } = {}): Promise<boolean> {
   return new Promise((resolve) => {

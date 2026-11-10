@@ -27,6 +27,11 @@ export const NeedPlace = createContext<{
   fileInfo?: (path: string) => Promise<{ ok: boolean; size?: number; error?: string }>;
   onComputer: () => void;
   openLink: (href: string) => void;
+  // GitHub's own sign-in through gh on this computer; absent where there is no app to run it.
+  gitHubSignIn?: {
+    start: () => Promise<{ code: string; url: string } | { error: string }>;
+    token: () => Promise<{ token: string } | { error: string }>;
+  };
 } | null>(null);
 
 /** Per thread, the files sent while another ask on the same message was open, with the words that go when the last is given. */
@@ -119,6 +124,44 @@ function KeyFields({ need, fields, plain, late }: { need: Need; fields: { name: 
   </form>;
 }
 
+/** GitHub's device sign-in, whose token is saved as the card's GH_TOKEN. */
+function GitHubOwnSignIn({ need, late, paste }: { need: Need; late: boolean; paste: () => void }) {
+  const place = useContext(NeedPlace)!;
+  const [device, setDevice] = useState<{ code: string; url: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [said, setSaid] = useState<string | null>(null);
+  const begin = async () => {
+    const own = place.gitHubSignIn!;
+    setBusy(true); setSaid(null);
+    const started = await own.start();
+    setBusy(false);
+    if ('error' in started) { setSaid(started.error); return; }
+    setDevice(started);
+    place.openLink(started.url);
+    const got = await own.token();
+    if ('error' in got) { setDevice(null); setSaid(got.error); return; }
+    const out = await place.saveKeys([{ name: 'GH_TOKEN', value: got.token, label: 'GitHub token' }], need, undefined, late);
+    if (out) { setDevice(null); setSaid(out); return; }
+    focusNextAsk();
+  };
+  return <>
+    {device ? <>
+      <div className="need-code-box">
+        <span className="need-code-label">Enter this code</span>
+        <span className="need-code-value">{device.code}</span>
+        <button type="button" className="need-link" onClick={() => { void navigator.clipboard?.writeText(device.code); }}>Copy</button>
+      </div>
+      <div className="need-acts">
+        <button type="button" className="need-btn need-main" onClick={() => place.openLink(device.url)}>Open GitHub<span className="need-btn-arrow">{I.arrow}</span></button>
+      </div>
+    </> : <div className="need-acts">
+      <button type="button" className="need-btn need-main" disabled={busy} onClick={() => void begin()}>{busy ? 'Starting' : 'Sign in with GitHub'}<span className="need-btn-arrow">{I.arrow}</span></button>
+      <button type="button" className="need-link need-skip" onClick={paste}>Paste a token instead</button>
+    </div>}
+    {said && <p className="need-said" role="status">{said}</p>}
+  </>;
+}
+
 function Footer() {
   const place = useContext(NeedPlace)!;
   return <button type="button" className="need-foot" onClick={place.onComputer}>
@@ -138,6 +181,7 @@ export function NeedCard({ source, fallback }: { source: string; fallback: React
   const [replacing, setReplacing] = useState(false);
   const [late, setLate] = useState(false);
   const [sentLate, setSentLate] = useState(false);
+  const [pasting, setPasting] = useState(false);
   const box = useRef<HTMLDivElement | null>(null);
   const live = !!place?.saved && !!need && place.live && !older;
   const taking = live || late;
@@ -183,6 +227,8 @@ export function NeedCard({ source, fallback }: { source: string; fallback: React
     const article = /^[aeiou]/i.test(plain) ? 'an' : 'a';
     const getIt = tokenUrl && <>Get {article} {plain} from <a href={tokenUrl} onClick={(e) => { e.preventDefault(); open(tokenUrl); }}>{name}'s own page</a></>;
     const mark = <Mark id={svc ? svc.id : null} fallback={I.key} />;
+    const own = svc?.id === 'github' && !!place.gitHubSignIn && !pasting;
+    const getItShown = own ? null : getIt;
     if ((saved && !replacing) || !taking) {
       return <div className="need need-done" data-need={svc ? svc.id : key!.name} ref={box} onKeyDown={keepKeys}>
         <div className="need-body">{mark}<div className="need-col">
@@ -198,11 +244,12 @@ export function NeedCard({ source, fallback }: { source: string; fallback: React
         <div className="need-title">{title}</div>
         {why ? <div className="need-why">{withLinks(why, open)}</div> : key?.what && <div className="need-why">{withLinks(sentence(key.what), open)}</div>}
         {showFacts ? <div className="need-facts">
-          {getIt && <div>{I.arrow}<span>{getIt}</span></div>}
+          {getItShown && <div>{I.arrow}<span>{getItShown}</span></div>}
           <div>{I.lock}<span>Kept encrypted in your {Name} Cloud</span></div>
           <div>{I.cloud}<span>Every thread can use it from now on</span></div>
-        </div> : getIt && <div className="need-why need-also">{getIt}. Kept the same way.</div>}
-        <KeyFields need={need} fields={fields} plain={plain} late={!live} />
+        </div> : getItShown && <div className="need-why need-also">{getItShown}. Kept the same way.</div>}
+        {own ? <GitHubOwnSignIn need={need} late={!live} paste={() => setPasting(true)} />
+          : <KeyFields need={need} fields={fields} plain={plain} late={!live} />}
       </div></div>
       {showFoot && live && <Footer />}
     </div>;

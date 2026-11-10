@@ -21,6 +21,7 @@ interface LaterBridge {
   liveRoom?(p: { product: string; project?: string | null; name: string }): Promise<LiveRoomTicket | null>;
   gitHubSignIn?(p: { token: string }): Promise<{ ok: boolean; again?: string[]; error?: string }>;
   gitHubBrowserSignIn?(): Promise<{ ok: boolean; code?: string; url?: string; error?: string }>;
+  gitHubCloudSignIn?(p: { action: 'start' | 'token' }): Promise<{ ok: boolean; code?: string; url?: string; token?: string; error?: string }>;
   signInAnswer?(p: { product: string; id: string; ask: string; said: 'signed-in' | 'skipped' | 'landed'; url?: string }): Promise<{ ok: boolean; error?: string }>;
   cloudAccountPay?(p: { plan: 'pro' | 'plus' | 'max' | 'team' }): Promise<{ ok: boolean; where?: 'checkout' | 'billing'; error?: string; message?: string }>;
   cloudAccountTeamBilling?(): Promise<{ ok: boolean; owner?: boolean } & Partial<TeamBillingDetails>>;
@@ -1688,6 +1689,13 @@ export const api = {
     const zero = laterBridge();
     if (!zero?.gitHubBrowserSignIn) return { ok: false, error: RESTART_NOTE };
     return zero.gitHubBrowserSignIn();
+  },
+
+  /** GitHub's own sign-in for a cloud thread that asked for GitHub: `start` gives the code and link, `token` waits for the approval. */
+  async gitHubCloudSignIn(p: { action: 'start' | 'token' }): Promise<{ ok: boolean; code?: string; url?: string; token?: string; error?: string }> {
+    const zero = laterBridge();
+    if (!zero?.gitHubCloudSignIn) return { ok: false, error: RESTART_NOTE };
+    return zero.gitHubCloudSignIn(p);
   },
 
   /** What the person did with a sign-in link an agent on this thread is waiting on. */

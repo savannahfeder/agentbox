@@ -1658,6 +1658,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     const words = pasted.words ? text.replace(pasted.value, `[${label}, saved]`) : undefined;
     void saveKeys([{ name: pasted.name, value: pasted.value, label }], need, words).then((said) => { if (said) onNotice(said); });
   };
+  const gitHubSignIn = {
+    start: async () => { const r = await api.gitHubCloudSignIn({ action: 'start' }); return r.ok && r.code && r.url ? { code: r.code, url: r.url } : { error: r.error ?? 'GitHub\'s sign-in did not start.' }; },
+    token: async () => { const r = await api.gitHubCloudSignIn({ action: 'token' }); return r.ok && r.token ? { token: r.token } : { error: r.error ?? 'GitHub\'s sign-in did not finish.' }; },
+  };
   const md = (text: string) => {
     const needs = needsIn(text);
     const body = (
@@ -1669,7 +1673,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     // Said to since, or running again, it has been answered (round six: a card stayed open under "Do it from my computer.").
     const spoken = item.answer !== '(withdrawn)' && (item.wrote?.answer?.ts ?? 0) > (item.wrote?.result?.ts ?? 0);
     const live = isNewestAnswer(text, item.result) && item.status === 'open' && !spoken;
-    return <NeedPlace.Provider value={{ itemId: item.id, given: heldHere.map((h) => h.need), saved: savedKeys, live, needs, saveKeys, sendFile, sendCode, fileInfo: (path) => api.cloudFileInfo({ path }), onComputer: () => onReplySend('Do it from my computer.'), openLink: (href) => openHref(href) }}>{body}</NeedPlace.Provider>;
+    return <NeedPlace.Provider value={{ itemId: item.id, given: heldHere.map((h) => h.need), saved: savedKeys, live, needs, saveKeys, sendFile, sendCode, fileInfo: (path) => api.cloudFileInfo({ path }), onComputer: () => onReplySend('Do it from my computer.'), openLink: (href) => openHref(href), gitHubSignIn }}>{body}</NeedPlace.Provider>;
   };
 
   // Every design THIS MESSAGE names, embedded live under it. The whole
