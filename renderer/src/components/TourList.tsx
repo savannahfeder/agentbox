@@ -2,9 +2,9 @@
 // while it runs, ticked as each lesson lands. The tips themselves stay in
 // Tour.tsx; this only lists them. `data-tour-list` makes room for it.
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { MAC } from '../this-keyboard';
-import { tourChecklist, tourCount, tourPlace } from '../setup-split';
+import { tourChecklist, tourCount } from '../setup-split';
 import type { Lesson, Tour } from '../tour';
 import { Name } from '../../../shared/product-name.mjs';
 import { Mark } from './SetupSplit';
@@ -20,13 +20,10 @@ export function TourList({ tour, now, onSkip }: { tour: Tour; now: Lesson | null
     return () => root.removeAttribute('data-tour-list');
   }, []);
   const rows = tourChecklist(tour.done, MAC ? '⌘' : 'Ctrl', now);
-  // The tour can point back at a step; the count never goes back.
-  const furthest = useRef(0);
-  furthest.current = Math.max(furthest.current, tourPlace(rows));
   return (
     <aside className="tour-list" aria-label={`How ${Name} works`}>
       <div className="tl-brand"><Mark />{Name}</div>
-      <div className="tl-count">{tourCount(rows, furthest.current)}</div>
+      <div className="tl-count">{tourCount(rows)}</div>
       <div className="tl-body">
         <h2 className="ss-h"><b>How {Name} works.</b>Try each step on the real thing.</h2>
         <div className="ss-list">

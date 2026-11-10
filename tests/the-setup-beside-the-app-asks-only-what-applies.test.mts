@@ -208,6 +208,13 @@ describe('the walkthrough counter', () => {
   it('agrees with the lit row when the tour starts further down', () => {
     expect(tourCount(tourChecklist([], '⌘', 'open'))).toBe('2 of 5');
   });
+  // Round six: Send opened the thread, the tour lit Write back (3), Escape went
+  // back to Home and lit Open one, and the count, kept from going back, still said 3.
+  it('is drawn off the rows as they are now, with no floor kept from before', () => {
+    const list = fs.readFileSync(new URL('../renderer/src/components/TourList.tsx', import.meta.url), 'utf8');
+    expect(list).toMatch(/\{tourCount\(rows\)\}/);
+    expect(list).not.toMatch(/furthest/);
+  });
   it('starts at 1 and stops at the last', () => {
     expect(tourCount(tourChecklist([]))).toBe('1 of 5');
     expect(tourCount(tourChecklist(['start', 'compose', 'open', 'choose', 'close', 'palette']))).toBe('5 of 5');

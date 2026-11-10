@@ -47,3 +47,13 @@ describe('every setup screen that takes Enter on the window', () => {
     }
   });
 });
+
+describe("Home's keys", () => {
+  // Round six: a tester tabbed from Home's New thread box onto its Claude Code
+  // button and pressed Enter, twice, and a thread from Needs you opened instead
+  // of the agent menu.
+  it('leave Enter on a focused button to the button', () => {
+    const home = fs.readFileSync(new URL('../renderer/src/home/HomePage.tsx', import.meta.url), 'utf8');
+    expect(home).toMatch(/if \(enterIsTheButtons\(e\)\) return;/);
+  });
+});

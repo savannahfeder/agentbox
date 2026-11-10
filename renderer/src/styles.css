@@ -9173,6 +9173,9 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
    plain white slab on the light theme. The `:root[data-skin] .modal.compose`
    block says the rest.
 */
+/* A dialog of its own, not a list dropping from the top like the command bar. */
+.modal-backdrop.fp-backdrop { place-items: center; padding-top: 0; }
+
 .fp-card {
   width: min(560px, 92vw);
   display: flex;

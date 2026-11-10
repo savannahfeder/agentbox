@@ -723,8 +723,7 @@ export function finishedCleared(
   laterAt: number,
 ): boolean {
   if (!run || !run.examples.length) return false;
-  const there = new Set(rows.map((r) => r.id));
-  return !run.examples.some((id, i) => i !== waitingAt && i !== laterAt && there.has(id));
+  return clearIds(rows, run, waitingAt, laterAt).length === 0;
 }
 
 /**
@@ -752,7 +751,9 @@ export function clearIds(
 ): string[] {
   if (!run) return [];
   const there = new Set(rows.map((r) => r.id));
-  return run.examples.filter((id, i) => i !== waitingAt && i !== laterAt && there.has(id));
+  const finished = run.examples.filter((id, i) => i !== waitingAt && i !== laterAt && there.has(id));
+  // Your own thread is in the inbox here only when Z brought it back.
+  return run.item && there.has(run.item) ? [...finished, run.item] : finished;
 }
 
 /**
@@ -941,7 +942,8 @@ export function afterUnblock(
   rows: { id: string }[], run: FirstRun | null, waitingAt: number,
 ): 'where' | 'clear' | null {
   if (!run) return null;
-  if (inboxCleared(rows, run)) return 'where';
+  const own = !!run.item && rows.some((r) => r.id === run.item);
+  if (inboxCleared(rows, run) && !own) return 'where';
   const waiting = waitingId(run, waitingAt);
   return waiting && rows.some((r) => r.id === waiting) ? null : 'clear';
 }
@@ -3060,6 +3062,12 @@ export function readFirstRun(store: Store): FirstRun {
 
 export function saveFirstRun(store: Store, s: FirstRun): void {
   try { store.setItem(KEY, JSON.stringify(s)); } catch { /* a full disk is not a reason to stop the walk */ }
+}
+
+/** The tutorial saved before a reload, when its practice project is still there to resume. */
+export function resumableTutorial(saved: FirstRun, products: { slug: string; practice?: boolean }[]): FirstRun | null {
+  if (!saved.tutorial || !saved.practice) return null;
+  return products.some((p) => p.slug === saved.practice && p.practice) ? saved : null;
 }
 
 export function finishFirstRun(store: Store): void {

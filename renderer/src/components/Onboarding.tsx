@@ -1237,7 +1237,7 @@ export function Onboarding({
   // can take seconds.
   const [recent, setRecent] = useState<RecentFolder[] | null>(null);
   // Nothing is lit until the person picks, so the Return that left the welcome
-  // cannot choose a folder. Arrow down lights the first.
+  // cannot take a recent folder. Unlit, Return opens Choose a folder.
   const [lit, setLit] = useState(-1);
   // Whether the mouse has moved since this screen was drawn. See `hoverLit`:
   // a row under a mouse standing still is not a row anybody chose.
@@ -1414,7 +1414,7 @@ export function Onboarding({
       // product wants one. The cap is not drawn on a row the mouse lit either,
       // so Return promises nothing here that it will not do.
       if (e.key === 'Enter' && lit > rows) { e.preventDefault(); if (!byMouse) skipFolder(); return; }
-      if (e.key === 'Enter' && lit < 0) { e.preventDefault(); return; }
+      if (e.key === 'Enter' && lit < 0) { e.preventDefault(); pickFolder(); return; }
       if (e.key === 'Enter') {
         e.preventDefault();
         if (lit < rows && recent[lit]) takeFolder(recent[lit].folder);
@@ -1696,7 +1696,7 @@ export function Onboarding({
             >
               <span className="fr-fold"><PlusGlyph /></span>
               <span className="fr-folder-name">{recent && recent.length ? COPY.folderOther : COPY.folderFirst}</span>
-              <span className="fr-folder-key">{lit === (recent?.length ?? 0) && <Cap cap="↵" />}</span>
+              <span className="fr-folder-key">{(lit === (recent?.length ?? 0) || lit < 0) && <Cap cap="↵" />}</span>
             </button>
             <button
               type="button"

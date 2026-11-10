@@ -183,7 +183,7 @@ import {
   afterUnblock, finishedCleared, firstRunNeeded, projectsOfTheirOwn, laterCleared, laterId, laterIndex,
   mayOpenInbox, noCodingAgent, practising, restartFirstRun, snoozeRefused, tutorialRun,
   waitingId, waitingIndex,
-  finishFirstRun, finishedTheFirstRun, setupStepCount, forcedStep, readFirstRun, walkRows,
+  finishFirstRun, finishedTheFirstRun, setupStepCount, forcedStep, readFirstRun, resumableTutorial, walkRows,
   saveFirstRun, START as RUN_START, stepTo, TASK_BODY, TASK_TITLE, whyNotMade, type FirstRun,
   replyAnswered, replyWritten, skipStep, tabStop, walkCoversTheApp, walkMayOpen,
 } from './onboarding';
@@ -1256,12 +1256,15 @@ export default function App() {
 
   useEffect(() => { if (run) saveFirstRun(localStorage, run); }, [run]);
 
-  // A reload ends a tutorial (it is not restored), so its practice threads go with it.
+  // After a reload: the tutorial picks up where it was, or its practice threads go.
   const sweptPractice = useRef(false);
   useEffect(() => {
     if (!snap || sweptPractice.current) return;
     sweptPractice.current = true;
-    if (!run && !forcedRun.current && snap.products.some((p) => p.practice)) {
+    if (run || forcedRun.current) return;
+    const again = resumableTutorial(readFirstRun(localStorage), snap.products);
+    if (again) setRun(again);
+    else if (snap.products.some((p) => p.practice)) {
       void api.firstRunPracticeEnd().then(() => refreshRef.current?.());
     }
   }, [snap, run]);
@@ -9221,7 +9224,7 @@ export default function App() {
              the row an agent is stopped on, which is why her E went there while
              the ring was on a row at the top. */
           beat={walkBeat}
-          unfinished={run ? run.examples.filter((id) => inbox.some((r) => r.id === id)).length : 0}
+          unfinished={run ? [...run.examples, run.item].filter((id) => inbox.some((r) => r.id === id)).length : 0}
           pointed={pointed?.id ?? null}
           picking={modal === 'snooze'}
           /*

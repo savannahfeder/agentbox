@@ -36,3 +36,12 @@ describe('Use this folder on a folder it cannot use', () => {
     expect(fp).toMatch(/className="fp-use" onClick=\{\(\) => void use\(\)\} disabled=\{busy\}/);
   });
 });
+
+describe('the folder picker sits in the middle of the window', () => {
+  // The founder asked for centred dialogs; round-six pictures showed this one
+  // hanging from 12% down, the way the command bar does.
+  it('centres its card', () => {
+    const css = fs.readFileSync(new URL('../renderer/src/styles.css', import.meta.url), 'utf8');
+    expect(css).toMatch(/\.modal-backdrop\.fp-backdrop \{ place-items: center; padding-top: 0; \}/);
+  });
+});

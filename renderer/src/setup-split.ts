@@ -97,6 +97,6 @@ export function setupStartsOn({ sky, dark }: { sky: string | null; dark: boolean
   return sky ? null : dark ? 'ember' : 'sage';
 }
 
-/** The walkthrough's place: the lit row or one past what is done, whichever is further. TourList keeps it from going back. */
+/** The walkthrough's place: the lit row or one past what is done, whichever is further. */
 export const tourPlace = (rows: ChecklistRow[]) => Math.min(Math.max(rows.filter((r) => r.state === 'done').length + 1, rows.findIndex((r) => r.state === 'now') + 1), rows.length);
-export const tourCount = (rows: ChecklistRow[], floor = 0) => `${Math.max(tourPlace(rows), floor)} of ${rows.length}`;
+export const tourCount = (rows: ChecklistRow[]) => `${tourPlace(rows)} of ${rows.length}`;

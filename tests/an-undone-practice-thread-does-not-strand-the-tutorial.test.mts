@@ -7,17 +7,21 @@
 // and nothing moved, because the step waited for every practice thread to
 // leave. Once the waiting one is answered, a thread still left sends the walk
 // back to the clearing step, which then runs forward on its own.
+//
+// Round six (2026-11-10): both testers pressed Z on their OWN practice thread,
+// the one they wrote, not an example, and still read "Your inbox is now empty"
+// with it in Needs you. Their thread counts as well now.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { START, afterUnblock, type FirstRun } from '../renderer/src/onboarding.ts';
+import { START, afterUnblock, clearIds, finishedCleared, type FirstRun } from '../renderer/src/onboarding.ts';
 
-const run: FirstRun = { ...START, step: 'unblock', examples: ['a', 'b', 'wait', 'later'] };
+const run: FirstRun = { ...START, step: 'unblock', item: 'mine', examples: ['a', 'b', 'wait', 'later'] };
 const W = 2;
 const rows = (...ids: string[]) => ids.map((id) => ({ id }));
 
 describe('afterUnblock', () => {
   it('goes on when every practice thread has left', () => {
-    expect(afterUnblock(rows('mine'), run, W)).toBe('where');
+    expect(afterUnblock(rows('real'), run, W)).toBe('where');
   });
   it('waits while the waiting thread is still in the inbox', () => {
     expect(afterUnblock(rows('wait'), run, W)).toBe(null);
@@ -27,11 +31,32 @@ describe('afterUnblock', () => {
     expect(afterUnblock(rows('a'), run, W)).toBe('clear');
     expect(afterUnblock(rows('later'), run, W)).toBe('clear');
   });
+  it('goes back to clearing when it is your own thread Z brought back', () => {
+    expect(afterUnblock(rows('mine'), run, W)).toBe('clear');
+  });
   it('is nothing without a walk', () => {
     expect(afterUnblock(rows(), null, W)).toBe(null);
   });
   it('is what the app follows', () => {
     const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
     expect(app).toMatch(/afterUnblock\(inbox, run, WAITING_AT\)/);
+  });
+});
+
+describe('the clearing step', () => {
+  it('points at your own thread when Z brought it back, after the examples', () => {
+    expect(clearIds(rows('a', 'mine'), run, 2, 3)).toEqual(['a', 'mine']);
+    expect(clearIds(rows('mine', 'wait'), run, 2, 3)).toEqual(['mine']);
+  });
+  it('is not finished while your own thread is back', () => {
+    expect(finishedCleared(rows('mine'), run, 2, 3)).toBe(false);
+    expect(finishedCleared(rows('wait', 'later'), run, 2, 3)).toBe(true);
+  });
+});
+
+describe('the inbox-zero line', () => {
+  it('counts your own thread among what is left', () => {
+    const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
+    expect(app).toMatch(/unfinished=\{run \? \[\.\.\.run\.examples, run\.item\]\.filter/);
   });
 });
