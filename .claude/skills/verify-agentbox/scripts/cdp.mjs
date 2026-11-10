@@ -22,12 +22,13 @@ import { MAC_CHROME, NO_HIDDEN_BROWSER, chromesForTesting, headlessShells } from
 export { chromesForTesting, headlessShells };
 
 /**
- * On a Mac, the hidden browser (shared/hidden-browser.mjs), and Google Chrome only as a
- * name launchChrome refuses; elsewhere `VERIFY_CHROME`, or the Chromium Playwright
- * installed (the Linux cloud has it).
+ * `VERIFY_CHROME` first, unless on a Mac it names Google Chrome. Then on a Mac,
+ * the hidden browser (shared/hidden-browser.mjs), and Google Chrome only as a
+ * name launchChrome refuses; elsewhere the Chromium Playwright installed (the
+ * Linux cloud has it).
  */
 export function findChrome(platform = process.platform, env = process.env, playwright = () => createRequire(import.meta.url)('playwright'), forTesting = chromesForTesting, shells = headlessShells) {
-  if (platform === 'darwin') return forTesting()[0] ?? shells()[0] ?? MAC_CHROME;
+  if (platform === 'darwin') return (env.VERIFY_CHROME && env.VERIFY_CHROME !== MAC_CHROME ? env.VERIFY_CHROME : null) ?? forTesting()[0] ?? shells()[0] ?? MAC_CHROME;
   if (env.VERIFY_CHROME) return env.VERIFY_CHROME;
   try { return playwright().chromium.executablePath(); } catch { return MAC_CHROME; }
 }
