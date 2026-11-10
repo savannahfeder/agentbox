@@ -1904,7 +1904,7 @@ export class Supervisor {
     for (const [key, trouble] of Object.entries(this._profileTrouble ?? {})) {
       if (trouble?.cause !== 'signed-out') continue;
       const stamp = this._signInMoment(key);
-      if (!stamp || stamp <= (trouble.stamp ?? trouble.at ?? 0)) continue;
+      if (!stamp || stamp <= (trouble.stamp || trouble.at || 0)) continue;
       trouble.stamp = stamp;
       if (this._profileCooldown) this._profileCooldown[key] = 0;
       if (!key.startsWith('codex:')) this._spawnCooldownUntil = 0;
@@ -1932,12 +1932,31 @@ export class Supervisor {
     const home = this.config.home || os.homedir();
     // The default login's entry is the real home's, not a stand-in home's.
     const keychain = folder || home === os.homedir() ? this._keychainStamp(claudeKeychainService(folder)) : null;
+    // Not read yet: `.claude.json` alone would look like a sign-in, so wait a tick.
+    if (keychain === undefined) return 0;
     if (keychain == null) return signInStamp(files);
     return Math.max(keychain, signInStamp(files.filter((f) => path.basename(f) !== '.claude.json')));
   }
 
-  _keychainStamp(service: string) {
-    return keychainStamp(service);
+  _keychainStamps: Record<string, number | null> = {};
+  _keychainAsking = new Set<string>();
+  _keychainRead = (service: string) => keychainStamp(service, undefined, this._keychainPlatform);
+  _keychainPlatform: string = process.platform;
+
+  /**
+   * The entry's date as last read, undefined before the first read lands. Each
+   * call starts a fresh read in the background unless one is still out, so the
+   * main thread never waits on `security`.
+   */
+  _keychainStamp(service: string): number | null | undefined {
+    if (this._keychainPlatform !== 'darwin') return null;
+    if (!this._keychainAsking.has(service)) {
+      this._keychainAsking.add(service);
+      this._keychainRead(service)
+        .then((at) => { this._keychainStamps[service] = at; }, () => {})
+        .finally(() => this._keychainAsking.delete(service));
+    }
+    return Object.hasOwn(this._keychainStamps, service) ? this._keychainStamps[service] : undefined;
   }
 
   /** Which files one account's login writes, by the key its trouble is kept under. */
