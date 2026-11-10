@@ -43,6 +43,7 @@ import * as approvals from './approvals.mts';
 import { cardsInFront } from '../shared/which-card-is-in-front.mts';
 import { restartNeeded } from './staleness.mts';
 import { artifactRoots, resolveArtifact } from './artifact-path.mts';
+import { filesKeeper, filesSettingsOf, type FilesKeeper, type FilesStorage } from './files-cloud.mts';
 import { folderPictures } from './folder-pictures.mts';
 import { docUrl } from './doc-scheme.mts';
 import { readDoc, writeDoc } from './doc-file.mts';
@@ -114,7 +115,7 @@ export interface IpcWindow {
   show?(): void;
 }
 
-export interface IpcShell { openExternal(url: string): unknown; openPath?(path: string): Promise<string> }
+export interface IpcShell { openExternal(url: string): unknown; openPath?(path: string): Promise<string>; trashItem?(path: string): Promise<void> }
 
 export interface IpcOpenDialog {
   title: string;
@@ -233,9 +234,12 @@ interface FilesPlace {
   pictureNamed(src: unknown): Promise<string | null>;
   newDocument(ask: { project: string; name: string; kind?: 'document' | 'table'; folder?: string | null; by?: string | null }): Promise<{ key: string }>;
   addFiles(ask: { project: string; paths?: string[]; folder?: string | null; by?: string | null }): Promise<{ added: number; refused: string[]; keys: string[] }>;
+  trash(ask: { keys: readonly string[]; older?: boolean }): Promise<{ ok: boolean; moved: number; bytes: number; error?: string }>;
+  bringBackFor(ask: { product: string; id: string; deadlineMs?: number }): Promise<boolean>;
+  considerNow(): void;
 }
 // The JS defaults `team = null` and `nameOf = () => ...` read as the whole type.
-const filesPlaceFor = appFilesPlace as (deps: { store: Store; team: IpcTeam | null; accountRoot: string; storeRoot: string; notify?: () => void }) => FilesPlace;
+const filesPlaceFor = appFilesPlace as (deps: { store: Store; team: IpcTeam | null; accountRoot: string; storeRoot: string; notify?: () => void; keeper?: FilesKeeper | null; trashItem?: ((file: string) => Promise<void>) | null }) => FilesPlace;
 type RoomCalls = Record<RoomOp, (...args: unknown[]) => unknown>;
 type ImportableThreads = Awaited<ReturnType<typeof readImportableThreads>>;
 type SetProjectPayload = { product?: string; key: string; value?: unknown };
@@ -2316,6 +2320,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       if (countsTurnedOff(payload)) { analytics.track('counts_turned_off'); analytics.flush(); }
       setWorkspaceSetting({ config, supervisor, store }, payload ?? {});
       if (payload?.key === 'alphaRooms') team?.rooms?.tick().catch(() => {});
+      if (payload?.key === 'filesInCloud' || payload?.key === 'filesOffAfterDays') filesPlaceNow().considerNow();
       if (cornerTagTurnedOff(payload)) analytics.track('tag_turned_off');
       push();
       return { ok: true, ...readSettings({ config, supervisor, store }) };
@@ -2543,8 +2548,48 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     catch (err) { return { ok: false, error: String((err as Error)?.message ?? err), lines: [], files: [], comments: [], total: { lines: 0, files: 0, comments: 0 } }; }
   });
   ipcMain.handle('zero:warm-find-in-threads', () => { finderNow().warm().catch(() => {}); return true; });
+  const cloudHome = () => ({ home: supervisor.config.home || os.homedir() });
+  const keeper = filesKeeper({
+    dir: path.join(config.storeRoot, 'files-cloud'),
+    storage: async () => {
+      const s = await (await import('./cloud/account.mts')).cloudFilesStorage(cloudHome());
+      return s?.putFile && s.getToFile && s.exists && s.del ? s as unknown as FilesStorage : null;
+    },
+    account: async () => (await import('./cloud/account.mts')).cloudFilesAccount(cloudHome()),
+    settings: () => filesSettingsOf(config as { filesInCloud?: unknown; filesOffAfterDays?: unknown }),
+    // The Mac's Quick Look draws a film's or picture's poster; elsewhere a kept file has none.
+    poster: async (src, to) => {
+      if (process.platform !== 'darwin' && process.platform !== 'win32') return false;
+      const { nativeImage } = await import('electron');
+      const img = await nativeImage.createThumbnailFromPath(src, { width: 640, height: 640 });
+      if (img.isEmpty()) return false;
+      await fsWatch.promises.writeFile(to, img.toJPEG(80));
+      return true;
+    },
+    freeBytes: async () => { const s = await fsWatch.promises.statfs(config.storeRoot); return s.bavail * s.bsize; },
+    notify: () => push(),
+  });
   let filesPlace: FilesPlace | null = null;
-  const filesPlaceNow = () => (filesPlace ??= filesPlaceFor({ store, team, accountRoot: config.accountRoot, storeRoot: config.storeRoot, notify: () => push() }));
+  const filesPlaceNow = () => (filesPlace ??= filesPlaceFor({
+    store, team, accountRoot: config.accountRoot, storeRoot: config.storeRoot, notify: () => push(), keeper,
+    trashItem: async (file) => {
+      const shell = await shellNow();
+      if (!shell.trashItem) throw new Error('this computer has no Trash');
+      await shell.trashItem(file);
+    },
+  }));
+  supervisor.onStarting = (item) => { void filesPlaceNow().bringBackFor({ product: item.product, id: item.id }).catch(() => {}); };
+  // Files is read when it is open; the keeper also passes while it is not.
+  const keeperTick = setInterval(() => { void filesPlaceNow().list().catch(() => {}); }, 15 * 60_000);
+  keeperTick.unref?.();
+  ipcMain.handle('zero:files-place-trash', async (_e, { keys, older }: { keys?: unknown; older?: unknown } = {}) => {
+    try {
+      const out = await filesPlaceNow().trash({ keys: Array.isArray(keys) ? keys.map(String) : [], older: older === true });
+      push();
+      return out;
+    } catch (err) { return { ok: false, moved: 0, bytes: 0, error: String((err as Error)?.message ?? err) }; }
+  });
+  ipcMain.handle('zero:files-cloud', () => keeper.look());
   // An agent's team_read reads folders from the view the reach tick writes.
   if (store.teammates) store.teammates.foldersForAgents = () => filesPlaceNow().forAgents();
   ipcMain.handle('zero:files-place', async () => {
@@ -2943,5 +2988,10 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // buttons do, rather than reaching past it into approvals.answer.
   // `push` goes with it so the updater can make the window refetch when a
   // download finishes, without holding the window itself.
-  return { answerApproval, pendingApprovals, cardSentAt, push, usageForPhone };
+  // A picture or film asked for where it was, and kept in the cloud: brought back.
+  const comeBackAt = (file: string): Promise<boolean> => {
+    const hash = keeper.hashAt(file);
+    return hash ? keeper.bringBack(hash) : Promise.resolve(false);
+  };
+  return { answerApproval, pendingApprovals, cardSentAt, push, usageForPhone, comeBackAt };
 }

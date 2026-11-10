@@ -1289,6 +1289,8 @@ export class Supervisor {
   declare cloudServerWatch: Pick<CloudServerWatch, 'down' | 'up'>;
   declare sessions: Map<string, WorkerSession>;
   declare onChange: (() => void) | null;
+  /** A run about to start, so its thread's files kept in the cloud start coming back. Never holds the start. */
+  declare onStarting?: ((item: WorkItem) => void) | null;
   declare onRecovered: ((news: RecoveryNews) => void) | null;
   declare paused: boolean;
   declare productOrder: string[];
@@ -11430,6 +11432,7 @@ export class Supervisor {
       return;
     }
     if (this._compactionJobs?.has(JSON.stringify([item.product, item.id]))) return;
+    try { this.onStarting?.(item); } catch (error) { console.warn(`zero: ${item.id}'s files did not start coming back:`, (error as Error).message); }
     // ASKED ONCE, HERE, AND ANSWERED CLAUDE CODE ON EVERY MACHINE TODAY. See
     // `_engineFor` for the two independent reasons why. It is asked ahead of
     // the door rather than after it because the door is the engine's own cap

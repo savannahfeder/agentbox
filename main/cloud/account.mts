@@ -312,6 +312,24 @@ export async function cloudPlan({ env = process.env, home = os.homedir() }: Stor
   return me.status === 200 ? { signedIn: true, ...cloudPlanOf(me.body as GatewayBody & { free?: FreeHours }) } : { signedIn: me.status !== 401, error: me.body.error || 'refused', message: me.body.message };
 }
 
+/** What this person keeps in the cloud and may, or null while that cannot be known: then nothing is sent or deleted. */
+export async function cloudFilesAccount({ env = process.env, home = os.homedir() }: StoreDirs = {}): Promise<{ bytes: number; cap: number; full: boolean; count: number } | null> {
+  const at = signedIn(env, home);
+  if (!at) return null;
+  const out = await ask(at.gateway, '/v1/files', { key: at.key }).catch(() => null);
+  if (!out || out.status !== 200) return null;
+  const b = out.body as { bytes?: unknown; cap?: unknown; full?: unknown; count?: unknown };
+  return typeof b.cap === 'number' ? { bytes: Number(b.bytes) || 0, cap: b.cap, full: !!b.full, count: Number(b.count) || 0 } : null;
+}
+
+/** The bucket through the cloud server, for files kept there. */
+export async function cloudFilesStorage({ env = process.env, home = os.homedir() }: StoreDirs = {}) {
+  const at = signedIn(env, home);
+  if (!at) return null;
+  const { managedClients } = await import('./managed.mts');
+  return managedClients({ url: at.gateway, key: at.key, onSignedOut: () => forgetCloudKey(at.key, env, home) }).storage;
+}
+
 /** What the team's owner sees of Stripe on Plan and Billing; `{ owner: false }` for anyone else. */
 export async function cloudTeamBilling({ env = process.env, home = os.homedir() }: StoreDirs = {}) {
   const at = signedIn(env, home);

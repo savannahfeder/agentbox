@@ -55,6 +55,16 @@ const KEEP_FREE = 2 * 2 ** 30;
 
 export const keyOf = (hash: string): string => `files/${hash}`;
 
+/** Days a film or picture stays on this computer unopened; 0 is never taken off. */
+export const OFF_AFTER_DAYS = [7, 30, 90, 0] as const;
+export const DEFAULT_OFF_AFTER = 30;
+
+/** On from the start, as a paid plan's files are; off only when someone switches it off. */
+export function filesSettingsOf(config: { filesInCloud?: unknown; filesOffAfterDays?: unknown }): { on: boolean; offAfterDays: number } {
+  const days = Number(config.filesOffAfterDays);
+  return { on: config.filesInCloud !== false, offAfterDays: (OFF_AFTER_DAYS as readonly number[]).includes(days) && config.filesOffAfterDays != null ? days : DEFAULT_OFF_AFTER };
+}
+
 async function hashOf(file: string): Promise<string | null> {
   return new Promise((resolve) => {
     const h = crypto.createHash('sha256');
@@ -202,8 +212,19 @@ export function filesKeeper({ dir, storage, account, settings, now = Date.now, p
     /** True while `hash` is on its way back. */
     isComing: (hash: string): boolean => coming.has(hash),
     off: (hash: string): OffEntry | null => ledger.off[hash] ?? null,
+    /** The kept file that was at `file` before it left this computer. */
+    hashAt(file: string): string | null {
+      const at = path.resolve(file);
+      return Object.entries(ledger.off).find(([, e]) => e.paths.some((p) => path.resolve(p) === at))?.[0] ?? null;
+    },
     isUp: (hash: string): boolean => !!ledger.up[hash],
     opened(hash: string): void { ledger.opened[hash] = now(); save(); },
+    /** The status with the account read again, for a page that shows it. */
+    async look(): Promise<KeeperStatus> {
+      const acct = await account().catch(() => null);
+      if (acct) last = { cap: acct.cap, bytes: acct.bytes, full: acct.full };
+      return this.status();
+    },
     status(): KeeperStatus {
       const { on, offAfterDays } = settings();
       return { ...last, on, offAfterDays, offBytes: Object.values(ledger.off).reduce((s, e) => s + e.size, 0) };

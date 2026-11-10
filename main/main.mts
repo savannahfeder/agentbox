@@ -143,6 +143,9 @@ const docGrants = new DocGrants();
 // is servable until the window has been built, which is the same shape as the
 // grants above: an empty list is a closed door, never an open one.
 let imageRoots: () => string[] = () => [];
+// A picture or film kept in the cloud, brought back to where it was (main/files-cloud.mts).
+let comeBackAt: ((file: string) => Promise<boolean>) | null = null;
+const COME_BACK_WAIT_MS = 60_000;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const appDir = path.join(__dirname, '..');
@@ -942,6 +945,7 @@ async function createWindow() {
   // Codex card.
   answerApproval = ipc.answerApproval;
   pushUpdate = ipc.push;
+  comeBackAt = ipc.comeBackAt;
   cardInFront = () => ipc.pendingApprovals()[0] ?? null;
   // What the window answers itself (badge, boot info) gets the plain stand-ins
   // a browser tab gets.
@@ -1434,6 +1438,11 @@ if (!app.requestSingleInstanceLock()) {
     for (const scheme of IMG_SCHEMES) protocol.handle(scheme, async (request) => {
       const file = imgPath(request.url);
       if (!file || !servable(file, imageRoots())) return new Response('Not available.', { status: 403 });
+      if (comeBackAt && !fs.existsSync(file)) {
+        let timer: NodeJS.Timeout | undefined;
+        await Promise.race([comeBackAt(file).catch(() => false), new Promise((r) => { timer = setTimeout(r, COME_BACK_WAIT_MS); })]);
+        clearTimeout(timer);
+      }
       try {
         // A sound or a film is answered in the piece the player asked for, or
         // it plays but cannot be moved (mediaResponse, main/img-scheme.mts).
