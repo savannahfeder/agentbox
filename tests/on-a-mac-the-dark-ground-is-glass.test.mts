@@ -35,6 +35,13 @@ describe('the window', () => {
     expect(w.additionalArguments).toEqual([GLASS_ARG]);
   });
 
+  it('sets the traffic lights where the reference has them, 25pt in and 25pt down', () => {
+    // The lights are 14pt across, so their top-left corner is 7pt short of
+    // the centre. The system default had the first one's centre at 19pt.
+    expect(glassWindow('darwin').trafficLightPosition).toEqual({ x: 18, y: 18 });
+    expect(glassWindow('linux')).not.toHaveProperty('trafficLightPosition');
+  });
+
   it('keeps the opaque window on Linux and Windows, where there is no blur to show', () => {
     for (const platform of ['linux', 'win32'] as const) {
       const w = glassWindow(platform);
