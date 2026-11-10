@@ -49,6 +49,16 @@ describe('a thread with no answer and no word', () => {
     expect(waitingTooLong(later, 121 * MIN, { afterMs: MIN })).toHaveLength(1);
   });
 
+  // The team run on w-1fc102959f (2026-11-09) logged six of these for messages
+  // between teammates ("I left a comment"), which wait on a person, not an agent.
+  it('leaves out a conversation between people until an agent is in it', () => {
+    const talk = created('m', 0).map((l) => ({ ...l, product: 'direct-78c08f66' }));
+    expect(waitingTooLong(talk, 60 * MIN, { afterMs: MIN })).toEqual([]);
+    const handed = [...talk, { id: 'm', ts: 5, product: 'direct-78c08f66', source: 'agent', patch: { result: 'on it' } }, { id: 'm', ts: 9, product: 'direct-78c08f66', source: 'founder', patch: { answer: 'and the csv?' } }];
+    expect(waitingTooLong(handed, 60 * MIN, { afterMs: MIN })).toHaveLength(1);
+    expect(waitingTooLong(created('p', 0).map((l) => ({ ...l, product: 'payments-api' })), 60 * MIN, { afterMs: MIN })).toHaveLength(1);
+  });
+
   it('does not take a rename for a new ask', () => {
     const lines = [...created('a', 0), { id: 'a', ts: 5, source: 'agent', patch: { result: 'done' } }, { id: 'a', ts: 9, source: 'founder', patch: { title: 'renamed' } }];
     expect(waitingTooLong(lines, 60 * MIN, { afterMs: MIN })).toEqual([]);

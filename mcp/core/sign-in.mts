@@ -23,10 +23,11 @@ const SAID: Record<SignInSaid, string> = {
   'signed-in': 'They say they finished signing in. Check that the login finished (its command exited, or the server\'s tools are there now) and carry on.',
   landed: 'Their browser was sent back to the address in `url`. Hand it to the login waiting for it: an MCP server\'s complete_authentication tool, the prompt of `codex mcp login --no-browser`, or `curl` it at the login\'s own localhost address on this machine. Then carry on.',
   skipped: 'They chose not to sign in now. Finish what you can without it, and say in your answer what is left.',
+  replied: 'They wrote you a message on the thread instead, so the card is gone. Do not call sign_in again for this ask. Answer their message: if it is not with you yet, end your turn now and it comes next. If the work still needs the sign-in after that, ask again with a new call.',
 };
 
 export interface SignInRequest { service?: string; url?: string; code?: string; why?: string; ask?: string; finished?: boolean }
-export interface SignInWait { status: 'closed' | 'waiting' | 'signed_in' | 'landed' | 'skipped'; ask: string; url?: string; message: string }
+export interface SignInWait { status: 'closed' | 'waiting' | 'signed_in' | 'landed' | 'skipped' | 'replied'; ask: string; url?: string; message: string }
 
 const askOn = (item: WorkItem): SignInAsk | undefined => item.signIn as SignInAsk | undefined;
 
