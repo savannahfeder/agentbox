@@ -22,7 +22,9 @@ import { appendTo, cleanEntry, foldLine } from '../../shared/version-line.mts';
 // The database's own checks on a message's file (20261013000000_message_files.sql).
 const FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,159}$/;
 const MAX_FILE_DATA = 14_000_000;
-const LINK_KINDS = new Set(['markdown', 'page', 'image', 'pdf']);
+const LINK_KINDS = new Set(['markdown', 'page', 'image', 'pdf', 'video']);
+const LINK_PIECE = /^([A-Za-z0-9_-]{16,64})\/([0-9a-f]{40})\/([0-9]{1,3})$/;
+const FILM_LIST = /^\{"pieces":[1-9][0-9]{0,2},"size":[0-9]{1,10},"hash":"([0-9a-f]{40})"\}$/;
 const MAX_LINK_BODY = 8_400_000;
 const MAX_PIECE_BYTES = 10 * 1024 * 1024;
 const MAX_WORK_BYTES = 1_000_000;
@@ -108,6 +110,7 @@ export interface MemoryCloud extends MemoryRoomsFields {
   fileVersions: MemoryFileVersion[];
   fileLinks: Map<string, MemoryFileLink>;
   fileLinkComments: MemoryFileLinkComment[];
+  linkPieces?: Map<string, { owner: string; bytes: Buffer }>;
   reads: Map<string, MemorySeen>;
   departures?: MemoryDeparture[];
   seq: number;
@@ -450,6 +453,7 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
     async shareFile({ source, name, kind, type, body, version = 1, hash = '' }: FileLinkShare) {
       if (!LINK_KINDS.has(kind)) refuse('a link to a file it cannot draw');
       if (String(body ?? '').length > MAX_LINK_BODY) refuse('a link to a file that big');
+      if (kind === 'video' && FILM_LIST.exec(String(body ?? ''))?.[1] !== hash) refuse('a film that is not the list of its pieces');
       const live = [...cloud.fileLinks.values()].find((l) => l.owner === personId && l.source === source && !l.stoppedAt);
       const fields = { name, kind, type, body, version: Math.max(1, version | 0), hash: String(hash ?? ''), updatedAt: cloud.now() };
       if (live) { Object.assign(live, fields); return live.token; }
@@ -466,6 +470,34 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
     async stopFileLink(token: string) {
       const l = cloud.fileLinks.get(token);
       if (l && l.owner === personId && !l.stoppedAt) Object.assign(l, { stoppedAt: cloud.now(), body: '' });
+    },
+
+    // A film's pieces in the private link-files bucket (20261109120000_a_film_can_be_shared_by_its_link.sql).
+    async putLinkPiece(name: string, bytes: unknown) {
+      const m = LINK_PIECE.exec(name);
+      const l = m ? cloud.fileLinks.get(m[1]) : null;
+      if (!l || l.owner !== personId || l.stoppedAt) refuse('a piece under a link that is not yours');
+      if (!Buffer.isBuffer(bytes) || bytes.length > MAX_PIECE_BYTES) refuse('a piece that big');
+      cloud.linkPieces ??= new Map();
+      if (!cloud.linkPieces.has(name)) cloud.linkPieces.set(name, { owner: personId, bytes: Buffer.from(bytes) });
+    },
+
+    async linkPiecesHeld(token: string, hash: string) {
+      return [...(cloud.linkPieces ?? new Map()).keys()].filter((k) => k.startsWith(`${token}/${hash}/`)).map((k) => Number(k.split('/')[2]));
+    },
+
+    async clearLinkPieces(token: string, keep: string | null) {
+      for (const [k, p] of [...(cloud.linkPieces ?? new Map())]) {
+        if (p.owner === personId && k.startsWith(`${token}/`) && k.split('/')[1] !== keep) cloud.linkPieces!.delete(k);
+      }
+    },
+
+    async linkPiece(name: string) {
+      const m = LINK_PIECE.exec(name);
+      const l = m ? cloud.fileLinks.get(m[1]) : null;
+      const readable = l && ((!l.stoppedAt && l.kind === 'video' && l.hash === m![2]) || l.owner === personId);
+      const got = readable ? cloud.linkPieces?.get(name) : null;
+      return got ? Buffer.from(got.bytes) : null;
     },
 
     // What anyone with the link reads (file_link_view, file_link_comments_of).

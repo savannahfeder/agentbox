@@ -1,4 +1,4 @@
-// The dithered sky drawn behind Home and the Inbox (Alpha features, Home).
+// The dithered sky drawn behind Home and the Inbox.
 // Square dots on a grid, four levels per channel, ordered by an 8x8 Bayer
 // matrix: a bright streak with a glow on its upper side and sparse grain.
 

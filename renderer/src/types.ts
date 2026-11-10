@@ -1690,6 +1690,7 @@ declare global {
       assistiveTech?(): Promise<boolean>;
       olderItems?(p: { offset: number; limit: number }): Promise<{ items: WorkItem[]; more: boolean }>;
       crash?(p: { name: string; message: string; stack: string }): Promise<unknown>;
+      draftCopy?: { read(): string | null; write(text: string): void };
       blankCheck?(p: { thread: string; facts: Record<string, unknown>; lateMs: number; longTaskMs: number }): Promise<string | null>;
       // A count. The name is checked against the approved list in the main
       // process, which attaches everything else; nothing from this side rides along.
@@ -1910,8 +1911,11 @@ declare global {
       fileLinks?(): Promise<{ ok: boolean; error?: string; links?: PublicLink[] }>;
       fileLinkComments?(p: { token: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
       fileLinkComment?(p: { token: string; text: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
+      bringSharedFile?(p: { link: string; product: string | null }): Promise<{ ok: boolean; error?: string; product?: string; id?: string; src?: string }>;
+      takeSharedFile?(): Promise<string | null>;
+      onSharedFile?(fn: () => void): () => void;
       retryFile?(p: { product: string; src: string }): Promise<unknown>;
-      codeChange?(p: { product: string; src: string }): Promise<{ ok: boolean; change?: unknown; error?: string }>;
+      codeChange?(p: { product: string; src: string; summary?: boolean }): Promise<{ ok: boolean; change?: unknown; error?: string }>;
       codeFile?(p: { product: string; src: string; path: string }): Promise<{ ok: boolean; text?: string; mtime?: number; path?: string; error?: string }>;
       saveCodeFile?(p: { product: string; src: string; path: string; text: string; mtime: number }): Promise<{ ok: boolean; mtime?: number; path?: string; stale?: boolean; error?: string }>;
       railNote?(p: { product: string }): Promise<{ ok: boolean; text?: string; mtime?: number; error?: string }>;

@@ -514,7 +514,13 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     if (editWord === 'Not saved') { dropSitting(); go(); return; }
     void endSitting().then((ok) => { if (ok) go(); else if (liveSession) { dropSitting(); go(); } });
   };
+  // A click on a picture drops a pin; one left with no words is not kept for next time.
+  const dropAnEmptyPin = () => {
+    const d = draftOf.current;
+    if (d && draftPlace && !wordsNow.current.trim()) d.holding = keepCommentDraft({ product, thread, file: d.file, across }, { words: wordsNow.current, place: null }, d.holding);
+  };
   const leave = () => {
+    dropAnEmptyPin();
     if (!editing) { onClose(); return; }
     if (editWord === 'Not saved') { dropSitting(); onClose(); return; }
     void endSitting().then((ok) => { if (ok) onClose(); else if (liveSession) { dropSitting(); onClose(); } });
@@ -583,7 +589,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
       if (link) setLink(null);
       else if (asking) setAsking(null);
       else if (replyingTo) setReplyingTo(null);
-      else if (draftPlace) setDraftPlace(null);
+      // Not a pin first: a click on a picture drops one, and Escape then seemed to do nothing.
       else leave();
     };
     const rest = (e: KeyboardEvent) => {
@@ -729,6 +735,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
           {onOutside && version && foundNow === 'open' && <button type="button" className="doc-mark" aria-label="Open outside" title="Open outside" onClick={() => onOutside(version.path)}><ArtifactControlGlyph kind="open" /></button>}
           {/* The side pane has no versions to step, so it shows the newest. */}
           {onBeside && family && <FocusControl style="corners-bare" focused onClick={() => onBeside(family.versions[family.versions.length - 1].path)} />}
+          <button type="button" className="doc-mark av-close" aria-label="Close" title="Close (esc)" onClick={leave}><ArtifactControlGlyph kind="close" /></button>
         </span>
       </header>
       <div className="av-body">

@@ -1350,7 +1350,14 @@ export default function App() {
       engine: x.engine, found: !!x.found, signedIn: !!x.signedIn, certain: x.certain,
     }))));
   }, []);
-  useEffect(() => { if (!run) void checkPlan(); }, [run, checkPlan]);
+  // Not while the first run is up: it may be signing in right now (F-198).
+  useEffect(() => { if (!run && !fresh) void checkPlan(); }, [run, fresh, checkPlan]);
+  useEffect(() => {
+    if (!planWords) return undefined;
+    const again = () => { void checkPlan(); };
+    window.addEventListener('focus', again);
+    return () => window.removeEventListener('focus', again);
+  }, [planWords, checkPlan]);
 
   const fire = useCallback((e: Parameters<typeof advanceRun>[1]) => {
     setRun((r) => (r ? advanceRun(r, e) : r));
@@ -2896,14 +2903,15 @@ export default function App() {
   const [shippedOpen, setShippedOpen] = useState(false);
   // The Files place, on a project's page or (null) on every file.
   const [filesPage, setFilesPage] = useState<{ project: string | null } | null>(null);
-  // Home (Alpha features) is where the app opens while it is on; any other
-  // page put in front of it hides it, and closing that page brings it back.
+  // Home is where the app opens on a computer; any other page put in front of
+  // it hides it, and closing that page brings it back. A phone has no Home and
+  // no skies.
+  const homeOn = !onPhone();
   const homeSet = useHomeSettings();
-  const [homeOpen, setHomeOpen] = useState(homeSet.on);
-  useEffect(() => { setHomeOpen(homeSet.on); }, [homeSet.on]);
+  const [homeOpen, setHomeOpen] = useState(homeOn);
   const darkWindow = useDarkWindow();
   // A sky theme is worn only while the window wears its look.
-  const skyPicked = homeSet.on ? skyTheme(homeSet.skyTheme) : null;
+  const skyPicked = homeOn ? skyTheme(homeSet.skyTheme) : null;
   const sky = skyPicked && skyPicked.dark === darkWindow ? skyPicked : null;
   useEffect(() => {
     const root = document.documentElement;
@@ -2936,9 +2944,9 @@ export default function App() {
   }, [weekCards, openTeammateCard, team]);
   const continueTeammateThread = useCallback((card: ThreadCard) => {
     void api.teamContinueBrief({ personId: card.personId, threadId: card.threadId })
-      .then((b) => { setComposeInitial(continueStart(b)); setModal('compose'); })
+      .then((b) => { setComposeInitial(continueStart(b, card, snap?.products ?? [])); setModal('compose'); })
       .catch((err) => showToast(String(err?.message ?? err)));
-  }, []);
+  }, [snap?.products]);
   const [teamBody, setTeamBody] = useState<HTMLElement | null>(null);
   // The card on screen is the newest one, and once its owner takes it back it
   // is not on screen at all: words they made private must not stay up.
@@ -4541,6 +4549,37 @@ export default function App() {
     joinWaiting.current = null;
     void roomsUi.join(token);
   }, [joinTick, roomsUi.live, snap, showToast]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A FILE SOMEONE SHARED BY ITS LINK, from the link page's "Open in Agentbox":
+  // brought into the project on screen, then its thread opens with the file open.
+  const projectNow = useRef<string | null>(null);
+  projectNow.current = productFilter ?? focused?.product ?? null;
+  const broughtIn = useRef<{ id: string; product: string; src: string } | null>(null);
+  const [broughtTick, setBroughtTick] = useState(0);
+  useEffect(() => {
+    const take = () => {
+      void window.zero?.takeSharedFile?.().then(async (token) => {
+        if (!token) return;
+        showToast('Bringing the file in');
+        const out = await api.bringSharedFile({ link: `agentbox://f/${token}`, product: projectNow.current });
+        if (!out.ok || !out.id || !out.product || !out.src) { showToast(out.error ?? 'That file did not come in.'); return; }
+        broughtIn.current = { id: out.id, product: out.product, src: out.src };
+        setBroughtTick((n) => n + 1);
+      }).catch(() => {});
+    };
+    take();
+    return window.zero?.onSharedFile?.(take);
+  }, [showToast]);
+  useEffect(() => {
+    const want = broughtIn.current;
+    const row = want && items.find((i) => i.id === want.id && i.product === want.product);
+    if (!want || !row) return;
+    broughtIn.current = null;
+    pendingDoc.current = { id: row.id, doc: { product: want.product, src: want.src } };
+    setSearch(null);
+    setFocused(row);
+    markSeen(row);
+  }, [broughtTick, items, markSeen]);
 
   // She dragged the window onto the other screen, or unplugged one. The picture
   // does not change, only which copy of it is painted, so there is nothing to
@@ -7276,7 +7315,7 @@ export default function App() {
   // empty inbox: the page is kept for the one render it takes to read the box,
   // and the dialog opens on it before anything paints.
   const clearWaiting = view === 'inbox' ? list.length + leadCount + sharedFileNews.length + followingNews.length : 0;
-  const clearMoves = view === 'inbox' && !(homeSet.on && homeOpen) && search === null && !focused && !focusedRepeat && modal !== 'compose'
+  const clearMoves = view === 'inbox' && !(homeOn && homeOpen) && search === null && !focused && !focusedRepeat && modal !== 'compose'
     && writingMovesToTheDialog({ waiting: clearWaiting, onScreen: clearSlot !== null, writing: clearWriting });
   clearMovesNow.current = clearMoves;
   // ONE SURFACE ON AN OPENED TASK (design C): no card, hairlines
@@ -7334,7 +7373,7 @@ export default function App() {
     tasks: homeLayout === 'list' && !onPhone() ? { on: tasksOn, onTasks: () => { goNeedsYou(); setTasksOn(true); } } : undefined,
   } : null;
   // Home's Team card and the Team page say what the faces at the end of the tab bar did.
-  if (teamTabs && homeSet.on) teamTabs.corner = null;
+  if (teamTabs && homeOn) teamTabs.corner = null;
   const dayStart = new Date(now).setHours(0, 0, 0, 0);
   const evItems = evMember?.kind === 'mate' ? (mateRunsOf(items, evMember.key.slice('mate:'.length), dayStart)) : [];
   const evCards = evMember?.kind === 'person' ? personCardsOf(cards, evMember.key.slice('person:'.length), dayStart) : [];
@@ -7378,7 +7417,7 @@ export default function App() {
     })}
     onOpen={(l) => { if (l.item) { setFocused(l.item); markSeen(l.item); } else if (l.card) openTeammateCard(l.card); else if (l.mention) roomsUi.openMention(l.mention); else if (l.roomId) roomsUi.open(l.roomId); else if (l.file) openFiles(filesForToday?.files.find((f) => f.key === l.file)?.project ?? null); }} /> : null;
   const todayEl = todayShown ? todayPage() : null;
-  const homeShown = homeSet.on && homeOpen && !!snap && !onPhone() && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
+  const homeShown = homeOn && homeOpen && !!snap && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
     && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown;
   const goHome = () => { openView('inbox'); setHomeOpen(true); };
   const homeNeeds: NeedsRow[] = homeShown ? inbox.slice(0, 80).map((i) => {
@@ -7629,7 +7668,7 @@ export default function App() {
         onAccount={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(false); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
         onSignOut={() => { void api.teamSignOut().then(() => refresh()); }}
         onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setOpenCard(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }} inboxCount={inbox.length + leadCount} scheduledCount={scheduledCount} view={view} collapsed={sideFolded} onSearch={openSearch} onCompose={() => setModal('compose')} onView={openView}
-        onHome={homeSet.on && !onPhone() ? goHome : undefined} homePage={homeShown} onTeammatesPage={teammatesShown} onFiles={() => openFiles(null)} filesPage={filesShown} tasksPage={tasksShown} onConnections={() => openConnectionsPage(null)} connectionsPage={connectionsShown} rail={narrowSidebar} onHover={setRailOpen} onGroupsPage={roomShown || directOpen}
+        onHome={homeOn ? goHome : undefined} homePage={homeShown} onTeammatesPage={teammatesShown} onFiles={() => openFiles(null)} filesPage={filesShown} tasksPage={tasksShown} onConnections={() => openConnectionsPage(null)} connectionsPage={connectionsShown} rail={narrowSidebar} onHover={setRailOpen} onGroupsPage={roomShown || directOpen}
         /* Without Groups the one row under Threads is Chats, and only while there are teammates. */
         groups={roomsUi.live ? roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown || chatsPlaceShown || cardFromPlace, teammatesUi.live || homeLayout === 'chats' ? openChats : undefined, homeLayout === 'chats' ? 'Team' : undefined) : teammatesUi.rail(teammatesShown)} />
       {/* THE REACH (w-5dcff78971). The corner is transparent and it is the
@@ -8527,7 +8566,7 @@ export default function App() {
         look={look}
         machine={machine}
         onSetLook={(l) => { chooseLook(l); setModal(null); }}
-        skyThemes={homeSet.on ? SKY_THEMES.map((k) => ({ id: k.id, name: k.name, on: homeSet.skyTheme === k.id })) : []}
+        skyThemes={homeOn ? SKY_THEMES.map((k) => ({ id: k.id, name: k.name, on: homeSet.skyTheme === k.id })) : []}
         onSkyTheme={(id) => { chooseSkyTheme(id); setModal(null); }}
         staleFiles={snap.restartNeeded?.files ?? []}
         /*
@@ -8823,6 +8862,7 @@ export default function App() {
           ...(filesForPalette?.projects ?? []).map((p) => ({ id: `project-${p}`, title: `Files in ${p}`, run: () => { setModal(null); openFiles(p); } })),
         ]}
         onConnections={() => { setModal(null); openConnectionsPage(null); }}
+        onHome={homeOn ? () => { setModal(null); goHome(); } : undefined}
         teammates={teammatesUi.live ? snap?.teammates?.list ?? [] : null}
         onTeammates={(which) => { setModal(null); teammatesUi.go(which); }}
         onPauseTeammate={(id, paused) => { setModal(null); void api.teammates('update', { id, patch: { paused } }).then(() => refresh()); }}
@@ -9008,10 +9048,10 @@ export default function App() {
           surfaces at once would photograph the welcome screen. */}
       {fresh && !modeDraft && arm === 'classic' && <ClassicFirstRun snap={snap} home={home} onDone={finishClassic} />}
       {fresh && !modeDraft && arm === 'tour' && <FirstRunFlow snap={snap} home={home} onDone={finishFresh}
-        look={(homeSet.on && homeSet.skyTheme) || (resolveTheme(theme) === 'light' ? 'light' : 'dark')} skies={homeSet.on}
+        look={(homeOn && homeSet.skyTheme) || (resolveTheme(theme) === 'light' ? 'light' : 'dark')} skies={homeOn}
         onLook={(id) => { if (id === 'light') chooseLook('light'); else if (id === 'dark') chooseLook('ember-grid'); else chooseSkyTheme(id); }}
         onProject={(slug) => { rememberProject(slug); setPickProject(slug); }}
-        onSetup={() => { setFocused(null); setView('inbox'); if (homeSet.on) setHomeOpen(true); }} />}
+        onSetup={() => { setFocused(null); setView('inbox'); if (homeOn) setHomeOpen(true); }} />}
       <OpenLesson at={lessonAt} />
       {!fresh && tour && tourLive(tour) && <TourList tour={tour} now={tourNow} onSkip={() => setTour(skipTour(tour))} />}
       {!fresh && <Tour tour={tour} view={view} thread={!!focused}

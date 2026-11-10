@@ -29,6 +29,7 @@ import { storeRootEnv } from './store/home.mts';
 import { keepAnswerModesIn } from './answer-modes.mts';
 import { Supervisor } from './supervisor.mts';
 import { gitHubPushSignIn } from './github-push-sign-in.mts';
+import { runHostWorksOn } from './run-host.mts';
 import { startCodexWatch } from './codex-watch.mts';
 import { watchNewChatsFor } from './new-chats-watch.mts';
 import { readCodexThreadsOffThread } from './codex-threads.mts';
@@ -73,9 +74,11 @@ import { leavesTheApp } from './app-window-stays.mts';
 import { IMG_SCHEMES, imgPath, mediaResponse, mediaType, servable } from './img-scheme.mts';
 import { hotWindowVerdict, storeHasWork } from './dev-window.mts';
 import { writeHeldThenReload } from './write-before-reload.mts';
+import { answerDraftCopy } from './draft-copy.mts';
 import { IS_SHE_TYPING_IN_THE_PAGE, theAppKeepsThisInput, theAppKeepsThisLetterInAPage } from '../shared/artifact-keys.mts';
 import { NAME, Name, WAS } from '../shared/product-name.mjs';
 import { JOIN_SCHEME, ourLink, tokenFromLink } from '../shared/room-links.mts';
+import { fileLinkToken } from './bring-shared-file.mts';
 import { getMic } from './mic.mts';
 import { openInBrowser } from './open-in-browser.mts';
 import type { IpcConfig } from './ipc.mts';
@@ -281,7 +284,16 @@ function showWindow() {
   if (window.isMinimized()) window.restore();
   window.focus();
 }
+// A SHARED FILE'S APP LINK (agentbox://f/<token>), from the link page's
+// "Open in Agentbox", held the same way until the window takes it.
+let pendingSharedFile = fileLinkToken(process.argv.find((a) => a.startsWith(`${JOIN_SCHEME}://`)) ?? '');
 function openJoinLink(url: string) {
+  const file = fileLinkToken(url);
+  if (file) {
+    pendingSharedFile = file;
+    if (window && !window.isDestroyed()) { window.webContents.send('zero:shared-file'); showWindow(); }
+    return;
+  }
   const token = tokenFromLink(url);
   if (!token) return;
   pendingJoin = token;
@@ -447,7 +459,7 @@ async function createWindow() {
   imageRoots = () => [config.accountRoot, ...store.listProducts().map((p) => p.repoPath).filter(Boolean) as string[]];
   const supervisor = new Supervisor(config, store, appDir, dataDir, userDir);
   // Local runs outlive a quit or a restart of the app (main/run-host.mts).
-  supervisor.hostRuns = true;
+  supervisor.hostRuns = runHostWorksOn();
   // And their store tools come from one shared process (main/tool-host.mts).
   supervisor.shareTools = true;
   // THAT agents start and stop work (main/analytics.mts checks the switch).
@@ -1171,6 +1183,7 @@ async function createWindow() {
   // itself (it has no disk and should not have one), and 'render-process-gone'
   // only fires when the process DIES, which a thrown React error does not.
   ipcMain.handle('zero:crash', (_e, payload) => { reportFromRenderer(payload ?? {}); });
+  answerDraftCopy({ ipcMain, file: path.join(userDir, 'drafts-copy.json') });
   recordBlankPages({
     ipcMain,
     window: () => window,
@@ -1186,6 +1199,7 @@ async function createWindow() {
     },
   });
   ipcMain.handle('zero:take-join', () => { const token = pendingJoin; pendingJoin = null; return token; });
+  ipcMain.handle('zero:take-shared-file', () => { const token = pendingSharedFile; pendingSharedFile = null; return token; });
   // External links from markdown open in the real browser; local artifacts
   // (a demo page, a screenshot a worker saved) open in their default app, so
   // "see it working" is one click from the message.
