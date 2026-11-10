@@ -125,7 +125,7 @@ function layCommands(dir, name) {
   const q = (s) => `'${String(s).replace(/'/g, "'\\''")}'`;
   for (const [cmd, script] of [['app', BROWSE], ['diary', DIARY]]) {
     // A machine whose Chrome is not at the Mac's path names it in CHROME (scripts/lib/chrome-guard.mjs).
-    const chrome = process.env.CHROME ? ` CHROME=${q(process.env.CHROME)}` : '';
+    const chrome = (process.env.CHROME ? ` CHROME=${q(process.env.CHROME)}` : '') + (process.env.VERIFY_CHROME ? ` VERIFY_CHROME=${q(process.env.VERIFY_CHROME)}` : '');
     fs.writeFileSync(path.join(dir, cmd), `#!/bin/sh\nexport VERIFY_INSTANCE=${q(name)} BREAKER_OUT=${q(dir)} POWER_OUT=${q(dir)}${chrome}\nexec ${q(node)} ${q(script)} "$@"\n`, { mode: 0o755 });
   }
   return { browse: path.join(dir, 'app'), diary: path.join(dir, 'diary') };

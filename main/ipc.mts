@@ -84,9 +84,10 @@ import { appFilesPlace } from './files-place.mts';
 import { Name } from '../shared/product-name.mjs';
 import { setUpGit, startGhLogin } from './github-browser-sign-in.mts';
 import type { GhLogin } from './github-browser-sign-in.mts';
-import { handedOnByReply, isGivenTask } from '../shared/team-rules.mts';
+import { handedOnByReply, isGivenTask, visibilityWhenMade } from '../shared/team-rules.mts';
 import { closeRefusal, closedAnywayNote } from '../shared/not-shipped.mts';
 import { lightRunning, snapshotSender } from '../shared/snapshot-delta.mts';
+import { wakesItselfAt } from '../shared/answers.mts';
 import { traceAnswer } from '../shared/trace-delta.mts';
 import { saveAttachments } from './save-attachments.mts';
 import { stageAttachment, stageAttachmentPart } from './stage-attachment.mts';
@@ -205,6 +206,8 @@ export interface TeammateArgs {
   to?: PostInput['to'];
   fresh?: boolean;
   answers?: unknown;
+  filesIn?: unknown;
+  priority?: unknown;
   ref: string;
   memory: string;
 }
@@ -1152,7 +1155,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       else if (op === 'update') value = mates.update(a.id, { ...a.patch, ...(a.patch && 'engine' in a.patch ? { engine: supervisor.engineOffered(a.patch.engine) ?? null } : {}) });
       else if (op === 'stop') value = mates.stop(a.id, { kill });
       else if (op === 'remove') value = mates.remove(a.id, { kill });
-      else if (op === 'post') value = mates.post({ text: a.text, to: a.to, fresh: a.fresh === true, answers: a.answers });
+      else if (op === 'post') value = mates.post({ text: a.text, to: a.to, fresh: a.fresh === true, answers: a.answers, filesIn: a.filesIn, priority: a.priority });
       else if (op === 'goAhead') value = mates.goAhead(a.id, a.ref);
       else if (op === 'remember') value = mates.remember(a.id, a.text, { from: 'you' });
       else if (op === 'forget') value = mates.forget(a.id, a.memory);
@@ -1317,7 +1320,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       // WHO DOES IT, when it is a person (the team version): the teammate it
       // goes to and the day it is due, and the two of you as the conversation,
       // so a reply can hand it back. An agent's row carries none of these.
-      assignee, due, visibility,
+      assignee, due, visibility: visibilityWhenMade(visibility, alphaFeatures(config).multiplayer),
       // AND WHO MAY SEE IT, when she chose people rather than the team
       // (w-41ff964775). The store keeps the list only beside 'people'.
       visibleTo,
@@ -1446,7 +1449,12 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   ipcMain.handle('zero:schedule', (_e, { product, id, runAt }: { product: string; id: string; runAt: number }) => {
     if (isAgentRow(id)) return { ok: false };
     if (runAt > Date.now()) supervisor.stopSession(id);
-    return store.scheduleItem(product, id, runAt);
+    const before = runAt > 0 ? null : store.readItem(product, id);
+    const out = store.scheduleItem(product, id, runAt);
+    // Let it run now: the queue walks past the agent's answer, so clearing the
+    // moment alone starts nothing.
+    if (before && wakesItselfAt(before) > Date.now()) supervisor.runNow(product, id);
+    return out;
   });
 
   // Snooze changes when a person sees the thread, never what an agent does.

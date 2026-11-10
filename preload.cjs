@@ -120,6 +120,7 @@ contextBridge.exposeInMainWorld('zero', {
   rooms: (payload) => ipcRenderer.invoke('zero:rooms', payload),
   teammates: (payload) => ipcRenderer.invoke('zero:teammates', payload),
   takeJoin: () => ipcRenderer.invoke('zero:take-join'),
+  takeThreadLink: () => ipcRenderer.invoke('zero:take-thread-link'),
   threadEdit: (payload) => ipcRenderer.invoke('zero:thread-edit', payload),
   moveItem: (payload) => ipcRenderer.invoke('zero:move-item', payload),
   // Repeating tasks. A rule, not a work item, so it has its own channels
@@ -364,6 +365,12 @@ contextBridge.exposeInMainWorld('zero', {
     const handler = (_e, payload) => fn(payload);
     ipcRenderer.on('zero:recovered', handler);
     return () => ipcRenderer.removeListener('zero:recovered', handler);
+  },
+  // A thread's link opened the app.
+  onThreadLink: (fn) => {
+    const handler = (_e, payload) => fn(payload);
+    ipcRenderer.on('zero:thread-link', handler);
+    return () => ipcRenderer.removeListener('zero:thread-link', handler);
   },
   // A room invite link opened the app (Rooms, alpha).
   onJoinRoom: (fn) => {
