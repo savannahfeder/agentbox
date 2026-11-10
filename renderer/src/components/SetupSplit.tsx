@@ -264,7 +264,7 @@ export function SetupSplit(p: SetupSplitProps) {
     </>;
   } else if (step === 'account') {
     // The app's own sign-in form, in this column: Google, email, or a new account. No skip; it is required.
-    body = <div className="ss-signin"><SignInPage purpose="team" onSignedIn={next} /></div>;
+    body = <div className="ss-signin"><SignInPage purpose="team" startOn="sign-up" inSetup onSignedIn={next} /></div>;
   } else if (step === 'invite') {
     head = ['Invite your team.', 'Add the people you work with.'];
     body = !p.snap?.team?.signedIn ? <>
@@ -321,10 +321,10 @@ export function SetupSplit(p: SetupSplitProps) {
           <span>{step ? stepLabel(steps, step) : 'All set'}</span>
         </div>
         <div className="ss-body" key={step ?? 'done'}>
+          {back && <button type="button" className="ss-back" onClick={back}><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 3.5L5.5 8l4.5 4.5" /></svg>Back</button>}
           {head[0] && <h1 className="ss-h"><b>{head[0]}</b>{head[1]}</h1>}
           {body}
           {error && <p className="ss-error" role="alert">{error}</p>}
-          {back && <button type="button" className="ss-back" onClick={back}>Back</button>}
         </div>
       </div>
 

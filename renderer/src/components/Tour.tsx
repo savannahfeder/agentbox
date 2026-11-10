@@ -21,7 +21,7 @@ const SETTLE_MS = 500;
 const SEEN_MS = 1000;
 /** Set once the tutorial has sent its sample banner. */
 const NOTIFY_TRIED = 'zero.tour.notifyTried';
-const BUSY_TOLD = <>We sent one. Didn’t see it? Allow notifications for {Name} in System Settings</>;
+const BUSY_TOLD = <>We sent a test notification. Explore the app while you wait</>;
 
 const K = ({ k }: { k: string }) => <span className="tour-k">{k}</span>;
 
@@ -347,7 +347,7 @@ export function Tour({ tour, view, thread, covered, palette, onChange, onPoint, 
         style={cardAt ? { left: cardAt.left, top: cardAt.top } : { left: -9999, top: -9999 }}>
         <span className="tour-say">{step === 'busy' && tried ? BUSY_TOLD : step === 'inPalette' ? <InPalette /> : SAY[step].words}</span>
         {step === 'busy' && !tried && <button type="button" className="tour-act" onClick={tryNotifications}>Turn on notifications</button>}
-        {step === 'busy' && tried && MAC && <button type="button" className="tour-act" onClick={openNotifySettings}>Open System Settings</button>}
+        {step === 'busy' && tried && MAC && <button type="button" className="tour-act" onClick={openNotifySettings}>Didn’t see it? Open settings</button>}
       </div>
     </>
   );

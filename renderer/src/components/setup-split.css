@@ -79,7 +79,8 @@
 .setup-split .ss-go:disabled { color: var(--text-faint); cursor: default; box-shadow: none; }
 .setup-split .ss-quiet, .setup-split .ss-back { border: 0; background: none; padding: 0; font-size: 14.5px; color: var(--text-dim); cursor: pointer; }
 .setup-split .ss-quiet:hover, .setup-split .ss-back:hover { color: var(--text); }
-.setup-split .ss-back { position: absolute; left: 0; bottom: -64px; }
+.setup-split .ss-back { display: inline-flex; margin: 0 0 18px -6px; align-items: center; gap: 4px; padding: 4px 6px; border-radius: 6px; font-size: 13.5px; color: var(--text-faint); }
+.setup-split .ss-back:hover { background: color-mix(in srgb, var(--text) 5%, transparent); }
 .setup-split .ss-note { margin: 14px 0 0 2px; font-size: 13px; color: var(--text-faint); }
 .setup-split .ss-error { margin: 14px 0 0 2px; font-size: 13px; color: var(--text); }
 .setup-split .ss-keys { display: inline-flex; gap: 4px; }
@@ -120,6 +121,17 @@
 :root .setup-split .ss-signin .si-page { position: static; inset: auto; z-index: auto; display: block; padding: 0; background: none; -webkit-app-region: no-drag; }
 :root .setup-split .ss-signin .si-card { width: 100%; max-width: 420px; padding: 0; background: none; border: 0; box-shadow: none; }
 .setup-split .ss-signin .si-mark { display: none; }
+/* Inside the setup the card wears the setup's parts: no orange slab, no uppercase labels. */
+.setup-split .ss-signin .si-google, .setup-split .ss-signin .si-primary { height: 40px; border: 1px solid color-mix(in srgb, var(--text) 18%, transparent); border-radius: 8px; box-shadow: 0 1px 2px rgba(30, 22, 36, .06); font-size: 14.5px; }
+.setup-split .ss-signin .si-primary { background: var(--ss-ground); color: var(--text); font-weight: 400; margin-top: 10px; }
+.setup-split .ss-signin .si-primary:hover:not(:disabled) { filter: none; background: color-mix(in srgb, var(--text) 3%, var(--bg)); }
+.setup-split .ss-signin .si-google { background: var(--ss-ground); }
+.setup-split .ss-signin .si-form label > span:first-child { font: 13.5px var(--font, inherit); letter-spacing: 0; text-transform: none; color: var(--text-dim); }
+.setup-split .ss-signin .si-form input { height: 40px; border-radius: 8px; border-color: color-mix(in srgb, var(--text) 16%, transparent); background: var(--ss-ground); }
+.setup-split .ss-signin .si-or { margin: 16px 0; }
+.setup-split .ss-signin .si-terms { text-align: left; margin-top: 16px; font-size: 13px; color: var(--text-faint); }
+.setup-split .ss-signin .si-setup-switch { margin-top: 18px; font-size: 14px; color: var(--text-faint); }
+
 .setup-split .ss-signin .si-card h1 { margin: 0 0 6px; font-size: 28px; line-height: 36px; letter-spacing: -0.014em; }
 .setup-split .ss-signin .si-lede { margin: 0 0 28px; font-size: 15px; line-height: 22px; }
 

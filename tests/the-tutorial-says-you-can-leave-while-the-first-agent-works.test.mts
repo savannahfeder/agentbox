@@ -32,7 +32,7 @@ describe('the tip while the first agent works', () => {
   // that has not allowed the app drops it without a word
   // (tests/turning-on-notifications-says-what-happened).
   it('after, says a banner was sent', () => {
-    expect(tour).toContain('We sent one. Didn’t see it?');
+    expect(tour).toContain('We sent a test notification.');
     expect(tour).toContain("step === 'busy' && tried ? BUSY_TOLD : step === 'inPalette' ? <InPalette /> : SAY[step].words");
   });
   it('never names a part of the app it has not shown', () => {

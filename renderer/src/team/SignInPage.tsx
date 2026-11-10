@@ -58,9 +58,11 @@ export const checkEmailLede = (email: string, cloud: boolean) => (cloud
   : `We sent a link to ${email}. Follow it to confirm your address, then sign in here.`);
 const TermsLinks = () => <>the <a href={TERMS_URL} onClick={(e) => { e.preventDefault(); window.open(TERMS_URL, '_blank'); }}>Terms</a> and the <a href={PRIVACY_URL} onClick={(e) => { e.preventDefault(); window.open(PRIVACY_URL, '_blank'); }}>Privacy policy</a></>;
 
-export function SignInPage({ onSkip, signedOut = false, error: startError = null, waitingUrl = null, purpose = 'team', startOn = 'sign-in', onClose, onSignedIn }: {
+export function SignInPage({ onSkip, signedOut = false, error: startError = null, waitingUrl = null, purpose = 'team', startOn = 'sign-in', inSetup = false, onClose, onSignedIn }: {
   onSkip?: () => void; signedOut?: boolean; error?: string | null; waitingUrl?: string | null;
   purpose?: 'team' | 'cloud' | 'phone' | 'share'; startOn?: 'sign-in' | 'sign-up'; onClose?: () => void; onSignedIn?: () => void;
+  /** Drawn as a step of the setup: no tabs, the setup's own buttons. */
+  inSetup?: boolean;
 }) {
   const cloud = purpose === 'cloud';
   const closable = cloud || purpose === 'phone' || purpose === 'share';
@@ -237,7 +239,7 @@ export function SignInPage({ onSkip, signedOut = false, error: startError = null
           ? <p className="si-lede">You&rsquo;re new to {Name} Cloud. Read <TermsLinks />, then agree to finish.</p>
           : lede && <p className="si-lede">{lede}</p>}
 
-        {(mode === 'sign-in' || mode === 'sign-up') && (
+        {(mode === 'sign-in' || mode === 'sign-up') && !inSetup && (
           <div className="si-tabs" role="tablist">
             {/* The password does not cross the tabs: an account made with one
                 typed to sign in is one nobody meant to make. */}
@@ -302,8 +304,16 @@ export function SignInPage({ onSkip, signedOut = false, error: startError = null
             {cloud && mode === 'sign-in' && (
               <p className="si-switch si-center si-forgot"><button type="button" onClick={() => { setMode('reset'); setError(null); }}>Forgot password?</button></p>
             )}
-            {cloud && mode === 'sign-up' && (
+            {mode === 'sign-up' && (
               <p className="si-terms">By creating an account or continuing with Google, you agree to <TermsLinks />.</p>
+            )}
+            {!cloud && mode === 'sign-in' && (
+              <p className="si-terms">By continuing, you agree to <TermsLinks />.</p>
+            )}
+            {inSetup && (
+              <p className="si-switch si-setup-switch">{mode === 'sign-up'
+                ? <>Have an account? <button type="button" onClick={() => { setMode('sign-in'); setPassword(''); setError(null); }}>Sign in</button></>
+                : <>New here? <button type="button" onClick={() => { setMode('sign-up'); setPassword(''); setError(null); }}>Create an account</button></>}</p>
             )}
           </>
         )}

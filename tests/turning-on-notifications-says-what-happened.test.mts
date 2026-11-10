@@ -15,10 +15,10 @@ const read = (p: string) => fs.readFileSync(new URL(`../${p}`, import.meta.url),
 describe('after Turn on notifications', () => {
   const tour = read('renderer/src/components/Tour.tsx');
   it('says a banner was sent and where to allow it', () => {
-    expect(tour).toContain('We sent one. Didn’t see it? Allow notifications for {Name} in System Settings');
+    expect(tour).toContain('We sent a test notification. Explore the app while you wait');
   });
   it('offers the system settings on a Mac', () => {
-    expect(tour).toMatch(/step === 'busy' && tried && MAC && <button type="button" className="tour-act" onClick=\{openNotifySettings\}>Open System Settings<\/button>/);
+    expect(tour).toMatch(/step === 'busy' && tried && MAC && <button type="button" className="tour-act" onClick=\{openNotifySettings\}>Didn’t see it\? Open settings<\/button>/);
   });
 });
 
