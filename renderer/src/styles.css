@@ -1374,6 +1374,12 @@ body {
   opacity: var(--row-line);
 }
 
+/* The last thread you were in. On the row itself, which runs the card's full
+   width, so the wash meets both edges instead of stopping at the hairlines. */
+.row.recent {
+  background: linear-gradient(90deg, rgb(var(--wash-rgb, 255 255 255) / 0.055), rgb(var(--wash-rgb, 255 255 255) / 0.012) 70%, transparent);
+}
+
 /* THE SELECTED ROW IS UNDERLINED. Chosen 2026-08-12, out of a family of six
    that were all text and a family of five before them that were all shapes.
    Hover is the same mechanism at a lower strength: one idea, two weights, so a
