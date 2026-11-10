@@ -1021,6 +1021,55 @@ body {
   background: var(--skin-pane);
 }
 .panel-marks { display: none; }
+
+/* GLASS ON A MAC (w-b4dbfc0f31), behind the Glass switch in Alpha features.
+   The window blurs the desktop behind it (main/window-glass.mts) and the
+   ground lets some of it through under the theme's own ground colour. The
+   card is drawn solid, so nothing on it changes. The top band is twice the
+   traffic lights' centre so they sit in its middle, and carries back and
+   forward, Home and Inbox, Search and New thread (GlassBand.tsx); the right
+   and the foot are an even 20px. The two looks are the approved pictures:
+   Dark keeps more tint and outlines the card, Light lets more of the desktop
+   through with the card flat on it. phone.css comes later and keeps the
+   phone's full-bleed card. */
+:root[data-glass] body::before { content: none; }
+:root[data-glass] .app.workspace-layout { padding-top: 50px; padding-right: 20px; padding-bottom: 20px; }
+:root[data-glass] .workspace-layout::before { top: 50px; right: 20px; bottom: 20px; border-radius: 14px; }
+:root[data-glass] .workspace-layout::after { height: 50px; }
+:root[data-glass] .workspace-navigation { top: 60px; bottom: 20px; }
+:root[data-glass] .home-sky { border-radius: 14px; }
+:root[data-glass] .home-sky::after { box-shadow: none; }
+:root[data-glass] .topbar > .back-forward { position: fixed; top: 12px; left: 94px; margin: 0; z-index: 3; }
+/* The band has its own New thread. */
+:root[data-glass] .workspace-layout > .topbar .th-new[data-hint="new-task"] { display: none; }
+:root[data-glass] .workspace-navigation .workspace-tab.active {
+  background: color-mix(in srgb, var(--text) 9%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 7%, transparent);
+}
+:root[data-glass]:not([data-theme="light"]) body { background: color-mix(in srgb, var(--bg) 60%, transparent); }
+:root[data-glass]:not([data-theme="light"]) .workspace-layout::before {
+  background: linear-gradient(var(--skin-pane), var(--skin-pane)), var(--skin-image) center / cover no-repeat fixed var(--bg);
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--text) 16%, transparent);
+}
+/* !important and the extra `html` because home.css paints a light sky's
+   frame colour over both with !important. */
+html:root[data-glass][data-theme="light"] body { background: color-mix(in srgb, var(--sky-frame, var(--bg)) 30%, transparent) !important; }
+html:root[data-glass][data-theme="light"] .app.workspace-layout { background: transparent !important; }
+:root[data-glass][data-theme="light"] .workspace-layout::before { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 8%, transparent); }
+
+.glass-band { display: none; }
+:root[data-glass] .glass-band { position: fixed; top: 12px; left: 160px; right: 20px; height: 26px; display: flex; align-items: center; gap: 4px; z-index: 3; }
+:root[data-glass] .app:not(.back-forward-on) .glass-band { left: 94px; }
+.glass-band button {
+  height: 26px; padding: 0 11px; display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: 8px; background: none;
+  font: inherit; font-size: 12.5px; color: var(--text-dim); white-space: nowrap; cursor: pointer; -webkit-app-region: no-drag;
+}
+.glass-band button:hover { color: var(--text); background: color-mix(in srgb, var(--text) 6%, transparent); }
+.glass-band button.on { color: var(--text); background: color-mix(in srgb, var(--text) 9%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 10%, transparent); }
+.glass-band .gb-count { color: var(--text-faint); font-family: var(--mono); font-size: 11px; }
+.glass-band .gb-tools { margin-left: auto; display: flex; gap: 8px; }
+.glass-band .gb-search { width: 220px; justify-content: space-between; color: var(--text-faint); background: color-mix(in srgb, var(--text) 6%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 9%, transparent); }
+.glass-band .gb-search small { font-family: var(--mono); font-size: 11px; }
+.glass-band .gb-new { color: var(--text); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 14%, transparent); }
 :root[data-skin="ember-grid"] .modal { background: var(--bg-raised); border-color: var(--line-strong); }
 /* Solid: at .97 a thread's text read through the box behind its rows. */
 :root[data-skin="ember-grid"] .modal.palette { background: rgb(38, 36, 34); border-color: rgba(255, 255, 255, .08); }

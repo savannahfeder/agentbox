@@ -176,6 +176,7 @@ import { nameRow, wantsName, askSmallModel } from './row-label.mts';
 import { catchUpRow, catchUpResult } from './catch-up.mts';
 import { isAuto, asksWho, routeCandidates, routePrompt, readRoute, routedPatch, orPrimary, NOBODY_WHY } from '../shared/auto-route.mts';
 import { LEVELS, latestMessage, sortMessage, wantsPriority } from './message-priority.mts';
+import { GUESSED_LEVELS, levelTask, wantsLevel } from './task-priority.mts';
 import { NAME, Name, envName, nameSlug, isOurSlug } from '../shared/product-name.mjs';
 import { signInFiles, signInStamp, claudeKeychainService, KeychainStamps } from './sign-in-files.mts';
 import { runsOn } from './runs-on.mts';
@@ -1012,6 +1013,8 @@ const DIGEST_RETRY_MS = 30 * 60_000;
 // How long a row the namer could not name waits before it is asked about again,
 // so it cannot hold the rows behind it (nameTheRows).
 const NAME_RETRY_MS = 10 * 60_000;
+// How many times a task on Agent decides is asked about before it stays Medium.
+const LEVEL_TRIES = 3;
 /** Rewrites of brought-in chats running at once (`catchUpTheImports`). */
 const CATCH_UP_AT_ONCE = 3;
 /** Someone is looking at these rows, so a miss is tried again far sooner than a name is. */
@@ -1404,6 +1407,8 @@ export class Supervisor {
   declare _routing: boolean | undefined;
   declare _sortedMessages: Set<string>;
   declare _sortingMessages: boolean | undefined;
+  declare _levelMisses: Map<string, { count: number; at: number }>;
+  declare _leveling: boolean | undefined;
   declare _crossModelSaid: Set<string> | undefined;
   declare _oldChoiceSaid: Set<string> | undefined;
   declare _folderRefused: Set<string> | undefined;
@@ -4943,6 +4948,43 @@ export class Supervisor {
 
   _askPriority(latest: LatestMessage, product: string | null = null) {
     return this._askSmall((opts) => sortMessage(latest, opts), { product });
+  }
+
+  /**
+   * GIVE A TASK LEFT ON "AGENT DECIDES" ITS LEVEL (main/task-priority.mts).
+   * Paced like the namer: one call at a time, newest first, never awaited by
+   * the tick. A miss waits ten minutes, and after three the task stays Medium.
+   */
+  levelTheTasks(items: WorkItem[], me: string | null | undefined, now = Date.now()) {
+    if (this._leveling || this._memoryCritical(now)) return undefined;
+    this._levelMisses ??= new Map();
+    const products = new Map((this.store.listProducts?.() ?? []).map((p) => [p.slug, p]));
+    const key = (i: WorkItem) => `${i.product}:${i.id}`;
+    const waiting = (i: WorkItem) => {
+      const miss = this._levelMisses.get(key(i));
+      return !!miss && (miss.count >= LEVEL_TRIES || now - miss.at < NAME_RETRY_MS);
+    };
+    const next = items
+      .filter((i) => wantsLevel(i, products.get(i.product), me) && !waiting(i))
+      .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))[0];
+    if (!next) return undefined;
+    this._leveling = true;
+    const missed = () => {
+      const was = this._levelMisses.get(key(next));
+      this._levelMisses.set(key(next), { count: (was?.count ?? 0) + 1, at: now });
+    };
+    return this._askLevel(next)
+      .then((level) => {
+        if (!level) return missed();
+        this._levelMisses.delete(key(next));
+        this.store.prioritizeItem(next.product, next.id, GUESSED_LEVELS[level]);
+      })
+      .catch((e) => { missed(); console.warn('zero: could not rank a task:', e.message); })
+      .finally(() => { this._leveling = false; });
+  }
+
+  _askLevel(item: WorkItem) {
+    return this._askSmall((opts) => levelTask(item, opts), { product: item.product });
   }
 
   /**
@@ -8941,6 +8983,8 @@ export class Supervisor {
     try { this.catchUpTheImports(items, now); } catch (e) { console.warn('zero: could not catch up a chat:', (e as Error).message); }
     // And has a teammate written something that needs sorting by urgency?
     try { this.sortTheMessages(items, process.env.AGENTBOX_PERSON_ID); } catch (e) { console.warn('zero: could not sort a message:', (e as Error).message); }
+    // And is there a task left on Agent decides that has no level yet?
+    try { this.levelTheTasks(items, process.env.AGENTBOX_PERSON_ID, now); } catch (e) { console.warn('zero: could not rank a task:', (e as Error).message); }
     // And is there a thread sent to Auto still waiting to be given to someone?
     try { this.routeTheThreads(items); } catch (e) { console.warn('zero: could not route a thread:', (e as Error).message); }
 
@@ -13957,10 +14001,13 @@ function accountRefusedTheRun(session: RunState) {
 // runAt also covers snoozes written before the inbox reminder had its own field.
 // visibleTo is Add people, and label a rename.
 const NOT_A_WORD = new Set(['visibility', 'visibleTo', 'label', 'priority', 'problem', 'progress', 'solution', 'blockedBy', 'blocks', 'runAt', 'snoozedUntil', 'shippedAt']);
-function lastFounderWrite(item: WorkItem | null | undefined) {
+// A teammate's pulled line keeps the source they gave it, so a "founder" line
+// written by somebody else is not your word.
+function lastFounderWrite(item: WorkItem | null | undefined, me: string | null = process.env.AGENTBOX_PERSON_ID || null) {
   let latest = 0;
   for (const [field, w] of Object.entries(item?.wrote ?? {})) {
     if (NOT_A_WORD.has(field)) continue;
+    if (w?.by && me && w.by !== me) continue;
     if (w?.source === 'founder' && w.ts > latest) latest = w.ts;
   }
   return latest;
