@@ -170,14 +170,13 @@ import { TutorialOffer } from './components/TutorialOffer';
 import { holdForStoppedAgent, neverWarned, rememberWarned } from './stopped-agent';
 import { comeBackTo, neverOffered, offerOnNewProject, rememberOffered } from './tutorial';
 import { FirstRunFlow } from './components/FirstRun';
-import { TourList } from './components/TourList';
 import { ClassicFirstRun, OpenLesson } from './components/FirstRunClassic';
 import { landing as firstRunLanding, lessonsLeft, setLessons, showsOpenLesson, type Lesson } from './first-run-classic';
 import { useLessonPlace } from './lesson-position';
 import { ideasFor, runOfRule } from './first-run';
 import { Tour } from './components/Tour';
 import { laterTabShown } from './later-tab';
-import { type Lesson as TourLesson, THREAD_CLOSED, finishLesson, firstTask, madeUrgent, noteSent, readTour, saveTour, showIdeas, skipTour, startTour, tourLive, type Tour as TourState } from './tour';
+import { type Lesson as TourLesson, THREAD_CLOSED, finishLesson, firstTask, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, showIdeas, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
 import {
   ANSWER_AFTER_MS, COACHED, COPY as WALK_COPY, FIRST_RUN_LABEL, advance as advanceRun, afterCommand, beatRows, coach, closingRefused, firstRunDone,
   afterUnblock, finishedCleared, firstRunNeeded, projectsOfTheirOwn, laterCleared, laterId, laterIndex,
@@ -1201,6 +1200,10 @@ export default function App() {
   const setTour = useCallback((t: TourState) => { saveTour(localStorage, t); setTourState(t); }, []);
   const tourRef = useRef(tour);
   tourRef.current = tour;
+  // The project Home's box pointed at before the walkthrough's practice thread.
+  const beforePractice = useRef<string | null>(null);
+  // The practice project Home's box sends the walkthrough's first thread to.
+  const tourTask = tourLive(tour) && !tour!.sent && tour!.practice && !tour!.practice.item ? tour!.practice.slug : null;
   // Making a thread urgent from that bar earns one more tip, saying what urgent does.
   const urgentTold = useCallback((c: { value: number }) => {
     if (c.value === URGENT_PRIORITY && tourLive(tourRef.current)) setTour(madeUrgent(finishLesson(tourRef.current!, 'palette')));
@@ -1263,6 +1266,7 @@ export default function App() {
     if (!snap || sweptPractice.current) return;
     sweptPractice.current = true;
     if (run || forcedRun.current) return;
+    if (tourLive(tourRef.current) && tourRef.current?.practice) return;
     const again = resumableTutorial(readFirstRun(localStorage), snap.products);
     if (again) setRun(again);
     else if (snap.products.some((p) => p.practice)) {
@@ -1567,6 +1571,30 @@ export default function App() {
     }, ANSWER_AFTER_MS);
     return () => { live = false; clearTimeout(t); };
   }, [run?.step, run?.item, run?.product, run?.practice, run?.replies, replyIn]);
+
+  // THE WALKTHROUGH'S PRACTICE THREAD IS ANSWERED BY THE STORE, as the practice
+  // tutorial's is: two seconds after it is sent, and after each reply lands.
+  const tourPractice = tourLive(tour) ? tour!.practice ?? null : null;
+  const practiceRow = tourPractice?.item ? snap?.items.find((i) => i.id === tourPractice.item && i.product === tourPractice.slug) ?? null : null;
+  const practiceDue = !!tourPractice?.item && (tourPractice.answered ?? 0) <= tourPractice.replies
+    && (tourPractice.replies === 0 || (!!practiceRow && replyWritten(practiceRow)));
+  useEffect(() => {
+    const p = tourRef.current?.practice;
+    if (!practiceDue || !p?.item) return;
+    let live = true;
+    const t = setTimeout(async () => {
+      try { await api.firstRunAnswer({ product: p.slug, id: p.item!, round: p.replies }); } catch { /* the thread still says it is working */ }
+      if (!live || !tourRef.current?.practice) return;
+      setTour({ ...tourRef.current, practice: { ...tourRef.current.practice, answered: p.replies + 1 } });
+      await refresh();
+    }, ANSWER_AFTER_MS);
+    return () => { live = false; clearTimeout(t); };
+  }, [practiceDue, tourPractice?.replies]); // eslint-disable-line react-hooks/exhaustive-deps
+  // And it goes with the walkthrough, finished or skipped.
+  const tourGone = !!tour && (tour.skipped || tourOver(tour));
+  useEffect(() => {
+    if (tourGone && tour?.practice) void api.firstRunPracticeEnd().then(() => refreshRef.current?.());
+  }, [tourGone]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // AND NOTHING FROM CLAUDE CODE STARTS WHILE THE WALK IS UP.Making the project
   // one screen earlier composes a real directive, and on her own walk that
@@ -4691,7 +4719,8 @@ export default function App() {
     // slot it was in, which is where you were working.
     const at = shownInbox.findIndex((i) => i.id === item.id);
     const index = at < 0 && focused?.id === item.id && inboxPlace.current?.id === item.id ? inboxPlace.current.index : at;
-    advanceRef.current = advanceAfter({ fromTask: !!focused, index, id: item.id });
+    // The walkthrough's practice thread does not lead on into real ones.
+    advanceRef.current = advanceAfter({ fromTask: !!focused && !isTourPractice(tourRef.current, item), index, id: item.id });
   }, [shownInbox, focused]);
 
   // AND EVERY WAY A ROW LEAVES HER INBOX CLOSES THE TASK THROUGH HERE.
@@ -5068,7 +5097,12 @@ export default function App() {
     return true;
   };
   const answerWith = useCallback(async (item: WorkItem, text: string, priority?: number, sent?: SentDraft, mode?: AnswerMode | null, engine?: string | null, pick?: ReplyPick, runAt?: number) => {
-    if (tourLive(tourRef.current)) setTour(finishLesson(tourRef.current!, 'reply'));
+    if (tourLive(tourRef.current)) {
+      let t = finishLesson(tourRef.current!, 'reply');
+      if (isTourPractice(t, item)) t = practiceReplied(t);
+      setTour(t);
+      tourRef.current = t;
+    }
     // AN AGENT ROW IS NOT WORK OF HERS TO CLOSE, DEFER OR RESTART. It stands
     // for a session running outside Agentbox; the only two things that mean
     // anything to it are a reply and being taken to its window.
@@ -5320,7 +5354,7 @@ export default function App() {
     // up.
     // A REPLY IN A CONVERSATION STAYS IN THE CONVERSATION (2026-10-01):
     // sending a message to a person must not jump to another page.
-    const stay = staysOnTheTask(item, text, engine) || talking || !movesOn(item);
+    const stay = staysOnTheTask(item, text, engine) || talking || !movesOn(item) || isTourPractice(tourRef.current, item);
     // Held, and so saying "press Z to undo", only where it really is held: a
     // phone writes it at once and has no Z (./phone-holds).
     const mine = { product: item.product, id: item.id, at: Date.now(), text, held: holdsReplies(onPhone()) };
@@ -7092,11 +7126,21 @@ export default function App() {
     finishFirstRun(localStorage);
     setNewInstall(false);
     rememberOffered(localStorage);
+    setTour(startTour());
     setFresh(false);
+    // Lands on Home when it is on, where the setup's preview already was.
+    setHomeOpen(homeOn);
+    setView('inbox');
+    setFocused(null);
     setSelected(0);
-    // The practice tutorial, on threads nothing real is behind; it ends on Home.
-    startTutorial(null);
-  }, [startTutorial]);
+    // The walkthrough's one thread lives in a practice project nothing real is behind.
+    beforePractice.current = rememberedProject();
+    void api.firstRunPractice({ bare: true }).then(async (made) => {
+      if (!made?.slug || !tourLive(tourRef.current)) return;
+      await refreshRef.current?.();
+      setTour(withPractice(tourRef.current!, { slug: made.slug }));
+    }).catch(() => {});
+  }, [setTour, setHomeOpen, homeOn]);
 
   // THE FIRST RUN ON MAIN ENDS IN THE INBOX, on the task just sent when there is one, with its two lessons left to give.
   const [landOn, setLandOn] = useState<string | null>(null);
@@ -7487,7 +7531,7 @@ export default function App() {
   // The sidebar's Search row and ⌘K search threads on a desktop; a phone has
   // neither, so only there does the list draw a magnifier, and it opens ⌘K.
   const searchInTheList = onPhone() ? () => setModal('palette') : undefined;
-  const sideFolded = sidebarFolded({ phone: onPhone(), shrinks: sidebarShrinks, pointedAt: railOpen });
+  const sideFolded = sidebarFolded({ phone: onPhone(), shrinks: sidebarShrinks && !tourLive(tour), pointedAt: railOpen });
   // A teammate's direct record is one of your groups, so Groups is the page it is on.
   const directOpen = !!focused && !isTaskRow(focused) && isDirect(snap?.products.find((p) => p.slug === focused.product));
   const inChats = !!focused && directOpen && !!chatsValue && focused.id === chatsDirect;
@@ -8514,7 +8558,7 @@ export default function App() {
       {(modal === 'compose' || clearSlot) && drawnIn(
         <ThreadComposer
           statusLine={snap.phoneStatus}
-          key={modal === 'compose' ? 'card' : 'page'}
+          key={`${modal === 'compose' ? 'card' : 'page'}${tourTask ? '-practice' : ''}`}
           inline={modal !== 'compose'}
           onWriting={setClearWriting}
           handOver={handOver}
@@ -8535,16 +8579,16 @@ export default function App() {
           codexModelDefault={codexModelDefault}
           // THE TUTORIAL SENDS ITS TASK INTO THE PRACTICE PROJECT, so the card
           // opens on that project rather than on whatever was last used.
-          defaultProduct={walkCard ? (run!.practice ?? run!.product) : projectOnScreen({ filter: productFilter, open: focused })}
+          defaultProduct={walkCard ? (run!.practice ?? run!.product) : tourTask ?? projectOnScreen({ filter: productFilter, open: focused })}
           /* THE WALK'S OWN TASK, ALREADY WRITTEN. The beat is about pressing
              send, not about thinking of something to ask, so the words are in
              the box when the card opens. `scripted` is what lets this one task
              into the practice project and what stamps the label the supervisor
              reads; everything else about the card is the card anybody uses. */
-          initial={walkCard ? { body: `${TASK_TITLE}\n\n${TASK_BODY}` } : composeInitial}
-          scripted={walkCard ? { labels: [FIRST_RUN_LABEL] } : null}
+          initial={walkCard ? { body: `${TASK_TITLE}\n\n${TASK_BODY}` } : tourTask ? { body: `${TASK_TITLE}\n\n${TASK_BODY}`, product: tourTask } : composeInitial}
+          scripted={walkCard || tourTask ? { labels: [FIRST_RUN_LABEL] } : null}
           ideas={!walkCard && showIdeas(tour) && !(homeShown && modal !== 'compose') ? FIRST_IDEAS : null}
-          askFolder={firstTask(tour)}
+          askFolder={firstTask(tour) && !tourTask}
           onOpenConversation={openConversation}
           blockChoicesFor={team ? (holder) => taskBlockChoices(holder) : undefined}
           // "Reorder" beside the project menu's heading: Settings on the
@@ -8631,6 +8675,15 @@ export default function App() {
             if (runRef.current?.step === 'task') {
               if (made?.id) fire({ t: 'sent', item: made.id, at: Date.now() });
               await refresh();
+              return;
+            }
+            // The walkthrough's practice thread: no toast and no undo, and it opens.
+            if (tourTask && made?.id && made.product === tourTask && tourLive(tourRef.current)) {
+              setTour(withPractice(tourRef.current!, { slug: tourTask, item: made.id }));
+              rememberProject(beforePractice.current);
+              const after = await refresh();
+              const row = after?.items.find((i) => i.id === made.id && i.product === made.product);
+              if (row) setFocused(row);
               return;
             }
             if (how?.kind === 'message') {
@@ -9199,8 +9252,7 @@ export default function App() {
         }}
         onLeave={setupStartedAgain.current ? leaveSetupAgain : undefined} />}
       <OpenLesson at={lessonAt} />
-      {!fresh && tour && tourLive(tour) && <TourList tour={tour} now={tourNow} onSkip={() => setTour(skipTour(tour))} />}
-      {!fresh && <Tour tour={tour} view={view} thread={!!focused}
+      {!fresh && <Tour tour={tour} practice={!!tourTask} view={view} thread={!!focused}
         covered={!!run || settingsOpen || teamOpen || newProject || (modal !== null && modal !== 'compose' && modal !== 'palette')}
         palette={modal === 'palette'}
         onChange={setTour}

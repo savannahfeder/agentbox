@@ -1383,8 +1383,10 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // the three rows in the same call, and archived by the handler below it when
   // the walk ends. It is a real project and it is never a project anybody works
   // in: main/store.mts and main/supervisor.mts both say what that means.
-  ipcMain.handle('zero:first-run-practice', () => {
+  ipcMain.handle('zero:first-run-practice', (_e, opts: { bare?: boolean } = {}) => {
     const made = store.createPractice();
+    // The walkthrough's: one thread of its own, no examples beside the person's real ones.
+    if (opts?.bare) return { ...made, examples: [], backdrop: [] };
     let rows: { ids: string[] } = { ids: [] };
     // A store that will not take the three rows is not a reason to strand
     // somebody mid-walk. They land in an empty practice inbox and the beat that

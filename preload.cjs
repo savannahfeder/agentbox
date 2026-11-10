@@ -136,7 +136,7 @@ contextBridge.exposeInMainWorld('zero', {
   firstRunAnswer: (payload) => ipcRenderer.invoke('zero:first-run-answer', payload),
   firstRunExamples: (payload) => ipcRenderer.invoke('zero:first-run-examples', payload),
   // The practice project: made with its three rows, archived when the walk ends.
-  firstRunPractice: () => ipcRenderer.invoke('zero:first-run-practice'),
+  firstRunPractice: (opts) => ipcRenderer.invoke('zero:first-run-practice', opts),
   firstRunPracticeEnd: () => ipcRenderer.invoke('zero:first-run-practice-end'),
   firstRunWalking: (payload) => ipcRenderer.invoke('zero:first-run-walking', payload),
   // A second Agentbox, in a throwaway home, as somebody who has never opened it.

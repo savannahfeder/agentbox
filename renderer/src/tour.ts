@@ -16,7 +16,17 @@ export interface Tour {
   done: Lesson[];
   /** A thread was made urgent from ⌘K, so the next tip says what that does. */
   urgent?: boolean;
+  /** The one practice thread the walkthrough runs on, in a practice project nothing real is behind. */
+  practice?: TourPractice;
 }
+
+export interface TourPractice { slug: string; item?: string; replies: number; answered?: number }
+
+export const withPractice = (t: Tour, p: { slug: string; item?: string }): Tour => ({ ...t, practice: { replies: 0, ...t.practice, ...p } });
+export const practiceReplied = (t: Tour): Tour => (t.practice ? { ...t, practice: { ...t.practice, replies: t.practice.replies + 1 } } : t);
+/** Whether a thread is the walkthrough's practice thread, while the walkthrough runs. */
+export const isTourPractice = (t: Tour | null, item: { product: string; id: string }): boolean =>
+  tourLive(t) && !!t!.practice && t!.practice.slug === item.product && t!.practice.item === item.id;
 
 /** What is on the screen, read from the window by the caller. */
 export interface TourScreen {
@@ -162,7 +172,10 @@ export function readTour(store: Store): Tour | null {
     if (!raw) return null;
     const t = JSON.parse(raw);
     if (typeof t !== 'object' || !t) return null;
-    return { sent: !!t.sent, skipped: !!t.skipped, done: Array.isArray(t.done) ? t.done : [], ...(t.urgent ? { urgent: true } : {}) };
+    const p = t.practice && typeof t.practice.slug === 'string'
+      ? { practice: { slug: t.practice.slug, ...(typeof t.practice.item === 'string' ? { item: t.practice.item } : {}), replies: Number(t.practice.replies) || 0, ...(t.practice.answered ? { answered: Number(t.practice.answered) } : {}) } }
+      : {};
+    return { sent: !!t.sent, skipped: !!t.skipped, done: Array.isArray(t.done) ? t.done : [], ...(t.urgent ? { urgent: true } : {}), ...p };
   } catch { return null; }
 }
 

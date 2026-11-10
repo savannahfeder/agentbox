@@ -1948,7 +1948,7 @@ declare global {
       searchAgentThreads?(p: { again?: boolean }): Promise<{ threads?: SessionThread[]; reached?: number }>;
       importThreads?(p: { product: string; threads: string[]; land?: 'sorted' | 'inbox' }): Promise<{ added?: number; already?: number; done?: number }>;
       firstRunExamples?(p: { product: string }): Promise<{ ids: string[] }>;
-      firstRunPractice?(): Promise<{ slug: string; examples: string[]; backdrop?: string[] }>;
+      firstRunPractice?(opts?: { bare?: boolean }): Promise<{ slug: string; examples: string[]; backdrop?: string[] }>;
       firstRunPracticeEnd?(): Promise<unknown>;
       onboardingArm?(): Promise<unknown>;
       notifyTest?(): Promise<unknown>;

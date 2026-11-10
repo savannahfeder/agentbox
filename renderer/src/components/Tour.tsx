@@ -44,6 +44,7 @@ const SAY: Record<TourStep, { words: JSX.Element; side: Side }> = {
   palette: { words: <>Press <K k={CMD} /><K k="K" /> to find anything {Name} can do</>, side: 'below' },
   urgent: { words: <>Urgent threads move up your list, and their agents start first</>, side: 'below-right' },
 };
+const PRACTICE_SEND = <>Press <K k={CMD} /><K k="↵" /> to send this practice thread</>;
 /** The urgent tip asks for nothing, so it goes by itself. */
 const URGENT_MS = 6000;
 
@@ -96,7 +97,7 @@ function targetsOf(step: TourStep): HTMLElement[] {
     // On the list, at the word Urgent on the thread just raised.
     case 'urgent': if (urgentCell()) return one(urgentCell());
     // falls through
-    case 'palette': return one(document.querySelector('.tm-tab')?.parentElement ?? document.querySelector('.thread-crumb-from')?.parentElement);
+    case 'palette': return one(document.querySelector('.tm-tab')?.parentElement ?? document.querySelector('.thread-crumb-from')?.parentElement ?? document.querySelector('.workspace-find button'));
   }
 }
 
@@ -160,8 +161,10 @@ function readScreen(view: string, thread: boolean, covered: boolean, palette: bo
 
 const same = (a: Box | null, b: Box | null) => (!a || !b ? a === b : a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h);
 
-export function Tour({ tour, view, thread, covered, palette, onChange, onPoint, onStep }: {
+export function Tour({ tour, practice = false, view, thread, covered, palette, onChange, onPoint, onStep }: {
   tour: TourState | null;
+  /** Home's box holds the walkthrough's practice task. */
+  practice?: boolean;
   view: string;
   thread: boolean;
   /** Settings, ⌘K or another card is over the window. */
@@ -345,7 +348,7 @@ export function Tour({ tour, view, thread, covered, palette, onChange, onPoint, 
       {step !== 'palette' && !(step === 'urgent' && !urgentCell()) && step !== 'busy' && step !== 'gettingReady' && step !== 'inPalette' && step !== 'startHere' && <div key={`glow-${step}`} className="tour-glow" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} aria-hidden="true" />}
       <div key={`card-${step}`} ref={cardRef} className="tour-card" role="status"
         style={cardAt ? { left: cardAt.left, top: cardAt.top } : { left: -9999, top: -9999 }}>
-        <span className="tour-say">{step === 'busy' && tried ? BUSY_TOLD : step === 'inPalette' ? <InPalette /> : SAY[step].words}</span>
+        <span className="tour-say">{step === 'busy' && tried ? BUSY_TOLD : step === 'inPalette' ? <InPalette /> : step === 'send' && practice ? PRACTICE_SEND : SAY[step].words}</span>
         {step === 'busy' && !tried && <button type="button" className="tour-act" onClick={tryNotifications}>Turn on notifications</button>}
         {step === 'busy' && tried && MAC && <button type="button" className="tour-act" onClick={openNotifySettings}>Didn’t see it? Open settings</button>}
       </div>
