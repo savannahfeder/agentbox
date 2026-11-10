@@ -13,35 +13,40 @@
 //     my teammates' private tasks doing.
 import path from 'node:path';
 import { createTeamSync, fileSyncState, MAX_MESSAGE_FILE_BYTES } from './sync.mts';
-import { createThreadShare as createThreadShareJs } from './thread-share.mjs';
-import { briefToContinue } from './continue-thread.mjs';
-import { CONTINUED_NOTE } from '../../shared/thread-continued.mjs';
-import { findFileToSend as findFileToSendJs } from './carry-files.mjs';
-import { readableSharedThreads } from '../everything-found.mjs';
-import { plainRef } from '../../shared/carried-files.mjs';
+import { createThreadShare } from './thread-share.mts';
+import type { SharedThreadView, ThreadShare, ThreadShareBackend } from './thread-share.mts';
+import { briefToContinue } from './continue-thread.mts';
+import { CONTINUED_NOTE } from '../../shared/thread-continued.mts';
+import { findFileToSend } from './carry-files.mts';
+import { readableSharedThreads } from '../everything-found.mts';
+import { plainRef } from '../../shared/carried-files.mts';
 import { listSharedProjects, joinSharedProject, markShared, makeDirect } from './projects.mts';
 import type { TeamRecord } from './projects.mts';
 import type { SyncBackend, SyncCard, SyncDisk, SyncReport, SyncState } from './sync.mts';
 import type { AttachmentFile, SavedAttachment } from '../save-attachments.mts';
-import type { PersonStatus } from '../../shared/team-status.mjs';
-import { GIVEN_TASK, WORK_THREAD, isTaskRow, isWorkThread, teamPeopleShown } from '../../shared/team-rules.mjs';
+import type { PersonStatus } from '../../shared/team-status.mts';
+import { GIVEN_TASK, WORK_THREAD, isTaskRow, isWorkThread, teamPeopleShown } from '../../shared/team-rules.mts';
 import { referencedFiles } from '../../shared/referenced-files.mts';
-import { shortTitle } from '../../shared/thread-title.mjs';
-import { taskTitle } from '../../shared/team-tasks.mjs';
-import { firstSentence } from '../../shared/thread-cards.mjs';
-import { cardsFor as cardsForJs } from '../../shared/thread-cards.mjs';
+import { shortTitle } from '../../shared/thread-title.mts';
+import { taskTitle } from '../../shared/team-tasks.mts';
+import { firstSentence } from '../../shared/thread-cards.mts';
+import { cardsFor } from '../../shared/thread-cards.mts';
 import fs from 'node:fs';
 import { saveAttachments, attachmentMarkdown } from '../save-attachments.mts';
-import { hasLapsed, statusEnds } from '../../shared/team-status.mjs';
+import { hasLapsed, statusEnds } from '../../shared/team-status.mts';
 import QRCode from 'qrcode';
 import { createPhoneInbox } from '../phone-inbox.mts';
 import type { PhoneBackendCalls, PhoneHistoryLine, PhoneInboxOptions, PhoneItem } from '../phone-inbox.mts';
-import { PHONE_UNDO_HOLD_MS } from '../../shared/phone-undo.mjs';
-import { SNAPSHOT_LIMITS, phoneProjectsOf, phoneEligible } from '../../shared/phone-snapshot.mjs';
+import { PHONE_UNDO_HOLD_MS } from '../../shared/phone-undo.mts';
+import { SNAPSHOT_LIMITS, phoneProjectsOf, phoneEligible } from '../../shared/phone-snapshot.mts';
 import { createRooms } from './rooms.mts';
-import { noticeEndedWaits as noticeEndedWaitsJs } from './waits.mjs';
-import { handOverDepartures } from './departures.mjs';
-import { mateCard as mateCardJs, splitCards as splitCardsJs } from '../../shared/mate-cards.mjs';
+import { noticeEndedWaits } from './waits.mts';
+import { handOverDepartures } from './departures.mts';
+import type { Departure } from './departures.mts';
+import type { CloudPhoneCommand } from './supabase-backend.mts';
+import { mateCard, splitCards } from '../../shared/mate-cards.mts';
+import type { BoardMate } from '../../shared/mate-cards.mts';
+import type { Mark } from '../../shared/artifact-marks.mts';
 import type { RoomsBackend, RoomsOptions, RoomsState } from './rooms.mts';
 
 export interface TeamPerson {
@@ -53,9 +58,8 @@ export interface TeamPerson {
   role?: string;
   connections?: string[];
 }
-/** Somebody else's AI teammate, as their card on the team's board describes it (shared/mate-cards.mjs). */
-export interface TeamMate { id: string; owner: string; name?: string; job?: string | null; now?: unknown; open?: boolean; running?: boolean; updatedAt?: number }
 export interface TeamRef { id: string; name: string }
+export type TeamCard = SyncCard & { personId: string; title?: string | null; updatedAt?: number };
 export interface TeamInvite { teamId: string; teamName: string; invitedBy: string | null; invitedByName: string | null }
 export interface TeamSentInvite { email: string; invitedBy: string | null }
 
@@ -72,7 +76,7 @@ export interface TeamState {
   invites: TeamInvite[];
   sent: TeamSentInvite[];
   people: TeamPerson[];
-  cards: SyncCard[];
+  cards: TeamCard[];
   lastSyncAt: number | null;
   error: string | null;
   phoneSite?: string | null;
@@ -82,7 +86,7 @@ export interface TeamState {
   since?: number | null;
   confirm?: boolean;
   rooms?: RoomsState;
-  teamMates?: TeamMate[];
+  teamMates?: BoardMate[];
   sharedFileNews?: unknown[];
   /** `${slug}/${id}` then person: when they last opened that conversation. */
   seen?: Record<string, Record<string, number>>;
@@ -96,21 +100,28 @@ export interface FileLinkRow { token: string; version: number; hash: string; cre
 export interface FileLinkListed { token: string; source: string; name: string; kind: string; createdAt: number; updatedAt: number; comments: number }
 export interface FileLinkComment { id: string; byName: string; byAvatar: string | null; text: string; at: number; mine: boolean; byOwner: boolean }
 
-export interface TeamHandover { handTo: string; name: string; mates: { id: string; name?: string; job?: string | null; to: string | null }[] }
+export interface TeamHandover { handTo: string; name: string; mates: { id: string; name?: unknown; job?: unknown; to: string | null }[] }
 
 /** The signed-in cloud, as far as the team service asks of it: the real one and the memory one both answer. */
-export type TeamBackend = Omit<SyncBackend, 'me' | 'personId'> & RoomsBackend & PhoneBackendCalls & {
+// A `setting` command names no project (20261023000000_phone_settings.sql), which PhoneCommand does not allow for.
+type TeamPhoneCalls = Omit<PhoneBackendCalls, 'waitingPhoneCommands' | 'cloudPhoneCommands' | 'addPhoneCommand'> & {
+  waitingPhoneCommands(device: string): Promise<CloudPhoneCommand[]>;
+  cloudPhoneCommands?(device: string, since: string): Promise<CloudPhoneCommand[]>;
+  addPhoneCommand(command: object): Promise<unknown>;
+};
+
+export type TeamBackend = Omit<SyncBackend, 'me' | 'personId'> & RoomsBackend & TeamPhoneCalls & ThreadShareBackend & {
   me(): Promise<TeamPerson | null | undefined>;
   setStatus(status: { text: unknown; until: number | null }): Promise<PersonStatus | null>;
   myTeams(): Promise<TeamRef[]>;
   teamPeople(teamId: string): Promise<TeamPerson[]>;
-  listCards(): Promise<SyncCard[]>;
+  listCards(): Promise<TeamCard[]>;
   pendingInvites(): Promise<TeamInvite[]>;
   listInvites?(teamId: string): Promise<TeamSentInvite[]>;
   createTeam(name: string): Promise<TeamRef>;
   renameTeam(teamId: string, name: string): Promise<unknown>;
   removeMember(teamId: string, personId: string, handover?: TeamHandover | null): Promise<void>;
-  departures?(teamId: string): Promise<unknown[]>;
+  departures?(teamId: string): Promise<Departure[]>;
   setConnections?(ids: unknown): Promise<unknown>;
   seenMarks?(): Promise<{ projectId: string; itemId: string; personId: string; at: number }[]>;
   markSeen?(projectId: string, itemId: string): Promise<unknown>;
@@ -120,6 +131,7 @@ export type TeamBackend = Omit<SyncBackend, 'me' | 'personId'> & RoomsBackend & 
   putFileFolder?(teamId: string, row: unknown): Promise<unknown>;
   placeFile?(owner: string, threadId: string, row: unknown): Promise<unknown>;
   addFileVersion?(teamId: string, row: unknown): Promise<unknown>;
+  liveToken?(): Promise<string | null>;
   fileVersions?(teamId: string): Promise<unknown>;
   cancelInvite(teamId: string, email: string): Promise<void>;
   acceptInvite(teamId: string): Promise<unknown>;
@@ -140,8 +152,8 @@ export interface TeamSession {
   configured?: boolean;
   restore(): Promise<TeamBackend | null | undefined>;
   signIn(options: { onUrl: (url: string) => void; log: (line: string) => void }): Promise<TeamBackend>;
-  reopen?(url: string): Promise<unknown>;
-  cancelSignIn?(): boolean;
+  reopen?(url: string): unknown;
+  cancelSignIn?(): boolean | void;
   signInWithPassword?(email: string, password: string): Promise<TeamBackend>;
   adoptSession?(session: { supabaseUrl: string; access_token: string; refresh_token: string } | null): Promise<TeamBackend | null>;
   signUp?(account: { email: string; password: string; name: string }): Promise<{ backend?: TeamBackend; confirm?: boolean } | null | undefined>;
@@ -184,7 +196,24 @@ export interface TeamRow {
 }
 
 /** A line of a thread's ledger, as the team service reads it. */
-export interface TeamHistoryLine extends PhoneHistoryLine { uid?: string; by?: string }
+export interface TeamHistoryLine extends PhoneHistoryLine {
+  id?: string;
+  ts: number;
+  source?: string;
+  uid?: string;
+  by?: string;
+  claim?: unknown;
+  heartbeat?: unknown;
+  release?: unknown;
+  patch?: TeamLinePatch;
+}
+
+export interface TeamLinePatch {
+  [key: string]: unknown;
+  fromPhone?: unknown;
+  artifact?: Mark | null;
+  comment?: { text?: unknown } | null;
+}
 
 export interface TeamAnswer { answer: string; voice?: unknown; forAgent?: unknown; inReplyTo?: string; status?: string }
 
@@ -193,7 +222,7 @@ export interface TeamStore {
   listItems(): TeamItem[];
   readItem(slug: string, id: string): TeamRow | null;
   readThread(slug: string, id: string): { text?: string }[];
-  readHistory(slug: string, id: string, opts?: { max?: number }): (TeamHistoryLine | null)[];
+  readHistory(slug: string, id: string, opts?: { max?: number }): TeamHistoryLine[];
   answerItem(slug: string, id: string, patch: TeamAnswer): unknown;
   teamPatch(slug: string, id: string, patch: { assignee: string }): unknown;
   composeItem(slug: string, fields: Record<string, unknown>): { id: string };
@@ -220,6 +249,7 @@ export interface TeamPhone {
   approvals?: PhoneInboxOptions['approvalsOf'];
   readSettings?: PhoneInboxOptions['readSettings'];
   pins?: PhoneInboxOptions['pinsOf'];
+  onMac?: PhoneInboxOptions['onMacOf'];
   repeats?: PhoneInboxOptions['repeatsOf'];
   teammates?: PhoneInboxOptions['teammatesOf'];
   version?: string;
@@ -262,6 +292,8 @@ export interface TeamServiceOptions {
   /** Where a file's link opens; the phone site when undefined, no links when null. */
   shareSite?: string | null;
   rooms?: TeamRoomsSetup | null;
+  /** Settings › Alpha features › Multiplayer. Off, no thread of this person's is shared. */
+  sharing?: () => boolean;
 }
 
 /** A file handed to a task; one with a `rel` is a file the words name. */
@@ -275,36 +307,9 @@ interface TaskInput {
 /** What rides along with a message: a voice note, the agent it is for, a subject that makes it its own thread. */
 interface MessageExtras { voice?: unknown; forAgent?: unknown; subject?: unknown }
 
-// The plain-JS helpers infer their `= null` defaults as `null`; these say what they are given.
-const findFileToSend = findFileToSendJs as (args: { ref: string; meant?: boolean; conversation?: { dir: string; people: string[] }; products: TeamProduct[] }) => Promise<unknown>;
-const splitCards = splitCardsJs as (all: SyncCard[], me?: string | null) => { cards: SyncCard[]; mates: TeamMate[] };
-const cardsFor = cardsForJs as (p: { products: TeamProduct[]; readItems: (product: TeamProduct) => PhoneItem[]; now?: number; since?: number | null; me?: string | null; running?: string[] }) => SyncCard[];
-const noticeEndedWaits = noticeEndedWaitsJs as (args: {
-  products: TeamProduct[]; read: (product: TeamProduct) => PhoneItem[]; write: (dir: string, id: string, patch: Record<string, unknown>) => unknown;
-  cards: SyncCard[]; nameOf: (id: string) => string; now: number; me?: string | null;
-}) => unknown;
-
-/** What the shared threads of teammates look like on this Mac (./thread-share.mjs). */
-interface ThreadShare {
-  pass(teamId: string | null | undefined): Promise<void>;
-  read(owner: string, threadId: string): { shared: boolean; lines: unknown[]; earlier: number; product: string | null; dir: string | null };
-  folders(): { ownerId: string; threadId: string; version: string }[];
-  products(): { slug: string; name: string; dir: string }[];
-  addMark(owner: string, threadId: string, mark: unknown): Promise<boolean>;
-  fileNews(): unknown[];
-  refreshComments(): Promise<void>;
-}
-const createThreadShare = createThreadShareJs as unknown as (args: {
-  backend: TeamBackend; me: string; myName: () => string | null; root: string; listCards: () => SyncCard[];
-  listThreads: () => Map<string, { item: PhoneItem; product: TeamProduct }>;
-  historyOf: (slug: string, id: string) => (TeamHistoryLine | null)[];
-  listProducts: () => TeamProduct[]; disk: TeamDisk; accountRoot: string; storeRoot?: string;
-  onChange: () => void; log: (line: string) => void; now: () => number;
-}) => ThreadShare;
-const mateCard = mateCardJs as (t: { id: string; name?: string; job?: string | null; openToTeam?: boolean }, how?: { now?: string | null; at?: number; running?: boolean }) => SyncCard;
-import { linkAddress, linkSiteFor } from '../file-link.mjs';
-import { noticeLinkComments } from './link-comments.mjs';
-import type { LinkComment } from './link-comments.mjs';
+import { linkAddress, linkSiteFor } from '../file-link.mts';
+import { noticeLinkComments } from './link-comments.mts';
+import type { LinkComment } from './link-comments.mts';
 
 const LINK_COMMENTS_EVERY_MS = 60_000;
 
@@ -338,6 +343,7 @@ export function createTeamService({
   runningIds = () => [],
   // This person's AI teammates, which the team sees on its board.
   ownMates = () => [],
+  sharing = () => true,
 }: TeamServiceOptions) {
   // The phone site's address, only an https one, and its code for Settings.
   const site = typeof phone?.site === 'string' && /^https:\/\/[^\s/]+(\/[^\s]*)?$/.test(phone.site) ? phone.site : null;
@@ -360,7 +366,7 @@ export function createTeamService({
 
   const set = (patch: Partial<TeamState>) => { state = { ...state, ...patch }; onChange(); };
   // Threads go on as they always did; the others' AI teammates go beside them.
-  const withCards = (all: SyncCard[] | null | undefined, rest: Partial<TeamState>): Partial<TeamState> => {
+  const withCards = (all: TeamCard[] | null | undefined, rest: Partial<TeamState>): Partial<TeamState> => {
     // Someone who left keeps their cards in the cloud; nobody here shows them.
     const on = new Set([state.me?.id, ...(rest.people ?? state.people).map((p) => p.id)]);
     const { cards, mates } = splitCards((all ?? []).filter((c) => on.has(c.personId)), state.me?.id ?? null);
@@ -380,7 +386,7 @@ export function createTeamService({
 
   // A status the owner set has run out: wipe it where it is stored, so old
   // text does not sit in the cloud. Everyone who READS it already saw it go,
-  // on their own clock (shared/team-status.mjs); this is the tidying.
+  // on their own clock (shared/team-status.mts); this is the tidying.
   async function clearLapsedStatus() {
     if (!backend || !hasLapsed(state.me?.status, now())) return;
     await backend.setStatus({ text: null, until: null });
@@ -559,7 +565,7 @@ export function createTeamService({
   }
 
   // Comments on this person's shared links, once a minute, as notes on the
-  // threads the files came from (main/team/link-comments.mjs).
+  // threads the files came from (main/team/link-comments.mts).
   let linkCommentsAt = 0;
   async function linkCommentsOnce() {
     if (!state.me || !backend?.newLinkComments || now() - linkCommentsAt < LINK_COMMENTS_EVERY_MS) return;
@@ -580,7 +586,7 @@ export function createTeamService({
     } catch (err) { log(`link comments: ${(err as Error).message}`); }
   }
 
-  async function handOverWhatLeft(cards: SyncCard[], people: TeamPerson[]) {
+  async function handOverWhatLeft(cards: TeamCard[], people: TeamPerson[]) {
     if (!backend?.departures || !state.me || !state.team) return;
     const departures = await backend.departures(state.team.id).catch((err: Error) => { log(`team: who left: ${err.message}`); return []; });
     if (!departures.length) return;
@@ -591,10 +597,10 @@ export function createTeamService({
       read: (p: TeamProduct) => disk.readWorkItems(p.dir),
       write: (dir: string, id: string, patch: Record<string, unknown>, source: string, at?: number) => disk.updateWorkItem(dir, id, patch, { source, ...(at ? { now: at } : {}) }),
       // As giveTask does, without its sync: this runs inside one.
-      give: async (to: string, { title, body, priority, due }: { title: string; body: string; priority: number; due?: string }) => {
+      give: async (to: string, { title, body, priority, due }: { title?: string; body: string; priority?: number; due?: string }) => {
         const record = directWith(me, to) ?? await makeRecordWith(me, [to]);
         store.composeItem(record.slug, {
-          title, body, priority: Number.isFinite(priority) && priority > 0 ? Math.trunc(priority) : 0,
+          title, body, priority: Number.isFinite(priority) && priority! > 0 ? Math.trunc(priority!) : 0,
           assignee: to, ...(due ? { due } : {}), people: [me, to], labels: [GIVEN_TASK],
         });
       },
@@ -636,7 +642,8 @@ export function createTeamService({
     if (!owner) return null;
     let inbox: ReturnType<typeof createPhoneInbox> | null = null;
     inbox = createPhoneInbox({
-      backend: backend!,
+      // See TeamPhoneCalls: the inbox's PhoneCommand says every command names a project.
+      backend: backend! as PhoneBackendCalls,
       owner,
       undoHoldMs: PHONE_UNDO_HOLD_MS,
       alive: () => phoneInbox === inbox && backend === signedInAs && state.me?.id === owner,
@@ -653,11 +660,12 @@ export function createTeamService({
       approvalsOf: () => phone.approvals?.() ?? [],
       readSettings: phone.readSettings ?? null,
       pinsOf: () => phone.pins?.() ?? {},
+      onMacOf: () => phone.onMac?.() ?? {},
       repeatsOf: phone.repeats ?? null,
       teammatesOf: phone.teammates ?? null,
       version: phone.version ?? '',
       idleMs: phone.idleMs ?? null,
-      // The lid shut: projects whose threads carry on in the cloud, and runs it started (shared/cloud-kit.mjs).
+      // The lid shut: projects whose threads carry on in the cloud, and runs it started (shared/cloud-kit.mts).
       carrying: phone.carrying ?? null,
       kitsFor: phone.kitsFor ?? null,
       adopt: phone.adopt ?? null,
@@ -692,7 +700,8 @@ export function createTeamService({
     const card = (state.cards ?? []).find((c) => c.personId === owner && c.threadId === threadId);
     const work = card ? threadShare.read(owner, threadId) : null;
     if (!work?.shared) throw new Error('that thread is not shared with you');
-    return { card: card!, work };
+    // read() only finds a thread shared when its owner and id made a folder.
+    return { card: card!, work: work as SharedThreadView & { dir: string } };
   }
 
   // Which tools you have, for a teammate wondering who to ask. Told on sign-in and
@@ -722,14 +731,17 @@ export function createTeamService({
     void publishConnections();
     if (state.settling) set({ settling: false });
     phoneInbox = makePhoneInbox();
-    const listCards = () => [
+    // Off, the window shows no team and no Team / Private choice, so nothing
+    // goes up, and what was up comes down as a private thread's card does.
+    const listCards = (): SyncCard[] => (!sharing() ? [] : [
       ...cardsFor({ products: products(), readItems: (p) => disk.readWorkItems(p.dir), since: state.me ? kept().getSince(state.me.id) : null, me: state.me?.id ?? null, running: runningIds() }),
       ...(ownMates() ?? []).map((t) => mateCard(t, { now: t.now ?? null, running: !!t.running, at: t.updatedAt ?? t.createdAt ?? 0 })),
-    ];
+    ]);
     threadShare = createThreadShare({
       backend,
       me: me.id,
       myName: () => state.me?.name ?? null,
+      nameOf: (personId: string) => state.people.find((p) => p.id === personId)?.name ?? null,
       root: path.join(accountRoot, '_team-threads', me.id),
       listCards,
       listThreads: () => {
@@ -778,7 +790,7 @@ export function createTeamService({
   return {
     state: () => ({ ...state, sharedFileNews: threadShare?.fileNews() ?? [], ...(rooms ? { rooms: rooms.state() } : {}) }),
     rooms,
-    /** What the desktop's banner was told arrived, for her phone's alerts (main/phone-alerts.mjs). */
+    /** What the desktop's banner was told arrived, for her phone's alerts (main/phone-alerts.mts). */
     phoneArrivals: (list: unknown[], needsYou: unknown[]) => phoneInbox?.arrivals(list, needsYou),
 
     // THREE TRIES AT START, because one dropped request left the app signed
@@ -1025,7 +1037,7 @@ export function createTeamService({
       const convo = about ? null : conversationIn(product.slug);
       if (convo) {
         store.answerItem(product.slug, convo.id, { answer: text, voice, forAgent });
-        // Who answers next is whoever did not speak last (shared/team-rules.mjs,
+        // Who answers next is whoever did not speak last (shared/team-rules.mts,
         // `inMyInbox`); the assignee stays for a Mac on an older build.
         store.teamPatch(product.slug, convo.id, { assignee: others[0] });
         onChange();
@@ -1080,7 +1092,7 @@ export function createTeamService({
     /**
      * Words to someone else's AI teammate. They go to its owner, in the record the
      * two of you share, because only its owner directs it (their copy decides
-     * whether it wakes: shared/teammate-reach.mjs).
+     * whether it wakes: shared/teammate-reach.mts).
      */
     async messageMate({ owner, mate, text }: { owner?: string; mate?: string; text?: unknown } = {}) {
       if (!state.me) throw new Error('sign in first');
@@ -1093,7 +1105,7 @@ export function createTeamService({
     /**
      * A TASK TO ONE PERSON. Its own row in the record you two share, never your
      * project, so it reaches them and no agent starts on it on either Mac
-     * (shared/team-rules.mjs). A file with a `rel` is one the words name: its
+     * (shared/team-rules.mts). A file with a `rel` is one the words name: its
      * links are pointed at the copy.
      */
     async giveTask(toIn: string | string[] | null | undefined, { title, body, priority, due, files = [], voice, visibility, visibleTo, blockedBy }: TaskInput = {}) {
@@ -1116,6 +1128,9 @@ export function createTeamService({
       let text = words;
       // The links first, so what is left of a path is only ever prose.
       for (const [rel, copy] of moved) text = text.split(`](${rel})`).join(`](${copy.rel})`);
+      // A path of the sender's ending in the file is the file: the whole of it becomes the link, or a cut-down path is left to send.
+      const quoted = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      for (const [rel, copy] of moved) text = text.replace(new RegExp(`(?<![\\w(\\]])(?:~|/)[^\\s()\\[\\]\`]*/${quoted(rel)}(?![\\w/])`, 'g'), `[${copy.name}](${copy.rel})`);
       for (const [rel, copy] of moved) text = text.split(rel).join(copy.name);
       const unlinked = saved.filter((s) => !text.includes(`](${s.rel})`));
       const full = [text, attachmentMarkdown(unlinked)].filter(Boolean).join('\n\n') || named;
@@ -1188,8 +1203,8 @@ export function createTeamService({
      */
     async continueBrief(owner: string, threadId: string) {
       const { work, card } = continuable(owner, threadId);
-      const nameOf = (id: string) => (state.people ?? []).find((p) => p.id === id)?.name?.split(/\s+/)[0] ?? null;
-      const brief = briefToContinue({ work, title: card.title, ownerName: nameOf(owner) ?? 'A teammate', nameOf });
+      const nameOf = (id: string | undefined) => (state.people ?? []).find((p) => p.id === id)?.name?.split(/\s+/)[0] ?? null;
+      const brief = briefToContinue({ work, title: card.title as string | undefined, ownerName: nameOf(owner) ?? 'A teammate', nameOf });
       return { ...brief, from: { personId: owner, threadId } };
     },
 
@@ -1203,7 +1218,7 @@ export function createTeamService({
       return state;
     },
 
-    /** The teammates' threads this person may search, each with a stamp that changes with it (main/everything-found.mjs). */
+    /** The teammates' threads this person may search, each with a stamp that changes with it (main/everything-found.mts). */
     sharedThreads: () => readableSharedThreads({ cards: state.cards, me: state.me?.id ?? null, folders: threadShare?.folders() ?? [] }),
 
     /** Those folders, as projects the file pane can read. */
@@ -1232,7 +1247,12 @@ export function createTeamService({
       };
     },
 
-    /** The team's version line (main/version-line.mjs). Null with no team to reach. */
+    /** What the live relay is shown to let this person into their team's rooms. Null signed out. */
+    async liveToken(): Promise<string | null> {
+      return (await backend?.liveToken?.().catch(() => null)) ?? null;
+    },
+
+    /** The team's version line (main/version-line.mts). Null with no team to reach. */
     fileVersions() {
       if (!backend?.addFileVersion || !state.team) return null;
       const teamId = state.team.id;
@@ -1314,7 +1334,7 @@ export function createTeamService({
       return backend.fileLinkComments!(token);
     },
     /** A first name for the tile that says whose computer a file waits for. */
-    firstNameOf: (id: string) => (state.people ?? []).find((p) => p.id === id)?.name?.split(/\s+/)[0] ?? null,
+    firstNameOf: (id: string | null) => (state.people ?? []).find((p) => p.id === id)?.name?.split(/\s+/)[0] ?? null,
     stop: stopLoop,
   };
 }

@@ -1,6 +1,6 @@
 // WHAT THE RENDERER'S TYPES MUST STILL REFUSE.
 //
-// tests/the-renderer-typechecks-clean.test.mjs compiles this file on the
+// tests/the-renderer-typechecks-clean.test.mts compiles this file on the
 // renderer's own settings and checks that every marked line is STILL an error,
 // with the code written beside it. Nothing here is ever imported or run.
 //
@@ -11,10 +11,10 @@
 //
 // No tsconfig includes this file but the test's own, so its errors never reach
 // the renderer's typecheck.
-import { unleaked } from '../../shared/agents.mjs';
+import { unleaked } from '../../shared/agents.mts';
 import { REQUEST_CHANNELS } from '../../shared/bridge-map.mts';
-import { checkKit, runOfClaim } from '../../shared/cloud-kit.mjs';
-import { CODEX_DEFAULT_MODE, codexModeWords } from '../../shared/codex-modes.mjs';
+import { checkKit, runOfClaim } from '../../shared/cloud-kit.mts';
+import { CODEX_DEFAULT_MODE, codexModeWords } from '../../shared/codex-modes.mts';
 import { ALL_SCHEMES, IMG_SCHEME } from '../../shared/schemes.mts';
 import type { AgentEvent } from '../../renderer/src/types';
 

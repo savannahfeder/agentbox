@@ -10,7 +10,7 @@ export function messageKind(e: Pick<AgentTurn, 'says' | 'fileMark'> | null | und
   if (e.fileMark?.kind === 'note') {
     const file = e.fileMark.shown ?? e.fileMark.file.replace(/#\d+$/, '');
     const place = e.fileMark.place && e.fileMark.place !== 'Whole file' ? `, ${e.fileMark.place}` : '';
-    return { word: `Note on ${file}${place}`, file: true };
+    return { word: `Note on ${file}${place}`, file: true, ...(e.fileMark.unsent ? { why: 'Goes with your next reply' } : {}) };
   }
   if (e.fileMark?.kind === 'edited') return { word: `Edited ${e.fileMark.shown ?? e.fileMark.file}`, file: true };
   if (e.says === 'comment') return { word: 'Comment', why: 'did not start the agent' };

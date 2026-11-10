@@ -1,17 +1,19 @@
 // Search, as the phone site draws it: the field takes the top bar, and every
 // thread in every tab is found, closed ones too (App.tsx `hits`, List.tsx's row).
 import { router } from '../lib/router';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState, type ComponentRef } from 'react';
 import { FlatList, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { groupName } from '../lib/groups';
 import { PHONE_LOOKS } from '../lib/look';
-import { commandsFor, phoneCommands, THREADS_SHOWN, type PhoneCommand } from '../lib/palette';
+import type { CloudMode } from '../../../renderer/src/cloud-menu';
+import { commandsFor, inRunningOrder, phoneCommands, THREADS_SHOWN, type ComputerFacts, type PhoneCommand } from '../lib/palette';
 import { phoneSearch, type Hit } from '../lib/tabs';
 import { useCloud } from '../state/cloud';
 import { useGroups } from '../state/groups';
 import { useLook } from '../state/look';
+import { SettingsProvider, useSettings, type SettingsState } from '../state/settings';
 import { PriorityBars, T, Wall } from '../ui/parts';
 import { SETTINGS_PAGES } from '../ui/SettingsPages';
 import { color, font, size } from '../ui/theme';
@@ -53,6 +55,20 @@ function HitRow({ hit, first, flush = false }: { hit: Hit; first: boolean; /** R
 
 const SETTINGS_ROWS = SETTINGS_PAGES.map((p) => ({ id: p.id, label: p.label }));
 
+/** The computer's copy as the commands read it, with a change still on its way laid over it. */
+function computerFacts(s: SettingsState): ComputerFacts | null {
+  const w = s.settings?.workspace;
+  if (!w) return null;
+  const order = s.reading('workspace', 'productOrder', w.productOrder ?? []).value as string[];
+  const projects: { slug: string; name: string }[] = s.settings?.projects ?? [];
+  return {
+    paused: !!s.reading('workspace', 'paused', !!w.paused).value,
+    cloud: w.cloud ? { mode: s.reading('workspace', 'cloudRuns', w.cloud.mode).value as CloudMode, whenOn: w.cloud.whenOn } : null,
+    projects: inRunningOrder(projects, order),
+    order,
+  };
+}
+
 const Label = ({ children }: { children: string }) => (
   <T style={{ paddingHorizontal: size.inset, paddingTop: 16, paddingBottom: 4, fontFamily: font.mono, fontSize: 11, letterSpacing: 0.88, textTransform: 'uppercase', color: color.faint }}>{children}</T>
 );
@@ -66,12 +82,24 @@ function CommandRow({ label, aside, onPress }: { label: string; aside?: string; 
   );
 }
 
+// The commands that change the computer read and send through its settings copy.
 export default function Search() {
+  return <SettingsProvider><SearchScreen /></SettingsProvider>;
+}
+
+function SearchScreen() {
   const c = useCloud();
   const g = useGroups();
+  const s = useSettings();
   const { pick: pickLook } = useLook();
   const inset = useSafeAreaInsets();
   const [q, setQ] = useState('');
+  const box = useRef<ComponentRef<typeof TextInput>>(null);
+  // The cross empties the box first, so a new search does not start on the old words; empty, it closes search.
+  const cross = () => {
+    if (!q) { router.back(); return; }
+    setQ(''); setAll(false); box.current?.focus();
+  };
   // "See all" is the whole list of threads, as it was before there were commands.
   const [all, setAll] = useState(false);
   const hits = useMemo(() => phoneSearch(c.view, q, c.now, c.tabs), [c.view, q, c.now, c.tabs]);
@@ -82,12 +110,24 @@ export default function Search() {
     groups: g.on ? g.state.rooms.map((r) => ({ id: r.id, name: groupName(r) })) : [],
     looks: PHONE_LOOKS,
     pages: SETTINGS_ROWS,
-  })), [q, c.team, g.on, g.state.rooms]);
+    computer: computerFacts(s),
+  })), [q, c.team, g.on, g.state.rooms, s]);
   const leave = () => (router.canGoBack() ? router.back() : router.replace('/'));
-  const run = ({ act }: PhoneCommand) => {
+  const run = async ({ act, label }: PhoneCommand) => {
+    if ('setting' in act) { await s.change(act.setting); c.say(`Sent to your computer: ${label}`); leave(); return; }
     if ('look' in act) { pickLook(act.look); leave(); return; }
     if ('push' in act) { if (router.canGoBack()) router.replace(act.push as never); else router.push(act.push as never); return; }
     if ('group' in act) { g.setLast(act.group); c.goTo({ place: 'chats', group: true }); leave(); return; }
+    if ('teammate' in act) {
+      const { teammate: id, paused } = act;
+      const name = c.team?.view.list.find((t) => t.id === id)?.name ?? 'your teammate';
+      try {
+        await c.askTeammate('pause', { id, paused });
+        c.say(`${paused ? 'Pausing' : 'Resuming'} ${name}`, async () => { await c.askTeammate('pause', { id, paused: !paused }); c.say(`${paused ? 'Not pausing' : 'Not resuming'} ${name}`); });
+      } catch (err) { c.say(err instanceof Error ? err.message : String(err)); }
+      leave();
+      return;
+    }
     c.goTo({ place: act.go, menu: act.menu });
     leave();
   };
@@ -97,17 +137,17 @@ export default function Search() {
         <View style={{ height: size.topBar, justifyContent: 'center', paddingLeft: size.inset, paddingRight: 48 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 11, borderBottomWidth: 1, borderBottomColor: color.lineStrong, paddingBottom: 9, marginTop: 8 }}>
             <Glass />
-            <TextInput value={q} onChangeText={(t) => { setQ(t); setAll(false); }} autoFocus placeholder="Search" placeholderTextColor={color.faint}
+            <TextInput ref={box} value={q} onChangeText={(t) => { setQ(t); setAll(false); }} autoFocus placeholder="Search" placeholderTextColor={color.faint}
               autoCorrect={false} autoCapitalize="none" spellCheck={false} returnKeyType="search" accessibilityLabel="Search threads"
               style={[{ flex: 1, minWidth: 0, padding: 0, fontFamily: font.medium, fontSize: 15, letterSpacing: -0.075, color: color.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
-            <Pressable onPress={() => router.back()} accessibilityLabel="Close search" accessibilityRole="button" hitSlop={10}
+            <Pressable onPress={cross} accessibilityLabel={q ? 'Clear search' : 'Close search'} accessibilityRole="button" hitSlop={10}
               style={{ width: 26, height: 26, alignItems: 'center', justifyContent: 'center' }}>
               <Out />
             </Pressable>
           </View>
         </View>
       </View>
-      <StatusNotice message={c.status} />
+      <StatusNotice message={c.status} next={c.statusNext} />
       <FlatList
         data={all ? found : found.slice(0, THREADS_SHOWN)}
         keyExtractor={(h) => h.key}
@@ -119,7 +159,7 @@ export default function Search() {
           <>
             {found.length > THREADS_SHOWN && <CommandRow label={`See all ${found.length} threads`} onPress={() => setAll(true)} />}
             {commands.length > 0 && found.length > 0 && <Label>Commands</Label>}
-            {commands.map((cmd) => <CommandRow key={cmd.id} label={cmd.label} aside={cmd.aside} onPress={() => run(cmd)} />)}
+            {commands.map((cmd) => <CommandRow key={cmd.id} label={cmd.label} aside={cmd.aside} onPress={() => void run(cmd)} />)}
           </>
         )}
         ListEmptyComponent={q.trim() && commands.length === 0 ? <T style={{ paddingVertical: 80, paddingHorizontal: 40, textAlign: 'center', fontSize: 14, color: color.faint }}>{`Nothing matches “${q}”.`}</T> : undefined}

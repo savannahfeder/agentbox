@@ -117,7 +117,7 @@
 .pl-name .ev-s { justify-content: flex-start; }
 .pl-name .ev-s-blank { display: none; }
 .pl-acts { margin-left: auto; display: flex; align-items: center; gap: 8px; }
-.pl-btn { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: 8px; background: none; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer; }
+.pl-btn { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; white-space: nowrap; box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: 8px; background: none; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer; }
 .pl-btn:hover { color: var(--text); border-color: var(--text-faint); background: var(--wash); }
 .pl-btn.go { color: var(--text); background: var(--wash-strong); }
 .pl-btn.quiet { border-color: transparent; }
@@ -130,6 +130,8 @@
 .pl-chat .tq-chat .tq-lines { padding-left: 6px; padding-right: 0; }
 .pl-chat .rm-compose.tq-compose { margin: 8px 0 0 6px; }
 .pl-side { width: 272px; flex: none; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 24px; padding-top: 2px; }
+/* A file open beside the page squeezes it to 400px: the chat keeps it all, or it is one letter wide. */
+.app.doc-open :is(.pl-side, .pl-name h2 em, .pl-btn.quiet) { display: none; }
 .pl-sec h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 4px; font-size: 12px; font-weight: 500; line-height: 18px; color: var(--text-dim); }
 .pl-sec h3 b { font-weight: 400; color: var(--text-faint); }
 .pl-link { margin-left: auto; padding: 0; border: 0; background: none; font: 12.5px var(--sans, inherit); letter-spacing: 0; text-transform: none; color: var(--text-faint); cursor: pointer; }

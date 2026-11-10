@@ -1,6 +1,7 @@
 // PURE. The picture that opens large over the thread (PictureView.tsx): which
 // clicks open it, how big it is drawn, and how it zooms and steps.
 import { docKind } from './doc-pane';
+import { familyKeyOf } from '../../shared/artifact-marks.mts';
 
 /** Zoom is counted from the fitted size, so 1 is "all of it on screen". */
 export const MAX_ZOOM = 8;
@@ -15,23 +16,35 @@ export type Shot = Picture & { section: string | null };
 
 // One file drawn twice, by a relative path and by a full one or with a
 // look-again query, is one picture.
-const fileOf = (s: Shot) => (s.url ?? s.path).replace(/[?#].*$/, '');
+const fileOf = (s: Picture) => (s.url ?? s.path).replace(/[?#].*$/, '');
+
+// v1 and v2 of a picture in one folder are one picture to step through.
+const pictureOf = (s: Shot) => {
+  const file = fileOf(s);
+  return `${file.slice(0, file.lastIndexOf('/') + 1)}${familyKeyOf(file)}`;
+};
 
 /**
  * The pictures stepped through from the one at `at`: those in its own part of
- * the thread, in reading order, each file once, with the clicked one open.
+ * the thread, in reading order, each picture once at the newest version drawn,
+ * with the clicked one open.
  */
 export function picturesBeside(shots: Shot[], at: number): { pictures: Picture[]; start: number } {
   const here = shots[at];
   if (!here) return { pictures: [], start: 0 };
-  const seen = new Map<string, number>();
+  const place = new Map<string, number>();
   const pictures: Picture[] = [];
   for (const s of shots) {
-    if (s.section !== here.section || seen.has(fileOf(s))) continue;
-    seen.set(fileOf(s), pictures.length);
-    pictures.push({ path: s.path, url: s.url });
+    if (s.section !== here.section) continue;
+    const key = pictureOf(s);
+    const was = place.get(key);
+    const pick = { path: s.path, url: s.url };
+    if (was === undefined) { place.set(key, pictures.length); pictures.push(pick); continue; }
+    const kept = fileOf(pictures[was]);
+    const later = fileOf(s) !== kept;
+    if (key === pictureOf(here) ? later && fileOf(s) === fileOf(here) : later) pictures[was] = pick;
   }
-  return { pictures, start: seen.get(fileOf(here)) ?? 0 };
+  return { pictures, start: place.get(pictureOf(here)) ?? 0 };
 }
 
 /** The pictures to read ahead of a step: the next one first, then the one before. */

@@ -10,14 +10,21 @@
 // Plain fetch rather than the database's own library: the phone needs five
 // calls, and each one here is one request a test can see.
 
+import type { PhoneRows } from './phone-rows';
+
+type PhoneCommand = PhoneRows['commands'][number];
 export interface CloudConfig { url: string; anonKey: string }
 export interface CloudSession { access_token: string; refresh_token: string; expires_at: number; user: { id: string; email?: string | null } }
+/** A row as the database answers it. Its columns depend on the table, so a caller says which shape it asked for. */
+export type CloudRow = object;
+interface TokenAnswer { access_token: string; refresh_token: string; expires_at?: number; expires_in?: number; user: { id: string; email?: string | null } }
 
 type Store = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
 const SESSION_KEY = 'agentbox-cloud-session';
 const VERIFIER_KEY = 'agentbox-cloud-verifier';
+const RESET_KEY = 'agentbox-cloud-reset';
 
 const b64url = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
@@ -38,7 +45,7 @@ export function cloudClient(cfg: CloudConfig, { storage, fetchImpl, now = () => 
   };
 
   // `anyone`: asked as whoever is signed in, and as nobody when nobody is.
-  async function call(path: string, init: RequestInit & { auth?: boolean | 'anyone' } = {}, again = true): Promise<any> {
+  async function call(path: string, init: RequestInit & { auth?: boolean | 'anyone' } = {}, again = true): Promise<unknown> {
     // A sign-in the database refuses is let go, and a call for anyone is still answered, as nobody.
     if (init.auth === 'anyone' && session) {
       try { return await call(path, { ...init, auth: true }, again); } catch (err) {
@@ -74,18 +81,31 @@ export function cloudClient(cfg: CloudConfig, { storage, fetchImpl, now = () => 
   const kindNotTaken = (err: unknown) => (/phone_commands_kind_check|violates check constraint/i.test(String((err as Error)?.message)) ? new Error('Your phone cannot do this yet: its online database needs an update.') : err);
 
   // From a token answer to a kept session, if it is still the sign-in asked for.
-  const took = (body: any, mine: number): CloudSession => {
+  const took = (body: TokenAnswer, mine: number): CloudSession => {
     if (gen !== mine) throw new Error('signed out');
     const s = { access_token: body?.access_token, refresh_token: body?.refresh_token, expires_at: body?.expires_at ? body.expires_at * 1000 : now() + (body?.expires_in ?? 3600) * 1000, user: { id: body?.user?.id, email: body?.user?.email ?? null } };
     if (!s.access_token || !s.user.id) throw new Error('the sign-in came back without an account');
     keep(s);
     return s;
   };
+  // The proof (PKCE) a code that comes back is traded with; kept until then.
+  const challenge = async () => {
+    const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
+    try { storage.setItem(VERIFIER_KEY, verifier); } catch { /* the return will say so */ }
+    return b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
+  };
   const signIn = async (path: string, payload: unknown) => {
     const mine = ++gen;
     renewing = null;
-    return took(await call(path, { method: 'POST', auth: false, body: JSON.stringify(payload) }), mine);
+    return took(await call(path, { method: 'POST', auth: false, body: JSON.stringify(payload) }) as TokenAnswer, mine);
   };
+  const tradeCode = async (code: string) => {
+    const verifier = storage.getItem(VERIFIER_KEY);
+    if (!verifier) throw new Error('This sign-in was started somewhere else. Try again here.');
+    storage.removeItem(VERIFIER_KEY);
+    return signIn('/auth/v1/token?grant_type=pkce', { auth_code: code, code_verifier: verifier });
+  };
+  const resetAsked = () => { try { return !!storage.getItem(RESET_KEY); } catch { return false; } };
 
   // A token good for at least another minute, renewed if it is not: one
   // renewal at a time, and one that is refused outright signs her out.
@@ -141,7 +161,7 @@ export function cloudClient(cfg: CloudConfig, { storage, fetchImpl, now = () => 
     async signUp(name: string, email: string, password: string, returnTo?: string): Promise<{ confirm: boolean }> {
       const mine = ++gen;
       const path = returnTo ? `/auth/v1/signup?redirect_to=${encodeURIComponent(returnTo)}` : '/auth/v1/signup';
-      const body = await call(path, { method: 'POST', auth: false, body: JSON.stringify({ email, password, data: { full_name: name } }) });
+      const body = await call(path, { method: 'POST', auth: false, body: JSON.stringify({ email, password, data: { full_name: name } }) }) as TokenAnswer | null;
       if (body?.access_token) { took(body, mine); return { confirm: false }; }
       return { confirm: true };
     },
@@ -160,18 +180,30 @@ export function cloudClient(cfg: CloudConfig, { storage, fetchImpl, now = () => 
     // (PKCE) so the code that comes back is no use to anybody else. It comes
     // back only to this page's own address.
     async googleUrl(returnTo: string) {
-      const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
-      const challenge = b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
-      try { storage.setItem(VERIFIER_KEY, verifier); } catch { /* the return will say so */ }
-      const q = new URLSearchParams({ provider: 'google', redirect_to: returnTo, code_challenge: challenge, code_challenge_method: 's256' });
+      const q = new URLSearchParams({ provider: 'google', redirect_to: returnTo, code_challenge: await challenge(), code_challenge_method: 's256' });
       return `${base}/auth/v1/authorize?${q}`;
     },
-    async finishGoogle(code: string) {
-      const verifier = storage.getItem(VERIFIER_KEY);
-      if (!verifier) throw new Error('This sign-in was started somewhere else. Try again here.');
-      storage.removeItem(VERIFIER_KEY);
-      return signIn('/auth/v1/token?grant_type=pkce', { auth_code: code, code_verifier: verifier });
+    // A RESET comes back like Google, with a code only this device's proof can
+    // trade, to an address nothing else listens on (the phone app's own).
+    async askPasswordReset(email: string, returnTo: string) {
+      const at = String(email ?? '').trim();
+      if (!at) throw new Error('Type your email first.');
+      storage.removeItem(RESET_KEY);
+      await call(`/auth/v1/recover?redirect_to=${encodeURIComponent(returnTo)}`, {
+        method: 'POST', auth: false, body: JSON.stringify({ email: at, code_challenge: await challenge(), code_challenge_method: 's256' }),
+      });
+      try { storage.setItem(RESET_KEY, at); } catch { /* the link will say so */ }
     },
+    resetAsked,
+    async finishReset(code: string) {
+      if (!resetAsked()) throw new Error('Ask for the reset email again.');
+      storage.removeItem(RESET_KEY);
+      return tradeCode(code);
+    },
+    async setPassword(password: string) {
+      await call('/auth/v1/user', { method: 'PUT', body: JSON.stringify({ password }) });
+    },
+    finishGoogle: tradeCode,
     signOut() {
       const had = session;
       gen += 1;
@@ -181,27 +213,27 @@ export function cloudClient(cfg: CloudConfig, { storage, fetchImpl, now = () => 
     },
 
     // Her rows. Row level security decides what comes back; these only ask.
-    async select(table: string, query: string) {
-      return (await call(`/rest/v1/${table}?${query}`, { method: 'GET' })) ?? [];
+    async select(table: string, query: string): Promise<CloudRow[]> {
+      return (await call(`/rest/v1/${table}?${query}`, { method: 'GET' }) as CloudRow[] | null) ?? [];
     },
-    async update(table: string, query: string, patch: Record<string, unknown>) {
-      return (await call(`/rest/v1/${table}?${query}`, { method: 'PATCH', keepalive: true, headers: { prefer: 'return=representation' }, body: JSON.stringify(patch) })) ?? [];
+    async update(table: string, query: string, patch: Record<string, unknown>): Promise<CloudRow[]> {
+      return (await call(`/rest/v1/${table}?${query}`, { method: 'PATCH', keepalive: true, headers: { prefer: 'return=representation' }, body: JSON.stringify(patch) }) as CloudRow[] | null) ?? [];
     },
     /** A row, or with `onConflict` the row already there left as it is. */
-    async insert(table: string, row: Record<string, unknown>, onConflict?: string) {
+    async insert(table: string, row: Record<string, unknown>, onConflict?: string): Promise<CloudRow | undefined> {
       const q = onConflict ? `?on_conflict=${encodeURIComponent(onConflict)}` : '';
       const out = await call(`/rest/v1/${table}${q}`, { method: 'POST', headers: { prefer: `return=representation${onConflict ? ',resolution=ignore-duplicates' : ''}` }, body: JSON.stringify(row) });
-      return Array.isArray(out) ? out[0] : out;
+      return (Array.isArray(out) ? out[0] : out) as CloudRow | undefined;
     },
     /** A row, or the row already there with the same key brought up to date. */
-    async upsert(table: string, row: Record<string, unknown>, onConflict: string) {
+    async upsert(table: string, row: Record<string, unknown>, onConflict: string): Promise<CloudRow | undefined> {
       const out = await call(`/rest/v1/${table}?on_conflict=${encodeURIComponent(onConflict)}`, { method: 'POST', headers: { prefer: 'return=representation,resolution=merge-duplicates' }, body: JSON.stringify(row) });
-      return Array.isArray(out) ? out[0] : out;
+      return (Array.isArray(out) ? out[0] : out) as CloudRow | undefined;
     },
-    async remove(table: string, query: string) {
-      return (await call(`/rest/v1/${table}?${query}`, { method: 'DELETE', headers: { prefer: 'return=representation' } })) ?? [];
+    async remove(table: string, query: string): Promise<CloudRow[]> {
+      return (await call(`/rest/v1/${table}?${query}`, { method: 'DELETE', headers: { prefer: 'return=representation' } }) as CloudRow[] | null) ?? [];
     },
-    async rpc(name: string, args: Record<string, unknown> = {}, { anyone = false }: { anyone?: boolean } = {}) {
+    async rpc(name: string, args: Record<string, unknown> = {}, { anyone = false }: { anyone?: boolean } = {}): Promise<unknown> {
       return call(`/rest/v1/rpc/${name}`, { method: 'POST', body: JSON.stringify(args), ...(anyone ? { auth: 'anyone' as const } : {}) });
     },
     /**
@@ -209,12 +241,12 @@ export function cloudClient(cfg: CloudConfig, { storage, fetchImpl, now = () => 
      * again after a lost answer is one. A database not yet updated for names
      * (20261019000000_phone_commands_do_more.sql) takes it unnamed, as before.
      */
-    async insertCommand(row: Record<string, unknown>): Promise<any> {
+    async insertCommand(row: Record<string, unknown>): Promise<PhoneCommand> {
       const named = { id: (row.id as string) ?? crypto.randomUUID(), ...row };
       if (!unnamed) {
         try {
           const out = await call('/rest/v1/phone_commands?on_conflict=id', { method: 'POST', keepalive: true, headers: { prefer: 'return=representation,resolution=ignore-duplicates' }, body: JSON.stringify(named) });
-          return (Array.isArray(out) ? out[0] : out) ?? named;
+          return ((Array.isArray(out) ? out[0] : out) ?? named) as PhoneCommand;
         } catch (err) {
           if (!/permission denied|42501|column "id"/i.test(String((err as Error).message))) throw kindNotTaken(err);
           unnamed = true;
@@ -223,7 +255,7 @@ export function cloudClient(cfg: CloudConfig, { storage, fetchImpl, now = () => 
       const { id: _id, ...plain } = named;
       try {
         const out = await call('/rest/v1/phone_commands', { method: 'POST', keepalive: true, headers: { prefer: 'return=representation' }, body: JSON.stringify(plain) });
-        return Array.isArray(out) ? out[0] : out;
+        return (Array.isArray(out) ? out[0] : out) as PhoneCommand;
       } catch (err) { throw kindNotTaken(err); }
     },
     /** A file into her own folder of a private bucket; one already there by that name is the same file. */

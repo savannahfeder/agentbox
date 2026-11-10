@@ -1,12 +1,12 @@
 // Notes beside a document opened full screen from its thread: you select words,
 // write as much as you like, attach files, and Send hands every waiting note
-// to the agent at once (main/notes-wake.mjs noteToItsAgent).
-import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+// to the agent at once (main/notes-wake.mts noteToItsAgent).
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api } from '../api';
 import { Face, TeamContext } from '../team/people';
 import { clock, type LedgerLine } from '../thread-history';
 import type { FileNote, NotePlace, Person, WorkItem } from '../types';
-import { notedFilesInLines, threadFiles, versionForPath, whoseIsTheFile } from '../../../shared/artifact-marks.mjs';
+import { notedFilesInLines, threadFiles, versionForPath, whoseIsTheFile } from '../../../shared/artifact-marks.mts';
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { notePictures, noteWithPictures } from '../note-pictures';
 import { canPaintQuotes, paintQuotes } from '../paint-quotes';
@@ -22,6 +22,29 @@ const newId = () => `n${Date.now().toString(36)}${Math.random().toString(36).sli
 const Glyph = ({ d }: { d: string }) => (
   <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>
 );
+
+/** "Notes 7" and the faces of who wrote them; the big viewer's column has the same one. */
+export function NotesHead({ count, faces }: { count: number; faces?: ReactNode }) {
+  return (
+    <div className="sb-head">
+      <span className="sb-title">Notes</span>
+      {count > 0 && <span className="sb-count">{count}</span>}
+      {faces && <span className="sb-faces">{faces}</span>}
+    </div>
+  );
+}
+
+/** A section's name over its notes, with Send on the Unsent line. */
+export function NotesSection({ word, send }: { word: string; send?: { count: number; onSend: () => void } }) {
+  return (
+    <div className="sb-sec">
+      <span className="doc-outline-head">{word}</span>
+      {send && <button type="button" className="sb-send" onClick={send.onSend}><Glyph d="M2.5 8h9M8 4.5 11.5 8 8 11.5" />Send {send.count}</button>}
+    </div>
+  );
+}
+
+export const ReturnGlyph = () => <Glyph d="M12.5 3.5v5h-9M6 5.5 3.5 8.5 6 11.5" />;
 
 /** The corner mark that opens and closes the sidebar; closed, it counts the notes not sent yet. */
 export function NotesToggle({ open, waiting, onToggle }: { open: boolean; waiting: number; onToggle: () => void }) {
@@ -96,7 +119,7 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
     const card = aside.current?.closest('.doc-card');
     if (!card) return;
     const find = () => {
-      const found = card.querySelector<HTMLElement>('.doc-rich-content');
+      const found = card.querySelector<HTMLElement>('.doc-rich-content, .code-scroll');
       if (found !== page.current) { page.current = found; setPageAt((n) => n + 1); }
     };
     find();
@@ -193,21 +216,15 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
 
   return (
     <aside ref={aside} className="sb" aria-label="Notes">
-      <div className="sb-head">
-        <span className="sb-title">Notes</span>
-        {waiting.length + said.length > 0 && <span className="sb-count">{waiting.length + said.length}</span>}
-        {authors.length > 0 && <span className="sb-faces">{authors.map((id) => <Face key={id ?? 'me'} person={person(id)} name={person(id) ? undefined : whoSaid(id)} me={!!me && id === me} />)}</span>}
-      </div>
+      <NotesHead count={waiting.length + said.length}
+        faces={authors.length > 0 && authors.map((id) => <Face key={id ?? 'me'} person={person(id)} name={person(id) ? undefined : whoSaid(id)} me={!!me && id === me} />)} />
       <div className="sb-list">
         {waiting.length > 0 && <>
-          <div className="sb-sec">
-            <span className="doc-outline-head">{canSend ? 'Unsent' : 'Notes'}</span>
-            {canSend && <button type="button" className="sb-send" onClick={() => void send()}><Glyph d="M2.5 8h9M8 4.5 11.5 8 8 11.5" />Send {waiting.length}</button>}
-          </div>
+          <NotesSection word={canSend ? 'Unsent' : 'Notes'} send={canSend ? { count: waiting.length, onSend: () => void send() } : undefined} />
           {waiting.map(note)}
         </>}
         {said.length > 0 && <>
-          <div className="sb-sec"><span className="doc-outline-head">{canSend ? 'Sent' : 'Notes'}</span></div>
+          <NotesSection word={canSend ? 'Sent' : 'Notes'} />
           {said.map(note)}
         </>}
       </div>
@@ -224,7 +241,7 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
             </div>
           )}
           <textarea ref={box} rows={1} value={words} aria-label="Note"
-            placeholder={quote ? 'Your note on these words' : 'Add a note, or select words in the page'}
+            placeholder={quote ? 'Your note on these words' : page.current ? 'Add a note, or select words in the page' : 'Add a note'}
             onChange={(e) => setWords(e.target.value)}
             onPaste={canAttach ? async (e) => {
               if (![...e.clipboardData.items].some((i) => i.kind === 'file')) return;
@@ -244,7 +261,7 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
             <span className="sb-spring" />
             <button type="submit" className="sb-add" title="Add note (return)" aria-label="Add note"
               disabled={(!words.trim() && !pictures.length) || sending || attaching.length > 0 || !!attachProblem(pictures)}>
-              <Glyph d="M12.5 3.5v5h-9M6 5.5 3.5 8.5 6 11.5" />
+              <ReturnGlyph />
             </button>
           </div>
         </div>

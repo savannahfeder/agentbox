@@ -8,7 +8,9 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { docKind } from '../../../renderer/src/doc-pane';
 import { fileGlance, type Glance } from '../../../renderer/src/file-glance';
 import { folderTitle } from '../../../renderer/src/mentions';
-import { docOnPhone, folderPictures, linkToShare, openingOf, pageOnPhone, pictureLink, pictureShapeOf, sentEmbeds, threadFilePaths, typedWords } from '../lib/files';
+import { isTablePath, type Table } from '../../../renderer/src/table-file';
+import { docOnPhone, folderPictures, linkToShare, openingOf, pageOnPhone, pictureLink, pictureShapeOf, sentEmbeds, tableOnPhone, threadFilePaths, typedWords } from '../lib/files';
+import { MiniTable } from './TableFile';
 import { withDeadline } from '../lib/deadline';
 import { useCloud } from '../state/cloud';
 import { offerLink } from './LinkMenu';
@@ -50,6 +52,7 @@ export function useMessageFiles(product: string, thread?: string): { dir: string
       const name = (id: string) => latest.current.items.find((i: { id: string; title?: string }) => i.id === id)?.title ?? null;
       return found && { title: folderTitle(src, { thread, name }), pictures: found.pictures, total: found.total };
     },
+    say: (line) => latest.current.say(line),
     hold: (src) => {
       const { places, links, say } = latest.current;
       offerLink(linkToShare(openingOf(places, links, product, src)), src.replace(/\/+$/, '').split('/').pop() || src, say);
@@ -85,7 +88,7 @@ export function SentFiles({ text, product }: { text: string; product: string }) 
   );
 }
 
-const KIND_LABEL: Record<string, string> = { html: 'Design', image: 'Picture', markdown: 'Document', code: 'Code', website: 'Website' };
+const KIND_LABEL: Record<string, string> = { html: 'Design', image: 'Picture', markdown: 'Document', code: 'Code', website: 'Website', pdf: 'PDF' };
 // A tile's page is `--doc-page` (`color.sunk`); one still on its way is `--bg-raised` (`color.raised`).
 
 /** Every design and document a thread names, as small framed tiles; one the phone cannot read gets none. */
@@ -100,11 +103,12 @@ export function ThreadFiles({ item, product }: { item: { id: string; result?: st
   );
 }
 
-type Face = { glance: Glance; html?: string };
+type Face = { glance: Glance; html?: string; table?: Table };
 
 function FileTile({ product, path, open, hold }: { product: string; path: string; open: () => void; hold: () => void }) {
   const c = useCloud();
   const kind = docKind(path);
+  const name = path.split('/').pop() ?? path;
   // undefined until the first read answers; null for a file the phone cannot read.
   const [face, setFace] = useState<Face | null | undefined>(undefined);
   useEffect(() => {
@@ -119,23 +123,30 @@ function FileTile({ product, path, open, hold }: { product: string; path: string
         const r = await pageOnPhone(places, c.links, product, path, readLink);
         return r.ok ? { glance: fileGlance(r.html, 'html'), html: r.html } : waiting(r.error);
       }
+      if (isTablePath(path)) {
+        const r = await tableOnPhone(places, c.links, product, path, readLink);
+        return r.ok ? { glance: { title: null, line: null, blocks: [] }, table: r.table } : waiting(r.error);
+      }
+      if (kind === 'pdf') {
+        const o = openingOf(places, c.links, product, path);
+        return o.kind === 'refused' ? waiting(o.error) : { glance: { title: name, line: null, blocks: [] } };
+      }
       return null;
     };
     read().then((f) => { if (live) setFace(f); }, () => { if (live) setFace(null); });
     return () => { live = false; };
   }, [product, path, c.signedAt]);
-  const name = path.split('/').pop() ?? path;
   if (face === null) return null;
   const foot = (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingTop: 7 }}>
       <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 12, lineHeight: 17, color: color.dim }}>{name}</T>
-      <T style={{ fontFamily: font.mono, fontSize: 10, lineHeight: 14, letterSpacing: 1.2, textTransform: 'uppercase', color: color.faint }}>{kind ? KIND_LABEL[kind] : 'File'}</T>
+      <T style={{ fontFamily: font.mono, fontSize: 10, lineHeight: 14, letterSpacing: 1.2, textTransform: 'uppercase', color: color.faint }}>{isTablePath(path) ? 'Table' : kind ? KIND_LABEL[kind] : 'File'}</T>
     </View>
   );
   return (
     <Pressable onPress={face ? open : undefined} onLongPress={hold} accessibilityRole="button" accessibilityLabel={`Open ${name}`} accessibilityHint="Hold to open it in the browser or share it">
       <View style={{ height: 104, backgroundColor: face ? color.sunk : color.raised, overflow: 'hidden' }}>
-        {face?.html !== undefined ? <PageFrame html={face.html} desktop style={{ flex: 1 }} /> : face ? <MiniPage title={face.glance.title || name} blocks={face.glance.blocks} /> : <Skeleton small />}
+        {face?.html !== undefined ? <PageFrame html={face.html} desktop style={{ flex: 1 }} /> : face?.table ? <MiniTable table={face.table} /> : face ?<MiniPage title={face.glance.title || name} blocks={face.glance.blocks} /> : <Skeleton small />}
         <Ticks />
       </View>
       {foot}

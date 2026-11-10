@@ -4,20 +4,44 @@
 // one copy of every rule.
 
 import { REQUEST_CHANNELS } from '../../shared/bridge-map.mts';
-import { madeHere, phoneChoices, WAIT_STATES } from '../../shared/phone-snapshot.mjs';
-import { runOfClaim } from '../../shared/cloud-kit.mjs';
-import { isCarried } from '../../shared/cloud-carry.mjs';
+import { madeHere, phoneChoices, WAIT_STATES } from '../../shared/phone-snapshot.mts';
+import { runOfClaim } from '../../shared/cloud-kit.mts';
+import { isCarried } from '../../shared/cloud-carry.mts';
 import { Name } from '../../shared/product-name.mjs';
 import { statusForReply } from './list-rules';
-import { cloudPlaces } from './cloud-files';
+import { cloudPlaces, type Attached } from './cloud-files';
+import type { RunningSession, WorkItem } from './types';
+import type { LedgerLine } from './thread-history';
+import type { SettingsRow } from './phone-settings-view';
+
+/** A thread's copy as her computer wrote it (shared/phone-snapshot.mts threadSnapshot), read back as JSON. */
+export interface PhoneSnapshot {
+  v?: number;
+  item?: WorkItem;
+  history?: LedgerLine[];
+  olderLines?: number;
+  approvals?: { id?: string; at?: number; tool?: string; card?: string | null; input?: Record<string, unknown> }[];
+  live?: { at: number; since?: number; where?: string; movable?: boolean; doing?: { label?: string; startedAt?: number }[] } | null;
+  wait?: { state: string; tool?: string; until?: number } | null;
+  attached?: Attached;
+}
+/** What a command carries, as JSON from the database: which fields depend on `kind`. */
+export interface CommandPayload {
+  [field: string]: unknown;
+  text?: string; title?: string; body?: string; until?: number; runAt?: number;
+  approval?: string; allow?: boolean; note?: string; card?: string;
+  scope?: string; key?: string; value?: unknown; product?: string; item?: string; id?: string;
+  carried?: unknown; notBefore?: unknown;
+}
+export type PhoneItem = WorkItem & { waitsForMac?: boolean };
 
 export interface PhoneRows {
-  // `cloud`: that computer leaves its threads ready for Agentbox Cloud (shared/cloud-kit.mjs).
+  // `cloud`: that computer leaves its threads ready for Agentbox Cloud (shared/cloud-kit.mts).
   projects: { device: string; project: string; name: string; updated_at?: string; cloud?: boolean }[];
-  threads: { device: string; project: string; item: string; snapshot: any; updated_at?: string }[];
+  threads: { device: string; project: string; item: string; snapshot: PhoneSnapshot; updated_at?: string }[];
   // `project` is null only on a 'setting', which is for the computer, not a thread.
   // `claimed_by` is `cloud:<run id>` when Agentbox Cloud took it with the computer away.
-  commands: { id: string; device: string; project: string | null; item: string | null; kind: string; payload: any; created_at: string; claimed_at?: string | null; claimed_by?: string | null; taken_at: string | null; outcome: string | null }[];
+  commands: { id: string; device: string; project: string | null; item: string | null; kind: string; payload: CommandPayload; created_at: string; claimed_at?: string | null; claimed_by?: string | null; taken_at: string | null; outcome: string | null }[];
 }
 
 // `sent`: taken, by her computer or the cloud, and not yet in the thread's copy.
@@ -39,8 +63,8 @@ const plainWords = (text: unknown) => String(text ?? '').replace(/\s+/g, ' ').tr
  * older than it. Until then the phone draws it itself, so a message taken by
  * the cloud or her computer is never on neither screen.
  */
-export function copyShows(snapshot: any, text: string, at: number) {
-  const history: any[] = Array.isArray(snapshot?.history) ? snapshot.history : [];
+export function copyShows(snapshot: PhoneSnapshot | null | undefined, text: string, at: number) {
+  const history: LedgerLine[] = Array.isArray(snapshot?.history) ? snapshot.history : [];
   const from = at - CLOCKS_DIFFER_MS;
   if (Number(snapshot?.olderLines) > 0 && history.length && Number(history[0]?.ts) > at) return true;
   const words = plainWords(text);
@@ -58,6 +82,24 @@ export const UNDONE = 'refused: taken back on the phone';
 // step 1, finding 4): the screens know it by its name there and that
 // computer's id together, so two computers' projects of the same name stay two.
 export const phoneSlug = (device: string, project: string) => `${project}@${device}`;
+
+/**
+ * The thread a computer made from a "new" sent here, once it has taken it:
+ * the phone showed it under madeHere(command id), and the computer gives it an
+ * id of its own. Its copy names the command (`fromPhone`); a copy from before
+ * that is matched by project, title and time.
+ */
+export function madeThreadOf(rows: PhoneRows, product: string, id: string): string | null {
+  const cmd = rows.commands.find((c) => c.kind === 'new' && madeHere(c.id) === id && c.project && phoneSlug(c.device, c.project) === product);
+  if (!cmd || !cmd.taken_at) return null;
+  const mine = rows.threads.flatMap((t) => (t.device === cmd.device && t.project === cmd.project && t.snapshot?.item ? [{ row: t, made: t.snapshot.item }] : []));
+  const named = mine.find(({ made }) => made.fromPhone === cmd.id);
+  if (named) return named.row.item;
+  const title = String(cmd.payload?.title || cmd.payload?.body || '').slice(0, 200).trim();
+  const sentAt = Date.parse(cmd.created_at) || 0;
+  const match = mine.filter(({ made }) => !made.fromPhone && String(made.title ?? '').trim() === title && Number(made.createdAt) >= sentAt - 60_000);
+  return match.length === 1 ? match[0].row.item : null;
+}
 export function splitSlug(slug: string): { device: string; project: string } | null {
   const m = /^(.+)@([0-9a-f]{12})$/.exec(String(slug));
   return m ? { project: m[1], device: m[2] } : null;
@@ -74,6 +116,12 @@ const fnv = (text: string) => {
 };
 const aliasFor = (slug: string, item: string, n: number) => `w-${(fnv(`${slug}/${item}/${n}`) + fnv(`${n}/${item}/${slug}`)).slice(0, 10)}`;
 export type Aliases = Record<string, { product: string; item: string }>;
+/** What a screen asks of a thread through the bridge (api.ts), as the phone takes it. A compose carries no `id` and never reads it. */
+export interface PhoneAsk {
+  [field: string]: unknown;
+  product: string; id: string;
+  answer?: string; status?: string; withdraw?: boolean; snoozedUntil?: number; runAt?: number; title?: string; body?: string; unschedule?: boolean;
+}
 /** The thread a screen's id stands for, in its project. */
 export const realItem = (aliases: Aliases, product: string, id: string) => (aliases[id]?.product === product ? aliases[id].item : id);
 
@@ -94,7 +142,7 @@ export function phoneView(rows: PhoneRows, now = Date.now()) {
     const slug = phoneSlug(p.device, p.project);
     return { slug, name: twice.has(p.name) ? `${p.name} (${p.device.slice(0, 4)})` : p.name, dir: places.get(slug)?.dir ?? '', oneLiner: '', repoPath: places.get(slug)?.repo ?? '' };
   });
-  const items = new Map<string, any>();
+  const items = new Map<string, PhoneItem>();
   const screenId = new Map<string, string>();
   const aliases: Aliases = {};
   const approvals: { id: string; at: number; product: string; item: string; tool: string; input: Record<string, unknown> }[] = [];
@@ -106,7 +154,7 @@ export function phoneView(rows: PhoneRows, now = Date.now()) {
   // them (Codex's third review, finding 6).
   const taken = new Set<string>([...rows.threads.map((t) => t.item), ...rows.commands.filter((c) => c.kind === 'new').map((c) => madeHere(c.id))]);
   const used = new Set<string>();
-  const running: any[] = [];
+  const running: RunningSession[] = [];
   const waits = new Map<string, { state: string; tool?: string; until?: number }>();
   const threads =[...rows.threads].sort((a, b) => `${a.device}/${a.project}`.localeCompare(`${b.device}/${b.project}`));
   for (const t of threads) {
@@ -120,7 +168,7 @@ export function phoneView(rows: PhoneRows, now = Date.now()) {
     }
     used.add(id);
     screenId.set(`${slug}/${t.item}`, id);
-    items.set(`${slug}/${t.item}`, { ...t.snapshot.item, id, product: slug, productName: names.get(slug) });
+    items.set(`${slug}/${t.item}`, { ...t.snapshot.item, id, product: slug, productName: names.get(slug)! });
     // Its permission cards, but not one she has answered here already.
     for (const a of Array.isArray(t.snapshot.approvals) ? t.snapshot.approvals : []) {
       if (!a?.id || !a.card) continue;
@@ -139,10 +187,10 @@ export function phoneView(rows: PhoneRows, now = Date.now()) {
         ...(live.where === 'cloud' ? { where: 'cloud' } : {}),
         ...(live.movable === true ? { movable: true } : {}),
         tail: [],
-        activity: (Array.isArray(live.doing) ? live.doing : []).map((d: any, i: number) => ({ id: `live-${i}`, label: String(d?.label ?? ''), detail: '', startedAt: Number(d?.startedAt) || 0 })),
+        activity: (Array.isArray(live.doing) ? live.doing : []).map((d: { label?: string; startedAt?: number } | null, i: number) => ({ id: `live-${i}`, label: String(d?.label ?? ''), detail: '', startedAt: Number(d?.startedAt) || 0 })),
       });
     }
-    // Why the computer has not started it, in its own words (shared/phone-snapshot.mjs phoneWaitsOf).
+    // Why the computer has not started it, in its own words (shared/phone-snapshot.mts phoneWaitsOf).
     const wait = t.snapshot.wait;
     if (wait && typeof wait === 'object' && WAIT_STATES.includes(wait.state)) waits.set(id, wait);
   }
@@ -168,14 +216,15 @@ export function phoneView(rows: PhoneRows, now = Date.now()) {
   }
   const ordered = [...rows.commands].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
   for (const c of ordered) {
-    if (isPinSetting(c)) {
+    const shows = shownSetting(c);
+    if (shows && isThreadSetting(c)) {
       const p = c.payload;
       const takenAt = c.taken_at ? Date.parse(c.taken_at) || 0 : null;
       const copyAt = Date.parse(rows.threads.find((t) => t.device === c.device && t.project === p.product && t.item === p.item)?.updated_at ?? '') || 0;
       const standing = takenAt === null ? !c.outcome : c.outcome === 'done' && copyAt < takenAt && now - takenAt < LANDING_SHOWN_MS;
       const key = `${phoneSlug(c.device, p.product)}/${p.item}`;
       const row = items.get(key);
-      if (standing && row) items.set(key, { ...row, pinned: p.value === true });
+      if (standing && row) items.set(key, { ...row, ...shows });
       continue;
     }
     // Her computer's own hand-over to the cloud is not something she sent.
@@ -209,38 +258,38 @@ export function phoneView(rows: PhoneRows, now = Date.now()) {
     }
     // Marked as the person's, as the computer will write them: the lists trust only a done and a time the person set.
     else if (c.kind === 'close' && row) items.set(key, { ...row, status: 'done', wrote: { ...row.wrote, status: { ts: at, source: 'founder' } }, updatedAt: at });
-    else if (c.kind === 'snooze' && row) items.set(key, { ...row, snoozedUntil: Number(c.payload?.until) || null, wrote: { ...row.wrote, snoozedUntil: { ts: at, source: 'founder' } }, updatedAt: at });
+    else if (c.kind === 'snooze' && row) items.set(key, { ...row, snoozedUntil: Number(c.payload?.until) || null, wrote: { ...row.wrote, snoozedUntil: { ts: at, source: 'founder' } }, updatedAt: at } as PhoneItem);
     else if (c.kind === 'new' && names.has(slug)) {
       const made = madeHere(c.id);
       // Started in the cloud with the computer away: the copy the cloud wrote is the thread.
       const inCloud = takenAt === null && !!runOfClaim(c.claimed_by);
       if (inCloud && items.has(`${slug}/${made}`)) continue;
       if (!refused && !inCloud && takenAt === null) queue(made);
-      const { runAt, start, engine, model, effort, priority } = phoneChoices('new', c.payload) as Record<string, any>;
+      const { runAt, start, engine, model, effort, priority } = phoneChoices('new', c.payload) as { runAt?: number; start?: 'later' | 'now'; engine?: string; model?: string; effort?: string; priority?: number };
       items.set(`${slug}/${made}`, {
-        id: made, product: slug, productName: names.get(slug), title: String(c.payload?.title || c.payload?.body || '').slice(0, 200),
+        id: made, product: slug, productName: names.get(slug)!, title: String(c.payload?.title || c.payload?.body || '').slice(0, 200),
         body: String(c.payload?.body ?? ''), kind: 'directive', labels: ['founder'], priority: priority ?? 0, createdAt: at, updatedAt: at,
         ...Object.fromEntries(Object.entries({ runAt, start, engine, model, effort }).filter(([, v]) => v !== undefined)),
         // Later trusts a time only the person set (list-rules `hiddenUntil`).
         ...(runAt ? { wrote: { runAt: { ts: at, source: 'founder' } } } : {}),
         ...(refused ? { status: 'blocked', result: `Your computer could not start this: ${refused}` } : inCloud ? { status: 'claimed' } : { status: 'open', waitsForMac: true }),
-      });
+      } as PhoneItem);
     }
   }
   return { now, products, items: [...items.values()], waiting, aliases, running, queued, runNow, stalled, shipping, signInNeeded, atLimit, paused, places, approvals, decided, cards };
 }
 
 /** What one thread's live line is told of the computer's queue, off the view (the phone app's thread page). */
-export function waitFacts(view: Pick<ReturnType<typeof phoneView>, 'queued' | 'runNow' | 'stalled' | 'shipping' | 'signInNeeded' | 'atLimit' | 'paused'>, id: string) {
+export function waitFacts(view: Pick<ReturnType<typeof phoneView>, 'queued' | 'runNow' | 'stalled' | 'shipping' | 'signInNeeded' | 'atLimit' | 'paused' | 'approvals'>, id: string) {
   return {
     queued: view.queued, runNow: view.runNow, signInNeeded: view.signInNeeded, atLimit: view.atLimit, paused: view.paused,
-    stalled: view.stalled.includes(id), shipping: view.shipping.includes(id),
+    stalled: view.stalled.includes(id), shipping: view.shipping.includes(id), asking: view.approvals.some((a) => a.item === id),
   };
 }
 
 const THREADS_MAX = 3000;
 type ThreadRow = PhoneRows['threads'][number];
-type Select = (table: string, query: string) => Promise<any[]>;
+type Select = (table: string, query: string) => Promise<readonly object[]>;
 /**
  * Her threads, fetching only the copies new or changed since `cache` had them:
  * a light list of when each last changed, then the changed copies at once.
@@ -248,11 +297,11 @@ type Select = (table: string, query: string) => Promise<any[]>;
  */
 export async function readThreads(select: Select, cache: Map<string, ThreadRow>): Promise<ThreadRow[]> {
   const keyOf = (t: { device: string; project: string; item: string }) => `${t.device}/${t.project}/${t.item}`;
-  const light: ThreadRow[] = await select('phone_threads', `select=device,project,item,updated_at&order=updated_at.desc&limit=${THREADS_MAX}`);
+  const light = await select('phone_threads', `select=device,project,item,updated_at&order=updated_at.desc&limit=${THREADS_MAX}`) as ThreadRow[];
   const changed = light.filter((t) => cache.get(keyOf(t))?.updated_at !== t.updated_at);
   if (changed.length) {
     const since = changed.map((t) => String(t.updated_at ?? '')).sort()[0];
-    const fresh: ThreadRow[] = await select('phone_threads', `select=device,project,item,snapshot,updated_at${since ? `&updated_at=gte.${encodeURIComponent(since)}` : ''}&order=updated_at.desc&limit=${THREADS_MAX}`);
+    const fresh = await select('phone_threads', `select=device,project,item,snapshot,updated_at${since ? `&updated_at=gte.${encodeURIComponent(since)}` : ''}&order=updated_at.desc&limit=${THREADS_MAX}`) as ThreadRow[];
     for (const t of fresh) cache.set(keyOf(t), t);
   }
   const here = new Set(light.map(keyOf));
@@ -268,25 +317,38 @@ export const PROJECTS_SELECT = 'select=*&order=name';
 export async function readCommands(select: Select, now = Date.now()): Promise<PhoneRows['commands']> {
   const waiting: PhoneRows['commands'] = [];
   for (let from = 0; ; from += 500) {
-    const page = await select('phone_commands', `${COMMANDS}&taken_at=is.null&offset=${from}&limit=500`);
+    const page = await select('phone_commands', `${COMMANDS}&taken_at=is.null&offset=${from}&limit=500`) as PhoneRows['commands'];
     waiting.push(...page);
     if (page.length < 500) break;
   }
   const since = new Date(now - 2 * 24 * 3600_000).toISOString();
   // Newest first: a busy two days must cut off the oldest, not the message she just sent.
-  const done = await select('phone_commands', `select=*&order=created_at.desc&taken_at=gte.${since}&limit=500`);
+  const done = await select('phone_commands', `select=*&order=created_at.desc&taken_at=gte.${since}&limit=500`) as PhoneRows['commands'];
   return [...waiting, ...done];
 }
 
-/** Each computer's settings as it last sent them (shared/phone-settings.mjs), newest first. */
-export const readSettingsRows = (select: Select) => select('phone_settings', 'select=device,name,settings,updated_at&order=updated_at.desc&limit=20');
+/** Each computer's settings as it last sent them (shared/phone-settings.mts), newest first. */
+export const readSettingsRows = (select: Select) => select('phone_settings', 'select=device,name,settings,updated_at&order=updated_at.desc&limit=20') as Promise<SettingsRow[]>;
 
 /** A change for one computer's settings, which its own handlers carry out. */
 export function settingCommand(device: string, change: { scope: 'workspace' | 'project' | 'thread' | 'repeat' | 'teammate'; key: string; value: unknown; product?: string; item?: string; id?: string }) {
   return { device, project: null, item: null, kind: 'setting', payload: change };
 }
-const isPinSetting = (c: PhoneRows['commands'][number]) => c.kind === 'setting' && c.payload?.scope === 'thread' && c.payload?.key === 'pinned'
+type ThreadSetting = PhoneRows['commands'][number] & { payload: CommandPayload & { product: string; item: string } };
+const isThreadSetting = (c: PhoneRows['commands'][number]): c is ThreadSetting => c.kind === 'setting' && c.payload?.scope === 'thread'
   && typeof c.payload?.product === 'string' && typeof c.payload?.item === 'string';
+// What a change to a thread the computer has not taken yet looks like on its row.
+const SHOWN: Record<string, (v: unknown) => Record<string, unknown>> = {
+  pinned: (v) => ({ pinned: v === true }),
+  onMac: (v) => ({ onMac: v === true }),
+  label: (v) => ({ label: v }),
+  priority: (v) => ({ priority: v }),
+};
+function shownSetting(c: PhoneRows['commands'][number]): Record<string, unknown> | null {
+  if (!isThreadSetting(c)) return null;
+  const key = c.payload.key;
+  return typeof key === 'string' && Object.hasOwn(SHOWN, key) ? SHOWN[key](c.payload.value) : null;
+}
 
 // Each card drawn on the phone: where it is, and the fingerprint her Mac drew it with.
 export type Cards = Record<string, { device: string; project: string; item: string; card: string }>;
@@ -301,7 +363,7 @@ export function approvalCommand(cards: Cards, p: { id: string; allow: boolean; n
 export function phoneHistory(rows: PhoneRows, product: string, id: string, aliases: Aliases = {}) {
   const item = realItem(aliases, product, id);
   const t = rows.threads.find((r) => phoneSlug(r.device, r.project) === product && r.item === item);
-  return { ok: true, lines: Array.isArray(t?.snapshot?.history) ? t.snapshot.history.map((l: any) => ({ ...l, id })) : [] };
+  return { ok: true, lines: Array.isArray(t?.snapshot?.history) ? t.snapshot.history.map((l: LedgerLine) => ({ ...l, id })) : [] };
 }
 
 /** What one press on the phone leaves for her Mac, or null for a press that is not one of the four. */
@@ -309,14 +371,14 @@ export function phoneHistory(rows: PhoneRows, product: string, id: string, alias
 // waiting: the phone marks its own command taken, as undone, and the computer
 // never sees it. Once the computer has closed the thread, undoing is the
 // computer's. Returns the command to take back, or null.
-export function closeToTakeBack(rows: PhoneRows, channel: string, p: any, aliases: Aliases = {}) {
+export function closeToTakeBack(rows: PhoneRows, channel: string, p: PhoneAsk, aliases: Aliases = {}) {
   if (channel !== REQUEST_CHANNELS.answer || p?.status !== 'open' || (typeof p.answer === 'string' && p.answer.trim())) return null;
   return waitingFor(rows, p, aliases, 'close');
 }
 
 // The same for a reply, when the window stops the agent to undo it, and for a
 // new thread, closed by the id the inbox drew it with.
-export function takeBack(rows: PhoneRows, channel: string, p: any, aliases: Aliases = {}) {
+export function takeBack(rows: PhoneRows, channel: string, p: PhoneAsk, aliases: Aliases = {}) {
   if (channel === REQUEST_CHANNELS.stopSession) return p?.withdraw ? waitingFor(rows, p, aliases, 'reply') : null;
   if (channel === REQUEST_CHANNELS.answer && p?.status === 'done' && !(typeof p.answer === 'string' && p.answer.trim())) {
     const where = splitSlug(p.product);
@@ -325,14 +387,14 @@ export function takeBack(rows: PhoneRows, channel: string, p: any, aliases: Alia
   return closeToTakeBack(rows, channel, p, aliases);
 }
 
-function waitingFor(rows: PhoneRows, p: any, aliases: Aliases, kind: string) {
+function waitingFor(rows: PhoneRows, p: PhoneAsk, aliases: Aliases, kind: string) {
   const where = splitSlug(p?.product);
   if (!where) return null;
   const item = realItem(aliases, p.product, p.id);
   return rows.commands.filter((c) => c.kind === kind && !c.taken_at && !c.claimed_at && c.device === where.device && c.project === where.project && c.item === item).at(-1) ?? null;
 }
 
-export function commandFor(channel: string, p: any, aliases: Aliases = {}): { device: string; project: string; item: string | null; kind: string; payload: Record<string, unknown> } | null {
+export function commandFor(channel: string, p: PhoneAsk, aliases: Aliases = {}): { device: string; project: string; item: string | null; kind: string; payload: Record<string, unknown> } | null {
   const where = splitSlug(p?.product);
   if (!where) return null;
   const on = (item: string | null, kind: string, payload: Record<string, unknown>) => ({ ...where, item: item === null ? null : realItem(aliases, p.product, item), kind, payload });
@@ -341,8 +403,8 @@ export function commandFor(channel: string, p: any, aliases: Aliases = {}): { de
     if (p.status === 'done') return on(p.id, 'close', {});
     return null;
   }
-  if (channel === REQUEST_CHANNELS.snooze && Number.isFinite(p.snoozedUntil) && p.snoozedUntil >= 0) return on(p.id, 'snooze', { until: p.snoozedUntil });
-  if (channel === REQUEST_CHANNELS.schedule && Number.isFinite(p.runAt) && p.runAt >= 0) return on(p.id, 'schedule', { runAt: p.runAt });
+  if (channel === REQUEST_CHANNELS.snooze && Number.isFinite(p.snoozedUntil) && p.snoozedUntil! >= 0) return on(p.id, 'snooze', { until: p.snoozedUntil });
+  if (channel === REQUEST_CHANNELS.schedule && Number.isFinite(p.runAt) && p.runAt! >= 0) return on(p.id, 'schedule', { runAt: p.runAt });
   const plain: Record<string, string> = { [REQUEST_CHANNELS.stopSession]: 'stop', [REQUEST_CHANNELS.runNow]: 'run-now', [REQUEST_CHANNELS.sendNow]: 'send-now', [REQUEST_CHANNELS.reopen]: 'reopen', [REQUEST_CHANNELS.moveToCloud]: 'move-to-cloud' };
   if (plain[channel] && p.id) return on(p.id, plain[channel], {});
   if (channel === REQUEST_CHANNELS.compose && (String(p.title ?? '').trim() || String(p.body ?? '').trim())) {
