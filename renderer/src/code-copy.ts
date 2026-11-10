@@ -37,7 +37,7 @@
  * called a removed line plus its replacement "one line", stood aside, and the
  * browser copied nothing, so the paste brought back whatever was on the
  * clipboard before (2026-10-04,
- * tests/a-copy-across-a-removed-line-takes-what-was-selected.test.mjs).
+ * tests/a-copy-across-a-removed-line-takes-what-was-selected.test.mts).
  *
  * Removed rows are skipped when any surviving row is selected; when only
  * removed rows are, she chose them, and they are what she gets.

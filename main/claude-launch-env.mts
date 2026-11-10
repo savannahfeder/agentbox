@@ -12,7 +12,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { candidatePaths, versionedPaths } from './claude-bin.mjs';
+import { candidatePaths, versionedPaths } from './claude-bin.mts';
 
 function executable(file: string) {
   try {

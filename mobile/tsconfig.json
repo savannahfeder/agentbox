@@ -10,6 +10,7 @@
     "moduleResolution": "bundler",
     "customConditions": ["react-native"],
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "target": "ESNext",

@@ -1,6 +1,7 @@
-import { ruleLabel, type RepeatShape as RepeatRuleValue } from '../../shared/repeats.mjs';
-import { isShippedNote } from '../../shared/shipped-note.mjs';
+import { ruleLabel, type RepeatShape as RepeatRuleValue } from '../../shared/repeats.mts';
+import { isShippedNote } from '../../shared/shipped-note.mts';
 import { readMoment } from './when-words';
+import { localDate } from './local-dates';
 // Time and grouping, Superhuman-style: terse, scannable, never a full date
 // where "3m" will do.
 
@@ -13,7 +14,7 @@ export function ago(ts: number, now = Date.now()): string {
   if (h < 24) return `${h}h`;
   const d = Math.floor(h / 24);
   if (d < 7) return `${d}d`;
-  return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return localDate(ts, { month: 'short', day: 'numeric' });
 }
 
 // THE PANEL CLOCK, AND IT ONLY EVER MOVES ON THE MINUTE. Under a minute this
@@ -28,17 +29,16 @@ export function agoQuiet(ts: number, now = Date.now()): string {
 }
 
 export function stamp(ts: number, now = Date.now()): string {
-  const d = new Date(ts);
   const days = Math.floor((startOfDay(now) - startOfDay(ts)) / 86_400_000);
-  if (days === 0) return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }).toUpperCase();
+  if (days === 0) return localDate(ts, { hour: 'numeric', minute: '2-digit' });
+  return localDate(ts, { month: 'short', day: 'numeric' }).toUpperCase();
 }
 
 export function dayLabel(ts: number, now = Date.now()): string {
   const days = Math.floor((startOfDay(now) - startOfDay(ts)) / 86_400_000);
   if (days === 0) return 'Today';
   if (days === -1) return 'Tomorrow';
-  if (days < 0) return new Date(ts).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+  if (days < 0) return localDate(ts, { weekday: 'long', month: 'short', day: 'numeric' });
   if (days === 1) return 'Yesterday';
   if (days < 7) return `Last 7 days`;
   return 'Earlier';
@@ -264,7 +264,7 @@ export function needsYourWords(option: string): boolean {
 // fall-through to whichever preset happens to be highlighted: that fall-through
 // is what scheduled an item for thirty minutes when the user typed "tomorrow", while
 // the preview beside the box was already admitting it did not understand
-// (tests/snooze-honours-what-she-typed.test.mjs).
+// (tests/snooze-honours-what-she-typed.test.mts).
 export type EnterMeans = 'typed' | 'refuse' | 'selected';
 
 export function enterMeans(text: string, parsed: unknown): EnterMeans {
@@ -365,7 +365,7 @@ export function repeatPresets(now = Date.now()): Array<{ label: string; rule: Re
  * as `parseRepeat`, with one difference. A box holds nothing but the rule, so a
  * time after the rhythm is the time even without "at": "every day 5pm" is
  * five, where at the top of a message the "5pm" would be the task and the
- * hour would default to eight (tests/repeat-it-takes-a-rule-in-words.test.mjs).
+ * hour would default to eight (tests/repeat-it-takes-a-rule-in-words.test.mts).
  */
 export function readRule(raw: string): RepeatParse {
   const phrase = (raw ?? '').trim().replace(/\s+/g, ' ');
@@ -408,11 +408,10 @@ function repeatRule(rule: RepeatRuleValue): RepeatParse {
 }
 
 function stamp2(ts: number, now: number): { ts: number; label: string } {
-  const d = new Date(ts);
   const days = Math.floor((ts - startOfDay(now)) / 86_400_000);
-  const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const time = localDate(ts, { hour: 'numeric', minute: '2-digit' });
   const day = days === 0 ? 'today' : days === 1 ? 'tomorrow'
-    : d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    : localDate(ts, { weekday: 'short', month: 'short', day: 'numeric' });
   return { ts, label: `${day}, ${time}` };
 }
 
@@ -421,11 +420,11 @@ function stamp2(ts: number, now: number): { ts: number; label: string } {
 // From seven days on, or once the moment has gone, it carries its date too:
 // "3 weeks" typed on a Thursday printed "THU 8:00 AM", which read as this
 // Thursday when it meant Thursday 5 Nov
-// (tests/a-later-time-weeks-away-says-its-date.test.mjs).
+// (tests/a-later-time-weeks-away-says-its-date.test.mts).
 export function dayAndTime(ts: number, now = Date.now()): string {
   const days = Math.round((startOfDay(ts) - startOfDay(now)) / 86_400_000);
   const dated = days < 0 || days >= 7;
-  return new Date(ts).toLocaleString(undefined, {
+  return localDate(ts, {
     weekday: 'short', ...(dated ? { month: 'short', day: 'numeric' } : {}), hour: 'numeric', minute: '2-digit',
   });
 }
@@ -452,7 +451,7 @@ function flatten(body: string, headings: 'drop' | 'keep'): string {
     .replace(/^#{1,4}\s.*$/gm, (line) => (headings === 'keep' ? line.replace(/^#{1,4}\s*/, '') : ''))
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-    // A cloud run's key ask reads as what it asks for (shared/cloud-keys.mjs).
+    // A cloud run's key ask reads as what it asks for (shared/cloud-keys.mts).
     // Its other asks are cards in the thread, and machine words anywhere else (round six: search showed them).
     .replace(/^\s*`?AGENTBOX-NEEDS:\s*(sign-in|key|file|code)\s.*$/gim, '')
     .replace(/^\s*`?AGENTBOX-NEEDS-A-KEY:\s*([A-Z][A-Z0-9_]+)\b[\s:\u2014\u2013-]*(.*?)`?\s*$/gm, (_l, name: string, what: string) => what || name)

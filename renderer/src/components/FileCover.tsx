@@ -2,12 +2,13 @@
 // a PDF's first page, a film's opening frame, a picture. Each says how long it
 // is (`onSize`) so the tile can put it under the face.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { readDeck, type Deck } from '../../../shared/pptx-slides.mjs';
+import { readDeck, type Deck } from '../../../shared/pptx-slides.mts';
 import { coverFit, coverPageWidth } from '../artifact-pins';
 import { useFilmPoster } from '../film-poster';
 import { fetchableFileUrl } from '../phone-files';
 import { pictureUrl } from '../picture';
 import { inflate, SlideFace } from './DeckSlides';
+import { FittedImg } from './FittedImg';
 import { openPdf, Page, type Pdf } from './PdfPages';
 
 const COVER_WIDTH = 220;
@@ -90,7 +91,7 @@ export function FileCover({ kind, opened, onSize, onBroken }: { kind: CoverKind;
 
 function PictureCover({ opened, onBroken }: { opened: string; onBroken?: () => void }) {
   const [fit, setFit] = useState<'cover' | 'contain'>('cover');
-  return <img className="file-cover-picture" src={pictureUrl(opened)} alt="" crossOrigin="anonymous" draggable={false} onError={onBroken} style={fit === 'contain' ? { objectFit: 'contain', objectPosition: 'center' } : undefined}
+  return <FittedImg cover className="file-cover-picture" src={pictureUrl(opened)} alt="" crossOrigin="anonymous" draggable={false} onError={onBroken} style={fit === 'contain' ? { objectFit: 'contain', objectPosition: 'center' } : undefined}
     onLoad={(e) => {
       const el = e.currentTarget;
       setFit(coverFit({ w: el.naturalWidth, h: el.naturalHeight }, { w: el.clientWidth, h: el.clientHeight }));

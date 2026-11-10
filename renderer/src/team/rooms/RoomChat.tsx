@@ -12,7 +12,7 @@ import { ConnectionLink } from '../../connections/ConnectionsPlace';
 import { connectionLinkOf, keepConnectionLinks } from '../../connections/connections-shown';
 import remarkGfm from 'remark-gfm';
 import type { Room, RoomMessage } from '../../types';
-import { voiceName } from '../../../../shared/agent-voice.mjs';
+import { voiceName } from '../../../../shared/agent-voice.mts';
 import { chatLayout } from '../chat-layout';
 import { MessageActions, Reactions } from '../ChatActions';
 import { DeleteMessage, MessageEditor } from '../MessageMore';
@@ -25,9 +25,10 @@ import { forgetVoiceDraft, markVoiceSent, sendTurnedBack, type VoiceControl } fr
 import { createPortal } from 'react-dom';
 import { FileSheet } from '../../components/FileSheet';
 import { FileCover } from '../../components/FileCover';
-import { opensBigInAGroup, reviewKind, shownName } from '../../../../shared/artifact-marks.mjs';
+import { opensBigInAGroup, reviewKind, shownName } from '../../../../shared/artifact-marks.mts';
 import { RoomFileView, type RoomFileOpening, type RoomFiles } from './RoomFileView';
 import { AttachRow } from '../../components/AttachRow';
+import { ChatLink } from '../../threads/ContinuedFrom';
 import { collectFiles, isImageName, type PendingAttachment } from '../../attachments';
 import { pictureUrl } from '../../picture';
 import { holdAtBottom } from '../../thread-bottom';
@@ -363,7 +364,7 @@ function RoomMarkdown({ text, names, loadFile, findFile, opensBig, roomId, mine,
         const shown = typeof children === 'string' ? children : (Array.isArray(children) ? children.join('') : name ?? '');
         if (name && reviewKind(name) === 'film') return <RoomFilm name={name} shown={shown} find={findOnDisk} load={fetchFile} opensBig={openBig} />;
         if (name) return <RoomFile name={name} shown={shown} load={fetchFile} opensBig={openBig} />;
-        return <a href={href} target="_blank" rel="noreferrer">{children}</a>;
+        return <ChatLink href={href}>{children}</ChatLink>;
       },
       img: ({ src, alt }: { src?: string; alt?: string }) => {
         const name = src ? storedIn(src) : null;

@@ -1,6 +1,6 @@
 // PURE. The words around a teammate's shared thread, and finding one by name.
 import type { ThreadCard } from '../types';
-import { filesInLines, threadFiles } from '../../../shared/artifact-marks.mjs';
+import { filesInLines, threadFiles, type ThreadLine } from '../../../shared/artifact-marks.mts';
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
@@ -37,9 +37,9 @@ export function standingLine(state: ThreadCard['state'], owner: string, waits: s
 /**
  * The files beside a teammate's thread: each file once, at its newest version,
  * with the notes on any of its versions. The same families the file view
- * pages through (shared/artifact-marks.mjs), so a note counted here is one it shows.
+ * pages through (shared/artifact-marks.mts), so a note counted here is one it shows.
  */
-export function filesOnThread(lines: unknown[], notes: { file: string }[]): { src: string; name: string; notes: number }[] {
+export function filesOnThread(lines: readonly ThreadLine[], notes: { file: string }[]): { src: string; name: string; notes: number }[] {
   return threadFiles(filesInLines(lines)).map((family) => {
     const newest = family.versions[family.versions.length - 1];
     const ids = new Set(family.versions.map((v) => v.id));

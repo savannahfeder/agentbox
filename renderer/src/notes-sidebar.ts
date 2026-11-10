@@ -1,11 +1,9 @@
-import { noteGoesTo } from '../../shared/artifact-marks.mjs';
+import { noteGoesTo } from '../../shared/artifact-marks.mts';
 import { DOCUMENT_HEIGHT_SCRIPT } from '../../shared/frame-document-height.mts';
 import { SELECTED_WORDS_SCRIPT } from '../../shared/frame-selected-words.mts';
 import type { FileNote } from './types';
-import { isLocalPreview } from './artifact-layout';
 import { docKind, isPlainText } from './doc-pane';
 import { isTablePath } from './table-file';
-export { notesStillHeld, sentTimes } from './held-notes';
 
 /** Stored when someone closes the notes sidebar; every window reads the same key. */
 export const NOTES_CLOSED_KEY = 'agentbox.notesSidebar.closed';
@@ -23,12 +21,11 @@ export function rememberNotesSidebar(storage: Storage, open: boolean): void {
   } catch { /* no storage: it opens next time */ }
 }
 
-/** Every file the pane draws itself. A website, a local app and a code change are not files to note. */
+/** A thread's file the pane draws as words, a table or a page. Pictures, PDFs and films have the big viewer's pins instead; a website and a change are not the thread's files. */
 export function takesNotesSidebar(src: string | null | undefined): boolean {
-  const path = String(src ?? '');
-  if (!path || isLocalPreview(path)) return false;
-  const kind = docKind(path);
-  return kind ? kind !== 'website' && kind !== 'code' : isPlainText(path);
+  if (!src) return false;
+  const kind = docKind(src);
+  return kind === 'markdown' || kind === 'html' || (kind === null && isPlainText(src));
 }
 
 /** Words can be selected where the text is the page's own; a page also takes a pin. */
@@ -54,6 +51,19 @@ export function pageTextForNotes(html: string): string {
   // `<\/script>` inside a script's own text would end it early.
   const run = `${DOCUMENT_HEIGHT_SCRIPT};\n${SELECTED_WORDS_SCRIPT};`.replace(/<\/script/gi, '<\\/script');
   return `${html}\n<script>${run}</script>`;
+}
+
+type MarkLine = { ts: number; patch?: { artifact?: { do?: string; on?: unknown } } | null };
+
+/** When each note was first sent, from the line that sent it. */
+export function sentTimes(lines: readonly MarkLine[]): Map<string, number> {
+  const at = new Map<string, number>();
+  for (const l of lines) {
+    const a = l.patch?.artifact;
+    if (a?.do !== 'sent' && a?.do !== 'toagent') continue;
+    for (const id of Array.isArray(a.on) ? a.on : [a.on]) if (typeof id === 'string' && !at.has(id)) at.set(id, l.ts);
+  }
+  return at;
 }
 
 /** The open notes on one document, split into those Send would tell the agent and the rest. */

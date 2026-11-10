@@ -1,7 +1,7 @@
 // THE BANNER. Once while she is away, only while she is somewhere else, taken
 // down the moment she comes back.
 //
-// The rule it obeys is in shared/notify-rules.mjs; this file is the live half:
+// The rule it obeys is in shared/notify-rules.mts; this file is the live half:
 // the window's focus, the machine's idle clock, and the lifetime of the one
 // notification that is allowed to exist. Nothing decidable lives here, so that
 // what the tests pin is the behaviour and not the wiring.
@@ -11,11 +11,11 @@
 // me when I am elsewhere, and never when I am here.
 //
 // AND ONCE, NOT TWENTY TIMES. One at a time is not once. `spoke` below is the
-// fix, and shared/notify-rules.mjs carries the rule.
+// fix, and shared/notify-rules.mts carries the rule.
 
 import path from 'node:path';
 import type { BrowserWindow, IpcMain, NativeImage, Notification as ElectronNotification, PowerMonitor } from 'electron';
-import { atTheApp, banner, shouldSpeak } from '../shared/notify-rules.mjs';
+import { atTheApp, banner, shouldSpeak } from '../shared/notify-rules.mts';
 import { NAME } from '../shared/product-name.mjs';
 
 // THE MARK THE BANNER WEARS, and why it is a png and not the .icns every other
@@ -77,7 +77,7 @@ export function createNotifier({ window, Notification, powerMonitor, icon = null
   let timer: NodeJS.Timeout | null = null;
   // HOW MANY TIMES SHE HAS BEEN INTERRUPTED SINCE SHE LAST HAD THE WINDOW.
   // Both reset in seen, so a stretch away is the unit. shouldSpeak in
-  // shared/notify-rules.mjs is the rule these two feed; the short version is
+  // shared/notify-rules.mts is the rule these two feed; the short version is
   // once, plus one more if an approval turns up afterwards.
   let spoke = false;
   let spokeAsk = false;
@@ -126,7 +126,7 @@ export function createNotifier({ window, Notification, powerMonitor, icon = null
       // No subtitle. macOS puts that field directly under the title in nearly
       // the same type, and she read a lone project name there as the title
       // bleeding over mid-render. The project is in the title now; see
-      // shared/notify-rules.mjs.
+      // shared/notify-rules.mts.
       n = new Notification({
         title: say.title,
         body: say.body,
@@ -206,7 +206,7 @@ export function createNotifier({ window, Notification, powerMonitor, icon = null
 }
 
 // `onArrivals` hears every arrival too, with the inbox they arrived in, for
-// the phone's alerts (main/phone-alerts.mjs), which make their own call.
+// the phone's alerts (main/phone-alerts.mts), which make their own call.
 interface NotifyPayload { arrivals?: unknown; needsYou?: unknown }
 const needsYouOf = (payload: NotifyPayload): unknown[] => (Array.isArray(payload.needsYou) ? payload.needsYou : []);
 

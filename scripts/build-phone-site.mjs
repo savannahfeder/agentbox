@@ -29,8 +29,8 @@ const commitHere = () => {
   return { sha: r.status === 0 ? r.stdout.trim() : '', at: new Date().toISOString() };
 };
 
-// THE APP'S PRIVACY POLICY AND TERMS (phone-legal/), filled in from the same
-// config. A page with a blank left in it is never published.
+// THE APP'S PRIVACY POLICY, TERMS AND HELP PAGE (phone-legal/), filled in from
+// the same config. A page with a blank left in it is never published.
 const LEGAL_FIELDS = { contact: 'CONTACT', operator: 'OPERATOR', governingLaw: 'GOVERNING_LAW' };
 const asWords = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
@@ -40,7 +40,7 @@ function publishLegal(legal, out, given, log) {
     log(`privacy and terms pages not published: team.config.json has no ${missing.join(', ')}`);
     return 'skipped';
   }
-  for (const name of ['privacy.html', 'terms.html']) {
+  for (const name of ['privacy.html', 'terms.html', 'support.html']) {
     let html = fs.readFileSync(path.join(legal, name), 'utf8');
     for (const [key, token] of Object.entries(LEGAL_FIELDS)) html = html.split(`{{${token}}}`).join(asWords(given[key].trim()));
     if (html.includes('{{')) throw new Error(`phone-legal/${name} has a blank no field fills`);
@@ -50,7 +50,7 @@ function publishLegal(legal, out, given, log) {
 }
 
 // THE PAGES ADDRESS SENDS A VISIT ON TO `phoneSite` when that is another address
-// (tests/the-web-apps-old-address-forwards-to-its-new-one.test.mjs). `_redirects`
+// (tests/the-web-apps-old-address-forwards-to-its-new-one.test.mts). `_redirects`
 // cannot match a host and the CSP refuses inline scripts, hence a file loaded first.
 function forwarderFor(given) {
   if (given.phoneSite == null) return null;
@@ -132,7 +132,7 @@ export function buildPhoneSite({ dist = path.join(root, 'renderer', 'dist'), out
   if (!worker.includes('const BAKED = null;')) throw new Error('cloud/web/shared-file-worker.mjs has no BAKED line to fill in');
   const baked = { cloud: origin.origin, anonKey, headers: { ...headers, 'Content-Security-Policy': csp.replace("frame-src blob:", "frame-src 'self' blob:") } };
   fs.writeFileSync(path.join(out, '_worker.js'), worker.replace('const BAKED = null;', () => `const BAKED = ${JSON.stringify(baked)};`));
-  fs.writeFileSync(path.join(out, '_routes.json'), JSON.stringify({ version: 1, include: ['/f/*', '/F/*'], exclude: [] }));
+  fs.writeFileSync(path.join(out, '_routes.json'), JSON.stringify({ version: 1, include: ['/f/*', '/F/*', '/t/*'], exclude: [] }));
   return { out, csp, legal: publishLegal(legal, out, given, log) };
 }
 

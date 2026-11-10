@@ -49,7 +49,7 @@ The same online inbox the phone site uses (docs/cloud/PHONE-PLAN.md). The app
 adds no server of its own except the alert sender.
 
 - **The owner's threads.** It reads `phone_projects` and `phone_threads` (the
-  snapshot shape is `shared/phone-snapshot.mjs`) and writes `phone_commands`,
+  snapshot shape is `shared/phone-snapshot.mts`) and writes `phone_commands`,
   every kind the site sends today: `reply`, `new`, `snooze`, `close`, `stop`,
   `run-now`, `send-now`, `reopen`, `schedule`, `approve` (migration
   20261019000000), with the device identity and approval fingerprints the site
@@ -66,7 +66,7 @@ adds no server of its own except the alert sender.
 - **People's messages: Direct conversations only, at first.** In a shared
   project a teammate's line carries only `problem`, `progress`, `solution`,
   `blockedBy`, `blocks` and `assignee` (`whatATeammateMaySet` in
-  shared/team-rules.mjs); message text crosses only in a Direct conversation.
+  shared/team-rules.mts); message text crosses only in a Direct conversation.
   Conversations inside shared projects need that protocol changed first.
 - **Writing a message.** Not a plain insert into `lines`: row security there
   checks only `by_person` and the project, and `body` is any JSON
@@ -80,7 +80,7 @@ adds no server of its own except the alert sender.
   that likelier. Either sequence numbers are handed out one at a time per
   project, or the pull rereads a window behind its cursor. Edits made at the
   same moment get a fixed tie-breaker instead of the order they arrived in
-  (shared/work-items.mjs).
+  (shared/work-items.mts).
 - **Deadlines.** Every request has one. supabase-js takes a `fetch`, and the
   app gives it one that stops at a timeout.
   `tests/no-network-call-in-the-app-can-wait-forever` reads only `.mjs`,
@@ -118,7 +118,7 @@ reviewers sometimes test there.
 
 ## Alerts (PHONE-PLAN step 3)
 
-The first version is sent by the Mac (2026-10-23, main/phone-alerts.mjs): the
+The first version is sent by the Mac (2026-10-23, main/phone-alerts.mts): the
 phone leaves its token in `push_devices`, and the Mac's phone pass sends the
 desktop banner's arrivals to it through Expo, by the desktop's rules, with no
 words of a thread in it. It reaches the phone only while that Mac is on and
@@ -130,14 +130,14 @@ and the Edge Function, is still to build.
 - `push_outbox`: owner, a dedupe key, the thread, created and sent times, and
   where it came from. Two things write it:
   - the Mac, for its own threads, from the same arrivals that make a desktop
-    banner today (`shared/notify-rules.mjs`, and the arrivals
+    banner today (`shared/notify-rules.mts`, and the arrivals
     main/phone-link.mts fed to web push);
   - the database, when a line for a person is written: a Direct message, an
     @mention, a task given to them. These have to buzz with every Mac shut.
 - **One rule on the server decides what is sent**, for both: duplicates,
   the person's settings, whether they may see the thread, age, and whether
   they are at a computer. The desk rule stays: no buzz while they have used a
-  Mac in the last five minutes (`shared/notify-rules.mjs`), read from an
+  Mac in the last five minutes (`shared/notify-rules.mts`), read from an
   activity record each Mac renews and that expires on its own. Alerts close
   together are folded into one, as main/phone-link.mts does.
 - **History is never an alert.** Lines brought in from history get a fresh
@@ -197,8 +197,8 @@ and the Edge Function, is still to build.
   current release on 2026-10-20), TypeScript, expo-router. Metro watches
   `../shared` for the modules the app may import.
 - Logic lives in `mobile/src/lib/` with no React Native imports. Its tests sit
-  in `tests/` as `.test.mjs` files, because vitest only collects
-  `tests/**/*.test.mjs` (vitest.config.mjs) and the push hook only picks out
+  in `tests/` as `.test.mts` files, because vitest only collects
+  `tests/**/*.test.mts` (vitest.config.mjs) and the push hook only picks out
   that shape (scripts/lib/tests-the-push-runs.mjs). GitHub's workflow also
   installs `mobile/` and type-checks it.
 - EAS credentials never enter git; the public check already refuses
@@ -249,9 +249,9 @@ email or by a public link.
    for anyone (w-6633e825a7, step 3), the privacy and terms pages
    (w-7a670f07bb; today they say nothing is hosted, and they must also name
    the copy of each computer's settings the phone reads, which carries no
-   paths and no instructions, shared/phone-settings.mjs), and an installed desktop
+   paths and no instructions, shared/phone-settings.mts), and an installed desktop
    app that can sign in to the cloud (`loadCloudConfig` in
-   main/team/session.mjs answers null when packaged). Without them, a stranger
+   main/team/session.mts answers null when packaged). Without them, a stranger
    who downloads the app has nothing to connect it to.
 7. **The submission.** Name, subtitle, description and keywords; 6.9-inch
    iPhone screenshots of the real app; privacy policy and support addresses;
@@ -275,16 +275,41 @@ is asleep.
 | Guideline | What could go wrong | The answer |
 |---|---|---|
 | 5.1.1(v) deletion | The account is deleted but what the person shared stays. | Deletion takes what they wrote with it, shared or not (Sign-in and accounts). Apple tokens revoked. |
-| 1.2 user content | People message each other with no filter, report, block or contact. | A filter for objectionable text, report a message, block a person (enforced by the server, not only hidden on the phone), a contact address, and a queue of reports that somebody answers within a day. Messages going only between invited teammates is no exemption. |
+| 1.2 user content | People message each other with no filter, report, block or contact. | A filter for objectionable text, report a message, block a person (enforced by the server, not only hidden on the phone), a contact address, and a queue of reports that somebody answers within a day. Messages going only between invited teammates is no exemption. Until those exist, the `store` build profile leaves group chat out (`mobile/src/lib/store-build.ts`); TestFlight's `production` builds keep it. The Help page (phone-legal/support.html) is the contact address. |
 | 2.1 completeness | The reviewer signs in, replies, and nothing answers, because no Mac is paired or it is asleep. | A review account on a cloud plan whose threads have kits, so a reply is answered by Agentbox Cloud with no computer awake (docs/cloud/PHONE-PLAN.md step 2). The reviewer replies, gets a result and an alert, and opens its files. The notes explain the desktop app, that the cloud carries replies while the computer is shut, and where the AI notice and Delete account are. The account never expires and its threads are kept fresh (a kit lasts six days). Over 40% of unresolved issues are 2.1 (Apple, 2026); link a short film of the desktop pairing. |
-| 4.8 sign-in | Google sign-in with no equivalent private option. | Sign in with Apple, which meets the rule; Apple does not require it of every app. |
-| 5.1.1(i) privacy policy | No privacy policy, or one that says nothing is hosted. | w-7a670f07bb, linked in the listing and in Settings. |
+| 4.8 sign-in | Google sign-in with no equivalent private option. | Sign in with Apple was taken out on 2026-11-04 (8f06d530: the computer cannot sign in with it), then Google came off the iPhone on 2026-11-08, which left accounts made with Google no way in. On 2026-11-09 both came back: Google on every phone, with Sign in with Apple beside it as the private option. |
+| 5.1.1(i) privacy policy | No privacy policy, or one that says nothing is hosted. | phone-legal/privacy.html, linked in the listing and in Settings › General. It is published only once `contact`, `operator` and `governingLaw` are in the phone site's config; on 2026-11-08 they were not, so /privacy on the phone site served the web app. |
+| 5.1.1(v) deletion, reached | An account no computer has joined sees only "Waiting for your computer". | That screen opens Settings, whose General page has Delete account. |
 | 5.1.2(i) AI data | Personal data sent to third-party AI without explicit permission. | Before anything is sent, a screen names the provider (Claude by Anthropic, or Codex by OpenAI, on your own account) and what goes to it. An explicit Continue, recorded. Withdrawing it in Settings is checked when a command runs, queued ones included. The privacy policy names both. |
 | 4.2 minimum function | A repackaged website. | Native screens, lock-screen alerts, replies from the alert. |
 | 3.1 purchases | Selling or advertising the paid cloud. | The app sells nothing and shows no prices, upgrade prompts or links to buy; setup and payment happen on the computer (the founder, 2026-10-24: "we should never run into a situation where the app store tries to take a cut"). A test fails on purchase words in the phone app. Do not lean on 3.1.3(f) in the notes: it names VoIP, cloud storage, email and web hosting only. |
 | 4.5.4 alerts | The app needing alerts to work, or marketing. | It works with alerts off. An alert names its thread (the founder asked for titles, 2026-10-13 and 2026-10-23), and the privacy policy says so. No marketing alerts. |
-| 2.5.19 hidden features | A switch or flag that hides a feature from review (spelled out 2026-10-16). | Nothing in the phone app is behind a flag; what does not work yet is not in the build. |
+| 2.5.19 hidden features | A switch or flag that hides a feature from review (spelled out 2026-10-16). | Nothing in a store build can be switched on after review: the `store` profile's switch is written into the bundle at build time, and the Alpha features page is not in it. |
+| 2.2 beta | An "Alpha features" page in a store app. | Left out of the `store` build. |
 | 4.2.7 remote desktop | Read as a thin client for a computer. | The notes say it is not a screen mirror: the phone has its own screens over the person's account, and the cloud runs replies itself. |
+
+### The first submission's checks (2026-11-08, w-007ab2ab26)
+
+- Claude and Codex each read `mobile/` as an Apple reviewer. Both put 4.8
+  (Google alone), 5.1.1(v) (deletion out of reach), 1.2 (group chat) and 2.2
+  (Alpha features) first; Codex also found the AI yes shared across accounts
+  and a reset link that failed after the app restarted. All are fixed.
+- Greenlight (RevylAI/greenlight, offline, no Apple login) found no privacy
+  manifest; the app config now declares one, and it passes.
+- `npx expo-doctor`: 20 of 20 checks pass. It checks project health, not
+  review.
+- fastlane precheck needs an App Store Connect login; its rules are held by
+  `tests/the-app-store-listing-passes-apples-limits-and-prechecks-rules`.
+- Apple's own upload check runs only on a real upload.
+- The listing is `mobile/store.config.json`, pushed with `eas metadata:push`.
+  EAS cannot send the App Privacy answers or screenshots.
+- The app review board (`scripts/app-review-board.mjs`, skill
+  `app-review-board`) is the gate before every submission. It runs fresh
+  Codex and Claude reviewers and live checks, and says submit only at 90% or
+  more with every check green. Its first round found consent skipped on
+  approving a filed task, Alpha features still reachable through Search, no
+  way to report an answer, a long video that could crash the app, and AI
+  teammates as a hidden feature. All are fixed.
 
 ## Costs
 
@@ -370,6 +395,15 @@ made-up threads), not yet on a phone:
   and Review on a permission card, files and pictures in group messages (read,
   not sent), and Settings search. A page or a note an answer names still opens
   from its tile rather than reading in place under the answer.
+
+- Everything the desktop does (2026-11-08): `mobile/parity.mjs` names each
+  feature the desktop offers by name (⌘K rows, thread commands, Settings
+  pages and rows) and says where the phone has it, why it should not, or what
+  it would take. `tests/the-phone-app-has-every-desktop-feature-or-says-why-not`
+  fails when the desktop gains one the file does not place, and its count
+  still to do only goes down. `node scripts/phone-parity.mjs` lists what is
+  left. The daily product loop builds the next one and has its testers try
+  what reached the phone that week (.claude/skills/product-loop).
 
 Tests: tests/the-phone-app-*.test.mjs pin the tabs, the thread and its
 commands, sign-in and the kept session, the request deadline and the

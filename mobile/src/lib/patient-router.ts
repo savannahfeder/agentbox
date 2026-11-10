@@ -8,6 +8,8 @@ const ASKS = new Set(['canGoBack', 'canDismiss']);
 
 type Options = { later?: (f: () => void) => unknown; giveUpMs?: number; now?: () => number; warn?: (msg: string) => void };
 
+type Methods = Record<string, (...args: unknown[]) => unknown>;
+
 const notReady = (e: unknown) => e instanceof Error && e.message === NOT_READY;
 
 export function patientRouter<R extends object>(real: R, opts: Options = {}): R {
@@ -21,7 +23,7 @@ export function patientRouter<R extends object>(real: R, opts: Options = {}): R 
     const p = pending;
     if (!p) return;
     try {
-      (real as any)[p.name](...p.args);
+      (real as Methods)[p.name](...p.args);
       pending = null;
     } catch (e) {
       if (!notReady(e)) { pending = null; throw e; }
@@ -32,11 +34,11 @@ export function patientRouter<R extends object>(real: R, opts: Options = {}): R 
 
   return new Proxy(real, {
     get(target, name) {
-      const value = (target as any)[name];
+      const value = (target as Record<string | symbol, unknown>)[name];
       if (typeof value !== 'function' || typeof name !== 'string') return value;
       return (...args: unknown[]) => {
         try {
-          const out = (target as any)[name](...args);
+          const out = (target as Methods)[name](...args);
           if (!ASKS.has(name)) pending = null;
           return out;
         } catch (e) {

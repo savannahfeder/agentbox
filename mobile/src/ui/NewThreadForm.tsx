@@ -4,25 +4,27 @@
 // thread page wears it whole; the empty inbox draws it open on the page, as
 // the web app does (Pages.tsx `InboxClear`).
 import { router } from '../lib/router';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { Platform, Pressable, TextInput, View } from 'react-native';
 import { readRule, repeatPresets } from '../../../renderer/src/format';
 import { engineModelLabel } from '../../../renderer/src/models';
-import { ruleLabel } from '../../../shared/repeats.mjs';
+import { ruleLabel } from '../../../shared/repeats.mts';
 import { priorityIdOf, priorityLabelOf, priorityValueOf } from '../../../renderer/src/priority';
-import { agentChoices, agentWordFor, autoOffered, laterHint, momentFromWords, mondayMorning, projectSwatch, tomorrowMorning, type Harness } from '../../../renderer/src/threads/composer-rules';
+import { agentChoices, agentWordFor, autoOffered, laterHint, momentFromWords, mondayIsTomorrow, mondayMorning, projectSwatch, tomorrowMorning, type Harness } from '../../../renderer/src/threads/composer-rules';
 import { splitSlug } from '../../../renderer/src/phone-rows';
-import { AUTO_LABEL } from '../../../shared/auto-route.mjs';
+import { AUTO_LABEL } from '../../../shared/auto-route.mts';
 import type { Choices } from '../lib/actions';
-import { newThreadChoices, onceAtATime, openingChoices, openingEngine, openingFor, openingRecipient, pickEffort, pickEngine, pickModel, pickProject, pickRecipient, projectNow, type Recipient } from '../lib/compose';
+import { newThreadChoices, onceAtATime, openingChoices, openingEngine, openingFor, openingRecipient, pickEffort, pickModel, projectNow, type Recipient } from '../lib/compose';
 import { AutoMark, TeammateMark } from './Teammates';
 import { roleOf } from '../lib/teammates';
 import type { Teammate } from '../../../renderer/src/types';
-import { useDraft } from '../lib/drafts';
+import { useDraft, type Draft } from '../lib/drafts';
 import { appStore } from '../platform/persist';
 import { useCloud } from '../state/cloud';
 import { useComputerAgents } from '../state/computer-agents';
+import { useSendWhenOnline } from '../state/send-when-online';
 import { AttachSheet, Attached } from './Attach';
+import { withPicked } from '../lib/attach';
 import { DictationProblem, Listening, MicButton, useDictation } from './Dictation';
 import { Caret, Clip, Clock, Repeat } from './icons';
 import { TimeBox, TypingSheet } from './Later';
@@ -41,26 +43,37 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** Everything the form holds, and its send; `sent` runs once a thread has gone. */
-export function useNewThread(sent: () => void) {
+/** Everything the form holds, and its send; `sent` runs once a thread has gone, `reopen` once its Undo has put the draft back. */
+export function useNewThread(sent: () => void, reopen?: () => void) {
   const c = useCloud();
   const projects = c.view.products;
-  // Her words, files and priority outlive the page (lib/drafts.ts); the
-  // project, model and level are the ones she last picked (lib/compose.ts).
+  // Your words, files and priority outlive the page (lib/drafts.ts); the
+  // model and level are the ones last picked, the To and project this thread's own (lib/compose.ts).
   const draft = useDraft('new', appStore);
   const [opening] = useState(() => openingChoices(projects, appStore));
   const [picked, setPicked] = useState<string | null>(null);
-  const product = projectNow(projects, picked, appStore) ?? '';
+  const product = projectNow(projects, picked) ?? '';
   const agents = useComputerAgents();
   const codex = { codexModels: agents.codexModels, codexDefault: agents.codexDefault };
   const offered = agentChoices(agents.engines);
   const [pickedEngine, setPickedEngine] = useState<Harness | null>(null);
-  const engine: Harness = offered.some((e) => e.id === pickedEngine) ? (pickedEngine as Harness) : openingEngine(appStore, agents.engines);
+  const engine: Harness = offered.some((e) => e.id === pickedEngine) ? (pickedEngine as Harness) : openingEngine(agents.engines, agents.workspace);
   // Each agent's model and level kept apart, as the site's card keeps them.
   const [chosen, setChosen] = useState<Partial<Record<Harness, { model: string; effort: string | null }>>>(() => ({ claude: { model: opening.model, effort: opening.effort } }));
   const { model, effort } = chosen[engine] ?? openingFor(appStore, engine, agents.codexDefault);
   const choose = (next: Partial<{ model: string; effort: string | null }>) => setChosen((was) => ({ ...was, [engine]: { model, effort, ...next } }));
   const [sheet, setSheet] = useState<'to' | 'model' | 'project' | 'priority' | 'attach' | 'later' | null>(null);
+  const box = useRef<ComponentRef<typeof TextInput>>(null);
+  const lastSheet = useRef(sheet);
+  // A picked project, agent, model or priority hands the cursor back to the
+  // message, once the sheet's fade is over: until then the sheet holds focus.
+  useEffect(() => {
+    const was = lastSheet.current;
+    lastSheet.current = sheet;
+    if (sheet !== null || !was || was === 'later') return;
+    const t = setTimeout(() => box.current?.focus(), 350);
+    return () => clearTimeout(t);
+  }, [sheet]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const projectName = useMemo(() => projects.find((p) => p.slug === product)?.name ?? '', [projects, product]);
@@ -69,12 +82,12 @@ export function useNewThread(sent: () => void) {
   const mates = useMemo(() => (c.team?.view.list ?? []).filter((t) => t.status === 'active'), [c.team]);
   const reach = !!c.team;
   const [pickedTo, setPickedTo] = useState<Recipient | null>(null);
-  const recipient = pickedTo ?? openingRecipient(mates, reach, appStore);
+  const recipient = pickedTo ?? openingRecipient(mates, reach);
   const autoHere = autoOffered(mates, reach);
   const onAuto = recipient.auto && autoHere && !recipient.mate;
   const mate: Teammate | 'new' | null = reach && recipient.mate === 'new' ? 'new' : mates.find((m) => m.id === recipient.mate) ?? null;
   const toWord = mate === 'new' ? 'Someone new' : mate ? mate.name : onAuto ? 'Auto' : null;
-  const chooseTo = (r: Recipient) => { setPickedTo(r); pickRecipient(appStore, r); };
+  const chooseTo = (r: Recipient) => setPickedTo(r);
   const canSend = (!!draft.text.trim() || draft.files.length > 0) && !!product && !busy && (!mate || !!draft.text.trim());
 
   // A teammate takes your words in your chat with it, not as a thread.
@@ -88,14 +101,13 @@ export function useNewThread(sent: () => void) {
       c.say('Your new teammate is on its way. It asks you what it needs in Chats.');
     } else {
       await c.askTeammate('post', { text: draft.text, to: [mate.id], fresh: true });
-      c.say(`Sent to ${mate.name}`);
+      c.say(mate.paused ? `Sent to ${mate.name}, who is paused. It waits until you resume it in Chats.` : `Sent to ${mate.name}`);
     }
   };
 
   const sendNow = async (later: Choices = {}) => {
     if (!canSend) return;
     setSheet(null); setBusy(true); setError(null);
-    pickProject(appStore, product);
     try {
       if (mate) {
         await sendToMate();
@@ -105,24 +117,35 @@ export function useNewThread(sent: () => void) {
       }
       const saved = await c.attach(product, draft.files);
       const harness = newThreadChoices({ priority: draft.priority, engine, model, effort, engineCount: agents.engines.length, ...codex });
-      await c.send({ kind: 'new', product, to: projectName, text: draft.text, saved, choices: { ...harness, ...later, ...(onAuto ? { labels: [AUTO_LABEL] } : {}) } }, null);
+      // Undo withdraws the thread, so its words and files come back to the box.
+      // Taken from the page, not the store, which drops pictures too big to keep.
+      const sending: Draft = { text: draft.text, files: draft.files, priority: draft.priority };
+      const undone = () => { if (draft.restore(sending)) reopen?.(); };
+      await c.send({ kind: 'new', product, to: projectName, text: draft.text, saved, choices: { ...harness, ...later, ...(onAuto ? { labels: [AUTO_LABEL] } : {}) } }, null, { undone });
       // The draft goes only once the thread has: a failed send keeps every word on the page.
       draft.take();
+      offline.clear();
       sent();
-    } catch (err) { setError(`Not sent: ${String((err as Error)?.message ?? err)}`); } finally { setBusy(false); }
+    } catch (err) { setError(offline.failed(String((err as Error)?.message ?? err))); } finally { setBusy(false); }
   };
   // Busy is drawn a frame late; two quick presses must still send once.
   const latest = useRef(sendNow);
   latest.current = sendNow;
-  const [send] = useState(() => onceAtATime((later?: Choices) => latest.current(later)));
+  const lastLater = useRef<Choices | undefined>(undefined);
+  const [sendOnce] = useState(() => onceAtATime((later?: Choices) => latest.current(later)));
+  const offline = useSendWhenOnline(() => {
+    if (!canSend) { offline.clear(); setError(null); return; }
+    void sendOnce(lastLater.current);
+  });
+  const send = (later?: Choices) => { offline.clear(); lastLater.current = later; return sendOnce(later); };
   const talk = useDictation(draft, () => void send());
   return {
-    draft, product, projectName, projects, model, effort, sheet, setSheet, busy, error, setError, canSend, send, talk,
+    draft, box, product, projectName, projects, model, effort, sheet, setSheet, busy, error, setError, canSend, send, talk,
     agents, offered, engine, codex, mates, reach, autoHere, onAuto, mate, toWord,
-    pickProject: (slug: string) => { setPicked(slug); pickProject(appStore, slug); },
+    pickProject: (slug: string) => setPicked(slug),
     pickAuto: () => chooseTo({ to: 'agent', mate: null, auto: true }),
     pickMate: (id: string) => chooseTo({ to: 'agent', mate: id, auto: false }),
-    pickEngine: (id: Harness) => { chooseTo({ to: 'agent', mate: null, auto: false }); setPickedEngine(id); pickEngine(appStore, id); },
+    pickEngine: (id: Harness) => { chooseTo({ to: 'agent', mate: null, auto: false }); setPickedEngine(id); },
     pickModel: (id: string) => { choose({ model: id }); pickModel(appStore, id, engine, agents.codexDefault); },
     pickEffort: (id: string) => choose({ effort: pickEffort(appStore, effort, id, engine) }),
   };
@@ -151,7 +174,7 @@ export function SendButtons({ form }: { form: NewThread }) {
 
 /** The four rows and the message. `inline` is the empty inbox's: a shorter box that does not take the keyboard on its own. */
 export function NewThreadFields({ form, inline = false, onFocus, onBlur }: { form: NewThread; inline?: boolean; onFocus?: () => void; onBlur?: () => void }) {
-  const { draft, talk, product, projectName, model, setSheet, error, agents, offered, engine, codex, mate, onAuto, toWord } = form;
+  const { draft, box, talk, product, projectName, model, setSheet, error, agents, offered, engine, codex, mate, onAuto, toWord } = form;
   // A teammate keeps its own model and project; someone new needs only the project it works in.
   const toMate = !!mate && mate !== 'new';
   return (
@@ -161,7 +184,8 @@ export function NewThreadFields({ form, inline = false, onFocus, onBlur }: { for
           ? (
             <Pressable onPress={() => setSheet('to')} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               {mate && mate !== 'new' ? <TeammateMark t={mate} /> : mate === 'new' ? <TeammateMark t={null} /> : onAuto ? <AutoMark /> : null}
-              <Pickable style={{ fontSize: 15 }} onPress={() => setSheet('to')}>{toWord ?? agentWordFor(agents.engines, engine)}</Pickable>
+              {/* The row is the button; a second one inside it is a button in a button. */}
+              <T style={{ fontSize: 15, textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: color.faint }}>{toWord ?? agentWordFor(agents.engines, engine)}</T>
             </Pressable>
           )
           : <T style={{ fontSize: 15 }}>Agent</T>}
@@ -184,7 +208,7 @@ export function NewThreadFields({ form, inline = false, onFocus, onBlur }: { for
         </Field>
       )}
       {/* Typing stops dictation with the words kept; tapping the box does not (web-speech.ts). */}
-      <TextInput multiline autoFocus={!inline} value={draft.text} placeholder={toMate ? `Message ${(mate as Teammate).name}` : 'What do you need done?'} placeholderTextColor={color.faint}
+      <TextInput ref={box} multiline autoFocus={!inline} value={draft.text} placeholder={toMate ? `Message ${(mate as Teammate).name}` : 'What do you need done?'} placeholderTextColor={color.faint}
         onChangeText={(t) => { if (talk.active()) talk.leave(); draft.setText(t); }} onFocus={onFocus} onBlur={onBlur}
         style={[{ flex: inline ? undefined : 1, minHeight: inline ? 120 : 160, padding: 16, fontFamily: font.regular, fontSize: 16, lineHeight: 24.8, color: color.text, textAlignVertical: 'top' }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
       <View style={{ paddingHorizontal: 16, paddingBottom: draft.files.length || error || draft.dropped ? 14 : 0, gap: 10 }}>
@@ -240,7 +264,7 @@ export function NewThreadSheets({ form, now }: { form: NewThread; now: number })
         {offered.map((a) => <SheetRow key={a.id} label={a.label} on={!form.onAuto && !form.mate && a.id === engine} onPress={() => { form.pickEngine(a.id); setSheet(null); }} />)}
         {form.reach && <><SheetSep /><SheetHead>Teammates</SheetHead></>}
         {form.mates.map((t) => (
-          <SheetRow key={t.id} label={t.name} lead={<TeammateMark t={t} />} aside={t.primary ? 'Primary' : roleOf(t) ?? undefined}
+          <SheetRow key={t.id} label={t.name} lead={<TeammateMark t={t} />} aside={t.paused ? 'Paused' : t.primary ? 'Primary' : roleOf(t) ?? undefined}
             on={form.mate !== 'new' && form.mate?.id === t.id} onPress={() => { form.pickMate(t.id); setSheet(null); }} />
         ))}
         {form.reach && <SheetRow label="Someone new" lead={<TeammateMark t={null} />} aside="makes a teammate for this" on={form.mate === 'new'} onPress={() => { form.pickMate('new'); setSheet(null); }} />}
@@ -248,7 +272,7 @@ export function NewThreadSheets({ form, now }: { form: NewThread; now: number })
       <ModelSheet open={sheet === 'model'} close={() => setSheet(null)} model={model} effort={effort} engine={engine} codex={codex}
         pickModel={form.pickModel} pickEffort={form.pickEffort} />
       <PrioritySheet open={sheet === 'priority'} close={() => setSheet(null)} value={priorityValueOf(draft.priority ?? 'medium')} pick={(v) => draft.setPriority(priorityIdOf(v))} />
-      <AttachSheet open={sheet === 'attach'} close={() => setSheet(null)} add={(more) => draft.setFiles((f) => [...f, ...more])} fail={setError} />
+      <AttachSheet open={sheet === 'attach'} close={() => setSheet(null)} add={(more) => draft.setFiles((f) => withPicked(f, more))} fail={setError} />
       <Sheet open={sheet === 'project'} close={() => setSheet(null)}>
         <SheetHead>Project</SheetHead>
         {projects.map((p) => <SheetRow key={p.slug} label={p.name} on={p.slug === product} lead={<Swatch slug={p.slug} />} onPress={() => { form.pickProject(p.slug); setSheet(null); }} />)}
@@ -258,7 +282,7 @@ export function NewThreadSheets({ form, now }: { form: NewThread; now: number })
         <SheetHead>Send later</SheetHead>
         <SheetRow label="Add it to Later" lead={<Clock />} onPress={() => void send({ start: 'later' })} />
         <SheetRow label="Tomorrow morning" lead={<Clock />} aside={laterHint(tomorrowMorning(now))} onPress={() => void send({ runAt: tomorrowMorning(now) })} />
-        <SheetRow label="Monday morning" lead={<Clock />} aside={laterHint(mondayMorning(now))} onPress={() => void send({ runAt: mondayMorning(now) })} />
+        {!mondayIsTomorrow(now) && <SheetRow label="Monday morning" lead={<Clock />} aside={laterHint(mondayMorning(now))} onPress={() => void send({ runAt: mondayMorning(now) })} />}
         {/* Repeat it, the desktop's own presets (format.ts `repeatPresets`): a rule whose runs are the threads. */}
         <SheetSep />
         {repeatPresets(now).flatMap((r) => (r.rule ? [r.rule] : []).map((rule) => (

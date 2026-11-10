@@ -12,8 +12,9 @@ import type { TabView } from '../threads/Pages';
 /** `new`, a teammate's id, or `sheet:`, `log:`, `about:` or `book:` one of its pages; 'team' opens the first chat. */
 export type TeammatesOpen = string | null;
 
-export function useTeammates({ items = [], view: stored, asking = [], running = [], queued = [], products, engines, models, me, mePic = null, onEnter, onOpenThread, onOpenFile, tabOf, onChanged }: {
+export function useTeammates({ items = [], view: stored, asking = [], running = [], queued = [], products, engines, models, me, mePic = null, onEnter, onOpenThread, onOpenFile, tabOf, onChanged, onNewProject }: {
   onOpenFile?: (product: string, src: string) => void;
+  onNewProject?: () => void;
   /** Every thread the app holds, so what a teammate sent you is drawn as its inbox row. */
   items?: WorkItem[];
   models?: TeammateModels;
@@ -61,7 +62,7 @@ export function useTeammates({ items = [], view: stored, asking = [], running = 
   const mate = shown && shown.kind !== 'new' ? team.find((t) => t.id === shown.id) ?? null : null;
   const page: ReactNode = shownOpen && view
     ? <TeammatesPage view={view} items={items} open={shownOpen} products={products} engines={engines} me={me}
-        onOpen={go} onOpenThread={onOpenThread} onOpenFile={onOpenFile} tabOf={tabOf} onChanged={onChanged} sessions={sessions} queued={queued} models={models} mePic={mePic} />
+        onOpen={go} onOpenThread={onOpenThread} onOpenFile={onOpenFile} tabOf={tabOf} onChanged={onChanged} sessions={sessions} queued={queued} models={models} mePic={mePic} onNewProject={onNewProject} />
     : null;
   const call = async (op: string, args: Record<string, unknown>) => { const r = await api.teammates(op, args); if (r.ok) onChanged(); return r.ok; };
   return {

@@ -69,7 +69,7 @@
   font: inherit; color: var(--text);
   background: none; border: 0; padding: 0; margin: 0; cursor: pointer;
 }
-.tc-word > .tm-av, .tc-word > .agent-face { margin-left: -27px; margin-right: 9px; position: relative; top: -1px; }
+.tc-word > .tm-av, .tc-word > .agent-face, .tc-word > .tq { margin-left: -27px; margin-right: 9px; position: relative; top: -1px; }
 .tc-word-text {
   text-decoration: underline dotted var(--line-strong);
   text-decoration-thickness: 1px;
@@ -110,6 +110,7 @@
 }
 .tc-chip:hover, .tc-chip.open, .tc-chip:focus-visible { color: var(--text); border-color: var(--line-strong); outline: none; }
 .tc-chip svg { color: var(--text-faint); flex: none; }
+.tc-chip-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tc-chip-name { display: inline-block; max-width: 200px; overflow: hidden; white-space: nowrap; }
 .tc-chip-name.cut { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
 .tc-repeat-note { display: flex; align-items: center; gap: 6px; }
@@ -360,7 +361,7 @@
   --send-fill: color-mix(in srgb, var(--text) 15%, transparent);
   --send-split: color-mix(in srgb, var(--bg) 55%, transparent);
 }
-.compose-sentence.dock-bar { gap: 8px; padding: 12px 12px 12px 16px; }
+.compose-sentence.dock-bar { gap: 8px; padding: 12px 16px; }
 .dock-chips { flex: 1; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 13px; }
 /* A repeat set in the reply is the one picker still drawn as a word; here it wears the chip. */
 .dock-chips .compose-word {
@@ -394,5 +395,6 @@
 .dock-send-pair > .dock-send:hover:not(:disabled), .dock-send-pair .dock-send-later:hover, .dock-send-pair .dock-send-later[aria-expanded='true'] { filter: brightness(1.15); background: var(--send-fill); }
 .dock-send-pair > .dock-send:focus-visible, .dock-send-pair .dock-send-later:focus-visible { outline: 1px solid var(--text); outline-offset: 1px; }
 .compose-sentence .dock-send-pair > .dock-send:disabled, .compose-sentence .dock-send-pair > .dock-send:disabled:hover { opacity: 0.45; background: var(--send-fill); }
+.dock-send-arrow { display: none; }
 .dock-send-pair .dock-send kbd { font: 11px var(--mono); color: inherit; opacity: 0.75; background: none; border: 0; padding: 0; margin: 0; line-height: 1; }
 .reply-later { position: relative; display: inline-flex; }

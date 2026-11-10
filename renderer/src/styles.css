@@ -15,7 +15,7 @@
    defined in BOTH themes. A raw rgba(255,255,255,x) wash is invisible on a
    light ground and a raw black shadow is a smudge on one, so the washes and
    shadows are tokens too (--wash, --wash-strong, --shadow-*).
-   tests/theme-tokens.test.mjs fails if a token is defined in only one theme,
+   tests/theme-tokens.test.mts fails if a token is defined in only one theme,
    because that failure has no symptom until you are staring at a control that
    is not there. --line-strong was that bug: used in nine places, defined in
    none, so every border that named it was an invalid declaration the browser
@@ -70,7 +70,7 @@
      the app's own fade taken one step further, not a new colour. Then the
      chosen option: the heading is left exactly as it is and the rows drop two steps to get out
      of its way. NEVER TUNE THIS BY EYE. `scripts/shot-sidebar-agents-four.mjs`
-     walks it and `tests/the-sidebar-agents.test.mjs` measures what it lands on.
+     walks it and `tests/the-sidebar-agents.test.mts` measures what it lands on.
   */
   --agent-ink: #949bb8;
   --line: rgba(17, 25, 48, 0.065);
@@ -331,7 +331,7 @@
      swatch cannot wear the shared glass and its line; this is the film at the
      alpha the theme's own token block was measured at. A token rather than a
      literal because the rules below the token blocks may not carry a bare
-     white, which tests/theme-tokens.test.mjs enforces. */
+     white, which tests/theme-tokens.test.mts enforces. */
   --look-glass-haze: rgba(255, 255, 255, 0.055);
   /* The three light hazes' tiles. Each carries its own because a card on paper
      has to lift off a ground that is already near white, so these are 0.41,
@@ -355,7 +355,7 @@
    produced it, because `setLook` is the only writer of either key and it writes
    both at once. This makes it impossible rather than merely unreached: any
    window wearing a picture takes the whole dark token set first, and the
-   picture's own block layers over that. tests/theme-tokens.test.mjs holds it.
+   picture's own block layers over that. tests/theme-tokens.test.mts holds it.
    `:not([data-theme="light"])` IS NOT A HOLE IN THAT, IT IS THE SAME RULE SAID
    PROPERLY, and it is what lets a picture be light at all. The bare
    `:root[data-skin]` was written when every picture was a photograph, where the
@@ -380,7 +380,7 @@
    `--skin-image` computed to `none` and `--skin-pane` to `#2e3136`, which is
    `--surface`. `:where` has zero specificity, so the selector is (0,2,0) again
    and the per picture blocks are back to being later-and-equal.
-   tests/theme-tokens.test.mjs measures the specificity now rather than trusting
+   tests/theme-tokens.test.mts measures the specificity now rather than trusting
    the shape.
 */
 :root[data-theme="dark"],
@@ -399,7 +399,7 @@
   --find-current: var(--accent);
   --find-current-ink: #ffffff;
   /* The same answer light gives, and said again here because every token this
-     app has is answered in both blocks (tests/theme-tokens.test.mjs). What
+     app has is answered in both blocks (tests/theme-tokens.test.mts). What
      moves is the picture themes, one block down.
   */
   --control-face: var(--surface);
@@ -417,7 +417,7 @@
      the same direction and stops where its heading-to-row distance meets
      lake's: 0.755 of the step, 1.326 against lake's 1.336, which is as close as
      8-bit hex gets while holding hue and chroma. Against the card the row goes
-     3.25 to 3.57. tests/the-sidebar-agents.test.mjs measures that equality, so
+     3.25 to 3.57. tests/the-sidebar-agents.test.mts measures that equality, so
      this cannot be nudged by eye without the test saying so.
   */
   --agent-ink: #818690;
@@ -501,7 +501,7 @@
      with orange accents. This block is the dark set UNDER the launch film's
      look rather than a look of its own, and it still carried the blue the app
      wore before that, so anything painting dark without the picture got it.
-     tests/every-theme-wears-the-one-orange.test.mjs reads every declaration. */
+     tests/every-theme-wears-the-one-orange.test.mts reads every declaration. */
   --accent: #ee6018;
   /* The logo's own two colours, the same as light's: the logo does not theme. */
   --logo-dot: #5f5e5c;
@@ -640,7 +640,7 @@
      swatch cannot wear the shared glass and its line; this is the film at the
      alpha the theme's own token block was measured at. A token rather than a
      literal because the rules below the token blocks may not carry a bare
-     white, which tests/theme-tokens.test.mjs enforces. */
+     white, which tests/theme-tokens.test.mts enforces. */
   --look-glass-haze: rgba(255, 255, 255, 0.055);
   /* The three light hazes' tiles. Each carries its own because a card on paper
      has to lift off a ground that is already near white, so these are 0.41,
@@ -686,7 +686,7 @@
    #5C5855, which is 2.7:1 on the panel: fine at 18px on a 1080p frame, too
    faint at 11px in a window. The three greys here are the film's #8A8380
    family walked up to 7.5, 4.8 and 3.3 to 1 on #101010, one step apart by the
-   ladder tests/the-note-she-asked-us-to-clean-up.test.mjs holds.
+   ladder tests/the-note-she-asked-us-to-clean-up.test.mts holds.
 
    THE GROUND IS ASH, NOT THE FILM'S NEAR BLACK (w-fbcb316f08, option 2, Ash).
    A near black theme is hard to read with any sun on the screen, and most dark
@@ -1274,7 +1274,7 @@ body {
    holds only the select box, which is invisible at rest. So the gutter costs
    the text nothing and the checkbox still gets a comfortable hit area away from
    the card's edge. --text-x is --gutter plus the box plus the gap;
-   tests/list-alignment.test.mjs pins that arithmetic.
+   tests/list-alignment.test.mts pins that arithmetic.
 */
 .list { --gutter: 8px; --text-x: 32px; --row-r: 24px; }
 
@@ -2081,7 +2081,8 @@ body {
    button shrinks to what is in it and the box would be 4:3 of nothing.
    `auto 4 / 3` takes the picture's own shape the moment its first bytes give
    it. Four :root outweigh the phone's own picture rules in phone.css. */
-:root:root:root:root .inline-image-open:has(> .inline-image[data-phone-img="loading"]) { width: 100%; }
+:root:root:root:root .inline-image-open:has(> .inline-image[data-phone-img="loading"]),
+:root:root:root:root .inline-image-open:has(> .inline-image.arriving) { width: 100%; }
 :root:root:root:root .inline-image[data-phone-img="loading"],
 :root:root:root:root .doc-picture[data-phone-img="loading"] {
   display: block; width: 100%; max-width: 100%; height: auto; aspect-ratio: auto 4 / 3;
@@ -2314,9 +2315,14 @@ body {
    card had stopped earning its keep. See "ONE SURFACE" below for what replaced
    it and why. The list is untouched and still a card.
 */
+/* `clip`, not `hidden`: a hidden box can still be scrolled by code, and
+   anything poking out below the pane let a centred search match slide the
+   whole thread up, reply box and all. The `:is` outranks the team pages'
+   own `overflow: hidden` when a thread is open inside one. */
 .list-pane.pinned {
-  overflow: hidden; display: flex; flex-direction: column;
+  display: flex; flex-direction: column;
 }
+.list-pane.pinned:is(.pinned, .rm-open, .tq-open, .pl-open) { overflow: clip; }
 
 /* Design C, chosen 2026-08-13: taking the card away works best and also solves
    the full screen problem, while the inbox keeps its own UI and highlight. So
@@ -2641,7 +2647,7 @@ body {
 .approval-card {
   position: relative;
   background: var(--bg-raised); border: 1px solid var(--line-strong); border-radius: var(--radius);
-  box-shadow: var(--shadow-lg); padding: 12px 14px;
+  box-shadow: var(--shadow-lg); padding: 14px 16px;
 }
 /* THE CARD WAS THE LAST OPAQUE SLAB IN A THEMED WINDOW (w-34b7b861b6,
    2026-09-24). Every other floating surface in the app already wears the same
@@ -2690,92 +2696,34 @@ body {
   -webkit-backdrop-filter: blur(22px) saturate(1.25);
   backdrop-filter: blur(22px) saturate(1.25);
 }
-/* FOUR BLOCKS, IN A DELIBERATE ORDER (2026-09-24). The most important thing to
-   see is what the command will do; the chat and its folder are lower in the
-   hierarchy, and too many stacked lines of text made the card hard to process.
-
-   1. .approval-lede   what will happen, in words
-   2. .approval-cmd    the command, which is the part that has to be exact
-   3. .approval-meta   the chat and the folder, quiet, on one line
-   4. .approval-actions
-
-   The card had six. Two came out by merging: the folder joined the verb on the
-   meta line, and "<Product> asks to run" stopped being a line of its own and
-   became the lede's fallback for the case where there is no description. */
-
-/* 1. THE SENTENCE READ FIRST, and the only thing on the card set at
-   reading weight. It is the worker's own description of what the command does,
-   so the user is never parsing shell to find out what is being agreed to.
-
-   13px / 560 IS "QUIET", AND IT IS SETTLED. It shipped at 14 / 620 for one
-   round and the header was a bit too bold and possibly too large. Four paths
-   were drawn in the real app and option 1, Quiet, was picked (2026-09-24).
-
-   Two points of size and sixty of weight sounds like nothing and is not: at 13
-   this sentence fits on ONE line in a 440px card where at 14 it wrapped onto
-   two, so the pick took a whole line off the card as well as the shout.
-
-   THE OTHER FOUR ARE GONE AND MUST NOT COME BACK, nor may the
-   `data-approval-look` attribute that switched between them. Their CSS is in
-   decisions.md under this date, verbatim, if anyone ever needs to read what was
-   rejected. Do not re-offer them: a card that is still switchable is a card
-   that has to be decided about again. */
-.approval-lede {
-  display: flex; align-items: baseline; gap: 10px;
-  font-size: 13px; font-weight: 560; line-height: 1.4; color: var(--text);
-  margin-bottom: 9px;
+/* THE CARD, TOP TO BOTTOM (w-78be9e67e8, picked 2026-11-08 from drawings on
+   the real app): which agent and thread is asking, what it wants in words,
+   the exact thing being authorised, where, then Allow and Deny with their keys.
+   The thread line is how you get into the agent, so it is quiet; it opens the
+   thread BEHIND the card (z-index 90) without answering anything. */
+.approval-from {
+  display: flex; align-items: baseline; gap: 8px; min-width: 0;
+  margin-bottom: 4px; font-size: 12px; color: var(--text-dim);
 }
-.approval-lede-text { flex: 1 1 auto; min-width: 0; }
-
-
-/* `flex: none` and `nowrap` because it shares the lede's line, and the sentence
-   beside it will wrap to give it room. Without them the count is the thing that
-   breaks, and "+2 / waiting" over two lines pushed the card taller than the ask
-   inside it. */
+.approval-from > .approval-task-title { flex: 0 1 auto; }
+.approval-lede {
+  font-size: 15px; font-weight: 560; line-height: 1.35; color: var(--text);
+  margin-bottom: 10px; overflow-wrap: anywhere;
+}
 .approval-count {
   margin-left: auto; font-size: 11.5px; font-weight: 400;
   color: var(--text-faint); flex: none; white-space: nowrap;
 }
-/* 3. THE TWO THINGS AT THE BOTTOM. One line, both quiet, the folder in
-   mono because it is a path and the chat in prose because it is a sentence.
-   They sit at opposite ends rather than in a list, so neither reads as the
-   continuation of the other. */
-.approval-meta {
-  display: flex; align-items: baseline; gap: 12px;
-  margin: -2px 0 10px; font-size: 11.5px; min-width: 0;
-}
-/* THE FOLDER TRUNCATES LAST, AND THAT IS NOT A TIE-BREAK. Both halves of this
-   line ellipsise, and the first build let them shrink together: the chat title
-   is a sentence somebody typed and can be any length, so it took the room and
-   the folder came out as "in /tm…", which answers nothing. A path has to be
-   read whole or not at all. `cat auth.json` in a scratch clone and in a home
-   directory are the same eleven characters and two different questions, and
-   that difference is the entire reason the folder is on the card.
-
-   So this one sizes to its content up to a cap, and the chat beside it has a
-   zero basis and gives ground first. The cap is there for the genuinely long
-   path, which would otherwise leave no room for the chat at all. */
 .approval-where {
-  font-family: var(--mono); color: var(--text-faint);
-  flex: 0 1 auto; min-width: 0; max-width: 62%;
+  font-size: 12px; color: var(--text-faint); margin: -2px 0 12px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-/* WHICH AGENT IS ASKING, and the way into it. One card could not be told from
-   the next: when a command comes up, the agent it belongs to has to be visible,
-   with a clear way to go into it.
-
-   IT IS DOWN HERE AND NOT AT THE TOP, which was the correction the round after
-   that one: the chat is how you get to the agent, not what you are
-   deciding about. The arrow is the only chrome it gets. A bordered control on a
-   card that already has Allow and Deny would compete with them for the press
-   that actually has to be made. Clicking opens that row BEHIND the card: the
-   approvals layer is fixed and above everything (z-index 90), so the user can read
-   what the agent is doing and answer without losing the ask. */
+.approval-add { color: rgb(110, 205, 140); }
+.approval-del { color: rgb(235, 120, 110); }
 .approval-task {
-  display: flex; align-items: baseline; justify-content: flex-end; gap: 5px;
-  margin-left: auto; flex: 1 1 0; min-width: 0;
-  font: inherit; font-size: 11.5px; color: var(--text-dim);
-  text-align: right; background: none; border: 0; padding: 0;
+  display: flex; align-items: baseline; gap: 5px; flex: 0 1 auto; min-width: 0;
+  font: inherit; font-size: 12px; color: var(--text-dim);
+  text-align: left; background: none; border: 0; padding: 0;
   cursor: pointer; transition: color 0.14s;
 }
 .approval-task:hover { color: var(--text); }
@@ -2786,19 +2734,30 @@ body {
 .approval-task:hover .approval-task-title { text-decoration: underline; text-underline-offset: 3px; }
 .approval-task-go { font-size: 10.5px; color: var(--text-faint); flex: none; }
 .approval-task:hover .approval-task-go { color: var(--text); }
-/* WHAT ELSE THE YES OPENS. Rare, and louder than the meta line on purpose:
-   these two widen what the command reaches, so they belong with it rather than
-   with the context underneath. */
+/* WHAT ELSE THE YES OPENS. Rare, and louder than the folder on purpose:
+   these two widen what the command reaches, so they belong with it. */
 .approval-opens {
-  font-size: 11.5px; color: var(--text-dim);
-  margin: -4px 0 10px; line-height: 1.45; word-break: break-word;
+  font-size: 12px; color: var(--text-dim);
+  margin: -2px 0 10px; line-height: 1.45; overflow-wrap: anywhere;
 }
+/* Long lines wrap between words where they can, and mid-word only where they must. */
 .approval-cmd {
-  font-family: var(--mono); font-size: 12px; line-height: 1.5; color: var(--text);
-  background: var(--bg); border-radius: var(--radius); padding: 9px 11px; margin-bottom: 10px;
-  white-space: pre-wrap; word-break: break-all; max-height: min(45vh, 360px); overflow-y: auto;
+  font-family: var(--mono); font-size: 12px; line-height: 1.55; color: var(--text);
+  background: var(--bg); border-radius: var(--radius); padding: 9px 11px; margin: 0 0 10px;
+  white-space: pre-wrap; overflow-wrap: anywhere; max-height: min(45vh, 360px); overflow-y: auto;
   user-select: text;
 }
+.approval-diff { padding: 6px 0; }
+.approval-dl { display: flex; gap: 8px; padding: 0 11px; }
+.approval-dl > span:last-child { flex: 1; min-width: 0; }
+.approval-dl.add { background: rgba(80, 200, 120, 0.1); }
+.approval-dl.del { background: rgba(240, 90, 80, 0.1); }
+.approval-dl.head { color: var(--text-faint); }
+.approval-dm { width: 8px; flex: none; color: var(--text-faint); }
+.approval-fields { font-family: inherit; font-size: 12.5px; display: grid; gap: 4px; }
+.approval-fr { display: grid; grid-template-columns: minmax(56px, max-content) 1fr; gap: 12px; }
+.approval-fk { color: var(--text-faint); }
+.approval-fv { color: var(--text); }
 /* AND THE BLOCK INSIDE IT IS A FILM, NOT THE GROUND. `--bg` is the window's own
    flat colour, so on a skin the command sat as a solid rectangle in the middle
    of a card that had just become glass, which is the same fault one layer in.
@@ -2808,17 +2767,22 @@ body {
 :root[data-skin] .approval-cmd { background: var(--film-strong); }
 .approval-actions { display: flex; gap: 8px; align-items: center; }
 .approval-actions button {
-  font: inherit; font-size: 12.5px; font-weight: 600; border-radius: var(--radius);
-  padding: 4px 14px; cursor: pointer; transition: background 0.15s, border-color 0.15s;
+  font: inherit; font-size: 13px; font-weight: 600; border-radius: var(--radius);
+  height: 30px; padding: 0 12px; display: inline-flex; align-items: center; gap: 8px;
+  cursor: pointer; transition: background 0.15s, border-color 0.15s;
 }
-/* Neutral, high-contrast: the green wash read as barely-there and the kbd
-   chips inside the buttons looked wrong. Allow is the
+/* Neutral, high-contrast: the green wash read as barely-there. Allow is the
    one solid-light button in the app, unmistakable on the dark card. */
 .approval-allow { color: var(--on-solid); background: var(--text); border: 1px solid transparent; }
 .approval-allow:hover { opacity: 0.88; }
-.approval-deny { color: var(--text-dim); background: var(--wash); border: 1px solid var(--line-strong); }
-.approval-deny:hover { border-color: var(--text-faint); color: var(--text); }
-.approval-hint { margin-left: auto; font-size: 11px; color: var(--text-faint); font-family: var(--mono); }
+.approval-deny { color: var(--text); background: var(--wash); border: 1px solid var(--line-strong); }
+.approval-deny:hover { border-color: var(--text-faint); }
+/* THE KEY IS PART OF THE WORD, NOT A CHIP (picked 2026-11-08): no border of its
+   own, the label's font and size, lighter. Bordered caps and a small mono ⌘
+   were both drawn and turned down as hard to read. */
+.approval-key { font-weight: 500; letter-spacing: 0.01em; }
+.approval-allow .approval-key { color: color-mix(in oklab, var(--on-solid) 55%, transparent); }
+.approval-deny .approval-key { color: var(--text-faint); }
 
 /* The answered card, leaving.So: a press (the card gives, briefly), a mark
    stamped over it, and the card settles away. No green wash, which was already
@@ -3648,6 +3612,9 @@ img.product-mark { object-fit: cover; opacity: 1; }
   place-items: center;
   padding-top: 0;
   padding-bottom: 25vh;
+  /* A click anywhere outside the box closes it, the title bar included. The
+     strip drawn after it stands down in workspace-navigation.css. */
+  -webkit-app-region: no-drag;
 }
 
 /* THE IMPORT CARD THAT ENDS SETUP WAS DRAWN DIMMED. Setup's veil is 299 and
@@ -5264,6 +5231,8 @@ img.product-mark { object-fit: cover; opacity: 1; }
   color: var(--text); background: none; outline: none;
 }
 .set-title-edit { cursor: text; }
+.set-title-pencil { width: 0.55em; height: 0.55em; margin-left: 0.35em; vertical-align: 0.02em; color: var(--text-faint); opacity: 0.7; }
+.set-title-edit:hover .set-title-pencil, .set-title-edit:focus-visible .set-title-pencil { color: var(--text); opacity: 1; }
 .set-title-edit:hover, .set-title-edit:focus-visible { background: var(--bg-hover); }
 .set-title-input { border-color: var(--accent); background: var(--bg); min-width: 12ch; }
 .set-title-row { display: flex; align-items: center; gap: 12px; }
@@ -5480,7 +5449,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
 /* --- controls ------------------------------------------------------------ */
 /* The three defaults are answered in the light block at the top of this file,
    beside every other colour token, because "light answers everything" is the
-   rule tests/theme-tokens.test.mjs holds. Only the override lives here. */
+   rule tests/theme-tokens.test.mts holds. Only the override lives here. */
 :root[data-skin] {
   --control-face: var(--skin-pane);
   --control-face-line: var(--line-strong);
@@ -5642,7 +5611,7 @@ a.set-ghost { text-decoration: none; display: inline-block; }
    nothing of ours at all. Deleted rather than left here greying over, because
    dead rules with a long note above them read as a card somebody can bring
    back. If one ever is wanted, it goes on `.modal.compose` like every other
-   card, which is what tests/skin-grounds.test.mjs still holds.
+   card, which is what tests/skin-grounds.test.mts still holds.
 */
 
 
@@ -5818,7 +5787,7 @@ a.set-ghost { text-decoration: none; display: inline-block; }
    `div.modal.palette`, rgb(55, 58, 65), covering 22.7% of the window, and 22.1%
    of that screen was byte-for-byte IDENTICAL to the app with no skin on at all.
    Nothing was wrong with the palette; it had simply never been on the list,
-   which is the failure mode `tests/skin-grounds.test.mjs` exists to catch and
+   which is the failure mode `tests/skin-grounds.test.mts` exists to catch and
    could not catch here, because the palette is not a ground of its own — it is
    `.modal`, and `.modal` had an answer on file. ⌘K is a surface the user TYPES
    into — the field at the top of it is the whole screen — so it is the same kind
@@ -6552,7 +6521,7 @@ a.set-ghost { text-decoration: none; display: inline-block; }
   /* UNDER THE TOAST AND UNDER THE WALK'S OWN SCREENS. The toast is 310 and it
      is the app telling somebody something went wrong; a band saying where they
      are may never be the thing that hides it
-     (tests/the-setup-says-why-it-could-not-make-the-project.test.mjs). It does
+     (tests/the-setup-says-why-it-could-not-make-the-project.test.mts). It does
      not need to be high: the app is pushed down by the band's own height, so
      there is nothing under it to be over. */
   z-index: 90;
@@ -6593,7 +6562,7 @@ a.set-ghost { text-decoration: none; display: inline-block; }
   max-width: min(560px, calc(100vw - 260px));
   /* THE CAPSULE THE APP ALREADY HAS, not a new number. 22px is the settings
      switch track's radius and the one capsule shape in the stylesheet
-     (tests/one-corner-for-the-whole-app.test.mjs holds the list of shapes that
+     (tests/one-corner-for-the-whole-app.test.mts holds the list of shapes that
      are allowed not to be the 3px corner). Anything over half this pill's
      height draws the same capsule, so reusing the app's own value costs
      nothing and adds no loose number to that list. */
@@ -7326,7 +7295,7 @@ button.cs-row:hover .cs-row-go { color: var(--text); }
    the beat they belonged to — `coach` in renderer/src/onboarding.ts names each
    one and says where it went — so nothing asked for by name was dropped, it
    was just said in one line instead of two.
-   `tests/the-coaching-card-is-two-lines.test.mjs` fails if a third line comes
+   `tests/the-coaching-card-is-two-lines.test.mts` fails if a third line comes
    back, in the copy or in the drawing.
 */
 .fr-tether kbd {
@@ -8883,6 +8852,9 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .live-details pre { margin: 5px 0 12px; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.6 ui-monospace, monospace; }
 .live-action + .live-action, .live-recent { margin-top: 12px; }
 .live-details-label { margin-bottom: 6px; color: var(--text-faint); }
+/* The line holds its own label: `.focus-scroll` is not positioned, so without
+   this the label escaped the scroller and sat a long thread's height below the pane. */
+.live-brief { position: relative; }
 .live-announcement { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @media (hover: none) { .live-chevron { opacity: 1; } }
 /* Past tool batches are quiet text, with details revealed deliberately. */
@@ -9417,6 +9389,10 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 
 /* What a message is, beside its time: Comment, Checkpoint, Note on a file. */
 .msg-kind { display: inline-flex; align-items: baseline; gap: 6px; margin-left: 8px; padding: 1px 7px; border: 1px solid var(--line, rgba(255,255,255,.12)); border-radius: var(--tag-radius); background: none; font: 11px var(--mono); letter-spacing: .02em; color: var(--text-dim); text-align: left; }
+/* In a narrow column the label drops under the name whole, lined up with it, rather than breaking inside its box. */
+.msg-head:has(> .msg-kind) { flex-wrap: wrap; row-gap: 4px; }
+.msg-head > .msg-kind { margin-left: 0; white-space: nowrap; }
+.msg-head:has(> .msg-kind) > .msg-when { white-space: nowrap; }
 .msg-kind-why { color: var(--text-faint); letter-spacing: 0; }
 .msg-kind-why::before { content: '\00b7'; margin-right: 6px; }
 button.msg-kind { cursor: pointer; }

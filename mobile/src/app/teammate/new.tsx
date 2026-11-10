@@ -7,11 +7,10 @@ import { router } from '../../lib/router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { splitSlug } from '../../../../renderer/src/phone-rows';
-import { GREETING, starterAsks } from '../../../../shared/teammates.mjs';
+import { GREETING, starterAsks } from '../../../../shared/teammates.mts';
 import { dayOf } from '../../../../renderer/src/teammates/chat-lines';
 import { projectNow } from '../../lib/compose';
 import { screenGate } from '../../lib/thread-gate';
-import { appStore } from '../../platform/persist';
 import { useCloud } from '../../state/cloud';
 import { Back } from '../../ui/icons';
 import { IconButton, Pickable, Sheet, SheetHead, SheetRow, T, TopBar, Wall } from '../../ui/parts';
@@ -34,7 +33,7 @@ export default function NewTeammate() {
   const team = c.team;
   // A teammate works on the computer that keeps your teammates, in one of its projects.
   const projects = team ? c.view.products.filter((p) => splitSlug(p.slug)?.device === team.device) : [];
-  const product = projects.find((p) => p.slug === picked)?.slug ?? projectNow(projects, null, appStore) ?? projects[0]?.slug ?? null;
+  const product = projects.find((p) => p.slug === picked)?.slug ?? projectNow(projects, null) ?? projects[0]?.slug ?? null;
   const where = projects.find((p) => p.slug === product) ?? null;
   const asks = starterAsks(team?.view.list ?? []);
 
@@ -73,7 +72,7 @@ export default function NewTeammate() {
           {!team && <T style={{ marginTop: 18, fontSize: 14, lineHeight: 21, color: color.dim }}>Your computer has not sent your teammates yet. Turn on AI teammates there, in Settings, Alpha features.</T>}
           {error && <T style={{ marginTop: 14, fontSize: 13, color: color.dim }}>{error}</T>}
         </ScrollView>
-        <MateComposer placeholder="Answer your new teammate" send={(text) => make({ text })} />
+        <MateComposer mate={null} placeholder="Answer your new teammate" send={(text) => make({ text })} />
       </KeyboardAvoidingView>
       <Sheet open={sheet} close={() => setSheet(false)}>
         <SheetHead>Works in</SheetHead>
