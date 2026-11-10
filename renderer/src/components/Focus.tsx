@@ -112,7 +112,7 @@ import { RichReply, type RichBox } from '../team/RichReply';
 import { OptionsOffer } from './OptionsOffer';
 import { foldedReply } from '../folded-reply';
 import { applyDockHeight } from '../dock-height';
-import { resumeTo } from '../thread-bottom';
+import { bringIntoView, resumeTo } from '../thread-bottom';
 import { optionIsClipped, optionPeek } from '../option-peek';
 import { changedFiles, FOLDER_SETTLES_MS, folderMayStillMove, onlyNamedFiles, shipOfferFor, shipOfferLive, standingFrom, UNREAD, type ChangedFile, type Standing } from '../ship-offer';
 import { MOVED_PX, THE_OPTIONS_MOVED, clickLandsOnTheRowYouSaw } from '../pick-settles';
@@ -1253,9 +1253,12 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
 
   // A close raises its question at the foot of the thread, which is off
   // screen whenever the reader has scrolled up (w-23de8a26c0).
+  // When it stands at the filed task instead, the conversation brings it.
   const closeAskRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (closeAsk) closeAskRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (!closeAsk || askAtTask) return;
+    const box = closeAskRef.current?.closest('.focus-scroll') as HTMLElement | null;
+    return bringIntoView(box, () => closeAskRef.current, { block: 'nearest' });
   }, [closeAsk?.raised]);
 
   // THE OPTION UNDER THE POINTER, IN FULL, IN A CARD OVER THE MESSAGE. The
