@@ -65,7 +65,7 @@ import { withoutLoneQuoteMark } from '../typed-message';
 import { teammateIdOf, OFFER_LABEL } from '../../../shared/teammates.mts';
 import { REACH_LABEL } from '../../../shared/teammate-reach.mts';
 import { Name } from '../../../shared/product-name.mjs';
-import { isCauseLedger, withoutBrief } from '../../../shared/causes.mts';
+import { isCause, isCauseLedger, withoutBrief } from '../../../shared/causes.mts';
 
 // A cause row's body is the brief its lead works from, not something said to her.
 const spoken = <T extends { source?: string; patch?: Record<string, unknown> | null }>(lines: T[]): T[] => (isCauseLedger(lines) ? withoutBrief(lines) : lines);
@@ -474,7 +474,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
     <QueueSummary
       key={`${item.product}:${item.id}`}
       title={talkName ?? pageTitle(item)}
-      context={working && !queue.context ? workingContext(item.body ?? item.title ?? '', pageTitle(item), queue.repeats ?? null) : queue.context}
+      context={working && !queue.context ? workingContext(isCause(item) ? '' : item.body ?? item.title ?? '', pageTitle(item), queue.repeats ?? null) : queue.context}
       earlier={short ? 0 : behind}
       steps={!short && alone && (events.some((e) => e.kind === 'work') || after.length > 0)}
       open={earlierOpen}

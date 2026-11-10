@@ -320,6 +320,8 @@ describe('the person reads the lead, not the lead\'s brief', () => {
     const view = fs.readFileSync(new URL('../renderer/src/components/ItemThread.tsx', import.meta.url), 'utf8');
     expect(view).toMatch(/lines: spoken\(r\?\.lines \?\? \[\]\)/);
     expect(view).toMatch(/isCauseLedger\(lines\) \? withoutBrief\(lines\) : lines/);
+    // Main's "You asked" line under a working thread's title read the brief as her ask (2026-11-10).
+    expect(view).toMatch(/workingContext\(isCause\(item\) \? '' : item\.body/);
   });
 });
 
