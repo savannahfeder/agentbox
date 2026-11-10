@@ -41,9 +41,9 @@ beforeEach(async () => {
     req.on('data', (c: Buffer) => {
       chunks.push(c);
       if (mode !== 'slow-but-moving') return;
-      // 2 MB a second: never still for long, but slower than the stall limit in total.
+      // 16 MB a second: never still for long, but slower than the stall limit in total.
       req.pause();
-      setTimeout(() => req.resume(), (c.length / (2 * MB)) * 1000);
+      setTimeout(() => req.resume(), (c.length / (16 * MB)) * 1000);
     });
     req.on('end', () => {
       if (mode === 'never-answers') return;
@@ -90,26 +90,27 @@ describe('an upload whose connection stops moving', () => {
 });
 
 describe('an upload that keeps moving', () => {
-  // Bigger than what the system buffers on loopback (about 1.5 MB measured),
-  // so the sending is seen moving, and a stall limit longer than that buffer
-  // takes to drain at this rate.
+  // The tail of a body sits in the system's buffers, unseen, until the bucket
+  // reads it. On Linux loopback that grew to about 15 MB (1.5 MB on a Mac), so
+  // at this rate the last 0.75 s look still: the stall limit is well over that
+  // and the body takes about twice the limit.
   it('is not cut off when it takes longer than the stall limit in total', async () => {
     mode = 'slow-but-moving';
-    const body = Buffer.alloc(8 * MB, 3);
+    const body = Buffer.alloc(96 * MB, 3);
     const started = Date.now();
-    await clients(1500).storage.put('runs/r1/files/3', body);
-    expect(Date.now() - started).toBeGreaterThan(3000);
+    await clients(2500).storage.put('runs/r1/files/3', body);
+    expect(Date.now() - started).toBeGreaterThan(3500);
     expect(store.get('runs/r1/files/3')!.equals(body)).toBe(true);
   }, 30_000);
 
   it('the same for a file sent from disk', async () => {
     mode = 'slow-but-moving';
     const file = path.join(tmp, 'conversation.jsonl');
-    const body = Buffer.alloc(8 * MB, 4);
+    const body = Buffer.alloc(96 * MB, 4);
     fs.writeFileSync(file, body);
     const started = Date.now();
-    await clients(1500).storage.putFile('runs/r1/conversation.jsonl', file);
-    expect(Date.now() - started).toBeGreaterThan(3000);
+    await clients(2500).storage.putFile('runs/r1/conversation.jsonl', file);
+    expect(Date.now() - started).toBeGreaterThan(3500);
     expect(store.get('runs/r1/conversation.jsonl')!.equals(body)).toBe(true);
   }, 30_000);
 

@@ -9,6 +9,7 @@ import type { BridgeStateEvent } from './task-remote-control.mts';
 import { taskFolderPath, real, restoreTaskFolder } from './task-folders.mts';
 import { SHIP_LABEL, ShipQueue, readShipSettings, shipScriptFor, shipSlot } from './ship-queue.mts';
 import { MainTests } from './main-went-red.mts';
+import { SecurityScan } from './the-security-scan-went-red.mts';
 import { CloudServerWatch, serverError } from './cloud-server-down.mts';
 import { folderJob } from './task-folders-offthread.mts';
 import { gitJob } from './git-change-offthread.mts';
@@ -1277,6 +1278,7 @@ export class Supervisor {
   declare gitHubSignIn: GitHubPushSignIn | null;
   declare signInReturns: SignInReturns;
   declare mainTests: MainTests;
+  declare securityScan: SecurityScan;
   declare cloudServerWatch: Pick<CloudServerWatch, 'down' | 'up'>;
   declare sessions: Map<string, WorkerSession>;
   declare onChange: (() => void) | null;
@@ -1511,6 +1513,7 @@ export class Supervisor {
     // agent has ended its turn, so main was red for four days in October with
     // nobody reading the cross (main/main-went-red.mts).
     this.mainTests = new MainTests({ store, userDir });
+    this.securityScan = new SecurityScan({ store, userDir });
     this.cloudServerWatch = new CloudServerWatch({ store, userDir, home: config?.home || undefined });
     this._compactionJobs = new Map();
     this.sessions = new Map(); // itemId -> {child, product, startedAt, tail, itemId}
@@ -1986,6 +1989,7 @@ export class Supervisor {
     if (!shipped?.sha || !shipped?.product) return;
     try {
       this.mainTests.watch(shipped as ShippedNote & { sha: string }).catch(() => {});
+      this.securityScan.watch(shipped as ShippedNote & { sha: string }).catch(() => {});
     } catch { /* a watch that cannot start is not a ship that failed */ }
     try {
       this.mainTests.watchSecurity(shipped as ShippedNote & { sha: string }).catch(() => {});
@@ -1996,6 +2000,7 @@ export class Supervisor {
     clearInterval(this._timer ?? undefined);
     clearInterval(this._memoryLogTimer);
     this.mainTests?.stop();
+    this.securityScan?.stop();
     // The shared `codex app-server` goes with them. An orphaned one keeps every
     // thread it is holding alive after the supervisor that answers their
     // approvals has gone, which is the 2026-08-06 orphan incident in the other
@@ -2056,6 +2061,17 @@ export class Supervisor {
     if (typeof session.child?.interrupt !== 'function') return { ok: true, interrupted: false };
     const { interrupted } = await session.child.interrupt();
     return { ok: true, interrupted };
+  }
+
+  // Their reply answers the card as "Not now" would, so the agent's sign_in
+  // wait returns and the reply queued behind it is taken.
+  endSignInWait(product: string, id: string) {
+    try {
+      const ask = openSignIn(this.store.readItem(product, id));
+      if (!ask) return;
+      this.store.answerSignIn(product, id, { id: ask.id, said: 'replied' }, { source: 'founder' });
+      this.onChange?.();
+    } catch (e) { console.warn('zero: could not end the sign-in wait for a reply:', (e as Error).message); }
   }
 
   // App quit: take the workers down with the supervisor. Killing the app used

@@ -104,6 +104,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   // Teammates: make, describe, start, edit, write to, and what they remember.
   teammates: 'zero:teammates',
   takeJoin: 'zero:take-join',
+  takeThreadLink: 'zero:take-thread-link',
   threadEdit: 'zero:thread-edit',
   // Move a thread to another project (shared/move-thread.mts).
   moveItem: 'zero:move-item',
@@ -210,6 +211,9 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   fileLinks: 'zero:file-links',
   fileLinkComments: 'zero:file-link-comments',
   fileLinkComment: 'zero:file-link-comment',
+  // A file someone shared by its link, brought into one of your projects (main/bring-shared-file.mts).
+  bringSharedFile: 'zero:bring-shared-file',
+  takeSharedFile: 'zero:take-shared-file',
   codeChange: 'zero:code-change',
   codeFile: 'zero:code-file',
   saveCodeFile: 'zero:save-code-file',
@@ -246,6 +250,8 @@ export const PUSH_CHANNELS: Readonly<Record<string, string>> = {
   onZoomPercent: 'zero:zoom-percent',
   onRecovered: 'zero:recovered',
   onJoinRoom: 'zero:join-room',
+  onThreadLink: 'zero:thread-link',
+  onSharedFile: 'zero:shared-file',
   onOpenItem: 'zero:open-item',
   onOpenSettings: 'zero:open-settings',
   onScreenDetail: 'zero:screen-detail',
@@ -272,4 +278,8 @@ export const WRAPPED_ARGS: Readonly<Record<string, string[]>> = {
 // `onWriteHeld` is the desktop's ⌘R asking the page to write what the undo
 // window holds before it reloads (main/write-before-reload.mts). A browser
 // reload asks nobody; the page writes on `pagehide` there instead.
-export const DESKTOP_ONLY: readonly string[] = ['pathForFile', 'onWriteHeld'];
+//
+// `draftCopy` is the desktop's file copy of the drafts (main/draft-copy.mts),
+// kept because Chromium can throw its localStorage away. A tab has no such
+// file, and the page simply goes without the copy.
+export const DESKTOP_ONLY: readonly string[] = ['pathForFile', 'onWriteHeld', 'draftCopy'];
