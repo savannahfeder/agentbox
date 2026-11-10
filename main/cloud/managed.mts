@@ -1,6 +1,6 @@
 // THE CLOUD THROUGH OUR SERVER, FOR A MAC WITH NO AWS ACCOUNT OF ITS OWN.
 //
-// The same two interfaces as main/cloud/aws.mjs (the session and the bucket),
+// The same two interfaces as main/cloud/aws.mts (the session and the bucket),
 // spoken to the cloud server (cloud/gateway/) with this Mac's cloud key. Files
 // go straight to and from the bucket on links the server signs; the server
 // only ever sees names. A sign-in is never read from here: a link to one is
@@ -12,7 +12,7 @@ import https from 'node:https';
 import crypto from 'node:crypto';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { LOGIN_NAME } from '../../shared/cloud-login-name.mjs';
+import { LOGIN_NAME } from '../../shared/cloud-login-name.mts';
 
 export { LOGIN_NAME };
 
@@ -24,6 +24,9 @@ const FILE_MS = 15 * 60_000;
 const LINK_SECONDS = 12 * 60 * 60;
 // Lambda takes at most 6 MB; a call past this goes through the bucket.
 const RELAY_BYTES = 4 * 1024 * 1024;
+// Lambda answers 429 when the server has all the calls open it may, before
+// running this one, so it is sent again for this long.
+const THROTTLE_MS = 60_000;
 
 export interface CloudEvent {
   seq: number;
@@ -85,6 +88,7 @@ export interface ManagedOptions {
   key: string;
   timeoutMs?: number;
   fileTimeoutMs?: number;
+  throttleMs?: number;
   onSignedOut?: () => void;
 }
 
@@ -118,7 +122,7 @@ function upload(link: string, body: { buffer: Buffer } | { file: string }, timeo
   });
 }
 
-export function managedClients({ url, key, timeoutMs = CALL_MS, fileTimeoutMs = FILE_MS, onSignedOut = () => {} }: ManagedOptions) {
+export function managedClients({ url, key, timeoutMs = CALL_MS, fileTimeoutMs = FILE_MS, throttleMs = THROTTLE_MS, onSignedOut = () => {} }: ManagedOptions) {
   const base = String(url).replace(/\/+$/, '');
 
   async function call(method: string, path: string, body?: unknown): Promise<CloudReply> {
@@ -127,7 +131,13 @@ export function managedClients({ url, key, timeoutMs = CALL_MS, fileTimeoutMs = 
       headers: { authorization: `Bearer ${key}`, ...(body ? { 'content-type': 'application/json' } : {}) },
       body: body ? JSON.stringify(body) : undefined,
     };
-    const res = await fetch(`${base}${path}`, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+    const until = Date.now() + throttleMs;
+    let res = await fetch(`${base}${path}`, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+    for (let wait = 250; res.status === 429 && Date.now() < until; wait = Math.min(wait * 2, 8000)) {
+      await res.body?.cancel();
+      await new Promise((r) => setTimeout(r, Math.min(until - Date.now(), wait * (0.5 + Math.random()))));
+      res = await fetch(`${base}${path}`, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+    }
     const out = await res.json().catch(() => ({})) as CloudReply;
     if (!res.ok) {
       if (res.status === 401) { try { onSignedOut(); } catch { /* the refusal below says it all the same */ } }
@@ -137,7 +147,18 @@ export function managedClients({ url, key, timeoutMs = CALL_MS, fileTimeoutMs = 
     }
     return out;
   }
-  const linkFor = async (op: string, k: string, seconds: number = LINK_SECONDS) => (await call('POST', '/v1/link', { op, key: k, seconds })).url as string;
+  // A link is only a signature, so one lost to a dropped connection or a
+  // server failure is asked for again; a refusal is an answer.
+  async function linkFor(op: string, k: string, seconds: number = LINK_SECONDS): Promise<string> {
+    const until = Date.now() + throttleMs;
+    for (let wait = 250; ; wait = Math.min(wait * 2, 8000)) {
+      try { return (await call('POST', '/v1/link', { op, key: k, seconds })).url as string; } catch (e) {
+        const err = e as CloudCallError;
+        if ((err.status && err.status < 500) || Date.now() >= until) throw err;
+        await new Promise((r) => setTimeout(r, Math.min(until - Date.now(), wait * (0.5 + Math.random()))));
+      }
+    }
+  }
   const object = (link: string, init: RequestInit = {}) => fetch(link, { ...init, signal: AbortSignal.timeout(fileTimeoutMs) });
   const refuseLogin = (k: string) => { if (isLogin(k)) throw new Error('a cloud sign-in is never read on this Mac'); };
 

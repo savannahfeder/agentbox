@@ -244,8 +244,16 @@ export function createSandbox({
   // Which Claude account a new token belongs to, so the Mac can name it.
   // Best effort: a token that cannot say is kept all the same, unnamed.
   whoIs = claudeAccountEmail,
+  // Disk held back from the run, given up the first time the disk is full,
+  // so the log and the results upload still have room.
+  reserveBytes = 0,
 } = {}) {
   const at = (p) => (pathRoot ? path.join(pathRoot, p) : p);
+  const reserve = path.join(workRoot, '.reserve');
+  if (reserveBytes > 0) {
+    try { fs.mkdirSync(workRoot, { recursive: true }); fs.writeFileSync(reserve, Buffer.alloc(reserveBytes)); } catch (err) { log(`no disk reserve: ${err.message}`); }
+  }
+  const freeReserve = () => { try { fs.rmSync(reserve); return true; } catch { return false; } };
   let run = null;
   let bridge = null;
   // A start answers the Mac at once and lays the folder out behind it, so a
@@ -263,7 +271,7 @@ export function createSandbox({
   function openLog(r) {
     fs.mkdirSync(r.dir, { recursive: true });
     const file = path.join(r.dir, 'events.jsonl');
-    r.log = { file, fd: fs.openSync(file, 'w+'), size: 0, index: [], closed: false };
+    r.log = { file, fd: fs.openSync(file, 'w+'), size: 0, index: [], closed: false, held: 0, saidFull: false };
   }
 
   function closeLog(r) {
@@ -278,11 +286,43 @@ export function createSandbox({
     if (r.log.closed) return null;
     const e = { seq: r.log.index.length + 1, at: Date.now(), ...event };
     const line = Buffer.from(JSON.stringify(e) + '\n');
-    fs.writeSync(r.log.fd, line, 0, line.length, r.log.size);
-    r.log.index.push({ off: r.log.size, len: line.length });
-    r.log.size += line.length;
+    const entry = { off: r.log.size, len: line.length };
+    if (logWrite(r, line)) r.log.size += line.length;
+    else { entry.held = line; r.log.held += 1; }
+    r.log.index.push(entry);
     for (const w of [...r.waiters]) w();
+    if (entry.held && !r.log.saidFull) {
+      r.log.saidFull = true;
+      emit({ kind: 'error', message: 'this cloud machine\'s disk is full, so the run\'s uncommitted work may not fit to be sent home' }, r);
+    }
     return e;
+  }
+
+  // Never throws: it runs in the agent's output handler, and the server ending
+  // ends the machine and the run's unsent work.
+  function logWrite(r, line) {
+    for (let tries = 0; tries < 2; tries += 1) {
+      try {
+        if (fs.writeSync(r.log.fd, line, 0, line.length, r.log.size) === line.length) return true;
+      } catch { /* refused; below */ }
+      if (tries === 0 && !freeReserve()) return false;
+    }
+    return false;
+  }
+
+  function logBytes(r, from, to) {
+    const idx = r.log.index;
+    if (from >= to) return Buffer.alloc(0);
+    const bytes = idx.slice(from, to).reduce((n, x) => n + x.len, 0);
+    const buf = Buffer.allocUnsafe(bytes);
+    if (!r.log.held) { fs.readSync(r.log.fd, buf, 0, bytes, idx[from].off); return buf; }
+    let at = 0;
+    for (let i = from; i < to; i += 1) {
+      if (idx[i].held) idx[i].held.copy(buf, at);
+      else fs.readSync(r.log.fd, buf, at, idx[i].len, idx[i].off);
+      at += idx[i].len;
+    }
+    return buf;
   }
 
   function readEvents(r, since, maxBytes = PAGE_BYTES) {
@@ -291,9 +331,7 @@ export function createSandbox({
     let end = since;
     let bytes = 0;
     while (end < idx.length && (end === since || bytes + idx[end].len <= maxBytes)) { bytes += idx[end].len; end += 1; }
-    const buf = Buffer.allocUnsafe(bytes);
-    fs.readSync(r.log.fd, buf, 0, bytes, idx[since].off);
-    const events = buf.toString('utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+    const events = logBytes(r, since, end).toString('utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
     return { events, more: end < idx.length };
   }
 
@@ -1000,7 +1038,7 @@ export function createSandbox({
     }
   }
 
-  // THE KEYS THEY SAVED FOR CLOUD RUNS (main/cloud/keys.mjs), each fetched
+  // THE KEYS THEY SAVED FOR CLOUD RUNS (main/cloud/keys.mts), each fetched
   // by its own link and given to the agent as the variable it is named for.
   // Never a reason to stop the run: one that cannot be fetched is left out,
   // and the agent asks for it as if it had never been saved.
@@ -1323,7 +1361,7 @@ export function createSandbox({
     r.collecting = (async () => {
       try {
         const manifest = await collect(r, urls);
-        if (urls.eventsUrl) await upload(fetchImpl, urls.eventsUrl, fs.readFileSync(r.log.file));
+        if (urls.eventsUrl) await upload(fetchImpl, urls.eventsUrl, logBytes(r, 0, r.log.index.length));
         const done = { ...manifest, runId: r.id, exitCode: r.exitCode, exitSignal: r.exitSignal || null, cancelled: r.cancelled || null, lastSeq: r.log.index.length, usage: r.usage || null };
         if (urls.doneUrl) await upload(fetchImpl, urls.doneUrl, Buffer.from(JSON.stringify(done)));
         r.manifest = done;
@@ -2111,8 +2149,16 @@ function json(res, status, body) {
   res.end(JSON.stringify(body));
 }
 
+// The server is the machine's first process, so it ending ends the machine and
+// every run's unsent work with it; a bug it did not catch is said instead.
+export function keepServing(log) {
+  process.on('uncaughtException', (err) => log(`uncaught, kept serving: ${err?.stack || err}`));
+  process.on('unhandledRejection', (err) => log(`unhandled rejection, kept serving: ${err?.stack || err}`));
+}
+
 // Started directly (the image's entrypoint), it serves AgentCore's port.
 if (import.meta.url === `file://${process.argv[1]}`) {
+  keepServing((line) => console.error(line));
   let runAs = null;
   const user = process.env.AGENTBOX_RUN_AS;
   if (user && process.getuid?.() === 0) {
@@ -2120,6 +2166,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const home = execFileSync('getent', ['passwd', user], { encoding: 'utf8' }).split(':')[5];
     runAs = { uid: id('-u'), gid: id('-g'), home, user };
   }
-  const sandbox = createSandbox({ workRoot: '/var/lib/agentbox', bridgeSocket: '/tmp/agentbox-bridge.sock', rootSocket: '/run/agentbox-root.sock', runAs, log: (line) => console.error(line) });
+  const sandbox = createSandbox({ workRoot: '/var/lib/agentbox', bridgeSocket: '/tmp/agentbox-bridge.sock', rootSocket: '/run/agentbox-root.sock', runAs, reserveBytes: 256 * 2 ** 20, log: (line) => console.error(line) });
   sandbox.listen(Number(process.env.PORT) || 8080).then((a) => console.error(`agentbox sandbox listening on ${a.port}`));
 }

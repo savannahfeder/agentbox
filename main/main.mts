@@ -4,31 +4,32 @@
 import { app, BrowserWindow, Menu, Notification, clipboard, crashReporter, dialog, ipcMain, nativeImage, net, powerMonitor, protocol, screen as electronScreen, shell, session, safeStorage, systemPreferences } from 'electron';
 import './no-default-menu.mts';
 import type { ContextMenuParams, MenuItemConstructorOptions, WebContents } from 'electron';
-import * as workItemsDisk from './store/work-items.mjs';
+import * as workItemsDisk from './store/work-items.mts';
 import { createTeamService, teamStateFile } from './team/index.mts';
 import type { TeamSession } from './team/index.mts';
-import { startConnections } from './connections/start.mjs';
+import { startConnections } from './connections/start.mts';
 import { roomsSetup } from './team/room-setup.mts';
-import { matesForTheTeam } from './teammate-reach.mjs';
+import { matesForTheTeam } from './teammate-reach.mts';
 import { alphaFeatures } from './settings.mts';
-import { loadCloudConfig, supabaseSession } from './team/session.mjs';
-import { liveAddress } from './team/live-room.mjs';
+import { loadCloudConfig, supabaseSession } from './team/session.mts';
+import { liveAddress } from './team/live-room.mts';
 // MY WORKSPACE IS NOT A TEAM FEATURE ANY MORE (w-f8d123be62), even though it
 // still lives in the team folder next to the sharing rules it has to obey.
 import { ensurePersonalProject } from './team/projects.mts';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { configDir, loadConfig, saveConfig } from './config.mjs';
+import { configDir, loadConfig, saveConfig } from './config.mts';
 import { installMenu, applyZoom, requestFind } from './menu.mts';
 import { zoomDeltaFor } from './zoom-keys.mts';
 import { copySelection } from './copy-selection.mts';
 import { screenDetailFor } from './screen-detail.mts';
 import { Store } from './store.mts';
-import { storeRootEnv } from './store/home.mjs';
+import { storeRootEnv } from './store/home.mts';
 import { keepAnswerModesIn } from './answer-modes.mts';
 import { Supervisor } from './supervisor.mts';
 import { gitHubPushSignIn } from './github-push-sign-in.mts';
+import { runHostWorksOn } from './run-host.mts';
 import { startCodexWatch } from './codex-watch.mts';
 import { watchNewChatsFor } from './new-chats-watch.mts';
 import { readCodexThreadsOffThread } from './codex-threads.mts';
@@ -37,19 +38,19 @@ import { registerIpc } from './ipc.mts';
 import { stallWatch } from './stall-watch.mts';
 import { startFreezeRecorder } from './freeze-recorder.mts';
 import { startMemoryRecorder } from './memory-recorder.mts';
-import { FreezeWatch } from './freeze-watch.mjs';
+import { FreezeWatch } from './freeze-watch.mts';
 import { applyThrough, phoneDevice } from './phone-inbox.mts';
 import type { PhoneChannel } from './phone-inbox.mts';
 import { answerWhatOnlyTheWindowAnswered } from './serve.mts';
 import type { CollectingIpcMain, IpcHandler } from './serve.mts';
 import { carryHerBriefsAcross, joinMessageRules, setAsideShippedMessageRules, unifyAgentInstructions } from './instruction-settings.mts';
-import * as approvals from './approvals.mjs';
+import * as approvals from './approvals.mts';
 import { recoveryToast } from '../shared/recovery.mts';
 import { CHORD_ANSWERS, chordLands } from '../shared/card-settles.mts';
-import { phoneWaitsOf } from '../shared/phone-snapshot.mjs';
-import { teammatesOn } from '../shared/teammates.mjs';
-import { dataFolderName, isNewUserBuild } from '../shared/side-build.mjs';
-import { runningAsAFreshUser } from '../shared/fresh-user-home.mjs';
+import { phoneWaitsOf } from '../shared/phone-snapshot.mts';
+import { teammatesOn } from '../shared/teammates.mts';
+import { dataFolderName, isNewUserBuild } from '../shared/side-build.mts';
+import { runningAsAFreshUser } from '../shared/fresh-user-home.mts';
 import { newUserWindow } from './new-user-window.mts';
 import { openFreshUser } from './fresh-user.mts';
 import { installCrashReports, report as reportCrash, reportFromRenderer, pending as pendingCrashes, setTransport } from './crash-report.mts';
@@ -61,7 +62,7 @@ import { quitStep, flushBeforeQuit, quitThenExit } from './quit-sequence.mts';
 import { askBeforeClosingWhileWorking } from './close-while-working.mts';
 import { createPlace } from '../shared/where-it-runs-from.mts';
 import { createSourceUpdater } from './source-updater.mts';
-import { learnShellDataDirs, recoverShellPath } from './shell-path.mjs';
+import { learnShellDataDirs, recoverShellPath } from './shell-path.mts';
 import { installNotifier } from './notify.mts';
 import { createCornerTag } from './corner-tag.mts';
 import { loadLiquidGlass } from './liquid-glass.mts';
@@ -69,13 +70,15 @@ import { DOC_SCHEMES, DocGrants, docPath } from './doc-scheme.mts';
 import { quietTheFramesScrollbars } from './frame-scrollbars.mts';
 import { letLocalAppsShowInThePane } from './local-app-frames.mts';
 import { hardenAttachedWebview } from './webview-guard.mts';
-import { leavesTheApp } from './app-window-stays.mjs';
+import { leavesTheApp } from './app-window-stays.mts';
 import { IMG_SCHEMES, imgPath, mediaResponse, mediaType, servable } from './img-scheme.mts';
-import { hotWindowVerdict, storeHasWork } from './dev-window.mjs';
+import { hotWindowVerdict, storeHasWork } from './dev-window.mts';
 import { writeHeldThenReload } from './write-before-reload.mts';
+import { answerDraftCopy } from './draft-copy.mts';
 import { IS_SHE_TYPING_IN_THE_PAGE, theAppKeepsThisInput, theAppKeepsThisLetterInAPage } from '../shared/artifact-keys.mts';
 import { NAME, Name, WAS } from '../shared/product-name.mjs';
-import { JOIN_SCHEME, ourLink, tokenFromLink } from '../shared/room-links.mjs';
+import { JOIN_SCHEME, ourLink, threadFromAppLink, tokenFromLink } from '../shared/room-links.mts';
+import { fileLinkToken } from './bring-shared-file.mts';
 import { getMic } from './mic.mts';
 import { openInBrowser } from './open-in-browser.mts';
 import type { IpcConfig } from './ipc.mts';
@@ -148,7 +151,7 @@ const appDir = path.join(__dirname, '..');
 // `scripts/pack-side.mjs` packs this branch as its own bundle, "the app Rest",
 // so a build she is trying out for a few days sits beside the real one in
 // Finder instead of overwriting it. The bundle is separate; the DATA FOLDER
-// must not be, and shared/side-build.mjs is where that rule and its reasons
+// must not be, and shared/side-build.mts is where that rule and its reasons
 // live. This has to happen before ANYTHING reads a path, because everything
 // downstream keys off app.getName, the single-instance lock at the foot of
 // this file included.
@@ -219,7 +222,7 @@ if (!PROFILE) try {
 //
 // AND A THROWAWAY COPY GETS THE USER DATA FOLDER WHATEVER IT WAS STARTED FROM,
 // because a throwaway home moves that folder and does not move the checkout.
-// `configDir` in main/config.mjs is the whole rule and says what she saw when
+// `configDir` in main/config.mts is the whole rule and says what she saw when
 // it was missing.
 const dataDir: string = configDir({ appDir, userData: app.getPath('userData'), packaged: app.isPackaged } as Parameters<typeof configDir>[0]);
 
@@ -281,14 +284,23 @@ function showWindow() {
   if (window.isMinimized()) window.restore();
   window.focus();
 }
+// And a thread's link (agentbox://t/<owner>/<thread>), which its web page opens: held the same way.
+let pendingThread = threadFromAppLink(process.argv.find((a) => a.startsWith(`${JOIN_SCHEME}://`)) ?? '');
+// A SHARED FILE'S APP LINK (agentbox://f/<token>), from the link page's
+// "Open in Agentbox", held the same way until the window takes it.
+let pendingSharedFile = fileLinkToken(process.argv.find((a) => a.startsWith(`${JOIN_SCHEME}://`)) ?? '');
+function tellWindow(channel: string) {
+  if (window && !window.isDestroyed()) { window.webContents.send(channel); showWindow(); }
+}
 function openJoinLink(url: string) {
+  const thread = threadFromAppLink(url);
+  if (thread) { pendingThread = thread; tellWindow('zero:thread-link'); return; }
+  const file = fileLinkToken(url);
+  if (file) { pendingSharedFile = file; tellWindow('zero:shared-file'); return; }
   const token = tokenFromLink(url);
   if (!token) return;
   pendingJoin = token;
-  if (window && !window.isDestroyed()) {
-    window.webContents.send('zero:join-room');
-    showWindow();
-  }
+  tellWindow('zero:join-room');
 }
 // Set by ⌘R and read once by the renderer as it comes back up, so a reload can
 // say so. A reload that lands on an identical screen and a chord that did
@@ -340,14 +352,14 @@ function reloadRenderer() {
 
 async function createWindow() {
   // Where the shell says Claude Code and Codex keep their logins and sessions,
-  // never put into this environment (main/shell-path.mjs). WAITED FOR, beside
+  // never put into this environment (main/shell-path.mts). WAITED FOR, beside
   // the PATH read so it costs no extra time: the folders it names are where
   // workers sign in now (w-6d8c543a43), and a task resumed at launch before
   // the answer landed ran on ~/.claude signed out.
   const [shellPath] = await Promise.all([recoverShellPath(), learnShellDataDirs()]);
   process.env.PATH = shellPath.path;
   if (shellPath.error) console.warn('agentbox: could not load your shell PATH; using the inherited PATH:', shellPath.error);
-  const config = loadConfig(dataDir) as unknown as AppConfig;
+  const config = loadConfig(dataDir) as AppConfig;
   // The store modules read the app's own home variable at call time; setting it
   // here points auth session files, sync, and every store path at its root.
   // Written under every name this app has had, because a store server or a
@@ -446,9 +458,9 @@ async function createWindow() {
   // request so a project made after launch is not a folder of broken images.
   imageRoots = () => [config.accountRoot, ...store.listProducts().map((p) => p.repoPath).filter(Boolean) as string[]];
   const supervisor = new Supervisor(config, store, appDir, dataDir, userDir);
-  // Local runs outlive a quit or a restart of the app (main/run-host.mjs).
-  supervisor.hostRuns = true;
-  // And their store tools come from one shared process (main/tool-host.mjs).
+  // Local runs outlive a quit or a restart of the app (main/run-host.mts).
+  supervisor.hostRuns = runHostWorksOn();
+  // And their store tools come from one shared process (main/tool-host.mts).
   supervisor.shareTools = true;
   // THAT agents start and stop work (main/analytics.mts checks the switch).
   supervisor.count = (name, props) => analytics.track(name, props);
@@ -485,7 +497,7 @@ async function createWindow() {
   // THE KEYCHAIN IS ONLY ASKED WHEN THERE IS A TEAM (2026-10-06): asking it at
   // every launch put a "Agentbox Safe Storage" password prompt in front of the
   // single-person app, which has no sign-in to keep
-  // (tests/the-installed-app-is-the-single-person-app.test.mjs).
+  // (tests/the-installed-app-is-the-single-person-app.test.mts).
   const cloudConfig = loadCloudConfig(appDir, { packaged: app.isPackaged });
   let phoneApply: ReturnType<typeof applyThrough> | null = null;
   let phoneSettings: (() => unknown) | null = null;
@@ -499,7 +511,7 @@ async function createWindow() {
       decrypt: (buf: Buffer) => (safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(buf) : buf.toString('utf8')),
       packaged: app.isPackaged,
       openExternal: (url: string) => shell.openExternal(url),
-    } as unknown as Parameters<typeof supabaseSession>[0]) as TeamSession,
+    }) as TeamSession,
     store,
     disk: workItemsDisk,
     accountRoot: config.accountRoot,
@@ -514,7 +526,7 @@ async function createWindow() {
     // HER PHONE WITH THE MAC SHUT (main/phone-inbox.mts). What it left is done
     // through the window's own handlers, filed below once the window exists.
     phone: {
-      // Her yes, with her id on it (shared/phone-snapshot.mjs phoneProjectsOf).
+      // Her yes, with her id on it (shared/phone-snapshot.mts phoneProjectsOf).
       projects: () => config.phoneProducts ?? null,
       ready: () => !!phoneApply,
       apply: (cmd) => phoneApply!(cmd),
@@ -535,9 +547,9 @@ async function createWindow() {
       device: () => phoneDevice(userDir, config.storeRoot),
       // Where her phone reads it, once the site is up (cloud/team.config.json).
       site: typeof cloudConfig.phoneSite === 'string' ? cloudConfig.phoneSite : null,
-      // No alert on her phone while she is at this Mac (main/phone-alerts.mjs).
+      // No alert on her phone while she is at this Mac (main/phone-alerts.mts).
       idleMs: () => powerMonitor.getSystemIdleTime() * 1000,
-      // A reply she sends with the lid shut carries on in the cloud (shared/cloud-kit.mjs).
+      // A reply she sends with the lid shut carries on in the cloud (shared/cloud-kit.mts).
       carrying: (c) => supervisor.phoneCarrying(c),
       kitsFor: (slug) => supervisor.leavesKitsFor(slug),
       adopt: ({ project, item, ...rest }) => supervisor.adoptCloudRun({ product: project, itemId: item, ...rest }),
@@ -546,7 +558,7 @@ async function createWindow() {
       // And a new thread she starts with the lid shut.
       newThreadKits: (c) => supervisor.leaveNewThreadKits(c),
       adoptNew: ({ project, item, ...rest }) => supervisor.adoptCloudNewThread({ product: project, itemId: item, ...rest }),
-      // And this Mac's own waiting rows, handed over in its dark wakes (shared/cloud-carry.mjs).
+      // And this Mac's own waiting rows, handed over in its dark wakes (shared/cloud-carry.mts).
       asleep: () => supervisor.asleep(),
       toCarry: () => supervisor.carryWhileAsleep(),
       handedOver: (c) => supervisor.handedOver(c),
@@ -1171,6 +1183,7 @@ async function createWindow() {
   // itself (it has no disk and should not have one), and 'render-process-gone'
   // only fires when the process DIES, which a thrown React error does not.
   ipcMain.handle('zero:crash', (_e, payload) => { reportFromRenderer(payload ?? {}); });
+  answerDraftCopy({ ipcMain, file: path.join(userDir, 'drafts-copy.json') });
   recordBlankPages({
     ipcMain,
     window: () => window,
@@ -1186,6 +1199,8 @@ async function createWindow() {
     },
   });
   ipcMain.handle('zero:take-join', () => { const token = pendingJoin; pendingJoin = null; return token; });
+  ipcMain.handle('zero:take-thread-link', () => { const thread = pendingThread; pendingThread = null; return thread; });
+  ipcMain.handle('zero:take-shared-file', () => { const token = pendingSharedFile; pendingSharedFile = null; return token; });
   // External links from markdown open in the real browser; local artifacts
   // (a demo page, a screenshot a worker saved) open in their default app, so
   // "see it working" is one click from the message.
@@ -1288,7 +1303,7 @@ async function createWindow() {
   // A HOT-RELOADING WINDOW MUST NOT BE THE ONE SHE WORKS IN. Every dev window
   // that can ever exist comes through here, which is why the guard is here and
   // not in the npm script: the one that cost her an afternoon was started by
-  // hand. See main/dev-window.mjs for what it allows and why.
+  // hand. See main/dev-window.mts for what it allows and why.
   const verdict = hotWindowVerdict({
     devUrl,
     fixtures: !!process.env.ZERO_FIXTURES,

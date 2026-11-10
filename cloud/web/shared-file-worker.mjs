@@ -43,11 +43,22 @@ function pageTitle(html) {
     return n > 0 && n < 0x110000 ? String.fromCodePoint(n) : whole;
   }).replace(/\s+/g, ' ').trim().slice(0, 120);
 }
+const isTable = (file) => file.kind === 'markdown' && /^text\/(csv|tab-separated-values)$/i.test(file.type ?? '');
 const titleOf = (file) => {
+  if (isTable(file)) return file.name;
   if (file.kind === 'markdown') return /^\s*#[ \t]+(.+?)[ \t]*#*[ \t]*(?:\r?\n|$)/.exec(file.body ?? '')?.[1] ?? String(file.name).replace(/\.(md|markdown)$/i, '');
   if (file.kind === 'page') return pageTitle(file.body) || file.name;
   return file.name;
 };
+
+// As renderer/src/shared-file/shared-file.ts filmOf reads it.
+const PIECE_DEADLINE_MS = 60_000;
+function filmOf(body) {
+  try {
+    const { pieces, size, hash } = JSON.parse(body);
+    return Number.isInteger(pieces) && pieces > 0 && Number.isInteger(size) && /^[0-9a-f]{40}$/.test(hash) ? { pieces, size, hash } : null;
+  } catch { return null; }
+}
 
 const pictureType = (t) => (/^image\/[a-z0-9.+-]{1,60}$/i.test(t ?? '') ? t : 'application/octet-stream');
 
@@ -100,6 +111,16 @@ export function sharedFileWorker({ cloud, anonKey, headers = {} }, { fetchImpl =
     });
   }
 
+  // A thread's link (/t/<owner>/<thread>) is the app's page, its files loaded from the root.
+  async function theThreadPage(request, env, url) {
+    const shell = await env.ASSETS.fetch(new URL('/', url));
+    const html = (await shell.text()).replace(/(\s(?:src|href))="\.\//g, '$1="/');
+    return new Response(request.method === 'HEAD' ? null : html, {
+      status: 200,
+      headers: { ...headers, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
+    });
+  }
+
   async function theFile(request, url, tok, preview) {
     let file;
     try { file = await view(tok); } catch { return plain(502, 'This file did not load. Try again.'); }
@@ -111,6 +132,26 @@ export function sharedFileWorker({ cloud, anonKey, headers = {} }, { fetchImpl =
     }
     const shared = { 'cache-control': preview ? 'public, max-age=300' : 'no-store', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' };
     if (file.kind === 'page') return new Response(file.body, { headers: { ...shared, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': PAGE_CSP } });
+    if (isTable(file)) {
+      return new Response(file.body, { headers: { ...shared, 'content-type': `${file.type.toLowerCase()}; charset=utf-8`, 'content-security-policy': TEXT_CSP, 'content-disposition': `attachment; filename="${String(file.name).replace(/[^\w.\- ]+/g, '_')}"` } });
+    }
+    if (file.kind === 'video') {
+      const film = filmOf(file.body);
+      if (!film) return plain(404, 'This link does not work.');
+      let n = 0;
+      const pieces = new ReadableStream({
+        async pull(out) {
+          if (n >= film.pieces) { out.close(); return; }
+          const res = await fetchImpl(`${base}/storage/v1/object/link-files/${tok}/${film.hash}/${n++}`, {
+            headers: { apikey: anonKey, authorization: `Bearer ${anonKey}` },
+            signal: AbortSignal.timeout(PIECE_DEADLINE_MS),
+          });
+          if (!res.ok) { out.error(new Error(`a piece answered ${res.status}`)); return; }
+          out.enqueue(new Uint8Array(await res.arrayBuffer()));
+        },
+      });
+      return new Response(request.method === 'HEAD' ? null : pieces, { headers: { ...shared, 'content-type': /^video\/[a-z0-9.+-]{1,40}$/i.test(file.type ?? '') ? file.type : 'application/octet-stream', 'content-length': String(film.size), 'content-security-policy': TEXT_CSP, 'content-disposition': `attachment; filename="${String(file.name).replace(/[^\w.\- ]+/g, '_')}"` } });
+    }
     if (file.kind === 'markdown') return new Response(file.body, { headers: { ...shared, 'content-type': 'text/plain; charset=utf-8', 'content-security-policy': TEXT_CSP } });
     let bytes;
     try { bytes = bytesOf(file.body); } catch { return plain(404, 'This link does not work.'); }
@@ -123,6 +164,7 @@ export function sharedFileWorker({ cloud, anonKey, headers = {} }, { fetchImpl =
   return {
     async fetch(request, env) {
       const url = new URL(request.url);
+      if (url.pathname.startsWith('/t/')) return theThreadPage(request, env, url);
       if (url.pathname.startsWith('/F/')) return new Response(null, { status: 301, headers: { location: `${url.origin}/f/${url.pathname.slice(3)}`, 'cache-control': 'no-store' } });
       const p = PUNCTUATED.exec(url.pathname);
       if (p) return new Response(null, { status: 301, headers: { location: `${url.origin}/f/${p[1]}`, 'cache-control': 'no-store' } });

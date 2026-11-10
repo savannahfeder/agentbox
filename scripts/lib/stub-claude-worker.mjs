@@ -44,6 +44,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { readWorld, worldTurn, worldAnswer, titleIn, stepEvery, workStep } from './stand-in-world.mjs';
+import { makeArtifacts } from './stand-in-artifacts.mjs';
 
 const argv = process.argv.slice(2);
 const say = (obj) => process.stdout.write(JSON.stringify(obj) + '\n');
@@ -146,7 +147,7 @@ function storeServer() {
   return Object.entries(mcpServers()).find(([name, s]) => name !== 'zero-approvals' && (s?.env?.STORE_ACCOUNT_ID || (s?.type === 'http' && /\/store$/.test(s.url ?? ''))))?.[1];
 }
 
-// A server the app shares between runs (main/tool-host.mjs), spoken to over
+// A server the app shares between runs (main/tool-host.mts), spoken to over
 // HTTP as Claude Code speaks to it.
 function httpSession(server) {
   let sid = null;
@@ -321,7 +322,7 @@ const world = argv.includes('-p') ? readWorld(plan.world) : {};
 const turn = worldTurn(world, loginName);
 if (Object.keys(world).length) said = worldAnswer(said, turn, titleIn(promptText), attempt);
 // WHAT ONLY THE PERSON CAN GIVE, ASKED FOR THE WAY A CLOUD RUN IS TOLD TO
-// (main/cloud/run.mjs cloudNote, shared/cloud-needs.mjs), and only by a run that
+// (main/cloud/run.mts cloudNote, shared/cloud-needs.mts), and only by a run that
 // was told it may. The task's own words say what it needs: a service names a
 // sign-in, found in the environment once saved; "the original film" a file;
 // "npm publish" a one-time code; Xcode or the simulator the computer itself.
@@ -419,6 +420,17 @@ const BROWSER_SIGN_INS = [
 }
 const handsOver = directive('stub:file')?.[1];
 if (handsOver) said = `${said}\n\n${handsOver}\n`;
+// A task that asks for something to look at gets real files, saved where a real agent saves them.
+if (plan.makesFiles && process.env.ZERO_ITEM && argv.includes('-p')) {
+  const brief = (() => { const at = argv.indexOf('--append-system-prompt'); return at >= 0 ? argv[at + 1] ?? '' : ''; })();
+  const docsDir = `${brief}\n${promptText}`.match(/^Product docs live in: (.+)$/m)?.[1]?.trim();
+  const task = promptText.match(/^Title: [\s\S]*?(?=\n# |(?![\s\S]))/m)?.[0] ?? '';
+  const asked = promptText.match(/# The founder has answered[\s\S]*?\n> (.*)/)?.[1] ?? '';
+  try {
+    const files = makeArtifacts({ docsDir, item: process.env.ZERO_ITEM, task, asked, promptText });
+    if (files.length) said = `${said}\n\n${files.join('\n')}\n`;
+  } catch { /* a stand-in's file is never worth its answer */ }
+}
 if (directive('stub:limit') || (directive('stub:limit-first') && attempt === 1) || (limitOn && limitOn === loginName) || turn.limit) {
   say({ type: 'result', subtype: 'success', result: "You've hit your session limit · resets 11:59pm", is_error: true, session_id: sessionId });
   await Promise.race([inputEnded, wait(2000)]);

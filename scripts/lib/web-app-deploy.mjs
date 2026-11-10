@@ -1,5 +1,5 @@
 // THE WEB APP GOES UP WITH THE SHIP THAT CHANGED IT
-// (tests/the-web-app-is-deployed-when-a-ship-changes-it.test.mjs).
+// (tests/the-web-app-is-deployed-when-a-ship-changes-it.test.mts).
 //
 // The live site says which commit it was built from (scripts/build-phone-site.mjs).
 // After a push, a ship that changed anything the site is built from since that

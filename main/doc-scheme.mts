@@ -38,6 +38,8 @@
 // is why the roots are granted and not just the folder.
 import path from 'node:path';
 import { DOC_SCHEME, DOC_SCHEMES, isScheme } from '../shared/schemes.mts';
+import { urlPathOf, windowsFileOf } from '../shared/file-url-path.mts';
+import { inside } from './img-scheme.mts';
 
 // The name is read rather than typed, and every spelling this app has used is
 // still answered, because a url on this scheme is STORED. shared/schemes.mts
@@ -51,34 +53,24 @@ export { DOC_SCHEME, DOC_SCHEMES };
 export const DOC_HOST = 'file';
 
 /** The url the pane points its frame at, for a file already resolved on disk. */
-export function docUrl(file: unknown): string | null {
-  if (typeof file !== 'string' || !path.isAbsolute(file)) return null;
-  // Each segment on its own: encodeURIComponent would eat the separators, and
-  // encodeURI would leave '#' and '?' in a filename to be read as url syntax.
-  const parts = file.split('/').filter(Boolean).map(encodeURIComponent);
-  return `${DOC_SCHEME}://${DOC_HOST}/${parts.join('/')}`;
+export function docUrl(file: unknown, platform: string = process.platform): string | null {
+  const at = urlPathOf(file, platform);
+  return at === null ? null : `${DOC_SCHEME}://${DOC_HOST}${at}`;
 }
 
 /** The file a request under this scheme is asking for, or null if it is not one. */
-export function docPath(url: unknown): string | null {
+export function docPath(url: unknown, platform: string = process.platform): string | null {
   let parsed: URL;
   try { parsed = new URL(String(url)); } catch { return null; }
   if (!isScheme(DOC_SCHEMES, parsed.protocol)) return null;
+  if (platform === 'win32') return windowsFileOf(parsed.pathname);
   let file: string;
   try { file = decodeURIComponent(parsed.pathname); } catch { return null; }
   if (!file.startsWith('/')) return null;
   // The url is the only thing between a page and the disk, so a climb written
   // into it is normalised away here rather than trusted to the grant check.
-  const normal = path.normalize(file);
-  return path.isAbsolute(normal) ? normal : null;
-}
-
-/** Is `file` inside `dir`, without /a/bc counting as inside /a/b. */
-function inside(dir: string | null | undefined, file: string | null | undefined): boolean {
-  if (!dir || !file) return false;
-  const d = path.resolve(dir);
-  const f = path.resolve(file);
-  return f === d || f.startsWith(d + path.sep);
+  const normal = path.posix.normalize(file);
+  return path.posix.isAbsolute(normal) ? normal : null;
 }
 
 /**
@@ -92,18 +84,22 @@ function inside(dir: string | null | undefined, file: string | null | undefined)
 export class DocGrants {
   declare limit: number;
   declare roots: string[];
+  declare platform: string;
+  declare path: typeof path.posix;
 
-  constructor(limit = 8) {
+  constructor(limit = 8, platform: string = process.platform) {
     this.limit = limit;
+    this.platform = platform;
+    this.path = platform === 'win32' ? path.win32 : path.posix;
     this.roots = [];
   }
 
   /** Open this file, and the folders that come with it, to the scheme. */
   grant(file: unknown, roots: string[] = []): void {
-    if (typeof file !== 'string' || !path.isAbsolute(file)) return;
-    const add = [path.dirname(file), ...roots.filter((r) => typeof r === 'string' && r)];
+    if (typeof file !== 'string' || !this.path.isAbsolute(file)) return;
+    const add = [this.path.dirname(file), ...roots.filter((r) => typeof r === 'string' && r)];
     for (const root of add) {
-      const r = path.resolve(root);
+      const r = this.path.resolve(root);
       if (this.roots.includes(r)) continue;
       this.roots.push(r);
     }
@@ -113,8 +109,8 @@ export class DocGrants {
   /** May the scheme read this path. */
   allows(file: unknown): boolean {
 
-    if (typeof file !== 'string' || !path.isAbsolute(file)) return false;
-    return this.roots.some((root) => inside(root, file));
+    if (typeof file !== 'string' || !this.path.isAbsolute(file)) return false;
+    return this.roots.some((root) => inside(root, file, this.platform));
   }
 }
 

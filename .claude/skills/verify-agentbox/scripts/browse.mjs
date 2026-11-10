@@ -9,11 +9,13 @@
 //   node browse.mjs dblclick <n> | rightclick <n>
 //   node browse.mjs drag <n> <m>         press on n, drag to m, let go (a block of cells)
 //   node browse.mjs drag <n> +140        drag n's right edge 140px across (a column's width)
+//   node browse.mjs scroll down|up [n]   the wheel over the page, n screens (look lists only what is on screen)
 //   node browse.mjs type "<text>"        type into whatever has the cursor
 //   node browse.mjs press <key> [meta] [shift] [ctrl] [alt]   one key: n, Enter, Escape, ArrowDown…
 //   node browse.mjs attach <file...>     hand files to the file picker on screen
 //   node browse.mjs shot <name>          a picture, saved beside the findings
 //   node browse.mjs away <minutes>       step away (up to 9), then look at what changed
+//   node browse.mjs goto <url>           open a web address someone sent you (reload comes back)
 //   node browse.mjs reload | close
 //
 // Every command is logged to actions.jsonl beside the findings, with how long
@@ -77,17 +79,19 @@ const LOOK = `(() => {
     el.setAttribute('data-breaker-ref', String(i + 1));
     const words = (el.getAttribute('aria-label') || el.innerText || el.textContent || el.getAttribute('placeholder') || el.getAttribute('title') || '').replace(/\\s+/g, ' ').trim().slice(0, 70);
     const kind = el.tagName.toLowerCase() + (el.getAttribute('role') ? '[' + el.getAttribute('role') + ']' : '');
-    return (i + 1) + '. ' + kind + ' "' + words + '"' + (document.activeElement === el ? '  <- cursor here' : '');
+    const ticked = ['aria-current', 'aria-checked', 'aria-pressed', 'aria-selected'].some((a) => el.getAttribute(a) === 'true');
+    return (i + 1) + '. ' + kind + ' "' + words + '"' + (ticked ? '  (ticked)' : '') + (document.activeElement === el ? '  <- cursor here' : '');
   });
   // A thread's newest messages are at its foot, so a long screen keeps its end as well as its start.
   const all = document.body.innerText.replace(/\\n{3,}/g, '\\n\\n');
   const max = 6000;
   const text = all.length <= max ? all
     : all.slice(0, 2000) + '\\n[' + (all.length - max) + ' characters in the middle left out]\\n' + all.slice(-(max - 2000));
-  return 'SCREEN TEXT:\\n' + text + '\\n\\nTHINGS TO PRESS (' + list.length + '):\\n' + list.join('\\n');
+  // A page opened beside a thread draws in a frame, whose words the screen text cannot read.
+  const frames = [...document.querySelectorAll('iframe')].filter(seen).map((f) => (f.title || decodeURIComponent((f.getAttribute('src') || '').split(/[?#]/)[0].split('/').pop() || 'a page')).slice(0, 80));
+  return 'SCREEN TEXT:\\n' + text + (frames.length ? '\\n\\nPAGES OPEN ON SCREEN (drawn, not read here; take a shot to see them): ' + frames.join(', ') : '') + '\\n\\nTHINGS TO PRESS (' + list.length + '):\\n' + list.join('\\n');
 })()`;
 
-const running = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
 /** The page loads before the app draws; a look straight after shows an empty screen. */
 const drawn = (t) => t.until('document.querySelectorAll("button").length > 0', { ms: 15_000 }).catch(() => {});
 
@@ -108,10 +112,15 @@ async function launch() {
 
 async function tab() {
   const b = saved();
-  if (!b) { console.log('No browser yet. Run: browse.mjs open'); process.exit(1); }
+  // An open that failed leaves nothing saved; a tester told only to look would be stuck for the rest of the test.
+  if (!b) {
+    console.log('(There was no browser on the app, so one was opened.)');
+    return launch();
+  }
   // The browser is the tester's, not the app's: if it went, open it again rather than fail every command after.
   // A pid that answers can still be a dead Chrome nobody reaped, so the connection decides.
-  const t = running(b.pid) ? await connect(b.wsUrl, { targetId: b.targetId }).catch(() => null) : null;
+  // The connection alone decides: a sandboxed tester may not signal another process, so a live Chrome reads as gone.
+  const t = await connect(b.wsUrl, { targetId: b.targetId }).catch(() => null);
   if (!t) {
     console.log('(The browser had closed, so it was opened on the app again.)');
     return launch();
@@ -140,11 +149,16 @@ const catchErrors = `window.__breakerErrors = window.__breakerErrors || [];
 async function thingAt(t, which, clickIfCovered, scroll = true) {
   return t.evaluate(`(() => {
     const w = ${JSON.stringify(String(which))};
+    const named = (e) => (e.getAttribute('aria-label') || e.innerText || e.textContent || '').replace(/\\s+/g, ' ').trim().toLowerCase().startsWith(w.toLowerCase());
+    // By name, a thing further down the page counts too: a person scrolls to what they can see the name of.
     const el = /^\\d+$/.test(w) ? document.querySelector('[data-breaker-ref="' + w + '"]')
-      : [...document.querySelectorAll('[data-breaker-ref]')].find((e) => (e.getAttribute('aria-label') || e.innerText || e.textContent || '').replace(/\\s+/g, ' ').trim().toLowerCase().startsWith(w.toLowerCase()));
+      : [...document.querySelectorAll('[data-breaker-ref]')].find(named)
+        || [...document.querySelectorAll('button, a[href], [role="button"], [role="tab"], [role="menuitem"]')].find((e) => named(e) && e.getClientRects().length > 0);
     if (!el) return null;
-    const at = () => { const r = el.getBoundingClientRect(); const x = r.left + r.width / 2; const y = r.top + r.height / 2;
-      const top = document.elementFromPoint(x, y); return { r, x, y, reachable: !!top && (top === el || el.contains(top) || top.contains(el)) }; };
+    // A link that wraps has the sentence around it at the middle of its box.
+    const at = () => { const lines = el.getClientRects(); const r = el.getBoundingClientRect(); const aim = lines.length > 1 ? lines[0] : r;
+      const x = aim.left + aim.width / 2; const y = aim.top + aim.height / 2;
+      const top = document.elementFromPoint(x, y); return { r, x, y, reachable: !!top && (top === el || el.contains(top)) }; };
     if (${scroll}) el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     // Scrolled only to the nearest edge, a cell can sit under a table's frozen first column; a person would scroll it clear.
     let { r, x, y, reachable } = at();
@@ -175,7 +189,8 @@ async function report(t, what) {
 
 if (verb === 'open') {
   const was = saved();
-  if (was && running(was.pid)) { console.log('Already open. Use: look'); process.exit(0); }
+  const live = was ? await connect(was.wsUrl, { targetId: was.targetId }).catch(() => null) : null;
+  if (live) { live.detach(); console.log('Already open. Use: look'); process.exit(0); }
   const t = await launch();
   console.log(await t.evaluate(LOOK));
   t.detach();
@@ -193,12 +208,37 @@ if (verb === 'open') {
   const held = unknown.length ? [] : mods;
   const t = await tab();
   const hit = await thingAt(t, which, verb === 'click');
+  // An app link (agentbox://f/<token>) opens the desktop app on a Mac. This
+  // browser has no app to open, so the copy is handed the link the same way.
+  const appLink = hit && verb === 'click' ? await t.evaluate(`(() => { const w = ${JSON.stringify(String(which))}; const el = /^\\d+$/.test(w) ? document.querySelector('[data-breaker-ref="' + w + '"]') : [...document.querySelectorAll('[data-breaker-ref]')].find((e) => (e.getAttribute('aria-label') || e.innerText || e.textContent || '').replace(/\\s+/g, ' ').trim().toLowerCase().startsWith(w.toLowerCase())); const a = el && el.closest('a[href]'); return a && /^[a-z][a-z0-9+.-]*:\\/\\/f\\//i.test(a.getAttribute('href')) && !/^https?:/i.test(a.getAttribute('href')) ? a.getAttribute('href') : null; })()`) : null;
+  if (appLink) {
+    const token = /\/f\/([A-Za-z0-9_-]+)/.exec(appLink)?.[1];
+    const { identifier } = await t.call('Page.addScriptToEvaluateOnNewDocument', { source: `(() => { let real; let given = false; Object.defineProperty(window, 'zero', { configurable: true, get() { return real; }, set(v) { real = v; if (v && typeof v === 'object') { const own = v.takeSharedFile; v.takeSharedFile = async () => { if (given) return own ? own() : null; given = true; return ${JSON.stringify(token)}; }; } } }); })()` });
+    await t.goto(state.url);
+    await drawn(t);
+    await t.call('Page.removeScriptToEvaluateOnNewDocument', { identifier }).catch(() => {});
+    await t.wait(2500);
+    waited += 2500;
+    await report(t, `Pressed "${hit.words}". Your Agentbox opened.`);
+    t.detach();
+    process.exit(0);
+  }
   // A real press, because only a real press may start a film with sound.
   if (hit?.reachable) await mouse(t, hit, { button: verb === 'rightclick' ? 'right' : 'left', times: verb === 'dblclick' ? 2 : 1, mods: held });
   const said = verb === 'dblclick' ? 'Double-clicked' : verb === 'rightclick' ? 'Right-clicked' : 'Pressed';
   await report(t, hit === null ? `Nothing numbered or named "${which}" on screen. Run look again.`
     : !hit.reachable && verb !== 'click' ? `"${hit.words}" is covered by something else on screen.`
       : `${said} "${hit.words}"${held.length ? ` holding ${held.join('+')}` : ''}.`);
+  t.detach();
+} else if (verb === 'scroll') {
+  // `scroll down` / `scroll up [n]`: the wheel over the middle of the page, n screens' worth.
+  const up = String(args[0] ?? 'down').toLowerCase() === 'up';
+  const screens = Math.min(Math.max(Number(args[1]) || 1, 1), 10);
+  const t = await tab();
+  const mid = await t.evaluate('({ x: Math.round(innerWidth * 0.45), y: Math.round(innerHeight / 2), h: innerHeight })');
+  await t.call('Input.dispatchMouseEvent', { type: 'mouseWheel', x: mid.x, y: mid.y, deltaX: 0, deltaY: (up ? -1 : 1) * mid.h * 0.8 * screens });
+  await t.wait(300);
+  await report(t, `Scrolled ${up ? 'up' : 'down'}.\n${await t.evaluate(LOOK)}`);
   t.detach();
 } else if (verb === 'drag') {
   // `drag 12 30`: from one numbered thing to another (a block of cells, rows).
@@ -275,6 +315,17 @@ if (verb === 'open') {
   await t.capture(file);
   console.log(`Saved ${file}`);
   t.detach();
+} else if (verb === 'goto') {
+  // A web address someone sent you (a shared file's link), opened in this tab. `reload` comes back to the app.
+  const to = String(args[0] ?? '');
+  if (!/^https?:\/\//.test(to)) { console.log('goto takes a web address (http:// or https://).'); process.exit(2); }
+  const t = await tab();
+  await t.goto(to);
+  await t.wait(1500);
+  waited += 1500;
+  await t.evaluate(catchErrors).catch(() => {});
+  console.log(await t.evaluate(LOOK));
+  t.detach();
 } else if (verb === 'reload') {
   const t = await tab();
   await t.goto(state.url);
@@ -296,7 +347,7 @@ if (verb === 'open') {
   try { fs.rmSync(FILE); } catch { /* none */ }
   console.log('Closed.');
 } else {
-  console.log('usage: browse.mjs open | look | click <n|words> | type "<text>" | press <key> [meta shift ctrl alt] | shot <name> | away <minutes> | reload | close');
+  console.log('usage: browse.mjs open | look | click <n|words> | scroll down|up [n] | type "<text>" | press <key> [meta shift ctrl alt] | shot <name> | away <minutes> | goto <url> | reload | close');
   process.exit(2);
 }
 logAction();

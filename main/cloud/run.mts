@@ -63,27 +63,27 @@ import { readMarker, writeMarker, clearMarker, addCloudNews, commonGitDirOf } fr
 import { Name, nameSlug } from '../../shared/product-name.mjs';
 import { KEPT_ASIDE } from '../../shared/not-shipped.mts';
 import { codexTranscriptFile } from '../codex-session.mts';
-import { CLIENT_INFO } from '../codex-app-server.mjs';
+import { CLIENT_INFO } from '../codex-app-server.mts';
 import { appendCloudUsage } from './usage.mts';
 import { docsFolderFor, docsToSend, tarDocs, layDocs } from './docs.mts';
 import type { LaidFile } from './docs.mts';
 import { troubleCause, limitResetMoment } from '../../shared/spawn-trouble.mts';
-import { HAND_BACK } from '../../shared/cloud-hand-back.mjs';
-import { NEED, SERVICES } from '../../shared/cloud-needs.mjs';
-import { filesSentFor, SENT_FILE_MAX } from '../../shared/cloud-sent-files.mjs';
+import { HAND_BACK } from '../../shared/cloud-hand-back.mts';
+import { NEED, SERVICES } from '../../shared/cloud-needs.mts';
+import { filesSentFor, SENT_FILE_MAX } from '../../shared/cloud-sent-files.mts';
 import { sentLine } from '../../shared/cloud-start.mts';
 import { referencedFiles } from '../../shared/referenced-files.mts';
 import { serveApprovals } from '../approval-prompt-core.mts';
 import { helperWatch, HELPERS_LOST } from '../claude-input.mts';
 import type { HelperState } from '../claude-input.mts';
 import { cacheKey, folderKey, sendOnce, pickBase, bundlePast, refsAt, sendConversation, sentRecordPath } from './reuse.mts';
-import { KIT_VERSION, checkKit, kitKey } from '../../shared/cloud-kit.mjs';
-import { NEW_ITEM_MARK } from '../../shared/cloud-kit.mjs';
-import { APPROVALS_SERVER } from '../../shared/cloud-kit.mjs';
+import { KIT_VERSION, checkKit, kitKey } from '../../shared/cloud-kit.mts';
+import { NEW_ITEM_MARK } from '../../shared/cloud-kit.mts';
+import { APPROVALS_SERVER } from '../../shared/cloud-kit.mts';
 import { asksPermission, approvalsHandshakes } from './kit.mts';
 import { snapshotSkills, filesInFolder } from './skills.mts';
 import { createResourceRequests, resourceContextFor, accountFolderFor } from './resources.mts';
-import { saveCloudKey } from './keys.mjs';
+import { saveCloudKey } from './keys.mts';
 import type { ResourceContext, ResourceState } from './resources.mts';
 import type { CloudMarker } from './marker.mts';
 import type { CloudCallError, CloudEvent, CloudReply, CloudStorage, CloudTransport } from './managed.mts';
@@ -253,7 +253,7 @@ export interface NewThreadAsk {
   defaultEngine?: 'claude' | 'codex';
 }
 
-/** A kit for the phone, not a run (shared/cloud-kit.mjs). */
+/** A kit for the phone, not a run (shared/cloud-kit.mts). */
 export interface CloudKit {
   device: string;
   project: string;
@@ -354,7 +354,7 @@ export function cloudNote({ plain = false, limitMs = RUN_LIMIT_MS, keys = null }
   if (plain) {
     return [
       HEADING,
-      'This turn runs in a Linux cloud sandbox (Debian, 2 cores, 8 GB) that is yours for this run and thrown away after it. It has: the project\'s documents folder, which is the folder you work in, at the same path as on their computer, but only its small files (up to 256 KB each), plus this thread\'s own designs folder (its newest files, up to 50 MB), every file attached to this thread (up to 1 GB each, at its own path in attachments/), and any file or folder the request names under the account\'s documents (up to 25 MB a file, 100 MB a folder); what you write there goes back to their computer as you work. There is no git repository here. It also has the store tools (look_at_page excepted); git, node, npm, python3 and pip, make, g++, curl, wget, unzip; and Playwright with Chromium already installed (`require(\'playwright\')` works from any folder; its Chromium is Debian\'s patched build with the sandbox on, so when a project\'s own Playwright asks for a different browser, launch it with `executablePath: \'/opt/agentbox/chromium.sh\'` rather than downloading one).',
+      'This turn runs in a Linux cloud sandbox (Debian, 2 cores, 8 GB of memory with no swap, and about 5 GB of free disk: delete large renders and downloads once you are done with them, because a full disk can stop the run\'s work coming back) that is yours for this run and thrown away after it. It has: the project\'s documents folder, which is the folder you work in, at the same path as on their computer, but only its small files (up to 256 KB each), plus this thread\'s own designs folder (its newest files, up to 50 MB), every file attached to this thread (up to 1 GB each, at its own path in attachments/), and any file or folder the request names under the account\'s documents (up to 25 MB a file, 100 MB a folder); what you write there goes back to their computer as you work. There is no git repository here. It also has the store tools (look_at_page excepted); git, node, npm, python3 and pip, make, g++, curl, wget, unzip; and Playwright with Chromium already installed (`require(\'playwright\')` works from any folder; its Chromium is Debian\'s patched build with the sandbox on, so when a project\'s own Playwright asks for a different browser, launch it with `executablePath: \'/opt/agentbox/chromium.sh\'` rather than downloading one).',
       'Install whatever else the work needs: you have sudo (`sudo apt-get update && sudo apt-get install -y <package>`, `pip install --user`, `npm install`).',
       'It does not have: any other file from their computer (documents over 256 KB, other threads\' design folders, large media, files under the home folder, /tmp from an earlier turn); API keys, key files or tokens kept on their computer; their computer\'s apps (Xcode, a simulator, their browser and its sign-ins).',
       howLongNote(limitMs),
@@ -363,7 +363,7 @@ export function cloudNote({ plain = false, limitMs = RUN_LIMIT_MS, keys = null }
   }
   return [
     HEADING,
-    'This turn runs in a Linux cloud sandbox (Debian, 2 cores, 8 GB) that is yours for this run and thrown away after it. It has: this task folder (its git branch and main, at the same path as on their computer); the project\'s documents folder at its usual path, but only its small files (up to 256 KB each), plus this thread\'s own designs folder (its newest files, up to 50 MB), every file attached to this thread (up to 1 GB each, at its own path in attachments/), and any file or folder the request names under the account\'s documents (up to 25 MB a file, 100 MB a folder); the store tools (look_at_page excepted); git, node, npm, python3 and pip, make, g++, curl, wget, unzip; and Playwright with Chromium already installed (`require(\'playwright\')` works from any folder; its Chromium is Debian\'s patched build with the sandbox on, so when a project\'s own Playwright asks for a different browser, launch it with `executablePath: \'/opt/agentbox/chromium.sh\'` rather than downloading one).',
+    'This turn runs in a Linux cloud sandbox (Debian, 2 cores, 8 GB of memory with no swap, and about 5 GB of free disk: delete large renders and downloads once you are done with them, because a full disk can stop the run\'s work coming back) that is yours for this run and thrown away after it. It has: this task folder (its git branch and main, at the same path as on their computer); the project\'s documents folder at its usual path, but only its small files (up to 256 KB each), plus this thread\'s own designs folder (its newest files, up to 50 MB), every file attached to this thread (up to 1 GB each, at its own path in attachments/), and any file or folder the request names under the account\'s documents (up to 25 MB a file, 100 MB a folder); the store tools (look_at_page excepted); git, node, npm, python3 and pip, make, g++, curl, wget, unzip; and Playwright with Chromium already installed (`require(\'playwright\')` works from any folder; its Chromium is Debian\'s patched build with the sandbox on, so when a project\'s own Playwright asks for a different browser, launch it with `executablePath: \'/opt/agentbox/chromium.sh\'` rather than downloading one).',
     'Install whatever else the work needs: you have sudo (`sudo apt-get update && sudo apt-get install -y <package>`, `pip install --user`, `npm install`). When you install a program the project will need again, add the same lines to `.agentbox/cloud-setup.sh` in the task folder and commit it: that script runs before every cloud run of this project, and its output from this run is in /tmp/agentbox-cloud-setup.log.',
     'It does not have: the project\'s other branches (only this task\'s branch and main came up); any other file from their computer (other threads\' design folders, large media, files under the home folder); files an earlier turn left outside git (node_modules, gitignored folders such as scripts/scratch, /tmp); API keys, key files or tokens kept on their computer; their computer\'s apps (Xcode, a simulator, their browser and its sign-ins). Run `npm ci --ignore-scripts` before anything that needs node_modules. Open files are capped at 1024 here (the cloud fixes that ceiling), so a test runner that watches the whole project (`vitest related`, `npm run test:changed`) fails with EMFILE: run the test files you changed and the ones that import them by name with `npx vitest run <files>`.',
     `Only this task's own branch comes back to their computer. A commit, merge or reset on main or any other branch stays in this sandbox and is thrown away with it, so a merge done here has not happened. To ship, when your brief has a section on How this task ships, do what it says from here: commit on this branch and add the label \`ship\`. The app ships the branch on their computer once it comes home, so a ship never needs the hand-back line. When your brief has no section on how this task ships and the request includes merging into main, or whenever it includes changing any branch but this task's, do the rest of the work and commit it on this branch, then end your turn with the one line \`${HAND_BACK} merging into main\` (as below): the app merges on their computer.`,
@@ -860,7 +860,7 @@ export function tarOf(dir: string) {
 const withoutKeys = <T extends { key?: string }>(list: T[]) => list.map(({ key: _k, ...rest }) => rest);
 
 // A NEW THREAD'S KIT is packed in the project's checkout and named for the
-// task folder the thread will have (shared/cloud-kit.mjs fillNewThreadKit):
+// task folder the thread will have (shared/cloud-kit.mts fillNewThreadKit):
 // its transcripts' folder, and what was sent into the checkout's, are that
 // folder's.
 function newThreadNames(n: NewThreadAsk, { cwd, startSha, files, joins, bringDirs }: { cwd: string; startSha: string | null; files: PackedFile[]; joins: Record<string, unknown>; bringDirs: BringDir[] }) {
@@ -910,7 +910,7 @@ export async function cloudRun({
   // Other sign-ins the run carries, in the same shape (./run-cli.mts
   // `loginsCarriedBy`). The sandbox places them if it can and starts anyway.
   also = [],
-  // The keys saved for cloud runs (./keys.mjs keysCarried): { name, key }.
+  // The keys saved for cloud runs (./keys.mts keysCarried): { name, key }.
   keys = [],
   // Told when the sandbox says the login was missing, refused or ran out.
   onLoginTrouble = () => {},
@@ -947,7 +947,7 @@ export async function cloudRun({
   // past a base the bucket already has (./reuse.mts).
   imageCaps = [],
   onCaps = () => {},
-  // A KIT FOR THE PHONE, not a run (shared/cloud-kit.mjs): { device, project,
+  // A KIT FOR THE PHONE, not a run (shared/cloud-kit.mts): { device, project,
   // item, frame, copy }. The pack goes up under the thread's kit and the kit
   // names it; nothing starts, and this folder's marker is left alone.
   kit = null,
@@ -2202,8 +2202,8 @@ export async function cloudRun({
   }
 }
 
-// A CODEX KIT'S OPENING LINES (shared/cloud-kit.mjs): what the computer's own
-// client (main/codex-app-server.mjs) sends to open the thread, the resume
+// A CODEX KIT'S OPENING LINES (shared/cloud-kit.mts): what the computer's own
+// client (main/codex-app-server.mts) sends to open the thread, the resume
 // rewritten here as a run's is, so the store is the sandbox's stub and the
 // rollout the resume needs goes with the pack. The ids are the kit's own.
 export const CODEX_RESUME_ID = 2;
@@ -2371,7 +2371,7 @@ async function gitIdentity(cwd: string) {
 function alive(pid: number) { try { process.kill(pid, 0); return true; } catch { return false; } }
 
 // A stored object straight to a file, and a file straight to storage, when the
-// storage can (main/cloud/aws.mjs); a stand-in that cannot goes through memory.
+// storage can (main/cloud/aws.mts); a stand-in that cannot goes through memory.
 async function fetchToFile(storage: CloudStorage, k: string, file: string) {
   if (storage.getToFile) return storage.getToFile(k, file);
   const body = await storage.get(k);
@@ -2462,7 +2462,7 @@ export function servedHere(cfg: Partial<ServerConfig> | undefined, env: NodeJS.P
     // Named here: runs share this process, so its own ZERO_ITEM is whichever run set it last.
     const ownItem = cfg!.env?.ZERO_ITEM || env.ZERO_ITEM || null;
     const ownProduct = cfg!.env?.ZERO_PRODUCT || env.ZERO_PRODUCT || null;
-    return channel(async (io) => (await import('../../mcp/stdio.mjs')).serveStore({ ...io, holder: `mcp-cloud-${holder}`, ownItem, ownProduct, requestCloudResource, keepCloudKey } as {}));
+    return channel(async (io) => (await import('../../mcp/stdio.mts')).serveStore({ ...io, holder: `mcp-cloud-${holder}`, ownItem, ownProduct, requestCloudResource, keepCloudKey } as {}));
   }
   return null;
 }

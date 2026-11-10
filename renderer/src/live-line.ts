@@ -32,7 +32,7 @@
 import { spanLabel } from './notes';
 import { Name } from '../../shared/product-name.mjs';
 import { resetDay } from '../../shared/usage.mts';
-import { openSignIn } from '../../shared/sign-in-ask.mjs';
+import { openSignIn } from '../../shared/sign-in-ask.mts';
 import { MAC } from './this-keyboard';
 import { whyWords, type WhyCard } from './where-why';
 import type { RunningSession, WhyNotCloud, WorkItem } from './types';

@@ -8,7 +8,7 @@ import {DirectReview} from './DirectReview';
 import {MessageFiles} from './MessageFiles';
 import {withoutBareTwins} from '../file-glance';
 import {reviewLabEnabled, reviewContextDraft} from '../review-lab';
-import { sourceReference } from '../source-reference.mjs';
+import { sourceReference } from '../source-reference.ts';
 import { remarkTicketReferences, resolveTicket, ticketReference, TICKET_HREF } from '../ticket-references';
 import { TicketItems, TicketLink, TicketNavigation } from './TicketReference';
 import { Mention, MentionIcon } from './Mention';
@@ -52,7 +52,7 @@ import {
   CODEX_MODE_STATUS,
   exactCodexMode,
   nextCodexMode,
-} from '../../../shared/codex-modes.mjs';
+} from '../../../shared/codex-modes.mts';
 /*
  * THE ROW'S TWO WORDS COME FROM `rowSays` NOW, not from six constants pulled
    apart here. One list, one row shape (w-23a7b3f568, 2026-08-27). */
@@ -60,16 +60,16 @@ import { commandBeingWritten, enterWaitsForWords, holdingHint, rowKey, rowSays, 
 import { commandDraft } from '../../../shared/claude-commands.mts';
 import { CompactionResult, runCompaction, runCommand } from './CompactionResult';
 import { codexCommand, COMPACTION_COPY } from '../../../shared/codex-commands.mts';
-import { DEFAULT_ENGINE } from '../../../shared/engines.mjs';
+import { DEFAULT_ENGINE } from '../../../shared/engines.mts';
 import { dayLabel, itemOptions, offerIsLive, optionsFrom, parseOptions, parseRepeat, repeatsLine, stripOptionsSection, type ParsedOption } from '../format';
-import { ruleIdOf } from '../../../shared/repeats.mjs';
-import { shownPriority } from '../../../shared/rank.mjs';
+import { ruleIdOf } from '../../../shared/repeats.mts';
+import { shownPriority } from '../../../shared/rank.mts';
 import { WhenPicker } from './When';
 import { ReplyModel } from './ReplyModel';
 import type { ModelChoice } from '../models';
-import { sameRule, type RepeatShape as RepeatRuleValue } from '../../../shared/repeats.mjs';
+import { sameRule, type RepeatShape as RepeatRuleValue } from '../../../shared/repeats.mts';
 import { fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
-import { onPictureLinks, pictureLinksVersion, pictureUrl, sentPictureLink } from '../picture';
+import { onPictureLinks, pictureLinksVersion, pictureUrl, sentPictureLink, wholeMediaPath, wholePicturePath } from '../picture';
 import { Listening, MicButton, useWebDictation } from './WebDictation';
 import { firstFrameSrc, playerShelf } from '../player-shelf';
 import { handleCopyOut, blockCopyText } from '../copy-out';
@@ -77,22 +77,22 @@ import { diagramSource } from '../diagram-fence';
 import { DiagramBlock } from './DiagramBlock';
 import { NeedCard, NeedPlace, HELD, setHeld } from './NeedCard';
 import { NEED_BLOCK, isNewestAnswer, keyFromReply, keyLooksWrong, keySavedWords, needsAsBlocks } from '../key-asks';
-import { connectedReply, lateReply, needsIn, needId, keysOf, type Need } from '../../../shared/cloud-needs.mjs';
-import { keyLabel, keyWords } from '../../../shared/cloud-keys.mjs';
+import { connectedReply, lateReply, needsIn, needId, keysOf, type Need } from '../../../shared/cloud-needs.mts';
+import { keyLabel, keyWords } from '../../../shared/cloud-keys.mts';
 import { referencedFiles, isImagePath } from '../referenced-files';
 import { pictureRoots } from '../message-folders';
 import { changePathFor } from '../code-artifact';
 import { fileCount, figuresFrom, figuresLabel, signed, type ChangeFigures } from '../change-figures';
 import { embeddedDocuments, isBookkeeping, messageDocuments } from '../message-artifacts';
 import { remarkMediaUnderSentences } from '../media-row';
-import { newestOfFamily } from '../../../shared/artifact-marks.mjs';
+import { newestOfFamily } from '../../../shared/artifact-marks.mts';
 import { PictureView, picturesFor, type Picture } from './PictureView';
 import { opensAsPicture } from '../picture-view';
 import { ThreadArtifacts } from './ThreadArtifacts';
 import type { ArtifactOpen } from './ArtifactView';
-import { fileNewsFor, shownName } from '../../../shared/artifact-marks.mjs';
+import { fileNewsFor, shownName, type ThreadLine } from '../../../shared/artifact-marks.mts';
 import { whereAFileOpens } from '../artifact-layout';
-import { carryLine, type CarryState } from '../../../shared/carried-files.mjs';
+import { carryLine, type CarryState } from '../../../shared/carried-files.mts';
 import { watchScrollGutter } from '../scroll-gutter';
 import { CODE_PATH, artifactUrlTransform, isMediaPath, productPath, remarkArtifactPaths } from '../remark-artifact-paths';
 import { api } from '../api';
@@ -101,7 +101,7 @@ import { ReplyLater } from './ReplyLater';
 import { effortSaid, pickOnTheRow, pickToSend, replyOpensOn } from '../reply-pick';
 import { withQuote } from '../team/chat-quote';
 import { THREAD_WIDTH, THREAD_WIDTH_KEY, clampThreadWidth, threadToOpen } from '../team/chat-threads';
-import { heldByAPerson, isGivenTask, nameIsAPersons, whatWaits } from '../../../shared/team-rules.mjs';
+import { heldByAPerson, isGivenTask, nameIsAPersons, whatWaits } from '../../../shared/team-rules.mts';
 import { FormatBar } from '../team/FormatBar';
 import { forgetVoiceDraft, markVoiceSent, sendTurnedBack, type Recorded, type VoiceControl } from '../team/useVoiceRecorder';
 import { VoiceNote } from '../team/VoiceNote';
@@ -112,12 +112,13 @@ import { RichReply, type RichBox } from '../team/RichReply';
 import { OptionsOffer } from './OptionsOffer';
 import { foldedReply } from '../folded-reply';
 import { applyDockHeight } from '../dock-height';
-import { resumeTo } from '../thread-bottom';
+import { ClipGlyph, SendGlyph } from './reply-glyphs';
+import { bringIntoView, resumeTo } from '../thread-bottom';
 import { optionIsClipped, optionPeek } from '../option-peek';
 import { changedFiles, FOLDER_SETTLES_MS, folderMayStillMove, onlyNamedFiles, shipOfferFor, shipOfferLive, standingFrom, UNREAD, type ChangedFile, type Standing } from '../ship-offer';
 import { MOVED_PX, THE_OPTIONS_MOVED, clickLandsOnTheRowYouSaw } from '../pick-settles';
 import { askHeading, askFull, askIsClipped } from '../ask-line';
-import { replyIsSwallowed, replyReaches } from '../../../shared/agents.mjs';
+import { replyIsSwallowed, replyReaches } from '../../../shared/agents.mts';
 import { recapFor } from '../recap';
 import type { LedgerLine } from '../thread-history';
 import type { LiveFacts } from '../live-line';
@@ -129,7 +130,8 @@ import { Live } from './Live';
 import { SidebarIcon } from './SidebarIcon';
 import { Byline, ConversationAside } from './Byline';
 import { ItemThread } from './ItemThread';
-import { ContinuedFrom } from '../threads/ContinuedFrom';
+import { ContinuedFrom, OpenTeammateThread } from '../threads/ContinuedFrom';
+import { threadLink, threadOfLink, seenWord, seenNow, type SeenBy, type ShareActs } from '../threads/share-rules';
 import { answerOnItsWay, type PendingSaid } from '../item-thread';
 import { isTroubleRow } from '../trouble-row';
 import { rowTitle } from '../list-rules';
@@ -151,7 +153,7 @@ import { useThreadMentions } from './ThreadMentions';
 import { AGENT_SCHEME } from '../team/agent-mentions';
 import { defaultModelFor, engineModelLabel } from '../models';
 import { defaultEffortFor, effortChoicesFor, effortShown } from '../effort';
-import { ENGINES } from '../../../shared/engines.mjs';
+import { ENGINES } from '../../../shared/engines.mts';
 import { lookAgainAfter } from '../picture-looks-again';
 import { OPEN_WITHIN_MS } from '../opening-wait';
 import { focusAtEnd } from '../focus-at-end';
@@ -227,7 +229,7 @@ function CodePre({ children }: { children?: ReactNode }) {
 // It opens the way the chip already does, which sends a png to Preview.
 //
 // AND WHEN EVERY ROOT MISSES, IT ASKS MAIN BEFORE IT GIVES UP (2026-10-04).
-// `find` is the same finder a click goes through (main/artifact-path.mjs),
+// `find` is the same finder a click goes through (main/artifact-path.mts),
 // which also hunts the project for the name. A picture a click could open and
 // the window drew as "missing image" was the screenshot on w-7fe215448b.
 /** A picture sent to this message that cannot be fetched: where it would be, by name. */
@@ -264,7 +266,7 @@ export function ArtifactImg({ src, alt, roots, onOpen, find }: {
     return () => clearTimeout(timer);
   }, [broken, tries]);
   const again = (url: string) => (tries ? `${url}?look=${tries}` : url);
-  const relative = !!src && !/^(data|https?|file):/.test(src) && !src.startsWith('/');
+  const relative = !!src && !/^(data|https?|file):/.test(src) && wholePicturePath(src) === null;
   const exhausted = relative && attempt >= roots.length;
   useEffect(() => {
     // A whole path written on a teammate's computer is not on this one: the
@@ -333,8 +335,9 @@ export function ArtifactImg({ src, alt, roots, onOpen, find }: {
   // A chat draws its pictures as previews (team/chat.css), a thread at reading width.
   const maxHeight = direct ? 240 : undefined;
   const minWidth = direct ? 360 : 760;
-  if (/^file:\/\//.test(src) || src.startsWith('/')) {
-    const file = src.startsWith('/') ? src : decodeURIComponent(src.slice(7));
+  const whole = wholePicturePath(src);
+  if (whole !== null) {
+    const file = whole;
     if (found) return door(found, <FittedImg maxHeight={maxHeight} minWidth={minWidth} src={pictureUrl(found)} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" />);
     if (broken && direct) return <CarriedNote src={file} always />;
     if (broken) return <button type="button" className="missing-artifact" title="Look for it again" onClick={() => { setTries(tries + 1); setBroken(false); }}>missing image: {file}</button>;
@@ -425,7 +428,8 @@ export function ArtifactMedia({ src, label, roots, onOpen, find }: { src: string
   // or has still to come, and fills in when it lands.
   const [found, setFound] = useState<string | null>(null);
   const [looks, setLooks] = useState(0);
-  const candidates = found ? [pictureUrl(found)] : src.startsWith('/') ? [pictureUrl(src)] : roots.map((r) => pictureUrl(`${r}/${rel}`));
+  const whole = wholeMediaPath(src);
+  const candidates = found ? [pictureUrl(found)] : whole !== null ? [pictureUrl(whole)] : roots.map((r) => pictureUrl(`${r}/${rel}`));
   const looked = candidates.join('\n');
   const missing = attempt >= candidates.length;
   useEffect(() => {
@@ -544,7 +548,7 @@ export function FolderPreview({ product, folder, onOpen, quiet, thread }: {
   const [shown, setShown] = useState<{ pictures: string[]; total: number } | null>(() => folderSeen.get(key) ?? null);
   const [asking, setAsking] = useState(!quiet && !folderSeen.has(key));
   useEffect(() => {
-    const api = (window as any).zero;
+    const api = window.zero;
     if (quiet || !api?.folderPictures) { setAsking(false); return; }
     let live = true;
     api.folderPictures({ product, src: folder })
@@ -623,7 +627,7 @@ export function ArtifactLink({ kind, product, src, fallback, onOpen, children }:
   useEffect(() => {
     setHref(fallback);
     if (!src || /^https?:/.test(src)) return;
-    (window as any).zero?.openArtifact?.({ product, src: sourceReference(src) ?? src, mode: 'resolve' })
+    window.zero?.openArtifact?.({ product, src: sourceReference(src) ?? src, mode: 'resolve' })
       .then((r: { ok: boolean; opened?: string }) => { if (r?.ok && r.opened) setHref(`file://${r.opened}`); })
       .catch(() => {});
   }, [product, src]);
@@ -665,7 +669,7 @@ export function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
   useEffect(() => {
     let live = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    const api = (window as any).zero;
+    const api = window.zero;
     if (!api?.openArtifact) { setSrc(fallback ?? null); return () => { live = false; }; }
     api.openArtifact({ product, src: path, mode: 'resolve' })
       .then((r: { ok: boolean; opened?: string }) => {
@@ -725,7 +729,7 @@ export function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 /** Which threads' choices are folded, kept on this machine. */
 const CHOICES_FOLDED = 'one.choicesFoldedOn';
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, giveTo = [], onGive, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, onShare, giveTo = [], onGive, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null }: {
   /** One thing at a time (w-65bcefb857): this thread's place in Needs you and the arrows that walk it. */
   queue?: { spot: Spot; onStep: (dir: 1 | -1) => void } | null;
   /** Drawn on the one-at-a-time page outside Needs you too: every thread with an agent. */
@@ -769,6 +773,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
    *  in To, so adding one more starts the group's conversation and leaves this
    *  one alone. On an agent thread: puts the person on its chosen people. */
   onAddPeople?: (item: WorkItem, person?: string) => void;
+  /** Share…: copy the thread's link, put it in teammates' inboxes, change who can open it. */
+  onShare?: ShareActs;
   artifactSlot?: (node: HTMLDivElement | null) => void;
   inlineArtifacts?: boolean;
   artifactView?: 'beside' | 'focus';
@@ -1253,9 +1259,12 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
 
   // A close raises its question at the foot of the thread, which is off
   // screen whenever the reader has scrolled up (w-23de8a26c0).
+  // When it stands at the filed task instead, the conversation brings it.
   const closeAskRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (closeAsk) closeAskRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (!closeAsk || askAtTask) return;
+    const box = closeAskRef.current?.closest('.focus-scroll') as HTMLElement | null;
+    return bringIntoView(box, () => closeAskRef.current, { block: 'nearest' });
   }, [closeAsk?.raised]);
 
   // THE OPTION UNDER THE POINTER, IN FULL, IN A CARD OVER THE MESSAGE. The
@@ -1312,7 +1321,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     // a change for it, so there is nothing to ask for.
     if (agent) return () => { live = false; };
     const read = () => {
-      api.codeChange({ product: item.product, src: changePathFor(item.id) })
+      api.codeChange({ product: item.product, src: changePathFor(item.id), summary: true })
         .then((r) => {
           if (!live) return;
           setFigures(r?.ok ? figuresFrom(r.change) : null);
@@ -1353,7 +1362,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   };
   const openFileMark = useCallback((link: FileMarkLink) => setArtifact({ file: link.file, note: link.id, at: Date.now() }), []);
   useEffect(() => watchForBlank(`${item.product}/${item.id}`), [item.product, item.id]);
-  const [historyLines, setHistoryLines] = useState<unknown[]>([]);
+  const [historyLines, setHistoryLines] = useState<readonly ThreadLine[]>([]);
   useEffect(() => {
     let live = true;
     const read = () => { void api.itemHistory({ product: item.product, id: item.id }).then((r) => { if (live) setHistoryLines(r?.lines ?? []); }); };
@@ -1362,8 +1371,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     return () => { live = false; off?.(); };
   }, [item.product, item.id]);
   const madeHere = useMemo(() => filesMadeHere(historyLines, item.artifacts?.notes ?? []), [historyLines, item.artifacts?.notes]);
-  const markdownActions = useRef({ onOpenDoc, onNotice, openPicture, opensBig, openBig, opensBeside, openBeside, edits: item.artifacts?.edits });
-  useLayoutEffect(() => { markdownActions.current = { onOpenDoc, onNotice, openPicture, opensBig, openBig, opensBeside, openBeside, edits: item.artifacts?.edits }; });
+  const openLinkedThread = useContext(OpenTeammateThread);
+  const markdownActions = useRef({ onOpenDoc, onNotice, openPicture, opensBig, openBig, opensBeside, openBeside, openLinkedThread, edits: item.artifacts?.edits });
+  useLayoutEffect(() => { markdownActions.current = { onOpenDoc, onNotice, openPicture, opensBig, openBig, opensBeside, openBeside, openLinkedThread, edits: item.artifacts?.edits }; });
   // A row in Needs you for a comment or an approval opens the file at it.
   const fileNewsMe = teamCtx?.me ?? null;
   useEffect(() => {
@@ -1398,7 +1408,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     };
 
     const find = (src: string) => {
-      const zero = (window as any).zero;
+      const zero = window.zero;
       if (!zero?.openArtifact) return Promise.resolve(null);
       return zero.openArtifact({ product, src, mode: 'resolve' })
         .then((r: { ok: boolean; opened?: string }) => (r?.ok && r.opened && isImagePath(r.opened) ? r.opened : null));
@@ -1406,7 +1416,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     const findMedia = (src: string) => api.resolveDoc({ product, src, thread: item.id }).then((r) => (r.ok && r.opened ? r.opened : null));
 
     // Clicks resolve in the main process, across the roots a worker might have
-    // meant WITHIN THIS CARD'S OWN PRODUCT (main/artifact-path.mjs): a
+    // meant WITHIN THIS CARD'S OWN PRODUCT (main/artifact-path.mts): a
     // single-root file:// href opened nothing, silently, when the worker wrote
     // it against a different root, and reaching into other products opened the
     // wrong file, which is worse.
@@ -1414,10 +1424,11 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     // A miss now SAYS SO.
     const openHref = (href?: string, from?: HTMLElement, click?: LinkClick) => {
       if (!href) return;
-      const { onOpenDoc, onNotice, openPicture, opensBig, openBig, opensBeside, openBeside, edits } = markdownActions.current;
+      const { onOpenDoc, onNotice, openPicture, opensBig, openBig, opensBeside, openBeside, openLinkedThread, edits } = markdownActions.current;
       // A file opens beside the chat, a deck full screen, a web address in the
       // pane, and a ⌘-click sends any of them out (../link-click.ts).
       const goes = whereALinkGoes(href, click, { pane: !!onOpenDoc });
+      if (goes === 'thread' && openLinkedThread) { const t = threadOfLink(href)!; openLinkedThread(t.owner, t.id); return; }
       if (!asksForANewTab(click) && opensBig(href)) { openBig(href, from); return; }
       if (!asksForANewTab(click) && opensBeside(href)) { openBeside(newestOfFamily(href, edits), from); return; }
       if (goes === 'picture') { openPicture(href, from); return; }
@@ -1425,7 +1436,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       // A reference like cart.mjs:2 is that file; its line number is only a label.
       const source = sourceReference(href);
       if (source && !asksForANewTab(click) && whereALinkGoes(source, click, { pane: !!onOpenDoc }) === 'pane') { onOpenDoc?.(source); return; }
-      const api = (window as any).zero;
+      const api = window.zero;
       if (!api?.openArtifact) { window.open(resolveSrc(href), '_blank'); return; }
       api.openArtifact({ product, src: source ?? href, thread: item.id, ...(source ? { mode: 'source' } : {}) }).then((r: { ok: boolean; error?: string}) => {
         if (!r?.ok) onNotice(r?.error || `${href} could not be opened.`);
@@ -1477,7 +1488,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         const note = href && !/^(https?|data):/.test(href) ? voiceNoteOf(href) : null;
         if (href && note) {
           const rel = href.replace(/^\.\//, '');
-          const urls = href.startsWith('/') ? [pictureUrl(href)] : roots.map((r) => pictureUrl(`${r}/${rel}`));
+          const whole = wholeMediaPath(href);
+          const urls = whole !== null ? [pictureUrl(whole)] : roots.map((r) => pictureUrl(`${r}/${rel}`));
           return <VoiceNote key={href} id={`${product}:${rel}`} ms={note.ms} load={() => firstFound(urls)} />;
         }
         // A SOUND OR A FILM PLAYS IN PLACE (ArtifactMedia, above).
@@ -1538,7 +1550,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   );
 
   // WHAT A CLOUD RUN ASKED FOR is a card in its message (NeedCard.tsx). A saved
-  // sign-in or key carries on every thread waiting on it (main/ipc.mjs zero:cloud-key);
+  // sign-in or key carries on every thread waiting on it (main/ipc.mts zero:cloud-key);
   // a file or a code goes back as this thread's reply.
   const [keysJustSaved, setKeysJustSaved] = useState<string[]>([]);
   const savedKeys = cloudKeys ? [...new Set([...cloudKeys, ...keysJustSaved])] : null;
@@ -1925,8 +1937,28 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const waiting = offersRunNow(item, { session, queued: live.queued, runNow: live.runNow, inProgress: live.inProgress });
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [renameAt, setRenameAt] = useState(0);
+  const share = (() => {
+    if (!teamCtx?.state.team || !onShare || !teamCtx.me || direct || agent || inChats) return null;
+    if ((item.createdBy ?? teamCtx.me) !== teamCtx.me) return null;
+    const seen: SeenBy = seenNow(item, teamCtx.products.get(item.product), teamCtx.state.since ?? null);
+    const teamName = teamCtx.state.team.name || 'your team';
+    return {
+      link: threadLink(teamCtx.me, item.id),
+      people: teamCtx.state.people.filter((p) => p.id !== teamCtx.me),
+      last: onShare.last,
+      seen,
+      seenWord: seenWord(seen, teamName, item.visibleTo?.length ?? 0),
+      teamName,
+      chosen: item.visibleTo ?? [],
+    };
+  })();
   const threadMenu = (
     <ThreadMenu
+      share={share}
+      onCopyLink={() => onShare!.copy(item)}
+      onSendTo={(to, note) => onShare!.send(item, to, note)}
+      onSee={(to) => onShare!.see(item, to)}
+      onChoose={(id) => onShare!.choose(item, id)}
       key={`${item.product}:${item.id}`}
       files={<ThreadFilesButton files={madeHere} onOpen={(f) => (opensBig(f.src) ? openBig(f.src) : onOpenDoc?.(f.src))} />}
       change={changeFigures}
@@ -2767,9 +2799,11 @@ function SlashMenu({ rows, at, onPick, onHover }: {
  *  underline, no box and no icon. The menu is `.prio-menu`, the same list the
  *  priority and the engine already open. Nothing new is drawn.
  */
-function ModePicker({ value, options, label, onChange, onEscape, chip = false }: {
+function ModePicker({ value, options, label, onChange, onEscape, chip = false, folded = false }: {
   /** Drawn as the new thread card's chip. */
   chip?: boolean;
+  /** Out of sight in a reply bar too narrow for it; Shift+Tab still changes the mode. */
+  folded?: boolean;
   value: string;
   options: Array<{ value: string; label: string }>;
   label: string;
@@ -2791,7 +2825,7 @@ function ModePicker({ value, options, label, onChange, onEscape, chip = false }:
   useEffect(() => (open ? escapeClosesMenu(window, () => { setOpen(false); onEscape?.(); }) : undefined), [open]);
   const now = options.find((o) => o.value === value);
   return (
-    <span className="compose-word-wrap" ref={wrap}>
+    <span className={`compose-word-wrap mode-pick${folded ? ' folded' : ''}`} ref={wrap}>
       {open && (
         <span className="prio-menu model-menu" role="listbox" aria-label={label}>
           {options.map((o) => (
@@ -2818,7 +2852,9 @@ function ModePicker({ value, options, label, onChange, onEscape, chip = false }:
       >
         {/* TITLE CASE, with "Mode" after it capitalised too: "In Auto Mode."
             Settled on w-86dd93ab0d. */}
-        {(now?.label ?? value).replace(/(^|\s)\S/g, (c) => c.toUpperCase())}
+        {chip
+          ? <span className="tc-chip-label">{titleCase(now?.label ?? value)}</span>
+          : titleCase(now?.label ?? value)}
       </button>
     </span>
   );
@@ -2933,7 +2969,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   // tag DISPLAYS the item's real level, though: an urgent thread's reply box
   // showing "medium" read as the reply demoting it.
   const [prio, setPrio] = useState<PriorityId | null>(null);
-  // The level it runs at (shared/rank.mjs shownPriority). A conversation is
+  // The level it runs at (shared/rank.mts shownPriority). A conversation is
   // offered no tag at all, so this is only ever a work thread's.
   const itemPrio: PriorityId = priorityIdOf(shownPriority(item));
   const shown = prio ?? itemPrio;
@@ -3310,6 +3346,20 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   // The level this thread is set to, for the footer, or null when it is set to
   // nothing and the engine is choosing.
   const levelSaid = effortSaid({ model, effort }, { engine: runningEngine, codexModels, codexDefault: codexModelDefault });
+  // The mode chip is the first thing a narrow bar gives up, before the model's
+  // name is shortened. Measured, not guessed from the width: the names differ.
+  const chipsRef = useRef<HTMLSpanElement>(null);
+  const [modeFolded, setModeFolded] = useState(false);
+  useLayoutEffect(() => {
+    const chips = chipsRef.current;
+    if (!chips || typeof ResizeObserver === 'undefined') return;
+    const check = () => setModeFolded(chipsOverflow(chips));
+    check();
+    const seen = new ResizeObserver(check);
+    seen.observe(chips);
+    document.fonts?.ready.then(check);
+    return () => seen.disconnect();
+  }, [running, model, effort, engineShown, levelSaid]);
   // The drawer has been open at least once, so a close is really a close and
   // not the first render reporting that it is shut.
   const drawerWasOpen = useRef(false);
@@ -3582,7 +3632,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
 
            It also says the one true thing the old line was reaching for, that what is
            typed here becomes the agent's next instruction, without having to explain it.
-           `tests/the-reply-box-asks-one-question.test.mjs` holds the sentence count.
+           `tests/the-reply-box-asks-one-question.test.mts` holds the sentence count.
         */
         placeholder="What should the agent do next?"
         onKeyDown={boxKey}
@@ -3664,12 +3714,13 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             exactly the footer it had. */}
         {talkTo?.length ? <FormatBar box={ref} onChange={changeText} onAttach={pickFiles} onFromFiles={(f) => setAttachments((a) => [...a, f])} onVoice={addVoice} onNotice={onNotice}
           voiceKey={`direct:${item.product}:${item.id}`} voice={voiceCtl} onRecording={setRecording} /> : null}
-        {item.agent ? <span className="compose-clauses"><span className="dim">Goes straight into {item.agent.name}.</span></span> : talkTo?.length ? null : <span className="dock-chips">
+        {item.agent ? <span className="compose-clauses"><span className="dim">Goes straight into {item.agent.name}.</span></span> : talkTo?.length ? null : <span className="dock-chips" ref={chipsRef}>
             <PriorityPicker variant="chip" value={shown} set={!!prio} onChange={setPrio} title="Priority" />
             {repeat && <WhenPicker value={{ runAt: 0, repeat }} onChange={(v) => setRepeat(v.repeat)} only="repeat" empty="Runs once" />}
             {canSetMode && (
               <ModePicker
                 chip
+                folded={modeFolded}
                 label="What this message may do"
                 value={running}
                 options={claudeCode
@@ -3682,7 +3733,8 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             )}
             <ReplyModel
               chip
-              label={`${engineModelLabel(engineShown, model, modelOpts)}${levelSaid ? ` · ${levelSaid}` : ''}`}
+              label={engineModelLabel(engineShown, model, modelOpts)}
+              level={levelSaid}
               pick={pick}
               onPick={pickModel}
               recent={recent}
@@ -3775,15 +3827,16 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   );
 }
 
-const ClipGlyph = () => (
-  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-    <path d="m20 11.5-8.2 8.2a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.4 8.4a1.7 1.7 0 0 1-2.4-2.4l7.7-7.7" />
-  </svg>
-);
+/** Whether the chips, every one at its full width, folded mode included, are wider than their room. */
+function chipsOverflow(chips: HTMLElement): boolean {
+  if (!chips.clientWidth) return false;
+  const kids = [...chips.children] as HTMLElement[];
+  const gap = parseFloat(getComputedStyle(chips).columnGap) || 0;
+  const whole = kids.reduce((sum, kid) => {
+    const cut = [...kid.querySelectorAll<HTMLElement>('.tc-chip-label')].reduce((c, l) => c + l.scrollWidth - l.clientWidth, 0);
+    return sum + kid.offsetWidth + cut;
+  }, 0) + gap * Math.max(0, kids.length - 1);
+  return whole > chips.clientWidth + 0.5;
+}
 
-// Drawn only when the reply box is too narrow for the word (narrow-conversation.css).
-const SendGlyph = () => (
-  <svg className="dock-send-arrow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M12 19V5M6 11l6-6 6 6" />
-  </svg>
-);
+const titleCase = (s: string) => s.replace(/(^|\s)\S/g, (c) => c.toUpperCase());

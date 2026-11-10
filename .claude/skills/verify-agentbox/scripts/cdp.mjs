@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { guard, sweep, processes } from '../../../../scripts/lib/chrome-guard.mjs';
-import { MAC_CHROME, NO_HIDDEN_BROWSER, chromesForTesting, headlessShells } from '../../../../shared/hidden-browser.mjs';
+import { MAC_CHROME, NO_HIDDEN_BROWSER, chromesForTesting, headlessShells } from '../../../../shared/hidden-browser.mts';
 
 export { chromesForTesting, headlessShells };
 
@@ -83,6 +83,11 @@ export function holdersOf(profile, list = processes, chrome = CHROME) {
   const bundle = chrome.includes('.app/') ? `${chrome.split('.app/')[0]}.app/` : chrome;
   const flag = new RegExp(`--user-data-dir=${profile.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=\\s|$)`);
   return list().filter((p) => p.command.startsWith(bundle) && flag.test(p.command)).map((p) => p.pid);
+}
+
+/** EPERM is a process this one may not signal, such as a Chrome the harness opened outside a tester's sandbox: it is there. */
+export function isRunning(pid, kill = process.kill.bind(process)) {
+  try { kill(pid, 0); return true; } catch (e) { return e?.code === 'EPERM'; }
 }
 
 /** Stop any Chrome still on this profile: one that will not answer keeps its lock, and every Chrome after it exits. */

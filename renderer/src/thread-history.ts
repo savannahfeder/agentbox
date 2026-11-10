@@ -20,11 +20,11 @@
 import { hasSpot } from './artifact-pins';
 import { readNotes, type Notes, type TraceSession } from './notes';
 import { commandPrompt } from '../../shared/claude-commands.mts';
-import { DEFAULT_ENGINE } from '../../shared/engines.mjs';
-import { instructionOf } from '../../shared/repeats.mjs';
-import { baseName, familyName, filesInLines, placeWords, threadFiles } from '../../shared/artifact-marks.mjs';
-import { handedFrom } from '../../shared/team-departures.mjs';
-import { isContinuedNote } from '../../shared/thread-continued.mjs';
+import { DEFAULT_ENGINE } from '../../shared/engines.mts';
+import { instructionOf } from '../../shared/repeats.mts';
+import { baseName, familyName, filesInLines, placeWords, threadFiles } from '../../shared/artifact-marks.mts';
+import { handedFrom } from '../../shared/team-departures.mts';
+import { isContinuedNote } from '../../shared/thread-continued.mts';
 import type { AgentVoice, ArtifactMark, FileMarkLink } from './types';
 
 const fileShownName = (id: string) => id.replace(/#\d+$/, '');
@@ -42,10 +42,10 @@ export interface LedgerLine {
   // of the single-person app.
   by?: string;
   // THE LINE'S OWN NAME, stamped where it reaches the disk and the same on
-  // every teammate's Mac (main/store/work-items.mjs). A reaction is stored
+  // every teammate's Mac (main/store/work-items.mts). A reaction is stored
   // against it, because it is the only name a message has that survives the
   // crossing: `ts` does not, since a pulled line takes the cloud's own
-  // created_at (shared/team-rules.mjs, `asPulled`).
+  // created_at (shared/team-rules.mts, `asPulled`).
   uid?: string;
 }
 
@@ -673,7 +673,7 @@ function withTitleSaid(events: ThreadEvent[], title: string | null, label: strin
 
 // A run's notes, read once for as long as the window holds the same log
 // object: an open thread is drawn on every push, and its finished runs'
-// logs do not change (shared/trace-delta.mjs keeps their objects).
+// logs do not change (shared/trace-delta.mts keeps their objects).
 const notesOfRun = new WeakMap<TraceSession, Notes | null>();
 function notesOf(session: TraceSession): Notes | null {
   if (!notesOfRun.has(session)) notesOfRun.set(session, readNotes([session]));

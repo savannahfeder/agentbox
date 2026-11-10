@@ -10,7 +10,7 @@ import { nameSlug } from '../shared/product-name.mjs';
 
 const ENTRIES = [
   { launcher: ['scripts', 'approval-server.sh'], entry: ['main', 'approval-prompt-server.mts'] },
-  { launcher: ['mcp', `${nameSlug}-mcp.sh`], entry: ['mcp', 'stdio.mjs'] },
+  { launcher: ['mcp', `${nameSlug}-mcp.sh`], entry: ['mcp', 'stdio.mts'] },
 ];
 
 /**
