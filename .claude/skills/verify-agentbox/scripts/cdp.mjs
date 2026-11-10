@@ -50,6 +50,14 @@ export function findChrome(platform = process.platform, env = process.env, playw
 export const CHROME = findChrome();
 
 /**
+ * Whether a process is alive. A tester in Codex's sandbox may not signal the
+ * browser opened for it outside, and is told EPERM: that one is alive.
+ */
+export function pidAlive(pid, kill = process.kill.bind(process)) {
+  try { kill(pid, 0); return true; } catch (e) { return e?.code === 'EPERM'; }
+}
+
+/**
  * The browsers to try, in order, with how long each may take to load the page.
  * A Chrome for Testing build can crash every renderer on a new macOS
  * (158.0.8127.18 on macOS 27.0.1), so a page that has not loaded in that time
