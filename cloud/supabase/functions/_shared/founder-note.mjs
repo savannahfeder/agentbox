@@ -1,0 +1,81 @@
+// The rules of the founder's thank-you note (functions/founder-note), kept
+// free of Deno so tests/a-thank-you-note-reaches-each-new-account-once can run
+// them.
+
+export const NOTE_WINDOW = Object.freeze({ oldestDays: 7, youngestDays: 3 });
+// A first run after a quiet week must not turn into a blast.
+export const NOTES_PER_RUN = 50;
+
+// "Hey ada.lovelace92" reads as a mail merge, so a first word that looks like
+// a username gets "Hey there" instead.
+export function firstNameFor(name) {
+  const first = String(name ?? '').trim().split(/\s+/)[0];
+  if (!first || /[@._\d]/.test(first) || !/\p{L}/u.test(first)) return null;
+  return first;
+}
+
+const addressIn = (from) => {
+  const m = /<([^<>]+)>\s*$/.exec(String(from));
+  return (m ? m[1] : String(from)).trim();
+};
+
+// Plain text only: no HTML, logo or link, so it reads as typed.
+export function noteFor(person, { from, signoff }) {
+  const hey = firstNameFor(person.name) ?? 'there';
+  return {
+    from,
+    to: [person.email],
+    reply_to: addressIn(from),
+    subject: 'Thanks for trying Agentbox',
+    text: `Hey ${hey},\n\nJust a quick note to say thanks for trying Agentbox.\n\nHope it's been treating you well.\n\nCheers,\n${signoff}\nFounder, Agentbox\n`,
+  };
+}
+
+export function keysMatch(given, expected) {
+  const a = String(given ?? '');
+  const b = String(expected ?? '');
+  if (!b || a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+// Null until every secret is set, which is how the note is switched off.
+export function readNoteConfig(get) {
+  const v = (name) => String(get(name) ?? '').trim();
+  const config = {
+    from: v('FOUNDER_NOTE_FROM'),
+    signoff: v('FOUNDER_NOTE_NAME'),
+    owners: v('FOUNDER_NOTE_OWNERS').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
+    key: v('FOUNDER_NOTE_KEY'),
+    resendKey: v('RESEND_API_KEY'),
+  };
+  return config.from && config.signoff && config.owners.length && config.key && config.resendKey ? config : null;
+}
+
+// The note as the sender's own inbox will show it. Only to one of the owners'
+// addresses, so the key alone cannot aim it at a stranger.
+export function previewFor(address, config) {
+  const to = String(address ?? '').trim().toLowerCase();
+  if (!config.owners.includes(to)) return null;
+  return noteFor({ name: config.signoff, email: to }, config);
+}
+
+// The mark goes down before the send, so two runs at once cannot both write
+// to someone; a failed send lifts it again and tomorrow's run retries.
+export async function sendFounderNotes({ db, send, config, dryRun = false }) {
+  const due = await db.due({ owners: config.owners, ...NOTE_WINDOW, limit: NOTES_PER_RUN });
+  if (dryRun) {
+    return { sent: 0, failed: 0, due: due.length, dryRun: true, names: due.map((p) => firstNameFor(p.name) ?? 'there') };
+  }
+  const out = { sent: 0, failed: 0, due: due.length };
+  for (const person of due) {
+    if (!(await db.claim(person.id))) continue;
+    const res = await send(noteFor(person, config), person.id);
+    if (res.ok) { out.sent++; continue; }
+    out.failed++;
+    out.error = res.error;
+    await db.release(person.id);
+  }
+  return out;
+}

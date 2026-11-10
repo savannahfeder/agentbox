@@ -306,6 +306,11 @@ inspector_port = 8083
 [functions.feedback]
 verify_jwt = false
 
+# The founder's thank-you note (functions/founder-note). Called by the
+# database's daily job, which knocks with its own key instead of a sign-in.
+[functions.founder-note]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
