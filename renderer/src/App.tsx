@@ -177,7 +177,7 @@ import { laterTabShown } from './later-tab';
 import { type Lesson as TourLesson, THREAD_CLOSED, finishLesson, firstTask, madeUrgent, noteSent, readTour, saveTour, showIdeas, skipTour, startTour, tourLive, type Tour as TourState } from './tour';
 import {
   ANSWER_AFTER_MS, COACHED, COPY as WALK_COPY, FIRST_RUN_LABEL, advance as advanceRun, afterCommand, beatRows, coach, closingRefused, firstRunDone,
-  finishedCleared, firstRunNeeded, projectsOfTheirOwn, inboxCleared, laterCleared, laterId, laterIndex,
+  afterUnblock, finishedCleared, firstRunNeeded, projectsOfTheirOwn, laterCleared, laterId, laterIndex,
   mayOpenInbox, noCodingAgent, practising, restartFirstRun, snoozeRefused, tutorialRun,
   waitingId, waitingIndex,
   finishFirstRun, finishedTheFirstRun, setupStepCount, forcedStep, readFirstRun, walkRows,
@@ -1250,6 +1250,16 @@ export default function App() {
   }, [snap, run, fresh, walkWaitsForSignIn]);
 
   useEffect(() => { if (run) saveFirstRun(localStorage, run); }, [run]);
+
+  // A reload ends a tutorial (it is not restored), so its practice threads go with it.
+  const sweptPractice = useRef(false);
+  useEffect(() => {
+    if (!snap || sweptPractice.current) return;
+    sweptPractice.current = true;
+    if (!run && !forcedRun.current && snap.products.some((p) => p.practice)) {
+      void api.firstRunPracticeEnd().then(() => refreshRef.current?.());
+    }
+  }, [snap, run]);
 
   // WHAT CODEX CALLS ITS MODELS ON THIS MAC, and what its own config.toml
   // runs. Both stay empty on every Mac with one coding agent, because
@@ -2401,8 +2411,8 @@ export default function App() {
   // rather than claimed on a card.
   useEffect(() => {
     if (run?.step !== 'unblock') return;
-    if (!inboxCleared(inbox, run)) return;
-    setRun((r) => (r ? stepTo(r, 'where') : r));
+    const next = afterUnblock(inbox, run, WAITING_AT);
+    if (next) setRun((r) => (r ? stepTo(r, next) : r));
   }, [inbox, run?.step, run?.examples.join('|')]);
 
 
@@ -6106,7 +6116,7 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       // Nothing behind the sign-in page answers a key.
       if (signInGateRef.current) return;
-      if (e.key === 'Escape' && walkScreenRef.current && setupStartedAgain.current) { e.preventDefault(); leaveSetupAgain(); return; }
+      if (e.key === 'Escape' && walkScreenRef.current && setupStartedAgain.current && !document.querySelector('.fp-card')) { e.preventDefault(); leaveSetupAgain(); return; }
       // EVERY OTHER KEY ANSWERS NO TO THE QUESTION A LATE Z ASKED, and it is
       // here, above every screen guard, because the answer is no wherever she
       // happens to be typing. Only a second Z goes through with it (`undo`).
@@ -9067,6 +9077,7 @@ export default function App() {
              the row an agent is stopped on, which is why her E went there while
              the ring was on a row at the top. */
           beat={walkBeat}
+          unfinished={run ? run.examples.filter((id) => inbox.some((r) => r.id === id)).length : 0}
           pointed={pointed?.id ?? null}
           picking={modal === 'snooze'}
           /*
@@ -9202,7 +9213,7 @@ export default function App() {
           onLeave={() => finishRun([], { celebrate: false })}
         />
       )}
-      {landing && <Landed agents={landing.agents || inbox.length + leadCount > 0} onGone={() => setLanding(null)} />}
+      {landing && <Landed agents={landing.agents || inbox.length + leadCount > 0} onGone={() => setLanding(null)} onNew={startThread} />}
       {/* THE BAR'S SETUP, on the walk's own screen so it is the card they would
           have seen in the walk. The arrow closes it; a setup that is running
           carries on, and the bar checks again when it does. */}

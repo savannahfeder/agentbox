@@ -64,6 +64,19 @@ export default function FolderPicker({ title, startIn, onPick, onClose }: Props)
 
   useEffect(() => { void go(startIn ?? null, false); }, [go, startIn]);
 
+  const close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    const onEscape = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      close.current();
+    };
+    window.addEventListener('keydown', onEscape, true);
+    return () => window.removeEventListener('keydown', onEscape, true);
+  }, []);
+
   const here = listing?.at ?? '';
   const canUse = !!here && !listing?.refused && !listing?.unreadable;
   const want = folderToUse(typed, here);
@@ -71,7 +84,7 @@ export default function FolderPicker({ title, startIn, onPick, onClose }: Props)
 
   const use = async () => {
     if (busy || !want) return;
-    if (want === here) { if (canUse) onPick(here); return; }
+    if (want === here) { if (canUse) onPick(here); else setMoved(true); return; }
     const next = await go(want);
     if (next && !next.refused && !next.unreadable) onPick(next.at);
   };
@@ -84,7 +97,6 @@ export default function FolderPicker({ title, startIn, onPick, onClose }: Props)
         role="dialog"
         aria-label={title ?? 'Choose a folder'}
         onKeyDown={(e) => {
-          if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
           if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') void use();
         }}
       >
@@ -138,7 +150,7 @@ export default function FolderPicker({ title, startIn, onPick, onClose }: Props)
         <div className="fp-foot">
           <span className="fp-hint">{note.hint ?? ''}</span>
           <button className="fp-cancel" onClick={onClose}>Cancel</button>
-          <button className="fp-use" onClick={() => void use()} disabled={busy || (want === here && !canUse)}>Use this folder</button>
+          <button className="fp-use" onClick={() => void use()} disabled={busy}>Use this folder</button>
         </div>
       </div>
     </div>

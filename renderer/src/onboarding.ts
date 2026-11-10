@@ -935,6 +935,17 @@ export function inboxCleared(rows: { id: string }[], run: FirstRun | null): bool
   return !run.examples.some((id) => there.has(id));
 }
 
+/** Where the walk goes once the waiting thread is answered. A thread Z brought
+ *  back is still in the inbox then, and the clearing step is the one about it. */
+export function afterUnblock(
+  rows: { id: string }[], run: FirstRun | null, waitingAt: number,
+): 'where' | 'clear' | null {
+  if (!run) return null;
+  if (inboxCleared(rows, run)) return 'where';
+  const waiting = waitingId(run, waitingAt);
+  return waiting && rows.some((r) => r.id === waiting) ? null : 'clear';
+}
+
 /*
  * THE EMPTY INBOX IS NOT A BEAT OF ITS OWN ANY MORE. It used to be held for
    four seconds behind a card reading "This is inbox zero. Get back here every
@@ -1644,6 +1655,8 @@ export function coach(
     board?: boolean;
     /** Whether the New thread box is open, for the send step. */
     composing?: boolean;
+    /** Practice threads still in the inbox, for the inbox-zero line. */
+    unfinished?: number;
     tabs?: readonly string[];
     /** The team strip's tab names, when that strip is what is drawn. */
     tabNames?: Readonly<Record<string, string>>;
@@ -2089,6 +2102,13 @@ export function coach(
       // THE OPENING IS HERS, WORD FOR WORD (tests/the-walk-teaches-undo-snooze-
       // and-notes). Three persona testers called "Great!" patronising in round
       // two (2026-10-06); that is noted for her and the sentence is not touched.
+      // An undo can bring a practice thread back after the last one was cleared.
+      if (ctx.unfinished) {
+        return say(
+          `${ctx.unfinished === 1 ? 'One thread is' : `${ctx.unfinished} threads are`} still in your inbox. An empty inbox, inbox zero, is the goal.`,
+          'Press ', cap, `${or} to see where the rest went.`,
+        );
+      }
       return say(
         'Great! Your inbox is now empty. That is inbox zero, and it is the goal.',
         'Press ', cap, `${or} to see where it all went.`,

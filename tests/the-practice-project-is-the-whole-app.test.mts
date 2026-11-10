@@ -614,7 +614,8 @@ describe('the introduction, in front of the app', () => {
     // FIVE since w-ec62ab6b38 (2026-09-28): the rebuilt folder list takes Enter too.
     // FOUR since w-9e434e8671: the theme picker and its row of arrows are gone.
     const src = fs.readFileSync(new URL('../renderer/src/components/Onboarding.tsx', import.meta.url), 'utf8');
-    expect(src.match(/setTimeout\(\(\) => window\.addEventListener\('keydown', on\), 0\)/g) ?? [])
+    // The last card listens in the capture phase so its N beats Home's focused box.
+    expect(src.match(/setTimeout\(\(\) => window\.addEventListener\('keydown', on(, true)?\), 0\)/g) ?? [])
       .toHaveLength(4);
   });
 });

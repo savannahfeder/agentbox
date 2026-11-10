@@ -25,6 +25,6 @@ describe('the practice tutorial', () => {
 describe('the setup and a focused button', () => {
   // A tester tabbed to Back and pressed Enter, and the setup went forward.
   it('lets Enter on a focused button press that button', () => {
-    expect(split).toMatch(/if \(\(e\.target as Element \| null\)\?\.closest\('button'\)\) return;/);
+    expect(split).toMatch(/if \(enterIsTheButtons\(e\)\) return;/);
   });
 });
