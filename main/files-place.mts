@@ -20,6 +20,7 @@ import type { ArtifactProduct } from './artifact-path.mts';
 import type { LineVersion, VersionLine } from './version-line.mts';
 import type { SavedVersion } from './file-version.mts';
 import type { Store, StoreProduct } from './store.mts';
+import type { FilesKeeper, KeptVersion } from './files-cloud.mts';
 import type { createTeamService } from './team/index.mts';
 
 type FilesTeam = ReturnType<typeof createTeamService>;
@@ -63,7 +64,7 @@ export interface ChainVersion {
   copies: ChainCopy[];
 }
 
-export interface LinedVersion extends ChainVersion { opened: string | null; pending?: boolean; blank?: boolean }
+export interface LinedVersion extends ChainVersion { opened: string | null; pending?: boolean; blank?: boolean; hash?: string }
 
 export type PlacedNote = FileNote & { thread: PlaceThread };
 export type PlacedApproval = FileApproval & { thread: PlaceThread };
@@ -96,7 +97,15 @@ interface CopyOnDisk { f: PlacedFile; v: ChainVersion; c: ChainCopy; bytes: File
 
 type HistoryReader = (id: string, o: { max?: number }) => readonly ThreadLine[];
 
-export type ListedFile = Omit<LinedFile, 'chain' | 'notes' | 'approvals' | 'seen'> & { folder: string | null; folderFollows?: boolean; opened: string | null };
+/**
+ * `bytes` is the newest version's size on this computer, `onMac` every
+ * version's, `older` what Move older versions to the Trash would move and
+ * `movable` what the file's own Move to the Trash would. `cloud` is a newest
+ * version kept in the cloud and off this computer, drawn from `poster`.
+ */
+export interface FileSizes { bytes: number | null; onMac: number; older: number; movable: number; cloud?: boolean; poster?: string | null }
+
+export type ListedFile = Omit<LinedFile, 'chain' | 'notes' | 'approvals' | 'seen'> & { folder: string | null; folderFollows?: boolean; opened: string | null } & FileSizes;
 
 export type MarkAnswer =
   | { ok: true; wrote?: { product: string; id: string } }
@@ -361,12 +370,15 @@ function viewOf(file: LinedFile, opened: Map<string, string>) {
 }
 
 /** The store and the team, as the Files place reads them. */
-export function appFilesPlace({ store, team = null, accountRoot, storeRoot, notify = () => {} }: {
+export function appFilesPlace({ store, team = null, accountRoot, storeRoot, notify = () => {}, keeper = null, trashItem = null }: {
   store: Store;
   team?: FilesTeam | null;
   accountRoot?: string | null;
   storeRoot: string;
   notify?: () => void;
+  keeper?: FilesKeeper | null;
+  /** The computer's own Trash, so a file moved there can be put back. */
+  trashItem?: ((file: string) => Promise<void>) | null;
 }) {
   const built = new Map<string, { version: unknown; lines: readonly ThreadLine[] }>();
   const logDir = (): string => store.teammates?.dir?.() ?? storeRoot;
@@ -642,6 +654,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
         ...(first?.edited ? { edited: true } : first?.made ? { made: true } : {}),
         copies: held.flatMap((m) => m.v.copies).concat(first ? [] : overwritten?.copies ?? []),
         opened: held.find((m) => m.src && m.entry?.hash === e.hash)?.src ?? e.kept ?? null,
+        hash: e.hash,
         ...(e.pending ? { pending: true } : {}),
       });
     }
@@ -691,6 +704,91 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     const out = { size: st.size, mtime: st.mtimeMs, hash };
     hashes.set(file, out);
     return out;
+  }
+
+  // Files moves only what sits in a project's own documents or among the
+  // version line's kept copies, never anything inside a code folder.
+  interface Roots { allow: string[]; deny: string[] }
+  const realOr = (p: string): string => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };
+  function rootsNow(): Roots {
+    const products = store.listProducts();
+    return {
+      allow: [...products.map((p) => p.dir), path.join(logDir(), '.file-versions')].filter(Boolean).map(realOr),
+      deny: products.map((p) => p.repoPath).filter(Boolean).map((p) => realOr(p as string)),
+    };
+  }
+  const within = (dir: string, file: string): boolean => { const rel = path.relative(dir, file); return !!rel && !rel.startsWith('..') && !path.isAbsolute(rel); };
+  function movableIn(roots: Roots, file: string): boolean {
+    const real = realOr(file);
+    if (real.split(path.sep).includes('.git') || roots.deny.some((d) => within(d, real))) return false;
+    return roots.allow.some((a) => within(a, real));
+  }
+
+  const TRASHED = (): string => path.join(logDir(), '.file-versions', 'trashed.json');
+  function trashedNow(): Record<string, number> {
+    try { return JSON.parse(fs.readFileSync(TRASHED(), 'utf8')) as Record<string, number>; } catch { return {}; }
+  }
+
+  /** Every place on this computer that holds this version's own bytes: a path written over since holds the next one. */
+  async function pathsOf(f: PlacedFile | LinedFile, v: LinedVersion, products: ArtifactProduct[]): Promise<string[]> {
+    if (!v.hash) return [];
+    const found = new Set<string>();
+    for (const c of v.copies) {
+      const ref = c.thread.ref;
+      if (ref.kind !== 'thread' && ref.kind !== 'chat') continue;
+      const p = await onDisk(c.path, ref.product, ref.kind === 'thread' ? ref.id : null, products);
+      if (p) found.add(p);
+    }
+    const kept = lineNow().of(f.key).find((e) => e.hash === v.hash)?.kept;
+    if (kept) found.add(kept);
+    if (v.opened) found.add(v.opened);
+    const out: string[] = [];
+    for (const p of found) if ((await lineNow().hashOf(p))?.hash === v.hash) out.push(p);
+    return out;
+  }
+
+  async function sizesOf(f: LinedFile, roots: Roots): Promise<FileSizes> {
+    let onMac = 0;
+    let older = 0;
+    let movable = 0;
+    let bytes: number | null = null;
+    const seen = new Set<string>();
+    const newest = f.chain.at(-1);
+    for (const v of f.chain) {
+      if (!v.opened || (v.hash && seen.has(v.hash))) continue;
+      const st = await fs.promises.stat(v.opened).catch(() => null);
+      if (!st?.isFile()) continue;
+      if (v.hash) seen.add(v.hash);
+      onMac += st.size;
+      if (v === newest) bytes = st.size;
+      if (movableIn(roots, v.opened)) { movable += st.size; if (v !== newest) older += st.size; }
+    }
+    const off = newest?.hash && !newest.opened ? keeper?.off(newest.hash) : null;
+    return { bytes, onMac, older, movable, ...(off ? { cloud: true, poster: off.poster ?? null } : {}) };
+  }
+
+  /** Every version on this computer, as the cloud keeper weighs them. */
+  async function keptVersions(): Promise<KeptVersion[]> {
+    const products = readable();
+    const roots = rootsNow();
+    const out: KeptVersion[] = [];
+    for (const whole of allFiles()) {
+      const { chain } = await lineChain(whole, audienceOf(whole.project) !== 'private', products);
+      for (const v of chain) {
+        const paths = await pathsOf(whole, v, products);
+        const st = paths[0] ? await fs.promises.stat(paths[0]).catch(() => null) : null;
+        if (!st || !v.hash) continue;
+        out.push({ hash: v.hash, size: st.size, paths, kind: whole.kind, at: v.at || st.mtimeMs, name: v.name, movable: paths.every((p) => movableIn(roots, p)) });
+      }
+    }
+    return out;
+  }
+  const CONSIDER_EVERY_MS = 10 * 60_000;
+  let consideredAt = 0;
+  function consider(force = false): void {
+    if (!keeper || (!force && Date.now() - consideredAt < CONSIDER_EVERY_MS)) return;
+    consideredAt = Date.now();
+    void keptVersions().then((vs) => keeper.pass(vs)).catch((err: Error) => { console.warn(`files: the cloud pass could not start: ${err.message}`); });
   }
 
   // Shared and group threads are only listed with a team, and a group's only with its rooms.
@@ -744,9 +842,13 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     };
     // Read once for the pass: per version it was thousands of stats of every project folder.
     const products = readable();
+    const roots = rootsNow();
+    const trashed = trashedNow();
     const lined: LinedFile[] = [];
     for (const whole of files) {
-      const { chain } = await lineChain(whole, isShared(whole.project), products);
+      const { chain: all } = await lineChain(whole, isShared(whole.project), products);
+      // A version put back from the Trash is on disk again, and shows again.
+      const chain = all.filter((v) => v.opened || !v.hash || !trashed[v.hash]);
       if (chain.length) lined.push(asOf(whole, chain));
     }
     const rows = await Promise.all(lined.map(async (f) => {
@@ -758,8 +860,11 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       const beside = own ? null : homeOf(f);
       // Filed in another project's folder, it is listed where it was filed.
       const shownIn = lib.folders.find((x) => x.id === (own ?? beside))?.project ?? project;
-      return { ...row, project: shownIn, folder: own ?? beside, ...(beside ? { folderFollows: true } : {}), opened: await faceOf(f, products) };
-    })).then((all) => all.filter((f) => f.opened || (f.kind !== 'page' && f.kind !== 'code')));
+      const sizes = await sizesOf(f, roots);
+      // A newest version in the cloud draws its poster, not an older version still here.
+      return { ...row, project: shownIn, folder: own ?? beside, ...(beside ? { folderFollows: true } : {}), opened: sizes.cloud ? null : await faceOf(f, products), ...sizes };
+    })).then((all) => all.filter((f) => f.opened || f.cloud || (f.kind !== 'page' && f.kind !== 'code')));
+    consider();
     const projects: string[] = [];
     for (const name of [...rows.map((f) => f.project), ...lib.folders.map((f) => f.project)]) {
       if (name && !projects.some((p) => projectKey(p) === projectKey(name))) projects.push(name);
@@ -996,13 +1101,84 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     async open(key: string) {
       const whole = find(key);
       if (!whole) return null;
-      const { chain, same } = await lineChain(whole);
+      const { chain: all, same } = await lineChain(whole);
+      const trashed = trashedNow();
+      const chain = all.filter((v) => v.opened || !v.hash || !trashed[v.hash]);
       if (!chain.length) return null;
       const file: LinedFile = { ...asOf(whole, chain), notes: whole.notes.map((n) => (same.has(n.file) ? { ...n, file: same.get(n.file)! } : n)) };
       const opened = new Map<string, string>();
       for (const v of file.chain) opened.set(v.id, v.opened ?? await openedOf(file, v, { fetch: true }) ?? v.copies[0]?.path ?? v.name);
-      return viewOf(file, opened);
+      // Opening it is what brings it back; its view reads again once it is here.
+      const newest = file.chain.at(-1);
+      const coming = !!(newest?.hash && !newest.opened && keeper?.off(newest.hash));
+      if (coming) void keeper!.bringBack(newest!.hash!);
+      else if (newest?.hash && keeper) keeper.opened(newest.hash);
+      return { ...viewOf(file, opened), ...(coming ? { coming: true } : {}) };
     },
+
+    /**
+     * Versions of these files moved to the computer's Trash, every copy here
+     * and the version line's kept one, so the space comes back once the Trash
+     * is emptied. `older` leaves each file's newest version where it is.
+     */
+    async trash({ keys, older = false }: { keys: readonly string[]; older?: boolean }): Promise<{ ok: true; moved: number; bytes: number } | { ok: false; error: string; moved: number; bytes: number }> {
+      let moved = 0;
+      let bytes = 0;
+      if (!trashItem) return { ok: false, error: 'This computer has no Trash to move files to.', moved, bytes };
+      const products = readable();
+      const roots = rootsNow();
+      const trashed = trashedNow();
+      const gone = new Set<string>();
+      try {
+        for (const key of keys) {
+          const whole = find(key);
+          if (!whole) continue;
+          const { chain } = await lineChain(whole, audienceOf(whole.project) !== 'private', products);
+          for (const v of older ? chain.slice(0, -1) : chain) {
+            const all = await pathsOf(whole, v, products);
+            // A version with a copy in a code folder is the code's, and stays whole.
+            if (!all.length || !all.every((p) => movableIn(roots, p))) continue;
+            const paths = all.filter((p) => !gone.has(p));
+            if (!paths.length) continue;
+            let size = 0;
+            for (const p of paths) {
+              size = Math.max(size, (await fs.promises.stat(p)).size);
+              await trashItem(p);
+              gone.add(p);
+            }
+            trashed[v.hash!] = Date.now();
+            moved += 1;
+            bytes += size;
+          }
+        }
+      } catch (err) {
+        return { ok: false, error: `Not everything could be moved to the Trash: ${(err as Error).message}`, moved, bytes };
+      } finally {
+        if (moved) {
+          fs.mkdirSync(path.dirname(TRASHED()), { recursive: true });
+          fs.writeFileSync(TRASHED(), JSON.stringify(trashed));
+          notify();
+        }
+      }
+      return { ok: true, moved, bytes };
+    },
+
+    /** A thread's files kept in the cloud, brought back before its agent starts. False when one could not come. */
+    async bringBackFor({ product, id, deadlineMs = 5 * 60_000 }: { product: string; id: string; deadlineMs?: number }): Promise<boolean> {
+      if (!keeper) return true;
+      const waits: Promise<boolean>[] = [];
+      for (const whole of allFiles().filter((f) => f.chain.some((v) => v.copies.some((c) => c.thread.ref.product === product && c.thread.ref.id === id)))) {
+        const { chain } = await lineChain(whole);
+        for (const v of chain) if (v.hash && !v.opened && keeper.off(v.hash)) waits.push(keeper.bringBack(v.hash));
+      }
+      if (!waits.length) return true;
+      let timer: NodeJS.Timeout | undefined;
+      const late = new Promise<boolean>((resolve) => { timer = setTimeout(() => resolve(false), deadlineMs); timer.unref?.(); });
+      try { return await Promise.race([Promise.all(waits).then((r) => r.every(Boolean)), late]); } finally { clearTimeout(timer); }
+    },
+
+    /** A pass of the cloud keeper now, as when its setting changes. */
+    considerNow: () => consider(true),
 
     /**
      * Each file a thread names, as its line numbers it: every version, where it

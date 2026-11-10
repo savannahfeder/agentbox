@@ -113,7 +113,9 @@ export function versionLine({ dir, cloud = () => null, onMoved = () => {} }: { d
   const keptDir = (hash: string): string => path.join(dir, BYTES, hash);
   const kept = new Map<string, string>();
   function keptOf(hash: string): string | null {
-    if (kept.has(hash)) return kept.get(hash)!;
+    // A kept copy can be moved to the Trash or taken off to the cloud.
+    if (kept.has(hash) && fs.existsSync(kept.get(hash)!)) return kept.get(hash)!;
+    kept.delete(hash);
     let found: string | null = null;
     try { const [name] = fs.readdirSync(keptDir(hash)).filter((n) => !n.endsWith('.tmp')); found = name ? path.join(keptDir(hash), name) : null; } catch { /* not kept */ }
     if (found) kept.set(hash, found);
