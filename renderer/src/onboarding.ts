@@ -2397,8 +2397,8 @@ export function pressCounts(target: EventTarget | null): boolean {
      already in it.
 */
 
-/** The one cap that is a wrong press and still has to reach the app. */
-const NEVER_SWALLOWED = '⇥';
+/** Caps that are wrong presses and still have to reach the app: Tab, and Z, which the walk tells you undoes. */
+const NEVER_SWALLOWED = new Set(['⇥', 'Z']);
 
 /**
  * Whether the walk should eat this press before the app underneath sees it.
@@ -2411,7 +2411,7 @@ export function swallowPress(
 ): boolean {
   if (!pressCounts(target)) return false;
   if (!wrongPress(want, e)) return false;
-  return keyToken(e) !== NEVER_SWALLOWED;
+  return !NEVER_SWALLOWED.has(keyToken(e) ?? '');
 }
 
 /* ----------------- AND A LETTER TYPED AT A GLOWING BOX --------------------- */

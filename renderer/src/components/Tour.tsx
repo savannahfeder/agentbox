@@ -224,7 +224,6 @@ export function Tour({ tour, view, thread, covered, palette, onChange, onPoint, 
     if (!live || !tour) { if (shown.current) { shown.current = null; setStep(null); } return undefined; }
     const read = () => {
       const screen = readScreen(view, thread, covered, palette);
-      if (screen.typing && !tour.done.includes('reply')) { onChange(finishLesson(tour, 'reply')); return; }
       const rawStep = tourStep(tour, screen);
       // Told to go and explore, nobody is then asked to come back and watch.
       const wanted = rawStep === 'working' && tried ? null : rawStep;
