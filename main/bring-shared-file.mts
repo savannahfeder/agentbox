@@ -30,6 +30,12 @@ export function sharedFileTitle(file: Pick<SharedLinkFile, 'name' | 'kind' | 'ty
   return file.name;
 }
 
+/** The project on screen when it is a project, else their first own one; never a chat with a teammate. */
+export function projectToBringInto(products: readonly { slug: string; team?: { direct?: unknown } | null }[], wanted: unknown): string | null {
+  const projects = products.filter((p) => p.team?.direct !== true);
+  return (projects.find((p) => p.slug === wanted) ?? projects[0])?.slug ?? null;
+}
+
 export interface BroughtIn { product: string; id: string; src: string }
 
 export async function bringSharedFile({ token, product, read, productDir, compose, hold }: {

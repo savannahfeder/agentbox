@@ -48,7 +48,7 @@ import { folderPictures } from './folder-pictures.mts';
 import { docUrl } from './doc-scheme.mts';
 import { readDoc, writeDoc } from './doc-file.mts';
 import { linkCopyOf, linkSource } from './file-link.mts';
-import { bringSharedFile, fileLinkToken } from './bring-shared-file.mts';
+import { bringSharedFile, fileLinkToken, projectToBringInto } from './bring-shared-file.mts';
 import { familyKeyOf, type Mark } from '../shared/artifact-marks.mts';
 import { readItemHistory } from './store/work-items.mts';
 import { readChange, readChangeSummary } from './code-change.mts';
@@ -2771,13 +2771,13 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     const token = fileLinkToken(link);
     if (!token) return { ok: false, error: 'That is not a link to a shared file.' };
     if (!team?.readFileLink) return { ok: false, error: 'This copy has no cloud to read shared files from.' };
-    const products = store.listProducts();
-    const slug = products.find((p) => p.slug === product)?.slug ?? products[0]?.slug;
+    const slug = projectToBringInto(store.listProducts(), product);
     if (!slug) return { ok: false, error: 'Make a project first, then open the link again.' };
     try {
       const out = await bringSharedFile({
         token, product: slug, read: (t) => team.readFileLink(t), productDir: store.productDir(slug),
-        compose: (fields) => store.composeItem(slug, fields),
+        // Their own copy: a teammate on a shared project sees it only if they share it.
+        compose: (fields) => store.composeItem(slug, { ...fields, visibility: 'private' }),
         hold: (id) => { store.waitOnThePerson(slug, id); },
       });
       push();
