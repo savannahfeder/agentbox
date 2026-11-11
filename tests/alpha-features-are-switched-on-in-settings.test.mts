@@ -40,10 +40,10 @@ describe('saving the switches', () => {
 
 describe('where the app reads them', () => {
   it('the snapshot carries the switches, so the renderer can gate Rooms', () => {
-    expect(read('main/ipc.mts')).toMatch(/const alpha = alphaFeatures\(config\);[\s\S]{0,600}\n\s+alpha,\n/);
+    expect(read('main/ipc.mts')).toMatch(/const alpha = alphaFeatures\(config, \{ onTeam: onTeamNow\(\) \}\);[\s\S]{0,600}\n\s+alpha,\n/);
   });
   it('Settings reads them back', () => {
-    expect(read('main/settings.mts')).toMatch(/alpha:\s*alphaFeatures\(config\)/);
+    expect(read('main/settings.mts')).toMatch(/alpha:\s*alphaFeatures\(config, \{ onTeam: onTeam\?\.\(\) \?\? false \}\)/);
   });
 });
 

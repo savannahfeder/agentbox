@@ -66,7 +66,7 @@ node $P --who startup-engineer,founder --hours 2 --focus "replies after switchin
 | `--who` | names from `people/`, `random:N` or `all` | `random:2` |
 | `--hours` / `--minutes` | how long | 1 hour |
 | `--focus` | what the team shipped and wants leaned on, in a sentence | none |
-| `--alpha` | alpha features on in every copy, e.g. `teammates` or `teammates,rooms` | off, as for anyone new |
+| `--alpha` | alpha features on in every copy, e.g. `teammates` | off, as for anyone new; a copy on a team gets Rooms without it |
 | `--stand-ins "<their words>"` | a Claude Code stand-in instead of the real one (Codex stays real on the testers' login), only with the person's own words agreeing to it for this run | the real Claude Code and Codex on this computer's plans |
 | `--stand-in-cloud` | every thread runs in a stand-in Agentbox Cloud of the copy's own (the real cloud server and sandbox, here, with the stand-in agent); a task naming Supabase, Vercel, Stripe, Expo, AWS or Sentry asks for its key. Stand-in agents, so it needs `--stand-ins` too | no cloud |
 | `--chaos` | `none`, `light`, `normal`, `heavy` | `normal` |

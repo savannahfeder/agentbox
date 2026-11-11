@@ -40,6 +40,7 @@ import type { PhoneBackendCalls, PhoneHistoryLine, PhoneInboxOptions, PhoneItem 
 import { PHONE_UNDO_HOLD_MS } from '../../shared/phone-undo.mts';
 import { SNAPSHOT_LIMITS, phoneProjectsOf, phoneEligible } from '../../shared/phone-snapshot.mts';
 import { createRooms } from './rooms.mts';
+import { isOnTeam } from '../../shared/rooms-on.mts';
 import { noticeEndedWaits } from './waits.mts';
 import { handOverDepartures } from './departures.mts';
 import type { Departure } from './departures.mts';
@@ -281,7 +282,7 @@ export interface TeamPhone {
   stateFile: string;
 }
 
-export type TeamRoomsSetup = Pick<RoomsOptions, 'enabled' | 'device' | 'presenceFacts' | 'prefsFile'>;
+export type TeamRoomsSetup = Pick<RoomsOptions, 'device' | 'presenceFacts' | 'prefsFile'> & { enabled: (facts: { onTeam: boolean }) => boolean };
 
 export interface TeamServiceOptions {
   session?: TeamSession | null;
@@ -389,6 +390,7 @@ export function createTeamService({
     backend: () => backend, me: () => state.me, team: () => state, now, log, onChange,
     findFile: (ref, how = {}) => findFileToSend({ ref, meant: how.meant === true, products: store.listProducts({ includeArchived: true }) }),
     ...roomsSetup,
+    enabled: () => roomsSetup.enabled({ onTeam: isOnTeam(state) }),
   }) : null;
   if (site) QRCode.toString(site, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }).then((qr) => { siteQr = qr; set({ phoneSiteQr: qr }); }).catch(() => {});
 
