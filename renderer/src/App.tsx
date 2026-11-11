@@ -2,7 +2,7 @@ import { previewFocus } from './preview-focus';
 import { PhoneStatus } from './components/PhoneStatus';
 import { sidebarFolded, useSidebarShrinks } from './sidebar-shrinks';
 import { GlassBand } from './components/GlassBand';
-import { cloudChord, cloudToggleNote, cloudToggleTarget, threadPlace } from './cloud-menu';
+import { cloudChord, cloudOffAsks, cloudToggleNote, cloudToggleTarget, threadPlace } from './cloud-menu';
 import { usePhoneBack, onCloudPhone, onPhone } from './phone-screen';
 import { holdsReplies, writeHeldWhenHidden } from './phone-holds';
 import { pollEvery } from './phone-polls';
@@ -74,6 +74,7 @@ import { importedLine } from './agent-import-card';
 import { whenLabel } from './components/When';
 import { RepeatFocus } from './components/RepeatFocus';
 import { Palette } from './components/Palette';
+import { CloudOffAsk } from './components/CloudOffAsk';
 import { Standing, STANDING } from './components/Standing';
 import { Settings } from './components/Settings';
 import { Snooze } from './components/Snooze';
@@ -290,7 +291,7 @@ async function armNow(): Promise<Arm> {
   } catch { return 'tour'; }
 }
 
-type Modal = null | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing';
+type Modal = null | 'cloud-off' | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing';
 
 // WHAT AN UNDO HANDS BACK, and where it belongs on the screen. A withdrawn
 // reply belongs to a thread, so undoing it opens that thread with the user's
@@ -4594,14 +4595,20 @@ export default function App() {
 
   // C TURNS THE CLOUD ON OR OFF, from anywhere a key reaches (2026-10-16), and
   // a note says which. Through a ref so the key handlers read the cloud as it
-  // is now. Nothing without a cloud set up.
+  // is now. Nothing without a cloud set up. Off asks first (CloudOffAsk).
   const toggleCloudRef = useRef<(() => void) | null>(null);
   toggleCloudRef.current = () => {
     const cloud = snap?.cloud;
     if (!cloud?.setUp) return;
     const mode = cloudToggleTarget(cloud);
+    if (cloudOffAsks(mode)) { setModal('cloud-off'); return; }
     void api.setWorkspaceSetting({ key: 'cloudRuns', value: mode });
     showToast(cloudToggleNote(mode));
+  };
+  const turnCloudOff = () => {
+    setModal(null);
+    void api.setWorkspaceSetting({ key: 'cloudRuns', value: 'mac' });
+    showToast(cloudToggleNote('mac'));
   };
 
   // A CLOUD ACCOUNT THAT WAS NOT ADDED, SAID THE MOMENT IT FAILS (2026-10-15):
@@ -7432,6 +7439,7 @@ export default function App() {
   // `said` false for a pick in the thread's own Runs on panel, which shows it there.
   const placeThread = (item: WorkItem, keep: PlaceAct, said = true) => {
     if (keep === 'move') { void moveToCloud([item.id], item.product, said); return; }
+    if (keep === 'cloud-on') { if (snap?.cloud) void api.setWorkspaceSetting({ key: 'cloudRuns', value: cloudToggleTarget(snap.cloud) }); void api.setThreadOnMac({ [item.id]: false }); return; }
     void api.setThreadOnMac({ [item.id]: keep });
     if (said) showToast(keep ? 'This thread now runs only on this Mac' : 'This thread can run on the cloud again');
   };
@@ -8908,11 +8916,12 @@ export default function App() {
           a `scripted` prop for that now, so the tutorial opens the same card
           everybody else opens. Her words: "the tutorial is using the wrong
           component here, we no longer use this". */}
+      {modal === 'cloud-off' && <CloudOffAsk onOff={turnCloudOff} onKeep={() => setModal(null)} />}
       <Palette
         open={modal === 'palette'}
         phone={onPhone()}
         cloud={snap.cloud?.setUp ? snap.cloud : null}
-        onCloudMode={(mode) => { setModal(null); void api.setWorkspaceSetting({ key: 'cloudRuns', value: mode }); }}
+        onCloudMode={(mode) => { if (cloudOffAsks(mode)) { setModal('cloud-off'); return; } setModal(null); void api.setWorkspaceSetting({ key: 'cloudRuns', value: mode }); }}
         onFirstRun={walkAgain}
         onTutorial={() => startTutorial(comeBackTo(snap.products, productFilter, rememberedProject()))}
         onImportAgents={() => { setModal(null); setImportAgents(true); }}

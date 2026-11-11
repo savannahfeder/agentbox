@@ -1054,7 +1054,7 @@ html:root[data-glass], html:root[data-glass] body, html:root[data-glass][data-sk
 :root[data-glass] .workspace-navigation .workspace-tab.active {
   background: color-mix(in srgb, var(--text) 9%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 7%, transparent);
 }
-:root[data-glass]:not([data-theme="light"]) .app.workspace-layout { background: color-mix(in srgb, var(--bg) 10%, transparent); }
+:root[data-glass]:not([data-theme="light"]) .app.workspace-layout { background: color-mix(in srgb, var(--bg) 30%, transparent); }
 :root[data-glass]:not([data-theme="light"]) .workspace-layout::before {
   background: linear-gradient(var(--skin-pane), var(--skin-pane)), var(--skin-image) center / cover no-repeat fixed var(--bg);
   box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--text) 16%, transparent);

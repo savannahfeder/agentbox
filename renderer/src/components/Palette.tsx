@@ -23,6 +23,8 @@ export interface Command {
   // Words she might TYPE that the label does not say. Matched, never shown;
   // the hint is shown, never matched (../palette-rows).
   keywords?: string;
+  /** A word the query must name before the row is offered (../palette-rows). */
+  onlyWith?: string;
   keyHint?: string;
   run: () => void;
   /** A line, file, comment or decision found inside something: drawn as its words with who and where under. */
@@ -173,7 +175,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     })),
     // The cloud on or off, with its key, then each meaning of on (C).
     ...(cloud && onCloudMode ? cloudCommands(cloud).map((r, i) => ({
-      id: i === 0 ? 'cloud-toggle' : `cloud-${r.mode}`, label: r.label, hint: r.hint, keyHint: r.keyHint,
+      id: i === 0 ? 'cloud-toggle' : `cloud-${r.mode}`, label: r.label, hint: r.hint, keyHint: r.keyHint, onlyWith: r.onlyWith,
       keywords: 'cloud where threads run mac overflow everything move on off',
       run: () => onCloudMode(r.mode),
     })) : []),

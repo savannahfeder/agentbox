@@ -1,19 +1,27 @@
 // The main window's ground, behind the Glass switch in Settings, Alpha
-// features. On a Mac with it on, the system blurs the desktop behind the
-// window and the page lets it through where it paints the ground with
-// see-through colour. Every Mac window carries GLASS_ARG, so its page knows it
-// may go glass; the switch itself reaches the page in the snapshot. Elsewhere
-// the window stays opaque, because a see-through page would show nothing.
+// features. On a Mac with it on, the desktop shows through the ground, blurred,
+// where the page paints it with see-through colour. Every Mac window carries
+// GLASS_ARG, so its page knows it may go glass; the switch itself reaches the
+// page in the snapshot. Elsewhere the window stays opaque, because a
+// see-through page would show nothing.
+//
+// From macOS 26 the glass is the Mac's own Liquid Glass
+// (main/native/window-glass), under a transparent window. Before that it is
+// the older blur, which lets far less of the desktop through.
+import { createRequire } from 'node:module';
+
 export const GLASS_ARG = '--agentbox-glass';
 
 const OPAQUE = '#1a1a1c';
-// The Finder sidebar's glass. 'under-window' is the window's own ground and is
-// close to opaque in dark mode, which read as no glass at all.
-const MATERIAL = 'sidebar';
+const CLEAR = '#00000000';
+// Of the older blurs, the one that lets about a third of the desktop through,
+// as the reference app does. 'sidebar' let a sixth through and read as solid.
+const MATERIAL = 'popover' as const;
 // The reference's lights, centred 25pt in and 25pt down; this is the top-left of 14pt buttons.
 const LIGHTS = { x: 18, y: 18 };
 
 export type GlassOptions = {
+  transparent?: boolean;
   vibrancy?: typeof MATERIAL;
   visualEffectState?: 'active';
   trafficLightPosition?: { x: number; y: number };
@@ -21,20 +29,37 @@ export type GlassOptions = {
   additionalArguments: string[];
 };
 
-export function glassWindow(platform: NodeJS.Platform, on: boolean): GlassOptions {
+export interface LiquidWindowGlass { set(handle: Buffer, on: boolean): unknown }
+
+/** The Mac's Liquid Glass for the main window, or null: not a Mac, before macOS 26, or not built. */
+export function loadWindowGlass({ mac = process.platform === 'darwin', load = createRequire(import.meta.url) as (id: string) => unknown }: { mac?: boolean; load?: (id: string) => unknown } = {}): LiquidWindowGlass | null {
+  if (!mac) return null;
+  try {
+    const native = load('./native/window-glass/build/window-glass.node') as LiquidWindowGlass & { available(): boolean };
+    return native.available() ? native : null;
+  } catch {
+    return null;
+  }
+}
+
+export function glassWindow(platform: NodeJS.Platform, on: boolean, liquid: boolean): GlassOptions {
   if (platform !== 'darwin') return { backgroundColor: OPAQUE, additionalArguments: [] };
-  // 'active' keeps the blur when the window is not focused, as the reference does.
-  const mac = { visualEffectState: 'active' as const, additionalArguments: [GLASS_ARG] };
+  // See-through from the start even with the switch off, under a solid
+  // background: the older blur, given to a running window, left old pixels on
+  // the glass at every repaint.
+  const mac = liquid
+    ? { transparent: true, additionalArguments: [GLASS_ARG] }
+    : { vibrancy: MATERIAL, visualEffectState: 'active' as const, additionalArguments: [GLASS_ARG] };
   return on
-    ? { ...mac, vibrancy: MATERIAL, trafficLightPosition: LIGHTS, backgroundColor: '#00000000' }
+    ? { ...mac, trafficLightPosition: LIGHTS, backgroundColor: CLEAR }
     : { ...mac, backgroundColor: OPAQUE };
 }
 
 export interface GlassableWindow {
   isDestroyed(): boolean;
-  setVibrancy(type: typeof MATERIAL | null): void;
   setBackgroundColor(color: string): void;
   setWindowButtonPosition(position: { x: number; y: number } | null): void;
+  getNativeWindowHandle(): Buffer;
 }
 
 /**
@@ -46,10 +71,10 @@ export function glassTone(tone: unknown): 'light' | 'dark' | 'system' {
   return tone === 'light' || tone === 'dark' ? tone : 'system';
 }
 
-/** Flipping the switch while the app runs: the same window, turned glass or back. */
-export function applyGlass(win: GlassableWindow | null, platform: NodeJS.Platform, on: boolean): void {
+/** The window turned glass or back: when it opens, and when the switch flips while it runs. */
+export function applyGlass(win: GlassableWindow | null, platform: NodeJS.Platform, on: boolean, liquid: LiquidWindowGlass | null = null): void {
   if (platform !== 'darwin' || !win || win.isDestroyed()) return;
-  win.setVibrancy(on ? MATERIAL : null);
-  win.setBackgroundColor(on ? '#00000000' : OPAQUE);
+  win.setBackgroundColor(on ? CLEAR : OPAQUE);
   win.setWindowButtonPosition(on ? LIGHTS : null);
+  liquid?.set(win.getNativeWindowHandle(), on);
 }

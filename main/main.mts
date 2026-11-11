@@ -52,7 +52,7 @@ import { teammatesOn } from '../shared/teammates.mts';
 import { dataFolderName, isNewUserBuild } from '../shared/side-build.mts';
 import { runningAsAFreshUser } from '../shared/fresh-user-home.mts';
 import { newUserWindow } from './new-user-window.mts';
-import { applyGlass, glassTone, glassWindow } from './window-glass.mts';
+import { applyGlass, glassTone, glassWindow, loadWindowGlass } from './window-glass.mts';
 import { openFreshUser } from './fresh-user.mts';
 import { installCrashReports, report as reportCrash, reportFromRenderer, pending as pendingCrashes, setTransport } from './crash-report.mts';
 import { keepThePageAlive } from './when-the-page-stops.mts';
@@ -787,7 +787,8 @@ async function createWindow() {
     });
   });
 
-  const { additionalArguments, ...glass } = glassWindow(process.platform, alphaFeatures(config).glass);
+  const liquidGlass = loadWindowGlass();
+  const { additionalArguments, ...glass } = glassWindow(process.platform, alphaFeatures(config).glass, !!liquidGlass);
   window = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -813,6 +814,8 @@ async function createWindow() {
       additionalArguments,
     },
   });
+
+  if (alphaFeatures(config).glass) applyGlass(window, process.platform, true, liquidGlass);
 
   // Electron hands the window's title to the page's the moment one loads, and
   // renderer/index.html carries the app's name, so a throwaway copy went back
@@ -935,7 +938,7 @@ async function createWindow() {
   quitStep(app, 'before-quit', 'connections.stop', () => connected.stop());
   const ipc = registerIpc({
     store, supervisor, config, window, analytics, docGrants, updater,
-    glass: (on) => applyGlass(window, process.platform, on),
+    glass: (on) => applyGlass(window, process.platform, on, liquidGlass),
     host: filingHost,
     team,
     connections: connected.connections,

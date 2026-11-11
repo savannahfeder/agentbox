@@ -252,6 +252,7 @@ export function createSandbox({
   // so the log and the results upload still have room.
   reserveBytes = 0,
 } = {}) {
+  const machineUpAt = Date.now();
   const at = (p) => (pathRoot ? path.join(pathRoot, p) : p);
   const reserve = path.join(workRoot, '.reserve');
   if (reserveBytes > 0) {
@@ -882,7 +883,9 @@ export function createSandbox({
     child.on('exit', (code, signal) => setImmediate(() => finish(code, signal)));
     if (r.cancelled) cancel(r, r.cancelled);
     setState('running', {}, r);
-    const deadline = Number(r.spec.deadlineMs) || DEFAULT_DEADLINE_MS;
+    // AgentCore's 8 hours run from the machine's start, so the time spent
+    // getting ready comes out of the agent's share, not the saving margin.
+    const deadline = Math.max(0, (Number(r.spec.deadlineMs) || DEFAULT_DEADLINE_MS) - (Date.now() - machineUpAt));
     r.deadlineTimer = setTimeout(() => {
       emit({ kind: 'error', message: 'stopped near the cloud session\'s 8-hour limit so its work could be saved' }, r);
       cancel(r, 'SIGTERM');
