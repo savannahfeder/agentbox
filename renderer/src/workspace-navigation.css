@@ -1024,15 +1024,15 @@ body {
 
 /* GLASS ON A MAC (w-b4dbfc0f31), behind the Glass switch in Alpha features.
    The window blurs the desktop behind it with the sidebar material
-   (main/window-glass.mts), and the app lays a light tint of the theme's own
-   ground over it. The tint is on the app, never on html or body: Chromium
+   (main/window-glass.mts) in the look's own appearance, and Dark lays a light
+   tint of its own ground over it. The tint is on the app, never on html or body: Chromium
    paints the root's colour as the window's own and sends it again with every
    frame, which flickered with each key typed. The card is drawn solid. The top
    band is twice the traffic lights' centre so they sit in its middle, and
    carries back and forward, Home and Inbox, Search and New thread
    (GlassBand.tsx); the right and the foot are an even 20px. phone.css comes
    later and keeps the phone's full-bleed card. */
-html:root[data-glass], html:root[data-glass] body { background: transparent !important; }
+html:root[data-glass], html:root[data-glass] body, html:root[data-glass][data-sky-frame] body { background: transparent !important; }
 :root[data-glass] body::before { content: none; }
 :root[data-glass] .app.workspace-layout { padding-top: 50px; padding-right: 20px; padding-bottom: 20px; }
 :root[data-glass] .workspace-layout::before { top: 50px; right: 20px; bottom: 20px; border-radius: 14px; }
@@ -1047,17 +1047,22 @@ html:root[data-glass], html:root[data-glass] body { background: transparent !imp
 :root[data-glass] .workspace-layout > .topbar .th-new[data-hint="new-task"] { display: none; }
 :root[data-glass] .back-forward .back-forward-inbox { display: none; }
 :root[data-glass] .hm-doors { display: none; }
+:root[data-glass] .app:has(> .glass-band[data-here="inbox"]) > .topbar { height: 0; min-height: 0; flex-basis: 0; padding: 0; border-bottom: 0; overflow: visible; }
+:root[data-glass] .app:has(> .glass-band[data-here="inbox"]) > .topbar .workspace-title { display: none; }
+:root[data-glass] .app:has(> .glass-band[data-here="inbox"]) > .topbar .topbar-right { position: absolute; top: 26px; right: 36px; z-index: 4; }
+:root[data-glass] .app:has(> .glass-band[data-here="inbox"]) .list-pane > .th-bar { padding-top: 27px; }
 :root[data-glass] .workspace-navigation .workspace-tab.active {
   background: color-mix(in srgb, var(--text) 9%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 7%, transparent);
 }
-:root[data-glass]:not([data-theme="light"]) .app.workspace-layout { background: color-mix(in srgb, var(--bg) 25%, transparent); }
+:root[data-glass]:not([data-theme="light"]) .app.workspace-layout { background: color-mix(in srgb, var(--bg) 10%, transparent); }
 :root[data-glass]:not([data-theme="light"]) .workspace-layout::before {
   background: linear-gradient(var(--skin-pane), var(--skin-pane)), var(--skin-image) center / cover no-repeat fixed var(--bg);
   box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--text) 16%, transparent);
 }
-/* !important and the extra `html` because home.css paints a light sky's
-   frame colour over the app with !important. */
-html:root[data-glass][data-theme="light"] .app.workspace-layout { background: color-mix(in srgb, var(--sky-frame, var(--bg)) 20%, transparent) !important; }
+/* !important, the extra `html` and [data-sky-frame] because home.css paints a
+   light sky's frame colour over body and the app with !important. Light is
+   untinted: measured against its design, the light glass alone matches. */
+html:root[data-glass][data-theme="light"] .app.workspace-layout { background: transparent !important; }
 :root[data-glass][data-theme="light"] .workspace-layout::before { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 8%, transparent); }
 
 /* The whole band drags the window; it comes before the header in the page, so

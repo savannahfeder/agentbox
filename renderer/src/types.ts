@@ -1693,6 +1693,7 @@ declare global {
       olderItems?(p: { offset: number; limit: number }): Promise<{ items: WorkItem[]; more: boolean }>;
       crash?(p: { name: string; message: string; stack: string }): Promise<unknown>;
       draftCopy?: { read(): string | null; write(text: string): void };
+      glassTone?(p: { tone: 'light' | 'dark' | 'system' }): Promise<unknown>;
       blankCheck?(p: { thread: string; facts: Record<string, unknown>; lateMs: number; longTaskMs: number }): Promise<string | null>;
       // A count. The name is checked against the approved list in the main
       // process, which attaches everything else; nothing from this side rides along.
