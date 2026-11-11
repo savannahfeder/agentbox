@@ -50,7 +50,7 @@ describe('the right side of the purchase page', () => {
   const css = fs.readFileSync(new URL('../renderer/src/components/setup-split.css', import.meta.url), 'utf8');
   it('shows Pro in place of the app', () => {
     expect(split).toMatch(/if \(step === 'pay'\) root\.dataset\.setupPro = ''; else delete root\.dataset\.setupPro;/);
-    expect(css).toMatch(/:root\[data-setup-pro\] #root \{ visibility: hidden; \}/);
+    expect(css).toMatch(/:root\[data-setup-pro\] #root \{ visibility: hidden; opacity: 0; \}/);
     expect(split).toMatch(/\{step === 'pay' && <ProShowcase agents=\{cloudShowcase\(p\.chats\.map\(\(t\) => t\.title\)\)\} team=\{p\.snap\?\.team\?\.team\?\.name \?\? null\} \/>\}/);
   });
   it('draws a card for each line on the left, in the same order', () => {

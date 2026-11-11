@@ -91,7 +91,8 @@
 .setup-split .ss-price-line { margin: 12px 0 0; font-size: 12.5px; color: var(--text-faint); }
 
 /* And on the right, in place of the app (ProShowcase.tsx): a card for each of those lines, over the sky. */
-:root[data-setup-pro] #root { visibility: hidden; }
+/* Opacity too: the back and forward buttons set their own visibility. */
+:root[data-setup-pro] #root { visibility: hidden; opacity: 0; }
 .setup-split .pro-show { position: absolute; inset: 0; border-radius: 16px; overflow: hidden; display: grid; place-items: center;
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 10%, transparent), 0 30px 80px rgba(30, 40, 40, .16); }
 .setup-split .pro-sky { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -104,9 +105,9 @@
   backdrop-filter: blur(36px) saturate(1.05); -webkit-backdrop-filter: blur(36px) saturate(1.05); box-shadow: 0 12px 40px rgba(40, 60, 50, .14); }
 .setup-split .pro-card header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 14px; font-weight: 500; }
 .setup-split .pro-card header span { margin-left: auto; font-size: 12.5px; font-weight: 400; opacity: .6; }
-.setup-split .pro-pcs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.setup-split .pro-pcs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .setup-split .pro-pc { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 8px 9px; border-radius: 8px; font-size: 12.5px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .08); }
+  background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .08); }
 :root[data-theme="light"] .setup-split .pro-pc { background: rgba(255, 255, 255, .7); border-color: rgba(20, 40, 30, .08); }
 .setup-split .pro-pc i { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pro-live 1.6s ease-in-out infinite; }
 @keyframes pro-live { 50% { opacity: .35; } }
@@ -115,8 +116,8 @@
 .setup-split .pro-face { flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-size: 11px; font-weight: 500;
   background: rgba(127, 127, 127, .22); }
 .setup-split .pro-who { flex: none; font-weight: 500; }
-.setup-split .pro-on, .setup-split .pro-file { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: .75; }
-.setup-split .pro-file { opacity: 1; }
+.setup-split .pro-on, .setup-split .pro-file, .setup-split .pro-pc span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: .75; }
+.setup-split .pro-file, .setup-split .pro-pc span { opacity: 1; }
 .setup-split .pro-size { margin-left: auto; flex: none; font-size: 12px; opacity: .55; }
 .ss-picker { position: fixed; inset: 0; z-index: 2147483005; }
 .setup-split .ss-empty { padding: 16px 18px; color: var(--text-faint); font-size: 13.5px; }
