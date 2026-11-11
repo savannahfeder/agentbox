@@ -36,8 +36,10 @@ describe('a copy with the real Codex', () => {
     expect(LIVE).toMatch(/const realCodexHome = value\('real-codex'\)/);
   });
 
-  it('is what the power test asks for, for people who use Codex, on the testers\' login', () => {
-    expect(POWER).toMatch(/const codexReal = !real && !standInCloud && !flag\('stand-in-codex'\);/);
+  // Since 2026-11-11 a power test is on real plans throughout unless the person
+  // agreed to stand-ins (tests/a-power-test-runs-on-real-plans-unless-the-person-agreed);
+  // on such a run Codex stays real on the testers' login.
+  it('is what a stand-in power test asks for, for people who use Codex, on the testers\' login', () => {
     expect(POWER).toMatch(/person\.codex && codexReal \? \['--real-codex', login\.home\] : \[\]/);
   });
 });
@@ -61,8 +63,7 @@ describe('what the tester is told', () => {
     expect(said).toMatch(/Claude Code agents are stand-ins/);
   });
 
-  it('must NOT say so on a copy with no real Codex, or on all-real tools', () => {
-    expect(prompt({})).not.toMatch(/Codex agents are real/);
-    expect(prompt({ real: true, codexReal: false })).not.toMatch(/at least half/);
+  it('must NOT say so on a copy with no real Codex', () => {
+    expect(prompt({})).not.toMatch(/Codex agents are real|at least half/);
   });
 });
