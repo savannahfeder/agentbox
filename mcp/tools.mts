@@ -30,6 +30,7 @@ import { WORK_ITEM_STATUSES } from '../shared/work-items.mts';
 import { CONTEXT_WORDS, DONE_STEPS, DONE_STEP_WORDS, SUMMARY_WORDS } from '../shared/thread-cards.mts';
 import { AGENT_CREATION_KINDS } from '../shared/contracts.mts';
 import { joinCause } from './core/causes.mts';
+import { addRuleToProduct } from './core/project-rules.mts';
 import { joinedWords } from '../shared/causes.mts';
 // The descriptions below are read by every agent on every run, so the app is
 // named in them from the one place it is named. They said "the app" while this
@@ -182,6 +183,16 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         archived: z.boolean().optional(),
       },
       run: ({ product, ...patch }: { product: string } & ProductPatch) => json(updateProduct(product, patch)),
+    },
+
+    {
+      name: 'add_project_rule',
+      description: 'Keep a rule the person gave for one project (when its work ships, what needs their yes, how it is done) in that project\'s instructions, which every agent working there reads from its next run. Only once they have agreed to keep it, and one rule per call, in their words.',
+      schema: {
+        product: z.string(),
+        rule: z.string().describe('one rule, a sentence or two'),
+      },
+      run: ({ product, rule }: { product: string; rule: string }) => json(addRuleToProduct(product, rule)),
     },
 
     /* ------------------------------ documents ------------------------------ */

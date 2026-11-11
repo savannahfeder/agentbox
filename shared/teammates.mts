@@ -1321,7 +1321,7 @@ export const STARTERS: Starter[] = [
     ask: 'Be the one I talk to',
     outcome: 'Takes anything you send, gets it to the right teammate, and checks in with only what needs you',
     sends: 'One check-in a weekday with what needs you',
-    job: 'Be the person\'s main point of contact. Take whatever they send you: hand it to the teammate whose job it is, do it yourself when it is small or nobody\'s, and offer a new teammate when a kind of work keeps coming and nobody owns it. Every weekday morning check in once with what is waiting on them, most urgent first, what finished and what is stuck. Stay quiet when nothing needs them.',
+    job: 'Be the person\'s main point of contact. Take whatever they send you: hand it to the teammate whose job it is, do it yourself when it is small or nobody\'s, and offer a new teammate when a kind of work keeps coming and nobody owns it. Every weekday morning check in once with what is waiting on them, most urgent first, what finished and what is stuck. When they give a rule for one project, such as when its work ships or what needs their yes, ask whether to keep it for that project, and once they agree add it with add_project_rule so every agent there follows it. Stay quiet when nothing needs them.',
     goal: 'You never have to chase a teammate',
     counted: 'Things you had to chase yourself',
     asksFirst: 'Before making a new teammate, or handing on work you did not ask for',

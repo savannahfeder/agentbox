@@ -9492,7 +9492,7 @@ export class Supervisor {
       return out;
     };
     try {
-      const done = await teammates.tick({ items, now, deliver, tell, room: (engine: string | null) => this._roomToLookBack(engine, now) });
+      const done = await teammates.tick({ items, now, deliver, tell, room: (engine: string | null) => this._roomToLookBack(engine, now), chief: true });
       if (done.length) this.onChange?.();
     } catch (err) {
       teammates.noteTrouble?.(`Teammates could not wake: ${(err as Error).message}`, now);

@@ -180,6 +180,8 @@ export interface TickInput {
   tell?: (product: string | null, item: string, hand: { text: string; from: { teammate: string; name: string }; hold: boolean; hop: number }) => unknown;
   /** Whether the plan this engine bills has room for a look-back. Without it none runs. */
   room?: (engine: string | null) => boolean;
+  /** Make the default Chief of staff when there is none yet (the running app's tick). */
+  chief?: boolean;
 }
 
 export interface OfferInput { items?: TeamItem[]; chat?: Chat; now?: number }
@@ -532,7 +534,7 @@ export class Teammates {
   // Carries out what `planWakes` decided. Each action is written so a crash
   // between two of them redoes nothing twice: runs are created if absent under
   // the project lock, and the seen marker comes after the run it records.
-  async tick({ items, now = Date.now(), deliver, tell, room }: TickInput = {}) {
+  async tick({ items, now = Date.now(), deliver, tell, room, chief = false }: TickInput = {}) {
     let team: Teammate[];
     let chat: Chat;
     try {
@@ -547,6 +549,7 @@ export class Teammates {
     } catch (err) {
       this.noteTrouble(`The offer of a teammate failed: ${(err as Error).message}`, now);
     }
+    if (chief) team = this._chiefOnce(team, now);
     if (!team.length) return [];
     team = this._namedByRole(team, now);
     const mine = (items ?? []).filter((i) => teammateIdOf(i));
@@ -714,6 +717,21 @@ export class Teammates {
     const day = new Date(now).toDateString();
     const already = this.chat().messages.some((m) => m.kind === 'act' && m.from === teammateId && m.verb === verb && new Date(m.ts).toDateString() === day);
     if (!already) writeChat(this.dir(), { kind: 'act', from: teammateId, verb, text }, now);
+  }
+
+  // A Chief of staff from the start, made once: one you remove stays gone, and
+  // one is not made beside a primary you already have.
+  _chiefOnce(team: Teammate[], now: number): Teammate[] {
+    const marker = path.join(this.dir(), 'chief-made');
+    if (fs.existsSync(marker)) return team;
+    if (!team.some((t) => t.primary)) {
+      if (!this._product(null)) return team;
+      const chief = this.create({ starter: 'chief' }, now);
+      this.start(chief.id, now);
+    }
+    fs.mkdirSync(this.dir(), { recursive: true });
+    fs.writeFileSync(marker, `${now}\n`);
+    return this.list(now);
   }
 
   // Teammates go by their role. Ones made with a person's name are renamed
