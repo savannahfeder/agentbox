@@ -4,7 +4,7 @@
 import {
   planWakes, teammateLabel, FROM_LABEL_PREFIX, HOP_LABEL_PREFIX, hopOf, teammateIdOf, YOU, mentionsIn,
   letterFor, statusOf, runLines, STARTERS, CHAT_TAIL, isWorks, DEFAULT_LIMIT, MAX_HOPS,
-  offerFrom, offerAnswer, OFFER_LABEL, OFFER_MAKE, OFFER_NOT_NOW, TEAMMATE_EFFORT, GREETING, starterAsks,
+  offerAnswer, OFFER_LABEL, TEAMMATE_EFFORT, GREETING, starterAsks,
   dutyWhen, dutyOf, DUTY_LABEL_PREFIX, CHAT_LABEL, yesFirst, WORK_LABEL_PREFIX, isActiveRun, isQueued, STOPPED_NOTE,
   METHOD_CAP, recordOf, sourceText, pausedNow, WEEK_MS, workOf, UNREAD_HOLD, cleanDuty, dutyStart, howYouWrite, VOICES,
   replyMessageId, projectNamedIn, LOOK_BACK_LABEL, lookBackEffort, lookBackThreads, isLookBack,
@@ -22,11 +22,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { RepeatShape } from '../shared/repeats.mts';
 import type { RouteRecord } from '../shared/auto-route.mts';
-import type { ItemRef, TeammateStatus, Offer, WakeTrigger, WakeAction, ChatLine, Playbook, TeamChat, Written } from '../shared/teammates.mts';
+import type { ItemRef, TeammateStatus, WakeTrigger, WakeAction, ChatLine, Playbook, TeamChat, Written } from '../shared/teammates.mts';
 import type { OutboxEntry, TeamView, ViewCard } from '../shared/teammate-reach.mts';
 import type { ReachTeam } from './teammate-reach.mts';
 
-export type { ItemRef, TeammateStatus, Offer, WakeTrigger, WakeAction };
+export type { ItemRef, TeammateStatus, WakeTrigger, WakeAction };
 
 export type Works = RepeatShape;
 
@@ -638,10 +638,10 @@ export class Teammates {
     return done;
   }
 
-  // The offer of a teammate for asks you keep making: acts on a tap on an
-  // open one, then makes a new one if your threads call for it.
+  // Taps on offer rows made before Auto offered a teammate on the thread
+  // itself. No new rows are made: counting alike titles offered the wrong ones.
   async offer({ items = [], chat = this.chat(), now = Date.now() }: OfferInput = {}) {
-    const { workItemsDisk, lock } = this.store.modules;
+    const { workItemsDisk } = this.store.modules;
     for (const row of items.filter((i) => (i.labels ?? []).includes(OFFER_LABEL) && i.status !== 'done')) {
       const tap: { kind: 'make' | 'dismiss'; words?: string } | null = offerAnswer(row.answer);
       if (!tap) continue;
@@ -666,27 +666,32 @@ export class Teammates {
         note: tap.kind === 'make' ? 'A new teammate is setting itself up in the team chat.' : 'Not now. This one will not be offered again.',
       }, { source: 'system', now });
     }
-    const offered = new Set(chat.messages.filter((m) => m.kind === 'act' && m.verb === 'offered').map((m) => m.ref));
-    const offer: Offer | null = offerFrom({ items, offered, now });
-    if (!offer) return null;
-    const dir = this.store.productDir(offer.product);
-    if (!dir) return null;
-    const body = offer.said;
-    const result = [
-      '**Make a teammate for these?**', '', `${offer.said} Like these:`, '', ...offer.asked.map(({ title, n }) => `- ${title}${n > 1 ? ` (${n} times)` : ''}`), '',
-      'A teammate would take this kind of work on. It does it on its own, on a schedule if you like, and comes to you only when it needs you. It reads these threads first, with everything you said in them, then asks you only what they leave open.',
-      '', '## Options', `1. ${OFFER_MAKE} (recommended)`, `2. ${OFFER_NOT_NOW}`,
-    ].join('\n');
-    // Recorded first, so a crash after it can never offer the same job twice.
-    writeChat(this.dir(), { kind: 'act', from: YOU, verb: 'offered', ref: offer.key, text: offer.title, threads: offer.threads }, now);
-    await lock.withProjectLock(dir, async () => {
-      const made = workItemsDisk.createWorkItem(dir, {
-        title: offer.title, body, kind: 'question', priority: 5, labels: [OFFER_LABEL],
-        problem: 'A teammate could do this kind of work on its own.', progress: `Found ${offer.count} asks like these this month`,
-      }, { source: 'system', now });
-      workItemsDisk.updateWorkItem(dir, made.id, { result }, { source: 'agent', now });
-    });
-    return offer;
+    return null;
+  }
+
+  // Roles turned down on a thread's offer (shared/auto-route.mts readOffer),
+  // which Auto never offers again.
+  declinedRoles(): string[] {
+    return this.chat().messages.filter((m) => m.kind === 'act' && m.verb === 'declined-role' && m.ref).map((m) => String(m.ref));
+  }
+
+  // A tap on the teammate Auto offered on a thread. Make sets one up from this
+  // thread, which it reads first; Not now means never this role again.
+  answerOffer(item: TeamItem, make: boolean, now = Date.now()) {
+    const offer = item.routed?.offer;
+    if (!item.routed || !offer || offer.answered) throw new Error('That offer was already answered.');
+    const dir = this.store.productDir(item.product);
+    if (!dir) throw new Error('That project is gone.');
+    let made: string | null = null;
+    if (make) {
+      const threads = [{ product: item.product, id: item.id, title: String(item.label || item.title).trim() }];
+      const text = `${offer.role}. Take on work like this thread from now on, and learn how I like it done.${offer.why ? ` ${offer.why}` : ''}`;
+      made = this.describe({ text, product: item.product, threads }, now).teammate?.id ?? null;
+    } else {
+      writeChat(this.dir(), { kind: 'act', from: YOU, verb: 'declined-role', ref: offer.role.toLowerCase(), text: offer.role }, now);
+    }
+    this.store.modules.workItemsDisk.updateWorkItem(dir, item.id, { routed: { ...item.routed, offer: { ...offer, answered: make ? 'made' : 'no' } } }, { source: 'system', now });
+    return { made };
   }
 
   // The threads an answered offer came from. An offer made before it kept

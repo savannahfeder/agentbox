@@ -14,11 +14,11 @@
 // The model you picked in the box stays the model the thread runs on, whoever
 // takes it.
 import { teammateLabel, teammateIdOf, activeRunOf, TEAMMATE_LABEL_PREFIX, type Labelled, type RunItem } from './teammates.mts';
-import type { Routed as RouteRecord } from './work-items.mts';
+import type { Routed as RouteRecord, RouteOffer } from './work-items.mts';
 
-export type { Routed as RouteRecord } from './work-items.mts';
+export type { Routed as RouteRecord, RouteOffer } from './work-items.mts';
 
-export interface RouteDecision { to?: string; ask?: string[]; why: string }
+export interface RouteDecision { to?: string; ask?: string[]; why: string; offer?: RouteOffer }
 export interface RouteMate {
   id: string;
   name: string;
@@ -98,8 +98,9 @@ export function routePrompt(
   item: { title?: string; body?: string } | null | undefined,
   candidates: readonly RouteMate[],
   items: readonly RouteItem[] = [],
-  { primary = null }: { primary?: RouteMate | null } = {},
+  { primary = null, declined = [] }: { primary?: RouteMate | null; declined?: readonly string[] } = {},
 ): string {
+  const never = [...new Set([...candidates, ...(primary ? [primary] : [])].flatMap((t) => [t.name, t.role ?? '']).concat(declined).map((r) => r.trim()).filter(Boolean))];
   const who = candidates.map((t, n) => {
     const parts = [`[${n + 1}] ${t.name}${t.role && t.role.toLowerCase() !== t.name.toLowerCase() ? `, ${t.role}` : ''}.`];
     if (t.job) parts.push(`Job: ${cut(t.job, 300)}`);
@@ -120,7 +121,7 @@ export function routePrompt(
     '[0] None of them: an ordinary coding agent does it.',
     ...(primary ? [`[P] ${primary.name}, their primary teammate: only when the task needs several of the teammates above, or is about the team's work as a whole.`] : []),
     '',
-    'Reply with exactly one line and nothing else, in one of these forms:',
+    'Reply with two lines and nothing else. The first, in one of these forms:',
     '  2 | It made the last four clips and runs the clip engine.',
     '  0 | -',
     '  1,2 | Both have worked on the captions.',
@@ -135,6 +136,19 @@ export function routePrompt(
     'teammate\'s status board, and "plan" is not its plan. When the words alone',
     'do not say what the task is about, as when they point at a picture you',
     'cannot see, answer 0.',
+    '',
+    'The second line says whether this is work an AI teammate of its own would',
+    'do better than a one-off agent, because none of the teammates above covers',
+    'it and it is one of these:',
+    '  - it repeats: every week, each new customer, a regular report',
+    '  - it is a long project, where what is learned carries over: the',
+    '    person\'s taste, what they approved, how they like it done',
+    '  - it is an ongoing role, such as support, marketing or hiring',
+    'A one-off fix, a question, or a single change is not. When unsure, it is not.',
+    'Write it in one of these forms, the role in one to three words:',
+    '  Teammate: Marketer | It is a post every week, and it would learn your voice.',
+    '  Teammate: -',
+    ...(never.length ? [`Never offer one of these, which they have or turned down: ${never.join(', ')}.`] : []),
     '',
     '--- the task ---',
     cut(unseen(item?.title), 400),
@@ -177,6 +191,17 @@ export function readRoute(text: string, candidates: readonly { id: string }[], p
   return a === 0 ? { to: 'agent', why: AGENT_WHY } : { to: key(a), why };
 }
 
+/** PURE. The offer in the model's reply, or null: no line, "-", or a role that is not a short one. */
+export function readOffer(text: string, { taken = [] }: { taken?: readonly string[] } = {}): RouteOffer | null {
+  const line = String(text ?? '').split('\n').map((l) => l.trim()).find((l) => /^teammate\s*:/i.test(l));
+  const m = line ? /^teammate\s*:\s*([^|]*?)\s*\|\s*(.*)$/i.exec(line) : null;
+  if (!m) return null;
+  const role = m[1].replace(/^["'`“”‘’]+|["'`“”‘’.]+$/g, '').trim();
+  if (!role || role === '-' || !/^[\p{L}][\p{L}&/' -]{0,29}$/u.test(role) || role.split(/\s+/).length > 3) return null;
+  if (taken.some((t) => t.trim().toLowerCase() === role.toLowerCase())) return null;
+  return { role: role[0].toUpperCase() + role.slice(1), why: cleanWhy(m[2]) };
+}
+
 /**
  * PURE. What the thread's row becomes once it is decided: its labels and the
  *  `routed` note the thread draws as one line. Never its words.
@@ -195,7 +220,7 @@ export function routedPatch(
     return { labels: [...others, AUTO_LABEL], routed: { ask: decision.ask, why: decision.why, at: now, by } };
   }
   const mate = decision.to?.startsWith('mate:') ? decision.to.slice('mate:'.length) : null;
-  const routed = { to: decision.to, why: decision.why ?? '', at: now, by };
+  const routed = { to: decision.to, why: decision.why ?? '', at: now, by, ...(decision.offer ? { offer: decision.offer } : {}) };
   if (!mate) return { labels: others, routed };
   const busy = activeRunOf(mate, (items ?? []).filter((i) => i.id !== item?.id));
   return { labels: [...others, teammateLabel(mate)], routed, ...(busy ? { start: 'later' } : {}) };

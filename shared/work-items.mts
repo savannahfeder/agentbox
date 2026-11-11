@@ -49,7 +49,8 @@ export type Visibility = 'team' | 'people' | 'private';
 
 export interface WorkItemClaim { holder: string; leaseUntil: number }
 export interface Reaction { on: string; emoji: string; off?: true }
-export interface Routed { to?: string; ask?: string[]; why: string; at: number; by: 'auto' | 'you' }
+export interface RouteOffer { role: string; why: string; answered?: 'made' | 'no' }
+export interface Routed { to?: string; ask?: string[]; why: string; at: number; by: 'auto' | 'you'; offer?: RouteOffer }
 export interface SaidAt { said: string; at: number }
 export interface TeammateFrom { teammate: string; name: string }
 export type MessageEditPatch = { on: string; gone: true; text?: undefined } | { on: string; text: string; gone?: undefined };
@@ -423,7 +424,18 @@ export function cleanRouted(value: Unchecked): Routed | undefined {
     const ask = [...new Set(value.ask.filter((x): x is string => typeof x === 'string' && ROUTE_TO.test(x)))].slice(0, 3);
     return ask.length ? { ask, why, at, by } : undefined;
   }
-  return typeof value.to === 'string' && ROUTE_TO.test(value.to) ? { to: value.to, why, at, by } : undefined;
+  if (typeof value.to !== 'string' || !ROUTE_TO.test(value.to)) return undefined;
+  const offer = cleanOffer(value.offer as Unchecked);
+  return { to: value.to, why, at, by, ...(offer ? { offer } : {}) };
+}
+
+function cleanOffer(value: Unchecked): RouteOffer | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const role = typeof value.role === 'string' ? value.role.trim().slice(0, 40) : '';
+  if (!role) return undefined;
+  const why = typeof value.why === 'string' ? value.why.slice(0, 200) : '';
+  const answered = value.answered === 'made' || value.answered === 'no' ? value.answered : undefined;
+  return { role, why, ...(answered ? { answered } : {}) };
 }
 
 // A person id or a line id: short, plain, never an object a writer slipped in.

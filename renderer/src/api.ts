@@ -1163,6 +1163,10 @@ export const api = {
   },
 
   /** Who takes a thread sent to Auto: 'agent' or a teammate as 'mate:<id>' (shared/auto-route.mts). */
+  async answerRouteOffer(p: { product: string; id: string; make: boolean }): Promise<void> {
+    if (useFixtures || !window.zero?.answerRouteOffer) return;
+    await window.zero.answerRouteOffer(p);
+  },
   async routeThread(p: { product: string; id: string; to: string }): Promise<void> {
     if (useFixtures || !window.zero?.routeThread) return;
     await window.zero.routeThread(p);

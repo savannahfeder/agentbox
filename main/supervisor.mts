@@ -176,7 +176,7 @@ import { codexAccount, codexPlanEnded, ensureCodexHome } from './codex-account.m
 import { accountName } from '../shared/account-names.mts';
 import { nameRow, wantsName, askSmallModel } from './row-label.mts';
 import { catchUpRow, catchUpResult } from './catch-up.mts';
-import { isAuto, asksWho, routeCandidates, routePrompt, readRoute, routedPatch, orPrimary, NOBODY_WHY } from '../shared/auto-route.mts';
+import { isAuto, asksWho, routeCandidates, routePrompt, readRoute, readOffer, routedPatch, orPrimary, NOBODY_WHY } from '../shared/auto-route.mts';
 import { LEVELS, latestMessage, sortMessage, wantsPriority } from './message-priority.mts';
 import { GUESSED_LEVELS, levelTask, wantsLevel } from './task-priority.mts';
 import { NAME, Name, envName, nameSlug, isOurSlug } from '../shared/product-name.mjs';
@@ -783,6 +783,7 @@ export interface SupervisorStore {
     filesFoldersLine?(project: string | undefined): string | null;
     briefFor(item: WorkItem): string | null;
     list?(now?: number): RouteMate[];
+    declinedRoles?(): string[];
     noteTrouble(text: string, now?: number): void;
     tick(opts: TickInput): Promise<unknown[]>;
   } | null;
@@ -5085,28 +5086,45 @@ export class Supervisor {
       .filter((i) => isAuto(i) && i.status === 'open' && !asksWho(i))
       .sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))[0];
     if (!next) return undefined;
+    const on = teammatesOn(this.config);
     let all: RouteMate[] = [];
-    try { all = teammatesOn(this.config) ? this.store.teammates?.list?.(now) ?? [] : []; } catch { all = []; }
+    try { all = on ? this.store.teammates?.list?.(now) ?? [] : []; } catch { all = []; }
     const team = routeCandidates(all);
     // What Auto cannot place goes to the primary, when there is one.
     const primary = primaryOf(all);
+    let declined: string[] = [];
+    try { declined = on ? this.store.teammates?.declinedRoles?.() ?? [] : []; } catch { declined = []; }
+    const taken = [...all.flatMap((t) => [t.name, t.role ?? '']), ...declined].filter(Boolean);
     const write = (decision: RouteDecision | null) => {
       this.store.routeItem(next.product, next.id, routedPatch(next, orPrimary(decision, primary), { items, now: Date.now() }));
       this.wake();
     };
-    if (!team.length) { write({ to: 'agent', why: NOBODY_WHY }); return undefined; }
+    if (!on) { write({ to: 'agent', why: NOBODY_WHY }); return undefined; }
+    // With nobody to give it to, the thread starts at once; the question is
+    // still asked, for the offer of a teammate, which follows on the thread.
+    const early = team.length ? null : routedPatch(next, orPrimary({ to: 'agent', why: NOBODY_WHY }, primary), { items, now: Date.now() });
+    if (early) { this.store.routeItem(next.product, next.id, early); this.wake(); }
     this._routing = true;
-    const prompt = routePrompt(next, team, items, { primary });
-    const clean = (text: string) => (readRoute(text, team, primary) ? text : '');
+    const prompt = routePrompt(next, team, items, { primary, declined });
+    const clean = (text: string) => (readRoute(text, team, primary) || readOffer(text) ? text : '');
     return this._askSmall((opts) => askSmallModel(prompt, clean, { ...opts, timeoutMs: ROUTE_TIMEOUT_MS }), { product: next.product })
-      .then((answer) => write(readRoute(answer, team, primary)))
+      .then((answer) => {
+        const offer = readOffer(answer, { taken });
+        if (early) {
+          if (offer) this.store.routeItem(next.product, next.id, { routed: { ...early.routed, offer } });
+          return;
+        }
+        const decision = orPrimary(readRoute(answer, team, primary), primary);
+        const toMate = decision.to?.startsWith('mate:') && decision.to !== (primary ? `mate:${primary.id}` : null);
+        write(offer && !decision.ask && !toMate ? { ...decision, offer } : decision);
+      })
       .catch((e) => {
         console.warn('zero: could not route a thread:', e.message);
+        if (early) return;
         try { write(null); } catch { /* the thread is gone */ }
       })
       .finally(() => { this._routing = false; });
   }
-
   sayItOnEveryStrandedRow(items: WorkItem[], now = Date.now(), { budgetMs = NEW_TRACES_BUDGET_MS } = {}) {
     let dirty = false;
     // AND THE SAME PASS COUNTS THEM, for the line above her list. The count

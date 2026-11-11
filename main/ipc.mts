@@ -1367,6 +1367,16 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     return { ok: true };
   });
 
+  // HER ANSWER TO THE TEAMMATE AUTO OFFERED ON A THREAD (Teammates#answerOffer).
+  ipcMain.handle('zero:answer-route-offer', (_e, { product, id, make }: { product: string; id: string; make: boolean }) => {
+    const item = store.readItem(product, id);
+    if (!item) throw new Error('that thread is gone');
+    if (!store.teammates?.answerOffer) throw new Error('teammates are off');
+    const out = store.teammates.answerOffer({ ...item, product }, make === true);
+    supervisor.wake();
+    return { ok: true, made: out.made };
+  });
+
   /* ----------------------------- the first run ---------------------------- */
   // THE WALK'S EXAMPLE TASK, ANSWERED BY THE APP RATHER THAN BY A SESSION.
   //

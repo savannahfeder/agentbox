@@ -113,7 +113,7 @@ export interface WorkItem {
   due?: string;
   people?: string[];
   /** Sent to Auto: who it went to and why, or the two it asks her to pick from (shared/auto-route.mts). */
-  routed?: { to?: string; ask?: string[]; why: string; at: number; by: 'auto' | 'you' };
+  routed?: { to?: string; ask?: string[]; why: string; at: number; by: 'auto' | 'you'; offer?: { role: string; why: string; answered?: 'made' | 'no' } };
   // THE THREAD'S OWN FIELDS (approved 2026-10-01, shared/work-items.mts).
   // `visibility` absent reads as 'team'. The summary is shared: the agent keeps
   // it current and the person can edit it, and the later write wins.
@@ -1720,6 +1720,7 @@ declare global {
       setProductHidden(p: { product: string; hidden: boolean }): Promise<unknown>;
       compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; onMac?: boolean }): Promise<WorkItem>;
       routeThread?(p: { product: string; id: string; to: string }): Promise<{ ok: true }>;
+      answerRouteOffer?(p: { product: string; id: string; make: boolean }): Promise<{ ok: true; made: string | null }>;
       // Feedback to the Agentbox team (main/feedback.mts). Optional: an older
       // main process under a newer window has no such door.
       sendFeedback?(p: { text: string; files: { name: string; type: string; size: number; data: string }[] }): Promise<{ ok: boolean; error?: string }>;
