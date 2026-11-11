@@ -1,6 +1,6 @@
 // A FILE SOMEONE SHARED BY ITS LINK, BROUGHT INTO THIS PERSON'S OWN AGENTBOX:
-// their own copy in a project's attachments, on a thread of its own that runs
-// nothing until they write to it. What they edit is theirs; the link and its
+// their own copy in a project's attachments, on a thread of its own that waits
+// on them and runs nothing until they write to it. What they edit is theirs; the link and its
 // owner's file are left as they were.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -32,13 +32,14 @@ export function sharedFileTitle(file: Pick<SharedLinkFile, 'name' | 'kind' | 'ty
 
 export interface BroughtIn { product: string; id: string; src: string }
 
-export async function bringSharedFile({ token, product, read, productDir, compose, close }: {
+export async function bringSharedFile({ token, product, read, productDir, compose, hold }: {
   token: string;
   product: string;
   read: (token: string) => Promise<{ file: SharedLinkFile; bytes: Buffer }>;
   productDir: string;
   compose: (fields: { title: string; body: string }) => { id: string } | null | undefined;
-  close: (id: string) => void;
+  /** Leaves the thread waiting on them, so no agent starts on it. */
+  hold: (id: string) => void;
 }): Promise<BroughtIn> {
   const { file, bytes } = await read(token);
   // Through a file rather than base64, since a film is up to 200 MB.
@@ -58,6 +59,6 @@ export async function bringSharedFile({ token, product, read, productDir, compos
   const body = [`${who} shared this with me.`, '', shown].join('\n');
   const made = compose({ title: sharedFileTitle(file), body });
   if (!made?.id) throw new Error('The thread for this file could not be made.');
-  close(made.id);
+  hold(made.id);
   return { product, id: made.id, src: saved.rel };
 }

@@ -2778,7 +2778,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       const out = await bringSharedFile({
         token, product: slug, read: (t) => team.readFileLink(t), productDir: store.productDir(slug),
         compose: (fields) => store.composeItem(slug, fields),
-        close: (id) => { store.answerItem(slug, id, { status: 'done' }); },
+        hold: (id) => { store.waitOnThePerson(slug, id); },
       });
       push();
       return { ok: true, ...out };
