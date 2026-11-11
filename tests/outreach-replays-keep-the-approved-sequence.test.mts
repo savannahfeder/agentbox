@@ -1,9 +1,15 @@
 // A sparse screen recording held the app switcher after it had closed.
 // Replay frames must cover the clock and bind data without changing that clock.
 import { describe, expect, it } from 'vitest';
-import { makeBindings, inject, validateTimeline, validateReplay, sceneAt, pointerAt, recordingTime, bridgeHold, replayKey } from '../scripts/lib/outreach-template.mjs';
+import { makeBindings, inject, validateTimeline, validateReplay, sceneAt, pointerAt, recordingTime, bridgeHold, replayKey, validateComments } from '../scripts/lib/outreach-template.mjs';
 
 describe('approved outreach replay', () => {
+  it('rejects teammate text that would hide its comment',()=>{
+    const film={needsYou:[{key:'maya',title:'a'.repeat(35),comment:'b'.repeat(35)},{key:'jordan',title:'c'.repeat(37),comment:'d'.repeat(33)}]};
+    expect(()=>validateComments(film)).not.toThrow();
+    expect(()=>validateComments({needsYou:[film.needsYou[0],{...film.needsYou[1],comment:'d'.repeat(34)}]})).toThrow(/jordan/);
+    expect(()=>validateComments({needsYou:[{...film.needsYou[0],title:'a'.repeat(37),comment:'b'},film.needsYou[1]]})).toThrow(/maya/);
+  });
   it('reuses pointer-only frames while keeping scroll and content changes',()=>{
     const html='<div id="film-pointer" style="translate: 10px 20px;"></div><p>Same</p>';
     expect(replayKey({scroll:[]},html)).toBe(replayKey({scroll:[]},html.replace('10px 20px','11px 21px')));

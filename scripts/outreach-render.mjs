@@ -9,13 +9,14 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { startableChrome } from '../shared/hidden-browser.mts';
-import { injectDOM, sceneAt, pointerAt, pointerSprite, recordingTime, escapeHtml, cameraBox, validateReplay, replayKey } from './lib/outreach-template.mjs';
+import { injectDOM, sceneAt, pointerAt, pointerSprite, recordingTime, escapeHtml, cameraBox, validateReplay, replayKey, validateComments } from './lib/outreach-template.mjs';
 
 const [folder, input, output, dist, ...flags] = process.argv.slice(2);
 if (!dist) throw new Error('Usage: outreach-render.mjs template film.json screen.mp4 app-dist [--at seconds]');
 const layerMode=flags.includes('--layers')&&!flags.includes('--at');
 const manifest = JSON.parse(fs.readFileSync(path.join(folder,'manifest.json')));
 const target = JSON.parse(fs.readFileSync(input));
+validateComments(target);
 const require = createRequire(import.meta.url);
 const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'playwright-core');
 validateReplay(manifest.frames, manifest.T1);
@@ -74,6 +75,17 @@ function camera(t) {
   return cameraBox(manifest.camera,t);
 }
 let lastContent=null;
+let jordanPoint=null;
+const jordanCamera=manifest.camera.find(e=>e.focus==='jordan'||e.scale===1.35);
+const jordanEnd=jordanCamera&&manifest.camera.find(e=>e.t>jordanCamera.t)?.t;
+const jordanOriginal=jordanCamera&&pointerAt(frames,jordanCamera.t+1.2);
+function scenePointer(t) {
+  const point=pointerAt(frames,t);
+  if(!point||!jordanPoint||!jordanCamera||!jordanOriginal)return point;
+  const smooth=u=>{u=Math.max(0,Math.min(1,u));return u*u*u*(10-15*u+6*u*u);};
+  const weight=smooth((t-jordanCamera.t)/.75)*(jordanEnd?1-smooth((t-jordanEnd)/.8):1);
+  return point.map((value,i)=>value+(jordanPoint[i]-jordanOriginal[i])*weight);
+}
 let lastMouse=null,lastHover=null;
 async function hoverAt(pointer,box,force=false) {
   if(!pointer)return lastHover;
@@ -95,7 +107,7 @@ async function draw(t) {
   const frame = sceneAt(frames,actual);
   const html = frame.html.replace(/__OUTREACH_\d+__/g,(token)=>codeTokens.has(token)?'':token);
   const box = layerMode?[0,0,1440,810]:camera(actual);
-  const pointer=pointerAt(frames,actual);
+  let pointer=scenePointer(actual);
   const content=replayKey(frame,html);
   if(content===lastContent) {
     if(layerMode){const previous=lastHover;await hoverAt(pointer,box);return previous===lastHover?null:page.screenshot({type:'png'});}
@@ -184,6 +196,17 @@ async function draw(t) {
     }
     if(/__OUTREACH_\d+__/.test(document.body.innerText))throw new Error('Unresolved replay field remains visible');
   },{source:manifest.source,target});
+  const notePoint=await page.evaluate(({box})=>{
+    const note=[...document.querySelectorAll('.row .th-aside')].find(el=>el.textContent.startsWith('Jordan commented:'));
+    if(!note)return null;
+    const r=note.getBoundingClientRect(),parent=note.parentElement.getBoundingClientRect();
+    const left=Math.max(r.left,parent.left),right=Math.min(r.right,parent.right),factor=1440/(box[2]-box[0]);
+    if(right-left<20)throw new Error('Jordan comment does not fit in its row');
+    return [(left+right)/2/factor+box[0]-8.9,(r.top+r.height/2)/factor+box[1]-4];
+  },{box});
+  if(notePoint)jordanPoint=notePoint;
+  pointer=scenePointer(actual);
+  if(!layerMode&&pointer)await page.evaluate(point=>{document.getElementById('film-pointer').style.translate=`${point[0]}px ${point[1]}px`;},pointer);
   lastContent=content;
   await hoverAt(pointer,box,true);
   return page.screenshot(layerMode?{type:'png'}:{type:'jpeg',quality:95});
@@ -204,7 +227,7 @@ try {
       for(let k=0;k<2913;k++) {
         const t=k/30,image=await draw(t),actual=recordingTime(manifest.beats,t);
         if(image){file=path.join(cache,`${count++}.png`);fs.writeFileSync(file,image);}
-        plan.frames.push({file,pointer:pointerAt(frames,actual),box:camera(actual)});
+        plan.frames.push({file,pointer:scenePointer(actual),box:camera(actual)});
         if(k%300===0)console.log(`scene ${k}/2913, ${count} drawings, ${(Date.now()-started)/1000}s`);
       }
       const planFile=path.join(cache,'plan.json');fs.writeFileSync(planFile,JSON.stringify(plan));

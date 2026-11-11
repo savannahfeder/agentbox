@@ -9,6 +9,9 @@ Each lead supplies the existing `film.json`, homepage, logo and headline
 image. Rendering replays saved DOM states and camera positions without
 driving the app again. It uses no model. The brief and headline checks
 still run before rendering.
+Maya and Jordan each need a title plus comment of at most 70 characters.
+Maya's title is at most 36 characters. The renderer rejects longer text
+before encoding, because the app otherwise hides the comment.
 
 For a queue, `targets.json` holds `{slug, input, output}` entries. `input`
 is the film JSON path and `output` is the next version's MP4 filename.
@@ -22,6 +25,7 @@ node scripts/outreach-batch.mjs TEMPLATE targets.json APP_DIST face.mp4 MASKS SO
 
 Set `OUTREACH_PYTHON` to the Python interpreter with NumPy installed.
 Set `OUTREACH_COMPOSITOR_PYTHON` if OpenCV is in a different interpreter.
+On the cloud machine, set `CHROME=/opt/agentbox/chromium.sh`.
 The batch caches app screenshots at the approved recording's resolution,
 then composites the pointer and camera. Scroll positions and hover changes
 invalidate the cache. No live app actions run during a lead's render.

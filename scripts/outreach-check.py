@@ -18,18 +18,20 @@ def audio(file):
 probe = json.loads(run(['ffprobe', '-v', 'error', '-show_streams', '-show_format', '-of', 'json', film]))
 video = next(stream for stream in probe['streams'] if stream['codec_type'] == 'video')
 decoder = subprocess.Popen(['ffmpeg', '-v', 'error', '-xerror', '-threads', '2', '-i', film, '-vf', 'scale=160:90,format=gray', '-filter_threads', '1', '-an', '-f', 'rawvideo', '-'], stdout=subprocess.PIPE)
-window = collections.deque(maxlen=4)
+window = collections.deque(maxlen=5)
 flashes = []
 count = 0
+screen_mask = np.ones((90, 160), dtype=bool)
+screen_mask[60:, 130:] = False
 while True:
     data = decoder.stdout.read(160 * 90)
     if not data:
         break
     if len(data) != 160 * 90:
         raise RuntimeError('Truncated frame')
-    frame = np.frombuffer(data, np.uint8).astype(np.float32).reshape(90, 160)[:, :130].flatten()
+    frame = np.frombuffer(data, np.uint8).astype(np.float32).reshape(90, 160)[screen_mask]
     window.append(frame)
-    for length in (1, 2):
+    for length in (1, 2, 3):
         if len(window) < length + 2:
             continue
         before, after = window[-length-2], window[-1]
@@ -53,7 +55,7 @@ active = np.flatnonzero(rms > max(float(rms.max())*.025, .0005))
 last = 94 + (int(active[-1])+1)*.01 if len(active) else None
 report = {'film': film, 'frames': count, 'width': video['width'], 'height': video['height'], 'duration': float(probe['format']['duration']), 'flash_candidates': flashes, 'ending_correlation': aligned, 'ending_alignment_seconds': lag/16000, 'last_voice_activity': last}
 (out/'checks.json').write_text(json.dumps(report, indent=2))
-for label, time in [('homepage', 1), ('switcher', 4.5), ('home', 7), ('team', 23), ('code', 51), ('headlines', 56), ('maya', 74), ('board', 90), ('ending', 96.4)]:
+for label, time in [('homepage', 1), ('switcher', 4.5), ('home', 7), ('team', 23), ('code', 51), ('headlines', 56), ('maya-row', 72.25), ('maya', 74), ('jordan', 82), ('board', 90), ('ending', 96.4)]:
     run(['ffmpeg', '-v', 'error', '-y', '-threads', '2', '-ss', str(time), '-i', film, '-frames:v', '1', '-q:v', '2', str(out/f'{label}.jpg')])
 assert (video['width'], video['height'], count) == (1920, 1080, 2913), report
 assert aligned > .95, report

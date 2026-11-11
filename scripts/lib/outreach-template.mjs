@@ -1,5 +1,13 @@
 export const escapeHtml = (s) => String(s).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 
+export function validateComments(film) {
+  for(const key of ['maya','jordan']) {
+    const row=film.needsYou?.find(row=>row.key===key);
+    if(!row||typeof row.title!=='string'||typeof row.comment!=='string')throw new Error(`Missing ${key} title or comment`);
+    if(row.title.length+row.comment.length>70||(key==='maya'&&row.title.length>36))throw new Error(`Shorten ${key} text so the comment remains visible`);
+  }
+}
+
 export function makeBindings(source) {
   const byText = new Map();
   function visit(value, path) {
@@ -139,7 +147,7 @@ export function injectDOM({bindings,target,source}) {
       if(thread.length)paths=thread;
     }
     if(paths.some(p=>p[0]==='projects')) {
-      const row=el.closest('.hm-row,.row,.td-line');
+      const row=el.closest('.hm-row,.row,.td-line,.th-card');
       if(row) {
         const titleBinding=bindings.find(b=>textOf(row).includes(b.token)&&b.paths.some(p=>p.at(-1)==='title'));
         if(titleBinding) {
@@ -154,29 +162,35 @@ export function injectDOM({bindings,target,source}) {
     if(new Set(values).size>1)throw new Error(`Ambiguous replay field ${binding.source}`);
     return values[0];
   };
+  const normalizer=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
+  for(let node=normalizer.nextNode();node;node=normalizer.nextNode()) {
+    if(node.parentElement.closest('style,script'))continue;
+    let text=node.textContent;
+    for(const binding of embedded)if(text.includes(binding.source))text=text.split(binding.source).join(binding.token);
+    if(text!==node.textContent)node.textContent=text;
+  }
   const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
   const changes=[];
   const projectLabels=[];
   const notes=[];
-  for(const row of document.querySelectorAll('.row,.hm-row')) {
+  for(const row of document.querySelectorAll('.row,.hm-row,.th-board .th-card')) {
     if(row.matches('.hm-mate'))continue;
     const b=bindings.find(b=>textOf(row).includes(b.token)&&b.paths.some(p=>p.at(-1)==='title'&&p[0]!=='team'));
     const p=b?.paths.find(p=>p.at(-1)==='title'&&p[0]!=='team');
     const record=p&&get(target,p.slice(0,-1));
     const project=record&&target.projects.find(p=>p.slug===record.project);
-    const label=row.querySelector('.th-cell-proj')??[...row.querySelectorAll('.hm-tag')].at(-1);
+    const label=row.querySelector('.th-cell-proj,.m > .p:not(.tm-due-word)')??[...row.querySelectorAll('.hm-tag')].at(-1);
     if(project&&label)projectLabels.push([label,project.name]);
-    if(record?.key==='maya'&&row.matches('.row')) {
+    if(['maya','jordan'].includes(record?.key)&&row.matches('.row')) {
       const title=row.querySelector('.th-cell-title');
-      if(title)notes.push([title,`Maya commented: ${record.comment}`]);
+      const waiting=/waiting on you/i.test(row.querySelector('.th-cell-state')?.textContent??'');
+      if(waiting&&typeof record.comment!=='string')throw new Error(`Missing teammate comment ${record.key}`);
+      if(title)notes.push([title,waiting?`${record.key==='maya'?'Maya':'Jordan'} commented: ${record.comment}`:null,record.title]);
     }
   }
   for(let node=walker.nextNode();node;node=walker.nextNode()) {
     if(node.parentElement.closest('style,script'))continue;
     let text=node.textContent;
-    for(const binding of embedded) {
-      if(text.includes(binding.source))text=text.split(binding.source).join(binding.token);
-    }
     if(!/__OUTREACH_\d+__/.test(text))continue;
     changes.push([node,text.replace(/__OUTREACH_\d+__/g,token=>{
       const b=byToken.get(token);
@@ -186,7 +200,9 @@ export function injectDOM({bindings,target,source}) {
   }
   for(const [node,text]of changes)node.textContent=text;
   for(const [node,text]of projectLabels)node.textContent=text;
-  for(const [node,text]of notes) {
+  for(const [node,text,title]of notes) {
+    for(const child of node.childNodes)if(child.nodeType===Node.TEXT_NODE&&child.textContent.includes(title))child.textContent=title;
+    if(text===null){node.querySelector('.th-aside')?.remove();continue;}
     const note=node.querySelector('.th-aside')??document.createElement('span');
     note.className='th-aside';note.textContent=text;
     if(!note.parentElement)node.append(note);
