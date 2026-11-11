@@ -98,7 +98,7 @@ import { approvalAnswered, approvalAsker, approvalView } from './approval-card';
 // there is anything to confirm the card has closed.
 import { sentLine, sendingLine } from './compose-says';
 import { wearJustMade, type JustMade } from './just-made';
-import { agentOnOrComing, asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
+import { agentOnOrComing, asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, commentsWaitOnYou, heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
 import { filedByThePerson, wordWaits } from '../../shared/answers.mts';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mts';
 import { focusAtEnd, focusTheReplyBox } from './focus-at-end';
@@ -137,6 +137,7 @@ import { teammateIdOf } from '../../shared/teammates.mts';
 import { asksWho } from '../../shared/auto-route.mts';
 import { RoomBoard } from './team/rooms/RoomBoard';
 import { directConversations } from './team/rooms/conversations';
+import { personPressOpens } from './team/one-conversation';
 import { isPresenceCard, roomMateCards, roomMatesById } from './team/rooms/room-rules';
 import { MARK_UNREAD, SAY } from './team/chat-events';
 import { aVoiceNoteIsRecording } from './team/useVoiceRecorder';
@@ -144,7 +145,7 @@ import { aBoxIsListening } from './dictation';
 import { MentionCards, MentionRows } from './team/rooms/MentionRows';
 import { AgentsLine, MateThreads, NeedsFaces, PersonThreads, SpaceBar, TeamThreads } from './team/everything/TeamStrip';
 import { EmptyChat, JobBlock, Place as MemberPlace, PlaceAction, PlaceList, PlaceMates, SendBox, type PlaceRow } from './team/everything/PlacePage';
-import { nowAndFinished, personChatOpens, pressOpensIn, waitsOnYou, youWaitOn, type HomeLayout } from './team/everything/place';
+import { nowAndFinished, pressOpensIn, waitsOnYou, youWaitOn, type HomeLayout } from './team/everything/place';
 import { buildMembers, mateRunsOf, orderMembers, personCardsOf, readHidden, readOrder, splitHidden, teamRunsOf, type Hidden, type Member } from './team/everything/members';
 import { boardItems, cardOpens, evColumns, flipEvView, readEvView, whoseBoard, writeEvView, type EvTab, type EvView } from './team/everything/whose-board';
 import { needsByWho, readFolded, readNeedsGroup, stackRows, toggleFolded, whoIsWaiting, writeNeedsGroup, type NeedsGroup, type StackKey } from './threads/stack-rules';
@@ -255,7 +256,7 @@ import { usePointerHold, useHeldOrder } from './threads/steady-rows';
 import { inviteRows, leadRows, type InviteRow, type LeadRow } from './threads/needs-you-rows';
 import { InviteCards, InviteRows } from './threads/InviteRows';
 import { mentionRows } from './team/rooms/room-rules';
-import { SAYS_UNDO, oIsTheToasts, oWaitsFor, oWaitsForTheSend, opensTheToast, saysWhereItWent, toastOpens, toastParts, type OWaits, type ToastGoes } from './toast-parts';
+import { SAYS_UNDO, othersIn, sentToWhom, toastTitle, oIsTheToasts, oWaitsFor, oWaitsForTheSend, opensTheToast, saysWhereItWent, toastOpens, toastParts, type OWaits, type ToastGoes } from './toast-parts';
 import { SentLine } from './components/SentLine';
 import { TickedBar } from './components/TickedBar';
 import { AgentSending } from './team/AgentSending';
@@ -2285,7 +2286,7 @@ export default function App() {
   const inboxCandidates = useMemo(() => items.filter((i) => {
     if (pendingIds.has(i.id)) return false; // action held in the grace window: already sent, as far as the inbox is concerned
     if (i.product && scope && i.product !== scope) return false;
-    if (i.waitingComments?.length) return true;
+    if (commentsWaitOnYou(i, seenAt[i.id] ?? unreadSince)) return true;
     if (fileNewsFor(i, team?.me ?? null, { myName }).length) return true;
     // An agent is working on it right now: In progress, whatever it says
     // (`live` in list-rules, w-bc976fd247). Ahead of every branch here,
@@ -2320,7 +2321,7 @@ export default function App() {
     // request is not something a project's sharing has any view on.
     if (asking(i)) return true;
     if (shared === true) return i.status !== 'done' && !(hiddenAt(i) > now) && !isProposal(i) && !waitsInLater(i, waitingOn(i));
-    return belongsInInbox(i, { deliveredThrough, hiddenUntil: hiddenAt(i), now, asking: asking(i), waitingOn: waitingOn(i), stopped: stalledIds.has(i.id) });
+    return belongsInInbox(i, { deliveredThrough, hiddenUntil: hiddenAt(i), now, asking: asking(i), waitingOn: waitingOn(i), stopped: stalledIds.has(i.id), seen: seenAt[i.id] ?? unreadSince });
   }), [items, hiddenAt, scope, now, pendingIds, teamInbox, liveIds, shippingIds, stalledIds, asking, waitingOn, team, seenAt, myName]);
   // A task asked for in a chat answers in that chat: Needs you lists the chat
   // instead (team/answers-in-the-chat.ts), and closing the chat closes them.
@@ -4282,8 +4283,10 @@ export default function App() {
     team: snap?.team?.people, directs,
     onOpenDirect: (id) => { const item = items.find((i) => i.id === id); if (item) { setChatsDirect(id); setTeamOpen(false); setSettingsOpen(false); setFocused(item); markSeen(item); } },
     onLeavePage: () => { setFocused(null); setFocusedRepeat(null); setTeamOpen(false); closeSearch(); },
-    // Teammates: the conversation you already have, or the new thread card addressed to them.
+    // One teammate: their page, which holds your chat with them. Several: the
+    // conversation you already have, or the new thread card addressed to them.
     onTeamMessage: (ids) => {
+      if (ids.length === 1 && homeLayout === 'chats') { openChatsPlace(`person:${ids[0]}`); return; }
       const want = [...ids].sort().join(',');
       const had = directs.find((d) => [...d.people].sort().join(',') === want);
       if (had) { setFocused(had.item); markSeen(had.item); return; }
@@ -4295,6 +4298,8 @@ export default function App() {
       cards={[...cards, ...roomMateCards(snap?.team?.rooms?.rooms ?? [])]} picked={people} onOpenCard={(c) => { if (!isPresenceCard(c)) openTeammateCard(c); }} columnOrder={columnOrder} later={later}
       onOpenItem={(item) => { setFocused(item); markSeen(item); }} />,
   });
+  // Two people have one conversation while Rooms is live: the chat on the person's page.
+  const oneChat = roomsUi.live && homeLayout === 'chats';
   // AN INVITATION IS ASKED, NEVER TAKEN UP ON ITS OWN: Join or Enter takes it.
   const joinInvite = async (r: InviteRow) => {
     const out = await api.teamAcceptInvite(r.id);
@@ -4524,7 +4529,7 @@ export default function App() {
     const direct = directWith(personId);
     const roomId = personChats.get(personId)?.slice('room:'.length);
     const room = roomId ? (snap?.team?.rooms?.rooms ?? []).find((r) => r.id === roomId) ?? null : null;
-    return personChatOpens(direct, room && { at: room.lastAt }) === 'direct' ? direct : null;
+    return personPressOpens({ roomsLive: roomsUi.live, direct, room: room && { at: room.lastAt } }) === 'direct' ? direct : null;
   };
   const chatsDirectKey = (id: string) => { const one = directs.find((d) => d.id === id && d.people.length === 1); return homeLayout === 'chats' && one ? `person:${one.people[0]}` : `direct:${id}`; };
   // A card opens its work under the cards: yours, the Team's, a person's or an AI
@@ -4555,10 +4560,10 @@ export default function App() {
       return;
     }
     setEvPick(key);
-    // A person's Messages: your direct record with them, else your chat with them in Groups.
+    // A person's Messages: your chat with them in Groups while Rooms is live, else your direct record.
     const person = key.startsWith('person:') && tab === 'messages' ? key.slice('person:'.length) : null;
-    const talk = person ? directWith(person) : null;
-    const chat = person && !talk ? personChats.get(person) : undefined;
+    const chat = person ? personChats.get(person) : undefined;
+    const talk = person && !(roomsUi.live && chat) ? directWith(person) : null;
     if (talk) { setChatsDirect(talk.id); setFocused(talk.item); markSeen(talk.item); }
     else if (chat) roomsUi.open(chat.slice('room:'.length));
     else {
@@ -5371,7 +5376,8 @@ export default function App() {
     // drawn off the ledger, so the words were nowhere for those three seconds.
     // A message to a person is held in `sending` like one to a running agent;
     // the written copy replaces it (item-thread.ts) and Z takes it off.
-    const talking = isDirect(snap?.products.find((p) => p.slug === item.product));
+    const replyIn = snap?.products.find((p) => p.slug === item.product);
+    const talking = isDirect(replyIn);
     // AND A COMMAND KEEPS HER ON THE ROW IT IS ABOUT TO ANSWER.Every other
     // reply hands work to somebody else and takes seconds to hours; this one
     // prints a table in four seconds and the table is the entire reason she
@@ -5461,8 +5467,8 @@ export default function App() {
         // means what it always meant.
         setFollowing(null);
       } });
-    }, talking ? 'Sent' : later ? `Sends ${laterHint(runAt!)} → ${item.productName}` : `Sent → ${item.productName}`, restore, stay, { product: item.product, id: item.id, ...(later ? { at: laterHint(runAt!) } : {}) }, undid, holdsReplies(onPhone()) ? UNDO_GRACE_MS : 0);
-  }, [deferCommit, snap?.supervisor.running, snap?.products, showToast, refresh, markSeen, pushUndo, startChatAgents, fire, movesOn]);
+    }, talking ? sentToWhom(replyIn?.team, snap?.team?.me?.id ?? null, (id) => snap?.team?.people.find((p) => p.id === id)?.name) : later ? `Sends ${laterHint(runAt!)} → ${item.productName}` : `Sent → ${item.productName}`, restore, stay, { product: item.product, id: item.id, ...(later ? { at: laterHint(runAt!) } : {}) }, undid, holdsReplies(onPhone()) ? UNDO_GRACE_MS : 0);
+  }, [deferCommit, snap?.supervisor.running, snap?.products, snap?.team?.people, snap?.team?.me?.id, showToast, refresh, markSeen, pushUndo, startChatAgents, fire, movesOn]);
   answerWithRef.current = answerWith;
 
   // A REPLY THE LAST PAGE NEVER SAW LAND goes back in its box (drafts.ts). It
@@ -7017,13 +7023,14 @@ export default function App() {
   // (Hooks live ABOVE the boot return: below it, React counts them
   // differently between the boot render and the first real one, #310.)
 
+  const isConversationRow = (i: WorkItem) => isDirect(snap?.products.find((p) => p.slug === i.product)) && !isTaskRow(i);
   const sentTo = sentLineShown && toast?.goes
     ? [...inbox, ...progress, ...snoozed, ...done].find((i) => i.id === toast.goes!.id && i.product === toast.goes!.product)
     : undefined;
   const whereItWent = sentLineShown && toast?.goes ? (
     <SentLine
       key={toastShown.current}
-      title={sentTo ? reachAudienceOf(sentTo) ?? rowTitle(sentTo) : 'the thread you left'}
+      title={sentTo ? reachAudienceOf(sentTo) ?? ((isConversationRow(sentTo) && othersIn(snap?.products.find((p) => p.slug === sentTo.product)?.team, snap?.team?.me?.id ?? null, (id) => snap?.team?.people.find((p) => p.id === id)?.name)) || rowTitle(sentTo)) : 'the thread you left'}
       says={sentLineSays(toast.text)}
       at={toast.goes.at}
       undoes={toastParts(toast.text).undo}
@@ -7548,7 +7555,10 @@ export default function App() {
       }
       // The card goes up first, or the link can arrive before there is anything to open.
       await api.teamSync().catch(() => {});
-      const out = await api.teamMessage(to.length === 1 ? to[0] : to, sentWords(rowTitle(item), link, note));
+      const words = sentWords(rowTitle(item), link, note);
+      const out = oneChat && to.length === 1
+        ? await roomsUi.startChat(to[0], team?.byId.get(to[0])?.name ?? 'Chat', words).then((error) => ({ ok: !error, error: error ?? undefined }))
+        : await api.teamMessage(to.length === 1 ? to[0] : to, words);
       const names = to.map((id) => firstName(team?.byId.get(id) ?? null) || 'them').join(' and ');
       showToast(out.ok ? `Sent to ${names}` : (out.error ?? `It did not reach ${names}.`));
       if (out.ok && to.length === 1) { try { localStorage.setItem(SHARE_LAST, to[0]); } catch { /* the menu just names the first */ } }
@@ -7787,6 +7797,7 @@ export default function App() {
       const id = placeMember.key.slice('person:'.length);
       const first = placeMember.name.split(' ')[0];
       const room = personChats.get(id)?.slice('room:'.length) ?? null;
+      const earlier = roomsUi.live ? directWith(id) : null;
       const onYou = mineInNeeds.filter((i) => (i.createdBy && i.createdBy === id) || directPerson.get(i.product) === id);
       const mentionsBy = roomsUi.live ? roomsUi.mentions.filter((m) => m.by === id) : [];
       const given = youWaitOn(items, team?.me ?? null, id);
@@ -7800,6 +7811,7 @@ export default function App() {
         actions={<>
           <PlaceAction onClick={() => { setComposeInitial({ to: id, sendAs: 'task' }); setModal('compose'); }} title={`A new task for ${first}`}>Give a task</PlaceAction>
           {room && !chatsPlaceShown && <PlaceAction quiet onClick={() => pickMember(placeMember.key, 'messages')} title="This chat on the Chats page">Open in Chats</PlaceAction>}
+          {earlier && <PlaceAction quiet onClick={() => { setChatsPlace(null); setChatsDirect(earlier.id); setFocused(earlier.item); markSeen(earlier.item); }} title={`Your messages with ${first} from before this chat`}>Earlier messages</PlaceAction>}
         </>}
         chat={room ? roomsUi.chatIn(room) : roomsUi.live
           ? <SendBox placeholder={`Message ${first}`} empty={<EmptyChat name={first} />}
@@ -8708,6 +8720,7 @@ export default function App() {
           ideas={!walkCard && showIdeas(tour) && !(homeShown && modal !== 'compose') ? FIRST_IDEAS : null}
           askFolder={firstTask(tour) && !tourTask}
           onOpenConversation={openConversation}
+          toChat={oneChat ? (id, words, files) => roomsUi.startChat(id, team?.byId.get(id)?.name ?? 'Chat', words, files) : undefined}
           blockChoicesFor={team ? (holder) => taskBlockChoices(holder) : undefined}
           // "Reorder" beside the project menu's heading: Settings on the
           // Projects page, which is where the order is set. The draft is
@@ -9752,6 +9765,7 @@ export default function App() {
           : toast.goes.repeat
             ? repeats.find((r) => r.id === toast.goes!.id && r.product === toast.goes!.product)
             : [...inbox, ...progress, ...snoozed, ...done].find((i) => i.id === toast.goes!.id && i.product === toast.goes!.product);
+        const aboutTitle = about && toastTitle(rowTitle(about), { conversation: !toast.goes!.repeat && isConversationRow(about as WorkItem) });
         // No O over the thread it names while that thread is the one open
         // (toastOpens): a reply that kept her there names it for after she leaves.
         const here = focused ? { product: focused.product, id: focused.id } : null;
@@ -9760,7 +9774,7 @@ export default function App() {
         const toastInBar = !!cornerHeaderTarget && (!!queueSpot || onePage) && !onPhone();
         const face = (
           <>
-            {about && <span className="toast-title">{rowTitle(about)}</span>}
+            {aboutTitle && <span className="toast-title">{aboutTitle}</span>}
             <span className="toast-line">{line}</span>
             {(opens || undoes) && (
               <span className="toast-keys">
@@ -9780,7 +9794,7 @@ export default function App() {
           </>
         );
         const card = toast.goes
-          ? <button key={toastShown.current} type="button" className={`toast toast-goes${about ? '' : ' toast-plain'}${toastInBar ? ' toast-in-bar' : ''}`} onClick={() => openToastRow(toast.goes!)}>{face}</button>
+          ? <button key={toastShown.current} type="button" className={`toast toast-goes${aboutTitle ? '' : ' toast-plain'}${toastInBar ? ' toast-in-bar' : ''}`} onClick={() => openToastRow(toast.goes!)}>{face}</button>
           : <div key={toastShown.current} className={`toast toast-plain${toastInBar ? ' toast-in-bar' : ''}`}>{face}</div>;
         return toastInBar && cornerHeaderTarget ? createPortal(card, cornerHeaderTarget) : card;
       })()}

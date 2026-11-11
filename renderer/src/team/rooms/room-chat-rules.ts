@@ -3,6 +3,7 @@
 // is stored under.
 import type { RoomMessage } from '../../types';
 import { markMentions } from './room-rules';
+import { isImageName } from '../../attachments';
 
 /**
  * The first message to sit under the New line: the oldest one in the chat
@@ -39,6 +40,12 @@ export function mentionMarkdown(body: string, names: readonly string[], me: read
 export function storedName(name: string, now = Date.now(), rand = Math.random().toString(36).slice(2, 8)): string {
   const safe = String(name || 'file').replace(/[^\w.-]+/g, '-').replace(/^[^A-Za-z0-9]+/, '').slice(0, 80) || 'file';
   return `${now.toString(36)}-${rand}-${safe}`;
+}
+
+/** A message's words with the files sent in it linked under them, as the chat's own box writes them. */
+export function withFileLinks(words: string, files: readonly { name: string; stored: string }[]): string {
+  const links = files.map((f) => `${isImageName(f.name) ? '!' : ''}[${f.name}](attachments/${f.stored})`);
+  return [words.trim(), links.join('\n')].filter(Boolean).join('\n\n');
 }
 
 /**

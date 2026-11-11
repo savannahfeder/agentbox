@@ -30,6 +30,7 @@ import { referencedFiles } from '../../shared/referenced-files.mts';
 import { shortTitle } from '../../shared/thread-title.mts';
 import { taskTitle } from '../../shared/team-tasks.mts';
 import { firstSentence } from '../../shared/thread-cards.mts';
+import { openTo, seenNow, sentWords, threadLink } from '../../shared/thread-link.mts';
 import { cardsFor } from '../../shared/thread-cards.mts';
 import fs from 'node:fs';
 import { saveAttachments, attachmentMarkdown } from '../save-attachments.mts';
@@ -206,6 +207,9 @@ export interface TeamRow {
   due?: unknown;
   edits?: Record<string, { gone?: boolean; text?: unknown } | undefined>;
   updatedAt?: number;
+  createdAt?: number;
+  visibility?: string;
+  visibleTo?: string[];
 }
 
 /** A line of a thread's ledger, as the team service reads it. */
@@ -237,6 +241,7 @@ export interface TeamStore {
   readThread(slug: string, id: string): { text?: string }[];
   readHistory(slug: string, id: string, opts?: { max?: number }): TeamHistoryLine[];
   answerItem(slug: string, id: string, patch: TeamAnswer): unknown;
+  threadEdit(slug: string, id: string, patch: { visibility: string; visibleTo: string[] }): unknown;
   teamPatch(slug: string, id: string, patch: { assignee: string }): unknown;
   composeItem(slug: string, fields: Record<string, unknown>): { id: string };
   commentOnASharedFile(slug: string, id: string, note: string, comment?: { name: string; file: string; text: string } | null): unknown;
@@ -1180,9 +1185,14 @@ export function createTeamService({
       if (to === state.me.id) throw new Error('that thread is yours already');
       const { words, files, tooBig } = briefOfThread(row, product);
       const left = tooBig.length ? `(Not sent: ${tooBig.join(', ')}, over 10 MB. Ask ${state.me.name || 'me'} for ${tooBig.length === 1 ? 'it' : 'them'}.)` : '';
+      const brief = [words, left].filter(Boolean).join('\n\n');
+      // The task leads back to the thread, opened to them as Share's Send opens it.
+      const seen = seenNow(row, product, kept().getSince(state.me.id));
+      if (seen !== 'team') store.threadEdit(slug, id, openTo(seen, row.visibleTo, [to]));
+      const link = threadLink(state.me.id, id);
       const made = await this.giveTask(to, {
         title: row.label || row.title,
-        body: [words, left].filter(Boolean).join('\n\n'),
+        body: link ? sentWords(row.label || row.title || '', link, brief) : brief,
         priority: row.priority, due: row.due && row.due !== 'none' ? row.due : undefined, files,
       });
       // As your own words: a note would be drawn as the agent's checkpoint.

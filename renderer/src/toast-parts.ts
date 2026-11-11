@@ -102,3 +102,21 @@ export function oWaitsFor(
   if (!goes) return { open: null, keep: w };
   return ready(goes) ? { open: goes, keep: null } : { open: null, keep: { ...w, goes } };
 }
+
+/** Everyone in a conversation but you, by first name: "Lena", "Lena and Sam". */
+export function othersIn(team: { people: readonly string[]; sharedBy: string | null } | null | undefined, me: string | null, nameOf: (id: string) => string | undefined): string {
+  const others = [...new Set([...(team?.people ?? []), ...(team?.sharedBy ? [team.sharedBy] : [])])].filter((id) => id !== me);
+  const names = others.map((id) => nameOf(id)?.split(/\s+/)[0]).filter((n): n is string => !!n);
+  return names.length <= 1 ? names[0] ?? '' : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+/** "Sent to Lena" for a send into a conversation. */
+export function sentToWhom(team: { people: readonly string[]; sharedBy: string | null } | null | undefined, me: string | null, nameOf: (id: string) => string | undefined): string {
+  const who = othersIn(team, me, nameOf);
+  return who ? `Sent to ${who}` : 'Sent';
+}
+
+/** A conversation's row is titled by whatever was first sent in it, so its toast draws no title; its line names who. */
+export function toastTitle(title: string, { conversation }: { conversation: boolean }): string | null {
+  return conversation ? null : title;
+}

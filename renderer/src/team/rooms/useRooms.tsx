@@ -3,12 +3,12 @@
 // App.tsx only places them beside the narrow sidebar (GroupsSidebar.tsx).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api } from '../../api';
-import type { ArtifactMark, Person, Room, RoomMention, RoomsState } from '../../types';
+import type { ArtifactMark, Person, Room, RoomMention, RoomsState, TeamMessageFile } from '../../types';
 import './rooms.css';
 import { boardPeople, boardPicked, chatPeople, groupInTab, mentionRows, noticeShown, roomTitle, readBoardLater, readBoardPicks, readNoticeSeen, readRoomTab, withMe, writeBoardLater, writeBoardPicks, writeNoticeSeen, writeRoomTab } from './room-rules';
 import { OpenGroupNotice } from './OpenGroupNotice';
 import { RoomViewButton } from './RoomView';
-import { landed, sameMessages } from './room-chat-rules';
+import { landed, sameMessages, storedName, withFileLinks } from './room-chat-rules';
 import { RoomPage, type RoomPane } from './RoomPage';
 import { RoomChat } from './RoomChat';
 import type { RoomFileOpening } from './RoomFileView';
@@ -354,7 +354,7 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
       full hang head={<></>} onSend={send(r.id)} onRead={read(r)} {...chatCalls(r)} /></div>;
   };
   // A two-person group with them, made if there is none, without leaving the page you are on.
-  const startChat = async (personId: string, name: string, first?: string): Promise<string | null> => {
+  const startChat = async (personId: string, name: string, first?: string, files: readonly TeamMessageFile[] = []): Promise<string | null> => {
     const want = new Set([meId, personId]);
     const had = all.find((r) => r.kind === 'group' && r.members === 2 && r.wall.every((c) => want.has(c.id)) && r.wall.some((c) => c.id === personId));
     let id = had?.id ?? null;
@@ -363,7 +363,17 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
       if (!res.ok || !res.value) return res.error ?? 'Could not start the chat';
       id = res.value;
     }
-    if (first) return send(id)(first, { inReplyTo: null, mentions: [] });
+    const put: { name: string; stored: string }[] = [];
+    for (const f of files) {
+      const stored = storedName(f.name);
+      const res = f.srcPath ? await call('putFileFrom', id, { name: stored, srcPath: f.srcPath })
+        : f.dataBase64 ? await call('putFile', id, { name: stored, dataBase64: f.dataBase64 })
+          : { ok: false, error: `${f.name} could not be read` };
+      if (!res.ok) return res.error ?? `${f.name} did not send`;
+      put.push({ name: f.name, stored });
+    }
+    const body = withFileLinks(first ?? '', put);
+    if (body) return send(id)(body, { inReplyTo: null, mentions: [] });
     return null;
   };
 
