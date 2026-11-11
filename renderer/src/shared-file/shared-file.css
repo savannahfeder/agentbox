@@ -42,8 +42,11 @@
 .sf-pdf { height: calc(100vh - 230px); min-height: 520px; display: flex; }
 .sf-pdf > * { flex: 1; min-width: 0; }
 .sf-table { height: calc(100vh - 230px); min-height: 420px; display: flex; flex-direction: column; }
-.sf-video { display: grid; place-items: center; }
-.sf-video video { display: block; max-width: 100%; max-height: calc(100vh - 220px); border-radius: var(--artifact-corner); background: #000; }
+.sf-video { height: calc(100vh - 230px); min-height: 360px; display: flex; }
+.sf-video .film-stage { margin: 0 0 12px; }
+.sf-video .film-bar { padding: 10px 0 0; }
+.sf-pinbox { position: relative; line-height: 0; }
+.sf-pinbox.can-pin { cursor: crosshair; }
 /* Its pieces arriving: the frame a film will fill, and a line across its foot. */
 .sf-video.is-loading { position: relative; width: 100%; aspect-ratio: 16 / 9; max-height: calc(100vh - 220px); overflow: hidden; border-radius: var(--artifact-corner); background: var(--bg-raised); }
 .sf-video.is-loading i { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--text-dim); transition: width 0.3s ease; }
@@ -52,12 +55,19 @@
 /* The comments: a panel over the page's right edge, opened from the bar. */
 .sf-panel {
   position: fixed; z-index: 4; top: 52px; right: 0; bottom: 0; width: 380px; box-sizing: border-box;
-  padding: 18px 24px 24px; overflow-y: auto;
+  padding: 18px 24px 20px; display: flex; flex-direction: column;
   background: var(--bg); border-left: 1px solid var(--line);
 }
-@media (min-width: 1180px) { .sf-page.has-panel { padding-right: 380px; } }
+@media (min-width: 1000px) {
+  .sf-page.has-panel { padding-right: 380px; }
+  .sf-page.has-panel .sf-bar { margin-right: -380px; }
+}
+.sf-comments { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.sf-comments .sf-list { flex: 1; min-height: 0; overflow-y: auto; margin: 0 -24px; padding: 0 24px; }
+.sf-comments:not(:has(.sf-list)) { justify-content: flex-end; }
 .sf-panel-head { display: flex; align-items: center; justify-content: space-between; height: 28px; margin-bottom: 4px; }
 .sf-panel-head h2 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+.sf-panel-head h2 span { margin-left: 8px; font-weight: 400; color: var(--text-faint); }
 .sf-panel-close { width: 28px; height: 28px; margin-right: -6px; padding: 0; display: grid; place-items: center; border: 0; border-radius: var(--radius); background: none; color: var(--text-dim); cursor: pointer; }
 .sf-panel-close:hover { color: var(--text); background: var(--wash); }
 .sf-panel-close svg { width: 14px; height: 14px; }
@@ -82,11 +92,23 @@
 .sf-comment:hover:has(.sf-remove) time, .sf-comment:focus-within:has(.sf-remove) time { display: none; }
 .sf-remove:hover { color: var(--text); }
 @media (hover: none) { .sf-remove { display: block; margin-left: 0; } }
+.sf-comment { cursor: default; }
+.sf-comment.is-on { background: var(--wash); margin: 0 -24px; padding-left: 24px; padding-right: 24px; }
+/* Where it points, in the app's words; a press goes there. */
+.sf-at { flex: none; padding: 0; border: 0; background: none; font: inherit; font-size: 12.5px; color: var(--text-dim); cursor: pointer; white-space: nowrap; }
+.sf-at:hover, .sf-quote:hover { color: var(--text); }
+.sf-quote { display: block; max-width: 100%; margin: 4px 0 0; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; line-height: 19px; color: var(--text-dim); text-align: left; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sf-said p { margin: 4px 0 0; font-size: 14px; line-height: 21px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 252px; overflow-y: auto; }
 .sf-remove.is-asking { display: block; color: var(--text); }
 .sf-comment:has(.sf-remove.is-asking) time { display: none; }
 
 .sf-write { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; margin-top: 14px; }
+.sf-where { align-self: stretch; display: flex; align-items: center; gap: 6px; min-height: 22px; margin: 0 0 -4px; font: 12px var(--mono); color: var(--text-faint); }
+.sf-where span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sf-where.is-set { color: var(--text-dim); }
+.sf-where button { flex: none; width: 20px; height: 20px; padding: 0; display: grid; place-items: center; border: 0; border-radius: var(--radius); background: none; color: var(--text-faint); cursor: pointer; }
+.sf-where button:hover { color: var(--text); background: var(--wash); }
+.sf-where svg { width: 12px; height: 12px; }
 .sf-write textarea {
   width: 100%; box-sizing: border-box; min-height: 84px; padding: 10px 11px; resize: vertical;
   border: 1px solid var(--line-strong); border-radius: var(--radius); background: rgba(0, 0, 0, 0.18);
