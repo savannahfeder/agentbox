@@ -6,6 +6,7 @@
 //     --hours 2 | --minutes 45                         how long (default 1 hour)
 //     --focus "what the team shipped"                  what the testers lean on
 //     --real                                           the Claude Code and Codex this computer has, on their plans (billed)
+//     --stand-in-codex                                 Codex on a scripted model too (default: the real Codex on the testers' login)
 //     --cloud                                          every thread in this Mac's cloud (implies --real); the Mac sleeps and shuts under the runs
 //     --cloud-accounts a@x.com,b@y.com                 the cloud accounts the copies may spend, of those signed in (default all)
 //     --free-hours 0.5                                 with --stand-in-cloud: start on the Free plan with that many hours
@@ -78,6 +79,8 @@ const cloudTeams = (opt('cloud-team') || '').split(',').filter(Boolean);
 if (cloudTeams.length && !standInCloud) stop('--cloud-team puts the stand-in cloud\'s account on a team: add --stand-in-cloud.');
 if (freeHours && !standInCloud) stop('--free-hours starts the stand-in cloud\'s account on the Free plan: add --stand-in-cloud.');
 const real = flag('real') || cloud;
+// Copies of people who use Codex get the real one on the testers' own login; Claude Code stays a stand-in.
+const codexReal = !real && !standInCloud && !flag('stand-in-codex');
 const cloudAccounts = opt('cloud-accounts');
 if (cloudAccounts && !cloud) stop('--cloud-accounts narrows the cloud\'s accounts: add --cloud.');
 const focus = opt('focus');
@@ -96,7 +99,7 @@ if (room && !team) stop('--room needs --team: a copy with no team is in no room.
 try { chaosPlan(chaos, totalMs); } catch (err) { stop(err.message); }
 
 // A cloud run holds a stand-in of a few megabytes here, not an agent.
-const need = people.length * (real && !cloud ? 2500 : 1200) + 1000;
+const need = people.reduce((mb, p) => mb + (real && !cloud ? 2500 : p.codex && codexReal ? 1700 : 1200), 1000);
 const free = freeMemoryMb();
 if (free < need) stop(`${people.length} ${people.length === 1 ? 'person needs' : 'people need'} about ${(need / 1024).toFixed(1)} GB free and this computer has ${(free / 1024).toFixed(1)} GB. Run fewer with --who.`);
 const login = testerLogin({ given: opt('codex-home', process.env.CODEX_HOME || null) });
@@ -133,7 +136,7 @@ function layCommands(dir, name) {
 
 const root = path.join(RUNS, `${new Date().toISOString().replace(/[:.]/g, '-')}-power`);
 fs.mkdirSync(root, { recursive: true });
-say(`power test: ${people.map((p) => p.name).join(', ')} for ${Math.round(totalMs / MIN)} min on ${cloud ? 'the real Claude Code and Codex in this Mac\'s cloud' : real ? 'the real Claude Code and Codex' : 'stand-ins'}, chaos ${chaos}.`);
+say(`power test: ${people.map((p) => p.name).join(', ')} for ${Math.round(totalMs / MIN)} min on ${cloud ? 'the real Claude Code and Codex in this Mac\'s cloud' : real ? 'the real Claude Code and Codex' : codexReal ? 'the real Codex and a Claude Code stand-in' : 'stand-ins'}, chaos ${chaos}.`);
 say(`evidence: ${root}  (progress.json there says how it is going)`);
 
 say(`testers: Codex on ${login.home} (${login.plan ?? 'plan unknown'}, ${login.why})${sandboxed ? '' : ', without Codex\'s sandbox, which this machine refuses'}.`);
@@ -147,6 +150,9 @@ function seedCode(state) {
     fs.cpSync(path.join(here, '..', 'fixtures', i % 2 ? 'web' : 'api'), repo, { recursive: true });
     await git(repo, 'add', '-A');
     await git(repo, '-c', 'user.email=power@agentbox.invalid', '-c', 'user.name=power test', 'commit', '-qm', 'The code so far');
+    // A copy's home is a throwaway with no git identity, so a real agent could not commit without these.
+    await git(repo, 'config', 'user.email', 'power@agentbox.invalid');
+    await git(repo, 'config', 'user.name', 'power test');
   }));
 }
 
@@ -212,7 +218,7 @@ for (const person of people) {
   const name = `power-${person.slug}`;
   const dir = path.join(root, person.slug);
   fs.mkdirSync(dir, { recursive: true });
-  const shape = real ? [] : ['--logins', String(person.logins), ...(person.codex ? [] : ['--no-codex'])];
+  const shape = real ? [] : ['--logins', String(person.logins), ...(person.codex ? [] : ['--no-codex']), ...(person.codex && codexReal ? ['--real-codex', login.home] : [])];
   say(`${person.name}: starting a copy of the app shaped like their setup`);
   const up = await live(name, 'up', ...(real ? ['--real'] : []), ...(cloud ? ['--cloud'] : []), ...(standInCloud ? ['--stand-in-cloud'] : []), ...(fresh ? ['--fresh'] : []), ...(freeHours ? ['--free-hours', freeHours] : []), ...(cloudTeams[people.indexOf(person)] ? ['--cloud-team', cloudTeams[people.indexOf(person)]] : []), ...(cloudAccounts ? ['--cloud-accounts', cloudAccounts] : []), ...shape, '--projects', person.projects.join(','), ...(team ? ['--team', team] : []), ...(teamFiles[person.slug] ? ['--team', teamFiles[person.slug]] : []), ...(alpha ? ['--alpha', alpha] : []));
   fs.writeFileSync(path.join(dir, 'up.log'), up.out);
@@ -297,7 +303,7 @@ async function runPerson({ person, name, dir, stateFile, seeded, failed, cmds })
   progress[person.slug] = { round: 0, stopped: result.stopped };
   if (failed) return result;
   const state = () => readJson(stateFile);
-  const events = chaosPlan(chaos, totalMs, { real, cloud, logins: person.logins, codex: person.codex });
+  const events = chaosPlan(chaos, totalMs, { real, cloud, logins: person.logins, codex: person.codex, codexReal: person.codex && codexReal });
   const fired = new Set();
   let quietUntil = 0;
   let busy = false;
@@ -376,7 +382,7 @@ async function runPerson({ person, name, dir, stateFile, seeded, failed, cmds })
       const cov = coverage({ actions: readJsonl(path.join(dir, 'actions.jsonl')), lines: readAllLines(state()), seeded, maxAtOnce: watcher.maxAtOnce, person });
       fs.writeFileSync(path.join(dir, 'clock.json'), JSON.stringify({ round, deadline, roundEnd: next.endsAt }));
       const prompt = testerPrompt({
-        person, focus, room, team: standInTeam ? teamWords({ teamName: standInTeam, me: person, people, shared: teamMade?.shared }) : null, browse: cmds.browse, diary: cmds.diary, shots: dir, round, real,
+        person, focus, room, team: standInTeam ? teamWords({ teamName: standInTeam, me: person, people, shared: teamMade?.shared }) : null, browse: cmds.browse, diary: cmds.diary, shots: dir, round, real, codexReal: person.codex && codexReal,
         totalMinutes: Math.round(totalMs / MIN), minutesLeft: Math.round((deadline - now) / MIN), roundMinutes: Math.round((next.endsAt - now) / MIN),
         fraction: (now - startedAt) / totalMs, diaryTail: diaryTail(dir),
         issues: issues.map((i) => `#${i.n} [${i.severity}] ${i.title} (seen ${i.seen})`), notYet: cov.notYet, stoppedEarlyMin: early,
@@ -426,7 +432,7 @@ const results = await Promise.all(setups.map((s) => runPerson(s).catch((err) => 
 }))));
 wake();
 
-const { file, counts } = writeReport({ root, startedAt, endedAt: Date.now(), focus, real, chaos, people: results });
+const { file, counts } = writeReport({ root, startedAt, endedAt: Date.now(), focus, real, codexReal, chaos, people: results });
 if (!flag('keep')) for (const s of setups) await live(s.name, 'down');
 if (teamCloud && !flag('keep')) await teamCloud.stop();
 say(`done: ${counts.issues} issue(s) from the testers (${counts.seenTwice} seen more than once), ${counts.machine} from the watcher.`);

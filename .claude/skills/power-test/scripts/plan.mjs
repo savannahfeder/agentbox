@@ -86,7 +86,7 @@ export const LOGIN_NAMES = ['default', '.claude-second', '.claude-third', '.clau
  * freeze, a Control-C. The tester is never told; a person learns of these from
  * the app, and whether the app says so is the test.
  */
-export function chaosPlan(level, totalMs, { real = false, cloud = false, logins = 2, codex = true } = {}) {
+export function chaosPlan(level, totalMs, { real = false, cloud = false, logins = 2, codex = true, codexReal = false } = {}) {
   if (!CHAOS.includes(level)) throw new Error(`chaos is one of ${CHAOS.join(', ')}`);
   if (level === 'none') return [];
   const at = (f) => Math.round(totalMs * f);
@@ -98,7 +98,8 @@ export function chaosPlan(level, totalMs, { real = false, cloud = false, logins 
     events.push({ kind: 'agents', at: 0, until: totalMs, world: { pace: { minMs: 5_000, maxMs: 90_000 }, options: 0.3, hang: share, die: share, edits: true },
       says: `Agents answer in 5 to 90 seconds; ${Math.round(share * 100)}% hang and ${Math.round(share * 100)}% die mid-run, as real ones sometimes do.` });
     if (names.length > 1) events.push({ kind: 'login-out', at: at(0.2), until: at(0.4), out: [names[1]], says: `The ${names[1]} login ran out of usage.` });
-    if (codex && level !== 'light') events.push({ kind: 'codex-out', at: at(0.45), until: at(0.55), out: ['codex'], says: 'Codex ran out of usage.' });
+    // The real Codex runs out when its login does; only the scripted one can be made to.
+    if (codex && !codexReal && level !== 'light') events.push({ kind: 'codex-out', at: at(0.45), until: at(0.55), out: ['codex'], says: 'Codex ran out of usage.' });
     if (level !== 'light') events.push({ kind: 'all-out', at: at(0.62), until: at(0.7), out: names, says: 'Every Claude login ran out of usage.' });
     if (level === 'heavy') events.push({ kind: 'slow-agents', at: at(0.8), until: at(0.9), world: { pace: { minMs: 60_000, maxMs: 300_000 } }, says: 'Agents slowed to 1 to 5 minutes an answer.' });
   }
@@ -254,7 +255,7 @@ const PACE = {
 
 const KEYS = 'N new thread; ⌘↵ (press Enter meta) sends; J/K or arrows move in the list; ↵ opens; esc goes back; R replies in an open thread; E closes a thread; L puts it off until later; Z undoes; ⌘K (press k meta) opens the command bar, which is also search; B switches list and board; Tab moves between the tabs; S shows or hides the summary; 1 to 9 pick an option an agent offered.';
 
-export function testerPrompt({ person, focus, room = null, team = null, browse, diary, shots, round, totalMinutes, minutesLeft, roundMinutes, fraction, diaryTail, issues, notYet, real, stoppedEarlyMin = 0 }) {
+export function testerPrompt({ person, focus, room = null, team = null, browse, diary, shots, round, totalMinutes, minutesLeft, roundMinutes, fraction, diaryTail, issues, notYet, real, codexReal = false, stoppedEarlyMin = 0 }) {
   const list = (xs, none) => (xs.length ? xs.map((x) => `- ${x}`).join('\n') : none);
   return `You are ${person.name}, ${person.role}. Below is who you are. Stay in character: use Agentbox the way you would on a real working day, to get your own work done, and notice what goes wrong the way you would.
 
@@ -281,6 +282,8 @@ Run look after anything that changes the screen.
 
 ${real
     ? 'The agents are real Claude Code and Codex on a real subscription, working in your projects\' repositories. Write tasks the way you normally would, but keep each one small enough to finish in a few minutes.'
+    : codexReal
+    ? 'The Codex agents are real Codex on a real subscription, working in your projects\' repositories: keep each Codex task small enough to finish in a few minutes. The Claude Code agents are stand-ins: they answer in seconds to a minute and a half with a short note naming the task, not real work. Send at least half of your work to Codex, and switch some threads between the two. Codex is the agent the team uses least, so what goes wrong with it is what nobody else finds. A Codex thread that fails, stalls, or says something you cannot act on is an issue to log.'
     : 'The agents are stand-ins: they take a few seconds to a minute and a half and answer with a short note naming the task, not real work. Judge the app, not the answers. Write tasks the way you normally would.'}
 
 TODAY'S TEST
