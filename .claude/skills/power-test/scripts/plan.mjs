@@ -88,6 +88,23 @@ export const LOGIN_NAMES = ['default', '.claude-second', '.claude-third', '.clau
  * freeze, a Control-C. The tester is never told; a person learns of these from
  * the app, and whether the app says so is the test.
  */
+/**
+ * WHICH AGENTS THE COPIES RUN: the real Claude Code and Codex, on this
+ * computer's plans, unless the person agreed to stand-ins for this run.
+ * `standIns` is their own words agreeing, as the run was asked for; null when
+ * nothing was said. Stand-ins never run on a default: a whole season of tests
+ * did, and nobody was told (2026-11-10).
+ */
+export function agentMode({ standIns = null, standInCloud = false, cloud = false } = {}) {
+  if (standIns !== null && (typeof standIns !== 'string' || !standIns.trim() || standIns.startsWith('--'))) {
+    throw new Error('--stand-ins takes the person\'s own words agreeing to stand-ins for this run, in quotes: their own words, not yours.');
+  }
+  if (standInCloud && standIns === null) throw new Error('--stand-in-cloud runs stand-in agents: it needs --stand-ins "<the person\'s words agreeing>".');
+  if (standIns !== null && cloud) throw new Error('--cloud runs the real agents in the cloud; it has no stand-ins.');
+  if (standIns === null) return { real: true, codexReal: false, standIns: null };
+  return { real: false, codexReal: !standInCloud, standIns };
+}
+
 export function chaosPlan(level, totalMs, { real = false, cloud = false, logins = 2, codex = true, codexReal = false, stuck = false } = {}) {
   if (!CHAOS.includes(level)) throw new Error(`chaos is one of ${CHAOS.join(', ')}`);
   if (level === 'none') return [];
@@ -285,7 +302,7 @@ You use the app through one command, run in your shell:
 Run look after anything that changes the screen.
 
 ${real
-    ? 'The agents are real Claude Code and Codex on a real subscription, working in your projects\' repositories. Write tasks the way you normally would, but keep each one small enough to finish in a few minutes.'
+    ? `The agents are real Claude Code and Codex on a real subscription, working in your projects' repositories. Write tasks the way you normally would, but keep each one small enough to finish in a few minutes.${person.codex ? ' Send at least half of your work to Codex, and switch some threads between the two. Codex is the agent the team uses least, so what goes wrong with it is what nobody else finds. A Codex thread that fails, stalls, or says something you cannot act on is an issue to log.' : ''}`
     : codexReal
     ? 'The Codex agents are real Codex on a real subscription, working in your projects\' repositories: keep each Codex task small enough to finish in a few minutes. The Claude Code agents are stand-ins: they answer in seconds to a minute and a half with a short note naming the task, not real work. Send at least half of your work to Codex, and switch some threads between the two. Codex is the agent the team uses least, so what goes wrong with it is what nobody else finds. A Codex thread that fails, stalls, or says something you cannot act on is an issue to log.'
     : 'The agents are stand-ins: they take a few seconds to a minute and a half and answer with a short note naming the task, not real work. Judge the app, not the answers. Write tasks the way you normally would.'}

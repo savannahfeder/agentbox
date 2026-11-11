@@ -2932,7 +2932,8 @@ export default function App() {
     const root = document.documentElement;
     if (glassOn && 'glassAble' in root.dataset) root.dataset.glass = '';
     else delete root.dataset.glass;
-  }, [glassOn]);
+    window.zero?.glassTone?.({ tone: glassOn && 'glassAble' in document.documentElement.dataset && theme !== 'match' ? theme : 'system' });
+  }, [glassOn, theme]);
   const [connectionsPage, setConnectionsPage] = useState<{ focus: string | null } | null>(null);
   const sharedFileNews = snap?.team?.sharedFileNews ?? [];
   const theirRows = useMemo(

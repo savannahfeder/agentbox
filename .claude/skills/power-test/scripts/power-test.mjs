@@ -5,13 +5,13 @@
 //     --who startup-engineer,founder | random:2 | all   who tests (../people; default random:2)
 //     --hours 2 | --minutes 45                         how long (default 1 hour)
 //     --focus "what the team shipped"                  what the testers lean on
-//     --real                                           the Claude Code and Codex this computer has, on their plans (billed)
-//     --stand-in-codex                                 Codex on a scripted model too (default: the real Codex on the testers' login)
+//                                                      the copies' agents are the real Claude Code and Codex on this computer's plans
+//     --stand-ins "<the person's words agreeing>"      stand-in Claude Code instead, only with their explicit say-so for this run
 //     --cloud                                          every thread in this Mac's cloud (implies --real); the Mac sleeps and shuts under the runs
 //     --cloud-accounts a@x.com,b@y.com                 the cloud accounts the copies may spend, of those signed in (default all)
 //     --free-hours 0.5                                 with --stand-in-cloud: start on the Free plan with that many hours
 //     --chaos none|light|normal|heavy                  what goes wrong around them (default normal)
-//     --stuck                                          for a stretch, most stand-in agents get stuck on one shared cause
+//     --stuck                                          for a stretch, most stand-in agents get stuck on one shared cause (needs --stand-ins)
 //     --round-minutes 20                               one tester session, before it is started again with its diary
 //     --model <id>                                     the testers' Codex model
 //     --codex-home ~/.codex-2                          the Codex login testers spend (default: the one on the best plan)
@@ -38,7 +38,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { readPeople, pickPeople, chaosPlan, worldAt, nextRound, restartAgain, roundOutcome, coverage, testerPrompt, projectNamedIn } from './plan.mjs';
+import { readPeople, pickPeople, agentMode, chaosPlan, worldAt, nextRound, restartAgain, roundOutcome, coverage, testerPrompt, projectNamedIn } from './plan.mjs';
 import { createWatcher, freeMemoryMb, readAllLines, keepEvidence, sleepTargets } from './watch.mjs';
 import { writeReport } from './report.mjs';
 import { makeFilm, seedArtifacts } from './artifacts.mjs';
@@ -73,15 +73,18 @@ const cloud = flag('cloud');
 const standInCloud = flag('stand-in-cloud');
 // Every copy opens as a brand-new install, on the first run (live.mjs --fresh).
 const fresh = flag('fresh');
-if (standInCloud && (cloud || flag('real'))) stop('--stand-in-cloud is the stand-ins\' own cloud; it cannot go with --real or --cloud.');
+if (standInCloud && cloud) stop('--stand-in-cloud is the stand-ins\' own cloud; it cannot go with --cloud.');
+if (flag('stand-in-codex')) stop('--stand-in-codex is gone: the agents are real unless the person agreed to stand-ins (--stand-ins "<their words>").');
 const freeHours = opt('free-hours');
 // `owner:0.3,member:0.3`, one per person in --who order: each copy on a team's trial in that role.
 const cloudTeams = (opt('cloud-team') || '').split(',').filter(Boolean);
 if (cloudTeams.length && !standInCloud) stop('--cloud-team puts the stand-in cloud\'s account on a team: add --stand-in-cloud.');
 if (freeHours && !standInCloud) stop('--free-hours starts the stand-in cloud\'s account on the Free plan: add --stand-in-cloud.');
-const real = flag('real') || cloud;
-// Copies of people who use Codex get the real one on the testers' own login; Claude Code stays a stand-in.
-const codexReal = !real && !standInCloud && !flag('stand-in-codex');
+let mode;
+try { mode = agentMode({ standIns: args.includes('--stand-ins') ? (opt('stand-ins') ?? '') : null, standInCloud, cloud }); } catch (err) { stop(err.message); }
+// With stand-ins agreed, Codex stays real on the testers' own login wherever it can.
+const { real, codexReal, standIns } = mode;
+if (flag('stuck') && real) stop('--stuck gets stand-in agents stuck on one cause: it needs --stand-ins "<the person\'s words agreeing>".');
 const cloudAccounts = opt('cloud-accounts');
 if (cloudAccounts && !cloud) stop('--cloud-accounts narrows the cloud\'s accounts: add --cloud.');
 const focus = opt('focus');
@@ -152,6 +155,10 @@ process.on('exit', () => { try { if (Number(readJson(lock)?.pid) === process.pid
 const root = path.join(RUNS, `${new Date().toISOString().replace(/[:.]/g, '-')}-power`);
 fs.mkdirSync(root, { recursive: true });
 say(`power test: ${people.map((p) => p.name).join(', ')} for ${Math.round(totalMs / MIN)} min on ${cloud ? 'the real Claude Code and Codex in this Mac\'s cloud' : real ? 'the real Claude Code and Codex' : codexReal ? 'the real Codex and a Claude Code stand-in' : 'stand-ins'}, chaos ${chaos}.`);
+if (standIns) {
+  say(`STAND-INS, NOT REAL PLANS: the copies' Claude Code is a stand-in${codexReal ? '' : ', and so is their Codex'}, because the person agreed: "${standIns}"`);
+  fs.writeFileSync(path.join(root, 'stand-ins.txt'), `${standIns}\n`);
+}
 say(`evidence: ${root}  (progress.json there says how it is going)`);
 
 say(`testers: Codex on ${login.home} (${login.plan ?? 'plan unknown'}, ${login.why})${sandboxed ? '' : ', without Codex\'s sandbox, which this machine refuses'}.`);
@@ -461,7 +468,7 @@ const results = await Promise.all(setups.map((s) => runPerson(s).catch((err) => 
 }))));
 wake();
 
-const { file, counts } = writeReport({ root, startedAt, endedAt: Date.now(), focus, real, codexReal, chaos, people: results });
+const { file, counts } = writeReport({ root, startedAt, endedAt: Date.now(), focus, real, codexReal, standIns, chaos, people: results });
 if (!flag('keep')) for (const s of setups) await live(s.name, 'down');
 if (teamCloud && !flag('keep')) await teamCloud.stop();
 say(`done: ${counts.issues} issue(s) from the testers (${counts.seenTwice} seen more than once), ${counts.machine} from the watcher.`);

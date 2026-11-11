@@ -16,6 +16,13 @@
 // and re-sends with every frame; and the 50px drag strip is `::after`, the
 // last thing in the page, so its drag rectangle beat every button under it.
 //
+// The second build, photographed from inside a demo copy over the designs'
+// wallpaper: Dark was see-through but greyer than its design at a 25% tint,
+// and Light was not see-through at all, because the light sky paints its
+// frame colour on body with a stronger rule, and because macOS draws the
+// glass in the Mac's own appearance, so Light on a dark Mac got dark glass.
+// Measured against the designs: Dark matches at 10%, Light at no tint.
+//
 // Covered: the switch is off unless turned on, and flips the window live; a
 // Mac window can go glass and Linux and Windows never can; the page goes glass
 // only when both are true; the root stays clear and the tint lives on the app;
@@ -23,7 +30,7 @@
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { GLASS_ARG, applyGlass, glassWindow } from '../main/window-glass.mts';
+import { GLASS_ARG, applyGlass, glassTone, glassWindow } from '../main/window-glass.mts';
 import { alphaFeatures } from '../main/settings.mts';
 
 const read = (f: string) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');
@@ -99,6 +106,18 @@ describe('the window', () => {
     expect(calls).toEqual([]);
   });
 
+  it('sets the glass to the look\'s own appearance, and back to the Mac\'s', () => {
+    expect(glassTone('light')).toBe('light');
+    expect(glassTone('dark')).toBe('dark');
+    for (const other of ['system', 'match', '', null, undefined, 3]) expect(glassTone(other)).toBe('system');
+    const main = read('main/main.mts');
+    expect(main).toContain("ipcMain.handle('zero:glass-tone', (_e, payload) => { nativeTheme.themeSource = glassTone(payload?.tone); });");
+    expect(read('preload.cjs')).toContain("glassTone: (payload) => ipcRenderer.invoke('zero:glass-tone', payload),");
+    const app = read('renderer/src/App.tsx');
+    // An explicit Light or Dark sets it; Match system and glass off give it back.
+    expect(app).toContain("window.zero?.glassTone?.({ tone: glassOn && 'glassAble' in document.documentElement.dataset && theme !== 'match' ? theme : 'system' });");
+  });
+
   it('is what the main window is made with', () => {
     const main = read('main/main.mts');
     const made = main.slice(main.indexOf('window = new BrowserWindow({'));
@@ -122,20 +141,20 @@ describe('the page', () => {
   });
 
   it('keeps the page root clear, so the window has no colour of its own to repaint', () => {
-    expect(rule(`html${GLASS}, html${GLASS} body`)).toMatch(/background: transparent !important/);
+    expect(rule(`html${GLASS}, html${GLASS} body, html${GLASS}[data-sky-frame] body`)).toMatch(/background: transparent !important/);
     // Nothing else may put a glass tint back on the root.
     expect(nav).not.toMatch(/\[data-glass\][^{]*body \{[^}]*color-mix/);
   });
 
   it('tints Dark lightly with its own ground, on the app, and outlines the card', () => {
-    expect(rule(`${DARK} .app.workspace-layout`)).toMatch(/background: color-mix\(in srgb, var\(--bg\) 25%, transparent\)/);
+    expect(rule(`${DARK} .app.workspace-layout`)).toMatch(/background: color-mix\(in srgb, var\(--bg\) 10%, transparent\)/);
     const card = rule(`${DARK} .workspace-layout::before`);
     expect(card).toMatch(/background: linear-gradient\(var\(--skin-pane\), var\(--skin-pane\)\), var\(--skin-image\) center \/ cover no-repeat fixed var\(--bg\)/);
     expect(card).toMatch(/box-shadow: 0 0 0 1\.5px color-mix\(in srgb, var\(--text\) 16%, transparent\)/);
   });
 
-  it('tints Light lightly with its sky\'s frame, on the app, with the card flat and no shadow', () => {
-    expect(rule(`${LIGHT} .app.workspace-layout`)).toMatch(/background: color-mix\(in srgb, var\(--sky-frame, var\(--bg\)\) 20%, transparent\) !important/);
+  it('leaves Light untinted, so the light glass alone shows, with the card flat and no shadow', () => {
+    expect(rule(`${LIGHT} .app.workspace-layout`)).toMatch(/background: transparent !important/);
     const card = rule(':root[data-glass][data-theme="light"] .workspace-layout::before');
     expect(card).toMatch(/box-shadow: inset 0 0 0 1px color-mix\(in srgb, var\(--text\) 8%, transparent\)/);
     expect(card).not.toMatch(/shadow-card/);
@@ -189,6 +208,24 @@ describe('the page', () => {
     expect(band).toMatch(new RegExp(`padding: ${y + 7 - 13}px 20px 0 ${x + 60 + 16 + 54 + 12}px`));
     expect(rule(`${GLASS} .app:not(.back-forward-on) .glass-band`)).toMatch(new RegExp(`padding-left: ${x + 60 + 16}px`));
     expect(rule('.glass-band')).toMatch(/display: none/);
+  });
+
+  it('has one Inbox: the band\'s tab, with the arrows\' icon and Home\'s own buttons put away', () => {
+    // The approved band is lights, arrows, Home and Inbox; Home's greeting had
+    // no place buttons under it.
+    expect(rule(`${GLASS} .back-forward .back-forward-inbox`)).toMatch(/display: none/);
+    expect(rule(`${GLASS} .hm-doors`)).toMatch(/display: none/);
+  });
+
+  it('folds the Inbox card\'s heading row away, since the band\'s tab already says it', () => {
+    expect(read('renderer/src/components/GlassBand.tsx')).toMatch(/data-here=\{homeHere \? 'home' : inboxHere \? 'inbox' : undefined\}/);
+    // The header row folds away, its Cloud and filter buttons stay on the
+    // tabs row's right end, and the tabs sit 27px into the card, as designed.
+    const INBOX = `${GLASS} .app:has(> .glass-band[data-here="inbox"])`;
+    expect(rule(`${INBOX} > .topbar`)).toMatch(/height: 0; min-height: 0; flex-basis: 0; padding: 0; border-bottom: 0/);
+    expect(rule(`${INBOX} > .topbar .workspace-title`)).toMatch(/display: none/);
+    expect(rule(`${INBOX} > .topbar .topbar-right`)).toMatch(/position: absolute; top: 26px; right: 36px/);
+    expect(rule(`${INBOX} .list-pane > .th-bar`)).toMatch(/padding-top: 27px/);
   });
 
   it('has one New thread: the band\'s, with the card header\'s put away', () => {
