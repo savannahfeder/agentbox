@@ -16,7 +16,7 @@
 // can hold all of it. ./RichReply.tsx is the box itself.
 import { Extension, getSchema, type JSONContent } from '@tiptap/core';
 import { StarterKit } from '@tiptap/starter-kit';
-import { Link } from '@tiptap/extension-link';
+import { EndingLink } from '../editor/ending-link';
 import { Placeholder } from '@tiptap/extension-placeholder';
 import { Plugin, PluginKey, type EditorState, type Transaction } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
@@ -231,7 +231,7 @@ export function chatExtensions(placeholder: string | (() => string) = '') {
     // No headings and no rule: a message is not a document. Pasted ones come
     // in as their words (`chatDoc`).
     StarterKit.configure({ heading: false, horizontalRule: false, ...STARTER_KIT_EXTRAS_OFF }),
-    Link.configure({ openOnClick: false, autolink: true }),
+    EndingLink.configure({ openOnClick: false, autolink: true }),
     // A function so the box can say who it replies to without being rebuilt.
     Placeholder.configure({ placeholder: typeof placeholder === 'function' ? () => placeholder() : placeholder }),
     ChatKeys,
