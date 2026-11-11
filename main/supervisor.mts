@@ -7051,9 +7051,11 @@ export class Supervisor {
     // those read as the agent getting going. It can outlast FAST_EXIT_MS as
     // well: a weekly limit is reported about two minutes in.
     const refused = accountRefusedTheRun(session);
+    // Claude Code names its session before it refuses the model, so the id proves nothing.
+    const modelRefused = !!session.resultIsError && troubleCause(session.result) === 'model-not-on-plan';
     this._heldStarts ??= {};
     const held = this._heldStarts[key];
-    if (!refused && (session.sessionId != null || session.result != null)) {
+    if (!refused && !modelRefused && (session.sessionId != null || session.result != null)) {
       delete this._deadStarts[key];
       if (held) { delete this._heldStarts[key]; this._saveState(); }
       return;
@@ -7062,12 +7064,12 @@ export class Supervisor {
     // Turned away while this Mac's other cloud runs fill the plan: it waits for
     // one of them to end, and they all do.
     if (session.stoppedByUs || (session.cloudFull && this._cloudFullOfOurs(session))) return;
-    if (!refused && now - (session.startedAt ?? now) >= FAST_EXIT_MS) {
+    if (!refused && !modelRefused && now - (session.startedAt ?? now) >= FAST_EXIT_MS) {
       if (held?.trying) { delete this._heldStarts[key]; this._saveState(); }
       return;
     }
     const said = (session.tail ?? []).filter((l) => typeof l === 'string' && l.startsWith('stderr:'))
-      .flatMap((l) => l.slice('stderr:'.length).split('\n')).map((l) => l.trim()).filter((l) => l && !l.startsWith(CLOUD_SENT)).at(-1) ?? null;
+      .flatMap((l) => l.slice('stderr:'.length).split('\n')).map((l) => l.trim()).filter((l) => l && !l.startsWith(CLOUD_SENT)).at(-1) ?? (modelRefused ? String(session.result) : null);
     // The login that refused it, so a sign-in on it can bring the next try forward (`_noticeSignIns`).
     const account = refused && !session.cloud ? this._accountKey(session.engine, session.profile || 'default') : null;
     // A try of its own that died at once is held again straight away.
@@ -8137,6 +8139,8 @@ export class Supervisor {
       this._saveState();
       return;
     }
+    // Claude Code's refusal of the model is the thread's setting, not the login's.
+    if (planRefused) return;
     // A level the model does not offer is the task's setting, on every login.
     if (refusedBy === 'level-not-offered' || troubleCause(lastFailure) === 'level-not-offered') return;
     // Another Codex window holds this conversation; the login is fine.
@@ -11625,7 +11629,8 @@ export class Supervisor {
       && (item.model.startsWith('claude-') || CLAUDE_MODELS.some(m => m.alias === item.model));
     if (item?.model && (!modelForEngine(item, engine) || claudeModelOnCodex)) {
       refuse('model', engine);
-      this._sayTheModelIsForAnotherEngine(claudeModelOnCodex ? { ...item, engine: 'claude' } : item, engine);
+      const asked = claudeModelOnCodex ? 'claude' : isEngine(item?.engine) ? item.engine : 'codex';
+      this._sayTheModelIsForAnotherEngine({ ...item, engine: asked }, engine);
       // THE USER'S WORDS ARE NOT DELIVERED BY A WORKER THAT NEVER STARTED. The queue
       // writes the delivery mark before it calls this method and that mark is
       // persisted, so leaving it standing would record the reply as handed over
