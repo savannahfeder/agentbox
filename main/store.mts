@@ -679,12 +679,16 @@ export class Store {
   }
 
   // The person's answer, or the app's when it caught the browser coming back, to the sign-in a thread is open on.
-  answerSignIn(slug: string, id: string, answer: { id: unknown; said: unknown; url?: unknown }, { source = 'founder', now = Date.now() }: { source?: 'founder' | 'system'; now?: number } = {}) {
+  answerSignIn(slug: string, id: string, answer: { id: unknown; said: unknown; url?: unknown; code?: unknown }, { source = 'founder', now = Date.now() }: { source?: 'founder' | 'system'; now?: number } = {}) {
     const item = this.readItem(slug, id);
     const ask = openSignIn(item);
     if (!ask || ask.id !== answer.id) throw new Error('That sign-in is no longer open.');
     const clean = cleanSignInAnswer({ ...answer, at: now });
-    if (!clean) throw new Error(answer.said === 'landed' ? 'That is not a web address. Paste the whole address from the browser.' : 'That answer is not one the agent can take.');
+    if (!clean) {
+      throw new Error(answer.said === 'landed' ? 'That is not a web address. Paste the whole address from the browser.'
+        : answer.said === 'code' ? 'Paste the code first.'
+        : 'That answer is not one the agent can take.');
+    }
     return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, { signInAnswer: clean }, { source, now });
   }
 
