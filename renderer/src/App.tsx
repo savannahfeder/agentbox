@@ -137,7 +137,8 @@ import { teammateIdOf } from '../../shared/teammates.mts';
 import { asksWho } from '../../shared/auto-route.mts';
 import { RoomBoard } from './team/rooms/RoomBoard';
 import { directConversations } from './team/rooms/conversations';
-import { personPressOpens } from './team/one-conversation';
+import { personChatShows, personPressOpens } from './team/one-conversation';
+import { listedIn, pairRooms } from '../../shared/pair-room.mts';
 import { isPresenceCard, roomMateCards, roomMatesById } from './team/rooms/room-rules';
 import { MARK_UNREAD, SAY } from './team/chat-events';
 import { aVoiceNoteIsRecording } from './team/useVoiceRecorder';
@@ -268,7 +269,7 @@ import { InboxSky } from './home/InboxSky';
 import { SKY_THEME_KEY, setHomeSetting, useDarkWindow, useHomeSettings } from './home/home-settings';
 import { setupLook } from './setup-split';
 import { MATCH_SKY, PLAIN, SKY_THEMES, skyTheme } from './home/sky';
-import { engineLetter, engineName, greeting, homeCoversTheList, teamRowState, weekCounts } from './home/home-model';
+import { engineLetter, engineName, greeting, somethingCoversTheList, teamRowState, weekCounts } from './home/home-model';
 import { sentFrom } from './team/company';
 import { reachAudienceOf } from '../../shared/teammate-reach.mts';
 import { useBackAndForward, type Stop as TrailStop } from './back-and-forward';
@@ -3294,13 +3295,6 @@ export default function App() {
     ? run.item
     : walkBeat.length ? (hoveredId && walkBeat.includes(hoveredId) ? hoveredId : walkBeat[0]) : null;
   const walkOwn = walkAim ? list.find((i) => i.id === walkAim) : undefined;
-  const homeCovers = homeCoversTheList({ homeOn, homeOpen, threadOpen: !!focused || !!focusedRepeat, searching: search !== null, settingsOpen, teamShown });
-  const pointed: WorkItem | undefined = walkOwn
-    ?? (hoveredId && !multiSel.size ? list.find((i) => i.id === hoveredId) : undefined)
-    ?? (keyCard || keyLeadPicked || homeCovers ? undefined : current);
-  const keyTab = stacked && pointed ? stacked.tabOf(pointed) : view;
-  // No row, card or tick on the list, so a row's keys are words for its box.
-  const nothingToActOn = !focused && !pointed && (homeCovers || (!multiSel.size && !keyLead && !stops.length));
 
   /* ------------------------- a panel with a panel in it -------------------- */
   // NO HAIRLINE WITHOUT A SIDEBAR BEHIND IT.
@@ -4347,6 +4341,13 @@ export default function App() {
   const filesShown = !!filesPage && !teammatesShown && !roomShown && !settingsOpen && !teamShown && !focused && !focusedRepeat && search === null;
   const connectionsShown = !!connectionsPage && !filesShown && !teammatesShown && !roomShown && !settingsOpen && !teamShown && !focused && !focusedRepeat && search === null;
   const chatsPlaceShown = !!chatsPlace && homeLayout === 'chats' && !connectionsShown && !filesShown && !teammatesShown && !roomShown && !settingsOpen && !teamShown && !focused && !focusedRepeat && search === null;
+  const listCovered = somethingCoversTheList({ homeOn, homeOpen, threadOpen: !!focused || !!focusedRepeat, searching: search !== null, settingsOpen, teamShown, placeShown: chatsPlaceShown, fileOverTheList: fullScreenDoc });
+  const pointed: WorkItem | undefined = walkOwn
+    ?? (hoveredId && !multiSel.size ? list.find((i) => !listCovered && i.id === hoveredId) : undefined)
+    ?? (keyCard || keyLeadPicked || listCovered ? undefined : current);
+  const keyTab = stacked && pointed ? stacked.tabOf(pointed) : view;
+  // No row, card or tick on the list, so a row's keys are words for its box.
+  const nothingToActOn = !focused && !pointed && (listCovered || (!multiSel.size && !keyLead && !stops.length));
   // A teammate's thread opened from a page in Team is still in Team.
   const cardFromPlace = homeLayout === 'chats' && !!chatsPlace && !!openCard;
   useEffect(() => { if (roomsUi.openId || teammatesUi.open) { setFilesPage(null); setConnectionsPage(null); } }, [roomsUi.openId, teammatesUi.open]);
@@ -4484,9 +4485,11 @@ export default function App() {
   const personChats = useMemo(() => {
     const out = new Map<string, string>();
     if (!roomsUi.live || !team) return out;
-    for (const r of snap?.team?.rooms?.rooms ?? []) {
+    const rooms = snap?.team?.rooms?.rooms ?? [];
+    for (const r of rooms) {
       const others = r.wall.filter((c) => !c.me);
-      if (r.kind === 'group' && r.members === 2 && others.length === 1 && team.byId.has(others[0].id) && !out.has(others[0].id)) out.set(others[0].id, `room:${r.id}`);
+      const chosen = others.length === 1 && team.byId.has(others[0].id) && !out.has(others[0].id) ? pairRooms(rooms, others[0].id, listedIn)[0] : undefined;
+      if (chosen) out.set(others[0].id, `room:${chosen.id}`);
     }
     return out;
   }, [roomsUi.live, team, snap?.team?.rooms?.rooms]);
@@ -7799,6 +7802,7 @@ export default function App() {
       const id = placeMember.key.slice('person:'.length);
       const first = placeMember.name.split(' ')[0];
       const room = personChats.get(id)?.slice('room:'.length) ?? null;
+      const chatShows = personChatShows({ roomsLive: roomsUi.live, ready: !!snap.team?.rooms?.ready, room: !!room });
       const earlier = roomsUi.live ? directWith(id) : null;
       const onYou = mineInNeeds.filter((i) => (i.createdBy && i.createdBy === id) || directPerson.get(i.product) === id);
       const mentionsBy = roomsUi.live ? roomsUi.mentions.filter((m) => m.by === id) : [];
@@ -7815,7 +7819,8 @@ export default function App() {
           {room && !chatsPlaceShown && <PlaceAction quiet onClick={() => pickMember(placeMember.key, 'messages')} title="This chat on the Chats page">Open in Chats</PlaceAction>}
           {earlier && <PlaceAction quiet onClick={() => { setChatsPlace(null); setChatsDirect(earlier.id); setFocused(earlier.item); markSeen(earlier.item); }} title={`Your messages with ${first} from before this chat`}>Earlier messages</PlaceAction>}
         </>}
-        chat={room ? roomsUi.chatIn(room) : roomsUi.live
+        chat={chatShows === 'chat' && room ? roomsUi.chatIn(room) : chatShows === 'not yet' ? null
+          : chatShows === 'first message'
           ? <SendBox placeholder={`Message ${first}`} empty={<EmptyChat name={first} />}
             onSend={(text) => roomsUi.startChat(id, placeMember.name, text)} />
           : <SendBox placeholder={`Message ${first}`} empty={<EmptyChat name={first} />}

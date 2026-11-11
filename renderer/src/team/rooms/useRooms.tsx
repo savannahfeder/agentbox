@@ -3,14 +3,15 @@
 // App.tsx only places them beside the narrow sidebar (GroupsSidebar.tsx).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api } from '../../api';
-import type { ArtifactMark, Person, Room, RoomMention, RoomsState, TeamMessageFile } from '../../types';
+import type { ArtifactMark, Person, Room, RoomMention, RoomMessage, RoomsState, TeamMessageFile } from '../../types';
+import { listedIn, oneConversation, pairRooms } from '../../../../shared/pair-room.mts';
 import './rooms.css';
 import { boardPeople, boardPicked, chatPeople, groupInTab, mentionRows, noticeShown, roomTitle, readBoardLater, readBoardPicks, readNoticeSeen, readRoomTab, withMe, writeBoardLater, writeBoardPicks, writeNoticeSeen, writeRoomTab } from './room-rules';
 import { OpenGroupNotice } from './OpenGroupNotice';
 import { RoomViewButton } from './RoomView';
 import { landed, sameMessages, storedName, withFileLinks } from './room-chat-rules';
 import { RoomPage, type RoomPane } from './RoomPage';
-import { RoomChat } from './RoomChat';
+import { RoomChat, type RoomChatCalls } from './RoomChat';
 import type { RoomFileOpening } from './RoomFileView';
 import { I } from './icons';
 import type { Conversation } from './MessagesPage';
@@ -144,7 +145,7 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
     const cards = new Map((from ?? open)?.wall.map((c) => [c.id, c]) ?? []);
     if (people.every((id) => cards.get(id)?.teammate)) { onTeamMessage(people); return; }
     const want = new Set([meId, ...people]);
-    const group = all.find((r) => r.kind === 'group' && r.members === want.size && r.wall.every((c) => want.has(c.id)) && people.every((id) => r.wall.some((c) => c.id === id)));
+    const group = people.length === 1 ? pairRooms(all, people[0], listedIn)[0] : all.find((r) => r.kind === 'group' && r.members === want.size && r.wall.every((c) => want.has(c.id)) && people.every((id) => r.wall.some((c) => c.id === id)));
     let id = group?.id ?? null;
     if (!id) {
       const name = people.map((p) => cards.get(p)?.name ?? 'Someone').join(', ').slice(0, 40);
@@ -229,6 +230,43 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
     }),
   });
 
+  // A pair who both started their chat in the same moment have two groups.
+  // Their chat reads both; new words go to the one both Macs pick, and a
+  // reply, an edit or a reaction to the room its message is in.
+  const pairChat = (r: Room): { room: Room; messages: RoomMessage[]; calls: RoomChatCalls } => {
+    const other = listedIn(r).find((id) => id !== meId);
+    const twins = other ? pairRooms(all, other, listedIn) : [];
+    const held = (t: Room) => rooms?.messages[t.id] ?? [];
+    if (twins.length < 2 || !twins.includes(r)) return { room: r, messages: held(r), calls: { onSend: send(r.id), onRead: read(r), ...chatCalls(r) } };
+    const home = twins[0];
+    const messages = oneConversation(twins.map(held));
+    const roomOfMessage = (id: string) => twins.find((t) => t.id === messages.find((m) => m.id === id)?.roomId) ?? home;
+    const of = (id: string) => chatCalls(roomOfMessage(id));
+    const first = async <T,>(get: (t: Room) => Promise<T | null>) => {
+      for (const t of twins) { const got = await get(t); if (got != null) return got; }
+      return null;
+    };
+    const base = chatCalls(home);
+    return { room: home, messages, calls: {
+      ...base,
+      openingFile: openingFile && twins.some((t) => t.id === openingFile.roomId) ? openingFile : null,
+      onSend: (body, opts) => send(opts.inReplyTo ? roomOfMessage(opts.inReplyTo).id : home.id)(body, opts),
+      onRead: () => { for (const t of twins) read(t)(); },
+      onReact: (id, emoji, on) => of(id).onReact(id, emoji, on),
+      onEdit: (id, body, mentions) => of(id).onEdit(id, body, mentions),
+      onDelete: (id) => of(id).onDelete(id),
+      marks: new Map(twins.flatMap((t) => [...decisionsOf(decisionsIn(t.id))])),
+      onDecide: (id, kind, on) => of(id).onDecide?.(id, kind, on),
+      files: {
+        ...base.files,
+        marks: twins.flatMap((t) => rooms?.fileMarks?.[t.id] ?? []),
+        find: (name) => first((t) => chatCalls(t).files.find(name)),
+        readText: (name) => first((t) => chatCalls(t).files.readText(name)),
+      },
+      loadFile: (name) => first((t) => chatCalls(t).loadFile(name)),
+    } };
+  };
+
   // Every group and every chat, a teammate's direct record among them, each its own.
   const conversations: Conversation[] = live ? [...roomConversations(rooms), ...directs] : [];
   const pinned = new Set(all.filter((r) => r.teamId || r.pinned).map((r) => `room:${r.id}`));
@@ -299,8 +337,11 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
         {rooms.me && noticeShown(open, answered) ? <OpenGroupNotice me={rooms.me}
           onLeave={() => void groupAction(open, 'leave', new DOMRect())}
           onHide={() => void call('saveProfile', { show_working: 'team' })} onOk={() => answerNotice(open.id)} /> : null}</>}
-      chat={<RoomChat room={open} messages={rooms.messages[open.id] ?? []} people={withMe(chatPeople(open, meId), meInChat)} meId={meId} now={now}
-        full hang head={<></>} onSend={send(open.id)} onRead={read(open)} {...chatCalls(open)} />}
+      chat={(() => {
+        const c = pairChat(open);
+        return <RoomChat room={c.room} messages={c.messages} people={withMe(chatPeople(c.room, meId), meInChat)} meId={meId} now={now}
+          full hang head={<></>} {...c.calls} />;
+      })()}
       people={inline && (open.teamId || open.members <= 2) ? null : <PeoplePanel room={open} onPerson={(id) => setPane(`person:${id}`)} />}      list={<GroupsColumn rows={rows} current={`room:${open.id}`} now={now} onOpen={pickGroup} />} />;
     heading = { title: <GroupsHead current={currentRow} onFind={() => setFinderOpen(true)} /> };
     if (inline) heading = null;
@@ -350,14 +391,13 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
   const chatIn = (roomId: string): ReactNode => {
     const r = all.find((x) => x.id === roomId);
     if (!r || !rooms) return null;
-    return <div className="gr-chat"><RoomChat key={r.id} room={r} messages={rooms.messages[r.id] ?? []} people={withMe(chatPeople(r, meId), meInChat)} meId={meId} now={now}
-      full hang head={<></>} onSend={send(r.id)} onRead={read(r)} {...chatCalls(r)} /></div>;
+    const c = pairChat(r);
+    return <div className="gr-chat"><RoomChat key={c.room.id} room={c.room} messages={c.messages} people={withMe(chatPeople(c.room, meId), meInChat)} meId={meId} now={now}
+      full hang head={<></>} {...c.calls} /></div>;
   };
   // A two-person group with them, made if there is none, without leaving the page you are on.
   const startChat = async (personId: string, name: string, first?: string, files: readonly TeamMessageFile[] = []): Promise<string | null> => {
-    const want = new Set([meId, personId]);
-    const had = all.find((r) => r.kind === 'group' && r.members === 2 && r.wall.every((c) => want.has(c.id)) && r.wall.some((c) => c.id === personId));
-    let id = had?.id ?? null;
+    let id = pairRooms(all, personId, listedIn)[0]?.id ?? null;
     if (!id) {
       const res = await call<string>('create', { name: name.slice(0, 40), kind: 'group', people: [personId] });
       if (!res.ok || !res.value) return res.error ?? 'Could not start the chat';
