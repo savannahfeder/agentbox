@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { CLOUD_ADDRESS } from '../shared/cloud-address.mjs';
+import { CLOUD_ADDRESS } from '../shared/cloud-address.mts';
 import { projectRefFrom } from './lib/feedback-setup.mjs';
 import { applyMigration, cliToken } from './apply-migration.mjs';
 import { resultsSql } from './lib/founder-note-setup.mjs';

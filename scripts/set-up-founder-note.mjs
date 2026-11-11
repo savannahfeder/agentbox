@@ -25,7 +25,7 @@ import path from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
-import { CLOUD_ADDRESS } from '../shared/cloud-address.mjs';
+import { CLOUD_ADDRESS } from '../shared/cloud-address.mts';
 import { VERSIONS } from '../cloud/supabase/functions/_shared/founder-note.mjs';
 import { projectRefFrom } from './lib/feedback-setup.mjs';
 import { applyMigration, cliToken } from './apply-migration.mjs';
