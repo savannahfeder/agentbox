@@ -953,10 +953,6 @@ export interface CodexServerEntry {
   procExit?: Promise<ProcExit>;
 }
 
-// The bold line and the 200 words in briefs/message-rules.md: a plain worker's
-// last message. A teammate's is a chat message (howYourRunEnds), and a brief
-// carrying both still wrote 1,000 characters.
-const WORKER_REPORT_RULES = /This is about the LAST message you send[\s\S]*?(?=A PICTURE YOU SHOW)/;
 const POLL_MS = 15_000;
 // How long a cloud session stays open after answering, for a reply that then
 // reaches it in seconds rather than after a new machine's two minutes.
@@ -9987,7 +9983,7 @@ export class Supervisor {
     // team chat are current on a reply too.
     let teammate: string | null = null;
     try { teammate = this.store.teammates?.briefFor(item) ?? null; } catch { teammate = null; }
-    const messages = this.messageRules({ teammate: !!teammate });
+    const messages = this.messageRules();
     // The connections say what this run can reach rather than how to behave,
     // so they go above the ranked blocks and the message rules stay last. What
     // the run is ON is a fact of the same kind, and it sits beside them.
@@ -10282,13 +10278,13 @@ export class Supervisor {
   // Read fresh at every spawn, never cached, like everything else she can edit
   // while the fleet is running. Emptying the box takes the user's words out,
   // never ours.
-  messageRules({ teammate = false } = {}) {
+  messageRules() {
     let theirs = '';
     if (!agentInstructionsUnified(this.userDir) && this.messageRulesFile() !== this.messageRulesDefaultFile()) {
       try { theirs = fs.readFileSync(this.messageRulesFile(), 'utf8').trim(); } catch {}
     }
     const shipped = this.shippedMessageRules();
-    const ours = (teammate ? shipped.replace(WORKER_REPORT_RULES, '') : shipped).replace(/<!-- autonomy-rules:(start|end) -->\n?/g, '').trim();
+    const ours = shipped.replace(/<!-- autonomy-rules:(start|end) -->\n?/g, '').trim();
     // ONE framing line each, for the same reason her project instructions carry
     // one: a session has no other way to know whose words these are, or which
     // wins where the two disagree.
