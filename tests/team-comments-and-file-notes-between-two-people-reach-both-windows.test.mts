@@ -77,6 +77,15 @@ describe('what the window is told passed on threads', () => {
     expect(talkOn(theo)).toEqual(want);
   });
 
+  it('carries a note sent to the owner from the review, which waits for their agent but not for them', async () => {
+    // "Send to Maya" on her file stores the note with `wait`, for her agent's next turn and naming her.
+    await theo.service.markSharedFile(maya.personId, open.id, { do: 'note', id: 'n2', file: 'a.png', place: { kind: 'whole' }, text: 'Add the retry', mentions: [maya.personId], wait: true });
+    await allSync();
+    const want = [{ kind: 'note', owner: maya.personId, threadId: open.id, by: theo.personId, text: 'Add the retry', file: 'a.png', note: 'n2' }];
+    expect(talkOn(maya)).toEqual(want);
+    expect(talkOn(theo)).toEqual(want);
+  });
+
   it('carries a comment on a thread open to only the two of them, to the two of them', async () => {
     await theo.service.commentOnThread(maya.personId, closed.id, 'Ship it');
     await allSync();

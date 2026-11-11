@@ -758,7 +758,9 @@ export function createThreadShare({
       const seen = new Set<string>();
       for (const m of [...fileMarks, ...(waiting ?? waitingMarks())]) {
         const mark = cleanMark(m.mark);
-        if (!mark || (mark.do !== 'note' && mark.do !== 'reply') || (mark.do === 'note' && mark.wait) || seen.has(`${m.owner}:${m.threadId}:${m.id}`)) continue;
+        if (!mark || (mark.do !== 'note' && mark.do !== 'reply') || seen.has(`${m.owner}:${m.threadId}:${m.id}`)) continue;
+        // `wait` holds a note for the owner's agent, not for the people: only your own note on your own file, naming nobody, is still a draft.
+        if (mark.do === 'note' && mark.wait && m.by === me && m.owner === me && !(mark.mentions?.length)) continue;
         seen.add(`${m.owner}:${m.threadId}:${m.id}`);
         out.push({ id: m.id, kind: 'note', owner: m.owner, threadId: m.threadId, by: m.by, text: mark.text, at: m.at, file: mark.file, note: mark.do === 'note' ? mark.id : mark.on });
       }
