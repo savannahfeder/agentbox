@@ -1043,8 +1043,10 @@ html:root[data-glass], html:root[data-glass] body { background: transparent !imp
 :root[data-glass] .home-sky { border-radius: 14px; }
 :root[data-glass] .home-sky::after { box-shadow: none; }
 :root[data-glass] .topbar > .back-forward { position: fixed; top: 12px; left: 94px; margin: 0; z-index: 3; }
-/* The band has its own New thread. */
+/* The band has its own New thread and Inbox, so the header's and Home's go. */
 :root[data-glass] .workspace-layout > .topbar .th-new[data-hint="new-task"] { display: none; }
+:root[data-glass] .back-forward .back-forward-inbox { display: none; }
+:root[data-glass] .hm-doors { display: none; }
 :root[data-glass] .workspace-navigation .workspace-tab.active {
   background: color-mix(in srgb, var(--text) 9%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 7%, transparent);
 }

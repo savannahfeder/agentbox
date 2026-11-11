@@ -191,6 +191,13 @@ describe('the page', () => {
     expect(rule('.glass-band')).toMatch(/display: none/);
   });
 
+  it('has one Inbox: the band\'s tab, with the arrows\' icon and Home\'s own buttons put away', () => {
+    // The approved band is lights, arrows, Home and Inbox; Home's greeting had
+    // no place buttons under it.
+    expect(rule(`${GLASS} .back-forward .back-forward-inbox`)).toMatch(/display: none/);
+    expect(rule(`${GLASS} .hm-doors`)).toMatch(/display: none/);
+  });
+
   it('has one New thread: the band\'s, with the card header\'s put away', () => {
     expect(rule(`${GLASS} .workspace-layout > .topbar .th-new[data-hint="new-task"]`)).toMatch(/display: none/);
     const band = read('renderer/src/components/GlassBand.tsx');
