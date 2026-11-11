@@ -175,6 +175,9 @@ describe('in the thread', () => {
     expect(said.message).toBeUndefined();
     expect(events.some((e) => e.says === 'progress')).toBe(false);
     expect(pickFields({ linkComment: { name: 'Chris', file: 'a.md', text: 'x', extra: 1 } })).toEqual({ linkComment: { name: 'Chris', file: 'a.md', text: 'x' } });
+    // A comment on a moment in a film says the moment (2026-11-11).
+    const atMoment = threadEvents([{ id: 'w-1', ts: 0, source: 'founder', patch: { title: 'Cut', status: 'open' } }, { id: 'w-1', ts: 2, source: 'system', patch: { note: 'x', linkComment: { name: 'Jun', file: 'cut.mp4', text: 'Too fast', place: { kind: 'time', s: 84.6 } } } }]);
+    expect(atMoment.find((e) => /commented/.test(e.said ?? ''))?.said).toBe('Jun commented on cut.mp4 at 1:24');
     expect(pickFields({ linkComment: { name: '', file: 'a.md', text: 'x' } })).toBeNull();
   });
   it('is written on the thread with the note, through the store', async () => {
