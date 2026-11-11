@@ -71,7 +71,7 @@ export function offersOf(item: PhoneItem, { session, inProgress, now, cloud = fa
     // your answer, and putting an agent back on it without one is not what this menu is for.
     resume: (made && !tryAgain && !session && !inProgress && item.status === 'done' ? 'done' : null) as 'done' | null,
     place: open ? placeOf(item, session, cloud) : null,
-    move: made && whyItCannotMove(item, { live: !!session }) === null,
+    move: made && whyItCannotMove(item) === null,
     // In the open reply box's send slot while nothing is typed (Focus.tsx `stopButton`).
     stop: inProgress && !item.agent,
     runNow: offersRunNow(item, { session: session as RunningSession | null, queued: [], runNow: [], inProgress }),

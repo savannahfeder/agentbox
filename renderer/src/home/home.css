@@ -120,7 +120,14 @@
 .inbox-sky-head { transform: scaleY(-1);
   -webkit-mask-image: linear-gradient(to top, #000 0, #000 70px, transparent 150px);
   mask-image: linear-gradient(to top, #000 0, #000 70px, transparent 150px); }
-.app.sky-shown:not(.home-shown) > .topbar h1, .app.sky-shown:not(.home-shown) > .topbar button { text-shadow: 0 1px 3px rgba(0, 0, 0, .6); }
+/* Words over the sky sit in a soft patch of the sky's own dark, and controls
+   are filled with it, so the streak never runs through a word on any sky.
+   --sky-under is set by InboxSky. */
+.app.sky-shown:not(.home-shown) > .topbar :is(h1, button), .app.sky-shown:not(.home-shown) :is(.tm-tab, .th-col-h, .th-col-empty, .td-top, .fp-bar, .cx-search, .pl-head, :is(.td-top, .fp-bar, .fp-tools, .cx-search, .pl-head) :is(button, input)) {
+  text-shadow: 0 0 1px var(--sky-under, var(--bg)), 0 0 3px var(--sky-under, var(--bg)), 0 0 6px var(--sky-under, var(--bg)), 0 0 10px var(--sky-under, var(--bg)), 0 0 16px var(--sky-under, var(--bg)); }
+.app.sky-shown:not(.home-shown) :is(.th-new, .th-disp, .fp-find, .cx-search, .pl-btn):not(:hover):not([aria-expanded="true"]) {
+  background-color: color-mix(in srgb, var(--sky-under, var(--bg)) 82%, transparent);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
 /* The header's rule would cut the sky in two. */
 .app.sky-shown:not(.home-shown) > .topbar { border-bottom-color: transparent; }
 /* The board has no tabs, so the same sky sits 60px higher, its top cut off,
@@ -128,6 +135,9 @@
 .app.sky-board .inbox-sky-head { transform: scaleY(-1) translateY(60px); clip-path: inset(0 0 60px 0 round var(--radius));
   -webkit-mask-image: linear-gradient(to top, #000 0, #000 105px, transparent 150px);
   mask-image: linear-gradient(to top, #000 0, #000 105px, transparent 150px); }
+
+/* Team and Files wear the Inbox's sky; the Team list would cover it. */
+.app.sky-place .cx-list { background: transparent; }
 
 /* A row's facts as tags in the Inbox's own column type, so they read as
    settings of the thread rather than a sentence about it. */
@@ -137,5 +147,3 @@
 .hm-prio { display: inline-flex; align-items: center; color: var(--text-faint); }
 .hm-prio.urgent { color: var(--accent); }
 .hm-prio .th-prio-mark { margin: 0; }
-/* The board has no tabs, so its column headings sit where the sky fades out. */
-.app.sky-shown:not(.home-shown) .th-col-h, .app.sky-shown:not(.home-shown) .th-col-empty { text-shadow: 0 1px 3px rgba(0, 0, 0, .8); }

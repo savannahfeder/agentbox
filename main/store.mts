@@ -950,7 +950,7 @@ export class Store {
     const to = this.listProducts().find((p) => p.slug === toSlug);
     if (!to) throw new Error(`no such project: ${toSlug}`);
     const item = this.readItem(fromSlug, id);
-    const why = whyItCannotMove(item, { live: false });
+    const why = whyItCannotMove(item);
     if (why) throw new Error(why);
 
     // Where it came from, in the thread rather than only in a toast, because a

@@ -267,6 +267,8 @@ const MODEL_NOT_ON_PLAN = [
   /model is not supported when using codex with a chatgpt account/i,
   /not a model the plan of the codex account/i,
   /not a model the codex on this computer knows/i,
+  // Claude Code 2.1.321, for a model it does not know or the login cannot use.
+  /there's an issue with the selected model/i,
 ];
 
 // Ours too, from `codexEffortRefusal`.
