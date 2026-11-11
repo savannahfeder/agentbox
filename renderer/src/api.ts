@@ -10,7 +10,7 @@ import type { LedgerLine } from './thread-history';
 import type { AgentFile as AgentFileRow } from './onboarding';
 import type { AgentFolder, SessionThread } from './agent-import-card';
 import type { EngineSetupState } from './plan-setup';
-import { fixtureAgents, fixtureSnapshot, fixtureDashboards, fixtureRepeats, fixtureRuns, fixtureMock, fixtureMockDashboards, fixtureTraces, fixtureHistory, fixtureSettings, fixtureConversation, fixtureAgentFiles, fixtureSessionThreads, fixtureSearchableThreads } from './fixtures';
+import { fixtureAgents, fixtureSnapshot, fixtureUrgentArrival,fixtureDashboards, fixtureRepeats, fixtureRuns, fixtureMock, fixtureMockDashboards, fixtureTraces, fixtureHistory, fixtureSettings, fixtureConversation, fixtureAgentFiles, fixtureSessionThreads, fixtureSearchableThreads } from './fixtures';
 import { fixtureEngineWorld, fixtureEngineSettings, fixtureSecondEngine } from './fixtures';
 import { fixtureFolders } from './fixtures';
 import { NAME, Name } from '../../shared/product-name.mjs';
@@ -102,6 +102,7 @@ const waitingFixtures = Math.max(0, Math.min(99, Number(params.get('waiting') ??
 const crowdedFixtures = params.get('fixtures') === 'crowded';
 // The thread on screen, in fixtures only: see `lookingAt` below.
 let fixtureLooking: { product: string | null; id: string } | null = null;
+let fixtureSnapshotsTaken = 0;
 // ?fixtures=mock is the reference design, with its own copy, so the built
 // app can be put beside the picture and measured rather than remembered.
 const mockFixtures = params.get('fixtures') === 'mock';
@@ -487,6 +488,9 @@ export const api = {
       // she is meant to press could never be looked at before shipping.
       const wanted = params.get('update');
       if (wanted) base.update = updateShape(wanted);
+      // &arrives puts an urgent thread in Needs you from the second snapshot on,
+      // so its arrival can be watched with another thread open.
+      if (params.has('arrives') && ++fixtureSnapshotsTaken > 1) base.items = [fixtureUrgentArrival(), ...base.items];
       // The approval queue is opt-in (&approvals): a worker frozen mid-command
       // is a real state worth being able to look at, and it is not the state
       // every other fixtures screenshot wants a card floating over.

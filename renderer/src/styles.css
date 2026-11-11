@@ -8342,30 +8342,6 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .doc-pane.doc-code .doc-card,
 .doc-pane.doc-code .doc-head,
 .doc-pane.doc-code .code-file-head { background: var(--code-ground); }
-/* The word. Amber, the same ink as the urgent square on the row (--chip-ask),
-   so the thing on screen and the mark in the list are one colour and nobody
-   has to be told they are the same. Never red. */
-.urgent-word {
-  color: var(--chip-ask);
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-/* THE WAY BACK. */
-.urgent-return {
-  background: none; border: none; padding: 0; cursor: pointer;
-  font-family: inherit; font-size: 13px; color: var(--text-dim);
-  letter-spacing: 0.01em; text-align: left;
-}
-.urgent-return:hover { color: var(--text); }
-.urgent-return-arrow { color: var(--text-faint); }
-/* The way back on the left, the amber word on the right, one row of chrome. */
-.urgent-bar {
-  display: flex; align-items: baseline; justify-content: space-between;
-  padding: 14px 0 0;
-}
-
 /* The switch, the rows, the ticks and the foot are the finish card's own
    classes (`.fr-switch`, `.fr-agent`, `.fr-offer`), so the card on ⌘K
    is the card at the end of the setup. What is added is the sentence

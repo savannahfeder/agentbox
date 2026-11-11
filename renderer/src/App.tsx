@@ -106,7 +106,7 @@ import { strayLetters } from './stray-letters';
 import { keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
 import { modelCommands } from './thread-model-commands';
 import { MOVE_KEYWORDS, whyItCannotMove } from '../../shared/move-thread.mts';
-import { isUrgentRow, taskToReturnTo, urgentInterruption } from './interrupt';
+import { isUrgentRow, urgentArrival, urgentNote } from './urgent-arrival';
 import { leavePlace, placeKey, placeToReturnTo } from './thread-place';
 import { DONE, manyOrOne } from './done-word';
 import { listedNow, type OpensWhenListed } from './opens-when-listed';
@@ -590,20 +590,10 @@ export default function App() {
   const runningEngine = focused ? (snap?.engines?.byItem?.[focused.id] ?? snap?.engines?.workspace ?? null) : null;
   // It used to live 800 lines below, which put it out of that reach.
   const [focusedRepeat, setFocusedRepeat] = useState<RepeatRule | null>(null);
-  // THE TASK AN URGENT ROW TOOK HER OFF, so she can be put back on it.
-  //
-  // The second sentence is the half that makes the first one bearable, so the
-  // two live together: nothing sets `focused` to an urgent row over her head
-  // without putting what she was reading in here first.
-  const [heldByUrgent, setHeldByUrgent] = useState<WorkItem | null>(null);
-  // Rows already in the inbox before now. An urgent row she has been ignoring
-  // all afternoon is not an interruption; one that ARRIVES while she is
-  // reading is. Without this, opening any task would bounce her off it.
+  // Rows already in the inbox before now: only an urgent row that ARRIVES is
+  // announced, and each one once.
   const knownRows = useRef<Set<string> | null>(null);
-  // A row interrupts once, ever, and this outlives the interruption itself: it
-  // is what stops her being pulled back to the same card every time the inbox
-  // refreshes after she has walked away from it.
-  const spentInterrupts = useRef<Set<string>>(new Set());
+  const announcedUrgent = useRef<Set<string>>(new Set());
   // Whether the box for changing that rule's instruction is open. Its own flag
   // rather than a value of `modal`, because `modal` is cleared the moment no
   // TASK is open (modal-scope.ts) and a rule is not a task: routed through
@@ -1074,10 +1064,8 @@ export default function App() {
   // Nothing in the app links to it.
   const [modeDraft] = useState(() => isModeVariant(new URLSearchParams(location.search).get('modes')));
   const [modeDraftValue, setModeDraftValue] = useState<PermissionMode>('auto');
-  // showToast is defined six hundred lines below, and the effect that brings
-  // her back from an interruption sits beside the interruption rather than
-  // beside the toast, so it reaches it through a ref.
-  const showToastRef = useRef<((line: string) => void) | null>(null);
+  // showToast is defined further down than the urgent-arrival effect that uses it.
+  const showToastRef = useRef<((line: string, goes?: ToastGoes) => void) | null>(null);
   // The approval she just answered, held only long enough for the card to
   // leave. Cmd+Y is caught in the main process, so this is the renderer's only
   // evidence the press landed at all.
@@ -3936,49 +3924,19 @@ export default function App() {
     start: startChatAgents,
   }), [snap?.products, snap?.supervisor.productOrder, snap?.supervisor.hiddenProducts, codexModels, codexModelDefault, items, stateOfMine, markSeen, startChatAgents]);
 
-  // AN URGENT ROW THAT ARRIVES WHILE SHE IS READING TAKES THE SCREEN.
-  //
-  // Every rule about WHEN this is allowed is in interrupt.ts, pure and tested,
-  // because the ways to get it wrong are all quiet: interrupting her mid-reply
-  // costs her the words she was typing, and interrupting for a row that was
-  // already in the list turns every task she opens into a bounce. What is left
-  // here is only the doing of it.
+  // AN URGENT THREAD THAT ARRIVES WHILE ANOTHER IS OPEN IS ANNOUNCED, NOT
+  // OPENED: the corner note names it and O opens it (./urgent-arrival).
   useEffect(() => {
     const ids = new Set(inbox.map((i) => i.id));
     // The first inbox we ever see is the baseline, not a pile of arrivals.
     if (knownRows.current === null) { knownRows.current = ids; return; }
-    const urgent = urgentInterruption({
-      reading: focused,
-      inbox,
-      known: knownRows.current,
-      spent: spentInterrupts.current,
-      typing: !!modal || search !== null,
-    });
+    const urgent = urgentArrival({ reading: focused, inbox, known: knownRows.current, spent: announcedUrgent.current });
     knownRows.current = ids;
-    if (!urgent || !focused) return;
-    spentInterrupts.current.add(urgent.id);
-    setHeldByUrgent(focused);
-    setFocused(urgent);
-    markSeen(urgent);
-  }, [inbox, focused, modal, search, markSeen]);
-
-  // AND BRINGS HER BACK. The other half of the rule, and the reason the
-  // first half is allowed to exist at all.
-  //
-  // Written against the STATE rather than against each of the ways out of a
-  // task — Escape, archiving it, resolving it, the close button — because
-  // fixing the routes you can find is how the next one gets missed. That is
-  // the same reasoning modal-scope.ts is built on, two lines above.
-  useEffect(() => {
-    if (focused || !heldByUrgent) return;
-    const back = taskToReturnTo(heldByUrgent, items);
-    setHeldByUrgent(null);
-    if (!back) return;
-    setFocused(back);
-    // Through the ref, because this effect sits beside the interruption it
-    // undoes rather than three hundred lines below where the toast is made.
-    showToastRef.current?.('Back to what you were reading');
-  }, [focused, heldByUrgent, items]);
+    if (!urgent) return;
+    announcedUrgent.current.add(urgent.id);
+    const note = urgentNote(urgent);
+    showToastRef.current?.(note.text, note.goes);
+  }, [inbox, focused]);
 
   /* ------------------ the open row keeps up with the store ----------------- */
   // THE PANE HOLDS A COPY OF THE ROW, AND THE ROW CHANGES UNDER HER.
@@ -6894,10 +6852,10 @@ export default function App() {
     if (opensIntoNeedsYou({
       view, onBoard, searching: search !== null,
       index: shownInbox.findIndex((i) => i.id === focused.id && i.product === focused.product),
-      conversation: directSlugs.has(focused.product), interrupted: !!heldByUrgent, walking: !!run,
+      conversation: directSlugs.has(focused.product), walking: !!run,
     })) setView('inbox');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focused, view, onBoard, search, shownInbox, directSlugs, heldByUrgent, run]);
+  }, [focused, view, onBoard, search, shownInbox, directSlugs, run]);
 
   // A SEND THAT MOVED HER ON IS SAID ABOVE THE REPLY BOX of the thread it moved
   // her to (./components/SentLine). The line keeps its own clock, which stops
@@ -8264,8 +8222,6 @@ export default function App() {
                   productDir={snap.products.find((p) => p.slug === focused.product)?.dir ?? null}
                   repoDir={snap.products.find((p) => p.slug === focused.product)?.repoPath ?? null}
                   selectedOption={optionSel}
-                  interruptedFrom={heldByUrgent && heldByUrgent.id !== focused.id ? heldByUrgent.title : null}
-                  onBackToInterrupted={() => setFocused(null)}
                   returnedFromSnooze={returnAt(focused) > 0 && returnAt(focused) <= now}
                   scheduledUntil={returnAt(focused) > now ? returnAt(focused) : 0}
                   scheduledByAgent={parkedByAgent(focused, now)}

@@ -94,14 +94,13 @@ export function advanceLandsHere(p: { view: string; onBoard: boolean }): boolean
  *  answer drops you back on it (w-d7e203a6c9). Only a thread you arrive at
  *  while it waits: one you opened from In progress that comes into Needs you
  *  while you read it stays where you opened it. Search, the board, a chat with
- *  a person, an urgent thread that took the screen and the first-run walk each
- *  keep their own way back. */
+ *  a person and the first-run walk each keep their own way back. */
 export function opensIntoNeedsYou(p: {
   view: string; onBoard: boolean; index: number; searching: boolean;
-  conversation: boolean; interrupted: boolean; walking: boolean;
+  conversation: boolean; walking: boolean;
 }): boolean {
   if (p.view === 'inbox' || p.onBoard || p.index < 0) return false;
-  return !p.searching && !p.conversation && !p.interrupted && !p.walking;
+  return !p.searching && !p.conversation && !p.walking;
 }
 
 /**

@@ -28,7 +28,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { dayGroups, List } from '../renderer/src/components/List';
 import { PriorityIcon } from '../renderer/src/components/Priority';
 import { REST_HEADING, URGENT_HEADING } from '../renderer/src/list-rules';
-import { isUrgentRow } from '../renderer/src/interrupt';
+import { isUrgentRow } from '../renderer/src/urgent-arrival';
 import { isUrgent, itemPriority, RANK_STEP, productRankScore } from '../shared/rank.mts';
 
 const row = (id, priority, extra = {}) => ({
