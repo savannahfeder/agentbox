@@ -62,6 +62,13 @@ describe('the setup account step', () => {
     expect(page).toMatch(/placeholder="you@company\.com"/);
     expect(page).toMatch(/placeholder="First and last name"/);
   });
+  it('shows nothing in the empty password field, and Show only once there is something to show', () => {
+    // The founder: "this looks super weird and sketch. Pretty sure password fields are ****". The
+    // empty field read "6 or more characters" in plain text, as if a password were showing.
+    expect(page).toMatch(/passwordField\('new-password', 'Password'\)\}/);
+    expect(page).not.toMatch(/6 or more characters/);
+    expect(page).toMatch(/\{password && <button type="button" className="si-pw-show"/);
+  });
   it('moves on with the setup’s own button and its ↵ key, which reads as not ready until the fields are filled', () => {
     expect(page).toMatch(/className=\{`ss-go\$\{ready \? '' : ' ss-not-yet'\}`\} aria-disabled=\{!ready \|\| undefined\}/);
     expect(page).toMatch(/<span className="ss-keys"><span className="ss-key">↵<\/span><\/span>/);

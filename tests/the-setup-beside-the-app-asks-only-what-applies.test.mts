@@ -21,16 +21,16 @@ describe('which steps the setup shows', () => {
   // The founder (2026-11-09): "we are making login required so this is not a
   // logical flow, anything that requires login should come after that step".
   it('signs in as a step of its own, after the first one, before inviting', () => {
-    expect(setupSteps({ chats: 3, team: true, teammates: true, project: true, signedIn: false, plan: 'pro' })).toEqual(['chats', 'account', 'plan', 'invite', 'teammates', 'look']);
+    expect(setupSteps({ chats: 3, team: true, teammates: true, project: true, signedIn: false, plan: 'pro' })).toEqual(['chats', 'account', 'plan', 'invite', 'pay', 'teammates', 'look']);
   });
   it('skips the sign-in step for someone already signed in', () => {
-    expect(setupSteps({ chats: 0, team: true, teammates: false, project: true, signedIn: true, plan: 'pro' })).toEqual(['folder', 'plan', 'invite', 'look']);
+    expect(setupSteps({ chats: 0, team: true, teammates: false, project: true, signedIn: true, plan: 'pro' })).toEqual(['folder', 'plan', 'invite', 'pay', 'look']);
   });
   it('has no sign-in step on a build with no account to sign in to', () => {
     expect(setupSteps({ chats: 0, team: false, teammates: false, project: true, signedIn: false })).toEqual(['folder', 'look']);
   });
   it('shows every step on a team build with chats and teammates on', () => {
-    expect(setupSteps({ chats: 3, team: true, teammates: true, project: true, signedIn: true, plan: 'pro' })).toEqual(['chats', 'plan', 'invite', 'teammates', 'look']);
+    expect(setupSteps({ chats: 3, team: true, teammates: true, project: true, signedIn: true, plan: 'pro' })).toEqual(['chats', 'plan', 'invite', 'pay', 'teammates', 'look']);
   });
   it('asks for a folder instead of chats when this computer has none', () => {
     expect(setupSteps({ chats: 0, team: true, teammates: true, project: true })[0]).toBe('folder');

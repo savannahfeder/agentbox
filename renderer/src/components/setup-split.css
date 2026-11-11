@@ -83,6 +83,12 @@
 .setup-split .ss-price { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.25; }
 .setup-split .ss-price b { font-size: 17px; font-weight: 500; }
 .setup-split .ss-price small { font-size: 12px; color: var(--text-faint); }
+/* The purchase page: Pro and its price on top, then what it brings, one line each. */
+.setup-split .ss-buy { padding: 4px 0 10px; }
+.setup-split .ss-buy-top { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px 14px; margin-bottom: 6px; border-bottom: 1px solid color-mix(in srgb, var(--text) 6%, transparent); }
+.setup-split .ss-buy-top .ss-name { font-size: 16px; font-weight: 500; }
+.setup-split .ss-buy-line { display: grid; grid-template-columns: 16px 1fr; column-gap: 12px; align-items: start; padding: 7px 18px; font-size: 14px; line-height: 20px; color: var(--text-dim); }
+.setup-split .ss-buy-line svg { margin-top: 3px; color: var(--text); }
 .ss-picker { position: fixed; inset: 0; z-index: 2147483005; }
 .setup-split .ss-empty { padding: 16px 18px; color: var(--text-faint); font-size: 13.5px; }
 

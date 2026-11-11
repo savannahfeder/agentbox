@@ -211,11 +211,11 @@ export function SignInPage({ onSkip, signedOut = false, error: startError = null
   };
 
   // `bare` is for a screen whose heading already names the field.
-  const passwordField = (autoComplete: string, label: string, bare = false, placeholder?: string) => (
+  const passwordField = (autoComplete: string, label: string, bare = false) => (
     <label className={missing?.field === 'password' ? 'si-missing' : undefined}>{!bare && <span>{label}</span>}
       <span className="si-pw">
-        <input ref={pwField} type={showPassword ? 'text' : 'password'} value={password} autoComplete={autoComplete} placeholder={placeholder} aria-label={bare ? label : undefined} aria-invalid={missing?.field === 'password' || undefined} onChange={(e) => { setPassword(e.target.value); setMissing(null); setError(null); }} />
-        <button type="button" className="si-pw-show" aria-pressed={showPassword} onClick={() => setShowPassword((on) => !on)}>{showPassword ? 'Hide' : 'Show'}</button>
+        <input ref={pwField} type={showPassword ? 'text' : 'password'} value={password} autoComplete={autoComplete} aria-label={bare ? label : undefined} aria-invalid={missing?.field === 'password' || undefined} onChange={(e) => { setPassword(e.target.value); setMissing(null); setError(null); }} />
+        {password && <button type="button" className="si-pw-show" aria-pressed={showPassword} onClick={() => setShowPassword((on) => !on)}>{showPassword ? 'Hide' : 'Show'}</button>}
       </span>
     </label>
   );
@@ -278,7 +278,7 @@ export function SignInPage({ onSkip, signedOut = false, error: startError = null
                 <label className={missing?.field === 'email' ? 'si-missing' : undefined}><span>Email</span>
                   <input ref={emailField} type="email" value={email} autoComplete="email" placeholder="you@company.com" aria-invalid={missing?.field === 'email' || undefined} onChange={(e) => { setEmail(e.target.value); setMissing(null); setError(null); }} />
                 </label>
-                {passwordField('new-password', 'Password', false, '6 or more characters')}
+                {passwordField('new-password', 'Password')}
               </>}
               <button type="submit" className={`ss-go${ready ? '' : ' ss-not-yet'}`} aria-disabled={!ready || undefined} disabled={!!busy}>
                 {part === 'login' ? (busy === 'email' ? 'Creating…' : 'Create account') : 'Continue'}

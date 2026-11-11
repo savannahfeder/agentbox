@@ -18,7 +18,7 @@ const split = fs.readFileSync(new URL('../renderer/src/components/SetupSplit.tsx
 
 describe('the plan step', () => {
   it('comes after the account, before inviting, on a team build', () => {
-    expect(setupSteps({ chats: 3, team: true, teammates: false, project: true, signedIn: false, plan: 'pro' })).toEqual(['chats', 'account', 'plan', 'invite', 'look']);
+    expect(setupSteps({ chats: 3, team: true, teammates: false, project: true, signedIn: false, plan: 'pro' })).toEqual(['chats', 'account', 'plan', 'invite', 'pay', 'look']);
   });
   it('leaves out inviting when Free is picked, since the team is a paid thing', () => {
     expect(setupSteps({ chats: 3, team: true, teammates: false, project: true, signedIn: false, plan: 'free' })).toEqual(['chats', 'account', 'plan', 'look']);
@@ -50,10 +50,10 @@ describe('the plans offered', () => {
 });
 
 describe('the step on screen', () => {
-  it('lists the plans, ticks the one picked, and goes on with the trial for Pro', () => {
+  it('lists the plans and ticks the one picked; Pro is paid for on its own page further on', () => {
     expect(split).toMatch(/\} else if \(step === 'plan'\) \{/);
     expect(split).toMatch(/SETUP_PLANS\.map\(\(pl\) => <Row key=\{pl\.id\}/);
-    expect(split).toMatch(/go\(plan === 'pro' \? `Start \$\{TEAM\.trialDays\} days free` : 'Continue', next\)/);
+    expect(split).toMatch(/<div className="ss-acts">\{go\('Continue', next\)\}<\/div>/);
   });
   it('no longer says the team is free for 14 days on the invite step', () => {
     expect(split).not.toMatch(/Free for 14 days\./);

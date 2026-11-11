@@ -15,7 +15,7 @@ import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { starterAsks } from '../../../shared/teammates.mts';
 import { MATCH_SKY, SKY_THEMES, drawSky } from '../home/sky';
-import { SETUP_PLANS, setupPreview, tabStop, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
+import { SETUP_PLANS, proIncludes, setupPreview, tabStop, teamPaid, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
 import { TEAM } from '../../../cloud/gateway/plans.mjs';
 import FolderPicker from './FolderPicker';
 import { SignInPage } from '../team/SignInPage';
@@ -140,7 +140,8 @@ export function SetupSplit(p: SetupSplitProps) {
   const addEmail = () => { const l = inviteList([...emails, typed]); if (l.length > emails.length) { setEmails(l); setTyped(''); } };
   const sendInvites = useCallback(async () => {
     const list = inviteList([...emails, typed]);
-    if (!list.length) { next(); return; }
+    // Pro's seats are bought for a team, so it is made even with nobody invited yet.
+    if (!list.length && (plan !== 'pro' || p.snap?.team?.team)) { next(); return; }
     setBusy(true); setError(null);
     if (!p.snap?.team?.team) {
       const name = teamName.trim();
@@ -153,7 +154,23 @@ export function SetupSplit(p: SetupSplitProps) {
     setBusy(false);
     setDone((d) => ({ ...d, invited: d.invited + sent }));
     if (sent === list.length) next();
-  }, [emails, typed, teamName, p.snap?.team?.team, next]);
+  }, [emails, typed, teamName, p.snap?.team?.team, next, plan]);
+
+  // ---- Paying for Pro: the team's Stripe checkout in the browser, then wait for its seats.
+  const [payState, setPayState] = useState<'idle' | 'opening' | 'waiting'>('idle');
+  const pay = useCallback(async () => {
+    setPayState('opening'); setError(null);
+    const out = await api.cloudAccountPay('team');
+    if (!out.ok) { setPayState('idle'); setError(out.message || 'Stripe could not be opened. Try again.'); return; }
+    setPayState('waiting');
+  }, []);
+  useEffect(() => {
+    if (payState !== 'waiting') return undefined;
+    let live = true;
+    const look = async () => { const paid = teamPaid(await api.cloudAccountPlan()); if (live && paid) next(); };
+    const t = setInterval(() => void look(), 3000);
+    return () => { live = false; clearInterval(t); };
+  }, [payState, next]);
 
   // ---- AI teammates
   const left = useMemo(() => starterChoices(starterAsks(p.snap?.teammates?.list ?? [])), [p.snap?.teammates?.list]);
@@ -285,7 +302,21 @@ export function SetupSplit(p: SetupSplitProps) {
           name={<>{pl.name}{pl.tag && <span className="ss-tag">{pl.tag}</span>}</>} sub={pl.sub}
           end={<span className="ss-price"><b>{pl.price}</b>{pl.per && <small>{pl.per}</small>}</span>} />)}
       </div>
-      <div className="ss-acts">{go(plan === 'pro' ? `Start ${TEAM.trialDays} days free` : 'Continue', next)}</div>
+      <div className="ss-acts">{go('Continue', next)}</div>
+    </>;
+  } else if (step === 'pay') {
+    head = ['Start Pro.', ''];
+    const teamOn = p.snap?.team?.team?.name;
+    body = <>
+      <div className="ss-list ss-buy">
+        <div className="ss-buy-top">
+          <span className="ss-name">Pro{teamOn && <span className="ss-dim"> for {teamOn}</span>}</span>
+          <span className="ss-price"><b>${TEAM.dollarsPerSeat}</b><small>a person a month</small></span>
+        </div>
+        {proIncludes(Date.now() + TEAM.trialDays * 24 * 3600_000).map((l) => <div key={l} className="ss-buy-line"><Tick />{l}</div>)}
+      </div>
+      {payState === 'waiting' && <p className="ss-note">Finish in your browser. This moves on once Stripe has your card.</p>}
+      <div className="ss-acts">{go(payState === 'opening' ? 'Opening Stripe…' : payState === 'waiting' ? 'Open Stripe again' : 'Add a card', () => void pay(), payState !== 'opening')}</div>
     </>;
   } else if (step === 'invite') {
     head = ['Invite your team.', ''];
@@ -299,7 +330,7 @@ export function SetupSplit(p: SetupSplitProps) {
         <div className="ss-row"><span className="ss-face ss-dash"><Plus /></span>
           <input className="ss-input" data-ss-enter="add" placeholder="Add by email…" value={typed} onChange={(e) => setTyped(e.target.value)} /></div>
       </div>
-      <div className="ss-acts">{go(emails.length || inviteList([typed]).length ? `Send ${inviteList([...emails, typed]).length === 1 ? '1 invite' : `${inviteList([...emails, typed]).length} invites`}` : 'Continue', () => void sendInvites(), true, 'Sending…')}{quiet('Just me for now', next)}</div>
+      <div className="ss-acts">{go(emails.length || inviteList([typed]).length ? `Send ${inviteList([...emails, typed]).length === 1 ? '1 invite' : `${inviteList([...emails, typed]).length} invites`}` : 'Continue', () => void sendInvites(), true, 'Sending…')}{plan !== 'pro' && quiet('Just me for now', next)}</div>
     </>;
   } else if (step === 'teammates') {
     head = ['Add your own AI teammates.', ''];

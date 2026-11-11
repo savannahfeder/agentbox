@@ -18,7 +18,7 @@ export function setupPreview(width: number, height: number) {
   return { left, x, y, scale, h: (height - 16 - y) / scale, right: Math.max(0, 1120 - (width - 16 - x) / scale) };
 }
 
-export type SetupStep = 'chats' | 'folder' | 'account' | 'plan' | 'invite' | 'teammates' | 'look';
+export type SetupStep = 'chats' | 'folder' | 'account' | 'plan' | 'invite' | 'pay' | 'teammates' | 'look';
 export type SetupPlan = 'free' | 'pro';
 
 /** Only the steps that can apply on this build: most people are not on a team,
@@ -31,6 +31,8 @@ export function setupSteps({ chats, team, teammates, project, signedIn = true, p
   // The team is a paid thing: Free goes on without inviting anyone.
   if (team && !onTeam) out.push('plan');
   if (team && (onTeam || plan === 'pro')) out.push('invite');
+  // Seats are bought for a team, so the purchase page follows the step that makes it.
+  if (team && !onTeam && plan === 'pro') out.push('pay');
   if (teammates && project) out.push('teammates');
   out.push('look');
   return out;
@@ -42,7 +44,21 @@ export const SETUP_PLANS: Array<{ id: SetupPlan; name: string; price: string; pe
   { id: 'pro', name: 'Pro', price: `$${TEAM.dollarsPerSeat}`, per: 'a person a month', tag: `${TEAM.trialDays} days free`, sub: `Your team, plus ${TEAM.agentsPerSeat} cloud agents at once` },
 ];
 
-export const stepLabel =(steps: SetupStep[], step: SetupStep) => `Step ${steps.indexOf(step) + 1} of ${steps.length}`;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** What the purchase page lists for Pro; `endsAt` is when the team's free days end and the card is first charged. */
+export function proIncludes(endsAt: number): string[] {
+  const d = new Date(endsAt);
+  return [
+    'Your team in one inbox',
+    `${TEAM.agentsPerSeat} cloud agents at once, ${TEAM.hoursPerSeat} hours a month each`,
+    `Nothing to pay until ${MONTHS[d.getMonth()]} ${d.getDate()}. Cancel before then and pay nothing.`,
+  ];
+}
+
+/** The team has bought its seats, so the purchase page can move on. */
+export const teamPaid = (plan: { team?: { seats?: number } } | null | undefined): boolean => (plan?.team?.seats ?? 0) > 0;
+
+export const stepLabel = (steps: SetupStep[], step: SetupStep) => `Step ${steps.indexOf(step) + 1} of ${steps.length}`;
 
 /** Ids in shared sky themes and skins.ts: Light and Dark are the plain looks. */
 const LOOK_ORDER = [MATCH_SKY, 'ember', 'dusk', 'aurora', 'sage', 'light', 'dark'];
