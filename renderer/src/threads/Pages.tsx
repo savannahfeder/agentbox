@@ -14,7 +14,7 @@ import { chord } from '../this-keyboard';
 import type { Person, Product, ThreadCard, ThreadStateWord, View, WorkItem } from '../types';
 import { priorityIdOf, priorityLabelOf, PRIORITIES, type PriorityId } from '../priority';
 import { Face, TeamContext, dueWords, firstName, personOf } from '../team/people';
-import { taskWords } from '../team/company';
+import { handedBy, taskWords } from '../team/company';
 import { agentSaidLast } from '../team/answers-in-the-chat';
 import { PriorityIcon } from '../components/Priority';
 import { asideBesides, notStarted, rowTitle, waitCameBack } from '../list-rules';
@@ -680,7 +680,7 @@ export function RowCells({ status, retry, lead, title, hidden = false, lock = fa
     {/* THE MARK SAYS WHICH KIND OF SHARED, QUIETLY (w-41ff964775): the two
         people with a small count beside them for a thread only a few people
         see. The whole team, the default, carries nothing (2026-10-02). */}
-    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}`}>{lead}{title}{aside && <span className={`th-aside${late ? ' late' : ''}`}>{aside}</span>}{held && <span className="th-aside">not started</span>}{shared && <SharedMark label={chosen ? `Visible to ${chosen} ${chosen === 1 ? 'person' : 'people'}` : 'Visible to the team'} />}{chosen > 0 && <span className="th-shared-n" aria-hidden="true">{chosen}</span>}{lock && <LockMark />}{pinned && <PinMark size={13} className="th-pin" />}</div>
+    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}${aside ? ' with-aside' : ''}`}>{lead}{aside ? <span className="th-title-text">{title}</span> : title}{aside && <span className="th-aside-box"><span className={`th-aside${late ? ' late' : ''}`}>{aside}</span></span>}{held && <span className="th-aside">not started</span>}{shared && <SharedMark label={chosen ? `Visible to ${chosen} ${chosen === 1 ? 'person' : 'people'}` : 'Visible to the team'} />}{chosen > 0 && <span className="th-shared-n" aria-hidden="true">{chosen}</span>}{lock && <LockMark />}{pinned && <PinMark size={13} className="th-pin" />}</div>
     <div className={`th-cell-state${status?.why ? ' has-card' : ''}${retry ? ' can-retry' : ''}`} title={status?.why ? undefined : status?.title}>{status && <><StatusMark status={status} />{status.word}</>}{retry}
       {status?.why && <span className="th-why-card" role="tooltip"><b>{status.why.head}</b><span>{status.why.body}</span></span>}</div>
     <div className="th-cell-proj th-col-proj">{where}</div>
@@ -801,11 +801,13 @@ export function ThreadCells({ item, product, now, person, tab }: {
   // the Status column says Queued on exactly those rows, and one fact in two
   // places on one row is what the column was drawn to end. `FreeAgentContext`
   // is untouched and still decides whether the cloud offers itself.
-  const commented = fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string | null) => firstName(team?.byId.get(id ?? '') ?? null))
+  const handed = team ? handedBy(item, product ?? undefined, team.me) : null;
+  const handedFace = handed ? <span className="tq-from"><Face person={team?.byId.get(handed.from) ?? null} /><b>{nameFirst(handed.from)}</b></span> : null;
+  const commented = (handed?.note ?? null) ?? fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string | null) => firstName(team?.byId.get(id ?? '') ?? null))
     ?? commentLine(item.waitingComments, (id) => firstName(team?.byId.get(id) ?? null))
     ?? (waitCameBack(item) ? item.waitEnded?.said : null)
     ?? item.handedOver?.said;
-  return <RowCells status={status} retry={retry} lead={<TeammateLead item={item} />} title={rowTitle(item)} aside={asideBesides(rowTitle(item), commented ?? (toApproveWords(waiting.get(`${item.product}/${item.id}`)) || null)) ?? undefined} shared={seen === 'people'} chosen={chosen} lock={lock} held={notStarted(item)} pinned={!!item.pinned && item.status !== 'done'} where={product?.name ?? ''} person={person}
+  return <RowCells status={status} retry={retry} lead={handedFace ?? <TeammateLead item={item} />} title={rowTitle(item)} aside={asideBesides(rowTitle(item), commented ?? (toApproveWords(waiting.get(`${item.product}/${item.id}`)) || null)) ?? undefined} shared={seen === 'people'} chosen={chosen} lock={lock} held={notStarted(item)} pinned={!!item.pinned && item.status !== 'done'} where={product?.name ?? ''} person={person}
     priority={shownPriority(item)} updatedAt={when} when={back} now={now} action={action} />;
 }
 

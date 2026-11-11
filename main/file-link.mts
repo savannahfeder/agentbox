@@ -12,19 +12,26 @@ import { PHONE_SITE } from '../shared/cloud-address.mts';
 
 export const LINK_MAX_BYTES = 6_000_000;
 const MAX_BODY_CHARS = 8_400_000;
+// A film goes up in pieces (20261109120000_a_film_can_be_shared_by_its_link.sql).
+export const LINK_PIECE_BYTES = 8 * 1024 * 1024;
+export const LINK_FILM_MAX_BYTES = 200 * 1024 * 1024;
 
-type LinkFs = Pick<typeof fsDefault, 'readFileSync' | 'realpathSync'>;
+type LinkFs = Pick<typeof fsDefault, 'readFileSync' | 'realpathSync'> & Partial<Pick<typeof fsDefault, 'statSync' | 'openSync' | 'readSync' | 'closeSync'>>;
 
-export type LinkKind = 'markdown' | 'page' | 'image' | 'pdf';
-export interface LinkFile { kind: LinkKind; type: string; body: string; hash: string; error?: undefined }
+export type LinkKind = 'markdown' | 'page' | 'image' | 'pdf' | 'video';
+/** `path`: a film's own file, read a piece at a time as it goes up. */
+export interface LinkFile { kind: LinkKind; type: string; body: string; hash: string; path?: string; error?: undefined }
 export interface LinkCopy extends LinkFile { name: string; version: number }
 
 const KINDS: Record<string, readonly [LinkKind, string] | undefined> = {
   '.md': ['markdown', 'text/markdown'], '.markdown': ['markdown', 'text/markdown'],
+  // A table rides as text like a document; its type is what draws it as a table.
+  '.csv': ['markdown', 'text/csv'], '.tsv': ['markdown', 'text/tab-separated-values'],
   '.html': ['page', 'text/html'], '.htm': ['page', 'text/html'],
   '.png': ['image', 'image/png'], '.jpg': ['image', 'image/jpeg'], '.jpeg': ['image', 'image/jpeg'],
   '.gif': ['image', 'image/gif'], '.webp': ['image', 'image/webp'], '.svg': ['image', 'image/svg+xml'],
   '.pdf': ['pdf', 'application/pdf'],
+  '.mp4': ['video', 'video/mp4'], '.m4v': ['video', 'video/mp4'], '.mov': ['video', 'video/quicktime'], '.webm': ['video', 'video/webm'],
 };
 const INSIDE_TYPES: Record<string, string | undefined> = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp',
@@ -92,10 +99,47 @@ function pageWithItsFiles(html: string, file: string, fs: LinkFs): string {
     .replace(/url\(\s*(["']?)([^"')]+)\1\s*\)/gi, (whole: string, q: string, ref: string) => { const d = inline(ref); return d ? `url(${q}${d}${q})` : whole; });
 }
 
+// The share panel asks for the hash every time it opens, and a film is up to 200 MB.
+const filmHashes = new Map<string, { size: number; mtimeMs: number; hash: string }>();
+
+/** A film as its link carries it: the list of its pieces, hashed over its bytes. */
+function filmForLink(file: string, type: string, fs: LinkFs): LinkFile | { error: string } {
+  const { statSync, openSync, readSync, closeSync } = { ...fsDefault, ...fs };
+  let st;
+  try { st = statSync(file); } catch { return { error: 'This file is not on this computer any more.' }; }
+  if (st.size > LINK_FILM_MAX_BYTES) return { error: `This film is over ${LINK_FILM_MAX_BYTES / 1024 / 1024} MB, too big to share as a link.` };
+  if (st.size === 0) return { error: 'This film is empty.' };
+  let hash = filmHashes.get(file);
+  if (!hash || hash.size !== st.size || hash.mtimeMs !== st.mtimeMs) {
+    const sha = crypto.createHash('sha256');
+    const fd = openSync(file, 'r');
+    try {
+      const buf = Buffer.alloc(LINK_PIECE_BYTES);
+      for (let n; (n = readSync(fd, buf, 0, buf.length, null)) > 0;) sha.update(buf.subarray(0, n));
+    } finally { closeSync(fd); }
+    hash = { size: st.size, mtimeMs: st.mtimeMs, hash: sha.digest('hex').slice(0, 40) };
+    filmHashes.set(file, hash);
+  }
+  const pieces = Math.ceil(st.size / LINK_PIECE_BYTES);
+  return { kind: 'video', type, body: JSON.stringify({ pieces, size: st.size, hash: hash.hash }), hash: hash.hash, path: file };
+}
+
+/** Piece `n` of a film, as it goes up. */
+export function filmPiece(file: string, n: number, { fs = fsDefault }: { fs?: LinkFs } = {}): Buffer {
+  const { openSync, readSync, closeSync } = { ...fsDefault, ...fs };
+  const fd = openSync(file, 'r');
+  try {
+    const buf = Buffer.alloc(LINK_PIECE_BYTES);
+    const got = readSync(fd, buf, 0, buf.length, n * LINK_PIECE_BYTES);
+    return buf.subarray(0, got);
+  } finally { closeSync(fd); }
+}
+
 /** The file as a link carries it: { kind, type, body } or { error } in words. */
 export function fileForLink(file: string, { fs = fsDefault }: { fs?: LinkFs } = {}): LinkFile | { error: string } {
   const kind = linkKindOf(file);
-  if (!kind) return { error: 'Only documents, pages, pictures and PDFs can be shared as a link.' };
+  if (!kind) return { error: 'Only documents, tables, pages, pictures, PDFs and films can be shared as a link.' };
+  if (kind.kind === 'video') return filmForLink(file, kind.type, fs);
   let bytes: Buffer;
   try { bytes = fs.readFileSync(file); } catch { return { error: 'This file is not on this computer any more.' }; }
   if (bytes.length > LINK_MAX_BYTES) return { error: `This file is over ${LINK_MAX_BYTES / 1e6} MB, too big to share as a link.` };

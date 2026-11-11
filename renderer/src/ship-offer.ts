@@ -20,6 +20,7 @@
 // that; `shipOfferLive` is unchanged and still decides whether the app asks at
 // all.
 import { offerIsLive, type ParsedOption } from './format';
+import { wakesItselfAt } from '../../shared/answers.mts';
 
 /** The label the ship queue takes a thread by (main/ship-queue.mts). */
 export const SHIP_LABEL = 'ship';
@@ -142,6 +143,8 @@ export function shipOfferFor(stands: Standing, onlyFiles?: readonly string[] | n
 
 interface Finished {
   status?: string;
+  kind?: string;
+  runAt?: number;
   labels?: string[];
   result?: string;
   note?: string;
@@ -178,6 +181,8 @@ export function shipOfferLive(item: Finished, { change, running }: { change: boo
   // the ship queue is not asking anybody anything.
   if (item.status === 'done') return false;
   if ((item.labels ?? []).includes(SHIP_LABEL)) return false;
+  // Its agent set a run still to come, so the work is not finished.
+  if (wakesItselfAt(item)) return false;
   // A result is written when a worker exits, so it is also how the pane knows
   // the run ended at all.
   if (!(item.result ?? '').trim()) return false;

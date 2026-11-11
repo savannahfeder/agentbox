@@ -16,6 +16,7 @@ import { defaultStoreRoot } from './store/home.mts';
 import { machineSlots } from './machine.mts';
 import { runningAsAFreshUser } from '../shared/fresh-user-home.mts';
 import { runningAsADemo } from '../shared/demo-world.mts';
+import { replaceFileSync } from './replace-file.mts';
 
 const CONFIG_NAME = 'zero.config.json';
 
@@ -439,7 +440,7 @@ export function saveConfig(config: object, patch: Record<string, unknown>): Reco
   }
   const tmp = `${file}.tmp-${process.pid}`;
   fs.writeFileSync(tmp, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
-  fs.renameSync(tmp, file);
+  replaceFileSync(tmp, file);
   const live = config as Record<string, unknown>;
   for (const [key, value] of Object.entries(patch)) {
     if (value === undefined) delete live[key];

@@ -104,6 +104,18 @@ export interface Place {
   // The row the keyboard was on, by id rather than by index: the list is rebuilt
   // from a fresh snapshot and row four may not be the same row any more.
   row?: string;
+  // Whether Home was up. It starts up on every load, so without this a reload
+  // from Needs you lands on Home. Absent on a phone, which has no Home.
+  home?: boolean;
+  // The pages beside the inbox, each as the state App.tsx keeps for it.
+  files?: { project: string | null };
+  connections?: boolean;
+  team?: boolean;
+  chats?: string;
+  room?: string;
+  teammate?: string;
+  today?: boolean;
+  tasks?: boolean;
 }
 
 // Anything at all can be in localStorage, including a place written by a build
@@ -145,6 +157,16 @@ export function readPlace(storage: Pick<Storage, 'getItem'>): Place | null {
   }
   if (typeof p.search === 'string') place.search = p.search;
   if (typeof p.row === 'string' && p.row) place.row = p.row;
+  if (typeof p.home === 'boolean') place.home = p.home;
+  if (p.files && typeof p.files === 'object') {
+    const f = (p.files as Record<string, unknown>).project;
+    if (f === null || (typeof f === 'string' && f)) place.files = { project: f };
+  }
+  for (const key of ['connections', 'team', 'today', 'tasks'] as const) if (p[key] === true) place[key] = true;
+  for (const key of ['chats', 'room', 'teammate'] as const) {
+    const v = p[key];
+    if (typeof v === 'string' && v) place[key] = v;
+  }
   return place;
 }
 
@@ -168,8 +190,8 @@ export function writePlace(storage: Pick<Storage, 'setItem'>, place: Place): voi
   try { storage.setItem(KEY, JSON.stringify(place)); } catch { /* a full disk is not worth a crash */ }
 }
 
-// WHETHER THERE IS ANYWHERE TO GO. A place that is the inbox with nothing open
-// is where a reload lands anyway, so restoring it is work with no effect, and
+// WHETHER THERE IS ANYWHERE TO GO. A place that is Home (or, on a phone, the
+// inbox) with nothing open is where a reload lands anyway, so restoring it is work with no effect, and
 // saying so lets the boot screen decide instantly whether it has to wait for
 // the snapshot before drawing. Without this, every reload holds the window on
 // "the app" for a frame it did not need to.
@@ -177,5 +199,7 @@ export function placeIsSomewhere(place: Place | null): place is Place {
   if (!place) return false;
   return place.view !== 'inbox'
     || !!place.item || !!place.repeat || !!place.settings
-    || place.search !== undefined || !!place.row;
+    || place.search !== undefined || !!place.row
+    || place.home === false || !!place.files || !!place.connections || !!place.team
+    || !!place.chats || !!place.room || !!place.teammate || !!place.today || !!place.tasks;
 }

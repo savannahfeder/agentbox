@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Name } from '../../shared/product-name.mjs';
 import { CLOUD_ADDRESS } from '../../shared/cloud-address.mts';
+import { replaceFileSync } from '../replace-file.mts';
 import type { CloudAccountConfig } from './account.mts';
 import type { CloudConfig } from './clients.mts';
 
@@ -91,7 +92,7 @@ export function noteImageCaps(config: CloudConfig | null | undefined, caps: stri
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(all, null, 2));
-  fs.renameSync(tmp, file);
+  replaceFileSync(tmp, file);
 }
 
 export function readCloudKey(env: Env = process.env, home: string = os.homedir()): string | null {
@@ -116,7 +117,7 @@ export function writeCloudKey(key: string, env: Env = process.env, home: string 
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.tmp`;
   fs.writeFileSync(tmp, key, { mode: 0o600 });
-  fs.renameSync(tmp, file);
+  replaceFileSync(tmp, file);
 }
 
 // The keychain service the first cloud build kept its own Claude tokens

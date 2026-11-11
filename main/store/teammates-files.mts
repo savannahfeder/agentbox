@@ -9,6 +9,7 @@ import { foldTeammates, foldChat, foldPlaybooks } from '../../shared/teammates.m
 import type { ChatKind, Playbook, TeamChat, Teammate } from '../../shared/teammates.mts';
 import { foldOutbox } from '../../shared/teammate-reach.mts';
 import type { Outbox, OutboxLine, TeamView } from '../../shared/teammate-reach.mts';
+import { replaceFileSync } from '../replace-file.mts';
 
 const MAX_READ = 4 * 1024 * 1024;
 const MAX_LINE = 64 * 1024;
@@ -54,7 +55,7 @@ export function writeMethod(dir: string, id: string, text: string): string {
   }
   const tmp = `${file}.${process.pid}.tmp`;
   fs.writeFileSync(tmp, text);
-  fs.renameSync(tmp, file);
+  replaceFileSync(tmp, file);
   return file;
 }
 
@@ -160,7 +161,7 @@ export function writeTeamView(dir: string, view: TeamView): void {
   const file = teamViewFile(dir);
   const tmp = `${file}.${process.pid}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(view));
-  fs.renameSync(tmp, file);
+  replaceFileSync(tmp, file);
 }
 
 export function readPlaybooks(dir: string): Playbook[] {

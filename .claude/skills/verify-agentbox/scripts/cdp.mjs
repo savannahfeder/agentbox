@@ -27,7 +27,11 @@ export { chromesForTesting, headlessShells };
  * installed (the Linux cloud has it).
  */
 export function findChrome(platform = process.platform, env = process.env, playwright = () => createRequire(import.meta.url)('playwright'), forTesting = chromesForTesting, shells = headlessShells) {
-  if (platform === 'darwin') return forTesting()[0] ?? shells()[0] ?? MAC_CHROME;
+  if (platform === 'darwin') {
+    // VERIFY_CHROME picks among the hidden browsers only: never the person's own Chrome.
+    const hidden = [...forTesting(), ...shells()];
+    return hidden.includes(env.VERIFY_CHROME) ? env.VERIFY_CHROME : hidden[0] ?? MAC_CHROME;
+  }
   if (env.VERIFY_CHROME) return env.VERIFY_CHROME;
   try { return playwright().chromium.executablePath(); } catch { return MAC_CHROME; }
 }

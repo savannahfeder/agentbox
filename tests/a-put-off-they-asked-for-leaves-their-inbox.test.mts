@@ -93,7 +93,7 @@ describe('putting a row off', () => {
     // The schedule still lands, as the brake it always was, but as the agent's.
     expect(after.runAt).toBe(later);
     expect(after.wrote.runAt.source).toBe('agent');
-    expect(after.deferredAsAgent).toMatch(/stays in their inbox/);
+    expect(after.deferredAsAgent).toMatch(/runs again then/);
   });
 
   it('does not let a row an agent filed quote the agent', async () => {
