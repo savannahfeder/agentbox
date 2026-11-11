@@ -163,6 +163,7 @@ import { CLAUDE_MODELS } from '../shared/claude-models.generated.mts';
 import { claudeModelRows } from './claude-models.mts';
 import { codexLaunchEnv } from './codex-launch-env.mts';
 import { CodexUsage, codexAccountReadings } from './codex-usage.mts';
+import { codexBackAt } from '../shared/codex-usage.mts';
 import { createCodexWorker, mcpServerNames, resumeThreadParams, workerThreadParams } from './codex-session.mts';
 import type { CodexServerClient, ConnectionServer, ConnectionServers } from './codex-session.mts';
 import { CODEX_DEFAULT_MODE, isCodexMode } from '../shared/codex-modes.mts';
@@ -8890,9 +8891,11 @@ export class Supervisor {
         const keys = profiles.map((p) => this._accountKey(engine, p));
         const allOut = profiles.length > 0 && !this._liveProfilesFor(engine).length
           && keys.every((k) => this._profileTrouble?.[k]?.cause === 'at-limit');
+        // Codex's refusal prints no hour, but its own reading of the login does.
+        const read = allOut && engine === 'codex' ? this._codexBackAt(profiles) : null;
         // The reset the tool printed, never the app's own retry clock: that is
         // when it tries again, which is not a time the limit promised.
-        held.set(engine, allOut ? Math.min(...keys.map((k) => this._profileTrouble[k].resetsAt ?? 0)) : null);
+        held.set(engine, allOut ? Math.min(...keys.map((k) => this._profileTrouble[k].resetsAt ?? read?.get(k) ?? 0)) : null);
       }
       return held.get(engine)!;
     };
@@ -8901,6 +8904,19 @@ export class Supervisor {
       const engine = engineOf(this._engineFor(i));
       const until = heldUntil(engine);
       if (until !== null) out[i.id] = { tool: engineLabel(engine), until };
+    }
+    return out;
+  }
+
+  /** When each Codex login's own reading says its spent window comes back, by account key. */
+  _codexBackAt(profiles: string[], now = Date.now()): Map<string, number> {
+    const out = new Map<string, number>();
+    const readings = codexAccountReadings({
+      profiles, homeOf: (p) => this._codexProfileHome(p), current: this.codexUsage(), currentHome: this._codexUsageHome(), now,
+    });
+    for (const r of readings) {
+      const at = codexBackAt(r.limits, now);
+      if (at) out.set(this._accountKey('codex', r.profile), at);
     }
     return out;
   }

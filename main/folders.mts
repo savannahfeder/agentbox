@@ -42,6 +42,19 @@ export function absolute(at: unknown, home: string = os.homedir()): string {
   return path.resolve(s);
 }
 
+const CODE_FOLDERS = ['code', 'Code', 'dev', 'Developer', 'Projects', 'projects', 'src', 'repos', 'git', 'GitHub', 'Desktop/dev', 'Documents/GitHub'];
+
+/** Where the picker opens when no folder is asked for. The home itself is refused as a project. */
+export function startFolder(home: string, isDir: (p: string) => boolean = (p) => {
+  try { return fs.statSync(p).isDirectory(); } catch { return false; }
+}): string {
+  for (const name of CODE_FOLDERS) {
+    const p = path.join(home, name);
+    if (isDir(p)) return p;
+  }
+  return home;
+}
+
 /**
  * The folders inside one folder, and the way back up.
  *

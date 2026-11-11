@@ -22,7 +22,7 @@ import { MAC_CHROME, NO_HIDDEN_BROWSER, chromesForTesting, headlessShells } from
 export { chromesForTesting, headlessShells };
 
 /**
- * On a Mac, the hidden browser (shared/hidden-browser.mjs), and Google Chrome only as a
+ * On a Mac, `VERIFY_CHROME` when it is on disk and is not the person's Chrome, else the hidden browser (shared/hidden-browser.mjs), and Google Chrome only as a
  * name launchChrome refuses; elsewhere `VERIFY_CHROME`, or the Chromium Playwright
  * installed (the Linux cloud has it).
  */

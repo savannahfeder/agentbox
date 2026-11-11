@@ -522,6 +522,7 @@ async function createWindow() {
     onChange: () => { try { pushUpdate(); } catch { /* no window yet */ } },
     log: (line) => console.log(line),
     runningIds: () => supervisor.runsGoing().map((s) => s.itemId),
+    wontStart: () => supervisor.status(),
     ownMates: () => matesForTheTeam(store, config),
     sharing: () => alphaFeatures(config).multiplayer,
     // HER PHONE WITH THE MAC SHUT (main/phone-inbox.mts). What it left is done
@@ -1153,6 +1154,7 @@ async function createWindow() {
   let cornerTag: ReturnType<typeof createCornerTag> | null = null;
   const notifier = installNotifier({
     app, window, Notification, powerMonitor, ipcMain, nativeImage,
+    openExternal: (url: string) => shell.openExternal(url),
     onArrivals: (list, needsYou) => team?.phoneArrivals(list, needsYou),
     onChange: () => cornerTag?.refresh(),
   });

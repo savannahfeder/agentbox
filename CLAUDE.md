@@ -63,6 +63,15 @@ those files still counts as a change to the look. Never move the fingerprints in
 `tests/fixtures/the-trays-approved-look.json` without that approval. Taking
 those pictures puts windows on their screen, so ask before you do it.
 
+## THE DESIGN IS ROUNDED (2026-11-10)
+
+A button, card, tip, key cap or ring with a border has rounded corners. Square
+ones kept coming back, so the founder had to point them out by hand.
+`tests/the-design-is-rounded-and-square-boxes-only-go-down` allows none in the
+first run, the setup, the walkthrough and the sign-in page, and elsewhere the
+count may only go down. Round what you touch; never raise a number in
+`tests/fixtures/square-boxes.json`.
+
 ## NOTHING RETRIES FOR EVER, NOTHING WAITS FOR EVER, NOTHING FAILS IN SILENCE (2026-10-19)
 
 One cloud thread's start died in under a second, every 15 seconds, 16,135

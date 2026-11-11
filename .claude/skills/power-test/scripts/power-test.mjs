@@ -37,7 +37,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { readPeople, pickPeople, agentMode, chaosPlan, worldAt, nextRound, restartAgain, roundOutcome, coverage, testerPrompt, projectNamedIn } from './plan.mjs';
+import { readPeople, pickPeople, agentMode, chaosPlan, worldAt, nextRound, restartAgain, roundOutcome, coverage, testerPrompt, projectNamedIn, fixtureFor } from './plan.mjs';
 import { createWatcher, freeMemoryMb, readAllLines, keepEvidence, sleepTargets } from './watch.mjs';
 import { writeReport } from './report.mjs';
 import { makeFilm, seedArtifacts } from './artifacts.mjs';
@@ -152,8 +152,8 @@ if (check.code !== 0) stop(`the testers' Codex is not signed in at ${login.home}
 /** The person's projects with real code in them, so real agents have work to do. */
 function seedCode(state) {
   const git = (cwd, ...a) => run('git', a, { cwd, timeoutMs: MIN });
-  return Promise.all(Object.values(state.repos).map(async (repo, i) => {
-    fs.cpSync(path.join(here, '..', 'fixtures', i % 2 ? 'web' : 'api'), repo, { recursive: true });
+  return Promise.all(Object.entries(state.repos).map(async ([slug, repo], i) => {
+    fs.cpSync(path.join(here, '..', 'fixtures', fixtureFor(slug, i)), repo, { recursive: true });
     await git(repo, 'add', '-A');
     await git(repo, '-c', 'user.email=power@agentbox.invalid', '-c', 'user.name=power test', 'commit', '-qm', 'The code so far');
     // A copy's home is a throwaway with no git identity, so a real agent could not commit without these.

@@ -15,20 +15,15 @@ const memory = (seed = {}) => { const m = new Map(Object.entries(seed)); return 
 const read = (f) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');
 
 describe('the first look', () => {
-  it('is Light on a computer set to light', () => {
-    const s = memory();
-    normalizeSavedLook(s, 'light');
-    expect(s.m.get(THEME_KEY)).toBe('light');
-    expect(s.m.get(SKIN_KEY)).toBe('none');
-    const t = memory();
-    expect(seedFirstRunLook(t, THEME_KEY, 'light')).toEqual({ theme: 'light', skin: 'none' });
-  });
-
-  it('is Dark on a computer set to dark', () => {
-    const s = memory();
-    normalizeSavedLook(s, 'dark');
-    expect(s.m.get(SKIN_KEY)).toBe(DEFAULT_SKIN);
-    expect(seedFirstRunLook(memory(), THEME_KEY, 'dark')?.skin).toBe(DEFAULT_SKIN);
+  // It follows the computer from then on, until a look is picked, since
+  // w-fbe5e95dea (tests/a-new-install-follows-the-mac-until-a-look-is-picked).
+  it('is the computer own light or dark, on either', () => {
+    for (const machine of ['light', 'dark']) {
+      const s = memory();
+      normalizeSavedLook(s, machine);
+      expect(s.m.get(THEME_KEY)).toBe('match');
+      expect(seedFirstRunLook(memory(), THEME_KEY, machine)).toEqual({ theme: 'match', skin: 'none' });
+    }
   });
 
   it('then stays what it was set to, whatever the computer does later', () => {

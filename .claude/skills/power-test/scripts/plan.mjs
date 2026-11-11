@@ -70,6 +70,14 @@ export function pickPeople(spec, people, rand = Math.random) {
  * Seeded history files a task that names a project there, or a tester rightly
  * calls it misfiled.
  */
+/** Which sample code a project is given: the one its name reads as, else by position. */
+export function fixtureFor(name, i) {
+  const words = String(name).toLowerCase().split(/[^a-z0-9]+/);
+  if (words.some((w) => ['web', 'site', 'app', 'mobile', 'frontend', 'ui'].includes(w))) return 'web';
+  if (words.some((w) => ['api', 'backend', 'service', 'infra', 'data'].includes(w))) return 'api';
+  return i % 2 ? 'web' : 'api';
+}
+
 export function projectNamedIn(title, projects) {
   const at = projects.findIndex((p) => new RegExp(`\\b${p.replace(/[^\w ]/g, '.')}\\b`, 'i').test(title));
   return at >= 0 ? at : undefined;

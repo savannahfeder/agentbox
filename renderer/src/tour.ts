@@ -16,7 +16,17 @@ export interface Tour {
   done: Lesson[];
   /** A thread was made urgent from ⌘K, so the next tip says what that does. */
   urgent?: boolean;
+  /** The one practice thread the walkthrough runs on, in a practice project nothing real is behind. */
+  practice?: TourPractice;
 }
+
+export interface TourPractice { slug: string; item?: string; replies: number; answered?: number }
+
+export const withPractice = (t: Tour, p: { slug: string; item?: string }): Tour => ({ ...t, practice: { replies: 0, ...t.practice, ...p } });
+export const practiceReplied = (t: Tour): Tour => (t.practice ? { ...t, practice: { ...t.practice, replies: t.practice.replies + 1 } } : t);
+/** Whether a thread is the walkthrough's practice thread, while the walkthrough runs. */
+export const isTourPractice = (t: Tour | null, item: { product: string; id: string }): boolean =>
+  tourLive(t) && !!t!.practice && t!.practice.slug === item.product && t!.practice.item === item.id;
 
 /** What is on the screen, read from the window by the caller. */
 export interface TourScreen {
@@ -41,6 +51,8 @@ export interface TourScreen {
   thread: boolean;
   /** The open thread's agent is still working on it. */
   busy?: boolean;
+  /** The open practice thread's answer for this round is still on its way; nothing runs to show it working. */
+  answering?: boolean;
   /** A menu is open over the page. */
   menu?: boolean;
   /** The thread's reply box has the keyboard. */
@@ -69,7 +81,8 @@ export const finishLesson = (t: Tour, l: Lesson): Tour => (t.done.includes(l) ? 
 export const lessonOf = (s: TourStep): Lesson =>
   s === 'folder' || s === 'pick' || s === 'write' || s === 'send' ? 'compose' : s === 'answered' || s === 'gettingReady' ? 'open' : s === 'inPalette' ? 'palette' : s === 'startHere' ? 'start' : s;
 
-const KEYS: Partial<Record<TourStep, RegExp>> = { start: /^n$/i, startHere: /^n$/i, working: /^Enter$/, open: /^Enter$/, choose: /^[1-9]$/, reply: /^r$/i, close: /^e$/i };
+// Not reply: R only opens the box, and the lesson is learned when a reply is sent (App.tsx answerWith).
+const KEYS: Partial<Record<TourStep, RegExp>> = { start: /^n$/i, startHere: /^n$/i, working: /^Enter$/, open: /^Enter$/, choose: /^[1-9]$/, close: /^e$/i };
 
 /** Whether this key press is the one the tip on screen asks for, which is the lesson learned. */
 export function keyLearns(step: TourStep, e: { key: string; metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean }): boolean {
@@ -132,7 +145,7 @@ export function tourStep(t: Tour | null, s: TourScreen): TourStep | null {
   if (s.preparing && todo('close')) return null;
   if (s.preparing) return todo('palette') && (t.sent || !todo('start')) ? 'palette' : !t.sent && todo('start') ? 'startHere' : null;
   if (s.thread) {
-    if (s.typing) return null;
+    if (s.typing || s.answering) return null;
     if (s.busy) return todo('busy') ? 'busy' : null;
     if (s.options && todo('choose')) return 'choose';
     if (!s.options && todo('reply') && todo('choose')) return 'reply';
@@ -161,7 +174,10 @@ export function readTour(store: Store): Tour | null {
     if (!raw) return null;
     const t = JSON.parse(raw);
     if (typeof t !== 'object' || !t) return null;
-    return { sent: !!t.sent, skipped: !!t.skipped, done: Array.isArray(t.done) ? t.done : [], ...(t.urgent ? { urgent: true } : {}) };
+    const p = t.practice && typeof t.practice.slug === 'string'
+      ? { practice: { slug: t.practice.slug, ...(typeof t.practice.item === 'string' ? { item: t.practice.item } : {}), replies: Number(t.practice.replies) || 0, ...(t.practice.answered ? { answered: Number(t.practice.answered) } : {}) } }
+      : {};
+    return { sent: !!t.sent, skipped: !!t.skipped, done: Array.isArray(t.done) ? t.done : [], ...(t.urgent ? { urgent: true } : {}), ...p };
   } catch { return null; }
 }
 

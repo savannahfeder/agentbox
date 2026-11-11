@@ -39,9 +39,9 @@ describe('tagging your agent', () => {
 
 describe('the button under the box says what pressing it does', () => {
   const mine = (text) => noteSendWords({ text, people, me: 'u-me', nameOf, agentMade: true, toAgent: true, owner: 'u-me' });
-  it('on your agent\'s file a plain comment is only a comment', () => {
-    expect(mine('')).toBe('Comment');
-    expect(mine('Make the last bar orange')).toBe('Comment');
+  it('on your agent\'s file a plain comment is a note for your agent', () => {
+    expect(mine('')).toBe('Note for your agent');
+    expect(mine('Make the last bar orange')).toBe('Note for your agent');
   });
   it('tagging your agent sends it now', () => {
     expect(mine('@agent make the last bar orange')).toBe('Send to your agent');

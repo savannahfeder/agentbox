@@ -25,6 +25,7 @@ import { liftListItem, wrapInList } from '@tiptap/pm/schema-list';
 import type { Node as PmNode, Schema } from '@tiptap/pm/model';
 import { mdToPmDoc, pmDocToMd } from '../editor/markdown';
 import { STARTER_KIT_EXTRAS_OFF } from '../editor/extensions';
+import { LinksOnlyAsYouType, linksAsAddress } from '../editor/typed-links';
 import type { Format } from './compose-format';
 
 type Json = JSONContent;
@@ -231,7 +232,8 @@ export function chatExtensions(placeholder: string | (() => string) = '') {
     // No headings and no rule: a message is not a document. Pasted ones come
     // in as their words (`chatDoc`).
     StarterKit.configure({ heading: false, horizontalRule: false, ...STARTER_KIT_EXTRAS_OFF }),
-    Link.configure({ openOnClick: false, autolink: true }),
+    Link.configure({ openOnClick: false, autolink: true, shouldAutoLink: linksAsAddress }),
+    LinksOnlyAsYouType,
     // A function so the box can say who it replies to without being rebuilt.
     Placeholder.configure({ placeholder: typeof placeholder === 'function' ? () => placeholder() : placeholder }),
     ChatKeys,

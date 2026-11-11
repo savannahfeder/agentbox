@@ -373,6 +373,22 @@ type LedgerLineShape = { ts: number; by?: string | null; source?: string; patch?
 /** What a comment or approval in the thread links to. */
 export interface FileMarkLink { kind: 'note' | 'approved' | 'edited'; file: string; id?: string; place?: string; /** The file's one name and version, for the words. */ shown?: string; /** A comment still waiting for Send. */ unsent?: true }
 
+/** A comment on a thread, or a note on one of its files (main/team/thread-share.mts `talk`), for the person's page. */
+export interface ThreadTalk {
+  id: string;
+  kind: 'comment' | 'note';
+  owner: string;
+  threadId: string;
+  by: string;
+  text: string;
+  at: number;
+  /** A note's file version, and the note it opens at (a reply's is the note it answers). */
+  file?: string;
+  note?: string;
+  /** Whom a note or reply is for: the file's owner, whom it names, the writer of the note it answers. A comment is for the thread's owner. */
+  to?: string[];
+}
+
 /** A note naming you on a teammate's shared thread: a row in Needs you. */
 export interface SharedFileNews {
   owner: string;
@@ -492,6 +508,7 @@ export interface TeamState {
   teamMates?: TeamMate[];
   /** Notes on teammates' threads that name you and wait on you. */
   sharedFileNews?: SharedFileNews[];
+  threadTalk?: ThreadTalk[];
   /** When each person last opened a conversation, by `${product}/${id}` then person. */
   seen?: Record<string, Record<string, number>>;
   lastSyncAt: number | null;
@@ -1763,8 +1780,8 @@ declare global {
       filesPlaceFolder?(p: FileFolderAct): Promise<{ ok: boolean; error?: string; folder?: string | null }>;
       filesPlaceNew?(p: { project: string; name: string; kind: 'document' | 'table'; folder: string | null }): Promise<{ ok: boolean; error?: string; key?: string }>;
       filesPlaceUpload?(p: { project: string; folder: string | null }): Promise<FilesUploaded>;
-      fileElsewhere?(p: { product: string; id: string; copies: { path: string; file: string }[] }): Promise<FileElsewhere[]>;
-      fileLine?(p: { product: string; id: string }): Promise<FileLine[]>;
+      fileElsewhere?(p: { product: string; id: string; room?: string; copies: { path: string; file: string }[] }): Promise<FileElsewhere[]>;
+      fileLine?(p: { product: string; id: string; room?: string }): Promise<FileLine[]>;
       teamComment(p: { personId: string; threadId: string; text: string }): Promise<TeamCallResult>;
       teamContinueBrief(p: { personId: string; threadId: string }): Promise<{ title: string; body: string; files: { name: string; srcPath: string }[]; from: { personId: string; threadId: string } }>;
       teamContinued(p: { personId: string; threadId: string }): Promise<TeamCallResult>;
@@ -1949,10 +1966,11 @@ declare global {
       searchAgentThreads?(p: { again?: boolean }): Promise<{ threads?: SessionThread[]; reached?: number }>;
       importThreads?(p: { product: string; threads: string[]; land?: 'sorted' | 'inbox' }): Promise<{ added?: number; already?: number; done?: number }>;
       firstRunExamples?(p: { product: string }): Promise<{ ids: string[] }>;
-      firstRunPractice?(): Promise<{ slug: string; examples: string[]; backdrop?: string[] }>;
+      firstRunPractice?(opts?: { bare?: boolean }): Promise<{ slug: string; examples: string[]; backdrop?: string[] }>;
       firstRunPracticeEnd?(): Promise<unknown>;
       onboardingArm?(): Promise<unknown>;
       notifyTest?(): Promise<unknown>;
+      notifySettings?(): Promise<unknown>;
       cloudSignIn?(p: { action: 'start' | 'code' | 'cancel' | 'remove'; engine: 'claude' | 'codex'; key?: string | null; code?: string }): Promise<{ ok: boolean; key?: string | null; error?: string }>;
       cloudSendFile?(p: { product: string; id: string; path?: string; choose?: boolean; hold?: boolean; also?: string }): Promise<{ ok: boolean; path?: string; canceled?: boolean; held?: boolean; words?: string; error?: string }>;
       cloudFileInfo?(p: { path: string }): Promise<{ ok: boolean; size?: number; error?: string }>;
