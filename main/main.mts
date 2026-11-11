@@ -522,6 +522,7 @@ async function createWindow() {
     onChange: () => { try { pushUpdate(); } catch { /* no window yet */ } },
     log: (line) => console.log(line),
     runningIds: () => supervisor.runsGoing().map((s) => s.itemId),
+    wontStart: () => supervisor.status(),
     ownMates: () => matesForTheTeam(store, config),
     sharing: () => alphaFeatures(config).multiplayer,
     // HER PHONE WITH THE MAC SHUT (main/phone-inbox.mts). What it left is done

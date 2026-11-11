@@ -31,7 +31,7 @@ import { shortTitle } from '../../shared/thread-title.mts';
 import { taskTitle } from '../../shared/team-tasks.mts';
 import { firstSentence } from '../../shared/thread-cards.mts';
 import { openTo, seenNow, sentWords, threadLink } from '../../shared/thread-link.mts';
-import { cardsFor } from '../../shared/thread-cards.mts';
+import { cardsFor, type WontStart } from '../../shared/thread-cards.mts';
 import fs from 'node:fs';
 import { saveAttachments, attachmentMarkdown } from '../save-attachments.mts';
 import { hasLapsed, statusEnds } from '../../shared/team-status.mts';
@@ -305,6 +305,8 @@ export interface TeamServiceOptions {
   carrierOptions?: Record<string, unknown> | null;
   /** The threads an agent is on right now, by id, so a card says so. */
   runningIds?: () => string[];
+  /** What the supervisor says it will not start, so no card says those are running. */
+  wontStart?: () => WontStart;
   /** This person's AI teammates, which the team sees on its board. */
   ownMates?: () => { id: string; name?: string; job?: string | null; openToTeam?: boolean; now?: string | null; running?: boolean; updatedAt?: number; createdAt?: number }[];
   phone?: TeamPhone | null;
@@ -360,6 +362,7 @@ export function createTeamService({
   rooms: roomsSetup = null,
   // The threads an agent is on right now, by id, so a card says so.
   runningIds = () => [],
+  wontStart = () => ({}),
   // This person's AI teammates, which the team sees on its board.
   ownMates = () => [],
   sharing = () => true,
@@ -754,7 +757,7 @@ export function createTeamService({
     // Off, the window shows no team and no Team / Private choice, so nothing
     // goes up, and what was up comes down as a private thread's card does.
     const listCards = (): SyncCard[] => (!sharing() ? [] : [
-      ...cardsFor({ products: products(), readItems: (p) => disk.readWorkItems(p.dir), since: state.me ? kept().getSince(state.me.id) : null, me: state.me?.id ?? null, running: runningIds() }),
+      ...cardsFor({ products: products(), readItems: (p) => disk.readWorkItems(p.dir), since: state.me ? kept().getSince(state.me.id) : null, me: state.me?.id ?? null, running: runningIds(), wontStart: wontStart() }),
       ...(ownMates() ?? []).map((t) => mateCard(t, { now: t.now ?? null, running: !!t.running, at: t.updatedAt ?? t.createdAt ?? 0 })),
     ]);
     threadShare = createThreadShare({

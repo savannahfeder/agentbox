@@ -429,6 +429,8 @@ export function stoppable(
   i: InboxItem,
   { deferredUntil = 0, now = Date.now(), live = false, stopped = false } = {},
 ): boolean {
+  // The header says Done for a done row, so a session still closing on it is not offered as a run to stop.
+  if (i.status === 'done') return false;
   return belongsInProgress(i, { deferredUntil, now, live, stopped });
 }
 

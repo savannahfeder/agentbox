@@ -60,6 +60,8 @@ export interface TodayPerson {
   finished: TodayLine[]; shipped: TodayLine[]; decided: TodayLine[]; blocked: TodayLine[]; waitingOnYou: TodayLine[];
   /** Open threads that moved in the range. */
   working: TodayLine[];
+  /** A teammate's open threads that moved in the range and wait on them, not on an agent. */
+  waiting?: TodayLine[];
   /** Every open task they hold, whatever the range. */
   tasks: TodayLine[];
   /** Private threads they finished: counted, never named. */
@@ -120,7 +122,7 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
   const byKey = new Map<string, TodayPerson>();
   const order: string[] = [];
   const add = (key: string, name: string, kind: TodayPerson['kind']) => {
-    byKey.set(key, { key, name, kind, finished: [], shipped: [], decided: [], blocked: [], waitingOnYou: [], working: [], tasks: [], privateDone: 0 });
+    byKey.set(key, { key, name, kind, finished: [], shipped: [], decided: [], blocked: [], waitingOnYou: [], working: [], waiting: [], tasks: [], privateDone: 0 });
     order.push(key);
   };
   add('me', 'You', 'me');
@@ -137,6 +139,13 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
   const waitsOnKey = (id: string) => {
     const w = waitParts(id);
     return w.kind === 'thread' ? owner.get(w.thread) : w.kind === 'name' ? null : keyOfPerson(w.person);
+  };
+  // Whom or what a thread of `self`'s waits on: someone else, else a block in words.
+  const blockOn = (ids: readonly string[], self: string): string | null => {
+    const other = ids.map(waitsOnKey).find((o) => o && o !== self);
+    if (other) return nameOf(other);
+    const words = ids.map(waitParts).find((w) => w.kind === 'name');
+    return words?.kind === 'name' ? words.name : null;
   };
 
   const ownKey = (i: WorkItem) => {
@@ -195,8 +204,8 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
       if (holder) holder.tasks.push(taskLine(i, line(taskNewsAt(i, null))));
       continue;
     }
-    const on = (i.blockedBy ?? []).map(waitsOnKey).find((o) => o && o !== k);
-    if (on) who.blocked.push(line(i.updatedAt, nameOf(on)));
+    const on = blockOn(i.blockedBy ?? [], k);
+    if (on) who.blocked.push(line(i.updatedAt, on));
     else if (i.status === 'blocked') who.blocked.push(line(i.updatedAt, null));
     // A thread put off till later is not being worked on.
     else if (inRange(i.updatedAt) && !task && threadState(i, now) !== 'scheduled' && !later(i)) {
@@ -226,11 +235,11 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
       continue;
     }
     if (!named) continue;
-    const on = c.blockedBy.map((b) => waitsOnKey(b.id)).find((o) => o && o !== who.key);
-    if (on) who.blocked.push({ ...line, on: nameOf(on) });
-    else if (inRange(c.updatedAt)) {
+    const on = blockOn(c.blockedBy.map((b) => b.id), who.key);
+    if (on) who.blocked.push({ ...line, on });
+    else if (inRange(c.updatedAt) && c.state !== 'scheduled') {
       const says = howFar(c.progress);
-      who.working.push({ ...line, ...(says ? { says } : {}) });
+      (c.state === 'running' ? who.working : who.waiting!).push({ ...line, ...(says ? { says } : {}) });
     }
   }
 
@@ -269,12 +278,12 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
   // Titles only for the lines a section draws: a week on a big store finishes thousands.
   for (const p of all) {
     p.tasks.sort(byDue);
-    for (const list of [p.finished, p.shipped, p.decided, p.blocked, p.waitingOnYou, p.working, p.tasks]) {
+    for (const list of [p.finished, p.shipped, p.decided, p.blocked, p.waitingOnYou, p.working, p.waiting!, p.tasks]) {
       if (list !== p.tasks) list.sort(newest);
       for (const l of list.slice(0, SHOWN)) if (!l.title && l.item) l.title = shownTitle(l.item);
     }
   }
-  const says = (p: TodayPerson) => p.finished.length + p.shipped.length + p.decided.length + p.blocked.length + p.waitingOnYou.length + p.working.length + p.tasks.length + p.privateDone > 0;
+  const says = (p: TodayPerson) => p.finished.length + p.shipped.length + p.decided.length + p.blocked.length + p.waitingOnYou.length + p.working.length + p.waiting!.length + p.tasks.length + p.privateDone > 0;
   return {
     people: all.filter(says),
     quiet: all.filter((p) => p.kind !== 'me' && !says(p)).map(quietName),
@@ -304,7 +313,7 @@ export function groupsOf(p: TodayPerson): Record<TodayGroup, GroupLine[]> {
   const tasks = (p.tasks ?? []).map((l): GroupLine => ({ ...l, task: true }));
   return {
     working: p.working,
-    todo: tasks.filter((l) => !l.blocked),
+    todo: [...tasks.filter((l) => !l.blocked), ...(p.waiting ?? [])],
     done: [
       ...p.shipped.map((l) => ({ ...l, tag: 'Shipped' })),
       ...p.finished,

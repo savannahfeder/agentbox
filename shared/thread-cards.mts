@@ -21,6 +21,8 @@ import { isShared, isTaskRow, runnerOf, taskGiver } from './team-rules.mts';
 import { deadlineOf, type TaskRow } from './team-tasks.mts';
 import { isShippedNote } from './shipped-note.mts';
 import { shownTitle, withoutFiles } from './thread-title.mts';
+import { nameWait } from './thread-waits.mts';
+import { saysARunGotNowhere } from './spawn-trouble.mts';
 
 export const THREAD_STATES = ['waiting', 'running', 'scheduled', 'done'] as const;
 export type ThreadState = typeof THREAD_STATES[number];
@@ -305,14 +307,37 @@ export interface CardProduct {
   team?: { direct?: unknown; projectId?: string; sharedBy?: string | null } | null;
 }
 
-export function cardsFor<P extends CardProduct>({ products, readItems, now = Date.now(), since = null, me = null, running = [] }: {
+/** What this computer's supervisor says it will not start, from its `status()`. */
+export interface WontStart {
+  stalled?: readonly string[];
+  atLimit?: Readonly<Record<string, { tool: string }>>;
+  signInNeeded?: Readonly<Record<string, string>>;
+  cannotStart?: Readonly<Record<string, { why: string; tool: string }>>;
+}
+
+// What the thread waits on, in words that follow "Waits on". Only the reasons
+// that hold until a person acts; a full fleet or short memory clears by itself.
+function heldBy(id: string, facts: WontStart): string | null {
+  const limit = facts.atLimit?.[id];
+  if (limit) return `${limit.tool} usage`;
+  const signIn = facts.signInNeeded?.[id];
+  if (signIn) return `a ${signIn} sign-in`;
+  const cannot = facts.cannotStart?.[id];
+  if (cannot?.why === 'engine') return `${cannot.tool} being installed`;
+  if (cannot?.why === 'login') return `a ${cannot.tool} sign-in`;
+  return null;
+}
+
+export function cardsFor<P extends CardProduct>({ products, readItems, now = Date.now(), since = null, me = null, running = [], wontStart = {} }: {
   products: readonly P[];
   readItems: (product: P) => readonly (CardItem & { id: string })[];
   now?: number;
   since?: number | null;
   me?: string | null;
   running?: Iterable<string>;
+  wontStart?: WontStart;
 }): OwnCard[] {
+  const stalled = new Set(wontStart.stalled ?? []);
   const live = new Set(running);
   const cards: OwnCard[] = [];
   const titleOf = new Map<string, string | null>();
@@ -353,9 +378,17 @@ export function cardsFor<P extends CardProduct>({ products, readItems, now = Dat
     if (isShared(product) && runnerOf(item, product) !== me) continue;
     // A session the folded row cannot show: a personal worker holds no claim,
     // and its second turn has a result on the row, which reads as waiting.
-    const state = live.has(item.id) ? 'running' : threadState(item, now);
-    if (state === 'done' && !(item.updatedAt! >= kept)) continue;
+    const said = live.has(item.id) ? 'running' : threadState(item, now);
+    if (said === 'done' && !(item.updatedAt! >= kept)) continue;
+    // An ordinary answer waits on its owner and says nothing more; only the
+    // app's own word that a run got nowhere is about the tool.
+    const gotNowhere = item.wrote?.result?.source === 'agent' && saysARunGotNowhere(item.result);
+    const onIt = live.has(item.id) || (item.status === 'claimed' && !!item.claim && !item.claimExpired);
+    const waitsOn = said === 'done' || onIt || (said !== 'running' && !gotNowhere) ? null : nameWait(heldBy(item.id, wontStart));
+    const state = waitsOn || (said === 'running' && !onIt && stalled.has(item.id)) ? 'waiting' : said;
     const s = summaryOf(item);
+    // The run that got nowhere is said by the wait; as a solution it read as finished.
+    const solution = waitsOn && gotNowhere ? '' : s.solution;
     const shippedAt = shippedAtOf(item);
     cards.push({
       threadId: item.id, visible: true, title: shownTitle(item), project: product.name,
@@ -365,8 +398,9 @@ export function cardsFor<P extends CardProduct>({ products, readItems, now = Dat
       people: shownToPeople(item, product).length ? shownToPeople(item, product) : null,
       // The level it runs at, so a teammate reads what the owner reads.
       state, priority: shownPriority(item),
-      problem: s.problem || null, progress: s.progress || null, solution: s.solution || null,
-      blockedBy: linked(item.blockedBy), blocks: linked(item.blocks), updatedAt: item.updatedAt ?? now,
+      problem: s.problem || null, progress: s.progress || null, solution: solution || null,
+      blockedBy: [...(waitsOn ? [{ id: waitsOn, title: waitsOn.slice('name:'.length) }] : []), ...linked(item.blockedBy)],
+      blocks: linked(item.blocks), updatedAt: item.updatedAt ?? now,
       ...(shippedAt ? { shippedAt } : {}),
     });
   }
