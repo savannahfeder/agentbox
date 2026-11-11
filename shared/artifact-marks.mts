@@ -403,7 +403,7 @@ function baseStem(name: string): string {
 const stemOf = (name: string): string => baseStem(name).toLowerCase();
 
 /** 3 for `rows-v3.csv`, 1 for a name with no tail, null for any other tail (final, (2)). */
-function numberInName(name: string): number | null {
+export function numberInName(name: string): number | null {
   const dot = name.lastIndexOf('.');
   const stem = dot > 0 ? name.slice(0, dot) : name;
   const v = stem.match(/[-_ ]v(\d+)$/i);

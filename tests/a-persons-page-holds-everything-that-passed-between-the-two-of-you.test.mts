@@ -131,11 +131,56 @@ describe('the stream between two people', () => {
   });
 });
 
+// ROUND FOUR (2026-11-11), Theo and Lena: a note on your own file sent to the
+// other ("Send to Lena", then "Sent to Lena") and a reply under a note were on
+// neither page, because only notes on the OTHER person's thread were kept.
+// `to` is whom a note or reply is for: the addressee, or the writer of the note answered.
+describe('a note on your own file and a reply under a note are between the two of you', () => {
+  const own: ThreadTalk[] = [
+    { id: 'n3', kind: 'note', owner: THEO, threadId: 'th-audit', by: THEO, text: 'Is the total right?', at: at(10, 10), file: 'missing-payments-finding.md', note: 'n3', to: [LENA] },
+    { id: 'r1', kind: 'note', owner: LENA, threadId: 'th-pricing', by: LENA, text: 'Fixed the overlap', at: at(10, 47), file: 'booking-conflict-web-followup.md', note: 'n9', to: [THEO] },
+    { id: 'r2', kind: 'note', owner: THEO, threadId: 'th-runbook', by: THEO, text: 'Done in v2', at: at(10, 49), file: 'stripe-runbook-v2.md', note: 'n8', to: [LENA] },
+  ];
+  const not: ThreadTalk[] = [
+    // A draft for Theo's own agent, naming nobody.
+    { id: 'n4', kind: 'note', owner: THEO, threadId: 'th-audit', by: THEO, text: 'Agent: redo the chart', at: at(10, 12), file: 'missing-payments-finding.md', note: 'n4', to: [] },
+    { id: 'n5', kind: 'note', owner: THEO, threadId: 'th-audit', by: THEO, text: 'Jun, check this', at: at(10, 13), file: 'missing-payments-finding.md', note: 'n5', to: [JUN] },
+    { id: 'n6', kind: 'note', owner: THEO, threadId: 'th-audit', by: JUN, text: 'Jun to Lena', at: at(10, 14), file: 'missing-payments-finding.md', note: 'n6', to: [THEO, LENA] },
+  ];
+  const lena = pairTimeline({ ...lenaSees, talk: [...own, ...not] });
+  const notes = lena.filter((e) => e.kind === 'note' && e.at >= at(10, 10));
+
+  it('keeps each, with the file and version it is on', () => {
+    expect(notes.map((e) => [e.by, e.text, e.where?.label])).toEqual([
+      [THEO, 'Is the total right?', 'missing-payments-finding.md v1'],
+      [LENA, 'Fixed the overlap', 'booking-conflict-web-followup.md v1'],
+      [THEO, 'Done in v2', 'stripe-runbook.md v2'],
+    ]);
+    expect(notes[1].where?.open).toEqual({ to: 'file', owner: LENA, threadId: 'th-pricing', file: 'booking-conflict-web-followup.md', note: 'n9' });
+  });
+
+  it('is the same on both screens', () => {
+    expect(pairTimeline({ ...theoSees, talk: [...not, ...own] })).toEqual(lena);
+  });
+
+  it('leaves out a draft for your own agent, a note to someone else, and a third person\'s note', () => {
+    for (const w of ['Agent: redo the chart', 'Jun, check this', 'Jun to Lena']) expect(lena.map((e) => e.text)).not.toContain(w);
+  });
+});
+
 describe('a file note names the file and its version', () => {
   it('reads the version from the note\'s file', () => {
     expect(fileLabel('report.md')).toBe('report.md v1');
     expect(fileLabel('report.md#3')).toBe('report.md v3');
     expect(fileLabel('report.md@4')).toBe('report.md v4');
+  });
+
+  it('names a version saved under a new name as the review does: the family and the number its name carries', () => {
+    expect(fileLabel('review-last-three-v2.md')).toBe('review-last-three.md v2');
+    expect(fileLabel('overlap-validation-fix_v3.md')).toBe('overlap-validation-fix.md v3');
+    expect(fileLabel('review-last-three.md')).toBe('review-last-three.md v1');
+    // A bare number is another file, not another version: shot-3.png is not v3.
+    expect(fileLabel('shot-3.png')).toBe('shot-3.png v1');
   });
 });
 

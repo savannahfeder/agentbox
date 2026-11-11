@@ -385,6 +385,8 @@ export interface ThreadTalk {
   /** A note's file version, and the note it opens at (a reply's is the note it answers). */
   file?: string;
   note?: string;
+  /** Whom a note or reply is for: the file's owner, whom it names, the writer of the note it answers. A comment is for the thread's owner. */
+  to?: string[];
 }
 
 /** A note naming you on a teammate's shared thread: a row in Needs you. */

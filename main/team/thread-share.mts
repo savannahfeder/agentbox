@@ -89,7 +89,7 @@ export interface ThreadFileMark { id: string; owner: string; threadId: string; b
 export interface ThreadFileNews { owner: string; threadId: string; id: string; file: string; text: string | undefined; by: string | null; ts: number }
 
 /** Words left on a thread or on one of its files, for the person's page in the window. */
-export interface ThreadTalk { id: string; kind: 'comment' | 'note'; owner: string; threadId: string; by: string; text: string; at: number; file?: string; note?: string }
+export interface ThreadTalk { id: string; kind: 'comment' | 'note'; owner: string; threadId: string; by: string; text: string; at: number; file?: string; note?: string; to?: string[] }
 
 export interface SharedThreadView { shared: boolean; lines: SharedLine[]; earlier: number; product: string | null; dir: string | null }
 
@@ -271,6 +271,8 @@ export function createThreadShare({
   onChange = () => {}, log = () => {}, now = Date.now, home = os.homedir(), myName = () => null, nameOf = () => null,
 }: ThreadShareOptions): ThreadShare {
   const built = new Map<string, Built>();
+  // Your threads with a card, and who may read each: null is the whole team.
+  let readers = new Map<string, readonly string[] | null>();
   const named = new Map<string, { mtimeMs: number; size: number; name: string }>();
   const delivered = new Set<string>();
   let comments: ThreadComment[] = [];
@@ -387,6 +389,7 @@ export function createThreadShare({
   async function publish(teamId: string, heads: ThreadHead[]) {
     const mine = new Map(heads.filter((h) => h.personId === me).map((h) => [h.threadId, h.hash]));
     const cards = listCards() ?? [];
+    readers = new Map(cards.map((c) => [c.threadId, Array.isArray(c.people) ? c.people.filter((p): p is string => typeof p === 'string') : null]));
     if (!cards.length) { built.clear(); return; }
     const threads = listThreads();
     let done = 0;
@@ -752,17 +755,49 @@ export function createThreadShare({
       return out;
     },
 
-    /** Every comment and file note this person may read, theirs included. */
+    /**
+     * Every comment, and every note or note reply that is for someone, this person
+     * may read, theirs included. A note on your own file lives only on your own
+     * thread, so published threads are read as well as marks on copies; a mark on
+     * a copy is on the owner's thread too once delivered, so each is kept once.
+     */
     talk() {
       const out: ThreadTalk[] = comments.map((c) => ({ id: c.id, kind: 'comment' as const, owner: c.owner, threadId: c.threadId, by: c.by, text: c.text, at: c.at }));
-      const seen = new Set<string>();
+      type Said = { id: string; owner: string; threadId: string; by: string; at: number; mark: Mark; theirs?: true };
+      const all: Said[] = [];
       for (const m of [...fileMarks, ...(waiting ?? waitingMarks())]) {
         const mark = cleanMark(m.mark);
-        if (!mark || (mark.do !== 'note' && mark.do !== 'reply') || seen.has(`${m.owner}:${m.threadId}:${m.id}`)) continue;
-        // `wait` holds a note for the owner's agent, not for the people: only your own note on your own file, naming nobody, is still a draft.
-        if (mark.do === 'note' && mark.wait && m.by === me && m.owner === me && !(mark.mentions?.length)) continue;
-        seen.add(`${m.owner}:${m.threadId}:${m.id}`);
-        out.push({ id: m.id, kind: 'note', owner: m.owner, threadId: m.threadId, by: m.by, text: mark.text, at: m.at, file: mark.file, note: mark.do === 'note' ? mark.id : mark.on });
+        if (mark) all.push({ id: m.id, owner: m.owner, threadId: m.threadId, by: m.by, at: m.at, mark });
+      }
+      const fromLines = (owner: string, threadId: string, lines: readonly { ts: number; by?: string; uid?: string; patch: { artifact?: unknown } }[], theirs: boolean) => {
+        for (const l of lines) {
+          const mark = cleanMark(l.patch.artifact);
+          if (!mark || !l.by || (mark.do !== 'note' && mark.do !== 'reply')) continue;
+          const id = l.uid?.startsWith('mark-') ? l.uid.slice('mark-'.length) : mark.id;
+          all.push({ id, owner, threadId, by: l.by, at: l.ts, mark, ...(theirs ? { theirs: true as const } : {}) });
+        }
+      };
+      for (const [threadId, b] of built) if (readers.has(threadId)) fromLines(me, threadId, b.work.marks ?? [], false);
+      for (const [owner, threadId] of localThreads()) fromLines(owner, threadId, readLocal(owner, threadId)?.marks ?? [], true);
+
+      const notes = new Map<string, { by: string; file: string }>();
+      for (const s of all) if (s.mark.do === 'note') notes.set(`${s.owner}:${s.threadId}:${s.mark.id}`, { by: s.by, file: s.mark.file });
+      const seen = new Set<string>();
+      for (const s of all) {
+        const { mark } = s;
+        if (mark.do !== 'note' && mark.do !== 'reply') continue;
+        const key = `${s.owner}:${s.threadId}:${mark.do}:${mark.id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const answers = mark.do === 'reply' ? notes.get(`${s.owner}:${s.threadId}:${mark.on}`) : undefined;
+        // A note on your own file is for whom it names; `wait` only holds it for your agent as well.
+        let to = [...new Set([s.owner, ...(mark.do === 'note' ? mark.mentions ?? [] : [answers?.by])])].filter((p): p is string => !!p && p !== s.by);
+        if (s.owner === me) {
+          const may = readers.get(s.threadId);
+          to = to.filter((p) => p === me || may === null || may?.includes(p));
+        }
+        if (!to.length || (s.theirs && s.by !== me && !to.includes(me))) continue;
+        out.push({ id: s.id, kind: 'note', owner: s.owner, threadId: s.threadId, by: s.by, text: mark.text, at: s.at, file: answers?.file ?? mark.file, note: mark.do === 'note' ? mark.id : mark.on, to });
       }
       return out.sort((a, b) => a.at - b.at);
     },
