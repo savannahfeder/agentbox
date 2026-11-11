@@ -914,6 +914,7 @@ body {
 .back-forward button:not(:disabled):hover { background: var(--film-strong); }
 .back-forward button:disabled { color: var(--text-faint); opacity: .45; cursor: default; }
 .back-forward svg { width: 15px; height: 15px; }
+.back-forward .back-forward-inbox { margin-right: 10px; }
 /* Home hides its header bar but keeps the arrows. */
 .app.home-shown > .topbar .back-forward { visibility: visible; }
 /* The arrows replace the one back arrow a thread and Settings already had. */
@@ -1381,7 +1382,11 @@ body {
   --wash: 255 255 255;
   background: linear-gradient(90deg, rgb(var(--wash) / 0.055), rgb(var(--wash) / 0.012) 70%, transparent);
 }
-[data-theme="light"] .row.recent { --wash: 0 0 0; }
+/* On white any grey read as dirt, so light mode takes the accent instead,
+   over enough stops that the fade shows no steps. */
+[data-theme="light"] .row.recent {
+  background: linear-gradient(90deg, rgb(238 96 24 / 0.07), rgb(238 96 24 / 0.045) 25%, rgb(238 96 24 / 0.015) 55%, transparent 85%);
+}
 .row.recent::after,
 .row.recent + .row::after { left: 0; }
 
@@ -2658,7 +2663,7 @@ body {
 /* Approval cards: a worker is frozen mid-action until the user answers,
    so these sit above everything, bottom-right, and say exactly what runs. */
 .approvals {
-  position: fixed; right: 22px; bottom: var(--approval-lift, 22px); z-index: 90; width: 440px;
+  position: fixed; right: 22px; bottom: var(--approval-lift, 22px); z-index: 90; width: var(--approval-width, 440px);
 }
 /* One card in front, the queue as stacked edges peeking above it. The ghosts
    are pure chrome: depth without height, so ten pending asks occupy the same

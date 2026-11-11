@@ -427,10 +427,10 @@ const endsWithPath = (whole: string, part: string): boolean => whole === part ||
  * `numbers` maps a path to its number on the file's version line
  * (shared/version-line.mts). A family the line knows is numbered by it, in its
  * order, and a path the line does not know is no version of that family,
- * except `keep`: the path a person pressed, which Files may not have numbered yet.
+ * except `keep`: the paths a person pressed or saw drawn, which Files may not have numbered yet.
  */
-export function threadFiles(files: readonly ThreadFile[] | null | undefined, numbers: Readonly<Record<string, number>> | null = null, { keep = null }: { keep?: string | null } = {}): FileFamily[] {
-  const kept = keep ? cleanAsked(keep) : null;
+export function threadFiles(files: readonly ThreadFile[] | null | undefined, numbers: Readonly<Record<string, number>> | null = null, { keep = null }: { keep?: string | readonly string[] | null } = {}): FileFamily[] {
+  const kept = (typeof keep === 'string' ? [keep] : keep ?? []).map(cleanAsked).filter(Boolean);
   const families = new Map<string, { key: string; versions: Array<FileVersion & { line?: number }> }>();
   const seenPaths = new Set<string>();
   for (const f of files ?? []) {
@@ -468,7 +468,7 @@ export function threadFiles(files: readonly ThreadFile[] | null | undefined, num
     const unknown: Array<FileVersion & { line?: number }> = [];
     for (const v of family.versions) {
       if (v.line === undefined) {
-        if (kept && [v.path, ...(v.also ?? [])].some((p) => endsWithPath(p, kept) || endsWithPath(kept, p))) unknown.push(v);
+        if ([v.path, ...(v.also ?? [])].some((p) => kept.some((k) => endsWithPath(p, k) || endsWithPath(k, p)))) unknown.push(v);
         continue;
       }
       const was = byLine.get(v.line);
@@ -715,6 +715,16 @@ function* pathsSaidOn(l: ThreadLine | null | undefined): Generator<{ path: strin
       if (!shorthand(path)) yield { path, edited };
     }
   }
+}
+
+/** `said` with each path a person pressed or saw drawn that it does not hold yet, when the big view can show it. */
+export function withFilesAsked(said: readonly NamedFile[], asked: readonly (string | null | undefined)[]): NamedFile[] {
+  const out = [...said];
+  for (const raw of asked) {
+    const path = raw?.replace(/^\.\//, '');
+    if (path && viewKind(path) && !versionForPath(threadFiles(out), path)) out.push({ path, by: null, at: 0 });
+  }
+  return out;
 }
 
 /** Every reviewable file a thread's lines name, in the order they name them. */
