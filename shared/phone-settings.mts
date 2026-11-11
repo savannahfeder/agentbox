@@ -198,7 +198,7 @@ const THREAD: Record<string, Rule> = {
   priority: (v: unknown) => v === null || (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 9),
   shippedAt: (v: unknown) => v === null || (Number.isInteger(v) && (v as number) >= 0),
   visibility: oneOf(['team', 'private']),
-  onMac: (v: unknown) => v === true || v === null,
+  onMac: (v: unknown) => typeof v === 'boolean' || v === null,
   resume: yes,
   redeliver: yes,
   moveTo: (v: unknown) => typeof v === 'string' && SLUG.test(v),
@@ -209,7 +209,8 @@ function threadRoute(p: SettingChange): SettingRoute {
   const at = { product: p.product, id: p.item };
   switch (p.key) {
     case 'pinned': return ['zero:set-thread-pins', { pins: { [p.item!]: p.value === true ? true : null } }];
-    case 'onMac': return ['zero:set-thread-on-mac', { onMac: { [p.item!]: p.value === true ? true : null } }];
+    // False sends the thread to the cloud (Supervisor#setThreadOnMac).
+    case 'onMac': return ['zero:set-thread-on-mac', { onMac: { [p.item!]: typeof p.value === 'boolean' ? p.value : null } }];
     case 'resume': return ['zero:resume-items', { ids: [p.item] }];
     case 'redeliver': return ['zero:redeliver', at];
     case 'moveTo': return ['zero:move-item', { ...at, to: p.value }];
