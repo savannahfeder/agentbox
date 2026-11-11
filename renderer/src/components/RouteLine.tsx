@@ -30,23 +30,25 @@ const aRole = (role: string) => `${/^[aeiou]/i.test(role) ? 'an' : 'a'} ${role}`
 
 /** The teammate Auto offered for this kind of work, answered with one press. */
 function Offer({ item }: { item: WorkItem }) {
-  const [busy, setBusy] = useState(false);
+  const [pressed, setPressed] = useState<'made' | 'no' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const offer = item.routed?.offer;
-  if (!offer || offer.answered === 'no') return null;
-  if (offer.answered === 'made') {
-    return <div className="rt-line rt-offer"><AutoFace /><span>{capital(aRole(offer.role))} is setting itself up in Chats.</span></div>;
+  const answered = pressed ?? offer?.answered;
+  if (!offer) return null;
+  if (answered === 'made') {
+    return <div className="rt-line rt-offer"><AutoFace /><span>You made {aRole(offer.role)} for work like this.</span></div>;
   }
+  if (answered === 'no' && !error) return null;
   const answer = (make: boolean) => {
-    setBusy(true);
     setError(null);
-    api.answerRouteOffer({ product: item.product, id: item.id, make }).catch((e) => { setBusy(false); setError(String(e?.message ?? e)); });
+    setPressed(make ? 'made' : 'no');
+    api.answerRouteOffer({ product: item.product, id: item.id, make }).catch((e) => { setPressed(null); setError(String(e?.message ?? e)); });
   };
   return <div className="rt-line rt-offer">
     <AutoFace />
     <span>{offer.why || `${capital(aRole(offer.role))} would learn this kind of work.`}</span>
-    <button type="button" disabled={busy} onClick={() => answer(true)}>Make {aRole(offer.role)}</button>
-    <button type="button" disabled={busy} onClick={() => answer(false)}>Not now</button>
+    <button type="button" onClick={() => answer(true)}>Make {aRole(offer.role)}</button>
+    <button type="button" onClick={() => answer(false)}>Not now</button>
     {error && <span className="rt-error">{error}</span>}
   </div>;
 }

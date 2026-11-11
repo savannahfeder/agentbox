@@ -9,7 +9,7 @@
 // the thread shows the offer there and then. The thread is never held for it:
 // with no teammates, it goes to an agent at once and the offer comes after.
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import fs, { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -184,5 +184,27 @@ describe('a thread sent to Auto', () => {
     await sup.routeTheThreads([thread()]);
     expect(routed).toHaveLength(1);
     expect(routed[0].patch.routed).toMatchObject({ to: 'agent' });
+  });
+});
+
+// Found by the power test of 2026-11-11 (founder and ops testers, real plans):
+// Not now gave no sign it was pressed until the next refresh, the thread said a
+// made teammate was "setting itself up" long after it had, and a two-week
+// launch got no offer.
+describe('what the power test found', () => {
+  const line = () => fs.readFileSync(new URL('../renderer/src/components/RouteLine.tsx', import.meta.url), 'utf8');
+
+  it('answers a press at once, before the app has written it', () => {
+    expect(line()).toMatch(/setPressed\(make \? 'made' : 'no'\);\s*\n\s*api\.answerRouteOffer/);
+    expect(line()).toMatch(/const answered = pressed \?\? offer\?\.answered/);
+  });
+
+  it('says a made teammate was made, not that it is still setting up', () => {
+    expect(line()).not.toMatch(/setting itself up/);
+    expect(line()).toMatch(/You made \{aRole\(offer\.role\)\} for work like this\./);
+  });
+
+  it('counts a project that runs for weeks as a long project', () => {
+    expect(routePrompt(thread(), [video], [])).toMatch(/runs for weeks/);
   });
 });
