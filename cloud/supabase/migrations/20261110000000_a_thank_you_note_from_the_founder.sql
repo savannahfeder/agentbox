@@ -10,6 +10,8 @@ create table if not exists public.founder_notes (
   person_id uuid primary key references public.people(id) on delete cascade,
   sent_at timestamptz not null default now()
 );
+-- Which of the two versions in functions/_shared/founder-note.mjs it was.
+alter table public.founder_notes add column if not exists version text check (version in ('name', 'lowercase'));
 alter table public.founder_notes enable row level security;
 -- No policy: only the function, as service_role, reads or writes it.
 revoke all on public.founder_notes from anon, authenticated;

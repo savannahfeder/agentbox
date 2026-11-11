@@ -17,8 +17,9 @@
 //
 // Until all five are set it refuses with "not configured", which is the off
 // switch. POST {"dryRun": true} says who is due and sends nothing;
-// {"previewTo": an owner's account id} sends that account the note.
-import { keysMatch, previewFor, readNoteConfig, sendFounderNotes } from '../_shared/founder-note.mjs';
+// {"previewTo": an owner's account id, "version": "name" or "lowercase"}
+// sends that account the note in that version.
+import { VERSIONS, keysMatch, previewFor, readNoteConfig, sendFounderNotes } from '../_shared/founder-note.mjs';
 
 const CALL_MS = 20_000;
 
@@ -34,7 +35,7 @@ Deno.serve(async (req) => {
   const config = readNoteConfig((name: string) => Deno.env.get(name));
   if (!config) return json({ ok: false, error: 'not configured' }, 503);
   if (!keysMatch(req.headers.get('x-founder-note-key'), config.key)) return json({ ok: false, error: 'wrong key' }, 401);
-  const body = await req.json().catch(() => ({})) as { dryRun?: unknown; previewTo?: unknown };
+  const body = await req.json().catch(() => ({})) as { dryRun?: unknown; previewTo?: unknown; version?: unknown };
 
   const base = `${Deno.env.get('SUPABASE_URL')}/rest/v1`;
   const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -56,11 +57,11 @@ Deno.serve(async (req) => {
       }), 'reading who is due');
       return await res.json();
     },
-    async claim(id: string) {
+    async claim(id: string, version: string) {
       const res = await must(await rest('/founder_notes', {
         method: 'POST',
         headers: { prefer: 'resolution=ignore-duplicates,return=representation' },
-        body: JSON.stringify({ person_id: id }),
+        body: JSON.stringify({ person_id: id, version }),
       }), 'marking a note');
       return (await res.json()).length === 1;
     },
@@ -90,7 +91,8 @@ Deno.serve(async (req) => {
     const found = config.owners.includes(id)
       ? await (await rest(`/people?select=id,email&id=eq.${encodeURIComponent(id)}`)).json().catch(() => [])
       : [];
-    const note = previewFor(found[0], config);
+    if (!VERSIONS.includes(String(body.version))) return json({ ok: false, error: `version is one of ${VERSIONS.join(', ')}` }, 400);
+    const note = previewFor(found[0], config, String(body.version));
     if (!note) return json({ ok: false, error: 'a preview only goes to an owner' }, 400);
     const res = await send(note, `preview-${Date.now()}`);
     return json(res.ok ? { ok: true, preview: true } : { ok: false, error: res.error }, res.ok ? 200 : 502);

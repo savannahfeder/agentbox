@@ -9,8 +9,13 @@
 // What this pins, since none of it can be watched before it is live:
 //   - who gets it: confirmed addresses inside the window, never twice, never
 //     the sender or anyone on a team with the sender, at most 50 a day;
-//   - what it is: plain text in the approved words, from and reply-to the
-//     sender's own address, with "Hey there" when there is no real name;
+//   - what it is: plain text in one of two approved versions, from and
+//     reply-to the sender's own address, with "Hey," when there is no real
+//     name;
+//   - the A/B test asked for on 2026-11-11 ("a/b test option 1 (just my name)
+//     against this lowercase"): each account gets one version, chosen from its
+//     id so a retry gets the same one, about half each, and the version is
+//     recorded with the mark so replies can be counted against it;
 //   - that a failed send hands the person back for tomorrow, and a dry run
 //     sends nothing;
 //   - that no address or name is written into the repository: all of it is in
@@ -20,10 +25,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect, beforeAll } from 'vitest';
 import {
-  NOTE_WINDOW, NOTES_PER_RUN, firstNameFor, noteFor, keysMatch, readNoteConfig, sendFounderNotes, previewFor,
+  NOTE_WINDOW, NOTES_PER_RUN, VERSIONS, versionFor, firstNameFor, noteFor, keysMatch, readNoteConfig, sendFounderNotes, previewFor,
 } from '../cloud/supabase/functions/_shared/founder-note.mjs';
 import {
-  DEFAULT_ADDRESS, noteUrl, senderLine, newKey, ownersFrom, secretsFile, vaultSql, heldMigration,
+  DEFAULT_ADDRESS, noteUrl, senderLine, newKey, ownersFrom, secretsFile, vaultSql, heldMigration, resultsSql,
 } from '../scripts/lib/founder-note-setup.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -76,24 +81,59 @@ describe('the name it opens with', () => {
 });
 
 describe('the email itself', () => {
-  it('is the approved words, in plain text, from and reply-to the sender', () => {
-    const note = noteFor({ name: 'Ada Lovelace', email: 'ada@x.dev' }, config);
+  it('"name" is option 1 as approved, in plain text, from and reply-to the sender', () => {
+    const note = noteFor({ name: 'Ada Lovelace', email: 'ada@x.dev' }, config, 'name');
     expect(note).toEqual({
       from: config.from,
       to: ['ada@x.dev'],
       reply_to: 'hello@example.com',
       subject: 'Thanks for trying Agentbox',
-      text: "Hey Ada,\n\nJust a quick note to say thanks for trying Agentbox.\n\nHope it's been treating you well.\n\nCheers,\nSam\nFounder, Agentbox\n",
+      text: "Hey Ada,\n\nJust a quick note to say thanks for trying Agentbox.\n\nHope it's been treating you well.\n\nSam\n",
     });
     expect(note).not.toHaveProperty('html');
   });
 
-  it('opens with "Hey there" without a real name', () => {
-    expect(noteFor({ name: 'ada92', email: 'ada92@x.dev' }, config).text.startsWith('Hey there,\n')).toBe(true);
+  it('"lowercase" is the version as written on the thread, the name lowercased too', () => {
+    const note = noteFor({ name: 'Ada Lovelace', email: 'ada@x.dev' }, config, 'lowercase');
+    expect(note).toEqual({
+      from: config.from,
+      to: ['ada@x.dev'],
+      reply_to: 'hello@example.com',
+      subject: 'thanks for trying agentbox',
+      text: "hey ada,\n\njust a quick note to say thanks for trying agentbox. hope it's been treating you well!\n\nsam\n",
+    });
+  });
+
+  it('says just "Hey," or "hey," without a real name', () => {
+    expect(noteFor({ name: 'ada92', email: 'ada92@x.dev' }, config, 'name').text.startsWith('Hey,\n\nJust')).toBe(true);
+    expect(noteFor({ name: '', email: 'a@x.dev' }, config, 'lowercase').text.startsWith('hey,\n\njust')).toBe(true);
+  });
+
+  it('refuses a version it does not know', () => {
+    expect(() => noteFor({ name: 'Ada', email: 'a@x.dev' }, config, 'shouty')).toThrow();
   });
 
   it('takes a bare address as the sender too', () => {
-    expect(noteFor({ name: 'Ada', email: 'a@x.dev' }, { ...config, from: 'hello@example.com' }).reply_to).toBe('hello@example.com');
+    expect(noteFor({ name: 'Ada', email: 'a@x.dev' }, { ...config, from: 'hello@example.com' }, 'name').reply_to).toBe('hello@example.com');
+  });
+});
+
+describe('which version each person gets', () => {
+  const ids = Array.from({ length: 1000 }, (_, i) => `${String(i).padStart(8, '0')}-0000-4000-8000-${String(i * 7919).padStart(12, '0').slice(-12)}`);
+
+  it('is one of the two, and the same every time for the same account', () => {
+    expect(VERSIONS).toEqual(['name', 'lowercase']);
+    for (const id of ids.slice(0, 50)) {
+      expect(VERSIONS).toContain(versionFor(id));
+      expect(versionFor(id)).toBe(versionFor(id));
+      expect(versionFor(id.toUpperCase())).toBe(versionFor(id));
+    }
+  });
+
+  it('splits accounts about half and half', () => {
+    const lower = ids.filter((id) => versionFor(id) === 'lowercase').length;
+    expect(lower).toBeGreaterThan(450);
+    expect(lower).toBeLessThan(550);
   });
 });
 
@@ -125,18 +165,19 @@ describe('the settings it needs', () => {
 // A stand-in for the database and for Resend, holding what each was asked.
 function world({ due = [], claimed = [], refuse = [] } = {}) {
   const notes = new Set(claimed);
+  const versions = {};
   const sent = [];
   const asked = [];
   return {
-    notes, sent, asked,
+    notes, sent, asked, versions,
     db: {
       due: async (args) => { asked.push(args); return due.filter((p) => !notes.has(p.id)); },
-      claim: async (id) => { if (notes.has(id)) return false; notes.add(id); return true; },
+      claim: async (id, version) => { if (notes.has(id)) return false; notes.add(id); versions[id] = version; return true; },
       release: async (id) => { notes.delete(id); },
     },
     send: async (note, id) => {
       if (refuse.includes(id)) return { ok: false, error: 'mail refused' };
-      sent.push({ id, to: note.to[0] });
+      sent.push({ id, to: note.to[0], lowercase: note.subject === note.subject.toLowerCase() });
       return { ok: true };
     },
   };
@@ -156,8 +197,19 @@ describe('a day of notes', () => {
   it('sends each person due one note and marks it', async () => {
     const w = world({ due: [ada, bob] });
     expect(await sendFounderNotes({ ...w, config })).toEqual({ sent: 2, failed: 0, due: 2 });
-    expect(w.sent).toEqual([{ id: 'p1', to: 'ada@x.dev' }, { id: 'p2', to: 'bob@x.dev' }]);
+    expect(w.sent.map(({ id, to }) => ({ id, to }))).toEqual([{ id: 'p1', to: 'ada@x.dev' }, { id: 'p2', to: 'bob@x.dev' }]);
     expect([...w.notes]).toEqual(['p1', 'p2']);
+  });
+
+  it('sends each person their own version and records it with the mark', async () => {
+    const people = Array.from({ length: 40 }, (_, i) => ({ id: `0000000${i % 10}-0000-4000-8000-0000000000${String(i).padStart(2, '0')}`, email: `p${i}@x.dev`, name: 'Pat' }));
+    const w = world({ due: people });
+    await sendFounderNotes({ ...w, config });
+    for (const s of w.sent) {
+      expect(w.versions[s.id]).toBe(versionFor(s.id));
+      expect(s.lowercase).toBe(versionFor(s.id) === 'lowercase');
+    }
+    expect(new Set(Object.values(w.versions))).toEqual(new Set(VERSIONS));
   });
 
   it('never sends twice: a second run the same day finds nobody', async () => {
@@ -185,7 +237,9 @@ describe('a day of notes', () => {
 
   it('sends nothing and marks nothing on a dry run', async () => {
     const w = world({ due: [ada, bob] });
-    expect(await sendFounderNotes({ ...w, config, dryRun: true })).toEqual({ sent: 0, failed: 0, due: 2, dryRun: true, names: ['Ada', 'Bob'] });
+    const out = await sendFounderNotes({ ...w, config, dryRun: true });
+    expect(out).toMatchObject({ sent: 0, failed: 0, due: 2, dryRun: true, names: ['Ada', 'Bob'] });
+    expect(out.versions.name + out.versions.lowercase).toBe(2);
     expect(w.sent).toEqual([]);
     expect(w.notes.size).toBe(0);
   });
@@ -252,6 +306,30 @@ create publication supabase_realtime;
     expect((await db.query('select count(*)::int as n from public.founder_notes where person_id = $1', [id(3)])).rows[0].n).toBe(0);
   });
 
+  it('records which version each person got, and only one of the two', async () => {
+    await db.query(`insert into public.founder_notes (person_id, version) values ($1, 'lowercase')`, [id(4)]);
+    expect((await db.query('select version from public.founder_notes where person_id = $1', [id(4)])).rows).toEqual([{ version: 'lowercase' }]);
+    await expect(db.query(`insert into public.founder_notes (person_id, version) values ($1, 'shouty')`, [id(8)])).rejects.toThrow();
+    await db.query('delete from public.founder_notes where person_id = $1', [id(4)]);
+  });
+
+  it('counts who got each version and, of those who replied, which version they had', async () => {
+    await db.query(`insert into public.founder_notes (person_id, version) values ($1, 'name'), ($2, 'lowercase'), ($3, 'lowercase')`, [id(2), id(4), id(5)]);
+    const rows = async (replied) => (await db.query(resultsSql(replied))).rows;
+    expect(await rows([])).toEqual([
+      { version: 'lowercase', sent: 2, replied: 0 },
+      { version: 'name', sent: 1, replied: 0 },
+      { version: null, sent: 1, replied: 0 },
+    ]);
+    expect(await rows(['SIX@x.dev', 'seven@x.dev ', "o'brien@x.dev", 'not an address', "x'); drop table public.people; --"])).toEqual([
+      { version: 'lowercase', sent: 2, replied: 2 },
+      { version: 'name', sent: 1, replied: 0 },
+      { version: null, sent: 1, replied: 0 },
+    ]);
+    expect((await db.query('select count(*)::int as n from public.people')).rows[0].n).toBeGreaterThan(0);
+    await db.query('delete from public.founder_notes where person_id in ($1, $2, $3)', [id(2), id(4), id(5)]);
+  });
+
   it('is closed to signed-in people and strangers', async () => {
     for (const role of ['authenticated', 'anon']) {
       await db.exec(`set role ${role}`);
@@ -308,8 +386,9 @@ describe('what is written down', () => {
 
 describe('a preview', () => {
   it("goes to an owner's account, greeting them by the name it is signed with", () => {
-    expect(previewFor({ id: OWNER, email: 'sam@x.dev' }, config)).toMatchObject({ to: ['sam@x.dev'], subject: 'Thanks for trying Agentbox' });
-    expect(previewFor({ id: OWNER.toUpperCase(), email: 'sam@x.dev' }, config).text.startsWith('Hey Sam,\n')).toBe(true);
+    expect(previewFor({ id: OWNER, email: 'sam@x.dev' }, config, 'name')).toMatchObject({ to: ['sam@x.dev'], subject: 'Thanks for trying Agentbox' });
+    expect(previewFor({ id: OWNER.toUpperCase(), email: 'sam@x.dev' }, config, 'name').text.startsWith('Hey Sam,\n')).toBe(true);
+    expect(previewFor({ id: OWNER, email: 'sam@x.dev' }, config, 'lowercase').text.startsWith('hey sam,\n')).toBe(true);
   });
 
   it('never goes to anyone else', () => {

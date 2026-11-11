@@ -24,16 +24,32 @@ const addressIn = (from) => {
   return (m ? m[1] : String(from)).trim();
 };
 
+// The two versions being compared: option 1 as approved, and the lowercase
+// one written on the thread.
+export const VERSIONS = Object.freeze(['name', 'lowercase']);
+
+// From the account id, so a retry gets the same version as the first try.
+export function versionFor(id) {
+  let h = 2166136261;
+  for (const c of String(id ?? '').toLowerCase()) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  return VERSIONS[(h >>> 0) % VERSIONS.length];
+}
+
 // Plain text only: no HTML, logo or link, so it reads as typed.
-export function noteFor(person, { from, signoff }) {
-  const hey = firstNameFor(person.name) ?? 'there';
-  return {
-    from,
-    to: [person.email],
-    reply_to: addressIn(from),
-    subject: 'Thanks for trying Agentbox',
-    text: `Hey ${hey},\n\nJust a quick note to say thanks for trying Agentbox.\n\nHope it's been treating you well.\n\nCheers,\n${signoff}\nFounder, Agentbox\n`,
-  };
+export function noteFor(person, { from, signoff }, version) {
+  const first = firstNameFor(person.name);
+  const letter = {
+    name: () => ({
+      subject: 'Thanks for trying Agentbox',
+      text: `Hey${first ? ` ${first}` : ''},\n\nJust a quick note to say thanks for trying Agentbox.\n\nHope it's been treating you well.\n\n${signoff}\n`,
+    }),
+    lowercase: () => ({
+      subject: 'thanks for trying agentbox',
+      text: `hey${first ? ` ${first.toLowerCase()}` : ''},\n\njust a quick note to say thanks for trying agentbox. hope it's been treating you well!\n\n${signoff.toLowerCase()}\n`,
+    }),
+  }[version];
+  if (!letter) throw new Error(`no version called ${version}`);
+  return { from, to: [person.email], reply_to: addressIn(from), ...letter() };
 }
 
 export function keysMatch(given, expected) {
@@ -64,9 +80,9 @@ export function readNoteConfig(get) {
 
 // The note as the sender's own inbox will show it. Only to an owner's
 // account, so the key alone cannot aim it at a stranger.
-export function previewFor(person, config) {
+export function previewFor(person, config, version) {
   if (!person?.email || !config.owners.includes(String(person.id ?? '').toLowerCase())) return null;
-  return noteFor({ name: config.signoff, email: person.email }, config);
+  return noteFor({ name: config.signoff, email: person.email }, config, version);
 }
 
 // The mark goes down before the send, so two runs at once cannot both write
@@ -74,12 +90,14 @@ export function previewFor(person, config) {
 export async function sendFounderNotes({ db, send, config, dryRun = false }) {
   const due = await db.due({ owners: config.owners, ...NOTE_WINDOW, limit: NOTES_PER_RUN });
   if (dryRun) {
-    return { sent: 0, failed: 0, due: due.length, dryRun: true, names: due.map((p) => firstNameFor(p.name) ?? 'there') };
+    const versions = Object.fromEntries(VERSIONS.map((v) => [v, due.filter((p) => versionFor(p.id) === v).length]));
+    return { sent: 0, failed: 0, due: due.length, dryRun: true, names: due.map((p) => firstNameFor(p.name) ?? '(no name)'), versions };
   }
   const out = { sent: 0, failed: 0, due: due.length };
   for (const person of due) {
-    if (!(await db.claim(person.id))) continue;
-    const res = await send(noteFor(person, config), person.id);
+    const version = versionFor(person.id);
+    if (!(await db.claim(person.id, version))) continue;
+    const res = await send(noteFor(person, config, version), person.id);
     if (res.ok) { out.sent++; continue; }
     out.failed++;
     out.error = res.error;

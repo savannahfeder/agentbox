@@ -7,7 +7,7 @@
 // --owners   your own account ids (public.people), comma separated: you and
 //            your teammates never get the note, and a preview goes to the first
 // --address  where it comes from and replies go (hello@agentbox.ac)
-// --preview  sends the note to the first owner instead of waiting a day
+// --preview  sends the first owner each version of the note
 // --hold     everything but the daily job, which is stopped if it was on
 //
 // It stores the secrets on the function, puts the function online, applies
@@ -26,6 +26,7 @@ import { spawnSync, execFileSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { CLOUD_ADDRESS } from '../shared/cloud-address.mjs';
+import { VERSIONS } from '../cloud/supabase/functions/_shared/founder-note.mjs';
 import { projectRefFrom } from './lib/feedback-setup.mjs';
 import { applyMigration, cliToken } from './apply-migration.mjs';
 import { DEFAULT_ADDRESS, noteUrl, senderLine, newKey, looksLikeEmail, isPersonId, ownersFrom, secretsFile, vaultSql, heldMigration } from './lib/founder-note-setup.mjs';
@@ -87,12 +88,14 @@ const call = async (body) => {
 say('4. Asking who is due, sending nothing…');
 const dry = await call({ dryRun: true });
 if (!dry.ok) stop(`The function answered: ${dry.error}`);
-say(`   ${dry.due} ${dry.due === 1 ? 'person is' : 'people are'} due today. ${flags.hold ? 'The daily job is held: run again without --hold to start it.' : 'The job sends at 17:00 UTC each day.'}`);
+say(`   ${dry.due} ${dry.due === 1 ? 'person is' : 'people are'} due today (${VERSIONS.map((v) => `${dry.versions?.[v] ?? 0} ${v}`).join(', ')}). ${flags.hold ? 'The daily job is held: run again without --hold to start it.' : 'The job sends at 17:00 UTC each day.'}`);
 
 if (flags.preview) {
-  say('5. Sending a preview to your own account…');
-  const sent = await call({ previewTo: owners[0] });
-  if (!sent.ok) stop(`The preview did not send: ${sent.error}`);
+  for (const version of VERSIONS) {
+    say(`5. Sending the "${version}" version to your own account…`);
+    const sent = await call({ previewTo: owners[0], version });
+    if (!sent.ok) stop(`The preview did not send: ${sent.error}`);
+  }
   say('   Sent.');
 }
 say(flags.hold ? '\n✓ The thank-you note is ready, and held.' : '\n✓ The thank-you note is on.');

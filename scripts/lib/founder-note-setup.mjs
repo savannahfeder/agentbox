@@ -53,3 +53,14 @@ export function vaultSql({ url, key }) {
   end if;`;
   return `do $$\nbegin${put('founder_note_url', url)}${put('founder_note_key', key)}\nend\n$$;\n`;
 }
+
+// How many got each version and, of the addresses that replied, how many of
+// each. Addresses that are not addresses are dropped before they reach SQL.
+export function resultsSql(replied = []) {
+  const list = [...new Set(replied.map((a) => String(a).trim().toLowerCase()).filter(looksLikeEmail))]
+    .map((a) => `'${a.replace(/'/g, "''")}'`);
+  return `select n.version, count(*)::int as sent,
+  count(*) filter (where lower(u.email) in (${list.length ? list.join(', ') : 'null'}))::int as replied
+from public.founder_notes n join auth.users u on u.id = n.person_id
+group by n.version order by n.version;`;
+}
