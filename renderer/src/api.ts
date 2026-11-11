@@ -1113,8 +1113,8 @@ export const api = {
     await window.zero.setThreadPins({ pins });
   },
 
-  /** Keep a thread on this Mac whatever the cloud is set to, or let it go again. */
-  async setThreadOnMac(onMac: Record<string, true | null>): Promise<void> {
+  /** Keep a thread on this Mac (true), send it to the cloud (false), or leave it to the cloud setting (null). */
+  async setThreadOnMac(onMac: Record<string, boolean | null>): Promise<void> {
     if (useFixtures || !window.zero?.setThreadOnMac) return;
     await window.zero.setThreadOnMac({ onMac });
   },

@@ -78,10 +78,10 @@ const cut = (s: string | null | undefined, n: number) => {
   return t.length > n ? `${t.slice(0, n - 1)}…` : t;
 };
 
-// The small model is sent text only. Handed a picture's file name, it guessed
-// what the picture showed and matched a teammate on that.
+// Handed a picture's file name, the small model guessed what the picture
+// showed and matched a teammate on that.
 const PICTURE = /!\[[^\]\n]*\]\([^)\n]*\)/g;
-const unseen = (s: string | null | undefined) => String(s ?? '').replace(PICTURE, '(a picture you cannot see)');
+const named = (s: string | null | undefined, seen: boolean) => String(s ?? '').replace(PICTURE, seen ? '(a picture, attached)' : '(a picture you cannot see)');
 
 /** A teammate's newest threads, by the name each shows on the row. */
 function recentTitles(id: string, items: readonly RouteItem[] | null | undefined, n = 6): string[] {
@@ -98,7 +98,7 @@ export function routePrompt(
   item: { title?: string; body?: string } | null | undefined,
   candidates: readonly RouteMate[],
   items: readonly RouteItem[] = [],
-  { primary = null, declined = [] }: { primary?: RouteMate | null; declined?: readonly string[] } = {},
+  { primary = null, declined = [], pictures = false }: { primary?: RouteMate | null; declined?: readonly string[]; pictures?: boolean } = {},
 ): string {
   const never = [...new Set([...candidates, ...(primary ? [primary] : [])].flatMap((t) => [t.name, t.role ?? '']).concat(declined).map((r) => r.trim()).filter(Boolean))];
   const who = candidates.map((t, n) => {
@@ -133,9 +133,16 @@ export function routePrompt(
     'none, answer 0.',
     'A teammate fits only when the task asks for the work its job describes.',
     'A word the task shares with a job is not a fit: "status" is not a',
-    'teammate\'s status board, and "plan" is not its plan. When the words alone',
-    'do not say what the task is about, as when they point at a picture you',
-    'cannot see, answer 0.',
+    'teammate\'s status board, and "plan" is not its plan.',
+    ...(pictures
+      ? ['The pictures attached are part of the task: look at them to see what',
+        'it is about. When the words and the pictures together do not say, answer 0.']
+      : ['When the words alone do not say what the task is about, as when they',
+        'point at a picture you cannot see, answer 0.']),
+    'An idea for something new, or a question about how hard it would be to',
+    'build, goes to a teammate only when its job is building that very thing.',
+    'A job of watching or fixing a part of the app is not building something',
+    'new in that part: answer 0.',
     '',
     'The second line says whether this is work an AI teammate of its own would',
     'do better than a one-off agent, because none of the teammates above covers',
@@ -151,8 +158,8 @@ export function routePrompt(
     ...(never.length ? [`Never offer one of these, which they have or turned down: ${never.join(', ')}.`] : []),
     '',
     '--- the task ---',
-    cut(unseen(item?.title), 400),
-    cut(unseen(item?.body && item.body !== item.title ? item.body : ''), 1500),
+    cut(named(item?.title, pictures), 400),
+    cut(named(item?.body && item.body !== item.title ? item.body : '', pictures), 1500),
     '---',
   ].filter((l, i, all) => !(l === '' && all[i - 1] === '')).join('\n');
 }

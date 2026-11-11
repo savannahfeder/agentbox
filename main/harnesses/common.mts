@@ -204,7 +204,11 @@ export interface Harness extends Omit<HarnessDefinition, 'instructions'> {
   approvalChanged(sup: HarnessSupervisor, ...args: unknown[]): unknown;
   memoryGate(sup: HarnessSupervisor, item?: HarnessItem): unknown;
   updatePlan(options: UpdatePlanOptions): UpdatePlanResult | null;
-  smallModelArgs(prompt: string, model?: string | null): string[];
+  smallModelArgs(prompt: string, model?: string | null, pictures?: readonly string[]): string[];
+  /** What a small call writes to stdin, for an engine that takes pictures there; null when nothing. */
+  smallModelInput?(prompt: string, pictures?: readonly string[]): string | null;
+  /** The answer inside what a small call printed, for an engine that wraps it. */
+  smallModelReply?(out: string, pictures?: readonly string[]): string;
   updateSettings(options: { home: string }): UpdateSettings;
   runCommand(sup: HarnessSupervisor, options: Record<string, unknown>): Promise<unknown>;
   instructions(context: InstructionsContext): InstructionsAnswer;
