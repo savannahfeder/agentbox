@@ -7,6 +7,14 @@
 // in Claude's input stream as images, or as `--image` to Codex. A picture call
 // that fails is asked again with the words alone, so Auto is never worse off
 // for having a picture.
+//
+// Measured on claude-haiku-4-5 through this path with the real screenshot:
+// asked what the picture showed, it answered "the Inbox screen showing the IN
+// PROGRESS tab, and the STATUS column displays NOT STARTED for nearly all rows".
+// With the team as it stood then, that thread went to an agent 4 in 4 and
+// "agents get stuck like this all the time" to the Performance lead 4 in 4.
+// Each call took about 9s with the picture against 6s without. 197 of the last
+// 200 pasted pictures were under the 3.75 MB limit.
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
