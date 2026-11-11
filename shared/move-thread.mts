@@ -7,17 +7,18 @@
 // that. Its session traces sit under <project>/sessions/<id>, its task folder
 // is a git worktree in THAT project's repository with a branch named after it,
 // and a worker may be inside that folder right now. Carrying all of it across
-// is a job of its own: a branch cannot change repository, and a running worker
-// cannot have the ground moved under it.
+// is a job of its own: a branch cannot change repository, so a running worker
+// is stopped before its thread moves (main/move-thread.mts).
 //
 // So the conversation and its traces move and the folder stays. A thread
 // nothing has run on starts in the new project from what you typed. One an
 // agent has answered carries every message, in the order and the hands they
 // were written in, and waits for you there unless a reply of yours was still on
 // its way: the agent in the new project cannot resume the old session, so
-// whether to run it again is yours. One that changed code in its old project
-// is refused, because that code would be left behind on a branch nobody looks
-// at (main/ipc.mts reads the folder; `notShipped` here).
+// whether to run it again is yours; one whose agent was still working runs
+// again there. One that changed code in its old project is refused, because
+// that code would be left behind on a branch nobody looks at
+// (main/move-thread.mts reads the folder; `notShipped` here).
 //
 // IT GETS A NEW ID THERE. Keeping the id would put two rows with the same id
 // in one store, and the lists draw rows keyed by id alone. The old row closes
@@ -50,16 +51,14 @@ export const SAME_PROJECT: string = 'That thread is already in that project.';
  * store asks again before it writes, because the screen's copy of a row can be
  * a few seconds behind a worker that has just picked it up.
  *
- * `live` is the supervisor's own answer about this row, which no field on the
- * item can stand in for: a worker writes nothing until it has something to
- * say, so a row can be under way and still look untouched.
+ * A thread an agent is working on can move: main/move-thread.mts stops the
+ * agent first.
  */
-export function whyItCannotMove(item: MovableThread | null | undefined, { live = false }: { live?: boolean } = {}): string | null {
+export function whyItCannotMove(item: MovableThread | null | undefined): string | null {
   if (!item) return 'That thread is gone.';
   // An agent row stands for a session running outside Agentbox and belongs to
   // no project's ledger, so there is nothing here to move.
   if (item.agent) return 'An agent’s own session does not live in a project.';
-  if (live) return 'An agent is working on this one. Stop it first.';
   if (item.status === 'done') return 'This thread is finished. Moving it would only move the record.';
   if (notShipped(item)) return CHANGED_HERE;
   return null;
@@ -72,8 +71,8 @@ export function ranHere(item: MovableThread | null | undefined): boolean {
   return (item?.epoch ?? 0) > 0 || words(item?.result) || words(item?.note);
 }
 
-export function canMove(item: MovableThread | null | undefined, opts?: { live?: boolean }): boolean {
-  return whyItCannotMove(item, opts) === null;
+export function canMove(item: MovableThread | null | undefined): boolean {
+  return whyItCannotMove(item) === null;
 }
 
 const words = (text: unknown): boolean => typeof text === 'string' && !!text.trim();

@@ -204,6 +204,10 @@ describe('no raw colour outside the token blocks', () => {
       // because the two states that need it are set on .app while the line
       // that reads it is on the nav.
       '--search-rule-inset',
+      // The back and forward arrows' width with their margin, which the Chats
+      // header's column pulls left by so its line stays on the list's edge.
+      // Geometry, set on .app beside the arrows it measures.
+      '--bf-w',
       // The height of the label line a tick on the import card has to sit in
       // the middle of, which is 18.75px next to a project name and 17.55px next
       // to an agent's. It is a variable because the rule that centres the box
@@ -239,10 +243,10 @@ describe('no raw colour outside the token blocks', () => {
       // ../renderer/src/scroll-gutter.ts so the reply box centres in the same
       // width as the words. Geometry only the running window knows.
       '--scroll-gutter',
-      // How tall the approval card is, written onto the page by
-      // ../renderer/src/room-for-the-card.ts so the list ends above it.
-      // Geometry only the running window knows.
-      '--approval-room', '--approval-lift',
+      // How tall the approval card is, how high and how wide it stands, written
+      // onto the page by ../renderer/src/room-for-the-card.ts so the list ends
+      // above it and it keeps off the Reply box. Geometry only the running window knows.
+      '--approval-room', '--approval-lift', '--approval-width',
       // Where the open file's card sits in its pane, written by
       // ../renderer/src/components/DocPane.tsx so the divider lands on its edge.
       '--doc-card-x', '--doc-card-y', '--doc-card-h', '--doc-card-r',

@@ -44,10 +44,8 @@ describe('which threads may move', () => {
     expect(whyItCannotMove({ status: 'open', epoch: 0, result: 'Done.' })).toBe(null);
   });
 
-  it('not one a worker is inside right now, which no field on the row can say', () => {
-    expect(canMove({ status: 'open', epoch: 0 }, { live: true })).toBe(false);
-    expect(whyItCannotMove({ status: 'open', epoch: 0 }, { live: true })).toMatch(/Stop it first/);
-  });
+  // One a worker is inside moves too: its agent is stopped first
+  // (tests/a-thread-whose-agent-is-working-can-move).
 
   it('not a finished one, and not a session running outside Agentbox', () => {
     expect(canMove({ status: 'done', epoch: 0 })).toBe(false);
