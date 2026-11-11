@@ -2,11 +2,11 @@
 //
 // The founder: the team route is the one that pays, and the setup must take
 // payment for it ("i see no plan purchase page or anything (that was
-// critical)"). The setup offers Pro as 14 days free, and every team already
-// gets 14 days from the day it was made. But the team checkout opened Stripe
+// critical)"). The setup offers Pro with free days first, and every team
+// gets them from the day it was made. But the team checkout opened Stripe
 // with no trial, so a card added in the setup was charged $40 a seat on the
 // spot. The checkout now hands Stripe the team's own trial end, so the card
-// is taken now and charged when the 14 days are up. Stripe will not take a
+// is taken now and charged when the free days are up. Stripe will not take a
 // trial ending within 48 hours, so a team that close to the end pays now.
 import { describe, it, expect } from 'vitest';
 import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
@@ -53,14 +53,14 @@ function setup(start: number) {
 }
 
 describe('the team checkout', () => {
-  it('takes the card now and charges when the team’s 14 days end', async () => {
+  it('takes the card now and charges when the team’s free days end', async () => {
     const { owner, made } = setup(MADE + 60_000);
     const out = await owner({ plan: 'team' });
     expect(out.body).toMatchObject({ where: 'checkout' });
     expect(made()['subscription_data[trial_end]']).toBe(String(Math.floor(TRIAL_ENDS / 1000)));
   });
   it('still trials a team a few days in, to the same end', async () => {
-    const { owner, made } = setup(MADE + 5 * DAY);
+    const { owner, made } = setup(MADE + 3 * DAY);
     await owner({ plan: 'team' });
     expect(made()['subscription_data[trial_end]']).toBe(String(Math.floor(TRIAL_ENDS / 1000)));
   });

@@ -18,6 +18,7 @@ import { MATCH_SKY, SKY_THEMES, drawSky } from '../home/sky';
 import { PRO_PITCH, SETUP_PLANS, cloudShowcase, setupPreview, tabStop, teamPaid, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
 import { TEAM } from '../../../cloud/gateway/plans.mjs';
 import FolderPicker from './FolderPicker';
+import { PERK_ICONS, ProShowcase } from './ProShowcase';
 import { SignInPage } from '../team/SignInPage';
 import { Name } from '../../../shared/product-name.mjs';
 import './setup-split.css';
@@ -30,7 +31,6 @@ const said = (when: number) => { const a = ago(when); return /^\d/.test(a) ? `${
 const Keys = ({ ks }: { ks: string[] }) => <span className="ss-keys">{ks.map((k) => <span key={k} className="ss-key">{k}</span>)}</span>;
 const Tick = () => <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3.5 8.4l3 3 6-6.6" /></svg>;
 const Plus = () => <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true"><path d="M8 2.5v11M2.5 8h11" /></svg>;
-const Monitor = () => <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="2" y="2.5" width="12" height="8.5" rx="1.5" /><path d="M6 13.5h4M8 11v2.5" /></svg>;
 const Folder = () => <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" aria-hidden="true"><path d="M2 4.5c0-.6.4-1 1-1h3.2l1.4 1.5H13c.6 0 1 .4 1 1V12c0 .6-.4 1-1 1H3c-.6 0-1-.4-1-1z" /></svg>;
 
 export function Mark() {
@@ -126,6 +126,13 @@ export function SetupSplit(p: SetupSplitProps) {
     addEventListener('resize', fit);
     return () => { removeEventListener('resize', fit); root.removeAttribute('data-setup'); };
   }, []);
+
+  // The purchase page shows Pro on the right instead of the app (./ProShowcase.tsx).
+  useEffect(() => {
+    const root = document.documentElement;
+    if (step === 'pay') root.dataset.setupPro = ''; else delete root.dataset.setupPro;
+    return () => { delete root.dataset.setupPro; };
+  }, [step]);
 
   const next = useCallback(() => { setError(null); setAt((i) => i + 1); }, []);
   // Google finishes in the browser, so the step moves on when the account arrives.
@@ -309,17 +316,7 @@ export function SetupSplit(p: SetupSplitProps) {
   } else if (step === 'pay') {
     head = [PRO_PITCH.head, ''];
     body = <>
-      <div className="ss-cloud">
-        <div className="ss-cloud-grid">
-          {cloudShowcase(p.chats.map((t) => t.title)).map((name, i) => (
-            <div key={name} className="ss-pc">
-              <span className="ss-pc-top"><Monitor /><span>Cloud {String(i + 1).padStart(2, '0')}</span><i className="ss-pc-live" /></span>
-              <span className="ss-pc-name">{name}</span>
-            </div>
-          ))}
-        </div>
-        <div className="ss-cloud-foot">{PRO_PITCH.foot}</div>
-      </div>
+      <div className="ss-perks">{PRO_PITCH.perks.map((k) => <div key={k.id} className="ss-perk"><span className="ss-perk-icon">{PERK_ICONS[k.id]}</span>{k.title}</div>)}</div>
       {payState === 'waiting' && <p className="ss-note">Finish in your browser. This moves on once Stripe has your card.</p>}
       <div className="ss-acts">{go(payState === 'opening' ? 'Opening Stripe…' : payState === 'waiting' ? 'Open Stripe again' : PRO_PITCH.cta, () => void pay(), payState !== 'opening')}{quiet('Skip for now', next)}</div>
       <p className="ss-price-line">{PRO_PITCH.terms}</p>
@@ -387,7 +384,7 @@ export function SetupSplit(p: SetupSplitProps) {
         <div className="ss-foot" ref={setFoot} />
       </div>
 
-      <div className="ss-right" aria-hidden="true"><div className="ss-cap">Your {Name} so far</div></div>
+      <div className="ss-right" aria-hidden="true"><div className="ss-cap">Your {Name} so far</div>{step === 'pay' && <ProShowcase agents={cloudShowcase(p.chats.map((t) => t.title))} team={p.snap?.team?.team?.name ?? null} />}</div>
     </div>,
     document.body,
   )}

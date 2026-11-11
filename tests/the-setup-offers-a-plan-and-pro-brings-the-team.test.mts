@@ -38,7 +38,8 @@ describe('the plans offered', () => {
   it('price Pro as a team seat is priced, free for the trial the cloud gives', () => {
     const pro = SETUP_PLANS.find((p) => p.id === 'pro')!;
     expect(pro.price).toBe(`$${TEAM.dollarsPerSeat}`);
-    expect(pro.per).toBe('a person a month');
+    // No per person: the founder took it off the purchase page (2026-11-10).
+    expect(pro.per).toBe('a month');
     expect(pro.tag).toBe(`${TEAM.trialDays} days free`);
     expect(pro.sub).toBe(`Your team, plus ${TEAM.agentsPerSeat} cloud agents at once`);
   });

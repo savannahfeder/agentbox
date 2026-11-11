@@ -41,15 +41,20 @@ export function setupSteps({ chats, team, teammates, project, signedIn = true, p
 /** The plans the setup offers, at the prices the cloud charges (cloud/gateway/plans.mjs). */
 export const SETUP_PLANS: Array<{ id: SetupPlan; name: string; price: string; per?: string; tag?: string; sub: string }> = [
   { id: 'free', name: 'Free', price: '$0', sub: `Just you, with ${FREE.hours} cloud hours to try` },
-  { id: 'pro', name: 'Pro', price: `$${TEAM.dollarsPerSeat}`, per: 'a person a month', tag: `${TEAM.trialDays} days free`, sub: `Your team, plus ${TEAM.agentsPerSeat} cloud agents at once` },
+  { id: 'pro', name: 'Pro', price: `$${TEAM.dollarsPerSeat}`, per: 'a month', tag: `${TEAM.trialDays} days free`, sub: `Your team, plus ${TEAM.agentsPerSeat} cloud agents at once` },
 ];
 
-/** The purchase page's words: the cloud first, the price in one quiet line. */
+/** The purchase page's words: what Pro brings in three lines, the cloud computer first, the price in one quiet line.
+ *  components/ProShowcase.tsx draws one card for each line, in this order. */
 export const PRO_PITCH = {
-  head: 'Every agent gets a computer.',
-  foot: `Each in the cloud, ${TEAM.agentsPerSeat} at once, even with your laptop shut`,
+  head: 'Upgrade to Pro.',
+  perks: [
+    { id: 'cloud', title: 'A computer for every agent' },
+    { id: 'team', title: 'Your team in one inbox' },
+    { id: 'files', title: 'Files saved in the cloud' },
+  ],
   cta: `Try Pro free for ${TEAM.trialDays} days`,
-  terms: `Then $${TEAM.dollarsPerSeat} a month per person. Cancel any time.`,
+  terms: `Then $${TEAM.dollarsPerSeat} a month. Cancel any time.`,
 };
 
 const SHOWCASE_FILL = ['Fix the flaky date picker test', 'Add a health check endpoint', 'Profile the slowest page', 'Port the cron jobs to the queue', 'Write tests for the refund flow', 'Speed up the search index build'];

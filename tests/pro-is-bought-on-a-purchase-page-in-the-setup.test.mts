@@ -29,13 +29,32 @@ describe('what the page says', () => {
   // more compelling card that really convinces peope to use it (cloud first)", "make it clear
   // that with this plan each agent gets its own cloud computer", "this is too convoluted, i dont
   // even want to read", and "this should also be skibppable".
-  it('leads with each agent on its own computer, in the cloud, at the cloud’s own numbers', () => {
-    expect(PRO_PITCH.head).toBe('Every agent gets a computer.');
-    expect(PRO_PITCH.foot).toBe(`Each in the cloud, ${TEAM.agentsPerSeat} at once, even with your laptop shut`);
+  // On the second: "Pro is NOT a 14 day free trial. We can make it 7 days", "remove the per
+  // person", and "pro is not JUST cloud computers (though that is 90% of it). the multiplayer is
+  // important, and i think you get cloud storage for artifacts too", shown "on the right side
+  // rather than keeping the product the same".
+  it('names what Pro brings in three short lines, the cloud computer first', () => {
+    expect(PRO_PITCH.head).toBe('Upgrade to Pro.');
+    expect(PRO_PITCH.perks.map((p) => p.title)).toEqual(['A computer for every agent', 'Your team in one inbox', 'Files saved in the cloud']);
   });
-  it('puts the price in one quiet line, with the free days on the button', () => {
-    expect(PRO_PITCH.cta).toBe(`Try Pro free for ${TEAM.trialDays} days`);
-    expect(PRO_PITCH.terms).toBe(`Then $${TEAM.dollarsPerSeat} a month per person. Cancel any time.`);
+  it('gives seven free days, and the price with no per person', () => {
+    expect(TEAM.trialDays).toBe(7);
+    expect(PRO_PITCH.cta).toBe('Try Pro free for 7 days');
+    expect(PRO_PITCH.terms).toBe(`Then $${TEAM.dollarsPerSeat} a month. Cancel any time.`);
+    expect(JSON.stringify(PRO_PITCH)).not.toMatch(/per person|a person/);
+  });
+});
+
+describe('the right side of the purchase page', () => {
+  const show = fs.readFileSync(new URL('../renderer/src/components/ProShowcase.tsx', import.meta.url), 'utf8');
+  const css = fs.readFileSync(new URL('../renderer/src/components/setup-split.css', import.meta.url), 'utf8');
+  it('shows Pro in place of the app', () => {
+    expect(split).toMatch(/if \(step === 'pay'\) root\.dataset\.setupPro = ''; else delete root\.dataset\.setupPro;/);
+    expect(css).toMatch(/:root\[data-setup-pro\] #root \{ visibility: hidden; \}/);
+    expect(split).toMatch(/\{step === 'pay' && <ProShowcase agents=\{cloudShowcase\(p\.chats\.map\(\(t\) => t\.title\)\)\} team=\{p\.snap\?\.team\?\.team\?\.name \?\? null\} \/>\}/);
+  });
+  it('draws a card for each line on the left, in the same order', () => {
+    expect([...show.matchAll(/data-perk="(\w+)"/g)].map((m) => m[1])).toEqual(PRO_PITCH.perks.map((p) => p.id));
   });
 });
 
@@ -69,8 +88,8 @@ describe('the page on screen', () => {
     expect(split).toMatch(/await api\.cloudAccountPay\('team'\)/);
     expect(split).toMatch(/const paid = teamPaid\(await api\.cloudAccountPlan\(\)\); if \(live && paid\) next\(\);/);
   });
-  it('draws the agents on their computers, and can be skipped', () => {
-    expect(split).toMatch(/cloudShowcase\(p\.chats\.map\(\(t\) => t\.title\)\)\.map\(/);
+  it('lists what Pro brings, and can be skipped', () => {
+    expect(split).toMatch(/PRO_PITCH\.perks\.map\(\(k\) => <div key=\{k\.id\} className="ss-perk">/);
     expect(split).toMatch(/: PRO_PITCH\.cta, \(\) => void pay\(\), payState !== 'opening'\)\}\{quiet\('Skip for now', next\)\}/);
   });
   it('moves from the team’s name to the email field on Enter, where Enter on nothing goes on', () => {
