@@ -3,6 +3,8 @@
 :root[data-tour-frame] { --tf-ground: var(--bg); }
 :root[data-tour-frame][data-theme="light"] { --tf-ground: #fff; }
 :root[data-tour-frame] body { background: var(--tf-ground); }
+/* Above home.css, which paints a light window's whole body in its sky's frame colour. */
+html:root[data-tour-frame][data-theme="light"] body { background: var(--tf-ground) !important; }
 :root[data-tour-frame] #root { position: fixed; top: 52px; left: 16px; right: 16px; bottom: 16px; width: auto; height: auto; margin: 0;
   border-radius: 14px; overflow: hidden;
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 10%, transparent), 0 24px 70px rgba(0, 0, 0, .16), 0 4px 14px rgba(0, 0, 0, .05); }

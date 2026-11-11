@@ -3,6 +3,7 @@
 // tests/the-setup-beside-the-app-asks-only-what-applies.test.mjs reads them.
 
 import { MATCH_SKY } from './home/sky';
+import { FREE, TEAM } from '../../cloud/gateway/plans.mjs';
 
 /** Where the app sits beside the setup, in window pixels: the steps panel's
  *  width, the app's top-left corner and scale, and, in the app's own pixels,
@@ -17,22 +18,31 @@ export function setupPreview(width: number, height: number) {
   return { left, x, y, scale, h: (height - 16 - y) / scale, right: Math.max(0, 1120 - (width - 16 - x) / scale) };
 }
 
-export type SetupStep = 'chats' | 'folder' | 'account' | 'invite' | 'teammates' | 'look';
+export type SetupStep = 'chats' | 'folder' | 'account' | 'plan' | 'invite' | 'teammates' | 'look';
+export type SetupPlan = 'free' | 'pro';
 
 /** Only the steps that can apply on this build: most people are not on a team,
  *  and an AI teammate needs a project to work in. Tools are not asked for: the
  *  person's Claude Code and Codex already carry their connections. */
-export function setupSteps({ chats, team, teammates, project, signedIn = true }: { chats: number; team: boolean; teammates: boolean; project: boolean; signedIn?: boolean }): SetupStep[] {
+export function setupSteps({ chats, team, teammates, project, signedIn = true, plan = 'free', onTeam = false }: { chats: number; team: boolean; teammates: boolean; project: boolean; signedIn?: boolean; plan?: SetupPlan; onTeam?: boolean }): SetupStep[] {
   const out: SetupStep[] = [chats > 0 ? 'chats' : 'folder'];
   // Signing in is required, so it is a step, and what needs it comes after.
   if (team && !signedIn) out.push('account');
-  if (team) out.push('invite');
+  // The team is a paid thing: Free goes on without inviting anyone.
+  if (team && !onTeam) out.push('plan');
+  if (team && (onTeam || plan === 'pro')) out.push('invite');
   if (teammates && project) out.push('teammates');
   out.push('look');
   return out;
 }
 
-export const stepLabel = (steps: SetupStep[], step: SetupStep) => `Step ${steps.indexOf(step) + 1} of ${steps.length}`;
+/** The plans the setup offers, at the prices the cloud charges (cloud/gateway/plans.mjs). */
+export const SETUP_PLANS: Array<{ id: SetupPlan; name: string; price: string; per?: string; tag?: string; sub: string }> = [
+  { id: 'free', name: 'Free', price: '$0', sub: `Just you, with ${FREE.hours} cloud hours to try` },
+  { id: 'pro', name: 'Pro', price: `$${TEAM.dollarsPerSeat}`, per: 'a person a month', tag: `${TEAM.trialDays} days free`, sub: `Your team, plus ${TEAM.agentsPerSeat} cloud agents at once` },
+];
+
+export const stepLabel =(steps: SetupStep[], step: SetupStep) => `Step ${steps.indexOf(step) + 1} of ${steps.length}`;
 
 /** Ids in shared sky themes and skins.ts: Light and Dark are the plain looks. */
 const LOOK_ORDER = [MATCH_SKY, 'ember', 'dusk', 'aurora', 'sage', 'light', 'dark'];

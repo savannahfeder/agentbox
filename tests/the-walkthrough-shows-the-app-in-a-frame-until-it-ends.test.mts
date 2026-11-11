@@ -36,6 +36,8 @@ describe('the frame', () => {
   it('insets the app on the setup’s ground, rounded, with room above for its bar', () => {
     expect(css).toMatch(/:root\[data-tour-frame\] #root \{[^}]*position: fixed; top: 52px; left: 16px; right: 16px; bottom: 16px;[^}]*border-radius: 14px;/);
     expect(css).toMatch(/:root\[data-tour-frame\]\[data-theme="light"\] \{ --tf-ground: #fff; \}/);
+    // A light sky paints the whole body its frame colour (home/home.css); the frame's white wins over it.
+    expect(css).toMatch(/html:root\[data-tour-frame\]\[data-theme="light"\] body \{ background: var\(--tf-ground\) !important; \}/);
   });
   it('draws its bar outside the app, where the window can still be dragged', () => {
     expect(app).toMatch(/\{tourFramed && createPortal\(<TourFrame /);

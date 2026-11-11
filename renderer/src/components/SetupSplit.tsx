@@ -15,7 +15,8 @@ import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { starterAsks } from '../../../shared/teammates.mts';
 import { MATCH_SKY, SKY_THEMES, drawSky } from '../home/sky';
-import { setupPreview, tabStop, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupStep } from '../setup-split';
+import { SETUP_PLANS, setupPreview, tabStop, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
+import { TEAM } from '../../../cloud/gateway/plans.mjs';
 import FolderPicker from './FolderPicker';
 import { SignInPage } from '../team/SignInPage';
 import { Name } from '../../../shared/product-name.mjs';
@@ -95,7 +96,10 @@ export function SetupSplit(p: SetupSplitProps) {
   const project = hadProject || at === 0 || !!done.project || done.chats > 0;
   // Read once: signing in during the setup must not take its own step out from under it.
   const signedInAtStart = useRef(!!p.snap?.team?.signedIn).current;
-  const steps = useMemo(() => setupSteps({ chats: p.chats.length, team, teammates: teammatesOn, project, signedIn: signedInAtStart }), [p.chats.length, team, teammatesOn, project, signedInAtStart]);
+  // Someone already on a team was asked to join it, not to pay for it.
+  const onTeam = useRef(!!p.snap?.team?.team).current;
+  const [plan, setPlan] = useState<SetupPlan>('free');
+  const steps = useMemo(() => setupSteps({ chats: p.chats.length, team, teammates: teammatesOn, project, signedIn: signedInAtStart, plan, onTeam }), [p.chats.length, team, teammatesOn, project, signedInAtStart, plan, onTeam]);
   // Read when the look step first shows, so picking does not reorder the list under the pointer.
   const looksAt = useRef<string[] | null>(null);
   const finished = at >= steps.length;
@@ -273,6 +277,16 @@ export function SetupSplit(p: SetupSplitProps) {
   } else if (step === 'account') {
     // The app's own sign-in form, in this column: Google, email, or a new account. No skip; it is required.
     body = <div className="ss-signin"><SignInPage purpose="team" startOn="sign-up" inSetup onSignedIn={next} onBack={back ?? undefined} primaryRef={accountPrimary} termsAt={foot} /></div>;
+  } else if (step === 'plan') {
+    head = ['Pick a plan.', ''];
+    body = <>
+      <div className="ss-list ss-plans">
+        {SETUP_PLANS.map((pl) => <Row key={pl.id} face={<Check on={plan === pl.id} />} on={plan === pl.id} onClick={() => setPlan(pl.id)}
+          name={<>{pl.name}{pl.tag && <span className="ss-tag">{pl.tag}</span>}</>} sub={pl.sub}
+          end={<span className="ss-price"><b>{pl.price}</b>{pl.per && <small>{pl.per}</small>}</span>} />)}
+      </div>
+      <div className="ss-acts">{go(plan === 'pro' ? `Start ${TEAM.trialDays} days free` : 'Continue', next)}</div>
+    </>;
   } else if (step === 'invite') {
     head = ['Invite your team.', ''];
     body = !p.snap?.team?.signedIn ? <>
@@ -285,7 +299,6 @@ export function SetupSplit(p: SetupSplitProps) {
         <div className="ss-row"><span className="ss-face ss-dash"><Plus /></span>
           <input className="ss-input" data-ss-enter="add" placeholder="Add by email…" value={typed} onChange={(e) => setTyped(e.target.value)} /></div>
       </div>
-      <p className="ss-note">Free for 14 days.</p>
       <div className="ss-acts">{go(emails.length || inviteList([typed]).length ? `Send ${inviteList([...emails, typed]).length === 1 ? '1 invite' : `${inviteList([...emails, typed]).length} invites`}` : 'Continue', () => void sendInvites(), true, 'Sending…')}{quiet('Just me for now', next)}</div>
     </>;
   } else if (step === 'teammates') {

@@ -52,6 +52,9 @@ describe('the app preview beside the setup', () => {
       expect(at.y + at.h * at.scale).toBeCloseTo(h - 16, 5);
     }
   });
+  it('holds Home in its middle, since the preview is taller for its width than a window is', () => {
+    expect(css).toMatch(/:root\[data-setup\] \.hm-page \{ align-items: center; padding-top: 0; padding-bottom: 0; \}/);
+  });
   it('is placed from those numbers, not from a second copy in the stylesheet', () => {
     expect(css).toMatch(/:root\[data-setup\] #root \{[^}]*left: var\(--ss-x\); top: var\(--ss-y\);\s*width: 1120px; height: var\(--ss-h\);/);
     expect(split).toMatch(/setupPreview\(innerWidth, innerHeight\)/);

@@ -17,6 +17,7 @@ describe('the headings of the setup', () => {
     expect(heads.map((h) => h.ask)).toEqual([
       'Add your recent agents.',
       'Pick a folder for your first project.',
+      'Pick a plan.',
       'Invite your team.',
       'Add your own AI teammates.',
       'Pick your look.',

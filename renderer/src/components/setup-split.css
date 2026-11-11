@@ -11,6 +11,9 @@
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 10%, transparent), 0 30px 80px rgba(30, 40, 40, .16), 0 4px 14px rgba(30, 40, 40, .06);
 }
 
+/* The preview is taller for its width than a window is, so Home sits in its middle rather than at the top. */
+:root[data-setup] .hm-page { align-items: center; padding-top: 0; padding-bottom: 0; }
+
 .setup-split {
   position: fixed; inset: 0; z-index: 2147482998;
   font-family: 'Geist', 'Avenir Next', -apple-system, BlinkMacSystemFont, 'DejaVu Sans', sans-serif; font-size: 15px; line-height: 1.4;
@@ -61,8 +64,7 @@
 .setup-split .ss-check.ss-on { background: var(--text); border-color: var(--text); color: var(--bg); }
 .setup-split .ss-input { grid-column: 2 / -1; border: 0; outline: 0; background: transparent; font-size: 14.5px; min-width: 0; }
 .setup-split .ss-input::placeholder { color: var(--text-faint); }
-.setup-split .ss-strip { width: 64px; height: 32px; border-radius: 7px; overflow: hidden; display: block; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 10%, transparent); }
-.setup-split .ss-strip { position: relative; }
+.setup-split .ss-strip { position: relative; width: 64px; height: 32px; border-radius: 7px; overflow: hidden; display: block; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 10%, transparent); }
 .setup-split .ss-strip .ss-sky { position: absolute; inset: 0; display: block; }
 .setup-split .ss-strip canvas { width: 100%; height: 100%; display: block; }
 /* Match my system: dark orange above the diagonal, light green below it. */
@@ -73,6 +75,14 @@
 .setup-split .ss-chats { max-height: 230px; }
 .setup-split .ss-chat { grid-template-columns: minmax(0, 1fr) auto auto; min-height: 46px; padding: 0 16px 0 18px; }
 .setup-split .ss-meta { font-size: 13px; color: var(--text-faint); white-space: nowrap; }
+/* The plan step: the tick on the left, the price on the right, a line under the name that may wrap. */
+.setup-split .ss-plans .ss-row { grid-template-columns: 18px 1fr auto; column-gap: 16px; min-height: 76px; padding: 14px 18px; }
+.setup-split .ss-plans .ss-face { width: auto; height: auto; background: none; }
+.setup-split .ss-plans .ss-sub { white-space: normal; margin-top: 2px; }
+.setup-split .ss-tag { margin-left: 8px; padding: 1px 7px; border-radius: 999px; font-size: 12px; color: var(--text-dim); border: 1px solid color-mix(in srgb, var(--text) 14%, transparent); vertical-align: 1px; }
+.setup-split .ss-price { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.25; }
+.setup-split .ss-price b { font-size: 17px; font-weight: 500; }
+.setup-split .ss-price small { font-size: 12px; color: var(--text-faint); }
 .ss-picker { position: fixed; inset: 0; z-index: 2147483005; }
 .setup-split .ss-empty { padding: 16px 18px; color: var(--text-faint); font-size: 13.5px; }
 
