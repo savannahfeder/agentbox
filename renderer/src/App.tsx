@@ -6738,13 +6738,24 @@ export default function App() {
     }
     if (search !== null) place.search = search;
     if (current) place.row = current.id;
+    if (homeOn) place.home = homeOpen;
+    if (filesPage) place.files = { project: filesPage.project };
+    if (connectionsPage) place.connections = true;
+    if (teamOpen) place.team = true;
+    if (chatsPlace) place.chats = chatsPlace;
+    // 'groups' is what Groups says when it has no group to open, not a group.
+    if (roomsUi.openId && roomsUi.openId !== 'groups') place.room = roomsUi.openId;
+    if (teammatesUi.open) place.teammate = teammatesUi.open;
+    if (todayOn) place.today = true;
+    if (tasksOn) place.tasks = true;
     writePlace(window.localStorage, place);
     // The dependencies are ids and not the rows themselves. Every snapshot
     // poll hands back fresh objects for the same work, and depending on those
     // would rewrite this file every ten seconds to say what it already said.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reloaded, restored, view, focused?.id, focused?.product, focusedRepeat?.id,
-    openDoc?.src, openDoc?.product, settingsOpen, settingsAt, search, current?.id]);
+    openDoc?.src, openDoc?.product, settingsOpen, settingsAt, search, current?.id,
+    homeOpen, filesPage?.project, !!filesPage, !!connectionsPage, teamOpen, chatsPlace, roomsUi.openId, teammatesUi.open, todayOn, tasksOn]);
 
   // READING IT BACK, once, on a page that is coming back and never on a fresh
   // launch. Opening Agentbox in the morning still opens on the inbox: that is
@@ -6773,7 +6784,19 @@ export default function App() {
     // for it costs nothing on the ordinary reload, which has no rule open.
     if (place.repeat && repeats.length === 0) return;
     setRestored(true);
+    // First, because opening either clears the thread, Team and search that
+    // the lines below may put back.
+    if (place.teammate) teammatesUi.go(place.teammate);
+    if (place.room) roomsUi.open(place.room);
     setView(place.view);
+    // A note from before Home was kept: any tab but the inbox was off Home.
+    if (homeOn) setHomeOpen(place.home ?? place.view === 'inbox');
+    if (place.files) setFilesPage({ project: place.files.project });
+    if (place.connections) setConnectionsPage({ focus: null });
+    if (place.team) setTeamOpen(true);
+    if (place.chats) setChatsPlace(place.chats);
+    if (place.today) setTodayOn(true);
+    if (place.tasks) setTasksOn(true);
     if (place.settings) {
       setSettingsPane(place.settingsPage ?? null);
       setSettingsOpen(true);
