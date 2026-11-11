@@ -265,6 +265,57 @@ function FilmBody({ token, file, piece, notes }: { token: string; file: SharedFi
   </div>;
 }
 
+/** Every text range in `root` that reads `quote`, across the elements it runs over. */
+function rangesOf(root: HTMLElement, quote: string): Range[] {
+  const nodes: Text[] = [];
+  const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let n = walk.nextNode(); n; n = walk.nextNode()) nodes.push(n as Text);
+  // The page's text with each run of space as one, and where each of its letters came from.
+  let flat = '';
+  const from: [Text, number][] = [];
+  for (const node of nodes) {
+    for (let i = 0; i < node.data.length; i++) {
+      const space = /\s/.test(node.data[i]);
+      if (space && flat.endsWith(' ')) continue;
+      flat += space ? ' ' : node.data[i];
+      from.push([node, i]);
+    }
+  }
+  const out: Range[] = [];
+  for (let at = flat.indexOf(quote); at >= 0 && out.length < 20; at = flat.indexOf(quote, at + quote.length)) {
+    const r = document.createRange();
+    const [a, ai] = from[at];
+    const [b, bi] = from[at + quote.length - 1];
+    r.setStart(a, ai);
+    r.setEnd(b, bi + 1);
+    out.push(r);
+  }
+  return out;
+}
+
+type Highlights = { set(name: string, h: unknown): void; delete(name: string): void };
+declare const Highlight: { new (...ranges: Range[]): unknown } | undefined;
+
+/** A document, the words its comments quote marked in it, and words picked here are what the next comment is about. */
+function DocBody({ body, notes }: { body: string; notes?: Notes }) {
+  const box = useRef<HTMLDivElement | null>(null);
+  const quotes = (notes?.comments ?? []).flatMap((c) => (c.place?.kind === 'quote' ? [{ id: c.id, text: c.place.text }] : []));
+  const lit = notes?.draft?.kind === 'quote' ? notes.draft.text : quotes.find((q) => q.id === notes?.chosen)?.text ?? null;
+  const key = JSON.stringify([quotes.map((q) => q.text), lit]);
+  useEffect(() => {
+    const marks = (globalThis.CSS as unknown as { highlights?: Highlights } | undefined)?.highlights;
+    const root = box.current;
+    if (!marks || typeof Highlight === 'undefined' || !root) return undefined;
+    marks.set('sf-quoted', new Highlight(...quotes.flatMap((q) => rangesOf(root, q.text))));
+    marks.set('sf-quoted-on', new Highlight(...(lit ? rangesOf(root, lit) : [])));
+    return () => { marks.delete('sf-quoted'); marks.delete('sf-quoted-on'); };
+  }, [key, body]); // eslint-disable-line react-hooks/exhaustive-deps
+  const picked = () => { const q = quoteOf(window.getSelection()?.toString() ?? ''); if (q) notes?.onPlace(q); };
+  return <div ref={box} className="sf-doc" onMouseUp={notes ? picked : undefined} onKeyUp={notes ? picked : undefined}>
+    <div className="markdown doc-prose"><ReactMarkdown remarkPlugins={MD_PLUGINS} components={MD_PARTS}>{body}</ReactMarkdown></div>
+  </div>;
+}
+
 /** A picture, its comments' pins on it, and a click on it pins the next one. */
 function PictureBody({ url, name, notes, onBroken }: { url: string | null; name: string; notes?: Notes; onBroken: () => void }) {
   const box = useRef<HTMLDivElement | null>(null);
@@ -298,9 +349,7 @@ export function FileBody({ token, file, piece, notes }: { token: string; file: S
   if (file.kind === 'video') return <FilmBody token={token} file={file} piece={piece} notes={notes} />;
   if (isTable(file)) return <div className="sf-table"><TableView text={file.body} path={file.name} mode="full" storeKey={`link:${token}`} /></div>;
   if (file.kind === 'markdown') {
-    // Words picked in the document are what the next comment is about.
-    const picked = () => { const q = quoteOf(window.getSelection()?.toString() ?? ''); if (q) notes?.onPlace(q); };
-    return <div className="sf-doc" onMouseUp={notes ? picked : undefined} onKeyUp={notes ? picked : undefined}><div className="markdown doc-prose"><ReactMarkdown remarkPlugins={MD_PLUGINS} components={MD_PARTS}>{titleOf(file).body}</ReactMarkdown></div></div>;
+    return <DocBody body={titleOf(file).body} notes={notes} />;
   }
   if ((file.kind === 'image' || file.kind === 'pdf') && (!bytes || unreadable)) return <div className="sf-state"><p>This file did not load.</p></div>;
   if (file.kind === 'image') return <PictureBody url={url} name={file.name} notes={notes} onBroken={() => setUnreadable(true)} />;

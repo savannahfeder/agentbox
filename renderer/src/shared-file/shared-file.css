@@ -34,6 +34,9 @@
 .sf-file { min-width: 0; }
 .sf-doc { container-type: inline-size; }
 .sf-doc .doc-prose { user-select: text; -webkit-user-select: text; }
+/* Words a comment quotes, marked in the document; the one being written or picked, washed. */
+::highlight(sf-quoted) { text-decoration: underline; text-decoration-color: var(--text-faint); text-underline-offset: 3px; }
+::highlight(sf-quoted-on) { background-color: rgba(232, 131, 107, 0.24); color: var(--text); }
 .sf-doc .doc-prose img { max-width: 100%; }
 .sf-image { display: grid; place-items: center; }
 .sf-image img { display: block; max-width: 100%; max-height: calc(100vh - 220px); object-fit: contain; border-radius: var(--artifact-corner); }
