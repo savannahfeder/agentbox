@@ -17,7 +17,7 @@
 //                from user research): not a wordless one, not a count.
 
 import { shownPriority } from './rank.mts';
-import { isTaskRow, taskGiver } from './team-rules.mts';
+import { isShared, isTaskRow, runnerOf, taskGiver } from './team-rules.mts';
 import { deadlineOf, type TaskRow } from './team-tasks.mts';
 import { isShippedNote } from './shipped-note.mts';
 import { shownTitle, withoutFiles } from './thread-title.mts';
@@ -302,7 +302,7 @@ export interface CardProduct {
   personal?: boolean;
   seenBy?: string;
   seenByPeople?: readonly string[];
-  team?: { direct?: unknown } | null;
+  team?: { direct?: unknown; projectId?: string; sharedBy?: string | null } | null;
 }
 
 export function cardsFor<P extends CardProduct>({ products, readItems, now = Date.now(), since = null, me = null, running = [] }: {
@@ -349,6 +349,8 @@ export function cardsFor<P extends CardProduct>({ products, readItems, now = Dat
   const kept = startOfDay(now - FINISHED_CARDS_KEPT_MS);
   for (const { item, product } of all) {
     if (!shownToTeam(item, since, product)) continue;
+    // A shared project's rows are in every member's store; only the Mac that runs one publishes it.
+    if (isShared(product) && runnerOf(item, product) !== me) continue;
     // A session the folded row cannot show: a personal worker holds no claim,
     // and its second turn has a result on the row, which reads as waiting.
     const state = live.has(item.id) ? 'running' : threadState(item, now);

@@ -3,7 +3,7 @@
 // store with no agent.
 import { shippedAtOf, threadState } from '../../../shared/thread-cards.mts';
 import { shownTitle, withoutFiles } from '../../../shared/thread-title.mts';
-import { isTaskRow, taskNewsAt } from '../../../shared/team-rules.mts';
+import { isShared, isTaskRow, runnerOf, taskNewsAt } from '../../../shared/team-rules.mts';
 import { isSetupTitle } from '../../../shared/teammates.mts';
 import { waitParts } from '../../../shared/thread-waits.mts';
 import { blockedWords, deadlineOf, dueSaid } from '../../../shared/team-tasks.mts';
@@ -111,6 +111,12 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
   const { from, to } = rangeOf(range, now);
   const inRange = (t: number | null | undefined) => !!t && t >= from && t < to;
   const direct = new Set(products.filter((p) => p.team?.direct).map((p) => p.slug));
+  const bySlug = new Map(products.map((p) => [p.slug, p]));
+  // A shared project's thread is in your store when a teammate's Mac runs it; their card says it.
+  const runBy = (i: WorkItem) => {
+    const product = bySlug.get(i.product);
+    return isShared(product) && !product?.team?.direct ? runnerOf(i, product) : me;
+  };
   const byKey = new Map<string, TodayPerson>();
   const order: string[] = [];
   const add = (key: string, name: string, kind: TodayPerson['kind']) => {
@@ -139,8 +145,9 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
   };
   for (const i of items) {
     if (i.agent || (direct.has(i.product) && !isTaskRow(i))) continue;
-    const k = ownKey(i);
-    owner.set(i.id, k);
+    const runner = runBy(i);
+    if (runner !== me) { const k = keyOfPerson(runner); if (k) owner.set(i.id, k); continue; }
+    owner.set(i.id, ownKey(i));
   }
 
   const inNeeds = new Set(needs.map((n) => `${n.product}/${n.id}`));
@@ -164,6 +171,7 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
     const setupSays = isSetupTitle(i.title) && i.labels?.some((l) => l.startsWith('teammate:')) ? howFar(i.progress) : undefined;
     const task = isTaskRow(i);
     if (direct.has(i.product) && !task) continue;
+    if (runBy(i) !== me) continue;
     // A task someone gave you is theirs to say finished; open, it is one of yours.
     if (task && i.createdBy && i.createdBy !== me) {
       if (i.status !== 'done' && !inNeeds.has(`${i.product}/${i.id}`)) byKey.get('me')!.tasks.push(taskLine(i, { key: `${i.product}/${i.id}`, title: '', at: i.updatedAt, item: i }));
