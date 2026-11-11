@@ -1049,11 +1049,11 @@ export const api = {
     return (await window.zero?.filesPlaceOpen?.(p).catch(() => null)) ?? null;
   },
   /** Each file a thread names, as its version line numbers it. */
-  async fileLine(p: { product: string; id: string }): Promise<FileLine[]> {
+  async fileLine(p: { product: string; id: string; room?: string }): Promise<FileLine[]> {
     return (await window.zero?.fileLine?.(p).catch(() => null)) ?? [];
   },
   /** One answer per copy, in the order asked. */
-  async fileElsewhere(p: { product: string; id: string; copies: { path: string; file: string }[] }): Promise<FileElsewhere[]> {
+  async fileElsewhere(p: { product: string; id: string; room?: string; copies: { path: string; file: string }[] }): Promise<FileElsewhere[]> {
     const got = await window.zero?.fileElsewhere?.(p).catch(() => null);
     return Array.isArray(got) ? got : p.copies.map(() => ({ key: null, notes: [], approvals: [] }));
   },

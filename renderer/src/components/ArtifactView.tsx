@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  addressedTo, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, latestPicturesSaid, nextStep, noteGoesTo, offeredTogether, otherFilesInLines, placeWords, resolvedInWords, reviewKind, sharedByWords, stepsThrough, stillInHand, stillWaiting, tagsYourAgent, threadFiles, viewKind, whereAPressLands, whoseIsTheFile, withFilesAsked,
+  addressedTo, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, latestPicturesSaid, marksOnVersions, nextStep, noteGoesTo, offeredTogether, otherFilesInLines, placeWords, resolvedInWords, reviewKind, sharedByWords, stepsThrough, stillInHand, stillWaiting, tagsYourAgent, threadFiles, versionNamed, viewKind, whereAPressLands, whoseIsTheFile, withFilesAsked,
 } from '../../../shared/artifact-marks.mts';
 import { AgentFace } from './AgentFace';
 import type { FileVersion } from '../../../shared/artifact-marks.mts';
@@ -37,6 +37,7 @@ import { NotesHead, NotesSection, ReturnGlyph } from './NotesSidebar';
 import { ShareLink, canShareFile } from './ShareLink';
 import { paneKey, staysOnNewest } from '../table-follows';
 import { SEND } from '../this-keyboard';
+import { missingWords } from '../files/files-shown';
 import './artifact-view.css';
 
 /** `steps`: the paths the arrows step through, in order, when the press came from a turn of the thread. `drawn`: every picture that turn drew, versions too. */
@@ -55,7 +56,7 @@ const KIND_WORD = { image: 'Picture', film: 'Film', pdf: 'PDF', deck: 'Slides', 
 
 const newId = () => `n${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
-export function ArtifactView({ product, project = null, thread, draftsAcross, shareThread, lines, numbers, marks, me, people, open, ownerOfRow, write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, onBeside, below, files: fromElsewhere, typing = false }: {
+export function ArtifactView({ product, project = null, thread, draftsAcross, shareThread, lines, numbers, marks: given, me, people, open, ownerOfRow, write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, onBeside, below, files: fromElsewhere, typing = false }: {
   /** The project the file belongs to, when it is not `product`'s own (a teammate's thread). */
   project?: string | null;
   /** Each path's number on its file's version line, which every surface counts by. */
@@ -98,15 +99,18 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     const reviewed = filesInLines(lines);
     const others = otherFilesInLines(lines);
     // Lines that name nothing else are Files opening this one script or page.
-    const said = [...reviewed, ...(reviewed.length ? otherFilesOpen(others, open.path, marks.notes) : others)];
+    const said = [...reviewed, ...(reviewed.length ? otherFilesOpen(others, open.path, given.notes) : others)];
     // A note on a page the thread never linked opens that page by its name, never the thread's last file.
-    const noted = open.note ? marks.notes.find((n) => n.id === open.note)?.file : undefined;
-    const path = open.path?.replace(/^\.\//, '') ?? (noted && !/[#@]\d+$/.test(noted) ? noted : undefined);
+    const noted = open.note ? given.notes.find((n) => n.id === open.note)?.file : undefined;
+    const asks = noted && !/[#@]\d+$/.test(noted) && !versionNamed(threadFiles(said), noted);
+    const path = open.path?.replace(/^\.\//, '') ?? (asks ? noted : undefined);
     return withFilesAsked(said, [path, ...(open.drawn ?? open.steps ?? [])]);
-  }, [lines, open.path, open.note, open.steps, open.drawn, marks.notes]);
+  }, [lines, open.path, open.note, open.steps, open.drawn, given.notes]);
   // What the page drew has bytes, so Files not having numbered it yet does not drop it.
   const kept = useMemo(() => [open.path, ...(open.steps ?? []), ...(open.drawn ?? [])].filter((p): p is string => !!p), [open.path, open.steps, open.drawn]);
   const families = useMemo(() => threadFiles(files, numbers, { keep: kept }), [files, numbers, kept]);
+  // A note made on another computer, or before a rename of how copies are read, still sits on its file here.
+  const marks = useMemo(() => marksOnVersions(given, families), [given, families]);
   const flat = useMemo(() => families.flatMap((f, fi) => f.versions.map((v, vi) => ({ fi, vi, v }))), [families]);
   const handedSteps = useMemo(() => stepsThrough(families, open.steps), [families, open.steps]);
   const latestSteps = useMemo(() => stepsThrough(families, latestPicturesSaid(lines)), [families, lines]);
@@ -155,7 +159,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
       return;
     }
     placedFor.current = press;
-    const wanted = open.note ? marks.notes.find((n) => n.id === open.note)?.file : open.file;
+    const wanted = open.note ? marks.notes.find((n) => n.id === open.note)?.file : versionNamed(families, open.file)?.id ?? open.file;
     // A press names one file at one version and opens exactly that, or waits.
     const hit = whereAPressLands(families, { path: open.path, file: wanted });
     if (!hit) return;
@@ -681,6 +685,11 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
       held={heldFor(n)} />
   );
 
+  const missingHere = (by: string | null) => {
+    const whose = by ?? ownerOfRow;
+    return missingWords(whose && whose !== me ? firstName(person(whose)) || null : null);
+  };
+
   const bylineOf = (v: { by: string | null; at: number; n: number; agent?: string }) => [
     sharedByWords(v, { me, nameOf }),
     v.at ? whenShared(v.at) : null,
@@ -708,7 +717,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
       onQuotesGone={editable ? noteGone : undefined}
       onOutside={onOutside ? () => onOutside(path) : undefined}
       files={fromElsewhere}
-      missingSays={missingSays?.(v?.by ?? null)}
+      missingSays={(missingSays ?? missingHere)(v?.by ?? null)}
     />
   );
 

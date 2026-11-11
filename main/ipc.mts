@@ -232,8 +232,8 @@ interface FilesPlace {
   open(key: string): Promise<unknown>;
   edit(key: string, text?: string): Promise<{ ok: boolean } & Record<string, unknown>>;
   editOnThread(ask: { product: string; id: string; path: string; baseId?: string; text: string; taken?: unknown; since?: unknown }): { ok: boolean } & Record<string, unknown>;
-  sameFiles(ask: { product: string; id: string; copies: unknown[] }): Promise<unknown>;
-  lineFor(ask: { product: string; id: string }): Promise<unknown>;
+  sameFiles(ask: { product: string; id: string; room?: string | null; copies: unknown[] }): Promise<unknown>;
+  lineFor(ask: { product: string; id: string; room?: string | null }): Promise<unknown>;
   mark(key: string, mark: unknown): Promise<{ ok: boolean; wrote?: { product: string; id: string } } & Record<string, unknown>>;
   pictureNamed(src: unknown): Promise<string | null>;
   newDocument(ask: { project: string; name: string; kind?: 'document' | 'table'; folder?: string | null; by?: string | null }): Promise<{ key: string }>;
@@ -2596,12 +2596,12 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     if (out.ok) { push(); void team?.syncNow?.()?.catch?.(() => {}); }
     return out;
   });
-  ipcMain.handle('zero:file-elsewhere', async (_e, { product, id, copies }: { product?: unknown; id?: unknown; copies?: unknown } = {}) => {
+  ipcMain.handle('zero:file-elsewhere', async (_e, { product, id, room, copies }: { product?: unknown; id?: unknown; room?: unknown; copies?: unknown } = {}) => {
     const asked = Array.isArray(copies) ? copies : [];
-    try { return await filesPlaceNow().sameFiles({ product: String(product ?? ''), id: String(id ?? ''), copies: asked }); } catch { return asked.map(() => ({ key: null, notes: [], approvals: [] })); }
+    try { return await filesPlaceNow().sameFiles({ product: String(product ?? ''), id: String(id ?? ''), room: room ? String(room) : null, copies: asked }); } catch { return asked.map(() => ({ key: null, notes: [], approvals: [] })); }
   });
-  ipcMain.handle('zero:file-line', async (_e, { product, id }: { product?: unknown; id?: unknown } = {}) => {
-    try { return await filesPlaceNow().lineFor({ product: String(product ?? ''), id: String(id ?? '') }); } catch { return []; }
+  ipcMain.handle('zero:file-line', async (_e, { product, id, room }: { product?: unknown; id?: unknown; room?: unknown } = {}) => {
+    try { return await filesPlaceNow().lineFor({ product: String(product ?? ''), id: String(id ?? ''), room: room ? String(room) : null }); } catch { return []; }
   });
   ipcMain.handle('zero:files-place-mark', async (_e, { key, mark }: { key?: unknown; mark?: unknown } = {}) => {
     const { wrote, ...out } = await filesPlaceNow().mark(String(key ?? ''), mark);

@@ -293,10 +293,11 @@ export function createThreadShare({
   };
 
   // A file the writer pointed at may be in any project of theirs, not only this
-  // thread's: they named it on purpose. A bare word looks in this thread's own.
-  async function copyOf(product: TeamProduct, src: string, meant: boolean): Promise<FoundCopy | null> {
+  // thread's: they named it on purpose. A bare word looks in this thread's own,
+  // its task folder first, as the owner's own view of the thread does.
+  async function copyOf(product: TeamProduct, thread: string, src: string, meant: boolean): Promise<FoundCopy | null> {
     let real: string | null = null;
-    const found = await resolveArtifact({ src, product: product.slug, products: [product], accountRoot, storeRoot });
+    const found = await resolveArtifact({ src, product: product.slug, products: [product], accountRoot, storeRoot, thread });
     if (found.ok) {
       try { real = fs.realpathSync(found.path); } catch { real = null; }
       const inside = real && artifactRoots(product).some((r) => {
@@ -333,7 +334,7 @@ export function createThreadShare({
     const wanted = new Map<string, boolean>();
     for (const { src, meant } of texts.flatMap(mentionsIn)) wanted.set(src, !!(meant || wanted.get(src)));
     for (const [src, meant] of wanted) {
-      const hit = await copyOf(product, src, meant);
+      const hit = await copyOf(product, item.id, src, meant);
       if (hit) found.set(src, hit);
     }
     kept = kept.map((l) => {

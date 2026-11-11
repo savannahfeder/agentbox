@@ -36,6 +36,13 @@ export type ThreadRef =
 
 type RefKind = ThreadRef['kind'];
 
+/** The thread or chat `product`/`id`, or the group `room`, whose copies are asked about. */
+export interface CopiesOf { product: string; id: string; room?: string | null }
+
+const hereIs = ({ product, id, room }: CopiesOf) => (t: PlaceThread): boolean => (room
+  ? t.ref.kind === 'room' && t.ref.roomId === room
+  : (t.ref.kind === 'thread' || t.ref.kind === 'chat') && t.ref.product === product && t.ref.id === id);
+
 export interface PlaceThread {
   ref: ThreadRef;
   title: string;
@@ -63,7 +70,8 @@ export interface ChainVersion {
   copies: ChainCopy[];
 }
 
-export interface LinedVersion extends ChainVersion { opened: string | null; pending?: boolean; blank?: boolean }
+/** `away`: its bytes are on no copy here, and its copies are those of the path it was written over. */
+export interface LinedVersion extends ChainVersion { opened: string | null; pending?: boolean; blank?: boolean; away?: boolean }
 
 export type PlacedNote = FileNote & { thread: PlaceThread };
 export type PlacedApproval = FileApproval & { thread: PlaceThread };
@@ -91,8 +99,6 @@ export interface PlacedFile {
 export type LinedFile = Omit<PlacedFile, 'chain'> & { chain: LinedVersion[]; blank?: boolean };
 
 interface FileBytes { size: number; mtime: number; hash: string }
-
-interface CopyOnDisk { f: PlacedFile; v: ChainVersion; c: ChainCopy; bytes: FileBytes }
 
 type HistoryReader = (id: string, o: { max?: number }) => readonly ThreadLine[];
 
@@ -556,34 +562,43 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
   };
 
   // An open file asks for every copy it names on each change in the app, so a
-  // project's copies are found and hashed once per state of the threads.
-  let copiesFor: { files: PlacedFile[] | null; products: ArtifactProduct[] | null; byProject: Map<string, Promise<CopyOnDisk[]>> } = { files: null, products: null, byProject: new Map() };
-  const copiesNow = (files: PlacedFile[]) => {
-    if (copiesFor.files !== files) copiesFor = { files, products: readable(), byProject: new Map() };
-    return copiesFor;
+  // file's line is read once per state of the threads, with one reading of the projects.
+  type Lined = { chain: LinedVersion[]; same: Map<string, string> };
+  let chainsFor: { files: PlacedFile[] | null; products: ArtifactProduct[]; shared: Map<string, boolean>; byKey: Map<string, Promise<Lined>> } = { files: null, products: [], shared: new Map(), byKey: new Map() };
+  const chainsNow = (files: PlacedFile[]) => {
+    if (chainsFor.files !== files) chainsFor = { files, products: readable(), shared: new Map(), byKey: new Map() };
+    return chainsFor;
   };
-  function copiesIn(files: PlacedFile[], project: string | null): Promise<CopyOnDisk[]> {
-    const { products, byProject } = copiesNow(files);
-    const key = projectKey(project);
-    if (!byProject.has(key)) {
-      byProject.set(key, (async () => {
-        const out: CopyOnDisk[] = [];
-        for (const f of files) {
-          if (projectKey(f.project) !== key) continue;
-          for (const v of f.chain) {
-            for (const c of v.copies) {
-              // copiesNow read the products when it took these files.
-              const there = await onDisk(c.path, c.thread.ref.product, null, products!);
-              const bytes = there && await bytesOf(there).catch(() => null);
-              if (bytes) out.push({ f, v, c, bytes });
-            }
-          }
-        }
-        return out;
-      })());
-    }
-    return byProject.get(key)!;
+  function chainOf(f: PlacedFile, files: PlacedFile[]): Promise<Lined> {
+    const now = chainsNow(files);
+    const project = projectKey(f.project);
+    if (!now.shared.has(project)) now.shared.set(project, audienceOf(f.project) !== 'private');
+    if (!now.byKey.has(f.key)) now.byKey.set(f.key, lineChain(f, now.shared.get(project), now.products));
+    return now.byKey.get(f.key)!;
   }
+  // A group's file not fetched yet is null: drawing a view fetches nothing.
+  const copyHere = (c: ChainCopy, products: ArtifactProduct[]): Promise<string | null> | string | null => (c.thread.ref.kind === 'room'
+    ? team!.rooms!.fileIfKept(c.thread.ref.roomId, nameInRoom(c.path))
+    : onDisk(c.path, c.thread.ref.product, c.thread.ref.kind === 'thread' ? c.thread.ref.id : null, products));
+  /**
+   * The version on the line whose bytes `src` holds. `undefined` when its bytes
+   * are not here to compare, null when they are and the line has no such version.
+   */
+  async function versionHeld(chain: readonly LinedVersion[], src: string | null): Promise<LinedVersion | null | undefined> {
+    const mine = src && await bytesOf(src).catch(() => null);
+    if (!mine) return undefined;
+    for (const v of chain) {
+      const theirs = v.opened && await bytesOf(v.opened).catch(() => null);
+      if (theirs && theirs.size === mine.size && theirs.hash === mine.hash) return v;
+    }
+    return null;
+  }
+  // A copy whose bytes are not here is the version that names it.
+  const versionOfCopy = async (chain: readonly LinedVersion[], c: ChainCopy, products: ArtifactProduct[]): Promise<LinedVersion | null> => {
+    const held = await versionHeld(chain, await copyHere(c, products));
+    return held === undefined ? chain.find((v) => !v.away && v.copies.some((x) => x.thread === c.thread && x.path === c.path)) ?? null : held;
+  };
+
   const nameInRoom = (src: string): string => String(src).replace(/^\.?\/?attachments\//, '');
   // A group's file may still be in the cloud, and drawing the list fetches nothing.
   async function openedOf(file: PlacedFile | LinedFile, v: ChainVersion, { fetch = false, products = readable() }: { fetch?: boolean; products?: ArtifactProduct[] } = {}): Promise<string | null> {
@@ -643,6 +658,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
         copies: held.flatMap((m) => m.v.copies).concat(first ? [] : overwritten?.copies ?? []),
         opened: held.find((m) => m.src && m.entry?.hash === e.hash)?.src ?? e.kept ?? null,
         ...(e.pending ? { pending: true } : {}),
+        ...(!first && !e.kept ? { away: true } : {}),
       });
     }
     // A group's file not fetched yet is in the cloud's keeping: a version still to be numbered.
@@ -671,6 +687,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
   // A tile draws the newest version this computer has rather than nothing.
   async function faceOf(f: LinedFile, products: ArtifactProduct[] = readable()): Promise<string | null> {
     for (const v of [...f.chain].reverse()) {
+      if (v.away) continue;
       const found = v.opened ?? await openedOf(f, v, { products });
       if (found) return found;
     }
@@ -998,29 +1015,38 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       if (!whole) return null;
       const { chain, same } = await lineChain(whole);
       if (!chain.length) return null;
-      const file: LinedFile = { ...asOf(whole, chain), notes: whole.notes.map((n) => (same.has(n.file) ? { ...n, file: same.get(n.file)! } : n)) };
+      const onLine = <T extends { file: string }>(m: T): T => (same.has(m.file) ? { ...m, file: same.get(m.file)! } : m);
+      const file: LinedFile = { ...asOf(whole, chain), notes: whole.notes.map(onLine), approvals: whole.approvals.map(onLine) };
       const opened = new Map<string, string>();
-      for (const v of file.chain) opened.set(v.id, v.opened ?? await openedOf(file, v, { fetch: true }) ?? v.copies[0]?.path ?? v.name);
+      // A path that finds nothing, so the view says where the version is rather than drawing the one it was written over.
+      for (const v of file.chain) opened.set(v.id, v.opened ?? (v.away ? `line/${v.n}/${v.name}` : await openedOf(file, v, { fetch: true }) ?? v.copies[0]?.path ?? v.name));
       return viewOf(file, opened);
     },
 
     /**
-     * Each file a thread names, as its line numbers it: every version, where it
-     * opens on this computer (null when only a teammate has it), and `here`, the
-     * paths this thread named it by.
+     * Each file a thread, chat or group names, as its line numbers it: every
+     * version, where it opens on this computer (null when only a teammate has
+     * it), and `here`, the paths this thread named it by.
      */
-    async lineFor({ product, id }: { product: string; id: string }): Promise<FileLine[]> {
-      const isHere = (t: PlaceThread): boolean => t.ref.kind === 'thread' && t.ref.product === product && t.ref.id === id;
+    async lineFor(ask: CopiesOf): Promise<FileLine[]> {
+      const isHere = hereIs(ask);
+      const files = allFiles();
+      const { products } = chainsNow(files);
       const out: FileLine[] = [];
-      for (const whole of allFiles().filter((f) => f.chain.some((v) => v.copies.some((c) => isHere(c.thread))))) {
-        const { chain } = await lineChain(whole);
+      for (const whole of files.filter((f) => f.chain.some((v) => v.copies.some((c) => isHere(c.thread))))) {
+        const { chain } = await chainOf(whole, files);
         if (!chain.length) continue;
+        const here = new Map<LinedVersion, string[]>();
+        for (const c of whole.chain.flatMap((v) => v.copies).filter((x) => isHere(x.thread))) {
+          const v = await versionOfCopy(chain, c, products);
+          if (v && !here.get(v)?.includes(c.path)) here.set(v, [...(here.get(v) ?? []), c.path]);
+        }
         out.push({
           key: whole.key,
           versions: chain.map((v) => ({
             n: v.n, name: v.name, path: v.opened, by: v.by ?? null, at: v.at || 0,
             ...(typeof v.agent === 'string' ? { agent: v.agent } : {}),
-            here: v.copies.filter((c) => isHere(c.thread)).map((c) => c.path),
+            here: here.get(v) ?? [],
           })),
         });
       }
@@ -1028,39 +1054,60 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     },
 
     /**
-     * The comments and approvals on other copies of the file a thread names at
-     * `path`: copies in the same project with the same bytes, under whatever
-     * name. `file` is the version's name in this thread; theirs are given it.
+     * The comments and approvals the Files file holds that were made elsewhere,
+     * for the copy a thread, chat or group names at `path`, each on the version
+     * it was made on: `file` when that is this copy's, else `name@n` by the line.
+     * The file is the one whose line holds this copy's bytes.
      */
-    async sameFile({ product, id, path: src, file: here }: { product: string; id: string; path: string; file: string }, files: PlacedFile[] = allFiles()): Promise<FileElsewhere> {
+    async sameFile({ path: src, file: here, ...ask }: CopiesOf & { path: string; file: string }, files: PlacedFile[] = allFiles()): Promise<FileElsewhere> {
       const none: FileElsewhere = { key: null, notes: [], approvals: [] };
-      const isHere = (t: PlaceThread): boolean => t.ref.kind !== 'shared' && t.ref.product === product && t.ref.id === id;
-      const home = files.find((f) => f.chain.some((v) => v.copies.some((c) => isHere(c.thread) && c.path === src)));
-      const mine = await onDisk(src, product, null, copiesNow(files).products!);
-      const me = mine && await bytesOf(mine);
-      if (!home || !me) return none;
+      const isHere = hereIs(ask);
+      const { products } = chainsNow(files);
+      const mineOf = (f: PlacedFile): ChainCopy | undefined => f.chain.flatMap((v) => v.copies).find((c) => isHere(c.thread) && c.path === src);
+      let home: { f: PlacedFile; chain: LinedVersion[]; same: Map<string, string>; mine: LinedVersion | null } | null = null;
+      for (const f of files) {
+        const copy = mineOf(f);
+        if (!copy) continue;
+        const { chain, same } = await chainOf(f, files);
+        const mine = await versionOfCopy(chain, copy, products);
+        // A chat's copy joins every project's file of its name; only the one with its bytes is its file.
+        if (mine || !home) home = { f, chain, same, mine };
+        if (mine) break;
+      }
+      if (!home?.mine) return home ? { ...none, key: home.f.key } : none;
+      const { f, chain, same, mine } = home;
+      const versionOf = async (m: { file: string; thread: PlaceThread }): Promise<LinedVersion | null> => {
+        if (!/@\d+$/.test(m.file)) {
+          const copy = f.chain.find((v) => v.id === m.file)?.copies.find((c) => c.thread === m.thread);
+          if (copy) return versionOfCopy(chain, copy, products);
+        }
+        const id = same.get(m.file) ?? m.file;
+        return chain.find((v) => v.id === id) ?? null;
+      };
+      const fileOf = (v: LinedVersion): string => (v === mine ? here : `${baseName(v.name)}@${v.n}`);
       const notes: FileElsewhere['notes'] = [];
       const approvals: FileElsewhere['approvals'] = [];
-      for (const { f, v, c, bytes: it } of await copiesIn(files, home.project)) {
-        if (isHere(c.thread) || it.size !== me.size || it.hash !== me.hash) continue;
-        for (const n of f.notes) {
-          if (n.thread !== c.thread || n.file !== v.id || notes.some((x) => x.id === n.id)) continue;
-          const { thread, ...rest } = n;
-          notes.push({ ...rest, file: here, in: thread.title, key: f.key });
-        }
-        for (const a of f.approvals) {
-          if (a.thread !== c.thread || a.file !== v.id) continue;
-          const { thread: _t, ...rest } = a;
-          approvals.push({ ...rest, file: here, key: f.key });
-        }
+      for (const n of f.notes) {
+        if (isHere(n.thread) || notes.some((x) => x.id === n.id)) continue;
+        const v = await versionOf(n);
+        if (!v) continue;
+        const { thread, ...rest } = n;
+        notes.push({ ...rest, file: fileOf(v), in: thread.title, key: f.key });
       }
-      return { key: home.key, notes, approvals };
+      for (const a of f.approvals) {
+        if (isHere(a.thread)) continue;
+        const v = await versionOf(a);
+        if (!v) continue;
+        const { thread: _t, ...rest } = a;
+        approvals.push({ ...rest, file: fileOf(v), key: f.key });
+      }
+      return { key: f.key, notes, approvals };
     },
 
     /** sameFile for every file a thread names, from one reading of the threads. */
-    async sameFiles({ product, id, copies }: { product: string; id: string; copies?: ReadonlyArray<{ path?: unknown; file?: unknown } | null> | null }): Promise<FileElsewhere[]> {
+    async sameFiles({ copies, ...ask }: CopiesOf & { copies?: ReadonlyArray<{ path?: unknown; file?: unknown } | null> | null }): Promise<FileElsewhere[]> {
       const files = allFiles();
-      return Promise.all((copies ?? []).map((c) => this.sameFile({ product, id, path: String(c?.path ?? ''), file: String(c?.file ?? '') }, files)));
+      return Promise.all((copies ?? []).map((c) => this.sameFile({ ...ask, path: String(c?.path ?? ''), file: String(c?.file ?? '') }, files)));
     },
 
     /** A comment, approval or "seen" from the big view, written where it belongs. */

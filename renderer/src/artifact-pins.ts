@@ -1,6 +1,6 @@
 // PURE. How the big file view (components/ArtifactView.tsx) draws its pins,
 // zooms a picture, and what it offers for the file it found.
-import { noteGoesTo, notesForTheAgent, placeWords, tagsYourAgent, unsentReplies, viewKind } from '../../shared/artifact-marks.mts';
+import { noteGoesTo, notesForTheAgent, placeWords, tagsYourAgent, threadFiles, unsentReplies, versionNamed, viewKind } from '../../shared/artifact-marks.mts';
 import type { FileVersion } from '../../shared/artifact-marks.mts';
 import { MAX_ZOOM } from './picture-view';
 import type { FileMarks, FileNote, NotePlace } from './types';
@@ -170,7 +170,7 @@ export function marksOnPages(notes: Pick<FileNote, 'place' | 'resolved'>[]): Map
 /** A script a thread names only counts once someone opened it or commented on it: most are just mentioned. */
 export function otherFilesOpen<F extends { path: string }>(others: F[], opened: string | null | undefined, notes: Pick<FileNote, 'file'>[]): F[] {
   const clean = opened?.replace(/^\.\//, '');
-  return others.filter((f) => f.path === clean || notes.some((n) => n.file === f.path.split('/').pop()));
+  return others.filter((f) => f.path === clean || notes.some((n) => !!versionNamed(threadFiles([f]), n.file)));
 }
 
 const TILE_AIR = 16;
