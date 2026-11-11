@@ -51,6 +51,11 @@ describe('the page on screen', () => {
     expect(split).toMatch(/await api\.cloudAccountPay\('team'\)/);
     expect(split).toMatch(/const paid = teamPaid\(await api\.cloudAccountPlan\(\)\); if \(live && paid\) next\(\);/);
   });
+  it('moves from the team’s name to the email field on Enter, where Enter on nothing goes on', () => {
+    // Walking it, Enter in "Name your team" did nothing at all.
+    expect(split).toMatch(/<input className="ss-input" data-ss-enter="to-email" placeholder="Name your team"/);
+    expect(split).toMatch(/if \(typing && enter === 'to-email'\) \{ e\.preventDefault\(\); document\.querySelector<HTMLInputElement>\('\.setup-split input\[data-ss-enter="add"\]'\)\?\.focus\(\); return; \}/);
+  });
   it('makes the team for Pro even when nobody is invited yet', () => {
     expect(split).toMatch(/if \(!list\.length && \(plan !== 'pro' \|\| p\.snap\?\.team\?\.team\)\) \{ next\(\); return; \}/);
   });

@@ -247,6 +247,7 @@ export function SetupSplit(p: SetupSplitProps) {
         if (where !== 'behind' && inSetup && enterIsTheButtons(e)) return;
         const enter = (e.target as Element).getAttribute('data-ss-enter');
         if (typing && enter === 'add') { e.preventDefault(); if (typed.trim()) addEmail(); else primary.current(); return; }
+        if (typing && enter === 'to-email') { e.preventDefault(); document.querySelector<HTMLInputElement>('.setup-split input[data-ss-enter="add"]')?.focus(); return; }
         if (typing && !(e.metaKey || e.ctrlKey)) return;
         e.preventDefault(); primary.current();
       }
@@ -325,7 +326,7 @@ export function SetupSplit(p: SetupSplitProps) {
       <div className="ss-acts">{go('Sign in', () => void api.teamSignIn())}{quiet('Just me for now', next)}</div>
     </> : <>
       <div className="ss-list">
-        {!p.snap?.team?.team && <div className="ss-row"><span className="ss-face"><Plus /></span><input className="ss-input" placeholder="Name your team" value={teamName} onChange={(e) => setTeamName(e.target.value)} /></div>}
+        {!p.snap?.team?.team && <div className="ss-row"><span className="ss-face"><Plus /></span><input className="ss-input" data-ss-enter="to-email" placeholder="Name your team" value={teamName} onChange={(e) => setTeamName(e.target.value)} /></div>}
         {emails.map((e) => <Row key={e} face={e[0].toUpperCase()} name={e} end={<span className="ss-dim"><Tick />Added</span>} />)}
         <div className="ss-row"><span className="ss-face ss-dash"><Plus /></span>
           <input className="ss-input" data-ss-enter="add" placeholder="Add by email…" value={typed} onChange={(e) => setTyped(e.target.value)} /></div>
