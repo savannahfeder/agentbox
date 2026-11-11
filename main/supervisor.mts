@@ -173,7 +173,7 @@ import { connectionLine, filesComeFirst } from '../shared/connections-catalog.mt
 import { codexDefaultModel, codexHome, codexKnownSlugs, codexModelLevels, codexModels } from './codex-models.mts';
 import { codexAccount, codexPlanEnded, ensureCodexHome } from './codex-account.mts';
 import { accountName } from '../shared/account-names.mts';
-import { nameRow, wantsName, askSmallModel } from './row-label.mts';
+import { nameRow, wantsName, askSmallModel, smallModelPictures } from './row-label.mts';
 import { catchUpRow, catchUpResult } from './catch-up.mts';
 import { isAuto, asksWho, routeCandidates, routePrompt, readRoute, routedPatch, orPrimary, NOBODY_WHY } from '../shared/auto-route.mts';
 import { LEVELS, latestMessage, sortMessage, wantsPriority } from './message-priority.mts';
@@ -5089,9 +5089,17 @@ export class Supervisor {
     };
     if (!team.length) { write({ to: 'agent', why: NOBODY_WHY }); return undefined; }
     this._routing = true;
-    const prompt = routePrompt(next, team, items, { primary });
+    let product: Product | null = null;
+    try { product = this.store.listProducts?.().find((p) => p.slug === next.product) ?? null; } catch { product = null; }
+    const pictures = product ? smallModelPictures(this.attachedPictures(next, product)) : [];
     const clean = (text: string) => (readRoute(text, team, primary) ? text : '');
-    return this._askSmall((opts) => askSmallModel(prompt, clean, { ...opts, timeoutMs: ROUTE_TIMEOUT_MS }), { product: next.product })
+    const ask = (sent: string[]) => {
+      const prompt = routePrompt(next, team, items, { primary, pictures: sent.length > 0 });
+      return this._askSmall((opts) => askSmallModel(prompt, clean, { ...opts, timeoutMs: ROUTE_TIMEOUT_MS, pictures: sent }), { product: next.product });
+    };
+    // A call with pictures that fails is asked again in words alone.
+    return ask(pictures)
+      .then((answer) => (answer || !pictures.length ? answer : ask([])))
       .then((answer) => write(readRoute(answer, team, primary)))
       .catch((e) => {
         console.warn('zero: could not route a thread:', e.message);
