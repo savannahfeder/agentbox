@@ -50,4 +50,12 @@ describe('the rule the model is given', () => {
   it('says a task whose words alone do not name the job goes to an agent', () => {
     expect(prompt).toMatch(/When the words alone\ndo not say what the task is about, as when they point at a picture you\ncannot see, answer 0\./);
   });
+
+  // w-064dd249d2: "How complex would it be for us to do something like that?",
+  // about a cloud browser that keeps logins, went to the Performance lead
+  // because its job says "cloud" and "keep work off the Mac".
+  it('says an idea for something new is not the job of a teammate who keeps something working', () => {
+    expect(prompt).toMatch(/An idea for something new, or a question about how hard it would be to\nbuild, goes to a teammate only when its job is building that very thing\./);
+    expect(prompt).toMatch(/A job of watching or fixing a part of the app is not building something\nnew in that part: answer 0\./);
+  });
 });
