@@ -1252,6 +1252,9 @@ export function createTeamService({
     /** Those folders, as projects the file pane can read. */
     sharedThreadProducts: () => threadShare?.products() ?? [],
 
+    /** A teammate's file by the sha256 of its bytes, from a thread shared with this person (thread-share.mts). */
+    sharedFileByHash: (hash: string, o?: { fetch?: boolean }) => threadShare?.fileByHash(hash, o) ?? Promise.resolve(null),
+
     // Words to a thread's owner. The cloud decides who may: whoever can read the card.
     async commentOnThread(owner: string, threadId: string, text: unknown) {
       if (!backend || !threadShare) throw new Error('sign in first');

@@ -8,9 +8,10 @@ import { ConnectionLink } from '../connections/ConnectionsPlace';
 import { connectionLinkOf } from '../connections/connections-shown';
 import remarkGfm from 'remark-gfm';
 import { api } from '../api';
-import { marksOf, opensBigInAGroup } from '../../../shared/artifact-marks.mts';
+import { filesInLines, lineAsThread, marksOf, opensBigInAGroup, otherFilesInLines, threadFiles } from '../../../shared/artifact-marks.mts';
 import { whereAFileOpens } from '../artifact-layout';
 import { ArtifactView, type ArtifactOpen } from '../components/ArtifactView';
+import { markGoesTo, withElsewhere } from '../components/ThreadArtifacts';
 import { MAX_EDIT_BYTES } from '../../../shared/artifact-marks.mts';
 import { ArtifactImg, ArtifactLink, ArtifactMedia } from '../components/Focus';
 import { Thread } from '../components/Thread';
@@ -22,7 +23,7 @@ import { artifactUrlTransform, isMediaPath } from '../remark-artifact-paths';
 import { firstName, Face, TeamContext } from '../team/people';
 import { FollowContext } from '../team/following';
 import type { LedgerLine } from '../thread-history';
-import type { AgentEvent, FileMarkLink, FileMarks, Person, ThreadCard } from '../types';
+import type { AgentEvent, FileElsewhere, FileLine, FileMarkLink, FileMarks, Person, ThreadCard } from '../types';
 import { MessagePerson, TeammateCard, TeammateStanding } from './Summary';
 import { earlierWords, filesOnThread, notSharedWords } from './teammate-thread';
 import { canContinue } from './continue-thread';
@@ -96,9 +97,33 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   const events = built.events.filter((e: AgentEvent) => e.kind !== 'work' && e.kind !== 'run');
 
   // Their copy publishes its marks with its messages; everyone's come together here.
-  const marks = useMemo(() => marksOf((work?.lines ?? [])
+  const own = useMemo(() => marksOf((work?.lines ?? [])
     .filter((l) => l.patch?.artifact)
     .map((l) => ({ ...(l.patch!.artifact as object), by: l.by ?? null, ts: l.ts, uid: l.uid ?? null }))) as FileMarks, [work?.lines]);
+  // The file in Files these copies belong to: what was said on its other copies, and its version numbers.
+  const copies = useMemo(() => {
+    const lines = work?.lines ?? [];
+    return threadFiles([...filesInLines(lines), ...otherFilesInLines(lines)]).flatMap((f) => f.versions.map((v) => ({ path: v.path, file: v.id })));
+  }, [work?.lines]);
+  const copiesKey = JSON.stringify(copies);
+  const [elsewhere, setElsewhere] = useState<FileElsewhere[]>([]);
+  const [line, setLine] = useState<FileLine[]>([]);
+  useEffect(() => {
+    if (!product) return undefined;
+    let live = true;
+    const read = () => {
+      if (copies.length) void api.fileElsewhere({ product, id: threadId, copies }).then((all) => { if (live) setElsewhere(all); });
+      void api.fileLine({ product, id: threadId }).then((all) => { if (live) setLine(all); });
+    };
+    read();
+    // A burst of changes asks once.
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const off = api.onChanged(() => { if (timer) clearTimeout(timer); timer = setTimeout(read, 1000); });
+    return () => { live = false; if (timer) clearTimeout(timer); off?.(); };
+  }, [product, threadId, copiesKey]);
+  const marks = useMemo(() => withElsewhere(own, elsewhere), [own, elsewhere]);
+  const numbered = useMemo(() => lineAsThread(line), [line]);
+  const viewLines = useMemo(() => (numbered.lines.length ? [...(work?.lines ?? []), ...numbered.lines as LedgerLine[]] : work?.lines ?? []), [work?.lines, numbered]);
   const [big, setBig] = useState<ArtifactOpen | null>(null);
   useEffect(() => { setBig(openAt ? { ...openAt, at: Date.now() } : null); }, [openAt, personId, threadId]);
   const people = useMemo(() => (team ? [...team.byId.values()].filter((p) => !card.people?.length || card.people.includes(p.id) || p.id === personId) : []), [team, card.people, personId]);
@@ -126,9 +151,11 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   return (
     <div className="tp-page">
       {big && product && (
-        <ArtifactView product={product} project={card.project ?? null} draftsAcross={`teammate:${personId}:${threadId}`} lines={work?.lines ?? []} marks={marks}
+        <ArtifactView product={product} project={card.project ?? null} draftsAcross={`teammate:${personId}:${threadId}`} lines={viewLines} numbers={numbered.numbers} marks={marks}
           me={team?.me ?? null} people={people} open={big} ownerOfRow={personId}
           write={async (mark) => {
+            const key = markGoesTo(mark, elsewhere);
+            if (key) return api.filesPlaceMark({ key, mark });
             const out = await api.teamMarkFile({ personId, threadId, mark });
             setReread((n) => n + 1);
             return { ok: !!out?.ok, error: out?.error };

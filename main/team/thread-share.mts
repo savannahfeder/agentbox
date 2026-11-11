@@ -131,6 +131,7 @@ export interface ThreadShare {
   read(owner: string, threadId: string): SharedThreadView;
   folders(): { ownerId: string; threadId: string; version: string }[];
   products(): { slug: string; name: string; dir: string }[];
+  fileByHash(hash: string, o?: { fetch?: boolean }): Promise<string | null>;
   addMark(owner: string, threadId: string, mark: unknown): Promise<boolean>;
   fileNews(): ThreadFileNews[];
   talk(): ThreadTalk[];
@@ -275,6 +276,7 @@ export function createThreadShare({
   let comments: ThreadComment[] = [];
   let fileMarks: ThreadFileMark[] = [];
   const deliveredMarks = new Set<string>();
+  const missed = new Map<string, number>();
   const waitingFile = `${root}.marks-waiting.json`;
   let waiting: ThreadFileMark[] | null = null;
   let logged = '';
@@ -687,6 +689,41 @@ export function createThreadShare({
     /** Each thread's folder as a project the file pane can read. Not on any list of projects, so never written to. */
     products() {
       return localThreads().map(([owner, threadId]) => ({ slug: slugOf(owner, threadId), name: 'Shared thread', dir: folderOf(owner, threadId) }));
+    },
+
+    /**
+     * A file some teammate's thread here names, by the sha256 of its bytes: its
+     * copy in that thread's folder, or with `fetch` taken from the cloud the way
+     * a pass takes it. Only a thread on this computer is asked about, and a
+     * thread is only here while its card can be read.
+     */
+    async fileByHash(hash, { fetch = false } = {}) {
+      if (!/^[0-9a-f]{64}$/.test(String(hash))) return null;
+      const sumOf = (file: string) => { try { return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'); } catch { return null; } };
+      const named = localThreads().flatMap(([owner, threadId]) => {
+        const local = readLocal(owner, threadId);
+        const big = new Set((local?.big ?? []).map((f) => f.name));
+        return (local?.files ?? []).filter((n) => n.startsWith(`${hash.slice(0, 12)}-`) && FILE_NAME.test(n) && !big.has(n))
+          .map((name) => ({ owner, threadId, name, file: path.join(folderOf(owner, threadId), 'attachments', name) }));
+      });
+      for (const n of named) if (fs.existsSync(n.file) && sumOf(n.file) === hash) return n.file;
+      if (!fetch) return null;
+      for (const n of named) {
+        const asked = `${n.owner}/${n.threadId}/${n.name}`;
+        // Every open view asks on each change in the app; one the cloud did not give waits for the next look.
+        if (fs.existsSync(n.file) || now() - (missed.get(asked) ?? -Infinity) < LOOK_AGAIN_MS) continue;
+        missed.set(asked, now());
+        const data = await quietly(`taking ${n.name}`, () => backend.getThreadFile(n.owner, n.threadId, n.name));
+        const bytes = typeof data === 'string' ? Buffer.from(data, 'base64') : null;
+        if (!bytes || bytes.length > MAX_THREAD_FILE_BYTES || crypto.createHash('sha256').update(bytes).digest('hex') !== hash) continue;
+        fs.mkdirSync(path.dirname(n.file), { recursive: true });
+        const tmp = `${n.file}.${process.pid}.tmp`;
+        fs.writeFileSync(tmp, bytes);
+        fs.renameSync(tmp, n.file);
+        missed.delete(asked);
+        return n.file;
+      }
+      return null;
     },
 
     /** Kept on disk first, then sent; a failed send waits for the next pass. */

@@ -36,12 +36,13 @@ export type ThreadRef =
 
 type RefKind = ThreadRef['kind'];
 
-/** The thread or chat `product`/`id`, or the group `room`, whose copies are asked about. */
+/** The thread or chat `product`/`id`, or the group `room`, whose copies are asked about. A teammate's thread is its folder's `product` and its thread id. */
 export interface CopiesOf { product: string; id: string; room?: string | null }
 
 const hereIs = ({ product, id, room }: CopiesOf) => (t: PlaceThread): boolean => (room
   ? t.ref.kind === 'room' && t.ref.roomId === room
-  : (t.ref.kind === 'thread' || t.ref.kind === 'chat') && t.ref.product === product && t.ref.id === id);
+  : t.ref.kind === 'shared' ? !!product && t.ref.product === product && t.ref.threadId === id
+    : (t.ref.kind === 'thread' || t.ref.kind === 'chat') && t.ref.product === product && t.ref.id === id);
 
 export interface PlaceThread {
   ref: ThreadRef;
@@ -70,8 +71,8 @@ export interface ChainVersion {
   copies: ChainCopy[];
 }
 
-/** `away`: its bytes are on no copy here, and its copies are those of the path it was written over. */
-export interface LinedVersion extends ChainVersion { opened: string | null; pending?: boolean; blank?: boolean; away?: boolean }
+/** `away`: its bytes are on no copy here, and its copies are those of the path it was written over. `hash`: its bytes' sha256 on the line. */
+export interface LinedVersion extends ChainVersion { opened: string | null; pending?: boolean; blank?: boolean; away?: boolean; hash?: string }
 
 export type PlacedNote = FileNote & { thread: PlaceThread };
 export type PlacedApproval = FileApproval & { thread: PlaceThread };
@@ -681,6 +682,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
         ...(first?.edited ? { edited: true } : first?.made ? { made: true } : {}),
         copies: held.flatMap((m) => m.v.copies).concat(first ? [] : overwritten?.copies ?? []),
         opened: held.find((m) => m.src && m.entry?.hash === e.hash)?.src ?? e.kept ?? null,
+        hash: e.hash,
         ...(e.pending ? { pending: true } : {}),
         ...(!first && !e.kept ? { away: true } : {}),
       });
@@ -693,6 +695,11 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     for (const v of chain) same.set(`${baseName(v.name)}@${v.n}`, v.id);
     return { chain, same };
   }
+  // Opening may fetch: a version a teammate made is in the cloud for whoever can read its thread.
+  async function openedToView(file: LinedFile, v: LinedVersion): Promise<string | null> {
+    const own = v.opened ?? (v.away ? null : await openedOf(file, v, { fetch: true }));
+    return own ?? (v.hash ? await team?.sharedFileByHash?.(v.hash, { fetch: true }) ?? null : null);
+  }
   /** A file as the big view opens it: its line, every mark on the line's ids, and where each version opens. */
   async function viewed(whole: PlacedFile): Promise<{ file: LinedFile; opened: Map<string, string>; same: Map<string, string> } | null> {
     const { chain, same } = await lineChain(whole);
@@ -701,7 +708,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     const file: LinedFile = { ...asOf(whole, chain), notes: whole.notes.map(onLine), approvals: whole.approvals.map(onLine) };
     const opened = new Map<string, string>();
     // A path that finds nothing, so the view says where the version is rather than drawing the one it was written over.
-    for (const v of file.chain) opened.set(v.id, v.opened ?? (v.away ? `line/${v.n}/${v.name}` : await openedOf(file, v, { fetch: true }) ?? v.copies[0]?.path ?? v.name));
+    for (const v of file.chain) opened.set(v.id, await openedToView(file, v) ?? (v.away ? `line/${v.n}/${v.name}` : v.copies[0]?.path ?? v.name));
     return { file, opened, same };
   }
 
@@ -1070,10 +1077,12 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
           const v = await versionOfCopy(chain, c, products);
           if (v && !here.get(v)?.includes(c.path)) here.set(v, [...(here.get(v) ?? []), c.path]);
         }
+        const lined: LinedFile = { ...whole, chain };
+        const paths = await Promise.all(chain.map((v) => openedToView(lined, v)));
         out.push({
           key: whole.key,
-          versions: chain.map((v) => ({
-            n: v.n, name: v.name, path: v.opened, by: v.by ?? null, at: v.at || 0,
+          versions: chain.map((v, i) => ({
+            n: v.n, name: v.name, path: paths[i], by: v.by ?? null, at: v.at || 0,
             ...(typeof v.agent === 'string' ? { agent: v.agent } : {}),
             here: here.get(v) ?? [],
           })),

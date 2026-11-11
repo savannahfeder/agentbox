@@ -14,10 +14,14 @@ export function fullScreenTakes(src: string | null | undefined): boolean {
 // Something to look at opens full screen; something to read and talk over opens beside the chat.
 const LOOKED_AT = new Set(['image', 'film', 'pdf', 'page', 'deck']);
 
-/** Where a file pressed in a thread opens first. Null: its older way. */
-export function whereAFileOpens(src: string | null | undefined): 'beside' | 'full' | null {
+/**
+ * Where a file pressed in a thread opens first. Null: its older way. In a
+ * conversation or a task a teammate gave you, the file's notes were made on
+ * other copies, and only the review shows those, so it opens there.
+ */
+export function whereAFileOpens(src: string | null | undefined, { conversation = false }: { conversation?: boolean } = {}): 'beside' | 'full' | null {
   if (!fullScreenTakes(src)) return null;
-  return LOOKED_AT.has(viewKind(src) as string) || !opensInPane(src) ? 'full' : 'beside';
+  return conversation || LOOKED_AT.has(viewKind(src) as string) || !opensInPane(src) ? 'full' : 'beside';
 }
 export function artifactFraction(fraction: number, width: number): number {
   return Math.max(560 / width, Math.min(1 - 400 / width, fraction));

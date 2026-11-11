@@ -55,7 +55,7 @@ describe('the wiring', () => {
   const teammate = read('renderer/src/threads/TeammateThread.tsx');
 
   it('a thread opens a file with the rule, both ways', () => {
-    expect(focus).toMatch(/const opensBig = [^\n]*whereAFileOpens\(path\) === 'full'/);
+    expect(focus).toMatch(/const opensBig = [^\n]*whereAFileOpens\(path(, \{ conversation: direct \})?\) === 'full'/);
     expect(focus).toMatch(/whereAFileOpens\(/);
     const openHref = focus.slice(focus.indexOf('const openHref'), focus.indexOf("if (goes === 'picture')"));
     expect(openHref).toMatch(/opensBeside\(href\)/);
