@@ -138,6 +138,10 @@ export function routePrompt(
         'it is about. When the words and the pictures together do not say, answer 0.']
       : ['When the words alone do not say what the task is about, as when they',
         'point at a picture you cannot see, answer 0.']),
+    'An idea for something new, or a question about how hard it would be to',
+    'build, goes to a teammate only when its job is building that very thing.',
+    'A job of watching or fixing a part of the app is not building something',
+    'new in that part: answer 0.',
     '',
     '--- the task ---',
     cut(named(item?.title, pictures), 400),

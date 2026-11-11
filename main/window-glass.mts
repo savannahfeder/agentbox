@@ -37,6 +37,15 @@ export interface GlassableWindow {
   setWindowButtonPosition(position: { x: number; y: number } | null): void;
 }
 
+/**
+ * The appearance macOS draws the glass in. It follows the Mac's own unless
+ * told, so Light on a dark Mac got dark glass. An explicit Light or Dark sets
+ * it; anything else gives it back to the Mac.
+ */
+export function glassTone(tone: unknown): 'light' | 'dark' | 'system' {
+  return tone === 'light' || tone === 'dark' ? tone : 'system';
+}
+
 /** Flipping the switch while the app runs: the same window, turned glass or back. */
 export function applyGlass(win: GlassableWindow | null, platform: NodeJS.Platform, on: boolean): void {
   if (platform !== 'darwin' || !win || win.isDestroyed()) return;

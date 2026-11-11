@@ -2932,7 +2932,8 @@ export default function App() {
     const root = document.documentElement;
     if (glassOn && 'glassAble' in root.dataset) root.dataset.glass = '';
     else delete root.dataset.glass;
-  }, [glassOn]);
+    window.zero?.glassTone?.({ tone: glassOn && 'glassAble' in document.documentElement.dataset && theme !== 'match' ? theme : 'system' });
+  }, [glassOn, theme]);
   const [connectionsPage, setConnectionsPage] = useState<{ focus: string | null } | null>(null);
   const sharedFileNews = snap?.team?.sharedFileNews ?? [];
   const theirRows = useMemo(
@@ -7314,7 +7315,7 @@ export default function App() {
   // `said` false for a pick in the thread's own Runs on panel, which shows it there.
   const placeThread = (item: WorkItem, keep: PlaceAct, said = true) => {
     if (keep === 'move') { void moveToCloud([item.id], item.product, said); return; }
-    void api.setThreadOnMac({ [item.id]: keep ? true : null });
+    void api.setThreadOnMac({ [item.id]: keep });
     if (said) showToast(keep ? 'This thread now runs only on this Mac' : 'This thread can run on the cloud again');
   };
   // The write the summary panel's Visible to menu makes.

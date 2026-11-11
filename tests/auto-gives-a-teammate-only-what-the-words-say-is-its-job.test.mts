@@ -57,4 +57,12 @@ describe('the rule the model is given', () => {
     expect(seen).toContain('The pictures attached are part of the task');
     expect(seen).not.toContain('a picture you cannot see');
   });
+
+  // w-064dd249d2: "How complex would it be for us to do something like that?",
+  // about a cloud browser that keeps logins, went to the Performance lead
+  // because its job says "cloud" and "keep work off the Mac".
+  it('says an idea for something new is not the job of a teammate who keeps something working', () => {
+    expect(prompt).toMatch(/An idea for something new, or a question about how hard it would be to\nbuild, goes to a teammate only when its job is building that very thing\./);
+    expect(prompt).toMatch(/A job of watching or fixing a part of the app is not building something\nnew in that part: answer 0\./);
+  });
 });
