@@ -173,9 +173,10 @@ const shortId = (v: unknown): string | null => (typeof v === 'string' && MARK_ID
 const fileId = (v: unknown): string | null => (typeof v === 'string' && FILE_ID.test(v) && v !== '.' && v !== '..' ? v : null);
 const unit = (v: unknown): v is number => typeof v === 'number' && v >= 0 && v <= 1;
 
-type RawPlace = { kind?: unknown; x?: unknown; y?: unknown; s?: unknown; n?: unknown; word?: unknown; text?: unknown; cell?: { row?: unknown; column?: unknown } | null };
+export type RawPlace = { kind?: unknown; x?: unknown; y?: unknown; s?: unknown; n?: unknown; word?: unknown; text?: unknown; cell?: { row?: unknown; column?: unknown } | null };
 
-function cleanPlace(place: RawPlace | null | undefined): NotePlace | undefined {
+/** A place as a note or a link comment may name it, or undefined. */
+export function cleanPlace(place: RawPlace | null | undefined): NotePlace | undefined {
   switch (place?.kind) {
     case 'pin': return unit(place.x) && unit(place.y) ? { kind: 'pin', x: place.x, y: place.y } : undefined;
     case 'time':

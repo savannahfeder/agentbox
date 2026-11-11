@@ -29,6 +29,8 @@ export interface InboxItem {
   snoozedUntil?: number;
   /** Teammates' comments its owner has not yet dealt with (shared/work-items.mts). */
   waitingComments?: { by: string; ts: number; text: string }[];
+  /** Comments on its shared links its owner has not yet dealt with. */
+  linkComments?: { name: string; file: string; text: string; ts: number }[];
   /** 'later' while a thread sits in Later, written down and not begun. */
   start?: 'later' | 'now';
   /** The thread this one was filed under: what makes it a proposal. */
@@ -188,7 +190,7 @@ export function belongsInInbox(
 ): boolean {
   // A teammate's words wait for you whatever the thread is doing, a running
   // agent included (`waitingComments`, shared/work-items.mts).
-  if (i.waitingComments?.length) return true;
+  if (i.waitingComments?.length || i.linkComments?.length) return true;
   // In Later and not begun: it waits for a person, not a clock, so it is in
   // Later and nowhere else.
   if (notStarted(i)) return false;
