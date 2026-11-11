@@ -6,11 +6,16 @@ export const NOTE_WINDOW = Object.freeze({ oldestDays: 7, youngestDays: 3 });
 // A first run after a quiet week must not turn into a blast.
 export const NOTES_PER_RUN = 50;
 
-// "Hey ada.lovelace92" reads as a mail merge, so a first word that looks like
-// a username gets "Hey there" instead.
+// "Hey ada.lovelace92" and "Hey J" read as a mail merge, so a username or an
+// initial counts as no name. A name typed in one case is capitalised; one
+// with its own mix of capitals (DeShawn) is left alone.
 export function firstNameFor(name) {
   const first = String(name ?? '').trim().split(/\s+/)[0];
-  if (!first || /[@._\d]/.test(first) || !/\p{L}/u.test(first)) return null;
+  if (!first || /[@._\d]/.test(first) || [...first].length < 2 || !/\p{L}/u.test(first)) return null;
+  if (first === first.toLowerCase() || first === first.toUpperCase()) {
+    const lower = first.toLowerCase();
+    return lower.charAt(0).toUpperCase() + lower.slice(1);
+  }
   return first;
 }
 

@@ -52,6 +52,27 @@ describe('the name it opens with', () => {
     expect(firstNameFor('José Núñez', 'jose@x.dev')).toBe('José');
     expect(firstNameFor('Mary-Jane O\'Neil', 'mj@x.dev')).toBe('Mary-Jane');
   });
+
+  // Of 149 confirmed accounts on 2026-11-10, 9 typed their first name all in
+  // lowercase and 3 gave a single letter.
+  it('capitalises a name typed all in lowercase or all in capitals', () => {
+    expect(firstNameFor('ada lovelace')).toBe('Ada');
+    expect(firstNameFor('ADA')).toBe('Ada');
+    expect(firstNameFor('josé')).toBe('José');
+    expect(firstNameFor('mary-jane')).toBe('Mary-jane');
+  });
+
+  it('leaves a name with its own mix of capitals as it was typed', () => {
+    expect(firstNameFor('DeShawn')).toBe('DeShawn');
+    expect(firstNameFor('McKenzie Smith')).toBe('McKenzie');
+  });
+
+  it('treats a single letter as no name, and keeps two letters', () => {
+    expect(firstNameFor('J')).toBe(null);
+    expect(firstNameFor('j smith')).toBe(null);
+    expect(firstNameFor('Al')).toBe('Al');
+    expect(firstNameFor('jo')).toBe('Jo');
+  });
 });
 
 describe('the email itself', () => {
