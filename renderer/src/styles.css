@@ -921,6 +921,15 @@ body {
 .app.back-forward-on .thread-crumb-back svg,
 .app.back-forward-on .workspace-page-heading .workspace-back { display: none; }
 .app.back-forward-on .thread-crumb-back { padding-left: 0; }
+/* Chats, Groups and Team pull their header's first column left to the card
+   edge so its line meets the list's. The arrows come first in the bar, so the
+   column pulls further by their width and its name starts after them. */
+.app.back-forward-on { --bf-w: 66px; }
+.app.back-forward-on .topbar > .back-forward { position: relative; z-index: 2; }
+.app.back-forward-on .topbar > .back-forward + .gc-head { margin-left: calc(-32px - var(--bf-w)); }
+.app.back-forward-on.gt-inset .topbar > .back-forward + .gc-head { margin-left: calc(-44px - var(--bf-w)); }
+.app.back-forward-on .topbar > .back-forward + .gc-head > .gc-head-col { padding-left: calc(32px + var(--bf-w)); }
+.app.back-forward-on.gt-inset .topbar > .back-forward + .gc-head > .gc-head-col { padding-left: calc(44px + var(--bf-w)); }
 
 /* WHAT AN OPENED TASK HAS INSTEAD OF A TOP BAR. Nothing is drawn here. It
    exists for two things only, and both are invisible: 1. THE THREE BUTTONS
