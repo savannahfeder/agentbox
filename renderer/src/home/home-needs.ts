@@ -35,7 +35,9 @@ export function homeNeedsRows(entries: readonly NeedsEntry[], { item, nameOf }: 
     const m = e.lead.mention;
     if (m) {
       const from = first(m.byName) ?? person(m.by);
-      return { ...row, letter: letterOf(from), title: firstRealLine(m.body) || 'sent a file', from, project: m.roomName, at: m.at, unread: m.unread !== false };
+      // A two-person chat is named for the sender, who is already on the row.
+      const project = m.roomName === m.byName ? '' : m.roomName;
+      return { ...row, letter: letterOf(from), title: firstRealLine(m.body) || 'sent a file', from, project, at: m.at, unread: m.unread !== false };
     }
     return { ...row, letter: letterOf(first(e.lead.invite?.words)), title: e.lead.invite?.words ?? 'An invitation', from: null, project: '', at: null };
   });

@@ -58,6 +58,14 @@ describe('Needs you on Home', () => {
     expect(html).toContain('Maya');
   });
 
+  it('names the sender once: a two-person chat is named for them, a group keeps its name', () => {
+    expect(rowsFor(list({ leads: [mention] }))[0]).toMatchObject({ from: 'Maya', project: '' });
+    const inGroup = { key: 'room-mention:r-team', mention: { ...mention.mention, id: 'room-mention:r-team', roomId: 'r-team', roomName: 'Kestrel' } };
+    expect(rowsFor(list({ leads: [inGroup] }))[0]).toMatchObject({ from: 'Maya', project: 'Kestrel' });
+    const three = { key: 'room-mention:r-3', mention: { ...mention.mention, id: 'room-mention:r-3', roomId: 'r-3', roomName: 'Maya C., Priya R.' } };
+    expect(rowsFor(list({ leads: [three] }))[0].project).toBe('Maya C., Priya R.');
+  });
+
   it('lists a teammate\'s thread waiting on you, and nothing of yours', () => {
     const entries = list({ cards: [card()] });
     expect(entries.map((e) => e.kind)).toEqual(['card']);
