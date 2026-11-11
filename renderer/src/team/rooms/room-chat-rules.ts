@@ -4,6 +4,7 @@
 import type { RoomMessage } from '../../types';
 import { markMentions } from './room-rules';
 import { isImageName } from '../../attachments';
+import { viewKind } from '../../../../shared/artifact-marks.mts';
 
 /**
  * The first message to sit under the New line: the oldest one in the chat
@@ -41,6 +42,12 @@ export function storedName(name: string, now = Date.now(), rand = Math.random().
   const safe = String(name || 'file').replace(/[^\w.-]+/g, '-').replace(/^[^A-Za-z0-9]+/, '').slice(0, 80) || 'file';
   return `${now.toString(36)}-${rand}-${safe}`;
 }
+
+/** The stored name of a file sent in the chat, from a link in a message; null for a web address or anything else. */
+export const attachedName = (href: string): string | null => /^attachments\/([A-Za-z0-9][\w.-]{0,159})$/.exec(href)?.[1] ?? null;
+
+/** Whether a file pressed in a chat opens in the review, with its notes, versions and Approve: every kind it draws. */
+export const opensInTheReview = (name: string): boolean => !!viewKind(name);
 
 /** A message's words with the files sent in it linked under them, as the chat's own box writes them. */
 export function withFileLinks(words: string, files: readonly { name: string; stored: string }[]): string {

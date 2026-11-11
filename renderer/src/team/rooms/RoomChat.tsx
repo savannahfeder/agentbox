@@ -25,7 +25,7 @@ import { forgetVoiceDraft, markVoiceSent, sendTurnedBack, type VoiceControl } fr
 import { createPortal } from 'react-dom';
 import { FileSheet } from '../../components/FileSheet';
 import { FileCover } from '../../components/FileCover';
-import { opensBigInAGroup, reviewKind, shownName } from '../../../../shared/artifact-marks.mts';
+import { reviewKind, shownName } from '../../../../shared/artifact-marks.mts';
 import { RoomFileView, type RoomFileOpening, type RoomFiles } from './RoomFileView';
 import { AttachRow } from '../../components/AttachRow';
 import { ChatLink } from '../../threads/ContinuedFrom';
@@ -39,7 +39,7 @@ import { LINE_MISSING } from '../../reveal-line';
 import { Face } from '../people';
 import { cardName, chatWidth, mentionsIn, readChatWidth, writeChatWidth } from './room-rules';
 import { clockOf } from '../../teammates/chat-lines';
-import { drawnRoots, holdsRead, mentionMarkdown, myNewest, newLineAt, quickOnBar, roomReader, storedName, wordsLeftAfterSend } from './room-chat-rules';
+import { attachedName, drawnRoots, holdsRead, mentionMarkdown, myNewest, newLineAt, opensInTheReview, quickOnBar, roomReader, storedName, wordsLeftAfterSend } from './room-chat-rules';
 
 export type ChatPerson = { id: string; name: string; avatarUrl: string | null; me: boolean };
 
@@ -58,7 +58,7 @@ export type RoomChatCalls = {
   onPutFileFrom?: (name: string, srcPath: string) => Promise<string | null>;
   /** Files going up in parts: `${roomId}/${name}` -> parts sent of how many. */
   sending?: Record<string, { done: number; total: number }>;
-  /** What opens a picture, film, PDF, deck or document big, with its comments. */
+  /** What opens a file big, with its comments. */
   files?: RoomFiles;
   /** A file a Needs you row asked to open. */
   openingFile?: RoomFileOpening | null;
@@ -84,7 +84,7 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
   const [thread, setThread] = useState<string | null>(null);
   const [viewing, setViewing] = useState<RoomFileOpening | null>(null);
   const opensBig = useCallback((name: string) => {
-    if (!calls.files || !opensBigInAGroup(name)) return false;
+    if (!calls.files || !opensInTheReview(name)) return false;
     setViewing({ name, at: Date.now() });
     return true;
   }, [!!calls.files]);
@@ -330,7 +330,6 @@ function RoomFile({ name, shown, load, opensBig, film = false, children }: { nam
 /** A room message as markdown: @names marked, voice notes and pictures drawn, other files named. */
 const MARKDOWN_PLUGINS = [remarkGfm];
 const NOBODY: readonly string[] = [];
-const storedIn = (href: string) => /^attachments\/([A-Za-z0-9][\w.-]{0,159})$/.exec(href)?.[1] ?? null;
 
 function RoomMarkdown({ text, names, loadFile, findFile, opensBig, roomId, mine, me }: {
   text: string; names: string[]; roomId: string; mine: boolean; loadFile?: (name: string) => Promise<Blob | null>;
@@ -358,7 +357,7 @@ function RoomMarkdown({ text, names, loadFile, findFile, opensBig, roomId, mine,
         if (href === '#mention-me') return <b className="rm-at me">{children}</b>;
         const connection = connectionLinkOf(href);
         if (connection) return <ConnectionLink id={connection.id}>{children}</ConnectionLink>;
-        const name = href ? storedIn(href) : null;
+        const name = href ? attachedName(href) : null;
         const note = name ? voiceNoteOf(name) : null;
         if (name && note) return <VoiceNote id={`room:${roomId}:${name}`} ms={note.ms} mine={mine} load={() => fetchFile(name)} />;
         const shown = typeof children === 'string' ? children : (Array.isArray(children) ? children.join('') : name ?? '');
@@ -367,7 +366,7 @@ function RoomMarkdown({ text, names, loadFile, findFile, opensBig, roomId, mine,
         return <ChatLink href={href}>{children}</ChatLink>;
       },
       img: ({ src, alt }: { src?: string; alt?: string }) => {
-        const name = src ? storedIn(src) : null;
+        const name = src ? attachedName(src) : null;
         return name ? <RoomPicture roomId={roomId} name={name} alt={alt ?? ''} loadFile={fetchFile} opensBig={openBig} /> : null;
       },
     };

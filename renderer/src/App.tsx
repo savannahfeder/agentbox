@@ -256,7 +256,7 @@ import { usePointerHold, useHeldOrder } from './threads/steady-rows';
 import { inviteRows, leadRows, type InviteRow, type LeadRow } from './threads/needs-you-rows';
 import { InviteCards, InviteRows } from './threads/InviteRows';
 import { mentionRows } from './team/rooms/room-rules';
-import { SAYS_UNDO, othersIn, sentToWhom, toastTitle, oIsTheToasts, oWaitsFor, oWaitsForTheSend, opensTheToast, saysWhereItWent, toastOpens, toastParts, type OWaits, type ToastGoes } from './toast-parts';
+import { SAYS_UNDO, handedToWhom, othersIn, sendingTo, sentToWhom, toastTitle, oIsTheToasts, oWaitsFor, oWaitsForTheSend, opensTheToast, saysWhereItWent, toastOpens, toastParts, type OWaits, type ToastGoes } from './toast-parts';
 import { SentLine } from './components/SentLine';
 import { TickedBar } from './components/TickedBar';
 import { AgentSending } from './team/AgentSending';
@@ -7492,8 +7492,9 @@ export default function App() {
       await api.routeThread({ product: item.product, id: item.id, to: to.id }).then(() => showToast(`Given to ${to.name}`), (err) => showToast(String(err?.message ?? err)));
       return;
     }
+    showToast(sendingTo(to.name.split(/\s+/)[0] || to.name));
     const out = await api.teamHandOn({ product: item.product, id: item.id, to: to.id });
-    showToast(out.ok ? `Task sent to ${to.name}` : out.error ?? 'That did not work.', out.made ? { product: out.made.product, id: out.made.id } : undefined);
+    showToast(out.ok ? handedToWhom(to.name) : out.error ?? 'That did not work.', out.made ? { product: out.made.product, id: out.made.id } : undefined);
     if (out.ok) await refresh();
   };
   const runThreadCommand = (item: WorkItem, c: ThreadCommand) => {
@@ -7548,6 +7549,8 @@ export default function App() {
       const item = items.find((i) => i.product === target.product && i.id === target.id);
       const link = threadLink(team?.me, target.id);
       if (!item || !link || !to.length) return;
+      const names = to.map((id) => firstName(team?.byId.get(id) ?? null) || 'them').join(' and ');
+      showToast(sendingTo(names));
       const seen = seenNow(item, team?.products.get(item.product), team?.state.since ?? null);
       if (seen !== 'team') {
         const opened = await api.threadEdit(item.product, item.id, openTo(seen, item.visibleTo, to));
@@ -7559,8 +7562,7 @@ export default function App() {
       const out = oneChat && to.length === 1
         ? await roomsUi.startChat(to[0], team?.byId.get(to[0])?.name ?? 'Chat', words).then((error) => ({ ok: !error, error: error ?? undefined }))
         : await api.teamMessage(to.length === 1 ? to[0] : to, words);
-      const names = to.map((id) => firstName(team?.byId.get(id) ?? null) || 'them').join(' and ');
-      showToast(out.ok ? `Sent to ${names}` : (out.error ?? `It did not reach ${names}.`));
+      showToast(out.ok ? `Sent to ${names}` : (out.error ?? `It did not reach ${names}.`), out.ok ? { product: item.product, id: item.id } : undefined);
       if (out.ok && to.length === 1) { try { localStorage.setItem(SHARE_LAST, to[0]); } catch { /* the menu just names the first */ } }
       void refresh();
     },

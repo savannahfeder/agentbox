@@ -248,3 +248,17 @@ export function noteSendWords({ text, people, me, nameOf, agentMade, toAgent, ow
   if (agentMade && toAgent) return tagsYourAgent(text) ? 'Send to your agent' : 'Comment';
   return owner && owner !== me ? `Send to ${nameOf(owner)}` : 'Comment';
 }
+
+/** What the button says once the note it sent has saved: who it went to, or null for a comment kept on the file. */
+export const noteSentWords = (sendWords: string): string | null => (sendWords.startsWith('Send to ') ? `Sent to ${sendWords.slice('Send to '.length)}` : null);
+
+/**
+ * Whether a key goes into the note box. The view takes every key while it is
+ * open, so a letter typed once the caret has left the box, as it does when the
+ * page's frame takes a click, would otherwise be lost.
+ */
+export function letterGoesToTheNote({ key, chord, on, boxThere }: {
+  key: string; chord: boolean; on: 'box' | 'control' | 'nothing'; boxThere: boolean;
+}): boolean {
+  return boxThere && !chord && on === 'nothing' && /^\p{L}$/u.test(key);
+}

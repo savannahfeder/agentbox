@@ -13,7 +13,7 @@ import { canPaintQuotes, paintQuotes } from '../paint-quotes';
 import { firstName, Face } from '../team/people';
 import { clock, type LedgerLine } from '../thread-history';
 import type { ArtifactMark, FileMarks, FileNote, NotePlace, Person } from '../types';
-import { hasSpot, noteSendWords, notesToSendTheAgent, notesToSendTheAgentAnywhere, otherFilesOpen, unsentWords, pageSpot, PIN_FRAME_S, pinned, viewOffers, type Found } from '../artifact-pins';
+import { hasSpot, letterGoesToTheNote, noteSendWords, noteSentWords, notesToSendTheAgent, notesToSendTheAgentAnywhere, otherFilesOpen, unsentWords, pageSpot, PIN_FRAME_S, pinned, viewOffers, type Found } from '../artifact-pins';
 import { commentsInList, notesWithSaving, settleLocally, UNDO_MS } from '../note-saving';
 import { keptDraft, opensForTyping, SAVE_AFTER_A_PAUSE_MS, savedVersionArrived, wordsToSave } from '../edit-sitting';
 import { quotesKey } from '../selection-bar';
@@ -54,6 +54,12 @@ const whenShared = (ts: number) => (new Date(ts).toDateString() === new Date().t
   ? `today at ${clockAt(ts)}` : new Date(ts).toLocaleDateString([], { month: 'short', day: 'numeric' }));
 const KIND_WORD = { image: 'Picture', film: 'Film', pdf: 'PDF', deck: 'Slides', markdown: 'Document', page: 'Page', table: 'Table', code: 'Code' } as const;
 
+const keyIsOn = (target: EventTarget | null): 'box' | 'control' | 'nothing' => {
+  const el = target instanceof HTMLElement ? target : null;
+  if (!el || el === document.body) return 'nothing';
+  if (el.matches('textarea, input, select') || el.isContentEditable) return 'box';
+  return el.closest('button, a[href], select, [role="button"], [role="option"], [role="menuitem"], [tabindex]:not([tabindex="-1"])') ? 'control' : 'nothing';
+};
 const newId = () => `n${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
 export function ArtifactView({ product, project = null, thread, draftsAcross, shareThread, lines, numbers, marks: given, me, people, open, ownerOfRow, write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, onBeside, below, files: fromElsewhere, typing = false }: {
@@ -134,6 +140,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   const [showSettled, setShowSettled] = useState(false);
   const [hold, setHold] = useState(0);
   const [sending, setSending] = useState(false);
+  const [justSent, setJustSent] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [found, setFound] = useState<Found>('looking');
   const [pictures, setPictures] = useState<PendingAttachment[]>([]);
@@ -208,7 +215,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     draftOf.current = version?.id ? { file: version.id, holding: kept.holding } : null;
     setWords(kept.words); setDraftPlace(kept.place); setAsking(null);
     setNamed(people.filter((p) => kept.words.includes(`@${firstName(p)}`)));
-    setHere(null); setReplyingTo(null); setFound('looking');
+    setHere(null); setReplyingTo(null); setFound('looking'); setJustSent(null);
   }, [version?.id]);
   useEffect(() => {
     const d = draftOf.current;
@@ -283,6 +290,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     // "Sofia, approved v4" names Sofia as surely as @Sofia does: it reaches her, not the agent.
     const to = addressedTo(typed, people);
     const mentions = [...new Set([...(to ? [to] : []), ...named.filter((p) => typed.includes(`@${firstName(p)}`)).map((p) => p.id)])];
+    const went = noteSentWords(sendWords);
     setSending(true);
     let links = '';
     try { links = await persistAttachments(product, pictures); } catch (err) {
@@ -311,6 +319,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
       setPictures(sentPictures);
       return;
     }
+    setJustSent(went);
     setNamed([]);
     // A pinned comment was covering the notes you carried; they come back once it is sent.
     const d = draftOf.current;
@@ -606,6 +615,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
       }
       if (e.metaKey || e.ctrlKey) return;
       e.stopPropagation();
+      if (letterGoesToTheNote({ key: e.key, chord: e.altKey, on: keyIsOn(e.target), boxThere: !!box.current })) { box.current!.focus(); return; }
       if (typing || followsTheFile || pressedInTheFindBox(e.target)) return;
       if (e.key === 'ArrowRight') { e.preventDefault(); stepFile(1); }
       if (e.key === 'ArrowLeft') { e.preventDefault(); stepFile(-1); }
@@ -633,6 +643,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   };
   const onWords = (value: string, caret: number) => {
     setWords(value);
+    if (value.trim()) setJustSent(null);
     const m = people.length || canTag ? /(^|\s)@(\w*)$/.exec(value.slice(0, caret)) : null;
     setAsking(m ? { start: caret - m[2].length - 1, query: m[2], sel: 0 } : null);
   };
@@ -668,6 +679,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     toAgent: withAgent,
     owner: version ? whoseIsTheFile(files, version.id) : null,
   });
+  const buttonWords = justSent && !words.trim() && !pictures.length ? justSent : sendWords;
 
   const heldFor = (n: FileNote): { words: string; went: boolean } | null => {
     if (n.sent || !offers.comment || typeof flat.find((x) => x.v.id === n.file)?.v.agent !== 'string') return null;
@@ -848,8 +860,8 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
                         onClick={() => { setDraftPlace(null); setWholeAsked(followsTheFile); }}><CrossIcon /></button>
                     </span>
                   )}
-                  <button type="submit" className="av-btn av-write-send" disabled={(!words.trim() && !pictures.length) || sending || attaching.length > 0 || !!attachProblem(pictures)}>
-                    {sendWords === 'Comment' ? <ReturnGlyph /> : <><NoteGlyph name="send" />{sendWords}</>}
+                  <button type="submit" className="av-btn av-write-send" aria-label={buttonWords === 'Comment' ? 'Send comment' : buttonWords} disabled={(!words.trim() && !pictures.length) || sending || attaching.length > 0 || !!attachProblem(pictures)}>
+                    {buttonWords === justSent ? <><NoteGlyph name="check" />{justSent}</> : buttonWords === 'Comment' ? <ReturnGlyph /> : <><NoteGlyph name="send" />{buttonWords}</>}
                   </button>
                 </div>
               </div>

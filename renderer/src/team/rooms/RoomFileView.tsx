@@ -2,7 +2,7 @@
 // opens in: its versions, comments, replies and Approve. The group's messages
 // stand in for a thread's lines, and its comments are kept in the room.
 import { useEffect, useMemo, useState } from 'react';
-import { filesInLines, lineAsThread, marksOf, threadFiles } from '../../../../shared/artifact-marks.mts';
+import { filesInLines, lineAsThread, marksOf, otherFilesInLines, threadFiles } from '../../../../shared/artifact-marks.mts';
 import { api } from '../../api';
 import { ArtifactView } from '../../components/ArtifactView';
 import { markGoesTo, withElsewhere } from '../../components/ThreadArtifacts';
@@ -31,7 +31,7 @@ export function RoomFileView({ room, messages, people, meId, opening, files, onN
   )), [messages]);
   const own = useMemo(() => marksOf(files.marks.map((r) => ({ ...r.mark, by: r.by, ts: r.at }))) as FileMarks, [files.marks]);
   // The file in Files these copies belong to: its comments and approvals made elsewhere, and its version numbers.
-  const copies = useMemo(() => threadFiles(filesInLines(lines)).flatMap((f) => f.versions.map((v) => ({ path: v.path, file: v.id }))), [lines]);
+  const copies = useMemo(() => threadFiles([...filesInLines(lines), ...otherFilesInLines(lines)]).flatMap((f) => f.versions.map((v) => ({ path: v.path, file: v.id }))), [lines]);
   const copiesKey = JSON.stringify(copies);
   const [elsewhere, setElsewhere] = useState<FileElsewhere[]>([]);
   const [line, setLine] = useState<FileLine[]>([]);

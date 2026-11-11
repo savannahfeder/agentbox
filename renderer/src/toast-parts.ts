@@ -116,6 +116,15 @@ export function sentToWhom(team: { people: readonly string[]; sharedBy: string |
   return who ? `Sent to ${who}` : 'Sent';
 }
 
+/** "Handed to Theo" once a thread has gone to them. */
+export function handedToWhom(name: string): string {
+  const first = name.trim().split(/\s+/)[0];
+  return first ? `Handed to ${first}` : 'Handed on';
+}
+
+/** Said at the press, since the cloud can take seconds to answer. */
+export const sendingTo = (names: string): string => `Sending to ${names}…`;
+
 /** A conversation's row is titled by whatever was first sent in it, so its toast draws no title; its line names who. */
 export function toastTitle(title: string, { conversation }: { conversation: boolean }): string | null {
   return conversation ? null : title;
