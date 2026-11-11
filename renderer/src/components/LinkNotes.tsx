@@ -8,7 +8,7 @@ import { NoteGlyph } from './NoteGlyphs';
 import { NotesSection } from './NotesSidebar';
 import { placeLabel, pinNumbers } from '../shared-file/link-notes';
 import { clock } from '../thread-history';
-import type { NotePlace } from '../types';
+import type { FileNote, NotePlace } from '../types';
 
 const POLL_MS = 30_000;
 
@@ -40,10 +40,26 @@ export function useLinkNotes(ask: { product: string; thread: string | null | und
   return { comments: got?.comments ?? [], reply };
 }
 
-export function LinkNotes({ comments, onGo, reply }: {
+/**
+ * The link's placed comments as the file draws notes: pins on a frame or a
+ * picture, marks on a timeline, quoted words. Drawn only, as notes carried
+ * from elsewhere are ("Link·1"); never listed or sent as the owner's own.
+ */
+export function linkNotesOnTheFile(comments: readonly LinkComment[], file: string): FileNote[] {
+  const n = pinNumbers(comments);
+  return comments.flatMap((c) => (c.place && c.place.kind !== 'whole' ? [{
+    id: linkNoteId(c.id), file, place: c.place, text: c.text, by: null, ts: c.at, mentions: [], owner: null, uid: null,
+    from: 'Link', ...(n.has(c.id) ? { pin: Number(n.get(c.id)) } : {}),
+  }] : []));
+}
+
+export const linkNoteId = (id: string) => `link-${id}`;
+
+export function LinkNotes({ comments, onGo, reply, activeId = null }: {
+  activeId?: string | null;
   comments: LinkComment[];
   /** Go to a comment's place in the file, as pressing a note does. */
-  onGo: (place: NotePlace) => void;
+  onGo: (place: NotePlace, id: string) => void;
   reply: (text: string) => Promise<boolean>;
 }) {
   const [writing, setWriting] = useState(false);
@@ -65,8 +81,8 @@ export function LinkNotes({ comments, onGo, reply }: {
       const at = placeLabel(c, numbers);
       const quote = c.place?.kind === 'quote';
       const who = c.byOwner ? 'You' : c.byName;
-      return <article key={c.id} className="av-note is-link">
-        <button type="button" className="av-note-go" disabled={!c.place} onClick={() => { if (c.place) onGo(c.place); }} aria-label={at ? `Go to ${at}` : who}>
+      return <article key={c.id} className={`av-note is-link${activeId === linkNoteId(c.id) ? ' is-on' : ''}`}>
+        <button type="button" className="av-note-go" disabled={!c.place} onClick={() => { if (c.place) onGo(c.place, linkNoteId(c.id)); }} aria-label={at ? `Go to ${at}` : who}>
           <span className="av-note-head">
             <Face person={null} name={who} me={c.byOwner} />
             <span className="av-note-who">{who}</span>
@@ -79,7 +95,7 @@ export function LinkNotes({ comments, onGo, reply }: {
       </article>;
     })}
     {writing ? (
-      <form className="av-reply-write" onSubmit={(e) => { e.preventDefault(); void send(); }}>
+      <form className="av-reply-write av-link-reply" onSubmit={(e) => { e.preventDefault(); void send(); }}>
         <textarea rows={1} autoFocus value={words} placeholder="Reply on the link page" aria-label="Reply on the link page"
           onChange={(e) => setWords(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }} />

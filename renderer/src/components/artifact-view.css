@@ -170,6 +170,9 @@
 .av-reply .av-note-head { font-size: 12.5px; }
 .av-reply .av-note-text { margin-top: 3px; font-size: 13px; }
 .av-reply-write { margin: 10px 0 0 9px; padding-left: 17px; border-left: 1px solid var(--line-strong); }
+/* Under a link's comments, on the cards' own edge. */
+.av-link-acts { margin: 0; padding: 0 10px; }
+.av-reply-write.av-link-reply { margin: 0 10px; }
 .av-reply-write .av-note-acts { justify-content: flex-end; margin-top: 6px; }
 .av-reply-write textarea {
   display: block; width: 100%; box-sizing: border-box; min-height: 32px; resize: none; padding: 6px 9px;
