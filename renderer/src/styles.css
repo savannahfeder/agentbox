@@ -1380,7 +1380,7 @@ body {
    it start there too, or the wash's corners poke past them. */
 .row.recent {
   --wash: 255 255 255;
-  background: linear-gradient(90deg, rgb(var(--wash) / 0.055), rgb(var(--wash) / 0.012) 70%, transparent);
+  background: linear-gradient(90deg, rgb(var(--wash) / 0.02), rgb(var(--wash) / 0.012) 25%, rgb(var(--wash) / 0.004) 50%, transparent 70%);
 }
 /* On white any grey read as dirt, so light mode takes the accent instead,
    over enough stops that the fade shows no steps. */

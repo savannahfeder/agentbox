@@ -47,13 +47,13 @@ function step(trail: Trail, by: 1 | -1, exists: (s: Stop) => boolean): { trail: 
 export const stepBack = (trail: Trail, exists: (s: Stop) => boolean = () => true) => step(trail, -1, exists);
 export const stepForward = (trail: Trail, exists: (s: Stop) => boolean = () => true) => step(trail, 1, exists);
 
-/** The most recent thread on the trail up to where you are now. */
-export function lastThreadIn(trail: Trail): { product: string; id: string } | null {
-  for (let i = Math.min(trail.at, trail.stops.length - 1); i >= 0; i--) {
-    const s = trail.stops[i];
-    if (s.at === 'thread') return { product: s.product, id: s.id };
-  }
-  return null;
+export type ThreadRef = { product: string; id: string };
+
+/** The last thread you stood on, once you have stood on `stop`. Kept apart
+ *  from the trail: back moves the trail's place to before the thread you
+ *  just left, and that thread is still the last one you were in. */
+export function lastThreadAfter(last: ThreadRef | null, stop: Stop): ThreadRef | null {
+  return stop.at === 'thread' ? { product: stop.product, id: stop.id } : last;
 }
 
 const stopKey = (s: Stop | null) => (s ? JSON.stringify(s) : '');
@@ -87,6 +87,7 @@ export function useBackAndForward({ on, here, go, exists }: {
   exists: (stop: Stop) => boolean;
 }) {
   const [trail, setTrail] = useState<Trail>(EMPTY_TRAIL);
+  const [lastThread, setLastThread] = useState<ThreadRef | null>(null);
   const trailRef = useRef(trail);
   trailRef.current = trail;
   // The place a step is on its way to, so arriving there is not recorded as a
@@ -98,6 +99,7 @@ export function useBackAndForward({ on, here, go, exists }: {
   const recorder = useRef<ReturnType<typeof settledPlaces> | null>(null);
   if (!recorder.current) {
     recorder.current = settledPlaces((s) => {
+      setLastThread((was) => lastThreadAfter(was, s));
       const going = travelling.current;
       travelling.current = null;
       if (going && sameStop(going, s)) return;
@@ -149,6 +151,6 @@ export function useBackAndForward({ on, here, go, exists }: {
     forward,
     backTo: on ? stepBack(trail, exists)?.stop ?? null : null,
     forwardTo: on ? stepForward(trail, exists)?.stop ?? null : null,
-    lastThread: on ? lastThreadIn(trail) : null,
+    lastThread: on ? lastThread : null,
   };
 }
