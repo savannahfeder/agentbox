@@ -7,9 +7,10 @@
 export const GLASS_ARG = '--agentbox-glass';
 
 const OPAQUE = '#1a1a1c';
+const CLEAR = '#00000000';
 // The Finder sidebar's glass. 'under-window' is the window's own ground and is
 // close to opaque in dark mode, which read as no glass at all.
-const MATERIAL = 'sidebar';
+const MATERIAL = 'sidebar' as const;
 // The reference's lights, centred 25pt in and 25pt down; this is the top-left of 14pt buttons.
 const LIGHTS = { x: 18, y: 18 };
 
@@ -23,16 +24,17 @@ export type GlassOptions = {
 
 export function glassWindow(platform: NodeJS.Platform, on: boolean): GlassOptions {
   if (platform !== 'darwin') return { backgroundColor: OPAQUE, additionalArguments: [] };
-  // 'active' keeps the blur when the window is not focused, as the reference does.
-  const mac = { visualEffectState: 'active' as const, additionalArguments: [GLASS_ARG] };
+  // The blur is there from the start even with the switch off, under a solid
+  // background: given to a running window, it left old pixels on the glass at
+  // every repaint. 'active' keeps it when the window is not focused.
+  const mac = { vibrancy: MATERIAL, visualEffectState: 'active' as const, additionalArguments: [GLASS_ARG] };
   return on
-    ? { ...mac, vibrancy: MATERIAL, trafficLightPosition: LIGHTS, backgroundColor: '#00000000' }
+    ? { ...mac, trafficLightPosition: LIGHTS, backgroundColor: CLEAR }
     : { ...mac, backgroundColor: OPAQUE };
 }
 
 export interface GlassableWindow {
   isDestroyed(): boolean;
-  setVibrancy(type: typeof MATERIAL | null): void;
   setBackgroundColor(color: string): void;
   setWindowButtonPosition(position: { x: number; y: number } | null): void;
 }
@@ -49,7 +51,6 @@ export function glassTone(tone: unknown): 'light' | 'dark' | 'system' {
 /** Flipping the switch while the app runs: the same window, turned glass or back. */
 export function applyGlass(win: GlassableWindow | null, platform: NodeJS.Platform, on: boolean): void {
   if (platform !== 'darwin' || !win || win.isDestroyed()) return;
-  win.setVibrancy(on ? MATERIAL : null);
-  win.setBackgroundColor(on ? '#00000000' : OPAQUE);
+  win.setBackgroundColor(on ? CLEAR : OPAQUE);
   win.setWindowButtonPosition(on ? LIGHTS : null);
 }

@@ -23,6 +23,17 @@
 // glass in the Mac's own appearance, so Light on a dark Mac got dark glass.
 // Measured against the designs: Dark matches at 10%, Light at no tint.
 //
+// The third build, on the owner's Mac: every click left old pixels behind
+// on the glass (the Settings sidebar, earlier labels, doubled counts) and the
+// tint built up until it went dark. Reproduced in a demo copy photographed
+// from inside: a window switched to glass while running keeps stale pixels,
+// and so does one that is merely given its blur while running; a window
+// created with the blur stays clean under the same clicks, Settings, sidebar
+// and window resizes, pixel for pixel against a clean repaint, in both looks.
+// So every Mac window is made with the blur, solid until the switch is on.
+// Measured with Glass off, the blur underneath cost nothing: window drawing
+// 39-46% against 41% without it, the app's GPU 12-13% against 12-14%.
+//
 // Covered: the switch is off unless turned on, and flips the window live; a
 // Mac window can go glass and Linux and Windows never can; the page goes glass
 // only when both are true; the root stays clear and the tint lives on the app;
@@ -73,9 +84,9 @@ describe('the window', () => {
     expect(w.trafficLightPosition).toEqual({ x: 18, y: 18 });
   });
 
-  it('starts a Mac window opaque when it is off, still able to go glass later', () => {
+  it('starts a Mac window solid when it is off, with the blur already under it', () => {
     const w = glassWindow('darwin', false);
-    expect(w).toEqual({ visualEffectState: 'active', backgroundColor: '#1a1a1c', additionalArguments: [GLASS_ARG] });
+    expect(w).toEqual({ visualEffectState: 'active', vibrancy: 'sidebar', backgroundColor: '#1a1a1c', additionalArguments: [GLASS_ARG] });
     expect(glassWindow('darwin', true).additionalArguments).toEqual([GLASS_ARG]);
   });
 
@@ -85,7 +96,7 @@ describe('the window', () => {
     }
   });
 
-  it('turns a running Mac window glass and back, and touches nothing elsewhere', () => {
+  it('turns a running Mac window glass and back without touching its blur, and touches nothing elsewhere', () => {
     const calls: unknown[][] = [];
     const win = {
       isDestroyed: () => false,
@@ -96,8 +107,8 @@ describe('the window', () => {
     applyGlass(win, 'darwin', true);
     applyGlass(win, 'darwin', false);
     expect(calls).toEqual([
-      ['vibrancy', 'sidebar'], ['background', '#00000000'], ['lights', { x: 18, y: 18 }],
-      ['vibrancy', null], ['background', '#1a1a1c'], ['lights', null],
+      ['background', '#00000000'], ['lights', { x: 18, y: 18 }],
+      ['background', '#1a1a1c'], ['lights', null],
     ]);
     calls.length = 0;
     applyGlass(win, 'linux', true);
@@ -116,6 +127,12 @@ describe('the window', () => {
     const app = read('renderer/src/App.tsx');
     // An explicit Light or Dark sets it; Match system and glass off give it back.
     expect(app).toContain("window.zero?.glassTone?.({ tone: glassOn && 'glassAble' in document.documentElement.dataset && theme !== 'match' ? theme : 'system' });");
+  });
+
+  it('never gives or takes a running window\'s blur, anywhere in the app', () => {
+    for (const f of fs.readdirSync(path.join(import.meta.dirname, '..', 'main')).filter((n) => n.endsWith('.mts'))) {
+      expect(read(`main/${f}`), f).not.toMatch(/\bsetVibrancy\(/);
+    }
   });
 
   it('is what the main window is made with', () => {
