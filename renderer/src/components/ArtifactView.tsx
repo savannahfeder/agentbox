@@ -13,7 +13,7 @@ import { canPaintQuotes, paintQuotes } from '../paint-quotes';
 import { firstName, Face } from '../team/people';
 import { clock, type LedgerLine } from '../thread-history';
 import type { ArtifactMark, FileMarks, FileNote, NotePlace, Person } from '../types';
-import { hasSpot, letterGoesToTheNote, noteSendWords, noteSentWords, notesToSendTheAgent, notesToSendTheAgentAnywhere, otherFilesOpen, unsentWords, pageSpot, PIN_FRAME_S, pinned, viewOffers, type Found } from '../artifact-pins';
+import { hasSpot, letterGoesToTheNote, noteSendWords, noteSentWords, notesToSendTheAgent, notesToSendTheAgentAnywhere, otherFilesOpen, unsentWords, pageSpot, PIN_FRAME_S, pinned, viewOffers, whereANoteGoes, whoTalksOnFile, type Found } from '../artifact-pins';
 import { commentsInList, notesWithSaving, settleLocally, UNDO_MS } from '../note-saving';
 import { keptDraft, opensForTyping, SAVE_AFTER_A_PAUSE_MS, savedVersionArrived, wordsToSave } from '../edit-sitting';
 import { quotesKey } from '../selection-bar';
@@ -62,7 +62,7 @@ const keyIsOn = (target: EventTarget | null): 'box' | 'control' | 'nothing' => {
 };
 const newId = () => `n${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
-export function ArtifactView({ product, project = null, thread, draftsAcross, shareThread, lines, numbers, marks: given, me, people, open, ownerOfRow, write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, onBeside, below, files: fromElsewhere, typing = false }: {
+export function ArtifactView({ product, project = null, thread, draftsAcross, shareThread, lines, numbers, marks: given, me, people, open, ownerOfRow, talkingWith = [], write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, onBeside, below, files: fromElsewhere, typing = false }: {
   /** The project the file belongs to, when it is not `product`'s own (a teammate's thread). */
   project?: string | null;
   /** Each path's number on its file's version line, which every surface counts by. */
@@ -85,6 +85,8 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   people: Person[];
   open: ArtifactOpen;
   ownerOfRow: string | null;
+  /** The people a conversation is with, who a note there goes to. */
+  talkingWith?: string[];
   write: (mark: ArtifactMark) => Promise<{ ok: boolean; error?: string }>;
   /** Only on a thread with an agent, on the owner's own computer. */
   withAgent?: boolean;
@@ -203,6 +205,11 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   // A line with no author is yours.
   const person = useCallback((id: string | null): Person | null => people.find((p) => p.id === (id ?? me)) ?? null, [people, me]);
   const nameOf = useCallback((id: string | null) => (id === me ? 'You' : firstName(person(id)) || 'A teammate'), [me, person]);
+  const noteTo = {
+    people, me, agentMade: typeof version?.agent === 'string', toAgent: withAgent,
+    owner: version ? whoseIsTheFile(files, version.id) : null, threadOwner: ownerOfRow,
+    talking: [...whoTalksOnFile(marks.notes, family?.versions.map((v) => v.id) ?? [], me), ...talkingWith],
+  };
 
   // The version the comment box's words belong to. Saving waits for it, so the
   // words on screen are never written under the version just stepped onto.
@@ -289,7 +296,8 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     if ((!typed && !pictures.length) || !version || sending || attaching.length) return;
     // "Sofia, approved v4" names Sofia as surely as @Sofia does: it reaches her, not the agent.
     const to = addressedTo(typed, people);
-    const mentions = [...new Set([...(to ? [to] : []), ...named.filter((p) => typed.includes(`@${firstName(p)}`)).map((p) => p.id)])];
+    const goes = whereANoteGoes({ ...noteTo, text: typed });
+    const mentions = [...new Set([...(to ? [to] : []), ...(goes.to === 'person' ? [goes.person] : []), ...named.filter((p) => typed.includes(`@${firstName(p)}`)).map((p) => p.id)])];
     const went = noteSentWords(sendWords);
     setSending(true);
     let links = '';
@@ -673,12 +681,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
         : kind === 'page' ? 'Press Pin a spot, then click the page'
           : kind === 'film' ? 'Pause the film and click it to pin a note'
             : null;
-  const agentMade = typeof version?.agent === 'string';
-  const sendWords = noteSendWords({
-    text: words, people, me, nameOf, agentMade,
-    toAgent: withAgent,
-    owner: version ? whoseIsTheFile(files, version.id) : null,
-  });
+  const sendWords = noteSendWords({ ...noteTo, text: words, nameOf });
   const buttonWords = justSent && !words.trim() && !pictures.length ? justSent : sendWords;
 
   const heldFor = (n: FileNote): { words: string; went: boolean } | null => {

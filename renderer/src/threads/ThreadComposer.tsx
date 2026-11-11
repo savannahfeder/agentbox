@@ -127,6 +127,8 @@ export interface ComposeStart {
   continueFrom?: { personId: string; threadId: string };
   /** The project it starts in, ahead of the default. */
   product?: string | null;
+  /** No project is taken for granted: Send waits for one to be picked. */
+  chooseProject?: boolean;
   /** The box on the page moving into the dialog: the plain card's draft, wherever it is addressed. */
   moved?: boolean;
   /** A message's subject: it starts a thread of its own with those people. */
@@ -286,7 +288,7 @@ export function ThreadComposer({
   /* ----------------------------- project -------------------------------- */
   const offered = useMemo(() => projectsOffered(products), [products]);
   const [productSlug, setProductSlug] = useState<string | null>(initial?.product ?? null);
-  const pointedAt = cardProject(offered, { picked: productSlug, defaultProduct, remembered: rememberedProject() });
+  const pointedAt = cardProject(offered, { picked: productSlug, defaultProduct, remembered: rememberedProject(), mustChoose: !!initial?.chooseProject });
   const toCode = !productSlug && pointedAt ? codeProjectFor(text, offered, pointedAt.slug) : null;
   const product = toCode ?? pointedAt;
   // Picked from the menu, My Workspace included: the tutorial takes it as the folder chosen.
@@ -388,7 +390,7 @@ export function ThreadComposer({
   const more = moreCount(recent, every);
 
   /* ------------------------------ menus --------------------------------- */
-  const [open, setOpen] = useState<MenuKey | null>(null);
+  const [open, setOpen] = useState<MenuKey | null>(() => (initial?.chooseProject ? 'project' : null));
   const [modelPage, setModelPage] = useState<'recent' | 'all'>('recent');
   const [laterPage, setLaterPage] = useState<'list' | 'repeat'>('list');
   const [laterText, setLaterText] = useState('');
@@ -590,7 +592,7 @@ export function ThreadComposer({
   // The other reason Send can be off: there is no project to send to at all
   // (w-f8d123be62). It gets a line in the bar rather than a tooltip, because
   // the whole fault was that nothing on screen said anything.
-  const stopper = noProjectYet(product, { person: !!person, noComputer: onCloudPhone() });
+  const stopper = initial?.chooseProject && offered.length ? null : noProjectYet(product, { person: !!person, noComputer: onCloudPhone() });
   // A task to a person rides the record the two of you share, so it needs a
   // project no more than a message does, and it goes to one person.
   const taskToMany = !!person && sendAs === 'task' && extra.length > 0;

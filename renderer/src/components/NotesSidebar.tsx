@@ -13,7 +13,7 @@ import { attachProblem, fromPaste, persistAttachments, useAttaching, type Pendin
 import { notePictures, noteWithPictures } from '../note-pictures';
 import { canPaintQuotes, cellAround, paintQuotes } from '../paint-quotes';
 import { notesCanPoint, noteAttachments, sentTimes, sidebarNotes } from '../notes-sidebar';
-import { pinLabel, pinsToDraw } from '../artifact-pins';
+import { noteSendWords, pinLabel, pinsToDraw, whereANoteGoes, whoTalksOnFile } from '../artifact-pins';
 import { AttachRow } from './AttachRow';
 import { NotePictureShown } from './FileNoteCard';
 import { NoteGlyph } from './NoteGlyphs';
@@ -124,6 +124,11 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
   const canSend = typeof version?.agent === 'string';
   const sentAt = useMemo(() => sentTimes(lines), [lines]);
   const authors = [...new Set([...waiting, ...said].map((n) => n.by))].slice(0, 3);
+  const noteTo = {
+    people, me, agentMade: canSend, toAgent: canSend,
+    owner: version ? whoseIsTheFile(files, version.id) : null, threadOwner: item.runner ?? item.createdBy ?? null,
+    talking: whoTalksOnFile(all, fileIds, me),
+  };
 
   const aside = useRef<HTMLElement | null>(null);
   const page = useRef<HTMLElement | null>(null);
@@ -207,6 +212,7 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
   };
 
   const [words, setWords] = useState('');
+  const sendWords = noteSendWords({ ...noteTo, text: words, nameOf: whoSaid });
   const [pictures, setPictures] = useState<PendingAttachment[]>([]);
   const { attaching, collect } = useAttaching();
   const [sending, setSending] = useState(false);
@@ -246,11 +252,13 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
     const place: NotePlace = spot ? { kind: 'pin', x: spot.x, y: spot.y } : quote ? { kind: 'quote', ...quote } : { kind: 'whole' };
     const id = newId();
     const owner = whoseIsTheFile(files, version.id);
+    const goes = whereANoteGoes({ ...noteTo, text: typed });
+    const mentions = goes.to === 'person' ? [goes.person] : [];
     const kept = { words, quote, spot, pictures };
     const pin = spot ? { pin: pinNotes.length + 1 } : {};
-    setPending((was) => [...was, { id, file: version.id, place, text, by: me, ts: Date.now(), mentions: [], owner: null, uid: null, wait: true, saving: true, ...pin }]);
+    setPending((was) => [...was, { id, file: version.id, place, text, by: me, ts: Date.now(), mentions, owner: null, uid: null, wait: true, saving: true, ...pin }]);
     setWords(''); setQuote(null); setSpot(null); setPictures([]); setTrouble(null);
-    const out = await api.fileMark({ product: item.product, id: item.id, mark: { do: 'note', id, file: version.id, place, text, wait: true, ...(owner ? { owner } : {}) } })
+    const out = await api.fileMark({ product: item.product, id: item.id, mark: { do: 'note', id, file: version.id, place, text, wait: true, ...(mentions.length ? { mentions } : {}), ...(owner ? { owner } : {}) } })
       .catch((err: Error) => ({ ok: false, error: err.message }));
     setSending(false);
     // Kept, so Send can take it before the thread's own copy catches up.
@@ -328,7 +336,7 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
               </button>
             )}
             <span className="sb-spring" />
-            <button type="submit" className="sb-add" title="Add note (return)" aria-label="Add note"
+            <button type="submit" className="sb-add" title={`${sendWords} (return)`} aria-label={sendWords}
               disabled={(!words.trim() && !pictures.length) || sending || attaching.length > 0 || !!attachProblem(pictures)}>
               <ReturnGlyph />
             </button>

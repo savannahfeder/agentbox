@@ -786,7 +786,7 @@ export default function App() {
       void api.teamTaskBrief({ product: item.product, id: item.id })
         .then((b) => {
           const { attachments, ...start } = taskHandOff({ from, brief: b, message: message ?? null, nameOf: (id) => seen?.byId.get(id)?.name?.split(/\s+/)[0],
-            handFrom: { product: item.product, id: item.id, message: message?.uid ?? 'first' } });
+            handFrom: { product: item.product, id: item.id, message: message?.uid ?? 'first' }, offered: snap?.products ?? [], cards: snap?.team?.cards ?? [] });
           setComposeInitial({ ...start, ...(attachments.length ? { attachments } : {}) });
           setModal('compose');
         })

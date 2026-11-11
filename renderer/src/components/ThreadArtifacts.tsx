@@ -91,6 +91,7 @@ export function ThreadArtifacts({ item, open, withAgent, onClose, onBeside, onNo
     people={people}
     open={open}
     ownerOfRow={item.runner ?? item.createdBy ?? null}
+    talkingWith={withAgent ? [] : (item.people ?? []).filter((p) => p !== team?.me)}
     write={(mark) => {
       const key = markGoesTo(mark, elsewhere);
       return key ? api.filesPlaceMark({ key, mark }) : api.fileMark({ product: item.product, id: item.id, mark });

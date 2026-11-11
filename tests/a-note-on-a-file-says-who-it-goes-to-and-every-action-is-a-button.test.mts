@@ -22,9 +22,9 @@ const words = (text, more = {}) => noteSendWords({ text, people, me: 'u-me', nam
 describe('the send button names who the note goes to', () => {
   // Since 2026-11-08 a comment waits for Send unless it tags your agent
   // (a-comment-waits-until-you-send-it-or-tag-your-agent).
-  it('a note on a file the agent made is a comment until it tags the agent, before a word is typed too', () => {
-    expect(words('')).toBe('Comment');
-    expect(words('Make the last bar orange')).toBe('Comment');
+  it('a note on a file the agent made is a note for your agent until it tags the agent, before a word is typed too', () => {
+    expect(words('')).toBe('Note for your agent');
+    expect(words('Make the last bar orange')).toBe('Note for your agent');
     expect(words('@agent make the last bar orange')).toBe('Send to your agent');
   });
   it('a note that opens on a teammate goes to them, not the agent', () => {
