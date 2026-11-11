@@ -43,6 +43,11 @@ import { attachedName, drawnRoots, holdsRead, mentionMarkdown, myNewest, newLine
 
 export type ChatPerson = { id: string; name: string; avatarUrl: string | null; me: boolean };
 
+export type ChatWhere = { label: string; onOpen: () => void };
+export type ChatAlongRow = { key: string; at: number; by: string; text: string; where: ChatWhere };
+/** What a person's page draws among the messages: tasks, replies on them, comments, file notes. `on` is a message's own place. */
+export type ChatAlong = { rows: readonly ChatAlongRow[]; on: ReadonlyMap<string, ChatWhere> };
+
 /** What a room's chat asks of the rooms around it. Each answers null, or why it did not happen. */
 export type RoomChatCalls = {
   onSend: (body: string, opts: { inReplyTo: string | null; mentions: string[] }) => Promise<string | null>;
@@ -71,7 +76,7 @@ export type RoomChatCalls = {
   onDecide?: (messageId: string, kind: 'decision' | 'priority', on: boolean) => void;
 };
 
-export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand, onSwitch, switchOpen, full = false, head, hang = false, ...calls }: {
+export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand, onSwitch, switchOpen, full = false, head, hang = false, along, ...calls }: {
   room: Room; messages: RoomMessage[]; people: ChatPerson[]; meId: string | null; now: number;
   onInvite?: () => void; onExpand?: () => void;
   onSwitch?: (anchor: DOMRect) => void; switchOpen?: boolean;
@@ -79,6 +84,7 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
   full?: boolean; head?: ReactNode;
   /** Faces at 32, hung beside the words, as a chat that is the whole page draws them. */
   hang?: boolean;
+  along?: ChatAlong;
 } & RoomChatCalls) {
   const { onSend, onRead, onReact, onEdit, onDelete, onMarkUnread, onNotice, marks, onDecide } = calls;
   const [thread, setThread] = useState<string | null>(null);
@@ -186,7 +192,11 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
   const who = (id: string | null) => (id ? byId.get(id) : undefined);
   const nameOf = (id: string | null) => { const p = who(id); return p ? cardName(p) : 'Someone'; };
   const listRef = useStick([room.id, thread]);
-  const slots = chatLayout(shown.map((m) => ({ at: m.at, by: m.by ?? '' })), now);
+  type Drawn = { m: RoomMessage; a?: undefined } | { a: ChatAlongRow; m?: undefined };
+  const asMessages = shown.map((m): Drawn => ({ m }));
+  const drawn: Drawn[] = root || !along?.rows.length ? asMessages
+    : [...asMessages, ...along.rows.map((a): Drawn => ({ a }))].sort((x, y) => (x.m ?? x.a).at - (y.m ?? y.a).at);
+  const slots = chatLayout(drawn.map((d) => ({ at: (d.m ?? d.a).at, by: d.m ? d.m.by ?? '' : d.a.by })), now);
   const myNames = useMemo(() => {
     const name = people.find((p) => p.me)?.name;
     if (!name) return [];
@@ -217,8 +227,24 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
       {onExpand && <button type="button" className="ic" title="Open full page" aria-label="Open full page" onClick={onExpand}>{I.expand()}</button>}
     </div>}
     <div className="rm-chat-list" ref={listRef}><div className="rm-chat-msgs">
-      {shown.map((m, i) => {
+      {drawn.map((d, i) => {
         const slot = slots[i];
+        if (d.a) {
+          const a = d.a, p = who(a.by);
+          return <div key={a.key} data-along={a.key}>
+            {slot.day && <div className="rm-day"><span className="rm-label">{slot.day}</span></div>}
+            <div className={`rm-cm rm-along${slot.head ? '' : ' cont'}`}>
+              {slot.head && <div className="h">
+                <Face name={p?.name ?? '?'} url={p?.avatarUrl} size={hang ? 32 : 16} />
+                <span>{nameOf(a.by)}</span><em>{clockOf(a.at)}</em>
+              </div>}
+              <div className="tx">{a.text}</div>
+              <button type="button" className="rm-there" onClick={a.where.onOpen}>{a.where.label}</button>
+            </div>
+          </div>;
+        }
+        const m = d.m;
+        const where = root ? undefined : along?.on.get(m.id);
         const mine = m.by === meId;
         const reps = !root ? replies.get(m.id) ?? [] : [];
         const p = who(m.by);
@@ -244,6 +270,7 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
               : m.deleted
                 ? <div className="tx rm-gone">This message was deleted.</div>
                 : <div className="tx">{body(m)}</div>}
+            {where && !m.deleted && <button type="button" className="rm-there" onClick={where.onOpen}>{where.label}</button>}
             {!headed && m.editedAt && !m.deleted && editing !== m.id && <em className="rm-edited">edited</em>}
             {!m.deleted && marks?.get(m.id) && <em className="rm-decided">{marks.get(m.id)?.priority ? 'This week’s priorities' : 'Decision'}</em>}
             {!m.deleted && onReact && <Reactions on={m.reactions} me={meId} nameOf={(id) => who(id)?.name} onReact={(emoji, off) => onReact(m.id, emoji, !off)} />}

@@ -11,7 +11,7 @@ import { OpenGroupNotice } from './OpenGroupNotice';
 import { RoomViewButton } from './RoomView';
 import { landed, sameMessages, storedName, withFileLinks } from './room-chat-rules';
 import { RoomPage, type RoomPane } from './RoomPage';
-import { RoomChat, type RoomChatCalls } from './RoomChat';
+import { RoomChat, type ChatAlong, type RoomChatCalls } from './RoomChat';
 import type { RoomFileOpening } from './RoomFileView';
 import { I } from './icons';
 import type { Conversation } from './MessagesPage';
@@ -233,11 +233,11 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
   // A pair who both started their chat in the same moment have two groups.
   // Their chat reads both; new words go to the one both Macs pick, and a
   // reply, an edit or a reaction to the room its message is in.
-  const pairChat = (r: Room): { room: Room; messages: RoomMessage[]; calls: RoomChatCalls } => {
+  const pairChat = (r: Room): { room: Room; rooms: string[]; messages: RoomMessage[]; calls: RoomChatCalls } => {
     const other = listedIn(r).find((id) => id !== meId);
     const twins = other ? pairRooms(all, other, listedIn) : [];
     const held = (t: Room) => rooms?.messages[t.id] ?? [];
-    if (twins.length < 2 || !twins.includes(r)) return { room: r, messages: held(r), calls: { onSend: send(r.id), onRead: read(r), ...chatCalls(r) } };
+    if (twins.length < 2 || !twins.includes(r)) return { room: r, rooms: [r.id], messages: held(r), calls: { onSend: send(r.id), onRead: read(r), ...chatCalls(r) } };
     const home = twins[0];
     const messages = oneConversation(twins.map(held));
     const roomOfMessage = (id: string) => twins.find((t) => t.id === messages.find((m) => m.id === id)?.roomId) ?? home;
@@ -247,7 +247,7 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
       return null;
     };
     const base = chatCalls(home);
-    return { room: home, messages, calls: {
+    return { room: home, rooms: twins.map((t) => t.id), messages, calls: {
       ...base,
       openingFile: openingFile && twins.some((t) => t.id === openingFile.roomId) ? openingFile : null,
       onSend: (body, opts) => send(opts.inReplyTo ? roomOfMessage(opts.inReplyTo).id : home.id)(body, opts),
@@ -388,12 +388,12 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
   };
 
   // A chat drawn somewhere other than Groups: a person's place on the home.
-  const chatIn = (roomId: string): ReactNode => {
+  const chatIn = (roomId: string, along?: (messages: RoomMessage[], rooms: string[]) => ChatAlong): ReactNode => {
     const r = all.find((x) => x.id === roomId);
     if (!r || !rooms) return null;
     const c = pairChat(r);
     return <div className="gr-chat"><RoomChat key={c.room.id} room={c.room} messages={c.messages} people={withMe(chatPeople(c.room, meId), meInChat)} meId={meId} now={now}
-      full hang head={<></>} {...c.calls} /></div>;
+      full hang head={<></>} along={along?.(c.messages, c.rooms)} {...c.calls} /></div>;
   };
   // A two-person group with them, made if there is none, without leaving the page you are on.
   const startChat = async (personId: string, name: string, first?: string, files: readonly TeamMessageFile[] = []): Promise<string | null> => {

@@ -90,6 +90,7 @@ export interface TeamState {
   rooms?: RoomsState;
   teamMates?: BoardMate[];
   sharedFileNews?: unknown[];
+  threadTalk?: unknown[];
   /** `${slug}/${id}` then person: when they last opened that conversation. */
   seen?: Record<string, Record<string, number>>;
 }
@@ -340,7 +341,7 @@ const EMPTY: TeamState = { configured: false, canSignIn: false, started: false, 
 export function teamForWindow(state: TeamState | null | undefined, multiplayer: boolean) {
   if (multiplayer || !state) return state;
   const { rooms, ...rest } = state;
-  return { ...rest, configured: false, team: null, invites: [], sent: [], people: [], cards: [], teamMates: [], sharedFileNews: [] };
+  return { ...rest, configured: false, team: null, invites: [], sent: [], people: [], cards: [], teamMates: [], sharedFileNews: [], threadTalk: [] };
 }
 
 export function createTeamService({
@@ -807,7 +808,7 @@ export function createTeamService({
   }
 
   return {
-    state: () => ({ ...state, sharedFileNews: threadShare?.fileNews() ?? [], ...(rooms ? { rooms: rooms.state() } : {}) }),
+    state: () => ({ ...state, sharedFileNews: threadShare?.fileNews() ?? [], threadTalk: threadShare?.talk() ?? [], ...(rooms ? { rooms: rooms.state() } : {}) }),
     rooms,
     /** What the desktop's banner was told arrived, for her phone's alerts (main/phone-alerts.mts). */
     phoneArrivals: (list: unknown[], needsYou: unknown[]) => phoneInbox?.arrivals(list, needsYou),

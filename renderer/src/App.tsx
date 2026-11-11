@@ -138,6 +138,8 @@ import { asksWho } from '../../shared/auto-route.mts';
 import { RoomBoard } from './team/rooms/RoomBoard';
 import { directConversations } from './team/rooms/conversations';
 import { personChatShows, personPressOpens } from './team/one-conversation';
+import { pairLine, pairTimeline, type PairEntry, type PairOpens } from './team/pair-timeline';
+import type { ChatAlong } from './team/rooms/RoomChat';
 import { listedIn, pairRooms } from '../../shared/pair-room.mts';
 import { isPresenceCard, roomMateCards, roomMatesById } from './team/rooms/room-rules';
 import { MARK_UNREAD, SAY } from './team/chat-events';
@@ -7811,6 +7813,30 @@ export default function App() {
       const givenAs = new Set(given.flatMap((i) => [i.id, rowTitle(i)]));
       const theirs = nowAndFinished(cards.filter((c) => c.personId === id && c.visible && !givenAs.has(c.threadId) && !givenAs.has(c.title ?? '')), { done: (c) => c.state === 'done', at: (c) => c.updatedAt, now });
       const cardRow = (c: ThreadCard): PlaceRow => ({ key: c.threadId, title: c.title ?? 'A thread', word: c.state === 'running' ? '' : (CARD_WORD[c.state] ?? CARD_WORD.running)[0], tone: (CARD_WORD[c.state] ?? CARD_WORD.running)[1], at: c.updatedAt, onOpen: () => openTeammateCard(c) });
+      const openPairEntry = (o: PairOpens) => {
+        if (o.to === 'task') {
+          const task = items.find((i) => i.id === o.id && isTaskRow(i));
+          if (task) { setFocused(task); markSeen(task); } else showToast('That task is not on this computer yet.');
+          return;
+        }
+        const own = o.owner === team?.me ? items.find((i) => i.id === o.threadId) : undefined;
+        if (own && o.to === 'file') { setFocused(own); markSeen(own); setFoundOpenAt({ key: `${own.product}/${own.id}`, open: { file: o.file, note: o.note } }); return; }
+        const card = o.to === 'file' ? weekCards.find((c) => c.personId === o.owner && c.threadId === o.threadId) : undefined;
+        if (card && o.to === 'file') { setFocused(null); openTeammateCard(card, { file: o.file, note: o.note }); return; }
+        openContinuedFrom(o.owner, o.threadId);
+      };
+      const titleOf = (owner: string, threadId: string) => {
+        const own = owner === team?.me ? items.find((i) => i.id === threadId) : undefined;
+        return own ? rowTitle(own) : weekCards.find((c) => c.personId === owner && c.threadId === threadId)?.title ?? null;
+      };
+      const along = (entries: PairEntry[]): ChatAlong => {
+        const there = (w: PairEntry['where']) => w && { label: w.label, onOpen: () => openPairEntry(w.open) };
+        const nameOf = (p: string) => team?.byId.get(p)?.name ?? '';
+        return {
+          rows: entries.flatMap((e) => { const w = there(e.where); return e.kind !== 'message' && w ? [{ key: e.key, at: e.at, by: e.by, text: pairLine(e, team?.me ?? '', nameOf), where: w }] : []; }),
+          on: new Map(entries.flatMap((e) => { const w = there(e.where); return e.kind === 'message' && w ? [[e.key, w] as const] : []; })),
+        };
+      };
       const theirMates = members.filter((m) => m.key.startsWith(`theirmate:${id}:`))
         .map((m) => ({ ...m, name: teamMates.find((t) => `theirmate:${t.owner}:${t.id}` === m.key)?.name ?? m.name }));
       placeEl = <MemberPlace m={placeMember} waits={placeWaits} onBack={back} backTo={backTo}
@@ -7819,7 +7845,7 @@ export default function App() {
           {room && !chatsPlaceShown && <PlaceAction quiet onClick={() => pickMember(placeMember.key, 'messages')} title="This chat on the Chats page">Open in Chats</PlaceAction>}
           {earlier && <PlaceAction quiet onClick={() => { setChatsPlace(null); setChatsDirect(earlier.id); setFocused(earlier.item); markSeen(earlier.item); }} title={`Your messages with ${first} from before this chat`}>Earlier messages</PlaceAction>}
         </>}
-        chat={chatShows === 'chat' && room ? roomsUi.chatIn(room) : chatShows === 'not yet' ? null
+        chat={chatShows === 'chat' && room ? roomsUi.chatIn(room, (messages, pairRoomIds) => along(pairTimeline({ me: team?.me ?? '', other: id, rooms: pairRoomIds, messages, directItems: items, talk: snap.team?.threadTalk ?? [], titleOf }))) : chatShows === 'not yet' ? null
           : chatShows === 'first message'
           ? <SendBox placeholder={`Message ${first}`} empty={<EmptyChat name={first} />}
             onSend={(text) => roomsUi.startChat(id, placeMember.name, text)} />

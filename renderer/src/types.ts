@@ -373,6 +373,20 @@ type LedgerLineShape = { ts: number; by?: string | null; source?: string; patch?
 /** What a comment or approval in the thread links to. */
 export interface FileMarkLink { kind: 'note' | 'approved' | 'edited'; file: string; id?: string; place?: string; /** The file's one name and version, for the words. */ shown?: string; /** A comment still waiting for Send. */ unsent?: true }
 
+/** A comment on a thread, or a note on one of its files (main/team/thread-share.mts `talk`), for the person's page. */
+export interface ThreadTalk {
+  id: string;
+  kind: 'comment' | 'note';
+  owner: string;
+  threadId: string;
+  by: string;
+  text: string;
+  at: number;
+  /** A note's file version, and the note it opens at (a reply's is the note it answers). */
+  file?: string;
+  note?: string;
+}
+
 /** A note naming you on a teammate's shared thread: a row in Needs you. */
 export interface SharedFileNews {
   owner: string;
@@ -492,6 +506,7 @@ export interface TeamState {
   teamMates?: TeamMate[];
   /** Notes on teammates' threads that name you and wait on you. */
   sharedFileNews?: SharedFileNews[];
+  threadTalk?: ThreadTalk[];
   /** When each person last opened a conversation, by `${product}/${id}` then person. */
   seen?: Record<string, Record<string, number>>;
   lastSyncAt: number | null;

@@ -88,6 +88,9 @@ export interface ThreadFileMark { id: string; owner: string; threadId: string; b
 
 export interface ThreadFileNews { owner: string; threadId: string; id: string; file: string; text: string | undefined; by: string | null; ts: number }
 
+/** Words left on a thread or on one of its files, for the person's page in the window. */
+export interface ThreadTalk { id: string; kind: 'comment' | 'note'; owner: string; threadId: string; by: string; text: string; at: number; file?: string; note?: string }
+
 export interface SharedThreadView { shared: boolean; lines: SharedLine[]; earlier: number; product: string | null; dir: string | null }
 
 export interface ThreadShareBackend {
@@ -130,6 +133,7 @@ export interface ThreadShare {
   products(): { slug: string; name: string; dir: string }[];
   addMark(owner: string, threadId: string, mark: unknown): Promise<boolean>;
   fileNews(): ThreadFileNews[];
+  talk(): ThreadTalk[];
   refreshComments(): Promise<void>;
 }
 
@@ -709,6 +713,19 @@ export function createThreadShare({
         for (const n of news) if (n.kind === 'named') out.push({ owner, threadId, id: n.id, file: n.file, text: n.text, by: n.by, ts: n.ts });
       }
       return out;
+    },
+
+    /** Every comment and file note this person may read, theirs included. */
+    talk() {
+      const out: ThreadTalk[] = comments.map((c) => ({ id: c.id, kind: 'comment' as const, owner: c.owner, threadId: c.threadId, by: c.by, text: c.text, at: c.at }));
+      const seen = new Set<string>();
+      for (const m of [...fileMarks, ...(waiting ?? waitingMarks())]) {
+        const mark = cleanMark(m.mark);
+        if (!mark || (mark.do !== 'note' && mark.do !== 'reply') || (mark.do === 'note' && mark.wait) || seen.has(`${m.owner}:${m.threadId}:${m.id}`)) continue;
+        seen.add(`${m.owner}:${m.threadId}:${m.id}`);
+        out.push({ id: m.id, kind: 'note', owner: m.owner, threadId: m.threadId, by: m.by, text: mark.text, at: m.at, file: mark.file, note: mark.do === 'note' ? mark.id : mark.on });
+      }
+      return out.sort((a, b) => a.at - b.at);
     },
 
     /** After a comment, so its writer sees it without waiting for the next pass. */
