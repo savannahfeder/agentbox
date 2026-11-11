@@ -66,7 +66,8 @@ export interface SmallModelOptions {
   env?: NodeJS.ProcessEnv;
 }
 
-export const NAME_MODEL = 'claude-haiku-4-5-20251001';
+// The alias, not a dated id: Claude Code moves it to each new Haiku.
+export const NAME_MODEL = 'haiku';
 
 /**
  * How long one naming call may take before it is abandoned. Generous against
