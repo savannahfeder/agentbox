@@ -340,19 +340,43 @@ function summary(f: GroupedFile): PlacedFile {
   };
 }
 
-/** What the big view draws: one line per version, every comment from every copy. */
+/** The big view's lines: one per version, at the path it opens from. */
+const linesOf = (file: LinedFile, opened: Map<string, string>): ThreadLine[] => file.chain.map((v): ThreadLine => (v.edited
+  ? { ts: v.at, by: v.by, source: 'founder', patch: { artifact: { do: 'edit', file: v.id, path: opened.get(v.id) } } }
+  : {
+    ts: v.at, by: v.by, source: typeof v.agent === 'string' ? 'agent' : 'system',
+    patch: { note: `[${v.name}](${opened.get(v.id)})`, ...(v.agent ? { voice: { name: v.agent } } : {}), ...(v.made ? { made: true } : {}) },
+  }));
+
+/**
+ * Each version's id in the big view, by line id. The view names versions from
+ * the paths its lines give (ArtifactView reads them with threadFiles), and a
+ * version written over its path is `name#2` there while the line calls it
+ * `name`, so what the view sends and what it is shown go by these.
+ */
+function viewIdsOf(file: LinedFile, opened: Map<string, string>): Map<string, string> {
+  const lines = linesOf(file, opened);
+  const reviewed = filesInLines(lines);
+  const drawn = threadFiles(reviewed.length ? reviewed : otherFilesInLines(lines)).flatMap((f) => f.versions);
+  const ids = new Map<string, string>();
+  for (const v of file.chain) {
+    const at = String(opened.get(v.id) ?? '').replace(/^\.\//, '');
+    const hit = drawn.find((d) => d.path === at || d.also?.includes(at));
+    if (hit) ids.set(v.id, hit.id);
+  }
+  return ids;
+}
+
+/** What the big view draws: one line per version, every comment from every copy, each on its version's id there. */
 function viewOf(file: LinedFile, opened: Map<string, string>) {
-  const lines = file.chain.map((v): ThreadLine => (v.edited
-    ? { ts: v.at, by: v.by, source: 'founder', patch: { artifact: { do: 'edit', file: v.id, path: opened.get(v.id) } } }
-    : {
-      ts: v.at, by: v.by, source: typeof v.agent === 'string' ? 'agent' : 'system',
-      patch: { note: `[${v.name}](${opened.get(v.id)})`, ...(v.agent ? { voice: { name: v.agent } } : {}), ...(v.made ? { made: true } : {}) },
-    }));
+  const lines = linesOf(file, opened);
+  const ids = viewIdsOf(file, opened);
+  const inView = <T extends { file: string }>(m: T): T => (ids.has(m.file) ? { ...m, file: ids.get(m.file)! } : m);
   const many = file.sentIn.length > 1;
   // Each copy numbers its own pins from 1; here they are one file's pins.
   const pins = new Map<string, number>();
   const notes = [...file.notes].sort((a, b) => a.ts - b.ts).map(({ thread, ...n }) => {
-    const out: FileNote & { in?: string } = { ...n, ...(many ? { in: thread.title } : {}) };
+    const out: FileNote & { in?: string } = { ...inView(n), ...(many ? { in: thread.title } : {}) };
     if (n.place?.kind === 'pin' || typeof n.place?.x === 'number') { const k = (pins.get(n.file) ?? 0) + 1; pins.set(n.file, k); out.pin = k; }
     return out;
   });
@@ -360,9 +384,9 @@ function viewOf(file: LinedFile, opened: Map<string, string>) {
   return {
     key: file.key, project: file.project, name: file.name, kind: file.kind, sentIn: file.sentIn,
     editsTo: editsTo ? { ...editsTo.ref, title: editsTo.title } : null,
-    versions: file.chain.map((v) => ({ id: v.id, name: v.name, n: v.n, at: v.at, by: v.by })),
+    versions: file.chain.map((v) => ({ id: ids.get(v.id) ?? v.id, name: v.name, n: v.n, at: v.at, by: v.by })),
     lines,
-    marks: { notes, approvals: file.approvals.map(({ thread: _t, ...a }) => a), seen: file.seen },
+    marks: { notes, approvals: file.approvals.map(({ thread: _t, ...a }) => inView(a)), seen: file.seen },
   };
 }
 
@@ -669,6 +693,18 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     for (const v of chain) same.set(`${baseName(v.name)}@${v.n}`, v.id);
     return { chain, same };
   }
+  /** A file as the big view opens it: its line, every mark on the line's ids, and where each version opens. */
+  async function viewed(whole: PlacedFile): Promise<{ file: LinedFile; opened: Map<string, string>; same: Map<string, string> } | null> {
+    const { chain, same } = await lineChain(whole);
+    if (!chain.length) return null;
+    const onLine = <T extends { file: string }>(m: T): T => (same.has(m.file) ? { ...m, file: same.get(m.file)! } : m);
+    const file: LinedFile = { ...asOf(whole, chain), notes: whole.notes.map(onLine), approvals: whole.approvals.map(onLine) };
+    const opened = new Map<string, string>();
+    // A path that finds nothing, so the view says where the version is rather than drawing the one it was written over.
+    for (const v of file.chain) opened.set(v.id, v.opened ?? (v.away ? `line/${v.n}/${v.name}` : await openedOf(file, v, { fetch: true }) ?? v.copies[0]?.path ?? v.name));
+    return { file, opened, same };
+  }
+
   const asOf = (row: PlacedFile | LinedFile, chain: LinedVersion[]): LinedFile => {
     const newest = chain[chain.length - 1];
     if (!newest) return { ...row, versions: 0, chain };
@@ -1012,15 +1048,8 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
 
     async open(key: string) {
       const whole = find(key);
-      if (!whole) return null;
-      const { chain, same } = await lineChain(whole);
-      if (!chain.length) return null;
-      const onLine = <T extends { file: string }>(m: T): T => (same.has(m.file) ? { ...m, file: same.get(m.file)! } : m);
-      const file: LinedFile = { ...asOf(whole, chain), notes: whole.notes.map(onLine), approvals: whole.approvals.map(onLine) };
-      const opened = new Map<string, string>();
-      // A path that finds nothing, so the view says where the version is rather than drawing the one it was written over.
-      for (const v of file.chain) opened.set(v.id, v.opened ?? (v.away ? `line/${v.n}/${v.name}` : await openedOf(file, v, { fetch: true }) ?? v.copies[0]?.path ?? v.name));
-      return viewOf(file, opened);
+      const seen = whole && await viewed(whole);
+      return seen ? viewOf(seen.file, seen.opened) : null;
     },
 
     /**
@@ -1138,14 +1167,21 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
           const own = [...by.keys()].find((t) => t.ref.kind !== 'shared' && t.ref.kind !== 'room');
           if (own) return { ok: true, wrote: { product: own.ref.product, id: own.ref.id } };
         } else if (mark.do === 'note' || mark.do === 'approve' || mark.do === 'unapprove') {
-          const { chain } = await lineChain(file);
-          const v = chain.find((x) => x.id === mark.file);
+          const seen = await viewed(file);
+          if (!seen) return { ok: false, error: 'that version is gone' };
+          const ids = viewIdsOf(seen.file, seen.opened);
+          const asked = String(mark.file ?? '');
+          // The view's own id first: `name` may be one version there and another on the line.
+          const v = seen.file.chain.find((x) => ids.get(x.id) === asked)
+            ?? seen.file.chain.find((x) => !ids.has(x.id) && x.id === asked)
+            ?? seen.file.chain.find((x) => x.id === seen.same.get(asked));
           if (!v) return { ok: false, error: 'that version is gone' };
           // Taking an approval back is done where it was given.
-          const given = mark.do === 'unapprove' ? file.approvals.find((a) => a.file === v.id && a.by === (team?.state?.().me?.id ?? null)) : null;
+          const given = mark.do === 'unapprove' ? seen.file.approvals.find((a) => a.file === v.id && a.by === (team?.state?.().me?.id ?? null)) : null;
           // A version only a teammate has is marked where the file's newest was said.
           const thread = given?.thread ?? v.copies[0]?.thread ?? file.chain.at(-1)!.copies[0].thread;
-          await writeTo(thread, mark);
+          // The thread keeps the line's id, which its own views and agent read.
+          await writeTo(thread, { ...mark, file: v.id });
           if (mark.do !== 'unapprove' && thread.ref.kind !== 'shared' && thread.ref.kind !== 'room') return { ok: true, wrote: { product: thread.ref.product, id: thread.ref.id } };
         } else return { ok: false, error: 'that cannot be done here' };
         return { ok: true };
