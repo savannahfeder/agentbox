@@ -103,6 +103,10 @@ describe('signed in', () => {
     expect(shareWords.fresh).toBe('Copy link to let anyone see it and comment');
     expect(shareWords.anyone).toBe('Anyone with the link');
     expect(shareWords.canComment).toBe('Can see it and its comments');
+    // Stopping read as deleting the review (power test, 2026-11-11); the thread keeps the comments.
+    expect(shareWords.stopAsk(2)).toBe('Stop, its comments stay in the thread');
+    expect(shareWords.stopAsk(1)).toBe('Stop, its comment stays in the thread');
+    expect(shareWords.stopAsk(0)).toBe('Stop the link');
     // Signed out, a file with a live link read as if nothing were shared (power test, round 3).
     expect(shareWords.signedOut).toBe('Sign in to share this file or see its link.');
   });

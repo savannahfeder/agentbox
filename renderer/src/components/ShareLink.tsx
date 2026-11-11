@@ -194,6 +194,7 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
                   </ol>
                   <form className="av-share-reply" onSubmit={(e) => { e.preventDefault(); void reply(); }}>
                     <input value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="Reply on the page" aria-label="Reply on the page" maxLength={4000} disabled={busy} />
+                    <button type="submit" className="av-share-send" aria-label="Send the reply" title="Send the reply" disabled={busy || !answer.trim()}><NoteGlyph name="send" /></button>
                   </form>
                 </>
               )}

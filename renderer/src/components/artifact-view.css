@@ -272,7 +272,9 @@
 .av-share-who em { font-style: normal; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .av-share-who time { margin-left: auto; font-size: 11.5px; color: var(--text-faint); }
 .av-share-box .av-share-comments p { margin: 2px 0 0; font-size: 13px; line-height: 18px; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-dim); }
-.av-share-reply { padding: 0 14px 12px; }
+.av-share-reply { padding: 0 14px 12px; display: flex; gap: 6px; }
+.av-share-send { flex: none; width: 30px; height: 30px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--wash); color: var(--text); cursor: pointer; }
+.av-share-send:disabled { opacity: 0.4; cursor: default; }
 .av-share-reply input {
   width: 100%; height: 30px; box-sizing: border-box; padding: 0 9px;
   font: inherit; font-size: 13px; color: var(--text); background: none; border: 1px solid var(--line-strong); border-radius: var(--radius); outline: none;
