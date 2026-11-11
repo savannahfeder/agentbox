@@ -130,7 +130,7 @@ import { CATCH_UP_LABEL, CATCH_UP_TRIES, catchUpDue, importedAgentBrief, importe
 import { readTranscriptHead } from './agent-sessions.mts';
 import { claudeSessionOpen } from './claude-session-open.mts';
 import { planStamp, readPlan } from './claude-plan.mts';
-import { troubleCause, refineCause, needsHerHands, troubleSentence, troubleRemedy, deadRunSentence, deadRunCause, deadRunPromisesARetry, undeliveredAnswerSentence, stoppedStartingSentence, limitResetsAt, limitResetMoment, strandedSentence, strandedRemedy, causeBreakdown } from '../shared/spawn-trouble.mts';
+import { troubleCause, chatCannotContinue, refineCause, needsHerHands, troubleSentence, troubleRemedy, deadRunSentence, deadRunCause, deadRunPromisesARetry, undeliveredAnswerSentence, stoppedStartingSentence, limitResetsAt, limitResetMoment, strandedSentence, strandedRemedy, causeBreakdown } from '../shared/spawn-trouble.mts';
 import { readDeadRunTrace, traceShowsASilentDeath, tracesAToolCall, STOPPED_ON_REQUEST, MOVED_HERE } from '../shared/dead-run-trace.mts';
 import { commandPrompt } from '../shared/claude-commands.mts';
 import { machineryPath, storeRootEnv } from './store/home.mts';
@@ -7044,6 +7044,12 @@ export class Supervisor {
     if (!item?.id || !session) return;
     const key = `${item.product}:${item.id}`;
     this._deadStarts ??= {};
+    // The resumed chat is what failed, so the next start is a fresh one briefed
+    // with the thread; that start is a different run and is counted on its own.
+    if (session.resumed && session.resultIsError && chatCannotContinue(session.result)) {
+      if (this._rowSessions?.[item.id]) { delete this._rowSessions[item.id]; this._saveState(); }
+      return;
+    }
     // A RUN THE ACCOUNT REFUSED NEVER BEGAN, whatever it came back carrying.
     // Codex names the thread (`thread/started`) before the model is asked
     // anything and reports the refusal as the turn's own result, so an
@@ -7051,8 +7057,8 @@ export class Supervisor {
     // those read as the agent getting going. It can outlast FAST_EXIT_MS as
     // well: a weekly limit is reported about two minutes in.
     const refused = accountRefusedTheRun(session);
-    // Claude Code names its session before it refuses the model, so the id proves nothing.
-    const modelRefused = !!session.resultIsError && troubleCause(session.result) === 'model-not-on-plan';
+    // The CLI names its session before it refuses the model or the chat, so the id proves nothing.
+    const modelRefused = !!session.resultIsError && (troubleCause(session.result) === 'model-not-on-plan' || chatCannotContinue(session.result));
     this._heldStarts ??= {};
     const held = this._heldStarts[key];
     if (!refused && !modelRefused && (session.sessionId != null || session.result != null)) {
@@ -8052,6 +8058,8 @@ export class Supervisor {
   // through, with nothing on screen saying why (store-demo, 2026-08-11).
   noteExitForBackoff(session: RunState, { onLine = () => {} }: { onLine?: (line: string) => void } = {}) {
     if (session.stoppedByUs) return;
+    // The chat could not go on; the login is fine.
+    if (session.resultIsError && chatCannotContinue(session.result)) return;
     // A CLOUD SIGN-IN THAT STOPPED WORKING SAYS NOTHING ABOUT THIS MAC'S (exit
     // 77, main/cloud/run.mts): the work that was done is home, the row waits,
     // and the account's login here is a different login, so nothing is struck

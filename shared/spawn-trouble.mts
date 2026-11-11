@@ -282,9 +282,18 @@ const OPEN_ELSEWHERE = [/already has an active writer/i];
 // WHICH OF THE THREE THINGS WENT WRONG, from whatever the tool printed.
 // 'unknown' is a first-class answer, not a failure: an honest generic sentence
 // beats a confident wrong one.
+// The chat itself cannot go on, whatever the login: Codex 0.165.0 failing to
+// compact a long conversation says "unauthorized (401)" with the login fine.
+const CHAT_CANNOT_CONTINUE = [/error running remote compact task/i];
+
+export function chatCannotContinue(raw: unknown): boolean {
+  return CHAT_CANNOT_CONTINUE.some((re) => re.test(String(raw ?? '')));
+}
+
 export function troubleCause(raw: unknown): string {
   const text = String(raw ?? '');
   if (!text.trim()) return 'unknown';
+  if (chatCannotContinue(text)) return 'unknown';
   // The CLI's own argument check, before any account is asked anything.
   if (TOO_OLD.some((re) => re.test(text))) return 'too-old';
   if (CODEX_CONFIG.some((re) => re.test(text))) return 'codex-config';
