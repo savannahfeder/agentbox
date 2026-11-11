@@ -3,7 +3,6 @@
 
 import type { Engine } from '../../shared/engines.mts';
 import type { AgentVoice } from '../../shared/agent-voice.mts';
-import type { NotePlace } from '../../shared/artifact-marks.mts';
 import type { CarryState } from '../../shared/carried-files.mts';
 import type { FileLinkAsk, FileLinkState, LinkComment, PublicLink } from './api';
 import type { LedgerLine } from './thread-history';
@@ -1920,7 +1919,7 @@ declare global {
       fileLinkStop?(p: { token: string }): Promise<{ ok: boolean; error?: string }>;
       fileLinks?(): Promise<{ ok: boolean; error?: string; links?: PublicLink[] }>;
       fileLinkComments?(p: { token: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
-      fileLinkComment?(p: { token: string; text: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
+      fileLinkComment?(p: { token: string; text: string; place?: NotePlace | null }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
       bringSharedFile?(p: { link: string; product: string | null }): Promise<{ ok: boolean; error?: string; product?: string; id?: string; src?: string }>;
       takeSharedFile?(): Promise<string | null>;
       onSharedFile?(fn: () => void): () => void;
