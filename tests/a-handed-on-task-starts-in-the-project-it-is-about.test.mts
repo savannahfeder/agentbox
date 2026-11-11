@@ -32,7 +32,10 @@ describe('the project a handed-on task runs in', () => {
   });
   it('is the project its words name, when the thread says nothing you have', () => {
     expect(handOffProject({ words: 'Wire the refund button in web app to the new endpoint.', cards, offered: projects })).toBe('web-app');
-    expect(handOffProject({ words: `${link('w-mobile')}\n\nThe Payments API needs a retry.`, cards, offered: projects })).toBe('payments-api');
+  });
+  // Round four: Lena handed Theo a Web app thread whose words also named his Payments API, and it opened on Payments API.
+  it('asks when it was handed from a thread in a project you do not have, whatever its words name', () => {
+    expect(handOffProject({ words: `${link('w-mobile')}\n\nThe Payments API needs a retry.`, cards, offered: projects })).toBeNull();
   });
   it('is nobody when nothing points at one of yours', () => {
     expect(handOffProject({ words: 'Finish the checkout form.', cards, offered: projects })).toBeNull();

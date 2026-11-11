@@ -735,8 +735,9 @@ export function handOffProject({ words, cards, offered }: {
   for (const m of words.matchAll(/https:\/\/[^\s)]+/g)) {
     const link = threadOfLink(m[0]);
     const card = link ? cards.find((c) => c.personId === link.owner && c.threadId === link.id) : null;
-    const slug = card?.project ? called(card.project) : null;
-    if (slug) return slug;
+    if (!card?.project) continue;
+    // Handed from a thread in a project you do not have: the work is about that project, so ask.
+    return called(card.project);
   }
   const plain = words.replace(/\]\([^)]*\)/g, ']');
   const said = new Set(mine.filter((p) => new RegExp(`(?<![\\w])${p.name.trim().replace(ESCAPED, '\\$&')}(?![\\w])`, 'i').test(plain)).map((p) => p.name.trim().toLowerCase()));
