@@ -1,7 +1,7 @@
 // A FILE SOMEONE SHARED BY ITS LINK, BROUGHT INTO THIS PERSON'S OWN AGENTBOX:
 // their own copy in a project's attachments, on a thread of its own that waits
-// on them and runs nothing until they write to it. What they edit is theirs; the link and its
-// owner's file are left as they were.
+// on them and runs nothing until they write to it. What they edit is theirs;
+// the link and its owner's file are left as they were.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

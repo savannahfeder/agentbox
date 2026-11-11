@@ -133,7 +133,6 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
     setSaid(shareWords.stopped);
   };
   const toggle = () => { setOpen(!open); setSaid(null); setProblem(null); setStopAsked(false); };
-  // The button says it was copied, for a moment, where the press was.
   const copyIt = async (url: string) => {
     if (!(await copy(url))) { setProblem('This browser would not copy. Open the link and copy it from there.'); return; }
     setCopied(true);
