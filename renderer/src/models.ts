@@ -33,7 +33,8 @@
 //
 // A model set by hand outside this list still draws as itself; see modelChoices.
 
-import { CLAUDE_MODELS } from '../../shared/claude-models.generated.mjs';
+import { CLAUDE_MODELS } from '../../shared/claude-models.generated.mts';
+import { DEFAULT_CLAUDE_MODEL } from '../../shared/engines.mts';
 
 export interface ModelChoice {
   /** What the CLI is sent. Always an alias, never a version. */
@@ -44,8 +45,8 @@ export interface ModelChoice {
   model?: string;
   /**
    * A CODEX MODEL'S OWN REASONING LEVELS, read off this Mac beside its name
-   *  (main/codex-models.mjs). Absent on every Claude Code row, whose levels are
-   *  the CLI's five for any model (../../shared/effort-levels.mjs). */
+   *  (main/codex-models.mts). Absent on every Claude Code row, whose levels are
+   *  the CLI's five for any model (../../shared/effort-levels.mts). */
   levels?: string[];
   defaultLevel?: string | null;
 }
@@ -72,7 +73,7 @@ export const BUILT_MODELS: ModelChoice[] = CLAUDE_MODELS.map((m) => ({
  * only the WORD that was frozen, because it came out of a file written when
  * Agentbox was built. MEASURED that day: her Claude Code 2.1.270 resolves `opus`
  * to Opus 5, and 2.1.280 resolves it to Opus 5.5. Now main reads the installed
- * CLI and this is where the answer lands (`main/claude-models.mjs`).
+ * CLI and this is where the answer lands (`main/claude-models.mts`).
  *
  * WHY A MODULE-LEVEL VALUE AND NOT A PROP. Codex's list is threaded through
  * Compose, Focus and Settings as `codexModels`, and it has to be: it is drawn
@@ -122,8 +123,12 @@ export const MODELS: ModelChoice[] = BUILT_MODELS;
  * it has to be the model that runs: Compose sends this constant on a Claude
  * Code card nobody has touched, instead of sending nothing and letting a
  * `--model` flag in zero.config.json answer a question already answered.
+ *
+ * EVERY OTHER KIND OF RUN IS PINNED TO IT TOO, which is why the word comes from
+ * shared/: a reply, a teammate's duty, a hand-off and a fork never pass this
+ * card, and they were the runs still taking that flag.
  */
-export const DEFAULT_MODEL = 'opus';
+export const DEFAULT_MODEL = DEFAULT_CLAUDE_MODEL;
 
 /**
  * A model set by hand that is none of the three is shown AS ITSELF rather than
@@ -149,12 +154,12 @@ export function modelLabelOf(id: string | null): string {
 // CLI resolves at spawn; Codex has no aliases and `thread/start`'s `model`
 // wants an exact slug (`gpt-5.6-sol`). So "On Opus. With Codex." was not merely
 // a card that read wrong -- since 2026-09-04 it is a row that cannot run at
-// all, because `codexModelRefusal` in main/supervisor.mjs stops a Codex run
+// all, because `codexModelRefusal` in main/supervisor.mts stops a Codex run
 // whose model this Mac's Codex does not know rather than picking a stand-in.
 //
 // CODEX'S LIST IS NOT IN THIS FILE ON PURPOSE. It is read off the Mac, out of
 // the cache codex-cli itself maintains, and arrives here through settings
-// (main/codex-models.mjs says why a hardcoded one is wrong the week after it is
+// (main/codex-models.mts says why a hardcoded one is wrong the week after it is
 // written and a generated one wrong the week after the build). This module
 // holds the RULE about which list is which; neither list is invented here.
 
@@ -165,7 +170,7 @@ export function modelLabelOf(id: string | null): string {
  * `codexDefaultModel` answers null and the app genuinely does not know the word.
  *
  * Both alternatives are worse. Printing the first row of the offer list would
- * print OUR sort order as her default, which main/codex-models.mjs refuses by
+ * print OUR sort order as her default, which main/codex-models.mts refuses by
  * name. Printing `opus` would be the Claude alias on a Codex card that this
  * whole section exists to stop. Her rejection of "the default model" on was of
  * a row whose job was to explain that the picker might not be picking anything;

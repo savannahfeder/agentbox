@@ -15,6 +15,7 @@
 // outranks a prose hit. Nothing is dropped for ranking low.
 
 import { searchText } from './format';
+import { fold, withHumps, wordStart } from '../../shared/word-match.mts';
 import { rowSummary, SUMMARY_BUDGET } from './list-rules';
 import { ticketQuery } from './ticket-references';
 
@@ -34,7 +35,7 @@ export interface Searchable {
 }
 
 // How well a row matched sets only the order. The list prints no headings for
-// it (tests/a-result-list-has-no-headings.test.mjs).
+// it (tests/a-result-list-has-no-headings.test.mts).
 export interface SearchHit<T> {
   item: T;
   // The sentence the query was found in, ready for the row's summary line.
@@ -51,18 +52,7 @@ export interface Query {
   quoted: boolean;
 }
 
-// Folding must keep the length, because `splitHits` slices the original string
-// at offsets found in the folded one. That rules out stripping accents by NFD.
-// Curly quotes and dashes fold to what a keyboard types.
-const FOLDED: Record<string, string> = {
-  '‘': "'", '’': "'", 'ʼ': "'",
-  '“': '"', '”': '"',
-  '–': '-', '—': '-',
-};
-
-export function fold(text: string): string {
-  return text.toLowerCase().replace(/[‘’ʼ“”–—]/g, (c) => FOLDED[c]);
-}
+export { fold, wordStart };
 
 // Whitespace-separated terms, all of which must appear, because a second word
 // is typed to narrow the list.
@@ -116,7 +106,7 @@ function haystack(i: Searchable): Hay {
   if (cached) return cached;
   // The list draws the label (rowTitle, list-rules.ts) with the title under it,
   // so both are searched.
-  const title = squash(fold([i.label, i.title].filter(Boolean).join(' . ')));
+  const title = squash(fold(withHumps([i.label, i.title].filter(Boolean).join(' . '))));
   const body = searchText(i.body);
   const result = searchText(i.result);
   const note = searchText(i.note);
@@ -124,7 +114,7 @@ function haystack(i: Searchable): Hay {
   // Fields, and the label and title above, are joined with ' . ' so no phrase
   // is found straddling the seam between two of them.
   const prose = [body, result, note, answer].filter(Boolean).join(' . ');
-  const all = `${fold(i.id)} . ${title} . ${squash(fold(prose))}`;
+  const all = `${fold(i.id)} . ${title} . ${squash(fold(withHumps(prose)))}`;
   const hay: Hay = {
     title,
     all,
@@ -135,27 +125,6 @@ function haystack(i: Searchable): Hay {
   };
   HAY.set(i as object, hay);
   return hay;
-}
-
-// Anything but a letter or a digit ends a word, so "(idle-time)" contains
-// "time".
-function isWordChar(c: string): boolean {
-  return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
-}
-
-// Where `needle` starts a word in `hay`, at or after `from`, or -1. A prefix
-// counts and the middle of a word does not. `whole` also requires the word to
-// end there.
-export function wordStart(hay: string, needle: string, from = 0, whole = false): number {
-  if (!needle) return -1;
-  let at = hay.indexOf(needle, from);
-  while (at >= 0) {
-    const startsWord = at === 0 || !isWordChar(hay[at - 1]);
-    const endsWord = !whole || !isWordChar(hay[at + needle.length] ?? '');
-    if (startsWord && endsWord) return at;
-    at = hay.indexOf(needle, at + 1);
-  }
-  return -1;
 }
 
 // Only the last term may be a prefix, since it is the one still being typed.

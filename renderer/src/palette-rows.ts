@@ -28,6 +28,7 @@
 
 import { type Look } from './skins';
 import { type ThemeChoice } from './theme';
+import { DONE } from './done-word';
 
 /* ------------------------------- matching -------------------------------- */
 
@@ -36,7 +37,8 @@ import { type ThemeChoice } from './theme';
 // Keeping those two jobs in separate fields is the point: the hint is UI copy
 // and has to read well, and a search that depends on copy reading a certain way
 // breaks the next time someone improves the sentence.
-export type Searchable = { label: string; keywords?: string };
+/** `onlyWith`: a word the query must name (two letters of it will do) before the row is offered at all. */
+export type Searchable = { label: string; keywords?: string; onlyWith?: string };
 
 // EVERY WORD OF THE QUERY MUST LAND, in any order, anywhere in the label or the
 // keywords. She types "dark mode", which as one substring appears in no label in
@@ -47,6 +49,8 @@ export type Searchable = { label: string; keywords?: string };
 export function matchesQuery(query: string, row: Searchable): boolean {
   const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   if (!words.length) return true;
+  const must = row.onlyWith?.toLowerCase();
+  if (must && !words.some((w) => w.length >= 2 && (must.startsWith(w) || w.startsWith(must)))) return false;
   const hay = `${row.label} ${row.keywords ?? ''}`.toLowerCase();
   return words.every((w) => hay.includes(w));
 }
@@ -77,10 +81,46 @@ const FIRST_AMONG_MATCHES = ['snooze'];
 // they are searched and never drawn, for whoever still reaches for them.
 export const LATER_KEYWORDS = 'remind me snooze put off defer schedule';
 
-export function rankMatches<T extends { id: string }>(query: string, rows: T[]): T[] {
-  if (!query.trim()) return rows;
-  const rank = (row: T) => (FIRST_AMONG_MATCHES.includes(row.id) ? 0 : 1);
+// No "inbox": typed alone it means going there, and this row would sit above
+// Go to Inbox under the return key.
+export const REOPEN_KEYWORDS = 'unmark undo undone not done open again bring back put back';
+
+export type PageRow = { id: string; label: string; keywords: string; view: 'inbox' | 'progress' | 'snoozed' | 'done' };
+
+/** The tabs ⌘K goes to. With a team on, Later and Done are columns of In progress. */
+export function pageRows({ team }: { team: boolean }): PageRow[] {
+  const inbox: PageRow = { id: 'view-inbox', label: 'Go to Inbox', keywords: 'needs you home list threads', view: 'inbox' };
+  if (team) return [inbox, { id: 'view-progress', label: 'Go to In progress', keywords: 'working running board later scheduled done finished closed', view: 'progress' }];
+  return [
+    inbox,
+    { id: 'view-progress', label: 'Go to In progress', keywords: 'working running', view: 'progress' },
+    { id: 'view-later', label: 'Go to Later', keywords: LATER_KEYWORDS, view: 'snoozed' },
+    { id: 'view-done', label: `Go to ${DONE.short}`, keywords: 'finished closed', view: 'done' },
+  ];
+}
+
+// Then a row whose name starts with what was typed: "go to" is Go to Inbox,
+// not a row that matched because "logo" holds "go".
+export function rankMatches<T extends { id: string; label?: string }>(query: string, rows: T[]): T[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return rows;
+  const rank = (row: T) => (FIRST_AMONG_MATCHES.includes(row.id) ? 0 : row.label?.toLowerCase().startsWith(q) ? 1 : 2);
   return [...rows].sort((a, b) => rank(a) - rank(b));
+}
+
+/** Escape closes ⌘K from the window's capture phase, so a panel under it that
+ *  stops the key's propagation cannot take the first press. */
+export function escapeClosesThePalette(
+  win: Pick<Window, 'addEventListener' | 'removeEventListener'>,
+  close: () => void,
+): () => void {
+  const key = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    close();
+  };
+  win.addEventListener('keydown', key, true);
+  return () => win.removeEventListener('keydown', key, true);
 }
 
 /* ---------------------------- the appearance rows ------------------------ */

@@ -1,0 +1,11 @@
+.document-preview-frame { max-height: min(720px, 66vh); overflow: hidden; }
+.document-preview-frame.opens { cursor: pointer; }
+.document-preview-frame.is-cut { mask-image: linear-gradient(to bottom, black calc(100% - 48px), transparent); }
+.document-preview-frame.is-expanded { max-height: none; overflow: visible; }
+.document-preview-toggle { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 11px 16px;
+  border: 0; border-top: 1px solid var(--line); background: var(--wash); color: var(--text-dim); font: inherit; font-size: 13px; cursor: pointer; }
+.document-preview-toggle:hover { color: var(--text); }
+.document-preview-toggle:focus-visible { outline: 2px solid var(--underline); outline-offset: -3px; }
+/* On the picture, not the button around it, which cut the picture off.
+   320px leaves room for the top bar, the options and the reply box. */
+.focus-pane[data-file-previews="page"] .inline-image { max-height: calc(100vh - 320px); }

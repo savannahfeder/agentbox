@@ -40,6 +40,8 @@ import { pipeline } from 'node:stream/promises';
 import { spawn, execFile, execFileSync } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
 import { usageMeter } from './usage.mjs';
+import { memoryGuard } from './memory-guard.mjs';
+import { keyNameRefused, HIDE_FROM } from './key-names.mjs';
 
 // One stdout event at most this many bytes of output.
 const CHUNK = 48 * 1024;
@@ -47,11 +49,81 @@ const CHUNK = 48 * 1024;
 const PAGE_BYTES = 8 * 1024 * 1024;
 // A single MCP line from the harness larger than this is refused.
 const MAX_MCP_LINE = 32 * 1024 * 1024;
+
+// Python's archive reader is available in the image; materialize only regular
+// files into a fresh directory before replacing an installed skill snapshot.
+export function unpackSkillArchive(file, destination) {
+  return sh('python3', ['-c', String.raw`import gzip, os, pathlib, shutil, sys, tarfile, tempfile
+archive, dest = sys.argv[1:]
+os.umask(0o022)
+parent = os.path.dirname(dest)
+os.makedirs(parent, exist_ok=True)
+stage = tempfile.mkdtemp(prefix='.skills-stage-', dir=parent)
+backup = None
+try:
+ with tempfile.TemporaryFile() as raw:
+  with gzip.open(archive, 'rb') as source:
+   size = 0
+   while True:
+    block = source.read(65536)
+    if not block: break
+    size += len(block)
+    if size > 128 * 1024 * 1024: raise ValueError('skill archive size cap exceeded')
+    raw.write(block)
+  raw.seek(0)
+  with tarfile.open(fileobj=raw, mode='r:') as tar:
+   seen = set(); total = 0; count = 0; entries = 0
+   for member in tar:
+    entries += 1
+    if entries > 100000: raise ValueError('skill archive entry count cap exceeded')
+    name = pathlib.PurePosixPath(member.name)
+    if name.is_absolute() or '..' in name.parts or len(name.parts) > 18 or any(c in member.name for c in '\r\n\0'):
+     raise ValueError('unsafe skill archive path')
+    if not member.isdir() and not member.isfile(): raise ValueError('skill archives cannot contain links or special files')
+    if not name.parts:
+     if not member.isdir(): raise ValueError('invalid skill archive entry')
+     continue
+    key = str(name)
+    if key in seen: raise ValueError('duplicate skill archive entry')
+    seen.add(key)
+    target = os.path.join(stage, *name.parts)
+    if member.isdir():
+     os.makedirs(target, exist_ok=True)
+     continue
+    count += 1; total += member.size
+    if count > 5000 or member.size > 25 * 1024 * 1024 or total > 100 * 1024 * 1024:
+     raise ValueError('skill archive file cap exceeded')
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    with tar.extractfile(member) as source, open(target, 'xb') as output:
+     shutil.copyfileobj(source, output, 65536)
+    os.chmod(target, 0o644 | (member.mode & 0o111))
+ os.chmod(stage, 0o755)
+ if os.path.lexists(dest):
+  backup = tempfile.mkdtemp(prefix='.skills-old-', dir=parent)
+  os.rmdir(backup); os.replace(dest, backup)
+ try:
+  os.replace(stage, dest)
+ except BaseException:
+  if backup: os.replace(backup, dest); backup = None
+  raise
+finally:
+ shutil.rmtree(stage, ignore_errors=True)
+ if backup:
+  if os.path.islink(backup): os.unlink(backup)
+  else: shutil.rmtree(backup, ignore_errors=True)
+`, file, destination], '/');
+}
+
+export async function unpackFileArchive(file, destination) {
+  if (/^\.skills-[a-f0-9]{64}\.tgz$/.test(path.basename(file))) return unpackSkillArchive(file, destination);
+  fs.mkdirSync(destination, { recursive: true });
+  await sh('tar', ['-xzf', file, '-C', destination], destination);
+}
 // What this server can do beyond the first version, said in a start's answer,
 // so a Mac knows rather than guesses whether its asks are honoured.
-const CAPS = ['offline', 'setup', 'kept', 'base', 'plain', 'hold'];
+const CAPS = ['offline', 'setup', 'kept', 'base', 'plain', 'hold', 'resources', 'keys', 'pieces'];
 // A conversation sent home as only what the run added is listed in this file
-// (the same name in main/cloud/run.mjs).
+// (the same name in main/cloud/run.mts).
 const TAILS = '.agentbox-tails.json';
 // A PROJECT'S OWN SETUP: `.agentbox/cloud-setup.sh` in its task folder, run as
 // the agent before the agent, on every cloud run, so a project needing a
@@ -79,7 +151,9 @@ const WAKE_GRACE_MS = 2 * 60 * 1000;
 // How long a cancelled command gets before its group is killed outright.
 const KILL_GRACE_MS = 15_000;
 // AgentCore ends a session at 8 hours; stop the command a quarter hour before.
-const DEFAULT_DEADLINE_MS = (8 * 60 - 15) * 60_000;
+// Exported so the relay can hold its own copy to this one (main/cloud/run.mts
+// RUN_LIMIT_MS), which is the number the agent is told at the start.
+export const DEFAULT_DEADLINE_MS = (8 * 60 - 15) * 60_000;
 
 const DONE_STATES = new Set(['collected', 'failed']);
 
@@ -159,6 +233,9 @@ export function createSandbox({
   // Where the usage meter reads the machine (cloud/sandbox/usage.mjs); a
   // test points it at a fake /sys/fs/cgroup and /proc.
   usage = {},
+  // Free memory under which the run's biggest program is stopped
+  // (cloud/sandbox/memory-guard.mjs). 0: no guard.
+  memoryFloorBytes = 0,
   // How a command gets a terminal (`claude setup-token` needs one). A test on
   // a Mac, whose `script` takes other flags, passes a plain shell.
   terminal = linuxTerminal,
@@ -171,8 +248,16 @@ export function createSandbox({
   // Which Claude account a new token belongs to, so the Mac can name it.
   // Best effort: a token that cannot say is kept all the same, unnamed.
   whoIs = claudeAccountEmail,
+  // Disk held back from the run, given up the first time the disk is full,
+  // so the log and the results upload still have room.
+  reserveBytes = 0,
 } = {}) {
   const at = (p) => (pathRoot ? path.join(pathRoot, p) : p);
+  const reserve = path.join(workRoot, '.reserve');
+  if (reserveBytes > 0) {
+    try { fs.mkdirSync(workRoot, { recursive: true }); fs.writeFileSync(reserve, Buffer.alloc(reserveBytes)); } catch (err) { log(`no disk reserve: ${err.message}`); }
+  }
+  const freeReserve = () => { try { fs.rmSync(reserve); return true; } catch { return false; } };
   let run = null;
   let bridge = null;
   // A start answers the Mac at once and lays the folder out behind it, so a
@@ -190,7 +275,7 @@ export function createSandbox({
   function openLog(r) {
     fs.mkdirSync(r.dir, { recursive: true });
     const file = path.join(r.dir, 'events.jsonl');
-    r.log = { file, fd: fs.openSync(file, 'w+'), size: 0, index: [], closed: false };
+    r.log = { file, fd: fs.openSync(file, 'w+'), size: 0, index: [], closed: false, held: 0, saidFull: false };
   }
 
   function closeLog(r) {
@@ -205,11 +290,43 @@ export function createSandbox({
     if (r.log.closed) return null;
     const e = { seq: r.log.index.length + 1, at: Date.now(), ...event };
     const line = Buffer.from(JSON.stringify(e) + '\n');
-    fs.writeSync(r.log.fd, line, 0, line.length, r.log.size);
-    r.log.index.push({ off: r.log.size, len: line.length });
-    r.log.size += line.length;
+    const entry = { off: r.log.size, len: line.length };
+    if (logWrite(r, line)) r.log.size += line.length;
+    else { entry.held = line; r.log.held += 1; }
+    r.log.index.push(entry);
     for (const w of [...r.waiters]) w();
+    if (entry.held && !r.log.saidFull) {
+      r.log.saidFull = true;
+      emit({ kind: 'error', message: 'this cloud machine\'s disk is full, so the run\'s uncommitted work may not fit to be sent home' }, r);
+    }
     return e;
+  }
+
+  // Never throws: it runs in the agent's output handler, and the server ending
+  // ends the machine and the run's unsent work.
+  function logWrite(r, line) {
+    for (let tries = 0; tries < 2; tries += 1) {
+      try {
+        if (fs.writeSync(r.log.fd, line, 0, line.length, r.log.size) === line.length) return true;
+      } catch { /* refused; below */ }
+      if (tries === 0 && !freeReserve()) return false;
+    }
+    return false;
+  }
+
+  function logBytes(r, from, to) {
+    const idx = r.log.index;
+    if (from >= to) return Buffer.alloc(0);
+    const bytes = idx.slice(from, to).reduce((n, x) => n + x.len, 0);
+    const buf = Buffer.allocUnsafe(bytes);
+    if (!r.log.held) { fs.readSync(r.log.fd, buf, 0, bytes, idx[from].off); return buf; }
+    let at = 0;
+    for (let i = from; i < to; i += 1) {
+      if (idx[i].held) idx[i].held.copy(buf, at);
+      else fs.readSync(r.log.fd, buf, at, idx[i].len, idx[i].off);
+      at += idx[i].len;
+    }
+    return buf;
   }
 
   function readEvents(r, since, maxBytes = PAGE_BYTES) {
@@ -218,9 +335,7 @@ export function createSandbox({
     let end = since;
     let bytes = 0;
     while (end < idx.length && (end === since || bytes + idx[end].len <= maxBytes)) { bytes += idx[end].len; end += 1; }
-    const buf = Buffer.allocUnsafe(bytes);
-    fs.readSync(r.log.fd, buf, 0, bytes, idx[since].off);
-    const events = buf.toString('utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+    const events = logBytes(r, since, end).toString('utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
     return { events, more: end < idx.length };
   }
 
@@ -441,6 +556,9 @@ export function createSandbox({
       try { e = JSON.parse(line); } catch { continue; }
       if (e?.type === 'result') {
         t.atResult = true;
+        // A turn that ends after the last job did is the wake it was given
+        // time for, as on the Mac (main/claude-input.mts).
+        t.lastJobEndedAt = 0;
         for (const [id, m] of t.unread) { m.results += 1; if (m.results >= 2) t.unread.delete(id); }
         continue;
       }
@@ -471,8 +589,10 @@ export function createSandbox({
   function watchWhileAway(r) {
     if (r.awayTimer) return;
     r.awayTimer = setInterval(() => {
-      if (!macAway(r) || DONE_STATES.has(r.state)) return;
-      for (const [k, c] of r.calls) {
+      if (DONE_STATES.has(r.state)) return;
+      const away = macAway(r);
+      if (!away && !r.endWhenDone) return;
+      if (away) for (const [k, c] of r.calls) {
         if (c.state !== 'sent' && c.state !== 'claimed') continue;
         // A held server's call waits for an answer from the phone, or the Mac's when it is back.
         if (c.msg.method === 'tools/call' && heldServer(r, r.connServer.get(c.conn))) { hold(r, k); continue; }
@@ -592,6 +712,7 @@ export function createSandbox({
   async function prepareAndSpawn(r) {
     const { cwd, branch, bundleUrl, argv, env = {}, files = [], remote, changesRef, base, refs } = r.spec;
     try {
+      try { r.resourceRoot = makeResourceRoot(r.id); } catch (err) { r.resourceError = err.message; }
       const bundle = path.join(r.dir, 'in.bundle');
       fs.mkdirSync(cwd, { recursive: true });
       // A project with no repository runs in its documents folder, which
@@ -646,6 +767,7 @@ export function createSandbox({
       fs.rmSync(bundle, { force: true });
       if (r.spec.login) await placeLogin(r);
       if (r.spec.also) await placeCodexToo(r);
+      if (r.spec.keys) await placeKeys(r);
       // What the documents folder held before the agent started, so only what
       // it writes there goes home (`sendDocs`).
       if (r.spec.docs) r.docsSeen = scanDocs(r.spec.docs);
@@ -689,6 +811,7 @@ export function createSandbox({
         env: {
           ...baseEnv,
           ...(runAs ? { HOME: runAs.home, USER: runAs.user, LOGNAME: runAs.user, TMPDIR: '/tmp' } : {}),
+          ...(r.keyEnv || {}),
           ...env,
           ...(r.secretEnv || {}),
           AGENTBOX_BRIDGE_SOCK: bridgeSocket,
@@ -704,6 +827,12 @@ export function createSandbox({
     }
     r.child = child;
     r.meter = usageMeter(usage);
+    if (memoryFloorBytes > 0 && child.pid) {
+      r.guard = memoryGuard({
+        floorBytes: memoryFloorBytes, agentPid: child.pid, ownerUid: runAs?.uid ?? null,
+        onStop: (s) => emit({ kind: 'error', message: `this cloud machine was almost out of memory (${Math.round(s.availableBytes / 2 ** 20)} MB free), so ${s.name} (${(s.rssBytes / 2 ** 30).toFixed(1)} GB) was stopped to keep the run going` }, r),
+      });
+    }
     child.stdout.on('data', (d) => { emitChunks('stdout', d, r); readTurn(r, d); });
     child.stderr.on('data', (d) => emitChunks('stderr', d, r));
     child.stdin.on('error', () => {});
@@ -725,6 +854,8 @@ export function createSandbox({
       r.exitSignal = signal || null;
       r.usage = r.meter?.stop() ?? null;
       r.meter = null;
+      r.guard?.stop();
+      r.guard = null;
       r.child = null;
       // Anything the command left running in its group goes now: a dev
       // server holding stdout open would otherwise keep the run "running".
@@ -770,13 +901,76 @@ export function createSandbox({
   // What a run was given is noted, so only what it adds goes home (`stageTails`).
   async function placeFile(f, r = null) {
     fs.mkdirSync(path.dirname(f.path), { recursive: true });
-    const body = await download(fetchImpl, f.url, f.path, stopping.signal);
+    if (f.more !== undefined && (!Array.isArray(f.more) || f.untar || !f.more.every((p) => typeof p?.url === 'string'))) throw new Error('more must be [{ url }] on a plain file');
+    // A file sent in pieces (`pieces`): the first at `url`, then each of `more`.
+    const body = f.more?.length
+      ? await downloadPieces(fetchImpl, [f.url, ...f.more.map((p) => p.url)], f.path, stopping.signal)
+      : await download(fetchImpl, f.url, f.path, stopping.signal);
     if (r && !f.untar) (r.placed ||= new Map()).set(f.path, { size: body.length, sha256: sha256(body) });
     if (f.untar) {
-      fs.mkdirSync(f.untar, { recursive: true });
-      await sh('tar', ['-xzf', f.path, '-C', f.untar], f.untar);
+      await unpackFileArchive(f.path, f.untar);
       fs.rmSync(f.path, { force: true });
     }
+  }
+
+  function protectedDirectory(dir) {
+    try { fs.mkdirSync(dir, { mode: 0o755 }); } catch (err) { if (err.code !== 'EEXIST') throw err; }
+    const st = fs.lstatSync(dir);
+    if (!st.isDirectory() || st.isSymbolicLink() || st.uid !== process.getuid?.()) throw new Error('resource directory is not owned by the server');
+    fs.chmodSync(dir, 0o755);
+    return dir;
+  }
+
+  function makeResourceRoot(id) {
+    const base = at('/tmp/agentbox-resources');
+    fs.mkdirSync(path.dirname(base), { recursive: true });
+    protectedDirectory(base);
+    return protectedDirectory(path.join(base, sha256(Buffer.from(id))));
+  }
+
+  async function placeResource(f, r) {
+    if (!r.resourceRoot) throw new Error(r.resourceError || 'resource storage is unavailable');
+    const logical = `/tmp/agentbox-resources/${sha256(Buffer.from(r.id))}`;
+    if (!f?.url || typeof f.path !== 'string' || !f.path.startsWith(logical + '/') || path.posix.normalize(f.path) !== f.path || /[\\\r\n\0]/.test(f.path)) throw new Error('invalid resource destination');
+    const parts = f.path.slice(logical.length + 1).split('/');
+    if (parts.length !== 2 || !/^[a-f0-9]{64}$/.test(parts[0]) || !parts[1]) throw new Error('invalid resource destination');
+    const archive = !!f.untar;
+    if (archive ? !/^\.skills-[a-f0-9]{64}\.tgz$/.test(parts[1]) || f.untar !== `${logical}/${parts[0]}/skills` : parts[1].startsWith('.')) throw new Error('invalid resource file');
+    makeResourceRoot(r.id);
+    const dir = protectedDirectory(path.join(r.resourceRoot, parts[0]));
+    const target = path.join(dir, archive ? 'skills' : parts[1]);
+    const existing = fs.lstatSync(target, { throwIfNoEntry: false });
+    if (existing && (existing.isSymbolicLink() || existing.uid !== process.getuid?.() || (archive ? !existing.isDirectory() : !existing.isFile() || existing.nlink !== 1))) throw new Error('unsafe existing resource');
+    const signal = AbortSignal.any([stopping.signal, AbortSignal.timeout(45_000)]);
+    const response = await fetchImpl(f.url, { signal });
+    if (!response.ok) throw new Error(`resource download failed (${response.status})`);
+    const limit = (archive ? 128 : 25) * 1024 * 1024;
+    const chunks = []; let bytes = 0;
+    if (response.body?.[Symbol.asyncIterator]) {
+      for await (const chunk of response.body) {
+        bytes += chunk.length;
+        if (bytes > limit) throw new Error('resource size cap exceeded');
+        chunks.push(Buffer.from(chunk));
+      }
+    } else {
+      const body = Buffer.from(await response.arrayBuffer());
+      if (body.length > limit) throw new Error('resource size cap exceeded');
+      chunks.push(body); bytes = body.length;
+    }
+    const body = Buffer.concat(chunks, bytes);
+    const job = fs.mkdtempSync(path.join(r.resourceRoot, '.incoming-'));
+    try {
+      const file = path.join(job, parts[1]);
+      const fd = fs.openSync(file, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_NOFOLLOW, 0o644);
+      try { fs.writeFileSync(fd, body); fs.fchmodSync(fd, 0o644 | (Number(f.mode) & 0o111)); } finally { fs.closeSync(fd); }
+      if (archive) {
+        const staged = path.join(job, 'skills');
+        await unpackSkillArchive(file, staged);
+        if (!existing) fs.renameSync(staged, target);
+      } else if (existing) {
+        if (sha256(fs.readFileSync(target)) !== sha256(body)) throw new Error('resource content changed');
+      } else fs.renameSync(file, target);
+    } finally { fs.rmSync(job, { recursive: true, force: true }); }
   }
 
   /* ----------------------------- THE SIGN-INS ----------------------------- */
@@ -854,6 +1048,24 @@ export function createSandbox({
         if (runAs) await sh('chown', ['-R', `${runAs.uid}:${runAs.gid}`, dir], '/').catch(() => {});
       } catch { /* Codex stays signed out in this run */ }
     }
+  }
+
+  // THE KEYS THEY SAVED FOR CLOUD RUNS (main/cloud/keys.mts), each fetched
+  // by its own link and given to the agent as the variable it is named for.
+  // Never a reason to stop the run: one that cannot be fetched is left out,
+  // and the agent asks for it as if it had never been saved.
+  async function placeKeys(r) {
+    const got = {};
+    await Promise.all(r.spec.keys.map(async (k) => {
+      try {
+        const res = await fetchImpl(k.url, { signal: AbortSignal.timeout(30_000) });
+        const key = res.ok ? JSON.parse(Buffer.from(await res.arrayBuffer()).toString('utf8')) : null;
+        if (key?.name !== k.name || keyNameRefused(key.name) || typeof key.value !== 'string' || !key.value) throw new Error('not that key');
+        got[key.name] = key.value;
+      } catch { log(`run ${String(r.spec.runId || '').slice(-8)}: the key ${k.name} could not be fetched`); }
+    }));
+    r.keyEnv = got;
+    r.secrets = [...(r.secrets || []), ...Object.values(got).filter((v) => v.length >= HIDE_FROM)];
   }
 
   const shape = (text) => String(text || '').replace(/[A-Za-z0-9_\-+/=]{16,}/g, '<long>').replace(/\s+/g, ' ').trim().slice(-600);
@@ -1161,7 +1373,7 @@ export function createSandbox({
     r.collecting = (async () => {
       try {
         const manifest = await collect(r, urls);
-        if (urls.eventsUrl) await upload(fetchImpl, urls.eventsUrl, fs.readFileSync(r.log.file));
+        if (urls.eventsUrl) await upload(fetchImpl, urls.eventsUrl, logBytes(r, 0, r.log.index.length));
         const done = { ...manifest, runId: r.id, exitCode: r.exitCode, exitSignal: r.exitSignal || null, cancelled: r.cancelled || null, lastSeq: r.log.index.length, usage: r.usage || null };
         if (urls.doneUrl) await upload(fetchImpl, urls.doneUrl, Buffer.from(JSON.stringify(done)));
         r.manifest = done;
@@ -1362,12 +1574,23 @@ export function createSandbox({
   // same number can be sent again.
   function sequenced(r, req, apply) {
     const step = async () => {
+      const resource = req.action === 'files' && req.resource === true;
+      if (resource && (!Number.isSafeInteger(req.n) || req.n < 1)) return { ok: false, error: 'bad-resource-sequence', consumed: true };
       if (req.n === undefined) return apply();
       const n = Number(req.n);
-      if (n <= r.inSeq) return { ok: true, dup: true };
+      if (n <= r.inSeq) {
+        if (resource) return { ...(r.resourceReceipts?.get(n) || { ok: false, error: 'resource-receipt-unavailable', consumed: true }), dup: true };
+        return { ok: true, dup: true };
+      }
       if (n !== r.inSeq + 1) return { ok: false, error: 'gap', expect: r.inSeq + 1 };
       const out = await apply();
-      if (out?.ok || out?.consumed) r.inSeq = n;
+      if (out?.ok || out?.consumed) {
+        r.inSeq = n;
+        if (resource) {
+          (r.resourceReceipts ??= new Map()).set(n, out);
+          while (r.resourceReceipts.size > 64) r.resourceReceipts.delete(r.resourceReceipts.keys().next().value);
+        }
+      }
       return out;
     };
     const p = (r.inputs || Promise.resolve()).then(step, step);
@@ -1379,7 +1602,7 @@ export function createSandbox({
     const action = req.action;
     if (action === 'status') {
       if (!run) return { ok: true, state: 'none' };
-      return { ok: true, runId: run.id, state: run.state, seq: run.log.index.length, inSeq: run.inSeq, exitCode: run.exitCode ?? null, manifest: run.manifest || null };
+      return { ok: true, runId: run.id, state: run.state, seq: run.log.index.length, inSeq: run.inSeq, exitCode: run.exitCode ?? null, manifest: run.manifest || null, caps: CAPS };
     }
     if (action === 'signin' || action === 'renew' || action === 'look') {
       if (run && run.id === req.runId) return { ok: true, already: true, state: run.state, seq: run.log.index.length, caps: CAPS };
@@ -1498,9 +1721,15 @@ export function createSandbox({
           // Closed here while the Mac was away: a reply written now is the
           // app's to keep for the next run, and it learns that from this.
           if (r.inputClosed === 'cloud') return { ok: false, error: 'turn-closed', consumed: true };
-          if (req.end) r.inputClosed = 'mac';
+          // An app that is leaving says no more is coming (`whenDone`). Closed
+          // at once, Claude Code ends after its turn and takes every helper
+          // still running with it, so it is closed here once the turn is over
+          // and nothing it started is still out, as while the Mac is away.
+          const whenDone = !!req.end && req.whenDone === true && r.offline?.endTurn === 'claude-stream-json';
+          if (req.end && !whenDone) r.inputClosed = 'mac';
+          if (whenDone) r.endWhenDone = true;
           noteInput(r, req.data);
-          writeStdin(r, req);
+          writeStdin(r, whenDone ? { data: req.data } : req);
           return { ok: true };
         });
       case 'files':
@@ -1508,13 +1737,18 @@ export function createSandbox({
         // attachment named in the prompt, which arrives over stdin).
         return sequenced(r, req, async () => {
           try {
+            if (req.resource === true) {
+              if (!Array.isArray(req.files) || req.files.length !== 1) throw new Error('a resource delivery contains one resource');
+              await placeResource(req.files[0], r);
+              return { ok: true };
+            }
             for (const f of req.files || []) {
               if (!f?.url || !path.isAbsolute(f?.path || '')) return { ok: false, error: 'bad-file', consumed: true };
               await placeFile({ ...f, path: at(f.path), ...(f.untar ? { untar: at(f.untar) } : {}) }, r);
               if (runAs) await sh('chown', [`${runAs.uid}:${runAs.gid}`, at(f.path)], '/').catch(() => {});
             }
           } catch (err) {
-            return { ok: false, error: 'file-failed', message: err.message };
+            return { ok: false, error: 'file-failed', message: err.message, ...(req.resource === true ? { consumed: true } : {}) };
           }
           return { ok: true };
         });
@@ -1655,6 +1889,7 @@ function invalidStart(req) {
   if (req.login && (!req.login.url || !['claude', 'codex'].includes(req.login.engine))) return 'a login needs its engine and its link';
   if (req.also != null && (!Array.isArray(req.also) || req.also.some((l) => l?.engine !== 'codex' || typeof l.url !== 'string' || !l.url))) return 'also is a list of Codex logins, each by its link';
   if (req.also?.length && req.login?.engine !== 'claude') return 'only a Claude run carries a Codex login too';
+  if (req.keys != null && (!Array.isArray(req.keys) || req.keys.some((k) => keyNameRefused(k?.name) || typeof k.url !== 'string' || !k.url))) return 'keys is a list of saved keys, each by its name and link';
   if (!req.runId || typeof req.runId !== 'string') return 'runId is required';
   if (!req.cwd || !path.isAbsolute(req.cwd)) return 'cwd must be an absolute path';
   if (req.plain != null && req.plain !== true) return 'plain is true or absent';
@@ -1775,7 +2010,7 @@ function mirror(from, to, skip) {
 
 // THE FOLDER AS IT GOES HOME WHEN IT HOLDS A FILE THE RUN WAS GIVEN AND ONLY
 // ADDED TO (a conversation): that file as what the run added, listed in TAILS
-// for the Mac to add to its own copy (main/cloud/run.mjs `layTails`). Null
+// for the Mac to add to its own copy (main/cloud/run.mts `layTails`). Null
 // when there is none; a file whose start the run changed goes whole.
 async function stageTails(r, dir, staging) {
   const tails = [];
@@ -1885,6 +2120,19 @@ async function download(fetchImpl, url, file, signal) {
   return body;
 }
 
+async function downloadPieces(fetchImpl, urls, file, signal) {
+  const parts = [];
+  for (const url of urls) {
+    const res = await fetchImpl(url, signal ? { signal } : undefined);
+    if (!res.ok) throw new Error(`fetch ${res.status} for ${redact(url)}`);
+    parts.push(Buffer.from(await res.arrayBuffer()));
+  }
+  const body = Buffer.concat(parts);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, body);
+  return body;
+}
+
 async function upload(fetchImpl, url, body) {
   // Never an upload that hangs a session: two minutes is far past any we make.
   const res = await fetchImpl(url, { method: 'PUT', body, signal: AbortSignal.timeout(120_000) });
@@ -1913,8 +2161,16 @@ function json(res, status, body) {
   res.end(JSON.stringify(body));
 }
 
+// The server is the machine's first process, so it ending ends the machine and
+// every run's unsent work with it; a bug it did not catch is said instead.
+export function keepServing(log) {
+  process.on('uncaughtException', (err) => log(`uncaught, kept serving: ${err?.stack || err}`));
+  process.on('unhandledRejection', (err) => log(`unhandled rejection, kept serving: ${err?.stack || err}`));
+}
+
 // Started directly (the image's entrypoint), it serves AgentCore's port.
 if (import.meta.url === `file://${process.argv[1]}`) {
+  keepServing((line) => console.error(line));
   let runAs = null;
   const user = process.env.AGENTBOX_RUN_AS;
   if (user && process.getuid?.() === 0) {
@@ -1922,6 +2178,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const home = execFileSync('getent', ['passwd', user], { encoding: 'utf8' }).split(':')[5];
     runAs = { uid: id('-u'), gid: id('-g'), home, user };
   }
-  const sandbox = createSandbox({ workRoot: '/var/lib/agentbox', bridgeSocket: '/tmp/agentbox-bridge.sock', rootSocket: '/run/agentbox-root.sock', runAs, log: (line) => console.error(line) });
+  const sandbox = createSandbox({ workRoot: '/var/lib/agentbox', bridgeSocket: '/tmp/agentbox-bridge.sock', rootSocket: '/run/agentbox-root.sock', runAs, reserveBytes: 256 * 2 ** 20, memoryFloorBytes: 512 * 2 ** 20, log: (line) => console.error(line) });
   sandbox.listen(Number(process.env.PORT) || 8080).then((a) => console.error(`agentbox sandbox listening on ${a.port}`));
 }

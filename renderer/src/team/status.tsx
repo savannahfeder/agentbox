@@ -22,13 +22,13 @@
 // hover at all.
 //
 // The rules (what reads as live, the words, how long a hold lasts) are in
-// shared/team-status.mjs, because the main process clears a lapsed one and
+// shared/team-status.mts, because the main process clears a lapsed one and
 // has to agree with what is drawn here.
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Person } from '../types';
 import { api } from '../api';
-import { STATUS_MAX, holdsUntil, liveStatus } from '../../../shared/team-status.mjs';
+import { STATUS_MAX, holdsUntil, liveStatus } from '../../../shared/team-status.mts';
 import { UNTIL_PRESETS, endOf, readUntil, untilWords, type StatusEnd } from './status-until';
 
 /** What a person is saying right now, or null. Everything here goes through

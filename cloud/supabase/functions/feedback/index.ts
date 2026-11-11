@@ -1,6 +1,6 @@
 // FEEDBACK FROM THE APP, FORWARDED BY EMAIL (w-1b574413db, 2026-10-04).
 //
-// The Feedback card posts here (main/feedback.mjs): what the person wrote,
+// The Feedback card posts here (main/feedback.mts): what the person wrote,
 // what they attached, and the app's version. This forwards it as one email
 // through Resend.
 //
@@ -16,7 +16,7 @@
 //
 // It takes no sign-in (config.toml, [functions.feedback]), because most
 // people sending feedback have no account. So it checks everything itself:
-// the same limits as shared/feedback.mjs, and a request too big to be one of
+// the same limits as shared/feedback.mts, and a request too big to be one of
 // ours is refused before it is read.
 
 const LIMITS = { text: 20_000, files: 10, bytes: 8 * 1024 * 1024 };
@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
   if (!to || !from || !key) return json({ ok: false, error: 'not configured' }, 503);
   if (Number(req.headers.get('content-length') ?? 0) > MAX_REQUEST) return json({ ok: false, error: 'too large' }, 413);
 
-  let body: { text?: unknown; files?: unknown; app?: { version?: unknown; os?: unknown } };
+  let body: { text?: unknown; files?: unknown; app?: { version?: unknown; os?: unknown; install?: unknown } };
   try {
     body = await req.json();
   } catch {
@@ -65,9 +65,12 @@ Deno.serve(async (req) => {
 
   const version = String(body.app?.version ?? '').slice(0, 40);
   const os = String(body.app?.os ?? '').slice(0, 80);
+  // The random install id (shared/install-id.mts), cut to 8 characters: enough
+  // to tell whether two emails came from one install.
+  const install = String(body.app?.install ?? '').replace(/[^\w-]/g, '').slice(0, 64);
   const first = text.split('\n')[0].slice(0, 70);
   const subject = `Agentbox feedback: ${first || `${files.length} file${files.length === 1 ? '' : 's'}`}`;
-  const footer = `Agentbox ${version || 'unknown version'} · ${os || 'unknown OS'}`;
+  const footer = `Agentbox ${version || 'unknown version'} · ${os || 'unknown OS'}${install ? ` · install ${install.slice(0, 8)}` : ''}`;
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',

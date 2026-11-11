@@ -37,11 +37,11 @@
 //
 // ADDING A MODAL MEANS ANSWERING THIS. If it is drawn inside an opened task,
 // its name goes in the set below. If it floats over the app, it does not.
-// `tests/a-modal-cannot-outlive-its-task.test.mjs` fails on a value that is in
+// `tests/a-modal-cannot-outlive-its-task.test.mts` fails on a value that is in
 // neither list.
 
 /** Every value `modal` can hold. Kept here so the two lists below are total. */
-export const EVERY_MODAL = ['compose', 'filter', 'palette', 'reply', 'snooze', 'standing'] as const;
+export const EVERY_MODAL = ['cloud-off', 'compose', 'filter', 'palette', 'reply', 'snooze', 'standing'] as const;
 
 export type ModalName = (typeof EVERY_MODAL)[number];
 
@@ -57,7 +57,8 @@ export const BELONGS_TO_THE_APP: ReadonlySet<string> = new Set<ModalName>([
   // (w-9e434e8671).
   // 'filter' is the menu under the corner's filter icon (w-aa3fa4cbf0). It is
   // about the box, never about a task.
-  'compose', 'filter', 'palette', 'snooze', 'standing',
+  // 'cloud-off' asks before the whole cloud turns off (components/CloudOffAsk).
+  'cloud-off', 'compose', 'filter', 'palette', 'snooze', 'standing',
 ]);
 
 /**

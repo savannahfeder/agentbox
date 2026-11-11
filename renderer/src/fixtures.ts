@@ -3,10 +3,11 @@
 // tells real agents to write, so the fixtures double as a schema preview.
 
 import type { AgentSession, FolderListing, Snapshot, WorkspaceSettings } from './types';
+import type { LedgerLine } from './thread-history';
 // The engine ids, labels and the default are read off the one file that holds
 // them rather than typed again here. A fixture that spelled "Claude Code" for
 // itself is a fixture that could go on saying it after the app had stopped.
-import { DEFAULT_ENGINE, ENGINES } from '../../shared/engines.mjs';
+import { DEFAULT_ENGINE, ENGINES } from '../../shared/engines.mts';
 import { BUILT_MODELS } from './models';
 import { CODEX_DEFAULT_MODE } from './codex-modes';
 
@@ -14,7 +15,30 @@ const now = Date.now();
 const min = 60_000;
 const hr = 3_600_000;
 
+// An answer with its list written as a markdown table, the way agents write
+// one in a message. Invented figures.
+const TABLE_IN_A_MESSAGE = [
+  '**Stripe is the biggest by volume, about twice the next one.**',
+  '',
+  'Figures are each company\'s own latest yearly number, so treat close ones as tied.',
+  '',
+  '| # | Company | What they do | Volume per year | Stage | Website |',
+  '|---|---|---|---|---|---|',
+  '| 1 | Stripe | Online payments | ~$1.4T | Private | stripe.com |',
+  '| 2 | Adyen | Payments for large merchants | ~$1.2T | Public | adyen.com |',
+  '| 3 | Block | Square and Cash App | ~$240B | Public | block.xyz |',
+  '| 4 | Wise | Money sent abroad | ~$150B | Public | wise.com |',
+  '| 5 | Ramp | Corporate cards | ~$55B | Private | ramp.com |',
+  '| 6 | Brex | Corporate cards | ~$40B | Private | brex.com |',
+  '| 7 | Mercury | Business banking | ~$30B | Private | mercury.com |',
+  '| 8 | Plaid | Bank connections | $10B+ | Private | plaid.com |',
+  '',
+  'Just outside the list are Rippling and Deel, which move payroll rather than payments.',
+].join('\n');
+
 export const fixtureSnapshot: Snapshot = {
+  // As a checkout has it (main/settings.mts alphaFeatures).
+  alpha: { rooms: false },
   products: [
     { slug: 'kestrel', dir: '/fixtures/kestrel', name: 'Kestrel', oneLiner: 'Collectible card games, made beautiful', repoPath: '/Users/you/Desktop/dev/kestrel' },
     { slug: 'onboard', dir: '/fixtures/onboard', name: 'Onboard', oneLiner: 'Employee onboarding that runs itself', repoPath: null },
@@ -255,6 +279,23 @@ export const fixtureSnapshot: Snapshot = {
       progress: 'First row waits for your reply\nTests pass\nOn its branch, ready to merge',
     },
     {
+      // A TABLE WRITTEN IN THE MESSAGE, as markdown, which is drawn as one too.
+      id: 'w-t2', product: 'onboard', productName: 'Onboard', status: 'open', kind: 'question',
+      title: 'Biggest payment companies by volume',
+      body: TABLE_IN_A_MESSAGE,
+      labels: [], priority: 5, epoch: 1, claim: null,
+      createdAt: now - 40 * min, updatedAt: now - 9 * min,
+    },
+    {
+      // A TABLE: a lead list as a csv on a line of its own (w-690551d7ea).
+      id: 'w-t1', product: 'onboard', productName: 'Onboard', status: 'open', kind: 'question',
+      title: 'Fintech companies to reach out to',
+      body: '**Pick who I write to first, or tell me who to drop.**\n\nI put 16 fintech companies in a table with a note and a status for each. Two already have a meeting booked and two replied. I would start with the five marked New.\n\nleads/fintech-leads.csv',
+      labels: [], priority: 5, epoch: 1, claim: null,
+      createdAt: now - 30 * min, updatedAt: now - 5 * min,
+      problem: 'Building a list of fintech companies to reach out to. 16 so far, waiting on which to contact first.',
+    },
+    {
       // STOPPED: she answered, a worker took it, and that worker died without
       // finishing. Three of these were on her screen at once, which is what
       // resuming-by-selection is for. Needs you shows them, since nothing will
@@ -404,11 +445,11 @@ export const fixtureSnapshot: Snapshot = {
     },
   ],
   // ONE CODING AGENT, WHICH IS THE MAC SHE RUNS. The capability gate in
-  // shared/engines.mjs is shut until she writes the moment into
+  // shared/engines.mts is shut until she writes the moment into
   // zero.config.json, so `Supervisor#engineChoices` hands over one entry on
   // every Mac that exists today, and the composer's clause, the byline's engine
   // word and the Settings row all draw nothing off it. That is the founder rule
-  // (tests/one-coding-agent-draws-nothing-new.test.mjs) and it is what the
+  // (tests/one-coding-agent-draws-nothing-new.test.mts) and it is what the
   // default world has to be a photograph of.
   //
   // THE SECOND ENGINE IS A URL MODIFIER, NOT A NEW DEFAULT. See
@@ -420,7 +461,7 @@ export const fixtureSnapshot: Snapshot = {
 
 /* --------------------------- the working notes --------------------------- */
 // Session traces, in the exact shape the supervisor writes them (main/
-// supervisor.mjs, traceStreamLine): "HH:MM:SS  " and then either the agent's
+// supervisor.mts, traceStreamLine): "HH:MM:SS  " and then either the agent's
 // own sentence or "[Tool] the thing it acted on", a "== RESULT" block at the
 // end, and an exit line. The notes panel reads nothing else, so a fixture in
 // this shape exercises the real parser rather than a stand-in for it.
@@ -467,10 +508,24 @@ export const fixtureTraces: Record<string, Array<{ startedAt: number; text: stri
       [4, '[mcp__agentbox__claim_work_item] w-p3'],
       [12, '[mcp__agentbox__read_document] strategy/art-style.md'],
       [26, 'You rejected all three frames and the idea behind them, so there is nothing here to merge.'],
-      [33, '[Bash] git log --oneline -5 main'],
+      [33, ['[Bash] git log --oneline -5 main', '#id p3-log', '#out p3-log 5',
+        '#| 8c1f2ae Deck builder remembers the last filter',
+        '#| 41d07b9 Card zoom keeps its place on resize',
+        '#| e93a6c0 Trade screen shows both hands',
+        '#| 1b7f5d2 Pack opening plays once per pack',
+        '#| 6a2c8e4 Rarity colours read in dark mode'].join('\n')],
       [39, '[Bash] git branch --contains kestrel/frames'],
       [48, 'Checked rather than assumed: the frame branch is on no other branch, and main has never carried it.'],
-      [57, '[Bash] npx vitest run'],
+      [57, ['[Bash] npx vitest run', '#id p3-test', '#out p3-test 9',
+        '#| ',
+        '#|  RUN  v3.2.4 /Users/you/Desktop/dev/kestrel',
+        '#| ',
+        '#|  ✓ tests/deck-builder.test.ts (41 tests) 212ms',
+        '#|  ✓ tests/card-zoom.test.ts (17 tests) 88ms',
+        '#|  ✓ tests/trade.test.ts (160 tests) 1.4s',
+        '#| ',
+        '#|  Test Files  3 passed (3)',
+        '#|       Tests  218 passed (218)'].join('\n')],
       [96, 'Suite green at 218 tests, so nothing half-merged is sitting in the tree.'],
       [104, '[Edit] docs/decisions.md'],
       [119, 'Recording the rejection where the next session will read it, not just on the row.'],
@@ -516,7 +571,7 @@ export const fixtureTraces: Record<string, Array<{ startedAt: number; text: stri
 // fixtures double as a schema preview and a history that contradicts the row it
 // belongs to would review nothing. The lease heartbeats are left out here for
 // the same reason the main process drops them: they are not events.
-export const fixtureHistory: Record<string, Array<Record<string, any>>> = {
+export const fixtureHistory: Record<string, LedgerLine[]> = {
   // the card whose one page was named in full. The ledger is here so the
   // MESSAGE is on screen beside its file row, because the whole point is that
   // the path she can read in the prose is the file she can press underneath
@@ -528,6 +583,19 @@ export const fixtureHistory: Record<string, Array<Record<string, any>>> = {
         title: 'The first row a new project makes is fixed and needs your yes',
         status: 'open', kind: 'review', priority: 5,
         body: '**Merge the first row change, or pick different words for it.**\n\nMaking a project used to compose a row the fleet took as work, so an agent started before you had said anything. It asks now, and nothing runs until you reply.\n\nThe page shows the row before and after:\n\n/fixtures/onboard/designs/w-n13/the-first-row.html',
+      },
+    },
+  ],
+  'w-t2': [
+    { id: 'w-t2', ts: now - 9 * min, source: 'agent', patch: { title: 'Biggest payment companies by volume', status: 'open', kind: 'question', priority: 5, body: TABLE_IN_A_MESSAGE } },
+  ],
+  'w-t1': [
+    {
+      id: 'w-t1', ts: now - 5 * min, source: 'agent',
+      patch: {
+        title: 'Fintech companies to reach out to',
+        status: 'open', kind: 'question', priority: 5,
+        body: '**Pick who I write to first, or tell me who to drop.**\n\nI put 16 fintech companies in a table with a note and a status for each. Two already have a meeting booked and two replied. I would start with the five marked New.\n\nleads/fintech-leads.csv',
       },
     },
   ],
@@ -845,18 +913,13 @@ export const fixtureSettings = {
   workspace: {
     agentsRunning: true,
     sessionsAtOnce: 3,
-    memoryGate: { on: false, slots: null, slotsAuto: 2, slotsMax: 12, now: null },
-    leftovers: { on: false, now: 'Right now finished agents have left 40 programs running; turning this on stops them when you close their tasks.' },
-    // COPIES OF A PROJECT NOBODY'S TASK OWNS (main/settings.mjs,
-    // `strayFolderSettings`). A fixture because the row is absent whenever there
-    // are none, which is most of the time and all of a fresh install: without
-    // one there is no way to look at the sentence before it is true for somebody.
-    strayFolders: { count: 11, now: `11 copies of Kestrel were made by hand outside the folder ${NAME} keeps its own in, and are holding disk until you remove them: ~/Desktop/dev/kestrel-fontsize, ~/Desktop/dev/kestrel-cardart, ~/Desktop/dev/wt-w-34eb858714 and 8 more. ${NAME} never removes a folder it did not make.` },
+    memoryGate: { on: true, slots: null, slotsAuto: 2, slotsMax: 12, now: null },
+    leftovers: { on: true, now: 'Finished agents have left 40 programs running. 40 stop when you close their tasks.' },
     capacity: 6,
     running: 2,
     model: 'claude-opus-5',
     permission: 'bypassPermissions',
-    // What main sends when the config names none (main/settings.mjs,
+    // What main sends when the config names none (main/settings.mts,
     // `outsideAgentsMode`). Absent, the Running page drew an empty picker over
     // a sentence ending in "undefined".
     outsideAgents: 'off',
@@ -882,7 +945,7 @@ export const fixtureSettings = {
     claudeInstallUrl: 'https://code.claude.com/docs/en/setup',
     // AND THE SAME ONE CODING AGENT THE SNAPSHOT ABOVE REPORTS. Six keys, all
     // of them the answer a Mac with the gate shut really gives (main/
-    // settings.mjs): one choice, so the Coding agent row is not drawn and the
+    // settings.mts): one choice, so the Coding agent row is not drawn and the
     // Model row still speaks for every agent; and `codex` says Codex is not on
     // this Mac, because the Codex page is drawn on every Mac (w-d5d632e503)
     // and a Mac with Codex on it opens the choice. They are written out rather than left
@@ -953,7 +1016,7 @@ export const fixtureSettings = {
 // founder rule and not an implementation detail: on every Mac she has, and on
 // every Mac until she writes the opt-in moment into zero.config.json, the
 // screen must be exactly the screen it is today (the whole of
-// tests/one-coding-agent-draws-nothing-new.test.mjs). A two-engine world that
+// tests/one-coding-agent-draws-nothing-new.test.mts). A two-engine world that
 // was the ONLY world would make THAT unphotographable, which is the same defect
 // pointing the other way, and it would silently rewrite every existing
 // scripts/shot-*.mjs picture: two choices in the workspace turn on five
@@ -986,9 +1049,14 @@ export const fixtureSettings = {
 //   ?engines=codex    two agents, workspace moved to Codex. The screen the
 //                     shipped bug was on.
 
-export type FixtureEngineWorld = 'missing' | 'claude' | 'codex' | 'nowhere' | 'chosen' | 'signedout' | 'ready';
+//   ?engines=installing  nothing on the machine and the install you pressed
+//                     still running. No url could draw that, which is how the
+//                     gate shipped asking you to press for the whole of one
+//                     (F-145).
 
-const ENGINE_WORLDS: FixtureEngineWorld[] = ['missing', 'claude', 'codex', 'nowhere', 'chosen', 'signedout', 'ready'];
+export type FixtureEngineWorld = 'missing' | 'claude' | 'codex' | 'nowhere' | 'chosen' | 'signedout' | 'ready' | 'installing';
+
+const ENGINE_WORLDS: FixtureEngineWorld[] = ['missing', 'claude', 'codex', 'nowhere', 'chosen', 'signedout', 'ready', 'installing'];
 
 /**
  * The world one url asks for, or null for the Mac she has. A word nothing
@@ -1003,7 +1071,7 @@ export function fixtureEngineWorld(asked: string | null): FixtureEngineWorld | n
  *
  * Not invented: these are the six that carry `visibility: "list"` in the
  * `models_cache.json` codex-cli maintains, in the CLI's own ascending
- * `priority` order, reduced to `{ id, label }` exactly as main/codex-models.mjs
+ * `priority` order, reduced to `{ id, label }` exactly as main/codex-models.mts
  * reduces them. Measured off a real 198,977-byte cache written by codex-cli
  * 0.148.0, which also carries two hidden models this list correctly drops.
  *
@@ -1028,7 +1096,7 @@ export const fixtureCodexModels: NonNullable<WorkspaceSettings['codexModels']> =
  *  to check the model list against. */
 export const fixtureCodexModelDefault = 'gpt-5.6-sol';
 
-// main/codex-bin.mjs's `INSTALL_URL`, typed rather than imported because the
+// main/codex-bin.mts's `INSTALL_URL`, typed rather than imported because the
 // renderer never imports from main/. The suite holds the two in step.
 const CODEX_INSTALL_URL = 'https://learn.chatgpt.com/docs/codex/cli';
 const CODEX_BIN = '/Users/you/.local/bin/codex';
@@ -1051,9 +1119,9 @@ const OFF_THE_WORKSPACE: Record<'claude' | 'codex', Record<string, string>> = {
 // none: it is absent until a figure lands, and adding one would put a pill on
 // every picture ever taken of this app. The two shapes are genuinely different
 // and both are copied from the readers that produce them. Claude Code prints a
-// clock time in a named zone (shared/claude-usage.mjs); Codex prints no clock
+// clock time in a named zone (shared/claude-usage.mts); Codex prints no clock
 // time and names no zone, it hands over the instant, so every text field is
-// null (shared/codex-usage.mjs). The Codex percentages are the ones in that
+// null (shared/codex-usage.mts). The Codex percentages are the ones in that
 // file's own recorded capture.
 const CLAUDE_LIMITS: NonNullable<Snapshot['usage']>['limits'] = [
   {
@@ -1138,7 +1206,7 @@ export function fixtureEngineSettings(world: FixtureEngineWorld | null): Partial
     return {
       claudeFound: false, claudeCertain: true, claudeBin: '/Users/you/.local/bin/claude',
       // THE THREE FLAT KEYS THE WALK'S LAST CARD READS, which no fixture world
-      // had set before. `codexFoundState` in main/settings.mjs sends them
+      // had set before. `codexFoundState` in main/settings.mts sends them
       // alongside the `codex` object below, and App.tsx reads THEM rather than
       // the object -- so a world that set only the object left `codexCertain`
       // undefined, `noCodingAgent` false, and the gate undrawable in fixtures.
@@ -1170,7 +1238,7 @@ export function fixtureEngineSettings(world: FixtureEngineWorld | null): Partial
     // She has set no workspace Codex model, so the row draws her config.toml's
     // own and nothing is sent at spawn. That is what her Mac says today.
     codexModel: null,
-    // Main's own default when the config names no mode (main/settings.mjs),
+    // Main's own default when the config names no mode (main/settings.mts),
     // and the one login a Codex Mac has. Without them the Codex page drew an
     // empty picker and no account.
     codexMode: CODEX_DEFAULT_MODE,
@@ -1198,7 +1266,9 @@ export function fixtureSecondEngine(snap: Snapshot, world: FixtureEngineWorld | 
   // already up (w-ce8c1a9275).
   // `ready` belongs with them: it says what is on the machine, not which agent
   // any row runs on.
-  if (!world || world === 'missing' || world === 'nowhere' || world === 'chosen' || world === 'signedout' || world === 'ready') return snap;
+  // `installing` belongs with them too: it is the gate waiting on a machine
+  // with nothing on it, and there are no rows behind it yet.
+  if (!world || world === 'missing' || world === 'nowhere' || world === 'chosen' || world === 'signedout' || world === 'ready' || world === 'installing') return snap;
   const byItem = OFF_THE_WORKSPACE[world];
   const engineOf = (id: string) => byItem[id] ?? world;
   return {
@@ -1241,7 +1311,7 @@ export function fixtureConversation() {
 }
 
 // A plausible set of Claude Code agent files, in the shape
-// main/agent-files.mjs reads them: four of the user's own and four in one
+// main/agent-files.mts reads them: four of the user's own and four in one
 // project. It stands in for the real ones when there is no main process.
 export function fixtureAgentFiles() {
   return {
@@ -1262,7 +1332,7 @@ export function fixtureAgentFiles() {
 }
 
 // A plausible set of Claude Code threads, in the shape
-// main/agent-sessions.mjs reads them.
+// main/agent-sessions.mts reads them.
 //
 // `when` is written as an offset from the moment the fixture is asked for, so
 // the row under each name ("today", "yesterday", "on Monday") stays true rather

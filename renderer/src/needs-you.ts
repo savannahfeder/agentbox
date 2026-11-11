@@ -11,4 +11,4 @@ export const needsYouLit = (inbox: readonly Pick<WorkItem, 'id' | 'createdAt' | 
  * every time rendered the page again, for ever.
  */
 export const lookedAtNow = (inbox: readonly Pick<WorkItem, 'id' | 'createdAt' | 'wrote'>[], lookedAt: number, now: number): number =>
-  needsYouLit(inbox, lookedAt) ? Math.max(now, ...inbox.map(arrivedAt)) : lookedAt;
+  needsYouLit(inbox, lookedAt) ? Math.max(now, ...inbox.map((i) => arrivedAt(i))) : lookedAt;

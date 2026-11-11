@@ -14,19 +14,21 @@
 // file is the half that has no DOM in it — the editor's set, the markdown in and
 // out, what each formatting key does, and where a character sits — so a test
 // can hold all of it. ./RichReply.tsx is the box itself.
-import { Extension, getSchema } from '@tiptap/core';
-import StarterKit from '@tiptap/starter-kit';
-import Link from '@tiptap/extension-link';
-import Placeholder from '@tiptap/extension-placeholder';
+import { Extension, getSchema, type JSONContent } from '@tiptap/core';
+import { StarterKit } from '@tiptap/starter-kit';
+import { Link } from '@tiptap/extension-link';
+import { Placeholder } from '@tiptap/extension-placeholder';
 import { Plugin, PluginKey, type EditorState, type Transaction } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import { lift, toggleMark, wrapIn } from '@tiptap/pm/commands';
 import { liftListItem, wrapInList } from '@tiptap/pm/schema-list';
 import type { Node as PmNode, Schema } from '@tiptap/pm/model';
 import { mdToPmDoc, pmDocToMd } from '../editor/markdown';
+import { STARTER_KIT_EXTRAS_OFF } from '../editor/extensions';
 import type { Format } from './compose-format';
 
-type Json = Record<string, any>;
+type Json = JSONContent;
+type Mark = NonNullable<Json['marks']>[number];
 
 // ONE LINE BREAK, NOT A NEW PARAGRAPH. Return in a message is a new line, the
 // way it was in the text field, so a run of paragraphs goes out as lines one
@@ -57,10 +59,10 @@ export function chatMarkdown(doc: Json): string {
  * draft saved by the old text field may carry any of them and none of it may
  * be lost on the way back in.
  */
-export function chatDoc(md: string, schema: Schema = chatSchema()): Json {
+export function chatDoc(md: string, schema: Schema = chatSchema()): Json & { content: Json[] } {
   const fit = (node: Json): Json[] => {
-    if (node.type === 'text') return [{ ...node, marks: (node.marks ?? []).filter((m: Json) => schema.marks[m.type]) }];
-    if (schema.nodes[node.type]) return [{ ...node, content: node.content?.flatMap(fit) }];
+    if (node.type === 'text') return [{ ...node, marks: (node.marks ?? []).filter((m: Mark) => schema.marks[m.type]) }];
+    if (schema.nodes[node.type as string]) return [{ ...node, content: node.content?.flatMap(fit) }];
     if (node.type === 'image') return [{ type: 'paragraph', content: [{ type: 'text', text: `![${node.attrs?.alt ?? ''}](${node.attrs?.src ?? ''})` }] }];
     const kids = (node.content ?? []).flatMap(fit);
     // A heading's words are a paragraph; a table or a task list is its rows.
@@ -228,7 +230,7 @@ export function chatExtensions(placeholder: string | (() => string) = '') {
   return [
     // No headings and no rule: a message is not a document. Pasted ones come
     // in as their words (`chatDoc`).
-    StarterKit.configure({ heading: false, horizontalRule: false }),
+    StarterKit.configure({ heading: false, horizontalRule: false, ...STARTER_KIT_EXTRAS_OFF }),
     Link.configure({ openOnClick: false, autolink: true }),
     // A function so the box can say who it replies to without being rebuilt.
     Placeholder.configure({ placeholder: typeof placeholder === 'function' ? () => placeholder() : placeholder }),

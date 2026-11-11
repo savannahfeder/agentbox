@@ -42,6 +42,9 @@ export interface DraftStore {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
   removeItem(key: string): void;
+  /** Only `repliesInFlight` walks the keys. */
+  readonly length?: number;
+  key?(index: number): string | null;
 }
 
 const backing = (store?: DraftStore): DraftStore =>
@@ -68,6 +71,32 @@ export function clearDraft(item: ItemRef, store?: DraftStore): void {
   s.removeItem(draftKey(item));
   s.removeItem(draftImagesKey(item));
   s.removeItem(draftPickKey(item));
+  s.removeItem(draftWhenKey(item));
+}
+
+/* ------------------------------- the time -------------------------------- */
+
+// A REPLY SET FOR LATER keeps its time beside its words, so a fold, a reload or
+// a Z puts both back. A time that has gone by is no longer a pick.
+
+export function draftWhenKey(item: ItemRef): string {
+  return `zero.draftwhen.${item.product}:${item.id}`;
+}
+
+/** The moment this reply is set for, or 0 for now. */
+export function readDraftWhen(item: ItemRef, store?: DraftStore, now = Date.now()): number {
+  let raw: string | null = null;
+  try { raw = backing(store).getItem(draftWhenKey(item)); } catch { return 0; }
+  const at = Number(raw);
+  return Number.isFinite(at) && at > now ? at : 0;
+}
+
+export function saveDraftWhen(item: ItemRef, at: number, store?: DraftStore): void {
+  const s = backing(store);
+  try {
+    if (at > 0) s.setItem(draftWhenKey(item), String(Math.trunc(at)));
+    else s.removeItem(draftWhenKey(item));
+  } catch { /* still set for this box */ }
 }
 
 /* ------------------------------- the pick -------------------------------- */
@@ -139,7 +168,7 @@ export function readDraftAttachments(item: ItemRef, store?: DraftStore): DraftAt
     // image, which reads as the app having damaged her paste.
     return parsed
       .filter((a) => a && typeof a === 'object' && typeof a.name === 'string' && (a.dataBase64 || a.srcPath))
-      .map((a) => ({ name: a.name, dataBase64: a.dataBase64, srcPath: a.srcPath, image: !!a.image, ...(typeof a.draftId === 'string' ? { draftId: a.draftId } : {}) }));
+      .map((a) => ({ name: a.name, dataBase64: a.dataBase64, srcPath: a.srcPath, image: !!a.image, ...(typeof a.draftId === 'string' ? { draftId: a.draftId } : {}), ...(typeof a.size === 'number' ? { size: a.size } : {}) }));
   } catch {
     return [];
   }
@@ -233,7 +262,7 @@ export function hasDraft(item: ItemRef, store?: DraftStore): boolean {
  * So the caller hands back the two things it took, separately: the words as
  * typed WITHOUT the markdown the send appended, and the staged attachments
  * themselves. The box then opens on what it looked like before Send. The
- * staged files are still on disk (main/ipc.mjs copies out of `.staging`, never
+ * staged files are still on disk (main/ipc.mts copies out of `.staging`, never
  * moves), so the thumbnails still draw.
  *
  * One consequence, stated rather than hidden: a withdrawn send leaves its copy
@@ -256,6 +285,8 @@ export function restoreDraft(
   text: string,
   attachments: DraftAttachment[] = [],
   store?: DraftStore,
+  runAt = 0,
+  pick: DraftPick | null = null,
 ): boolean {
   const words = String(text ?? '').trim();
   const images = (attachments ?? []).filter((a) => a && !!a.name && (!!a.dataBase64 || !!a.srcPath));
@@ -263,16 +294,110 @@ export function restoreDraft(
   if (readDraft(item, store).trim() || readDraftAttachments(item, store).length) return false;
   if (words) saveDraft(item, words, store);
   if (images.length) saveDraftAttachments(item, images, store);
+  saveDraftWhen(item, runAt, store);
+  if (pick) saveDraftPick(item, pick, store);
   return true;
 }
 
 // A rejected live send may return after she has started typing again. Preserve
 // both instead of overwriting her new work or silently discarding the failure.
-export function restoreFailedDraft(item: ItemRef, text: string, attachments: DraftAttachment[] = [], store?: DraftStore): void {
+export function restoreFailedDraft(item: ItemRef, text: string, attachments: DraftAttachment[] = [], store?: DraftStore, runAt = 0): void {
   const existing = readDraft(item, store);
   saveDraft(item, [existing, text.trim()].filter(Boolean).join('\n\n'), store);
   saveDraftAttachments(item, [...readDraftAttachments(item, store), ...attachments], store);
+  if (runAt) saveDraftWhen(item, runAt, store);
   if (!store && typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('zero:reply-restored', { detail: draftKey(item) }));
+}
+
+/* --------------------------- a reply in flight --------------------------- */
+
+// Send empties the box at once, but the words stay here until the write lands.
+// Between the two they were only in the page's memory (the undo hold, then the
+// call itself), so a reload, a crash or a call the reload aborted lost them for
+// good. The next load reads what is left here and puts back whatever never
+// reached its thread.
+
+/** One send not yet written: `body` is what went out, `words` and `attachments` what the box held. */
+export interface InFlightReply { words: string; body: string; attachments: DraftAttachment[]; at: number }
+
+const IN_FLIGHT = 'zero.replysending.';
+const inFlightKey = (item: ItemRef) => `${IN_FLIGHT}${item.product}:${item.id}`;
+
+function readInFlight(item: ItemRef, s: DraftStore): InFlightReply[] {
+  try {
+    const parsed = JSON.parse(s.getItem(inFlightKey(item)) ?? '[]');
+    return Array.isArray(parsed) ? parsed.filter((r) => r && typeof r.words === 'string' && typeof r.at === 'number') : [];
+  } catch { return []; }
+}
+
+function writeInFlight(item: ItemRef, replies: InFlightReply[], s: DraftStore): void {
+  try {
+    if (!replies.length) { s.removeItem(inFlightKey(item)); return; }
+    const all = JSON.stringify(replies);
+    // Pictures are the first thing given up: the words are what must survive.
+    s.setItem(inFlightKey(item), all.length <= COMPOSE_DRAFT_MAX_BYTES ? all : JSON.stringify(replies.map((r) => ({ ...r, attachments: r.attachments.filter((a) => !a.dataBase64) }))));
+  } catch { /* a refused store is not a reason to lose the send */ }
+}
+
+/** Keep a send until it lands. Returns the stamp that `replyLanded` takes off. */
+export function markReplyInFlight(item: ItemRef, sent: { words: string; attachments: DraftAttachment[] }, body: string, at = Date.now(), store?: DraftStore): number {
+  const s = backing(store);
+  const replies = readInFlight(item, s);
+  while (replies.some((r) => r.at === at)) at += 1;
+  writeInFlight(item, [...replies, { words: sent.words, body, attachments: sent.attachments ?? [], at }], s);
+  return at;
+}
+
+/** The send stamped `at` was written, failed back into the box, or was taken back. */
+export function replyLanded(item: ItemRef, at: number, store?: DraftStore): void {
+  const s = backing(store);
+  writeInFlight(item, readInFlight(item, s).filter((r) => r.at !== at), s);
+}
+
+/** Every thread with a send that had not landed when the page went. */
+export function repliesInFlight(store?: DraftStore): Array<ItemRef & { replies: InFlightReply[] }> {
+  const s = backing(store);
+  const keys: string[] = [];
+  try { for (let i = 0; i < (s.length ?? 0); i++) { const k = s.key?.(i); if (k?.startsWith(IN_FLIGHT)) keys.push(k); } } catch { return []; }
+  return keys.flatMap((k) => {
+    const rest = k.slice(IN_FLIGHT.length);
+    const colon = rest.indexOf(':');
+    if (colon < 0) return [];
+    const item = { product: rest.slice(0, colon), id: rest.slice(colon + 1) };
+    const replies = readInFlight(item, s);
+    return replies.length ? [{ ...item, replies }] : [];
+  });
+}
+
+const flatWords = (s: string) => s.replace(/\s+/g, ' ').trim();
+
+/**
+ * Whether a send reached its thread: an answer in its history carries its
+ * words, or the phone shows it waiting for the computer. Text, not time: a
+ * phone's clock and its computer's need not agree, and a wrong yes loses the
+ * words where a wrong no only puts a sent reply back in the box.
+ */
+export function landedIn(reply: InFlightReply, lines: Array<{ source?: string; patch?: Record<string, unknown> | null }>, waiting: string[] = []): boolean {
+  const wanted = [reply.body, reply.words].map(flatWords).filter(Boolean);
+  if (!wanted.length) return true;
+  const has = (text: unknown) => typeof text === 'string' && wanted.some((w) => flatWords(text).includes(w));
+  return lines.some((l) => has(l.patch?.answer)) || waiting.some(has);
+}
+
+/**
+ * Put back each of these sends that never landed, after whatever the box holds
+ * now, and let all of them go. Sends made since `replies` was read are left
+ * alone. Returns how many came back.
+ */
+export function bringBackUnsent(item: ItemRef, replies: InFlightReply[], lines: Parameters<typeof landedIn>[1], waiting: string[] = [], store?: DraftStore): number {
+  let back = 0;
+  for (const r of replies) {
+    replyLanded(item, r.at, store);
+    if (landedIn(r, lines, waiting)) continue;
+    restoreFailedDraft(item, r.words, r.attachments, store);
+    back += 1;
+  }
+  return back;
 }
 
 // ---------------------------------------------------------------------------
@@ -308,6 +433,7 @@ export interface DraftAttachment {
   image: boolean;
   /** A voice note's id in the store of unsent notes, so it is never put back twice. */
   draftId?: string;
+  size?: number;
 }
 
 export interface ComposeDraft {
@@ -315,8 +441,8 @@ export interface ComposeDraft {
   attachments: DraftAttachment[];
   /** A PriorityId, or null for untagged. Kept as a string so this stays pure. */
   priority: string | null;
-  /** A WhenValue: a moment to start at, or a rule, never both. */
-  when: { runAt: number; repeat: unknown };
+  /** A moment to start at, a rule, or Later, never two of them. */
+  when: { runAt: number; repeat: unknown; later?: boolean };
   /** Images that did not fit, so the card can say so instead of coming back short. */
   dropped: number;
   /** When Send was pressed on these words, while that send has not landed. */
@@ -324,6 +450,11 @@ export interface ComposeDraft {
 }
 
 export const COMPOSE_DRAFT_KEY = 'zero.draft.compose';
+
+// A card opened on a person, or on a message handed to an agent, has its own
+// place, so what it holds never opens in another card. No `place` is the plain
+// card, on the key it has always had.
+const composeKey = (place?: string) => (place ? `${COMPOSE_DRAFT_KEY}.${place}` : COMPOSE_DRAFT_KEY);
 
 /** How much of the store one unsent card may take, serialized. */
 export const COMPOSE_DRAFT_MAX_BYTES = 3_000_000;
@@ -350,9 +481,9 @@ const attachmentOf = (raw: unknown): DraftAttachment | null => {
  * refuses to open because of a bad string in storage is worse than a card that
  * opens empty, and the user has no way to clear it.
  */
-export function readComposeDraft(store?: DraftStore): ComposeDraft {
+export function readComposeDraft(store?: DraftStore, place?: string): ComposeDraft {
   let raw: string | null = null;
-  try { raw = backing(store).getItem(COMPOSE_DRAFT_KEY); } catch { return { ...EMPTY_COMPOSE_DRAFT }; }
+  try { raw = backing(store).getItem(composeKey(place)); } catch { return { ...EMPTY_COMPOSE_DRAFT }; }
   if (!raw) return { ...EMPTY_COMPOSE_DRAFT };
   let parsed: unknown;
   try { parsed = JSON.parse(raw); } catch { return { ...EMPTY_COMPOSE_DRAFT }; }
@@ -363,7 +494,7 @@ export function readComposeDraft(store?: DraftStore): ComposeDraft {
     text: typeof d.text === 'string' ? d.text : '',
     attachments: (Array.isArray(d.attachments) ? d.attachments : []).map(attachmentOf).filter((a): a is DraftAttachment => !!a),
     priority: typeof d.priority === 'string' ? d.priority : null,
-    when: { runAt: typeof when.runAt === 'number' ? when.runAt : 0, repeat: when.repeat ?? null },
+    when: { runAt: typeof when.runAt === 'number' ? when.runAt : 0, repeat: when.repeat ?? null, ...(when.later === true ? { later: true } : {}) },
     dropped: typeof d.dropped === 'number' && d.dropped > 0 ? d.dropped : 0,
     ...(typeof d.sendingAt === 'number' ? { sendingAt: d.sendingAt } : {}),
   };
@@ -373,10 +504,10 @@ export function readComposeDraft(store?: DraftStore): ComposeDraft {
 export const COMPOSE_SENDING_GRACE_MS = 6_000;
 
 /** Stamp the written copy as being sent, and return it. */
-export function markComposeDraftSending(store?: DraftStore, now = Date.now()): ComposeDraft {
-  const d = readComposeDraft(store);
+export function markComposeDraftSending(store?: DraftStore, now = Date.now(), place?: string): ComposeDraft {
+  const d = readComposeDraft(store, place);
   if (composeDraftIsEmpty(d)) return d;
-  return saveComposeDraft({ ...d, sendingAt: now }, store);
+  return saveComposeDraft({ ...d, sendingAt: now }, store, place);
 }
 
 /**
@@ -384,8 +515,8 @@ export function markComposeDraftSending(store?: DraftStore, now = Date.now()): C
  * draft yet, or N straight after Send opens on the task just sent; once the
  * send has hung past the grace they come back, as a frozen app needs.
  */
-export function openingComposeDraft(store?: DraftStore, now = Date.now()): ComposeDraft {
-  const d = readComposeDraft(store);
+export function openingComposeDraft(store?: DraftStore, now = Date.now(), place?: string): ComposeDraft {
+  const d = readComposeDraft(store, place);
   if (d.sendingAt && now - d.sendingAt < COMPOSE_SENDING_GRACE_MS) return { ...EMPTY_COMPOSE_DRAFT };
   return d;
 }
@@ -393,7 +524,7 @@ export function openingComposeDraft(store?: DraftStore, now = Date.now()): Compo
 /** Nothing typed, nothing pasted and nothing set is not a draft. */
 export function composeDraftIsEmpty(d: ComposeDraft): boolean {
   return !d.text.trim() && !d.attachments.length && !d.priority
-    && !d.when.runAt && !d.when.repeat;
+    && !d.when.runAt && !d.when.repeat && !d.when.later;
 }
 
 /**
@@ -404,10 +535,11 @@ export function composeDraftIsEmpty(d: ComposeDraft): boolean {
  * one that goes is counted. The caller shows that count, because an image that
  * vanished without a word is indistinguishable from the app losing it.
  */
-export function saveComposeDraft(draft: ComposeDraft, store?: DraftStore): ComposeDraft {
+export function saveComposeDraft(draft: ComposeDraft, store?: DraftStore, place?: string): ComposeDraft {
   const s = backing(store);
+  const key = composeKey(place);
   if (composeDraftIsEmpty(draft)) {
-    try { s.removeItem(COMPOSE_DRAFT_KEY); } catch { /* nothing to undo */ }
+    try { s.removeItem(key); } catch { /* nothing to undo */ }
     return { ...EMPTY_COMPOSE_DRAFT };
   }
   // Attachments carrying only a path cost nothing, so they are never the ones
@@ -419,7 +551,7 @@ export function saveComposeDraft(draft: ComposeDraft, store?: DraftStore): Compo
     const candidate: ComposeDraft = { ...draft, attachments: kept, dropped };
     const body = JSON.stringify(candidate);
     if (body.length > COMPOSE_DRAFT_MAX_BYTES) return null;
-    try { s.setItem(COMPOSE_DRAFT_KEY, body); } catch { return null; }
+    try { s.setItem(key, body); } catch { return null; }
     return candidate;
   };
   for (;;) {
@@ -433,12 +565,12 @@ export function saveComposeDraft(draft: ComposeDraft, store?: DraftStore): Compo
   // Even with no image bytes left it would not go in. The words are the thing
   // that must not be lost, so they go in alone.
   const bare: ComposeDraft = { ...draft, attachments: kept, dropped };
-  try { s.setItem(COMPOSE_DRAFT_KEY, JSON.stringify(bare)); } catch { return bare; }
+  try { s.setItem(key, JSON.stringify(bare)); } catch { return bare; }
   return bare;
 }
 
-export function clearComposeDraft(store?: DraftStore): void {
-  try { backing(store).removeItem(COMPOSE_DRAFT_KEY); } catch { /* nothing to undo */ }
+export function clearComposeDraft(store?: DraftStore, place?: string): void {
+  try { backing(store).removeItem(composeKey(place)); } catch { /* nothing to undo */ }
 }
 
 /**
@@ -454,11 +586,11 @@ export function clearComposeDraft(store?: DraftStore): void {
  * `restoreComposeDraft` below: a card opened and typed into in the meantime is
  * never emptied by an older send landing.
  */
-export function dropComposeDraft(sent: ComposeDraft, store?: DraftStore): void {
-  const now = readComposeDraft(store);
+export function dropComposeDraft(sent: ComposeDraft, store?: DraftStore, place?: string): void {
+  const now = readComposeDraft(store, place);
   if (now.text !== sent.text) return;
   if (now.attachments.length !== sent.attachments.length) return;
-  clearComposeDraft(store);
+  clearComposeDraft(store, place);
 }
 
 /**
@@ -484,15 +616,15 @@ export function dropComposeDraft(sent: ComposeDraft, store?: DraftStore): void {
  * Returns whether anything actually came back, because the caller says so out
  * loud and must not promise a restore that did not happen.
  */
-export function restoreComposeDraft(draft: ComposeDraft, store?: DraftStore): boolean {
+export function restoreComposeDraft(draft: ComposeDraft, store?: DraftStore, place?: string): boolean {
   if (!draft || composeDraftIsEmpty(draft)) return false;
-  const now = readComposeDraft(store);
+  const now = readComposeDraft(store, place);
   // A send that failed still holds its stamped copy: it comes back as a draft.
   if (now.sendingAt && now.text === draft.text) {
-    saveComposeDraft({ ...now, sendingAt: undefined }, store);
+    saveComposeDraft({ ...now, sendingAt: undefined }, store, place);
     return true;
   }
   if (!composeDraftIsEmpty(now)) return false;
-  saveComposeDraft({ ...draft, sendingAt: undefined }, store);
+  saveComposeDraft({ ...draft, sendingAt: undefined }, store, place);
   return true;
 }

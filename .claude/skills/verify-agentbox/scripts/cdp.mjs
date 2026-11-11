@@ -17,11 +17,21 @@ import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { guard, sweep, processes } from '../../../../scripts/lib/chrome-guard.mjs';
+import { MAC_CHROME, NO_HIDDEN_BROWSER, chromesForTesting, headlessShells } from '../../../../shared/hidden-browser.mts';
 
-const MAC_CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-/** Google Chrome on a Mac; elsewhere `VERIFY_CHROME`, or the Chromium Playwright installed (the Linux cloud has it). */
-export function findChrome(platform = process.platform, env = process.env, playwright = () => createRequire(import.meta.url)('playwright')) {
-  if (platform === 'darwin') return MAC_CHROME;
+export { chromesForTesting, headlessShells };
+
+/**
+ * On a Mac, the hidden browser (shared/hidden-browser.mjs), and Google Chrome only as a
+ * name launchChrome refuses; elsewhere `VERIFY_CHROME`, or the Chromium Playwright
+ * installed (the Linux cloud has it).
+ */
+export function findChrome(platform = process.platform, env = process.env, playwright = () => createRequire(import.meta.url)('playwright'), forTesting = chromesForTesting, shells = headlessShells) {
+  if (platform === 'darwin') {
+    // VERIFY_CHROME picks among the hidden browsers only: never the person's own Chrome.
+    const hidden = [...forTesting(), ...shells()];
+    return hidden.includes(env.VERIFY_CHROME) ? env.VERIFY_CHROME : hidden[0] ?? MAC_CHROME;
+  }
   if (env.VERIFY_CHROME) return env.VERIFY_CHROME;
   try { return playwright().chromium.executablePath(); } catch { return MAC_CHROME; }
 }
@@ -33,9 +43,31 @@ const KEYS = {
   Tab: { code: 'Tab', keyCode: 9 },
   ArrowDown: { code: 'ArrowDown', keyCode: 40 },
   ArrowUp: { code: 'ArrowUp', keyCode: 38 },
+  ArrowLeft: { code: 'ArrowLeft', keyCode: 37 },
+  ArrowRight: { code: 'ArrowRight', keyCode: 39 },
+  Home: { code: 'Home', keyCode: 36 },
+  End: { code: 'End', keyCode: 35 },
+  PageUp: { code: 'PageUp', keyCode: 33 },
+  PageDown: { code: 'PageDown', keyCode: 34 },
+  Backspace: { code: 'Backspace', keyCode: 8 },
+  Delete: { code: 'Delete', keyCode: 46 },
+  F2: { code: 'F2', keyCode: 113 },
   ' ': { code: 'Space', keyCode: 32 },
 };
 const MODIFIERS = { alt: 1, ctrl: 2, meta: 4, shift: 8 };
+const MODIFIER_NAMES = { control: 'ctrl', cmd: 'meta', command: 'meta', option: 'alt' };
+
+/** The modifiers a tester named, and the words that name none, which must be refused rather than dropped. */
+export function readModifiers(words) {
+  const mods = [];
+  const unknown = [];
+  for (const word of words) {
+    const name = MODIFIER_NAMES[word.toLowerCase()] ?? word.toLowerCase();
+    if (name in MODIFIERS) mods.push(name);
+    else unknown.push(word);
+  }
+  return { mods, unknown };
+}
 
 /** The editing command a Mac keyboard sends with a shortcut: a key event alone selects or undoes nothing. */
 export function editingCommands(key, mods = []) {
@@ -44,6 +76,9 @@ export function editingCommands(key, mods = []) {
   if (held === 'meta' && k === 'a') return ['selectAll'];
   if (held === 'meta' && k === 'z') return ['undo'];
   if (held === 'meta+shift' && k === 'z') return ['redo'];
+  // Copy, cut and paste with ⌘ on a Mac or Ctrl elsewhere, where the app says Ctrl.
+  const clip = { c: 'copy', x: 'cut', v: 'paste' }[k];
+  if (clip && (held === 'meta' || held === 'ctrl')) return [clip];
   return [];
 }
 
@@ -54,11 +89,33 @@ export function holdersOf(profile, list = processes, chrome = CHROME) {
   return list().filter((p) => p.command.startsWith(bundle) && flag.test(p.command)).map((p) => p.pid);
 }
 
+/** EPERM is a process this one may not signal, such as a Chrome the harness opened outside a tester's sandbox: it is there. */
+export function isRunning(pid, kill = process.kill.bind(process)) {
+  try { kill(pid, 0); return true; } catch (e) { return e?.code === 'EPERM'; }
+}
+
 /** Stop any Chrome still on this profile: one that will not answer keeps its lock, and every Chrome after it exits. */
-export function freeProfile(profile) {
-  const pids = holdersOf(profile);
+export function freeProfile(profile, bin = CHROME) {
+  const pids = holdersOf(profile, processes, bin);
   for (const pid of pids) { try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ } }
   return pids.length;
+}
+
+/**
+ * End a drive: stop the browser, its helpers, and delete its throwaway profile.
+ *
+ * The helpers outlive a kill of the one process Node started and keep writing
+ * into that folder, so a delete in the next statement hits ENOTEMPTY.
+ */
+export function stopChrome(chrome, profile, { bin = CHROME } = {}) {
+  if (chrome?.pid) { try { process.kill(chrome.pid, 'SIGKILL'); } catch { /* gone */ } }
+  if (profile) freeProfile(profile, bin);
+  if (profile) fs.rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+}
+
+/** Whether launchChrome would start this browser here, for tests that need a real one. */
+export function canDrive(bin = CHROME, platform = process.platform, exists = fs.existsSync) {
+  return !(platform === 'darwin' && bin === MAC_CHROME) && exists(bin);
 }
 
 /**
@@ -67,9 +124,10 @@ export function freeProfile(profile) {
  * browser, which lives across many short commands); then its profile should sit
  * inside the instance folder, so `live.mjs down` finds and stops it.
  */
-export async function launchChrome({ width = 1440, height = 900, profile, detached = false, bin = CHROME, waitMs = 20_000 } = {}) {
-  if (!fs.existsSync(bin)) throw new Error(`No Google Chrome at ${bin}. The live drive needs it.`);
-  const chrome = spawn(bin, [
+export async function launchChrome({ width = 1440, height = 900, profile, detached = false, bin = CHROME, waitMs = 20_000, platform = process.platform, start = spawn } = {}) {
+  if (platform === 'darwin' && bin === MAC_CHROME) throw new Error(NO_HIDDEN_BROWSER);
+  if (!fs.existsSync(bin)) throw new Error(`No browser at ${bin}. The live drive needs it.`);
+  const chrome = start(bin, [
     '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
     '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run',
     `--window-size=${width},${height}`, 'about:blank',
@@ -143,6 +201,9 @@ export async function connect(wsUrl, { width = 1440, height = 900, targetId: exi
   const call = (m, p) => send(m, p, sessionId);
   await call('Page.enable');
   await call('Runtime.enable');
+  // A tab the app opened (a sign-in, Open outside) leaves this one hidden, and
+  // Chrome loads no film in a hidden tab: black, 0:00 / 0:00, for good.
+  await call('Page.bringToFront');
   await call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 2, mobile: false });
   // Dark, because that is how the people who use this read it.
   await call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
@@ -169,7 +230,7 @@ export async function connect(wsUrl, { width = 1440, height = 900, targetId: exi
     const base = named
       ? { key, code: named.code, windowsVirtualKeyCode: named.keyCode }
       : { key, code: `Key${key.toUpperCase()}`, windowsVirtualKeyCode: key.toUpperCase().charCodeAt(0) };
-    const text = !named && !mods.length ? key : key === 'Enter' && !mods.length ? '\r' : undefined;
+    const text = !named && !mods.length ? key : key === 'Enter' && !mods.length ? '\r' : key === ' ' && !mods.length ? ' ' : undefined;
     const commands = editingCommands(key, mods);
     await call('Input.dispatchKeyEvent', { type: text ? 'keyDown' : 'rawKeyDown', modifiers, ...base, ...(text ? { text } : {}), ...(commands.length ? { commands } : {}) });
     await call('Input.dispatchKeyEvent', { type: 'keyUp', modifiers, ...base });

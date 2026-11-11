@@ -30,7 +30,7 @@ export interface Speech {
 
 export type Phase = 'idle' | 'asking' | 'starting' | 'listening' | 'finishing';
 export interface Listening { phase: Phase; level: number; problem: string | null; settings: boolean }
-interface Timers { setTimeout(fn: () => void, ms: number): unknown; clearTimeout(id: any): void }
+interface Timers { setTimeout(fn: () => void, ms: number): unknown; clearTimeout(id: unknown): void }
 
 export const START_MS = 5000;
 export const FINISH_MS = 2000;
@@ -44,6 +44,8 @@ const PROBLEMS: Record<string, string> = {
   'service-not-allowed': 'Dictation is not available on this phone.',
   busy: 'Dictation is busy. Try again in a moment.',
   'no-speech': 'Nothing was heard.',
+  // The web app's own (web-speech.ts DEAF_MS).
+  'not-hearing': 'Nothing was heard. Try the keyboard\'s microphone.',
   interrupted: 'Dictation stopped.',
 };
 
@@ -84,6 +86,12 @@ export const levelOf = (value: number) => Math.min(1, Math.max(0, value / 10));
 
 // One box listens at a time; the microphone is the phone's, not the box's.
 let holder: { leave(): void } | null = null;
+
+/**
+ * Whether a box is listening, or asking for the microphone to. Closing the box
+ * ends its dictation, so a click away must not close it meanwhile.
+ */
+export const aBoxIsListening = () => holder !== null;
 // Set when a phone that offered to listen on its own wanted speech recognition after all.
 let needsSpeech = false;
 

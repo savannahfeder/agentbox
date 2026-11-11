@@ -9,6 +9,10 @@ export const Back = ({ size = 16, tint = color.dim }: P) => (
   <Svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke={tint} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><Path d="M10 3.5L5.5 8l4.5 4.5" /></Svg>
 );
 
+/** The chevron the page's arrows and folds wear (OneThingAtATime.tsx `chevron`). */
+export const Chevron = ({ up = false, size = 14, tint = color.dim }: P & { up?: boolean }) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke={tint} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"><Path d={up ? 'M4 10l4-4 4 4' : 'M4 6l4 4 4-4'} /></Svg>
+);
 export const Gear = ({ size = 17, tint = color.dim }: P) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={tint} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
     <Circle cx={12} cy={12} r={3} />
@@ -18,6 +22,20 @@ export const Gear = ({ size = 17, tint = color.dim }: P) => (
 
 export const Pen = ({ size = 22, tint = color.ink }: P) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={tint} strokeWidth={1.5}><Path d="M12 20h8" /><Path d="m4 20 1-4.5L15.5 5a2.1 2.1 0 0 1 3 3L8 18.5 4 20Z" /></Svg>
+);
+
+/** The logo inside the app: the nine dots alone, the top right one lit (components/AppMark.tsx). The tile is the app icon's. */
+export const AppMark = ({ size = 24 }: { size?: number }) => (
+  <Svg width={size} height={size} viewBox="10 10 80 80">
+    {[21, 50, 79].flatMap((cy) => [21, 50, 79].map((cx) => (cx === 79 && cy === 21
+      ? <Circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={10.5} fill="#ee6018" />
+      : <Circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={10.5} fill={color.text} fillOpacity={0.38} />)))}
+  </Svg>
+);
+
+/** Done's two ticks (threads/ThreadMenu.tsx `DoneMark`). */
+export const DoneMark = ({ size = 16, tint = color.dim }: P) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={tint} strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round"><Path d="m3 13 3.6 3.6L13.4 9" /><Path d="m10.6 13 3.6 3.6L21 9" /></Svg>
 );
 
 export const More = ({ size = 18, tint = color.dim }: P) => (
@@ -47,7 +65,21 @@ export const Clock =({ size = 15, tint = color.faint }: P) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={tint} strokeWidth={1.6} strokeLinecap="round"><Circle cx={12} cy={12} r={8.5} /><Path d="M12 7.5V12l3 2" /></Svg>
 );
 
-export const Caret = ({ size = 12, tint = '#fff' }: P) => (
+/** A repeating task (threads/Pages.tsx `RepeatMark`). */
+export const Repeat = ({ size = 14, tint = color.faint }: P) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke={tint} strokeWidth={1.4}>
+    <Path d="M13 6.5A5.5 5.5 0 0 0 3.2 4.8M3 2.5v2.6h2.6" /><Path d="M3 9.5a5.5 5.5 0 0 0 9.8 1.7M13 13.5v-2.6h-2.6" />
+  </Svg>
+);
+
+/** A pinned thread (threads/ThreadMenu.tsx `PinMark`), square-headed like every shape here. */
+export const Pin = ({ size = 13, tint = color.faint }: P) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={tint} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M8 3h8l-1.5 6 3.5 3.5H6L9.5 9z" /><Path d="M12 12.5V21" />
+  </Svg>
+);
+
+export const Caret =({ size = 12, tint = '#fff' }: P) => (
   <Svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke={tint} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"><Path d="m4 6 4 4 4-4" /></Svg>
 );
 

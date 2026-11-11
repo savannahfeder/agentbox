@@ -5,7 +5,7 @@ import { PLANS } from '../../cloud/gateway/plans.mjs';
 import type { Speech, SpeechEvents } from './dictation';
 
 type Plans = Record<string, { agents: number }>;
-type SettingsRow = { updated_at?: string; settings?: { workspace?: { plan?: unknown } } };
+type SettingsRow = { updated_at?: string; settings?: { workspace?: { plan?: unknown } | null } | null };
 
 /** True on a paid Agentbox Cloud plan, as the computer heard from most recently read it. */
 export function dictationAllowed(rows: SettingsRow[]): boolean {
@@ -44,13 +44,83 @@ type Win = {
 // The browser asks for the microphone once start() is called, so the start
 // waits on the person's answer as well as on the recogniser.
 const ASKING_MS = 20_000;
+// SAFARI ON AN IPHONE ENDS A RECOGNISER ON ITS OWN, mid-sentence and with no
+// error, which read as the dictation ending. One that ran a while is started
+// again with the words kept; one that ends at once is failing, and stops.
+const RESTARTS = 20;
+const LIVED_MS = 1000;
+// SAFARI ON iOS 27 CAN START A RECOGNISER THAT NEVER HEARS: start fires, then
+// no word, error or end (bugs.webkit.org/show_bug.cgi?id=321436). One that has
+// heard nothing this long is given up on, with the words kept.
+export const DEAF_MS = 8000;
+
+type Timers = { setTimeout(fn: () => void, ms: number): unknown; clearTimeout(id: unknown): void };
 
 /** The browser's recogniser as a Speech, or null where it has none. */
-export function webSpeech(win: Win): Speech | null {
+export function webSpeech(win: Win, { now = Date.now, timers = globalThis as unknown as Timers }: { now?: () => number; timers?: Timers } = {}): Speech | null {
   const Make = win.SpeechRecognition ?? win.webkitSpeechRecognition;
   if (!Make) return null;
   let on: SpeechEvents | null = null;
   let live: Recognition | null = null;
+  let wanted = false;
+  let restarts = 0;
+  const begin = () => {
+    const r = new Make();
+    live = r;
+    const began = now();
+    // What is heard but not yet final, written as final if this one ends early.
+    let pending = '';
+    let deaf: unknown = null;
+    const hears = () => { if (deaf !== null) timers.clearTimeout(deaf); deaf = null; };
+    r.lang = win.navigator?.language ?? '';
+    r.continuous = true;
+    r.interimResults = true;
+    r.onstart = () => {
+      if (live !== r) return;
+      deaf = timers.setTimeout(() => {
+        deaf = null;
+        if (live !== r || !wanted) return;
+        live = null;
+        wanted = false;
+        on?.error('not-hearing', '');
+        r.abort();
+      }, DEAF_MS);
+      on?.start();
+    };
+    // Each final result once, and what is still being heard after the last one.
+    r.onresult = (e) => {
+      if (live !== r) return;
+      hears();
+      const heard: string[] = [];
+      for (let i = e.resultIndex; i < e.results.length; i += 1) {
+        const res = e.results[i];
+        if (res.isFinal) on?.result(res[0].transcript, true);
+        else heard.push(res[0].transcript);
+      }
+      pending = heard.join(' ');
+      if (heard.length) on?.result(pending, false);
+    };
+    r.onerror = (e) => {
+      if (live !== r || (e.error === 'aborted' && wanted)) return;
+      wanted = false;
+      on?.error(e.error, e.message ?? '');
+    };
+    r.onend = () => {
+      hears();
+      if (live !== r) return;
+      live = null;
+      if (wanted && on && restarts < RESTARTS && now() - began >= LIVED_MS) {
+        if (pending.trim()) on.result(pending, true);
+        restarts += 1;
+        try { begin(); return; } catch { /* ends below */ }
+      }
+      wanted = false;
+      on?.end();
+    };
+    r.onspeechstart = () => { if (live === r) { hears(); on?.level(7); } };
+    r.onspeechend = () => { if (live === r) on?.level(0); };
+    r.start();
+  };
   return {
     onDevice: () => false,
     // Refused here before is said at once; otherwise the browser asks on start.
@@ -60,30 +130,12 @@ export function webSpeech(win: Win): Speech | null {
     },
     startMs: ASKING_MS,
     start() {
-      const r = new Make();
-      live = r;
-      r.lang = win.navigator?.language ?? '';
-      r.continuous = true;
-      r.interimResults = true;
-      r.onstart = () => on?.start();
-      // Each final result once, and what is still being heard after the last one.
-      r.onresult = (e) => {
-        const heard: string[] = [];
-        for (let i = e.resultIndex; i < e.results.length; i += 1) {
-          const res = e.results[i];
-          if (res.isFinal) on?.result(res[0].transcript, true);
-          else heard.push(res[0].transcript);
-        }
-        if (heard.length) on?.result(heard.join(' '), false);
-      };
-      r.onerror = (e) => on?.error(e.error, e.message ?? '');
-      r.onend = () => { if (live === r) live = null; on?.end(); };
-      r.onspeechstart = () => on?.level(7);
-      r.onspeechend = () => on?.level(0);
-      r.start();
+      wanted = true;
+      restarts = 0;
+      begin();
     },
-    stop() { live?.stop(); },
-    abort() { live?.abort(); },
+    stop() { wanted = false; live?.stop(); },
+    abort() { wanted = false; live?.abort(); },
     listen(events) {
       on = events;
       return () => { if (on === events) on = null; };

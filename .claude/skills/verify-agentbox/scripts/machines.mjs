@@ -118,7 +118,7 @@ export const SHAPES = [
   },
   {
     name: 'claude-old-npm-under-nvm-lazy',
-    why: 'An npm Claude Code from before the native binary: bin/claude is `#!/usr/bin/env node`, and nothing puts node on a Dock launch\'s PATH. The worker needs the node beside it (main/claude-launch-env.mjs).',
+    why: 'An npm Claude Code from before the native binary: bin/claude is `#!/usr/bin/env node`, and nothing puts node on a Dock launch\'s PATH. The worker needs the node beside it (main/claude-launch-env.mts).',
     files: [
       { at: '~/.nvm/versions/node/v20.11.1/bin/node', kind: 'node' },
       { at: '~/.nvm/versions/node/v20.11.1/lib/node_modules/@anthropic-ai/claude-code/cli.js', kind: 'npm', engine: 'claude' },

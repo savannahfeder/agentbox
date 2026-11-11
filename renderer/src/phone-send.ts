@@ -2,17 +2,17 @@
 // phone app (mobile/) alike: each door the screens press, the command it
 // leaves, and taking one back while her Mac has not claimed it.
 
-import { REQUEST_CHANNELS } from '../../shared/bridge-map.mjs';
-import { madeHere } from '../../shared/phone-snapshot.mjs';
+import { REQUEST_CHANNELS } from '../../shared/bridge-map.mts';
+import { madeHere } from '../../shared/phone-snapshot.mts';
 import {
-  NOT_HERE, UNDONE, approvalCommand, commandFor, phoneSlug, phoneView, realItem, takeBack, type Aliases, type PhoneRows,
+  NOT_HERE, UNDONE, approvalCommand, commandFor, phoneSlug, phoneView, realItem, settingCommand, splitSlug, takeBack, type Aliases, type PhoneAsk, type PhoneRows,
 } from './phone-rows';
 
 type Command = PhoneRows['commands'][number];
 export interface SendClient {
   generation(): number;
   insertCommand(row: Record<string, unknown>): Promise<Command>;
-  update(table: string, query: string, patch: Record<string, unknown>): Promise<any[]>;
+  update(table: string, query: string, patch: Record<string, unknown>): Promise<readonly object[]>;
 }
 
 export function phoneSender({ client, rows, setRows, aliases, changed }: {
@@ -25,23 +25,23 @@ export function phoneSender({ client, rows, setRows, aliases, changed }: {
   // Threads whose reply was just taken back: the window's own undo goes on to
   // put the schedule back and send "(withdrawn)", none of which the Mac saw.
   const withdrawn = new Map<string, number>();
-  // A reply to a thread put off clears the schedule on her Mac (phone-inbox.mjs
+  // A reply to a thread put off clears the schedule on her Mac (phone-inbox.mts
   // ROUTES), so the window's clearing call right after it has nothing to do.
   const replied = new Map<string, number>();
-  const scheduled = (p: any) => {
+  const scheduled = (p: PhoneAsk) => {
     const item = realItem(aliases(), p?.product, p?.id);
     const t = rows().threads.find((r) => phoneSlug(r.device, r.project) === p?.product && r.item === item)?.snapshot?.item;
     return Math.max(Number(t?.runAt) || 0, Number(t?.snoozedUntil) || 0) > Date.now();
   };
 
-  const leave = async (channel: string, payload: any) => {
+  const leave = async (channel: string, payload: PhoneAsk) => {
     const back = takeBack(rows(), channel, payload, aliases());
     if (back) {
       const asked = client.generation();
       // Only while the computer has not claimed it (Codex's third review, finding 3).
       const done = await client.update('phone_commands', `id=eq.${encodeURIComponent(back.id)}&taken_at=is.null&claimed_at=is.null`, { taken_at: new Date().toISOString(), outcome: UNDONE });
       if (!done.length) throw new Error('Your computer already has it. Reopen it there.');
-      if (client.generation() === asked) setRows({ ...rows(), commands: rows().commands.map((c) => (c.id === back.id ? done[0] : c)) });
+      if (client.generation() === asked) setRows({ ...rows(), commands: rows().commands.map((c) => (c.id === back.id ? done[0] as Command : c)) });
       if (back.kind === 'reply') withdrawn.set(`${payload.product}/${payload.id}`, Date.now());
       changed();
       return { ok: true };
@@ -49,7 +49,8 @@ export function phoneSender({ client, rows, setRows, aliases, changed }: {
     if ((withdrawn.get(`${payload?.product}/${payload?.id}`) ?? 0) > Date.now() - 60_000
       && (channel === REQUEST_CHANNELS.schedule || (channel === REQUEST_CHANNELS.answer && (payload?.answer === '(withdrawn)' || !String(payload?.answer ?? '').trim())))) return { ok: true };
     if (channel === REQUEST_CHANNELS.stopSession && payload?.withdraw) throw new Error('Your computer already has it. Undo it there.');
-    const cmd = commandFor(channel, channel === REQUEST_CHANNELS.answer && scheduled(payload) ? { ...payload, unschedule: true } : payload, aliases());
+    const clears = channel === REQUEST_CHANNELS.answer && scheduled(payload) && !(Number(payload?.runAt) > Date.now());
+    const cmd = commandFor(channel, clears ? { ...payload, unschedule: true } : payload, aliases());
     if (!cmd) throw new Error(NOT_HERE);
     const asked = client.generation();
     const row = await client.insertCommand(cmd);
@@ -61,19 +62,88 @@ export function phoneSender({ client, rows, setRows, aliases, changed }: {
     return { ok: true };
   };
 
+  // A change to one computer's own lists, left for that computer.
+  const setting = async (device: string, change: Parameters<typeof settingCommand>[1]) => {
+    const asked = client.generation();
+    const row = await client.insertCommand(settingCommand(device, change));
+    if (client.generation() === asked) setRows({ ...rows(), commands: [...rows().commands, row] });
+    changed();
+  };
+
+  // A change to one thread, for the computer that copied it (shared/phone-settings.mjs THREAD).
+  const onThread = async (product: string | undefined, id: string, key: string, value: unknown) => {
+    const t = rows().threads.find((r) => r.item === id && (product === undefined || phoneSlug(r.device, r.project) === product));
+    if (!t) throw new Error('Only a thread your computer has made can be changed.');
+    await setting(t.device, { scope: 'thread', key, product: t.project, item: id, value });
+  };
+  const real = (p: { product: string; id: string }) => realItem(aliases(), p?.product, p?.id);
+
   return {
-    answer: (p: unknown) => leave(REQUEST_CHANNELS.answer, p),
-    stopSession: (p: unknown) => leave(REQUEST_CHANNELS.stopSession, p),
-    runNow: (p: unknown) => leave(REQUEST_CHANNELS.runNow, p),
-    sendNow: (p: unknown) => leave(REQUEST_CHANNELS.sendNow, p),
-    reopen: (p: unknown) => leave(REQUEST_CHANNELS.reopen, p),
-    snooze: (p: unknown) => leave(REQUEST_CHANNELS.snooze, p),
-    compose: (p: unknown) => leave(REQUEST_CHANNELS.compose, p),
-    schedule: async (p: any) => {
+    // The window's doors (api.ts) for the thread menu's rows.
+    threadEdit: async (p: { product: string; id: string; patch: Record<string, unknown> }) => {
+      for (const [key, value] of Object.entries(p?.patch ?? {})) await onThread(p.product, real(p), key, value);
+      return { ok: true };
+    },
+    setThreadOnMac: async (p: { onMac: Record<string, boolean | null> }) => {
+      for (const [id, keep] of Object.entries(p?.onMac ?? {})) await onThread(undefined, id, 'onMac', typeof keep === 'boolean' ? keep : null);
+      return { ok: true };
+    },
+    resumeItems: async (p: { ids: string[] }) => {
+      for (const id of p?.ids ?? []) await onThread(undefined, id, 'resume', true);
+      return { ok: true };
+    },
+    redeliver: async (p: { product: string; id: string }) => { await onThread(p?.product, real(p), 'redeliver', true); return { ok: true }; },
+    // `to` as the phone names a project; a move never leaves the computer the thread is on.
+    moveItem: async (p: { product: string; id: string; to: string }) => {
+      const to = splitSlug(p?.to);
+      const from = splitSlug(p?.product);
+      if (to && from && to.device !== from.device) throw new Error('A thread moves only between projects on its own computer.');
+      await onThread(p?.product, real(p), 'moveTo', to?.project ?? p?.to);
+      return { ok: true };
+    },
+    // The window's door (App.tsx `pinThread`): ids to true, or null to unpin.
+    setThreadPins: async (p: { pins: Record<string, true | null> }) => {
+      for (const [id, pin] of Object.entries(p?.pins ?? {})) {
+        const t = rows().threads.find((r) => r.item === id);
+        if (!t) throw new Error('Only a thread your computer has made can be pinned.');
+        await setting(t.device, { scope: 'thread', key: 'pinned', product: t.project, item: id, value: pin === true });
+      }
+      return { ok: true };
+    },
+    // The repeating task doors (api.ts), for the computer that has the project.
+    composeRepeat: async (p: { product: string; title: string; body?: string; priority?: number; rule: Record<string, unknown>; engine?: string; model?: string }) => {
+      const where = splitSlug(p?.product);
+      if (!where) throw new Error(NOT_HERE);
+      const { every, on, at } = p.rule ?? {};
+      const value = { title: p.title, ...(p.body ? { body: p.body } : {}), ...(p.priority === undefined ? {} : { priority: p.priority }), every, ...(every === 'week' ? { on } : {}), at, ...(p.engine ? { engine: p.engine } : {}), ...(p.model ? { model: p.model } : {}) };
+      await setting(where.device, { scope: 'repeat', key: 'new', product: where.project, value });
+      return null;
+    },
+    setRepeat: async (p: { product: string; id: string; rule: Record<string, unknown> }) => {
+      const where = splitSlug(p?.product);
+      if (!where) throw new Error(NOT_HERE);
+      await setting(where.device, { scope: 'repeat', key: 'change', product: where.project, id: p.id, value: p.rule });
+      return null;
+    },
+    endRepeat: async (p: { product: string; id: string }) => {
+      const where = splitSlug(p?.product);
+      if (!where) throw new Error(NOT_HERE);
+      await setting(where.device, { scope: 'repeat', key: 'end', product: where.project, id: p.id, value: true });
+      return null;
+    },
+    answer: (p: PhoneAsk) => leave(REQUEST_CHANNELS.answer, p),
+    stopSession: (p: PhoneAsk) => leave(REQUEST_CHANNELS.stopSession, p),
+    runNow: (p: PhoneAsk) => leave(REQUEST_CHANNELS.runNow, p),
+    moveToCloud: (p: PhoneAsk) => leave(REQUEST_CHANNELS.moveToCloud, p),
+    sendNow: (p: PhoneAsk) => leave(REQUEST_CHANNELS.sendNow, p),
+    reopen: (p: PhoneAsk) => leave(REQUEST_CHANNELS.reopen, p),
+    snooze: (p: PhoneAsk) => leave(REQUEST_CHANNELS.snooze, p),
+    compose: (p: PhoneAsk) => leave(REQUEST_CHANNELS.compose, p),
+    schedule: async (p: PhoneAsk) => {
       if (p?.runAt === 0 && (replied.get(`${p.product}/${p.id}`) ?? 0) > Date.now() - 60_000) return { ok: true };
       return leave(REQUEST_CHANNELS.schedule, p);
     },
-    // Allow and Deny go to her Mac with the card they answer (phone-inbox.mjs).
+    // Allow and Deny go to her Mac with the card they answer (phone-inbox.mts).
     approve: async (p: { id: string; allow: boolean; note?: string }) => {
       const cmd = approvalCommand(phoneView(rows()).cards, p);
       if (!cmd) return { ok: false, error: 'This card is no longer waiting.' };

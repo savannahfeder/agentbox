@@ -48,8 +48,10 @@ give the same text to both reviewers:
 > - Complexity: could it be simpler without losing anything?
 >
 > For each finding give: severity (critical, warning or nit), `file:line`,
-> what is wrong, the evidence (trace the call path, do not just assert), and
-> a concrete fix if you have one. If you find nothing, say "no findings".
+> what is wrong, the evidence (trace the call path, do not just assert), two
+> scores from 1 to 10 for how often it would happen in real use and how bad
+> it would be, and a concrete fix if you have one. If you find nothing, say
+> "no findings".
 
 ## 4. Run both at once
 
@@ -82,7 +84,8 @@ against the code before you trust it. Put each in one bucket, with who raised
 it and one line of reasoning:
 
 - **Act on**: real problems with correctness, security or maintenance that
-  would block a pull request.
+  would block a pull request, and whose two scores multiply to 5 or more.
+  Below 5 goes in Consider or Noted, however sure the reviewer is.
 - **Consider**: legitimate, but not clearly worth fixing now.
 - **Noted**: true but not worth acting on at this stage.
 - **Dismissed**: wrong, nitpicking, or missing context, with the reason.

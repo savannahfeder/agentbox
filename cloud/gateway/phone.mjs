@@ -1,5 +1,5 @@
 // THE PHONE'S REPLIES, CARRIED ON IN THE CLOUD WITH THE COMPUTER SHUT
-// (docs/cloud/PHONE-PLAN.md step 2; the kit is shared/cloud-kit.mjs).
+// (docs/cloud/PHONE-PLAN.md step 2; the kit is shared/cloud-kit.mts).
 //
 // Every minute: a reply no computer has claimed for a minute is claimed as
 // `cloud:<run id>` and started from the kit its computer left, through the
@@ -19,27 +19,36 @@ import crypto from 'node:crypto';
 import {
   CLOUD_TAKES_AFTER_MS, CLOUD_TAKES_UNTIL_MS, answersIn, checkKit, cloudClaim, cloudSessionId, cloudUserLine,
   kitKey, replyPrompt, resultsInLines, runKey, serverRunKey, startPayload,
-} from '../../shared/cloud-kit.mjs';
-import { withCloudTurn } from '../../shared/phone-snapshot.mjs';
-import { fillNewThreadKit, newThreadKitKey } from '../../shared/cloud-kit.mjs';
-import { madeHere, newThreadSnapshot } from '../../shared/phone-snapshot.mjs';
-import { codexOpenLines, codexTurnLines, codexReadLines, codexAnswersIn } from '../../shared/cloud-kit.mjs';
-import { phoneBanner } from '../../shared/notify-rules.mjs';
-import { handsBack, HAND_BACK } from '../../shared/cloud-hand-back.mjs';
-import { LOGIN_NAME } from '../../shared/cloud-login-name.mjs';
-import { askId, approvalAnswerLine } from '../../shared/cloud-kit.mjs';
-import { phoneApproval } from '../../shared/phone-snapshot.mjs';
-import { cardDigest } from '../../shared/approval-card.mjs';
-import { PHONE_FILES_MAX, PHONE_FILE_MAX_BYTES, phoneFilesIn, phoneAttachmentRel, linkPhoneFiles } from '../../shared/phone-files.mjs';
+} from '../../shared/cloud-kit.mts';
+import { withCloudTurn } from '../../shared/phone-snapshot.mts';
+import { cloudRunSnapshot } from './phone-status.mjs';
+import { fillNewThreadKit, newThreadKitKey } from '../../shared/cloud-kit.mts';
+import { madeHere, newThreadSnapshot } from '../../shared/phone-snapshot.mts';
+import { codexOpenLines, codexTurnLines, codexReadLines, codexAnswersIn } from '../../shared/cloud-kit.mts';
+import { phoneBanner } from '../../shared/notify-rules.mts';
+import { handsBack, HAND_BACK } from '../../shared/cloud-hand-back.mts';
+import { LOGIN_NAME } from '../../shared/cloud-login-name.mts';
+import { askId, approvalAnswerLine } from '../../shared/cloud-kit.mts';
+import { phoneApproval } from '../../shared/phone-snapshot.mts';
+import { cardDigest } from '../../shared/approval-card.mts';
+import { PHONE_FILES_MAX, PHONE_FILE_MAX_BYTES, phoneFilesIn, phoneAttachmentRel, linkPhoneFiles } from '../../shared/phone-files.mts';
 import { isOurSlug } from '../../shared/product-name.mjs';
-import { codexApprovalCard, fileChangeCard, isMcpToolCall, elicitationServer, REMEMBERED_CHANGES } from '../../main/codex-approvals.mjs';
-import { yesTo, refusalTo } from '../../main/codex-app-server.mjs';
-import { sendWebAlert, webPushOf, TEST_ALERT } from '../../main/phone-alerts.mjs';
-import { WEB_ALERTS_KEY, WEB_ALERTS_TEST_KEY, webAlertsOn } from '../../shared/web-alerts.mjs';
+import { codexApprovalCard, fileChangeCard, isMcpToolCall, elicitationServer, REMEMBERED_CHANGES } from '../../main/codex-approvals.mts';
+import { yesTo, refusalTo } from '../../main/codex-app-server.mts';
+import { sendWebAlert, webPushOf, TEST_ALERT } from '../../main/phone-alerts.mts';
+import { isCarried, notBeforeOf } from '../../shared/cloud-carry.mts';
+import { WEB_ALERTS_KEY, WEB_ALERTS_TEST_KEY, webAlertsOn } from '../../shared/web-alerts.mts';
 
 export const PHONE_TRIES = 3;
 // A start the cloud refused is tried again no sooner than this.
 const TRY_AGAIN_MS = 5 * 60_000;
+// GIVING UP IS NOT FOR EVER. Three tries five minutes apart answers a reply
+// this server cannot start; it does not answer a cloud that is down for a
+// quarter of an hour, because the computer whose reply it is may be asleep
+// and takes nothing back. So a give-up rests this long and the three tries
+// come round again, until the sweep stops looking at the command at all
+// (CLOUD_TAKES_UNTIL_MS).
+export const GIVEN_UP_FOR_MS = 30 * 60_000;
 // A run's end is looked for by the sweep once its notice may have been missed.
 const END_LOOK_AFTER_MS = 2 * 60_000;
 // The links a run is started with outlive its 8 hours.
@@ -61,6 +70,8 @@ const PERSON = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const FILE_MS = 60_000;
 // A test alert this old is not sent: whoever asked has stopped looking.
 const WEB_TEST_KEPT_MS = 10 * 60_000;
+// Plans asked for in the database that one sweep takes up.
+const PLANS_GIVEN_MAX = 200;
 
 const iso = (t) => new Date(t).toISOString();
 
@@ -77,7 +88,7 @@ export function supabaseRest({ url, serviceKey, fetchImpl = fetch, timeoutMs = D
   }
   const thread = (owner, device, project, item) => `owner=eq.${q(owner)}&device=eq.${q(device)}&project=eq.${q(project)}&item=eq.${q(item)}`;
   return {
-    waitingReplies: ({ after, before, limit }) => call('GET', `phone_commands?select=id,owner,device,project,item,kind,payload,created_at&kind=in.(reply,new)&taken_at=is.null&claimed_at=is.null&created_at=gt.${q(iso(after))}&created_at=lt.${q(iso(before))}&order=created_at.asc&limit=${limit}`),
+    waitingReplies: ({ after, before, limit }) => call('GET', `phone_commands?select=id,owner,device,project,item,kind,payload,created_at&kind=in.(reply,new,run-now)&taken_at=is.null&claimed_at=is.null&created_at=gt.${q(iso(after))}&created_at=lt.${q(iso(before))}&order=created_at.asc&limit=${limit}`),
     async claim(id, by, at) {
       const rows = await call('PATCH', `phone_commands?id=eq.${q(id)}&claimed_at=is.null&taken_at=is.null`, { body: { claimed_at: at, claimed_by: by }, prefer: 'return=representation' });
       return Array.isArray(rows) && rows.length === 1;
@@ -91,6 +102,26 @@ export function supabaseRest({ url, serviceKey, fetchImpl = fetch, timeoutMs = D
       return Array.isArray(rows) && rows[0] ? rows[0] : null;
     },
     writeThread: (owner, device, project, item, snapshot) => call('PATCH', `phone_threads?${thread(owner, device, project, item)}`, { body: { snapshot, updated_at: iso(Date.now()) } }),
+    async runStatus(owner, phone, status) {
+      const where = thread(owner, phone.device, phone.project, phone.item);
+      const rows = await call('GET', `phone_threads?select=snapshot,updated_at&${where}`);
+      const row = rows?.[0];
+      if (!row) return status.at === null;
+      const snapshot = cloudRunSnapshot(row.snapshot, status);
+      if (!snapshot) return true;
+      const updated = await call('PATCH', `phone_threads?${where}&updated_at=eq.${q(row.updated_at)}`, {
+        body: { snapshot, updated_at: iso(Date.now()) }, prefer: 'return=representation',
+      });
+      return !!updated?.length;
+    },
+    async cloudRuns() {
+      const rows = [];
+      for (let offset = 0; ; offset += 500) {
+        const page = await call('GET', `phone_threads?select=owner,device,project,item,runId:snapshot->live->>runId,since:snapshot->live->>since&snapshot->live->>where=eq.cloud&snapshot->live->>runId=not.is.null&order=owner,device,project,item&limit=500&offset=${offset}`);
+        rows.push(...(page ?? []));
+        if (!page || page.length < 500) return rows;
+      }
+    },
     // A thread the cloud started from the phone; one already there is kept.
     newThread: (owner, device, project, item, snapshot) => call('POST', 'phone_threads?on_conflict=owner,device,project,item', { body: { owner, device, project, item, snapshot, updated_at: iso(Date.now()) }, prefer: 'resolution=ignore-duplicates,return=minimal' }),
     // A link the sandbox fetches one of her phone's files by, or null when it is not there.
@@ -120,10 +151,42 @@ export function supabaseRest({ url, serviceKey, fetchImpl = fetch, timeoutMs = D
       return { sha256: hash.digest('hex'), bytes };
     },
     pushDevices: (owner) => call('GET', `push_devices?select=token&owner=eq.${q(owner)}`),
-    // The web app's alerts are in the settings it left for its computers (shared/web-alerts.mjs).
+    // The web app's alerts are in the settings it left for its computers (shared/web-alerts.mts).
     webAlerts: (owner) => call('GET', `phone_commands?select=payload,created_at&owner=eq.${q(owner)}&kind=eq.setting&payload->>key=eq.${WEB_ALERTS_KEY}&order=created_at.desc&limit=200`),
     waitingWebTests: ({ after, before, limit }) => call('GET', `phone_commands?select=id,owner,device,payload,created_at&kind=eq.setting&payload->>key=eq.${WEB_ALERTS_TEST_KEY}&taken_at=is.null&claimed_at=is.null&created_at=gt.${q(iso(after))}&created_at=lt.${q(iso(before))}&order=created_at.asc&limit=${limit}`),
     dropPushDevice: (owner, token) => call('DELETE', `push_devices?owner=eq.${q(owner)}&token=eq.${q(token)}`),
+    // WHO IS SUBSCRIBED (cloud_plans): the plan the ledger holds someone to,
+    // beside their account, and `give`, a plan the owner asks for there.
+    plansGiven: () => call('GET', `cloud_plans?select=person,give&give=not.is.null&order=person&limit=${PLANS_GIVEN_MAX}`),
+    async writePlan(person, { plan, source, rev, at }) {
+      const row = { plan, source: source ?? null, rev, at: iso(at) };
+      // Only ever forwards: a write the row has already passed changes
+      // nothing, and the insert gives way to the row that is there.
+      const moved = await call('PATCH', `cloud_plans?person=eq.${q(person)}&rev=lt.${rev}`, { body: row, prefer: 'return=representation' });
+      if (Array.isArray(moved) && moved.length) return;
+      await call('POST', 'cloud_plans?on_conflict=person', { body: { person, ...row }, prefer: 'resolution=ignore-duplicates,return=minimal' });
+    },
+    takeGive: (person, give) => call('PATCH', `cloud_plans?person=eq.${q(person)}&give=eq.${q(give)}`, { body: { give: null } }),
+    // The team someone is on (the app has one a person), when it was made, and who is on it.
+    async teamOf(person) {
+      const mine = await call('GET', `team_members?select=team_id,teams(created_at)&person_id=eq.${q(person)}&order=joined_at.asc&limit=1`);
+      const row = mine?.[0];
+      if (!row?.team_id) return null;
+      const all = await call('GET', `team_members?select=person_id,role&team_id=eq.${q(row.team_id)}&limit=500`);
+      return { id: row.team_id, createdAt: Date.parse(row.teams?.created_at), members: (all ?? []).map((r) => r.person_id), owners: (all ?? []).filter((r) => r.role === 'owner').map((r) => r.person_id) };
+    },
+  };
+}
+
+/** `db.teamOf`, asked at most once a minute a person: every run start reads it. */
+export function teamsFrom(db, { ttlMs = 60_000, now = Date.now } = {}) {
+  const seen = new Map();
+  return async (person) => {
+    const had = seen.get(person);
+    if (had && now() - had.at < ttlMs) return had.team;
+    const team = await db.teamOf(person);
+    seen.set(person, { team, at: now() });
+    return team;
   };
 }
 
@@ -157,6 +220,13 @@ export function createPhoneCarry({ db, runFiles, links, objects, start, input, s
     return kit;
   }
 
+  // What this command has already been turned down for, while a give-up still
+  // stands; past that it is as if it had never been tried.
+  async function triesSoFar(person, cmd) {
+    const t = await readJson(tryKey(person, cmd.id));
+    return t && now() - Number(t.at) < GIVEN_UP_FOR_MS ? t : null;
+  }
+
   async function failed(person, cmd, tries, why) {
     const n = (tries?.n ?? 0) + 1;
     await objects.put(tryKey(person, cmd.id), JSON.stringify({ n, at: now(), why }));
@@ -164,7 +234,7 @@ export function createPhoneCarry({ db, runFiles, links, objects, start, input, s
     if (n >= PHONE_TRIES) log(`phone: reply ${cmd.id} was tried ${n} times and is left to the computer`);
   }
 
-  // HER PHONE'S FILES IN HER WORDS (shared/phone-files.mjs), each checked to
+  // HER PHONE'S FILES IN HER WORDS (shared/phone-files.mts), each checked to
   // be what its name says and fetched by the sandbox into the project's
   // documents folder where her computer saves the same file: { said, files },
   // her words linked there and the files to place, or null to leave them to
@@ -433,7 +503,7 @@ export function createPhoneCarry({ db, runFiles, links, objects, start, input, s
     return db.taken(cmd.id, ANSWERED_OUTCOME, iso(now()));
   }
 
-  // A CODEX RUN (shared/cloud-kit.mjs): its thread is opened first, and her
+  // A CODEX RUN (shared/cloud-kit.mts): its thread is opened first, and her
   // words go as one `turn/start` each, the next only once the last has
   // answered, numbered on from the kit's first turn id.
   const busy = (rec) => (rec.codex ? rec.codex.read.resumed !== true || rec.relayed < rec.codex.turnsSent : rec.relayed < rec.turns.length);
@@ -576,7 +646,8 @@ export function createPhoneCarry({ db, runFiles, links, objects, start, input, s
   const titleOf = (p) => String(p?.title ?? '').trim() || String(p?.body ?? '').trim().split('\n')[0].slice(0, 200);
   // What a new thread's kit cannot do as she asked, so her computer does it.
   function newThreadLeft(p, kit) {
-    if (p.start === 'later' || Number(p.runAt) > 0) return 'it is to start later';
+    // Later with no time is hers to start; one set for a time waits for it (`considerNew`).
+    if (p.start === 'later' && !(Number(p.runAt) > 0)) return 'it is to start later';
     if (p.engine && p.engine !== kit.engine) return 'it is for another coding agent';
     if (p.model && p.model !== (kit.newThread?.model ?? null)) return 'it asks for a model its kit does not run';
     if (p.effort && p.effort !== (kit.newThread?.effort ?? null)) return 'it asks for an effort its kit does not run';
@@ -609,7 +680,9 @@ export function createPhoneCarry({ db, runFiles, links, objects, start, input, s
     return usual === 'codex' ? codex : claude;
   }
 
-  async function startNewRun(person, cmd, itemId, tries) {
+  // `carried`: a row of the computer's own (shared/cloud-carry.mts), whose
+  // thread is already on the phone as the computer's copy.
+  async function startNewRun(person, cmd, itemId, tries, { carried = false } = {}) {
     const project = await newThreadKitFor(person, cmd);
     if (!project) return null;
     const p = cmd.payload ?? {};
@@ -668,10 +741,12 @@ export function createPhoneCarry({ db, runFiles, links, objects, start, input, s
     }
     rec.sent = 1;
     await save(rec);
-    try { await db.newThread(person, cmd.device, cmd.project, itemId, newThreadSnapshot({ itemId, title, body, at: Date.parse(cmd.created_at) || now() })); } catch (err) {
-      once('new-copy', `phone: could not write a new thread's copy for the phone: ${err?.message || err}`);
+    if (!carried) {
+      try { await db.newThread(person, cmd.device, cmd.project, itemId, newThreadSnapshot({ itemId, title, body, at: Date.parse(cmd.created_at) || now() })); } catch (err) {
+        once('new-copy', `phone: could not write a new thread's copy for the phone: ${err?.message || err}`);
+      }
     }
-    const forComputer = { runId, sessionId: rec.sessionId, command: cmd.id, device: cmd.device, project: cmd.project, item: itemId, new: { title, body }, repliedAt: cmd.created_at, startedAt: rec.startedAt, kitMadeAt: project.madeAt };
+    const forComputer = { runId, sessionId: rec.sessionId, command: cmd.id, device: cmd.device, project: cmd.project, item: itemId, new: { title, body }, ...(carried ? { carried: true } : {}), repliedAt: cmd.created_at, startedAt: rec.startedAt, kitMadeAt: project.madeAt };
     try { await runFiles.put(scopedKey(person, serverRunKey(runId)), JSON.stringify(forComputer)); } catch (err) { once('record', `phone: could not leave the run's record for the computer: ${err?.message || err}`); }
     log(`phone: started new thread ${itemId} in the cloud as ${runId}`);
     return rec;
@@ -682,11 +757,26 @@ export function createPhoneCarry({ db, runFiles, links, objects, start, input, s
     if (!PERSON.test(person) || cmd.item) return 'left';
     const itemId = madeHere(cmd.id);
     if (open.has(threadOf({ owner: person, device: cmd.device, project: cmd.project, item: itemId }))) return 'left';
-    const tries = await readJson(tryKey(person, cmd.id));
+    const tries = await triesSoFar(person, cmd);
     if (tries && (tries.n >= PHONE_TRIES || now() - tries.at < TRY_AGAIN_MS)) return 'left';
     // A computer that is awake makes the thread within seconds.
     if (now() - Date.parse(cmd.created_at) < CLOUD_TAKES_AFTER_MS) return 'left';
+    if (Number(cmd.payload?.runAt) > now()) return 'left';
     const made = await startNewRun(person, cmd, itemId, tries);
+    if (!made) return 'left';
+    open.set(threadOf(made), made);
+    return 'started';
+  }
+
+  // A row nobody has run, handed over by a computer going back to sleep: no
+  // minute is waited, since the computer said it is not there to take it.
+  async function considerCarried(cmd, open) {
+    const person = String(cmd.owner || '').toLowerCase();
+    if (!PERSON.test(person) || typeof cmd.item !== 'string' || !/^[A-Za-z0-9._-]{1,120}$/.test(cmd.item)) return 'left';
+    if (notBeforeOf(cmd) > now() || open.has(threadOf({ owner: person, ...cmd }))) return 'left';
+    const tries = await triesSoFar(person, cmd);
+    if (tries && (tries.n >= PHONE_TRIES || now() - tries.at < TRY_AGAIN_MS)) return 'left';
+    const made = await startNewRun(person, cmd, cmd.item, tries, { carried: true });
     if (!made) return 'left';
     open.set(threadOf(made), made);
     return 'started';
@@ -694,15 +784,18 @@ export function createPhoneCarry({ db, runFiles, links, objects, start, input, s
 
   async function consider(cmd, open) {
     if (cmd.kind === 'new') return considerNew(cmd, open);
+    // Run now pressed on the phone is the computer's to do.
+    if (cmd.kind === 'run-now') return isCarried(cmd) ? considerCarried(cmd, open) : 'left';
     const person = String(cmd.owner || '').toLowerCase();
     const text = cmd.payload?.text;
     if (!PERSON.test(person) || typeof text !== 'string' || !text.trim() || !cmd.item) return 'left';
-    const tries = await readJson(tryKey(person, cmd.id));
+    if (isCarried(cmd) && notBeforeOf(cmd) > now()) return 'left';
+    const tries = await triesSoFar(person, cmd);
     if (tries && (tries.n >= PHONE_TRIES || now() - tries.at < TRY_AGAIN_MS)) return 'left';
     const rec = open.get(threadOf({ owner: person, ...cmd }));
     if (rec) return follow(rec, cmd, text, tries);
     // A computer that is awake claims a reply within seconds.
-    if (now() - Date.parse(cmd.created_at) < CLOUD_TAKES_AFTER_MS) return 'left';
+    if (!isCarried(cmd) && now() - Date.parse(cmd.created_at) < CLOUD_TAKES_AFTER_MS) return 'left';
     const made = await startRun(person, cmd, text, tries);
     if (!made) return 'left';
     open.set(threadOf(made), made);
@@ -816,6 +909,10 @@ export function createPhoneCarry({ db, runFiles, links, objects, start, input, s
         if (rec.state === 'open' && t - rec.startedAt >= END_LOOK_AFTER_MS && (await objects.head(`runs/u-${rec.owner}/${rec.runId}/done.json`).catch(() => null))) {
           if (await runEnded(rec.owner, rec.runId)) out.ended += 1;
         }
+        await db.runStatus?.(rec.owner, { device: rec.device, project: rec.project, item: rec.item }, {
+          runId: rec.runId, since: rec.startedAt,
+          at: rec.state === 'open' && !rec.joined && busy(rec) ? t : null,
+        });
       } catch (err) { log(`phone: cloud run ${rec.runId} was passed: ${err?.message || err}`); }
     }
     return out;

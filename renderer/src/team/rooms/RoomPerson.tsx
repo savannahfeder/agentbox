@@ -1,10 +1,10 @@
-// Pointing at someone, and their page (round 23): level, rank in the room,
+// Pointing at someone, and their page (round 23): rank in the room,
 // days in a row, and Progress (agent hours since they started). Never their
 // threads: nobody could tell who else saw them.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Room, RoomCard } from '../../types';
 import { I } from './icons';
-import { RoomFace } from './RoomFace';
+import { Face } from '../people';
 import { cardName, chartNamed, hoursWords, weekRank } from './room-rules';
 import { useOutside } from './RoomsPage';
 import { Name } from '../../../../shared/product-name.mjs';
@@ -16,11 +16,10 @@ export function PersonHover({ card, room, at, onMessage, onProfile, onRanks, onC
   const left = Math.min(window.innerWidth - 310, Math.max(10, at.left + at.width / 2 - 150));
   const top = Math.min(window.innerHeight - 280, at.top + 94);
   return <div ref={ref} className="rm-hc rm-pop" style={{ left, top }}>
-    <div className="hd"><RoomFace name={card.name} url={card.avatarUrl} size={44} />
+    <div className="hd"><Face name={card.name} url={card.avatarUrl} size={44} />
       <div className="w"><span className="rm-nm"><span className="n">{cardName(card)}</span></span>{card.headline && <span className="rl">{card.headline}</span>}</div></div>
     {card.bio && <div className="bio">{card.bio}</div>}
     <div className="nums">
-      {card.level != null && <div><b>{card.level}</b><span>Level</span></div>}
       <div><button type="button" className="lnk" onClick={onRanks}>#{weekRank(room.wall, card.id)}</button><span>This week</span></div>
       <div><b>{hoursWords(card.hoursTotal)}</b><span>Agent hours</span></div>
     </div>
@@ -42,7 +41,7 @@ export function ProfilePage({ card, room, rooms, rank, onMessage, onRanks, onRoo
   const firstMonth = card.byMonth.find((m) => m.hours > 0)?.month ?? null;
   return <div className="rm-prof">
     <div className="rm-ph">
-      <div className="top"><RoomFace name={card.name} url={card.avatarUrl} size={72} />
+      <div className="top"><Face name={card.name} url={card.avatarUrl} size={72} />
         <div className="who">
           <span className="rm-nm"><span className="n">{cardName(card)}</span></span>
           {card.headline && <span className="rl">{card.headline}</span>}
@@ -52,7 +51,6 @@ export function ProfilePage({ card, room, rooms, rank, onMessage, onRanks, onRoo
         {onMessage && !card.me && <div className="acts"><button type="button" className="rm-btn" onClick={onMessage}>{I.chat()}Message</button></div>}
       </div>
       <div className="rm-stats">
-        {card.level != null && <div><b>{card.level}</b><span className="rm-label">Level</span></div>}
         <div><button type="button" className="lnk" onClick={onRanks}>#{weekRank(room.wall, card.id)}</button><span className="rm-label">In {room.name} this week</span></div>
         {rank != null && <div><b>#{rank}</b><span className="rm-label">On {Name} all time</span></div>}
         <div><b>{I.flame()}{card.streak}</b><span className="rm-label">Days in a row</span></div>

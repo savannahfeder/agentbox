@@ -7,7 +7,7 @@
 // seam, and it is a script rather than a note in a README because a note gets
 // skipped and a script does not.
 //
-// It is also what `tests/the-app-is-named-in-one-place.test.mjs` runs, in
+// It is also what `tests/the-app-is-named-in-one-place.test.mts` runs, in
 // read-only mode, to fail the suite when package.json has drifted. Renaming the
 // app is therefore: edit NAME and WAS in shared/product-name.mjs, run this with
 // --write, done.
@@ -31,6 +31,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { NAME, Name, nameSlug } from '../shared/product-name.mjs';
+import { JOIN_SCHEME } from '../shared/room-links.mts';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const WRITE = process.argv.includes('--write');
@@ -61,12 +62,15 @@ export function expected() {
     //
     // A field whose value is decided by what a registry happens to have free is
     // not a field this file can own. It is chosen once, by hand, and pinned in
-    // tests/the-listing-says-what-this-is.test.mjs, which also checks it still
+    // tests/the-listing-says-what-this-is.test.mts, which also checks it still
     // CONTAINS the slug: rename the product and that fails, which is the nudge
     // to go and see whether the new name is free.
     [['productName'], NAME],
     [['build', 'productName'], NAME],
     [['build', 'dmg', 'title'], NAME],
+    // macOS hands a link on the app's scheme only to an app whose Info.plist
+    // declares it; setAsDefaultProtocolClient alone does nothing there.
+    [['build', 'protocols'], [{ name: NAME, schemes: [JOIN_SCHEME] }]],
     ...Object.entries(USAGE).map(([key, template]) => [
       ['build', 'mac', 'extendInfo', key], fill(template),
     ]),
@@ -88,7 +92,7 @@ export function drift(pkg) {
   const out = [];
   for (const [keys, want] of expected()) {
     const has = at(pkg, keys);
-    if (has !== want) out.push([keys.join('.'), has, want]);
+    if (JSON.stringify(has) !== JSON.stringify(want)) out.push([keys.join('.'), has, want]);
   }
   return out;
 }

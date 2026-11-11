@@ -1,7 +1,7 @@
 // Talking into a message in the web app (dictation.ts, web-speech.ts), as the
 // phone app does it (mobile/src/ui/Dictation.tsx): the microphone, and while it
 // listens, Stop to keep the words in the box and Send to send them.
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
 import { dictation, IDLE, type Listening as Heard } from '../dictation';
 import { dictationAllowedNow, onDictationAllowed, webSpeech } from '../web-speech';
 
@@ -14,19 +14,31 @@ export type Talk = Heard & {
   start: () => void;
   stop: () => void;
   send: () => void;
+  /** The person typed while it listens: off, with the words already in the box. */
+  typed: () => void;
 };
 
 /** Dictation into `box`; `send` runs once the last words are in it. */
-export function useWebDictation(box: { text: string; setText: (text: string) => void }, send: () => void): Talk {
+export function useWebDictation(box: { text: string; setText: (text: string) => void; field: RefObject<HTMLTextAreaElement | null> }, send: () => void): Talk {
   const latest = useRef(box);
   latest.current = box;
   const paid = useSyncExternalStore(onDictationAllowed, dictationAllowedNow, dictationAllowedNow);
   const [now, setNow] = useState<Heard>(IDLE);
+  const wrote = useRef(false);
   const [ctl] = useState(() => speech && dictation({
     speech,
-    box: { read: () => latest.current.text, write: (text) => latest.current.setText(text) },
+    box: { read: () => latest.current.text, write: (text) => { wrote.current = true; latest.current.setText(text); } },
     changed: setNow,
   }));
+  // A value written by code does not move the box's view, so once the box is
+  // full the newest words would land out of sight below it. This runs after
+  // the effects a caller declares before this hook, such as one growing the box.
+  useEffect(() => {
+    if (!wrote.current) return;
+    wrote.current = false;
+    const field = latest.current.field.current;
+    if (field) field.scrollTop = field.scrollHeight;
+  });
   // The send waits a render, so it reads the box with the last words in it.
   const [sending, setSending] = useState(false);
   const sendLatest = useRef(send);
@@ -44,10 +56,17 @@ export function useWebDictation(box: { text: string; setText: (text: string) => 
     ...now,
     allowed: !!ctl && paid,
     on: now.phase !== 'idle',
-    // The keyboard goes down, as the phone app's does; tapping the box again stops.
-    start: () => { (document.activeElement as HTMLElement | null)?.blur?.(); void ctl?.start(); },
+    // The box takes the cursor, at the end where the words go, which also puts the
+    // keyboard's own microphone to hand. Tapping the box goes on listening; typing
+    // stops it, so the two never write over each other.
+    start: () => {
+      const field = latest.current.field.current;
+      if (field) { field.focus(); field.setSelectionRange(field.value.length, field.value.length); }
+      void ctl?.start();
+    },
     stop: () => ctl?.stop(),
     send: () => { void ctl?.finish().then(() => setSending(true)); },
+    typed: () => { if (ctl?.now.phase !== 'idle') ctl?.leave(); },
   };
 }
 

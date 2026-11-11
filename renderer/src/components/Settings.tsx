@@ -29,20 +29,26 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import type { ReactNode } from 'react';
 import type { AgentMode, CodexModeId, PermissionMode, ProjectSettings, Settings as SettingsModel, UpdateState } from '../types';
 import { onCloudPhone, onPhone, phoneSized } from '../phone-screen';
+import { setSidebarShrinks, useSidebarShrinks } from '../sidebar-shrinks';
 import { computerSays, type PhoneRows } from '../phone-rows';
 import { changesOn, readingOf, type Reading, type SettingsRow } from '../phone-settings-view';
-import { lastAccountAsk, webSettingsPages } from '../web-settings';
+import { lastAccountAsk, webProjectRow, webSettingsGroups, webSettingsPages } from '../web-settings';
+import { whatTakesEscape } from '../settings-escape';
 import { WebAlertsGroup } from './WebAlerts';
-import { api, RESTART_NOTE } from '../api';
+import { api, RESTART_NOTE, type PublicLink } from '../api';
+import { publicLinkLine, shareWords } from '../public-link-words';
 import { updateLook } from '../update-row';
 import { InstructionSettings, sizeLabel } from './InstructionSettings';
 import { EVERY } from '../instruction-scope';
 import type {AccountUsageReading, Usage, UsageLimit, WorkspaceSettings} from '../types';
-import { accountLabel, cloudAccountInUse, cloudToggleTarget, countedAccounts, type CloudStatus } from '../cloud-menu';
-import { cloudBilling, planSummary, type PaidPlan } from '../cloud-upgrade';
+import { accountLabel, cloudAccountInUse, cloudRunsLine, cloudToggleTarget, countedAccounts, type CloudStatus } from '../cloud-menu';
+import { cloudBilling, planKey, planSummary, type PaidPlan } from '../cloud-upgrade';
+import { keyLooksWrong } from '../key-asks';
 import { CloudPlanCards } from './CloudPlanCards';
-import type { CloudPlan } from '../types';
-import { cloudAccountState, meterPair } from '../account-words';
+import type { CloudPlan, TeamBillingDetails } from '../types';
+import { cloudAccountState, hourWords, meterPair, resetWords } from '../account-words';
+import { runningFigures, type GateReading } from '../running-reading';
+import { CODEX_CLOUD_WHAT, sameAsHere } from '../cloud-permission-words';
 import { accountReadingFor, accountsOnce, codexAccountsOnce, type HereLogin, type OneAccount } from '../accounts-once';
 import { LOOKS, lookMeans, SKINS, TUNE_DEFAULT, TUNE_LIMITS, type Look, type SkinId, type SkinTune } from '../skins';
 import { readySkin } from '../look-switch';
@@ -51,16 +57,19 @@ import { MODE_ORDER, MODE_SENTENCE, MODE_WORDS, RULES_ALWAYS_APPLY } from '../mo
 import { CODEX_MODES, CODEX_MODE_ORDER } from '../codex-modes';
 import { ProductMark } from './ProductMark';
 import { SHORTCUTS } from '../shortcuts';
-import { chord, chords, sayKeys } from '../this-keyboard';
+import { chord, chords } from '../this-keyboard';
 import { capWord } from '../hint-plate';
 import { NAME, Name } from '../../../shared/product-name.mjs';
-import { SETTINGS_TERMINAL } from '../../../shared/settings-terminal.mjs';
+import { SETTINGS_TERMINAL } from '../../../shared/settings-terminal.mts';
 import { TaskTerminal } from './TaskTerminal';
 import { ProjectsPage } from './ProjectsPage';
 import { searchSettings, SETTINGS_PAGES, type SettingsHit, type SettingsPageId } from '../settings-search';
 import type { Product } from '../types';
 import { CloudMark, MacMark } from '../threads/ThreadMenu';
 import './settings.css';
+import { SkyTile } from '../home/SkyPicker';
+import { useHomeSettings } from '../home/home-settings';
+import { SKY_THEMES } from '../home/sky';
 
 /* * TEAM IS A PANE HERE (w-8415594d19, 2026-10-01). The pane's CONTENT is
  handed in as `teamPane` rather than imported, so this screen, which is shared
@@ -85,15 +94,22 @@ export function shortPath(full: string, home?: string | null): string {
 
 /* --------------------------------- controls ------------------------------- */
 
-function Switch({ on, onChange, label, busy }: { on: boolean; onChange: (v: boolean) => void; label: string; busy?: boolean }) {
+// It flips on the click, not when the save answers: a slow answer read as a
+// click that did not land. Once the save settles it shows what was saved.
+export function Switch({ on, onChange, label, busy }: { on: boolean; onChange: (v: boolean) => void | Promise<unknown>; label: string; busy?: boolean }) {
+  const [want, setWant] = useState<boolean | null>(null);
+  const shown = want ?? on;
   return (
     <button
       type="button"
       role="switch"
-      aria-checked={on}
+      aria-checked={shown}
       aria-label={label}
-      className={`set-sw ${on ? 'on' : ''} ${busy ? 'busy' : ''}`}
-      onClick={() => onChange(!on)}
+      className={`set-sw ${shown ? 'on' : ''} ${busy ? 'busy' : ''}`}
+      onClick={() => {
+        setWant(!shown);
+        void Promise.resolve(onChange(!shown)).catch(() => {}).finally(() => setWant(null));
+      }}
     />
   );
 }
@@ -332,6 +348,8 @@ function agentStory(w: WorkspaceSettings, readings: Usage[], engine: 'claude' | 
       signedIn: !!a.email,
       trouble: a.trouble?.note ?? null,
       atLimit: a.trouble?.cause === 'at-limit',
+      limitAt: a.trouble?.at ?? null,
+      limitResetsAt: a.trouble?.resetsAt ?? null,
       dir: a.dir ?? null,
     })),
   };
@@ -340,6 +358,44 @@ function agentStory(w: WorkspaceSettings, readings: Usage[], engine: 'claude' | 
 type Agent = ReturnType<typeof agentStory>;
 
 /** Whichever of two readings was taken later, either possibly absent. */
+const loadPublicLinks = () => api.fileLinks();
+
+export { publicLinkLine };
+
+/** WHAT THIS PERSON MADE PUBLIC, in one list, so it can be checked and stopped without finding each file. */
+export function PublicLinks({ load = loadPublicLinks, first = null, now = Date.now() }: {
+  load?: () => Promise<{ ok: boolean; links?: PublicLink[] }>; first?: PublicLink[] | null; now?: number;
+}) {
+  const [links, setLinks] = useState<PublicLink[] | null>(first);
+  const [asking, setAsking] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  useEffect(() => { let live = true; void load().then((r) => { if (live && r.ok) setLinks(r.links ?? []); }); return () => { live = false; }; }, [load]);
+  if (!links?.length) return null;
+  const stop = async (l: PublicLink) => {
+    if (asking !== l.token) { setAsking(l.token); return; }
+    setAsking(null);
+    const out = await api.fileLinkStop({ token: l.token });
+    if (!out.ok) { setProblem(out.error ?? 'That did not stop.'); return; }
+    setLinks(links.filter((x) => x.token !== l.token));
+  };
+  const copy = async (l: PublicLink) => {
+    try { await navigator.clipboard.writeText(l.url); setCopied(l.token); } catch { setCopied(null); }
+  };
+  return (
+    <Group id="public-links" label="Public links" warn={problem}>
+      {links.map((l) => (
+        <Row key={l.token} label={l.name} desc={publicLinkLine(l, now)}>
+          <button type="button" className="set-ghost" onBlur={() => setCopied(null)} onClick={() => void copy(l)}>{copied === l.token ? 'Copied' : 'Copy link'}</button>
+          <button type="button" className="set-ghost" onBlur={() => setAsking(null)} onClick={() => void stop(l)}>
+            {asking === l.token ? shareWords.stopAsk(l.comments) : 'Stop sharing'}
+          </button>
+        </Row>
+      ))}
+    </Group>
+  );
+}
+
 export function newerReading(a: Usage | null, b: Usage | null): Usage | null {
   if (!a) return b;
   if (!b) return a;
@@ -389,18 +445,19 @@ export function MiniMeters({ limits, now = Date.now(), none = 'No usage reading 
   return (
     <span className="acct-meters">
       {meters.map((m) => (
-        <span className={`acct-meter${m.percent >= 100 ? ' full' : ''}`} key={m.key}>
+        <span className={`acct-meter${(m.percent ?? 0) >= 100 ? ' full' : ''}`} key={m.key}>
           <span className="acct-meter-word">{m.word}</span>
-          <span className="usage-meter" aria-hidden="true"><i style={{ width: `${Math.min(100, m.percent)}%` }} /></span>
-          <span className="acct-meter-pct">{m.percent}%</span>
-          <span className="acct-meter-when" title={m.resets ? `Resets ${m.resets}` : undefined}>{m.resets ?? ''}</span>
+          <span className="usage-meter" aria-hidden="true"><i style={{ width: `${Math.min(100, m.percent ?? 0)}%` }} /></span>
+          <span className="acct-meter-pct">{m.percent == null ? '–' : `${m.percent}%`}</span>
+          <span className="acct-meter-when" title={m.percent == null ? 'Reset since this was read' : m.resets ? `Resets ${m.resets}` : undefined}>{m.resets ?? ''}</span>
         </span>
       ))}
     </span>
   );
 }
 
-// The header says the newest reading's time; a tile older than this says its own.
+// The header says the newest reading's time; a tile says its own when that
+// reads differently, or once it is this old.
 const OWN_TIME_AFTER_MS = 15 * 60_000;
 
 type Where = 'here' | 'cloud';
@@ -413,6 +470,9 @@ const PLACE_TAG: Record<Where, { word: string; Mark: typeof CloudMark }> = {
  *  beside the address (on the right margin it was missed), and the button
  *  that switches to an account sits in its top right corner. */
 export function PlaceTiles({ accounts, onAdd, now = Date.now() }: { accounts: PlaceAccount[]; onAdd?: () => void; now?: number }) {
+  const headerTime = usageCheckedAt(Math.max(0, ...accounts.map((a) => a.checkedAt ?? 0)) || null, now);
+  const ownTime = (a: PlaceAccount) => !!a.checkedAt
+    && (!!a.usageError || now - a.checkedAt >= OWN_TIME_AFTER_MS || usageCheckedAt(a.checkedAt, now) !== headerTime);
   return (
     <div className="acct-tiles">
       {accounts.map((a) => (
@@ -441,7 +501,7 @@ export function PlaceTiles({ accounts, onAdd, now = Date.now() }: { accounts: Pl
             {(!a.usageError || a.limits?.length) && <MiniMeters limits={a.limits} now={now} none={a.none} />}
             {a.usageError && <div className="acct-tile-trouble" role="status">{a.usageError}</div>}
           </>}
-          {!!a.checkedAt && (a.usageError || now - a.checkedAt >= OWN_TIME_AFTER_MS) && <div className="acct-reading-time">{usageCheckedAt(a.checkedAt, now)}</div>}
+          {ownTime(a) && <div className="acct-reading-time">{usageCheckedAt(a.checkedAt, now)}</div>}
         </div>
       ))}
       {onAdd && <button type="button" className="acct-tile acct-tile-add" onClick={onAdd}>Add account</button>}
@@ -507,41 +567,36 @@ export function accountTile(a: OneAccount, { many, now, onUse, cloud = false, on
   // At its limit, the meters say which limit it is and when it resets.
   const limited = !!h?.trouble && !!h.atLimit && !!a.limits?.length;
   const trouble = limited ? null : h?.trouble ?? null;
+  // A reading taken since the limit was seen is the newer fact, full meter or not.
+  const readSince = !!h?.limitAt && !!a.checkedAt && a.checkedAt >= h.limitAt;
+  const sayLimit = limited && !readSince && !meterPair(a.limits, now).some((m) => (m.percent ?? 0) >= 100);
+  const when = h?.limitResetsAt ? resetWords({ resetsAt: h.limitResetsAt } as UsageLimit, now) : null;
+  const back = !when ? '' : when === hourWords(h!.limitResetsAt!) ? `, back at ${when}` : `, back ${when}`;
   return {
     key: a.key, name: a.name, plan: a.plan,
     about: signingIn ? ['Finish signing in to use it']
-      : limited && !meterPair(a.limits, now).some((m) => m.percent >= 100) ? ['At its limit'] : [],
+      : sayLimit ? [`At its limit${back}`] : [],
     places,
     cloudAct: !cloud || signingIn ? null : broken ? signIn('Sign in to cloud again', c!.key) : h && !c ? signIn('Add to cloud', null) : null,
     // ONE ACCOUNT IS IN USE AND IT SAYS SO (w-dac993a554). This asked `picked`
     // as well, because until somebody picked, every account took a share of
     // the work and none of them was the one; the supervisor answers `chosen`
     // now, so the tile with it is the account and the others offer the switch.
-    inUse: !!h?.chosen,
+    // The supervisor names one Codex login as the one that runs even before it is signed in.
+    inUse: !!h?.chosen && !signingIn,
     limits: a.limits, checkedAt: a.checkedAt, usageError: a.usageError,
     use: h?.signedIn && !h.chosen && many ? { word: 'Switch', onUse: () => onUse(h.profile) } : null,
     trouble,
     cmd: trouble && h?.dir ? `CLAUDE_CONFIG_DIR=${h.dir} claude` : null,
-    meters: !!(h || a.limits?.length),
+    meters: !!a.limits?.length || (!!h && !signingIn),
   };
 }
 
-/**
- * The cloud row's sentence: when threads go there, and on which account.
- *
- * ONE ACCOUNT, HOWEVER MANY ARE SIGNED IN THERE (w-dac993a554). This listed
- * them and ended "in turn", which is what `pickCloudLogin` used to do; it takes
- * one account now and waits for it, so the sentence names that one.
- */
-export function cloudRunsLine(mode: CloudStatus['mode'], inUse: string | null): string {
-  if (mode === 'mac') return 'Every thread runs on this computer.';
-  const when = mode === 'all' ? 'Threads start there first' : 'Threads start there when this computer is full';
-  return `${when}, on ${inUse ?? 'your cloud account'}.`;
-}
+export { cloudRunsLine };
 
 /*
  * THE SETTINGS SHELL, which is the app's own terminal opened against the one
-   reserved key that belongs to no task (shared/settings-terminal.mjs). It is
+   reserved key that belongs to no task (shared/settings-terminal.mts). It is
    `TaskTerminal` and not a second terminal: one xterm in this app, one set of
    keys, one scrollback rule.
 
@@ -594,6 +649,48 @@ const Group = ({ id, label, warn, action, bare = false, children }: { id?: strin
   </div>
 );
 
+/** One key kept in the cloud: replaced in place, or removed once asked twice, since getting it again means a trip to the service. */
+function CloudKeyRow({ name, label, savedAt }: { name: string; label: string | null; savedAt: number | null }) {
+  const [mode, setMode] = useState<'shown' | 'replacing' | 'removing'>('shown');
+  const [value, setValue] = useState('');
+  const [said, setSaid] = useState<string | null>(null);
+  const [warned, setWarned] = useState<string | null>(null);
+  const day = (t: number) => (new Date(t).toDateString() === new Date().toDateString() ? 'today' : new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+  const when = savedAt ? `saved ${day(savedAt)} at ${new Date(savedAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}` : null;
+  const act = async (p: { action: 'save' | 'remove'; name: string; value?: string }) => {
+    const out = await api.cloudKey(p);
+    if (!out.ok) { setSaid(out.error ?? 'The cloud did not answer. Try again.'); return; }
+    setSaid(p.action === 'save' ? `${name}, replaced just now` : null); setValue(''); setMode('shown');
+  };
+  if (mode === 'replacing') {
+    return (
+      <form className="set-row set-key-replace" aria-label={`Replace ${label ?? name}`} onSubmit={(e) => {
+        e.preventDefault();
+        if (!value.trim()) return;
+        const wrong = keyLooksWrong(name, value, label ?? undefined);
+        if (wrong && warned !== value) { setWarned(value); setSaid(wrong); return; }
+        void act({ action: 'save', name, value });
+      }}>
+        <span className="set-key-name">{label ?? name}</span>
+        <input className="set-key-input" type="password" aria-label={name} placeholder="Paste the new key" autoComplete="off" spellCheck={false} autoFocus
+          value={value} onChange={(e) => { setValue(e.target.value); setSaid(null); }} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setMode('shown'); } }} />
+        <span className="set-row-ctl">
+          <button type="submit" className="set-ghost" disabled={!value.trim()}>Save</button>
+          <button type="button" className="set-ghost" onClick={() => { setMode('shown'); setSaid(null); }}>Cancel</button>
+        </span>
+        {said && <span className="set-key-said">{said}</span>}
+      </form>
+    );
+  }
+  return (
+    <Row label={label ?? name} desc={said ?? (mode === 'removing' ? 'Threads that need it will ask again.' : [label ? name : null, when].filter(Boolean).join(', '))}>
+      {mode === 'removing'
+        ? <><button type="button" className="set-ghost" onClick={() => setMode('shown')}>Keep</button><button type="button" className="set-ghost" onClick={() => void act({ action: 'remove', name })}>Remove</button></>
+        : <><button type="button" className="set-ghost" onClick={() => setMode('replacing')}>Replace</button><button type="button" className="set-ghost" onClick={() => setMode('removing')}>Remove</button></>}
+    </Row>
+  );
+}
+
 /**
  * THE MENU BEHIND "How many run at once": Automatic, then every number it could
  * have been, all of them counted for the MACHINE.
@@ -627,7 +724,7 @@ export function agentCountOptions(w: {
  *
  * Every figure here is read, never worked out for display: the agents are the
  * sessions this app is running, and the rest comes from the memory check's own
- * coordinator (main/memory-gate-server.mjs) through `memoryReading`. ANYTHING IT
+ * coordinator (main/memory-gate-server.mts) through `memoryReading`. ANYTHING IT
  * DOES NOT KNOW IS LEFT OUT. A card whose whole job is to be the measured corner
  * of the screen cannot afford one invented number, so a kernel reading that did
  * not arrive takes its cell with it rather than showing a nought.
@@ -638,26 +735,11 @@ export function agentCountOptions(w: {
  */
 function Reading({ running, capacity, gate }: {
   running?: number; capacity?: number;
-  gate?: { on: boolean; reading?: { heavy: number | null; waiting: number | null; pressure: string | null; usedPct: number | null; asked: number | null; waited: number | null; refused: number | null; holding?: boolean } };
+  gate?: { on: boolean; reading?: GateReading };
 }) {
-  const r = gate?.on ? gate.reading : null;
-  if (!r) return null;
-  const word = r.pressure === 'critical' ? 'Very short' : r.pressure === 'tight' ? 'Tight' : r.pressure ? 'Fine' : null;
-  const cells: Array<{ n: string; of: string }> = [];
-  if (Number.isFinite(running)) cells.push({ n: String(running), of: capacity ? `of ${capacity} running` : 'running' });
-  if (r.heavy !== null) cells.push({ n: String(r.heavy), of: 'heavy at once' });
-  if (r.waiting !== null) cells.push({ n: String(r.waiting), of: 'waiting on memory' });
-  if (word) cells.push({ n: word, of: 'memory now' });
-  // The day's tally is one sentence and only where there is one to tell. "None
-  // turned away" is the part that answers "is this Mac coping", so it is said
-  // in full rather than left to a nought the eye skips.
-  const tally = r.asked
-    ? `Today: ${r.asked} commands asked, ${r.waited ?? 0} waited, ${r.refused ? `${r.refused} turned away` : 'none turned away'}.`
-    : null;
-  // NEW AGENTS HELD FOR MEMORY (w-ec27ff1a51) is said while it is happening,
-  // because a queue that is not moving and says nothing reads as broken.
-  const holding = r.holding ? 'New agents wait until memory frees up. Urgent tasks still start.' : null;
-  if (!cells.length && !tally && !holding) return null;
+  const f = runningFigures({ running, capacity, gate });
+  if (!f) return null;
+  const { cells, holding, tally } = f;
   return (
     <div className="set-group">
       <div className="set-plate">
@@ -666,9 +748,9 @@ function Reading({ running, capacity, gate }: {
             {cells.map((c) => <div key={c.of}><b>{c.n}</b><span>{c.of}</span></div>)}
           </div>
         )}
-        {r.usedPct !== null && (
+        {f.usedPct !== null && (
           <div className="set-row set-bar-row">
-            <i className="set-bar"><i className={r.pressure === 'normal' ? '' : 'hot'} style={{ width: `${r.usedPct}%` }} /></i>
+            <i className="set-bar"><i className={f.hot ? 'hot' : ''} style={{ width: `${f.usedPct}%` }} /></i>
           </div>
         )}
         {holding && <div className="set-row set-row-warn">{holding}</div>}
@@ -707,7 +789,7 @@ function PhoneFeedbackGroup({ onFeedback }: { onFeedback: () => void }) {
 // thing"): Every project, None, or a tick beside each project.
 type MacShut = {
   site: string | null; siteQr: string | null; all: boolean; projects: ProjectSettings[]; onChoose: (all: boolean, except: string[]) => void;
-  // Who this computer sends as, and whether its threads are reaching the web app (main/team/index.mjs phoneOnce).
+  // Who this computer sends as, and whether its threads are reaching the web app (main/team/index.mts phoneOnce).
   email?: string | null; sentAt?: number | null; error?: string | null;
 };
 function PhoneConnection({ macShut }: { macShut: MacShut }) {
@@ -856,7 +938,13 @@ function PhonePage({ onFeedback, macShut, onSignIn, web, onPhoneProjects }: { on
 // two meters, then the cards to change to (w-893c5fe268). Choosing opens
 // Stripe in the browser; the page reads the plan again until it changes
 // (../cloud-upgrade.ts).
-function CloudPlansPage({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: () => void }) {
+/** What the team's page is handed to draw from. */
+export interface TeamPlanPage {
+  team: NonNullable<CloudPlan['team']>; billing: TeamBillingDetails | null; paying: boolean;
+  onPay: () => void; onManage: () => void; onInvite?: () => void;
+}
+
+function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite }: { signedIn: boolean; onSignIn: () => void; teamPlan?: (page: TeamPlanPage) => ReactNode; onInvite?: () => void }) {
   const [plan, setPlan] = useState<CloudPlan | null>(null);
   const [said, setSaid] = useState<string | null>(null);
   const [waitingFor, setWaitingFor] = useState<string | null>(null);
@@ -877,7 +965,7 @@ function CloudPlansPage({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: (
     const t = setInterval(async () => {
       n += 1;
       const p = await read();
-      if (p.plan !== was || n > 60) { setWaitingFor(null); setChosen(null); clearInterval(t); }
+      if (planKey(p) !== was || n > 60) { setWaitingFor(null); setChosen(null); clearInterval(t); }
     }, 5000);
     return () => clearInterval(t);
   }, [waitingFor]);
@@ -891,8 +979,24 @@ function CloudPlansPage({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: (
     if (!out.ok) { setSaid(out.message || 'Stripe could not be opened. Try again.'); return; }
     setChosen(id);
     setSwitching(out.where === 'billing');
-    setWaitingFor(plan?.plan ?? 'none');
+    setWaitingFor(planKey(plan));
   };
+  const [teamOpening, setTeamOpening] = useState(false);
+  const payForTeam = async () => {
+    setSaid(null); setTeamOpening(true);
+    const out = await api.cloudAccountPay('team');
+    setTeamOpening(false);
+    if (!out.ok) { setSaid(out.message || 'Stripe could not be opened. Try again.'); return; }
+    setSwitching(out.where === 'billing');
+    setWaitingFor(planKey(plan));
+  };
+  // A paying team's owner sees its card, next bill and last invoice, read from Stripe through the cloud.
+  const [teamBillingSeen, setTeamBillingSeen] = useState<TeamBillingDetails | null>(null);
+  const readsStripe = !!plan?.team?.owner && !plan.team.trial;
+  useEffect(() => {
+    if (!readsStripe) return;
+    void api.cloudAccountTeamBilling().then((out) => { if (out.ok && out.owner) setTeamBillingSeen(out as TeamBillingDetails); });
+  }, [readsStripe, plan?.team?.seats]);
   const [switching, setSwitching] = useState(false);
   const [billSaid, setBillSaid] = useState<string | null>(null);
   const billing = async () => {
@@ -910,6 +1014,14 @@ function CloudPlansPage({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: (
       {bill.says && !waitingFor && <p className="cloud-plans-say">{bill.says}</p>}
     </>
   );
+  if (plan?.plan === 'team' && plan.team && teamPlan) {
+    return (
+      <Page title="Plan and Billing">
+        {teamPlan({ team: plan.team, billing: teamBillingSeen, paying: teamOpening || !!waitingFor, onPay: () => void payForTeam(), onManage: () => void billing(), onInvite })}
+        {lines}
+      </Page>
+    );
+  }
   // THE PLAN YOU PAY FOR, FOUND UNDER BILLING (the founder's pick of five, 2026-10-25).
   const sum = planSummary(plan);
   if (sum) {
@@ -931,10 +1043,10 @@ function CloudPlansPage({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: (
             {sum.manage && <button type="button" className="set-ghost" onClick={() => void billing()}>Manage billing</button>}
           </div>
         </Group>
-        <Group id="cloud-use" label="This month" bare>
-          <div className="bill-meters">{meter('Agents in the cloud', sum.agents)}{meter('Hours used', sum.hours)}</div>
+        <Group id="cloud-use" label={sum.period} bare>
+          <div className="bill-meters">{meter('Agents in the cloud', sum.agents)}{meter(sum.hours.label, sum.hours)}</div>
         </Group>
-        <Group id="cloud-plans" label="Change plan" bare><div className="bill-cards">{cards}</div></Group>
+        {sum.change && <Group id="cloud-plans" label={sum.change} bare><div className="bill-cards">{cards}</div></Group>}
         {lines}
       </Page>
     );
@@ -1000,19 +1112,12 @@ const PERMISSION_OPTIONS: Array<{ value: PermissionMode; label: string }> = MODE
   (value) => ({ value, label: MODE_WORDS[value] }),
 );
 
-// CODEX'S THREE, in the order shared/codex-modes.mjs keeps them, which is
+// CODEX'S THREE, in the order shared/codex-modes.mts keeps them, which is
 // least to most an agent may do. That file is the only place the list lives.
 const CODEX_MODE_OPTIONS: Array<{ value: CodexModeId; label: string }> = CODEX_MODE_ORDER.map(
   (value) => ({ value, label: CODEX_MODES[value].label }),
 );
 
-const SAME_AS_HERE = 'The same as on this computer.';
-
-// Full access's own sentence says "on this computer", which a cloud run is not.
-const CODEX_CLOUD_WHAT: Record<CodexModeId, string> = {
-  ...Object.fromEntries(CODEX_MODE_ORDER.map((id) => [id, CODEX_MODES[id].what])) as Record<CodexModeId, string>,
-  'full-access': 'Anything on its own throwaway cloud machine, without asking.',
-};
 
 /* -------------------- the model is not asked here ------------------------- */
 // The new task card asks which model a run goes out on, keeps the answer
@@ -1198,7 +1303,7 @@ function Connection({ copy, check, engine, found, certain, bin, chosen = false, 
   /**
    * WHICH AGENT THIS CARD IS ABOUT, and the only thing the window hands over
    *  when somebody points at the file themselves. The path comes back from the
-   *  panel main opened; it never goes the other way (main/ipc.mjs,
+   *  panel main opened; it never goes the other way (main/ipc.mts,
    *  `zero:engine-bin`). */
   engine: 'claude' | 'codex';
   /**
@@ -1215,8 +1320,8 @@ function Connection({ copy, check, engine, found, certain, bin, chosen = false, 
   account?: EngineAccount | null;
   /**
    * WHY NOTHING RUNS ON IT DESPITE IT BEING HERE, or null. Main's sentence,
-   *  never one derived here (main/settings.mjs `engineTroubleFor`, off
-   *  shared/spawn-trouble.mjs). BEING FOUND IS NOT BEING USABLE: a subscription
+   *  never one derived here (main/settings.mts `engineTroubleFor`, off
+   *  shared/spawn-trouble.mts). BEING FOUND IS NOT BEING USABLE: a subscription
    *  that lapsed leaves the binary exactly where it was and stops every task on
    *  that engine. */
   trouble?: string | null;
@@ -1241,7 +1346,7 @@ function Connection({ copy, check, engine, found, certain, bin, chosen = false, 
       const r = await check();
       setAgain(!r.found);
       // The search has already updated the path the rest of the app spawns
-      // from (main/settings.mjs, recheckClaude and recheckCodex), so re-reading
+      // from (main/settings.mts, recheckClaude and recheckCodex), so re-reading
       // settings is what puts this row and every other row in step with it.
       await onChecked();
     } finally {
@@ -1375,8 +1480,8 @@ const CodexCli = (props: EngineConnectionProps) => (
    disk. The words are all ../update-row.ts, shared with ⌘K.
 
    IT WORKS THE SAME ON BOTH KINDS OF COPY. Installed, the check is a release
-   feed (main/updater.mjs); run from a checkout, it is `git fetch` against the
-   branch (main/source-updater.mjs). Both answer the same door and the same
+   feed (main/updater.mts); run from a checkout, it is `git fetch` against the
+   branch (main/source-updater.mts). Both answer the same door and the same
    shape, so there is nothing here that knows which one it is talking to.
 
    NOTHING IS ASSUMED ABOUT THE PRESS. The check's own answer is drawn, and the
@@ -1400,7 +1505,7 @@ function Updates({ state }: { state?: UpdateState | null }) {
     // THE COPY THAT CANNOT UPDATE ITSELF FROM WHERE IT IS: the press moves the
     // app into Applications and macOS relaunches it, so nothing after a
     // success here is ever drawn. A refusal arrives in the state, through the
-    // snapshot, like every other failure (shared/where-it-runs-from.mjs).
+    // snapshot, like every other failure (shared/where-it-runs-from.mts).
     if (look.move) { void api.updateMove(); return; }
     setChecking(true);
     try {
@@ -1430,7 +1535,7 @@ function Updates({ state }: { state?: UpdateState | null }) {
 // THE PICTURE BESIDE A PROJECT'S NAME, AND THE ONE CONTROL THAT CHANGES IT.
 //
 // Nothing is uploaded and nothing is hosted: the picture is copied into the
-// project's own folder and read from there. main/project-identity.mjs says why
+// project's own folder and read from there. main/project-identity.mts says why
 // it is copied rather than pointed at.
 //
 // THE MARK IS THE BUTTON. Clicking it opens the Mac's own picker. THE WAY BACK
@@ -1505,6 +1610,9 @@ function ProjectTitle({ project, onRename }: {
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditing(true); } }}
       >
         {project.name}
+        {/* Projects promises "open it to rename it", and a title that only
+            lights under the pointer was never found (QA batch 011, F-172). */}
+        <svg className="set-title-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /></svg>
       </h1>
     );
   }
@@ -1578,7 +1686,7 @@ function paneFrom(want: string, has: { team: boolean }): Pane {
 
 /* --------------------------------- screen --------------------------------- */
 
-export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onNewProject, ranked = [], onSetOrder, teamPane, projectShare, projectWho, account, phoneCloud, phoneWeb, onPhoneSignIn, update = null, onClose, onFeedback, cloud = null, onCloudSignIn, cloudPlans = null, roomsPane }: {
+export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onPaneChange, onNewProject, ranked = [], onSetOrder, teamPane, projectShare, projectWho, account, phoneCloud, phoneWeb, onPhoneSignIn, update = null, onClose, onFeedback, cloud = null, onCloudSignIn, cloudPlans = null, roomsPane }: {
   /** Opens the feedback card. A phone has no Feedback button in its corner,
    *  so its own Settings page offers it (2026-10-12). */
   onFeedback?: () => void;
@@ -1587,12 +1695,15 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   /** Signs a Claude account in to the cloud (a login's key to sign it in again), on the cloud's own screen. */
   onCloudSignIn?: (key: string | null, email: string | null) => void;
   /** Agentbox Cloud's plans, where this copy offers it: the Cloud page. */
-  cloudPlans?: { signedIn: boolean; onSignIn: () => void } | null;
+  /** `teamPlan`: a team's own Plan and Billing page, handed in like `teamPane` so this screen holds no team code. */
+  cloudPlans?: { signedIn: boolean; onSignIn: () => void; teamPlan?: (page: TeamPlanPage) => ReactNode } | null;
   // ONE control for the three of them. Light, dark and each picture are one
   // list, because a picture IS dark (skins.ts) and asking her to set a theme
   // and then a background is two decisions for one choice.
   look: Look;
   onSetLook: (l: Look) => void;
+  /** A sky theme: its look and its sky together. */
+  onSkyTheme?: (id: string) => void;
   // The dials on whichever picture is on. They only ever show under a picture,
   // so there is no disabled control on this screen for her to wonder about.
   tune: SkinTune;
@@ -1610,6 +1721,9 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   usageReadings?: Usage[];
   now?: number;
   onSectionChange?: (section: string | null) => void;
+  /** The page up, by the name `startPane` takes back (`project:kestrel` for a
+   *  project), so a reload can reopen it. */
+  onPaneChange?: (pane: string) => void;
   // The new project card, from the Projects page.
   onNewProject?: () => void;
   // The running order, for the Projects page: every project already in order
@@ -1646,6 +1760,12 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   roomsPane?: ReactNode;
   onClose: () => void;
 }) {
+  const homeSet = useHomeSettings();
+  // A phone has no skies (App.tsx's `homeOn`).
+  const skies = !onPhone();
+  // Under Match system the sky is Match's default, so the Match tile is the one ticked.
+  const skyOn = skies && (homeSet.picked || look !== 'match') ? homeSet.skyTheme : null;
+  const sidebarShrinks = useSidebarShrinks();
   const [model, setModel] = useState<SettingsModel | null>(null);
   // ?settings=claude, or ?settings=project:kestrel. Anything else (including the
   // bare ?settings=1 that only means "open") lands on General. `startPane` is
@@ -1658,6 +1778,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   // WHICH PAGE IS UP, for the window around this screen.
   useEffect(() => {
     onSectionChange?.(typeof pane === 'object' ? 'projects' : pane === 'general' ? null : pane);
+    onPaneChange?.(typeof pane === 'object' ? `project:${pane.project}` : pane);
   }, [pane]);
 
   const [error, setError] = useState<string | null>(null);
@@ -1723,8 +1844,11 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
     // A search with words in it is emptied by its own Escape (`searchKeys`).
     const clearing = (e: KeyboardEvent) => !!queryRef.current && e.target === searchBox.current;
     const onKey = (e: KeyboardEvent) => {
-      // A screen over this one, such as the cloud's sign-in, takes its own keys.
-      if (document.querySelector('.ps-over')) return;
+      // A screen over this one, such as the cloud's sign-in, takes its own
+      // keys; so does an open menu inside it (../settings-escape.ts).
+      const takes = whatTakesEscape(document);
+      if (takes === 'over') return;
+      if (e.key === 'Escape' && takes === 'menu') return;
       if (e.key === 'Escape' && !clearing(e)) { e.preventDefault(); e.stopPropagation(); onClose(); return; }
       // ⌘F, or / from anywhere that is not a box being typed in, goes to the search.
       const typing = e.target instanceof HTMLElement && e.target.closest('input, textarea, [contenteditable="true"]');
@@ -1853,7 +1977,21 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
     const tiles = accounts.map((a) => {
       const tile = accountTile(a, {
         many: agent.accounts.length > 1, now,
-        onUse: (profile) => write(api.setWorkspaceSetting({ key: 'activeAccount', value: { engine, profile } })),
+        onUse: (profile) => {
+          void (async () => {
+            const saved = await api.setWorkspaceSetting({ key: 'activeAccount', value: { engine, profile } });
+            await write(Promise.resolve(saved));
+            if (!saved.ok) return;
+            try {
+              await api.agentUpdate(engine, 'refresh');
+              await write(api.settings());
+            } catch (error) {
+              setError(error instanceof Error ? error.message : String(error));
+            } finally {
+              window.dispatchEvent(new Event('agent-models-changed'));
+            }
+          })().catch(error => setError(error instanceof Error ? error.message : String(error)));
+        },
         // Signing in to the cloud from a tile is Claude's alone.
         cloud: !!cloud?.setUp, onCloudSignIn: engine === 'claude' ? onCloudSignIn : undefined,
       });
@@ -1919,6 +2057,11 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 </Row>
               </Group>
             )}
+            {cloudHere && !!cloudHere.keys?.length && (
+              <Group id="cloud-keys" label="Keys for cloud threads">
+                {cloudHere.keys.map((k) => <CloudKeyRow key={k.name} name={k.name} label={k.label ?? null} savedAt={k.savedAt} />)}
+              </Group>
+            )}
             {/* SIGNING A SECOND ACCOUNT IN, IN THE APP (w-c2904cc8d9). Main
                 makes the folder and registers the login, and the shell below
                 is left with the one part that is genuinely hers, signing in to
@@ -1927,7 +2070,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               <div className="ac-adding">
                 <div className="ac-adding-top">
                   <span>{adding.error ? 'Could not add an account' : `Sign in to ${adding.name ?? 'your account'}`}</span>
-                  <button type="button" className="ac-adding-x" aria-label="Close" onClick={() => { setAdding(null); void load(); }}>&#215;</button>
+                  <button type="button" className="ac-adding-x" aria-label="Close" onClick={() => { setAdding(null); void api.terminal({ ...SETTINGS_TERMINAL, action: 'close' }); void load(); }}>&#215;</button>
                 </div>
                 {adding.error
                   ? <p>{adding.error}</p>
@@ -1951,7 +2094,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                   />
                 </Row>
                 {cloudHere && (
-                  <Row label="In the cloud" desc={w.cloudCodexMode && w.cloudCodexMode !== 'same' ? CODEX_CLOUD_WHAT[w.cloudCodexMode] : SAME_AS_HERE}>
+                  <Row label="In the cloud" desc={w.cloudCodexMode && w.cloudCodexMode !== 'same' ? CODEX_CLOUD_WHAT[w.cloudCodexMode] : sameAsHere()}>
                     <Picker
                       bare
                       label="Permission mode in the cloud"
@@ -1984,9 +2127,9 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 )}
                 {/* THE CLOUD'S OWN MODE: a cloud run works on a throwaway copy
                     with nobody there to approve anything, so by default it
-                    does not ask (main/cloud-permission.mjs). */}
+                    does not ask (main/cloud-permission.mts). */}
                 {cloudHere && (
-                  <Row label="In the cloud" desc={w.cloudPermission && w.cloudPermission !== 'same' ? PERMISSION_SENTENCE[w.cloudPermission] : SAME_AS_HERE}>
+                  <Row label="In the cloud" desc={w.cloudPermission && w.cloudPermission !== 'same' ? PERMISSION_SENTENCE[w.cloudPermission] : sameAsHere()}>
                     <Picker
                       bare
                       label="Permission mode in the cloud"
@@ -2087,7 +2230,8 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
 
         {/* TEAM MANAGEMENT (w-8415594d19). It does not wait on `model`, because
             nothing on it comes from the settings file. */}
-        {pane === 'cloud' && cloudPlans && <CloudPlansPage signedIn={cloudPlans.signedIn} onSignIn={cloudPlans.onSignIn} />}
+        {pane === 'cloud' && cloudPlans && <CloudPlansPage signedIn={cloudPlans.signedIn} onSignIn={cloudPlans.onSignIn} teamPlan={cloudPlans.teamPlan}
+          onInvite={teamPane ? () => setPane('team') : undefined} />}
 
         {pane === 'rooms' && roomsPane && (
           <Page title="Rooms" lede="What people in your rooms see of you. Private threads never show.">
@@ -2096,7 +2240,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
         )}
 
         {pane === 'team' && teamPane && (
-          <Page title="Team" lede="Who is on your team, who has been invited, and the team's name. Everyone sees a short summary of your threads unless you mark one private.">
+          <Page title="Team" lede="Who is on your team, who has been invited, and the team's name. Everyone can open and read your threads and their files unless you mark one private.">
             {teamPane}
           </Page>
         )}
@@ -2138,6 +2282,9 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               <Row label="Multiplayer" desc="Share projects with your team and see their threads beside yours. Needs a sign-in.">
                 <Switch label="Multiplayer" on={!!w.alpha?.multiplayer} onChange={(v) => setWorkspace('alphaMultiplayer', v)} />
               </Row>
+              <Row label="Glass" desc="The space around the page becomes frosted glass over your desktop.">
+                <Switch label="Glass" on={!!w.alpha?.glass} onChange={(v) => setWorkspace('alphaGlass', v)} />
+              </Row>
             </Group>
           </Page>
         )}
@@ -2152,13 +2299,18 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 <Switch label="Show keyboard shortcut hints" on={keyHints} onChange={onSetKeyHints} />
               </Row>
             </Group>
+            <Group id="sidebar" label="Sidebar">
+              <Row label="Shrink the sidebar to icons">
+                <Switch label="Shrink the sidebar to icons" on={sidebarShrinks} onChange={setSidebarShrinks} />
+              </Row>
+            </Group>
             {/* THE CORNER TAG (w-dafae58a23). The tag itself only hides for a
                 while; this is the one place it turns off for good, so it can
                 never become a thing she closed once and forgot. */}
             <Group id="corner-tag" label="Agent Tray">
               <Row
                 label="Show the Agent Tray"
-                desc="A small tag over your other apps says when an agent has something for you. Drag it anywhere; it keeps that corner on every screen, and sizes itself to the screen it is on. Drag its bottom-left corner to make it bigger or smaller, or right-click it for that, for hiding it a while, and for turning it off."
+                desc="A small tag over your other apps says when an agent has something for you. Drag it anywhere; it keeps that corner on every screen, and sizes itself to the screen it is on. Make it bigger or smaller with Size, at the foot of the list that opens when you point at it. Right-click it to hide it a while or turn it off."
               >
                 <Switch label="Show the Agent Tray" on={w.cornerTag !== false} onChange={(v) => setWorkspace('cornerTag', v)} />
               </Row>
@@ -2190,6 +2342,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 "How do i log out" looks for it: "should be at bottom of
                 settings page". Your account menu in the sidebar's corner has
                 it too. */}
+            {account && <PublicLinks />}
             {account && (
               <Group id="account" label="Account">
                 <Row label={`Signed in as ${account.email}`} desc={account.team ? `On the ${account.team} team.` : undefined}>
@@ -2225,18 +2378,16 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                   THE NUMBER SHOWN IS THE MACHINE'S, NOT THE ACCOUNT'S. The
                   stepper was per account while the sentence beside it talked
                   about the total, so this Mac showed 3 and said 6. Automatic
-                  answers for the Mac and main/machine.mjs shares it out; the
+                  answers for the Mac and main/machine.mts shares it out; the
                   per-account number is arithmetic nobody is asked to do.
 
-                  A PLAN THAT ALLOWS ONE AT A TIME STILL SAYS SO, because that is
-                  a fact about the subscription rather than about this Mac. */}
+                  THE CLAUDE PLAN HAS NO SAY (w-54c640f8da): its limit is a
+                  budget, and a spent one waits for its reset. */}
               <Row
                 label="How many run at once"
-                desc={w.sessionsAtOnceFromPlan
-                  ? `Your plan is ${w.sessionsAtOnceFromPlan}, so ${NAME} starts one ${twoEngines ? 'Claude Code agent ' : ''}at a time.`
-                  : w.agentsAuto
-                    ? 'From this computer’s memory, kept there as you add accounts or turn the memory check on.'
-                    : `You set this. Automatic would run ${w.agentsAutoTotal ?? w.sessionsAtOnce} on this computer.`}
+                desc={w.agentsAuto
+                  ? 'From this computer’s memory, kept there as you add accounts or turn the memory check on.'
+                  : `You set this. Automatic would run ${w.agentsAutoTotal ?? w.sessionsAtOnce} on this computer.`}
               >
                 {/* ONE DROPDOWN, NOT A CHOICE AND THEN A NUMBER (2026-10-05, her
                     note). Automatic and every number it could be are the same
@@ -2260,7 +2411,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
             {/* HOLD HEAVY WORK WHEN MEMORY IS SHORT (w-3958c3753d). An agent
                 waiting on the model costs a few hundred MB; one running tests
                 or a build costs a gigabyte or more, so the number that runs
-                out is heavy commands, not agents. Off out of the box. */}
+                out is heavy commands, not agents. On out of the box. */}
               {w.memoryGate && (
                 <Row
                   label="Hold heavy work when memory is short"
@@ -2292,7 +2443,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               )}
               {/* STOP WHAT FINISHED AGENTS LEAVE RUNNING (2026-10-05). A night
                   of agents left 7.7 GB running after every agent had finished
-                  and the Mac ran out of memory; main/leftovers.mjs has the
+                  and the Mac ran out of memory; main/leftovers.mts has the
                   numbers and the rules agreed with Codex. Its own switch,
                   because the memory switch only ever delays commands and this
                   one stops programs, and the person should agree to that by
@@ -2325,7 +2476,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                   outside the folder the app keeps its own in, about 740 MB, and
                   nothing in the app could list, show or sweep one: the same
                   invisibility that stranded 26 GB a fortnight earlier, in a new
-                  place. main/task-folders.mjs has the measurement and the rules.
+                  place. main/task-folders.mts has the measurement and the rules.
 
                   A SENTENCE AND NO CONTROL, and the row is absent whenever there
                   is nothing to say. A folder the app did not make is not the
@@ -2333,7 +2484,6 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                   uncommitted inside it — so there is nothing here to decide,
                   only something to know. A permanent row saying "none" would be
                   bookkeeping on a page that is already long. */}
-              {w.strayFolders && <Row label="Copies of a project made by hand" desc={w.strayFolders.now} />}
               {/* THE ONE LEVER NO READING REPLACES. She is sitting in front of
                   the Mac and the app is not: "If there are issues with that, the
                   user determines whether they can take some sort of more manual
@@ -2382,8 +2532,8 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 {LOOKS.map((l) => (
                   <button
                     key={l.id}
-                    className={`look${look === l.id ? ' on' : ''}`}
-                    aria-pressed={look === l.id}
+                    className={`look${look === l.id && !skyOn ? ' on' : ''}`}
+                    aria-pressed={look === l.id && !skyOn}
                     onPointerEnter={() => void readySkin(lookMeans(l.id).skin)}
                     onFocus={() => void readySkin(lookMeans(l.id).skin)}
                     onClick={() => onSetLook(l.id)}
@@ -2399,6 +2549,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                     <span className="look-name">{l.name}</span>
                   </button>
                 ))}
+                {skies && SKY_THEMES.map((k) => <SkyTile key={k.id} sky={k} on={skyOn === k.id} onPick={() => onSkyTheme?.(k.id)} />)}
               </div>
             </Group>
             {/* THE DIALS, and only under a picture. Both move the window she is
@@ -2447,7 +2598,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
             CONTROL: it is the one page you read rather than set. What is here
             is what a person actually presses, grouped by the moment they would
             want it; ../shortcuts.ts holds the list. Every key on it works today
-            (`tests/the-shortcuts-page-lists-keys-that-work.test.mjs`). */}
+            (`tests/the-shortcuts-page-lists-keys-that-work.test.mts`). */}
         {pane === 'phone' && <PhonePage onFeedback={onFeedback} onSignIn={onPhoneSignIn} web={phoneWeb}
           onPhoneProjects={webComputer ? <WebPhoneProjects web={webComputer} onWorkspace={setWorkspace} /> : undefined} macShut={phoneCloud ? { ...phoneCloud, all: model?.workspace?.phoneAll !== false, projects: projects.filter((p) => p.slug !== 'practice'), onChoose: (all, except) => setWorkspace('phoneProjects', { all, except }) } : undefined} />}
         {pane === 'shortcuts' && (
@@ -2678,10 +2829,18 @@ function WebComputerPane({ pane, web, onWorkspace, onProject, onOpenProject }: {
     const claude = pane === 'claude';
     const mode = read(claude ? 'permission' : 'codexMode', claude ? w.permission : (w.codexMode ?? 'auto'));
     const account = read('activeAccount', null);
-    const found = claude ? w.claude?.found : w.codex?.found;
+    // Nothing installed is one answer, not one answer and two more under it
+    // (QA batch 005, F-119).
+    const groups = webSettingsGroups(w, claude ? 'claude' : 'codex');
+    if (!groups.includes('accounts')) {
+      return (
+        <Page title={claude ? 'Claude Code' : 'Codex'}>
+          <Group id="status" label="Status"><Row label={`${claude ? 'Claude Code' : 'Codex'} is not on this computer`} /></Group>
+        </Page>
+      );
+    }
     return (
       <Page title={claude ? 'Claude Code' : 'Codex'}>
-        {!found && <Group id="status" label="Status"><Row label={`${claude ? 'Claude Code' : 'Codex'} is not on this computer`} /></Group>}
         <Group id="accounts" label="Signed in">
           <WebAccounts engine={claude ? 'claude' : 'codex'} list={(claude ? w.accounts : w.codexAccounts) ?? []} reading={account} refusedAsk={lastAccountAsk(web.commands, web.computer.device)}
             onUse={(id) => onWorkspace('activeAccount', { engine: claude ? 'claude' : 'codex', account: id })} />
@@ -2722,7 +2881,7 @@ function WebComputerPane({ pane, web, onWorkspace, onProject, onOpenProject }: {
             desc={`Tests and builds take turns, urgent first, and new agents wait to start until memory frees up.${two ? ' Claude Code and Codex both.' : ''}`}>
             <Switch label="Hold heavy work when memory is short" on={!!gate.value} onChange={(v) => onWorkspace('memoryGate', v)} />
           </ReadRow>
-          {gate.value && !isAuto && (
+          {(gate.value as boolean) && !isAuto && (
             <ReadRow label="Heavy commands at once" reading={slots}
               desc={slots.value === null ? `Auto: ${w.memoryGate.slotsAuto} on this computer, one for every 8 GB of memory.` : `You picked ${slots.value}. Auto is ${w.memoryGate.slotsAuto} on this computer.`}>
               <Stepper label="Heavy commands at once" value={(slots.value as number | null) ?? w.memoryGate.slotsAuto} min={1} max={w.memoryGate.slotsMax ?? 8}
@@ -2745,7 +2904,7 @@ function WebComputerPane({ pane, web, onWorkspace, onProject, onOpenProject }: {
       </Page>
     );
   }
-  const projects: Array<{ slug: string; name: string; running?: number; autonomous: boolean; permission: string; codexMode: string; account: string }> = s.projects ?? [];
+  const projects: Array<{ slug: string; name: string; running?: number; onPhone?: boolean; autonomous: boolean; permission: string; codexMode: string; account: string }> = s.projects ?? [];
   const p = typeof pane === 'object' ? projects.find((x) => x.slug === pane.project) : undefined;
   if (p) {
     const own = (key: string, copy: unknown) => readingOf(changes, 'project', key, copy, p.slug);
@@ -2788,7 +2947,7 @@ function WebComputerPane({ pane, web, onWorkspace, onProject, onOpenProject }: {
       <Page title="Projects">
         <Group id="projects">
           {projects.length ? projects.map((x) => (
-            <Row key={x.slug} label={x.name} desc={x.running ? `${x.running} running` : undefined}>
+            <Row key={x.slug} label={x.name} desc={webProjectRow(x).desc}>
               <button type="button" className="set-ghost" onClick={() => onOpenProject(x.slug)}>Open</button>
             </Row>
           )) : <Row label="No projects yet." />}

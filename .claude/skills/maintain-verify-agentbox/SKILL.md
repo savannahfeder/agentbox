@@ -34,8 +34,8 @@ End with exactly one, and say which:
 
 Only `.claude/skills/verify-agentbox/` and the harness it owns:
 `scripts/lib/stub-claude-worker.mjs` and the two tests that pin the harness
-(`tests/the-pre-deploy-check-runs-what-a-change-needs.test.mjs`,
-`tests/the-stand-in-worker-speaks-claude-codes-input-protocol.test.mjs`).
+(`tests/the-pre-deploy-check-runs-what-a-change-needs.test.mts`,
+`tests/the-stand-in-worker-speaks-claude-codes-input-protocol.test.mts`).
 Never product code. Behaviour the map describes that the app no longer has is
 either drift (fix the map) or a regression (file it as its own thread, mark
 the claim `known` with that thread's id, leave the product alone).
@@ -60,7 +60,7 @@ the claim `known` with that thread's id, leave the product alone).
    for user-facing surfaces missing from the map; name a concrete source path
    before calling one missing. Also check the two things only this repo has:
    - **The stand-in still speaks Claude Code.** Compare the flags
-     `main/harnesses/claude.mjs` and `main/claude-input.mjs` spawn with against
+     `main/harnesses/claude.mts` and `main/claude-input.mts` spawn with against
      what `scripts/lib/stub-claude-worker.mjs` honours. A new input or output
      contract the stand-in ignores makes every live drive prove the wrong thing
      (this happened once: the stand-in predated streamed input and no answer

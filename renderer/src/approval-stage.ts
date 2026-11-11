@@ -12,7 +12,36 @@
 // whack-a-mole that made one-card-at-a-time necessary in the first place, and
 // an exit animation is the exact moment it would happen again.
 
+import { CHORD_ANSWERS, chordLands } from '../../shared/card-settles.mts';
+
 export interface StagedApproval { id: string }
+
+export function approvalClickAllowed(phone: boolean, detail: number, pressed: string | null, target: string): boolean {
+  return !phone || detail === 0 || pressed === target;
+}
+
+/** Long past a slow answer, and short enough that a person is still looking at the card. */
+export const PRESS_WITHIN_MS = 20_000;
+
+/**
+ * A press that gets no answer comes back as a refusal that says so, because
+ * until it does the card has nothing true to show.
+ */
+export async function pressWithin<T>(press: () => Promise<T> | undefined, ms = PRESS_WITHIN_MS): Promise<T | { ok: false; error: string } | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      press(),
+      new Promise<{ ok: false; error: string }>((resolve) => {
+        timer = setTimeout(() => resolve({ ok: false, error: 'the app did not answer. Press again' }), ms);
+      }),
+    ]);
+  } catch (err) {
+    return { ok: false, error: (err as Error)?.message || 'it did not go through' };
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export interface Answered {
   id: string;
@@ -38,7 +67,9 @@ export function approvalStage<T extends StagedApproval>(
   pending: readonly T[] | null | undefined,
   answered: Answered | null | undefined,
   leaving: T | null | undefined,
+  blocked = false,
 ): Stage<T> {
+  if (blocked) return { card: null, verdict: null, waiting: 0 };
   const queue = Array.isArray(pending) ? pending.filter(Boolean) : [];
 
   // The answered card keeps the stage: still in the snapshot if the push has
@@ -61,4 +92,17 @@ export function approvalStage<T extends StagedApproval>(
   // mid-animation) is not worth holding an empty stage for.
   const card = queue[0] ?? null;
   return { card, verdict: null, waiting: card ? queue.length - 1 : 0 };
+}
+
+/**
+ * ⌘1 or ⌘2 (⌘Y or ⌘N still work) as the page heard it, as an answer to the card
+ * on screen. Main answers a key the window received and takes it from the page,
+ * so this hears only the presses main never saw. A press in the card's first
+ * moment answers nothing (shared/card-settles.mts).
+ */
+export function cardChord(e: { key: string; metaKey: boolean; ctrlKey: boolean; altKey: boolean; shiftKey: boolean }, cardId: string | null, shownAt: number | null = null, now = Date.now()): Answered | null {
+  if (!cardId || !(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return null;
+  const allow = CHORD_ANSWERS[e.key.toLowerCase()];
+  if (allow === undefined || !chordLands(shownAt, now)) return null;
+  return { id: cardId, allow };
 }

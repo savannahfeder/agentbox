@@ -1,5 +1,5 @@
 /* THE PHONE LAYOUT. A phone reaches the inbox through the phone
-   door (main/phone-link.mjs) and draws the same screens in a quarter of the
+   door (main/phone-link.mts) and draws the same screens in a quarter of the
    width. The desktop window cannot get this narrow (its minimum is 720), so
    nothing here ever reaches it.
 
@@ -20,11 +20,13 @@
 @media (max-width: 700px), (max-height: 520px) {
   /* iOS enlarges text when a page turns sideways, and keeps it when it turns
      back. Text stays the size it is set to. */
-  /* THE ROOM LEFT UNDER THE BOTTOM BAR FOR THE HOME BAR. The iPhone's whole
-     34px inset under the inboxes read as "extra padding at the bottom"
-     (2026-10-11); the home bar itself is a 5px line 8px off the edge, so 20px
-     clears it. Never under 8px, on a phone with no home bar. */
-  :root { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; --phone-foot: max(8px, calc(env(safe-area-inset-bottom, 0px) - 14px)); background-color: var(--bg); }
+  /* THE ROOM LEFT UNDER THE BOTTOM BAR FOR THE HOME BAR: all of it, as the
+     phone app keeps (footRoom, mobile/src/ui/parts.tsx). It was the inset less
+     14px after the whole 34px read as "extra padding at the bottom"
+     (2026-10-11); beside the phone app that bar was "super duper low and worse
+     vibes" and the phone app's "perfect" (2026-10-28). Never under 8px, on a
+     phone with no home bar. */
+  :root { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; --phone-foot: max(8px, env(safe-area-inset-bottom, 0px)); background-color: var(--bg); }
   /* THE PAGE ITSELF NEVER SCROLLS; its panes do. Turned sideways and back,
      iOS left the whole page scrolled by the status bar's height, the title
      under the clock and the bottom bar under the frame (an iPhone,
@@ -61,13 +63,17 @@
      colored background", 2026-10-12), and left the screen lighter than the
      wall colour iOS paints behind the clock, which is the seam at the top. */
   :root:root:root .workspace-layout::before { top: 0; left: 0; right: 0; bottom: 0; border-radius: 0; background: none; box-shadow: none; }
+  /* Nor its corner marks, which bracket the card. Two showed at the foot of
+     the screen, either side of the home bar, once the tabs moved up from
+     over them (2026-10-28). */
+  :root:root:root .panel-marks { display: none; }
 
   /* THE SIDE RAIL ON A PHONE IS SETTINGS, AT THE RIGHT OF THE TOP BAR. The
      rest of it has no place here: the logo opened a sidebar ("idek what menu
      means"), Threads is the page you are on, and Feedback and Instructions are
      not worth a button on a phone. */
   :root:root:root .workspace-navigation {
-    position: fixed; top: env(safe-area-inset-top, 0px); right: calc(4px + env(safe-area-inset-right, 0px)); left: auto; bottom: auto;
+    position: fixed; top: env(safe-area-inset-top, 0px); right: env(safe-area-inset-right, 0px); left: auto; bottom: auto;
     width: auto; height: var(--phone-top); padding: 0; margin: 0;
     flex-direction: row; align-items: center;
     background: none; border: 0; box-shadow: none;
@@ -75,6 +81,7 @@
   }
   :root:root:root .workspace-navigation .th-team,
   :root:root:root .workspace-navigation .workspace-tabs,
+  :root:root:root .workspace-navigation .workspace-find,
   :root:root:root .workspace-navigation button[aria-label="Feedback"],
   :root:root:root .workspace-navigation button[aria-label="Instructions"],
   :root:root:root .workspace-navigation .workspace-usage,
@@ -91,7 +98,7 @@
   :root:root:root .workspace-navigation .workspace-bottom > :not(.workspace-utilities) { display: none; }
   :root:root:root .workspace-navigation button[aria-label="Settings"] {
     display: flex; align-items: center; justify-content: center;
-    width: 40px; min-width: 40px; height: 40px; margin: 0; padding: 0;
+    width: 44px; min-width: 44px; height: 44px; margin: 0; padding: 0;
     border: 0; background: none; box-shadow: none; color: var(--text-dim);
   }
   :root:root:root .workspace-navigation button > span:not(.th-mark):not(.tm-av) { display: none; }
@@ -106,13 +113,13 @@
 
   /* The top bar: the title, then search, filters and (the side rail's)
      Settings as three plain icons of one size, no boxes. */
-  /* SOLID, IN THE WALL'S COLOUR, as is the page's root (above). Safari on
-     iOS paints the band behind the clock by matching the top of the page and
-     takes no notice of theme-color: over the wall's glow it gave up and drew
-     its own grey, (19, 20, 22), against a bar of (26, 24, 23) to (34, 29, 26)
-     sampled off a screenshot (2026-10-12). A flat bar gives it one colour to
-     match, and the glow starts under the bar's line. */
-  :root:root:root .workspace-layout > .topbar { padding: 0 48px 0 16px; height: var(--phone-top); min-height: var(--phone-top); flex-basis: var(--phone-top); background: var(--bg); border-bottom: 0; }
+  /* SEE-THROUGH, SO THE WALL'S DOTS AND GLOW RUN UP UNDER THE TITLE. It was
+     solid in the wall's flat colour from 2026-10-12, so Safari had one colour
+     to match behind the clock; that job is the edge strip's now (below), and
+     the flat bar read as "black" over a textured page ("before it was nice
+     when it matched the rest of the background texture and color",
+     2026-10-29). */
+  :root:root:root .workspace-layout > .topbar { padding: 0 48px 0 16px; height: var(--phone-top); min-height: var(--phone-top); flex-basis: var(--phone-top); background: transparent; border-bottom: 0; }
   /* SAFARI 26 COLOURS THE BAND BEHIND THE CLOCK from what touches the top of
      the page, and ignores theme-color. The page is one fixed body, so nothing
      short touched it and Safari drew its own grey there. This strip, in the
@@ -124,11 +131,13 @@
   /* The title at the desktop's 400 weight and tight spacing read thin and
      stretched at phone size ("the threads title looks a little weird",
      2026-10-11): a phone's bar title is smaller and a step heavier. */
-  :root:root:root .workspace-layout > .topbar .workspace-title { font-size: 19px; font-weight: 500; letter-spacing: -.01em; line-height: 1; }
+  :root:root:root .workspace-layout > .topbar .workspace-title { font-size: calc(19px * var(--phone-type, 1)); font-weight: 500; letter-spacing: -.01em; line-height: 1; }
   :root:root:root .th-right { gap: 0; }
   :root:root:root .th-search > span, :root:root:root .th-new > span, :root:root:root .th-new { font-size: 0; }
   :root:root:root .topbar button { border-color: transparent; background: none; box-shadow: none; }
-  :root:root:root .topbar .th-search, :root:root:root .topbar .th-disp { width: 40px; min-width: 40px; height: 40px; padding: 0; justify-content: center; color: var(--text-dim); }
+  /* 44, NOT 40 (QA batch 005, F-121): three icons bunched in the corner, each
+     one four points short of the floor both phone platforms publish. */
+  :root:root:root .topbar .th-search, :root:root:root .topbar .th-disp { width: 44px; min-width: 44px; height: 44px; padding: 0; justify-content: center; color: var(--text-dim); }
   /* On a team the button also wears the faces of whose threads are shown;
      in 40px they lay over the sliders and the gear ("icons in the top corner
      are bunched up", 2026-10-11). The choice is the first line of its menu. */
@@ -153,46 +162,61 @@
   :root:root:root .app:has(.workspace-task-header) .workspace-navigation,
   :root:root:root .app:has(.workspace-task-header) .th-new { display: none; }
 
-  /* THE INBOXES ARE WORDS ALONG THE BOTTOM, under the thumb, the way
-     Superhuman's phone app keeps its split inboxes ("Important 3 · Calendar 6
-     · Docs 8") and not its icons, which read as "incomprehensible"
-     (2026-10-11). Sentence case with the count after the word, the picked one
-     underlined, scrolling sideways when they do not fit. */
-  /* The alerts offer is on the body, outside the app, and sits above the tabs too. */
-  :root:root:root .app.workspace-layout, :root:root:root:has(.app.workspace-layout) #phone-alerts-ask { --phone-tabs: 48px; }
+  /* THE INBOXES ARE WORDS UNDER THE TITLE, the way Superhuman's phone app
+     keeps its split inboxes ("Important 3 · Calendar 6 · Docs 8") and not its
+     icons, which read as "incomprehensible" (2026-10-11). Sentence case with
+     the count after the word, the picked one underlined, scrolling sideways
+     when they do not fit. They were along the bottom until 2026-10-28, "super
+     duper low"; at the top they "do a lot better", in the phone app as here.
+     ONE LINE runs under the title and the tabs together, drawn by the bar, and
+     the picked tab's mark covers it: a line under the title and another under
+     the tabs "doesn't really work well". */
+  /* Nothing is along the bottom now; the new-thread button and the alerts
+     offer, which sat above the tabs, sit on the home bar's room. */
+  :root:root:root .app.workspace-layout, :root:root:root:has(.app.workspace-layout) #phone-alerts-ask { --phone-tabs: 0px; }
   :root:root:root .list-pane > .th-bar {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
-    height: calc(var(--phone-tabs) + var(--phone-foot));
-    padding: 0 calc(16px + env(safe-area-inset-right, 0px)) var(--phone-foot) calc(16px + env(safe-area-inset-left, 0px));
-    align-items: center; gap: 12px; overflow-x: auto; scrollbar-width: none;
-    /* Solid, or the rows scroll visibly under the words, and the same colour
-       as the list. The list is the wall now, with no card wash over it, so
-       this is the wall's own colour (it was the wash over the base while the
-       list wore the wash; "a tad bit different" was the two disagreeing). */
-    background: var(--bg); border-top: 0;
+    position: relative; flex: none; z-index: 40;
+    height: 44px;
+    padding: 0 calc(16px + env(safe-area-inset-right, 0px)) 0 calc(16px + env(safe-area-inset-left, 0px));
+    align-items: stretch; gap: 12px; overflow-x: auto; scrollbar-width: none;
+    /* The wall itself shows through, so the bar and the list never disagree
+       ("a tad bit different", 2026-10-11; the flat colour read as "black",
+       2026-10-29), with its one line a shadow at its foot, not a border, so
+       the picked tab's mark can lie over it. */
+    background: transparent; box-shadow: inset 0 -1px var(--line); border-top: 0; border-bottom: 0;
   }
   :root:root:root .th-bar::-webkit-scrollbar { display: none; }
   /* SEARCH GOES UP INTO THE TOP BAR, left of the gear. At the end of the
      inboxes it pushed the row past a 393px screen and was cut in half at the
      edge. */
   :root:root:root .th-bar > .th-search {
-    position: fixed; z-index: 50; top: calc(env(safe-area-inset-top, 0px) + (var(--phone-top) - 40px) / 2); right: calc(44px + env(safe-area-inset-right, 0px));
-    width: 40px; min-width: 40px; height: 40px; margin: 0; padding: 0; justify-content: center;
+    position: fixed; z-index: 50; top: calc(env(safe-area-inset-top, 0px) + (var(--phone-top) - 44px) / 2); right: calc(44px + env(safe-area-inset-right, 0px));
+    width: 44px; min-width: 44px; height: 44px; margin: 0; padding: 0; justify-content: center;
     border: 0; background: none; box-shadow: none; color: var(--text-dim);
   }
-  :root:root:root .workspace-layout:has(.th-bar > .th-search) > .topbar { padding-right: 84px; }
+  :root:root:root .workspace-layout:has(.th-bar > .th-search) > .topbar { padding-right: 88px; }
   :root:root:root:has(.topbar input) .th-bar > .th-search { display: none; }
-  /* Spread across the row: at 22px apart the four ran 412px on a 393px phone.
-     Spread, they are 15px apart there, and still fit a 375px one at the least. */
-  :root:root:root .tm-tabs { flex: 1 0 auto; justify-content: space-between; gap: 10px; flex-wrap: nowrap; white-space: nowrap; height: 100%; align-items: center; }
-  /* The picked one's underline sits just under its word. Drawn at the foot of
-     the whole bar it hung loose between the words and the home bar. */
+  /* ON THE PHONE DOOR SEARCH IS DRAWN IN THE TOP BAR ITSELF (App.tsx), after
+     View and filters and before the gear. Pinned up there from inside the
+     tabs row, which scrolls sideways, an iPhone clipped it to that row and it
+     was not drawn at all ("the little search icon is gone", 2026-10-29). */
+  :root:root:root .topbar .th-right > .th-search { order: 1; }
+  :root:root:root:has(.topbar input) .topbar .th-right > .th-search { display: none; }
+  /* From the left, 18px apart, as the phone app draws them. At 15px an iPhone
+     set a step up draws them 16.8px, and the four with two-figure counts run
+     383px there, inside a 402px phone. */
+  :root:root:root .tm-tabs { flex: none; justify-content: flex-start; gap: 18px; flex-wrap: nowrap; white-space: nowrap; height: 100%; align-items: stretch; }
+  /* Each word's box is the bar's full 44px, a thumb's size (F-121), and the
+     picked one's mark is the foot of that box, so it lies on the bar's line.
+     The count sits on its word's line, as the phone app's does: centred
+     beside the word it sat 2px high, "the numbers are misaligned". The 42px
+     line (44 less the mark) keeps the word where centring put it. */
   :root:root:root .tm-tab {
-    white-space: nowrap; flex: none; height: 32px; display: flex; align-items: center; border-bottom: 2px solid transparent;
-    font-family: inherit; text-transform: none; letter-spacing: 0; font-size: 15px; color: var(--text-dim);
+    white-space: nowrap; flex: none; height: 100%; padding: 0; display: flex; align-items: baseline; line-height: 42px; gap: 6px; border: 0; border-bottom: 2px solid transparent; border-radius: 0;
+    font-family: inherit; text-transform: none; letter-spacing: 0; font-size: calc(15px * var(--phone-type, 1)); color: var(--text-dim);
   }
-  :root:root:root .tm-tab.on { color: var(--text); border-bottom-color: var(--accent); }
-  :root:root:root .tm-tab b { font-size: 11px; font-weight: 500; margin-left: 4px; color: var(--text-faint, var(--text-dim)); }
+  :root:root:root .tm-tab.on { color: var(--text); font-weight: 500; border-bottom-color: var(--accent); }
+  :root:root:root .tm-tab b { font-size: calc(11.5px * var(--phone-type, 1)); font-weight: 500; line-height: 1; margin: 0; padding: 0; color: var(--text-faint, var(--text-dim)); }
 
   /* A row: its title over two lines, then the project and the age together
      on one quiet line under it. */
@@ -204,9 +228,9 @@
     grid-template-columns: auto minmax(0, 1fr);
     grid-auto-rows: auto; row-gap: 4px; column-gap: 8px;
   }
-  :root:root:root .th-grid > :nth-child(1) { grid-column: 1 / -1; white-space: normal; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: 16px; line-height: 1.35; }
-  :root:root:root .th-grid > :nth-child(2) { grid-column: 1; font-size: 11px; color: var(--text-dim); }
-  :root:root:root .th-grid > :last-child { grid-column: 2; font-size: 11px; text-align: left; color: var(--text-faint, var(--text-dim)); }
+  :root:root:root .th-grid > :nth-child(1) { grid-column: 1 / -1; white-space: normal; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: calc(16px * var(--phone-type, 1)); line-height: 1.35; }
+  :root:root:root .th-grid > :nth-child(2) { grid-column: 1; font-size: calc(11px * var(--phone-type, 1)); color: var(--text-dim); }
+  :root:root:root .th-grid > :last-child { grid-column: 2; font-size: calc(11px * var(--phone-type, 1)); text-align: left; color: var(--text-faint, var(--text-dim)); }
   :root:root:root .th-grid > :last-child::before { content: '·'; margin-right: 8px; }
   :root:root:root .th-grid > :last-child:has(.th-when:empty)::before { content: none; }
   :root:root:root .th-grid > :not(:first-child):not(:nth-child(2)):not(:last-child) { display: none; }
@@ -266,6 +290,28 @@
      top margin and hung from the top, 4px below the bar's middle. On the
      right it stops short of the summary icon: the bar keeps 48px, this 48. */
   :root:root:root .workspace-task-header { margin: 0 48px 0 0; align-self: center; }
+  /* 44px FOR EVERY CONTROL IN A THREAD'S BAR AND NOTHING MOVED TO GET IT
+     (F-121). Only the boxes grow, outwards around ink that stays where it was
+     measured into: the chevron on the title's first line, starting where the
+     letters start. The crumb's own back arrow grows LEFT, into the bar's
+     padding, and gives the width back as a negative margin so the thread's
+     name does not move. Measured: chevron at 20,22 either way. */
+  :root:root:root .workspace-task-header > .back-esc {
+    left: -10px; top: -11px; width: 44px; height: 44px; padding: 0;
+  }
+  /* 28 clipped the taller button; the name clips itself, so the row has no
+     second use for the overflow. */
+  :root:root:root .workspace-task-header > .thread-crumb { height: 44px; overflow: visible; }
+  :root:root:root .thread-crumb > .back-esc.thread-crumb-back {
+    height: 44px; min-width: 44px; margin-left: -11px; padding: 0 8px 0 15px; align-items: center;
+  }
+  /* The name beside it renames the thread, so it is a target too. */
+  :root:root:root button.thread-crumb-name { height: 44px; }
+  /* One middle line and one height across the row: a 44px arrow beside a 30px
+     Done is the row no longer lining up. */
+  :root:root:root .ts-top { align-items: center; gap: 2px; }
+  :root:root:root .ts-top .ts-more { width: 44px; height: 44px; border-color: transparent; }
+  :root:root:root .ts-top .ts-done { height: 44px; padding: 0 10px; border-color: transparent; }
   /* Open, it is a page of its own over the thread, under the same top bar,
      closed from its own icon at its top right. */
   :root:root:root .focus-pane .ts-panel {
@@ -337,9 +383,9 @@
   :root:root:root .doc-picture { touch-action: none; transform-origin: center center; transition: transform .05s linear; }
   /* A picture's box while it loads is at the foot of this file, outside this
      block, because the phone link in a computer's browser is wider than this. */
-  /* The reply box's attach button, an icon like the box's others. */
-  :root:root:root .compose-attach {
-    flex: none; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; margin: 0 4px 0 -6px;
+  /* The reply box's paperclip at a finger's size. */
+  :root:root:root .dock-clip {
+    flex: none; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0;
     border: 0; background: none; color: var(--text-dim); box-shadow: none;
   }
   /* The microphone beside it (WebDictation.tsx), the phone app's size. */
@@ -369,6 +415,11 @@
   :root:root:root .toast .toast-undo .toast-key-word { font-size: 13.5px; color: var(--accent); }
   :root:root:root .toast .toast-clock { left: 14px; right: 14px; }
   :root:root:root .app.composing .toast { top: calc(env(safe-area-inset-top, 0px) + var(--phone-top, 56px) + 8px); }
+  /* AND IT NEVER COVERS THE THING IT IS ABOUT (F-122). It was drawn over the
+     title of the thread it had just started, which is the one line it exists
+     to point at. The slim line stays; what is under it moves down while it is. */
+  :root:root:root .app:has(> .toast) .list.th-table { padding-top: 48px; }
+  :root:root:root .app:has(> .toast) .focus { padding-top: 56px; }
 
   /* WHERE A REPLY WENT stands in the reply box's own flow, right above the
      input, rather than over the page under the top bar. Back and Undo are
@@ -412,7 +463,14 @@
   }
   :root:root:root .settings-screen .set-search:focus-within input { width: auto; flex: 1; opacity: 1; font-size: 16px; }
   :root:root:root .settings-screen .set-nav-esc { display: none; }
-  :root:root:root .settings-screen .set-nav-scroll { display: flex; flex-direction: row; align-items: center; gap: 4px; flex: none; overflow-x: auto; overflow-y: hidden; padding: 0 12px 8px; scrollbar-width: none; }
+  /* THE STRIP SAYS THERE IS MORE OF IT (F-122): clipped mid-word at both edges
+     with nothing to say it scrolled, the pages past the clip were not looked
+     for. The words fade into each edge rather than being cut off at it. */
+  :root:root:root .settings-screen .set-nav-scroll {
+    display: flex; flex-direction: row; align-items: center; gap: 4px; flex: none; overflow-x: auto; overflow-y: hidden; padding: 0 12px 8px; scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%);
+  }
   :root:root:root .settings-screen .set-nav-scroll::-webkit-scrollbar { display: none; }
   :root:root:root .settings-screen .set-nav-group, :root:root:root .settings-screen .set-nav-sub { display: none; }
   :root:root:root .settings-screen .set-nav-ico { display: none; }
@@ -485,6 +543,7 @@
   :root:root:root .tc-card > .tc-bar > .tc-anchor:nth-child(2)::before { content: 'Priority'; }
   :root:root:root .tc-card .tc-chip { border: 0; background: none; box-shadow: none; padding: 0; height: auto; font-size: 15px; color: var(--text); }
   :root:root:root .tc-card > .tc-text { order: 2; flex: 1; min-height: 0; height: auto; max-height: none; padding: 16px; font-size: 16px; resize: none; }
+  :root:root:root .tc-card > .tc-connection-status { order: 2; padding: 12px 16px 0; }
   /* Attaching is one row of words at the foot, not a paperclip to decode. Its
      52px is its own, with the home bar's room added under it: with the
      iPhone's 34px inset counted inside the 52 its words had 18px, hard under
@@ -503,7 +562,7 @@
   :root:root:root .tc-card > .tc-bar > .dictate-row {
     order: 3; flex: none; height: calc(52px + var(--phone-foot)); padding: 0 12px var(--phone-foot) 16px; border-top: 1px solid var(--line);
   }
-  /* Send is the orange box, square, 16px in from the edge and centred on the
+  /* Send is the grey box, square, 16px in from the edge and centred on the
      top bar: at 12px from the edge it sat "touching the top corner of the
      app" (2026-10-11). */
   :root:root:root .tc-card .tc-send {
@@ -571,7 +630,7 @@
   /* AN AGENT ASKING PERMISSION is a card across the screen above the inboxes,
      with Allow and Deny big enough for a thumb. The desktop pins it to a
      corner at its desktop width, which on a phone hung it off the left edge
-     and over the inboxes; its ⌘Y / ⌘N are keys no phone has. */
+     and over the inboxes; its ⌘1 / ⌘2 are keys no phone has. */
   :root:root:root .approvals {
     left: 8px; right: 8px; bottom: calc(var(--phone-tabs, 0px) + 8px + var(--phone-foot)); top: auto;
     width: auto; max-width: none; transform: none; z-index: 90;
@@ -579,7 +638,12 @@
   :root:root:root .approvals .approval-stack, :root:root:root .approvals .approval-card { width: auto; max-width: none; }
   :root:root:root .approvals .approval-actions { display: flex; gap: 8px; }
   :root:root:root .approvals .approval-actions button { flex: 1; height: 44px; font-size: 16px; }
-  :root:root:root .approvals .approval-hint { display: none; }
+  :root:root:root .approvals .approval-key { display: none; }
+  :root:root:root .approval-minimize {
+    min-height: 44px; padding: 0 8px; border: 0; flex: none;
+    border-radius: 0; background: none; color: var(--text-dim); font: inherit;
+  }
+  :root:root:root .topbar .approval-review { min-height: 44px; padding: 0 6px; font: inherit; font-size: 13px; white-space: nowrap; color: var(--text-dim); }
   /* Its corner is under the card, so the pen joins the top bar's icons and
      a new thread can still be started before the card is answered. */
   :root:root:root:has(.approvals) .topbar .th-new {
@@ -594,6 +658,20 @@
   :root:root:root .pv-stage { inset: calc(72px + env(safe-area-inset-top, 0px)) 8px calc(96px + env(safe-area-inset-bottom, 0px)); }
   :root:root:root .pv-step { width: 44px; }
   :root:root:root .pv-top { left: 8px; right: 8px; }
+  :root:root:root .pv-icon { width: 44px; height: 44px; }
+  /* SIDEWAYS, THE PICTURE HAS THE WHOLE SCREEN and the controls float over
+     it; a tap puts them away. Keeping the bars' room above and below left a
+     402pt-tall screen a 234pt picture, smaller than it was upright. */
+  @media (orientation: landscape) and (max-height: 520px) {
+    :root:root:root .pv-stage { inset: 0 env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px); }
+    :root:root:root .pv-top { top: 8px; left: calc(8px + env(safe-area-inset-left, 0px)); right: calc(8px + env(safe-area-inset-right, 0px)); }
+    :root:root:root .pv-strip { bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
+    :root:root:root .pv-step { top: 64px; bottom: 80px; }
+    :root:root:root .pv-prev { left: env(safe-area-inset-left, 0px); }
+    :root:root:root .pv-next { right: env(safe-area-inset-right, 0px); }
+    /* Over the picture now, so the name must not read through into its words. */
+    :root:root:root .pv-title, :root:root:root .pv-tools, :root:root:root .pv-strip { background: color-mix(in srgb, var(--read-ground) 90%, transparent); }
+  }
 
   /* A PROPOSAL'S TITLE GETS ITS OWN LINE, its answers under it: beside them
      it was cut to "Add a re…". */
@@ -619,6 +697,20 @@
   :root:root:root #phone-alerts-ask button.quiet { background: none; color: var(--text-dim); }
   /* Both sit at the foot; the agent's question comes first and the offer waits. */
   :root:root:root body:has(.approvals) #phone-alerts-ask { display: none; }
+
+  /* EVERYTHING ELSE ON A PHONE ("The everything else page is misaligned",
+     2026-10-29). It had no phone rules, so its pieces kept the desktop's
+     32px left margin while the tabs over them start at 16px and the board
+     under them at 12px: three left edges on one screen. And the bar over an
+     AI teammate's board ran 157px off the right of a 393px screen, its
+     Message button out of reach. Every piece now sits on the phone's 16px. */
+  :root:root:root .list-pane:has(.ev-head) { --text-x: 16px; --row-r: 16px; }
+  :root:root:root .ev-board .th-board { padding: 0 16px; scroll-padding: 0 16px; }
+  :root:root:root .ev-bar { gap: 10px; }
+  :root:root:root .ev-bn { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  /* No room for a teammate's job beside its name; the name stays. */
+  :root:root:root .ev-bn em { display: none; }
+  :root:root:root .ev-right + .ev-msg { margin-left: 4px; }
 }
 
 /* A picture's placeholder while it loads is in styles.css: every window has it. */
@@ -626,3 +718,33 @@
 /* Only a phone-sized screen has the strip Safari takes its top colour from. */
 :root[data-door="phone"] .phone-edge-top { display: none; }
 
+
+/* ⌘K ON A PHONE (w-33611c2122): the screen above the keyboard, the field at
+   the top with Cancel beside it, threads before commands, no keys. */
+:root:root:root[data-door="phone"] .palette-on-phone {
+  position: fixed; top: var(--vvtop, 0px); left: 0; right: 0; bottom: var(--kb, 0px); z-index: 70;
+  display: block; padding: 0; background: var(--bg); backdrop-filter: none;
+}
+:root:root:root[data-door="phone"] .palette-phone {
+  width: 100%; max-width: none; height: 100%; margin: 0; border: 0; border-radius: 0; box-shadow: none;
+  background: var(--bg); backdrop-filter: none; display: flex; flex-direction: column;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px);
+}
+:root:root:root[data-door="phone"] .palette-phone .palette-query { height: 56px; padding: 0 6px 0 16px; gap: 10px; }
+:root:root:root[data-door="phone"] .palette-phone .palette-input { font-size: 17px; }
+:root:root:root[data-door="phone"] .palette-phone .palette-input::placeholder { color: var(--text-faint); }
+:root:root:root[data-door="phone"] .palette-phone .palette-cancel {
+  flex: none; height: 44px; padding: 0 10px; border: 0; background: none; font: inherit; font-size: 16px; color: var(--text-dim); cursor: pointer;
+}
+:root:root:root[data-door="phone"] .palette-phone .palette-list { flex: 1; max-height: none; overflow-y: auto; padding: 4px 0 calc(16px + var(--phone-foot, 8px)); }
+:root:root:root[data-door="phone"] .palette-phone .palette-section { padding: 18px 16px 8px; }
+:root:root:root[data-door="phone"] .palette-phone .palette-section:first-child { padding-top: 12px; }
+:root:root:root[data-door="phone"] .palette-phone .palette-item { height: auto; min-height: 52px; padding: 8px 16px; gap: 14px; font-size: 16px; color: var(--text); }
+:root:root:root[data-door="phone"] .palette-phone .palette-item.selected { background: none; box-shadow: none; }
+:root:root:root[data-door="phone"] .palette-phone .palette-item:active { background: var(--wash); }
+:root:root:root[data-door="phone"] .palette-phone .palette-item.selected .palette-glyph { color: var(--agent-ink); }
+:root:root:root[data-door="phone"] .palette-phone .palette-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+:root:root:root[data-door="phone"] .palette-phone .palette-sub { font: 400 11px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); }
+:root:root:root[data-door="phone"] .palette-phone .palette-empty { padding: 16px; font-size: 16px; }
+/* A command's name wraps rather than being cut: every word of it has to be readable. */
+:root:root:root[data-door="phone"] .palette-phone .palette-item:not(.palette-thread) .palette-label { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: break-word; line-height: 1.3; }

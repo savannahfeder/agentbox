@@ -4,7 +4,7 @@
 //
 // Two faults wore that one sentence. A parse bug had dropped the time beside
 // the number, so a control built to say two things was saying one (see
-// shared/claude-usage.mjs).
+// shared/claude-usage.mts).
 //
 // SIX SHAPES WERE DRAWN AT REAL SIZE for her to pick from
 // (designs//usage-options.html) and this is the one she picked:
@@ -17,12 +17,10 @@
 // too, and the panel's numbers say "used" beside it rather than disagreeing
 // with the thing they sit under.
 //
-// AND THE DETAIL IS ONE MOVEMENT AWAY, not one screen away. Hover or click and
-// all three limits open underneath, named the way she named them. Both gestures,
-// because she asked for both: the hover is for the glance, the click is for
-// reading it without having to hold the mouse still.
-//
-// IT NO LONGER OPENS SETTINGS.
+// AND THE DETAIL IS ONE MOVEMENT AWAY, not one screen away. Hover and all
+// three limits open over it, named the way she named them. In the window's
+// corner a click pins them open; in the sidebar a click opens that agent's
+// page in Settings (w-07891cd502).
 //
 // NOTHING IS DRAWN UNTIL THERE IS SOMETHING TRUE TO DRAW. No dashes, no
 // skeleton, no "checking…". Reading the figure costs seconds and a launch is
@@ -31,10 +29,10 @@
 // about status lines.
 
 import { useEffect, useId, useRef, useState } from 'react';
-import { headlineLimit, limitRows, limitsStillRunning, usageSentence } from '../../../shared/usage.mjs';
+import { headlineLimit, limitRows, limitsStillRunning, limitsToShow, usageSentence } from '../../../shared/usage.mts';
 import { agoQuiet } from '../format';
 import type { Usage } from '../types';
-import { engineLabel } from '../../../shared/engines.mjs';
+import { engineLabel } from '../../../shared/engines.mts';
 
 // It is the one threshold and it is deliberately high: a corner that shouts at
 // half is a corner that is shouting all day. Stated as what is SPENT, like
@@ -71,9 +69,12 @@ export function UsagePill({ all, recent = null, ...props }: Parameters<typeof Us
   return <UsageOne {...props} usage={last} engineWord={engineLabel(last.engine)} agents={agents} />;
 }
 
-function UsageOne({ usage, now, engineWord = null, onOpen, sidebar = false, agents = [] }: {
+function UsageOne({ usage, now, engineWord = null, onOpen, sidebar = false, folded = false, agents = [] }: {
   usage: Usage | null;
   sidebar?: boolean;
+  /** The sidebar is folded to its icons. The panel hangs at the sidebar's
+   *  width, so it is not drawn there (w-07891cd502). */
+  folded?: boolean;
   /** In the sidebar, every agent in use, the one used last first. */
   agents?: { word: string; usage: Usage }[];
   /**
@@ -85,20 +86,18 @@ function UsageOne({ usage, now, engineWord = null, onOpen, sidebar = false, agen
    * agent.
    *
    *  IT IS HANDED OVER, NEVER DERIVED. Which agent the corner is about needs the
-   *  capability gate and the staleness rule, both pinned to main/supervisor.mjs;
+   *  capability gate and the staleness rule, both pinned to main/supervisor.mts;
    *  a corner that worked it out here could name Codex over a Claude Code
    *  reading. App.tsx asks `engineWordFor`, which is the byline's one rule for
    *  this and returns null wherever there is only one agent to name -- so on
    *  that Mac nothing here draws anything new. */
   engineWord?: string | null;
-  /**
-   * Called when the panel opens. Kept so a caller that used to hand this a
-   *  destination still compiles; nothing in the app passes one any more, because
-   *  her answer was that this does not belong in Settings. */
-  onOpen?: () => void;
+  /** In the sidebar, a press opens this agent's Settings page instead of pinning the panel. */
+  onOpen?: (engine: string) => void;
 }) {
-  // Only the windows this reading can still answer for (`limitsStillRunning`).
-  const limits = limitsStillRunning(usage?.limits, now);
+  // The windows this reading can still answer for, and a five hour one that
+  // reset since, without a figure (`limitsToShow`).
+  const limits = limitsToShow(usage?.limits, now);
   // OPEN BECAUSE SHE CLICKED, which outlives the pointer leaving. Hover is held
   // separately, so moving away closes a hovered panel and leaves a clicked one
   // exactly where it is.
@@ -109,9 +108,16 @@ function UsageOne({ usage, now, engineWord = null, onOpen, sidebar = false, agen
   const bar = useRef<HTMLButtonElement>(null);
   const panelId = useId();
 
-  const open = pinned || hovering;
+  const open = !folded && (pinned || hovering);
 
   useEffect(() => () => { if (linger.current) clearTimeout(linger.current); }, []);
+
+  useEffect(() => {
+    if (!folded) return;
+    if (linger.current) { clearTimeout(linger.current); linger.current = null; }
+    setHovering(false);
+    setPinned(false);
+  }, [folded]);
 
   // ESCAPE CLOSES IT, and a press anywhere else does too: the same two ways out
   // that everything else opening over this app has.
@@ -133,13 +139,19 @@ function UsageOne({ usage, now, engineWord = null, onOpen, sidebar = false, agen
     // that as a press inside left the row unreachable (w-7b7182ef61). The bar is
     // left out because its own click already toggles.
     const onDown = (e: MouseEvent) => {
-      if (!bar.current?.contains(e.target as Node)) setPinned(false);
+      if (!bar.current?.contains(e.target as Node)) { setPinned(false); setHovering(false); }
     };
+    // Any key moves on from it, or it stays standing over the next screen.
+    const onAnyKey = (e: KeyboardEvent) => { if (!['Shift', 'Meta', 'Control', 'Alt'].includes(e.key)) { setPinned(false); setHovering(false); } };
     window.addEventListener('keydown', onKey, true);
+    window.addEventListener('keydown', onAnyKey);
     window.addEventListener('mousedown', onDown);
+    window.addEventListener('click', onDown);
     return () => {
       window.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('keydown', onAnyKey);
       window.removeEventListener('mousedown', onDown);
+      window.removeEventListener('click', onDown);
     };
   }, [pinned]);
 
@@ -152,30 +164,43 @@ function UsageOne({ usage, now, engineWord = null, onOpen, sidebar = false, agen
   const session = headlineLimit(limits);
   if (!session) return null;
 
-  const used = Math.max(0, Math.min(100, session.percent));
+  // A session that reset since the reading has no figure, and the sidebar
+  // shows none rather than the week's.
+  const used = session.reset ? null : Math.max(0, Math.min(100, session.percent));
   const rows = limitRows(limits, now);
   const joint = agents.length > 1;
   const sentence = joint
     ? agents.map((a) => usageSentence(a.usage.limits, now, a.word)).join(' ')
     : usageSentence(limits, now, engineWord) ?? '';
 
-  // In the sidebar it opens after a beat, so a pointer crossing the foot does not flash it.
+  // In the sidebar it opens after a beat, so a pointer crossing the foot does
+  // not flash it. A pointer that lands on the folded rail waits for its first
+  // move once the rail is open, so the panel never opens into a rail that is
+  // still widening.
   const enter = () => {
     if (linger.current) { clearTimeout(linger.current); linger.current = null; }
-    if (sidebar) linger.current = setTimeout(() => setHovering(true), 120);
-    else setHovering(true);
+    if (!sidebar) { setHovering(true); return; }
+    if (folded) return;
+    linger.current = setTimeout(() => { linger.current = null; setHovering(true); }, 120);
   };
+  const move = () => { if (sidebar && !folded && !hovering && !linger.current) enter(); };
   const leave = () => {
     if (linger.current) clearTimeout(linger.current);
-    linger.current = setTimeout(() => setHovering(false), LINGER_MS);
+    linger.current = setTimeout(() => { linger.current = null; setHovering(false); }, LINGER_MS);
+  };
+  const press = () => {
+    if (!sidebar || !onOpen || !usage) { setPinned(!pinned); return; }
+    if (linger.current) { clearTimeout(linger.current); linger.current = null; }
+    setHovering(false);
+    onOpen(usage.engine);
   };
 
   return (
-    <div className="usage-box" ref={box} onMouseEnter={enter} onMouseLeave={leave}>
+    <div className="usage-box" ref={box} onMouseEnter={enter} onMouseMove={move} onMouseLeave={leave}>
       <button
         type="button"
         ref={bar}
-        className={`usage-pill ${used >= CLOSE ? 'is-close' : ''}`}
+        className={`usage-pill ${used != null && used >= CLOSE ? 'is-close' : ''}`}
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         // THE WHOLE TRUTH GOES TO WHATEVER READS THIS ALOUD. The corner has no
@@ -183,13 +208,13 @@ function UsageOne({ usage, now, engineWord = null, onOpen, sidebar = false, agen
         // expanded. It is the only reading there is for somebody who cannot see
         // a bar.
         aria-label={sentence}
-        onClick={() => { const next = !pinned; setPinned(next); if (next) onOpen?.(); }}
+        onClick={press}
         onFocus={sidebar ? undefined : enter}
         onBlur={sidebar ? undefined : leave}
       >
-        {sidebar && <><GaugeIcon /><span className="usage-row-label">{engineWord ?? 'Usage'}</span><span className="usage-row-num">{used}%</span></>}
+        {sidebar && <><GaugeIcon /><span className="usage-row-label">{engineWord ?? 'Usage'}</span>{used != null && <span className="usage-row-num">{used}%</span>}</>}
         {!sidebar && <span className="usage-meter" aria-hidden="true">
-          <i style={{ width: `${used}%` }} />
+          <i style={{ width: `${used ?? 0}%` }} />
         </span>}
       </button>
       {open && (
@@ -204,11 +229,11 @@ function UsageOne({ usage, now, engineWord = null, onOpen, sidebar = false, agen
             <div className="usage-lim" key={r.key}>
               <div className="usage-lim-top">
                 <span className="usage-lim-name">{r.name}</span>
-                <span className="usage-lim-used">{r.used}% used</span>
+                <span className="usage-lim-used">{r.used == null ? 'Reset' : `${r.used}% used`}</span>
               </div>
-              <span className="usage-meter wide" aria-hidden="true">
+              {r.used != null && <span className="usage-meter wide" aria-hidden="true">
                 <i style={{ width: `${r.used}%` }} />
-              </span>
+              </span>}
               {r.when && <div className="usage-lim-when">{r.when}</div>}
             </div>
           ))}
@@ -219,9 +244,9 @@ function UsageOne({ usage, now, engineWord = null, onOpen, sidebar = false, agen
               <div className="usage-lim" key={r.key}>
                 <div className="usage-lim-top">
                   <span className="usage-lim-name">{r.name}</span>
-                  <span className="usage-lim-used">{r.used}% used</span>
+                  <span className="usage-lim-used">{r.used == null ? 'Reset' : `${r.used}% used`}</span>
                 </div>
-                <span className="usage-meter wide" aria-hidden="true"><i style={{ width: `${r.used}%` }} /></span>
+                {r.used != null && <span className="usage-meter wide" aria-hidden="true"><i style={{ width: `${r.used}%` }} /></span>}
                 {r.when && <div className="usage-lim-when">{r.when}</div>}
               </div>
             ))}

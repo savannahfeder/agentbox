@@ -13,7 +13,7 @@
 // read the same trace for two different purposes — that one keeps the
 // SENTENCES the agent wrote, this one keeps every line it typed.
 import { momentOf, type TraceSession } from './notes';
-import { runStoppedLine } from '../../shared/spawn-trouble.mjs';
+import { runStoppedLine } from '../../shared/spawn-trouble.mts';
 
 export interface TraceLine {
   // "9:12:04", in the time zone she is sitting in.
@@ -26,12 +26,20 @@ export interface TraceLine {
   // What the agent said, what it ran, or the reason it stopped.
   kind: 'say' | 'tool' | 'stopped';
   text: string;
+  // A tool line's call id and what came back from it, when the log kept them.
+  id?: string;
+  output?: string;
+  outputLines?: number;
+  failed?: boolean;
 }
+
+const CALL_ID = /^#id (\S+)$/;
+const OUTPUT_HEAD = /^#out (\S+) (\d+)( error)?$/;
 
 const STAMPED = /^(\d\d):(\d\d):(\d\d) {2}(.*)$/;
 const EXIT = /^# exited \((-?\d+)\)/;
 
-// The trace's clock is UTC and carries no date (supervisor.mjs stamps every
+// The trace's clock is UTC and carries no date (supervisor.mts stamps every
 // line with toISOString.slice(11, 19)), so a local 10pm can be written "05:00:12".
 // The session's own startedAt supplies the missing date; notes.ts owns that
 // arithmetic and this borrows it rather than keeping a second copy.
@@ -70,7 +78,7 @@ function oneLine(text: string): string {
 // one, and a second normaliser is a second answer to "are these the same
 // words".
 // The body of the run's ERROR result, or '' when it ended any other way. The
-// same block shared/dead-run-trace.mjs reads for a cause.
+// same block shared/dead-run-trace.mts reads for a cause.
 const ERROR_RESULT = /^\d{2}:\d{2}:\d{2}\s{2}== RESULT \([^)]*\bERROR\b[^)]*\) ==$/m;
 function errorResultText(raw: string): string {
   const at = ERROR_RESULT.exec(raw);
@@ -100,6 +108,10 @@ export function traceLines(session: TraceSession): TraceLine[] {
   // How many blank lines have gone by since the last line of prose, so a
   // paragraph break survives and a run of them does not become a gap.
   let blanks = 0;
+  // The supervisor writes a stderr chunk with one unstamped `stderr:` in front,
+  // so its later lines carry no prefix. Without this they read as the agent's
+  // last sentence running on.
+  let inStderr = false;
 
   // THE TOOL'S OWN REFUSAL, WHEN THE RUN ENDED ON ONE. The CLI types it into
   // the run as a line of prose and then repeats it as an ERROR result; the
@@ -108,9 +120,39 @@ export function traceLines(session: TraceSession): TraceLine[] {
   const failure = errorResultText(session?.text ?? '');
   const failureLine = failure ? said(failure.split('\n')[0]) : '';
 
+  // The tool line an `#out` block is being read into.
+  let outputOf: TraceLine | null = null;
+  let outputRead: string[] = [];
+
   for (const raw of (session?.text ?? '').split('\n')) {
     const stamped = STAMPED.exec(raw);
     if (!stamped) {
+      if (raw.startsWith('stderr:')) { inStderr = true; continue; }
+      if (inStderr) {
+        if (raw.trim() && !raw.startsWith('#')) continue;
+        inStderr = false;
+        if (!raw.trim()) continue;
+      }
+      if (raw.startsWith('#| ')) {
+        if (outputOf) { outputRead.push(raw.slice(3)); outputOf.output = outputRead.join('\n'); }
+        continue;
+      }
+      const head = OUTPUT_HEAD.exec(raw);
+      if (head) {
+        outputOf = null;
+        outputRead = [];
+        for (let i = lines.length - 1; i >= 0; i -= 1) {
+          if (lines[i].kind === 'tool' && lines[i].id === head[1]) { outputOf = lines[i]; break; }
+        }
+        if (outputOf) Object.assign(outputOf, { output: '', outputLines: Number(head[2]), failed: !!head[3] });
+        continue;
+      }
+      const id = CALL_ID.exec(raw);
+      if (id) {
+        const call = lines[lines.length - 1];
+        if (call?.kind === 'tool' && !call.id) call.id = id[1];
+        continue;
+      }
       if (EXIT.test(raw)) { exited = true; inResult = false; continue; }
       if (raw.startsWith('#')) continue;
       if (inResult || exited) continue;
@@ -127,13 +169,15 @@ export function traceLines(session: TraceSession): TraceLine[] {
     }
 
     blanks = 0;
+    outputOf = null;
     const body = stamped[4];
     const at = momentOf(session.startedAt, Number(stamped[1]), Number(stamped[2]), Number(stamped[3]));
     const time = hers(session.startedAt, Number(stamped[1]), Number(stamped[2]), Number(stamped[3]));
 
+    inStderr = body.startsWith('stderr:');
     if (body.startsWith('== RESULT')) { inResult = true; continue; }
     inResult = false;
-    if (body.startsWith('stderr:')) continue;
+    if (inStderr) continue;
     if (!body.trim()) continue;
 
     const kind = body.startsWith('[') ? 'tool' : 'say';

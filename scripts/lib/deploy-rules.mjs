@@ -25,6 +25,21 @@ export function nextVersion(mainVersion, taken = []) {
 }
 
 /**
+ * What a release page says. The version alone used to be all of it, so nothing
+ * anywhere wrote down which commit became which release, and a build made from
+ * that commit reported the older number main still carried (F-138).
+ */
+export function releaseNotes({ version, commit = '', sourceVersion = '' } = {}) {
+  const head = `Agentbox ${version}`;
+  if (!commit) return head;
+  const lines = [head, '', `Built from https://github.com/savannahfeder/agentbox/commit/${commit}`];
+  if (sourceVersion && sourceVersion !== version) {
+    lines.push('', `That commit's package.json still says ${sourceVersion}. The version is picked when the release runs rather than committed, so a copy built from source calls itself ${sourceVersion}. This release is ${version}.`);
+  }
+  return lines.join('\n');
+}
+
+/**
  * Which file names the AWS account the cloud server runs in. cloud.json first,
  * then cloud.own-aws.json, which is where those details went when this Mac's
  * cloud.json became the managed cloud's address (2026-10-25). None means stop:
@@ -33,6 +48,45 @@ export function nextVersion(mainVersion, taken = []) {
 export function serverConfig(files) {
   const order = Object.keys(files).sort((a, b) => (a.endsWith('/cloud.json') ? -1 : b.endsWith('/cloud.json') ? 1 : 0));
   return order.find((f) => files[f]?.bucket && files[f]?.runtimeArn) ?? null;
+}
+
+/**
+ * Whether package.json differs from the committed one only in what a deploy
+ * writes there for its run, so a deploy that was cut short left it.
+ */
+export function leftFromARelease(committed, current) {
+  const rest = (t) => {
+    try {
+      const { version, bakedPosthogKey, ...others } = JSON.parse(t);
+      return JSON.stringify(others);
+    } catch { return null; }
+  };
+  const [a, b] = [rest(committed), rest(current)];
+  return a !== null && a === b;
+}
+
+/** package.json or package-lock.json text with this version, the lockfile in both its places. */
+export function withVersion(text, version) {
+  const json = JSON.parse(text);
+  if (json.version === version && (!json.packages?.[''] || json.packages[''].version === version)) return text;
+  json.version = version;
+  if (json.packages?.['']) json.packages[''].version = version;
+  return `${JSON.stringify(json, null, 2)}\n`;
+}
+
+/** Whether `after` differs from `before` in the version alone, which no test reads. */
+export function onlyTheVersionMoved(before, after) {
+  const rest = (t) => {
+    try {
+      const json = JSON.parse(t);
+      const version = json.version;
+      delete json.version;
+      if (json.packages?.['']) delete json.packages[''].version;
+      return { version, rest: JSON.stringify(json) };
+    } catch { return null; }
+  };
+  const [a, b] = [rest(before), rest(after)];
+  return !!a && !!b && a.rest === b.rest && a.version !== b.version;
 }
 
 /** One line per place people get Agentbox from, and whether it now has this version. */

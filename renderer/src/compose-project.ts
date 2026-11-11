@@ -30,6 +30,25 @@ export function resolveProject<T extends ProjectLike>(
   return all.find((p) => p.slug === slug) ?? shown[0] ?? all[0] ?? null;
 }
 
+const ABOUT_CODE = /\b(?:code|page|screen|button|bug|fix|build|restyle|repo|branch|merge|component|css|test suite|browser test|onboarding page)\b/i;
+
+/**
+ * The one other project with code, when these words are about code and the card
+ * points at a project with none. Two with code is a guess, so it stays. Agents told
+ * "no page code in repo" from a project holding one README.
+ */
+export function codeProjectFor<T extends ProjectLike & { code?: boolean; team?: { direct?: boolean } | null }>(
+  text: string,
+  all: readonly T[],
+  current: string,
+): T | null {
+  const here = all.find((p) => p.slug === current);
+  if (!here || here.code || !ABOUT_CODE.test(text)) return null;
+  if (text.toLowerCase().includes(here.name.toLowerCase())) return null;
+  const withCode = all.filter((p) => p.code && !p.team?.direct);
+  return withCode.length === 1 ? withCode[0] : null;
+}
+
 // Tab, and shift-Tab, across the chip row.
 //
 // Stepping is the one place a position is legitimate, because "the next chip"
@@ -88,7 +107,7 @@ export function rememberedProject(): string | null {
  *     never run anything, and an agent can end up run in the practice project
  *     by accident.
  *   - The slug is the reserved practice slug and there is no such project at
- *     all. The folder is deleted at the end of the walk now (main/store.mjs), so
+ *     all. The folder is deleted at the end of the walk now (main/store.mts), so
  *     this is the ordinary leftover, and it is worth forgetting rather than
  *     leaving to be adopted later by anything that happens to take that name.
  *

@@ -2,8 +2,7 @@
 // The button and the menu are drawn in threads/Pages.tsx, beside the filters
 // button and built like its menu; what they say lives here.
 import type { UsageLimit } from './types';
-import { accountName } from '../../shared/account-names.mjs';
-import { teammateIdOf } from '../../shared/teammates.mjs';
+import { accountName } from '../../shared/account-names.mts';
 
 export type CloudMode = 'mac' | 'full' | 'all';
 
@@ -14,7 +13,7 @@ export interface CloudMonth {
   costPerAgentHour: number | null;
 }
 
-// A sign-in going on in the cloud (main/cloud/logins.mjs). Claude: its page
+// A sign-in going on in the cloud (main/cloud/logins.mts). Claude: its page
 // opens, she copies the code it shows. Codex: OpenAI's page opens, she types
 // the code shown here, and it finishes by itself.
 export interface CloudSignIn {
@@ -72,6 +71,8 @@ export interface CloudStatus {
   accounts?: CloudAccount[];
   /** Engines whose account on this Mac has no working sign-in in the cloud, so their threads run here. */
   notInCloud?: Array<'claude' | 'codex'>;
+  /** Engines with no sign-in in the cloud at all, so the cloud can run none of their threads. */
+  noCloudSignIn?: Array<'claude' | 'codex'>;
   signIns?: CloudSignIn[];
   /** 'resting' after runs failed in a row before their agent started, until `restingUntil`. */
   health?: 'ok' | 'failing' | 'resting';
@@ -83,6 +84,14 @@ export interface CloudStatus {
   versionGap?: { engine: 'claude' | 'codex'; cloud: string; mac: string; blocks: boolean } | null;
   /** The slugs of the projects whose threads the cloud may run (supervisor `_cloudTakesProject`). */
   projects?: string[];
+  /** The Agentbox Cloud plan the server last said; 'none' is no plan. */
+  plan?: string | null;
+  /** Runs on this Mac the cloud could take now (supervisor `_movableToCloud`). */
+  movable?: string[];
+  /** The keys saved for cloud runs, by name only (main/cloud/keys.mts). */
+  keys?: { name: string; savedAt: number | null; label?: string | null }[];
+  /** The app moved off a Claude account at its limit (supervisor `_moveOffALimitedAccount`). */
+  switched?: { from: string; to: string; until: number } | null;
 }
 
 const agentName = (engine: 'claude' | 'codex') => (engine === 'codex' ? 'Codex' : 'Claude Code');
@@ -102,7 +111,7 @@ export function pageToOpen(s: CloudSignIn | null): { key: string; url: string } 
 // What an account is called: its email, or, when the vendor would not say,
 // "Claude account 2", counted among that engine's accounts. The rule itself is
 // shared, because the sentence a thread gets when a login runs out names one
-// too (shared/account-names.mjs).
+// too (shared/account-names.mts).
 export function accountLabel(a: CloudAccount, all: CloudAccount[]): string {
   const same = all.filter((x) => x.engine === a.engine);
   return accountName({ email: a.name, engine: a.engine, index: same.indexOf(a), total: same.length });
@@ -141,12 +150,25 @@ type OnOff = { mode: CloudMode; whenOn?: Exclude<CloudMode, 'mac'> } | null | un
 
 export const cloudIsOn = (status: OnOff) => !!status && status.mode !== 'mac';
 
+/**
+ * The cloud row's sentence: when threads go there, and on which account.
+ *
+ * ONE ACCOUNT, HOWEVER MANY ARE SIGNED IN THERE (w-dac993a554). This listed
+ * them and ended "in turn", which is what `pickCloudLogin` used to do; it takes
+ * one account now and waits for it, so the sentence names that one.
+ */
+export function cloudRunsLine(mode: CloudMode, inUse: string | null, computer = 'this computer'): string {
+  if (mode === 'mac') return `Every thread runs on ${computer}.`;
+  const when = mode === 'all' ? 'Threads start there first' : `Threads start there when ${computer} is full`;
+  return `${when}, on ${inUse ?? 'your cloud account'}.`;
+}
+
 /** The accounts that count: one added twice counts once. */
 export const countedAccounts = (accounts: CloudAccount[]) => accounts.filter((a) => a.state !== 'duplicate');
 
 /**
  * THE ONE ACCOUNT THE CLOUD RUNS ON, as the app marks it. The rule is
- * `pickCloudLogin`'s (main/cloud/logins.mjs) and it starts from this Mac's own
+ * `pickCloudLogin`'s (main/cloud/logins.mts) and it starts from this Mac's own
  * account, which the screen's copy of the cloud accounts cannot see. One at
  * its usage limit is still the account, and the cloud waits for it.
  */
@@ -159,6 +181,12 @@ export const cloudAccountInUse = (accounts: CloudAccount[], engine: 'claude' | '
  * (2026-10-16: "our cloud must be broken", when it was out of usage).
  */
 const clock = (t: number) => new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(' ', '').toLowerCase();
+
+// A weekly limit lifts days away, so its hour alone would read as today's.
+const dayAndHour = (t: number, now: number) => {
+  const hour = clock(t).replace(':00', '');
+  return new Date(t).toDateString() === new Date(now).toDateString() ? hour : `${new Date(t).toLocaleDateString('en-US', { weekday: 'short' })} ${hour}`;
+};
 
 export function cloudFootLine(cloud: CloudStatus, now = Date.now()): string {
   if (cloud.health === 'resting' && cloud.restingUntil && cloud.restingUntil > now) {
@@ -174,13 +202,29 @@ export function cloudFootLine(cloud: CloudStatus, now = Date.now()): string {
   // EVERY account was at its limit, which was right while runs rotated over
   // all of them and is silence now: the cloud starts nothing the moment the
   // account in use is out, however many others are signed in.
+  const moved = cloud.switched;
+  if (cloudIsOn(cloud) && moved && moved.until > now) {
+    return `${moved.from} is at its limit until ${dayAndHour(moved.until, now)}, so threads run on ${moved.to}.`;
+  }
   const inUse = cloudAccountInUse(cloud.accounts || [], 'claude');
   const until = inUse?.limitedUntil && inUse.limitedUntil > now ? inUse.limitedUntil : null;
   if (cloudIsOn(cloud) && until) {
-    return `Your cloud account is at its usage limit until ${clock(until)}. Threads run on this Mac until then.`;
+    return `The Claude account the cloud runs on is at its usage limit until ${clock(until)}. Threads run on this Mac until then.`;
   }
   if (gap) return rebuildLine(gap);
   return cloud.running ? `${cloud.running} running in the cloud now` : 'Nothing running in the cloud now';
+}
+
+/**
+ * THE MENU'S LINE ABOUT RUNS ON THIS MAC THE CLOUD COULD TAKE. With Everything
+ * they move by themselves and the line says so; when this Mac is full, it
+ * offers to move them. Null with none, or with the cloud off.
+ */
+export function cloudMoveLine({ mode, movable }: { mode: CloudMode; movable: number }): { say: string; go: string | null } | null {
+  if (!movable || mode === 'mac') return null;
+  const threads = `${movable} thread${movable === 1 ? '' : 's'}`;
+  if (mode === 'all') return { say: `Moving ${threads} to the cloud`, go: null };
+  return { say: `${threads} could run in the cloud`, go: movable === 1 ? 'Move it' : 'Move them' };
 }
 
 /** Where C takes it: off from either kind of on, back on to what "on" means. */
@@ -196,11 +240,24 @@ export function cloudToggleNote(mode: CloudMode): string {
   return 'Cloud on: threads that don’t fit here start in the cloud';
 }
 
-/** ⌘K's rows: on or off with its key first, then each meaning of on. */
-export function cloudCommands(status: OnOff): { mode: CloudMode; label: string; keyHint?: string; hint?: string }[] {
+/** Turning the cloud off by ⌘C or ⌘K asks first: both were hit by accident. */
+export const cloudOffAsks = (mode: CloudMode) => mode === 'mac';
+export const CLOUD_OFF_ASK = {
+  head: 'Turn the cloud off?',
+  line: 'New threads and replies will run on this Mac.',
+  keep: 'Keep it on',
+  off: 'Turn off',
+} as const;
+
+/**
+ * ⌘K's rows: on or off with its key first, then each meaning of on. Turning
+ * it off is offered only once the query names the cloud, because "off" alone
+ * put it first under Enter.
+ */
+export function cloudCommands(status: OnOff): { mode: CloudMode; label: string; keyHint?: string; hint?: string; onlyWith?: string }[] {
   const on = cloudIsOn(status);
   return [
-    { mode: cloudToggleTarget(status), label: on ? 'Turn the cloud off' : 'Turn the cloud on', keyHint: CLOUD_KEY },
+    { mode: cloudToggleTarget(status), label: on ? 'Turn the cloud off' : 'Turn the cloud on', keyHint: CLOUD_KEY, ...(on ? { onlyWith: 'cloud' } : {}) },
     ...CLOUD_WHEN_ON.map((c) => ({
       mode: c.id,
       label: `Cloud on: ${c.label[0].toLowerCase()}${c.label.slice(1)}`,
@@ -230,21 +287,33 @@ export function cloudMonthLine(month: CloudMonth): string {
   return `${hours(month.agentHours)} agent-hours`;
 }
 
+/** Set up for the cloud, and not on Agentbox Cloud without a plan. */
+export function onCloudPlan(cloud: CloudStatus | null | undefined): cloud is CloudStatus {
+  if (!cloud?.setUp) return false;
+  return !(cloud.managed && (cloud.plan === 'none' || cloud.noRoom?.error === 'plan'));
+}
+
 /**
  * WHERE ONE THREAD RUNS, for its menu's row (threads/ThreadMenu.tsx): in the
- * cloud now, kept on this Mac, or here and free to go to the cloud. Null where
- * the cloud could never run it: no cloud set up, the cloud off and the thread
- * not kept, or a project the cloud does not take.
+ * cloud now, kept on this Mac, here and free to go to the cloud, or here
+ * because the whole cloud is off. Null where the cloud could never run it: no
+ * cloud set up, or a project or agent the cloud does not take.
  */
 export function threadPlace(
-  item: { id: string; product: string; onMac?: boolean; labels?: string[] },
-  session: { where?: string } | null,
+  item: { id: string; product: string; onMac?: boolean; needsMac?: string; labels?: string[] },
+  session: { where?: string; movable?: boolean } | null,
   cloud: CloudStatus | null,
-): 'cloud' | 'here' | 'kept' | null {
-  if (!cloud?.setUp) return null;
-  if (teammateIdOf(item)) return null;
+  engine: string | null = null,
+): 'cloud' | 'here' | 'kept' | 'move' | 'needs' | 'off' | null {
+  // The phone has no cloud status, only the computer's word on each run.
+  if (session?.movable && session.where !== 'cloud') return 'move';
+  if (!onCloudPlan(cloud)) return null;
+  if (item.needsMac) return 'needs';
   if (item.onMac) return 'kept';
   if (session?.where === 'cloud') return 'cloud';
-  if (!cloudIsOn(cloud)) return null;
-  return cloud.projects?.includes(item.product) ? 'here' : null;
+  if (engine && cloud.noCloudSignIn?.includes(engine as 'claude' | 'codex')) return null;
+  const taken = !!cloud.projects?.includes(item.product);
+  if (!cloudIsOn(cloud)) return taken ? 'off' : null;
+  if (cloud.movable?.includes(item.id)) return 'move';
+  return taken ? 'here' : null;
 }

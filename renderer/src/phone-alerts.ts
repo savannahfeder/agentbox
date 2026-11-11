@@ -1,6 +1,6 @@
 // ALERTS AND THE ICON COUNT, ON A PHONE.
 //
-// The computer sends each alert (main/phone-link.mjs); this is the phone's
+// The computer sends each alert (main/phone-link.mts); this is the phone's
 // half. It registers the worker that shows alerts while the app is closed
 // (main/phone-sw.js), asks to turn them on when somebody taps for it, keeps the
 // icon's count while the app is open, and opens the thread an alert was about.
@@ -30,7 +30,7 @@ let openItem: ((id: string) => void) | null = null;
 
 const IOS = () => /iPhone|iPad/.test(navigator.userAgent);
 // iOS says whether the page was opened from the home screen; only iOS needs to.
-const standalone = () => (navigator as any).standalone === true;
+const standalone = () => (navigator as Navigator & { standalone?: boolean }).standalone === true;
 const pushable = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 
 async function ask(action: string, extra: Record<string, unknown> = {}) {
@@ -58,15 +58,7 @@ const keyOf = (sub: PushSubscription) => {
   return k ? btoa(String.fromCharCode(...new Uint8Array(k))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') : null;
 };
 
-// THROUGH THE RELAY the page is already run by the relay's worker, which
-// carries every request to the Mac and handles alerts too (relay/phone/sw.mjs).
-// Registering /phone-sw.js over it would replace it and cut the phone off.
-const RELAY_WORKER = '/relay-sw.js';
-const worker = async () => {
-  const running = await navigator.serviceWorker.getRegistration('/');
-  if (running?.active?.scriptURL && new URL(running.active.scriptURL).pathname === RELAY_WORKER) return running;
-  return navigator.serviceWorker.register('/phone-sw.js', { scope: '/' });
-};
+const worker = () => navigator.serviceWorker.register('/phone-sw.js', { scope: '/' });
 
 export async function alertsState(): Promise<AlertsState> {
   if (!via) return 'unsupported';
@@ -119,7 +111,7 @@ export const ALERTS_SAY: Record<AlertsState, string> = {
 /** The icon's count, while the app is open. The computer's alerts carry it
  *  while the app is closed. */
 export function setIconCount(n: number) {
-  const nav = navigator as any;
+  const nav = navigator as Navigator & { setAppBadge?: (n: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
   try {
     if (n > 0) void nav.setAppBadge?.(n)?.catch?.(() => {});
     else void nav.clearAppBadge?.()?.catch?.(() => {});

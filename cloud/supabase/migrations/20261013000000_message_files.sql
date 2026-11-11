@@ -3,7 +3,7 @@
 -- A picture pasted into a message is saved on the sender's Mac and the message
 -- links to it. Only the line used to come here, so every picture sent to a
 -- teammate arrived as "missing image". The sender's Mac now puts the file here
--- before the line, and the reader's Mac takes it down (main/team/sync.mjs).
+-- before the line, and the reader's Mac takes it down (main/team/sync.mts).
 --
 -- The same doors as a line: whoever may see the project reads and adds, as
 -- themselves. A name is stored once and never changed or deleted, so nobody

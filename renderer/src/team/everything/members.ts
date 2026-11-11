@@ -1,10 +1,11 @@
 // Everything else's cards: you, the team chat, the people on your team, your AI
 // teammates and your other chats, in the order you dragged them into.
+import { voiceName } from '../../../../shared/agent-voice.mts';
 
 export type MemberKind = 'me' | 'person' | 'mate' | 'chat';
 
 export interface Member {
-  /** `me`, `person:<id>`, `mate:<id>`, or a chat's own key (`room:<id>`, `direct:<id>`). */
+  /** `me`, `person:<id>`, `mate:<id>`, `theirmate:<owner>:<id>`, or a chat's own key (`room:<id>`, `direct:<id>`). */
   key: string;
   kind: MemberKind;
   name: string;
@@ -14,9 +15,18 @@ export interface Member {
   /** An AI teammate's letter. */
   letter?: string;
   role?: string | null;
-  level?: number | null;
   /** Agents running now; null when they keep it to themselves. */
   agents: number | null;
+  /** A person's: what they have on, agents and waiting threads and tasks they hold. */
+  inProgress?: number;
+  /** Tasks they hold that nothing shows is under way. */
+  toDo?: number;
+  /** An AI teammate whose run is up and has no agent yet. */
+  starting?: boolean;
+  /** Someone else's AI teammate at work, which its owner's card says. */
+  running?: boolean;
+  /** Your AI teammate, paused, with no run still going. */
+  paused?: boolean;
   /** What they are on, or the line that says why nothing is running. */
   now: string | null;
   /** A chat's people, its newest line, and whether it holds something you have not read. */
@@ -25,14 +35,16 @@ export interface Member {
   unread?: boolean;
   /** The team's own chat. */
   team?: boolean;
+  /** A group anyone on the app can join. */
+  open?: boolean;
   /** When a chat last moved, for the order of chats nobody dragged. */
   at?: number;
 }
 
 type PersonIn = { id: string; name: string; avatarUrl: string | null };
-type CardIn = { id: string; name: string; me: boolean; avatarUrl: string | null; agents: number | null; level: number | null; workingOn: string | null; workingPrivate: boolean; status: string | null; away?: boolean };
-type MateIn = { id: string; name: string; letter: string; role: string | null; now: string | null; status: string; paused: boolean };
-type ChatIn = { key: string; name: string; faces: { name: string; url: string | null }[]; last: string; at: number; unread: boolean };
+type CardIn = { id: string; name: string; me: boolean; avatarUrl: string | null; agents: number | null; workingOn: string | null; workingPrivate: boolean; status: string | null; away?: boolean };
+type MateIn = { id: string; name: string; letter: string; role: string | null; now: string | null; status: string; paused: boolean; running?: { id: string } | null; waiting?: readonly unknown[] };
+type ChatIn = { key: string; name: string; faces: { name: string; url: string | null }[]; last: string; at: number; unread: boolean; open?: boolean };
 type ThreadIn = { personId: string; state: string; title: string | null; updatedAt: number };
 
 const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
@@ -42,14 +54,18 @@ function quietLine(c: CardIn): string | null {
   return c.status ?? (c.away ? 'Not on Rooms yet' : c.workingOn);
 }
 
-export function buildMembers({ me, people = [], wall = null, cards = [], teammates = [], mateAgents = new Map(), chats = [], personChats = new Map(), teamRoomId = null, myAgents = 0, myNow = null }: {
+export function buildMembers({ me, people = [], wall = null, cards = [], tasksHeld = new Map(), teammates = [], theirMates = [], mateAgents = new Map(), chats = [], personChats = new Map(), teamRoomId = null, myAgents = 0, myNow = null }: {
+  /** Other people's AI teammates. Anyone may see what they do; their owner directs them. */
+  theirMates?: readonly { id: string; owner: string; name: string; now: string | null; running?: boolean }[];
   me: PersonIn | null;
   /** The people on your team, you among them. */
   people?: readonly PersonIn[];
-  /** The team room's cards, when Rooms is on: level, agents running and what each is on. */
+  /** The team room's cards, when Rooms is on: agents running and what each is on. */
   wall?: readonly CardIn[] | null;
   /** Teammates' shared threads, which say who is running something when there is no wall. */
-  cards?: readonly ThreadIn[];
+  cards?: readonly (ThreadIn & { threadId?: string })[];
+  /** Tasks this Mac knows each person holds, by id; their own card may not have arrived. */
+  tasksHeld?: ReadonlyMap<string, readonly string[]>;
   teammates?: readonly MateIn[];
   /** Agents running now for each AI teammate. */
   mateAgents?: ReadonlyMap<string, number>;
@@ -61,49 +77,69 @@ export function buildMembers({ me, people = [], wall = null, cards = [], teammat
   /** This Mac's own count and newest thread, when there is no wall to say. */
   myAgents?: number; myNow?: string | null;
 }): Member[] {
+  const under = (id: string) => new Set(cards.filter((t) => t.personId === id && (t.state === 'running' || t.state === 'waiting')).map((t) => t.threadId ?? `${t.title}/${t.updatedAt}`));
+  const onThem = (id: string | undefined, agents: number | null) => (id ? Math.max(agents ?? 0, under(id).size) : agents ?? 0);
+  const toDo = (id: string | undefined) => {
+    if (!id) return 0;
+    const going = under(id);
+    return new Set((tasksHeld.get(id) ?? []).filter((t) => !going.has(t))).size;
+  };
   const cardOf = new Map((wall ?? []).map((c) => [c.id, c]));
   const meCard = (wall ?? []).find((c) => c.me) ?? (me ? cardOf.get(me.id) : undefined);
   const out: Member[] = [{
-    key: 'me', kind: 'me', name: 'You', faceName: me?.name, avatarUrl: me?.avatarUrl ?? meCard?.avatarUrl ?? null, level: meCard?.level ?? null,
+    key: 'me', kind: 'me', name: 'You', faceName: me?.name, avatarUrl: me?.avatarUrl ?? meCard?.avatarUrl ?? null,
     agents: meCard ? meCard.agents : myAgents, now: meCard ? quietLine(meCard) ?? myNow : myNow,
+    inProgress: onThem(me?.id, meCard ? meCard.agents : myAgents), toDo: toDo(me?.id),
   }];
   const team = teamRoomId ? chats.find((c) => c.key === `room:${teamRoomId}`) : undefined;
-  const humans = people.filter((p) => p.id !== me?.id).slice().sort(byName);
-  // A named room has no faces of its own; the team's chat wears the team's.
-  const teamFaces = team?.faces.length ? team.faces : humans.map((p) => ({ name: p.name, url: p.avatarUrl ?? cardOf.get(p.id)?.avatarUrl ?? null }));
-  if (team) out.push({ key: team.key, kind: 'chat', team: true, name: 'Team chat', faces: teamFaces, last: team.last, unread: team.unread, agents: null, now: null, at: team.at });
+  const humans = [...new Map(people.filter((p) => p.id !== me?.id).map((p) => [p.id, p])).values()].sort(byName);
+  // Its people's faces would draw each of them twice beside their own cards, so it wears the mark.
+  const teamFaces = team?.faces ?? [];
+  // "Team", not "Team chat": its card opens everybody's work, and the chat is a tab under it.
+  if (team) out.push({ key: team.key, kind: 'chat', team: true, name: 'Team', faces: teamFaces, last: team.last, unread: team.unread, agents: null, now: null, at: team.at });
   for (const p of humans) {
     const c = cardOf.get(p.id);
     const running = cards.filter((t) => t.personId === p.id && t.state === 'running').sort((a, b) => b.updatedAt - a.updatedAt);
     out.push(c
-      ? { key: `person:${p.id}`, kind: 'person', name: p.name, avatarUrl: p.avatarUrl ?? c.avatarUrl, level: c.level, agents: c.agents, now: quietLine(c) }
-      : { key: `person:${p.id}`, kind: 'person', name: p.name, avatarUrl: p.avatarUrl, level: null, agents: running.length, now: running[0]?.title ?? null });
+      ? { key: `person:${p.id}`, kind: 'person', name: p.name, avatarUrl: p.avatarUrl ?? c.avatarUrl, agents: c.agents, now: quietLine(c), inProgress: onThem(p.id, c.agents), toDo: toDo(p.id) }
+      : { key: `person:${p.id}`, kind: 'person', name: p.name, avatarUrl: p.avatarUrl, agents: running.length, now: running[0]?.title ?? null, inProgress: onThem(p.id, running.length), toDo: toDo(p.id) });
   }
   for (const t of teammates) {
-    out.push({ key: `mate:${t.id}`, kind: 'mate', name: t.name, letter: t.letter || t.name.slice(0, 1), role: t.role, agents: mateAgents.get(t.id) ?? 0,
-      now: t.paused ? 'Paused' : t.status === 'draft' ? 'Setting up' : t.now });
+    const agents = mateAgents.get(t.id) ?? 0;
+    // A run under way outranks Paused, which stops nothing already going.
+    const paused = t.paused && !t.running;
+    const now = t.status === 'draft' && !t.waiting?.length ? 'Setting up' : paused ? 'Paused' : t.now;
+    out.push({ key: `mate:${t.id}`, kind: 'mate', name: t.name, letter: t.letter || t.name.slice(0, 1), role: t.role, agents, starting: !!t.running && !agents, now, ...(paused ? { paused: true } : {}) });
+  }
+  for (const t of theirMates) {
+    const owner = people.find((p) => p.id === t.owner)?.name ?? '';
+    out.push({ key: `theirmate:${t.owner}:${t.id}`, kind: 'mate', name: voiceName(t, owner), letter: t.name.slice(0, 1), role: null, agents: null, now: t.now, running: !!t.running });
   }
   const teamCard = out.find((m) => m.team);
-  if (teamCard) teamCard.agents = out.reduce((n, m) => n + (m.kind === 'person' || m.kind === 'mate' ? m.agents ?? 0 : 0), 0);
+  // Yours too: the Team's board is everybody's work.
+  if (teamCard) teamCard.agents = out.reduce((n, m) => n + (m.kind === 'chat' ? 0 : m.agents ?? 0), 0);
   // A chat with one person is that person's card; a chat with several, or a group, is a chat of its own.
   const theirs = new Set(personChats.values());
   const others = chats.filter((c) => c !== team && !theirs.has(c.key) && !(c.key.startsWith('direct:') && c.faces.length <= 1)).slice().sort((a, b) => b.at - a.at);
-  for (const c of others) out.push({ key: c.key, kind: 'chat', team: false, name: c.name, faces: c.faces, last: c.last, unread: c.unread, agents: null, now: null, at: c.at });
+  for (const c of others) out.push({ key: c.key, kind: 'chat', team: false, open: !!c.open, name: c.name, faces: c.faces, last: c.last, unread: c.unread, agents: null, now: null, at: c.at });
   return out;
 }
 
 const OPEN_FIRST: Record<string, number> = { running: 0, claimed: 0, waiting: 1, open: 1, blocked: 1, scheduled: 2, done: 3 };
 
-/** An AI teammate's threads for its Agents tab: everything not finished, then what it finished today. */
+/** An AI teammate's threads for its Agents tab: everything not finished, then what it finished today.
+ *  One that has waited on its owner since before today is the owner's, not the team's news. */
 export function mateRunsOf<T extends { id: string; labels?: string[]; status: string; updatedAt?: number }>(items: readonly T[], mateId: string, dayStart: number): T[] {
   const label = `teammate:${mateId}`;
-  return items.filter((i) => i.labels?.includes(label) && (i.status !== 'done' || (i.updatedAt ?? 0) >= dayStart))
+  return items.filter((i) => i.labels?.includes(label) && (!['done', 'blocked'].includes(i.status) || (i.updatedAt ?? 0) >= dayStart))
     .sort((a, b) => (OPEN_FIRST[a.status] ?? 1) - (OPEN_FIRST[b.status] ?? 1) || (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
 }
 
-/** A person's shared threads for their Agents tab: running, waiting, later, then what they finished today. */
-export function personCardsOf<T extends ThreadIn & { visible: boolean }>(cards: readonly T[], personId: string, dayStart: number): T[] {
-  return cards.filter((c) => c.personId === personId && c.visible && (c.state !== 'done' || c.updatedAt >= dayStart))
+/** A person's shared threads for their Agents tab: running, waiting, later, then what they finished today.
+ *  A thread that has waited on its owner since before today is left out; a task never is. */
+export function personCardsOf<T extends ThreadIn & { visible: boolean; task?: unknown }>(cards: readonly T[], personId: string, dayStart: number): T[] {
+  const old = (c: T) => c.updatedAt < dayStart && (c.state === 'done' || (c.state === 'waiting' && !c.task));
+  return cards.filter((c) => c.personId === personId && c.visible && !old(c))
     .sort((a, b) => (OPEN_FIRST[a.state] ?? 1) - (OPEN_FIRST[b.state] ?? 1) || b.updatedAt - a.updatedAt);
 }
 
@@ -157,4 +193,82 @@ export function readOrder(store: Store = local()): string[] | null {
 
 export function writeOrder(keys: readonly string[], store: Store = local()) {
   try { store?.setItem(ORDER_KEY, JSON.stringify(keys)); } catch { /* kept for this window only */ }
+}
+
+/** Cards you put away, each with when its chat last moved at the time, so a chat comes back once it moves again. */
+export type Hidden = Record<string, number>;
+const HIDEABLE = new Set<MemberKind>(['chat', 'person']);
+
+export function hideMember(hidden: Hidden, m: Member): Hidden {
+  return HIDEABLE.has(m.kind) ? { ...hidden, [m.key]: m.at ?? 0 } : hidden;
+}
+
+export function unhideMember(hidden: Hidden, key: string): Hidden {
+  const rest = { ...hidden };
+  delete rest[key];
+  return rest;
+}
+
+export function splitHidden<T extends Member>(members: readonly T[], hidden: Hidden): { shown: T[]; hidden: T[] } {
+  const shown: T[] = [];
+  const away: T[] = [];
+  for (const m of members) {
+    const at = hidden[m.key];
+    const still = at !== undefined && HIDEABLE.has(m.kind) && !(m.kind === 'chat' && (m.at ?? 0) > at);
+    (still ? away : shown).push(m);
+  }
+  return { shown, hidden: away };
+}
+
+const HIDDEN_KEY = 'agentbox.everything.hidden';
+
+export function readHidden(store: Store = local()): Hidden {
+  try {
+    const v = JSON.parse(store?.getItem(HIDDEN_KEY) ?? 'null');
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return {};
+    return Object.fromEntries(Object.entries(v).filter(([, at]) => typeof at === 'number')) as Hidden;
+  } catch { return {}; }
+}
+
+export function writeHidden(hidden: Hidden, store: Store = local()) {
+  try { store?.setItem(HIDDEN_KEY, JSON.stringify(hidden)); } catch { /* kept for this window only */ }
+}
+
+/** How many rows of cards show: a count the grip left, every row, or null for the usual one. */
+export type CardRows = number | 'all' | null;
+const USUAL_ROWS = 1;
+
+export function rowsShown(choice: CardRows, total: number): number {
+  return choice === 'all' ? total : Math.min(choice ?? USUAL_ROWS, total);
+}
+
+/** The nearest whole row to a drag, given where each row ends, so no row is cut through. */
+export function rowsAfterDrag(want: number, ends: readonly number[]): CardRows {
+  const stops = [0, ...ends];
+  const near = stops.reduce((best, h, i) => (Math.abs(h - want) < Math.abs(stops[best] - want) ? i : best), 0);
+  return near >= ends.length ? 'all' : near;
+}
+
+/** The line under the cards, given the rows shown, the rows there are, and the members in the rows not shown. */
+export function moreLine(shown: number, total: number, more: number): { words: string; next: CardRows } | null {
+  if (shown === 0 && total > 0) return { words: 'Show the cards', next: null };
+  if (shown < total) return { words: more ? `Show ${more} more` : 'Show all', next: 'all' };
+  return total > USUAL_ROWS ? { words: 'Show fewer', next: null } : null;
+}
+
+const ROWS_KEY = 'agentbox.everything.cardRows';
+
+export function readCardRows(store: Pick<Storage, 'getItem'> | null = local()): CardRows {
+  try {
+    const raw = store?.getItem(ROWS_KEY);
+    if (raw === 'all') return 'all';
+    return raw && /^\d+$/.test(raw) ? Number(raw) : null;
+  } catch { return null; }
+}
+
+export function writeCardRows(rows: CardRows, store: (Store & Partial<Pick<Storage, 'removeItem'>>) | null = local()) {
+  try {
+    if (rows === null) store?.removeItem?.(ROWS_KEY);
+    else store?.setItem(ROWS_KEY, String(rows));
+  } catch { /* kept for this window only */ }
 }

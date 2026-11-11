@@ -1,4 +1,4 @@
-import {limitRows} from '../../../shared/usage.mjs';
+import {limitRows} from '../../../shared/usage.mts';
 import {agoQuiet} from '../format';
 import type {Usage} from '../types';
 export function UsageOverview({readings,now}: {readings:Usage[];now:number}) {
@@ -9,8 +9,8 @@ export function UsageOverview({readings,now}: {readings:Usage[];now:number}) {
   <div className="settings-usage-grid">{available.map(reading=><section key={reading.engine} className="settings-usage-provider" aria-label={reading.engine==='codex'?'Codex':'Claude Code'}>
    <h3>{reading.engine==='codex'?'Codex':'Claude Code'}</h3>
    {limitRows(reading.limits,now).map(row=><div className="settings-usage-window" key={row.key}>
-    <div><span>{row.name}</span><span>{row.used}% used</span></div>
-    <span className="usage-meter wide" aria-hidden="true"><i style={{width:`${row.used}%`}}/></span>
+    <div><span>{row.name}</span><span>{row.used==null?'Reset':`${row.used}% used`}</span></div>
+    {row.used!=null && <span className="usage-meter wide" aria-hidden="true"><i style={{width:`${row.used}%`}}/></span>}
     {row.when && <p>{row.when}</p>}
    </div>)}
    <small>{agoQuiet(reading.at,now)==='now'?'Read just now':`Read ${agoQuiet(reading.at,now)} ago`}</small>

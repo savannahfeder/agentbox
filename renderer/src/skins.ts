@@ -3,7 +3,7 @@ import { THEME_KEY, type ThemeChoice } from './theme';
 // The picture themes, and which one the window is wearing.
 //
 // A skin is a second axis laid over the light and dark token sets in theme.ts
-// (pinned by tests/theme-tokens.test.mjs), carried on its own `data-skin`
+// (pinned by tests/theme-tokens.test.mts), carried on its own `data-skin`
 // attribute so nothing under it moves. A third value of `theme` would have
 // made every token block a three-way answer.
 
@@ -85,13 +85,13 @@ const LIGHT_PICTURES = ['frost-haze', 'slate-haze', 'peach-haze', 'peach-haze-2'
 
 /**
  * Resolve old preferences once before the first paint, onto one of the three
- * choices. An empty store gets the default, Dark. Light and Match system are
+ * choices. An empty store gets the computer's own light or dark. Light and Match system are
  * kept. Plain dark and every dark picture become Dark, which is Ember Grid.
  * A light picture becomes Light. */
 export function normalizeSavedLook(store: {
   getItem(k: string): string | null;
   setItem(k: string, v: string): void;
-}): void {
+}, machine: 'light' | 'dark' = 'dark'): void {
   const theme = store.getItem(THEME_KEY);
   const skin = store.getItem(SKIN_KEY);
   const put = (look: Look) => {
@@ -100,7 +100,8 @@ export function normalizeSavedLook(store: {
     if (skin !== l.skin) store.setItem(SKIN_KEY, String(l.skin));
   };
   // A new Mac gets the default, whatever its own light or dark setting says.
-  if (theme === null && skin === null) return put(DEFAULT_SKIN);
+  // A new install starts in the computer's own light or dark, then keeps it.
+  if (theme === null && skin === null) return put(machine === 'dark' ? DEFAULT_SKIN : 'light');
   if (skin && LIGHT_PICTURES.includes(skin)) return put('light');
   if (skin && skin !== 'none') return put('ember-grid');
   if (theme === 'light') return put('light');
@@ -142,7 +143,7 @@ export function applySkin(skin: SkinChoice, root: Root = document.documentElemen
 }
 
 // A picture ships a sharp copy and a soft '-sm' copy resampled to 1536 wide.
-// main/screen-detail.mjs picks which one a screen gets, because only the main
+// main/screen-detail.mts picks which one a screen gets, because only the main
 // process sees the display's real density. devicePixelRatio here includes page zoom.
 export type SkinDetail = 'soft' | 'sharp';
 
@@ -185,7 +186,7 @@ export const TUNE_LIMITS = {
 
 export const TUNE_DEFAULT: Record<SkinId, SkinTune> = {
   // Several of these follow reference screenshots, pinned by
-  // tests/her-theme-screenshots-set-the-defaults.test.mjs. The Lake's 0.63 was
+  // tests/her-theme-screenshots-set-the-defaults.test.mts. The Lake's 0.63 was
   // fitted per channel against a reference drawing, and the Lake is also the
   // fallback in resolveTune.
   lake: { blur: 8, backgroundBlur: 5, dim: 0.63 },
@@ -279,9 +280,9 @@ export function walkSkin(skin: SkinChoice): SkinChoice {
  */
 export const WALK_PICTURE: SkinChoice = 'gouache-valley';
 
-// Writes the default look into an empty store, so a fresh install does not
-// fall through to the Mac's own light or dark setting and the picker opens
-// with the worn look already ticked. Both keys, so theme and skin agree.
+// Writes the computer's own light or dark into an empty store, once, so it
+// stays that after the computer changes and the picker opens with the worn
+// look already ticked. Both keys, so theme and skin agree.
 //
 // A store holding any choice is left alone, which also makes `?firstrun=1`
 // safe on a Mac that is already set up. Returns what it wrote so the caller
@@ -289,9 +290,9 @@ export const WALK_PICTURE: SkinChoice = 'gouache-valley';
 export function seedFirstRunLook(store: {
   getItem(k: string): string | null;
   setItem(k: string, v: string): void;
-}, themeKey: string): { theme: 'light' | 'dark' | 'match'; skin: SkinChoice } | null {
+}, themeKey: string, machine: 'light' | 'dark' = 'dark'): { theme: 'light' | 'dark' | 'match'; skin: SkinChoice } | null {
   if (store.getItem(themeKey) !== null || store.getItem(SKIN_KEY) !== null) return null;
-  const look = lookMeans(DEFAULT_SKIN);
+  const look = lookMeans(machine === 'dark' ? DEFAULT_SKIN : 'light');
   store.setItem(themeKey, look.theme);
   store.setItem(SKIN_KEY, String(look.skin));
   return look;

@@ -43,7 +43,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
-import { findClaudeBin } from '../main/claude-bin.mjs';
+import { findClaudeBin } from '../main/claude-bin.mts';
 // The app's name is never typed, here or in what this writes out.
 import { Possessive } from '../shared/product-name.mjs';
 
@@ -51,7 +51,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..');
 // A MODULE RATHER THAN A .json, so main (node ESM) and the renderer (vite)
 // import it the same way with no import assertion and no bundler plugin. The
-// logic that reads it lives next door in claude-commands.mjs, hand-written;
+// logic that reads it lives next door in claude-commands.mts, hand-written;
 // this file is only the table.
 //
 // AND A BUILD DOES NOT WRITE IT. It is TRACKED, and a build that rewrote it made
@@ -61,9 +61,9 @@ const ROOT = path.join(HERE, '..');
 // work, and the diff in a change card carried two files nobody had touched).
 // `npm run build` writes LOCAL instead; `npm run read:claude` writes this one,
 // which is how adopting a new reading became a decision rather than a side
-// effect. tests/a-build-does-not-rewrite-a-tracked-file.test.mjs holds the
+// effect. tests/a-build-does-not-rewrite-a-tracked-file.test.mts holds the
 // measurement.
-export const OUT = path.join(ROOT, 'shared', 'claude-commands.generated.mjs');
+export const OUT = path.join(ROOT, 'shared', 'claude-commands.generated.mts');
 
 // WHAT THIS MACHINE READ, which is nobody's edit and so is gitignored. JSON
 // rather than a module because nothing imports it: it is read with `fs` by the
@@ -317,7 +317,7 @@ export function shown(file) {
  * READ_AT "2026-10-07" -> "2026-10-08". A line saying "the committed table is
  * behind" on every one of those builds would be a warning that is almost always
  * noise, and this app has already learnt once what that trains (the staleness
- * banner, main/staleness.mjs). So the new table is rendered with the OLD stamps
+ * banner, main/staleness.mts). So the new table is rendered with the OLD stamps
  * and compared byte for byte: equal means nothing but the clock moved.
  */
 export function onlyTheStampsMoved(had, table, render = moduleText) {
@@ -346,7 +346,7 @@ export function run({ bin = null, out = OUT, local = LOCAL, snapshot = false, lo
     if (!had) throw new Error(`No Claude Code on this machine and no ${shown(out)} to fall back on.`);
     const from = had.match(/READ_FROM = "([^"]*)"/)?.[1] ?? 'an older version';
     const at = had.match(/READ_AT = "([^"]*)"/)?.[1] ?? 'an unknown day';
-    log(`[claude-commands] no Claude Code here; keeping the list read from ${from} on ${at}`);
+    log(`[claude-commands] building without Claude Code installed, using the list read from ${from} on ${at}`);
     return;
   }
   // THE READ HAPPENS EVERY BUILD AND SO DOES THE REFUSAL. `build` throws with

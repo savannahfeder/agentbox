@@ -20,7 +20,8 @@ export const SETUP = {
   homeHead: 'Run your agents in the cloud',
   // NOT "Add more any time" (w-dac993a554): the cloud runs on one account, so
   // inviting a second one was the screen asking for something it will not use.
-  homeLede: 'Add the account it should use.',
+  // Named, because right after the Agentbox sign-in "the account" read as that one.
+  homeLede: 'Add the Claude or Codex account your agents run on.',
   addClaude: 'Add Claude account',
   addCodex: 'Add Codex account',
   addOne: 'Add account',
@@ -46,7 +47,6 @@ export const SETUP = {
   inviteHead: 'Run your agents in the cloud',
   inviteLine: 'They keep working with your laptop closed, and as many run at once as you need.',
   inviteGo: 'Set up the cloud',
-  inviteNote: 'About a minute to set up',
   // THE WAIT BEFORE THE PLAN IS KNOWN SAYS SO (F-96, w-aaedc8f711). Reading
   // it from the cloud server took 5 to 9 seconds after a sign-in, and the
   // screen stood empty for all of it. No heading, so none flashes before

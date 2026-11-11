@@ -11,12 +11,30 @@ replies while an agent works, switching engine or model, a second login, a
 login running out, a restart. This skill runs that day, for as long as you
 say, and the clock owns it, not the tester.
 
+## The agents are real. Always, unless the person said otherwise
+
+The testers exist to use the product the way it actually works: real
+Claude Code and real Codex on real plans. That is most of the point. Until
+2026-11-10 the copies ran stand-in agents by default and nobody was told;
+48 of 50 runs did, and a Codex thread that started 64 times on the wrong
+agent reached the person instead of a tester. Their words: "It should NEVER
+EVER have run without letting me know that and getting my explicit
+awareness."
+
+So the copies' agents are the real Claude Code and Codex on this
+computer's plans, with nothing to ask for. Stand-ins run only when the
+person has agreed to them for this run, and the script refuses them unless
+it is handed their words: `--stand-ins "<what they said>"`. Never supply
+words of your own, and never fall back to stand-ins because a plan is low
+or a run would be cheaper: say so to them and let them decide. A stand-in
+run says so when it starts and on the first line of its report.
+
 Each person in `people/` gets:
 
 - **Their own copy of the app** (`live.mjs`, one per person), shaped like
   their setup: their number of Claude logins, Codex or not, their projects
   with real code in them (`fixtures/`), an inbox with weeks of old threads.
-- **A tester playing them**: a Claude Code session given who they are, their
+- **A tester playing them**: a Codex session given who they are, their
   day, their work, and two commands, `app` (the screen, through
   `browse.mjs`) and `diary` (notes and issues). It is stopped every
   `--round-minutes` and started again with its diary, the issues it logged,
@@ -24,12 +42,11 @@ Each person in `people/` gets:
   is up. A tester that stops early just gets the next stretch.
 - **Things going wrong on a clock** (`plan.mjs`, `chaosPlan`), never told to
   the tester, because a person learns of them from the app: a second login
-  runs out, Codex runs out, every login runs out, the app restarts, the
-  app's processes freeze for a while (its window does not); 2% of agents
-  hang and 2% die. Stand-ins take 5 to 90
-  seconds and offer options 30% of the time.
+  restarts, the app's processes freeze for a while (its window does not).
+  On an agreed stand-in run there is more: a second login runs out, Codex
+  runs out, every login runs out, 2% of agents hang and 2% die.
 - **A watcher** (`watch.mjs`) every minute: threads with no answer and no
-  word for 10 minutes (30 on real tools), a thread started six times in ten
+  word for 30 minutes (10 on stand-ins), a thread started six times in ten
   minutes, errors in the app's log, memory climbing, more agents than the
   app allows, a screen that stops answering.
 
@@ -50,13 +67,14 @@ node $P --who startup-engineer,founder --hours 2 --focus "replies after switchin
 | `--hours` / `--minutes` | how long | 1 hour |
 | `--focus` | what the team shipped and wants leaned on, in a sentence | none |
 | `--alpha` | alpha features on in every copy, e.g. `teammates` or `teammates,rooms` | off, as for anyone new |
-| `--real` | the Claude Code and Codex this computer has, on their plans | stand-ins |
+| `--stand-ins "<their words>"` | a Claude Code stand-in instead of the real one (Codex stays real on the testers' login), only with the person's own words agreeing to it for this run | the real Claude Code and Codex on this computer's plans |
+| `--stand-in-cloud` | every thread runs in a stand-in Agentbox Cloud of the copy's own (the real cloud server and sandbox, here, with the stand-in agent); a task naming Supabase, Vercel, Stripe, Expo, AWS or Sentry asks for its key. Stand-in agents, so it needs `--stand-ins` too | no cloud |
 | `--chaos` | `none`, `light`, `normal`, `heavy` | `normal` |
 | `--round-minutes` | one tester session before it is restarted with its diary | 20 |
-| `--model` | the testers' model | Claude Code's default |
-| `--testers external` | you run each stretch yourself (below) | testers are `claude -p` |
-| `--tester-login inherit` | testers get this session's sign-in variables | their own login |
+| `--model` | the testers' Codex model | Codex's default |
+| `--codex-home` | the Codex login testers spend | the Codex login on the best plan |
 | `--keep` | leave the copies up afterwards | taken down |
+| `--files <dir>` | copied into every project's documents in every copy, so testers meet the thing under test (a table, a deck) as their own | none |
 | `--team <file>` / `--room <name>` | one tester on a real team, talking in that room (below) | no team |
 
 Evidence goes to `/tmp/agentbox-verify/runs/<time>-power/`, one folder per
@@ -78,25 +96,38 @@ you cite into the product's docs before you finish.
 - **How long.** A feature check: 1 hour. Before a launch: 3 hours or more.
   The chaos is laid out as fractions of the length, so a short run is the
   same day squeezed.
-- **Stand-ins or real.** Stand-ins cost nothing but the testers and test the
-  app around the agents. `--real` puts real Claude Code and Codex behind the
-  copies, in the fixture repositories, on this computer's subscriptions:
-  this is the run for usage that would otherwise expire before a reset, and
-  the only way to meet a real login running out. Logins running out, hangs
-  and deaths on a clock are stand-ins only; on real tools the clock only
-  restarts and freezes the app.
+- **Codex gets half the work.** The person does not use Codex, so its
+  failures reached them only on a thread they needed. Every tester who uses
+  Codex is told to send at least half its work there. On an agreed stand-in
+  run Codex still stays real, on the testers' own Codex login
+  (`live.mjs up --real-codex <home>`).
+- **Real plans are spent.** The copies' agents work in the fixture
+  repositories on this computer's Claude and Codex plans. That is the point,
+  not a cost to avoid. If a plan is too low for the run, tell the person.
+  Real logins run out when they really do; the clock adds only restarts and
+  freezes.
 - **Chaos.** `normal` unless asked. `none` to test a feature in calm,
   `heavy` before a launch (adds a Control-C crash and an hour of slow agents).
 
+## Testers run on Codex, never Claude Code
+
+The person keeps a Codex plan for testing only (2026-11-08). Every tester is
+`codex exec`, started by the script, on the Codex login with the best plan
+(`~/.codex` or any `~/.codex-*`, read from its own sign-in) unless
+`--codex-home` names one. The script says which login and plan it chose when
+it starts. Never run a tester as a subagent or as `claude -p`: that spends the
+Claude plan the person keeps for real work. `scripts/codex-tester.mjs` is the
+one place that starts a tester, for this skill and the product loop.
+
 ## Where it runs
 
-- **On a Mac** the testers are `claude -p` on the Mac's own login. Each
-  person needs about 1.2 GB free (2.5 GB with `--real`), and the script
-  refuses to start more than fits. Check memory before more than two.
-- **In the Agentbox cloud** a Claude Code started from a session cannot sign
-  in (the session's key is blanked for what it starts), so the script stops
-  at its sign-in check. Run with `--testers external`, and the stretches
-  as your own subagents (below). This keeps a long run off the person's Mac.
+- **On a Mac** each person needs about 2.5 GB free (1.2 to 1.7 GB on
+  agreed stand-ins),
+  and the script refuses to start more than fits. Check memory before more
+  than two. Testers run inside Codex's own sandbox with the local network open.
+- **In the Agentbox cloud** Codex signs in with the login the cloud carries,
+  but its sandbox cannot start there, so testers run without it: the machine
+  is the throwaway. This keeps a long run off the person's Mac.
 
 ## Waiting for it
 
@@ -108,30 +139,14 @@ one-line update every half hour or so: stretch, issues so far, anything the
 watcher found. Ctrl-C (SIGTERM) still writes the report and takes the
 copies down.
 
-## Running the stretches yourself (`--testers external`)
-
-The script writes each stretch's prompt to `<person>/round-NN.prompt.md`,
-names it in `progress.json` under `waiting`, and waits for
-`<person>/round-NN.done`. For each person, in a loop until `progress.json`
-says `done`:
-
-1. Wait for `waiting` to name a prompt file.
-2. Start a subagent whose prompt is that file's contents, plus: "Run only the
-   `app` and `diary` commands it names, with Bash; Read only your own
-   pictures. Set the Bash timeout to 600000 for `app away`."
-3. When it returns, write its last line into the `.done` file.
-
-Run the people in parallel. Do not tell a tester about the chaos, and do not
-coach it: the point is what a person in their shoes notices.
-
 ## After it
 
 1. Read `report.md`, then open the pictures of the top issues.
 2. Reproduce the broken and wrong ones yourself before calling them bugs
    (`live.mjs up`, the steps, `browse.mjs`). A tester can be wrong; the
    watcher's findings are facts but may have a dull cause.
-   Testers do not know these stand-in quirks and will log them; they are not
-   the app's:
+   On an agreed stand-in run only, testers do not know these stand-in quirks
+   and will log them; they are not the app's:
    - answers are canned, named after the task and numbered by start, so the
      number skips after a start that failed;
    - a Claude login out says "resets 11:59pm" whatever its window, and comes
@@ -175,4 +190,6 @@ Tests: `tests/a-power-test-keeps-testing-until-its-clock-runs-out`,
 `the-power-test-watcher-catches-what-a-tester-walks-past`,
 `a-power-test-report-puts-the-worst-first`,
 `every-power-tester-is-someone-agentbox-is-for`,
-`a-login-runs-out-mid-test-without-the-task-saying-so`.
+`a-login-runs-out-mid-test-without-the-task-saying-so`,
+`power-testers-send-work-to-the-real-codex`,
+`a-power-test-runs-on-real-plans-unless-the-person-agreed`.

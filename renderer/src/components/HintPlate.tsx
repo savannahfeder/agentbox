@@ -62,13 +62,13 @@ export function HintPlate({ lines, comp, align, text }: {
     >
       {lines.map((line) => (
         <div className="hint-line" key={line.key}>
-          <span className="hint-caps">
+          {capsFor(line.key).length > 0 && <span className="hint-caps">
             {capsFor(line.key).map((glyph, i) => (
               // The index is in the key because a chord can repeat a glyph
               // and nothing here re-orders.
               <kbd key={`${glyph}-${i}`}>{glyph}{capWord(glyph) && <span className="fr-cap-word">{capWord(glyph)}</span>}</kbd>
             ))}
-          </span>
+          </span>}
           <span className="hint-what">{line.what}</span>
         </div>
       ))}
