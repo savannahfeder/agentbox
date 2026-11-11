@@ -32,6 +32,7 @@ import { FocusControl } from './FocusControl';
 import { DocText } from './DocText';
 import { useLiveSession, useLiveTicket } from '../live/live-session';
 import { FileNoteCard } from './FileNoteCard';
+import { LinkNotes, useLinkNotes } from './LinkNotes';
 import { NoteGlyph } from './NoteGlyphs';
 import { NotesHead, NotesSection, ReturnGlyph } from './NotesSidebar';
 import { ShareLink, canShareFile } from './ShareLink';
@@ -213,6 +214,8 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   const [editing, setEditing] = useState<Editing | null>(null);
   // The editor read the file itself, so it is open while it is on screen.
   const foundNow: Found = editing ? 'open' : found;
+  const linkThread = thread ?? shareThread ?? null;
+  const linkNotes = useLinkNotes(linkThread && version && canShareFile(version.path) ? { product, thread: linkThread, src: version.path } : null);
   const offers = viewOffers(foundNow, !!me && !!version);
 
   // Opening it is what clears a row from Needs you.
@@ -774,7 +777,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
           )}
           {link && <FileLinkBrowser key={link} url={link} product={product} backTo={kind ? `the ${KIND_WORD[kind].toLowerCase()}` : 'the file'} onClose={closeLink} />}
         </div>
-        {(foundNow === 'looking' || offers.comment || openNotes.length > 0 || settled.length > 0) && <aside className="av-side" aria-label="Notes">
+        {(foundNow === 'looking' || offers.comment || openNotes.length > 0 || settled.length > 0 || linkNotes.comments.length > 0) && <aside className="av-side" aria-label="Notes">
           <NotesHead count={openNotes.length} faces={authors.length > 0 && authors.map((id) => <Face key={id ?? 'me'} person={person(id)} name={person(id) ? undefined : nameOf(id)} me={!!me && id === me} />)} />
           {(offers.approve || othersApproved.length > 0 || earlier) && (
             <div className="av-verdict">
@@ -796,7 +799,8 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
               </button>
             )}
             {showSettled && settled.map(card)}
-            {offers.comment && hint && !draftPlace && !openNotes.length && !(showSettled && settled.length) && (
+            <LinkNotes comments={linkNotes.comments} reply={linkNotes.reply} onGo={(place) => setGo({ place, at: Date.now() })} />
+            {offers.comment && hint && !draftPlace && !openNotes.length && !linkNotes.comments.length && !(showSettled && settled.length) && (
               <div className="av-empty"><NoteGlyph name="pin" /><span>{hint}</span></div>
             )}
           </div>
