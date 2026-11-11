@@ -1,7 +1,7 @@
 // The app: the agent inbox. Electron shell around a keyboard-first renderer, a
 // file-derived store, and a supervisor of headless sessions.
 
-import { app, BrowserWindow, Menu, Notification, clipboard, crashReporter, dialog, ipcMain, nativeImage, net, powerMonitor, protocol, screen as electronScreen, shell, session, safeStorage, systemPreferences } from 'electron';
+import { app, BrowserWindow, Menu, Notification, clipboard, crashReporter, dialog, ipcMain, nativeImage, nativeTheme, net, powerMonitor, protocol, screen as electronScreen, shell, session, safeStorage, systemPreferences } from 'electron';
 import './no-default-menu.mts';
 import type { ContextMenuParams, MenuItemConstructorOptions, WebContents } from 'electron';
 import * as workItemsDisk from './store/work-items.mts';
@@ -52,7 +52,7 @@ import { teammatesOn } from '../shared/teammates.mts';
 import { dataFolderName, isNewUserBuild } from '../shared/side-build.mts';
 import { runningAsAFreshUser } from '../shared/fresh-user-home.mts';
 import { newUserWindow } from './new-user-window.mts';
-import { applyGlass, glassWindow } from './window-glass.mts';
+import { applyGlass, glassTone, glassWindow } from './window-glass.mts';
 import { openFreshUser } from './fresh-user.mts';
 import { installCrashReports, report as reportCrash, reportFromRenderer, pending as pendingCrashes, setTransport } from './crash-report.mts';
 import { keepThePageAlive } from './when-the-page-stops.mts';
@@ -1173,6 +1173,7 @@ async function createWindow() {
   // Asked for once by the renderer as it mounts, rather than pushed on
   // did-finish-load, which races the first effects and would drop the very
   // message it exists to deliver.
+  ipcMain.handle('zero:glass-tone', (_e, payload) => { nativeTheme.themeSource = glassTone(payload?.tone); });
   ipcMain.handle('zero:boot-info', () => {
     const info = {
       reloaded: reloadRequested, builtAt: builtAt(), recovered: pendingRecovery,

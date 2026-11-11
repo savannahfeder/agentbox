@@ -231,6 +231,7 @@ export function answerWhatOnlyTheWindowAnswered(ipcMain: CollectingIpcMain) {
   ipcMain.handle('zero:take-shared-file', () => null);
   ipcMain.handle('zero:crash', (_e, payload) => { reportFromRenderer(payload ?? {}); return null; });
   ipcMain.handle('zero:blank-check', () => null);
+  ipcMain.handle('zero:glass-tone', () => null);
   // The phone door belongs to the desktop app (main/phone-link.mts); a tab is told there is none.
   ipcMain.handle('zero:phone-link', () => null);
 }

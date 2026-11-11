@@ -32,6 +32,8 @@ import {
 } from '../../main/store/pending-writes.mts';
 import { resolveProduct } from './account.mts';
 import { nameSlug } from '../../shared/product-name.mjs';
+import { PICKED_WHY, routedPatch, type RoutedPatch } from '../../shared/auto-route.mts';
+import { TEAMMATE_LABEL_PREFIX } from '../../shared/teammates.mts';
 
 // The log prefix, named from the one place the app is named. It was a literal
 // for as long as this server lived in another product's repo.
@@ -43,7 +45,7 @@ const HEARTBEAT_MS = Math.floor(LEASE_MS / 3);
 
 type Project = ReturnType<typeof resolveProduct>;
 export type ProductItem = Omit<WorkItem, 'product'> & { product: string; productName: string };
-export type AgentPatch = { [K in WorkItemField]?: unknown } & { closeBecause?: string; deferBecause?: string };
+export type AgentPatch = { [K in WorkItemField]?: unknown } & { closeBecause?: string; deferBecause?: string; toAnAgentBecause?: string };
 
 export interface WorkListFilter {
   product?: string | null;
@@ -267,6 +269,21 @@ export function saidToClose(item: Pick<WorkItem, 'answer' | 'body' | 'title'> | 
  * as the user's. That is what hides a row until it comes due, puts it in
  * Scheduled, and lets the user's L move it again.
  */
+/*
+ * A THREAD THAT WENT TO THE WRONG TEAMMATE GOES TO AN AGENT WHEN THEY SAY SO
+ * (w-064dd249d2). A teammate's label is put back on every other write
+ * (`keepRunLabels`), so only their own words, checked as `closeBecause` is,
+ * move it: the same write as their "Give it to someone else", an agent.
+ */
+const NOT_GIVEN_TO_AN_AGENT = 'The thread was NOT given to an agent: the words in toAnAgentBecause are not ones they wrote on this row, or they did not write the row. If they did say it went to the wrong teammate, send toAnAgentBecause again with their exact words.';
+const NO_TEAMMATE_TO_LEAVE = 'No teammate has this thread, so it is already an ordinary agent\'s.';
+
+function toAnAgent(before: WorkItem | null, words: unknown): { patch: RoutedPatch } | { refused: string } {
+  if (!before?.labels?.some((l) => String(l).startsWith(TEAMMATE_LABEL_PREFIX))) return { refused: NO_TEAMMATE_TO_LEAVE };
+  if (!herRow(before) || !saidToClose(before, words)) return { refused: NOT_GIVEN_TO_AN_AGENT };
+  return { patch: routedPatch(before, { to: 'agent', why: PICKED_WHY }, { by: 'you' }) };
+}
+
 const DEFERRED_AS_AGENT = 'The put-off was saved as YOURS, not theirs, so the thread runs again then, and stays in their inbox meanwhile if your answer offers options: the words in deferBecause are not ones they wrote on this row. If they did ask for it to be put off, send runAt again with deferBecause set to their exact words.';
 
 /*
@@ -333,7 +350,7 @@ export interface ClaimAsk { product?: string | null; id?: string | null; filter?
 export type ClaimOutcome =
   | { claimed: true; epoch: number; item: ProductItem; pending?: PendingWrite[]; pendingNotice?: string; reason?: never; heldBy?: never }
   | { claimed: false; reason: string; heldBy?: string };
-export type UpdateOutcome = Partial<WorkItem> & { leftOpen?: string; deferredAsAgent?: string; summaryTooLong?: string; reopened?: string };
+export type UpdateOutcome = Partial<WorkItem> & { leftOpen?: string; deferredAsAgent?: string; notGivenToAnAgent?: string; summaryTooLong?: string; reopened?: string };
 
 export interface ClaimRegistry {
   holder: string | undefined;
@@ -494,7 +511,9 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder }: { he
         // fence below still catches the case where somebody else took over.
       }
 
-      const { closeBecause, deferBecause, ...asked } = patch;
+      const { closeBecause, deferBecause, toAnAgentBecause, ...asked } = patch;
+      const leaving = toAnAgentBecause === undefined ? null : toAnAgent(readWorkItem(holding.dir, id), toAnAgentBecause);
+      const notGiven = leaving && 'refused' in leaving ? { notGivenToAnAgent: leaving.refused } : {};
       let leftOpen = false;
       if (asked.status === 'done') {
         const before = readWorkItem(holding.dir, id);
@@ -541,6 +560,8 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder }: { he
       // Only now, past the fence, so a session that lost the row cannot still
       // put it away in the user's name.
       if (theirMoment) item = updateWorkItem(holding.dir, id, { runAt: theirMoment }, { source: 'founder' });
+      // On the app's authority, as their own pick is (main/store.mts routeItem).
+      if (leaving && 'patch' in leaving) item = updateWorkItem(holding.dir, id, leaving.patch, { source: 'system' });
 
       // FINISHING A ROW GIVES THE CLAIM BACK NOW, not in five minutes. It used
       // to drop the row from this map and leave the claim line standing, so the
@@ -564,9 +585,9 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder }: { he
           holding.live = false;
           stopTimer();
         }
-        return { ...item, leftOpen: LEFT_OPEN, ...deferredAsAgent, ...summaryTooLong, ...(reopened ? { reopened: REOPENED } : {}) };
+        return { ...item, leftOpen: LEFT_OPEN, ...deferredAsAgent, ...notGiven, ...summaryTooLong, ...(reopened ? { reopened: REOPENED } : {}) };
       }
-      return { ...item, ...deferredAsAgent, ...summaryTooLong, ...(reopened ? { reopened: REOPENED } : {}) };
+      return { ...item, ...deferredAsAgent, ...notGiven, ...summaryTooLong, ...(reopened ? { reopened: REOPENED } : {}) };
     },
 
     release(id) {

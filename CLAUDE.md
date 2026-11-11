@@ -131,6 +131,12 @@ a Codex plan for testing only. Both skills start every tester as `codex exec`
 on the Codex login with the best plan; never run one as a subagent
 (`tests/every-synthetic-tester-runs-on-codex`).
 
+The app they test runs real agents on real plans, Claude Code and Codex
+(2026-11-11). Stand-in agents run only when the person agreed to them for
+that run, in their own words (`--stand-ins "<their words>"`), and the run
+says so up front. 48 of 50 runs were on stand-ins without anyone being told
+(`tests/a-power-test-runs-on-real-plans-unless-the-person-agreed`).
+
 The standard for the tester loop is thread w-e5f506ccb3: a synthetic team
 used the multiplayer build for whole workdays, logged what broke, agents
 fixed it on the branch, and the team tested the fixes. The person only chose

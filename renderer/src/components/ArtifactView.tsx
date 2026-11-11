@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  addressedTo, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, latestPicturesSaid, nextStep, noteGoesTo, offeredTogether, otherFilesInLines, placeWords, resolvedInWords, reviewKind, sharedByWords, stepsThrough, stillInHand, stillWaiting, tagsYourAgent, threadFiles, versionForPath, viewKind, whereAPressLands, whoseIsTheFile,
+  addressedTo, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, latestPicturesSaid, nextStep, noteGoesTo, offeredTogether, otherFilesInLines, placeWords, resolvedInWords, reviewKind, sharedByWords, stepsThrough, stillInHand, stillWaiting, tagsYourAgent, threadFiles, viewKind, whereAPressLands, whoseIsTheFile, withFilesAsked,
 } from '../../../shared/artifact-marks.mts';
 import { AgentFace } from './AgentFace';
 import type { FileVersion } from '../../../shared/artifact-marks.mts';
@@ -39,8 +39,8 @@ import { paneKey, staysOnNewest } from '../table-follows';
 import { SEND } from '../this-keyboard';
 import './artifact-view.css';
 
-/** `steps`: the paths the arrows step through, in order, when the press came from a turn of the thread. */
-export interface ArtifactOpen { path?: string; file?: string; note?: string; at?: number; steps?: string[]; /** Where a film beside the chat had got to, in seconds. */ time?: number }
+/** `steps`: the paths the arrows step through, in order, when the press came from a turn of the thread. `drawn`: every picture that turn drew, versions too. */
+export interface ArtifactOpen { path?: string; file?: string; note?: string; at?: number; steps?: string[]; drawn?: string[]; /** Where a film beside the chat had got to, in seconds. */ time?: number }
 
 type Editing = { fam: string; text: string; draft?: string; folder: string | null; base: ReturnType<typeof threadFiles>[number]['versions'][number] };
 
@@ -102,9 +102,11 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     // A note on a page the thread never linked opens that page by its name, never the thread's last file.
     const noted = open.note ? marks.notes.find((n) => n.id === open.note)?.file : undefined;
     const path = open.path?.replace(/^\.\//, '') ?? (noted && !/[#@]\d+$/.test(noted) ? noted : undefined);
-    return path && !versionForPath(threadFiles(said), path) && viewKind(path) ? [...said, { path, by: null, at: 0 }] : said;
-  }, [lines, open.path, open.note, marks.notes]);
-  const families = useMemo(() => threadFiles(files, numbers, { keep: open.path }), [files, numbers, open.path]);
+    return withFilesAsked(said, [path, ...(open.drawn ?? open.steps ?? [])]);
+  }, [lines, open.path, open.note, open.steps, open.drawn, marks.notes]);
+  // What the page drew has bytes, so Files not having numbered it yet does not drop it.
+  const kept = useMemo(() => [open.path, ...(open.steps ?? []), ...(open.drawn ?? [])].filter((p): p is string => !!p), [open.path, open.steps, open.drawn]);
+  const families = useMemo(() => threadFiles(files, numbers, { keep: kept }), [files, numbers, kept]);
   const flat = useMemo(() => families.flatMap((f, fi) => f.versions.map((v, vi) => ({ fi, vi, v }))), [families]);
   const handedSteps = useMemo(() => stepsThrough(families, open.steps), [families, open.steps]);
   const latestSteps = useMemo(() => stepsThrough(families, latestPicturesSaid(lines)), [families, lines]);

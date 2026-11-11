@@ -29,17 +29,20 @@ describe('the Inbox button', () => {
     expect(read('renderer/src/components/WorkspaceNavigation.tsx')).toContain('M5 7h14M5 12h14M5 17h9');
   });
 
-  it('names esc on its plate only where esc goes to the inbox', () => {
-    expect(bf).toContain("inboxOnEsc ? { 'data-hint': 'inbox-esc' } : { 'data-hint': 'inbox' }");
-    expect(HINTS['inbox-esc']).toEqual([{ key: 'esc', what: 'Inbox' }]);
-    expect(HINTS.inbox).toEqual([{ key: '', what: 'Inbox' }]);
+  it('names esc on its plate, since it is only drawn where esc goes to the inbox', () => {
+    expect(bf).toContain('data-hint="inbox"');
+    expect(HINTS.inbox).toEqual([{ key: 'esc', what: 'Inbox' }]);
+    expect(HINTS).not.toHaveProperty('inbox-esc');
   });
 
-  it('opens the inbox from every page that draws the arrows', () => {
+  // Reported: it showed on every page, and on Chats it pushed the forward
+  // arrow into the page's name. On the inbox it led to the inbox itself.
+  it('is drawn only on an inbox thread, and opens the inbox', () => {
     const app = read('renderer/src/App.tsx');
     const tag = app.split('\n').find((l) => l.includes('<BackForward ')) ?? '';
-    expect(tag).toContain("onInbox={() => openView('inbox')}");
-    expect(tag).toContain('inboxOnEsc={!!focused}');
+    expect(tag).toContain("onInbox={onInboxThread ? () => openView('inbox') : undefined}");
+    expect(app).toContain('const onInboxThread = !!focused && !settingsOpen && !inChats;');
+    expect(bf).toMatch(/\{onInbox && <button/);
   });
 });
 
