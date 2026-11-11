@@ -117,6 +117,7 @@ function whoHasIt(made: { taken?: boolean; reason?: string; heldBy?: number | nu
   return `: its folder is ${made.reason}${made.heldBy ? ` by pid ${made.heldBy}` : ''}`;
 }
 import { agentSpokeSince, answerSettled, answerTs, stoppedByHer, heldForHer, toldBy, filedByThePerson, wakesItselfAt } from '../shared/answers.mts';
+import { saveConfig } from './config.mts';
 import { accountIdentity, nameForOrganization, profileForCloudLogin, isCloudLoginOf, toolingLine } from './account-tooling.mts';
 import type { AccountIdentity } from './account-tooling.mts';
 import { effectiveProfiles } from './account-discovery.mts';
@@ -1351,6 +1352,8 @@ export class Supervisor {
   declare _keychainStamps: KeychainStamps | undefined;
   declare _profileStrikes: Record<string, number> | undefined;
   declare _movedWhy: Record<string, MovedWhy>;
+  declare _accountChosenAt: number | undefined;
+  declare _accountSwitch: { from: string; to: string; until: number } | null | undefined;
   declare _movedToCloudAt: Record<string, number> | undefined;
   declare _hungReaps: Record<string, { count: number; at: number }> | undefined;
   declare _modelRefused: Record<string, string[]> | undefined;
@@ -1921,6 +1924,7 @@ export class Supervisor {
   accountChosen(engine: string, profile: string | null | undefined) {
     // The cloud follows the pick (`_cloudAccountOfThisMac`), so its check is asked afresh.
     this._cloudConfigAt = 0;
+    if (engineOf(engine) === DEFAULT_ENGINE) { this._accountChosenAt = Date.now(); this._accountSwitch = null; }
     if (!profile) return false;
     const key = this._accountKey(engine, profile);
     if (this._profileTrouble?.[key]?.cause === 'at-limit') this._clearProfileTrouble(key);
@@ -1929,6 +1933,79 @@ export class Supervisor {
     this._saveState();
     this.wake();
     return true;
+  }
+
+  /**
+   * AN ACCOUNT AT ITS LIMIT HANDS THE WORK TO ONE WITH ROOM (2026-11-10, their
+   * call: "your Mac and the cloud move to your account with room by
+   * themselves"). Claude only: a second Codex login is kept for testing. The
+   * cloud follows because it runs on whatever account this Mac is set to.
+   * Another folder of the same subscription shares its limit, so it is no way
+   * out; with nowhere to go, the limit is waited out as before.
+   */
+  _moveOffALimitedAccount(now = Date.now()) {
+    const engine = DEFAULT_ENGINE;
+    const from = this._profilesFor(engine)[0];
+    if (!from) return null;
+    const until = this._limitedUntil(from, now);
+    if (!until) return null;
+    const home = this.config.home || os.homedir();
+    const idOf = (p: string) => accountIdentity(p === 'default' ? null : p, { home });
+    const mine = idOf(from);
+    const same = (a: AccountIdentity | null) => !!a && !!mine && ((!!a.accountUuid && a.accountUuid === mine.accountUuid) || a.email.toLowerCase() === mine.email.toLowerCase());
+    const room = this._profiles().filter((p) => p !== from && !!idOf(p) && !same(idOf(p))
+      && !this._profileTrouble?.[this._accountKey(engine, p)] && !this._profileResting(this._accountKey(engine, p))
+      && !this._limitedUntil(p, now));
+    if (!room.length) return null;
+    const cloudRuns = (p: string) => { const r = this._cloudLoginOf(p); return !!r && mayRunOn(cloudLoginState(r, { now })); };
+    const to = room.find(cloudRuns) ?? room[0];
+    try { saveConfig(this.config, { activeAccount: { ...(this.config.activeAccount ?? {}), [engine]: to } }); }
+    catch (e) {
+      console.warn('zero: could not save the account switch:', (e as Error).message);
+      this.config.activeAccount = { ...(this.config.activeAccount ?? {}), [engine]: to };
+    }
+    this._accountSwitch = { from, to, until };
+    this._cloudConfigAt = 0;
+    this._cloudInUseSeen?.delete(engine);
+    console.log(`zero: ${from} is at its usage limit, so work moves to ${to}`);
+    this._saveState();
+    this.onChange?.();
+    this.wake?.();
+    return { from, to, until };
+  }
+
+  // When this login's limit lifts, or null when it is not at one: its own
+  // filed limit, or the cloud's reading of the same account. A reading taken
+  // before the person picked this account is theirs to overrule.
+  _limitedUntil(profile: string, now = Date.now()): number | null {
+    const key = this._accountKey(DEFAULT_ENGINE, profile);
+    const t = this._profileTrouble?.[key];
+    if (t?.cause === 'at-limit') {
+      const until = Math.max(t.resetsAt ?? 0, this._profileCooldown?.[key] ?? 0);
+      if (until > now) return until;
+    }
+    const r = this._cloudLoginOf(profile);
+    const picked = (this._accountChosenAt ?? 0) > 0 && this.config.activeAccount?.[DEFAULT_ENGINE] === profile;
+    if (!r || (picked && !((r.readAt ?? 0) > this._accountChosenAt!))) return null;
+    const full = (r.limits ?? []).map((l) => l as { percent?: number; resetsAt?: number })
+      .filter((l) => (l.percent ?? 0) >= 100 && (l.resetsAt ?? 0) > now).map((l) => l.resetsAt!);
+    if (full.length) return Math.max(...full);
+    return !picked && r.limitedUntil && r.limitedUntil > now ? r.limitedUntil : null;
+  }
+
+  _cloudLoginOf(profile: string) {
+    const home = this.config.home || os.homedir();
+    const ids = this._profiles().map((p) => ({ ...accountIdentity(p === 'default' ? null : p, { home }), profile: p }));
+    const me = ids.find((id) => id.profile === profile);
+    return listCloudLogins(DEFAULT_ENGINE, { home }).filter((r) => !r.duplicateOf).find((r) => isCloudLoginOf(r, me, ids)) ?? null;
+  }
+
+  // The switch, by name, while the limit it got round lasts and nobody has picked since.
+  _accountSwitchNow(now = Date.now()) {
+    const s = this._accountSwitch;
+    if (!s || s.until <= now || this._profilesFor(DEFAULT_ENGINE)[0] !== s.to) return null;
+    const name = (p: string) => this._accountNameFor(DEFAULT_ENGINE, this._accountKey(DEFAULT_ENGINE, p)) ?? 'your other Claude account';
+    return { from: name(s.from), to: name(s.to), until: s.until };
   }
 
   /**
@@ -2906,9 +2983,10 @@ export class Supervisor {
    * with it, because dropping it would lose the thread and buy nothing.
    *
    * A USAGE LIMIT USED TO COUNT HERE ON ITS OWN (w-dac993a554), so the app
-   * moved a chat off a capped login by itself. It does not decide that for a
-   * person any more: on the account in use, a limit is waited out and the row
-   * says the hour it resets. SWITCHING TO YOUR OTHER PLAN AT A LIMIT IS
+   * moved a chat off a capped login by itself. That is now decided for the
+   * whole app instead: the account in use at its limit hands the work to
+   * another with room (`_moveOffALimitedAccount`), and with none, the limit is
+   * waited out and the row says the hour it resets. SWITCHING TO YOUR OTHER PLAN AT A LIMIT IS
    * ALLOWED (the founder, 2026-10-23: "It is 100% acceptable to switch to work
    * plan when you've hit your limit"). Pick it in Settings and the capped
    * login's chats come here, by the last paragraph below.
@@ -6364,6 +6442,7 @@ export class Supervisor {
     return {
       setUp, offered, managed: typeof config?.gateway === 'string', mode, running: this._cloudRunsShown(), month: this._cloudMonth.month,
       ...this._cloudHealthNow(now),
+      switched: this._accountSwitchNow(now),
       noRoom: (({ error, message }: { error?: string; message?: string | null } = {}) => (error ? { error, message } : null))(this._cloudNoRoomNow(now) ?? {}),
       versionGap: setUp ? this._cloudVersionGaps(now).sort((a, b) => Number(b.blocks) - Number(a.blocks))[0] ?? null : null,
       // What C turns the cloud back on to (main/settings.mts cloudWhenOn).
@@ -8912,6 +8991,7 @@ export class Supervisor {
     try { this._noticeLimitTryLived(); } catch (e) { console.warn('zero: could not check a capped login\'s try:', (e as Error).message); }
     try { this._forgetResetLimits(); } catch (e) { console.warn('zero: could not let a reset limit go:', (e as Error).message); }
     try { this._forgetLimitsOfAnOldPlan(); } catch (e) { console.warn('zero: could not read a login for a new plan:', (e as Error).message); }
+    try { this._moveOffALimitedAccount(); } catch (e) { console.warn('zero: could not move off an account at its limit:', (e as Error).message); }
     try { this._forgetRenewedSubscriptions(); } catch (e) { console.warn('zero: could not let a renewed subscription back in:', (e as Error).message); }
     // _cloudReady reads the cloud's setup (at most once a minute) first.
     try { this._cloudReady('codex'); this._renewCloudLogins(); void this._noteCloudOrgs(); } catch (e) { console.warn('zero: could not check the cloud sign-ins:', (e as Error).message); }

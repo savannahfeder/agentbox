@@ -14,7 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import {
-  setupSteps, stepLabel, typingInSetup, setupStartsOn, tourCount, lookChoices, starterChoices, inviteList, setUpLines, tourChecklist,
+  setupSteps, stepLabel, typingInSetup, setupLook, tourCount, lookChoices, starterChoices, inviteList, setUpLines, tourChecklist,
 } from '../renderer/src/setup-split.ts';
 
 describe('which steps the setup shows', () => {
@@ -58,8 +58,8 @@ describe('which steps the setup shows', () => {
 });
 
 describe('the looks offered', () => {
-  it('puts the look you have first, then the dark orange sky', () => {
-    expect(lookChoices('sage', true).slice(0, 2)).toEqual(['sage', 'ember']);
+  it('puts the look you have first, then Match my system, then the dark orange sky', () => {
+    expect(lookChoices('sage', true).slice(0, 3)).toEqual(['sage', 'match', 'ember']);
   });
   it('does not offer the light pink sky unless you already wear it', () => {
     expect(lookChoices('light', true)).not.toContain('dusk-light');
@@ -156,12 +156,13 @@ describe('the look a new install starts on', () => {
   // orange and light mode will be the light green sky".
   // As the pair that follows the Mac since w-fbe5e95dea (2026-11-10): she
   // switched macOS to light during the setup and it stayed dark.
+  // Nothing picked wears the pair by main's own rule (w-1bf65f4322), so the setup ticks Match my system.
   it('wears the pair: dark orange on a dark Mac, light green on a light one', () => {
-    expect(setupStartsOn({ sky: null, dark: true })).toBe('match');
-    expect(setupStartsOn({ sky: null, dark: false })).toBe('match');
+    expect(setupLook({ skies: true, picked: false, worn: 'ember', light: false })).toBe('match');
+    expect(setupLook({ skies: true, picked: false, worn: 'sage', light: true })).toBe('match');
   });
   it('keeps a sky someone already chose', () => {
-    expect(setupStartsOn({ sky: 'dusk', dark: false })).toBeNull();
+    expect(setupLook({ skies: true, picked: true, worn: 'dusk', light: false })).toBe('dusk');
   });
 });
 
@@ -248,7 +249,7 @@ describe('the app preview in its panel', () => {
   // outline and shadow on every side, top and left included.
   const split = fs.readFileSync(new URL('../renderer/src/components/SetupSplit.tsx', import.meta.url), 'utf8');
   it('is cut only at the right and bottom edges, so its outline shows', () => {
-    expect(split).toMatch(/--ss-clip', `inset\(-\d+px \$\{at\.right\}px \$\{at\.bottom\}px -\d+px/);
+    expect(split).toMatch(/--ss-clip', `inset\(-\d+px \$\{at\.right\}px -\d+px -\d+px\)`/);
   });
 });
 

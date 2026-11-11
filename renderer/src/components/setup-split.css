@@ -1,11 +1,11 @@
 /* THE SETUP BESIDE THE APP (SetupSplit.tsx). Every colour is the app's own
    token; every class is ss- prefixed. */
 
-/* The app itself, moved into the right panel and running off its edges. */
+/* The app itself, moved into the right panel and running off its right edge. */
 :root[data-setup] #root {
   position: fixed; z-index: 2147482999;
   left: var(--ss-x); top: var(--ss-y);
-  width: 1120px; height: 1300px;
+  width: 1120px; height: var(--ss-h);
   transform: scale(var(--ss-scale, .8)); transform-origin: 0 0;
   border-radius: 16px; overflow: hidden; pointer-events: none; clip-path: var(--ss-clip, none);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 10%, transparent), 0 30px 80px rgba(30, 40, 40, .16), 0 4px 14px rgba(30, 40, 40, .06);
@@ -62,7 +62,11 @@
 .setup-split .ss-input { grid-column: 2 / -1; border: 0; outline: 0; background: transparent; font-size: 14.5px; min-width: 0; }
 .setup-split .ss-input::placeholder { color: var(--text-faint); }
 .setup-split .ss-strip { width: 64px; height: 32px; border-radius: 7px; overflow: hidden; display: block; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 10%, transparent); }
+.setup-split .ss-strip { position: relative; }
+.setup-split .ss-strip .ss-sky { position: absolute; inset: 0; display: block; }
 .setup-split .ss-strip canvas { width: 100%; height: 100%; display: block; }
+/* Match my system: dark orange above the diagonal, light green below it. */
+.setup-split .ss-strip-pair .ss-sky + .ss-sky { clip-path: polygon(100% 0, 100% 100%, 0 100%); }
 .setup-split .ss-strip-light { background: #fff; }
 .setup-split .ss-strip-dark { background: radial-gradient(ellipse 80% 70% at 75% 25%, rgba(238, 96, 24, .18), transparent 70%), #1a1817; }
 .setup-split .ss-row:has(.ss-strip) { grid-template-columns: 64px 1fr auto; }
@@ -77,6 +81,10 @@
   border-radius: 8px; background: var(--ss-ground); font-size: 14.5px; cursor: pointer; box-shadow: 0 1px 2px rgba(30, 22, 36, .06); }
 .setup-split .ss-go:hover:not(:disabled) { background: color-mix(in srgb, var(--text) 3%, var(--bg)); }
 .setup-split .ss-go:disabled { color: var(--text-faint); cursor: default; box-shadow: none; }
+/* Not ready yet: a press still names the field that is missing (../team/sign-up-parts.ts). */
+.setup-split .ss-go.ss-not-yet { color: var(--text-faint); border-color: color-mix(in srgb, var(--text) 10%, transparent); box-shadow: none; cursor: default; }
+.setup-split .ss-go.ss-not-yet:hover { background: var(--ss-ground); }
+.setup-split .ss-go.ss-not-yet .ss-key { color: var(--text-faint); box-shadow: none; }
 .setup-split .ss-quiet, .setup-split .ss-back { border: 0; background: none; padding: 0; font-size: 14.5px; color: var(--text-dim); cursor: pointer; }
 .setup-split .ss-quiet:hover, .setup-split .ss-back:hover { color: var(--text); }
 .setup-split .ss-back { display: inline-flex; margin: 0 0 18px -6px; align-items: center; gap: 4px; padding: 4px 6px; border-radius: 6px; font-size: 13.5px; color: var(--text-faint); }
@@ -129,6 +137,9 @@
 .setup-split .ss-signin .si-form label > span:first-child { font: 13.5px var(--font, inherit); letter-spacing: 0; text-transform: none; color: var(--text-dim); }
 .setup-split .ss-signin .si-form input { height: 40px; border-radius: 8px; border-color: color-mix(in srgb, var(--text) 16%, transparent); background: var(--ss-ground); }
 .setup-split .ss-signin .si-or { margin: 16px 0; }
+.setup-split .ss-signin .si-steps .si-form { gap: 14px; }
+.setup-split .ss-signin .si-steps .si-form .ss-go { align-self: flex-start; margin-top: 10px; }
+.setup-split .ss-signin .si-form input::placeholder { color: var(--text-faint); }
 .setup-split .ss-signin .si-terms { text-align: left; margin-top: 16px; font-size: 13px; color: var(--text-faint); }
 .setup-split .ss-signin .si-setup-switch { margin-top: 20px; font-size: 14px; color: var(--text-faint); }
 /* The terms sit at the panel's foot, away from the buttons. */

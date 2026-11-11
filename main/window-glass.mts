@@ -7,11 +7,14 @@
 export const GLASS_ARG = '--agentbox-glass';
 
 const OPAQUE = '#1a1a1c';
+// The Finder sidebar's glass. 'under-window' is the window's own ground and is
+// close to opaque in dark mode, which read as no glass at all.
+const MATERIAL = 'sidebar';
 // The reference's lights, centred 25pt in and 25pt down; this is the top-left of 14pt buttons.
 const LIGHTS = { x: 18, y: 18 };
 
 export type GlassOptions = {
-  vibrancy?: 'under-window';
+  vibrancy?: typeof MATERIAL;
   visualEffectState?: 'active';
   trafficLightPosition?: { x: number; y: number };
   backgroundColor: string;
@@ -23,13 +26,13 @@ export function glassWindow(platform: NodeJS.Platform, on: boolean): GlassOption
   // 'active' keeps the blur when the window is not focused, as the reference does.
   const mac = { visualEffectState: 'active' as const, additionalArguments: [GLASS_ARG] };
   return on
-    ? { ...mac, vibrancy: 'under-window', trafficLightPosition: LIGHTS, backgroundColor: '#00000000' }
+    ? { ...mac, vibrancy: MATERIAL, trafficLightPosition: LIGHTS, backgroundColor: '#00000000' }
     : { ...mac, backgroundColor: OPAQUE };
 }
 
 export interface GlassableWindow {
   isDestroyed(): boolean;
-  setVibrancy(type: 'under-window' | null): void;
+  setVibrancy(type: typeof MATERIAL | null): void;
   setBackgroundColor(color: string): void;
   setWindowButtonPosition(position: { x: number; y: number } | null): void;
 }
@@ -37,7 +40,7 @@ export interface GlassableWindow {
 /** Flipping the switch while the app runs: the same window, turned glass or back. */
 export function applyGlass(win: GlassableWindow | null, platform: NodeJS.Platform, on: boolean): void {
   if (platform !== 'darwin' || !win || win.isDestroyed()) return;
-  win.setVibrancy(on ? 'under-window' : null);
+  win.setVibrancy(on ? MATERIAL : null);
   win.setBackgroundColor(on ? '#00000000' : OPAQUE);
   win.setWindowButtonPosition(on ? LIGHTS : null);
 }

@@ -54,6 +54,11 @@ export function engineLetter(engine: string | undefined): string {
   return engine === 'codex' ? 'X' : 'C';
 }
 
+/** Home is drawn over the Inbox, so the Inbox's selected row is out of sight and no key may act on it. */
+export function homeCoversTheList(p: { homeOn: boolean; homeOpen: boolean; threadOpen: boolean; searching: boolean; settingsOpen: boolean; teamShown: boolean }): boolean {
+  return p.homeOn && p.homeOpen && !p.threadOpen && !p.searching && !p.settingsOpen && !p.teamShown;
+}
+
 export type TeamRowState = 'working' | 'waiting' | 'quiet';
 
 export function teamRowState({ agents, waitingOnYou }: { agents: number | null; waitingOnYou: boolean }): TeamRowState {

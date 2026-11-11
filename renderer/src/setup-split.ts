@@ -5,15 +5,16 @@
 import { MATCH_SKY } from './home/sky';
 
 /** Where the app sits beside the setup, in window pixels: the steps panel's
- *  width, the app's top-left corner and scale, and how much of the 1120 by
- *  1300 app the panel cuts at its right and bottom edges, in the app's own pixels. */
+ *  width, the app's top-left corner and scale, and, in the app's own pixels,
+ *  its height and how much of its 1120 width the panel cuts at the right. */
 export function setupPreview(width: number, height: number) {
   const left = Math.round(Math.min(720, Math.max(480, width * 0.41)));
   const x = left + 24;
   const y = 40;
   // The app runs a little past the panel's right edge at any window size.
   const scale = Math.min(0.85, Math.max(0.55, (width - x + 60) / 1120));
-  return { left, x, y, scale, right: Math.max(0, 1120 - (width - 16 - x) / scale), bottom: Math.max(0, 1300 - (height - 16 - y) / scale) };
+  // As tall as the panel, so Home lays out as it does in a real window.
+  return { left, x, y, scale, h: (height - 16 - y) / scale, right: Math.max(0, 1120 - (width - 16 - x) / scale) };
 }
 
 export type SetupStep = 'chats' | 'folder' | 'account' | 'invite' | 'teammates' | 'look';
@@ -34,7 +35,7 @@ export function setupSteps({ chats, team, teammates, project, signedIn = true }:
 export const stepLabel = (steps: SetupStep[], step: SetupStep) => `Step ${steps.indexOf(step) + 1} of ${steps.length}`;
 
 /** Ids in shared sky themes and skins.ts: Light and Dark are the plain looks. */
-const LOOK_ORDER = ['ember', 'dusk', 'aurora', 'sage', 'light', 'dark'];
+const LOOK_ORDER = [MATCH_SKY, 'ember', 'dusk', 'aurora', 'sage', 'light', 'dark'];
 const LIGHT_SKIES = ['sage', 'dusk-light'];
 /** The look you have first, then the dark orange sky; the light pink sky only if you already wear it.
  *  A sky is drawn only on Home, so without it the choice is Light or Dark. */
@@ -106,11 +107,19 @@ export function tabStop(count: number, at: number, back: boolean): number {
   return (at + (back ? count - 1 : 1)) % count;
 }
 
-/** The sky a new install starts in, unless someone already chose one: the pair that follows the Mac. */
-export function setupStartsOn({ sky }: { sky: string | null; dark?: boolean }): string | null {
-  return sky ? null : MATCH_SKY;
+/** The look the setup ticks: the sky picked, Light or Dark once one of those was picked, and otherwise Match my system. */
+export function setupLook({ skies, picked, worn, light }: { skies: boolean; picked: boolean; worn: string | null; light: boolean }): string {
+  if (skies && picked && worn) return worn;
+  if (skies && worn) return MATCH_SKY;
+  return light ? 'light' : 'dark';
 }
 
 /** The walkthrough's place: the lit row or one past what is done, whichever is further. */
 export const tourPlace = (rows: ChecklistRow[]) => Math.min(Math.max(rows.filter((r) => r.state === 'done').length + 1, rows.findIndex((r) => r.state === 'now') + 1), rows.length);
 export const tourCount = (rows: ChecklistRow[]) => `${tourPlace(rows)} of ${rows.length}`;
+
+/** How far through the walkthrough you are, for the bar above the framed app. */
+export function walkPlace(done: readonly Lesson[], now: Lesson | null): { at: number; of: number } {
+  const rows = tourChecklist(done, '⌘', now);
+  return { at: tourPlace(rows), of: rows.length };
+}

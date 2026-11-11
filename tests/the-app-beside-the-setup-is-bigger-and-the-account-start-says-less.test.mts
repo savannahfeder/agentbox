@@ -40,13 +40,20 @@ describe('the app preview beside the setup', () => {
     expect(setupPreview(1024, 700).scale).toBe(0.55);
     expect(setupPreview(2560, 1440).scale).toBe(0.85);
   });
-  it('is cut where the panel ends, right and bottom', () => {
-    const at = setupPreview(1440, 900);
-    expect(at.x + (1120 - at.right) * at.scale).toBeCloseTo(1440 - 16, 5);
-    expect(at.y + (1300 - at.bottom) * at.scale).toBeCloseTo(900 - 16, 5);
+  it('is cut where the panel ends on the right, and ends where the panel ends at the bottom', () => {
+    // The founder on the look step: Home's content was "not properly centered on page, it's very
+    // high up", because the window behind it was 1300px tall and ran off the bottom. It is now as
+    // tall as the panel, so Home lays out the way it does in a real window.
+    for (const [w, h] of [[1440, 900], [1280, 800], [1920, 1080]]) {
+      const at = setupPreview(w, h);
+      // At its size cap on a wide window it stops short of the right edge instead.
+      if (at.right > 0) expect(at.x + (1120 - at.right) * at.scale).toBeCloseTo(w - 16, 5);
+      else expect(at.x + 1120 * at.scale).toBeLessThanOrEqual(w - 16);
+      expect(at.y + at.h * at.scale).toBeCloseTo(h - 16, 5);
+    }
   });
   it('is placed from those numbers, not from a second copy in the stylesheet', () => {
-    expect(css).toMatch(/:root\[data-setup\] #root \{[^}]*left: var\(--ss-x\); top: var\(--ss-y\);/);
+    expect(css).toMatch(/:root\[data-setup\] #root \{[^}]*left: var\(--ss-x\); top: var\(--ss-y\);\s*width: 1120px; height: var\(--ss-h\);/);
     expect(split).toMatch(/setupPreview\(innerWidth, innerHeight\)/);
   });
 });

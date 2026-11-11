@@ -14,8 +14,7 @@ import type { SessionThread } from '../agent-import-card';
 import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { starterAsks } from '../../../shared/teammates.mts';
-import { MATCH_SKY, SKY_THEMES, drawSky, wornSky } from '../home/sky';
-import { useDarkWindow } from '../home/home-settings';
+import { MATCH_SKY, SKY_THEMES, drawSky } from '../home/sky';
 import { setupPreview, tabStop, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupStep } from '../setup-split';
 import FolderPicker from './FolderPicker';
 import { SignInPage } from '../team/SignInPage';
@@ -50,15 +49,18 @@ function Row({ face, name, sub, end, on, onClick }: { face: ReactNode; name: Rea
 }
 const Check = ({ on }: { on: boolean }) => <span className={`ss-check${on ? ' ss-on' : ''}`}>{on && <Tick />}</span>;
 
-/** A sky drawn small on a strip, the way the window wears it. */
+/** A sky drawn small on a strip, the way the window wears it; Match my system draws the pair it switches between. */
 function Strip({ look }: { look: string }) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  const dark = useDarkWindow();
-  const sky = look === MATCH_SKY ? wornSky(MATCH_SKY, dark) : SKY_THEMES.find((s) => s.id === look);
-  useEffect(() => { if (ref.current && sky) drawSky(ref.current, sky.art, { from: 0, span: 6 }); }, [sky]);
   if (look === 'light') return <span className="ss-strip ss-strip-light" />;
   if (look === 'dark') return <span className="ss-strip ss-strip-dark" />;
-  return <span className="ss-strip" style={sky?.frame ? { background: sky.frame } : undefined}><canvas ref={ref} /></span>;
+  if (look === MATCH_SKY) return <span className="ss-strip ss-strip-pair"><SkyArt id="ember" /><SkyArt id="sage" /></span>;
+  return <span className="ss-strip"><SkyArt id={look} /></span>;
+}
+function SkyArt({ id }: { id: string }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  const sky = SKY_THEMES.find((s) => s.id === id);
+  useEffect(() => { if (ref.current && sky) drawSky(ref.current, sky.art, { from: 0, span: 6 }); }, [sky]);
+  return <span className="ss-sky" style={sky?.frame ? { background: sky.frame } : undefined}><canvas ref={ref} /></span>;
 }
 const LOOK_NAME = (id: string) => (id === MATCH_SKY ? 'Match my system' : id === 'light' ? 'Light' : id === 'dark' ? 'Dark' : SKY_THEMES.find((s) => s.id === id)?.name ?? id);
 
@@ -108,8 +110,9 @@ export function SetupSplit(p: SetupSplitProps) {
       root.style.setProperty('--ss-x', `${at.x}px`);
       root.style.setProperty('--ss-y', `${at.y}px`);
       root.style.setProperty('--ss-scale', String(at.scale));
-      // Negative top and left keep the window's outline and shadow, which a clip would otherwise cut.
-      root.style.setProperty('--ss-clip', `inset(-80px ${at.right}px ${at.bottom}px -80px round 0 0 ${16 / at.scale}px 0)`);
+      // Only the right edge is cut; the rest keeps the window's outline and shadow.
+      root.style.setProperty('--ss-h', `${at.h}px`);
+      root.style.setProperty('--ss-clip', `inset(-80px ${at.right}px -80px -80px)`);
     };
     fit();
     // The preview's new-thread box must not keep the keyboard behind the setup.
@@ -303,7 +306,7 @@ export function SetupSplit(p: SetupSplitProps) {
     const looks = looksAt.current;
     body = <>
       <div className="ss-list">
-        {looks.map((id, i) => <Row key={id} face={<Strip look={id} />} name={LOOK_NAME(id)} sub={i === 0 && id === p.look ? 'What you’re using now' : undefined}
+        {looks.map((id) => <Row key={id} face={<Strip look={id} />} name={LOOK_NAME(id)} sub={id === MATCH_SKY ? 'Orange in dark mode, green in light' : undefined}
           end={<Check on={id === p.look} />} on={id === p.look} onClick={() => p.onLook(id)} />)}
       </div>
       <div className="ss-acts">{go('Continue', next)}</div>

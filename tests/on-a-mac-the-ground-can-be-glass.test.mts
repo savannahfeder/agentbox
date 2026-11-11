@@ -9,9 +9,17 @@
 // approved two frames: Dark at 60% tint with the card outlined, Light at 30%
 // with the card flat. They wanted it behind an Alpha switch to try first.
 //
+// The first build, tried on the owner's Mac: not see-through, the ground's
+// colour changed with every key typed, and the band's buttons did nothing.
+// Read off the code: the 60% tint sat on top of macOS's darkest material; the
+// tint was on body, which Chromium paints as the window's own root colour
+// and re-sends with every frame; and the 50px drag strip is `::after`, the
+// last thing in the page, so its drag rectangle beat every button under it.
+//
 // Covered: the switch is off unless turned on, and flips the window live; a
 // Mac window can go glass and Linux and Windows never can; the page goes glass
-// only when both are true; each look draws its approved frame.
+// only when both are true; the root stays clear and the tint lives on the app;
+// no drag strip lies over the band's buttons; each look draws its frame.
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -51,7 +59,7 @@ describe('the switch', () => {
 describe('the window', () => {
   it('starts a Mac window glass when the switch is on', () => {
     const w = glassWindow('darwin', true);
-    expect(w.vibrancy).toBe('under-window');
+    expect(w.vibrancy).toBe('sidebar');
     expect(w.visualEffectState).toBe('active');
     expect(w.backgroundColor).toBe('#00000000');
     // The lights are 14pt across: this centres them 25pt in and 25pt down.
@@ -81,7 +89,7 @@ describe('the window', () => {
     applyGlass(win, 'darwin', true);
     applyGlass(win, 'darwin', false);
     expect(calls).toEqual([
-      ['vibrancy', 'under-window'], ['background', '#00000000'], ['lights', { x: 18, y: 18 }],
+      ['vibrancy', 'sidebar'], ['background', '#00000000'], ['lights', { x: 18, y: 18 }],
       ['vibrancy', null], ['background', '#1a1a1c'], ['lights', null],
     ]);
     calls.length = 0;
@@ -113,16 +121,21 @@ describe('the page', () => {
     expect(app).toContain('else delete root.dataset.glass;');
   });
 
-  it('tints Dark at 60% of its own ground and outlines the card', () => {
-    expect(rule(`${DARK} body`)).toMatch(/color-mix\(in srgb, var\(--bg\) 60%, transparent\)/);
+  it('keeps the page root clear, so the window has no colour of its own to repaint', () => {
+    expect(rule(`html${GLASS}, html${GLASS} body`)).toMatch(/background: transparent !important/);
+    // Nothing else may put a glass tint back on the root.
+    expect(nav).not.toMatch(/\[data-glass\][^{]*body \{[^}]*color-mix/);
+  });
+
+  it('tints Dark lightly with its own ground, on the app, and outlines the card', () => {
+    expect(rule(`${DARK} .app.workspace-layout`)).toMatch(/background: color-mix\(in srgb, var\(--bg\) 25%, transparent\)/);
     const card = rule(`${DARK} .workspace-layout::before`);
     expect(card).toMatch(/background: linear-gradient\(var\(--skin-pane\), var\(--skin-pane\)\), var\(--skin-image\) center \/ cover no-repeat fixed var\(--bg\)/);
     expect(card).toMatch(/box-shadow: 0 0 0 1\.5px color-mix\(in srgb, var\(--text\) 16%, transparent\)/);
   });
 
-  it('lets Light through at 30% of its sky\'s frame, with the card flat and no shadow', () => {
-    expect(rule(`${LIGHT} body`)).toMatch(/color-mix\(in srgb, var\(--sky-frame, var\(--bg\)\) 30%, transparent\) !important/);
-    expect(rule(`${LIGHT} .app.workspace-layout`)).toMatch(/background: transparent !important/);
+  it('tints Light lightly with its sky\'s frame, on the app, with the card flat and no shadow', () => {
+    expect(rule(`${LIGHT} .app.workspace-layout`)).toMatch(/background: color-mix\(in srgb, var\(--sky-frame, var\(--bg\)\) 20%, transparent\) !important/);
     const card = rule(':root[data-glass][data-theme="light"] .workspace-layout::before');
     expect(card).toMatch(/box-shadow: inset 0 0 0 1px color-mix\(in srgb, var\(--text\) 8%, transparent\)/);
     expect(card).not.toMatch(/shadow-card/);
@@ -144,7 +157,24 @@ describe('the page', () => {
     expect(band).toBe(50);
     expect(rule(`${GLASS} .app.workspace-layout`)).toMatch(new RegExp(`padding-top: ${band}px;`));
     expect(rule(`${GLASS} .workspace-layout::before`)).toMatch(new RegExp(`top: ${band}px;`));
-    expect(rule(`${GLASS} .workspace-layout::after`)).toMatch(new RegExp(`height: ${band}px`));
+    expect(rule(`${GLASS} .glass-band`)).toMatch(new RegExp(`top: 0; left: 0; right: 0; height: ${band}px`));
+  });
+
+  it('drags the window from the band, with no strip drawn over its buttons', () => {
+    // `::after` comes last in the page, so its drag rectangle would beat every
+    // no-drag button under it. Under glass it is not drawn; the band, which
+    // comes before the header in the page, is the drag strip instead.
+    expect(rule(`${GLASS} .workspace-layout::after`)).toMatch(/content: none/);
+    const band = rule(`${GLASS} .glass-band`);
+    expect(band).toMatch(/-webkit-app-region: drag/);
+    // It lies over the arrows, so it must not take their clicks.
+    expect(band).toMatch(/pointer-events: none/);
+    const buttons = rule('.glass-band button');
+    expect(buttons).toMatch(/-webkit-app-region: no-drag/);
+    expect(buttons).toMatch(/pointer-events: auto/);
+    const app = read('renderer/src/App.tsx');
+    expect(app.indexOf('<GlassBand ')).toBeGreaterThan(-1);
+    expect(app.indexOf('<GlassBand ')).toBeLessThan(app.indexOf('<header className="topbar">'));
   });
 
   it('puts back and forward, then Home and Inbox, level with the lights', () => {
@@ -155,11 +185,9 @@ describe('the page', () => {
     expect(arrows).toMatch(new RegExp(`top: ${y + 7 - 13}px`));
     expect(arrows).toMatch(new RegExp(`left: ${x + 60 + 16}px`));
     const band = rule(`${GLASS} .glass-band`);
-    expect(band).toMatch(new RegExp(`top: ${y + 7 - 13}px`));
-    expect(band).toMatch(/right: 20px/);
-    // Two 26px arrows and their 2px gap, then 12px.
-    expect(band).toMatch(new RegExp(`left: ${x + 60 + 16 + 54 + 12}px`));
-    expect(rule(`${GLASS} .app:not(.back-forward-on) .glass-band`)).toMatch(new RegExp(`left: ${x + 60 + 16}px`));
+    // Its 26px buttons centred on the lights in a 50px band.
+    expect(band).toMatch(new RegExp(`padding: ${y + 7 - 13}px 20px 0 ${x + 60 + 16 + 54 + 12}px`));
+    expect(rule(`${GLASS} .app:not(.back-forward-on) .glass-band`)).toMatch(new RegExp(`padding-left: ${x + 60 + 16}px`));
     expect(rule('.glass-band')).toMatch(/display: none/);
   });
 

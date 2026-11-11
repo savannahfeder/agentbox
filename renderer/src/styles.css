@@ -914,6 +914,7 @@ body {
 .back-forward button:not(:disabled):hover { background: var(--film-strong); }
 .back-forward button:disabled { color: var(--text-faint); opacity: .45; cursor: default; }
 .back-forward svg { width: 15px; height: 15px; }
+.back-forward .back-forward-inbox { margin-right: 10px; }
 /* Home hides its header bar but keeps the arrows. */
 .app.home-shown > .topbar .back-forward { visibility: visible; }
 /* The arrows replace the one back arrow a thread and Settings already had. */

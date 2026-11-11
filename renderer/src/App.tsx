@@ -101,7 +101,7 @@ import { wearJustMade, type JustMade } from './just-made';
 import { agentOnOrComing, asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
 import { filedByThePerson, wordWaits } from '../../shared/answers.mts';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mts';
-import { focusTheReplyBox } from './focus-at-end';
+import { focusAtEnd, focusTheReplyBox } from './focus-at-end';
 import { strayLetters } from './stray-letters';
 import { keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
 import { modelCommands } from './thread-model-commands';
@@ -176,6 +176,7 @@ import { landing as firstRunLanding, lessonsLeft, setLessons, showsOpenLesson, t
 import { useLessonPlace } from './lesson-position';
 import { ideasFor, runOfRule } from './first-run';
 import { Tour } from './components/Tour';
+import { TourFrame } from './components/TourFrame';
 import { laterTabShown } from './later-tab';
 import { type Lesson as TourLesson, THREAD_CLOSED, finishLesson, firstTask, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, showIdeas, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
 import {
@@ -262,9 +263,9 @@ import { HomePage, type NeedsRow, type ProgressRow, type TeamRow } from './home/
 import { SkyBackdrop } from './home/SkyBackdrop';
 import { InboxSky } from './home/InboxSky';
 import { SKY_THEME_KEY, setHomeSetting, useDarkWindow, useHomeSettings } from './home/home-settings';
-import { setupStartsOn } from './setup-split';
-import { MATCH_SKY, SKY_THEMES, skyTheme, wornSky } from './home/sky';
-import { engineLetter, engineName, greeting, teamRowState, weekCounts } from './home/home-model';
+import { setupLook } from './setup-split';
+import { MATCH_SKY, PLAIN, SKY_THEMES, skyTheme } from './home/sky';
+import { engineLetter, engineName, greeting, homeCoversTheList, teamRowState, weekCounts } from './home/home-model';
 import { sentFrom } from './team/company';
 import { reachAudienceOf } from '../../shared/teammate-reach.mts';
 import { useBackAndForward, type Stop as TrailStop } from './back-and-forward';
@@ -632,7 +633,7 @@ export default function App() {
   const startThread = () => {
     const box = clearSlot?.querySelector('textarea');
     // offsetParent is null where the page hides the box (a phone).
-    if (box?.offsetParent && modal !== 'compose') box.focus(); else setModal('compose');
+    if (box?.offsetParent && modal !== 'compose') focusAtEnd(box); else setModal('compose');
   };
   // Read by a send that lands after its card has closed, which must not close
   // or cover whatever has been opened since.
@@ -977,9 +978,9 @@ export default function App() {
     });
   }, []);
   // Light, Dark and Match system take any sky theme off; a sky theme brings its own look.
-  const chooseLook = useCallback((next: Look) => { setHomeSetting(SKY_THEME_KEY, null); setLook(next); }, [setLook]);
+  const chooseLook = useCallback((next: Look) => { setHomeSetting(SKY_THEME_KEY, next === 'match' ? null : PLAIN); setLook(next); }, [setLook]);
   const chooseSkyTheme = useCallback((id: string) => {
-    if (id === MATCH_SKY) { setLook('match'); setHomeSetting(SKY_THEME_KEY, MATCH_SKY); return; }
+    if (id === MATCH_SKY) { setHomeSetting(SKY_THEME_KEY, null); setLook('match'); return; }
     const k = skyTheme(id);
     if (!k) return;
     setLook(k.dark ? 'ember-grid' : 'light');
@@ -2986,11 +2987,18 @@ export default function App() {
   // it hides it, and closing that page brings it back. A phone has no Home and
   // no skies.
   const homeOn = !onPhone();
+  // THE WALKTHROUGH'S FRAME: the app inset, with its bar above, until the tips end (components/TourFrame.tsx).
+  const tourFramed = !fresh && homeOn && tourLive(tour);
+  useEffect(() => {
+    const root = document.documentElement;
+    if (tourFramed) root.dataset.tourFrame = ''; else delete root.dataset.tourFrame;
+  }, [tourFramed]);
   const homeSet = useHomeSettings();
   const [homeOpen, setHomeOpen] = useState(homeOn);
   const darkWindow = useDarkWindow();
   // A sky theme is worn only while the window wears its look.
-  const sky = homeOn ? wornSky(homeSet.skyTheme, darkWindow) : null;
+  const skyPicked = homeOn ? skyTheme(homeSet.skyTheme) : null;
+  const sky = skyPicked && skyPicked.dark === darkWindow ? skyPicked : null;
   useEffect(() => {
     const root = document.documentElement;
     if (sky?.frame) { root.dataset.skyFrame = sky.id; root.style.setProperty('--sky-frame', sky.frame); }
@@ -3276,11 +3284,13 @@ export default function App() {
     ? run.item
     : walkBeat.length ? (hoveredId && walkBeat.includes(hoveredId) ? hoveredId : walkBeat[0]) : null;
   const walkOwn = walkAim ? list.find((i) => i.id === walkAim) : undefined;
+  const homeCovers = homeCoversTheList({ homeOn, homeOpen, threadOpen: !!focused || !!focusedRepeat, searching: search !== null, settingsOpen, teamShown });
   const pointed: WorkItem | undefined = walkOwn
-    ?? (hoveredId && !multiSel.size ? list.find((i) => i.id === hoveredId) : undefined) ?? (keyCard || keyLeadPicked ? undefined : current);
+    ?? (hoveredId && !multiSel.size ? list.find((i) => i.id === hoveredId) : undefined)
+    ?? (keyCard || keyLeadPicked || homeCovers ? undefined : current);
   const keyTab = stacked && pointed ? stacked.tabOf(pointed) : view;
   // No row, card or tick on the list, so a row's keys are words for its box.
-  const nothingToActOn = !focused && !pointed && !multiSel.size && !keyLead && !stops.length;
+  const nothingToActOn = !focused && !pointed && (homeCovers || (!multiSel.size && !keyLead && !stops.length));
 
   /* ------------------------- a panel with a panel in it -------------------- */
   // NO HAIRLINE WITHOUT A SIDEBAR BEHIND IT.
@@ -4751,10 +4761,11 @@ export default function App() {
 
   // Threads opened with O this session (openToastRow).
   const openedWithO = useRef(new Set<string>());
+  const openedFromHome = useRef(new Set<string>());
   // Whether a reply from inside this thread moves her on to the next (./advance).
   const movesOn = useCallback((item: WorkItem) => replyMovesOn({
     view, onBoard, index: shownInbox.findIndex((i) => i.id === item.id), searching: search !== null, phone: onPhone(),
-    cameBack: openedWithO.current.has(keyOf(item)),
+    cameBack: openedWithO.current.has(keyOf(item)), fromHome: openedFromHome.current.has(keyOf(item)),
   }), [view, onBoard, shownInbox, search]);
 
   // Every resolving action goes through here: the UI advances instantly, the
@@ -6653,7 +6664,7 @@ export default function App() {
           if (means === 'nowhere') {
             const box = clearSlot?.querySelector('textarea');
             // Not prevented: the character lands in the box it has just focused.
-            if (box?.offsetParent) { box.focus(); return; }
+            if (box?.offsetParent) { focusAtEnd(box); return; }
             // A second letter soon after is somebody typing; one is a slip.
             if (Date.now() - nowhereAt.current < 2000) showToast(NOWHERE_TO_TYPE);
             nowhereAt.current = Date.now();
@@ -7306,7 +7317,7 @@ export default function App() {
     : s.at === 'settings' ? 'Settings'
     : selectable.find((i) => i.id === s.id && i.product === s.product)?.title ?? 'the thread';
   const backForward = backForwardOn
-    ? <BackForward backTo={trail.backTo} forwardTo={trail.forwardTo} onBack={trail.back} onForward={trail.forward} name={stopName} />
+    ? <BackForward backTo={trail.backTo} forwardTo={trail.forwardTo} onBack={trail.back} onForward={trail.forward} onInbox={() => openView('inbox')} inboxOnEsc={!!focused} name={stopName} />
     : null;
   useEffect(() => {
     if (!onPhone()) return;
@@ -7678,6 +7689,7 @@ export default function App() {
   const homeOpenRow = (key: string) => {
     const item = items.find((i) => `${i.product}/${i.id}` === key);
     if (!item) return;
+    openedFromHome.current.add(keyOf(item));
     setFocused(item); markSeen(item);
   };
   // Light themes keep the Inbox plain; only dark ones wear its sky.
@@ -8244,7 +8256,7 @@ export default function App() {
                   crumbFrom={teamOpen ? 'Team' : search !== null ? 'Search'
                     : onBoard ? 'Inbox'
                     : directOpen && roomsUi.openId ? 'Groups'
-                    : crumbTabNow === 'inbox' && team ? needsWord(picked, team.me)
+                    : crumbTabNow === 'inbox' ? 'Inbox'
                       : INBOX_TABS.find((t) => t.view === crumbTabNow)?.label}
                   inlineArtifacts
                   previewSample={api.isFixtures && (reviewLab || new URLSearchParams(location.search).has('artifactTweaks')) ? artifactPreviewSample : undefined}
@@ -9298,17 +9310,16 @@ export default function App() {
           surfaces at once would photograph the welcome screen. */}
       {fresh && !modeDraft && arm === 'classic' && <ClassicFirstRun snap={snap} home={home} onDone={finishClassic} />}
       {fresh && !modeDraft && arm === 'tour' && <FirstRunFlow snap={snap} home={home} onDone={finishFresh}
-        look={(homeOn && homeSet.skyTheme) || (resolveTheme(theme) === 'light' ? 'light' : 'dark')} skies={homeOn}
+        look={setupLook({ skies: homeOn, picked: homeSet.picked, worn: homeSet.skyTheme, light: resolveTheme(theme) === 'light' })} skies={homeOn}
         onLook={(id) => { if (id === 'light') chooseLook('light'); else if (id === 'dark') chooseLook('ember-grid'); else chooseSkyTheme(id); }}
         onProject={(slug) => { rememberProject(slug); setPickProject(slug); }}
         onSetup={() => {
           setFocused(null); setView('inbox');
           if (homeOn) setHomeOpen(true);
-          const sky = setupStartsOn({ sky: homeSet.skyTheme, dark: darkWindow });
-          if (sky) chooseSkyTheme(sky);
         }}
         onLeave={setupStartedAgain.current ? leaveSetupAgain : undefined} />}
       <OpenLesson at={lessonAt} />
+      {tourFramed && createPortal(<TourFrame done={tour!.done} now={tourNow} onSkip={() => setTour(skipTour(tour!))} />, document.body)}
       {!fresh && <Tour tour={tour} practice={!!tourTask} view={view} thread={!!focused}
         answering={!!tourPractice?.item && focused?.id === tourPractice.item && (tourPractice.answered ?? 0) <= tourPractice.replies}
         covered={!!run || settingsOpen || teamOpen || newProject || (modal !== null && modal !== 'compose' && modal !== 'palette')}

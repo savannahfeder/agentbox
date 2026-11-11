@@ -3,13 +3,12 @@
 // The founder switched macOS to light during the first run, and Agentbox
 // stayed dark. A new install saved "dark" the moment it opened, and the setup
 // then pinned the dark orange sky, so neither followed the Mac again. A new
-// install now saves "match" with a sky that pairs dark orange on a dark Mac
-// with light green on a light one, until somebody picks a look of their own.
+// install now saves "match" and no sky, which wears dark orange on a dark Mac
+// and light green on a light one, until somebody picks a look of their own.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { normalizeSavedLook, seedFirstRunLook, SKIN_KEY } from '../renderer/src/skins.ts';
-import { MATCH_SKY, wornSky } from '../renderer/src/home/sky.ts';
-import { setupStartsOn } from '../renderer/src/setup-split.ts';
+import { PLAIN, shownSkyId } from '../renderer/src/home/sky.ts';
 
 const memory = (seed: Record<string, string> = {}) => { const m = new Map(Object.entries(seed)); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => { m.set(k, v); }, m }; };
 
@@ -36,28 +35,24 @@ describe('the first look', () => {
 });
 
 describe('the sky that follows the Mac', () => {
+  // Main's rule (w-1bf65f4322): with no sky saved, the window wears dark orange
+  // in the dark and light green in the light. Match my system is that rule.
   it('is dark orange on a dark Mac and light green on a light one', () => {
-    expect(wornSky(MATCH_SKY, true)?.id).toBe('ember');
-    expect(wornSky(MATCH_SKY, false)?.id).toBe('sage');
+    expect(shownSkyId(null, true)).toBe('ember');
+    expect(shownSkyId(null, false)).toBe('sage');
   });
-  it('leaves a picked sky as it is, worn only in its own light or dark', () => {
-    expect(wornSky('dusk', true)?.id).toBe('dusk');
-    expect(wornSky('dusk', false)).toBeNull();
-    expect(wornSky(null, true)).toBeNull();
-  });
-  it('is what the setup starts in when nobody has picked one', () => {
-    expect(setupStartsOn({ sky: null, dark: true })).toBe(MATCH_SKY);
-    expect(setupStartsOn({ sky: null, dark: false })).toBe(MATCH_SKY);
-    expect(setupStartsOn({ sky: 'dusk', dark: true })).toBe(null);
+  it('leaves a picked sky as it is, and plain Light or Dark with no sky', () => {
+    expect(shownSkyId('dusk', true)).toBe('dusk');
+    expect(shownSkyId(PLAIN, true)).toBe(null);
   });
 });
 
 describe('the app', () => {
   const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
-  it('wears the sky through wornSky, so a Mac that flips takes the sky with it', () => {
-    expect(app).toMatch(/const sky = homeOn \? wornSky\(homeSet\.skyTheme, darkWindow\) : null;/);
+  it('chooses Match my system by saving no sky, so the default follows the Mac', () => {
+    expect(app).toMatch(/if \(id === MATCH_SKY\) \{ setHomeSetting\(SKY_THEME_KEY, null\); setLook\('match'\); return; \}/);
   });
-  it('chooses the pair as Match my system', () => {
-    expect(app).toMatch(/if \(id === MATCH_SKY\) \{ setLook\('match'\); setHomeSetting\(SKY_THEME_KEY, MATCH_SKY\); return; \}/);
+  it('no longer pins a sky when the setup opens', () => {
+    expect(app).not.toMatch(/setupStartsOn/);
   });
 });

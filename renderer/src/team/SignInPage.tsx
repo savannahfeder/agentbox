@@ -14,7 +14,7 @@ import { AppMark } from '../components/AppMark';
 import { onCloudPhone } from '../phone-screen';
 import { agreedHere, rememberAgreed } from './cloud-agreed';
 import { whatIsMissing, type Missing } from './what-is-missing';
-import { nextSignUpPart, type SignUpPart } from './sign-up-parts';
+import { nextSignUpPart, partMissing, partReady, type SignUpPart } from './sign-up-parts';
 import './sign-in.css';
 
 export const GoogleMark = () => (
@@ -92,7 +92,7 @@ export function SignInPage({ onSkip, signedOut = false, error: startError = null
   const [part, setPart] = useState<SignUpPart>('start');
   useEffect(() => {
     if (!inSetup || mode !== 'sign-up' || part === 'start') return;
-    fieldOf[part].current?.focus();
+    (part === 'name' ? nameField : emailField).current?.focus();
   }, [part, mode, inSetup]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     setMissing(null);
@@ -168,7 +168,7 @@ export function SignInPage({ onSkip, signedOut = false, error: startError = null
     e?.preventDefault();
     if (busy) return;
     const gap = whatIsMissing({ mode: mode === 'sign-up' ? 'sign-up' : 'sign-in', name, email, password });
-    if (gap) { setMissing(gap); setError(null); if (inSetup && mode === 'sign-up') setPart(gap.field); fieldOf[gap.field].current?.focus(); return; }
+    if (gap) { setMissing(gap); setError(null); if (inSetup && mode === 'sign-up') setPart(gap.field === 'name' ? 'name' : 'login'); fieldOf[gap.field].current?.focus(); return; }
     setBusy('email'); setError(null);
     const out = cloud
       ? await api.cloudAccountSignIn(mode === 'sign-up' ? { method: 'sign-up', name, email, password } : { method: 'email', email, password, acceptTerms: agreedHere(email) })
@@ -211,10 +211,10 @@ export function SignInPage({ onSkip, signedOut = false, error: startError = null
   };
 
   // `bare` is for a screen whose heading already names the field.
-  const passwordField = (autoComplete: string, label: string, bare = false) => (
+  const passwordField = (autoComplete: string, label: string, bare = false, placeholder?: string) => (
     <label className={missing?.field === 'password' ? 'si-missing' : undefined}>{!bare && <span>{label}</span>}
       <span className="si-pw">
-        <input ref={pwField} type={showPassword ? 'text' : 'password'} value={password} autoComplete={autoComplete} aria-label={bare ? label : undefined} aria-invalid={missing?.field === 'password' || undefined} onChange={(e) => { setPassword(e.target.value); setMissing(null); setError(null); }} />
+        <input ref={pwField} type={showPassword ? 'text' : 'password'} value={password} autoComplete={autoComplete} placeholder={placeholder} aria-label={bare ? label : undefined} aria-invalid={missing?.field === 'password' || undefined} onChange={(e) => { setPassword(e.target.value); setMissing(null); setError(null); }} />
         <button type="button" className="si-pw-show" aria-pressed={showPassword} onClick={() => setShowPassword((on) => !on)}>{showPassword ? 'Hide' : 'Show'}</button>
       </span>
     </label>
@@ -251,15 +251,15 @@ export function SignInPage({ onSkip, signedOut = false, error: startError = null
       const to = nextSignUpPart(part, by);
       if (to) setPart(to); else if (by < 0) onBack?.();
     };
+    const ready = partReady(part, { name, email, password });
     const onward = (e?: FormEvent) => {
       e?.preventDefault();
-      if (part === 'name' && !name.trim()) { setMissing({ field: 'name', say: 'Enter your name.' }); return; }
-      if (part === 'email' && !email.trim()) { setMissing({ field: 'email', say: 'Enter your email address.' }); return; }
-      if (part === 'password') { void submit(); return; }
+      if (!ready) { setMissing(partMissing(part, { name, email, password })); return; }
+      if (part === 'login') { void submit(); return; }
       step(1);
     };
     if (primaryRef) primaryRef.current = () => onward();
-    const ask = part === 'start' ? 'Create your account.' : part === 'name' ? 'What’s your name?' : part === 'email' ? 'What’s your email?' : 'Choose a password.';
+    const ask = part === 'start' ? 'Create your account.' : part === 'name' ? 'What’s your name?' : 'Your email and a password.';
     return (
       <div className="si-page si-steps" role="group" aria-label={ask}>
         <div className="si-card">
@@ -272,11 +272,18 @@ export function SignInPage({ onSkip, signedOut = false, error: startError = null
               <p className="si-switch si-setup-switch">Have an account? <button type="button" onClick={() => { setMode('sign-in'); setPassword(''); setError(null); }}>Sign in</button></p>
             </>
           ) : (
-            <form className="si-form" onSubmit={onward}>
-              {part === 'name' && <input ref={nameField} value={name} autoComplete="name" aria-label="Name" aria-invalid={missing?.field === 'name' || undefined} onChange={(e) => { setName(e.target.value); setMissing(null); }} />}
-              {part === 'email' && <input ref={emailField} type="email" value={email} autoComplete="email" aria-label="Email" aria-invalid={missing?.field === 'email' || undefined} onChange={(e) => { setEmail(e.target.value); setMissing(null); setError(null); }} />}
-              {part === 'password' && passwordField('new-password', 'Password', true)}
-              <button type="submit" className="si-primary" disabled={!!busy}>{part === 'password' ? (busy === 'email' ? 'Creating…' : 'Create account') : 'Continue'}</button>
+            <form className="si-form" onSubmit={onward} noValidate>
+              {part === 'name' && <input ref={nameField} value={name} autoComplete="name" aria-label="Name" placeholder="First and last name" aria-invalid={missing?.field === 'name' || undefined} onChange={(e) => { setName(e.target.value); setMissing(null); }} />}
+              {part === 'login' && <>
+                <label className={missing?.field === 'email' ? 'si-missing' : undefined}><span>Email</span>
+                  <input ref={emailField} type="email" value={email} autoComplete="email" placeholder="you@company.com" aria-invalid={missing?.field === 'email' || undefined} onChange={(e) => { setEmail(e.target.value); setMissing(null); setError(null); }} />
+                </label>
+                {passwordField('new-password', 'Password', false, '6 or more characters')}
+              </>}
+              <button type="submit" className={`ss-go${ready ? '' : ' ss-not-yet'}`} aria-disabled={!ready || undefined} disabled={!!busy}>
+                {part === 'login' ? (busy === 'email' ? 'Creating…' : 'Create account') : 'Continue'}
+                <span className="ss-keys"><span className="ss-key">↵</span></span>
+              </button>
             </form>
           )}
           {fault}
