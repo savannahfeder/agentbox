@@ -9,7 +9,7 @@
 // there and moves on by itself once the cloud says the team has seats.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { proIncludes, setupSteps, teamPaid } from '../renderer/src/setup-split.ts';
+import { cloudShowcase, PRO_PITCH, setupSteps, teamPaid } from '../renderer/src/setup-split.ts';
 import { TEAM } from '../cloud/gateway/plans.mjs';
 
 const split = fs.readFileSync(new URL('../renderer/src/components/SetupSplit.tsx', import.meta.url), 'utf8');
@@ -25,14 +25,32 @@ describe('where the purchase page comes', () => {
 });
 
 describe('what the page says', () => {
-  const ends = Date.UTC(2026, 10, 24, 12);
-  it('lists what Pro brings, at the cloud’s own numbers', () => {
-    const lines = proIncludes(ends);
-    expect(lines[0]).toBe('Your team in one inbox');
-    expect(lines[1]).toBe(`${TEAM.agentsPerSeat} cloud agents at once, ${TEAM.hoursPerSeat} hours a month each`);
+  // The founder on the first version, a card of three ticked lines under "Start Pro.": "needs a
+  // more compelling card that really convinces peope to use it (cloud first)", "make it clear
+  // that with this plan each agent gets its own cloud computer", "this is too convoluted, i dont
+  // even want to read", and "this should also be skibppable".
+  it('leads with each agent on its own computer, in the cloud, at the cloud’s own numbers', () => {
+    expect(PRO_PITCH.head).toBe('Every agent gets a computer.');
+    expect(PRO_PITCH.foot).toBe(`Each in the cloud, ${TEAM.agentsPerSeat} at once, even with your laptop shut`);
   });
-  it('says when the first charge comes, and that cancelling before then costs nothing', () => {
-    expect(proIncludes(ends)[2]).toBe('Nothing to pay until Nov 24. Cancel before then and pay nothing.');
+  it('puts the price in one quiet line, with the free days on the button', () => {
+    expect(PRO_PITCH.cta).toBe(`Try Pro free for ${TEAM.trialDays} days`);
+    expect(PRO_PITCH.terms).toBe(`Then $${TEAM.dollarsPerSeat} a month per person. Cancel any time.`);
+  });
+});
+
+describe('the agents drawn on their own computers', () => {
+  it('are the person’s own chats first', () => {
+    expect(cloudShowcase(['Fix the crash', 'Add retries', 'Write tests'])).toEqual(['Fix the crash', 'Add retries', 'Write tests', 'Fix the flaky date picker test', 'Add a health check endpoint', 'Profile the slowest page']);
+  });
+  it('are always six, however many chats there are', () => {
+    expect(cloudShowcase([])).toHaveLength(6);
+    expect(cloudShowcase(Array.from({ length: 20 }, (_, i) => `Chat ${i}`))).toEqual(['Chat 0', 'Chat 1', 'Chat 2', 'Chat 3', 'Chat 4', 'Chat 5']);
+  });
+  it('never show the same agent twice, or a blank one', () => {
+    const out = cloudShowcase(['  ', 'Add a health check endpoint']);
+    expect(new Set(out).size).toBe(6);
+    expect(out).not.toContain('');
   });
 });
 
@@ -50,6 +68,10 @@ describe('the page on screen', () => {
     expect(split).toMatch(/\} else if \(step === 'pay'\) \{/);
     expect(split).toMatch(/await api\.cloudAccountPay\('team'\)/);
     expect(split).toMatch(/const paid = teamPaid\(await api\.cloudAccountPlan\(\)\); if \(live && paid\) next\(\);/);
+  });
+  it('draws the agents on their computers, and can be skipped', () => {
+    expect(split).toMatch(/cloudShowcase\(p\.chats\.map\(\(t\) => t\.title\)\)\.map\(/);
+    expect(split).toMatch(/: PRO_PITCH\.cta, \(\) => void pay\(\), payState !== 'opening'\)\}\{quiet\('Skip for now', next\)\}/);
   });
   it('moves from the team’s name to the email field on Enter, where Enter on nothing goes on', () => {
     // Walking it, Enter in "Name your team" did nothing at all.

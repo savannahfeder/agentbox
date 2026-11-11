@@ -44,15 +44,19 @@ export const SETUP_PLANS: Array<{ id: SetupPlan; name: string; price: string; pe
   { id: 'pro', name: 'Pro', price: `$${TEAM.dollarsPerSeat}`, per: 'a person a month', tag: `${TEAM.trialDays} days free`, sub: `Your team, plus ${TEAM.agentsPerSeat} cloud agents at once` },
 ];
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-/** What the purchase page lists for Pro; `endsAt` is when the team's free days end and the card is first charged. */
-export function proIncludes(endsAt: number): string[] {
-  const d = new Date(endsAt);
-  return [
-    'Your team in one inbox',
-    `${TEAM.agentsPerSeat} cloud agents at once, ${TEAM.hoursPerSeat} hours a month each`,
-    `Nothing to pay until ${MONTHS[d.getMonth()]} ${d.getDate()}. Cancel before then and pay nothing.`,
-  ];
+/** The purchase page's words: the cloud first, the price in one quiet line. */
+export const PRO_PITCH = {
+  head: 'Every agent gets a computer.',
+  foot: `Each in the cloud, ${TEAM.agentsPerSeat} at once, even with your laptop shut`,
+  cta: `Try Pro free for ${TEAM.trialDays} days`,
+  terms: `Then $${TEAM.dollarsPerSeat} a month per person. Cancel any time.`,
+};
+
+const SHOWCASE_FILL = ['Fix the flaky date picker test', 'Add a health check endpoint', 'Profile the slowest page', 'Port the cron jobs to the queue', 'Write tests for the refund flow', 'Speed up the search index build'];
+/** The agents drawn on their own cloud computers: the person's own chats first, then stand-ins to make six. */
+export function cloudShowcase(titles: readonly string[]): string[] {
+  const own = titles.map((t) => t.trim()).filter(Boolean).slice(0, 6);
+  return [...own, ...SHOWCASE_FILL.filter((t) => !own.includes(t))].slice(0, 6);
 }
 
 /** The team has bought its seats, so the purchase page can move on. */

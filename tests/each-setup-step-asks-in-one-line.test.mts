@@ -8,6 +8,7 @@
 // change the files, now has a heading alone, short enough for one line.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
+import { PRO_PITCH } from '../renderer/src/setup-split.ts';
 
 const split = fs.readFileSync(new URL('../renderer/src/components/SetupSplit.tsx', import.meta.url), 'utf8');
 const heads = [...split.matchAll(/head = \['([^']*)', '([^']*)'\];/g)].map((m) => ({ ask: m[1], under: m[2] }));
@@ -18,7 +19,6 @@ describe('the headings of the setup', () => {
       'Add your recent agents.',
       'Pick a folder for your first project.',
       'Pick a plan.',
-      'Start Pro.',
       'Invite your team.',
       'Add your own AI teammates.',
       'Pick your look.',
@@ -33,6 +33,10 @@ describe('the headings of the setup', () => {
   });
   it('fit on one line of the steps column', () => {
     for (const h of heads.filter((x) => !x.under)) expect(h.ask.length).toBeLessThanOrEqual(26);
+  });
+  it('include the purchase page’s, from its own words, alone and on one line', () => {
+    expect(split).toMatch(/head = \[PRO_PITCH\.head, ''\];/);
+    expect(PRO_PITCH.head.length).toBeLessThanOrEqual(28);
   });
   it('still say the AI teammates are yours, not the team’s', () => {
     expect(heads.find((h) => /AI teammates/.test(h.ask))!.ask).toMatch(/your own/);

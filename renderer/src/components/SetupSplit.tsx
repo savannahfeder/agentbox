@@ -15,7 +15,7 @@ import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { starterAsks } from '../../../shared/teammates.mts';
 import { MATCH_SKY, SKY_THEMES, drawSky } from '../home/sky';
-import { SETUP_PLANS, proIncludes, setupPreview, tabStop, teamPaid, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
+import { PRO_PITCH, SETUP_PLANS, cloudShowcase, setupPreview, tabStop, teamPaid, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
 import { TEAM } from '../../../cloud/gateway/plans.mjs';
 import FolderPicker from './FolderPicker';
 import { SignInPage } from '../team/SignInPage';
@@ -30,6 +30,7 @@ const said = (when: number) => { const a = ago(when); return /^\d/.test(a) ? `${
 const Keys = ({ ks }: { ks: string[] }) => <span className="ss-keys">{ks.map((k) => <span key={k} className="ss-key">{k}</span>)}</span>;
 const Tick = () => <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3.5 8.4l3 3 6-6.6" /></svg>;
 const Plus = () => <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true"><path d="M8 2.5v11M2.5 8h11" /></svg>;
+const Monitor = () => <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="2" y="2.5" width="12" height="8.5" rx="1.5" /><path d="M6 13.5h4M8 11v2.5" /></svg>;
 const Folder = () => <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" aria-hidden="true"><path d="M2 4.5c0-.6.4-1 1-1h3.2l1.4 1.5H13c.6 0 1 .4 1 1V12c0 .6-.4 1-1 1H3c-.6 0-1-.4-1-1z" /></svg>;
 
 export function Mark() {
@@ -306,18 +307,22 @@ export function SetupSplit(p: SetupSplitProps) {
       <div className="ss-acts">{go('Continue', next)}</div>
     </>;
   } else if (step === 'pay') {
-    head = ['Start Pro.', ''];
-    const teamOn = p.snap?.team?.team?.name;
+    head = [PRO_PITCH.head, ''];
     body = <>
-      <div className="ss-list ss-buy">
-        <div className="ss-buy-top">
-          <span className="ss-name">Pro{teamOn && <span className="ss-dim"> for {teamOn}</span>}</span>
-          <span className="ss-price"><b>${TEAM.dollarsPerSeat}</b><small>a person a month</small></span>
+      <div className="ss-cloud">
+        <div className="ss-cloud-grid">
+          {cloudShowcase(p.chats.map((t) => t.title)).map((name, i) => (
+            <div key={name} className="ss-pc">
+              <span className="ss-pc-top"><Monitor /><span>Cloud {String(i + 1).padStart(2, '0')}</span><i className="ss-pc-live" /></span>
+              <span className="ss-pc-name">{name}</span>
+            </div>
+          ))}
         </div>
-        {proIncludes(Date.now() + TEAM.trialDays * 24 * 3600_000).map((l) => <div key={l} className="ss-buy-line"><Tick />{l}</div>)}
+        <div className="ss-cloud-foot">{PRO_PITCH.foot}</div>
       </div>
       {payState === 'waiting' && <p className="ss-note">Finish in your browser. This moves on once Stripe has your card.</p>}
-      <div className="ss-acts">{go(payState === 'opening' ? 'Opening Stripe…' : payState === 'waiting' ? 'Open Stripe again' : 'Add a card', () => void pay(), payState !== 'opening')}</div>
+      <div className="ss-acts">{go(payState === 'opening' ? 'Opening Stripe…' : payState === 'waiting' ? 'Open Stripe again' : PRO_PITCH.cta, () => void pay(), payState !== 'opening')}{quiet('Skip for now', next)}</div>
+      <p className="ss-price-line">{PRO_PITCH.terms}</p>
     </>;
   } else if (step === 'invite') {
     head = ['Invite your team.', ''];
