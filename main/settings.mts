@@ -81,6 +81,7 @@ export interface SettingsConfig {
   adhdMode?: boolean | null;
   importNew?: boolean | null;
   cornerTag?: boolean | null;
+  agentsUseYourChrome?: boolean | null;
   activeAccount?: Record<string, string | null | undefined> | null;
   alphaRooms?: boolean | null;
   diagnostics?: boolean;
@@ -840,6 +841,7 @@ export function readSettings({ config, supervisor, store }: SettingsDeps, { sear
       // The corner tag over other apps (w-dafae58a23). On unless she turned it
       // off here, which is the only place it turns off for good.
       cornerTag: config.cornerTag !== false,
+      agentsUseYourChrome: config.agentsUseYourChrome === true,
       // How much of her own Claude Code goes in her inbox: all / waiting / off.
       // All by default, because the machine nobody has opened this page on is
       // the one with thirteen forgotten sessions on it.
@@ -1445,6 +1447,10 @@ export function setWorkspaceSetting({ config, supervisor, store }: SettingsDeps,
     // the switch does what it says the moment she flips it.
     case 'cornerTag':
       saveConfig(config, value ? { cornerTag: true, cornerTagHiddenUntil: 0 } : { cornerTag: false });
+      break;
+    // Off unless saved as exactly true (main/your-chrome.mts). Read at every spawn.
+    case 'agentsUseYourChrome':
+      saveConfig(config, { agentsUseYourChrome: value === true });
       break;
     // WHICH ACCOUNT HER WORK RUNS ON.
     //

@@ -19,7 +19,8 @@ import { cloudClaudeMode, cloudPermissionArgs } from '../cloud-permission.mts';
 import { claudeActivity } from '../agent-activity.mts';
 import { captureStream, streamingText, summarizeStreamLine, traceStreamLine } from './claude-stream.mts';
 import { definitionMethods, commonUpdatePlan } from './common.mts';
-import type { BinKey, Env, HarnessItem, HarnessPlan, HarnessRecord, HarnessSpawnContext, HarnessSupervisor, SignInFilesWhere, UpdatePlanOptions } from './common.mts';
+import { yourChromeArgs } from '../your-chrome.mts';
+import type { BinKey, Env, HarnessConfig, HarnessItem, HarnessPlan, HarnessRecord, HarnessSpawnContext, HarnessSupervisor, SignInFilesWhere, UpdatePlanOptions } from './common.mts';
 import { findTranscript } from '../transcript-search.mts';
 const definition = harnessDefinition('claude')!;
 
@@ -29,6 +30,11 @@ const definition = harnessDefinition('claude')!;
 // outranks both (measured on 2.1.301, w-6d8c543a43). Every Claude Code run the
 // app starts carries it: workers in their settings file, small calls inline.
 export const NO_METERED_KEY = Object.freeze({ env: Object.freeze({ ANTHROPIC_API_KEY: '' }), apiKeyHelper: '' });
+
+/** A worker's line on this computer. A cloud run has no Chrome of the person's, so `cloudLaunch` never adds it. */
+export function localClaudeArgv(config: HarnessConfig, plan: Pick<HarnessPlan, 'args'>): string[] {
+  return streamInputArgs(definition.run, [...plan.args, ...yourChromeArgs(config, plan.args)]);
+}
 
 export const claudeHarness = {
   ...definitionMethods(definition),
@@ -72,7 +78,7 @@ export const claudeHarness = {
     // The binary is the one this definition names, not a field spelled out
     // here: that is the last place an engine of this family needed code.
     const bin = sup.config[definition.binKey as BinKey];
-    const argv = streamInputArgs(definition.run, plan.args);
+    const argv = localClaudeArgv(sup.config, plan);
     const runEnv = { ...claudeLaunchEnv(bin, env), STORE_ACCOUNT_ID: sup.config.accountId, ...storeRootEnv(sup.config.storeRoot),
       ...(profile !== 'default' ? { [definition.homeEnv]: profile } : {}),
       ZERO_PRODUCT: item.product, ZERO_ITEM: item.id, ...sup.memoryGateEnv(item) };
