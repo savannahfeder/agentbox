@@ -1,7 +1,8 @@
 // The Today page: what each person and AI teammate finished, shipped and
 // decided, what is blocked and on whom, and what waits on you, read from the
 // store with no agent.
-import { shippedAtOf, threadState } from '../../../shared/thread-cards.mts';
+import { cardStateOf, shippedAtOf, type WontStart } from '../../../shared/thread-cards.mts';
+import { agentOnOrComing } from '../list-rules';
 import { shownTitle, withoutFiles } from '../../../shared/thread-title.mts';
 import { isShared, isTaskRow, runnerOf, taskNewsAt } from '../../../shared/team-rules.mts';
 import { isSetupTitle } from '../../../shared/teammates.mts';
@@ -92,7 +93,11 @@ const oneLine = (s: string) => {
   return line.length > 110 ? `${line.slice(0, 108).replace(/\s+\S*$/, '')}…` : line;
 };
 
-export function teamToday({ range, now, me, items, products, cards, decisions, needs, mentions = [], approvals = [], people, mates, mateOf, directWith = () => null, needsCount, later = () => false }: {
+export function teamToday({ range, now, me, items, products, cards, decisions, needs, mentions = [], approvals = [], people, mates, mateOf, directWith = () => null, needsCount, later = () => false, supervisor = {}, undoing = new Set() }: {
+  /** This computer's supervisor, which says what it will not start; it rules your own threads, never a teammate's card. */
+  supervisor?: WontStart & { running?: readonly { itemId: string }[]; starting?: readonly string[] };
+  /** Your rows whose move is held in the undo window: out of Needs you already, not yet written. */
+  undoing?: ReadonlySet<string>;
   /** Your own threads put off till later, by this app's own rule (which this computer keeps). */
   later?: (item: WorkItem) => boolean;
   range: TodayRange; now: number; me: string | null;
@@ -174,6 +179,7 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
     return { ...l, ...dueOf(deadlineOf(i, me)), ...(b ? { blocked: b.on } : {}), ...level(shownPriority(i)) };
   };
   const localTasks = new Set(items.filter((i) => isTaskRow(i)).map((i) => i.id));
+  const agentOn = agentOnOrComing(supervisor);
   for (const i of items) {
     // A teammate's "Set up …" thread is often its first day of work; its title says nothing of that work, its progress does.
     if (i.agent || i.title === 'Set up its job') continue;
@@ -198,17 +204,18 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
       if (inRange(doneAt)) (closer && closer !== 'me' ? byKey.get(closer)! : who).finished.push(line(doneAt));
       continue;
     }
-    if (inNeeds.has(`${i.product}/${i.id}`)) continue;
+    if (inNeeds.has(`${i.product}/${i.id}`) || undoing.has(i.id)) continue;
     if (task) {
       const holder = byKey.get(keyOfPerson(i.assignee) ?? '');
       if (holder) holder.tasks.push(taskLine(i, line(taskNewsAt(i, null))));
       continue;
     }
-    const on = blockOn(i.blockedBy ?? [], k);
+    const card = cardStateOf(i, { now, live: agentOn.has(i.id), wontStart: supervisor });
+    const on = blockOn([...(card.waitsOn ? [card.waitsOn] : []), ...(i.blockedBy ?? [])], k);
     if (on) who.blocked.push(line(i.updatedAt, on));
     else if (i.status === 'blocked') who.blocked.push(line(i.updatedAt, null));
     // A thread put off till later is not being worked on.
-    else if (inRange(i.updatedAt) && !task && threadState(i, now) !== 'scheduled' && !later(i)) {
+    else if (inRange(i.updatedAt) && !task && card.state !== 'scheduled' && !card.held && !later(i)) {
       const says = howFar(i.progress);
       who.working.push({ ...line(i.updatedAt), ...(says ? { says } : {}) });
     }

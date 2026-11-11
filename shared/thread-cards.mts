@@ -328,6 +328,20 @@ function heldBy(id: string, facts: WontStart): string | null {
   return null;
 }
 
+/** The state a thread's card says once the supervisor has had its word, and what it waits on in words. */
+export function cardStateOf(item: CardItem & { id: string }, { now = Date.now(), live = false, wontStart = {} }: { now?: number; live?: boolean; wontStart?: WontStart } = {}): { state: ThreadState; waitsOn: string | null; gotNowhere: boolean; held: boolean } {
+  // A session the folded row cannot show: a personal worker holds no claim,
+  // and its second turn has a result on the row, which reads as waiting.
+  const said = live ? 'running' : threadState(item, now);
+  // An ordinary answer waits on its owner and says nothing more; only the
+  // app's own word that a run got nowhere is about the tool.
+  const gotNowhere = item.wrote?.result?.source === 'agent' && saysARunGotNowhere(item.result);
+  const onIt = live || (item.status === 'claimed' && !!item.claim && !item.claimExpired);
+  const waitsOn = said === 'done' || onIt || (said !== 'running' && !gotNowhere) ? null : nameWait(heldBy(item.id, wontStart));
+  const held = !!waitsOn || (said === 'running' && !onIt && !!wontStart.stalled?.includes(item.id));
+  return { state: held ? 'waiting' : said, waitsOn, gotNowhere, held };
+}
+
 export function cardsFor<P extends CardProduct>({ products, readItems, now = Date.now(), since = null, me = null, running = [], wontStart = {} }: {
   products: readonly P[];
   readItems: (product: P) => readonly (CardItem & { id: string })[];
@@ -337,7 +351,6 @@ export function cardsFor<P extends CardProduct>({ products, readItems, now = Dat
   running?: Iterable<string>;
   wontStart?: WontStart;
 }): OwnCard[] {
-  const stalled = new Set(wontStart.stalled ?? []);
   const live = new Set(running);
   const cards: OwnCard[] = [];
   const titleOf = new Map<string, string | null>();
@@ -376,16 +389,8 @@ export function cardsFor<P extends CardProduct>({ products, readItems, now = Dat
     if (!shownToTeam(item, since, product)) continue;
     // A shared project's rows are in every member's store; only the Mac that runs one publishes it.
     if (isShared(product) && runnerOf(item, product) !== me) continue;
-    // A session the folded row cannot show: a personal worker holds no claim,
-    // and its second turn has a result on the row, which reads as waiting.
-    const said = live.has(item.id) ? 'running' : threadState(item, now);
-    if (said === 'done' && !(item.updatedAt! >= kept)) continue;
-    // An ordinary answer waits on its owner and says nothing more; only the
-    // app's own word that a run got nowhere is about the tool.
-    const gotNowhere = item.wrote?.result?.source === 'agent' && saysARunGotNowhere(item.result);
-    const onIt = live.has(item.id) || (item.status === 'claimed' && !!item.claim && !item.claimExpired);
-    const waitsOn = said === 'done' || onIt || (said !== 'running' && !gotNowhere) ? null : nameWait(heldBy(item.id, wontStart));
-    const state = waitsOn || (said === 'running' && !onIt && stalled.has(item.id)) ? 'waiting' : said;
+    const { state, waitsOn, gotNowhere } = cardStateOf(item, { now, live: live.has(item.id), wontStart });
+    if (state === 'done' && !(item.updatedAt! >= kept)) continue;
     const s = summaryOf(item);
     // The run that got nowhere is said by the wait; as a solution it read as finished.
     const solution = waitsOn && gotNowhere ? '' : s.solution;
