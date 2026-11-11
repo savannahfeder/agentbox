@@ -99,7 +99,10 @@ describe('signed in', () => {
     expect((await maya.fileLink(SOURCE, 'h4', 4)).link).toMatchObject({ current: false, ahead: false });
     expect(shareWords.ahead(3)).toBe('The link shows version 3, newer than this one.');
     // Two investors' testers did not know the comments were public (round 4).
-    expect(shareWords.fresh).toBe('Make a link anyone can open, without an account. Its comments are public too.');
+    // The panel says so before sharing and after (redrawn 2026-11-11).
+    expect(shareWords.fresh).toBe('Copy link to let anyone see it and comment');
+    expect(shareWords.anyone).toBe('Anyone with the link');
+    expect(shareWords.canComment).toBe('Can see it and its comments');
     // Signed out, a file with a live link read as if nothing were shared (power test, round 3).
     expect(shareWords.signedOut).toBe('Sign in to share this file or see its link.');
   });

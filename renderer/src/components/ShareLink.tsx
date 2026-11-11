@@ -5,8 +5,16 @@ import { useEffect, useRef, useState } from 'react';
 import { api, type FileLinkState, type LinkComment } from '../api';
 import { shareWords } from '../public-link-words';
 import { NoteGlyph } from './NoteGlyphs';
+import { placeWords, shownName, type NotePlace } from '../../../shared/artifact-marks.mts';
+
+/** A link comment's place, short: "at 0:24", "a pin", the quote. */
+const placeOn = (place: NotePlace) => (place.kind === 'time' ? `at ${placeWords({ place: { kind: 'time', s: place.s } })}` : place.kind === 'pin' ? 'on a pin' : placeWords({ place }));
 
 export const SIGN_IN_TO_SHARE = 'agentbox:sign-in-to-share';
+export const COPIED_MS = 1800;
+
+/** The Share panel's one button: it says the link was copied, for a moment, where it was pressed. */
+export const copyWords = ({ copied, making }: { copied: boolean; making: boolean }) => (copied ? 'Copied' : making ? 'Making the link' : 'Copy link');
 
 export { shareWords };
 
@@ -61,6 +69,9 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
   const ask = { product, thread, src };
 
   const [stopAsked, setStopAsked] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const copiedFor = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(copiedFor.current), []);
   const [comments, setComments] = useState<LinkComment[] | null>(null);
   const [answer, setAnswer] = useState('');
   const [unseen, setUnseen] = useState(false);
@@ -110,14 +121,6 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
   };
   const flagged = behind || unseen;
 
-  const share = async () => {
-    setBusy(true); setProblem(null); setSaid(null);
-    const out = await api.fileLinkShare(ask);
-    setBusy(false);
-    if (!out.ok || !out.link) { setProblem(out.error ?? 'That did not share.'); return; }
-    setState(out);
-    setSaid(await afterSharing(!!link, () => copy(out.link!.url)));
-  };
   const stop = async () => {
     if (!link) return;
     if (!stopAsked) { setStopAsked(true); return; }
@@ -130,6 +133,22 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
     setSaid(shareWords.stopped);
   };
   const toggle = () => { setOpen(!open); setSaid(null); setProblem(null); setStopAsked(false); };
+  // The button says it was copied, for a moment, where the press was.
+  const copyIt = async (url: string) => {
+    if (!(await copy(url))) { setProblem('This browser would not copy. Open the link and copy it from there.'); return; }
+    setCopied(true);
+    window.clearTimeout(copiedFor.current);
+    copiedFor.current = window.setTimeout(() => setCopied(false), COPIED_MS);
+  };
+  const makeAndCopy = async () => {
+    setBusy(true); setProblem(null); setSaid(null);
+    const out = await api.fileLinkShare(ask);
+    setBusy(false);
+    if (!out.ok || !out.link) { setProblem(out.error ?? 'That did not share.'); return; }
+    setState(out);
+    if (!link) await copyIt(out.link.url);
+  };
+  const name = shownName(src) || src;
 
   return (
     <div className={`av-share${icon ? ' is-mark' : ''}`} ref={box}>
@@ -138,51 +157,60 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
         : <button type="button" className={`av-btn${open ? ' is-on' : ''}${flagged ? ' is-behind' : ''}`} title={behind ? shareWords.behind : unseen ? shareWords.newComments : undefined} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="globe" />{link ? shareWords.live : 'Share'}</button>}
       {open && (
         <div className="av-share-box" role="dialog" aria-label="Share">
+          <p className="av-share-title">Share <span>{name}</span></p>
           {!state.signedIn ? (
             <>
-              <p>{shareWords.signedOut}</p>
-              <div className="av-share-acts">
-                <button type="button" className="av-btn is-on" onClick={() => { setOpen(false); window.dispatchEvent(new Event(SIGN_IN_TO_SHARE)); }}>Sign in</button>
+              <div className="av-share-who-sees">
+                <span className="av-share-icon"><NoteGlyph name="lock" /></span>
+                <span className="av-share-access"><b>Only you</b><i>{shareWords.signedOut}</i></span>
               </div>
-            </>
-          ) : link ? (
-            <>
-              <input className="av-share-url" readOnly value={link.url} aria-label="Link" onFocus={(e) => e.currentTarget.select()} />
-              <p className="av-share-meta"><span>{behind ? shareWords.behind : link.ahead ? shareWords.ahead(link.version) : shareWords.shared(link)}</span></p>
-              <div className="av-share-acts">
-                {behind && <button type="button" className="av-btn is-on" disabled={busy} onClick={() => void share()}>Update link</button>}
-                <button type="button" className={`av-btn${behind ? '' : ' is-on'}`} disabled={busy} onClick={() => void copy(link.url).then((ok) => setSaid(ok ? 'Link copied' : null))}>Copy link</button>
-                {!behind && <button type="button" className="av-btn" disabled={busy} onClick={() => window.open(link.url, '_blank')}>Open</button>}
-                <span className="av-spring" />
-                <button type="button" className={`av-share-stop${stopAsked ? ' is-asking' : ''}`} disabled={busy} onBlur={() => setStopAsked(false)} onClick={() => void stop()}>
-                  {stopAsked ? shareWords.stopAsk(link.comments) : 'Stop sharing'}
-                </button>
+              <div className="av-share-foot">
+                <span />
+                <button type="button" className="av-share-copy" onClick={() => { setOpen(false); window.dispatchEvent(new Event(SIGN_IN_TO_SHARE)); }}>Sign in</button>
               </div>
-              {comments && comments.length > 0 && (
-                <ol className="av-share-comments" aria-label="Comments">
-                  {comments.map((c) => (
-                    <li key={c.id}>
-                      <span className="av-share-who"><b>{c.byOwner ? 'You' : c.byName}</b><time>{whenSaid(c.at)}</time></span>
-                      <p>{c.text}</p>
-                    </li>
-                  ))}
-                </ol>
-              )}
-              {comments && comments.length > 0 && (
-                <form className="av-share-reply" onSubmit={(e) => { e.preventDefault(); void reply(); }}>
-                  <input value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="Reply on the page" aria-label="Reply on the page" maxLength={4000} disabled={busy} />
-                </form>
-              )}
             </>
           ) : (
             <>
-              <p>{shareWords.fresh}</p>
-              <div className="av-share-acts">
-                <button type="button" className="av-btn is-on" disabled={busy} onClick={() => void share()}>{busy ? 'Making the link' : 'Make link'}</button>
+              <div className="av-share-who-sees">
+                <span className={`av-share-icon${link ? ' is-open' : ''}`}><NoteGlyph name={link ? 'globe' : 'lock'} /></span>
+                <span className="av-share-access">
+                  <b>{link ? shareWords.anyone : shareWords.onlyYou}</b>
+                  <i>{link ? shareWords.canComment : shareWords.fresh}</i>
+                </span>
+                {link && (
+                  <button type="button" className={`av-share-stop${stopAsked ? ' is-asking' : ''}`} disabled={busy} onBlur={() => setStopAsked(false)} onClick={() => void stop()}>
+                    {stopAsked ? shareWords.stopAsk(link.comments) : 'Stop sharing'}
+                  </button>
+                )}
+              </div>
+              {link && comments && comments.length > 0 && (
+                <>
+                  <ol className="av-share-comments" aria-label="Comments">
+                    {comments.map((c) => (
+                      <li key={c.id}>
+                        <span className="av-share-who"><b>{c.byOwner ? 'You' : c.byName}</b>{c.place && c.place.kind !== 'whole' && <em>{placeOn(c.place)}</em>}<time>{whenSaid(c.at)}</time></span>
+                        <p>{c.text}</p>
+                      </li>
+                    ))}
+                  </ol>
+                  <form className="av-share-reply" onSubmit={(e) => { e.preventDefault(); void reply(); }}>
+                    <input value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="Reply on the page" aria-label="Reply on the page" maxLength={4000} disabled={busy} />
+                  </form>
+                </>
+              )}
+              {(said || problem) && <p className={`av-share-said${problem ? ' is-bad' : ''}`} role="status">{problem ?? said}</p>}
+              <div className="av-share-foot">
+                <span className="av-share-when">{!link ? '' : behind ? shareWords.behind : link.ahead ? shareWords.ahead(link.version) : shareWords.shared(link)}</span>
+                {link && !behind && <button type="button" className="av-share-out" title="Open the link" aria-label="Open the link" onClick={() => window.open(link.url, '_blank')}><NoteGlyph name="out" /></button>}
+                {link && behind
+                  ? <button type="button" className="av-share-copy" disabled={busy} onClick={() => void makeAndCopy()}>Update link</button>
+                  : <button type="button" className={`av-share-copy${copied ? ' is-copied' : ''}`} disabled={busy} aria-live="polite"
+                    onClick={() => void (link ? copyIt(link.url) : makeAndCopy())}>
+                    <NoteGlyph name={copied ? 'check' : 'link'} />{copyWords({ copied, making: busy && !link })}
+                  </button>}
               </div>
             </>
           )}
-          {(said || problem) && <p className={`av-share-said${problem ? ' is-bad' : ''}`} role="status">{problem ?? said}</p>}
         </div>
       )}
     </div>

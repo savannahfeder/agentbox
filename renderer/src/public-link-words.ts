@@ -3,7 +3,10 @@ import { clock } from './thread-history';
 
 export const shareWords = {
   signedOut: 'Sign in to share this file or see its link.',
-  fresh: 'Make a link anyone can open, without an account. Its comments are public too.',
+  fresh: 'Copy link to let anyone see it and comment',
+  onlyYou: 'Only you',
+  anyone: 'Anyone with the link',
+  canComment: 'Can see it and its comments',
   stopped: 'Stopped. The old link no longer works.',
   behind: 'The link shows an older copy.',
   ahead: (v: number) => `The link shows version ${v}, newer than this one.`,
