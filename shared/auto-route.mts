@@ -78,6 +78,11 @@ const cut = (s: string | null | undefined, n: number) => {
   return t.length > n ? `${t.slice(0, n - 1)}…` : t;
 };
 
+// The small model is sent text only. Handed a picture's file name, it guessed
+// what the picture showed and matched a teammate on that.
+const PICTURE = /!\[[^\]\n]*\]\([^)\n]*\)/g;
+const unseen = (s: string | null | undefined) => String(s ?? '').replace(PICTURE, '(a picture you cannot see)');
+
 /** A teammate's newest threads, by the name each shows on the row. */
 function recentTitles(id: string, items: readonly RouteItem[] | null | undefined, n = 6): string[] {
   return (items ?? [])
@@ -125,10 +130,15 @@ export function routePrompt(
     'Name two numbers only when two teammates fit equally well and you cannot',
     'tell which; the person will be asked. When unsure between a teammate and',
     'none, answer 0.',
+    'A teammate fits only when the task asks for the work its job describes.',
+    'A word the task shares with a job is not a fit: "status" is not a',
+    'teammate\'s status board, and "plan" is not its plan. When the words alone',
+    'do not say what the task is about, as when they point at a picture you',
+    'cannot see, answer 0.',
     '',
     '--- the task ---',
-    cut(item?.title, 400),
-    cut(item?.body && item.body !== item.title ? item.body : '', 1500),
+    cut(unseen(item?.title), 400),
+    cut(unseen(item?.body && item.body !== item.title ? item.body : ''), 1500),
     '---',
   ].filter((l, i, all) => !(l === '' && all[i - 1] === '')).join('\n');
 }

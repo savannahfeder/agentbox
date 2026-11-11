@@ -141,8 +141,9 @@ describe('Move to another project', () => {
   it('on a thread nothing has run on', () => {
     expect(offersOf(item({ status: 'open' }), facts()).move).toBe(true);
   });
-  it('not while it runs, once it changed code, once closed, or before the computer has it', () => {
-    expect(offersOf(item({ status: 'claimed' }), facts({ session: session(), inProgress: true })).move).toBe(false);
+  // A running one moves too: the computer stops its agent first (tests/a-thread-whose-agent-is-working-can-move).
+  it('while it runs, but not once it changed code, once closed, or before the computer has it', () => {
+    expect(offersOf(item({ status: 'claimed' }), facts({ session: session(), inProgress: true })).move).toBe(true);
     const failed = item({ note: 'It did not ship, and it went back to its agent: tests failed', wrote: { note: { ts: NOW - MIN, source: 'system' } } });
     expect(offersOf(failed, facts()).move).toBe(false);
     expect(offersOf(item({ status: 'done' }), facts()).move).toBe(false);

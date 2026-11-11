@@ -8,6 +8,8 @@ import type { ArtifactMark, FileElsewhere, FileMarks, Person, WorkItem } from '.
 import { ArtifactView, NO_MARKS, type ArtifactOpen } from './ArtifactView';
 import { useFileLine } from '../file-numbers';
 import { filesInLines, threadFiles } from '../../../shared/artifact-marks.mts';
+import { withRunsSaid } from '../runs-said';
+import type { TraceSession } from '../notes';
 
 /** This thread's marks with those from the other copies, every pin numbered in the order it was made. */
 export function withElsewhere(own: FileMarks, elsewhere: FileElsewhere[]): FileMarks {
@@ -39,14 +41,21 @@ export function ThreadArtifacts({ item, open, withAgent, onClose, onBeside, onNo
   onNotice: (words: string) => void;
 }) {
   const team = useContext(TeamContext);
-  const [lines, setLines] = useState<LedgerLine[]>([]);
+  const [ledger, setLedger] = useState<LedgerLine[]>([]);
   useEffect(() => {
     let live = true;
-    const read = () => { void api.itemHistory({ product: item.product, id: item.id }).then((r) => { if (live) setLines(r?.lines ?? []); }); };
+    const read = () => { void api.itemHistory({ product: item.product, id: item.id }).then((r) => { if (live) setLedger(r?.lines ?? []); }); };
     read();
     const off = api.onChanged(read);
     return () => { live = false; off?.(); };
   }, [item.product, item.id]);
+  const [runs, setRuns] = useState<TraceSession[]>([]);
+  useEffect(() => {
+    let live = true;
+    api.sessionTrace({ product: item.product, id: item.id }).then((r) => { if (live) setRuns(r?.sessions ?? []); }).catch(() => {});
+    return () => { live = false; };
+  }, [item.product, item.id, ledger.length]);
+  const lines = useMemo(() => withRunsSaid(ledger, runs, item.runner ?? item.createdBy ?? null), [ledger, runs, item.runner, item.createdBy]);
   // Each file the thread names, and what was said on its copies elsewhere.
   const copies = useMemo(() => threadFiles(filesInLines(lines)).flatMap((f) => f.versions.map((v) => ({ path: v.path, file: v.id }))), [lines]);
   const [elsewhere, setElsewhere] = useState<FileElsewhere[]>([]);
