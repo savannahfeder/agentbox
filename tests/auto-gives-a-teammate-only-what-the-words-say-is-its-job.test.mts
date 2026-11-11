@@ -48,7 +48,14 @@ describe('the rule the model is given', () => {
   });
 
   it('says a task whose words alone do not name the job goes to an agent', () => {
-    expect(prompt).toMatch(/When the words alone\ndo not say what the task is about, as when they point at a picture you\ncannot see, answer 0\./);
+    expect(prompt).toContain('When the words alone do not say what the task is about, as when they\npoint at a picture you cannot see, answer 0.');
+  });
+
+  it('says to look at the pictures when they are sent with it', () => {
+    const seen = routePrompt({ title: 'why do these all say not started', body: '![a.png](attachments/a.png)' }, team, [], { pictures: true });
+    expect(seen).toContain('why do these all say not started\n(a picture, attached)');
+    expect(seen).toContain('The pictures attached are part of the task');
+    expect(seen).not.toContain('a picture you cannot see');
   });
 
   // w-064dd249d2: "How complex would it be for us to do something like that?",
