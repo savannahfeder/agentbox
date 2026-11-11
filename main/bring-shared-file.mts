@@ -6,7 +6,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { saveAttachments } from './save-attachments.mts';
-import type { SharedLinkFile } from './team/index.mts';
+import type { FileLinkComment, SharedLinkFile } from './team/index.mts';
+import { placeWords, type NotePlace } from '../shared/artifact-marks.mts';
 
 const TOKEN = /^[A-Za-z0-9_-]{16,64}$/;
 
@@ -36,16 +37,29 @@ export function projectToBringInto(products: readonly { slug: string; team?: { d
   return (projects.find((p) => p.slug === wanted) ?? projects[0])?.slug ?? null;
 }
 
+/** Where a link comment pointed, as a line in a message says it: " at 0:03", " on the picture". */
+export function whereSaid(place: NotePlace | null | undefined): string {
+  if (!place) return '';
+  const at = placeWords({ place: place.kind === 'time' ? { kind: 'time', s: place.s } : place });
+  switch (place.kind) {
+    case 'time': return typeof place.x === 'number' ? ` on the frame at ${at}` : ` at ${at}`;
+    case 'pin': return ' on the picture';
+    case 'page': return ` on ${at.toLowerCase()}`;
+    case 'quote': return ` on ${at}`;
+    default: return '';
+  }
+}
+
 export interface BroughtIn { product: string; id: string; src: string }
 
 export async function bringSharedFile({ token, product, read, productDir, compose }: {
   token: string;
   product: string;
-  read: (token: string) => Promise<{ file: SharedLinkFile; bytes: Buffer }>;
+  read: (token: string) => Promise<{ file: SharedLinkFile; bytes: Buffer; comments?: FileLinkComment[] }>;
   productDir: string;
   compose: (fields: { title: string; body: string; start: 'later' }) => { id: string } | null | undefined;
 }): Promise<BroughtIn> {
-  const { file, bytes } = await read(token);
+  const { file, bytes, comments = [] } = await read(token);
   // Through a file rather than base64, since a film is up to 200 MB.
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbox-shared-'));
   let saved;
@@ -60,7 +74,8 @@ export async function bringSharedFile({ token, product, read, productDir, compos
   const who = file.ownerName?.trim() || 'Someone';
   const shown = saved.image ? `![${saved.name}](${saved.rel})` : `[${saved.name}](${saved.rel})`;
   // The link stays off the message: a person's own message draws no markdown link, and a raw one fills it.
-  const body = [`${who} shared this with me.`, '', shown].join('\n');
+  const said = comments.map((c) => `- ${c.byName}${whereSaid(c.place)}: ${c.text.replace(/\s+/g, ' ').trim()}`);
+  const body = [`${who} shared this with me.`, '', shown, ...(said.length ? ['', 'Comments on the link:', ...said] : [])].join('\n');
   // Written down and not begun, so no agent starts on it until they write.
   const made = compose({ title: sharedFileTitle(file), body, start: 'later' });
   if (!made?.id) throw new Error('The thread for this file could not be made.');
