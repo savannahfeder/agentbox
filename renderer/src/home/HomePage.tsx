@@ -3,6 +3,7 @@ import { agoShort, doors, type DoorKey, type TeamRowState } from './home-model';
 import { PriorityMark } from '../threads/Pages';
 import { priorityLabelOf, type PriorityId } from '../priority';
 import './home.css';
+import { enterIsTheButtons } from '../focused-button';
 
 /** `from` is the teammate who asked, when one did; priority is null at Medium, as in the Inbox. */
 export type NeedsRow = { key: string; letter: string; title: string; from: string | null; priority: PriorityId | null; project: string; at: number; unread: boolean };
@@ -41,8 +42,14 @@ export function HomePage({ hello, now, needs, needsCount, progressCount, team, p
     // J and K walk Needs you and Enter opens the row, as they do in the Inbox.
     const key = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (enterIsTheButtons(e)) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.closest('input, textarea, [contenteditable="true"], .modal'))) return;
+      // The New thread box's suggestions take ↓ and Enter themselves; the setup has its own keys.
+      if (t?.closest('.tc-card') || document.documentElement.hasAttribute('data-setup')) return;
+      // Never from the New thread box's own controls, or with a menu or a dialog open.
+      if (t?.closest('.hm-start')) return;
+      if (document.querySelector('.modal-backdrop, .proj-menu, [role="listbox"], [role="menu"]')) return;
       const down = e.key === 'j' || e.key === 'ArrowDown', up = e.key === 'k' || e.key === 'ArrowUp';
       if (!down && !up && !(e.key === 'Enter' && pick >= 0)) return;
       if (!needs.length) return;

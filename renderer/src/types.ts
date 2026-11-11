@@ -1949,10 +1949,11 @@ declare global {
       searchAgentThreads?(p: { again?: boolean }): Promise<{ threads?: SessionThread[]; reached?: number }>;
       importThreads?(p: { product: string; threads: string[]; land?: 'sorted' | 'inbox' }): Promise<{ added?: number; already?: number; done?: number }>;
       firstRunExamples?(p: { product: string }): Promise<{ ids: string[] }>;
-      firstRunPractice?(): Promise<{ slug: string; examples: string[]; backdrop?: string[] }>;
+      firstRunPractice?(opts?: { bare?: boolean }): Promise<{ slug: string; examples: string[]; backdrop?: string[] }>;
       firstRunPracticeEnd?(): Promise<unknown>;
       onboardingArm?(): Promise<unknown>;
       notifyTest?(): Promise<unknown>;
+      notifySettings?(): Promise<unknown>;
       cloudSignIn?(p: { action: 'start' | 'code' | 'cancel' | 'remove'; engine: 'claude' | 'codex'; key?: string | null; code?: string }): Promise<{ ok: boolean; key?: string | null; error?: string }>;
       cloudSendFile?(p: { product: string; id: string; path?: string; choose?: boolean; hold?: boolean; also?: string }): Promise<{ ok: boolean; path?: string; canceled?: boolean; held?: boolean; words?: string; error?: string }>;
       cloudFileInfo?(p: { path: string }): Promise<{ ok: boolean; size?: number; error?: string }>;

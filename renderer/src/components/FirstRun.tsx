@@ -20,6 +20,8 @@ import {
 } from '../first-run';
 import { SetupSplit } from './SetupSplit';
 import './first-run.css';
+import { WelcomeSky } from './WelcomeSky';
+import { useDarkWindow } from '../home/home-settings';
 
 type Project = { slug: string; name: string };
 
@@ -57,7 +59,7 @@ const said = (when: number) => {
   return /^\d/.test(a) ? `${a} ago` : a;
 };
 
-export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false, onLook, onSetup, onProject }: {
+export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false, onLook, onSetup, onProject, onLeave }: {
   snap: Snapshot | null;
   home: string;
   /** The look worn now and how to change it, for the setup's look step. */
@@ -70,8 +72,11 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
   onSetup?: () => void;
   /** Called once, when the first run hands over to the inbox, with how many chats it brought in. */
   onDone: (brought: number) => void;
+  /** Set up again from ⌘K, with the app behind it to go back to. */
+  onLeave?: () => void;
 }) {
   const [screen, setScreen] = useState<Screen | 'setup'>('welcome');
+  const dark = useDarkWindow();
   const [leaving, setLeaving] = useState(false);
   const [ready, setReady] = useState<Engine[] | undefined>(undefined);
   const hasReady = !!ready?.length;
@@ -231,6 +236,7 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
         else if (!hasReady && gate.again && e.key === 'Enter') { e.preventDefault(); signInAgain(); }
         else if (!hasReady && !gate.running && e.key === '1') startSetup('claude');
         else if (!hasReady && !gate.running && e.key === '2') startSetup('codex');
+        else if (onLeave && e.key === 'Escape') { e.preventDefault(); onLeave(); }
         return;
       }
       const k = listKey(e);
@@ -247,14 +253,14 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [screen, leaving, hasReady, gate.running, gate.again, chats, cursor, start, startSetup, stopSetup, signInAgain, bringIn, leave]);
+  }, [screen, leaving, hasReady, gate.running, gate.again, chats, cursor, start, startSetup, stopSetup, signInAgain, bringIn, leave, onLeave]);
 
   const cls = `ob-screen${leaving ? ' ob-leaving' : ''}`;
 
   if (screen === 'setup') {
-    return <SetupSplit snap={snap} chats={chats} ticks={chatTicks} nameOf={nameOf}
+    return <SetupSplit snap={snap} chats={chats} ticks={chatTicks}
       onToggle={(id) => setChatTicks((had) => { const n = new Set(had); if (n.has(id)) n.delete(id); else n.add(id); return n; })}
-      bringIn={bringIn} projectFor={async (folder) => { const p = await projectFor(folder); if (p) onProject?.(p.slug); return p; }} look={look} skies={skies} onLook={(id) => onLook?.(id)} onDone={onDone} />;
+      bringIn={bringIn} projectFor={async (folder) => { const p = await projectFor(folder); if (p) onProject?.(p.slug); return p; }} look={look} skies={skies} onLook={(id) => onLook?.(id)} onDone={onDone} onBack={() => go('welcome')} />;
   }
 
   return (
@@ -263,9 +269,14 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
         <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m9.5 3-5 5 5 5" /></svg>
         Back
       </button>}
+      {screen === 'welcome' && onLeave && <button type="button" className="ob-back" disabled={leaving} onClick={onLeave}>
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m9.5 3-5 5 5 5" /></svg>
+        Back
+      </button>}
       {screen === 'welcome' && (
-        <div className={cls} key="welcome">
-          <div className="ob-col ob-mid ob-center">
+        <div className={`${cls} ob-welcome`} key="welcome">
+          <WelcomeSky dark={dark} />
+          <div className="ob-col ob-mid ob-hero">
             <Mark />
             {ready && !hasReady ? (
               <>
@@ -282,7 +293,8 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
               </>
             ) : (
               <>
-                <h1 className="ob-big ob-in" style={{ animationDelay: '1.3s' }}>Give your agents an inbox</h1>
+                <h1 className="ob-big ob-in" style={{ animationDelay: '1.3s' }}>An inbox for hundreds of agents.</h1>
+                <p className="ob-lede ob-in" style={{ animationDelay: '1.45s' }}>Start as many as you like. Each works on its own, and comes back to you only when it needs you.</p>
                 <div className="ob-actions ob-in" style={{ animationDelay: '1.6s', marginTop: 40 }}>
                   <button type="button" className="ob-btn" disabled={!hasReady || !threads} onClick={start}>Get started <Key k="↵" /></button>
                 </div>

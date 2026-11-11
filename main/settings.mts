@@ -12,6 +12,7 @@
 // place a grant is reviewed; what changed is that she edits them as fields on
 // the project they belong to instead of in a text editor.
 
+import { isPackagedElectron } from './team/session.mts';
 import { teammatesOn } from '../shared/teammates.mts';
 import { phoneChoiceOf, phoneProjectsOf, withPhoneAll, withPhoneProject, phoneEligible } from '../shared/phone-snapshot.mts';
 import fs from 'node:fs';
@@ -38,7 +39,6 @@ import { codexAccount, codexFreePlan, codexLoginCommand, makeCodexHome } from '.
 import { codexDefaultModel, codexModelsAcross } from './codex-models.mts';
 import { CODEX_DEFAULT_MODE, isCodexMode } from '../shared/codex-modes.mts';
 import { CLOUD_SAME, CLOUD_CLAUDE_DEFAULT, CLOUD_CODEX_DEFAULT } from './cloud-permission.mts';
-import { isPackagedElectron } from './team/session.mts';
 import { claudeModels } from './claude-models.mts';
 import { forgetCodexBin, INSTALL_URL as CODEX_INSTALL_URL } from './codex-bin.mts';
 
@@ -611,13 +611,13 @@ export function searchForEngineBin(config: SettingsConfig, engine: string) {
 }
 
 // THE ALPHA FEATURES SWITCHES (w-3d0fa23ffb). Off unless someone turned them
-// on in Settings; only a real `true` counts. Multiplayer, the team version, is
-// the exception in a checkout, where it was always on.
+// on in Settings; only a real `true` counts. Multiplayer is on unless turned off:
+// the first run offers a team, so it cannot wait behind a switch in Settings.
 export function alphaFeatures(config?: SettingsConfig | null, { packaged = isPackagedElectron() }: { packaged?: boolean } = {}) {
   return {
     rooms: config?.alphaRooms === true,
     teammates: teammatesOn(config),
-    multiplayer: packaged ? config?.alphaMultiplayer === true : config?.alphaMultiplayer !== false,
+    multiplayer: config?.alphaMultiplayer !== false,
     glass: config?.alphaGlass === true,
   };
 }

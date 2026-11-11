@@ -645,7 +645,11 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       const open = await stripe.session(bill.checkout.id).catch(() => null);
       if (open?.status === 'open') return { url: open.url, where: 'checkout' };
     }
-    const made = await stripe.checkout({ person, plan: 'team', team: team.id, quantity: Math.max(1, team.members.length), customer: bill.stripe?.customer, successUrl: `${base}/v1/paid?plan=team`, cancelUrl: `${base}/v1/paid?cancelled=1` });
+    // Paid for inside the team's free days, the card is charged when they end.
+    // Stripe trials nothing that ends within 48 hours, so a team that close pays now.
+    const trialEnds = Number(team.createdAt) + teamPlan.trialDays * DAY_MS;
+    const trialEnd = trialEnds - now() > 2 * DAY_MS ? trialEnds : null;
+    const made = await stripe.checkout({ person, plan: 'team', team: team.id, quantity: Math.max(1, team.members.length), customer: bill.stripe?.customer, trialEnd, successUrl: `${base}/v1/paid?plan=team`, cancelUrl: `${base}/v1/paid?cancelled=1` });
     await updateTeam(team.id, (b) => { b.checkout = { id: made.id, url: made.url, by: person, at: now() }; });
     return { url: made.url, where: 'checkout' };
   }

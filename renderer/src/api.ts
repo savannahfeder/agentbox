@@ -1200,11 +1200,11 @@ export const api = {
   // process behind them, and a build old enough not to have the handler is the
   // ordinary case for anybody who opens a stale window: both give null, and the
   // walk carries on in the project they made rather than stopping.
-  async firstRunPractice(): Promise<{ slug: string; examples: string[]; backdrop?: string[] } | null> {
+  async firstRunPractice(opts?: { bare?: boolean }): Promise<{ slug: string; examples: string[]; backdrop?: string[] } | null> {
     if (useFixtures) return null;
     const zero = window.zero;
     if (!zero?.firstRunPractice) return null;
-    return zero.firstRunPractice();
+    return opts ? zero.firstRunPractice(opts) : zero.firstRunPractice();
   },
 
   // AND OFF THE SCREEN AGAIN AT THE END. Archived, never deleted: everything
