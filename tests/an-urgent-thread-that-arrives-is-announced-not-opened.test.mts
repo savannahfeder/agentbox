@@ -5,15 +5,17 @@
 // it." An urgent thread arriving in Needs you swapped itself in for the thread
 // open on screen (App.tsx set `focused` to it) and drew a "Back to …" bar.
 // Measured by reading the effect and photographing the sample app with
-// &arrives: the open thread was replaced. Now the arrival raises the corner
-// note with O to open it, and the thread on screen stays.
+// &arrives: the open thread was replaced. Now the arrival is named in the top
+// bar with O to open it, and the thread on screen stays.
 
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { urgentArrival, urgentNote, isUrgentRow } from '../renderer/src/urgent-arrival.ts';
-import { opensTheToast, toastOpens } from '../renderer/src/toast-parts.ts';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { urgentArrival, urgentRaised, urgentShown, isUrgentRow } from '../renderer/src/urgent-arrival.ts';
+import { UrgentReady } from '../renderer/src/components/UrgentReady.tsx';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel: string) => fs.readFileSync(path.join(root, rel), 'utf8');
@@ -75,19 +77,55 @@ describe('which arrival is announced', () => {
   });
 });
 
-describe('the note it raises', () => {
-  const urgent = { ...row('w-urgent', 9), product: 'onboard' } as never;
+// The first version raised the routine corner note, which fades in six seconds
+// and "looks just like a processed task note which i've learned to ignore". It
+// now has its own mark in the top bar that stays until it is dealt with.
+describe('how long the top bar names it', () => {
+  const urgent = row('w-urgent', 9);
+  const reading = row('w-medium', 5);
+  const raised = urgentRaised(urgent, reading);
 
-  it('names the thread so O opens it from the thread that is open', () => {
-    const note = urgentNote(urgent);
-    expect(note.goes).toEqual({ product: 'onboard', id: 'w-urgent' });
-    const here = { product: 'agentbox', id: 'w-medium' };
-    expect(toastOpens(note, here)).toBe(true);
-    expect(opensTheToast('o', note, here)).toEqual(note.goes);
+  it('while the thread it arrived over is open and it still waits', () => {
+    expect(urgentShown(raised, reading, [urgent])).toBe(urgent);
   });
 
-  it('says it is urgent in plain words, with no undo', () => {
-    expect(urgentNote(urgent).text).toBe('Urgent and ready for you');
+  it('the current copy of the row, not the one it arrived as', () => {
+    const newer = { ...(urgent as object), title: 'renamed' } as never;
+    expect(urgentShown(raised, reading, [newer])).toBe(newer);
+  });
+
+  it('not once another thread is open', () => {
+    expect(urgentShown(raised, row('w-other', 5), [urgent])).toBeNull();
+  });
+
+  it('not with no thread open', () => {
+    expect(urgentShown(raised, null, [urgent])).toBeNull();
+  });
+
+  it('not once it has left the inbox', () => {
+    expect(urgentShown(raised, reading, [])).toBeNull();
+  });
+
+  it('not for the same id in another project', () => {
+    expect(urgentShown(raised, { ...(reading as object), product: 'elsewhere' } as never, [urgent])).toBeNull();
+  });
+
+  it('nothing when nothing arrived', () => {
+    expect(urgentShown(null, reading, [urgent])).toBeNull();
+  });
+});
+
+describe('the mark in the top bar', () => {
+  const html = renderToStaticMarkup(createElement(UrgentReady, { row: row('w-urgent', 9, { title: 'Sign-in is down' }), onOpen: () => {} }));
+
+  it('is one button with the title and the O key', () => {
+    expect(html.match(/<button/g)).toHaveLength(1);
+    expect(html).toContain('Sign-in is down');
+    expect(html).toContain('>O</kbd>');
+  });
+
+  it('has no timer and is not the routine note', () => {
+    expect(html).not.toContain('toast');
   });
 });
 

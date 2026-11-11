@@ -1,8 +1,7 @@
 // PURE. Which urgent thread to announce when it arrives while another thread is
-// open. It is announced in the corner note with O to open it; the thread on
-// screen stays where it is (w-f18ede1965).
+// open, and for how long. It is named in the top bar with O to open it; the
+// thread on screen stays where it is (w-f18ede1965).
 import { itemPriority, URGENT_PRIORITY } from '../../shared/rank.mts';
-import type { ToastGoes } from './toast-parts';
 import type { WorkItem } from './types';
 
 export function isUrgentRow(item: WorkItem | null | undefined): boolean {
@@ -32,6 +31,22 @@ export function urgentArrival(q: ArrivalQuestion): WorkItem | null {
   return null;
 }
 
-export function urgentNote(row: Pick<WorkItem, 'product' | 'id'>): { text: string; goes: ToastGoes } {
-  return { text: 'Urgent and ready for you', goes: { product: row.product, id: row.id } };
+type Ref = Pick<WorkItem, 'product' | 'id'>;
+/** The urgent thread to name in the top bar, and the thread it was raised over. */
+export type UrgentRaised = { row: Ref; on: Ref };
+
+export function urgentRaised(row: Ref, on: Ref): UrgentRaised {
+  return { row: { product: row.product, id: row.id }, on: { product: on.product, id: on.id } };
+}
+
+const same = (a: Ref | null | undefined, b: Ref | null | undefined) => !!a && !!b && a.product === b.product && a.id === b.id;
+
+/**
+ * The row to name in the top bar right now: only over the thread it was raised
+ * on, so leaving that thread puts it away, and only while it still waits in
+ * the inbox, so answering it anywhere else puts it away too.
+ */
+export function urgentShown(raised: UrgentRaised | null, open: Ref | null, inbox: WorkItem[]): WorkItem | null {
+  if (!raised || !same(raised.on, open)) return null;
+  return inbox.find((i) => same(i, raised.row)) ?? null;
 }

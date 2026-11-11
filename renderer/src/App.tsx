@@ -106,7 +106,8 @@ import { strayLetters } from './stray-letters';
 import { keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
 import { modelCommands } from './thread-model-commands';
 import { MOVE_KEYWORDS, whyItCannotMove } from '../../shared/move-thread.mts';
-import { isUrgentRow, urgentArrival, urgentNote } from './urgent-arrival';
+import { isUrgentRow, urgentArrival, urgentRaised, urgentShown, type UrgentRaised } from './urgent-arrival';
+import { UrgentReady, type UrgentLook } from './components/UrgentReady';
 import { leavePlace, placeKey, placeToReturnTo } from './thread-place';
 import { DONE, manyOrOne } from './done-word';
 import { listedNow, type OpensWhenListed } from './opens-when-listed';
@@ -310,6 +311,7 @@ const TOAST_TITLE = 48;
 // How long a toast that goes somewhere stays up, and so how long its orange
 // timer runs. One number for both, or the line and the card disagree.
 const TOAST_GOES_MS = 6000;
+const URGENT_LOOK = (new URLSearchParams(location.search).get('urgentlook') ?? 'a') as UrgentLook;
 
 /**
  * How long a message she sent to a running agent is held after the row has
@@ -594,6 +596,7 @@ export default function App() {
   // announced, and each one once.
   const knownRows = useRef<Set<string> | null>(null);
   const announcedUrgent = useRef<Set<string>>(new Set());
+  const [urgentReady, setUrgentReady] = useState<UrgentRaised | null>(null);
   // Whether the box for changing that rule's instruction is open. Its own flag
   // rather than a value of `modal`, because `modal` is cleared the moment no
   // TASK is open (modal-scope.ts) and a rule is not a task: routed through
@@ -3925,18 +3928,25 @@ export default function App() {
   }), [snap?.products, snap?.supervisor.productOrder, snap?.supervisor.hiddenProducts, codexModels, codexModelDefault, items, stateOfMine, markSeen, startChatAgents]);
 
   // AN URGENT THREAD THAT ARRIVES WHILE ANOTHER IS OPEN IS ANNOUNCED, NOT
-  // OPENED: the corner note names it and O opens it (./urgent-arrival).
+  // OPENED: the top bar names it and O opens it (./urgent-arrival).
   useEffect(() => {
     const ids = new Set(inbox.map((i) => i.id));
     // The first inbox we ever see is the baseline, not a pile of arrivals.
     if (knownRows.current === null) { knownRows.current = ids; return; }
     const urgent = urgentArrival({ reading: focused, inbox, known: knownRows.current, spent: announcedUrgent.current });
     knownRows.current = ids;
-    if (!urgent) return;
+    if (!urgent || !focused) return;
     announcedUrgent.current.add(urgent.id);
-    const note = urgentNote(urgent);
-    showToastRef.current?.(note.text, note.goes);
+    setUrgentReady(urgentRaised(urgent, focused));
   }, [inbox, focused]);
+  const urgentShownRow = urgentShown(urgentReady, focused, inbox);
+  const openUrgentReady = useCallback(() => {
+    if (!urgentShownRow) return;
+    setUrgentReady(null);
+    setSearch(null);
+    setFocused(urgentShownRow);
+    markSeen(urgentShownRow);
+  }, [urgentShownRow, markSeen]);
 
   /* ------------------ the open row keeps up with the store ----------------- */
   // THE PANE HOLDS A COPY OF THE ROW, AND THE ROW CHANGES UNDER HER.
@@ -6355,6 +6365,7 @@ export default function App() {
         oWaits.current = { at: Date.now(), screen: screenWas.current };
         return;
       }
+      if ((e.key === 'o' || e.key === 'O') && urgentShownRow) { e.preventDefault(); openUrgentReady(); return; }
       // AN OPEN REPEATING TASK IS A SCREEN, AND EVERY KEY STOPS HERE.
       //
       // There was no branch for it at all, so with a rule on screen the whole
@@ -6640,7 +6651,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [modal, newProject, focused, focusedRepeat, inFullScreen, current, pointed, list, view, markDone, openSnooze, pickOption, offerNow, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside, teamShown, openCard, inboxDisplay, setInboxDisplay, stateTabOrder, roomShown, roomsUi, teammatesShown, teammatesUi, filesShown, connectionsShown, boardCols, stops, pageStops, keyLead, keyCard, walkPlace, goToStop, openTeammateCard, closeAskOn, closeAskWhy, waitingFiled, answerCloseAsk, keepThreadOpen, toast, openToastRow, clearSlot, teamMode, evPick, evView, onBoard, pickMember, goNeedsYou, keyTab]);
+  }, [modal, newProject, focused, focusedRepeat, inFullScreen, current, pointed, list, view, markDone, openSnooze, pickOption, offerNow, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside, teamShown, openCard, inboxDisplay, setInboxDisplay, stateTabOrder, roomShown, roomsUi, teammatesShown, teammatesUi, filesShown, connectionsShown, boardCols, stops, pageStops, keyLead, keyCard, walkPlace, goToStop, openTeammateCard, closeAskOn, closeAskWhy, waitingFiled, answerCloseAsk, keepThreadOpen, toast, openToastRow, urgentShownRow, openUrgentReady, clearSlot, teamMode, evPick, evView, onBoard, pickMember, goNeedsYou, keyTab]);
 
   // WHO HOLDS THE KEYBOARD WHILE SEARCHING. The field is in the top bar and
   // stays mounted while a result is open, so without this the J and K that walk
@@ -9564,6 +9575,10 @@ export default function App() {
           else if (view === 'snoozed') unsnooze(sel);
           else void batchDone(multiSel);
         }} />
+      )}
+      {urgentShownRow && cornerHeaderTarget && createPortal(
+        <UrgentReady row={urgentShownRow} look={URGENT_LOOK} onOpen={openUrgentReady} />,
+        cornerHeaderTarget,
       )}
       {toast && (() => {
         // Said above the reply box instead, or about to be: the frame between

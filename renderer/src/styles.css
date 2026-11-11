@@ -4470,6 +4470,40 @@ img.product-mark { object-fit: cover; opacity: 1; }
 }
 @keyframes toast-drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 
+/* AN URGENT THREAD THAT ARRIVED, in the top bar until it is opened
+   (./components/UrgentReady). Square, no fill, accent only on the dot or edge. */
+.ur {
+  display: inline-flex; align-items: center; gap: 9px;
+  order: -1; height: 30px; max-width: 420px; min-width: 0; margin-right: 6px; padding: 0 8px 0 10px;
+  background: none; border: 1px solid transparent; border-radius: var(--tag-radius);
+  font: inherit; font-size: 13px; color: var(--text); cursor: pointer; white-space: nowrap;
+}
+.ur > span:not(.ur-dot):not(.ur-bell) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ur-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--chip-ask); animation: ur-arrive 1.2s ease-in-out 3; }
+@keyframes ur-arrive { 50% { opacity: .25; } }
+.ur-kbd {
+  flex: none; font-family: inherit; font-size: 10.5px; font-weight: 600; color: var(--text-faint);
+  border: 1px solid var(--line-strong); border-radius: 0; padding: 0 4px; line-height: 15px;
+}
+.ur:hover .ur-kbd { color: var(--text); border-color: var(--text-faint); }
+/* a: an accent edge round the title. */
+.ur-a { border-color: var(--chip-ask); }
+/* b: the breadcrumb's own type, so it reads as part of the bar. */
+.ur-b { font: 11px var(--mono); letter-spacing: .09em; text-transform: uppercase; gap: 8px; }
+.ur-b-word { color: var(--chip-ask); }
+.ur-b-title { color: var(--text-dim); }
+/* c: only a count, the title on hover. */
+.ur-c { color: var(--text-dim); border-color: var(--line); }
+/* d: a small word over the title. */
+.ur-d { height: 34px; }
+.ur-d-text { display: grid; text-align: left; line-height: 1.2; }
+.ur-d-word { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--chip-ask); }
+.ur-d-title { font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
+/* e: a bell with the dot on it. */
+.ur-e { border-color: var(--line); }
+.ur-bell { position: relative; flex: none; display: grid; color: var(--text-dim); }
+.ur-bell-dot { position: absolute; top: -1px; right: -2px; width: 6px; height: 6px; border-radius: 50%; background: var(--chip-ask); }
+
 /* WHERE A REPLY WENT, above the reply box of the thread it moved her to
    (./components/SentLine). The box's own width and hairline, square, one
    small dot of accent, and the toast's keycaps. The toast grey and the close
