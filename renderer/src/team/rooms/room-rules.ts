@@ -1,6 +1,6 @@
 // The rules the room screens draw by (w-3d0fa23ffb), kept apart from the
 // drawing so they can be tested. tests/a-room-reads-the-way-it-was-approved.
-import type { Person, Room, RoomCard, RoomMention, RoomProfile, ThreadCard } from '../../types';
+import type { Person, Room, RoomCard, RoomMention, RoomProfile, RoomsState, ThreadCard } from '../../types';
 import { Name } from '../../../../shared/product-name.mjs';
 import { mentionsIn } from '../../../../shared/room-needs-you.mts';
 
@@ -181,6 +181,15 @@ export function initialsOf(name: string): string {
 /** The name drawn on a card: "You" on my own. */
 export const cardName = (c: Pick<RoomCard, 'me' | 'name'>) => (c.me ? 'You' : c.name || 'Someone');
 
+/** A group is named for the others in it, from where `meId` sits; its stored
+ *  name is its maker's view of it. A room keeps its own name. */
+export function roomTitle(room: Pick<Room, 'kind' | 'name' | 'wall' | 'people'>, meId: string | null): string {
+  if (room.kind !== 'group') return room.name;
+  const onWall = room.wall.filter((c) => !c.me).map(cardName);
+  const others = onWall.length ? onWall : (room.people ?? []).filter((p) => p.id !== meId).map((p) => p.name || 'Someone');
+  return others.join(', ') || room.name;
+}
+
 export { mentionsIn };
 
 /** A message cut into plain text and the @names in it, for drawing. */
@@ -262,11 +271,15 @@ export function withMe<T extends { me: boolean }>(people: readonly T[], me: T | 
 }
 
 /** One Needs you row per group, the newest: a Mac's rooms already give one, a phone's give one per message. */
-export function mentionRows(mentions: readonly RoomMention[]): RoomMention[] {
+export function mentionRows(mentions: readonly RoomMention[], rooms: Pick<RoomsState, 'rooms' | 'me'> | null): RoomMention[] {
   const rows = new Map<string, RoomMention>();
   for (const m of mentions) {
     const had = rows.get(m.roomId);
     if (!had || m.at > had.at) rows.set(m.roomId, { ...m, id: `room-mention:${m.roomId}` });
   }
-  return [...rows.values()].sort((a, b) => b.at - a.at);
+  const meId = rooms?.me?.person_id ?? null;
+  return [...rows.values()].sort((a, b) => b.at - a.at).map((m) => {
+    const room = rooms?.rooms.find((r) => r.id === m.roomId);
+    return room ? { ...m, roomName: roomTitle(room, meId) } : m;
+  });
 }

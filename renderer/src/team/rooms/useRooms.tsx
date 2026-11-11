@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { api } from '../../api';
 import type { ArtifactMark, Person, Room, RoomMention, RoomsState } from '../../types';
 import './rooms.css';
-import { boardPeople, boardPicked, cardName, chatPeople, groupInTab, mentionRows, noticeShown, readBoardLater, readBoardPicks, readNoticeSeen, readRoomTab, withMe, writeBoardLater, writeBoardPicks, writeNoticeSeen, writeRoomTab } from './room-rules';
+import { boardPeople, boardPicked, chatPeople, groupInTab, mentionRows, noticeShown, roomTitle, readBoardLater, readBoardPicks, readNoticeSeen, readRoomTab, withMe, writeBoardLater, writeBoardPicks, writeNoticeSeen, writeRoomTab } from './room-rules';
 import { OpenGroupNotice } from './OpenGroupNotice';
 import { RoomViewButton } from './RoomView';
 import { landed, sameMessages } from './room-chat-rules';
@@ -27,9 +27,6 @@ import { decisionsOf, decisionRows } from '../decisions';
 import { DecisionsList } from '../TeamLists';
 
 type Direct = Conversation & { people: string[] };
-
-/** A named group's name, or the people in a chat. */
-const nameOf = (r: Room) => (r.kind === 'group' ? r.wall.filter((c) => !c.me).map(cardName).join(', ') || r.name : r.name);
 
 export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team = [], directs = [], now, toast, onOpenDirect, onTeamMessage, onLeavePage, renderBoard, inline = false }: {
   rooms: RoomsState | null | undefined; on: boolean; meId: string | null; myName: string; fullName?: string; hasTeam: boolean;
@@ -70,6 +67,7 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
   // One group's or one project's decisions, over whatever is on screen.
   const [listing, setListing] = useState<{ roomId: string; project: string | null; title: string } | null>(null);
   const open = openId ? all.find((r) => r.id === openId) ?? null : null;
+  const nameOf = (r: Room) => roomTitle(r, meId);
   const invisibleUntil = Date.parse(rooms?.me?.invisible_until ?? '');
 
   // A room I left, or was removed from, closes. One just joined or made may
@@ -341,7 +339,7 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
     comeBack={() => { void call('comeBack'); }} /> : live ? <RoomsNotReady error={rooms?.error ?? null} /> : undefined;
 
   // Needs you counts these rows too, so a group counts once.
-  const mentions: RoomMention[] = live ? mentionRows(rooms!.mentions) : [];
+  const mentions: RoomMention[] = live ? mentionRows(rooms!.mentions, rooms!) : [];
   const faces = new Map(all.flatMap((r) => r.wall.map((c) => [c.id, c.avatarUrl] as const)));
   const openMention = (m: RoomMention) => {
     if (m.note || m.file) setOpeningFile({ roomId: m.roomId, note: m.note, file: m.file, at: Date.now() });

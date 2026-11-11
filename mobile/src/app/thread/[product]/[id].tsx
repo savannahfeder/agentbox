@@ -410,7 +410,7 @@ export default function ThreadScreen() {
   const asks = questionsForYou(c.team, c.teamPending)
     .map((q) => ({ ...q, thread: questionThread(q.question, c.view.items) }))
     .filter((q) => !q.thread || !inNeedsYou.has(`${q.thread.product}/${q.thread.id}`));
-  const walk = walkKeeping(needsYouOrder(asks, groups.on ? mentionRows(groups.state.mentions) : [], inbox), here, walked.current);
+  const walk = walkKeeping(needsYouOrder(asks, groups.on ? mentionRows(groups.state.mentions, groups.state) : [], inbox), here, walked.current);
   walked.current = walk;
   const spot = needsYouSpot(walk, here);
   const step = (dir: 1 | -1) => {

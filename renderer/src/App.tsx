@@ -260,6 +260,8 @@ import { SentLine } from './components/SentLine';
 import { TickedBar } from './components/TickedBar';
 import { AgentSending } from './team/AgentSending';
 import { HomePage, type NeedsRow, type ProgressRow, type TeamRow } from './home/HomePage';
+import { homeNeedsRows } from './home/home-needs';
+import { needsYouList, openNeedsEntry } from './threads/needs-you-list';
 import { SkyBackdrop } from './home/SkyBackdrop';
 import { InboxSky } from './home/InboxSky';
 import { SKY_THEME_KEY, setHomeSetting, useDarkWindow, useHomeSettings } from './home/home-settings';
@@ -3184,12 +3186,18 @@ export default function App() {
   }, [teamMode, view, search, onBoard, shownAs, progressTab, snoozed, done, now, stackFolded, repeats.length, directSlugs]);
   // THE ROWS ABOVE THE THREADS (./threads/needs-you-rows). The Mac's rooms hold
   // them whether or not the Groups page has been opened.
-  const groupRows = useMemo(() => (snap?.alpha?.rooms && snap?.team?.rooms?.on ? mentionRows(snap.team.rooms.mentions) : []), [snap?.alpha?.rooms, snap?.team?.rooms]);
+  const groupRows = useMemo(() => (snap?.alpha?.rooms && snap?.team?.rooms?.on ? mentionRows(snap.team.rooms.mentions, snap.team.rooms) : []), [snap?.alpha?.rooms, snap?.team?.rooms]);
   const allLeads = useMemo(() => leadRows(
     inviteRows(snap?.team?.invites),
     groupRows,
   ), [snap?.team?.invites, groupRows]);
   const leadCount = allLeads.length;
+  // HOME'S NEEDS YOU: your rows as the tab's number counts them (no box filter), then what the tab adds.
+  const needsList = useMemo(() => needsYouList({
+    mine: mineShown ? sortedByDisplay(inbox.filter((i) => shownCount([i]) === 1), inboxDisplay, 'inbox', projectOrder, directSlugs) : [],
+    withOthers, cards, picked, me: team?.me ?? null, display: inboxDisplay, products: snap?.products ?? [], now,
+    order: projectOrder, leads: allLeads, fileNews: sharedFileNews, follows: followingNews,
+  }), [mineShown, inbox, shownCount, inboxDisplay, projectOrder, directSlugs, withOthers, cards, picked, team?.me, snap?.products, now, allLeads, sharedFileNews, followingNews]);
   // One list by priority, unless someone chose Group by Who under View and filters.
   const [needsFolded, setNeedsFolded] = useState<ReadonlySet<string>>(() => new Set());
   const fromPeopleAbove = leadCount + sharedFileNews.length + followingNews.length;
@@ -7694,10 +7702,15 @@ export default function App() {
   const inboxCount = inboxBadge({ rows: shownCount(inbox), leads: leadCount, fileNews: sharedFileNews.length, follows: followingNews.length });
   const inboxHere = !homeShown && view === 'inbox' && search === null && !settingsOpen && !teamShown && !focused && !focusedRepeat
     && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown;
-  const homeNeeds: NeedsRow[] = homeShown ? inbox.slice(0, 80).map((i) => {
-    const sent = team ? sentFrom(i, team.products.get(i.product), team.me) : null;
-    const from = sent ? (team?.byId.get(sent.from)?.name?.split(/\s+/)[0] ?? 'Someone') : null;
-    return { key: `${i.product}/${i.id}`, letter: from ? from.slice(0, 1).toUpperCase() : engineLetter(i.engine), title: rowTitle(i), from, priority: rowPriorityId(shownPriority(i)), project: i.productName, at: sentAtOf(i), unread: isUnread(i, seenAt, unreadSince, team?.me ?? null) };
+  const homeNeeds: NeedsRow[] = homeShown ? homeNeedsRows(needsList, {
+    nameOf: (id) => team?.byId.get(id)?.name ?? '',
+    item: (i) => {
+      const sent = team ? sentFrom(i, team.products.get(i.product), team.me) : null;
+      const from = sent ? (team?.byId.get(sent.from)?.name?.split(/\s+/)[0] ?? 'Someone') : null;
+      // A conversation's record is named for nobody; the row's sender says who it is with.
+      const project = directSlugs.has(i.product) ? '' : i.productName;
+      return { key: `${i.product}/${i.id}`, letter: from ? from.slice(0, 1).toUpperCase() : engineLetter(i.engine), title: rowTitle(i), from, priority: rowPriorityId(shownPriority(i)), project, at: sentAtOf(i), unread: isUnread(i, seenAt, unreadSince, team?.me ?? null) };
+    },
   }) : [];
   const homeTeam: TeamRow[] | null = !homeShown || !teamMode ? null : members.filter((m) => m.kind === 'person' || (m.kind === 'mate' && m.key.startsWith('mate:'))).map((m) => {
     const id = m.key.slice(m.key.indexOf(':') + 1);
@@ -7714,10 +7727,16 @@ export default function App() {
   });
   const homeProgress: ProgressRow[] = homeShown && !teamMode ? progressTab.slice(0, 60).map((i) => ({ key: `${i.product}/${i.id}`, letter: engineLetter(i.engine), title: rowTitle(i), line: `${engineName(i.engine)} · ${i.productName}`, at: sentAtOf(i) })) : [];
   const homeOpenRow = (key: string) => {
-    const item = items.find((i) => `${i.product}/${i.id}` === key);
-    if (!item) return;
-    openedFromHome.current.add(keyOf(item));
-    setFocused(item); markSeen(item);
+    const entry = needsList.find((e) => e.key === key);
+    if (!entry) return;
+    openNeedsEntry(entry, {
+      item: (item) => { openedFromHome.current.add(keyOf(item)); setFocused(item); markSeen(item); },
+      card: (card) => openTeammateCard(card),
+      // A click on an invitation opens it, as its Inbox row does; joining is its own button there.
+      lead: (l) => { if (l.mention) roomsUi.openMention(l.mention); else openInvite(); },
+      file: (n, card) => openTeammateCard(card, { file: n.file, note: n.id }),
+      follow: (n, card) => { changeFollows((was) => markTold(was, n)); openTeammateCard(card); },
+    });
   };
   // Light themes keep the Inbox plain; only dark ones wear its sky.
   const skyOnInbox = !!sky && sky.dark && !homeShown && (['inbox', 'progress', 'snoozed', 'done'] as string[]).includes(view) && !onPhone() && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
@@ -8201,7 +8220,7 @@ export default function App() {
               {skyOnPlace && sky && <InboxSky art={sky.art} />}
               {homeShown ? (
                 <HomePage hello={greeting(new Date(now).getHours(), snap.team?.me?.name ?? null)} now={now}
-                  needs={homeNeeds} needsCount={needsYouCount.inbox} progressCount={mineShown ? shownCount(progressTab) : 0}
+                  needs={homeNeeds} needsCount={needsList.length} inboxCount={needsYouCount.inbox} progressCount={mineShown ? shownCount(progressTab) : 0}
                   team={homeTeam} progress={homeProgress} slot={setClearSlot}
                   onDoor={(d) => { if (d === 'inbox') openView('inbox'); else if (d === 'progress') { openView('inbox'); if (teamMode) goMine('progress'); else openView('progress'); } else openChatsPlace('team'); }}
                   onOpen={homeOpenRow} onMember={(key) => openChatsPlace(key)} onTeam={() => openChatsPlace('team')} />
