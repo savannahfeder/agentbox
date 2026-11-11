@@ -47,10 +47,11 @@ describe('what the thread scope takes', () => {
     expect(checkSetting(on('visibility', 'people'))).toBe('not a value that setting takes');
     expect(checkSetting(on('visibility', 'everyone'))).toBe('not a value that setting takes');
   });
-  it('kept on the computer: yes, or none to let the cloud have it', () => {
+  it('kept on the computer: yes, no to send it to the cloud, or none to leave it to the setting', () => {
     expect(checkSetting(on('onMac', true))).toBeNull();
+    expect(checkSetting(on('onMac', false))).toBeNull();
     expect(checkSetting(on('onMac', null))).toBeNull();
-    expect(checkSetting(on('onMac', false))).toBe('not a value that setting takes');
+    expect(checkSetting(on('onMac', 'yes'))).toBe('not a value that setting takes');
   });
   it('try again and restart: only yes', () => {
     for (const k of ['resume', 'redeliver']) {

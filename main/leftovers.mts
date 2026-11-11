@@ -28,10 +28,11 @@
 //      store it is in, has no session for it; the clock starts then, never
 //      back-dated.
 //   4. ITS PROGRAMS STOP `closeGraceMs` (2 min) AFTER THE TASK IS CLOSED, so a
-//      Z that reopens it keeps them. While memory is tight or critical, also
+//      Z that reopens it keeps them. While memory is critical, also
 //      `tightIdleMs` (10 min) after the run ended, one task per look, the one
-//      whose run ended longest ago first. Never sooner than that long after
-//      the switch went on.
+//      whose run ended longest ago first. Not while merely tight: a busy Mac
+//      is tight most of the day. Never sooner than that long after the switch
+//      went on.
 //   5. NOTHING PROTECTED IS EVER STOPPED: AGENTBOX_KEEP=1 in its environment,
 //      an executable inside an installed app or the system (Docker Desktop and
 //      its VM, a browser an agent opened), an executable that cannot be read,
@@ -440,7 +441,7 @@ export class LeftoverCleaner {
   stoppingNote(item: string): string | null {
     const left = Object.values(this.stopping).filter((s) => s.item === item);
     if (!left.length) return null;
-    return `Programs from an earlier run of this task were asked to stop and may still be shutting down: ${left.map((s) => `pid ${s.pid} (${s.cmd || s.exe})`).join(', ')}. Do not reuse them; start what you need afresh.`;
+    return `Programs from an earlier run of this task were asked to stop and may still be shutting down: ${left.map((s) => `pid ${s.pid} (${s.cmd || s.exe})`).join(', ')}. Do not reuse them; start what you need afresh. If the person was using one of them (a window, a server), tell them it was stopped.`;
   }
 
   /** The worker process of the run just started, so a crash can be told from a run. */
@@ -606,7 +607,7 @@ export class LeftoverCleaner {
     try { closed = this.closedAt(item, product); } catch { closed = null; }
     const times: number[] = [];
     if (Number.isFinite(closed)) times.push(Math.max(from, closed!) + this.closeGraceMs);
-    if (pressure !== 'normal') times.push(from + this.tightIdleMs);
+    if (pressure === 'critical') times.push(from + this.tightIdleMs);
     return times.length ? Math.min(...times) : null;
   }
 

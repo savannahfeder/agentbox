@@ -3,7 +3,6 @@
 // versions within a project (shared/artifact-marks.mts); its comments and
 // approvals are those made on any copy of it. Only the threads the caller
 // lists are read: your own, and the teammates' threads the cloud shows you.
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { resolveArtifact } from './artifact-path.mts';
@@ -677,21 +676,8 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     return null;
   }
 
-  // Kept while the file is unchanged, so a film is read once, not on every look.
-  const hashes = new Map<string, FileBytes>();
-  async function bytesOf(file: string): Promise<FileBytes | null> {
-    const st = await fs.promises.stat(file).catch(() => null);
-    if (!st?.isFile()) return null;
-    const was = hashes.get(file);
-    if (was && was.size === st.size && was.mtime === st.mtimeMs) return was;
-    const hash = await new Promise<string>((resolve, reject) => {
-      const h = crypto.createHash('sha256');
-      fs.createReadStream(file).on('data', (d) => h.update(d)).on('end', () => resolve(h.digest('hex'))).on('error', reject);
-    });
-    const out = { size: st.size, mtime: st.mtimeMs, hash };
-    hashes.set(file, out);
-    return out;
-  }
+  // The version line saves its fingerprints, so a restart reads no film again.
+  const bytesOf = (file: string): Promise<FileBytes | null> => lineNow().hashOf(file);
 
   // Shared and group threads are only listed with a team, and a group's only with its rooms.
   async function writeTo(thread: PlaceThread, mark: unknown): Promise<void> {
