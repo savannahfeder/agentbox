@@ -1,16 +1,14 @@
-// A FILE LINK IN A HANDED-ON TASK OPENS THE REVIEW WITH ITS NOTES (2026-11-11).
+// A FILE LINK IN A HANDED-ON TASK CARRIES THE NOTES FILES SHOWS (2026-11-11).
 //
 // Two testers on one team, twice: "Report link in handoff opens document
 // without shared review notes." Measured through two copies of the app over
 // the memory cloud: the task a hand-off makes carries the report as a copy in
-// the receiver's conversation, and Files does find the notes made on the
-// thread for that copy. But a document pressed in a task opened beside the
-// chat, and the pane beside the chat draws no notes. In a conversation or a
-// task a teammate gave you, a file now opens in the review, as a chat
-// attachment does, where its notes, numbers and version line come from Files.
-//
-// What must NOT change: a document in your own thread still opens beside the
-// chat, and a web address is still not a file the review reads.
+// the receiver's conversation, and Files finds the notes made on the thread
+// for that copy. A document opens beside the chat first, and the pane there
+// draws no notes for any file (App.tsx fills its notes slot only in full
+// screen); its full-screen button opens the review for the task, which reads
+// those notes through the same lookup. This holds that the lookup answers for
+// a task's copy with what Files shows, and that the review asks it.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -22,7 +20,6 @@ import { createTeamService } from '../main/team/index.mts';
 import { memorySession } from '../main/team/session.mts';
 import { appFilesPlace } from '../main/files-place.mts';
 import { filesInLines, threadFiles } from '../shared/artifact-marks.mts';
-import { whereAFileOpens } from '../renderer/src/artifact-layout.ts';
 
 async function aMac(cloud, personId) {
   const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'task-file-'));
@@ -82,25 +79,10 @@ describe("the report in a hand-off task, on the receiver's computer", () => {
   });
 });
 
-describe('where a file pressed in a conversation or a given task opens', () => {
-  it('in the review, for a document, a table and a script as well as a picture', () => {
-    for (const f of ['attachments/mvwy0003-cccc-csv-report.md', 'leads.csv', 'cart.mjs', 'shot.png', 'brief.pdf']) {
-      expect(whereAFileOpens(f, { conversation: true }), f).toBe('full');
-    }
-  });
-
-  it('a document in your own thread still opens beside the chat', () => {
-    expect(whereAFileOpens('csv-report.md')).toBe('beside');
-    expect(whereAFileOpens('csv-report.md', { conversation: false })).toBe('beside');
-  });
-
-  it('a web address is still not a file the review reads', () => {
-    expect(whereAFileOpens('https://example.com/report.md', { conversation: true })).toBeNull();
-  });
-
-  it('the thread page asks with whether it is a conversation', () => {
-    const focus = fs.readFileSync(new URL('../renderer/src/components/Focus.tsx', import.meta.url), 'utf8');
-    expect(focus).toContain("whereAFileOpens(path, { conversation: direct }) === 'full'");
-    expect(focus).toContain("whereAFileOpens(path, { conversation: direct }) === 'beside'");
+describe("the review a task's file opens in", () => {
+  it("asks Files for the notes of the task's own copies", () => {
+    const view = fs.readFileSync(new URL('../renderer/src/components/ThreadArtifacts.tsx', import.meta.url), 'utf8');
+    expect(view).toContain('api.fileElsewhere({ product: item.product, id: item.id, copies })');
+    expect(view).toContain('withElsewhere(item.artifacts ?? NO_MARKS, elsewhere)');
   });
 });

@@ -22,7 +22,7 @@ const focus = read('components/Focus.tsx');
 const kindOpensBig = (path) => whereAFileOpens(path) === 'full';
 
 it('a thread decides with that rule', () => {
-  expect(focus).toMatch(/const opensBig = [^\n]*whereAFileOpens\(path(, \{ conversation: direct \})?\) === 'full'/);
+  expect(focus).toMatch(/const opensBig = [^\n]*whereAFileOpens\(path\) === 'full'/);
 });
 
 it('a note, a table or a script does not open in the large viewer', () => {

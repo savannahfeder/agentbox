@@ -1350,8 +1350,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // A file opened full screen, with its comments. A phone keeps the picture view its fingers know.
   const [artifact, setArtifact] = useState<ArtifactOpen | null>(null);
   const bigView = !onPhone() && !item.agent && !previewSample;
-  const opensBig = (path?: string | null) => bigView && whereAFileOpens(path, { conversation: direct }) === 'full';
-  const opensBeside = (path?: string | null) => bigView && !!onOpenDoc && whereAFileOpens(path, { conversation: direct }) === 'beside';
+  const opensBig = (path?: string | null) => bigView && whereAFileOpens(path) === 'full';
+  const opensBeside = (path?: string | null) => bigView && !!onOpenDoc && whereAFileOpens(path) === 'beside';
   // A picture clicked in the thread steps through its own turn's pictures, as the small view does.
   const turnOf = (path: string, from?: HTMLElement): { steps?: string[]; drawn?: string[] } => {
     if (!from || !opensAsPicture(path)) return {};
