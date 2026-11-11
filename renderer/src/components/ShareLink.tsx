@@ -174,7 +174,7 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
                 <span className={`av-share-icon${link ? ' is-open' : ''}`}><NoteGlyph name={link ? 'globe' : 'lock'} /></span>
                 <span className="av-share-access">
                   <b>{link ? shareWords.anyone : shareWords.notPublic}</b>
-                  <i>{link ? shareWords.canComment : shareWords.fresh}</i>
+                  <i>{link && stopAsked && link.comments > 0 ? shareWords.keptComments(link.comments) : link ? shareWords.canComment : shareWords.fresh}</i>
                 </span>
                 {link && (
                   <button type="button" className={`av-share-stop${stopAsked ? ' is-asking' : ''}`} disabled={busy} onBlur={() => setStopAsked(false)} onClick={() => void stop()}>

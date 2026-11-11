@@ -13,8 +13,10 @@ export const shareWords = {
   ahead: (v: number) => `The link shows version ${v}, newer than this one.`,
   newComments: 'New comments on the link',
   comments: (n: number) => (n === 1 ? '1 comment' : `${n} comments`),
+  // The press that ends it says so. As a statement it read as done already (power test, 2026-11-11).
+  stopAsk: (_n: number) => 'Stop the link',
   // A link's comments are kept on the thread its file came from (main/team/link-comments.mts).
-  stopAsk: (n: number) => (n > 0 ? `Stop, ${n === 1 ? 'its comment stays' : 'its comments stay'} in the thread` : 'Stop the link'),
+  keptComments: (n: number) => (n === 1 ? 'Its comment stays in the thread' : 'Its comments stay in the thread'),
   shared: ({ createdAt, updatedAt }: { createdAt: number; updatedAt: number }, now = Date.now()) => {
     const what = updatedAt - createdAt > 1000 ? 'Updated' : 'Shared';
     return new Date(updatedAt).toDateString() === new Date(now).toDateString()

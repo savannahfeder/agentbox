@@ -105,10 +105,11 @@ describe('signed in', () => {
     // "Only you" read as hiding the file from the team on a shared project (2026-11-11).
     expect(shareWords.notPublic).toBe('No public link');
     expect(shareWords.canComment).toBe('Can see it and its comments');
-    // Stopping read as deleting the review (power test, 2026-11-11); the thread keeps the comments.
-    expect(shareWords.stopAsk(2)).toBe('Stop, its comments stay in the thread');
-    expect(shareWords.stopAsk(1)).toBe('Stop, its comment stays in the thread');
-    expect(shareWords.stopAsk(0)).toBe('Stop the link');
+    // Stopping read as deleting the review, then as already done (power tests, 2026-11-11).
+    // The press says what it does, and the line above it says the comments stay.
+    for (const n of [0, 1, 2]) expect(shareWords.stopAsk(n)).toBe('Stop the link');
+    expect(shareWords.keptComments(2)).toBe('Its comments stay in the thread');
+    expect(shareWords.keptComments(1)).toBe('Its comment stays in the thread');
     // Signed out, a file with a live link read as if nothing were shared (power test, round 3).
     expect(shareWords.signedOut).toBe('Sign in to share this file or see its link.');
   });
