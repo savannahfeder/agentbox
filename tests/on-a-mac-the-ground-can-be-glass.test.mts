@@ -130,9 +130,9 @@ describe('the window', () => {
   });
 
   it('never gives or takes a running window\'s blur, anywhere in the app', () => {
-    for (const f of fs.readdirSync(path.join(import.meta.dirname, '..', 'main')).filter((n) => n.endsWith('.mts'))) {
-      expect(read(`main/${f}`), f).not.toMatch(/\bsetVibrancy\(/);
-    }
+    const files = fs.readdirSync(path.join(import.meta.dirname, '..', 'main'), { recursive: true, encoding: 'utf8' }).filter((n) => /\.m?[jt]s$/.test(n));
+    expect(files.length).toBeGreaterThan(50);
+    for (const f of files) expect(read(`main/${f}`), f).not.toMatch(/\bsetVibrancy\(/);
   });
 
   it('is what the main window is made with', () => {
