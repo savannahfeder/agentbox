@@ -102,6 +102,8 @@ describe('signed in', () => {
     // The panel says so before sharing and after (redrawn 2026-11-11).
     expect(shareWords.fresh).toBe('Copy link to let anyone see it and comment');
     expect(shareWords.anyone).toBe('Anyone with the link');
+    // "Only you" read as hiding the file from the team on a shared project (2026-11-11).
+    expect(shareWords.notPublic).toBe('No public link');
     expect(shareWords.canComment).toBe('Can see it and its comments');
     // Stopping read as deleting the review (power test, 2026-11-11); the thread keeps the comments.
     expect(shareWords.stopAsk(2)).toBe('Stop, its comments stay in the thread');

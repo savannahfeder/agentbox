@@ -4,7 +4,8 @@ import { clock } from './thread-history';
 export const shareWords = {
   signedOut: 'Sign in to share this file or see its link.',
   fresh: 'Copy link to let anyone see it and comment',
-  onlyYou: 'Only you',
+  // Not "Only you": on a team's project its teammates see the file without a link.
+  notPublic: 'No public link',
   anyone: 'Anyone with the link',
   canComment: 'Can see it and its comments',
   stopped: 'Stopped. The old link no longer works.',

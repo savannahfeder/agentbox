@@ -1108,12 +1108,6 @@ export class Store {
     return workItemsDisk.updateWorkItem(this.productDir(slug), id, { note }, { source: 'system' });
   }
 
-  // A THREAD THAT WAITS ON ITS PERSON AND RUNS NOTHING until they write to it,
-  // such as a file someone shared that they brought in (main/bring-shared-file.mts).
-  waitOnThePerson(slug: string, id: string) {
-    return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, { status: 'blocked' }, { source: 'system' });
-  }
-
   // SOMEONE COMMENTED ON A FILE THIS THREAD MADE, through its shared link
   // (main/team/link-comments.mts). Said as a note; a closed thread comes back
   // to wait on her as `closedBeforeItShipped` brings one, and a thread still

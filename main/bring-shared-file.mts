@@ -1,6 +1,6 @@
 // A FILE SOMEONE SHARED BY ITS LINK, BROUGHT INTO THIS PERSON'S OWN AGENTBOX:
-// their own copy in a project's attachments, on a thread of its own that waits
-// on them and runs nothing until they write to it. What they edit is theirs;
+// their own copy in a project's attachments, on a thread of its own in Later,
+// which runs nothing until they write to it. What they edit is theirs;
 // the link and its owner's file are left as they were.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -38,14 +38,12 @@ export function projectToBringInto(products: readonly { slug: string; team?: { d
 
 export interface BroughtIn { product: string; id: string; src: string }
 
-export async function bringSharedFile({ token, product, read, productDir, compose, hold }: {
+export async function bringSharedFile({ token, product, read, productDir, compose }: {
   token: string;
   product: string;
   read: (token: string) => Promise<{ file: SharedLinkFile; bytes: Buffer }>;
   productDir: string;
-  compose: (fields: { title: string; body: string }) => { id: string } | null | undefined;
-  /** Leaves the thread waiting on them, so no agent starts on it. */
-  hold: (id: string) => void;
+  compose: (fields: { title: string; body: string; start: 'later' }) => { id: string } | null | undefined;
 }): Promise<BroughtIn> {
   const { file, bytes } = await read(token);
   // Through a file rather than base64, since a film is up to 200 MB.
@@ -63,8 +61,8 @@ export async function bringSharedFile({ token, product, read, productDir, compos
   const shown = saved.image ? `![${saved.name}](${saved.rel})` : `[${saved.name}](${saved.rel})`;
   // The link stays off the message: a person's own message draws no markdown link, and a raw one fills it.
   const body = [`${who} shared this with me.`, '', shown].join('\n');
-  const made = compose({ title: sharedFileTitle(file), body });
+  // Written down and not begun, so no agent starts on it until they write.
+  const made = compose({ title: sharedFileTitle(file), body, start: 'later' });
   if (!made?.id) throw new Error('The thread for this file could not be made.');
-  hold(made.id);
   return { product, id: made.id, src: saved.rel };
 }

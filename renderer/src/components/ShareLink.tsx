@@ -161,7 +161,7 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
             <>
               <div className="av-share-who-sees">
                 <span className="av-share-icon"><NoteGlyph name="lock" /></span>
-                <span className="av-share-access"><b>Only you</b><i>{shareWords.signedOut}</i></span>
+                <span className="av-share-access"><b>{shareWords.notPublic}</b><i>{shareWords.signedOut}</i></span>
               </div>
               <div className="av-share-foot">
                 <span />
@@ -173,7 +173,7 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
               <div className="av-share-who-sees">
                 <span className={`av-share-icon${link ? ' is-open' : ''}`}><NoteGlyph name={link ? 'globe' : 'lock'} /></span>
                 <span className="av-share-access">
-                  <b>{link ? shareWords.anyone : shareWords.onlyYou}</b>
+                  <b>{link ? shareWords.anyone : shareWords.notPublic}</b>
                   <i>{link ? shareWords.canComment : shareWords.fresh}</i>
                 </span>
                 {link && (

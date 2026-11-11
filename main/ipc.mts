@@ -2778,7 +2778,6 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
         token, product: slug, read: (t) => team.readFileLink(t), productDir: store.productDir(slug),
         // Their own copy: a teammate on a shared project sees it only if they share it.
         compose: (fields) => store.composeItem(slug, { ...fields, visibility: 'private' }),
-        hold: (id) => { store.waitOnThePerson(slug, id); },
       });
       push();
       return { ok: true, ...out };
