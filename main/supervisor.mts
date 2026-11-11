@@ -13599,8 +13599,11 @@ export class Supervisor {
     // Blank, Claude Code tells the agent to add no co-author or "Generated with
     // Claude Code" line; unset, it tells it to add both, over any CLAUDE.md.
     rules.attribution = { commit: '', pr: '' };
-    const gateHooks = this.memoryGateHooks();
-    if (gateHooks) rules.hooks = { ...(rules.hooks ?? {}), ...gateHooks };
+    const hooks: Record<string, unknown[]> = {};
+    for (const set of [rules.hooks, this.safetyCheckHooks(runId), this.memoryGateHooks()]) {
+      for (const [event, groups] of Object.entries(set ?? {})) hooks[event] = [...(hooks[event] ?? []), ...(Array.isArray(groups) ? groups : [])];
+    }
+    rules.hooks = hooks;
     // Beside the MCP config, and written the same way: a real file on disk,
     // because the CLI reading --settings is not this process. Named by the
     // run, because two spawns with different rules must never share a file.
@@ -13708,7 +13711,20 @@ export class Supervisor {
     // The app decides each of these calls itself, so the engine does not ask too.
     for (const name of Object.keys(connectionServers ?? {})) args.push('--allowedTools', `mcp__${name}`);
     const rules = this.writeWorkerSettings(product, runId);
-    if (rules) { spawnFiles.push(rules); args.push('--settings', rules); }
+    if (rules) {
+      const refused = refusalsDir(runId);
+      spawnFiles.push(rules, () => fs.rmSync(refused, { recursive: true, force: true }));
+      args.push('--settings', rules);
+    }
+  }
+
+  safetyCheckHooks(runId: string) {
+    const q = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
+    const script = q(unpacked(path.join(this.appDir, 'scripts', 'safety-check-hook.sh')));
+    // The runtime the approvals server runs on, for the same reason (mcpServers).
+    const run = [refusalsDir(runId), process.execPath, ...stripTypesFlags(), path.join(this.appDir, 'main', 'safety-check-hook.mts')].map(q).join(' ');
+    const on = (mode: string) => [{ hooks: [{ type: 'command', command: `${script} ${mode} ${run}`, timeout: 30 }] }];
+    return { PermissionDenied: on('denied'), PreToolUse: on('pre') };
   }
 
   /* ------------------ heavy work waits when memory is short ----------------- */
@@ -14049,6 +14065,11 @@ export class Supervisor {
 // her rows to date fits inside this whole. It is a ceiling against a runaway
 // row, not a style choice, and hitting it prints a line saying so.
 const THREAD_BUDGET = 24000;
+
+/** Where one run notes the calls auto mode refused (main/safety-check-hook.mts). Made by the hook on the first. */
+export function refusalsDir(runId: string) {
+  return path.join(os.tmpdir(), `${nameSlug}-refused-${runId}`);
+}
 
 export function unpacked(p: string): string {
   return p.includes(`${path.sep}app.asar${path.sep}`)

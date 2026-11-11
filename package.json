@@ -55,6 +55,7 @@
     "scripts/approval-server.sh",
     "scripts/cloud-shim.pl",
     "scripts/memory-gate-hook.sh",
+    "scripts/safety-check-hook.sh",
     "worker-permissions.json",
     "LICENSE",
     "README.md"
@@ -172,6 +173,7 @@
       "scripts/approval-server.sh",
       "scripts/cloud-shim.pl",
       "scripts/memory-gate-hook.sh",
+      "scripts/safety-check-hook.sh",
       "mcp/connection-proxy.mts",
       "renderer/dist/**/*",
       "package.json"
@@ -181,6 +183,7 @@
       "scripts/approval-server.sh",
       "scripts/cloud-shim.pl",
       "scripts/memory-gate-hook.sh",
+      "scripts/safety-check-hook.sh",
       "node_modules/node-pty/**",
       "main/native/**/*.node"
     ],
