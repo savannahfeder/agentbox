@@ -184,13 +184,16 @@ export function waitCameBack(i: InboxItem & { waitEnded?: { at: number } }): boo
 // `stopped`: the supervisor will not start it again on its own
 // (`supervisor.stalled`), so a person has to, and Needs you is the list they
 // read.
+/** A teammate's words, or comments on its links, its owner has not dealt with: they hold it in Needs you. */
+export const wordsWait = (i: Pick<InboxItem, 'waitingComments' | 'linkComments'>): boolean => !!(i.waitingComments?.length || i.linkComments?.length);
+
 export function belongsInInbox(
   i: InboxItem,
   { deliveredThrough = 0, hiddenUntil = 0, now = Date.now(), live = false, shipping = false, asking = false, waitingOn = [] as readonly string[], stopped = false } = {},
 ): boolean {
   // A teammate's words wait for you whatever the thread is doing, a running
   // agent included (`waitingComments`, shared/work-items.mts).
-  if (i.waitingComments?.length || i.linkComments?.length) return true;
+  if (wordsWait(i)) return true;
   // In Later and not begun: it waits for a person, not a clock, so it is in
   // Later and nowhere else.
   if (notStarted(i)) return false;
