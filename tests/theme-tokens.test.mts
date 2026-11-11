@@ -204,6 +204,10 @@ describe('no raw colour outside the token blocks', () => {
       // because the two states that need it are set on .app while the line
       // that reads it is on the nav.
       '--search-rule-inset',
+      // The back and forward arrows' width with their margin, which the Chats
+      // header's column pulls left by so its line stays on the list's edge.
+      // Geometry, set on .app beside the arrows it measures.
+      '--bf-w',
       // The height of the label line a tick on the import card has to sit in
       // the middle of, which is 18.75px next to a project name and 17.55px next
       // to an agent's. It is a variable because the rule that centres the box
