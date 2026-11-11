@@ -36,14 +36,19 @@ describe('the ask line', () => {
 });
 
 describe('the approval card a waiting run raises', () => {
-  it('says which key, where it is read from, and that every cloud thread gets it', () => {
+  // Picked 2026-11-10: a question naming the key, and where it goes, so it does not read as one more Allow.
+  it('asks whether to send which key, says where it is read from and where it goes', () => {
     expect(approvalView({ name: 'POSTHOG_PERSONAL_KEY', what: 'the PostHog personal API key the daily report reads', place: 'keychain', from: 'posthog-read-key' }, 'cloud_key')).toEqual({
-      title: 'Give the cloud a key from this computer',
-      body: { kind: 'fields', rows: [['Key', 'PostHog personal API key the daily report reads'], ['From', 'Your Keychain, as posthog-read-key'], ['Saved as', 'POSTHOG_PERSONAL_KEY']] },
-      where: 'Every cloud thread can use it from now on',
+      title: 'Send your PostHog key to the cloud?',
+      body: { kind: 'fields', rows: [['Key', 'PostHog personal API key the daily report reads'], ['From', 'Your Keychain, as posthog-read-key'], ['To', 'Your Agentbox Cloud, for every cloud thread']] },
+      where: null,
     });
-    expect(approvalView({ name: 'POSTHOG_KEY', what: '', place: 'file', from: '~/app/.env', entry: 'POSTHOG_KEY' }, 'cloud_key').body.rows)
-      .toEqual([['Key', 'POSTHOG_KEY'], ['From', 'POSTHOG_KEY in ~/app/.env'], ['Saved as', 'POSTHOG_KEY']]);
+    expect(approvalView({ name: 'SUPABASE_ACCESS_TOKEN', what: 'the Supabase access token', place: 'shell', from: 'SUPABASE_ACCESS_TOKEN' }, 'cloud_key').title)
+      .toBe('Send your Supabase token to the cloud?');
+    expect(approvalView({ name: 'POSTHOG_KEY', what: '', place: 'file', from: '~/app/.env', entry: 'POSTHOG_KEY' }, 'cloud_key')).toMatchObject({
+      title: 'Send this key to the cloud?',
+      body: { rows: [['Key', 'POSTHOG_KEY'], ['From', 'POSTHOG_KEY in ~/app/.env'], ['To', 'Your Agentbox Cloud, for every cloud thread']] },
+    });
   });
 
   it('shows nothing it could not read as a place', () => {

@@ -2783,6 +2783,22 @@ body {
 .approval-key { font-weight: 500; letter-spacing: 0.01em; }
 .approval-allow .approval-key { color: color-mix(in oklab, var(--on-solid) 55%, transparent); }
 .approval-deny .approval-key { color: var(--text-faint); }
+/* A key card's Reply (renderer/src/components/KeyCardActions.tsx): at the far
+   end and without Deny's box, because the two side by side were mixed up. */
+.approval-actions .approval-reply {
+  margin-left: auto; color: var(--text-dim); background: none; border: 1px solid transparent; padding: 0 4px;
+}
+.approval-actions .approval-reply:hover { color: var(--text); }
+.approval-reply .approval-key { color: var(--text-faint); }
+.approval-reply-box {
+  width: 100%; box-sizing: border-box; margin: 0 0 10px; padding: 7px 10px;
+  font: inherit; font-size: 13px; color: var(--text);
+  background: var(--bg); border: 1px solid var(--line-strong); border-radius: var(--artifact-corner-small);
+}
+.approval-reply-box::placeholder { color: var(--text-faint); }
+.approval-reply-box:focus { outline: none; border-color: var(--text-faint); }
+:root[data-skin] .approval-reply-box { background: var(--film-strong); }
+.approval-actions button:disabled { opacity: 0.5; cursor: default; }
 
 /* The answered card, leaving.So: a press (the card gives, briefly), a mark
    stamped over it, and the card settles away. No green wash, which was already
