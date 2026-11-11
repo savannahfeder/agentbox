@@ -1,4 +1,6 @@
-// Every new thread opens on Medium, whatever the last one was tagged.
+// Every new thread opens on Agent decides, whatever the last one was tagged.
+// It opened on Medium until 2026-11-10 (w-f3683346f9); the rule below is the
+// same, only the default moved.
 //
 // The card used to remember the last level picked (`zero.lastPriority`), so
 // one Urgent thread made the next one Urgent too, and the one after. A tester
@@ -23,8 +25,8 @@ const fakeStore = () => {
   };
 };
 
-// What both cards do on mount: the draft's own tag, else untagged (Medium).
-const cardOpensOn = (store) => startingPriority(readComposeDraft(store).priority) ?? 'medium';
+// What both cards do on mount: the draft's own tag, else Agent decides.
+const cardOpensOn = (store) => startingPriority(readComposeDraft(store).priority) ?? 'agent';
 
 const draft = (priority) => ({
   text: 'Cut the film to thirty seconds',
@@ -32,24 +34,24 @@ const draft = (priority) => ({
 });
 
 describe('a new thread', () => {
-  it('opens on Medium after an Urgent one was sent', () => {
+  it('opens on Agent decides after an Urgent one was sent', () => {
     const store = fakeStore();
     saveComposeDraft(draft('urgent'), store);
     clearComposeDraft(store);
-    expect(cardOpensOn(store)).toBe('medium');
+    expect(cardOpensOn(store)).toBe('agent');
   });
 
-  it('opens on Medium even when an old remembered Urgent is still in storage', () => {
+  it('opens on Agent decides even when an old remembered Urgent is still in storage', () => {
     const store = fakeStore();
     store.setItem('zero.lastPriority', 'urgent');
-    expect(cardOpensOn(store)).toBe('medium');
+    expect(cardOpensOn(store)).toBe('agent');
   });
 
-  it('opens on Medium after a Low one too, not only after Urgent', () => {
+  it('opens on Agent decides after a Low one too, not only after Urgent', () => {
     const store = fakeStore();
     saveComposeDraft(draft('low'), store);
     clearComposeDraft(store);
-    expect(cardOpensOn(store)).toBe('medium');
+    expect(cardOpensOn(store)).toBe('agent');
   });
 });
 

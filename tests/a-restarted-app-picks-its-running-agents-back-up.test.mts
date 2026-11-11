@@ -42,7 +42,8 @@ afterEach(async () => {
   const pid = dir ? await hostPid(path.join(dir, 'r.sock')) : null;
   if (pid) try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ }
   await wait(100);
-  if (dir) fs.rmSync(dir, { recursive: true, force: true });
+  // The stand-in worker can still be writing its transcript, which gave ENOTEMPTY.
+  if (dir) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   dir = null; apps = [];
 });
 

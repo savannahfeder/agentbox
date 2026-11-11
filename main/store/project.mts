@@ -12,6 +12,7 @@ import { withProjectLockSync } from './project-lock.mts';
 import { projectWritten } from './projects-changed.mts';
 import { readEnv } from '../../shared/product-name.mjs';
 import { defaultStoreRoot } from './home.mts';
+import { replaceFileSync } from '../replace-file.mts';
 import type { ChatMessage } from './chats.mts';
 
 // `kind` and `title` are optional because a deleted entry keeps only `id`, `deleted` and `ts`.
@@ -136,7 +137,7 @@ export function atomicWriteJson(file: string, obj: unknown): void {
   const tmp = `${file}.tmp-${crypto.randomBytes(4).toString('hex')}`;
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(tmp, JSON.stringify(obj, null, 2));
-  fs.renameSync(tmp, file);
+  replaceFileSync(tmp, file);
 }
 
 /** The file's JSON, taken to be a `T` without checking, or `fallback` when it is missing or unreadable. */
@@ -401,7 +402,7 @@ export function saveCreation(projectDir: string, envelope: CreationEnvelope, con
   if (typeof body === 'string') {
     const tmp = `${file}.tmp-${crypto.randomBytes(4).toString('hex')}`;
     fs.writeFileSync(tmp, body);
-    fs.renameSync(tmp, file);
+    replaceFileSync(tmp, file);
   } else if (body != null) {
     atomicWriteJson(file, body);
   }

@@ -134,7 +134,9 @@ export function mayRunHere(item: TeamRow | null | undefined, product: TeamProduc
   }
   return runnerOf(item, product) === me;
 }
-const STARTS_A_RUN = ['body', 'answer', 'status', 'runAt'];
+// The assignee too: a row given to a person runs nowhere, so giving it back
+// to an agent is starting one.
+const STARTS_A_RUN = ['body', 'answer', 'status', 'runAt', 'assignee'];
 
 // WHOSE INBOX A SHARED ROW IS IN: one person's at a time, whoever has to act.
 // A row given to a person is theirs until it is done; an agent's row is its
@@ -392,3 +394,8 @@ export function whatYourOtherCopyMaySet<L extends PulledLine>(line: L | null | u
   if (!direct || !line || typeof line !== 'object') return null;
   return withoutALease(line);
 }
+
+// A THREAD MADE WITH MULTIPLAYER OFF IS PRIVATE. The window offers no Team or
+// Private choice then, so it was left to the project's default, and turning
+// Multiplayer back on published it to the team.
+export const visibilityWhenMade = <V extends string | undefined | null>(asked: V, sharing: boolean): V | 'private' | undefined => asked ?? (sharing ? undefined : 'private');

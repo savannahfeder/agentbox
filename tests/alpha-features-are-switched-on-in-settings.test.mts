@@ -23,14 +23,14 @@ describe('saving the switches', () => {
   };
 
   it('all are off until someone turns them on', () => {
-    expect(alphaFeatures({}, { packaged: true })).toEqual({ rooms: false, teammates: false, multiplayer: false });
+    expect(alphaFeatures({}, { packaged: true })).toEqual({ rooms: false, teammates: false, multiplayer: false, glass: false });
   });
 
   it('Rooms on is written to the config file and read back', () => {
     const w = world();
     setWorkspaceSetting(w, { key: 'alphaRooms', value: true });
     expect(JSON.parse(fs.readFileSync(path.join(w.dir, 'zero.config.json'), 'utf8')).alphaRooms).toBe(true);
-    expect(alphaFeatures(w.config, { packaged: true })).toEqual({ rooms: true, teammates: false, multiplayer: false });
+    expect(alphaFeatures(w.config, { packaged: true })).toEqual({ rooms: true, teammates: false, multiplayer: false, glass: false });
     setWorkspaceSetting(w, { key: 'alphaRooms', value: false });
     expect(alphaFeatures(w.config).rooms).toBe(false);
     fs.rmSync(w.dir, { recursive: true, force: true });

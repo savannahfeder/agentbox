@@ -88,6 +88,7 @@ export interface SettingsConfig {
   posthogHost?: string;
   alphaTeammates?: unknown;
   alphaMultiplayer?: boolean | null;
+  alphaGlass?: boolean | null;
   [key: string]: unknown;
 }
 
@@ -617,6 +618,7 @@ export function alphaFeatures(config?: SettingsConfig | null, { packaged = isPac
     rooms: config?.alphaRooms === true,
     teammates: teammatesOn(config),
     multiplayer: packaged ? config?.alphaMultiplayer === true : config?.alphaMultiplayer !== false,
+    glass: config?.alphaGlass === true,
   };
 }
 
@@ -1433,6 +1435,10 @@ export function setWorkspaceSetting({ config, supervisor, store }: SettingsDeps,
       break;
     case 'alphaMultiplayer':
       saveConfig(config, { alphaMultiplayer: !!value });
+      supervisor.onChange?.();
+      break;
+    case 'alphaGlass':
+      saveConfig(config, { alphaGlass: !!value });
       supervisor.onChange?.();
       break;
     // THE CORNER TAG (w-dafae58a23). Turning it back on also ends any hide, so

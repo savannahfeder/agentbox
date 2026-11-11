@@ -76,7 +76,7 @@ describe('About', () => {
   // Power test: "Sent a change from the About page and it vanished with no
   // sign it went anywhere." The box emptied and About stayed as it was.
   it('takes you to the chat once you send it a change, where your words and its answer show', () => {
-    expect(fn('About')).toMatch(/const sent = \(await call\('post', \{ text, to: \[t\.id\] \}\)\) !== false;\s*if \(sent\) onOpen\(t\.id\);/);
+    expect(fn('About')).toMatch(/const sent = \(await call\('post', \{ text, to: \[t\.id\](, priority)?(, \.\.\.\(filesIn \? \{ filesIn \} : \{\}\))? \}\)\) !== false;\s*if \(sent\) onOpen\(t\.id\);/);
   });
 
   it('lists everything it knows, each one with a way to forget it', () => {

@@ -55,6 +55,7 @@
     "scripts/approval-server.sh",
     "scripts/cloud-shim.pl",
     "scripts/memory-gate-hook.sh",
+    "scripts/safety-check-hook.sh",
     "worker-permissions.json",
     "LICENSE",
     "README.md"
@@ -90,7 +91,7 @@
     "@electric-sql/pglite": "^0.5.8",
     "@fontsource-variable/source-sans-3": "^5.3.0",
     "@tiptap/core": "^3.32.1",
-    "@tiptap/extension-collaboration": "^3.32.1",
+    "@tiptap/extension-collaboration": "^3.32.2",
     "@tiptap/extension-link": "^3.32.1",
     "@tiptap/extension-placeholder": "^3.32.1",
     "@tiptap/extension-table": "^3.32.1",
@@ -172,6 +173,7 @@
       "scripts/approval-server.sh",
       "scripts/cloud-shim.pl",
       "scripts/memory-gate-hook.sh",
+      "scripts/safety-check-hook.sh",
       "mcp/connection-proxy.mts",
       "renderer/dist/**/*",
       "package.json"
@@ -181,6 +183,7 @@
       "scripts/approval-server.sh",
       "scripts/cloud-shim.pl",
       "scripts/memory-gate-hook.sh",
+      "scripts/safety-check-hook.sh",
       "node_modules/node-pty/**",
       "main/native/**/*.node"
     ],

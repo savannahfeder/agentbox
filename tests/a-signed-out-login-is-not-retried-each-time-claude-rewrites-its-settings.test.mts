@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
-import { claudeKeychainService, keychainStamp } from '../main/sign-in-files.mts';
+import { claudeKeychainService } from '../main/sign-in-files.mts';
 
 const REFUSED = 'Failed to authenticate: OAuth session expired and could not be refreshed';
 const MIN = 60_000;
@@ -121,17 +121,5 @@ describe('reading the Keychain entry', () => {
     expect(claudeKeychainService('/Users/someone/.claude-3')).toMatch(/^Claude Code-credentials-[0-9a-f]{8}$/);
   });
 
-  it('reads only the date the entry last changed', () => {
-    const out = '    "mdat"<timedate>=0x32303236313130393034333534355A00  "20261109043545Z\\000"\n';
-    let asked;
-    const at = keychainStamp('Claude Code-credentials', (cmd, args) => { asked = args; return out; }, 'darwin');
-    expect(at).toBe(Date.UTC(2026, 10, 9, 4, 35, 45));
-    expect(asked).not.toContain('-w');
-    expect(asked).not.toContain('-g');
-  });
-
-  it('is nothing when there is no entry, or off a Mac', () => {
-    expect(keychainStamp('x', () => { throw new Error('exit 44'); }, 'darwin')).toBe(null);
-    expect(keychainStamp('x', () => { throw new Error('never asked'); }, 'linux')).toBe(null);
-  });
+  // Reading the entry's date: tests/the-app-never-waits-on-the-keychain-to-look-for-a-sign-in.
 });

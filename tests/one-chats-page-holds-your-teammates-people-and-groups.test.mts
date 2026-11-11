@@ -124,8 +124,8 @@ describe('a teammate\'s page', () => {
     expect(page).toMatch(/tq-about-key[^\n]*>About</);
   });
 
-  it('writes to it in the app\'s own chat box', () => {
-    expect(page).toMatch(/className="rm-compose tq-compose"/);
+  it('writes to it in the app\'s own reply box', () => {
+    expect(page).toMatch(/className="dock-card tq-compose"/);
   });
 
   it('says quietly when it saved something, with a way to see it', () => {

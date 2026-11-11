@@ -45,6 +45,7 @@ export interface EngineSetupOptions {
   env?: NodeJS.ProcessEnv;
   poll?: number;
   onSignIn?: (engine: string, signedIn: boolean) => void;
+  now?: () => number;
   setUpHere?: (engine: string, env: NodeJS.ProcessEnv) => boolean;
 }
 
@@ -102,6 +103,9 @@ export function statusCommand(engine: string, bin: string) {
 const LOG_LIMIT = 64 * 1024;
 const STATUS_TIMEOUT = 15_000;
 const POLL = 2_000;
+/** How long a sign-in may wait on the browser: long enough for a slow login
+ *  full of captchas, and not for ever. */
+export const SIGN_IN_WAIT = 30 * 60_000;
 const ANSI = /\x1b\[[0-9;?]*[A-Za-z]/g;
 
 function realSpawn(file: string, args: string[], { env, onData, keepStdin = false }: SetupSpawnOptions = {}): SetupProcess {
@@ -132,7 +136,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * config so the rest of the app runs on what was just installed). `spawn` and
  * `wait` are seams for the tests; nothing in the app passes them.
  */
-export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env = process.env, poll = POLL, onSignIn = () => {}, setUpHere = () => true }: EngineSetupOptions = {} as EngineSetupOptions) {
+export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env = process.env, poll = POLL, onSignIn = () => {}, setUpHere = () => true, now = Date.now }: EngineSetupOptions = {} as EngineSetupOptions) {
   const runEnv = terminalEnv(env);
   const toolEnv = (engine: string, bin: string | null | undefined) => engine === 'codex' ? codexLaunchEnv(bin, runEnv) : runEnv;
   const jobs = new Map<string, SetupJob>();
@@ -196,16 +200,28 @@ export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env =
     j.phase = 'signing-in';
     let login = startLogin(j, hit.path);
     let ended = false;
+    let since = now();
     const watchLogin = (loginProcess: SetupProcess) => loginProcess.exit.then(() => { if (loginProcess === j.login) ended = true; });
     watchLogin(login);
+    // A check that does not answer says nothing about a login still waiting on
+    // the browser, so it must not end that login: killing it closes the
+    // callback port the browser is about to come back to.
+    const signedInYet = async () => {
+      try { return await signedIn(j, hit!.path); } catch (error) { if (ended) throw error; return false; }
+    };
     for (;;) {
       await wait(poll);
       if (!live()) return;
-      if (await signedIn(j, hit.path)) { if (live()) ready(j); return; }
+      if (await signedInYet()) { if (live()) ready(j); return; }
+      if (!live()) return;
       if (j.login !== login) {
         login = j.login!;
         ended = false;
+        since = now();
         watchLogin(login);
+      }
+      if (!ended && now() - since >= SIGN_IN_WAIT) {
+        return fail(j, `The sign-in waited ${Math.round(SIGN_IN_WAIT / 60_000)} minutes and stopped. Try again.`);
       }
       // ASK ONCE MORE BEFORE CALLING IT CLOSED. A sign-in that finishes while
       // the check above is running exits before that check answers, and the

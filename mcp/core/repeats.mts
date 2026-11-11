@@ -1,5 +1,5 @@
 // The standing instruction behind a repeating task, for the agent on one of its
-// runs.
+// runs, and a new repeating task, for an agent the person asked for one.
 //
 // WHICH RUN THE SESSION IS ON COMES FROM THE APP, NOT FROM THE MODEL.
 // `ZERO_ITEM` and `ZERO_PRODUCT` are written into a worker's environment when
@@ -15,7 +15,7 @@
 import { Repeats } from '../../main/repeats.mts';
 import { readWorkItem } from '../../main/store/work-items.mts';
 import { listProjects, type ProjectSummary } from '../../main/store/project.mts';
-import { nextRunAt, ruleIdOf, ruleLabel, standingInstruction, type RepeatRule } from '../../shared/repeats.mts';
+import { DAY_NAMES, nextRunAt, ruleIdOf, ruleLabel, sameRule, standingInstruction, type RepeatRule, type RepeatShape } from '../../shared/repeats.mts';
 import type { WorkItem } from '../../shared/work-items.mts';
 import { resolveProduct } from './account.mts';
 
@@ -34,8 +34,8 @@ export interface StandingInstruction {
 
 const NO_THREAD = 'this session is not on a thread, so there is no repeating task behind it';
 
-// Read and patch only, so the store modules `serve` needs are never built here:
-// nothing below creates a work item or takes the project lock.
+// No store modules: `serve` is the app's, so nothing below creates a work item
+// or takes the project lock. A new rule's first run comes from the app's tick.
 const rules = new Repeats(null);
 
 function projectOf(itemId: string, product: string | null): ProjectSummary {
@@ -100,4 +100,69 @@ export function setStandingInstruction({ instruction }: { instruction: unknown }
   // The rule was read just above, so the patched one is on file.
   const rule = rules.patchRule(found.project.dir, found.ruleId, { body: words }, now)!;
   return asAnswer({ ...found, rule }, now);
+}
+
+export interface NewRepeatingTask {
+  product?: string;
+  title?: unknown;
+  instruction?: unknown;
+  every?: string;
+  at?: string;
+  on?: string;
+  startNow?: boolean;
+}
+export interface MadeRepeatingTask {
+  repeat: string;
+  product: string;
+  label: string;
+  instruction: string | undefined;
+  schedule: string;
+  nextRun: number | null;
+  startsNow: boolean;
+  engine: string | null;
+  model: string | null;
+}
+
+/**
+ * A new repeating task, as the person's own When menu makes one. It runs on
+ * the coding agent and model of the thread that asked for it: those were
+ * checked against what this machine offers when the thread was written, and
+ * this server cannot ask that question itself.
+ */
+export function createRepeatingTask(ask: NewRepeatingTask, { env = process.env, now = Date.now() }: RunOptions = {}): MadeRepeatingTask {
+  const title = typeof ask.title === 'string' ? ask.title.trim() : '';
+  const words = typeof ask.instruction === 'string' ? ask.instruction.trim() : '';
+  if (!words) throw new Error('a repeating task needs an instruction: the words every run is briefed with');
+  if (!title) throw new Error('a repeating task needs a short title, the name it is listed under');
+
+  const itemId = String(env.ZERO_ITEM ?? '').trim();
+  const threadHome = itemId ? projectOf(itemId, String(env.ZERO_PRODUCT ?? '').trim() || null) : null;
+  const thread = threadHome ? readWorkItem(threadHome.dir, itemId, now) : null;
+  const project = ask.product?.trim() ? resolveProduct(ask.product) : threadHome;
+  if (!project) throw new Error('which product? pass product, since this session is not on a thread');
+
+  const on = ask.on === undefined ? undefined : DAY_NAMES.findIndex((d) => d.toLowerCase() === String(ask.on).trim().toLowerCase());
+  const schedule = { every: ask.every, at: ask.at, ...(ask.every === 'week' ? { on: on === -1 ? undefined : on } : {}) };
+  const startsNow = ask.startNow !== false;
+
+  // A retried call must not make a second task that runs alongside the first.
+  const same = rules.list(project.dir, now).find((r) => !r.endedAt && r.title === title
+    && standingInstruction(r) === words && sameRule(r, schedule as RepeatShape));
+  const rule = same ?? rules.setRule(project.dir, {
+    title, body: words, ...schedule,
+    engine: thread?.engine ?? null, model: thread?.model ?? null,
+    startsNext: !startsNow,
+  }, now)!;
+
+  return {
+    repeat: rule.id,
+    product: project.id,
+    label: rule.title,
+    instruction: standingInstruction(rule),
+    schedule: ruleLabel(rule),
+    nextRun: nextRunAt(rule, now),
+    startsNow: !same && startsNow,
+    engine: rule.engine ?? null,
+    model: rule.model ?? null,
+  };
 }

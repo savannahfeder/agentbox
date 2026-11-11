@@ -129,6 +129,7 @@
 .pl-chat { --text-x: 6px; }
 .pl-chat .tq-chat .tq-lines { padding-left: 6px; padding-right: 0; }
 .pl-chat .rm-compose.tq-compose { margin: 8px 0 0 6px; }
+.pl-chat .dock-card.tq-compose { margin: 8px 0 0 6px; }
 .pl-side { width: 272px; flex: none; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 24px; padding-top: 2px; }
 /* A file open beside the page squeezes it to 400px: the chat keeps it all, or it is one letter wide. */
 .app.doc-open :is(.pl-side, .pl-name h2 em, .pl-btn.quiet) { display: none; }
