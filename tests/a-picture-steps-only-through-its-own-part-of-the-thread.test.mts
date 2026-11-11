@@ -161,7 +161,7 @@ describe('the pictures a click steps through', () => {
   });
 
   it('has nothing to show for a click that matched no picture', () => {
-    expect(picturesBeside(thread, -1)).toEqual({ pictures: [], start: 0 });
+    expect(picturesBeside(thread, -1)).toEqual({ pictures: [], start: 0, drawn: [] });
   });
 });
 

@@ -25,7 +25,7 @@ type Touching =
   | { kind: 'two'; distance: number; mid: { x: number; y: number }; pan: { x: number; y: number }; zoom: number };
 
 /** The pictures a click on `href` steps through: those in the pressed picture's part of the thread. */
-export function picturesFor(root: ParentNode | null, href: string, from?: Element | null): { pictures: Picture[]; start: number } {
+export function picturesFor(root: ParentNode | null, href: string, from?: Element | null): { pictures: Picture[]; start: number; drawn: string[] } {
   const doors = root ? [...root.querySelectorAll<HTMLElement>('[data-picture]')].filter((d) => d.querySelector('img')) : [];
   const pressed = from?.closest<HTMLElement>('[data-picture]');
   let at = pressed ? doors.indexOf(pressed) : -1;
@@ -33,7 +33,7 @@ export function picturesFor(root: ParentNode | null, href: string, from?: Elemen
   const turn = from?.closest('[data-exchange]');
   const named = doors.flatMap((d, i) => (d.dataset.picture === href ? [i] : []));
   if (at < 0) at = named.filter((i) => turn?.contains(doors[i])).at(-1) ?? named.at(-1) ?? -1;
-  if (at < 0) return { pictures: [{ path: href, url: null }], start: 0 };
+  if (at < 0) return { pictures: [{ path: href, url: null }], start: 0, drawn: [href] };
   return picturesBeside(doors.map((d) => {
     const img = d.querySelector('img')!;
     // A thread draws a picture from a shrunk copy (FittedImg); the viewer opens the whole one.
