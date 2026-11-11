@@ -162,7 +162,8 @@ export function TeamRouteStrip({ item, onHandToAgent, items = [], onOpenItem }: 
     setBusy(false);
     if (!out.ok) setError(out.error ?? 'That did not work.');
   };
-  const ask = (item.body ?? item.title).split('\n').find((l) => l.trim())?.replace(/\*\*/g, '').trim() ?? item.title;
+  // Where it stands now, which is the agent's last word when there is one, not the first ask.
+  const ask = (item.result || item.body || item.title).split('\n').find((l) => l.trim())?.replace(/\*\*/g, '').trim() ?? item.title;
   return <div className="opt-strip">
     {!isGivenTask(item, team?.products.get(item.product)) && <div className="opt-head opt-head-ask"><span>{ask}</span></div>}
     {choices.map(({ label, route: r }, i) => <button key={r} className="opt-row" disabled={busy} onClick={() => route(r)}>

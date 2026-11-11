@@ -1,27 +1,27 @@
 import { useEffect, useState } from 'react';
+import { shownSkyId } from './sky';
 
-// Home is an alpha feature, switched on in Settings, Alpha features. It and
-// the sky chosen for each look are kept on this machine only.
-export const HOME_KEY = 'zero.alpha.home';
-/** The sky theme picked, if any; Light, Dark and Match system clear it. */
+// The sky chosen for each look is kept on this machine only.
+/** The sky theme picked, or PLAIN once plain Light or Dark is picked; Match system clears it. */
 export const SKY_THEME_KEY = 'zero.sky.theme';
 const CHANGED = 'agentbox:home-settings';
 
-export type HomeSettings = { on: boolean; skyTheme: string | null };
+/** `skyTheme` is the sky worn, with the default filled in (./sky: shownSkyId); `picked` is whether a sky was chosen. */
+export type HomeSettings = { skyTheme: string | null; picked: boolean };
+
+const darkNow = () => document.documentElement.dataset.theme !== 'light';
 
 function read(): HomeSettings {
-  try {
-    return {
-      on: localStorage.getItem(HOME_KEY) === '1',
-      skyTheme: localStorage.getItem(SKY_THEME_KEY) || null,
-    };
-  } catch { return { on: false, skyTheme: null }; }
+  let saved: string | null = null;
+  try { saved = localStorage.getItem(SKY_THEME_KEY) || null; } catch { /* private window */ }
+  const skyTheme = shownSkyId(saved, darkNow());
+  return { skyTheme, picked: !!skyTheme && skyTheme === saved };
 }
 
-export function setHomeSetting(key: typeof HOME_KEY | typeof SKY_THEME_KEY, value: string | boolean | null) {
+export function setHomeSetting(key: typeof SKY_THEME_KEY, value: string | null) {
   try {
     if (value === null) localStorage.removeItem(key);
-    else localStorage.setItem(key, value === true ? '1' : value === false ? '0' : value);
+    else localStorage.setItem(key, value);
   } catch { /* private window */ }
   window.dispatchEvent(new Event(CHANGED));
 }
@@ -32,7 +32,9 @@ export function useHomeSettings(): HomeSettings {
     const again = () => set(read());
     window.addEventListener(CHANGED, again);
     window.addEventListener('storage', again);
-    return () => { window.removeEventListener(CHANGED, again); window.removeEventListener('storage', again); };
+    const mo = new MutationObserver(again);
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => { window.removeEventListener(CHANGED, again); window.removeEventListener('storage', again); mo.disconnect(); };
   }, []);
   return s;
 }

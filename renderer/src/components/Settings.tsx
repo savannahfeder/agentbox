@@ -57,7 +57,7 @@ import { MODE_ORDER, MODE_SENTENCE, MODE_WORDS, RULES_ALWAYS_APPLY } from '../mo
 import { CODEX_MODES, CODEX_MODE_ORDER } from '../codex-modes';
 import { ProductMark } from './ProductMark';
 import { SHORTCUTS } from '../shortcuts';
-import { chord, chords, sayKeys } from '../this-keyboard';
+import { chord, chords } from '../this-keyboard';
 import { capWord } from '../hint-plate';
 import { NAME, Name } from '../../../shared/product-name.mjs';
 import { SETTINGS_TERMINAL } from '../../../shared/settings-terminal.mts';
@@ -68,7 +68,7 @@ import type { Product } from '../types';
 import { CloudMark, MacMark } from '../threads/ThreadMenu';
 import './settings.css';
 import { SkyTile } from '../home/SkyPicker';
-import { HOME_KEY, setHomeSetting, useHomeSettings } from '../home/home-settings';
+import { useHomeSettings } from '../home/home-settings';
 import { SKY_THEMES } from '../home/sky';
 
 /* * TEAM IS A PANE HERE (w-8415594d19, 2026-10-01). The pane's CONTENT is
@@ -1702,7 +1702,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
   // and then a background is two decisions for one choice.
   look: Look;
   onSetLook: (l: Look) => void;
-  /** A sky theme (Alpha features, Home): its look and its sky together. */
+  /** A sky theme: its look and its sky together. */
   onSkyTheme?: (id: string) => void;
   // The dials on whichever picture is on. They only ever show under a picture,
   // so there is no disabled control on this screen for her to wonder about.
@@ -1761,7 +1761,10 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
   onClose: () => void;
 }) {
   const homeSet = useHomeSettings();
-  const skyOn = homeSet.on ? homeSet.skyTheme : null;
+  // A phone has no skies (App.tsx's `homeOn`).
+  const skies = !onPhone();
+  // Under Match system the sky is Match's default, so the Match tile is the one ticked.
+  const skyOn = skies && (homeSet.picked || look !== 'match') ? homeSet.skyTheme : null;
   const sidebarShrinks = useSidebarShrinks();
   const [model, setModel] = useState<SettingsModel | null>(null);
   // ?settings=claude, or ?settings=project:kestrel. Anything else (including the
@@ -2067,7 +2070,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
               <div className="ac-adding">
                 <div className="ac-adding-top">
                   <span>{adding.error ? 'Could not add an account' : `Sign in to ${adding.name ?? 'your account'}`}</span>
-                  <button type="button" className="ac-adding-x" aria-label="Close" onClick={() => { setAdding(null); void load(); }}>&#215;</button>
+                  <button type="button" className="ac-adding-x" aria-label="Close" onClick={() => { setAdding(null); void api.terminal({ ...SETTINGS_TERMINAL, action: 'close' }); void load(); }}>&#215;</button>
                 </div>
                 {adding.error
                   ? <p>{adding.error}</p>
@@ -2279,8 +2282,8 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
               <Row label="Multiplayer" desc="Share projects with your team and see their threads beside yours. Needs a sign-in.">
                 <Switch label="Multiplayer" on={!!w.alpha?.multiplayer} onChange={(v) => setWorkspace('alphaMultiplayer', v)} />
               </Row>
-              <Row label="Home" desc="A page to start from: what needs you, a box to start a thread, and your team's week. The Inbox gets a sky below its list. Pick the sky in Appearance.">
-                <Switch label="Home" on={homeSet.on} onChange={(v) => setHomeSetting(HOME_KEY, v)} />
+              <Row label="Glass" desc="The space around the page becomes frosted glass over your desktop.">
+                <Switch label="Glass" on={!!w.alpha?.glass} onChange={(v) => setWorkspace('alphaGlass', v)} />
               </Row>
             </Group>
           </Page>
@@ -2546,7 +2549,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
                     <span className="look-name">{l.name}</span>
                   </button>
                 ))}
-                {homeSet.on && SKY_THEMES.map((k) => <SkyTile key={k.id} sky={k} on={skyOn === k.id} onPick={() => onSkyTheme?.(k.id)} />)}
+                {skies && SKY_THEMES.map((k) => <SkyTile key={k.id} sky={k} on={skyOn === k.id} onPick={() => onSkyTheme?.(k.id)} />)}
               </div>
             </Group>
             {/* THE DIALS, and only under a picture. Both move the window she is

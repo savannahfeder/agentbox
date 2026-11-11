@@ -17,6 +17,16 @@ if (process.platform !== 'darwin') {
   else document.addEventListener('DOMContentLoaded', markFlat);
 }
 
+// A Mac window can put the system's blur behind itself (main/window-glass.mts);
+// the page goes glass only while the Alpha switch is on.
+if ((process.argv ?? []).includes('--agentbox-glass')) {
+  const markGlass = () => {
+    if (document.documentElement) document.documentElement.dataset.glassAble = '';
+  };
+  if (document.documentElement) markGlass();
+  else document.addEventListener('DOMContentLoaded', markGlass);
+}
+
 // EVERY ASK BEFORE A RELOAD IS ANSWERED, held write or not. main waits for
 // this before it reloads (main/write-before-reload.mts), so a page with
 // nothing held, or one that has not set a handler yet, says so at once rather
@@ -120,6 +130,7 @@ contextBridge.exposeInMainWorld('zero', {
   rooms: (payload) => ipcRenderer.invoke('zero:rooms', payload),
   teammates: (payload) => ipcRenderer.invoke('zero:teammates', payload),
   takeJoin: () => ipcRenderer.invoke('zero:take-join'),
+  takeThreadLink: () => ipcRenderer.invoke('zero:take-thread-link'),
   threadEdit: (payload) => ipcRenderer.invoke('zero:thread-edit', payload),
   moveItem: (payload) => ipcRenderer.invoke('zero:move-item', payload),
   // Repeating tasks. A rule, not a work item, so it has its own channels
@@ -260,6 +271,11 @@ contextBridge.exposeInMainWorld('zero', {
   // One way, name/message/stack only, scrubbed on the far side before it is
   // written. The window never chooses what a crash report contains.
   crash: (payload) => ipcRenderer.invoke('zero:crash', payload),
+  // Read once before the first screen, so it is the one call here that waits (renderer/src/draft-copy.ts).
+  draftCopy: {
+    read: () => ipcRenderer.sendSync('zero:draft-copy-read'),
+    write: (text) => ipcRenderer.send('zero:draft-copy-write', text),
+  },
   // What an opened thread laid out, so the app can check it painted it (main/blank-page.mts).
   blankCheck: (payload) => ipcRenderer.invoke('zero:blank-check', payload),
   // A COUNT, AND THE NAME IS THE WHOLE MESSAGE. There is no analytics SDK in
@@ -285,6 +301,8 @@ contextBridge.exposeInMainWorld('zero', {
   fileLinks: () => ipcRenderer.invoke('zero:file-links'),
   fileLinkComments: (payload) => ipcRenderer.invoke('zero:file-link-comments', payload),
   fileLinkComment: (payload) => ipcRenderer.invoke('zero:file-link-comment', payload),
+  bringSharedFile: (payload) => ipcRenderer.invoke('zero:bring-shared-file', payload),
+  takeSharedFile: () => ipcRenderer.invoke('zero:take-shared-file'),
   retryFile: (payload) => ipcRenderer.invoke('zero:retry-file', payload),
   // The change a run made, read as a built artifact.
   codeChange: (payload) => ipcRenderer.invoke('zero:code-change', payload),
@@ -358,11 +376,23 @@ contextBridge.exposeInMainWorld('zero', {
     ipcRenderer.on('zero:recovered', handler);
     return () => ipcRenderer.removeListener('zero:recovered', handler);
   },
+  // A thread's link opened the app.
+  onThreadLink: (fn) => {
+    const handler = (_e, payload) => fn(payload);
+    ipcRenderer.on('zero:thread-link', handler);
+    return () => ipcRenderer.removeListener('zero:thread-link', handler);
+  },
   // A room invite link opened the app (Rooms, alpha).
   onJoinRoom: (fn) => {
     const handler = (_e, payload) => fn(payload);
     ipcRenderer.on('zero:join-room', handler);
     return () => ipcRenderer.removeListener('zero:join-room', handler);
+  },
+  // A shared file's app link opened the app (main/bring-shared-file.mts).
+  onSharedFile: (fn) => {
+    const handler = (_e, payload) => fn(payload);
+    ipcRenderer.on('zero:shared-file', handler);
+    return () => ipcRenderer.removeListener('zero:shared-file', handler);
   },
   // She clicked the banner. The window is already coming forward; this says
   // which row it was about, so she lands on it rather than on wherever she

@@ -134,7 +134,7 @@ describe('the tabs on the phone app', () => {
     expect(tabs).toMatch(/<ScrollView horizontal/);
   });
   it('leave the new-thread button on the home bar room, and the rows as they were', () => {
-    expect(inbox).toMatch(/bottom: foot \+ 16,/);
+    expect(inbox).toMatch(/bottom: foot \+ PEN\.lift,/);
     expect(row).toMatch(/paddingTop: 14, paddingBottom: 14/);
     expect(row).toMatch(/fontSize: 16, lineHeight: 21\.6/);
   });

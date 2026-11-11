@@ -14,7 +14,7 @@ import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { LAST_PRODUCT_KEY } from '../compose-project';
 import {
-  ENGINE_NAME, FIRST_RUN_STEP, chatChoices, chatsHeadline, foundLine, installGate, listKey, previousScreen, projectsToMake, readyEngines, setupWord, signedOutEngines,
+  ENGINE_NAME, FIRST_RUN_STEP, chatChoices, chatsHeadline, foundLine, installGate, listKey, previousScreen, projectsToMake, readyEngines, setupWord, runningSetup, signedOutEngines,
   type Engine, type Screen,
   inHomeFolder,
 } from '../first-run';
@@ -116,6 +116,20 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
     return () => clearInterval(tick);
   }, [setup]);
 
+  // A setup the app is running that this screen did not see start.
+  useEffect(() => {
+    const look = async () => {
+      const found = runningSetup(await Promise.all([
+        api.engineSetup('status', 'claude').catch(() => null),
+        api.engineSetup('status', 'codex').catch(() => null),
+      ]));
+      if (found) setSetup((had) => (installGate(had).running ? had : found));
+    };
+    void look();
+    window.addEventListener('focus', look);
+    return () => window.removeEventListener('focus', look);
+  }, []);
+
   const chats = useMemo(() => chatChoices(threads ?? [], { home }), [threads, home]);
   const backTo = screen === 'setup' ? null : previousScreen(screen);
 
@@ -159,6 +173,7 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
   }, [hasReady, threads, go, onSetup]);
 
   const startSetup = useCallback(async (engine: Engine) => {
+    setSetup({ engine, phase: 'checking', error: null });
     const s = await api.engineSetup('start', engine).catch(() => null);
     setSetup({ engine, phase: s?.phase ?? 'installing', error: s?.error ?? null });
   }, []);

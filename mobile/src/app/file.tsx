@@ -11,7 +11,9 @@ import { FlatList, Pressable, ScrollView, StyleSheet, useWindowDimensions, View 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { MAX_ZOOM, fitScale } from '../../../renderer/src/picture-view';
-import { docOnPhone, openingOf, pageOnPhone, pictureLink, pictureSource, shapeOfDrawn } from '../lib/files';
+import { docOnPhone, openingOf, pageOnPhone, pictureLink, pictureSource, shapeOfDrawn, tableOnPhone } from '../lib/files';
+import type { Table } from '../../../renderer/src/table-file';
+import { TableFile } from '../ui/TableFile';
 import { PictureMenu } from '../../modules/picture-menu';
 import { useCloud } from '../state/cloud';
 import { readLink, useMessageFiles } from '../ui/Files';
@@ -21,7 +23,7 @@ import { PageFrame } from '../ui/PageFrame';
 import { IconButton, T, TopBar, Wall } from '../ui/parts';
 import { Player } from '../ui/Player';
 import { Skeleton } from '../ui/Skeleton';
-import { color, corner } from '../ui/theme';
+import { color, corner, font } from '../ui/theme';
 
 const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
 const nameOf = (src: string) => src.split('/').pop() ?? src;
@@ -45,6 +47,8 @@ function OnItsOwn({ product, src }: { product: string; src: string }) {
   const card = { flex: 1, margin: 12, marginBottom: 12 + inset.bottom };
   let body;
   if (o.kind === 'doc') body = <Doc product={product} src={src} style={{ ...card, borderWidth: 1, borderColor: color.lineStrong, borderRadius: 3 }} />;
+  else if (o.kind === 'table') body = <TableDoc product={product} src={src} style={{ flex: 1, marginTop: 4, marginBottom: inset.bottom }} />;
+  else if (o.kind === 'text') body = <TextDoc product={product} src={src} style={{ ...card, borderWidth: 1, borderColor: color.lineStrong, borderRadius: 3 }} />;
   else if (o.kind === 'page') body = <Page product={product} src={src} style={{ ...card, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: 'rgba(255, 255, 255, 0.1)', backgroundColor: PAGE }} />;
   else if (o.kind === 'media') {
     body = (
@@ -80,6 +84,41 @@ function Doc({ product, src, style }: { product: string; src: string; style: obj
     <View style={style}>
       <ScrollView contentContainerStyle={{ paddingTop: 6, paddingHorizontal: 16, paddingBottom: 40 }}>
         {doc && ('text' in doc ? <Markdown doc text={doc.text} dir={dir} files={files} /> : <Said words={doc.error} />)}
+      </ScrollView>
+      {!doc && <View style={StyleSheet.absoluteFill}><Skeleton /></View>}
+    </View>
+  );
+}
+
+function TableDoc({ product, src, style }: { product: string; src: string; style: object }) {
+  const c = useCloud();
+  const [read, setRead] = useState<{ table: Table } | { error: string } | null>(null);
+  useEffect(() => {
+    let live = true;
+    tableOnPhone(c.view.places, c.links, product, src, readLink).then((r) => { if (live) setRead(r.ok ? { table: r.table } : { error: r.error }); });
+    return () => { live = false; };
+  }, [product, src, c.signedAt]);
+  return <View style={style}>{read ? ('table' in read ? <TableFile table={read.table} /> : <Said words={read.error} />) : <Skeleton />}</View>;
+}
+
+// A JSON file reads better laid out; one that does not parse is shown as written.
+const laidOut = (text: string, src: string) => {
+  if (!/\.json$/i.test(src)) return text;
+  try { return JSON.stringify(JSON.parse(text), null, 2); } catch { return text; }
+};
+
+function TextDoc({ product, src, style }: { product: string; src: string; style: object }) {
+  const c = useCloud();
+  const [doc, setDoc] = useState<{ text: string } | { error: string } | null>(null);
+  useEffect(() => {
+    let live = true;
+    docOnPhone(c.view.places, c.links, product, src, readLink).then((r) => { if (live) setDoc(r.ok ? { text: laidOut(r.text, src) } : { error: r.error }); });
+    return () => { live = false; };
+  }, [product, src, c.signedAt]);
+  return (
+    <View style={style}>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+        {doc && ('text' in doc ? <T selectable style={{ fontFamily: font.mono, fontSize: 12.5, lineHeight: 19, color: color.text }}>{doc.text}</T> : <Said words={doc.error} />)}
       </ScrollView>
       {!doc && <View style={StyleSheet.absoluteFill}><Skeleton /></View>}
     </View>

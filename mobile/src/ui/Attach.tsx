@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { Image, Platform, Pressable, View } from 'react-native';
 import { isImageName } from '../../../renderer/src/attachments';
-import { pickAfterClose } from '../lib/attach';
+import { pickAfterClose, thumbUri } from '../lib/attach';
 import { pickFiles, pickPhotos, type Picked } from '../platform/pick';
 import { Clip, Cross } from './icons';
 import { Sheet, SheetHead, SheetRow, T } from './parts';
@@ -27,8 +27,6 @@ export function AttachSheet({ open, close, add, fail }: { open: boolean; close: 
   );
 }
 
-const TYPES: Record<string, string> = { jpg: 'jpeg', jpeg: 'jpeg', png: 'png', gif: 'gif', webp: 'webp' };
-const dataUri = (f: Picked) => `data:image/${TYPES[f.name.split('.').pop()!.toLowerCase()] ?? 'png'};base64,${f.dataBase64}`;
 const THUMB = 84;
 
 // As tall as the site's (84), as wide as the picture is, up to 220.
@@ -36,7 +34,7 @@ function Thumb({ file, drop }: { file: Picked; drop: () => void }) {
   const [width, setWidth] = useState(THUMB);
   return (
     <View>
-      <Image source={{ uri: dataUri(file) }} accessibilityLabel={file.name} resizeMode="cover"
+      <Image source={{ uri: thumbUri(file) }} accessibilityLabel={file.name} resizeMode="cover"
         onLoad={(e) => { const { width: w = 0, height: h = 0 } = e.nativeEvent?.source ?? {}; if (w && h) setWidth(Math.min(220, Math.round((THUMB * w) / h))); }}
         style={{ height: THUMB, width, borderWidth: 1, borderRadius: corner.small, borderColor: color.line }} />
       <Pressable onPress={drop} accessibilityLabel={`Remove ${file.name}`} hitSlop={10}

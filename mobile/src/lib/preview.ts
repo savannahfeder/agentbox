@@ -26,7 +26,7 @@ export function previewRows(now = Date.now()): PhoneRows {
   // The files a Mac lists for a project, as main/phone-inbox.mts sends them.
   const attached = PREVIEW_ATTACHED;
   const roundAsk = 'Draw three versions of the inbox for the phone.';
-  const roundNote = "Three versions of the inbox are in the folder below. I'd go with the quiet one: it reads fastest at arm's length.\n\n~/docs/agentbox/designs/w-8b9c0d1e2f/\n\nWhat each one changes is in `designs/w-8b9c0d1e2f/inbox-versions.md`, and `designs/w-8b9c0d1e2f/compare.html` sets them side by side.\n\nThe walk-through is a short film: `designs/w-8b9c0d1e2f/walkthrough.mp4`\n\nThe full recording, `recordings/session.mov`, is too big for the phone.\n\n## Options\n1. Go with the quiet one (recommended)\n2. Try a fourth version";
+  const roundNote = "Three versions of the inbox are in the folder below. I'd go with the quiet one: it reads fastest at arm's length.\n\n~/docs/agentbox/designs/w-8b9c0d1e2f/\n\nWhat each one changes is in `designs/w-8b9c0d1e2f/inbox-versions.md`, and `designs/w-8b9c0d1e2f/compare.html` sets them side by side.\n\nThe walk-through is a short film: `designs/w-8b9c0d1e2f/walkthrough.mp4`\n\nThe threads I drew them from are in `designs/w-8b9c0d1e2f/threads.csv`, and the counts in `designs/w-8b9c0d1e2f/counts.json`.\n\nThe full recording, `recordings/session.mov`, is too big for the phone.\n\n## Options\n1. Go with the quiet one (recommended)\n2. Try a fourth version";
   const stuckAsk = 'Threads stuck on a Codex limit should land in Needs you.';
   const stuckNote = 'I found where a run that hits its limit is put back. Two ways to fix it:\n\n- Mark it stopped, so it shows in Needs you with the reason.\n- Retry on another account first, and only then show it.\n\n## Options\n1. Mark it stopped (recommended)\n2. Retry on another account first';
   const meterResult = 'Shipped. Each account meter now ends with its reset time, like 6:19pm.\n\n## Options\n1. Close this task';
@@ -346,6 +346,13 @@ export function previewCloud(now = () => Date.now()) {
   if (scene === 'connect') rows.projects = [];
   // `?scene=queued`: a reply on a thread nothing is running, which reads Queued.
   if (scene === 'queued') rows.commands.push({ id: 'c-preview-q', device: DEV, project: 'film', item: 'w-5e6f7a8b9c', kind: 'reply', payload: { text: 'Open on the inbox.' }, created_at: new Date(now() - 30_000).toISOString(), claimed_at: null, taken_at: null, outcome: null } as PhoneRows['commands'][number]);
+  // `?scene=away`: a computer last online three hours ago, with no cloud to carry on.
+  if (scene === 'away') rows.projects = rows.projects.map((p) => ({ ...p, updated_at: new Date(now() - 180 * 60_000).toISOString() }));
+  // `?scene=copies`: one task sent to Claude Code and again to Codex.
+  if (scene === 'copies') {
+    const stuck = rows.threads.find((t) => t.item === 'w-2b3c4d5e6f');
+    if (stuck) rows.threads.push({ ...stuck, item: 'w-2b3c4d5e70', snapshot: { ...stuck.snapshot, item: { ...stuck.snapshot.item, id: 'w-2b3c4d5e70', engine: 'codex' } as WorkItem } });
+  }
   let signedIn = scene !== 'signed-out' && !walking;
   const settings = previewSettings(now());
   // `?scene=codex`: a computer whose chosen agent is Codex, so a thread naming none runs on it.

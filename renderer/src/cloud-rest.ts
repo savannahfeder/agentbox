@@ -267,6 +267,14 @@ export function cloudClient(cfg: CloudConfig, { storage, fetchImpl, now = () => 
         throw err;
       }
     },
+    /** A file's bytes from a bucket, read as whoever is signed in or as nobody; null when it is not there or not theirs to read. */
+    async fileBytes(bucket: string, path: string): Promise<Uint8Array | null> {
+      const bearer = session ? await token().catch(() => cfg.anonKey) : cfg.anonKey;
+      const res = await fetchImpl(`${base}/storage/v1/object/${bucket}/${path.split('/').map(encodeURIComponent).join('/')}`, { headers: { apikey: cfg.anonKey, authorization: `Bearer ${bearer}` }, signal: AbortSignal.timeout(120_000) });
+      if ([400, 401, 403, 404].includes(res.status)) return null;
+      if (!res.ok) throw Object.assign(new Error(`the cloud answered ${res.status}`), { status: res.status });
+      return new Uint8Array(await res.arrayBuffer());
+    },
     /** Links to her own files in a private bucket, each good for `seconds`: path -> address. */
     /** One page of what is under `prefix`: a folder comes back with no id. */
     async listFiles(bucket: string, prefix: string, limit = 1000, offset = 0): Promise<{ name: string; id: string | null }[]> {

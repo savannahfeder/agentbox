@@ -267,6 +267,8 @@ const MODEL_NOT_ON_PLAN = [
   /model is not supported when using codex with a chatgpt account/i,
   /not a model the plan of the codex account/i,
   /not a model the codex on this computer knows/i,
+  // Claude Code 2.1.321, for a model it does not know or the login cannot use.
+  /there's an issue with the selected model/i,
 ];
 
 // Ours too, from `codexEffortRefusal`.
@@ -818,9 +820,11 @@ function fixBeforeReplying({ cause, engineWord, resetsAt, model, planEnded }: { 
 
 // NO SENTENCE HERE OFFERS ANOTHER ACCOUNT (w-dac993a554). There used to be an
 // `elsewhere` flag: another signed-in login had room, or had the model, so the
-// line promised the move instead of the wait. Nothing moves work between
-// accounts any more, so a limit is named with the hour it resets and a model no
-// plan includes is answered with another model.
+// line promised the move instead of the wait. The app moves off a Claude
+// account at its limit by itself when another has room
+// (`Supervisor#_moveOffALimitedAccount`), so a limit still on a row has nowhere
+// to go: it is named with the hour it resets. A model no plan includes is
+// answered with another model.
 //
 // `planEnded` is when the account's paid ChatGPT plan ended (main/codex-account.mts
 // `codexPlanEnded`), which is why its list lacks `model`.

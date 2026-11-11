@@ -199,7 +199,7 @@ it('every version of a file is one link, and only kinds a link can draw are offe
   expect(versionInName('plan-v3.md')).toBe(3);
   expect(versionInName('plan.md')).toBe(1);
   for (const yes of ['a.md', 'b.HTML', 'c.png', 'd.jpeg', 'e.pdf', 'f.svg']) expect(canShareFile(yes), yes).toBe(true);
-  for (const no of ['a.mp4', 'b.csv', 'c.ts', 'd']) expect(canShareFile(no), no).toBe(false);
+  for (const no of ['a.mkv', 'b.xlsx', 'c.ts', 'd']) expect(canShareFile(no), no).toBe(false);
 });
 
 // A tester could not tell which files were public: the mark only turned a shade brighter (power test, round 3, 2026-11-04).

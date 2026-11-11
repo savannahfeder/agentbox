@@ -50,7 +50,8 @@ node $P --who startup-engineer,founder --hours 2 --focus "replies after switchin
 | `--hours` / `--minutes` | how long | 1 hour |
 | `--focus` | what the team shipped and wants leaned on, in a sentence | none |
 | `--alpha` | alpha features on in every copy, e.g. `teammates` or `teammates,rooms` | off, as for anyone new |
-| `--real` | the Claude Code and Codex this computer has, on their plans | stand-ins |
+| `--real` | the Claude Code and Codex this computer has, on their plans | the real Codex beside a Claude Code stand-in |
+| `--stand-in-codex` | Codex on a scripted model as well, for a run that must spend nothing | off |
 | `--stand-in-cloud` | every thread runs in a stand-in Agentbox Cloud of the copy's own (the real cloud server and sandbox, here, with the stand-in agent); a task naming Supabase, Vercel, Stripe, Expo, AWS or Sentry asks for its key | no cloud |
 | `--chaos` | `none`, `light`, `normal`, `heavy` | `normal` |
 | `--stuck` | from a twentieth to six tenths of the way in, 7 in 10 stand-in agents get stuck on one cause outside their work (git on the Mac cannot sign in to GitHub) and wait on its row | off |
@@ -80,6 +81,15 @@ you cite into the product's docs before you finish.
 - **How long.** A feature check: 1 hour. Before a launch: 3 hours or more.
   The chaos is laid out as fractions of the length, so a short run is the
   same day squeezed.
+- **Codex is real by default (2026-11-10).** The person does not use Codex,
+  so its failures reached them only on a thread they needed: one sat on a
+  Codex model that never started, 64 times. 48 of the 50 runs before this
+  used a scripted Codex with no login, which cannot fail that way. So a copy
+  for someone who uses Codex runs the real Codex on the testers' own Codex
+  login (`live.mjs up --real-codex <home>`), and the tester sends at least
+  half its work there. Claude Code stays a stand-in, so the Claude plan is
+  not spent and no one needs to be asked. "Codex ran out" is not on the clock
+  for these copies: only the scripted Codex can be run out on purpose.
 - **Stand-ins or real.** Stand-ins cost nothing but the testers and test the
   app around the agents. `--real` puts real Claude Code and Codex behind the
   copies, in the fixture repositories, on this computer's subscriptions:
@@ -103,7 +113,8 @@ one place that starts a tester, for this skill and the product loop.
 
 ## Where it runs
 
-- **On a Mac** each person needs about 1.2 GB free (2.5 GB with `--real`),
+- **On a Mac** each person needs about 1.2 GB free (1.7 GB with the real
+  Codex, 2.5 GB with `--real`),
   and the script refuses to start more than fits. Check memory before more
   than two. Testers run inside Codex's own sandbox with the local network open.
 - **In the Agentbox cloud** Codex signs in with the login the cloud carries,
@@ -171,4 +182,5 @@ Tests: `tests/a-power-test-keeps-testing-until-its-clock-runs-out`,
 `the-power-test-watcher-catches-what-a-tester-walks-past`,
 `a-power-test-report-puts-the-worst-first`,
 `every-power-tester-is-someone-agentbox-is-for`,
-`a-login-runs-out-mid-test-without-the-task-saying-so`.
+`a-login-runs-out-mid-test-without-the-task-saying-so`,
+`power-testers-send-work-to-the-real-codex`.

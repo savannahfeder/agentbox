@@ -69,8 +69,8 @@ export interface Plan {
   goes?: { product: string; id: string } | null;
 }
 export interface PressedItem { product: string; id: string; status: string; title?: string; productName?: string; runAt?: number | null; snoozedUntil?: number | null; waitsForMac?: boolean; body?: string; priority?: number; start?: string; engine?: string; model?: string; effort?: string }
-/** Where the computer is: away, and whether Agentbox Cloud starts what is sent meanwhile. */
-export interface Reach { away?: boolean; cloud?: boolean }
+/** Where the computer is: away, and whether Agentbox Cloud starts what is sent meanwhile; `inCloud` is the pressed thread running there now. */
+export interface Reach { away?: boolean; cloud?: boolean; inCloud?: boolean }
 
 // App.tsx's TOAST_TITLE.
 const TOAST_TITLE = 48;
@@ -157,13 +157,14 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
   switch (press.kind) {
     case 'reply': {
       const at = Number(press.choices?.runAt) || 0;
-      const said = at > now ? `Sends ${dayClock(at, now)}${to ? ` → ${to}` : ''}` : waits ? `Waiting for your computer${to ? ` → ${to}` : ''}` : to ? `Sent → ${to}` : 'Sent';
+      const said = at > now ? `Sends ${dayClock(at, now)}${to ? ` → ${to}` : ''}` : reach.inCloud ? `Waiting for Agentbox Cloud${to ? ` → ${to}` : ''}` : waits ? `Waiting for your computer${to ? ` → ${to}` : ''}` : to ? `Sent → ${to}` : 'Sent';
       return press.text.trim() ? reply(press.text, press.choices ?? {}, said, 'Reply withdrawn, back in your inbox') : null;
     }
     case 'pick':
       // "Close this task" is done, never sent: as a reply it would start a run to close it (App.tsx).
       if (closesTheTask(press.option.text)) return close();
-      return reply(`Option ${press.option.n}: ${press.option.text}`, press.choices ?? {}, `Option ${press.option.n} → ${to}`, `Option ${press.option.n} withdrawn, back in your inbox`);
+      return reply(`Option ${press.option.n}: ${press.option.text}`, press.choices ?? {},
+        `Picked: ${clipToSentence(press.option.text.replace(/\s*\(recommended\)\s*$/i, ''), TOAST_TITLE)}`, 'Pick withdrawn, back in your inbox');
     case 'close':
       return close();
     case 'later': {
@@ -192,7 +193,7 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
       };
     }
     case 'stop':
-      return { steps: [{ door: 'stopSession', payload: on }], toast: 'Stop sent. Your computer stops the agent when it gets it.' };
+      return { steps: [{ door: 'stopSession', payload: on }], toast: 'Stopping the agent' };
     case 'run-now':
       return { steps: [{ door: 'runNow', payload: on }], toast: waits ? 'Up next once your computer is back.' : 'Up next. It starts as soon as an agent is free.' };
     case 'move-to-cloud':

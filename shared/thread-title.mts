@@ -12,6 +12,9 @@ const MOST_WORDS = 8;
 
 // Opening words that are manners or a request, not the work.
 const GREETING = /^(?:(?:hey|hi|hello|ok|okay|so|right)\b[^,.!?]{0,24}[,!]\s*)+/i;
+// Spoken openers a voice note leaves with no comma after them. "So" goes only
+// before words a sentence starts on, so "So many errors" keeps it.
+const FILLER = /^(?:(?:ok(?:ay)?|alright|um+|uh+|basically|so(?=[,!]?\s+(?:basically|the|a|an|i|we|my|our|this|that|it|there|when|if)\b))[,!]?\s+)+/i;
 const ASK = /^(?:(?:can|could|would|will) (?:you|we|someone)(?: please)?|please|pls|i (?:need|want|would like) (?:you )?to|we (?:need|have) to|i'd like (?:you )?to|let's|lets|go ahead and|help me)\s+/i;
 const CANNOT = /^(?:i|we|they|it)(?: still)? (?:can't|cannot|can no longer|couldn't|am unable to|are unable to|is unable to)\s+/i;
 const LOOK = /^(?:look (?:at|into)|find out|figure out|check|see)\s+(?=(?:why|how|what|whether|if)\b)/i;
@@ -103,7 +106,11 @@ function naturalCut(w: string[]): number {
  * with no greeting, no "can you", no quote mark and no trailing punctuation.
  */
 export function shortTitle(opening: string | null | undefined): string {
-  const text = withoutFiles(opening).trim() || PICTURE_LINK.exec(String(opening ?? ''))?.[1] || opening;
+  const typed = withoutFiles(opening).trim() || PICTURE_LINK.exec(String(opening ?? ''))?.[1] || opening;
+  const said = String(typed ?? '').trim();
+  // Only before a sentence: "OK button" is a name.
+  const unspoken = said.replace(FILLER, '');
+  const text = unspoken !== said && words(unspoken).length >= 3 ? unspoken[0].toUpperCase() + unspoken.slice(1) : typed;
   if (alreadyShort(text)) return String(text).trim().replace(/(?<!\.)\.$/, '');
   let t = plain(text);
   if (!t) return '';

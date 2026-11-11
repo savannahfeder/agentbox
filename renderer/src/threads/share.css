@@ -1,0 +1,27 @@
+/* Share… under the thread's dots: the menu's card, rounded as the theme is. */
+.sh-list { min-width: 280px; }
+.sh-list .ts-more-row .tm-av { margin-left: auto; }
+.sh-list .ts-more-row kbd { margin-left: auto; }
+.sh-sep { height: 1px; margin: 4px 6px; background: var(--line); flex: none; }
+
+.sh-send { width: 400px; text-align: left; padding: 0; gap: 0; overflow: visible; max-height: none; }
+.sh-to { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 42px; padding: 6px 14px; border-bottom: 1px solid var(--line); }
+.sh-label { flex: none; margin-right: 6px; font: 11px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); }
+.sh-find { flex: 1; min-width: 90px; font: inherit; font-size: 13.5px; color: var(--text); background: none; border: 0; padding: 4px 0; outline: none; }
+.sh-find::placeholder, .sh-note::placeholder { color: var(--text-faint); }
+.sh-chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px 0 4px; font: inherit; font-size: 13px; color: var(--text); background: var(--bg-selected); border: 1px solid var(--line); border-radius: 999px; cursor: pointer; }
+.sh-chip:hover { border-color: var(--line-strong); }
+.sh-found { display: flex; flex-direction: column; padding: 4px; border-bottom: 1px solid var(--line); }
+.sh-note { display: block; width: 100%; box-sizing: border-box; min-height: 64px; padding: 10px 14px; font: inherit; font-size: 13.5px; line-height: 20px; color: var(--text); background: none; border: 0; outline: none; resize: none; }
+.sh-foot { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); }
+.sh-foot .th-new { height: 30px; font-size: 13px; }
+.sh-foot .sh-go { margin-left: auto; background: var(--bg-selected); }
+.sh-foot .sh-go:disabled { opacity: .5; cursor: default; }
+.sh-foot .sh-ghost { border-color: var(--line); color: var(--text-dim); }
+
+.sh-copied { width: 320px; padding: 6px; text-align: left; }
+.sh-done { display: flex; justify-content: flex-start; align-items: center; gap: 10px; padding: 6px 8px 2px; font-size: 13.5px; color: var(--text); }
+.sh-copied .sh-done .ts-more-tick { margin: 0; color: var(--text-dim); }
+.sh-url { padding: 2px 8px 8px 34px; font: 12px/18px var(--mono); color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sh-head { padding: 6px 8px 4px; font: 11px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); }
+.sh-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 8px 6px; }

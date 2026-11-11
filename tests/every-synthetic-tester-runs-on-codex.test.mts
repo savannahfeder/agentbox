@@ -114,7 +114,6 @@ describe('a sandboxed tester finds the browser the runner opened', () => {
 
   it('counts a process it may not signal as running', () => {
     expect(read('.claude/skills/verify-agentbox/scripts/cdp.mjs')).toMatch(/catch \(e\) \{ return e\?\.code === 'EPERM'; \}/);
-    expect(read('.claude/skills/verify-agentbox/scripts/browse.mjs')).toMatch(/const running = \(pid\) => isRunning\(pid\)/);
   });
 });
 

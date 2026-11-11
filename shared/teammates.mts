@@ -531,6 +531,10 @@ export interface ChatLine {
   answers?: Record<string, string>;
   /** A document that goes with the words, drawn as a card to open. */
   doc?: { product: string; src: string; name: string };
+  /** The project the files it links were saved in. */
+  filesIn?: string;
+  /** On your message: the priority of the run it starts or joins. */
+  priority?: number;
 }
 
 /** A message read into a run, and when. */
@@ -680,6 +684,19 @@ function asksYouStill(item: RunItem, tid: string, chat: ChatLike, except: string
     || (isSetupRun(item, tid, chat) && leavesSomethingOpen(item.result));
 }
 
+// A run whose question reached you in the chat, so your next chat words can be
+// its answer. A run made by a duty or a hand-off asks in its own thread, and
+// chat words to its teammate are new work.
+function talksInChat(item: RunItem, tid: string, chat: ChatLike, except: string | null): boolean {
+  return (item.labels ?? []).includes(CHAT_LABEL) || openQuestionOn(item, tid, chat, except) || isSetupRun(item, tid, chat);
+}
+
+// The run whose chat question your message answers by name, from its options.
+function runAnswered(m: ChatLine, chat: ChatLike): string | null {
+  const ids = Object.keys(m.answers ?? {});
+  return (chat?.messages ?? []).find((q) => ids.includes(q.id) && typeof q.run === 'string')?.run ?? null;
+}
+
 function isSetupRun(item: RunItem, tid: string, chat: ChatLike | null | undefined): boolean {
   return (chat?.messages ?? []).some((m) => m.kind === 'msg' && m.from === YOU && m.setup && (m.to ?? []).includes(tid) && runIdFor(`${m.id}>${tid}`) === item.id);
 }
@@ -723,6 +740,68 @@ export function activeRunOf(teammateId: string, items: readonly RunItem[] | null
 export function runsThisWeek(teammateId: string, items: readonly RunItem[] | null | undefined, now = Date.now()): number {
   return runsOf(teammateId, items).filter((i) => (i.createdAt ?? 0) > now - WEEK_MS).length;
 }
+
+// ------------------------------------------------------------ looking back
+// A run that rereads the threads you replied on and tightens the method. It
+// spends the person's plan on no work they asked for, so each rule below is
+// there to keep it rare and cheap.
+export const LOOK_BACK_LABEL = 'look-back';
+export const LOOK_BACK_AFTER = 3;
+const LOOK_BACK_EVERY_MS = 24 * 60 * 60 * 1000;
+const LOOK_BACK_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+const LOOK_BACK_LEAVES = 3;
+const LOOK_BACK_THREADS = 6;
+const USAGE_FRESH_MS = 6 * 60 * 60 * 1000;
+const ROOM_SESSION = 50;
+const ROOM_WEEK = 60;
+
+export const isLookBack = (item: { labels?: readonly string[] } | null | undefined): boolean => (item?.labels ?? []).includes(LOOK_BACK_LABEL);
+
+function yourLastWordAt(item: RunItem): number {
+  const w = item?.wrote ?? {};
+  const answered = w.answer?.source === 'founder' ? w.answer.ts ?? 0 : 0;
+  const closed = item?.status === 'done' && w.status?.source === 'founder' ? w.status.ts ?? 0 : 0;
+  return Math.max(answered, closed);
+}
+
+/** When the teammate last looked back, before `before`; 0 if it never has. */
+export function lookBackSince(teammateId: string, items: readonly RunItem[] | null | undefined, before = Infinity): number {
+  let at = 0;
+  for (const i of runsOf(teammateId, items)) {
+    const c = i.createdAt ?? 0;
+    if (isLookBack(i) && c < before && c > at) at = c;
+  }
+  return at;
+}
+
+/** Its runs you replied on or closed since `since`, in the last two weeks, oldest first. */
+export function taughtRuns(teammateId: string, items: readonly RunItem[] | null | undefined, since: number, now = Date.now()): RunItem[] {
+  return runsOf(teammateId, items)
+    .filter((i) => !isLookBack(i) && (i.createdAt ?? 0) >= now - LOOK_BACK_WINDOW_MS && yourLastWordAt(i) > since)
+    .sort((a, b) => yourLastWordAt(a) - yourLastWordAt(b));
+}
+
+/** The threads a look-back rereads: the newest few you replied on since the last one. */
+export function lookBackThreads(teammateId: string, items: readonly RunItem[] | null | undefined, item: { createdAt?: number } | null | undefined, now = Date.now()): RunItem[] {
+  const since = lookBackSince(teammateId, items, item?.createdAt ?? now);
+  return taughtRuns(teammateId, items, since, item?.createdAt ?? now).slice(-LOOK_BACK_THREADS);
+}
+
+/**
+ * Whether a plan's usage reading leaves room for a look-back: known, read in
+ * the last six hours, and every limit well under its line. Unknown is no.
+ */
+export function roomToLookBack(reading: { at?: number; limits?: readonly { span?: string; percent?: number | null }[] | null } | null | undefined, now = Date.now()): boolean {
+  const limits = reading?.limits ?? [];
+  if (!limits.length || !(now - (reading?.at ?? 0) < USAGE_FRESH_MS)) return false;
+  return limits.every((l) => {
+    const p = Number(l?.percent);
+    if (!Number.isFinite(p)) return false;
+    return p < (l.span === 'session' ? ROOM_SESSION : ROOM_WEEK);
+  });
+}
+
+export const lookBackEffort = (effort: string | null | undefined): 'low' | 'medium' => (effort === 'low' ? 'low' : 'medium');
 
 // Deterministic, so a tick that dies after creating the run and before marking
 // the message seen finds the same row next time rather than making a second.
@@ -777,6 +856,7 @@ export const isSetupTitle = (title: string | null | undefined): boolean => title
 export function runTitle(trigger: WakeTrigger, teammate: { name?: string }): string {
   if (trigger.kind === 'schedule') return trigger.label === 'week' ? "This week's round" : "Today's round";
   if (trigger.kind === 'duty') return clip(trigger.what, 120);
+  if (trigger.kind === 'look-back') return 'Learn from your recent replies';
   if (trigger.kind === 'pass') return clip(trigger.title || 'Work passed on', 120);
   if (trigger.kind === 'first') return 'Start on its first job';
   if (trigger.opening === 'setup') return setupTitle(teammate?.name);
@@ -822,8 +902,9 @@ export type WakeTrigger =
   | (TriggerBase & { kind: 'schedule'; key: string; label: string })
   | (TriggerBase & { kind: 'duty'; duty: string; what: string; tell?: string; key: string })
   | (TriggerBase & { kind: 'pass'; fromName?: string; title?: string; details?: string })
-  | (TriggerBase & { kind: 'message'; text?: string; fromName?: string; opening?: 'start' | 'setup' })
-  | (TriggerBase & { kind: 'first'; key: string });
+  | (TriggerBase & { kind: 'message'; text?: string; fromName?: string; opening?: 'start' | 'setup'; priority?: number })
+  | (TriggerBase & { kind: 'first'; key: string })
+  | (TriggerBase & { kind: 'look-back'; since: number });
 
 interface ActionBase { teammate: string; msg?: string; trigger?: WakeTrigger }
 
@@ -833,7 +914,7 @@ export type WakeAction =
   | (ActionBase & { type: 'seen'; msg: string; run?: string })
   | (ActionBase & { type: 'served'; key: string })
   | (ActionBase & { type: 'dutyServed'; duty: string; key: string })
-  | (ActionBase & { type: 'answer'; item: string; product: string; text: string | undefined; msg: string })
+  | (ActionBase & { type: 'answer'; item: string; product: string; text: string | undefined; msg: string; priority?: number })
   | (ActionBase & { type: 'tell'; item: string; product: string | null; text: string; from: { teammate: string; name: string }; hop: number; hold: boolean; msg: string })
   | (ActionBase & { type: 'release'; item: string; product: string })
   | (ActionBase & { type: 'limit' })
@@ -865,13 +946,15 @@ type MadeRun = Omit<RunItem, 'product'> & { teammate: string; product: string | 
 // - One run at a time: a new run behind an active one is made queued, and a
 //   teammate with nothing active gets its oldest queued run released.
 // - A teammate past its weekly runs takes nothing new except your own words.
-export function planWakes({ teammates = [], chat = { messages: [], seen: new Set() }, items = [], now = Date.now(), shipped = {} }: {
+export function planWakes({ teammates = [], chat = { messages: [], seen: new Set() }, items = [], now = Date.now(), shipped = {}, lookBack = null }: {
   teammates?: readonly TeammateLike[];
   chat?: ChatLike;
   items?: readonly RunItem[];
   now?: number;
   /** When each project last shipped. */
   shipped?: Readonly<Record<string, number>>;
+  /** Whether a teammate may look back now (it has a method, and its plan has room). */
+  lookBack?: { ok: (t: TeammateLike) => boolean } | null;
 } = {}): WakeAction[] {
   const actions: WakeAction[] = [];
   const live = teammates.filter((t) => !t.endedAt);
@@ -933,14 +1016,16 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
       // A new thread to a teammate is new work, never an answer to its last question.
       if (fromYou && m.kind === 'msg' && !m.fresh) {
         const runs = runsOf(tid, items);
-        const waiting = runs.filter((i) => waitingOnYou(i) && asksYouStill(i, tid, chat, m.id)).sort((a, b) => (b.wrote?.result?.ts ?? 0) - (a.wrote?.result?.ts ?? 0))[0];
+        const named = runAnswered(m, chat);
+        const waiting = runs.find((i) => i.id === named && waitingOnYou(i))
+          ?? runs.filter((i) => waitingOnYou(i) && asksYouStill(i, tid, chat, m.id) && talksInChat(i, tid, chat, m.id)).sort((a, b) => (b.wrote?.result?.ts ?? 0) - (a.wrote?.result?.ts ?? 0))[0];
         // A running run hears your words only if your words started it;
         // anything else is new work, queued behind it.
         const yours = new Set((chat.messages ?? []).filter((x) => x.kind === 'msg' && x.from === YOU && x.id !== m.id).map((x) => runIdFor(`${x.id}>${tid}`)));
         const running = runs.find((i) => isActiveRun(i) && i.status === 'claimed' && yours.has(i.id));
         const into = waiting ?? running;
         if (into) {
-          actions.push({ type: 'answer', teammate: tid, item: into.id, product: into.product, text: m.text, msg: m.id });
+          actions.push({ type: 'answer', teammate: tid, item: into.id, product: into.product, text: m.text, msg: m.id, ...(m.priority ? { priority: m.priority } : {}) });
           actions.push({ type: 'seen', msg: m.id, teammate: tid, run: into.id });
           continue;
         }
@@ -960,7 +1045,7 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
       const work = fromYou ? m.via ?? null : m.work ?? null;
       const trigger: WakeTrigger = m.kind === 'pass'
         ? { kind: 'pass', from: m.from, ...(m.fromName ? { fromName: m.fromName } : {}), title: m.title, details: m.details, msg: m.id, hop, ...origin, ...(work ? { work } : {}), ...(hold ? { hold } : {}) }
-        : { kind: 'message', from: m.from, text: m.text, msg: m.id, hop, ...origin, ...(work ? { work } : {}), ...(fromYou && m.start ? { opening: 'start' } : fromYou && m.setup ? { opening: 'setup' } : {}) };
+        : { kind: 'message', from: m.from, text: m.text, msg: m.id, hop, ...origin, ...(work ? { work } : {}), ...(fromYou && m.priority ? { priority: m.priority } : {}), ...(fromYou && m.start ? { opening: 'start' } : fromYou && m.setup ? { opening: 'setup' } : {}) };
       const id = newRun(t, trigger, `${m.id}>${tid}`, { fromYou, hold });
       if (id) {
         actions.push({ type: 'seen', msg: m.id, teammate: tid, run: id });
@@ -985,6 +1070,15 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
       const posted = (chat.messages ?? []).some((x) => x.kind === 'msg' && x.from === t.id && x.run === i.id && !x.options?.length && x.ts > since && toNames(x.to).every((y) => y === YOU));
       const said = (chat.messages ?? []).some((x) => x.id === replyMessageId(i.id));
       actions.push({ type: 'replied', teammate: t.id, item: i.id, product: i.product, labels: i.labels ?? [], text, say: !!text && !posted && !said });
+    }
+  }
+
+  // A finished look-back asks nothing of you, whatever its answer says; it
+  // posts its own line when the method changed. A blocked one stays to be seen.
+  for (const t of live) {
+    for (const i of runsOf(t.id, items)) {
+      if (!isLookBack(i) || i.status === 'blocked' || !waitingOnYou(i)) continue;
+      actions.push({ type: 'replied', teammate: t.id, item: i.id, product: i.product, labels: i.labels ?? [], text: '', say: false });
     }
   }
 
@@ -1053,6 +1147,20 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
     if (t.firstRun !== 'owed' || t.paused || t.status !== 'active' || pausedNow(t, now)) continue;
     const id = newRun(t, { kind: 'first', key: 'first' }, `${t.id}#first`);
     if (id) actions.push({ type: 'firstServed', teammate: t.id });
+  }
+
+  // Last, so it never takes a place real work wanted this tick.
+  for (const t of live) {
+    if (!lookBack?.ok?.(t) || t.paused || t.status !== 'active' || pausedNow(t, now)) continue;
+    if (active(t) || runsOf(t.id, items).some(isQueued) || pendingNew.get(t.id)) continue;
+    if (runsThisWeek(t.id, items, now) >= (t.limit ?? DEFAULT_LIMIT) - LOOK_BACK_LEAVES) continue;
+    const since = lookBackSince(t.id, items);
+    if (since && now - since < LOOK_BACK_EVERY_MS) continue;
+    if (taughtRuns(t.id, items, since, now).length < LOOK_BACK_AFTER) continue;
+    const trigger: WakeTrigger = { kind: 'look-back', since };
+    actions.push({ type: 'run', teammate: t.id, id: runIdFor(`${t.id}~look-back~${since}`), trigger, title: runTitle(trigger, t), start: 'now' });
+    pendingNew.set(t.id, 1);
+    startsNow.set(t.id, true);
   }
 
   for (const t of live) {

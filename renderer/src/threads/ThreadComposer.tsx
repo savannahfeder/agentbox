@@ -47,7 +47,7 @@ import { conversationWith } from './page-rules';
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { AttachRow } from '../components/AttachRow';
 import { Listening, MicButton, useWebDictation } from '../components/WebDictation';
-import { PRIORITIES, priorityLabelOf, priorityValueOf, startingPriority, type PriorityId } from '../priority';
+import { AGENT_DECIDES, PRIORITIES, choiceLabelOf, priorityValueOf, sentPriority, startingPriority, type PriorityChoice } from '../priority';
 import { clearComposeDraft, composeDraftIsEmpty, dropComposeDraft, markComposeDraftSending, openingComposeDraft, readComposeDraft, restoreComposeDraft, saveComposeDraft, type ComposeDraft } from '../drafts';
 import { codeProjectFor, LAST_PRODUCT_KEY, rememberedProject } from '../compose-project';
 import { practiceRefusal, noProjectYet } from '../compose-says';
@@ -124,6 +124,8 @@ export interface ComposeStart {
   handFrom?: HandFrom;
   /** The teammate's thread this one carries on: labelled on the new thread, and its owner told once it is sent. */
   continueFrom?: { personId: string; threadId: string };
+  /** The project it starts in, ahead of the default. */
+  product?: string | null;
   /** The box on the page moving into the dialog: the plain card's draft, wherever it is addressed. */
   moved?: boolean;
   /** A message's subject: it starts a thread of its own with those people. */
@@ -280,7 +282,7 @@ export function ThreadComposer({
 
   /* ----------------------------- project -------------------------------- */
   const offered = useMemo(() => projectsOffered(products), [products]);
-  const [productSlug, setProductSlug] = useState<string | null>(null);
+  const [productSlug, setProductSlug] = useState<string | null>(initial?.product ?? null);
   const pointedAt = cardProject(offered, { picked: productSlug, defaultProduct, remembered: rememberedProject() });
   const toCode = !productSlug && pointedAt ? codeProjectFor(text, offered, pointedAt.slug) : null;
   const product = toCode ?? pointedAt;
@@ -295,11 +297,10 @@ export function ThreadComposer({
   useEffect(() => { if (selectProject) { pickProject(selectProject); textRef.current?.focus(); } }, [selectProject]);
 
   /* ---------------------------- priority -------------------------------- */
-  // Every new thread opens on Medium; only a half-written card keeps its tag
-  // (../priority.ts says why the last pick is no longer carried over).
-  const [prio, setPrio] = useState<PriorityId | null>(() => startingPriority(opened.current.priority));
-  const prioShown: PriorityId = prio ?? 'medium';
-  const pickPrio = (id: PriorityId) => { setPrio(id); };
+  // Every new thread opens on Agent decides; only a half-written card keeps
+  // its tag (../priority.ts says why the last pick is no longer carried over).
+  const [prio, setPrio] = useState<PriorityChoice>(() => startingPriority(opened.current.priority));
+  const pickPrio = (id: PriorityChoice) => { setPrio(id); };
 
   /* ---------------------------- send later ------------------------------ */
   // A row of Send later sets when it goes, and Send sends it, so there is still
@@ -628,7 +629,7 @@ export function ThreadComposer({
         effort: effortPicked(effort, effortRows) ? effort : null,
         engineCount: engineRows.length, codexDefault,
       });
-      const priority = prio ? priorityValueOf(prio) : 5;
+      const priority = sentPriority(prio);
       if (when.repeat) {
         // A repeating task is a rule, not a work item, so it goes down the same
         // separate path the old card's did, with the model and engine beside it.
@@ -1032,8 +1033,8 @@ export function ThreadComposer({
   const priorityMenu = (
     <div className="tc-menu tc-rise tc-narrow" role="listbox" aria-label="Priority" onKeyDown={menuKeys}>
       <span className="tc-menu-head">Priority</span>
-      {PRIORITIES.map((p) => (
-        <button key={p.id} type="button" data-item className={`tc-row ${p.id === prioShown ? 'on' : ''}`} onPointerMove={hover}
+      {[{ id: null, label: AGENT_DECIDES.label }, ...PRIORITIES].map((p) => (
+        <button key={p.id ?? AGENT_DECIDES.id} type="button" data-item className={`tc-row ${p.id === prio ? 'on' : ''}`} onPointerMove={hover}
           onClick={() => { pickPrio(p.id); close('text'); }}>
           <PrioGlyph id={p.id} /><span className="tc-row-label">{p.label}</span>
         </button>
@@ -1049,7 +1050,7 @@ export function ThreadComposer({
     <span className="tc-anchor" ref={anchor('priority')}>
       <button type="button" data-trigger className={`tc-chip ${open === 'priority' ? 'open' : ''}`} title="Priority"
         aria-haspopup="listbox" aria-expanded={open === 'priority'} onClick={() => toggle('priority')} onKeyDown={triggerKeys('priority')}>
-        <PrioGlyph id={prioShown} />{priorityLabelOf(prioShown)}
+        <PrioGlyph id={prio} />{choiceLabelOf(prio)}
       </button>
       {open === 'priority' && priorityMenu}
     </span>
@@ -1523,7 +1524,7 @@ function Swatch({ slug }: { slug: string }) {
 
 // THE APP'S OWN PRIORITY BARS. Urgent is a fourth bar, never an exclamation
 // mark in a box (w-bba20a03f5, Priority.tsx), whatever the drawing showed.
-const PrioGlyph = ({ id }: { id: PriorityId }) => <span className="tc-prio"><PriorityIcon id={id} /></span>;
+const PrioGlyph = ({ id }: { id: PriorityChoice }) => <span className="tc-prio"><PriorityIcon id={id} /></span>;
 
 const PeopleIcon = () => (
   <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
