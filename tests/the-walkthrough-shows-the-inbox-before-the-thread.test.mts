@@ -37,6 +37,26 @@ describe('after the practice thread is sent', () => {
   });
 });
 
+// Walked again with four chats brought in: after E closed the practice thread the bar read
+// 5 of 5 over an inbox with no tip for 20 seconds and more, because the chats were still
+// being written up and that held every tip on the list.
+describe('the last tip, with chats still being written up', () => {
+  const closed = ['working', 'open', 'reply', 'close'].reduce((t, l) => finishLesson(t, l as 'close'), sent);
+  const writing = { practice: false, rows: 0, waiting: 4, preparing: true };
+  it('shows on Needs you and on In progress once the practice thread is closed', () => {
+    expect(tourStep(closed, screen({ ...writing, view: 'inbox' }))).toBe('palette');
+    expect(tourStep(closed, screen({ ...writing, view: 'progress' }))).toBe('palette');
+  });
+  it('does not show before the close, on another page, or under the New thread box', () => {
+    expect(tourStep(finishLesson(finishLesson(sent, 'open'), 'reply'), screen({ ...writing, view: 'inbox' }))).toBeNull();
+    expect(tourStep(closed, screen({ ...writing, view: 'files' }))).toBeNull();
+    expect(tourStep(closed, screen({ ...writing, view: 'inbox', composer: 'card' }))).toBeNull();
+  });
+  it('is said once: with ⌘K learned the list is quiet again', () => {
+    expect(tourStep(finishLesson(closed, 'palette'), screen({ ...writing, view: 'inbox' }))).toBeNull();
+  });
+});
+
 describe('what stays as it was', () => {
   it('in the open practice thread the tips are the thread\'s', () => {
     const opened = finishLesson(sent, 'open');

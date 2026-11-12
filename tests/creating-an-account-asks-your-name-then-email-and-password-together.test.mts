@@ -76,7 +76,7 @@ describe('the setup account step', () => {
     expect(css).toMatch(/\.setup-split \.ss-go\.ss-not-yet \{[^}]*color: var\(--text-faint\)/);
   });
   it('still names what is missing when the button is pressed early, rather than saying nothing', () => {
-    expect(page).toMatch(/if \(!ready\) \{ setMissing\(partMissing\(part, \{ name, email, password \}\)\); return; \}/);
+    expect(page).toMatch(/if \(!ready\) \{\s*const gap = partMissing\(part, \{ name, email, password \}\);[\s\S]{0,160}setMissing\(gap\);/);
   });
   it('lets the sign-in page own Back and Enter on this step', () => {
     expect(split).toMatch(/<SignInPage purpose="team" startOn="sign-up" inSetup onSignedIn=\{next\} onBack=\{back \?\? undefined\} primaryRef=\{accountPrimary\} termsAt=\{foot\} \/>/);

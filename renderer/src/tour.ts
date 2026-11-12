@@ -153,7 +153,12 @@ export function tourStep(t: Tour | null, s: TourScreen): TourStep | null {
     if (s.view !== 'inbox' && !s.practice && (s.waiting ?? 0) > 0) return 'answered';
     return s.view === 'inbox' && s.practice ? 'open' : null;
   }
-  if (s.preparing && !s.thread) return s.view === 'inbox' && todo('open') ? 'gettingReady' : null;
+  if (s.preparing && !s.thread) {
+    if (s.view === 'inbox' && todo('open')) return 'gettingReady';
+    // Chats still being written up do not hold the last tip: it is about the bar, not the list.
+    const last = !todo('close') && todo('palette') && (t.sent || !todo('start')) && s.composer !== 'card' && (s.view === 'inbox' || s.view === 'progress');
+    return last ? 'palette' : null;
+  }
   if (s.preparing && todo('close')) return null;
   if (s.preparing) return todo('palette') && (t.sent || !todo('start')) ? 'palette' : !t.sent && todo('start') ? 'startHere' : null;
   if (s.thread) {
