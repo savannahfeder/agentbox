@@ -256,7 +256,9 @@ function messageLines(lines: TeamHistoryLine[], me: string): OutLine[] {
       // A rewritten ask replaces the ask, when the side that wrote it wrote this.
       if (opening.source === l.source) opening.patch.body = body;
     } else if (body && !said(p.answer) && !said(p.result) && !said(p.note)) patch.body = body;
-    if (said(p.answer)) patch.answer = p.answer as string;
+    // A reply the app wrote from notes is for the agent; readers get the notes as notes, and what was typed with them.
+    const answer = Array.isArray(p.fromNotes) ? said(p.typed) : said(p.answer);
+    if (answer) patch.answer = answer;
     if (said(p.result)) patch.result = p.result as string;
     if (said(p.note)) patch.note = p.note as string;
     if (!Object.keys(patch).length) continue;
