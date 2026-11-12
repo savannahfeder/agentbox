@@ -309,9 +309,11 @@ export function cloudAccountFrom(env: NodeJS.ProcessEnv = process.env, engine = 
 //
 // `only` (emails or keys) narrows it for a copy of the app under test, which
 // shares this list with the person's own app.
+const namedBy = (only: string[] | null) => (r: Partial<CloudLoginRecord>) => !only || [r.email, r.key ?? r.dir].some((n) => n && only.includes(String(n).toLowerCase()));
+
 function accountInUse(all: CloudLogins, engine: string, { now, only, prefer, follow = false }: { now: number; only: string[] | null; prefer: string | null; follow?: boolean }): [string, CloudLoginRecord] | null {
   const dup = duplicatesIn(Object.values(all).filter((r) => r?.engine === engine));
-  const named = (r: Partial<CloudLoginRecord>) => !only || [r.email, r.key ?? r.dir].some((n) => n && only.includes(String(n).toLowerCase()));
+  const named = namedBy(only);
   // A login that was never finished or has stopped working is not an account
   // at all. A Codex login due a renewal is the account and simply cannot run
   // yet; `Supervisor#_renewCloudLogins` mends that on its own clock.
@@ -342,7 +344,23 @@ export function pickCloudLogin(engine: string, { home = os.homedir(), now = Date
   });
 }
 
-const clock = (t: number) => new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(/\s/g, '').toLowerCase();
+/**
+ * The state of the account a run would take, as `cloudLoginState` names it.
+ * An account that stopped working is no account to `cloudLoginInUse`, so it
+ * is looked for here: 'broken', not 'none', when that is why nothing ran.
+ */
+export function cloudLoginStateForARun(engine: string, { home = os.homedir(), now = Date.now(), only = null, prefer = null }: CloudLoginPick = {}) {
+  const inUse = cloudLoginInUse(engine, { home, now, only, prefer });
+  if (inUse) {
+    const state = cloudLoginState(inUse, { now });
+    return { state, until: state === 'limited' ? inUse.limitedUntil ?? null : null };
+  }
+  const named = namedBy(only);
+  const broken = listCloudLogins(engine, { home }).some((r) => r.broken && !r.duplicateOf && named(r) && (!prefer || r.key === prefer));
+  return { state: broken ? 'broken' : 'none', until: null };
+}
+
+export const clock = (t: number) => new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(/\s/g, '').toLowerCase();
 
 /** Why a run found no account to take, as its thread will quote it. */
 export function noCloudAccountSentence(engine: string, inUse: CloudLoginRecord | null | undefined, { now = Date.now() }: { now?: number } = {}) {

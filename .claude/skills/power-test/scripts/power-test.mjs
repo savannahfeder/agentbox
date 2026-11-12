@@ -43,7 +43,7 @@ import { writeReport } from './report.mjs';
 import { makeFilm, seedArtifacts } from './artifacts.mjs';
 import { readDiary } from './diary.mjs';
 import { writeTeamFiles, namePeople, doorOf, formTeam, teamWords } from './team.mjs';
-import { testerLogin, codexCanSandbox, codexTesterArgv, codexTesterEnv, lastMessage } from './codex-tester.mjs';
+import { testerLogin, codexCanSandbox, codexTesterArgv, codexTesterEnv, lastMessage, CODEX_CHECK_ARGV, codexCheckFailed } from './codex-tester.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const VERIFY = path.resolve(here, '../../verify-agentbox/scripts');
@@ -146,8 +146,9 @@ if (standIns) {
 say(`evidence: ${root}  (progress.json there says how it is going)`);
 
 say(`testers: Codex on ${login.home} (${login.plan ?? 'plan unknown'}, ${login.why})${sandboxed ? '' : ', without Codex\'s sandbox, which this machine refuses'}.`);
-const check = await run('codex', ['login', 'status'], { env: testerEnv(), timeoutMs: MIN, cwd: root });
-if (check.code !== 0) stop(`the testers' Codex is not signed in at ${login.home}: "${check.out.trim().slice(-300)}". Sign it in (CODEX_HOME=${login.home} codex login) or name another with --codex-home.`);
+const check = await run('codex', CODEX_CHECK_ARGV, { env: testerEnv(), timeoutMs: 3 * MIN, cwd: root });
+const refused = codexCheckFailed(check, { home: login.home, onCloud: fs.existsSync('/opt/agentbox/server.mjs') });
+if (refused) stop(refused);
 
 /** The person's projects with real code in them, so real agents have work to do. */
 function seedCode(state) {
