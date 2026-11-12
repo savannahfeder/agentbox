@@ -4,6 +4,7 @@ import {createRequire} from 'node:module';
 import {execFileSync} from 'node:child_process';
 import {startableChrome} from '../shared/hidden-browser.mts';
 import {setHeroHeadline} from './lib/outreach-hero-copy.mts';
+import {safeHeroBottom} from './lib/outreach-hero-crop.mts';
 const [input,folder]=process.argv.slice(2);
 const film=JSON.parse(fs.readFileSync(input,'utf8'));
 const require=createRequire(import.meta.url);
@@ -68,9 +69,20 @@ try{
     return {x,y,width,height:Math.min(810-y,Math.max(bottom-r.top+48,width/2.4))};
   },{highlight:film.creative.heroHighlight,inkWidth:reference.inkWidth});
   if(film.creative.heroCropBottomInset)clip.height-=film.creative.heroCropBottomInset;
+  const applyHeadline=(i:number,text:string)=>view.evaluate(setHeroHeadline,{text,width:reference.inkWidth,highlight:film.creative.heroHighlight,textSelector:film.creative.heroTextSelector,lines:film.creative.headlineLines?.[i]});
+  let stable=false;
+  for(let pass=0;pass<20&&!stable;pass++){
+    const before=clip.height;
+    for(const [i,text]of film.creative.headlines.entries()){
+      await applyHeadline(i,text);
+      clip.height=(await view.evaluate(safeHeroBottom,{left:clip.x,right:clip.x+clip.width,top:clip.y+24+reference.height,bottom:clip.y+clip.height}))-clip.y;
+    }
+    stable=clip.height===before;
+  }
+  if(!stable)throw new Error('No common clean crop for these hero proposals');
   const shots=[];
   for(const [i,headline]of film.creative.headlines.entries()){
-    const fit=await view.evaluate(setHeroHeadline,{text:headline,width:reference.inkWidth,highlight:film.creative.heroHighlight,textSelector:film.creative.heroTextSelector,lines:film.creative.headlineLines?.[i]});
+    const fit=await applyHeadline(i,headline);
     if(fit.overflow||fit.height>reference.height+2||fit.left<clip.x||fit.right>clip.x+clip.width||fit.bottom>clip.y+clip.height)throw new Error(`Headline ${i+1} exceeds the company's original headline layout`);
     const file=path.join(folder,`headline-${i+1}.png`);await view.screenshot({path:file,clip});shots.push(file);
   }

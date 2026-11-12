@@ -10,7 +10,7 @@ import { once } from 'node:events';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { startableChrome } from '../shared/hidden-browser.mts';
 import {repairReplayDOM} from './lib/outreach-layout.mts';
-import {anchoredPointer,smoothPointer} from './lib/outreach-pointer.mts';
+import {anchoredPointer,smoothPointer,recordedPointer} from './lib/outreach-pointer.mts';
 import {validateCreative} from './lib/outreach-creative.mts';
 import {setHeroFrame} from './lib/outreach-hero-motion.mts';
 import { injectDOM, sceneAt, pointerAt, pointerSprite, recordingTime, escapeHtml, cameraBox, validateReplay, replayKey, validateComments } from './lib/outreach-template.mjs';
@@ -87,7 +87,11 @@ function checkHeading(title,actual,t){
 }
 const anchors=[{t:0,delta:[0,0]}];
 const clickChecks=[];
-const basePointer=t=>smoothPointer(t=>pointerAt(frames,t),t);
+const recorded=recordedPointer(frames),pointerCache=new Map();
+const basePointer=t=>{
+  if(!pointerCache.has(t))pointerCache.set(t,smoothPointer(recorded,t));
+  return pointerCache.get(t);
+};
 function scenePointer(t) {
   const point=basePointer(t);
   return point?anchoredPointer(point,t,anchors):null;
