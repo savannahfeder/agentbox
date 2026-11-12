@@ -1,6 +1,11 @@
 // A public link's words, apart from the components so the phone draws the same ones.
 import { clock } from './thread-history';
 
+/** What Share says to someone signed out, by the tab its sign-in page opens on. */
+export const shareSignedOutWords = (startOn: 'sign-in' | 'sign-up') => (startOn === 'sign-up'
+  ? { line: 'Create an account to share this file.', button: 'Create account' }
+  : { line: shareWords.signedOut, button: 'Sign in' });
+
 export const shareWords = {
   signedOut: 'Sign in to share this file or see its link.',
   fresh: 'Copy link to let anyone see it and comment',

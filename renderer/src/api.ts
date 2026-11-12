@@ -608,6 +608,10 @@ export const api = {
         base.supervisor.queued = queued;
         base.supervisor.capacity = base.supervisor.running.filter((r) => (r as { where?: string }).where !== 'cloud').length;
       }
+      // &team=signedout: a build that can sign in, with nobody signed in and no team.
+      if (params.get('team') === 'signedout') {
+        base.team = { configured: false, canSignIn: true, started: true, signedIn: false, signingIn: null, me: null, team: null, people: [], cards: [], lastSyncAt: null, error: null };
+      }
       // &usagestale: a Codex reading six hours old whose five hour window has ended.
       if (params.has('usagestale')) {
         const now = Date.now();

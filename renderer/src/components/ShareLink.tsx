@@ -3,7 +3,8 @@
 // one file shares one link; Update link puts the copy on screen in it.
 import { useEffect, useRef, useState } from 'react';
 import { api, type FileLinkState, type LinkComment } from '../api';
-import { shareWords } from '../public-link-words';
+import { shareSignedOutWords, shareWords } from '../public-link-words';
+import { shareSignInStartsOn, signInWasSkipped } from '../sign-in-ask';
 import { NoteGlyph } from './NoteGlyphs';
 import { placeWords, shownName, type NotePlace } from '../../../shared/artifact-marks.mts';
 
@@ -157,18 +158,19 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
       {open && (
         <div className="av-share-box" role="dialog" aria-label="Share">
           <p className="av-share-title">Share <span>{name}</span></p>
-          {!state.signedIn ? (
-            <>
+          {!state.signedIn ? (() => {
+            const offer = shareSignedOutWords(shareSignInStartsOn({ skipped: signInWasSkipped() }));
+            return <>
               <div className="av-share-who-sees">
                 <span className="av-share-icon"><NoteGlyph name="lock" /></span>
-                <span className="av-share-access"><b>{shareWords.notPublic}</b><i>{shareWords.signedOut}</i></span>
+                <span className="av-share-access"><b>{shareWords.notPublic}</b><i>{offer.line}</i></span>
               </div>
               <div className="av-share-foot">
                 <span />
-                <button type="button" className="av-share-copy" onClick={() => { setOpen(false); window.dispatchEvent(new Event(SIGN_IN_TO_SHARE)); }}>Sign in</button>
+                <button type="button" className="av-share-copy" onClick={() => { setOpen(false); window.dispatchEvent(new Event(SIGN_IN_TO_SHARE)); }}>{offer.button}</button>
               </div>
-            </>
-          ) : (
+            </>;
+          })() : (
             <>
               <div className="av-share-who-sees">
                 <span className={`av-share-icon${link ? ' is-open' : ''}`}><NoteGlyph name={link ? 'globe' : 'lock'} /></span>
