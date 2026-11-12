@@ -48,7 +48,7 @@ import { folderPictures } from './folder-pictures.mts';
 import { docUrl } from './doc-scheme.mts';
 import { readDoc, writeDoc } from './doc-file.mts';
 import { linkCopyOf, linkSource } from './file-link.mts';
-import { bringSharedFile, fileLinkToken } from './bring-shared-file.mts';
+import { bringSharedFile, fileLinkToken, projectToBringInto } from './bring-shared-file.mts';
 import { familyKeyOf, type Mark } from '../shared/artifact-marks.mts';
 import { readItemHistory } from './store/work-items.mts';
 import { readChange, readChangeSummary } from './code-change.mts';
@@ -2745,7 +2745,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
 
   // A LINK ANYONE CAN OPEN, to one of this person's files (main/file-link.mts).
   // One link per file of a thread, whichever of its versions is on screen.
-  type LinkArg = { product?: string; thread?: unknown; src?: unknown; token?: unknown; text?: unknown };
+  type LinkArg = { product?: string; thread?: unknown; src?: unknown; token?: unknown; text?: unknown; place?: unknown };
   const linkOf = ({ product, thread, src }: LinkArg = {}) => linkSource(product, thread, familyKeyOf(String(src ?? '')));
   const linkCall = (fn: (arg: LinkArg, team: IpcTeam) => Promise<object>) => async (_e: unknown, arg: LinkArg = {}) => {
     if (!team?.fileLink) return { ok: false, error: 'This copy has no cloud to share files on.' };
@@ -2769,7 +2769,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   ipcMain.handle('zero:file-links', linkCall(async (_arg, team) => team.fileLinks()));
   ipcMain.handle('zero:file-link-stop', linkCall(async ({ token }, team) => { await team.stopFileLink(String(token ?? '')); return {}; }));
   ipcMain.handle('zero:file-link-comments', linkCall(async ({ token }, team) => ({ comments: await team.fileLinkComments(String(token ?? '')) })));
-  ipcMain.handle('zero:file-link-comment', linkCall(async ({ token, text }, team) => ({ comments: await team.commentOnFileLink(String(token ?? ''), text) })));
+  ipcMain.handle('zero:file-link-comment', linkCall(async ({ token, text, place }, team) => ({ comments: await team.commentOnFileLink(String(token ?? ''), text, place ?? null) })));
 
   // A FILE SOMEONE SHARED WITH THIS PERSON, brought into one of their projects
   // as their own copy on a thread that runs nothing until they write to it.
@@ -2777,14 +2777,13 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     const token = fileLinkToken(link);
     if (!token) return { ok: false, error: 'That is not a link to a shared file.' };
     if (!team?.readFileLink) return { ok: false, error: 'This copy has no cloud to read shared files from.' };
-    const products = store.listProducts();
-    const slug = products.find((p) => p.slug === product)?.slug ?? products[0]?.slug;
+    const slug = projectToBringInto(store.listProducts(), product);
     if (!slug) return { ok: false, error: 'Make a project first, then open the link again.' };
     try {
       const out = await bringSharedFile({
         token, product: slug, read: (t) => team.readFileLink(t), productDir: store.productDir(slug),
-        compose: (fields) => store.composeItem(slug, fields),
-        close: (id) => { store.answerItem(slug, id, { status: 'done' }); },
+        // Their own copy: a teammate on a shared project sees it only if they share it.
+        compose: (fields) => store.composeItem(slug, { ...fields, visibility: 'private' }),
       });
       push();
       return { ok: true, ...out };
