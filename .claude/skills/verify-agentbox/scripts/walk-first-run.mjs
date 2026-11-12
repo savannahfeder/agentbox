@@ -98,6 +98,12 @@ try {
   await see('chats', /STEP 1 OF \d+.*Add your recent agents/i);
   await key('Enter');
   await see('agent', /Pick your agent.*Claude Code.*Codex/i);
+  // A choice is made with the arrows: down to Codex, back up to Claude Code.
+  const ticked = () => page.evaluate(`document.querySelector('.setup-split .ss-row.ss-on')?.innerText ?? ''`);
+  await key('ArrowDown');
+  if (!/Codex/.test(await ticked())) throw new Error('↓ on the agent step did not move the choice to Codex');
+  await key('ArrowUp');
+  if (!/Claude Code/.test(await ticked())) throw new Error('↑ on the agent step did not move the choice back to Claude Code');
   await key('Enter');
   await see('account', /Create your account/i);
   await key('Enter');
@@ -112,7 +118,7 @@ try {
   await see('account-email-and-password', /Create account/i);
   await key('Enter');
   await see('plan', /Pick a plan.*Free.*Pro/i);
-  await click('Pro');
+  await key('ArrowDown');
   await see('plan-pro', /STEP \d+ OF 7/i);
   await key('Enter');
   await see('invite', /Invite your team/i);

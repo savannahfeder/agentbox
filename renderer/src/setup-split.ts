@@ -69,11 +69,17 @@ export function cloudShowcase(titles: readonly string[]): string[] {
 /** The team has bought its seats, so the purchase page can move on. */
 export const teamPaid = (plan: { team?: { seats?: number } } | null | undefined): boolean => (plan?.team?.seats ?? 0) > 0;
 
-/** Enter held down repeats, and a repeat is not a press: one press moves one step. Arrows may repeat. */
+/** ↑ and ↓ on a step that asks for one of a list: the choice one along, stopping at either end. */
+export function nextChoice<T>(all: readonly T[], now: T, by: 1 | -1): T {
+  const at = all.indexOf(now);
+  return all[Math.max(0, Math.min(all.length - 1, (at < 0 ? 0 : at) + by))] ?? now;
+}
+
 /** Which box has the cursor when the invite step opens: the team's name until it has one, then the email. */
 export const inviteCursor = (hasTeam: boolean): 'to-email' | 'add' => (hasTeam ? 'add' : 'to-email');
 
-export const heldPress = (e: { key: string; repeat?: boolean }): boolean => e.key === 'Enter' && !!e.repeat;
+/** Enter held down repeats, and a repeat is not a press: one press moves one step. Arrows may repeat. */
+export const heldPress =(e: { key: string; repeat?: boolean }): boolean => e.key === 'Enter' && !!e.repeat;
 
 export const stepLabel = (steps: SetupStep[], step: SetupStep) => `Step ${steps.indexOf(step) + 1} of ${steps.length}`;
 

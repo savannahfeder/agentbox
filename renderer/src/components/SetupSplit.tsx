@@ -15,7 +15,7 @@ import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { starterAsks } from '../../../shared/teammates.mts';
 import { MATCH_SKY, SKY_THEMES, drawSky } from '../home/sky';
-import { PRO_PITCH, SETUP_PLANS, cloudShowcase, heldPress, inviteCursor, setupPreview, tabStop, teamPaid, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
+import { PRO_PITCH, SETUP_PLANS, cloudShowcase, heldPress, inviteCursor, nextChoice, setupPreview, tabStop, teamPaid, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
 import { writeLastEngine } from '../engines';
 import { TEAM } from '../../../cloud/gateway/plans.mjs';
 import FolderPicker from './FolderPicker';
@@ -239,6 +239,7 @@ export function SetupSplit(p: SetupSplitProps) {
   }, [step, signedIn]); // eslint-disable-line react-hooks/exhaustive-deps
   // ---- the keyboard: Enter is always the primary button
   const primary = useRef<() => void>(() => {});
+  const choose = useRef<((by: 1 | -1) => void) | null>(null);
   const accountPrimary = useRef<(() => void) | null>(null);
   const [foot, setFoot] = useState<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -253,6 +254,7 @@ export function SetupSplit(p: SetupSplitProps) {
       e.stopPropagation();
       const panel = document.querySelector('.setup-split');
       const inSetup = !!(e.target as Element | null)?.closest?.('.setup-split, .ss-picker');
+      if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !typing && choose.current) { e.preventDefault(); choose.current(e.key === 'ArrowDown' ? 1 : -1); return; }
       if (e.key === 'Tab') {
         if (!panel) return;
         const stops = [...panel.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
@@ -283,6 +285,7 @@ export function SetupSplit(p: SetupSplitProps) {
 
   // A step that draws no button of its own must not keep the last step's Enter.
   primary.current = step === 'account' ? () => accountPrimary.current?.() : () => {};
+  choose.current = null;
   let head: [string, string] = ['', ''];
   let body: ReactNode = null;
   if (step === 'chats') {
@@ -316,6 +319,7 @@ export function SetupSplit(p: SetupSplitProps) {
     body = <div className="ss-signin"><SignInPage purpose="team" startOn="sign-up" inSetup onSignedIn={next} onBack={back ?? undefined} primaryRef={accountPrimary} termsAt={foot} /></div>;
   } else if (step === 'plan') {
     head = ['Pick a plan.', ''];
+    choose.current = (by) => setPlan(nextChoice(SETUP_PLANS.map((pl) => pl.id), plan, by));
     body = <>
       <div className="ss-list ss-plans">
         {SETUP_PLANS.map((pl) => <Row key={pl.id} face={<Check on={plan === pl.id} />} on={plan === pl.id} onClick={() => setPlan(pl.id)}
@@ -360,6 +364,7 @@ export function SetupSplit(p: SetupSplitProps) {
     </>;
   } else if (step === 'agent') {
     head = ['Pick your agent.', ''];
+    choose.current = (by) => setEngine(nextChoice(['claude', 'codex'] as const, engine, by));
     body = <>
       <div className="ss-list">
         {(['claude', 'codex'] as const).map((id) => <Row key={id} face={<span className="ss-ai">{id === 'claude' ? 'C' : 'X'}</span>} name={id === 'claude' ? 'Claude Code' : 'Codex'}
@@ -371,6 +376,7 @@ export function SetupSplit(p: SetupSplitProps) {
     head = ['Pick your look.', ''];
     if (!looksAt.current) looksAt.current = lookChoices(p.look, p.skies);
     const looks = looksAt.current;
+    choose.current = (by) => p.onLook(nextChoice(looks, p.look, by));
     body = <>
       <div className="ss-list">
         {looks.map((id) => <Row key={id} face={<Strip look={id} />} name={LOOK_NAME(id)} sub={id === MATCH_SKY ? 'Orange in dark mode, green in light' : undefined}
