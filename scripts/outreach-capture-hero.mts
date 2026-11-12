@@ -12,7 +12,7 @@ fs.mkdirSync(folder,{recursive:true});
 const browser=await chromium.launch({executablePath:startableChrome(),args:['--hide-scrollbars']});
 const options={viewport:{width:1440,height:810},deviceScaleFactor:2,colorScheme:'light' as const};
 async function visit(page){
-  await page.goto(`https://${film.company.domain}`,{waitUntil:'domcontentloaded',timeout:30000});
+  await page.goto(film.creative?.heroURL||`https://${film.company.domain}`,{waitUntil:'domcontentloaded',timeout:30000});
   await page.waitForLoadState('networkidle',{timeout:10000}).catch(()=>{});
   await page.evaluate(()=>document.fonts.ready);
   await page.waitForTimeout(2000);
@@ -67,6 +67,7 @@ try{
     const x=Math.max(0,left-24),y=Math.max(0,r.top-24),width=Math.min(1440-x,right-left+48);
     return {x,y,width,height:Math.min(810-y,Math.max(bottom-r.top+48,width/2.4))};
   },{highlight:film.creative.heroHighlight,inkWidth:reference.inkWidth});
+  if(film.creative.heroCropBottomInset)clip.height-=film.creative.heroCropBottomInset;
   const shots=[];
   for(const [i,headline]of film.creative.headlines.entries()){
     const fit=await view.evaluate(setHeroHeadline,{text:headline,width:reference.inkWidth,highlight:film.creative.heroHighlight,textSelector:film.creative.heroTextSelector,lines:film.creative.headlineLines?.[i]});
