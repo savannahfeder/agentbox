@@ -45,7 +45,7 @@ import type { ModelChoice } from '../models';
 import type { LedgerLine } from '../thread-history';
 import type { TraceSession } from '../notes';
 import { withEveryRun } from '../every-run';
-import { keepPlace, placeKey, placeToReturnTo } from '../thread-place';
+import { keepPlace, opensWhole, placeKey, placeToReturnTo } from '../thread-place';
 import { bringIntoView } from '../thread-bottom';
 import { arrivedAt } from '../unread';
 import type { AgentTurn, FileMarkLink, RunningSession, WorkItem } from '../types';
@@ -222,7 +222,9 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
   // worker writes, because losing the messages she just went looking for every
   // eight seconds is the same fault wearing a timer.
   const [whole, setWhole] = useState(false);
-  useEffect(() => { setWhole(!!kept?.whole); }, [item.product, item.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The first run's practice thread opens with all of it showing: your ask, what the agent did, its answer.
+  const practice = opensWhole(item.labels);
+  useEffect(() => { setWhole(kept ? !!kept.whole : practice); }, [item.product, item.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // The regular read below has only the newest runs; the middle needs them all.
   const [everyRun, setEveryRun] = useState<TraceSession[]>([]);
   useEffect(() => {
@@ -235,7 +237,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
     return () => { live = false; };
   }, [item.product, item.id, whole]);
   const [earlierOpen, setEarlierOpen] = useState(false);
-  useEffect(() => { setEarlierOpen(!!kept?.earlier); }, [item.product, item.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setEarlierOpen(kept ? !!kept.earlier : practice); }, [item.product, item.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // Not keyed on the thread: on the render that changes thread these still hold
   // the last one's, and writing them then would file them under the new one.
   useEffect(() => { keepPlace(place, { earlier: earlierOpen, whole }); }, [earlierOpen, whole]); // eslint-disable-line react-hooks/exhaustive-deps

@@ -43,6 +43,8 @@ export interface TourScreen {
   rows: number;
   /** Rows an agent is on, in that list. */
   running: number;
+  /** The walkthrough's practice thread is a row in the list on screen. */
+  practice?: boolean;
   /** A chat brought in is still being written up as a thread. */
   preparing?: boolean;
   /** The count on the Needs you tab. */
@@ -66,6 +68,8 @@ export interface TourScreen {
 }
 
 export const TOUR_KEY = 'zero.tour';
+/** How long the practice thread's agent is seen working before it answers: long enough to read the tip on its row. */
+export const PRACTICE_RUN_MS = 6_000;
 /** Sent by the app once a thread is really closed, which is the close lesson. */
 export const THREAD_CLOSED = 'agentbox:thread-closed';
 
@@ -140,6 +144,14 @@ export function tourStep(t: Tour | null, s: TourScreen): TourStep | null {
     if (s.menu) return null;
     if (s.text) return 'send';
     return s.ideas === false ? 'write' : 'pick';
+  }
+  // The practice thread goes where every thread goes: In progress, then Needs you, then you open it.
+  // Until it is open, no tip lands on a real thread beside it.
+  if (t.practice?.item && t.sent && todo('open') && !s.thread) {
+    if (s.composer === 'card' || s.menu) return null;
+    if (s.view === 'progress' && s.practice) return 'working';
+    if (s.view !== 'inbox' && !s.practice && (s.waiting ?? 0) > 0) return 'answered';
+    return s.view === 'inbox' && s.practice ? 'open' : null;
   }
   if (s.preparing && !s.thread) return s.view === 'inbox' && todo('open') ? 'gettingReady' : null;
   if (s.preparing && todo('close')) return null;

@@ -183,7 +183,7 @@ import { ideasFor, runOfRule } from './first-run';
 import { Tour } from './components/Tour';
 import { TourFrame } from './components/TourFrame';
 import { laterTabShown } from './later-tab';
-import { type Lesson as TourLesson, THREAD_CLOSED, finishLesson, firstTask, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, showIdeas, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
+import { type Lesson as TourLesson, PRACTICE_RUN_MS, THREAD_CLOSED, finishLesson, firstTask, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, showIdeas, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
 import {
   ANSWER_AFTER_MS, COACHED, COPY as WALK_COPY, FIRST_RUN_LABEL, advance as advanceRun, afterCommand, beatRows, coach, closingRefused, firstRunDone,
   afterUnblock, finishedCleared, firstRunNeeded, projectsOfTheirOwn, laterCleared, laterId, laterIndex,
@@ -1598,7 +1598,7 @@ export default function App() {
       if (!live || !tourRef.current?.practice) return;
       setTour({ ...tourRef.current, practice: { ...tourRef.current.practice, answered: p.replies + 1 } });
       await refresh();
-    }, ANSWER_AFTER_MS);
+    }, p.replies ? ANSWER_AFTER_MS : PRACTICE_RUN_MS);
     return () => { live = false; clearTimeout(t); };
   }, [practiceDue, tourPractice?.replies]); // eslint-disable-line react-hooks/exhaustive-deps
   // And it goes with the walkthrough, finished or skipped.
@@ -7669,7 +7669,7 @@ export default function App() {
   // The sidebar's Search row and ⌘K search threads on a desktop; a phone has
   // neither, so only there does the list draw a magnifier, and it opens ⌘K.
   const searchInTheList = onPhone() ? () => setModal('palette') : undefined;
-  const sideFolded = sidebarFolded({ phone: onPhone(), shrinks: sidebarShrinks && !tourLive(tour), pointedAt: railOpen });
+  const sideFolded = sidebarFolded({ phone: onPhone(), shrinks: sidebarShrinks, pointedAt: railOpen });
   // A teammate's direct record is one of your groups, so Groups is the page it is on.
   const directOpen = !!focused && !isTaskRow(focused) && isDirect(snap?.products.find((p) => p.slug === focused.product));
   const inChats = !!focused && directOpen && !!chatsValue && focused.id === chatsDirect;
@@ -8865,13 +8865,13 @@ export default function App() {
               await refresh();
               return;
             }
-            // The walkthrough's practice thread: no toast and no undo, and it opens.
+            // The walkthrough's practice thread: no toast and no undo.
+            // It goes to In progress like any thread, and is opened from the inbox.
             if (tourTask && made?.id && made.product === tourTask && tourLive(tourRef.current)) {
               setTour(withPractice(tourRef.current!, { slug: tourTask, item: made.id }));
               rememberProject(beforePractice.current);
-              const after = await refresh();
-              const row = after?.items.find((i) => i.id === made.id && i.product === made.product);
-              if (row) setFocused(row);
+              await refresh();
+              setHomeOpen(false); setFocused(null); setView('progress'); setSelected(0);
               return;
             }
             if (how?.kind === 'message') {
@@ -9439,7 +9439,7 @@ export default function App() {
         onLeave={setupStartedAgain.current ? leaveSetupAgain : undefined} />}
       <OpenLesson at={lessonAt} />
       {tourFramed && createPortal(<TourFrame done={tour!.done} now={tourNow} onSkip={() => setTour(skipTour(tour!))} />, document.body)}
-      {!fresh && <Tour tour={tour} practice={!!tourTask} view={view} thread={!!focused}
+      {!fresh && <Tour tour={tour} practice={!!tourTask} practiceId={tourPractice?.item ?? null} view={view} thread={!!focused}
         answering={!!tourPractice?.item && focused?.id === tourPractice.item && (tourPractice.answered ?? 0) <= tourPractice.replies}
         covered={!!run || settingsOpen || teamOpen || newProject || (modal !== null && modal !== 'compose' && modal !== 'palette')}
         palette={modal === 'palette'}

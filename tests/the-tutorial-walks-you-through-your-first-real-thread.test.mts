@@ -168,7 +168,7 @@ describe('a tip on a screen still arriving', () => {
     const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
     expect(tour).toMatch(/const SETTLE_MS = 500;/);
     expect(tour).toMatch(/const SEEN_MS = 1000;/);
-    expect(tour).toContain('if (was && seenFor >= SEEN_MS && !covered && learnedBy(was, before.current, screen))');
+    expect(tour).toContain("if (was && seenFor >= SEEN_MS && !covered && !(practiceId && was === 'answered') && learnedBy(was, before.current, screen))");
   });
   // Measured 2026-10-29 walking the first run with the machine busy: the
   // folder was chosen and the suggestions were up, and "Choose the folder this

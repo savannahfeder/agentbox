@@ -18,14 +18,16 @@ export function setupPreview(width: number, height: number) {
   return { left, x, y, scale, h: (height - 16 - y) / scale, right: Math.max(0, 1120 - (width - 16 - x) / scale) };
 }
 
-export type SetupStep = 'chats' | 'folder' | 'account' | 'plan' | 'invite' | 'pay' | 'teammates' | 'look';
+export type SetupStep = 'chats' | 'folder' | 'agent' | 'account' | 'plan' | 'invite' | 'pay' | 'teammates' | 'look';
 export type SetupPlan = 'free' | 'pro';
 
 /** Only the steps that can apply on this build: most people are not on a team,
  *  and an AI teammate needs a project to work in. Tools are not asked for: the
  *  person's Claude Code and Codex already carry their connections. */
-export function setupSteps({ chats, team, teammates, project, signedIn = true, plan = 'free', onTeam = false }: { chats: number; team: boolean; teammates: boolean; project: boolean; signedIn?: boolean; plan?: SetupPlan; onTeam?: boolean }): SetupStep[] {
+export function setupSteps({ chats, team, teammates, project, signedIn = true, plan = 'free', onTeam = false, agents = 1 }: { chats: number; team: boolean; teammates: boolean; project: boolean; signedIn?: boolean; plan?: SetupPlan; onTeam?: boolean; agents?: number }): SetupStep[] {
   const out: SetupStep[] = [chats > 0 ? 'chats' : 'folder'];
+  // With Claude Code and Codex both ready, which one starts your threads is yours to say.
+  if (agents > 1) out.push('agent');
   // Signing in is required, so it is a step, and what needs it comes after.
   if (team && !signedIn) out.push('account');
   // The team is a paid thing: Free goes on without inviting anyone.
@@ -66,6 +68,9 @@ export function cloudShowcase(titles: readonly string[]): string[] {
 
 /** The team has bought its seats, so the purchase page can move on. */
 export const teamPaid = (plan: { team?: { seats?: number } } | null | undefined): boolean => (plan?.team?.seats ?? 0) > 0;
+
+/** Enter held down repeats, and a repeat is not a press: one press moves one step. Arrows may repeat. */
+export const heldPress = (e: { key: string; repeat?: boolean }): boolean => e.key === 'Enter' && !!e.repeat;
 
 export const stepLabel = (steps: SetupStep[], step: SetupStep) => `Step ${steps.indexOf(step) + 1} of ${steps.length}`;
 

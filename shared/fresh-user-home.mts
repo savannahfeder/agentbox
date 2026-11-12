@@ -153,6 +153,9 @@ export function prepareHome(
   const agents = withAgents
     ? link(path.join(realHome, '.claude'), path.join(home, '.claude'))
     : false;
+  // Somebody with Claude Code has its folder, and a home with none reads as never set up
+  // (main/engine-setup.mts), so the copy would run on Codex beside a signed-in Claude Code.
+  if (claudeBin && !agents) fs.mkdirSync(path.join(home, '.claude'), { recursive: true });
   return { home, claudeBin, keychain, agents };
 }
 

@@ -15,7 +15,8 @@ import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { starterAsks } from '../../../shared/teammates.mts';
 import { MATCH_SKY, SKY_THEMES, drawSky } from '../home/sky';
-import { PRO_PITCH, SETUP_PLANS, cloudShowcase, setupPreview, tabStop, teamPaid, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
+import { PRO_PITCH, SETUP_PLANS, cloudShowcase, heldPress, setupPreview, tabStop, teamPaid, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
+import { writeLastEngine } from '../engines';
 import { TEAM } from '../../../cloud/gateway/plans.mjs';
 import FolderPicker from './FolderPicker';
 import { PERK_ICONS, ProShowcase } from './ProShowcase';
@@ -71,6 +72,8 @@ export interface SetupSplitProps {
   /** Back from the first step, to the welcome. */
   onBack?: () => void;
   chats: SessionThread[];
+  /** The agents ready on this computer; with both, the setup asks which one starts your threads. */
+  engines?: readonly ('claude' | 'codex')[];
   ticks: Set<string>;
   onToggle: (id: string) => void;
   /** Brings the ticked chats in, making their projects; resolves to how many came in. */
@@ -100,7 +103,9 @@ export function SetupSplit(p: SetupSplitProps) {
   // Someone already on a team was asked to join it, not to pay for it.
   const onTeam = useRef(!!p.snap?.team?.team).current;
   const [plan, setPlan] = useState<SetupPlan>('free');
-  const steps = useMemo(() => setupSteps({ chats: p.chats.length, team, teammates: teammatesOn, project, signedIn: signedInAtStart, plan, onTeam }), [p.chats.length, team, teammatesOn, project, signedInAtStart, plan, onTeam]);
+  const [engine, setEngine] = useState<'claude' | 'codex'>('claude');
+  const agents = p.engines?.length ?? 1;
+  const steps = useMemo(() => setupSteps({ chats: p.chats.length, team, teammates: teammatesOn, project, signedIn: signedInAtStart, plan, onTeam, agents }), [p.chats.length, team, teammatesOn, project, signedInAtStart, plan, onTeam, agents]);
   // Read when the look step first shows, so picking does not reorder the list under the pointer.
   const looksAt = useRef<string[] | null>(null);
   const finished = at >= steps.length;
@@ -236,6 +241,8 @@ export function SetupSplit(p: SetupSplitProps) {
     const onKey = (e: KeyboardEvent) => {
       // The folder picker hears its own keys.
       if (browsing) return;
+      // Enter held on the screen before this one must not answer this one too.
+      if (heldPress(e)) { e.preventDefault(); e.stopPropagation(); return; }
       const where = typingInSetup(e.target as Element | null);
       if (where === 'behind') { e.preventDefault(); (e.target as HTMLElement).blur?.(); }
       const typing = where === 'typing';
@@ -346,6 +353,15 @@ export function SetupSplit(p: SetupSplitProps) {
         <div className="ss-row"><span className="ss-face ss-ai ss-dash"><Plus /></span><input className="ss-input" placeholder="Describe another job…" value={own} onChange={(e) => setOwn(e.target.value)} /></div>
       </div>
       <div className="ss-acts">{go(count ? `Make ${count === 1 ? '1 teammate' : `${count} teammates`}` : 'Continue', () => void makeTeammates(), true, 'Making…')}{quiet('Skip for now', next)}</div>
+    </>;
+  } else if (step === 'agent') {
+    head = ['Pick your agent.', ''];
+    body = <>
+      <div className="ss-list">
+        {(['claude', 'codex'] as const).map((id) => <Row key={id} face={<span className="ss-ai">{id === 'claude' ? 'C' : 'X'}</span>} name={id === 'claude' ? 'Claude Code' : 'Codex'}
+          end={<Check on={engine === id} />} on={engine === id} onClick={() => setEngine(id)} />)}
+      </div>
+      <div className="ss-acts">{go('Continue', () => { writeLastEngine(engine === 'codex' ? 'codex' : null); next(); })}</div>
     </>;
   } else if (step === 'look') {
     head = ['Pick your look.', ''];

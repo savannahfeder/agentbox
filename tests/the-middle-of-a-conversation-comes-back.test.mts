@@ -117,7 +117,8 @@ describe('asking for the middle back', () => {
   it('is her decision and it is dropped when she leaves the row', () => {
     const item = read('renderer/src/components/ItemThread.tsx');
     expect(item).toMatch(/const \[whole, setWhole\] = useState\(false\);/);
-    expect(item).toMatch(/useEffect\(\(\) => \{ setWhole\(!!kept\?\.whole\); \}, \[item\.product, item\.id\]\);/);
+    // The first run's practice thread is the one thread that opens whole (2026-11-12).
+    expect(item).toMatch(/useEffect\(\(\) => \{ setWhole\(kept \? !!kept\.whole : practice\); \}, \[item\.product, item\.id\]\);/);
     const agent = read('renderer/src/components/AgentThread.tsx');
     expect(agent).toMatch(/const \[whole, setWhole\] = useState\(false\);/);
     expect(agent).toMatch(/useEffect\(\(\) => \{ setWhole\(false\); \}, \[pid, sessionId, cwd\]\);/);

@@ -21,6 +21,7 @@ describe('the headings of the setup', () => {
       'Pick a plan.',
       'Invite your team.',
       'Add your own AI teammates.',
+      'Pick your agent.',
       'Pick your look.',
       'You’re set up.',
     ]);

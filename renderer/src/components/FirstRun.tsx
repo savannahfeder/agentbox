@@ -18,6 +18,7 @@ import {
   type Engine, type Screen,
   inHomeFolder,
 } from '../first-run';
+import { heldPress } from '../setup-split';
 import { SetupSplit } from './SetupSplit';
 import './first-run.css';
 import { WelcomeSky } from './WelcomeSky';
@@ -227,6 +228,7 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
     const onKey = (e: KeyboardEvent) => {
       // The setup beside the app hears its own keys.
       if (screen === 'setup') return;
+      if (heldPress(e)) { e.preventDefault(); e.stopPropagation(); return; }
       e.stopPropagation();
       if (leaving) return;
       if ((e.target as Element | null)?.closest('.ob-back') && (e.key === 'Enter' || e.key === ' ')) return;
@@ -258,7 +260,7 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
   const cls = `ob-screen${leaving ? ' ob-leaving' : ''}`;
 
   if (screen === 'setup') {
-    return <SetupSplit snap={snap} chats={chats} ticks={chatTicks}
+    return <SetupSplit snap={snap} chats={chats} engines={ready ?? []} ticks={chatTicks}
       onToggle={(id) => setChatTicks((had) => { const n = new Set(had); if (n.has(id)) n.delete(id); else n.add(id); return n; })}
       bringIn={bringIn} projectFor={async (folder) => { const p = await projectFor(folder); if (p) onProject?.(p.slug); return p; }} look={look} skies={skies} onLook={(id) => onLook?.(id)} onDone={onDone} onBack={() => go('welcome')} />;
   }
