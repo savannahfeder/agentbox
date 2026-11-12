@@ -181,19 +181,28 @@ function mentionsIn(text: string): { src: string; meant: boolean }[] {
   return out;
 }
 
-/** `found` maps a path as written to { name } (a copy), { tooBig } or nothing. */
-function withLinks(text: string, found: Map<string, FoundCopy>): string {
+/**
+ * `found` maps a path as written to { name } (a copy), { tooBig } or nothing.
+ * `typed`: a person's own words, which a thread draws as typed. A file they
+ * only named stays as they wrote it and goes on a line of its own under them.
+ */
+function withLinks(text: string, found: Map<string, FoundCopy>, { typed = false }: { typed?: boolean } = {}): string {
+  const under: string[] = [];
   const swap = (whole: string, bang: string | undefined, label: string | undefined, url: string | undefined, code: string | undefined, bare: string | undefined) => {
     // Each of MENTION's three alternatives captures one of these.
     const src = (url ?? code ?? bare) as string;
     const hit = A_PATH.test(src) ? found.get(src) : null;
     if (!hit) return whole;
     const base = path.basename(src);
-    if (hit.tooBig) return `${label || base} ${TOO_BIG}`;
+    const named = typed && url === undefined;
     const shows = bang || (!url && PICTURE.test(src)) ? '!' : '';
-    return `${shows}[${label || base}](attachments/${hit.name})`;
+    const link = hit.tooBig ? `${label || base} ${TOO_BIG}` : `${shows}[${label || base}](attachments/${hit.name})`;
+    if (!named) return link;
+    if (!under.includes(link)) under.push(link);
+    return whole;
   };
-  return text.split(FENCE).map((part, i) => (i % 2 ? part : part.replace(MENTION, swap))).join('');
+  const out = text.split(FENCE).map((part, i) => (i % 2 ? part : part.replace(MENTION, swap))).join('');
+  return under.length ? `${out.replace(/\s+$/, '')}\n\n${under.join('\n')}` : out;
 }
 
 const clip = (text: string, home: string) => {
@@ -347,7 +356,7 @@ export function createThreadShare({
     }
     kept = kept.map((l) => {
       const patch = { ...l.patch };
-      for (const f of ['body', 'answer', 'result', 'note'] as const) if (patch[f]) patch[f] = clip(withLinks(patch[f], found), home);
+      for (const f of ['body', 'answer', 'result', 'note'] as const) if (patch[f]) patch[f] = clip(withLinks(patch[f], found, { typed: f === 'body' || f === 'answer' }), home);
       return { ...l, patch };
     });
     while (kept.length > 1 && bytesOf(kept) > WORK_BYTES) kept = kept.slice(1);
