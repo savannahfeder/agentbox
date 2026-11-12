@@ -2282,9 +2282,6 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
               <Row label="Multiplayer" desc="Share projects with your team and see their threads beside yours. Needs a sign-in.">
                 <Switch label="Multiplayer" on={!!w.alpha?.multiplayer} onChange={(v) => setWorkspace('alphaMultiplayer', v)} />
               </Row>
-              <Row label="Glass" desc="The space around the page becomes frosted glass over your desktop.">
-                <Switch label="Glass" on={!!w.alpha?.glass} onChange={(v) => setWorkspace('alphaGlass', v)} />
-              </Row>
             </Group>
           </Page>
         )}
