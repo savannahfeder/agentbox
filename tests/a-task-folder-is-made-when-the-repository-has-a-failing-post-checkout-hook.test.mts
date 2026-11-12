@@ -105,10 +105,14 @@ describe('a repository whose post-checkout hook fails', () => {
     expect(got).toMatchObject({ taken: true, how: 'clone' });
   }, 30_000);
 
-  it('an add git really refused is still a failure: the branch is checked out somewhere else', () => {
+  // A clean folder elsewhere now lets go of the branch
+  // (a-task-whose-branch-is-open-in-another-folder-still-gets-its-own), so the
+  // one here holds uncommitted work to stay a refusal.
+  it('a refused folder is still a failure: the branch is checked out somewhere else with work in it', () => {
     const elsewhere = path.join(hooks, 'elsewhere');
     git(dir, 'worktree', 'add', '-q', '-b', 'agentbox/w-taken', elsewhere);
     git(elsewhere, 'commit', '-q', '--allow-empty', '-m', 'so the clone cannot be used');
+    fs.writeFileSync(path.join(elsewhere, 'unsaved.txt'), 'work\n');
     failingHook(path.join(dir, '.git', 'hooks'));
 
     expect(() => ensureTaskFolder(dir, 'w-taken', { dependencies: false })).toThrow(/already (checked out|used by worktree)/);

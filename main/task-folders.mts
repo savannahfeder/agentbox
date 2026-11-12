@@ -670,6 +670,7 @@ export function ensureTaskFolder(dir: string, id: unknown, { pid = process.pid, 
   // add below with "already registered", so clear those first. `prune` only
   // ever drops registrations whose folder is already gone.
   tryGit(root, ['worktree', 'prune']);
+  letGoOfTheBranchElsewhere(root, folder, branch, name);
   fs.mkdirSync(path.dirname(folder), { recursive: true });
   keepOutOfBackups(path.dirname(folder));
 
@@ -793,6 +794,31 @@ export function ensureTaskFolder(dir: string, id: unknown, { pid = process.pid, 
   const held = acquireTaskFolder(root, folder, { pid });
   if (!held.taken) return refused(held);
   return { taken: true, heldBy: pid, path: folder, branch, created: true, how };
+}
+
+/**
+ * THE TASK'S BRANCH CHECKED OUT IN A FOLDER THE APP DID NOT MAKE, often one an
+ * agent or a person opened beside the repository. Git lets a branch live in one
+ * folder at a time, so until it lets go the task can never get its own.
+ *
+ * A clean one is detached at the same commit: no file in it changes and every
+ * commit stays on the branch. Uncommitted work, a lock, or the main checkout
+ * means somebody may be using it, so it is left alone and the refusal names it.
+ */
+function letGoOfTheBranchElsewhere(root: string, folder: string, branch: string, name: string): void {
+  const all = registered(root);
+  const at = all.find((w) => w.branch === branch && w.path !== folder && !path.basename(w.path).startsWith(BUILDING));
+  if (!at) return;
+  const refuse = (why: string): never => {
+    throw Error(`Could not make a folder for ${name}: its branch ${branch} is already checked out at '${at.path}', ${why}, then reply here.`);
+  };
+  if (at === all[0]) refuse('the main checkout. Switch that checkout to another branch');
+  if (at.lock !== undefined) refuse('a folder somebody locked. Unlock it with `git worktree unlock` or close what is using it');
+  const status = tryGit(at.path, ['status', '--porcelain']);
+  if (!status.ok) refuse(`a folder git could not read (${status.out}). Fix or remove that folder`);
+  if (status.out) refuse('with changes not committed there. Commit or discard them in that folder');
+  const detached = tryGit(at.path, ['checkout', '-q', '--detach']);
+  if (!detached.ok) refuse(`and it would not let go of it (${detached.out}). Switch that folder to another branch`);
 }
 
 /**
