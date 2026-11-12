@@ -6,13 +6,13 @@ import { createPortal } from 'react-dom';
 import { api } from '../api';
 import { Face, TeamContext } from '../team/people';
 import { clock, type LedgerLine } from '../thread-history';
-import type { FileNote, NotePlace, Person, TableCell, WorkItem } from '../types';
+import type { FileElsewhere, FileNote, NotePlace, Person, TableCell, WorkItem } from '../types';
 import { isTablePath } from '../table-file';
-import { notedFilesInLines, threadFiles, versionForPath, whoseIsTheFile } from '../../../shared/artifact-marks.mts';
+import { whoseIsTheFile } from '../../../shared/artifact-marks.mts';
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { notePictures, noteWithPictures } from '../note-pictures';
 import { canPaintQuotes, cellAround, paintQuotes } from '../paint-quotes';
-import { notesCanPoint, noteAttachments, sentTimes, sidebarNotes } from '../notes-sidebar';
+import { fileFamilyFor, notesBesideCount, notesCanPoint, noteAttachments, sentTimes, sidebarNotes } from '../notes-sidebar';
 import { noteSendWords, pinLabel, pinsToDraw, whereANoteGoes, whoTalksOnFile } from '../artifact-pins';
 import { AttachRow } from './AttachRow';
 import { NotePictureShown } from './FileNoteCard';
@@ -61,6 +61,31 @@ export function NotesToggle({ open, waiting, onToggle }: { open: boolean; waitin
   );
 }
 
+/**
+ * Beside the chat, where notes are not drawn: the same corner mark, counting the
+ * file's notes, every copy's included, and pressing it opens them full screen.
+ */
+export function NotesBesideMark({ item, src, onOpen }: { item: WorkItem; src: string; onOpen: () => void }) {
+  const [lines, setLines] = useState<LedgerLine[]>([]);
+  useEffect(() => {
+    let live = true;
+    const read = () => { void api.itemHistory({ product: item.product, id: item.id }).then((r) => { if (live) setLines(r?.lines ?? []); }); };
+    read();
+    const off = api.onChanged(read);
+    return () => { live = false; off?.(); };
+  }, [item.product, item.id]);
+  const { fileIds, copies } = useMemo(() => fileFamilyFor(lines, src), [lines, src]);
+  const copiesKey = JSON.stringify(copies);
+  const [elsewhere, setElsewhere] = useState<FileElsewhere[]>([]);
+  useEffect(() => {
+    if (!copies.length) { setElsewhere([]); return undefined; }
+    let live = true;
+    void api.fileElsewhere({ product: item.product, id: item.id, copies }).then((all) => { if (live) setElsewhere(all); });
+    return () => { live = false; };
+  }, [item.product, item.id, copiesKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  return <NotesToggle open={false} waiting={notesBesideCount(item.artifacts?.notes ?? [], fileIds, elsewhere)} onToggle={onOpen} />;
+}
+
 type Quote = { text: string; cell?: TableCell };
 
 const Quoted = ({ quote }: { quote: Quote }) => (
@@ -105,17 +130,7 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
     return () => { live = false; off?.(); };
   }, [item.product, item.id]);
 
-  // The version this document is on the thread's file line, or a line of its own when no message named it.
-  const { version, fileIds, files } = useMemo(() => {
-    const asked = src.replace(/^\.\//, '');
-    const said = notedFilesInLines(lines);
-    const named = versionForPath(threadFiles(said), asked);
-    const all = named ? said : [...said, { path: asked, by: null, at: 0 }];
-    const families = threadFiles(all);
-    const v = named ?? versionForPath(families, asked);
-    const family = v ? families.find((f) => f.versions.some((x) => x.id === v.id)) : null;
-    return { version: v, fileIds: family ? family.versions.map((x) => x.id) : [], files: all };
-  }, [lines, src]);
+  const { version, fileIds, files } = useMemo(() => fileFamilyFor(lines, src), [lines, src]);
 
   const [pending, setPending] = useState<FileNote[]>([]);
   const stored = item.artifacts?.notes ?? [];

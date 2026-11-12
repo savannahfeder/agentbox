@@ -2,7 +2,7 @@
 // at the top, then the conversation as its owner sees it (drawn by the owner's
 // own Thread from the lines their copy published) with a box for a comment,
 // and beside it what it is about, its files and its properties. Read-only.
-import { useCallback, useContext, useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState, type KeyboardEvent, type ReactNode, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ConnectionLink } from '../connections/ConnectionsPlace';
 import { connectionLinkOf } from '../connections/connections-shown';
@@ -25,7 +25,7 @@ import { FollowContext } from '../team/following';
 import type { LedgerLine } from '../thread-history';
 import type { AgentEvent, FileElsewhere, FileLine, FileMarkLink, FileMarks, Person, ThreadCard } from '../types';
 import { MessagePerson, TeammateCard, TeammateStanding } from './Summary';
-import { earlierWords, filesOnThread, notSharedWords } from './teammate-thread';
+import { earlierWords, filesOnThread, notSharedWords, notesOnFile } from './teammate-thread';
 import { canContinue } from './continue-thread';
 
 const PICTURE = /\.(png|jpe?g|gif|webp|svg)$/i;
@@ -46,7 +46,8 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   /** The sync that last ran, which is when there can be anything new to read. */
   syncedAt: number | null;
   /** Open a copied file in the side pane. */
-  onOpenDoc: (product: string, src: string) => void;
+  /** `notes`: how many the file has here, for the mark beside the chat. */
+  onOpenDoc: (product: string, src: string, notes?: number) => void;
   onNotice: (text: string) => void;
 }) {
   const [work, setWork] = useState<Work | null>(null);
@@ -67,14 +68,17 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
 
   const product = work?.product ?? '';
   const dir = work?.dir ?? '';
+  // The notes are read below; a ref keeps `open` steady for the markdown it is memoized into.
+  const notesHere = useRef<{ file: string }[]>([]);
+  const beside = useCallback((src: string) => onOpenDoc(product, src, notesOnFile(work?.lines ?? [], notesHere.current, src)), [product, onOpenDoc, work?.lines]);
   const open = useCallback((src?: string) => {
     if (!src || !product) return;
     // Beside the chat a teammate's copy is read-only, so a document or table opens big, where it is edited live.
     const goes = opensBigInAGroup(src) ? 'full' : whereAFileOpens(src);
     if (goes === 'full') setBig({ path: src, at: Date.now() });
-    else if (goes === 'beside' || docKind(src)) onOpenDoc(product, src);
+    else if (goes === 'beside' || docKind(src)) beside(src);
     else void api.openArtifactExternally({ product, src }).then((r) => { if (!r.ok) onNotice(r.error ?? `${src} could not be opened.`); });
-  }, [product, onOpenDoc, onNotice]);
+  }, [product, beside, onNotice]);
   const md = useMemo(() => {
     const roots = dir ? [dir] : [];
     const components = {
@@ -122,6 +126,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
     return () => { live = false; if (timer) clearTimeout(timer); off?.(); };
   }, [product, threadId, copiesKey]);
   const marks = useMemo(() => withElsewhere(own, elsewhere), [own, elsewhere]);
+  notesHere.current = marks.notes;
   const numbered = useMemo(() => lineAsThread(line), [line]);
   const viewLines = useMemo(() => (numbered.lines.length ? [...(work?.lines ?? []), ...numbered.lines as LedgerLine[]] : work?.lines ?? []), [work?.lines, numbered]);
   const [big, setBig] = useState<ArtifactOpen | null>(null);
@@ -167,7 +172,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
             return out?.ok ? null : out?.error ?? 'That did not save.';
           }}
           editGoes={`Sent to ${owner}.`}
-          onBeside={(path) => { setBig(null); onOpenDoc(product, path); }}
+          onBeside={(path) => { setBig(null); beside(path); }}
           onClose={() => setBig(null)} />
       )}
       <div className="tp-bar">

@@ -43,7 +43,7 @@ import { Focus } from './components/Focus';
 import { TicketItems } from './components/TicketReference';
 import type { PendingSaid } from './item-thread';
 import { DocPane, type OpenDoc } from './components/DocPane';
-import { NotesSidebar, NotesToggle } from './components/NotesSidebar';
+import { NotesBesideMark, NotesSidebar, NotesToggle } from './components/NotesSidebar';
 import { NOTES_CLOSED_KEY, notesSidebarOpen, rememberNotesSidebar, takesNotesSidebar } from './notes-sidebar';
 import { putAwayTheNewest } from './escape-steps';
 import { docKind, EVEN_SPLIT, escapeClosesDoc, escapeInTheFileClosesIt, focusIsInTheFile, readSplit, writeSplit } from './doc-pane';
@@ -3477,9 +3477,23 @@ export default function App() {
     if (artifactMode === 'focus' && artifactReturnBeside) setArtifactMode('beside');
     else putDocDown();
   };
+  // Full screen is the one view with versions, notes and Approve, wherever the file is a thread's.
+  const docFull = () => {
+    if (!openDoc) return;
+    if (fullScreenTakes(openDoc.src) && !onPhone()) {
+      const thread = !!focused && !focused.agent && !openDoc.readOnly && openDoc.product === focused.product;
+      if (thread || (openCard && openDoc.readOnly)) {
+        const open = { path: openDoc.src, at: Date.now(), time: filmBeside() };
+        if (thread) setFullAt({ key: `${focused!.product}/${focused!.id}`, open }); else setCardOpenAt(open);
+        return;
+      }
+    }
+    setArtifactReturnBeside(artifactMode === 'beside'); setArtifactMode('focus');
+  };
+  const openNotesFull = () => { rememberNotesSidebar(localStorage, true); setNotesOpen(true); docFull(); };
   // Full screen is for one look. Once the file is put down, the next one opens beside.
   useEffect(() => { if (!openDoc) setArtifactMode('beside'); }, [openDoc]);
-  const openTeammateFile = useCallback((product: string, src: string) => { setOpenDoc({ product, src, readOnly: true }); }, []);
+  const openTeammateFile = useCallback((product: string, src: string, notes?: number) => { setOpenDoc({ product, src, readOnly: true, notes }); }, []);
   // An AI teammate of yours writes into your own project, so its files are yours to edit.
   const openMateFile = useCallback((product: string, src: string) => { setOpenDoc({ product, src }); }, []);
   // A copy of a teammate's file does not outlive their thread on the screen.
@@ -7062,6 +7076,9 @@ export default function App() {
   const cellsTakeNotes = !!focused && openDoc?.product === focused.product && !openDoc.readOnly && takesNotesSidebar(openDoc.src);
   const notesShown = notesHere && notesOpen;
   const notesClosed = notesHere && !notesOpen;
+  // Beside the chat the notes are not drawn, so the mark counts them and opens them full screen.
+  const notesBeside = !fullScreenDoc && cellsTakeNotes;
+  const teammateNotesBeside = !fullScreenDoc && !!openDoc?.readOnly && !!openCard && openDoc.notes != null && takesNotesSidebar(openDoc.src);
   const [artifactHeader, setArtifactHeader] = useState<HTMLDivElement | null>(null);
   const readingWidth = 'balanced';
   const [taskHeader, setTaskHeader] = useState<HTMLDivElement | null>(null);
@@ -8690,16 +8707,7 @@ export default function App() {
               mode={artifactMode}
                 onMode={mode => {
                   if (mode === 'beside' && !roomBeside) { putDocDown(); return; }
-                  // Full screen is the one view with versions, notes and Approve, wherever the file is a thread's.
-                  if (mode === 'focus' && fullScreenTakes(openDoc.src) && !onPhone()) {
-                    const thread = !!focused && !focused.agent && !openDoc.readOnly && openDoc.product === focused.product;
-                    if (thread || (openCard && openDoc.readOnly)) {
-                      const open = { path: openDoc.src, at: Date.now(), time: filmBeside() };
-                      if (thread) setFullAt({ key: `${focused!.product}/${focused!.id}`, open }); else setCardOpenAt(open);
-                      return;
-                    }
-                  }
-                  setArtifactReturnBeside(artifactMode === 'beside'); setArtifactMode(mode);
+                  if (mode === 'focus') docFull(); else { setArtifactReturnBeside(artifactMode === 'beside'); setArtifactMode(mode); }
                 }}
                 split={artifactFraction(split, artifactWidth)}
                 onSplit={resizeDoc}
@@ -8711,6 +8719,8 @@ export default function App() {
                 firstMark={<>
                   {focused && focused.product === openDoc.product && canShareFile(openDoc.src) && <ShareLink icon product={openDoc.product} thread={focused.id} src={openDoc.src} signedIn={!!snap?.team?.signedIn} />}
                   {notesHere && focused && <NotesToggle open={notesOpen} waiting={(focused.artifacts?.notes ?? []).filter((n) => !n.resolved && stillWaiting(n)).length} onToggle={toggleNotes} />}
+                  {notesBeside && focused && <NotesBesideMark key={`${focused.id}\n${openDoc.src}`} item={focused} src={openDoc.src} onOpen={openNotesFull} />}
+                  {teammateNotesBeside && <NotesToggle open={false} waiting={openDoc.notes ?? 0} onToggle={openNotesFull} />}
                 </>}
               /></ArtifactSurface>
             )}
