@@ -183,6 +183,9 @@ export function tourStep(t: Tour | null, s: TourScreen): TourStep | null {
   return null;
 }
 
+/** The command-bar tip sits level with a list's tabs when they end before it begins, else under them. */
+export const fitsBesideTabs = (tabsEnd: number | null, cardLeft: number, gap: number): boolean => tabsEnd !== null && tabsEnd + gap <= cardLeft;
+
 type Store = Pick<Storage, 'getItem' | 'setItem'>;
 
 export function readTour(store: Store): Tour | null {

@@ -7,7 +7,7 @@ import { MAC } from '../this-keyboard';
 import { Name } from '../../../shared/product-name.mjs';
 import { FIRST_RUN_STEP } from '../first-run';
 import { ConfettiBurst } from './ConfettiBurst';
-import { THREAD_CLOSED, cursorOwed, stillPreparing, closeLessons, closesThread, finishLesson, keyLearns, learnedBy, lessonOf, tourLive, tourOver, tourStep, type Lesson, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
+import { THREAD_CLOSED, cursorOwed, fitsBesideTabs, stillPreparing, closeLessons, closesThread, finishLesson, keyLearns, learnedBy, lessonOf, tourLive, tourOver, tourStep, type Lesson, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
 import './tour.css';
 
 type Box = { x: number; y: number; w: number; h: number };
@@ -299,8 +299,9 @@ export function Tour({ tour, practice = false, practiceId = null, answering = fa
     if (step === 'palette' || (step === 'urgent' && !urgentCell())) {
       const pane = document.querySelector('.list-pane')?.getBoundingClientRect();
       left = pane ? pane.left + (pane.width - w) / 2 : (window.innerWidth - w) / 2;
-      // Under the tabs on a list; on a thread, in the empty middle of its header line.
-      top = document.querySelector('.tm-tab') ? box.y + box.h + 3 * GAP : box.y + (box.h - h) / 2;
+      // In the empty middle of the line: a list's tabs or a thread's header. Under the tabs when they reach it.
+      const tabsEnd = [...document.querySelectorAll('.tm-tab')].at(-1)?.getBoundingClientRect().right ?? null;
+      top = tabsEnd !== null && !fitsBesideTabs(tabsEnd, left, GAP) ? box.y + box.h + 3 * GAP : box.y + (box.h - h) / 2;
     }
     left = Math.max(12, Math.min(left, window.innerWidth - w - 12));
     top = Math.max(12, Math.min(top, window.innerHeight - h - 12));

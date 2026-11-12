@@ -10,7 +10,7 @@
 // tips are about that one row, never a real thread beside it.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { finishLesson, noteSent, startTour, tourStep, withPractice, type TourScreen } from '../renderer/src/tour.ts';
+import { finishLesson, fitsBesideTabs, noteSent, startTour, tourStep, withPractice, type TourScreen } from '../renderer/src/tour.ts';
 import { walkPlace } from '../renderer/src/setup-split.ts';
 import { opensWhole } from '../renderer/src/thread-place.ts';
 
@@ -54,6 +54,23 @@ describe('the last tip, with chats still being written up', () => {
   });
   it('is said once: with ⌘K learned the list is quiet again', () => {
     expect(tourStep(finishLesson(closed, 'palette'), screen({ ...writing, view: 'inbox' }))).toBeNull();
+  });
+});
+
+// That tip sat centred under the tabs, which is the line the column names are on: with a
+// Status column it covered the word (the picture read "TUS").
+describe('where the last tip sits on a list', () => {
+  it('is level with the tabs when they end before it begins', () => {
+    expect(fitsBesideTabs(390, 557, 8)).toBe(true);
+    expect(fitsBesideTabs(549, 557, 8)).toBe(true);
+  });
+  it('stays under them when they would touch it, or there are none', () => {
+    expect(fitsBesideTabs(550, 557, 8)).toBe(false);
+    expect(fitsBesideTabs(700, 557, 8)).toBe(false);
+    expect(fitsBesideTabs(null, 557, 8)).toBe(false);
+  });
+  it('is how the card is placed', () => {
+    expect(read('renderer/src/components/Tour.tsx')).toMatch(/top = tabsEnd !== null && !fitsBesideTabs\(tabsEnd, left, GAP\) \? box\.y \+ box\.h \+ 3 \* GAP : box\.y \+ \(box\.h - h\) \/ 2;/);
   });
 });
 
