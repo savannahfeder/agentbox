@@ -113,6 +113,35 @@
 .sf-offer { margin: 14px 0 0; font-size: 13px; line-height: 19px; color: var(--text-dim); }
 .sf-offer a { color: var(--text); text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
 
+/* A document an editor types into: the same column and type as reading it. */
+.sf-editing .ProseMirror { outline: none; min-height: 240px; }
+.sf-head .sf-unsaved { color: #f5a894; }
+:root[data-theme="light"] .sf-head .sf-unsaved { color: #9d3318; }
+
+/* The history: one line per version, the one on screen marked. */
+.sf-history .sf-dots { margin: 18px 0; }
+.sf-versions { margin: 6px -10px 0; padding: 0; list-style: none; }
+.sf-version {
+  width: 100%; display: grid; gap: 2px; padding: 10px; text-align: left;
+  border: 0; border-radius: var(--radius); background: none; color: var(--text); font: inherit; cursor: pointer;
+}
+.sf-version:hover { background: var(--wash); }
+.sf-version.is-on { background: var(--wash-strong); }
+.sf-version b { font-size: 13.5px; font-weight: 600; }
+.sf-version span { font-size: 13px; color: var(--text-dim); }
+.sf-version em { font-style: normal; font-size: 12px; color: var(--text-faint); }
+
+/* An earlier version shown in place of the file, with the way back and the way to restore it. */
+.sf-peek {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+  margin: -24px 0 32px; padding: 12px 14px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--bg-raised);
+}
+.sf-peek p { margin: 0; font-size: 13.5px; color: var(--text-dim); }
+.sf-peek p b { color: var(--text); font-weight: 600; }
+.sf-peek-acts { display: flex; gap: 8px; }
+.sf-peek .sf-quiet-btn, .sf-peek .sf-send { height: 32px; }
+.sf-peek .sf-error { flex-basis: 100%; margin: 0; }
+
 .sf-state { flex: 1; display: grid; align-content: center; justify-items: center; gap: 14px; padding: 80px 24px; text-align: center; }
 .sf-state p { margin: 0; font-size: 16px; line-height: 22px; color: var(--text-dim); }
 .sf-quiet-btn { height: 34px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none; color: var(--text); font: inherit; font-size: 13.5px; cursor: pointer; }
