@@ -2,7 +2,9 @@
 //
 // The Feedback card posts here (main/feedback.mts): what the person wrote,
 // what they attached, and the app's version. This forwards it as one email
-// through Resend.
+// through Resend, and keeps it in public.feedback (with whether the email went)
+// so `npm run feedback` can read it back. Either one is enough to answer ok:
+// what someone typed is not lost because the other failed.
 //
 // WHO IT GOES TO IS A SECRET, never a line in this file. The repository is
 // public and the ask was that nobody using Agentbox can see the address
@@ -37,6 +39,9 @@ const CORS = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'content-type': 'application/json' } });
 
+const CALL_MS = 20_000;
+const noAddresses = (s: string) => s.replace(/[^\s<>"'`]+@[^\s<>"'`]+/g, '[address]').slice(0, 300);
+
 const escape = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
 
 Deno.serve(async (req) => {
@@ -45,7 +50,11 @@ Deno.serve(async (req) => {
   const to = Deno.env.get('FEEDBACK_TO');
   const from = Deno.env.get('FEEDBACK_FROM');
   const key = Deno.env.get('RESEND_API_KEY');
-  if (!to || !from || !key) return json({ ok: false, error: 'not configured' }, 503);
+  const canMail = !!(to && from && key);
+  const db = Deno.env.get('SUPABASE_URL');
+  const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const canKeep = !!(db && service);
+  if (!canMail && !canKeep) return json({ ok: false, error: 'not configured' }, 503);
   if (Number(req.headers.get('content-length') ?? 0) > MAX_REQUEST) return json({ ok: false, error: 'too large' }, 413);
 
   let body: { text?: unknown; files?: unknown; app?: { version?: unknown; os?: unknown; install?: unknown } };
@@ -72,27 +81,60 @@ Deno.serve(async (req) => {
   const subject = `Agentbox feedback: ${first || `${files.length} file${files.length === 1 ? '' : 's'}`}`;
   const footer = `Agentbox ${version || 'unknown version'} · ${os || 'unknown OS'}${install ? ` · install ${install.slice(0, 8)}` : ''}`;
 
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-    body: JSON.stringify({
-      from,
-      to: [to],
-      subject,
-      text: `${text || '(no words, files only)'}\n\n--\n${footer}`,
-      html: `<div style="white-space:pre-wrap">${escape(text || '(no words, files only)')}</div><hr><small>${escape(footer)}</small>`,
-      attachments: files.map((f) => ({ filename: f.name, content: f.data })),
-    }),
-  });
-  // Resend's own reason rides back, so a refusal says why (an unverified
-  // sending domain was the first one met). Any address in it is cut out first:
-  // anyone can call this, and a reason like "you can only send to <address>"
-  // would hand out exactly what the secret exists to hide.
-  if (!res.ok) {
-    const why = await res.json().catch(() => ({})) as { name?: string; message?: string };
-    const detail = [why.name, why.message].filter(Boolean).join(': ')
-      .replace(/[^\s<>"'`]+@[^\s<>"'`]+/g, '[address]').slice(0, 300);
-    return json({ ok: false, error: 'mail refused', detail }, 502);
+  let mailed = false;
+  let detail: string | null = canMail ? null : 'mail is not set up';
+  if (canMail) {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          from,
+          to: [to],
+          subject,
+          text: `${text || '(no words, files only)'}\n\n--\n${footer}`,
+          html: `<div style="white-space:pre-wrap">${escape(text || '(no words, files only)')}</div><hr><small>${escape(footer)}</small>`,
+          attachments: files.map((f) => ({ filename: f.name, content: f.data })),
+        }),
+        signal: AbortSignal.timeout(CALL_MS),
+      });
+      mailed = res.ok;
+      // Resend's own reason rides back, so a refusal says why (an unverified
+      // sending domain was the first one met). Any address in it is cut out first:
+      // anyone can call this, and a reason like "you can only send to <address>"
+      // would hand out exactly what the secret exists to hide.
+      if (!res.ok) {
+        const why = await res.json().catch(() => ({})) as { name?: string; message?: string };
+        detail = noAddresses([why.name, why.message].filter(Boolean).join(': ') || `status ${res.status}`);
+      }
+    } catch (err) {
+      detail = noAddresses(`could not reach Resend: ${(err as Error)?.message ?? err}`);
+    }
   }
-  return json({ ok: true });
+
+  let kept = false;
+  if (canKeep) {
+    try {
+      const res = await fetch(`${db}/rest/v1/rpc/keep_feedback`, {
+        method: 'POST',
+        headers: { apikey: service!, authorization: `Bearer ${service}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          the_words: text,
+          the_version: version,
+          the_os: os,
+          the_install: install,
+          was_mailed: mailed,
+          why_not_mailed: mailed ? null : detail,
+          the_files: files.map((f) => ({ name: f.name, type: f.type, bytes: Math.floor((f.data.length * 3) / 4), data: f.data })),
+        }),
+        signal: AbortSignal.timeout(CALL_MS),
+      });
+      kept = res.ok;
+    } catch {
+      kept = false;
+    }
+  }
+
+  if (mailed || kept) return json({ ok: true });
+  return json({ ok: false, error: 'mail refused', detail }, 502);
 });

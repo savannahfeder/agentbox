@@ -1,12 +1,14 @@
 // A FILE SHARED BY ITS LINK, as the web app reads it: <site>/f/<token>.
 // The database side is cloud/supabase/migrations/20261105000001_a_file_anyone_with_its_link_can_read.sql.
 
+import { cleanPlace, type NotePlace, type RawPlace } from '../../../shared/artifact-marks.mts';
+
 export type Rpc = (name: string, args: Record<string, unknown>) => Promise<unknown>;
 export type FileKind = 'markdown' | 'page' | 'image' | 'pdf' | 'video';
 
 // The rows the database's functions answer with, as JSON; checked field by field below.
 interface LinkRow { name?: string; kind: FileKind; type?: string; body?: string; version?: number; created_at: string; updated_at: string; owner_name?: unknown; owner_avatar?: unknown; mine?: boolean }
-interface CommentRow { id: string; by_name?: unknown; by_avatar?: unknown; body?: string; created_at: string; mine?: boolean; by_owner?: boolean }
+interface CommentRow { id: string; by_name?: unknown; by_avatar?: unknown; body?: string; created_at: string; mine?: boolean; by_owner?: boolean; place?: unknown }
 
 export interface SharedFile {
   name: string;
@@ -32,6 +34,8 @@ export interface FileComment {
   createdAt: number;
   mine: boolean;
   byOwner: boolean;
+  /** Where in the file it points; none for the whole file. */
+  place?: NotePlace;
 }
 
 // What a sentence leaves on a pasted link ("here it is: <link>." or "(<link>)").
@@ -71,11 +75,16 @@ export async function readComments(rpc: Rpc, tok: string): Promise<FileComment[]
     id: String(r.id), byName: (typeof r.by_name === 'string' && r.by_name.trim()) || 'Someone',
     byAvatar: typeof r.by_avatar === 'string' && /^https:/.test(r.by_avatar) ? r.by_avatar : null,
     body: String(r.body ?? ''), createdAt: Date.parse(r.created_at) || 0, mine: r.mine === true, byOwner: r.by_owner === true,
+    ...placed(r.place),
   }));
 }
 
-export async function postComment(rpc: Rpc, tok: string, words: string): Promise<string> {
-  return String(await rpc('comment_on_file_link', { tok, b: words }));
+const placed = (raw: unknown): { place?: NotePlace } => { const place = cleanPlace(raw as RawPlace | null); return place && place.kind !== 'whole' ? { place } : {}; };
+
+/** `place` none or the whole file: the two-word call, which a database without places still answers. */
+export async function postComment(rpc: Rpc, tok: string, words: string, place: NotePlace | null = null): Promise<string> {
+  const p = placed(place).place;
+  return String(await rpc('comment_on_file_link', p ? { tok, b: words, p } : { tok, b: words }));
 }
 
 export async function removeComment(rpc: Rpc, id: string): Promise<void> {
