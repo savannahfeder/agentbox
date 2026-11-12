@@ -62,7 +62,7 @@ describe('in the app', () => {
   // Second round: B did nothing on Needs you, and the board sat under the In
   // progress tab without a Needs you column. B is the whole board, as without a team.
   it('lets B open the board from Needs you too, on a computer', () => {
-    expect(app).toMatch(/if \(search === null && !teamShown && !openCard && \(view !== 'inbox' \|\| !onPhone\(\)\)\) \{ e\.preventDefault\(\); setEvView\(flipEvView\(evView\)\)/);
+    expect(app).toMatch(/if \(search === null && !teamShown && \(view !== 'inbox' \|\| !onPhone\(\)\)\) \{ e\.preventDefault\(\); setEvView\(flipEvView\(evView\)\)/);
   });
 
   it('draws your board as the one without a team: every column, Needs you too, and no tabs over it', () => {

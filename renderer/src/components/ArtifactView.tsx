@@ -41,7 +41,7 @@ import { missingWords } from '../files/files-shown';
 import './artifact-view.css';
 
 /** `steps`: the paths the arrows step through, in order, when the press came from a turn of the thread. `drawn`: every picture that turn drew, versions too. */
-export interface ArtifactOpen { path?: string; file?: string; note?: string; at?: number; steps?: string[]; drawn?: string[]; /** Where a film beside the chat had got to, in seconds. */ time?: number }
+export interface ArtifactOpen { path?: string; file?: string; note?: string; at?: number; steps?: string[]; drawn?: string[]; /** Opened to read its notes: the newest version of that file, where every version's notes are. */ newest?: true; /** Where a film beside the chat had got to, in seconds. */ time?: number }
 
 type Editing = { fam: string; text: string; draft?: string; folder: string | null; base: ReturnType<typeof threadFiles>[number]['versions'][number] };
 
@@ -172,7 +172,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     // A press names one file at one version and opens exactly that, or waits.
     const hit = whereAPressLands(families, { path: open.path, file: wanted });
     if (!hit) return;
-    setAt(hit);
+    setAt(open.newest ? { fi: hit.fi, vi: families[hit.fi].versions.length - 1 } : hit);
     const note = open.note ? marks.notes.find((n) => n.id === open.note) : null;
     if (note) { setActiveId(note.id); if (note.resolved) setShowSettled(true); setGo({ place: note.place, at: Date.now() }); }
     else if (open.time) setGo({ place: { kind: 'time', s: open.time }, at: Date.now() });
@@ -295,9 +295,10 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     const typed = words.trim();
     if ((!typed && !pictures.length) || !version || sending || attaching.length) return;
     // "Sofia, approved v4" names Sofia as surely as @Sofia does: it reaches her, not the agent.
-    const to = addressedTo(typed, people);
+    const others = people.filter((p) => p.id !== me);
+    const to = addressedTo(typed, others);
     const goes = whereANoteGoes({ ...noteTo, text: typed });
-    const mentions = [...new Set([...(to ? [to] : []), ...(goes.to === 'person' ? [goes.person] : []), ...named.filter((p) => typed.includes(`@${firstName(p)}`)).map((p) => p.id)])];
+    const mentions = [...new Set([...(to ? [to] : []), ...(goes.to === 'person' ? [goes.person] : []), ...named.filter((p) => p.id !== me && typed.includes(`@${firstName(p)}`)).map((p) => p.id)])];
     const went = noteSentWords(sendWords);
     setSending(true);
     let links = '';
@@ -687,7 +688,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   const heldFor = (n: FileNote): { words: string; went: boolean } | null => {
     if (n.sent || !offers.comment || typeof flat.find((x) => x.v.id === n.file)?.v.agent !== 'string') return null;
     const goes = noteGoesTo(n, people);
-    if (goes.to === 'person') return { words: `Sent to ${goes.person === me ? 'you' : nameOf(goes.person)}`, went: true };
+    if (goes.to === 'person' && goes.person !== n.by) return { words: `Sent to ${goes.person === me ? 'you' : nameOf(goes.person)}`, went: true };
     return withAgent && n.by === me && goes.to === 'agent' && stillWaiting(n) ? { words: 'Not sent', went: false } : null;
   };
   const answeredBy = (n: FileNote): string | null => {
@@ -706,7 +707,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   };
 
   const bylineOf = (v: { by: string | null; at: number; n: number; agent?: string }) => [
-    sharedByWords(v, { me, nameOf }),
+    sharedByWords({ ...v, by: v.by ?? ownerOfRow }, { me, nameOf }),
     v.at ? whenShared(v.at) : null,
   ].filter(Boolean).join('  ·  ');
 

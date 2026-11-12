@@ -251,8 +251,8 @@ export function whereANoteGoes({ text, people, me, agentMade, toAgent, owner, th
   text: string; people: Named; me: string | null; agentMade: boolean; toAgent: boolean; owner: string | null;
   threadOwner?: string | null; talking?: readonly string[];
 }): NoteGoes {
-  const named = noteGoesTo({ text }, people);
-  if (named.to === 'person') return named.person === me ? { to: 'file' } : { to: 'person', person: named.person };
+  const named = noteGoesTo({ text, by: me }, people);
+  if (named.to === 'person') return { to: 'person', person: named.person };
   const other = (id: string | null | undefined): id is string => !!id && id !== me;
   const mate = talking.find(other);
   if (!toAgent) {

@@ -1061,9 +1061,11 @@ export function onlyThanks(text: string | null | undefined): boolean {
  * to, or nobody (a thank-you or an approval that asks for nothing). Only the
  * agent's notes start a run; "Send to the agent" (`toAgent`) overrules.
  */
-export function noteGoesTo(note: { text?: string; mentions?: readonly string[]; toAgent?: boolean } | null | undefined, people: readonly NotePerson[] = []): NoteTarget {
+export function noteGoesTo(note: { text?: string; mentions?: readonly string[]; toAgent?: boolean; by?: string | null } | null | undefined, people: readonly NotePerson[] = []): NoteTarget {
   if (note?.toAgent) return { to: 'agent' };
-  const named = note?.mentions?.[0] ?? addressedTo(note?.text, people);
+  // "Lena: add a switch", written by Lena, is signed, not addressed.
+  const others = note?.by ? people.filter((p) => p.id !== note.by) : people;
+  const named = (note?.mentions ?? []).find((m) => m !== note?.by) ?? addressedTo(note?.text, others);
   if (named) return { to: 'person', person: named };
   const text = String(note?.text ?? '').trim();
   // "Sam, approved" names nobody on the team, so it is read past the name, and

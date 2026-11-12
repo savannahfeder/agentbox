@@ -3478,19 +3478,19 @@ export default function App() {
     else putDocDown();
   };
   // Full screen is the one view with versions, notes and Approve, wherever the file is a thread's.
-  const docFull = () => {
+  const docFull = (forNotes = false) => {
     if (!openDoc) return;
     if (fullScreenTakes(openDoc.src) && !onPhone()) {
       const thread = !!focused && !focused.agent && !openDoc.readOnly && openDoc.product === focused.product;
       if (thread || (openCard && openDoc.readOnly)) {
-        const open = { path: openDoc.src, at: Date.now(), time: filmBeside() };
+        const open = { path: openDoc.src, at: Date.now(), time: filmBeside(), ...(forNotes ? { newest: true as const } : {}) };
         if (thread) setFullAt({ key: `${focused!.product}/${focused!.id}`, open }); else setCardOpenAt(open);
         return;
       }
     }
     setArtifactReturnBeside(artifactMode === 'beside'); setArtifactMode('focus');
   };
-  const openNotesFull = () => { rememberNotesSidebar(localStorage, true); setNotesOpen(true); docFull(); };
+  const openNotesFull = () => { rememberNotesSidebar(localStorage, true); setNotesOpen(true); docFull(true); };
   // Full screen is for one look. Once the file is put down, the next one opens beside.
   useEffect(() => { if (!openDoc) setArtifactMode('beside'); }, [openDoc]);
   const openTeammateFile = useCallback((product: string, src: string, notes?: number) => { setOpenDoc({ product, src, readOnly: true, notes }); }, []);
@@ -6798,10 +6798,10 @@ export default function App() {
         case 'b': case 'B':
           if (teamMode) {
             // On a phone Needs you is a list; B switches Everything else.
-            if (search === null && !teamShown && !openCard && (view !== 'inbox' || !onPhone())) { e.preventDefault(); setEvView(flipEvView(evView)); setSelected(0); }
+            if (search === null && !teamShown && (view !== 'inbox' || !onPhone())) { e.preventDefault(); setEvView(flipEvView(evView)); setSelected(0); }
             break;
           }
-          if (search === null && !teamShown && !openCard) { e.preventDefault(); setInboxDisplay(flipView(inboxDisplay)); setSelected(0); }
+          if (search === null && !teamShown) { e.preventDefault(); setInboxDisplay(flipView(inboxDisplay)); setSelected(0); }
           break;
         case 'Escape':
           if (multiSel.size) setMultiSel(new Set());
@@ -7352,7 +7352,7 @@ export default function App() {
 
   // Leaving Chats forgets which conversation was open there, or the same row
   // opened from Needs you lands back on the Chats screen with another reply box.
-  const openView = (next: View) => { roomsUi.leave(); setChatsDirect(null); teammatesUi.leave(); setFilesPage(null); setConnectionsPage(null); setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); setEvPick(null); setTodayOn(false); setTasksOn(false); setChatsPlace(null); setHomeOpen(false); };
+  const openView = (next: View) => { roomsUi.leave(); setChatsDirect(null); teammatesUi.leave(); setFilesPage(null); setConnectionsPage(null); setTeamOpen(false); setOpenCard(null); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); setEvPick(null); setTodayOn(false); setTasksOn(false); setChatsPlace(null); setHomeOpen(false); };
 
   // BACK AND FORWARD, on every computer. Above the early returns below, because
   // it is a hook; `homeShown` is worked out again here for the same reason.

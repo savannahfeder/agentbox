@@ -76,7 +76,7 @@ describe('the window', () => {
     expect(app).toMatch(/\{notesBeside && focused && <NotesBesideMark [^\n]*onOpen=\{openNotesFull\} \/>\}/);
   });
   it('pressing it opens the notes and goes full screen the way the pane\'s own button does', () => {
-    expect(app).toContain('const openNotesFull = () => { rememberNotesSidebar(localStorage, true); setNotesOpen(true); docFull(); };');
+    expect(app).toContain('const openNotesFull = () => { rememberNotesSidebar(localStorage, true); setNotesOpen(true); docFull(true); };');
     expect(app).toMatch(/if \(mode === 'focus'\) docFull\(\)/);
   });
   it("on a teammate's copy it counts the notes their thread has, and opens the review", () => {
