@@ -4,7 +4,7 @@
 import type { Engine } from '../../shared/engines.mts';
 import type { AgentVoice } from '../../shared/agent-voice.mts';
 import type { CarryState } from '../../shared/carried-files.mts';
-import type { FileLinkAsk, FileLinkState, LinkComment, PublicLink } from './api';
+import type { FileLinkAsk, FileLinkState, LinkAccess, LinkCan, LinkComment, LinkPerson, PublicLink } from './api';
 import type { LedgerLine } from './thread-history';
 import type { AgentFile } from './onboarding';
 import type { AgentFolder, SessionThread } from './agent-import-card';
@@ -1933,6 +1933,9 @@ declare global {
       fileLinks?(): Promise<{ ok: boolean; error?: string; links?: PublicLink[] }>;
       fileLinkComments?(p: { token: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
       fileLinkComment?(p: { token: string; text: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
+      fileLinkAccess?(p: { token: string; access: LinkAccess; can: LinkCan }): Promise<{ ok: boolean; error?: string }>;
+      fileLinkPeople?(p: { token: string }): Promise<{ ok: boolean; error?: string; people?: LinkPerson[] }>;
+      fileLinkPerson?(p: { token: string; email: string; can: LinkCan | null }): Promise<{ ok: boolean; error?: string; people?: LinkPerson[] }>;
       bringSharedFile?(p: { link: string; product: string | null }): Promise<{ ok: boolean; error?: string; product?: string; id?: string; src?: string }>;
       takeSharedFile?(): Promise<string | null>;
       onSharedFile?(fn: () => void): () => void;
