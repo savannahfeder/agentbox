@@ -25,7 +25,7 @@ import { readTeammates, readTeamView, teamDir } from '../main/store/teammates-fi
 import { legacyRoot } from '../main/store/project.mts';
 import { listProductChats, readProductChat } from './core/chat.mts';
 import { lookAtPage } from './core/page.mts';
-import { askToSignIn, waitForSignIn, WAIT_MS } from './core/sign-in.mts';
+import { askToSignIn, keepAfterSignIn, waitForSignIn, WAIT_MS } from './core/sign-in.mts';
 import { WORK_ITEM_STATUSES } from '../shared/work-items.mts';
 import { CONTEXT_WORDS, DONE_STEPS, DONE_STEP_WORDS, SUMMARY_WORDS } from '../shared/thread-cards.mts';
 import { AGENT_CREATION_KINDS } from '../shared/contracts.mts';
@@ -320,7 +320,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         labels: z.array(z.string()).optional(),
         runAt: z.number().int().optional().describe('epoch ms to defer this item until; 0 clears a schedule and makes it available now'),
         closeBecause: z.string().optional().describe('only with status done on a row the founder wrote: their own words, quoted exactly from the row, asking you to close it'),
-        deferBecause: z.string().optional().describe('only with runAt on a row the founder wrote: their own words, quoted exactly from the row, asking for it to be put off or to be reminded later. Without them the row stays in their inbox'),
+        deferBecause: z.string().optional().describe('only with runAt on a row the founder wrote: their own words, quoted exactly from the row, asking for it to be put off or to be reminded later. Without them the row stays in their inbox. A reminder starts NO run; words asking for work at a time ("continue at 1:30") start a run then, and the answer\'s `saved` says which was kept'),
         toAnAgentBecause: z.string().optional().describe('on a thread of theirs that went to a teammate when it should not have: their own words, quoted exactly from the row, saying so. The thread then goes to an ordinary agent, as their "Give it to someone else" would, and its next turn is not the teammate\'s'),
         problem: z.string().optional().describe(`the summary's CONTEXT: a few plain sentences, ${CONTEXT_WORDS} words at most, about the whole thread for someone who has forgotten it. It says what the thread is about: what was asked for and why, in the words the person would use. Not where it stands or the latest round, which the answer gives`),
         progress: z.string().optional().describe(`the summary's DONE list: the steps taken so far, one per line, oldest first and newest last, ${DONE_STEPS} lines at most of ${DONE_STEP_WORDS} words each. Send the whole list each time; it replaces the last one. Every line is a step that FINISHED: one you are about to take goes on after it happens, never before`),
@@ -593,8 +593,15 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         await keepCloudKey(keep.name, keep.value);
         return json({ status: 'kept', message: `Kept as ${keep.name} for every later cloud run.` });
       }
-      if (finished) return json({ status: 'closed', message: 'The card is gone. Carry on.' });
-      return json(await waitForSignIn(id, asked.id, { product }));
+      const inCloud = typeof keepCloudKey === 'function';
+      const withKeep = <T extends { message: string }>(out: T, finishing = false): T => {
+        if (!inCloud) return out;
+        const k = keepAfterSignIn(asked.service, { finishing });
+        return { ...out, ...(k.keep ? { keep: k.keep } : {}), message: `${out.message} ${k.message}` };
+      };
+      if (finished) return json(withKeep({ status: 'closed', message: 'The card is gone.' }));
+      const said = await waitForSignIn(id, asked.id, { product });
+      return json(said.status === 'signed_in' ? withKeep(said) : said.status === 'landed' ? withKeep(said, true) : said);
     },
   });
 

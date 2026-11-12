@@ -27,16 +27,20 @@ export function cliToken(raw) {
   return text.startsWith('go-keyring-base64:') ? Buffer.from(text.slice('go-keyring-base64:'.length), 'base64').toString('utf8') : text;
 }
 
-export async function applyMigration(file, { ref, token, fetchImpl = fetch }) {
+export async function runSql(query, { ref, token, fetchImpl = fetch, label = 'query' }) {
   const res = await fetchImpl(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
     method: 'POST',
     headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', 'user-agent': 'Mozilla/5.0' },
-    body: JSON.stringify({ query: fs.readFileSync(file, 'utf8') }),
+    body: JSON.stringify({ query }),
     signal: AbortSignal.timeout(CALL_MS),
   });
   const said = await res.text();
-  if (!res.ok) throw new Error(`${path.basename(file)}: the database said ${res.status}: ${said.slice(0, 500)}`);
+  if (!res.ok) throw new Error(`${label}: the database said ${res.status}: ${said.slice(0, 500)}`);
   return said;
+}
+
+export function applyMigration(file, { ref, token, fetchImpl = fetch }) {
+  return runSql(fs.readFileSync(file, 'utf8'), { ref, token, fetchImpl, label: path.basename(file) });
 }
 
 async function main(files) {
