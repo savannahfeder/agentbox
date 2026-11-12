@@ -39,7 +39,7 @@ import { LINE_MISSING } from '../../reveal-line';
 import { Face } from '../people';
 import { cardName, chatWidth, mentionsIn, readChatWidth, writeChatWidth } from './room-rules';
 import { clockOf } from '../../teammates/chat-lines';
-import { attachedName, drawnRoots, holdsRead, mentionMarkdown, myNewest, newLineAt, opensInTheReview, quickOnBar, roomReader, storedName, wordsLeftAfterSend } from './room-chat-rules';
+import { attachedName, drawnRoots, holdsRead, madeOnce, mentionMarkdown, myNewest, newLineAt, opensInTheReview, quickOnBar, roomReader, storedName, wordsLeftAfterSend } from './room-chat-rules';
 
 export type ChatPerson = { id: string; name: string; avatarUrl: string | null; me: boolean };
 
@@ -442,6 +442,26 @@ function sendingWords(sending: Record<string, { done: number; total: number }> |
 
 // A file in the box is given the name it will be stored under once, here.
 const staged = (a: PendingAttachment): PendingAttachment => (a.storedAs ? a : { ...a, storedAs: storedName(a.name) });
+
+/** The chat's own box before there is a chat with this person; the first thing it sends makes the chat. */
+export function FirstChatBox({ person, placeholder, open, send, putFile, putFileFrom, sending, onNotice }: {
+  person: ChatPerson; placeholder: string;
+  /** The chat's id, made if there is none; throws with why it could not be. */
+  open: () => Promise<string>;
+  send: (roomId: string, body: string, mentions: string[]) => Promise<string | null>;
+  putFile: (roomId: string, name: string, dataBase64: string) => Promise<string | null>;
+  putFileFrom: (roomId: string, name: string, srcPath: string) => Promise<string | null>;
+  sending?: Record<string, { done: number; total: number }>;
+  onNotice?: (text: string) => void;
+}) {
+  const room = useRef(madeOnce(open)).current;
+  const people = [person];
+  return <Composer roomId={`with:${person.id}`} threadId={null} takesTyping placeholder={placeholder} people={people}
+    sending={sending} onNotice={onNotice} onEditLast={() => {}}
+    onSend={async (body) => send(await room(), body, mentionsIn(body, people))}
+    onPutFile={async (name, data) => putFile(await room(), name, data)}
+    onPutFileFrom={async (name, srcPath) => putFileFrom(await room(), name, srcPath)} />;
+}
 
 function Composer({ roomId, threadId, takesTyping = false, placeholder, people, onSend, onPutFile, onPutFileFrom, sending, onNotice, onEditLast }: {
   roomId: string; threadId: string | null; takesTyping?: boolean; placeholder: string; people: ChatPerson[];

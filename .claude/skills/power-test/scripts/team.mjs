@@ -10,11 +10,12 @@ import path from 'node:path';
 export const teamEmail = (person) => `${person.name.split(' ')[0].toLowerCase()}@team.test`;
 
 /** The file live.mjs `--team` reads, one per person, beside their evidence. */
-export function writeTeamFiles({ root, url, people }) {
+/** `site`: where shared links open (main/file-link.mts linkSiteFor); none, and Share is not offered. */
+export function writeTeamFiles({ root, url, people, site = null }) {
   const dir = path.join(root, 'team-cloud');
   fs.mkdirSync(dir, { recursive: true });
   const config = path.join(dir, 'team.config.json');
-  fs.writeFileSync(config, JSON.stringify({ url, anonKey: 'stand-in', standin: true }));
+  fs.writeFileSync(config, JSON.stringify({ url, anonKey: 'stand-in', standin: true, ...(site ? { phoneSite: site } : {}) }));
   const files = {};
   for (const p of people) {
     const file = path.join(root, p.slug, 'team.json');

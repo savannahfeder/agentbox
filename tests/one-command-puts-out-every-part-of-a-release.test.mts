@@ -113,7 +113,7 @@ describe('the deploy script', () => {
   const release = read('scripts/release.mjs');
 
   it('is what npm run deploy runs', () => {
-    expect(JSON.parse(read('package.json')).scripts.deploy).toBe('node scripts/deploy.mjs');
+    expect(JSON.parse(read('package.json')).scripts.deploy).toBe('node scripts/run.mjs scripts/deploy.mjs');
   });
 
   // The Mac build first: it is slow and the likeliest to fail, and until it is

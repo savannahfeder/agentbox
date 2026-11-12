@@ -178,7 +178,10 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     const team = await teams(person);
     if (!team?.id || !Array.isArray(team.members)) return null;
     const bill = (await readJson(teamKey(team.id))) || {};
-    const seats = bill.plan === 'team' && PAYING.has(bill.stripe?.status) ? Math.max(0, Math.floor(Number(bill.seats)) || 0) : 0;
+    // A trial's subscription can reach past_due never having been charged;
+    // a record from before `paid` was kept is taken as paid.
+    const neverPaid = bill.stripe?.status === 'past_due' && bill.stripe.paid === false;
+    const seats = bill.plan === 'team' && PAYING.has(bill.stripe?.status) && !neverPaid ? Math.max(0, Math.floor(Number(bill.seats)) || 0) : 0;
     const endsAt = Number(team.createdAt) + teamPlan.trialDays * DAY_MS;
     const trial = !seats && t < endsAt;
     if (!seats && !trial) return null;
@@ -782,9 +785,12 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     await updateTeam(team, (bill) => {
       // An old subscription ending leaves alone a newer one that pays.
       if (!pays && bill.stripe?.subscription && bill.stripe.subscription !== sub.id && PAYING.has(bill.stripe.status)) return;
+      // A past_due recorded before `paid` was kept is a renewal's retry.
+      const was = bill.stripe?.subscription === sub.id ? bill.stripe : null;
+      const paid = sub.status === 'active' || !!was && (was.paid === true || was.status === 'active' || (was.paid === undefined && was.status === 'past_due'));
       bill.plan = pays ? 'team' : 'none';
       bill.seats = Math.max(0, Math.floor(Number(item?.quantity)) || 0);
-      bill.stripe = { customer: sub.customer, subscription: sub.id, status: sub.status, at: now() };
+      bill.stripe = { customer: sub.customer, subscription: sub.id, status: sub.status, paid, at: now() };
       if (pays) delete bill.checkout;
     });
     log(`team ${team} is on ${pays ? `${Math.floor(Number(item?.quantity)) || 0} seats` : 'no plan'} (Stripe ${sub.status})`);

@@ -5,6 +5,8 @@
 import crypto from 'node:crypto';
 import { fileKeyIn } from '../../shared/file-folders.mts';
 import { liveColorOf } from '../../shared/live/colors.mts';
+import { projectSeenBy } from '../../shared/thread-cards.mts';
+import type { ProjectSeen } from '../../shared/thread-cards.mts';
 import type { CloudConfig } from './session.mts';
 
 export interface LiveMe { name: string; person: string; color: string; kind: 'person'; canSave: true; owner: boolean }
@@ -30,6 +32,19 @@ const ownName = (name: unknown): string => (String(name ?? '').split('/').pop() 
 
 export const liveRoomId = (teamId: string, project: string, name: unknown): string =>
   `${teamId}.${crypto.createHash('sha256').update(fileKeyIn(project, ownName(name))).digest('hex').slice(0, 40)}`;
+
+// THE RELAY LETS IN ANYONE ON THE TEAM, and a room's name is worked out from
+// the team, the project's name and the file's, so a file the whole team may
+// not read opens no room: a teammate left out of it could join and read it.
+export function liveForTheWholeTeam({ mine, cards, named }: {
+  mine: (NonNullable<ProjectSeen> & { team?: { projectId?: string | null } | null }) | null | undefined;
+  cards: readonly { project?: string | null; people?: readonly string[] | null }[] | null | undefined;
+  named: string | null | undefined;
+}): boolean {
+  const key = (s: unknown) => String(s ?? '').trim().toLowerCase();
+  if (mine) return !!mine.team?.projectId && projectSeenBy(mine).who === 'team';
+  return (cards ?? []).some((c) => key(c.project) === key(named) && !c.people?.length);
+}
 
 /**
  * The room for a file, or null when it is nobody else's to open: no relay, no

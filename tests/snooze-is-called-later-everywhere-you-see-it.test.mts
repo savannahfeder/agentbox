@@ -50,8 +50,8 @@ const type = (query) => rankMatches(query, ROWS.filter((c) => matchesQuery(query
 
 describe('⌘K', () => {
   it('draws the row as Later, alone and over a ticked selection', () => {
-    expect(app).toContain("{ id: 'snooze', label: 'Later', keywords: LATER_KEYWORDS, keyHint: 'L', run: () => openSnooze(target) },");
-    expect(app).toContain("{ id: 'snooze', label: `Later (${n} selected)`, keywords: LATER_KEYWORDS, keyHint: 'L', run: () => openSnooze(sel) },");
+    expect(app).toContain("{ id: 'snooze', label: 'Later', keywords: LATER_KEYWORDS, oldNames: LATER_OLD_NAMES, keyHint: 'L', run: () => openSnooze(target) },");
+    expect(app).toContain("{ id: 'snooze', label: `Later (${n} selected)`, keywords: LATER_KEYWORDS, oldNames: LATER_OLD_NAMES, keyHint: 'L', run: () => openSnooze(sel) },");
   });
 
   it('finds it by the word on the key', () => {

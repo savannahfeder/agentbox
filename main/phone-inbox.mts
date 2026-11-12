@@ -43,7 +43,7 @@ import { PHONE_FILES_MAX, phoneFilesIn, phoneFileSafeName, phoneAttachmentRel } 
 import { runOfClaim, cloudCard } from '../shared/cloud-kit.mts';
 import { isCarried } from '../shared/cloud-carry.mts';
 import { heldForUndo } from '../shared/phone-undo.mts';
-import type { CarriedCommand } from '../shared/cloud-carry.mts';
+import type { CarriedCommand, CarriedReply } from '../shared/cloud-carry.mts';
 import type { PhoneWait, TeammatesViewSeen } from '../shared/phone-snapshot.mts';
 import type { SettingChange, SettingsModel } from '../shared/phone-settings.mts';
 import { leftByAMove } from '../shared/move-thread.mts';
@@ -132,6 +132,7 @@ export interface AdoptArgs {
   replies: string[];
   commands?: string[];
   carried?: boolean;
+  carriedReply?: CarriedReply;
 }
 
 export interface AdoptNewArgs extends AdoptArgs {
@@ -730,7 +731,10 @@ export function createPhoneInbox({
             sayOnce(`adopt:${(err as Thrown)?.message}`, `phone: could not join the cloud's run for ${item}: ${(err as Thrown)?.message ?? err}`);
           }
         } else if (item && fresh.length) {
-          const carried = fresh.some(isCarried) ? { carried: true } : {};
+          const handedOver = fresh.filter(isCarried).at(-1);
+          const carried = handedOver
+            ? { carried: true, carriedReply: { text: String(handedOver.payload?.text ?? ''), at: Date.parse(handedOver.createdAt ?? handedOver.created_at ?? '') || 0 } }
+            : {};
           try { out = await adopt({ project, item, runId, replies, commands: fresh.map((c) => c.id), ...carried }); } catch (err) {
             out = 'failed';
             sayOnce(`adopt:${(err as Thrown)?.message}`, `phone: could not join the cloud's run for ${item}: ${(err as Thrown)?.message ?? err}`);

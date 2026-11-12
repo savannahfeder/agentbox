@@ -53,14 +53,28 @@ describe('after it', () => {
     expect(notes).toEqual([['payments/w-1a2b', 'Chris Novak commented on q1-roadmap.md. "Is the flag still on for new accounts only?"']]);
   });
 
-  it('says several comments on one file once, with the newest', async () => {
+  // One note for several replaced the earlier comments on the row (2026-11-10):
+  // each is a line of its own now, and the row counts them.
+  it('writes each of several comments on one file, oldest first, and counts the file once', async () => {
     const tok = await share('payments/w-1a2b/plans/q1-roadmap', 'q1-roadmap.md');
     await chris.commentOnFileLink(tok, 'One');
     clock += 1000;
     await lena.commentOnFileLink(tok, 'Two');
     clock += 1000;
-    await run();
-    expect(notes).toEqual([['payments/w-1a2b', '2 new comments on q1-roadmap.md. The newest is from Lena Fischer. "Two"']]);
+    expect(await run()).toBe(1);
+    expect(notes).toEqual([
+      ['payments/w-1a2b', 'Chris Novak commented on q1-roadmap.md. "One"'],
+      ['payments/w-1a2b', 'Lena Fischer commented on q1-roadmap.md. "Two"'],
+    ]);
+  });
+
+  it('carries the place a comment points at', async () => {
+    const tok = await share('payments/w-1a2b/plans/cut.mp4', 'cut.mp4');
+    await chris.commentOnFileLink(tok, 'Too fast here', { kind: 'time', s: 12.5 });
+    clock += 1000;
+    const written = [];
+    await noticeLinkComments({ backend: maya, now: () => clock, cursor: () => cursor, setCursor: (at) => { cursor = at; }, readItem: () => ({}), write: (_p, _n, c) => { written.push(c); } });
+    expect(written).toEqual([{ name: 'Chris Novak', file: 'cut.mp4', text: 'Too fast here', place: { kind: 'time', s: 12.5 } }]);
   });
 
   it('never says a comment twice, nor the owner\'s own answer', async () => {
@@ -161,6 +175,9 @@ describe('in the thread', () => {
     expect(said.message).toBeUndefined();
     expect(events.some((e) => e.says === 'progress')).toBe(false);
     expect(pickFields({ linkComment: { name: 'Chris', file: 'a.md', text: 'x', extra: 1 } })).toEqual({ linkComment: { name: 'Chris', file: 'a.md', text: 'x' } });
+    // A comment on a moment in a film says the moment (2026-11-11).
+    const atMoment = threadEvents([{ id: 'w-1', ts: 0, source: 'founder', patch: { title: 'Cut', status: 'open' } }, { id: 'w-1', ts: 2, source: 'system', patch: { note: 'x', linkComment: { name: 'Jun', file: 'cut.mp4', text: 'Too fast', place: { kind: 'time', s: 84.6 } } } }]);
+    expect(atMoment.find((e) => /commented/.test(e.said ?? ''))?.said).toBe('Jun commented on cut.mp4 at 1:24');
     expect(pickFields({ linkComment: { name: '', file: 'a.md', text: 'x' } })).toBeNull();
   });
   it('is written on the thread with the note, through the store', async () => {

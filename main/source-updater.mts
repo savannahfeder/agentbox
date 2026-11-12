@@ -32,7 +32,9 @@
 
 import { execFile, execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
+import path from 'node:path';
 import type { PathLike } from 'node:fs';
+import { leftFromARelease } from '../shared/release-leftover.mts';
 import { describe } from './updater.mts';
 import type { UpdaterState, UpdaterView } from './updater.mts';
 import { loginShell } from './shell-path.mts';
@@ -77,7 +79,6 @@ const isBuildOutput = (file: string) => file === 'package-lock.json' || /^shared
 // The status code is one or two letters and `gitIn` trims the output, which
 // takes the leading space off the first line, so it is matched, not sliced.
 const changedPaths = (porcelain: unknown) => String(porcelain ?? '').split('\n').filter(Boolean).map((l) => l.replace(/^[ MADRCUT?!]{1,2} /, '').replace(/^"|"$/g, ''));
-const theirEdits = (porcelain: unknown) => changedPaths(porcelain).filter((f) => !isBuildOutput(f));
 
 function gitIn(appDir: string) {
   return (args: string[], { timeout = 30_000 }: { timeout?: number } = {}) => new Promise<GitResult>((resolve) => {
@@ -204,6 +205,20 @@ export function createSourceUpdater({
     try { onChanged(describe(state)); } catch {}
   };
 
+  // The changed files that are not her edits: what the build and npm rewrite,
+  // and a package.json a deploy cut short left behind.
+  async function notHers(porcelain: string) {
+    const files = changedPaths(porcelain);
+    const ours = files.filter(isBuildOutput);
+    if (files.includes('package.json')) {
+      const committed = await git(['show', 'HEAD:package.json']);
+      let current = '';
+      try { current = fs.readFileSync(path.join(appDir, 'package.json'), 'utf8'); } catch { /* gone: hers */ }
+      if (committed.code === 0 && leftFromARelease(committed.out, current)) ours.push('package.json');
+    }
+    return { ours, hers: files.filter((f) => !ours.includes(f)) };
+  }
+
   // Everything that has to be true before an update is offered or applied.
   // Returns the upstream commit, or the sentence saying why not.
   async function preconditions(): Promise<{ why: string; up?: undefined } | { up: string; why?: undefined }> {
@@ -211,7 +226,7 @@ export function createSourceUpdater({
     const upstream = await git(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}']);
     if (upstream.code !== 0) return { why: SAY.noUpstream };
     const dirty = await git(['status', '--porcelain', '--untracked-files=no']);
-    if (dirty.code !== 0 || theirEdits(dirty.out).length) return { why: SAY.dirty };
+    if (dirty.code !== 0 || (await notHers(dirty.out)).hers.length) return { why: SAY.dirty };
     const ahead = await git(['merge-base', '--is-ancestor', 'HEAD', '@{u}']);
     if (ahead.code !== 0) return { why: SAY.diverged };
     const up = await git(['rev-parse', '@{u}']);
@@ -269,11 +284,11 @@ export function createSourceUpdater({
       return;
     }
     const head = await git(['rev-parse', 'HEAD']);
-    // What the last build stamped goes back first, so the fast-forward can
-    // never trip on it. The build below writes it again.
+    // What the last build or deploy stamped goes back first, so the
+    // fast-forward can never trip on it. The build below writes it again.
     const stamped = await git(['status', '--porcelain', '--untracked-files=no']);
-    const buildOutput = stamped.code === 0 ? changedPaths(stamped.out).filter(isBuildOutput) : [];
-    if (buildOutput.length) await git(['checkout', '--', ...buildOutput]);
+    const ours = stamped.code === 0 ? (await notHers(stamped.out)).ours : [];
+    if (ours.length) await git(['checkout', '--', ...ours]);
     if (head.out !== ok.up) {
       const merged = await git(['merge', '--ff-only', '--quiet', '@{u}']);
       if (merged.code !== 0) {

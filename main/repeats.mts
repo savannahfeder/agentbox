@@ -235,7 +235,13 @@ export class Repeats {
       // supersede its own live run.
       if (rule.lastOccurrence && rule.lastOccurrence !== id) {
         const prev = workItemsDisk.readWorkItem(productDir, rule.lastOccurrence, now);
-        if (prev && (prev.status === 'open' || prev.status === 'claimed')) {
+        // A run that ended with an answer stays open, because answering a row
+        // the person owns does not close it. Superseding it would hide that
+        // answer behind "did not finish".
+        const answered = prev?.status === 'open' && !!prev.result;
+        if (answered) {
+          misses = 0;
+        } else if (prev && (prev.status === 'open' || prev.status === 'claimed')) {
           workItemsDisk.updateWorkItem(productDir, prev.id, {
             status: 'done',
             result: 'This run did not finish before the next one was due, so it was superseded.',

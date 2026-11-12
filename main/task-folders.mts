@@ -670,6 +670,7 @@ export function ensureTaskFolder(dir: string, id: unknown, { pid = process.pid, 
   // add below with "already registered", so clear those first. `prune` only
   // ever drops registrations whose folder is already gone.
   tryGit(root, ['worktree', 'prune']);
+  letGoOfTheBranchElsewhere(root, folder, branch);
   fs.mkdirSync(path.dirname(folder), { recursive: true });
   keepOutOfBackups(path.dirname(folder));
 
@@ -793,6 +794,25 @@ export function ensureTaskFolder(dir: string, id: unknown, { pid = process.pid, 
   const held = acquireTaskFolder(root, folder, { pid });
   if (!held.taken) return refused(held);
   return { taken: true, heldBy: pid, path: folder, branch, created: true, how };
+}
+
+/**
+ * THE TASK'S BRANCH CHECKED OUT IN A FOLDER THE APP DID NOT MAKE, often one an
+ * agent or a person opened beside the repository. Git lets a branch live in one
+ * folder at a time, so until it lets go the task can never get its own.
+ *
+ * A clean one is detached at the same commit: no file in it changes and every
+ * commit stays on the branch. Uncommitted work, a lock, or the main checkout
+ * means somebody may be using it, so it is left alone and the add below fails
+ * with git's own words, which name the folder.
+ */
+function letGoOfTheBranchElsewhere(root: string, folder: string, branch: string): void {
+  const all = registered(root);
+  const at = all.find((w) => w.branch === branch && w.path !== folder && !path.basename(w.path).startsWith(BUILDING));
+  if (!at || at === all[0] || at.lock !== undefined) return;
+  const status = tryGit(at.path, ['status', '--porcelain']);
+  if (!status.ok || status.out) return;
+  tryGit(at.path, ['checkout', '-q', '--detach']);
 }
 
 /**

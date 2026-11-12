@@ -9,6 +9,7 @@ import crypto from 'node:crypto';
 import fsDefault from 'node:fs';
 import path from 'node:path';
 import { PHONE_SITE } from '../shared/cloud-address.mts';
+import { shownName } from '../shared/artifact-marks.mts';
 
 export const LINK_MAX_BYTES = 6_000_000;
 const MAX_BODY_CHARS = 8_400_000;
@@ -159,7 +160,7 @@ export function fileForLink(file: string, { fs = fsDefault }: { fs?: LinkFs } = 
 export function linkCopyOf(file: string, { fs = fsDefault }: { fs?: LinkFs } = {}): LinkCopy | { error: string } {
   const made = fileForLink(file, { fs });
   if (made.error) return made;
-  return { ...(made as LinkFile), name: path.basename(file), version: versionInName(file) };
+  return { ...(made as LinkFile), name: shownName(file) || path.basename(file), version: versionInName(file) };
 }
 
 /** The version a file's name says (plan-v3.md is 3), as files here are named. */

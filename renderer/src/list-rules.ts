@@ -29,6 +29,8 @@ export interface InboxItem {
   snoozedUntil?: number;
   /** Teammates' comments its owner has not yet dealt with (shared/work-items.mts). */
   waitingComments?: { by: string; ts: number; text: string }[];
+  /** Comments on its shared links its owner has not yet dealt with. */
+  linkComments?: { name: string; file: string; text: string; ts: number }[];
   /** 'later' while a thread sits in Later, written down and not begun. */
   start?: 'later' | 'now';
   /** The thread this one was filed under: what makes it a proposal. */
@@ -176,6 +178,10 @@ export function commentsWaitOnYou(i: Pick<InboxItem, 'status' | 'waitingComments
   return i.status !== 'done' || said.some((c) => c.ts > seen);
 }
 
+/** A teammate's words it has not dealt with, or comments on its links: either holds it in Needs you. */
+export const wordsWait = (i: Pick<InboxItem, 'status' | 'waitingComments' | 'linkComments'>, seen = 0): boolean =>
+  commentsWaitOnYou(i, seen) || !!i.linkComments?.length;
+
 // The only copy of the inbox membership rule. Do not duplicate it: call this.
 //
 // `deliveredThrough`: answers finished before this moment stay in Done, so
@@ -199,7 +205,7 @@ export function belongsInInbox(
 ): boolean {
   // A teammate's words wait for you whatever the thread is doing, a running
   // agent included (`waitingComments`, shared/work-items.mts).
-  if (commentsWaitOnYou(i, seen)) return true;
+  if (wordsWait(i, seen)) return true;
   // In Later and not begun: it waits for a person, not a clock, so it is in
   // Later and nowhere else.
   if (notStarted(i)) return false;

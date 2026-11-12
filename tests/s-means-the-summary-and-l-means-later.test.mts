@@ -98,7 +98,7 @@ describe('every surface that says a key says the same one', () => {
   });
 
   it('the ⌘K rows, both the single one and the one over a ticked selection', () => {
-    expect(app).toContain("{ id: 'snooze', label: 'Later', keywords: LATER_KEYWORDS, keyHint: 'L', run: () => openSnooze(target) },");
+    expect(app).toContain("{ id: 'snooze', label: 'Later', keywords: LATER_KEYWORDS, oldNames: LATER_OLD_NAMES, keyHint: 'L', run: () => openSnooze(target) },");
     expect(app).toContain("keyHint: 'L', run: () => openSnooze(sel) },");
     expect(app).not.toMatch(/keyHint: 'S'/);
   });

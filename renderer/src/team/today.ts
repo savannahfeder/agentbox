@@ -315,6 +315,26 @@ export interface GroupLine extends TodayLine { task?: true; tag?: string }
 
 const byNewest = (a: TodayLine, b: TodayLine) => b.at - a.at;
 
+/** A section's lines: all of them only in the range "and N more" was pressed in. */
+export function linesShown<T>(lines: readonly T[], openedIn: TodayRange | null, range: TodayRange): readonly T[] {
+  return openedIn === range ? lines : lines.slice(0, SHOWN);
+}
+
+export const EVERYONE_RANGE_KEY = 'zero.everyoneRange';
+const RANGE_IDS: readonly string[] = ['today', 'yesterday', 'week'];
+
+/** The range the Everyone page opens on: the last one picked, else This week. */
+export function everyoneRange(storage: Pick<Storage, 'getItem'>): TodayRange {
+  try {
+    const kept = storage.getItem(EVERYONE_RANGE_KEY);
+    return kept && RANGE_IDS.includes(kept) ? kept as TodayRange : 'week';
+  } catch { return 'week'; }
+}
+
+export function keepEveryoneRange(storage: Pick<Storage, 'setItem'>, range: TodayRange): void {
+  try { storage.setItem(EVERYONE_RANGE_KEY, range); } catch { /* private mode: it opens on This week again */ }
+}
+
 /** A person's lists folded into the three groups. What waits on you is left to Needs you. */
 export function groupsOf(p: TodayPerson): Record<TodayGroup, GroupLine[]> {
   const tasks = (p.tasks ?? []).map((l): GroupLine => ({ ...l, task: true }));
