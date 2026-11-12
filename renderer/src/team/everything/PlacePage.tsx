@@ -89,7 +89,6 @@ export function JobBlock({ job, onSave }: { job: string | null; onSave?: (job: s
   </div>;
 }
 
-/** A box that sends one message, for a conversation that has no chat of its own yet. */
 /** A chat with nothing in it yet: two faint bubbles, and what to do. */
 export function EmptyChat({ name }: { name: string }) {
   return <div className="pl-empty-chat">
@@ -98,6 +97,15 @@ export function EmptyChat({ name }: { name: string }) {
   </div>;
 }
 
+/** A chat not started yet: what to do, over the chat's own box. */
+export function ChatStart({ empty, box }: { empty: ReactNode; box: ReactNode }) {
+  return <div className="pl-send">
+    <div className="pl-send-empty">{empty}</div>
+    {box}
+  </div>;
+}
+
+/** A box that sends one message, for a conversation that has no chat of its own. */
 export function SendBox({ placeholder, note, onSend, empty }: {
   placeholder: string; note?: string | null; empty?: ReactNode;
   /** Null once it went, or the reason it did not. */

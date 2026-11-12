@@ -148,7 +148,7 @@ import { aVoiceNoteIsRecording } from './team/useVoiceRecorder';
 import { aBoxIsListening } from './dictation';
 import { MentionCards, MentionRows } from './team/rooms/MentionRows';
 import { AgentsLine, MateThreads, NeedsFaces, PersonThreads, SpaceBar, TeamThreads } from './team/everything/TeamStrip';
-import { EmptyChat, JobBlock, Place as MemberPlace, PlaceAction, PlaceList, PlaceMates, SendBox, type PlaceRow } from './team/everything/PlacePage';
+import { ChatStart, EmptyChat, JobBlock, Place as MemberPlace, PlaceAction, PlaceList, PlaceMates, SendBox, type PlaceRow } from './team/everything/PlacePage';
 import { nowAndFinished, pressOpensIn, waitsOnYou, youWaitOn, type HomeLayout } from './team/everything/place';
 import { buildMembers, mateRunsOf, orderMembers, personCardsOf, readHidden, readOrder, splitHidden, teamRunsOf, type Hidden, type Member } from './team/everything/members';
 import { boardItems, cardOpens, evColumns, flipEvView, readEvView, whoseBoard, writeEvView, type EvTab, type EvView } from './team/everything/whose-board';
@@ -7878,8 +7878,8 @@ export default function App() {
         </>}
         chat={chatShows === 'chat' && room ? roomsUi.chatIn(room, (messages, pairRoomIds) => along(pairTimeline({ me: team?.me ?? '', other: id, rooms: pairRoomIds, messages, directItems: items, talk: snap.team?.threadTalk ?? [], titleOf }))) : chatShows === 'not yet' ? null
           : chatShows === 'first message'
-          ? <SendBox placeholder={`Message ${first}`} empty={<EmptyChat name={first} />}
-            onSend={(text) => roomsUi.startChat(id, placeMember.name, text)} />
+          ? <ChatStart empty={<EmptyChat name={first} />}
+            box={roomsUi.firstChat({ id, name: placeMember.name, avatarUrl: placeMember.avatarUrl ?? null }, `Message ${first}`)} />
           : <SendBox placeholder={`Message ${first}`} empty={<EmptyChat name={first} />}
             onSend={async (text) => { setComposeInitial({ to: id, body: text }); setModal('compose'); return null; }} />}
         side={<>

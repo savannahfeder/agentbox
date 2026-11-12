@@ -45,6 +45,6 @@ describe('App.tsx', () => {
   });
   it('draws the first-message box only when the rule says so, and nothing while it waits', () => {
     expect(place).toMatch(/chatShows === 'not yet' \? null/);
-    expect(place).toMatch(/chatShows === 'first message'\s*\?\s*<SendBox[^>]*empty=\{<EmptyChat/);
+    expect(place).toMatch(/chatShows === 'first message'\s*\?\s*<ChatStart empty=\{<EmptyChat/);
   });
 });
