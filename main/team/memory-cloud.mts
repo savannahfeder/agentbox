@@ -16,6 +16,7 @@ import { PHONE_COMMANDS } from '../../shared/phone-snapshot.mts';
 import { roomsMemory } from './rooms-memory.mts';
 import type { MemoryRoomsFields } from './rooms-memory.mts';
 import type { LedgerLine } from './sync.mts';
+import { cleanPlace, type NotePlace, type RawPlace } from '../../shared/artifact-marks.mts';
 import type { FileLinkShare } from './index.mts';
 import { appendTo, cleanEntry, foldLine } from '../../shared/version-line.mts';
 
@@ -55,7 +56,7 @@ export interface MemoryThreadComment { id: string; owner: string; threadId: stri
 export interface MemoryFileMark { id: string; owner: string; threadId: string; by: string; mark: object; at: number }
 export interface MemoryPiece { projectId: string; name: string; byPerson: string; bytes: Buffer }
 export interface MemoryFileLink { token: string; owner: string; source: string; name: string; kind: string; type: string; body: string; version: number; hash: string; createdAt: number; updatedAt: number; stoppedAt: number | null }
-export interface MemoryFileLinkComment { id: string; token: string; by: string; text: string; at: number }
+export interface MemoryFileLinkComment { id: string; token: string; by: string; text: string; at: number; place?: NotePlace | null }
 export interface MemorySeen { projectId: string; itemId: string; personId: string; at: number }
 /** What a person who leaves hands over: their open work to `handTo`, each AI teammate to `to`. */
 export interface MemoryHandover { handTo: string; name?: unknown; mates?: unknown }
@@ -513,7 +514,7 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
       if (!l || l.stoppedAt) return [];
       return cloud.fileLinkComments.filter((c) => c.token === token).map((c) => {
         const p = cloud.people.get(c.by);
-        return { id: c.id, byName: p?.name || 'Someone', byAvatar: p?.avatarUrl ?? null, text: c.text, at: c.at, mine: c.by === personId, byOwner: c.by === l.owner };
+        return { id: c.id, byName: p?.name || 'Someone', byAvatar: p?.avatarUrl ?? null, text: c.text, at: c.at, mine: c.by === personId, byOwner: c.by === l.owner, ...(c.place ? { place: c.place } : {}) };
       });
     },
 
@@ -529,15 +530,17 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
         .filter((c) => c.at > since && c.by !== personId)
         .map((c) => ({ c, l: cloud.fileLinks.get(c.token) }))
         .filter((x): x is { c: MemoryFileLinkComment; l: MemoryFileLink } => !!x.l && x.l.owner === personId && !x.l.stoppedAt)
-        .map(({ c, l }) => ({ token: c.token, source: l.source, name: l.name, byName: cloud.people.get(c.by)?.name || 'Someone', text: c.text, at: c.at }));
+        .map(({ c, l }) => ({ token: c.token, source: l.source, name: l.name, byName: cloud.people.get(c.by)?.name || 'Someone', text: c.text, at: c.at, ...(c.place ? { place: c.place } : {}) }));
     },
 
-    async commentOnFileLink(token: string, text: unknown) {
+    async commentOnFileLink(token: string, text: unknown, place: unknown = null) {
       const l = cloud.fileLinks.get(token);
       if (!l || l.stoppedAt) refuse('comment on a stopped link');
       const clean = String(text ?? '').trim();
       if (!clean || clean.length > 4000) refuse('a comment with nothing in it, or that long');
-      const row = { id: crypto.randomUUID(), token, by: personId, text: clean, at: cloud.now() };
+      const where = place == null ? null : cleanPlace(place as RawPlace);
+      if (place != null && !where) refuse('a place that is not in the file');
+      const row = { id: crypto.randomUUID(), token, by: personId, text: clean, at: cloud.now(), ...(where ? { place: where } : {}) };
       cloud.fileLinkComments.push(row);
       return row.id;
     },

@@ -64,6 +64,7 @@ import { askBeforeClosingWhileWorking } from './close-while-working.mts';
 import { createPlace } from '../shared/where-it-runs-from.mts';
 import { createSourceUpdater } from './source-updater.mts';
 import { learnShellDataDirs, recoverShellPath } from './shell-path.mts';
+import { openForThePerson } from './opens-a-program.mts';
 import { installNotifier } from './notify.mts';
 import { createCornerTag } from './corner-tag.mts';
 import { loadLiquidGlass } from './liquid-glass.mts';
@@ -607,7 +608,7 @@ async function createWindow() {
   // web-contents-created only fires for contents created after it (the first
   // fix missed the main window for exactly that reason, 2026-08-04).
   const openLink = (url: string) => {
-    if (url.startsWith('file://')) shell.openPath(decodeURIComponent(url.replace('file://', '')));
+    if (url.startsWith('file://')) void openForThePerson(shell, decodeURIComponent(url.replace('file://', '')));
     else void openInBrowser(url, { shell });
   };
 
@@ -1216,7 +1217,7 @@ async function createWindow() {
   // "see it working" is one click from the message.
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:/.test(url)) void openInBrowser(url, { shell });
-    else if (url.startsWith('file://')) shell.openPath(decodeURIComponent(url.replace('file://', '')));
+    else if (url.startsWith('file://')) void openForThePerson(shell, decodeURIComponent(url.replace('file://', '')));
     return { action: 'deny' };
   });
   // A plain link the renderer did not catch would turn the whole window into

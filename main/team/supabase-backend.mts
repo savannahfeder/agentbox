@@ -10,6 +10,7 @@ import { cleanConnections } from '../../shared/team-connections.mts';
 import { cleanMates } from '../../shared/team-departures.mts';
 import { roomsSupabase } from './rooms-supabase.mts';
 import type { LedgerLine } from './sync.mts';
+import { cleanPlace, type NotePlace, type RawPlace } from '../../shared/artifact-marks.mts';
 import type { FileLinkShare, TeamHandover } from './index.mts';
 
 const PAGE = 500;
@@ -98,8 +99,8 @@ export interface CardToPut {
 interface FileLinkRow { token: string; version: number; hash: string | null; created_at?: string; updated_at: string; comments: number }
 interface LinkViewRow { name: string; kind: string; type: string; body: string; version: number; created_at?: string; updated_at: string; owner_name: string | null; owner_avatar: string | null; mine: boolean }
 interface MyFileLinkRow { token: string; source: string; name: string; kind: string; created_at: string; updated_at: string; comments: number }
-interface LinkCommentRow { id: string; by_name: string; by_avatar: string | null; body: string; created_at: string; mine: boolean; by_owner: boolean }
-interface NewLinkCommentRow { token: string; source: string; name: string; by_name: string; body: string; created_at: string }
+interface LinkCommentRow { id: string; by_name: string; by_avatar: string | null; body: string; created_at: string; mine: boolean; by_owner: boolean; place?: unknown }
+interface NewLinkCommentRow { token: string; source: string; name: string; by_name: string; body: string; created_at: string; place?: unknown }
 
 const PERSON_COLS = 'id,email,name,avatar_url,status_text,status_until';
 const personOut = (p: PersonRow | undefined): CloudPerson | undefined => p && ({
@@ -481,7 +482,7 @@ export function supabaseBackend(client: SupabaseClient) {
     async fileLinkComments(token: string) {
       await myId();
       const rows = must<LinkCommentRow[] | null>(await client.rpc('file_link_comments_of', { tok: token }), 'reading the comments');
-      return (rows ?? []).map((c) => ({ id: c.id, byName: c.by_name, byAvatar: c.by_avatar ?? null, text: c.body, at: msOf(c.created_at), mine: !!c.mine, byOwner: !!c.by_owner }));
+      return (rows ?? []).map((c) => { const place = cleanPlace(c.place as RawPlace | null); return { id: c.id, byName: c.by_name, byAvatar: c.by_avatar ?? null, text: c.body, at: msOf(c.created_at), mine: !!c.mine, byOwner: !!c.by_owner, ...(place ? { place } : {}) }; });
     },
 
     async myFileLinks() {
@@ -493,12 +494,12 @@ export function supabaseBackend(client: SupabaseClient) {
     async newLinkComments(since: number) {
       await myId();
       const rows = must<NewLinkCommentRow[] | null>(await client.rpc('new_comments_on_my_links', { since: new Date(since).toISOString() }), 'reading new comments on your links');
-      return (rows ?? []).map((c) => ({ token: c.token, source: c.source, name: c.name, byName: c.by_name, text: c.body, at: msOf(c.created_at) }));
+      return (rows ?? []).map((c) => { const place = cleanPlace(c.place as RawPlace | null); return { token: c.token, source: c.source, name: c.name, byName: c.by_name, text: c.body, at: msOf(c.created_at), ...(place ? { place } : {}) }; });
     },
 
-    async commentOnFileLink(token: string, text: unknown) {
+    async commentOnFileLink(token: string, text: unknown, place: NotePlace | null = null) {
       await myId();
-      return must<unknown>(await client.rpc('comment_on_file_link', { tok: token, b: text }), 'sending your comment');
+      return must<unknown>(await client.rpc('comment_on_file_link', { tok: token, b: text, ...(place ? { p: place } : {}) }), 'sending your comment');
     },
 
     async getThreadFile(owner: string, threadId: string, name: string) {
