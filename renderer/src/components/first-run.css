@@ -42,12 +42,12 @@
 @keyframes ob-lit { from { fill: currentColor; fill-opacity: .38; } to { fill: #ee6018; fill-opacity: 1; } }
 
 /* Keycaps: the option key from the thread view. */
-.first-run .ob-key { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; font-family: var(--mono); font-size: 11px; line-height: 1; color: var(--text-dim); border: 1px solid var(--line-strong); }
+.first-run .ob-key { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; font-family: var(--mono); font-size: 11px; line-height: 1; color: var(--text-dim); border: 1px solid var(--line-strong); border-radius: 5px; }
 .first-run .ob-key.ob-k1 { width: 20px; padding: 0; }
 .first-run .ob-keys { display: inline-flex; gap: 3px; align-items: center; }
 
 /* Buttons: the New thread button. The keycap sits as far in from the right as from the top. */
-.first-run .ob-btn { display: inline-flex; align-items: center; gap: 12px; height: 36px; padding: 0 7px 0 14px; font-size: 15px; color: var(--text); background: var(--film-strong); border: 1px solid var(--line-strong); white-space: nowrap; transition: background .15s, border-color .15s, color .15s; }
+.first-run .ob-btn { display: inline-flex; align-items: center; gap: 12px; height: 36px; padding: 0 7px 0 14px; font-size: 15px; color: var(--text); background: var(--film-strong); border: 1px solid var(--line-strong); border-radius: 8px; white-space: nowrap; transition: background .15s, border-color .15s, color .15s; }
 .first-run .ob-btn:hover:not(:disabled) { background: var(--wash-strong); }
 .first-run .ob-btn:disabled { color: var(--text-faint); }
 /* A quiet button keeps its words where they were; under the pointer it becomes the bordered button. */
@@ -66,7 +66,7 @@
 .first-run .ob-meta { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-faint); white-space: nowrap; display: flex; align-items: center; gap: 14px; margin-right: -.12em; }
 
 /* A square tick box. */
-.first-run .ob-tick { width: 14px; height: 14px; border: 1px solid var(--line-strong); position: relative; flex: none; transition: border-color .15s; }
+.first-run .ob-tick { width: 14px; height: 14px; border: 1px solid var(--line-strong); border-radius: 4px; position: relative; flex: none; transition: border-color .15s; }
 .first-run .ob-tick.ob-on { border-color: var(--text-faint); }
 .first-run .ob-tick.ob-on::after { content: ''; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border: solid var(--text); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
 
@@ -74,10 +74,20 @@
 .first-run .ob-check { display: flex; align-items: center; justify-content: center; gap: 12px; font-family: var(--mono); font-size: 11.5px; line-height: 16px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-faint); white-space: nowrap; }
 .first-run .ob-check b { font-weight: 400; color: var(--text-dim); }
 .first-run .ob-foot { position: absolute; left: 0; right: 0; bottom: 44px; }
-.first-run .ob-sq { width: 7px; height: 7px; background: var(--text-dim); flex: none; display: inline-block; }
+.first-run .ob-sq { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); flex: none; display: inline-block; }
 .first-run .ob-sq.ob-live { background: var(--accent); }
 .first-run .ob-sq.ob-off { background: transparent; border: 1px solid var(--text-faint); }
 
 /* The key legend along the floor. */
 .first-run .ob-legend { position: absolute; left: 40px; bottom: 30px; display: flex; gap: 26px; color: var(--text-faint); font-size: 13px; }
 .first-run .ob-legend > span { display: flex; align-items: center; gap: 9px; }
+
+/* THE FIRST PAGE: the setup's sky behind it, the words on the left. */
+.first-run .ob-welcome .ob-sky { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.first-run .ob-welcome .ob-sky canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+:root[data-theme="light"] .first-run .ob-welcome { background: #fff; }
+.first-run .ob-welcome .ob-col.ob-hero { left: clamp(64px, 8.5vw, 140px); width: min(600px, 46vw); transform: translateY(-50%); z-index: 1; }
+.first-run .ob-welcome h1.ob-big { font-size: clamp(44px, 4.6vw, 66px); line-height: 1.06; letter-spacing: -0.035em; margin-top: 40px; }
+.first-run .ob-welcome .ob-lede { margin: 22px 0 0; max-width: 480px; font-size: 19px; line-height: 29px; color: var(--text-dim); }
+.first-run .ob-welcome .ob-actions { justify-content: flex-start; }
+.first-run .ob-welcome .ob-foot { left: clamp(64px, 8.5vw, 140px); right: auto; justify-content: flex-start; z-index: 1; }

@@ -28,9 +28,12 @@ describe('the tip while the first agent works', () => {
   it('before notifications, says only that you can come back', () => {
     expect(tour).toContain('busy: { words: <>This agent is working. You can leave and come back when it’s done</>');
   });
-  it('after, says a notification will tell you', () => {
-    expect(tour).toContain('You’ll get a notification when it’s done. Explore the app while you wait');
-    expect(tour).toContain("step === 'busy' && tried ? BUSY_TOLD : step === 'inPalette' ? <InPalette /> : SAY[step].words");
+  // Since w-fbe5e95dea it says the banner was sent and where to allow it: a Mac
+  // that has not allowed the app drops it without a word
+  // (tests/turning-on-notifications-says-what-happened).
+  it('after, says a banner was sent', () => {
+    expect(tour).toContain('We sent a test notification.');
+    expect(tour).toContain("step === 'busy' && tried ? BUSY_TOLD : step === 'inPalette' ? <InPalette /> :");
   });
   it('never names a part of the app it has not shown', () => {
     expect(tour).not.toMatch(/Agent Tray/i);

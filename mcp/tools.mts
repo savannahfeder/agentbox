@@ -363,7 +363,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
     },
     {
       name: 'create_repeating_task',
-      description: 'Make a new repeating task, exactly as the person would with the When menu: every day, every weekday, or one day a week, at a local time. Each run is its own thread briefed with your instruction, so write it for an agent that has seen nothing of this conversation. Use it when the person asks for something to happen regularly, rather than telling them to set it up by hand. Every run spends their plan, so only make one they asked for or agreed to. It runs on the same coding agent and model as this thread. The first run starts within a minute unless startNow is false; then it waits for its next time.',
+      description: 'Make a new repeating task, exactly as the person would with the When menu: every day, every weekday, or one day a week, at a local time. Each run is its own thread briefed with your instruction, so write it for an agent that has seen nothing of this conversation. Use it when the person asks for something to happen regularly, rather than telling them to set it up by hand. Every run spends their plan and starts on its own as their request, so on a thread it is made only with their own words there asking for something regular, quoted in askedBecause. It runs on the same coding agent and model as this thread. The first run starts within a minute unless startNow is false; then it waits for its next time.',
       schema: {
         product: z.string().optional().describe('which product it runs in; defaults to this thread\'s'),
         title: z.string().describe('the short name it is listed under, such as "Daily security review"'),
@@ -372,6 +372,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         at: z.string().describe('local time, 24-hour "HH:MM", such as "09:00"'),
         on: z.enum(['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']).optional().describe('the day, when every is week'),
         startNow: z.boolean().optional().describe('false to wait for its first time instead of running now'),
+        askedBecause: z.string().optional().describe('on a thread: the person\'s own words on it asking for this to happen regularly, quoted exactly, such as "Daily 9am, audit Mondays 10am". Without them nothing is made'),
       },
       run: (ask: NewRepeatingTask) => json(createRepeatingTask(ask, thisRun())),
     },

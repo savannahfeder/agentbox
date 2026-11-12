@@ -22,15 +22,15 @@ describe('saving the switches', () => {
     return { config: { appDir: dir }, supervisor: { onChange() {} }, store: {}, dir };
   };
 
-  it('all are off until someone turns them on', () => {
-    expect(alphaFeatures({}, { packaged: true })).toEqual({ rooms: false, teammates: false, multiplayer: false, glass: false });
+  it('rooms, teammates and glass are off until someone turns them on; multiplayer is on', () => {
+    expect(alphaFeatures({}, { packaged: true })).toEqual({ rooms: false, teammates: false, multiplayer: true, glass: false });
   });
 
   it('Rooms on is written to the config file and read back', () => {
     const w = world();
     setWorkspaceSetting(w, { key: 'alphaRooms', value: true });
     expect(JSON.parse(fs.readFileSync(path.join(w.dir, 'zero.config.json'), 'utf8')).alphaRooms).toBe(true);
-    expect(alphaFeatures(w.config, { packaged: true })).toEqual({ rooms: true, teammates: false, multiplayer: false, glass: false });
+    expect(alphaFeatures(w.config, { packaged: true })).toEqual({ rooms: true, teammates: false, multiplayer: true, glass: false });
     setWorkspaceSetting(w, { key: 'alphaRooms', value: false });
     expect(alphaFeatures(w.config).rooms).toBe(false);
     fs.rmSync(w.dir, { recursive: true, force: true });
@@ -40,10 +40,10 @@ describe('saving the switches', () => {
 
 describe('where the app reads them', () => {
   it('the snapshot carries the switches, so the renderer can gate Rooms', () => {
-    expect(read('main/ipc.mts')).toMatch(/const alpha = alphaFeatures\(config\);[\s\S]{0,600}\n\s+alpha,\n/);
+    expect(read('main/ipc.mts')).toMatch(/const alpha = alphaFeatures\(config, \{ onTeam: onTeamNow\(\) \}\);[\s\S]{0,600}\n\s+alpha,\n/);
   });
   it('Settings reads them back', () => {
-    expect(read('main/settings.mts')).toMatch(/alpha:\s*alphaFeatures\(config\)/);
+    expect(read('main/settings.mts')).toMatch(/alpha:\s*alphaFeatures\(config, \{ onTeam: onTeam\?\.\(\) \?\? false \}\)/);
   });
 });
 

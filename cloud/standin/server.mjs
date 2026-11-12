@@ -145,7 +145,7 @@ export function startStandinCloud({ port = 0, file = null, saveEveryMs = 3000 } 
       if (!handler) return send(404, { error: 'no such door' });
       return send(200, await handler(body));
     } catch (err) {
-      return send(400, { error: String(err?.message || err) });
+      return send(400, { error: String(err?.message || err), ...(typeof err?.code === 'string' ? { code: err.code } : {}) });
     }
   });
 

@@ -66,7 +66,7 @@ node $P --who startup-engineer,founder --hours 2 --focus "replies after switchin
 | `--who` | names from `people/`, `random:N` or `all` | `random:2` |
 | `--hours` / `--minutes` | how long | 1 hour |
 | `--focus` | what the team shipped and wants leaned on, in a sentence | none |
-| `--alpha` | alpha features on in every copy, e.g. `teammates` or `teammates,rooms` | off, as for anyone new |
+| `--alpha` | alpha features on in every copy, e.g. `teammates` | off, as for anyone new; a copy on a team gets Rooms without it |
 | `--stand-ins "<their words>"` | a Claude Code stand-in instead of the real one (Codex stays real on the testers' login), only with the person's own words agreeing to it for this run | the real Claude Code and Codex on this computer's plans |
 | `--stand-in-cloud` | every thread runs in a stand-in Agentbox Cloud of the copy's own (the real cloud server and sandbox, here, with the stand-in agent); a task naming Supabase, Vercel, Stripe, Expo, AWS or Sentry asks for its key. Stand-in agents, so it needs `--stand-ins` too | no cloud |
 | `--chaos` | `none`, `light`, `normal`, `heavy` | `normal` |
@@ -157,6 +157,31 @@ copies down.
    report's path. If they want them fixed, that is one thread for the lot,
    not one per issue. Copy any picture you show into the product's docs
    folder under `designs/<task id>/`.
+
+## Testing a first run, or anything a person sees first
+
+Seven rounds of testers on the new first run (w-fbe5e95dea, 2026-11-10)
+logged 80 keyboard bugs. The founder then found a dozen worse problems in
+one sitting that no tester had reported. Two causes: the focus each round
+was given asked only about keys, and the copies were nothing like her computer.
+For a first run, a tutorial or any screen a person meets first:
+
+- **Ask for judgement, not only bugs.** Tell every tester, every round, to
+  stop on each screen and say what pulls their eye two ways, what the first
+  thing to do is, and whether it looks like the rest of the app. Give them
+  the design rules to judge against: rounded corners, accent only on a dot
+  or a key, no grey on grey, words that say one thing.
+- **Follow every promise to its end.** An invite sent: did an email arrive?
+  Notifications turned on: did one show? A tutorial step: is it acting on
+  practice work or on the person's real threads? Terms: are they named
+  before an account is made? A tester that only sees the screen cannot
+  tell, so you check these yourself.
+- **Make the copy look like a real computer**: 20 chats already on it, not
+  four; a dark Mac switched to light halfway through; a team with someone on
+  it. A browser copy cannot show the Mac's own windows, banners or
+  appearance, so before you show the person, open the desktop app
+  (`npm run fresh -- --with-agents`) and click through every screen
+  yourself, in dark and in light.
 
 ## What it does not cover yet
 

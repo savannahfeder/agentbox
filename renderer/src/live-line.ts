@@ -35,6 +35,7 @@ import { resetDay } from '../../shared/usage.mts';
 import { openSignIn } from '../../shared/sign-in-ask.mts';
 import { MAC } from './this-keyboard';
 import { whyWords, type WhyCard } from './where-why';
+import { FIRST_RUN_LABEL } from './onboarding';
 import type { RunningSession, WhyNotCloud, WorkItem } from './types';
 
 // THE FIFTH STATE, AND IT IS THE ONE SOMEBODY OUTSIDE THIS BUILDING ASKED FOR.
@@ -307,6 +308,8 @@ export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null
   // An imported Claude Code session is not one of ours and has no place in any
   // of these lists; AgentThread draws its own liveness off the process.
   if (item.agent) return null;
+  // The walkthrough's practice rows are answered by the app and never started.
+  if ((item.labels ?? []).includes(FIRST_RUN_LABEL)) return null;
   // Finished is finished. The result at the foot of the conversation is the
   // news, and a mark under it about agents would be an appendix to an ending.
   if (item.status === 'done') return null;

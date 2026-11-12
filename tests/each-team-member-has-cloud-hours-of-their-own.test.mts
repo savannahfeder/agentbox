@@ -1,6 +1,7 @@
-// EACH TEAM MEMBER HAS CLOUD HOURS OF THEIR OWN: a 14-day trial, then $40 a seat.
+// EACH TEAM MEMBER HAS CLOUD HOURS OF THEIR OWN: a 7-day trial, then $40 a seat.
 //
-// The owner's plan for the multiplayer launch: every team gets 14 days free,
+// The owner's plan for the multiplayer launch: every team gets 7 days free
+// (14 until 2026-11-10, when she cut Pro's trial to 7),
 // each member with 10 cloud hours and 2 agents at once of their own; then $40
 // a member a month, each seat the same as the $40 cloud plan, 400 hours and 10
 // agents at once (2026-11-08, replacing one pool for the whole team: three
@@ -63,8 +64,8 @@ function setup({ members = [A, B], owners = [A], madeAt = MADE, start = MADE + H
 }
 
 describe('the trial', () => {
-  it('is 14 days, 10 hours and 2 agents at once a member; a seat is 400 hours and 10 agents', () => {
-    expect(TEAM).toMatchObject({ trialDays: 14, trialHoursPerMember: 10, trialAgentsPerMember: 2, hoursPerSeat: 400, agentsPerSeat: 10, dollarsPerSeat: 40 });
+  it('is 7 days, 10 hours and 2 agents at once a member; a seat is 400 hours and 10 agents', () => {
+    expect(TEAM).toMatchObject({ trialDays: 7, trialHoursPerMember: 10, trialAgentsPerMember: 2, hoursPerSeat: 400, agentsPerSeat: 10, dollarsPerSeat: 40 });
   });
 
   it('runs a member with no plan on their own trial hours, not on their free hours', async () => {
@@ -74,7 +75,7 @@ describe('the trial', () => {
     tick(HOUR);
     await a.finish(1);
     const me = await a.me();
-    expect(me.team).toMatchObject({ trial: true, hours: 10, agents: 2, usedSeconds: 3600, endsAt: MADE + 14 * DAY, owner: true });
+    expect(me.team).toMatchObject({ trial: true, hours: 10, agents: 2, usedSeconds: 3600, endsAt: MADE + 7 * DAY, owner: true });
     expect(me.free.usedSeconds).toBe(0);
   });
 
@@ -119,10 +120,10 @@ describe('the trial', () => {
     expect(await gw.room(A)).toMatchObject({ ok: false, error: 'hours' });
   });
 
-  it("ends after 14 days: back to each member's own free hours", async () => {
+  it("ends after 7 days: back to each member's own free hours", async () => {
     const { as, tick } = setup();
     const a = as(A);
-    tick(14 * DAY);
+    tick(7 * DAY);
     expect((await a.start(1)).body.ok).toBe(true);
     tick(HOUR);
     await a.finish(1);
@@ -133,7 +134,7 @@ describe('the trial', () => {
 
   it('a day before the end, it still runs', async () => {
     const { as, tick } = setup();
-    tick(13 * DAY);
+    tick(6 * DAY);
     expect((await as(A).me()).team).toMatchObject({ trial: true });
   });
 
@@ -159,7 +160,7 @@ describe('the trial', () => {
   });
 
   it('runs going when the trial ends are ended by the sweep', async () => {
-    const { gw, as, tick, stopped } = setup({ start: MADE + 14 * DAY - 60_000 });
+    const { gw, as, tick, stopped } = setup({ start: MADE + 7 * DAY - 60_000 });
     const a = as(A);
     await a.start(1);
     tick(2 * 60_000);
@@ -252,7 +253,7 @@ describe('who is on a team, as the database says', () => {
 describe('what the app makes of it', () => {
   const NOW = MADE + 5 * DAY;
   const people = [{ id: A, usedSeconds: 4.2 * 3600, running: 1 }, { id: B, usedSeconds: 3.1 * 3600, running: 0 }, { id: C, usedSeconds: 0, running: 0 }];
-  const trial = { trial: true, endsAt: MADE + 14 * DAY, seats: 0, members: 3, owner: true, agents: 2, running: 1, hours: 10, usedSeconds: 4.2 * 3600, people };
+  const trial = { trial: true, endsAt: MADE + 7 * DAY, seats: 0, members: 3, owner: true, agents: 2, running: 1, hours: 10, usedSeconds: 4.2 * 3600, people };
   const server = (team, over = {}) => ({ plan: 'none', agents: 0, hoursPerMonth: 0, running: 1, usedSeconds: 0, free: { agents: 2, hours: 5, usedSeconds: 0 }, team, ...over });
   const names = [
     { id: A, name: 'Sam Rivera', email: 's@example.com', avatarUrl: null, role: 'owner' },
@@ -276,12 +277,12 @@ describe('what the app makes of it', () => {
 
   it('the trial says its days, your hours now beside a seat after it, and the owner can pay for every seat', () => {
     const t = page(trial);
-    expect(t).toContain('9 days left in your team\'s trial');
+    expect(t).toContain('2 days left in your team\'s trial');
     expect(t).toContain('Started Nov 17');
-    expect(t).toContain('Ends Dec 1');
+    expect(t).toContain('Ends Nov 24');
     expect(t).toContain('Pay for 3 seats now · $120 a month');
     expect(t).toMatch(/Now, each person 5\.8 of 10 of your trial hours left 2 agents at once/);
-    expect(t).toMatch(/From Dec 1, each person \$40 a month 400 cloud hours a month 10 agents at once · you pay \$120 a month for 3/);
+    expect(t).toMatch(/From Nov 24, each person \$40 a month 400 cloud hours a month 10 agents at once · you pay \$120 a month for 3/);
   });
 
   it("each member's own hours left, you first, by the names the team knows", () => {
@@ -306,7 +307,7 @@ describe('what the app makes of it', () => {
   });
 
   it('on its last day it says 1 day, never 0', () => {
-    expect(teamBillingView(trial, names, A, MADE + 14 * DAY - 60_000).days).toBe(1);
+    expect(teamBillingView(trial, names, A, MADE + 7 * DAY - 60_000).days).toBe(1);
   });
 
   it('a paying team shows its price, next bill, card and last invoice to its owner', () => {

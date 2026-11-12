@@ -30,7 +30,8 @@ import { referencedFiles } from '../../shared/referenced-files.mts';
 import { shortTitle } from '../../shared/thread-title.mts';
 import { taskTitle } from '../../shared/team-tasks.mts';
 import { firstSentence } from '../../shared/thread-cards.mts';
-import { cardsFor } from '../../shared/thread-cards.mts';
+import { openTo, seenNow, sentWords, threadLink } from '../../shared/thread-link.mts';
+import { cardsFor, type WontStart } from '../../shared/thread-cards.mts';
 import fs from 'node:fs';
 import { saveAttachments, attachmentMarkdown } from '../save-attachments.mts';
 import { hasLapsed, statusEnds } from '../../shared/team-status.mts';
@@ -40,6 +41,7 @@ import type { PhoneBackendCalls, PhoneHistoryLine, PhoneInboxOptions, PhoneItem 
 import { PHONE_UNDO_HOLD_MS } from '../../shared/phone-undo.mts';
 import { SNAPSHOT_LIMITS, phoneProjectsOf, phoneEligible } from '../../shared/phone-snapshot.mts';
 import { createRooms } from './rooms.mts';
+import { isOnTeam } from '../../shared/rooms-on.mts';
 import { noticeEndedWaits } from './waits.mts';
 import { handOverDepartures } from './departures.mts';
 import type { Departure } from './departures.mts';
@@ -88,6 +90,7 @@ export interface TeamState {
   rooms?: RoomsState;
   teamMates?: BoardMate[];
   sharedFileNews?: unknown[];
+  threadTalk?: unknown[];
   /** `${slug}/${id}` then person: when they last opened that conversation. */
   seen?: Record<string, Record<string, number>>;
 }
@@ -205,6 +208,9 @@ export interface TeamRow {
   due?: unknown;
   edits?: Record<string, { gone?: boolean; text?: unknown } | undefined>;
   updatedAt?: number;
+  createdAt?: number;
+  visibility?: string;
+  visibleTo?: string[];
 }
 
 /** A line of a thread's ledger, as the team service reads it. */
@@ -236,6 +242,7 @@ export interface TeamStore {
   readThread(slug: string, id: string): { text?: string }[];
   readHistory(slug: string, id: string, opts?: { max?: number }): TeamHistoryLine[];
   answerItem(slug: string, id: string, patch: TeamAnswer): unknown;
+  threadEdit(slug: string, id: string, patch: { visibility: string; visibleTo: string[] }): unknown;
   teamPatch(slug: string, id: string, patch: { assignee: string }): unknown;
   composeItem(slug: string, fields: Record<string, unknown>): { id: string };
   commentOnASharedFile(slug: string, id: string, note: string, comment?: { name: string; file: string; text: string } | null): unknown;
@@ -281,7 +288,7 @@ export interface TeamPhone {
   stateFile: string;
 }
 
-export type TeamRoomsSetup = Pick<RoomsOptions, 'enabled' | 'device' | 'presenceFacts' | 'prefsFile'>;
+export type TeamRoomsSetup = Pick<RoomsOptions, 'device' | 'presenceFacts' | 'prefsFile'> & { enabled: (facts: { onTeam: boolean }) => boolean };
 
 export interface TeamServiceOptions {
   session?: TeamSession | null;
@@ -298,6 +305,8 @@ export interface TeamServiceOptions {
   carrierOptions?: Record<string, unknown> | null;
   /** The threads an agent is on right now, by id, so a card says so. */
   runningIds?: () => string[];
+  /** What the supervisor says it will not start, so no card says those are running. */
+  wontStart?: () => WontStart;
   /** This person's AI teammates, which the team sees on its board. */
   ownMates?: () => { id: string; name?: string; job?: string | null; openToTeam?: boolean; now?: string | null; running?: boolean; updatedAt?: number; createdAt?: number }[];
   phone?: TeamPhone | null;
@@ -334,7 +343,7 @@ const EMPTY: TeamState = { configured: false, canSignIn: false, started: false, 
 export function teamForWindow(state: TeamState | null | undefined, multiplayer: boolean) {
   if (multiplayer || !state) return state;
   const { rooms, ...rest } = state;
-  return { ...rest, configured: false, team: null, invites: [], sent: [], people: [], cards: [], teamMates: [], sharedFileNews: [] };
+  return { ...rest, configured: false, team: null, invites: [], sent: [], people: [], cards: [], teamMates: [], sharedFileNews: [], threadTalk: [] };
 }
 
 export function createTeamService({
@@ -353,6 +362,7 @@ export function createTeamService({
   rooms: roomsSetup = null,
   // The threads an agent is on right now, by id, so a card says so.
   runningIds = () => [],
+  wontStart = () => ({}),
   // This person's AI teammates, which the team sees on its board.
   ownMates = () => [],
   sharing = () => true,
@@ -389,6 +399,7 @@ export function createTeamService({
     backend: () => backend, me: () => state.me, team: () => state, now, log, onChange,
     findFile: (ref, how = {}) => findFileToSend({ ref, meant: how.meant === true, products: store.listProducts({ includeArchived: true }) }),
     ...roomsSetup,
+    enabled: () => roomsSetup.enabled({ onTeam: isOnTeam(state) }),
   }) : null;
   if (site) QRCode.toString(site, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }).then((qr) => { siteQr = qr; set({ phoneSiteQr: qr }); }).catch(() => {});
 
@@ -746,7 +757,7 @@ export function createTeamService({
     // Off, the window shows no team and no Team / Private choice, so nothing
     // goes up, and what was up comes down as a private thread's card does.
     const listCards = (): SyncCard[] => (!sharing() ? [] : [
-      ...cardsFor({ products: products(), readItems: (p) => disk.readWorkItems(p.dir), since: state.me ? kept().getSince(state.me.id) : null, me: state.me?.id ?? null, running: runningIds() }),
+      ...cardsFor({ products: products(), readItems: (p) => disk.readWorkItems(p.dir), since: state.me ? kept().getSince(state.me.id) : null, me: state.me?.id ?? null, running: runningIds(), wontStart: wontStart() }),
       ...(ownMates() ?? []).map((t) => mateCard(t, { now: t.now ?? null, running: !!t.running, at: t.updatedAt ?? t.createdAt ?? 0 })),
     ]);
     threadShare = createThreadShare({
@@ -800,7 +811,7 @@ export function createTeamService({
   }
 
   return {
-    state: () => ({ ...state, sharedFileNews: threadShare?.fileNews() ?? [], ...(rooms ? { rooms: rooms.state() } : {}) }),
+    state: () => ({ ...state, sharedFileNews: threadShare?.fileNews() ?? [], threadTalk: threadShare?.talk() ?? [], ...(rooms ? { rooms: rooms.state() } : {}) }),
     rooms,
     /** What the desktop's banner was told arrived, for her phone's alerts (main/phone-alerts.mts). */
     phoneArrivals: (list: unknown[], needsYou: unknown[]) => phoneInbox?.arrivals(list, needsYou),
@@ -1178,9 +1189,14 @@ export function createTeamService({
       if (to === state.me.id) throw new Error('that thread is yours already');
       const { words, files, tooBig } = briefOfThread(row, product);
       const left = tooBig.length ? `(Not sent: ${tooBig.join(', ')}, over 10 MB. Ask ${state.me.name || 'me'} for ${tooBig.length === 1 ? 'it' : 'them'}.)` : '';
+      const brief = [words, left].filter(Boolean).join('\n\n');
+      // The task leads back to the thread, opened to them as Share's Send opens it.
+      const seen = seenNow(row, product, kept().getSince(state.me.id));
+      if (seen !== 'team') store.threadEdit(slug, id, openTo(seen, row.visibleTo, [to]));
+      const link = threadLink(state.me.id, id);
       const made = await this.giveTask(to, {
         title: row.label || row.title,
-        body: [words, left].filter(Boolean).join('\n\n'),
+        body: link ? sentWords(row.label || row.title || '', link, brief) : brief,
         priority: row.priority, due: row.due && row.due !== 'none' ? row.due : undefined, files,
       });
       // As your own words: a note would be drawn as the agent's checkpoint.
@@ -1235,6 +1251,9 @@ export function createTeamService({
 
     /** Those folders, as projects the file pane can read. */
     sharedThreadProducts: () => threadShare?.products() ?? [],
+
+    /** A teammate's file by the sha256 of its bytes, from a thread shared with this person (thread-share.mts). */
+    sharedFileByHash: (hash: string, o?: { fetch?: boolean }) => threadShare?.fileByHash(hash, o) ?? Promise.resolve(null),
 
     // Words to a thread's owner. The cloud decides who may: whoever can read the card.
     async commentOnThread(owner: string, threadId: string, text: unknown) {

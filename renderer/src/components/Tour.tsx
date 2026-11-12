@@ -21,7 +21,7 @@ const SETTLE_MS = 500;
 const SEEN_MS = 1000;
 /** Set once the tutorial has sent its sample banner. */
 const NOTIFY_TRIED = 'zero.tour.notifyTried';
-const BUSY_TOLD = <>You’ll get a notification when it’s done. Explore the app while you wait</>;
+const BUSY_TOLD = <>We sent a test notification. Explore the app while you wait</>;
 
 const K = ({ k }: { k: string }) => <span className="tour-k">{k}</span>;
 
@@ -44,14 +44,16 @@ const SAY: Record<TourStep, { words: JSX.Element; side: Side }> = {
   palette: { words: <>Press <K k={CMD} /><K k="K" /> to find anything {Name} can do</>, side: 'below' },
   urgent: { words: <>Urgent threads move up your list, and their agents start first</>, side: 'below-right' },
 };
+const PRACTICE_SEND = <>Press <K k={CMD} /><K k="↵" /> to send this practice thread</>;
 /** The urgent tip asks for nothing, so it goes by itself. */
 const URGENT_MS = 6000;
 
 /** Inside ⌘K: one thing worth trying on the thread it acts on, and the way out. */
 function InPalette() {
   const urgent = [...document.querySelectorAll('.palette-label')].some((l) => /Priority: Urgent/.test(l.textContent ?? ''));
-  const here = document.querySelector('.focus-body') ? 'this thread' : 'the selected thread';
-  return urgent
+  // Home has no list on screen, so there is no selected thread to name there.
+  const here = document.querySelector('.focus-body') ? 'this thread' : document.querySelector('.list-pane .row.selected') ? 'the selected thread' : null;
+  return urgent && here
     ? <>Type <K k="urgent" /> and press <K k="↵" /> to make {here} urgent, or <K k="esc" /> to close</>
     : <>Type what you want to do and press <K k="↵" />, or <K k="esc" /> to close</>;
 }
@@ -95,7 +97,7 @@ function targetsOf(step: TourStep): HTMLElement[] {
     // On the list, at the word Urgent on the thread just raised.
     case 'urgent': if (urgentCell()) return one(urgentCell());
     // falls through
-    case 'palette': return one(document.querySelector('.tm-tab')?.parentElement ?? document.querySelector('.thread-crumb-from')?.parentElement);
+    case 'palette': return one(document.querySelector('.tm-tab')?.parentElement ?? document.querySelector('.thread-crumb-from')?.parentElement ?? document.querySelector('.workspace-find button'));
   }
 }
 
@@ -117,6 +119,12 @@ function snug(el: HTMLElement): Box {
     if (r.width) { x0 = Math.min(x0, r.left); x1 = Math.max(x1, r.right); }
   }
   if (x0 === Infinity) { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; }
+  // The unread dot is the row's ::before, which no text or icon walk finds.
+  const mark = getComputedStyle(el, '::before');
+  if (mark.content && mark.content !== 'none' && mark.position === 'absolute') {
+    const at = el.getBoundingClientRect().left + parseFloat(mark.left);
+    if (!Number.isNaN(at)) x0 = Math.min(x0, at);
+  }
   return { x: x0 - 14, y: y0 - 12, w: x1 - x0 + 28, h: y1 - y0 + 24 };
 }
 
@@ -129,7 +137,7 @@ function boxOf(step: TourStep, els: HTMLElement[]): Box | null {
   return { x, y, w: Math.max(...rs.map((r) => r.right)) - x, h: Math.max(...rs.map((r) => r.bottom)) - y };
 }
 
-function readScreen(view: string, thread: boolean, covered: boolean, palette: boolean): TourScreen {
+function readScreen(view: string, thread: boolean, covered: boolean, palette: boolean, answering: boolean): TourScreen {
   const card = document.querySelector<HTMLElement>('.tc-card');
   return {
     composer: !card ? 'none' : card.classList.contains('tc-inline') ? 'inline' : 'card',
@@ -143,7 +151,8 @@ function readScreen(view: string, thread: boolean, covered: boolean, palette: bo
     thread,
     preparing: stillPreparing({ thread, onPage: !!document.querySelector('.one-catching-up'), ready: document.querySelectorAll(ROWS).length, writing: document.querySelectorAll('.list-pane .row[data-catching-up]').length }),
     typing: thread && !!document.activeElement?.closest('.dock-card'),
-    busy: thread && !!document.querySelector('.live-word.is-shimmering'),
+    busy: thread && !!document.querySelector('.live-word.is-shimmering, .live-brief.live-queued'),
+    answering: thread && answering,
     menu: !!document.querySelector('.tc-menu'),
     options: !!document.querySelector('.opt-row'),
     palette,
@@ -153,8 +162,12 @@ function readScreen(view: string, thread: boolean, covered: boolean, palette: bo
 
 const same = (a: Box | null, b: Box | null) => (!a || !b ? a === b : a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h);
 
-export function Tour({ tour, view, thread, covered, palette, onChange, onPoint, onStep }: {
+export function Tour({ tour, practice = false, answering = false, view, thread, covered, palette, onChange, onPoint, onStep }: {
   tour: TourState | null;
+  /** Home's box holds the walkthrough's practice task. */
+  practice?: boolean;
+  /** The practice thread on screen is waiting for its answer. */
+  answering?: boolean;
   view: string;
   thread: boolean;
   /** Settings, ⌘K or another card is over the window. */
@@ -199,6 +212,7 @@ export function Tour({ tour, view, thread, covered, palette, onChange, onPoint, 
     setTried(true);
     void (window.zero as { notifyTest?: () => Promise<unknown> } | undefined)?.notifyTest?.();
   };
+  const openNotifySettings = () => { void (window.zero as { notifySettings?: () => Promise<unknown> } | undefined)?.notifySettings?.(); };
   const ended = (t: TourState | null) => tourOver(t);
   const hadEnded = useRef(ended(tour));
   useEffect(() => {
@@ -216,8 +230,7 @@ export function Tour({ tour, view, thread, covered, palette, onChange, onPoint, 
   useEffect(() => {
     if (!live || !tour) { if (shown.current) { shown.current = null; setStep(null); } return undefined; }
     const read = () => {
-      const screen = readScreen(view, thread, covered, palette);
-      if (screen.typing && !tour.done.includes('reply')) { onChange(finishLesson(tour, 'reply')); return; }
+      const screen = readScreen(view, thread, covered, palette, answering);
       const rawStep = tourStep(tour, screen);
       // Told to go and explore, nobody is then asked to come back and watch.
       const wanted = rawStep === 'working' && tried ? null : rawStep;
@@ -256,7 +269,7 @@ export function Tour({ tour, view, thread, covered, palette, onChange, onPoint, 
     read();
     const t = setInterval(read, 120);
     return () => clearInterval(t);
-  }, [live, tour, view, thread, covered, palette, onChange, tried]);
+  }, [live, tour, view, thread, covered, palette, answering, onChange, tried]);
 
   // THE CARD, beside the glow, kept inside the window.
   useEffect(() => {
@@ -338,8 +351,9 @@ export function Tour({ tour, view, thread, covered, palette, onChange, onPoint, 
       {step !== 'palette' && !(step === 'urgent' && !urgentCell()) && step !== 'busy' && step !== 'gettingReady' && step !== 'inPalette' && step !== 'startHere' && <div key={`glow-${step}`} className="tour-glow" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} aria-hidden="true" />}
       <div key={`card-${step}`} ref={cardRef} className="tour-card" role="status"
         style={cardAt ? { left: cardAt.left, top: cardAt.top } : { left: -9999, top: -9999 }}>
-        <span className="tour-say">{step === 'busy' && tried ? BUSY_TOLD : step === 'inPalette' ? <InPalette /> : SAY[step].words}</span>
+        <span className="tour-say">{step === 'busy' && tried ? BUSY_TOLD : step === 'inPalette' ? <InPalette /> : step === 'send' && practice ? PRACTICE_SEND : SAY[step].words}</span>
         {step === 'busy' && !tried && <button type="button" className="tour-act" onClick={tryNotifications}>Turn on notifications</button>}
+        {step === 'busy' && tried && MAC && <button type="button" className="tour-act" onClick={openNotifySettings}>Didn’t see it? Open settings</button>}
       </div>
     </>
   );

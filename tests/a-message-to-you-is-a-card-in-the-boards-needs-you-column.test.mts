@@ -45,6 +45,7 @@ describe('the board with a message to you', () => {
 describe('in the app', () => {
   it('draws no strip of rows above the board', () => {
     expect(app).not.toContain('{leadCount > 0 && <div className="list th-table">{leadRowsDrawn(allLeads)}</div>}');
-    expect(app).toContain('lead={leadCount ? { count: leadCount, cards: leadCardsDrawn(allLeads) } : undefined}');
+    expect(app).toContain('<InboxBoard items={items} lead={boardLead}');
+    expect(app).toContain('count: fromPeopleAbove');
   });
 });

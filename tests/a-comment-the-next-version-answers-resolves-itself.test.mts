@@ -125,6 +125,8 @@ beforeEach(async () => {
   const n1 = { do: 'note', id: 'n1', file: 'plan.md', place: { kind: 'whole' }, text: 'Shorter intro' };
   store.fileMark('website', thread.id, n1);
   await noteToItsAgent({ store, supervisor, product: 'website', id: thread.id, mark: n1 });
+  // An answer is a version written after the send. A test's next line can land in the same millisecond, which no agent's does.
+  await new Promise((r) => setTimeout(r, 3));
 });
 
 describe('on a thread in the store', () => {
