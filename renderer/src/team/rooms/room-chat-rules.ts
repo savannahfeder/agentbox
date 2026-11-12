@@ -43,6 +43,15 @@ export function storedName(name: string, now = Date.now(), rand = Math.random().
   return `${now.toString(36)}-${rand}-${safe}`;
 }
 
+/** A chat made on first use: every caller gets the one made, and a failed try is tried again next time. */
+export function madeOnce(make: () => Promise<string>): () => Promise<string> {
+  let made: Promise<string> | null = null;
+  return () => {
+    made ??= make().catch((e: unknown) => { made = null; throw e; });
+    return made;
+  };
+}
+
 /** The stored name of a file sent in the chat, from a link in a message; null for a web address or anything else. */
 export const attachedName = (href: string): string | null => /^attachments\/([A-Za-z0-9][\w.-]{0,159})$/.exec(href)?.[1] ?? null;
 

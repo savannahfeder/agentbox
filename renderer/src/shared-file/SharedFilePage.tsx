@@ -14,6 +14,10 @@ import {
 import { SharedSignIn, type SignInFor } from './SharedSignIn';
 import { LinkEditor } from './LinkEditor';
 import { TableView } from '../components/TableView';
+import { FilmPlayer } from '../components/FilmPlayer';
+import { PinMarks, spotIn } from '../components/PinMarks';
+import { draftWords, filmMarks, filmPins, picturePins, pinNumbers, placeLabel, placeToSend, quoteOf, type FileKindHere } from './link-notes';
+import type { NotePlace } from '../../../shared/artifact-marks.mts';
 import { Name } from '../../../shared/product-name.mjs';
 import { JOIN_SCHEME } from '../../../shared/room-links.mts';
 import '../components/doc-reading.css';
@@ -153,6 +157,24 @@ export function SharedFilePage({ token, client, finishing = null }: {
   const [peek, setPeek] = useState<{ version: LinkVersion; body: string } | null>(null);
   const openComments = (on: boolean) => { setCommentsOpen(on); if (on) { setHistoryOpen(false); setPeek(null); } };
   const openHistory = (on: boolean) => { setHistoryOpen(on); if (on) setCommentsOpen(false); else setPeek(null); };
+  const kind: FileKindHere = !file ? 'other' : file.kind === 'video' ? 'film' : file.kind === 'image' ? 'picture' : file.kind === 'markdown' && !isTable(file) ? 'words' : 'other';
+  const [chosen, setChosen] = useState<string | null>(null);
+  const [draft, setDraft] = useState<NotePlace | null>(null);
+  const [wholeFilm, setWholeFilm] = useState(false);
+  const [filmNow, setFilmNow] = useState(0);
+  const [seek, setSeek] = useState<{ s: number; at: number } | null>(null);
+  const [hold, setHold] = useState(0);
+  const sendTo = placeToSend(kind, draft, filmNow, wholeFilm);
+  const numbers = useMemo(() => pinNumbers(comments ?? []), [comments]);
+  const pick = (id: string) => {
+    const c = comments?.find((x) => x.id === id);
+    if (!c) return;
+    setChosen(id === chosen ? null : id);
+    openComments(true);
+    if (c.place?.kind === 'time') setSeek({ s: c.place.s, at: Date.now() });
+  };
+  const pointAt = (place: NotePlace | null) => { setDraft(place); setWholeFilm(false); setChosen(null); if (place) openComments(true); };
+  const notes: Notes = { comments: comments ?? [], chosen, draft, next: String(numbers.size + 1), seek, hold, onTime: setFilmNow, onPlace: pointAt, onPick: pick };
   // Signing in to comment comes back to the comments; to open or edit, back to the file.
   const signedInNow = async () => {
     setAsking(null);
@@ -208,7 +230,7 @@ export function SharedFilePage({ token, client, finishing = null }: {
   } else {
     body = (
       <FilePage
-        token={token} file={load.file} piece={piece}
+        token={token} file={load.file} piece={piece} notes={peek ? undefined : notes}
         edit={editing && !peek ? { save, saved } : null}
         peek={peek ? { ...peek, restore: () => restore(peek.version), back: () => setPeek(null) } : null}
       />
@@ -227,12 +249,19 @@ export function SharedFilePage({ token, client, finishing = null }: {
       {body}
       {commentsOpen && (
         <aside className="sf-panel" aria-label="Comments">
-          <PanelHead title="Comments" onClose={() => setCommentsOpen(false)} />
+          <PanelHead title="Comments" count={comments?.length ?? 0} onClose={() => setCommentsOpen(false)} />
           {file && (
             <Comments
               file={file} comments={comments} signedIn={signedIn}
               onAsk={(how) => ask(how, 'comment')}
-              post={async (words) => { await postComment(asMe, token, words); setComments(await readComments(anyone, token)); }}
+              placeOf={(c) => placeLabel(c, numbers)} chosen={chosen} onPick={pick}
+              where={draftWords(kind, sendTo)} canClear={!!sendTo} onClear={() => { if (draft) setDraft(null); else setWholeFilm(true); }}
+              onWriting={() => setHold((n) => n + 1)}
+              post={async (words) => {
+                await postComment(asMe, token, words, sendTo);
+                setDraft(null); setWholeFilm(false);
+                setComments(await readComments(anyone, token));
+              }}
               remove={async (id) => { await removeComment(asMe, id); setComments(await readComments(anyone, token)); }}
             />
           )}
@@ -294,10 +323,10 @@ export function TopBar({ count, open, onComments, openIn = null, history = null,
   );
 }
 
-function PanelHead({ title, onClose }: { title: string; onClose: () => void }) {
+function PanelHead({ title, count = 0, onClose }: { title: string; count?: number; onClose: () => void }) {
   return (
     <div className="sf-panel-head">
-      <h2>{title}</h2>
+      <h2>{title}{count ? <span>{count}</span> : null}</h2>
       <button type="button" className="sf-panel-close" aria-label={`Close ${title.toLowerCase()}`} onClick={onClose}>
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
       </button>
@@ -344,8 +373,22 @@ type Piece = (name: string) => Promise<Uint8Array | null>;
 type EditHands = { save: (whole: string) => void; saved: null | 'saving' | 'saved' | { error: string } };
 type Peek = { version: LinkVersion; body: string; restore: () => Promise<void>; back: () => void };
 
+/** The comments as the file draws them, and how a click on the file points one at a place. */
+interface Notes {
+  comments: FileComment[];
+  chosen: string | null;
+  draft: NotePlace | null;
+  /** The number the pin being placed will have. */
+  next: string;
+  seek: { s: number; at: number } | null;
+  hold: number;
+  onTime: (s: number) => void;
+  onPlace: (place: NotePlace | null) => void;
+  onPick: (id: string) => void;
+}
+
 /** The file on its own: its title, who shared it, and the file. */
-export function FilePage({ token, file, piece, edit = null, peek = null }: { token: string; file: SharedFile; piece?: Piece; edit?: EditHands | null; peek?: Peek | null }) {
+export function FilePage({ token, file, piece, notes, edit = null, peek = null }: { token: string; file: SharedFile; piece?: Piece; notes?: Notes; edit?: EditHands | null; peek?: Peek | null }) {
   const table = isTable(file);
   const kept = table || file.kind === 'image' || file.kind === 'pdf' || file.kind === 'video';
   // An earlier copy of a page is framed from its words, as the site's /raw holds only the current one.
@@ -362,7 +405,7 @@ export function FilePage({ token, file, piece, edit = null, peek = null }: { tok
           {saved && <> · <span className={typeof saved === 'object' ? 'sf-unsaved' : undefined} role="status">{saved === 'saving' ? 'Saving…' : saved === 'saved' ? 'Saved' : `Not saved. ${saved.error}`}</span></>}
         </p>
       </div>
-      <section className="sf-file" aria-label={file.name}><FileBody token={token} file={shown} piece={piece} edit={peek ? null : edit} /></section>
+      <section className="sf-file" aria-label={file.name}><FileBody token={token} file={shown} piece={piece} notes={peek ? undefined : notes} edit={peek ? null : edit} /></section>
     </main>
   );
 }
@@ -402,7 +445,7 @@ function Download({ token, file }: { token: string; file: SharedFile }) {
 }
 
 /** A film, its pieces read in order and played once they are all here. */
-function FilmBody({ token, file, piece }: { token: string; file: SharedFile; piece?: Piece }) {
+function FilmBody({ token, file, piece, notes }: { token: string; file: SharedFile; piece?: Piece; notes?: Notes }) {
   const [url, setUrl] = useState<string | null>(null);
   const [done, setDone] = useState(0);
   const [failed, setFailed] = useState(false);
@@ -422,13 +465,91 @@ function FilmBody({ token, file, piece }: { token: string; file: SharedFile; pie
   }, [token, file.body, file.type, piece]); // eslint-disable-line react-hooks/exhaustive-deps
   if (failed) return <div className="sf-state"><p>This film did not load.</p></div>;
   if (!url) return <div className="sf-video is-loading" aria-busy="true" aria-label="Loading"><i style={{ width: `${Math.round(done * 100)}%` }} /></div>;
-  return <div className="sf-video"><video src={url} controls playsInline preload="metadata" aria-label={file.name} /></div>;
+  const spot = notes?.draft?.kind === 'time' && typeof notes.draft.x === 'number' && typeof notes.draft.y === 'number' ? { x: notes.draft.x, y: notes.draft.y, label: notes.next } : null;
+  return <div className="sf-video">
+    <FilmPlayer url={url} name={file.name} wide
+      marks={notes ? filmMarks(notes.comments, notes.chosen) : []} pins={notes ? filmPins(notes.comments, notes.chosen) : []} draft={spot}
+      seek={notes?.seek ?? null} hold={notes?.hold} onMark={notes?.onPick} onTime={notes?.onTime}
+      onSpot={notes ? ({ s, x, y }) => notes.onPlace({ kind: 'time', s: Math.round(s * 10) / 10, x, y }) : undefined} />
+  </div>;
 }
 
 // A page framed from the copy this page holds has no headers of its own, so it carries the same rules the site's /raw sends.
 const FRAMED_PAGE_RULES = `<meta http-equiv="Content-Security-Policy" content="default-src * data: blob: 'unsafe-inline' 'unsafe-eval'; connect-src 'none'; form-action 'none'">`;
 
-export function FileBody({ token, file, piece, edit = null }: { token: string; file: SharedFile; piece?: Piece; edit?: EditHands | null }) {
+/** Every text range in `root` that reads `quote`, across the elements it runs over. */
+function rangesOf(root: HTMLElement, quote: string): Range[] {
+  const nodes: Text[] = [];
+  const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let n = walk.nextNode(); n; n = walk.nextNode()) nodes.push(n as Text);
+  // The page's text with each run of space as one, and where each of its letters came from.
+  let flat = '';
+  const from: [Text, number][] = [];
+  for (const node of nodes) {
+    for (let i = 0; i < node.data.length; i++) {
+      const space = /\s/.test(node.data[i]);
+      if (space && flat.endsWith(' ')) continue;
+      flat += space ? ' ' : node.data[i];
+      from.push([node, i]);
+    }
+  }
+  const out: Range[] = [];
+  for (let at = flat.indexOf(quote); at >= 0 && out.length < 20; at = flat.indexOf(quote, at + quote.length)) {
+    const r = document.createRange();
+    const [a, ai] = from[at];
+    const [b, bi] = from[at + quote.length - 1];
+    r.setStart(a, ai);
+    r.setEnd(b, bi + 1);
+    out.push(r);
+  }
+  return out;
+}
+
+type Highlights = { set(name: string, h: unknown): void; delete(name: string): void };
+declare const Highlight: { new (...ranges: Range[]): unknown } | undefined;
+
+/** A document, the words its comments quote marked in it, and words picked here are what the next comment is about. */
+function DocBody({ body, notes }: { body: string; notes?: Notes }) {
+  const box = useRef<HTMLDivElement | null>(null);
+  const quotes = (notes?.comments ?? []).flatMap((c) => (c.place?.kind === 'quote' ? [{ id: c.id, text: c.place.text }] : []));
+  const lit = notes?.draft?.kind === 'quote' ? notes.draft.text : quotes.find((q) => q.id === notes?.chosen)?.text ?? null;
+  const key = JSON.stringify([quotes.map((q) => q.text), lit]);
+  useEffect(() => {
+    const marks = (globalThis.CSS as unknown as { highlights?: Highlights } | undefined)?.highlights;
+    const root = box.current;
+    if (!marks || typeof Highlight === 'undefined' || !root) return undefined;
+    marks.set('sf-quoted', new Highlight(...quotes.flatMap((q) => rangesOf(root, q.text))));
+    marks.set('sf-quoted-on', new Highlight(...(lit ? rangesOf(root, lit) : [])));
+    return () => { marks.delete('sf-quoted'); marks.delete('sf-quoted-on'); };
+  }, [key, body]); // eslint-disable-line react-hooks/exhaustive-deps
+  const picked = () => { const q = quoteOf(window.getSelection()?.toString() ?? ''); if (q) notes?.onPlace(q); };
+  return <div ref={box} className="sf-doc" onMouseUp={notes ? picked : undefined} onKeyUp={notes ? picked : undefined}>
+    <div className="markdown doc-prose"><ReactMarkdown remarkPlugins={MD_PLUGINS} components={MD_PARTS}>{body}</ReactMarkdown></div>
+  </div>;
+}
+
+/** A picture, its comments' pins on it, and a click on it pins the next one. */
+function PictureBody({ url, name, notes, onBroken }: { url: string | null; name: string; notes?: Notes; onBroken: () => void }) {
+  const box = useRef<HTMLDivElement | null>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return undefined;
+    const measure = () => setSize({ w: el.clientWidth, h: el.clientHeight });
+    const seen = new ResizeObserver(measure);
+    seen.observe(el);
+    return () => seen.disconnect();
+  }, []);
+  const draft = notes?.draft?.kind === 'pin' ? { x: notes.draft.x, y: notes.draft.y } : null;
+  return <div className="sf-image">
+    <div ref={box} className={`sf-pinbox${notes ? ' can-pin' : ''}`} onClick={notes ? (e) => { if (!(e.target as HTMLElement).closest('.av-pin')) notes.onPlace({ kind: 'pin', ...spotIn(e.currentTarget, e) }); } : undefined}>
+      <img src={url ?? undefined} alt={name} onError={onBroken} />
+      {notes && <PinMarks pins={picturePins(notes.comments, notes.chosen)} draft={draft} draftLabel={notes.next} size={size} onPick={notes.onPick} />}
+    </div>
+  </div>;
+}
+
+export function FileBody({ token, file, piece, notes, edit = null }: { token: string; file: SharedFile; piece?: Piece; notes?: Notes; edit?: EditHands | null }) {
   const bytes = useMemo(() => {
     if (file.kind !== 'image' && file.kind !== 'pdf') return null;
     try { return fileBytes(file); } catch { return null; }
@@ -437,7 +558,7 @@ export function FileBody({ token, file, piece, edit = null }: { token: string; f
   useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
   const [unreadable, setUnreadable] = useState(false);
   const pdf = useCallback(async () => bytes ?? new Uint8Array(), [bytes]);
-  if (file.kind === 'video') return <FilmBody token={token} file={file} piece={piece} />;
+  if (file.kind === 'video') return <FilmBody token={token} file={file} piece={piece} notes={notes} />;
   if (isTable(file)) {
     const onSave = edit ? async (text: string) => { edit.save(text); return { ok: true }; } : undefined;
     return <div className="sf-table"><TableView text={file.body} path={file.name} mode="full" storeKey={`link:${token}`} onSave={onSave} /></div>;
@@ -449,10 +570,10 @@ export function FileBody({ token, file, piece, edit = null }: { token: string; f
       const head = file.body.slice(0, file.body.length - body.length);
       return <div className="sf-doc"><LinkEditor text={body} label={file.name} onWords={(md) => edit.save(head + md)} /></div>;
     }
-    return <div className="sf-doc"><div className="markdown doc-prose"><ReactMarkdown remarkPlugins={MD_PLUGINS} components={MD_PARTS}>{body}</ReactMarkdown></div></div>;
+    return <DocBody body={body} notes={notes} />;
   }
   if ((file.kind === 'image' || file.kind === 'pdf') && (!bytes || unreadable)) return <div className="sf-state"><p>This file did not load.</p></div>;
-  if (file.kind === 'image') return <div className="sf-image"><img src={url ?? undefined} alt={file.name} onError={() => setUnreadable(true)} /></div>;
+  if (file.kind === 'image') return <PictureBody url={url} name={file.name} notes={notes} onBroken={() => setUnreadable(true)} />;
   if (file.kind === 'pdf') return <div className="sf-pdf"><PdfPages load={pdf} name={file.name} /></div>;
   // No allow-same-origin: this page holds the viewer's sign-in, and the page shared runs its own scripts.
   // Only signed in can read a link kept to the people added, which the site's /raw is not.
@@ -461,9 +582,19 @@ export function FileBody({ token, file, piece, edit = null }: { token: string; f
     sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms" referrerPolicy="no-referrer" />;
 }
 
-export function Comments({ file, comments, signedIn, onAsk, post, remove }: {
+export function Comments({ file, comments, signedIn, onAsk, post, remove, placeOf = () => null, chosen = null, onPick, where = null, canClear = false, onClear, onWriting }: {
   file: SharedFile; comments: FileComment[] | null; signedIn: boolean; onAsk: (how: 'sign-in' | 'sign-up') => void;
   post: (words: string) => Promise<void>; remove: (id: string) => Promise<void>;
+  /** Where a comment points, in the app's words; null on the whole file. */
+  placeOf?: (c: FileComment) => string | null;
+  chosen?: string | null;
+  onPick?: (id: string) => void;
+  /** Where the comment being written goes, or how to point it at a place. */
+  where?: string | null;
+  canClear?: boolean;
+  onClear?: () => void;
+  /** Typing has begun, so a playing film stops on the moment it is about. */
+  onWriting?: () => void;
 }) {
   const [words, setWords] = useState('');
   const [busy, setBusy] = useState(false);
@@ -498,13 +629,17 @@ export function Comments({ file, comments, signedIn, onAsk, post, remove }: {
     <div className="sf-comments">
       {comments && comments.length > 0 && (
         <ol className="sf-list">
-          {comments.map((c) => (
-            <li key={c.id} className="sf-comment">
+          {comments.map((c) => {
+            const placed = placeOf(c);
+            const quoted = c.place?.kind === 'quote';
+            return (
+            <li key={c.id} className={`sf-comment${chosen === c.id ? ' is-on' : ''}`}>
               <span className="sf-face" aria-hidden="true">{c.byAvatar ? <img src={c.byAvatar} alt="" referrerPolicy="no-referrer" /> : initialOf(c.byName)}</span>
               <div className="sf-said">
                 <div className="sf-who">
                   <b>{c.byName}</b>
                   {c.byOwner && <span className="sf-owner">Owner</span>}
+                  {placed && !quoted && <button type="button" className="sf-at" onClick={() => onPick?.(c.id)}>{/^\d/.test(placed) ? `at ${placed}` : placed}</button>}
                   <time dateTime={new Date(c.createdAt).toISOString()}>{commentWhen(c.createdAt)}</time>
                   {signedIn && (c.mine || file.mine) && (
                     <button type="button" className={`sf-remove${removing === c.id ? ' is-asking' : ''}`} onBlur={() => setRemoving(null)} onClick={() => void take(c.id)}>
@@ -512,16 +647,27 @@ export function Comments({ file, comments, signedIn, onAsk, post, remove }: {
                     </button>
                   )}
                 </div>
+                {quoted && <button type="button" className="sf-quote" onClick={() => onPick?.(c.id)}>{placed}</button>}
                 <p>{c.body}</p>
               </div>
             </li>
-          ))}
+            );
+          })}
         </ol>
       )}
       {signedIn ? (
         <form className="sf-write" onSubmit={(e) => { e.preventDefault(); void send(); }}>
-          <textarea ref={box} value={words} rows={3} placeholder={openToAnyone(file) ? 'Add a comment anyone with the link can read' : 'Add a comment'} aria-label="Add a comment"
-            onChange={(e) => { setWords(e.target.value); setError(null); }}
+          {where && (
+            <p className={`sf-where${canClear ? ' is-set' : ''}`}>
+              <span>{where}</span>
+              {canClear && <button type="button" aria-label="Comment on the whole file" title="Comment on the whole file" onClick={onClear}>
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><path d="M5 5l6 6M11 5l-6 6" /></svg>
+              </button>}
+            </p>
+          )}
+          <textarea ref={box} value={words} rows={3} placeholder="Add a comment" aria-label="Add a comment"
+            onFocus={onWriting}
+            onChange={(e) => { setWords(e.target.value); setError(null); if (!words) onWriting?.(); }}
             onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void send(); } }} />
           <div className="sf-write-row">
             {left < 400 && <span className={`sf-left${left < 0 ? ' is-over' : ''}`}>{left < 0 ? `${-left} over 4000` : `${left} left`}</span>}

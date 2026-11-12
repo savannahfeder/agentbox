@@ -72,7 +72,7 @@ describe('how far a thing got', () => {
 describe('the page', () => {
   const page = read('renderer/src/team/TodayPage.tsx');
   it('unfolds "and N more" where it stands', () => {
-    expect(page).toMatch(/setOpen\(true\)/);
+    expect(page).toMatch(/setOpenedIn\(range\)/);
     expect(page).not.toMatch(/onClick=\{onMore\}/);
   });
   it('draws what a row says', () => {

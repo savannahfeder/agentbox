@@ -41,10 +41,10 @@ describe('the words', () => {
     expect(shareWords.editedBy('Theo', { updatedAt: new Date(2026, 10, 3, 9, 0).getTime() }, now)).toBe('Edited by Theo Nov 3');
   });
   // Asked the same day: pressing Stop sharing only changed the button's words, so it was not clear it stopped.
-  it('ask before stopping, saying what stopping does, and count the comments it deletes', () => {
+  it('ask before stopping, saying what stopping does and that its comments stay in the thread', () => {
     expect(shareWords.stopConfirm(0)).toBe('Stop sharing? The link stops working for everyone.');
-    expect(shareWords.stopConfirm(1)).toBe('Stop sharing? The link stops working for everyone, and its comment is deleted.');
-    expect(shareWords.stopConfirm(3)).toMatch(/its 3 comments are deleted\.$/);
+    expect(shareWords.stopConfirm(1)).toBe('Stop sharing? The link stops working for everyone. Its comment stays in the thread.');
+    expect(shareWords.stopConfirm(3)).toBe('Stop sharing? The link stops working for everyone. Its comments stay in the thread.');
   });
   // Asked the same day: once the panel shut, the shared globe looked like every other mark.
   it('put the word Shared on the mark of a shared file, drawn as a rounded button in both headers', () => {

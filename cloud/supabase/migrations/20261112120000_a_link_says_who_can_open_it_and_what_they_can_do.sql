@@ -117,10 +117,10 @@ $$;
 
 -- A viewer reads the file only; comments are for those who may write one.
 create or replace function public.file_link_comments_of(tok text)
-returns table (id uuid, by_name text, by_avatar text, body text, created_at timestamptz, mine boolean, by_owner boolean)
+returns table (id uuid, by_name text, by_avatar text, body text, created_at timestamptz, mine boolean, by_owner boolean, place jsonb)
 language sql stable security definer set search_path = public as $$
   select c.id, coalesce(nullif(p.name, ''), 'Someone'), p.avatar_url, c.body, c.created_at,
-         coalesce(c.by_person = auth.uid(), false), c.by_person = l.owner
+         coalesce(c.by_person = auth.uid(), false), c.by_person = l.owner, c.place
   from public.file_link_comments c
   join public.file_links l on l.token = c.token and l.stopped_at is null
   join public.people p on p.id = c.by_person
@@ -129,7 +129,8 @@ language sql stable security definer set search_path = public as $$
   limit 500
 $$;
 
-create or replace function public.comment_on_file_link(tok text, b text)
+-- `p`, a place in the file, as 20261111000000_a_link_comment_names_its_place.sql gave it.
+create or replace function public.comment_on_file_link(tok text, b text, p jsonb default null)
 returns uuid
 language plpgsql security definer set search_path = public as $$
 declare me uuid := auth.uid(); out_id uuid; used int; words text := btrim(coalesce(b, ''));
@@ -145,7 +146,8 @@ begin
   if used >= 10 then raise exception 'too many comments for now; try again in a minute'; end if;
   select count(*) into used from public.file_link_comments where by_person = me and created_at > now() - interval '1 day';
   if used >= 300 then raise exception 'too many comments today; try again tomorrow'; end if;
-  insert into public.file_link_comments (token, by_person, body) values (tok, me, words) returning id into out_id;
+  if p is not null and not public.link_comment_place_is_fine(p) then raise exception 'that is not a place in the file'; end if;
+  insert into public.file_link_comments (token, by_person, body, place) values (tok, me, words, p) returning id into out_id;
   return out_id;
 end $$;
 

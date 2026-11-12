@@ -48,7 +48,7 @@ import type { Departure } from './departures.mts';
 import type { CloudPhoneCommand } from './supabase-backend.mts';
 import { mateCard, splitCards } from '../../shared/mate-cards.mts';
 import type { BoardMate } from '../../shared/mate-cards.mts';
-import type { Mark } from '../../shared/artifact-marks.mts';
+import { cleanPlace, type Mark, type NotePlace, type RawPlace } from '../../shared/artifact-marks.mts';
 import type { RoomsBackend, RoomsOptions, RoomsState } from './rooms.mts';
 
 export interface TeamPerson {
@@ -110,7 +110,8 @@ export interface FileLinkRow {
 export interface FileLinkPerson { email: string; can: LinkCan; name: string | null; avatar: string | null }
 export interface FileLinkListed { token: string; source: string; name: string; kind: string; createdAt: number; updatedAt: number; comments: number }
 export interface SharedLinkFile { name: string; kind: string; type: string; body: string; version: number; createdAt: number; updatedAt: number; ownerName: string | null; ownerAvatar: string | null; mine: boolean; rev?: number }
-export interface FileLinkComment { id: string; byName: string; byAvatar: string | null; text: string; at: number; mine: boolean; byOwner: boolean }
+/** `place`: where in the file it points, as a note in the app does; none for the whole file. */
+export interface FileLinkComment { id: string; byName: string; byAvatar: string | null; text: string; at: number; mine: boolean; byOwner: boolean; place?: NotePlace }
 
 export interface TeamHandover { handTo: string; name: string; mates: { id: string; name?: unknown; job?: unknown; to: string | null }[] }
 
@@ -162,7 +163,7 @@ export type TeamBackend = Omit<SyncBackend, 'me' | 'personId'> & RoomsBackend & 
   fileLinkView?(token: string): Promise<{ stopped: boolean; file: SharedLinkFile | null }>;
   linkPiece?(name: string): Promise<Buffer | null>;
   fileLinkComments?(token: string): Promise<FileLinkComment[]>;
-  commentOnFileLink?(token: string, text: string): Promise<unknown>;
+  commentOnFileLink?(token: string, text: string, place?: NotePlace | null): Promise<unknown>;
   newLinkComments?(since: number): Promise<LinkComment[]>;
   setFileLinkAccess?(token: string, access: string, can: string): Promise<void>;
   fileLinkPeople?(token: string): Promise<FileLinkPerson[]>;
@@ -1451,7 +1452,9 @@ export function createTeamService({
         }
         bytes = Buffer.concat(parts);
       } else bytes = Buffer.from(file.body, file.kind === 'image' || file.kind === 'pdf' ? 'base64' : 'utf8');
-      return { file, bytes };
+      // The review on the link comes in with the file; a cloud that will not say leaves it out.
+      const comments = await b.fileLinkComments?.(token).catch(() => []) ?? [];
+      return { file, bytes, comments };
     },
     /** Every live link of this person's, for the one list of what they made public. */
     async fileLinks() {
@@ -1469,11 +1472,11 @@ export function createTeamService({
       if (!backend?.fileLinkComments || !state.me) return [];
       return backend.fileLinkComments(token);
     },
-    async commentOnFileLink(token: string, text: unknown) {
+    async commentOnFileLink(token: string, text: unknown, place: unknown = null) {
       if (!backend?.commentOnFileLink || !state.me) throw new Error('Sign in first.');
       const words = String(text ?? '').trim();
       if (!words) throw new Error('Write something first.');
-      await backend.commentOnFileLink(token, words);
+      await backend.commentOnFileLink(token, words, cleanPlace(place as RawPlace | null) ?? null);
       return backend.fileLinkComments!(token);
     },
     /** A first name for the tile that says whose computer a file waits for. */

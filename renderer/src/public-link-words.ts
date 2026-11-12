@@ -3,16 +3,21 @@ import { clock } from './thread-history';
 
 export const shareWords = {
   signedOut: 'Sign in to share this file or see its link.',
-  fresh: 'Make a link anyone can open, without an account. Its comments are public too.',
+  fresh: 'Copy link to let anyone see it and comment',
+  // Not "Only you": on a team's project its teammates see the file without a link.
+  notPublic: 'No public link',
+  anyone: 'Anyone with the link',
+  canComment: 'Can see it and its comments',
   stopped: 'Stopped. The old link no longer works.',
   behind: 'The link shows an older copy.',
   ahead: (v: number) => `The link shows version ${v}, newer than this one.`,
   newComments: 'New comments on the link',
   comments: (n: number) => (n === 1 ? '1 comment' : `${n} comments`),
-  stopConfirm: (n: number) => (n > 0
-    ? `Stop sharing? The link stops working for everyone, and ${n === 1 ? 'its comment is' : `its ${n} comments are`} deleted.`
-    : 'Stop sharing? The link stops working for everyone.'),
-  stopAsk: (n: number) =>(n > 0 ? `Stop, and delete ${n === 1 ? 'its comment' : `its ${n} comments`}` : 'Stop the link'),
+  stopConfirm: (n: number) => `Stop sharing? The link stops working for everyone.${n > 0 ? ` ${n === 1 ? 'Its comment stays' : 'Its comments stay'} in the thread.` : ''}`,
+  // The press that ends it says so. As a statement it read as done already (power test, 2026-11-11).
+  stopAsk: (_n: number) => 'Stop the link',
+  // A link's comments are kept on the thread its file came from (main/team/link-comments.mts).
+  keptComments: (n: number) => (n === 1 ? 'Its comment stays in the thread' : 'Its comments stay in the thread'),
   shared: ({ createdAt, updatedAt }: { createdAt: number; updatedAt: number }, now = Date.now()) => {
     const what = updatedAt - createdAt > 1000 ? 'Updated' : 'Shared';
     return new Date(updatedAt).toDateString() === new Date(now).toDateString()
