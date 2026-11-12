@@ -130,7 +130,7 @@ import { Live } from './Live';
 import { SidebarIcon } from './SidebarIcon';
 import { Byline, ConversationAside } from './Byline';
 import { ItemThread } from './ItemThread';
-import { ContinuedFrom, OpenTeammateThread } from '../threads/ContinuedFrom';
+import { ContinuedFrom, HandedFrom, OpenTeammateThread } from '../threads/ContinuedFrom';
 import { threadLink, threadOfLink, seenWord, seenNow, type SeenBy, type ShareActs } from '../threads/share-rules';
 import { answerOnItsWay, type PendingSaid } from '../item-thread';
 import { isTroubleRow } from '../trouble-row';
@@ -2307,6 +2307,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         <HandedLine item={item} />
         <ContinuedFrom labels={item.labels} />
         {givenTask && <div className="focus-meta by-lead"><TeamSaid item={item} /></div>}
+        {givenTask && <HandedFrom item={item} />}
         {made
           ? <div className="outcome">{md(item.body ?? '')}</div>
           : !agent && (

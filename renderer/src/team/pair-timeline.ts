@@ -3,7 +3,7 @@
 // draw the same entries: nothing in an entry depends on who is looking.
 import { baseName, numberInName } from '../../../shared/artifact-marks.mts';
 import { isTaskRow, taskGiver } from '../../../shared/team-rules.mts';
-import { threadOfLink } from '../../../shared/thread-link.mts';
+import { handedFrom } from '../../../shared/thread-link.mts';
 import type { RoomMessage, ThreadTalk } from '../types';
 
 export type { ThreadTalk };
@@ -78,9 +78,7 @@ export function pairTimeline({ me, other, rooms, messages, directItems, talk, ti
     if (!giver || !pair.has(giver)) continue;
     const title = t.label || t.title;
     const open: PairOpens = { to: 'task', id: t.id };
-    const link = /^\[[^\]]*\]\(([^)\s]+)\)/.exec(t.body ?? '');
-    const from = link ? threadOfLink(link[1]) : null;
-    const handoff = from?.owner === giver;
+    const handoff = !!handedFrom(t.body, giver);
     out.push({ key: `task:${t.id}`, at: t.createdAt ?? 0, kind: handoff ? 'handoff' : 'task', by: giver, to: otherOf(giver), text: title, where: { label: title, open } });
     const brief = said(t.body ?? '');
     let briefSeen = false;

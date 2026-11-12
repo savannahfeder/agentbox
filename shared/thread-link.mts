@@ -48,3 +48,10 @@ export function sentWords(title: string, link: string, note: string): string {
   const name = String(title || 'A thread').replace(/[[\]]/g, '').trim();
   return note.trim() ? `[${name}](${link})\n\n${note.trim()}` : `[${name}](${link})`;
 }
+
+/** The thread a task was handed on from: the link `sentWords` put first, when the giver owns it. */
+export function handedFrom(body: string | null | undefined, giver: string | null | undefined): { owner: string; id: string } | null {
+  const link = /^\[[^\]]*\]\(([^)\s]+)\)/.exec(body ?? '');
+  const from = link ? threadOfLink(link[1]) : null;
+  return from && giver && from.owner === giver ? from : null;
+}
