@@ -1,0 +1,288 @@
+// THE ONE LIST OF WHAT THE SCREEN MAY ASK FOR.
+//
+// preload.cjs is the desktop half of this: it turns each name below into an
+// Electron invoke. renderer/src/browser-bridge.ts is the other half and turns
+// the same name into a POST to the local server. Both doors read this list, so
+// a channel added to one cannot go missing from the other, and
+// tests/both-front-doors-offer-the-same-bridge.test.mts fails the suite if
+// preload.cjs and this file ever disagree.
+//
+// The keys are the screen's own vocabulary, the values are the channels
+// main/ipc.mts registered. Nothing here decides anything; it is a phone book.
+
+/** Asked, and the screen waits for the answer. */
+export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
+  terminal: 'zero:terminal',
+  agentUpdate: 'zero:agent-update',
+  snapshot: 'zero:snapshot',
+  // Which thread is on screen. The one thing that reads it is which approval
+  // card is in front (shared/which-card-is-in-front.mts).
+  looking: 'zero:looking',
+  refreshUsage: 'zero:refresh-usage',
+  accountUsage: 'zero:account-usage',
+  // Whether a screen reader is running, which is the terminal pane's question
+  // before it builds xterm's accessibility tree.
+  assistiveTech: 'zero:assistiveTech',
+  // The next page of old finished threads, at the foot of Done and All.
+  olderItems: 'zero:older-items',
+  dashboard: 'zero:dashboard',
+  commandCatalog: 'zero:command-catalog',
+  remoteControl: 'zero:remote-control',
+  command: 'zero:command',
+  compact: 'zero:compact',
+  compactionStatus: 'zero:compaction-status',
+  answer: 'zero:answer',
+  sendNow: 'zero:send-now',
+  compose: 'zero:compose',
+  routeThread: 'zero:route-thread',
+  schedule: 'zero:schedule',
+  snooze: 'zero:snooze',
+  // Feedback to the Agentbox team, from the sidebar's Feedback card.
+  sendFeedback: 'zero:send-feedback',
+  // The team version: signing in, the team, sharing, routing a given task.
+  teamSignIn: 'zero:team-sign-in',
+  teamSignInCancel: 'zero:team-sign-in-cancel',
+  teamSignInReopen: 'zero:team-sign-in-reopen',
+  teamSignOut: 'zero:team-sign-out',
+  teamSignInEmail: 'zero:team-sign-in-email',
+  teamSignUp: 'zero:team-sign-up',
+  teamCreate: 'zero:team-create',
+  teamInvite: 'zero:team-invite',
+  teamRename: 'zero:team-rename',
+  teamRemoveMember: 'zero:team-remove-member',
+  teamLeave: 'zero:team-leave',
+  teamCancelInvite: 'zero:team-cancel-invite',
+  teamAcceptInvite: 'zero:team-accept-invite',
+  teamStatus: 'zero:team-status',
+  teamShare: 'zero:team-share',
+  teamSync: 'zero:team-sync',
+  teamRoute: 'zero:team-route',
+  teamReact: 'zero:team-react',
+  // A teammate's shared thread, and a comment on it.
+  teamThreadWork: 'zero:team-thread-work',
+  // Lines, files and comments inside threads that a query finds, and the call that reads them ahead.
+  findInThreads: 'zero:find-in-threads',
+  warmFindInThreads: 'zero:warm-find-in-threads',
+  teamComment: 'zero:team-comment',
+  teamContinueBrief: 'zero:team-continue-brief',
+  teamContinued: 'zero:team-continued',
+  // A note, resolve or approval on a file: your own thread, or a teammate's.
+  fileMark: 'zero:file-mark',
+  fileNewVersion: 'zero:file-new-version',
+  teamMarkFile: 'zero:team-mark-file',
+  // The Files place: every file you may read, one opened, and a mark on it.
+  filesPlace: 'zero:files-place',
+  filesPlaceOpen: 'zero:files-place-open',
+  filesPlaceEdit: 'zero:files-place-edit',
+  filesPlaceMark: 'zero:files-place-mark',
+  filesPlaceFolder: 'zero:files-place-folder',
+  filesPlaceNew: 'zero:files-place-new',
+  filesPlaceUpload: 'zero:files-place-upload',
+  fileElsewhere: 'zero:file-elsewhere',
+  fileLine: 'zero:file-line',
+  connections: 'zero:connections',
+  connectionsConnect: 'zero:connections-connect',
+  connectionsCancel: 'zero:connections-cancel',
+  connectionsCheck: 'zero:connections-check',
+  connectionsDisconnect: 'zero:connections-disconnect',
+  connectionsAccept: 'zero:connections-accept',
+  connectionsAdd: 'zero:connections-add',
+  connectionsChoose: 'zero:connections-choose',
+  connectionsCopy: 'zero:connections-copy',
+  // New words for a message you sent to a teammate, or the message taken back.
+  teamEdit: 'zero:team-edit',
+  // The microphone, asked for when a voice note starts recording.
+  micAccess: 'zero:mic-access',
+  teamMessage: 'zero:team-message',
+  teamSeen: 'zero:team-seen',
+  teamMoveToThread: 'zero:team-move-to-thread',
+  teamMessageMate: 'zero:team-message-mate',
+  teamGiveTask: 'zero:team-give-task',
+  teamHandOn: 'zero:team-hand-on',
+  teamTaskBrief: 'zero:team-task-brief',
+  rooms: 'zero:rooms',
+  // Teammates: make, describe, start, edit, write to, and what they remember.
+  teammates: 'zero:teammates',
+  takeJoin: 'zero:take-join',
+  takeThreadLink: 'zero:take-thread-link',
+  threadEdit: 'zero:thread-edit',
+  // Move a thread to another project (shared/move-thread.mts).
+  moveItem: 'zero:move-item',
+  repeats: 'zero:repeats',
+  composeRepeat: 'zero:compose-repeat',
+  setRepeat: 'zero:set-repeat',
+  endRepeat: 'zero:end-repeat',
+  pauseSupervisor: 'zero:supervisor-pause',
+  createProduct: 'zero:create-product',
+  firstRunAnswer: 'zero:first-run-answer',
+  firstRunExamples: 'zero:first-run-examples',
+  firstRunPractice: 'zero:first-run-practice',
+  firstRunPracticeEnd: 'zero:first-run-practice-end',
+  firstRunWalking: 'zero:first-run-walking',
+  openFreshUser: 'zero:open-fresh-user',
+  openDemo: 'zero:open-demo',
+  chooseFolder: 'zero:choose-folder',
+  listFolders: 'zero:list-folders',
+  folderExists: 'zero:folder-exists',
+  agentFiles: 'zero:agent-files',
+  agentFolders: 'zero:agent-folders',
+  importAgents: 'zero:import-agents',
+  agentThreads: 'zero:agent-threads',
+  searchAgentThreads: 'zero:search-agent-threads',
+  importThreads: 'zero:import-threads',
+  badge: 'zero:badge',
+  cornerTag: 'zero:corner-tag',
+  bootInfo: 'zero:boot-info',
+  updateCheck: 'zero:update-check',
+  updateInstall: 'zero:update-install',
+  updateMove: 'zero:update-move',
+  notify: 'zero:notify',
+  notifyTest: 'zero:notify-test',
+  notifySettings: 'zero:notify-settings',
+  onboardingArm: 'zero:onboarding-arm',
+  stopSession: 'zero:stop-session',
+  runNow: 'zero:run-now',
+  reopen: 'zero:reopen',
+  instructionRead: 'zero:instruction-read',
+  instructionWrite: 'zero:instruction-write',
+  instructionHistory: 'zero:instruction-history',
+  instructionVersion: 'zero:instruction-version',
+  standingRead: 'zero:standing-read',
+  standingWrite: 'zero:standing-write',
+  messageRulesRead: 'zero:message-rules-read',
+  messageRulesWrite: 'zero:message-rules-write',
+  settingsRead: 'zero:settings-read',
+  claudeRecheck: 'zero:claude-recheck',
+  codexRecheck: 'zero:codex-recheck',
+  // Point at the coding agent yourself, or hand the choice back to the search.
+  // The browser tab has no file panel, so main answers it ok-with-nothing-done
+  // there (main/serve.mts stubs showOpenDialog) and the row stays honest.
+  engineBin: 'zero:engine-bin',
+  engineSetup: 'zero:engine-setup',
+  codexAddAccount: 'zero:codex-add-account',
+  claudeAddAccount: 'zero:claude-add-account',
+  setProjectSetting: 'zero:settings-set-project',
+  setWorkspaceSetting: 'zero:settings-set-workspace',
+  // The cloud setup's sign-in for one account, made in the cloud (main/cloud/logins.mts).
+  cloudSignIn: 'zero:cloud-signin',
+  // A key kept in the cloud for every cloud run (main/cloud/keys.mts).
+  cloudKey: 'zero:cloud-key',
+  // The GitHub sign-in this computer's ships push with (main/github-push-sign-in.mts).
+  gitHubSignIn: 'zero:github-sign-in',
+  gitHubBrowserSignIn: 'zero:github-browser-sign-in',
+  // The answer to a sign-in link an agent is waiting on (shared/sign-in-ask.mjs).
+  signInAnswer: 'zero:sign-in-answer',
+  // A file or a one-time code a cloud run asked for (shared/cloud-needs.mts).
+  cloudSendFile: 'zero:cloud-send-file',
+  cloudSendCode: 'zero:cloud-send-code',
+  cloudFileInfo: 'zero:cloud-file-info',
+  // Claude's sign-in code, read from the clipboard while one is waiting for it.
+  cloudClipboardCode: 'zero:cloud-clipboard-code',
+  // Signing in to Agentbox Cloud itself, on the app's sign-in page (main/cloud/account.mts).
+  cloudAccountSignIn: 'zero:cloud-account-sign-in',
+  cloudAccountCancel: 'zero:cloud-account-cancel',
+  cloudAccountReopen: 'zero:cloud-account-reopen',
+  cloudAccountSignOut: 'zero:cloud-account-sign-out',
+  cloudAccountPlan: 'zero:cloud-account-plan',
+  cloudAccountPay: 'zero:cloud-account-pay',
+  cloudAccountBilling: 'zero:cloud-account-billing',
+  cloudAccountTeamBilling: 'zero:cloud-account-team-billing',
+  projectRename: 'zero:project-rename',
+  projectArchive: 'zero:project-archive',
+  projectSeenBy: 'zero:project-seen-by',
+  projectIcon: 'zero:project-icon',
+  projectIconClear: 'zero:project-icon-clear',
+  projectInstructionsRead: 'zero:project-instructions-read',
+  projectInstructionsWrite: 'zero:project-instructions-write',
+  saveAttachments: 'zero:save-attachments',
+  retryFile: 'zero:retry-file',
+  stageAttachment: 'zero:stage-attachment',
+  stageAttachmentPart: 'zero:stage-attachment-part',
+  crash: 'zero:crash',
+  blankCheck: 'zero:blank-check',
+  // The appearance the desktop window's glass is drawn in; a tab has no glass.
+  glassTone: 'zero:glass-tone',
+  track: 'zero:track',
+  sessionTrace: 'zero:session-trace',
+  itemHistory: 'zero:item-history',
+  openArtifact: 'zero:open-artifact',
+  folderPictures: 'zero:folder-pictures',
+  readDoc: 'zero:read-doc',
+  fileLink: 'zero:file-link',
+  fileLinkShare: 'zero:file-link-share',
+  fileLinkStop: 'zero:file-link-stop',
+  fileLinks: 'zero:file-links',
+  fileLinkComments: 'zero:file-link-comments',
+  fileLinkComment: 'zero:file-link-comment',
+  // A file someone shared by its link, brought into one of your projects (main/bring-shared-file.mts).
+  bringSharedFile: 'zero:bring-shared-file',
+  takeSharedFile: 'zero:take-shared-file',
+  codeChange: 'zero:code-change',
+  codeFile: 'zero:code-file',
+  saveCodeFile: 'zero:save-code-file',
+  writeDoc: 'zero:write-doc',
+  liveRoom: 'zero:live-room',
+  railNote: 'zero:rail-note',
+  saveRailNote: 'zero:save-rail-note',
+  agentReply: 'zero:agent-reply',
+  agentReveal: 'zero:agent-reveal',
+  agentConversation: 'zero:agent-conversation',
+  scheduleAgent: 'zero:schedule-agent',
+  closeAgent: 'zero:close-agent',
+  unreplyAgent: 'zero:unreply-agent',
+  resumeAgents: 'zero:resume-agents',
+  resumeItems: 'zero:resume-items',
+  redeliver: 'zero:redeliver',
+  setProductOrder: 'zero:set-product-order',
+  setThreadPlaces: 'zero:set-thread-places',
+  setThreadPins: 'zero:set-thread-pins',
+  setThreadOnMac: 'zero:set-thread-on-mac',
+  moveToCloud: 'zero:move-to-cloud',
+  setProductHidden: 'zero:set-product-hidden',
+  approve: 'zero:approve',
+  // The phone door's Settings page (main/phone-link.mts): its state, on, off,
+  // a new key, and which address the QR code carries. The desktop window only.
+  phoneLink: 'zero:phone-link',
+};
+
+/** Told rather than asked: the app talks and the screen listens. */
+export const PUSH_CHANNELS: Readonly<Record<string, string>> = {
+  onApprovalAnswered: 'zero:approval-answered',
+  onChanged: 'zero:changed',
+  onFind: 'zero:find',
+  onZoomPercent: 'zero:zoom-percent',
+  onRecovered: 'zero:recovered',
+  onJoinRoom: 'zero:join-room',
+  onThreadLink: 'zero:thread-link',
+  onSharedFile: 'zero:shared-file',
+  onOpenItem: 'zero:open-item',
+  onOpenSettings: 'zero:open-settings',
+  onScreenDetail: 'zero:screen-detail',
+  onEscapeBrowser: 'zero:escape-browser',
+  onKeyInTheFile: 'zero:key-in-the-file',
+  // A phone connected, left, or the key changed.
+  onPhoneChanged: 'zero:phone-changed',
+};
+
+// THE FEW THAT ARE NOT A STRAIGHT HANDOVER. Each is called with bare values
+// and the handler on the far side reads an object, so the key each value goes
+// under is part of the contract and belongs here beside the channel.
+export const WRAPPED_ARGS: Readonly<Record<string, string[]>> = {
+  notify: ['arrivals', 'needsYou'],
+  track: ['name', 'count'],
+  instructionWrite: ['id', 'text'],
+  instructionVersion: ['id', 'at'],
+};
+
+// Electron can tell you the real path of a file somebody dropped onto the
+// window. A browser cannot, by design, and no server can answer it either, so
+// this one is absent there rather than wrong. The screen already reads null.
+//
+// `onWriteHeld` is the desktop's ⌘R asking the page to write what the undo
+// window holds before it reloads (main/write-before-reload.mts). A browser
+// reload asks nobody; the page writes on `pagehide` there instead.
+//
+// `draftCopy` is the desktop's file copy of the drafts (main/draft-copy.mts),
+// kept because Chromium can throw its localStorage away. A tab has no such
+// file, and the page simply goes without the copy.
+export const DESKTOP_ONLY: readonly string[] = ['pathForFile', 'onWriteHeld', 'draftCopy'];

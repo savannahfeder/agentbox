@@ -4,7 +4,7 @@
 // big enough to press: inside the small screen they were "too small to click
 // reasonably".
 import React from 'react';
-import type { Grip } from '../../../shared/corner-tag.mjs';
+import type { Grip } from '../../../shared/corner-tag.mts';
 
 export const CORNERS: Grip[] = ['tl', 'tr', 'bl', 'br'];
 export const CORNER_NAMES: Record<Grip, string> = { tl: 'Top left', tr: 'Top right', bl: 'Bottom left', br: 'Bottom right' };

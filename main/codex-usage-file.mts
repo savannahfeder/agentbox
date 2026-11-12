@@ -1,0 +1,203 @@
+// THE CODEX FIGURE SHE ALREADY HAS ON THIS MAC, WHEN NOTHING HAS PUSHED ONE.
+//
+// IT WAS NOT A BUG, AND IT WAS STILL WRONG. main/codex-usage.mts holds one rule
+// and it is a good one: never spawn anything and never ask OpenAI anything to
+// draw a picture. Codex's figures ride the app-server the fleet is already
+// running and arrive unprompted during a turn. The unstated cost of that rule is
+// that the app only ever learns a number for work POWERUP ITSELF RAN. Someone
+// who runs Codex in its own app all day never gets the push, so the panel sits
+// empty while their weekly limit is at 100% used.
+//
+// SO THERE IS A THIRD SOURCE, AND IT BREAKS NEITHER HALF OF THAT RULE. Codex
+// writes every rate-limit report it receives into its own session log under
+// CODEX_HOME, as a `rate_limits` object on the `token_count` events. Reading it
+// starts no process, sends nothing anywhere, and touches no credential: it is a
+// file on the disk that Codex put there. A busy Codex home holds hundreds of
+// such records across its most recent sessions, the newest written within
+// the minute.
+//
+// A LIVE PUSH STILL WINS, AND A QUIET ONE NO LONGER DOES (w-7b7182ef61). A
+// notification that arrived a moment ago is this second's truth and nothing on
+// disk can be newer, so main/codex-usage.mts does not open a file while one is
+// fresh. Past that the two are compared and the newer is read, because an hours
+// old push was being drawn over a newer line in this log.
+//
+// IT IS THE SAME ACCOUNT OR IT IS NOT READ. One CODEX_HOME is one login, and the
+// log lives inside the home, so a reading taken from `~/.codex/sessions` is a
+// fact about whoever is signed into `~/.codex` and about nobody else. The home is
+// handed in for exactly that reason, never guessed at here.
+//
+// THE FILES ARE ENORMOUS AND ARE NEVER READ WHOLE. Her newest session log was
+// 791 MB on the day this was written. Only the tail of each is read, newest
+// first, and the answer is cached against the file's own modified time so an idle
+// app re-reads nothing.
+
+import fs from 'node:fs';
+import path from 'node:path';
+
+export type CodexSnapshot = Record<string, unknown>;
+
+export interface LoggedLimits {
+  snapshot: CodexSnapshot;
+  at: number;
+}
+
+type LogFile = { file: string; at: number };
+
+/**
+ * How much of the end of a session log to read. Her records sit roughly 1.6 MB
+ *  apart in the biggest file measured, so this holds several of them; a file
+ *  whose tail has none simply falls through to the next one. */
+const TAIL_BYTES = 8 * 1024 * 1024;
+
+/**
+ * How many session logs to look back through before giving up. A log with no
+ *  rate limits in its tail is ordinary: a session can end on a long tool output.
+ *  Three is enough to cross that and is still three cheap reads. */
+const FILES = 3;
+
+/**
+ * Don't answer out of a log nobody has written to in a fortnight. A stale
+ *  percentage is worse than no percentage, and the panel says how old its reading
+ *  is rather than hiding it, so this only has to catch the absurd cases. */
+const TOO_OLD_MS = 14 * 24 * 60 * 60 * 1000;
+
+const plain = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+
+/**
+ * A window is only worth having if it says how much is spent. Either spelling,
+ *  because the log is snake_case and the push is camel. */
+const usable = (window: unknown): boolean => plain(window)
+  && (Number.isFinite(window.used_percent) || Number.isFinite(window.usedPercent));
+
+/**
+ * THE NEWEST SESSION LOGS UNDER THIS HOME, newest first.
+ *
+ * Codex files them by date (`sessions/2026/09/18/rollout-....jsonl`), so the
+ * walk is three levels of directory and never a full recursive scan of a folder
+ * holding a thousand files. Only the newest day or two is ever opened.
+ */
+function newestLogs(home: string, limit = FILES): LogFile[] {
+  const root = path.join(home, 'sessions');
+  const found: LogFile[] = [];
+  const descend = (dir: string, depth: number): void => {
+    let entries: fs.Dirent[];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    if (depth === 0) {
+      for (const entry of entries) {
+        if (!entry.isFile() || !entry.name.endsWith('.jsonl')) continue;
+        const file = path.join(dir, entry.name);
+        try { found.push({ file, at: fs.statSync(file).mtimeMs }); } catch { /* it went away */ }
+      }
+      return;
+    }
+    // Newest folder first, and only a couple of them: the name sorts as the date
+    // because Codex names them for the date.
+    const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort().reverse().slice(0, 2);
+    for (const name of dirs) descend(path.join(dir, name), depth - 1);
+  };
+  descend(root, 3);
+  return found.sort((a, b) => b.at - a.at).slice(0, limit);
+}
+
+/** The end of a file, without reading the front of it. */
+function tail(file: string, bytes = TAIL_BYTES): { text: string; whole: boolean } | null {
+  let fd: number | null = null;
+  try {
+    fd = fs.openSync(file, 'r');
+    const size = fs.fstatSync(fd).size;
+    const take = Math.min(size, bytes);
+    const buffer = Buffer.allocUnsafe(take);
+    fs.readSync(fd, buffer, 0, take, size - take);
+    return { text: buffer.toString('utf8'), whole: take === size };
+  } catch {
+    return null;
+  } finally {
+    if (fd !== null) { try { fs.closeSync(fd); } catch { /* nothing to do */ } }
+  }
+}
+
+/**
+ * THE LAST RATE LIMITS THIS LOG RECORDS, or null.
+ *
+ * Lines are walked backwards because the last report is the one that is true. A
+ * report carrying no usable window is skipped rather than accepted: Codex emits
+ * an all-null snapshot for limit families that do not apply to the account (a
+ * `premium` family, every field null), and taking one of those would blank a
+ * panel that had a real figure a moment earlier.
+ */
+function lastLimitsIn(file: string): { snapshot: CodexSnapshot; at: number | null } | null {
+  const read = tail(file);
+  if (!read) return null;
+  const lines = read.text.split('\n');
+  // The first line is a fragment unless the whole file was read, and a fragment
+  // is not JSON.
+  if (!read.whole) lines.shift();
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    const line = lines[i];
+    if (!line || !line.includes('"rate_limits"')) continue;
+    let event: { timestamp?: string } | null = null;
+    try { event = JSON.parse(line); } catch { continue; }
+    const limits = find(event);
+    if (!limits) continue;
+    if (!usable(limits.primary) && !usable(limits.secondary)) continue;
+    const at = Date.parse(event?.timestamp ?? '');
+    return {
+      snapshot: { primary: limits.primary ?? null, secondary: limits.secondary ?? null },
+      at: Number.isFinite(at) ? at : null,
+    };
+  }
+  return null;
+}
+
+/**
+ * `rate_limits` sits a couple of levels inside the event and Codex has moved it
+ *  before, so it is looked for rather than reached for. */
+function find(node: unknown, depth = 0): Record<string, unknown> | null {
+  if (!plain(node) || depth > 6) return null;
+  if (plain(node.rate_limits)) return node.rate_limits;
+  for (const value of Object.values(node)) {
+    const hit = find(value, depth + 1);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/**
+ * What was read last, so an app nobody is touching re-reads nothing. Keyed by
+ *  home, and thrown away when the newest log is written to again. */
+const remembered = new Map<string, { file: string; at: number; reading: LoggedLimits | null }>();
+
+/**
+ * THE LAST FIGURE CODEX WROTE DOWN UNDER THIS HOME, or null because it never
+ * wrote one. Null is an ordinary answer on a Mac where Codex has never run.
+ *
+ * @param home The CODEX_HOME this reading would belong to.
+ */
+export function loggedCodexLimits(home: string | null, { now = Date.now() }: { now?: number } = {}): LoggedLimits | null {
+  if (!home) return null;
+  const logs = newestLogs(home);
+  if (!logs.length) return null;
+  if (now - logs[0].at > TOO_OLD_MS) return null;
+
+  const seen = remembered.get(home);
+  if (seen && seen.file === logs[0].file && seen.at === logs[0].at) return seen.reading;
+
+  let reading: LoggedLimits | null = null;
+  for (const log of logs) {
+    const read = lastLimitsIn(log.file);
+    if (read) {
+      // The event's own timestamp when it has one, and the file's otherwise.
+      reading = { snapshot: read.snapshot, at: read.at ?? log.at };
+      break;
+    }
+  }
+
+  remembered.set(home, { file: logs[0].file, at: logs[0].at, reading });
+  return reading;
+}
+
+/** Drop what was remembered. For tests, and for a home that has changed under us. */
+export function forgetLoggedLimits() {
+  remembered.clear();
+}

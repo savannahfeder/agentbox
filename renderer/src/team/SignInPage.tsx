@@ -6,16 +6,18 @@
 // app standing with nobody in it. Now a team build with nobody signed in shows
 // this page over the whole window: Google first, then email and password, and
 // a way to make an account. Signing out lands here too, saying so.
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type MutableRefObject } from 'react';
+import { createPortal } from 'react-dom';
 import { api } from '../api';
 import { Name } from '../../../shared/product-name.mjs';
 import { AppMark } from '../components/AppMark';
 import { onCloudPhone } from '../phone-screen';
 import { agreedHere, rememberAgreed } from './cloud-agreed';
 import { whatIsMissing, type Missing } from './what-is-missing';
+import { nextSignUpPart, partMissing, partReady, type SignUpPart } from './sign-up-parts';
 import './sign-in.css';
 
-const GoogleMark = () => (
+export const GoogleMark = () => (
   <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
     <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z" />
     <path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
@@ -34,7 +36,7 @@ type Mode = 'sign-in' | 'sign-up' | 'check-email' | 'agree' | 'reset' | 'reset-s
 // AND IT SIGNS IN TO AGENTBOX CLOUD (2026-10-20, w-6633e825a7). The owner
 // turned down new screens for the cloud: "We already have a sign-in page
 // built that's pretty darn decent." With purpose cloud the same page signs in
-// through main/cloud/account.mjs, says one line about the terms, and can be
+// through main/cloud/account.mts, says one line about the terms, and can be
 // left: the cloud is something chosen, not a gate over the app. With purpose
 // phone it is the team sign-in, opened from Settings › Phone and closable the
 // same way, for a build whose team version is off.
@@ -58,12 +60,20 @@ export const checkEmailLede = (email: string, cloud: boolean) => (cloud
   : `We sent a link to ${email}. Follow it to confirm your address, then sign in here.`);
 const TermsLinks = () => <>the <a href={TERMS_URL} onClick={(e) => { e.preventDefault(); window.open(TERMS_URL, '_blank'); }}>Terms</a> and the <a href={PRIVACY_URL} onClick={(e) => { e.preventDefault(); window.open(PRIVACY_URL, '_blank'); }}>Privacy policy</a></>;
 
-export function SignInPage({ onSkip, signedOut = false, error: startError = null, waitingUrl = null, purpose = 'team', startOn = 'sign-in', onClose, onSignedIn }: {
+export function SignInPage({ onSkip, signedOut = false, error: startError = null, waitingUrl = null, purpose = 'team', startOn = 'sign-in', inSetup = false, onBack, primaryRef, termsAt = null, onClose, onSignedIn }: {
   onSkip?: () => void; signedOut?: boolean; error?: string | null; waitingUrl?: string | null;
-  purpose?: 'team' | 'cloud' | 'phone'; startOn?: 'sign-in' | 'sign-up'; onClose?: () => void; onSignedIn?: () => void;
+  purpose?: 'team' | 'cloud' | 'phone' | 'share'; startOn?: 'sign-in' | 'sign-up'; onClose?: () => void; onSignedIn?: () => void;
+  /** Drawn as a step of the setup: no tabs, the setup's own buttons, one field at a time. */
+  inSetup?: boolean;
+  /** In the setup: Back from the first screen, to the step before. */
+  onBack?: () => void;
+  /** In the setup: what Enter does when no field has the keyboard. */
+  primaryRef?: MutableRefObject<(() => void) | null>;
+  /** In the setup: where the terms line goes, at the foot of the panel. */
+  termsAt?: HTMLElement | null;
 }) {
   const cloud = purpose === 'cloud';
-  const closable = cloud || purpose === 'phone';
+  const closable = cloud || purpose === 'phone' || purpose === 'share';
   const [mode, setMode] = useState<Mode>(startOn);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -79,6 +89,11 @@ export function SignInPage({ onSkip, signedOut = false, error: startError = null
   const emailField = useRef<HTMLInputElement | null>(null);
   const pwField = useRef<HTMLInputElement | null>(null);
   const fieldOf = { name: nameField, email: emailField, password: pwField };
+  const [part, setPart] = useState<SignUpPart>('start');
+  useEffect(() => {
+    if (!inSetup || mode !== 'sign-up' || part === 'start') return;
+    (part === 'name' ? nameField : emailField).current?.focus();
+  }, [part, mode, inSetup]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     setMissing(null);
     (mode === 'sign-up' ? nameField : mode === 'new-password' ? pwField : emailField).current?.focus();
@@ -149,11 +164,11 @@ export function SignInPage({ onSkip, signedOut = false, error: startError = null
     );
   }
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
+  const submit = async (e?: FormEvent) => {
+    e?.preventDefault();
     if (busy) return;
     const gap = whatIsMissing({ mode: mode === 'sign-up' ? 'sign-up' : 'sign-in', name, email, password });
-    if (gap) { setMissing(gap); setError(null); fieldOf[gap.field].current?.focus(); return; }
+    if (gap) { setMissing(gap); setError(null); if (inSetup && mode === 'sign-up') setPart(gap.field === 'name' ? 'name' : 'login'); fieldOf[gap.field].current?.focus(); return; }
     setBusy('email'); setError(null);
     const out = cloud
       ? await api.cloudAccountSignIn(mode === 'sign-up' ? { method: 'sign-up', name, email, password } : { method: 'email', email, password, acceptTerms: agreedHere(email) })
@@ -195,11 +210,12 @@ export function SignInPage({ onSkip, signedOut = false, error: startError = null
     if (closable) onSignedIn?.();
   };
 
-  const passwordField = (autoComplete: string, label: string) => (
-    <label className={missing?.field === 'password' ? 'si-missing' : undefined}><span>{label}</span>
+  // `bare` is for a screen whose heading already names the field.
+  const passwordField = (autoComplete: string, label: string, bare = false, placeholder?: string) => (
+    <label className={missing?.field === 'password' ? 'si-missing' : undefined}>{!bare && <span>{label}</span>}
       <span className="si-pw">
-        <input ref={pwField} type={showPassword ? 'text' : 'password'} value={password} autoComplete={autoComplete} aria-invalid={missing?.field === 'password' || undefined} onChange={(e) => { setPassword(e.target.value); setMissing(null); setError(null); }} />
-        <button type="button" className="si-pw-show" aria-pressed={showPassword} onClick={() => setShowPassword((on) => !on)}>{showPassword ? 'Hide' : 'Show'}</button>
+        <input ref={pwField} type={showPassword ? 'text' : 'password'} value={password} autoComplete={autoComplete} placeholder={placeholder} aria-label={bare ? label : undefined} aria-invalid={missing?.field === 'password' || undefined} onChange={(e) => { setPassword(e.target.value); setMissing(null); setError(null); }} />
+        {password && <button type="button" className="si-pw-show" aria-pressed={showPassword} onClick={() => setShowPassword((on) => !on)}>{showPassword ? 'Hide' : 'Show'}</button>}
       </span>
     </label>
   );
@@ -218,7 +234,7 @@ export function SignInPage({ onSkip, signedOut = false, error: startError = null
     // NO LINE UNDER THE HEADING ON THE CLOUD'S CARD (2026-10-26): "it just
     // feels a little cluttered with text". The heading says what the card is
     // for, and the two tabs keep the same height without it.
-    : cloud ? null
+    : cloud || purpose === 'share' ? null
       : purpose === 'phone' ? 'Then your phone can read and reply to your threads, even with this computer closed.'
       : mode === 'sign-up' ? 'Your teammates will see this name beside your threads and messages.'
       : signedOut ? 'Sign in again to get back to your inbox and your team.'
@@ -226,18 +242,74 @@ export function SignInPage({ onSkip, signedOut = false, error: startError = null
         : onCloudPhone() ? 'Use the account your computer is signed in with. Your threads are here even when it is closed.'
         : 'Your threads, your agents and your team, in one inbox.';
 
+  const backArrow = <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 3.5L5.5 8l4.5 4.5" /></svg>;
+  const fault = (error || missing) && <p className="si-error" role="alert">{error || missing?.say}</p>;
+
+  if (inSetup && mode === 'sign-up') {
+    const step = (by: 1 | -1) => {
+      setMissing(null); setError(null);
+      const to = nextSignUpPart(part, by);
+      if (to) setPart(to); else if (by < 0) onBack?.();
+    };
+    const ready = partReady(part, { name, email, password });
+    const onward = (e?: FormEvent) => {
+      e?.preventDefault();
+      if (!ready) { setMissing(partMissing(part, { name, email, password })); return; }
+      if (part === 'login') { void submit(); return; }
+      step(1);
+    };
+    if (primaryRef) primaryRef.current = () => onward();
+    const ask = part === 'start' ? 'Create your account.' : part === 'name' ? 'What’s your name?' : 'Your email and a password.';
+    return (
+      <div className="si-page si-steps" role="group" aria-label={ask}>
+        <div className="si-card">
+          {(part !== 'start' || onBack) && <button type="button" className="ss-back" onClick={() => step(-1)}>{backArrow}Back</button>}
+          <h1 className="ss-h"><b>{ask}</b></h1>
+          {part === 'start' ? (
+            <>
+              <button type="button" className="si-google" disabled={!!busy} onClick={google}><GoogleMark />Continue with Google</button>
+              <button type="button" className="si-primary" onClick={() => step(1)}>Continue with email</button>
+              <p className="si-switch si-setup-switch">Have an account? <button type="button" onClick={() => { setMode('sign-in'); setPassword(''); setError(null); }}>Sign in</button></p>
+            </>
+          ) : (
+            <form className="si-form" onSubmit={onward} noValidate>
+              {part === 'name' && <input ref={nameField} value={name} autoComplete="name" aria-label="Name" placeholder="First and last name" aria-invalid={missing?.field === 'name' || undefined} onChange={(e) => { setName(e.target.value); setMissing(null); }} />}
+              {part === 'login' && <>
+                <label className={missing?.field === 'email' ? 'si-missing' : undefined}><span>Email</span>
+                  <input ref={emailField} type="email" value={email} autoComplete="email" placeholder="you@company.com" aria-invalid={missing?.field === 'email' || undefined} onChange={(e) => { setEmail(e.target.value); setMissing(null); setError(null); }} />
+                </label>
+                {passwordField('new-password', 'Password', false, '••••••••')}
+              </>}
+              <button type="submit" className={`ss-go${ready ? '' : ' ss-not-yet'}`} aria-disabled={!ready || undefined} disabled={!!busy}>
+                {part === 'login' ? (busy === 'email' ? 'Creating…' : 'Create account') : 'Continue'}
+                <span className="ss-keys"><span className="ss-key">↵</span></span>
+              </button>
+            </form>
+          )}
+          {fault}
+          {termsAt ? createPortal(<p className="si-terms">By continuing, you agree to <TermsLinks />.</p>, termsAt) : <p className="si-terms">By continuing, you agree to <TermsLinks />.</p>}
+        </div>
+      </div>
+    );
+  }
+  if (primaryRef) primaryRef.current = inSetup && mode === 'sign-in' ? () => void submit() : null;
+
   return (
     <div className="si-page" role="dialog" aria-modal="true" aria-label={heading}>
       {/* No key on purpose: a stray Escape would skip it without anyone meaning to. */}
       {onSkip && <button type="button" className="si-skip-corner" onClick={onSkip}>Skip for now</button>}
       <div className="si-card">
         <span className="si-mark"><AppMark size={28} /></span>
-        <h1>{heading}</h1>
-        {mode === 'agree'
+        {inSetup && onBack && <button type="button" className="ss-back" onClick={() => { setMode('sign-up'); setPart('start'); setError(null); }}>{backArrow}Back</button>}
+        {inSetup && (mode === 'sign-up' || mode === 'sign-in')
+          // The setup's own two-line heading, as every other step has.
+          ? <h1 className="ss-h"><b>{mode === 'sign-up' ? 'Create your account.' : 'Sign in.'}</b>{mode === 'sign-up' ? 'Your team sees this name on your threads.' : 'With the account you already have.'}</h1>
+          : <h1>{heading}</h1>}
+        {inSetup && (mode === 'sign-up' || mode === 'sign-in') ? null : mode === 'agree'
           ? <p className="si-lede">You&rsquo;re new to {Name} Cloud. Read <TermsLinks />, then agree to finish.</p>
           : lede && <p className="si-lede">{lede}</p>}
 
-        {(mode === 'sign-in' || mode === 'sign-up') && (
+        {(mode === 'sign-in' || mode === 'sign-up') && !inSetup && (
           <div className="si-tabs" role="tablist">
             {/* The password does not cross the tabs: an account made with one
                 typed to sign in is one nobody meant to make. */}
@@ -302,8 +374,16 @@ export function SignInPage({ onSkip, signedOut = false, error: startError = null
             {cloud && mode === 'sign-in' && (
               <p className="si-switch si-center si-forgot"><button type="button" onClick={() => { setMode('reset'); setError(null); }}>Forgot password?</button></p>
             )}
-            {cloud && mode === 'sign-up' && (
+            {mode === 'sign-up' && (
               <p className="si-terms">By creating an account or continuing with Google, you agree to <TermsLinks />.</p>
+            )}
+            {!cloud && mode === 'sign-in' && (
+              <p className="si-terms">By continuing, you agree to <TermsLinks />.</p>
+            )}
+            {inSetup && (
+              <p className="si-switch si-setup-switch">{mode === 'sign-up'
+                ? <>Have an account? <button type="button" onClick={() => { setMode('sign-in'); setPassword(''); setError(null); }}>Sign in</button></>
+                : <>New here? <button type="button" onClick={() => { setMode('sign-up'); setPassword(''); setError(null); }}>Create an account</button></>}</p>
             )}
           </>
         )}

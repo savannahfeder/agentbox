@@ -1,27 +1,46 @@
-/* The files a message names, as small framed tiles side by side
-   (w-9ed13d72b3). No box: the window's L-shaped corner marks, shorter and
-   tucked onto the picture's own corners, in the plain line colour. */
-.message-files {display:grid;gap:10px;width:100%;max-width:680px;margin:12px 0 20px;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));}
+/* The files a message names, as small cards side by side. A card is a rounded
+   frame holding the file's own face: a document's title and first lines, a
+   deck's first slide, a PDF's first page, a film's frame, a picture. Under it,
+   the name and how long the file is. */
+.message-files {display:grid;gap:12px;width:100%;max-width:760px;margin:14px 0 22px;grid-template-columns:repeat(auto-fill,minmax(212px,232px));}
 .message-files:empty {display:none;}
-.message-file {position:relative;display:flex;flex-direction:column;min-width:0;font:inherit;color:var(--text);text-align:left;cursor:pointer;padding:0;background:none;border:0;}
-.message-file-face {position:relative;display:block;height:104px;background:var(--doc-page,var(--surface));}
-.message-file-face > :not(.tick) {overflow:hidden;}
-.message-file-face .retained-preview {display:block;height:100%;}
+.message-file {position:relative;display:flex;flex-direction:column;min-width:0;width:100%;font:inherit;color:var(--text);text-align:left;cursor:pointer;
+  padding:5px;background:var(--doc-page,var(--surface));border:1px solid var(--line);border-radius:var(--artifact-corner);}
+.message-file:hover {border-color:var(--line-strong);}
+.message-file[aria-pressed="true"] {border-color:var(--text-faint);}
+.message-file:focus-visible {outline:none;border-color:var(--text-dim);}
+.message-file-face {position:relative;display:flex;align-items:flex-start;justify-content:center;height:124px;overflow:hidden;border-radius:var(--artifact-corner-small);background:var(--bg);}
+.message-file[data-kind="deck"] .message-file-face {align-items:center;}
+.message-file-face .retained-preview {display:block;width:100%;height:100%;}
 .message-file-face .artifact-thumbnail {width:100%;height:100%;aspect-ratio:auto;max-height:none;border:0;border-radius:0;}
 .message-file-face .artifact-thumbnail iframe {opacity:1!important;filter:none;}
-.message-file .tick {position:absolute;z-index:1;width:8px;height:8px;border:0 solid var(--line-strong);}
-.message-file .tick.tl {top:0;left:0;border-top-width:1px;border-left-width:1px;}
-.message-file .tick.tr {top:0;right:0;border-top-width:1px;border-right-width:1px;}
-.message-file .tick.bl {bottom:0;left:0;border-bottom-width:1px;border-left-width:1px;}
-.message-file .tick.br {bottom:0;right:0;border-bottom-width:1px;border-right-width:1px;}
-.message-file:hover .tick,.message-file[aria-pressed="true"] .tick {border-color:var(--text-faint);}
-.message-file:focus-visible .tick {border-color:var(--text-dim);}
-.message-file-foot {display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0 0;}
-.message-file-name {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;line-height:17px;color:var(--text-dim);}
-.message-file-kind {font:10px/14px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--text-faint);white-space:nowrap;}
+.message-file-face .deck-slide {flex:none;border-radius:4px;}
+.message-file-face .pdf-page {margin:0;border-radius:4px;box-shadow:none;}
+.message-file-face .pdf-page canvas {display:block;}
+.file-cover-picture, .file-cover-film {width:100%;height:100%;object-fit:cover;display:block;}
+.file-cover-page {display:flex;align-items:center;justify-content:center;width:100%;height:100%;}
+.message-file-face .file-cover-page .pdf-page, .fp-face .file-cover-page .pdf-page {margin:0;border-radius:4px;box-shadow:0 2px 10px rgba(0,0,0,.28);}
+.file-cover-play {position:absolute;left:6px;bottom:6px;width:22px;height:22px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;padding-left:1px;box-sizing:border-box;
+  background:rgba(0,0,0,.62);color:#fff;}
+.file-cover-play svg {width:10px;height:10px;}
+.message-file-badge {position:absolute;right:6px;bottom:6px;padding:3px 6px;border-radius:5px;background:rgba(0,0,0,.62);color:#fff;font:10.5px/1 var(--mono);font-variant-numeric:tabular-nums;}
+.message-file-foot {display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 5px 3px;}
+.message-file-name {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;line-height:17px;color:var(--text);}
+.message-file-kind {font:10px/14px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--text-faint);white-space:nowrap;}
 
 /* A document as a small page: its title and opening lines, set as text. */
-.message-file-page {display:flex;flex-direction:column;gap:3px;height:100%;padding:10px 12px;overflow:hidden;-webkit-mask-image:linear-gradient(180deg,#000 70%,transparent);mask-image:linear-gradient(180deg,#000 70%,transparent);}
-.message-file-page b {font-size:12px;font-weight:500;line-height:16px;color:var(--text);margin-bottom:2px;}
-.message-file-page em {font-style:normal;font-size:10px;font-weight:500;line-height:14px;color:var(--text-dim);margin-top:3px;}
-.message-file-page span {font-size:10px;line-height:14px;color:var(--text-faint);}
+.message-file-page {display:flex;flex-direction:column;gap:3px;width:100%;height:100%;padding:12px 14px;box-sizing:border-box;overflow:hidden;background:var(--bg-raised);-webkit-mask-image:linear-gradient(180deg,#000 70%,transparent);mask-image:linear-gradient(180deg,#000 70%,transparent);}
+.message-file-page b {font-size:13px;font-weight:600;line-height:17px;letter-spacing:-.01em;color:var(--text);margin-bottom:3px;}
+.message-file-page em {font-style:normal;font-size:10.5px;font-weight:600;line-height:14px;color:var(--text-dim);margin-top:4px;}
+.message-file-page span {font-size:10.5px;line-height:14px;color:var(--text-faint);}
+
+/* How the file got to the people on the thread, under its tile. */
+.message-file-slot {display:flex;flex-direction:column;min-width:0;}
+.message-file-slot.picture-tile {width:220px;max-width:100%;margin:6px 0;}
+.picture-tile-face {align-items:center;font-size:12.5px;color:var(--text-faint);}
+.message-file-state {display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 4px 0;font-size:11.5px;line-height:16px;color:var(--text-faint);}
+.message-file-state.failed .message-file-state-words {color:var(--text-dim);}
+.message-file-bar {flex:1 1 48px;max-width:120px;height:2px;background:var(--line);}
+.message-file-bar i {display:block;height:100%;background:var(--text-dim);}
+.message-file-retry {font:inherit;color:var(--text);background:none;border:0;padding:0;text-decoration:underline;cursor:pointer;}

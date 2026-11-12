@@ -4,9 +4,9 @@
 // desktop is built by preload.cjs out of Electron's private channel between a
 // window and the app. A browser tab has no such channel, so this builds the
 // identical object out of ordinary http instead: every name calls the same
-// handler, through the server in main/serve.mjs.
+// handler, through the server in main/serve.mts.
 //
-// It is built rather than written out. Both halves read shared/bridge-map.mjs,
+// It is built rather than written out. Both halves read shared/bridge-map.mts,
 // so a channel cannot be added to one door and forgotten on the other, and
 // nothing in api.ts had to change to gain a second transport: it asks whether
 // `window.zero` is there, and now it is either way.
@@ -16,17 +16,19 @@
 // finished before the first import of api.ts, which is why main.tsx calls it
 // on its very first line.
 
-import { REQUEST_CHANNELS, PUSH_CHANNELS, WRAPPED_ARGS, DESKTOP_ONLY } from '../../shared/bridge-map.mjs';
+import { REQUEST_CHANNELS, PUSH_CHANNELS, WRAPPED_ARGS, DESKTOP_ONLY } from '../../shared/bridge-map.mts';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import { setIconCount, startPhoneAlerts } from './phone-alerts';
 import { installPhoneFiles } from './phone-files';
 import { installPhoneScreen, pagePinched } from './phone-screen';
 import { atMostEvery, PHONE_PUSH_MS } from './phone-polls';
+import { callLane } from './tab-calls';
+import type { AppBridge } from './types';
 
 type Push = (payload: unknown) => void;
 
 // The header and the storage key are spelled out rather than built from the
-// product name, on purpose. They are wire identifiers that main/serve.mjs has
+// product name, on purpose. They are wire identifiers that main/serve.mts has
 // to agree with exactly, and renaming the app should not invalidate a token a
 // tab is already holding. Everything a person READS uses `Name`.
 const TOKEN_HEADER = 'x-agentbox-token';
@@ -41,12 +43,48 @@ const KEEPALIVE_MAX = 16_000;
  *  not want it in a screenshot, and it would otherwise ride along into every
  *  link somebody copies out of here.
  */
-// THE PHONE DOOR IS THE OTHER CASE (main/phone-link.mjs). Its address is not
+// THE PHONE DOOR IS THE OTHER CASE (main/phone-link.mts). Its address is not
 // this computer's own, and there the key stays in the address bar on purpose:
 // a phone's home-screen icon is saved from that address, and on a phone the
 // icon gets storage of its own, so a key kept anywhere else is lost to it.
 const LOOPBACK = /^(127\.\d+\.\d+\.\d+|localhost|\[::1\])$/;
-export const onPhoneDoor = (host = location.hostname) => !LOOPBACK.test(host);
+// A DESKTOP WINDOW ONTO A HUB is not a phone, wherever its hub is (main/hub-client.mts).
+type DesktopShell = {
+  notify(payload: { arrivals: unknown; needsYou: unknown }): Promise<unknown>;
+  badge(count: unknown): Promise<unknown>;
+  open(address: string): Promise<unknown>;
+  onOpenItem?(fn: (payload: { id: string }) => void): () => void;
+};
+const desktopShell = (): DesktopShell | undefined => (typeof window === 'undefined' ? undefined : (window as Window & { agentboxShell?: DesktopShell }).agentboxShell);
+export const onPhoneDoor = (host = location.hostname, shell: unknown = desktopShell()) => !shell && !LOOPBACK.test(host);
+
+// Built channel by channel from shared/bridge-map.mts, so only the two doors read here are named.
+type HubBridge = Record<string, unknown> & Required<Pick<AppBridge, 'openArtifact'>> & Pick<AppBridge, 'onOpenItem'>;
+type OpenAsk = Parameters<HubBridge['openArtifact']>[0];
+
+/** What stays on this Mac when the rest of the app is on a hub. */
+export function withDesktopShell(bridge: HubBridge, shell?: DesktopShell) {
+  if (!shell) return bridge;
+  const hubOpens = bridge.openArtifact;
+  const hubSays = bridge.onOpenItem;
+  return {
+    ...bridge,
+    onOpenItem: (fn: (payload: { id: string }) => void) => {
+      const offHub = hubSays?.(fn);
+      const offHere = shell.onOpenItem?.(fn);
+      return () => { offHub?.(); offHere?.(); };
+    },
+    notify: (arrivals: unknown, needsYou: unknown) => shell.notify({ arrivals, needsYou }),
+    badge: (count: unknown) => shell.badge(count),
+    openArtifact: async (p: OpenAsk) => {
+      if (p?.mode !== 'resolve' && /^https?:/.test(String(p?.src))) {
+        await shell.open(String(p.src));
+        return { ok: true, opened: p.src };
+      }
+      return hubOpens(p);
+    },
+  };
+}
 
 /** A made-up name for this browser, so Settings can list the phones. */
 function deviceId(): string {
@@ -65,7 +103,7 @@ function deviceId(): string {
 // THE DOOR IS HERE AND THE ADDRESS HAS NO KEY ON IT. api.ts falls back to the
 // canned fixtures whenever there is no bridge, and on a page this computer
 // served that read as somebody else's inbox: invented products, invented
-// threads, nothing saying so (w-5aa14b9a8a). The mark main/serve.mjs puts in
+// threads, nothing saying so (w-5aa14b9a8a). The mark main/serve.mts puts in
 // the html is how this page knows it came from the door rather than from a
 // build somebody is previewing, which is the one case the fixtures are for.
 let needsItsKey = false;
@@ -100,10 +138,7 @@ function showLockedOut() {
 
 function takeToken(): string | null {
   const url = new URL(location.href);
-  // THROUGH THE RELAY the key is after the # (relay/phone/), which a browser
-  // never sends, so the relay never sees it.
-  const fromHash = onPhoneDoor() ? /(?:^#|&)k=([A-Za-z0-9_-]{24,})/.exec(url.hash)?.[1] ?? null : null;
-  const fromUrl = url.searchParams.get('token') ?? fromHash;
+  const fromUrl = url.searchParams.get('token');
   if (fromUrl && onPhoneDoor()) {
     try { localStorage.setItem(TOKEN_KEY, fromUrl); } catch { /* private mode */ }
     return fromUrl;
@@ -126,7 +161,7 @@ function takeToken(): string | null {
 
 export function installBrowserBridge(): boolean {
   // A desktop window already has the real bridge and must keep it.
-  if (typeof window === 'undefined' || (window as any).zero) return false;
+  if (typeof window === 'undefined' || window.zero) return false;
   const token = takeToken();
   if (!token) {
     if (servedByThisComputer()) askForTheKey();
@@ -156,14 +191,14 @@ export function installBrowserBridge(): boolean {
   // asks for them on the app's own scheme, which only Electron answers, so in
   // the browser copy every local picture in a thread drew as missing. They come
   // from this computer under the file key, which reads files and nothing else
-  // (main/serve.mjs fileKey).
+  // (main/serve.mts fileKey).
   fetch('/file-key', { headers: { [TOKEN_HEADER]: token } })
     .then((res) => (res.ok ? res.json() : null))
     .then((said) => { if (said?.key) installPhoneFiles(said.key); })
     .catch(() => { /* pictures stay blank; everything else still works */ });
 
-  const ask = async (channel: string, payload?: unknown) => {
-    const body = JSON.stringify(payload ?? null);
+  const ask = (channel: string, payload?: unknown) => lane(channel, JSON.stringify(payload ?? null));
+  const lane = callLane(async (channel: string, body: string) => {
     const res = await fetch(`/api/${encodeURIComponent(channel)}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', [TOKEN_HEADER]: token, 'x-agentbox-device': device },
@@ -181,7 +216,7 @@ export function installBrowserBridge(): boolean {
       throw new Error(said.error ?? `${Name} could not answer ${channel}.`);
     }
     return res.json();
-  };
+  });
 
   const bridge: Record<string, unknown> = {};
 
@@ -236,7 +271,7 @@ export function installBrowserBridge(): boolean {
     deliver(message.channel, message.args?.[0]);
   };
 
-  (window as any).zero = bridge;
+  window.zero = withDesktopShell(bridge as HubBridge, desktopShell()) as AppBridge;
   // A tapped alert opens its thread, the way the desktop's notification does.
   if (phone) {
     startPhoneAlerts({ token, device }, (id) => {
@@ -248,6 +283,6 @@ export function installBrowserBridge(): boolean {
   }
   // A tab has no title bar to clear, so the window's top inset can match its
   // bottom one (renderer/src/threads/pages.css reads this).
-  if (typeof document !== 'undefined') document.documentElement.dataset.shell = 'tab';
+  if (typeof document !== 'undefined' && !desktopShell()) document.documentElement.dataset.shell = 'tab';
   return true;
 }

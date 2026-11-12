@@ -4,16 +4,19 @@
    (## headings, **bold**, - bullets, 1. numbered), task lists ([ ] / [x]),
    underline (Cmd+U — StarterKit omits it), and "type an arrow, get an arrow"
    (-> becomes →, one Backspace undoes it). */
-import { Mark, Node, Extension, mergeAttributes, textInputRule } from '@tiptap/core';
-import StarterKit from '@tiptap/starter-kit';
-import Placeholder from '@tiptap/extension-placeholder';
-import TaskList from '@tiptap/extension-task-list';
-import TaskItem from '@tiptap/extension-task-item';
-import Link from '@tiptap/extension-link';
-import Table from '@tiptap/extension-table';
-import TableRow from '@tiptap/extension-table-row';
-import TableHeader from '@tiptap/extension-table-header';
-import TableCell from '@tiptap/extension-table-cell';
+import { Mark, Node, Extension, mergeAttributes, textInputRule, type AnyExtension } from '@tiptap/core';
+import type { EditorState, Transaction } from '@tiptap/pm/state';
+import type { Node as PmNode } from '@tiptap/pm/model';
+import { StarterKit } from '@tiptap/starter-kit';
+import { Placeholder } from '@tiptap/extension-placeholder';
+import { TaskList } from '@tiptap/extension-task-list';
+import { TaskItem } from '@tiptap/extension-task-item';
+import { EndingLink } from './ending-link';
+import { LinksOnlyAsYouType, linksAsAddress } from './typed-links';
+import { Table } from '@tiptap/extension-table';
+import { TableRow } from '@tiptap/extension-table-row';
+import { TableHeader } from '@tiptap/extension-table-header';
+import { TableCell } from '@tiptap/extension-table-cell';
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -69,13 +72,13 @@ export const Underline = Mark.create({
 //
 // It is a plain ProseMirror command rather than a TipTap chain so it can be run
 // against a bare EditorState in a test, with no DOM and no editor view.
-export function unboldHeading(state: any, dispatch?: (tr: any) => void): boolean {
+export function unboldHeading(state: EditorState, dispatch?: (tr: Transaction) => void): boolean {
   const heading = state.schema.nodes.heading;
   const paragraph = state.schema.nodes.paragraph;
   if (!heading || !paragraph) return false;
   const { from, to } = state.selection;
-  const found: { node: any; pos: number }[] = [];
-  state.doc.nodesBetween(from, to, (node: any, pos: number) => {
+  const found: { node: PmNode; pos: number }[] = [];
+  state.doc.nodesBetween(from, to, (node: PmNode, pos: number) => {
     if (node.type === heading) found.push({ node, pos });
   });
   if (!found.length) return false;
@@ -120,8 +123,11 @@ export const Arrows = Extension.create({
 // round-trips ![alt](src) through markdown.ts and renders a plain <img>. src is
 // a creation-file:// URL written by creation:save-image; the founder pastes or
 // drops an image and it lands as a real file beside the doc.
-export const Image = Node.create({
+export const Image = Node.create<{ drawnFrom: ((src: string) => string) | null }>({
   name: 'image',
+  addOptions() {
+    return { drawnFrom: null };
+  },
   group: 'block',
   atom: true,
   draggable: true,
@@ -136,9 +142,16 @@ export const Image = Node.create({
     return [{ tag: 'img[src]' }];
   },
   renderHTML({ HTMLAttributes }) {
-    return ['img', mergeAttributes(HTMLAttributes)];
+    // Only what is drawn: the document keeps the path it wrote.
+    const src = HTMLAttributes.src && this.options.drawnFrom ? this.options.drawnFrom(HTMLAttributes.src) : HTMLAttributes.src;
+    return ['img', mergeAttributes(HTMLAttributes, { src })];
   },
 });
+
+// StarterKit 3 added these. Link and underline are configured here and in the
+// chat box, and a trailing empty paragraph would change the markdown written
+// back to disk.
+export const STARTER_KIT_EXTRAS_OFF = { link: false, underline: false, trailingNode: false, listKeymap: false } as const;
 
 /*
  * `tables` is off for the sidebar note and on everywhere else.
@@ -146,16 +159,21 @@ export const Image = Node.create({
    only two ways that ends are a panel wider than its own words or a row of
    cells running off the edge. Nothing else about the set changes: the same
    markdown, the same input rules, the same file on disk either way. */
-export function buildExtensions(placeholder: string, { tables = true }: { tables?: boolean } = {}) {
+export function buildExtensions(placeholder: string, { tables = true, drawnFrom = null, live = null }: { tables?: boolean; drawnFrom?: ((src: string) => string) | null; live?: AnyExtension[] | null } = {}) {
   return [
     StarterKit.configure({
       heading: { levels: [1, 2, 3] },
+      ...STARTER_KIT_EXTRAS_OFF,
+      // A shared document has its own undo, which takes back only your own typing.
+      ...(live ? { undoRedo: false } : {}),
     }),
+    ...(live ?? []),
     Underline,
     UnboldHeading,
     Arrows,
-    Image,
-    Link.configure({ openOnClick: false, autolink: true }),
+    Image.configure({ drawnFrom }),
+    EndingLink.configure({ openOnClick: false, autolink: true, shouldAutoLink: linksAsAddress }),
+    LinksOnlyAsYouType,
     TaskList,
     TaskItem.configure({ nested: true }),
     ...(tables ? [Table.configure({ resizable: false }), TableRow, TableHeader, TableCell] : []),

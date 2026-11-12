@@ -7,7 +7,7 @@
 // know what an agent is doing was the one screen that would not tell her.
 //
 // The app has known the answer the entire time. `supervisor.status` in
-// main/supervisor.mjs returns the live sessions, the ids waiting for a slot,
+// main/supervisor.mts returns the live sessions, the ids waiting for a slot,
 // the ids whose worker died, the capacity and whether spawning is paused. Every
 // one of those was already on the snapshot the pane is drawn from.
 //
@@ -25,15 +25,17 @@
 // nothing back, so the tick is resting it (`restingUntil`). A live claim this
 // window did not take is not that: an agent is on it, just not one of ours
 // (`elsewhere`). Saying "queued" there would be the lie this whole vocabulary
-// was invented to stop telling (`queued` in supervisor.mjs, and the founder's
+// was invented to stop telling (`queued` in supervisor.mts, and the founder's
 // own report on of a row reading "queued" under a sentence saying it was
 // reading).
 
 import { spanLabel } from './notes';
 import { Name } from '../../shared/product-name.mjs';
-import { resetDay } from '../../shared/usage.mjs';
+import { resetDay } from '../../shared/usage.mts';
+import { openSignIn } from '../../shared/sign-in-ask.mts';
 import { MAC } from './this-keyboard';
 import { whyWords, type WhyCard } from './where-why';
+import { FIRST_RUN_LABEL } from './onboarding';
 import type { RunningSession, WhyNotCloud, WorkItem } from './types';
 
 // THE FIFTH STATE, AND IT IS THE ONE SOMEBODY OUTSIDE THIS BUILDING ASKED FOR.
@@ -59,8 +61,19 @@ import type { RunningSession, WhyNotCloud, WorkItem } from './types';
 // not working, because nothing moves until you answer it.
 export type LiveState = 'asking' | 'working' | 'elsewhere' | 'shipping' | 'next' | 'queued' | 'cannot' | 'signin' | 'limit' | 'paused' | 'silent' | 'idle';
 
+/** How long a thread just sent reads Queued before the fleet has listed it. */
+const JUST_SENT_MS = 30_000;
+
+/** Sent or replied to moments ago, and no agent has claimed it or written on it since. */
+function justSent(item: WorkItem, now: number): boolean {
+  const sentAt = Math.max(item.createdAt ?? 0, item.wrote?.answer?.ts ?? 0);
+  if (now - sentAt >= JUST_SENT_MS) return false;
+  if (sentAt === item.createdAt && (item.epoch ?? 0) > 0) return false;
+  return !Object.values(item.wrote ?? {}).some((w) => w?.source === 'agent' && w.ts >= sentAt);
+}
+
 export interface CannotStart {
-  why: 'setup' | 'asleep' | 'engine' | 'login' | 'memory' | 'slow-folder' | 'error' | string;
+  why: 'setup' | 'asleep' | 'cloud-carried' | 'engine' | 'login' | 'memory' | 'slow-folder' | 'error' | 'brake' | string;
   /** "Claude Code" or "Codex". */
   tool: string;
 }
@@ -69,6 +82,7 @@ export interface CannotStart {
 export function cannotStartLine({ why, tool }: CannotStart): string | null {
   if (why === 'setup') return 'Agents wait while setup is open. This starts as soon as you finish or skip it.';
   if (why === 'asleep') return 'This computer looks asleep to the app, so nothing starts until it wakes.';
+  if (why === 'cloud-carried') return 'This computer is asleep, so the cloud is starting this. It runs here instead if the cloud cannot.';
   if (why === 'engine') return `${tool} was not found on this computer, so nothing can start. Install it and this starts on its own.`;
   if (why === 'login') {
     return tool === 'Codex'
@@ -78,6 +92,7 @@ export function cannotStartLine({ why, tool }: CannotStart): string | null {
   if (why === 'memory') return 'This computer is short of memory, so this waits for heavier work to finish.';
   if (why === 'slow-folder') return 'Making this thread\'s own copy of the project is taking much longer than it should, so the agent has not started.';
   if (why === 'error') return 'Starting an agent on this failed. The app tries again on its own.';
+  if (why === 'brake') return `${tool}'s last runs stopped before they began, so the app is waiting before it tries again.`;
   return null;
 }
 
@@ -167,7 +182,7 @@ export function shortWord(state: LiveState, helpers = 0): string {
   // still open. The lead is not idle. So at "1 Agent Working" two agents were
   // working, and the word counted one of them.
   //
-  // `countHelpers` in main/supervisor.mjs only ever adds a `task_started` id,
+  // `countHelpers` in main/supervisor.mts only ever adds a `task_started` id,
   // so this number is subagents and can never be anything else. Naming what it
   // counts is the fix. Counting the lead as well was the alternative and it
   // costs more than it is worth: it would put "1 Agent Working" on every run in
@@ -220,6 +235,11 @@ export function shortSpan(ms: number): string {
   return `${hours}h ${minutes % 60}m`;
 }
 
+/** When the work on screen began: the reply a cloud run took between turns, else the run's start. */
+export function runningSince(session: Pick<RunningSession, 'startedAt' | 'turnStartedAt'>): number {
+  return session.turnStartedAt || session.startedAt;
+}
+
 export interface LivePlace {
   /** Said after the time: "on this Mac", "in the cloud". */
   word: string;
@@ -267,7 +287,7 @@ function said(text: string | null | undefined): boolean {
  * the one she reads first.
  *
  * a row with something on it to read has NOT come back empty, whatever the last
- * run did. `main/supervisor.mjs` refuses these too; this is the same rule kept
+ * run did. `main/supervisor.mts` refuses these too; this is the same rule kept
  * where the window can enforce it, because a renderer that trusts the main
  * process to be the only careful one is a renderer that draws whatever it is
  * sent.
@@ -288,6 +308,8 @@ export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null
   // An imported Claude Code session is not one of ours and has no place in any
   // of these lists; AgentThread draws its own liveness off the process.
   if (item.agent) return null;
+  // The walkthrough's practice rows are answered by the app and never started.
+  if ((item.labels ?? []).includes(FIRST_RUN_LABEL)) return null;
   // Finished is finished. The result at the foot of the conversation is the
   // news, and a mark under it about agents would be an appendix to an ending.
   if (item.status === 'done') return null;
@@ -297,14 +319,15 @@ export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null
   // "Working" won. Above `stalled` and `scheduled` too — a card with Allow and
   // Deny on it outranks any news about the run behind it.
   if (facts.asking) {
+    const signIn = openSignIn(item);
     return {
       state: 'asking',
-      line: 'The agent stopped to ask your permission. Nothing happens on this thread until you answer.',
+      line: signIn ? `The agent is waiting for you to sign in to ${signIn.service}.` : 'The agent stopped to ask your permission. Nothing happens on this thread until you answer.',
     };
   }
 
   if (session) {
-    const elapsed = Math.max(0, now - session.startedAt);
+    const elapsed = Math.max(0, now - runningSince(session));
     const helpers = session.helpers ?? 0;
     // The spoken sentence says the same fact at length. It has to move with
     // the word or the pane shows one number and says another. And it is the
@@ -351,7 +374,7 @@ export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null
   // her, and "Nothing came back" printed underneath. Both facts were true and
   // the pair was a lie: an agent had come back, at length.
   //
-  // `_silentRows` in main/supervisor.mjs now refuses these too, and this is the
+  // `_silentRows` in main/supervisor.mts now refuses these too, and this is the
   // same rule kept where a test can hold it, because the pane must not depend on
   // the main process being the only careful one. A row with a result or a
   // checkpoint on it has news already; this state is only ever about a row with
@@ -445,6 +468,15 @@ export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null
     return {
       state: 'paused',
       line: 'Agents are paused, so nothing will start on this.',
+    };
+  }
+
+  // The window draws a thread she has just sent before the fleet's next
+  // snapshot lists it, and idle there offered Try again on it.
+  if (justSent(item, now)) {
+    return {
+      state: 'queued',
+      line: 'Queued. An agent starts on it as soon as one is free.',
     };
   }
 

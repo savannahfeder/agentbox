@@ -4,7 +4,8 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { Animated, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type TextProps, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, Path, Pattern, RadialGradient, Rect, Stop } from 'react-native-svg';
-import { color, font, size } from './theme';
+import { useCloud } from '../state/cloud';
+import { color, corner, font, size } from './theme';
 
 /** Ember Grid's wall, the dot grid and the orange glow, under everything, the status bar included. */
 export function Wall({ children, style }: { children: ReactNode; style?: ViewStyle }) {
@@ -34,6 +35,8 @@ export function T({ style, ...rest }: TextProps) {
  * goes `below` (the inbox's tabs) sits inside it, over the same one line. */
 export function TopBar({ left, title, right, below }: { left?: ReactNode; title?: ReactNode; right?: ReactNode; below?: ReactNode }) {
   const inset = useSafeAreaInsets();
+  const { view, minimizedApproval, setMinimizedApproval } = useCloud();
+  const aside = view.approvals.findIndex((a: { id: string }) => a.id === minimizedApproval) === 0;
   return (
     <View style={{ paddingTop: inset.top, borderBottomWidth: 1, borderBottomColor: color.line }}>
       {/* The line is inside the 56px, as the website's border-box bar has it. */}
@@ -42,6 +45,12 @@ export function TopBar({ left, title, right, below }: { left?: ReactNode; title?
         <View style={{ flex: 1, minWidth: 0 }}>
           {typeof title === 'string' ? <T numberOfLines={1} style={{ fontFamily: font.medium, fontSize: 19, lineHeight: 23, letterSpacing: -0.19 }}>{title}</T> : title}
         </View>
+        {aside && (
+          <Pressable onPress={() => setMinimizedApproval(null)} accessibilityRole="button" accessibilityLabel="Review permission" hitSlop={4}
+            style={({ pressed }) => ({ height: 30, paddingHorizontal: 10, marginRight: 6, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : color.fill })}>
+            <T style={{ fontSize: 13, color: color.text }}>{`Review (${view.approvals.length})`}</T>
+          </Pressable>
+        )}
         {right}
       </View>
       {below}
@@ -62,7 +71,7 @@ export function IconButton({ onPress, label, children, width = 40 }: { onPress: 
 export function Ghost({ title, onPress, disabled }: { title: string; onPress: () => void; disabled?: boolean }) {
   return (
     <Pressable onPress={onPress} disabled={disabled} accessibilityRole="button"
-      style={({ pressed }) => ({ height: 28, paddingHorizontal: 11, justifyContent: 'center', borderWidth: 1, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill, opacity: disabled ? 0.5 : 1 })}>
+      style={({ pressed }) => ({ height: 28, paddingHorizontal: 11, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill, opacity: disabled ? 0.5 : 1 })}>
       <T style={{ fontSize: 13, color: color.dim }}>{title}</T>
     </Pressable>
   );
@@ -75,7 +84,7 @@ export function Sheet({ open, close, onGone, children }: { open: boolean; close:
   return (
     <Modal visible={open} transparent animationType="fade" onRequestClose={close} onDismiss={onGone}>
       <Pressable style={{ flex: 1, backgroundColor: color.scrim }} onPress={close} accessibilityLabel="Close" />
-      <View style={{ maxHeight: height * 0.72, backgroundColor: color.pop, borderTopWidth: 1, borderTopColor: color.lineStrong }}>
+      <View style={{ maxHeight: height * 0.72, backgroundColor: color.pop, borderTopWidth: 1, borderTopColor: color.lineStrong, borderTopLeftRadius: corner.card, borderTopRightRadius: corner.card, overflow: 'hidden' }}>
         <ScrollView style={{ flexGrow: 0 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 10, paddingHorizontal: 8, paddingBottom: 16 + inset.bottom, gap: 1 }}>
           {children}
         </ScrollView>
@@ -140,7 +149,7 @@ export function RunningMark({ cloud, children }: { cloud?: boolean; children?: R
 /** A word that opens a picker, dotted under, as the desktop's sentence words are. */
 export function Pickable({ children, onPress, style }: { children: ReactNode; onPress: () => void; style?: object }) {
   return (
-    <T onPress={onPress} suppressHighlighting
+    <T onPress={onPress} suppressHighlighting role="button"
       style={[{ textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: color.faint }, style]}>{children}</T>
   );
 }

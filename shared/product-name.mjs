@@ -18,7 +18,7 @@
 //      name into package.json, which Electron reads before any of our code
 //      runs and so cannot import this file.
 //
-//   Nothing else. `tests/the-app-is-named-in-one-place.test.mjs` fails if step
+//   Nothing else. `tests/the-app-is-named-in-one-place.test.mts` fails if step
 //   3 is skipped, and it fails if a new literal of the name is typed into the
 //   code by hand instead of read from here.
 //
@@ -39,7 +39,7 @@
 export const NAME = 'Agentbox';
 
 /**
- * Every name this app has had, newest first. main/main.mjs walks this to find
+ * Every name this app has had, newest first. main/main.mts walks this to find
  *  the data folder an existing install already writes to, because Chromium
  *  names that folder after the app and a rename would otherwise hand her an
  *  empty one and lose her theme, her zoom and her project order. HISTORY IS

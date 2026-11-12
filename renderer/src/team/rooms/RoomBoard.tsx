@@ -22,7 +22,8 @@ export function RoomBoard({ items, products, display, now, stateOf, cards, picke
     () => boardColumns({
       // The room is the team's view, so only what the team can see.
       items, products, display: { ...display, privacy: 'shared' }, now, stateOf, cards, picked, me, since: team?.state.since ?? null, live, projectOrder,
-      order: later ? columnOrder : columnOrder.filter((s) => s !== 'scheduled'),
+      order: (later ? columnOrder : columnOrder.filter((s) => s !== 'scheduled')).filter((s) => s !== 'waiting'),
+      waitingIsInProgress: true,
       nameOf: (id) => firstName(personOf(team, id)),
     }),
     [items, products, display, now, stateOf, cards, picked, me, team, live, columnOrder, later, projectOrder],

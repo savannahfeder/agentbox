@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { RoomCard } from '../../types';
 import { SlidersIcon, StateGlyph } from '../../threads/Pages';
 import { togglePicked } from '../../threads/people-rules';
-import { RoomFace } from './RoomFace';
+import { Face } from '../people';
 import { cardName } from './room-rules';
 
 type Props = {
@@ -52,7 +52,7 @@ export function RoomViewMenu({ people, picked, onPick, unseen, later, onLater }:
         <button type="button" className={everyone ? 'on' : ''} onClick={() => onPick(people.map((p) => p.id))}>Everyone</button>
         {ordered.map((p) => <button type="button" key={p.id} aria-pressed={picked.includes(p.id)} className={picked.includes(p.id) && !everyone ? 'on' : ''}
           onClick={() => onPick(everyone ? [p.id] : togglePicked(picked, p.id, null))}>
-          <RoomFace name={p.name} url={p.avatarUrl} size={16} />{cardName(p)}
+          <Face name={p.name} url={p.avatarUrl} size={16} />{cardName(p)}
         </button>)}
       </span></div>
     </>}

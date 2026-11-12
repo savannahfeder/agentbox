@@ -4,11 +4,11 @@
 import { useState } from 'react';
 import { Image, Platform, Pressable, View } from 'react-native';
 import { isImageName } from '../../../renderer/src/attachments';
-import { pickAfterClose } from '../lib/attach';
+import { pickAfterClose, thumbUri } from '../lib/attach';
 import { pickFiles, pickPhotos, type Picked } from '../platform/pick';
 import { Clip, Cross } from './icons';
 import { Sheet, SheetHead, SheetRow, T } from './parts';
-import { color } from './theme';
+import { color, corner } from './theme';
 
 export function AttachSheet({ open, close, add, fail }: { open: boolean; close: () => void; add: (files: Picked[]) => void; fail: (why: string) => void }) {
   const [after] = useState(() => pickAfterClose({ ios: Platform.OS === 'ios' }));
@@ -27,8 +27,6 @@ export function AttachSheet({ open, close, add, fail }: { open: boolean; close: 
   );
 }
 
-const TYPES: Record<string, string> = { jpg: 'jpeg', jpeg: 'jpeg', png: 'png', gif: 'gif', webp: 'webp' };
-const dataUri = (f: Picked) => `data:image/${TYPES[f.name.split('.').pop()!.toLowerCase()] ?? 'png'};base64,${f.dataBase64}`;
 const THUMB = 84;
 
 // As tall as the site's (84), as wide as the picture is, up to 220.
@@ -36,11 +34,11 @@ function Thumb({ file, drop }: { file: Picked; drop: () => void }) {
   const [width, setWidth] = useState(THUMB);
   return (
     <View>
-      <Image source={{ uri: dataUri(file) }} accessibilityLabel={file.name} resizeMode="cover"
+      <Image source={{ uri: thumbUri(file) }} accessibilityLabel={file.name} resizeMode="cover"
         onLoad={(e) => { const { width: w = 0, height: h = 0 } = e.nativeEvent?.source ?? {}; if (w && h) setWidth(Math.min(220, Math.round((THUMB * w) / h))); }}
-        style={{ height: THUMB, width, borderWidth: 1, borderColor: color.line }} />
+        style={{ height: THUMB, width, borderWidth: 1, borderRadius: corner.small, borderColor: color.line }} />
       <Pressable onPress={drop} accessibilityLabel={`Remove ${file.name}`} hitSlop={10}
-        style={{ position: 'absolute', top: 0, right: 0, width: 18, height: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: color.card, borderWidth: 1, borderColor: color.lineStrong }}>
+        style={{ position: 'absolute', top: 0, right: 0, width: 18, height: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: color.card, borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong }}>
         <Cross size={10} tint={color.dim} />
       </Pressable>
     </View>
@@ -53,7 +51,7 @@ export function Attached({ files, drop }: { files: Picked[]; drop: (i: number) =
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
       {files.map((f, i) => (isImageName(f.name) ? <Thumb key={`${f.name}-${i}`} file={f} drop={() => drop(i)} /> : (
-        <View key={`${f.name}-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 28, paddingLeft: 10, paddingRight: 4, borderWidth: 1, borderColor: color.line, backgroundColor: color.fill, maxWidth: 240 }}>
+        <View key={`${f.name}-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 28, paddingLeft: 10, paddingRight: 4, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: color.fill, maxWidth: 240 }}>
           <Clip size={13} tint={color.faint} />
           <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 13, color: color.dim }}>{f.name}</T>
           <Pressable onPress={() => drop(i)} accessibilityLabel={`Remove ${f.name}`} hitSlop={6} style={{ width: 22, height: 22, alignItems: 'center', justifyContent: 'center' }}>

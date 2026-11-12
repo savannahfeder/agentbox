@@ -1,18 +1,19 @@
 // An opened repeating task on the phone, as the desktop's RepeatFocus has it:
 // its project, schedule and next run, the instruction every run reads, and
 // the runs still on file. Change when and End go to the computer that keeps it.
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { router } from '../../../lib/router';
 import { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { readRule, repeatPresets, stamp } from '../../../../../renderer/src/format';
 import { repeatRow, repeatTag } from '../../../../../renderer/src/repeat-words';
-import { isCleanRun, ruleIdOf, ruleLabel } from '../../../../../shared/repeats.mjs';
+import { isCleanRun, ruleIdOf, ruleLabel } from '../../../../../shared/repeats.mts';
 import { useCloud } from '../../../state/cloud';
 import { Back, Repeat } from '../../../ui/icons';
 import { TimeBox, TypingSheet } from '../../../ui/Later';
 import { Markdown } from '../../../ui/Markdown';
 import { IconButton, Sheet, SheetHead, SheetRow, SheetSep, T, TopBar, Wall } from '../../../ui/parts';
-import { color, font, size } from '../../../ui/theme';
+import { color, corner, font, size } from '../../../ui/theme';
 
 const label = { fontFamily: font.mono, fontSize: 11, letterSpacing: 0.88, textTransform: 'uppercase' as const, get color() { return color.faint; } };
 
@@ -31,7 +32,7 @@ export default function RepeatPage() {
       </Wall>
     );
   }
-  const items = c.view.items as any[];
+  const items = c.view.items;
   const last = rule.lastOccurrence ? items.find((i) => i.id === rule.lastOccurrence) ?? null : null;
   const runs = items.filter((i) => i.product === rule.product && ruleIdOf(i) === rule.id).sort((a, b) => b.createdAt - a.createdAt).slice(0, 20);
   const read = readRule(typed);
@@ -75,7 +76,7 @@ export default function RepeatPage() {
 
         <View style={{ flexDirection: 'row', gap: 10, marginTop: 32 }}>
           <Pressable onPress={() => setSheet('when')} accessibilityRole="button"
-            style={({ pressed }) => ({ height: 36, paddingHorizontal: 14, justifyContent: 'center', borderWidth: 1, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
+            style={({ pressed }) => ({ height: 36, paddingHorizontal: 14, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
             <T style={{ fontSize: 14 }}>Change when</T>
           </Pressable>
           <Pressable onPress={() => setSheet('end')} accessibilityRole="button"

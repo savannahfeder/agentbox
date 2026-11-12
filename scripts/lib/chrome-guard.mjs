@@ -27,20 +27,24 @@
 
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { MAC_CHROME, startableChrome } from '../../shared/hidden-browser.mts';
+
+export { startableChrome };
 
 const PREFIX = '/tmp/shot-profile-';
-// The Linux box the QA sessions run on has no Chrome at a Mac path, so the
-// binary is an env override there. Everything below still only ever touches a
-// browser running on one of our own throwaway profiles.
-export const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const OURS = process.env.CHROME || '/Applications/Google Chrome.app';
+// Earlier runs started the person's Google Chrome; the sweep still reaps those.
+const OURS = process.env.CHROME || MAC_CHROME.split('/Contents/')[0];
 
 // Every process on the box, as {pid, ppid, command}. `ps` is the only thing that
 // sees processes this one did not start, which is the whole point of the sweep.
+//
+// `-ww`, or a Mac's ps cuts each line to the terminal's width, and to 79 columns
+// when there is no terminal: a headless Chrome's --user-data-dir sits past that
+// cut, so every match below silently found nothing.
 export function processes() {
   let out;
   try {
-    out = execFileSync('ps', ['-Ao', 'pid=,ppid=,command='], { encoding: 'utf8', maxBuffer: 32 << 20 });
+    out = execFileSync('ps', ['-ww', '-Ao', 'pid=,ppid=,command='], { encoding: 'utf8', maxBuffer: 32 << 20 });
   } catch {
     return []; // ps is unavailable; a failed sweep must never fail the screenshot
   }
@@ -52,7 +56,11 @@ export function processes() {
 
 // Deliberately narrow: a real Chrome binary AND one of our throwaway profiles.
 // Her own browsing Chrome runs from ~/Library and never matches.
-export const isOurChrome = (p) => p.command.startsWith(OURS) && p.command.includes(`--user-data-dir=${PREFIX}`);
+export const isOurChrome = (p) =>
+  (p.command.startsWith(OURS)
+    || /^\/(?:(?! -).)*?\/Google Chrome for Testing\.app\/Contents\/MacOS\/Google Chrome for Testing /.test(p.command)
+    || /^\/(?:(?! -).)*?\/chromium_headless_shell-\d+\/chrome-headless-shell-mac-[a-z0-9]+\/chrome-headless-shell /.test(p.command))
+  && p.command.includes(`--user-data-dir=${PREFIX}`);
 
 export const profileOf = (command) => command.match(/--user-data-dir=(\/tmp\/shot-profile-[A-Za-z0-9]+)/)?.[1];
 

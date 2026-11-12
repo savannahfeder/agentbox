@@ -1,7 +1,7 @@
 // What the hosted phone sends with a reply or a new thread: each file into
 // her own storage, in the folder of the computer the thread is on, named by
 // what is in it, and a link to it there in the words. That computer takes it
-// down and links the reply to its own copy (main/phone-inbox.mjs).
+// down and links the reply to its own copy (main/phone-inbox.mts).
 
 const SENT = /(?:^|\/)phone-files\/([0-9a-f]{64}\.[a-z0-9]{1,8})$/;
 const SENT_IN_WORDS = /\]\(phone-files\/([0-9a-f]{64}\.[a-z0-9]{1,8})\)/g;

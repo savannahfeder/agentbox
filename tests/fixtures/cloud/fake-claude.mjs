@@ -19,7 +19,13 @@
 // "LATE" makes it wait a moment after its handshake and before its tool call,
 // so a test can quit the app in between.
 // "AMEND" makes it amend the commit the branch started on instead of adding
-// one; "IDLE" makes it change nothing in the folder.
+// one; "IDLE" makes it change nothing in the folder. "STAY" makes it commit
+// and then keep working for ever, so a test can kill its machine.
+// "SLOW" makes it wait a moment before it commits; "SLOW:<path>" waits instead
+// until that path exists, so a test that has something to do while the run is
+// away waits for the thing itself rather than racing a fixed wait.
+// "HELPER:<path>" makes it start a background helper and end its turn waiting
+// on it; the helper finishes, and the agent answers, once that path exists.
 // "DOCS:<folder>" makes it read and write the project's documents folder:
 // it reports what it found there, draws a picture in its own designs folder
 // and waits a moment, then edits the notes just before its result.
@@ -100,13 +106,17 @@ async function turn(text) {
     const data = answer.status === 'delivered' ? fs.readFileSync(at(answer.path), 'utf8') : '';
     requested = { ...answer, length: data.length, beginning: data.slice(0, 8) };
   }
-  if (text.includes('SLOW')) await new Promise((r) => setTimeout(r, 1500));
+  // The path is the Mac's own, as DOCS below is: nothing maps it.
+  const until = (text.match(/SLOW:(\S+)/) || [])[1];
+  if (until) for (let waited = 0; waited < 20_000 && !fs.existsSync(until); waited += 50) await new Promise((r) => setTimeout(r, 50));
+  else if (text.includes('SLOW')) await new Promise((r) => setTimeout(r, 1500));
   if (text.includes('SWITCH')) execSync('git checkout -q -b somewhere-else');
   if (!text.includes('IDLE')) {
     fs.appendFileSync('cloud.txt', 'made in the cloud\n');
     execSync(text.includes('AMEND') ? 'git add cloud.txt && git commit -q --amend -m "Amended in the cloud"' : 'git add cloud.txt && git commit -q -m "From the cloud"');
     fs.writeFileSync('loose.txt', 'not committed\n');
   }
+  if (text.includes('STAY')) await new Promise(() => {});
   const docs = (text.match(/DOCS:(\S+)/) || [])[1];
   let found = null;
   if (docs) {
@@ -129,6 +139,21 @@ async function turn(text) {
   const dir = path.join(at(process.env.CLAUDE_CONFIG_DIR), 'projects', process.cwd().slice(root.length).replace(/[^a-zA-Z0-9]/g, '-'));
   fs.mkdirSync(dir, { recursive: true });
   fs.appendFileSync(path.join(dir, `${sessionId}.jsonl`), JSON.stringify({ type: 'user', text }) + '\n');
+  const helper = (text.match(/HELPER:(\S+)/) || [])[1];
+  if (helper) {
+    const task = { task_id: 'h1', task_type: 'local_agent', description: 'Make design stills' };
+    out({ type: 'system', subtype: 'background_tasks_changed', tasks: [task] });
+    out({ type: 'assistant', message: { content: [{ type: 'text', text: 'Waiting on the designer.' }] } });
+    out({ type: 'result', subtype: 'success', is_error: false, session_id: sessionId, result: 'Waiting on the designer.' });
+    // Outside `busy`, so input closing first ends the process and the helper with it, as in Claude Code.
+    (async () => {
+      while (!fs.existsSync(helper)) await new Promise((r) => setTimeout(r, 50));
+      out({ type: 'system', subtype: 'background_tasks_changed', tasks: [] });
+      out({ type: 'assistant', message: { content: [{ type: 'text', text: 'Stills are ready.' }] } });
+      out({ type: 'result', subtype: 'success', is_error: false, session_id: sessionId, result: 'Stills are ready.' });
+    })();
+    return;
+  }
   out({ type: 'assistant', message: { content: [{ type: 'text', text: 'working' }] } });
   const settings = readSettings();
   out({ type: 'result', subtype: 'success', is_error: false, session_id: sessionId, result: JSON.stringify({ said, names, attached, found, ...(resource ? { requested } : {}), memory: readMemory(), settings, hookScripts: readHookScripts(settings), token: process.env.CLAUDE_CODE_OAUTH_TOKEN || null, home: process.env.HOME === undefined ? null : 'set' }) });

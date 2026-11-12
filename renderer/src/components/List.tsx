@@ -10,24 +10,30 @@ import { REST_HEADING, URGENT_HEADING, clickIntent, rowKeys, rowSummary, rowTitl
 import { isUrgentRow } from '../interrupt';
 // THE SAME PREDICATE THE PANE USES, not a second copy of the rule. The row and
 // the pane disagreeing about one fact on one screen is what this import fixes.
-import { cameBackEmpty, cannotStartLine } from '../live-line';
+import { cameBackEmpty, cannotStartLine, runningSince } from '../live-line';
 import { agentAtWork, engineWordFor } from '../byline';
-import { DEFAULT_ENGINE } from '../../../shared/engines.mjs';
+import { DEFAULT_ENGINE } from '../../../shared/engines.mts';
 import { isTroubleRow, TROUBLE_ID } from '../trouble-row';
 import { isUpdateRow, UPDATE_ID } from '../update-row';
 import { IMPORT_KEYS, JUST_IMPORTED_WORD, NOT_IMPORTED_HEADING, NOT_IMPORTED_KEYS, isImportRow, isNotImportedRow, justImported, type ImportChoice } from '../import-row';
-import { splitHits } from '../search';
+import { Hits } from './Hits';
 import type { ThreadSearchDetails } from '../threads/search';
 import { nextRunWords, repeatRow, repeatTag } from '../repeat-words';
-import { Face, TeamRowEnd, type TeamView } from '../team/people';
+import { Face, TeamRowEnd, firstName, type TeamView } from '../team/people';
+import { commentLine, linkCommentLine } from '../threads/teammate-thread';
+import { fileNewsFor, fileNewsLine } from '../../../shared/artifact-marks.mts';
 import { CloudOfferRow, RepeatMark, RowCells, SectionHead, TableHead, ThreadCells, WaitingContext } from '../threads/Pages';
 import type { StackKey, StackSection } from '../threads/stack-rules';
+import { cardPlace } from '../threads/page-rules';
 import { FleetContext } from '../fleet';
-import { cardStatus, factsFor, statusCell } from '../status-word';
+import { cardStatus, factsFor, laterCell, statusCell } from '../status-word';
+import { opensOnKey } from '../repeat-from-thread';
 import { toApproveWords } from '../threads-made';
 import type { MixedRow } from '../threads/people-rules';
 import { useRowDrag } from '../threads/row-drag';
-import { heldByAPerson } from '../../../shared/team-rules.mjs';
+import { heldByAPerson } from '../../../shared/team-rules.mts';
+import { catchUpDue } from '../../../shared/agent-import.mts';
+import { cutAt, firstRows, placeOf, useRowsDrawn } from '../rows-drawn';
 
 /**
  * THE AGENT A ROW WITH NOTHING RUNNING WOULD RUN ON.
@@ -62,20 +68,8 @@ function agentRest(
   return engineWordFor({ engineChoice, engine });
 }
 
-// THE MATCH IS TONE, NOT COLOUR.), so a matched word cannot wear a chip or a
-// wash. It is drawn at full text strength inside a line that is dim, which is a
-// difference the eye finds instantly and which adds nothing to the list's
-// vocabulary. When nothing is being searched this renders the plain string.
-function Hits({ text, terms, phrase }: { text: string; terms?: string[]; phrase?: string }) {
-  if (!terms?.length) return <>{text}</>;
-  return (
-    <>
-      {splitHits(text, terms, phrase).map((run, i) => (
-        run.hit ? <b className="hit" key={i}>{run.text}</b> : <span key={i}>{run.text}</span>
-      ))}
-    </>
-  );
-}
+// THE MATCH IS TONE, NOT COLOUR (./Hits), so a matched word cannot wear a chip
+// or a wash. It is drawn at full text strength inside a line that is dim.
 
 // A repeating task's words, kept where the phone app can read them too.
 export { repeatRow, repeatTag, nextRunWords };
@@ -102,11 +96,16 @@ export function dayGroups(
   return groups;
 }
 
-export function List({ items, view, keyView, hoveredId, selected, seen, unread, running, engineChoice, engines, stalled, queued, signInNeeded, atLimit, cannotStart, shipping, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, searchDetails, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover: hoverTo, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard, selectedCard = null, onEnd, onReorder, lead = null, stack }: {
+export function List({ items, view, keyView, hoveredId, selected, seen, unread, lastThread = null, running, engineChoice, engines, stalled, queued, signInNeeded, atLimit, cannotStart, shipping, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, searchDetails, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover: hoverTo, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard, selectedCard = null, onEnd, onReorder, lead = null, foot = null, pointer, stack, leadIn = null }: {
+  /** The section the lead rows sit under instead of over the list: mentions and news are from people. */
+  leadIn?: StackKey | null;
   /** Your threads as one list in sections (../threads/stack-rules): each section's header, and which section a row is in. */
   stack?: { sections: StackSection[]; sectionOf: (item: WorkItem) => StackKey; onFold: (key: StackKey) => void };
   /** Rows drawn above the list's own, under its head: a mention in a room (team/rooms/MentionRows.tsx). */
   lead?: ReactNode;
+  /** What arrived above the threads while the pointer holds the rows still (../threads/steady-rows). */
+  foot?: ReactNode;
+  pointer?: { onPointerMove: () => void; onPointerLeave: () => void };
   items: WorkItem[];
   view: View;
   // WHICH VIEW'S KEYS THE ROW HINT PRINTS, which is not always the view this
@@ -122,6 +121,8 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
   seen: Set<string>;
   /** An agent wrote since you last opened it (renderer/src/unread.ts). */
   unread?: (item: WorkItem) => boolean;
+  /** The thread you were in last, washed so you can find it again. */
+  lastThread?: { product: string; id: string } | null;
   running: RunningSession[];
   /**
    * WHETHER THIS MAC HAS TWO CODING AGENTS TO TELL APART. False on almost every
@@ -251,6 +252,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
     walk ?? null,
     id,
   ));
+  const rowsNow = useRowsDrawn(`${keyView ?? view}|${table}|${(terms ?? []).join(' ')}|${phrase ?? ''}`, table && mixed ? mixed.length : items.length);
   // NO EMPTY PAGE ANYWHERE IN THE APP.A view with nothing in it draws the
   // background and nothing else. Two sentences died here: "Nothing here." on
   // the inbox, Scheduled and Closed, and "Nothing running. Compose (C) to
@@ -261,7 +263,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
   // `emptyText` survives because search is the one case that is NOT an empty
   // page: something was typed and the app has to say what it matched.
   if (items.length === 0 && rules.length === 0 && !mixed?.length && !lead && !stack?.sections.length) {
-    return emptyText ? <div className="empty">{emptyText}</div> : null;
+    return emptyText || foot ? <>{emptyText && !foot ? <div className="empty">{emptyText}</div> : null}{foot}</> : null;
   }
 
   // The scheduled view is about WHEN things come back, so its groups and its
@@ -342,6 +344,10 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
     ? [{ key: 'mixed', label: '', items: mixed.flatMap((r): Entry[] => (r.card ? [{ card: r.card }] : at.has(r.item.id) ? [{ item: r.item, index: at.get(r.item.id)! }] : [])) }]
     : groups;
   const withPerson = table && !!mixed;
+  const total = shown.reduce((n, g) => n + g.items.length, 0);
+  const cut = cutAt(rowsNow, placeOf(shown, selected));
+  const allDrawn = cut >= total;
+  const drawn = allDrawn ? shown : firstRows(shown, cut);
 
   // A repeating rule's own state is its last run's: the mark turns only
   // where an agent really is on that one (w-ec2b04d449).
@@ -349,11 +355,14 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
     const pool = allItems ?? items;
     const last = rule.lastOccurrence ? pool.find((i) => i.id === rule.lastOccurrence) ?? null : null;
     const live = !!last && (last.status === 'open' || last.status === 'claimed');
+    // Its run's word only while an agent is on that run; otherwise it comes back at its time.
+    const running = live && last ? statusCell(last, { ...factsFor(fleet, last.id), inProgress: live, now: Date.now() }) : null;
     return (
       <div key={rule.id} data-repeat-id={rule.id} className="row" title={repeatRow(rule, last).last}
+        role="button" tabIndex={0} onKeyDown={opensOnKey(() => onOpenRepeat?.(rule))}
         onClick={() => onOpenRepeat?.(rule)}>
         <span className="mark" aria-hidden="true" />
-        <RowCells status={last ? statusCell(last, { ...factsFor(fleet, last.id), inProgress: live, now: Date.now() }) : undefined}
+        <RowCells status={running?.live ? running : laterCell(null)}
           lead={<RepeatMark />} title={rule.title} aside={repeatTag(rule)} where={rule.productName}
           person={withPerson ? personCell?.(team?.me ?? null) : undefined}
           priority={rule.priority ?? 5} updatedAt={rule.updatedAt ?? rule.createdAt}
@@ -363,9 +372,9 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
   });
 
   return (
-    <div className={`list${table ? ' th-table' : ''}`} ref={drag.listRef}>
-      {table && !stack && <TableHead person={withPerson} tab={view} />}
-      {lead}
+    <div className={`list${table ? ' th-table' : ''}`} ref={drag.listRef} {...pointer}>
+      {table && (!stack || stack.sections.every((x) => x.bare)) && <TableHead person={withPerson} tab={view} />}
+      {!leadIn && lead}
       {/* Repeating tasks sit above the deferred rows, in the tab that already
           holds work with a moment attached. They are RULES, not items, so they
           arrive on their own list and no inbox rule has an opinion about them. */}
@@ -386,7 +395,8 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
             const last = rule.lastOccurrence ? pool.find((i) => i.id === rule.lastOccurrence) ?? null : null;
             const row = repeatRow(rule, last);
             return (
-              <div key={rule.id} data-repeat-id={rule.id} className="row" onClick={() => onOpenRepeat?.(rule)}>
+              <div key={rule.id} data-repeat-id={rule.id} className="row" role="button" tabIndex={0}
+                onKeyDown={opensOnKey(() => onOpenRepeat?.(rule))} onClick={() => onOpenRepeat?.(rule)}>
                 <span className="mark" />
                 <div className="row-main">
                   <div className="subject">{rule.title}</div>
@@ -406,10 +416,11 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
           })}
         </div>
       )}
-      {shown.map((group) => (
+      {drawn.map((group) => (
         <div key={group.key}>
-          {group.section && <SectionHead label={group.section.label} count={group.section.count} tab={group.section.tab} folded={group.section.folded} onFold={() => stack?.onFold(group.section!.key)} />}
+          {group.section && !group.section.bare && <SectionHead label={group.section.label} count={group.section.count} tab={group.section.tab} folded={group.section.folded} onFold={() => stack?.onFold(group.section!.key)} />}
           {group.section?.key === 'later' && !group.section.folded && ruleRows(laterRules)}
+          {leadIn && group.section?.key === leadIn && !group.section.folded && lead}
           {/* An empty label is a ranked list or the row that says nothing is
               running, and it draws NOTHING: an empty div here still spends the
               day label's whole height and leaves a band of nothing above the
@@ -425,7 +436,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
               return (
                 <div key={key} className={`row th-their-row${selectedCard === key ? ' selected' : ''}`} onClick={() => onOpenCard?.(c)}>
                   <span className="mark" aria-hidden="true" />
-                  <RowCells status={cardStatus(c.state)} title={c.title ?? 'Private thread'} where={c.project ?? ''} person={personCell?.(c.personId)}
+                  <RowCells status={cardStatus(c.state, team?.byId.get(c.personId)?.name?.split(/\s+/)[0])} title={c.title ?? 'Private thread'} where={cardPlace(c)} person={personCell?.(c.personId)}
                     priority={c.priority} updatedAt={c.updatedAt} now={Date.now()} />
                 </div>
               );
@@ -450,6 +461,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                    itself, by id, rather than at whatever is drawn first
                    (w-0b60195a14, 2026-08-21). Nothing else reads this. */
                 data-item-id={item.id}
+                data-catching-up={catchUpDue(item) ? '1' : undefined}
                 /*
                  * THE HOVER HINT, AND ONLY IN THE INBOX. `hint-plate.ts` says
                    ↵ Open task, E Mark done, S Schedule for later, which are the
@@ -462,7 +474,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                 {...(tab === 'inbox' && !isImportRow(item)
                   ? { 'data-hint': 'row', 'data-hint-text': '.subject' }
                   : {})}
-                className={`row ${made ? 'trouble-row ' : ''}${index === selected && !selectedCard ? 'selected' : ''} ${checked ? 'checked' : ''}${tab === 'inbox' && unread?.(item) ? ' unread' : ''}`}
+                className={`row ${made ? 'trouble-row ' : ''}${index === selected && !selectedCard ? 'selected' : ''} ${checked ? 'checked' : ''}${tab === 'inbox' && unread?.(item) ? ' unread' : ''}${lastThread?.id === item.id && lastThread.product === item.product ? ' recent' : ''}`}
                 /*
                  * ON MOUSE MOVE, NOT ON MOUSE ENTER. A pointer parked over the
                    list while she walks it with J and K would otherwise claim
@@ -546,7 +558,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                       rows' usual openings is a list of rows that look unrelated
                       to what was typed. */}
                   <div className="preview">
-                    <Hits text={summaries?.get(item.id) ?? rowSummary(item, tab)} terms={terms} phrase={phrase} />
+                    <Hits text={summaries?.get(item.id) ?? fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string | null) => firstName(team?.byId.get(id ?? '') ?? null)) ?? commentLine(item.waitingComments, (id) => firstName(team?.byId.get(id) ?? null)) ?? linkCommentLine(item.linkComments) ?? rowSummary(item, tab)} terms={terms} phrase={phrase} />
                   </div>
                 </div>
                 {/* Everything that is not the message itself lives at the right end, on the
@@ -636,7 +648,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                       turned down, the word Urgent in small capitals, is in
                       decisions.md if it ever needs to come back.
 
-                      The predicate is `isUrgent` in shared/rank.mjs, reached
+                      The predicate is `isUrgent` in shared/rank.mts, reached
                       through interrupt.ts, and not the inline `item.agent ?
                       null : priority >= 9` that used to be on this line: that
                       one unmarked the user's urgent row the moment a worker claimed
@@ -743,7 +755,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                   {justImported(item, seen)
                     ? <span className="time imported">{JUST_IMPORTED_WORD}</span>
                     : session
-                    ? <span className="time working">working · {ago(session.startedAt)}</span>
+                    ? <span className="time working">working · {ago(runningSince(session))}</span>
                     : stalled?.includes(item.id)
                       ? <span className="time stalled">stopped · {ago(item.updatedAt)}</span>
                       : cameBackEmpty(item, silent?.[item.id])
@@ -772,8 +784,9 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
           {group.section?.key === 'progress' && !group.section.folded && !ranked && <CloudOfferRow />}
         </div>
       ))}
-      {table && !stack && view === 'progress' && !ranked && <CloudOfferRow />}
-      {onEnd && <ListFoot onEnd={onEnd} />}
+      {allDrawn && foot}
+      {allDrawn && table && !stack && view === 'progress' && !ranked && <CloudOfferRow />}
+      {allDrawn && onEnd && <ListFoot onEnd={onEnd} />}
     </div>
   );
 }

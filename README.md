@@ -11,6 +11,11 @@
 </p>
 
 <p align="center">
+  <a href="https://agentbox.ac/download"><strong>Download for Mac</strong></a>
+</p>
+
+<p align="center">
+  <a href="https://agentbox.ac">agentbox.ac</a> ·
   <a href="#install">Get it</a> ·
   <a href="#an-interface-that-helps-you-hyperfocus">Hyperfocus</a> ·
   <a href="#how-it-works">How it works</a> ·
@@ -33,9 +38,11 @@
 
 ## Install
 
-There are two ways to run it: in the browser, or as a Mac app. Both need Node 22.13 or newer and Claude Code or Codex installed and signed in.
+**As a Mac app.** [Download Agentbox for Mac](https://agentbox.ac/download). It is signed and notarised, and runs on Apple silicon and Intel.
 
-**As a desktop app.** Build it from this repo. `npm start` is the desktop command on Omarchy and on a Mac:
+Every way needs Claude Code or Codex installed and signed in. Building it from source or running it in the browser also needs Node 22.18 or newer.
+
+**As a desktop app from source.** Build it from this repo. `npm start` is the desktop command on Omarchy and on a Mac:
 
 ```
 git clone https://github.com/savannahfeder/agentbox.git
@@ -218,7 +225,7 @@ nothing new to pay for.
 <br>
 
 `zero.config.json` in the repo root, gitignored and machine-specific. Every
-default works unset and they all live in `main/config.mjs`. The ones that
+default works unset and they all live in `main/config.mts`. The ones that
 matter:
 
 - `storeRoot`: where the store lives. On macOS this defaults to a folder
@@ -279,17 +286,17 @@ A released copy counts nineteen things, and they are counts:
 - counts were turned off
 
 Each carries a random install id, the app and platform version, whether it
-came from the Mac app or the browser copy, and at most
+came from the Mac app or the browser copy, which of two first runs a new install was shown, and at most
 eight other things: how long something took, how many of a thing there were,
 which kind of row it was out of six fixed words, whether an agent or you did
 it, whether an agent's run failed, whether it happened in setup's practice
 project, which coding agent ran it, Claude Code or Codex, and why an agent
 could not start yet, out of eighteen fixed words.
 No file contents, no prompts, no paths, no titles, nothing you typed.
-`shared/analytics-events.mjs` is the whole list, and anything a caller attaches
+`shared/analytics-events.mts` is the whole list, and anything a caller attaches
 beyond those eight is dropped rather than sent, so nobody can widen it by
 accident. Crash reports travel the same way and are scrubbed first
-(`shared/crash-scrub.mjs`).
+(`shared/crash-scrub.mts`).
 
 **The events can be turned off,** and either way is enough on its own:
 
@@ -322,7 +329,7 @@ in exactly one place. The app can crash, restart or be rewritten without any
 agent noticing.
 
 - `main/` the Electron main process: config, the store
-  (`main/store/work-items.mjs` is the single write path), the supervisor that
+  (`main/store/work-items.mts` is the single write path), the supervisor that
   spawns one headless session per work item, and IPC.
 - `mcp/` the store server handed to those sessions.
 - `renderer/` the inbox: list, focus mode, rail, compose, palette, browser.
@@ -341,7 +348,13 @@ agent noticing.
 ```
 npm run dev        # vite HMR plus electron
 npm test
+npm run typecheck  # strict tsc over the back end and the renderer
 ```
+
+The app is TypeScript throughout. `main/`, `shared/` and `mcp/` are `.mts` that
+Node runs as they are, stripping the types at load, so there is no build step
+for the back end; the renderer and the phone app are `.ts` and `.tsx` built
+by Vite and Expo. CI runs the strict type check beside the tests on every push.
 
 Useful modes:
 

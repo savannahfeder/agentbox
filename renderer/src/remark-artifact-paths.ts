@@ -1,7 +1,7 @@
 // The window's half of reading a path in a message: the url transform
 // react-markdown needs. The rule itself is in artifact-paths.ts, which has no
 // react-markdown in it so the phone app can share it.
-import { defaultUrlTransform } from 'react-markdown';
+import { keepConnectionLinks } from './connections/connections-shown';
 
 export { CODE_PATH, isMediaPath, linkArtifactPaths, productPath, remarkArtifactPaths, type Options } from './artifact-paths';
 
@@ -10,5 +10,5 @@ export { CODE_PATH, isMediaPath, linkArtifactPaths, productPath, remarkArtifactP
 export function artifactUrlTransform(url: string): string {
   // An agent mentioned in a conversation keeps its address, which is what the
   // link component reads to draw it as a mention (w-7b9cb8636a).
-  return /^(file:\/\/|agentbox-agent:)/i.test(url) ? url : defaultUrlTransform(url);
+  return /^(file:\/\/|agentbox-agent:)/i.test(url) ? url : keepConnectionLinks(url);
 }

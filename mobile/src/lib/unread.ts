@@ -2,6 +2,7 @@
 // unread while its latest answer is newer than when you last opened it here.
 // Keyed by project and id, since two computers can both have a w-1.
 import { arrivedAt } from '../../../renderer/src/unread';
+import type { WorkItem } from '../../../renderer/src/types';
 
 type Store = { getItem(k: string): string | null; setItem(k: string, v: string): void };
 
@@ -28,5 +29,14 @@ export function markSeen(seen: Seen, item: { product: string; id: string }, stor
   return { ...seen, at };
 }
 
-export const isUnread = (item: { product: string; id: string; createdAt?: number; wrote?: any }, seen: Seen) =>
-  arrivedAt(item as any) > (seen.at[keyOf(item)] ?? seen.since);
+/** Unread again until it is next opened (the web app's Mark unread). */
+export function markUnseen(seen: Seen, item: { product: string; id: string }, store: Store): Seen {
+  const at = { ...seen.at, [keyOf(item)]: 0 };
+  store.setItem(SEEN_AT_KEY, JSON.stringify(at));
+  return { ...seen, at };
+}
+
+// Her own thread with no answer yet holds nothing new: only her message, and "Queued".
+export const isUnread =(item: { product: string; id: string; createdAt?: number; wrote?: WorkItem['wrote']; waitsForMac?: boolean }, seen: Seen) =>
+  !(!item.wrote?.result && (item.waitsForMac || item.wrote?.body?.source === 'founder'))
+  && arrivedAt(item as Parameters<typeof arrivedAt>[0]) > (seen.at[keyOf(item)] ?? seen.since);

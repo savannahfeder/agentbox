@@ -1,5 +1,5 @@
 /* THE PHONE LAYOUT. A phone reaches the inbox through the phone
-   door (main/phone-link.mjs) and draws the same screens in a quarter of the
+   door (main/phone-link.mts) and draws the same screens in a quarter of the
    width. The desktop window cannot get this narrow (its minimum is 720), so
    nothing here ever reaches it.
 
@@ -81,6 +81,7 @@
   }
   :root:root:root .workspace-navigation .th-team,
   :root:root:root .workspace-navigation .workspace-tabs,
+  :root:root:root .workspace-navigation .workspace-find,
   :root:root:root .workspace-navigation button[aria-label="Feedback"],
   :root:root:root .workspace-navigation button[aria-label="Instructions"],
   :root:root:root .workspace-navigation .workspace-usage,
@@ -112,13 +113,13 @@
 
   /* The top bar: the title, then search, filters and (the side rail's)
      Settings as three plain icons of one size, no boxes. */
-  /* SOLID, IN THE WALL'S COLOUR, as is the page's root (above). Safari on
-     iOS paints the band behind the clock by matching the top of the page and
-     takes no notice of theme-color: over the wall's glow it gave up and drew
-     its own grey, (19, 20, 22), against a bar of (26, 24, 23) to (34, 29, 26)
-     sampled off a screenshot (2026-10-12). A flat bar gives it one colour to
-     match, and the glow starts under the bar's line. */
-  :root:root:root .workspace-layout > .topbar { padding: 0 48px 0 16px; height: var(--phone-top); min-height: var(--phone-top); flex-basis: var(--phone-top); background: var(--bg); border-bottom: 0; }
+  /* SEE-THROUGH, SO THE WALL'S DOTS AND GLOW RUN UP UNDER THE TITLE. It was
+     solid in the wall's flat colour from 2026-10-12, so Safari had one colour
+     to match behind the clock; that job is the edge strip's now (below), and
+     the flat bar read as "black" over a textured page ("before it was nice
+     when it matched the rest of the background texture and color",
+     2026-10-29). */
+  :root:root:root .workspace-layout > .topbar { padding: 0 48px 0 16px; height: var(--phone-top); min-height: var(--phone-top); flex-basis: var(--phone-top); background: transparent; border-bottom: 0; }
   /* SAFARI 26 COLOURS THE BAND BEHIND THE CLOCK from what touches the top of
      the page, and ignores theme-color. The page is one fixed body, so nothing
      short touched it and Safari drew its own grey there. This strip, in the
@@ -178,10 +179,11 @@
     height: 44px;
     padding: 0 calc(16px + env(safe-area-inset-right, 0px)) 0 calc(16px + env(safe-area-inset-left, 0px));
     align-items: stretch; gap: 12px; overflow-x: auto; scrollbar-width: none;
-    /* The wall's own colour, so the bar and the list never disagree ("a tad
-       bit different", 2026-10-11), with its one line a shadow at its foot,
-       not a border, so the picked tab's mark can lie over it. */
-    background: var(--bg); box-shadow: inset 0 -1px var(--line); border-top: 0; border-bottom: 0;
+    /* The wall itself shows through, so the bar and the list never disagree
+       ("a tad bit different", 2026-10-11; the flat colour read as "black",
+       2026-10-29), with its one line a shadow at its foot, not a border, so
+       the picked tab's mark can lie over it. */
+    background: transparent; box-shadow: inset 0 -1px var(--line); border-top: 0; border-bottom: 0;
   }
   :root:root:root .th-bar::-webkit-scrollbar { display: none; }
   /* SEARCH GOES UP INTO THE TOP BAR, left of the gear. At the end of the
@@ -194,6 +196,12 @@
   }
   :root:root:root .workspace-layout:has(.th-bar > .th-search) > .topbar { padding-right: 88px; }
   :root:root:root:has(.topbar input) .th-bar > .th-search { display: none; }
+  /* ON THE PHONE DOOR SEARCH IS DRAWN IN THE TOP BAR ITSELF (App.tsx), after
+     View and filters and before the gear. Pinned up there from inside the
+     tabs row, which scrolls sideways, an iPhone clipped it to that row and it
+     was not drawn at all ("the little search icon is gone", 2026-10-29). */
+  :root:root:root .topbar .th-right > .th-search { order: 1; }
+  :root:root:root:has(.topbar input) .topbar .th-right > .th-search { display: none; }
   /* From the left, 18px apart, as the phone app draws them. At 15px an iPhone
      set a step up draws them 16.8px, and the four with two-figure counts run
      383px there, inside a 402px phone. */
@@ -304,10 +312,6 @@
   :root:root:root .ts-top { align-items: center; gap: 2px; }
   :root:root:root .ts-top .ts-more { width: 44px; height: 44px; border-color: transparent; }
   :root:root:root .ts-top .ts-done { height: 44px; padding: 0 10px; border-color: transparent; }
-  :root:root:root .ts-top .one-nav { gap: 0; margin-right: 0; align-items: center; }
-  /* "1 OF 4" is read, not pressed: its size stays, and it keeps clear of the
-     arrow's box, which now reaches further left than its chevron does. */
-  :root:root:root .ts-top .one-pos { margin-right: 6px; color: var(--text-dim); }
   /* Open, it is a page of its own over the thread, under the same top bar,
      closed from its own icon at its top right. */
   :root:root:root .focus-pane .ts-panel {
@@ -379,9 +383,9 @@
   :root:root:root .doc-picture { touch-action: none; transform-origin: center center; transition: transform .05s linear; }
   /* A picture's box while it loads is at the foot of this file, outside this
      block, because the phone link in a computer's browser is wider than this. */
-  /* The reply box's attach button, an icon like the box's others. */
-  :root:root:root .compose-attach {
-    flex: none; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; margin: 0 4px 0 -6px;
+  /* The reply box's paperclip at a finger's size. */
+  :root:root:root .dock-clip {
+    flex: none; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0;
     border: 0; background: none; color: var(--text-dim); box-shadow: none;
   }
   /* The microphone beside it (WebDictation.tsx), the phone app's size. */
@@ -558,7 +562,7 @@
   :root:root:root .tc-card > .tc-bar > .dictate-row {
     order: 3; flex: none; height: calc(52px + var(--phone-foot)); padding: 0 12px var(--phone-foot) 16px; border-top: 1px solid var(--line);
   }
-  /* Send is the orange box, square, 16px in from the edge and centred on the
+  /* Send is the grey box, square, 16px in from the edge and centred on the
      top bar: at 12px from the edge it sat "touching the top corner of the
      app" (2026-10-11). */
   :root:root:root .tc-card .tc-send {
@@ -626,7 +630,7 @@
   /* AN AGENT ASKING PERMISSION is a card across the screen above the inboxes,
      with Allow and Deny big enough for a thumb. The desktop pins it to a
      corner at its desktop width, which on a phone hung it off the left edge
-     and over the inboxes; its ⌘Y / ⌘N are keys no phone has. */
+     and over the inboxes; its ⌘1 / ⌘2 are keys no phone has. */
   :root:root:root .approvals {
     left: 8px; right: 8px; bottom: calc(var(--phone-tabs, 0px) + 8px + var(--phone-foot)); top: auto;
     width: auto; max-width: none; transform: none; z-index: 90;
@@ -634,7 +638,7 @@
   :root:root:root .approvals .approval-stack, :root:root:root .approvals .approval-card { width: auto; max-width: none; }
   :root:root:root .approvals .approval-actions { display: flex; gap: 8px; }
   :root:root:root .approvals .approval-actions button { flex: 1; height: 44px; font-size: 16px; }
-  :root:root:root .approvals .approval-hint { display: none; }
+  :root:root:root .approvals .approval-key { display: none; }
   :root:root:root .approval-minimize {
     min-height: 44px; padding: 0 8px; border: 0; flex: none;
     border-radius: 0; background: none; color: var(--text-dim); font: inherit;

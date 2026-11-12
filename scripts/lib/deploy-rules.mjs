@@ -50,6 +50,45 @@ export function serverConfig(files) {
   return order.find((f) => files[f]?.bucket && files[f]?.runtimeArn) ?? null;
 }
 
+/**
+ * Whether package.json differs from the committed one only in what a deploy
+ * writes there for its run, so a deploy that was cut short left it.
+ */
+export function leftFromARelease(committed, current) {
+  const rest = (t) => {
+    try {
+      const { version, bakedPosthogKey, ...others } = JSON.parse(t);
+      return JSON.stringify(others);
+    } catch { return null; }
+  };
+  const [a, b] = [rest(committed), rest(current)];
+  return a !== null && a === b;
+}
+
+/** package.json or package-lock.json text with this version, the lockfile in both its places. */
+export function withVersion(text, version) {
+  const json = JSON.parse(text);
+  if (json.version === version && (!json.packages?.[''] || json.packages[''].version === version)) return text;
+  json.version = version;
+  if (json.packages?.['']) json.packages[''].version = version;
+  return `${JSON.stringify(json, null, 2)}\n`;
+}
+
+/** Whether `after` differs from `before` in the version alone, which no test reads. */
+export function onlyTheVersionMoved(before, after) {
+  const rest = (t) => {
+    try {
+      const json = JSON.parse(t);
+      const version = json.version;
+      delete json.version;
+      if (json.packages?.['']) delete json.packages[''].version;
+      return { version, rest: JSON.stringify(json) };
+    } catch { return null; }
+  };
+  const [a, b] = [rest(before), rest(after)];
+  return !!a && !!b && a.rest === b.rest && a.version !== b.version;
+}
+
 /** One line per place people get Agentbox from, and whether it now has this version. */
 export function whatIsLive({ version, startedAt, npm, download, feed, server }) {
   const deployed = Date.parse(String(server ?? '').replace(/\+0000$/, 'Z'));

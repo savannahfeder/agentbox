@@ -38,7 +38,12 @@ public class AppleDictationModule: Module {
     AsyncFunction("start") { (language: String) async throws -> Void in
       guard #available(iOS 26.0, *) else { throw DictationError.unavailable }
       (self.live as? LiveDictation)?.abort()
-      let session = LiveDictation { [weak self] name, body in self?.sendEvent(name, body) }
+      // Levels and words arrive on Core Audio's own thread and on Swift
+      // concurrency's; reaching JavaScript from either is the crash a debug
+      // build survives and a store build does not.
+      let session = LiveDictation { [weak self] name, body in
+        DispatchQueue.main.async { self?.sendEvent(name, body) }
+      }
       self.live = session
       try await session.start(language: language)
     }
@@ -62,13 +67,14 @@ public class AppleDictationModule: Module {
 }
 
 enum DictationError: LocalizedError {
-  case unavailable, noFormat, noConverter
+  case unavailable, noFormat, noConverter, microphoneBusy
 
   var errorDescription: String? {
     switch self {
     case .unavailable: return "This iPhone cannot use the newer dictation model."
     case .noFormat: return "The dictation model has no audio format it can use."
     case .noConverter: return "The microphone's audio could not be converted."
+    case .microphoneBusy: return "Something else on this iPhone is using the microphone."
     }
   }
 }
@@ -161,8 +167,19 @@ final class LiveDictation {
 
     let converter = Converter(to: format)
     let node = engine.inputNode
+    // A call, Siri, CarPlay or another recording app holding the microphone
+    // leaves the input at 0 Hz, and `installTap` answers that with an
+    // Objective-C exception, which no Swift `catch` can take: the app is
+    // killed where it stands. expo-speech-recognition guards the same call
+    // (ExpoSpeechRecognizer.swift, `audioInputIsBusy`).
+    let live = node.outputFormat(forBus: 0)
+    guard live.sampleRate > 0, live.channelCount > 0 else {
+      // This way out never reached `microphoneOn`, so it hands the session back itself.
+      try? audio.setActive(false, options: .notifyOthersOnDeactivation)
+      throw DictationError.microphoneBusy
+    }
     node.removeTap(onBus: 0)
-    node.installTap(onBus: 0, bufferSize: 4096, format: node.outputFormat(forBus: 0)) { [weak self] buffer, _ in
+    node.installTap(onBus: 0, bufferSize: 4096, format: live) { [weak self] buffer, _ in
       self?.level(buffer)
       if let converted = try? converter.convert(buffer) {
         continuation.yield(AnalyzerInput(buffer: converted))
@@ -206,9 +223,16 @@ final class LiveDictation {
 
   // About eight times a second, on the scale the older model reports: 0 unheard, 10 loud.
   private func level(_ buffer: AVAudioPCMBuffer) {
+    guard let samples = buffer.floatChannelData?[0] else { return }
+    // Core Audio's thread reaches `lastLevel` while the JS thread stops and
+    // starts; an unlocked Date read here is a race, which a store build's
+    // optimiser is free to make anything of.
     let now = Date()
-    guard now.timeIntervalSince(lastLevel) > 0.12, let samples = buffer.floatChannelData?[0] else { return }
-    lastLevel = now
+    lock.lock()
+    let due = now.timeIntervalSince(lastLevel) > 0.12
+    if due { lastLevel = now }
+    lock.unlock()
+    guard due else { return }
     let count = Int(buffer.frameLength)
     guard count > 0 else { return }
     var sum: Float = 0

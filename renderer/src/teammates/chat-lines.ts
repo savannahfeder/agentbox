@@ -2,8 +2,8 @@
 // runs leave, in time order, seen whole or through one teammate.
 import type { RunningSession, Teammate, TeamChatLine, TeamRunLine, TeammatesView, WorkItem } from '../types';
 import { spanLabel } from '../notes';
-import { nextRunAt } from '../../../shared/repeats.mjs';
-import { teammateIdOf } from '../../../shared/teammates.mjs';
+import { nextRunAt } from '../../../shared/repeats.mts';
+import { teammateIdOf } from '../../../shared/teammates.mts';
 
 export type ChatEntry = TeamChatLine | TeamRunLine;
 
@@ -27,7 +27,14 @@ export function chatEntries(view: TeammatesView | null | undefined, only: string
   const all: ChatEntry[] = [...view.chat, ...view.runs];
   // What you wrote in the chat reaches a waiting run as its answer; the chat
   // already shows it, so only answers typed in the thread itself get a line.
-  const saidInChat = new Set(view.chat.filter((m) => m.kind === 'msg' && m.from === 'you').map((m) => String(m.text ?? '').trim()));
+  // The run keeps your words folded onto one line and cut at 400 characters.
+  const folded = (s: unknown) => String(s ?? '').replace(/\s+/g, ' ').trim();
+  const saidInChat = view.chat.filter((m) => m.kind === 'msg' && m.from === 'you').map((m) => folded(m.text));
+  const alreadySaid = (text: unknown) => {
+    const t = folded(text);
+    const cut = t.endsWith('…') ? t.slice(0, -1).trimEnd() : null;
+    return saidInChat.some((s) => s === t || (!!cut && s.length > t.length && s.startsWith(cut)));
+  };
   // The team chat says a run finished and leaves out that it was picked up;
   // a teammate's own page keeps both.
   const finished = new Set(view.runs.filter((r) => r.verb === 'finished' || r.verb === 'stopped').map((r) => r.item));
@@ -35,7 +42,7 @@ export function chatEntries(view: TeammatesView | null | undefined, only: string
     if (!only && e.kind === 'run' && e.verb === 'picked' && finished.has(e.item)) return false;
     // A run's own start line repeats the pass that made it, so the pass speaks for it.
     if (e.kind === 'run' && e.verb === 'passed') return false;
-    if (e.kind === 'run' && e.verb === 'answered' && saidInChat.has(String(e.text ?? '').trim())) return false;
+    if (e.kind === 'run' && e.verb === 'answered' && alreadySaid(e.text)) return false;
     if (e.kind === 'msg' && (e as TeamChatLine & { start?: boolean }).start) return false;
     return only ? involves(e, only) : true;
   });
@@ -93,7 +100,16 @@ export function answerOf(view: TeammatesView | null | undefined, q: TeamChatLine
     if (!m.answers) return { text: String(m.text ?? ''), named: false };
     if (q.id in m.answers) return { text: m.answers[q.id], named: true };
   }
-  return null;
+  // A reply typed in the thread that asked it answers it too.
+  const inThread = q.run ? view.runs.find((r) => r.verb === 'answered' && r.item === q.run && r.ts > q.ts) : null;
+  return inThread ? { text: String(inThread.text ?? ''), named: false } : null;
+}
+
+/** A teammate's questions asked in this thread, with answers to tap, that you have not answered anywhere. */
+export function openQuestionsIn(view: TeammatesView | null | undefined, item: Pick<WorkItem, 'id' | 'labels'>): TeamChatLine[] {
+  const tid = teammateIdOf(item);
+  if (!view || !tid) return [];
+  return view.chat.filter((m) => m.kind === 'msg' && m.from === tid && m.run === item.id && !!m.options?.length && !answerOf(view, m));
 }
 
 // The question a teammate's message asks: its last sentence that ends in a
@@ -154,6 +170,28 @@ export function workingLine(
   return { state: 'working', text: session.activity?.at(-1)?.label?.trim() || run, aside: elapsed < 60_000 ? 'just started' : `${spanLabel(elapsed)} in` };
 }
 
+// What stands between a waiting run and an agent. No estimate: nothing knows how
+// long a run takes, so it says how long the busy ones have been going.
+const NAMED_AT_MOST = 3;
+export function whyWaiting({ item, running, queued, titleOf, now }: {
+  item: string;
+  running: Pick<RunningSession, 'itemId' | 'startedAt'>[];
+  queued: string[];
+  titleOf: (id: string) => string | null;
+  now: number;
+}): string {
+  const busy = running.filter((s) => s.itemId !== item);
+  if (!busy.length) return 'It starts at the next free moment.';
+  const named = busy.slice(0, NAMED_AT_MOST).map((s) => {
+    const span = now - s.startedAt;
+    return `${titleOf(s.itemId) ?? 'another thread'} (${span < 60_000 ? 'just started' : `${Math.floor(span / 60_000)}m`})`;
+  });
+  if (busy.length > NAMED_AT_MOST) named.push(`and ${busy.length - NAMED_AT_MOST} more`);
+  const ahead = queued.indexOf(item);
+  const behind = ahead > 0 ? ` ${ahead} ${ahead === 1 ? 'thread is' : 'threads are'} ahead of this one.` : '';
+  return `${busy.length} ${busy.length === 1 ? 'agent is' : 'agents are'} busy: ${named.join(', ')}.${behind}`;
+}
+
 // A run's first line. Its teammate's queue letting it go is not an agent
 // having it: until a session exists it is waiting, as the live line says.
 export function startWord(r: Pick<TeamRunLine, 'teammate' | 'item'>, team: Pick<Teammate, 'id' | 'running'>[], sessions: ReadonlyMap<string, unknown>): string {
@@ -176,7 +214,12 @@ export function liveLine(
   session: Pick<RunningSession, 'startedAt' | 'activity'> | null | undefined,
   now = Date.now(),
   asked: string | null = null,
+  { answered = false, queued = true }: { answered?: boolean; queued?: boolean } = {},
 ): { state: 'working' | 'waiting'; lead: string; text: string; aside: string } | null {
+  // A claim left behind by a run that has ended is no wait: its answer is already there.
+  if (answered && !session) return null;
+  // Nor is a run nothing will start: the queue is the one promise of a free agent.
+  if (!queued && !session) return null;
   const line = workingLine(t, session, now, asked);
   return line && { state: line.state, ...teamWorkingLine(t.name, line), aside: line.aside };
 }
@@ -242,16 +285,16 @@ export function goalLine(goal: string, counted: string | null | undefined): stri
   return c ? `${g.replace(/[.,;:\s]+$/, '')}, counted as ${c.replace(/^./, (x) => x.toLowerCase())}.` : g;
 }
 
+const ATTACHED = /!?\[([^\]\n]*)\]\((?:\.\/)?attachments\/[^)\s]+\)/g;
+
+/** A message's first sentence, without the links to what was attached: their names when that is all it is. */
 export function firstSentence(text: string): string {
-  const one = String(text ?? '').replace(/\s+/g, ' ').trim();
+  const raw = String(text ?? '');
+  const one = raw.replace(ATTACHED, ' ').replace(/\s+/g, ' ').trim();
+  if (!one) return [...raw.matchAll(ATTACHED)].map((m) => m[1]).filter(Boolean).join(', ');
   return one.match(/^.+?[.!?](?=\s|$)/)?.[0] ?? one;
 }
 
-/** The inbox tab every one of these threads sits in, or null when they differ or one is in none. */
-export function sentTab<T extends string>(tabs: (T | null)[]): T | null {
-  const first = tabs[0] ?? null;
-  return first !== null && tabs.every((x) => x === first) ? first : null;
-}
 
 // What it saved, shown in your chat with it as one quiet line.
 export const SAVED_VERBS = new Set(['learned', 'updated', 'lesson']);

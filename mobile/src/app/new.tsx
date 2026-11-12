@@ -1,7 +1,8 @@
 // A new thread, a whole page as the phone layout draws it (phone.css `.tc-card`):
 // a cross and the page's name, Send and its Send later caret at the right, and
 // the form (ui/NewThreadForm.tsx) under them.
-import { Redirect, router } from 'expo-router';
+import { Redirect } from 'expo-router';
+import { router } from '../lib/router';
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { screenGate } from '../lib/thread-gate';
@@ -15,7 +16,7 @@ export default function NewThread() {
   const c = useCloud();
   const inset = useSafeAreaInsets();
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
-  const form = useNewThread(close);
+  const form = useNewThread(close, () => router.push('/new'));
   const gate = screenGate(c);
   if (gate === 'wait') return <Wall><View /></Wall>;
   if (gate === 'sign-in') return <Redirect href="/sign-in" />;

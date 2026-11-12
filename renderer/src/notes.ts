@@ -15,7 +15,7 @@
 // Nothing is summarised, inferred or smoothed. If the run said little, the
 // panel says little (the fix for that is briefs/worker.md, not this file).
 
-import { SERVER_BUSY } from '../../shared/spawn-trouble.mjs';
+import { SERVER_BUSY } from '../../shared/spawn-trouble.mts';
 
 export interface Step {
   // Wall-clock, as the trace recorded it: "5:16pm".
@@ -66,7 +66,7 @@ function clock(h: number, m: number): string {
 }
 
 // THE TRACE'S CLOCK IS UTC AND CARRIES NO DATE. The supervisor stamps every
-// line with `new Date.toISOString.slice(11, 19)` (supervisor.mjs), so a step
+// line with `new Date.toISOString.slice(11, 19)` (supervisor.mts), so a step
 // she watched at 10:01pm is written "05:01:32", and printing those digits
 // straight out put her own evening seven hours into the morning: the fold on
 // read 5:01am, 6:39am, 12:15am, 4:29am for one continuous run. The session's
@@ -151,10 +151,17 @@ function readSession(session: TraceSession) {
   // read it (two of the nine runs on claimed 8h 37m and 6h 37m of work that
   // took minutes).
   let saidAt: number | null = null;
+  // A stderr chunk's lines after its first carry no prefix (see traceLines).
+  let inStderr = false;
 
   for (const line of session.text.split('\n')) {
     const stamped = LINE.exec(line);
     if (!stamped) {
+      if (line.startsWith('stderr:')) { inStderr = true; continue; }
+      if (inStderr) {
+        if (line.trim() && !line.startsWith('#')) continue;
+        inStderr = false;
+      }
       const exit = EXIT.exec(line);
       if (exit) {
         exitCode = Number(exit[1]);
@@ -172,6 +179,7 @@ function readSession(session: TraceSession) {
     }
 
     const body = stamped[4];
+    inStderr = body.startsWith('stderr:');
 
     if (body.startsWith('== RESULT')) {
       inResult = true;

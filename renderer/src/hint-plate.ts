@@ -37,7 +37,7 @@
 //   now carries a note pointing here. `esc` and a bare arrow are one key
 //   whatever their length, so only a real chord splits.
 
-import { capNameOf, capsOf } from '../../shared/key-caps.mjs';
+import { capNameOf, capsOf } from '../../shared/key-caps.mts';
 import { MAC } from './this-keyboard';
 
 /** One line of a plate: the caps to draw, and the fragment beside them. */
@@ -55,7 +55,7 @@ export interface HintLine {
  *  however many characters it is written with, which is what keeps `esc` from
  *  being drawn as three caps.
  *
- *  THE GLYPHS ARE THIS KEYBOARD'S (shared/key-caps.mjs): ⌘↵ on a Mac, Ctrl and
+ *  THE GLYPHS ARE THIS KEYBOARD'S (shared/key-caps.mts): ⌘↵ on a Mac, Ctrl and
  *  Enter where there is no Command key.
  */
 export function capsFor(key: string, mac: boolean = MAC): string[] {
@@ -79,7 +79,7 @@ export function capWord(glyph: string, mac: boolean = MAC): string | null {
  *
  *  A component opts in by writing `data-hint="<id>"` on itself; the id is
  *  looked up here. Adding a component means adding it in both places, and
- *  `tests/the-hint-plate.test.mjs` holds the two lists to each other so a
+ *  `tests/the-hint-plate.test.mts` holds the two lists to each other so a
  *  `data-hint` with nothing to say cannot ship.
  */
 export const HINTS: Record<string, HintLine[]> = {
@@ -122,9 +122,8 @@ export const HINTS: Record<string, HintLine[]> = {
   // lists it.
   // The cloud button (threads/Pages.tsx): ⌘C turns the cloud on or off.
   cloud: [{ key: '⌘C', what: 'Cloud on or off' }],
-  // THE MAGNIFIER GETS A PLATE although the search field prints / at its right
-  // end: nothing about a magnifier says what pressing it costs.
-  search: [{ key: '/', what: 'Search your tasks' }],
+  // THE MAGNIFIER GETS A PLATE: nothing about a magnifier says what pressing it costs.
+  search: [{ key: '⌘K', what: 'Search your threads' }],
   // A task she has opened.
   // THE MARK THAT FINISHED IT IS A ROW NOW (w-e731ca9376, 2026-10-01): Mark
   // done, in the thread's menu, which prints E beside its words. A component
@@ -134,14 +133,23 @@ export const HINTS: Record<string, HintLine[]> = {
   // thread's dots. It prints only its word, so E goes here, in
   // the row plate's own wording.
   done: [{ key: 'E', what: 'Mark done' }],
+  'close-task': [{ key: '', what: 'Close the task for both of you' }],
   // The Summary button printed its S on its face until w-5984544441; the key
   // is said here now, the same as every other button in the corner. Since
   // w-a3482b8c2c it hangs from the summary's rail and the icon that closes it.
   summary: [{ key: 'S', what: 'Show or hide the summary' }],
   back: [{ key: 'esc', what: 'Go back one level' }],
+  // The Inbox button left of the back arrow, drawn only on a thread.
+  inbox: [{ key: 'esc', what: 'Inbox' }],
   // The up and down arrows on a thread in Needs you (w-65bcefb857).
   'previous-thread': [{ key: 'K', what: 'Previous thread' }],
   'next-thread': [{ key: 'J', what: 'Next thread' }],
+  // The icon buttons over a thread that have no key: the plate names them.
+  'add-people': [{ key: '', what: 'Add people to this thread' }],
+  'add-to-group': [{ key: '', what: 'Start a group with more people' }],
+  'thread-files': [{ key: '', what: 'Files in this thread' }],
+  'runs-on': [{ key: '', what: 'Where this thread runs' }],
+  more: [{ key: '', what: 'More actions' }],
 };
 
 export interface Rect { top: number; left: number; right: number; bottom: number; width: number; height: number }

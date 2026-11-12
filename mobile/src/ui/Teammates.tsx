@@ -1,0 +1,228 @@
+// Your AI teammates on the phone, drawn as the desktop's Chats draws them
+// (renderer/src/teammates/ChatsColumn.tsx): the dashed letter, the primary
+// first, a dot on the ones waiting on you, and your groups under them.
+import { router } from '../lib/router';
+import { useState, type ReactNode } from 'react';
+import { Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
+import type { Room, Teammate } from '../../../renderer/src/types';
+import { updatedWords } from '../../../renderer/src/threads/page-rules';
+import { mateDraft, useDraft } from '../lib/drafts';
+import { groupName, groupsInOrder } from '../lib/groups';
+import { answersMessage } from '../../../renderer/src/teammates/chat-lines';
+import { teammateIdOf } from '../../../shared/teammates.mts';
+import { asideOf, matesInOrder, nowLine, questionsInThread, waitsOnYou } from '../lib/teammates';
+import { appStore } from '../platform/persist';
+import { Markdown } from './Markdown';
+import { useCloud } from '../state/cloud';
+import { useGroups } from '../state/groups';
+import { Face } from './Groups';
+import { Gear } from './icons';
+import { footRoom, IconButton, T, TopBar } from './parts';
+import { color, corner, font, size } from './theme';
+
+/** The corner of an AI teammate's dashed mark, as `--mate-corner` is on the web: round, like a person. */
+export const mateCorner = (s: number) => s / 2;
+
+/** A teammate's mark: its letter in a dashed ring, with a dot when it waits on you (TeammatesRail.tsx). */
+export function TeammateMark({ t, size: s = 20, waiting = false }: { t: Pick<Teammate, 'letter' | 'name'> | null; size?: number; waiting?: boolean }) {
+  return (
+    <View style={{ width: s, height: s, borderRadius: mateCorner(s), borderWidth: 1, borderStyle: 'dashed', borderColor: color.lineStrong, alignItems: 'center', justifyContent: 'center' }}>
+      <T style={{ fontFamily: font.mono, fontSize: Math.max(9.5, Math.round(s * 0.36 * 2) / 2), color: t ? color.dim : color.faint }}>{t ? t.letter || t.name.slice(0, 1) : '+'}</T>
+      {waiting && <View style={{ position: 'absolute', top: -4, right: -4, width: 7, height: 7, borderRadius: 3.5, backgroundColor: color.accent }} />}
+    </View>
+  );
+}
+
+/** Your own face in a chat: your initials as Groups knows your name, else a person drawn in the tile. */
+export function YouFace({ size: s = 32 }: { size?: number }) {
+  const g = useGroups();
+  const name = g.state.rooms.flatMap((r) => r.wall).find((w) => w.me)?.name;
+  if (name) return <Face name={name} size={s} />;
+  return (
+    <View style={{ width: s, height: s, borderRadius: s / 2, borderWidth: 1, borderColor: color.lineStrong, backgroundColor: color.film, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={s * 0.5} height={s * 0.5} viewBox="0 0 24 24" fill="none" stroke={color.dim} strokeWidth={1.6} strokeLinecap="round"><Path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" /><Path d="M4.5 20c.9-3.6 3.8-5.5 7.5-5.5s6.6 1.9 7.5 5.5" /></Svg>
+    </View>
+  );
+}
+
+/** Auto's mark in To: the agent's dashed tile with a fork in it (AutoFace.tsx). */
+export function AutoMark({ size: s = 20 }: { size?: number }) {
+  return (
+    <View style={{ width: s, height: s, borderRadius: mateCorner(s), borderWidth: 1, borderStyle: 'dashed', borderColor: color.lineStrong, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={s * 0.62} height={s * 0.62} viewBox="0 0 24 24" fill="none" stroke={color.dim} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+        <Path d="M5 12h6" /><Path d="M11 12c3 0 4-5 8-5" /><Path d="M11 12c3 0 4 5 8 5" /><Path d="M16 4.5 19 7l-3 2.5" /><Path d="M16 14.5 19 17l-3 2.5" />
+      </Svg>
+    </View>
+  );
+}
+
+const Head = ({ title, count }: { title: string; count: number }) => (
+  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: size.inset, paddingTop: 18, paddingBottom: 4 }}>
+    <T style={{ fontFamily: font.mono, fontSize: 11, letterSpacing: 0.88, textTransform: 'uppercase', color: color.faint }}>{title}</T>
+    <T style={{ fontFamily: font.mono, fontSize: 11, color: color.faint }}>{count}</T>
+  </View>
+);
+
+function ChatRow({ lead, name, aside, line, need, first, onPress, label }: { lead: ReactNode; name: string; aside?: string; line?: string; need?: boolean; first: boolean; onPress: () => void; label?: string }) {
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label}
+      style={({ pressed }) => ({ minHeight: 64, paddingVertical: 12, paddingLeft: size.inset, paddingRight: 16, flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: pressed ? color.fill : 'transparent' })}>
+      {!first && <View style={{ position: 'absolute', top: 0, left: 0, right: 12, height: 1, backgroundColor: color.rowLine }} />}
+      {lead}
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
+          <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 16, lineHeight: 21.6, letterSpacing: -0.16 }}>{name}</T>
+          {aside ? <T style={{ fontSize: 12.5, color: color.faint }}>{aside}</T> : null}
+        </View>
+        {line ? <T numberOfLines={1} style={{ fontSize: 13, lineHeight: 19, color: color.dim, marginTop: 2 }}>{line}</T> : null}
+      </View>
+      {need && <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: color.accent }} />}
+    </Pressable>
+  );
+}
+
+/** A day's label across the chat, a line either side (teammates.css `.rm-day`). */
+export function DayRule({ label }: { label: string }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 18, marginBottom: 6 }}>
+      <View style={{ flex: 1, height: 1, backgroundColor: color.line }} />
+      <T style={{ fontSize: 12, color: color.faint }}>{label}</T>
+      <View style={{ flex: 1, height: 1, backgroundColor: color.line }} />
+    </View>
+  );
+}
+
+/** Answers to tap under a question (`.tq-chip`); the picked one lit. */
+export function Chips({ options, on, disabled, tap }: { options: string[]; on: string | null; disabled?: boolean; tap?: (o: string) => void }) {
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+      {options.map((o) => (
+        <Pressable key={o} disabled={disabled || !tap} onPress={() => tap?.(o)} accessibilityRole="button" accessibilityState={{ selected: on === o }}
+          style={({ pressed }) => ({ minHeight: 34, paddingHorizontal: 12, paddingVertical: 7, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small,
+            borderColor: on === o ? color.accent : color.lineStrong, backgroundColor: on === o ? 'rgba(238, 96, 24, 0.12)' : pressed ? color.picked : color.fill })}>
+          <T style={{ fontSize: 14, lineHeight: 19, color: on === o ? color.text : color.dim }}>{o}</T>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+const SendGlyph = ({ tint }: { tint: string }) => (
+  <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={tint} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round"><Path d="M12 19V5" /><Path d="m6 11 6-6 6 6" /></Svg>
+);
+
+/** The chat box at the foot, the one Groups uses. `send` answers whether the words went. */
+export function MateComposer({ mate, placeholder, send, above }: { mate: string | null; placeholder: string; send: (text: string) => Promise<boolean>; above?: ReactNode }) {
+  const draft = useDraft(mateDraft(mate), appStore);
+  const { text, setText } = draft;
+  const [busy, setBusy] = useState(false);
+  const inset = useSafeAreaInsets();
+  const go = async () => {
+    const words = text.trim();
+    if (!words || busy) return;
+    setBusy(true);
+    const ok = await send(words);
+    setBusy(false);
+    if (ok) draft.take();
+  };
+  return (
+    <View style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 16 + footRoom(inset) }}>
+      {above}
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', borderWidth: 1, borderRadius: corner.small, borderColor: text ? color.lineStrong : color.line, backgroundColor: color.field }}>
+        <TextInput value={text} onChangeText={setText} multiline placeholder={placeholder} placeholderTextColor={color.faint} editable={!busy}
+          style={[{ flex: 1, minHeight: 42, maxHeight: 140, paddingTop: 10, paddingBottom: 10, paddingHorizontal: 14, fontFamily: font.regular, fontSize: 15.5, lineHeight: 22, color: color.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
+        {!!text.trim() && <IconButton label="Send" onPress={() => void go()}><SendGlyph tint={color.accent} /></IconButton>}
+      </View>
+    </View>
+  );
+}
+
+/** A teammate's open questions inside the thread that asked them, over its reply box (TeammatesPage.tsx `ThreadQuestions`).
+ *  With one question a tap sends; with several it picks, and one Send answers them all. */
+export function ThreadQuestions({ item }: { item: { id: string; labels?: string[] } }) {
+  const c = useCloud();
+  const [picks, setPicks] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const open = questionsInThread(c.team?.view, item, c.teamPending);
+  const tid = teammateIdOf(item);
+  if (!open.length || !tid) return null;
+  const many = open.length > 1;
+  const send = async (chosen: Record<string, string>) => {
+    const m = answersMessage(open, chosen);
+    if (!m.text || busy) return;
+    setBusy(true); setError(null);
+    try { await c.askTeammate('post', { text: m.text, to: [tid], answers: m.answers }); setPicks({}); }
+    catch (err) { setError(String((err as Error)?.message ?? err)); }
+    finally { setBusy(false); }
+  };
+  const tap = (q: string, o: string) => {
+    if (!many) { void send({ [q]: o }); return; }
+    setPicks((all) => ({ ...all, [q]: all[q] === o ? '' : o }));
+  };
+  const answered = open.filter((q) => picks[q.id]).length;
+  return (
+    <ScrollView style={{ flexGrow: 0, flexShrink: 0, maxHeight: 300, marginHorizontal: 12, marginTop: 8 }} keyboardShouldPersistTaps="handled">
+      <View style={{ borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: color.fill, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14, gap: 14 }}>
+        {open.map((q) => (
+          <View key={q.id}>
+            <Markdown text={q.text ?? ''} />
+            <Chips options={q.options ?? []} on={picks[q.id] || null} disabled={busy} tap={(o) => tap(q.id, o)} />
+          </View>
+        ))}
+        {many && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Pressable disabled={!answered || busy} onPress={() => void send(picks)} accessibilityRole="button"
+              style={({ pressed }) => ({ height: 32, paddingHorizontal: 14, justifyContent: 'center', backgroundColor: color.accent, borderRadius: corner.small, opacity: !answered || busy ? 0.45 : pressed ? 0.85 : 1 })}>
+              <T style={{ fontSize: 15, fontFamily: font.medium, color: '#fff' }}>Send answers</T>
+            </Pressable>
+            {answered < open.length && <T style={{ fontSize: 13, color: color.faint }}>{`${answered} of ${open.length} answered`}</T>}
+          </View>
+        )}
+        {error && <T style={{ fontSize: 13, color: color.dim }}>{error}</T>}
+      </View>
+    </ScrollView>
+  );
+}
+
+/** How many of your teammates wait on you, for the Chats tab's count. */
+export function teammatesWaiting(c: ReturnType<typeof useCloud>): number {
+  const team = c.team;
+  return team ? team.view.list.filter((t) => waitsOnYou(t, team.view, c.teamPending)).length : 0;
+}
+
+/** The Chats tab: your AI teammates, then your groups. `tabs` are the inbox's, drawn under the bar. */
+export function ChatsPlace({ tabs, openGroup }: { tabs: ReactNode; openGroup: (id: string) => void }) {
+  const c = useCloud();
+  const g = useGroups();
+  const team = c.team;
+  const mates = team ? matesInOrder(team.view.list) : [];
+  const rooms: Room[] = g.on ? groupsInOrder(g.state.rooms) : [];
+  return (
+    <>
+      <TopBar title="Chats" right={<IconButton label="Settings" onPress={() => router.push('/settings')}><Gear /></IconButton>} below={tabs} />
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: Math.max(40, c.approvalRoom + 16) }}>
+        {team && <Head title="AI teammates" count={mates.length} />}
+        {mates.map((t, i) => (
+          <ChatRow key={t.id} first={i === 0} lead={<TeammateMark t={t} size={32} />} name={t.name} aside={t.primary && !t.paused && t.status !== 'draft' ? 'Primary' : undefined}
+            line={team ? nowLine(t, team.view, c.now, c.teamPending) : undefined} need={!!team && waitsOnYou(t, team.view, c.teamPending)} label={t.name}
+            onPress={() => router.push({ pathname: '/teammate/[id]', params: { id: t.id } })} />
+        ))}
+        {team && <ChatRow first={mates.length === 0} lead={<TeammateMark t={null} size={32} />} name="New teammate" onPress={() => router.push('/teammate/new')} />}
+        {!!team?.view.trouble && <T style={{ paddingHorizontal: size.inset, paddingTop: 10, fontSize: 13, lineHeight: 19, color: color.dim }}>{team.view.trouble}</T>}
+        {g.on && (
+          <>
+            <Head title="Groups" count={rooms.length} />
+            {rooms.length === 0 && <T style={{ paddingHorizontal: size.inset, paddingTop: 6, fontSize: 14, lineHeight: 21, color: color.faint }}>You are not in any groups yet.</T>}
+            {rooms.map((r, i) => (
+              <ChatRow key={r.id} first={i === 0} lead={r.kind === 'group' ? <Face name={groupName(r)} size={32} /> : <View style={{ width: 32, alignItems: 'center' }}><T style={{ fontFamily: font.mono, fontSize: 17, color: color.faint }}>#</T></View>}
+                name={groupName(r)} line={r.unread > 0 ? 'New messages' : updatedWords(r.lastAt, c.now)} need={r.unread > 0} onPress={() => openGroup(r.id)} />
+            ))}
+          </>
+        )}
+      </ScrollView>
+    </>
+  );
+}

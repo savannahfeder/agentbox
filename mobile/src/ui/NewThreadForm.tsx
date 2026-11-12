@@ -3,29 +3,34 @@
 // message under them, and attaching a file or picture at the foot. The New
 // thread page wears it whole; the empty inbox draws it open on the page, as
 // the web app does (Pages.tsx `InboxClear`).
-import { router } from 'expo-router';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { router } from '../lib/router';
+import { useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { Platform, Pressable, TextInput, View } from 'react-native';
 import { readRule, repeatPresets } from '../../../renderer/src/format';
 import { engineModelLabel } from '../../../renderer/src/models';
-import { ruleLabel } from '../../../shared/repeats.mjs';
-import { readSettingsRows } from '../../../renderer/src/phone-rows';
+import { ruleLabel } from '../../../shared/repeats.mts';
 import { priorityIdOf, priorityLabelOf, priorityValueOf } from '../../../renderer/src/priority';
-import { agentChoices, agentWordFor, laterHint, momentFromWords, mondayMorning, projectSwatch, tomorrowMorning, type Harness } from '../../../renderer/src/threads/composer-rules';
-import { computerAgents } from '../../../renderer/src/web-settings';
+import { agentChoices, agentWordFor, autoOffered, laterHint, momentFromWords, mondayIsTomorrow, mondayMorning, projectSwatch, tomorrowMorning, type Harness } from '../../../renderer/src/threads/composer-rules';
+import { splitSlug } from '../../../renderer/src/phone-rows';
+import { AUTO_LABEL } from '../../../shared/auto-route.mts';
 import type { Choices } from '../lib/actions';
-import { newThreadChoices, onceAtATime, openingChoices, openingEngine, openingFor, pickEffort, pickEngine, pickModel, pickProject, projectNow } from '../lib/compose';
-import { useDraft } from '../lib/drafts';
-import { computerOf } from '../lib/settings-view';
+import { newThreadChoices, onceAtATime, openingChoices, openingEngine, openingFor, openingRecipient, pickEffort, pickModel, projectNow, type Recipient } from '../lib/compose';
+import { AutoMark, TeammateMark } from './Teammates';
+import { roleOf } from '../lib/teammates';
+import type { Teammate } from '../../../renderer/src/types';
+import { useDraft, type Draft } from '../lib/drafts';
 import { appStore } from '../platform/persist';
 import { useCloud } from '../state/cloud';
+import { useComputerAgents } from '../state/computer-agents';
+import { useSendWhenOnline } from '../state/send-when-online';
 import { AttachSheet, Attached } from './Attach';
+import { withPicked } from '../lib/attach';
 import { DictationProblem, Listening, MicButton, useDictation } from './Dictation';
 import { Caret, Clip, Clock, Repeat } from './icons';
 import { TimeBox, TypingSheet } from './Later';
 import { Pickable, PriorityBars, Sheet, SheetHead, SheetRow, SheetSep, T } from './parts';
 import { ModelSheet, PrioritySheet, barsFor } from './Pickers';
-import { color, font, size } from './theme';
+import { color, corner, font, size } from './theme';
 
 const Swatch = ({ slug }: { slug: string }) => <View style={{ width: 9, height: 9, backgroundColor: projectSwatch(slug) }} />;
 
@@ -38,66 +43,109 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** Everything the form holds, and its send; `sent` runs once a thread has gone. */
-export function useNewThread(sent: () => void) {
+/** Everything the form holds, and its send; `sent` runs once a thread has gone, `reopen` once its Undo has put the draft back. */
+export function useNewThread(sent: () => void, reopen?: () => void) {
   const c = useCloud();
   const projects = c.view.products;
-  // Her words, files and priority outlive the page (lib/drafts.ts); the
-  // project, model and level are the ones she last picked (lib/compose.ts).
+  // Your words, files and priority outlive the page (lib/drafts.ts); the
+  // model and level are the ones last picked, the To and project this thread's own (lib/compose.ts).
   const draft = useDraft('new', appStore);
   const [opening] = useState(() => openingChoices(projects, appStore));
   const [picked, setPicked] = useState<string | null>(null);
-  const product = projectNow(projects, picked, appStore) ?? '';
-  // WHICH CODING AGENTS THE COMPUTER OFFERS, off its settings copy
-  // (w-24119e8784): To read "Agent" and every thread went to Claude Code,
-  // whatever the computer had. Claude Code alone until the copy is read.
-  const [agents, setAgents] = useState(() => computerAgents(null));
-  useEffect(() => {
-    const cloud = c.cloud;
-    if (!cloud?.signedIn()) return;
-    let gone = false;
-    readSettingsRows((t, q) => cloud.select(t, q))
-      .then((rows) => { if (!gone) setAgents(computerAgents(computerOf(rows))); })
-      .catch(() => { /* Claude Code alone, as before */ });
-    return () => { gone = true; };
-  }, [c.cloud]);
+  const product = projectNow(projects, picked) ?? '';
+  const agents = useComputerAgents();
   const codex = { codexModels: agents.codexModels, codexDefault: agents.codexDefault };
   const offered = agentChoices(agents.engines);
   const [pickedEngine, setPickedEngine] = useState<Harness | null>(null);
-  const engine: Harness = offered.some((e) => e.id === pickedEngine) ? (pickedEngine as Harness) : openingEngine(appStore, agents.engines);
+  const engine: Harness = offered.some((e) => e.id === pickedEngine) ? (pickedEngine as Harness) : openingEngine(agents.engines, agents.workspace);
   // Each agent's model and level kept apart, as the site's card keeps them.
   const [chosen, setChosen] = useState<Partial<Record<Harness, { model: string; effort: string | null }>>>(() => ({ claude: { model: opening.model, effort: opening.effort } }));
   const { model, effort } = chosen[engine] ?? openingFor(appStore, engine, agents.codexDefault);
   const choose = (next: Partial<{ model: string; effort: string | null }>) => setChosen((was) => ({ ...was, [engine]: { model, effort, ...next } }));
   const [sheet, setSheet] = useState<'to' | 'model' | 'project' | 'priority' | 'attach' | 'later' | null>(null);
+  const box = useRef<ComponentRef<typeof TextInput>>(null);
+  const lastSheet = useRef(sheet);
+  // A picked project, agent, model or priority hands the cursor back to the
+  // message, once the sheet's fade is over: until then the sheet holds focus.
+  useEffect(() => {
+    const was = lastSheet.current;
+    lastSheet.current = sheet;
+    if (sheet !== null || !was || was === 'later') return;
+    const t = setTimeout(() => box.current?.focus(), 350);
+    return () => clearTimeout(t);
+  }, [sheet]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const projectName = useMemo(() => projects.find((p) => p.slug === product)?.name ?? '', [projects, product]);
-  const canSend = (!!draft.text.trim() || draft.files.length > 0) && !!product && !busy;
+  // WHO IT GOES TO, while the computer sends your AI teammates: Auto, an agent,
+  // one of them, or someone new made for it (renderer/src/threads/ThreadComposer.tsx).
+  const mates = useMemo(() => (c.team?.view.list ?? []).filter((t) => t.status === 'active'), [c.team]);
+  const reach = !!c.team;
+  const [pickedTo, setPickedTo] = useState<Recipient | null>(null);
+  const recipient = pickedTo ?? openingRecipient(mates, reach);
+  const autoHere = autoOffered(mates, reach);
+  const onAuto = recipient.auto && autoHere && !recipient.mate;
+  const mate: Teammate | 'new' | null = reach && recipient.mate === 'new' ? 'new' : mates.find((m) => m.id === recipient.mate) ?? null;
+  const toWord = mate === 'new' ? 'Someone new' : mate ? mate.name : onAuto ? 'Auto' : null;
+  const chooseTo = (r: Recipient) => setPickedTo(r);
+  const canSend = (!!draft.text.trim() || draft.files.length > 0) && !!product && !busy && (!mate || !!draft.text.trim());
+
+  // A teammate takes your words in your chat with it, not as a thread.
+  const sendToMate = async () => {
+    if (!mate) return;
+    if (draft.files.length) throw new Error('A message to a teammate carries words only. Send files in a thread.');
+    if (mate === 'new') {
+      const where = splitSlug(product);
+      if (!where || where.device !== c.team?.device) throw new Error('Pick a project on the computer that keeps your teammates.');
+      await c.askTeammate('describe', { text: draft.text, product: where.project });
+      c.say('Your new teammate is on its way. It asks you what it needs in Chats.');
+    } else {
+      await c.askTeammate('post', { text: draft.text, to: [mate.id], fresh: true });
+      c.say(mate.paused ? `Sent to ${mate.name}, who is paused. It waits until you resume it in Chats.` : `Sent to ${mate.name}`);
+    }
+  };
 
   const sendNow = async (later: Choices = {}) => {
     if (!canSend) return;
     setSheet(null); setBusy(true); setError(null);
-    pickProject(appStore, product);
     try {
+      if (mate) {
+        await sendToMate();
+        draft.take();
+        sent();
+        return;
+      }
       const saved = await c.attach(product, draft.files);
       const harness = newThreadChoices({ priority: draft.priority, engine, model, effort, engineCount: agents.engines.length, ...codex });
-      await c.send({ kind: 'new', product, text: draft.text, saved, choices: { ...harness, ...later } }, null);
+      // Undo withdraws the thread, so its words and files come back to the box.
+      // Taken from the page, not the store, which drops pictures too big to keep.
+      const sending: Draft = { text: draft.text, files: draft.files, priority: draft.priority };
+      const undone = () => { if (draft.restore(sending)) reopen?.(); };
+      await c.send({ kind: 'new', product, to: projectName, text: draft.text, saved, choices: { ...harness, ...later, ...(onAuto ? { labels: [AUTO_LABEL] } : {}) } }, null, { undone });
       // The draft goes only once the thread has: a failed send keeps every word on the page.
       draft.take();
+      offline.clear();
       sent();
-    } catch (err) { setError(`Not sent: ${String((err as Error)?.message ?? err)}`); } finally { setBusy(false); }
+    } catch (err) { setError(offline.failed(String((err as Error)?.message ?? err))); } finally { setBusy(false); }
   };
   // Busy is drawn a frame late; two quick presses must still send once.
   const latest = useRef(sendNow);
   latest.current = sendNow;
-  const [send] = useState(() => onceAtATime((later?: Choices) => latest.current(later)));
+  const lastLater = useRef<Choices | undefined>(undefined);
+  const [sendOnce] = useState(() => onceAtATime((later?: Choices) => latest.current(later)));
+  const offline = useSendWhenOnline(() => {
+    if (!canSend) { offline.clear(); setError(null); return; }
+    void sendOnce(lastLater.current);
+  });
+  const send = (later?: Choices) => { offline.clear(); lastLater.current = later; return sendOnce(later); };
   const talk = useDictation(draft, () => void send());
   return {
-    draft, product, projectName, projects, model, effort, sheet, setSheet, busy, error, setError, canSend, send, talk,
-    agents, offered, engine, codex,
-    pickProject: (slug: string) => { setPicked(slug); pickProject(appStore, slug); },
-    pickEngine: (id: Harness) => { setPickedEngine(id); pickEngine(appStore, id); },
+    draft, box, product, projectName, projects, model, effort, sheet, setSheet, busy, error, setError, canSend, send, talk,
+    agents, offered, engine, codex, mates, reach, autoHere, onAuto, mate, toWord,
+    pickProject: (slug: string) => setPicked(slug),
+    pickAuto: () => chooseTo({ to: 'agent', mate: null, auto: true }),
+    pickMate: (id: string) => chooseTo({ to: 'agent', mate: id, auto: false }),
+    pickEngine: (id: Harness) => { chooseTo({ to: 'agent', mate: null, auto: false }); setPickedEngine(id); },
     pickModel: (id: string) => { choose({ model: id }); pickModel(appStore, id, engine, agents.codexDefault); },
     pickEffort: (id: string) => choose({ effort: pickEffort(appStore, effort, id, engine) }),
   };
@@ -110,42 +158,57 @@ export function SendButtons({ form }: { form: NewThread }) {
   return (
     <View style={{ flexDirection: 'row', opacity: canSend ? 1 : 0.45 }}>
       <Pressable disabled={!canSend} onPress={() => (talk.on ? talk.send() : void send())} accessibilityRole="button" accessibilityLabel="Send"
-        style={({ pressed }) => ({ height: 32, paddingHorizontal: 14, justifyContent: 'center', backgroundColor: color.accent, opacity: pressed ? 0.85 : 1 })}>
+        style={({ pressed }) => ({ height: 32, paddingHorizontal: 14, justifyContent: 'center', backgroundColor: color.accent, borderTopLeftRadius: corner.small, borderBottomLeftRadius: corner.small, opacity: pressed ? 0.85 : 1 })}>
         <T style={{ fontSize: 15, fontFamily: font.medium, color: '#fff' }}>{busy ? 'Sending…' : 'Send'}</T>
       </Pressable>
-      <Pressable disabled={!canSend} onPress={() => setSheet('later')} accessibilityRole="button" accessibilityLabel="Send later"
-        style={({ pressed }) => ({ width: 32, height: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: color.accent, borderLeftWidth: 1, borderLeftColor: 'rgba(26, 24, 23, 0.28)', opacity: pressed ? 0.85 : 1 })}>
-        <Caret />
-      </Pressable>
+      {/* A message to a teammate goes now; it has no later. */}
+      {!form.mate && (
+        <Pressable disabled={!canSend} onPress={() => setSheet('later')} accessibilityRole="button" accessibilityLabel="Send later"
+          style={({ pressed }) => ({ width: 32, height: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: color.accent, borderLeftWidth: 1, borderLeftColor: 'rgba(26, 24, 23, 0.28)', borderTopRightRadius: corner.small, borderBottomRightRadius: corner.small, opacity: pressed ? 0.85 : 1 })}>
+          <Caret />
+        </Pressable>
+      )}
     </View>
   );
 }
 
 /** The four rows and the message. `inline` is the empty inbox's: a shorter box that does not take the keyboard on its own. */
 export function NewThreadFields({ form, inline = false, onFocus, onBlur }: { form: NewThread; inline?: boolean; onFocus?: () => void; onBlur?: () => void }) {
-  const { draft, talk, product, projectName, model, setSheet, error, agents, offered, engine, codex } = form;
+  const { draft, box, talk, product, projectName, model, setSheet, error, agents, offered, engine, codex, mate, onAuto, toWord } = form;
+  // A teammate keeps its own model and project; someone new needs only the project it works in.
+  const toMate = !!mate && mate !== 'new';
   return (
     <>
       <Field label="To">
-        {offered.length > 1
-          ? <Pickable style={{ fontSize: 15 }} onPress={() => setSheet('to')}>{agentWordFor(agents.engines, engine)}</Pickable>
+        {offered.length > 1 || form.reach
+          ? (
+            <Pressable onPress={() => setSheet('to')} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {mate && mate !== 'new' ? <TeammateMark t={mate} /> : mate === 'new' ? <TeammateMark t={null} /> : onAuto ? <AutoMark /> : null}
+              {/* The row is the button; a second one inside it is a button in a button. */}
+              <T style={{ fontSize: 15, textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: color.faint }}>{toWord ?? agentWordFor(agents.engines, engine)}</T>
+            </Pressable>
+          )
           : <T style={{ fontSize: 15 }}>Agent</T>}
       </Field>
-      <Field label="Model"><Pickable style={{ fontSize: 15 }} onPress={() => setSheet('model')}>{engineModelLabel(engine, model, codex)}</Pickable></Field>
-      <Field label="Project">
-        <Pressable onPress={() => setSheet('project')} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          {!!product && <Swatch slug={product} />}
-          <T style={{ fontSize: 15, marginLeft: 6 }}>{projectName || 'Pick a project'}</T>
-        </Pressable>
-      </Field>
-      <Field label="Priority">
-        <Pressable onPress={() => setSheet('priority')} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <PriorityBars level={barsFor(priorityValueOf(draft.priority ?? 'medium'))} />
-          <T style={{ fontSize: 15 }}>{priorityLabelOf(draft.priority ?? 'medium')}</T>
-        </Pressable>
-      </Field>
+      {!mate && <Field label="Model"><Pickable style={{ fontSize: 15 }} onPress={() => setSheet('model')}>{engineModelLabel(engine, model, codex)}</Pickable></Field>}
+      {!toMate && (
+        <Field label={mate === 'new' ? 'Works in' : 'Project'}>
+          <Pressable onPress={() => setSheet('project')} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {!!product && <Swatch slug={product} />}
+            <T style={{ fontSize: 15, marginLeft: 6 }}>{projectName || 'Pick a project'}</T>
+          </Pressable>
+        </Field>
+      )}
+      {!mate && (
+        <Field label="Priority">
+          <Pressable onPress={() => setSheet('priority')} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <PriorityBars level={barsFor(priorityValueOf(draft.priority ?? 'medium'))} />
+            <T style={{ fontSize: 15 }}>{priorityLabelOf(draft.priority ?? 'medium')}</T>
+          </Pressable>
+        </Field>
+      )}
       {/* Typing stops dictation with the words kept; tapping the box does not (web-speech.ts). */}
-      <TextInput multiline autoFocus={!inline} value={draft.text} placeholder="What do you need done?" placeholderTextColor={color.faint}
+      <TextInput ref={box} multiline autoFocus={!inline} value={draft.text} placeholder={toMate ? `Message ${(mate as Teammate).name}` : 'What do you need done?'} placeholderTextColor={color.faint}
         onChangeText={(t) => { if (talk.active()) talk.leave(); draft.setText(t); }} onFocus={onFocus} onBlur={onBlur}
         style={[{ flex: inline ? undefined : 1, minHeight: inline ? 120 : 160, padding: 16, fontFamily: font.regular, fontSize: 16, lineHeight: 24.8, color: color.text, textAlignVertical: 'top' }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
       <View style={{ paddingHorizontal: 16, paddingBottom: draft.files.length || error || draft.dropped ? 14 : 0, gap: 10 }}>
@@ -197,12 +260,19 @@ export function NewThreadSheets({ form, now }: { form: NewThread; now: number })
     <>
       <Sheet open={sheet === 'to'} close={() => setSheet(null)}>
         <SheetHead>To</SheetHead>
-        {offered.map((a) => <SheetRow key={a.id} label={a.label} on={a.id === engine} onPress={() => { form.pickEngine(a.id); setSheet(null); }} />)}
+        {form.autoHere && <SheetRow label="Auto" lead={<AutoMark />} aside="picks who when you send" on={form.onAuto} onPress={() => { form.pickAuto(); setSheet(null); }} />}
+        {offered.map((a) => <SheetRow key={a.id} label={a.label} on={!form.onAuto && !form.mate && a.id === engine} onPress={() => { form.pickEngine(a.id); setSheet(null); }} />)}
+        {form.reach && <><SheetSep /><SheetHead>Teammates</SheetHead></>}
+        {form.mates.map((t) => (
+          <SheetRow key={t.id} label={t.name} lead={<TeammateMark t={t} />} aside={t.paused ? 'Paused' : t.primary ? 'Primary' : roleOf(t) ?? undefined}
+            on={form.mate !== 'new' && form.mate?.id === t.id} onPress={() => { form.pickMate(t.id); setSheet(null); }} />
+        ))}
+        {form.reach && <SheetRow label="Someone new" lead={<TeammateMark t={null} />} aside="makes a teammate for this" on={form.mate === 'new'} onPress={() => { form.pickMate('new'); setSheet(null); }} />}
       </Sheet>
       <ModelSheet open={sheet === 'model'} close={() => setSheet(null)} model={model} effort={effort} engine={engine} codex={codex}
         pickModel={form.pickModel} pickEffort={form.pickEffort} />
       <PrioritySheet open={sheet === 'priority'} close={() => setSheet(null)} value={priorityValueOf(draft.priority ?? 'medium')} pick={(v) => draft.setPriority(priorityIdOf(v))} />
-      <AttachSheet open={sheet === 'attach'} close={() => setSheet(null)} add={(more) => draft.setFiles((f) => [...f, ...more])} fail={setError} />
+      <AttachSheet open={sheet === 'attach'} close={() => setSheet(null)} add={(more) => draft.setFiles((f) => withPicked(f, more))} fail={setError} />
       <Sheet open={sheet === 'project'} close={() => setSheet(null)}>
         <SheetHead>Project</SheetHead>
         {projects.map((p) => <SheetRow key={p.slug} label={p.name} on={p.slug === product} lead={<Swatch slug={p.slug} />} onPress={() => { form.pickProject(p.slug); setSheet(null); }} />)}
@@ -212,7 +282,7 @@ export function NewThreadSheets({ form, now }: { form: NewThread; now: number })
         <SheetHead>Send later</SheetHead>
         <SheetRow label="Add it to Later" lead={<Clock />} onPress={() => void send({ start: 'later' })} />
         <SheetRow label="Tomorrow morning" lead={<Clock />} aside={laterHint(tomorrowMorning(now))} onPress={() => void send({ runAt: tomorrowMorning(now) })} />
-        <SheetRow label="Monday morning" lead={<Clock />} aside={laterHint(mondayMorning(now))} onPress={() => void send({ runAt: mondayMorning(now) })} />
+        {!mondayIsTomorrow(now) && <SheetRow label="Monday morning" lead={<Clock />} aside={laterHint(mondayMorning(now))} onPress={() => void send({ runAt: mondayMorning(now) })} />}
         {/* Repeat it, the desktop's own presets (format.ts `repeatPresets`): a rule whose runs are the threads. */}
         <SheetSep />
         {repeatPresets(now).flatMap((r) => (r.rule ? [r.rule] : []).map((rule) => (
@@ -239,7 +309,7 @@ export function InboxComposer() {
   text.current = form.draft.text;
   useEffect(() => () => { if (typing.current && text.current.trim()) router.push('/new'); }, []);
   return (
-    <View style={{ borderWidth: 1, borderColor: color.lineStrong, backgroundColor: color.card }}>
+    <View style={{ borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: color.lineStrong, backgroundColor: color.card }}>
       <NewThreadFields form={form} inline onFocus={() => { typing.current = true; }} onBlur={() => { typing.current = false; }} />
       <NewThreadFoot form={form} send={<SendButtons form={form} />} />
       <NewThreadSheets form={form} now={c.now} />

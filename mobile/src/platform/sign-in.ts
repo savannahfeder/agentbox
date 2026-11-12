@@ -1,6 +1,6 @@
-// The two sign-ins a phone does natively. Apple hands the app a token for the
-// account database; Google goes through the database's own page in the
-// system's sign-in sheet and comes back to the app with a one-time code.
+// The two outside sign-ins. Apple hands the app a token for the account
+// database; Google goes through the database's own page in the system's
+// sign-in sheet and comes back to the app with a one-time code.
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';

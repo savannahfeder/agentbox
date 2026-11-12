@@ -8,7 +8,7 @@ export type EvTab = 'messages' | 'agents';
 export interface WhoseBoard {
   picked: string[];
   mate: string | null;
-  /** Your own threads without your AI teammates' runs, which their cards hold. */
+  /** Your own board: your threads and your AI teammates' runs, each card led by the teammate's name. */
   mineOnly: boolean;
 }
 
@@ -42,7 +42,6 @@ export function cardOpens(key: string, { team, shares, hasChat }: { team: string
 
 export function boardItems<T>(items: readonly T[], board: WhoseBoard, mateOf: (item: T) => string | null): T[] {
   if (board.mate) return items.filter((i) => mateOf(i) === board.mate);
-  if (board.mineOnly) return items.filter((i) => !mateOf(i));
   return [...items];
 }
 
@@ -52,12 +51,17 @@ export function evColumns(order: readonly ThreadStateWord[]): ThreadStateWord[] 
 }
 
 export type EvView = 'board' | 'list';
-const VIEW_KEY = 'agentbox.everything.view';
+// A new name, so a board picked back when In progress held Later and Done starts as the list.
+const VIEW_KEY = 'agentbox.inbox.view';
 type Store = Pick<Storage, 'getItem' | 'setItem'> | null;
 const local = (): Store => { try { return globalThis.localStorage ?? null; } catch { return null; } };
 
-export function readEvView(store: Store = local()): EvView {
-  try { return store?.getItem(VIEW_KEY) === 'list' ? 'list' : 'board'; } catch { return 'board'; }
+/** What was picked, or `fallback` while nobody has picked. */
+export function readEvView<F extends EvView | null = EvView>(store: Store = local(), fallback: F = 'board' as F): EvView | F {
+  try {
+    const v = store?.getItem(VIEW_KEY);
+    return v === 'list' || v === 'board' ? v : fallback;
+  } catch { return fallback; }
 }
 
 export function writeEvView(view: EvView, store: Store = local()) {
