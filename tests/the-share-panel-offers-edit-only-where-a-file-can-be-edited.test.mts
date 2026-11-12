@@ -6,6 +6,7 @@
 // cannot do. Measured on the panel's level picker as it renders, and on the
 // words the panel and its button say.
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { CanPick } from '../renderer/src/components/ShareLink.tsx';
@@ -44,6 +45,14 @@ describe('the words', () => {
     expect(shareWords.stopConfirm(0)).toBe('Stop sharing? The link stops working for everyone.');
     expect(shareWords.stopConfirm(1)).toBe('Stop sharing? The link stops working for everyone, and its comment is deleted.');
     expect(shareWords.stopConfirm(3)).toMatch(/its 3 comments are deleted\.$/);
+  });
+  // Asked the same day: once the panel shut, the shared globe looked like every other mark.
+  it('put the word Shared on the mark of a shared file, drawn as a rounded button in both headers', () => {
+    const css = fs.readFileSync(new URL('../renderer/src/components/artifact-view.css', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../renderer/src/components/ShareLink.tsx', import.meta.url), 'utf8');
+    expect(shareWords.sharedMark).toBe('Shared');
+    expect(src).toMatch(/link && <span>\{shareWords\.sharedMark\}<\/span>/);
+    expect(css).toMatch(/:root\[data-code-review\] \.workspace-layout \.doc-marks \.doc-mark\.av-share-on \{[^}]*border-radius: var\(--pill\)/);
   });
   it('call a link kept to certain people private, not public', () => {
     expect(shareWords.kept).toBe('Private link');

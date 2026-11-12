@@ -273,6 +273,16 @@
 .av-share-box .av-share-meta { display: flex; gap: 12px; font: 11.5px var(--mono); color: var(--text-dim); }
 .av-share-meta a { color: var(--text-dim); text-decoration: underline; text-underline-offset: 2px; }
 .av-share-acts { display: flex; align-items: center; gap: 8px; }
+/* A shared file says so on its mark, so it is not forgotten once the panel shuts. Beats both headers' corner-mark rules. */
+.doc-mark.av-share-on,
+.av-top .doc-mark.av-share-on,
+:root[data-code-review] .workspace-layout .doc-marks .doc-mark.av-share-on {
+  width: auto; min-width: 0; padding: 0 10px 0 8px; gap: 6px;
+  border: 1px solid var(--line-strong); border-radius: var(--pill); background: transparent;
+  color: var(--text); font: inherit; font-size: 13px; white-space: nowrap;
+}
+:root[data-code-review] .workspace-layout .doc-marks .doc-mark.av-share-on:is(:hover, :active),
+.av-top .doc-mark.av-share-on:is(:hover, :active) { background: var(--wash); }
 .av-share-confirm { display: flex; flex-direction: column; gap: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .av-share-gone b { font-weight: 600; }
 /* Who can open the link and what they can do: words that open a list, not boxed fields. */

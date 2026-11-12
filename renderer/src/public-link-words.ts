@@ -25,6 +25,7 @@ export const shareWords = {
   // "Shared" already means a teammate's thread, and a file your agent handed you.
   live: 'Public link',
   kept: 'Private link',
+  sharedMark: 'Shared',
   access: { anyone: 'Anyone with the link', people: 'Only people added' },
   can: { view: 'can view', comment: 'can comment', edit: 'can edit' },
   addPeople: 'Add people by email',
