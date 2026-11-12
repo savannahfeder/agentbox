@@ -1,7 +1,7 @@
-// A person's or an AI teammate's place: your conversation with them on the
-// left, what they are on and what they finished on the right, and the few
-// things you do with them over both.
-import { useEffect, useState, type ReactNode } from 'react';
+// A person's or an AI teammate's place: your conversation with them, with
+// small buttons over it that open their work and job, and the few things you
+// do with them in the header.
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { agoQuiet } from '../../format';
 import { sendKeyFor } from '../../reply-keys';
 import { MemberFace, MemberWord } from './TeamStrip';
@@ -9,13 +9,16 @@ import type { Member } from './members';
 
 const BACK = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>;
 
-export function Place({ m, waits = 0, about, onBack, backTo, actions, chat, side }: {
+/** One button over a place's chat: a list or the job, opened over the chat, or a page it goes to. */
+export type PlacePart = { key: string; label: string; count?: number; ask?: boolean; body?: ReactNode; onOpen?: () => void };
+
+export function Place({ m, waits = 0, about, onBack, backTo, actions, chat, parts = [] }: {
   m: Member; waits?: number;
   /** Under the name: their role, or whose AI teammate it is. */
   about?: string | null;
   /** Absent inside Chats, where the list beside it is the way back. */
   onBack?: () => void; backTo?: string;
-  actions?: ReactNode; chat: ReactNode; side: ReactNode;
+  actions?: ReactNode; chat: ReactNode; parts?: PlacePart[];
 }) {
   return <section className="pl" aria-label={m.name}>
     <header className="pl-head">
@@ -29,29 +32,57 @@ export function Place({ m, waits = 0, about, onBack, backTo, actions, chat, side
       </div>
       {actions && <div className="pl-acts">{actions}</div>}
     </header>
+    {parts.length > 0 && <PlaceParts key={m.key} parts={parts} />}
     <div className="pl-body">
       <div className="pl-chat">{chat}</div>
-      <aside className="pl-side">{side}</aside>
     </div>
   </section>;
 }
 
+/** The buttons over the chat; one list is open at a time, and a press elsewhere or Esc puts it away. */
+function PlaceParts({ parts }: { parts: PlacePart[] }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const shown = parts.find((p) => p.key === open && p.body) ?? null;
+  useEffect(() => {
+    if (!shown) return undefined;
+    const away = (e: MouseEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(null); };
+    // A box being written in takes its own Esc first.
+    const esc = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== 'Escape' || (e.target as HTMLElement | null)?.closest?.('.pl-pop textarea')) return;
+      e.stopPropagation(); setOpen(null);
+    };
+    window.addEventListener('mousedown', away);
+    window.addEventListener('keydown', esc, true);
+    return () => { window.removeEventListener('mousedown', away); window.removeEventListener('keydown', esc, true); };
+  }, [shown]);
+  return <div className="pl-parts" ref={box}>
+    {parts.map((p) => <div key={p.key} className="pl-part">
+      <button type="button" className={`pl-btn pl-chip${p.ask ? ' ask' : ''}`} aria-expanded={p.body ? shown === p : undefined}
+        onClick={() => { if (p.onOpen) p.onOpen(); else setOpen(shown === p ? null : p.key); }}>
+        {p.ask && <i aria-hidden="true" />}{p.label}{p.count != null && <b>{p.count}</b>}
+      </button>
+      {shown === p && <div className="pl-pop" role="dialog" aria-label={p.label}
+        onClick={(e) => { if ((e.target as HTMLElement).closest('.pl-row, .pl-mate')) setOpen(null); }}>{p.body}</div>}
+    </div>)}
+  </div>;
+}
+
 export type PlaceRow = { key: string; title: string; word: string; at: number; tone?: 'work' | 'ask' | 'hold' | 'done' | 'later'; onOpen?: () => void };
 
-/** One list on a place's right: a quiet title, its rows, and a line when there are none. */
-export function PlaceList({ title, rows, now, empty, more }: { title: string; rows: PlaceRow[]; now: number; empty?: string; more?: ReactNode }) {
-  if (!rows.length && !empty) return null;
-  return <div className="pl-sec">
-    <h3>{title}{rows.length > 0 && <b>{rows.length}</b>}</h3>
-    {rows.length ? <ul className="pl-rows">{rows.map((r) => <li key={r.key}>
-      <button type="button" className={`pl-row ${r.tone ?? 'work'}`} onClick={r.onOpen} disabled={!r.onOpen} title={r.title}>
-        <i aria-hidden="true" /><span className="pl-t">{r.title}</span>
-        <span className="pl-at">{agoQuiet(r.at, now)}</span>
-        {r.word && <span className="pl-w">{r.word}</span>}
-      </button>
-    </li>)}</ul> : <p className="pl-none">{empty}</p>}
-    {more}
-  </div>;
+/** A list as a button over the chat, or no button when it is empty. */
+export function listPart(label: string, rows: PlaceRow[], now: number, { ask = false }: { ask?: boolean } = {}): PlacePart[] {
+  return rows.length ? [{ key: label, label, count: rows.length, ask, body: <PlaceRows rows={rows} now={now} /> }] : [];
+}
+
+function PlaceRows({ rows, now }: { rows: PlaceRow[]; now: number }) {
+  return <ul className="pl-rows">{rows.map((r) => <li key={r.key}>
+    <button type="button" className={`pl-row ${r.tone ?? 'work'}`} onClick={r.onOpen} disabled={!r.onOpen} title={r.title}>
+      <i aria-hidden="true" /><span className="pl-t">{r.title}</span>
+      <span className="pl-at">{agoQuiet(r.at, now)}</span>
+      {r.word && <span className="pl-w">{r.word}</span>}
+    </button>
+  </li>)}</ul>;
 }
 
 /** Its job, in its own block, with Edit for the AI teammate you own. */
@@ -143,13 +174,12 @@ export function PlaceAction({ children, onClick, quiet = false, title }: { child
   return <button type="button" className={`pl-btn${quiet ? ' quiet' : ''}`} onClick={onClick} title={title}>{children}</button>;
 }
 
-/** Their AI teammates, under a person's lists: a face and a name each, which open its own place. */
-export function PlaceMates({ title, mates, waits, onPick }: { title: string; mates: Member[]; waits?: ReadonlyMap<string, number>; onPick: (key: string) => void }) {
-  if (!mates.length) return null;
-  return <div className="pl-sec pl-mates">
-    <h3>{title}</h3>
+/** Their AI teammates as a button over the chat: a face and a name each, which open its own place. */
+export function matesPart(label: string, mates: Member[], waits: ReadonlyMap<string, number> | undefined, onPick: (key: string) => void): PlacePart[] {
+  if (!mates.length) return [];
+  return [{ key: 'mates', label, count: mates.length, body: <div className="pl-mates">
     {mates.map((t) => <button type="button" key={t.key} className="pl-mate" onClick={() => onPick(t.key)}>
       <MemberFace m={t} size={24} /><span className="rm-one">{t.name}</span><MemberWord m={t} waits={waits?.get(t.key) ?? 0} />
     </button>)}
-  </div>;
+  </div> }];
 }
