@@ -209,7 +209,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
               <Face person={team?.me ? team.byId.get(team.me) : null} me />
               <textarea value={draft} rows={2} placeholder={`Comment to ${owner}`} aria-label={`Comment to ${owner}`}
                 onChange={(e) => setDraft(e.target.value)} onKeyDown={onKey} />
-              <button type="submit" disabled={!draft.trim() || sending}>Comment</button>
+              <button type="submit" disabled={!draft.trim() || sending}>Send to {owner}</button>
             </div>
           </form>
         </section>
