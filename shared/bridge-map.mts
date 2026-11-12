@@ -214,6 +214,9 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   fileLinks: 'zero:file-links',
   fileLinkComments: 'zero:file-link-comments',
   fileLinkComment: 'zero:file-link-comment',
+  fileLinkAccess: 'zero:file-link-access',
+  fileLinkPeople: 'zero:file-link-people',
+  fileLinkPerson: 'zero:file-link-person',
   // A file someone shared by its link, brought into one of your projects (main/bring-shared-file.mts).
   bringSharedFile: 'zero:bring-shared-file',
   takeSharedFile: 'zero:take-shared-file',

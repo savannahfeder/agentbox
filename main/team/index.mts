@@ -100,9 +100,16 @@ export interface TeamState {
 /** `path`: a film's own file, which goes up in pieces rather than in `body`. */
 export interface FileLinkShare { source: string; name: string; kind: string; type: string; body: string; version?: number; hash?: string; path?: string }
 /** This person's live link to one file. */
-export interface FileLinkRow { token: string; version: number; hash: string; createdAt: number; updatedAt: number; comments: number }
+export type LinkAccess = 'anyone' | 'people';
+export type LinkCan = 'view' | 'comment' | 'edit';
+/** `changedOnWeb`: its copy was edited on its page and is not yet in this person's files. */
+export interface FileLinkRow {
+  token: string; version: number; hash: string; createdAt: number; updatedAt: number; comments: number;
+  access: LinkAccess; can: LinkCan; rev: number; changedOnWeb: boolean; changedByName: string | null;
+}
+export interface FileLinkPerson { email: string; can: LinkCan; name: string | null; avatar: string | null }
 export interface FileLinkListed { token: string; source: string; name: string; kind: string; createdAt: number; updatedAt: number; comments: number }
-export interface SharedLinkFile { name: string; kind: string; type: string; body: string; version: number; createdAt: number; updatedAt: number; ownerName: string | null; ownerAvatar: string | null; mine: boolean }
+export interface SharedLinkFile { name: string; kind: string; type: string; body: string; version: number; createdAt: number; updatedAt: number; ownerName: string | null; ownerAvatar: string | null; mine: boolean; rev?: number }
 /** `place`: where in the file it points, as a note in the app does; none for the whole file. */
 export interface FileLinkComment { id: string; byName: string; byAvatar: string | null; text: string; at: number; mine: boolean; byOwner: boolean; place?: NotePlace }
 
@@ -158,6 +165,14 @@ export type TeamBackend = Omit<SyncBackend, 'me' | 'personId'> & RoomsBackend & 
   fileLinkComments?(token: string): Promise<FileLinkComment[]>;
   commentOnFileLink?(token: string, text: string, place?: NotePlace | null): Promise<unknown>;
   newLinkComments?(since: number): Promise<LinkComment[]>;
+  setFileLinkAccess?(token: string, access: string, can: string): Promise<void>;
+  fileLinkPeople?(token: string): Promise<FileLinkPerson[]>;
+  /** `can` null takes them off. */
+  setFileLinkPerson?(token: string, email: string, can: string | null): Promise<void>;
+  linksChangedOnWeb?(): Promise<LinkEdit[]>;
+  fileLinkBroughtHome?(token: string, rev: number, version: number): Promise<unknown>;
+  /** The stand-in cloud's way to edit a link as its page would; the real page calls edit_file_link itself. */
+  editFileLink?(token: string, body: string, base: number): Promise<number>;
   subscribe(onChange: () => void): () => void;
 };
 
@@ -332,8 +347,10 @@ interface MessageExtras { voice?: unknown; forAgent?: unknown; subject?: unknown
 import { filmPiece, linkAddress, linkSiteFor } from '../file-link.mts';
 import { noticeLinkComments } from './link-comments.mts';
 import type { LinkComment } from './link-comments.mts';
+import { bringLinkEditsHome, type LinkEdit } from './link-edits.mts';
 
 const LINK_COMMENTS_EVERY_MS = 60_000;
+const LINK_EDITS_EVERY_MS = 60_000;
 
 // `signingIn` is { url } while a Google sign-in waits on the browser, so the
 // page can offer that link again rather than a button that does nothing.
@@ -582,6 +599,7 @@ export function createTeamService({
         await phoneOnce();
         await rooms?.tick().catch((err) => log(`rooms: ${err.message}`));
         await linkCommentsOnce();
+        await linkEditsOnce();
         pending = null;
       }
     });
@@ -608,6 +626,32 @@ export function createTeamService({
       });
       if (wrote) onChange();
     } catch (err) { log(`link comments: ${(err as Error).message}`); }
+  }
+
+  // Edits made on this person's link pages, into their files (main/team/link-edits.mts).
+  // `rightAway`: the share panel asked about an edited link, so it goes ahead of the minute.
+  let linkEditsAt = 0;
+  let linkEditsRunning: Promise<void> | null = null;
+  function linkEditsOnce(rightAway = false): Promise<void> {
+    if (linkEditsRunning) return linkEditsRunning;
+    if (!state.me || !backend?.linksChangedOnWeb || (!rightAway && now() - linkEditsAt < LINK_EDITS_EVERY_MS)) return Promise.resolve();
+    linkEditsAt = now();
+    const b = backend;
+    linkEditsRunning = (async () => {
+      try {
+        const wrote = await bringLinkEditsHome({
+          backend: b, log,
+          placeOf: (source) => kept().getLinkPlace(source),
+          setPlace: (source, place) => kept().setLinkPlace(source, place),
+          note: ({ product, thread }, text) => {
+            const p = products().find((x) => x.slug === product);
+            if (p && disk.readWorkItems(p.dir).some((i) => i.id === thread)) store.commentOnASharedFile(product, thread, text);
+          },
+        });
+        if (wrote) onChange();
+      } catch (err) { log(`link edits: ${(err as Error).message}`); } finally { linkEditsRunning = null; }
+    })();
+    return linkEditsRunning;
   }
 
   async function handOverWhatLeft(cards: TeamCard[], people: TeamPerson[]) {
@@ -1330,11 +1374,35 @@ export function createTeamService({
     async fileLink(source: string, hashNow: string | null = null, versionNow: number | null = null) {
       if (!linkSite) return { site: null, signedIn: !!state.me, link: null };
       if (!backend?.fileLinkFor || !state.me) return { site: linkSite, signedIn: false, link: null };
-      const l = await backend.fileLinkFor(source);
+      let l = await backend.fileLinkFor(source);
+      if (l?.changedOnWeb) {
+        await linkEditsOnce(true);
+        l = await backend.fileLinkFor(source);
+      }
       if (!l) return { site: linkSite, signedIn: true, link: null };
-      // `current`: the link holds the very copy on screen. `ahead`: it holds a later version than the one on screen.
+      // `current`: the link holds the very copy on screen. `ahead`: it holds a later version than the one on screen,
+      // or an edit made on its page that is not in the files yet, which Update link must not go over.
       const current = hashNow == null || l.hash === hashNow;
-      return { site: linkSite, signedIn: true, link: { ...l, url: linkAddress(linkSite, l.token), current, ahead: !current && versionNow != null && l.version > versionNow } };
+      const ahead = !current && (l.changedOnWeb || (versionNow != null && l.version > versionNow));
+      return { site: linkSite, signedIn: true, link: { ...l, url: linkAddress(linkSite, l.token), current, ahead } };
+    },
+    /** Where a shared file is on this computer, so an edit made on its page can come home beside it. */
+    rememberLinkPlace(source: string, file: string) {
+      const had = kept().getLinkPlace(source);
+      if (had?.path !== file) kept().setLinkPlace(source, { ...had, path: file });
+    },
+    async setFileLinkAccess(token: string, access: string, can: string) {
+      if (!backend?.setFileLinkAccess || !state.me) throw new Error('Sign in first.');
+      await backend.setFileLinkAccess(token, access, can);
+    },
+    async fileLinkPeople(token: string) {
+      if (!backend?.fileLinkPeople || !state.me) return [];
+      return backend.fileLinkPeople(token);
+    },
+    async setFileLinkPerson(token: string, email: string, can: string | null) {
+      if (!backend?.setFileLinkPerson || !backend.fileLinkPeople || !state.me) throw new Error('Sign in first.');
+      await backend.setFileLinkPerson(token, email, can);
+      return backend.fileLinkPeople(token);
     },
     /** Shares the file, or puts this copy of it in its live link. */
     async shareFile({ source, name, kind, type, body, version, hash, path: file }: FileLinkShare) {

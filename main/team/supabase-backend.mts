@@ -11,7 +11,7 @@ import { cleanMates } from '../../shared/team-departures.mts';
 import { roomsSupabase } from './rooms-supabase.mts';
 import type { LedgerLine } from './sync.mts';
 import { cleanPlace, type NotePlace, type RawPlace } from '../../shared/artifact-marks.mts';
-import type { FileLinkShare, TeamHandover } from './index.mts';
+import type { FileLinkShare, LinkAccess, LinkCan, TeamHandover } from './index.mts';
 
 const PAGE = 500;
 const PUSH_BATCH = 200;
@@ -96,8 +96,11 @@ export interface CardToPut {
   task?: unknown;
 }
 
-interface FileLinkRow { token: string; version: number; hash: string | null; created_at?: string; updated_at: string; comments: number }
-interface LinkViewRow { name: string; kind: string; type: string; body: string; version: number; created_at?: string; updated_at: string; owner_name: string | null; owner_avatar: string | null; mine: boolean }
+// The columns after `comments` came with 20261112120000_a_link_says_who_can_open_it_and_what_they_can_do.sql.
+interface FileLinkRow { token: string; version: number; hash: string | null; created_at?: string; updated_at: string; comments: number; access?: string; can?: string; rev?: number; changed_on_web?: boolean; changed_by_name?: string | null }
+interface LinkViewRow { name: string; kind: string; type: string; body: string; version: number; created_at?: string; updated_at: string; owner_name: string | null; owner_avatar: string | null; mine: boolean; rev?: number }
+interface LinkPersonRow { email: string; can: string; name: string | null; avatar: string | null }
+interface LinkChangedRow { token: string; source: string; name: string; rev: number; hash: string | null; version: number; changed_by_name: string | null }
 interface MyFileLinkRow { token: string; source: string; name: string; kind: string; created_at: string; updated_at: string; comments: number }
 interface LinkCommentRow { id: string; by_name: string; by_avatar: string | null; body: string; created_at: string; mine: boolean; by_owner: boolean; place?: unknown }
 interface NewLinkCommentRow { token: string; source: string; name: string; by_name: string; body: string; created_at: string; place?: unknown }
@@ -107,6 +110,9 @@ const personOut = (p: PersonRow | undefined): CloudPerson | undefined => p && ({
   id: p.id, email: p.email, name: p.name, avatarUrl: p.avatar_url ?? null,
   status: p.status_text ? { text: p.status_text, until: p.status_until ? Date.parse(p.status_until) : null } : null,
 });
+
+const linkAccessOf = (v: unknown): LinkAccess => (v === 'people' ? 'people' : 'anyone');
+const linkCanOf = (v: unknown): LinkCan => (v === 'view' || v === 'edit' ? v : 'comment');
 
 function must<T>({ data, error }: CloudAnswer, what: string): T {
   if (error) throw new Error(`${what}: ${error.message}`);
@@ -423,7 +429,37 @@ export function supabaseBackend(client: SupabaseClient) {
       await myId();
       const rows = must<FileLinkRow[] | null>(await client.rpc('my_file_link', { src: source }), 'asking for the file\'s link');
       const r = rows?.[0];
-      return r ? { token: r.token, version: r.version, hash: r.hash ?? '', createdAt: msOf(r.created_at ?? r.updated_at), updatedAt: msOf(r.updated_at), comments: r.comments } : null;
+      return r ? {
+        token: r.token, version: r.version, hash: r.hash ?? '', createdAt: msOf(r.created_at ?? r.updated_at), updatedAt: msOf(r.updated_at), comments: r.comments,
+        access: linkAccessOf(r.access), can: linkCanOf(r.can), rev: Number(r.rev) || 1, changedOnWeb: r.changed_on_web === true, changedByName: r.changed_by_name ?? null,
+      } : null;
+    },
+
+    async setFileLinkAccess(token: string, access: string, can: string) {
+      await myId();
+      must(await client.rpc('set_file_link_access', { tok: token, acc: access, c: can }), 'changing who can open the link');
+    },
+
+    async fileLinkPeople(token: string) {
+      await myId();
+      const rows = must<LinkPersonRow[] | null>(await client.rpc('file_link_people_of', { tok: token }), 'reading who the link is shared with');
+      return (rows ?? []).map((p) => ({ email: p.email, can: linkCanOf(p.can), name: p.name ?? null, avatar: p.avatar ?? null }));
+    },
+
+    async setFileLinkPerson(token: string, email: string, can: string | null) {
+      await myId();
+      must(await client.rpc('set_file_link_person', { tok: token, mail: email, c: can }), can ? 'sharing the link with them' : 'taking them off the link');
+    },
+
+    async linksChangedOnWeb() {
+      await myId();
+      const rows = must<LinkChangedRow[] | null>(await client.rpc('my_links_changed_on_web'), 'reading edits made on your links');
+      return (rows ?? []).map((r) => ({ token: r.token, source: r.source, name: r.name, rev: r.rev, hash: r.hash ?? '', version: r.version, byName: r.changed_by_name || 'Someone' }));
+    },
+
+    async fileLinkBroughtHome(token: string, rev: number, version: number) {
+      await myId();
+      must(await client.rpc('file_link_brought_home', { tok: token, r: rev, v: version }), 'marking the edit as on this computer');
     },
 
     async stopFileLink(token: string) {
@@ -467,7 +503,7 @@ export function supabaseBackend(client: SupabaseClient) {
       const rows = must<LinkViewRow[] | null>(await client.rpc('file_link_view', { tok: token }), 'reading the shared file');
       const r = rows?.[0];
       if (!r) return { stopped: must<boolean>(await client.rpc('file_link_stopped', { tok: token }), 'reading the shared file') === true, file: null };
-      return { stopped: false, file: { name: r.name, kind: r.kind, type: r.type, body: r.body, version: r.version, createdAt: msOf(r.created_at ?? r.updated_at), updatedAt: msOf(r.updated_at), ownerName: r.owner_name ?? null, ownerAvatar: r.owner_avatar ?? null, mine: !!r.mine } };
+      return { stopped: false, file: { name: r.name, kind: r.kind, type: r.type, body: r.body, version: r.version, createdAt: msOf(r.created_at ?? r.updated_at), updatedAt: msOf(r.updated_at), ownerName: r.owner_name ?? null, ownerAvatar: r.owner_avatar ?? null, mine: !!r.mine, ...(r.rev != null ? { rev: Number(r.rev) } : {}) } };
     },
 
     async linkPiece(name: string) {

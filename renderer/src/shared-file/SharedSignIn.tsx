@@ -13,11 +13,14 @@ const TERMS_URL = 'https://agentbox.ac/terms';
 const PRIVACY_URL = 'https://agentbox.ac/privacy';
 
 type Mode = 'sign-in' | 'sign-up' | 'check-email';
+export type SignInFor = 'comment' | 'edit' | 'open';
+const FOR_WORDS: Record<SignInFor, string> = { comment: 'to comment', edit: 'to edit', open: 'to open this file' };
 
-export function SharedSignIn({ client, startOn, error: startError = null, onNew, onClose, onSignedIn }: {
+export function SharedSignIn({ client, startOn, error: startError = null, purpose = 'comment', onNew, onClose, onSignedIn }: {
   client: CloudClient;
   startOn: 'sign-in' | 'sign-up';
   error?: string | null;
+  purpose?: SignInFor;
   /** Called before an account may be made here, so the page can offer the Mac app after the first comment. */
   onNew: () => void;
   onClose: () => void;
@@ -74,7 +77,7 @@ export function SharedSignIn({ client, startOn, error: startError = null, onNew,
     <button type="button" role="tab" aria-selected={mode === to} className={mode === to ? 'on' : ''}
       onClick={() => { setMode(to); setPassword(''); setError(null); }}>{words}</button>
   );
-  const heading = mode === 'sign-up' ? 'Create an account to comment' : mode === 'check-email' ? 'Check your email' : 'Sign in to comment';
+  const heading = mode === 'sign-up' ? `Create an account ${FOR_WORDS[purpose]}` : mode === 'check-email' ? 'Check your email' : `Sign in ${FOR_WORDS[purpose]}`;
 
   return (
     <div className="si-page sf-sign-in" role="dialog" aria-modal="true" aria-label={heading}

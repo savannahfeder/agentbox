@@ -18,6 +18,7 @@ export const shareWords = {
   ahead: (v: number) => `The link shows version ${v}, newer than this one.`,
   newComments: 'New comments on the link',
   comments: (n: number) => (n === 1 ? '1 comment' : `${n} comments`),
+  stopConfirm: (n: number) => `Stop sharing? The link stops working for everyone.${n > 0 ? ` ${n === 1 ? 'Its comment stays' : 'Its comments stay'} in the thread.` : ''}`,
   // The press that ends it says so. As a statement it read as done already (power test, 2026-11-11).
   stopAsk: (_n: number) => 'Stop the link',
   // A link's comments are kept on the thread its file came from (main/team/link-comments.mts).
@@ -28,8 +29,16 @@ export const shareWords = {
       ? `${what} today at ${clock(updatedAt)}`
       : `${what} ${new Date(updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
   },
+  editedBy: (name: string, { updatedAt }: { updatedAt: number }, now = Date.now()) => (new Date(updatedAt).toDateString() === new Date(now).toDateString()
+    ? `Edited by ${name} today at ${clock(updatedAt)}`
+    : `Edited by ${name} ${new Date(updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}`),
   // "Shared" already means a teammate's thread, and a file your agent handed you.
   live: 'Public link',
+  kept: 'Private link',
+  sharedMark: 'Shared',
+  access: { anyone: 'Anyone with the link', people: 'Only people added' },
+  can: { view: 'can view', comment: 'can comment', edit: 'can edit' },
+  addPeople: 'Add people by email',
 };
 
 /** One live link's row: its file, when it went up or was updated, and its comments. */

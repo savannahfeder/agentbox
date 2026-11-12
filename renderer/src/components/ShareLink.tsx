@@ -54,6 +54,93 @@ async function copy(text: string) {
   try { await navigator.clipboard.writeText(text); return true; } catch { return false; }
 }
 
+type Can = 'view' | 'comment' | 'edit';
+type Access = 'anyone' | 'people';
+type Person = { email: string; can: Can; name: string | null };
+const CANS: Can[] = ['view', 'comment', 'edit'];
+const looksLikeEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
+
+/** What a link lets people do, as words a select can show. */
+export function CanPick({ value, editable, onPick, label, remove = false, disabled }: {
+  value: Can; editable: boolean; onPick: (c: Can | null) => void; label: string; remove?: boolean; disabled?: boolean;
+}) {
+  // An edit given before the file stopped being editable still reads as what it is.
+  const offered = CANS.filter((c) => c !== 'edit' || editable || value === 'edit');
+  return (
+    <select className="av-share-pick" aria-label={label} value={value} disabled={disabled}
+      onChange={(e) => onPick(e.target.value === 'remove' ? null : e.target.value as Can)}>
+      {offered.map((c) => <option key={c} value={c}>{shareWords.can[c]}</option>)}
+      {remove && <option value="remove">Remove</option>}
+    </select>
+  );
+}
+
+/** Who can open the link and what they can do, in place of the words that only said so. */
+function AccessPicks({ token, access, can, editable, onChanged, onProblem }: {
+  token: string; access: Access; can: Can; editable: boolean; onChanged: () => void; onProblem: (words: string | null) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const set = async (a: Access, c: Can) => {
+    setBusy(true); onProblem(null);
+    const out = await api.fileLinkAccess({ token, access: a, can: c });
+    setBusy(false);
+    if (!out.ok) { onProblem(out.error ?? 'That did not change.'); return; }
+    onChanged();
+  };
+  return (
+    <span className="av-share-access">
+      <select className="av-share-pick is-main" aria-label="Who can open it" value={access} disabled={busy} onChange={(e) => void set(e.target.value as Access, can)}>
+        <option value="anyone">{shareWords.access.anyone}</option>
+        <option value="people">{shareWords.access.people}</option>
+      </select>
+      {access === 'anyone' && <CanPick value={can} editable={editable} label="What anyone with the link can do" disabled={busy} onPick={(c) => void set(access, c ?? can)} />}
+    </span>
+  );
+}
+
+/** The people added by email, each with what they can do. */
+function People({ token, editable, onProblem }: { token: string; editable: boolean; onProblem: (words: string | null) => void }) {
+  const [people, setPeople] = useState<Person[] | null>(null);
+  const [adding, setAdding] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void api.fileLinkPeople({ token }).then((r) => { if (live && r.ok) setPeople(r.people ?? []); });
+    return () => { live = false; };
+  }, [token]);
+  const setPerson = async (email: string, c: Can | null) => {
+    setBusy(true); onProblem(null);
+    const out = await api.fileLinkPerson({ token, email, can: c });
+    setBusy(false);
+    if (!out.ok) { onProblem(out.error ?? 'That did not change.'); return false; }
+    setPeople(out.people ?? []);
+    return true;
+  };
+  const add = async () => {
+    const email = adding.trim();
+    if (!email) return;
+    if (!looksLikeEmail(email)) { onProblem('That is not an email address.'); return; }
+    if (await setPerson(email, editable ? 'edit' : 'comment')) setAdding('');
+  };
+  return (
+    <>
+      <form className="av-share-add" onSubmit={(e) => { e.preventDefault(); void add(); }}>
+        <input type="email" value={adding} onChange={(e) => { setAdding(e.target.value); onProblem(null); }} placeholder={shareWords.addPeople} aria-label={shareWords.addPeople} disabled={busy} autoComplete="off" spellCheck={false} />
+      </form>
+      {people && people.length > 0 && (
+        <ul className="av-share-people" aria-label="People added">
+          {people.map((p) => (
+            <li key={p.email}>
+              <span className="av-share-person" title={p.email}>{p.name ? <><b>{p.name}</b> {p.email}</> : p.email}</span>
+              <CanPick value={p.can} editable={editable} remove label={`What ${p.name ?? p.email} can do`} disabled={busy} onPick={(c) => void setPerson(p.email, c)} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
 /** `icon`: drawn as the side pane's square mark rather than a worded button. */
 export function ShareLink({ product, thread, src, signedIn, icon = false }: {
   product: string; thread: string; src: string;
@@ -121,6 +208,7 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
     seeComments(link.token, (out.comments ?? []).length);
   };
   const flagged = behind || unseen;
+  const live = link?.access === 'people' ? shareWords.kept : shareWords.live;
 
   const stop = async () => {
     if (!link) return;
@@ -153,8 +241,8 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
   return (
     <div className={`av-share${icon ? ' is-mark' : ''}`} ref={box}>
       {icon
-        ? <button type="button" className={`doc-mark${link ? ' is-shared' : ''}${flagged ? ' is-behind' : ''}`} title={behind ? shareWords.behind : unseen ? shareWords.newComments : link ? shareWords.live : 'Share'} aria-label={link ? shareWords.live : 'Share'} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="globe" /></button>
-        : <button type="button" className={`av-btn${open ? ' is-on' : ''}${flagged ? ' is-behind' : ''}`} title={behind ? shareWords.behind : unseen ? shareWords.newComments : undefined} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="globe" />{link ? shareWords.live : 'Share'}</button>}
+        ? <button type="button" className={`doc-mark${link ? ' is-shared av-share-on' : ''}${flagged ? ' is-behind' : ''}`} title={behind ? shareWords.behind : unseen ? shareWords.newComments : link ? live : 'Share'} aria-label={link ? live : 'Share'} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="globe" />{link && <span>{shareWords.sharedMark}</span>}</button>
+        : <button type="button" className={`av-btn${open ? ' is-on' : ''}${flagged ? ' is-behind' : ''}`} title={behind ? shareWords.behind : unseen ? shareWords.newComments : undefined} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="globe" />{link ? live : 'Share'}</button>}
       {open && (
         <div className="av-share-box" role="dialog" aria-label="Share">
           <p className="av-share-title">Share <span>{name}</span></p>
@@ -173,17 +261,22 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
           })() : (
             <>
               <div className="av-share-who-sees">
-                <span className={`av-share-icon${link ? ' is-open' : ''}`}><NoteGlyph name={link ? 'globe' : 'lock'} /></span>
-                <span className="av-share-access">
-                  <b>{link ? shareWords.anyone : shareWords.notPublic}</b>
-                  <i>{link && stopAsked && link.comments > 0 ? shareWords.keptComments(link.comments) : link ? shareWords.canComment : shareWords.fresh}</i>
-                </span>
-                {link && (
-                  <button type="button" className={`av-share-stop${stopAsked ? ' is-asking' : ''}`} disabled={busy} onBlur={() => setStopAsked(false)} onClick={() => void stop()}>
-                    {stopAsked ? shareWords.stopAsk(link.comments) : 'Stop sharing'}
-                  </button>
-                )}
+                <span className={`av-share-icon${link ? ' is-open' : ''}`}><NoteGlyph name={link && link.access !== 'people' ? 'globe' : 'lock'} /></span>
+                {link
+                  ? <AccessPicks token={link.token} access={link.access ?? 'anyone'} can={link.can ?? 'comment'} editable={!!link.editable} onChanged={() => void api.fileLink(ask).then(setState)} onProblem={setProblem} />
+                  : <span className="av-share-access"><b>{shareWords.notPublic}</b><i>{shareWords.fresh}</i></span>}
+                {link && !stopAsked && <button type="button" className="av-share-stop" disabled={busy} onClick={() => void stop()}>Stop sharing</button>}
               </div>
+              {link && stopAsked && (
+                <div className="av-share-confirm" role="group" aria-label="Stop sharing">
+                  <p>{shareWords.stopConfirm(link.comments)}</p>
+                  <div className="av-share-acts">
+                    <button type="button" className="av-btn is-on" disabled={busy} autoFocus onClick={() => void stop()}>Stop sharing</button>
+                    <button type="button" className="av-btn" disabled={busy} onClick={() => setStopAsked(false)}>Keep sharing</button>
+                  </div>
+                </div>
+              )}
+              {link && !stopAsked && <People token={link.token} editable={!!link.editable} onProblem={setProblem} />}
               {link && comments && comments.length > 0 && (
                 <>
                   <ol className="av-share-comments" aria-label="Comments">
@@ -202,7 +295,7 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
               )}
               {(said || problem) && <p className={`av-share-said${problem ? ' is-bad' : ''}`} role="status">{problem ?? said}</p>}
               <div className="av-share-foot">
-                <span className="av-share-when">{!link ? '' : behind ? shareWords.behind : link.ahead ? shareWords.ahead(link.version) : shareWords.shared(link)}</span>
+                <span className="av-share-when">{!link ? '' : behind ? shareWords.behind : link.ahead ? shareWords.ahead(link.version) : link.changedByName ? shareWords.editedBy(link.changedByName, link) : shareWords.shared(link)}</span>
                 {link && !behind && <button type="button" className="av-share-out" title="Open the link" aria-label="Open the link" onClick={() => window.open(link.url, '_blank')}><NoteGlyph name="out" /></button>}
                 {link && behind
                   ? <button type="button" className="av-share-copy" disabled={busy} onClick={() => void makeAndCopy()}>Update link</button>
