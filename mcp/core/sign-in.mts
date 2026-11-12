@@ -3,6 +3,7 @@
 // on a tool call at 60 seconds; the agent calls again to keep waiting.
 import { listProjects } from '../../main/store/project.mts';
 import { readWorkItem, updateWorkItem } from '../../main/store/work-items.mts';
+import { SERVICES } from '../../shared/cloud-needs.mts';
 import { answerTo, cleanSignIn, newSignInId, type SignInAsk, type SignInSaid } from '../../shared/sign-in-ask.mts';
 import type { WorkItem } from '../../shared/work-items.mts';
 import { resolveProduct } from './account.mts';
@@ -25,6 +26,34 @@ const SAID: Record<SignInSaid, string> = {
   skipped: 'They chose not to sign in now. Finish what you can without it, and say in your answer what is left.',
   replied: 'They wrote you a message on the thread instead, so the card is gone. Do not call sign_in again for this ask. Answer their message: if it is not with you yet, end your turn now and it comes next. If the work still needs the sign-in after that, ask again with a new call.',
 };
+
+// Where a service's own login leaves its token on a cloud machine. Supabase's
+// CLI writes no file on Linux: the token goes in the kernel keyring, which the
+// machine takes with it.
+const READ_TOKEN: Record<string, string> = {
+  supabase: "{ command -v keyctl >/dev/null || sudo apt-get install -y -qq keyutils >/dev/null 2>&1; } && keyctl pipe %user:'keyring:supabase@Supabase CLI' 2>/dev/null || cat ~/.supabase/access-token",
+  github: 'gh auth token',
+};
+
+const plain = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+export interface KeepIt { keep?: { name: string; read?: string }; message: string }
+
+/** What a cloud agent is told to keep once the person signed in to `service`, so later cloud runs are signed in too. */
+export function keepAfterSignIn(service: string, { finishing = false }: { finishing?: boolean } = {}): KeepIt {
+  const n = plain(service);
+  const svc = SERVICES.find((s) => s.id === n || plain(s.name) === n || n.startsWith(plain(s.name)));
+  const when = finishing ? 'Once the login finishes, keep' : 'First, keep';
+  const why = 'this sign-in for every later cloud thread: a cloud machine forgets its logins when the run ends.';
+  if (!svc || svc.keys.length !== 1) {
+    const names = svc ? ` under ${svc.keys.map((k) => k.name).join(' and ')}, one call each` : ', under the variable its tools read, if they read one from the environment';
+    return { message: `${when} ${why} Read the token its login saved and call sign_in with this ask and keep${names}.` };
+  }
+  const name = svc.keys[0].name;
+  const read = READ_TOKEN[svc.id];
+  const how = read ? `Run \`${read}\`` : 'Read the token its login saved';
+  return { keep: { name, ...(read ? { read } : {}) }, message: `${when} ${why} ${how} and call sign_in with this ask and keep { name: '${name}', value: the token }.` };
+}
 
 export interface SignInRequest { service?: string; url?: string; code?: string; why?: string; ask?: string; finished?: boolean }
 export interface SignInWait { status: 'closed' | 'waiting' | 'signed_in' | 'landed' | 'skipped' | 'replied'; ask: string; url?: string; message: string }
