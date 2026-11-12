@@ -1735,7 +1735,7 @@ declare global {
       setThreadOnMac?(p: { onMac: Record<string, boolean | null> }): Promise<unknown>;
       moveToCloud?(p: { ids: string[]; product?: string; id?: string }): Promise<{ moving?: number; ok?: boolean }>;
       setProductHidden(p: { product: string; hidden: boolean }): Promise<unknown>;
-      compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; onMac?: boolean }): Promise<WorkItem>;
+      compose(p: { product: string; title: string; body?: string; label?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; onMac?: boolean }): Promise<WorkItem>;
       routeThread?(p: { product: string; id: string; to: string }): Promise<{ ok: true }>;
       // Feedback to the Agentbox team (main/feedback.mts). Optional: an older
       // main process under a newer window has no such door.

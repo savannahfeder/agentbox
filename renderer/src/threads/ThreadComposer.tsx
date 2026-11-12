@@ -123,6 +123,8 @@ export interface ComposeStart {
   attachments?: PendingAttachment[];
   /** The message this card was opened from, when it was handed to an agent. */
   handFrom?: HandFrom;
+  /** The task's name, which the thread keeps while its first line still says it. */
+  named?: string;
   /** The teammate's thread this one carries on: labelled on the new thread, and its owner told once it is sent. */
   continueFrom?: { personId: string; threadId: string };
   /** The project it starts in, ahead of the default. */
@@ -658,6 +660,7 @@ export function ThreadComposer({
           ...(when.start ? { start: when.start } : {}),
           ...harness,
           ...(team ? sharingFields(visibility, chosenHere) : {}),
+          ...(initial?.named && message.title === initial.named ? { label: initial.named } : {}),
           ...(onAuto || initial?.handFrom || initial?.continueFrom ? { labels: [
             ...(onAuto ? [AUTO_LABEL] : []),
             ...(initial?.handFrom ? [handedFromLabel(initial.handFrom.product, initial.handFrom.id)] : []),

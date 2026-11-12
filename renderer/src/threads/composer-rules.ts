@@ -766,7 +766,10 @@ export function taskHandOff({ from, brief, message, nameOf, handFrom, offered = 
     const who = message?.by ? nameOf(message.by) : null;
     return { to: 'agent', body: `${who ? `${who} wrote: ` : ''}${pressed}\n\n`, attachments, ...from_, ...where };
   }
-  return { to: 'agent', body: from ? `${from} asked:\n\n${brief.body}\n\n` : `${brief.body}\n\n`, attachments, ...from_, ...where };
+  // The thread is called what the task is called; who asked is its first words.
+  const name = String(brief.title ?? '').trim();
+  const asked = from ? `${from} asked:\n\n${brief.body}\n\n` : `${brief.body}\n\n`;
+  return { to: 'agent', body: name && from ? `${name}\n\n${asked}` : asked, ...(name && from ? { named: name } : {}), attachments, ...from_, ...where };
 }
 
 export const handedFromLabel = (product: string, id: string) => `handed-from:${product}:${id}`;

@@ -1310,7 +1310,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     await team!.syncNow();
   }));
 
-  ipcMain.handle('zero:compose', (_e, { product, title, body, kind, priority, runAt, start, labels, engine, model, effort, assignee, due, visibility, visibleTo, fromPhone, onMac }: ComposeInput & { product: string; onMac?: unknown }) => {
+  ipcMain.handle('zero:compose', (_e, { product, title, body, kind, priority, runAt, start, labels, engine, model, effort, assignee, due, visibility, visibleTo, fromPhone, onMac, label }: ComposeInput & { product: string; onMac?: unknown; label?: unknown }) => {
     const out = store.composeItem(product, {
       // HOW HARD IT THINKS rides through unjudged: the store keeps any word
       // shaped like a level, and the spawn is the gate that knows each
@@ -1341,6 +1341,8 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       // fields cannot be corrected separately.
       model: supervisor.modelOffered(engine, model),
     });
+    // A thread a task was handed to an agent in keeps the task's name, so the namer leaves it.
+    if (typeof label === 'string' && label.trim() && out?.id) store.nameItem(product, out.id, label);
     // Before the wake below, so its first run cannot start in the cloud.
     if (onMac === true && out?.id) supervisor.setThreadOnMac({ [out.id]: true });
     // A real thread ends the walk's hold on agents (`Supervisor#sentByThem`).

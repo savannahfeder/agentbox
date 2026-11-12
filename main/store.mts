@@ -703,6 +703,11 @@ export class Store {
     return this.modules.workItemsDisk.releaseRunClaim(this.productDir(slug), id, run);
   }
 
+  /** Who is signed in on this computer, or null: whose words a new line is. */
+  author(): string | null {
+    return this.modules.workItemsDisk.currentAuthor();
+  }
+
   // THE WRITTEN NAME THE LIST DRAWS. Written by the app rather than by a
   // session, on agent authority, and never onto `title`: the title is what she
   // typed and the fold keeps it hers (main/row-label.mts says why at length).

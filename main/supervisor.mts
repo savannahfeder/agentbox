@@ -758,6 +758,8 @@ export interface SupervisorStore {
   recordSessionResult(slug: string, id: string, opts: { result: string; status?: WorkItemStatus | null }): StoredRow | null | undefined;
   releaseRunClaim(slug: string, id: string, run: unknown): unknown;
   nameItem(slug: string, id: string, label: string): unknown;
+  /** Who is signed in on this computer; absent on a store with no team. */
+  author?(): string | null;
   catchUpItem(slug: string, id: string, opts: { label?: string; problem?: string; result?: string }): unknown;
   routeItem(slug: string, id: string, patch: Record<string, unknown>): unknown;
   prioritizeItem(slug: string, id: string, value: unknown): unknown;
@@ -4880,7 +4882,7 @@ export class Supervisor {
     this._nameMisses ??= new Map();
     const key = (i: WorkItem) => `${i.product}:${i.id}`;
     const next = items
-      .filter((i) => wantsName(i) && !(now - (this._nameMisses.get(key(i)) ?? -Infinity) < NAME_RETRY_MS))
+      .filter((i) => wantsName(i, this.store.author?.() ?? null) && !(now - (this._nameMisses.get(key(i)) ?? -Infinity) < NAME_RETRY_MS))
       .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))[0];
     if (!next) return undefined;
     this._naming = true;
