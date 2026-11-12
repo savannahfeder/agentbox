@@ -72,7 +72,7 @@
     "pack": "node scripts/run.mjs scripts/release.mjs --no-sign",
     "pack:side": "node scripts/run.mjs scripts/pack-side.mjs",
     "release": "node scripts/run.mjs scripts/release.mjs",
-    "deploy": "node scripts/deploy.mjs",
+    "deploy": "node scripts/run.mjs scripts/deploy.mjs",
     "setup:feedback": "node scripts/set-up-feedback.mjs",
     "feedback": "node scripts/run.mjs scripts/read-feedback.mjs",
     "fresh": "node scripts/run.mjs scripts/fresh-user.mjs",
