@@ -117,6 +117,8 @@ import { NOTHING_OVER_THE_APP, afterTheWalk, type OpenOverTheApp } from './walk-
 import { splitMessage } from './message-split';
 import { parseQuery } from './search';
 import { searchThreads, threadSearchDetails } from './threads/search';
+import { repeatsFound, withoutRunsOf } from './repeat-search';
+import { repeatTag } from './repeat-words';
 import { applyTheme, machineTheme, onMachineTheme, resolvePick, resolveTheme, THEME_KEY, type ThemePick } from './theme';
 import { hintScheduler, type HintScheduler } from './hint-timing';
 import { HINTS } from './hint-plate';
@@ -3914,8 +3916,16 @@ export default function App() {
     return () => window.removeEventListener('focus', back);
   }, [focused?.product, focused?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // ⌘K finds threads with the same search as the list's own field.
-  const findThreads = useCallback((q: string) => [
-    ...searchThreads(items, q, searchContext).map(({ item }) => ({
+  const findThreads = useCallback((q: string) => {
+    const ruled = repeatsFound(repeats, q);
+    return [
+    ...ruled.map((rule) => ({
+      id: `thread-repeat-${rule.product}-${rule.id}`,
+      label: rule.title,
+      hint: `Repeats ${repeatTag(rule)}`,
+      run: () => { setModal(null); if (search !== null) closeSearch(); openRepeatRef.current?.(rule); },
+    })),
+    ...withoutRunsOf(searchThreads(items, q, searchContext).map(({ item }) => item), ruled).map((item) => ({
       id: `thread-${item.product}-${item.id}`,
       label: threadSearchDetails(item, searchContext).title,
       hint: snap?.products.find((p) => p.slug === item.product)?.name ?? item.product,
@@ -3927,7 +3937,8 @@ export default function App() {
       hint: `${firstName(team?.byId.get(card.personId) ?? null)}'s thread`,
       run: () => { setModal(null); if (search !== null) closeSearch(); setFocused(null); openTeammateCard(card); },
     })),
-  ], [items, searchContext, snap?.products, search, closeSearch, markSeen, weekCards, team, openTeammateCard]);
+    ];
+  }, [repeats, items, searchContext, snap?.products, search, closeSearch, markSeen, weekCards, team, openTeammateCard]);
   // J AND K FROM AN OPEN THREAD OR AN OPEN TEAMMATE CARD (w-fb16bcaeba): open
   // the next stop, whoever's it is. Yours opens as your thread, theirs as
   // their card, exactly as a click on its row would.
