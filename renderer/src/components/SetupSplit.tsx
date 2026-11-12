@@ -15,7 +15,7 @@ import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { starterAsks } from '../../../shared/teammates.mts';
 import { MATCH_SKY, SKY_THEMES, drawSky } from '../home/sky';
-import { PRO_PITCH, SETUP_PLANS, cloudShowcase, heldPress, setupPreview, tabStop, teamPaid, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
+import { PRO_PITCH, SETUP_PLANS, cloudShowcase, heldPress, inviteCursor, setupPreview, tabStop, teamPaid, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
 import { writeLastEngine } from '../engines';
 import { TEAM } from '../../../cloud/gateway/plans.mjs';
 import FolderPicker from './FolderPicker';
@@ -158,7 +158,7 @@ export function SetupSplit(p: SetupSplitProps) {
     setBusy(true); setError(null);
     if (!p.snap?.team?.team) {
       const name = teamName.trim();
-      if (!name) { setBusy(false); setError('Name your team first.'); return; }
+      if (!name) { setBusy(false); setError('Name your team first.'); document.querySelector<HTMLInputElement>('.setup-split input[data-ss-enter="to-email"]')?.focus(); return; }
       const made = await api.teamCreate(name);
       if (!made.ok) { setBusy(false); setError(made.error ?? 'The team was not made.'); return; }
     }
@@ -233,6 +233,10 @@ export function SetupSplit(p: SetupSplitProps) {
     if (got.path) void takeFolder(got.path);
   }, [takeFolder]);
 
+  useEffect(() => {
+    if (step !== 'invite') return;
+    document.querySelector<HTMLInputElement>(`.setup-split input[data-ss-enter="${inviteCursor(!!p.snap?.team?.team)}"]`)?.focus();
+  }, [step, signedIn]); // eslint-disable-line react-hooks/exhaustive-deps
   // ---- the keyboard: Enter is always the primary button
   const primary = useRef<() => void>(() => {});
   const accountPrimary = useRef<(() => void) | null>(null);

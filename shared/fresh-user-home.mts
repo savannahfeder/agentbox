@@ -220,6 +220,14 @@ export function freshEnv(home: string, env: NodeJS.ProcessEnv = process.env, { o
   return fresh;
 }
 
+/** `--team`: the team cloud this checkout or computer already has, so the window gets the account, plan and invite steps a download does. */
+export function teamConfigToUse({ repo, realHome = os.homedir(), env = process.env, exists = fs.existsSync }: {
+  repo: string; realHome?: string; env?: NodeJS.ProcessEnv; exists?: (file: string) => boolean;
+}): string | null {
+  const tries = [env.AGENTBOX_TEAM_CONFIG, path.join(repo, 'cloud', 'team.config.json'), path.join(realHome, `.${nameSlug}`, 'team.config.json')];
+  return tries.find((f): f is string => !!f && exists(f)) ?? null;
+}
+
 /** Make one and link its two prerequisites, in a single call. */
 export function newFreshHome({ withAgents = false, realHome = os.homedir(), now }: { withAgents?: boolean; realHome?: string; now?: Date } = {}) {
   return prepareHome(makeHome(now), { withAgents, realHome });

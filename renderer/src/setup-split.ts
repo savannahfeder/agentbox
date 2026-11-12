@@ -70,6 +70,9 @@ export function cloudShowcase(titles: readonly string[]): string[] {
 export const teamPaid = (plan: { team?: { seats?: number } } | null | undefined): boolean => (plan?.team?.seats ?? 0) > 0;
 
 /** Enter held down repeats, and a repeat is not a press: one press moves one step. Arrows may repeat. */
+/** Which box has the cursor when the invite step opens: the team's name until it has one, then the email. */
+export const inviteCursor = (hasTeam: boolean): 'to-email' | 'add' => (hasTeam ? 'add' : 'to-email');
+
 export const heldPress = (e: { key: string; repeat?: boolean }): boolean => e.key === 'Enter' && !!e.repeat;
 
 export const stepLabel = (steps: SetupStep[], step: SetupStep) => `Step ${steps.indexOf(step) + 1} of ${steps.length}`;
