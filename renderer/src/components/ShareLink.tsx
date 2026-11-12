@@ -203,7 +203,7 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
   };
   const stop = async () => {
     if (!link) return;
-    if (!stopAsked) { setStopAsked(true); return; }
+    if (!stopAsked) { setStopAsked(true); setSaid(null); return; }
     setStopAsked(false);
     setBusy(true); setProblem(null);
     const out = await api.fileLinkStop({ token: link.token });
@@ -236,15 +236,23 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
                 token={link.token} access={link.access ?? 'anyone'} can={link.can ?? 'comment'} editable={!!link.editable}
                 onChanged={() => void api.fileLink(ask).then(setState)} onProblem={setProblem}
               />
-              <div className="av-share-acts">
-                {behind && <button type="button" className="av-btn is-on" disabled={busy} onClick={() => void share()}>Update link</button>}
-                <button type="button" className={`av-btn${behind ? '' : ' is-on'}`} disabled={busy} onClick={() => void copy(link.url).then((ok) => setSaid(ok ? 'Link copied' : null))}>Copy link</button>
-                {!behind && <button type="button" className="av-btn" disabled={busy} onClick={() => window.open(link.url, '_blank')}>Open</button>}
-                <span className="av-spring" />
-                <button type="button" className={`av-share-stop${stopAsked ? ' is-asking' : ''}`} disabled={busy} onBlur={() => setStopAsked(false)} onClick={() => void stop()}>
-                  {stopAsked ? shareWords.stopAsk(link.comments) : 'Stop sharing'}
-                </button>
-              </div>
+              {stopAsked ? (
+                <div className="av-share-confirm" role="group" aria-label="Stop sharing">
+                  <p>{shareWords.stopConfirm(link.comments)}</p>
+                  <div className="av-share-acts">
+                    <button type="button" className="av-btn is-on" disabled={busy} autoFocus onClick={() => void stop()}>Stop sharing</button>
+                    <button type="button" className="av-btn" disabled={busy} onClick={() => setStopAsked(false)}>Keep sharing</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="av-share-acts">
+                  {behind && <button type="button" className="av-btn is-on" disabled={busy} onClick={() => void share()}>Update link</button>}
+                  <button type="button" className={`av-btn${behind ? '' : ' is-on'}`} disabled={busy} onClick={() => void copy(link.url).then((ok) => setSaid(ok ? 'Link copied' : null))}>Copy link</button>
+                  {!behind && <button type="button" className="av-btn" disabled={busy} onClick={() => window.open(link.url, '_blank')}>Open</button>}
+                  <span className="av-spring" />
+                  <button type="button" className="av-share-stop" disabled={busy} onClick={() => void stop()}>Stop sharing</button>
+                </div>
+              )}
               {comments && comments.length > 0 && (
                 <ol className="av-share-comments" aria-label="Comments">
                   {comments.map((c) => (
@@ -263,13 +271,16 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
             </>
           ) : (
             <>
-              <p>{shareWords.fresh}</p>
+              {/* Just stopped: that is what the panel says, in place of the offer to share. */}
+              {said === shareWords.stopped
+                ? <p className="av-share-gone" role="status"><b>Not shared.</b> The old link no longer works.</p>
+                : <p>{shareWords.fresh}</p>}
               <div className="av-share-acts">
-                <button type="button" className="av-btn is-on" disabled={busy} onClick={() => void share()}>{busy ? 'Making the link' : 'Make link'}</button>
+                <button type="button" className="av-btn is-on" disabled={busy} onClick={() => void share()}>{busy ? 'Making the link' : said === shareWords.stopped ? 'Make a new link' : 'Make link'}</button>
               </div>
             </>
           )}
-          {(said || problem) && <p className={`av-share-said${problem ? ' is-bad' : ''}`} role="status">{problem ?? said}</p>}
+          {(problem || (said && said !== shareWords.stopped)) && <p className={`av-share-said${problem ? ' is-bad' : ''}`} role="status">{problem ?? said}</p>}
         </div>
       )}
     </div>

@@ -9,7 +9,10 @@ export const shareWords = {
   ahead: (v: number) => `The link shows version ${v}, newer than this one.`,
   newComments: 'New comments on the link',
   comments: (n: number) => (n === 1 ? '1 comment' : `${n} comments`),
-  stopAsk: (n: number) => (n > 0 ? `Stop, and delete ${n === 1 ? 'its comment' : `its ${n} comments`}` : 'Stop the link'),
+  stopConfirm: (n: number) => (n > 0
+    ? `Stop sharing? The link stops working for everyone, and ${n === 1 ? 'its comment is' : `its ${n} comments are`} deleted.`
+    : 'Stop sharing? The link stops working for everyone.'),
+  stopAsk: (n: number) =>(n > 0 ? `Stop, and delete ${n === 1 ? 'its comment' : `its ${n} comments`}` : 'Stop the link'),
   shared: ({ createdAt, updatedAt }: { createdAt: number; updatedAt: number }, now = Date.now()) => {
     const what = updatedAt - createdAt > 1000 ? 'Updated' : 'Shared';
     return new Date(updatedAt).toDateString() === new Date(now).toDateString()

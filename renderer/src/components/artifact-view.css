@@ -273,6 +273,8 @@
 .av-share-box .av-share-meta { display: flex; gap: 12px; font: 11.5px var(--mono); color: var(--text-dim); }
 .av-share-meta a { color: var(--text-dim); text-decoration: underline; text-underline-offset: 2px; }
 .av-share-acts { display: flex; align-items: center; gap: 8px; }
+.av-share-confirm { display: flex; flex-direction: column; gap: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.av-share-gone b { font-weight: 600; }
 /* Who can open the link and what they can do: words that open a list, not boxed fields. */
 .av-share-access { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; }
 .av-share-pick {
