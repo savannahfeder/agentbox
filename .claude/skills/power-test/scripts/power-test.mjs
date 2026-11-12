@@ -19,6 +19,8 @@
 //     --team <file> --room <name>                      one tester signs in to a real team (live.mjs --team) and talks in that room
 //     --stand-in-team "<name>"                         every tester on one team, through a stand-in team cloud of the run's own;
 //                                                      the first starts it, invites the rest and shares their first project
+//     --share-stage /tmp/share-stage                   with --stand-in-team: the team on scripts/share-stage.mjs's cloud, so
+//                                                      Share makes links and the link page opens them
 //
 // For each person: a copy of the app of their own (live.mjs with
 // VERIFY_INSTANCE=power-<who>), shaped like their setup; a watcher reading it
@@ -94,6 +96,8 @@ const room = opt('room');
 const files = opt('files') ? path.resolve(opt('files')) : null;
 if (files && !fs.existsSync(files)) stop(`--files: there is no folder at ${files}.`);
 const standInTeam = opt('stand-in-team');
+const shareStage = opt('share-stage');
+if (shareStage && !standInTeam) stop('--share-stage is where a stand-in team lives: add --stand-in-team.');
 if (standInTeam && team) stop('--stand-in-team makes a team of its own: leave out --team.');
 if (standInTeam && people.length < 2) stop('--stand-in-team is two or more testers on one team: name them with --who.');
 if (team && people.length !== 1) stop('--team signs one account in, so it runs one tester: name them with --who.');
@@ -213,10 +217,13 @@ let teamFiles = {};
 if (standInTeam) {
   const { startStandinCloud } = await import(path.join(REPO, 'cloud', 'standin', 'server.mjs'));
   fs.mkdirSync(path.join(root, 'team-cloud'), { recursive: true });
-  teamCloud = await startStandinCloud({ file: path.join(root, 'team-cloud', 'cloud.json') });
-  teamFiles = writeTeamFiles({ root, url: teamCloud.url, people });
+  // The stage's cloud has a link page beside it; it is the stage's to stop, not this run's.
+  const staged = shareStage ? readJson(path.join(shareStage, 'standin.json')) : null;
+  if (shareStage && !staged?.url) stop(`no stage at ${shareStage}: start it with node scripts/share-stage.mjs`);
+  teamCloud = staged ? { url: staged.url, stop: async () => {} } : await startStandinCloud({ file: path.join(root, 'team-cloud', 'cloud.json') });
+  teamFiles = writeTeamFiles({ root, url: teamCloud.url, people, site: staged?.phoneSite ?? null });
   await namePeople({ url: teamCloud.url, people });
-  say(`${standInTeam}: a stand-in team cloud at ${teamCloud.url} for ${people.map((p) => p.name).join(', ')}`);
+  say(`${standInTeam}: a stand-in team cloud at ${teamCloud.url} for ${people.map((p) => p.name).join(', ')}${staged ? `, links at ${staged.phoneSite}` : ''}`);
 }
 
 const setups = [];

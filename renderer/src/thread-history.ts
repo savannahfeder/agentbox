@@ -486,9 +486,11 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
       continue;
     }
 
-    const fromLink = (patch as { linkComment?: { name?: unknown; file?: unknown; text?: unknown } } | null)?.linkComment;
+    const fromLink = (patch as { linkComment?: { name?: unknown; file?: unknown; text?: unknown; place?: { kind?: unknown; s?: unknown } } } | null)?.linkComment;
     if (fromLink && typeof fromLink.name === 'string' && typeof fromLink.file === 'string') {
-      events.push({ at, who: 'agent', said: `${fromLink.name} commented on ${fromLink.file}`, ...(words(fromLink.text) ? { words: words(fromLink.text)! } : {}) });
+      const s = fromLink.place?.kind === 'time' && typeof fromLink.place.s === 'number' ? Math.floor(fromLink.place.s) : null;
+      const moment = s === null ? '' : ` at ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+      events.push({ at, who: 'agent', said: `${fromLink.name} commented on ${fromLink.file}${moment}`, ...(words(fromLink.text) ? { words: words(fromLink.text)! } : {}) });
       continue;
     }
 

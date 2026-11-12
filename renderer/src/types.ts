@@ -13,6 +13,9 @@ import type { EngineSetupState } from './plan-setup';
 
 export type { AgentVoice };
 
+/** A comment on a thread's shared link, waiting for its owner (shared/work-items.mts `linkComments`). */
+export interface LinkCommentWaiting { name: string; file: string; text: string; ts: number; place?: NotePlace }
+
 export interface WorkItem {
   id: string;
   product: string;
@@ -73,6 +76,8 @@ export interface WorkItem {
   snoozedUntil?: number;
   /** Teammates' comments its owner has not yet dealt with (shared/work-items.mts). */
   waitingComments?: { by: string; ts: number; text: string }[];
+  /** Comments on its shared links its owner has not yet dealt with (shared/work-items.mts). */
+  linkComments?: LinkCommentWaiting[];
   /** Comments and approvals on this thread's files. */
   artifacts?: FileMarks;
   // Whether this has been started at all (w-afb66e6661). 'later' is a thread
@@ -1932,7 +1937,7 @@ declare global {
       fileLinkStop?(p: { token: string }): Promise<{ ok: boolean; error?: string }>;
       fileLinks?(): Promise<{ ok: boolean; error?: string; links?: PublicLink[] }>;
       fileLinkComments?(p: { token: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
-      fileLinkComment?(p: { token: string; text: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
+      fileLinkComment?(p: { token: string; text: string; place?: NotePlace | null }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
       bringSharedFile?(p: { link: string; product: string | null }): Promise<{ ok: boolean; error?: string; product?: string; id?: string; src?: string }>;
       takeSharedFile?(): Promise<string | null>;
       onSharedFile?(fn: () => void): () => void;
