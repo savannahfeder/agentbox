@@ -9,6 +9,10 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { startableChrome } from '../shared/hidden-browser.mts';
+import {repairReplayDOM} from './lib/outreach-layout.mts';
+import {anchoredPointer,smoothPointer} from './lib/outreach-pointer.mts';
+import {validateCreative} from './lib/outreach-creative.mts';
+import {setHeroFrame} from './lib/outreach-hero-motion.mts';
 import { injectDOM, sceneAt, pointerAt, pointerSprite, recordingTime, escapeHtml, cameraBox, validateReplay, replayKey, validateComments } from './lib/outreach-template.mjs';
 
 const [folder, input, output, dist, ...flags] = process.argv.slice(2);
@@ -16,6 +20,7 @@ if (!dist) throw new Error('Usage: outreach-render.mjs template film.json screen
 const layerMode=flags.includes('--layers')&&!flags.includes('--at');
 const manifest = JSON.parse(fs.readFileSync(path.join(folder,'manifest.json')));
 const target = JSON.parse(fs.readFileSync(input));
+if(!flags.includes('--at'))validateCreative(target);
 validateComments(target);
 const require = createRequire(import.meta.url);
 const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'playwright-core');
@@ -29,7 +34,7 @@ for await(const line of lines) {
   if(frames.length>1&&Math.floor(frames.at(-1).t*30)===bucket)frames[frames.length-1]=frame;
   else frames.push(frame);
 }
-const types = {'.html':'text/html','.js':'text/javascript','.css':'text/css','.woff2':'font/woff2','.woff':'font/woff','.png':'image/png','.svg':'image/svg+xml','.jpg':'image/jpeg','.ttf':'font/ttf'};
+const types = {'.mp4':'video/mp4','.html':'text/html','.js':'text/javascript','.css':'text/css','.woff2':'font/woff2','.woff':'font/woff','.png':'image/png','.svg':'image/svg+xml','.jpg':'image/jpeg','.ttf':'font/ttf'};
 const company = target.company;
 const asset = (file,name) => {
   if(fs.existsSync(file))return file;
@@ -39,6 +44,7 @@ const asset = (file,name) => {
   return path.join(folder,'..','leads',slug,name);
 };
 const assets = {'/pics/site.png':asset(company.siteFile,'site.png'),'/pics/logo.svg':asset(company.logoFile,'logo.png'),'/pics/headlines.png':asset(target.headlinesFile,'headlines.png')};
+if(company.siteMotionFile)assets['/pics/hero.mp4']=company.siteMotionFile;
 for(const p of manifest.fixedImages||[])assets[p]=path.join(folder,'assets',path.basename(p));
 for(const file of Object.values(assets))if(!file||!fs.existsSync(file))throw new Error(`Missing image ${file}`);
 const server = http.createServer((req,res)=>{
@@ -74,17 +80,17 @@ const codeRows = target.change?.files.map((file)=>({...file,rows:file.hunks.flat
 function camera(t) {
   return cameraBox(manifest.camera,t);
 }
-let lastContent=null;
-let jordanPoint=null;
-const jordanCamera=manifest.camera.find(e=>e.focus==='jordan'||e.scale===1.35);
-const jordanEnd=jordanCamera&&manifest.camera.find(e=>e.t>jordanCamera.t)?.t;
-const jordanOriginal=jordanCamera&&pointerAt(frames,jordanCamera.t+1.2);
+let lastContent=null,lastTitleBounds=null;
+function checkHeading(title,actual,t){
+  const view=camera(actual);
+  if(title&&(title[0]<view[0]||title[2]>view[2]||title[1]<view[1]||title[3]>view[3]))throw new Error(`Company heading ${title.join(',')} is outside camera ${view.join(',')} at ${t}s`);
+}
+const anchors=[{t:0,delta:[0,0]}];
+const clickChecks=[];
+const basePointer=t=>smoothPointer(t=>pointerAt(frames,t),t);
 function scenePointer(t) {
-  const point=pointerAt(frames,t);
-  if(!point||!jordanPoint||!jordanCamera||!jordanOriginal)return point;
-  const smooth=u=>{u=Math.max(0,Math.min(1,u));return u*u*u*(10-15*u+6*u*u);};
-  const weight=smooth((t-jordanCamera.t)/.75)*(jordanEnd?1-smooth((t-jordanEnd)/.8):1);
-  return point.map((value,i)=>value+(jordanPoint[i]-jordanOriginal[i])*weight);
+  const point=basePointer(t);
+  return point?anchoredPointer(point,t,anchors):null;
 }
 let lastMouse=null,lastHover=null;
 async function hoverAt(pointer,box,force=false) {
@@ -102,14 +108,15 @@ async function hoverAt(pointer,box,force=false) {
   return lastHover;
 }
 
-async function draw(t) {
+async function draw(t,anchor=null) {
   const actual=recordingTime(manifest.beats,t);
   const frame = sceneAt(frames,actual);
   const html = frame.html.replace(/__OUTREACH_\d+__/g,(token)=>codeTokens.has(token)?'':token);
   const box = layerMode?[0,0,1440,810]:camera(actual);
   let pointer=scenePointer(actual);
   const content=replayKey(frame,html);
-  if(content===lastContent) {
+  if(content===lastContent&&!frame.site) {
+    checkHeading(lastTitleBounds,actual,t);
     if(layerMode){const previous=lastHover;await hoverAt(pointer,box);return previous===lastHover?null:page.screenshot({type:'png'});}
     await page.evaluate(({pointer,box})=>{
       if(pointer)document.getElementById('film-pointer').style.translate=`${pointer[0]}px ${pointer[1]}px`;
@@ -188,7 +195,24 @@ async function draw(t) {
     }
     await Promise.all([...document.images].map((im)=>im.decode().catch(()=>{})));
   },{html,scroll:frame.scroll,box,pointer,layerMode,sourceReply,targetReply,codeRows,codeStats:target.change});
+  let hit=null;
+  if(anchor){
+    await page.evaluate(injectDOM,{bindings:manifest.bindings,target:manifest.source,source:manifest.source});
+    hit=await page.evaluate(point=>{
+      document.body.style.transform='none';
+      const selector='button,a,textarea,[role="button"],.row,.td-line,.hm-row,.hm-mate';
+      const element=document.elementFromPoint(point[0]+8.9,point[1]+4)?.closest(selector);
+      if(!element)throw new Error(`Recorded click does not land on a control at ${point.join(',')}; hit ${document.elementFromPoint(point[0]+8.9,point[1]+4)?.outerHTML.slice(0,180)}`);
+      const r=element.getBoundingClientRect();
+      element.setAttribute('data-outreach-click','true');
+      return {u:(point[0]+8.9-r.left)/r.width,v:(point[1]+4-r.top)/r.height};
+    },anchor.point);
+  }
   await page.evaluate(injectDOM,{bindings:manifest.bindings,target,source:manifest.source});
+  const layout=await page.evaluate(repairReplayDOM,{company:company.name});
+  if(layout.violations.length)throw new Error(layout.violations.join('; '));
+  lastTitleBounds=layout.titleBounds;checkHeading(lastTitleBounds,actual,t);
+  if(frame.site&&company.siteMotionFile)await page.evaluate(setHeroFrame,{url:origin+'/pics/hero.mp4',time:t});
   await page.evaluate(({source,target})=>{
     const text=document.body.innerText.toLowerCase();
     for(const value of [source.company.name,source.company.domain]) {
@@ -196,15 +220,20 @@ async function draw(t) {
     }
     if(/__OUTREACH_\d+__/.test(document.body.innerText))throw new Error('Unresolved replay field remains visible');
   },{source:manifest.source,target});
-  const notePoint=await page.evaluate(({box})=>{
-    const note=[...document.querySelectorAll('.row .th-aside')].find(el=>el.textContent.startsWith('Jordan commented:'));
-    if(!note)return null;
-    const r=note.getBoundingClientRect(),parent=note.parentElement.getBoundingClientRect();
-    const left=Math.max(r.left,parent.left),right=Math.min(r.right,parent.right),factor=1440/(box[2]-box[0]);
-    if(right-left<20)throw new Error('Jordan comment does not fit in its row');
-    return [(left+right)/2/factor+box[0]-8.9,(r.top+r.height/2)/factor+box[1]-4];
-  },{box});
-  if(notePoint)jordanPoint=notePoint;
+  if(hit){
+    const destination=await page.evaluate(hit=>{
+      document.body.style.transform='none';
+      const element=document.querySelector('[data-outreach-click]');
+      if(!element)throw new Error('Replay click target disappeared');
+      const r=element.getBoundingClientRect();
+      const x=r.left+r.width*Math.max(.15,Math.min(.85,hit.u)),y=r.top+r.height*Math.max(.15,Math.min(.85,hit.v));
+      const landed=document.elementFromPoint(x,y);
+      if(!landed||!element.contains(landed))throw new Error('Personalised click target is clipped or covered');
+      return {point:[x-8.9,y-4],label:element.textContent?.trim().slice(0,160),bounds:[r.left,r.top,r.width,r.height]};
+    },hit);
+    anchors.push({t:anchor.t,delta:destination.point.map((value,i)=>value-basePointer(anchor.t)[i])});
+    clickChecks.push({time:anchor.t,...destination});
+  }
   pointer=scenePointer(actual);
   if(!layerMode&&pointer)await page.evaluate(point=>{document.getElementById('film-pointer').style.translate=`${point[0]}px ${point[1]}px`;},pointer);
   lastContent=content;
@@ -214,6 +243,21 @@ async function draw(t) {
 
 const atIndex=flags.indexOf('--at');
 try {
+  for(const event of manifest.events.filter(event=>event.kind==='click')){
+    let lo=0,hi=97.1;
+    for(let n=0;n<30;n++){const mid=(lo+hi)/2;if(recordingTime(manifest.beats,mid)<event.t-.08)lo=mid;else hi=mid;}
+    lastContent=null;
+    try {await draw(hi,{t:event.t,point:pointerAt(frames,event.t)});} catch(error){throw new Error(`Click at ${event.t}s: ${error.message}`);}
+  }
+  anchors.push({t:manifest.T1,delta:[0,0]});lastContent=null;
+  let previous=null,maxPointerStep=0;
+  for(let k=0;k<2913;k++){
+    const point=scenePointer(recordingTime(manifest.beats,k/30));
+    if(previous&&point)maxPointerStep=Math.max(maxPointerStep,Math.hypot(point[0]-previous[0],point[1]-previous[1]));
+    previous=point;
+  }
+  if(maxPointerStep>120)throw new Error(`Pointer moves ${maxPointerStep.toFixed(1)}px in one frame; review its trajectory`);
+  fs.writeFileSync(output+'.qa.json',JSON.stringify({company:company.name,clicks:clickChecks,maxPointerStep,hero:target.creative?.hero},null,2));
   if(atIndex>=0) {
     fs.writeFileSync(output,await draw(Number(flags[atIndex+1])));
   } else if(layerMode) {

@@ -26,7 +26,7 @@ try {
     const started=Date.now();
     const film=path.join(output,target.output),partial=film.replace(/\.mp4$/,'.partial.mp4');
     const screen=path.join(scratch,`${target.slug}.mp4`);
-    const review=path.join(output,'stills',target.slug);
+    const review=path.join(output,'stills',target.slug,path.basename(target.output,'.mp4'));
     try {
       if(fs.existsSync(film))throw new Error(`Output already exists: ${film}`);
       console.log(`START ${target.slug}`);
@@ -34,6 +34,7 @@ try {
       await run(python,[path.join(scripts,'outreach-overlay.py'),screen,sfx,face,masks,partial,'97.1']);
       await run(python,[path.join(scripts,'outreach-check.py'),partial,face,review]);
       fs.renameSync(partial,film);
+      fs.copyFileSync(screen+'.qa.json',film+'.qa.json');
       const report=JSON.parse(fs.readFileSync(path.join(review,'checks.json')));
       report.film=film;report.elapsed_seconds=(Date.now()-started)/1000;
       fs.writeFileSync(path.join(review,'checks.json'),JSON.stringify(report,null,2));
@@ -41,7 +42,7 @@ try {
     } catch(error){
       failed.push(target.slug);console.error(`FAILED ${target.slug}: ${error.message}`);
     } finally {
-      fs.rmSync(screen,{force:true});fs.rmSync(partial,{force:true});
+      fs.rmSync(screen,{force:true});fs.rmSync(screen+'.qa.json',{force:true});fs.rmSync(partial,{force:true});
     }
   }
 } finally {fs.rmSync(scratch,{recursive:true,force:true});}
