@@ -29,6 +29,8 @@
 // constants that a test can hold to, not string literals scattered through a
 // component.
 
+import { resetDay } from '../../shared/usage.mts';
+
 /**
  * As much of a project as either sentence needs. The practice mark is written
  *  by main/store.mts off `project.json` (PRACTICE_FLAG) rather than matched on
@@ -140,9 +142,10 @@ export function sentLine(p: {
     const at = p.limit.until > now
       ? new Date(p.limit.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).replace(/\s/g, '').toLowerCase()
       : null;
+    const day = at ? resetDay(p.limit.until, now) : null;
     // Short, because the card holds about thirty characters on this line and
     // the reason is the half that must survive; its title names the task.
-    return `${at ? `${p.limit.tool} is out until ${at}` : `${p.limit.tool} is out of usage`} · Z to undo`;
+    return `${at ? `${p.limit.tool} is out until ${at}${day ? ` ${day}` : ''}` : `${p.limit.tool} is out of usage`} · Z to undo`;
   }
   const where = p.when ? `Scheduled in ${p.to}` : `Started in ${p.to}`;
   return `${p.when ? `${where} · ${p.when}` : where} · Z to undo`;

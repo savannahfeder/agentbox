@@ -138,6 +138,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   updateMove: 'zero:update-move',
   notify: 'zero:notify',
   notifyTest: 'zero:notify-test',
+  notifySettings: 'zero:notify-settings',
   onboardingArm: 'zero:onboarding-arm',
   stopSession: 'zero:stop-session',
   runNow: 'zero:run-now',
@@ -199,6 +200,8 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   stageAttachmentPart: 'zero:stage-attachment-part',
   crash: 'zero:crash',
   blankCheck: 'zero:blank-check',
+  // The appearance the desktop window's glass is drawn in; a tab has no glass.
+  glassTone: 'zero:glass-tone',
   track: 'zero:track',
   sessionTrace: 'zero:session-trace',
   itemHistory: 'zero:item-history',

@@ -414,6 +414,18 @@ export function limitInResultLine(line: string, now: number = Date.now()) {
   return limitResetMoment(text, now) ?? now + LIMIT_REST_MS;
 }
 
+// A Codex turn that failed because the cloud's sign-in was refused, off one
+// relayed app-server frame. The cloud only checks a Codex sign-in's expiry, so
+// this is how a refused one is found out.
+export function codexLoginRefusedInLine(line: string) {
+  let msg: { method?: string; params?: { turn?: { status?: string; error?: { message?: unknown } } } } | null;
+  try { msg = JSON.parse(line); } catch { return false; }
+  if (msg?.method !== 'turn/completed' && msg?.method !== 'turn/failed') return false;
+  const turn = msg.params?.turn;
+  if (!turn || (turn.status ?? 'failed') !== 'failed') return false;
+  return troubleCause(String(turn.error?.message ?? '')) === 'signed-out';
+}
+
 export const IMPORT_FAILED = 75;
 // Said when the image turns down a run with no repository; the supervisor
 // does not count it as the cloud failing (`_noteCloudOutcome`).
@@ -1652,6 +1664,18 @@ export async function cloudRun({
       if (until) { try { onLimit({ until }); } catch { /* noted elsewhere */ } }
     }
   }
+  let codexLine = '';
+  const codexDecoder = new StringDecoder('utf8');
+  function noteCodexRefusal(buf: Buffer) {
+    codexLine += codexDecoder.write(buf);
+    let i;
+    while ((i = codexLine.indexOf('\n')) >= 0) {
+      const line = codexLine.slice(0, i);
+      codexLine = codexLine.slice(i + 1);
+      if (!line.includes('"turn/')) continue;
+      if (codexLoginRefusedInLine(line)) loginTrouble = { state: 'refused', id: login?.id ?? null };
+    }
+  }
   async function sayWhatWasLost() {
     const lost = helpers.lost();
     if (lost.length) await write(stdout, helpersLostLine(lost));
@@ -1672,6 +1696,7 @@ export async function cloudRun({
     if (e.kind === 'stdout') {
       const buf = Buffer.from(e.data, 'base64');
       if (!codex) noteLimit(buf);
+      if (codex) noteCodexRefusal(buf);
       await write(stdout, buf);
     }
     else if (e.kind === 'stderr') { if (!joining) await write(stderr, Buffer.from(e.data, 'base64')); }

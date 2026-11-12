@@ -70,7 +70,7 @@ describe('2. the card opens with the practice thread already written in it', () 
   it('hands the card its words on the beat that opens it, not one beat later', () => {
     // The card reads `initial` once, when it mounts, and it mounts on `make`.
     expect(app).toMatch(/const walkCard = run\?\.step === 'make' \|\| run\?\.step === 'task';/);
-    expect(app).toMatch(/initial=\{walkCard \? \{ body: `\$\{TASK_TITLE\}\\n\\n\$\{TASK_BODY\}` \} : composeInitial\}/);
+    expect(app).toMatch(/initial=\{walkCard \? \{ body: `\$\{TASK_TITLE\}\\n\\n\$\{TASK_BODY\}` \} : /);
   });
 });
 

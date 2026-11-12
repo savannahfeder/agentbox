@@ -146,7 +146,7 @@ contextBridge.exposeInMainWorld('zero', {
   firstRunAnswer: (payload) => ipcRenderer.invoke('zero:first-run-answer', payload),
   firstRunExamples: (payload) => ipcRenderer.invoke('zero:first-run-examples', payload),
   // The practice project: made with its three rows, archived when the walk ends.
-  firstRunPractice: () => ipcRenderer.invoke('zero:first-run-practice'),
+  firstRunPractice: (opts) => ipcRenderer.invoke('zero:first-run-practice', opts),
   firstRunPracticeEnd: () => ipcRenderer.invoke('zero:first-run-practice-end'),
   firstRunWalking: (payload) => ipcRenderer.invoke('zero:first-run-walking', payload),
   // A second Agentbox, in a throwaway home, as somebody who has never opened it.
@@ -180,6 +180,8 @@ contextBridge.exposeInMainWorld('zero', {
   cornerTag: (state) => ipcRenderer.invoke('zero:corner-tag', state),
   // Whether this page came up from ⌘R, and which build it is running.
   bootInfo: () => ipcRenderer.invoke('zero:boot-info'),
+  // Which appearance the window's glass is drawn in (main/window-glass.mts).
+  glassTone: (payload) => ipcRenderer.invoke('zero:glass-tone', payload),
   // KEEPING AGENTBOX CURRENT (main/updater.mts). The state of it rides the
   // snapshot, so these two are only the verbs: look again now, and restart onto
   // the version that has already downloaded. Nothing here can start a download,
@@ -192,6 +194,7 @@ contextBridge.exposeInMainWorld('zero', {
   // not decide (main/notify.mts).
   notify: (arrivals, needsYou) => ipcRenderer.invoke('zero:notify', { arrivals, needsYou }),
   notifyTest: () => ipcRenderer.invoke('zero:notify-test'),
+  notifySettings: () => ipcRenderer.invoke('zero:notify-settings'),
   stopSession: (payload) => ipcRenderer.invoke('zero:stop-session', payload),
   runNow: (payload) => ipcRenderer.invoke('zero:run-now', payload),
   reopen: (payload) => ipcRenderer.invoke('zero:reopen', payload),

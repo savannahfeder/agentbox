@@ -27,7 +27,9 @@ describe('a test copy\'s Multiplayer switch', () => {
   });
 
   it('is on for a copy signed in to a team, which needs it to see its room', () => {
-    const onTeam = unpackaged(copyConfig({ storeRoot: '/s', teamFile: '/t.json' }));
-    expect(onTeam).toMatchObject({ multiplayer: true, rooms: true });
+    const config = copyConfig({ storeRoot: '/s', teamFile: '/t.json' });
+    // Rooms comes from being on the team, not from a switch the harness writes.
+    expect(alphaFeatures(config, { packaged: false, onTeam: true })).toMatchObject({ multiplayer: true, rooms: true });
+    expect(unpackaged(config).rooms).toBe(false);
   });
 });

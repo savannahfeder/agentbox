@@ -742,7 +742,8 @@ export function ThreadCells({ item, product, now, person, tab }: {
   const nameFirst = (id: string) => firstName(team?.byId.get(id) ?? null);
   const inNeedsYou = tab === 'inbox';
   // A teammate's words, or comments on its links, hold it in Needs you whatever the thread itself says.
-  const peopleWaitOnYou = inNeedsYou && !cell.live && (!!item.linkComments?.length || (!!team && (!!item.waitingComments?.length || fileNewsFor(item, team.me, { myName: team.byId.get(team.me ?? '')?.name ?? null }).length > 0 || closedOverWords(item, product, team.me))));
+  // On a closed thread a teammate's comment is only news to read, so it keeps its Done.
+  const peopleWaitOnYou = inNeedsYou && !cell.live && (!!item.linkComments?.length || (!!team && ((item.status !== 'done' && !!item.waitingComments?.length) || fileNewsFor(item, team.me, { myName: team.byId.get(team.me ?? '')?.name ?? null }).length > 0 || closedOverWords(item, product, team.me))));
   const worded = waits && !cell.live ? { ...cell, word: waits.word, title: waits.title }
     : peopleWaitOnYou ? { ...cell, word: 'Waiting on you', mark: 'need' as const }
       : team && (cell.word === STATE_WORD.waiting || iSpokeLast(item, product, team.me)) ? { ...cell, word: waitingWord(item, product, team.me, nameFirst, { inNeedsYou: tab === 'inbox' }) } : cell;

@@ -1248,6 +1248,7 @@ export class Store {
       name: PRACTICE_NAME,
       createdAt: new Date().toISOString(),
       [PRACTICE_FLAG]: true,
+      seenBy: 'private',
     }, null, 2));
     // AND THE SIDEBAR NOTE IS WRITTEN WITH IT.
     //

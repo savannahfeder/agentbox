@@ -53,20 +53,21 @@ export type ThreadMenuRowId = 'share' | 'run' | 'code' | 'terminal' | 'people' |
 /**
  * WHERE THIS THREAD RUNS: in the cloud now (`cloud`), free to go there
  * (`here`), kept on this Mac by her (`kept`) or by the cloud handing it back
- * (`needs`), or running here where the cloud could take it now (`move`). The
- * top bar's PlaceButton draws it; ⌘K offers PLACE_ROW's words.
+ * (`needs`), running here where the cloud could take it now (`move`), or here
+ * because the whole cloud is off (`off`). The top bar's PlaceButton draws it;
+ * ⌘K offers PLACE_ROW's words, and for `off` its own Turn the cloud on row.
  */
-export type ThreadPlace = 'cloud' | 'here' | 'kept' | 'move' | 'needs';
-export const PLACE_ROW: Record<ThreadPlace, { label: string; detail: string }> = {
+export type ThreadPlace = 'cloud' | 'here' | 'kept' | 'move' | 'needs' | 'off';
+export const PLACE_ROW: Record<Exclude<ThreadPlace, 'off'>, { label: string; detail: string }> = {
   cloud: { label: 'Run on this Mac', detail: 'In the cloud now' },
   here: { label: 'Keep on this Mac', detail: 'Cloud allowed' },
   kept: { label: 'Run on the cloud', detail: 'This Mac only' },
   move: { label: 'Move to the cloud', detail: 'On this Mac now' },
   needs: { label: 'Run on the cloud', detail: 'Needs this Mac' },
 };
-/** What picking does: keep it on this Mac (true), let the cloud have it (false), or move its run now. */
-export type PlaceAct = boolean | 'move';
-export const placeAct = (place: ThreadPlace): PlaceAct => (place === 'move' ? 'move' : place !== 'kept' && place !== 'needs');
+/** What picking does: keep it on this Mac (true), let the cloud have it (false), move its run now, or turn the whole cloud on. */
+export type PlaceAct = boolean | 'move' | 'cloud-on';
+export const placeAct = (place: Exclude<ThreadPlace, 'off'>): PlaceAct => (place === 'move' ? 'move' : place !== 'kept' && place !== 'needs');
 export interface ThreadMenuRow { id: ThreadMenuRowId; label: string; key: string | null; detail?: string }
 
 /**

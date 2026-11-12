@@ -4091,6 +4091,14 @@ img.product-mark { object-fit: cover; opacity: 1; }
 }
 .palette-confirm { padding: 18px; font-size: 14px; line-height: 1.55; position: relative; }
 
+/* Turn the cloud off? (components/CloudOffAsk.tsx), in ⌘K's box and place. */
+.modal.cloud-off-ask { width: 400px; padding: 18px 18px 16px; }
+.cloud-off-ask-head { font-size: 15px; color: var(--text); margin-bottom: 6px; }
+.cloud-off-ask-line { font-size: 13.5px; color: var(--text-dim); line-height: 1.5; }
+.cloud-off-ask-acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.cloud-off-ask-acts .ts-done { height: 28px; padding: 0 8px 0 12px; gap: 8px; }
+.cloud-off-ask-acts .cloud-off-ask-go { color: var(--text); border-color: var(--line-strong); }
+
 /* ⌘K in the website's look (w-391bc4efbe): magnifier and Esc on the input, a
    mark per row, the keys in a footer. Scoped to `.palette-k` because the Later
    box and Find a group reuse the rows above, and the selected row stays the
@@ -9218,6 +9226,9 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
    plain white slab on the light theme. The `:root[data-skin] .modal.compose`
    block says the rest.
 */
+/* A dialog of its own, not a list dropping from the top like the command bar. */
+.modal-backdrop.fp-backdrop { place-items: center; padding-top: 0; }
+
 .fp-card {
   width: min(560px, 92vw);
   display: flex;
@@ -9446,7 +9457,7 @@ button.msg-kind:hover { color: var(--text); border-color: var(--text-faint); }
 .msg.yours:has(> .msg-head > .msg-kind) .msg-body { font-size: 15px; line-height: 1.6; font-weight: 400; }
 
 /* A thread a teammate gave you, above its title (team/HandedBy.tsx). */
-.handed-line { display: flex; align-items: center; gap: 9px; min-width: 0; margin: 4px 0 18px; padding: 10px 14px; background: var(--bg-raised); border: 1px solid var(--line); font-size: 14px; color: var(--text-dim); }
+.handed-line { display: flex; align-items: center; gap: 9px; min-width: 0; margin: 4px 0 18px; padding: 10px 14px; background: var(--bg-raised); border: 1px solid var(--line); border-radius: 10px; font-size: 14px; color: var(--text-dim); }
 .handed-line b { font-weight: 500; color: var(--text); }
 .handed-who { flex: 0 0 auto; white-space: nowrap; }
 .handed-when { color: var(--text-faint); margin-left: 4px; }

@@ -18,6 +18,7 @@ import type { Person } from '../types';
 import { projectSeenBy } from '../../../shared/thread-cards.mts';
 import { isRepeatRule, ruleLabel, type RepeatShape } from '../../../shared/repeats.mts';
 import { clockWords, dayDeadline } from '../../../shared/team-tasks.mts';
+import { threadOfLink } from '../../../shared/thread-link.mts';
 
 export type Harness = 'claude' | 'codex';
 
@@ -365,9 +366,11 @@ export function projectOnScreen({ filter, open }: { filter: string | null; open:
  */
 export function cardProject<T extends ProjectLike>(
   offered: readonly T[],
-  { picked, defaultProduct, remembered }: { picked: string | null; defaultProduct?: string | null; remembered?: string | null },
+  { picked, defaultProduct, remembered, mustChoose = false }: { picked: string | null; defaultProduct?: string | null; remembered?: string | null; mustChoose?: boolean },
 ): T | null {
-  return offered.find((p) => p.slug === picked) ?? startingProject(offered, { defaultProduct, remembered });
+  const hit = offered.find((p) => p.slug === picked);
+  if (hit || mustChoose) return hit ?? null;
+  return startingProject(offered, { defaultProduct, remembered });
 }
 
 // Projects carry no colour of their own yet, so the swatch is read off the slug:
@@ -712,23 +715,58 @@ export function handOffStart({ product, id, message, nameOf, dir }: {
   };
 }
 
+type NamedProject = ProjectLike & { name: string };
+const ESCAPED = /[.*+?^${}()|[\]\\]/g;
+
+/**
+ * The project a handed-on task runs in: the one the thread it came from is in,
+ * else the one its words name, else none, so the card asks. Only one of yours.
+ */
+export function handOffProject({ words, cards, offered }: {
+  words: string;
+  cards: readonly { personId: string; threadId: string; project: string | null }[];
+  offered: readonly NamedProject[];
+}): string | null {
+  const mine = offered.filter((p) => !p.practice && !isDirect(p) && p.name.trim());
+  const called = (name: string) => {
+    const hits = mine.filter((p) => p.name.trim().toLowerCase() === name.trim().toLowerCase());
+    return (hits.find((p) => p.team) ?? hits[0])?.slug ?? null;
+  };
+  for (const m of words.matchAll(/https:\/\/[^\s)]+/g)) {
+    const link = threadOfLink(m[0]);
+    const card = link ? cards.find((c) => c.personId === link.owner && c.threadId === link.id) : null;
+    if (!card?.project) continue;
+    // Handed from a thread in a project you do not have: the work is about that project, so ask.
+    return called(card.project);
+  }
+  const plain = words.replace(/\]\([^)]*\)/g, ']');
+  const said = new Set(mine.filter((p) => new RegExp(`(?<![\\w])${p.name.trim().replace(ESCAPED, '\\$&')}(?![\\w])`, 'i').test(plain)).map((p) => p.name.trim().toLowerCase()));
+  return said.size === 1 ? called([...said][0]) : null;
+}
+
+/** The project a hand-off opens on, or the card asks for one. */
+const projectOrAsk = (slug: string | null) => (slug ? { product: slug } : { chooseProject: true as const });
+
 /** The same for a task, whose files come from its brief because a new thread cannot read the record. */
-export function taskHandOff({ from, brief, message, nameOf, handFrom }: {
+export function taskHandOff({ from, brief, message, nameOf, handFrom, offered = [], cards = [] }: {
   from: string | null | undefined;
-  brief: { body: string; files: { name: string; srcPath: string }[] };
+  brief: { title?: string; body: string; files: { name: string; srcPath: string }[] };
   message: { text?: string; by?: string | null } | null;
   nameOf: (person: string) => string | null | undefined;
   /** The task, so the task can say which agent has it. */
   handFrom?: HandFrom;
+  offered?: readonly NamedProject[];
+  cards?: readonly { personId: string; threadId: string; project: string | null }[];
 }) {
   const attachments = brief.files.map((f) => ({ ...f, image: /\.(png|jpe?g|gif|webp)$/i.test(f.name) }));
   const pressed = (message?.text ?? '').replace(FILE_LINK, '').trim();
   const from_ = handFrom ? { handFrom } : {};
+  const where = projectOrAsk(handOffProject({ words: `${brief.title ?? ''}\n${brief.body}\n${pressed}`, cards, offered }));
   if (pressed && pressed !== brief.body.trim()) {
     const who = message?.by ? nameOf(message.by) : null;
-    return { to: 'agent', body: `${who ? `${who} wrote: ` : ''}${pressed}\n\n`, attachments, ...from_ };
+    return { to: 'agent', body: `${who ? `${who} wrote: ` : ''}${pressed}\n\n`, attachments, ...from_, ...where };
   }
-  return { to: 'agent', body: from ? `${from} asked:\n\n${brief.body}\n\n` : `${brief.body}\n\n`, attachments, ...from_ };
+  return { to: 'agent', body: from ? `${from} asked:\n\n${brief.body}\n\n` : `${brief.body}\n\n`, attachments, ...from_, ...where };
 }
 
 export const handedFromLabel = (product: string, id: string) => `handed-from:${product}:${id}`;

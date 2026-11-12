@@ -225,10 +225,12 @@ describe('answering the agent', () => {
   it('then points at closing it', () => {
     expect(tourStep(after('open', 'reply'), at({ thread: true }))).toBe('close');
   });
-  it('counts the reply lesson as done once the reply box has the keyboard', async () => {
+  // Since 2026-11-10 the reply lesson is learned when a reply is sent, not when
+  // the box takes the keyboard (write-back-ticks-when-the-reply-is-sent).
+  it('does not count the reply lesson as done just because the reply box has the keyboard', async () => {
     const fs = await import('node:fs');
     const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
-    expect(tour).toContain("if (screen.typing && !tour.done.includes('reply'))");
+    expect(tour).not.toContain("if (screen.typing && !tour.done.includes('reply'))");
   });
 });
 
@@ -316,7 +318,8 @@ describe('a tip is learned by pressing its key', () => {
     expect(keyLearns('start', { key: 'n' })).toBe(true);
     expect(keyLearns('open', { key: 'Enter' })).toBe(true);
     expect(keyLearns('choose', { key: '2' })).toBe(true);
-    expect(keyLearns('reply', { key: 'r' })).toBe(true);
+    // R opens the box; the reply lesson is learned on sending (write-back-ticks-when-the-reply-is-sent).
+    expect(keyLearns('reply', { key: 'r' })).toBe(false);
   });
   it('and not another key, or the same key with a modifier', async () => {
     const { keyLearns } = await import('../renderer/src/tour.ts');

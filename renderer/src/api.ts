@@ -1051,11 +1051,11 @@ export const api = {
     return (await window.zero?.filesPlaceOpen?.(p).catch(() => null)) ?? null;
   },
   /** Each file a thread names, as its version line numbers it. */
-  async fileLine(p: { product: string; id: string }): Promise<FileLine[]> {
+  async fileLine(p: { product: string; id: string; room?: string }): Promise<FileLine[]> {
     return (await window.zero?.fileLine?.(p).catch(() => null)) ?? [];
   },
   /** One answer per copy, in the order asked. */
-  async fileElsewhere(p: { product: string; id: string; copies: { path: string; file: string }[] }): Promise<FileElsewhere[]> {
+  async fileElsewhere(p: { product: string; id: string; room?: string; copies: { path: string; file: string }[] }): Promise<FileElsewhere[]> {
     const got = await window.zero?.fileElsewhere?.(p).catch(() => null);
     return Array.isArray(got) ? got : p.copies.map(() => ({ key: null, notes: [], approvals: [] }));
   },
@@ -1115,8 +1115,8 @@ export const api = {
     await window.zero.setThreadPins({ pins });
   },
 
-  /** Keep a thread on this Mac whatever the cloud is set to, or let it go again. */
-  async setThreadOnMac(onMac: Record<string, true | null>): Promise<void> {
+  /** Keep a thread on this Mac (true), send it to the cloud (false), or leave it to the cloud setting (null). */
+  async setThreadOnMac(onMac: Record<string, boolean | null>): Promise<void> {
     if (useFixtures || !window.zero?.setThreadOnMac) return;
     await window.zero.setThreadOnMac({ onMac });
   },
@@ -1202,11 +1202,11 @@ export const api = {
   // process behind them, and a build old enough not to have the handler is the
   // ordinary case for anybody who opens a stale window: both give null, and the
   // walk carries on in the project they made rather than stopping.
-  async firstRunPractice(): Promise<{ slug: string; examples: string[]; backdrop?: string[] } | null> {
+  async firstRunPractice(opts?: { bare?: boolean }): Promise<{ slug: string; examples: string[]; backdrop?: string[] } | null> {
     if (useFixtures) return null;
     const zero = window.zero;
     if (!zero?.firstRunPractice) return null;
-    return zero.firstRunPractice();
+    return opts ? zero.firstRunPractice(opts) : zero.firstRunPractice();
   },
 
   // AND OFF THE SCREEN AGAIN AT THE END. Archived, never deleted: everything

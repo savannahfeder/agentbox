@@ -7,6 +7,7 @@
 
 import { liveLine, type LiveFacts } from './live-line';
 import { saysARunGotNowhere } from '../../shared/spawn-trouble.mts';
+import { FIRST_RUN_LABEL } from './onboarding';
 import type { WorkItem } from './types';
 
 // Queued, Up next and Shipping come on their own. Signed out waits for a
@@ -15,7 +16,7 @@ import type { WorkItem } from './types';
 const STUCK = new Set(['idle', 'silent', 'limit']);
 
 export function offersTryAgain(item: WorkItem, facts: LiveFacts & { practice?: boolean } = {}): boolean {
-  if (item.agent || item.status === 'done' || facts.session || facts.practice) return false;
+  if (item.agent || item.status === 'done' || facts.session || facts.practice || (item.labels ?? []).includes(FIRST_RUN_LABEL)) return false;
   // Without the fleet this window knows nothing about what is coming.
   if (!Array.isArray(facts.queued)) return false;
   if (facts.asking || facts.shipping || facts.remoteHeld) return false;
