@@ -24,6 +24,9 @@ it.skipIf(!chromium)('measures the final reply, preserves company context and fo
     const again=await page.evaluate(repairReplayDOM,{company:'ExampleCo'});
     assert.equal((await page.locator('.one-title').textContent())?.split('ExampleCo').length,2);
     assert.notDeepEqual(again.caret,result.caret);
+    await page.locator('.tc-chip-name').evaluate(el=>{el.textContent='Workflows';});
+    await page.evaluate(repairReplayDOM,{company:'ExampleCo'});
+    assert(await page.locator('[data-tour="project"]').evaluate(el=>Math.abs(el.getBoundingClientRect().width-el.querySelector('button')!.getBoundingClientRect().width)<2));
     await page.locator('.one-title').evaluate(el=>{
       el.textContent='ExampleCo · Check reminder timing after appointment moves';
       Object.assign(el.style,{font:'27px Arial',width:'760px',marginLeft:'278px'});
