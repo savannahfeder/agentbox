@@ -12,7 +12,7 @@
 // A clean folder elsewhere gives the branch up (detached at the same commit,
 // every file left where it is) and the task gets its folder on that branch.
 // A folder elsewhere with uncommitted work, a locked one, or the main checkout
-// itself is never touched, and the refusal says which folder and what to do.
+// itself is never touched, and the refusal is git's, naming that folder.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -78,7 +78,7 @@ describe('a task whose branch is open in another folder', () => {
     fs.writeFileSync(path.join(elsewhere, 'work.txt'), 'half done\n');
 
     expect(() => ensureTaskFolder(dir, id, { dependencies: false }))
-      .toThrow(new RegExp(`already checked out at '${elsewhere}'.*not committed`, 's'));
+      .toThrow(`already checked out at '${elsewhere}'`);
     expect(branchAt(elsewhere)).toBe(taskBranch(id));
     expect(fs.readFileSync(path.join(elsewhere, 'work.txt'), 'utf8')).toBe('half done\n');
     expect(fs.existsSync(taskFolderPath(dir, id))).toBe(false);
@@ -87,14 +87,14 @@ describe('a task whose branch is open in another folder', () => {
   it('counts a new file nobody has added as uncommitted work', () => {
     fs.writeFileSync(path.join(elsewhere, 'notes.md'), 'draft\n');
 
-    expect(() => ensureTaskFolder(dir, id, { dependencies: false })).toThrow(/not committed/);
+    expect(() => ensureTaskFolder(dir, id, { dependencies: false })).toThrow(/already checked out at/);
     expect(branchAt(elsewhere)).toBe(taskBranch(id));
   }, 30_000);
 
   it('leaves a folder somebody locked alone', () => {
     git(dir, 'worktree', 'lock', '--reason', 'mine', elsewhere);
 
-    expect(() => ensureTaskFolder(dir, id, { dependencies: false })).toThrow(/locked/);
+    expect(() => ensureTaskFolder(dir, id, { dependencies: false })).toThrow(/already checked out at/);
     expect(branchAt(elsewhere)).toBe(taskBranch(id));
   }, 30_000);
 
