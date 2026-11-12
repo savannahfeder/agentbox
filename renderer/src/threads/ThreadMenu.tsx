@@ -45,7 +45,7 @@ import { PriorityIcon } from '../components/Priority';
 import { PRIORITIES, priorityLabelOf, type PriorityId } from '../priority';
 import { Face } from '../team/people';
 import type { Person } from '../types';
-import { ChooseList, CopiedSheet, SeeList, SendSheet, ShareList } from './SharePanel';
+import { ChooseList, CopiedSheet, GiveSheet, SeeList, SendSheet, ShareList } from './SharePanel';
 import { sendFirst, type SeenBy } from './share-rules';
 
 export type ThreadMenuRowId = 'share' | 'run' | 'code' | 'terminal' | 'people' | 'later' | 'priority' | 'pin' | 'rename' | 'move' | 'give' | 'wait' | 'shipped' | 'close-task' | 'done';
@@ -268,7 +268,8 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
   onWait?: (id: string | null) => void;
   /** Who it can be handed on to; the row is only there when somebody is. */
   giveTo?: readonly { id: string; name: string }[];
-  onGive?: (to: { id: string; name: string }) => void;
+  /** `note`: what the giver wants from a person; empty for an AI teammate. */
+  onGive?: (to: { id: string; name: string }, note: string) => void;
   /** Opens the name box, on a conversation, whose bar has no name to press. */
   onRename?: (() => void) | null;
   /** The change figures, or null when this run changed no code. */
@@ -311,6 +312,7 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
   const { done, menu: rows } = splitDone(threadMenuRows({ change: !!change && !codeButton, share: !!share, people: !!addPeople && !!onAddPeople, terminal, finish: !!onFinish, runNow: !!onRunNow, later: onLater ? (onPhone() ? true : 'key') : false, priority: onPriority ? priority : null, rename: !!onRename, move: !!onMove, pin: pinned === null || !onPin ? null : pinned ? 'pinned' : 'unpinned', give: giveTo.length > 0 && !!onGive && !!onFinish, wait: waitChoices.length > 0 && !!onWait && !!onFinish ? (blocks ? 'blocked' : true) : false, shipped: shipped === null || !onShipped ? null : shipped ? 'marked' : 'unmarked', closeTask: !!onCloseTask }));
   const [open, setOpen] = useState(false);
   const [giving, setGiving] = useState(false);
+  const [givingTo, setGivingTo] = useState<{ id: string; name: string } | null>(null);
   const [waiting, setWaiting] = useState(false);
   const [adding, setAdding] = useState(false);
   const [leveling, setLeveling] = useState(false);
@@ -321,6 +323,7 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
   const close = useCallback((refocus: boolean) => {
     setOpen(false);
     setGiving(false);
+    setGivingTo(null);
     setWaiting(false);
     setAdding(false);
     setLeveling(false);
@@ -498,10 +501,12 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
       {open && share && sharing === 'see' && <SeeList seen={share.seen} teamName={share.teamName}
         onPick={(to) => { if (to === 'people') { setSharing('choose'); return; } close(false); if (to !== share.seen) onSee?.(to); }} />}
       {open && share && sharing === 'choose' && <ChooseList people={share.people} chosen={share.seen === 'people' ? share.chosen ?? [] : []} onPick={(id) => onChoose?.(id)} />}
-      {open && !waiting && !adding && !leveling && !sharing && (giving
+      {open && !waiting && !adding && !leveling && !sharing && (giving && givingTo
+        ? <GiveSheet to={givingTo} onGive={(note) => { close(false); onGive?.(givingTo, note); }} />
+        : giving
         ? <div className="th-menu ts-more-menu" role="menu" aria-label="Give it to">
           <p className="ts-menu-say">A person gets it as a task in their Needs you. An AI teammate starts on it.</p>
-          {giveTo.map((p) => <button key={p.id} type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" onClick={() => { close(false); onGive?.(p); }}>
+          {giveTo.map((p) => <button key={p.id} type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" onClick={() => { if (p.id.startsWith('mate:')) { close(false); onGive?.(p, ''); } else setGivingTo(p); }}>
             <span className="ico"><GiveMark /></span>
             <span className="ts-more-label">{p.name}</span>
           </button>)}

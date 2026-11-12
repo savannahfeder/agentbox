@@ -1133,9 +1133,9 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   ipcMain.handle('zero:team-give-task', teamCall(({ to, title, body, priority, due, files, visibility, visibleTo, blockedBy }: { to: string; title?: string; body?: string; priority?: number; due?: unknown; files?: AttachmentFile[]; visibility?: string; visibleTo?: string[]; blockedBy?: unknown }) => team!.giveTask(to, { title, body, priority, due, files, visibility, visibleTo, blockedBy })));
   // Only a thread nothing is running on: closing one with an agent on it would
   // leave that agent writing into a thread its owner has given away.
-  ipcMain.handle('zero:team-hand-on', teamCall(async ({ product, id, to }: { product: string; id: string; to: string }) => {
+  ipcMain.handle('zero:team-hand-on', teamCall(async ({ product, id, to, note }: { product: string; id: string; to: string; note?: string }) => {
     if (supervisor.status().running?.some((r) => r.itemId === id)) throw new Error('An agent is still on this thread. Stop it, then give it.');
-    const made = await team!.handOn({ product, id, to });
+    const made = await team!.handOn({ product, id, to, note });
     supervisor.setThreadPins({ [id]: null });
     return made;
   }));

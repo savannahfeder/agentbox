@@ -1793,7 +1793,7 @@ declare global {
       teamMoveToThread(p: { product: string; id: string; on: string }): Promise<TeamCallResult>;
       teamGiveTask(p: { to: string; title?: string; body: string; priority?: number; due?: string; files?: TeamMessageFile[]; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; blockedBy?: string[] }): Promise<TeamCallResult>;
       teamMessageMate(p: { owner: string; mate: string; text: string }): Promise<TeamCallResult>;
-      teamHandOn(p: { product: string; id: string; to: string }): Promise<TeamCallResult>;
+      teamHandOn(p: { product: string; id: string; to: string; note?: string }): Promise<TeamCallResult>;
       teamTaskBrief(p: { product: string; id: string }): Promise<{ title: string; body: string; files: { name: string; srcPath: string }[] }>;
       rooms?(p: { op: string; args?: unknown[] }): Promise<RoomsResult>;
       teammates?(p: { op: string; args?: unknown }): Promise<TeammatesResult>;

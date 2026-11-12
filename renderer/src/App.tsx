@@ -7523,13 +7523,13 @@ export default function App() {
     const mates = teammatesUi.list.filter((t) => !t.paused && t.status !== 'draft' && item.routed?.to !== `mate:${t.id}`);
     return [...people, ...mates.map((t) => ({ id: `mate:${t.id}`, name: t.name }))];
   };
-  const giveThread = async (item: WorkItem, to: GiveTo) => {
+  const giveThread = async (item: WorkItem, to: GiveTo, note = '') => {
     if (to.id.startsWith('mate:')) {
       await api.routeThread({ product: item.product, id: item.id, to: to.id }).then(() => showToast(`Given to ${to.name}`), (err) => showToast(String(err?.message ?? err)));
       return;
     }
     showToast(sendingTo(to.name.split(/\s+/)[0] || to.name));
-    const out = await api.teamHandOn({ product: item.product, id: item.id, to: to.id });
+    const out = await api.teamHandOn({ product: item.product, id: item.id, to: to.id, ...(note.trim() ? { note: note.trim() } : {}) });
     showToast(out.ok ? handedToWhom(to.name) : out.error ?? 'That did not work.', out.made ? { product: out.made.product, id: out.made.id } : undefined);
     if (out.ok) await refresh();
   };
@@ -8359,7 +8359,7 @@ export default function App() {
                   // its page.
                   onHandToAgent={handToAgent}
                   giveTo={giveToFor(focused)}
-                  onGive={(to) => { void giveThread(focused, to); }}
+                  onGive={(to, note) => { void giveThread(focused, to, note); }}
                   shippedMark={shippedFor(focused)}
                   onShipped={(on) => { void markShipped(focused, on); }}
                   waitChoices={waitsFor(focused)}

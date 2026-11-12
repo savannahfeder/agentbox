@@ -1076,7 +1076,7 @@ export const api = {
   async teamSeen(p: { product: string; id: string }): Promise<boolean> { try { return !!(await window.zero?.teamSeen?.(p)); } catch { return false; } },
   async teamMoveToThread(p: { product: string; id: string; on: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMoveToThread(p)); },
   async teamMessageMate(p: { owner: string; mate: string; text: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMessageMate(p)); },
-  async teamHandOn(p: { product: string; id: string; to: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamHandOn(p)); },
+  async teamHandOn(p: { product: string; id: string; to: string; note?: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamHandOn(p)); },
   async teamTaskBrief(p: { product: string; id: string }) { return window.zero!.teamTaskBrief(p); },
   async teamContinueBrief(p: { personId: string; threadId: string }) { return window.zero!.teamContinueBrief(p); },
   async teamContinued(p: { personId: string; threadId: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamContinued(p)); },
