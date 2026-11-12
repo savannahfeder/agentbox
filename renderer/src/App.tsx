@@ -78,7 +78,7 @@ import { CloudOffAsk } from './components/CloudOffAsk';
 import { Standing, STANDING } from './components/Standing';
 import { Settings } from './components/Settings';
 import { Snooze } from './components/Snooze';
-import { LATER_KEYWORDS, REOPEN_KEYWORDS } from './palette-rows';
+import { LATER_KEYWORDS, LATER_OLD_NAMES, REOPEN_KEYWORDS } from './palette-rows';
 /* The line, the toast and the dot on the cog were the other three drawn for that round and
  are gone; their copy is in decisions.md and their photographs on
  `astral/w-86452550e5-looks`.
@@ -9008,7 +9008,7 @@ export default function App() {
               ...(view !== 'snoozed'
                 ? [{ id: 'done', label: `${DONE.verb} (${n} selected)`, keyHint: 'E', run: () => { setModal(null); batchDone(multiSel); } }]
                 : []),
-              { id: 'snooze', label: `Later (${n} selected)`, keywords: LATER_KEYWORDS, keyHint: 'L', run: () => openSnooze(sel) },
+              { id: 'snooze', label: `Later (${n} selected)`, keywords: LATER_KEYWORDS, oldNames: LATER_OLD_NAMES, keyHint: 'L', run: () => openSnooze(sel) },
               ...(sel.some((i) => returnAt(i) > Date.now())
                 ? [{ id: 'unsnooze', label: `Back to Inbox (${n} selected)`, run: () => unsnooze(sel) }]
                 : []),
@@ -9105,7 +9105,7 @@ export default function App() {
                   run: () => unsnooze(target),
                 }]
               : []),
-            { id: 'snooze', label: 'Later', keywords: LATER_KEYWORDS, keyHint: 'L', run: () => openSnooze(target) },
+            { id: 'snooze', label: 'Later', keywords: LATER_KEYWORDS, oldNames: LATER_OLD_NAMES, keyHint: 'L', run: () => openSnooze(target) },
             // WHAT THE THREAD'S OWN CONTROLS DO (w-e85916b92c): its summary
             // panel, three-dot menu, S key, Add people and a teammate's strip.
             ...(() => {
