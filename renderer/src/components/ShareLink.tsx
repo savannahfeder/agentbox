@@ -45,6 +45,88 @@ async function copy(text: string) {
   try { await navigator.clipboard.writeText(text); return true; } catch { return false; }
 }
 
+type Can = 'view' | 'comment' | 'edit';
+type Person = { email: string; can: Can; name: string | null };
+const CANS: Can[] = ['view', 'comment', 'edit'];
+const looksLikeEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
+
+/** What a link lets people do and who it is for, as words a select can show. */
+export function CanPick({ value, editable, onPick, label, remove = false, disabled }: {
+  value: Can; editable: boolean; onPick: (c: Can | null) => void; label: string; remove?: boolean; disabled?: boolean;
+}) {
+  // An edit given before the file stopped being editable still reads as what it is.
+  const offered = CANS.filter((c) => c !== 'edit' || editable || value === 'edit');
+  return (
+    <select className="av-share-pick" aria-label={label} value={value} disabled={disabled}
+      onChange={(e) => onPick(e.target.value === 'remove' ? null : e.target.value as Can)}>
+      {offered.map((c) => <option key={c} value={c}>{shareWords.can[c]}</option>)}
+      {remove && <option value="remove">Remove</option>}
+    </select>
+  );
+}
+
+/** Who can open the link, what they can do, and the people added by email. */
+function WhoCanOpen({ token, access, can, editable, onChanged, onProblem }: {
+  token: string; access: 'anyone' | 'people'; can: Can; editable: boolean;
+  onChanged: () => void; onProblem: (words: string | null) => void;
+}) {
+  const [people, setPeople] = useState<Person[] | null>(null);
+  const [adding, setAdding] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void api.fileLinkPeople({ token }).then((r) => { if (live && r.ok) setPeople(r.people ?? []); });
+    return () => { live = false; };
+  }, [token]);
+
+  const setAccess = async (a: 'anyone' | 'people', c: Can) => {
+    setBusy(true); onProblem(null);
+    const out = await api.fileLinkAccess({ token, access: a, can: c });
+    setBusy(false);
+    if (!out.ok) { onProblem(out.error ?? 'That did not change.'); return; }
+    onChanged();
+  };
+  const setPerson = async (email: string, c: Can | null) => {
+    setBusy(true); onProblem(null);
+    const out = await api.fileLinkPerson({ token, email, can: c });
+    setBusy(false);
+    if (!out.ok) { onProblem(out.error ?? 'That did not change.'); return false; }
+    setPeople(out.people ?? []);
+    return true;
+  };
+  const add = async () => {
+    const email = adding.trim();
+    if (!email) return;
+    if (!looksLikeEmail(email)) { onProblem('That is not an email address.'); return; }
+    if (await setPerson(email, editable ? 'edit' : 'comment')) setAdding('');
+  };
+
+  return (
+    <>
+      <div className="av-share-access">
+        <select className="av-share-pick" aria-label="Who can open it" value={access} disabled={busy} onChange={(e) => void setAccess(e.target.value as 'anyone' | 'people', can)}>
+          <option value="anyone">{shareWords.access.anyone}</option>
+          <option value="people">{shareWords.access.people}</option>
+        </select>
+        {access === 'anyone' && <CanPick value={can} editable={editable} label="What anyone with the link can do" disabled={busy} onPick={(c) => void setAccess(access, c ?? can)} />}
+      </div>
+      <form className="av-share-add" onSubmit={(e) => { e.preventDefault(); void add(); }}>
+        <input type="email" value={adding} onChange={(e) => { setAdding(e.target.value); onProblem(null); }} placeholder={shareWords.addPeople} aria-label={shareWords.addPeople} disabled={busy} autoComplete="off" spellCheck={false} />
+      </form>
+      {people && people.length > 0 && (
+        <ul className="av-share-people" aria-label="People added">
+          {people.map((p) => (
+            <li key={p.email}>
+              <span className="av-share-person" title={p.email}>{p.name ? <><b>{p.name}</b> {p.email}</> : p.email}</span>
+              <CanPick value={p.can} editable={editable} remove label={`What ${p.name ?? p.email} can do`} disabled={busy} onPick={(c) => void setPerson(p.email, c)} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
 /** `icon`: drawn as the side pane's square mark rather than a worded button. */
 export function ShareLink({ product, thread, src, signedIn, icon = false }: {
   product: string; thread: string; src: string;
@@ -109,6 +191,7 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
     seeComments(link.token, (out.comments ?? []).length);
   };
   const flagged = behind || unseen;
+  const live = link?.access === 'people' ? shareWords.kept : shareWords.live;
 
   const share = async () => {
     setBusy(true); setProblem(null); setSaid(null);
@@ -134,8 +217,8 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
   return (
     <div className={`av-share${icon ? ' is-mark' : ''}`} ref={box}>
       {icon
-        ? <button type="button" className={`doc-mark${link ? ' is-shared' : ''}${flagged ? ' is-behind' : ''}`} title={behind ? shareWords.behind : unseen ? shareWords.newComments : link ? shareWords.live : 'Share'} aria-label={link ? shareWords.live : 'Share'} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="globe" /></button>
-        : <button type="button" className={`av-btn${open ? ' is-on' : ''}${flagged ? ' is-behind' : ''}`} title={behind ? shareWords.behind : unseen ? shareWords.newComments : undefined} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="globe" />{link ? shareWords.live : 'Share'}</button>}
+        ? <button type="button" className={`doc-mark${link ? ' is-shared' : ''}${flagged ? ' is-behind' : ''}`} title={behind ? shareWords.behind : unseen ? shareWords.newComments : link ? live : 'Share'} aria-label={link ? live : 'Share'} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="globe" /></button>
+        : <button type="button" className={`av-btn${open ? ' is-on' : ''}${flagged ? ' is-behind' : ''}`} title={behind ? shareWords.behind : unseen ? shareWords.newComments : undefined} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="globe" />{link ? live : 'Share'}</button>}
       {open && (
         <div className="av-share-box" role="dialog" aria-label="Share">
           {!state.signedIn ? (
@@ -148,7 +231,11 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
           ) : link ? (
             <>
               <input className="av-share-url" readOnly value={link.url} aria-label="Link" onFocus={(e) => e.currentTarget.select()} />
-              <p className="av-share-meta"><span>{behind ? shareWords.behind : link.ahead ? shareWords.ahead(link.version) : shareWords.shared(link)}</span></p>
+              <p className="av-share-meta"><span>{behind ? shareWords.behind : link.ahead ? shareWords.ahead(link.version) : link.changedByName ? shareWords.editedBy(link.changedByName, link) : shareWords.shared(link)}</span></p>
+              <WhoCanOpen
+                token={link.token} access={link.access ?? 'anyone'} can={link.can ?? 'comment'} editable={!!link.editable}
+                onChanged={() => void api.fileLink(ask).then(setState)} onProblem={setProblem}
+              />
               <div className="av-share-acts">
                 {behind && <button type="button" className="av-btn is-on" disabled={busy} onClick={() => void share()}>Update link</button>}
                 <button type="button" className={`av-btn${behind ? '' : ' is-on'}`} disabled={busy} onClick={() => void copy(link.url).then((ok) => setSaid(ok ? 'Link copied' : null))}>Copy link</button>

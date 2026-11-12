@@ -166,7 +166,8 @@ export function SharedFilePage({ token, client, finishing = null }: {
     void finishing.then((failed) => {
       let why: string | null = null;
       try { why = sessionStorage.getItem(SIGNING_IN_FOR); sessionStorage.removeItem(SIGNING_IN_FOR); } catch { /* private mode */ }
-      if (!failed && client.signedIn() && (why ?? 'comment') === 'comment') setCommentsOpen(true);
+      // Only a sign-in made to comment opens the comments; a visit already signed in lands on the file.
+      if (!failed && client.signedIn() && why === 'comment') setCommentsOpen(true);
     });
   }, [finishing, client]);
   useEffect(() => {
@@ -519,7 +520,7 @@ export function Comments({ file, comments, signedIn, onAsk, post, remove }: {
       )}
       {signedIn ? (
         <form className="sf-write" onSubmit={(e) => { e.preventDefault(); void send(); }}>
-          <textarea ref={box} value={words} rows={3} placeholder={openToAnyone(file) ? 'Add a comment anyone with the link can read' : 'Add a comment everyone it is shared with can read'} aria-label="Add a comment"
+          <textarea ref={box} value={words} rows={3} placeholder={openToAnyone(file) ? 'Add a comment anyone with the link can read' : 'Add a comment'} aria-label="Add a comment"
             onChange={(e) => { setWords(e.target.value); setError(null); }}
             onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void send(); } }} />
           <div className="sf-write-row">

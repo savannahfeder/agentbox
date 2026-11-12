@@ -16,8 +16,15 @@ export const shareWords = {
       ? `${what} today at ${clock(updatedAt)}`
       : `${what} ${new Date(updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
   },
+  editedBy: (name: string, { updatedAt }: { updatedAt: number }, now = Date.now()) => (new Date(updatedAt).toDateString() === new Date(now).toDateString()
+    ? `Edited by ${name} today at ${clock(updatedAt)}`
+    : `Edited by ${name} ${new Date(updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}`),
   // "Shared" already means a teammate's thread, and a file your agent handed you.
   live: 'Public link',
+  kept: 'Private link',
+  access: { anyone: 'Anyone with the link', people: 'Only people added' },
+  can: { view: 'can view', comment: 'can comment', edit: 'can edit' },
+  addPeople: 'Add people by email',
 };
 
 /** One live link's row: its file, when it went up or was updated, and its comments. */

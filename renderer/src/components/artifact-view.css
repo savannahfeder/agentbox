@@ -273,6 +273,27 @@
 .av-share-box .av-share-meta { display: flex; gap: 12px; font: 11.5px var(--mono); color: var(--text-dim); }
 .av-share-meta a { color: var(--text-dim); text-decoration: underline; text-underline-offset: 2px; }
 .av-share-acts { display: flex; align-items: center; gap: 8px; }
+/* Who can open the link and what they can do: words that open a list, not boxed fields. */
+.av-share-access { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; }
+.av-share-pick {
+  max-width: 100%; height: 28px; padding: 0 20px 0 0; border: 0; background: none; color: var(--text); font: inherit; font-size: 13px;
+  appearance: none; -webkit-appearance: none; cursor: pointer; text-overflow: ellipsis;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-dim) 50%), linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
+  background-position: calc(100% - 9px) 13px, calc(100% - 5px) 13px; background-size: 4px 4px; background-repeat: no-repeat;
+}
+.av-share-pick:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 2px; border-radius: var(--radius); }
+.av-share-pick:disabled { opacity: 0.6; cursor: default; }
+.av-share-pick option { background: var(--pop); color: var(--text); }
+.av-share-access .av-share-pick + .av-share-pick, .av-share-people .av-share-pick { color: var(--text-dim); }
+.av-share-add input {
+  width: 100%; height: 30px; box-sizing: border-box; padding: 0 9px;
+  font: inherit; font-size: 13px; color: var(--text); background: none; border: 1px solid var(--line-strong); border-radius: var(--radius); outline: none;
+}
+.av-share-add input:focus { border-color: var(--text-faint); }
+.av-share-people { margin: -2px 0 0; padding: 0; list-style: none; max-height: 168px; overflow-y: auto; }
+.av-share-people li { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 28px; }
+.av-share-person { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--text-dim); }
+.av-share-person b { font-weight: 500; color: var(--text); }
 .av-share-stop { background: none; border: 0; padding: 0; font: inherit; font-size: 12.5px; color: var(--text-dim); }
 .av-share-stop:hover:not(:disabled) { color: var(--text); }
 .av-share-box .av-share-said { font-size: 12.5px; color: var(--text-dim); }
