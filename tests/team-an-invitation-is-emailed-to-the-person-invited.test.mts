@@ -36,9 +36,32 @@ describe('the email', () => {
   });
   it('has a button that goes where Agentbox is downloaded, which is a page that exists', () => {
     expect(mail.html).toContain(`<a href="${DOWNLOAD}"`);
-    expect(mail.html).toContain('>Get Agentbox</a>');
-    expect(mail.html).toContain('border-radius');
-    expect(mail.html).toContain('Sign in with theo@northwind.test and your invitation to Northwind is waiting.');
+    expect(mail.html).toContain('>Join Northwind</a>');
+  });
+  // The first drawing was a default-looking email: "looks visually extremely ugly". Five were drawn in
+  // the app's own look and the light letter was approved (designs/w-1e52420829/invite-email, b).
+  describe('the look that was approved', () => {
+    it('is a light card with rounded corners, the mark and the name above one big line', () => {
+      expect(mail.html).toContain('background:#f7f5f0');
+      expect(mail.html).toContain('border:1px solid #e4e0d8');
+      expect(mail.html).toContain('border-radius:16px');
+      expect(mail.html).toMatch(/>Agentbox<\/td>/);
+      expect(mail.html).toMatch(/font:500 34px\/1\.15 [^"]*">Dana Whitfield invited you to join Northwind\.<\/h1>/);
+    });
+    it('draws the mark as nine dots, one of them the accent, and nothing else in that colour', () => {
+      expect([...mail.html.matchAll(/border-radius:50%/g)]).toHaveLength(9);
+      expect([...mail.html.matchAll(/#ee6018/g)]).toHaveLength(1);
+    });
+    it('has a dark rounded button and two quiet lines under it', () => {
+      expect(mail.html).toMatch(/border-radius:10px;background:#1a1817;color:#f7f5f0/);
+      expect(mail.html).toContain('Sign in with theo@northwind.test and the invitation is waiting.<br>Not expecting this? Ignore it.');
+    });
+    it('uses nothing a mail app is known to drop: no grid, no flex, no outside picture or font file', () => {
+      expect(mail.html).not.toMatch(/display:(inline-)?(grid|flex)|<img|@font-face|url\(/);
+    });
+    it('names the team on the button even when it has no name', () => {
+      expect(inviteEmail({ ...invite, team: '' }, config).html).toContain('>Join the team</a>');
+    });
   });
   it('writes a name into the page as text, never as markup', () => {
     const odd = inviteEmail({ ...invite, inviter: 'Dana "<b>" & co', team: 'A&B' }, config);
