@@ -274,31 +274,6 @@ function Row({ label, desc, children }: {
   );
 }
 
-/* Agents in the person's own signed-in Chrome (main/your-chrome.mts). Turning it
-   on takes a second click that says what it grants; turning it off takes one. */
-export function YourChromeRow({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
-  const [asking, setAsking] = useState(false);
-  const label = 'Let agents use your Chrome';
-  if (asking && !on) {
-    return (
-      <Row label={label} desc="They could act as you on every site you are signed in to. Chrome asks before each new site.">
-        <button type="button" className="set-ghost" onClick={() => setAsking(false)}>Cancel</button>
-        <button type="button" className="set-ghost" onClick={() => { setAsking(false); onChange(true); }}>Turn on</button>
-      </Row>
-    );
-  }
-  return (
-    <Row
-      label={label}
-      desc={on
-        ? 'Chrome asks before each new site. Never in the cloud, or when a task skips permissions.'
-        : 'With the Claude in Chrome extension, agents work in your browser, signed in as you.'}
-    >
-      <Switch label={label} on={on} onChange={(v) => (v ? setAsking(true) : onChange(false))} />
-    </Row>
-  );
-}
-
 /* * WORDS THE USER CAN TAKE OFF THIS PAGE. The command to sign an account back in is
  printed on the account rows, and selecting a phrase out of the middle of a sentence
  is still work, so the one string that is a command rather than prose gets a button.
@@ -2165,7 +2140,6 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
                     />
                   </Row>
                 )}
-                <YourChromeRow on={w.agentsUseYourChrome === true} onChange={(v) => setWorkspace('agentsUseYourChrome', v)} />
               </Group>
             )}
           </>

@@ -19,8 +19,8 @@ import { cloudClaudeMode, cloudPermissionArgs } from '../cloud-permission.mts';
 import { claudeActivity } from '../agent-activity.mts';
 import { captureStream, streamingText, summarizeStreamLine, traceStreamLine } from './claude-stream.mts';
 import { definitionMethods, commonUpdatePlan } from './common.mts';
-import { yourChromeArgs } from '../your-chrome.mts';
-import type { BinKey, Env, HarnessConfig, HarnessItem, HarnessPlan, HarnessRecord, HarnessSpawnContext, HarnessSupervisor, SignInFilesWhere, UpdatePlanOptions } from './common.mts';
+import { chromeOnInClaudeCode, claudeJsonFor, yourChromeArgs } from '../your-chrome.mts';
+import type { BinKey, Env, HarnessItem, HarnessPlan, HarnessRecord, HarnessSpawnContext, HarnessSupervisor, SignInFilesWhere, UpdatePlanOptions } from './common.mts';
 import { findTranscript } from '../transcript-search.mts';
 const definition = harnessDefinition('claude')!;
 
@@ -32,8 +32,8 @@ const definition = harnessDefinition('claude')!;
 export const NO_METERED_KEY = Object.freeze({ env: Object.freeze({ ANTHROPIC_API_KEY: '' }), apiKeyHelper: '' });
 
 /** A worker's line on this computer. A cloud run has no Chrome of the person's, so `cloudLaunch` never adds it. */
-export function localClaudeArgv(config: HarnessConfig, plan: Pick<HarnessPlan, 'args'>): string[] {
-  return streamInputArgs(definition.run, [...plan.args, ...yourChromeArgs(config, plan.args)]);
+export function localClaudeArgv(plan: Pick<HarnessPlan, 'args'>, { chromeOn }: { chromeOn: boolean }): string[] {
+  return streamInputArgs(definition.run, [...plan.args, ...yourChromeArgs(chromeOn, plan.args)]);
 }
 
 export const claudeHarness = {
@@ -78,7 +78,7 @@ export const claudeHarness = {
     // The binary is the one this definition names, not a field spelled out
     // here: that is the last place an engine of this family needed code.
     const bin = sup.config[definition.binKey as BinKey];
-    const argv = localClaudeArgv(sup.config, plan);
+    const argv = localClaudeArgv(plan, { chromeOn: chromeOnInClaudeCode(claudeJsonFor(profile, sup.config.home || os.homedir())) });
     const runEnv = { ...claudeLaunchEnv(bin, env), STORE_ACCOUNT_ID: sup.config.accountId, ...storeRootEnv(sup.config.storeRoot),
       ...(profile !== 'default' ? { [definition.homeEnv]: profile } : {}),
       ZERO_PRODUCT: item.product, ZERO_ITEM: item.id, ...sup.memoryGateEnv(item) };

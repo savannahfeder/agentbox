@@ -15,7 +15,6 @@ export interface HarnessConfig extends Partial<Record<BinKey, string | null>> {
   accountId?: string;
   storeRoot?: string;
   cloudPermission?: string | null;
-  agentsUseYourChrome?: boolean | null;
 }
 
 export interface HarnessRun {

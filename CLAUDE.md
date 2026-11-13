@@ -168,11 +168,13 @@ instead, then ship as usual:
 
 Claude Code can attach a session to the browser a person is signed into with
 `--chrome`, and that browser is signed into every account its owner holds. It
-is a switch on the Claude Code settings page, off on every computer until its
-person turns it on, so a computer that never chose starts the same line as
-before. Only `main/your-chrome.mts` may put `--chrome` on a worker's line: never
-in the cloud, never on a run that skips permissions (that also skips Chrome's
-per-site asks), and only when the config says exactly `true`.
+follows the person's own Claude Code: a worker gets it only when the account it
+runs on has "Claude in Chrome enabled by default" on (`/chrome`, kept as
+`claudeInChromeDefaultEnabled: true` in that account's `.claude.json`), which
+Claude Code itself ignores in a `-p` run. There is no Agentbox switch for it.
+Only `main/your-chrome.mts` may put `--chrome` on a worker's line: never in the
+cloud, and never on a run that skips permissions (that also skips Chrome's
+per-site asks).
 `tests/no-worker-drives-her-own-browser.test.mts` fails if the flag appears
 anywhere else. `--ide` is the user's to switch on, never ours.
 

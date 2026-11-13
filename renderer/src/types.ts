@@ -1575,8 +1575,6 @@ export interface WorkspaceSettings {
   alpha?: { rooms: boolean; teammates?: boolean; multiplayer?: boolean; glass?: boolean };
   // The corner tag over other apps (w-dafae58a23). On unless she turned it off.
   cornerTag?: boolean;
-  // Claude Code agents on this computer may use the person's own Chrome. Off unless turned on.
-  agentsUseYourChrome?: boolean;
   outsideAgents: AgentMode;
   accounts: AccountSetting[];
   /**

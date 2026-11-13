@@ -5,14 +5,15 @@
 // Code to have the ability at all; if it is ever built it needs careful
 // permissioning first. On w-007ab2ab26, 2026-11-09, she narrowed it: "that
 // shouldn't be a rule for everyone as it might block some users, but i do llike
-// it as a rule for me." So it became a switch, off on every computer until its
-// person turns it on (tests/an-agent-uses-your-chrome-only-once-you-turn-it-on).
+// it as a rule for me." So it follows each person's own Claude Code: on only
+// where they turned Claude in Chrome on by default
+// (tests/an-agent-uses-your-chrome-only-once-you-turn-it-on).
 //
 // The reason it is still a test and not a note: the flag is one word,
 // `--chrome`, and an easy thing for a later session to add in good faith while
 // chasing parity with the terminal clients. The browser a person uses is signed
 // into everything they have, so it may come in through one file, behind that
-// switch, and nowhere else.
+// setting, and nowhere else.
 //
 // A browser an agent may drive without asking has to carry nothing: the pane on
 // the `persist:junk` partition, a separate store with no logins in it.
@@ -37,7 +38,7 @@ function* files(dir) {
 }
 
 describe('the browser an agent may reach', () => {
-  it('is the person’s own only through the one file behind their switch', () => {
+  it('is the person’s own only through the one file behind their setting', () => {
     const naming = [];
     for (const dir of SPAWNING) {
       for (const rel of files(dir)) {
@@ -49,8 +50,8 @@ describe('the browser an agent may reach', () => {
     expect(naming).toEqual([THE_ONE_DOOR]);
   });
 
-  it('is behind a switch that is only on when saved as true', () => {
-    expect(read(THE_ONE_DOOR)).toContain('config?.agentsUseYourChrome !== true');
+  it('is behind their Claude Code setting, on only when it says exactly true', () => {
+    expect(read(THE_ONE_DOOR)).toContain('.claudeInChromeDefaultEnabled === true');
   });
 
   it('is the pane the app ships, which carries no logins, when nobody turned it on', () => {
