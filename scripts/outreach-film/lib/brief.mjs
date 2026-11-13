@@ -24,7 +24,7 @@ export const norm = (s) => String(s ?? '').replace(/[’‘]/g, "'").replace(/[�
 export function tidyBrief(value) {
   if (typeof value === 'string') return value.replace(/[’‘]/g, "'").replace(/[“”]/g, '"').replace(/ /g, ' ').replace(/[ \t]+/g, ' ').trim();
   if (Array.isArray(value)) return value.map(tidyBrief);
-  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, tidyBrief(v)]));
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, k === 'rows' ? v : tidyBrief(v)])); // code keeps its indents
   return value;
 }
 

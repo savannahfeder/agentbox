@@ -104,7 +104,10 @@ if (problems.length) stop(1, `brief.json has ${problems.length} problem(s). Fix 
 if (cmd === 'check') stop(0, 'brief.json passes. Next: film.mjs make.');
 if (cmd !== 'make') stop(2, `Unknown command ${cmd}. Use make, check or check-film.`);
 
-// ---- 4. the kit: her voice and bubble, the icons, the sounds ----
+// ---- 4. the machine, and the kit: her voice and bubble, the icons, the sounds ----
+const tools = [['ffmpeg', ['-version']], ['python3', ['-c', 'import numpy, PIL, cv2']]];
+if (process.platform === 'linux') tools.push(['sh', ['-c', 'fc-list | grep -q "SF Pro Text"']]);
+if (tools.some(([c, a]) => run(c, a, { quiet: true }).status !== 0)) stop(2, `This machine is missing something the film needs. Run: sh ${path.join(HERE, 'setup.sh')}`);
 const kit = opt('--kit') ?? process.env.OUTREACH_KIT;
 if (!kit || !exists(kit)) stop(2, 'Pass --kit <dir>: the outreach-films/kit folder in the product documents (README.md says what is in it).');
 const need = ['pointer.svg', 'cues.json', 'icons/chrome.png', 'icons/terminal.png', 'icons/agentbox.png', 'icons/finder.png', 'sfx/pad1.wav', 'sfx/pad2.wav', 'sfx/pad3.wav', 'sfx/key1.wav'];
