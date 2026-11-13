@@ -24,6 +24,7 @@
 .su-chip:hover { color: var(--text-dim); }
 .su-chip.on { color: var(--text); border-color: var(--line-strong); background: var(--bg-selected); }
 .su-select { height: 30px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--pop, var(--bg-raised)); font: inherit; font-size: 13px; color: var(--text); }
+.su-tz { font-size: 13px; color: var(--text-faint); }
 .su-btn { height: 30px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--bg-raised); font: inherit; font-size: 13px; color: var(--text); cursor: pointer; }
 
 .su-days { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }

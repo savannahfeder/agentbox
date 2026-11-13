@@ -63,6 +63,7 @@ function Post({ p, face, at, since, onOpen, onPerson }: {
 }
 
 function Settings({ s, onChange, onClose }: { s: StandupSettings; onChange: (s: StandupSettings) => void; onClose: () => void }) {
+  const zone = new Intl.DateTimeFormat('en-US', { timeZoneName: 'short' }).formatToParts(new Date()).find((p) => p.type === 'timeZoneName')?.value ?? '';
   const toggleDay = (d: number) => {
     const days = s.days.includes(d) ? s.days.filter((x) => x !== d) : [...s.days, d].sort();
     if (days.length) onChange({ ...s, days });
@@ -77,6 +78,7 @@ function Settings({ s, onChange, onClose }: { s: StandupSettings; onChange: (s: 
       <select className="su-select" value={s.at} aria-label="Standup time" onChange={(e) => onChange({ ...s, at: e.target.value })}>
         {(TIMES.includes(s.at) ? TIMES : [s.at, ...TIMES]).map((t) => <option key={t} value={t}>{clockOf(t)}</option>)}
       </select>
+      <span className="su-tz">{zone}</span>
     </div>
     <div className="su-set-row"><span className="su-set-l" /><button type="button" className="su-btn" onClick={onClose}>Done</button></div>
   </section>;

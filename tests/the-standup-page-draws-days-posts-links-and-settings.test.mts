@@ -70,6 +70,9 @@ describe('the Standup page', () => {
     const page = read('renderer/src/team/StandupPage.tsx');
     expect(page).toContain('<span className="su-set-l">Days</span>');
     expect(page).toContain('<span className="su-set-l">Time</span>');
+    // A tester could not tell which time zone 9am meant.
+    expect(page).toContain("timeZoneName: 'short'");
+    expect(page).toContain('<span className="su-tz">{zone}</span>');
     // Said once: a second control for the same thing inside the settings was taken out.
     expect(page).not.toContain('Count as yours');
     expect(html).toMatch(/role="switch" aria-checked="true"[^>]*><i><\/i>AI teammates post too/);

@@ -65,4 +65,13 @@ describe('the page around it', () => {
     expect(mate).toContain("api.teammates('post', { text, to: [id], fresh: true })");
     expect(mate).not.toContain('teammatesUi.chatWith(id)');
   });
+  // Two testers saw a whole answer, or a usage-limit message, in place of each
+  // task's name: the inbox names a teammate's thread by its last message.
+  it('names each task by what it was asked to do, not by its last message', () => {
+    const app = read('renderer/src/App.tsx');
+    const mate = app.slice(app.indexOf("placeMember.key.startsWith('mate:')"), app.indexOf('} else {', app.indexOf("placeMember.key.startsWith('mate:')")));
+    expect(mate).toMatch(/const taskRow = \(i: WorkItem, word: string, tone: PlaceRow\['tone'\]\): PlaceRow => \(\{ \.\.\.itemRow\(i, word, tone\), title: shownTitle\(i\) \}\);/);
+    expect(mate).not.toMatch(/active=\{[^}]*itemRow\(/);
+    expect(mate).not.toMatch(/done=\{[^}]*itemRow\(/);
+  });
 });

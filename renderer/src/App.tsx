@@ -239,6 +239,7 @@ import { shippedThisWeek } from './team/shipped';
 import { teamToday, type TodayLine, type TodayRange } from './team/today';
 import { TodayPage } from './team/TodayPage';
 import { StandupPage } from './team/StandupPage';
+import { shownTitle } from '../../shared/thread-title.mts';
 import { TasksPage } from './team/TasksPage';
 import { teamTasks } from './team/tasks';
 import { shippedAtOf, shownToTeam } from '../../shared/thread-cards.mts';
@@ -7909,11 +7910,13 @@ export default function App() {
       const askIds = new Set(asks.map((i) => i.id));
       const split = nowAndFinished(runs.filter((i) => !askIds.has(i.id)), { done: (i) => i.status === 'done', at: (i) => i.updatedAt, now });
       const word = (i: WorkItem) => ITEM_WORD[stateOfMine(i) ?? 'running'] ?? ITEM_WORD.running;
+      // Its list is of tasks, so each is named for what it was asked, not for its last message as in the inbox.
+      const taskRow = (i: WorkItem, word: string, tone: PlaceRow['tone']): PlaceRow => ({ ...itemRow(i, word, tone), title: shownTitle(i) });
       // No chat: you give it tasks here and its answers come to the inbox.
       placeEl = <MemberPlace m={placeMember} waits={placeWaits} about={t?.role ?? 'AI teammate'} onBack={back} backTo={backTo} chatLabel="Tasks"
         chat={<MateWork name={placeMember.name} now={now}
-          active={[...asks.map((i) => itemRow(i, 'Waiting on you', 'ask')), ...split.now.map((i) => itemRow(i, word(i)[0], word(i)[1]))]}
-          done={split.finished.map((i) => itemRow(i, '', 'done'))}
+          active={[...asks.map((i) => taskRow(i, 'Waiting on you', 'ask')), ...split.now.map((i) => taskRow(i, word(i)[0], word(i)[1]))]}
+          done={split.finished.map((i) => taskRow(i, '', 'done'))}
           onGive={async (text) => {
             const r = await api.teammates('post', { text, to: [id], fresh: true });
             if (!r.ok) return r.error;
