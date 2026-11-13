@@ -113,6 +113,18 @@ it('reads as nothing once the link is stopped, and its pieces are cleared', asyn
   expect(cloud.linkPieces!.size).toBe(0);
 });
 
+// A stopped link's pieces stay readable from the cloud's cache until they are
+// deleted (seen live 2026-11-12, for at least 5 minutes), so one failed delete must not be the last.
+it('clears a stopped film\'s pieces again when the first try fails', async () => {
+  const made = (await share(film('cut-v6.mp4', 100, 6))).link;
+  const pieces = cloud.linkPieces!;
+  const realDelete = pieces.delete.bind(pieces);
+  let fails = 1;
+  pieces.delete = (k) => { if (fails-- > 0) throw new Error('the network dropped'); return realDelete(k); };
+  await maya.stopFileLink(made.token);
+  expect(pieces.size).toBe(0);
+});
+
 it('says so when a film is too big or empty, before anything leaves the computer', () => {
   const big = path.join(dir, 'huge.mp4');
   fs.writeFileSync(big, '');
