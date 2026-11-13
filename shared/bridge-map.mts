@@ -64,6 +64,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   // Lines, files and comments inside threads that a query finds, and the call that reads them ahead.
   findInThreads: 'zero:find-in-threads',
   warmFindInThreads: 'zero:warm-find-in-threads',
+  findByDescription: 'zero:find-by-description',
   teamComment: 'zero:team-comment',
   teamContinueBrief: 'zero:team-continue-brief',
   teamContinued: 'zero:team-continued',

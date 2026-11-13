@@ -54,9 +54,9 @@ export function searchThreads(items: WorkItem[], query: string, context: SearchC
     const matched = chat ? matchedSentence(searchText(hit.item.body), q.terms, q.phrase) : '';
     const subject = chat ? matchedSentence([item.label, item.title].filter(Boolean).join(' . '), q.terms, q.phrase) : '';
     const subjectMatch = searchScore({ id: item.id, title: [item.label, item.title].filter(Boolean).join(' . ') }, query) >= 2;
-    return { item, summary: chat ? ((subjectMatch ? subject : matched) || subject || latest || hit.summary) : hit.summary, named };
+    return { item, summary: chat ? ((subjectMatch ? subject : matched) || subject || latest || hit.summary) : hit.summary, named, rung: searchScore(hit.item, query) };
   }).sort((a, b) => Number(b.named) - Number(a.named))
-    .map(({ item, summary }) => ({ item, summary }));
+    .map(({ item, summary, rung, named }) => ({ item, summary, rung: named ? Math.max(rung, 2) : rung }));
 }
 
 export function threadSearchDetails(item: WorkItem, context: SearchContext) {

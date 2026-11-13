@@ -4,6 +4,7 @@
 import type { Engine } from '../../shared/engines.mts';
 import type { AgentVoice } from '../../shared/agent-voice.mts';
 import type { CarryState } from '../../shared/carried-files.mts';
+import type { FindAnswer, FindCandidate } from '../../shared/find-by-description.mts';
 import type { FileLinkAsk, FileLinkState, LinkAccess, LinkCan, LinkComment, LinkPerson, PublicLink } from './api';
 import type { LedgerLine } from './thread-history';
 import type { AgentFile } from './onboarding';
@@ -438,12 +439,16 @@ export interface FoundWhere {
 export interface FoundLine extends FoundWhere { uid: string; by: string | null; source: 'founder' | 'agent' | 'system'; at: number; comment: boolean; text: string }
 export interface FoundFile extends FoundWhere { how: 'name' | 'contents'; src: string; name: string; by: string | null; at: number; text: string }
 export interface FoundComment extends FoundWhere { src: string; name: string; by: string | null; at: number; resolved: boolean; noteId: string; fileId: string; text: string }
+/** A thread whose messages hold the words: how many of them do, and the best of them. */
+export interface FoundThread extends FoundLine { hits: number; phrase: boolean }
+export interface FindLimit { lines?: number; files?: number; comments?: number; threads?: number }
 /** What the finder in main answers (main/everything-found.mts). */
 export interface FoundInThreads {
   ok?: boolean;
   lines: FoundLine[];
   files: FoundFile[];
   comments: FoundComment[];
+  threads: FoundThread[];
   total: { lines: number; files: number; comments: number };
 }
 
@@ -1765,8 +1770,9 @@ declare global {
       teamSync(): Promise<TeamCallResult>;
       teamRoute(p: { product: string; id: string; route: 'agent' | 'me' | 'back' }): Promise<TeamCallResult>;
       teamThreadWork(p: { personId: string; threadId: string }): Promise<TeammateThreadWork>;
-      findInThreads(p: { query: string; limit?: { lines?: number; files?: number; comments?: number } }): Promise<FoundInThreads>;
+      findInThreads(p: { query: string; limit?: FindLimit }): Promise<Omit<FoundInThreads, 'threads'> & { threads?: FoundThread[] }>;
       warmFindInThreads(): Promise<boolean>;
+      findByDescription?(p: { description: string; candidates: FindCandidate[] }): Promise<FindAnswer>;
       fileMark(p: { product: string; id: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }>;
       fileNewVersion?(p: { product: string; id: string; path: string; text: string; since?: string | null }): Promise<{ ok: boolean; path?: string; error?: string }>;
       teamMarkFile(p: { personId: string; threadId: string; mark: ArtifactMark }): Promise<TeamCallResult>;

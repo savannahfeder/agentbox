@@ -22,7 +22,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { cursorAfterWait, cursorIndex, cursorMark, cursorWait, type CursorMark, type CursorWait } from './cursor-follows';
 import { createPortal, flushSync } from 'react-dom';
 import { readySkin, swapLook } from './look-switch';
-import type { AgentTurn, AnswerMode, Approval, ApprovalInput, CloudPlan, PermissionMode, Product, RepeatRule, RepeatShape, RunningSession, Snapshot, TableCell, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
+import type { AgentTurn, AnswerMode, Approval, ApprovalInput, CloudPlan, FoundThread, PermissionMode, Product, RepeatRule, RepeatShape, RunningSession, Snapshot, TableCell, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
 import type { ReplyPick } from './reply-pick';
 import { api } from './api';
 import { setClaudeModels, setCodexFreePlan } from './models';
@@ -73,7 +73,7 @@ import { ImportAgents } from './components/ImportAgents';
 import { importedLine } from './agent-import-card';
 import { whenLabel } from './components/When';
 import { RepeatFocus } from './components/RepeatFocus';
-import { Palette } from './components/Palette';
+import { Palette, type DescribedAnswer } from './components/Palette';
 import { CloudOffAsk } from './components/CloudOffAsk';
 import { Standing, STANDING } from './components/Standing';
 import { Settings } from './components/Settings';
@@ -119,6 +119,7 @@ import { NOTHING_OVER_THE_APP, afterTheWalk, type OpenOverTheApp } from './walk-
 import { splitMessage } from './message-split';
 import { parseQuery } from './search';
 import { searchThreads, threadSearchDetails } from './threads/search';
+import { rankFoundThreads } from './threads/found-threads';
 import { repeatsFound, withoutRunsOf } from './repeat-search';
 import { repeatTag } from './repeat-words';
 import { applyTheme, machineTheme, onMachineTheme, resolvePick, resolveTheme, THEME_KEY, type ThemePick } from './theme';
@@ -160,7 +161,7 @@ import { needsByWho, readFolded, readNeedsGroup, stackRows, toggleFolded, whoIsW
 import { FeedbackCard } from './components/FeedbackCard';
 import { searchFieldInStrip, workspaceDestinations, workspacePageTitle } from './workspace-navigation.ts';
 import { UsagePill } from './components/UsagePill';
-import { engineWordFor } from './byline';
+import { engineWordFor, lastChange } from './byline';
 import { lastUsedEngine } from './usage-last-used';
 import { SearchIcon } from './components/SearchIcon';
 import { CrossIcon } from './components/CrossIcon';
@@ -204,7 +205,7 @@ import { NO_FILTER, filterBox, harnessOf, isFiltering, type BoxFilter as BoxFilt
 import { URGENT_PRIORITY, itemPriority, shownPriority, moveProduct, placeScore, placedScore } from '../../shared/rank.mts';
 import { rankProducts } from './project-priority';
 import { threadsMade, approvableFiled, doItHereWrites, answerAllWrites, RUN_IT } from './threads-made';
-import { waitingCounts } from './threads-made';
+import { waitingCounts, stateWord } from './threads-made';
 import { closeAsk, closeAskOwnsKey, unshippedAsk } from './close-asks-first';
 import { notShipped, shipItAsk } from '../../shared/not-shipped.mts';
 import { openSignIn } from '../../shared/sign-in-ask.mts';
@@ -2716,10 +2717,15 @@ export default function App() {
   const searchContext = useMemo(() => ({
     products: snap?.products ?? [], people: snap?.team?.people ?? [], me: team?.me ?? null,
   }), [snap?.products, snap?.team?.people, team?.me]);
-  const hits = useMemo(
-    () => (search === null ? null : searchThreads(items, search, searchContext)),
-    [items, search, searchContext],
-  );
+  // The threads what was said in them found, for the words now in the field.
+  const [pageSaid, setPageSaid] = useState<{ query: string; said: FoundThread[] } | null>(null);
+  const hits = useMemo(() => {
+    if (search === null) return null;
+    const own = searchThreads(items, search, searchContext);
+    if (!search.trim()) return own;
+    const said = pageSaid?.query === search.trim() ? pageSaid.said : [];
+    return rankFoundThreads({ hits: own, said, items }).map((r) => ({ item: r.item, summary: r.line }));
+  }, [items, search, searchContext, pageSaid]);
   const searchDetails = useMemo(
     () => search === null ? undefined : new Map((hits ?? []).map(h => [h.item.id, threadSearchDetails(h.item, searchContext)])),
     [hits, search, searchContext],
@@ -3916,9 +3922,22 @@ export default function App() {
     window.addEventListener('focus', back);
     return () => window.removeEventListener('focus', back);
   }, [focused?.product, focused?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-  // ⌘K finds threads with the same search as the list's own field.
-  const findThreads = useCallback((q: string) => {
+  // A found thread as a ⌘K row: its title, the line under it, its tab and when it last moved.
+  const projectNameOf = useCallback((slug: string) => snap?.products.find((p) => p.slug === slug)?.name ?? slug, [snap?.products]);
+  const threadCommand = useCallback((item: WorkItem, line: string, { said = null, why = false, projects = 1 }: { said?: FoundThread | null; why?: boolean; projects?: number } = {}) => ({
+    id: `thread-${item.product}-${item.id}`,
+    label: threadSearchDetails(item, searchContext).title,
+    hint: projectNameOf(item.product),
+    thread: { line, where: stateWord(tabState.get(item.id)), at: lastChange(item), project: projects > 1 ? projectNameOf(item.product) : undefined, why },
+    run: () => { setModal(null); if (search !== null) closeSearch(); setFocused(item); markSeen(item); if (said) revealLine(said.uid); },
+  }), [searchContext, projectNameOf, tabState, search, closeSearch, markSeen]);
+  // ⌘K finds threads with the same search as the list's own field, and with
+  // what was said in them once main has answered (`said`).
+  const findThreads = useCallback((q: string, said: readonly FoundThread[] = []) => {
     const ruled = repeatsFound(repeats, q);
+    const kept = new Set(withoutRunsOf(items, ruled));
+    const found = rankFoundThreads({ hits: searchThreads(items, q, searchContext), said, items }).filter((r) => kept.has(r.item));
+    const projects = new Set(found.map((r) => r.item.product)).size;
     return [
     ...ruled.map((rule) => ({
       id: `thread-repeat-${rule.product}-${rule.id}`,
@@ -3926,12 +3945,7 @@ export default function App() {
       hint: `Repeats ${repeatTag(rule)}`,
       run: () => { setModal(null); if (search !== null) closeSearch(); openRepeatRef.current?.(rule); },
     })),
-    ...withoutRunsOf(searchThreads(items, q, searchContext).map(({ item }) => item), ruled).map((item) => ({
-      id: `thread-${item.product}-${item.id}`,
-      label: threadSearchDetails(item, searchContext).title,
-      hint: snap?.products.find((p) => p.slug === item.product)?.name ?? item.product,
-      run: () => { setModal(null); if (search !== null) closeSearch(); setFocused(item); markSeen(item); },
-    })),
+    ...found.map((r) => threadCommand(r.item, r.line, { said: r.said, projects })),
     ...teammateThreadsFound(weekCards, team?.me, q).map((card) => ({
       id: `card-${card.personId}-${card.threadId}`,
       label: card.title ?? '',
@@ -3939,7 +3953,23 @@ export default function App() {
       run: () => { setModal(null); if (search !== null) closeSearch(); setFocused(null); openTeammateCard(card); },
     })),
     ];
-  }, [repeats, items, searchContext, snap?.products, search, closeSearch, markSeen, weekCards, team, openTeammateCard]);
+  }, [repeats, items, searchContext, threadCommand, search, closeSearch, weekCards, team, openTeammateCard]);
+  // A thread described in a sentence, found by a small agent (shared/find-by-description.mts).
+  const askAgentToFind = useMemo(() => api.findByDescription(), []);
+  const findByDescription = useCallback(async (description: string): Promise<DescribedAnswer> => {
+    if (!askAgentToFind) return { ok: false, error: 'This copy of the app cannot ask an agent yet.' };
+    const candidates = items.map((i) => ({
+      key: `${i.product}/${i.id}`, product: i.product, title: threadSearchDetails(i, searchContext).title,
+      about: (i.problem?.trim() || i.body || '').slice(0, 300), where: stateWord(tabState.get(i.id)) || 'Done',
+      at: lastChange(i), project: projectNameOf(i.product),
+    }));
+    const answer = await askAgentToFind({ description, candidates });
+    if (!answer.ok) return answer;
+    const byKey = new Map(items.map((i) => [`${i.product}/${i.id}`, i]));
+    const picked = answer.picks.flatMap((p) => { const item = byKey.get(p.key); return item ? [{ item, why: p.why }] : []; });
+    const projects = new Set(picked.map((p) => p.item.product)).size;
+    return { ok: true, rows: picked.map((p) => threadCommand(p.item, p.why, { why: true, projects })) };
+  }, [askAgentToFind, items, searchContext, tabState, projectNameOf, threadCommand]);
   // J AND K FROM AN OPEN THREAD OR AN OPEN TEAMMATE CARD (w-fb16bcaeba): open
   // the next stop, whoever's it is. Yours opens as your thread, theirs as
   // their card, exactly as a click on its row would.
@@ -4424,14 +4454,19 @@ export default function App() {
   // and teammates' shared threads are searched in main; groups and decisions are
   // already on screen.
   const roomNames = useMemo(() => new Map((roomsUi.live ? roomsUi.groups : []).filter((g) => g.key.startsWith('room:')).map((g) => [g.key.slice('room:'.length), g.name])), [roomsUi.live, roomsUi.groups]);
+  // What was said in your own threads is in the one list of threads, so the
+  // lines found here are the ones in groups and teammates' threads.
   const insideFor = useCallback(async (q: string, limit: Record<InsideGroupKey, number>) => {
-    const found = await api.findInThreads({ query: q, limit: { lines: limit.lines + 3, files: limit.files + 2, comments: limit.comments + 2 } });
-    return insideGroups({
+    const answer = await api.findInThreads({ query: q, limit: { lines: limit.lines + 40, files: limit.files + 2, comments: limit.comments + 2, threads: 200 } });
+    const shared = answer.lines.filter((l) => l.kind === 'shared');
+    const found = { ...answer, lines: shared, total: { ...answer.total, lines: shared.length } };
+    const groups = insideGroups({
       query: q, found, items, cards: weekCards, rooms: roomNames,
       messages: snap?.team?.rooms?.messages ?? {}, decisions: snap?.team?.rooms?.decisions ?? {},
       me: team?.me ?? null, nameOf: (id) => firstName(team?.byId.get(id) ?? null),
       titleOf: (item) => threadSearchDetails(item, searchContext).title, limit,
     });
+    return { groups, said: answer.threads };
   }, [items, weekCards, roomNames, snap?.team?.rooms?.messages, snap?.team?.rooms?.decisions, team, searchContext]);
   // The file a found row asked to open big belongs to that one thread and to that visit.
   const [foundOpenAt, setFoundOpenAt] = useState<{ key: string; open: ArtifactOpen } | null>(null);
@@ -4461,12 +4496,18 @@ export default function App() {
     openTeammateCard(o.card, big);
     if (o.line) revealLine(o.line);
   }, [search, closeSearch, roomsUi, markSeen, openTeammateCard]);
-  const insideForPalette = useCallback(async (q: string) => (await insideFor(q, { lines: 3, files: 3, comments: 2, decisions: 2 })).map((g) => ({
-    key: g.key, label: g.label,
-    rows: g.rows.map((r) => ({
-      id: r.id, label: r.text, found: { text: r.text, file: r.group === 'comments' || r.group === 'files' ? r.file : undefined, who: r.who, at: r.at, where: r.where }, run: () => openInside(r, false),
-    })),
-  })), [insideFor, openInside]);
+  const insideForPalette = useCallback(async (q: string) => {
+    const { groups, said } = await insideFor(q, { lines: 3, files: 3, comments: 2, decisions: 2 });
+    return {
+      said,
+      sections: groups.map((g) => ({
+        key: g.key, label: g.label,
+        rows: g.rows.map((r) => ({
+          id: r.id, label: r.text, found: { text: r.text, file: r.group === 'comments' || r.group === 'files' ? r.file : undefined, who: r.who, at: r.at, where: r.where }, run: () => openInside(r, false),
+        })),
+      })),
+    };
+  }, [insideFor, openInside]);
   const [pageInside, setPageInside] = useState<InsideGroup[]>([]);
   const insideForRef = useRef(insideFor);
   insideForRef.current = insideFor;
@@ -4474,7 +4515,10 @@ export default function App() {
     const q = search?.trim();
     if (!q) { setPageInside([]); return; }
     let live = true;
-    const timer = setTimeout(() => { void insideForRef.current(q, { lines: 10, files: 6, comments: 6, decisions: 6 }).then((got) => { if (live) setPageInside(got); }).catch(() => {}); }, 90);
+    const timer = setTimeout(() => {
+      void insideForRef.current(q, { lines: 10, files: 6, comments: 6, decisions: 6 })
+        .then((got) => { if (live) { setPageInside(got.groups); setPageSaid({ query: q, said: got.said }); } }).catch(() => {});
+    }, 90);
     return () => { live = false; clearTimeout(timer); };
   }, [search, items.length]);
   // Read the threads ahead when a search opens, so the first words typed are answered at once.
@@ -8984,6 +9028,7 @@ export default function App() {
         findThreads={findThreads}
         findChats={findChats}
         findInside={insideForPalette}
+        findByDescription={askAgentToFind ? findByDescription : undefined}
         onSearchFor={searchFor}
         itemCommands={(() => {
           // A cmd-A (or shift-J/K) selection turns the palette into batch

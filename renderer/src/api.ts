@@ -5,7 +5,7 @@ import {updateFixture} from './agent-update-fixture';
 // developed, reviewed, and screenshotted without a live store or any agents.
 
 import type { Person, TeamBillingDetails } from './types';
-import type { AccountUsageReading, AgentConversation, AgentUpdate, AgentUpdateAction, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, ProductDashboard, ProjectSettings, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, TerminalAction, TerminalAnswer, TerminalAsk, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, FilesUploaded, TeamMessageFile, ThreadEditPatch, LiveRoomTicket, UpdateState, Usage, UsageLimit, WorkItem, WorkspaceSettings } from './types';
+import type { AccountUsageReading, AgentConversation, AgentUpdate, AgentUpdateAction, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, ProductDashboard, ProjectSettings, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, TerminalAction, TerminalAnswer, TerminalAsk, FindLimit, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, FilesUploaded, TeamMessageFile, ThreadEditPatch, LiveRoomTicket, UpdateState, Usage, UsageLimit, WorkItem, WorkspaceSettings } from './types';
 import type { LedgerLine } from './thread-history';
 import type { NotePlace } from '../../shared/artifact-marks.mts';
 import type { AgentFile as AgentFileRow } from './onboarding';
@@ -16,6 +16,7 @@ import { fixtureEngineWorld, fixtureEngineSettings, fixtureSecondEngine } from '
 import { fixtureFolders } from './fixtures';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import type { CarryState } from '../../shared/carried-files.mts';
+import type { FindAnswer, FindCandidate } from '../../shared/find-by-description.mts';
 
 // Preload calls the bridge type in types.ts does not list yet.
 interface LaterBridge {
@@ -1026,13 +1027,20 @@ export const api = {
     return window.zero.teamThreadWork(p);
   },
   // Lines, files and comments inside threads (main/everything-found.mts).
-  async findInThreads(p: { query: string; limit?: { lines?: number; files?: number; comments?: number } }): Promise<FoundInThreads> {
-    const none: FoundInThreads = { lines: [], files: [], comments: [], total: { lines: 0, files: 0, comments: 0 } };
+  async findInThreads(p: { query: string; limit?: FindLimit }): Promise<FoundInThreads> {
+    const none: FoundInThreads = { lines: [], files: [], comments: [], threads: [], total: { lines: 0, files: 0, comments: 0 } };
     if (!window.zero?.findInThreads) return none;
     const got = await window.zero.findInThreads(p).catch(() => none);
-    return got.ok === false ? none : got;
+    // A main from before the per-thread tally answers without it.
+    return got.ok === false ? none : { ...got, threads: got.threads ?? [] };
   },
   warmFindInThreads(): void { void window.zero?.warmFindInThreads?.()?.catch?.(() => {}); },
+  /** Null when this copy's main cannot ask an agent. */
+  findByDescription: (): ((p: { description: string; candidates: FindCandidate[] }) => Promise<FindAnswer>) | null => {
+    const ask = window.zero?.findByDescription;
+    if (!ask) return null;
+    return (p) => ask(p).catch((err: unknown) => ({ ok: false as const, error: String((err as Error)?.message ?? err) }));
+  },
   async teamComment(p: { personId: string; threadId: string; text: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamComment(p)); },
   async teamReact(p: { product: string; id: string; on: string; emoji: string; off?: boolean }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamReact(p)); },
   async fileMark(p: { product: string; id: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }> {

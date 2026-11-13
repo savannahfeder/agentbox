@@ -188,9 +188,9 @@ export function createFinder({ listThreads, loadThread, readText = async () => n
     for (const key of built.keys()) if (!threads.some((t) => t.key === key)) built.delete(key);
   }
 
-  async function search(query: string, { lines = 6, files = 5, comments = 5 }: { lines?: number; files?: number; comments?: number } = {}) {
+  async function search(query: string, { lines = 6, files = 5, comments = 5, threads: threadsWanted = 0 }: { lines?: number; files?: number; comments?: number; threads?: number } = {}) {
     const q = queryOf(query);
-    const empty = { lines: [], files: [], comments: [], total: { lines: 0, files: 0, comments: 0 } };
+    const empty = { lines: [], files: [], comments: [], threads: [], total: { lines: 0, files: 0, comments: 0 } };
     if (!q.terms.length) return empty;
     const threads = listThreads();
     const behind = threads.filter((t) => staleOf(t, built.get(t.key)));
@@ -227,7 +227,23 @@ export function createFinder({ listThreads, loadThread, readText = async () => n
     foundLines.sort(newest);
     foundFiles.sort(byName);
     foundNotes.sort(newest);
+    // One entry per thread, so a thread that talks about the words all the way
+    // through outranks one that said them once, and no thread fills every slot.
+    const perThread = new Map<string, { where: Where; m: Folded<FoundMessage>; hits: number; phrase: boolean }>();
+    for (const { where, m, rank } of foundLines) {
+      const key = `${where.kind}/${where.product ?? where.ownerId}/${where.id ?? where.threadId}`;
+      const had = perThread.get(key);
+      if (had) had.hits += 1;
+      else perThread.set(key, { where, m, hits: 1, phrase: rank > 0 });
+    }
+    const tallied = [...perThread.values()]
+      .sort((a, b) => Number(b.phrase) - Number(a.phrase) || b.hits - a.hits || b.m.at - a.m.at)
+      .slice(0, threadsWanted)
+      .map(({ where, m, hits, phrase }) => ({
+        ...where, hits, phrase, uid: m.uid, by: m.by, source: m.source, at: m.at, comment: !!m.comment, text: windowAround(m.text, firstHit(m.f, q), SNIPPET_CHARS),
+      }));
     return {
+      threads: tallied,
       lines: foundLines.slice(0, lines).map(({ where, m }) => ({
         ...where, uid: m.uid, by: m.by, source: m.source, at: m.at, comment: !!m.comment, text: windowAround(m.text, firstHit(m.f, q), SNIPPET_CHARS),
       })),

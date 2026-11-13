@@ -4164,6 +4164,11 @@ img.product-mark { object-fit: cover; opacity: 1; }
 .palette-k .palette-found .palette-sub { font-size: 12px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .palette-k .palette-found .palette-file { margin-right: 8px; color: var(--text); font-weight: 500; }
 .palette-k .palette-found .hit { color: var(--text); font-weight: 600; }
+/* A found thread: its title with where it is and when it last moved on the
+   right, and what it is about, or where the words were said, under it. */
+.palette-k .palette-head { display: flex; align-items: baseline; gap: 16px; min-width: 0; }
+.palette-k .palette-when { margin-left: auto; flex: none; font-size: 12px; color: var(--text-faint); white-space: nowrap; }
+.palette-k .palette-project { margin-right: 8px; color: var(--text-dim); }
 
 /* A found line, landed on from the results: marked for a moment. */
 [data-line] { transition: background-color .5s ease, box-shadow .5s ease; }
