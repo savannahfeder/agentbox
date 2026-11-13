@@ -27,9 +27,9 @@
 
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { MAC_CHROME, startableChrome } from '../../shared/hidden-browser.mts';
+import { MAC_CHROME, KEEPS_OFF_THE_KEYCHAIN, startableChrome } from '../../shared/hidden-browser.mts';
 
-export { startableChrome };
+export { startableChrome, KEEPS_OFF_THE_KEYCHAIN };
 
 const PREFIX = '/tmp/shot-profile-';
 // Earlier runs started the person's Google Chrome; the sweep still reaps those.

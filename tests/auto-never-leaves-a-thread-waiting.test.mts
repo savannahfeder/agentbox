@@ -135,7 +135,7 @@ describe('a thread sent to Auto', () => {
 
   it('carries a deadline on the question', () => {
     expect(source).toMatch(/\nconst ROUTE_TIMEOUT_MS = 60_000;/);
-    expect(String(Supervisor.prototype.routeTheThreads)).toMatch(/askSmallModel\(prompt, clean, \{ \.\.\.opts, timeoutMs: ROUTE_TIMEOUT_MS \}\)/);
+    expect(String(Supervisor.prototype.routeTheThreads)).toMatch(/askSmallModel\(prompt, clean, \{ \.\.\.opts, timeoutMs: ROUTE_TIMEOUT_MS[ ,]/);
   });
 
   // The supervisor's `stalled` is the list Needs you takes as nothing will start it.

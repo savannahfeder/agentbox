@@ -3,7 +3,7 @@
 import type { Person, Product, Room, RoomsState, WorkItem } from '../../types';
 import { isDirect, messageLine } from '../../threads/page-rules';
 import type { Conversation } from './MessagesPage';
-import { cardName, chatPeople } from './room-rules';
+import { cardName, chatPeople, roomTitle } from './room-rules';
 import { voiceSaid } from '../voice-note';
 import { isTaskRow, isWorkThread, nameIsAPersons } from '../../../../shared/team-rules.mts';
 import { voiceName } from '../../../../shared/agent-voice.mts';
@@ -56,7 +56,7 @@ export function roomConversations(rooms: RoomsState | null | undefined): Convers
     const others = r.wall.filter((c) => !c.me);
     return {
       key: `room:${r.id}`, kind: r.kind === 'group' ? 'group' as const : 'room' as const, id: r.id,
-      name: r.kind === 'group' ? others.map(cardName).join(', ') || r.name : r.name,
+      name: roomTitle(r, meId),
       faces: r.kind === 'group' ? others.map((c) => ({ name: c.name, url: c.avatarUrl })) : [],
       ...(r.kind === 'group' ? { people: others.map((c) => c.id) } : {}),
       last: last ? `${last.voice ? voiceName(last.voice, by && !by.me ? by.name : '', { mine: !!by?.me }) : by ? (by.me ? 'You' : cardName(by)) : 'Someone'}: ${last.deleted ? 'Deleted a message' : voiceSaid(last.body)}` : '',

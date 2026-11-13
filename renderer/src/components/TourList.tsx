@@ -4,7 +4,7 @@
 
 import { useEffect } from 'react';
 import { MAC } from '../this-keyboard';
-import { tourChecklist } from '../setup-split';
+import { tourChecklist, tourCount } from '../setup-split';
 import type { Lesson, Tour } from '../tour';
 import { Name } from '../../../shared/product-name.mjs';
 import { Mark } from './SetupSplit';
@@ -23,7 +23,7 @@ export function TourList({ tour, now, onSkip }: { tour: Tour; now: Lesson | null
   return (
     <aside className="tour-list" aria-label={`How ${Name} works`}>
       <div className="tl-brand"><Mark />{Name}</div>
-      <div className="tl-count">{rows.findIndex((r) => r.state === 'now') + 1 || rows.length} of {rows.length}</div>
+      <div className="tl-count">{tourCount(rows)}</div>
       <div className="tl-body">
         <h2 className="ss-h"><b>How {Name} works.</b>Try each step on the real thing.</h2>
         <div className="ss-list">

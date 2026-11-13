@@ -69,6 +69,7 @@ import { docsFolderFor, docsToSend, tarDocs, layDocs } from './docs.mts';
 import type { LaidFile } from './docs.mts';
 import { troubleCause, limitResetMoment } from '../../shared/spawn-trouble.mts';
 import { HAND_BACK } from '../../shared/cloud-hand-back.mts';
+import { clock } from './logins.mts';
 import { NEED, SERVICES } from '../../shared/cloud-needs.mts';
 import { filesSentFor, SENT_FILE_MAX } from '../../shared/cloud-sent-files.mts';
 import { sentLine } from '../../shared/cloud-start.mts';
@@ -84,7 +85,8 @@ import { asksPermission, approvalsHandshakes } from './kit.mts';
 import { snapshotSkills, filesInFolder } from './skills.mts';
 import { createResourceRequests, resourceContextFor, accountFolderFor } from './resources.mts';
 import { saveCloudKey } from './keys.mts';
-import type { ResourceContext, ResourceState } from './resources.mts';
+import type { ResourceContext, ResourceFile, ResourceState } from './resources.mts';
+import { createKeyAsks, keyFileFor } from './key-asks.mts';
 import type { CloudMarker } from './marker.mts';
 import type { CloudCallError, CloudEvent, CloudReply, CloudStorage, CloudTransport } from './managed.mts';
 import type { Readable, Writable } from 'node:stream';
@@ -213,6 +215,10 @@ export interface RunMarker extends CloudMarker {
   resourceContext?: ResourceContext;
   resources?: ResourceState;
   resourceCapable?: boolean;
+  // The saved keys this run started with, and whether its machine takes one mid-run.
+  keysCarried?: string[];
+  liveKeys?: boolean;
+  foldersCapable?: boolean;
   offline?: boolean;
   plain?: boolean;
   cursor?: number;
@@ -277,6 +283,7 @@ export interface CloudRunOptions {
   storage: CloudStorage;
   login?: CloudLogin | null;
   also?: CloudLogin[];
+  codexHere?: CodexHere | null;
   keys?: { name: string; key: string }[];
   onLoginTrouble?: (trouble: { state: string; id: string | null }) => void;
   onLimit?: (limit: { until: number }) => void;
@@ -329,7 +336,7 @@ const COMMIT_NOTE = 'Your commits on this task\'s branch are sent back to their 
 // its film's files, ffmpeg and a key missing, and asked the person to move the
 // thread (2026-10-16). Kept true to cloud/sandbox/Dockerfile and ./docs.mts.
 const HEADING = '# You are running on a cloud machine, not on the person\'s own computer';
-const HAND_BACK_NOTE = `For a missing installed skill or task file, first use the store tool request_cloud_resource. Request a skill by name, or a file or folder by its path: relative to this task or the product's documents, or any path under the account's documents, other products' folders included, written out in full as the request writes it (\`~/...\` works). It returns a separate scratch path when delivery succeeds; read the skill's SKILL.md there with its references and scripts. A folder answers with its files, which you then ask for. Their own files outside the documents (on their Desktop, in Downloads or Movies, a film, recording or screenshot they made) and anything over 25 MB are only on their computer, unless they attached it to this thread. When the request is for such files, or cannot be done without them, whether it gives their path or only says what they are ("the original launch video", "my screenshots"), that is work that cannot go ahead here: hand it back as below rather than answering in part. For something the work can do without, such as a skill or a reference it would have liked, finish the rest and say exactly what is missing. Something missing does not end the conversation. When they ask a question or for a status, answer it from what you have (this thread, the documents, the code), say in one sentence what you could not recheck from here, and end with the option "Check from my computer". When the missing thing is something they can tell you in a reply, such as a link, a choice, a name or where a file is, ask for it in plain words as your usual final answer with options. Never ask them to type a password, key or sign-in into the thread. When the work itself cannot go ahead without a key, one of their apps, a private repository this machine cannot reach, or a file, folder or skill the request names or needs that request_cloud_resource cannot deliver, stop at once. Do not work around it, do not write to the work item, do not give the person commands to run, and do not offer to move the thread: the app moves it. End your turn with one line and nothing else: ${HAND_BACK} followed by what was missing, in a few words they would use (your AWS sign-in, the iOS simulator), since the app shows those words to them. A person who asks to have this thread moved to their computer, or picks "Check from my computer", is answered with this line as well. That line replaces your usual final answer and its options. The app then runs the same request again on their computer, where all of it is. A program you can install is not a reason to stop. Otherwise work as usual, and never write that line.`;
+const HAND_BACK_NOTE = `For a missing installed skill or task file, first use the store tool request_cloud_resource. Request a skill by name, or a file or folder by its path: relative to this task or the product's documents, or any path under the account's documents, other products' folders included, written out in full as the request writes it (\`~/...\` works). It returns a separate scratch path when delivery succeeds; read the skill's SKILL.md there with its references and scripts. Ask for a folder rather than its files one by one: it comes whole in one request, at the path the answer gives, unless it is too big, when it answers with its files, which you then ask for. Their own files outside the documents (on their Desktop, in Downloads or Movies, a film, recording or screenshot they made) and anything over 25 MB are only on their computer, unless they attached it to this thread. When the request is for such files, or cannot be done without them, whether it gives their path or only says what they are ("the original launch video", "my screenshots"), that is work that cannot go ahead here: hand it back as below rather than answering in part. For something the work can do without, such as a skill or a reference it would have liked, finish the rest and say exactly what is missing. Something missing does not end the conversation. When they ask a question or for a status, answer it from what you have (this thread, the documents, the code), say in one sentence what you could not recheck from here, and end with the option "Check from my computer". When the missing thing is something they can tell you in a reply, such as a link, a choice, a name or where a file is, ask for it in plain words as your usual final answer with options. Never ask them to type a password, key or sign-in into the thread. When the work itself cannot go ahead without a key, one of their apps, a private repository this machine cannot reach, or a file, folder or skill the request names or needs that request_cloud_resource cannot deliver, stop at once. Do not work around it, do not write to the work item, do not give the person commands to run, and do not offer to move the thread: the app moves it. End your turn with one line and nothing else: ${HAND_BACK} followed by what was missing, in a few words they would use (your AWS sign-in, the iOS simulator), since the app shows those words to them. A person who asks to have this thread moved to their computer, or picks "Check from my computer", is answered with this line as well. That line replaces your usual final answer and its options. The app then runs the same request again on their computer, where all of it is. A program you can install is not a reason to stop. Otherwise work as usual, and never write that line.`;
 // With keys (the names of those saved for cloud runs; null when this run's
 // image cannot place them), a missing key is asked for, not handed back.
 const handBackNote = (keys: string[] | null) => (keys
@@ -341,16 +348,50 @@ const handBackNote = (keys: string[] | null) => (keys
   : HAND_BACK_NOTE);
 const keysNote = (names: string[]) => [
   names.length ? `Keys and sign-ins they saved for cloud runs are in your environment under these names: ${names.join(', ')}.` : 'They have saved no keys or sign-ins for cloud runs yet.',
+  'When a service needs them to sign in, use its own browser sign-in, the way they would in Claude Code or Codex, before asking for any token: start its login in the background and hand its link, and any code it printed, to the sign_in tool, which shows it to them while you wait.',
+  'These print a link on this machine: `gh auth login --web` (after `sudo apt-get install -y gh`), `vercel login`, `netlify login`, `npx wrangler login --browser=false`, `fly auth login`, `stripe login`, `npm login --auth-type=web`, `eas login --device --non-interactive`, `aws login --remote` (with asksForCode), and an MCP server\'s authenticate tool or `codex mcp login --no-browser`.',
+  '`supabase login` refuses to run without a terminal, so give it one and a pipe for its code: `mkfifo /tmp/sb-in; (sleep 3600 > /tmp/sb-in &); script -qfc "supabase login --no-browser --agent no --output-format text" /tmp/sb-out < /tmp/sb-in` in the background, then hand the link in /tmp/sb-out to sign_in with asksForCode, and write the code it answers with into the pipe ending in a carriage return, which a newline does not stand in for: `printf \'%s\\r\' CODE > /tmp/sb-in`.',
+  'Once a login worked, keep the token it made with sign_in\'s keep, under the variable its tool reads, so later cloud runs are signed in too. A ship\'s push runs on their computer, and when that computer needs a GitHub sign-in the app asks for it on the thread itself, so never ask for that one.',
   'When the work needs something only they can give, do all of the work that does not need it, then ask for it: line one of your usual final answer says what you need in plain words, and just above its Options goes one line per thing, in one of these forms.',
-  `\`${NEED} sign-in SERVICE | what it is for\` connects a service whose tools read a token from the environment. SERVICE is one of ${SERVICES.map((s) => s.id).join(', ')}; once connected, every later cloud run has ${SERVICES.slice(0, 3).map((s) => s.keys.map((k) => k.name).join(' and ')).join(', ')} and the rest. Before either line, sign in the way they would in Claude Code or Codex: when the service has a browser sign-in (an MCP server's authenticate tool, \`codex mcp login --no-browser\`, or its command-line login, such as \`gh auth login --web\` after \`sudo apt-get install -y gh\`), start it in the background and hand its link to the sign_in tool, which shows it to them while you wait, then keep the token it made with sign_in's keep. A ship's push runs on their computer, and when that computer needs a GitHub sign-in the app asks for it on the thread itself, so never ask for that one.`,
-  `\`${NEED} key VARIABLE | what it is and where they get it\` asks for any other key a tool reads from the environment, under the variable the tool reads.`,
+  `\`${NEED} sign-in SERVICE | what it is for\` asks them to paste the service's access token, on a card that links to the page where they make one. Use it only when the service has no browser sign-in here, or they chose Not now on it. SERVICE is one of ${SERVICES.map((s) => s.id).join(', ')}; once it is saved, every later cloud run has ${SERVICES.slice(0, 3).map((s) => s.keys.map((k) => k.name).join(' and ')).join(', ')} and the rest.`,
+  `\`${NEED} key VARIABLE | what it is and where they get it\` asks for any other key a tool reads from the environment, under the variable the tool reads. When their instructions, notes or memory say where on their computer a key is kept (a Keychain item, a file, a variable in their shell), ask for it with the store tool request_cloud_key first: they allow it on a card and this run gets it without ending. If that does not get it, add the same place as a third part of the key line (\`| keychain ITEM\`, \`| file PATH\` with the variable for an .env file, or \`| shell VARIABLE\`), so their card takes it in one press.`,
   `\`${NEED} file PATH | what it is for\` asks for a file only their computer has, by its full or ~/ path there, up to 1 GB. It is at that same path here on your next turn.`,
   `\`${NEED} code WHAT | what it is for\` asks for a one-time code, such as an npm one-time password or a verification code. It comes back as their reply.`,
   'The app draws each line as a card they answer on the thread. A sign-in or a key is kept in the cloud and given to every later cloud run of every thread, and their reply comes back to you once it is given. The card already offers doing it on their computer instead, so do not add that as an option. A key under a name Claude Code or Codex read for their own sign-in (ANTHROPIC_, CLAUDE_, CODEX_, OPENAI_API_KEY) cannot be saved.',
 ].join(' ');
 
+// WHETHER CODEX IS SIGNED IN ON THE MACHINE, told to a Claude run once. A
+// sign-in an agent makes there is gone with the machine, so it is never the
+// fix: the cloud menu's sign-in is the one every later run is given.
+export interface CodexHere {
+  carried: boolean;
+  state?: string | null;
+  until?: number | null;
+}
+
+const CODEX_WHY: Record<string, (until?: string) => [why: string, fix: string]> = {
+  broken: () => ['the cloud\'s Codex sign-in has stopped working', 'the cloud\'s Codex sign-in stopped working, and Sign in again in the cloud menu on their computer mends it for every later run'],
+  renew: () => ['the cloud\'s Codex sign-in is being renewed by their computer', 'the cloud\'s Codex sign-in is being renewed by their computer and comes back on its own'],
+  limited: (until) => [`the cloud's Codex account is at its usage limit until ${until}`, `the cloud's Codex account is at its usage limit until ${until}`],
+  none: () => ['no Codex account is signed in for the cloud', 'Codex can be signed in for the cloud from the cloud menu on their computer, and every later run is then given it'],
+};
+
+export function codexNote({ carried, state = null, until = null }: CodexHere) {
+  const [why, fix] = (CODEX_WHY[state ?? ''] ?? CODEX_WHY.none)(until ? clock(until) : 'later');
+  const opening = carried
+    ? 'Codex here is signed in to the cloud\'s Codex account, which their computer keeps and renews. Before anything long runs on Codex, try one tiny request (`codex exec --skip-git-repo-check \'Reply ok\'`): `codex login status` says signed in even when OpenAI refuses the sign-in. If it is refused,'
+    : `Codex is signed out on this machine, because ${why}. Whatever the work,`;
+  return [
+    opening,
+    'do not sign Codex in on this machine: a sign-in made here is lost when the run ends, so the next run would ask for it again. Say it once instead.',
+    `When the work can go ahead without Codex, finish the rest and say in one sentence of your answer that ${carried ? CODEX_WHY.broken()[1] : fix}.`,
+    `When it cannot (Codex testers, a Codex review), end your turn with the one line \`${HAND_BACK} a working Codex sign-in\`, and their computer runs it on its own Codex.`,
+  ].join(' ');
+}
+
 /** The note a cloud run is given, for a project with a repository or without one. */
-export function cloudNote({ plain = false, limitMs = RUN_LIMIT_MS, keys = null }: { plain?: boolean; limitMs?: number; keys?: string[] | null } = {}) {
+export function cloudNote({ plain = false, limitMs = RUN_LIMIT_MS, keys = null, codex = null }: { plain?: boolean; limitMs?: number; keys?: string[] | null; codex?: CodexHere | null } = {}) {
+  const codexPart = codex ? [codexNote(codex)] : [];
   if (plain) {
     return [
       HEADING,
@@ -358,6 +399,7 @@ export function cloudNote({ plain = false, limitMs = RUN_LIMIT_MS, keys = null }
       'Install whatever else the work needs: you have sudo (`sudo apt-get update && sudo apt-get install -y <package>`, `pip install --user`, `npm install`).',
       'It does not have: any other file from their computer (documents over 256 KB, other threads\' design folders, large media, files under the home folder, /tmp from an earlier turn); API keys, key files or tokens kept on their computer; their computer\'s apps (Xcode, a simulator, their browser and its sign-ins).',
       howLongNote(limitMs),
+      ...codexPart,
       handBackNote(keys),
     ].join('\n\n');
   }
@@ -368,6 +410,7 @@ export function cloudNote({ plain = false, limitMs = RUN_LIMIT_MS, keys = null }
     'It does not have: the project\'s other branches (only this task\'s branch and main came up); any other file from their computer (other threads\' design folders, large media, files under the home folder); files an earlier turn left outside git (node_modules, gitignored folders such as scripts/scratch, /tmp); API keys, key files or tokens kept on their computer; their computer\'s apps (Xcode, a simulator, their browser and its sign-ins). Run `npm ci --ignore-scripts` before anything that needs node_modules. Open files are capped at 1024 here (the cloud fixes that ceiling), so a test runner that watches the whole project (`vitest related`, `npm run test:changed`) fails with EMFILE: run the test files you changed and the ones that import them by name with `npx vitest run <files>`.',
     `Only this task's own branch comes back to their computer. A commit, merge or reset on main or any other branch stays in this sandbox and is thrown away with it, so a merge done here has not happened. To ship, when your brief has a section on How this task ships, do what it says from here: commit on this branch and add the label \`ship\`. The app ships the branch on their computer once it comes home, so a ship never needs the hand-back line. When your brief has no section on how this task ships and the request includes merging into main, or whenever it includes changing any branch but this task's, do the rest of the work and commit it on this branch, then end your turn with the one line \`${HAND_BACK} merging into main\` (as below): the app merges on their computer.`,
     `${howLongNote(limitMs)} ${COMMIT_NOTE}`,
+    ...codexPart,
     handBackNote(keys),
   ].join('\n\n');
 }
@@ -412,6 +455,18 @@ export function limitInResultLine(line: string, now: number = Date.now()) {
   const text = String(msg.result ?? '');
   if (troubleCause(text) !== 'at-limit') return null;
   return limitResetMoment(text, now) ?? now + LIMIT_REST_MS;
+}
+
+// A Codex turn that failed because the cloud's sign-in was refused, off one
+// relayed app-server frame. The cloud only checks a Codex sign-in's expiry, so
+// this is how a refused one is found out.
+export function codexLoginRefusedInLine(line: string) {
+  let msg: { method?: string; params?: { turn?: { status?: string; error?: { message?: unknown } } } } | null;
+  try { msg = JSON.parse(line); } catch { return false; }
+  if (msg?.method !== 'turn/completed' && msg?.method !== 'turn/failed') return false;
+  const turn = msg.params?.turn;
+  if (!turn || (turn.status ?? 'failed') !== 'failed') return false;
+  return troubleCause(String(turn.error?.message ?? '')) === 'signed-out';
 }
 
 export const IMPORT_FAILED = 75;
@@ -910,6 +965,8 @@ export async function cloudRun({
   // Other sign-ins the run carries, in the same shape (./run-cli.mts
   // `loginsCarriedBy`). The sandbox places them if it can and starts anyway.
   also = [],
+  // Whether `also` carried Codex, or why not (./run-cli.mts `codexInTheRun`).
+  codexHere = null,
   // The keys saved for cloud runs (./keys.mts keysCarried): { name, key }.
   keys = [],
   // Told when the sandbox says the login was missing, refused or ran out.
@@ -964,7 +1021,7 @@ export async function cloudRun({
   // Keys go only to an image that places them, and the agent is told of them
   // only then, or it would ask for one, have it saved, and still not find it.
   const keysGo = imageCaps.includes('keys') && !kit ? keys : [];
-  const note = cloudNote({ plain, limitMs: runLimitMs, keys: imageCaps.includes('keys') && !kit ? keysGo.map((k) => k.name) : null });
+  const note = cloudNote({ plain, limitMs: runLimitMs, keys: imageCaps.includes('keys') && !kit ? keysGo.map((k) => k.name) : null, codex: engine === 'claude' ? codexHere : null });
   const here = plain ? { folder: cwd, file: env.AGENTBOX_CLOUD_MARKER } : cwd;
   const configDir = env.CLAUDE_CONFIG_DIR || path.join(homeDir, '.claude');
   const codexHome = env.CODEX_HOME || path.join(homeDir, '.codex');
@@ -1035,7 +1092,7 @@ export async function cloudRun({
   if (importOnly && !joining) return 0;
   if (!joining && (!login || login.engine !== engine)) { say(`this ${engine === 'codex' ? 'Codex' : 'Claude'} account has not signed in for the cloud`); return LOGIN_TROUBLE; }
 
-  let runId: string; let sessionId: string; let marker: RunMarker; let docs: RunDocs | null; let sentFiles: Set<string>; let sendFile: SendFile; let resourceCapable = false;
+  let runId: string; let sessionId: string; let marker: RunMarker; let docs: RunDocs | null; let sentFiles: Set<string>; let sendFile: SendFile; let resourceCapable = false; let foldersCapable = false;
   // Files that are a conversation, sent joined to the copy the bucket has.
   const conversations = new Set<string>();
   let mcpConfig: McpConfig = { mcpServers: {} };
@@ -1097,6 +1154,7 @@ export async function cloudRun({
     const { state: _s, pid: _p, at: _a, cursor: c, n: sent, conns, ...kept } = joining;
     marker = kept;
     resourceCapable = !!marker.resourceCapable || !!joinedAt!.caps?.includes('resources');
+    foldersCapable = !!marker.foldersCapable || !!joinedAt!.caps?.includes('folders');
     docs = joining.docs || null;
     // The app's servers as they are now win over the ones the run started
     // with (the approvals key is new at every start); the run's own record
@@ -1318,7 +1376,7 @@ export async function cloudRun({
   // the servers, and the worker's own variables they ran with.
   // `startedAt` outlives this process, so a run brought home by a later one
   // can still say how long it had been going when its machine stopped.
-  marker = { runId, sessionId, branch, startSha, sent, configDir, engine, bringDirs, docs, startedAt: Date.now(), mcp: mcpConfig.mcpServers, toolEnv: toolVariables(env), resourceContext: { engine, homeDir, configDir, codexHome }, ...(plain ? { plain: true } : {}) };
+  marker = { runId, sessionId, branch, startSha, sent, configDir, engine, bringDirs, docs, startedAt: Date.now(), mcp: mcpConfig.mcpServers, toolEnv: toolVariables(env), resourceContext: { engine, homeDir, configDir, codexHome }, keysCarried: keysGo.map((k) => k.name), ...(plain ? { plain: true } : {}) };
   if (kit) {
     signals.off('SIGHUP', early);
     const { runId: _r, sessionId: _s, ...joins } = marker;
@@ -1409,6 +1467,9 @@ export async function cloudRun({
   offlineOn = (started.caps || []).includes('offline');
   resourceCapable = (started.caps || []).includes('resources');
   marker.resourceCapable = resourceCapable;
+  marker.liveKeys = (started.caps || []).includes('live-keys');
+  foldersCapable = (started.caps || []).includes('folders');
+  marker.foldersCapable = foldersCapable;
   if (!resourceCapable) say('this cloud image cannot take a file or skill the run asks this Mac for; rebuild it (npm run deploy, or node scripts/cloud-setup.mjs)');
   if (!offlineOn) say('this cloud image stops at its next tool call while this Mac sleeps; rebuild it (node scripts/cloud-setup.mjs) to keep runs going');
   marker.offline = offlineOn;
@@ -1456,13 +1517,17 @@ export async function cloudRun({
     state: marker.resources ??= {}, save: () => saveMarker(),
     stopped: () => !!finished || leaving || cancelled,
     capable: () => resourceCapable,
+    folders: () => foldersCapable,
     log: say,
     upload: async (name, body) => {
       const k = cacheKey(name);
       await sendOnce(storage, k, () => body);
       return storage.getUrl(k);
     },
-    deliver: (files, signal) => new Promise<boolean>((resolve) => {
+    deliver: deliverToRun,
+  });
+  function deliverToRun(files: ResourceFile[], signal: AbortSignal) {
+    return new Promise<boolean>((resolve) => {
       if (signal.aborted || finished || leaving || cancelled) { resolve(false); return; }
       const done = (ok: boolean) => { signal.removeEventListener('abort', abort); resolve(ok); };
       const message: OutMessage = { action: 'files', resource: true, files, onAck: (res: CloudReply) => done(!!(res.ok || res.dup) && !res.error) };
@@ -1473,7 +1538,17 @@ export async function cloudRun({
       };
       signal.addEventListener('abort', abort, { once: true });
       enqueue(message);
-    }),
+    });
+  }
+  const runKeysAt = `/tmp/agentbox-resources/${crypto.createHash('sha256').update(runId).digest('hex')}/keys`;
+  const requestCloudKey = createKeyAsks({
+    spool: env.ZERO_APPROVALS_DIR, publicKey: env.ZERO_APPROVALS_PUBKEY,
+    item: env.ZERO_ITEM || null, product: env.ZERO_PRODUCT || null,
+    home: homeDir, storage, carried: marker.keysCarried ?? [], runKeysAt,
+    capable: () => !!marker.liveKeys,
+    stopped: () => !!finished || leaving || cancelled,
+    log: say,
+    deliver: ({ name, url }) => deliverToRun([{ key: name, url, path: keyFileFor(runKeysAt, name) }], AbortSignal.timeout(2 * 60_000)),
   });
 
   // ONE INPUT AT A TIME, KEPT UNTIL ACKNOWLEDGED. Each gets its number once,
@@ -1564,7 +1639,7 @@ export async function cloudRun({
   function openServer(conn: string, name: string, init: string[] = []) {
     const cfg = mcpConfig.mcpServers?.[name];
     if (!cfg) { enqueue({ action: 'mcp-close', conn }); return; }
-    const proc = servedHere(cfg, toolEnv({ ...serverEnv, ...(cfg.env || {}) }), `${runId}-${conn}`, { requestCloudResource, keepCloudKey })
+    const proc = servedHere(cfg, toolEnv({ ...serverEnv, ...(cfg.env || {}) }), `${runId}-${conn}`, { requestCloudResource, requestCloudKey, keepCloudKey })
       ?? spawn(cfg.command, cfg.args || [], { cwd, env: toolEnv({ ...serverEnv, ...(cfg.env || {}) }), stdio: ['pipe', 'pipe', 'pipe'] });
     const s: ServerEntry = { proc, name, buf: '', closed: false, init: [...init], pending: new Set(), swallow: new Set() };
     servers.set(conn, s);
@@ -1652,6 +1727,18 @@ export async function cloudRun({
       if (until) { try { onLimit({ until }); } catch { /* noted elsewhere */ } }
     }
   }
+  let codexLine = '';
+  const codexDecoder = new StringDecoder('utf8');
+  function noteCodexRefusal(buf: Buffer) {
+    codexLine += codexDecoder.write(buf);
+    let i;
+    while ((i = codexLine.indexOf('\n')) >= 0) {
+      const line = codexLine.slice(0, i);
+      codexLine = codexLine.slice(i + 1);
+      if (!line.includes('"turn/')) continue;
+      if (codexLoginRefusedInLine(line)) loginTrouble = { state: 'refused', id: login?.id ?? null };
+    }
+  }
   async function sayWhatWasLost() {
     const lost = helpers.lost();
     if (lost.length) await write(stdout, helpersLostLine(lost));
@@ -1672,6 +1759,7 @@ export async function cloudRun({
     if (e.kind === 'stdout') {
       const buf = Buffer.from(e.data, 'base64');
       if (!codex) noteLimit(buf);
+      if (codex) noteCodexRefusal(buf);
       await write(stdout, buf);
     }
     else if (e.kind === 'stderr') { if (!joining) await write(stderr, Buffer.from(e.data, 'base64')); }
@@ -1794,6 +1882,7 @@ export async function cloudRun({
     }
   } finally {
     requestCloudResource.close();
+    requestCloudKey.close();
     signals.off('SIGTERM', onTerm);
     signals.off('SIGINT', onInt);
     signals.off('SIGHUP', onHup);
@@ -2285,7 +2374,8 @@ export function codexLineForTheCloud(line: string, { stubPath = STUB, codexHome,
       // Codex starts an MCP server with a bare environment, so the stub is
       // told where the sandbox's bridge is in its own entry (measured
       // 2026-10-13: without it the stub never connected).
-      servers[name] = { ...s, command: SANDBOX_NODE, args: [stubPath, name], env: { AGENTBOX_BRIDGE_SOCK: BRIDGE_SOCK } };
+      // Codex's own limit on a call is 60 seconds; request_cloud_key waits up to 15 minutes for a person.
+      servers[name] = { ...s, command: SANDBOX_NODE, args: [stubPath, name], env: { AGENTBOX_BRIDGE_SOCK: BRIDGE_SOCK }, tool_timeout_sec: Math.max(Number(s.tool_timeout_sec) || 0, 20 * 60) };
     }
   }
   // THE CLOUD MACHINE IS CODEX'S SANDBOX (her decision, 2026-10-13: "Yes, let
@@ -2449,7 +2539,7 @@ export async function takeImportSlot({ dir = path.join(os.tmpdir(), `${nameSlug}
 // 2026-10-17), most of it the runtime starting up, not work. In here each
 // connection gets its own channel: the approvals for its own row, the store
 // with its own claims. Any other server is still started as configured.
-export function servedHere(cfg: Partial<ServerConfig> | undefined, env: NodeJS.ProcessEnv, holder: string, { requestCloudResource, keepCloudKey }: { requestCloudResource?: unknown; keepCloudKey?: unknown } = {}): ServerProcess | null {
+export function servedHere(cfg: Partial<ServerConfig> | undefined, env: NodeJS.ProcessEnv, holder: string, { requestCloudResource, requestCloudKey, keepCloudKey }: { requestCloudResource?: unknown; requestCloudKey?: unknown; keepCloudKey?: unknown } = {}): ServerProcess | null {
   const cmd = String(cfg?.command || '');
   if (cmd.endsWith('/approval-server.sh')) return channel((io) => serveApprovals({ env, ...io, warn: (m) => io.output.emit('warn', m) }));
   if (cmd.endsWith(`/${nameSlug}-mcp.sh`)) {
@@ -2462,7 +2552,7 @@ export function servedHere(cfg: Partial<ServerConfig> | undefined, env: NodeJS.P
     // Named here: runs share this process, so its own ZERO_ITEM is whichever run set it last.
     const ownItem = cfg!.env?.ZERO_ITEM || env.ZERO_ITEM || null;
     const ownProduct = cfg!.env?.ZERO_PRODUCT || env.ZERO_PRODUCT || null;
-    return channel(async (io) => (await import('../../mcp/stdio.mts')).serveStore({ ...io, holder: `mcp-cloud-${holder}`, ownItem, ownProduct, requestCloudResource, keepCloudKey } as {}));
+    return channel(async (io) => (await import('../../mcp/stdio.mts')).serveStore({ ...io, holder: `mcp-cloud-${holder}`, ownItem, ownProduct, requestCloudResource, requestCloudKey, keepCloudKey } as {}));
   }
   return null;
 }

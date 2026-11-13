@@ -423,7 +423,8 @@ describe('the wiring, which is the half a pure test cannot see', () => {
     // when it mounts, and it mounts on `make`, so leaving `make` out opened it
     // with an empty box under "Press ⌘↵ or click Send".
     expect(app).toMatch(/const walkCard = run\?\.step === 'make' \|\| run\?\.step === 'task';/);
-    expect(app).toMatch(/scripted=\{walkCard \? \{ labels: \[FIRST_RUN_LABEL\] \} : null\}/);
+    // The walkthrough's practice task carries the same mark (w-fbe5e95dea).
+    expect(app).toMatch(/scripted=\{walkCard( \|\| tourTask)? \? \{ labels: \[FIRST_RUN_LABEL\] \} : null\}/);
     const card = src('threads', 'ThreadComposer.tsx');
     expect(card).toMatch(/\.\.\.\(scripted \? \{ labels: scripted\.labels \} : \{\}\)/);
     expect(card).toMatch(/practiceRefusal\(product, \{ scripted: !!scripted \}\)/);

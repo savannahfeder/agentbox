@@ -11,6 +11,9 @@ export const MAC_CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google
 const PLAYWRIGHT_CACHE = path.join(os.homedir(), 'Library/Caches/ms-playwright');
 const FOR_TESTING = 'Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing';
 
+/** Without these, every launch asks for the login keychain password ("Chromium Safe Storage"). */
+export const KEEPS_OFF_THE_KEYCHAIN = ['--use-mock-keychain', '--password-store=basic'];
+
 export const NO_HIDDEN_BROWSER = 'No test browser on this computer, and a hidden Google Chrome would stop your own Chrome opening a window. Run `npx playwright install chromium-headless-shell`, then try again.';
 
 function builds(root: string, folder: RegExp, arches: string[], exe: string): string[] {

@@ -1,0 +1,22 @@
+/* THE WALKTHROUGH'S FRAME (TourFrame.tsx): the app inset on the setup's own
+   ground while the tips run, so the practice still reads as practice. */
+:root[data-tour-frame] { --tf-ground: var(--bg); }
+:root[data-tour-frame][data-theme="light"] { --tf-ground: #fff; }
+:root[data-tour-frame] body { background: var(--tf-ground); }
+/* Above home.css, which paints a light window's whole body in its sky's frame colour. */
+html:root[data-tour-frame][data-theme="light"] body { background: var(--tf-ground) !important; }
+:root[data-tour-frame] #root { position: fixed; top: 52px; left: 16px; right: 16px; bottom: 16px; width: auto; height: auto; margin: 0;
+  border-radius: 14px; overflow: hidden;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 10%, transparent), 0 24px 70px rgba(0, 0, 0, .16), 0 4px 14px rgba(0, 0, 0, .05); }
+
+.tour-frame { position: fixed; left: 0; right: 0; top: 0; height: 52px; z-index: 40; display: flex; align-items: center; justify-content: center;
+  -webkit-app-region: drag; font-family: 'Geist', 'Avenir Next', -apple-system, BlinkMacSystemFont, 'DejaVu Sans', sans-serif; color: var(--text); }
+.tour-frame button { -webkit-app-region: no-drag; }
+.tour-frame .tf-steps { display: flex; align-items: center; gap: 5px; }
+.tour-frame .tf-steps i { width: 16px; height: 2px; border-radius: 1px; background: color-mix(in srgb, var(--text) 12%, transparent); }
+.tour-frame .tf-steps i.tf-was { background: color-mix(in srgb, var(--text) 40%, transparent); }
+.tour-frame .tf-steps i.tf-is { background: var(--text); }
+.tour-frame .tf-steps span { margin-left: 12px; font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); }
+.tour-frame .tf-skip { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); padding: 5px 8px; border: 0; border-radius: 6px; background: none;
+  font: inherit; font-size: 13px; color: var(--text-faint); cursor: pointer; }
+.tour-frame .tf-skip:hover { color: var(--text); background: color-mix(in srgb, var(--text) 5%, transparent); }

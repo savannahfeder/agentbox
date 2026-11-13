@@ -66,7 +66,7 @@ export function startHubClient(hub: HubAddress): void {
     });
     webContents.on('render-process-gone', () => { clearTimeout(retry); retry = setTimeout(load, RETRY_MS); });
     window.on('closed', () => { clearTimeout(retry); window = null; });
-    installNotifier({ app, window, Notification, powerMonitor, ipcMain, nativeImage });
+    installNotifier({ app, window, Notification, powerMonitor, ipcMain, nativeImage, openExternal: (url: string) => shell.openExternal(url) });
     load();
   };
 

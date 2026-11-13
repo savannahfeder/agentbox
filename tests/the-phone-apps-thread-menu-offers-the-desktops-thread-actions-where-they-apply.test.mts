@@ -131,9 +131,10 @@ describe('Keep on your computer', () => {
     expect(offersOf(item({ status: 'done' }), facts({ cloud: true })).place).toBeNull();
     expect(offersOf(item({ status: 'claimed' }), facts({ cloud: true, session: session({ movable: true }), inProgress: true })).place).toBeNull();
   });
-  it('sends the keep, and the let go', () => {
+  // False sends it to the cloud, so its replies start there (tests/a-thread-sent-to-the-cloud-starts-its-replies-there).
+  it('sends the keep, and the send to the cloud', () => {
     expect(planFor({ kind: 'keep-here', keep: true }, item(), NOW)).toEqual({ steps: [{ door: 'setThreadOnMac', payload: { onMac: { 'w-1': true } } }], toast: 'This thread now runs only on your computer' });
-    expect(planFor({ kind: 'keep-here', keep: false }, item(), NOW)).toEqual({ steps: [{ door: 'setThreadOnMac', payload: { onMac: { 'w-1': null } } }], toast: 'This thread can run on the cloud again' });
+    expect(planFor({ kind: 'keep-here', keep: false }, item(), NOW)).toEqual({ steps: [{ door: 'setThreadOnMac', payload: { onMac: { 'w-1': false } } }], toast: 'This thread can run on the cloud again' });
   });
 });
 
