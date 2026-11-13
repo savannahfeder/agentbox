@@ -4,7 +4,7 @@
 // subscription can reach `past_due` without ever having been paid: the card
 // passes Stripe's setup check, the first charge at the trial's end fails, and
 // Stripe retries it for weeks. `past_due` counted as paying, so the team kept
-// 400 hours and 10 agents a member through every retry and was never charged.
+// 400 hours a member through every retry and was never charged.
 // Measured on stand-ins against the real gateway: trialing then past_due gave
 // `seats: 2, hours: 400` a day after the trial ended. `past_due` now pays only
 // for a subscription that was once `active`, which is what a renewal's retry is.
@@ -119,10 +119,12 @@ describe('a team subscription that was paid', () => {
   });
 });
 
+// Since 2026-11-13 a trialing team keeps the trial's hours until it is charged
+// (tests/a-team-runs-any-number-at-once-and-a-card-trial-runs-on-trial-hours).
 describe('a trialing team', () => {
-  it('is on its seats, as the setup’s "Try Pro free" offers', async () => {
+  it("has its card in and the trial's hours, not yet a seat's", async () => {
     const { teamOfMember, webhook } = setup();
     await webhook('sub_team', 'trialing');
-    expect(await teamOfMember()).toMatchObject({ trial: false, seats: 2, hours: TEAM.hoursPerSeat });
+    expect(await teamOfMember()).toMatchObject({ trial: true, seats: 2, hours: TEAM.trialHoursPerMember });
   });
 });

@@ -75,19 +75,19 @@ export function TeamBilling({ team, people, meId, billing, now = Date.now(), pay
           ? `${v.seatsLine}${billing?.nextAt ? ` · next bill $${n(billing.nextAmount ?? 0)} on ${day(billing.nextAt)}` : ''}`
           : v.seatsLine}</div>
       )}
-      {team.owner && (team.trial
+      {team.owner && (team.trial && !team.seats
         ? <button type="button" className="set-ghost" disabled={paying} onClick={onPay}>{paying ? 'Opening Stripe…' : `Pay for ${v.seatsLine} now · ${v.price}`}</button>
         : <button type="button" className="set-ghost" onClick={onManage}>Manage billing</button>)}
     </div>
     <div className="tb-compare">
       <Card name={team.trial ? 'Now, each person' : 'This month, you'} big={v.mine}>
         <div className="tb-compare-small">{team.trial ? 'of your trial hours left' : 'cloud hours left'}</div>
-        <div className="tb-compare-small">{team.agents} agents at once</div>
+        <div className="tb-compare-small">Any number at once</div>
       </Card>
       {team.trial ? (
         <Card name={`From ${v.ends}, each person`} big={`$${TEAM.dollarsPerSeat} a month`}>
           <div className="tb-compare-small">{n(TEAM.hoursPerSeat)} cloud hours a month</div>
-          <div className="tb-compare-small">{TEAM.agentsPerSeat} agents at once · {team.owner ? `you pay ${v.price} for ${team.members}` : "paid by your team's owner"}</div>
+          <div className="tb-compare-small">{team.owner ? `You pay ${v.price} for ${team.members}` : "Paid by your team's owner"}</div>
         </Card>
       ) : team.owner ? (
         <Card name="Billing" big={billing?.card ? `${billing.card.brand} ${billing.card.last4}` : 'No card yet'}>

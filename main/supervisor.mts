@@ -49,6 +49,7 @@ import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { stripTypesFlags } from './strip-types.mts';
+import { plainCopy } from './plain-copy.mts';
 import { cloudWorkPending, takeCloudNews, writeMarker, readMarker } from './cloud/marker.mts';
 import { cloudClients } from './cloud/clients.mts';
 import { kitCopyPath, kitFramePath, readKitCopy, markerForCloudRun } from './cloud/kit.mts';
@@ -187,7 +188,7 @@ import { runsOn } from './runs-on.mts';
 import { MemoryGateServer, defaultSocketPath as memoryGateSocketPath, readMacPressure } from './memory-gate-server.mts';
 import { startDecision, readMacPressureNow, SETTLE_MS, STALE_MS } from './start-hold.mts';
 import { MemoryLog } from './memory-log.mts';
-import { StartBudget } from './cloud/start-budget.mts';
+import { StartBudget, cloudStartPressure } from './cloud/start-budget.mts';
 import { isPlainMerge, mergeHome, mergedSentence } from './cloud/merge-home.mts';
 import type { MergeHomeResult } from './cloud/merge-home.mts';
 import { autoSlots, DEFAULTS as MEMORY_GATE, pressureFrom } from './memory-gate.mts';
@@ -242,6 +243,7 @@ export type WorkItem = {
   claim?: { holder: string; leaseUntil: number } | null;
   claimExpired?: boolean;
   answer?: string;
+  answeredThrough?: number;
   answerMode?: string | null;
   result?: string;
   note?: string;
@@ -958,10 +960,6 @@ export interface CodexServerEntry {
   procExit?: Promise<ProcExit>;
 }
 
-// The bold line and the 200 words in briefs/message-rules.md: a plain worker's
-// last message. A teammate's is a chat message (howYourRunEnds), and a brief
-// carrying both still wrote 1,000 characters.
-const WORKER_REPORT_RULES = /This is about the LAST message you send[\s\S]*?(?=A PICTURE YOU SHOW)/;
 const POLL_MS = 15_000;
 // How long a cloud session stays open after answering, for a reply that then
 // reaches it in seconds rather than after a new machine's two minutes.
@@ -4256,7 +4254,7 @@ export class Supervisor {
     const carried = answerTs(session?.lastLiveReply);
     if (!carried || carried <= answerTs(item)) return 'nothing to settle';
     const ranClean = session?.result != null && !session.resultIsError;
-    if (!ranClean || !this.spokeOnTheRow(item, carried)) {
+    if (!ranClean || session?.handedBack || !this.spokeOnTheRow(item, carried)) {
       this.releaseLiveReply(session);
       return 'undelivered';
     }
@@ -5596,8 +5594,23 @@ export class Supervisor {
     this._handedBack ??= new Set();
     this._handedBack.add(item.id);
     (this._movedWhy ??= {})[item.id] = { why: 'handed-back', detail: handBackWhat(session.result) };
+    this._releaseUnsettledReplies(item);
     if (!this._mergeHome(item, session.result, cwd, session.startedAt ?? 0)) this._moveToMac(item.id);
     return true;
+  }
+
+  // Replies steered into the handed-back run were marked handled as they went
+  // in; the run here must carry every one the row has not settled.
+  _releaseUnsettledReplies(item: WorkItem) {
+    const through = this.store.readItem?.(item.product, item.id)?.answeredThrough ?? item.answeredThrough ?? 0;
+    const prefix = `${item.product}:${item.id}:`;
+    let released = false;
+    for (const key of [...this._handledAnswers]) {
+      if (!key.startsWith(prefix)) continue;
+      const ts = Number(key.slice(key.lastIndexOf(':') + 1));
+      if (ts > through) released = this._handledAnswers.delete(key) || released;
+    }
+    if (released) this._saveState();
   }
 
   // The thread holds while git runs (spawnWorker). Merged: the merge is its
@@ -6663,7 +6676,7 @@ export class Supervisor {
 
   /** Whether the file a cloud run asked for is here to send, and how big, before anyone presses Send. */
   cloudFileInfo(asked: string) {
-    const file = fileToSend(asked, { home: this.config.home });
+    const file = fileToSend(asked, { home: this.config.home, appData: this.userDir });
     return file.error ? { ok: false, error: file.error } : { ok: true, size: file.size };
   }
 
@@ -6671,7 +6684,7 @@ export class Supervisor {
   // every start until one gets the agent going: the files are packed before
   // the agent begins, so a start that died sooner may not have taken them.
   cloudSendFile(itemId: string, asked: string) {
-    const file = fileToSend(asked, { home: this.config.home });
+    const file = fileToSend(asked, { home: this.config.home, appData: this.userDir });
     if (file.error) throw new Error(file.error);
     const sent = { path: file.path!, size: file.size! };
     const files = (this._filesForCloud ??= new Map());
@@ -6991,8 +7004,7 @@ export class Supervisor {
 
   // What a cloud start that just went out says about whether another may.
   _howTheMachineIs() {
-    const reading = this._memReading;
-    return { pressure: reading ? pressureFrom(reading) : undefined, stallMs: this.stalls?.longestNow?.() ?? 0 };
+    return { pressure: cloudStartPressure(this._memReading, Date.now()), stallMs: this.stalls?.longestNow?.() ?? 0 };
   }
 
   _cloudHostAvailable() {
@@ -9133,7 +9145,20 @@ export class Supervisor {
       && this.restingUntil(item) <= now;
   }
 
+  // Ahead of every early return in the tick: a cloud run goes on while this
+  // computer is paused, braked or holding for setup, and so does its card.
+  _listenForSignInReturns() {
+    try {
+      this.signInReturns.sync([...this.sessions].flatMap(([id, s]) => {
+        if (!s?.cloud || !s.product) return [];
+        const ask = openSignIn(this.store.readItem?.(s.product, id));
+        return ask ? [{ product: s.product, id, ask: ask.id, url: ask.url }] : [];
+      }));
+    } catch (e) { console.warn('zero: listening for a sign-in to come back:', (e as Error).message); }
+  }
+
   async _tick() {
+    this._listenForSignInReturns();
     if (this.paused) { this._noteWaitingRows('paused'); return; }
     this._refreshMemoryReading();
     if (this.firstRunHolding()) { this._noteWaitingRows('setup'); return; }
@@ -9190,12 +9215,6 @@ export class Supervisor {
     this.bringBackWhatNeverShipped(items);
     // A task its agent marked ready goes out, one at a time, beside the tick.
     try { this.shipQueue.tick(items, this.store.listProducts()); } catch (e) { console.warn('zero: the ship queue:', (e as Error).message); }
-    try {
-      this.signInReturns.sync(items.flatMap((i) => {
-        const ask = openSignIn(i);
-        return ask && this.sessions.get(i.id)?.cloud ? [{ product: i.product, id: i.id, ask: ask.id, url: ask.url }] : [];
-      }));
-    } catch (e) { console.warn('zero: listening for a sign-in to come back:', (e as Error).message); }
 
     // A session that died without exiting still holds its row. Stopping it
     // here lets the passes below put a fresh worker on the row.
@@ -10137,7 +10156,7 @@ export class Supervisor {
     // team chat are current on a reply too.
     let teammate: string | null = null;
     try { teammate = this.store.teammates?.briefFor(item) ?? null; } catch { teammate = null; }
-    const messages = this.messageRules({ teammate: !!teammate });
+    const messages = this.messageRules();
     // The connections say what this run can reach rather than how to behave,
     // so they go above the ranked blocks and the message rules stay last. What
     // the run is ON is a fact of the same kind, and it sits beside them.
@@ -10432,13 +10451,13 @@ export class Supervisor {
   // Read fresh at every spawn, never cached, like everything else she can edit
   // while the fleet is running. Emptying the box takes the user's words out,
   // never ours.
-  messageRules({ teammate = false } = {}) {
+  messageRules() {
     let theirs = '';
     if (!agentInstructionsUnified(this.userDir) && this.messageRulesFile() !== this.messageRulesDefaultFile()) {
       try { theirs = fs.readFileSync(this.messageRulesFile(), 'utf8').trim(); } catch {}
     }
     const shipped = this.shippedMessageRules();
-    const ours = (teammate ? shipped.replace(WORKER_REPORT_RULES, '') : shipped).replace(/<!-- autonomy-rules:(start|end) -->\n?/g, '').trim();
+    const ours = shipped.replace(/<!-- autonomy-rules:(start|end) -->\n?/g, '').trim();
     // ONE framing line each, for the same reason her project instructions carry
     // one: a session has no other way to know whose words these are, or which
     // wins where the two disagree.
@@ -14163,6 +14182,16 @@ export class Supervisor {
     if (session?.spawnFiles) session.spawnFiles = [];
   }
 
+  /** The approvals server as plain JavaScript in this app's folder, for its launcher; nothing when no copy could be made. */
+  _plainApprovalsServer(): { ZERO_APPROVALS_SERVER?: string } {
+    if (!this.userDir || !this.appDir) return {};
+    // A copy run from its checkout with no folder of its own (tests, the browser copy) leaves the checkout as it was.
+    const within = path.relative(path.resolve(this.appDir), path.resolve(this.userDir));
+    if (!within.startsWith('..') && !path.isAbsolute(within)) return {};
+    const copy = plainCopy(path.join(this.appDir, 'main', 'approval-prompt-server.mts'), path.join(this.userDir, 'plain-helpers'), { root: this.appDir });
+    return copy ? { ZERO_APPROVALS_SERVER: copy } : {};
+  }
+
   /** The servers themselves, apart from the file. */
   mcpServers(connectionServers: ConnectionServers | null = null, platform: NodeJS.Platform = process.platform) {
     const storeCmd = this.storeMcpCommand();
@@ -14187,6 +14216,7 @@ export class Supervisor {
           // Electron run with ELECTRON_RUN_AS_NODE=1 is a node, so handing the
           // path down asks nothing of the machine.
           ZERO_APPROVALS_RUNTIME: process.execPath,
+          ...this._plainApprovalsServer(),
         },
       },
     };

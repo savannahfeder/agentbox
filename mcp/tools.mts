@@ -18,7 +18,7 @@ import { listProducts, getProduct, createProduct, updateProduct, type ProductPat
 import { listDocuments, nameOnThread, noteWrittenForRun, readDocument, writeDocument } from './core/documents.mts';
 import { listSkills, fetchSkill, fetchReference } from './core/skills.mts';
 import { listWorkItems, updateItem, createClaimRegistry, type AgentPatch, type ClaimAsk, type ItemFields, type WorkListFilter } from './core/work.mts';
-import { createRepeatingTask, readStandingInstruction, setStandingInstruction, type NewRepeatingTask } from './core/repeats.mts';
+import { createRepeatingTask, readStandingInstruction, setStandingInstruction, stopRepeatingTask, type NewRepeatingTask, type StopRepeatingTask } from './core/repeats.mts';
 import { teamPost, teamPass, teamRemember, teamSetup, teamRoster, teamPlaybook, teamMethod, teamHire, noteToAnotherThread } from './core/teammates.mts';
 import { documentVersion, documentsWithFolders, keepAsWritten, fileWrittenDocument, teamFile, teamTell, teamTask, teamThreads, teamRead, waitsNamed } from './core/reach.mts';
 import { readTeammates, readTeamView, teamDir } from '../main/store/teammates-files.mts';
@@ -377,6 +377,16 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         askedBecause: z.string().optional().describe('on a thread: the person\'s own words on it asking for this to happen regularly, quoted exactly, such as "Daily 9am, audit Mondays 10am". Without them nothing is made'),
       },
       run: (ask: NewRepeatingTask) => json(createRepeatingTask(ask, thisRun())),
+    },
+    {
+      name: 'stop_repeating_task',
+      description: 'Stop a repeating task for good, as Stop repeating on the person\'s own screen does: no more runs start, and runs already made are left as they are. Use it when the person asks for one to stop, be switched off or cancelled, rather than telling them to find it and stop it by hand. Name it as it is listed (such as "Daily security review") or by its id; a name not in this thread\'s product is looked for in every product, and a name two running tasks share is refused with both ids. On a thread it needs the person\'s own words there asking for it to stop, quoted in askedBecause.',
+      schema: {
+        which: z.string().describe('the task\'s name as it is listed, or its id (r-…)'),
+        product: z.string().optional().describe('which product it is in, when you know; otherwise every product is searched'),
+        askedBecause: z.string().optional().describe('on a thread: the person\'s own words on it asking for this to stop, quoted exactly, such as "Switch it off". Without them nothing is stopped'),
+      },
+      run: (ask: StopRepeatingTask) => json(stopRepeatingTask(ask, thisRun())),
     },
 
     /* ------------------------------- teammates ------------------------------ */

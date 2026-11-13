@@ -96,6 +96,9 @@ export function statusCell(item: WorkItem, facts: StatusFacts = {}): StatusCell 
   // The bar over the conversation owns the whole story of a dead worker; the
   // row says the one word, because a row that says nothing reads as a row
   // nothing has happened on.
+  // Signed out is the reason a stopped thread is stopped, so it is the word.
+  const signIn = facts.signInNeeded?.[item.id] ? liveLine(item, { ...facts, stalled: false }) : null;
+  if (signIn?.state === 'signin') return says(shortWord('signin'), 'held', true, signIn.line);
   if (facts.stalled) return says('Stopped', 'held', true, 'The agent that was on this died without finishing. Send it a message to start it again.');
   if (state === 'scheduled') return plain(stateWordOf(item, state), 'sched');
 
@@ -173,6 +176,7 @@ export function factsFor(fleet: Fleet, id: string): LiveFacts {
     silent: fleet.silent?.[id] ?? null,
     paused: !!fleet.paused,
     whyNotCloud: fleet.whyNotCloud?.[id] ?? null,
+    signInBar: !!fleet.signInBar,
   };
 }
 

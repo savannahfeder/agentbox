@@ -48,7 +48,7 @@ import type { Person } from '../types';
 import { ChooseList, CopiedSheet, SeeList, SendSheet, ShareList } from './SharePanel';
 import { sendFirst, type SeenBy } from './share-rules';
 
-export type ThreadMenuRowId = 'share' | 'run' | 'code' | 'terminal' | 'people' | 'later' | 'priority' | 'pin' | 'rename' | 'move' | 'give' | 'wait' | 'shipped' | 'close-task' | 'done';
+export type ThreadMenuRowId = 'share' | 'run' | 'code' | 'terminal' | 'people' | 'later' | 'priority' | 'pin' | 'rename' | 'move' | 'give' | 'wait' | 'shipped' | 'stop-repeat' | 'close-task' | 'done';
 
 /**
  * WHERE THIS THREAD RUNS: in the cloud now (`cloud`), free to go there
@@ -91,11 +91,13 @@ export interface ThreadMenuRow { id: ThreadMenuRowId; label: string; key: string
  * door to one verb; on a phone there was no door at all and the Later tab
  * could not be filled. It names no key for the same reason.
  */
-export function threadMenuRows({ change, terminal, finish, runNow = false, share = false, people = false, later = false, priority = null, pin = null, rename = false, move = false, give = false, wait = false, shipped = null, closeTask = false }: {
+export function threadMenuRows({ change, terminal, finish, runNow = false, share = false, people = false, later = false, priority = null, pin = null, rename = false, move = false, give = false, wait = false, shipped = null, stopRepeat = false, closeTask = false }: {
   /** Share… opens the link, the inbox and who can open it; it takes Add people's place. */
   share?: boolean;
   /** Someone could still be added to the thread. */
   people?: boolean;
+  /** A run of a repeating task: no more runs after this one. */
+  stopRepeat?: boolean;
   /** An open task between people: E only clears it from your Needs you, so closing it is its own row. */
   closeTask?: boolean;
   /** Whether a person has said it shipped, or null where the team would not see that. */
@@ -129,6 +131,7 @@ export function threadMenuRows({ change, terminal, finish, runNow = false, share
   if (give) rows.push({ id: 'give', label: 'Give it to someone else…', key: null });
   if (wait) rows.push({ id: 'wait', label: wait === 'blocked' ? 'Blocked by…' : 'Waits on…', key: null });
   if (shipped) rows.push({ id: 'shipped', label: shipped === 'marked' ? 'Not shipped after all' : 'Mark as shipped', key: null });
+  if (stopRepeat) rows.push({ id: 'stop-repeat', label: 'Stop repeating', key: null });
   if (closeTask) rows.push({ id: 'close-task', label: 'Close task', key: null, detail: 'For both of you' });
   if (finish) rows.push({ id: 'done', label: 'Mark done', key: 'E' });
   return rows;
@@ -185,6 +188,10 @@ function GiveMark() {
 function ShippedMark() {
   return <svg {...mark}><path d="M4 9h16v11H4z" /><path d="M12 15V3m-3.5 3.5L12 3l3.5 3.5" /></svg>;
 }
+/** The circling arrow a repeat wears, struck through. */
+function StopRepeatMark() {
+  return <svg {...mark}><path d="M20 12a8 8 0 0 1-13.7 5.6M4 12a8 8 0 0 1 13.7-5.6" /><path d="M18 3v4h-4M6 21v-4h4" /><path d="m4 4 16 16" /></svg>;
+}
 /** An hourglass, squared off. */
 function WaitMark() {
   return <svg {...mark}><path d="M6 3h12M6 21h12M7 3v4l5 5 5-5V3M7 21v-4l5-5 5 5v4" /></svg>;
@@ -200,7 +207,7 @@ function MoveMark() {
 function PeopleMark() {
   return <svg {...mark}><circle cx="9" cy="8" r="3.5" /><path d="M3 20c0-3.5 2.7-5.5 6-5.5 1.4 0 2.7.4 3.7 1" /><path d="M18 13v7m-3.5-3.5h7" /></svg>;
 }
-const MARKS: Record<ThreadMenuRowId, typeof CodeMark> = { share: PeopleMark, run: RunMark, code: CodeMark, terminal: TerminalMark, people: PeopleMark, later: LaterMark, priority: () => <PriorityIcon id="medium" />, pin: () => <PinMark />, rename: RenameMark, move: MoveMark, give: GiveMark, wait: WaitMark, shipped: ShippedMark, 'close-task': DoneMark, done: DoneMark };
+const MARKS: Record<ThreadMenuRowId, typeof CodeMark> = { share: PeopleMark, run: RunMark, code: CodeMark, terminal: TerminalMark, people: PeopleMark, later: LaterMark, priority: () => <PriorityIcon id="medium" />, pin: () => <PinMark />, rename: RenameMark, move: MoveMark, give: GiveMark, wait: WaitMark, shipped: ShippedMark, 'stop-repeat': StopRepeatMark, 'close-task': DoneMark, done: DoneMark };
 
 /** Three square dots, because every shape in this skin is square. */
 function Dots() {
@@ -245,7 +252,7 @@ function BlockWords({ onPick }: { onPick: (id: string) => void }) {
 
 /* ----------------------------------------------------------------- button */
 
-export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose, change = null, codeButton = null, codeOpen = false, onViewChange, addPeople = null, onAddPeople, terminal = null, onToggleTerminal, onFinish = null, onCloseTask = null, onReopen = null, onRunNow = null, onLater = null, priority = null, onPriority, pinned = null, onPin, place = null, placeFacts = {}, onPlace, giveTo = [], onGive, onRename = null, onMove = null, shipped = null, onShipped, waitChoices = [], waitsNow = false, onWait, blocks = false, files = null }: {
+export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose, change = null, codeButton = null, codeOpen = false, onViewChange, addPeople = null, onAddPeople, terminal = null, onToggleTerminal, onFinish = null, onCloseTask = null, onStopRepeating = null, onReopen = null, onRunNow = null, onLater = null, priority = null, onPriority, pinned = null, onPin, place = null, placeFacts = {}, onPlace, giveTo = [], onGive, onRename = null, onMove = null, shipped = null, onShipped, waitChoices = [], waitsNow = false, onWait, blocks = false, files = null }: {
   /** What Share… offers, or null where the thread cannot be shared. */
   share?: { link: string | null; people: readonly Person[]; last?: string | null; seen: SeenBy; seenWord: string; teamName: string; chosen?: readonly string[] } | null;
   /** Puts the link on the clipboard; false when it could not. */
@@ -286,6 +293,8 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
   onToggleTerminal?: () => void;
   /** Null on a thread that is already done. */
   onFinish?: (() => void) | null;
+  /** Non-null on a run of a repeating task that still repeats. */
+  onStopRepeating?: (() => void) | null;
   /** Non-null on an open task between people: closes it for both. */
   onCloseTask?: (() => void) | null;
   /** On a done thread: opens it again, where Done sits on an open one. */
@@ -308,7 +317,7 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
   /** True keeps it on this Mac (moving it here if it is in the cloud). */
   onPlace?: (keep: PlaceAct) => void;
 }) {
-  const { done, menu: rows } = splitDone(threadMenuRows({ change: !!change && !codeButton, share: !!share, people: !!addPeople && !!onAddPeople, terminal, finish: !!onFinish, runNow: !!onRunNow, later: onLater ? (onPhone() ? true : 'key') : false, priority: onPriority ? priority : null, rename: !!onRename, move: !!onMove, pin: pinned === null || !onPin ? null : pinned ? 'pinned' : 'unpinned', give: giveTo.length > 0 && !!onGive && !!onFinish, wait: waitChoices.length > 0 && !!onWait && !!onFinish ? (blocks ? 'blocked' : true) : false, shipped: shipped === null || !onShipped ? null : shipped ? 'marked' : 'unmarked', closeTask: !!onCloseTask }));
+  const { done, menu: rows } = splitDone(threadMenuRows({ change: !!change && !codeButton, share: !!share, people: !!addPeople && !!onAddPeople, terminal, finish: !!onFinish, runNow: !!onRunNow, later: onLater ? (onPhone() ? true : 'key') : false, priority: onPriority ? priority : null, rename: !!onRename, move: !!onMove, pin: pinned === null || !onPin ? null : pinned ? 'pinned' : 'unpinned', give: giveTo.length > 0 && !!onGive && !!onFinish, wait: waitChoices.length > 0 && !!onWait && !!onFinish ? (blocks ? 'blocked' : true) : false, shipped: shipped === null || !onShipped ? null : shipped ? 'marked' : 'unmarked', stopRepeat: !!onStopRepeating, closeTask: !!onCloseTask }));
   const [open, setOpen] = useState(false);
   const [giving, setGiving] = useState(false);
   const [waiting, setWaiting] = useState(false);
@@ -410,6 +419,7 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
     else if (id === 'move') onMove?.();
     else if (id === 'pin') onPin?.(!pinned);
     else if (id === 'shipped') onShipped?.(!shipped);
+    else if (id === 'stop-repeat') onStopRepeating?.();
     else if (id === 'close-task') onCloseTask?.();
     else onFinish?.();
   };

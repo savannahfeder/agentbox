@@ -4505,6 +4505,24 @@ img.product-mark { object-fit: cover; opacity: 1; }
 }
 @keyframes toast-drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 
+/* AN URGENT THREAD THAT ARRIVED, in the top bar until it is opened
+   (./components/UrgentReady). Square, no fill, accent only on the dot and the word. */
+.ur {
+  display: inline-flex; align-items: center; gap: 8px;
+  order: -1; height: 30px; max-width: 420px; min-width: 0; margin-right: 6px; padding: 0 8px 0 10px;
+  background: none; border: 1px solid var(--line); border-radius: var(--tag-radius);
+  font: inherit; font-size: 13px; color: var(--text); cursor: pointer; white-space: nowrap;
+}
+.ur-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--chip-ask); animation: ur-arrive 1.2s ease-in-out 3; }
+@keyframes ur-arrive { 50% { opacity: .25; } }
+.ur-word { flex: none; color: var(--chip-ask); font-weight: 500; }
+.ur-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ur-kbd {
+  flex: none; font-family: inherit; font-size: 10.5px; font-weight: 600; color: var(--text-faint);
+  border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 0 4px; line-height: 15px;
+}
+.ur:hover .ur-kbd { color: var(--text); border-color: var(--text-faint); }
+
 /* WHERE A REPLY WENT, above the reply box of the thread it moved her to
    (./components/SentLine). The box's own width and hairline, square, one
    small dot of accent, and the toast's keycaps. The toast grey and the close
@@ -8377,30 +8395,6 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .doc-pane.doc-code .doc-card,
 .doc-pane.doc-code .doc-head,
 .doc-pane.doc-code .code-file-head { background: var(--code-ground); }
-/* The word. Amber, the same ink as the urgent square on the row (--chip-ask),
-   so the thing on screen and the mark in the list are one colour and nobody
-   has to be told they are the same. Never red. */
-.urgent-word {
-  color: var(--chip-ask);
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-/* THE WAY BACK. */
-.urgent-return {
-  background: none; border: none; padding: 0; cursor: pointer;
-  font-family: inherit; font-size: 13px; color: var(--text-dim);
-  letter-spacing: 0.01em; text-align: left;
-}
-.urgent-return:hover { color: var(--text); }
-.urgent-return-arrow { color: var(--text-faint); }
-/* The way back on the left, the amber word on the right, one row of chrome. */
-.urgent-bar {
-  display: flex; align-items: baseline; justify-content: space-between;
-  padding: 14px 0 0;
-}
-
 /* The switch, the rows, the ticks and the foot are the finish card's own
    classes (`.fr-switch`, `.fr-agent`, `.fr-offer`), so the card on ⌘K
    is the card at the end of the setup. What is added is the sentence
