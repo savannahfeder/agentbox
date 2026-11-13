@@ -58,6 +58,14 @@ describe('the Standup page', () => {
   it('each teammate posts a sentence whose tasks are links', () => {
     expect(html).toMatch(/Shipped <button type="button" class="su-link">Invoice email<\/button>\. Working on <button type="button" class="su-link">Billing page<\/button>\./);
   });
+  // Changing the time moved every past post's time with it: the time a past
+  // standup happened is not kept, so only today's posts say one.
+  it('only today\'s posts carry the standup time', () => {
+    expect(html.match(/<span>9am<\/span>/g)).toHaveLength(2);
+  });
+  it('the AI teammates switch says where their work goes when it is off', () => {
+    expect(html).toContain('title="Off, their work is counted in your post"');
+  });
   it('what someone needs from you is its own line', () => {
     expect(html).toMatch(/Needs you on <button type="button" class="su-link">Stripe keys<\/button>/);
   });

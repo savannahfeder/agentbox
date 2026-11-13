@@ -202,6 +202,8 @@ export function teamToday({ range, window, now, me, items, products, cards, deci
     const shipped = shippedAtOf(i);
     if (inRange(shipped)) { who.shipped.push(line(shipped!)); continue; }
     if (i.status === 'done') {
+      // Handing a thread on closes it with "Given to …" (main/team handOn): the work went on, it did not finish.
+      if (/^Given to /.test(i.answer ?? '')) continue;
       const doneAt = i.wrote?.status?.ts ?? i.updatedAt;
       // A task you gave is finished by whoever closed it, in their words, not yours.
       const closer = task ? keyOfPerson(i.wrote?.status?.by) : null;

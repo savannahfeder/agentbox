@@ -60,6 +60,7 @@ button.su-name:hover { text-decoration: underline; text-underline-offset: 2px; }
 .su-need::before { content: ''; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); position: relative; top: -2px; }
 .su-fold { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; color: var(--text-faint); cursor: pointer; }
 .su-fold:hover { color: var(--text-dim); }
+.su-list-l { margin: 10px 0 0 18px; font-size: 12.5px; color: var(--text-faint); }
 .su-done { list-style: none; margin: 4px 0 0 18px; padding: 0; }
 .su-done li { display: flex; align-items: baseline; gap: 10px; font-size: 14px; line-height: 25px; color: var(--text-dim); }
 .su-done li::before { content: ''; flex: none; width: 4px; height: 4px; border-radius: 50%; background: var(--text-faint); position: relative; top: -3px; }

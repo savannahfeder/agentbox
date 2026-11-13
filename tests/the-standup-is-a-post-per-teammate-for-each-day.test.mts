@@ -22,7 +22,7 @@ const base = {
   decisions: [], mentions: [], people: [{ id: 'p-dev', name: 'Dev Patel' }], mates: [{ id: 't-fix', name: 'Maintainer' }],
   mateOf: (r: { labels?: string[] }) => r.labels?.find((l) => l.startsWith('teammate:'))?.slice(9) ?? null, needs: [], cards: [],
 };
-const words = (parts: Part[]) => parts.map((p) => (typeof p === 'string' ? p : `[${p.title}]`)).join('');
+const words = (parts: Part[]) => parts.map((p) => (typeof p === 'string' ? p : 'more' in p ? `${p.more} more` : `[${p.title}]`)).join('');
 const memory = () => { const m = new Map<string, string>(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => { m.set(k, v); }, m }; };
 
 describe('when a standup happens and what it covers', () => {
@@ -165,6 +165,30 @@ describe('what a teammate handed you is in their post', () => {
   it('your own post does not repeat your Needs you', () => {
     const mine = teamToday({ ...base, window: standupWindow(on(12, 0), DEFAULT_STANDUP, NOW), items: [item({ id: 'x', title: 'My ask', status: 'done', updatedAt: on(12, 11) })], needs: [item({ id: 'q', title: 'Agent asks me' })] as never });
     expect(postsOf(mine.people, { mates: true, live: true }).find((p) => p.key === 'me')?.needs ?? []).toEqual([]);
+  });
+});
+
+// Two testers handed a blocked pricing thread to a teammate and the standup
+// said they Finished it. Handing on closes the thread with "Given to …".
+describe('a thread handed to someone else', () => {
+  const given = item({ id: 'g', title: 'Teams pricing', status: 'done', answer: 'Given to Maya Chen.', updatedAt: on(12, 12), wrote: { status: { ts: on(12, 12) } } });
+  const done = item({ id: 'd', title: 'Refund copy', status: 'done', answer: 'Done, and tested.', updatedAt: on(12, 12), wrote: { status: { ts: on(12, 12) } } });
+  const me = () => teamToday({ ...base, window: standupWindow(on(12, 0), DEFAULT_STANDUP, NOW), items: [given, done] }).people.find((p) => p.key === 'me')!;
+  it('is not something you finished', () => {
+    expect(me().finished.map((l) => l.title)).toEqual(['Refund copy']);
+  });
+});
+
+describe('a post when searching, and its "more"', () => {
+  const line = (title: string) => ({ key: title, title, at: 1 });
+  const post = { key: 'p', name: 'Dev Patel', kind: 'person' as const, done: [], shipped: [], finished: [], working: [line('A'), line('B'), line('CORS fix')], needs: [], privateDone: 0 };
+  it('a long list says how many more, and that count can be opened', () => {
+    const parts = sentenceOf(post);
+    expect(words(parts)).toBe('Working on [A], [B] and 1 more.');
+    expect(parts.find((p) => typeof p === 'object' && 'more' in p)).toEqual({ more: 1, of: 'working' });
+  });
+  it('a search names every task, so the one that matched is never hidden', () => {
+    expect(words(sentenceOf(post, { all: true }))).toBe('Working on [A], [B] and [CORS fix].');
   });
 });
 

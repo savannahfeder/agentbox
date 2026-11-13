@@ -31,33 +31,45 @@ function openingDay(now: number, s: StandupSettings): number {
   return s.days.includes(new Date(today).getDay()) ? today : previousStandupDay(today, s);
 }
 
-function Words({ parts, onOpen }: { parts: Part[]; onOpen: (l: TodayLine) => void }) {
+function Words({ parts, onOpen, onMore }: { parts: Part[]; onOpen: (l: TodayLine) => void; onMore?: () => void }) {
   return <>{parts.map((p, i) => (typeof p === 'string'
     ? <Fragment key={i}>{p}</Fragment>
-    : <button type="button" key={i} className="su-link" onClick={() => onOpen(p)}>{titleOf(p)}</button>))}</>;
+    : 'more' in p
+      ? <button type="button" key={i} className="su-link" onClick={onMore}>{p.more} more</button>
+      : <button type="button" key={i} className="su-link" onClick={() => onOpen(p)}>{titleOf(p)}</button>))}</>;
 }
 
-function Post({ p, face, at, since, onOpen, onPerson }: {
-  p: StandupPost; face?: Member; at: string; since: string;
+function Post({ p, face, at, since, all, onOpen, onPerson }: {
+  p: StandupPost; face?: Member;
+  /** The standup's time, on today's posts only: a past one's time is not kept. */
+  at: string | null;
+  since: string;
+  /** Searching: every task named, so the one that matched is never behind "more". */
+  all: boolean;
   onOpen: (l: TodayLine) => void; onPerson?: (key: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const n = p.done.length;
+  const moreWorking = p.working.length > 2;
   return <article className="su-post" aria-label={p.name}>
     <span className="su-face">{face && <MemberFace m={face} size={32} />}</span>
     <div className="su-body">
       <div className="su-hd">
         {onPerson && p.key !== 'me' ? <button type="button" className="su-name" onClick={() => onPerson(p.key)}>{p.name}</button> : <b className="su-name">{p.name}</b>}
-        <span>{at}</span>
+        {at && <span>{at}</span>}
       </div>
-      <p className="su-tx"><Words parts={sentenceOf(p)} onOpen={onOpen} /></p>
+      <p className="su-tx"><Words parts={sentenceOf(p, { all })} onOpen={onOpen} onMore={() => setOpen(true)} /></p>
       {p.needs.map((need) => <p className="su-need" key={need.line.key}>
         <span>{need.on === 'you' ? 'Needs you on ' : need.on ? `Waiting on ${need.on} for ` : 'Stuck on '}<Words parts={[need.line]} onOpen={onOpen} /></span>
       </p>)}
       {n > 0 && <button type="button" className="su-fold" aria-expanded={open} onClick={() => setOpen(!open)}>
         {open ? I.down() : I.chev()}{n} {n === 1 ? 'thing' : 'things'} done since {since}
       </button>}
-      {open && <ul className="su-done">{p.done.map((l) => <li key={l.key}><button type="button" className="su-link" onClick={() => onOpen(l)}>{titleOf(l)}</button></li>)}</ul>}
+      {open && n > 0 && <ul className="su-done">{p.done.map((l) => <li key={l.key}><button type="button" className="su-link" onClick={() => onOpen(l)}>{titleOf(l)}</button></li>)}</ul>}
+      {open && moreWorking && <>
+        <p className="su-list-l">Working on</p>
+        <ul className="su-done">{p.working.map((l) => <li key={l.key}><button type="button" className="su-link" onClick={() => onOpen(l)}>{titleOf(l)}</button></li>)}</ul>
+      </>}
     </div>
   </article>;
 }
@@ -115,7 +127,7 @@ export function StandupPage({ now, faces, team = [], dayFor, onOpen, onPerson }:
       <div className="su-top">
         <h2>{dayTitle(day)}</h2><span className="su-date">{dateOf(day)}</span>
         <div className="su-r">
-          <button type="button" className="su-tog" role="switch" aria-checked={s.mates} onClick={() => change({ ...s, mates: !s.mates })}><i />AI teammates post too</button>
+          <button type="button" className="su-tog" role="switch" aria-checked={s.mates} title="Off, their work is counted in your post" onClick={() => change({ ...s, mates: !s.mates })}><i />AI teammates post too</button>
           <button type="button" className={`su-icon${setting ? ' on' : ''}`} aria-expanded={setting} aria-label="Standup settings" title="Standup settings" onClick={() => setSetting(!setting)}>{I.sliders()}</button>
         </div>
       </div>
@@ -136,7 +148,7 @@ export function StandupPage({ now, faces, team = [], dayFor, onOpen, onPerson }:
         return <section key={d} className="su-dayfeed" aria-label={dayTitle(d)}>
           {(i > 0 || searching) && <div className="su-sep">{dayTitle(d)} {dateOf(d)}</div>}
           {posts.length === 0 && <p className="su-empty">Nothing moved.</p>}
-          {posts.map((p) => <Post key={`${d}/${p.key}`} p={p} face={faces.get(p.key)} at={clockOf(s.at)} since={since}
+          {posts.map((p) => <Post key={`${d}/${p.key}`} p={p} face={faces.get(p.key)} at={d === midnight(now) ? clockOf(s.at) : null} since={since} all={searching}
             onOpen={onOpen} onPerson={onPerson} />)}
           {i === 0 && !searching && (() => {
             const quiet = team.filter((t) => (t.kind === 'person' || s.mates) && !posts.some((p) => p.key === t.key))

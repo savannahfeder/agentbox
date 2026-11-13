@@ -7909,7 +7909,12 @@ export default function App() {
       const asks = mineInNeeds.filter((i) => teammateIdOf(i) === id);
       const askIds = new Set(asks.map((i) => i.id));
       const split = nowAndFinished(runs.filter((i) => !askIds.has(i.id)), { done: (i) => i.status === 'done', at: (i) => i.updatedAt, now });
-      const word = (i: WorkItem) => ITEM_WORD[stateOfMine(i) ?? 'running'] ?? ITEM_WORD.running;
+      const word = (i: WorkItem): [string, PlaceRow['tone']] => {
+        const s = stateOfMine(i);
+        // Open is not running: Working only while an agent is on it or starting.
+        if ((s === 'running' || !s) && !liveIds.has(i.id)) return ['Not started', 'later'];
+        return ITEM_WORD[s ?? 'running'] ?? ITEM_WORD.running;
+      };
       // Its list is of tasks, so each is named for what it was asked, not for its last message as in the inbox.
       const taskRow = (i: WorkItem, word: string, tone: PlaceRow['tone']): PlaceRow => ({ ...itemRow(i, word, tone), title: shownTitle(i) });
       // No chat: you give it tasks here and its answers come to the inbox.

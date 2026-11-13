@@ -132,37 +132,31 @@ export function postsOf(people: readonly TodayPerson[], { mates, live = true }: 
   return [mine, ...posts.filter((p) => p.kind === 'person')].filter(says);
 }
 
-/** A run of words with tasks in it, each task drawn as a link. */
-export type Part = string | TodayLine;
+/** How many more there are past the two named, drawn as a button that opens the full list. */
+export type More = { more: number; of: 'done' | 'working' };
 
-const named = (lines: readonly TodayLine[]): Part[] => {
-  const shown = lines.slice(0, 2);
+/** A run of words with tasks in it, each task drawn as a link. */
+export type Part = string | TodayLine | More;
+
+/** Two named and how many more, or every one when `all`; `tail` is said last, after "and". */
+const named = (lines: readonly TodayLine[], of: More['of'], all: boolean, tail = ''): Part[] => {
+  const shown = all ? lines : lines.slice(0, 2);
   const rest = lines.length - shown.length;
-  if (shown.length === 1) return [shown[0]];
-  if (!rest) return [shown[0], ' and ', shown[1]];
-  return [shown[0], ', ', shown[1], ` and ${rest} more`];
+  const items: Part[] = [...shown, ...(rest ? [{ more: rest, of }] : []), ...(tail ? [tail] : [])];
+  return items.flatMap((x, i) => (i === 0 ? [x] : [i === items.length - 1 ? ' and ' : ', ', x]));
 };
 
 /** The post's sentence: what shipped, what finished, what it is on. */
-export function sentenceOf(p: StandupPost): Part[] {
+export function sentenceOf(p: StandupPost, { all = false }: { all?: boolean } = {}): Part[] {
   const out: Part[] = [];
-  const say = (lead: string, lines: readonly TodayLine[]) => {
-    if (!lines.length) return;
-    out.push(out.length ? ` ${lead} ` : `${lead} `, ...named(lines), '.');
+  const say = (lead: string, parts: Part[]) => {
+    if (parts.length) out.push(out.length ? ` ${lead} ` : `${lead} `, ...parts, '.');
   };
-  say('Shipped', p.shipped);
-  say('Finished', p.finished);
+  say('Shipped', named(p.shipped, 'done', all));
+  say('Finished', named(p.finished, 'done', all));
   if (!p.shipped.length && !p.finished.length && p.privateDone) out.push(`Finished ${p.privateDone} private ${p.privateDone === 1 ? 'thread' : 'threads'}.`);
   const hidden = p.privateWorking ?? 0;
-  if (!hidden) say('Working on', p.working);
-  else {
-    const privately = `${hidden} private ${hidden === 1 ? 'thread' : 'threads'}`;
-    const shown = p.working.slice(0, 2);
-    const rest = p.working.length - shown.length;
-    out.push(out.length ? ' Working on ' : 'Working on ');
-    shown.forEach((l, i) => { if (i) out.push(', '); out.push(l); });
-    out.push(!shown.length ? privately : rest ? `, ${rest} more and ${privately}` : ` and ${privately}`, '.');
-  }
+  say('Working on', named(p.working, 'working', all, hidden ? `${hidden} private ${hidden === 1 ? 'thread' : 'threads'}` : ''));
   return out.length ? out : ['Nothing moved.'];
 }
 

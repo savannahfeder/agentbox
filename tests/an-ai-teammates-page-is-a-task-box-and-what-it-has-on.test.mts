@@ -67,6 +67,13 @@ describe('the page around it', () => {
   });
   // Two testers saw a whole answer, or a usage-limit message, in place of each
   // task's name: the inbox names a teammate's thread by its last message.
+  // A tester sent a task from the page, saw "Working" for nine minutes, and
+  // opened it to "Not started yet": the row assumed any open task was running.
+  it('says Working only while an agent is on it or starting', () => {
+    const app = read('renderer/src/App.tsx');
+    const mate = app.slice(app.indexOf("placeMember.key.startsWith('mate:')"), app.indexOf('} else {', app.indexOf("placeMember.key.startsWith('mate:')")));
+    expect(mate).toContain("if ((s === 'running' || !s) && !liveIds.has(i.id)) return ['Not started', 'later'];");
+  });
   it('names each task by what it was asked to do, not by its last message', () => {
     const app = read('renderer/src/App.tsx');
     const mate = app.slice(app.indexOf("placeMember.key.startsWith('mate:')"), app.indexOf('} else {', app.indexOf("placeMember.key.startsWith('mate:')")));
