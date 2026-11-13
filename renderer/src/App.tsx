@@ -280,15 +280,15 @@ import { BackForward } from './components/BackForward';
 
 const FIRST_IDEAS = ideasFor();
 
-/** Which first run this install shows, half each (shared/onboarding-arm.mts). */
+/** Which first run this install shows (shared/onboarding-arm.mts). */
 type Arm = 'tour' | 'classic';
 const ARM_WAIT_MS = 3000;
 async function armNow(): Promise<Arm> {
   try {
     const asked = (window.zero as { onboardingArm?: () => Promise<unknown> } | undefined)?.onboardingArm?.();
     const word = await Promise.race([asked, new Promise((r) => setTimeout(() => r(null), ARM_WAIT_MS))]);
-    return word === 'classic' ? 'classic' : 'tour';
-  } catch { return 'tour'; }
+    return word === 'tour' ? 'tour' : 'classic';
+  } catch { return 'classic'; }
 }
 
 type Modal = null | 'cloud-off' | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing';
