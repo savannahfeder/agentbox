@@ -46,6 +46,9 @@ import { makeFilm, seedArtifacts } from './artifacts.mjs';
 import { readDiary } from './diary.mjs';
 import { writeTeamFiles, namePeople, doorOf, formTeam, teamWords } from './team.mjs';
 import { testerLogin, codexCanSandbox, codexTesterArgv, codexTesterEnv, lastMessage, CODEX_CHECK_ARGV, codexCheckFailed } from './codex-tester.mjs';
+import { rerunWithStripTypes } from '../../../../scripts/lib/rerun-with-strip-types.mjs';
+
+rerunWithStripTypes(import.meta.url);
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const VERIFY = path.resolve(here, '../../verify-agentbox/scripts');
