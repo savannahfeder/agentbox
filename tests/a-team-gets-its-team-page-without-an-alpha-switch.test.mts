@@ -60,8 +60,8 @@ describe('Rooms with nothing saved', () => {
     expect(everywhere({}, ON_TEAM)).toEqual(on);
   });
   it('leaves every other alpha default as it was', () => {
-    expect(alphaFeatures({}, { packaged: true })).toEqual({ rooms: false, teammates: false, multiplayer: true });
-    expect(alphaFeatures({}, { packaged: true, onTeam: true })).toEqual({ rooms: true, teammates: false, multiplayer: true });
+    expect(alphaFeatures({}, { packaged: true })).toEqual({ rooms: false, teammates: false, multiplayer: true, glass: false });
+    expect(alphaFeatures({}, { packaged: true, onTeam: true })).toEqual({ rooms: true, teammates: false, multiplayer: true, glass: false });
   });
 });
 
