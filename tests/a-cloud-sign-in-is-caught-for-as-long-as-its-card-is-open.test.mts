@@ -21,9 +21,9 @@ import { comesBackTo } from '../shared/sign-in-ask.mts';
 import { SignInReturns, type OpenReturn } from '../main/sign-in-returns.mts';
 import { Supervisor } from '../main/supervisor.mts';
 
-// Only parsed out of a link, never listened on.
-const AWS_CALLBACK_PORT = 8765;
-const awsLink = (port: number) =>'https://us-east-1.signin.aws.amazon.com/v1/authorize?response_type=code'
+// The real `aws login` callback, only ever read out of a link here; nothing listens on it.
+const AWS_CALLBACK = 8765;
+const awsLink = (port: number) => 'https://us-east-1.signin.aws.amazon.com/v1/authorize?response_type=code'
   + '&client_id=arn%3Aaws%3Asignin%3A%3A%3Adevtools%2Fsame-device&state=st1&code_challenge_method=SHA-256&scope=openid'
   + `&redirect_uri=${encodeURIComponent(`http://127.0.0.1:${port}/oauth/callback`)}&code_challenge=cc1`;
 
@@ -52,7 +52,7 @@ afterEach(() => { returns?.stopAll(); vi.useRealTimers(); });
 
 describe('an aws login link on a fixed 127.0.0.1 port', () => {
   it('is read as coming back to this computer', () => {
-    expect(comesBackTo(awsLink(AWS_CALLBACK_PORT))).toEqual({ port: AWS_CALLBACK_PORT, path: '/oauth/callback' });
+    expect(comesBackTo(awsLink(AWS_CALLBACK))).toEqual({ port: AWS_CALLBACK, path: '/oauth/callback' });
   });
 
   it('is caught when the person signs in straight away', async () => {
@@ -143,7 +143,7 @@ describe('what must not be caught', () => {
 describe("the app's pass listens whatever else holds it", () => {
   let sup: Supervisor;
   let synced: OpenReturn[][];
-  const ask = { id: 's-aws00001', service: 'AWS', url: awsLink(AWS_CALLBACK_PORT), at: 1 };
+  const ask = { id: 's-aws00001', service: 'AWS', url: awsLink(AWS_CALLBACK), at: 1 };
   const rows: Record<string, Record<string, unknown>> = {
     'w-cloud': { id: 'w-cloud', product: 'p', status: 'open', signIn: ask },
     'w-mac': { id: 'w-mac', product: 'p', status: 'open', signIn: { ...ask, id: 's-mac00001' } },
