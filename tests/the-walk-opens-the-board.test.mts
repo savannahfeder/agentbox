@@ -170,7 +170,8 @@ describe('when the board beat ends', () => {
   it('ends back on the list once the board has been on the screen, not on a click', () => {
     // Read off the view the inbox is drawn in, never off a click: the press is
     // two deep, and a click handler would end the beat with the menu open.
-    expect(app).toMatch(/if \(inboxDisplay\.view === 'board'\) \{ boardSeen\.current = true; return; \}/);
+    // `boardDrawn` is that view, or the team layout's own board (the-tutorials-board-beat-sees-the-board-the-team-layout-draws).
+    expect(app).toMatch(/if \(boardDrawn\) \{ boardSeen\.current = true; return; \}/);
     expect(app).toMatch(/if \(!boardSeen\.current\) return;\s*\n\s*setRun\(\(r\) => \(r \? stepTo\(r, 'command'\) : r\)\)/);
   });
 

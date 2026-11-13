@@ -41,6 +41,7 @@ const NOTARY_KEYCHAIN = path.join(os.homedir(), 'Library', 'Keychains', 'login.k
 const PACKAGE = 'agentbox-app';
 const SERVER = 'agentbox-gateway';
 const REGION = 'us-east-1';
+const NPM_LOGIN_MS = 15 * 60_000;
 
 const pkgPath = path.join(repo, 'package.json');
 let packageWritten = false;
@@ -64,8 +65,8 @@ function quiet(cmd, args, timeout = 30_000) {
   return { ok: r.status === 0, out: (r.stdout ?? '').trim(), err: (r.stderr ?? '').trim() };
 }
 
-function live(cmd, args, env = {}) {
-  return spawnSync(cmd, args, { cwd: repo, stdio: 'inherit', env: { ...process.env, ...env } }).status === 0;
+function live(cmd, args, env = {}, timeout = undefined) {
+  return spawnSync(cmd, args, { cwd: repo, stdio: 'inherit', env: { ...process.env, ...env }, timeout }).status === 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -166,7 +167,9 @@ const signIns = [
 const npmSignIn = {
   name: 'npm, to publish the package',
   ok: () => quiet('npm', ['whoami', '--fetch-timeout=20000'], 30_000).ok,
-  fix: () => live('npm', ['login']),
+  // By the time it asks, the build has run for a quarter of an hour and the
+  // person may have walked away; everything else is already out.
+  fix: () => live('npm', ['login'], {}, NPM_LOGIN_MS),
 };
 const signedOut = [];
 function signIn(s, { required = true } = {}) {
@@ -179,6 +182,22 @@ function signIn(s, { required = true } = {}) {
   return false;
 }
 signIns.forEach(signIn);
+
+// THE LIVE DATABASE HAS EVERY MIGRATION. Nothing applies them on merge, and on
+// 2026-11-12 fourteen were missing, so the shipped app called functions the
+// cloud did not have.
+say('checking the live database has every migration on main');
+const onLive = quiet('node', ['scripts/run.mjs', 'scripts/migrations-on-live.mjs'], 90_000);
+const notOnLive = onLive.out.split('\n').filter(Boolean);
+if (onLive.ok) console.log('  ✓ all of them');
+else if (checkOnly) console.log(`  ✗ ${notOnLive.join('\n  ✗ ')}`);
+else if (notOnLive.length && /\.sql$/.test(notOnLive[0])) {
+  stop('The live database is missing these migrations, so the app would call what is not there:',
+    ...notOnLive.map((f) => `- ${f}`), '',
+    `Apply them, then run npm run deploy again: node scripts/run.mjs scripts/apply-migration.mjs ${notOnLive.map((f) => `cloud/supabase/migrations/${f}`).join(' ')}`);
+} else {
+  stop(`Could not read the live database to check its migrations: ${onLive.out || onLive.err || 'no answer'}`);
+}
 
 if (checkOnly) {
   signIn(npmSignIn);
@@ -219,12 +238,12 @@ function shipTheVersion(v) {
 }
 if (version !== mainVersion) commit = shipTheVersion(version);
 
-// The version and the counting key go into package.json for this run only,
-// because every step below reads the version from there and `npm publish` packs
-// the file as it stands: the key is what lets `npx agentbox-app` count, as
-// electron-builder's extraMetadata does for the Mac app. It is put back at the
-// end, so main's file never carries either.
-fs.writeFileSync(pkgPath, `${JSON.stringify({ ...JSON.parse(fs.readFileSync(pkgPath, 'utf8')), version, bakedPosthogKey: posthog }, null, 2)}\n`);
+// Every step below reads the version from package.json. Main already says it by
+// now, so this normally writes nothing. The counting key is added only around
+// `npm publish` (step 7): while the file differs from main, the app's update
+// check and the launcher refuse to update this folder, and the deploy can wait
+// a long time before publishing.
+fs.writeFileSync(pkgPath, withVersion(fs.readFileSync(pkgPath, 'utf8'), version));
 packageWritten = true;
 process.on('exit', restorePackageJson);
 // SIGHUP is the Terminal window closing mid-build.
@@ -269,6 +288,9 @@ const serverOk = live('node', ['scripts/cloud-gateway-setup.mjs'], { AGENTBOX_CL
 // to publish something else.
 // npm sessions expire, and publishing can require its own approval after login.
 if (signIn(npmSignIn, { required: false })) {
+  // The key is what lets `npx agentbox-app` count, as extraMetadata does for the Mac app.
+  fs.writeFileSync(pkgPath, `${JSON.stringify({ ...JSON.parse(fs.readFileSync(pkgPath, 'utf8')), bakedPosthogKey: posthog }, null, 2)}\n`);
+  packageWritten = true;
   say(`publishing ${PACKAGE}@${version} to npm (it may ask for a one-time code)`);
   if (!live('npm', ['publish'], { AGENTBOX_PUBLISH_ANYWAY: '1' })) console.log('  ✗ npm did not publish; the reason is just above');
 }

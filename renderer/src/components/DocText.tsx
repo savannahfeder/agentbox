@@ -21,11 +21,12 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import { buildExtensions } from '../editor/extensions';
 import { mdToPmDoc, pmDocToMd } from '../editor/markdown';
 import { patchOriginal } from '../editor/patch-md';
+import { isTypedHere, wordsTheyChanged } from '../editor/typed-links';
 import { mergeText } from '../../../shared/text-merge.mts';
 import { theAppKeepsThisKey } from '../../../shared/artifact-keys.mts';
 import { api } from '../api';
 import { asksForANewTab } from '../link-click';
-import { pictureUrl } from '../picture';
+import { fileBeside, pictureUrl } from '../picture';
 import { agoWords } from '../threads/summary-rules';
 import { DocOutline } from './DocOutline';
 import { scrollKey, useKeptScroll } from '../kept-scroll';
@@ -97,6 +98,8 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
   const baseMd = useRef(pmDocToMd(mdToPmDoc(text)));
   const lastMtime = useRef(mtime);
   const dirty = useRef(!!versions?.draft);
+  // Unlike `dirty`, stays set once a person changed the file, so a later flush still hands their words over.
+  const touched = useRef(!!versions?.draft);
   const saveTimer = useRef<number | null>(null);
   const asVersions = useRef(versions);
   asVersions.current = versions;
@@ -111,7 +114,7 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
   // A picture the document names beside itself, on the window's picture scheme:
   // the page's own address is no folder, so it drew as a broken picture.
   const extensions = useMemo(() => buildExtensions('Write anything…', {
-    drawnFrom: folder ? (from) => (/^(?:[a-z][a-z0-9+.-]*:|\/)/i.test(from) ? from : pictureUrl(new URL(from, `file://${folder}/`).pathname)) : null,
+    drawnFrom: folder ? (from) => (/^(?:[a-z][a-z0-9+.-]*:|\/)/i.test(from) ? from : pictureUrl(fileBeside(from, folder))) : null,
     live: collab ? liveExtensions(collab) : null,
   }), [folder, collab?.doc]);
 
@@ -120,6 +123,9 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
     ...(collab ? {} : { content: mdToPmDoc(versions?.draft ?? text) }),
     editable: !readOnly && !(live && !collab),
     autofocus: versions?.focus && !readOnly ? 'end' : false,
+    onTransaction: ({ transaction }) => {
+      if (transaction.docChanged && isTypedHere(transaction)) touched.current = true;
+    },
     onUpdate: () => {
       const room = liveNow.current;
       // Everyone's words are in the room. The owner's copy saves them as they come; a
@@ -238,8 +244,8 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
     if (dirty.current) return;
     const doc = mdToPmDoc(text);
     onDisk.current = text;
-    baseMd.current = pmDocToMd(doc);
     editor.commands.setContent(doc, { emitUpdate: false });
+    baseMd.current = pmDocToMd(editor.getJSON());
   }, [text, editor]);
 
   // ⌘S SAVES IT NOW.A markdown file was already saving itself on a pause and on
@@ -366,7 +372,9 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
       firstUnsaved.current = null;
       const md = pmDocToMd(editor.getJSON());
       dirty.current = false;
-      return md === baseMd.current ? null : patchOriginal(onDisk.current, baseMd.current, md) ?? md;
+      // In a live file the room's words are everyone's typing, which the keeper saves whoever typed them.
+      const out = wordsTheyChanged({ touched: touched.current || !!room, baseline: baseMd.current, now: md });
+      return out === null ? null : patchOriginal(onDisk.current, baseMd.current, out) ?? out;
     };
     const paint = () => asVersions.current?.paint?.(editor.view.dom);
     let timer: number | null = null;

@@ -14,6 +14,7 @@ import { carryIntoRoom } from './carry-files.mts';
 import type { FoundToSend } from './carry-files.mts';
 import { readRoomMessage } from '../../shared/agent-voice.mts';
 import { cleanMark } from '../../shared/artifact-marks.mts';
+import { pairRooms } from '../../shared/pair-room.mts';
 import { TEAM_LOOK, TEAM_LOOK_POSTED, TEAM_LOOK_TEMPLATE, newestTeamLook } from '../../shared/team-look.mts';
 import { ROOM_MAX_BYTES, ROOM_PART_BYTES, partName, partList, partsOf, readPartList } from '../../shared/room-file-parts.mts';
 
@@ -517,6 +518,14 @@ export function createRooms({
     keepTeamLook().catch((err) => log(`rooms: team look: ${err.message}`));
   }
 
+  // Asked of the cloud, not of the last pull: the other person's Mac may have
+  // made the group seconds ago.
+  async function pairRoomIn(b: RoomsBackend, personId: string) {
+    const rows = (await b.myRooms()).filter((r) => r.kind === 'group' && !r.teamId && r.members === 2);
+    const people = new Map(await Promise.all(rows.map(async (r) => [r.id, await b.roomPeople(r.id)] as const)));
+    return pairRooms(rows, personId, (r) => people.get(r.id) ?? [])[0]?.id ?? null;
+  }
+
   function merge(old: RoomMessage[] = [], fresh: RoomMessage[] = []) {
     const byId = new Map(old.map((m): [string, RoomMessage] => [m.id, m]));
     for (const m of fresh) byId.set(m.id, readRoomMessage(m));
@@ -964,7 +973,10 @@ export function createRooms({
     async create({ name, kind = 'room', listed = false, inviteOnly = false, people: who = [] }: { name: unknown; kind?: string; listed?: boolean; inviteOnly?: boolean; people?: string[] }) {
       const mates = new Set((team()?.people ?? []).map((p) => p.id));
       if (kind !== 'group' || listed || !who.length || who.some((id) => id !== meId() && !mates.has(id))) throw new Error('A group is only ever people on your team');
-      const id = await need().createRoom({ name: String(name ?? '').trim(), kind, listed, inviteOnly, people: who });
+      const b = need();
+      const others = who.filter((p) => p !== meId());
+      const id = (others.length === 1 ? await pairRoomIn(b, others[0]) : null)
+        ?? await b.createRoom({ name: String(name ?? '').trim(), kind, listed, inviteOnly, people: who });
       prefs.set(meId(), { pinned: [...new Set([...prefs.get(meId()).pinned, id])] });
       await refresh();
       return id;

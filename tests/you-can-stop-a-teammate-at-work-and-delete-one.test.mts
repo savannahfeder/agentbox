@@ -137,7 +137,9 @@ describe('the buttons', () => {
   it('while it works, the chat box offers Stop where Send is, until you type', () => {
     const page = read('renderer/src/teammates/TeammatesPage.tsx');
     expect(page).toMatch(/stop=\{t\.running \? <button type="button" className="dock-stop" onClick=\{\(\) => \{ void call\('stop', \{ id: t\.id \}\); \}\}/);
-    expect(page).toMatch(/\{stop && !text\.trim\(\) \? stop\s*: <button type="button" className="dock-send"/);
+    // Typing or attaching a file is a message to send.
+    expect(page).toMatch(/const ready = !!text\.trim\(\) \|\| files\.length > 0;/);
+    expect(page).toMatch(/\{stop && !ready \? stop\s*: <span className="dock-send-pair solo"><button type="button" className="dock-send"/);
   });
 
   it('the ⋯ menu offers Delete, which asks first and comes back with the reason when refused', () => {

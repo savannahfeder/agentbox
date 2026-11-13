@@ -171,6 +171,16 @@ export function codexLimits(snapshot: unknown): CodexLimit[] {
 }
 
 /**
+ * When a spent window comes back: the latest reset among the windows at their
+ * limit or refused, since nothing runs before the last of them. Null when none
+ * is spent or none says.
+ */
+export function codexBackAt(limits: ReadonlyArray<UsageLimit & { reached?: boolean }> | null | undefined, now = Date.now()): number | null {
+  const backs = (limits ?? []).filter((l) => (l.reached || l.percent >= 100) && l.resetsAt != null && l.resetsAt > now).map((l) => l.resetsAt!);
+  return backs.length ? Math.max(...backs) : null;
+}
+
+/**
  * WHICH WINDOW THE PROVIDER SAYS IS SPENT, or null when it says nothing.
  *
  * `rateLimitReachedType` NAMES a window (`primary` / `secondary`), measured on a

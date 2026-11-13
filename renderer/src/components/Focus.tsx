@@ -69,7 +69,7 @@ import { ReplyModel } from './ReplyModel';
 import type { ModelChoice } from '../models';
 import { sameRule, type RepeatShape as RepeatRuleValue } from '../../../shared/repeats.mts';
 import { fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
-import { onPictureLinks, pictureLinksVersion, pictureUrl, sentPictureLink } from '../picture';
+import { onPictureLinks, pictureLinksVersion, pictureUrl, sentPictureLink, wholeMediaPath, wholePicturePath } from '../picture';
 import { Listening, MicButton, useWebDictation } from './WebDictation';
 import { firstFrameSrc, playerShelf } from '../player-shelf';
 import { handleCopyOut, blockCopyText } from '../copy-out';
@@ -78,6 +78,7 @@ import { DiagramBlock } from './DiagramBlock';
 import { NeedCard, NeedPlace, HELD, setHeld } from './NeedCard';
 import { NEED_BLOCK, isNewestAnswer, keyFromReply, keyLooksWrong, keySavedWords, needsAsBlocks } from '../key-asks';
 import { connectedReply, lateReply, needsIn, needId, keysOf, type Need } from '../../../shared/cloud-needs.mts';
+import type { KeySource } from '../../../shared/cloud-key-sources.mts';
 import { keyLabel, keyWords } from '../../../shared/cloud-keys.mts';
 import { referencedFiles, isImagePath } from '../referenced-files';
 import { pictureRoots } from '../message-folders';
@@ -112,6 +113,7 @@ import { RichReply, type RichBox } from '../team/RichReply';
 import { OptionsOffer } from './OptionsOffer';
 import { foldedReply } from '../folded-reply';
 import { applyDockHeight } from '../dock-height';
+import { ClipGlyph, SendGlyph } from './reply-glyphs';
 import { bringIntoView, resumeTo } from '../thread-bottom';
 import { optionIsClipped, optionPeek } from '../option-peek';
 import { changedFiles, FOLDER_SETTLES_MS, folderMayStillMove, onlyNamedFiles, shipOfferFor, shipOfferLive, standingFrom, UNREAD, type ChangedFile, type Standing } from '../ship-offer';
@@ -129,7 +131,8 @@ import { Live } from './Live';
 import { SidebarIcon } from './SidebarIcon';
 import { Byline, ConversationAside } from './Byline';
 import { ItemThread } from './ItemThread';
-import { ContinuedFrom } from '../threads/ContinuedFrom';
+import { ContinuedFrom, HandedFrom, OpenTeammateThread } from '../threads/ContinuedFrom';
+import { threadLink, threadOfLink, seenWord, seenNow, type SeenBy, type ShareActs } from '../threads/share-rules';
 import { answerOnItsWay, type PendingSaid } from '../item-thread';
 import { isTroubleRow } from '../trouble-row';
 import { rowTitle } from '../list-rules';
@@ -137,6 +140,7 @@ import { useKeepInWindow } from '../keep-in-window';
 import { escapeClosesMenu } from '../menu-escape';
 import { isUpdateRow } from '../update-row';
 import { TeamRouteStrip, TeamSaid, teamHeld } from '../team/TeamFocus';
+import { HandedLine } from '../team/HandedBy';
 import {
   PriorityPicker, priorityIdOf, priorityValueOf, type PriorityId,
 } from './Priority';
@@ -264,7 +268,7 @@ export function ArtifactImg({ src, alt, roots, onOpen, find }: {
     return () => clearTimeout(timer);
   }, [broken, tries]);
   const again = (url: string) => (tries ? `${url}?look=${tries}` : url);
-  const relative = !!src && !/^(data|https?|file):/.test(src) && !src.startsWith('/');
+  const relative = !!src && !/^(data|https?|file):/.test(src) && wholePicturePath(src) === null;
   const exhausted = relative && attempt >= roots.length;
   useEffect(() => {
     // A whole path written on a teammate's computer is not on this one: the
@@ -333,8 +337,9 @@ export function ArtifactImg({ src, alt, roots, onOpen, find }: {
   // A chat draws its pictures as previews (team/chat.css), a thread at reading width.
   const maxHeight = direct ? 240 : undefined;
   const minWidth = direct ? 360 : 760;
-  if (/^file:\/\//.test(src) || src.startsWith('/')) {
-    const file = src.startsWith('/') ? src : decodeURIComponent(src.slice(7));
+  const whole = wholePicturePath(src);
+  if (whole !== null) {
+    const file = whole;
     if (found) return door(found, <FittedImg maxHeight={maxHeight} minWidth={minWidth} src={pictureUrl(found)} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" />);
     if (broken && direct) return <CarriedNote src={file} always />;
     if (broken) return <button type="button" className="missing-artifact" title="Look for it again" onClick={() => { setTries(tries + 1); setBroken(false); }}>missing image: {file}</button>;
@@ -425,7 +430,8 @@ export function ArtifactMedia({ src, label, roots, onOpen, find }: { src: string
   // or has still to come, and fills in when it lands.
   const [found, setFound] = useState<string | null>(null);
   const [looks, setLooks] = useState(0);
-  const candidates = found ? [pictureUrl(found)] : src.startsWith('/') ? [pictureUrl(src)] : roots.map((r) => pictureUrl(`${r}/${rel}`));
+  const whole = wholeMediaPath(src);
+  const candidates = found ? [pictureUrl(found)] : whole !== null ? [pictureUrl(whole)] : roots.map((r) => pictureUrl(`${r}/${rel}`));
   const looked = candidates.join('\n');
   const missing = attempt >= candidates.length;
   useEffect(() => {
@@ -725,7 +731,7 @@ export function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 /** Which threads' choices are folded, kept on this machine. */
 const CHOICES_FOLDED = 'one.choicesFoldedOn';
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, giveTo = [], onGive, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, onShare, giveTo = [], onGive, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null }: {
   /** One thing at a time (w-65bcefb857): this thread's place in Needs you and the arrows that walk it. */
   queue?: { spot: Spot; onStep: (dir: 1 | -1) => void } | null;
   /** Drawn on the one-at-a-time page outside Needs you too: every thread with an agent. */
@@ -769,6 +775,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
    *  in To, so adding one more starts the group's conversation and leaves this
    *  one alone. On an agent thread: puts the person on its chosen people. */
   onAddPeople?: (item: WorkItem, person?: string) => void;
+  /** Share…: copy the thread's link, put it in teammates' inboxes, change who can open it. */
+  onShare?: ShareActs;
   artifactSlot?: (node: HTMLDivElement | null) => void;
   inlineArtifacts?: boolean;
   artifactView?: 'beside' | 'focus';
@@ -1346,10 +1354,14 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const opensBig = (path?: string | null) => bigView && whereAFileOpens(path) === 'full';
   const opensBeside = (path?: string | null) => bigView && !!onOpenDoc && whereAFileOpens(path) === 'beside';
   // A picture clicked in the thread steps through its own turn's pictures, as the small view does.
-  const turnOf = (path: string, from?: HTMLElement) => (from && opensAsPicture(path) ? { steps: picturesFor(paneRef.current, path, from).pictures.map((p) => p.path) } : {});
+  const turnOf = (path: string, from?: HTMLElement): { steps?: string[]; drawn?: string[] } => {
+    if (!from || !opensAsPicture(path)) return {};
+    const turn = picturesFor(paneRef.current, path, from);
+    return { steps: turn.pictures.map((p) => p.path), drawn: turn.drawn };
+  };
   const openBig = (path: string, from?: HTMLElement) => setArtifact({ path, at: Date.now(), ...turnOf(path, from) });
   // Kept for when the file beside goes full screen.
-  const besideTurn = useRef<{ path: string; steps?: string[] } | null>(null);
+  const besideTurn = useRef<{ path: string; steps?: string[]; drawn?: string[] } | null>(null);
   const openBeside = (path: string, from?: HTMLElement) => {
     besideTurn.current = { path, ...turnOf(path, from) };
     onOpenDoc?.(path);
@@ -1365,8 +1377,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     return () => { live = false; off?.(); };
   }, [item.product, item.id]);
   const madeHere = useMemo(() => filesMadeHere(historyLines, item.artifacts?.notes ?? []), [historyLines, item.artifacts?.notes]);
-  const markdownActions = useRef({ onOpenDoc, onNotice, openPicture, opensBig, openBig, opensBeside, openBeside, edits: item.artifacts?.edits });
-  useLayoutEffect(() => { markdownActions.current = { onOpenDoc, onNotice, openPicture, opensBig, openBig, opensBeside, openBeside, edits: item.artifacts?.edits }; });
+  const openLinkedThread = useContext(OpenTeammateThread);
+  const markdownActions = useRef({ onOpenDoc, onNotice, openPicture, opensBig, openBig, opensBeside, openBeside, openLinkedThread, edits: item.artifacts?.edits });
+  useLayoutEffect(() => { markdownActions.current = { onOpenDoc, onNotice, openPicture, opensBig, openBig, opensBeside, openBeside, openLinkedThread, edits: item.artifacts?.edits }; });
   // A row in Needs you for a comment or an approval opens the file at it.
   const fileNewsMe = teamCtx?.me ?? null;
   useEffect(() => {
@@ -1377,8 +1390,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   useEffect(() => {
     if (!openAt || onPhone()) return;
     const kept = besideTurn.current;
-    const turn = kept && kept.path === openAt.path ? kept.steps : undefined;
-    setArtifact({ ...(turn ? { steps: turn } : {}), ...openAt, at: Date.now() });
+    const turn = kept && kept.path === openAt.path ? kept : undefined;
+    setArtifact({ ...(turn?.steps ? { steps: turn.steps } : {}), ...(turn?.drawn ? { drawn: turn.drawn } : {}), ...openAt, at: Date.now() });
   }, [openAt]);
 
   // Everything the markdown renderer closes over, memoized as ONE stable
@@ -1417,10 +1430,11 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     // A miss now SAYS SO.
     const openHref = (href?: string, from?: HTMLElement, click?: LinkClick) => {
       if (!href) return;
-      const { onOpenDoc, onNotice, openPicture, opensBig, openBig, opensBeside, openBeside, edits } = markdownActions.current;
+      const { onOpenDoc, onNotice, openPicture, opensBig, openBig, opensBeside, openBeside, openLinkedThread, edits } = markdownActions.current;
       // A file opens beside the chat, a deck full screen, a web address in the
       // pane, and a ⌘-click sends any of them out (../link-click.ts).
       const goes = whereALinkGoes(href, click, { pane: !!onOpenDoc });
+      if (goes === 'thread' && openLinkedThread) { const t = threadOfLink(href)!; openLinkedThread(t.owner, t.id); return; }
       if (!asksForANewTab(click) && opensBig(href)) { openBig(href, from); return; }
       if (!asksForANewTab(click) && opensBeside(href)) { openBeside(newestOfFamily(href, edits), from); return; }
       if (goes === 'picture') { openPicture(href, from); return; }
@@ -1480,7 +1494,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         const note = href && !/^(https?|data):/.test(href) ? voiceNoteOf(href) : null;
         if (href && note) {
           const rel = href.replace(/^\.\//, '');
-          const urls = href.startsWith('/') ? [pictureUrl(href)] : roots.map((r) => pictureUrl(`${r}/${rel}`));
+          const whole = wholeMediaPath(href);
+          const urls = whole !== null ? [pictureUrl(whole)] : roots.map((r) => pictureUrl(`${r}/${rel}`));
           return <VoiceNote key={href} id={`${product}:${rel}`} ms={note.ms} load={() => firstFound(urls)} />;
         }
         // A SOUND OR A FILM PLAYS IN PLACE (ArtifactMedia, above).
@@ -1563,7 +1578,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     const held = (HELD.get(item.id) ?? []).map((h) => h.words).join(' ');
     return [connected, held].filter(Boolean).join(' ');
   };
-  const saveKeys = async (fields: { name: string; value: string; label: string }[], need: Need, words?: string, late = false) => {
+  const saveKeys = async (fields: { name: string; value: string; label: string; from?: KeySource }[], need: Need, words?: string, late = false) => {
     if (late) return saveLate(fields, need);
     let out: Awaited<ReturnType<typeof api.cloudKey>> = { ok: true };
     const savedAfter = [...(savedKeys ?? []), ...fields.map((f) => f.name)];
@@ -1575,7 +1590,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       const reply = withHeld && i === fields.length - 1 ? { product: item.product, id: item.id, answer: withHeld } : undefined;
       // Which Stripe key is kept, said where it is listed (round ten).
       const mode = /^STRIPE_/.test(f.name) ? (/^(sk|rk)_live_/.test(f.value.trim()) ? 'Live ' : /^(sk|rk)_test_/.test(f.value.trim()) ? 'Test-mode ' : '') : '';
-      out = await api.cloudKey({ action: 'save', name: f.name, value: f.value, label: `${mode}${f.label}`, ...(reply ? { reply } : {}) });
+      out = await api.cloudKey({ action: 'save', name: f.name, value: f.value, label: `${mode}${f.label}`, ...(f.from ? { from: f.from } : {}), ...(reply ? { reply } : {}) });
       if (!out.ok) return out.error || 'The cloud did not take the key. Try again.';
     }
     if (withHeld !== words) { setHeld(item.id, null); setHeldTick((t) => t + 1); }
@@ -1587,11 +1602,11 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     return null;
   };
   // A key from a card already answered in words: nothing is held for it, and the thread hears it came after all.
-  const saveLate = async (fields: { name: string; value: string; label: string }[], need: Need) => {
+  const saveLate = async (fields: { name: string; value: string; label: string; from?: KeySource }[], need: Need) => {
     let out: Awaited<ReturnType<typeof api.cloudKey>> = { ok: true };
     for (const [i, f] of fields.entries()) {
       const reply = i === fields.length - 1 ? { product: item.product, id: item.id, answer: lateReply([need]) } : undefined;
-      out = await api.cloudKey({ action: 'save', name: f.name, value: f.value, label: f.label, ...(reply ? { reply } : {}) });
+      out = await api.cloudKey({ action: 'save', name: f.name, value: f.value, label: f.label, ...(f.from ? { from: f.from } : {}), ...(reply ? { reply } : {}) });
       if (!out.ok) return out.error || 'The cloud did not take the key. Try again.';
     }
     const names = fields.map((f) => f.name);
@@ -1928,8 +1943,28 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const waiting = offersRunNow(item, { session, queued: live.queued, runNow: live.runNow, inProgress: live.inProgress });
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [renameAt, setRenameAt] = useState(0);
+  const share = (() => {
+    if (!teamCtx?.state.team || !onShare || !teamCtx.me || direct || agent || inChats) return null;
+    if ((item.createdBy ?? teamCtx.me) !== teamCtx.me) return null;
+    const seen: SeenBy = seenNow(item, teamCtx.products.get(item.product), teamCtx.state.since ?? null);
+    const teamName = teamCtx.state.team.name || 'your team';
+    return {
+      link: threadLink(teamCtx.me, item.id),
+      people: teamCtx.state.people.filter((p) => p.id !== teamCtx.me),
+      last: onShare.last,
+      seen,
+      seenWord: seenWord(seen, teamName, item.visibleTo?.length ?? 0),
+      teamName,
+      chosen: item.visibleTo ?? [],
+    };
+  })();
   const threadMenu = (
     <ThreadMenu
+      share={share}
+      onCopyLink={() => onShare!.copy(item)}
+      onSendTo={(to, note) => onShare!.send(item, to, note)}
+      onSee={(to) => onShare!.see(item, to)}
+      onChoose={(id) => onShare!.choose(item, id)}
       key={`${item.product}:${item.id}`}
       files={<ThreadFilesButton files={madeHere} onOpen={(f) => (opensBig(f.src) ? openBig(f.src) : onOpenDoc?.(f.src))} />}
       change={changeFigures}
@@ -1944,6 +1979,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       onToggleTerminal={() => window.dispatchEvent(new Event('task-terminal-toggle'))}
       onFinish={canFinish ? onResolve : null}
       onCloseTask={canFinish && givenTask ? onCloseTask ?? null : null}
+      onStopRepeating={repeat ? repeat.onEnd : null}
       onReopen={!canFinish && !agent ? onReopenDone ?? null : null}
       onRunNow={waiting && onRunNow ? onRunNow : null}
       onLater={canFinish ? onSnooze ?? null : null}
@@ -2105,10 +2141,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       <ThreadArtifacts item={item} open={artifact} withAgent={!direct && !heldByPerson && !item.agent}
         onClose={() => setArtifact(null)} onNotice={onNotice}
         onBeside={onOpenArtifact ? (path) => {
-          const steps = artifact.steps?.includes(path) ? artifact.steps : undefined;
+          const same = artifact.steps?.includes(path);
           setArtifact(null);
           onOpenArtifact(path, 'beside');
-          besideTurn.current = { path, ...(steps ? { steps } : {}) };
+          besideTurn.current = { path, ...(same ? { steps: artifact.steps, drawn: artifact.drawn } : {}) };
         } : undefined} />
     )}
     {picture && (
@@ -2270,8 +2306,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             thread head. For one it is which tasks are stopped and what each is
             waiting on (w-cf0e8821b3); for the other it is what restarting costs
             and which two versions this is between (w-86452550e5). */}
+        <HandedLine item={item} />
         <ContinuedFrom labels={item.labels} />
         {givenTask && <div className="focus-meta by-lead"><TeamSaid item={item} /></div>}
+        {givenTask && <HandedFrom item={item} />}
         {made
           ? <div className="outcome">{md(item.body ?? '')}</div>
           : !agent && (
@@ -3781,7 +3819,8 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
           <button type="button" className="tc-icon dock-clip" title="Attach files" aria-label="Attach files" onClick={pickFiles}><ClipGlyph /></button>
         )}
         {!talkTo?.length && talk.allowed && <MicButton talk={talk} />}
-        {stop && !hasDraft ? stop : (
+        {/* Stop gives way to Send, which would leave focus on the page and the next words typed nowhere. */}
+        {stop && !hasDraft ? <span style={{ display: 'contents' }} onClick={() => requestAnimationFrame(() => ref.current?.focus())}>{stop}</span> : (
         <span className={`dock-send-pair${canWait ? '' : ' solo'}`}>
         <button
           className="dock-send"
@@ -3811,16 +3850,3 @@ function chipsOverflow(chips: HTMLElement): boolean {
 }
 
 const titleCase = (s: string) => s.replace(/(^|\s)\S/g, (c) => c.toUpperCase());
-
-const ClipGlyph = () => (
-  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-    <path d="m20 11.5-8.2 8.2a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.4 8.4a1.7 1.7 0 0 1-2.4-2.4l7.7-7.7" />
-  </svg>
-);
-
-// Drawn only when the reply box is too narrow for the word (narrow-conversation.css).
-const SendGlyph = () => (
-  <svg className="dock-send-arrow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M12 19V5M6 11l6-6 6 6" />
-  </svg>
-);

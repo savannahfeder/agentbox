@@ -1,16 +1,21 @@
 import { useEffect, useState } from 'react';
+import { shownSkyId } from './sky';
 
 // The sky chosen for each look is kept on this machine only.
-/** The sky theme picked, if any; Light, Dark and Match system clear it. */
+/** The sky theme picked, or PLAIN once plain Light or Dark is picked; Match system clears it. */
 export const SKY_THEME_KEY = 'zero.sky.theme';
 const CHANGED = 'agentbox:home-settings';
 
-export type HomeSettings = { skyTheme: string | null };
+/** `skyTheme` is the sky worn, with the default filled in (./sky: shownSkyId); `picked` is whether a sky was chosen. */
+export type HomeSettings = { skyTheme: string | null; picked: boolean };
+
+const darkNow = () => document.documentElement.dataset.theme !== 'light';
 
 function read(): HomeSettings {
-  try {
-    return { skyTheme: localStorage.getItem(SKY_THEME_KEY) || null };
-  } catch { return { skyTheme: null }; }
+  let saved: string | null = null;
+  try { saved = localStorage.getItem(SKY_THEME_KEY) || null; } catch { /* private window */ }
+  const skyTheme = shownSkyId(saved, darkNow());
+  return { skyTheme, picked: !!skyTheme && skyTheme === saved };
 }
 
 export function setHomeSetting(key: typeof SKY_THEME_KEY, value: string | null) {
@@ -27,7 +32,9 @@ export function useHomeSettings(): HomeSettings {
     const again = () => set(read());
     window.addEventListener(CHANGED, again);
     window.addEventListener('storage', again);
-    return () => { window.removeEventListener(CHANGED, again); window.removeEventListener('storage', again); };
+    const mo = new MutationObserver(again);
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => { window.removeEventListener(CHANGED, again); window.removeEventListener('storage', again); mo.disconnect(); };
   }, []);
   return s;
 }

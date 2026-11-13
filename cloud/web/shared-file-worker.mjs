@@ -111,6 +111,16 @@ export function sharedFileWorker({ cloud, anonKey, headers = {} }, { fetchImpl =
     });
   }
 
+  // A thread's link (/t/<owner>/<thread>) is the app's page, its files loaded from the root.
+  async function theThreadPage(request, env, url) {
+    const shell = await env.ASSETS.fetch(new URL('/', url));
+    const html = (await shell.text()).replace(/(\s(?:src|href))="\.\//g, '$1="/');
+    return new Response(request.method === 'HEAD' ? null : html, {
+      status: 200,
+      headers: { ...headers, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
+    });
+  }
+
   async function theFile(request, url, tok, preview) {
     let file;
     try { file = await view(tok); } catch { return plain(502, 'This file did not load. Try again.'); }
@@ -154,6 +164,7 @@ export function sharedFileWorker({ cloud, anonKey, headers = {} }, { fetchImpl =
   return {
     async fetch(request, env) {
       const url = new URL(request.url);
+      if (url.pathname.startsWith('/t/')) return theThreadPage(request, env, url);
       if (url.pathname.startsWith('/F/')) return new Response(null, { status: 301, headers: { location: `${url.origin}/f/${url.pathname.slice(3)}`, 'cache-control': 'no-store' } });
       const p = PUNCTUATED.exec(url.pathname);
       if (p) return new Response(null, { status: 301, headers: { location: `${url.origin}/f/${p[1]}`, 'cache-control': 'no-store' } });

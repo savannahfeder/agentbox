@@ -79,7 +79,8 @@ const LOOK = `(() => {
     el.setAttribute('data-breaker-ref', String(i + 1));
     const words = (el.getAttribute('aria-label') || el.innerText || el.textContent || el.getAttribute('placeholder') || el.getAttribute('title') || '').replace(/\\s+/g, ' ').trim().slice(0, 70);
     const kind = el.tagName.toLowerCase() + (el.getAttribute('role') ? '[' + el.getAttribute('role') + ']' : '');
-    return (i + 1) + '. ' + kind + ' "' + words + '"' + (document.activeElement === el ? '  <- cursor here' : '');
+    const ticked = ['aria-current', 'aria-checked', 'aria-pressed', 'aria-selected'].some((a) => el.getAttribute(a) === 'true');
+    return (i + 1) + '. ' + kind + ' "' + words + '"' + (ticked ? '  (ticked)' : '') + (document.activeElement === el ? '  <- cursor here' : '');
   });
   // A thread's newest messages are at its foot, so a long screen keeps its end as well as its start.
   const all = document.body.innerText.replace(/\\n{3,}/g, '\\n\\n');
@@ -154,8 +155,10 @@ async function thingAt(t, which, clickIfCovered, scroll = true) {
       : [...document.querySelectorAll('[data-breaker-ref]')].find(named)
         || [...document.querySelectorAll('button, a[href], [role="button"], [role="tab"], [role="menuitem"]')].find((e) => named(e) && e.getClientRects().length > 0);
     if (!el) return null;
-    const at = () => { const r = el.getBoundingClientRect(); const x = r.left + r.width / 2; const y = r.top + r.height / 2;
-      const top = document.elementFromPoint(x, y); return { r, x, y, reachable: !!top && (top === el || el.contains(top) || top.contains(el)) }; };
+    // A link that wraps has the sentence around it at the middle of its box.
+    const at = () => { const lines = el.getClientRects(); const r = el.getBoundingClientRect(); const aim = lines.length > 1 ? lines[0] : r;
+      const x = aim.left + aim.width / 2; const y = aim.top + aim.height / 2;
+      const top = document.elementFromPoint(x, y); return { r, x, y, reachable: !!top && (top === el || el.contains(top)) }; };
     if (${scroll}) el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     // Scrolled only to the nearest edge, a cell can sit under a table's frozen first column; a person would scroll it clear.
     let { r, x, y, reachable } = at();
@@ -220,8 +223,18 @@ if (verb === 'open') {
     t.detach();
     process.exit(0);
   }
+  // The pointer arriving can move the page (leaving the sidebar slides it back
+  // 164px), and a person aims again at where the thing went.
+  let aim = hit;
+  if (hit?.reachable) {
+    await t.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: hit.x, y: hit.y, button: 'none' });
+    await t.wait(320);
+    waited += 320;
+    const again = await thingAt(t, which, false, false);
+    if (again?.reachable) aim = again;
+  }
   // A real press, because only a real press may start a film with sound.
-  if (hit?.reachable) await mouse(t, hit, { button: verb === 'rightclick' ? 'right' : 'left', times: verb === 'dblclick' ? 2 : 1, mods: held });
+  if (aim?.reachable) await mouse(t, aim, { button: verb === 'rightclick' ? 'right' : 'left', times: verb === 'dblclick' ? 2 : 1, mods: held });
   const said = verb === 'dblclick' ? 'Double-clicked' : verb === 'rightclick' ? 'Right-clicked' : 'Pressed';
   await report(t, hit === null ? `Nothing numbered or named "${which}" on screen. Run look again.`
     : !hit.reachable && verb !== 'click' ? `"${hit.words}" is covered by something else on screen.`

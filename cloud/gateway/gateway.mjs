@@ -13,6 +13,7 @@ import http from 'node:http';
 import { FREE, PLANS, TEAM, RUN_CEILING_MS, SIGNIN_CEILING_MS, SIGNINS_AT_ONCE } from './plans.mjs';
 import { TERMS_VERSION } from './terms.mjs';
 import { LOGIN_NAME } from '../../shared/cloud-login-name.mts';
+import { isKeyObject } from '../../shared/cloud-keys.mts';
 import { Name } from '../../shared/product-name.mjs';
 import { JOIN_SCHEME } from '../../shared/room-links.mts';
 import { PAYING, planOfLookupKey } from './stripe.mjs';
@@ -178,7 +179,10 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     const team = await teams(person);
     if (!team?.id || !Array.isArray(team.members)) return null;
     const bill = (await readJson(teamKey(team.id))) || {};
-    const seats = bill.plan === 'team' && PAYING.has(bill.stripe?.status) ? Math.max(0, Math.floor(Number(bill.seats)) || 0) : 0;
+    // A trial's subscription can reach past_due never having been charged;
+    // a record from before `paid` was kept is taken as paid.
+    const neverPaid = bill.stripe?.status === 'past_due' && bill.stripe.paid === false;
+    const seats = bill.plan === 'team' && PAYING.has(bill.stripe?.status) && !neverPaid ? Math.max(0, Math.floor(Number(bill.seats)) || 0) : 0;
     const endsAt = Number(team.createdAt) + teamPlan.trialDays * DAY_MS;
     const trial = !seats && t < endsAt;
     if (!seats && !trial) return null;
@@ -457,6 +461,14 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     }))).filter(Boolean);
     if (Array.isArray(sent.also)) sent.also = await linked(sent.also);
     if (Array.isArray(sent.keys)) sent.keys = await linked(sent.keys);
+    // A saved key handed to a run while it goes (main/cloud/key-asks.mts), and never any other sign-in.
+    if (sent.action === 'files' && Array.isArray(sent.files) && sent.files.some((f) => f?.key !== undefined)) {
+      sent.files = await Promise.all(sent.files.map(async (f) => {
+        if (f?.key === undefined) return f;
+        if (typeof f.url !== 'string' || !f.url.startsWith(LOGIN_NAME) || !isKeyObject(f.url.slice(LOGIN_NAME.length))) throw bad('a key handed to a run is one of the saved keys');
+        return { ...f, url: await loginLink(person, f.url, 'get') };
+      }));
+    }
     if ('loginUrl' in sent) sent.loginUrl = await loginLink(person, sent.loginUrl, 'get');
     if ('saveUrl' in sent) {
       if (!SAVES_A_SIGNIN.has(sent.action)) throw bad('a sign-in is saved only by a sign-in');
@@ -645,7 +657,11 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       const open = await stripe.session(bill.checkout.id).catch(() => null);
       if (open?.status === 'open') return { url: open.url, where: 'checkout' };
     }
-    const made = await stripe.checkout({ person, plan: 'team', team: team.id, quantity: Math.max(1, team.members.length), customer: bill.stripe?.customer, successUrl: `${base}/v1/paid?plan=team`, cancelUrl: `${base}/v1/paid?cancelled=1` });
+    // Paid for inside the team's free days, the card is charged when they end.
+    // Stripe trials nothing that ends within 48 hours, so a team that close pays now.
+    const trialEnds = Number(team.createdAt) + teamPlan.trialDays * DAY_MS;
+    const trialEnd = trialEnds - now() > 2 * DAY_MS ? trialEnds : null;
+    const made = await stripe.checkout({ person, plan: 'team', team: team.id, quantity: Math.max(1, team.members.length), customer: bill.stripe?.customer, trialEnd, successUrl: `${base}/v1/paid?plan=team`, cancelUrl: `${base}/v1/paid?cancelled=1` });
     await updateTeam(team.id, (b) => { b.checkout = { id: made.id, url: made.url, by: person, at: now() }; });
     return { url: made.url, where: 'checkout' };
   }
@@ -778,9 +794,12 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     await updateTeam(team, (bill) => {
       // An old subscription ending leaves alone a newer one that pays.
       if (!pays && bill.stripe?.subscription && bill.stripe.subscription !== sub.id && PAYING.has(bill.stripe.status)) return;
+      // A past_due recorded before `paid` was kept is a renewal's retry.
+      const was = bill.stripe?.subscription === sub.id ? bill.stripe : null;
+      const paid = sub.status === 'active' || !!was && (was.paid === true || was.status === 'active' || (was.paid === undefined && was.status === 'past_due'));
       bill.plan = pays ? 'team' : 'none';
       bill.seats = Math.max(0, Math.floor(Number(item?.quantity)) || 0);
-      bill.stripe = { customer: sub.customer, subscription: sub.id, status: sub.status, at: now() };
+      bill.stripe = { customer: sub.customer, subscription: sub.id, status: sub.status, paid, at: now() };
       if (pays) delete bill.checkout;
     });
     log(`team ${team} is on ${pays ? `${Math.floor(Number(item?.quantity)) || 0} seats` : 'no plan'} (Stripe ${sub.status})`);

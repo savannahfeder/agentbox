@@ -1,6 +1,6 @@
 // PURE. How the big file view (components/ArtifactView.tsx) draws its pins,
 // zooms a picture, and what it offers for the file it found.
-import { noteGoesTo, notesForTheAgent, placeWords, tagsYourAgent, unsentReplies, viewKind } from '../../shared/artifact-marks.mts';
+import { noteGoesTo, notesForTheAgent, placeWords, tagsYourAgent, threadFiles, unsentReplies, versionNamed, viewKind } from '../../shared/artifact-marks.mts';
 import type { FileVersion } from '../../shared/artifact-marks.mts';
 import { MAX_ZOOM } from './picture-view';
 import type { FileMarks, FileNote, NotePlace } from './types';
@@ -170,7 +170,7 @@ export function marksOnPages(notes: Pick<FileNote, 'place' | 'resolved'>[]): Map
 /** A script a thread names only counts once someone opened it or commented on it: most are just mentioned. */
 export function otherFilesOpen<F extends { path: string }>(others: F[], opened: string | null | undefined, notes: Pick<FileNote, 'file'>[]): F[] {
   const clean = opened?.replace(/^\.\//, '');
-  return others.filter((f) => f.path === clean || notes.some((n) => n.file === f.path.split('/').pop()));
+  return others.filter((f) => f.path === clean || notes.some((n) => !!versionNamed(threadFiles([f]), n.file)));
 }
 
 const TILE_AIR = 16;
@@ -235,16 +235,64 @@ export function unsentWords(total: number, elsewhere: number, kind: 'picture' | 
   return elsewhere >= total ? `${head}, on ${where}` : `${head}, ${elsewhere} on ${where}`;
 }
 
+export type NoteGoes = { to: 'agent'; now: boolean } | { to: 'person'; person: string } | { to: 'file' };
+
 /**
- * What the comment box's button says. A comment waits for Send unless it tags
- * your agent; `toAgent` is whether this file's agent is yours to tag at all;
- * `owner` is who shared the file.
+ * WHO A NOTE GOES TO follows whose thing it is on. A name in the words wins.
+ * A teammate's thread or version goes to them. On your own agent's file it is
+ * for your agent unless a teammate is already talking about the file, and
+ * `@agent` always reaches your agent there.
+ *
+ * `toAgent`: this thread is yours and has your agent. `owner`: who made the
+ * version. `threadOwner`: whose thread it is. `talking`: teammates in the
+ * conversation about the file, newest first.
  */
-export function noteSendWords({ text, people, me, nameOf, agentMade, toAgent, owner }: {
-  text: string; people: Named; me: string | null; nameOf: (id: string | null) => string; agentMade: boolean; toAgent: boolean; owner: string | null;
-}): string {
-  const goes = noteGoesTo({ text }, people);
-  if (goes.to === 'person') return goes.person === me ? 'Comment' : `Send to ${nameOf(goes.person)}`;
-  if (agentMade && toAgent) return tagsYourAgent(text) ? 'Send to your agent' : 'Comment';
-  return owner && owner !== me ? `Send to ${nameOf(owner)}` : 'Comment';
+export function whereANoteGoes({ text, people, me, agentMade, toAgent, owner, threadOwner = null, talking = [] }: {
+  text: string; people: Named; me: string | null; agentMade: boolean; toAgent: boolean; owner: string | null;
+  threadOwner?: string | null; talking?: readonly string[];
+}): NoteGoes {
+  const named = noteGoesTo({ text, by: me }, people);
+  if (named.to === 'person') return { to: 'person', person: named.person };
+  const other = (id: string | null | undefined): id is string => !!id && id !== me;
+  const mate = talking.find(other);
+  if (!toAgent) {
+    const theirs = [owner, threadOwner, mate].find(other);
+    return theirs ? { to: 'person', person: theirs } : { to: 'file' };
+  }
+  if (agentMade && tagsYourAgent(text)) return { to: 'agent', now: true };
+  if (named.to === 'nobody') return { to: 'file' };
+  const theirs = [owner, mate].find(other);
+  if (theirs) return { to: 'person', person: theirs };
+  return agentMade ? { to: 'agent', now: false } : { to: 'file' };
+}
+
+/** What the comment box's button says: where the note goes. */
+export function noteSendWords(p: Parameters<typeof whereANoteGoes>[0] & { nameOf: (id: string | null) => string }): string {
+  const goes = whereANoteGoes(p);
+  if (goes.to === 'person') return `Send to ${p.nameOf(goes.person)}`;
+  if (goes.to === 'agent') return goes.now ? 'Send to your agent' : 'Note for your agent';
+  return 'Comment';
+}
+
+/** Everyone but you who noted one of these versions or replied under a note on them, newest first. */
+export function whoTalksOnFile(notes: readonly Pick<FileNote, 'file' | 'by' | 'ts' | 'replies'>[], versions: readonly string[], me: string | null): string[] {
+  const said = notes.filter((n) => versions.includes(n.file))
+    .flatMap((n) => [{ by: n.by, ts: n.ts }, ...(n.replies ?? []).map((r) => ({ by: r.by, ts: r.ts }))])
+    .filter((x): x is { by: string; ts: number } => !!x.by && x.by !== me)
+    .sort((a, b) => b.ts - a.ts);
+  return [...new Set(said.map((x) => x.by))];
+}
+
+/** What the button says once the note it sent has saved: who it went to, or null for a comment kept on the file. */
+export const noteSentWords = (sendWords: string): string | null => (sendWords.startsWith('Send to ') ? `Sent to ${sendWords.slice('Send to '.length)}` : null);
+
+/**
+ * Whether a key goes into the note box. The view takes every key while it is
+ * open, so a letter typed once the caret has left the box, as it does when the
+ * page's frame takes a click, would otherwise be lost.
+ */
+export function letterGoesToTheNote({ key, chord, on, boxThere }: {
+  key: string; chord: boolean; on: 'box' | 'control' | 'nothing'; boxThere: boolean;
+}): boolean {
+  return boxThere && !chord && on === 'nothing' && /^\p{L}$/u.test(key);
 }

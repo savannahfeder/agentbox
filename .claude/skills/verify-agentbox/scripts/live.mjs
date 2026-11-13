@@ -156,8 +156,7 @@ export function copyConfig(state, had = {}) {
     maxConcurrentSessions: 2,
     // A checkout reads a missing switch as Multiplayer on; a download reads it as off.
     alphaMultiplayer: !!state.teamFile,
-    ...(state.teamFile ? { alphaRooms: true } : {}),
-    // `up --alpha teammates,rooms`: features still in testing are off for a new person.
+    // `up --alpha teammates`: features still in testing are off for a new person.
     ...Object.fromEntries((state.alpha ?? []).map((f) => [`alpha${f[0].toUpperCase()}${f.slice(1)}`, true])),
     ...((state.cloud || state.standInCloud) && !('cloudRuns' in had) ? { cloudRuns: 'all', cloudWhenOn: 'all' } : {}),
   };
@@ -200,7 +199,7 @@ async function realCodex() {
  * home, the stand-in layered into their config.toml and signed with their own
  * login, and the copy finding codex and the home as theirs would.
  */
-async function prepare(real, setupName = null, { logins = 2, codex = true, projectNames = null, fresh = false } = {}) {
+async function prepare(real, setupName = null, { logins = 2, codex = true, projectNames = null, fresh = false, realCodexHome = null } = {}) {
   const data = path.join(INSTANCE, 'data');
   const storeRoot = path.join(INSTANCE, 'store');
   const accountRoot = path.join(storeRoot, 'accounts', ACCOUNT);
@@ -314,7 +313,10 @@ async function prepare(real, setupName = null, { logins = 2, codex = true, proje
     for (const p of ['priority-palette.png', 'inbox-urgent.png']) fs.copyFileSync(path.join(REPO, 'docs', 'readme', p), path.join(INSTANCE, 'bin', 'pictures', p));
     fs.writeFileSync(claudeBin, `#!/bin/sh\nexec "${process.execPath}" "${stub}" "$@"\n`, { mode: 0o755 });
     codexBin = codex ? await realCodex() : null;
-    if (codexBin) {
+    if (codexBin && realCodexHome) {
+      // `--real-codex <home>`: the real Codex, signed in as that login is, beside the Claude stand-in.
+      codexHome = realCodexHome;
+    } else if (codexBin) {
       codexHome = path.join(INSTANCE, 'codex-home');
       fs.mkdirSync(codexHome, { recursive: true });
     }
@@ -322,6 +324,7 @@ async function prepare(real, setupName = null, { logins = 2, codex = true, proje
   const state = {
     repoRoot: REPO, instance: INSTANCE, data, storeRoot, accountRoot, repo: repos[PRODUCT.slug] ?? Object.values(repos)[0], repos, receipts, plan, home,
     log: path.join(INSTANCE, 'app.log'), engine: setup ? 'setup' : real ? 'real' : 'stub', claudeBin, codexBin, codexHome,
+    codexReal: !real && !setup && !!(codexBin && realCodexHome),
     setup: setup?.name ?? null, claudeModel, codexModel,
   };
   return state;
@@ -436,6 +439,31 @@ async function startInstalled(state) {
 }
 
 /** Start the copy over an instance that is already on disk, and wait for its address. */
+/**
+ * Made-up keys where a person keeps theirs (a Keychain item, a key file, an
+ * .env file, a shell variable), and a stand-in `security` first on the copy's
+ * PATH that knows only these, so a cloud run asking this computer for a key
+ * (main/cloud/key-asks.mts) never reaches the real Keychain. Returns the env to add.
+ */
+export function layStandInKeys(home, env) {
+  const items = { 'posthog-read-key': 'phx_standin_keychain_posthog_0000', 'resend-api-key': 're_standin_keychain_resend_0000' };
+  fs.writeFileSync(path.join(home, '.stand-in-keychain.json'), JSON.stringify(items));
+  fs.mkdirSync(path.join(home, '.config'), { recursive: true });
+  fs.writeFileSync(path.join(home, '.config', 'openrouter.key'), 'sk-or-standin-file-openrouter-0000\n');
+  fs.mkdirSync(path.join(home, 'app'), { recursive: true });
+  fs.writeFileSync(path.join(home, 'app', '.env'), 'RESEND_API_KEY=re_standin_env_resend_0000\nPOSTHOG_KEY=phx_standin_env_posthog_0000\n');
+  const bin = path.join(INSTANCE, 'keychain-bin');
+  fs.mkdirSync(bin, { recursive: true });
+  const reader = path.join(bin, 'security.cjs');
+  fs.writeFileSync(reader, `const a = process.argv.slice(2); const s = a[a.indexOf('-s') + 1];
+const items = JSON.parse(require('fs').readFileSync(${JSON.stringify(path.join(home, '.stand-in-keychain.json'))}, 'utf8'));
+if (a[0] !== 'find-generic-password' || !Object.hasOwn(items, s)) { console.error('security: SecKeychainSearchCopyNext: The specified item could not be found in the keychain.'); process.exit(44); }
+console.log(a.includes('-w') ? items[s] : 'keychain: "stand-in"');
+`);
+  fs.writeFileSync(path.join(bin, 'security'), `#!/bin/sh\nexec "${process.execPath}" "${reader}" "$@"\n`, { mode: 0o755 });
+  return { PATH: `${bin}:${env.PATH ?? '/usr/bin:/bin:/usr/sbin:/sbin'}`, MIXPANEL_API_SECRET: 'mx_standin_shell_mixpanel_0000' };
+}
+
 async function start(state) {
   if (state.installed) return startInstalled(state);
   const env = { ...cleanEnv(), STUB_CLAUDE_PLAN: state.plan,
@@ -474,7 +502,7 @@ async function start(state) {
     // HOME and CFFIXED_USER_HOME together: macOS asks Core Foundation, not the
     // environment, for some paths (scripts/fresh-user.mjs says why).
     Object.assign(env, { HOME: state.home, CFFIXED_USER_HOME: state.home });
-    if (state.codexHome) {
+    if (state.codexHome && !state.codexReal) {
       // A new scripted model on each start; the old one died with the copy.
       const server = spawn(process.execPath, [path.join(here, 'stub-codex-server.mjs'), INSTANCE], { detached: true, stdio: 'ignore' });
       server.unref();
@@ -503,20 +531,30 @@ async function start(state) {
   let had = {};
   try { had = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { /* first start */ }
   fs.writeFileSync(file, `${JSON.stringify({ ...had, ...copyConfig(state, had) }, null, 2)}\n`);
+  if (state.engine === 'stub') Object.assign(env, layStandInKeys(state.home, env));
 
   const fd = fs.openSync(state.log, 'a');
-  const before = fs.existsSync(state.log) ? fs.statSync(state.log).size : 0;
-  const child = spawn(process.execPath, [...stripTypesFlags(), path.join(REPO, 'bin', 'agentbox.mjs'), '--dir', state.data, '--no-open'], {
-    cwd: REPO, detached: true, stdio: ['ignore', fd, fd], env,
-  });
-  child.unref();
-  const deadline = Date.now() + 30_000;
-  let url = null;
-  while (!url && Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, 200));
-    url = fs.readFileSync(state.log, 'utf8').slice(before).match(/http:\/\/127\.0\.0\.1:\d+\/\?token=\S+/)?.[0] ?? null;
-    if (!alive(child.pid)) break;
-  }
+  // A restart keeps its port: a new port is a new origin, and the window's own
+  // storage (threads followed, drafts) would read as wiped to a tester.
+  const kept = state.url ? new URL(state.url).port : '';
+  const launch = async (port) => {
+    const from = fs.statSync(state.log).size;
+    const child = spawn(process.execPath, [...stripTypesFlags(), path.join(REPO, 'bin', 'agentbox.mjs'), '--dir', state.data, '--no-open', ...(port ? ['--port', port] : [])], {
+      cwd: REPO, detached: true, stdio: ['ignore', fd, fd], env,
+    });
+    child.unref();
+    const deadline = Date.now() + 30_000;
+    let found = null;
+    while (!found && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 200));
+      found = fs.readFileSync(state.log, 'utf8').slice(from).match(/http:\/\/127\.0\.0\.1:\d+\/\?token=\S+/)?.[0] ?? null;
+      if (!alive(child.pid)) break;
+    }
+    return { child, found };
+  };
+  let { child, found: url } = await launch(kept);
+  // Somebody else took the old port meanwhile: a new one, as before.
+  if (!url && kept && !alive(child.pid)) ({ child, found: url } = await launch(''));
   if (!url) {
     try { process.kill(-child.pid, 'SIGKILL'); } catch { /* already gone */ }
     stop(`the copy never printed its address. Its log:\n${fs.readFileSync(state.log, 'utf8').slice(-3000)}`);
@@ -604,7 +642,15 @@ async function up(args) {
     codex: !args.includes('--no-codex'),
     projectNames: value('projects')?.split(',').map((s) => s.trim()).filter(Boolean) ?? null,
     fresh: args.includes('--fresh'),
+    realCodexHome: null,
   };
+  const realCodexHome = value('real-codex');
+  if (realCodexHome) {
+    if (real || installed || setupName || standInCloud) stop('--real-codex puts the real Codex beside the Claude stand-in on the browser copy; it cannot go with --real, --installed, --setup or --stand-in-cloud.');
+    if (!shape.codex) stop('--real-codex and --no-codex say opposite things.');
+    if (!fs.existsSync(path.join(realCodexHome, 'auth.json'))) stop(`--real-codex: no Codex login at ${realCodexHome} (no auth.json).`);
+    shape.realCodexHome = path.resolve(realCodexHome);
+  }
   const emails = value('cloud-accounts');
   if (emails && !cloud) stop('--cloud-accounts narrows the cloud\'s accounts: add --cloud.');
   let cloudAccounts = null;
@@ -627,7 +673,7 @@ async function up(args) {
     ? `workers: in this Mac's cloud, on ${next.cloudAccounts ? `only ${emails} (${next.cloudAccounts})` : 'every account signed in for it'} (Everything), relay in ${next.cloudTmp}`
     : real
     ? 'workers: the Claude Code and Codex this Mac has, on their own subscriptions'
-    : `workers: the Claude stand-in on ${shape.logins === 2 ? 'two' : shape.logins} fake login(s)${next.codexBin ? ', and real codex on a scripted model' : shape.codex ? '; no codex on this Mac, so Codex drives are skipped' : '; no Codex (--no-codex)'}`);
+    : `workers: the Claude stand-in on ${shape.logins === 2 ? 'two' : shape.logins} fake login(s)${next.codexReal ? `, and the real Codex signed in at ${next.codexHome} (billed to that login)` : next.codexBin ? ', and real codex on a scripted model' :shape.codex ? '; no codex on this Mac, so Codex drives are skipped' : '; no Codex (--no-codex)'}`);
   say(`store: ${next.storeRoot}`);
   say('next: live.mjs doctor');
 }
