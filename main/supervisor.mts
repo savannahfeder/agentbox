@@ -199,7 +199,7 @@ import type { ChildProcess, ChildProcessWithoutNullStreams, SpawnOptions as Chil
 import type { WriteStream } from 'node:fs';
 import type { PressureSample } from './start-hold.mts';
 import type { RepeatRule } from '../shared/repeats.mts';
-import type { CarriedCommand } from '../shared/cloud-carry.mts';
+import type { CarriedCommand, CarriedReply } from '../shared/cloud-carry.mts';
 import type { RouteDecision, RouteMate } from '../shared/auto-route.mts';
 import type { LatestMessage } from './message-priority.mts';
 import type { ActiveTool } from './agent-activity.mts';
@@ -13414,8 +13414,9 @@ export class Supervisor {
    * (other cloud work is still coming home here; asked again later).
    */
   // `carried`: the run is of a reply this computer handed over while asleep,
-  // which is on the row already and is what the run carries.
-  async adoptCloudRun({ product: slug, itemId, runId, replies = [], carried = false }: { product: string; itemId: string; runId: string; replies?: string[]; carried?: boolean }) {
+  // which is on the row already. `carriedReply` is that reply's words and when
+  // it was handed over: a run can come home days later, after a newer reply.
+  async adoptCloudRun({ product: slug, itemId, runId, replies = [], carried = false, carriedReply = null }: { product: string; itemId: string; runId: string; replies?: string[]; carried?: boolean; carriedReply?: CarriedReply | null }) {
     const kit = readKitCopy(kitCopyPath(this.userDir, slug, itemId)) as KitCopy | null;
     if (!kit || kit.item !== itemId || kit.project !== slug) {
       for (const reply of replies) this.store.answerItem(slug, itemId, { answer: reply, status: 'open' });
@@ -13428,7 +13429,7 @@ export class Supervisor {
     // Before the run is joined, so the server's next reply and its idle close stop.
     await this._tellServerJoined(runId);
     writeMarker(place, markerForCloudRun(kit, runId));
-    const carrying = this._answerHeard(slug, itemId, replies) ?? (carried ? this._answerOnTheRowHeard(slug, itemId) : null);
+    const carrying = this._answerHeard(slug, itemId, replies) ?? (carried ? this._answerOnTheRowHeard(slug, itemId, carriedReply) : null);
     if (carried) delete this._carried?.[itemId];
     const codex = kit.engine === 'codex';
     const configDir = kit.marker?.configDir;
@@ -13473,10 +13474,12 @@ export class Supervisor {
     return key;
   }
 
-  // The answer already on the row, marked as heard. Its key.
-  _answerOnTheRowHeard(slug: string, itemId: string) {
+  // The answer already on the row, marked as heard, when it is the one handed
+  // over: the same words, written before the hand-over. Its key.
+  _answerOnTheRowHeard(slug: string, itemId: string, handed: CarriedReply | null = null) {
     const row = this.store.readItem?.(slug, itemId);
     if (!row?.answer) return null;
+    if (handed && (row.answer !== handed.text || !(answerTs(row) <= handed.at))) return null;
     const key = this._answerKey({ ...row, product: slug, id: itemId });
     this._handledAnswers.add(key);
     this._saveState();

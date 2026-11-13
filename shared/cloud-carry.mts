@@ -47,6 +47,12 @@ export type CarriedCommand = {
   };
 });
 
+/** A reply the computer handed over: its words, and when the hand-over was written. */
+export interface CarriedReply {
+  text: string;
+  at: number;
+}
+
 /** Whether a command is the computer's own hand-over rather than something the phone sent. */
 export const isCarried = (cmd: unknown): boolean => (cmd as CommandLike)?.payload?.carried === CARRIED;
 
