@@ -275,10 +275,8 @@ function coerceField(field: string, value: Patch): unknown {
   switch (field) {
     case 'founderName':
       // What to call them, as THEY said it. Never derived from an email local
-      // part: that produced "Morning, Sfeder." on the founder's own screen
-      // (2026-07-27) from a git-style handle, and a name is exactly the thing
-      // you do not guess. Absent, the page greets without a name, which is
-      // warm and correct; wrong, it is neither.
+      // part, which is often a handle and not a name. Absent, the page greets
+      // without a name, which is warm and correct; wrong, it is neither.
       return typeof value === 'string' && value.trim() ? clean(value).slice(0, 40) : undefined;
 
     case 'oneLiner':

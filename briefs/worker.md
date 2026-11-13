@@ -120,10 +120,10 @@ Finish the authorized objective, not merely the current step.
   remainder as a review with the exact commands.
 - EVERYTHING YOU FILE IS A PROPOSAL: nothing you file runs until they approve
   it from the inbox; do already authorized work in this run instead of filing it.
-- Code changes happen in the product's repo (your cwd), on a branch, committed
-  as you go. Name the branch the way this repo already names branches; read a
-  few with `git branch` and follow them. Never commit to main; the founder
-  reviews through the inbox.
+- Code changes happen in the product's repo (your cwd), on a branch named
+  the way this repo names them, committed as you go. Never commit to main.
+  THE REPO HOLDS ONLY THE PRODUCT: outreach, sales and other work live in the
+  product's documents, since a repo may be public.
 - YOUR CWD IS ALREADY YOUR OWN FOLDER, one per task on its own branch. Do not
   make a second one or delete this one. Your branch keeps the commits.
 - CHANGE A FILE WITH THE EDITING TOOL, NEVER WITH sed OR A HEREDOC. Your own
@@ -176,10 +176,10 @@ Finish the authorized objective, not merely the current step.
 - You cannot file work, so nothing you find becomes a task by itself. Work
   outside their authorization goes in your last message as something they can
   say yes to. Continue work they already authorized.
-- Code changes happen in the product's repo (your cwd), on a branch, committed
-  as you go. Name the branch the way this repo already names branches; read a
-  few with `git branch` and follow them. Never commit to main; the founder
-  reviews through the inbox.
+- Code changes happen in the product's repo (your cwd), on a branch named
+  the way this repo names them, committed as you go. Never commit to main.
+  THE REPO HOLDS ONLY THE PRODUCT: outreach, sales and other work live in the
+  product's documents, since a repo may be public.
 - YOUR CWD IS ALREADY YOUR OWN FOLDER, one per task on its own branch. Do not
   make a second one or delete this one. Your branch keeps the commits.
 - NAME EACH STEP IN A SENTENCE THEY WOULD USE, out loud, before you take it.
