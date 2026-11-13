@@ -70,7 +70,34 @@ export function readFootprints(platform: string = process.platform): Promise<Map
 }
 
 const name = (exe: unknown) => String(exe ?? '').split('/').filter(Boolean).pop() || String(exe ?? '');
-const top = (list: ProcessRecord[], n: number) => [...list].sort((a, b) => b.mb - a.mb).slice(0, n).map((p) => ({ name: name(p.exe), mb: Math.round(p.mb) }));
+const INTERPRETER = /^(node|python[\d.]*|bun|deno|ruby|Electron)$/;
+
+/**
+ * A program's name, and for an interpreter the file name of the script it runs,
+ * so "node" at 4 GB says whether it is a typecheck, a test run or a tester.
+ * Arguments after the script are left out: they can carry tokens.
+ */
+export function programName(p: { exe?: string | null; cmd?: string | null }): string {
+  const base = name(p.exe);
+  if (!INTERPRETER.test(base)) return base;
+  const cmd = String(p.cmd ?? '').trim();
+  const renamed = /^\S+ \([^)]*\)/.exec(cmd);
+  if (renamed) return renamed[0].slice(0, 60);
+  const words = cmd.split(/\s+/).filter(Boolean);
+  if (!words.length) return base;
+  if (name(words[0]) !== base) {
+    const said: string[] = [];
+    for (const w of words) {
+      if (said.length === 3 || /^-|[/=]/.test(w)) break;
+      said.push(w);
+    }
+    return said.length ? said.join(' ') : base;
+  }
+  const script = words.slice(1).find((w) => !w.startsWith('-'));
+  return script ? `${base} ${name(script)}` : base;
+}
+
+const top = (list: ProcessRecord[], n: number) => [...list].sort((a, b) => b.mb - a.mb).slice(0, n).map((p) => ({ name: programName(p), mb: Math.round(p.mb) }));
 
 /** One minute's line, from one listing. Pure. */
 export function summarizeMemory(procs: ProcessRecord[], { appPid = process.pid, at = Date.now(), reading = {} }: { appPid?: number; at?: number; reading?: PressureReading } = {}) {
@@ -114,7 +141,7 @@ export function summarizeMemory(procs: ProcessRecord[], { appPid = process.pid, 
     swapInMbps,
     swapMb,
     totalMb: sum(procs),
-    app: { mb: sum(app), procs: app.length },
+    app: { mb: sum(app), procs: app.length, top: top(app, 3) },
     tasks: [...tasks.values()]
       .map((t) => ({ item: t.item, product: t.product, mb: sum(t.list), procs: t.list.length, top: top(t.list, 3) }))
       .sort((a, b) => b.mb - a.mb),

@@ -15,7 +15,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { guard, sweep, startableChrome } from './lib/chrome-guard.mjs';
+import { guard, sweep, startableChrome, KEEPS_OFF_THE_KEYCHAIN } from './lib/chrome-guard.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'renderer', 'dist');
@@ -52,7 +52,7 @@ sweep(); // reap anything an earlier run left behind
 const profile = fs.mkdtempSync('/tmp/shot-profile-');
 const chrome = spawn(startableChrome(), [
   '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
-  '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run',
+  '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run', ...KEEPS_OFF_THE_KEYCHAIN,
   '--window-size=1728,1030', 'about:blank',
 ], { stdio: ['ignore', 'ignore', 'pipe'] });
 guard(chrome, profile);

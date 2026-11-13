@@ -21,6 +21,7 @@
 // all.
 import { offerIsLive, type ParsedOption } from './format';
 import { wakesItselfAt } from '../../shared/answers.mts';
+import { saysARunGotNowhere } from '../../shared/spawn-trouble.mts';
 
 /** The label the ship queue takes a thread by (main/ship-queue.mts). */
 export const SHIP_LABEL = 'ship';
@@ -191,6 +192,9 @@ export function shipOfferLive(item: Finished, { change, running }: { change: boo
   // (the same), and you have already answered it (a run is on its way).
   if (at(item, 'result') < at(item, 'note') || at(item, 'result') < at(item, 'answer')) return false;
   if (NOTHING_LEFT.test(item.result ?? '')) return false;
+  // The app's own word that the run stopped: the work is half done, and the
+  // next run picks up from those loose edits.
+  if (saysARunGotNowhere(item.result)) return false;
   return !offerIsLive(item);
 }
 

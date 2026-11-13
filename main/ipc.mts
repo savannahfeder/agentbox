@@ -37,7 +37,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { looksLikeClaudeCode } from '../shared/claude-code-shape.mts';
 import fsWatch from 'node:fs';
-import { listFolders } from './folders.mts';
+import { listFolders, startFolder } from './folders.mts';
 import { feedbackUrl, sendFeedback } from './feedback.mts';
 import { feedbackPayload } from '../shared/feedback.mts';
 import * as approvals from './approvals.mts';
@@ -47,15 +47,17 @@ import { artifactRoots, resolveArtifact } from './artifact-path.mts';
 import { folderPictures } from './folder-pictures.mts';
 import { docUrl } from './doc-scheme.mts';
 import { readDoc, writeDoc } from './doc-file.mts';
-import { linkCopyOf, linkSource } from './file-link.mts';
-import { bringSharedFile, fileLinkToken } from './bring-shared-file.mts';
+import { linkCopyOf, linkKindOf, linkSource } from './file-link.mts';
+import { bringSharedFile, fileLinkToken, projectToBringInto } from './bring-shared-file.mts';
 import { familyKeyOf, type Mark } from '../shared/artifact-marks.mts';
 import { readItemHistory } from './store/work-items.mts';
 import { readChange, readChangeSummary } from './code-change.mts';
 import { findFile, readCodeFile, writeCodeFile } from './code-file.mts';
 import { readNote, writeNote } from './rail-note.mts';
 import { teamForWindow } from './team/index.mts';
-import { liveRoomFor } from './team/live-room.mts';
+import { isOnTeam } from '../shared/rooms-on.mts';
+import { liveForTheWholeTeam, liveRoomFor } from './team/live-room.mts';
+import { openForThePerson } from './opens-a-program.mts';
 import { addClaudeAccount, addCodexAccount, alphaFeatures, cornerTagTurnedOff, countsTurnedOff, lookAgainFor, outsideAgentsMode, permissionMode, pointAtEngineBin, readSettings, searchForEngineBin, setProjectSetting, setWorkspaceSetting } from './settings.mts';
 import { ICON_KINDS, clearProjectIcon, setProjectIcon, setProjectName } from './project-identity.mts';
 import { ClaudeUsage } from './claude-usage.mts';
@@ -116,7 +118,7 @@ export interface IpcWindow {
   show?(): void;
 }
 
-export interface IpcShell { openExternal(url: string): unknown; openPath?(path: string): Promise<string> }
+export interface IpcShell { openExternal(url: string): unknown; openPath?(path: string): Promise<string>; showItemInFolder?(path: string): void }
 
 export interface IpcOpenDialog {
   title: string;
@@ -231,8 +233,8 @@ interface FilesPlace {
   open(key: string): Promise<unknown>;
   edit(key: string, text?: string): Promise<{ ok: boolean } & Record<string, unknown>>;
   editOnThread(ask: { product: string; id: string; path: string; baseId?: string; text: string; taken?: unknown; since?: unknown }): { ok: boolean } & Record<string, unknown>;
-  sameFiles(ask: { product: string; id: string; copies: unknown[] }): Promise<unknown>;
-  lineFor(ask: { product: string; id: string }): Promise<unknown>;
+  sameFiles(ask: { product: string; id: string; room?: string | null; copies: unknown[] }): Promise<unknown>;
+  lineFor(ask: { product: string; id: string; room?: string | null }): Promise<unknown>;
   mark(key: string, mark: unknown): Promise<{ ok: boolean; wrote?: { product: string; id: string } } & Record<string, unknown>>;
   pictureNamed(src: unknown): Promise<string | null>;
   newDocument(ask: { project: string; name: string; kind?: 'document' | 'table'; folder?: string | null; by?: string | null }): Promise<{ key: string }>;
@@ -293,6 +295,8 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     throw new Error('registerIpc needs host: { ipcMain, app, dialog }');
   }
   const { ipcMain, app, dialog } = host;
+  // Rooms reads it (shared/rooms-on.mts), here and in the Rooms service alike.
+  const onTeamNow = () => isOnTeam(team?.state());
   // A browser copy hands in its own; outside Electron, the `electron` package has no shell.
   const shellNow = async () => host.shell ?? (await import('electron')).shell;
   // Coalesced: the supervisor fires onChange per worker stream line, which is
@@ -400,7 +404,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // appears): a browser SDK autocaptures the text of what was clicked, and in
   // Agentbox that text is task titles. A NUMBER MAY RIDE WITH THE NAME, and only
   // a number (2026-10-06): which setup step was reached.
-  ipcMain.handle('zero:onboarding-arm', () => analytics.onboardingArm?.() ?? 'tour');
+  ipcMain.handle('zero:onboarding-arm', () => analytics.onboardingArm?.() ?? 'classic');
   ipcMain.handle('zero:track', (_e, { name, count }: { name: string; count?: unknown } = {} as { name: string; count?: unknown }) => {
     if (!EVENT_NAMES.includes(name)) return false;
     onCount();
@@ -701,7 +705,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     // draw -- which is what a Codex-only workflow paid every five minutes until
     // now. The Codex side never starts anything at all (main/codex-usage.mts).
     const reading = usageFor === DEFAULT_ENGINE ? usage.read() : supervisor.codexUsage();
-    const alpha = alphaFeatures(config);
+    const alpha = alphaFeatures(config, { onTeam: onTeamNow() });
     return snapshots.answer({
       products: store.listProducts(),
       // Each with the place she dragged it to, if she did (w-6e5b532a95).
@@ -1391,8 +1395,10 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // the three rows in the same call, and archived by the handler below it when
   // the walk ends. It is a real project and it is never a project anybody works
   // in: main/store.mts and main/supervisor.mts both say what that means.
-  ipcMain.handle('zero:first-run-practice', () => {
+  ipcMain.handle('zero:first-run-practice', (_e, opts: { bare?: boolean } = {}) => {
     const made = store.createPractice();
+    // The walkthrough's: one thread of its own, no examples beside the person's real ones.
+    if (opts?.bare) return { ...made, examples: [], backdrop: [] };
     let rows: { ids: string[] } = { ids: [] };
     // A store that will not take the three rows is not a reason to strand
     // somebody mid-walk. They land in an empty practice inbox and the beat that
@@ -1614,7 +1620,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // of the two on the one thing that actually costs somebody an afternoon.
   ipcMain.handle('zero:list-folders', (_e, { at = null, showHidden = false }: { at?: string | null; showHidden?: boolean } = {}) => {
     const home = os.homedir();
-    const listed = listFolders({ at, home, showHidden });
+    const listed = listFolders({ at: at ?? startFolder(home), home, showHidden });
     const verdict = checkProjectFolder(listed.at, { home });
     return { ...listed, refused: verdict.ok ? null : verdict.say };
   });
@@ -1954,7 +1960,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // believing a setting took when it did not.
   ipcMain.handle('zero:settings-read', (_e, how?: { search?: boolean }) => {
     try {
-      return { ok: true, ...readSettings({ config, supervisor, store }, { search: how?.search !== false }) };
+      return { ok: true, ...readSettings({ config, supervisor, store, onTeam: onTeamNow }, { search: how?.search !== false }) };
     } catch (err) {
       return { ok: false, error: String((err as Error).message) };
     }
@@ -2014,7 +2020,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       if (action === 'search') {
         const gave = searchForEngineBin(config, engine);
         if (!gave.ok) return { ok: false, refused: gave.say };
-        return { ok: true, ...readSettings({ config, supervisor, store }) };
+        return { ok: true, ...readSettings({ config, supervisor, store, onTeam: onTeamNow }) };
       }
       const { dialog } = await import('electron');
       const r = await dialog.showOpenDialog(window as IpcWindow as AppWindow, {
@@ -2027,7 +2033,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       if (r.canceled || !r.filePaths?.length) return { ok: true, canceled: true };
       const took = pointAtEngineBin(config, engine, r.filePaths[0]);
       if (!took.ok) return { ok: false, refused: took.say };
-      return { ok: true, ...readSettings({ config, supervisor, store }) };
+      return { ok: true, ...readSettings({ config, supervisor, store, onTeam: onTeamNow }) };
     } catch (err) {
       return { ok: false, error: String((err as Error).message) };
     }
@@ -2088,7 +2094,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       // ended: a terminal that says one thing in its prompt and signs another
       // account in is the defect this whole row has been about.
       try { terminals.close(JSON.stringify(SETTINGS_TERMINAL)); } catch { /* none open */ }
-      return { ok: true, ...made, workspace: readSettings({ config, supervisor, store }).workspace };
+      return { ok: true, ...made, workspace: readSettings({ config, supervisor, store, onTeam: onTeamNow }).workspace };
     } catch (err) {
       return { ok: false, error: String((err as Error).message) };
     }
@@ -2104,7 +2110,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       const made = addClaudeAccount({ config, supervisor });
       pendingLogin = made.home;
       try { terminals.close(JSON.stringify(SETTINGS_TERMINAL)); } catch { /* none open */ }
-      return { ok: true, ...made, workspace: readSettings({ config, supervisor, store }).workspace };
+      return { ok: true, ...made, workspace: readSettings({ config, supervisor, store, onTeam: onTeamNow }).workspace };
     } catch (err) {
       return { ok: false, error: String((err as Error).message) };
     }
@@ -2114,7 +2120,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     try {
       setProjectSetting({ config, supervisor, store }, (payload ?? {}) as SetProjectPayload);
       push();
-      return { ok: true, ...readSettings({ config, supervisor, store }) };
+      return { ok: true, ...readSettings({ config, supervisor, store, onTeam: onTeamNow }) };
     } catch (err) {
       return { ok: false, error: String((err as Error).message) };
     }
@@ -2225,9 +2231,9 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     }
   });
   // What the person did with a sign-in link an agent is waiting on (shared/sign-in-ask.mjs).
-  ipcMain.handle('zero:sign-in-answer', (_e, { product, id, ask, said, url } = {}) => {
+  ipcMain.handle('zero:sign-in-answer', (_e, { product, id, ask, said, url, code } = {}) => {
     try {
-      store.answerSignIn(product, id, { id: ask, said, url });
+      store.answerSignIn(product, id, { id: ask, said, url, code });
       push();
       return { ok: true };
     } catch (err) {
@@ -2328,11 +2334,11 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       // Before the save: once the switch is off, nothing leaves, not even this.
       if (countsTurnedOff(payload)) { analytics.track('counts_turned_off'); analytics.flush(); }
       setWorkspaceSetting({ config, supervisor, store }, payload ?? {});
-      if (payload?.key === 'alphaRooms') team?.rooms?.tick().catch(() => {});
+      if (payload?.key === 'alphaRooms' || payload?.key === 'alphaMultiplayer') team?.rooms?.tick().catch(() => {});
       if (cornerTagTurnedOff(payload)) analytics.track('tag_turned_off');
       if (payload?.key === 'alphaGlass') glass(alphaFeatures(config).glass);
       push();
-      return { ok: true, ...readSettings({ config, supervisor, store }) };
+      return { ok: true, ...readSettings({ config, supervisor, store, onTeam: onTeamNow }) };
     } catch (err) {
       return { ok: false, error: String((err as Error).message) };
     }
@@ -2360,7 +2366,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       // and a rename that only redrew Settings would leave the rest of the app
       // calling it the old thing until something else happened to refresh.
       push();
-      return { ok: true, name: saved, ...readSettings({ config, supervisor, store }) };
+      return { ok: true, name: saved, ...readSettings({ config, supervisor, store, onTeam: onTeamNow }) };
     } catch (err) {
       return { ok: false, error: String((err as Error).message) };
     }
@@ -2373,7 +2379,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     try {
       store.setProductArchived(product, archived === true);
       push();
-      return { ok: true, ...readSettings({ config, supervisor, store }) };
+      return { ok: true, ...readSettings({ config, supervisor, store, onTeam: onTeamNow }) };
     } catch (err) {
       return { ok: false, error: String((err as Error).message) };
     }
@@ -2412,7 +2418,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       if (r.canceled || !r.filePaths?.length) return { ok: true, canceled: true };
       setProjectIcon(dir, r.filePaths[0]);
       push();
-      return { ok: true, ...readSettings({ config, supervisor, store }) };
+      return { ok: true, ...readSettings({ config, supervisor, store, onTeam: onTeamNow }) };
     } catch (err) {
       return { ok: false, error: String((err as Error).message) };
     }
@@ -2424,7 +2430,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       if (!dir) return { ok: false, error: 'That project could not be found.' };
       clearProjectIcon(dir);
       push();
-      return { ok: true, ...readSettings({ config, supervisor, store }) };
+      return { ok: true, ...readSettings({ config, supervisor, store, onTeam: onTeamNow }) };
     } catch (err) {
       return { ok: false, error: String((err as Error).message) };
     }
@@ -2601,12 +2607,12 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     if (out.ok) { push(); void team?.syncNow?.()?.catch?.(() => {}); }
     return out;
   });
-  ipcMain.handle('zero:file-elsewhere', async (_e, { product, id, copies }: { product?: unknown; id?: unknown; copies?: unknown } = {}) => {
+  ipcMain.handle('zero:file-elsewhere', async (_e, { product, id, room, copies }: { product?: unknown; id?: unknown; room?: unknown; copies?: unknown } = {}) => {
     const asked = Array.isArray(copies) ? copies : [];
-    try { return await filesPlaceNow().sameFiles({ product: String(product ?? ''), id: String(id ?? ''), copies: asked }); } catch { return asked.map(() => ({ key: null, notes: [], approvals: [] })); }
+    try { return await filesPlaceNow().sameFiles({ product: String(product ?? ''), id: String(id ?? ''), room: room ? String(room) : null, copies: asked }); } catch { return asked.map(() => ({ key: null, notes: [], approvals: [] })); }
   });
-  ipcMain.handle('zero:file-line', async (_e, { product, id }: { product?: unknown; id?: unknown } = {}) => {
-    try { return await filesPlaceNow().lineFor({ product: String(product ?? ''), id: String(id ?? '') }); } catch { return []; }
+  ipcMain.handle('zero:file-line', async (_e, { product, id, room }: { product?: unknown; id?: unknown; room?: unknown } = {}) => {
+    try { return await filesPlaceNow().lineFor({ product: String(product ?? ''), id: String(id ?? ''), room: room ? String(room) : null }); } catch { return []; }
   });
   ipcMain.handle('zero:files-place-mark', async (_e, { key, mark }: { key?: unknown; mark?: unknown } = {}) => {
     const { wrote, ...out } = await filesPlaceNow().mark(String(key ?? ''), mark);
@@ -2714,7 +2720,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       try { await openSourceFile(found.path); return { ok: true, opened: found.path }; }
       catch (error) { return { ok: false, error: (error as Error).message || 'The text editor could not be opened.' }; }
     }
-    const err = await shell.openPath!(found.path);
+    const err = await openForThePerson(shell, found.path);
     return err ? { ok: false, error: err } : { ok: true, opened: found.path };
   });
 
@@ -2749,13 +2755,15 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
 
   // A LINK ANYONE CAN OPEN, to one of this person's files (main/file-link.mts).
   // One link per file of a thread, whichever of its versions is on screen.
-  type LinkArg = { product?: string; thread?: unknown; src?: unknown; token?: unknown; text?: unknown };
+  type LinkArg = { product?: string; thread?: unknown; src?: unknown; token?: unknown; text?: unknown; place?: unknown };
   const linkOf = ({ product, thread, src }: LinkArg = {}) => linkSource(product, thread, familyKeyOf(String(src ?? '')));
   const linkCall = (fn: (arg: LinkArg, team: IpcTeam) => Promise<object>) => async (_e: unknown, arg: LinkArg = {}) => {
     if (!team?.fileLink) return { ok: false, error: 'This copy has no cloud to share files on.' };
     try { return { ok: true, ...(await fn(arg, team)) }; } catch (err) { return { ok: false, error: String((err as Error | undefined)?.message ?? err) }; }
   };
-  const fileOnScreen = async ({ product, src, thread }: LinkArg) => {
+  // Remembered by the link's source, so an edit made on its page comes home beside this file.
+  const fileOnScreen = async (arg: LinkArg, team: IpcTeam) => {
+    const { product, src, thread } = arg;
     const found = await resolveArtifact({
       src, product, thread: typeof thread === 'string' ? thread : null,
       products: readableProducts(), accountRoot: config.accountRoot, storeRoot: config.storeRoot, nameOf: team?.firstNameOf,
@@ -2763,17 +2771,30 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     if (!found.ok) throw new Error(found.error || 'This file is not on this computer.');
     const copy = linkCopyOf(found.path);
     if (copy.error !== undefined) throw new Error(copy.error);
+    team.rememberLinkPlace(linkOf(arg), found.path);
     return copy;
   };
+  // Only a document or a table can be edited on its page (edit_file_link).
+  const withEditable = <T extends { link?: object | null }>(arg: LinkArg, out: T): T => (out.link
+    ? { ...out, link: { ...out.link, editable: linkKindOf(String(arg.src ?? '').split(/[?#]/)[0])?.kind === 'markdown' } }
+    : out);
   ipcMain.handle('zero:file-link', linkCall(async (arg, team) => {
-    const now = await fileOnScreen(arg).catch(() => null);
-    return team.fileLink(linkOf(arg), now?.hash ?? null, now?.version ?? null);
+    const now = await fileOnScreen(arg, team).catch(() => null);
+    return withEditable(arg, await team.fileLink(linkOf(arg), now?.hash ?? null, now?.version ?? null));
   }));
-  ipcMain.handle('zero:file-link-share', linkCall(async (arg, team) => team.shareFile({ source: linkOf(arg), ...(await fileOnScreen(arg)) })));
+  ipcMain.handle('zero:file-link-share', linkCall(async (arg, team) => withEditable(arg, await team.shareFile({ source: linkOf(arg), ...(await fileOnScreen(arg, team)) }))));
+  type AccessArg = LinkArg & { access?: unknown; can?: unknown; email?: unknown };
+  ipcMain.handle('zero:file-link-access', linkCall(async ({ token, access, can }: AccessArg, team) => {
+    await team.setFileLinkAccess(String(token ?? ''), String(access ?? ''), String(can ?? ''));
+    return {};
+  }));
+  ipcMain.handle('zero:file-link-people', linkCall(async ({ token }, team) => ({ people: await team.fileLinkPeople(String(token ?? '')) })));
+  ipcMain.handle('zero:file-link-person', linkCall(async ({ token, email, can }: AccessArg, team) => (
+    { people: await team.setFileLinkPerson(String(token ?? ''), String(email ?? ''), can == null ? null : String(can)) })));
   ipcMain.handle('zero:file-links', linkCall(async (_arg, team) => team.fileLinks()));
   ipcMain.handle('zero:file-link-stop', linkCall(async ({ token }, team) => { await team.stopFileLink(String(token ?? '')); return {}; }));
   ipcMain.handle('zero:file-link-comments', linkCall(async ({ token }, team) => ({ comments: await team.fileLinkComments(String(token ?? '')) })));
-  ipcMain.handle('zero:file-link-comment', linkCall(async ({ token, text }, team) => ({ comments: await team.commentOnFileLink(String(token ?? ''), text) })));
+  ipcMain.handle('zero:file-link-comment', linkCall(async ({ token, text, place }, team) => ({ comments: await team.commentOnFileLink(String(token ?? ''), text, place ?? null) })));
 
   // A FILE SOMEONE SHARED WITH THIS PERSON, brought into one of their projects
   // as their own copy on a thread that runs nothing until they write to it.
@@ -2781,14 +2802,13 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     const token = fileLinkToken(link);
     if (!token) return { ok: false, error: 'That is not a link to a shared file.' };
     if (!team?.readFileLink) return { ok: false, error: 'This copy has no cloud to read shared files from.' };
-    const products = store.listProducts();
-    const slug = products.find((p) => p.slug === product)?.slug ?? products[0]?.slug;
+    const slug = projectToBringInto(store.listProducts(), product);
     if (!slug) return { ok: false, error: 'Make a project first, then open the link again.' };
     try {
       const out = await bringSharedFile({
         token, product: slug, read: (t) => team.readFileLink(t), productDir: store.productDir(slug),
-        compose: (fields) => store.composeItem(slug, fields),
-        close: (id) => { store.answerItem(slug, id, { status: 'done' }); },
+        // Their own copy: a teammate on a shared project sees it only if they share it.
+        compose: (fields) => store.composeItem(slug, { ...fields, visibility: 'private' }),
       });
       push();
       return { ok: true, ...out };
@@ -2859,14 +2879,12 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // The live room a document or table opens in, when teammates can open it too.
   ipcMain.handle('zero:live-room', async (_e, { product, project, name }: { product?: unknown; project?: unknown; name?: unknown }) => {
     if (!team || typeof name !== 'string') return null;
-    const state = team.state() as { signedIn?: boolean; me?: { id: string; name?: string }; team?: { id: string }; cards?: { project?: string | null }[] };
+    const state = team.state() as { signedIn?: boolean; me?: { id: string; name?: string }; team?: { id: string }; cards?: { project?: string | null; people?: string[] | null }[] };
     const own = store.listProducts().find((p) => p.slug === product && !p.team?.direct);
     const key = (s: unknown) => String(s ?? '').trim().toLowerCase();
     const named = typeof project === 'string' && project ? project : own?.name;
     const mine = store.listProducts().find((p) => !p.team?.direct && key(p.name) === key(named));
-    const shared = mine
-      ? !!mine.team?.projectId && projectSeenBy(mine).who !== 'private'
-      : (state.cards ?? []).some((c) => key(c.project) === key(named));
+    const shared = liveForTheWholeTeam({ mine, cards: state.cards, named });
     const room = liveRoomFor({ address: liveAt, state, multiplayer: alphaFeatures(config).multiplayer, project: named, name: name.split('/').pop(), shared, owner: !!own && own === mine });
     if (!room) return null;
     const token = await team.liveToken?.();

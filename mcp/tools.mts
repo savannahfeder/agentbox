@@ -25,7 +25,7 @@ import { readTeammates, readTeamView, teamDir } from '../main/store/teammates-fi
 import { legacyRoot } from '../main/store/project.mts';
 import { listProductChats, readProductChat } from './core/chat.mts';
 import { lookAtPage } from './core/page.mts';
-import { askToSignIn, waitForSignIn, WAIT_MS } from './core/sign-in.mts';
+import { askToSignIn, keepAfterSignIn, waitForSignIn, WAIT_MS } from './core/sign-in.mts';
 import { WORK_ITEM_STATUSES } from '../shared/work-items.mts';
 import { CONTEXT_WORDS, DONE_STEPS, DONE_STEP_WORDS, SUMMARY_WORDS } from '../shared/thread-cards.mts';
 import { AGENT_CREATION_KINDS } from '../shared/contracts.mts';
@@ -109,7 +109,7 @@ interface TeamSetupArgs {
   ready?: boolean;
   startNow?: boolean;
 }
-interface SignInArgs { service?: string; url?: string; code?: string; why?: string; ask?: string; finished?: boolean; keep?: { name: string; value: string } }
+interface SignInArgs { service?: string; url?: string; code?: string; why?: string; asksForCode?: boolean; ask?: string; finished?: boolean; keep?: { name: string; value: string } }
 interface SentFiles { files?: string[]; versionOf?: string; folder?: string }
 interface TeamTellArgs extends SentFiles { text?: string; to?: string[]; group?: string; thread?: boolean; outside?: boolean }
 interface TeamTaskArgs extends SentFiles { to: string; title: string; details?: string; due?: string; blockedBy?: string[] }
@@ -333,7 +333,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         labels: z.array(z.string()).optional(),
         runAt: z.number().int().optional().describe('epoch ms to defer this item until; 0 clears a schedule and makes it available now'),
         closeBecause: z.string().optional().describe('only with status done on a row the founder wrote: their own words, quoted exactly from the row, asking you to close it'),
-        deferBecause: z.string().optional().describe('only with runAt on a row the founder wrote: their own words, quoted exactly from the row, asking for it to be put off or to be reminded later. Without them the row stays in their inbox'),
+        deferBecause: z.string().optional().describe('only with runAt on a row the founder wrote: their own words, quoted exactly from the row, asking for it to be put off or to be reminded later. Without them the row stays in their inbox. A reminder starts NO run; words asking for work at a time ("continue at 1:30") start a run then, and the answer\'s `saved` says which was kept'),
         toAnAgentBecause: z.string().optional().describe('on a thread of theirs that went to a teammate when it should not have: their own words, quoted exactly from the row, saying so. The thread then goes to an ordinary agent, as their "Give it to someone else" would, and its next turn is not the teammate\'s'),
         problem: z.string().optional().describe(`the summary's CONTEXT: a few plain sentences, ${CONTEXT_WORDS} words at most, about the whole thread for someone who has forgotten it. It says what the thread is about: what was asked for and why, in the words the person would use. Not where it stands or the latest round, which the answer gives`),
         progress: z.string().optional().describe(`the summary's DONE list: the steps taken so far, one per line, oldest first and newest last, ${DONE_STEPS} lines at most of ${DONE_STEP_WORDS} words each. Send the whole list each time; it replaces the last one. Every line is a step that FINISHED: one you are about to take goes on after it happens, never before`),
@@ -399,7 +399,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
     },
     {
       name: 'create_repeating_task',
-      description: 'Make a new repeating task, exactly as the person would with the When menu: every day, every weekday, or one day a week, at a local time. Each run is its own thread briefed with your instruction, so write it for an agent that has seen nothing of this conversation. Use it when the person asks for something to happen regularly, rather than telling them to set it up by hand. Every run spends their plan, so only make one they asked for or agreed to. It runs on the same coding agent and model as this thread. The first run starts within a minute unless startNow is false; then it waits for its next time.',
+      description: 'Make a new repeating task, exactly as the person would with the When menu: every day, every weekday, or one day a week, at a local time. Each run is its own thread briefed with your instruction, so write it for an agent that has seen nothing of this conversation. Use it when the person asks for something to happen regularly, rather than telling them to set it up by hand. Every run spends their plan and starts on its own as their request, so on a thread it is made only with their own words there asking for something regular, quoted in askedBecause. It runs on the same coding agent and model as this thread. The first run starts within a minute unless startNow is false; then it waits for its next time.',
       schema: {
         product: z.string().optional().describe('which product it runs in; defaults to this thread\'s'),
         title: z.string().describe('the short name it is listed under, such as "Daily security review"'),
@@ -408,6 +408,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         at: z.string().describe('local time, 24-hour "HH:MM", such as "09:00"'),
         on: z.enum(['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']).optional().describe('the day, when every is week'),
         startNow: z.boolean().optional().describe('false to wait for its first time instead of running now'),
+        askedBecause: z.string().optional().describe('on a thread: the person\'s own words on it asking for this to happen regularly, quoted exactly, such as "Daily 9am, audit Mondays 10am". Without them nothing is made'),
       },
       run: (ask: NewRepeatingTask) => json(createRepeatingTask(ask, thisRun())),
     },
@@ -608,34 +609,42 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
 
   if (ownItem) tools.push({
     name: 'sign_in',
-    description: `Put a service's own sign-in link in front of the person, on this thread, while you wait: the way they would click it in Claude Code or Codex. Use it whenever a service needs them to sign in, before asking for a pasted key. The link comes from the service's own login: an MCP server's authenticate tool (then pass what comes back to its complete_authentication), \`codex mcp login <name> --no-browser\`, or a command-line login that prints a link and a code (\`gh auth login --web\`, \`vercel login\`, \`supabase login\`, \`npx wrangler login\`, \`fly auth login\`, \`netlify login\`, \`stripe login\`). Start that login in the background first so it keeps waiting, then call this with its link and any code it printed. The thread moves to their Needs you with a card that opens the link in their own browser. Each call waits up to ${Math.round(WAIT_MS / 1000)} seconds and answers signed_in, landed (with the address their browser was sent back to, for a login waiting on another machine; ${Name} catches it for you when the link sends the browser to localhost), skipped, or waiting (call again with the ask it gives).`,
+    description: `Put a service's own sign-in link in front of the person, on this thread, while you wait: the way they would click it in Claude Code or Codex. Use it whenever a service needs them to sign in, before asking for a pasted key. The link comes from the service's own login: an MCP server's authenticate tool (then pass what comes back to its complete_authentication), \`codex mcp login <name> --no-browser\`, or a command-line login that prints a link and a code (\`gh auth login --web\`, \`vercel login\`, \`npx wrangler login --browser=false\`, \`fly auth login\`, \`netlify login\`, \`stripe login\`, \`npm login --auth-type=web\`, \`eas login --device --non-interactive\`). A login that waits for a code the service's page shows them after they sign in (\`supabase login\`, \`aws login --remote\`) needs asksForCode, and one that refuses to run without a terminal (\`supabase login\`) runs under \`script\` with its input on a pipe you can write the code into. Start that login in the background first so it keeps waiting, then call this with its link and any code it printed. The thread moves to their Needs you with a card that opens the link in their own browser. Each call waits up to ${Math.round(WAIT_MS / 1000)} seconds and answers signed_in, landed (with the address their browser was sent back to, for a login waiting on another machine; ${Name} catches it for you when the link sends the browser to localhost), code (with the code they pasted), skipped, or waiting (call again with the ask it gives).`,
     schema: {
       service: z.string().optional().describe('the service as they know it: GitHub, Vercel, Linear'),
       url: z.string().optional().describe('the sign-in link the login printed or the authenticate tool returned'),
       code: z.string().optional().describe('the one-time code the login printed, when it gave one to enter on that page'),
       why: z.string().optional().describe('what the sign-in is for, in a few plain words'),
+      asksForCode: z.boolean().optional().describe('the login waits for a code the service\'s page shows them once they sign in: the card takes it and this answers code with it'),
       ask: z.string().optional().describe('to keep waiting on a sign-in already asked: the ask an earlier call answered with'),
       finished: z.boolean().optional().describe('with ask: the login finished by itself, so take the card away'),
       keep: z.object({ name: z.string(), value: z.string() }).optional().describe('with ask, on a cloud machine, once the login worked: the token it made, under the variable its tool reads (GH_TOKEN from `gh auth token`), so every later cloud run is signed in too. A cloud machine forgets its logins when the run ends'),
     },
-    run: async ({ service, url, code, why, ask, finished, keep }: SignInArgs) => {
+    run: async ({ service, url, code, why, asksForCode, ask, finished, keep }: SignInArgs) => {
       const id = env().ZERO_ITEM ?? '';
       const product = env().ZERO_PRODUCT || null;
-      const asked = askToSignIn(id, { service, url, code, why, ask, finished }, { product });
+      const asked = askToSignIn(id, { service, url, code, why, asksForCode, ask, finished }, { product });
       if (keep) {
         if (!ask) throw new Error('keep goes with the ask of a sign-in that worked');
         if (typeof keepCloudKey !== 'function') return json({ status: 'kept_here', message: 'On this computer the login keeps its own sign-in, so there is nothing to keep.' });
         await keepCloudKey(keep.name, keep.value);
         return json({ status: 'kept', message: `Kept as ${keep.name} for every later cloud run.` });
       }
-      if (finished) return json({ status: 'closed', message: 'The card is gone. Carry on.' });
-      return json(await waitForSignIn(id, asked.id, { product }));
+      const inCloud = typeof keepCloudKey === 'function';
+      const withKeep = <T extends { message: string }>(out: T, finishing = false): T => {
+        if (!inCloud) return out;
+        const k = keepAfterSignIn(asked.service, { finishing });
+        return { ...out, ...(k.keep ? { keep: k.keep } : {}), message: `${out.message} ${k.message}` };
+      };
+      if (finished) return json(withKeep({ status: 'closed', message: 'The card is gone.' }));
+      const said = await waitForSignIn(id, asked.id, { product });
+      return json(said.status === 'signed_in' ? withKeep(said) : said.status === 'landed' || said.status === 'code' ? withKeep(said, true) : said);
     },
   });
 
   if (typeof requestCloudResource === 'function') tools.push({
     name: 'request_cloud_resource',
-    description: 'Fetch a missing file, folder or installed skill from this thread’s computer without moving the conversation there. A file or folder is any path under this task checkout or the account’s documents, other products’ folders included: relative with a scope, or written out in full (`~/…` or absolute) with no scope. Skills use their installed name. Delivered resources get a separate scratch path, preserving cloud edits. Returns delivered, folder (its files, to ask for one by one), denied, not_found, too_large, or unavailable, with the reason. A delivered skill includes its scripts and references; read its returned SKILL.md. If the request names or needs what could not be delivered, by its path or by what it is, end the turn with the hand-back line rather than building around a guess; otherwise continue and explain what is missing.',
+    description: 'Fetch a missing file, folder or installed skill from this thread’s computer without moving the conversation there. A file or folder is any path under this task checkout or the account’s documents, other products’ folders included: relative with a scope, or written out in full (`~/…` or absolute) with no scope. Skills use their installed name. Delivered resources get a separate scratch path, preserving cloud edits. A folder is delivered whole in one request, with its files listed; ask for the folder rather than each file. Returns delivered, folder (a folder too big to send whole: its files, to ask for one by one), denied, not_found, too_large, or unavailable, with the reason. A delivered skill includes its scripts and references; read its returned SKILL.md. If the request names or needs what could not be delivered, by its path or by what it is, end the turn with the hand-back line rather than building around a guess; otherwise continue and explain what is missing.',
     schema: {
       kind: z.enum(['file', 'skill']),
       path: z.string().describe('file or folder path (relative, ~/…, or absolute), or installed skill name'),

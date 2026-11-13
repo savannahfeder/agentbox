@@ -121,7 +121,7 @@ export async function unpackFileArchive(file, destination) {
 }
 // What this server can do beyond the first version, said in a start's answer,
 // so a Mac knows rather than guesses whether its asks are honoured.
-const CAPS = ['offline', 'setup', 'kept', 'base', 'plain', 'hold', 'resources', 'keys', 'pieces'];
+const CAPS = ['offline', 'setup', 'kept', 'base', 'plain', 'hold', 'resources', 'keys', 'pieces', 'folders'];
 // A conversation sent home as only what the run added is listed in this file
 // (the same name in main/cloud/run.mts).
 const TAILS = '.agentbox-tails.json';
@@ -252,6 +252,7 @@ export function createSandbox({
   // so the log and the results upload still have room.
   reserveBytes = 0,
 } = {}) {
+  const machineUpAt = Date.now();
   const at = (p) => (pathRoot ? path.join(pathRoot, p) : p);
   const reserve = path.join(workRoot, '.reserve');
   if (reserveBytes > 0) {
@@ -882,7 +883,9 @@ export function createSandbox({
     child.on('exit', (code, signal) => setImmediate(() => finish(code, signal)));
     if (r.cancelled) cancel(r, r.cancelled);
     setState('running', {}, r);
-    const deadline = Number(r.spec.deadlineMs) || DEFAULT_DEADLINE_MS;
+    // AgentCore's 8 hours run from the machine's start, so the time spent
+    // getting ready comes out of the agent's share, not the saving margin.
+    const deadline = Math.max(0, (Number(r.spec.deadlineMs) || DEFAULT_DEADLINE_MS) - (Date.now() - machineUpAt));
     r.deadlineTimer = setTimeout(() => {
       emit({ kind: 'error', message: 'stopped near the cloud session\'s 8-hour limit so its work could be saved' }, r);
       cancel(r, 'SIGTERM');
@@ -935,10 +938,15 @@ export function createSandbox({
     const parts = f.path.slice(logical.length + 1).split('/');
     if (parts.length !== 2 || !/^[a-f0-9]{64}$/.test(parts[0]) || !parts[1]) throw new Error('invalid resource destination');
     const archive = !!f.untar;
-    if (archive ? !/^\.skills-[a-f0-9]{64}\.tgz$/.test(parts[1]) || f.untar !== `${logical}/${parts[0]}/skills` : parts[1].startsWith('.')) throw new Error('invalid resource file');
+    // A skill bundle unpacks to `skills`; a folder to its own name beside the archive.
+    const unpacked = archive && typeof f.untar === 'string' ? f.untar.slice(`${logical}/${parts[0]}/`.length) : null;
+    const archiveOk = archive && f.untar.startsWith(`${logical}/${parts[0]}/`) && (
+      (/^\.skills-[a-f0-9]{64}\.tgz$/.test(parts[1]) && unpacked === 'skills')
+      || (/^\.folder-[a-f0-9]{64}\.tgz$/.test(parts[1]) && /^[^./\\\r\n\0][^/\\\r\n\0]{0,254}$/.test(unpacked) && unpacked !== 'skills'));
+    if (archive ? !archiveOk : parts[1].startsWith('.')) throw new Error('invalid resource file');
     makeResourceRoot(r.id);
     const dir = protectedDirectory(path.join(r.resourceRoot, parts[0]));
-    const target = path.join(dir, archive ? 'skills' : parts[1]);
+    const target = path.join(dir, archive ? unpacked : parts[1]);
     const existing = fs.lstatSync(target, { throwIfNoEntry: false });
     if (existing && (existing.isSymbolicLink() || existing.uid !== process.getuid?.() || (archive ? !existing.isDirectory() : !existing.isFile() || existing.nlink !== 1))) throw new Error('unsafe existing resource');
     const signal = AbortSignal.any([stopping.signal, AbortSignal.timeout(45_000)]);
@@ -964,7 +972,7 @@ export function createSandbox({
       const fd = fs.openSync(file, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_NOFOLLOW, 0o644);
       try { fs.writeFileSync(fd, body); fs.fchmodSync(fd, 0o644 | (Number(f.mode) & 0o111)); } finally { fs.closeSync(fd); }
       if (archive) {
-        const staged = path.join(job, 'skills');
+        const staged = path.join(job, unpacked);
         await unpackSkillArchive(file, staged);
         if (!existing) fs.renameSync(staged, target);
       } else if (existing) {

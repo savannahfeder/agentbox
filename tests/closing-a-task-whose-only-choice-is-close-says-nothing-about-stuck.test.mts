@@ -42,6 +42,7 @@ describe('the wiring', () => {
   const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
   it('the agent\'s own close, picked, goes past the warning', () => {
     expect(app).toMatch(/if \(closesTheTask\(option\.text\)\) \{ await markDone\(item, \{ chosen: true \}\)/);
-    expect(app).toMatch(/if \(!chosen && nudgeOnStopped\(\[item\], 'E'\)\) return;/);
+    // ...and so does the close the first-run walkthrough is teaching (w-fbe5e95dea).
+    expect(app).toMatch(/if \(!chosen && !teachingClose && nudgeOnStopped\(\[item\], 'E'\)\) return;/);
   });
 });

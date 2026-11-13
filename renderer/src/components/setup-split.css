@@ -1,15 +1,18 @@
 /* THE SETUP BESIDE THE APP (SetupSplit.tsx). Every colour is the app's own
    token; every class is ss- prefixed. */
 
-/* The app itself, moved into the right panel and running off its edges. */
+/* The app itself, moved into the right panel and running off its right edge. */
 :root[data-setup] #root {
   position: fixed; z-index: 2147482999;
-  left: calc(var(--ss-left) + 56px); top: 92px;
-  width: 1120px; height: 1300px;
+  left: var(--ss-x); top: var(--ss-y);
+  width: 1120px; height: var(--ss-h);
   transform: scale(var(--ss-scale, .8)); transform-origin: 0 0;
-  border-radius: 16px; overflow: hidden; pointer-events: none;
+  border-radius: 16px; overflow: hidden; pointer-events: none; clip-path: var(--ss-clip, none);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 10%, transparent), 0 30px 80px rgba(30, 40, 40, .16), 0 4px 14px rgba(30, 40, 40, .06);
 }
+
+/* The preview is taller for its width than a window is, so Home sits in its middle rather than at the top. */
+:root[data-setup] .hm-page { align-items: center; padding-top: 0; padding-bottom: 0; }
 
 .setup-split {
   position: fixed; inset: 0; z-index: 2147482998;
@@ -22,11 +25,8 @@
 .setup-split * { box-sizing: border-box; }
 .setup-split button, .setup-split input { font: inherit; color: inherit; }
 .setup-split .ss-left { position: absolute; left: 0; top: 0; bottom: 0; width: var(--ss-left); z-index: 2147483001; background: var(--ss-ground); }
-.setup-split .ss-right { position: absolute; left: var(--ss-left); right: 16px; top: 16px; bottom: 16px; border-radius: 16px;
-  background: var(--sky-frame, color-mix(in srgb, #5f8f74 14%, var(--bg))); }
-/* The light green sky's own frame, so a window without a sky still sits on the approved green. */
-:root[data-theme="light"] .setup-split .ss-right { background: var(--sky-frame, #e3e8e5); }
-.setup-split .ss-cap { position: absolute; left: 56px; top: 40px; font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); }
+.setup-split .ss-right { position: absolute; left: var(--ss-left); right: 16px; top: 16px; bottom: 16px; border-radius: 16px; background: none; }
+.setup-split .ss-cap { display: none; }
 
 .setup-split .ss-brand { position: absolute; left: 48px; top: 40px; display: flex; align-items: center; gap: 10px; font-size: 15px; letter-spacing: -0.01em; }
 .setup-split .ss-steps { position: absolute; right: 48px; top: 45px; display: flex; align-items: center; gap: 5px; }
@@ -35,7 +35,7 @@
 .setup-split .ss-steps i.ss-is { background: var(--text); }
 .setup-split .ss-steps span { margin-left: 12px; font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); }
 
-.setup-split .ss-body { position: absolute; left: clamp(48px, 8vw, 136px); right: clamp(40px, 7vw, 136px); max-width: 560px; top: 50%; transform: translateY(-50%);
+.setup-split .ss-body { position: absolute; left: clamp(48px, 6vw, 112px); right: 40px; max-width: 560px; top: 50%; transform: translateY(-50%);
   animation: ss-in .4s cubic-bezier(.2, .7, .2, 1) both; }
 @keyframes ss-in { from { opacity: 0; transform: translateY(calc(-50% + 8px)); } to { opacity: 1; transform: translateY(-50%); } }
 .setup-split .ss-h { margin: 0 0 28px; font-size: 28px; line-height: 36px; letter-spacing: -0.014em; font-weight: 400; color: var(--text-faint); }
@@ -46,7 +46,7 @@
 .setup-split .ss-row { display: grid; grid-template-columns: 32px 1fr auto; column-gap: 14px; align-items: center; min-height: 62px; padding: 12px 18px; }
 .setup-split .ss-row + .ss-row { border-top: 1px solid color-mix(in srgb, var(--text) 6%, transparent); }
 .setup-split .ss-row.ss-press { cursor: pointer; }
-.setup-split .ss-row.ss-press:hover, .setup-split .ss-row.ss-on { background: color-mix(in srgb, var(--text) 3%, transparent); }
+.setup-split .ss-row.ss-press:hover, .setup-split .ss-row.ss-on { background: color-mix(in srgb, var(--text) 5%, transparent); }
 .setup-split .ss-face { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 500;
   background: color-mix(in srgb, var(--text) 6%, transparent); color: var(--text); }
 .setup-split .ss-face.ss-dash, .setup-split .ss-ai.ss-dash { background: transparent; border: 1px dashed color-mix(in srgb, var(--text) 22%, transparent); color: var(--text-faint); }
@@ -64,11 +64,61 @@
 .setup-split .ss-check.ss-on { background: var(--text); border-color: var(--text); color: var(--bg); }
 .setup-split .ss-input { grid-column: 2 / -1; border: 0; outline: 0; background: transparent; font-size: 14.5px; min-width: 0; }
 .setup-split .ss-input::placeholder { color: var(--text-faint); }
-.setup-split .ss-strip { width: 64px; height: 32px; border-radius: 7px; overflow: hidden; display: block; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 10%, transparent); }
+.setup-split .ss-strip { position: relative; width: 64px; height: 32px; border-radius: 7px; overflow: hidden; display: block; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 10%, transparent); }
+.setup-split .ss-strip .ss-sky { position: absolute; inset: 0; display: block; }
 .setup-split .ss-strip canvas { width: 100%; height: 100%; display: block; }
+/* Match my system: dark orange above the diagonal, light green below it. */
+.setup-split .ss-strip-pair .ss-sky + .ss-sky { clip-path: polygon(100% 0, 100% 100%, 0 100%); }
 .setup-split .ss-strip-light { background: #fff; }
 .setup-split .ss-strip-dark { background: radial-gradient(ellipse 80% 70% at 75% 25%, rgba(238, 96, 24, .18), transparent 70%), #1a1817; }
 .setup-split .ss-row:has(.ss-strip) { grid-template-columns: 64px 1fr auto; }
+.setup-split .ss-chats { max-height: 230px; }
+.setup-split .ss-chat { grid-template-columns: minmax(0, 1fr) auto auto; min-height: 46px; padding: 0 16px 0 18px; }
+.setup-split .ss-meta { font-size: 13px; color: var(--text-faint); white-space: nowrap; }
+/* The plan step: the tick on the left, the price on the right, a line under the name that may wrap. */
+.setup-split .ss-plans .ss-row { grid-template-columns: 18px 1fr auto; column-gap: 16px; min-height: 76px; padding: 14px 18px; }
+.setup-split .ss-plans .ss-face { width: auto; height: auto; background: none; }
+.setup-split .ss-plans .ss-sub { white-space: normal; margin-top: 2px; }
+.setup-split .ss-tag { margin-left: 8px; padding: 1px 7px; border-radius: 999px; font-size: 12px; color: var(--text-dim); border: 1px solid color-mix(in srgb, var(--text) 14%, transparent); vertical-align: 1px; }
+.setup-split .ss-price { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.25; }
+.setup-split .ss-price b { font-size: 17px; font-weight: 500; }
+.setup-split .ss-price small { font-size: 12px; color: var(--text-faint); }
+/* The purchase page: what Pro brings in three lines, the price in one quiet line. */
+.setup-split .ss-perks { display: flex; flex-direction: column; gap: 14px; margin: 0 0 30px; }
+.setup-split .ss-perk { display: flex; align-items: center; gap: 12px; font-size: 16px; color: var(--text); }
+.setup-split .ss-perk-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; color: var(--text);
+  background: color-mix(in srgb, var(--text) 6%, transparent); border: 1px solid color-mix(in srgb, var(--text) 9%, transparent); }
+.setup-split .ss-price-line { margin: 12px 0 0; font-size: 12.5px; color: var(--text-faint); }
+
+/* And on the right, in place of the app (ProShowcase.tsx): a card for each of those lines, over the sky. */
+/* Opacity too: the back and forward buttons set their own visibility. */
+:root[data-setup-pro] #root { visibility: hidden; opacity: 0; }
+.setup-split .pro-show { position: absolute; inset: 0; border-radius: 16px; overflow: hidden; display: grid; place-items: center;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 10%, transparent), 0 30px 80px rgba(30, 40, 40, .16); }
+.setup-split .pro-sky { position: absolute; inset: 0; width: 100%; height: 100%; }
+.setup-split .pro-cards { position: relative; width: min(500px, 78%); display: flex; flex-direction: column; gap: 14px; }
+.setup-split .pro-card { padding: 14px 16px 12px; border-radius: 14px; color: #f3efe9;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .075), rgba(255, 255, 255, .025)), rgba(17, 16, 15, .5);
+  backdrop-filter: blur(20px) saturate(1.5); -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  border: 1px solid rgba(255, 255, 255, .13); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 12px 40px rgba(0, 0, 0, .3); }
+:root[data-theme="light"] .setup-split .pro-card { color: #1d2420; background: rgba(255, 255, 255, .72); border-color: rgba(255, 255, 255, .8);
+  backdrop-filter: blur(36px) saturate(1.05); -webkit-backdrop-filter: blur(36px) saturate(1.05); box-shadow: 0 12px 40px rgba(40, 60, 50, .14); }
+.setup-split .pro-card header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 14px; font-weight: 500; }
+.setup-split .pro-card header span { margin-left: auto; font-size: 12.5px; font-weight: 400; opacity: .6; }
+.setup-split .pro-pcs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.setup-split .pro-pc { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 8px 9px; border-radius: 8px; font-size: 12.5px;
+  background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .08); }
+:root[data-theme="light"] .setup-split .pro-pc { background: rgba(255, 255, 255, .7); border-color: rgba(20, 40, 30, .08); }
+.setup-split .pro-pc i { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pro-live 1.6s ease-in-out infinite; }
+@keyframes pro-live { 50% { opacity: .35; } }
+.setup-split .pro-row { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 6px 0; font-size: 13px; }
+.setup-split .pro-row + .pro-row { border-top: 1px solid rgba(127, 127, 127, .14); }
+.setup-split .pro-face { flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-size: 11px; font-weight: 500;
+  background: rgba(127, 127, 127, .22); }
+.setup-split .pro-who { flex: none; font-weight: 500; }
+.setup-split .pro-on, .setup-split .pro-file, .setup-split .pro-pc span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: .75; }
+.setup-split .pro-file, .setup-split .pro-pc span { opacity: 1; }
+.setup-split .pro-size { margin-left: auto; flex: none; font-size: 12px; opacity: .55; }
 .ss-picker { position: fixed; inset: 0; z-index: 2147483005; }
 .setup-split .ss-empty { padding: 16px 18px; color: var(--text-faint); font-size: 13.5px; }
 
@@ -77,9 +127,14 @@
   border-radius: 8px; background: var(--ss-ground); font-size: 14.5px; cursor: pointer; box-shadow: 0 1px 2px rgba(30, 22, 36, .06); }
 .setup-split .ss-go:hover:not(:disabled) { background: color-mix(in srgb, var(--text) 3%, var(--bg)); }
 .setup-split .ss-go:disabled { color: var(--text-faint); cursor: default; box-shadow: none; }
+/* Not ready yet: a press still names the field that is missing (../team/sign-up-parts.ts). */
+.setup-split .ss-go.ss-not-yet { color: var(--text-faint); border-color: color-mix(in srgb, var(--text) 10%, transparent); box-shadow: none; cursor: default; }
+.setup-split .ss-go.ss-not-yet:hover { background: var(--ss-ground); }
+.setup-split .ss-go.ss-not-yet .ss-key { color: var(--text-faint); box-shadow: none; }
 .setup-split .ss-quiet, .setup-split .ss-back { border: 0; background: none; padding: 0; font-size: 14.5px; color: var(--text-dim); cursor: pointer; }
 .setup-split .ss-quiet:hover, .setup-split .ss-back:hover { color: var(--text); }
-.setup-split .ss-back { position: absolute; left: 0; bottom: -64px; }
+.setup-split .ss-back { display: inline-flex; margin: 0 0 18px -6px; align-items: center; gap: 4px; padding: 4px 6px; border-radius: 6px; font-size: 13.5px; color: var(--text-faint); }
+.setup-split .ss-back:hover { background: color-mix(in srgb, var(--text) 5%, transparent); }
 .setup-split .ss-note { margin: 14px 0 0 2px; font-size: 13px; color: var(--text-faint); }
 .setup-split .ss-error { margin: 14px 0 0 2px; font-size: 13px; color: var(--text); }
 .setup-split .ss-keys { display: inline-flex; gap: 4px; }
@@ -87,7 +142,13 @@
   background: var(--ss-ground); border: 1px solid color-mix(in srgb, var(--text) 14%, transparent); box-shadow: 0 1px 0 color-mix(in srgb, var(--text) 12%, transparent); }
 
 /* THE TOUR'S STEP LIST, beside the app while the tutorial runs (TourList in Tour.tsx). */
-:root[data-tour-list] #root { margin-left: var(--tl-w); width: calc(100vw - var(--tl-w)); }
+:root[data-tour-list] { --tl-panel: color-mix(in srgb, var(--text) 5%, var(--bg)); }
+:root[data-tour-list][data-theme="light"] { --tl-panel: color-mix(in srgb, var(--sky-frame, #e3e8e5) 93%, var(--text)); }
+:root[data-tour-list] body { background: var(--tl-panel); }
+/* The app as a window in a panel beside the list, at full size, rounded as in the setup. */
+:root[data-tour-list] #root { position: fixed; left: calc(var(--tl-w) + 12px); top: 12px; right: 12px; bottom: 12px; width: auto; height: auto; margin: 0;
+  border-radius: 14px; overflow: hidden; box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 10%, transparent), 0 20px 60px rgba(0, 0, 0, .18); }
+:root[data-tour-list] .modal-backdrop { left: var(--tl-w); }
 .tour-list { position: fixed; left: 0; top: 0; bottom: 0; width: var(--tl-w); z-index: 50; background: var(--bg);
   border-right: 1px solid color-mix(in srgb, var(--text) 8%, transparent); color: var(--text);
   font-family: 'Geist', 'Avenir Next', -apple-system, BlinkMacSystemFont, 'DejaVu Sans', sans-serif; }
@@ -100,7 +161,8 @@
 .tour-list .ss-list { border: 1px solid color-mix(in srgb, var(--text) 10%, transparent); border-radius: 10px; overflow: hidden; }
 .tour-list .ss-row { display: grid; grid-template-columns: 26px 1fr auto; column-gap: 12px; align-items: center; min-height: 50px; padding: 8px 16px; font-size: 14px; }
 .tour-list .ss-row + .ss-row { border-top: 1px solid color-mix(in srgb, var(--text) 6%, transparent); }
-.tour-list .ss-row.ss-on { background: color-mix(in srgb, var(--text) 3%, transparent); }
+.tour-list .ss-row.ss-on { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.tour-list .ss-row.ss-on .ss-face { box-shadow: inset 0 0 0 1.5px var(--text); }
 .tour-list .ss-face { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; background: color-mix(in srgb, var(--text) 6%, transparent); }
 .tour-list .ss-face.ss-ok { background: var(--text); color: var(--bg); }
 .tour-list .ss-keys { display: inline-flex; gap: 4px; }
@@ -108,3 +170,31 @@
   border: 1px solid color-mix(in srgb, var(--text) 14%, transparent); box-shadow: 0 1px 0 color-mix(in srgb, var(--text) 12%, transparent); }
 .tour-list .tl-skip { margin-top: 22px; border: 0; background: none; padding: 0; font: inherit; font-size: 14px; color: var(--text-dim); cursor: pointer; }
 .tour-list .tl-skip:hover { color: var(--text); }
+
+/* The sign-in step: the app's own form, in the setup's column rather than over the window. */
+:root .setup-split .ss-signin .si-page { position: static; inset: auto; z-index: auto; display: block; place-items: normal; padding: 0; background: none; -webkit-app-region: no-drag; }
+:root .setup-split .ss-signin .si-card { width: 100%; max-width: 420px; padding: 0; background: none; border: 0; box-shadow: none; }
+.setup-split .ss-signin .si-mark { display: none; }
+/* Inside the setup the card wears the setup's parts: no orange slab, no uppercase labels. */
+.setup-split .ss-signin .si-google, .setup-split .ss-signin .si-primary { height: 40px; border: 1px solid color-mix(in srgb, var(--text) 18%, transparent); border-radius: 8px; box-shadow: 0 1px 2px rgba(30, 22, 36, .06); font-size: 14.5px; }
+.setup-split .ss-signin .si-primary { background: var(--ss-ground); color: var(--text); font-weight: 400; margin-top: 10px; }
+.setup-split .ss-signin .si-primary:hover:not(:disabled) { filter: none; background: color-mix(in srgb, var(--text) 3%, var(--bg)); }
+.setup-split .ss-signin .si-google { background: var(--ss-ground); }
+.setup-split .ss-signin .si-form label > span:first-child { font: 13.5px var(--font, inherit); letter-spacing: 0; text-transform: none; color: var(--text-dim); }
+.setup-split .ss-signin .si-form input { height: 40px; border-radius: 8px; border-color: color-mix(in srgb, var(--text) 16%, transparent); background: var(--ss-ground); }
+.setup-split .ss-signin .si-or { margin: 16px 0; }
+.setup-split .ss-signin .si-steps .si-form { gap: 14px; }
+.setup-split .ss-signin .si-steps .si-form .ss-go { align-self: flex-start; margin-top: 10px; }
+.setup-split .ss-signin .si-form input::placeholder { color: var(--text-faint); }
+.setup-split .ss-signin .si-terms { text-align: left; margin-top: 16px; font-size: 13px; color: var(--text-faint); }
+.setup-split .ss-signin .si-setup-switch { margin-top: 20px; font-size: 14px; color: var(--text-faint); }
+/* The terms sit at the panel's foot, away from the buttons. */
+.setup-split .ss-foot { position: absolute; left: clamp(48px, 6vw, 112px); right: 40px; bottom: 40px; }
+.setup-split .ss-foot .si-terms { margin: 0; text-align: left; font-size: 12.5px; line-height: 18px; color: var(--text-faint); }
+:root .setup-split .ss-signin .si-card { max-width: 360px; margin: 0; }
+.setup-split .ss-signin .si-card h1.ss-h { margin: 0 0 28px; font-size: 28px; line-height: 36px; font-weight: 400; }
+.setup-split .ss-signin .si-pw-show { height: 38px; font-size: 13px; color: var(--text-faint); }
+
+.setup-split .ss-signin .si-card h1 { margin: 0 0 6px; font-size: 28px; line-height: 36px; letter-spacing: -0.014em; }
+.setup-split .ss-signin .si-lede { margin: 0 0 28px; font-size: 15px; line-height: 22px; }
+

@@ -12,7 +12,7 @@ import { describe, it, expect } from 'vitest';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { pressOpens, pressOpensIn } from '../renderer/src/team/everything/place.ts';
-import { JobBlock, Place, PlaceList, SendBox } from '../renderer/src/team/everything/PlacePage.tsx';
+import { JobBlock, Place, SendBox, listPart } from '../renderer/src/team/everything/PlacePage.tsx';
 
 describe('what a press opens', () => {
   it('is a place for a person, your AI teammate and someone else\'s', () => {
@@ -46,7 +46,7 @@ describe('a place', () => {
     m: sofia, waits: 1, onBack() {}, backTo: 'Needs you',
     actions: h('button', null, 'Give a task'),
     chat: h('div', { className: 'chat-here' }, 'the real chat'),
-    side: h(PlaceList, { title: 'On now', now: 10_000, rows: [{ key: 'a', title: 'Pricing page test', word: 'Working', at: 5_000 }] }),
+    parts: listPart('In progress', [{ key: 'a', title: 'Pricing page test', word: 'Working', at: 5_000 }], 10_000),
   }));
 
   it('has a way back that says where it goes', () => {
@@ -57,7 +57,7 @@ describe('a place', () => {
   it('holds their conversation, their work and what you can do, under their name', () => {
     expect(html).toContain('Sofia Reyes');
     expect(html).toContain('the real chat');
-    expect(html).toContain('Pricing page test');
+    expect(html).toMatch(/In progress<b>1<\/b>/);
     expect(html).toContain('Give a task');
   });
 
