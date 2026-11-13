@@ -17,11 +17,13 @@ export const PLANS = Object.freeze({
 // 2026-11-06). Two at once, because ten would spend five hours in thirty minutes.
 export const FREE = Object.freeze({ agents: 2, hours: 5 });
 
-// A team's cloud (the owner, 2026-11-06): 14 days free from the day it was
-// made, 10 hours a member shared by all; then $40 a seat a month, each seat
-// Pro's agents and hours, the hours one pool. Kept apart from PLANS, which are
-// one person's.
-export const TEAM = Object.freeze({ trialDays: 14, trialHoursPerMember: 10, trialAgentsPerMember: 2, hoursPerSeat: 400, agentsPerSeat: 10, dollarsPerSeat: 40, filesGBPerSeat: 100 });
+// A team's cloud (the owner, 2026-11-06; 7 days since 2026-11-10): free from
+// the day it was made, 50 hours a member (10 until 2026-11-13: "10 cloud hours
+// for pro is very bad given free is 5"); then $40 a seat a month, each seat
+// Pro's hours and files. Hours are its only limit: "there should never be a limit on how
+// many cloud agents a team can use at once" (the owner, 2026-11-13). Kept apart
+// from PLANS, which are one person's.
+export const TEAM = Object.freeze({ trialDays: 7, trialHoursPerMember: 50, hoursPerSeat: 400, dollarsPerSeat: 40, filesGBPerSeat: 100 });
 
 // Files in the cloud are a paid plan's (the owner, 2026-11-09): a free plan
 // keeps them on the computer, and a lapsed plan's are deleted after this,

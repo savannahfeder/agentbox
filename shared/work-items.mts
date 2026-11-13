@@ -34,7 +34,7 @@
 
 import { resolveEdits } from './message-edits.mts';
 import { cleanVoice } from './agent-voice.mts';
-import { cleanMark, isBookkeepingMark, marksOf } from './artifact-marks.mts';
+import { cleanMark, cleanPlace, isBookkeepingMark, marksOf, type NotePlace, type RawPlace } from './artifact-marks.mts';
 import { isContinuedNote } from './thread-continued.mts';
 import { wordWaits, type AnsweredItem } from './answers.mts';
 import type { AgentVoice } from './agent-voice.mts';
@@ -49,11 +49,14 @@ export type Visibility = 'team' | 'people' | 'private';
 
 export interface WorkItemClaim { holder: string; leaseUntil: number }
 export interface Reaction { on: string; emoji: string; off?: true }
-export interface Routed { to?: string; ask?: string[]; why: string; at: number; by: 'auto' | 'you' }
+/** `gains`: the three lines the card draws, what this teammate would learn, carry on and then do. */
+export interface RouteOffer { role: string; why: string; gains?: string[]; answered?: 'made' | 'no' }
+export interface Routed { to?: string; ask?: string[]; why: string; at: number; by: 'auto' | 'you'; offer?: RouteOffer }
 export interface SaidAt { said: string; at: number }
 export interface TeammateFrom { teammate: string; name: string }
 export type MessageEditPatch = { on: string; gone: true; text?: undefined } | { on: string; text: string; gone?: undefined };
-export interface LinkComment { name: string; file: string; text: string }
+/** `place`: where in the file it points, as an in-app note does (shared/artifact-marks.mts). */
+export interface LinkComment { name: string; file: string; text: string; place?: NotePlace }
 export type ArtifactMarkPatch = NonNullable<ReturnType<typeof cleanMark>>;
 
 // A type rather than an interface so a patch passes where `Record<string, unknown>` is asked for.
@@ -151,6 +154,8 @@ export type WorkItem = Omit<WorkItemPatch, LineMark> & {
   wrote: Record<string, FieldWrite | undefined>;
   placedAt?: number;
   waitingComments?: WaitingComment[];
+  /** Comments on this thread's shared links its owner has not yet dealt with. */
+  linkComments?: (LinkComment & { ts: number })[];
   reactions?: Record<string, Record<string, string[]>>;
   edits?: Record<string, MessageEdit>;
   artifacts?: ReturnType<typeof marksOf>;
@@ -423,7 +428,19 @@ export function cleanRouted(value: Unchecked): Routed | undefined {
     const ask = [...new Set(value.ask.filter((x): x is string => typeof x === 'string' && ROUTE_TO.test(x)))].slice(0, 3);
     return ask.length ? { ask, why, at, by } : undefined;
   }
-  return typeof value.to === 'string' && ROUTE_TO.test(value.to) ? { to: value.to, why, at, by } : undefined;
+  if (typeof value.to !== 'string' || !ROUTE_TO.test(value.to)) return undefined;
+  const offer = cleanOffer(value.offer as Unchecked);
+  return { to: value.to, why, at, by, ...(offer ? { offer } : {}) };
+}
+
+function cleanOffer(value: Unchecked): RouteOffer | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const role = typeof value.role === 'string' ? value.role.trim().slice(0, 40) : '';
+  if (!role) return undefined;
+  const why = typeof value.why === 'string' ? value.why.slice(0, 200) : '';
+  const gains = Array.isArray(value.gains) ? value.gains.filter((g: unknown): g is string => typeof g === 'string' && !!g.trim()).slice(0, 3).map((g: string) => g.trim().slice(0, 120)) : [];
+  const answered = value.answered === 'made' || value.answered === 'no' ? value.answered : undefined;
+  return { role, why, ...(gains.length ? { gains } : {}), ...(answered ? { answered } : {}) };
 }
 
 // A person id or a line id: short, plain, never an object a writer slipped in.
@@ -455,6 +472,8 @@ export const LEASE_MS = 5 * 60 * 1000;
 // and a refused write loses a whole report rather than its tail.
 const MAX_TITLE = 200;
 const MAX_SHORT = 200;
+// A busy link waits as one row; its oldest comments still read in the thread.
+const MAX_LINK_COMMENTS = 100;
 // ONE budget for every long text, because a result is the answer to a body and
 // there is no reason an answer may be shorter than the question. It used to be
 // a quarter of it, and on 2026-08-11 three of the founder's finished research
@@ -787,7 +806,8 @@ function coerceField(field: string, value: Unchecked): PatchValue | undefined {
       const name = str(value.name, MAX_SHORT);
       const file = str(value.file, MAX_SHORT);
       const text = str(value.text, MAX_TEXT_BYTES);
-      return name && file && text ? { name, file, text } : undefined;
+      const place = cleanPlace(value.place as RawPlace | null | undefined);
+      return name && file && text ? { name, file, text, ...(place ? { place } : {}) } : undefined;
     }
     case 'waitEnded': case 'handedOver': {
       if (!value || typeof value !== 'object' || !Number.isFinite((value as Fields).at)) return undefined;
@@ -1009,6 +1029,12 @@ export function foldRawInto(items: Map<string, FoldingItem>, lines: unknown, tou
         if (line.by && teammateComment(line)) (item.waitingComments ??= []).push({ by: line.by, ts: line.ts, text: value.text });
         continue;
       }
+      if (field === 'linkComment') {
+        const kept = (item.linkComments ??= []);
+        kept.push({ ...value, ts: line.ts });
+        if (kept.length > MAX_LINK_COMMENTS) kept.splice(0, kept.length - MAX_LINK_COMMENTS);
+        continue;
+      }
       if (field === 'artifact') {
         (item.artifactLines ??= []).push({ ...value, by: line.by ?? null, ts: line.ts, uid: line.uid ?? null });
         continue;
@@ -1069,6 +1095,7 @@ export function foldRawInto(items: Map<string, FoldingItem>, lines: unknown, tou
     }
     if (!isNotNews(line)) item.updatedAt = Math.max(item.updatedAt, line.ts);
     if (item.waitingComments && dealsWithComments(line)) delete item.waitingComments;
+    if (item.linkComments && dealsWithComments(line)) delete item.linkComments;
     if (line.ts < item.createdAt) item.createdAt = line.ts;
   }
 

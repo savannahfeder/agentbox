@@ -15,8 +15,9 @@ interface StandinWait { boot: string; events: ({ kind: 'change' } | { kind: 'roo
 async function post<T>(url: string, door: string, body: unknown, ms = CALL_MS): Promise<T> {
   const init = { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) };
   const res = await fetch(`${url}/${door}`, { ...init, signal: AbortSignal.timeout(ms) });
-  const out = await res.json().catch(() => ({})) as T & { error?: string };
-  if (!res.ok) throw new Error(out.error || `the stand-in cloud said ${res.status}`);
+  const out = await res.json().catch(() => ({})) as T & { error?: string; code?: string };
+  // The code rides along: "that file is already in the room" is told from a failure by it.
+  if (!res.ok) throw Object.assign(new Error(out.error || `the stand-in cloud said ${res.status}`), out.code ? { code: out.code } : {});
   return out;
 }
 

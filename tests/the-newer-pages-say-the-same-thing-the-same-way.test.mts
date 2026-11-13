@@ -22,10 +22,10 @@ describe('the same words', () => {
   it('Waiting on you on a place and a row, never Waits on you', () => {
     const page = read('renderer/src/team/TodayPage.tsx');
     expect(page).not.toContain('Waits on you');
-    expect(app).toContain('<PlaceList title="Waiting on you"');
+    expect(app).toContain("listPart('Waiting on you'");
   });
   it('In progress on a place, as on the tab', () => {
-    expect(app).toContain('<PlaceList title="In progress"');
+    expect(app).toContain("listPart('In progress'");
     expect(app).not.toContain('title="On now"');
     expect(app).not.toMatch(/nothing under way|Nothing under way/);
   });

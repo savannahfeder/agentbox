@@ -58,7 +58,7 @@ import { MODE_ORDER, MODE_SENTENCE, MODE_WORDS, RULES_ALWAYS_APPLY } from '../mo
 import { CODEX_MODES, CODEX_MODE_ORDER } from '../codex-modes';
 import { ProductMark } from './ProductMark';
 import { SHORTCUTS } from '../shortcuts';
-import { chord, chords, sayKeys } from '../this-keyboard';
+import { chord, chords } from '../this-keyboard';
 import { capWord } from '../hint-plate';
 import { NAME, Name } from '../../../shared/product-name.mjs';
 import { SETTINGS_TERMINAL } from '../../../shared/settings-terminal.mts';
@@ -1033,7 +1033,7 @@ function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite }: { signedIn: 
   };
   // A paying team's owner sees its card, next bill and last invoice, read from Stripe through the cloud.
   const [teamBillingSeen, setTeamBillingSeen] = useState<TeamBillingDetails | null>(null);
-  const readsStripe = !!plan?.team?.owner && !plan.team.trial;
+  const readsStripe = !!plan?.team?.owner && (!plan.team.trial || plan.team.seats > 0);
   useEffect(() => {
     if (!readsStripe) return;
     void api.cloudAccountTeamBilling().then((out) => { if (out.ok && out.owner) setTeamBillingSeen(out as TeamBillingDetails); });
@@ -1805,7 +1805,8 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
   const homeSet = useHomeSettings();
   // A phone has no skies (App.tsx's `homeOn`).
   const skies = !onPhone();
-  const skyOn = skies ? homeSet.skyTheme : null;
+  // Under Match system the sky is Match's default, so the Match tile is the one ticked.
+  const skyOn = skies && (homeSet.picked || look !== 'match') ? homeSet.skyTheme : null;
   const sidebarShrinks = useSidebarShrinks();
   const [model, setModel] = useState<SettingsModel | null>(null);
   // ?settings=claude, or ?settings=project:kestrel. Anything else (including the
@@ -2326,6 +2327,9 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
               </Row>
               <Row label="Multiplayer" desc="Share projects with your team and see their threads beside yours. Needs a sign-in.">
                 <Switch label="Multiplayer" on={!!w.alpha?.multiplayer} onChange={(v) => setWorkspace('alphaMultiplayer', v)} />
+              </Row>
+              <Row label="Glass" desc="The space around the page becomes frosted glass over your desktop.">
+                <Switch label="Glass" on={!!w.alpha?.glass} onChange={(v) => setWorkspace('alphaGlass', v)} />
               </Row>
             </Group>
           </Page>

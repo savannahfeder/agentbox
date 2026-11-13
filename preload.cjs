@@ -17,6 +17,16 @@ if (process.platform !== 'darwin') {
   else document.addEventListener('DOMContentLoaded', markFlat);
 }
 
+// A Mac window can put the system's blur behind itself (main/window-glass.mts);
+// the page goes glass only while the Alpha switch is on.
+if ((process.argv ?? []).includes('--agentbox-glass')) {
+  const markGlass = () => {
+    if (document.documentElement) document.documentElement.dataset.glassAble = '';
+  };
+  if (document.documentElement) markGlass();
+  else document.addEventListener('DOMContentLoaded', markGlass);
+}
+
 // EVERY ASK BEFORE A RELOAD IS ANSWERED, held write or not. main waits for
 // this before it reloads (main/write-before-reload.mts), so a page with
 // nothing held, or one that has not set a handler yet, says so at once rather
@@ -58,6 +68,7 @@ contextBridge.exposeInMainWorld('zero', {
   compose: (payload) => ipcRenderer.invoke('zero:compose', payload),
   // Who takes a thread sent to Auto, when she picks.
   routeThread: (payload) => ipcRenderer.invoke('zero:route-thread', payload),
+  answerRouteOffer: (payload) => ipcRenderer.invoke('zero:answer-route-offer', payload),
   schedule: (payload) => ipcRenderer.invoke('zero:schedule', payload),
   snooze: (payload) => ipcRenderer.invoke('zero:snooze', payload),
   // Feedback to the Agentbox team, from the card the sidebar opens.
@@ -139,7 +150,7 @@ contextBridge.exposeInMainWorld('zero', {
   firstRunAnswer: (payload) => ipcRenderer.invoke('zero:first-run-answer', payload),
   firstRunExamples: (payload) => ipcRenderer.invoke('zero:first-run-examples', payload),
   // The practice project: made with its three rows, archived when the walk ends.
-  firstRunPractice: () => ipcRenderer.invoke('zero:first-run-practice'),
+  firstRunPractice: (opts) => ipcRenderer.invoke('zero:first-run-practice', opts),
   firstRunPracticeEnd: () => ipcRenderer.invoke('zero:first-run-practice-end'),
   firstRunWalking: (payload) => ipcRenderer.invoke('zero:first-run-walking', payload),
   // A second Agentbox, in a throwaway home, as somebody who has never opened it.
@@ -173,6 +184,8 @@ contextBridge.exposeInMainWorld('zero', {
   cornerTag: (state) => ipcRenderer.invoke('zero:corner-tag', state),
   // Whether this page came up from ⌘R, and which build it is running.
   bootInfo: () => ipcRenderer.invoke('zero:boot-info'),
+  // Which appearance the window's glass is drawn in (main/window-glass.mts).
+  glassTone: (payload) => ipcRenderer.invoke('zero:glass-tone', payload),
   // KEEPING AGENTBOX CURRENT (main/updater.mts). The state of it rides the
   // snapshot, so these two are only the verbs: look again now, and restart onto
   // the version that has already downloaded. Nothing here can start a download,
@@ -185,6 +198,7 @@ contextBridge.exposeInMainWorld('zero', {
   // not decide (main/notify.mts).
   notify: (arrivals, needsYou) => ipcRenderer.invoke('zero:notify', { arrivals, needsYou }),
   notifyTest: () => ipcRenderer.invoke('zero:notify-test'),
+  notifySettings: () => ipcRenderer.invoke('zero:notify-settings'),
   stopSession: (payload) => ipcRenderer.invoke('zero:stop-session', payload),
   runNow: (payload) => ipcRenderer.invoke('zero:run-now', payload),
   reopen: (payload) => ipcRenderer.invoke('zero:reopen', payload),
@@ -294,6 +308,9 @@ contextBridge.exposeInMainWorld('zero', {
   fileLinks: () => ipcRenderer.invoke('zero:file-links'),
   fileLinkComments: (payload) => ipcRenderer.invoke('zero:file-link-comments', payload),
   fileLinkComment: (payload) => ipcRenderer.invoke('zero:file-link-comment', payload),
+  fileLinkAccess: (payload) => ipcRenderer.invoke('zero:file-link-access', payload),
+  fileLinkPeople: (payload) => ipcRenderer.invoke('zero:file-link-people', payload),
+  fileLinkPerson: (payload) => ipcRenderer.invoke('zero:file-link-person', payload),
   bringSharedFile: (payload) => ipcRenderer.invoke('zero:bring-shared-file', payload),
   takeSharedFile: () => ipcRenderer.invoke('zero:take-shared-file'),
   retryFile: (payload) => ipcRenderer.invoke('zero:retry-file', payload),

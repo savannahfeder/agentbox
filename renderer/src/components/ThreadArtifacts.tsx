@@ -8,10 +8,13 @@ import type { ArtifactMark, FileElsewhere, FileMarks, Person, WorkItem } from '.
 import { ArtifactView, NO_MARKS, type ArtifactOpen } from './ArtifactView';
 import { useFileLine } from '../file-numbers';
 import { filesInLines, threadFiles } from '../../../shared/artifact-marks.mts';
+import { withRunsSaid } from '../runs-said';
+import type { TraceSession } from '../notes';
 
 /** This thread's marks with those from the other copies, every pin numbered in the order it was made. */
 export function withElsewhere(own: FileMarks, elsewhere: FileElsewhere[]): FileMarks {
-  const theirs = elsewhere.flatMap((e) => e.notes);
+  // Every copy of one file answers with all of that file's notes.
+  const theirs = [...new Map(elsewhere.flatMap((e) => e.notes).filter((n) => !own.notes.some((x) => x.id === n.id)).map((n) => [n.id, n])).values()];
   if (!theirs.length && !elsewhere.some((e) => e.approvals.length)) return own;
   const pins = new Map<string, number>();
   const notes = [...own.notes, ...theirs].sort((a, b) => a.ts - b.ts).map((n) => {
@@ -20,7 +23,8 @@ export function withElsewhere(own: FileMarks, elsewhere: FileElsewhere[]): FileM
     pins.set(n.file, k);
     return { ...n, pin: k };
   });
-  return { ...own, notes, approvals: [...own.approvals, ...elsewhere.flatMap((e) => e.approvals)] };
+  const approvals = [...new Map(elsewhere.flatMap((e) => e.approvals).map((a) => [`${a.key}\0${a.by}\0${a.ts}`, a])).values()];
+  return { ...own, notes, approvals: [...own.approvals, ...approvals] };
 }
 
 /** The Files place file to write to when the mark answers another copy's comment, else null for this thread. */
@@ -39,14 +43,21 @@ export function ThreadArtifacts({ item, open, withAgent, onClose, onBeside, onNo
   onNotice: (words: string) => void;
 }) {
   const team = useContext(TeamContext);
-  const [lines, setLines] = useState<LedgerLine[]>([]);
+  const [ledger, setLedger] = useState<LedgerLine[]>([]);
   useEffect(() => {
     let live = true;
-    const read = () => { void api.itemHistory({ product: item.product, id: item.id }).then((r) => { if (live) setLines(r?.lines ?? []); }); };
+    const read = () => { void api.itemHistory({ product: item.product, id: item.id }).then((r) => { if (live) setLedger(r?.lines ?? []); }); };
     read();
     const off = api.onChanged(read);
     return () => { live = false; off?.(); };
   }, [item.product, item.id]);
+  const [runs, setRuns] = useState<TraceSession[]>([]);
+  useEffect(() => {
+    let live = true;
+    api.sessionTrace({ product: item.product, id: item.id }).then((r) => { if (live) setRuns(r?.sessions ?? []); }).catch(() => {});
+    return () => { live = false; };
+  }, [item.product, item.id, ledger.length]);
+  const lines = useMemo(() => withRunsSaid(ledger, runs, item.runner ?? item.createdBy ?? null), [ledger, runs, item.runner, item.createdBy]);
   // Each file the thread names, and what was said on its copies elsewhere.
   const copies = useMemo(() => threadFiles(filesInLines(lines)).flatMap((f) => f.versions.map((v) => ({ path: v.path, file: v.id }))), [lines]);
   const [elsewhere, setElsewhere] = useState<FileElsewhere[]>([]);
@@ -80,6 +91,7 @@ export function ThreadArtifacts({ item, open, withAgent, onClose, onBeside, onNo
     people={people}
     open={open}
     ownerOfRow={item.runner ?? item.createdBy ?? null}
+    talkingWith={withAgent ? [] : (item.people ?? []).filter((p) => p !== team?.me)}
     write={(mark) => {
       const key = markGoesTo(mark, elsewhere);
       return key ? api.filesPlaceMark({ key, mark }) : api.fileMark({ product: item.product, id: item.id, mark });

@@ -2,15 +2,16 @@
 // at the top, then the conversation as its owner sees it (drawn by the owner's
 // own Thread from the lines their copy published) with a box for a comment,
 // and beside it what it is about, its files and its properties. Read-only.
-import { useCallback, useContext, useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState, type KeyboardEvent, type ReactNode, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ConnectionLink } from '../connections/ConnectionsPlace';
 import { connectionLinkOf } from '../connections/connections-shown';
 import remarkGfm from 'remark-gfm';
 import { api } from '../api';
-import { marksOf, opensBigInAGroup } from '../../../shared/artifact-marks.mts';
+import { filesInLines, lineAsThread, marksOf, opensBigInAGroup, otherFilesInLines, threadFiles } from '../../../shared/artifact-marks.mts';
 import { whereAFileOpens } from '../artifact-layout';
 import { ArtifactView, type ArtifactOpen } from '../components/ArtifactView';
+import { markGoesTo, withElsewhere } from '../components/ThreadArtifacts';
 import { MAX_EDIT_BYTES } from '../../../shared/artifact-marks.mts';
 import { ArtifactImg, ArtifactLink, ArtifactMedia } from '../components/Focus';
 import { Thread } from '../components/Thread';
@@ -22,9 +23,9 @@ import { artifactUrlTransform, isMediaPath } from '../remark-artifact-paths';
 import { firstName, Face, TeamContext } from '../team/people';
 import { FollowContext } from '../team/following';
 import type { LedgerLine } from '../thread-history';
-import type { AgentEvent, FileMarkLink, FileMarks, Person, ThreadCard } from '../types';
+import type { AgentEvent, FileElsewhere, FileLine, FileMarkLink, FileMarks, Person, ThreadCard } from '../types';
 import { MessagePerson, TeammateCard, TeammateStanding } from './Summary';
-import { earlierWords, filesOnThread, notSharedWords } from './teammate-thread';
+import { earlierWords, filesOnThread, notSharedWords, notesOnFile } from './teammate-thread';
 import { canContinue } from './continue-thread';
 
 const PICTURE = /\.(png|jpe?g|gif|webp|svg)$/i;
@@ -45,7 +46,8 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   /** The sync that last ran, which is when there can be anything new to read. */
   syncedAt: number | null;
   /** Open a copied file in the side pane. */
-  onOpenDoc: (product: string, src: string) => void;
+  /** `notes`: how many the file has here, for the mark beside the chat. */
+  onOpenDoc: (product: string, src: string, notes?: number) => void;
   onNotice: (text: string) => void;
 }) {
   const [work, setWork] = useState<Work | null>(null);
@@ -66,14 +68,17 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
 
   const product = work?.product ?? '';
   const dir = work?.dir ?? '';
+  // The notes are read below; a ref keeps `open` steady for the markdown it is memoized into.
+  const notesHere = useRef<{ file: string }[]>([]);
+  const beside = useCallback((src: string) => onOpenDoc(product, src, notesOnFile(work?.lines ?? [], notesHere.current, src)), [product, onOpenDoc, work?.lines]);
   const open = useCallback((src?: string) => {
     if (!src || !product) return;
     // Beside the chat a teammate's copy is read-only, so a document or table opens big, where it is edited live.
     const goes = opensBigInAGroup(src) ? 'full' : whereAFileOpens(src);
     if (goes === 'full') setBig({ path: src, at: Date.now() });
-    else if (goes === 'beside' || docKind(src)) onOpenDoc(product, src);
+    else if (goes === 'beside' || docKind(src)) beside(src);
     else void api.openArtifactExternally({ product, src }).then((r) => { if (!r.ok) onNotice(r.error ?? `${src} could not be opened.`); });
-  }, [product, onOpenDoc, onNotice]);
+  }, [product, beside, onNotice]);
   const md = useMemo(() => {
     const roots = dir ? [dir] : [];
     const components = {
@@ -96,9 +101,34 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   const events = built.events.filter((e: AgentEvent) => e.kind !== 'work' && e.kind !== 'run');
 
   // Their copy publishes its marks with its messages; everyone's come together here.
-  const marks = useMemo(() => marksOf((work?.lines ?? [])
+  const own = useMemo(() => marksOf((work?.lines ?? [])
     .filter((l) => l.patch?.artifact)
     .map((l) => ({ ...(l.patch!.artifact as object), by: l.by ?? null, ts: l.ts, uid: l.uid ?? null }))) as FileMarks, [work?.lines]);
+  // The file in Files these copies belong to: what was said on its other copies, and its version numbers.
+  const copies = useMemo(() => {
+    const lines = work?.lines ?? [];
+    return threadFiles([...filesInLines(lines), ...otherFilesInLines(lines)]).flatMap((f) => f.versions.map((v) => ({ path: v.path, file: v.id })));
+  }, [work?.lines]);
+  const copiesKey = JSON.stringify(copies);
+  const [elsewhere, setElsewhere] = useState<FileElsewhere[]>([]);
+  const [line, setLine] = useState<FileLine[]>([]);
+  useEffect(() => {
+    if (!product) return undefined;
+    let live = true;
+    const read = () => {
+      if (copies.length) void api.fileElsewhere({ product, id: threadId, copies }).then((all) => { if (live) setElsewhere(all); });
+      void api.fileLine({ product, id: threadId }).then((all) => { if (live) setLine(all); });
+    };
+    read();
+    // A burst of changes asks once.
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const off = api.onChanged(() => { if (timer) clearTimeout(timer); timer = setTimeout(read, 1000); });
+    return () => { live = false; if (timer) clearTimeout(timer); off?.(); };
+  }, [product, threadId, copiesKey]);
+  const marks = useMemo(() => withElsewhere(own, elsewhere), [own, elsewhere]);
+  notesHere.current = marks.notes;
+  const numbered = useMemo(() => lineAsThread(line), [line]);
+  const viewLines = useMemo(() => (numbered.lines.length ? [...(work?.lines ?? []), ...numbered.lines as LedgerLine[]] : work?.lines ?? []), [work?.lines, numbered]);
   const [big, setBig] = useState<ArtifactOpen | null>(null);
   useEffect(() => { setBig(openAt ? { ...openAt, at: Date.now() } : null); }, [openAt, personId, threadId]);
   const people = useMemo(() => (team ? [...team.byId.values()].filter((p) => !card.people?.length || card.people.includes(p.id) || p.id === personId) : []), [team, card.people, personId]);
@@ -126,9 +156,11 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   return (
     <div className="tp-page">
       {big && product && (
-        <ArtifactView product={product} project={card.project ?? null} draftsAcross={`teammate:${personId}:${threadId}`} lines={work?.lines ?? []} marks={marks}
+        <ArtifactView product={product} project={card.project ?? null} draftsAcross={`teammate:${personId}:${threadId}`} lines={viewLines} numbers={numbered.numbers} marks={marks}
           me={team?.me ?? null} people={people} open={big} ownerOfRow={personId}
           write={async (mark) => {
+            const key = markGoesTo(mark, elsewhere);
+            if (key) return api.filesPlaceMark({ key, mark });
             const out = await api.teamMarkFile({ personId, threadId, mark });
             setReread((n) => n + 1);
             return { ok: !!out?.ok, error: out?.error };
@@ -140,7 +172,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
             return out?.ok ? null : out?.error ?? 'That did not save.';
           }}
           editGoes={`Sent to ${owner}.`}
-          onBeside={(path) => { setBig(null); onOpenDoc(product, path); }}
+          onBeside={(path) => { setBig(null); beside(path); }}
           onClose={() => setBig(null)} />
       )}
       <div className="tp-bar">
@@ -182,7 +214,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
               <Face person={team?.me ? team.byId.get(team.me) : null} me />
               <textarea value={draft} rows={2} placeholder={`Comment to ${owner}`} aria-label={`Comment to ${owner}`}
                 onChange={(e) => setDraft(e.target.value)} onKeyDown={onKey} />
-              <button type="submit" disabled={!draft.trim() || sending}>Comment</button>
+              <button type="submit" disabled={!draft.trim() || sending}>Send to {owner}</button>
             </div>
           </form>
         </section>

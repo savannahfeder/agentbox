@@ -4,7 +4,7 @@
 import type { Engine } from '../../shared/engines.mts';
 import type { AgentVoice } from '../../shared/agent-voice.mts';
 import type { CarryState } from '../../shared/carried-files.mts';
-import type { FileLinkAsk, FileLinkState, LinkComment, PublicLink } from './api';
+import type { FileLinkAsk, FileLinkState, LinkAccess, LinkCan, LinkComment, LinkPerson, PublicLink } from './api';
 import type { LedgerLine } from './thread-history';
 import type { AgentFile } from './onboarding';
 import type { AgentFolder, SessionThread } from './agent-import-card';
@@ -12,6 +12,9 @@ import type { TryAgainOutcome } from './try-again';
 import type { EngineSetupState } from './plan-setup';
 
 export type { AgentVoice };
+
+/** A comment on a thread's shared link, waiting for its owner (shared/work-items.mts `linkComments`). */
+export interface LinkCommentWaiting { name: string; file: string; text: string; ts: number; place?: NotePlace }
 
 export interface WorkItem {
   id: string;
@@ -73,6 +76,8 @@ export interface WorkItem {
   snoozedUntil?: number;
   /** Teammates' comments its owner has not yet dealt with (shared/work-items.mts). */
   waitingComments?: { by: string; ts: number; text: string }[];
+  /** Comments on its shared links its owner has not yet dealt with (shared/work-items.mts). */
+  linkComments?: LinkCommentWaiting[];
   /** Comments and approvals on this thread's files. */
   artifacts?: FileMarks;
   // Whether this has been started at all (w-afb66e6661). 'later' is a thread
@@ -113,7 +118,7 @@ export interface WorkItem {
   due?: string;
   people?: string[];
   /** Sent to Auto: who it went to and why, or the two it asks her to pick from (shared/auto-route.mts). */
-  routed?: { to?: string; ask?: string[]; why: string; at: number; by: 'auto' | 'you' };
+  routed?: { to?: string; ask?: string[]; why: string; at: number; by: 'auto' | 'you'; offer?: { role: string; why: string; gains?: string[]; answered?: 'made' | 'no' } };
   // THE THREAD'S OWN FIELDS (approved 2026-10-01, shared/work-items.mts).
   // `visibility` absent reads as 'team'. The summary is shared: the agent keeps
   // it current and the person can edit it, and the later write wins.
@@ -399,6 +404,22 @@ type LedgerLineShape = { ts: number; by?: string | null; source?: string; patch?
 /** What a comment or approval in the thread links to. */
 export interface FileMarkLink { kind: 'note' | 'approved' | 'edited'; file: string; id?: string; place?: string; /** The file's one name and version, for the words. */ shown?: string; /** A comment still waiting for Send. */ unsent?: true }
 
+/** A comment on a thread, or a note on one of its files (main/team/thread-share.mts `talk`), for the person's page. */
+export interface ThreadTalk {
+  id: string;
+  kind: 'comment' | 'note';
+  owner: string;
+  threadId: string;
+  by: string;
+  text: string;
+  at: number;
+  /** A note's file version, and the note it opens at (a reply's is the note it answers). */
+  file?: string;
+  note?: string;
+  /** Whom a note or reply is for: the file's owner, whom it names, the writer of the note it answers. A comment is for the thread's owner. */
+  to?: string[];
+}
+
 /** A note naming you on a teammate's shared thread: a row in Needs you. */
 export interface SharedFileNews {
   owner: string;
@@ -518,6 +539,7 @@ export interface TeamState {
   teamMates?: TeamMate[];
   /** Notes on teammates' threads that name you and wait on you. */
   sharedFileNews?: SharedFileNews[];
+  threadTalk?: ThreadTalk[];
   /** When each person last opened a conversation, by `${product}/${id}` then person. */
   seen?: Record<string, Record<string, number>>;
   lastSyncAt: number | null;
@@ -881,10 +903,10 @@ export interface CloudPlan {
   usedSeconds?: number;
   /** With no plan: the free hours, spent or not. */
   free?: { agents: number; hours: number; usedSeconds: number };
-  /** The team's shared hours: a trial until `endsAt`, or `seats` paid for. */
-  /** Hours and agents are this person's own; `people` is every member's own use (names come from the team). */
+  /** The team's hours: a trial until `endsAt`, or `seats` paid for; `seats` in a trial means the card is in and not yet charged. */
+  /** Hours are this person's own, with no limit at once; `people` is every member's own use (names come from the team). */
   team?: {
-    trial: boolean; endsAt: number | null; seats: number; members: number; owner: boolean; agents: number; running: number; hours: number; usedSeconds: number;
+    trial: boolean; endsAt: number | null; seats: number; members: number; owner: boolean; agents?: null; running: number; hours: number; usedSeconds: number;
     people?: { id: string; usedSeconds: number; running: number; name?: string }[];
   };
   /** Who bills the plan: Stripe, or nobody because it was set by hand. Absent from older servers. */
@@ -1285,7 +1307,7 @@ export interface Snapshot {
   team?: TeamState | null;
   teammates?: TeammatesView | null;
   /** Which alpha features are switched on (Settings, Alpha features). */
-  alpha?: { rooms: boolean; teammates?: boolean; multiplayer?: boolean };
+  alpha?: { rooms: boolean; teammates?: boolean; multiplayer?: boolean; glass?: boolean };
   agents?: AgentSession[];
   approvals?: Approval[];
   supervisor: SupervisorStatus;
@@ -1600,7 +1622,7 @@ export interface WorkspaceSettings {
   // New Claude Code and Codex chats come in on their own (w-62228098e6).
   importNew?: boolean;
   // Settings, Alpha features (w-3d0fa23ffb).
-  alpha?: { rooms: boolean; teammates?: boolean; multiplayer?: boolean };
+  alpha?: { rooms: boolean; teammates?: boolean; multiplayer?: boolean; glass?: boolean };
   // The corner tag over other apps (w-dafae58a23). On unless she turned it off.
   cornerTag?: boolean;
   outsideAgents: AgentMode;
@@ -1721,6 +1743,7 @@ declare global {
       olderItems?(p: { offset: number; limit: number }): Promise<{ items: WorkItem[]; more: boolean }>;
       crash?(p: { name: string; message: string; stack: string }): Promise<unknown>;
       draftCopy?: { read(): string | null; write(text: string): void };
+      glassTone?(p: { tone: 'light' | 'dark' | 'system' }): Promise<unknown>;
       blankCheck?(p: { thread: string; facts: Record<string, unknown>; lateMs: number; longTaskMs: number }): Promise<string | null>;
       // A count. The name is checked against the approved list in the main
       // process, which attaches everything else; nothing from this side rides along.
@@ -1742,11 +1765,12 @@ declare global {
       setProductOrder(p: { order: string[] }): Promise<unknown>;
       setThreadPlaces(p: { places: Record<string, number | null> }): Promise<unknown>;
       setThreadPins?(p: { pins: Record<string, true | null> }): Promise<unknown>;
-      setThreadOnMac?(p: { onMac: Record<string, true | null> }): Promise<unknown>;
+      setThreadOnMac?(p: { onMac: Record<string, boolean | null> }): Promise<unknown>;
       moveToCloud?(p: { ids: string[]; product?: string; id?: string }): Promise<{ moving?: number; ok?: boolean }>;
       setProductHidden(p: { product: string; hidden: boolean }): Promise<unknown>;
       compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; onMac?: boolean }): Promise<WorkItem>;
       routeThread?(p: { product: string; id: string; to: string }): Promise<{ ok: true }>;
+      answerRouteOffer?(p: { product: string; id: string; make: boolean }): Promise<{ ok: true; made: string | null }>;
       // Feedback to the Agentbox team (main/feedback.mts). Optional: an older
       // main process under a newer window has no such door.
       sendFeedback?(p: { text: string; files: { name: string; type: string; size: number; data: string }[] }): Promise<{ ok: boolean; error?: string }>;
@@ -1793,8 +1817,8 @@ declare global {
       filesPlaceTrash?(p: { keys: string[]; older?: boolean }): Promise<FilesTrashed>;
       filesPlaceUntrash?(p: { token: string }): Promise<{ ok: boolean; back?: number; error?: string }>;
       filesCloud?(): Promise<FilesCloudStatus>;
-      fileElsewhere?(p: { product: string; id: string; copies: { path: string; file: string }[] }): Promise<FileElsewhere[]>;
-      fileLine?(p: { product: string; id: string }): Promise<FileLine[]>;
+      fileElsewhere?(p: { product: string; id: string; room?: string; copies: { path: string; file: string }[] }): Promise<FileElsewhere[]>;
+      fileLine?(p: { product: string; id: string; room?: string }): Promise<FileLine[]>;
       teamComment(p: { personId: string; threadId: string; text: string }): Promise<TeamCallResult>;
       teamContinueBrief(p: { personId: string; threadId: string }): Promise<{ title: string; body: string; files: { name: string; srcPath: string }[]; from: { personId: string; threadId: string } }>;
       teamContinued(p: { personId: string; threadId: string }): Promise<TeamCallResult>;
@@ -1945,7 +1969,10 @@ declare global {
       fileLinkStop?(p: { token: string }): Promise<{ ok: boolean; error?: string }>;
       fileLinks?(): Promise<{ ok: boolean; error?: string; links?: PublicLink[] }>;
       fileLinkComments?(p: { token: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
-      fileLinkComment?(p: { token: string; text: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
+      fileLinkComment?(p: { token: string; text: string; place?: NotePlace | null }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
+      fileLinkAccess?(p: { token: string; access: LinkAccess; can: LinkCan }): Promise<{ ok: boolean; error?: string }>;
+      fileLinkPeople?(p: { token: string }): Promise<{ ok: boolean; error?: string; people?: LinkPerson[] }>;
+      fileLinkPerson?(p: { token: string; email: string; can: LinkCan | null }): Promise<{ ok: boolean; error?: string; people?: LinkPerson[] }>;
       bringSharedFile?(p: { link: string; product: string | null }): Promise<{ ok: boolean; error?: string; product?: string; id?: string; src?: string }>;
       takeSharedFile?(): Promise<string | null>;
       onSharedFile?(fn: () => void): () => void;
@@ -1979,10 +2006,11 @@ declare global {
       searchAgentThreads?(p: { again?: boolean }): Promise<{ threads?: SessionThread[]; reached?: number }>;
       importThreads?(p: { product: string; threads: string[]; land?: 'sorted' | 'inbox' }): Promise<{ added?: number; already?: number; done?: number }>;
       firstRunExamples?(p: { product: string }): Promise<{ ids: string[] }>;
-      firstRunPractice?(): Promise<{ slug: string; examples: string[]; backdrop?: string[] }>;
+      firstRunPractice?(opts?: { bare?: boolean }): Promise<{ slug: string; examples: string[]; backdrop?: string[] }>;
       firstRunPracticeEnd?(): Promise<unknown>;
       onboardingArm?(): Promise<unknown>;
       notifyTest?(): Promise<unknown>;
+      notifySettings?(): Promise<unknown>;
       cloudSignIn?(p: { action: 'start' | 'code' | 'cancel' | 'remove'; engine: 'claude' | 'codex'; key?: string | null; code?: string }): Promise<{ ok: boolean; key?: string | null; error?: string }>;
       cloudSendFile?(p: { product: string; id: string; path?: string; choose?: boolean; hold?: boolean; also?: string }): Promise<{ ok: boolean; path?: string; canceled?: boolean; held?: boolean; words?: string; error?: string }>;
       cloudFileInfo?(p: { path: string }): Promise<{ ok: boolean; size?: number; error?: string }>;

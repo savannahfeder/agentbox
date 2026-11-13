@@ -25,7 +25,7 @@ import { forgetVoiceDraft, markVoiceSent, sendTurnedBack, type VoiceControl } fr
 import { createPortal } from 'react-dom';
 import { FileSheet } from '../../components/FileSheet';
 import { FileCover } from '../../components/FileCover';
-import { opensBigInAGroup, reviewKind, shownName } from '../../../../shared/artifact-marks.mts';
+import { reviewKind, shownName } from '../../../../shared/artifact-marks.mts';
 import { RoomFileView, type RoomFileOpening, type RoomFiles } from './RoomFileView';
 import { AttachRow } from '../../components/AttachRow';
 import { ChatLink } from '../../threads/ContinuedFrom';
@@ -39,9 +39,14 @@ import { LINE_MISSING } from '../../reveal-line';
 import { Face } from '../people';
 import { cardName, chatWidth, mentionsIn, readChatWidth, writeChatWidth } from './room-rules';
 import { clockOf } from '../../teammates/chat-lines';
-import { drawnRoots, holdsRead, mentionMarkdown, myNewest, newLineAt, quickOnBar, roomReader, storedName, wordsLeftAfterSend } from './room-chat-rules';
+import { attachedName, drawnRoots, holdsRead, madeOnce, mentionMarkdown, myNewest, newLineAt, opensInTheReview, quickOnBar, roomReader, storedName, wordsLeftAfterSend } from './room-chat-rules';
 
 export type ChatPerson = { id: string; name: string; avatarUrl: string | null; me: boolean };
+
+export type ChatWhere = { label: string; onOpen: () => void };
+export type ChatAlongRow = { key: string; at: number; by: string; text: string; where: ChatWhere };
+/** What a person's page draws among the messages: tasks, replies on them, comments, file notes. `on` is a message's own place. */
+export type ChatAlong = { rows: readonly ChatAlongRow[]; on: ReadonlyMap<string, ChatWhere> };
 
 /** What a room's chat asks of the rooms around it. Each answers null, or why it did not happen. */
 export type RoomChatCalls = {
@@ -58,7 +63,7 @@ export type RoomChatCalls = {
   onPutFileFrom?: (name: string, srcPath: string) => Promise<string | null>;
   /** Files going up in parts: `${roomId}/${name}` -> parts sent of how many. */
   sending?: Record<string, { done: number; total: number }>;
-  /** What opens a picture, film, PDF, deck or document big, with its comments. */
+  /** What opens a file big, with its comments. */
   files?: RoomFiles;
   /** A file a Needs you row asked to open. */
   openingFile?: RoomFileOpening | null;
@@ -71,7 +76,7 @@ export type RoomChatCalls = {
   onDecide?: (messageId: string, kind: 'decision' | 'priority', on: boolean) => void;
 };
 
-export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand, onSwitch, switchOpen, full = false, head, hang = false, ...calls }: {
+export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand, onSwitch, switchOpen, full = false, head, hang = false, along, ...calls }: {
   room: Room; messages: RoomMessage[]; people: ChatPerson[]; meId: string | null; now: number;
   onInvite?: () => void; onExpand?: () => void;
   onSwitch?: (anchor: DOMRect) => void; switchOpen?: boolean;
@@ -79,12 +84,13 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
   full?: boolean; head?: ReactNode;
   /** Faces at 32, hung beside the words, as a chat that is the whole page draws them. */
   hang?: boolean;
+  along?: ChatAlong;
 } & RoomChatCalls) {
   const { onSend, onRead, onReact, onEdit, onDelete, onMarkUnread, onNotice, marks, onDecide } = calls;
   const [thread, setThread] = useState<string | null>(null);
   const [viewing, setViewing] = useState<RoomFileOpening | null>(null);
   const opensBig = useCallback((name: string) => {
-    if (!calls.files || !opensBigInAGroup(name)) return false;
+    if (!calls.files || !opensInTheReview(name)) return false;
     setViewing({ name, at: Date.now() });
     return true;
   }, [!!calls.files]);
@@ -186,7 +192,11 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
   const who = (id: string | null) => (id ? byId.get(id) : undefined);
   const nameOf = (id: string | null) => { const p = who(id); return p ? cardName(p) : 'Someone'; };
   const listRef = useStick([room.id, thread]);
-  const slots = chatLayout(shown.map((m) => ({ at: m.at, by: m.by ?? '' })), now);
+  type Drawn = { m: RoomMessage; a?: undefined } | { a: ChatAlongRow; m?: undefined };
+  const asMessages = shown.map((m): Drawn => ({ m }));
+  const drawn: Drawn[] = root || !along?.rows.length ? asMessages
+    : [...asMessages, ...along.rows.map((a): Drawn => ({ a }))].sort((x, y) => (x.m ?? x.a).at - (y.m ?? y.a).at);
+  const slots = chatLayout(drawn.map((d) => ({ at: (d.m ?? d.a).at, by: d.m ? d.m.by ?? '' : d.a.by })), now);
   const myNames = useMemo(() => {
     const name = people.find((p) => p.me)?.name;
     if (!name) return [];
@@ -217,8 +227,24 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
       {onExpand && <button type="button" className="ic" title="Open full page" aria-label="Open full page" onClick={onExpand}>{I.expand()}</button>}
     </div>}
     <div className="rm-chat-list" ref={listRef}><div className="rm-chat-msgs">
-      {shown.map((m, i) => {
+      {drawn.map((d, i) => {
         const slot = slots[i];
+        if (d.a) {
+          const a = d.a, p = who(a.by);
+          return <div key={a.key} data-along={a.key}>
+            {slot.day && <div className="rm-day"><span className="rm-label">{slot.day}</span></div>}
+            <div className={`rm-cm rm-along${slot.head ? '' : ' cont'}`}>
+              {slot.head && <div className="h">
+                <Face name={p?.name ?? '?'} url={p?.avatarUrl} size={hang ? 32 : 16} />
+                <span>{nameOf(a.by)}</span><em>{clockOf(a.at)}</em>
+              </div>}
+              <div className="tx">{a.text}</div>
+              <button type="button" className="rm-there" onClick={a.where.onOpen}>{a.where.label}</button>
+            </div>
+          </div>;
+        }
+        const m = d.m;
+        const where = root ? undefined : along?.on.get(m.id);
         const mine = m.by === meId;
         const reps = !root ? replies.get(m.id) ?? [] : [];
         const p = who(m.by);
@@ -244,6 +270,7 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
               : m.deleted
                 ? <div className="tx rm-gone">This message was deleted.</div>
                 : <div className="tx">{body(m)}</div>}
+            {where && !m.deleted && <button type="button" className="rm-there" onClick={where.onOpen}>{where.label}</button>}
             {!headed && m.editedAt && !m.deleted && editing !== m.id && <em className="rm-edited">edited</em>}
             {!m.deleted && marks?.get(m.id) && <em className="rm-decided">{marks.get(m.id)?.priority ? 'This week’s priorities' : 'Decision'}</em>}
             {!m.deleted && onReact && <Reactions on={m.reactions} me={meId} nameOf={(id) => who(id)?.name} onReact={(emoji, off) => onReact(m.id, emoji, !off)} />}
@@ -330,7 +357,6 @@ function RoomFile({ name, shown, load, opensBig, film = false, children }: { nam
 /** A room message as markdown: @names marked, voice notes and pictures drawn, other files named. */
 const MARKDOWN_PLUGINS = [remarkGfm];
 const NOBODY: readonly string[] = [];
-const storedIn = (href: string) => /^attachments\/([A-Za-z0-9][\w.-]{0,159})$/.exec(href)?.[1] ?? null;
 
 function RoomMarkdown({ text, names, loadFile, findFile, opensBig, roomId, mine, me }: {
   text: string; names: string[]; roomId: string; mine: boolean; loadFile?: (name: string) => Promise<Blob | null>;
@@ -358,7 +384,7 @@ function RoomMarkdown({ text, names, loadFile, findFile, opensBig, roomId, mine,
         if (href === '#mention-me') return <b className="rm-at me">{children}</b>;
         const connection = connectionLinkOf(href);
         if (connection) return <ConnectionLink id={connection.id}>{children}</ConnectionLink>;
-        const name = href ? storedIn(href) : null;
+        const name = href ? attachedName(href) : null;
         const note = name ? voiceNoteOf(name) : null;
         if (name && note) return <VoiceNote id={`room:${roomId}:${name}`} ms={note.ms} mine={mine} load={() => fetchFile(name)} />;
         const shown = typeof children === 'string' ? children : (Array.isArray(children) ? children.join('') : name ?? '');
@@ -367,7 +393,7 @@ function RoomMarkdown({ text, names, loadFile, findFile, opensBig, roomId, mine,
         return <ChatLink href={href}>{children}</ChatLink>;
       },
       img: ({ src, alt }: { src?: string; alt?: string }) => {
-        const name = src ? storedIn(src) : null;
+        const name = src ? attachedName(src) : null;
         return name ? <RoomPicture roomId={roomId} name={name} alt={alt ?? ''} loadFile={fetchFile} opensBig={openBig} /> : null;
       },
     };
@@ -416,6 +442,26 @@ function sendingWords(sending: Record<string, { done: number; total: number }> |
 
 // A file in the box is given the name it will be stored under once, here.
 const staged = (a: PendingAttachment): PendingAttachment => (a.storedAs ? a : { ...a, storedAs: storedName(a.name) });
+
+/** The chat's own box before there is a chat with this person; the first thing it sends makes the chat. */
+export function FirstChatBox({ person, placeholder, open, send, putFile, putFileFrom, sending, onNotice }: {
+  person: ChatPerson; placeholder: string;
+  /** The chat's id, made if there is none; throws with why it could not be. */
+  open: () => Promise<string>;
+  send: (roomId: string, body: string, mentions: string[]) => Promise<string | null>;
+  putFile: (roomId: string, name: string, dataBase64: string) => Promise<string | null>;
+  putFileFrom: (roomId: string, name: string, srcPath: string) => Promise<string | null>;
+  sending?: Record<string, { done: number; total: number }>;
+  onNotice?: (text: string) => void;
+}) {
+  const room = useRef(madeOnce(open)).current;
+  const people = [person];
+  return <Composer roomId={`with:${person.id}`} threadId={null} takesTyping placeholder={placeholder} people={people}
+    sending={sending} onNotice={onNotice} onEditLast={() => {}}
+    onSend={async (body) => send(await room(), body, mentionsIn(body, people))}
+    onPutFile={async (name, data) => putFile(await room(), name, data)}
+    onPutFileFrom={async (name, srcPath) => putFileFrom(await room(), name, srcPath)} />;
+}
 
 function Composer({ roomId, threadId, takesTyping = false, placeholder, people, onSend, onPutFile, onPutFileFrom, sending, onNotice, onEditLast }: {
   roomId: string; threadId: string | null; takesTyping?: boolean; placeholder: string; people: ChatPerson[];
