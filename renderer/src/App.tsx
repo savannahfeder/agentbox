@@ -107,7 +107,7 @@ import { keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
 import { modelCommands } from './thread-model-commands';
 import { MOVE_KEYWORDS, whyItCannotMove } from '../../shared/move-thread.mts';
 import { isUrgentRow, urgentArrival, urgentRaised, urgentShown, type UrgentRaised } from './urgent-arrival';
-import { UrgentReady, type UrgentLook } from './components/UrgentReady';
+import { UrgentReady } from './components/UrgentReady';
 import { leavePlace, placeKey, placeToReturnTo } from './thread-place';
 import { DONE, manyOrOne } from './done-word';
 import { listedNow, type OpensWhenListed } from './opens-when-listed';
@@ -311,7 +311,6 @@ const TOAST_TITLE = 48;
 // How long a toast that goes somewhere stays up, and so how long its orange
 // timer runs. One number for both, or the line and the card disagree.
 const TOAST_GOES_MS = 6000;
-const URGENT_LOOK = (new URLSearchParams(location.search).get('urgentlook') ?? 'a') as UrgentLook;
 
 /**
  * How long a message she sent to a running agent is held after the row has
@@ -9577,7 +9576,7 @@ export default function App() {
         }} />
       )}
       {urgentShownRow && cornerHeaderTarget && createPortal(
-        <UrgentReady row={urgentShownRow} look={URGENT_LOOK} onOpen={openUrgentReady} />,
+        <UrgentReady row={urgentShownRow} onOpen={openUrgentReady} />,
         cornerHeaderTarget,
       )}
       {toast && (() => {

@@ -127,6 +127,22 @@ describe('the mark in the top bar', () => {
   it('has no timer and is not the routine note', () => {
     expect(html).not.toContain('toast');
   });
+
+  // "i like this but it does not indicate that it's urgent": the word goes
+  // before the name, in the accent.
+  it('says Urgent before the title', () => {
+    expect(html.indexOf('>Urgent<')).toBeGreaterThan(-1);
+    expect(html.indexOf('>Urgent<')).toBeLessThan(html.indexOf('Sign-in is down'));
+    expect(read('renderer/src/styles.css')).toMatch(/\.ur-word \{[^}]*color: var\(--chip-ask\)/);
+  });
+
+  // "no need for the hover to see more info. not needed anymore now that you
+  // have the title". And only the approved look ships, with no switch.
+  it('has no hover card and only the approved look', () => {
+    expect(html).not.toContain('tooltip');
+    expect(read('renderer/src/styles.css')).not.toMatch(/\.ur-(card|bell|[a-g])\b/);
+    expect(read('renderer/src/App.tsx')).not.toContain('urgentlook');
+  });
 });
 
 describe('the takeover is gone', () => {
