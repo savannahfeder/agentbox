@@ -231,7 +231,7 @@ import { ProjectShare, ProjectWho } from './team/ProjectShare';
 import { ConnectComputer, EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, ItemsContext, LiveContext, CloudContext, SavedKeysContext, MoveToCloudContext, CloudOfferContext, FreeAgentContext, StateTabs, TryAgainContext, WaitingContext } from './threads/Pages';
 import { offersTryAgain, tryAgainWords } from './try-again';
 import { cloudOffer, type OfferGo } from './cloud-upgrade';
-import { FleetContext, queuedWithHeld, type Fleet } from './fleet';
+import { FleetContext, queuedWithHeld, stoppedIds, type Fleet } from './fleet';
 import { factsFor } from './status-word';
 import { isCarrying } from './threads/row-drag';
 import { TeammateThread } from './threads/TeammateThread';
@@ -2279,7 +2279,8 @@ export default function App() {
     silent: snap?.supervisor.silent, paused: snap?.supervisor.paused,
     asking: [...askingIds],
     whyNotCloud: snap?.supervisor.whyNotCloud,
-  }), [runningRows, snap?.supervisor, heldAnswer, pendingIds, askingIds]);
+    signInBar: !!planWords,
+  }), [runningRows, snap?.supervisor, heldAnswer, pendingIds, askingIds, planWords]);
   const savedCloudKeyList = snap?.cloud?.setUp ? snap.cloud.keys : null;
   const savedCloudKeys = useMemo(() => (savedCloudKeyList ?? []).map((k) => k.name), [savedCloudKeyList]);
   const cloudIds = useMemo(() => new Set(runningRows.filter((r) => r.where === 'cloud').map((r) => r.itemId)), [runningRows]);
@@ -2288,7 +2289,7 @@ export default function App() {
   // they have shipped or gone back to their agent.
   const shippingIds = useMemo(() => new Set(snap?.supervisor.shipping ?? []), [snap?.supervisor.shipping]);
   // The threads nothing will start again on its own: Needs you, not In progress.
-  const stalledIds = useMemo(() => new Set(snap?.supervisor.stalled ?? []), [snap?.supervisor.stalled]);
+  const stalledIds = useMemo(() => stoppedIds(snap?.supervisor ?? {}), [snap?.supervisor]);
   // AND THE THREADS A THREAD IS WAITING ON (w-5244c90c33). A waiting thread is
   // in Later and resumes by itself when they finish; only the window can see
   // the other rows, so it works this out and hands it to each list.
@@ -4832,7 +4833,7 @@ export default function App() {
   const openedFromHome = useRef(new Set<string>());
   // Whether a reply from inside this thread moves her on to the next (./advance).
   const movesOn = useCallback((item: WorkItem) => replyMovesOn({
-    view, onBoard, index: shownInbox.findIndex((i) => i.id === item.id), searching: search !== null, phone: onPhone(),
+    view, onBoard, index: shownInbox.findIndex((i) => i.id === item.id), searching: search !== null,
     cameBack: openedWithO.current.has(keyOf(item)), fromHome: openedFromHome.current.has(keyOf(item)),
   }), [view, onBoard, shownInbox, search]);
 
@@ -8495,7 +8496,7 @@ export default function App() {
                      another task belongs in that task's conversation. */
                   sending={sendingOn(focused)}
                   // Auto asking her who takes it is stalled for the list, not a dead agent.
-                  stalled={(snap.supervisor.stalled?.includes(focused.id) ?? false) && !asksWho(focused)}
+                  stalled={(snap.supervisor.stalled?.includes(focused.id) ?? false) && !asksWho(focused) && !snap.supervisor.signInNeeded?.[focused.id]}
                   onRedeliver={() => redeliver(focused)}
                   onTryAgain={() => void tryAgain(focused)}
                   onClose={closeThreadOntoItsTab}
