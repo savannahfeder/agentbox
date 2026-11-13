@@ -479,7 +479,8 @@ try {
   // "when someone on your team gets stuck": her thread lands in your inbox, with her note
   await at(A.stuck - 1.9); await page.evaluate((note) => { const s = window.__DEMO__.state; const m = window.__mayaHeld; if (m) { const t = Date.now(); m.createdAt = t - 3 * 60_000; m.updatedAt = t; m.waitingComments = [{ by: 'maya', ts: t, text: note }]; for (const k of Object.keys(m.wrote)) m.wrote[k].ts = k === 'title' || k === 'body' ? t - 3 * 60_000 : t; s.items.push(m); window.__demoNotify(); } }, MAYA.comment);
   await at(A.stuck - 1.2); await go('open Needs you', '^Needs you\\s*\\d+$', main);
-  await sleep(300); if (!(await rectOf('^Maya commented', main))) fail("Maya's comment is not on her row");
+  // The row shows her comment after her title ("Maya commented: ..." before November 2026).
+  await sleep(300); if (!(await rectOf(`^(Maya commented: )?${esc(MAYA.comment)}$`, main))) fail("Maya's comment is not on her row");
   await at(A.open_their - 1.1); await go("open Maya's thread", R.maya, main);
   await sleep(260); await key('r'); await sleep(120);
   const typing = await page.evaluate(() => document.activeElement instanceof HTMLTextAreaElement) || await press('^Reply', main);

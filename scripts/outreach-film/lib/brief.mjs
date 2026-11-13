@@ -223,6 +223,12 @@ export function checkBrief(b, site, headlinesReport = null) {
   const theirs = norm(site?.hero?.text).replace(/[.]$/, '');
   b.headlines.lines.forEach((h, i) => { if (theirs && norm(h).replace(/[.]$/, '') === theirs) say(`headlines.lines[${i}]`, 'is their current headline; write a new one'); });
   if (new Set(b.headlines.lines.map(norm)).size !== 3) say('headlines.lines', 'two headlines are the same');
-  if (headlinesReport) headlinesReport.headlines.forEach((h, i) => { if (!h.fits) say(`headlines.lines[${i}]`, `runs to ${h.lines} lines on their page where theirs takes ${h.theirLines}; make it shorter`); });
+  const theirs2 = headlinesReport?.theirs ? ` ("${headlinesReport.theirs.replace(/\s+/g, ' ').trim()}", ${headlinesReport.theirs.replace(/\s+/g, ' ').trim().length} characters)` : '';
+  if (headlinesReport) headlinesReport.headlines.forEach((h, i) => {
+    if (h.fits) return;
+    if (h.why === 'wide') say(`headlines.lines[${i}]`, `is wider than the space their own headline${theirs2} has on their page; use fewer or shorter words`);
+    else if (h.why === 'tall') say(`headlines.lines[${i}]`, `pushes past the bottom of their hero on their page; use fewer words`);
+    else say(`headlines.lines[${i}]`, `runs to ${h.lines} lines on their page where theirs takes ${h.theirLines}; use fewer words`);
+  });
   return bad;
 }

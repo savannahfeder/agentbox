@@ -90,7 +90,9 @@ for (const [i, text] of heads.entries()) {
   const f = `${out}.${i + 1}.png`;
   await page.screenshot({ path: f, clip });
   files.push(f);
-  report.push({ text, lines: got.lines, theirLines: before.lines, fits: got.lines <= Math.max(2, before.lines) && got.bottom <= clip.y + clip.height && !got.over && got.left >= clip.x + 16 && got.right <= clip.x + clip.width - 16 && got.right - got.left <= 1440 });
+  const why = got.lines > Math.max(2, before.lines) ? 'lines' : got.bottom > clip.y + clip.height ? 'tall'
+    : got.over || got.left < clip.x + 16 || got.right > clip.x + clip.width - 16 || got.right - got.left > 1440 ? 'wide' : null;
+  report.push({ text, lines: got.lines, theirLines: before.lines, theirChars: before.text.replace(/\s+/g, ' ').trim().length, fits: !why, why });
 }
 await b.close();
 // The three side by side, numbered, as the thread's picture.
