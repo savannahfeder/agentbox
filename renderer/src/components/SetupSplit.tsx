@@ -317,6 +317,10 @@ export function SetupSplit(p: SetupSplitProps) {
     head = [PRO_PITCH.head, ''];
     body = <>
       <div className="ss-perks">{PRO_PITCH.perks.map((k) => <div key={k.id} className="ss-perk"><span className="ss-perk-icon">{PERK_ICONS[k.id]}</span>{k.title}</div>)}</div>
+      <div className="ss-pricing">
+        <div><span className="ss-pricing-label">{PRO_PITCH.trial.label}</span><b className="ss-pricing-price">{PRO_PITCH.trial.price}</b><span className="ss-pricing-line">{PRO_PITCH.trial.line}</span></div>
+        <div><span className="ss-pricing-label">{PRO_PITCH.paid.label}</span><b className="ss-pricing-price">{PRO_PITCH.paid.price}<small>{PRO_PITCH.paid.per}</small></b><span className="ss-pricing-line">{PRO_PITCH.paid.line}</span></div>
+      </div>
       {payState === 'waiting' && <p className="ss-note">Finish in your browser. This moves on once Stripe has your card.</p>}
       <div className="ss-acts">{go(payState === 'opening' ? 'Opening Stripe…' : payState === 'waiting' ? 'Open Stripe again' : PRO_PITCH.cta, () => void pay(), payState !== 'opening')}{quiet('Skip for now', next)}</div>
       <p className="ss-price-line">{PRO_PITCH.terms}</p>

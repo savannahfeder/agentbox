@@ -46,11 +46,12 @@ export function advanceAfter(p: { fromTask: boolean; index: number; id: string }
  * (tests/a-reply-keeps-you-on-the-thread-unless-you-are-clearing-your-inbox).
  * A thread you came back to with O is one you are working in, so it keeps you
  * too (tests/a-thread-you-came-back-to-with-o-keeps-you-after-a-reply).
+ * The phone reads this same rule (tests/a-reply-on-the-phone-moves-on-like-the-computer).
  */
-export function replyMovesOn(p: { view: string; onBoard: boolean; index: number; searching?: boolean; phone?: boolean; cameBack?: boolean; fromHome?: boolean }): boolean {
+export function replyMovesOn(p: { view: string; onBoard: boolean; index: number; searching?: boolean; cameBack?: boolean; fromHome?: boolean }): boolean {
   // With search open, the tab under it is not where the work is happening.
   // Home sits on the Inbox view, but a thread picked there is chosen, not cleared.
-  return !p.phone && !p.searching && !p.cameBack && !p.fromHome && advanceLandsHere(p) && p.index >= 0;
+  return !p.searching && !p.cameBack && !p.fromHome && advanceLandsHere(p) && p.index >= 0;
 }
 
 const MORE_COMING = /\?\s*$|\bask me\b|\bI(?:'ll| will) (?:explain|say|tell|describe)\b|\blet me (?:explain|say|describe)\b/i;

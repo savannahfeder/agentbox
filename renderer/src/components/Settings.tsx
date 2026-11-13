@@ -992,7 +992,7 @@ function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite }: { signedIn: 
   };
   // A paying team's owner sees its card, next bill and last invoice, read from Stripe through the cloud.
   const [teamBillingSeen, setTeamBillingSeen] = useState<TeamBillingDetails | null>(null);
-  const readsStripe = !!plan?.team?.owner && !plan.team.trial;
+  const readsStripe = !!plan?.team?.owner && (!plan.team.trial || plan.team.seats > 0);
   useEffect(() => {
     if (!readsStripe) return;
     void api.cloudAccountTeamBilling().then((out) => { if (out.ok && out.owner) setTeamBillingSeen(out as TeamBillingDetails); });
