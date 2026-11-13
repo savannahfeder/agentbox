@@ -214,6 +214,7 @@ export interface RunMarker extends CloudMarker {
   resourceContext?: ResourceContext;
   resources?: ResourceState;
   resourceCapable?: boolean;
+  foldersCapable?: boolean;
   offline?: boolean;
   plain?: boolean;
   cursor?: number;
@@ -331,7 +332,7 @@ const COMMIT_NOTE = 'Your commits on this task\'s branch are sent back to their 
 // its film's files, ffmpeg and a key missing, and asked the person to move the
 // thread (2026-10-16). Kept true to cloud/sandbox/Dockerfile and ./docs.mts.
 const HEADING = '# You are running on a cloud machine, not on the person\'s own computer';
-const HAND_BACK_NOTE = `For a missing installed skill or task file, first use the store tool request_cloud_resource. Request a skill by name, or a file or folder by its path: relative to this task or the product's documents, or any path under the account's documents, other products' folders included, written out in full as the request writes it (\`~/...\` works). It returns a separate scratch path when delivery succeeds; read the skill's SKILL.md there with its references and scripts. A folder answers with its files, which you then ask for. Their own files outside the documents (on their Desktop, in Downloads or Movies, a film, recording or screenshot they made) and anything over 25 MB are only on their computer, unless they attached it to this thread. When the request is for such files, or cannot be done without them, whether it gives their path or only says what they are ("the original launch video", "my screenshots"), that is work that cannot go ahead here: hand it back as below rather than answering in part. For something the work can do without, such as a skill or a reference it would have liked, finish the rest and say exactly what is missing. Something missing does not end the conversation. When they ask a question or for a status, answer it from what you have (this thread, the documents, the code), say in one sentence what you could not recheck from here, and end with the option "Check from my computer". When the missing thing is something they can tell you in a reply, such as a link, a choice, a name or where a file is, ask for it in plain words as your usual final answer with options. Never ask them to type a password, key or sign-in into the thread. When the work itself cannot go ahead without a key, one of their apps, a private repository this machine cannot reach, or a file, folder or skill the request names or needs that request_cloud_resource cannot deliver, stop at once. Do not work around it, do not write to the work item, do not give the person commands to run, and do not offer to move the thread: the app moves it. End your turn with one line and nothing else: ${HAND_BACK} followed by what was missing, in a few words they would use (your AWS sign-in, the iOS simulator), since the app shows those words to them. A person who asks to have this thread moved to their computer, or picks "Check from my computer", is answered with this line as well. That line replaces your usual final answer and its options. The app then runs the same request again on their computer, where all of it is. A program you can install is not a reason to stop. Otherwise work as usual, and never write that line.`;
+const HAND_BACK_NOTE = `For a missing installed skill or task file, first use the store tool request_cloud_resource. Request a skill by name, or a file or folder by its path: relative to this task or the product's documents, or any path under the account's documents, other products' folders included, written out in full as the request writes it (\`~/...\` works). It returns a separate scratch path when delivery succeeds; read the skill's SKILL.md there with its references and scripts. Ask for a folder rather than its files one by one: it comes whole in one request, at the path the answer gives, unless it is too big, when it answers with its files, which you then ask for. Their own files outside the documents (on their Desktop, in Downloads or Movies, a film, recording or screenshot they made) and anything over 25 MB are only on their computer, unless they attached it to this thread. When the request is for such files, or cannot be done without them, whether it gives their path or only says what they are ("the original launch video", "my screenshots"), that is work that cannot go ahead here: hand it back as below rather than answering in part. For something the work can do without, such as a skill or a reference it would have liked, finish the rest and say exactly what is missing. Something missing does not end the conversation. When they ask a question or for a status, answer it from what you have (this thread, the documents, the code), say in one sentence what you could not recheck from here, and end with the option "Check from my computer". When the missing thing is something they can tell you in a reply, such as a link, a choice, a name or where a file is, ask for it in plain words as your usual final answer with options. Never ask them to type a password, key or sign-in into the thread. When the work itself cannot go ahead without a key, one of their apps, a private repository this machine cannot reach, or a file, folder or skill the request names or needs that request_cloud_resource cannot deliver, stop at once. Do not work around it, do not write to the work item, do not give the person commands to run, and do not offer to move the thread: the app moves it. End your turn with one line and nothing else: ${HAND_BACK} followed by what was missing, in a few words they would use (your AWS sign-in, the iOS simulator), since the app shows those words to them. A person who asks to have this thread moved to their computer, or picks "Check from my computer", is answered with this line as well. That line replaces your usual final answer and its options. The app then runs the same request again on their computer, where all of it is. A program you can install is not a reason to stop. Otherwise work as usual, and never write that line.`;
 // With keys (the names of those saved for cloud runs; null when this run's
 // image cannot place them), a missing key is asked for, not handed back.
 const handBackNote = (keys: string[] | null) => (keys
@@ -1083,7 +1084,7 @@ export async function cloudRun({
   if (importOnly && !joining) return 0;
   if (!joining && (!login || login.engine !== engine)) { say(`this ${engine === 'codex' ? 'Codex' : 'Claude'} account has not signed in for the cloud`); return LOGIN_TROUBLE; }
 
-  let runId: string; let sessionId: string; let marker: RunMarker; let docs: RunDocs | null; let sentFiles: Set<string>; let sendFile: SendFile; let resourceCapable = false;
+  let runId: string; let sessionId: string; let marker: RunMarker; let docs: RunDocs | null; let sentFiles: Set<string>; let sendFile: SendFile; let resourceCapable = false; let foldersCapable = false;
   // Files that are a conversation, sent joined to the copy the bucket has.
   const conversations = new Set<string>();
   let mcpConfig: McpConfig = { mcpServers: {} };
@@ -1145,6 +1146,7 @@ export async function cloudRun({
     const { state: _s, pid: _p, at: _a, cursor: c, n: sent, conns, ...kept } = joining;
     marker = kept;
     resourceCapable = !!marker.resourceCapable || !!joinedAt!.caps?.includes('resources');
+    foldersCapable = !!marker.foldersCapable || !!joinedAt!.caps?.includes('folders');
     docs = joining.docs || null;
     // The app's servers as they are now win over the ones the run started
     // with (the approvals key is new at every start); the run's own record
@@ -1457,6 +1459,8 @@ export async function cloudRun({
   offlineOn = (started.caps || []).includes('offline');
   resourceCapable = (started.caps || []).includes('resources');
   marker.resourceCapable = resourceCapable;
+  foldersCapable = (started.caps || []).includes('folders');
+  marker.foldersCapable = foldersCapable;
   if (!resourceCapable) say('this cloud image cannot take a file or skill the run asks this Mac for; rebuild it (npm run deploy, or node scripts/cloud-setup.mjs)');
   if (!offlineOn) say('this cloud image stops at its next tool call while this Mac sleeps; rebuild it (node scripts/cloud-setup.mjs) to keep runs going');
   marker.offline = offlineOn;
@@ -1504,6 +1508,7 @@ export async function cloudRun({
     state: marker.resources ??= {}, save: () => saveMarker(),
     stopped: () => !!finished || leaving || cancelled,
     capable: () => resourceCapable,
+    folders: () => foldersCapable,
     log: say,
     upload: async (name, body) => {
       const k = cacheKey(name);
