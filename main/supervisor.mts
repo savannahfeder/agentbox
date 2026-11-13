@@ -9104,7 +9104,20 @@ export class Supervisor {
       && this.restingUntil(item) <= now;
   }
 
+  // Ahead of every early return in the tick: a cloud run goes on while this
+  // computer is paused, braked or holding for setup, and so does its card.
+  _listenForSignInReturns() {
+    try {
+      this.signInReturns.sync([...this.sessions].flatMap(([id, s]) => {
+        if (!s?.cloud || !s.product) return [];
+        const ask = openSignIn(this.store.readItem?.(s.product, id));
+        return ask ? [{ product: s.product, id, ask: ask.id, url: ask.url }] : [];
+      }));
+    } catch (e) { console.warn('zero: listening for a sign-in to come back:', (e as Error).message); }
+  }
+
   async _tick() {
+    this._listenForSignInReturns();
     if (this.paused) { this._noteWaitingRows('paused'); return; }
     this._refreshMemoryReading();
     if (this.firstRunHolding()) { this._noteWaitingRows('setup'); return; }
@@ -9160,12 +9173,6 @@ export class Supervisor {
     this.bringBackWhatNeverShipped(items);
     // A task its agent marked ready goes out, one at a time, beside the tick.
     try { this.shipQueue.tick(items, this.store.listProducts()); } catch (e) { console.warn('zero: the ship queue:', (e as Error).message); }
-    try {
-      this.signInReturns.sync(items.flatMap((i) => {
-        const ask = openSignIn(i);
-        return ask && this.sessions.get(i.id)?.cloud ? [{ product: i.product, id: i.id, ask: ask.id, url: ask.url }] : [];
-      }));
-    } catch (e) { console.warn('zero: listening for a sign-in to come back:', (e as Error).message); }
 
     // A session that died without exiting still holds its row. Stopping it
     // here lets the passes below put a fresh worker on the row.
