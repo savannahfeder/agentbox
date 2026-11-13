@@ -1,0 +1,144 @@
+{
+ "company": { "name": "Parcelwise", "domain": "parcelwise.example", "oneLiner": "Shipping rates, labels and tracking for online stores, through one API" },
+ "projects": ["Rates API", "Labels", "Tracking", "Website", "Docs"],
+ "grounding": [
+  { "term": "Parcelwise", "quote": "Parcelwise gives online stores shipping rates, labels and tracking through one API." },
+  { "term": "Rates API", "quote": "The Rates API returns live prices from every carrier in one call." },
+  { "term": "Label API", "quote": "Print labels for 40 carriers with the Label API." },
+  { "term": "Tracking Webhooks", "quote": "Tracking Webhooks tell your store the moment a parcel moves." },
+  { "term": "Canada Post", "quote": "Now with Canada Post and DHL Express." },
+  { "term": "Shopify", "quote": "Works with Shopify and WooCommerce." }
+ ],
+ "bug": {
+  "project": "Rates API",
+  "title": "Fix rounding on multi-parcel rate quotes",
+  "summary": "Quotes for orders with more than one parcel rounded each parcel up before adding them, so totals ran a few cents high. Totals now round once, after the sum.",
+  "ask": "Merge the rounding fix?",
+  "progress": ["Reproduced the gap with a three-parcel order", "Moved rounding after the sum", "Compared 37 saved quotes with carrier invoices", "Passed all 212 rate tests"],
+  "context": ["37 of 37 saved multi-parcel quotes now match the carrier invoice to the cent.", "Single-parcel quotes do not change."],
+  "options": ["Merge it", "Show the saved quotes", "Make changes"]
+ },
+ "migration": {
+  "project": "Tracking",
+  "title": "Add an index for webhook delivery lookups",
+  "summary": "Looking up a parcel's webhook deliveries scanned the whole table. A new index on parcel and time makes the lookup direct.",
+  "ask": "Run the index migration on staging?",
+  "progress": ["Timed the lookup on a copy of production", "Wrote the index migration", "Changed the lookup to use it"],
+  "context": ["On a copy of production the lookup went from 3.1 seconds to 40 milliseconds across 4.2M deliveries.", "Nothing changes in production until you say so."],
+  "change": {
+   "files": [
+    {
+     "path": "migrations/20261112_webhook_delivery_index.sql",
+     "said": "Index deliveries by parcel and time, built without locking the table.",
+     "rows": [
+      ["+", "CREATE INDEX CONCURRENTLY webhook_deliveries_parcel_sent_idx"],
+      ["+", "  ON webhook_deliveries (parcel_id, sent_at DESC);"],
+      ["+", ""],
+      ["+", "COMMENT ON INDEX webhook_deliveries_parcel_sent_idx"],
+      ["+", "  IS 'Tracking Webhooks history for one parcel';"]
+     ]
+    },
+    {
+     "path": "src/tracking/deliveries.ts",
+     "said": "Read the newest deliveries for a parcel through the new index.",
+     "rows": [
+      ["=", "export async function deliveriesFor(parcelId: string, limit = 50) {"],
+      ["-", "  const rows = await db.query('SELECT * FROM webhook_deliveries WHERE parcel_id = $1', [parcelId]);"],
+      ["-", "  return rows.sort((a, b) => b.sent_at - a.sent_at).slice(0, limit);"],
+      ["+", "  return db.query("],
+      ["+", "    'SELECT * FROM webhook_deliveries WHERE parcel_id = $1 ORDER BY sent_at DESC LIMIT $2',"],
+      ["+", "    [parcelId, limit],"],
+      ["+", "  );"],
+      ["=", "}"]
+     ]
+    }
+   ]
+  }
+ },
+ "headlines": {
+  "project": "Website",
+  "lines": ["Every carrier's price in one call", "Ship today at the lowest rate", "Shipping your checkout can trust"],
+  "why": "The first leads with one call for every carrier, the second with the cheapest rate, and the third with trust at checkout."
+ },
+ "fourth": {
+  "project": "Docs",
+  "title": "Document how to test Tracking Webhooks locally",
+  "summary": "Added a guide for receiving Tracking Webhooks on a laptop with a test parcel. It covers signing secrets and replaying an event.",
+  "ask": "Publish the webhook testing guide?",
+  "progress": ["Wrote the local setup steps", "Checked all 5 example events"],
+  "context": ["Every example event in the guide was sent and verified against the sandbox."],
+  "options": ["Publish it", "Show the examples", "Make changes"]
+ },
+ "jordan": {
+  "project": "Website",
+  "title": "Write this week's Parcelwise changelog",
+  "summary": "Drafted this week's update covering the rounding fix and the webhook guide. Each entry links to its change.",
+  "ask": "Post the changelog?",
+  "progress": ["Drafted 2 entries from merged changes", "Linked the webhook guide"],
+  "context": ["The index migration stays out until it reaches production."],
+  "options": ["Post it", "Make changes"],
+  "comment": "Can you add the new Canada Post rates?"
+ },
+ "sixth": {
+  "project": "Labels",
+  "title": "Retry label purchases when a carrier times out",
+  "summary": "A carrier timeout used to fail the label purchase outright. Purchases now retry twice with the same request key, so no label is bought twice.",
+  "ask": "Ship the label retry?",
+  "progress": ["Added retries with the same request key", "Passed 30 timeout tests"],
+  "context": ["30 of 30 timeout tests end with exactly one label bought."],
+  "options": ["Ship it", "Make changes"]
+ },
+ "maya": {
+  "project": "Labels",
+  "title": "Debug sandbox label printing",
+  "body": "Find out why sandbox labels print blank.",
+  "ask": "I'm stuck on the sandbox carrier key.",
+  "summary": "Sandbox label printing needs a carrier key she cannot see.",
+  "context": "Every sandbox label comes back blank because the carrier key in staging expired. Production labels print fine. I need someone with admin access to rotate the sandbox key.",
+  "comment": "Can you rotate the sandbox key?",
+  "reply": "Rotated it, try now"
+ },
+ "running": [
+  { "project": "Tracking", "title": "Retry webhook deliveries that time out", "activity": "Replaying 40 failed deliveries", "cloud": true },
+  { "project": "Rates API", "title": "Add dimensional weight to rate quotes", "activity": "Checking 18 carrier rules", "cloud": true },
+  { "project": "Labels", "title": "Show the carrier logo on printed labels", "activity": "Rendering 12 test labels", "cloud": false },
+  { "project": "Rates API", "title": "Cache carrier rate tables for an hour", "activity": "Timing 200 quotes", "cloud": true },
+  { "project": "Website", "title": "Speed up the pricing page", "activity": "Measuring page load", "cloud": false },
+  { "project": "Docs", "title": "Document label voids and refunds", "activity": "Writing the refund steps", "cloud": false },
+  { "project": "Tracking", "title": "Group tracking events by parcel", "activity": "Grouping 3,100 events", "cloud": true },
+  { "project": "Labels", "title": "Add return labels to the Label API", "activity": "Writing return label tests", "cloud": false },
+  { "project": "Rates API", "title": "Flag quotes that skip a carrier", "activity": "Comparing 90 quotes", "cloud": false },
+  { "project": "Website", "title": "Fix the carrier list on small screens", "activity": "Checking 4 screen sizes", "cloud": false },
+  { "project": "Docs", "title": "Update the Shopify setup guide", "activity": "Following the setup steps", "cloud": false },
+  { "project": "Tracking", "title": "Log why a webhook was skipped", "activity": "Adding skip reasons", "cloud": true },
+  { "project": "Labels", "title": "Validate addresses before buying a label", "activity": "Testing 60 addresses", "cloud": false },
+  { "project": "Rates API", "title": "Sort quotes by delivery date", "activity": "Checking sort order", "cloud": false },
+  { "project": "Tracking", "title": "Send a webhook when a parcel is delayed", "activity": "Writing delay tests", "cloud": true },
+  { "project": "Website", "title": "Add the Canada Post page", "activity": "Drafting the page", "cloud": false },
+  { "project": "Docs", "title": "Explain rate limits in the API reference", "activity": "Reading the limits code", "cloud": false },
+  { "project": "Labels", "title": "Speed up label PDF rendering", "activity": "Profiling 50 renders", "cloud": false },
+  { "project": "Rates API", "title": "Retry carriers that return no rate", "activity": "Replaying 25 empty quotes", "cloud": false }
+ ],
+ "done": [
+  { "project": "Rates API", "title": "Fix currency on cross-border quotes", "result": "All 24 cross-border quotes show the store's currency. Merged." },
+  { "project": "Tracking", "title": "Show delivery photos in tracking events", "result": "Delivery photos appear on 3 carriers that send them. Live." },
+  { "project": "Labels", "title": "Add label sizes for thermal printers", "result": "4x6 and 4x8 labels print on both test printers. Merged." }
+ ],
+ "team": {
+  "maya": {
+   "working": { "title": "Add return labels to the Label API", "project": "Labels" },
+   "doneProject": "Labels",
+   "done": ["Fix blank labels for long addresses", "Add a label preview", "Show the label cost before buying", "Fix duplicate label purchases", "Add customs forms to labels", "Keep the label size per store", "Fix label voids after midnight", "Show the void deadline", "Add a reprint button", "Fix the barcode quiet zone", "Trim label PDF size", "Add a label test mode"]
+  },
+  "jordan": {
+   "working": [{ "title": "Write this week's Parcelwise changelog", "project": "Website" }, { "title": "Fix the carrier list on small screens", "project": "Website" }],
+   "doneProject": "Website",
+   "done": ["Fix the pricing table on mobile", "Add the status page link", "Fix the footer links", "Show carrier count on the homepage", "Fix form errors on signup", "Add the security page", "Fix image sizes on the blog", "Keep the menu open on hover", "Add alt text to carrier logos", "Fix the docs search box", "Show the API status badge", "Fix heading spacing"]
+  },
+  "sam": {
+   "working": [{ "title": "Cache carrier rate tables for an hour", "project": "Rates API" }, { "title": "Fix currency on cross-border quotes", "project": "Rates API" }],
+   "doneProject": "Rates API",
+   "done": ["Fix weight units in quotes", "Add zone lookups", "Retry slow carriers", "Show quote expiry", "Fix negative surcharges", "Add a quote id to responses", "Cache zone tables", "Fix rate rounding for Canada", "Log carrier response times", "Add a rate comparison test", "Fix sorting on equal prices", "Speed up quote parsing"]
+  }
+ }
+}

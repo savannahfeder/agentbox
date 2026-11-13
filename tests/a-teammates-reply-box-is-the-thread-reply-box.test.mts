@@ -44,7 +44,7 @@ describe('the reply box in a teammate chat', () => {
   });
 
   it('leaves the job and voice fields as plain text fields', () => {
-    expect(page).toMatch(/<textarea className="tq-field" rows=\{6\}/);
+    expect(page).toMatch(/<textarea className="tq-field" rows=\{whole \? 14 : 6\}/);
     expect(page).toMatch(/<textarea className="tq-field tq-voice-own"/);
   });
 });

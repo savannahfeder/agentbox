@@ -32,6 +32,7 @@ import { whatATeammateMaySet, whatYourOtherCopyMaySet } from '../../shared/team-
 import type { CloudProject, SharedProjectRef } from './projects.mts';
 import { MAX_CARRIED_BYTES, namedFiles, wordsOfLine } from '../../shared/carried-files.mts';
 import { createFileCarrier } from './carry-files.mts';
+import type { LinkPlace } from './link-edits.mts';
 
 /** A ledger line as it is written and pushed; other keys pass through. */
 export interface LedgerLine {
@@ -73,6 +74,9 @@ export interface SyncState {
   /** When the newest comment on this person's links already noted was made. */
   getLinkComments(personId: string): number | null;
   setLinkComments(personId: string, at: number): void;
+  /** Where a shared link's file is on this computer, by the link's source (main/team/link-edits.mts). */
+  getLinkPlace(source: string): LinkPlace | null;
+  setLinkPlace(source: string, place: LinkPlace): void;
 }
 
 type FsForState = Pick<typeof fs, 'readFileSync' | 'writeFileSync' | 'renameSync'>;
@@ -193,7 +197,8 @@ export const diskFiles: SyncFiles = {
 
 // Where each shared project's cursors stand, kept between runs.
 export function memorySyncState(): SyncState {
-  const map = new Map<string, Partial<SyncCursor> & { hash?: string | null; keys?: string[]; [personId: string]: unknown }>();
+  const places = new Map<string, LinkPlace>();
+  const map =new Map<string, Partial<SyncCursor> & { hash?: string | null; keys?: string[]; [personId: string]: unknown }>();
   return {
     get: (projectId) => ({ pushedTo: 0, pulledSeq: 0, ...(map.get(projectId) || {}) }),
     set: (projectId, value) => { map.set(projectId, { ...value }); },
@@ -207,6 +212,8 @@ export function memorySyncState(): SyncState {
     markHandedOver: (key) => { map.set('__handed__', { keys: [...(map.get('__handed__')?.keys ?? []), key] }); },
     getLinkComments: (personId) => map.get('__links__')?.[personId] as number | null | undefined ?? null,
     setLinkComments: (personId, at) => { map.set('__links__', { ...(map.get('__links__') || {}), [personId]: at }); },
+    getLinkPlace: (source) => places.get(source) ?? null,
+    setLinkPlace: (source, place) => { places.set(source, place); },
   };
 }
 
@@ -218,6 +225,7 @@ export function fileSyncState(file: string, fs: FsForState): SyncState {
     since?: Record<string, number | null>;
     handedOver?: string[];
     linkComments?: Record<string, number>;
+    linkPlaces?: Record<string, LinkPlace>;
   } = {};
   try { data = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { data = {}; }
   const save = () => {
@@ -244,6 +252,8 @@ export function fileSyncState(file: string, fs: FsForState): SyncState {
     // The newest comment on this person's shared links already put on a thread (main/team/link-comments.mts).
     getLinkComments: (personId) => data.linkComments?.[personId] ?? null,
     setLinkComments: (personId, at) => { data.linkComments = { ...(data.linkComments || {}), [personId]: at }; save(); },
+    getLinkPlace: (source) => data.linkPlaces?.[source] ?? null,
+    setLinkPlace: (source, place) => { data.linkPlaces = { ...(data.linkPlaces || {}), [source]: place }; save(); },
   };
 }
 
