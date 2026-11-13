@@ -93,7 +93,9 @@ const oneLine = (s: string) => {
   return line.length > 110 ? `${line.slice(0, 108).replace(/\s+\S*$/, '')}…` : line;
 };
 
-export function teamToday({ range, now, me, items, products, cards, decisions, needs, mentions = [], approvals = [], people, mates, mateOf, directWith = () => null, needsCount, later = () => false, supervisor = {}, undoing = new Set() }: {
+export function teamToday({ range, window, now, me, items, products, cards, decisions, needs, mentions = [], approvals = [], people, mates, mateOf, directWith = () => null, needsCount, later = () => false, supervisor = {}, undoing = new Set() }: {
+  /** A span of its own, in place of the range's: a standup covers from the one before it. */
+  window?: { from: number; to: number };
   /** This computer's supervisor, which says what it will not start; it rules your own threads, never a teammate's card. */
   supervisor?: WontStart & { running?: readonly { itemId: string }[]; starting?: readonly string[] };
   /** Your rows whose move is held in the undo window: out of Needs you already, not yet written. */
@@ -115,7 +117,7 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
   /** The Needs you tab's own number, so the two never disagree. */
   needsCount?: number;
 }): { people: TodayPerson[]; quiet: string[]; counts: TodayCounts } {
-  const { from, to } = rangeOf(range, now);
+  const { from, to } = window ?? rangeOf(range, now);
   const inRange = (t: number | null | undefined) => !!t && t >= from && t < to;
   const direct = new Set(products.filter((p) => p.team?.direct).map((p) => p.slug));
   const bySlug = new Map(products.map((p) => [p.slug, p]));
