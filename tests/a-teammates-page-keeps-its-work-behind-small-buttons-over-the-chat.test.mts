@@ -6,8 +6,11 @@
 // in the sidebar." Measured on a stand-in Security lead: a 272px column beside
 // the chat held its whole job (about 40 lines) over Waiting on you, In progress
 // and Finished this week. Of five drawn layouts the founder approved a row of
-// small buttons over the chat (designs/w-3e7d2d1260/teammate-option-4.png):
-// each names a list and its count and opens it over the chat; Job opens the job.
+// small buttons over the chat (designs/w-3e7d2d1260/teammate-option-4.png).
+// Built first as dropdowns over the chat, which the founder read as wrong: "I
+// assumed those were things I could click into, and it would show me that
+// content". So each shows its list, or the job, in the chat's place, and Chat,
+// first and lit, brings the chat back.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import React, { createElement as h } from 'react';
@@ -38,16 +41,21 @@ describe("a teammate's page", () => {
     expect(html).toContain('the chat');
   });
   it('names each list with its count on a small button, in order', () => {
-    const labels = [...html.matchAll(/<button type="button" class="pl-btn pl-chip[^"]*"[^>]*>(.*?)<\/button>/g)].map((m) => m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
-    expect(labels).toEqual(['Waiting on you 1', 'In progress 1', 'Done this week 2', 'Job']);
+    const labels = [...html.matchAll(/<button [^>]*class="pl-btn pl-chip[^"]*"[^>]*>(.*?)<\/button>/g)].map((m) => m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
+    expect(labels).toEqual(['Chat', 'Waiting on you 1', 'In progress 1', 'Done this week 2', 'Job']);
   });
   it('marks only what waits on you with the dot', () => {
     expect(html.match(/class="pl-btn pl-chip ask"/g)).toHaveLength(1);
   });
+  it('opens on the chat, with Chat lit', () => {
+    expect(html).toMatch(/role="tab" aria-selected="true" class="pl-btn pl-chip">Chat</);
+    expect(html.match(/aria-selected="true"/g)).toHaveLength(1);
+  });
   it('shows neither the job nor a list until one is pressed', () => {
     expect(html).not.toContain('docs/security-checks.md');
     expect(html).not.toContain('Check the pairing token');
-    expect(html).not.toContain('pl-pop');
+    expect(html).not.toContain('pl-view');
+    expect(html).not.toContain('pl-chat away');
   });
 });
 
@@ -73,8 +81,10 @@ describe('the styles', () => {
   it('keep the chat to a readable width now the column is gone', () => {
     expect(css).toMatch(/\.pl-body \{[^}]*max-width: 900px/);
   });
-  it('draw the list over the chat with rounded corners', () => {
-    expect(css).toMatch(/\.pl-pop \{[^}]*position: absolute;[^}]*border-radius: var\(--artifact-corner\)/);
+  it('put a list in the chat\'s place, keeping the chat mounted so a draft survives', () => {
+    expect(css).toContain('.pl-chat.away { display: none; }');
+    expect(css).toMatch(/\.pl-view \{[^}]*overflow-y: auto/);
+    expect(css).not.toContain('.pl-pop');
   });
   it('leave no rule for the old column', () => {
     expect(css).not.toContain('.pl-side');

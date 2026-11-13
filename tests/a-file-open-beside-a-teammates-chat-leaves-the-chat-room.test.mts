@@ -104,10 +104,36 @@ describe.skipIf(!browserAvailable)('the same page with no file open, full width'
   it('keeps the job and its lists behind buttons over the chat, and Settings in the header', () => {
     expect(m.buttons).toEqual(['Give a task', 'Settings']);
     expect(m.side).toBe(0);
-    expect(m.chips).toEqual(['Done this week1', 'Job']);
+    expect(m.chips).toEqual(['Chat', 'Done this week1', 'Job']);
     expect(m.jobShown).toBe(false);
     expect(m.chat).toBeGreaterThan(800);
     expect(m.chat).toBeLessThanOrEqual(900);
     expect(m.nameWhole).toBe(true);
   });
+});
+
+describe.skipIf(!browserAvailable)('pressing Job on the page', () => {
+  it('shows the job where the chat was, and Chat or Esc brings the chat back', async () => {
+    const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+    page.setDefaultTimeout(5_000);
+    await page.route('http://fits.test/**', (r) => r.fulfill({ contentType: 'text/html',
+      body: `<style>${css}</style><div class="app workspace-layout"><div class="list-pane pl-open" id="root" style="width:1300px;height:900px"></div></div>` }));
+    await page.goto('http://fits.test/');
+    await page.addScriptTag({ content: bundle });
+    await page.locator('.pl-chat .rm-compose-input').waitFor();
+    const state = () => page.evaluate(() => ({
+      chat: document.querySelector('.pl-chat').offsetWidth > 0,
+      job: [...document.querySelectorAll('.pl-view')].some((v) => v.offsetWidth > 0 && v.textContent.includes('Cohort 1')),
+      lit: [...document.querySelectorAll('.pl-chip[aria-selected="true"]')].map((b) => b.textContent),
+    }));
+    expect(await state()).toEqual({ chat: true, job: false, lit: ['Chat'] });
+    await page.locator('.pl-chip', { hasText: 'Job' }).click();
+    expect(await state()).toEqual({ chat: false, job: true, lit: ['Job'] });
+    await page.locator('.pl-chip', { hasText: 'Chat' }).click();
+    expect(await state()).toEqual({ chat: true, job: false, lit: ['Chat'] });
+    await page.locator('.pl-chip', { hasText: 'Job' }).click();
+    await page.keyboard.press('Escape');
+    expect(await state()).toEqual({ chat: true, job: false, lit: ['Chat'] });
+    await page.close();
+  }, 30_000);
 });

@@ -104,7 +104,7 @@
 .ev-tip .ev-s:empty { display: none; }
 
 /* A PERSON'S OR AN AI TEAMMATE'S PLACE fills the page under the tabs: the chat takes the room,
-   and their work and job wait behind small buttons over it. */
+   and buttons over it show their work or job in its place. */
 .list-pane.pl-open { display: flex; flex-direction: column; overflow: hidden; }
 .pl { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 10px var(--row-r, 24px) 20px var(--text-x, 32px); }
 .pl-head { display: flex; align-items: center; gap: 14px; flex: none; padding: 8px 0 16px; }
@@ -133,14 +133,17 @@
 /* A file open beside the page squeezes it to 400px: the header keeps the name and Give a task. */
 .app.doc-open :is(.pl-name h2 em, .pl-btn.quiet) { display: none; }
 .pl-parts { display: flex; flex-wrap: wrap; gap: 8px; flex: none; margin: 0 0 18px 6px; }
-.pl-part { position: relative; }
 .pl-chip { height: 28px; gap: 7px; font-size: 12.5px; }
 .pl-chip i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 .pl-chip b { font-weight: 400; color: var(--text-faint); }
-.pl-chip[aria-expanded="true"] { color: var(--text); border-color: var(--text-faint); background: var(--wash); }
-.pl-pop { position: absolute; z-index: 20; top: 34px; left: 0; width: 360px; max-height: min(440px, 60vh); overflow-y: auto; box-sizing: border-box; padding: 6px; border: 1px solid var(--line-strong); border-radius: var(--artifact-corner); background: var(--skin-solid, var(--surface)); box-shadow: 0 8px 28px #0006; }
-.pl-pop :is(.pl-rows, .pl-mate) { margin: 0; }
-.pl-pop > :is(.pl-sec, .pl-text) { padding: 6px 8px; }
+.pl-chip[aria-selected="true"] { color: var(--text); border-color: var(--text-faint); background: var(--wash); }
+/* A list or the job takes the chat's place; the chat stays mounted so a draft survives. */
+.pl-chat.away { display: none; }
+.pl-view { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; padding: 2px 0 0 6px; }
+.pl-view .pl-rows { margin: 0 -8px; }
+.pl-view .pl-t { font-size: 14px; line-height: 20px; }
+.pl-view .pl-text { max-width: 680px; font-size: 14px; line-height: 22px; white-space: pre-wrap; }
+.pl-view .pl-mate { margin: 0 -8px; }
 .pl-sec h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 4px; font-size: 12px; font-weight: 500; line-height: 18px; color: var(--text-dim); }
 .pl-sec h3 b { font-weight: 400; color: var(--text-faint); }
 .pl-link { margin-left: auto; padding: 0; border: 0; background: none; font: 12.5px var(--sans, inherit); letter-spacing: 0; text-transform: none; color: var(--text-faint); cursor: pointer; }

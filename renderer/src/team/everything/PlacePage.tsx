@@ -1,7 +1,7 @@
 // A person's or an AI teammate's place: your conversation with them, with
 // small buttons over it that open their work and job, and the few things you
 // do with them in the header.
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { agoQuiet } from '../../format';
 import { sendKeyFor } from '../../reply-keys';
 import { MemberFace, MemberWord } from './TeamStrip';
@@ -9,7 +9,7 @@ import type { Member } from './members';
 
 const BACK = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>;
 
-/** One button over a place's chat: a list or the job, opened over the chat, or a page it goes to. */
+/** One button over a place's chat: a list or the job, shown in the chat's place, or a page it goes to. */
 export type PlacePart = { key: string; label: string; count?: number; ask?: boolean; body?: ReactNode; onOpen?: () => void };
 
 export function Place({ m, waits = 0, about, onBack, backTo, actions, chat, parts = [] }: {
@@ -20,6 +20,18 @@ export function Place({ m, waits = 0, about, onBack, backTo, actions, chat, part
   onBack?: () => void; backTo?: string;
   actions?: ReactNode; chat: ReactNode; parts?: PlacePart[];
 }) {
+  const [view, setView] = useState<{ of: string; key: string } | null>(null);
+  const shown = view?.of === m.key ? parts.find((p) => p.key === view.key && p.body) ?? null : null;
+  useEffect(() => {
+    if (!shown) return undefined;
+    // Esc goes back to the chat, unless it is ending an edit in a box first.
+    const esc = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== 'Escape' || (e.target as HTMLElement | null)?.closest?.('textarea, input')) return;
+      e.stopPropagation(); setView(null);
+    };
+    window.addEventListener('keydown', esc, true);
+    return () => window.removeEventListener('keydown', esc, true);
+  }, [shown]);
   return <section className="pl" aria-label={m.name}>
     <header className="pl-head">
       {onBack && <button type="button" className="pl-back" onClick={onBack} title={`Back to ${backTo} (Esc)`} aria-label={`Back to ${backTo}`}>{BACK}<span>{backTo}</span></button>}
@@ -32,40 +44,19 @@ export function Place({ m, waits = 0, about, onBack, backTo, actions, chat, part
       </div>
       {actions && <div className="pl-acts">{actions}</div>}
     </header>
-    {parts.length > 0 && <PlaceParts key={m.key} parts={parts} />}
+    {parts.length > 0 && <div className="pl-parts" role="tablist" aria-label={m.name}>
+      <button type="button" role="tab" aria-selected={!shown} className="pl-btn pl-chip" onClick={() => setView(null)}>Chat</button>
+      {parts.map((p) => <button type="button" key={p.key} role={p.body ? 'tab' : undefined} aria-selected={p.body ? shown === p : undefined}
+        className={`pl-btn pl-chip${p.ask ? ' ask' : ''}`}
+        onClick={() => { if (p.onOpen) p.onOpen(); else setView({ of: m.key, key: p.key }); }}>
+        {p.ask && <i aria-hidden="true" />}{p.label}{p.count != null && <b>{p.count}</b>}
+      </button>)}
+    </div>}
     <div className="pl-body">
-      <div className="pl-chat">{chat}</div>
+      <div className={`pl-chat${shown ? ' away' : ''}`}>{chat}</div>
+      {shown && <div className="pl-view" role="tabpanel" aria-label={shown.label}>{shown.body}</div>}
     </div>
   </section>;
-}
-
-/** The buttons over the chat; one list is open at a time, and a press elsewhere or Esc puts it away. */
-function PlaceParts({ parts }: { parts: PlacePart[] }) {
-  const [open, setOpen] = useState<string | null>(null);
-  const box = useRef<HTMLDivElement>(null);
-  const shown = parts.find((p) => p.key === open && p.body) ?? null;
-  useEffect(() => {
-    if (!shown) return undefined;
-    const away = (e: MouseEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(null); };
-    // A box being written in takes its own Esc first.
-    const esc = (e: globalThis.KeyboardEvent) => {
-      if (e.key !== 'Escape' || (e.target as HTMLElement | null)?.closest?.('.pl-pop textarea')) return;
-      e.stopPropagation(); setOpen(null);
-    };
-    window.addEventListener('mousedown', away);
-    window.addEventListener('keydown', esc, true);
-    return () => { window.removeEventListener('mousedown', away); window.removeEventListener('keydown', esc, true); };
-  }, [shown]);
-  return <div className="pl-parts" ref={box}>
-    {parts.map((p) => <div key={p.key} className="pl-part">
-      <button type="button" className={`pl-btn pl-chip${p.ask ? ' ask' : ''}`} aria-expanded={p.body ? shown === p : undefined}
-        onClick={() => { if (p.onOpen) p.onOpen(); else setOpen(shown === p ? null : p.key); }}>
-        {p.ask && <i aria-hidden="true" />}{p.label}{p.count != null && <b>{p.count}</b>}
-      </button>
-      {shown === p && <div className="pl-pop" role="dialog" aria-label={p.label}
-        onClick={(e) => { if ((e.target as HTMLElement).closest('.pl-row, .pl-mate')) setOpen(null); }}>{p.body}</div>}
-    </div>)}
-  </div>;
 }
 
 export type PlaceRow = { key: string; title: string; word: string; at: number; tone?: 'work' | 'ask' | 'hold' | 'done' | 'later'; onOpen?: () => void };
