@@ -20,7 +20,7 @@ import { Hits } from './Hits';
 import type { ThreadSearchDetails } from '../threads/search';
 import { nextRunWords, repeatRow, repeatTag } from '../repeat-words';
 import { Face, TeamRowEnd, firstName, type TeamView } from '../team/people';
-import { commentLine } from '../threads/teammate-thread';
+import { commentLine, linkCommentLine } from '../threads/teammate-thread';
 import { fileNewsFor, fileNewsLine } from '../../../shared/artifact-marks.mts';
 import { CloudOfferRow, RepeatMark, RowCells, SectionHead, TableHead, ThreadCells, WaitingContext } from '../threads/Pages';
 import type { StackKey, StackSection } from '../threads/stack-rules';
@@ -558,7 +558,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                       rows' usual openings is a list of rows that look unrelated
                       to what was typed. */}
                   <div className="preview">
-                    <Hits text={summaries?.get(item.id) ?? fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string | null) => firstName(team?.byId.get(id ?? '') ?? null)) ?? commentLine(item.waitingComments, (id) => firstName(team?.byId.get(id) ?? null)) ?? rowSummary(item, tab)} terms={terms} phrase={phrase} />
+                    <Hits text={summaries?.get(item.id) ?? fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string | null) => firstName(team?.byId.get(id ?? '') ?? null)) ?? commentLine(item.waitingComments, (id) => firstName(team?.byId.get(id) ?? null)) ?? linkCommentLine(item.linkComments) ?? rowSummary(item, tab)} terms={terms} phrase={phrase} />
                   </div>
                 </div>
                 {/* Everything that is not the message itself lives at the right end, on the

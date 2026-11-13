@@ -63,6 +63,15 @@ those files still counts as a change to the look. Never move the fingerprints in
 `tests/fixtures/the-trays-approved-look.json` without that approval. Taking
 those pictures puts windows on their screen, so ask before you do it.
 
+## THE DESIGN IS ROUNDED (2026-11-10)
+
+A button, card, tip, key cap or ring with a border has rounded corners. Square
+ones kept coming back, so the founder had to point them out by hand.
+`tests/the-design-is-rounded-and-square-boxes-only-go-down` allows none in the
+first run, the setup, the walkthrough and the sign-in page, and elsewhere the
+count may only go down. Round what you touch; never raise a number in
+`tests/fixtures/square-boxes.json`.
+
 ## NOTHING RETRIES FOR EVER, NOTHING WAITS FOR EVER, NOTHING FAILS IN SILENCE (2026-10-19)
 
 One cloud thread's start died in under a second, every 15 seconds, 16,135
@@ -130,6 +139,12 @@ Synthetic users run on Codex, never Claude Code (2026-11-08): the person keeps
 a Codex plan for testing only. Both skills start every tester as `codex exec`
 on the Codex login with the best plan; never run one as a subagent
 (`tests/every-synthetic-tester-runs-on-codex`).
+
+The app they test runs real agents on real plans, Claude Code and Codex
+(2026-11-11). Stand-in agents run only when the person agreed to them for
+that run, in their own words (`--stand-ins "<their words>"`), and the run
+says so up front. 48 of 50 runs were on stand-ins without anyone being told
+(`tests/a-power-test-runs-on-real-plans-unless-the-person-agreed`).
 
 The standard for the tester loop is thread w-e5f506ccb3: a synthetic team
 used the multiplayer build for whole workdays, logged what broke, agents

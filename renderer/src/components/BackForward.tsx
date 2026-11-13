@@ -6,21 +6,20 @@ const Chevron = ({ d }: { d: string }) => (
 );
 
 /** The Inbox button and the back and forward arrows that start a page's header. */
-export function BackForward({ backTo, forwardTo, onBack, onForward, onInbox, inboxOnEsc, name }: {
+export function BackForward({ backTo, forwardTo, onBack, onForward, onInbox, name }: {
   backTo: Stop | null;
   forwardTo: Stop | null;
   onBack: () => void;
   onForward: () => void;
-  onInbox: () => void;
-  /** Whether esc on this page goes to the inbox, which the hint then says. */
-  inboxOnEsc: boolean;
+  /** Given only on a thread, where esc also goes to the inbox. */
+  onInbox?: () => void;
   name: (s: Stop) => string;
 }) {
   return (
     <span className="back-forward">
-      <button type="button" className="back-forward-inbox" aria-label="Inbox" {...(inboxOnEsc ? { 'data-hint': 'inbox-esc' } : { 'data-hint': 'inbox' })} onClick={onInbox}>
+      {onInbox && <button type="button" className="back-forward-inbox" aria-label="Inbox" data-hint="inbox" onClick={onInbox}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9" /></svg>
-      </button>
+      </button>}
       <button type="button" disabled={!backTo} onClick={onBack}
         aria-label={backTo ? `Back to ${name(backTo)}` : 'Back'}
         title={backTo ? `Back to ${name(backTo)} (${chord('⌘[')})` : undefined}>

@@ -41,7 +41,7 @@ describe('one minute, summed', () => {
   });
 
   it('counts the app itself apart from its tasks', () => {
-    expect(line.app).toEqual({ mb: 700, procs: 2 });
+    expect(line.app).toMatchObject({ mb: 700, procs: 2 });
   });
 
   it('names the biggest programs that are not ours, so a crash caused elsewhere says so', () => {

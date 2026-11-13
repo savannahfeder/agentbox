@@ -19,6 +19,7 @@ export function InboxSky({ art, band = 190 }: { art: SkyArt; band?: number }) {
       return wrap;
     };
     const head = make('inbox-sky-head');
+    host.style.setProperty('--sky-under', art.bg);
     let frame = 0;
     let last = '';
     const paint = () => {
@@ -42,7 +43,7 @@ export function InboxSky({ art, band = 190 }: { art: SkyArt; band?: number }) {
     // The card moves when the sidebar opens or folds, which changes the window's classes, not its size.
     const moved = new MutationObserver(later);
     moved.observe(host, { attributes: true, attributeFilter: ['class'] });
-    return () => { ro.disconnect(); moved.disconnect(); if (frame) cancelAnimationFrame(frame); head.remove(); };
+    return () => { ro.disconnect(); moved.disconnect(); if (frame) cancelAnimationFrame(frame); head.remove(); host.style.removeProperty('--sky-under'); };
   }, [art, band]);
   return null;
 }

@@ -11,7 +11,7 @@ export function GlassBand({ homeHere, inboxHere, inboxCount, onHome, onInbox, on
   onCompose: () => void;
 }) {
   return (
-    <nav className="glass-band" aria-label="Places">
+    <nav className="glass-band" aria-label="Places" data-here={homeHere ? 'home' : inboxHere ? 'inbox' : undefined}>
       {onHome && <button type="button" className={homeHere ? 'on' : undefined} onClick={onHome}>Home</button>}
       <button type="button" className={inboxHere ? 'on' : undefined} onClick={onInbox}>
         Inbox{inboxCount > 0 && <span className="gb-count">{inboxCount}</span>}

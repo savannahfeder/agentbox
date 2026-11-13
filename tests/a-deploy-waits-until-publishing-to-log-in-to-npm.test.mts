@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
-import { nextVersion, serverConfig, whatIsLive } from '../scripts/lib/deploy-rules.mjs';
+import { nextVersion, serverConfig, whatIsLive, withVersion } from '../scripts/lib/deploy-rules.mjs';
 
 const scriptUrl = new URL('../scripts/deploy.mjs', import.meta.url);
 const source = fs.readFileSync(scriptUrl, 'utf8')
@@ -26,7 +26,7 @@ function deploy({ signedIn = false, expireDuringBuild = false, buildOk = true,
   const failed = { status: 1, stdout: '', stderr: 'failed' };
   let exitCode = 0;
   const context = {
-    path, os, fileURLToPath, nextVersion, serverConfig, whatIsLive,
+    path, os, fileURLToPath, nextVersion, serverConfig, whatIsLive, withVersion,
     RELEASE_REPO: 'example/releases',
     fs: {
       existsSync: () => true,

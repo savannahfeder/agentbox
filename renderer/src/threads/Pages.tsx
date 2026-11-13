@@ -22,7 +22,7 @@ import { deadlineOf, dueSaid } from '../../../shared/team-tasks.mts';
 import { waitWords } from '../../../shared/thread-waits.mts';
 import { needsLeft, needsWord } from '../../../shared/cloud-needs.mts';
 import { closedOverWords, iSpokeLast, isWorkThread } from '../../../shared/team-rules.mts';
-import { commentLine } from './teammate-thread';
+import { commentLine, linkCommentLine } from './teammate-thread';
 import { fileNewsFor, fileNewsLine } from '../../../shared/artifact-marks.mts';
 import { toApproveWords } from '../threads-made';
 import { DONE } from '../done-word';
@@ -741,8 +741,9 @@ export function ThreadCells({ item, product, now, person, tab }: {
   const waits = team ? waitWords(item, { items: allItems, cards: team.state.cards ?? [], nameOf: (id: string) => team.byId.get(id)?.name ?? 'Someone' }) : null;
   const nameFirst = (id: string) => firstName(team?.byId.get(id) ?? null);
   const inNeedsYou = tab === 'inbox';
-  // A teammate's words hold it in Needs you whatever the thread itself says.
-  const peopleWaitOnYou = !!team && inNeedsYou && !cell.live && (!!item.waitingComments?.length || fileNewsFor(item, team.me, { myName: team.byId.get(team.me ?? '')?.name ?? null }).length > 0 || closedOverWords(item, product, team.me));
+  // A teammate's words, or comments on its links, hold it in Needs you whatever the thread itself says.
+  // On a closed thread a teammate's comment is only news to read, so it keeps its Done.
+  const peopleWaitOnYou = inNeedsYou && !cell.live && (!!item.linkComments?.length || (!!team && ((item.status !== 'done' && !!item.waitingComments?.length) || fileNewsFor(item, team.me, { myName: team.byId.get(team.me ?? '')?.name ?? null }).length > 0 || closedOverWords(item, product, team.me))));
   const worded = waits && !cell.live ? { ...cell, word: waits.word, title: waits.title }
     : peopleWaitOnYou ? { ...cell, word: 'Waiting on you', mark: 'need' as const }
       : team && (cell.word === STATE_WORD.waiting || iSpokeLast(item, product, team.me)) ? { ...cell, word: waitingWord(item, product, team.me, nameFirst, { inNeedsYou: tab === 'inbox' }) } : cell;
@@ -805,6 +806,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
   const handedFace = handed ? <span className="tq-from"><Face person={team?.byId.get(handed.from) ?? null} /><b>{nameFirst(handed.from)}</b></span> : null;
   const commented = (handed?.note ?? null) ?? fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string | null) => firstName(team?.byId.get(id ?? '') ?? null))
     ?? commentLine(item.waitingComments, (id) => firstName(team?.byId.get(id) ?? null))
+    ?? linkCommentLine(item.linkComments)
     ?? (waitCameBack(item) ? item.waitEnded?.said : null)
     ?? item.handedOver?.said;
   return <RowCells status={status} retry={retry} lead={handedFace ?? <TeammateLead item={item} />} title={rowTitle(item)} aside={asideBesides(rowTitle(item), commented ?? (toApproveWords(waiting.get(`${item.product}/${item.id}`)) || null)) ?? undefined} shared={seen === 'people'} chosen={chosen} lock={lock} held={notStarted(item)} pinned={!!item.pinned && item.status !== 'done'} where={product?.name ?? ''} person={person}
