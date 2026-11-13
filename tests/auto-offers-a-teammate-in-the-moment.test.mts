@@ -13,7 +13,7 @@ import fs, { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const fake = vi.hoisted(() => ({ spawns: [] as unknown[], reply: [1, ''] as [number, string] }));
+const fake = vi.hoisted(() => ({ spawns: [] as unknown[], reply: [1, ''] as [number, string], queue: [] as [number, string][] }));
 vi.mock('node:child_process', async (importActual) => {
   const actual = await importActual<typeof import('node:child_process')>();
   const { EventEmitter: Emitter } = await import('node:events');
@@ -25,7 +25,7 @@ vi.mock('node:child_process', async (importActual) => {
       child.stdout = new Emitter();
       child.stderr = new Emitter();
       child.kill = () => true;
-      const [code, out] = fake.reply;
+      const [code, out] = fake.queue.shift() ?? fake.reply;
       setTimeout(() => { if (out) child.stdout.emit('data', Buffer.from(out)); child.emit('close', code); }, 0);
       return child;
     },
@@ -68,7 +68,7 @@ const thread = (extra = {}) => ({
   body: '', labels: ['founder', AUTO_LABEL], priority: 5, createdAt: 1, updatedAt: 1, claim: null, ...extra,
 });
 
-beforeEach(() => { fake.spawns.length = 0; fake.reply = [1, '']; });
+beforeEach(() => { fake.spawns.length = 0; fake.reply = [1, '']; fake.queue.length = 0; });
 afterAll(() => { for (const d of dirs) { try { rmSync(d, { recursive: true, force: true }); } catch { /* best effort */ } } });
 
 describe('the question Auto asks', () => {
@@ -88,6 +88,10 @@ describe('the question Auto asks', () => {
 });
 
 describe('reading the offer', () => {
+  it('reads a role with no why, which the small model sometimes writes', () => {
+    expect(readOffer('0 | -\nTeammate: Support')).toEqual({ role: 'Support', why: '' });
+  });
+
   it('reads a role and why', () => {
     expect(readOffer('0 | -\nTeammate: Marketer | It is a post every week, and it would learn your voice.'))
       .toEqual({ role: 'Marketer', why: 'It is a post every week, and it would learn your voice.' });
@@ -124,13 +128,53 @@ describe('the offer on the thread', () => {
 });
 
 describe('a thread sent to Auto', () => {
+  // Since 2026-11-12 the thread is routed first and the offer follows once the
+  // card's reasons are asked for (tests/the-teammate-offer-is-a-card-under-the-answer).
   it('carries the offer when nobody\'s job covers it', async () => {
     fake.reply = [0, '0 | -\nTeammate: Marketer | It is a post every week, and it would learn your voice.\n'];
     const { sup, routed } = build({ items: [thread()] });
     await sup.routeTheThreads([thread()]);
+    expect(fake.spawns).toHaveLength(2);
+    expect(routed).toHaveLength(2);
+    expect(routed[0].patch.routed).toMatchObject({ to: 'agent' });
+    expect(routed[1].patch.routed).toMatchObject({ to: 'agent', offer: { role: 'Marketer' } });
+  });
+
+  it('asks the card\'s three reasons only once there is an offer, and puts them on it', async () => {
+    fake.queue.push([0, '0 | -\nTeammate: Marketer | It repeats.\n'], [0, '- Learns your voice\n- Carries on from this post\n- Writes it every Monday, and asks first\n']);
+    const { sup, routed } = build({ items: [thread()] });
+    await sup.routeTheThreads([thread()]);
+    expect(routed.at(-1)!.patch.routed).toMatchObject({ offer: { role: 'Marketer', gains: ['Learns your voice', 'Carries on from this post', 'Writes it every Monday, and asks first'] } });
+  });
+
+  it('asks nothing more when there is no offer', async () => {
+    fake.reply = [0, '0 | -\nTeammate: -\n'];
+    const { sup } = build({ items: [thread()] });
+    await sup.routeTheThreads([thread()]);
     expect(fake.spawns).toHaveLength(1);
+  });
+
+  it('still makes the offer, with the card\'s own reasons, when the second question fails', async () => {
+    fake.queue.push([0, '0 | -\nTeammate: Marketer | It repeats.\n'], [1, '']);
+    const { sup, routed } = build({ items: [thread()] });
+    await sup.routeTheThreads([thread()]);
+    expect(routed.at(-1)!.patch.routed).toMatchObject({ offer: { role: 'Marketer', why: 'It repeats.' } });
+    expect((routed.at(-1)!.patch.routed as { offer: { gains?: unknown } }).offer.gains).toBeUndefined();
+  });
+
+  it('puts no offer on a thread you gave to someone else while it was asked', async () => {
+    fake.queue.push([0, '0 | -\nTeammate: Marketer | It repeats.\n'], [0, '- a\n- b\n- c\n']);
+    const items = [thread()];
+    const { sup, routed } = build({ items });
+    // Your pick lands while the second question is out.
+    const realAsk = sup._askSmall.bind(sup);
+    let asked = 0;
+    sup._askSmall = (async (ask: never, opts: never) => {
+      if (++asked === 2) items[0] = thread({ routed: { to: 'mate:t-video', why: 'x', at: 1, by: 'you' } });
+      return realAsk(ask, opts);
+    }) as typeof sup._askSmall;
+    await sup.routeTheThreads([thread()]);
     expect(routed).toHaveLength(1);
-    expect(routed[0].patch.routed).toMatchObject({ to: 'agent', offer: { role: 'Marketer' } });
   });
 
   it('carries no offer when it went to a teammate whose job it is', async () => {
@@ -144,7 +188,7 @@ describe('a thread sent to Auto', () => {
     fake.reply = [0, 'P | It needs several of them.\nTeammate: Marketer | It repeats.\n'];
     const { sup, routed } = build({ items: [thread()], team: [video, chief] });
     await sup.routeTheThreads([thread()]);
-    expect(routed[0].patch.routed).toMatchObject({ to: 'mate:t-chief', offer: { role: 'Marketer' } });
+    expect(routed.at(-1)!.patch.routed).toMatchObject({ to: 'mate:t-chief', offer: { role: 'Marketer' } });
   });
 
   it('with no teammates yet, goes to an agent at once, and the offer follows', async () => {

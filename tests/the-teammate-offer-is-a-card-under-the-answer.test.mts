@@ -9,54 +9,51 @@
 // the hire card (designs/w-bb45118b10/teammate-card-1-hire-card-v2.png): a sky
 // banner, "Make this a Marketer's job.", one sentence, three reasons in a
 // bordered list, and Make with ↵ beside Not now. The reasons are about this
-// thread, so Auto now writes them in the same call that makes the offer.
+// thread, so once Auto offers a role, a second short question writes them.
+// Asking for them inside Auto's own question made it offer on 7 of 12
+// recurring tasks against 11 of 12 (Haiku, 2026-11-12), so they are asked apart.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-const { readOffer, routePrompt } = await import('../shared/auto-route.mts');
+const { routePrompt, offerPrompt, readGains } = await import('../shared/auto-route.mts');
 const { cleanRouted } = await import('../shared/work-items.mts');
 const { offerCard, offerWaiting, enterMakesTeammate, DEFAULT_GAINS } = await import('../renderer/src/teammate-offer.ts');
 const { TeammateOffer } = await import('../renderer/src/components/TeammateOffer.tsx');
 
-const reply = [
-  '0 | -',
-  'Teammate: Marketer | A Marketer would write this post every week and get better at it each time.',
-  '- Learns your voice from every post you approve or change',
-  '- Carries on where this post left off, not from nothing',
-  '- Writes it every Monday, and asks you before it posts',
-].join('\n');
 const gains = ['Learns your voice from every post you approve or change', 'Carries on where this post left off, not from nothing', 'Writes it every Monday, and asks you before it posts'];
 
 describe('Auto writes what the teammate would bring', () => {
-  it('asks for three lines: what it learns, what it carries on, and what it then does', () => {
-    const prompt = routePrompt({ title: 'Write this week\'s launch post' }, [], []);
+  it('asks, about this task, what it learns, carries on from and then does, and to ask before posting', () => {
+    const prompt = offerPrompt({ title: 'Write this week\'s launch post' }, { role: 'Marketer' });
+    expect(prompt).toContain('Write this week\'s launch post');
+    expect(prompt).toContain('a Marketer');
     expect(prompt).toMatch(/- Learns /);
     expect(prompt).toMatch(/- Carries on /);
+    expect(prompt).toMatch(/without asking first/);
   });
 
-  it('reads the three lines with the role and why', () => {
-    expect(readOffer(reply)).toEqual({ role: 'Marketer', why: 'A Marketer would write this post every week and get better at it each time.', gains });
+  it('leaves Auto\'s own question as it was', () => {
+    expect(routePrompt({ title: 'x' }, [], [])).not.toMatch(/- Learns /);
   });
 
-  it('reads an offer with no lines as before, with no gains', () => {
-    expect(readOffer('0 | -\nTeammate: Marketer | It repeats.')).toEqual({ role: 'Marketer', why: 'It repeats.' });
+  it('reads three lines, with bullets, numbers or none, which is how the model writes them', () => {
+    expect(readGains(gains.map((g) => `- ${g}`).join('\n'))).toEqual(gains);
+    expect(readGains(gains.map((g, i) => `${i + 1}. ${g}`).join('\n'))).toEqual(gains);
+    expect(readGains(gains.join('\n\n'))).toEqual(gains);
   });
 
-  it('keeps no gains when fewer than three came back, so the card never mixes its own with the model\'s', () => {
-    expect(readOffer('0 | -\nTeammate: Marketer | It repeats.\n- Learns your voice\n- Carries on')).toEqual({ role: 'Marketer', why: 'It repeats.' });
-  });
-
-  it('takes only the three lines right under the offer, not a list further down', () => {
-    const r = readOffer('0 | -\nTeammate: Marketer | It repeats.\n\nNotes:\n- one\n- two\n- three');
-    expect(r?.gains).toBeUndefined();
+  it('reads anything but exactly three as none, so the card never mixes its own with the model\'s', () => {
+    expect(readGains('- Learns your voice\n- Carries on')).toBeNull();
+    expect(readGains([...gains, 'a fourth'].join('\n'))).toBeNull();
+    expect(readGains('0 | -\nTeammate: Marketer | It repeats.\n- one')).toBeNull();
+    expect(readGains('')).toBeNull();
   });
 
   it('shortens a line too long for one row of the card', () => {
-    const long = `- Learns ${'your voice and your taste and '.repeat(6)}more`;
-    const r = readOffer(`0 | -\nTeammate: Marketer | It repeats.\n${long}\n- Carries on\n- Asks first`);
-    expect(r?.gains?.[0].length).toBeLessThanOrEqual(90);
+    const long = `Learns ${'your voice and your taste and '.repeat(6)}more`;
+    expect(readGains(`${long}\nCarries on\nAsks first`)?.[0].length).toBeLessThanOrEqual(90);
   });
 
   it('is kept by the store: three short strings at most, nothing else', () => {

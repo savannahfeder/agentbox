@@ -176,7 +176,7 @@ import { codexAccount, codexPlanEnded, ensureCodexHome } from './codex-account.m
 import { accountName } from '../shared/account-names.mts';
 import { nameRow, wantsName, askSmallModel, smallModelPictures } from './row-label.mts';
 import { catchUpRow, catchUpResult } from './catch-up.mts';
-import { isAuto, asksWho, routeCandidates, routePrompt, readRoute, readOffer, routedPatch, orPrimary, NOBODY_WHY } from '../shared/auto-route.mts';
+import { isAuto, asksWho, routeCandidates, routePrompt, readRoute, readOffer, offerPrompt, readGains, routedPatch, orPrimary, NOBODY_WHY } from '../shared/auto-route.mts';
 import { LEVELS, latestMessage, sortMessage, wantsPriority } from './message-priority.mts';
 import { GUESSED_LEVELS, levelTask, wantsLevel } from './task-priority.mts';
 import { NAME, Name, envName, nameSlug, isOurSlug } from '../shared/product-name.mjs';
@@ -5101,8 +5101,10 @@ export class Supervisor {
     try { declined = on ? this.store.teammates?.declinedRoles?.() ?? [] : []; } catch { declined = []; }
     const taken = [...all.flatMap((t) => [t.name, t.role ?? '']), ...declined].filter(Boolean);
     const write = (decision: RouteDecision | null) => {
-      this.store.routeItem(next.product, next.id, routedPatch(next, orPrimary(decision, primary), { items, now: Date.now() }));
+      const patch = routedPatch(next, orPrimary(decision, primary), { items, now: Date.now() });
+      this.store.routeItem(next.product, next.id, patch);
       this.wake();
+      return patch;
     };
     if (!on) { write({ to: 'agent', why: NOBODY_WHY }); return undefined; }
     // With nobody to give it to, the thread starts at once; the question is
@@ -5121,15 +5123,24 @@ export class Supervisor {
     // A call with pictures that fails is asked again in words alone.
     return ask(pictures)
       .then((answer) => (answer || !pictures.length ? answer : ask([])))
-      .then((answer) => {
+      .then(async (answer) => {
         const offer = readOffer(answer, { taken });
-        if (early) {
-          if (offer) this.store.routeItem(next.product, next.id, { routed: { ...early.routed, offer } });
-          return;
+        let routed = early?.routed;
+        if (!early) {
+          const decision = orPrimary(readRoute(answer, team, primary), primary);
+          const toMate = decision.to?.startsWith('mate:') && decision.to !== (primary ? `mate:${primary.id}` : null);
+          routed = write(decision).routed;
+          if (decision.ask || toMate) return;
         }
-        const decision = orPrimary(readRoute(answer, team, primary), primary);
-        const toMate = decision.to?.startsWith('mate:') && decision.to !== (primary ? `mate:${primary.id}` : null);
-        write(offer && !decision.ask && !toMate ? { ...decision, offer } : decision);
+        if (!offer || !routed) return;
+        // The thread is already moving; the card's reasons are asked for after.
+        const said = await this._askSmall((opts) => askSmallModel(offerPrompt(next, offer), (t) => (readGains(t) ? t : ''), { ...opts, timeoutMs: ROUTE_TIMEOUT_MS }), { product: next.product });
+        const gains = said ? readGains(said) : null;
+        let now: WorkItem | undefined;
+        try { now = this.store.listItems().find((i) => i.product === next.product && i.id === next.id); } catch { now = undefined; }
+        // Given to someone else in the meantime: that choice stands, with no offer on it.
+        if (now?.routed && now.routed.at !== routed.at) return;
+        this.store.routeItem(next.product, next.id, { routed: { ...routed, offer: { ...offer, ...(gains ? { gains } : {}) } } });
       })
       .catch((e) => {
         console.warn('zero: could not route a thread:', e.message);
