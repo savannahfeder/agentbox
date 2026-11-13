@@ -4519,7 +4519,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
 .ur-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .ur-kbd {
   flex: none; font-family: inherit; font-size: 10.5px; font-weight: 600; color: var(--text-faint);
-  border: 1px solid var(--line-strong); border-radius: 0; padding: 0 4px; line-height: 15px;
+  border: 1px solid var(--line-strong); border-radius: 4px; padding: 0 4px; line-height: 15px;
 }
 .ur:hover .ur-kbd { color: var(--text); border-color: var(--text-faint); }
 
