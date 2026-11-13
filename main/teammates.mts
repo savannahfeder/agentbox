@@ -695,7 +695,19 @@ export class Teammates {
     } else {
       writeChat(this.dir(), { kind: 'act', from: YOU, verb: 'declined-role', ref: offer.role.toLowerCase(), text: offer.role }, now);
     }
-    this.store.modules.workItemsDisk.updateWorkItem(dir, item.id, { routed: { ...item.routed, offer: { ...offer, answered: make ? 'made' : 'no' } } }, { source: 'system', now });
+    const answered = make ? 'made' : 'no';
+    this.store.modules.workItemsDisk.updateWorkItem(dir, item.id, { routed: { ...item.routed, offer: { ...offer, answered } } }, { source: 'system', now });
+    // One answer covers the same offer waiting on your other threads.
+    const role = offer.role.trim().toLowerCase();
+    let everything: TeamItem[] = [];
+    try { everything = this.store.listItems(now); } catch { everything = []; }
+    for (const other of everything) {
+      const theirs = other.routed?.offer;
+      if (!other.routed || !theirs || theirs.answered || theirs.role.trim().toLowerCase() !== role) continue;
+      if (other.product === item.product && other.id === item.id) continue;
+      const otherDir = this.store.productDir(other.product);
+      if (otherDir) this.store.modules.workItemsDisk.updateWorkItem(otherDir, other.id, { routed: { ...other.routed, offer: { ...theirs, answered } } }, { source: 'system', now });
+    }
     return { made };
   }
 

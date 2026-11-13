@@ -64,6 +64,37 @@ describe('making a teammate from the offer on a thread', () => {
     expect(next).toContain('- Group by what users notice.');
   });
 
+  // 2026-11-13: an answer on one thread left the same card waiting on every
+  // other thread that had been offered the same role.
+  it('answered on one thread, answers the same role waiting on your other threads, and no other role', async () => {
+    const { loadStore } = await import('../main/store-modules.mts');
+    const { Teammates } = await import('../main/teammates.mts');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-offer-everywhere-'));
+    const mods = await loadStore();
+    const w = mods.workItemsDisk;
+    const now = Date.now();
+    const offerOn = (title: string, role: string) => {
+      const it = w.createWorkItem(root, { title, labels: ['founder'] }, { source: 'founder', now });
+      w.updateWorkItem(root, it.id, { routed: { to: 'agent', why: 'x', at: now, by: 'auto', offer: { role, why: 'It repeats.' } } }, { source: 'system', now });
+      return it.id;
+    };
+    const a = offerOn('Weekly update for investors', 'Investor writer');
+    const b = offerOn('Investor update for March', 'investor writer');
+    const c = offerOn('Answer support email', 'Support lead');
+    const store = {
+      config: { storeRoot: root, accountId: 'acct-offer-everywhere' }, modules: mods,
+      listProducts: () => [{ slug: 'site', dir: root, name: 'Site', repoPath: '/r' }],
+      productDir: () => root,
+      listItems: () => w.readWorkItems(root).map((i) => ({ ...i, product: 'site' })),
+    };
+    const team = new Teammates(store);
+    team.answerOffer(store.listItems().find((i) => i.id === a), false, now);
+    const offerOf = (id: string) => store.listItems().find((i) => i.id === id).routed.offer;
+    expect(offerOf(a).answered).toBe('no');
+    expect(offerOf(b).answered).toBe('no');
+    expect(offerOf(c).answered).toBeUndefined();
+  });
+
   it('turned down, is never offered again, and makes nobody', async () => {
     const { loadStore } = await import('../main/store-modules.mts');
     const { Teammates } = await import('../main/teammates.mts');

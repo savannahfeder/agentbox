@@ -8,7 +8,7 @@
 // of making an AI teammate for it (learning, continuity, etc.)". She approved
 // the hire card (designs/w-bb45118b10/teammate-card-1-hire-card-v2.png): a sky
 // banner, "Make this a Marketer's job.", one sentence, three reasons in a
-// bordered list, and Make with ↵ beside Not now. The reasons are about this
+// bordered list, and Make beside Not now. The reasons are about this
 // thread, so once Auto offers a role, a second short question writes them.
 // Asking for them inside Auto's own question made it offer on 7 of 12
 // recurring tasks against 11 of 12 (Haiku, 2026-11-12), so they are asked apart.
@@ -19,7 +19,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 const { routePrompt, offerPrompt, readGains } = await import('../shared/auto-route.mts');
 const { cleanRouted } = await import('../shared/work-items.mts');
-const { offerCard, offerWaiting, enterMakesTeammate, DEFAULT_GAINS } = await import('../renderer/src/teammate-offer.ts');
+const { offerCard, offerWaiting, startsFolded, DEFAULT_GAINS } = await import('../renderer/src/teammate-offer.ts');
 const { TeammateOffer } = await import('../renderer/src/components/TeammateOffer.tsx');
 
 const gains = ['Learns your voice from every post you approve or change', 'Carries on where this post left off, not from nothing', 'Writes it every Monday, and asks you before it posts'];
@@ -63,11 +63,12 @@ describe('Auto writes what the teammate would bring', () => {
   });
 });
 
+const row = (offer: Record<string, unknown> | undefined, extra = {}) => ({
+  id: 'w-post', product: 'site', title: 'Write this week\'s launch post', status: 'open', labels: ['founder'],
+  routed: { to: 'agent', why: 'x', at: 1, by: 'auto', ...(offer ? { offer } : {}) }, ...extra,
+});
+
 describe('the card', () => {
-  const row = (offer: Record<string, unknown> | undefined, extra = {}) => ({
-    id: 'w-post', product: 'site', title: 'Write this week\'s launch post', status: 'open', labels: ['founder'],
-    routed: { to: 'agent', why: 'x', at: 1, by: 'auto', ...(offer ? { offer } : {}) }, ...extra,
-  });
 
   it('says whose job it is, why, the three reasons, and the button, in the approved words', () => {
     expect(offerCard({ role: 'Marketer', why: 'A Marketer would write it every week.', gains })).toEqual({
@@ -87,13 +88,13 @@ describe('the card', () => {
     expect(card.why).toMatch(/Support lead/);
   });
 
-  it('draws as a card with the banner, the list and both buttons, with ↵ on Make', () => {
+  it('draws as a card with the banner, the list and both buttons', () => {
     const html = renderToStaticMarkup(h(TeammateOffer, { item: row({ role: 'Marketer', why: 'It repeats.', gains }) }));
     expect(html).toContain('class="to-card"');
     expect(html).toContain('<canvas');
     expect(html).toContain('Make this a Marketer&#x27;s job.');
     for (const g of gains) expect(html).toContain(g);
-    expect(html).toMatch(/Make a Marketer.*↵/);
+    expect(html).toContain('Make a Marketer');
     expect(html).toContain('Not now');
   });
 
@@ -116,25 +117,50 @@ describe('the card', () => {
   });
 });
 
-describe('↵ makes the teammate', () => {
-  const waiting = { routed: { to: 'agent', why: 'x', at: 1, by: 'auto' as const, offer: { role: 'Marketer', why: '' } } };
-
-  it('when the card is waiting and no option is picked', () => {
-    expect(enterMakesTeammate(waiting, null)).toBe(true);
-  });
-
-  it('never over an option you arrowed to: ↵ sends that option', () => {
-    expect(enterMakesTeammate(waiting, 1)).toBe(false);
-  });
-
-  it('never with no card waiting, so ↵ on arrival stays inert', () => {
-    expect(enterMakesTeammate({ routed: { to: 'agent', why: 'x', at: 1, by: 'auto' as const } }, null)).toBe(false);
-    expect(enterMakesTeammate({ routed: { ...waiting.routed, offer: { role: 'Marketer', why: '', answered: 'no' as const } } }, null)).toBe(false);
-  });
-
-  it('is what the thread\'s ↵ does', () => {
+// The founder, 2026-11-13: ↵ making a teammate was "not a good idea in case
+// someone does it accidentally", and the card should fold away.
+describe('only a click makes a teammate', () => {
+  it('↵ in a thread does nothing to the card', () => {
     const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
-    expect(app).toMatch(/enterMakesTeammate\(focused, optionSel\)/);
+    expect(app).not.toMatch(/teammate-offer|answerRouteOffer/);
+  });
+
+  it('and the button shows no key', () => {
+    const html = renderToStaticMarkup(h(TeammateOffer, { item: row({ role: 'Marketer', why: '', gains }) }));
+    expect(html).not.toContain('↵');
+  });
+});
+
+describe('folding it away', () => {
+  it('opens whole the first time, and folded once you have seen it on this thread', () => {
+    expect(startsFolded({ choice: null, seen: false })).toBe(false);
+    expect(startsFolded({ choice: null, seen: true })).toBe(true);
+  });
+
+  it('keeps what you chose with the chevron, either way', () => {
+    expect(startsFolded({ choice: 'open', seen: true })).toBe(false);
+    expect(startsFolded({ choice: 'folded', seen: false })).toBe(true);
+  });
+
+  it('folded, is one line that still names the role, and opens again with a click', () => {
+    const store = new Map<string, string>([['agentbox.teammate-offer.fold.site/w-post', 'folded']]);
+    const was = (globalThis as { localStorage?: unknown }).localStorage;
+    (globalThis as { localStorage?: unknown }).localStorage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v); } };
+    try {
+      const html = renderToStaticMarkup(h(TeammateOffer, { item: row({ role: 'Marketer', why: '', gains }) }));
+      expect(html).toContain('class="to-bar"');
+      expect(html).toContain('aria-expanded="false"');
+      expect(html).toContain('Make this a Marketer&#x27;s job.');
+      expect(html).not.toContain('to-card');
+      expect(html).not.toContain(gains[0]);
+    } finally {
+      (globalThis as { localStorage?: unknown }).localStorage = was;
+    }
+  });
+
+  it('whole, has a chevron to fold it', () => {
+    const html = renderToStaticMarkup(h(TeammateOffer, { item: row({ role: 'Marketer', why: '', gains }) }));
+    expect(html).toContain('aria-label="Fold this away"');
   });
 });
 

@@ -1,5 +1,5 @@
 // What the card offering a teammate says (./components/TeammateOffer.tsx), and
-// when ↵ in the thread answers it.
+// whether it opens folded.
 import type { WorkItem } from './types';
 
 type Offer = NonNullable<NonNullable<WorkItem['routed']>['offer']>;
@@ -28,10 +28,17 @@ export function offerWaiting(item: Pick<WorkItem, 'routed'> | null | undefined):
   return !!offer && !offer.answered;
 }
 
-/** ↵ sends an option you arrowed to; with none picked it makes the teammate the card offers. */
-export function enterMakesTeammate(item: Pick<WorkItem, 'routed'> | null | undefined, optionSel: number | null): boolean {
-  return optionSel === null && offerWaiting(item);
+/** What you chose with the chevron, which always wins; otherwise a card you have already seen on this thread opens folded. */
+export type Fold = 'folded' | 'open' | null;
+export function startsFolded({ choice, seen }: { choice: Fold; seen: boolean }): boolean {
+  return choice ? choice === 'folded' : seen;
 }
 
-/** The thread's ↵ reaches the card on screen through this, so the card shows the press at once. */
-export const MAKE_OFFERED_TEAMMATE = 'agentbox:make-offered-teammate';
+const key = (kind: 'fold' | 'seen', item: Pick<WorkItem, 'product' | 'id'>) => `agentbox.teammate-offer.${kind}.${item.product}/${item.id}`;
+const read = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
+const write = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* private window */ } };
+
+export const foldChosen = (item: Pick<WorkItem, 'product' | 'id'>): Fold => { const v = read(key('fold', item)); return v === 'folded' || v === 'open' ? v : null; };
+export const chooseFold = (item: Pick<WorkItem, 'product' | 'id'>, folded: boolean) => write(key('fold', item), folded ? 'folded' : 'open');
+export const seenBefore = (item: Pick<WorkItem, 'product' | 'id'>) => read(key('seen', item)) === '1';
+export const markSeen = (item: Pick<WorkItem, 'product' | 'id'>) => write(key('seen', item), '1');
