@@ -287,9 +287,10 @@ async function follow() {
     await new Promise((r) => setTimeout(r, 35));
   }
 }
-async function move(x, y, { dur } = {}) {
+async function move(x, y, { dur, real = true } = {}) {
   await page.evaluate(([a, b, d]) => window.__human(a, b, d == null ? {} : { dur: d }), [x, y, dur ?? null]);
   cur = { x, y };
+  if (!real) return;
   const q = await page.evaluate(() => window.__ptr);
   lastReal = q; await page.mouse.move(q.x, q.y);
 }
@@ -366,6 +367,22 @@ async function go(what, target, opts = {}, cutOpts = {}) {
   const r = await rectOf(target, opts);
   if (r) { const c = centerOf(r, 0.5, 0.5); if (Math.abs(c.x - cur.x) > r.w / 2 - 2 || Math.abs(c.y - cur.y) > r.h / 2 - 2) await move(c.x, c.y, { dur: 0.16 }); }
   return cut(what, click, cutOpts);
+}
+// Home sits on the side rail, which opens when the mouse rests on it for
+// 140 ms; the slowed film always rests that long, a hand on a Mac does not.
+// So only the drawn pointer goes there, and the press is the button's own click.
+async function goHome(what, then) {
+  held = true;
+  const ok = await to('css:button[aria-label="Home"]', { real: false });
+  await sleep(90 + Math.random() * 80);
+  await cut(what, async () => {
+    if (!ok) return false;
+    events.push({ t: +now().toFixed(3), kind: 'click' });
+    return page.evaluate(() => { const b = document.querySelector('button[aria-label="Home"]'); b?.click(); return !!b; });
+  });
+  await move(then.x, then.y, { real: false });
+  lastReal = { x: -1, y: -1 };
+  held = false;
 }
 async function press(target, opts = {}) {
   const r0 = await to(target, opts);
@@ -447,7 +464,7 @@ try {
   await at(A.everyone - 0.05); await go('open Team', '^Open Team', main);
   await at(A.everyone + 1.3); page.evaluate(() => window.__flick(320, 1.0)).catch(() => {});
   // "And this is your inbox": back to Home, then into the inbox
-  await at(A.inbox - 3.6); await go('back to Home', 'css:button[aria-label="Home"]'); await move(760, 330);
+  await at(A.inbox - 3.6); await goHome('back to Home', { x: 760, y: 330 });
   await at(A.inbox - 1.0); await go('open the inbox', '^Inbox\\s*\\d+$', { minX: 400 });
   await at(A.most_important - 0.7); await to('^Urgent$', main);
   // "every agent runs on the Claude Code and Codex plan you already have"
@@ -506,7 +523,7 @@ try {
   // "So that's every agent you have from one inbox, ... dozens of threads": the board
   await at(A.thats_every - 0.3); unzoom(0.8);
   await at(A.dozens - 0.6); await cut('show the board', () => key('b')); await sleep(500); await move(980, 560);
-  await at(A.free - 0.8); await go('back to Home at the end', 'css:button[aria-label="Home"]'); await move(1050, 600);
+  await at(A.free - 0.8); await goHome('back to Home at the end', { x: 1050, y: 600 });
   await at(T1);
 } catch (e) { fail(`stopped: ${e.message}`); }
 
