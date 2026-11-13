@@ -66,7 +66,9 @@ export default defineConfig({
     // `--maxWorkers`, `--no-file-parallelism` and VITEST_MAX_FORKS still win.
     maxWorkers: workersFor({ memBytes: os.totalmem(), cpus: os.availableParallelism?.() ?? os.cpus().length }),
     minWorkers: 1,
-    poolOptions: { forks: { execArgv: [`--max-old-space-size=${WORKER_HEAP_MB}`] } },
+    // In NODE_OPTIONS, not execArgv: the app starts its worker threads with
+    // process.execArgv, and Node refuses a thread whose flags set the heap.
+    env: { NODE_OPTIONS: [process.env.NODE_OPTIONS, `--max-old-space-size=${WORKER_HEAP_MB}`].filter(Boolean).join(' ') },
     // ROOM FOR A MAC THAT IS NEVER IDLE (w-c121bd85e6, 2026-10-04). Vitest's
     // defaults, 5 s for a test and 10 s for a hook, are written for a laptop
     // running one suite. A dozen agents share this one, and the end-to-end

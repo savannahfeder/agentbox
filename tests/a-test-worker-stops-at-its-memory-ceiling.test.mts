@@ -13,6 +13,7 @@
 // sits above them.
 import { describe, expect, it } from 'vitest';
 import v8 from 'node:v8';
+import { Worker } from 'node:worker_threads';
 import config, { WORKER_HEAP_MB, workersFor } from '../vitest.config.mjs';
 
 const GB = 1024 ** 3;
@@ -25,7 +26,17 @@ describe('a test worker\'s memory ceiling', () => {
   });
 
   it('is set in the config every run reads, the push hook\'s included', () => {
-    expect(config.test?.poolOptions?.forks?.execArgv).toContain(`--max-old-space-size=${WORKER_HEAP_MB}`);
+    expect(config.test?.env?.NODE_OPTIONS).toContain(`--max-old-space-size=${WORKER_HEAP_MB}`);
+  });
+
+  // Set as a start flag instead, it reached process.execArgv, and every worker
+  // thread the app starts with those flags was refused; the app then did that
+  // work on the main thread, and two tests about exactly that went red.
+  it('leaves the app\'s worker threads able to start', async () => {
+    const thread = new Worker('require("node:worker_threads").parentPort.postMessage("up")', { eval: true, execArgv: [...process.execArgv] });
+    const said = await new Promise((resolve, reject) => { thread.once('message', resolve); thread.once('error', reject); });
+    await thread.terminate();
+    expect(said).toBe('up');
   });
 
   it('leaves a 16 GB Mac at least half its memory with every worker full', () => {
