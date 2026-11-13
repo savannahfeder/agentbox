@@ -4478,7 +4478,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
   background: none; border: 1px solid transparent; border-radius: var(--tag-radius);
   font: inherit; font-size: 13px; color: var(--text); cursor: pointer; white-space: nowrap;
 }
-.ur > span:not(.ur-dot):not(.ur-bell) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ur > span:not(.ur-dot):not(.ur-bell):not(.ur-card) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .ur-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--chip-ask); animation: ur-arrive 1.2s ease-in-out 3; }
 @keyframes ur-arrive { 50% { opacity: .25; } }
 .ur-kbd {
@@ -4492,8 +4492,24 @@ img.product-mark { object-fit: cover; opacity: 1; }
 .ur-b { font: 11px var(--mono); letter-spacing: .09em; text-transform: uppercase; gap: 8px; }
 .ur-b-word { color: var(--chip-ask); }
 .ur-b-title { color: var(--text-dim); }
-/* c: only a count, the title on hover. */
-.ur-c { color: var(--text-dim); border-color: var(--line); }
+/* c: only a count, the thread on hover. f: the same box with the title in it. */
+.ur-c { position: relative; color: var(--text-dim); border-color: var(--line); }
+.ur-f-title { color: var(--text); }
+/* The card under it on hover. The padding is the bridge the pointer crosses. */
+.ur-card {
+  position: absolute; top: 100%; right: -1px; z-index: 40; width: 340px; padding-top: 8px;
+  display: none; cursor: pointer; white-space: normal; text-align: left;
+}
+.ur-c:hover .ur-card, .ur-c:focus-visible .ur-card { display: block; }
+.ur-card-in {
+  display: grid; gap: 4px; padding: 12px 14px 11px;
+  background: var(--pop); border: 1px solid var(--line); border-radius: var(--tag-radius); box-shadow: var(--shadow-lg);
+}
+.ur-card-title { font-size: 14px; font-weight: 500; line-height: 1.4; color: var(--text); }
+.ur-card-said { font-size: 13px; line-height: 1.45; color: var(--text-dim); text-wrap: pretty; }
+.ur-f .ur-card-title { display: none; }
+.ur-card-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; font-size: 12px; color: var(--text-faint); }
+.ur-card-key { display: inline-flex; align-items: center; gap: 6px; }
 /* d: a small word over the title. */
 .ur-d { height: 34px; }
 .ur-d-text { display: grid; text-align: left; line-height: 1.2; }

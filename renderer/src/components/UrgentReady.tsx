@@ -1,13 +1,32 @@
 // The urgent thread that arrived while another was open, named in the top bar
 // until it is opened or this thread is left. Pressing it, or O, opens it.
 //
-// DRAFT: five looks to choose from (?urgentlook=a..e). Only the picked one ships.
-import { rowTitle } from '../list-rules';
+// DRAFT: six looks to choose from (?urgentlook=a..f). Only the picked one ships.
+import { rowSummary, rowTitle } from '../list-rules';
+import { agoQuiet } from '../format';
 import type { WorkItem } from '../types';
 
-export type UrgentLook = 'a' | 'b' | 'c' | 'd' | 'e';
+export type UrgentLook = 'a' | 'b' | 'c' | 'd' | 'e' | 'f';
 
 const Key = () => <kbd className="ur-kbd">O</kbd>;
+
+// On hover: the thread as its inbox row would say it, so it can be judged
+// without opening it.
+function Card({ row, title }: { row: WorkItem; title: string }) {
+  const summary = rowSummary(row, 'inbox');
+  return (
+    <span className="ur-card" role="tooltip">
+      <span className="ur-card-in">
+        <span className="ur-card-title">{title}</span>
+        {summary && <span className="ur-card-said">{summary}</span>}
+        <span className="ur-card-foot">
+          <span>{[row.productName, agoQuiet(row.updatedAt)].filter(Boolean).join(' · ')}</span>
+          <span className="ur-card-key"><Key />Open</span>
+        </span>
+      </span>
+    </span>
+  );
+}
 
 export function UrgentReady({ row, look = 'a', onOpen }: { row: WorkItem; look?: UrgentLook; onOpen: () => void }) {
   const title = rowTitle(row);
@@ -17,8 +36,15 @@ export function UrgentReady({ row, look = 'a', onOpen }: { row: WorkItem; look?:
     </button>
   );
   if (look === 'c') return (
-    <button type="button" className="ur ur-c" onClick={onOpen} title={title}>
+    <button type="button" className="ur ur-c" onClick={onOpen}>
       <span className="ur-dot" />1 urgent<Key />
+      <Card row={row} title={title} />
+    </button>
+  );
+  if (look === 'f') return (
+    <button type="button" className="ur ur-c ur-f" onClick={onOpen}>
+      <span className="ur-dot" /><span className="ur-f-title">{title}</span><Key />
+      <Card row={row} title={title} />
     </button>
   );
   if (look === 'd') return (
