@@ -30,6 +30,18 @@ const definition = harnessDefinition('claude')!;
 // app starts carries it: workers in their settings file, small calls inline.
 export const NO_METERED_KEY = Object.freeze({ env: Object.freeze({ ANTHROPIC_API_KEY: '' }), apiKeyHelper: '' });
 
+// A small-model question (a thread's name, a task's level, where Auto sends a
+// thread) is the question and nothing else: no tools, skills, MCP servers,
+// hooks, thinking or saved session. Without these each one carried a whole
+// agent's system prompt and tools, 85.8 KB to get back a name.
+const SMALL_MODEL_ALONE = Object.freeze([
+  '--system-prompt', 'Answer the message exactly as it asks, and nothing else.',
+  '--tools', '', '--disable-slash-commands',
+  '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
+  '--no-session-persistence',
+  '--settings', JSON.stringify({ ...NO_METERED_KEY, alwaysThinkingEnabled: false, disableAllHooks: true }),
+]);
+
 const pictureType = (p: string) => {
   const ext = path.extname(p).toLowerCase();
   return ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : ext === '.gif' ? 'image/gif' : ext === '.webp' ? 'image/webp' : 'image/png';
@@ -107,9 +119,12 @@ export const claudeHarness = {
   memoryGate: (sup: HarnessSupervisor, item: HarnessItem) => sup.memoryGateEnv(item),
   // `-p "<words>"` cannot carry a picture, so a call with pictures sends the
   // words and the pictures as one message on stdin and reads the result event.
-  smallModelArgs: (prompt: string, model: string, pictures: readonly string[] = []) => pictures.length
-    ? ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--model', model, '--settings', JSON.stringify(NO_METERED_KEY)]
-    : ['-p', prompt, '--model', model, '--settings', JSON.stringify(NO_METERED_KEY)],
+  smallModelArgs: (prompt: string, model: string, pictures: readonly string[] = []) => [
+    ...(pictures.length
+      ? ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--model', model]
+      : ['-p', prompt, '--model', model]),
+    ...SMALL_MODEL_ALONE,
+  ],
   smallModelInput: (prompt: string, pictures: readonly string[] = []) => {
     if (!pictures.length) return null;
     const content = [

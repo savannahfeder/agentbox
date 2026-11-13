@@ -13,7 +13,7 @@ import { attachProblem, fromPaste, persistAttachments, useAttaching, type Pendin
 import { notePictures, noteWithPictures } from '../note-pictures';
 import { canPaintQuotes, cellAround, paintQuotes } from '../paint-quotes';
 import { fileFamilyFor, notesBesideCount, notesCanPoint, noteAttachments, sentTimes, sidebarNotes } from '../notes-sidebar';
-import { noteSendWords, pinLabel, pinsToDraw, whereANoteGoes, whoTalksOnFile } from '../artifact-pins';
+import { noteBoxKey, noteSendWords, pinLabel, pinsToDraw, sentWithTheNote, whereANoteGoes, whoTalksOnFile } from '../artifact-pins';
 import { AttachRow } from './AttachRow';
 import { NotePictureShown } from './FileNoteCard';
 import { NoteGlyph } from './NoteGlyphs';
@@ -253,7 +253,7 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
     if (got.length) setPictures((was) => [...was, ...got]);
   };
 
-  const add = async () => {
+  const add = async (now = false) => {
     const typed = words.trim();
     if ((!typed && !pictures.length) || !version || sending || attaching.length) return;
     setSending(true);
@@ -269,6 +269,7 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
     const owner = whoseIsTheFile(files, version.id);
     const goes = whereANoteGoes({ ...noteTo, text: typed });
     const mentions = goes.to === 'person' ? [goes.person] : [];
+    const withIt = now && canSend ? sentWithTheNote(goes, waiting.filter((n) => !n.saving).map((n) => n.id), id) : [];
     const kept = { words, quote, spot, pictures };
     const pin = spot ? { pin: pinNotes.length + 1 } : {};
     setPending((was) => [...was, { id, file: version.id, place, text, by: me, ts: Date.now(), mentions, owner: null, uid: null, wait: true, saving: true, ...pin }]);
@@ -277,16 +278,18 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
       .catch((err: Error) => ({ ok: false, error: err.message }));
     setSending(false);
     // Kept, so Send can take it before the thread's own copy catches up.
-    if (out.ok) setPending((was) => was.map((n) => (n.id === id ? { ...n, saving: false } : n)));
-    else {
+    if (out.ok) {
+      setPending((was) => was.map((n) => (n.id === id ? { ...n, saving: false } : n)));
+      if (withIt.length) await sendNotes(withIt);
+    } else {
       setPending((was) => was.filter((n) => n.id !== id));
       setWords(kept.words); setQuote(kept.quote); setSpot(kept.spot); setPictures(kept.pictures);
       setTrouble(out.error ?? 'That note did not save.');
     }
   };
 
-  const send = async () => {
-    const on = waiting.filter((n) => !n.saving).map((n) => n.id);
+  const send = () => sendNotes(waiting.filter((n) => !n.saving).map((n) => n.id));
+  const sendNotes = async (on: string[]) => {
     if (!on.length) return;
     const out = await api.fileMark({ product: item.product, id: item.id, mark: { do: 'toagent', on } }).catch((err: Error) => ({ ok: false, error: err.message }));
     setTrouble(out.ok ? null : out.error ?? 'Those notes did not reach the agent.');
@@ -334,7 +337,8 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
               if (got.length) setPictures((was) => [...was, ...got]);
             } : undefined}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void add(); }
+              const does = noteBoxKey({ key: e.key, chord: e.metaKey || e.ctrlKey, shift: e.shiftKey, composing: e.nativeEvent.isComposing, typed: !!words.trim() || !!pictures.length, waiting: canSend ? waiting.length : 0 });
+              if (does !== 'leave') { e.preventDefault(); void (does === 'send waiting' ? send() : add(does === 'note and send')); }
               // The app ignores Escape inside a box, so letting go of it is what lets the next one leave full screen.
               else if (e.key === 'Escape') { e.preventDefault(); if (quote || spot || pinning) pointAt(null, null); else e.currentTarget.blur(); }
             }} />

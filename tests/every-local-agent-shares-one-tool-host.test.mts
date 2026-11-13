@@ -23,7 +23,19 @@ import { stripTypesFlags } from '../main/strip-types.mts';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cleanup = [];
 afterEach(async () => { while (cleanup.length) await cleanup.pop()(); });
-const tempDir = (name = 'tools-') => { const d = fs.mkdtempSync(path.join(os.tmpdir(), name)); cleanup.push(() => fs.rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })); return d; };
+// rmSync's own retries list a folder once and then only retry the rmdir, so one
+// file a just-ended run writes after that listing fails every retry. Starting
+// the whole delete over picks the late file up.
+const removeDir = async (d, ms = 30_000) => {
+  const end = Date.now() + ms;
+  for (;;) {
+    try { fs.rmSync(d, { recursive: true, force: true }); return; } catch (e) {
+      if (Date.now() > end) throw e;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  }
+};
+const tempDir = (name = 'tools-') => { const d = fs.mkdtempSync(path.join(os.tmpdir(), name)); cleanup.push(() => removeDir(d)); return d; };
 const until = async (check, ms = 10_000) => {
   const end = Date.now() + ms;
   for (;;) {
@@ -319,8 +331,7 @@ describe('the real supervisor, with a stand-in agent', () => {
       sock.once('data', (d) => { sock.destroy(); try { resolve(JSON.parse(d).pid); } catch { resolve(null); } });
     }) : null;
     if (runHost) try { process.kill(runHost, 'SIGKILL'); } catch { /* gone */ }
-    // A process just killed can still be writing here; macOS then refuses the delete.
-    if (copy) fs.rmSync(copy.dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    if (copy) await removeDir(copy.dir);
     app = null;
     copy = null;
   });
