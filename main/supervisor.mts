@@ -7,7 +7,7 @@ export { streamingText, countHelpers, saidNothingSheCanUse } from './harnesses/c
 import { taskRemoteControl } from './task-remote-control.mts';
 import type { BridgeStateEvent } from './task-remote-control.mts';
 import { taskFolderPath, real, restoreTaskFolder } from './task-folders.mts';
-import { SHIP_LABEL, ShipQueue, readShipSettings, shipScriptFor, shipSlot } from './ship-queue.mts';
+import { SHIP_LABEL, ShipQueue, readShipSettings, shipScriptFor, shipSlot, stopShips } from './ship-queue.mts';
 import { MainTests } from './main-went-red.mts';
 import { SecurityScan } from './the-security-scan-went-red.mts';
 import { CloudServerWatch, serverError } from './cloud-server-down.mts';
@@ -2228,6 +2228,8 @@ export class Supervisor {
     // let go, and picked back up at the next start.
     for (const session of this.sessions.values()) if (!this._letGoOfHostedRun(session)) this._kill(session, session.cloud && session.engine !== 'codex' ? 'SIGHUP' : undefined);
     this._closeCodex(`${Name} is quitting`);
+    // A ship cut off here is tried again at the next start.
+    stopShips();
     this.stopMemoryGate();
     this.signInReturns?.stopAll();
     clearInterval(this._leftoverTimer);
@@ -6729,6 +6731,8 @@ export class Supervisor {
     this._saveState();
     return sent;
   }
+
+  hasFilesForCloud(itemId: string): boolean { return this._filesWaitingFor(itemId).length > 0; }
 
   _filesWaitingFor(itemId: string): string[] {
     const waiting = this._filesForCloud?.get(itemId);
