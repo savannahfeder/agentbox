@@ -173,6 +173,27 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   // A team's run ends once its person's own hours are spent; the sweep ends it when the trial or the team does.
   const runOver = (rec, s, t) => (s.team ? teamUsedOf(rec, s.team, !!s.trial, t) >= teamAllot(!!s.trial) : s.free ? freeSpent(rec, t) : onFree(rec) || ownOver(rec, t));
   // `people`: every member's own use, for the owner's page; a start needs only this person's.
+  // A TEAM PAYS FOR THE PEOPLE ON IT: one seat when it starts, one more when
+  // somebody accepts an invitation, one fewer when somebody leaves. Stripe is
+  // told when the two differ and its webhook writes the new count. A team asks
+  // at most once in ten minutes, so a Stripe that is down is not asked on
+  // every call, and what it said is logged.
+  const seatsAsked = new Map();
+  const SEATS_ASK_GAP_MS = 10 * 60_000;
+  async function seatsFollowMembers(teamId, bill, seats, members) {
+    const want = Math.max(1, members);
+    if (!stripe?.seats || !seats || !bill.stripe?.subscription || want === seats) return;
+    const t = now();
+    if (t - (seatsAsked.get(teamId) ?? -Infinity) < SEATS_ASK_GAP_MS) return;
+    seatsAsked.set(teamId, t);
+    try {
+      await stripe.seats(bill.stripe.subscription, want);
+      log(`team ${teamId} has ${want} ${want === 1 ? 'person' : 'people'} and paid for ${seats} seats, so Stripe was told ${want}`);
+    } catch (err) {
+      log(`team ${teamId} has ${want} people and pays for ${seats} seats, and Stripe would not change it: ${err?.message || err}`);
+    }
+  }
+
   async function teamNow(person, t, { people = false } = {}) {
     if (!teams) return null;
     const team = await teams(person);
@@ -188,6 +209,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     const trial = seats ? bill.stripe.status === 'trialing' : t < endsAt;
     if (!seats && !trial) return null;
     const members = team.members.filter((m) => PERSON.test(m));
+    await seatsFollowMembers(team.id, bill, seats, members.length);
     const tm = {
       id: team.id, trial, seats, endsAt: trial ? endsAt : null, members: members.length, owner: (team.owners || []).includes(person),
       seconds: teamAllot(trial),
