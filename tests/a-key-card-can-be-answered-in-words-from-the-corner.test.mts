@@ -47,7 +47,7 @@ describe('the key card\'s buttons', () => {
     const html = row(false);
     expect(html.indexOf('Send the key')).toBeLessThan(html.indexOf('Deny'));
     expect(html.indexOf('Deny')).toBeLessThan(html.indexOf('Reply'));
-    expect(html).toMatch(/class="approval-reply"[^>]*>.*Reply.*⌘3/);
+    expect(html).toMatch(/class="approval-reply"[^>]*>.*Reply<span class="approval-key"><svg class="key-mark".*<\/svg>3/);
     expect(html).not.toMatch(/class="approval-deny"[^>]*>Reply/);
   });
 

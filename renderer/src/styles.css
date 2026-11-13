@@ -2783,6 +2783,12 @@ body {
 .approval-key { font-weight: 500; letter-spacing: 0.01em; }
 .approval-allow .approval-key { color: color-mix(in oklab, var(--on-solid) 55%, transparent); }
 .approval-deny .approval-key { color: var(--text-faint); }
+/* The drawn ⌘ of renderer/src/components/CardKey.tsx. Geist's numbers are
+   0.71em, but its round loops read taller than a number at that height and the
+   number renders a little under it; at 0.68em the inks' tops and baselines
+   meet to the device pixel. */
+.key-mark { height: 0.68em; width: 0.68em; vertical-align: baseline; margin-right: 0.14em; stroke-width: 2.2; }
+.approval-reply .key-mark { stroke-width: 1.95; }
 /* A key card's Reply (renderer/src/components/KeyCardActions.tsx): at the far
    end, without Deny's box and lighter than it, because the two side by side
    were mixed up. Its right edge is the card's content edge. */

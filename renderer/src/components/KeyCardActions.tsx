@@ -2,6 +2,7 @@
 // (main/cloud/key-asks.mts): Send the key, Deny, and Reply, which swaps them
 // for a box whose words go back to the run instead of a yes or a no.
 import { useState, type ReactNode, type KeyboardEvent } from 'react';
+import { CardKey } from './CardKey';
 
 export function KeyCardActions({ send, deny, chord, replying, onReplying, onReply }: {
   send: ReactNode;
@@ -32,7 +33,7 @@ export function KeyCardActions({ send, deny, chord, replying, onReplying, onRepl
     {/* Drawn apart from Deny, at the far end and without its box: the two were mixed up. */}
     <button type="button" className="approval-reply" onClick={() => onReplying(true)}>
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 4 2.5 7.5 6 11" /><path d="M2.5 7.5H9a4.5 4.5 0 0 1 4.5 4.5v.5" /></svg>
-      Reply<span className="approval-key">{chord('⌘3')}</span>
+      Reply<CardKey keys={chord('⌘3')} />
     </button>
   </div>;
 }
