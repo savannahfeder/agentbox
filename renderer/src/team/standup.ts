@@ -103,7 +103,11 @@ function postOf(p: TodayPerson, live: boolean): StandupPost {
     // A thread whose agent answered and now waits on its owner is still theirs to finish.
     working: [...g.working, ...(p.waiting ?? [])].sort(byNewest).map(titled),
     // What is stuck is only known as of now, so only today's post says it.
-    needs: live ? g.blocked.map((l) => ({ line: titled(l), on: l.on ?? null })) : [],
+    // A teammate's post also says what they handed you; your own Needs you is the inbox's to say.
+    needs: live ? [
+      ...g.blocked.map((l) => ({ line: titled(l), on: l.on ?? null })),
+      ...(p.kind === 'me' ? [] : p.waitingOnYou.map((l) => ({ line: titled(l), on: 'you' }))),
+    ] : [],
     privateDone: p.privateDone,
     privateWorking: p.privateWorking ?? 0,
   };

@@ -150,6 +150,24 @@ describe('what a post says on a past day and while a thread waits on its owner',
   });
 });
 
+// A tester's AI teammate finished a fix and handed it over for review; its
+// standup post left it out, because what waits on you lives in Needs you.
+describe('what a teammate handed you is in their post', () => {
+  const review = item({ id: 'r', title: 'Booking fix', labels: ['teammate:t-fix'], updatedAt: on(12, 14) });
+  const dayOf = () => teamToday({ ...base, window: standupWindow(on(12, 0), DEFAULT_STANDUP, NOW), items: [review], needs: [review] as never });
+  it('an AI teammate\'s post says it needs you on what it handed over', () => {
+    const mate = postsOf(dayOf().people, { mates: true, live: true }).find((p) => p.key === 'mate:t-fix');
+    expect(mate?.needs.map((n) => [n.line.title, n.on])).toEqual([['Booking fix', 'you']]);
+  });
+  it('a past day does not say it', () => {
+    expect(postsOf(dayOf().people, { mates: true, live: false }).flatMap((p) => p.needs)).toEqual([]);
+  });
+  it('your own post does not repeat your Needs you', () => {
+    const mine = teamToday({ ...base, window: standupWindow(on(12, 0), DEFAULT_STANDUP, NOW), items: [item({ id: 'x', title: 'My ask', status: 'done', updatedAt: on(12, 11) })], needs: [item({ id: 'q', title: 'Agent asks me' })] as never });
+    expect(postsOf(mine.people, { mates: true, live: true }).find((p) => p.key === 'me')?.needs ?? []).toEqual([]);
+  });
+});
+
 describe('the sentence for every shape of day', () => {
   const line = (title: string) => ({ key: title, title, at: 1 });
   const post = (o: Partial<ReturnType<typeof postsOf>[number]>) => ({ key: 'p', name: 'Dev Patel', kind: 'person' as const, done: [], shipped: [], finished: [], working: [], needs: [], privateDone: 0, ...o });
