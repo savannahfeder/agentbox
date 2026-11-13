@@ -71,13 +71,6 @@ export function shownSkyId(saved: string | null, dark: boolean): SkyId | null {
 /** The look step's choice that follows the Mac: it saves no sky, so shownSkyId wears orange in the dark and green in the light. */
 export const MATCH_SKY = 'match';
 
-/** The empty Inbox's sky: dots over the whole card, the streak laid out below
- *  the writing box so no word sits on it. `boxFoot` is 0 when the box is not
- *  on the page. */
-export function emptyInboxSky(boxFoot: number, height: number): { from: number; span: number; curveTop: number } {
-  return { from: 40, span: 300, curveTop: boxFoot > 0 ? boxFoot + 24 : Math.round(height * 0.55) };
-}
-
 const BAYER = [0, 32, 8, 40, 2, 34, 10, 42, 48, 16, 56, 24, 50, 18, 58, 26, 12, 44, 4, 36, 14, 46, 6, 38, 60, 28, 52, 20, 62, 30, 54, 22, 3, 35, 11, 43, 1, 33, 9, 41, 51, 19, 59, 27, 49, 17, 57, 25, 15, 47, 7, 39, 13, 45, 5, 37, 63, 31, 55, 23, 61, 29, 53, 21];
 
 /** Paints `art` into `canvas` at its CSS size. Dots start at `from` px and are
