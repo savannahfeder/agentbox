@@ -14,7 +14,7 @@ import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { LAST_PRODUCT_KEY } from '../compose-project';
 import {
-  ENGINE_NAME, FIRST_RUN_STEP, chatChoices, chatsHeadline, foundLine, installGate, listKey, previousScreen, projectsToMake, readyEngines, setupWord, runningSetup, signedOutEngines,
+  ENGINE_NAME, FIRST_RUN_STEP, chatChoices, chatsHeadline, foundLine, installGate, listKey, previousScreen, projectsToMake, knownSignedOut, offeredEngines, setupWord, runningSetup, unsureEngines,
   type Engine, type Screen,
   inHomeFolder,
 } from '../first-run';
@@ -28,6 +28,8 @@ type Project = { slug: string; name: string };
 
 const SEND = MAC ? ['⌘', '↵'] : ['Ctrl', '↵'];
 const LEAVE_MS = 260;
+/** How many more times an agent whose sign-in check did not answer is asked before the welcome goes on without it. */
+const ASKS_AGAIN = 3;
 const bare = (folder: string) => folder.replace(/\/+$/, '');
 
 const Key = ({ k }: { k: string }) => <span className={`ob-key${[...k].length === 1 ? ' ob-k1' : ''}`}>{k}</span>;
@@ -93,13 +95,17 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
   useEffect(() => {
     let live = true;
     (async () => {
-      const [claude, codex] = await Promise.all([
+      let readings: (Awaited<ReturnType<typeof api.engineSetup>> | null)[] = await Promise.all([
         api.engineSetup('ready', 'claude').catch(() => null),
         api.engineSetup('ready', 'codex').catch(() => null),
       ]);
+      for (let again = 0; again < ASKS_AGAIN && unsureEngines(readings).length; again += 1) {
+        if (!live) return;
+        readings = await Promise.all(readings.map((r) => (unsureEngines(readings).includes(r?.engine as Engine) ? api.engineSetup('ready', r!.engine).catch(() => r) : r)));
+      }
       if (!live) return;
-      setReady(readyEngines([claude, codex]));
-      setSignedOut(signedOutEngines([claude, codex]));
+      setReady(offeredEngines(readings));
+      setSignedOut(knownSignedOut(readings));
     })();
     api.agentThreads().then((t) => { if (live) setThreads(t); }).catch(() => { if (live) setThreads([]); });
     return () => { live = false; };
