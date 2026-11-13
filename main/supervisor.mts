@@ -49,6 +49,7 @@ import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { stripTypesFlags } from './strip-types.mts';
+import { plainCopy } from './plain-copy.mts';
 import { cloudWorkPending, takeCloudNews, writeMarker, readMarker } from './cloud/marker.mts';
 import { cloudClients } from './cloud/clients.mts';
 import { kitCopyPath, kitFramePath, readKitCopy, markerForCloudRun } from './cloud/kit.mts';
@@ -14091,6 +14092,13 @@ export class Supervisor {
     if (session?.spawnFiles) session.spawnFiles = [];
   }
 
+  /** The approvals server as plain JavaScript in this app's folder, for its launcher; nothing when no copy could be made. */
+  _plainApprovalsServer(): { ZERO_APPROVALS_SERVER?: string } {
+    if (!this.userDir || !this.appDir) return {};
+    const copy = plainCopy(path.join(this.appDir, 'main', 'approval-prompt-server.mts'), path.join(this.userDir, 'plain-helpers'), { root: this.appDir });
+    return copy ? { ZERO_APPROVALS_SERVER: copy } : {};
+  }
+
   /** The servers themselves, apart from the file. */
   mcpServers(connectionServers: ConnectionServers | null = null, platform: NodeJS.Platform = process.platform) {
     const storeCmd = this.storeMcpCommand();
@@ -14115,6 +14123,7 @@ export class Supervisor {
           // Electron run with ELECTRON_RUN_AS_NODE=1 is a node, so handing the
           // path down asks nothing of the machine.
           ZERO_APPROVALS_RUNTIME: process.execPath,
+          ...this._plainApprovalsServer(),
         },
       },
     };
