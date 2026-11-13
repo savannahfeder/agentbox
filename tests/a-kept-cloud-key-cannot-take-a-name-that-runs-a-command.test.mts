@@ -28,6 +28,10 @@ const RUNS_A_COMMAND = [
   'PERL5OPT', 'PERL5LIB', 'PERLLIB', 'RUBYOPT', 'RUBYLIB', 'PYTHONSTARTUP', 'PYTHONWARNINGS', 'PYTHONINSPECT',
   'JAVA_TOOL_OPTIONS', '_JAVA_OPTIONS', 'JDK_JAVA_OPTIONS',
   'PIP_INDEX_URL', 'PIP_EXTRA_INDEX_URL', 'UV_INDEX_URL', 'GOFLAGS', 'GOPROXY', 'XDG_CONFIG_HOME', 'CURL_HOME', 'WGETRC',
+  // Found by the credential review the same day: tar, make, compilers, rsync and svn run commands named here.
+  'TAR_OPTIONS', 'CC', 'CXX', 'CPP', 'LD', 'MAKEFLAGS', 'MAKE', 'MFLAGS', 'RSYNC_RSH', 'SVN_SSH', 'CVS_RSH',
+  // And this one switches off the TLS check for Claude Code itself.
+  'NODE_TLS_REJECT_UNAUTHORIZED', 'NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE', 'SSL_CERT_DIR', 'REQUESTS_CA_BUNDLE', 'CURL_CA_BUNDLE',
 ];
 
 const REAL_KEYS = [

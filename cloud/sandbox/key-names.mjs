@@ -16,6 +16,9 @@ const SYSTEM = /^(?:LD_|DYLD_|LC_|GIT_|NPM_CONFIG_|BASH|PERL5|PERLLIB|RUBY(?:OPT
 const RUNS = new Set([
   'ENV', 'PROMPT_COMMAND', 'SHELLOPTS', 'PS1', 'PS2', 'PS3', 'PS4', 'IFS', 'CDPATH', 'ZDOTDIR',
   'PAGER', 'MANPAGER', 'VISUAL', 'SSH_ASKPASS', 'SUDO_ASKPASS', 'GOFLAGS', 'GOPROXY', 'CURL_HOME', 'WGETRC',
+  'TAR_OPTIONS', 'CC', 'CXX', 'CPP', 'LD', 'MAKEFLAGS', 'MAKE', 'MFLAGS', 'RSYNC_RSH', 'SVN_SSH', 'CVS_RSH',
+  // These decide which servers the agent's own connections trust.
+  'NODE_TLS_REJECT_UNAUTHORIZED', 'NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE', 'SSL_CERT_DIR', 'REQUESTS_CA_BUNDLE', 'CURL_CA_BUNDLE',
 ]);
 
 /** Why a key cannot be saved under `name`, or null when it can. */
