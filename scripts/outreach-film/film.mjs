@@ -165,7 +165,8 @@ for (let take = 1; take <= 2; take += 1) {
   const chk = run('python3', [path.join(HERE, 'check-film.py'), final, `${final}.cuts.json`, '--json', path.join(work, 'check.json')], { quiet: true });
   if (chk.status !== 0) { failed = readJson(path.join(work, 'check.json')).problems; say(`Take ${take} failed its check:\n${failed.map((p) => `- ${p}`).join('\n')}`); continue; }
   // Passed: the next version number beside the earlier ones, a contact sheet, a report.
-  const taken = fs.readdirSync(outDir).map((f) => f.match(new RegExp(`^${slug}-outreach-v(\\d+)\\.mp4$`))?.[1]).filter(Boolean).map(Number);
+  // The small report and sheet count too: a cloud machine may hold them without the film.
+  const taken = fs.readdirSync(outDir).map((f) => f.match(new RegExp(`^${slug}-outreach-v(\\d+)\\.(mp4|report\\.json|sheet\\.png)$`))?.[1]).filter(Boolean).map(Number);
   const name = `${slug}-outreach-v${Math.max(0, ...taken) + 1}`;
   const film = path.join(outDir, `${name}.mp4`);
   fs.copyFileSync(final, film);
