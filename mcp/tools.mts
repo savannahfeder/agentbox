@@ -73,6 +73,7 @@ export interface StoreTool {
 }
 
 export interface CloudResourceAsk { kind: 'file' | 'skill'; path: string; scope?: 'task' | 'documents' | 'account' }
+export interface CloudKeyAsk { name: string; what: string; place: 'keychain' | 'file' | 'shell'; from: string; entry?: string }
 
 type DocumentStatus = 'current' | 'history' | 'exploration';
 interface DocumentFilter { kind?: string; status?: DocumentStatus; pathPrefix?: string; query?: string; catalogedOnly?: boolean }
@@ -106,7 +107,7 @@ interface TeamSetupArgs {
   ready?: boolean;
   startNow?: boolean;
 }
-interface SignInArgs { service?: string; url?: string; code?: string; why?: string; ask?: string; finished?: boolean; keep?: { name: string; value: string } }
+interface SignInArgs { service?: string; url?: string; code?: string; why?: string; asksForCode?: boolean; ask?: string; finished?: boolean; keep?: { name: string; value: string } }
 interface SentFiles { files?: string[]; versionOf?: string; folder?: string }
 interface TeamTellArgs extends SentFiles { text?: string; to?: string[]; group?: string; thread?: boolean; outside?: boolean }
 interface TeamTaskArgs extends SentFiles { to: string; title: string; details?: string; due?: string; blockedBy?: string[] }
@@ -116,6 +117,7 @@ export interface BuildToolsOptions {
   ownItem?: string | null;
   ownProduct?: string | null;
   requestCloudResource?: ((ask: CloudResourceAsk) => unknown) | null;
+  requestCloudKey?: ((ask: CloudKeyAsk) => unknown) | null;
   /** Saves a token a cloud run's login made, so every later cloud run has it. */
   keepCloudKey?: ((name: string, value: string) => unknown) | null;
 }
@@ -132,7 +134,7 @@ const guard = (fn: StoreTool['run']) => async (args: object | undefined): Promis
 
 // `ownItem` is the row this server's session was started for, if any, and
 // `ownProduct` its project.
-export function buildTools({ holder, ownItem: givenItem, ownProduct = process.env.ZERO_PRODUCT || null, requestCloudResource = null, keepCloudKey = null }: BuildToolsOptions = {}) {
+export function buildTools({ holder, ownItem: givenItem, ownProduct = process.env.ZERO_PRODUCT || null, requestCloudResource = null, requestCloudKey = null, keepCloudKey = null }: BuildToolsOptions = {}) {
   const ownItem = givenItem === undefined ? process.env.ZERO_ITEM || null : givenItem;
   const account = resolveAccount();
   // Cloud runs share one process, whose own ZERO_ITEM belongs to no run or to
@@ -573,20 +575,21 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
 
   if (ownItem) tools.push({
     name: 'sign_in',
-    description: `Put a service's own sign-in link in front of the person, on this thread, while you wait: the way they would click it in Claude Code or Codex. Use it whenever a service needs them to sign in, before asking for a pasted key. The link comes from the service's own login: an MCP server's authenticate tool (then pass what comes back to its complete_authentication), \`codex mcp login <name> --no-browser\`, or a command-line login that prints a link and a code (\`gh auth login --web\`, \`vercel login\`, \`supabase login\`, \`npx wrangler login\`, \`fly auth login\`, \`netlify login\`, \`stripe login\`). Start that login in the background first so it keeps waiting, then call this with its link and any code it printed. The thread moves to their Needs you with a card that opens the link in their own browser. Each call waits up to ${Math.round(WAIT_MS / 1000)} seconds and answers signed_in, landed (with the address their browser was sent back to, for a login waiting on another machine; ${Name} catches it for you when the link sends the browser to localhost), skipped, or waiting (call again with the ask it gives).`,
+    description: `Put a service's own sign-in link in front of the person, on this thread, while you wait: the way they would click it in Claude Code or Codex. Use it whenever a service needs them to sign in, before asking for a pasted key. The link comes from the service's own login: an MCP server's authenticate tool (then pass what comes back to its complete_authentication), \`codex mcp login <name> --no-browser\`, or a command-line login that prints a link and a code (\`gh auth login --web\`, \`vercel login\`, \`npx wrangler login --browser=false\`, \`fly auth login\`, \`netlify login\`, \`stripe login\`, \`npm login --auth-type=web\`, \`eas login --device --non-interactive\`). A login that waits for a code the service's page shows them after they sign in (\`supabase login\`, \`aws login --remote\`) needs asksForCode, and one that refuses to run without a terminal (\`supabase login\`) runs under \`script\` with its input on a pipe you can write the code into. Start that login in the background first so it keeps waiting, then call this with its link and any code it printed. The thread moves to their Needs you with a card that opens the link in their own browser. Each call waits up to ${Math.round(WAIT_MS / 1000)} seconds and answers signed_in, landed (with the address their browser was sent back to, for a login waiting on another machine; ${Name} catches it for you when the link sends the browser to localhost), code (with the code they pasted), skipped, or waiting (call again with the ask it gives).`,
     schema: {
       service: z.string().optional().describe('the service as they know it: GitHub, Vercel, Linear'),
       url: z.string().optional().describe('the sign-in link the login printed or the authenticate tool returned'),
       code: z.string().optional().describe('the one-time code the login printed, when it gave one to enter on that page'),
       why: z.string().optional().describe('what the sign-in is for, in a few plain words'),
+      asksForCode: z.boolean().optional().describe('the login waits for a code the service\'s page shows them once they sign in: the card takes it and this answers code with it'),
       ask: z.string().optional().describe('to keep waiting on a sign-in already asked: the ask an earlier call answered with'),
       finished: z.boolean().optional().describe('with ask: the login finished by itself, so take the card away'),
       keep: z.object({ name: z.string(), value: z.string() }).optional().describe('with ask, on a cloud machine, once the login worked: the token it made, under the variable its tool reads (GH_TOKEN from `gh auth token`), so every later cloud run is signed in too. A cloud machine forgets its logins when the run ends'),
     },
-    run: async ({ service, url, code, why, ask, finished, keep }: SignInArgs) => {
+    run: async ({ service, url, code, why, asksForCode, ask, finished, keep }: SignInArgs) => {
       const id = env().ZERO_ITEM ?? '';
       const product = env().ZERO_PRODUCT || null;
-      const asked = askToSignIn(id, { service, url, code, why, ask, finished }, { product });
+      const asked = askToSignIn(id, { service, url, code, why, asksForCode, ask, finished }, { product });
       if (keep) {
         if (!ask) throw new Error('keep goes with the ask of a sign-in that worked');
         if (typeof keepCloudKey !== 'function') return json({ status: 'kept_here', message: 'On this computer the login keeps its own sign-in, so there is nothing to keep.' });
@@ -601,19 +604,32 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
       };
       if (finished) return json(withKeep({ status: 'closed', message: 'The card is gone.' }));
       const said = await waitForSignIn(id, asked.id, { product });
-      return json(said.status === 'signed_in' ? withKeep(said) : said.status === 'landed' ? withKeep(said, true) : said);
+      return json(said.status === 'signed_in' ? withKeep(said) : said.status === 'landed' || said.status === 'code' ? withKeep(said, true) : said);
     },
   });
 
   if (typeof requestCloudResource === 'function') tools.push({
     name: 'request_cloud_resource',
-    description: 'Fetch a missing file, folder or installed skill from this thread’s computer without moving the conversation there. A file or folder is any path under this task checkout or the account’s documents, other products’ folders included: relative with a scope, or written out in full (`~/…` or absolute) with no scope. Skills use their installed name. Delivered resources get a separate scratch path, preserving cloud edits. Returns delivered, folder (its files, to ask for one by one), denied, not_found, too_large, or unavailable, with the reason. A delivered skill includes its scripts and references; read its returned SKILL.md. If the request names or needs what could not be delivered, by its path or by what it is, end the turn with the hand-back line rather than building around a guess; otherwise continue and explain what is missing.',
+    description: 'Fetch a missing file, folder or installed skill from this thread’s computer without moving the conversation there. A file or folder is any path under this task checkout or the account’s documents, other products’ folders included: relative with a scope, or written out in full (`~/…` or absolute) with no scope. Skills use their installed name. Delivered resources get a separate scratch path, preserving cloud edits. A folder is delivered whole in one request, with its files listed; ask for the folder rather than each file. Returns delivered, folder (a folder too big to send whole: its files, to ask for one by one), denied, not_found, too_large, or unavailable, with the reason. A delivered skill includes its scripts and references; read its returned SKILL.md. If the request names or needs what could not be delivered, by its path or by what it is, end the turn with the hand-back line rather than building around a guess; otherwise continue and explain what is missing.',
     schema: {
       kind: z.enum(['file', 'skill']),
       path: z.string().describe('file or folder path (relative, ~/…, or absolute), or installed skill name'),
       scope: z.enum(['task', 'documents', 'account']).optional().describe('for a relative file path: this task, this product\'s documents, or the account\'s documents; omitted for a full path or a skill'),
     },
     run: async (args: CloudResourceAsk) => json(await requestCloudResource(args)),
+  });
+
+  if (typeof requestCloudKey === 'function') tools.push({
+    name: 'request_cloud_key',
+    description: 'Ask this thread’s computer for a key the run needs when you know where it is kept there: their instructions, notes or memory name a Keychain item, a file under their home folder, or a variable in their shell. They get a card to allow it; once allowed it is saved for every cloud run and handed to this one. The call waits up to 15 minutes for their answer. Returns saved (with the file this run reads it from), already, denied, replied (their words instead of a yes), not_found, no_answer or unavailable, each with what to do next. When you do not know where the key is, do not guess: ask for it with the key line at the end of your turn.',
+    schema: {
+      name: z.string().describe('the environment variable its tools read, such as POSTHOG_PERSONAL_KEY'),
+      what: z.string().describe('what it is, in plain words, such as "the PostHog personal API key the daily report reads"'),
+      place: z.enum(['keychain', 'file', 'shell']),
+      from: z.string().describe('the Keychain item\'s name, the file\'s path (~/… or absolute), or the shell variable\'s name'),
+      entry: z.string().optional().describe('for an .env-style file, the variable inside it'),
+    },
+    run: async (args: CloudKeyAsk) => json(await requestCloudKey(args)),
   });
 
   // Teammates are an alpha feature: their tools are offered once there is a

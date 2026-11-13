@@ -47,7 +47,7 @@ import { artifactRoots, resolveArtifact } from './artifact-path.mts';
 import { folderPictures } from './folder-pictures.mts';
 import { docUrl } from './doc-scheme.mts';
 import { readDoc, writeDoc } from './doc-file.mts';
-import { linkCopyOf, linkSource } from './file-link.mts';
+import { linkCopyOf, linkKindOf, linkSource } from './file-link.mts';
 import { bringSharedFile, fileLinkToken, projectToBringInto } from './bring-shared-file.mts';
 import { familyKeyOf, type Mark } from '../shared/artifact-marks.mts';
 import { readItemHistory } from './store/work-items.mts';
@@ -404,7 +404,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // appears): a browser SDK autocaptures the text of what was clicked, and in
   // Agentbox that text is task titles. A NUMBER MAY RIDE WITH THE NAME, and only
   // a number (2026-10-06): which setup step was reached.
-  ipcMain.handle('zero:onboarding-arm', () => analytics.onboardingArm?.() ?? 'tour');
+  ipcMain.handle('zero:onboarding-arm', () => analytics.onboardingArm?.() ?? 'classic');
   ipcMain.handle('zero:track', (_e, { name, count }: { name: string; count?: unknown } = {} as { name: string; count?: unknown }) => {
     if (!EVENT_NAMES.includes(name)) return false;
     onCount();
@@ -2206,9 +2206,9 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   });
   // A saved key carries on every thread that was waiting on it, as if each had been replied to.
   // `reply` is the person's own words for the thread the key was pasted on, which go instead of the app's.
-  ipcMain.handle('zero:cloud-key', async (_e, { action, name, value, label, reply } = {}) => {
+  ipcMain.handle('zero:cloud-key', async (_e, { action, name, value, label, reply, from } = {}) => {
     try {
-      let { keys, freed } = await supervisor.cloudKey(action, name, value, { label: typeof label === 'string' ? label : null });
+      let { keys, freed } = await supervisor.cloudKey(action, name, value, { label: typeof label === 'string' ? label : null, from: from ?? null });
       if (reply?.id && typeof reply.answer === 'string' && reply.answer.trim()) {
         freed = [...freed.filter((t) => t.id !== reply.id || t.product !== reply.product), { product: reply.product, id: reply.id, answer: reply.answer }];
       }
@@ -2221,9 +2221,9 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     }
   });
   // What the person did with a sign-in link an agent is waiting on (shared/sign-in-ask.mjs).
-  ipcMain.handle('zero:sign-in-answer', (_e, { product, id, ask, said, url } = {}) => {
+  ipcMain.handle('zero:sign-in-answer', (_e, { product, id, ask, said, url, code } = {}) => {
     try {
-      store.answerSignIn(product, id, { id: ask, said, url });
+      store.answerSignIn(product, id, { id: ask, said, url, code });
       push();
       return { ok: true };
     } catch (err) {
@@ -2751,7 +2751,9 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     if (!team?.fileLink) return { ok: false, error: 'This copy has no cloud to share files on.' };
     try { return { ok: true, ...(await fn(arg, team)) }; } catch (err) { return { ok: false, error: String((err as Error | undefined)?.message ?? err) }; }
   };
-  const fileOnScreen = async ({ product, src, thread }: LinkArg) => {
+  // Remembered by the link's source, so an edit made on its page comes home beside this file.
+  const fileOnScreen = async (arg: LinkArg, team: IpcTeam) => {
+    const { product, src, thread } = arg;
     const found = await resolveArtifact({
       src, product, thread: typeof thread === 'string' ? thread : null,
       products: readableProducts(), accountRoot: config.accountRoot, storeRoot: config.storeRoot, nameOf: team?.firstNameOf,
@@ -2759,13 +2761,26 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     if (!found.ok) throw new Error(found.error || 'This file is not on this computer.');
     const copy = linkCopyOf(found.path);
     if (copy.error !== undefined) throw new Error(copy.error);
+    team.rememberLinkPlace(linkOf(arg), found.path);
     return copy;
   };
+  // Only a document or a table can be edited on its page (edit_file_link).
+  const withEditable = <T extends { link?: object | null }>(arg: LinkArg, out: T): T => (out.link
+    ? { ...out, link: { ...out.link, editable: linkKindOf(String(arg.src ?? '').split(/[?#]/)[0])?.kind === 'markdown' } }
+    : out);
   ipcMain.handle('zero:file-link', linkCall(async (arg, team) => {
-    const now = await fileOnScreen(arg).catch(() => null);
-    return team.fileLink(linkOf(arg), now?.hash ?? null, now?.version ?? null);
+    const now = await fileOnScreen(arg, team).catch(() => null);
+    return withEditable(arg, await team.fileLink(linkOf(arg), now?.hash ?? null, now?.version ?? null));
   }));
-  ipcMain.handle('zero:file-link-share', linkCall(async (arg, team) => team.shareFile({ source: linkOf(arg), ...(await fileOnScreen(arg)) })));
+  ipcMain.handle('zero:file-link-share', linkCall(async (arg, team) => withEditable(arg, await team.shareFile({ source: linkOf(arg), ...(await fileOnScreen(arg, team)) }))));
+  type AccessArg = LinkArg & { access?: unknown; can?: unknown; email?: unknown };
+  ipcMain.handle('zero:file-link-access', linkCall(async ({ token, access, can }: AccessArg, team) => {
+    await team.setFileLinkAccess(String(token ?? ''), String(access ?? ''), String(can ?? ''));
+    return {};
+  }));
+  ipcMain.handle('zero:file-link-people', linkCall(async ({ token }, team) => ({ people: await team.fileLinkPeople(String(token ?? '')) })));
+  ipcMain.handle('zero:file-link-person', linkCall(async ({ token, email, can }: AccessArg, team) => (
+    { people: await team.setFileLinkPerson(String(token ?? ''), String(email ?? ''), can == null ? null : String(can)) })));
   ipcMain.handle('zero:file-links', linkCall(async (_arg, team) => team.fileLinks()));
   ipcMain.handle('zero:file-link-stop', linkCall(async ({ token }, team) => { await team.stopFileLink(String(token ?? '')); return {}; }));
   ipcMain.handle('zero:file-link-comments', linkCall(async ({ token }, team) => ({ comments: await team.fileLinkComments(String(token ?? '')) })));

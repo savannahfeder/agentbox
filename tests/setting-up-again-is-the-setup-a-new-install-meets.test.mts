@@ -6,6 +6,11 @@
 // folder screen skipped the account screen, three and four times. It now opens
 // the same setup, and since there is an app behind it, Back on its first
 // screen and Escape on its welcome leave it.
+//
+// On 2026-11-13 the new setup was held back from every real install until it is
+// approved, but this command still opened it with setArm('tour'). It now asks
+// for the install's word the way a first run does, so a real install gets the
+// old first run and a test window still gets the new one.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 
@@ -14,10 +19,14 @@ const app = read('renderer/src/App.tsx');
 const body = (name: string) => app.slice(app.indexOf(`const ${name} = useCallback`), app.indexOf('\n  }, [', app.indexOf(`const ${name} = useCallback`)));
 
 describe('Set Agentbox up again', () => {
-  it('opens the setup beside the app, not the old walk', () => {
+  it('opens the first run this install gets, not the old walk', () => {
     const fn = body('walkAgain');
-    expect(fn).toMatch(/setArm\('tour'\); setFresh\(true\);/);
+    expect(fn).toContain('void armNow().then((a) => { setArm(a); setFresh(true); });');
+    expect(fn).not.toMatch(/setArm\('tour'\)/);
     expect(fn).not.toMatch(/setRun\(/);
+  });
+  it('ends the old first run where a first run ends too', () => {
+    expect(body('finishClassic')).toMatch(/setupStartedAgain\.current = false/);
   });
   it('hands that setup a way back to the app', () => {
     expect(app).toMatch(/onLeave=\{setupStartedAgain\.current \? leaveSetupAgain : undefined\}/);

@@ -3,7 +3,7 @@
 // useRooms, whose every field App reads is pinned by its own tests.
 import { useMemo, useState, type ReactNode } from 'react';
 import type { Product, RunningSession, TeammatesView, WorkItem } from '../types';
-import { TeammateChat, TeammateMenu, TeammatesPage, TeammatesTitle, shownOf, type TeammateModels } from './TeammatesPage';
+import { TeammateAbout, TeammateChat, TeammateMenu, TeammatesPage, TeammatesTitle, shownOf, type TeammateModels } from './TeammatesPage';
 import { SidebarGroups } from '../team/rooms/GroupsSidebar';
 import { api } from '../api';
 import { asksYou, heldFor } from './chat-lines';
@@ -85,11 +85,10 @@ export function useTeammates({ items = [], view: stored, asking = [], running = 
       return t && view ? <TeammateChat key={t.id} view={view} items={items} products={products} t={t} me={me} mePic={mePic} sessions={sessions} queued={queued}
         onOpen={go} onOpenThread={onOpenThread} onOpenFile={onOpenFile} onChanged={onChanged} tabOf={tabOf} /> : null;
     },
-    /** Change what an AI teammate you own does: null once saved, or why not. */
-    setJob: async (id: string, job: string): Promise<string | null> => {
-      const r = await api.teammates('update', { id, patch: { job } });
-      if (r.ok) onChanged();
-      return r.ok ? null : r.error ?? 'Its job did not save';
+    /** One AI teammate's About, drawn on its place: what it is and how it is set, to read and change. */
+    aboutOf: (id: string): ReactNode => {
+      const t = team.find((x) => x.id === id);
+      return t ? <TeammateAbout key={t.id} t={t} view={view ?? null} products={products} engines={engines} models={models} onOpen={go} onNewProject={onNewProject} onChanged={onChanged} /> : null;
     },
   };
 }

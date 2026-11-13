@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { guard, sweep, startableChrome } from './lib/chrome-guard.mjs';
+import { guard, sweep, startableChrome, KEEPS_OFF_THE_KEYCHAIN } from './lib/chrome-guard.mjs';
 const origin = process.argv[2];
 const outDir = path.resolve(process.argv[3] || 'phone-verification');
 const url = new URL(origin);
@@ -13,7 +13,7 @@ const profile = fs.mkdtempSync('/tmp/shot-profile-');
 const W = 1440, H = 1000;
 const chrome = spawn(startableChrome(), [
   '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
-  '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run', `--window-size=${W},${H}`, 'about:blank',
+  '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run', ...KEEPS_OFF_THE_KEYCHAIN, `--window-size=${W},${H}`, 'about:blank',
 ], { stdio: ['ignore', 'ignore', 'pipe'] });
 guard(chrome, profile);
 const deadline = setTimeout(() => { chrome.kill(); throw new Error('Phone dismissal verification exceeded 60 seconds'); }, 60000);
