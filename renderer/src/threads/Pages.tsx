@@ -46,7 +46,7 @@ import { offersTryAgain } from '../try-again';
 import { voiceName } from '../../../shared/agent-voice.mts';
 import { shownPriority } from '../../../shared/rank.mts';
 import { api } from '../api';
-import { InboxSky, type SkyShape } from '../home/InboxSky';
+import { InboxSky } from '../home/InboxSky';
 import type { SkyArt } from '../home/sky';
 import { CLOUD_KEY, CLOUD_WHEN_ON, cloudButtonCount, cloudFootLine, cloudIsOn, cloudMonthLine, cloudMoveLine, countedAccounts, type CloudMode, type CloudStatus } from '../cloud-menu';
 import { brokenAccounts, buttonAsksSignIn, menuSetupLine, readBrokenSeen, seenAfter, SETUP, writeBrokenSeen } from '../cloud-setup';
@@ -574,12 +574,10 @@ export function ConnectComputer({ email, onSignOut }: { email: string | null; on
  *  puts the one composer into `slot`. What is in progress has its own tab and
  *  is not counted here. */
 export function InboxClear({ slot, first = false, sky = null }: { slot: (el: HTMLDivElement | null) => void; first?: boolean; sky?: SkyArt | null }) {
-  const shape = (localStorage.getItem('zero.preview.zeroSky') || 'full') as SkyShape;
-  const head = localStorage.getItem('zero.preview.zeroHead') || 'halo';
-  const h2 = <h2>{first ? 'Give an agent its first task' : 'Nothing needs you'}</h2>;
-  return <div className={`th-clear th-start zh-${head}`}>
-    {sky && <InboxSky art={sky} shape={shape} below={head === 'below'} low={head === 'open'} />}
-    {head === 'card' ? <div className="zh-card">{h2}<div className="th-clear-compose" ref={slot} /></div> : <>{h2}<div className="th-clear-compose" ref={slot} /></>}
+  return <div className="th-clear th-start">
+    <h2>{first ? 'Give an agent its first task' : 'Nothing needs you'}</h2>
+    <div className="th-clear-compose" ref={slot} />
+    {sky && <InboxSky art={sky} shape="zero" />}
   </div>;
 }
 
