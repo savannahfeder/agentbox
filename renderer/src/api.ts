@@ -1742,7 +1742,7 @@ export const api = {
     if (useFixtures) {
       if (params.get('cloudplan') === 'pro') return { signedIn: true, plan: 'pro', unlimited: false, agents: 10, hoursPerMonth: 400, running: 6, usedSeconds: 88 * 3600 };
       if (params.get('cloudplan') === 'free') return { signedIn: true, plan: 'free', unlimited: false, agents: 2, hoursPerMonth: 5, running: 1, usedSeconds: 1.5 * 3600, billing: null };
-      // &cloudplan=team-trial|team-trial-card|team: on a team of 3, its trial 9 days from its end
+      // &cloudplan=team-trial|team-trial-card|team: on a team of 3, its trial 5 days from its end
       // (with the card in, not yet charged), or 3 seats paid for.
       if (['team-trial', 'team-trial-card', 'team'].includes(params.get('cloudplan') ?? '')) {
         const trial = params.get('cloudplan') !== 'team';
@@ -1755,7 +1755,7 @@ export const api = {
           { id: 'p2', name: 'Priya Natarajan', usedSeconds: (trial ? 3.1 : 81) * 3600, running: 1 },
           { id: 'p3', name: 'Leo Okafor', usedSeconds: (trial ? 1.2 : 35) * 3600, running: 0 },
         ];
-        const team = { trial, endsAt: trial ? Date.now() + 9 * 86_400_000 : null, seats: trial && !card ? 0 : 3, members: 3, owner: params.get('owner') !== '0', agents: null, running: people[0].running, hours: each, usedSeconds: people[0].usedSeconds, people };
+        const team = { trial, endsAt: trial ? Date.now() + 5 * 86_400_000 : null, seats: trial && !card ? 0 : 3, members: 3, owner: params.get('owner') !== '0', agents: null, running: people[0].running, hours: each, usedSeconds: people[0].usedSeconds, people };
         return { signedIn: true, plan: 'team', unlimited: true, agents: null, hoursPerMonth: team.hours, running: team.running, usedSeconds: team.usedSeconds, billing: null, team };
       }
       if (params.get('cloudplan') === 'spent') return { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0, billing: null, free: { agents: 2, hours: 5, usedSeconds: 5 * 3600 } };
