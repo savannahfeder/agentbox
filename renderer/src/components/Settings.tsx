@@ -45,7 +45,8 @@ import { accountLabel, cloudAccountInUse, cloudRunsLine, cloudToggleTarget, coun
 import { cloudBilling, planKey, planSummary, type PaidPlan } from '../cloud-upgrade';
 import { keyLooksWrong } from '../key-asks';
 import { CloudPlanCards } from './CloudPlanCards';
-import type { CloudPlan, TeamBillingDetails } from '../types';
+import type { CloudPlan, FilesCloudStatus, TeamBillingDetails } from '../types';
+import { MACHINE, sizeWords } from '../files/files-shown';
 import { cloudAccountState, hourWords, meterPair, resetWords } from '../account-words';
 import { runningFigures, type GateReading } from '../running-reading';
 import { CODEX_CLOUD_WHAT, sameAsHere } from '../cloud-permission-words';
@@ -932,6 +933,46 @@ function PhonePage({ onFeedback, macShut, onSignIn, web, onPhoneProjects }: { on
   );
 }
 
+/* --------------------------------- Files ---------------------------------- */
+// On a plan that keeps files, what agents make is saved to the cloud and big
+// files leave this computer after the days chosen (main/files-cloud.mts).
+// Without one, the same row leads to the plans.
+const OFF_AFTER: Array<{ value: string; label: string }> = [
+  { value: '7', label: 'After 7 days' }, { value: '30', label: 'After 30 days' }, { value: '90', label: 'After 90 days' }, { value: '0', label: 'Never' },
+];
+
+function FilesPage({ files, onSet, onPlans }: {
+  files: { on: boolean; offAfterDays: number };
+  onSet: (key: 'filesInCloud' | 'filesOffAfterDays', value: unknown) => void;
+  onPlans: () => void;
+}) {
+  const [cloud, setCloud] = useState<FilesCloudStatus | null>(null);
+  useEffect(() => { let live = true; void api.filesCloud().then((c) => { if (live) setCloud(c); }); return () => { live = false; }; }, [files.on, files.offAfterDays]);
+  const cap = cloud?.cap ?? 0;
+  return (
+    <Page title="Files">
+      <Group id="files-cloud" label="In the cloud">
+        <Row label="Keep files in the cloud" desc={cap ? `What your agents make is saved to ${Name} Cloud as they make it.` : `Comes with Pro, Plus and Max. Until then your files stay on this ${MACHINE}.`}>
+          {cap
+            ? <Switch label="Keep files in the cloud" on={files.on} onChange={(v) => onSet('filesInCloud', v)} />
+            : <button type="button" className="set-ghost" onClick={onPlans}>See plans</button>}
+        </Row>
+        {cap > 0 && files.on && (
+          <Row label={`Take big files off this ${MACHINE}`} desc="Films and pictures only. Documents always stay.">
+            <Picker bare label={`Take big files off this ${MACHINE}`} value={String(files.offAfterDays)} options={OFF_AFTER} onChange={(v) => onSet('filesOffAfterDays', Number(v))} />
+          </Row>
+        )}
+        {cap > 0 && (
+          <Row label="Space used">
+            <span className="set-files-used">{sizeWords(cloud!.bytes)} of {sizeWords(cap)}</span>
+            <span className="set-files-bar"><i style={{ width: `${Math.min(100, Math.max(cloud!.bytes ? 2 : 0, (cloud!.bytes / cap) * 100))}%` }} /></span>
+          </Row>
+        )}
+      </Group>
+    </Page>
+  );
+}
+
 /* ---------------------------- Plan and Billing ---------------------------- */
 // With no plan, the plans as cards (w-1dc7ee2408, cloud-slots/20) and how the
 // cloud counts. With one, the plan and Stripe's billing page, this month as
@@ -992,7 +1033,7 @@ function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite }: { signedIn: 
   };
   // A paying team's owner sees its card, next bill and last invoice, read from Stripe through the cloud.
   const [teamBillingSeen, setTeamBillingSeen] = useState<TeamBillingDetails | null>(null);
-  const readsStripe = !!plan?.team?.owner && !plan.team.trial;
+  const readsStripe = !!plan?.team?.owner && (!plan.team.trial || plan.team.seats > 0);
   useEffect(() => {
     if (!readsStripe) return;
     void api.cloudAccountTeamBilling().then((out) => { if (out.ok && out.owner) setTeamBillingSeen(out as TeamBillingDetails); });
@@ -1658,6 +1699,7 @@ function NavIcon({ id }: { id: SettingsPageId }) {
     cloud: <path d="M4 18V9M9.5 18V5M15 18v-6M20.5 18v-9" />,
     instructions: <path d="M6.5 3.5h7.5l4 4V20.5h-11.5zM14 3.5V8h4M9.5 12h5M9.5 16h5" />,
     projects: <path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" />,
+    files: <path d="M6.5 3.5h7l4 4v13h-11zM13.5 3.5v4h4" />,
     team: <><circle cx="9" cy="9" r="3" /><path d="M3.5 19c.8-3 3-4.5 5.5-4.5s4.7 1.5 5.5 4.5" /><circle cx="16.5" cy="9.5" r="2.5" /><path d="M16 14.6c2.3-.2 4 1.2 4.5 4" /></>,
     alpha: <><path d="M9.5 3.5h5M10.5 3.5v5.2L5.6 17.6a2 2 0 0 0 1.8 2.9h9.2a2 2 0 0 0 1.8-2.9l-4.9-8.9V3.5" /><path d="M7.6 14.5h8.8" /></>,
     rooms: <path d="M9.5 4.5 7.5 19.5M16.5 4.5l-2 15M5 9.5h14.5M4.5 14.5H19" />,
@@ -2232,6 +2274,10 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
             nothing on it comes from the settings file. */}
         {pane === 'cloud' && cloudPlans && <CloudPlansPage signedIn={cloudPlans.signedIn} onSignIn={cloudPlans.onSignIn} teamPlan={cloudPlans.teamPlan}
           onInvite={teamPane ? () => setPane('team') : undefined} />}
+
+        {model && w && pane === 'files' && (
+          <FilesPage files={w.files ?? { on: true, offAfterDays: 30 }} onSet={(key, value) => setWorkspace(key, value)} onPlans={() => setPane('cloud')} />
+        )}
 
         {pane === 'rooms' && roomsPane && (
           <Page title="Rooms" lede="What people in your rooms see of you. Private threads never show.">

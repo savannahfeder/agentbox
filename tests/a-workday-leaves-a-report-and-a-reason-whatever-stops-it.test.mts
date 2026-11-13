@@ -48,8 +48,8 @@ describe('a workday stopped mid-day', () => {
       let said = '';
       child.stdout.on('data', (d) => { said += d; });
       const until = Date.now() + 15_000;
-      while (!said.includes('Evidence:') && Date.now() < until) await new Promise((r) => setTimeout(r, 100));
-      await new Promise((r) => setTimeout(r, 500));
+      // No grace after "Evidence:": the stop can land while the week's phone changes are still being read.
+      while (!said.includes('Evidence:') && Date.now() < until) await new Promise((r) => setTimeout(r, 20));
       child.kill('SIGTERM');
       await new Promise((r) => child.on('exit', r));
 

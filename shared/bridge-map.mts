@@ -35,6 +35,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   sendNow: 'zero:send-now',
   compose: 'zero:compose',
   routeThread: 'zero:route-thread',
+  answerRouteOffer: 'zero:answer-route-offer',
   schedule: 'zero:schedule',
   snooze: 'zero:snooze',
   // Feedback to the Agentbox team, from the sidebar's Feedback card.
@@ -78,6 +79,9 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   filesPlaceFolder: 'zero:files-place-folder',
   filesPlaceNew: 'zero:files-place-new',
   filesPlaceUpload: 'zero:files-place-upload',
+  filesPlaceTrash: 'zero:files-place-trash',
+  filesPlaceUntrash: 'zero:files-place-untrash',
+  filesCloud: 'zero:files-cloud',
   fileElsewhere: 'zero:file-elsewhere',
   fileLine: 'zero:file-line',
   connections: 'zero:connections',
@@ -170,6 +174,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   // The GitHub sign-in this computer's ships push with (main/github-push-sign-in.mts).
   gitHubSignIn: 'zero:github-sign-in',
   gitHubBrowserSignIn: 'zero:github-browser-sign-in',
+  gitHubCloudSignIn: 'zero:github-cloud-sign-in',
   // The answer to a sign-in link an agent is waiting on (shared/sign-in-ask.mjs).
   signInAnswer: 'zero:sign-in-answer',
   // A file or a one-time code a cloud run asked for (shared/cloud-needs.mts).

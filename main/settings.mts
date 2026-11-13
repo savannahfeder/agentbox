@@ -42,6 +42,7 @@ import { CODEX_DEFAULT_MODE, isCodexMode } from '../shared/codex-modes.mts';
 import { CLOUD_SAME, CLOUD_CLAUDE_DEFAULT, CLOUD_CODEX_DEFAULT } from './cloud-permission.mts';
 import { claudeModels } from './claude-models.mts';
 import { forgetCodexBin, INSTALL_URL as CODEX_INSTALL_URL } from './codex-bin.mts';
+import { filesSettingsOf, OFF_AFTER_DAYS } from './files-cloud.mts';
 
 export interface SettingsConfig {
   home?: string;
@@ -830,6 +831,7 @@ export function readSettings({ config, supervisor, store, onTeam }: SettingsDeps
       permissionArgs: workspaceArgs,
       cloudPermission: config.cloudPermission ?? CLOUD_CLAUDE_DEFAULT,
       cloudCodexMode: config.cloudCodexMode ?? CLOUD_CODEX_DEFAULT,
+      files: filesSettingsOf(config as { filesInCloud?: unknown; filesOffAfterDays?: unknown }),
       // ONE SWITCH FOR EVERYTHING THAT LEAVES THE MACHINE, and it is on when
       // Agentbox is installed (legal/privacy.html, section 10). Off stops the
       // counts AND the crash reports; there is deliberately no partial mode and
@@ -1399,6 +1401,16 @@ export function setWorkspaceSetting({ config, supervisor, store }: SettingsDeps,
       saveConfig(config, patch);
       Object.assign(config, patch);
       supervisor.onChange?.();
+      break;
+    }
+    // Settings › Files: whether files are kept in the cloud, and how long a
+    // film or picture stays here unopened (main/files-cloud.mts).
+    case 'filesInCloud':
+    case 'filesOffAfterDays': {
+      if (key === 'filesOffAfterDays' && !(OFF_AFTER_DAYS as readonly number[]).includes(Number(value))) throw new Error(`files stay ${OFF_AFTER_DAYS.join(', ')} days`);
+      const patch = key === 'filesInCloud' ? { filesInCloud: !!value } : { filesOffAfterDays: Number(value) };
+      saveConfig(config, patch);
+      Object.assign(config, patch);
       break;
     }
     case 'cleanupLeftovers':

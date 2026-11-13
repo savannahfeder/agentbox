@@ -61,9 +61,10 @@ export function earlierCount(events: AgentEvent[], outcome: ItemOutcome | null, 
 const FOLD_FROM = 3;
 
 /** Whether the page draws the whole conversation rather than folding `behind` messages away. None behind is a fold of steps only, which still helps.
- *  A chat brought in from Claude Code or Codex is always folded: its first look is the agent's answer, not the ask it started from. */
-export function drawnWhole(behind: number, imported = false): boolean {
-  return !imported && behind > 0 && behind < FOLD_FROM;
+ *  A page that `leads` with a fresh answer always folds, however short, as does a chat brought in from Claude Code or Codex:
+ *  drawn whole, they read as a chat rather than the answer. Only the view from an answer you have since followed up keeps a short history in place. */
+export function drawnWhole(behind: number, { leads = false, imported = false }: { leads?: boolean; imported?: boolean } = {}): boolean {
+  return !leads && !imported && behind > 0 && behind < FOLD_FROM;
 }
 
 /** The line under the title while an agent works: the first paragraph of what you asked, unless the title already says it. */
