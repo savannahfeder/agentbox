@@ -6,9 +6,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { NAME, WAS } from './product-name.mjs';
+import { pathHoldsSignIns } from './sign-in-places.mts';
 
 export const SENT_FILE_MAX = 1024 ** 3;
-const SIGN_INS = /(^|\/)(\.ssh|\.aws|\.gnupg|\.netrc|\.npmrc|\.pypirc|\.docker|\.kube|\.claude[^/]*|\.codex|\.agentbox|Keychains|\.config\/gh|\.config\/gcloud|\.password-store)(\/|$)/;
 
 export type FileToSend = { path: string; size: number; error?: undefined } | { error: string; path?: undefined; size?: undefined };
 
@@ -36,7 +36,7 @@ export function fileToSend(asked: unknown, { home = os.homedir(), appData }: { h
   if (appData && !fs.existsSync(resolved)) resolved = inAppFolder(resolved, home, appData) ?? resolved;
   let real;
   try { real = fs.realpathSync(resolved); } catch { return { error: `${raw} is not on this computer.` }; }
-  if (SIGN_INS.test(resolved) || SIGN_INS.test(real)) return { error: 'That file holds sign-ins, so it never goes to the cloud.' };
+  if (pathHoldsSignIns(resolved) || pathHoldsSignIns(real)) return { error: 'That file holds sign-ins, so it never goes to the cloud.' };
   let st;
   try { st = fs.statSync(real); } catch { return { error: `${raw} could not be read.` }; }
   if (!st.isFile()) return { error: `${raw} is a folder, not a file.` };
