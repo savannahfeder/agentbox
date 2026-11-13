@@ -78,13 +78,6 @@ function Settings({ s, onChange, onClose }: { s: StandupSettings; onChange: (s: 
         {(TIMES.includes(s.at) ? TIMES : [s.at, ...TIMES]).map((t) => <option key={t} value={t}>{clockOf(t)}</option>)}
       </select>
     </div>
-    <div className="su-set-row">
-      <span className="su-set-l">AI teammates</span>
-      <div className="su-chips">
-        <button type="button" className={`su-chip${s.mates ? ' on' : ''}`} aria-pressed={s.mates} onClick={() => onChange({ ...s, mates: true })}>Post their own</button>
-        <button type="button" className={`su-chip${!s.mates ? ' on' : ''}`} aria-pressed={!s.mates} onClick={() => onChange({ ...s, mates: false })}>Count as yours</button>
-      </div>
-    </div>
     <div className="su-set-row"><span className="su-set-l" /><button type="button" className="su-btn" onClick={onClose}>Done</button></div>
   </section>;
 }
@@ -119,7 +112,7 @@ export function StandupPage({ now, faces, dayFor, onOpen, onPerson }: {
         <h2>{dayTitle(day)}</h2><span className="su-date">{dateOf(day)}</span>
         <div className="su-r">
           <button type="button" className="su-tog" role="switch" aria-checked={s.mates} onClick={() => change({ ...s, mates: !s.mates })}><i />AI teammates post too</button>
-          <button type="button" className={`su-icon${setting ? ' on' : ''}`} aria-expanded={setting} aria-label="Standup settings" title="Standup settings" onClick={() => setSetting(!setting)}>{I.gear()}</button>
+          <button type="button" className={`su-icon${setting ? ' on' : ''}`} aria-expanded={setting} aria-label="Standup settings" title="Standup settings" onClick={() => setSetting(!setting)}>{I.sliders()}</button>
         </div>
       </div>
       {setting && <Settings s={s} onChange={change} onClose={() => setSetting(false)} />}
@@ -134,7 +127,8 @@ export function StandupPage({ now, faces, dayFor, onOpen, onPerson }: {
         const posts = postsOf(dayFor(standupWindow(d, s, now)).people, { mates: s.mates }).filter((p) => postMatches(p, q));
         found += posts.length;
         const since = DAY_NAMES[new Date(previousStandupDay(d, s)).getDay()];
-        if (searching && !posts.length) return null;
+        // An earlier day with nothing in it is left out rather than said again and again.
+        if ((searching || i > 0) && !posts.length) return null;
         return <section key={d} className="su-dayfeed" aria-label={dayTitle(d)}>
           {(i > 0 || searching) && <div className="su-sep">{dayTitle(d)} {dateOf(d)}</div>}
           {posts.length === 0 && <p className="su-empty">Nothing moved.</p>}

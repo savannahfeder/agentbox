@@ -34,9 +34,12 @@ describe('the Standup page', () => {
     expect(html).toMatch(/disabled=""[^>]*>Fri 13</);
     expect(html).toContain('aria-label="The week before"');
   });
-  it('draws the days before today under it', () => {
+  it('draws the days before today under it, and leaves out one where nothing moved', () => {
     expect(html).toContain('Wednesday 11 November');
     expect(html).toContain('Tuesday 10 November');
+    const quiet = renderToStaticMarkup(React.createElement(StandupPage, { now: NOW, faces: new Map(), dayFor: (w) => (w.to === NOW ? day : { people: [] }), onOpen: () => {} }));
+    expect(quiet).not.toContain('Wednesday 11 November');
+    expect(quiet.match(/Nothing moved\./g)).toBeNull();
   });
   it('each teammate posts a sentence whose tasks are links', () => {
     expect(html).toMatch(/Shipped <button type="button" class="su-link">Invoice email<\/button>\. Working on <button type="button" class="su-link">Billing page<\/button>\./);
@@ -49,12 +52,12 @@ describe('the Standup page', () => {
     expect(html).toContain('aria-label="Standup settings"');
     expect(html).toContain('AI teammates post too');
   });
-  it('sets days, time and how AI teammates post, and keeps no explaining under them', () => {
+  it('its settings set the days and the time, and the switch over the posts says whether AI teammates post', () => {
     const page = read('renderer/src/team/StandupPage.tsx');
     expect(page).toContain('<span className="su-set-l">Days</span>');
     expect(page).toContain('<span className="su-set-l">Time</span>');
-    expect(page).toContain('<span className="su-set-l">AI teammates</span>');
-    expect(page).toContain('>Post their own</button>');
-    expect(page).toContain('>Count as yours</button>');
+    // Said once: a second control for the same thing inside the settings was taken out.
+    expect(page).not.toContain('Count as yours');
+    expect(html).toMatch(/role="switch" aria-checked="true"[^>]*><i><\/i>AI teammates post too/);
   });
 });

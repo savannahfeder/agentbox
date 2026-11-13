@@ -44,7 +44,7 @@ export const I = {
   lock: () => svg('<rect x="5" y="11" width="14" height="9"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>', 15, 1.4),
   chat: () => svg('<path d="M5 5h14v10H9l-4 4z"/>', 15, 1.4),
   standupNav: () => svg('<path d="M5 6.5h14M5 12h14M5 17.5h8"/><circle cx="18.5" cy="17.5" r="1.6"/>', 20, 1.25, 'workspace-nav-icon'),
-  gear: () => svg('<circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M6 6l1.6 1.6M16.4 16.4 18 18M6 18l1.6-1.6M16.4 7.6 18 6"/>', 15, 1.5),
+  sliders: () => svg('<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>', 15, 1.5),
   groupNav: () => svg('<circle cx="9" cy="8.5" r="3"/><path d="M3.5 19c.5-3.2 2.7-5 5.5-5s5 1.8 5.5 5"/><path d="M15 5.8a3 3 0 0 1 0 5.4M16.8 14.2c2 .6 3.3 2.2 3.7 4.8"/>', 20, 1.25, 'workspace-nav-icon'),
   chatNav: () => svg('<path d="M15 9V4H4v8h2v3l3-3"/><path d="M9 9h11v8h-2v3l-3-3H9z"/>', 20, 1.25, 'workspace-nav-icon'),
   flame: () => svg('<path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5.3 1.5 1 2.5 2 3 0-3.5 0-6 1-8.5z"/>', 18, 1.4),
