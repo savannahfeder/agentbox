@@ -325,6 +325,30 @@ export interface PlacedFile {
   folder?: string | null;
   /** Nobody put it there: it sits beside its thread's other files. */
   folderFollows?: boolean;
+  /** The newest version's size on this computer, or null when it is not here. */
+  bytes?: number | null;
+  /** Every version's, together. */
+  onMac?: number;
+  /** What Move older versions to the Trash would move. */
+  older?: number;
+  /** What this file's own Move to the Trash would move. */
+  movable?: number;
+  /** The newest version is kept in the cloud and off this computer. */
+  cloud?: boolean;
+  /** A small picture of it while it is in the cloud. */
+  poster?: string | null;
+}
+
+/** `undo` is what Z hands back to put them where they were. */
+export interface FilesTrashed { ok: boolean; moved: number; bytes: number; error?: string; undo?: string }
+export interface FilesCloudStatus {
+  /** null while the account cannot be read. */
+  cap: number | null;
+  bytes: number;
+  full: boolean;
+  on: boolean;
+  offAfterDays: number;
+  offBytes: number;
 }
 
 export interface FileFolder { id: string; project: string; name: string; parent: string | null; at: number }
@@ -366,6 +390,8 @@ export interface FilesPlaceView {
   key: string;
   project: string | null;
   name: string;
+  /** Its newest version is on its way back from the cloud. */
+  coming?: boolean;
   sentIn: FileSentIn[];
   /** Where Done in the editor puts the next version. */
   editsTo?: FileSentIn | null;
@@ -1581,6 +1607,8 @@ export interface WorkspaceSettings {
   /** The mode cloud runs start in, or 'same' for this computer's. */
   cloudPermission?: PermissionMode | 'same' | null;
   cloudCodexMode?: CodexModeId | 'same';
+  /** Settings › Files: kept in the cloud on a paid plan, and the days a film or picture stays unopened (0 is never). */
+  files?: { on: boolean; offAfterDays: number };
   /** What a Codex worker may do across the workspace. Never 'workspace' here. */
   codexMode: CodexModeId;
   // One switch over everything that leaves the machine, on at install
@@ -1786,6 +1814,9 @@ declare global {
       filesPlaceFolder?(p: FileFolderAct): Promise<{ ok: boolean; error?: string; folder?: string | null }>;
       filesPlaceNew?(p: { project: string; name: string; kind: 'document' | 'table'; folder: string | null }): Promise<{ ok: boolean; error?: string; key?: string }>;
       filesPlaceUpload?(p: { project: string; folder: string | null }): Promise<FilesUploaded>;
+      filesPlaceTrash?(p: { keys: string[]; older?: boolean }): Promise<FilesTrashed>;
+      filesPlaceUntrash?(p: { token: string }): Promise<{ ok: boolean; back?: number; error?: string }>;
+      filesCloud?(): Promise<FilesCloudStatus>;
       fileElsewhere?(p: { product: string; id: string; room?: string; copies: { path: string; file: string }[] }): Promise<FileElsewhere[]>;
       fileLine?(p: { product: string; id: string; room?: string }): Promise<FileLine[]>;
       teamComment(p: { personId: string; threadId: string; text: string }): Promise<TeamCallResult>;

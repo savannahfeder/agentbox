@@ -1,7 +1,7 @@
 // The Today page: what each person and AI teammate finished, shipped and
 // decided, what is blocked and on whom, and what waits on you, read from the
 // store with no agent.
-import { cardStateOf, shippedAtOf, type WontStart } from '../../../shared/thread-cards.mts';
+import { cardStateOf, handedOn, shippedAtOf, type WontStart } from '../../../shared/thread-cards.mts';
 import { agentOnOrComing } from '../list-rules';
 import { shownTitle, withoutFiles } from '../../../shared/thread-title.mts';
 import { isShared, isTaskRow, runnerOf, taskNewsAt } from '../../../shared/team-rules.mts';
@@ -67,6 +67,8 @@ export interface TodayPerson {
   tasks: TodayLine[];
   /** Private threads they finished: counted, never named. */
   privateDone: number;
+  /** Private threads an agent is on for them in the range: counted, never named. */
+  privateWorking?: number;
 }
 
 export interface TodayCounts { needYou: number; blocked: number; shipped: number; listed?: number }
@@ -93,7 +95,9 @@ const oneLine = (s: string) => {
   return line.length > 110 ? `${line.slice(0, 108).replace(/\s+\S*$/, '')}…` : line;
 };
 
-export function teamToday({ range, now, me, items, products, cards, decisions, needs, mentions = [], approvals = [], people, mates, mateOf, directWith = () => null, needsCount, later = () => false, supervisor = {}, undoing = new Set() }: {
+export function teamToday({ range, window, now, me, items, products, cards, decisions, needs, mentions = [], approvals = [], people, mates, mateOf, directWith = () => null, needsCount, later = () => false, supervisor = {}, undoing = new Set() }: {
+  /** A span of its own, in place of the range's: a standup covers from the one before it. */
+  window?: { from: number; to: number };
   /** This computer's supervisor, which says what it will not start; it rules your own threads, never a teammate's card. */
   supervisor?: WontStart & { running?: readonly { itemId: string }[]; starting?: readonly string[] };
   /** Your rows whose move is held in the undo window: out of Needs you already, not yet written. */
@@ -115,7 +119,7 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
   /** The Needs you tab's own number, so the two never disagree. */
   needsCount?: number;
 }): { people: TodayPerson[]; quiet: string[]; counts: TodayCounts } {
-  const { from, to } = rangeOf(range, now);
+  const { from, to } = window ?? rangeOf(range, now);
   const inRange = (t: number | null | undefined) => !!t && t >= from && t < to;
   const direct = new Set(products.filter((p) => p.team?.direct).map((p) => p.slug));
   const bySlug = new Map(products.map((p) => [p.slug, p]));
@@ -198,6 +202,7 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
     const shipped = shippedAtOf(i);
     if (inRange(shipped)) { who.shipped.push(line(shipped!)); continue; }
     if (i.status === 'done') {
+      if (handedOn(i)) continue;
       const doneAt = i.wrote?.status?.ts ?? i.updatedAt;
       // A task you gave is finished by whoever closed it, in their words, not yours.
       const closer = task ? keyOfPerson(i.wrote?.status?.by) : null;
@@ -238,10 +243,13 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
     const line: TodayLine = { key: `card/${c.personId}/${c.threadId}`, title: c.title ?? '', at: c.updatedAt, card: c };
     if (inRange(c.shippedAt)) { if (named) who.shipped.push({ ...line, at: c.shippedAt! }); else who.privateDone += 1; continue; }
     if (c.state === 'done') {
-      if (inRange(c.updatedAt)) { if (named) who.finished.push(line); else who.privateDone += 1; }
+      if (inRange(c.updatedAt) && !handedOn({ status: 'done', answer: c.solution })) { if (named) who.finished.push(line); else who.privateDone += 1; }
       continue;
     }
-    if (!named) continue;
+    if (!named) {
+      if (c.state === 'running' && inRange(c.updatedAt)) who.privateWorking = (who.privateWorking ?? 0) + 1;
+      continue;
+    }
     const on = blockOn(c.blockedBy.map((b) => b.id), who.key);
     if (on) who.blocked.push({ ...line, on });
     else if (inRange(c.updatedAt) && c.state !== 'scheduled') {
@@ -290,7 +298,7 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
       for (const l of list.slice(0, SHOWN)) if (!l.title && l.item) l.title = shownTitle(l.item);
     }
   }
-  const says = (p: TodayPerson) => p.finished.length + p.shipped.length + p.decided.length + p.blocked.length + p.waitingOnYou.length + p.working.length + p.waiting!.length + p.tasks.length + p.privateDone > 0;
+  const says = (p: TodayPerson) => p.finished.length + p.shipped.length + p.decided.length + p.blocked.length + p.waitingOnYou.length + p.working.length + p.waiting!.length + p.tasks.length + p.privateDone + (p.privateWorking ?? 0) > 0;
   return {
     people: all.filter(says),
     quiet: all.filter((p) => p.kind !== 'me' && !says(p)).map(quietName),

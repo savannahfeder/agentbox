@@ -1465,7 +1465,13 @@ export function createTeamService({
     async stopFileLink(token: string) {
       if (!backend?.stopFileLink || !state.me) throw new Error('Sign in first.');
       await backend.stopFileLink(token);
-      if (backend.clearLinkPieces) await backend.clearLinkPieces(token, null).catch((err: Error) => log(`file link: a stopped film's pieces stay: ${err.message}`));
+      // The cloud's cache serves a stopped link's pieces until they are deleted.
+      for (let tries = 1; backend.clearLinkPieces; tries++) {
+        try { await backend.clearLinkPieces(token, null); break; } catch (err) {
+          if (tries === 3) { log(`file link: a stopped film's pieces stay: ${(err as Error).message}`); break; }
+          await new Promise((r) => setTimeout(r, 1000 * tries));
+        }
+      }
     },
     /** The comments people left on a link's page, and the owner's answer to them. */
     async fileLinkComments(token: string) {

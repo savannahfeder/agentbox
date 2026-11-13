@@ -1,6 +1,7 @@
 // PURE. What the Files place shows of the list main/files-place.mts hands it.
 import type { FileFolder, FileKind, PlacedFile } from '../types';
 import { PLAIN_AGENT } from '../../../shared/agent-voice.mts';
+import { MAC } from '../this-keyboard';
 
 export const KIND_ORDER: FileKind[] = ['markdown', 'image', 'film', 'deck', 'pdf', 'page', 'table', 'code'];
 export const KIND_PLURAL: Record<FileKind, string> = { markdown: 'Documents', image: 'Pictures', film: 'Films', deck: 'Decks', pdf: 'PDFs', page: 'Pages', table: 'Tables', code: 'Code' };
@@ -97,11 +98,30 @@ export function shownName(f: Pick<PlacedFile, 'name' | 'sentIn'>) {
 
 export const needsReview = (f: Pick<PlacedFile, 'open' | 'approvedBy'>) => f.open > 0 && f.approvedBy.length === 0;
 
-export type FileSort = 'recent' | 'name';
-export function sortFiles<T extends Pick<PlacedFile, 'name' | 'sentIn' | 'at'>>(files: T[], by: FileSort): T[] {
+export type FileSort = 'recent' | 'name' | 'size';
+export function sortFiles<T extends Pick<PlacedFile, 'name' | 'sentIn' | 'at' | 'onMac'>>(files: T[], by: FileSort): T[] {
   return [...files].sort(by === 'name'
     ? (a, b) => shownName(a).localeCompare(shownName(b), undefined, { sensitivity: 'base', numeric: true })
-    : (a, b) => b.at - a.at);
+    : by === 'size' ? (a, b) => (b.onMac ?? 0) - (a.onMac ?? 0) || b.at - a.at
+      : (a, b) => b.at - a.at);
+}
+
+// The app runs on Linux too, where "this Mac" would be untrue.
+export const MACHINE = MAC ? 'Mac' : 'computer';
+
+/** A size as a person reads it: 625 MB, 2.1 MB, 4 KB, 4.8 GB. */
+export function sizeWords(bytes: number): string {
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let n = bytes / 1024;
+  let u = 0;
+  while (n >= 1000 && u < units.length - 1) { n /= 1024; u += 1; }
+  if (n < 1) return '1 KB';
+  return `${n >= 100 || u === 0 ? Math.round(n) : Math.round(n * 10) / 10} ${units[u]}`;
+}
+
+/** What the files here take on this computer, all versions; and what their older versions take. */
+export function onMacOf(files: readonly Pick<PlacedFile, 'onMac' | 'older'>[]): { onMac: number; older: number } {
+  return files.reduce<{ onMac: number; older: number }>((s, f) => ({ onMac: s.onMac + (f.onMac ?? 0), older: s.older + (f.older ?? 0) }), { onMac: 0, older: 0 });
 }
 
 type Place = { project: string | null; folder: string | null };

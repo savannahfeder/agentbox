@@ -5,7 +5,7 @@ import {updateFixture} from './agent-update-fixture';
 // developed, reviewed, and screenshotted without a live store or any agents.
 
 import type { Person, TeamBillingDetails } from './types';
-import type { AccountUsageReading, AgentConversation, AgentUpdate, AgentUpdateAction, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, ProductDashboard, ProjectSettings, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, TerminalAction, TerminalAnswer, TerminalAsk, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, FilesUploaded, TeamMessageFile, ThreadEditPatch, LiveRoomTicket, UpdateState, Usage, UsageLimit, WorkItem, WorkspaceSettings } from './types';
+import type { AccountUsageReading, AgentConversation, AgentUpdate, AgentUpdateAction, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, ProductDashboard, ProjectSettings, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, TerminalAction, TerminalAnswer, TerminalAsk, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, FilesUploaded, FilesTrashed, FilesCloudStatus, TeamMessageFile, ThreadEditPatch, LiveRoomTicket, UpdateState, Usage, UsageLimit, WorkItem, WorkspaceSettings } from './types';
 import type { LedgerLine } from './thread-history';
 import type { NotePlace } from '../../shared/artifact-marks.mts';
 import type { AgentFile as AgentFileRow } from './onboarding';
@@ -22,6 +22,7 @@ interface LaterBridge {
   liveRoom?(p: { product: string; project?: string | null; name: string }): Promise<LiveRoomTicket | null>;
   gitHubSignIn?(p: { token: string }): Promise<{ ok: boolean; again?: string[]; error?: string }>;
   gitHubBrowserSignIn?(): Promise<{ ok: boolean; code?: string; url?: string; error?: string }>;
+  gitHubCloudSignIn?(p: { action: 'start' | 'token' }): Promise<{ ok: boolean; code?: string; url?: string; token?: string; error?: string }>;
   signInAnswer?(p: { product: string; id: string; ask: string; said: 'signed-in' | 'skipped' | 'landed' | 'code'; url?: string; code?: string }): Promise<{ ok: boolean; error?: string }>;
   cloudAccountPay?(p: { plan: 'pro' | 'plus' | 'max' | 'team' }): Promise<{ ok: boolean; where?: 'checkout' | 'billing'; error?: string; message?: string }>;
   cloudAccountTeamBilling?(): Promise<{ ok: boolean; owner?: boolean } & Partial<TeamBillingDetails>>;
@@ -1071,6 +1072,17 @@ export const api = {
     if (!window.zero?.filesPlaceFolder) return { ok: false, error: `quit and reopen ${NAME} to use folders` };
     return window.zero.filesPlaceFolder(p);
   },
+  async filesPlaceTrash(p: { keys: string[]; older?: boolean }): Promise<FilesTrashed> {
+    if (!window.zero?.filesPlaceTrash) return { ok: false, moved: 0, bytes: 0, error: `Quit and reopen ${NAME} to move files to the Trash.` };
+    return window.zero.filesPlaceTrash(p);
+  },
+  async filesPlaceUntrash(token: string): Promise<{ ok: boolean; back?: number; error?: string }> {
+    if (!window.zero?.filesPlaceUntrash) return { ok: false, error: `Quit and reopen ${NAME} to put files back.` };
+    return window.zero.filesPlaceUntrash({ token });
+  },
+  async filesCloud(): Promise<FilesCloudStatus | null> {
+    return (await window.zero?.filesCloud?.().catch(() => null)) ?? null;
+  },
   async filesPlaceNew(p: { project: string; name: string; kind: 'document' | 'table'; folder: string | null }): Promise<{ ok: boolean; error?: string; key?: string }> {
     if (!window.zero?.filesPlaceNew) return { ok: false, error: `Quit and reopen ${NAME} to make a document here.` };
     return window.zero.filesPlaceNew(p);
@@ -1726,6 +1738,13 @@ export const api = {
     const zero = laterBridge();
     if (!zero?.gitHubBrowserSignIn) return { ok: false, error: RESTART_NOTE };
     return zero.gitHubBrowserSignIn();
+  },
+
+  /** GitHub's own sign-in for a cloud thread that asked for GitHub: `start` gives the code and link, `token` waits for the approval. */
+  async gitHubCloudSignIn(p: { action: 'start' | 'token' }): Promise<{ ok: boolean; code?: string; url?: string; token?: string; error?: string }> {
+    const zero = laterBridge();
+    if (!zero?.gitHubCloudSignIn) return { ok: false, error: RESTART_NOTE };
+    return zero.gitHubCloudSignIn(p);
   },
 
   /** What the person did with a sign-in link an agent on this thread is waiting on. */
