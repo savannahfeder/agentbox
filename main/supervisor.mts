@@ -14095,6 +14095,9 @@ export class Supervisor {
   /** The approvals server as plain JavaScript in this app's folder, for its launcher; nothing when no copy could be made. */
   _plainApprovalsServer(): { ZERO_APPROVALS_SERVER?: string } {
     if (!this.userDir || !this.appDir) return {};
+    // A copy run from its checkout with no folder of its own (tests, the browser copy) leaves the checkout as it was.
+    const within = path.relative(path.resolve(this.appDir), path.resolve(this.userDir));
+    if (!within.startsWith('..') && !path.isAbsolute(within)) return {};
     const copy = plainCopy(path.join(this.appDir, 'main', 'approval-prompt-server.mts'), path.join(this.userDir, 'plain-helpers'), { root: this.appDir });
     return copy ? { ZERO_APPROVALS_SERVER: copy } : {};
   }

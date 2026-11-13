@@ -153,16 +153,34 @@ describe('the launcher', () => {
 });
 
 describe('an agent', () => {
-  it('is handed the plain copy in its approvals server\'s environment', () => {
-    const userDir = tmpdir('user');
+  const supervisorIn = (appDir: string, userDir: string) => {
     const s = Object.create(Supervisor.prototype);
-    s.appDir = repo;
+    s.appDir = appDir;
     s.dataDir = userDir;
     s.userDir = userDir;
     s.config = { storeRoot: userDir, accountId: 'nobody', storeMcpCommand: null };
-    const env = s.mcpServers(null, 'darwin')['zero-approvals'].env;
+    return s;
+  };
+
+  it('is handed the plain copy in its approvals server\'s environment', () => {
+    const userDir = tmpdir('user');
+    const env = supervisorIn(repo, userDir).mcpServers(null, 'darwin')['zero-approvals'].env;
     expect(env.ZERO_APPROVALS_SERVER).toMatch(/approval-prompt-server\.mjs$/);
     expect(env.ZERO_APPROVALS_SERVER.startsWith(userDir)).toBe(true);
     expect(fs.existsSync(env.ZERO_APPROVALS_SERVER)).toBe(true);
+  });
+
+  it('runs the TypeScript server, and writes nothing into the checkout, when the app keeps its data there', () => {
+    const app = tmpdir('checkout');
+    fs.mkdirSync(path.join(app, 'main'));
+    for (const f of ['approval-prompt-server.mts', 'approval-prompt-core.mts', 'approvals.mts']) fs.copyFileSync(path.join(repo, 'main', f), path.join(app, 'main', f));
+    fs.mkdirSync(path.join(app, 'shared'));
+    fs.copyFileSync(path.join(repo, 'shared', 'approval-card.mts'), path.join(app, 'shared', 'approval-card.mts'));
+    fs.mkdirSync(path.join(app, 'scripts'));
+    fs.copyFileSync(launcher, path.join(app, 'scripts', 'approval-server.sh'));
+    const before = filesUnder(app).sort();
+    const env = supervisorIn(app, app).mcpServers(null, 'darwin')['zero-approvals'].env;
+    expect(env.ZERO_APPROVALS_SERVER).toBeUndefined();
+    expect(filesUnder(app).sort()).toEqual(before);
   });
 });
