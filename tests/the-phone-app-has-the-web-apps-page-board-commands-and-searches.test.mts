@@ -36,10 +36,10 @@ describe('a thread as one page', () => {
     expect(p.from).toBe(0);
     expect(p.toggle).toBe('Hide earlier messages');
   });
-  it('draws the conversation whole when only a message or two would be folded', () => {
+  it('leads with the answer even when only a message would be folded', () => {
     const p = pageOf(item(), [said(1, 'you', 'Ask')], outcome('Done.'), [], false);
-    expect(p.answer).toBeNull();
-    expect(p.toggle).toBeNull();
+    expect(p.answer).not.toBeNull();
+    expect(p.toggle).toBe('Show 1 earlier message');
   });
   it('with no answer yet draws the conversation, with nothing to fold', () => {
     expect(pageOf(item(), [said(1, 'you', 'Ask')], null, [], false)).toMatchObject({ answer: null, toggle: null, from: 0 });

@@ -439,6 +439,31 @@ async function startInstalled(state) {
 }
 
 /** Start the copy over an instance that is already on disk, and wait for its address. */
+/**
+ * Made-up keys where a person keeps theirs (a Keychain item, a key file, an
+ * .env file, a shell variable), and a stand-in `security` first on the copy's
+ * PATH that knows only these, so a cloud run asking this computer for a key
+ * (main/cloud/key-asks.mts) never reaches the real Keychain. Returns the env to add.
+ */
+export function layStandInKeys(home, env) {
+  const items = { 'posthog-read-key': 'phx_standin_keychain_posthog_0000', 'resend-api-key': 're_standin_keychain_resend_0000' };
+  fs.writeFileSync(path.join(home, '.stand-in-keychain.json'), JSON.stringify(items));
+  fs.mkdirSync(path.join(home, '.config'), { recursive: true });
+  fs.writeFileSync(path.join(home, '.config', 'openrouter.key'), 'sk-or-standin-file-openrouter-0000\n');
+  fs.mkdirSync(path.join(home, 'app'), { recursive: true });
+  fs.writeFileSync(path.join(home, 'app', '.env'), 'RESEND_API_KEY=re_standin_env_resend_0000\nPOSTHOG_KEY=phx_standin_env_posthog_0000\n');
+  const bin = path.join(INSTANCE, 'keychain-bin');
+  fs.mkdirSync(bin, { recursive: true });
+  const reader = path.join(bin, 'security.cjs');
+  fs.writeFileSync(reader, `const a = process.argv.slice(2); const s = a[a.indexOf('-s') + 1];
+const items = JSON.parse(require('fs').readFileSync(${JSON.stringify(path.join(home, '.stand-in-keychain.json'))}, 'utf8'));
+if (a[0] !== 'find-generic-password' || !Object.hasOwn(items, s)) { console.error('security: SecKeychainSearchCopyNext: The specified item could not be found in the keychain.'); process.exit(44); }
+console.log(a.includes('-w') ? items[s] : 'keychain: "stand-in"');
+`);
+  fs.writeFileSync(path.join(bin, 'security'), `#!/bin/sh\nexec "${process.execPath}" "${reader}" "$@"\n`, { mode: 0o755 });
+  return { PATH: `${bin}:${env.PATH ?? '/usr/bin:/bin:/usr/sbin:/sbin'}`, MIXPANEL_API_SECRET: 'mx_standin_shell_mixpanel_0000' };
+}
+
 async function start(state) {
   if (state.installed) return startInstalled(state);
   const env = { ...cleanEnv(), STUB_CLAUDE_PLAN: state.plan,
@@ -506,6 +531,7 @@ async function start(state) {
   let had = {};
   try { had = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { /* first start */ }
   fs.writeFileSync(file, `${JSON.stringify({ ...had, ...copyConfig(state, had) }, null, 2)}\n`);
+  if (state.engine === 'stub') Object.assign(env, layStandInKeys(state.home, env));
 
   const fd = fs.openSync(state.log, 'a');
   // A restart keeps its port: a new port is a new origin, and the window's own

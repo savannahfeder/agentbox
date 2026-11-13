@@ -18,7 +18,7 @@ import { listProducts, getProduct, createProduct, updateProduct, type ProductPat
 import { listDocuments, nameOnThread, noteWrittenForRun, readDocument, writeDocument } from './core/documents.mts';
 import { listSkills, fetchSkill, fetchReference } from './core/skills.mts';
 import { listWorkItems, updateItem, createClaimRegistry, type AgentPatch, type ClaimAsk, type ItemFields, type WorkListFilter } from './core/work.mts';
-import { createRepeatingTask, readStandingInstruction, setStandingInstruction, type NewRepeatingTask } from './core/repeats.mts';
+import { createRepeatingTask, readStandingInstruction, setStandingInstruction, stopRepeatingTask, type NewRepeatingTask, type StopRepeatingTask } from './core/repeats.mts';
 import { teamPost, teamPass, teamRemember, teamSetup, teamRoster, teamPlaybook, teamMethod, teamHire, noteToAnotherThread } from './core/teammates.mts';
 import { documentVersion, documentsWithFolders, keepAsWritten, fileWrittenDocument, teamFile, teamTell, teamTask, teamThreads, teamRead, waitsNamed } from './core/reach.mts';
 import { readTeammates, readTeamView, teamDir } from '../main/store/teammates-files.mts';
@@ -73,6 +73,7 @@ export interface StoreTool {
 }
 
 export interface CloudResourceAsk { kind: 'file' | 'skill'; path: string; scope?: 'task' | 'documents' | 'account' }
+export interface CloudKeyAsk { name: string; what: string; place: 'keychain' | 'file' | 'shell'; from: string; entry?: string }
 
 type DocumentStatus = 'current' | 'history' | 'exploration';
 interface DocumentFilter { kind?: string; status?: DocumentStatus; pathPrefix?: string; query?: string; catalogedOnly?: boolean }
@@ -116,6 +117,7 @@ export interface BuildToolsOptions {
   ownItem?: string | null;
   ownProduct?: string | null;
   requestCloudResource?: ((ask: CloudResourceAsk) => unknown) | null;
+  requestCloudKey?: ((ask: CloudKeyAsk) => unknown) | null;
   /** Saves a token a cloud run's login made, so every later cloud run has it. */
   keepCloudKey?: ((name: string, value: string) => unknown) | null;
 }
@@ -132,7 +134,7 @@ const guard = (fn: StoreTool['run']) => async (args: object | undefined): Promis
 
 // `ownItem` is the row this server's session was started for, if any, and
 // `ownProduct` its project.
-export function buildTools({ holder, ownItem: givenItem, ownProduct = process.env.ZERO_PRODUCT || null, requestCloudResource = null, keepCloudKey = null }: BuildToolsOptions = {}) {
+export function buildTools({ holder, ownItem: givenItem, ownProduct = process.env.ZERO_PRODUCT || null, requestCloudResource = null, requestCloudKey = null, keepCloudKey = null }: BuildToolsOptions = {}) {
   const ownItem = givenItem === undefined ? process.env.ZERO_ITEM || null : givenItem;
   const account = resolveAccount();
   // Cloud runs share one process, whose own ZERO_ITEM belongs to no run or to
@@ -376,6 +378,16 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
       },
       run: (ask: NewRepeatingTask) => json(createRepeatingTask(ask, thisRun())),
     },
+    {
+      name: 'stop_repeating_task',
+      description: 'Stop a repeating task for good, as Stop repeating on the person\'s own screen does: no more runs start, and runs already made are left as they are. Use it when the person asks for one to stop, be switched off or cancelled, rather than telling them to find it and stop it by hand. Name it as it is listed (such as "Daily security review") or by its id; a name not in this thread\'s product is looked for in every product, and a name two running tasks share is refused with both ids. On a thread it needs the person\'s own words there asking for it to stop, quoted in askedBecause.',
+      schema: {
+        which: z.string().describe('the task\'s name as it is listed, or its id (r-…)'),
+        product: z.string().optional().describe('which product it is in, when you know; otherwise every product is searched'),
+        askedBecause: z.string().optional().describe('on a thread: the person\'s own words on it asking for this to stop, quoted exactly, such as "Switch it off". Without them nothing is stopped'),
+      },
+      run: (ask: StopRepeatingTask) => json(stopRepeatingTask(ask, thisRun())),
+    },
 
     /* ------------------------------- teammates ------------------------------ */
     // On a teammate's run, the teammate speaks; on any other thread, the person
@@ -615,6 +627,19 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
       scope: z.enum(['task', 'documents', 'account']).optional().describe('for a relative file path: this task, this product\'s documents, or the account\'s documents; omitted for a full path or a skill'),
     },
     run: async (args: CloudResourceAsk) => json(await requestCloudResource(args)),
+  });
+
+  if (typeof requestCloudKey === 'function') tools.push({
+    name: 'request_cloud_key',
+    description: 'Ask this thread’s computer for a key the run needs when you know where it is kept there: their instructions, notes or memory name a Keychain item, a file under their home folder, or a variable in their shell. They get a card to allow it; once allowed it is saved for every cloud run and handed to this one. The call waits up to 15 minutes for their answer. Returns saved (with the file this run reads it from), already, denied, replied (their words instead of a yes), not_found, no_answer or unavailable, each with what to do next. When you do not know where the key is, do not guess: ask for it with the key line at the end of your turn.',
+    schema: {
+      name: z.string().describe('the environment variable its tools read, such as POSTHOG_PERSONAL_KEY'),
+      what: z.string().describe('what it is, in plain words, such as "the PostHog personal API key the daily report reads"'),
+      place: z.enum(['keychain', 'file', 'shell']),
+      from: z.string().describe('the Keychain item\'s name, the file\'s path (~/… or absolute), or the shell variable\'s name'),
+      entry: z.string().optional().describe('for an .env-style file, the variable inside it'),
+    },
+    run: async (args: CloudKeyAsk) => json(await requestCloudKey(args)),
   });
 
   // Teammates are an alpha feature: their tools are offered once there is a
