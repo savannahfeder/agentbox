@@ -33,7 +33,7 @@ describe('the look the setup ticks', () => {
 
 describe('the looks offered', () => {
   it('put Match my system first when it is the look on', () => {
-    expect(lookChoices(MATCH_SKY, true)).toEqual([MATCH_SKY, 'ember', 'dusk', 'aurora', 'sage', 'light', 'dark']);
+    expect(lookChoices(MATCH_SKY, true)).toEqual([MATCH_SKY, 'ember', 'dusk', 'aurora', 'sage', 'dusk-light', 'light', 'dark']);
   });
   it('still offer Match my system when a sky was picked, once and only once', () => {
     const out = lookChoices('dusk', true);

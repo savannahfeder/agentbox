@@ -7,8 +7,8 @@ import { AppMark } from '../components/AppMark';
 import { PdfPages } from '../components/PdfPages';
 import type { CloudClient } from '../cloud-rest';
 import {
-  commentWhen, fileBytes, filmOf, initialOf, isTable, mayComment, mayEdit, mayLookBack, postComment, readFilm, readComments, readHistory, readSharedFile,
-  readVersion, removeComment, restoreVersion, saidOf, saveEdit, sharedLine, titleOf, versionLine, versionWhen,
+  blobType, commentWhen, fileBytes, filmOf, initialOf, isTable, mayComment, mayEdit, mayLookBack, postComment, readFilm, readComments, readHistory, readSharedFile,
+  pictureAddress, readVersion, removeComment, restoreVersion, saidOf, saveEdit, sharedLine, titleOf, versionLine, versionWhen,
   type FileComment, type LinkVersion, type Rpc, type SharedFile, type Shown,
 } from './shared-file';
 import { SharedSignIn, type SignInFor } from './SharedSignIn';
@@ -436,7 +436,7 @@ function Download({ token, file }: { token: string; file: SharedFile }) {
     if (openToAnyone(file) || file.kind === 'video') return null;
     try {
       const data = file.kind === 'image' || file.kind === 'pdf' ? fileBytes(file) : file.body;
-      return URL.createObjectURL(new Blob([data as BlobPart], { type: file.type || 'application/octet-stream' }));
+      return URL.createObjectURL(new Blob([data as BlobPart], { type: blobType(file.kind, file.type) }));
     } catch { return null; }
   }, [file]);
   useEffect(() => () => { if (local) URL.revokeObjectURL(local); }, [local]);
@@ -458,7 +458,7 @@ function FilmBody({ token, file, piece, notes }: { token: string; file: SharedFi
     readFilm(piece, token, film, (d) => { if (live) setDone(d); }).then((parts) => {
       if (!live) return;
       if (!parts) { setFailed(true); return; }
-      made = URL.createObjectURL(new Blob(parts as BlobPart[], { type: file.type || 'video/mp4' }));
+      made = URL.createObjectURL(new Blob(parts as BlobPart[], { type: blobType('video', file.type) }));
       setUrl(made);
     }, () => { if (live) setFailed(true); });
     return () => { live = false; if (made) URL.revokeObjectURL(made); };
@@ -554,7 +554,7 @@ export function FileBody({ token, file, piece, notes, edit = null }: { token: st
     if (file.kind !== 'image' && file.kind !== 'pdf') return null;
     try { return fileBytes(file); } catch { return null; }
   }, [file]);
-  const url = useMemo(() => (file.kind === 'image' && bytes ? URL.createObjectURL(new Blob([bytes as BlobPart], { type: file.type })) : null), [file, bytes]);
+  const url = useMemo(() => (file.kind === 'image' && bytes ? pictureAddress(file) : null), [file, bytes]);
   useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
   const [unreadable, setUnreadable] = useState(false);
   const pdf = useCallback(async () => bytes ?? new Uint8Array(), [bytes]);

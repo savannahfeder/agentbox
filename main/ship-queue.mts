@@ -36,7 +36,13 @@ import type { GateAnswer, GateRequest, GateReply } from './memory-gate.mts';
 
 export const SHIP_LABEL = 'ship';
 const SHIP_MS = 20 * 60 * 1000;
+// The whole suite is about 3,000 files, and on a busy Mac it runs past 20 minutes.
+export const WHOLE_SUITE_SHIP_MS = 60 * 60 * 1000;
+// What scripts/ship.mjs says before a push the hook runs every test for.
+export const RUNS_EVERY_TEST = 'ship: the hook runs every test for this push';
 const KEEP = 4000;
+
+const minutes = (ms: number) => { const n = Math.max(1, Math.round(ms / 60_000)); return `${n} minute${n === 1 ? '' : 's'}`; };
 
 export interface ShipItem {
   id: string;
@@ -56,7 +62,8 @@ export type ShipHandled = Record<string, number>;
 
 export interface ShipJob { item: ShipItem; product: ShipProduct; script: string; cwd: string }
 
-export interface ShipRun { code: number; out: string }
+/** `quit`: stopped because the app is quitting, so not a verdict on the change. */
+export interface ShipRun { code: number; out: string; quit?: boolean }
 
 export interface ShipStore {
   readItem?(slug: string, id: string): ConflictThread | null | undefined;
@@ -319,6 +326,9 @@ export function failureReply(output: unknown, { brief = null }: { brief?: string
     'Fix what the script says below in your task folder, commit, then add the label',
     `\`${SHIP_LABEL}\` to this row again and end your turn. Do not push or touch any`,
     'other folder yourself; the app ships it.',
+    'If your change is fine and what stopped it is outside it (git could not sign in,',
+    'no network, the computer), call `wait_on_cause` instead of asking the person,',
+    'and add the label again once you are started after it is cleared.',
     '',
     '```',
     tail,
@@ -356,7 +366,20 @@ export function gitConfigEnv(pairs: [string, string][]): Record<string, string> 
   return out;
 }
 
-export async function runScript(script: string, cwd: string, { timeout = SHIP_MS, env = process.env, gitConfig = [] }: { timeout?: number; env?: NodeJS.ProcessEnv; gitConfig?: [string, string][] } = {}): Promise<ShipRun> {
+// Process groups of the ships running now, so quitting the app can stop them.
+const runningShips = new Map<number, () => void>();
+const ownGroup = process.platform !== 'win32';
+
+function signalShip(pid: number, signal: NodeJS.Signals) {
+  try { process.kill(ownGroup ? -pid : pid, signal); } catch { /* already gone */ }
+}
+
+/** Stops every running ship and everything under it (git, the hook, vitest and its workers). */
+export function stopShips() {
+  for (const [pid, markQuit] of runningShips) { markQuit(); signalShip(pid, 'SIGTERM'); }
+}
+
+export async function runScript(script: string, cwd: string, { timeout = SHIP_MS, wholeSuiteTimeout = WHOLE_SUITE_SHIP_MS, env = process.env, gitConfig = [], graceMs = 5000 }: { timeout?: number; wholeSuiteTimeout?: number; env?: NodeJS.ProcessEnv; gitConfig?: [string, string][]; graceMs?: number } = {}): Promise<ShipRun> {
   const node = env.npm_node_execpath && fs.existsSync(env.npm_node_execpath) ? env.npm_node_execpath : 'node';
   const hooks = await baseHooksPath(cwd);
   const baseGate = gitConfigEnv([...(hooks ? [['core.hooksPath', hooks] as [string, string]] : []), ...gitConfig]);
@@ -364,17 +387,51 @@ export async function runScript(script: string, cwd: string, { timeout = SHIP_MS
     let out = '';
     let child: ChildProcess;
     try {
-      child = spawn(node, [script], { cwd, env: { ...env, GIT_TERMINAL_PROMPT: '0', ...baseGate }, stdio: ['ignore', 'pipe', 'pipe'] });
+      // Its own process group, so a stop reaches the hook's test run and not
+      // only this script.
+      child = spawn(node, [script], { cwd, env: { ...env, GIT_TERMINAL_PROMPT: '0', ...baseGate }, stdio: ['ignore', 'pipe', 'pipe'], detached: ownGroup });
     } catch (e) {
       resolve({ code: 1, out: String((e as Error)?.message ?? e) });
       return;
     }
-    const keep = (b: Buffer | string) => { out = (out + b).slice(-64 * 1024); };
+    const pid = child.pid;
+    let quit = false;
+    if (pid) runningShips.set(pid, () => { quit = true; });
+    let settled = false;
+    let exitCode: number | null = null;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (pid) runningShips.delete(pid);
+      resolve({ code: exitCode ?? 1, out, ...(quit ? { quit } : {}) });
+    };
+    // Whatever is left in the group once the script is over is a leftover: a
+    // polite stop, then a hard one, and the answer does not wait on a leftover
+    // that holds the output pipe open.
+    const stopTheRest = () => {
+      if (!pid) return;
+      signalShip(pid, 'SIGTERM');
+      setTimeout(() => { signalShip(pid, 'SIGKILL'); setTimeout(finish, 200).unref(); }, graceMs).unref();
+    };
+    const began = Date.now();
+    const stopAfter = (ms: number) => setTimeout(() => { keep(`\nship: stopped after ${minutes(ms)}.`); if (pid) signalShip(pid, 'SIGTERM'); else child.kill('SIGTERM'); }, Math.max(0, began + ms - Date.now()));
+    let timer: NodeJS.Timeout;
+    let longer = false;
+    const keep = (b: Buffer | string) => {
+      out = (out + b).slice(-64 * 1024);
+      if (!longer && wholeSuiteTimeout > timeout && out.includes(RUNS_EVERY_TEST)) {
+        longer = true;
+        clearTimeout(timer);
+        timer = stopAfter(wholeSuiteTimeout);
+      }
+    };
     child.stdout!.on('data', keep);
     child.stderr!.on('data', keep);
-    const timer = setTimeout(() => { keep('\nship: stopped after 20 minutes.'); child.kill('SIGTERM'); }, timeout);
-    child.on('error', (e: Error) => keep(`\n${e.message}`));
-    child.on('close', (code) => { clearTimeout(timer); resolve({ code: code ?? 1, out }); });
+    timer = stopAfter(timeout);
+    child.on('error', (e: Error) => { keep(`\n${e.message}`); if (!pid) finish(); });
+    child.on('exit', (code) => { exitCode = code; clearTimeout(timer); stopTheRest(); });
+    child.on('close', (code) => { exitCode = code ?? exitCode; finish(); });
   });
 }
 
@@ -439,7 +496,7 @@ export class ShipQueue {
     // (w-f37a34def6, 2026-10-04). Within one app, `busy` already stops a
     // second start; across a restart, trying again is the point.
     const done = () => writeHandled(this.userDir, { ...readHandled(this.userDir), [keyOf(next.item)]: markedAt(next.item) });
-    this.busy = this.ship(next, products, items).then(done, done).finally(() => { this.busy = null; });
+    this.busy = this.ship(next, products, items).then((r) => { if (!r?.quit) done(); }, done).finally(() => { this.busy = null; });
     return this.busy;
   }
 
@@ -528,6 +585,10 @@ export class ShipQueue {
       giveBack?.();
     }
     const { code, out } = ran;
+    if (ran.quit) {
+      this.log.info?.(`zero: the ship of ${item.id} was stopped by the quit and goes again at the next start`);
+      return { code, quit: true };
+    }
     try {
       // Already on main: there is nothing to fix, so nobody is woken.
       const already = /There is nothing to ship/.test(out);

@@ -70,6 +70,7 @@ node $P --who startup-engineer,founder --hours 2 --focus "replies after switchin
 | `--stand-ins "<their words>"` | a Claude Code stand-in instead of the real one (Codex stays real on the testers' login), only with the person's own words agreeing to it for this run | the real Claude Code and Codex on this computer's plans |
 | `--stand-in-cloud` | every thread runs in a stand-in Agentbox Cloud of the copy's own (the real cloud server and sandbox, here, with the stand-in agent); a task naming Supabase, Vercel, Stripe, Expo, AWS or Sentry asks for its key. Stand-in agents, so it needs `--stand-ins` too | no cloud |
 | `--chaos` | `none`, `light`, `normal`, `heavy` | `normal` |
+| `--stuck` | from a twentieth to six tenths of the way in, 7 in 10 stand-in agents get stuck on one cause outside their work (git on the Mac cannot sign in to GitHub) and wait on its row. Needs `--stand-ins` | off |
 | `--round-minutes` | one tester session before it is restarted with its diary | 20 |
 | `--model` | the testers' Codex model | Codex's default |
 | `--codex-home` | the Codex login testers spend | the Codex login on the best plan |
@@ -96,10 +97,12 @@ you cite into the product's docs before you finish.
 - **How long.** A feature check: 1 hour. Before a launch: 3 hours or more.
   The chaos is laid out as fractions of the length, so a short run is the
   same day squeezed.
-- **Codex gets half the work.** The person does not use Codex, so its
-  failures reached them only on a thread they needed. Every tester who uses
-  Codex is told to send at least half its work there. On an agreed stand-in
-  run Codex still stays real, on the testers' own Codex login
+- **Codex gets most of the work.** The person does not use Codex, so its
+  failures reached them only on a thread they needed, and Codex gives more
+  use per plan. On real plans every tester who uses Codex is told to send
+  about four threads in five there and Claude Code the rest. On an agreed
+  stand-in run, whose Claude Code is free, it is at least half, and Codex
+  stays real on the testers' own Codex login
   (`live.mjs up --real-codex <home>`).
 - **Real plans are spent.** The copies' agents work in the fixture
   repositories on this computer's Claude and Codex plans. That is the point,

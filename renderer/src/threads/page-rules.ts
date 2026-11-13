@@ -19,6 +19,7 @@ import { heldByAPerson, iSpokeLast, isTaskRow, isWorkThread, lastSpeaker, nameIs
 import { taskWords } from '../team/company';
 import { shownTitle } from '../../../shared/thread-title.mts';
 import { localDate } from '../local-dates';
+import { isCause, waitingOn, causeWhere } from '../../../shared/causes.mts';
 
 export type PageId = 'inbox' | 'team';
 export type UpdatedWindow = 'today' | 'week' | 'any';
@@ -785,7 +786,9 @@ export function teamEntries({ items, products, cards, me, now, since = null, sta
     const state = stateOf?.(item) ?? threadState(item, now);
     if (state === 'done' && !(item.updatedAt >= today)) continue;
     out.push({
-      key: `mine/${item.product}/${item.id}`, ownerId: me, state, title: shownTitle(item), project: product.name,
+      key: `mine/${item.product}/${item.id}`, ownerId: me, state, title: shownTitle(item),
+      // A cause names every project its threads are in, as its list row does.
+      project: isCause(item) && item.status !== 'done' ? causeWhere(item, waitingOn(item, items), product.name) : product.name,
       projectSlug: product.slug, priority: shownPriority(item), updatedAt: item.updatedAt, item, card: null,
       live: !!live?.has(item.id),
     });
