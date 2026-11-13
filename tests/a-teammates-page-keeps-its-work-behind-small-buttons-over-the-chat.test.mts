@@ -10,7 +10,10 @@
 // Built first as dropdowns over the chat, which the founder read as wrong: "I
 // assumed those were things I could click into, and it would show me that
 // content". So each shows its list, or the job, in the chat's place, and Chat,
-// first and lit, brings the chat back.
+// first and lit, brings the chat back. Then: "job should basically be an about
+// page that you can use to get info about an agent and edit it", so Job became
+// About, the teammate sheet's rows (job, voice, schedule, model and the rest)
+// drawn in the page with the whole job, and Settings left the header.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import React, { createElement as h } from 'react';
@@ -31,7 +34,7 @@ const html = renderToStaticMarkup(h(Place, {
     ...listPart('Waiting on you', [row('a', 'Ship both fixes?')], 10_000, { ask: true }),
     ...listPart('In progress', [row('b', 'Check the pairing token')], 10_000),
     ...listPart('Done this week', [row('c', 'First audit'), row('d', 'Daily review')], 10_000),
-    { key: 'job', label: 'Job', body: h(JobBlock, { job: JOB }) },
+    { key: 'about', label: 'About', body: h(JobBlock, { job: JOB }) },
   ],
 }));
 
@@ -42,7 +45,7 @@ describe("a teammate's page", () => {
   });
   it('names each list with its count on a small button, in order', () => {
     const labels = [...html.matchAll(/<button [^>]*class="pl-btn pl-chip[^"]*"[^>]*>(.*?)<\/button>/g)].map((m) => m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
-    expect(labels).toEqual(['Chat', 'Waiting on you 1', 'In progress 1', 'Done this week 2', 'Job']);
+    expect(labels).toEqual(['Chat', 'Waiting on you 1', 'In progress 1', 'Done this week 2', 'About']);
   });
   it('marks only what waits on you with the dot', () => {
     expect(html.match(/class="pl-btn pl-chip ask"/g)).toHaveLength(1);
@@ -71,6 +74,11 @@ describe('App.tsx', () => {
     expect(places).not.toMatch(/\bside=\{/);
     expect(places.match(/parts=\{\[/g)).toHaveLength(3);
   });
+  it('gives your AI teammate an About that reads and changes it, and no Settings button', () => {
+    expect(places).toContain("{ key: 'about', label: 'About', body: teammatesUi.aboutOf(id) }");
+    expect(places).not.toContain('>Settings</PlaceAction>');
+    expect(places).not.toContain("label: 'Job'");
+  });
   it('says Done this week, as the approved picture does', () => {
     expect(places).toContain("listPart('Done this week'");
     expect(places).not.toContain('Finished this week');
@@ -88,5 +96,17 @@ describe('the styles', () => {
   });
   it('leave no rule for the old column', () => {
     expect(css).not.toContain('.pl-side');
+  });
+});
+
+describe("an AI teammate's About", () => {
+  const page = read('renderer/src/teammates/TeammatesPage.tsx');
+  it('draws the same rows as the About sheet, from one place', () => {
+    expect(page).toMatch(/function Details\(props: AboutProps\) \{[^]*?<AboutFields \{\.\.\.props\} \/>/);
+    expect(page).toMatch(/export function TeammateAbout\([^]*?<AboutFields \{\.\.\.props\} models=\{models\} call=\{call\} whole \/>/);
+  });
+  it('shows the whole job on the page and every setting open, where the sheet clips and folds them', () => {
+    expect(page).toContain('shown={job && !whole ? clipLine(firstSentence(job), 150) : job}');
+    expect(page).toContain('{whole ? <><h4 className="tq-about-h">Settings</h4>{settings}</>');
   });
 });

@@ -7906,14 +7906,13 @@ export default function App() {
       placeEl = <MemberPlace m={placeMember} waits={placeWaits} about={t?.role ?? 'AI teammate'} onBack={back} backTo={backTo}
         actions={<>
           <PlaceAction onClick={() => { setComposeInitial({ mate: id }); setModal('compose'); }} title={`A new thread for ${placeMember.name}`}>Give a task</PlaceAction>
-          <PlaceAction quiet onClick={() => { setEvPick(null); teammatesUi.go(id); }} title="Its chat with its settings beside it">Settings</PlaceAction>
         </>}
         chat={teammatesUi.chatWith(id)}
         parts={[
           ...listPart('Waiting on you', asks.map((i) => itemRow(i, '', 'ask')), now, { ask: true }),
           ...listPart('In progress', split.now.map((i) => itemRow(i, word(i)[0], word(i)[1])), now),
           ...listPart('Done this week', split.finished.map((i) => itemRow(i, '', 'done')), now),
-          { key: 'job', label: 'Job', body: <JobBlock job={t?.job ?? null} onSave={(job) => teammatesUi.setJob(id, job)} /> },
+          { key: 'about', label: 'About', body: teammatesUi.aboutOf(id) },
         ]} />;
     } else {
       const tm = teamMates.find((x) => `theirmate:${x.owner}:${x.id}` === placeMember.key) ?? null;
@@ -7926,7 +7925,7 @@ export default function App() {
           onSend={async (text) => { const r = await api.teamMessageMate({ owner: tm.owner, mate: tm.id, text }); if (r.ok) { showToast(tm.open ? `Sent to ${tm.name}` : `Sent to ${first} to pass on`); void refresh(); } return r.ok ? null : r.error ?? 'That did not send.'; }} />}
         parts={[
           ...(tm.running && tm.now ? [{ key: 'now', label: 'In progress', body: <p className="pl-text">{tm.now}</p> }] : []),
-          ...(tm.job ? [{ key: 'job', label: 'Job', body: <JobBlock job={tm.job} /> }] : []),
+          ...(tm.job ? [{ key: 'about', label: 'About', body: <JobBlock job={tm.job} /> }] : []),
           ...(ownerMember ? [{ key: 'owner', label: ownerMember.name, onOpen: () => pickMember(ownerMember.key) }] : []),
         ]} />;
     }
