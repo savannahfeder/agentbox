@@ -433,8 +433,10 @@ const NONE_FOUND: Command[] = [];
 type Asked = { query: string; at: number } & ({ state: 'looking' } | { state: 'found'; rows: Command[] } | { state: 'failed'; error: string });
 
 /** The row that asks an agent, in each of its states. */
+const ASK_ROW = 'find-by-description';
+
 export function agentRow(asked: Asked | null, now: number, ask: () => void, phone = false): Command {
-  const row = { id: 'find-by-description' };
+  const row = { id: ASK_ROW };
   if (!asked) return { ...row, label: 'Ask an agent to find it', ...(phone ? {} : { keyHint: chord('⌘↵') }), run: ask };
   if (asked.state === 'looking') return { ...row, label: 'An agent is looking through your threads', hint: `${Math.max(0, Math.floor((now - asked.at) / 1000))}s`, run: () => {} };
   if (asked.state === 'failed') return { ...row, label: asked.error, hint: 'Try again', run: ask };
@@ -452,6 +454,16 @@ export const NOT_ON_A_PHONE = ['keyhints', 'shortcuts', 'stale', 'update', 'upda
 const ASKED_FOR_BY_NAME = new Set(['first-run']);
 
 export function paletteOrder(all: Command[], threads: Command[], phone = false, query = '', chats = 0): { rows: Command[]; labels: Map<number, string> } {
+  // The ask row alone is no thread found: it goes under every command, so Enter
+  // never starts an agent the words were not looking for.
+  const ask = threads.find((t) => t.id === ASK_ROW);
+  if (ask && threads.length === chats + 1) {
+    const rest = paletteOrder(all, threads.filter((t) => t !== ask), phone, query, chats);
+    if (rest.rows.length) {
+      rest.labels.set(rest.rows.length, 'Threads');
+      return { rows: [...rest.rows, ask], labels: rest.labels };
+    }
+  }
   const labels = new Map<number, string>();
   // The people and groups found lead the found rows, under their own heading.
   const found = (at: number) => {

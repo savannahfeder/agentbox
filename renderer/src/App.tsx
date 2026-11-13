@@ -108,6 +108,7 @@ import { strayLetters } from './stray-letters';
 import { keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
 import { modelCommands } from './thread-model-commands';
 import { MOVE_KEYWORDS, whyItCannotMove } from '../../shared/move-thread.mts';
+import { aboutThread } from '../../shared/find-by-description.mts';
 import { isUrgentRow, urgentArrival, urgentRaised, urgentShown, type UrgentRaised } from './urgent-arrival';
 import { UrgentReady } from './components/UrgentReady';
 import { leavePlace, placeKey, placeToReturnTo } from './thread-place';
@@ -3960,7 +3961,7 @@ export default function App() {
     if (!askAgentToFind) return { ok: false, error: 'This copy of the app cannot ask an agent yet.' };
     const candidates = items.map((i) => ({
       key: `${i.product}/${i.id}`, product: i.product, title: threadSearchDetails(i, searchContext).title,
-      about: (i.problem?.trim() || i.body || '').slice(0, 300), where: stateWord(tabState.get(i.id)) || 'Done',
+      about: aboutThread(i), where: stateWord(tabState.get(i.id)) || 'Done',
       at: lastChange(i), project: projectNameOf(i.product),
     }));
     const answer = await askAgentToFind({ description, candidates });

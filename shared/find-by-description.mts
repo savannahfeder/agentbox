@@ -29,8 +29,11 @@ export interface FindPick { key: string; why: string }
  */
 export const FIND_MOST = 200;
 export const FIND_PICKS = 5;
-/** The whole wait, over every account tried: the ten seconds they said they would wait. */
-export const FIND_BUDGET_MS = 10_000;
+/**
+ * The whole wait, over every account tried. Answers take 4 to 6 s; a busy Mac
+ * pushed one past the ten seconds they said they would wait.
+ */
+export const FIND_BUDGET_MS = 15_000;
 
 const SMALL_WORDS = new Set('a an and the of to in on for with that this it its is was were be by at from about my me i we our you your one thread threads which where when what who how there their them they some any had has have did do does not but or as so if'.split(' '));
 
@@ -60,6 +63,13 @@ export function candidatesFor(all: readonly FindCandidate[], description: string
 
 const oneLine = (s: string, n: number) => s.replace(/\s+/g, ' ').trim().slice(0, n);
 
+/** What a thread is about, and the start of its answer, which is often what a person remembers. */
+export function aboutThread({ problem, body, result }: { problem?: string | null; body?: string | null; result?: string | null }): string {
+  const asked = oneLine(problem?.trim() || body || '', 160);
+  const answer = oneLine(result ?? '', 140);
+  return answer ? `${asked} Answer: ${answer}` : asked;
+}
+
 function when(at: number, now: number): string {
   const days = Math.floor((now - at) / 86_400_000);
   if (days <= 0) return 'today';
@@ -76,7 +86,7 @@ export function describePrompt(description: string, shown: readonly FindCandidat
     '',
     'Here are their threads, one per line: number, where it is, when it last moved, project, title, and what it is about.',
     '',
-    ...shown.map((c, i) => `${i + 1}. [${c.where}, ${when(c.at, now)}, ${oneLine(c.project, 40)}] ${oneLine(c.title, 90)} :: ${oneLine(c.about, 200)}`),
+    ...shown.map((c, i) => `${i + 1}. [${c.where}, ${when(c.at, now)}, ${oneLine(c.project, 40)}] ${oneLine(c.title, 90)} :: ${oneLine(c.about, 320)}`),
     '',
     `Reply with the threads that best fit the description, best first, at most ${FIND_PICKS}, one per line, as`,
     'NUMBER | why it fits, in under ten plain words',
