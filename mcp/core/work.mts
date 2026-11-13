@@ -31,7 +31,10 @@ import {
   parkPendingWrite, readPendingWrites, collectPendingWrites,
 } from '../../main/store/pending-writes.mts';
 import { resolveProduct } from './account.mts';
+import { isCause } from '../../shared/causes.mts';
 import { nameSlug } from '../../shared/product-name.mjs';
+import { PICKED_WHY, routedPatch, type RoutedPatch } from '../../shared/auto-route.mts';
+import { TEAMMATE_LABEL_PREFIX } from '../../shared/teammates.mts';
 
 // The log prefix, named from the one place the app is named. It was a literal
 // for as long as this server lived in another product's repo.
@@ -43,7 +46,7 @@ const HEARTBEAT_MS = Math.floor(LEASE_MS / 3);
 
 type Project = ReturnType<typeof resolveProduct>;
 export type ProductItem = Omit<WorkItem, 'product'> & { product: string; productName: string };
-export type AgentPatch = { [K in WorkItemField]?: unknown } & { closeBecause?: string; deferBecause?: string };
+export type AgentPatch = { [K in WorkItemField]?: unknown } & { closeBecause?: string; deferBecause?: string; toAnAgentBecause?: string };
 
 export interface WorkListFilter {
   product?: string | null;
@@ -243,6 +246,8 @@ const plainly = (s: unknown) => String(s ?? '')
 export function herRow(item: Pick<WorkItem, 'labels' | 'routed'> | null | undefined): boolean {
   const labels = item?.labels ?? [];
   if (!labels.includes('founder')) return false;
+  // A cause row is the app's, and its lead closes it once the cause is cleared.
+  if (isCause(item)) return false;
   return !!item!.routed || !labels.some((l) => String(l).startsWith('repeat:') || String(l).startsWith('teammate:'));
 }
 
@@ -267,7 +272,40 @@ export function saidToClose(item: Pick<WorkItem, 'answer' | 'body' | 'title'> | 
  * as the user's. That is what hides a row until it comes due, puts it in
  * Scheduled, and lets the user's L move it again.
  */
+/*
+ * A THREAD THAT WENT TO THE WRONG TEAMMATE GOES TO AN AGENT WHEN THEY SAY SO
+ * (w-064dd249d2). A teammate's label is put back on every other write
+ * (`keepRunLabels`), so only their own words, checked as `closeBecause` is,
+ * move it: the same write as their "Give it to someone else", an agent.
+ */
+const NOT_GIVEN_TO_AN_AGENT = 'The thread was NOT given to an agent: the words in toAnAgentBecause are not ones they wrote on this row, or they did not write the row. If they did say it went to the wrong teammate, send toAnAgentBecause again with their exact words.';
+const NO_TEAMMATE_TO_LEAVE = 'No teammate has this thread, so it is already an ordinary agent\'s.';
+
+function toAnAgent(before: WorkItem | null, words: unknown): { patch: RoutedPatch } | { refused: string } {
+  if (!before?.labels?.some((l) => String(l).startsWith(TEAMMATE_LABEL_PREFIX))) return { refused: NO_TEAMMATE_TO_LEAVE };
+  if (!herRow(before) || !saidToClose(before, words)) return { refused: NOT_GIVEN_TO_AN_AGENT };
+  return { patch: routedPatch(before, { to: 'agent', why: PICKED_WHY }, { by: 'you' }) };
+}
+
 const DEFERRED_AS_AGENT = 'The put-off was saved as YOURS, not theirs, so the thread runs again then, and stays in their inbox meanwhile if your answer offers options: the words in deferBecause are not ones they wrote on this row. If they did ask for it to be put off, send runAt again with deferBecause set to their exact words.';
+
+// "Continue at 1:30 pm" asks for work then, and a moment saved as theirs never
+// starts a run (`wakesItselfAt`), so such words keep the moment as the agent's.
+// "Remind me" wins over a work verb: "remind me to continue at 3" is a reminder.
+const ASKS_TO_BE_REMINDED = /\b(remind|reminder|snooze|bring (it|this) back|show (it|this|me))\b/i;
+const ASKS_FOR_WORK = /\b(continue|start|restart|run|rerun|resume|pick (it|this|that|them) (back )?up|carry on|keep going|get (back )?(on|to) (it|this)|do (it|this|that)|work on|try again|retry|finish)\b/i;
+
+export function asksForWorkThen(words: unknown): boolean {
+  const said = plainly(words);
+  return ASKS_FOR_WORK.test(said) && !ASKS_TO_BE_REMINDED.test(said);
+}
+
+function savedAs(at: number, runs: boolean): string {
+  const when = new Date(at).toISOString();
+  return runs
+    ? `Saved: this thread starts again on its own at ${when}, and a run picks it up then.`
+    : `Saved: this row comes back to their inbox at ${when} and NO run starts. Do not tell them it will run. If they asked for work at that time, send runAt again without deferBecause.`;
+}
 
 /*
  * A SUMMARY LINE IS SHORT ENOUGH TO READ (w-b51b2e1c86). An agent's problem,
@@ -333,7 +371,7 @@ export interface ClaimAsk { product?: string | null; id?: string | null; filter?
 export type ClaimOutcome =
   | { claimed: true; epoch: number; item: ProductItem; pending?: PendingWrite[]; pendingNotice?: string; reason?: never; heldBy?: never }
   | { claimed: false; reason: string; heldBy?: string };
-export type UpdateOutcome = Partial<WorkItem> & { leftOpen?: string; deferredAsAgent?: string; summaryTooLong?: string; reopened?: string };
+export type UpdateOutcome = Partial<WorkItem> & { leftOpen?: string; deferredAsAgent?: string; notGivenToAnAgent?: string; summaryTooLong?: string; reopened?: string };
 
 export interface ClaimRegistry {
   holder: string | undefined;
@@ -494,7 +532,9 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder }: { he
         // fence below still catches the case where somebody else took over.
       }
 
-      const { closeBecause, deferBecause, ...asked } = patch;
+      const { closeBecause, deferBecause, toAnAgentBecause, ...asked } = patch;
+      const leaving = toAnAgentBecause === undefined ? null : toAnAgent(readWorkItem(holding.dir, id), toAnAgentBecause);
+      const notGiven = leaving && 'refused' in leaving ? { notGivenToAnAgent: leaving.refused } : {};
       let leftOpen = false;
       if (asked.status === 'done') {
         const before = readWorkItem(holding.dir, id);
@@ -505,7 +545,8 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder }: { he
       }
       let theirMoment = 0;
       let deferredAsAgent = null;
-      if (deferBecause !== undefined && Number.isFinite(asked.runAt) && (asked.runAt as number) > 0) {
+      const moment = Number.isFinite(asked.runAt) && (asked.runAt as number) > 0 ? asked.runAt as number : 0;
+      if (deferBecause !== undefined && moment && !asksForWorkThen(deferBecause)) {
         const before = readWorkItem(holding.dir, id);
         if (herRow(before) && saidToClose(before, deferBecause)) {
           theirMoment = asked.runAt as number;
@@ -541,6 +582,11 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder }: { he
       // Only now, past the fence, so a session that lost the row cannot still
       // put it away in the user's name.
       if (theirMoment) item = updateWorkItem(holding.dir, id, { runAt: theirMoment }, { source: 'founder' });
+      // On the app's authority, as their own pick is (main/store.mts routeItem).
+      if (leaving && 'patch' in leaving) item = updateWorkItem(holding.dir, id, leaving.patch, { source: 'system' });
+
+      // Read off the row as written: a moment they set earlier outranks the agent's.
+      const saved = moment ? { saved: savedAs(item?.runAt ?? moment, item?.wrote?.runAt?.source !== 'founder') } : {};
 
       // FINISHING A ROW GIVES THE CLAIM BACK NOW, not in five minutes. It used
       // to drop the row from this map and leave the claim line standing, so the
@@ -564,9 +610,9 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder }: { he
           holding.live = false;
           stopTimer();
         }
-        return { ...item, leftOpen: LEFT_OPEN, ...deferredAsAgent, ...summaryTooLong, ...(reopened ? { reopened: REOPENED } : {}) };
+        return { ...item, leftOpen: LEFT_OPEN, ...deferredAsAgent, ...saved, ...notGiven, ...summaryTooLong, ...(reopened ? { reopened: REOPENED } : {}) };
       }
-      return { ...item, ...deferredAsAgent, ...summaryTooLong, ...(reopened ? { reopened: REOPENED } : {}) };
+      return { ...item, ...deferredAsAgent, ...saved, ...notGiven, ...summaryTooLong, ...(reopened ? { reopened: REOPENED } : {}) };
     },
 
     release(id) {

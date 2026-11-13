@@ -104,7 +104,7 @@
 .ev-tip .ev-s:empty { display: none; }
 
 /* A PERSON'S OR AN AI TEAMMATE'S PLACE fills the page under the tabs: the chat takes the room,
-   their work sits in a column beside it. */
+   and buttons over it show their work or job in its place. */
 .list-pane.pl-open { display: flex; flex-direction: column; overflow: hidden; }
 .pl { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 10px var(--row-r, 24px) 20px var(--text-x, 32px); }
 .pl-head { display: flex; align-items: center; gap: 14px; flex: none; padding: 8px 0 16px; }
@@ -123,16 +123,28 @@
 .pl-btn.quiet { border-color: transparent; }
 .pl-btn.quiet:hover { border-color: transparent; }
 .pl-btn:disabled { opacity: .45; cursor: default; }
-.pl-body { flex: 1; min-height: 0; display: flex; gap: 40px; }
+.pl-body { flex: 1; min-height: 0; display: flex; max-width: 900px; }
 .pl-chat { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 /* No box around the chat: its words and reply box line up with the face in the header. */
 .pl-chat { --text-x: 6px; }
 .pl-chat .tq-chat .tq-lines { padding-left: 6px; padding-right: 0; }
 .pl-chat .rm-compose.tq-compose { margin: 8px 0 0 6px; }
 .pl-chat .dock-card.tq-compose { margin: 8px 0 0 6px; }
-.pl-side { width: 272px; flex: none; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 24px; padding-top: 2px; }
-/* A file open beside the page squeezes it to 400px: the chat keeps it all, or it is one letter wide. */
-.app.doc-open :is(.pl-side, .pl-name h2 em, .pl-btn.quiet) { display: none; }
+/* A file open beside the page squeezes it to 400px: the header keeps the name and Give a task. */
+.app.doc-open :is(.pl-name h2 em, .pl-btn.quiet) { display: none; }
+.pl-parts { display: flex; flex-wrap: wrap; gap: 8px; flex: none; margin: 0 0 18px 6px; }
+.pl-chip { height: 28px; gap: 7px; font-size: 12.5px; }
+.pl-chip i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.pl-chip b { font-weight: 400; color: var(--text-faint); }
+.pl-chip[aria-selected="true"] { color: var(--text); border-color: var(--text-faint); background: var(--wash); }
+/* A list or the job takes the chat's place; the chat stays mounted so a draft survives. */
+.pl-chat.away { display: none; }
+.pl-view { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; padding: 2px 0 0 6px; }
+.pl-view > * { max-width: 680px; }
+.pl-view .pl-rows { margin: 0 -8px; }
+.pl-view .pl-t { font-size: 14px; line-height: 20px; }
+.pl-view .pl-text { font-size: 14px; line-height: 22px; white-space: pre-wrap; }
+.pl-view .pl-mate { margin: 0 -8px; }
 .pl-sec h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 4px; font-size: 12px; font-weight: 500; line-height: 18px; color: var(--text-dim); }
 .pl-sec h3 b { font-weight: 400; color: var(--text-faint); }
 .pl-link { margin-left: auto; padding: 0; border: 0; background: none; font: 12.5px var(--sans, inherit); letter-spacing: 0; text-transform: none; color: var(--text-faint); cursor: pointer; }
@@ -164,14 +176,12 @@
 .pl-send-empty { flex: 1; display: flex; align-items: center; justify-content: center; }
 .pl-hello { max-width: 420px; margin: 0; text-align: center; font-size: 14px; line-height: 21px; color: var(--text-faint); }
 .pl-send .rm-compose.tq-compose { margin: 8px 0 0; }
+/* Where the chat's own box sits once the chat has begun (.gr-chat .rm-full .rm-compose). */
+.pl-send > .rm-compose:not(.tq-compose) { margin: 8px 32px 24px 0; }
 .pl-first .rm-compose-input { display: block; width: 100%; border: 0; background: none; resize: none; outline: none; font: inherit; font-size: 15px; line-height: 22px; }
 .pl-first .rm-compose-bar { justify-content: flex-end; }
 .pl-note { margin: 8px 2px 0; font-size: 12.5px; color: var(--text-faint); }
-/* A narrow window: their work under the chat rather than beside it. */
 @media (max-width: 860px) {
-  .pl-body { flex-direction: column; overflow-y: auto; }
-  .pl-chat { flex: none; height: 60vh; }
-  .pl-side { width: auto; overflow: visible; }
   .pl-head { flex-wrap: wrap; }
 }
 

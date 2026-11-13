@@ -147,7 +147,7 @@ describe('a page is served exactly as it was written', () => {
     expect(serve).not.toMatch(/<script/i);
     // What is left is one line: hand the file over as it is. `noStore` adds a
     // header and passes the body through untouched (w-3fc39983be).
-    expect(serve).toContain('return noStore(await net.fetch(pathToFileURL(file).toString()));');
+    expect(serve).toContain('return noStore(await net.fetch(pathToFileURL(file).toString()), servedApart(file));');
   });
 
   it('leaves the pane with no size of its own', async () => {

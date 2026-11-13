@@ -52,7 +52,7 @@ import { teammatesOn } from '../shared/teammates.mts';
 import { dataFolderName, isNewUserBuild } from '../shared/side-build.mts';
 import { runningAsAFreshUser } from '../shared/fresh-user-home.mts';
 import { newUserWindow } from './new-user-window.mts';
-import { applyGlass, glassTone, glassWindow } from './window-glass.mts';
+import { applyGlass, glassTone, glassWindow, loadWindowGlass } from './window-glass.mts';
 import { openFreshUser } from './fresh-user.mts';
 import { installCrashReports, report as reportCrash, reportFromRenderer, pending as pendingCrashes, setTransport } from './crash-report.mts';
 import { keepThePageAlive } from './when-the-page-stops.mts';
@@ -64,10 +64,11 @@ import { askBeforeClosingWhileWorking } from './close-while-working.mts';
 import { createPlace } from '../shared/where-it-runs-from.mts';
 import { createSourceUpdater } from './source-updater.mts';
 import { learnShellDataDirs, recoverShellPath } from './shell-path.mts';
+import { openForThePerson } from './opens-a-program.mts';
 import { installNotifier } from './notify.mts';
 import { createCornerTag } from './corner-tag.mts';
 import { loadLiquidGlass } from './liquid-glass.mts';
-import { DOC_SCHEMES, DocGrants, docPath } from './doc-scheme.mts';
+import { DOC_SCHEMES, DocGrants, docPath, servedApart } from './doc-scheme.mts';
 import { quietTheFramesScrollbars } from './frame-scrollbars.mts';
 import { letLocalAppsShowInThePane } from './local-app-frames.mts';
 import { hardenAttachedWebview } from './webview-guard.mts';
@@ -129,9 +130,10 @@ protocol.registerSchemesAsPrivileged([...DOC_SCHEMES.map((scheme) => ({
 
 // A local file answered so the window asks again next time instead of reusing
 // what it drew before. Why, measured, is at the page scheme's handler below.
-function noStore(res: Response) {
+function noStore(res: Response, extra: Record<string, string> = {}) {
   const headers = new Headers(res.headers);
   headers.set('cache-control', 'no-store');
+  for (const [k, v] of Object.entries(extra)) headers.set(k, v);
   return new Response(res.body, { status: res.status, headers });
 }
 
@@ -522,6 +524,7 @@ async function createWindow() {
     onChange: () => { try { pushUpdate(); } catch { /* no window yet */ } },
     log: (line) => console.log(line),
     runningIds: () => supervisor.runsGoing().map((s) => s.itemId),
+    wontStart: () => supervisor.status(),
     ownMates: () => matesForTheTeam(store, config),
     sharing: () => alphaFeatures(config).multiplayer,
     // HER PHONE WITH THE MAC SHUT (main/phone-inbox.mts). What it left is done
@@ -606,7 +609,7 @@ async function createWindow() {
   // web-contents-created only fires for contents created after it (the first
   // fix missed the main window for exactly that reason, 2026-08-04).
   const openLink = (url: string) => {
-    if (url.startsWith('file://')) shell.openPath(decodeURIComponent(url.replace('file://', '')));
+    if (url.startsWith('file://')) void openForThePerson(shell, decodeURIComponent(url.replace('file://', '')));
     else void openInBrowser(url, { shell });
   };
 
@@ -786,7 +789,8 @@ async function createWindow() {
     });
   });
 
-  const { additionalArguments, ...glass } = glassWindow(process.platform, alphaFeatures(config).glass);
+  const liquidGlass = loadWindowGlass();
+  const { additionalArguments, ...glass } = glassWindow(process.platform, alphaFeatures(config).glass, !!liquidGlass);
   window = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -812,6 +816,8 @@ async function createWindow() {
       additionalArguments,
     },
   });
+
+  if (alphaFeatures(config).glass) applyGlass(window, process.platform, true, liquidGlass);
 
   // Electron hands the window's title to the page's the moment one loads, and
   // renderer/index.html carries the app's name, so a throwaway copy went back
@@ -934,7 +940,7 @@ async function createWindow() {
   quitStep(app, 'before-quit', 'connections.stop', () => connected.stop());
   const ipc = registerIpc({
     store, supervisor, config, window, analytics, docGrants, updater,
-    glass: (on) => applyGlass(window, process.platform, on),
+    glass: (on) => applyGlass(window, process.platform, on, liquidGlass),
     host: filingHost,
     team,
     connections: connected.connections,
@@ -1150,6 +1156,7 @@ async function createWindow() {
   let cornerTag: ReturnType<typeof createCornerTag> | null = null;
   const notifier = installNotifier({
     app, window, Notification, powerMonitor, ipcMain, nativeImage,
+    openExternal: (url: string) => shell.openExternal(url),
     onArrivals: (list, needsYou) => team?.phoneArrivals(list, needsYou),
     onChange: () => cornerTag?.refresh(),
   });
@@ -1211,7 +1218,7 @@ async function createWindow() {
   // "see it working" is one click from the message.
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:/.test(url)) void openInBrowser(url, { shell });
-    else if (url.startsWith('file://')) shell.openPath(decodeURIComponent(url.replace('file://', '')));
+    else if (url.startsWith('file://')) void openForThePerson(shell, decodeURIComponent(url.replace('file://', '')));
     return { action: 'deny' };
   });
   // A plain link the renderer did not catch would turn the whole window into
@@ -1428,7 +1435,7 @@ if (!app.requestSingleInstanceLock()) {
         // replaced on disk 2250 -> 3118 wide, page reopened, frame drew 2250.
         // With this header it drew 3118. These are local files; there is no
         // download to save by caching them.
-        return noStore(await net.fetch(pathToFileURL(file).toString()));
+        return noStore(await net.fetch(pathToFileURL(file).toString()), servedApart(file));
       } catch {
         return new Response('Not there.', { status: 404 });
       }

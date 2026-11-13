@@ -162,6 +162,13 @@ Finish the authorized objective, not merely the current step.
 - If you set status blocked, say what would unblock it, and when that is
   theirs to do, file it as a child work item (parent: this item id) so their
   row can take them straight to it.
+- STUCK ON SOMETHING OUTSIDE YOUR WORK IS NOT YOURS TO ASK ABOUT. When your
+  work is fine and what stops you would stop other threads too (a sign-in or
+  key missing, git or GitHub refusing, the computer offline or out of memory,
+  main broken, a service down), call `wait_on_cause` instead of asking them,
+  then end your turn with one line saying what you wait on. One row per cause
+  reaches them, for every thread stuck on it, and you are started again once
+  it is cleared. A question about your own work is still asked as usual.
 <!-- store-tools:end -->
 <!-- no-store-tools:start -->
 - There is nothing to claim and nothing to release. The app gave this row to
@@ -274,6 +281,7 @@ item with `status: "done"` and its labels plus `"clean"`, all in one call
 report they did not ask a question about belongs in the chat, not their inbox.
 
 They need to decide, approve or sign in: end with that question as your last
-message: a line or two, then numbered options
-with your recommendation first. Leave the item open. It reaches their inbox.
+message, written by the same rules as any agent thread's: the bold line, plain
+sentences, then numbered options with your recommendation first. Leave the
+item open. It reaches their inbox.
 <!-- teammate-rules:end -->

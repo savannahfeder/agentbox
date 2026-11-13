@@ -3,6 +3,8 @@
 // is stored under.
 import type { RoomMessage } from '../../types';
 import { markMentions } from './room-rules';
+import { isImageName } from '../../attachments';
+import { viewKind } from '../../../../shared/artifact-marks.mts';
 
 /**
  * The first message to sit under the New line: the oldest one in the chat
@@ -39,6 +41,27 @@ export function mentionMarkdown(body: string, names: readonly string[], me: read
 export function storedName(name: string, now = Date.now(), rand = Math.random().toString(36).slice(2, 8)): string {
   const safe = String(name || 'file').replace(/[^\w.-]+/g, '-').replace(/^[^A-Za-z0-9]+/, '').slice(0, 80) || 'file';
   return `${now.toString(36)}-${rand}-${safe}`;
+}
+
+/** A chat made on first use: every caller gets the one made, and a failed try is tried again next time. */
+export function madeOnce(make: () => Promise<string>): () => Promise<string> {
+  let made: Promise<string> | null = null;
+  return () => {
+    made ??= make().catch((e: unknown) => { made = null; throw e; });
+    return made;
+  };
+}
+
+/** The stored name of a file sent in the chat, from a link in a message; null for a web address or anything else. */
+export const attachedName = (href: string): string | null => /^attachments\/([A-Za-z0-9][\w.-]{0,159})$/.exec(href)?.[1] ?? null;
+
+/** Whether a file pressed in a chat opens in the review, with its notes, versions and Approve: every kind it draws. */
+export const opensInTheReview = (name: string): boolean => !!viewKind(name);
+
+/** A message's words with the files sent in it linked under them, as the chat's own box writes them. */
+export function withFileLinks(words: string, files: readonly { name: string; stored: string }[]): string {
+  const links = files.map((f) => `${isImageName(f.name) ? '!' : ''}[${f.name}](attachments/${f.stored})`);
+  return [words.trim(), links.join('\n')].filter(Boolean).join('\n\n');
 }
 
 /**

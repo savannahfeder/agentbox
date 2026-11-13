@@ -27,6 +27,7 @@ import { afterCheck, type EngineSetupState, type Plan } from '../plan-setup';
 import { NAME, Name } from '../../../shared/product-name.mjs';
 import { foundOnThisComputer, type RunsOn } from '../../../shared/runs-on.mts';
 import { chord, sayKeys } from '../this-keyboard';
+import { enterIsTheButtons } from '../focused-button';
 
 /** What the walk knows about each coding agent on this computer. */
 type Readings = Array<Pick<EngineSetupState, 'engine' | 'found' | 'signedIn'>>;
@@ -82,7 +83,11 @@ export function WayOut({ run, blocked, onLeave }: {
   useEffect(() => {
     if (!asking) return undefined;
     const on = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (enterIsTheButtons(e)) return;
+      // Its own buttons need these; nothing else may reach the app behind it while it asks.
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Tab') return;
+      if (e.key !== 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); return; }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
@@ -844,11 +849,13 @@ export const LANDED_MS = 14_000;
  * The end of the walk, over the person's own inbox: confetti and what to do
  * next. It takes no clicks and nothing needs pressing, so it never blocks the
  * first real task. */
-export function Landed({ agents, onGone }: {
+export function Landed({ agents, onGone, onNew }: {
   /** Whether any agents were kept, which picks the line that is true of the
    * inbox behind it. */
   agents: boolean;
   onGone: () => void;
+  /** N, which the card tells you to press. Home's focused box would otherwise take it as a letter. */
+  onNew?: () => void;
 }) {
   // Computed once in a ref so a re-render does not restart the burst.
   const pieces = useRef<{ left: number; delay: number; drift: number; spin: number; hue: number; fall: number }[]>(
@@ -868,16 +875,24 @@ export function Landed({ agents, onGone }: {
   // all never reached the end of them.
   const gone = useRef(onGone);
   gone.current = onGone;
+  const newRef = useRef(onNew);
+  newRef.current = onNew;
   useEffect(() => {
     const t = setTimeout(() => gone.current(), LANDED_MS);
-    // Any key or press takes it down and still reaches the app, so the event is
-    // neither stopped nor prevented.
-    const on = () => gone.current();
-    const armed = setTimeout(() => window.addEventListener('keydown', on), 0);
+    // Any key or press takes it down. All but N still reach the app untouched.
+    const on = (e: Event) => {
+      if (e instanceof KeyboardEvent && (e.key === 'n' || e.key === 'N') && !e.metaKey && !e.ctrlKey && !e.altKey && newRef.current) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        newRef.current();
+      }
+      gone.current();
+    };
+    const armed = setTimeout(() => window.addEventListener('keydown', on, true), 0);
     const armedClick = setTimeout(() => window.addEventListener('pointerdown', on), 0);
     return () => {
       clearTimeout(t); clearTimeout(armed); clearTimeout(armedClick);
-      window.removeEventListener('keydown', on);
+      window.removeEventListener('keydown', on, true);
       window.removeEventListener('pointerdown', on);
     };
   }, []);
@@ -1070,6 +1085,7 @@ function Slab({ head, line, piece, onNext }: {
 }) {
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
+      if (enterIsTheButtons(e)) return;
       if (e.key !== 'Enter') return;
       e.preventDefault();
       onNext();
@@ -1104,6 +1120,7 @@ function Statement({ head, line, go, onNext, skip, onSkip }: {
 }) {
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
+      if (enterIsTheButtons(e)) return;
       if (e.key !== 'Enter') return;
       e.preventDefault();
       onNext();
@@ -1128,8 +1145,8 @@ function Statement({ head, line, go, onNext, skip, onSkip }: {
 }
 
 export function Onboarding({
-  run, claude, home, opened, waiting, later, picking, palette, board, replying, view, tabs, products = [],
-  beat, pointed, runsOn = null,
+  run, claude, home, opened, waiting, later, picking, palette, board, composing, replying, view, tabs, products = [],
+  beat, pointed, unfinished, runsOn = null,
   onEvent, onStep, onSkipToApp, onPractice, onDone, onFiled, onProjectMade, onRecheck, onLeave, onShut, onSkipStep,
   onType,
 }: {
@@ -1157,6 +1174,8 @@ export function Onboarding({
   picking?: boolean;
   /** Whether the command palette is open, for the last beat's second half. */
   palette?: boolean;
+  /** The New thread box is open. */
+  composing?: boolean;
   /** Whether the page is drawn as the board, for the board beat's second half. */
   board?: boolean;
   /** Whether the reply box is open, for the answer beat's second half. */
@@ -1168,6 +1187,8 @@ export function Onboarding({
    * in onboarding.ts. */
   beat?: string[];
   pointed?: string | null;
+  /** Practice threads still in the inbox. */
+  unfinished?: number;
   /** The app's own Tab rotation, so the walk keeps no second copy of it. */
   tabs?: string[];
   /** Which tab is up. The tab tour reads the screen from this rather than
@@ -1216,7 +1237,7 @@ export function Onboarding({
   // can take seconds.
   const [recent, setRecent] = useState<RecentFolder[] | null>(null);
   // Nothing is lit until the person picks, so the Return that left the welcome
-  // cannot choose a folder. Arrow down lights the first.
+  // cannot take a recent folder. Unlit, Return opens Choose a folder.
   const [lit, setLit] = useState(-1);
   // Whether the mouse has moved since this screen was drawn. See `hoverLit`:
   // a row under a mouse standing still is not a row anybody chose.
@@ -1358,6 +1379,7 @@ export function Onboarding({
   useEffect(() => {
     if (run.step !== 'welcome') return;
     const on = (e: KeyboardEvent) => {
+      if (enterIsTheButtons(e)) return;
       if (e.key === 'Enter') { e.preventDefault(); void begin(); }
     };
     window.addEventListener('keydown', on);
@@ -1384,6 +1406,7 @@ export function Onboarding({
   useEffect(() => {
     if (run.step !== 'folder' || recent === null) return;
     const on = (e: KeyboardEvent) => {
+      if (enterIsTheButtons(e)) return;
       if (e.key === 'ArrowDown') { e.preventDefault(); setByMouse(false); setLit((i) => Math.min(rows + 1, i + 1)); }
       if (e.key === 'ArrowUp') { e.preventDefault(); setByMouse(false); setLit((i) => Math.max(0, i - 1)); }
       // SKIPPING IS THE KEYBOARD'S ALONE. A hand left on the mouse over this
@@ -1391,7 +1414,7 @@ export function Onboarding({
       // product wants one. The cap is not drawn on a row the mouse lit either,
       // so Return promises nothing here that it will not do.
       if (e.key === 'Enter' && lit > rows) { e.preventDefault(); if (!byMouse) skipFolder(); return; }
-      if (e.key === 'Enter' && lit < 0) { e.preventDefault(); return; }
+      if (e.key === 'Enter' && lit < 0) { e.preventDefault(); pickFolder(); return; }
       if (e.key === 'Enter') {
         e.preventDefault();
         if (lit < rows && recent[lit]) takeFolder(recent[lit].folder);
@@ -1475,7 +1498,7 @@ export function Onboarding({
     const teamStrip = run.step === 'where' && typeof document !== 'undefined'
       && !!document.querySelector('.th-bar .tm-tabs');
     const say = coach(run.step, run.sentAt ? now - run.sentAt : 0, {
-      opened, view, picking, palette, board, replying: !!replying || inReply, left: beat?.length, tabs, replies: run.replies,
+      opened, view, picking, palette, board, composing, replying: !!replying || inReply, left: beat?.length, unfinished, tabs, replies: run.replies,
       tabNames: teamStrip ? TEAM_TAB_NAMES : undefined, team: !!team, wrote,
     });
     if (!say) return null;
@@ -1673,7 +1696,7 @@ export function Onboarding({
             >
               <span className="fr-fold"><PlusGlyph /></span>
               <span className="fr-folder-name">{recent && recent.length ? COPY.folderOther : COPY.folderFirst}</span>
-              <span className="fr-folder-key">{lit === (recent?.length ?? 0) && <Cap cap="↵" />}</span>
+              <span className="fr-folder-key">{(lit === (recent?.length ?? 0) || lit < 0) && <Cap cap="↵" />}</span>
             </button>
             <button
               type="button"

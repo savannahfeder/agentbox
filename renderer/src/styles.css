@@ -248,6 +248,7 @@
   --artifact-corner: 10px;
   --artifact-corner-small: 6px;
   --radius: var(--artifact-corner-small);
+  --pill: 999px;
   /* An AI teammate is round like a person; its dashed ring tells it apart. */
   --mate-corner: 50%;
   --tag-radius: var(--radius);
@@ -2828,6 +2829,32 @@ body {
 .approval-key { font-weight: 500; letter-spacing: 0.01em; }
 .approval-allow .approval-key { color: color-mix(in oklab, var(--on-solid) 55%, transparent); }
 .approval-deny .approval-key { color: var(--text-faint); }
+/* The drawn ⌘ of renderer/src/components/CardKey.tsx. Geist's numbers are
+   0.71em, but its round loops read taller than a number at that height and the
+   number renders a little under it; at 0.68em the inks' tops and baselines
+   meet to the device pixel. */
+.key-mark { height: 0.68em; width: 0.68em; vertical-align: baseline; margin-right: 0.14em; stroke-width: 2.2; }
+.approval-reply .key-mark { stroke-width: 1.95; }
+/* A key card's Reply (renderer/src/components/KeyCardActions.tsx): at the far
+   end, without Deny's box and lighter than it, because the two side by side
+   were mixed up. Its right edge is the card's content edge. */
+.approval-actions .approval-reply {
+  margin-left: auto; padding: 0; gap: 6px; border: 0; background: none;
+  font-weight: 450; color: var(--text-dim);
+}
+.approval-actions .approval-reply:hover { color: var(--text); }
+.approval-reply svg { flex: none; color: var(--text-faint); }
+.approval-reply:hover svg { color: var(--text-dim); }
+.approval-reply .approval-key { margin-left: 2px; font-weight: 400; color: var(--text-faint); }
+.approval-reply-box {
+  width: 100%; box-sizing: border-box; margin: 0 0 10px; padding: 7px 10px;
+  font: inherit; font-size: 13px; color: var(--text);
+  background: var(--bg); border: 1px solid var(--line-strong); border-radius: var(--artifact-corner-small);
+}
+.approval-reply-box::placeholder { color: var(--text-faint); }
+.approval-reply-box:focus { outline: none; border-color: var(--text-faint); }
+:root[data-skin] .approval-reply-box { background: var(--film-strong); }
+.approval-actions button:disabled { opacity: 0.5; cursor: default; }
 
 /* The answered card, leaving.So: a press (the card gives, briefly), a mark
    stamped over it, and the card settles away. No green wash, which was already
@@ -4091,6 +4118,14 @@ img.product-mark { object-fit: cover; opacity: 1; }
 }
 .palette-confirm { padding: 18px; font-size: 14px; line-height: 1.55; position: relative; }
 
+/* Turn the cloud off? (components/CloudOffAsk.tsx), in ⌘K's box and place. */
+.modal.cloud-off-ask { width: 400px; padding: 18px 18px 16px; }
+.cloud-off-ask-head { font-size: 15px; color: var(--text); margin-bottom: 6px; }
+.cloud-off-ask-line { font-size: 13.5px; color: var(--text-dim); line-height: 1.5; }
+.cloud-off-ask-acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.cloud-off-ask-acts .ts-done { height: 28px; padding: 0 8px 0 12px; gap: 8px; }
+.cloud-off-ask-acts .cloud-off-ask-go { color: var(--text); border-color: var(--line-strong); }
+
 /* ⌘K in the website's look (w-391bc4efbe): magnifier and Esc on the input, a
    mark per row, the keys in a footer. Scoped to `.palette-k` because the Later
    box and Find a group reuse the rows above, and the selected row stays the
@@ -4469,6 +4504,24 @@ img.product-mark { object-fit: cover; opacity: 1; }
   animation: toast-drain linear forwards;
 }
 @keyframes toast-drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+/* AN URGENT THREAD THAT ARRIVED, in the top bar until it is opened
+   (./components/UrgentReady). Square, no fill, accent only on the dot and the word. */
+.ur {
+  display: inline-flex; align-items: center; gap: 8px;
+  order: -1; height: 30px; max-width: 420px; min-width: 0; margin-right: 6px; padding: 0 8px 0 10px;
+  background: none; border: 1px solid var(--line); border-radius: var(--tag-radius);
+  font: inherit; font-size: 13px; color: var(--text); cursor: pointer; white-space: nowrap;
+}
+.ur-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--chip-ask); animation: ur-arrive 1.2s ease-in-out 3; }
+@keyframes ur-arrive { 50% { opacity: .25; } }
+.ur-word { flex: none; color: var(--chip-ask); font-weight: 500; }
+.ur-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ur-kbd {
+  flex: none; font-family: inherit; font-size: 10.5px; font-weight: 600; color: var(--text-faint);
+  border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 0 4px; line-height: 15px;
+}
+.ur:hover .ur-kbd { color: var(--text); border-color: var(--text-faint); }
 
 /* WHERE A REPLY WENT, above the reply box of the thread it moved her to
    (./components/SentLine). The box's own width and hairline, square, one
@@ -8342,30 +8395,6 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .doc-pane.doc-code .doc-card,
 .doc-pane.doc-code .doc-head,
 .doc-pane.doc-code .code-file-head { background: var(--code-ground); }
-/* The word. Amber, the same ink as the urgent square on the row (--chip-ask),
-   so the thing on screen and the mark in the list are one colour and nobody
-   has to be told they are the same. Never red. */
-.urgent-word {
-  color: var(--chip-ask);
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-/* THE WAY BACK. */
-.urgent-return {
-  background: none; border: none; padding: 0; cursor: pointer;
-  font-family: inherit; font-size: 13px; color: var(--text-dim);
-  letter-spacing: 0.01em; text-align: left;
-}
-.urgent-return:hover { color: var(--text); }
-.urgent-return-arrow { color: var(--text-faint); }
-/* The way back on the left, the amber word on the right, one row of chrome. */
-.urgent-bar {
-  display: flex; align-items: baseline; justify-content: space-between;
-  padding: 14px 0 0;
-}
-
 /* The switch, the rows, the ticks and the foot are the finish card's own
    classes (`.fr-switch`, `.fr-agent`, `.fr-offer`), so the card on ⌘K
    is the card at the end of the setup. What is added is the sentence
@@ -9218,6 +9247,9 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
    plain white slab on the light theme. The `:root[data-skin] .modal.compose`
    block says the rest.
 */
+/* A dialog of its own, not a list dropping from the top like the command bar. */
+.modal-backdrop.fp-backdrop { place-items: center; padding-top: 0; }
+
 .fp-card {
   width: min(560px, 92vw);
   display: flex;
@@ -9446,7 +9478,7 @@ button.msg-kind:hover { color: var(--text); border-color: var(--text-faint); }
 .msg.yours:has(> .msg-head > .msg-kind) .msg-body { font-size: 15px; line-height: 1.6; font-weight: 400; }
 
 /* A thread a teammate gave you, above its title (team/HandedBy.tsx). */
-.handed-line { display: flex; align-items: center; gap: 9px; min-width: 0; margin: 4px 0 18px; padding: 10px 14px; background: var(--bg-raised); border: 1px solid var(--line); font-size: 14px; color: var(--text-dim); }
+.handed-line { display: flex; align-items: center; gap: 9px; min-width: 0; margin: 4px 0 18px; padding: 10px 14px; background: var(--bg-raised); border: 1px solid var(--line); border-radius: 10px; font-size: 14px; color: var(--text-dim); }
 .handed-line b { font-weight: 500; color: var(--text); }
 .handed-who { flex: 0 0 auto; white-space: nowrap; }
 .handed-when { color: var(--text-faint); margin-left: 4px; }

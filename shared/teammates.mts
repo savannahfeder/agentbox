@@ -243,15 +243,12 @@ export function howYouWrite(t: Voiced): string {
   ].join('\n');
 }
 
-/** A teammate's last message, in place of the worker's rules for one, and last in its system prompt so nothing outranks it by position. */
+/** Last in a teammate's system prompt, so the chat rules in howYouWrite do not reach the message that ends its run. */
 export function howYourRunEnds(): string {
   return [
     '## Your last message on this thread',
-    'The message that ends your run is a chat message, written once: the app puts it on this thread, options and all. This holds even when you were asked a question or asked for detail.',
-    '- A line or two, then stop: one or two short sentences, usually under 150 characters, the news or the ask first, in your voice. No bold line, no heading, no list, no labels, no recap of what you did.',
-    '- When there is more (a plan, a draft, a table, a list, more than about three facts), write it in a document first with write_document, then say in one sentence what it is or what you need, naming the file, like launch-plan.md. That name draws as a card under your message. A person asking for ten lines or the details gets them in that document. Do not write a document for an answer that fits in a line or two.',
-    '- A decision still ends with the `## Options` section, under your one line, so they can answer in a tap.',
-    '- Never give a number you did not measure. "I don\'t know" is an answer. Something you could not do is said in those same few words.',
+    'The message that ends your run is written like any agent thread\'s last message, by the rules above: the bold line first, then plain sentences, then `## Options` when there is something to decide. Write it in your voice.',
+    'The short chat rules under How you write are for team_post and team_tell, not for this message.',
   ].join('\n');
 }
 
@@ -1321,7 +1318,7 @@ export const STARTERS: Starter[] = [
     ask: 'Be the one I talk to',
     outcome: 'Takes anything you send, gets it to the right teammate, and checks in with only what needs you',
     sends: 'One check-in a weekday with what needs you',
-    job: 'Be the person\'s main point of contact. Take whatever they send you: hand it to the teammate whose job it is, do it yourself when it is small or nobody\'s, and offer a new teammate when a kind of work keeps coming and nobody owns it. Every weekday morning check in once with what is waiting on them, most urgent first, what finished and what is stuck. Stay quiet when nothing needs them.',
+    job: 'Be the person\'s main point of contact. Take whatever they send you: hand it to the teammate whose job it is, do it yourself when it is small or nobody\'s, and offer a new teammate when a kind of work keeps coming and nobody owns it. Every weekday morning check in once with what is waiting on them, most urgent first, what finished and what is stuck. When they give a rule for one project, such as when its work ships or what needs their yes, ask whether to keep it for that project, and once they agree add it with add_project_rule so every agent there follows it. Stay quiet when nothing needs them.',
     goal: 'You never have to chase a teammate',
     counted: 'Things you had to chase yourself',
     asksFirst: 'Before making a new teammate, or handing on work you did not ask for',
@@ -1396,96 +1393,11 @@ export const STARTERS: Starter[] = [
 ];
 
 // ---------------------------------------------------------------- the offer
-// When you keep asking for the same kind of thing, the app offers a teammate
-// for it: one inbox row, which no agent ever runs, answered by a tap.
+// Offer rows from before Auto offered a teammate on the thread itself: one
+// inbox row, which no agent ever runs, answered by a tap.
 export const OFFER_LABEL = 'teammate-offer';
 export const OFFER_MAKE = 'Make a teammate for it';
 export const OFFER_NOT_NOW = 'Not now';
-const OFFER_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
-const OFFER_AT_LEAST = 3;
-const STOP = new Set(('the a an and or but for to of in on at by with from into onto about as is are was were be been it its this that these those '
-  + 'my our your their me we you i us can could would should will please pls just also some any all new more make do does did get got let lets '
-  + 'need want like have has had what which who how why when where there here then than them they not no yes ok okay one two three today tomorrow week').split(' '));
-
-function wordsOf(title: string | null | undefined): Set<string> {
-  return new Set(String(title ?? '').toLowerCase().replace(/[’']/g, '').split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !STOP.has(w)));
-}
-
-function alike(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
-  let shared = 0;
-  for (const w of a) if (b.has(w)) shared += 1;
-  return shared >= 2 && shared / Math.min(a.size, b.size) >= 0.6;
-}
-
-// Threads you wrote yourself in the last month: not a teammate's or a repeat's
-// runs, not imported, not an offer.
-function yourAsks(items: readonly RunItem[] | null | undefined, now: number): RunItem[] {
-  return (items ?? []).filter((i) => {
-    const labels = i.labels ?? [];
-    if (!labels.includes('founder') || i.wrote?.labels?.source === 'agent') return false;
-    if (labels.some((l) => /^(teammate|repeat|hop|from):/.test(l) || l === OFFER_LABEL || l === 'thread-import' || l === 'codex-import' || l === 'codex')) return false;
-    return now - (i.createdAt ?? 0) <= OFFER_WINDOW_MS && wordsOf(i.title).size >= 2;
-  });
-}
-
-/**
- * The offer to make now, if any: three or more of your own asks this month
- * alike enough to be one job, under a key no offer has used. One open offer at
- * a time, and one a day at most.
- */
-function askedOnce(group: readonly RunItem[]): { title: string; n: number }[] {
-  const seen = new Map<string, { title: string; n: number }>();
-  for (const i of group) {
-    const title = String(i.label || i.title).trim();
-    const had = seen.get(title.toLowerCase());
-    if (had) had.n += 1; else seen.set(title.toLowerCase(), { title, n: 1 });
-  }
-  return [...seen.values()];
-}
-
-/** A teammate offered for a kind of thing you keep asking for. */
-export interface Offer {
-  key: string;
-  product: string;
-  count: number;
-  titles: string[];
-  asked: { title: string; n: number }[];
-  threads: { product: string; id: string; title: string }[];
-  title: string;
-  said: string;
-}
-
-export function offerFrom({ items = [], offered = new Set(), now = Date.now() }: { items?: readonly RunItem[]; offered?: ReadonlySet<unknown>; now?: number } = {}): Offer | null {
-  const open = (items ?? []).filter((i) => (i.labels ?? []).includes(OFFER_LABEL));
-  if (open.some((i) => i.status !== 'done' || now - (i.createdAt ?? 0) < 24 * 60 * 60 * 1000)) return null;
-  const asks = yourAsks(items, now).sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
-  // Every ask has its bag of words, so the lookups below always find one.
-  const bags = new Map(asks.map((i) => [i.id, wordsOf(i.title)]));
-  for (const lead of asks) {
-    const group = asks.filter((i) => i === lead || alike(bags.get(lead.id)!, bags.get(i.id)!));
-    if (group.length < OFFER_AT_LEAST) continue;
-    const counts = new Map<string, number>();
-    for (const i of group) for (const w of bags.get(i.id)!) counts.set(w, (counts.get(w) ?? 0) + 1);
-    const common = [...counts].filter(([, n]) => n >= Math.ceil(group.length / 2)).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 3).map(([w]) => w);
-    const key = common.sort().join('-');
-    if (!key || offered.has(key)) continue;
-    const byProduct = new Map<string, number>();
-    for (const i of group) byProduct.set(i.product, (byProduct.get(i.product) ?? 0) + 1);
-    const product = [...byProduct].sort((a, b) => b[1] - a[1])[0]?.[0] ?? lead.product;
-    return {
-      key, product, count: group.length,
-      // The same words asked again are one line, not five.
-      titles: [...new Map(group.map((i) => [String(i.label || i.title).trim().toLowerCase(), String(i.label || i.title).trim()])).values()].slice(0, 5),
-      asked: askedOnce(group).slice(0, 5),
-      threads: group.slice(0, OFFER_THREADS).map((i) => ({ product: i.product, id: i.id, title: String(i.label || i.title).trim() })),
-      title: `Want a teammate for things like “${clip(lead.label || lead.title, 60)}”?`,
-      said: `You've asked for this ${group.length} times this month.`,
-    };
-  }
-  return null;
-}
-
-const OFFER_THREADS = 12;
 
 // ---------------------------------------------------------------- the method
 // A teammate's method is one file it keeps and reads whole every run: what

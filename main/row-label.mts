@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { harnessFor } from './harnesses.mts';
 import { teammateIdOf } from '../shared/teammates.mts';
 import { catchUpDue } from '../shared/agent-import.mts';
@@ -40,6 +41,7 @@ import { catchUpDue } from '../shared/agent-import.mts';
 import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import { codexLaunchEnv } from './codex-launch-env.mts';
+import { codexHome, codexSmallModel } from './codex-models.mts';
 
 /**
  * The model this runs on. Small and fast on purpose: this is a naming call, it
@@ -64,9 +66,22 @@ export interface SmallModelOptions {
   model?: string;
   timeoutMs?: number;
   env?: NodeJS.ProcessEnv;
+  /** Absolute paths of pictures sent with the question (`smallModelPictures`). */
+  pictures?: readonly string[];
 }
 
-export const NAME_MODEL = 'claude-haiku-4-5-20251001';
+// The alias, not a dated id: Claude Code moves it to each new Haiku.
+export const NAME_MODEL = 'haiku';
+
+/** Claude refuses an image over 5 MB once base64'd, which is this many bytes on disk. */
+export const SMALL_MODEL_PICTURE_BYTES = 3_750_000;
+
+/** The pictures a small call can carry: on disk, small enough, three at most. */
+export function smallModelPictures(paths: readonly string[]): string[] {
+  return paths.filter((p) => {
+    try { return fs.statSync(p).size <= SMALL_MODEL_PICTURE_BYTES; } catch { return false; }
+  }).slice(0, 3);
+}
 
 /**
  * How long one naming call may take before it is abandoned. Generous against
@@ -214,23 +229,46 @@ export function nameRow(item: RowItem | null | undefined, opts: SmallModelOption
  * was named for a day, while agents ran on the second account. The supervisor
  * passes one per account and walks them (`_askSmall` in main/supervisor.mts).
  */
-export function askSmallModel(prompt: string, clean: (text: string) => string, { claudeBin, codexBin = null, engine = 'claude', model = NAME_MODEL, timeoutMs = NAME_TIMEOUT_MS, env }: SmallModelOptions = {}) {
+export async function askSmallModel(prompt: string, clean: (text: string) => string, { claudeBin, codexBin = null, engine = 'claude', model = NAME_MODEL, timeoutMs = NAME_TIMEOUT_MS, env, pictures = [] }: SmallModelOptions = {}): Promise<string> {
+  if (engine !== 'codex') return askOnce(prompt, clean, { claudeBin, codexBin, engine, model, timeoutMs, env, pictures });
+  let small: string | null = null;
+  try { small = codexSmallModel({ home: codexHome({ env: env ?? process.env }) }); } catch { small = null; }
+  const first = await askOnce(prompt, clean, { codexBin, engine, model: small, timeoutMs, env, pictures }, true);
+  // A small model this login lists can still refuse; Codex's own default is the fallback.
+  if (first.text || !small || first.timedOut) return first.text;
+  return askOnce(prompt, clean, { codexBin, engine, model: null, timeoutMs, env, pictures });
+}
+
+type AskOnce = Omit<SmallModelOptions, 'model'> & { model?: string | null };
+function askOnce(prompt: string, clean: (text: string) => string, opts: AskOnce): Promise<string>;
+function askOnce(prompt: string, clean: (text: string) => string, opts: AskOnce, detail: true): Promise<{ text: string; timedOut: boolean }>;
+function askOnce(prompt: string, clean: (text: string) => string, { claudeBin, codexBin = null, engine = 'claude', model = null, timeoutMs = NAME_TIMEOUT_MS, env, pictures = [] }: AskOnce, detail = false): Promise<string | { text: string; timedOut: boolean }> {
+  let timedOut = false;
   return new Promise<string>((resolve) => {
     let harness;
     try { harness = harnessFor(engine); } catch { return resolve(''); }
     const bin = harness.binary({ claudeBin, codexBin });
     if (!bin) return resolve('');
+    let input: string | null = null;
+    try { input = harness.smallModelInput?.(prompt, pictures) ?? null; } catch { return resolve(''); }
+    const reply = (out: string) => harness.smallModelReply?.(out, pictures) ?? out;
+    // A streamed reply opens with an init event longer than any answer.
+    const cap = input ? 1_000_000 : 4000;
     let child: ChildProcess;
     try {
-      child = spawn(bin, harness.smallModelArgs(prompt, model), {
+      child = spawn(bin, harness.smallModelArgs(prompt, model, pictures), {
         // Somewhere that is nobody's project. A naming call must not pick up a
         // CLAUDE.md, a settings file or a hook from whatever folder it lands in.
         cwd: '/tmp',
         ...(engine === 'codex' ? { env: codexLaunchEnv(bin, env) } : env ? { env } : {}),
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: [input ? 'pipe' : 'ignore', 'pipe', 'pipe'],
       });
     } catch {
       return resolve('');
+    }
+    if (input) {
+      child.stdin!.on('error', () => { /* the close below settles it */ });
+      child.stdin!.end(input);
     }
     let out = '';
     let done = false;
@@ -241,9 +279,9 @@ export function askSmallModel(prompt: string, clean: (text: string) => string, {
       try { child.kill('SIGKILL'); } catch { /* already gone */ }
       resolve(value);
     };
-    const timer = setTimeout(() => finish(''), timeoutMs);
-    child.stdout!.on('data', (d) => { out += d.toString(); if (out.length > 4000) finish(clean(out)); });
+    const timer = setTimeout(() => { timedOut = true; finish(''); }, timeoutMs);
+    child.stdout!.on('data', (d) => { out += d.toString(); if (out.length > cap) finish(clean(reply(out))); });
     child.on('error', () => finish(''));
-    child.on('close', (code) => finish(code === 0 ? clean(out) : ''));
-  });
+    child.on('close', (code) => finish(code === 0 ? clean(reply(out)) : ''));
+  }).then((text) => (detail ? { text, timedOut } : text));
 }

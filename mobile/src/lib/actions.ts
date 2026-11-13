@@ -229,7 +229,7 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
       return { steps: [{ door: 'redeliver', payload: on }], toast: waits ? 'Up next once your computer is back.' : `A fresh agent is picking this up → ${to}` };
     case 'keep-here':
       return {
-        steps: [{ door: 'setThreadOnMac', payload: { onMac: { [item.id]: press.keep ? true : null } } }],
+        steps: [{ door: 'setThreadOnMac', payload: { onMac: { [item.id]: !!press.keep } } }],
         toast: waits ? (press.keep ? 'Runs only on your computer once it is back' : 'Can run on the cloud again once your computer is back')
           : press.keep ? 'This thread now runs only on your computer' : 'This thread can run on the cloud again',
       };

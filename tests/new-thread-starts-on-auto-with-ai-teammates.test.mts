@@ -83,7 +83,7 @@ describe('the row of a thread sent to Auto', () => {
 
   it('opens with no bar saying an agent stopped on it, since none did', () => {
     const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
-    expect(app).toContain('stalled={(snap.supervisor.stalled?.includes(focused.id) ?? false) && !asksWho(focused)}');
+    expect(app).toContain('stalled={(snap.supervisor.stalled?.includes(focused.id) ?? false) && !asksWho(focused) && !snap.supervisor.signInNeeded?.[focused.id]}');
   });
 
   it('is an ordinary row once it is given to someone', () => {

@@ -149,7 +149,7 @@ describe('4. one copy of where the press goes, used by the ring and the words', 
 
   it('hands the strip to the card as well as to the ring', () => {
     expect(read('renderer/src/components/Onboarding.tsx'))
-      .toContain('left: beat?.length, tabs,');
+      .toContain('left: beat?.length, unfinished, tabs,');
   });
 
   it('keeps the tab names out of the copy as a written-out order', () => {

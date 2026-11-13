@@ -188,6 +188,6 @@ describe('the wiring', () => {
   it('the settings channel hands that on', () => {
     const ipc = read('main/ipc.mts');
     const handler = ipc.slice(ipc.indexOf("ipcMain.handle('zero:settings-read'"), ipc.indexOf("ipcMain.handle('zero:settings-read'") + 400);
-    expect(handler).toMatch(/readSettings\(\{ config, supervisor, store \}, \{ search: how\?\.search !== false \}\)/);
+    expect(handler).toMatch(/readSettings\(\{ config, supervisor, store, onTeam: onTeamNow \}, \{ search: how\?\.search !== false \}\)/);
   });
 });
