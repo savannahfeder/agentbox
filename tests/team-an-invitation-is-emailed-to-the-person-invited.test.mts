@@ -87,6 +87,15 @@ describe('the switch', () => {
     expect(readInviteConfig(() => '')).toBe(null);
     expect(readInviteConfig((n: string) => ({ TEAM_INVITE_FROM: config.from, TEAM_INVITE_KEY: config.key, RESEND_API_KEY: 're_x' } as Record<string, string>)[n])).toEqual(config);
   });
+  // Asked which address invitations come from: the one the thank-you note already sends from.
+  it('sends from the thank-you note’s address under the name Agentbox when it has none of its own', () => {
+    const env = { FOUNDER_NOTE_FROM: 'Sam from Agentbox <hello@example.test>', TEAM_INVITE_KEY: config.key, RESEND_API_KEY: 're_x' } as Record<string, string>;
+    expect(readInviteConfig((n: string) => env[n])?.from).toBe('Agentbox <hello@example.test>');
+  });
+  it('prefers its own address when one is set', () => {
+    const env = { FOUNDER_NOTE_FROM: 'Sam from Agentbox <hello@example.test>', TEAM_INVITE_FROM: 'Agentbox <team@example.test>', TEAM_INVITE_KEY: config.key, RESEND_API_KEY: 're_x' } as Record<string, string>;
+    expect(readInviteConfig((n: string) => env[n])?.from).toBe('Agentbox <team@example.test>');
+  });
   it('refuses a key too short to be a secret', () => {
     expect(readInviteConfig((n: string) => ({ TEAM_INVITE_FROM: config.from, TEAM_INVITE_KEY: 'short', RESEND_API_KEY: 're_x' } as Record<string, string>)[n])).toBe(null);
   });

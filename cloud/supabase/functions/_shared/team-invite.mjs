@@ -22,7 +22,9 @@ export function keysMatch(given, expected) {
 // Null until every secret is set, which is how the email is switched off.
 export function readInviteConfig(get) {
   const v = (name) => String(get(name) ?? '').trim();
-  const config = { from: v('TEAM_INVITE_FROM'), key: v('TEAM_INVITE_KEY'), resendKey: v('RESEND_API_KEY') };
+  // With no address of its own it sends from the one the thank-you note uses, which the mail service already knows.
+  const noteAddress = v('FOUNDER_NOTE_FROM') ? addressIn(v('FOUNDER_NOTE_FROM')) : '';
+  const config = { from: v('TEAM_INVITE_FROM') || (noteAddress ? `Agentbox <${noteAddress}>` : ''), key: v('TEAM_INVITE_KEY'), resendKey: v('RESEND_API_KEY') };
   return config.from && config.key.length >= 24 && config.resendKey ? config : null;
 }
 
