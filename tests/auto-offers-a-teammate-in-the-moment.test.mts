@@ -192,7 +192,8 @@ describe('a thread sent to Auto', () => {
 // made teammate was "setting itself up" long after it had, and a two-week
 // launch got no offer.
 describe('what the power test found', () => {
-  const line = () => fs.readFileSync(new URL('../renderer/src/components/RouteLine.tsx', import.meta.url), 'utf8');
+  // Since 2026-11-12 the offer is a card (tests/the-teammate-offer-is-a-card-under-the-answer).
+  const line = () => fs.readFileSync(new URL('../renderer/src/components/TeammateOffer.tsx', import.meta.url), 'utf8');
 
   it('answers a press at once, before the app has written it', () => {
     expect(line()).toMatch(/setPressed\(make \? 'made' : 'no'\);\s*\n\s*api\.answerRouteOffer/);

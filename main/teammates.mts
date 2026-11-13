@@ -688,7 +688,9 @@ export class Teammates {
     let made: string | null = null;
     if (make) {
       const threads = [{ product: item.product, id: item.id, title: String(item.label || item.title).trim() }];
-      const text = `${offer.role}. Take on work like this thread from now on, and learn how I like it done.${offer.why ? ` ${offer.why}` : ''}`;
+      // The card's reasons are what the person said yes to, so they are the job.
+      const gains = offer.gains?.length ? ` ${offer.gains.map((g) => (/[.!?…]$/.test(g) ? g : `${g}.`)).join(' ')}` : '';
+      const text = `${offer.role}. Take on work like this thread from now on, and learn how I like it done.${offer.why ? ` ${offer.why}` : ''}${gains}`;
       made = this.describe({ text, product: item.product, threads }, now).teammate?.id ?? null;
     } else {
       writeChat(this.dir(), { kind: 'act', from: YOU, verb: 'declined-role', ref: offer.role.toLowerCase(), text: offer.role }, now);

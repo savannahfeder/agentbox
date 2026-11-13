@@ -28,7 +28,7 @@ describe('making a teammate from the offer on a thread', () => {
     const made = w.createWorkItem(root, { title: 'Write this week’s changelog from the merged PRs', labels: ['founder'] }, { source: 'founder', now: now - 2 * DAY });
     w.updateWorkItem(root, made.id, { result: 'Here is the changelog draft.' }, { source: 'agent', now: now - 2 * DAY + 1000 });
     w.updateWorkItem(root, made.id, { answer: 'Group by what users notice, not by PR.' }, { source: 'founder', now: now - 2 * DAY + 2000 });
-    w.updateWorkItem(root, made.id, { routed: { to: 'agent', why: 'x', at: now, by: 'auto', offer: { role: 'Changelog writer', why: 'It is every week.' } } }, { source: 'system', now: now - 2 * DAY + 3000 });
+    w.updateWorkItem(root, made.id, { routed: { to: 'agent', why: 'x', at: now, by: 'auto', offer: { role: 'Changelog writer', why: 'It is every week.', gains: ['Learns what your users notice', 'Carries on from this changelog', 'Writes it every Friday, and asks you before it posts'] } } }, { source: 'system', now: now - 2 * DAY + 3000 });
     const store = {
       config: { storeRoot: root, accountId: 'acct-offer-learn' }, modules: mods,
       listProducts: () => [{ slug: 'site', dir: root, name: 'Site', repoPath: '/r' }],
@@ -44,6 +44,8 @@ describe('making a teammate from the offer on a thread', () => {
     const opening = team.chat().messages.find((m) => m.kind === 'msg' && m.setup && m.to?.includes(mate.id));
     expect(opening.threads.map((t) => t.id)).toEqual([made.id]);
     expect(opening.text).toMatch(/^Changelog writer\. Take on work like this thread/);
+    // The card's three reasons are what the person said yes to, so they are its job.
+    expect(opening.text).toContain('Writes it every Friday, and asks you before it posts');
     expect(store.listItems().find((i) => i.id === made.id).routed.offer.answered).toBe('made');
 
     const brief = team.briefFor({ id: 'w-setup', labels: ['founder', `teammate:${mate.id}`, 'hop:0'] }, now);

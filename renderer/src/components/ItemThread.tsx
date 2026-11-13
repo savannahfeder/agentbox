@@ -62,6 +62,7 @@ import { firstName } from '../team/people';
 import { ThreadsMade, type MadeRow } from './ThreadsMade';
 import { TeammatesContext } from '../teammates/row-lead';
 import { RouteLine } from './RouteLine';
+import { TeammateOffer } from './TeammateOffer';
 import { withoutLoneQuoteMark } from '../typed-message';
 import { teammateIdOf, OFFER_LABEL } from '../../../shared/teammates.mts';
 import { REACH_LABEL } from '../../../shared/teammate-reach.mts';
@@ -510,6 +511,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
       <>
         {queueHead}
         <QueueAnswer text={clean(newest.text)} md={md} name={pageTitle(item)} by={signer ? { t: signer, at: newest.at } : null} />
+        <TeammateOffer item={item} />
         {byApp && outcome && <p className="one-app-note">{clean(outcome.text)}</p>}
         {afterList}
         {signInHere}
@@ -593,6 +595,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
         thread.host,
       )}
       {answer}
+      <TeammateOffer item={item} />
       {afterList}
       {signInHere}
       {/* AND WHAT THE NEWEST TURN FILED, under its own last word. */}

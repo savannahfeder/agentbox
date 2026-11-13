@@ -49,7 +49,8 @@ export type Visibility = 'team' | 'people' | 'private';
 
 export interface WorkItemClaim { holder: string; leaseUntil: number }
 export interface Reaction { on: string; emoji: string; off?: true }
-export interface RouteOffer { role: string; why: string; answered?: 'made' | 'no' }
+/** `gains`: the three lines the card draws, what this teammate would learn, carry on and then do. */
+export interface RouteOffer { role: string; why: string; gains?: string[]; answered?: 'made' | 'no' }
 export interface Routed { to?: string; ask?: string[]; why: string; at: number; by: 'auto' | 'you'; offer?: RouteOffer }
 export interface SaidAt { said: string; at: number }
 export interface TeammateFrom { teammate: string; name: string }
@@ -434,8 +435,9 @@ function cleanOffer(value: Unchecked): RouteOffer | undefined {
   const role = typeof value.role === 'string' ? value.role.trim().slice(0, 40) : '';
   if (!role) return undefined;
   const why = typeof value.why === 'string' ? value.why.slice(0, 200) : '';
+  const gains = Array.isArray(value.gains) ? value.gains.filter((g: unknown): g is string => typeof g === 'string' && !!g.trim()).slice(0, 3).map((g: string) => g.trim().slice(0, 120)) : [];
   const answered = value.answered === 'made' || value.answered === 'no' ? value.answered : undefined;
-  return { role, why, ...(answered ? { answered } : {}) };
+  return { role, why, ...(gains.length ? { gains } : {}), ...(answered ? { answered } : {}) };
 }
 
 // A person id or a line id: short, plain, never an object a writer slipped in.

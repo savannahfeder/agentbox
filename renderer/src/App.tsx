@@ -85,6 +85,7 @@ import { LATER_KEYWORDS, REOPEN_KEYWORDS } from './palette-rows';
 */
 import { announcesMove, announcesUpdate, isUpdateRow, CHECK_SAY, updateLook } from './update-row';
 import { ago, closesTheTask, leavesItOnTheBranch, discardsTheChange, itemOptions, liveOption, needsYourWords, offerIsLive, parseRepeat, type ParsedOption } from './format';
+import { enterMakesTeammate, MAKE_OFFERED_TEAMMATE } from './teammate-offer';
 import { discardAsk } from './discard-asks-first';
 import {
   draftKey, hasDraft, readDraft, restoreDraft, restoreFailedDraft, readComposeDraft, restoreComposeDraft, saveDraft, clearComposeDraft,
@@ -6507,7 +6508,11 @@ export default function App() {
             return i <= 0 ? null : opts[i - 1].n; // above the first → nothing selected
           });
         }
-        else if (e.key === 'Enter') { e.preventDefault(); if (optionSel !== null) pickOption(focused, optionSel); }
+        else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (optionSel !== null) pickOption(focused, optionSel);
+          else if (enterMakesTeammate(focused, optionSel)) window.dispatchEvent(new CustomEvent(MAKE_OFFERED_TEAMMATE, { detail: { product: focused.product, id: focused.id } }));
+        }
         // J/K walk the inbox from inside a task (Superhuman): read one, jump
         // to the next, leave the arrows to scroll the document and options.
         // The next one may be a teammate's, which opens as their card.

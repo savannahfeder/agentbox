@@ -113,7 +113,7 @@ export interface WorkItem {
   due?: string;
   people?: string[];
   /** Sent to Auto: who it went to and why, or the two it asks her to pick from (shared/auto-route.mts). */
-  routed?: { to?: string; ask?: string[]; why: string; at: number; by: 'auto' | 'you'; offer?: { role: string; why: string; answered?: 'made' | 'no' } };
+  routed?: { to?: string; ask?: string[]; why: string; at: number; by: 'auto' | 'you'; offer?: { role: string; why: string; gains?: string[]; answered?: 'made' | 'no' } };
   // THE THREAD'S OWN FIELDS (approved 2026-10-01, shared/work-items.mts).
   // `visibility` absent reads as 'team'. The summary is shared: the agent keeps
   // it current and the person can edit it, and the later write wins.

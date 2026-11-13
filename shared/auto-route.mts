@@ -121,7 +121,8 @@ export function routePrompt(
     '[0] None of them: an ordinary coding agent does it.',
     ...(primary ? [`[P] ${primary.name}, their primary teammate: only when the task needs several of the teammates above, or is about the team's work as a whole.`] : []),
     '',
-    'Reply with two lines and nothing else. The first, in one of these forms:',
+    'Reply with two lines, or five when you name a role, and nothing else.',
+    'The first, in one of these forms:',
     '  2 | It made the last four clips and runs the clip engine.',
     '  0 | -',
     '  1,2 | Both have worked on the captions.',
@@ -153,8 +154,15 @@ export function routePrompt(
     '  - it is an ongoing role, such as support, marketing or hiring',
     'A one-off fix, a question, or a single change is not. When unsure, it is not.',
     'Write it in one of these forms, the role in one to three words:',
-    '  Teammate: Marketer | It is a post every week, and it would learn your voice.',
+    '  Teammate: Marketer | A Marketer would write this post every week and get better at it each time.',
     '  Teammate: -',
+    'When you name a role, add three lines under it, each under ten words,',
+    'about this task, saying what the teammate would learn, what it would',
+    'carry on from, and what it would then do. Promise nothing it would send',
+    'or post without asking first:',
+    '  - Learns your voice from every post you approve or change',
+    '  - Carries on where this post left off, not from nothing',
+    '  - Writes it every Monday, and asks you before it posts',
     ...(never.length ? [`Never offer one of these, which they have or turned down: ${never.join(', ')}.`] : []),
     '',
     '--- the task ---',
@@ -200,13 +208,21 @@ export function readRoute(text: string, candidates: readonly { id: string }[], p
 
 /** PURE. The offer in the model's reply, or null: no line, "-", or a role that is not a short one. */
 export function readOffer(text: string, { taken = [] }: { taken?: readonly string[] } = {}): RouteOffer | null {
-  const line = String(text ?? '').split('\n').map((l) => l.trim()).find((l) => /^teammate\s*:/i.test(l));
-  const m = line ? /^teammate\s*:\s*([^|]*?)\s*\|\s*(.*)$/i.exec(line) : null;
+  const lines = String(text ?? '').split('\n').map((l) => l.trim());
+  const at = lines.findIndex((l) => /^teammate\s*:/i.test(l));
+  const m = at >= 0 ? /^teammate\s*:\s*([^|]*?)\s*\|\s*(.*)$/i.exec(lines[at]) : null;
   if (!m) return null;
   const role = m[1].replace(/^["'`“”‘’]+|["'`“”‘’.]+$/g, '').trim();
   if (!role || role === '-' || !/^[\p{L}][\p{L}&/' -]{0,29}$/u.test(role) || role.split(/\s+/).length > 3) return null;
   if (taken.some((t) => t.trim().toLowerCase() === role.toLowerCase())) return null;
-  return { role: role[0].toUpperCase() + role.slice(1), why: cleanWhy(m[2]) };
+  // All three or none: the card's own fallbacks never sit beside the model's.
+  const gains = lines.slice(at + 1, at + 4).map((l) => /^[-*•]\s+(.+)$/.exec(l)?.[1]).map((g) => (g ? cleanGain(g) : ''));
+  return { role: role[0].toUpperCase() + role.slice(1), why: cleanWhy(m[2]), ...(gains.length === 3 && gains.every(Boolean) ? { gains } : {}) };
+}
+
+function cleanGain(text: string): string {
+  const t = text.replace(/^["'`“”‘’]+|["'`“”‘’.]+$/g, '').replace(/\s+/g, ' ').trim();
+  return t.length > 90 ? `${t.slice(0, 89).replace(/\s+\S*$/, '')}…` : t;
 }
 
 /**

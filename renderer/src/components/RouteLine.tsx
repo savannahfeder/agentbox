@@ -26,35 +26,6 @@ function Choices({ to, mates, names, onPick }: { to: string[]; mates: ReadonlyMa
   ))}</>;
 }
 
-const aRole = (role: string) => `${/^[aeiou]/i.test(role) ? 'an' : 'a'} ${role}`;
-
-/** The teammate Auto offered for this kind of work, answered with one press. */
-function Offer({ item }: { item: WorkItem }) {
-  const [pressed, setPressed] = useState<'made' | 'no' | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const offer = item.routed?.offer;
-  const answered = pressed ?? offer?.answered;
-  if (!offer) return null;
-  if (answered === 'made') {
-    return <div className="rt-line rt-offer"><AutoFace /><span>You made {aRole(offer.role)} for work like this.</span></div>;
-  }
-  if (answered === 'no' && !error) return null;
-  const answer = (make: boolean) => {
-    setError(null);
-    setPressed(make ? 'made' : 'no');
-    api.answerRouteOffer({ product: item.product, id: item.id, make }).catch((e) => { setPressed(null); setError(String(e?.message ?? e)); });
-  };
-  return <div className="rt-line rt-offer">
-    <AutoFace />
-    <span>{offer.why || `${capital(aRole(offer.role))} would learn this kind of work.`}</span>
-    <button type="button" onClick={() => answer(true)}>Make {aRole(offer.role)}</button>
-    <button type="button" onClick={() => answer(false)}>Not now</button>
-    {error && <span className="rt-error">{error}</span>}
-  </div>;
-}
-
-const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-
 export function RouteLine({ item, mates }: { item: WorkItem; mates: ReadonlyMap<string, Mate> }) {
   const [changing, setChanging] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,12 +57,12 @@ export function RouteLine({ item, mates }: { item: WorkItem; mates: ReadonlyMap<
   const mate = mateOf(routed.to, mates);
   const others = [...people.map((p) => p.id), ...working.map((t) => `mate:${t.id}`), 'agent'].filter((key) => key !== routed.to);
   const names = new Map(people.map((p) => [p.id, p.name]));
-  return <><div className="rt-line">
+  return <div className="rt-line">
     {mate ? <TeammateMark t={mate} /> : <AgentFace />}
     {changing
       ? <span>Give it to <Choices to={others} mates={mates} names={names} onPick={pick} />.</span>
       : <span>{mate ? <><b>{mate.name}</b> took this.{routed.why ? ` ${routed.why}` : ''}</> : routed.why}</span>}
     {!changing && others.length > 0 && <button type="button" className="rt-change" onClick={() => setChanging(true)}>Give it to someone else</button>}
     {failed}
-  </div><Offer item={item} /></>;
+  </div>;
 }
