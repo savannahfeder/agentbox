@@ -150,7 +150,7 @@ describe('the empty inbox during the tutorial', () => {
     const pages = fs.readFileSync(new URL('../renderer/src/threads/Pages.tsx', import.meta.url), 'utf8');
     const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
     expect(pages).toContain("{first ? 'Give an agent its first task' : 'Nothing needs you'}");
-    expect(app).toContain('<InboxClear slot={setClearSlot} first={firstTask(tour)} />');
+    expect(app).toContain('<InboxClear slot={setClearSlot} first={firstTask(tour)} sky={skyOnInbox && sky ? sky.art : null} />');
   });
   it('offers the suggestions only once the project has a folder', async () => {
     const fs = await import('node:fs');

@@ -13,7 +13,7 @@
 export type SettingsPageId =
   | 'general' | 'appearance' | 'shortcuts' | 'phone' | 'alpha' | 'rooms'
   | 'claude' | 'codex' | 'running' | 'cloud' | 'instructions'
-  | 'projects' | 'team';
+  | 'projects' | 'files' | 'team';
 
 /** The menu, in the order it is drawn, under the headings it is drawn
  *  under. Team is left out by the screen on a build with no team cloud. */
@@ -28,6 +28,7 @@ export const SETTINGS_PAGES: Array<{ id: SettingsPageId; label: string; group: '
   { id: 'running', label: 'Running', group: 'Agents' },
   { id: 'instructions', label: 'Instructions', group: 'Agents' },
   { id: 'projects', label: 'Projects', group: 'Workspace' },
+  { id: 'files', label: 'Files', group: 'Workspace' },
   { id: 'team', label: 'Team', group: 'Workspace' },
   { id: 'rooms', label: 'Rooms', group: 'Workspace' },
   // Last, where people look for what they pay for; the founder's capital B.
@@ -77,6 +78,8 @@ const ENTRIES: Entry[] = [
   // The Memory group folded into the Agents card (w-e5225b62ba), so these three
   // land on `at-once` together. An anchor naming a group that no longer exists
   // is a search result that scrolls nowhere.
+  { page: 'files', label: 'Keep files in the cloud', anchor: 'files-cloud', words: 'storage disk space full upload backup films videos pictures images' },
+  { page: 'files', label: 'Take big files off this computer', anchor: 'files-cloud', words: 'mac days free space disk storage old films videos pictures' },
   { page: 'cloud', label: 'Your plan', anchor: 'cloud-billing', words: 'agentbox cloud billing stripe payment invoices invoice receipts card cancel subscription manage plan account' },
   { page: 'cloud', label: 'This month', anchor: 'cloud-use', words: 'cloud usage hours agents running used left' },
   { page: 'cloud', label: 'Change plan', anchor: 'cloud-plans', words: 'agentbox cloud plan plans pro plus max slots upgrade downgrade switch price pay subscription' },

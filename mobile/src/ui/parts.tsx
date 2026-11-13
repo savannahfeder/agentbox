@@ -1,8 +1,8 @@
 // The pieces every screen is made of, sized from the phone site as it draws
 // (renderer/src/phone.css and the styles under it).
 import { useEffect, useRef, type ReactNode } from 'react';
-import { Animated, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type TextProps, type ViewStyle } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Animated, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type TextProps, type ViewStyle } from 'react-native';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, Path, Pattern, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { useCloud } from '../state/cloud';
 import { color, corner, font, size } from './theme';
@@ -79,17 +79,26 @@ export function Ghost({ title, onPress, disabled }: { title: string; onPress: ()
 
 /** Every picker is a sheet from the bottom, a row per choice in words (phone.css `.tc-menu`). */
 export function Sheet({ open, close, onGone, children }: { open: boolean; close: () => void; /** iOS: the sheet has finished leaving. */ onGone?: () => void; children: ReactNode }) {
+  const body = <SheetBody close={close}>{children}</SheetBody>;
+  return (
+    <Modal visible={open} transparent animationType="fade" onRequestClose={close} onDismiss={onGone}>
+      {/* Android draws a modal as its own window under the navigation bar; the app's insets are not that window's. */}
+      {Platform.OS === 'android' ? <SafeAreaProvider>{body}</SafeAreaProvider> : body}
+    </Modal>
+  );
+}
+function SheetBody({ close, children }: { close: () => void; children: ReactNode }) {
   const inset = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   return (
-    <Modal visible={open} transparent animationType="fade" onRequestClose={close} onDismiss={onGone}>
+    <>
       <Pressable style={{ flex: 1, backgroundColor: color.scrim }} onPress={close} accessibilityLabel="Close" />
       <View style={{ maxHeight: height * 0.72, backgroundColor: color.pop, borderTopWidth: 1, borderTopColor: color.lineStrong, borderTopLeftRadius: corner.card, borderTopRightRadius: corner.card, overflow: 'hidden' }}>
         <ScrollView style={{ flexGrow: 0 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 10, paddingHorizontal: 8, paddingBottom: 16 + inset.bottom, gap: 1 }}>
           {children}
         </ScrollView>
       </View>
-    </Modal>
+    </>
   );
 }
 export const SheetHead = ({ children }: { children: string }) => (
@@ -143,6 +152,15 @@ export function RunningMark({ cloud, children }: { cloud?: boolean; children?: R
         </Svg>
       )}
     </Animated.View>
+  );
+}
+
+/** The dotted word as a view of its own: Android folds a press nested in a Text into the one text, out of a screen reader's and a tap's reach. */
+export function ChoiceButton({ children, said, onPress, style }: { children: string; said: string; onPress: () => void; style?: object }) {
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={said} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
+      <T style={[{ textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: color.faint }, style]}>{children}</T>
+    </Pressable>
   );
 }
 

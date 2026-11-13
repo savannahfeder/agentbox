@@ -41,6 +41,7 @@ import { catchUpDue } from '../shared/agent-import.mts';
 import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import { codexLaunchEnv } from './codex-launch-env.mts';
+import { codexHome, codexSmallModel } from './codex-models.mts';
 
 /**
  * The model this runs on. Small and fast on purpose: this is a naming call, it
@@ -69,7 +70,8 @@ export interface SmallModelOptions {
   pictures?: readonly string[];
 }
 
-export const NAME_MODEL = 'claude-haiku-4-5-20251001';
+// The alias, not a dated id: Claude Code moves it to each new Haiku.
+export const NAME_MODEL = 'haiku';
 
 /** Claude refuses an image over 5 MB once base64'd, which is this many bytes on disk. */
 export const SMALL_MODEL_PICTURE_BYTES = 3_750_000;
@@ -227,7 +229,21 @@ export function nameRow(item: RowItem | null | undefined, opts: SmallModelOption
  * was named for a day, while agents ran on the second account. The supervisor
  * passes one per account and walks them (`_askSmall` in main/supervisor.mts).
  */
-export function askSmallModel(prompt: string, clean: (text: string) => string, { claudeBin, codexBin = null, engine = 'claude', model = NAME_MODEL, timeoutMs = NAME_TIMEOUT_MS, env, pictures = [] }: SmallModelOptions = {}) {
+export async function askSmallModel(prompt: string, clean: (text: string) => string, { claudeBin, codexBin = null, engine = 'claude', model = NAME_MODEL, timeoutMs = NAME_TIMEOUT_MS, env, pictures = [] }: SmallModelOptions = {}): Promise<string> {
+  if (engine !== 'codex') return askOnce(prompt, clean, { claudeBin, codexBin, engine, model, timeoutMs, env, pictures });
+  let small: string | null = null;
+  try { small = codexSmallModel({ home: codexHome({ env: env ?? process.env }) }); } catch { small = null; }
+  const first = await askOnce(prompt, clean, { codexBin, engine, model: small, timeoutMs, env, pictures }, true);
+  // A small model this login lists can still refuse; Codex's own default is the fallback.
+  if (first.text || !small || first.timedOut) return first.text;
+  return askOnce(prompt, clean, { codexBin, engine, model: null, timeoutMs, env, pictures });
+}
+
+type AskOnce = Omit<SmallModelOptions, 'model'> & { model?: string | null };
+function askOnce(prompt: string, clean: (text: string) => string, opts: AskOnce): Promise<string>;
+function askOnce(prompt: string, clean: (text: string) => string, opts: AskOnce, detail: true): Promise<{ text: string; timedOut: boolean }>;
+function askOnce(prompt: string, clean: (text: string) => string, { claudeBin, codexBin = null, engine = 'claude', model = null, timeoutMs = NAME_TIMEOUT_MS, env, pictures = [] }: AskOnce, detail = false): Promise<string | { text: string; timedOut: boolean }> {
+  let timedOut = false;
   return new Promise<string>((resolve) => {
     let harness;
     try { harness = harnessFor(engine); } catch { return resolve(''); }
@@ -263,9 +279,9 @@ export function askSmallModel(prompt: string, clean: (text: string) => string, {
       try { child.kill('SIGKILL'); } catch { /* already gone */ }
       resolve(value);
     };
-    const timer = setTimeout(() => finish(''), timeoutMs);
+    const timer = setTimeout(() => { timedOut = true; finish(''); }, timeoutMs);
     child.stdout!.on('data', (d) => { out += d.toString(); if (out.length > cap) finish(clean(reply(out))); });
     child.on('error', () => finish(''));
     child.on('close', (code) => finish(code === 0 ? clean(reply(out)) : ''));
-  });
+  }).then((text) => (detail ? { text, timedOut } : text));
 }

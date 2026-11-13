@@ -63,10 +63,20 @@ export function installGate(setup: EngineSetup, signedOut: Engine[] = []): { hea
   const signingIn = setup!.phase === 'signing-in';
   return {
     heading: signingIn ? `Finish signing in to ${named} in your browser`
-      : setup!.phase === 'checking' && signedOut.includes(setup!.engine) ? `Signing in to ${named}` : `Installing ${named}`,
+      : startsSignIn(setup!, signedOut) ? `Signing in to ${named}` : `Installing ${named}`,
     running: true,
     again: signingIn,
   };
+}
+
+const startsSignIn = (setup: NonNullable<EngineSetup>, signedOut: Engine[]) =>
+  setup.phase === 'checking' && signedOut.includes(setup.engine);
+
+/** The footer's word for a setup that has not reached ready; it must agree with the heading. */
+export function footWord(setup: NonNullable<EngineSetup>, signedOut: Engine[] = []): string {
+  if (setup.phase === 'failed') return setup.error ?? 'did not finish';
+  if (setup.phase === 'signing-in') return 'finish in your browser';
+  return startsSignIn(setup, signedOut) ? 'signing in' : 'installing';
 }
 
 /**

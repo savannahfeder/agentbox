@@ -69,6 +69,8 @@ export interface ReplySupervisor {
   deliverMidflightReply(item: ReplyItem, files: null): unknown;
   /** Answer the sign-in card the run is waiting on, so the wait ends and the reply can be taken. */
   endSignInWait?(product: string, id: string): unknown;
+  /** Whether a file sent from a card is waiting to go with this thread's next cloud run. */
+  hasFilesForCloud?(id: string): boolean;
 }
 
 export interface ReplyPayload {
@@ -94,7 +96,10 @@ export function submitReply(supervisor: ReplySupervisor, payload: ReplyPayload, 
   // Between turns a slash command, a new permission mode or a teammate's word
   // is saved instead, and the tick ends the wait so a new run takes it.
   const between = !!session?.between && typeof supervisor.nextReplyBrief === 'function';
+  // A file sent from a card goes only with a new cloud run, so its reply never
+  // goes into the open one: the tick ends that session and the next run takes both.
   const live = !later && session?.product === product && typeof session.child?.steer === 'function'
+    && !supervisor.hasFilesForCloud?.(id)
     && !(from && (session.remoteIdle || session.between))
     && !(session?.between && (permissionMode != null || String(answer ?? '').trimStart().startsWith('/')))
     && status !== 'done' && typeof answer === 'string' && answer.trim() && answer !== '(withdrawn)';

@@ -68,7 +68,7 @@ import { openForThePerson } from './opens-a-program.mts';
 import { installNotifier } from './notify.mts';
 import { createCornerTag } from './corner-tag.mts';
 import { loadLiquidGlass } from './liquid-glass.mts';
-import { DOC_SCHEMES, DocGrants, docPath } from './doc-scheme.mts';
+import { DOC_SCHEMES, DocGrants, docPath, servedApart } from './doc-scheme.mts';
 import { quietTheFramesScrollbars } from './frame-scrollbars.mts';
 import { letLocalAppsShowInThePane } from './local-app-frames.mts';
 import { hardenAttachedWebview } from './webview-guard.mts';
@@ -130,9 +130,10 @@ protocol.registerSchemesAsPrivileged([...DOC_SCHEMES.map((scheme) => ({
 
 // A local file answered so the window asks again next time instead of reusing
 // what it drew before. Why, measured, is at the page scheme's handler below.
-function noStore(res: Response) {
+function noStore(res: Response, extra: Record<string, string> = {}) {
   const headers = new Headers(res.headers);
   headers.set('cache-control', 'no-store');
+  for (const [k, v] of Object.entries(extra)) headers.set(k, v);
   return new Response(res.body, { status: res.status, headers });
 }
 
@@ -145,6 +146,9 @@ const docGrants = new DocGrants();
 // is servable until the window has been built, which is the same shape as the
 // grants above: an empty list is a closed door, never an open one.
 let imageRoots: () => string[] = () => [];
+// A picture or film kept in the cloud, brought back to where it was (main/files-cloud.mts).
+let comeBackAt: ((file: string) => Promise<boolean>) | null = null;
+const COME_BACK_WAIT_MS = 60_000;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const appDir = path.join(__dirname, '..');
@@ -951,6 +955,7 @@ async function createWindow() {
   // Codex card.
   answerApproval = ipc.answerApproval;
   pushUpdate = ipc.push;
+  comeBackAt = ipc.comeBackAt;
   cardInFront = () => ipc.pendingApprovals()[0] ?? null;
   // What the window answers itself (badge, boot info) gets the plain stand-ins
   // a browser tab gets.
@@ -1434,7 +1439,7 @@ if (!app.requestSingleInstanceLock()) {
         // replaced on disk 2250 -> 3118 wide, page reopened, frame drew 2250.
         // With this header it drew 3118. These are local files; there is no
         // download to save by caching them.
-        return noStore(await net.fetch(pathToFileURL(file).toString()));
+        return noStore(await net.fetch(pathToFileURL(file).toString()), servedApart(file));
       } catch {
         return new Response('Not there.', { status: 404 });
       }
@@ -1445,6 +1450,11 @@ if (!app.requestSingleInstanceLock()) {
     for (const scheme of IMG_SCHEMES) protocol.handle(scheme, async (request) => {
       const file = imgPath(request.url);
       if (!file || !servable(file, imageRoots())) return new Response('Not available.', { status: 403 });
+      if (comeBackAt && !fs.existsSync(file)) {
+        let timer: NodeJS.Timeout | undefined;
+        await Promise.race([comeBackAt(file).catch(() => false), new Promise((r) => { timer = setTimeout(r, COME_BACK_WAIT_MS); })]);
+        clearTimeout(timer);
+      }
       try {
         // A sound or a film is answered in the piece the player asked for, or
         // it plays but cannot be moved (mediaResponse, main/img-scheme.mts).

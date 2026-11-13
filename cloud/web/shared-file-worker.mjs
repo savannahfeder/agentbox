@@ -60,6 +60,15 @@ function filmOf(body) {
   } catch { return null; }
 }
 
+// RFC 6266: a plain name for old browsers, and the whole name in filename*.
+function disposition(how, name) {
+  const whole = String(name).replace(/[\x00-\x1f\x7f]/g, ' ');
+  const plain = whole.replace(/[^\w.\- ]+/g, '_');
+  if (plain === whole) return `${how}; filename="${plain}"`;
+  const encoded = encodeURIComponent(whole).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+  return `${how}; filename="${plain}"; filename*=UTF-8''${encoded}`;
+}
+
 const pictureType = (t) => (/^image\/[a-z0-9.+-]{1,60}$/i.test(t ?? '') ? t : 'application/octet-stream');
 
 export function sharedFileWorker({ cloud, anonKey, headers = {} }, { fetchImpl = (u, i) => fetch(u, i) } = {}) {
@@ -133,7 +142,7 @@ export function sharedFileWorker({ cloud, anonKey, headers = {} }, { fetchImpl =
     const shared = { 'cache-control': preview ? 'public, max-age=300' : 'no-store', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' };
     if (file.kind === 'page') return new Response(file.body, { headers: { ...shared, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': PAGE_CSP } });
     if (isTable(file)) {
-      return new Response(file.body, { headers: { ...shared, 'content-type': `${file.type.toLowerCase()}; charset=utf-8`, 'content-security-policy': TEXT_CSP, 'content-disposition': `attachment; filename="${String(file.name).replace(/[^\w.\- ]+/g, '_')}"` } });
+      return new Response(file.body, { headers: { ...shared, 'content-type': `${file.type.toLowerCase()}; charset=utf-8`, 'content-security-policy': TEXT_CSP, 'content-disposition': disposition('attachment', file.name) } });
     }
     if (file.kind === 'video') {
       const film = filmOf(file.body);
@@ -150,13 +159,13 @@ export function sharedFileWorker({ cloud, anonKey, headers = {} }, { fetchImpl =
           out.enqueue(new Uint8Array(await res.arrayBuffer()));
         },
       });
-      return new Response(request.method === 'HEAD' ? null : pieces, { headers: { ...shared, 'content-type': /^video\/[a-z0-9.+-]{1,40}$/i.test(file.type ?? '') ? file.type : 'application/octet-stream', 'content-length': String(film.size), 'content-security-policy': TEXT_CSP, 'content-disposition': `attachment; filename="${String(file.name).replace(/[^\w.\- ]+/g, '_')}"` } });
+      return new Response(request.method === 'HEAD' ? null : pieces, { headers: { ...shared, 'content-type': /^video\/[a-z0-9.+-]{1,40}$/i.test(file.type ?? '') ? file.type : 'application/octet-stream', 'content-length': String(film.size), 'content-security-policy': TEXT_CSP, 'content-disposition': disposition('attachment', file.name) } });
     }
     if (file.kind === 'markdown') return new Response(file.body, { headers: { ...shared, 'content-type': 'text/plain; charset=utf-8', 'content-security-policy': TEXT_CSP } });
     let bytes;
     try { bytes = bytesOf(file.body); } catch { return plain(404, 'This link does not work.'); }
     if (file.kind === 'pdf') {
-      return new Response(bytes, { headers: { ...shared, 'content-type': 'application/pdf', 'content-security-policy': PDF_CSP, 'content-disposition': `inline; filename="${String(file.name).replace(/[^\w.\- ]+/g, '_')}"` } });
+      return new Response(bytes, { headers: { ...shared, 'content-type': 'application/pdf', 'content-security-policy': PDF_CSP, 'content-disposition': disposition('inline', file.name) } });
     }
     return new Response(bytes, { headers: { ...shared, 'content-type': pictureType(file.type), 'content-security-policy': PICTURE_CSP } });
   }

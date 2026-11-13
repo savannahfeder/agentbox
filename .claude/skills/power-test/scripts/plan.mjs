@@ -84,6 +84,8 @@ export function projectNamedIn(title, projects) {
 }
 
 export const CHAOS = ['none', 'light', 'normal', 'heavy'];
+export const STUCK_CAUSE = "Your Mac can't push to GitHub";
+const STUCK_ASK = 'The change is fine. Git on the Mac could not sign in to GitHub when the app pushed ("could not read Username for github.com"). Run gh auth login, then gh auth setup-git.';
 export const LOGIN_NAMES = ['default', '.claude-second', '.claude-third', '.claude-fourth'];
 
 /**
@@ -111,7 +113,7 @@ export function agentMode({ standIns = null, standInCloud = false, cloud = false
   return { real: false, codexReal: !standInCloud, standIns };
 }
 
-export function chaosPlan(level, totalMs, { real = false, cloud = false, logins = 2, codex = true, codexReal = false } = {}) {
+export function chaosPlan(level, totalMs, { real = false, cloud = false, logins = 2, codex = true, codexReal = false, stuck = false } = {}) {
   if (!CHAOS.includes(level)) throw new Error(`chaos is one of ${CHAOS.join(', ')}`);
   if (level === 'none') return [];
   const at = (f) => Math.round(totalMs * f);
@@ -126,6 +128,8 @@ export function chaosPlan(level, totalMs, { real = false, cloud = false, logins 
     // The real Codex runs out when its login does; only the scripted one can be made to.
     if (codex && !codexReal && level !== 'light') events.push({ kind: 'codex-out', at: at(0.45), until: at(0.55), out: ['codex'], says: 'Codex ran out of usage.' });
     if (level !== 'light') events.push({ kind: 'all-out', at: at(0.62), until: at(0.7), out: names, says: 'Every Claude login ran out of usage.' });
+    // --stuck: one cause outside every agent's work, as on 2026-11-08 (shared/causes.mts).
+    if (stuck) events.push({ kind: 'stuck', at: at(0.05), until: at(0.6), world: { stuck: { cause: STUCK_CAUSE, ask: STUCK_ASK, share: 0.7 } }, says: 'Git on the Mac could not sign in to GitHub, and 7 in 10 agents got stuck on it.' });
     if (level === 'heavy') events.push({ kind: 'slow-agents', at: at(0.8), until: at(0.9), world: { pace: { minMs: 60_000, maxMs: 300_000 } }, says: 'Agents slowed to 1 to 5 minutes an answer.' });
   }
   if (level !== 'light') {
@@ -306,7 +310,7 @@ You use the app through one command, run in your shell:
 Run look after anything that changes the screen.
 
 ${real
-    ? `The agents are real Claude Code and Codex on a real subscription, working in your projects' repositories. Write tasks the way you normally would, but keep each one small enough to finish in a few minutes.${person.codex ? ' Send at least half of your work to Codex, and switch some threads between the two. Codex is the agent the team uses least, so what goes wrong with it is what nobody else finds. A Codex thread that fails, stalls, or says something you cannot act on is an issue to log.' : ''}`
+    ? `The agents are real Claude Code and Codex on a real subscription, working in your projects' repositories. Write tasks the way you normally would, but keep each one small enough to finish in a few minutes.${person.codex ? ' Send about four threads in five to Codex, use Claude Code now and then, and switch some threads between the two. Codex is the agent the team uses least, so what goes wrong with it is what nobody else finds. A Codex thread that fails, stalls, or says something you cannot act on is an issue to log.' : ''}`
     : codexReal
     ? 'The Codex agents are real Codex on a real subscription, working in your projects\' repositories: keep each Codex task small enough to finish in a few minutes. The Claude Code agents are stand-ins: they answer in seconds to a minute and a half with a short note naming the task, not real work. Send at least half of your work to Codex, and switch some threads between the two. Codex is the agent the team uses least, so what goes wrong with it is what nobody else finds. A Codex thread that fails, stalls, or says something you cannot act on is an issue to log.'
     : 'The agents are stand-ins: they take a few seconds to a minute and a half and answer with a short note naming the task, not real work. Judge the app, not the answers. Write tasks the way you normally would.'}

@@ -19,7 +19,7 @@ export interface ChatsValue {
   onTeammate: (id: string) => void;
   onNew: () => void;
   onGroup: (key: string) => void;
-  /** The team's day, first in the list, on the layout where Chats holds the team. */
+  /** The standup, first in the list, on the layout where Chats holds the team. */
   onTeam?: () => void;
   /** Everyone on the team, each opening their page, on that same layout. */
   persons?: { id: string; name: string; url: string | null; waits: boolean }[];
@@ -71,7 +71,7 @@ export function ChatsColumn({ current }: { current: string | null }) {
   return <aside className="gc-list cx-list" aria-label="Chats">
     <label className="cx-search">{I.search()}<input value={q} placeholder="Search" aria-label="Search your chats" onChange={(e) => setQ(e.target.value)} /><kbd>G</kbd></label>
     {c.onTeam && <button type="button" className={`cx-row cx-team${current === 'team' ? ' on' : ''}`} aria-current={current === 'team' ? 'page' : undefined} onClick={c.onTeam}>
-      <span className="cx-mark" aria-hidden="true">{I.groupNav()}</span><span className="cx-n">Everyone</span>
+      <span className="cx-mark" aria-hidden="true">{I.standupNav()}</span><span className="cx-n">Standup</span>
     </button>}
     {section('teammates', 'AI teammates', c.teammates.length, <>
       {mates.map((t) => {

@@ -44,16 +44,17 @@ describe('your day', () => {
 });
 
 describe('the team in Chats', () => {
-  it('is called Everyone, with the people mark rather than a channel #', () => {
+  // 2026-11-13: the team's day became the Standup, a post per teammate per day.
+  it('is called Standup, with its own mark rather than a channel #', () => {
     const col = read('renderer/src/teammates/ChatsColumn.tsx');
     const row = col.slice(col.indexOf('c.onTeam &&'), col.indexOf('</button>}', col.indexOf('c.onTeam &&')));
-    expect(row).toMatch(/<span className="cx-n">Everyone<\/span>/);
-    expect(row).toMatch(/I\.groupNav\(\)/);
+    expect(row).toMatch(/<span className="cx-n">Standup<\/span>/);
+    expect(row).toMatch(/I\.standupNav\(\)/);
     expect(row).not.toMatch(/tq-hash/);
-    expect(read('renderer/src/App.tsx')).toMatch(/todayPage\('Everyone', homeLayout === 'chats' \?/);
+    expect(read('renderer/src/App.tsx')).toMatch(/standupPage\(homeLayout === 'chats' \?/);
   });
 
   it('opens a person\'s page from their name', () => {
-    expect(read('renderer/src/team/TodayPage.tsx')).toMatch(/onPerson && p\.key !== 'me' \? <button type="button" className="td-name" onClick=\{\(\) => onPerson\(p\.key\)\}>/);
+    expect(read('renderer/src/team/StandupPage.tsx')).toMatch(/onPerson && p\.key !== 'me' \? <button type="button" className="su-name" onClick=\{\(\) => onPerson\(p\.key\)\}>/);
   });
 });

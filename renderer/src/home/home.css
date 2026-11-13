@@ -116,10 +116,11 @@
 .hm-scroll { padding-bottom: 28px; }
 
 /* The Inbox under a sky (approved 2026-11-08, design 86): the sky at full
-   strength behind the header and nowhere else, so the list keeps the page. */
+   strength behind the header and nowhere else, so the list keeps the page.
+   It is gone before the tab row: dots between 11px grey capitals defeat any halo. */
 .inbox-sky-head { transform: scaleY(-1);
-  -webkit-mask-image: linear-gradient(to top, #000 0, #000 70px, transparent 150px);
-  mask-image: linear-gradient(to top, #000 0, #000 70px, transparent 150px); }
+  -webkit-mask-image: linear-gradient(to top, #000 0, #000 46px, transparent 90px);
+  mask-image: linear-gradient(to top, #000 0, #000 46px, transparent 90px); }
 /* Words over the sky sit in a soft patch of the sky's own dark, and controls
    are filled with it, so the streak never runs through a word on any sky.
    --sky-under is set by InboxSky. */
@@ -135,6 +136,12 @@
 .app.sky-board .inbox-sky-head { transform: scaleY(-1) translateY(60px); clip-path: inset(0 0 60px 0 round var(--radius));
   -webkit-mask-image: linear-gradient(to top, #000 0, #000 105px, transparent 150px);
   mask-image: linear-gradient(to top, #000 0, #000 105px, transparent 150px); }
+
+/* The empty Inbox has no rows to keep clear, so its sky covers the card
+   (InboxSky `zero`) in place of the header strip. */
+.app:has(> .inbox-sky-zero) > .inbox-sky-head { display: none; }
+.app:has(> .inbox-sky-zero) .th-start .tc-text::placeholder { color: var(--text-dim); }
+.app:has(> .inbox-sky-zero) .th-start .tc-chip { color: var(--text); }
 
 /* Team and Files wear the Inbox's sky; the Team list would cover it. */
 .app.sky-place .cx-list { background: transparent; }
