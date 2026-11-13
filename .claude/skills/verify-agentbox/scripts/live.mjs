@@ -159,6 +159,9 @@ export function copyConfig(state, had = {}) {
     // `up --alpha teammates`: features still in testing are off for a new person.
     ...Object.fromEntries((state.alpha ?? []).map((f) => [`alpha${f[0].toUpperCase()}${f.slice(1)}`, true])),
     ...((state.cloud || state.standInCloud) && !('cloudRuns' in had) ? { cloudRuns: 'all', cloudWhenOn: 'all' } : {}),
+    // The copy runs with the real home, so the app's default would send what
+    // does not fit here to the owner's own cloud.
+    ...(!state.cloud && !state.standInCloud ? { cloudRuns: false } : {}),
   };
 }
 
