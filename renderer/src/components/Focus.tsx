@@ -1979,6 +1979,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       onToggleTerminal={() => window.dispatchEvent(new Event('task-terminal-toggle'))}
       onFinish={canFinish ? onResolve : null}
       onCloseTask={canFinish && givenTask ? onCloseTask ?? null : null}
+      onStopRepeating={repeat ? repeat.onEnd : null}
       onReopen={!canFinish && !agent ? onReopenDone ?? null : null}
       onRunNow={waiting && onRunNow ? onRunNow : null}
       onLater={canFinish ? onSnooze ?? null : null}

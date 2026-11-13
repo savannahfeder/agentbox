@@ -168,7 +168,6 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   // are kept in the member's own record, so a member is held to them as to a plan.
   const teamKey = (id) => `ledger/teams/${id}.json`;
   const teamAllot = (trial) => (trial ? teamPlan.trialHoursPerMember : teamPlan.hoursPerSeat) * 3600;
-  const teamAgents = (trial) => (trial ? teamPlan.trialAgentsPerMember : teamPlan.agentsPerSeat);
   const teamUsedOf = (rec, id, trial, t) => (trial ? rec.teamTrialUsed?.[id] || 0 : rec.teamUsed?.[id]?.[month(t)] || 0)
     + live(rec, 'run').filter((s) => s.team === id && !!s.trial === trial).reduce((sum, s) => sum + (t - (trial ? s.at : Math.max(s.at, monthStart(t)))) / 1000, 0);
   // A team's run ends once its person's own hours are spent; the sweep ends it when the trial or the team does.
@@ -184,12 +183,14 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     const neverPaid = bill.stripe?.status === 'past_due' && bill.stripe.paid === false;
     const seats = bill.plan === 'team' && PAYING.has(bill.stripe?.status) && !neverPaid ? Math.max(0, Math.floor(Number(bill.seats)) || 0) : 0;
     const endsAt = Number(team.createdAt) + teamPlan.trialDays * DAY_MS;
-    const trial = !seats && t < endsAt;
+    // A card taken in the trial is not yet a charge: its seats wait for `active`,
+    // and a late charge after the free days keeps the trial rather than nothing.
+    const trial = seats ? bill.stripe.status === 'trialing' : t < endsAt;
     if (!seats && !trial) return null;
     const members = team.members.filter((m) => PERSON.test(m));
     const tm = {
       id: team.id, trial, seats, endsAt: trial ? endsAt : null, members: members.length, owner: (team.owners || []).includes(person),
-      agents: teamAgents(trial), seconds: teamAllot(trial),
+      seconds: teamAllot(trial),
     };
     if (!people) return tm;
     const recs = await Promise.all(members.map(async (m) => [m, m === person ? null : await recOf(m).catch(() => fresh())]));
@@ -355,7 +356,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       ...(onFree(rec) ? { free: { agents: free.agents, hours: free.hours, usedSeconds: Math.min(free.hours * 3600, Math.round(rec.freeUsed || 0)) } } : {}),
       // Hours and agents are this person's own; `people` is every member's, this one's included.
       ...(tm ? { team: {
-        trial: tm.trial, endsAt: tm.endsAt, seats: tm.seats, members: tm.members, owner: tm.owner, agents: tm.agents, running: teamRunning(tm, rec),
+        trial: tm.trial, endsAt: tm.endsAt, seats: tm.seats, members: tm.members, owner: tm.owner, agents: null, running: teamRunning(tm, rec),
         hours: tm.seconds / 3600, usedSeconds: Math.min(tm.seconds, Math.round(teamUsedOf(rec, tm.id, tm.trial, t))),
         ...(tm.people ? { people: tm.people.map(({ id, rec: r }) => {
           const of = r ?? rec;
@@ -379,10 +380,11 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     } else if (pays === 'team') {
       if (!teamLeft(team, rec, t)) {
         const h = team.seconds / 3600;
-        const next = team.trial ? (team.owner ? ' Pay for the team on Plan and Billing to keep running agents there.' : ' Your team\'s owner can pay for the team to keep running agents there.') : '';
+        const next = !team.trial ? ''
+          : team.seats ? ` Your team's ${teamPlan.hoursPerSeat} hours each start when the trial ends.`
+            : team.owner ? ' Pay for the team on Plan and Billing to keep running agents there.' : ' Your team\'s owner can pay for the team to keep running agents there.';
         return { ok: false, error: 'hours', message: `${team.trial ? `Your ${h} trial hours` : `This month's ${h} cloud hours`} are used.${next}` };
       }
-      if (teamRunning(team, rec) >= team.agents) return { ok: false, error: 'agents', message: `All ${team.agents} of your cloud agents are running.` };
     } else {
       if (freeSpent(rec, t)) return { ok: false, error: 'plan', message: `Your ${free.hours} free cloud hours are used. Choose a cloud plan to keep running agents there.` };
       if (live(rec, 'run').filter((s) => s.free).length >= free.agents) return { ok: false, error: 'agents', message: 'Both of your free cloud agents are running.' };
