@@ -12,6 +12,7 @@
 // team keeps the trial's hours until Stripe says it is active.
 import { describe, it, expect } from 'vitest';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
@@ -128,10 +129,12 @@ describe('a team that adds its card in the trial', () => {
     const { as, webhook, tick } = setup();
     await webhook('trialing');
     const b = as(B);
-    await b.start(1); await b.start(2);
-    tick((TEAM.trialHoursPerMember / 2) * HOUR + 60_000);
-    await b.finish(1); await b.finish(2);
-    const next = (await b.start(3)).body;
+    // Five-hour runs side by side, each under the 8-hour run ceiling.
+    const runs = Array.from({ length: TEAM.trialHoursPerMember / 5 }, (_, i) => i + 1);
+    for (const n of runs) await b.start(n);
+    tick(5 * HOUR + 60_000);
+    for (const n of runs) await b.finish(n);
+    const next = (await b.start(100)).body;
     expect(next).toMatchObject({ ok: false, error: 'hours' });
     expect(next.message).toBe(`Your ${TEAM.trialHoursPerMember} trial hours are used. Your team's ${TEAM.hoursPerSeat} hours each start when the trial ends.`);
   });
@@ -182,9 +185,20 @@ describe('what the screens say', () => {
     expect(planKey(seen(trial))).not.toBe(planKey(seen({ ...trial, seats: 2 })));
   });
 
-  it('the setup sells Pro by hours, and says what the trial gives', () => {
+  // The founder, on the purchase page: it "doesn't tell me how many cloud hours I
+  // get", "these actually don't say how much Pro normally costs", "anything on the
+  // right side gets ignored". The free week and the paid month now sit side by side
+  // on the left, and the trial is 50 hours, not 10 ("10 cloud hours for pro is very
+  // bad given free is 5. should be more like 50").
+  it('the purchase page shows the free week beside the paid month, on the left', () => {
     const pro = SETUP_PLANS.find((p) => p.id === 'pro')!;
     expect(pro.sub).not.toMatch(/\d+ cloud agents at once/);
-    expect(PRO_PITCH.terms).toBe(`${TEAM.trialHoursPerMember} cloud hours each in the trial, then $${TEAM.dollarsPerSeat} a month. Cancel any time.`);
+    expect(TEAM.trialHoursPerMember).toBe(50);
+    expect(PRO_PITCH.trial).toEqual({ label: 'First 7 days', price: 'Free', line: '50 cloud hours to try' });
+    expect(PRO_PITCH.paid).toEqual({ label: 'Then', price: '$40', per: 'a month', line: '400 cloud hours a month' });
+    expect(PRO_PITCH.terms).toBe('Cancel any time.');
+    const split = fs.readFileSync(new URL('../renderer/src/components/SetupSplit.tsx', import.meta.url), 'utf8');
+    expect(split).toMatch(/PRO_PITCH\.trial/);
+    expect(split).toMatch(/PRO_PITCH\.paid/);
   });
 });

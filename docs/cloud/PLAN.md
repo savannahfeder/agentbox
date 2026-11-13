@@ -428,10 +428,11 @@ at AgentCore's published rates. The plan limits are set from these.
 ### The team plan (the owner, 2026-11-06; to build for 2026-11-17)
 
 - **Trial:** every team gets 7 days from the day it was made (14 until
-  2026-11-10). Each member has 10 cloud hours of their own. No card. It
-  replaces each member's own 5 free hours while it lasts; it does not add to
-  them. A card added in the trial is charged when the trial ends, and until
-  that charge clears the team keeps the trial's 10 hours, not a seat's 400
+  2026-11-10). Each member has 50 cloud hours of their own (10 until
+  2026-11-13: "10 cloud hours for pro is very bad given free is 5"). No card.
+  It replaces each member's own 5 free hours while it lasts; it does not add
+  to them. A card added in the trial is charged when the trial ends, and until
+  that charge clears the team keeps the trial's 50 hours, not a seat's 400
   (2026-11-13: a trialing team had 400 hours a member and could cancel).
 - **Paying:** $40 a member a month (Stripe price `agentbox_cloud_team_monthly`,
   quantity = members). Each seat is the $40 cloud plan's 400 hours a month for

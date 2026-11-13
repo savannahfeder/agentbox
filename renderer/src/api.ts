@@ -1747,8 +1747,8 @@ export const api = {
       if (['team-trial', 'team-trial-card', 'team'].includes(params.get('cloudplan') ?? '')) {
         const trial = params.get('cloudplan') !== 'team';
         const card = params.get('cloudplan') === 'team-trial-card';
-        // Each person's own hours: 10 on the trial, a seat's 400 a month once paid; &spent=1 has yours used up.
-        const each = trial ? 10 : 400;
+        // Each person's own hours: 50 on the trial, a seat's 400 a month once paid; &spent=1 has yours used up.
+        const each = trial ? 50 : 400;
         const used = (mine: number) => (params.has('spent') ? each : mine) * 3600;
         const people = [
           { id: 'p1', name: 'Sam Rivera', usedSeconds: used(trial ? 4.2 : 96), running: params.has('spent') ? 0 : 1 },

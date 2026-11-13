@@ -44,17 +44,20 @@ export const SETUP_PLANS: Array<{ id: SetupPlan; name: string; price: string; pe
   { id: 'pro', name: 'Pro', price: `$${TEAM.dollarsPerSeat}`, per: 'a month', tag: `${TEAM.trialDays} days free`, sub: `Your team, plus ${TEAM.hoursPerSeat} cloud hours each` },
 ];
 
-/** The purchase page's words: what Pro brings in three lines, the cloud computer first, the price in one quiet line.
+/** The purchase page's words: what Pro brings in three lines, the cloud computer first, then the free week beside the paid month.
  *  components/ProShowcase.tsx draws one card for each line, in this order. */
 export const PRO_PITCH = {
   head: 'Upgrade to Pro.',
   perks: [
     { id: 'cloud', title: 'A computer for every agent' },
-    { id: 'team', title: 'Your team in one inbox' },
+    { id: 'team', title: 'Share threads and tasks with your team' },
     { id: 'files', title: 'Files saved in the cloud' },
   ],
+  // The free week beside the paid month, so the trial's hours are never read as the plan's.
+  trial: { label: `First ${TEAM.trialDays} days`, price: 'Free', line: `${TEAM.trialHoursPerMember} cloud hours to try` },
+  paid: { label: 'Then', price: `$${TEAM.dollarsPerSeat}`, per: 'a month', line: `${TEAM.hoursPerSeat} cloud hours a month` },
   cta: `Try Pro free for ${TEAM.trialDays} days`,
-  terms: `${TEAM.trialHoursPerMember} cloud hours each in the trial, then $${TEAM.dollarsPerSeat} a month. Cancel any time.`,
+  terms: 'Cancel any time.',
 };
 
 const SHOWCASE_FILL = ['Fix the flaky date picker test', 'Add a health check endpoint', 'Profile the slowest page', 'Port the cron jobs to the queue', 'Write tests for the refund flow', 'Speed up the search index build'];

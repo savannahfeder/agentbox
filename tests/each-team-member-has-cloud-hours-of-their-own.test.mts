@@ -2,7 +2,8 @@
 //
 // The owner's plan for the multiplayer launch: every team gets 7 days free
 // (14 until 2026-11-10, when she cut Pro's trial to 7),
-// each member with 10 cloud hours of their own; then $40 a member a month,
+// each member with 50 cloud hours of their own (10 until 2026-11-13: "10 cloud
+// hours for pro is very bad given free is 5"); then $40 a member a month,
 // each seat the $40 cloud plan's 400 hours (2026-11-08, replacing one pool for
 // the whole team: three power testers ran a shared pool dry and could not tell
 // who had). Hours are the only limit, never how many run at once (2026-11-13,
@@ -27,6 +28,14 @@ const HOUR = 60 * 60_000;
 const DAY = 24 * HOUR;
 const MADE = Date.UTC(2026, 10, 17, 9, 0, 0);
 const SET = { ...PLANS, pro: { agents: 10, hoursPerMonth: 100, dollarsPerMonth: 40 } };
+// A member's whole trial as five-hour runs side by side, each under the 8-hour run ceiling.
+const TRIAL_RUNS = TEAM.trialHoursPerMember / 5;
+const ids = (first: number) => Array.from({ length: TRIAL_RUNS }, (_, i) => first + i);
+async function spendTrial(p: { start: (n: number) => Promise<unknown>; finish: (n: number) => Promise<unknown> }, tick: (ms: number) => void, first: number) {
+  for (const n of ids(first)) await p.start(n);
+  tick(5 * HOUR);
+  for (const n of ids(first)) await p.finish(n);
+}
 
 function setup({ members = [A, B], owners = [A], madeAt = MADE, start = MADE + HOUR } = {}) {
   let clock = start;
@@ -66,8 +75,8 @@ function setup({ members = [A, B], owners = [A], madeAt = MADE, start = MADE + H
 }
 
 describe('the trial', () => {
-  it('is 7 days and 10 hours a member; a seat is 400 hours', () => {
-    expect(TEAM).toEqual({ trialDays: 7, trialHoursPerMember: 10, hoursPerSeat: 400, dollarsPerSeat: 40 });
+  it('is 7 days and 50 hours a member; a seat is 400 hours', () => {
+    expect(TEAM).toEqual({ trialDays: 7, trialHoursPerMember: 50, hoursPerSeat: 400, dollarsPerSeat: 40 });
   });
 
   it('runs a member with no plan on their own trial hours, not on their free hours', async () => {
@@ -77,16 +86,14 @@ describe('the trial', () => {
     tick(HOUR);
     await a.finish(1);
     const me = await a.me();
-    expect(me.team).toMatchObject({ trial: true, hours: 10, agents: null, usedSeconds: 3600, endsAt: MADE + 7 * DAY, owner: true });
+    expect(me.team).toMatchObject({ trial: true, hours: 50, agents: null, usedSeconds: 3600, endsAt: MADE + 7 * DAY, owner: true });
     expect(me.free.usedSeconds).toBe(0);
   });
 
   it("one member spending all their hours leaves the other member's untouched", async () => {
     const { as, tick } = setup();
     const a = as(A); const b = as(B);
-    await a.start(1); await a.start(6);
-    tick(5 * HOUR);
-    await a.finish(1); await a.finish(6);
+    await spendTrial(a, tick, 100);
     expect((await a.start(7)).body).toMatchObject({ ok: false, error: 'hours' });
     expect((await b.me()).team.usedSeconds).toBe(0);
     expect((await b.start(2)).body.ok).toBe(true);
@@ -105,11 +112,11 @@ describe('the trial', () => {
   it('spent, refuses the next run and says whose hours are used and who can pay, never falling to the free hours', async () => {
     const { as, tick } = setup();
     const a = as(A); const b = as(B);
-    await a.start(1); await a.start(4); tick(5 * HOUR); await a.finish(1); await a.finish(4);
+    await spendTrial(a, tick, 100);
     const owner = await a.start(3);
     expect(owner.body).toMatchObject({ ok: false, error: 'hours' });
-    expect(owner.body.message).toBe('Your 10 trial hours are used. Pay for the team on Plan and Billing to keep running agents there.');
-    await b.start(5); await b.start(8); tick(5 * HOUR); await b.finish(5); await b.finish(8);
+    expect(owner.body.message).toBe('Your 50 trial hours are used. Pay for the team on Plan and Billing to keep running agents there.');
+    await spendTrial(b, tick, 200);
     expect((await b.start(9)).body.message).toMatch(/owner can pay/);
     expect((await a.me()).free.usedSeconds).toBe(0);
   });
@@ -117,7 +124,7 @@ describe('the trial', () => {
   it('spent, gives no upload link for a run, and no room to the phone', async () => {
     const { gw, as, tick } = setup();
     const a = as(A);
-    await a.start(1); await a.start(4); tick(5 * HOUR); await a.finish(1); await a.finish(4);
+    await spendTrial(a, tick, 100);
     expect((await a.call('POST', '/v1/link', { op: 'put', key: 'runs/r9/in.bundle', seconds: 600 })).status).toBe(403);
     expect(await gw.room(A)).toMatchObject({ ok: false, error: 'hours' });
   });
@@ -150,7 +157,7 @@ describe('the trial', () => {
   it("runs that outlast a member's hours end at the next call", async () => {
     const { as, tick, stopped } = setup();
     const a = as(A);
-    await a.start(1); await a.start(2);
+    for (const n of ids(1)) await a.start(n);
     tick(5 * HOUR + 60_000);
     await a.poll(1);
     expect(stopped()).toEqual(expect.arrayContaining([`u-${A}-run-1`, `u-${A}-run-2`]));
