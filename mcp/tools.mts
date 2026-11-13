@@ -25,7 +25,7 @@ import { readTeammates, readTeamView, teamDir } from '../main/store/teammates-fi
 import { legacyRoot } from '../main/store/project.mts';
 import { listProductChats, readProductChat } from './core/chat.mts';
 import { lookAtPage } from './core/page.mts';
-import { askToSignIn, waitForSignIn, WAIT_MS } from './core/sign-in.mts';
+import { askToSignIn, keepAfterSignIn, waitForSignIn, WAIT_MS } from './core/sign-in.mts';
 import { WORK_ITEM_STATUSES } from '../shared/work-items.mts';
 import { CONTEXT_WORDS, DONE_STEPS, DONE_STEP_WORDS, SUMMARY_WORDS } from '../shared/thread-cards.mts';
 import { AGENT_CREATION_KINDS } from '../shared/contracts.mts';
@@ -320,7 +320,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         labels: z.array(z.string()).optional(),
         runAt: z.number().int().optional().describe('epoch ms to defer this item until; 0 clears a schedule and makes it available now'),
         closeBecause: z.string().optional().describe('only with status done on a row the founder wrote: their own words, quoted exactly from the row, asking you to close it'),
-        deferBecause: z.string().optional().describe('only with runAt on a row the founder wrote: their own words, quoted exactly from the row, asking for it to be put off or to be reminded later. Without them the row stays in their inbox'),
+        deferBecause: z.string().optional().describe('only with runAt on a row the founder wrote: their own words, quoted exactly from the row, asking for it to be put off or to be reminded later. Without them the row stays in their inbox. A reminder starts NO run; words asking for work at a time ("continue at 1:30") start a run then, and the answer\'s `saved` says which was kept'),
         toAnAgentBecause: z.string().optional().describe('on a thread of theirs that went to a teammate when it should not have: their own words, quoted exactly from the row, saying so. The thread then goes to an ordinary agent, as their "Give it to someone else" would, and its next turn is not the teammate\'s'),
         problem: z.string().optional().describe(`the summary's CONTEXT: a few plain sentences, ${CONTEXT_WORDS} words at most, about the whole thread for someone who has forgotten it. It says what the thread is about: what was asked for and why, in the words the person would use. Not where it stands or the latest round, which the answer gives`),
         progress: z.string().optional().describe(`the summary's DONE list: the steps taken so far, one per line, oldest first and newest last, ${DONE_STEPS} lines at most of ${DONE_STEP_WORDS} words each. Send the whole list each time; it replaces the last one. Every line is a step that FINISHED: one you are about to take goes on after it happens, never before`),
@@ -363,7 +363,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
     },
     {
       name: 'create_repeating_task',
-      description: 'Make a new repeating task, exactly as the person would with the When menu: every day, every weekday, or one day a week, at a local time. Each run is its own thread briefed with your instruction, so write it for an agent that has seen nothing of this conversation. Use it when the person asks for something to happen regularly, rather than telling them to set it up by hand. Every run spends their plan, so only make one they asked for or agreed to. It runs on the same coding agent and model as this thread. The first run starts within a minute unless startNow is false; then it waits for its next time.',
+      description: 'Make a new repeating task, exactly as the person would with the When menu: every day, every weekday, or one day a week, at a local time. Each run is its own thread briefed with your instruction, so write it for an agent that has seen nothing of this conversation. Use it when the person asks for something to happen regularly, rather than telling them to set it up by hand. Every run spends their plan and starts on its own as their request, so on a thread it is made only with their own words there asking for something regular, quoted in askedBecause. It runs on the same coding agent and model as this thread. The first run starts within a minute unless startNow is false; then it waits for its next time.',
       schema: {
         product: z.string().optional().describe('which product it runs in; defaults to this thread\'s'),
         title: z.string().describe('the short name it is listed under, such as "Daily security review"'),
@@ -372,6 +372,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         at: z.string().describe('local time, 24-hour "HH:MM", such as "09:00"'),
         on: z.enum(['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']).optional().describe('the day, when every is week'),
         startNow: z.boolean().optional().describe('false to wait for its first time instead of running now'),
+        askedBecause: z.string().optional().describe('on a thread: the person\'s own words on it asking for this to happen regularly, quoted exactly, such as "Daily 9am, audit Mondays 10am". Without them nothing is made'),
       },
       run: (ask: NewRepeatingTask) => json(createRepeatingTask(ask, thisRun())),
     },
@@ -592,8 +593,15 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         await keepCloudKey(keep.name, keep.value);
         return json({ status: 'kept', message: `Kept as ${keep.name} for every later cloud run.` });
       }
-      if (finished) return json({ status: 'closed', message: 'The card is gone. Carry on.' });
-      return json(await waitForSignIn(id, asked.id, { product }));
+      const inCloud = typeof keepCloudKey === 'function';
+      const withKeep = <T extends { message: string }>(out: T, finishing = false): T => {
+        if (!inCloud) return out;
+        const k = keepAfterSignIn(asked.service, { finishing });
+        return { ...out, ...(k.keep ? { keep: k.keep } : {}), message: `${out.message} ${k.message}` };
+      };
+      if (finished) return json(withKeep({ status: 'closed', message: 'The card is gone.' }));
+      const said = await waitForSignIn(id, asked.id, { product });
+      return json(said.status === 'signed_in' ? withKeep(said) : said.status === 'landed' ? withKeep(said, true) : said);
     },
   });
 

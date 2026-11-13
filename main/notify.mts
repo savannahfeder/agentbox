@@ -210,7 +210,12 @@ export function createNotifier({ window, Notification, powerMonitor, icon = null
 interface NotifyPayload { arrivals?: unknown; needsYou?: unknown }
 const needsYouOf = (payload: NotifyPayload): unknown[] => (Array.isArray(payload.needsYou) ? payload.needsYou : []);
 
+/** The Mac's own notification settings, where Agentbox is allowed or not. */
+export const NOTIFY_SETTINGS_URL = 'x-apple.systempreferences:com.apple.Notifications-Settings.extension';
+
 export interface InstallNotifierOptions {
+  /** Opens a system settings address; the Mac's banner settings, here. */
+  openExternal?: (url: string) => unknown;
   app: { getAppPath(): string };
   window: BrowserWindow;
   Notification: typeof ElectronNotification;
@@ -221,7 +226,8 @@ export interface InstallNotifierOptions {
   onChange?: () => void;
 }
 
-export function installNotifier({ app, window, Notification, powerMonitor, ipcMain, nativeImage, onArrivals = () => {}, onChange = () => {} }: InstallNotifierOptions) {
+export function installNotifier({ app, window, Notification, powerMonitor, ipcMain, nativeImage, openExternal = () => {}, onArrivals = () => {}, onChange = () => {} }: InstallNotifierOptions) {
+  ipcMain.handle('zero:notify-settings', () => { void openExternal(NOTIFY_SETTINGS_URL); return null; });
   if (Notification.isSupported && !Notification.isSupported()) {
     ipcMain.handle('zero:notify', (_e, payload: NotifyPayload = {}) => { try { onArrivals(Array.isArray(payload.arrivals) ? payload.arrivals : [], needsYouOf(payload)); } catch {} });
     ipcMain.handle('zero:notify-test', () => null);

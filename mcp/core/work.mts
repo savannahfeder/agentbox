@@ -286,6 +286,24 @@ function toAnAgent(before: WorkItem | null, words: unknown): { patch: RoutedPatc
 
 const DEFERRED_AS_AGENT = 'The put-off was saved as YOURS, not theirs, so the thread runs again then, and stays in their inbox meanwhile if your answer offers options: the words in deferBecause are not ones they wrote on this row. If they did ask for it to be put off, send runAt again with deferBecause set to their exact words.';
 
+// "Continue at 1:30 pm" asks for work then, and a moment saved as theirs never
+// starts a run (`wakesItselfAt`), so such words keep the moment as the agent's.
+// "Remind me" wins over a work verb: "remind me to continue at 3" is a reminder.
+const ASKS_TO_BE_REMINDED = /\b(remind|reminder|snooze|bring (it|this) back|show (it|this|me))\b/i;
+const ASKS_FOR_WORK = /\b(continue|start|restart|run|rerun|resume|pick (it|this|that|them) (back )?up|carry on|keep going|get (back )?(on|to) (it|this)|do (it|this|that)|work on|try again|retry|finish)\b/i;
+
+export function asksForWorkThen(words: unknown): boolean {
+  const said = plainly(words);
+  return ASKS_FOR_WORK.test(said) && !ASKS_TO_BE_REMINDED.test(said);
+}
+
+function savedAs(at: number, runs: boolean): string {
+  const when = new Date(at).toISOString();
+  return runs
+    ? `Saved: this thread starts again on its own at ${when}, and a run picks it up then.`
+    : `Saved: this row comes back to their inbox at ${when} and NO run starts. Do not tell them it will run. If they asked for work at that time, send runAt again without deferBecause.`;
+}
+
 /*
  * A SUMMARY LINE IS SHORT ENOUGH TO READ (w-b51b2e1c86). An agent's problem,
  * progress or solution over SUMMARY_WORDS words is taken out of the write and
@@ -524,7 +542,8 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder }: { he
       }
       let theirMoment = 0;
       let deferredAsAgent = null;
-      if (deferBecause !== undefined && Number.isFinite(asked.runAt) && (asked.runAt as number) > 0) {
+      const moment = Number.isFinite(asked.runAt) && (asked.runAt as number) > 0 ? asked.runAt as number : 0;
+      if (deferBecause !== undefined && moment && !asksForWorkThen(deferBecause)) {
         const before = readWorkItem(holding.dir, id);
         if (herRow(before) && saidToClose(before, deferBecause)) {
           theirMoment = asked.runAt as number;
@@ -563,6 +582,9 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder }: { he
       // On the app's authority, as their own pick is (main/store.mts routeItem).
       if (leaving && 'patch' in leaving) item = updateWorkItem(holding.dir, id, leaving.patch, { source: 'system' });
 
+      // Read off the row as written: a moment they set earlier outranks the agent's.
+      const saved = moment ? { saved: savedAs(item?.runAt ?? moment, item?.wrote?.runAt?.source !== 'founder') } : {};
+
       // FINISHING A ROW GIVES THE CLAIM BACK NOW, not in five minutes. It used
       // to drop the row from this map and leave the claim line standing, so the
       // ledger went on reading "held by <this session>" for a full lease after
@@ -585,9 +607,9 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder }: { he
           holding.live = false;
           stopTimer();
         }
-        return { ...item, leftOpen: LEFT_OPEN, ...deferredAsAgent, ...notGiven, ...summaryTooLong, ...(reopened ? { reopened: REOPENED } : {}) };
+        return { ...item, leftOpen: LEFT_OPEN, ...deferredAsAgent, ...saved, ...notGiven, ...summaryTooLong, ...(reopened ? { reopened: REOPENED } : {}) };
       }
-      return { ...item, ...deferredAsAgent, ...notGiven, ...summaryTooLong, ...(reopened ? { reopened: REOPENED } : {}) };
+      return { ...item, ...deferredAsAgent, ...saved, ...notGiven, ...summaryTooLong, ...(reopened ? { reopened: REOPENED } : {}) };
     },
 
     release(id) {

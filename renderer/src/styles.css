@@ -248,6 +248,7 @@
   --artifact-corner: 10px;
   --artifact-corner-small: 6px;
   --radius: var(--artifact-corner-small);
+  --pill: 999px;
   /* An AI teammate is round like a person; its dashed ring tells it apart. */
   --mate-corner: 50%;
   --tag-radius: var(--radius);
@@ -9226,6 +9227,9 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
    plain white slab on the light theme. The `:root[data-skin] .modal.compose`
    block says the rest.
 */
+/* A dialog of its own, not a list dropping from the top like the command bar. */
+.modal-backdrop.fp-backdrop { place-items: center; padding-top: 0; }
+
 .fp-card {
   width: min(560px, 92vw);
   display: flex;
@@ -9454,7 +9458,7 @@ button.msg-kind:hover { color: var(--text); border-color: var(--text-faint); }
 .msg.yours:has(> .msg-head > .msg-kind) .msg-body { font-size: 15px; line-height: 1.6; font-weight: 400; }
 
 /* A thread a teammate gave you, above its title (team/HandedBy.tsx). */
-.handed-line { display: flex; align-items: center; gap: 9px; min-width: 0; margin: 4px 0 18px; padding: 10px 14px; background: var(--bg-raised); border: 1px solid var(--line); font-size: 14px; color: var(--text-dim); }
+.handed-line { display: flex; align-items: center; gap: 9px; min-width: 0; margin: 4px 0 18px; padding: 10px 14px; background: var(--bg-raised); border: 1px solid var(--line); border-radius: 10px; font-size: 14px; color: var(--text-dim); }
 .handed-line b { font-weight: 500; color: var(--text); }
 .handed-who { flex: 0 0 auto; white-space: nowrap; }
 .handed-when { color: var(--text-faint); margin-left: 4px; }

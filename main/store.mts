@@ -35,7 +35,7 @@ import {
   CODEX_IMPORT_LABEL, NOT_IMPORTED_LABEL, codexIdOf, codexImportRow, codexMirrorPatch, isCodexImportRow, isCodexMirrorRow,
   productsForThread, threadsNeedingRows as codexThreadsNeedingRows,
 } from '../shared/codex-import.mts';
-import { buildClaimLine, buildReleaseLine, GIVEN_TASK } from '../shared/work-items.mts';
+import { buildClaimLine, buildReleaseLine, GIVEN_TASK, type LinkComment } from '../shared/work-items.mts';
 import { isEffortWord } from '../shared/effort-levels.mts';
 import { shippedNote } from '../shared/shipped-note.mts';
 import { notShipped } from '../shared/not-shipped.mts';
@@ -1112,7 +1112,7 @@ export class Store {
   // (main/team/link-comments.mts). Said as a note; a closed thread comes back
   // to wait on her as `closedBeforeItShipped` brings one, and a thread still
   // going is left going.
-  commentOnASharedFile(slug: string, id: string, note: string, linkComment: { name: string; file: string; text: string } | null = null) {
+  commentOnASharedFile(slug: string, id: string, note: string, linkComment: LinkComment | null = null) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
     const item = workItemsDisk.updateWorkItem(dir, id, { note, ...(linkComment ? { linkComment } : {}) }, { source: 'system' });
@@ -1248,6 +1248,7 @@ export class Store {
       name: PRACTICE_NAME,
       createdAt: new Date().toISOString(),
       [PRACTICE_FLAG]: true,
+      seenBy: 'private',
     }, null, 2));
     // AND THE SIDEBAR NOTE IS WRITTEN WITH IT.
     //

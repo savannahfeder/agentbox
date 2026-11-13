@@ -29,6 +29,8 @@ export interface InboxItem {
   snoozedUntil?: number;
   /** Teammates' comments its owner has not yet dealt with (shared/work-items.mts). */
   waitingComments?: { by: string; ts: number; text: string }[];
+  /** Comments on its shared links its owner has not yet dealt with. */
+  linkComments?: { name: string; file: string; text: string; ts: number }[];
   /** 'later' while a thread sits in Later, written down and not begun. */
   start?: 'later' | 'now';
   /** The thread this one was filed under: what makes it a proposal. */
@@ -166,6 +168,20 @@ export function waitCameBack(i: InboxItem & { waitEnded?: { at: number } }): boo
   return !!i.waitEnded && i.status !== 'done' && i.waitEnded.at > herLastWord(i);
 }
 
+/**
+ * A teammate's comment waits on you. On a thread you closed it is news to read
+ * once: opening the thread after it settles it. `seen`: when you last opened it.
+ */
+export function commentsWaitOnYou(i: Pick<InboxItem, 'status' | 'waitingComments'>, seen = 0): boolean {
+  const said = i.waitingComments ?? [];
+  if (!said.length) return false;
+  return i.status !== 'done' || said.some((c) => c.ts > seen);
+}
+
+/** A teammate's words it has not dealt with, or comments on its links: either holds it in Needs you. */
+export const wordsWait = (i: Pick<InboxItem, 'status' | 'waitingComments' | 'linkComments'>, seen = 0): boolean =>
+  commentsWaitOnYou(i, seen) || !!i.linkComments?.length;
+
 // The only copy of the inbox membership rule. Do not duplicate it: call this.
 //
 // `deliveredThrough`: answers finished before this moment stay in Done, so
@@ -182,13 +198,14 @@ export function waitCameBack(i: InboxItem & { waitEnded?: { at: number } }): boo
 // `stopped`: the supervisor will not start it again on its own
 // (`supervisor.stalled`), so a person has to, and Needs you is the list they
 // read.
+// `seen`: when the person last opened the row (`commentsWaitOnYou`).
 export function belongsInInbox(
   i: InboxItem,
-  { deliveredThrough = 0, hiddenUntil = 0, now = Date.now(), live = false, shipping = false, asking = false, waitingOn = [] as readonly string[], stopped = false } = {},
+  { deliveredThrough = 0, hiddenUntil = 0, now = Date.now(), live = false, shipping = false, asking = false, waitingOn = [] as readonly string[], stopped = false, seen = 0 } = {},
 ): boolean {
   // A teammate's words wait for you whatever the thread is doing, a running
   // agent included (`waitingComments`, shared/work-items.mts).
-  if (i.waitingComments?.length) return true;
+  if (wordsWait(i, seen)) return true;
   // In Later and not begun: it waits for a person, not a clock, so it is in
   // Later and nowhere else.
   if (notStarted(i)) return false;
@@ -418,6 +435,8 @@ export function stoppable(
   i: InboxItem,
   { deferredUntil = 0, now = Date.now(), live = false, stopped = false } = {},
 ): boolean {
+  // The header says Done for a done row, so a session still closing on it is not offered as a run to stop.
+  if (i.status === 'done') return false;
   return belongsInProgress(i, { deferredUntil, now, live, stopped });
 }
 

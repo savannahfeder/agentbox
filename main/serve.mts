@@ -224,6 +224,7 @@ export function answerWhatOnlyTheWindowAnswered(ipcMain: CollectingIpcMain) {
   ipcMain.handle('zero:corner-tag', () => null);
   ipcMain.handle('zero:notify', () => null);
   ipcMain.handle('zero:notify-test', () => null);
+  ipcMain.handle('zero:notify-settings', () => null);
   ipcMain.handle('zero:boot-info', () => ({ reloaded: false, builtAt: null, recovered: null }));
   // A room invite link only ever opens the desktop app.
   ipcMain.handle('zero:take-join', () => null);

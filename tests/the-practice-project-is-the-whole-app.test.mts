@@ -614,7 +614,8 @@ describe('the introduction, in front of the app', () => {
     // FIVE since w-ec62ab6b38 (2026-09-28): the rebuilt folder list takes Enter too.
     // FOUR since w-9e434e8671: the theme picker and its row of arrows are gone.
     const src = fs.readFileSync(new URL('../renderer/src/components/Onboarding.tsx', import.meta.url), 'utf8');
-    expect(src.match(/setTimeout\(\(\) => window\.addEventListener\('keydown', on\), 0\)/g) ?? [])
+    // The last card listens in the capture phase so its N beats Home's focused box.
+    expect(src.match(/setTimeout\(\(\) => window\.addEventListener\('keydown', on(, true)?\), 0\)/g) ?? [])
       .toHaveLength(4);
   });
 });
@@ -704,7 +705,8 @@ describe('the wire between the two halves', () => {
       ['firstRunPracticeEnd', 'zero:first-run-practice-end', 'sweepPractice'],
     ]) {
       expect(api, fn).toMatch(new RegExp(`zero\\?\\.${fn}|zero\\.${fn}`));
-      expect(preload, fn).toMatch(new RegExp(`${fn}: \\(\\) => ipcRenderer\\.invoke\\('${channel}'`));
+      // The walkthrough asks for a bare one (w-fbe5e95dea), so this one takes options.
+      expect(preload, fn).toMatch(new RegExp(`${fn}: \\((opts)?\\) => ipcRenderer\\.invoke\\('${channel}'`));
       expect(ipc, channel).toMatch(new RegExp(`ipcMain\\.handle\\('${channel}'`));
       expect(ipc, method).toMatch(new RegExp(`store\\.${method}\\(`));
     }
@@ -718,6 +720,6 @@ describe('the wire between the two halves', () => {
     // task they send themselves lands in their own project. The walk opens the
     // real new thread card since 2026-10-01, and that card is told which
     // project to open on rather than being handed a prefill with one inside it.
-    expect(app).toMatch(/defaultProduct=\{walkCard \? \(run!\.practice \?\? run!\.product\) : projectOnScreen\(\{ filter: productFilter, open: focused \}\)\}/);
+    expect(app).toMatch(/defaultProduct=\{walkCard \? \(run!\.practice \?\? run!\.product\) : (tourTask \?\? )?projectOnScreen\(\{ filter: productFilter, open: focused \}\)\}/);
   });
 });

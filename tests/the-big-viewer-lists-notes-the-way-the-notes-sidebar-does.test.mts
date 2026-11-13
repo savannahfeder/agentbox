@@ -58,6 +58,6 @@ describe('the box', () => {
     expect(view).toContain("placeholder={canTag ? 'Add a note, or @ your agent' : 'Add a note'}");
   });
   it('adds a plain note with the return mark, and keeps the words when it goes to someone', () => {
-    expect(view).toMatch(/sendWords === 'Comment' \? <ReturnGlyph \/> : <><NoteGlyph name="send" \/>\{sendWords\}<\/>/);
+    expect(view).toMatch(/buttonWords === 'Comment' \? <ReturnGlyph \/> : <><NoteGlyph name="send" \/>\{buttonWords\}<\/>/);
   });
 });

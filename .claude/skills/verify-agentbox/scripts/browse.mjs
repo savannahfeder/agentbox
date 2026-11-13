@@ -223,8 +223,18 @@ if (verb === 'open') {
     t.detach();
     process.exit(0);
   }
+  // The pointer arriving can move the page (leaving the sidebar slides it back
+  // 164px), and a person aims again at where the thing went.
+  let aim = hit;
+  if (hit?.reachable) {
+    await t.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: hit.x, y: hit.y, button: 'none' });
+    await t.wait(320);
+    waited += 320;
+    const again = await thingAt(t, which, false, false);
+    if (again?.reachable) aim = again;
+  }
   // A real press, because only a real press may start a film with sound.
-  if (hit?.reachable) await mouse(t, hit, { button: verb === 'rightclick' ? 'right' : 'left', times: verb === 'dblclick' ? 2 : 1, mods: held });
+  if (aim?.reachable) await mouse(t, aim, { button: verb === 'rightclick' ? 'right' : 'left', times: verb === 'dblclick' ? 2 : 1, mods: held });
   const said = verb === 'dblclick' ? 'Double-clicked' : verb === 'rightclick' ? 'Right-clicked' : 'Pressed';
   await report(t, hit === null ? `Nothing numbered or named "${which}" on screen. Run look again.`
     : !hit.reachable && verb !== 'click' ? `"${hit.words}" is covered by something else on screen.`
