@@ -58,9 +58,10 @@ describe('the empty Inbox sky', () => {
   });
 
   // "font is a bit hard to read", pinned on the placeholder: it was --text-faint straight on the dots.
-  it('sets the heading and the writing line in a patch of the sky\'s dark, the placeholder a step brighter', () => {
-    expect(css).toMatch(/\.app:has\(> \.inbox-sky-zero\) \.th-start :is\(h2, \.tc-text\),\n\.app:has\(> \.inbox-sky-zero\) \.th-start \.tc-text::placeholder \{\s*text-shadow:[^;]*var\(--sky-under/);
+  // The fix is the text's colour alone. A dark patch behind the words was turned down: "no bg changes".
+  it('draws the placeholder a step brighter, with nothing behind the words', () => {
     expect(css).toMatch(/\.app:has\(> \.inbox-sky-zero\) \.th-start \.tc-text::placeholder \{ color: var\(--text-dim\); \}/);
+    expect(css).not.toMatch(/\.inbox-sky-zero\)[^{]*\{[^}]*text-shadow/);
   });
 
   it('fills the chips and Send so the dots never show through their words', () => {
