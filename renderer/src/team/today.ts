@@ -67,6 +67,8 @@ export interface TodayPerson {
   tasks: TodayLine[];
   /** Private threads they finished: counted, never named. */
   privateDone: number;
+  /** Private threads an agent is on for them in the range: counted, never named. */
+  privateWorking?: number;
 }
 
 export interface TodayCounts { needYou: number; blocked: number; shipped: number; listed?: number }
@@ -243,7 +245,10 @@ export function teamToday({ range, window, now, me, items, products, cards, deci
       if (inRange(c.updatedAt)) { if (named) who.finished.push(line); else who.privateDone += 1; }
       continue;
     }
-    if (!named) continue;
+    if (!named) {
+      if (c.state === 'running' && inRange(c.updatedAt)) who.privateWorking = (who.privateWorking ?? 0) + 1;
+      continue;
+    }
     const on = blockOn(c.blockedBy.map((b) => b.id), who.key);
     if (on) who.blocked.push({ ...line, on });
     else if (inRange(c.updatedAt) && c.state !== 'scheduled') {
@@ -292,7 +297,7 @@ export function teamToday({ range, window, now, me, items, products, cards, deci
       for (const l of list.slice(0, SHOWN)) if (!l.title && l.item) l.title = shownTitle(l.item);
     }
   }
-  const says = (p: TodayPerson) => p.finished.length + p.shipped.length + p.decided.length + p.blocked.length + p.waitingOnYou.length + p.working.length + p.waiting!.length + p.tasks.length + p.privateDone > 0;
+  const says = (p: TodayPerson) => p.finished.length + p.shipped.length + p.decided.length + p.blocked.length + p.waitingOnYou.length + p.working.length + p.waiting!.length + p.tasks.length + p.privateDone + (p.privateWorking ?? 0) > 0;
   return {
     people: all.filter(says),
     quiet: all.filter((p) => p.kind !== 'me' && !says(p)).map(quietName),

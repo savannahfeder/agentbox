@@ -110,6 +110,25 @@ describe('each teammate posts once a day, in a sentence with links', () => {
   });
 });
 
+// A tester's teammate was busy in projects she had not shared: her standup had
+// no post at all, so she read as idle. Private work is counted, never named.
+describe('a teammate working in private projects', () => {
+  const card = (o: Record<string, unknown>) => ({ personId: 'p-dev', visible: false, title: null, state: 'running', project: null, blockedBy: [], blocks: [], people: null, priority: null, progress: null, updatedAt: on(12, 13), ...o });
+  const day = (cards: unknown[]) => teamToday({ ...base, window: standupWindow(on(12, 0), DEFAULT_STANDUP, NOW), items: [], cards: cards as never });
+  it('posts how many private threads they are on, without naming any', () => {
+    const posts = postsOf(day([card({ threadId: 'x1' }), card({ threadId: 'x2' })]).people, { mates: true });
+    const dev = posts.find((p) => p.key === 'person:p-dev')!;
+    expect(words(sentenceOf(dev))).toBe('Working on 2 private threads.');
+  });
+  it('one private thread is said in the singular, beside named work', () => {
+    const posts = postsOf(day([card({ threadId: 'x1' }), card({ threadId: 'n1', visible: true, title: 'Seat picker' })]).people, { mates: true });
+    expect(words(sentenceOf(posts.find((p) => p.key === 'person:p-dev')!))).toBe('Working on [Seat picker] and 1 private thread.');
+  });
+  it('a private thread that last moved before the standup window is not counted', () => {
+    expect(postsOf(day([card({ threadId: 'x1', updatedAt: on(10, 13) })]).people, { mates: true }).map((p) => p.key)).not.toContain('person:p-dev');
+  });
+});
+
 describe('the sentence for every shape of day', () => {
   const line = (title: string) => ({ key: title, title, at: 1 });
   const post = (o: Partial<ReturnType<typeof postsOf>[number]>) => ({ key: 'p', name: 'Dev Patel', kind: 'person' as const, done: [], shipped: [], finished: [], working: [], needs: [], privateDone: 0, ...o });

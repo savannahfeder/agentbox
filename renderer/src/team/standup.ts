@@ -85,6 +85,8 @@ export interface StandupPost {
   /** What is stuck, and on whom. */
   needs: StandupNeed[];
   privateDone: number;
+  /** Private threads an agent is on: counted, never named. */
+  privateWorking?: number;
 }
 
 const byNewest = (a: TodayLine, b: TodayLine) => b.at - a.at;
@@ -101,10 +103,11 @@ function postOf(p: TodayPerson): StandupPost {
     working: g.working.map(titled),
     needs: g.blocked.map((l) => ({ line: titled(l), on: l.on ?? null })),
     privateDone: p.privateDone,
+    privateWorking: p.privateWorking ?? 0,
   };
 }
 
-const says = (p: StandupPost) => p.done.length + p.working.length + p.needs.length + p.privateDone > 0;
+const says = (p: StandupPost) => p.done.length + p.working.length + p.needs.length + p.privateDone + (p.privateWorking ?? 0) > 0;
 
 /** A post per teammate. With AI teammates off, each AI teammate's work joins yours. */
 export function postsOf(people: readonly TodayPerson[], { mates }: { mates: boolean }): StandupPost[] {
@@ -118,6 +121,7 @@ export function postsOf(people: readonly TodayPerson[], { mates }: { mates: bool
     mine.working = [...mine.working, ...m.working].sort(byNewest);
     mine.needs = [...mine.needs, ...m.needs];
     mine.privateDone += m.privateDone;
+    mine.privateWorking = (mine.privateWorking ?? 0) + (m.privateWorking ?? 0);
   }
   return [mine, ...posts.filter((p) => p.kind === 'person')].filter(says);
 }
@@ -143,7 +147,16 @@ export function sentenceOf(p: StandupPost): Part[] {
   say('Shipped', p.shipped);
   say('Finished', p.finished);
   if (!p.shipped.length && !p.finished.length && p.privateDone) out.push(`Finished ${p.privateDone} private ${p.privateDone === 1 ? 'thread' : 'threads'}.`);
-  say('Working on', p.working);
+  const hidden = p.privateWorking ?? 0;
+  if (!hidden) say('Working on', p.working);
+  else {
+    const privately = `${hidden} private ${hidden === 1 ? 'thread' : 'threads'}`;
+    const shown = p.working.slice(0, 2);
+    const rest = p.working.length - shown.length;
+    out.push(out.length ? ' Working on ' : 'Working on ');
+    shown.forEach((l, i) => { if (i) out.push(', '); out.push(l); });
+    out.push(!shown.length ? privately : rest ? `, ${rest} more and ${privately}` : ` and ${privately}`, '.');
+  }
   return out.length ? out : ['Nothing moved.'];
 }
 
