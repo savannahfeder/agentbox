@@ -38,6 +38,9 @@ describe('the shape', () => {
     one((b) => { b.running.pop(); }, 'running: has 18; needs exactly 19');
     one((b) => { b.running[0].cloud = false; }, 'running[0].cloud');
   });
+  it('refuses a key it does not know, which a model leaves behind', () => {
+    one((b) => { b.running_placeholder = null; }, 'running_placeholder: is not part of a brief; remove it');
+  });
   it('refuses something that is not a brief at all', () => {
     expect(checkBrief([], site)[0]).toMatch(/one JSON object/);
     expect(checkBrief(null, site)[0]).toMatch(/one JSON object/);
@@ -99,6 +102,14 @@ describe('the truth about the company', () => {
   });
   it('takes a name everyone knows without a quote', () => {
     expect(problemsWith((b) => { b.sixth.title = 'Retry label purchases when Stripe times out'; })).toEqual([]);
+  });
+  it('refuses a line lifted from the example, which is another company', () => {
+    const other = (b) => { b.company.name = 'Shipfast'; b.grounding[0] = { term: 'Shipfast', quote: 'Shipfast' }; };
+    const s = structuredClone(site); s.pages[0].text += '\nShipfast';
+    const b = example(); other(b);
+    const p = checkBrief(tidyBrief(b), s);
+    expect(p.some((x) => x.startsWith('bug.title: "Fix rounding on multi-parcel rate quotes" is copied from brief.example.json')), p.join('\n')).toBe(true);
+    expect(p.some((x) => x.startsWith('running[4].title: "Speed up the pricing page" is copied')), p.join('\n')).toBe(true);
   });
   it('refuses their current headline', () => {
     one((b) => { b.headlines.lines[2] = 'Shipping that just works'; }, 'headlines.lines[2]: is their current headline');

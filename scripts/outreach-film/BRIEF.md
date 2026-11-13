@@ -3,7 +3,9 @@
 You are filling in the words for a 97-second outreach film. The founder's
 voice, the order of events and everything on screen are fixed. You write only
 what is about this one company, in `brief.json`, shaped exactly like
-`brief.example.json` beside this file. Copy that file and replace every value.
+`brief.example.json` beside this file. That example is a made-up shipping
+company: copy its shape, replace every value, and reuse none of its lines or
+ideas. A line copied from it is refused.
 
 You get two files in the lead's folder: `site.json` (their own site, read by a
 script: each page's title, headings and text) and `lead.json` (who it is for).
@@ -36,10 +38,12 @@ it again. Nothing is filmed until the brief passes.
 ## Accuracy, so nobody has to check it
 
 - Every product, feature, plan, integration or customer type you name must be
-  on their site, spelled as they spell it. Put each one in `grounding` with a
-  quote copied character for character from `site.json` that contains it.
-  The check looks for every quote in the site's text, and for every
-  capitalised name in a title, summary or ask in `grounding` or on the site.
+  on their site, spelled as they spell it. Put each one in `grounding` as
+  `{"term": "<the name>", "quote": "<a sentence from site.json>"}`. The quote
+  is copied character for character from `site.json`, whole words only, and
+  contains the term. The check looks for every quote in the site's text, and
+  for every capitalised word in a title, summary or ask in `grounding` or on
+  the site. The first word of a title or of a sentence does not count.
 - Work from what the site says they build. `lead.json` hints may be wrong.
 - Never invent facts about the company: no customer names, revenue, funding,
   headcount, launch dates or business metrics. Numbers about the agents' own
@@ -74,7 +78,11 @@ it again. Nothing is filmed until the brief passes.
 | `context` | 1 to 3 sentences, each at most 240 characters |
 | `options` | 2 or 3, each at most 40 characters; `bug.options` is 3 and starts with "Merge it" |
 | `migration.change` | 1 to 3 files, 12 to 30 rows of code in all, each row `["+" or "-" or "=", "code"]` at most 100 characters |
-| `maya.ask` | starts "I'm stuck on" |
+| `fourth`, `sixth` | two more threads waiting on you, shaped like `bug`: `fourth` usually in Docs, `sixth` anywhere |
+| `maya.body` | at most 140 characters: what she first asked her agent |
+| `maya.ask` | starts "I'm stuck on", at most 90 characters |
+| `maya.summary` | at most 140 characters: the line her inbox row shows |
+| `maya.context` | 40 to 400 characters, in her agent's voice: what fails, what passes, what she needs |
 | `maya.title` + `maya.comment` | at most 70 characters together, or her inbox row hides the comment |
 | `maya.reply` | 12 to 28 characters of plain keyboard text: the thing that unblocks her |
 | `jordan.title` | starts "Write this week's " (for example "Write this week's Acme changelog") |
@@ -87,8 +95,10 @@ it again. Nothing is filmed until the brief passes.
 
 Three lines, each a real candidate for their homepage, each from a different
 angle (what it is, what it saves, who it is for, the moment it helps). At most
-8 words and 46 characters each, so it sits in their hero like theirs does; the
-film draws each one on their live page and refuses one that wraps further.
+8 words and 46 characters each, so it sits in their hero like theirs does. The
+film draws each one on their live page in their font, and refuses one that
+takes more lines than their own headline (or more than two), or spills out of
+the hero.
 `headlines.why` says in one sentence what each leads with: "The first leads
 with X, the second with Y, and the third with Z."
 

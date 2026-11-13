@@ -14,7 +14,20 @@ const COMMON = new Set(('API APIs SDK SDKs CLI CI CD UI UX URL URLs JSON CSV PDF
   + 'Monday Tuesday Wednesday Thursday Friday Saturday Sunday Website Docs Dashboard Maya Chen Jordan Lee Sam Patel I'
   + ' US EU UK EUR USD SOC HIPAA GDPR CCPA PR PRs QA E2E 1Password Vault Postman Figma Webflow Supabase Firebase npm pip').split(' '));
 
+import fs from 'node:fs';
+
 const THREADS = ['bug', 'migration', 'fourth', 'jordan', 'sixth'];
+const EXAMPLE = (() => { try { return JSON.parse(fs.readFileSync(new URL('../brief.example.json', import.meta.url), 'utf8')); } catch { return null; } })();
+// Every line of words a brief puts on screen, with where it is.
+function lines(b) {
+  const out = [];
+  for (const k of [...THREADS, 'maya']) for (const f of ['title', 'summary', 'ask', 'comment', 'reply', 'body']) if (typeof b[k]?.[f] === 'string') out.push([`${k}.${f}`, b[k][f]]);
+  (b.headlines?.lines ?? []).forEach((s, i) => out.push([`headlines.lines[${i}]`, s]));
+  for (const k of ['running', 'done']) (b[k] ?? []).forEach((r, i) => out.push([`${k}[${i}].title`, r.title]));
+  for (const who of ['maya', 'jordan', 'sam']) (b.team?.[who]?.done ?? []).forEach((s, i) => out.push([`team.${who}.done[${i}]`, s]));
+  return out.filter(([, s]) => typeof s === 'string');
+}
+const TOP = ['company', 'projects', 'grounding', 'bug', 'migration', 'headlines', 'fourth', 'jordan', 'sixth', 'maya', 'running', 'done', 'team'];
 const VERB = /^(Fix|Add|Move|Show|Speed up|Let|Cache|Retry|Document|Write|Debug|Update|Remove|Rename|Split|Merge|Check|Test|Run|Make|Stop|Keep|Send|Sync|Flag|Link|Draft|Publish|Clean up|Handle|Support|Track|Log|Limit|Load|Read|Store|Group|Sort|Match|Pre-fill|Backfill|Migrate|Upgrade|Index|Build|Bump|Catch|Turn|Use|Allow|Block|Warn|Reuse|Drop|Batch|Parse|Cut|Save|Trim|Find|Prefill|Export|Import|Draw|Pin|Mark|Tag|Score|Rank|Lint|Profile|Measure|Replace|Retire|Deprecate|Expose|Hide|Guard|Validate|Verify|Wire|Port|Ship|Investigate|Audit|Review|Write up|Explain|Answer|Reply|Set up|Configure|Open|Close|Archive|Restore|Translate|Localize|Compress|Resize|Crop|Render|Fetch|Stream|Paginate|Throttle|Queue|Schedule|Notify|Email|Alert|Monitor|Record|Detect|Classify|Extract|Summarize|Generate|Train|Evaluate|Benchmark|Compare|Tune|Shorten|Simplify|Combine|Separate|Normalize|Dedupe|Deduplicate)\b/;
 
 export const norm = (s) => String(s ?? '').replace(/[’‘]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ').toLowerCase();
@@ -37,6 +50,7 @@ export function checkBrief(b, site, headlinesReport = null) {
   const say = (at, what) => bad.push(`${at}: ${what}`);
   if (!b || typeof b !== 'object' || Array.isArray(b)) return ['brief.json: must be one JSON object shaped like brief.example.json'];
   if (b.unsure) return [`unsure: ${b.unsure} (the brief says the site is too thin to know what they build, so no film is made)`];
+  for (const k of Object.keys(b)) if (!TOP.includes(k)) say(k, 'is not part of a brief; remove it');
 
   // ---- shape: every field there, of the right kind, of a size the screen holds ----
   const str = (v, at, { min = 1, max, end, start } = {}) => {
@@ -198,6 +212,12 @@ export function checkBrief(b, site, headlinesReport = null) {
   if (/[—–]/.test(words)) say('wording', 'uses a long dash; write two sentences or use a comma');
   if (/!/.test(words)) say('wording', 'uses an exclamation mark');
   for (const k of [...THREADS, 'maya']) for (const f of ['title', 'summary']) if (/\w: \w/.test(b[k][f])) say(`${k}.${f}`, 'has a colon inside a sentence; write it as a sentence');
+
+  // ---- nothing lifted from the example, which is another company ----
+  if (EXAMPLE && norm(b.company.name) !== norm(EXAMPLE.company.name)) {
+    const theirsToo = new Set(lines(EXAMPLE).map(([, s]) => norm(s)).filter((s) => s.split(' ').length >= 3));
+    for (const [at, s] of lines(b)) if (theirsToo.has(norm(s))) say(at, `"${s}" is copied from brief.example.json, which is another company; write this company's own`);
+  }
 
   // ---- the heroes ----
   const theirs = norm(site?.hero?.text).replace(/[.]$/, '');

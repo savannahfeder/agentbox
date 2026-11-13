@@ -19,7 +19,8 @@ node scripts/outreach-film/film.mjs make <lead dir> --kit <kit dir> [--out <dir>
 2. Run `make`. It reads their site (no model) and stops with exit code 3 and
    a prompt: brief.json is not written yet.
 3. Write `brief.json` in the lead folder by following `BRIEF.md`, using
-   `brief.example.json` as the shape. Read only `site.json`; do not browse.
+   `brief.example.json` as the shape. Read only `site.json` and `lead.json`;
+   do not browse. A key the example does not have is refused.
 4. Run `make` again. If the brief breaks a rule it exits 1 and lists each
    problem as `where: what to change`. Fix exactly those and run it again.
    (`film.mjs check <lead dir>` runs only this step, in about a minute.)

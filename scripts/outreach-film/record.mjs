@@ -426,7 +426,10 @@ async function at(t) {
 
 // ---- the film, keyed to her words ----
 const main = { minX: 120 };
-const inboxTab = { minX: 120, maxX: 400 };
+const inboxTab = { minX: 120, maxX: 500 };
+// A thread's breadcrumb back to the list: "Needs you" or "In progress" until
+// November 2026, "Inbox" since.
+const BACK = '^(Needs you|In progress|Inbox)$';
 try {
   // Their site in Chrome while she says hello. The hand rests.
   // ⌘-Tab: hold ⌘, Tab past Terminal to Agentbox, let go. Agentbox is on Home.
@@ -467,12 +470,12 @@ try {
   { const r = await rectOf('css:img[alt^="Three headlines"]'); if (r) { await move(r.l + r.w * 0.2, r.t + r.h * 0.45); await sleep(150); await move(r.l + r.w * 0.8, r.t + r.h * 0.48); await at(A.pick - 1.2); await move(r.l + r.w * 0.5, r.t + r.h * 0.42); } else fail('not found: the headlines picture'); }
   await at(A.pick + 0.35); await cut('pick headline 2', () => key('2'));
   // "Each of those took me only a few seconds"
-  await at(A.adds_up - 0.4); await go('back to Needs you', '^Needs you$', inboxTab);
+  await at(A.adds_up - 0.4); await go('back to Needs you', BACK, inboxTab);
   // "each thread gets access to its very own cloud computer"
   await at(A.cloud - 2.1); await go('open In progress', '^In progress\\s*\\d+$', main);
   await at(A.cloud - 0.7); await go('open the cloud thread', R.cloud, main);
   await sleep(400); await zoom([R.cloud, 'in the cloud$'], { opts: main, scale: 1.45, pad: 50 }); await to('in the cloud$', main);
-  await at(A.as_many - 0.7); unzoom(0.6); await go('back to In progress', '^In progress$', { minX: 120, maxX: 500 });
+  await at(A.as_many - 0.7); unzoom(0.6); await go('back to In progress', BACK, inboxTab);
   // "when someone on your team gets stuck": her thread lands in your inbox, with her note
   await at(A.stuck - 1.9); await page.evaluate((note) => { const s = window.__DEMO__.state; const m = window.__mayaHeld; if (m) { const t = Date.now(); m.createdAt = t - 3 * 60_000; m.updatedAt = t; m.waitingComments = [{ by: 'maya', ts: t, text: note }]; for (const k of Object.keys(m.wrote)) m.wrote[k].ts = k === 'title' || k === 'body' ? t - 3 * 60_000 : t; s.items.push(m); window.__demoNotify(); } }, MAYA.comment);
   await at(A.stuck - 1.2); await go('open Needs you', '^Needs you\\s*\\d+$', main);
@@ -488,11 +491,11 @@ try {
   // "their messages actually land in the same inbox as your agents": the hand
   // goes to Needs you while the reply waits, then ⌘↵ and the click are one
   // cut, so the app's stops between them (the inbox, the next thread) never show.
-  await to('^Needs you$', inboxTab);
+  await to(BACK, inboxTab);
   await at(A.messages - 0.45);
   await cut('send the reply and go to Needs you', async () => {
     await key('Meta+Enter'); await sleep(120);
-    const r = await rectOf('^Needs you$', inboxTab);
+    const r = await rectOf(BACK, inboxTab);
     if (!r) { fail('not found: Needs you, after sending the reply'); return false; }
     await move(r.l + r.w / 2, r.t + r.h / 2, { dur: 0.05 }); await click();
     return true;
