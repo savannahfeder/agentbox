@@ -61,6 +61,11 @@ await page.call('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
     if (String(url).includes('zero%3Aengine-setup') && body.includes('"ready"') && body.includes('"codex"')) {
       return new Response(JSON.stringify({ ok: true, engine: 'codex', found: true, signedIn: true, certain: true }), { status: 200, headers: { 'content-type': 'application/json' } });
     }
+    // Since 2026-11-13 the copy's stand-in Claude Code reads as signed out too (why is not found yet; the
+    // stand-in answers 0 by hand). So neither agent's sign-in reading is the walk's to prove: a real window is.
+    if (String(url).includes('zero%3Aengine-setup') && body.includes('"ready"') && body.includes('"claude"')) {
+      return new Response(JSON.stringify({ ok: true, engine: 'claude', found: true, signedIn: true, certain: true }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
     // NOTHING HERE PAYS. The walk cannot give Stripe a card, so the cloud's three answers on the plan page are
     // stood in for: signed in, checkout opened, seats bought. The team itself is made on the stand-in team cloud.
     // What the real cloud says to a team sign-in is tests/the-setup-has-one-plan-page-then-payment-then-an-invite-you-can-skip.
