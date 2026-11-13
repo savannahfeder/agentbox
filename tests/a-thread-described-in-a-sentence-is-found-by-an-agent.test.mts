@@ -8,11 +8,20 @@
 // reads a list of the threads and names the ones that fit.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { candidatesFor, describePrompt, findByDescription, readPicks, FIND_MOST, type FindCandidate } from '../shared/find-by-description.mts';
+import { candidatesFor, describePrompt, findByDescription, readPicks, FIND_MOST, FIND_BUDGET_MS, type FindCandidate } from '../shared/find-by-description.mts';
 import { agentRow, offersAgent } from '../renderer/src/components/Palette.tsx';
 
 const thread = (n: number, title: string, about = '', at = n): FindCandidate => ({
   key: `p/w-${n}`, product: 'p', title, about, where: 'Done', at, project: 'Agentbox',
+});
+
+describe('the wait', () => {
+  // The cloud run allowed 20 s. On their Mac the answer took 4.1 to 4.7 s
+  // over 424 real threads, so 10 s is room enough and is what they agreed to.
+  it('never runs past the ten seconds they said they would wait', () => {
+    expect(FIND_BUDGET_MS).toBeLessThanOrEqual(10_000);
+    expect(FIND_BUDGET_MS).toBeGreaterThanOrEqual(8_000);
+  });
 });
 
 describe('the list the agent reads', () => {

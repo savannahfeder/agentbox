@@ -29,8 +29,8 @@ export interface FindPick { key: string; why: string }
  */
 export const FIND_MOST = 200;
 export const FIND_PICKS = 5;
-/** The whole wait, over every account tried. */
-export const FIND_BUDGET_MS = 20_000;
+/** The whole wait, over every account tried: the ten seconds they said they would wait. */
+export const FIND_BUDGET_MS = 10_000;
 
 const SMALL_WORDS = new Set('a an and the of to in on for with that this it its is was were be by at from about my me i we our you your one thread threads which where when what who how there their them they some any had has have did do does not but or as so if'.split(' '));
 
