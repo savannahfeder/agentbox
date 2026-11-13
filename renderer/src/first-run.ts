@@ -119,7 +119,7 @@ function placed(t: ThreadLike, home: string): boolean {
 const unanswered = (t: ThreadLike) => typeof t.lastSaid === 'string' && !t.endUnknown && !t.lastSaid.trim();
 
 /** The newest chats not yet in the inbox, from any folder that can be a project. */
-export function chatChoices<T extends ThreadLike>(threads: T[], { home = '', max = 8 }: { home?: string; max?: number } = {}): T[] {
+export function chatChoices<T extends ThreadLike>(threads: T[], { home = '', max = 50 }: { home?: string; max?: number } = {}): T[] {
   return threads
     .filter((t) => !t.imported && placed(t, home) && !unanswered(t))
     .sort((a, b) => (b.when ?? 0) - (a.when ?? 0))

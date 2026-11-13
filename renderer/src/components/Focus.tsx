@@ -130,7 +130,7 @@ import { Live } from './Live';
 import { SidebarIcon } from './SidebarIcon';
 import { Byline, ConversationAside } from './Byline';
 import { ItemThread } from './ItemThread';
-import { ContinuedFrom, OpenTeammateThread } from '../threads/ContinuedFrom';
+import { ContinuedFrom, HandedFrom, OpenTeammateThread } from '../threads/ContinuedFrom';
 import { threadLink, threadOfLink, seenWord, seenNow, type SeenBy, type ShareActs } from '../threads/share-rules';
 import { answerOnItsWay, type PendingSaid } from '../item-thread';
 import { isTroubleRow } from '../trouble-row';
@@ -1353,10 +1353,14 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const opensBig = (path?: string | null) => bigView && whereAFileOpens(path) === 'full';
   const opensBeside = (path?: string | null) => bigView && !!onOpenDoc && whereAFileOpens(path) === 'beside';
   // A picture clicked in the thread steps through its own turn's pictures, as the small view does.
-  const turnOf = (path: string, from?: HTMLElement) => (from && opensAsPicture(path) ? { steps: picturesFor(paneRef.current, path, from).pictures.map((p) => p.path) } : {});
+  const turnOf = (path: string, from?: HTMLElement): { steps?: string[]; drawn?: string[] } => {
+    if (!from || !opensAsPicture(path)) return {};
+    const turn = picturesFor(paneRef.current, path, from);
+    return { steps: turn.pictures.map((p) => p.path), drawn: turn.drawn };
+  };
   const openBig = (path: string, from?: HTMLElement) => setArtifact({ path, at: Date.now(), ...turnOf(path, from) });
   // Kept for when the file beside goes full screen.
-  const besideTurn = useRef<{ path: string; steps?: string[] } | null>(null);
+  const besideTurn = useRef<{ path: string; steps?: string[]; drawn?: string[] } | null>(null);
   const openBeside = (path: string, from?: HTMLElement) => {
     besideTurn.current = { path, ...turnOf(path, from) };
     onOpenDoc?.(path);
@@ -1385,8 +1389,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   useEffect(() => {
     if (!openAt || onPhone()) return;
     const kept = besideTurn.current;
-    const turn = kept && kept.path === openAt.path ? kept.steps : undefined;
-    setArtifact({ ...(turn ? { steps: turn } : {}), ...openAt, at: Date.now() });
+    const turn = kept && kept.path === openAt.path ? kept : undefined;
+    setArtifact({ ...(turn?.steps ? { steps: turn.steps } : {}), ...(turn?.drawn ? { drawn: turn.drawn } : {}), ...openAt, at: Date.now() });
   }, [openAt]);
 
   // Everything the markdown renderer closes over, memoized as ONE stable
@@ -2135,10 +2139,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       <ThreadArtifacts item={item} open={artifact} withAgent={!direct && !heldByPerson && !item.agent}
         onClose={() => setArtifact(null)} onNotice={onNotice}
         onBeside={onOpenArtifact ? (path) => {
-          const steps = artifact.steps?.includes(path) ? artifact.steps : undefined;
+          const same = artifact.steps?.includes(path);
           setArtifact(null);
           onOpenArtifact(path, 'beside');
-          besideTurn.current = { path, ...(steps ? { steps } : {}) };
+          besideTurn.current = { path, ...(same ? { steps: artifact.steps, drawn: artifact.drawn } : {}) };
         } : undefined} />
     )}
     {picture && (
@@ -2303,6 +2307,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         <HandedLine item={item} />
         <ContinuedFrom labels={item.labels} />
         {givenTask && <div className="focus-meta by-lead"><TeamSaid item={item} /></div>}
+        {givenTask && <HandedFrom item={item} />}
         {made
           ? <div className="outcome">{md(item.body ?? '')}</div>
           : !agent && (

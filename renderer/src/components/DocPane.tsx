@@ -97,7 +97,7 @@ const CloseGlyph = () => (
 // and K and pressing the SAME chip again leaves `at` on the value it already
 // had, so nothing downstream would notice and the press would do nothing. This
 // changes on every press and is the whole reason it exists.
-export type OpenDoc = { product: string; src: string; auto?: boolean; at?: string; atFrom?: number; readOnly?: boolean };
+export type OpenDoc = { product: string; src: string; auto?: boolean; at?: string; atFrom?: number; readOnly?: boolean; /** A teammate's copy: how many notes it has, for the mark beside the chat. */ notes?: number };
 
 // The same element with or without notes: a different one would rebuild the
 // editor inside it, from the text the pane first read, whenever Focus opens or closes.

@@ -292,7 +292,7 @@ if (cloud) {
 }
 if (teamCloud) {
   for (const k of ['url', 'anonKey', 'phoneSite']) if (teamCloud[k]) args.push(`-c.extraMetadata.bakedTeam.${k}=${teamCloud[k]}`);
-  console.log(`→ baking the team cloud into the build (${teamCloud.url}): Settings › Phone can sign in, and Multiplayer is in Alpha features`);
+  console.log(`→ baking the team cloud into the build (${teamCloud.url}): Settings › Phone can sign in, and a team gets its Team page`);
 } else {
   console.log('→ no team.config.json, so this build cannot sign in for the phone');
 }

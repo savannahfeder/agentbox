@@ -134,7 +134,9 @@ export function mayRunHere(item: TeamRow | null | undefined, product: TeamProduc
   }
   return runnerOf(item, product) === me;
 }
-const STARTS_A_RUN = ['body', 'answer', 'status', 'runAt'];
+// The assignee too: a row given to a person runs nowhere, so giving it back
+// to an agent is starting one.
+const STARTS_A_RUN = ['body', 'answer', 'status', 'runAt', 'assignee'];
 
 // WHOSE INBOX A SHARED ROW IS IN: one person's at a time, whoever has to act.
 // A row given to a person is theirs until it is done; an agent's row is its

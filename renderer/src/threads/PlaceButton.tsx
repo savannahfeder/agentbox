@@ -26,6 +26,8 @@ export interface PlaceFacts {
 export interface PlaceView {
   word: 'Cloud' | 'This Mac';
   on: 'cloud' | 'mac';
+  /** The whole cloud is off: drawn as a faded cloud (approved designs/w-dd3b8c10c7/2-runs-on-button-stays-v7). */
+  off: boolean;
   dot: boolean;
   note: string;
   needs: string | null;
@@ -55,10 +57,12 @@ function finishesHere(why: WhyNotCloud | null): string {
 }
 
 export function placeView({ place, running = false, why = null, needs = null }: PlaceFacts): PlaceView {
-  const mac = { word: 'This Mac' as const, on: 'mac' as const, dot: false, needs: null, pickMac: null };
-  const cloud = { word: 'Cloud' as const, on: 'cloud' as const, dot: false, needs: null, pickCloud: null, pickMac: true };
+  const mac = { word: 'This Mac' as const, on: 'mac' as const, off: false, dot: false, needs: null, pickMac: null };
+  const cloud = { word: 'Cloud' as const, on: 'cloud' as const, off: false, dot: false, needs: null, pickCloud: null, pickMac: true };
   const moving = why?.why === 'moving';
   switch (place) {
+    case 'off':
+      return { ...mac, off: true, pickCloud: 'cloud-on', note: 'The cloud is off. Pick Cloud to turn it on.' };
     case 'cloud':
       return { ...cloud, note: 'Running in the cloud now. Pick This Mac and its work comes back here and carries on.' };
     case 'move':
@@ -78,6 +82,7 @@ export function placeView({ place, running = false, why = null, needs = null }: 
 /** The facts a pick leads to, drawn until the app's own arrive. */
 export function afterPick(facts: PlaceFacts, act: PlaceAct): PlaceFacts {
   if (act === 'move') return { ...facts, place: 'move', why: { at: 'mac', why: 'moving' } };
+  if (act === 'cloud-on') return { ...facts, place: 'here', running: false, why: null };
   return { ...facts, place: act ? 'kept' : 'here', needs: null };
 }
 
@@ -127,9 +132,9 @@ export function PlaceButton({ onPlace, startOpen = false, ...facts }: PlaceFacts
 
   return (
     <span className="ts-place-wrap" ref={wrap}>
-      <button type="button" className={`ts-done ts-place${open ? ' open' : ''}`} aria-haspopup="dialog" aria-expanded={open}
-        aria-label={`Runs on: ${v.word}`} title={`Runs on ${v.word}`} data-hint="runs-on" data-hint-align="right" onClick={() => setOpen((o) => !o)}>
-        {v.on === 'cloud' ? <CloudMark /> : <MacMark />}
+      <button type="button" className={`ts-done ts-place${v.off ? ' ts-place-off' : ''}${open ? ' open' : ''}`} aria-haspopup="dialog" aria-expanded={open}
+        aria-label={`Runs on: ${v.off ? 'This Mac, the cloud is off' : v.word}`} title={`Runs on ${v.off ? 'this Mac, the cloud is off' : v.word}`} data-hint="runs-on" data-hint-align="right" onClick={() => setOpen((o) => !o)}>
+        {v.on === 'cloud' || v.off ? <CloudMark /> : <MacMark />}
         {v.dot && <i className="ts-place-dot" aria-hidden="true" />}
       </button>
       {open && (

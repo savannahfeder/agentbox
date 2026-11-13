@@ -47,7 +47,15 @@ import { readWorld, worldTurn, worldAnswer, titleIn, stepEvery, workStep, asksFo
 import { makeArtifacts } from './stand-in-artifacts.mjs';
 
 const argv = process.argv.slice(2);
-const say = (obj) => process.stdout.write(JSON.stringify(obj) + '\n');
+// The app's question about a task's level (main/task-priority.mts) passes no output
+// format, and real Claude Code answers that in plain text. Only that question, so the
+// namer keeps the answer it had.
+const asksLevel = argv.some((a) => /left for you to rank/.test(a));
+const plainText = asksLevel && !argv.includes('--output-format');
+const say = (obj) => {
+  if (!plainText) process.stdout.write(JSON.stringify(obj) + '\n');
+  else if (obj.type === 'result') process.stdout.write(`${obj.result}\n`);
+};
 const sessionId = `stub-${crypto.randomUUID()}`;
 
 const planFile = process.env.STUB_CLAUDE_PLAN ?? null;
@@ -351,6 +359,13 @@ const limitOn = directive('stub:limit-on')?.[1];
 const world = argv.includes('-p') ? readWorld(plan.world) : {};
 const turn = worldTurn(world, loginName);
 if (Object.keys(world).length) said = worldAnswer(said, turn, titleIn(promptText), attempt);
+// The app asking for the level of a task left on Agent decides (main/task-priority.mts),
+// answered from the task's own words so a tester sees a level a person would agree with.
+if (asksLevel && !turn.limit) {
+  const task = promptText.split('--- task ---')[1] ?? '';
+  said = /\b(broken|down|crash\w*|block\w*|urgent|asap|today|fail\w*|error)\b/i.test(task) ? 'high'
+    : /\b(idea|clean ?up|someday|nice to have|maybe|tidy)\b/i.test(task) ? 'low' : 'medium';
+}
 // WHAT ONLY THE PERSON CAN GIVE, ASKED FOR THE WAY A CLOUD RUN IS TOLD TO
 // (main/cloud/run.mts cloudNote, shared/cloud-needs.mts), and only by a run that
 // was told it may. The task's own words say what it needs: a service names a

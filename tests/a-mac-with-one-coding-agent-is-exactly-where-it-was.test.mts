@@ -85,13 +85,16 @@ for (const engine of [undefined, 'claude', 'codex', 'nonsense']) {
 }
 
 /** The one class that is deliberately different: the row names the other
- *  harness AND carries a model, which used to become `claude --model <slug>`. */
-const crossesHarnesses = (item) => isEngine(item?.engine) && item.engine !== DEFAULT_ENGINE && !!item.model;
+ *  harness AND carries a model, or names no harness and carries a Codex slug
+ *  (2026-11-10, tests/a-thread-given-a-codex-model-runs-on-codex). Both used to
+ *  become `claude --model <slug>`. */
+const crossesHarnesses = (item) => (isEngine(item?.engine) && item.engine !== DEFAULT_ENGINE && !!item.model)
+  || (!isEngine(item?.engine) && item.model === 'gpt-5.6-sol');
 
 describe('the fixtures themselves', () => {
   it('cover every shape a row can be, and one narrow class is excluded', () => {
     expect(ROWS).toHaveLength(48);
-    expect(ROWS.filter(crossesHarnesses)).toHaveLength(8);
+    expect(ROWS.filter(crossesHarnesses)).toHaveLength(16);
   });
 });
 
@@ -127,9 +130,8 @@ describe('a Mac with no Codex and a shut gate', () => {
   // the other harness's slug, and only that one.
   it('changes exactly the rows that used to become a command line that cannot run', () => {
     const moved = ROWS.filter((item) => modelForEngine(item, 'claude') !== wasModelOnPlan(item));
-    expect(moved).toHaveLength(8);
+    expect(moved).toEqual(ROWS.filter(crossesHarnesses));
     for (const item of moved) {
-      expect(item.engine).toBe('codex');
       expect(wasModelOnPlan(item)).toBeTruthy();
       expect(modelForEngine(item, 'claude')).toBe(null);
     }

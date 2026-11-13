@@ -69,6 +69,7 @@ import { docsFolderFor, docsToSend, tarDocs, layDocs } from './docs.mts';
 import type { LaidFile } from './docs.mts';
 import { troubleCause, limitResetMoment } from '../../shared/spawn-trouble.mts';
 import { HAND_BACK } from '../../shared/cloud-hand-back.mts';
+import { clock } from './logins.mts';
 import { NEED, SERVICES } from '../../shared/cloud-needs.mts';
 import { filesSentFor, SENT_FILE_MAX } from '../../shared/cloud-sent-files.mts';
 import { sentLine } from '../../shared/cloud-start.mts';
@@ -277,6 +278,7 @@ export interface CloudRunOptions {
   storage: CloudStorage;
   login?: CloudLogin | null;
   also?: CloudLogin[];
+  codexHere?: CodexHere | null;
   keys?: { name: string; key: string }[];
   onLoginTrouble?: (trouble: { state: string; id: string | null }) => void;
   onLimit?: (limit: { until: number }) => void;
@@ -353,8 +355,38 @@ const keysNote = (names: string[]) => [
   'The app draws each line as a card they answer on the thread. A sign-in or a key is kept in the cloud and given to every later cloud run of every thread, and their reply comes back to you once it is given. The card already offers doing it on their computer instead, so do not add that as an option. A key under a name Claude Code or Codex read for their own sign-in (ANTHROPIC_, CLAUDE_, CODEX_, OPENAI_API_KEY) cannot be saved.',
 ].join(' ');
 
+// WHETHER CODEX IS SIGNED IN ON THE MACHINE, told to a Claude run once. A
+// sign-in an agent makes there is gone with the machine, so it is never the
+// fix: the cloud menu's sign-in is the one every later run is given.
+export interface CodexHere {
+  carried: boolean;
+  state?: string | null;
+  until?: number | null;
+}
+
+const CODEX_WHY: Record<string, (until?: string) => [why: string, fix: string]> = {
+  broken: () => ['the cloud\'s Codex sign-in has stopped working', 'the cloud\'s Codex sign-in stopped working, and Sign in again in the cloud menu on their computer mends it for every later run'],
+  renew: () => ['the cloud\'s Codex sign-in is being renewed by their computer', 'the cloud\'s Codex sign-in is being renewed by their computer and comes back on its own'],
+  limited: (until) => [`the cloud's Codex account is at its usage limit until ${until}`, `the cloud's Codex account is at its usage limit until ${until}`],
+  none: () => ['no Codex account is signed in for the cloud', 'Codex can be signed in for the cloud from the cloud menu on their computer, and every later run is then given it'],
+};
+
+export function codexNote({ carried, state = null, until = null }: CodexHere) {
+  const [why, fix] = (CODEX_WHY[state ?? ''] ?? CODEX_WHY.none)(until ? clock(until) : 'later');
+  const opening = carried
+    ? 'Codex here is signed in to the cloud\'s Codex account, which their computer keeps and renews. Before anything long runs on Codex, try one tiny request (`codex exec --skip-git-repo-check \'Reply ok\'`): `codex login status` says signed in even when OpenAI refuses the sign-in. If it is refused,'
+    : `Codex is signed out on this machine, because ${why}. Whatever the work,`;
+  return [
+    opening,
+    'do not sign Codex in on this machine: a sign-in made here is lost when the run ends, so the next run would ask for it again. Say it once instead.',
+    `When the work can go ahead without Codex, finish the rest and say in one sentence of your answer that ${carried ? CODEX_WHY.broken()[1] : fix}.`,
+    `When it cannot (Codex testers, a Codex review), end your turn with the one line \`${HAND_BACK} a working Codex sign-in\`, and their computer runs it on its own Codex.`,
+  ].join(' ');
+}
+
 /** The note a cloud run is given, for a project with a repository or without one. */
-export function cloudNote({ plain = false, limitMs = RUN_LIMIT_MS, keys = null }: { plain?: boolean; limitMs?: number; keys?: string[] | null } = {}) {
+export function cloudNote({ plain = false, limitMs = RUN_LIMIT_MS, keys = null, codex = null }: { plain?: boolean; limitMs?: number; keys?: string[] | null; codex?: CodexHere | null } = {}) {
+  const codexPart = codex ? [codexNote(codex)] : [];
   if (plain) {
     return [
       HEADING,
@@ -362,6 +394,7 @@ export function cloudNote({ plain = false, limitMs = RUN_LIMIT_MS, keys = null }
       'Install whatever else the work needs: you have sudo (`sudo apt-get update && sudo apt-get install -y <package>`, `pip install --user`, `npm install`).',
       'It does not have: any other file from their computer (documents over 256 KB, other threads\' design folders, large media, files under the home folder, /tmp from an earlier turn); API keys, key files or tokens kept on their computer; their computer\'s apps (Xcode, a simulator, their browser and its sign-ins).',
       howLongNote(limitMs),
+      ...codexPart,
       handBackNote(keys),
     ].join('\n\n');
   }
@@ -372,6 +405,7 @@ export function cloudNote({ plain = false, limitMs = RUN_LIMIT_MS, keys = null }
     'It does not have: the project\'s other branches (only this task\'s branch and main came up); any other file from their computer (other threads\' design folders, large media, files under the home folder); files an earlier turn left outside git (node_modules, gitignored folders such as scripts/scratch, /tmp); API keys, key files or tokens kept on their computer; their computer\'s apps (Xcode, a simulator, their browser and its sign-ins). Run `npm ci --ignore-scripts` before anything that needs node_modules. Open files are capped at 1024 here (the cloud fixes that ceiling), so a test runner that watches the whole project (`vitest related`, `npm run test:changed`) fails with EMFILE: run the test files you changed and the ones that import them by name with `npx vitest run <files>`.',
     `Only this task's own branch comes back to their computer. A commit, merge or reset on main or any other branch stays in this sandbox and is thrown away with it, so a merge done here has not happened. To ship, when your brief has a section on How this task ships, do what it says from here: commit on this branch and add the label \`ship\`. The app ships the branch on their computer once it comes home, so a ship never needs the hand-back line. When your brief has no section on how this task ships and the request includes merging into main, or whenever it includes changing any branch but this task's, do the rest of the work and commit it on this branch, then end your turn with the one line \`${HAND_BACK} merging into main\` (as below): the app merges on their computer.`,
     `${howLongNote(limitMs)} ${COMMIT_NOTE}`,
+    ...codexPart,
     handBackNote(keys),
   ].join('\n\n');
 }
@@ -416,6 +450,18 @@ export function limitInResultLine(line: string, now: number = Date.now()) {
   const text = String(msg.result ?? '');
   if (troubleCause(text) !== 'at-limit') return null;
   return limitResetMoment(text, now) ?? now + LIMIT_REST_MS;
+}
+
+// A Codex turn that failed because the cloud's sign-in was refused, off one
+// relayed app-server frame. The cloud only checks a Codex sign-in's expiry, so
+// this is how a refused one is found out.
+export function codexLoginRefusedInLine(line: string) {
+  let msg: { method?: string; params?: { turn?: { status?: string; error?: { message?: unknown } } } } | null;
+  try { msg = JSON.parse(line); } catch { return false; }
+  if (msg?.method !== 'turn/completed' && msg?.method !== 'turn/failed') return false;
+  const turn = msg.params?.turn;
+  if (!turn || (turn.status ?? 'failed') !== 'failed') return false;
+  return troubleCause(String(turn.error?.message ?? '')) === 'signed-out';
 }
 
 export const IMPORT_FAILED = 75;
@@ -914,6 +960,8 @@ export async function cloudRun({
   // Other sign-ins the run carries, in the same shape (./run-cli.mts
   // `loginsCarriedBy`). The sandbox places them if it can and starts anyway.
   also = [],
+  // Whether `also` carried Codex, or why not (./run-cli.mts `codexInTheRun`).
+  codexHere = null,
   // The keys saved for cloud runs (./keys.mts keysCarried): { name, key }.
   keys = [],
   // Told when the sandbox says the login was missing, refused or ran out.
@@ -968,7 +1016,7 @@ export async function cloudRun({
   // Keys go only to an image that places them, and the agent is told of them
   // only then, or it would ask for one, have it saved, and still not find it.
   const keysGo = imageCaps.includes('keys') && !kit ? keys : [];
-  const note = cloudNote({ plain, limitMs: runLimitMs, keys: imageCaps.includes('keys') && !kit ? keysGo.map((k) => k.name) : null });
+  const note = cloudNote({ plain, limitMs: runLimitMs, keys: imageCaps.includes('keys') && !kit ? keysGo.map((k) => k.name) : null, codex: engine === 'claude' ? codexHere : null });
   const here = plain ? { folder: cwd, file: env.AGENTBOX_CLOUD_MARKER } : cwd;
   const configDir = env.CLAUDE_CONFIG_DIR || path.join(homeDir, '.claude');
   const codexHome = env.CODEX_HOME || path.join(homeDir, '.codex');
@@ -1656,6 +1704,18 @@ export async function cloudRun({
       if (until) { try { onLimit({ until }); } catch { /* noted elsewhere */ } }
     }
   }
+  let codexLine = '';
+  const codexDecoder = new StringDecoder('utf8');
+  function noteCodexRefusal(buf: Buffer) {
+    codexLine += codexDecoder.write(buf);
+    let i;
+    while ((i = codexLine.indexOf('\n')) >= 0) {
+      const line = codexLine.slice(0, i);
+      codexLine = codexLine.slice(i + 1);
+      if (!line.includes('"turn/')) continue;
+      if (codexLoginRefusedInLine(line)) loginTrouble = { state: 'refused', id: login?.id ?? null };
+    }
+  }
   async function sayWhatWasLost() {
     const lost = helpers.lost();
     if (lost.length) await write(stdout, helpersLostLine(lost));
@@ -1676,6 +1736,7 @@ export async function cloudRun({
     if (e.kind === 'stdout') {
       const buf = Buffer.from(e.data, 'base64');
       if (!codex) noteLimit(buf);
+      if (codex) noteCodexRefusal(buf);
       await write(stdout, buf);
     }
     else if (e.kind === 'stderr') { if (!joining) await write(stderr, Buffer.from(e.data, 'base64')); }

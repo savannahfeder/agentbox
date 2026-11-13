@@ -311,13 +311,13 @@ export function roomsMemory(cloud: MemoryCloud, personId: string, helpers: { con
         if (had) { s.roomDecisions.set(key, { ...had, on: false, at: now() }); emit({ kind: 'decision', roomId: r }); }
         return;
       }
-      const elsewhere = !!project || String(messageId).startsWith('chat:');
-      const m = elsewhere ? null : s.roomMessages.find((x) => x.id === messageId && x.roomId === r);
+      const m = s.roomMessages.find((x) => x.id === messageId && x.roomId === r) ?? null;
+      const elsewhere = !m && (!!project || String(messageId).startsWith('chat:'));
       if (!elsewhere && (!m || m.deleted)) refuse('mark a message that is not in this room');
       const words = elsewhere ? String(body ?? '').trim() : m!.body;
       if (!words || words.length > 4000) refuse('a decision that empty or that long');
       s.roomDecisions.set(key, decisionOut({
-        room_id: r, message_id: messageId, kind, project: project ? String(project).slice(0, 120) : null, body: words,
+        room_id: r, message_id: messageId, kind, project: elsewhere && project ? String(project).slice(0, 120) : null, body: words,
         said_by: elsewhere ? (saidBy != null && peopleOf(r).has(saidBy) ? saidBy : null) : m!.by, marked_by: personId, is_on: true, updated_at: iso(now()),
       }));
       emit({ kind: 'decision', roomId: r });

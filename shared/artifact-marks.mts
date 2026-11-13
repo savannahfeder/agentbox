@@ -173,9 +173,10 @@ const shortId = (v: unknown): string | null => (typeof v === 'string' && MARK_ID
 const fileId = (v: unknown): string | null => (typeof v === 'string' && FILE_ID.test(v) && v !== '.' && v !== '..' ? v : null);
 const unit = (v: unknown): v is number => typeof v === 'number' && v >= 0 && v <= 1;
 
-type RawPlace = { kind?: unknown; x?: unknown; y?: unknown; s?: unknown; n?: unknown; word?: unknown; text?: unknown; cell?: { row?: unknown; column?: unknown } | null };
+export type RawPlace = { kind?: unknown; x?: unknown; y?: unknown; s?: unknown; n?: unknown; word?: unknown; text?: unknown; cell?: { row?: unknown; column?: unknown } | null };
 
-function cleanPlace(place: RawPlace | null | undefined): NotePlace | undefined {
+/** A place as a note or a link comment may name it, or undefined. */
+export function cleanPlace(place: RawPlace | null | undefined): NotePlace | undefined {
   switch (place?.kind) {
     case 'pin': return unit(place.x) && unit(place.y) ? { kind: 'pin', x: place.x, y: place.y } : undefined;
     case 'time':
@@ -353,7 +354,15 @@ export function placeWords(note: { place?: NotePlace | null; pin?: number | stri
 // `<sha12>-name`, how a shared thread names its copy, and `<time>-<random>-name`,
 // how a saved attachment is named: main/team/thread-share.mts, main/save-attachments.mts.
 const COPY_PREFIX = /^[0-9a-f]{12}-/;
-const SAVED_PREFIX = /^[a-z0-9]{8}-[a-z0-9]{1,6}-/;
+const SAVED_PREFIX = /^([a-z0-9]{8})-[a-z0-9]{1,6}-/;
+// The stamp is Date.now() in base 36, so it must read as a moment the app could
+// have saved at: "payments-auth-" and "bookings-empty-" fit the shape and are words.
+const FIRST_SAVED_MS = Date.UTC(2025, 0, 1);
+const DAY_MS = 86_400_000;
+const savedStamp = (base: string): boolean => {
+  const at = parseInt(SAVED_PREFIX.exec(base)?.[1] ?? '', 36);
+  return at >= FIRST_SAVED_MS && at <= Date.now() + DAY_MS;
+};
 
 /** A file's name as a person gave it. */
 // A copy carries a mark in its name: a thread's attachments, or a group's file as kept here.
@@ -364,8 +373,13 @@ export function shownName(path: string | null | undefined): string {
   const base = clean.split('/').pop() ?? '';
   // A hash in front is a shared thread's copy, even when an agent names it bare.
   if (!SENT_COPY.test(clean) && !COPY_PREFIX.test(base)) return base;
-  return base.replace(COPY_PREFIX, '').replace(SAVED_PREFIX, '');
+  const rest = base.replace(COPY_PREFIX, '');
+  return savedStamp(rest) ? rest.replace(SAVED_PREFIX, '') : rest;
 }
+
+// Notes written on a teammate's copy before shownName checked the stamp carry
+// the name it gave then: `audit.md` for payments-auth-audit.md.
+const nameBefore = (name: string): string => name.replace(SAVED_PREFIX, '');
 
 const KINDS: ReadonlyArray<readonly [ReviewKind, RegExp]> = [
   ['image', /\.(png|jpe?g|gif|webp|svg)$/i],
@@ -390,7 +404,7 @@ function baseStem(name: string): string {
 const stemOf = (name: string): string => baseStem(name).toLowerCase();
 
 /** 3 for `rows-v3.csv`, 1 for a name with no tail, null for any other tail (final, (2)). */
-function numberInName(name: string): number | null {
+export function numberInName(name: string): number | null {
   const dot = name.lastIndexOf('.');
   const stem = dot > 0 ? name.slice(0, dot) : name;
   const v = stem.match(/[-_ ]v(\d+)$/i);
@@ -427,10 +441,10 @@ const endsWithPath = (whole: string, part: string): boolean => whole === part ||
  * `numbers` maps a path to its number on the file's version line
  * (shared/version-line.mts). A family the line knows is numbered by it, in its
  * order, and a path the line does not know is no version of that family,
- * except `keep`: the path a person pressed, which Files may not have numbered yet.
+ * except `keep`: the paths a person pressed or saw drawn, which Files may not have numbered yet.
  */
-export function threadFiles(files: readonly ThreadFile[] | null | undefined, numbers: Readonly<Record<string, number>> | null = null, { keep = null }: { keep?: string | null } = {}): FileFamily[] {
-  const kept = keep ? cleanAsked(keep) : null;
+export function threadFiles(files: readonly ThreadFile[] | null | undefined, numbers: Readonly<Record<string, number>> | null = null, { keep = null }: { keep?: string | readonly string[] | null } = {}): FileFamily[] {
+  const kept = (typeof keep === 'string' ? [keep] : keep ?? []).map(cleanAsked).filter(Boolean);
   const families = new Map<string, { key: string; versions: Array<FileVersion & { line?: number }> }>();
   const seenPaths = new Set<string>();
   for (const f of files ?? []) {
@@ -468,7 +482,7 @@ export function threadFiles(files: readonly ThreadFile[] | null | undefined, num
     const unknown: Array<FileVersion & { line?: number }> = [];
     for (const v of family.versions) {
       if (v.line === undefined) {
-        if (kept && [v.path, ...(v.also ?? [])].some((p) => endsWithPath(p, kept) || endsWithPath(kept, p))) unknown.push(v);
+        if ([v.path, ...(v.also ?? [])].some((p) => kept.some((k) => endsWithPath(p, k) || endsWithPath(k, p)))) unknown.push(v);
         continue;
       }
       const was = byLine.get(v.line);
@@ -532,6 +546,36 @@ export function whereAPressLands(families: readonly FileFamily[] | null | undefi
     return at(v ? flat.find((x) => x.v === v) : null);
   }
   return at(flat.at(-1));
+}
+
+/**
+ * The version a mark's `file` names on this computer: its id here, else
+ * `name@n`, the n-th on the file's version line as Files names it, else a name
+ * a teammate's copy gave it before (`name#k` for the k-th of those). Null when
+ * it names none, never the nearest file.
+ */
+export function versionNamed(families: readonly FileFamily[] | null | undefined, file: string | null | undefined): FileVersion | null {
+  if (!file) return null;
+  const all = (families ?? []).flatMap((f) => f.versions);
+  const exact = all.find((v) => v.id === file);
+  if (exact) return exact;
+  const [, base, mark, num] = /^(.*?)(?:([#@])(\d+))?$/.exec(file)!;
+  const n = num ? Number(num) : 1;
+  if (mark === '@') return (families ?? []).find((f) => f.key === familyOfName(base))?.versions.find((v) => v.n === n) ?? null;
+  return all.filter((v) => v.name !== base && nameBefore(v.name) === base)[n - 1] ?? null;
+}
+
+/** `marks` with each note and approval on the id its version has here, so both people's views put it on one file. */
+export function marksOnVersions<N extends { file: string }, A extends { file: string }, M extends { notes: N[]; approvals: A[] }>(marks: M, families: readonly FileFamily[] | null | undefined): M {
+  const ids = new Set((families ?? []).flatMap((f) => f.versions.map((v) => v.id)));
+  const onIt = <T extends { file: string }>(m: T): T => {
+    if (ids.has(m.file)) return m;
+    const v = versionNamed(families, m.file);
+    return v ? { ...m, file: v.id } : m;
+  };
+  const notes = marks.notes.map(onIt);
+  const approvals = marks.approvals.map(onIt);
+  return notes.every((n, i) => n === marks.notes[i]) && approvals.every((a, i) => a === marks.approvals[i]) ? marks : { ...marks, notes, approvals };
 }
 
 /**
@@ -715,6 +759,16 @@ function* pathsSaidOn(l: ThreadLine | null | undefined): Generator<{ path: strin
       if (!shorthand(path)) yield { path, edited };
     }
   }
+}
+
+/** `said` with each path a person pressed or saw drawn that it does not hold yet, when the big view can show it. */
+export function withFilesAsked(said: readonly NamedFile[], asked: readonly (string | null | undefined)[]): NamedFile[] {
+  const out = [...said];
+  for (const raw of asked) {
+    const path = raw?.replace(/^\.\//, '');
+    if (path && viewKind(path) && !versionForPath(threadFiles(out), path)) out.push({ path, by: null, at: 0 });
+  }
+  return out;
 }
 
 /** Every reviewable file a thread's lines name, in the order they name them. */
@@ -1008,9 +1062,11 @@ export function onlyThanks(text: string | null | undefined): boolean {
  * to, or nobody (a thank-you or an approval that asks for nothing). Only the
  * agent's notes start a run; "Send to the agent" (`toAgent`) overrules.
  */
-export function noteGoesTo(note: { text?: string; mentions?: readonly string[]; toAgent?: boolean } | null | undefined, people: readonly NotePerson[] = []): NoteTarget {
+export function noteGoesTo(note: { text?: string; mentions?: readonly string[]; toAgent?: boolean; by?: string | null } | null | undefined, people: readonly NotePerson[] = []): NoteTarget {
   if (note?.toAgent) return { to: 'agent' };
-  const named = note?.mentions?.[0] ?? addressedTo(note?.text, people);
+  // "Lena: add a switch", written by Lena, is signed, not addressed.
+  const others = note?.by ? people.filter((p) => p.id !== note.by) : people;
+  const named = (note?.mentions ?? []).find((m) => m !== note?.by) ?? addressedTo(note?.text, others);
   if (named) return { to: 'person', person: named };
   const text = String(note?.text ?? '').trim();
   // "Sam, approved" names nobody on the team, so it is read past the name, and
