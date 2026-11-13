@@ -402,7 +402,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // appears): a browser SDK autocaptures the text of what was clicked, and in
   // Agentbox that text is task titles. A NUMBER MAY RIDE WITH THE NAME, and only
   // a number (2026-10-06): which setup step was reached.
-  ipcMain.handle('zero:onboarding-arm', () => analytics.onboardingArm?.() ?? 'tour');
+  ipcMain.handle('zero:onboarding-arm', () => analytics.onboardingArm?.() ?? 'classic');
   ipcMain.handle('zero:track', (_e, { name, count }: { name: string; count?: unknown } = {} as { name: string; count?: unknown }) => {
     if (!EVENT_NAMES.includes(name)) return false;
     onCount();
