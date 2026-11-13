@@ -435,6 +435,12 @@ type Asked = { query: string; at: number } & ({ state: 'looking' } | { state: 'f
 /** The row that asks an agent, in each of its states. */
 const ASK_ROW = 'find-by-description';
 
+/** The threads the words found, less those the agent already named above them. */
+export const withoutPicked = (rows: Command[], picks: readonly Command[]) => {
+  const named = new Set(picks.map((p) => p.id));
+  return named.size ? rows.filter((r) => !named.has(r.id)) : rows;
+};
+
 export function agentRow(asked: Asked | null, now: number, ask: () => void, phone = false): Command {
   const row = { id: ASK_ROW };
   if (!asked) return { ...row, label: 'Ask an agent to find it', ...(phone ? {} : { keyHint: chord('⌘↵') }), run: ask };
@@ -560,9 +566,9 @@ function PaletteBox({ commands, findThreads, findChats, findInside, findByDescri
   const picks = askedNow?.state === 'found' ? askedNow.rows : NONE_FOUND;
   const offerAgent = !!findByDescription && !picks.length && (!!askedNow || offersAgent(query, listed.length));
   const threads = useMemo(
-    () => [...chats, ...listed, ...(offerAgent ? [agentRow(askedNow, tick, askAgent, phone)] : [])],
+    () => [...chats, ...withoutPicked(listed, picks), ...(offerAgent ? [agentRow(askedNow, tick, askAgent, phone)] : [])],
     // askAgent reads the state it is drawn with.
-    [chats, listed, offerAgent, askedNow, tick, phone], // eslint-disable-line react-hooks/exhaustive-deps
+    [chats, listed, picks, offerAgent, askedNow, tick, phone], // eslint-disable-line react-hooks/exhaustive-deps
   );
   // The agent's picks come first under their own heading, and the first is picked.
   useEffect(() => { if (picks.length) setPickedKey(null); }, [picks]);

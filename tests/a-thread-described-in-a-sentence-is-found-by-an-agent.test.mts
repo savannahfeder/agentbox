@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { aboutThread, candidatesFor, describePrompt, findByDescription, readPicks, FIND_MOST, FIND_BUDGET_MS, type FindCandidate } from '../shared/find-by-description.mts';
-import { agentRow, offersAgent, paletteOrder } from '../renderer/src/components/Palette.tsx';
+import { agentRow, offersAgent, paletteOrder, withoutPicked } from '../renderer/src/components/Palette.tsx';
 
 const thread = (n: number, title: string, about = '', at = n): FindCandidate => ({
   key: `p/w-${n}`, product: 'p', title, about, where: 'Done', at, project: 'Agentbox',
@@ -114,5 +114,20 @@ describe('⌘K offers it', () => {
     expect(handler).toMatch(/_projectProfile\(c\.product\)/);
     expect(handler).toMatch(/_askSmall\(/);
     expect(handler).toMatch(/timeoutMs: left/);
+  });
+});
+
+// From the same tester: a thread the agent named was listed again under
+// Threads; and for "the launch plan for Tuesday" the agent put five threads
+// that last moved on a Tuesday above the one about launching on Tuesday.
+describe('what the agent found', () => {
+  it('is listed once, under its own heading', () => {
+    const row = (id: string) => ({ id, label: id, run: () => {} });
+    expect(withoutPicked([row('thread-p-1'), row('thread-p-2'), row('all-threads')], [row('thread-p-2')]).map((r) => r.id)).toEqual(['thread-p-1', 'all-threads']);
+    expect(withoutPicked([row('thread-p-1')], []).map((r) => r.id)).toEqual(['thread-p-1']);
+  });
+
+  it('is judged by what a thread is about, and by when only if the description says when', () => {
+    expect(describePrompt('launch plan for Tuesday', [thread(1, 'a')], 0)).toMatch(/what each thread is about/i);
   });
 });

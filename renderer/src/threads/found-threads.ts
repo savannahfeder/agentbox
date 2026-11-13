@@ -7,8 +7,9 @@
 //      then the thread most recently active.
 //   2. Everything else, the typed phrase first, then by how much of the thread
 //      is about the words, then most recently active.
-import type { FoundThread, WorkItem } from '../types';
+import type { FoundThread, ThreadStateWord, WorkItem } from '../types';
 import { lastChange } from '../byline';
+import { stateWord } from '../threads-made';
 
 export interface ThreadHit { item: WorkItem; summary: string; rung: number }
 
@@ -33,6 +34,9 @@ export function mostCommon(slugs: readonly string[]): string | undefined {
   for (const s of slugs) count.set(s, (count.get(s) ?? 0) + 1);
   return [...count].sort((a, b) => b[1] - a[1])[0]?.[0];
 }
+
+/** Where a found thread is: its tab, or Done for a closed one on none (another project's, or one just closed). */
+export const whereWord = (tab: ThreadStateWord | null | undefined, item: Pick<WorkItem, 'status'>) => stateWord(tab ?? (item.status === 'done' ? 'done' : null));
 
 const keyOf = (product: string | null | undefined, id: string | null | undefined) => `${product}/${id}`;
 

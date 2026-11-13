@@ -120,7 +120,7 @@ import { NOTHING_OVER_THE_APP, afterTheWalk, type OpenOverTheApp } from './walk-
 import { splitMessage } from './message-split';
 import { parseQuery } from './search';
 import { searchThreads, threadSearchDetails } from './threads/search';
-import { mostCommon, rankFoundThreads } from './threads/found-threads';
+import { mostCommon, rankFoundThreads, whereWord } from './threads/found-threads';
 import { repeatsFound, withoutRunsOf } from './repeat-search';
 import { repeatTag } from './repeat-words';
 import { applyTheme, machineTheme, onMachineTheme, resolvePick, resolveTheme, THEME_KEY, type ThemePick } from './theme';
@@ -3929,7 +3929,7 @@ export default function App() {
     id: `thread-${item.product}-${item.id}`,
     label: threadSearchDetails(item, searchContext).title,
     hint: projectNameOf(item.product),
-    thread: { line, where: stateWord(tabState.get(item.id)), at: lastChange(item), project: item.product !== mostly ? projectNameOf(item.product) : undefined, why },
+    thread: { line, where: whereWord(tabState.get(item.id), item), at: lastChange(item), project: item.product !== mostly ? projectNameOf(item.product) : undefined, why },
     run: () => { setModal(null); if (search !== null) closeSearch(); setFocused(item); markSeen(item); if (said) revealLine(said.uid); },
   }), [searchContext, projectNameOf, tabState, search, closeSearch, markSeen]);
   // ⌘K finds threads with the same search as the list's own field, and with
@@ -3961,7 +3961,7 @@ export default function App() {
     if (!askAgentToFind) return { ok: false, error: 'This copy of the app cannot ask an agent yet.' };
     const candidates = items.map((i) => ({
       key: `${i.product}/${i.id}`, product: i.product, title: threadSearchDetails(i, searchContext).title,
-      about: aboutThread(i), where: stateWord(tabState.get(i.id)) || 'Done',
+      about: aboutThread(i), where: whereWord(tabState.get(i.id), i) || 'Open',
       at: lastChange(i), project: projectNameOf(i.product),
     }));
     const answer = await askAgentToFind({ description, candidates });

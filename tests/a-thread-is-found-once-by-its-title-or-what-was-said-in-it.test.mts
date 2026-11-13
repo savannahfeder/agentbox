@@ -9,7 +9,7 @@
 // title or summary, was not a thread row at all, only a line; and "opening"
 // did not find "Chrome won't open".
 import { describe, it, expect } from 'vitest';
-import { mostCommon, rankFoundThreads } from '../renderer/src/threads/found-threads.ts';
+import { mostCommon, rankFoundThreads, whereWord } from '../renderer/src/threads/found-threads.ts';
 import { splitHits, matches } from '../renderer/src/search.ts';
 import { searchThreads } from '../renderer/src/threads/search.ts';
 import { holds, queryOf, stemOf } from '../shared/word-match.mts';
@@ -133,5 +133,16 @@ describe('the finder tallies each thread once', () => {
 
   it('sends no tally unless asked for one', async () => {
     expect((await finder.search('chrome')).threads).toEqual([]);
+  });
+});
+
+// A power tester closed a thread with E, searched for it, and its row said
+// only "1 min ago": a closed thread, or one outside the project in view, is
+// on no tab, so it had no word for where it is.
+describe('every found thread says where it is', () => {
+  it('by its tab, and by its own status when it is on none', () => {
+    expect(whereWord('waiting', thread('a', 'x', 1))).toBe('Needs you');
+    expect(whereWord(undefined, thread('a', 'x', 1, { status: 'done' }))).toBe('Done');
+    expect(whereWord(undefined, thread('a', 'x', 1, { status: 'open' }))).toBe('');
   });
 });

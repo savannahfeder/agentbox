@@ -88,6 +88,7 @@ export function describePrompt(description: string, shown: readonly FindCandidat
     '',
     ...shown.map((c, i) => `${i + 1}. [${c.where}, ${when(c.at, now)}, ${oneLine(c.project, 40)}] ${oneLine(c.title, 90)} :: ${oneLine(c.about, 320)}`),
     '',
+    'Judge by what each thread is about. Use when it last moved only when the description says when, and a day named in the description may be a day the thread talks about.',
     `Reply with the threads that best fit the description, best first, at most ${FIND_PICKS}, one per line, as`,
     'NUMBER | why it fits, in under ten plain words',
     'Only list threads that really fit. If none do, reply with the word none.',
