@@ -4832,7 +4832,7 @@ export default function App() {
   const openedFromHome = useRef(new Set<string>());
   // Whether a reply from inside this thread moves her on to the next (./advance).
   const movesOn = useCallback((item: WorkItem) => replyMovesOn({
-    view, onBoard, index: shownInbox.findIndex((i) => i.id === item.id), searching: search !== null, phone: onPhone(),
+    view, onBoard, index: shownInbox.findIndex((i) => i.id === item.id), searching: search !== null,
     cameBack: openedWithO.current.has(keyOf(item)), fromHome: openedFromHome.current.has(keyOf(item)),
   }), [view, onBoard, shownInbox, search]);
 

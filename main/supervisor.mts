@@ -188,7 +188,7 @@ import { runsOn } from './runs-on.mts';
 import { MemoryGateServer, defaultSocketPath as memoryGateSocketPath, readMacPressure } from './memory-gate-server.mts';
 import { startDecision, readMacPressureNow, SETTLE_MS, STALE_MS } from './start-hold.mts';
 import { MemoryLog } from './memory-log.mts';
-import { StartBudget } from './cloud/start-budget.mts';
+import { StartBudget, cloudStartPressure } from './cloud/start-budget.mts';
 import { isPlainMerge, mergeHome, mergedSentence } from './cloud/merge-home.mts';
 import type { MergeHomeResult } from './cloud/merge-home.mts';
 import { autoSlots, DEFAULTS as MEMORY_GATE, pressureFrom } from './memory-gate.mts';
@@ -243,6 +243,7 @@ export type WorkItem = {
   claim?: { holder: string; leaseUntil: number } | null;
   claimExpired?: boolean;
   answer?: string;
+  answeredThrough?: number;
   answerMode?: string | null;
   result?: string;
   note?: string;
@@ -4257,7 +4258,7 @@ export class Supervisor {
     const carried = answerTs(session?.lastLiveReply);
     if (!carried || carried <= answerTs(item)) return 'nothing to settle';
     const ranClean = session?.result != null && !session.resultIsError;
-    if (!ranClean || !this.spokeOnTheRow(item, carried)) {
+    if (!ranClean || session?.handedBack || !this.spokeOnTheRow(item, carried)) {
       this.releaseLiveReply(session);
       return 'undelivered';
     }
@@ -5597,8 +5598,23 @@ export class Supervisor {
     this._handedBack ??= new Set();
     this._handedBack.add(item.id);
     (this._movedWhy ??= {})[item.id] = { why: 'handed-back', detail: handBackWhat(session.result) };
+    this._releaseUnsettledReplies(item);
     if (!this._mergeHome(item, session.result, cwd, session.startedAt ?? 0)) this._moveToMac(item.id);
     return true;
+  }
+
+  // Replies steered into the handed-back run were marked handled as they went
+  // in; the run here must carry every one the row has not settled.
+  _releaseUnsettledReplies(item: WorkItem) {
+    const through = this.store.readItem?.(item.product, item.id)?.answeredThrough ?? item.answeredThrough ?? 0;
+    const prefix = `${item.product}:${item.id}:`;
+    let released = false;
+    for (const key of [...this._handledAnswers]) {
+      if (!key.startsWith(prefix)) continue;
+      const ts = Number(key.slice(key.lastIndexOf(':') + 1));
+      if (ts > through) released = this._handledAnswers.delete(key) || released;
+    }
+    if (released) this._saveState();
   }
 
   // The thread holds while git runs (spawnWorker). Merged: the merge is its
@@ -6992,8 +7008,7 @@ export class Supervisor {
 
   // What a cloud start that just went out says about whether another may.
   _howTheMachineIs() {
-    const reading = this._memReading;
-    return { pressure: reading ? pressureFrom(reading) : undefined, stallMs: this.stalls?.longestNow?.() ?? 0 };
+    return { pressure: cloudStartPressure(this._memReading, Date.now()), stallMs: this.stalls?.longestNow?.() ?? 0 };
   }
 
   _cloudHostAvailable() {
