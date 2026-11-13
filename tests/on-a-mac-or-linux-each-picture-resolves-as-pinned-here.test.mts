@@ -1,14 +1,21 @@
 // ON A MAC OR LINUX EACH PICTURE RESOLVES AS PINNED HERE.
 //
-// The Windows picture fix (on-windows-a-picture-or-document-opens-from-its-drive)
-// runs through code a Mac and Linux run too, and it was written on a Windows
-// computer where neither can be tried. So each input below was run through
-// main at 174d82f3 as a Mac runs it, the main process with `path` bound to
-// path.posix and the window's own lines from Focus.tsx, DocText.tsx and
-// ArtifactStage.tsx, and its answers are written in as they came out. The same
-// inputs go through the branch with the window told it is not on Windows and
-// the main process told darwin, then linux, and must come out the same, byte
-// for byte, a throw included.
+// The picture fixes made for Windows (on-windows-a-picture-or-document-opens-from-its-drive)
+// now run on a Mac and Linux too, and they were written on a Windows computer
+// where neither can be tried. So each input below was run through main at
+// 174d82f3 as a Mac runs it, the main process with `path` bound to path.posix
+// and the window's own lines from Focus.tsx, DocText.tsx and ArtifactStage.tsx,
+// and its answers are written in the tables as they came out. The *_NOW lists
+// are every input whose answer this change moves, with the new answer, worked
+// out by running the window's code on Windows. Every other input must still
+// come out as main gave it, byte for byte, on darwin and on linux.
+//
+// One kind of answer gets worse. A page that names a file whose real name holds
+// a %XX that decodes, like a%20b.png or a%23b.png, drew it before and now asks
+// for a b.png or a#b.png, because the name is read as a url, the way a browser
+// reads it. The window cannot ask the disk which of the two exists. A %XX that
+// decodes to a slash, a backslash or a climb is left as written, so
+// a%2Fb.png and ..%2f..%2fsecret.png come out as main gave them.
 
 import { describe, it, expect } from 'vitest';
 import { imgUrl, imgPath, servable, IMG_SCHEME } from '../main/img-scheme.mts';
@@ -19,7 +26,6 @@ const IMG = `${IMG_SCHEME}://file`;
 const DOC = `${DOC_SCHEME}://file`;
 const THROWS = { throws: 'URIError' };
 const outcome = (fn) => { try { return fn(); } catch (e) { return { throws: e.constructor.name }; } };
-const NOT_WINDOWS = false;
 
 // [the picture it names, the page folder, the file, the url drawn, the file a Mac opens]
 const BESIDE = [
@@ -39,6 +45,9 @@ const BESIDE = [
   ['./a.png', '/Users/me/dir', '/Users/me/dir/a.png', `${IMG}/Users/me/dir/a.png`, '/Users/me/dir/a.png'],
   ['sub/a#1.png', '/Users/me/dir', '/Users/me/dir/sub/a', `${IMG}/Users/me/dir/sub/a`, '/Users/me/dir/sub/a'],
   ['a?.png', '/Users/me/dir', '/Users/me/dir/a', `${IMG}/Users/me/dir/a`, '/Users/me/dir/a'],
+  ['a%23b.png', '/Users/me/dir', '/Users/me/dir/a%23b.png', `${IMG}/Users/me/dir/a%2523b.png`, '/Users/me/dir/a%23b.png'],
+  ['a%2Fb.png', '/Users/me/dir', '/Users/me/dir/a%2Fb.png', `${IMG}/Users/me/dir/a%252Fb.png`, '/Users/me/dir/a%2Fb.png'],
+  ['..%2f..%2fsecret.png', '/Users/me/dir', '/Users/me/dir/..%2f..%2fsecret.png', `${IMG}/Users/me/dir/..%252f..%252fsecret.png`, '/Users/me/dir/..%2f..%2fsecret.png'],
 ];
 
 // [what a message names, as a picture, as a film or voice note, the file a Mac opens]
@@ -119,29 +128,79 @@ const MAIN_PROCESS = [
   ['grants', 'C:\\page.html', 'C:\\shots\\a.png', false],
 ];
 
+// [the picture it names, the page folder, the file, the url drawn, the file a Mac opens]
+const BESIDE_NOW = [
+  ['pic.png', '/Users/me/my dir', '/Users/me/my dir/pic.png', `${IMG}/Users/me/my%20dir/pic.png`, '/Users/me/my dir/pic.png'],
+  ['pic.png', '/Users/me/C# notes', '/Users/me/C# notes/pic.png', `${IMG}/Users/me/C%23%20notes/pic.png`, '/Users/me/C# notes/pic.png'],
+  ['pic.png', '/Users/me/what? now', '/Users/me/what? now/pic.png', `${IMG}/Users/me/what%3F%20now/pic.png`, '/Users/me/what? now/pic.png'],
+  ['pic.png', '/Users/me/100% done', '/Users/me/100% done/pic.png', `${IMG}/Users/me/100%25%20done/pic.png`, '/Users/me/100% done/pic.png'],
+  ['pic.png', '/Users/me/café', '/Users/me/café/pic.png', `${IMG}/Users/me/caf%C3%A9/pic.png`, '/Users/me/café/pic.png'],
+  ['pic.png', '/home/me/my dir', '/home/me/my dir/pic.png', `${IMG}/home/me/my%20dir/pic.png`, '/home/me/my dir/pic.png'],
+  ['a b.png', '/Users/me/dir', '/Users/me/dir/a b.png', `${IMG}/Users/me/dir/a%20b.png`, '/Users/me/dir/a b.png'],
+  // The kind that is worse, said at the top of this file.
+  ['a%20b.png', '/Users/me/dir', '/Users/me/dir/a b.png', `${IMG}/Users/me/dir/a%20b.png`, '/Users/me/dir/a b.png'],
+  ['a%23b.png', '/Users/me/dir', '/Users/me/dir/a#b.png', `${IMG}/Users/me/dir/a%23b.png`, '/Users/me/dir/a#b.png'],
+  ['é.png', '/Users/me/dir', '/Users/me/dir/é.png', `${IMG}/Users/me/dir/%C3%A9.png`, '/Users/me/dir/é.png'],
+  ['../shots/a.png', '/Users/me/C# notes', '/Users/me/shots/a.png', `${IMG}/Users/me/shots/a.png`, '/Users/me/shots/a.png'],
+];
+
+// [what a message names, as a picture, as a film or voice note, the file a Mac opens]
+const WHOLE_NOW = [
+  ['file:///Users/x/a.png', '/Users/x/a.png', '/Users/x/a.png', '/Users/x/a.png'],
+  ['file:///Users/x/a%20b.png', '/Users/x/a b.png', '/Users/x/a b.png', '/Users/x/a b.png'],
+  ['file:///Users/x/a%zz.png', '/Users/x/a%zz.png', '/Users/x/a%zz.png', '/Users/x/a%zz.png'],
+  ['file:///C:/x/a.png', 'C:/x/a.png', 'C:/x/a.png', '/C:/x/a.png'],
+  ['C:/x.png', 'C:/x.png', 'C:/x.png', '/C:/x.png'],
+  ['C:\\x.png', 'C:\\x.png', 'C:\\x.png', '/C:/x.png'],
+  ['file:///Users/x/clip.mp4', '/Users/x/clip.mp4', '/Users/x/clip.mp4', '/Users/x/clip.mp4'],
+  ['file:///Users/x/a%20b.m4a', '/Users/x/a b.m4a', '/Users/x/a b.m4a', '/Users/x/a b.m4a'],
+  ['C:\\x\\clip.mp4', 'C:\\x\\clip.mp4', 'C:\\x\\clip.mp4', '/C:/x/clip.mp4'],
+];
+
+// [the path, the url drawn]
+const DRAWN_NOW = [
+  ['/C:/x/a.png', `${IMG}/C:/x/a.png`],
+  ['C:\\x.png', `${IMG}/C:/x.png`],
+  ['C:/x.png', `${IMG}/C:/x.png`],
+];
+
+const now = (list, row, keys) => list.find((r) => r.slice(0, keys).every((v, i) => v === row[i])) ?? row;
 const opens = (url) => outcome(() => imgPath(url, 'darwin'));
 
-describe('a picture a page names beside itself, drawn by a window not on Windows', () => {
-  it.each(BESIDE)('%s in %s', (from, folder, file, drawn, mac) => {
-    expect(outcome(() => fileBeside(from, folder, NOT_WINDOWS))).toEqual(file);
-    const url = outcome(() => pictureUrl(fileBeside(from, folder, NOT_WINDOWS), NOT_WINDOWS));
+describe('the inputs this change moves', () => {
+  it.each([['beside a page', BESIDE, BESIDE_NOW, 2], ['named whole', WHOLE, WHOLE_NOW, 1], ['drawn', DRAWN, DRAWN_NOW, 1]])('%s are each in main\'s table with another answer there', (_, before, after, keys) => {
+    for (const row of after) {
+      const was = before.find((r) => r.slice(0, keys).every((v, i) => v === row[i]));
+      expect(was).toBeDefined();
+      expect(was).not.toEqual(row);
+    }
+  });
+});
+
+describe('a picture a page names beside itself', () => {
+  it.each(BESIDE)('%s in %s', (...row) => {
+    const [from, folder, file, drawn, mac] = now(BESIDE_NOW, row, 2);
+    expect(outcome(() => fileBeside(from, folder))).toEqual(file);
+    const url = outcome(() => pictureUrl(fileBeside(from, folder)));
     expect(url).toEqual(drawn);
     expect(opens(url)).toEqual(mac);
   });
 });
 
-describe('a whole path a message names, drawn by a window not on Windows', () => {
-  it.each(WHOLE)('%s', (src, picture, media, mac) => {
-    const whole = outcome(() => wholePicturePath(src, NOT_WINDOWS));
+describe('a whole path a message names', () => {
+  it.each(WHOLE)('%s', (...row) => {
+    const [src, picture, media, mac] = now(WHOLE_NOW, row, 1);
+    const whole = outcome(() => wholePicturePath(src));
     expect(whole).toEqual(picture);
-    expect(outcome(() => wholeMediaPath(src, NOT_WINDOWS))).toEqual(media);
-    expect(typeof whole === 'string' ? opens(pictureUrl(whole, NOT_WINDOWS)) : null).toEqual(mac);
+    expect(outcome(() => wholeMediaPath(src))).toEqual(media);
+    expect(typeof whole === 'string' ? opens(pictureUrl(whole)) : null).toEqual(mac);
   });
 });
 
-describe('a path the window draws, not on Windows', () => {
-  it.each(DRAWN)('%s', (file, drawn) => {
-    expect(pictureUrl(file, NOT_WINDOWS)).toBe(drawn);
+describe('a path the window draws', () => {
+  it.each(DRAWN)('%s', (...row) => {
+    const [file, drawn] = now(DRAWN_NOW, row, 1);
+    expect(pictureUrl(file)).toBe(drawn);
   });
 });
 
