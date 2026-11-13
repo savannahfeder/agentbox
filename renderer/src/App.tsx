@@ -119,7 +119,7 @@ import { NOTHING_OVER_THE_APP, afterTheWalk, type OpenOverTheApp } from './walk-
 import { splitMessage } from './message-split';
 import { parseQuery } from './search';
 import { searchThreads, threadSearchDetails } from './threads/search';
-import { rankFoundThreads } from './threads/found-threads';
+import { mostCommon, rankFoundThreads } from './threads/found-threads';
 import { repeatsFound, withoutRunsOf } from './repeat-search';
 import { repeatTag } from './repeat-words';
 import { applyTheme, machineTheme, onMachineTheme, resolvePick, resolveTheme, THEME_KEY, type ThemePick } from './theme';
@@ -3924,11 +3924,11 @@ export default function App() {
   }, [focused?.product, focused?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // A found thread as a ⌘K row: its title, the line under it, its tab and when it last moved.
   const projectNameOf = useCallback((slug: string) => snap?.products.find((p) => p.slug === slug)?.name ?? slug, [snap?.products]);
-  const threadCommand = useCallback((item: WorkItem, line: string, { said = null, why = false, projects = 1 }: { said?: FoundThread | null; why?: boolean; projects?: number } = {}) => ({
+  const threadCommand = useCallback((item: WorkItem, line: string, { said = null, why = false, mostly = item.product }: { said?: FoundThread | null; why?: boolean; mostly?: string } = {}) => ({
     id: `thread-${item.product}-${item.id}`,
     label: threadSearchDetails(item, searchContext).title,
     hint: projectNameOf(item.product),
-    thread: { line, where: stateWord(tabState.get(item.id)), at: lastChange(item), project: projects > 1 ? projectNameOf(item.product) : undefined, why },
+    thread: { line, where: stateWord(tabState.get(item.id)), at: lastChange(item), project: item.product !== mostly ? projectNameOf(item.product) : undefined, why },
     run: () => { setModal(null); if (search !== null) closeSearch(); setFocused(item); markSeen(item); if (said) revealLine(said.uid); },
   }), [searchContext, projectNameOf, tabState, search, closeSearch, markSeen]);
   // ⌘K finds threads with the same search as the list's own field, and with
@@ -3937,7 +3937,7 @@ export default function App() {
     const ruled = repeatsFound(repeats, q);
     const kept = new Set(withoutRunsOf(items, ruled));
     const found = rankFoundThreads({ hits: searchThreads(items, q, searchContext), said, items }).filter((r) => kept.has(r.item));
-    const projects = new Set(found.map((r) => r.item.product)).size;
+    const mostly = mostCommon(found.map((r) => r.item.product));
     return [
     ...ruled.map((rule) => ({
       id: `thread-repeat-${rule.product}-${rule.id}`,
@@ -3945,7 +3945,7 @@ export default function App() {
       hint: `Repeats ${repeatTag(rule)}`,
       run: () => { setModal(null); if (search !== null) closeSearch(); openRepeatRef.current?.(rule); },
     })),
-    ...found.map((r) => threadCommand(r.item, r.line, { said: r.said, projects })),
+    ...found.map((r) => threadCommand(r.item, r.line, { said: r.said, mostly })),
     ...teammateThreadsFound(weekCards, team?.me, q).map((card) => ({
       id: `card-${card.personId}-${card.threadId}`,
       label: card.title ?? '',
@@ -3967,8 +3967,8 @@ export default function App() {
     if (!answer.ok) return answer;
     const byKey = new Map(items.map((i) => [`${i.product}/${i.id}`, i]));
     const picked = answer.picks.flatMap((p) => { const item = byKey.get(p.key); return item ? [{ item, why: p.why }] : []; });
-    const projects = new Set(picked.map((p) => p.item.product)).size;
-    return { ok: true, rows: picked.map((p) => threadCommand(p.item, p.why, { why: true, projects })) };
+    const mostly = mostCommon(picked.map((p) => p.item.product));
+    return { ok: true, rows: picked.map((p) => threadCommand(p.item, p.why, { why: true, mostly })) };
   }, [askAgentToFind, items, searchContext, tabState, projectNameOf, threadCommand]);
   // J AND K FROM AN OPEN THREAD OR AN OPEN TEAMMATE CARD (w-fb16bcaeba): open
   // the next stop, whoever's it is. Yours opens as your thread, theirs as

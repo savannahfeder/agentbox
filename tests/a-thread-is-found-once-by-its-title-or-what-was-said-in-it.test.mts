@@ -9,7 +9,7 @@
 // title or summary, was not a thread row at all, only a line; and "opening"
 // did not find "Chrome won't open".
 import { describe, it, expect } from 'vitest';
-import { rankFoundThreads } from '../renderer/src/threads/found-threads.ts';
+import { mostCommon, rankFoundThreads } from '../renderer/src/threads/found-threads.ts';
 import { splitHits, matches } from '../renderer/src/search.ts';
 import { searchThreads } from '../renderer/src/threads/search.ts';
 import { holds, queryOf, stemOf } from '../shared/word-match.mts';
@@ -45,6 +45,11 @@ describe('one list, each thread once', () => {
   it('shows what a thread is about under a title that already shows the words', () => {
     expect(rank(items, 'chrome')[0].line).toBe('Chrome opened no window after an agent started it.');
     expect(rank(items, 'chrome')[0].said).toBeNull();
+  });
+
+  it('names a project only on rows outside the one most of them are in', () => {
+    expect(mostCommon(['a', 'b', 'a'])).toBe('a');
+    expect(mostCommon([])).toBeUndefined();
   });
 
   it('drops a match in a thread this screen does not hold', () => {

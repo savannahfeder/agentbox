@@ -654,7 +654,7 @@ function PaletteBox({ commands, findThreads, findChats, findInside, findByDescri
             </div>
           </Fragment>))}
         </div>
-        {!phone && <div className="palette-foot" aria-hidden="true"><span><b>↑ ↓</b> move</span><span><b>↵</b> select</span>{findByDescription && query.trim() && <span><b>{chord('⌘↵')}</b> ask an agent</span>}</div>}
+        {!phone && <div className="palette-foot" aria-hidden="true"><span><b>↑ ↓</b> move</span><span><b>↵</b> select</span>{findByDescription && query.trim() && !offerAgent && <span><b>{chord('⌘↵')}</b> ask an agent</span>}</div>}
       </div>
     </div>
   );

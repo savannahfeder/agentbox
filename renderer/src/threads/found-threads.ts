@@ -27,6 +27,13 @@ const IN_TITLE = new Set([2, 4, 5, 6]);
 /** 1 mention, a few, or many: a bigger count only counts once it is a different amount. */
 const howMuch = (n: number) => (n >= 5 ? 2 : n >= 2 ? 1 : 0);
 
+/** The project most found threads are in; a row elsewhere names its project. */
+export function mostCommon(slugs: readonly string[]): string | undefined {
+  const count = new Map<string, number>();
+  for (const s of slugs) count.set(s, (count.get(s) ?? 0) + 1);
+  return [...count].sort((a, b) => b[1] - a[1])[0]?.[0];
+}
+
 const keyOf = (product: string | null | undefined, id: string | null | undefined) => `${product}/${id}`;
 
 export function rankFoundThreads({ hits, said = [], items }: { hits: readonly ThreadHit[]; said?: readonly FoundThread[]; items: readonly WorkItem[] }): RankedThread[] {
