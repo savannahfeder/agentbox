@@ -7,7 +7,7 @@ import * as SecureStore from 'expo-secure-store';
 import { AppState, Platform } from 'react-native';
 import { NOTICE_KEY } from '../lib/ai-notice';
 import { ALERTS_KEY } from '../lib/push-device';
-import { syncStore } from '../lib/drafts';
+import { syncStore, type KeyedStore } from '../lib/drafts';
 import type { Persist } from '../lib/kept';
 
 const KEYS = ['agentbox-cloud-session', 'agentbox-cloud-verifier', 'agentbox-cloud-reset', ALERTS_KEY, NOTICE_KEY];
@@ -41,6 +41,6 @@ function fileStore() {
 }
 
 // Unwrapped on the web: the draft rules catch a full store themselves, and drop pictures to fit.
-export const appStore: { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void } = Platform.OS === 'web'
+export const appStore: KeyedStore = Platform.OS === 'web'
   ? globalThis.localStorage
   : fileStore();

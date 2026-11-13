@@ -39,6 +39,7 @@ import { onTheirWay, teamFrom, withPendingPauses, withPhoneAnswers } from '../li
 import { isUnread, markSeen as markSeenIn, markUnseen as markUnseenIn, readSeen } from '../lib/unread';
 import { alertToken, alertTokenIfAllowed, setIconCount } from '../platform/alerts';
 import { appStore, persist } from '../platform/persist';
+import { forgetDrafts } from '../lib/drafts';
 import { forgetCrash, keptCrash } from '../platform/crash';
 import { crashReport, reportsOn } from '../lib/crash-note';
 
@@ -408,6 +409,7 @@ function useCloudState() {
     } else c?.signOut();
     cache.current.clear();
     links.current.clear();
+    forgetDrafts(appStore);
     setRows(EMPTY);
     setSettingsRows([]);
     settingsAt.current = -Infinity;

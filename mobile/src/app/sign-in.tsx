@@ -40,6 +40,8 @@ export default function SignIn() {
     } finally { setBusy(null); }
   };
   const canSubmit = !!email.trim() && !!password && !busy && !!c.cloud;
+  // A refusal is about what was sent; once either field changes it no longer is.
+  const edited = (set: (v: string) => void) => (v: string) => { set(v); setError(null); setFailed(false); };
   const signIn = run('email', () => c.cloud!.signInWithPassword(email.trim(), password));
 
   return (
@@ -64,8 +66,8 @@ export default function SignIn() {
         <Lede>Use the account from Agentbox on your computer.</Lede>
         {!c.cloud && !c.preview && <Lede>This build was made without the cloud's address, so it cannot sign in.</Lede>}
         <View style={{ gap: 16, marginTop: 28 }}>
-          <Field label="Email" testID="sign-in-email" value={email} onChangeText={setEmail} keyboardType="email-address" textContentType="emailAddress" autoComplete="email" />
-          <Field label="Password" testID="sign-in-password" value={password} onChangeText={setPassword} secureTextEntry textContentType="password" autoComplete="password"
+          <Field label="Email" testID="sign-in-email" value={email} onChangeText={edited(setEmail)} keyboardType="email-address" textContentType="emailAddress" autoComplete="email" />
+          <Field label="Password" testID="sign-in-password" value={password} onChangeText={edited(setPassword)} secureTextEntry textContentType="password" autoComplete="password"
             returnKeyType="go" onSubmitEditing={() => { if (canSubmit) void signIn(); }} />
         </View>
         <T onPress={() => router.push({ pathname: '/reset-password', params: { email: email.trim() } })} accessibilityRole="link" suppressHighlighting

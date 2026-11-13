@@ -72,6 +72,21 @@ export function tabsTighten({ view, content }: { view: number; content: number }
   return content + (tight ? saved : 0) > view + 1;
 }
 
+/** The smallest the tab words go before the row is left to scroll. */
+export const TABS_SMALLEST = 0.7;
+
+/**
+ * How much the tab words shrink so the tight row fits: large text on a narrow
+ * phone pushed Done off the edge. Only ever down for one width, so it settles;
+ * `measuredAt` is the width it was worked out for, and a new width starts over.
+ */
+export function tabsScale({ view, content }: { view: number; content: number }, tight: boolean, now: { scale: number; measuredAt: number }) {
+  if (view <= 0 || content <= 0) return now;
+  const from = now.measuredAt === view ? now.scale : 1;
+  if (!tight || content <= view + 1) return { scale: from, measuredAt: view };
+  return { scale: Math.max(TABS_SMALLEST, Math.floor(from * (view / content) * 100) / 100), measuredAt: view };
+}
+
 /** Whether a sideways row runs on past its right edge (a 1px slack for rounding). */
 export const moreToTheRight = ({ view, content, x }: { view: number; content: number; x: number }) =>
   view > 0 && content - (x + view) > 1;
@@ -80,6 +95,9 @@ export const moreToTheRight = ({ view, content, x }: { view: number; content: nu
 // (App.tsx `deliveredThrough`), years before any phone. Zero is that, for
 // every desktop the phone could be reading.
 const DELIVERED_THROUGH = 0;
+
+/** The moment a thread's row is dated by, in the list and in search: when it was closed, else when you last wrote. */
+export const rowTime = (i: WorkItem): number => (i.status === 'done' ? i.wrote?.status?.ts ?? i.updatedAt : sentAt(i));
 
 export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
   const items: WorkItem[] = view.items;
@@ -121,7 +139,7 @@ export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
   // Later says when a thread comes back, and leaves waiting a turn to In progress (Pages.tsx `back`).
   const row = (i: WorkItem, tab: TabId): Row => ({
     key: `${i.product}/${i.id}`, id: i.id, product: i.product, title: rowTitle(i), projectName: names.get(i.product) ?? '',
-    when: (tab === 'snoozed' && backWords(i, now)) || updatedWords(i.status === 'done' ? i.wrote?.status?.ts ?? i.updatedAt : sentAt(i), now), running: live.has(i.id), cloud: inCloud.has(i.id),
+    when: (tab === 'snoozed' && backWords(i, now)) || updatedWords(rowTime(i), now), running: live.has(i.id), cloud: inCloud.has(i.id),
     held: notStarted(i), toApprove: toApproveWords(toApprove.get(`${i.product}/${i.id}`)), queued: tab !== 'snoozed' && queued.has(i.id) && !live.has(i.id), item: i,
     priority: ((p) => (p === 'high' || p === 'urgent' ? p : null))(priorityIdOf(i.priority)), agent: agentOf(i),
   });
@@ -203,7 +221,7 @@ export function phoneSearch(view: View, query: string, now = Date.now(), tabs?: 
       key: `${item.product}/${item.id}`, id: item.id, product: item.product,
       title: runs(rowTitle(item)), summary: runs(summary ?? ''), toApprove: asks.get(`${item.product}/${item.id}`) ?? '',
       bars: isUrgentRow(item) ? null : p >= 7 ? 3 : p <= 2 ? 1 : null,
-      projectName: item.productName ?? '', when: stamp(item.updatedAt, now),
+      projectName: item.productName ?? '', when: stamp(rowTime(item), now),
     };
   });
 }

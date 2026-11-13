@@ -97,6 +97,20 @@ export function useDraft(key: DraftKey, store: DraftStore) {
   };
 }
 
+// Every key the draft rules write: words, files, picks, times, the new-thread
+// card, and a reply on its way (renderer/src/drafts.ts).
+const DRAFT_KEY = /^zero\.(?:draft|replysending\.)/;
+
+/** The phone's file store lists its keys; a browser's storage counts them. */
+export type KeyedStore = DraftStore & ({ keys(): string[] } | { readonly length: number; key(i: number): string | null });
+const keysOf = (store: KeyedStore): string[] =>
+  'keys' in store ? store.keys() : Array.from({ length: store.length }, (_, i) => store.key(i)).filter((k): k is string => k !== null);
+
+/** Signing out leaves nothing of what was typed for the next person on this phone. */
+export function forgetDrafts(store: KeyedStore): void {
+  for (const k of keysOf(store)) if (DRAFT_KEY.test(k)) store.removeItem(k);
+}
+
 /**
  * A store that answers at once, over a file a phone reads when first asked
  * and writes `wait` ms after the last change; `flush` writes now, for the app
@@ -125,6 +139,7 @@ export function syncStore({ read, write, wait = 400 }: { read: () => string | nu
     getItem: (k: string) => { const v = all()[k]; return typeof v === 'string' ? v : null; },
     setItem: (k: string, v: string) => { all()[k] = String(v); soon(); },
     removeItem: (k: string) => { if (k in all()) { delete all()[k]; soon(); } },
+    keys: () => Object.keys(all()),
     flush,
   };
 }
