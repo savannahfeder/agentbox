@@ -496,7 +496,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
 
     const toLink = (patch as { linkReply?: { file?: unknown; text?: unknown } } | null)?.linkReply;
     if (toLink && typeof toLink.file === 'string' && words(toLink.text)) {
-      events.push({ at, who: 'you', said: `You replied on the link page for ${toLink.file}`, words: words(toLink.text)! });
+      events.push({ at, who: 'you', said: 'You replied on the link page', words: words(toLink.text)! });
       continue;
     }
 

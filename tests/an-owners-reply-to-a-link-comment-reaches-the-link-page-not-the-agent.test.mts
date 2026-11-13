@@ -50,7 +50,7 @@ describe('the reply line', () => {
 
   it('reads in the thread as your reply on the link page, in your words', () => {
     const said = threadEvents([make, comment(2, 'c1'), reply(3)]).find((e) => /link page/.test(e.said ?? ''));
-    expect(said).toMatchObject({ who: 'you', said: 'You replied on the link page for plan.md', words: 'Thanks, fixed' });
+    expect(said).toMatchObject({ who: 'you', said: 'You replied on the link page', words: 'Thanks, fixed' });
     expect(said?.message).toBeUndefined();
   });
 });
