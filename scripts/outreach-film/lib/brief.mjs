@@ -228,7 +228,7 @@ export function checkBrief(b, site, headlinesReport = null) {
     if (h.fits) return;
     if (h.why === 'wide') say(`headlines.lines[${i}]`, `is wider than the space their own headline${theirs2} has on their page; use fewer or shorter words`);
     else if (h.why === 'tall') say(`headlines.lines[${i}]`, `pushes past the bottom of their hero on their page; use fewer words`);
-    else say(`headlines.lines[${i}]`, `runs to ${h.lines} lines on their page where theirs takes ${h.theirLines}; use fewer words`);
+    else say(`headlines.lines[${i}]`, `runs to ${h.lines} lines on their page where theirs${theirs2} takes ${h.theirLines}; use fewer words`);
   });
   return bad;
 }

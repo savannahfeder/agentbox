@@ -80,7 +80,7 @@ describe('what the screen can hold', () => {
     const p = (why) => checkBrief(tidyBrief(example()), site, report(why)).join('\n');
     expect(p('wide')).toMatch(/headlines\.lines\[0\]: is wider than the space their own headline \("Email for developers", 20 characters\) has/);
     expect(p('tall')).toMatch(/headlines\.lines\[0\]: pushes past the bottom of their hero/);
-    expect(p('lines')).toMatch(/headlines\.lines\[0\]: runs to 3 lines on their page where theirs takes 2/);
+    expect(p('lines')).toMatch(/headlines\.lines\[0\]: runs to 3 lines on their page where theirs \("Email for developers", 20 characters\) takes 2/);
     expect(checkBrief(tidyBrief(example()), site, { theirs: 'x', headlines: [{ fits: true }, { fits: true }, { fits: true }] })).toEqual([]);
   });
   it('holds a headline to 8 words', () => {

@@ -75,7 +75,10 @@ const clip = await page.evaluate(({ id }) => {
 const report = [];
 const files = [];
 for (const [i, text] of heads.entries()) {
-  const got = await page.evaluate(({ id, text, lh }) => {
+  const got = await page.evaluate(({ id, text, lh, width }) => {
+    // Some heroes size to their words; a new line wraps in the width theirs had.
+    const hero = document.getElementById(id);
+    hero.style.maxWidth = `${Math.ceil(width) + 2}px`; hero.style.whiteSpace = 'normal';
     const h = document.getElementById(id);
     // Keep their markup's first text styling: replace the words, not the element.
     const walker = document.createTreeWalker(h, NodeFilter.SHOW_TEXT); const nodes = []; for (let t = walker.nextNode(); t; t = walker.nextNode()) if (t.textContent.trim()) nodes.push(t);
@@ -85,7 +88,7 @@ for (const [i, text] of heads.entries()) {
     const rg = document.createRange(); rg.selectNodeContents(h); const tr = rg.getBoundingClientRect();
     const over = h.scrollWidth > h.clientWidth + 2 || [...h.querySelectorAll('*')].some((e) => e.scrollWidth > e.clientWidth + 2 && getComputedStyle(e).overflow !== 'visible');
     return { lines: Math.round(r.height / lh), bottom: Math.max(r.bottom, tr.bottom), right: tr.right, left: tr.left, over };
-  }, { id: before.id, text, lh: before.lh });
+  }, { id: before.id, text, lh: before.lh, width: before.box[2] });
   await page.waitForTimeout(300);
   const f = `${out}.${i + 1}.png`;
   await page.screenshot({ path: f, clip });

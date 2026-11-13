@@ -5,7 +5,8 @@ voice, the order of events and everything on screen are fixed. You write only
 what is about this one company, in `brief.json`, shaped exactly like
 `brief.example.json` beside this file. That example is a made-up shipping
 company: copy its shape, replace every value, and reuse none of its lines or
-ideas. A line copied from it is refused.
+ideas. Any line copied from it word for word is refused, the teammates' done
+lists included.
 
 You get two files in the lead's folder: `site.json` (their own site, read by a
 script: each page's title, headings and text) and `lead.json` (who it is for).
@@ -39,7 +40,7 @@ it again. Nothing is filmed until the brief passes.
 
 - Every product, feature, plan, integration or customer type you name must be
   on their site, spelled as they spell it. Put each one in `grounding` as
-  `{"term": "<the name>", "quote": "<a sentence from site.json>"}`. The quote
+  `{"term": "<the name>", "quote": "<a line from site.json>"}`. The quote
   is copied character for character from `site.json`, whole words only, and
   contains the term. The check looks for every quote in the site's text, and
   for every capitalised word in a title, summary or ask in `grounding` or on
@@ -98,7 +99,9 @@ angle (what it is, what it saves, who it is for, the moment it helps). At most
 8 words and 46 characters each, so it sits in their hero like theirs does. The
 film draws each one on their live page in their font, and refuses one that
 takes more lines than their own headline (or more than two), or spills out of
-the hero.
+the hero. Their hero's width and font size set the real limit: a site with
+huge type fits fewer words, and the problem message gives their headline and
+its length to aim near.
 `headlines.why` says in one sentence what each leads with: "The first leads
 with X, the second with Y, and the third with Z."
 
