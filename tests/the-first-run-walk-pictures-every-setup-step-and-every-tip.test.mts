@@ -20,7 +20,7 @@ const STEPS_NOT_WALKED: Record<string, string> = {
 };
 const TIPS_NOT_WALKED: Record<string, string> = {
   start: 'the walkthrough opens on the New thread box, so nothing asks for N',
-  choose: 'the practice answer offers no options',
+  reply: 'the practice answer ends in options, so the tip asks for a number and not for R',
 };
 
 describe('the first-run walk', () => {

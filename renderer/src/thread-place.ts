@@ -68,8 +68,6 @@ export function leavePlace(key: string, news: number, parts: Parts): void {
 }
 
 /** Where to put her back, or null to open the thread as new. */
-/** A thread that opens with its earlier messages showing: the first run's practice thread, which is there to be read whole. */
-export const opensWhole = (labels: readonly string[] | null | undefined): boolean => !!labels?.includes('first-run');
 
 export function placeToReturnTo(key: string, news: number): ThreadPlace | null {
   const kept = all().get(key);

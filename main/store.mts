@@ -19,7 +19,7 @@ import { SAME_PROJECT, carriedLines, leftByAMove, movedAway, movedHere, ranHere,
 import { agentSpokeSince, answerTs } from '../shared/answers.mts';
 import { EXAMPLES, stampsFor } from '../shared/first-run-examples.mts';
 import {
-  PRACTICE_ANSWER, PRACTICE_BACKDROP, PRACTICE_FLAG, PRACTICE_NAME, PRACTICE_NOTE, PRACTICE_ROWS, PRACTICE_SLUG,
+  PRACTICE_ANSWER, PRACTICE_BACKDROP, PRACTICE_CONTEXT, PRACTICE_DONE, PRACTICE_FLAG, PRACTICE_NAME, PRACTICE_NOTE, PRACTICE_ROWS, PRACTICE_SLUG,
   PRACTICE_REPLY_ANSWER, PRACTICE_TASK_TRACE,
 } from '../shared/first-run-practice.mts';
 import { NOTE_NAME } from './rail-note.mts';
@@ -1610,7 +1610,7 @@ export class Store {
     // earn.
     if (product?.practice) {
       const item = workItemsDisk.updateWorkItem(
-        this.productDir(slug), id, { result: PRACTICE_ANSWER }, { source: 'agent' },
+        this.productDir(slug), id, { result: PRACTICE_ANSWER, problem: PRACTICE_CONTEXT, progress: PRACTICE_DONE }, { source: 'agent' },
       );
       // AND THE RUN IT DID, so the thread opens onto a conversation rather than
       // a result with nothing before it. Dated between the ask and the answer,

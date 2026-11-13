@@ -12,7 +12,6 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { finishLesson, fitsBesideTabs, noteSent, startTour, tourStep, withPractice, type TourScreen } from '../renderer/src/tour.ts';
 import { walkPlace } from '../renderer/src/setup-split.ts';
-import { opensWhole } from '../renderer/src/thread-place.ts';
 
 const read = (p: string) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 const screen = (over: Partial<TourScreen> = {}): TourScreen => ({ composer: 'none', folder: true, text: false, view: 'inbox', rows: 4, running: 0, waiting: 4, thread: false, options: false, covered: false, ...over });
@@ -85,13 +84,11 @@ describe('what stays as it was', () => {
 });
 
 describe('the practice thread, opened', () => {
-  it('shows all of itself: your ask, what the agent did, its answer', () => {
-    expect(opensWhole(['founder', 'first-run'])).toBe(true);
-    expect(opensWhole(['founder'])).toBe(false);
-    expect(opensWhole(null)).toBe(false);
+  // 2026-11-13: it opened with every earlier message showing, and that read as the wrong screen for a
+  // finished thread ("it just shows the response + summary and the numbered options, that's all").
+  it('opens folded, like every finished thread', () => {
     const thread = read('renderer/src/components/ItemThread.tsx');
-    expect(thread).toContain('const practice = opensWhole(item.labels);');
-    expect(thread).toContain('setEarlierOpen(kept ? !!kept.earlier : practice);');
+    expect(thread).toContain('setEarlierOpen(kept ? !!kept.earlier : false);');
   });
 });
 

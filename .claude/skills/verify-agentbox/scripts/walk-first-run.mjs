@@ -155,10 +155,9 @@ try {
   await key('Tab', ['shift']);
   await see('walkthrough-open', /WALKTHROUGH 2 OF 5.*Agents land here when they need you/i);
   await key('Enter');
-  await see('walkthrough-reply', /WALKTHROUGH 3 OF 5.*to answer this agent/i);
-  await key('r');
-  await page.type('Make it three lines.');
-  await key('Enter', [CHORD]);
+  // The practice answer ends in numbered options, so the tip asks for a number and nothing is typed.
+  await see('walkthrough-choose', /WALKTHROUGH 3 OF 5.*to choose the recommended option/i);
+  await key('1');
   await see('walkthrough-close', /WALKTHROUGH 4 OF 5.*to close it/i);
   await key('e');
   await see('walkthrough-palette', /WALKTHROUGH 5 OF 5.*to find anything/i);
