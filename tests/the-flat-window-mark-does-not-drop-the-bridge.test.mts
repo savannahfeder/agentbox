@@ -9,6 +9,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
+import { GLASS_ARG } from '../main/window-glass.mts';
 
 const preloadPath = fileURLToPath(new URL('../preload.cjs', import.meta.url));
 const source = fs.readFileSync(preloadPath, 'utf8');
@@ -31,11 +32,13 @@ function loadingDocument(present) {
   return { doc, html };
 }
 
-function run({ platform, document }) {
+// `argv` is left off the stand-in unless a case gives one, so a line that
+// assumes it is there throws here as it would have dropped the bridge.
+function run({ platform, document, argv = undefined }) {
   const exposed = [];
   const sandbox = {
     console,
-    process: { platform, env: {} },
+    process: { platform, env: {}, ...(argv ? { argv } : {}) },
     document,
     require(id) {
       if (id !== 'electron') throw new Error(`unexpected require ${id}`);
@@ -78,5 +81,20 @@ describe('the flat-window mark does not drop the bridge', () => {
     expect(exposed).toContain('zero');
     doc.arrive();
     expect(html.dataset.window).toBeUndefined();
+    expect(html.dataset.glassAble).toBeUndefined();
+  });
+
+  // The glass mark (tests/on-a-mac-the-ground-can-be-glass) is set the same
+  // way, from the argument main/window-glass.mts gives a Mac window.
+  it('marks a window able to go glass only when it was started with the glass argument, and keeps the bridge', () => {
+    const glass = loadingDocument(false);
+    expect(run({ platform: 'darwin', document: glass.doc, argv: ['electron', GLASS_ARG] })).toContain('zero');
+    expect(glass.html.dataset.glassAble).toBeUndefined();
+    glass.doc.arrive();
+    expect(glass.html.dataset.glassAble).toBe('');
+
+    const plain = loadingDocument(true);
+    expect(run({ platform: 'darwin', document: plain.doc, argv: ['electron'] })).toContain('zero');
+    expect(plain.html.dataset.glassAble).toBeUndefined();
   });
 });

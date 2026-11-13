@@ -23,6 +23,10 @@ export interface Command {
   // Words she might TYPE that the label does not say. Matched, never shown;
   // the hint is shown, never matched (../palette-rows).
   keywords?: string;
+  /** What the row was called before a rename: typing one ranks the row as its label would. Keep them in keywords too. */
+  oldNames?: readonly string[];
+  /** A word the query must name before the row is offered (../palette-rows). */
+  onlyWith?: string;
   keyHint?: string;
   run: () => void;
   /** A line, file, comment or decision found inside something: drawn as its words with who and where under. */
@@ -173,7 +177,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     })),
     // The cloud on or off, with its key, then each meaning of on (C).
     ...(cloud && onCloudMode ? cloudCommands(cloud).map((r, i) => ({
-      id: i === 0 ? 'cloud-toggle' : `cloud-${r.mode}`, label: r.label, hint: r.hint, keyHint: r.keyHint,
+      id: i === 0 ? 'cloud-toggle' : `cloud-${r.mode}`, label: r.label, hint: r.hint, keyHint: r.keyHint, onlyWith: r.onlyWith,
       keywords: 'cloud where threads run mac overflow everything move on off',
       run: () => onCloudMode(r.mode),
     })) : []),
@@ -192,6 +196,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       label: 'Go to Groups',
       hint: 'the people you work with, and what they are on',
       keywords: 'rooms room groups group chat channel messages message dm dms direct teammates team people together',
+      oldNames: ['rooms'],
       run: onGroups,
     }] : []),
     // One row per group, by its own name, as the projects above are. No hint:
@@ -301,6 +306,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       label: 'General agent instructions…',
       hint: 'every agent, every task',
       keywords: 'standing instructions rules your my brief guidelines preferences every agent every session tell agents dont do',
+      oldNames: ['standing instructions', 'your rules'],
       run: onStanding,
     },
     // WHAT IS LEFT OF YOUR LIMIT, BY NAME. It is read on the Claude pane, where
@@ -420,8 +426,8 @@ export function paletteOrder(all: Command[], threads: Command[], phone = false, 
     if (threads.length > chats) labels.set(at + chats, 'Threads');
   };
   // Ahead of the threads only when the words start words of its name: "sum up"
-  // is not "reSUMe interrUPted agents".
-  const named = (c: Command) => namesIt(query, c.label);
+  // is not "reSUMe interrUPted agents". A name it had before a rename counts.
+  const named = (c: Command) => namesIt(query, c.label) || (c.oldNames ?? []).some((n) => namesIt(query, n));
   const matched = all.filter((c) => !ASKED_FOR_BY_NAME.has(c.id) || !query.trim() || named(c));
   // "Waits on <that thread>" names a thread the words name, so it stays below
   // that thread unless its label starts with them.

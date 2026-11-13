@@ -30,7 +30,8 @@ beforeEach(() => {
   vi.setSystemTime(T0);
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-at-limit-'));
   sup = new Supervisor(
-    { home: path.join(root, 'home'), storeRoot: root, maxConcurrentSessions: 3, authProfiles: ['default'] },
+    // codexHome keeps this Mac's own Codex usage reading out of the test.
+    { home: path.join(root, 'home'), codexHome: path.join(root, 'codex'), storeRoot: root, maxConcurrentSessions: 3, authProfiles: ['default'] },
     { listItems: () => [], listProducts: () => [] },
     '/nonexistent-app',
   );

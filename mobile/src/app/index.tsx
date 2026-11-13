@@ -365,7 +365,7 @@ export default function Threads() {
   const rows = onEverything ? myItems(shown.rows[tab].map((r) => ({ ...r, labels: r.item?.labels }))) as typeof shown.rows[TabId] : shown.rows[tab];
   // Later counts its repeating tasks too, as the desktop's does (App.tsx `scheduledCount`).
   // Messages in your groups that name you lead Needs you, and count in it (App.tsx `MentionRows`).
-  const mentions = groups.on ? mentionRows(groups.state.mentions) : [];
+  const mentions = groups.on ? mentionRows(groups.state.mentions, groups.state) : [];
   // A teammate's question waits where you read, not only in Chats; counted on every tab.
   // One asked in a thread opens it, as the desktop answers it there; already in Needs you, its row is that thread's.
   const inNeedsYou = new Set(shown.rows.inbox.map((r) => r.key));

@@ -7,10 +7,11 @@ import {updateFixture} from './agent-update-fixture';
 import type { Person, TeamBillingDetails } from './types';
 import type { AccountUsageReading, AgentConversation, AgentUpdate, AgentUpdateAction, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, ProductDashboard, ProjectSettings, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, TerminalAction, TerminalAnswer, TerminalAsk, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, FilesUploaded, TeamMessageFile, ThreadEditPatch, LiveRoomTicket, UpdateState, Usage, UsageLimit, WorkItem, WorkspaceSettings } from './types';
 import type { LedgerLine } from './thread-history';
+import type { NotePlace } from '../../shared/artifact-marks.mts';
 import type { AgentFile as AgentFileRow } from './onboarding';
 import type { AgentFolder, SessionThread } from './agent-import-card';
 import type { EngineSetupState } from './plan-setup';
-import { fixtureAgents, fixtureSnapshot, fixtureDashboards, fixtureRepeats, fixtureRuns, fixtureMock, fixtureMockDashboards, fixtureTraces, fixtureHistory, fixtureSettings, fixtureConversation, fixtureAgentFiles, fixtureSessionThreads, fixtureSearchableThreads } from './fixtures';
+import { fixtureAgents, fixtureSnapshot, fixtureUrgentArrival,fixtureDashboards, fixtureRepeats, fixtureRuns, fixtureMock, fixtureMockDashboards, fixtureTraces, fixtureHistory, fixtureSettings, fixtureConversation, fixtureAgentFiles, fixtureSessionThreads, fixtureSearchableThreads } from './fixtures';
 import { fixtureEngineWorld, fixtureEngineSettings, fixtureSecondEngine } from './fixtures';
 import { fixtureFolders } from './fixtures';
 import { NAME, Name } from '../../shared/product-name.mjs';
@@ -22,7 +23,7 @@ interface LaterBridge {
   gitHubSignIn?(p: { token: string }): Promise<{ ok: boolean; again?: string[]; error?: string }>;
   gitHubBrowserSignIn?(): Promise<{ ok: boolean; code?: string; url?: string; error?: string }>;
   gitHubCloudSignIn?(p: { action: 'start' | 'token' }): Promise<{ ok: boolean; code?: string; url?: string; token?: string; error?: string }>;
-  signInAnswer?(p: { product: string; id: string; ask: string; said: 'signed-in' | 'skipped' | 'landed'; url?: string }): Promise<{ ok: boolean; error?: string }>;
+  signInAnswer?(p: { product: string; id: string; ask: string; said: 'signed-in' | 'skipped' | 'landed' | 'code'; url?: string; code?: string }): Promise<{ ok: boolean; error?: string }>;
   cloudAccountPay?(p: { plan: 'pro' | 'plus' | 'max' | 'team' }): Promise<{ ok: boolean; where?: 'checkout' | 'billing'; error?: string; message?: string }>;
   cloudAccountTeamBilling?(): Promise<{ ok: boolean; owner?: boolean } & Partial<TeamBillingDetails>>;
 }
@@ -30,10 +31,18 @@ const laterBridge = () => window.zero as (Omit<NonNullable<Window['zero']>, keyo
 
 export interface FileLinkAsk { product: string; thread: string; src: string }
 /** `current`: the link holds the copy of the file on screen now. */
-/** `ahead`: the link holds a later version of the file than the one on screen. */
-export interface FileLink { token: string; url: string; version: number; createdAt: number; updatedAt: number; comments: number; current: boolean; ahead?: boolean }
+/** `ahead`: the link holds a later version of the file than the one on screen, or an edit made on its page not yet in the files. */
+/** `editable`: a document or a table, which the people it lets edit can change on its page. */
+export interface FileLink {
+  token: string; url: string; version: number; createdAt: number; updatedAt: number; comments: number; current: boolean; ahead?: boolean;
+  access: LinkAccess; can: LinkCan; rev: number; changedOnWeb: boolean; changedByName: string | null; editable: boolean;
+}
+export type LinkAccess = 'anyone' | 'people';
+export type LinkCan = 'view' | 'comment' | 'edit';
+export interface LinkPerson { email: string; can: LinkCan; name: string | null; avatar: string | null }
 export interface PublicLink { token: string; url: string; source: string; name: string; kind: string; createdAt: number; updatedAt: number; comments: number }
-export interface LinkComment { id: string; byName: string; byAvatar: string | null; text: string; at: number; mine: boolean; byOwner: boolean }
+/** `place`: where in the file it points (shared/artifact-marks.mts NotePlace); none for the whole file. */
+export interface LinkComment { id: string; byName: string; byAvatar: string | null; text: string; at: number; mine: boolean; byOwner: boolean; place?: NotePlace }
 /** `site` null: this copy's cloud has no website, so there is nothing to share on. */
 export interface FileLinkState { ok: boolean; error?: string; site?: string | null; signedIn?: boolean; link?: FileLink | null }
 import { checkProjectFolder } from '../../shared/project-folder-check.mts';
@@ -103,6 +112,7 @@ const waitingFixtures = Math.max(0, Math.min(99, Number(params.get('waiting') ??
 const crowdedFixtures = params.get('fixtures') === 'crowded';
 // The thread on screen, in fixtures only: see `lookingAt` below.
 let fixtureLooking: { product: string | null; id: string } | null = null;
+let fixtureSnapshotsTaken = 0;
 // ?fixtures=mock is the reference design, with its own copy, so the built
 // app can be put beside the picture and measured rather than remembered.
 const mockFixtures = params.get('fixtures') === 'mock';
@@ -488,6 +498,9 @@ export const api = {
       // she is meant to press could never be looked at before shipping.
       const wanted = params.get('update');
       if (wanted) base.update = updateShape(wanted);
+      // &arrives puts an urgent thread in Needs you from the second snapshot on,
+      // so its arrival can be watched with another thread open.
+      if (params.has('arrives') && ++fixtureSnapshotsTaken > 1) base.items = [fixtureUrgentArrival(), ...base.items];
       // The approval queue is opt-in (&approvals): a worker frozen mid-command
       // is a real state worth being able to look at, and it is not the state
       // every other fixtures screenshot wants a card floating over.
@@ -606,6 +619,10 @@ export const api = {
         const queued = base.items.filter((i) => /^(Can the welcome email|Bring back a list)/.test(i.title)).map((i) => i.id);
         base.supervisor.queued = queued;
         base.supervisor.capacity = base.supervisor.running.filter((r) => (r as { where?: string }).where !== 'cloud').length;
+      }
+      // &team=signedout: a build that can sign in, with nobody signed in and no team.
+      if (params.get('team') === 'signedout') {
+        base.team = { configured: false, canSignIn: true, started: true, signedIn: false, signingIn: null, me: null, team: null, people: [], cards: [], lastSyncAt: null, error: null };
       }
       // &usagestale: a Codex reading six hours old whose five hour window has ended.
       if (params.has('usagestale')) {
@@ -801,10 +818,27 @@ export const api = {
     if (!zero?.bringSharedFile) return { ok: false, error: `quit and reopen ${NAME} to bring in shared files` };
     return zero.bringSharedFile(p);
   },
-  async fileLinkComment(p: { token: string; text: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }> {
+  async fileLinkComment(p: { token: string; text: string; place?: NotePlace | null }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }> {
     const zero = window.zero;
     if (!zero?.fileLinkComment) return { ok: false, error: `quit and reopen ${NAME} to answer comments` };
     return zero.fileLinkComment(p);
+  },
+  /** Who can open a link, and what the link itself lets them do. */
+  async fileLinkAccess(p: { token: string; access: LinkAccess; can: LinkCan }): Promise<{ ok: boolean; error?: string }> {
+    const zero = window.zero;
+    if (!zero?.fileLinkAccess) return { ok: false, error: `quit and reopen ${NAME} to change who can open links` };
+    return zero.fileLinkAccess(p);
+  },
+  async fileLinkPeople(p: { token: string }): Promise<{ ok: boolean; error?: string; people?: LinkPerson[] }> {
+    const zero = window.zero;
+    if (!zero?.fileLinkPeople) return { ok: false, error: 'not here' };
+    return zero.fileLinkPeople(p);
+  },
+  /** Adds a person by email or changes what they can do; `can` null takes them off. */
+  async fileLinkPerson(p: { token: string; email: string; can: LinkCan | null }): Promise<{ ok: boolean; error?: string; people?: LinkPerson[] }> {
+    const zero = window.zero;
+    if (!zero?.fileLinkPerson) return { ok: false, error: `quit and reopen ${NAME} to share with people` };
+    return zero.fileLinkPerson(p);
   },
 
   /** "Try again" on a file in a conversation that was not delivered. */
@@ -1050,11 +1084,11 @@ export const api = {
     return (await window.zero?.filesPlaceOpen?.(p).catch(() => null)) ?? null;
   },
   /** Each file a thread names, as its version line numbers it. */
-  async fileLine(p: { product: string; id: string }): Promise<FileLine[]> {
+  async fileLine(p: { product: string; id: string; room?: string }): Promise<FileLine[]> {
     return (await window.zero?.fileLine?.(p).catch(() => null)) ?? [];
   },
   /** One answer per copy, in the order asked. */
-  async fileElsewhere(p: { product: string; id: string; copies: { path: string; file: string }[] }): Promise<FileElsewhere[]> {
+  async fileElsewhere(p: { product: string; id: string; room?: string; copies: { path: string; file: string }[] }): Promise<FileElsewhere[]> {
     const got = await window.zero?.fileElsewhere?.(p).catch(() => null);
     return Array.isArray(got) ? got : p.copies.map(() => ({ key: null, notes: [], approvals: [] }));
   },
@@ -1114,8 +1148,8 @@ export const api = {
     await window.zero.setThreadPins({ pins });
   },
 
-  /** Keep a thread on this Mac whatever the cloud is set to, or let it go again. */
-  async setThreadOnMac(onMac: Record<string, true | null>): Promise<void> {
+  /** Keep a thread on this Mac (true), send it to the cloud (false), or leave it to the cloud setting (null). */
+  async setThreadOnMac(onMac: Record<string, boolean | null>): Promise<void> {
     if (useFixtures || !window.zero?.setThreadOnMac) return;
     await window.zero.setThreadOnMac({ onMac });
   },
@@ -1164,6 +1198,10 @@ export const api = {
   },
 
   /** Who takes a thread sent to Auto: 'agent' or a teammate as 'mate:<id>' (shared/auto-route.mts). */
+  async answerRouteOffer(p: { product: string; id: string; make: boolean }): Promise<void> {
+    if (useFixtures || !window.zero?.answerRouteOffer) return;
+    await window.zero.answerRouteOffer(p);
+  },
   async routeThread(p: { product: string; id: string; to: string }): Promise<void> {
     if (useFixtures || !window.zero?.routeThread) return;
     await window.zero.routeThread(p);
@@ -1201,11 +1239,11 @@ export const api = {
   // process behind them, and a build old enough not to have the handler is the
   // ordinary case for anybody who opens a stale window: both give null, and the
   // walk carries on in the project they made rather than stopping.
-  async firstRunPractice(): Promise<{ slug: string; examples: string[]; backdrop?: string[] } | null> {
+  async firstRunPractice(opts?: { bare?: boolean }): Promise<{ slug: string; examples: string[]; backdrop?: string[] } | null> {
     if (useFixtures) return null;
     const zero = window.zero;
     if (!zero?.firstRunPractice) return null;
-    return zero.firstRunPractice();
+    return opts ? zero.firstRunPractice(opts) : zero.firstRunPractice();
   },
 
   // AND OFF THE SCREEN AGAIN AT THE END. Archived, never deleted: everything
@@ -1670,8 +1708,8 @@ export const api = {
     return zero.cloudSendCode(p);
   },
 
-  /** A key kept in the cloud for every cloud run: saved under its name, or removed. */
-  async cloudKey(p: { action: 'save' | 'remove'; name: string; value?: string; label?: string; reply?: { product: string; id: string; answer: string } }): Promise<{ ok: boolean; keys?: { name: string; savedAt: number | null; label?: string | null }[]; freed?: string[]; cloudOff?: boolean; error?: string }> {
+  /** A key kept in the cloud for every cloud run: saved under its name, or removed. `from` reads it on this computer instead of `value`. */
+  async cloudKey(p: { action: 'save' | 'remove'; name: string; value?: string; label?: string; from?: { place: string; from: string; entry?: string }; reply?: { product: string; id: string; answer: string } }): Promise<{ ok: boolean; keys?: { name: string; savedAt: number | null; label?: string | null }[]; freed?: string[]; cloudOff?: boolean; error?: string }> {
     const zero = window.zero;
     if (!zero?.cloudKey) return { ok: false, error: RESTART_NOTE };
     return zero.cloudKey(p);
@@ -1699,7 +1737,7 @@ export const api = {
   },
 
   /** What the person did with a sign-in link an agent on this thread is waiting on. */
-  async signInAnswer(p: { product: string; id: string; ask: string; said: 'signed-in' | 'skipped' | 'landed'; url?: string }): Promise<{ ok: boolean; error?: string }> {
+  async signInAnswer(p: { product: string; id: string; ask: string; said: 'signed-in' | 'skipped' | 'landed' | 'code'; url?: string; code?: string }): Promise<{ ok: boolean; error?: string }> {
     const zero = laterBridge();
     if (!zero?.signInAnswer) return { ok: false, error: RESTART_NOTE };
     return zero.signInAnswer(p);
@@ -1720,19 +1758,21 @@ export const api = {
     if (useFixtures) {
       if (params.get('cloudplan') === 'pro') return { signedIn: true, plan: 'pro', unlimited: false, agents: 10, hoursPerMonth: 400, running: 6, usedSeconds: 88 * 3600 };
       if (params.get('cloudplan') === 'free') return { signedIn: true, plan: 'free', unlimited: false, agents: 2, hoursPerMonth: 5, running: 1, usedSeconds: 1.5 * 3600, billing: null };
-      // &cloudplan=team-trial|team: on a team of 3, its trial 9 days from its end, or 3 seats paid for.
-      if (params.get('cloudplan') === 'team-trial' || params.get('cloudplan') === 'team') {
-        const trial = params.get('cloudplan') === 'team-trial';
-        // Each person's own hours: 10 on the trial, a seat's 400 a month once paid; &spent=1 has yours used up.
-        const each = trial ? 10 : 400;
+      // &cloudplan=team-trial|team-trial-card|team: on a team of 3, its trial 5 days from its end
+      // (with the card in, not yet charged), or 3 seats paid for.
+      if (['team-trial', 'team-trial-card', 'team'].includes(params.get('cloudplan') ?? '')) {
+        const trial = params.get('cloudplan') !== 'team';
+        const card = params.get('cloudplan') === 'team-trial-card';
+        // Each person's own hours: 50 on the trial, a seat's 400 a month once paid; &spent=1 has yours used up.
+        const each = trial ? 50 : 400;
         const used = (mine: number) => (params.has('spent') ? each : mine) * 3600;
         const people = [
           { id: 'p1', name: 'Sam Rivera', usedSeconds: used(trial ? 4.2 : 96), running: params.has('spent') ? 0 : 1 },
           { id: 'p2', name: 'Priya Natarajan', usedSeconds: (trial ? 3.1 : 81) * 3600, running: 1 },
           { id: 'p3', name: 'Leo Okafor', usedSeconds: (trial ? 1.2 : 35) * 3600, running: 0 },
         ];
-        const team = { trial, endsAt: trial ? Date.now() + 9 * 86_400_000 : null, seats: trial ? 0 : 3, members: 3, owner: params.get('owner') !== '0', agents: trial ? 2 : 10, running: people[0].running, hours: each, usedSeconds: people[0].usedSeconds, people };
-        return { signedIn: true, plan: 'team', unlimited: false, agents: team.agents, hoursPerMonth: team.hours, running: team.running, usedSeconds: team.usedSeconds, billing: null, team };
+        const team = { trial, endsAt: trial ? Date.now() + 5 * 86_400_000 : null, seats: trial && !card ? 0 : 3, members: 3, owner: params.get('owner') !== '0', agents: null, running: people[0].running, hours: each, usedSeconds: people[0].usedSeconds, people };
+        return { signedIn: true, plan: 'team', unlimited: true, agents: null, hoursPerMonth: team.hours, running: team.running, usedSeconds: team.usedSeconds, billing: null, team };
       }
       if (params.get('cloudplan') === 'spent') return { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0, billing: null, free: { agents: 2, hours: 5, usedSeconds: 5 * 3600 } };
       return { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0 };

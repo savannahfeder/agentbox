@@ -64,6 +64,7 @@ import { fileURLToPath } from 'node:url';
 import { envName, readEnv } from '../shared/product-name.mjs';
 import { liveDownload, RELEASE_REPO, DOWNLOAD_ASSET } from './lib/live-download.mjs';
 import { whyNotToRelease } from './lib/ship-rules.mjs';
+import { tryAgain } from './lib/try-again.mjs';
 import { cloudAccountConfig } from '../main/cloud/config.mts';
 import { loadCloudConfig } from '../main/team/session.mts';
 
@@ -292,7 +293,7 @@ if (cloud) {
 }
 if (teamCloud) {
   for (const k of ['url', 'anonKey', 'phoneSite']) if (teamCloud[k]) args.push(`-c.extraMetadata.bakedTeam.${k}=${teamCloud[k]}`);
-  console.log(`→ baking the team cloud into the build (${teamCloud.url}): Settings › Phone can sign in, and Multiplayer is in Alpha features`);
+  console.log(`→ baking the team cloud into the build (${teamCloud.url}): Settings › Phone can sign in, and a team gets its Team page`);
 } else {
   console.log('→ no team.config.json, so this build cannot sign in for the phone');
 }
@@ -327,9 +328,14 @@ console.log(`\n${dmgs.length ? dmgs.map((f) => `  release/${f}`).join('\n') : ' 
 // Apple's own check with two fatal errors. Measured on 0.1.0. So the disk
 // image is signed, sent to Apple and stapled here, with the same three env
 // vars electron-builder already used for the .app.
-function run(label, file, argv) {
-  const r = spawnSync(file, argv, { cwd: repo, stdio: 'inherit' });
-  if (r.status !== 0) {
+// Apple drops uploads now and then (0.1.24: "Connection reset by peer"), so the
+// steps that talk to it are given more than one try.
+function run(label, file, argv, { tries = 1 } = {}) {
+  const ok = tryAgain((attempt) => {
+    if (attempt > 1) console.log(`→ ${label} again (try ${attempt} of ${tries})`);
+    return spawnSync(file, argv, { cwd: repo, stdio: 'inherit' }).status === 0;
+  }, { tries });
+  if (!ok) {
     die([
       `${label} failed for the disk image.`,
       'The .app inside it is fine; the disk image is not, and Gatekeeper will refuse it.',
@@ -355,11 +361,11 @@ if (!noSign) {
           '--team-id', process.env.APPLE_TEAM_ID,
           '--password', process.env.APPLE_APP_SPECIFIC_PASSWORD,
         ]),
-      '--wait',
-    ]);
+      '--wait', '--timeout', '1h',
+    ], { tries: 3 });
 
     console.log(`→ stapling the ticket onto ${dmg}`);
-    run('stapler', 'xcrun', ['stapler', 'staple', dmg]);
+    run('stapler', 'xcrun', ['stapler', 'staple', dmg], { tries: 3 });
 
     // The same check a stranger's Mac makes. It has to pass here or the build
     // is not finished, whatever the notarisation said about the .app.

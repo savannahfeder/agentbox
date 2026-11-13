@@ -1,7 +1,7 @@
 // The app: the agent inbox. Electron shell around a keyboard-first renderer, a
 // file-derived store, and a supervisor of headless sessions.
 
-import { app, BrowserWindow, Menu, Notification, clipboard, crashReporter, dialog, ipcMain, nativeImage, net, powerMonitor, protocol, screen as electronScreen, shell, session, safeStorage, systemPreferences } from 'electron';
+import { app, BrowserWindow, Menu, Notification, clipboard, crashReporter, dialog, ipcMain, nativeImage, nativeTheme, net, powerMonitor, protocol, screen as electronScreen, shell, session, safeStorage, systemPreferences } from 'electron';
 import './no-default-menu.mts';
 import type { ContextMenuParams, MenuItemConstructorOptions, WebContents } from 'electron';
 import * as workItemsDisk from './store/work-items.mts';
@@ -52,6 +52,7 @@ import { teammatesOn } from '../shared/teammates.mts';
 import { dataFolderName, isNewUserBuild } from '../shared/side-build.mts';
 import { runningAsAFreshUser } from '../shared/fresh-user-home.mts';
 import { newUserWindow } from './new-user-window.mts';
+import { applyGlass, glassTone, glassWindow, loadWindowGlass } from './window-glass.mts';
 import { openFreshUser } from './fresh-user.mts';
 import { installCrashReports, report as reportCrash, reportFromRenderer, pending as pendingCrashes, setTransport } from './crash-report.mts';
 import { keepThePageAlive } from './when-the-page-stops.mts';
@@ -63,10 +64,11 @@ import { askBeforeClosingWhileWorking } from './close-while-working.mts';
 import { createPlace } from '../shared/where-it-runs-from.mts';
 import { createSourceUpdater } from './source-updater.mts';
 import { learnShellDataDirs, recoverShellPath } from './shell-path.mts';
+import { openForThePerson } from './opens-a-program.mts';
 import { installNotifier } from './notify.mts';
 import { createCornerTag } from './corner-tag.mts';
 import { loadLiquidGlass } from './liquid-glass.mts';
-import { DOC_SCHEMES, DocGrants, docPath } from './doc-scheme.mts';
+import { DOC_SCHEMES, DocGrants, docPath, servedApart } from './doc-scheme.mts';
 import { quietTheFramesScrollbars } from './frame-scrollbars.mts';
 import { letLocalAppsShowInThePane } from './local-app-frames.mts';
 import { hardenAttachedWebview } from './webview-guard.mts';
@@ -77,7 +79,7 @@ import { writeHeldThenReload } from './write-before-reload.mts';
 import { answerDraftCopy } from './draft-copy.mts';
 import { IS_SHE_TYPING_IN_THE_PAGE, theAppKeepsThisInput, theAppKeepsThisLetterInAPage } from '../shared/artifact-keys.mts';
 import { NAME, Name, WAS } from '../shared/product-name.mjs';
-import { JOIN_SCHEME, ourLink, tokenFromLink } from '../shared/room-links.mts';
+import { JOIN_SCHEME, ourLink, threadFromAppLink, tokenFromLink } from '../shared/room-links.mts';
 import { fileLinkToken } from './bring-shared-file.mts';
 import { getMic } from './mic.mts';
 import { openInBrowser } from './open-in-browser.mts';
@@ -128,9 +130,10 @@ protocol.registerSchemesAsPrivileged([...DOC_SCHEMES.map((scheme) => ({
 
 // A local file answered so the window asks again next time instead of reusing
 // what it drew before. Why, measured, is at the page scheme's handler below.
-function noStore(res: Response) {
+function noStore(res: Response, extra: Record<string, string> = {}) {
   const headers = new Headers(res.headers);
   headers.set('cache-control', 'no-store');
+  for (const [k, v] of Object.entries(extra)) headers.set(k, v);
   return new Response(res.body, { status: res.status, headers });
 }
 
@@ -284,23 +287,23 @@ function showWindow() {
   if (window.isMinimized()) window.restore();
   window.focus();
 }
+// And a thread's link (agentbox://t/<owner>/<thread>), which its web page opens: held the same way.
+let pendingThread = threadFromAppLink(process.argv.find((a) => a.startsWith(`${JOIN_SCHEME}://`)) ?? '');
 // A SHARED FILE'S APP LINK (agentbox://f/<token>), from the link page's
 // "Open in Agentbox", held the same way until the window takes it.
 let pendingSharedFile = fileLinkToken(process.argv.find((a) => a.startsWith(`${JOIN_SCHEME}://`)) ?? '');
+function tellWindow(channel: string) {
+  if (window && !window.isDestroyed()) { window.webContents.send(channel); showWindow(); }
+}
 function openJoinLink(url: string) {
+  const thread = threadFromAppLink(url);
+  if (thread) { pendingThread = thread; tellWindow('zero:thread-link'); return; }
   const file = fileLinkToken(url);
-  if (file) {
-    pendingSharedFile = file;
-    if (window && !window.isDestroyed()) { window.webContents.send('zero:shared-file'); showWindow(); }
-    return;
-  }
+  if (file) { pendingSharedFile = file; tellWindow('zero:shared-file'); return; }
   const token = tokenFromLink(url);
   if (!token) return;
   pendingJoin = token;
-  if (window && !window.isDestroyed()) {
-    window.webContents.send('zero:join-room');
-    showWindow();
-  }
+  tellWindow('zero:join-room');
 }
 // Set by ⌘R and read once by the renderer as it comes back up, so a reload can
 // say so. A reload that lands on an identical screen and a chord that did
@@ -521,6 +524,7 @@ async function createWindow() {
     onChange: () => { try { pushUpdate(); } catch { /* no window yet */ } },
     log: (line) => console.log(line),
     runningIds: () => supervisor.runsGoing().map((s) => s.itemId),
+    wontStart: () => supervisor.status(),
     ownMates: () => matesForTheTeam(store, config),
     sharing: () => alphaFeatures(config).multiplayer,
     // HER PHONE WITH THE MAC SHUT (main/phone-inbox.mts). What it left is done
@@ -605,7 +609,7 @@ async function createWindow() {
   // web-contents-created only fires for contents created after it (the first
   // fix missed the main window for exactly that reason, 2026-08-04).
   const openLink = (url: string) => {
-    if (url.startsWith('file://')) shell.openPath(decodeURIComponent(url.replace('file://', '')));
+    if (url.startsWith('file://')) void openForThePerson(shell, decodeURIComponent(url.replace('file://', '')));
     else void openInBrowser(url, { shell });
   };
 
@@ -785,6 +789,8 @@ async function createWindow() {
     });
   });
 
+  const liquidGlass = loadWindowGlass();
+  const { additionalArguments, ...glass } = glassWindow(process.platform, alphaFeatures(config).glass, !!liquidGlass);
   window = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -800,15 +806,18 @@ async function createWindow() {
       width: 1440,
       height: 900,
     }),
-    backgroundColor: '#1a1a1c',
+    ...glass,
     titleBarStyle: 'hiddenInset',
     webPreferences: {
       preload: path.join(appDir, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       webviewTag: true, // the inbox-zero browser
+      additionalArguments,
     },
   });
+
+  if (alphaFeatures(config).glass) applyGlass(window, process.platform, true, liquidGlass);
 
   // Electron hands the window's title to the page's the moment one loads, and
   // renderer/index.html carries the app's name, so a throwaway copy went back
@@ -931,6 +940,7 @@ async function createWindow() {
   quitStep(app, 'before-quit', 'connections.stop', () => connected.stop());
   const ipc = registerIpc({
     store, supervisor, config, window, analytics, docGrants, updater,
+    glass: (on) => applyGlass(window, process.platform, on, liquidGlass),
     host: filingHost,
     team,
     connections: connected.connections,
@@ -1146,6 +1156,7 @@ async function createWindow() {
   let cornerTag: ReturnType<typeof createCornerTag> | null = null;
   const notifier = installNotifier({
     app, window, Notification, powerMonitor, ipcMain, nativeImage,
+    openExternal: (url: string) => shell.openExternal(url),
     onArrivals: (list, needsYou) => team?.phoneArrivals(list, needsYou),
     onChange: () => cornerTag?.refresh(),
   });
@@ -1169,6 +1180,7 @@ async function createWindow() {
   // Asked for once by the renderer as it mounts, rather than pushed on
   // did-finish-load, which races the first effects and would drop the very
   // message it exists to deliver.
+  ipcMain.handle('zero:glass-tone', (_e, payload) => { nativeTheme.themeSource = glassTone(payload?.tone); });
   ipcMain.handle('zero:boot-info', () => {
     const info = {
       reloaded: reloadRequested, builtAt: builtAt(), recovered: pendingRecovery,
@@ -1199,13 +1211,14 @@ async function createWindow() {
     },
   });
   ipcMain.handle('zero:take-join', () => { const token = pendingJoin; pendingJoin = null; return token; });
+  ipcMain.handle('zero:take-thread-link', () => { const thread = pendingThread; pendingThread = null; return thread; });
   ipcMain.handle('zero:take-shared-file', () => { const token = pendingSharedFile; pendingSharedFile = null; return token; });
   // External links from markdown open in the real browser; local artifacts
   // (a demo page, a screenshot a worker saved) open in their default app, so
   // "see it working" is one click from the message.
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:/.test(url)) void openInBrowser(url, { shell });
-    else if (url.startsWith('file://')) shell.openPath(decodeURIComponent(url.replace('file://', '')));
+    else if (url.startsWith('file://')) void openForThePerson(shell, decodeURIComponent(url.replace('file://', '')));
     return { action: 'deny' };
   });
   // A plain link the renderer did not catch would turn the whole window into
@@ -1422,7 +1435,7 @@ if (!app.requestSingleInstanceLock()) {
         // replaced on disk 2250 -> 3118 wide, page reopened, frame drew 2250.
         // With this header it drew 3118. These are local files; there is no
         // download to save by caching them.
-        return noStore(await net.fetch(pathToFileURL(file).toString()));
+        return noStore(await net.fetch(pathToFileURL(file).toString()), servedApart(file));
       } catch {
         return new Response('Not there.', { status: 404 });
       }

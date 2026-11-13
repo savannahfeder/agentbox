@@ -18,12 +18,13 @@ import { newThreadChoices, onceAtATime, openingChoices, openingEngine, openingFo
 import { AutoMark, TeammateMark } from './Teammates';
 import { roleOf } from '../lib/teammates';
 import type { Teammate } from '../../../renderer/src/types';
-import { useDraft } from '../lib/drafts';
+import { useDraft, type Draft } from '../lib/drafts';
 import { appStore } from '../platform/persist';
 import { useCloud } from '../state/cloud';
 import { useComputerAgents } from '../state/computer-agents';
 import { useSendWhenOnline } from '../state/send-when-online';
 import { AttachSheet, Attached } from './Attach';
+import { withPicked } from '../lib/attach';
 import { DictationProblem, Listening, MicButton, useDictation } from './Dictation';
 import { Caret, Clip, Clock, Repeat } from './icons';
 import { TimeBox, TypingSheet } from './Later';
@@ -42,8 +43,8 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** Everything the form holds, and its send; `sent` runs once a thread has gone. */
-export function useNewThread(sent: () => void) {
+/** Everything the form holds, and its send; `sent` runs once a thread has gone, `reopen` once its Undo has put the draft back. */
+export function useNewThread(sent: () => void, reopen?: () => void) {
   const c = useCloud();
   const projects = c.view.products;
   // Your words, files and priority outlive the page (lib/drafts.ts); the
@@ -116,7 +117,11 @@ export function useNewThread(sent: () => void) {
       }
       const saved = await c.attach(product, draft.files);
       const harness = newThreadChoices({ priority: draft.priority, engine, model, effort, engineCount: agents.engines.length, ...codex });
-      await c.send({ kind: 'new', product, to: projectName, text: draft.text, saved, choices: { ...harness, ...later, ...(onAuto ? { labels: [AUTO_LABEL] } : {}) } }, null);
+      // Undo withdraws the thread, so its words and files come back to the box.
+      // Taken from the page, not the store, which drops pictures too big to keep.
+      const sending: Draft = { text: draft.text, files: draft.files, priority: draft.priority };
+      const undone = () => { if (draft.restore(sending)) reopen?.(); };
+      await c.send({ kind: 'new', product, to: projectName, text: draft.text, saved, choices: { ...harness, ...later, ...(onAuto ? { labels: [AUTO_LABEL] } : {}) } }, null, { undone });
       // The draft goes only once the thread has: a failed send keeps every word on the page.
       draft.take();
       offline.clear();
@@ -267,7 +272,7 @@ export function NewThreadSheets({ form, now }: { form: NewThread; now: number })
       <ModelSheet open={sheet === 'model'} close={() => setSheet(null)} model={model} effort={effort} engine={engine} codex={codex}
         pickModel={form.pickModel} pickEffort={form.pickEffort} />
       <PrioritySheet open={sheet === 'priority'} close={() => setSheet(null)} value={priorityValueOf(draft.priority ?? 'medium')} pick={(v) => draft.setPriority(priorityIdOf(v))} />
-      <AttachSheet open={sheet === 'attach'} close={() => setSheet(null)} add={(more) => draft.setFiles((f) => [...f, ...more])} fail={setError} />
+      <AttachSheet open={sheet === 'attach'} close={() => setSheet(null)} add={(more) => draft.setFiles((f) => withPicked(f, more))} fail={setError} />
       <Sheet open={sheet === 'project'} close={() => setSheet(null)}>
         <SheetHead>Project</SheetHead>
         {projects.map((p) => <SheetRow key={p.slug} label={p.name} on={p.slug === product} lead={<Swatch slug={p.slug} />} onPress={() => { form.pickProject(p.slug); setSheet(null); }} />)}

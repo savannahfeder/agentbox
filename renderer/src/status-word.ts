@@ -14,6 +14,7 @@ import { STATE_WORD, stateWordOf } from './threads/summary-rules';
 import { threadState } from '../../shared/thread-cards.mts';
 import { closedUnshipped, notShippedLine, shippedAs } from '../../shared/not-shipped.mts';
 import { asksWho, isAuto } from '../../shared/auto-route.mts';
+import { saysARunGotNowhere } from '../../shared/spawn-trouble.mts';
 import type { ThreadStateWord, WorkItem } from './types';
 import type { Fleet } from './fleet';
 import { whyWords, type WhyCard } from './where-why';
@@ -95,6 +96,9 @@ export function statusCell(item: WorkItem, facts: StatusFacts = {}): StatusCell 
   // The bar over the conversation owns the whole story of a dead worker; the
   // row says the one word, because a row that says nothing reads as a row
   // nothing has happened on.
+  // Signed out is the reason a stopped thread is stopped, so it is the word.
+  const signIn = facts.signInNeeded?.[item.id] ? liveLine(item, { ...facts, stalled: false }) : null;
+  if (signIn?.state === 'signin') return says(shortWord('signin'), 'held', true, signIn.line);
   if (facts.stalled) return says('Stopped', 'held', true, 'The agent that was on this died without finishing. Send it a message to start it again.');
   if (state === 'scheduled') return plain(stateWordOf(item, state), 'sched');
 
@@ -139,6 +143,10 @@ export function statusCell(item: WorkItem, facts: StatusFacts = {}): StatusCell 
     return waiting ? { ...cell, why } : cell;
   }
   if (state === 'waiting' && shipped) return shipped;
+  // The app's own note that a run got nowhere is not an answer.
+  if (state === 'waiting' && item.wrote?.result?.source === 'agent' && saysARunGotNowhere(item.result)) {
+    return says('Stopped', 'held', true, String(item.result).split('\n')[0]);
+  }
   return plain(stateWordOf(item, state), state === 'waiting' ? 'need' : 'queued');
 }
 
@@ -168,6 +176,7 @@ export function factsFor(fleet: Fleet, id: string): LiveFacts {
     silent: fleet.silent?.[id] ?? null,
     paused: !!fleet.paused,
     whyNotCloud: fleet.whyNotCloud?.[id] ?? null,
+    signInBar: !!fleet.signInBar,
   };
 }
 

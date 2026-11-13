@@ -1,21 +1,22 @@
-// NO WORKER EVER DRIVES THE BROWSER SHE ACTUALLY USES.
+// NO WORKER DRIVES A PERSON'S OWN BROWSER UNLESS THEY TURNED IT ON.
 //
-// Her decision on w-5ebf7bf7bb, 2026-09-23, while the parity project was
-// weighing browser support: having Claude Code drive your real browser is
-// viable, she does not want to use it, and she does not want Claude Code to have
-// the ability at all. If browser work is ever built here it needs careful
-// permissioning first.
+// Her decision on w-5ebf7bf7bb, 2026-09-23: having Claude Code drive your real
+// browser is viable, she does not want to use it, and she does not want Claude
+// Code to have the ability at all; if it is ever built it needs careful
+// permissioning first. On w-007ab2ab26, 2026-11-09, she narrowed it: "that
+// shouldn't be a rule for everyone as it might block some users, but i do llike
+// it as a rule for me." So it follows each person's own Claude Code: on only
+// where they turned Claude in Chrome on by default
+// (tests/an-agent-uses-your-chrome-only-once-you-turn-it-on).
 //
-// The reason it is a test and not a note: the flag that would do it is one word,
-// `--chrome`, and it would be an easy thing for a later session to add in good
-// faith while chasing parity with the terminal clients. The browser she uses is
-// signed into everything she has, so an agent with the keyboard there holds every
-// account she holds, and no per-run approval makes that legible in the moment.
+// The reason it is still a test and not a note: the flag is one word,
+// `--chrome`, and an easy thing for a later session to add in good faith while
+// chasing parity with the terminal clients. The browser a person uses is signed
+// into everything they have, so it may come in through one file, behind that
+// setting, and nowhere else.
 //
-// A browser an agent may drive has to carry nothing. The app already ships one:
-// the pane on the `persist:junk` partition, a separate store with no logins in
-// it, described in main/main.mts as a browser a human drives. That is the only
-// door this may come through, and it needs its own permission design first.
+// A browser an agent may drive without asking has to carry nothing: the pane on
+// the `persist:junk` partition, a separate store with no logins in it.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -26,6 +27,7 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
 /** Everything that builds or spawns a session. */
 const SPAWNING = ['main', 'shared'];
+const THE_ONE_DOOR = path.join('main', 'your-chrome.mts');
 
 function* files(dir) {
   for (const entry of fs.readdirSync(path.join(root, dir), { withFileTypes: true })) {
@@ -36,22 +38,23 @@ function* files(dir) {
 }
 
 describe('the browser an agent may reach', () => {
-  it('is never the one she is signed into', () => {
-    const offenders = [];
+  it('is the person’s own only through the one file behind their setting', () => {
+    const naming = [];
     for (const dir of SPAWNING) {
       for (const rel of files(dir)) {
-        const text = read(rel);
         // The flag itself, however it is quoted, and the same thing spelled as
         // an argument in a list.
-        if (/['"`]--chrome['"`]/.test(text)) offenders.push(rel);
+        if (/['"`]--chrome['"`]/.test(read(rel))) naming.push(rel);
       }
     }
-    expect(offenders).toEqual([]);
+    expect(naming).toEqual([THE_ONE_DOOR]);
   });
 
-  it('is the pane the app ships, which carries no logins', () => {
-    // If this line ever goes, the sentence above stops being true and the rule
-    // in CLAUDE.md has nothing behind it.
+  it('is behind their Claude Code setting, on only when it says exactly true', () => {
+    expect(read(THE_ONE_DOOR)).toContain('.claudeInChromeDefaultEnabled === true');
+  });
+
+  it('is the pane the app ships, which carries no logins, when nobody turned it on', () => {
     expect(read('main/main.mts')).toContain("session.fromPartition('persist:junk')");
   });
 
@@ -59,5 +62,6 @@ describe('the browser an agent may reach', () => {
     const law = read('CLAUDE.md');
     expect(law).toContain('NO WORKER EVER DRIVES THE USER'); // the heading
     expect(law).toContain('--chrome');
+    expect(law).toContain('main/your-chrome.mts');
   });
 });

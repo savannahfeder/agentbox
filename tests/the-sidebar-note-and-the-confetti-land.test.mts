@@ -134,7 +134,7 @@ describe('the last card asks one thing and the celebration is in her own project
     // listener survive a redraw at all
     // (tests/the-finished-tutorial-words-take-themselves-down).
     expect(walk).toMatch(/const t = setTimeout\(\(\) => gone\.current\(\), LANDED_MS\);/);
-    expect(walk).toMatch(/const on = \(\) => gone\.current\(\);/);
+    expect(walk).toMatch(/const on = \(e: Event\) => \{[\s\S]{0,400}?\n      gone\.current\(\);\n    \};/);
   });
 
   it('says the line that is true of the inbox behind it', () => {

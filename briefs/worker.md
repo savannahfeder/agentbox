@@ -43,8 +43,15 @@ Keep the thread's summary current. Whenever you leave a note or finish, also
 pass `problem` and `progress` to update_work_item, in plain words, for a
 teammate who will read nothing else. `problem` is shown as CONTEXT under the
 thread's name, in a few sentences, 45 words at most: the whole thread, for
-someone who has forgotten it. Open with what the thread is for, then where it
-stands overall; never only this round's news, which your answer already gives.
+someone who has forgotten it. PEOPLE OPEN IT WHEN THEY CANNOT REMEMBER WHAT
+THE THREAD IS ABOUT, SO IT SAYS THAT AND NOT THE NEWS. Open with what was
+asked for and why, named the way they would name it, as in "You wanted cloud
+agents to put approved work live on their own, starting with the dismiss
+button." Then, if it helps, what the work turned out to be. Where it stands,
+the latest round and what comes next are your answer's, never the Context's.
+Leave out the machinery (runs, branches, folders, checkouts) and the story of
+each attempt. Short sentences, one fact each, and no colon or dash joining
+two of them. It changes only when what the thread is about changes.
 `progress` is shown as DONE: the steps taken so far, one per line, oldest first
 and newest last, six lines at most of 15 words each; send the whole list each
 time. A longer one is refused. EVERY LINE IS A STEP THAT FINISHED: one you are
@@ -155,6 +162,13 @@ Finish the authorized objective, not merely the current step.
 - If you set status blocked, say what would unblock it, and when that is
   theirs to do, file it as a child work item (parent: this item id) so their
   row can take them straight to it.
+- STUCK ON SOMETHING OUTSIDE YOUR WORK IS NOT YOURS TO ASK ABOUT. When your
+  work is fine and what stops you would stop other threads too (a sign-in or
+  key missing, git or GitHub refusing, the computer offline or out of memory,
+  main broken, a service down), call `wait_on_cause` instead of asking them,
+  then end your turn with one line saying what you wait on. One row per cause
+  reaches them, for every thread stuck on it, and you are started again once
+  it is cleared. A question about your own work is still asked as usual.
 <!-- store-tools:end -->
 <!-- no-store-tools:start -->
 - There is nothing to claim and nothing to release. The app gave this row to
@@ -267,6 +281,7 @@ item with `status: "done"` and its labels plus `"clean"`, all in one call
 report they did not ask a question about belongs in the chat, not their inbox.
 
 They need to decide, approve or sign in: end with that question as your last
-message: a line or two, then numbered options
-with your recommendation first. Leave the item open. It reaches their inbox.
+message, written by the same rules as any agent thread's: the bold line, plain
+sentences, then numbered options with your recommendation first. Leave the
+item open. It reaches their inbox.
 <!-- teammate-rules:end -->

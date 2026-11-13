@@ -35,18 +35,21 @@ describe('a teammate\'s chat', () => {
   });
 
   it('keeps every setting in the sheet, the rarely changed ones folded', () => {
-    const body = fn('Details');
-    const folded = body.slice(body.indexOf('<details'), body.indexOf('</details>'));
-    for (const k of ['Name', 'Model', 'Works in', 'Can read', 'Your team', 'This week']) expect(folded).toContain(`<dt>${k}</dt>`);
-    const open = body.slice(0, body.indexOf('<details'));
+    // The sheet and a teammate's About on its place share AboutFields; the sheet folds the settings.
+    expect(fn('Details')).toContain('<AboutFields {...props} />');
+    const body = fn('AboutFields');
+    const settings = body.slice(body.indexOf('const settings = <dl>'), body.indexOf('</dl>;'));
+    for (const k of ['Name', 'Model', 'Works in', 'Can read', 'Your team', 'This week']) expect(settings).toContain(`<dt>${k}</dt>`);
+    expect(body).toContain('<details className="tq-sheet-more"><summary role="button">Settings</summary>{settings}</details>');
+    const open = body.slice(body.indexOf('return <>'));
     for (const k of ['Job', 'How it writes', 'On its own', 'Knows', 'Playbooks', 'Its work']) expect(open).toContain(`<dt>${k}</dt>`);
   });
 
   it('keeps its work and everything it remembers one press away', () => {
-    expect(fn('Details')).toMatch(/onOpen\(`log:\$\{t\.id\}`\)/);
-    expect(fn('Details')).toMatch(/const knows = t\.memory\.slice\(-3\)/);
-    expect(fn('Details')).toMatch(/t\.memory\.length > knows\.length && <Inline onClick=\{about\}>All \{t\.memory\.length\}<\/Inline>/);
-    expect(fn('Details')).toMatch(/const about = \(\) => onOpen\(`about:\$\{t\.id\}`\)/);
+    expect(fn('AboutFields')).toMatch(/onOpen\(`log:\$\{t\.id\}`\)/);
+    expect(fn('AboutFields')).toMatch(/const knows = t\.memory\.slice\(-3\)/);
+    expect(fn('AboutFields')).toMatch(/t\.memory\.length > knows\.length && <Inline onClick=\{about\}>All \{t\.memory\.length\}<\/Inline>/);
+    expect(fn('AboutFields')).toMatch(/const about = \(\) => onOpen\(`about:\$\{t\.id\}`\)/);
   });
 
   it('draws no column on a new teammate\'s page either, and still asks where it works', () => {
@@ -76,7 +79,7 @@ describe('About', () => {
   // Power test: "Sent a change from the About page and it vanished with no
   // sign it went anywhere." The box emptied and About stayed as it was.
   it('takes you to the chat once you send it a change, where your words and its answer show', () => {
-    expect(fn('About')).toMatch(/const sent = \(await call\('post', \{ text, to: \[t\.id\] \}\)\) !== false;\s*if \(sent\) onOpen\(t\.id\);/);
+    expect(fn('About')).toMatch(/const sent = \(await call\('post', \{ text, to: \[t\.id\](, priority)?(, \.\.\.\(filesIn \? \{ filesIn \} : \{\}\))? \}\)\) !== false;\s*if \(sent\) onOpen\(t\.id\);/);
   });
 
   it('lists everything it knows, each one with a way to forget it', () => {

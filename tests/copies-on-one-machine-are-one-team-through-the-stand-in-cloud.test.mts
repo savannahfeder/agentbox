@@ -39,6 +39,19 @@ describe('the stand-in team cloud', () => {
     await expect(dev.renameTeam(team.id, 'Mine')).rejects.toThrow(/not allowed/);
   });
 
+  // Two testers' chat messages read "auth-audit.md did not send" for a file
+  // the room already held (2026-11-12): the wire dropped the error's code, so
+  // "already here" read as a failure. The hosted cloud tells them apart.
+  it('says a file is already in the room by the error\'s code, as the hosted cloud does', async () => {
+    const { url } = await up();
+    const maya = await person(url, 'maya');
+    const room = await maya.createRoom({ name: 'Lumen', people: [] });
+    const data = Buffer.from('# Audit').toString('base64');
+    await maya.putRoomFile(room, 'abc123-audit.md', data);
+    await expect(maya.putRoomFile(room, 'abc123-audit.md', data)).rejects.toMatchObject({ code: 'room-file-exists' });
+    await expect(maya.putRoomFile(room, 'not a plain name/x', data)).rejects.not.toHaveProperty('code');
+  });
+
   it('tells a listener about a change the other person made, and not a line of someone else\'s room', async () => {
     const { url } = await up();
     const maya = await person(url, 'maya');

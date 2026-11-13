@@ -73,7 +73,7 @@ describe('what an agent left running', () => {
   });
 
   it('while memory is short, goes one task a look, the one that finished longest ago first', async () => {
-    const h = cleaner([p(10, 'w-old'), p(20, 'w-mid'), p(30, 'w-new')], { pressure: 'tight' });
+    const h = cleaner([p(10, 'w-old'), p(20, 'w-mid'), p(30, 'w-new')], { pressure: 'critical' });
     h.c.ended('w-old');
     h.advance(HOUR); h.c.ended('w-mid');
     h.advance(HOUR); h.c.ended('w-new');

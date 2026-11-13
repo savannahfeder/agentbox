@@ -79,6 +79,7 @@ it('on Linux, the Chromium the copy runs, helpers included', () => {
 it("the tester's browser frees its profile before it opens", () => {
   const browse = fs.readFileSync(new URL('../.claude/skills/verify-agentbox/scripts/browse.mjs', import.meta.url), 'utf8');
   const launch = browse.slice(browse.indexOf('async function launch()'), browse.indexOf('async function tab()'));
-  expect(launch.indexOf('freeProfile(profile)')).toBeGreaterThan(-1);
-  expect(launch.indexOf('freeProfile(profile)')).toBeLessThan(launch.indexOf('launchChrome('));
+  const frees = launch.search(/freeProfile\(profile[,)]/);
+  expect(frees).toBeGreaterThan(-1);
+  expect(frees).toBeLessThan(launch.indexOf('launchChrome('));
 });

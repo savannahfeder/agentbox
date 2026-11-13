@@ -22,7 +22,7 @@ import { opensIntoNeedsYou, replyMovesOn } from '../renderer/src/advance.ts';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const app = fs.readFileSync(path.join(root, 'renderer', 'src', 'App.tsx'), 'utf8');
 
-const waiting = { view: 'progress', onBoard: false, index: 1, searching: false, conversation: false, interrupted: false, walking: false };
+const waiting = { view: 'progress', onBoard: false, index: 1, searching: false, conversation: false, walking: false };
 
 describe('opening a thread that waits in Needs you', () => {
   it('from Everything else or In progress puts you in Needs you', () => {
@@ -51,9 +51,6 @@ describe('it leaves you where you were', () => {
   });
   it('in a conversation with a person', () => {
     expect(opensIntoNeedsYou({ ...waiting, conversation: true })).toBe(false);
-  });
-  it('when an urgent thread took the screen, which goes back to what you were reading', () => {
-    expect(opensIntoNeedsYou({ ...waiting, interrupted: true })).toBe(false);
   });
   it('during the first-run walk, which moves the tabs itself', () => {
     expect(opensIntoNeedsYou({ ...waiting, walking: true })).toBe(false);
