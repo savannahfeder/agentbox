@@ -108,9 +108,10 @@ describe('the cloud machine\'s own log', () => {
     const lines: string[] = [];
     sandbox = createSandbox({ workRoot: path.join(tmp, 'vm'), reserveBytes: 64 * 1024, log: (l: string) => lines.push(l) });
     const real = fs.writeSync;
-    let toLog = 0; let refused = 0;
+    let refused = 0;
+    // The first output event, which every run has however its output is chunked.
     vi.spyOn(fs, 'writeSync').mockImplementation(((fd: number, ...rest: unknown[]) => {
-      if (Buffer.isBuffer(rest[0]) && rest[0].subarray(0, 7).toString() === '{"seq":' && (toLog += 1) > 4 && refused < 1) {
+      if (Buffer.isBuffer(rest[0]) && rest[0].subarray(0, 7).toString() === '{"seq":' && rest[0].includes('"kind":"stdout"') && refused < 1) {
         refused += 1;
         throw Object.assign(new Error('ENOSPC: no space left on device, write'), { code: 'ENOSPC' });
       }
