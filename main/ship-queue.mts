@@ -365,7 +365,20 @@ export function gitConfigEnv(pairs: [string, string][]): Record<string, string> 
   return out;
 }
 
-export async function runScript(script: string, cwd: string, { timeout = SHIP_MS, wholeSuiteTimeout = WHOLE_SUITE_SHIP_MS, env = process.env, gitConfig = [] }: { timeout?: number; wholeSuiteTimeout?: number; env?: NodeJS.ProcessEnv; gitConfig?: [string, string][] } = {}): Promise<ShipRun> {
+// Process groups of the ships running now, so quitting the app can stop them.
+const runningShips = new Set<number>();
+const ownGroup = process.platform !== 'win32';
+
+function signalShip(pid: number, signal: NodeJS.Signals) {
+  try { process.kill(ownGroup ? -pid : pid, signal); } catch { /* already gone */ }
+}
+
+/** Stops every running ship and everything under it (git, the hook, vitest and its workers). */
+export function stopShips() {
+  for (const pid of runningShips) signalShip(pid, 'SIGTERM');
+}
+
+export async function runScript(script: string, cwd: string, { timeout = SHIP_MS, wholeSuiteTimeout = WHOLE_SUITE_SHIP_MS, env = process.env, gitConfig = [], graceMs = 5000 }: { timeout?: number; wholeSuiteTimeout?: number; env?: NodeJS.ProcessEnv; gitConfig?: [string, string][]; graceMs?: number } = {}): Promise<ShipRun> {
   const node = env.npm_node_execpath && fs.existsSync(env.npm_node_execpath) ? env.npm_node_execpath : 'node';
   const hooks = await baseHooksPath(cwd);
   const baseGate = gitConfigEnv([...(hooks ? [['core.hooksPath', hooks] as [string, string]] : []), ...gitConfig]);
@@ -373,13 +386,34 @@ export async function runScript(script: string, cwd: string, { timeout = SHIP_MS
     let out = '';
     let child: ChildProcess;
     try {
-      child = spawn(node, [script], { cwd, env: { ...env, GIT_TERMINAL_PROMPT: '0', ...baseGate }, stdio: ['ignore', 'pipe', 'pipe'] });
+      // Its own process group, so a stop reaches the hook's test run and not
+      // only this script.
+      child = spawn(node, [script], { cwd, env: { ...env, GIT_TERMINAL_PROMPT: '0', ...baseGate }, stdio: ['ignore', 'pipe', 'pipe'], detached: ownGroup });
     } catch (e) {
       resolve({ code: 1, out: String((e as Error)?.message ?? e) });
       return;
     }
+    const pid = child.pid;
+    if (pid) runningShips.add(pid);
+    let settled = false;
+    let exitCode: number | null = null;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (pid) runningShips.delete(pid);
+      resolve({ code: exitCode ?? 1, out });
+    };
+    // Whatever is left in the group once the script is over is a leftover: a
+    // polite stop, then a hard one, and the answer does not wait on a leftover
+    // that holds the output pipe open.
+    const stopTheRest = () => {
+      if (!pid) return;
+      signalShip(pid, 'SIGTERM');
+      setTimeout(() => { signalShip(pid, 'SIGKILL'); setTimeout(finish, 200).unref(); }, graceMs).unref();
+    };
     const began = Date.now();
-    const stopAfter = (ms: number) => setTimeout(() => { keep(`\nship: stopped after ${minutes(ms)}.`); child.kill('SIGTERM'); }, Math.max(0, began + ms - Date.now()));
+    const stopAfter = (ms: number) => setTimeout(() => { keep(`\nship: stopped after ${minutes(ms)}.`); if (pid) signalShip(pid, 'SIGTERM'); else child.kill('SIGTERM'); }, Math.max(0, began + ms - Date.now()));
     let timer: NodeJS.Timeout;
     let longer = false;
     const keep = (b: Buffer | string) => {
@@ -393,8 +427,9 @@ export async function runScript(script: string, cwd: string, { timeout = SHIP_MS
     child.stdout!.on('data', keep);
     child.stderr!.on('data', keep);
     timer = stopAfter(timeout);
-    child.on('error', (e: Error) => keep(`\n${e.message}`));
-    child.on('close', (code) => { clearTimeout(timer); resolve({ code: code ?? 1, out }); });
+    child.on('error', (e: Error) => { keep(`\n${e.message}`); if (!pid) finish(); });
+    child.on('exit', (code) => { exitCode = code; clearTimeout(timer); stopTheRest(); });
+    child.on('close', (code) => { exitCode = code ?? exitCode; finish(); });
   });
 }
 
