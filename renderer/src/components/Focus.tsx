@@ -78,6 +78,7 @@ import { DiagramBlock } from './DiagramBlock';
 import { NeedCard, NeedPlace, HELD, setHeld } from './NeedCard';
 import { NEED_BLOCK, isNewestAnswer, keyFromReply, keyLooksWrong, keySavedWords, needsAsBlocks } from '../key-asks';
 import { connectedReply, lateReply, needsIn, needId, keysOf, type Need } from '../../../shared/cloud-needs.mts';
+import type { KeySource } from '../../../shared/cloud-key-sources.mts';
 import { keyLabel, keyWords } from '../../../shared/cloud-keys.mts';
 import { referencedFiles, isImagePath } from '../referenced-files';
 import { pictureRoots } from '../message-folders';
@@ -124,7 +125,6 @@ import type { LedgerLine } from '../thread-history';
 import type { LiveFacts } from '../live-line';
 import { offersRunNow } from '../run-now';
 import { AttachRow } from './AttachRow';
-import { BackToWhatSheWasReading } from './UrgentBar';
 import { AgentThread } from './AgentThread';
 import { Live } from './Live';
 import { SidebarIcon } from './SidebarIcon';
@@ -730,7 +730,7 @@ export function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 /** Which threads' choices are folded, kept on this machine. */
 const CHOICES_FOLDED = 'one.choicesFoldedOn';
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, onShare, giveTo = [], onGive, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, onShare, giveTo = [], onGive, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null }: {
   /** One thing at a time (w-65bcefb857): this thread's place in Needs you and the arrows that walk it. */
   queue?: { spot: Spot; onStep: (dir: 1 | -1) => void } | null;
   /** Drawn on the one-at-a-time page outside Needs you too: every thread with an agent. */
@@ -871,14 +871,6 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   productDir: string | null;
   repoDir: string | null;
   selectedOption: number | null;
-  // The task this one took her off, by name, when an Urgent row arrived while
-  // she was reading something else. Null the rest of the time, which is
-  // nearly always. The card has to SAY it: a screen that changes under her
-  // with no explanation and no way back breaks every design rule this app
-  // keeps, and the way back is the half that matters most.
-  interruptedFrom?: string | null;
-  // What pressing that control does. Only ever set alongside interruptedFrom.
-  onBackToInterrupted?: () => void;
   returnedFromSnooze?: boolean;
   // The moment nothing happens to this task until, and whether an agent is the
   // one who said so. 0 when it is not waiting on a moment at all.
@@ -1577,7 +1569,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     const held = (HELD.get(item.id) ?? []).map((h) => h.words).join(' ');
     return [connected, held].filter(Boolean).join(' ');
   };
-  const saveKeys = async (fields: { name: string; value: string; label: string }[], need: Need, words?: string, late = false) => {
+  const saveKeys = async (fields: { name: string; value: string; label: string; from?: KeySource }[], need: Need, words?: string, late = false) => {
     if (late) return saveLate(fields, need);
     let out: Awaited<ReturnType<typeof api.cloudKey>> = { ok: true };
     const savedAfter = [...(savedKeys ?? []), ...fields.map((f) => f.name)];
@@ -1589,7 +1581,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       const reply = withHeld && i === fields.length - 1 ? { product: item.product, id: item.id, answer: withHeld } : undefined;
       // Which Stripe key is kept, said where it is listed (round ten).
       const mode = /^STRIPE_/.test(f.name) ? (/^(sk|rk)_live_/.test(f.value.trim()) ? 'Live ' : /^(sk|rk)_test_/.test(f.value.trim()) ? 'Test-mode ' : '') : '';
-      out = await api.cloudKey({ action: 'save', name: f.name, value: f.value, label: `${mode}${f.label}`, ...(reply ? { reply } : {}) });
+      out = await api.cloudKey({ action: 'save', name: f.name, value: f.value, label: `${mode}${f.label}`, ...(f.from ? { from: f.from } : {}), ...(reply ? { reply } : {}) });
       if (!out.ok) return out.error || 'The cloud did not take the key. Try again.';
     }
     if (withHeld !== words) { setHeld(item.id, null); setHeldTick((t) => t + 1); }
@@ -1601,11 +1593,11 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     return null;
   };
   // A key from a card already answered in words: nothing is held for it, and the thread hears it came after all.
-  const saveLate = async (fields: { name: string; value: string; label: string }[], need: Need) => {
+  const saveLate = async (fields: { name: string; value: string; label: string; from?: KeySource }[], need: Need) => {
     let out: Awaited<ReturnType<typeof api.cloudKey>> = { ok: true };
     for (const [i, f] of fields.entries()) {
       const reply = i === fields.length - 1 ? { product: item.product, id: item.id, answer: lateReply([need]) } : undefined;
-      out = await api.cloudKey({ action: 'save', name: f.name, value: f.value, label: f.label, ...(reply ? { reply } : {}) });
+      out = await api.cloudKey({ action: 'save', name: f.name, value: f.value, label: f.label, ...(f.from ? { from: f.from } : {}), ...(reply ? { reply } : {}) });
       if (!out.ok) return out.error || 'The cloud did not take the key. Try again.';
     }
     const names = fields.map((f) => f.name);
@@ -1978,6 +1970,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       onToggleTerminal={() => window.dispatchEvent(new Event('task-terminal-toggle'))}
       onFinish={canFinish ? onResolve : null}
       onCloseTask={canFinish && givenTask ? onCloseTask ?? null : null}
+      onStopRepeating={repeat ? repeat.onEnd : null}
       onReopen={!canFinish && !agent ? onReopenDone ?? null : null}
       onRunNow={waiting && onRunNow ? onRunNow : null}
       onLater={canFinish ? onSnooze ?? null : null}
@@ -2161,15 +2154,6 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
          line and the notes start exactly where the message below them starts, and nothing
          in this header pushes them in.
        */}
-      {/* WHY THE SCREEN CHANGED, AND HOW TO UNDO IT, in one plain sentence.
-          w-2c0db3395f: an Urgent row interrupts what she is reading, and
-          then she is brought back. This line is the whole of her being told
-          that, so it names the task she was on rather than saying "the
-          previous task", and it names the key rather than describing it. */}
-      
-      {interruptedFrom && (
-        <BackToWhatSheWasReading title={interruptedFrom} onBack={onBackToInterrupted ?? onClose} />
-      )}
       {/* The band is not a second copy of this header, it IS this header, which is why the
          byline went with it: hiding `.focus-head` and drawing the title alone lost the
          working mark and the code figures. w-7bc66fced1.

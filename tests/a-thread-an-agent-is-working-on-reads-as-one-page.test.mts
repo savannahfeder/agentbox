@@ -37,7 +37,7 @@ describe('the page', () => {
     expect(page).toContain('const stands = !queue ? -1 : working ? workingFrom(events) : standsAt(events, newest);');
   });
   it('says what you asked until the agent writes a summary of its own', () => {
-    expect(page).toContain("context={working && !queue.context ? workingContext(item.body ?? item.title ?? '', pageTitle(item), queue.repeats ?? null) : queue.context}");
+    expect(page).toContain("context={working && !queue.context ? workingContext(isCause(item) ? '' : item.body ?? item.title ?? '', pageTitle(item), queue.repeats ?? null) : queue.context}");
   });
   it('never draws the answer alone while the agent works', () => {
     expect(page).toContain('const alone = !!newest && !working && stands < 0;');

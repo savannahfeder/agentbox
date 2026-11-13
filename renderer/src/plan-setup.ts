@@ -121,6 +121,7 @@ export const COPY = {
   barSay: 'Agents cannot start until they have a plan to run on.',
   /** When one tool is already on the disk, so the thing missing has a name. */
   barSignedOut: (name: string) => `Agents cannot start until you sign in to your ${name} plan.`,
+  barSignedOutBoth: 'Agents cannot start until you sign in to your Claude or ChatGPT plan.',
   barSub: 'Takes a couple of clicks.',
   barSetUp: (name: string) => `Set up with ${name}`,
   barSignIn: (name: string) => `Sign in to ${name}`,
@@ -186,7 +187,7 @@ export function planBar(readings: BarReading[]): BarWords | null {
   const lead = here.length === 1 ? here[0] : 'claude';
   const other: Engine = lead === 'claude' ? 'codex' : 'claude';
   return {
-    say: here.length === 1 ? COPY.barSignedOut(planName(lead)) : COPY.barSay,
+    say: here.length === 1 ? COPY.barSignedOut(planName(lead)) : here.length > 1 ? COPY.barSignedOutBoth : COPY.barSay,
     first: button(lead),
     second: button(other),
   };

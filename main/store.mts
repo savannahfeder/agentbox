@@ -62,6 +62,11 @@ const ROW_ID = /^(w-[0-9a-f]{6,}|r-[0-9a-f]{6,}-\d{8})$/;
 // a thousand times reads the disk once, short enough that nothing a person can
 // do lands inside it.
 const PRODUCTS_KEPT_NS = 1_000_000n;
+// While the store's watchers are up, any project folder made, removed or
+// renamed and any project.json written clears the kept list, so the stamps only
+// have to catch what they cannot see: a code folder gaining its first file and
+// an archived project's project.json, which is not watched.
+const PRODUCTS_WATCHED_KEPT_NS = 5_000_000_000n;
 const stampable = (file: string): fs.Stats | null => { try { return fs.statSync(file); } catch { return null; } };
 const markOf = (st: fs.Stats | null): string => (st ? `${st.mtimeMs}:${st.size}` : 'gone');
 export interface StoreConfig {
@@ -187,6 +192,7 @@ interface ProductsRead {
   repos: string[];
   stamp?: string;
   writes?: number;
+  seen?: number;
   at?: bigint;
 }
 
@@ -203,6 +209,8 @@ export class Store {
   declare onChange: (() => void) | null;
   declare _debounce: NodeJS.Timeout | null;
   declare _products: ProductsRead | null;
+  declare _projectsWatched: boolean;
+  declare _projectEvents: number;
 
   constructor(config: StoreConfig) {
     this.config = config;
@@ -212,6 +220,8 @@ export class Store {
     this.onChange = null; // set by ipc layer; called on any store file change
     this._debounce = null;
     this._products = null; // the kept project list (_productsNow)
+    this._projectsWatched = false;
+    this._projectEvents = 0;
   }
 
   async init() {
@@ -269,11 +279,17 @@ export class Store {
    *  is another process making a project folder, and the app waits 150 ms on
    *  its watcher before it redraws on one of those anyway.
    *
+   *  While the store watches its folders the millisecond becomes five seconds,
+   *  and what the watchers see forgets the list instead: a stamp of 48
+   *  projects is about 140 stats, and taken every millisecond it was the
+   *  app's biggest share of the holds on a swapping Mac on 2026-11-12.
+   *
    *  The clock is hrtime, not Date.now: a test with a fake clock would
    *  otherwise hold the window open for its whole run. */
   _productsNow(): ProductsRead {
-    const kept = this._products?.writes === projectWrites() ? this._products : null;
-    if (kept && process.hrtime.bigint() - kept.at! < PRODUCTS_KEPT_NS) return kept;
+    const kept = this._products?.writes === projectWrites() && this._products.seen === this._projectEvents ? this._products : null;
+    const keep = this._projectsWatched ? PRODUCTS_WATCHED_KEPT_NS : PRODUCTS_KEPT_NS;
+    if (kept && process.hrtime.bigint() - kept.at! < keep) return kept;
     const stamped = this._stampProducts(kept?.repos ?? []);
     if (!stamped) return { live: [], all: [], repos: [] }; // the account root is unreadable
     if (kept && stamped.stamp === kept.stamp) {
@@ -375,7 +391,7 @@ export class Store {
       if (!project.archived) live.push({ slug, ...rest });
     }
     const byName = (a: ProductRow, b: ProductRow) => a.name.localeCompare(b.name);
-    return { live: live.sort(byName), all: all.sort(byName), repos, stamp, writes: projectWrites(), at: process.hrtime.bigint() };
+    return { live: live.sort(byName), all: all.sort(byName), repos, stamp, writes: projectWrites(), seen: this._projectEvents, at: process.hrtime.bigint() };
   }
 
   /** ARCHIVE A PROJECT, OR BRING ONE BACK. One flag in its project.json and
@@ -2004,9 +2020,12 @@ export class Store {
         this.watchers.push(watcher);
       } catch {}
     }
+    let watchedAll = true;
     for (const dir of dirs) {
+      const isRoot = dir === this.config.accountRoot;
       try {
         const watcher = fs.watch(dir, (event, file) => {
+          if (isRoot || !file || file === 'project.json') this._projectEvents += 1;
           if (file && !/work-items\.jsonl|dashboard\.jsonl|project\.json/.test(file)) return;
           this._notify();
         });
@@ -2014,12 +2033,14 @@ export class Store {
         // EMFILE). An unhandled error takes down the app, outside this catch.
         // Reads still work without a watcher; release only the failed one.
         watcher.on('error', () => {
+          this._projectsWatched = false;
           try { watcher.close(); } catch {}
           this.watchers = this.watchers.filter((w) => w !== watcher);
         });
         this.watchers.push(watcher);
-      } catch {}
+      } catch { watchedAll = false; }
     }
+    this._projectsWatched = watchedAll;
   }
 
   _notify() {
@@ -2028,6 +2049,7 @@ export class Store {
   }
 
   unwatch() {
+    this._projectsWatched = false;
     for (const w of this.watchers) try { w.close(); } catch {}
     this.watchers = [];
   }

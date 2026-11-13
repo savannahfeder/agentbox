@@ -35,6 +35,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   sendNow: 'zero:send-now',
   compose: 'zero:compose',
   routeThread: 'zero:route-thread',
+  answerRouteOffer: 'zero:answer-route-offer',
   schedule: 'zero:schedule',
   snooze: 'zero:snooze',
   // Feedback to the Agentbox team, from the sidebar's Feedback card.
