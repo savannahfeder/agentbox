@@ -6647,6 +6647,8 @@ export class Supervisor {
     return sent;
   }
 
+  hasFilesForCloud(itemId: string): boolean { return !!this._filesForCloud?.get(itemId)?.length; }
+
   // THE CLOUD SETUP'S SIGN-IN. `start` adds a new account of an engine (or,
   // given one of hers, signs it in again); `code` relays the code she pasted;
   // `cancel` stops one; `remove` takes an account out of the cloud. The
