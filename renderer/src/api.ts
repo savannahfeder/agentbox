@@ -22,7 +22,7 @@ interface LaterBridge {
   liveRoom?(p: { product: string; project?: string | null; name: string }): Promise<LiveRoomTicket | null>;
   gitHubSignIn?(p: { token: string }): Promise<{ ok: boolean; again?: string[]; error?: string }>;
   gitHubBrowserSignIn?(): Promise<{ ok: boolean; code?: string; url?: string; error?: string }>;
-  signInAnswer?(p: { product: string; id: string; ask: string; said: 'signed-in' | 'skipped' | 'landed'; url?: string }): Promise<{ ok: boolean; error?: string }>;
+  signInAnswer?(p: { product: string; id: string; ask: string; said: 'signed-in' | 'skipped' | 'landed' | 'code'; url?: string; code?: string }): Promise<{ ok: boolean; error?: string }>;
   cloudAccountPay?(p: { plan: 'pro' | 'plus' | 'max' | 'team' }): Promise<{ ok: boolean; where?: 'checkout' | 'billing'; error?: string; message?: string }>;
   cloudAccountTeamBilling?(): Promise<{ ok: boolean; owner?: boolean } & Partial<TeamBillingDetails>>;
 }
@@ -1699,8 +1699,8 @@ export const api = {
     return zero.cloudSendCode(p);
   },
 
-  /** A key kept in the cloud for every cloud run: saved under its name, or removed. */
-  async cloudKey(p: { action: 'save' | 'remove'; name: string; value?: string; label?: string; reply?: { product: string; id: string; answer: string } }): Promise<{ ok: boolean; keys?: { name: string; savedAt: number | null; label?: string | null }[]; freed?: string[]; cloudOff?: boolean; error?: string }> {
+  /** A key kept in the cloud for every cloud run: saved under its name, or removed. `from` reads it on this computer instead of `value`. */
+  async cloudKey(p: { action: 'save' | 'remove'; name: string; value?: string; label?: string; from?: { place: string; from: string; entry?: string }; reply?: { product: string; id: string; answer: string } }): Promise<{ ok: boolean; keys?: { name: string; savedAt: number | null; label?: string | null }[]; freed?: string[]; cloudOff?: boolean; error?: string }> {
     const zero = window.zero;
     if (!zero?.cloudKey) return { ok: false, error: RESTART_NOTE };
     return zero.cloudKey(p);
@@ -1721,7 +1721,7 @@ export const api = {
   },
 
   /** What the person did with a sign-in link an agent on this thread is waiting on. */
-  async signInAnswer(p: { product: string; id: string; ask: string; said: 'signed-in' | 'skipped' | 'landed'; url?: string }): Promise<{ ok: boolean; error?: string }> {
+  async signInAnswer(p: { product: string; id: string; ask: string; said: 'signed-in' | 'skipped' | 'landed' | 'code'; url?: string; code?: string }): Promise<{ ok: boolean; error?: string }> {
     const zero = laterBridge();
     if (!zero?.signInAnswer) return { ok: false, error: RESTART_NOTE };
     return zero.signInAnswer(p);
