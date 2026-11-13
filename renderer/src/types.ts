@@ -877,10 +877,10 @@ export interface CloudPlan {
   usedSeconds?: number;
   /** With no plan: the free hours, spent or not. */
   free?: { agents: number; hours: number; usedSeconds: number };
-  /** The team's shared hours: a trial until `endsAt`, or `seats` paid for. */
-  /** Hours and agents are this person's own; `people` is every member's own use (names come from the team). */
+  /** The team's hours: a trial until `endsAt`, or `seats` paid for; `seats` in a trial means the card is in and not yet charged. */
+  /** Hours are this person's own, with no limit at once; `people` is every member's own use (names come from the team). */
   team?: {
-    trial: boolean; endsAt: number | null; seats: number; members: number; owner: boolean; agents: number; running: number; hours: number; usedSeconds: number;
+    trial: boolean; endsAt: number | null; seats: number; members: number; owner: boolean; agents?: null; running: number; hours: number; usedSeconds: number;
     people?: { id: string; usedSeconds: number; running: number; name?: string }[];
   };
   /** Who bills the plan: Stripe, or nobody because it was set by hand. Absent from older servers. */

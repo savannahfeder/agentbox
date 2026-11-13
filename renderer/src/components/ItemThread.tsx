@@ -475,7 +475,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
   const start = stands > gapIndex(events, omitted) ? stands : -1;
   const alone = !!newest && !working && stands < 0;
   const behind = start >= 0 ? earlierThan(events, start) + omitted : alone ? earlierCount(events, byApp ? null : outcome) + omitted : 0;
-  const short = !earlierOpen && drawnWhole(behind, broughtIn(item));
+  const short = !earlierOpen && drawnWhole(behind, { leads: alone, imported: broughtIn(item) });
   const from = short || earlierOpen ? -1 : start;
   const queueHead = queue && (
     <QueueSummary
