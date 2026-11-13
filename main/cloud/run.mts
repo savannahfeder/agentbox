@@ -85,7 +85,8 @@ import { asksPermission, approvalsHandshakes } from './kit.mts';
 import { snapshotSkills, filesInFolder } from './skills.mts';
 import { createResourceRequests, resourceContextFor, accountFolderFor } from './resources.mts';
 import { saveCloudKey } from './keys.mts';
-import type { ResourceContext, ResourceState } from './resources.mts';
+import type { ResourceContext, ResourceFile, ResourceState } from './resources.mts';
+import { createKeyAsks, keyFileFor } from './key-asks.mts';
 import type { CloudMarker } from './marker.mts';
 import type { CloudCallError, CloudEvent, CloudReply, CloudStorage, CloudTransport } from './managed.mts';
 import type { Readable, Writable } from 'node:stream';
@@ -214,6 +215,9 @@ export interface RunMarker extends CloudMarker {
   resourceContext?: ResourceContext;
   resources?: ResourceState;
   resourceCapable?: boolean;
+  // The saved keys this run started with, and whether its machine takes one mid-run.
+  keysCarried?: string[];
+  liveKeys?: boolean;
   foldersCapable?: boolean;
   offline?: boolean;
   plain?: boolean;
@@ -350,7 +354,7 @@ const keysNote = (names: string[]) => [
   'Once a login worked, keep the token it made with sign_in\'s keep, under the variable its tool reads, so later cloud runs are signed in too. A ship\'s push runs on their computer, and when that computer needs a GitHub sign-in the app asks for it on the thread itself, so never ask for that one.',
   'When the work needs something only they can give, do all of the work that does not need it, then ask for it: line one of your usual final answer says what you need in plain words, and just above its Options goes one line per thing, in one of these forms.',
   `\`${NEED} sign-in SERVICE | what it is for\` asks them to paste the service's access token, on a card that links to the page where they make one. Use it only when the service has no browser sign-in here, or they chose Not now on it. SERVICE is one of ${SERVICES.map((s) => s.id).join(', ')}; once it is saved, every later cloud run has ${SERVICES.slice(0, 3).map((s) => s.keys.map((k) => k.name).join(' and ')).join(', ')} and the rest.`,
-  `\`${NEED} key VARIABLE | what it is and where they get it\` asks for any other key a tool reads from the environment, under the variable the tool reads.`,
+  `\`${NEED} key VARIABLE | what it is and where they get it\` asks for any other key a tool reads from the environment, under the variable the tool reads. When their instructions, notes or memory say where on their computer a key is kept (a Keychain item, a file, a variable in their shell), ask for it with the store tool request_cloud_key first: they allow it on a card and this run gets it without ending. If that does not get it, add the same place as a third part of the key line (\`| keychain ITEM\`, \`| file PATH\` with the variable for an .env file, or \`| shell VARIABLE\`), so their card takes it in one press.`,
   `\`${NEED} file PATH | what it is for\` asks for a file only their computer has, by its full or ~/ path there, up to 1 GB. It is at that same path here on your next turn.`,
   `\`${NEED} code WHAT | what it is for\` asks for a one-time code, such as an npm one-time password or a verification code. It comes back as their reply.`,
   'The app draws each line as a card they answer on the thread. A sign-in or a key is kept in the cloud and given to every later cloud run of every thread, and their reply comes back to you once it is given. The card already offers doing it on their computer instead, so do not add that as an option. A key under a name Claude Code or Codex read for their own sign-in (ANTHROPIC_, CLAUDE_, CODEX_, OPENAI_API_KEY) cannot be saved.',
@@ -1372,7 +1376,7 @@ export async function cloudRun({
   // the servers, and the worker's own variables they ran with.
   // `startedAt` outlives this process, so a run brought home by a later one
   // can still say how long it had been going when its machine stopped.
-  marker = { runId, sessionId, branch, startSha, sent, configDir, engine, bringDirs, docs, startedAt: Date.now(), mcp: mcpConfig.mcpServers, toolEnv: toolVariables(env), resourceContext: { engine, homeDir, configDir, codexHome }, ...(plain ? { plain: true } : {}) };
+  marker = { runId, sessionId, branch, startSha, sent, configDir, engine, bringDirs, docs, startedAt: Date.now(), mcp: mcpConfig.mcpServers, toolEnv: toolVariables(env), resourceContext: { engine, homeDir, configDir, codexHome }, keysCarried: keysGo.map((k) => k.name), ...(plain ? { plain: true } : {}) };
   if (kit) {
     signals.off('SIGHUP', early);
     const { runId: _r, sessionId: _s, ...joins } = marker;
@@ -1463,6 +1467,7 @@ export async function cloudRun({
   offlineOn = (started.caps || []).includes('offline');
   resourceCapable = (started.caps || []).includes('resources');
   marker.resourceCapable = resourceCapable;
+  marker.liveKeys = (started.caps || []).includes('live-keys');
   foldersCapable = (started.caps || []).includes('folders');
   marker.foldersCapable = foldersCapable;
   if (!resourceCapable) say('this cloud image cannot take a file or skill the run asks this Mac for; rebuild it (npm run deploy, or node scripts/cloud-setup.mjs)');
@@ -1519,7 +1524,10 @@ export async function cloudRun({
       await sendOnce(storage, k, () => body);
       return storage.getUrl(k);
     },
-    deliver: (files, signal) => new Promise<boolean>((resolve) => {
+    deliver: deliverToRun,
+  });
+  function deliverToRun(files: ResourceFile[], signal: AbortSignal) {
+    return new Promise<boolean>((resolve) => {
       if (signal.aborted || finished || leaving || cancelled) { resolve(false); return; }
       const done = (ok: boolean) => { signal.removeEventListener('abort', abort); resolve(ok); };
       const message: OutMessage = { action: 'files', resource: true, files, onAck: (res: CloudReply) => done(!!(res.ok || res.dup) && !res.error) };
@@ -1530,7 +1538,17 @@ export async function cloudRun({
       };
       signal.addEventListener('abort', abort, { once: true });
       enqueue(message);
-    }),
+    });
+  }
+  const runKeysAt = `/tmp/agentbox-resources/${crypto.createHash('sha256').update(runId).digest('hex')}/keys`;
+  const requestCloudKey = createKeyAsks({
+    spool: env.ZERO_APPROVALS_DIR, publicKey: env.ZERO_APPROVALS_PUBKEY,
+    item: env.ZERO_ITEM || null, product: env.ZERO_PRODUCT || null,
+    home: homeDir, storage, carried: marker.keysCarried ?? [], runKeysAt,
+    capable: () => !!marker.liveKeys,
+    stopped: () => !!finished || leaving || cancelled,
+    log: say,
+    deliver: ({ name, url }) => deliverToRun([{ key: name, url, path: keyFileFor(runKeysAt, name) }], AbortSignal.timeout(2 * 60_000)),
   });
 
   // ONE INPUT AT A TIME, KEPT UNTIL ACKNOWLEDGED. Each gets its number once,
@@ -1621,7 +1639,7 @@ export async function cloudRun({
   function openServer(conn: string, name: string, init: string[] = []) {
     const cfg = mcpConfig.mcpServers?.[name];
     if (!cfg) { enqueue({ action: 'mcp-close', conn }); return; }
-    const proc = servedHere(cfg, toolEnv({ ...serverEnv, ...(cfg.env || {}) }), `${runId}-${conn}`, { requestCloudResource, keepCloudKey })
+    const proc = servedHere(cfg, toolEnv({ ...serverEnv, ...(cfg.env || {}) }), `${runId}-${conn}`, { requestCloudResource, requestCloudKey, keepCloudKey })
       ?? spawn(cfg.command, cfg.args || [], { cwd, env: toolEnv({ ...serverEnv, ...(cfg.env || {}) }), stdio: ['pipe', 'pipe', 'pipe'] });
     const s: ServerEntry = { proc, name, buf: '', closed: false, init: [...init], pending: new Set(), swallow: new Set() };
     servers.set(conn, s);
@@ -1864,6 +1882,7 @@ export async function cloudRun({
     }
   } finally {
     requestCloudResource.close();
+    requestCloudKey.close();
     signals.off('SIGTERM', onTerm);
     signals.off('SIGINT', onInt);
     signals.off('SIGHUP', onHup);
@@ -2355,7 +2374,8 @@ export function codexLineForTheCloud(line: string, { stubPath = STUB, codexHome,
       // Codex starts an MCP server with a bare environment, so the stub is
       // told where the sandbox's bridge is in its own entry (measured
       // 2026-10-13: without it the stub never connected).
-      servers[name] = { ...s, command: SANDBOX_NODE, args: [stubPath, name], env: { AGENTBOX_BRIDGE_SOCK: BRIDGE_SOCK } };
+      // Codex's own limit on a call is 60 seconds; request_cloud_key waits up to 15 minutes for a person.
+      servers[name] = { ...s, command: SANDBOX_NODE, args: [stubPath, name], env: { AGENTBOX_BRIDGE_SOCK: BRIDGE_SOCK }, tool_timeout_sec: Math.max(Number(s.tool_timeout_sec) || 0, 20 * 60) };
     }
   }
   // THE CLOUD MACHINE IS CODEX'S SANDBOX (her decision, 2026-10-13: "Yes, let
@@ -2519,7 +2539,7 @@ export async function takeImportSlot({ dir = path.join(os.tmpdir(), `${nameSlug}
 // 2026-10-17), most of it the runtime starting up, not work. In here each
 // connection gets its own channel: the approvals for its own row, the store
 // with its own claims. Any other server is still started as configured.
-export function servedHere(cfg: Partial<ServerConfig> | undefined, env: NodeJS.ProcessEnv, holder: string, { requestCloudResource, keepCloudKey }: { requestCloudResource?: unknown; keepCloudKey?: unknown } = {}): ServerProcess | null {
+export function servedHere(cfg: Partial<ServerConfig> | undefined, env: NodeJS.ProcessEnv, holder: string, { requestCloudResource, requestCloudKey, keepCloudKey }: { requestCloudResource?: unknown; requestCloudKey?: unknown; keepCloudKey?: unknown } = {}): ServerProcess | null {
   const cmd = String(cfg?.command || '');
   if (cmd.endsWith('/approval-server.sh')) return channel((io) => serveApprovals({ env, ...io, warn: (m) => io.output.emit('warn', m) }));
   if (cmd.endsWith(`/${nameSlug}-mcp.sh`)) {
@@ -2532,7 +2552,7 @@ export function servedHere(cfg: Partial<ServerConfig> | undefined, env: NodeJS.P
     // Named here: runs share this process, so its own ZERO_ITEM is whichever run set it last.
     const ownItem = cfg!.env?.ZERO_ITEM || env.ZERO_ITEM || null;
     const ownProduct = cfg!.env?.ZERO_PRODUCT || env.ZERO_PRODUCT || null;
-    return channel(async (io) => (await import('../../mcp/stdio.mts')).serveStore({ ...io, holder: `mcp-cloud-${holder}`, ownItem, ownProduct, requestCloudResource, keepCloudKey } as {}));
+    return channel(async (io) => (await import('../../mcp/stdio.mts')).serveStore({ ...io, holder: `mcp-cloud-${holder}`, ownItem, ownProduct, requestCloudResource, requestCloudKey, keepCloudKey } as {}));
   }
   return null;
 }

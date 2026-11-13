@@ -132,8 +132,9 @@ describe('the card', () => {
     expect(card).toContain('onClick={() => openApprovalRow(a.item)}');
   });
   it('puts each key inside its button, after the word, with no hint line beside them', () => {
-    expect(card).toContain("Allow<span className=\"approval-key\">{chord('⌘1')}</span>");
-    expect(card).toContain("Deny<span className=\"approval-key\">{chord('⌘2')}</span>");
+    // A key card says Send the key instead of Allow (tests/a-key-card-can-be-answered-in-words-from-the-corner).
+    expect(card).toContain("'Allow'}<CardKey keys={chord('⌘1')} />");
+    expect(card).toContain("Deny<CardKey keys={chord('⌘2')} />");
     expect(card).not.toContain('approval-hint');
     const css = read('renderer/src/styles.css');
     expect(/\.approval-key \{[^}]*\}/.exec(css)[0]).not.toMatch(/border/);
