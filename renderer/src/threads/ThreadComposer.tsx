@@ -55,7 +55,7 @@ import { practiceRefusal, noProjectYet } from '../compose-says';
 import { onCloudPhone } from '../phone-screen';
 import { defaultModelFor, engineModelLabel, readLastModel, writeLastModel, type ModelChoice } from '../models';
 import { defaultEffortFor, effortChoicesFor, effortPicked, effortShown, readLastEffort, writeLastEffort } from '../effort';
-import { startingEngine, writeLastEngine } from '../engines';
+import { ENGINE_CHOSEN, startingEngine, writeLastEngine } from '../engines';
 import { repeatPresets } from '../components/When';
 import { ideasFor, type Idea } from '../first-run';
 import { readRule, repeatsLine } from '../format';
@@ -361,6 +361,16 @@ export function ThreadComposer({
     if (pick.engine === 'claude' && !claudeOffered && codexOffered) setPick({ engine: 'codex', model: readLastModel(undefined, 'codex', codexDefault) ?? defaultModelFor('codex', codexDefault) });
   }, [codexOffered, claudeOffered]);
   const [effort, setEffort] = useState<string | null>(() => readLastEffort(undefined, pick.engine));
+  // The setup asks which agent while this box is already open behind it.
+  useEffect(() => {
+    const chosen = (e: Event) => {
+      const engine: Harness = startingEngine(String((e as CustomEvent).detail ?? ''), engines);
+      setPick({ engine, model: readLastModel(undefined, engine, codexDefault) ?? defaultModelFor(engine, codexDefault) });
+      setEffort(readLastEffort(undefined, engine));
+    };
+    addEventListener(ENGINE_CHOSEN, chosen);
+    return () => removeEventListener(ENGINE_CHOSEN, chosen);
+  });
   const pickModel = (p: ModelPick) => {
     setPick(p);
     writeLastEngine(p.engine);

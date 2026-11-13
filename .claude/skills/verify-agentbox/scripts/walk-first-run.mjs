@@ -99,6 +99,8 @@ try {
   await page.until(`/ready/i.test(document.querySelector('.ob-foot')?.textContent ?? '')`, { why: 'the welcome to say which agents are ready' });
   // The welcome fades in; a picture taken at once is a logo on an empty screen.
   await page.wait(2500);
+  // When the welcome names the wrong agents, what each one's check said is the first thing to read.
+  console.log(`   checks: ${await page.evaluate(`Promise.all(['claude', 'codex'].map((engine) => window.zero.engineSetup({ action: 'ready', engine }).then((r) => engine + ' found=' + r.found + ' signedIn=' + r.signedIn + ' certain=' + r.certain + (r.error ? ' (' + r.error + ')' : ''), (e) => engine + ' failed: ' + e))).then((l) => l.join('; '))`).catch((e) => `not read: ${e.message}`)}`);
   await see('welcome', /CLAUDE CODE AND CODEX\s+READY/i);
   // One long press of Enter is one step, not the whole setup.
   await page.call('Input.dispatchKeyEvent', { type: 'keyDown', ...enter });

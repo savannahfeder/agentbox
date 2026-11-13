@@ -116,11 +116,16 @@ describe('the last page', () => {
 // The same tester picked Codex on the agent step and the first thread's box still
 // said Claude Code: the box is open behind the setup and had read the agent already.
 describe('the agent picked in the setup', () => {
+  // 2026-11-13, on a real window: the box on Home opens on the default agent in Settings, never on
+  // the last one picked, so remembering the pick did nothing. The choice is that default.
+  it('is saved as the default agent, which is what a new thread opens on', () => {
+    expect(split).toMatch(/void api\.setWorkspaceSetting\(\{ key: 'engine', value: engine \}\);/);
+  });
   it('is told to the new-thread box that is already open behind it', () => {
-    expect(split).toMatch(/writeLastEngine\(engine === 'codex' \? 'codex' : null\); dispatchEvent\(new Event\(ENGINE_CHOSEN\)\); next\(\);/);
-    const compose = read('renderer/src/components/Compose.tsx');
-    expect(compose).toMatch(/addEventListener\(ENGINE_CHOSEN, chosen\);\n    return \(\) => removeEventListener\(ENGINE_CHOSEN, chosen\);/);
-    expect(compose).toMatch(/const chosen = \(\) => \{\n      const id = engineThisMacOffers\(readLastEngine\(undefined, workspaceEngine\), engineRows\);/);
+    expect(split).toMatch(/dispatchEvent\(new CustomEvent\(ENGINE_CHOSEN, \{ detail: engine \}\)\); next\(\);/);
+    const box = read('renderer/src/threads/ThreadComposer.tsx');
+    expect(box).toMatch(/const engine: Harness = startingEngine\(String\(\(e as CustomEvent\)\.detail \?\? ''\), engines\);/);
+    expect(box).toMatch(/addEventListener\(ENGINE_CHOSEN, chosen\);\n    return \(\) => removeEventListener\(ENGINE_CHOSEN, chosen\);/);
   });
 });
 

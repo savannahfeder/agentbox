@@ -377,7 +377,7 @@ export function SetupSplit(p: SetupSplitProps) {
         {(['claude', 'codex'] as const).map((id) => <Row key={id} face={<span className="ss-ai">{id === 'claude' ? 'C' : 'X'}</span>} name={id === 'claude' ? 'Claude Code' : 'Codex'}
           end={<Check on={engine === id} />} on={engine === id} onClick={() => setEngine(id)} />)}
       </div>
-      <div className="ss-acts">{go('Continue', () => { writeLastEngine(engine === 'codex' ? 'codex' : null); dispatchEvent(new Event(ENGINE_CHOSEN)); next(); })}</div>
+      <div className="ss-acts">{go('Continue', () => { void api.setWorkspaceSetting({ key: 'engine', value: engine }); writeLastEngine(engine === 'codex' ? 'codex' : null); dispatchEvent(new CustomEvent(ENGINE_CHOSEN, { detail: engine })); next(); })}</div>
     </>;
   } else if (step === 'look') {
     head = ['Pick your look.', ''];
