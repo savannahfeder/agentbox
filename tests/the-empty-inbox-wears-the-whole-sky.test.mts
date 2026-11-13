@@ -9,10 +9,14 @@
 // - the streak moved down under the writing box ("i said not to have moved the
 //   placement of things");
 // - a dark patch behind the hard-to-read placeholder ("no bg changes").
-// What stands is Home's sky, where Home draws it, over the whole card, with the
-// placeholder a step brighter.
+// - an empty blob where the sky was faded out round the words ("a no (for the
+//   30th time) to this big empty blob space").
+// What stands is Home's sky, where Home draws it, over the whole card. Only the
+// bright line itself is turned down where it passes behind the words ("yes to
+// reducing the intensity of the line behind text"); every dot stays.
 import fs from 'node:fs';
 import { describe, it, expect } from 'vitest';
+import { lineStrength } from '../renderer/src/home/sky.ts';
 
 const read = (p: string) => fs.readFileSync(new URL(`../renderer/src/${p}`, import.meta.url), 'utf8');
 const css = read('home/home.css');
@@ -23,7 +27,28 @@ const inboxSky = read('home/InboxSky.tsx');
 describe('the empty Inbox sky', () => {
   it('is drawn where Home draws it, from the top of the card, the streak not moved', () => {
     expect(app).toContain('<SkyBackdrop art={sky.art} from={sky.dark ? 40 : 150} span={sky.dark ? 300 : 240} />');
-    expect(inboxSky).toMatch(/shape === 'zero'\) \{ drawSky\(canvas, art, \{ from: 40, span: 300, dpr \}\); return; \}/);
+    expect(inboxSky).toMatch(/shape === 'zero'\) \{ drawSky\(canvas, art, \{ from: 40, span: 300, dpr, quiet: words\(\) \}\); return; \}/);
+  });
+
+  describe('turns the line down behind the words without emptying anything', () => {
+    const words = { x: 400, y: 300, w: 720, h: 180 };
+    it('dims the line inside the words, but never to nothing', () => {
+      const s = lineStrength(700, 400, words);
+      expect(s).toBeGreaterThan(0.2);
+      expect(s).toBeLessThan(0.6);
+    });
+    it('leaves the line at full strength well away from them', () => {
+      expect(lineStrength(100, 900, words)).toBe(1);
+      expect(lineStrength(1300, 400, words)).toBe(1);
+    });
+    it('comes back gradually at the edge, not as a cut', () => {
+      const a = lineStrength(1120 + 10, 400, words), b = lineStrength(1120 + 40, 400, words), c = lineStrength(1120 + 80, 400, words);
+      expect(a).toBeLessThan(b);
+      expect(b).toBeLessThan(c);
+    });
+    it('is full strength everywhere when there are no words', () => {
+      expect(lineStrength(700, 400, null)).toBe(1);
+    });
   });
 
   it('is drawn by the empty page, and only where the Inbox wears a sky', () => {

@@ -1,5 +1,5 @@
 import { useLayoutEffect } from 'react';
-import { drawSky, type SkyArt } from './sky';
+import { drawSky, type Box, type SkyArt } from './sky';
 
 /**
  * The Inbox's sky, approved 2026-11-08 (design 86): at full strength behind
@@ -7,7 +7,8 @@ import { drawSky, type SkyArt } from './sky';
  * drawn at the card's foot and turned over (home.css .inbox-sky-head).
  *
  * `zero` is the empty Inbox's (2026-11-13): it has no rows to keep clear, so
- * it is Home's sky, drawn where Home draws it, over the whole card.
+ * it is Home's sky, drawn where Home draws it, over the whole card, its line
+ * turned down behind the heading and the writing box.
  */
 export function InboxSky({ art, band = 190, shape = 'head' }: { art: SkyArt; band?: number; shape?: 'head' | 'zero' }) {
   useLayoutEffect(() => {
@@ -22,6 +23,8 @@ export function InboxSky({ art, band = 190, shape = 'head' }: { art: SkyArt; ban
       return wrap;
     };
     const head = make(shape === 'zero' ? 'inbox-sky-zero' : 'inbox-sky-head');
+    const page = shape === 'zero' ? document.querySelector('.th-start') : null;
+    const box = page?.querySelector('.th-clear-compose') ?? null;
     host.style.setProperty('--sky-under', art.bg);
     let frame = 0;
     let last = '';
@@ -32,13 +35,21 @@ export function InboxSky({ art, band = 190, shape = 'head' }: { art: SkyArt; ban
       const L = parseFloat(b.left) || 0, T = parseFloat(b.top) || 0, R = parseFloat(b.right) || 0, B = parseFloat(b.bottom) || 0;
       const w = hr.width - L - R, h = hr.height - T - B;
       if (w <= 0 || h <= 0) return;
-      const key = [L, T, w, h].join(',');
+      // The heading and the writing box, in the card's own pixels.
+      const words = (): Box | null => {
+        const parts = [page?.querySelector('h2'), box].map((e) => e?.getBoundingClientRect()).filter((r): r is DOMRect => !!r && r.height > 0);
+        if (!parts.length) return null;
+        const x = Math.min(...parts.map((r) => r.left)), y = Math.min(...parts.map((r) => r.top));
+        const x2 = Math.max(...parts.map((r) => r.right)), y2 = Math.max(...parts.map((r) => r.bottom));
+        return { x: Math.round(x - hr.left - L), y: Math.round(y - hr.top - T), w: Math.round(x2 - x), h: Math.round(y2 - y) };
+      };
+      const key = [L, T, w, h, JSON.stringify(words())].join(',');
       if (key === last) return;
       last = key;
       Object.assign(head.style, { left: `${L}px`, top: `${T}px`, width: `${w}px`, height: `${h}px` });
       const canvas = head.querySelector('canvas')!;
       const dpr = Math.min(2, window.devicePixelRatio || 1);
-      if (shape === 'zero') { drawSky(canvas, art, { from: 40, span: 300, dpr }); return; }
+      if (shape === 'zero') { drawSky(canvas, art, { from: 40, span: 300, dpr, quiet: words() }); return; }
       const start = Math.round(h - band);
       drawSky(canvas, art, { from: start, span: 120, curveTop: start - 60, dpr });
     };
@@ -46,6 +57,8 @@ export function InboxSky({ art, band = 190, shape = 'head' }: { art: SkyArt; ban
     paint();
     const ro = new ResizeObserver(later);
     ro.observe(host);
+    // The writing box lands in its slot after the sky is first drawn.
+    if (box) ro.observe(box);
     // The card moves when the sidebar opens or folds, which changes the window's classes, not its size.
     const moved = new MutationObserver(later);
     moved.observe(host, { attributes: true, attributeFilter: ['class'] });
