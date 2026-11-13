@@ -79,6 +79,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   filesPlaceNew: 'zero:files-place-new',
   filesPlaceUpload: 'zero:files-place-upload',
   filesPlaceTrash: 'zero:files-place-trash',
+  filesPlaceUntrash: 'zero:files-place-untrash',
   filesCloud: 'zero:files-cloud',
   fileElsewhere: 'zero:file-elsewhere',
   fileLine: 'zero:file-line',

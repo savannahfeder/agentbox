@@ -1041,6 +1041,10 @@ export const api = {
     if (!window.zero?.filesPlaceTrash) return { ok: false, moved: 0, bytes: 0, error: `Quit and reopen ${NAME} to move files to the Trash.` };
     return window.zero.filesPlaceTrash(p);
   },
+  async filesPlaceUntrash(token: string): Promise<{ ok: boolean; back?: number; error?: string }> {
+    if (!window.zero?.filesPlaceUntrash) return { ok: false, error: `Quit and reopen ${NAME} to put files back.` };
+    return window.zero.filesPlaceUntrash({ token });
+  },
   async filesCloud(): Promise<FilesCloudStatus | null> {
     return (await window.zero?.filesCloud?.().catch(() => null)) ?? null;
   },

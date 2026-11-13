@@ -4,8 +4,8 @@
 // under the sha256 of its bytes, and a film or picture nobody has opened for
 // the chosen days leaves this computer until it is opened again. Documents,
 // tables and code always stay: they are small and agents read them all the
-// time. A plan that stops keeping files brings everything back down before
-// the cloud copy is deleted. An account that cannot be read changes nothing.
+// time. A plan that stops keeping files, or the switch turned off, brings
+// everything back down before the cloud copy is deleted. An account that cannot be read changes nothing.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -161,7 +161,8 @@ export function filesKeeper({ dir, storage, account, settings, now = Date.now, p
     if (!acct) return;
     const store = await storage();
     if (!store) return;
-    if (!acct.cap) {
+    const { on, offAfterDays } = settings();
+    if (!acct.cap || !on) {
       for (const hash of Object.keys(ledger.off)) await bringBack(hash).catch((err: Error) => { log(`could not bring back ${ledger.off[hash]?.name}: ${err.message}`); });
       for (const hash of Object.keys(ledger.up)) {
         if (ledger.off[hash]) continue;
@@ -170,8 +171,6 @@ export function filesKeeper({ dir, storage, account, settings, now = Date.now, p
       notify();
       return;
     }
-    const { on, offAfterDays } = settings();
-    if (!on) return;
     let bytes = acct.bytes;
     let full = acct.full;
     for (const v of [...versions].sort((a, b) => b.at - a.at)) {

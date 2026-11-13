@@ -117,7 +117,8 @@ export function versionLine({ dir, cloud = () => null, onMoved = () => {} }: { d
     if (kept.has(hash) && fs.existsSync(kept.get(hash)!)) return kept.get(hash)!;
     kept.delete(hash);
     let found: string | null = null;
-    try { const [name] = fs.readdirSync(keptDir(hash)).filter((n) => !n.endsWith('.tmp')); found = name ? path.join(keptDir(hash), name) : null; } catch { /* not kept */ }
+    // Finder leaves a .DS_Store behind when it trashes the kept copy.
+    try { const [name] = fs.readdirSync(keptDir(hash)).filter((n) => !n.endsWith('.tmp') && !n.startsWith('.')); found = name ? path.join(keptDir(hash), name) : null; } catch { /* not kept */ }
     if (found) kept.set(hash, found);
     return found;
   }

@@ -8,10 +8,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { openTab } from '../../verify-agentbox/scripts/cdp.mjs';
 
-const { chromium } = createRequire(import.meta.url)('playwright');
 const instance = process.argv[2];
 const oldAt = process.argv.indexOf('--old');
 const oldDays = oldAt > 0 ? Number(process.argv[oldAt + 1]) : 0;
@@ -34,14 +33,24 @@ const cards = [
   { name: 'demo-cut-30s.png', words: 'Thirty seconds<br>of Agentbox.', bg: '#121212', glow: '#e9e1d4', ink: '#fff' },
   { name: 'onboarding-walkthrough.png', words: 'Your first<br>thread.', bg: '#0f1514', glow: '#9fe3d4', ink: '#fff' },
 ];
+// Each cut of a film gets its own poster, marked with its number, so the cuts differ.
+const cuts = { 'launch-film.png': 4, 'demo-cut-30s.png': 2, 'onboarding-walkthrough.png': 1 };
+const posters = cards.flatMap((c) => (cuts[c.name] ? Array.from({ length: cuts[c.name] }, (_, i) => ({ ...c, name: c.name.replace('.png', `-cut${i + 1}.png`), cut: i + 1 })) : [c]));
 const tmp = fs.mkdtempSync('/tmp/seed-');
-const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
-for (const c of cards) {
-  await page.setContent(`<body style="margin:0;width:1600px;height:1000px;background:radial-gradient(circle at 62% 38%, ${c.glow} 0, transparent 46%), ${c.bg};font-family:Inter,Helvetica,Arial,sans-serif;display:flex;align-items:center;padding-left:110px;box-sizing:border-box"><div style="font-size:128px;line-height:1.02;font-weight:700;letter-spacing:-3px;color:${c.ink}">${c.words}</div></body>`);
-  await page.screenshot({ path: path.join(tmp, c.name) });
+// The test tools' own hidden browser: this checkout has no Playwright package, and ffmpeg here may lack drawtext.
+// Without a browser (a busy Mac stops it), plain glows from ffmpeg: the files still differ by cut.
+const plain = (c) => execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'lavfi', '-i', `gradients=s=1600x1000:c0=0x${c.glow.slice(1)}:c1=0x${c.bg.slice(1)}:x0=990:y0=380:x1=${1500 + (c.cut ?? 0) * 40}:y1=1000:type=radial`, '-frames:v', '1', path.join(tmp, c.name)]);
+const tab = await openTab('about:blank', { width: 1600, height: 1000 }).catch((err) => { console.error(`seed: no browser (${err.message}); plain pictures instead`); return null; });
+try {
+  for (const c of posters) {
+    if (!tab) { plain(c); continue; }
+    const html = `<body style="margin:0;width:1600px;height:1000px;background:radial-gradient(circle at 62% 38%, ${c.glow} 0, transparent 46%), ${c.bg};font-family:Inter,Helvetica,Arial,sans-serif;display:flex;align-items:center;padding-left:110px;box-sizing:border-box;position:relative"><div style="font-size:128px;line-height:1.02;font-weight:700;letter-spacing:-3px;color:${c.ink}">${c.words}</div>${c.cut ? `<div style="position:absolute;left:40px;bottom:50px;font-size:34px;color:rgba(255,255,255,.35)">cut ${c.cut}</div>` : ''}</body>`;
+    await tab.goto(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+    await tab.capture(path.join(tmp, c.name));
+  }
+} finally {
+  tab?.close();
 }
-await browser.close();
 
 const pad = (file, size) => fs.truncateSync(file, Math.max(fs.statSync(file).size, Math.round(size)));
 for (const c of cards.filter((x) => x.size)) {
@@ -50,7 +59,7 @@ for (const c of cards.filter((x) => x.size)) {
 }
 const film = (poster, out, mb, n) => {
   const to = path.join(dir, 'designs', out);
-  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-loop', '1', '-i', path.join(tmp, poster), '-t', '8', '-r', '24', '-vf', `scale=1280:-2,drawtext=text='cut ${n}':x=40:y=h-80:fontsize=28:fontcolor=white@0.35`, '-pix_fmt', 'yuv420p', '-movflags', '+faststart', to]);
+  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-loop', '1', '-i', path.join(tmp, poster.replace('.png', `-cut${n}.png`)), '-t', '8', '-r', '24', '-vf', 'scale=1280:-2', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', to]);
   pad(to, mb * MB);
   return out;
 };

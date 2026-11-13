@@ -7,6 +7,7 @@
 // copy, the version line's kept one too, to the computer's Trash. Measured on
 // appFilesPlace over a real store, with a Trash that is a folder.
 import { describe, it, expect } from 'vitest';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -14,7 +15,7 @@ import * as disk from '../main/store/work-items.mts';
 import { Store } from '../main/store.mts';
 import { appFilesPlace } from '../main/files-place.mts';
 
-async function aMac({ repo = false, refuse = false } = {}) {
+async function aMac({ repo = false, refuse = false, says = false } = {}) {
   const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'sizes-'));
   const accountRoot = path.join(storeRoot, 'accounts', 'a');
   const dir = path.join(accountRoot, 'app');
@@ -28,7 +29,14 @@ async function aMac({ repo = false, refuse = false } = {}) {
   const binned: string[] = [];
   const place = appFilesPlace({
     store, accountRoot, storeRoot,
-    trashItem: async (p) => { if (refuse) throw new Error('no Trash here'); binned.push(p); fs.renameSync(p, path.join(trash, `${binned.length}-${path.basename(p)}`)); },
+    // `says`: a Trash that answers where the file went, as Linux's does; Electron's does not.
+    trashItem: async (p) => {
+      if (refuse) throw new Error('no Trash here');
+      binned.push(p);
+      const to = path.join(trash, `${binned.length}-${path.basename(p)}`);
+      fs.renameSync(p, to);
+      return says ? to : undefined;
+    },
   });
   const put = (rel: string, bytes: string, at = dir) => { const f = path.join(at, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, bytes); return f; };
   const thread = async (title: string, ...notes: string[]) => {
@@ -36,8 +44,18 @@ async function aMac({ repo = false, refuse = false } = {}) {
     for (const note of notes) await disk.updateWorkItem(dir, t.id, { note }, { source: 'agent' });
     return t;
   };
-  return { place, put, thread, dir, repoPath, trash, binned };
+  return { place, put, thread, dir, repoPath, trash, binned, storeRoot };
 }
+// APFS makes a clone that takes no space; ext4 cannot, and there only a Trash that says where it put the file can be undone.
+const clones = (() => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'clone-'));
+  try {
+    fs.writeFileSync(path.join(d, 'a'), 'a');
+    if (process.platform === 'darwin') execFileSync('/bin/cp', ['-c', path.join(d, 'a'), path.join(d, 'b')], { stdio: 'ignore' });
+    else fs.copyFileSync(path.join(d, 'a'), path.join(d, 'b'), fs.constants.COPYFILE_FICLONE_FORCE);
+    return true;
+  } catch { return false; } finally { fs.rmSync(d, { recursive: true, force: true }); }
+})();
 const named = (list: { files: Array<{ name: string }> }, name: string) => list.files.find((f) => f.name === name) as unknown as Record<string, unknown> & { key: string; versions: number };
 
 describe('the size of a file', () => {
@@ -103,6 +121,24 @@ describe('Move to the Trash', () => {
     expect(named(await m.place.list(), 'hero.png')).toBeDefined();
   });
 
+  // Finder leaves a 6,148-byte .DS_Store in a folder it trashes from. Two
+  // testers' pictures came back as "Not on this computer yet · 6 KB", that
+  // .DS_Store read as the kept copy, and could never be moved (power test, 2026-11-13).
+  it('a .DS_Store Finder leaves where the kept copy was is not the file come back', async () => {
+    const m = await aMac();
+    m.put('designs/film.mp4', 'first cut');
+    await m.thread('Film', '[film.mp4](designs/film.mp4)');
+    await m.place.list();
+    m.put('designs/film.mp4', 'final cut');
+    const film = named(await m.place.list(), 'film.mp4');
+    const kept = execFileSync('find', [m.storeRoot, '-type', 'd', '-name', 'version-bytes'], { encoding: 'utf8' }).trim();
+    expect(kept).not.toBe('');
+    await m.place.trash({ keys: [film.key] });
+    for (const d of fs.readdirSync(kept)) fs.writeFileSync(path.join(kept, d, '.DS_Store'), 'd'.repeat(6148));
+    m.put('.DS_Store', 'd'.repeat(6148), path.join(m.dir, 'designs'));
+    expect(named(await m.place.list(), 'film.mp4')).toBeUndefined();
+  });
+
   it('a file nobody moved is left alone', async () => {
     const m = await aMac();
     m.put('designs/a.png', 'a');
@@ -112,6 +148,52 @@ describe('Move to the Trash', () => {
     await m.place.trash({ keys: [a.key] });
     expect(fs.readFileSync(path.join(m.dir, 'designs/b.png'), 'utf8')).toBe('b');
     expect(named(await m.place.list(), 'b.png')).toBeDefined();
+  });
+
+  // A tester moved a picture to the Trash, pressed Z, and nothing came back (power test, 2026-11-13).
+  for (const says of [true, false]) {
+    it.runIf(says || clones)(`Z puts every version back where it was${says ? ', from a Trash that says where it put them' : ', from a clone made first'}`, async () => {
+      const m = await aMac({ says });
+      const at = m.put('designs/film.mp4', 'first cut');
+      await m.thread('Film', '[film.mp4](designs/film.mp4)');
+      await m.place.list();
+      m.put('designs/film.mp4', 'final cut');
+      const film = named(await m.place.list(), 'film.mp4');
+      const out = await m.place.trash({ keys: [film.key] }) as { undo?: string };
+      expect(out.undo).toBeTruthy();
+      expect(fs.existsSync(at)).toBe(false);
+      expect(await m.place.untrash(out.undo!)).toMatchObject({ ok: true });
+      expect(fs.readFileSync(at, 'utf8')).toBe('final cut');
+      // From a clone, the Trash keeps its copies; emptying it later leaves what came back alone.
+      if (says) expect(fs.readdirSync(m.trash)).toEqual([]);
+      expect(named(await m.place.list(), 'film.mp4')).toMatchObject({ versions: 2 });
+      // Nothing is held once it is back: a clone left behind would keep the space after the Trash is emptied.
+      const held = execFileSync('find', [m.storeRoot, '-path', '*undo/*', '-type', 'f'], { encoding: 'utf8' }).trim();
+      expect(held).toBe('');
+    });
+  }
+
+  it('Z never writes over a file made at the same place since', async () => {
+    const m = await aMac({ says: true });
+    const at = m.put('designs/hero.png', 'old hero');
+    await m.thread('Hero', '[hero.png](designs/hero.png)');
+    const hero = named(await m.place.list(), 'hero.png');
+    const out = await m.place.trash({ keys: [hero.key] }) as { undo?: string };
+    m.put('designs/hero.png', 'new hero');
+    expect(await m.place.untrash(out.undo!)).toMatchObject({ ok: true });
+    expect(fs.readFileSync(at, 'utf8')).toBe('new hero');
+    expect(fs.readdirSync(m.trash).some((n) => n.endsWith('-hero.png'))).toBe(true);
+  });
+
+  it('a Z after the files left for good says where they are', async () => {
+    const m = await aMac({ says: true });
+    m.put('designs/hero.png', 'hero');
+    await m.thread('Hero', '[hero.png](designs/hero.png)');
+    const hero = named(await m.place.list(), 'hero.png');
+    await m.place.trash({ keys: [hero.key] });
+    const out = await m.place.untrash('gone-long-ago');
+    expect(out).toMatchObject({ ok: false });
+    expect((out as { error: string }).error).toMatch(/Trash/);
   });
 
   it('a Trash that refuses says so, and the file stays', async () => {

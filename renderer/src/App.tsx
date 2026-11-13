@@ -8022,7 +8022,7 @@ export default function App() {
               : connectionsShown ? (
                 <ConnectionsPlace now={now} focus={connectionsPage!.focus} onNotice={showToast} corner={connectionsCorner} cloudKeys={savedCloudKeyList} />
               ) : filesShown ? (
-                <FilesPlace project={filesPage!.project} onProject={(project) => setFilesPage({ project })} now={now} onNotice={showToast}
+                <FilesPlace project={filesPage!.project} onProject={(project) => setFilesPage({ project })} now={now} onNotice={showToast} onUndoable={pushUndo}
                   onSettings={(pane) => { setTeamOpen(false); setSettingsPane(pane); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
                   onPlace={(p) => {
                     if (p.kind === 'room') { roomsUi.openGroupById(p.roomId!); return; }

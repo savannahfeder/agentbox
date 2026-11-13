@@ -217,20 +217,50 @@ describe('when the plan stops keeping files', () => {
     expect(w.keeper.off(film.hash)).not.toBeNull();
   });
 
-  it('switched off in Settings, nothing new is sent or taken off, and what left still comes back when opened', async () => {
+  // A tester switched it off and saw their films stay faded "In the cloud",
+  // Space used still at 3.5 GB: off read as broken (power test, 2026-11-13).
+  it('switched off in Settings, what left comes back down, then the cloud copies go, and nothing new is sent', async () => {
+    const w = world({ days: 1 });
+    const film = w.file('launch.mp4', 'film bytes');
+    await w.keeper.pass([film]);
+    w.later(2 * DAY);
+    await w.keeper.pass([film]);
+    expect(fs.existsSync(film.paths[0])).toBe(false);
+    w.settings.on = false;
+    const pic = w.file('hero.png', 'picture', 'image');
+    await w.keeper.pass([film, pic]);
+    expect(fs.readFileSync(film.paths[0], 'utf8')).toBe('film bytes');
+    expect(w.keeper.off(film.hash)).toBeNull();
+    expect(w.c.held.size).toBe(0);
+    w.later(5 * DAY);
+    await w.keeper.pass([film, pic]);
+    expect(w.c.puts).toHaveLength(1);
+    expect(fs.existsSync(pic.paths[0])).toBe(true);
+  });
+
+  it('switched off, a film that could not come back is still known to be in the cloud', async () => {
     const w = world({ days: 1 });
     const film = w.file('launch.mp4', 'film bytes');
     await w.keeper.pass([film]);
     w.later(2 * DAY);
     await w.keeper.pass([film]);
     w.settings.on = false;
-    const pic = w.file('hero.png', 'picture', 'image');
-    await w.keeper.pass([film, pic]);
-    w.later(5 * DAY);
-    await w.keeper.pass([film, pic]);
-    expect(w.c.puts).toHaveLength(1);
-    expect(fs.existsSync(pic.paths[0])).toBe(true);
-    expect(await w.keeper.bringBack(film.hash)).toBe(true);
+    await w.c.storage.del(`files/${film.hash}`);
+    await w.keeper.pass([film]);
+    expect(w.keeper.off(film.hash)).not.toBeNull();
+    expect(fs.existsSync(film.paths[0])).toBe(false);
+  });
+
+  it('switched on again, what came back is sent again', async () => {
+    const w = world({ days: 1 });
+    const film = w.file('launch.mp4', 'film bytes');
+    await w.keeper.pass([film]);
+    w.settings.on = false;
+    await w.keeper.pass([film]);
+    expect(w.c.held.size).toBe(0);
+    w.settings.on = true;
+    await w.keeper.pass([film]);
+    expect(w.c.held.has(`files/${film.hash}`)).toBe(true);
   });
 });
 

@@ -4,8 +4,10 @@
 // approvals are those made on any copy of it. Only the threads the caller
 // lists are read: your own, and the teammates' threads the cloud shows you.
 import crypto from 'node:crypto';
+import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { promisify } from 'node:util';
 import { resolveArtifact } from './artifact-path.mts';
 import { approvalId, baseName, editedWords, familyName, familyOfName, filesInLines, marksOf, MAX_EDIT_BYTES, otherFilesInLines, otherKind, reviewKind, shownName, threadFiles, viewKind } from '../shared/artifact-marks.mts';
 import { saveNextVersion } from './file-version.mts';
@@ -135,6 +137,7 @@ const projectKey = (name: string | null | undefined): string => String(name ?? '
 const toCloudFamily = (family: string): string => family.split('\0').map(encodeURIComponent).join('/');
 const fromCloudFamily = (family: unknown): string => String(family).split('/').map(decodeURIComponent).join('\0');
 const CROSS_EVERY_MS = 10_000;
+const UNDO_KEEP_MS = 10 * 60_000;
 // What New makes, and what it starts with: a table needs its columns to be typed into.
 const MADE: Record<MadeKind, { ext: string; seed: string }> = { document: { ext: '.md', seed: '' }, table: { ext: '.csv', seed: 'Name,Notes\n' } };
 const SEED_OF = new Map(Object.values(MADE).map((m) => [m.ext, m.seed]));
@@ -378,7 +381,8 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
   notify?: () => void;
   keeper?: FilesKeeper | null;
   /** The computer's own Trash, so a file moved there can be put back. */
-  trashItem?: ((file: string) => Promise<void>) | null;
+  /** Where the file landed, when the Trash says. */
+  trashItem?: ((file: string) => Promise<string | void>) | null;
 }) {
   const built = new Map<string, { version: unknown; lines: readonly ThreadLine[] }>();
   const logDir = (): string => store.teammates?.dir?.() ?? storeRoot;
@@ -727,6 +731,35 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
   const TRASHED = (): string => path.join(logDir(), '.file-versions', 'trashed.json');
   function trashedNow(): Record<string, number> {
     try { return JSON.parse(fs.readFileSync(TRASHED(), 'utf8')) as Record<string, number>; } catch { return {}; }
+  }
+
+  // Z's way back from the Trash. Electron's Trash does not say where a file
+  // went, so a clone is made first; once the Trash is emptied a clone holds
+  // the space, so it goes after a few minutes.
+  interface HeldBack { from: string; at: string; hash: string }
+  const UNDO = (): string => path.join(logDir(), '.file-versions', 'undo');
+  const HELD = 'held.json';
+  async function cloneFor(file: string, hold: string, n: number): Promise<string | null> {
+    const to = path.join(hold, `${n}-${path.basename(file)}`);
+    try {
+      fs.mkdirSync(hold, { recursive: true });
+      // Node cannot force a clone on a Mac (ENOSYS), and a full copy of a film is the space being freed.
+      if (process.platform === 'darwin') await promisify(execFile)('/bin/cp', ['-c', file, to], { timeout: 30_000 });
+      else await fs.promises.copyFile(file, to, fs.constants.COPYFILE_FICLONE_FORCE);
+      return to;
+    } catch {
+      fs.rmSync(to, { force: true });
+      return null;
+    }
+  }
+  function sweepUndo(): void {
+    let names: string[] = [];
+    try { names = fs.readdirSync(UNDO()); } catch { return; }
+    for (const n of names) {
+      const at = path.join(UNDO(), n);
+      const st = fs.statSync(at, { throwIfNoEntry: false });
+      if (st && Date.now() - st.mtimeMs > UNDO_KEEP_MS) fs.rmSync(at, { recursive: true, force: true });
+    }
   }
 
   /** Every place on this computer that holds this version's own bytes: a path written over since holds the next one. */
@@ -1123,7 +1156,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
      * and the version line's kept one, so the space comes back once the Trash
      * is emptied. `older` leaves each file's newest version where it is.
      */
-    async trash({ keys, older = false }: { keys: readonly string[]; older?: boolean }): Promise<{ ok: true; moved: number; bytes: number } | { ok: false; error: string; moved: number; bytes: number }> {
+    async trash({ keys, older = false }: { keys: readonly string[]; older?: boolean }): Promise<{ ok: true; moved: number; bytes: number; undo?: string } | { ok: false; error: string; moved: number; bytes: number }> {
       let moved = 0;
       let bytes = 0;
       if (!trashItem) return { ok: false, error: 'This computer has no Trash to move files to.', moved, bytes };
@@ -1131,6 +1164,11 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       const roots = rootsNow();
       const trashed = trashedNow();
       const gone = new Set<string>();
+      sweepUndo();
+      const token = `${Date.now().toString(36)}-${crypto.randomBytes(4).toString('hex')}`;
+      const hold = path.join(UNDO(), token);
+      const held: HeldBack[] = [];
+      let undoable = true;
       try {
         for (const key of keys) {
           const whole = find(key);
@@ -1145,8 +1183,13 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
             let size = 0;
             for (const p of paths) {
               size = Math.max(size, (await fs.promises.stat(p)).size);
-              await trashItem(p);
+              const clone = await cloneFor(p, hold, held.length);
+              const landed = await trashItem(p);
               gone.add(p);
+              const back = typeof landed === 'string' ? landed : clone;
+              if (clone && back !== clone) fs.rmSync(clone, { force: true });
+              if (back) held.push({ from: p, at: back, hash: v.hash! });
+              else undoable = false;
             }
             trashed[v.hash!] = Date.now();
             moved += 1;
@@ -1154,6 +1197,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
           }
         }
       } catch (err) {
+        undoable = false;
         return { ok: false, error: `Not everything could be moved to the Trash: ${(err as Error).message}`, moved, bytes };
       } finally {
         if (moved) {
@@ -1161,8 +1205,42 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
           fs.writeFileSync(TRASHED(), JSON.stringify(trashed));
           notify();
         }
+        if (undoable && held.length) {
+          fs.mkdirSync(hold, { recursive: true });
+          fs.writeFileSync(path.join(hold, HELD), JSON.stringify(held));
+          setTimeout(sweepUndo, UNDO_KEEP_MS + 1000).unref?.();
+        } else fs.rmSync(hold, { recursive: true, force: true });
       }
-      return { ok: true, moved, bytes };
+      return { ok: true, moved, bytes, ...(undoable && held.length ? { undo: token } : {}) };
+    },
+
+    /** Z on a Move to the Trash: each file back where it was, unless something new is there now. */
+    async untrash(token: string): Promise<{ ok: true; back: number } | { ok: false; error: string }> {
+      sweepUndo();
+      const hold = path.join(UNDO(), path.basename(token));
+      let held: HeldBack[];
+      try { held = JSON.parse(fs.readFileSync(path.join(hold, HELD), 'utf8')) as HeldBack[]; } catch { return { ok: false, error: 'Those files are in the Trash now. Put them back from there.' }; }
+      const trashed = trashedNow();
+      let back = 0;
+      for (const h of held) {
+        if (fs.existsSync(h.from) || !fs.existsSync(h.at)) continue;
+        fs.mkdirSync(path.dirname(h.from), { recursive: true });
+        try { fs.renameSync(h.at, h.from); } catch (err) {
+          if ((err as NodeJS.ErrnoException).code !== 'EXDEV') throw err;
+          await fs.promises.copyFile(h.at, h.from);
+          await fs.promises.rm(h.at);
+        }
+        // A Trash that follows the freedesktop spec keeps a note beside each file.
+        if (path.basename(path.dirname(h.at)) === 'files') fs.rmSync(path.join(path.dirname(path.dirname(h.at)), 'info', `${path.basename(h.at)}.trashinfo`), { force: true });
+        delete trashed[h.hash];
+        back += 1;
+      }
+      fs.rmSync(hold, { recursive: true, force: true });
+      if (back) {
+        fs.writeFileSync(TRASHED(), JSON.stringify(trashed));
+        notify();
+      }
+      return { ok: true, back };
     },
 
     /** A thread's files kept in the cloud, brought back as its agent starts. False when one could not come in time. */

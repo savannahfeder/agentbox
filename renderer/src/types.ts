@@ -334,7 +334,8 @@ export interface PlacedFile {
   poster?: string | null;
 }
 
-export interface FilesTrashed { ok: boolean; moved: number; bytes: number; error?: string }
+/** `undo` is what Z hands back to put them where they were. */
+export interface FilesTrashed { ok: boolean; moved: number; bytes: number; error?: string; undo?: string }
 export interface FilesCloudStatus {
   /** null while the account cannot be read. */
   cap: number | null;
@@ -1790,6 +1791,7 @@ declare global {
       filesPlaceNew?(p: { project: string; name: string; kind: 'document' | 'table'; folder: string | null }): Promise<{ ok: boolean; error?: string; key?: string }>;
       filesPlaceUpload?(p: { project: string; folder: string | null }): Promise<FilesUploaded>;
       filesPlaceTrash?(p: { keys: string[]; older?: boolean }): Promise<FilesTrashed>;
+      filesPlaceUntrash?(p: { token: string }): Promise<{ ok: boolean; back?: number; error?: string }>;
       filesCloud?(): Promise<FilesCloudStatus>;
       fileElsewhere?(p: { product: string; id: string; copies: { path: string; file: string }[] }): Promise<FileElsewhere[]>;
       fileLine?(p: { product: string; id: string }): Promise<FileLine[]>;

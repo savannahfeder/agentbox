@@ -51,3 +51,44 @@ describe('on Linux', () => {
     expect(fs.existsSync(path.join(root, '.local', 'share', 'Trash'))).toBe(false);
   });
 });
+
+// A power test's copies, each with a HOME of its own, sent their seeded films
+// through Finder into the person's own Trash: 18 files there after one run (2026-11-13).
+describe('on a Mac, a copy of the app with a home of its own', () => {
+  it('keeps its own Trash in that home and says where the file went', async () => {
+    const file = path.join(root, 'work', 'launch-film.mp4');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, 'film');
+    const landed = await trashFile(file, { platform: 'darwin', home: root, realHome: '/Users/someone' });
+    expect(landed).toBe(path.join(root, '.Trash', 'launch-film.mp4'));
+    expect(fs.readFileSync(landed as string, 'utf8')).toBe('film');
+    expect(fs.existsSync(file)).toBe(false);
+  });
+
+  it('a second file of the same name does not replace the first', async () => {
+    for (const n of ['one', 'two']) {
+      const file = path.join(root, n, 'hero.png');
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, n);
+      await trashFile(file, { platform: 'darwin', home: root, realHome: '/Users/someone' });
+    }
+    expect(fs.readdirSync(path.join(root, '.Trash')).sort()).toEqual(['hero 2.png', 'hero.png']);
+  });
+
+  it('the person\'s own copy, whose home is theirs, still goes through Finder and never into a folder of ours', async () => {
+    const file = path.join(root, 'hero.png');
+    fs.writeFileSync(file, 'x');
+    const asked: string[] = [];
+    await trashFile(file, { platform: 'darwin', home: root, realHome: root, finder: async (f) => { asked.push(f); } });
+    expect(asked).toEqual([file]);
+    expect(fs.existsSync(path.join(root, '.Trash'))).toBe(false);
+  });
+
+  it('a test copy never asks Finder', async () => {
+    const file = path.join(root, 'hero.png');
+    fs.writeFileSync(file, 'x');
+    const asked: string[] = [];
+    await trashFile(file, { platform: 'darwin', home: root, realHome: '/Users/someone', finder: async (f) => { asked.push(f); } });
+    expect(asked).toEqual([]);
+  });
+});

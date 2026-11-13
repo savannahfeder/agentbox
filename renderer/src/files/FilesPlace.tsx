@@ -10,6 +10,7 @@ import { firstName, TeamContext } from '../team/people';
 import { ArtifactView, NO_MARKS } from '../components/ArtifactView';
 import { FileCover } from '../components/FileCover';
 import { SearchIcon } from '../components/SearchIcon';
+import { SAYS_UNDO } from '../toast-parts';
 import type { LedgerLine } from '../thread-history';
 import type { DragEvent } from 'react';
 import type { FileFolder, FileFolderAct, FileKind, FileSentIn, FilesCloudStatus, FilesPlaceList, FilesPlaceView, PlacedFile } from '../types';
@@ -394,13 +395,15 @@ const PlaceGlyph = ({ kind }: { kind: FileSentIn['kind'] }) => (kind === 'chat'
   ? <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" strokeLinejoin="round" /></svg>
   : <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6" strokeLinecap="round" /></svg>);
 
-export function FilesPlace({ project, onProject, now, onPlace, onNotice, onSettings }: {
+export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoable, onSettings }: {
   /** The project's page, or null for every file. */
   project: string | null;
   onProject: (project: string | null) => void;
   now: number;
   onPlace: (p: FileSentIn) => void;
   onNotice: (words: string) => void;
+  /** Puts a Move to the Trash on the app's Z. */
+  onUndoable?: (entry: { label: string; undoes: string; run: () => Promise<void | { refused: string }> }) => void;
   /** Settings › Files, or the plans when files are not kept in the cloud. */
   onSettings?: (pane: 'files' | 'cloud') => void;
 }) {
@@ -414,11 +417,24 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onSetti
     return () => window.removeEventListener('keydown', key, true);
   }, [chosen !== null]); // eslint-disable-line react-hooks/exhaustive-deps
   const trash = (keys: string[], what: string, older = false) => {
+    onNotice(`Moving ${what} to the Trash…`);
     void api.filesPlaceTrash({ keys, older }).then((r) => {
       readAgain();
       if (!r.ok) { onNotice(r.error || 'Those files could not be moved to the Trash.'); return; }
       if (!r.moved) { onNotice('Nothing here could be moved to the Trash.'); return; }
-      onNotice(`Moved ${what} to the Trash. Empty the Trash to get the ${sizeWords(r.bytes)} back.`);
+      const undo = r.undo && onUndoable ? r.undo : null;
+      if (undo) {
+        onUndoable!({
+          label: `Back from the Trash: ${what}`,
+          undoes: `put ${what} back`,
+          run: async () => {
+            const back = await api.filesPlaceUntrash(undo);
+            readAgain();
+            if (!back.ok) return { refused: back.error || 'Those files are in the Trash now. Put them back from there.' };
+          },
+        });
+      }
+      onNotice(`Moved ${what} to the Trash. Empty the Trash to get the ${sizeWords(r.bytes)} back.${undo ? SAYS_UNDO : ''}`);
     });
   };
   const team = useContext(TeamContext);

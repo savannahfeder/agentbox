@@ -234,12 +234,13 @@ interface FilesPlace {
   pictureNamed(src: unknown): Promise<string | null>;
   newDocument(ask: { project: string; name: string; kind?: 'document' | 'table'; folder?: string | null; by?: string | null }): Promise<{ key: string }>;
   addFiles(ask: { project: string; paths?: string[]; folder?: string | null; by?: string | null }): Promise<{ added: number; refused: string[]; keys: string[] }>;
-  trash(ask: { keys: readonly string[]; older?: boolean }): Promise<{ ok: boolean; moved: number; bytes: number; error?: string }>;
+  trash(ask: { keys: readonly string[]; older?: boolean }): Promise<{ ok: boolean; moved: number; bytes: number; error?: string; undo?: string }>;
+  untrash(token: string): Promise<{ ok: boolean; back?: number; error?: string }>;
   bringBackFor(ask: { product: string; id: string; deadlineMs?: number }): Promise<boolean>;
   considerNow(): void;
 }
 // The JS defaults `team = null` and `nameOf = () => ...` read as the whole type.
-const filesPlaceFor = appFilesPlace as (deps: { store: Store; team: IpcTeam | null; accountRoot: string; storeRoot: string; notify?: () => void; keeper?: FilesKeeper | null; trashItem?: ((file: string) => Promise<void>) | null }) => FilesPlace;
+const filesPlaceFor = appFilesPlace as (deps: { store: Store; team: IpcTeam | null; accountRoot: string; storeRoot: string; notify?: () => void; keeper?: FilesKeeper | null; trashItem?: ((file: string) => Promise<string | void>) | null }) => FilesPlace;
 type RoomCalls = Record<RoomOp, (...args: unknown[]) => unknown>;
 type ImportableThreads = Awaited<ReturnType<typeof readImportableThreads>>;
 type SetProjectPayload = { product?: string; key: string; value?: unknown };
@@ -2581,7 +2582,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     trashItem: async (file) => {
       const shell = await shellNow();
       if (shell.trashItem) await shell.trashItem(file);
-      else await (await import('./trash-file.mts')).trashFile(file, { home: supervisor.config?.home || os.homedir() });
+      else return (await import('./trash-file.mts')).trashFile(file, { home: supervisor.config?.home || os.homedir() });
     },
   }));
   supervisor.onStarting = (item) => { void filesPlaceNow().bringBackFor({ product: item.product, id: item.id }).catch(() => {}); };
@@ -2593,6 +2594,13 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       push();
       return out;
     } catch (err) { return { ok: false, moved: 0, bytes: 0, error: String((err as Error)?.message ?? err) }; }
+  });
+  ipcMain.handle('zero:files-place-untrash', async (_e, { token }: { token?: unknown } = {}) => {
+    try {
+      const out = await filesPlaceNow().untrash(String(token ?? ''));
+      push();
+      return out;
+    } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
   });
   ipcMain.handle('zero:files-cloud', () => keeperNow()?.look() ?? null);
   // An agent's team_read reads folders from the view the reach tick writes.
