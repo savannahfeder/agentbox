@@ -184,7 +184,7 @@ import { runsOn } from './runs-on.mts';
 import { MemoryGateServer, defaultSocketPath as memoryGateSocketPath, readMacPressure } from './memory-gate-server.mts';
 import { startDecision, readMacPressureNow, SETTLE_MS, STALE_MS } from './start-hold.mts';
 import { MemoryLog } from './memory-log.mts';
-import { StartBudget } from './cloud/start-budget.mts';
+import { StartBudget, cloudStartPressure } from './cloud/start-budget.mts';
 import { isPlainMerge, mergeHome, mergedSentence } from './cloud/merge-home.mts';
 import type { MergeHomeResult } from './cloud/merge-home.mts';
 import { autoSlots, DEFAULTS as MEMORY_GATE, pressureFrom } from './memory-gate.mts';
@@ -6869,8 +6869,7 @@ export class Supervisor {
 
   // What a cloud start that just went out says about whether another may.
   _howTheMachineIs() {
-    const reading = this._memReading;
-    return { pressure: reading ? pressureFrom(reading) : undefined, stallMs: this.stalls?.longestNow?.() ?? 0 };
+    return { pressure: cloudStartPressure(this._memReading, Date.now()), stallMs: this.stalls?.longestNow?.() ?? 0 };
   }
 
   _cloudHostAvailable() {
