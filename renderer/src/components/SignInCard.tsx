@@ -3,8 +3,8 @@ import { comesBackTo } from '../../../shared/sign-in-ask.mts';
 import { logoOf, DARK_INK } from '../connections/logos';
 import './need-card.css';
 
-export interface SignInAsk { id: string; service: string; url: string; code?: string; why?: string }
-export type SignInSaid = { said: 'signed-in' | 'skipped' } | { said: 'landed'; url: string };
+export interface SignInAsk { id: string; service: string; url: string; code?: string; why?: string; asksForCode?: true }
+export type SignInSaid = { said: 'signed-in' | 'skipped' } | { said: 'landed'; url: string } | { said: 'code'; code: string };
 
 const arrow = <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.4"><path d="M5 11l6-6M6 5h5v5" /></svg>;
 const key = <svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="14" r="4" /><path d="M11 11l8-8M16 6l2 2M14 8l2 2" /></svg>;
@@ -25,6 +25,7 @@ export function SignInCard({ ask, cloud, open, answer, copy }: {
   const [said, setSaid] = useState<string | null>(null);
   const [pasting, setPasting] = useState(false);
   const [landed, setLanded] = useState('');
+  const [pasted, setPasted] = useState('');
   const id = logoId(ask.service);
   const logo = logoOf(id);
   const back = cloud && !!comesBackTo(ask.url);
@@ -47,9 +48,17 @@ export function SignInCard({ ask, cloud, open, answer, copy }: {
         </div>}
         <div className="need-acts">
           <button type="button" className="need-btn need-main" disabled={busy} onClick={() => open(ask.url)}>Open {ask.service}<span className="need-btn-arrow">{arrow}</span></button>
-          <button type="button" className="need-btn" disabled={busy} onClick={() => void send({ said: 'signed-in' })}>I've signed in</button>
+          {!ask.asksForCode && <button type="button" className="need-btn" disabled={busy} onClick={() => void send({ said: 'signed-in' })}>I've signed in</button>}
           <button type="button" className="need-link need-skip" disabled={busy} onClick={() => void send({ said: 'skipped' })}>Not now</button>
         </div>
+        {ask.asksForCode && <form className="need-form" onSubmit={(e) => { e.preventDefault(); if (pasted.trim() && !busy) void send({ said: 'code', code: pasted.trim() }); }}>
+          <div className="need-row">
+            <input className="need-input" spellCheck={false} autoComplete="off" aria-label={`The code ${ask.service} shows`} placeholder={`Paste the code ${ask.service} shows`}
+              onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); e.currentTarget.blur(); } }}
+              value={pasted} onChange={(e) => { setPasted(e.target.value); setSaid(null); }} />
+            <button type="submit" className="need-btn need-main" disabled={busy || !pasted.trim()}>Send</button>
+          </div>
+        </form>}
         {back && !pasting && <button type="button" className="need-link need-also" onClick={() => setPasting(true)}>Page did not load after signing in?</button>}
         {pasting && <form className="need-form" onSubmit={(e) => { e.preventDefault(); if (landed.trim() && !busy) void send({ said: 'landed', url: landed.trim() }); }}>
           <div className="need-row">

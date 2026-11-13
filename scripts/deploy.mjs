@@ -183,6 +183,22 @@ function signIn(s, { required = true } = {}) {
 }
 signIns.forEach(signIn);
 
+// THE LIVE DATABASE HAS EVERY MIGRATION. Nothing applies them on merge, and on
+// 2026-11-12 fourteen were missing, so the shipped app called functions the
+// cloud did not have.
+say('checking the live database has every migration on main');
+const onLive = quiet('node', ['scripts/run.mjs', 'scripts/migrations-on-live.mjs'], 90_000);
+const notOnLive = onLive.out.split('\n').filter(Boolean);
+if (onLive.ok) console.log('  ✓ all of them');
+else if (checkOnly) console.log(`  ✗ ${notOnLive.join('\n  ✗ ')}`);
+else if (notOnLive.length && /\.sql$/.test(notOnLive[0])) {
+  stop('The live database is missing these migrations, so the app would call what is not there:',
+    ...notOnLive.map((f) => `- ${f}`), '',
+    `Apply them, then run npm run deploy again: node scripts/run.mjs scripts/apply-migration.mjs ${notOnLive.map((f) => `cloud/supabase/migrations/${f}`).join(' ')}`);
+} else {
+  stop(`Could not read the live database to check its migrations: ${onLive.out || onLive.err || 'no answer'}`);
+}
+
 if (checkOnly) {
   signIn(npmSignIn);
   console.log(`\nA real run would put out ${version} from ${version === mainVersion ? commit.slice(0, 8) : `a commit on main setting it to ${version}`}${signedOut.length ? `, after signing in to ${signedOut.length === 1 ? 'one thing' : `${signedOut.length} things`}` : ''}.`);
