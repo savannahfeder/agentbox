@@ -248,6 +248,7 @@
   --artifact-corner: 10px;
   --artifact-corner-small: 6px;
   --radius: var(--artifact-corner-small);
+  --pill: 999px;
   /* An AI teammate is round like a person; its dashed ring tells it apart. */
   --mate-corner: 50%;
   --tag-radius: var(--radius);

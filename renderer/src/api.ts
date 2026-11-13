@@ -30,8 +30,15 @@ const laterBridge = () => window.zero as (Omit<NonNullable<Window['zero']>, keyo
 
 export interface FileLinkAsk { product: string; thread: string; src: string }
 /** `current`: the link holds the copy of the file on screen now. */
-/** `ahead`: the link holds a later version of the file than the one on screen. */
-export interface FileLink { token: string; url: string; version: number; createdAt: number; updatedAt: number; comments: number; current: boolean; ahead?: boolean }
+/** `ahead`: the link holds a later version of the file than the one on screen, or an edit made on its page not yet in the files. */
+/** `editable`: a document or a table, which the people it lets edit can change on its page. */
+export interface FileLink {
+  token: string; url: string; version: number; createdAt: number; updatedAt: number; comments: number; current: boolean; ahead?: boolean;
+  access: LinkAccess; can: LinkCan; rev: number; changedOnWeb: boolean; changedByName: string | null; editable: boolean;
+}
+export type LinkAccess = 'anyone' | 'people';
+export type LinkCan = 'view' | 'comment' | 'edit';
+export interface LinkPerson { email: string; can: LinkCan; name: string | null; avatar: string | null }
 export interface PublicLink { token: string; url: string; source: string; name: string; kind: string; createdAt: number; updatedAt: number; comments: number }
 /** `place`: where in the file it points (shared/artifact-marks.mts NotePlace); none for the whole file. */
 export interface LinkComment { id: string; byName: string; byAvatar: string | null; text: string; at: number; mine: boolean; byOwner: boolean; place?: NotePlace }
@@ -608,6 +615,10 @@ export const api = {
         base.supervisor.queued = queued;
         base.supervisor.capacity = base.supervisor.running.filter((r) => (r as { where?: string }).where !== 'cloud').length;
       }
+      // &team=signedout: a build that can sign in, with nobody signed in and no team.
+      if (params.get('team') === 'signedout') {
+        base.team = { configured: false, canSignIn: true, started: true, signedIn: false, signingIn: null, me: null, team: null, people: [], cards: [], lastSyncAt: null, error: null };
+      }
       // &usagestale: a Codex reading six hours old whose five hour window has ended.
       if (params.has('usagestale')) {
         const now = Date.now();
@@ -806,6 +817,23 @@ export const api = {
     const zero = window.zero;
     if (!zero?.fileLinkComment) return { ok: false, error: `quit and reopen ${NAME} to answer comments` };
     return zero.fileLinkComment(p);
+  },
+  /** Who can open a link, and what the link itself lets them do. */
+  async fileLinkAccess(p: { token: string; access: LinkAccess; can: LinkCan }): Promise<{ ok: boolean; error?: string }> {
+    const zero = window.zero;
+    if (!zero?.fileLinkAccess) return { ok: false, error: `quit and reopen ${NAME} to change who can open links` };
+    return zero.fileLinkAccess(p);
+  },
+  async fileLinkPeople(p: { token: string }): Promise<{ ok: boolean; error?: string; people?: LinkPerson[] }> {
+    const zero = window.zero;
+    if (!zero?.fileLinkPeople) return { ok: false, error: 'not here' };
+    return zero.fileLinkPeople(p);
+  },
+  /** Adds a person by email or changes what they can do; `can` null takes them off. */
+  async fileLinkPerson(p: { token: string; email: string; can: LinkCan | null }): Promise<{ ok: boolean; error?: string; people?: LinkPerson[] }> {
+    const zero = window.zero;
+    if (!zero?.fileLinkPerson) return { ok: false, error: `quit and reopen ${NAME} to share with people` };
+    return zero.fileLinkPerson(p);
   },
 
   /** "Try again" on a file in a conversation that was not delivered. */
