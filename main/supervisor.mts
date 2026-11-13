@@ -702,6 +702,7 @@ export interface SavedState {
   deliveryAttempts?: Record<string, number>;
   fruitless?: Record<string, FruitlessRecord>;
   heldStarts?: Record<string, HeldStart>;
+  filesForCloud?: Record<string, { paths: string[]; at: number }>;
   deadStarts?: Record<string, number[]>;
   carried?: Record<string, CarriedMark>;
   profileTrouble?: Record<string, ProfileTrouble>;
@@ -1088,6 +1089,7 @@ const STORM_WINDOW_MS = 10 * 60_000;
 // the try before, in case what stopped it has gone away. Then it waits for a
 // person.
 const HELD_RETRY_MS = [30 * 60_000, 2 * 3_600_000, 8 * 3_600_000];
+const FILES_FOR_CLOUD_KEPT_MS = 7 * 24 * 3_600_000;
 // How long a cloud run may take to start before it stops holding others back.
 const CLOUD_START_PATIENCE_MS = 10 * 60_000;
 // A run paused to move to the cloud whose resume has not gone there by then
@@ -1321,7 +1323,8 @@ export class Supervisor {
   declare _madeFolders: Map<string, string>;
   // Threads whose next turn goes to the cloud (a key saved or a file sent for it), and the files each sends.
   declare _cloudForKey: Set<string> | undefined;
-  declare _filesForCloud: Map<string, string[]> | undefined;
+  declare _filesForCloud: Map<string, { paths: string[]; at: number }> | undefined;
+  declare _filesGivenToCloud: Map<string, string[]> | undefined;
   declare _photos: Map<string, ReturnType<typeof snapshotRepo> | null> | undefined;
   declare _firstRunUntil: number;
   declare _startBudget: StartBudget;
@@ -1622,6 +1625,7 @@ export class Supervisor {
       // every app restart resumed the every-tick loop from zero, and restarts
       // are frequent. It is keyed and cleared exactly like _deliveryAttempts.
       this._fruitless = state.fruitless ?? {};
+      this._loadFilesForCloud(state.filesForCloud);
       this._heldStarts = state.heldStarts ?? {};
       // A hold saved before holds tried again on their own gets the first try.
       for (const held of Object.values(this._heldStarts)) {
@@ -6636,15 +6640,48 @@ export class Supervisor {
     return file.error ? { ok: false, error: file.error } : { ok: true, size: file.size };
   }
 
-  // A FILE SENT FROM THIS COMPUTER to a thread's next cloud turn, once.
+  // A FILE SENT FROM THIS COMPUTER to a thread's cloud turns. It goes with
+  // every start until one gets the agent going: the files are packed before
+  // the agent begins, so a start that died sooner may not have taken them.
   cloudSendFile(itemId: string, asked: string) {
     const file = fileToSend(asked, { home: this.config.home });
     if (file.error) throw new Error(file.error);
     const sent = { path: file.path!, size: file.size! };
     const files = (this._filesForCloud ??= new Map());
-    files.set(itemId, [...new Set([...(files.get(itemId) ?? []), sent.path])]);
+    files.set(itemId, { paths: [...new Set([...(files.get(itemId)?.paths ?? []), sent.path])], at: Date.now() });
     (this._cloudForKey ??= new Set()).add(itemId);
+    this._saveState();
     return sent;
+  }
+
+  _filesWaitingFor(itemId: string): string[] {
+    const waiting = this._filesForCloud?.get(itemId);
+    if (!waiting) return [];
+    if (Date.now() - waiting.at > FILES_FOR_CLOUD_KEPT_MS) { this._filesForCloud!.delete(itemId); return []; }
+    return waiting.paths;
+  }
+
+  _settleFilesForCloud(item: { id?: string } | null | undefined, session: { cloud?: boolean; sessionId?: string | null; result?: unknown } | null | undefined) {
+    const id = item?.id;
+    const given = id ? this._filesGivenToCloud?.get(id) : null;
+    if (!id || !given || !session?.cloud || (session.sessionId == null && session.result == null)) return;
+    this._filesGivenToCloud!.delete(id);
+    const left = this._filesWaitingFor(id).filter((p) => !given.includes(p));
+    if (left.length) this._filesForCloud!.set(id, { ...this._filesForCloud!.get(id)!, paths: left });
+    else this._filesForCloud?.delete(id);
+    this._saveState();
+  }
+
+  _filesForCloudSaved(): Record<string, { paths: string[]; at: number }> {
+    return Object.fromEntries([...(this._filesForCloud ?? new Map()).entries()]);
+  }
+
+  _loadFilesForCloud(saved: unknown) {
+    this._filesForCloud = new Map();
+    if (!saved || typeof saved !== 'object') return;
+    for (const [id, v] of Object.entries(saved as Record<string, { paths?: unknown; at?: unknown }>)) {
+      if (Array.isArray(v?.paths) && typeof v.at === 'number') this._filesForCloud.set(id, { paths: v.paths.filter((p): p is string => typeof p === 'string'), at: v.at });
+    }
   }
 
   // THE CLOUD SETUP'S SIGN-IN. `start` adds a new account of an engine (or,
@@ -7425,8 +7462,11 @@ export class Supervisor {
     const env: NodeJS.ProcessEnv = { ...rest, ...this._cloudAccountEnv(),
       ...(this._phoneCarries?.slugs.has(given.ZERO_PRODUCT) ? { AGENTBOX_PHONE_DEVICE: this._phoneCarries.device } : {}),
     };
-    const sent = given.ZERO_ITEM ? this._filesForCloud?.get(given.ZERO_ITEM) : null;
-    if (sent?.length && given.ZERO_ITEM) { env.AGENTBOX_SEND_FILES = JSON.stringify(sent); this._filesForCloud?.delete(given.ZERO_ITEM); }
+    const sent = given.ZERO_ITEM ? this._filesWaitingFor(given.ZERO_ITEM) : [];
+    if (sent.length && given.ZERO_ITEM) {
+      env.AGENTBOX_SEND_FILES = JSON.stringify(sent);
+      (this._filesGivenToCloud ??= new Map()).set(given.ZERO_ITEM, sent);
+    }
     return env;
   }
 
@@ -8347,6 +8387,7 @@ export class Supervisor {
         deliveryAttempts: this._deliveryAttempts,
         fruitless: this._fruitless,
         heldStarts: this._heldStarts,
+        filesForCloud: this._filesForCloudSaved(),
         // The starts a hold is counted from, pruned to the window they are
         // counted in. A restart in the middle of a storm used to reset the
         // count to zero while the hold it leads to was kept.
@@ -12285,6 +12326,7 @@ export class Supervisor {
       this._noteCloudOutcome(session, code, signal);
       this._leaveKitForThePhone(item, session);
       this._noteHowTheRunStarted(item, session);
+      this._settleFilesForCloud(item, session);
       this._closeSignInItWaitedOn(item);
       onLine(`session exited (${code})`);
       if (this._noteCloudHandBack(item, session, cwd)) onLine('the cloud handed this request back to this computer; the next one goes to the cloud');
