@@ -81,6 +81,9 @@ describe('a cloud sign-in that worked', () => {
     const { out } = await signedIn('Acme');
     expect(out.keep).toBeUndefined();
     expect(out.message).toMatch(/keep/);
+    // A tool server's own sign-in cannot become a variable, so it goes to Connections, which every thread uses.
+    expect(out.message).toMatch(/agentbox:\/\/connections/);
+    expect((await signedIn('Supabase')).out.message).not.toMatch(/agentbox:\/\/connections/);
   });
 
   it('says to keep it once a login that landed elsewhere finishes', async () => {
@@ -121,5 +124,108 @@ describe('where there is nothing to keep', () => {
     expect(out.status).toBe('skipped');
     expect(out.keep).toBeUndefined();
     expect(out.message).not.toMatch(/every later cloud/);
+  });
+});
+
+// The person chooses on the card whether a cloud sign-in is saved. The choice
+// sits on the ask itself, so a sign-in that comes back by itself (this
+// computer catching the browser at localhost) honours it too.
+describe('when they untick "Save this sign-in for every cloud thread"', () => {
+  async function unticked(service = 'Supabase') {
+    const { askToSignIn } = await import('../mcp/core/sign-in.mts');
+    const t = work.createItem(product.id, { title: 'Deploy', labels: ['founder'] }, { source: 'system' });
+    process.env.ZERO_ITEM = t.id;
+    process.env.ZERO_PRODUCT = product.id;
+    const ask = askToSignIn(t.id, { service, url: LINK }, { product: product.id });
+    const item = disk.readWorkItem(product.dir, t.id);
+    disk.updateWorkItem(product.dir, t.id, { signIn: { ...item.signIn, keep: false } }, { source: 'founder' });
+    return { t, ask: ask.id };
+  }
+
+  it('the agent is told not to keep it', async () => {
+    const { t, ask } = await unticked();
+    answer(t, ask, 'signed-in');
+    const out = await call(await tools(t.id, true), { ask });
+    expect(out.status).toBe('signed_in');
+    expect(out.keep).toBeUndefined();
+    expect(out.message).toMatch(/not to save/);
+    expect(out.message).not.toMatch(/every later cloud/);
+  });
+
+  it('nor when the login finished by itself', async () => {
+    const { t, ask } = await unticked('GitHub');
+    const out = await call(await tools(t.id, true), { ask, finished: true });
+    expect(out.keep).toBeUndefined();
+    expect(out.message).toMatch(/not to save/);
+  });
+
+  it('and keeping it anyway is refused', async () => {
+    const { t, ask } = await unticked();
+    answer(t, ask, 'signed-in');
+    const ts = await tools(t.id, true);
+    kept.length = 0;
+    const out = await call(ts, { ask, keep: { name: 'SUPABASE_ACCESS_TOKEN', value: 'sbp_x' } });
+    expect(out.status).toBe('not_saved');
+    expect(kept).toEqual([]);
+  });
+
+  it('the choice survives the agent closing the card', async () => {
+    const { t, ask } = await unticked();
+    await call(await tools(t.id, true), { ask, finished: true });
+    expect(disk.readWorkItem(product.dir, t.id).signIn.keep).toBe(false);
+  });
+});
+
+describe('ticking and unticking the box on this computer', () => {
+  const fake = (item) => {
+    const wrote = [];
+    return { wrote, readItem: () => item, productDir: () => '/p', modules: { workItemsDisk: { updateWorkItem: (_d, _id, patch, o) => { wrote.push([patch, o.source]); } } } };
+  };
+  const open = { id: 's-abcdef12', service: 'Supabase', url: LINK, at: 1 };
+  it('marks the open ask not to be saved, and saved again, as the person', async () => {
+    const { Store } = await import('../main/store.mts');
+    const off = fake({ id: 'w', status: 'open', signIn: open });
+    Store.prototype.chooseSignInKeep.call(off, 'p', 'w', { id: open.id, keep: false });
+    expect(off.wrote).toEqual([[{ signIn: { ...open, keep: false } }, 'founder']]);
+    const on = fake({ id: 'w', status: 'open', signIn: { ...open, keep: false } });
+    Store.prototype.chooseSignInKeep.call(on, 'p', 'w', { id: open.id, keep: true });
+    expect(on.wrote).toEqual([[{ signIn: open }, 'founder']]);
+  });
+  it('refuses an ask that is no longer open', async () => {
+    const { Store } = await import('../main/store.mts');
+    const s = fake({ id: 'w', status: 'open', signIn: open, signInAnswer: { id: open.id, said: 'signed-in', at: 2 } });
+    expect(() => Store.prototype.chooseSignInKeep.call(s, 'p', 'w', { id: open.id, keep: false })).toThrow(/no longer open/);
+    expect(() => Store.prototype.chooseSignInKeep.call(fake({ id: 'w', status: 'open', signIn: open }), 'p', 'w', { id: 's-other123', keep: false })).toThrow(/no longer open/);
+  });
+});
+
+describe('what the ask keeps of the choice', () => {
+  it('keeps "not saved" and nothing else', async () => {
+    const { cleanSignIn } = await import('../shared/sign-in-ask.mts');
+    const base = { id: 's-abcdef12', service: 'Supabase', url: LINK, at: 1 };
+    expect(cleanSignIn({ ...base, keep: false })?.keep).toBe(false);
+    expect(cleanSignIn({ ...base, keep: true })).not.toHaveProperty('keep');
+    expect(cleanSignIn({ ...base, keep: 'no' })).not.toHaveProperty('keep');
+  });
+});
+
+describe('the checkbox on the card', () => {
+  const ask = { id: 's-abcdef12', service: 'Supabase', url: LINK };
+  const draw = async (props) => {
+    const { createElement: h } = await import('react');
+    const { renderToStaticMarkup } = await import('react-dom/server');
+    const { SignInCard } = await import('../renderer/src/components/SignInCard.tsx');
+    return renderToStaticMarkup(h(SignInCard, { ask, cloud: true, open: () => {}, answer: async () => null, copy: () => {}, choose: async () => null, ...props }));
+  };
+  it('is ticked on a cloud thread', async () => {
+    const html = await draw({});
+    expect(html).toContain('Save this sign-in for every cloud thread');
+    expect(html).toMatch(/type="checkbox"[^>]*checked/);
+  });
+  it('is unticked once they said not to save it', async () => {
+    expect(await draw({ ask: { ...ask, keep: false } })).not.toMatch(/type="checkbox"[^>]*checked/);
+  });
+  it('is not there on this computer, where nothing is saved', async () => {
+    expect(await draw({ cloud: false })).not.toContain('Save this sign-in');
   });
 });

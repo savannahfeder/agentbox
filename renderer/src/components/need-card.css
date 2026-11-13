@@ -47,18 +47,7 @@
 .need-btn-arrow { display: inline-flex; margin-left: 6px; vertical-align: -1px; }
 .need-acts .need-skip { margin-left: 6px; align-self: center; }
 
-/* The save choice on a cloud sign-in (design round). */
-.need-title-row { display: flex; align-items: center; gap: 12px; }
-.need-title-row .need-title { flex: 1; min-width: 0; }
-.need-check { margin-top: 12px; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; line-height: 18px; color: var(--text-dim); cursor: default; }
+.need-check { position: relative; margin-top: 12px; display: flex; width: fit-content; align-items: center; gap: 8px; font-size: 13px; line-height: 18px; color: var(--text-dim); cursor: default; }
 .need-check input { position: absolute; opacity: 0; pointer-events: none; }
 .need-check-box { width: 16px; height: 16px; box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; color: var(--text); }
 .need-check input:focus-visible + .need-check-box { border-color: var(--text-faint); }
-.need-save-line { margin-top: 12px; display: flex; gap: 8px; align-items: baseline; font-size: 13px; line-height: 18px; color: var(--text-faint); }
-.need-switch { flex: none; display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-dim); cursor: default; }
-.need-switch-track { position: relative; width: 28px; height: 16px; padding: 0; border: 1px solid var(--line-strong); border-radius: 8px; background: transparent; cursor: default; }
-.need-switch-track span { position: absolute; top: 2px; left: 2px; width: 10px; height: 10px; border-radius: 50%; background: var(--text-faint); transition: left .15s; }
-.need-switch-track.on { background: var(--text); border-color: var(--text); }
-.need-switch-track.on span { left: 14px; background: var(--bg-raised); }
-.need-facts-save > div { position: relative; }
-.need-facts-off { margin-left: auto; font-size: 12.5px; }

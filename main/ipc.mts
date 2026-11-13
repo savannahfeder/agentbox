@@ -2230,6 +2230,15 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       return { ok: false, error: String((err as Error).message) };
     }
   });
+  ipcMain.handle('zero:sign-in-keep', (_e, { product, id, ask, keep } = {}) => {
+    try {
+      store.chooseSignInKeep(product, id, { id: ask, keep: keep !== false });
+      push();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
   // GitHub's own sign-in for this computer's git, started from the card on a ship that could not push.
   let ghLogin: GhLogin | null = null;
   ipcMain.handle('zero:github-browser-sign-in', async () => {

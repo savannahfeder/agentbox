@@ -9,14 +9,15 @@
 // back to the agent, which is still running.
 //
 // Two fields on the thread, both latest-wins:
-//   signIn        { id, service, url, code?, why?, at, done? }   the agent's ask
+//   signIn        { id, service, url, code?, why?, at, done?, keep? }   the agent's ask;
+//                 `keep: false` when the person unticked saving it for every cloud thread
 //   signInAnswer  { id, said, url?, at }                          the answer to it
 // `said` is 'signed-in' (they finished in the browser), 'landed' (with the
 // address the browser was sent back to, for a login waiting on another
 // machine), 'skipped', or 'replied' (they wrote on the thread instead, which
 // ends the wait so the agent can take what they wrote).
 
-export interface SignInAsk { id: string; service: string; url: string; code?: string; why?: string; at: number; done?: true }
+export interface SignInAsk { id: string; service: string; url: string; code?: string; why?: string; at: number; done?: true; keep?: false }
 export type SignInSaid = 'signed-in' | 'landed' | 'skipped' | 'replied';
 export interface SignInAnswer { id: string; said: SignInSaid; url?: string; at: number }
 
@@ -43,6 +44,7 @@ export function cleanSignIn(value: unknown): SignInAsk | undefined {
   if (code) out.code = code;
   if (why) out.why = why;
   if (v.done === true) out.done = true;
+  if (v.keep === false) out.keep = false;
   return out;
 }
 

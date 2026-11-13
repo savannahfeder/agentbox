@@ -23,6 +23,7 @@ interface LaterBridge {
   gitHubSignIn?(p: { token: string }): Promise<{ ok: boolean; again?: string[]; error?: string }>;
   gitHubBrowserSignIn?(): Promise<{ ok: boolean; code?: string; url?: string; error?: string }>;
   signInAnswer?(p: { product: string; id: string; ask: string; said: 'signed-in' | 'skipped' | 'landed'; url?: string }): Promise<{ ok: boolean; error?: string }>;
+  signInKeep?(p: { product: string; id: string; ask: string; keep: boolean }): Promise<{ ok: boolean; error?: string }>;
   cloudAccountPay?(p: { plan: 'pro' | 'plus' | 'max' | 'team' }): Promise<{ ok: boolean; where?: 'checkout' | 'billing'; error?: string; message?: string }>;
   cloudAccountTeamBilling?(): Promise<{ ok: boolean; owner?: boolean } & Partial<TeamBillingDetails>>;
 }
@@ -1725,6 +1726,13 @@ export const api = {
     const zero = laterBridge();
     if (!zero?.signInAnswer) return { ok: false, error: RESTART_NOTE };
     return zero.signInAnswer(p);
+  },
+
+  /** Whether a cloud sign-in an agent on this thread is waiting on is saved for every cloud thread. */
+  async signInKeep(p: { product: string; id: string; ask: string; keep: boolean }): Promise<{ ok: boolean; error?: string }> {
+    const zero = laterBridge();
+    if (!zero?.signInKeep) return { ok: false, error: RESTART_NOTE };
+    return zero.signInKeep(p);
   },
 
   /** Signing in to Agentbox Cloud itself, on the app's sign-in page: Google, email, a new account and its link again, or a password reset. */

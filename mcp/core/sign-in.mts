@@ -47,13 +47,22 @@ export function keepAfterSignIn(service: string, { finishing = false }: { finish
   const why = 'this sign-in for every later cloud thread: a cloud machine forgets its logins when the run ends.';
   if (!svc || svc.keys.length !== 1) {
     const names = svc ? ` under ${svc.keys.map((k) => k.name).join(' and ')}, one call each` : ', under the variable its tools read, if they read one from the environment';
-    return { message: `${when} ${why} Read the token its login saved and call sign_in with this ask and keep${names}.` };
+    const server = svc ? '' : ` A tool server's own sign-in (its authenticate tool, \`codex mcp login\`) cannot be kept that way: if they will want that tool again, give them its link in Connections (agentbox://connections), which every thread can use.`;
+    return { message: `${when} ${why} Read the token its login saved and call sign_in with this ask and keep${names}.${server}` };
   }
   const name = svc.keys[0].name;
   const read = READ_TOKEN[svc.id];
   const how = read ? `Run \`${read}\`` : 'Read the token its login saved';
   return { keep: { name, ...(read ? { read } : {}) }, message: `${when} ${why} ${how} and call sign_in with this ask and keep { name: '${name}', value: the token }.` };
 }
+
+/** Whether the person unticked saving the sign-in `askId` for every cloud thread. */
+export function notToBeSaved(id: string, askId: string, { product = null }: { product?: string | null } = {}): boolean {
+  const open = askOn(own(id, product).item);
+  return open?.id === askId && open.keep === false;
+}
+
+export const NOT_SAVED = 'They chose not to save this sign-in for other threads, so do not keep it.';
 
 export interface SignInRequest { service?: string; url?: string; code?: string; why?: string; ask?: string; finished?: boolean }
 export interface SignInWait { status: 'closed' | 'waiting' | 'signed_in' | 'landed' | 'skipped' | 'replied'; ask: string; url?: string; message: string }
