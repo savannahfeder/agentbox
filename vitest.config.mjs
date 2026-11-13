@@ -36,6 +36,13 @@ export function workersFor({ memBytes, cpus }) {
   return Math.max(1, Math.min(byMemory, (Number(cpus) || 1) - 1));
 }
 
+/**
+ * Each worker's heap ceiling, in MB. Without one V8 lets a worker grow to
+ * about 4 GB on a 16 GB Mac before it dies, and five such workers once filled
+ * the swap (tests/a-test-worker-stops-at-its-memory-ceiling).
+ */
+export const WORKER_HEAP_MB = 1536;
+
 // .test.mjs still runs so a test written the old way is not skipped in silence;
 // tests/every-test-is-typescript fails until it is renamed.
 export const SUITE_INCLUDE = ['tests/**/*.test.mts', 'tests/**/*.test.mjs'];
@@ -59,6 +66,9 @@ export default defineConfig({
     // `--maxWorkers`, `--no-file-parallelism` and VITEST_MAX_FORKS still win.
     maxWorkers: workersFor({ memBytes: os.totalmem(), cpus: os.availableParallelism?.() ?? os.cpus().length }),
     minWorkers: 1,
+    // In NODE_OPTIONS, not execArgv: the app starts its worker threads with
+    // process.execArgv, and Node refuses a thread whose flags set the heap.
+    env: { NODE_OPTIONS: [process.env.NODE_OPTIONS, `--max-old-space-size=${WORKER_HEAP_MB}`].filter(Boolean).join(' ') },
     // ROOM FOR A MAC THAT IS NEVER IDLE (w-c121bd85e6, 2026-10-04). Vitest's
     // defaults, 5 s for a test and 10 s for a hook, are written for a laptop
     // running one suite. A dozen agents share this one, and the end-to-end

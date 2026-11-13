@@ -21,7 +21,7 @@ export function offersTryAgain(item: WorkItem, facts: LiveFacts & { practice?: b
   if (!Array.isArray(facts.queued)) return false;
   if (facts.asking || facts.shipping || facts.remoteHeld) return false;
   if ((facts.scheduledUntil ?? 0) > (facts.now ?? Date.now())) return false;
-  if (facts.stalled) return true;
+  if (facts.stalled && !facts.signInNeeded?.[item.id]) return true;
   const live = liveLine(item, facts);
   if (live) return STUCK.has(live.state);
   // Out of In progress, the newest word on it is the app's own note that a run
