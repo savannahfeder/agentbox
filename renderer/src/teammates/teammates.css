@@ -251,6 +251,11 @@ span.tq-link:focus-visible { outline: 1px solid var(--text-faint); outline-offse
 textarea.tq-field { resize: vertical; border-color: var(--line); margin-left: 0; }
 .tq-job-edit { display: flex; flex-direction: column; gap: 6px; width: 100%; }
 .tq-job-keys { display: flex; align-items: center; gap: 8px; }
+/* About on a teammate's place: the sheet's rows, with room for the whole job. */
+.tq-about-page { padding: 4px 0 32px; }
+.tq-about-page dl { grid-template-columns: 110px minmax(0, 1fr); row-gap: 18px; font-size: 14px; line-height: 22px; }
+.tq-job-whole { white-space: pre-wrap; }
+.tq-about-h { margin: 36px 0 16px; font-size: 12px; font-weight: 500; line-height: 18px; color: var(--text-dim); }
 .tq-when-edit { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 2px; }
 .tq-time { font: inherit; font-size: 13px; color: var(--text); background: none; border: 1px solid var(--line); border-radius: var(--radius); padding: 1px 4px; }
 .tq-book { display: inline-flex; align-items: center; gap: 7px; border: 0; padding: 0; background: none; font: inherit; color: var(--text); text-align: left; cursor: default; }

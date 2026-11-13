@@ -38,17 +38,20 @@ export function setupSteps({ chats, team, teammates, project, signedIn = true, p
   return out;
 }
 
-/** The plan page's words: what Pro brings in three lines, the cloud computer first, the price in one quiet line, and Free as the way on.
+/** The plan page's words: what Pro brings in three lines, the cloud computer first, then the free week beside the paid month, and Free as the way on.
  *  components/ProShowcase.tsx draws one card for each line, in this order. */
 export const PRO_PITCH = {
   head: 'Upgrade to Pro.',
   perks: [
     { id: 'cloud', title: 'A computer for every agent' },
-    { id: 'team', title: 'Your team in one inbox' },
+    { id: 'team', title: 'Share threads and tasks with your team' },
     { id: 'files', title: 'Files saved in the cloud' },
   ],
+  // The free week beside the paid month, so the trial's hours are never read as the plan's.
+  trial: { label: `First ${TEAM.trialDays} days`, price: 'Free', line: `${TEAM.trialHoursPerMember} cloud hours to try` },
+  paid: { label: 'Then', price: `$${TEAM.dollarsPerSeat}`, per: 'a month', line: `${TEAM.hoursPerSeat} cloud hours a month` },
   cta: `Try Pro free for ${TEAM.trialDays} days`,
-  terms: `Then $${TEAM.dollarsPerSeat} a month. Cancel any time.`,
+  terms: 'Cancel any time.',
   free: 'Stay on Free',
 };
 

@@ -31,7 +31,7 @@ describe('the note button once a note has gone', () => {
   });
 
   it('is shown only after the write came back ok, and the button keeps saying it until the next words', () => {
-    expect(view).toMatch(/const went = noteSentWords\(sendWords\);/);
+    expect(view).toMatch(/const went = noteSentWords\([^;]*sendWords\);/);
     const send = view.slice(view.indexOf('const send = async'), view.indexOf('const settle = async'));
     expect(send.indexOf("if (failed(out, 'That comment did not save.'))")).toBeGreaterThan(-1);
     expect(send.indexOf('setJustSent(went)')).toBeGreaterThan(send.indexOf("if (failed(out, 'That comment did not save.'))"));

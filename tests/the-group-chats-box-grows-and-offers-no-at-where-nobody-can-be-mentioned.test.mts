@@ -33,7 +33,7 @@ describe('the group chat\'s box', () => {
     expect(bar()).toMatch(/Mention someone/);
   });
   it('is not used for the job and voice fields, which stay plain text fields', () => {
-    expect(page).toMatch(/<textarea className="tq-field" rows=\{6\}/);
+    expect(page).toMatch(/<textarea className="tq-field" rows=\{whole \? 14 : 6\}/);
     expect(page).toMatch(/<textarea className="tq-field tq-voice-own"/);
   });
 });

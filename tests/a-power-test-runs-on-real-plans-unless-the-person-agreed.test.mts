@@ -84,12 +84,12 @@ describe('what a tester on real plans is told', () => {
   const p = { name: 'Priya', role: 'engineer', text: 'You build.', atOnce: 4, day: ['Morning'], codex: true, knowsKeys: true, projects: ['api'] };
   const prompt = (person, extra) => testerPrompt({ person, browse: 'app', diary: 'diary', shots: '/tmp/s', round: 1, totalMinutes: 60, minutesLeft: 60, roundMinutes: 20, fraction: 0, diaryTail: [], issues: [], notYet: [], real: true, ...extra });
 
-  it('is told the agents are real and to send half the work to Codex', () => {
+  it('is told the agents are real and to send most of the work to Codex', () => {
     expect(prompt(p)).toMatch(/real Claude Code and Codex/);
-    expect(prompt(p)).toMatch(/at least half of your work to Codex/);
+    expect(prompt(p)).toMatch(/four threads in five to Codex/);
   });
 
   it('must NOT be sent to Codex when they do not use it', () => {
-    expect(prompt({ ...p, codex: false })).not.toMatch(/Codex agents|at least half of your work to Codex/);
+    expect(prompt({ ...p, codex: false })).not.toMatch(/Codex agents|four threads in five to Codex/);
   });
 });

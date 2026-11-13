@@ -76,6 +76,7 @@ describe('⌘K finds threads', () => {
   it('is handed the list search and a way to open it with words typed', () => {
     expect(app).toContain('findThreads={findThreads}');
     expect(app).toContain('onSearchFor={searchFor}');
-    expect(app).toMatch(/const findThreads = useCallback\(\(q: string\) => \[\s*\.\.\.searchThreads\(items, q, searchContext\)/);
+    const finder = app.slice(app.indexOf('const findThreads = useCallback'), app.indexOf('const goToStop'));
+    expect(finder).toMatch(/searchThreads\(items, q, searchContext\)/);
   });
 });

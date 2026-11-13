@@ -274,6 +274,25 @@ export function noteSendWords(p: Parameters<typeof whereANoteGoes>[0] & { nameOf
   return 'Comment';
 }
 
+export type NoteBoxKey = 'note' | 'note and send' | 'send waiting' | 'leave';
+
+/**
+ * A key in a note box. Enter keeps the note for Send; ⌘↵ keeps it and sends it
+ * now, and with an empty box sends what is waiting.
+ */
+export function noteBoxKey({ key, chord, shift, composing, typed, waiting }: {
+  key: string; chord: boolean; shift: boolean; composing: boolean; typed: boolean; waiting: number;
+}): NoteBoxKey {
+  if (key !== 'Enter' || composing) return 'leave';
+  if (chord) return typed ? 'note and send' : waiting ? 'send waiting' : 'note';
+  return shift ? 'leave' : 'note';
+}
+
+/** The notes ⌘↵ hands your agent with a new note: none unless the note is for your agent. */
+export function sentWithTheNote(goes: NoteGoes, waiting: readonly string[], id: string): string[] {
+  return goes.to === 'agent' ? [...new Set([...waiting, id])] : [];
+}
+
 /** Everyone but you who noted one of these versions or replied under a note on them, newest first. */
 export function whoTalksOnFile(notes: readonly Pick<FileNote, 'file' | 'by' | 'ts' | 'replies'>[], versions: readonly string[], me: string | null): string[] {
   const said = notes.filter((n) => versions.includes(n.file))

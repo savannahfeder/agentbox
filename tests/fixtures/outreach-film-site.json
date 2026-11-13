@@ -1,0 +1,20 @@
+{
+ "domain": "parcelwise.example",
+ "name": "Parcelwise",
+ "readAt": "2026-11-12T00:00:00.000Z",
+ "hero": { "text": "Shipping that just works" },
+ "problems": [],
+ "pages": [
+  {
+   "kind": "home",
+   "url": "https://parcelwise.example/",
+   "title": "Parcelwise | Shipping API for online stores",
+   "description": "Parcelwise gives online stores shipping rates, labels and tracking through one API.",
+   "h1": ["Shipping that just works"],
+   "h2": ["Rates API", "Label API", "Tracking Webhooks"],
+   "nav": ["Product", "Docs", "Pricing", "Changelog"],
+   "buttons": ["Start free", "Talk to us"],
+   "text": "Shipping that just works\nParcelwise gives online stores shipping rates, labels and tracking through one API.\nThe Rates API returns live prices from every carrier in one call.\nPrint labels for 40 carriers with the Label API.\nTracking Webhooks tell your store the moment a parcel moves.\nNow with Canada Post and DHL Express.\nWorks with Shopify and WooCommerce."
+  }
+ ]
+}

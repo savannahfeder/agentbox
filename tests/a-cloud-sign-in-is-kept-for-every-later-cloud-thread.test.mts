@@ -89,6 +89,14 @@ describe('a cloud sign-in that worked', () => {
     expect(out.keep?.name).toBe('SUPABASE_ACCESS_TOKEN');
   });
 
+  it('says to keep it once a login waiting for a pasted code finishes', async () => {
+    const { out } = await signedIn('Supabase', { said: 'code', extra: { code: 'A1B2C3D4' } });
+    expect(out.status).toBe('code');
+    expect(out.code).toBe('A1B2C3D4');
+    expect(out.keep?.name).toBe('SUPABASE_ACCESS_TOKEN');
+    expect(out.message).toMatch(/Once the login finishes, keep/);
+  });
+
   it('says to keep it when the login finished by itself', async () => {
     const { askToSignIn } = await import('../mcp/core/sign-in.mts');
     const t = work.createItem(product.id, { title: 'Deploy', labels: ['founder'] }, { source: 'system' });

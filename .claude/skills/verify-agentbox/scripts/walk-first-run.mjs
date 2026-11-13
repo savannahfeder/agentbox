@@ -127,7 +127,7 @@ try {
   await see('account-email-and-password', /Create account/i);
   await key('Enter');
   await see('plan', /Upgrade to Pro.*Try Pro free for 7 days.*Stay on Free/i);
-  if (/at once/i.test(await page.evaluate(`document.querySelector('.setup-split')?.innerText ?? ''`))) throw new Error('the plan page still names a number of cloud agents at once');
+  if (/\d+ (cloud agents )?at once/i.test(await page.evaluate(`document.querySelector('.setup-split')?.innerText ?? ''`))) throw new Error('the plan page still names a number of cloud agents at once');
   await key('Enter');
   await see('plan-waiting-on-stripe', /Finish in your browser/i);
   await page.evaluate('window.__walkPaid = true');

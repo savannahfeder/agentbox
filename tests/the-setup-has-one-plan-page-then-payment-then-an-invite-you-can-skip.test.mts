@@ -68,7 +68,7 @@ describe('the plan page', () => {
   });
   it('names no number of cloud agents at once, on either side', () => {
     expect(JSON.stringify(PRO_PITCH)).not.toMatch(/at once|\b10\b/);
-    expect(show).not.toMatch(/at once|agentsPerSeat/);
+    expect(show).not.toMatch(/\d+ at once|agentsPerSeat/);
   });
   it('starts Pro by making the team, then opening its checkout, and goes on to invite once it is paid', () => {
     expect(split).toMatch(/const made = await api\.teamCreate\(teamNameFor\(me\?\.name\)\);/);

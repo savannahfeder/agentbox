@@ -9,18 +9,20 @@
 // back to the agent, which is still running.
 //
 // Two fields on the thread, both latest-wins:
-//   signIn        { id, service, url, code?, why?, at, done? }   the agent's ask
-//   signInAnswer  { id, said, url?, at }                          the answer to it
+//   signIn        { id, service, url, code?, why?, asksForCode?, at, done? }   the agent's ask
+//   signInAnswer  { id, said, url?, code?, at }                                 the answer to it
 // `said` is 'signed-in' (they finished in the browser), 'landed' (with the
 // address the browser was sent back to, for a login waiting on another
-// machine), 'skipped', or 'replied' (they wrote on the thread instead, which
-// ends the wait so the agent can take what they wrote).
+// machine), 'code' (with the code the service's page showed them, for a login
+// that waits for one: `supabase login`, `aws login --remote`), 'skipped', or
+// 'replied' (they wrote on the thread instead, which ends the wait so the
+// agent can take what they wrote).
 
-export interface SignInAsk { id: string; service: string; url: string; code?: string; why?: string; at: number; done?: true }
-export type SignInSaid = 'signed-in' | 'landed' | 'skipped' | 'replied';
-export interface SignInAnswer { id: string; said: SignInSaid; url?: string; at: number }
+export interface SignInAsk { id: string; service: string; url: string; code?: string; why?: string; asksForCode?: true; at: number; done?: true }
+export type SignInSaid = 'signed-in' | 'landed' | 'code' | 'skipped' | 'replied';
+export interface SignInAnswer { id: string; said: SignInSaid; url?: string; code?: string; at: number }
 
-const SAID: readonly string[] = ['signed-in', 'landed', 'skipped', 'replied'];
+const SAID: readonly string[] = ['signed-in', 'landed', 'code', 'skipped', 'replied'];
 const ID = /^s-[a-z0-9]{6,24}$/;
 const text = (v: unknown, max: number): string | null => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null);
 const link = (v: unknown): string | null => {
@@ -42,6 +44,7 @@ export function cleanSignIn(value: unknown): SignInAsk | undefined {
   const why = text(v.why, 300);
   if (code) out.code = code;
   if (why) out.why = why;
+  if (v.asksForCode === true) out.asksForCode = true;
   if (v.done === true) out.done = true;
   return out;
 }
@@ -55,6 +58,11 @@ export function cleanSignInAnswer(value: unknown): SignInAnswer | undefined {
     const url = link(v.url);
     if (!url) return undefined;
     out.url = url;
+  }
+  if (v.said === 'code') {
+    const code = text(v.code, 80);
+    if (!code) return undefined;
+    out.code = code;
   }
   return out;
 }

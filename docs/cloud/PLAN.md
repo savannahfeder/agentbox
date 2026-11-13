@@ -427,13 +427,21 @@ at AgentCore's published rates. The plan limits are set from these.
 
 ### The team plan (the owner, 2026-11-06; to build for 2026-11-17)
 
-- **Trial:** every team gets 14 days from the day it was made. Each member
-  has 10 cloud hours and 2 agents at once of their own. No card. It replaces
-  each member's own 5 free hours while it lasts; it does not add to them.
+- **Trial:** every team gets 7 days from the day it was made (14 until
+  2026-11-10). Each member has 50 cloud hours of their own (10 until
+  2026-11-13: "10 cloud hours for pro is very bad given free is 5"). No card.
+  It replaces each member's own 5 free hours while it lasts; it does not add
+  to them. A card added in the trial is charged when the trial ends, and until
+  that charge clears the team keeps the trial's 50 hours, not a seat's 400
+  (2026-11-13: a trialing team had 400 hours a member and could cancel).
 - **Paying:** $40 a member a month (Stripe price `agentbox_cloud_team_monthly`,
-  quantity = members). Each seat is the $40 cloud plan for its person: 400
-  hours and 10 agents at once a month (the owner, 2026-11-08, replacing one
-  pool for the team after three power testers ran a pool dry).
+  quantity = members). Each seat is the $40 cloud plan's 400 hours a month for
+  its person (the owner, 2026-11-08, replacing one pool for the team after
+  three power testers ran a pool dry).
+- **No limit at once, ever.** "There should never be a limit on how many
+  cloud agents a team can use at once because that almost completely defeats
+  the point of cloud" (the owner, 2026-11-13). Hours are a team's only limit,
+  in the trial and on seats; there is no hidden ceiling either.
 - **Which hours a run spends:** the person's own paid plan first, then the
   team's (paid or trial), then their free hours.
 - **How it is counted:** in the person's own ledger, as a plan is: the run

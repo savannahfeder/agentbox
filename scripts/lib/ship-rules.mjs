@@ -58,6 +58,26 @@ export function notReadyToShip({ isPrimaryWorktree, dirty, onMain, hasCommits })
   return null;
 }
 
+// The two reasons scripts/hooks/pre-push runs every test, in the hook's own
+// patterns (a test holds them the same).
+export const DELETED_CODE = '\\.(mjs|mts|cjs|js|jsx|ts|tsx)$';
+export const EVERY_TEST_DEPENDS_ON = '^(package(-lock)?\\.json|vitest\\.config\\.mjs|tests/agentbox-home\\.setup\\.mts|tests/app-home\\.mts|scripts/hooks/)';
+
+/**
+ * Whether the hook runs every test for a push carrying `nameStatus`, the
+ * output of `git diff --name-status <remote main> HEAD`. Like the hook, a file
+ * git reads as moved is not a deletion.
+ */
+export function runsEveryTest(nameStatus) {
+  const deleted = new RegExp(DELETED_CODE);
+  const core = new RegExp(EVERY_TEST_DEPENDS_ON);
+  return String(nameStatus ?? '').split('\n').some((line) => {
+    const [status = '', ...paths] = line.split('\t');
+    if (status === 'D') return deleted.test(paths[0] ?? '');
+    return paths.some((p) => core.test(p));
+  });
+}
+
 /**
  * WHY THIS CHECKOUT SHOULD NOT BE RELEASED, as sentences, or an empty list.
  *

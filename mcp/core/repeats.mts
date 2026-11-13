@@ -125,6 +125,75 @@ function personAskedForIt(thread: WorkItem | null, words: unknown): boolean {
   return !!thread && herRow(thread) && filedByThePerson(thread) && REGULAR.test(String(words ?? '')) && saidToClose(thread, words);
 }
 
+export interface StopRepeatingTask {
+  which?: unknown;
+  product?: string;
+  askedBecause?: unknown;
+}
+
+export interface StoppedRepeatingTask {
+  repeat: string;
+  product: string;
+  label: string;
+  schedule: string;
+  ended: true;
+  endedAt: number;
+}
+
+const STOP = /\b(stop|stopped|end|cancel|switch(ed)?\s+(it\s+|that\s+|this\s+)?off|turn(ed)?\s+(it\s+|that\s+|this\s+)?off|pause|kill|remove|delete|no longer|(do not|don'?t) need)\b/i;
+const NOT_ASKED_TO_STOP = 'Nothing was stopped: it needs the person\'s own words on this thread asking for it to stop, quoted exactly in askedBecause. If they asked, send it again with their words; if not, ask them.';
+
+// Only what the person wrote themselves: a teammate's or the app's words on
+// the row are not their say-so.
+function theirWords(thread: WorkItem): string[] {
+  return (['body', 'title', 'answer'] as const)
+    .filter((f) => thread.wrote?.[f]?.source === 'founder')
+    .map((f) => String(thread[f] ?? ''));
+}
+
+function personAskedToStop(thread: WorkItem | null, words: unknown): boolean {
+  if (!thread || !(thread.labels ?? []).includes('founder') || !filedByThePerson(thread)) return false;
+  if (!STOP.test(String(words ?? ''))) return false;
+  const own = theirWords(thread);
+  return own.length > 0 && saidToClose({ title: '', body: '', answer: own.join('\n') }, words);
+}
+
+/**
+ * End a repeating task the person asked to stop, found by its id or its name.
+ * The person rarely knows which product a task lives in, so a name not found
+ * in this thread's product is looked for in every one.
+ */
+export function stopRepeatingTask(ask: StopRepeatingTask, { env = process.env, now = Date.now() }: RunOptions = {}): StoppedRepeatingTask {
+  const which = typeof ask.which === 'string' ? ask.which.trim() : '';
+  if (!which) throw new Error('which repeating task? pass its name as it is listed, or its id');
+
+  const itemId = String(env.ZERO_ITEM ?? '').trim();
+  const threadHome = itemId ? projectOf(itemId, String(env.ZERO_PRODUCT ?? '').trim() || null) : null;
+  const thread = threadHome ? readWorkItem(threadHome.dir, itemId, now) : null;
+  if (itemId && !personAskedToStop(thread, ask.askedBecause)) throw new Error(NOT_ASKED_TO_STOP);
+
+  const named = (r: RepeatRule) => r.id === which || r.title.trim().toLowerCase() === which.toLowerCase();
+  const inProject = (p: ProjectSummary) => rules.list(p.dir, now).filter(named).map((rule) => ({ project: p, rule }));
+  const first = ask.product?.trim() ? resolveProduct(ask.product) : threadHome;
+  let found = first ? inProject(first) : [];
+  if (!ask.product?.trim() && !found.some((f) => !f.rule.endedAt)) {
+    found = listProjects().flatMap(inProject);
+  }
+
+  const live = found.filter((f) => !f.rule.endedAt);
+  if (live.length > 1) {
+    throw new Error(`more than one repeating task is called "${which}": ${live.map((f) => `${f.rule.id} in ${f.project.name}`).join(', ')}. Pass the id of the one to stop.`);
+  }
+  const hit = live[0] ?? found[0];
+  if (!hit) {
+    const names = (first ? [first] : listProjects()).flatMap((p) => rules.list(p.dir, now).filter((r) => !r.endedAt).map((r) => `"${r.title}" (${r.id})`));
+    throw new Error(`no repeating task is called "${which}". Running now: ${names.join(', ') || 'none'}.`);
+  }
+
+  const rule = hit.rule.endedAt ? hit.rule : rules.endRule(hit.project.dir, hit.rule.id, now)!;
+  return { repeat: rule.id, product: hit.project.id, label: rule.title, schedule: ruleLabel(rule), ended: true, endedAt: rule.endedAt! };
+}
+
 export interface MadeRepeatingTask {
   repeat: string;
   product: string;

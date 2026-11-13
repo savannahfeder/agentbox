@@ -4,7 +4,7 @@
 import type { Engine } from '../../shared/engines.mts';
 import type { AgentVoice } from '../../shared/agent-voice.mts';
 import type { CarryState } from '../../shared/carried-files.mts';
-import type { FileLinkAsk, FileLinkState, LinkComment, PublicLink } from './api';
+import type { FileLinkAsk, FileLinkState, LinkAccess, LinkCan, LinkComment, LinkPerson, PublicLink } from './api';
 import type { LedgerLine } from './thread-history';
 import type { AgentFile } from './onboarding';
 import type { AgentFolder, SessionThread } from './agent-import-card';
@@ -877,10 +877,10 @@ export interface CloudPlan {
   usedSeconds?: number;
   /** With no plan: the free hours, spent or not. */
   free?: { agents: number; hours: number; usedSeconds: number };
-  /** The team's shared hours: a trial until `endsAt`, or `seats` paid for. */
-  /** Hours and agents are this person's own; `people` is every member's own use (names come from the team). */
+  /** The team's hours: a trial until `endsAt`, or `seats` paid for; `seats` in a trial means the card is in and not yet charged. */
+  /** Hours are this person's own, with no limit at once; `people` is every member's own use (names come from the team). */
   team?: {
-    trial: boolean; endsAt: number | null; seats: number; members: number; owner: boolean; agents: number; running: number; hours: number; usedSeconds: number;
+    trial: boolean; endsAt: number | null; seats: number; members: number; owner: boolean; agents?: null; running: number; hours: number; usedSeconds: number;
     people?: { id: string; usedSeconds: number; running: number; name?: string }[];
   };
   /** Who bills the plan: Stripe, or nobody because it was set by hand. Absent from older servers. */
@@ -1938,6 +1938,9 @@ declare global {
       fileLinks?(): Promise<{ ok: boolean; error?: string; links?: PublicLink[] }>;
       fileLinkComments?(p: { token: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
       fileLinkComment?(p: { token: string; text: string; place?: NotePlace | null }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
+      fileLinkAccess?(p: { token: string; access: LinkAccess; can: LinkCan }): Promise<{ ok: boolean; error?: string }>;
+      fileLinkPeople?(p: { token: string }): Promise<{ ok: boolean; error?: string; people?: LinkPerson[] }>;
+      fileLinkPerson?(p: { token: string; email: string; can: LinkCan | null }): Promise<{ ok: boolean; error?: string; people?: LinkPerson[] }>;
       bringSharedFile?(p: { link: string; product: string | null }): Promise<{ ok: boolean; error?: string; product?: string; id?: string; src?: string }>;
       takeSharedFile?(): Promise<string | null>;
       onSharedFile?(fn: () => void): () => void;
