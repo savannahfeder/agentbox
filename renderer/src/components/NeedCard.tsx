@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { keysOf, needId, type Need } from '../../../shared/cloud-needs.mts';
 import { Name } from '../../../shared/product-name.mjs';
 import { keyLabel, keyWords } from '../../../shared/cloud-keys.mts';
+import type { KeySource } from '../../../shared/cloud-key-sources.mts';
 import { codeLooksWrong, keyLooksWrong } from '../key-asks';
 import { DARK_INK, logoOf } from '../connections/logos';
 import './need-card.css';
@@ -19,8 +20,9 @@ export const NeedPlace = createContext<{
   // Every need of the message, in order: the facts are said on its first
   // sign-in or key and the way out once, under its last card.
   needs: Need[];
+  // `from`: read on this computer, where the run said the key is, instead of a pasted value.
   // `late`: given from a card already answered in words, so the thread is told it came after all.
-  saveKeys: (fields: { name: string; value: string; label: string }[], need: Need, words?: string, late?: boolean) => Promise<string | null>;
+  saveKeys: (fields: { name: string; value: string; label: string; from?: KeySource }[], need: Need, words?: string, late?: boolean) => Promise<string | null>;
   // false: the person closed the file panel, so nothing was sent.
   sendFile: (path: string | null, need: Need, late?: boolean) => Promise<string | null | false>;
   sendCode: (about: string, code: string) => Promise<string | null>;
@@ -82,8 +84,33 @@ export function fileWhy(path: string, why: string, info: { ok: boolean; size?: n
 const fileName = (p: string) => p.split('/').filter(Boolean).pop() ?? p;
 const folderOf = (p: string) => { const parts = p.split('/').filter(Boolean); return parts.length > 1 ? parts[parts.length - 2] : null; };
 
-/** Fields for a sign-in or a key, kept for every cloud thread. */
-function KeyFields({ need, fields, plain, late }: { need: Need; fields: { name: string; label: string }[]; plain: string; late: boolean }) {
+// The title is keyWords(what); a `what` that is no more than that is not said again under it.
+const saysOnlyTheTitle = (what: string) => (keyWords(what) ?? '').toLowerCase() === what.replace(/^\s*(your|an?|the)\s+/i, '').replace(/[.\s]+$/, '').toLowerCase();
+const placeName = (src: KeySource) => (src.place === 'keychain' ? 'your Keychain' : src.place === 'shell' ? 'your shell' : fileName(src.from));
+const placeItem = (src: KeySource) => (src.place === 'shell' ? `$${src.from}` : src.entry ? `${src.entry} in ${src.from}` : src.from);
+
+/** The key where the run said it is on this computer, read and saved in one press. */
+function FromHere({ need, name, label, src, late }: { need: Need; name: string; label: string; src: KeySource; late: boolean }) {
+  const place = useContext(NeedPlace)!;
+  const [busy, setBusy] = useState(false);
+  const [said, setSaid] = useState<string | null>(null);
+  const go = async () => {
+    setBusy(true); setSaid(null);
+    const out = await place.saveKeys([{ name, value: '', label, from: src }], need, undefined, late);
+    setBusy(false);
+    if (out) setSaid(out); else focusNextAsk();
+  };
+  return <>
+    <div className="need-acts need-here">
+      <button type="button" className="need-btn need-main" disabled={busy} onClick={() => void go()}>{busy ? 'Reading' : `Use the one in ${placeName(src)}`}</button>
+      <span className="need-from" title={placeItem(src)}>{placeItem(src)}</span>
+    </div>
+    {said && <p className="need-said" role="status">{said}</p>}
+  </>;
+}
+
+/** Fields for a sign-in or a key, kept for every cloud thread. `second` when a press above already offers the key. */
+function KeyFields({ need, fields, plain, late, second = false }: { need: Need; fields: { name: string; label: string }[]; plain: string; late: boolean; second?: boolean }) {
   const place = useContext(NeedPlace)!;
   const [values, setValues] = useState<Record<string, string>>({});
   const [said, setSaid] = useState<string | null>(null);
@@ -110,9 +137,9 @@ function KeyFields({ need, fields, plain, late }: { need: Need; fields: { name: 
     {fields.map((f, i) => (
       <div className="need-row" key={f.name}>
         <input className="need-input" type="password" onKeyDown={giveBackKeys} onFocus={(e) => e.currentTarget.select()} autoComplete="off" spellCheck={false} aria-label={f.label}
-          placeholder={`Paste the ${fields.length > 1 ? lower(f.label) : plain}`}
+          placeholder={second ? 'Or paste it' : `Paste the ${fields.length > 1 ? lower(f.label) : plain}`}
           value={values[f.name] ?? ''} onChange={(e) => { setValues((v) => ({ ...v, [f.name]: e.target.value })); setSaid(null); }} />
-        {i === fields.length - 1 && <button type="submit" className="need-btn need-main" disabled={busy || !some}>{busy ? 'Saving' : anyway ? 'Save anyway' : 'Save'}</button>}
+        {i === fields.length - 1 && <button type="submit" className={second ? 'need-btn' : 'need-btn need-main'} disabled={busy || !some}>{busy ? 'Saving' : anyway ? 'Save anyway' : 'Save'}</button>}
       </div>
     ))}
     {said && <p className="need-said" role="status">{said}</p>}
@@ -196,13 +223,14 @@ export function NeedCard({ source, fallback }: { source: string; fallback: React
     return <div className="need" data-need={svc ? svc.id : key!.name} ref={box} onKeyDown={keepKeys}>
       <div className="need-body">{mark}<div className="need-col">
         <div className="need-title">{title}</div>
-        {why ? <div className="need-why">{withLinks(why, open)}</div> : key?.what && <div className="need-why">{withLinks(sentence(key.what), open)}</div>}
+        {why ? <div className="need-why">{withLinks(why, open)}</div> : key?.what && !saysOnlyTheTitle(key.what) && <div className="need-why">{withLinks(sentence(key.what), open)}</div>}
         {showFacts ? <div className="need-facts">
           {getIt && <div>{I.arrow}<span>{getIt}</span></div>}
           <div>{I.lock}<span>Kept encrypted in your {Name} Cloud</span></div>
           <div>{I.cloud}<span>Every thread can use it from now on</span></div>
         </div> : getIt && <div className="need-why need-also">{getIt}. Kept the same way.</div>}
-        <KeyFields need={need} fields={fields} plain={plain} late={!live} />
+        {key?.from && <FromHere need={need} name={key.name} label={fields[0].label} src={key.from} late={!live} />}
+        <KeyFields need={need} fields={fields} plain={plain} late={!live} second={!!key?.from} />
       </div></div>
       {showFoot && live && <Footer />}
     </div>;
