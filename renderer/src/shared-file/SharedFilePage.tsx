@@ -390,7 +390,7 @@ interface Notes {
 /** The file on its own: its title, who shared it, and the file. */
 export function FilePage({ token, file, piece, notes, edit = null, peek = null }: { token: string; file: SharedFile; piece?: Piece; notes?: Notes; edit?: EditHands | null; peek?: Peek | null }) {
   const table = isTable(file);
-  const kept = table || file.kind === 'image' || file.kind === 'pdf' || file.kind === 'video';
+  const kept = file.kind === 'markdown' || file.kind === 'image' || file.kind === 'pdf' || file.kind === 'video';
   // An earlier copy of a page is framed from its words, as the site's /raw holds only the current one.
   const shown = peek ? { ...file, body: peek.body, anyone: false } : file;
   const saved = edit?.saved;
@@ -430,10 +430,10 @@ function PeekBar({ peek }: { peek: Peek }) {
 
 const openToAnyone = (file: Pick<SharedFile, 'anyone'>) => file.anyone !== false;
 
-/** From the site's own address when anyone may read it; otherwise from the copy this page already holds. */
+/** From the site's own address when anyone may read it; otherwise from the copy this page already holds. A doc is always from the copy: the site serves it as text to read, not to save. */
 function Download({ token, file }: { token: string; file: SharedFile }) {
   const local = useMemo(() => {
-    if (openToAnyone(file) || file.kind === 'video') return null;
+    if ((openToAnyone(file) && file.kind !== 'markdown') || file.kind === 'video') return null;
     try {
       const data = file.kind === 'image' || file.kind === 'pdf' ? fileBytes(file) : file.body;
       return URL.createObjectURL(new Blob([data as BlobPart], { type: blobType(file.kind, file.type) }));
