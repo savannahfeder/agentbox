@@ -31,8 +31,11 @@
 //      Z that reopens it keeps them. While memory is critical, also
 //      `tightIdleMs` (10 min) after the run ended, one task per look, the one
 //      whose run ended longest ago first. Not while merely tight: a busy Mac
-//      is tight most of the day. Never sooner than that long after the switch
-//      went on.
+//      is tight most of the day. And `busyIdleMs` (10 min) after the run ended
+//      when one of them used `busyShare` (half a core) or more over the last
+//      `busyWindowMs` (5 min): orphaned browsers spinning at a core each
+//      throttled a Mac with memory at 50% free (2026-11-13). Never sooner than
+//      that long after the switch went on.
 //   5. NOTHING PROTECTED IS EVER STOPPED: AGENTBOX_KEEP=1 in its environment,
 //      an executable inside an installed app or the system (Docker Desktop and
 //      its VM, a browser an agent opened), an executable that cannot be read,
@@ -88,7 +91,7 @@ export function lstartSeconds(text: unknown): number | null {
 
 /**
  * Three listings of the same moment into one record per process:
- *   base: `ps -axo pid=,ppid=,rss=,lstart=,comm=`  (comm is the exec'd path)
+ *   base: `ps -axo pid=,ppid=,rss=,time=,lstart=,comm=`  (comm is the exec'd path)
  *   argv: `ps -ww -axo pid=,lstart=,command=`
  *   full: `ps -E -ww -axo pid=,lstart=,command=`   (arguments, then environment)
  */
@@ -102,6 +105,15 @@ export interface ProcessRecord {
   item: string | null;
   product: string | null;
   keep: boolean;
+  /** CPU seconds used so far, or null when it could not be read. */
+  cpu?: number | null;
+}
+
+/** `ps` CPU time: [[dd-]hh:]mm:ss.ss, minutes past sixty on macOS. */
+export function cpuSeconds(text: string | undefined | null): number | null {
+  const m = String(text ?? '').match(/^(?:(\d+)-)?(?:(\d+):)?(\d+):(\d+(?:\.\d+)?)$/);
+  if (!m) return null;
+  return (+(m[1] ?? 0)) * 86400 + (+(m[2] ?? 0)) * 3600 + (+m[3]) * 60 + (+m[4]);
 }
 
 export function parseListings({ base, argv, full }: { base: unknown; argv: unknown; full: unknown }): ProcessRecord[] {
@@ -117,9 +129,9 @@ export function parseListings({ base, argv, full }: { base: unknown; argv: unkno
   const a = lines(argv, cmdRe);
   const f = lines(full, cmdRe);
   const out: ProcessRecord[] = [];
-  for (const m of lines(base, new RegExp(`^\\s*(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(${LSTART})\\s*(.*)$`)).values()) {
+  for (const m of lines(base, new RegExp(`^\\s*(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(?:([\\d:.-]+)\\s+)?(${LSTART})\\s*(.*)$`)).values()) {
     const pid = +m[1];
-    const start = lstartSeconds(m[4]);
+    const start = lstartSeconds(m[5]);
     const args = a.get(pid);
     const all = f.get(pid);
     let env: string | null = null;
@@ -134,11 +146,12 @@ export function parseListings({ base, argv, full }: { base: unknown; argv: unkno
       ppid: +m[2],
       mb: +m[3] / 1024,
       start,
-      exe: m[5].trim(),
+      exe: m[6].trim(),
       cmd: (args?.[3] ?? '').slice(0, 300),
       item: env?.match(/(?:^|\s)ZERO_ITEM=(w-[0-9a-f]+)(?=\s|$)/)?.[1] ?? null,
       product: env?.match(/(?:^|\s)ZERO_PRODUCT=(\S+)/)?.[1] ?? null,
       keep: env ? /(?:^|\s)AGENTBOX_KEEP=1(?=\s|$)/.test(env) : false,
+      cpu: cpuSeconds(m[4]),
     });
   }
   return out;
@@ -224,6 +237,7 @@ export function readLinuxProcesses({ root = '/proc', hz = USER_HZ, btime = null 
       item: /^w-[0-9a-f]+$/.test(item ?? '') ? item! : null,
       product: env.get('ZERO_PRODUCT')?.split(/\s/)[0] || null,
       keep: env.get('AGENTBOX_KEEP') === '1',
+      cpu: (+rest[11] + +rest[12]) / hz,
     });
   }
   return out;
@@ -233,7 +247,7 @@ export function readLinuxProcesses({ root = '/proc', hz = USER_HZ, btime = null 
 export async function listProcesses(platform: string = process.platform): Promise<ProcessRecord[]> {
   if (platform !== 'darwin') return readLinuxProcesses();
   const [base, argv, full] = await Promise.all([
-    ps(['-axo', 'pid=,ppid=,rss=,lstart=,comm=']),
+    ps(['-axo', 'pid=,ppid=,rss=,time=,lstart=,comm=']),
     ps(['-ww', '-axo', 'pid=,lstart=,command=']),
     ps(['-E', '-ww', '-axo', 'pid=,lstart=,command=']),
   ]);
@@ -358,6 +372,9 @@ export interface LeftoverCleanerOptions {
   closedAt?: (item: string, product: string | null) => number | null;
   closeGraceMs?: number;
   tightIdleMs?: number;
+  busyIdleMs?: number;
+  busyWindowMs?: number;
+  busyShare?: number;
   confirmMs?: number;
   settleMs?: number;
   home?: string;
@@ -377,6 +394,11 @@ export class LeftoverCleaner {
   declare closedAt: (item: string, product: string | null) => number | null;
   declare closeGraceMs: number;
   declare tightIdleMs: number;
+  declare busyIdleMs: number;
+  declare busyWindowMs: number;
+  declare busyShare: number;
+  declare cpuMarks: Map<string, { cpu: number; at: number }>;
+  declare cpuShares: Map<string, number>;
   declare confirmMs: number;
   declare settleMs: number;
   declare home: string;
@@ -403,6 +425,9 @@ export class LeftoverCleaner {
     closedAt = () => null,
     closeGraceMs = 2 * 60_000,
     tightIdleMs = 10 * 60_000,
+    busyIdleMs = 10 * 60_000,
+    busyWindowMs = 5 * 60_000,
+    busyShare = 0.5,
     confirmMs = 60_000,
     settleMs = 30_000,
     home = os.homedir(),
@@ -411,8 +436,10 @@ export class LeftoverCleaner {
     enabled = true,
     log = () => {},
   }: LeftoverCleanerOptions = {}) {
-    Object.assign(this, { list, kill, clock, readPressure, file, enabledSince, live, owns, closedAt, closeGraceMs, tightIdleMs, confirmMs, settleMs, home, enabled, log });
+    Object.assign(this, { list, kill, clock, readPressure, file, enabledSince, live, owns, closedAt, closeGraceMs, tightIdleMs, busyIdleMs, busyWindowMs, busyShare, confirmMs, settleMs, home, enabled, log });
     this.firstSeen = new Map();
+    this.cpuMarks = new Map();
+    this.cpuShares = new Map();
     this.withPrograms = new Set();
     this.lastStatus = { leftovers: [], survivors: [], stopped: null, pressure: 'normal' };
     const saved = this._load();
@@ -548,6 +575,7 @@ export class LeftoverCleaner {
       const id = idOf(p);
       seen.add(id);
       if (!this.firstSeen.has(id)) this.firstSeen.set(id, now);
+      this._measureCpu(id, p.cpu, now);
       const r = resolve(p);
       if (!r.item) continue;
       if (r.inherits) this.protectedIds.add(id);
@@ -561,9 +589,25 @@ export class LeftoverCleaner {
       else t.procs.push(p);
     }
     for (const id of [...this.firstSeen.keys()]) if (!seen.has(id)) this.firstSeen.delete(id);
+    for (const id of [...this.cpuMarks.keys()]) if (!seen.has(id)) { this.cpuMarks.delete(id); this.cpuShares.delete(id); }
     for (const id of [...this.protectedIds]) if (!seen.has(id)) this.protectedIds.delete(id);
     for (const id of [...this.taskOf.keys()]) if (!seen.has(id)) this.taskOf.delete(id);
     return { procs, byPid, tasks, seen };
+  }
+
+  /** A core's share each program used over the last full `busyWindowMs`. */
+  _measureCpu(id: string, cpu: number | null | undefined, now: number) {
+    if (typeof cpu !== 'number' || !Number.isFinite(cpu)) { this.cpuMarks.delete(id); this.cpuShares.delete(id); return; }
+    const mark = this.cpuMarks.get(id);
+    if (!mark) { this.cpuMarks.set(id, { cpu, at: now }); return; }
+    if (now - mark.at < this.busyWindowMs) return;
+    this.cpuShares.set(id, Math.max(0, cpu - mark.cpu) / ((now - mark.at) / 1000));
+    this.cpuMarks.set(id, { cpu, at: now });
+  }
+
+  /** Whether one of the task's stoppable programs is keeping a core busy. */
+  _busy(t: TaskView | undefined): boolean {
+    return !!t?.procs.some((p) => (this.cpuShares.get(idOf(p)) ?? 0) >= this.busyShare);
   }
 
   /** Crashes and unknown tasks, turned into records the rules can use. */
@@ -599,7 +643,7 @@ export class LeftoverCleaner {
   }
 
   /** When this task's programs stop, or null while nothing says they should. */
-  _stopsAt(item: string, product: string | null, pressure: Pressure): number | null {
+  _stopsAt(item: string, product: string | null, pressure: Pressure, busy = false): number | null {
     const run = this.runs[item];
     if (!run || run.state !== 'ended') return null;
     const from = Math.max(run.endedAt, this.enabledSince);
@@ -608,6 +652,7 @@ export class LeftoverCleaner {
     const times: number[] = [];
     if (Number.isFinite(closed)) times.push(Math.max(from, closed!) + this.closeGraceMs);
     if (pressure === 'critical') times.push(from + this.tightIdleMs);
+    if (busy) times.push(from + this.busyIdleMs);
     return times.length ? Math.min(...times) : null;
   }
 
@@ -622,7 +667,7 @@ export class LeftoverCleaner {
     let short: { ended: number; ready: DueProgram[] } | null = null;
     for (const t of view.tasks.values()) {
       if (this._alive(t)) continue;
-      const closed = this._stopsAt(t.item, t.product, 'normal');
+      const closed = this._stopsAt(t.item, t.product, 'normal', this._busy(t));
       if (closed !== null && now >= closed) { due.push(...this._ready(t, now)); continue; }
       const at = pressure === 'normal' ? null : this._stopsAt(t.item, t.product, pressure);
       if (at === null || now < at) continue;
@@ -661,7 +706,7 @@ export class LeftoverCleaner {
       const t = view.tasks.get(d.item);
       if (!t || !t.procs.includes(p)) continue; // protected now, or no longer this task's
       if (this._alive(t)) continue;
-      const at = this._stopsAt(d.item, t.product, pressure);
+      const at = this._stopsAt(d.item, t.product, pressure, this._busy(t));
       if (at === null || now < at) continue; // a run started, or the task reopened, meanwhile
       // Switched off while this look was under way: nothing more is signalled.
       if (!this.enabled) break;
@@ -690,7 +735,7 @@ export class LeftoverCleaner {
         kept: t.guarded.length,
         mb: all.reduce((n, p) => n + (p.mb ?? 0), 0),
         oldest: Math.min(...all.map((p) => p.start! * 1000)),
-        stopsAt: t.procs.length ? this._stopsAt(t.item, t.product, pressure) : null,
+        stopsAt: t.procs.length ? this._stopsAt(t.item, t.product, pressure, this._busy(t)) : null,
       });
     }
     return out.sort((a, b) => a.oldest - b.oldest);
