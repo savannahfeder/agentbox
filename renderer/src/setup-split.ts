@@ -41,7 +41,7 @@ export function setupSteps({ chats, team, teammates, project, signedIn = true, p
 /** The plans the setup offers, at the prices the cloud charges (cloud/gateway/plans.mjs). */
 export const SETUP_PLANS: Array<{ id: SetupPlan; name: string; price: string; per?: string; tag?: string; sub: string }> = [
   { id: 'free', name: 'Free', price: '$0', sub: `Just you, with ${FREE.hours} cloud hours to try` },
-  { id: 'pro', name: 'Pro', price: `$${TEAM.dollarsPerSeat}`, per: 'a month', tag: `${TEAM.trialDays} days free`, sub: `Your team, plus ${TEAM.agentsPerSeat} cloud agents at once` },
+  { id: 'pro', name: 'Pro', price: `$${TEAM.dollarsPerSeat}`, per: 'a month', tag: `${TEAM.trialDays} days free`, sub: `Your team, plus ${TEAM.hoursPerSeat} cloud hours each` },
 ];
 
 /** The purchase page's words: what Pro brings in three lines, the cloud computer first, the price in one quiet line.
@@ -54,7 +54,7 @@ export const PRO_PITCH = {
     { id: 'files', title: 'Files saved in the cloud' },
   ],
   cta: `Try Pro free for ${TEAM.trialDays} days`,
-  terms: `Then $${TEAM.dollarsPerSeat} a month. Cancel any time.`,
+  terms: `${TEAM.trialHoursPerMember} cloud hours each in the trial, then $${TEAM.dollarsPerSeat} a month. Cancel any time.`,
 };
 
 const SHOWCASE_FILL = ['Fix the flaky date picker test', 'Add a health check endpoint', 'Profile the slowest page', 'Port the cron jobs to the queue', 'Write tests for the refund flow', 'Speed up the search index build'];

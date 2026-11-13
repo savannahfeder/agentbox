@@ -40,7 +40,7 @@ describe('what the page says', () => {
   it('gives seven free days, and the price with no per person', () => {
     expect(TEAM.trialDays).toBe(7);
     expect(PRO_PITCH.cta).toBe('Try Pro free for 7 days');
-    expect(PRO_PITCH.terms).toBe(`Then $${TEAM.dollarsPerSeat} a month. Cancel any time.`);
+    expect(PRO_PITCH.terms).toBe(`${TEAM.trialHoursPerMember} cloud hours each in the trial, then $${TEAM.dollarsPerSeat} a month. Cancel any time.`);
     expect(JSON.stringify(PRO_PITCH)).not.toMatch(/per person|a person/);
   });
 });
