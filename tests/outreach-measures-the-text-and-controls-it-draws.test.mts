@@ -1,4 +1,4 @@
-// A substituted reply kept the old caret, and a long project pushed Send onto another row.
+// Replies and switcher labels kept stale text positions; long projects pushed Send onto another row.
 import {it} from 'vitest';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -7,6 +7,28 @@ import {repairReplayDOM} from '../scripts/lib/outreach-layout.mts';
 const require=createRequire(import.meta.url);
 let chromium;
 try{({chromium}=require(process.env.OUTREACH_BROWSER_MODULE||'playwright-core'));}catch{}
+it.skipIf(!chromium)('centers the smaller semibold switcher label under every selected icon',async()=>{
+  const browser=await chromium.launch({executablePath:startableChrome()});
+  try {
+    const page=await browser.newPage({viewport:{width:1440,height:810}});
+    await page.setContent(`<style>#film-switcher{position:absolute;left:300px;top:200px;padding:20px;border:1px solid transparent}.row{display:flex;gap:28px}.app{padding:10px}.app img{width:92px;height:92px}.name{position:absolute;bottom:4px}</style><div id="film-switcher"><div class="row">${Array.from({length:4},()=>'<div class="app"><img></div>').join('')}</div><div class="name" style="left:160.625px;transform:none">Terminal</div></div>`);
+    for(const [index,label] of ['Google Chrome','Terminal','Agentbox','Finder'].entries()){
+      await page.evaluate(({index,label})=>{
+        document.querySelectorAll('.app').forEach((el,i)=>el.classList.toggle('on',i===index));
+        document.querySelector('.name')!.textContent=label;
+      },{index,label});
+      await page.evaluate(repairReplayDOM,{company:'ExampleCo'});
+      const measured=await page.evaluate(()=>{
+        const label=document.querySelector('.name')!,icon=document.querySelector('.app.on img')!;
+        const a=label.getBoundingClientRect(),b=icon.getBoundingClientRect(),css=getComputedStyle(label);
+        return {delta:Math.abs((a.left+a.width/2)-(b.left+b.width/2)),size:css.fontSize,weight:css.fontWeight};
+      });
+      assert(measured.delta<0.5,`${label} is ${measured.delta}px off center`);
+      assert.equal(measured.size,'15px');
+      assert.equal(measured.weight,'600');
+    }
+  } finally {await browser.close();}
+});
 it.skipIf(!chromium)('measures the final reply, preserves company context and folds history',async()=>{
   const browser=await chromium.launch({executablePath:startableChrome()});
   try {

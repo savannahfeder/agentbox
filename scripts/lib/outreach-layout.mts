@@ -3,7 +3,14 @@ export function repairReplayDOM({company}: {company: string}) {
   document.body.style.transform='none';
   let style=document.getElementById('outreach-layout');
   if(!style){style=document.createElement('style');style.id='outreach-layout';document.head.append(style);}
-  style.textContent=`#film-switcher{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif!important;letter-spacing:normal!important}#film-switcher .name{font:400 18px/1.2 -apple-system,BlinkMacSystemFont,sans-serif!important;letter-spacing:normal!important}.tc-bar{flex-wrap:nowrap!important;min-width:0}.tc-bar [data-tour="project"]{flex:0 1 auto!important;min-width:0;max-width:220px}.tc-bar [data-tour="project"] .tc-chip{max-width:100%;min-width:0}.tc-bar .tc-chip-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}.tc-bar .tc-send-pair{flex-shrink:0}`;
+  style.textContent=`#film-switcher{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif!important;letter-spacing:normal!important}#film-switcher .name{font:600 15px/1.2 -apple-system,BlinkMacSystemFont,sans-serif!important;letter-spacing:normal!important;width:max-content!important;text-align:center!important;transform:translateX(-50%)!important}.tc-bar{flex-wrap:nowrap!important;min-width:0}.tc-bar [data-tour="project"]{flex:0 1 auto!important;min-width:0;max-width:220px}.tc-bar [data-tour="project"] .tc-chip{max-width:100%;min-width:0}.tc-bar .tc-chip-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}.tc-bar .tc-send-pair{flex-shrink:0}`;
+  const switcher=document.getElementById('film-switcher');
+  const label=switcher?.querySelector<HTMLElement>('.name');
+  const icon=switcher?.querySelector('.app.on img');
+  if(switcher&&label&&icon){
+    const selected=icon.getBoundingClientRect(),parent=switcher.getBoundingClientRect();
+    label.style.left=`${selected.left+selected.width/2-parent.left-switcher.clientLeft}px`;
+  }
   style.textContent+='.one-title{max-width:min(100%,600px)!important;min-width:0!important;white-space:normal!important;overflow-wrap:break-word}';
   const title=document.querySelector('.one-title');
   if(title && !title.textContent?.startsWith(`${company} · `))title.textContent=`${company} · ${title.textContent}`;
