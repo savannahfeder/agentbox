@@ -82,9 +82,11 @@ function Settings({ s, onChange, onClose }: { s: StandupSettings; onChange: (s: 
   </section>;
 }
 
-export function StandupPage({ now, faces, dayFor, onOpen, onPerson }: {
+export function StandupPage({ now, faces, team = [], dayFor, onOpen, onPerson }: {
   now: number;
   faces: ReadonlyMap<string, Member>;
+  /** Everyone who could post: a teammate with nothing is named, so quiet never reads as missing. */
+  team?: readonly { key: string; name: string; kind: 'person' | 'mate' }[];
   /** The team's day for a span: what moved in it, per person and AI teammate. */
   dayFor: (window: { from: number; to: number }) => { people: TodayPerson[] };
   onOpen: (l: TodayLine) => void;
@@ -134,6 +136,13 @@ export function StandupPage({ now, faces, dayFor, onOpen, onPerson }: {
           {posts.length === 0 && <p className="su-empty">Nothing moved.</p>}
           {posts.map((p) => <Post key={`${d}/${p.key}`} p={p} face={faces.get(p.key)} at={clockOf(s.at)} since={since}
             onOpen={onOpen} onPerson={onPerson} />)}
+          {i === 0 && !searching && (() => {
+            const quiet = team.filter((t) => (t.kind === 'person' || s.mates) && !posts.some((p) => p.key === t.key))
+              .map((t) => (t.kind === 'person' ? t.name.split(/\s+/)[0] : t.name));
+            if (!quiet.length) return null;
+            const names = quiet.length === 1 ? quiet[0] : `${quiet.slice(0, -1).join(', ')} and ${quiet[quiet.length - 1]}`;
+            return <p className="su-quiet">Nothing from {names} since {dayTitle(previousStandupDay(d, s))}’s standup.</p>;
+          })()}
         </section>;
       })}
       {searching && !found && <p className="su-empty">No standup this week mentions that.</p>}

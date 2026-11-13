@@ -41,6 +41,20 @@ describe('the Standup page', () => {
     expect(quiet).not.toContain('Wednesday 11 November');
     expect(quiet.match(/Nothing moved\./g)).toBeNull();
   });
+  // A tester on a two-person team saw only her own post and could not tell
+  // whether her teammate had done nothing or was missing from the page.
+  it('names who has nothing yet today, so a quiet teammate is not a missing one', () => {
+    const team = [{ key: 'person:p-maya', name: 'Maya Chen', kind: 'person' as const }, { key: 'person:p-theo', name: 'Theo Park', kind: 'person' as const }, { key: 'mate:t1', name: 'Maintainer', kind: 'mate' as const }];
+    const page = renderToStaticMarkup(React.createElement(StandupPage, { now: NOW, faces: new Map(), team, dayFor: () => day, onOpen: () => {} }));
+    expect(page).toContain('Nothing from Theo and Maintainer since Wednesday’s standup.');
+    expect(page.match(/Nothing from/g)).toHaveLength(1);
+    expect(page).not.toMatch(/Nothing from[^<]*Maya/);
+  });
+  it('says nothing about quiet teammates when there are none', () => {
+    const team = [{ key: 'person:p-maya', name: 'Maya Chen', kind: 'person' as const }];
+    const page = renderToStaticMarkup(React.createElement(StandupPage, { now: NOW, faces: new Map(), team, dayFor: () => day, onOpen: () => {} }));
+    expect(page).not.toContain('Nothing from');
+  });
   it('each teammate posts a sentence whose tasks are links', () => {
     expect(html).toMatch(/Shipped <button type="button" class="su-link">Invoice email<\/button>\. Working on <button type="button" class="su-link">Billing page<\/button>\./);
   });

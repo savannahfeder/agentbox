@@ -41,6 +41,7 @@
 .su-sep { display: flex; align-items: center; gap: 14px; margin: 14px 0 2px; font-size: 13px; color: var(--text-faint); }
 .su-sep::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 .su-empty { margin: 12px 0; font-size: 13.5px; color: var(--text-faint); }
+.su-quiet { margin: 4px 0 8px 46px; font-size: 13.5px; color: var(--text-faint); }
 
 .su-post { display: flex; gap: 14px; padding: 14px 0 16px; border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent); }
 .su-dayfeed .su-post:last-child { border-bottom: 0; }
