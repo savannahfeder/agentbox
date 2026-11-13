@@ -46,6 +46,8 @@ import { offersTryAgain } from '../try-again';
 import { voiceName } from '../../../shared/agent-voice.mts';
 import { shownPriority } from '../../../shared/rank.mts';
 import { api } from '../api';
+import { InboxSky, type SkyShape } from '../home/InboxSky';
+import type { SkyArt } from '../home/sky';
 import { CLOUD_KEY, CLOUD_WHEN_ON, cloudButtonCount, cloudFootLine, cloudIsOn, cloudMonthLine, cloudMoveLine, countedAccounts, type CloudMode, type CloudStatus } from '../cloud-menu';
 import { brokenAccounts, buttonAsksSignIn, menuSetupLine, readBrokenSeen, seenAfter, SETUP, writeBrokenSeen } from '../cloud-setup';
 import type { Offer, OfferGo } from '../cloud-upgrade';
@@ -571,8 +573,10 @@ export function ConnectComputer({ email, onSignOut }: { email: string | null; on
  *  heading, and under it the New thread box drawn open on the page: App.tsx
  *  puts the one composer into `slot`. What is in progress has its own tab and
  *  is not counted here. */
-export function InboxClear({ slot, first = false }: { slot: (el: HTMLDivElement | null) => void; first?: boolean }) {
+export function InboxClear({ slot, first = false, sky = null }: { slot: (el: HTMLDivElement | null) => void; first?: boolean; sky?: SkyArt | null }) {
+  const shape = (localStorage.getItem('zero.preview.zeroSky') || 'tall') as SkyShape;
   return <div className="th-clear th-start">
+    {sky && <InboxSky art={sky} shape={shape} />}
     <h2>{first ? 'Give an agent its first task' : 'Nothing needs you'}</h2>
     <div className="th-clear-compose" ref={slot} />
   </div>;

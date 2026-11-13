@@ -1,12 +1,17 @@
 import { useLayoutEffect } from 'react';
 import { drawSky, type SkyArt } from './sky';
 
+/** How much of the card the sky takes. `head` is the list's: behind the
+ *  header and nowhere else. The rest are for the empty Inbox, which has no
+ *  rows to keep clear. */
+export type SkyShape = 'head' | 'tall' | 'full' | 'dim' | 'frame' | 'foot';
+
 /**
  * The Inbox's sky, approved 2026-11-08 (design 86): at full strength behind
  * the header and nowhere else, so the list keeps every line. The streak is
  * drawn at the card's foot and turned over (home.css .inbox-sky-head).
  */
-export function InboxSky({ art, band = 190 }: { art: SkyArt; band?: number }) {
+export function InboxSky({ art, band = 190, shape = 'head' }: { art: SkyArt; band?: number; shape?: SkyShape }) {
   useLayoutEffect(() => {
     const host = document.querySelector<HTMLElement>('.app.workspace-layout');
     if (!host) return;
@@ -18,7 +23,7 @@ export function InboxSky({ art, band = 190 }: { art: SkyArt; band?: number }) {
       host.insertBefore(wrap, host.firstChild);
       return wrap;
     };
-    const head = make('inbox-sky-head');
+    const head = make(shape === 'head' ? 'inbox-sky-head' : `inbox-sky-zero inbox-sky-${shape}`);
     host.style.setProperty('--sky-under', art.bg);
     let frame = 0;
     let last = '';
@@ -33,8 +38,13 @@ export function InboxSky({ art, band = 190 }: { art: SkyArt; band?: number }) {
       if (key === last) return;
       last = key;
       Object.assign(head.style, { left: `${L}px`, top: `${T}px`, width: `${w}px`, height: `${h}px` });
-      const start = Math.round(h - band);
-      drawSky(head.querySelector('canvas')!, art, { from: start, span: 120, curveTop: start - 60, dpr: Math.min(2, window.devicePixelRatio || 1) });
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const canvas = head.querySelector('canvas')!;
+      if (shape === 'full' || shape === 'dim') { drawSky(canvas, art, { from: 40, span: 300, dpr }); return; }
+      const tall = Math.round(h * 0.42);
+      const reach = shape === 'head' ? band : tall;
+      const start = Math.round(h - reach);
+      drawSky(canvas, art, { from: start, span: shape === 'head' ? 120 : 260, curveTop: start - (shape === 'head' ? 60 : 120), dpr });
     };
     const later = () => { if (!frame) frame = requestAnimationFrame(paint); };
     paint();
@@ -43,7 +53,9 @@ export function InboxSky({ art, band = 190 }: { art: SkyArt; band?: number }) {
     // The card moves when the sidebar opens or folds, which changes the window's classes, not its size.
     const moved = new MutationObserver(later);
     moved.observe(host, { attributes: true, attributeFilter: ['class'] });
-    return () => { ro.disconnect(); moved.disconnect(); if (frame) cancelAnimationFrame(frame); head.remove(); host.style.removeProperty('--sky-under'); };
-  }, [art, band]);
+    return () => { ro.disconnect(); moved.disconnect(); if (frame) cancelAnimationFrame(frame); head.remove();
+      // The list's sky and the empty page's can be up together.
+      if (!host.querySelector(':scope > .inbox-sky')) host.style.removeProperty('--sky-under'); };
+  }, [art, band, shape]);
   return null;
 }
