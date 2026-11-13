@@ -97,6 +97,9 @@ async function serve(port) {
   const { bootHeadless, createServer, newToken, picturesTheAppOwns } = await import('../main/serve.mts');
   const { startFreezeRecorder } = await import('../main/freeze-recorder.mts');
   const booted = await bootHeadless({ dataDir: data, appDir: repo, userDir: data });
+  // The desktop app watches the store and the browser copy does not; what is
+  // kept between reads depends on it.
+  booted.store.watch();
   startFreezeRecorder({ dir: path.join(data, 'memory-log'), appDir: repo, thresholdMs: 200, onFreeze: (f) => log({ freeze: f }) });
   for (const [channel, fn] of booted.channels) {
     booted.channels.set(channel, (...a) => {
@@ -134,7 +137,10 @@ async function measure() {
   fs.rmSync(timings, { force: true });
   fs.rmSync(path.join(data, 'memory-log'), { recursive: true, force: true });
   const port = 4700 + Math.floor(Math.random() * 200);
-  const env = { PATH: process.env.PATH, HOME: path.join(root, 'home'), AGENTBOX_FRESH_USER: '1' };
+  // TMPDIR: on a Mac os.tmpdir() is read from it, and without it the copy
+  // opened an empty store in /tmp instead of the one made above. NODE_OPTIONS:
+  // scripts/run.mjs puts the flag a Node before 22.18 needs for .mts there.
+  const env = { PATH: process.env.PATH, TMPDIR: os.tmpdir(), NODE_OPTIONS: process.env.NODE_OPTIONS ?? '', HOME: path.join(root, 'home'), AGENTBOX_FRESH_USER: '1' };
   const app = spawn(process.execPath, [fileURLToPath(import.meta.url), '--serve', String(port)], { env, stdio: ['ignore', 'pipe', 'inherit'] });
   const url = await new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('the app did not start in 2 minutes')), 120_000);
