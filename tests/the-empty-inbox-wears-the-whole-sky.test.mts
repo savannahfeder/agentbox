@@ -57,6 +57,12 @@ describe('the empty Inbox sky', () => {
     expect(css).not.toMatch(/\.inbox-sky-zero[^{]*\{[^}]*mask-image/);
   });
 
+  // "font is a bit hard to read", pinned on the placeholder: it was --text-faint straight on the dots.
+  it('sets the heading and the writing line in a patch of the sky\'s dark, the placeholder a step brighter', () => {
+    expect(css).toMatch(/\.app:has\(> \.inbox-sky-zero\) \.th-start :is\(h2, \.tc-text\),\n\.app:has\(> \.inbox-sky-zero\) \.th-start \.tc-text::placeholder \{\s*text-shadow:[^;]*var\(--sky-under/);
+    expect(css).toMatch(/\.app:has\(> \.inbox-sky-zero\) \.th-start \.tc-text::placeholder \{ color: var\(--text-dim\); \}/);
+  });
+
   it('fills the chips and Send so the dots never show through their words', () => {
     expect(css).toMatch(/\.app:has\(> \.inbox-sky-zero\) \.th-start \.tc-chip \{[^}]*var\(--sky-under/);
     expect(css).toMatch(/\.app:has\(> \.inbox-sky-zero\) \.th-start \.tc-send \{[^}]*var\(--sky-under/);

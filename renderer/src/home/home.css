@@ -142,6 +142,10 @@
 .app:has(> .inbox-sky-zero) > .inbox-sky-head { display: none; }
 .app:has(> .inbox-sky-zero) .th-start .tc-chip { background: linear-gradient(rgba(255, 255, 255, .03), rgba(255, 255, 255, .03)), var(--sky-under, var(--bg)); }
 .app:has(> .inbox-sky-zero) .th-start .tc-send { background: var(--sky-under, var(--bg)); border-radius: var(--radius); }
+.app:has(> .inbox-sky-zero) .th-start :is(h2, .tc-text),
+.app:has(> .inbox-sky-zero) .th-start .tc-text::placeholder {
+  text-shadow: 0 0 1px var(--sky-under), 0 0 3px var(--sky-under), 0 0 6px var(--sky-under), 0 0 10px var(--sky-under), 0 0 16px var(--sky-under); }
+.app:has(> .inbox-sky-zero) .th-start .tc-text::placeholder { color: var(--text-dim); }
 
 /* Team and Files wear the Inbox's sky; the Team list would cover it. */
 .app.sky-place .cx-list { background: transparent; }
