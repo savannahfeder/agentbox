@@ -51,7 +51,7 @@ describe('the list the agent reads', () => {
   });
 
   it('tells the agent where each thread is and when it last moved', () => {
-    const prompt = describePrompt('the chrome one', [{ ...thread(1, 'Chrome not opening'), where: 'Needs you', at: Date.UTC(2026, 10, 13) }], Date.UTC(2026, 10, 13, 12));
+    const prompt = describePrompt('the chrome one', [{ ...thread(1, 'Chrome not opening'), where: 'Needs you', at: new Date(2026, 10, 13, 9).getTime() }], new Date(2026, 10, 13, 12).getTime());
     expect(prompt).toContain('1. [Needs you, today, Agentbox] Chrome not opening');
   });
 });
@@ -67,6 +67,19 @@ describe('reading the answer', () => {
 
   it('drops a number it was not shown, a repeat, and anything that is not a pick', () => {
     expect(readPicks('Here you go:\n9 | no such\n3 | yes\n3 | again\nnone', shown).map((p) => p.key)).toEqual(['p/w-3']);
+  });
+
+  // In the second round every Claude login on the tester's copy refused (one
+  // out of usage, one with a payment past due) and Codex was out of usage. The
+  // agent failed in 3 s and said "No agent answered in time", which sent the
+  // tester waiting and retrying for half an hour.
+  it('says no login could answer when the time is not what ran out', async () => {
+    expect(await findByDescription({ description: 'x', candidates: shown, ask: async () => '', outOfTime: () => false }))
+      .toEqual({ ok: false, error: 'No agent could answer. Your logins may be out of usage.' });
+    expect(await findByDescription({ description: 'x', candidates: shown, ask: async () => '', outOfTime: () => true }))
+      .toEqual({ ok: false, error: 'No agent answered in time.' });
+    const ipc = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
+    expect(ipc.slice(ipc.indexOf("'zero:find-by-description'"), ipc.indexOf("'zero:find-by-description'") + 1200)).toMatch(/outOfTime/);
   });
 
   it('says so when no agent answered, and says nothing fits when none fits', async () => {
@@ -129,5 +142,22 @@ describe('what the agent found', () => {
 
   it('is judged by what a thread is about, and by when only if the description says when', () => {
     expect(describePrompt('launch plan for Tuesday', [thread(1, 'a')], 0)).toMatch(/what each thread is about/i);
+  });
+});
+
+// Second round: the agent said a thread was "completed today" beside a row
+// reading Yesterday (it counted 24-hour blocks, not days), and said an answer
+// did not name the appointments when it had only read the start of it.
+describe('what the agent is told', () => {
+  it('names the day by the calendar, as the rows do', () => {
+    const now = new Date(2026, 10, 13, 8, 0).getTime();
+    const line = (at: number) => describePrompt('x', [{ ...thread(1, 'T'), at }], now).split('\n').find((l) => l.startsWith('1. '));
+    expect(line(new Date(2026, 10, 12, 23, 0).getTime())).toContain('yesterday');
+    expect(line(new Date(2026, 10, 13, 0, 30).getTime())).toContain('today');
+    expect(line(new Date(2026, 10, 11, 9, 0).getTime())).toContain('2 days ago');
+  });
+
+  it('that each line is cut short, so it never says something is missing', () => {
+    expect(describePrompt('x', [thread(1, 'T')], 0)).toMatch(/cut short/i);
   });
 });

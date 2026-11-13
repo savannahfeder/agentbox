@@ -2576,7 +2576,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       const left = until - Date.now();
       return left < 2000 ? '' : askSmallModel(prompt, (t) => t.trim(), { ...opts, timeoutMs: left });
     });
-    try { return await findByDescription({ description: String(description ?? '').slice(0, 400), candidates: all, ask }); }
+    try { return await findByDescription({ description: String(description ?? '').slice(0, 400), candidates: all, ask, outOfTime: () => until - Date.now() < 2000 }); }
     catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
   });
   let filesPlace: FilesPlace | null = null;

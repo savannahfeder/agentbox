@@ -70,21 +70,24 @@ export function aboutThread({ problem, body, result }: { problem?: string | null
   return answer ? `${asked} Answer: ${answer}` : asked;
 }
 
+/** Days between two moments by this computer's calendar, as the rows count them. */
+const dayOf = (t: number) => { const d = new Date(t); return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()); };
+
 function when(at: number, now: number): string {
-  const days = Math.floor((now - at) / 86_400_000);
+  const days = Math.round((dayOf(now) - dayOf(at)) / 86_400_000);
   if (days <= 0) return 'today';
   if (days === 1) return 'yesterday';
   if (days < 14) return `${days} days ago`;
-  return new Date(at).toISOString().slice(0, 10);
+  return new Date(dayOf(at)).toISOString().slice(0, 10);
 }
 
 export function describePrompt(description: string, shown: readonly FindCandidate[], now = Date.now()): string {
   return [
-    `Today is ${new Date(now).toISOString().slice(0, 10)}. Someone is looking for one of their work threads and described it like this:`,
+    `Today is ${new Date(dayOf(now)).toISOString().slice(0, 10)}. Someone is looking for one of their work threads and described it like this:`,
     '',
     oneLine(description, 400),
     '',
-    'Here are their threads, one per line: number, where it is, when it last moved, project, title, and what it is about.',
+    'Here are their threads, one per line: number, where it is, when it last moved, project, title, and what it is about. Each line is cut short, so never say something is missing from a thread.',
     '',
     ...shown.map((c, i) => `${i + 1}. [${c.where}, ${when(c.at, now)}, ${oneLine(c.project, 40)}] ${oneLine(c.title, 90)} :: ${oneLine(c.about, 320)}`),
     '',
@@ -117,16 +120,18 @@ export type FindAnswer = { ok: true; picks: FindPick[]; read: number } | { ok: f
  * Ask once and read the answer. `ask` resolves to '' for every failure (the
  * small-model contract in main/row-label.mts), which is said as one.
  */
-export async function findByDescription({ description, candidates, ask, now = Date.now() }: {
+export async function findByDescription({ description, candidates, ask, outOfTime = () => true, now = Date.now() }: {
   description: string;
   candidates: readonly FindCandidate[];
   ask: (prompt: string) => Promise<string>;
+  /** Whether the wait ran out, rather than every login refusing. */
+  outOfTime?: () => boolean;
   now?: number;
 }): Promise<FindAnswer> {
   const shown = candidatesFor(candidates, description);
   if (!description.trim()) return { ok: false, error: 'Describe the thread first.' };
   if (!shown.length) return { ok: true, picks: [], read: 0 };
   const reply = await ask(describePrompt(description, shown, now)).catch(() => '');
-  if (!reply.trim()) return { ok: false, error: 'No agent answered in time.' };
+  if (!reply.trim()) return { ok: false, error: outOfTime() ? 'No agent answered in time.' : 'No agent could answer. Your logins may be out of usage.' };
   return { ok: true, picks: readPicks(reply, shown), read: shown.length };
 }
