@@ -45,20 +45,25 @@ permissions:
   contents: read
 
 # A second push to the same branch cancels the first, so a branch pushed five
-# times in a minute pays for one run rather than five.
+# times in a minute pays for one run rather than five. NOT ON MAIN: each commit
+# there is its own group and runs to the end, because a red main starts its own
+# fix from the commit that broke it (main/main-went-red.mts), and a cancelled
+# run names no commit.
 concurrency:
-  group: tests-${{ github.ref }}
-  cancel-in-progress: true
+  group: tests-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   vitest:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: macos-latest
-    timeout-minutes: 20
+    # The same suite takes 5 to 20 minutes here, depending on how busy
+    # GitHub's macOS runners are.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -76,7 +81,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -84,3 +89,29 @@ jobs:
       - run: npm ci
 
       - run: npx vitest run --reporter=basic
+
+  # Strict tsc over the renderer and the back end (main/, shared/, mcp/), and
+  # over the phone app, which imports shared/ too. Its own job so a type error
+  # shows as a red `typecheck` beside the tests.
+  typecheck:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            mobile/package-lock.json
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm ci --prefix mobile
+
+      - run: npm run typecheck --prefix mobile

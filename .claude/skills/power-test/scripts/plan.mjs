@@ -70,6 +70,14 @@ export function pickPeople(spec, people, rand = Math.random) {
  * Seeded history files a task that names a project there, or a tester rightly
  * calls it misfiled.
  */
+/** Which sample code a project is given: the one its name reads as, else by position. */
+export function fixtureFor(name, i) {
+  const words = String(name).toLowerCase().split(/[^a-z0-9]+/);
+  if (words.some((w) => ['web', 'site', 'app', 'mobile', 'frontend', 'ui'].includes(w))) return 'web';
+  if (words.some((w) => ['api', 'backend', 'service', 'infra', 'data'].includes(w))) return 'api';
+  return i % 2 ? 'web' : 'api';
+}
+
 export function projectNamedIn(title, projects) {
   const at = projects.findIndex((p) => new RegExp(`\\b${p.replace(/[^\w ]/g, '.')}\\b`, 'i').test(title));
   return at >= 0 ? at : undefined;
@@ -86,7 +94,24 @@ export const LOGIN_NAMES = ['default', '.claude-second', '.claude-third', '.clau
  * freeze, a Control-C. The tester is never told; a person learns of these from
  * the app, and whether the app says so is the test.
  */
-export function chaosPlan(level, totalMs, { real = false, cloud = false, logins = 2, codex = true } = {}) {
+/**
+ * WHICH AGENTS THE COPIES RUN: the real Claude Code and Codex, on this
+ * computer's plans, unless the person agreed to stand-ins for this run.
+ * `standIns` is their own words agreeing, as the run was asked for; null when
+ * nothing was said. Stand-ins never run on a default: a whole season of tests
+ * did, and nobody was told (2026-11-10).
+ */
+export function agentMode({ standIns = null, standInCloud = false, cloud = false } = {}) {
+  if (standIns !== null && (typeof standIns !== 'string' || !standIns.trim() || standIns.startsWith('--'))) {
+    throw new Error('--stand-ins takes the person\'s own words agreeing to stand-ins for this run, in quotes: their own words, not yours.');
+  }
+  if (standInCloud && standIns === null) throw new Error('--stand-in-cloud runs stand-in agents: it needs --stand-ins "<the person\'s words agreeing>".');
+  if (standIns !== null && cloud) throw new Error('--cloud runs the real agents in the cloud; it has no stand-ins.');
+  if (standIns === null) return { real: true, codexReal: false, standIns: null };
+  return { real: false, codexReal: !standInCloud, standIns };
+}
+
+export function chaosPlan(level, totalMs, { real = false, cloud = false, logins = 2, codex = true, codexReal = false } = {}) {
   if (!CHAOS.includes(level)) throw new Error(`chaos is one of ${CHAOS.join(', ')}`);
   if (level === 'none') return [];
   const at = (f) => Math.round(totalMs * f);
@@ -95,10 +120,11 @@ export function chaosPlan(level, totalMs, { real = false, cloud = false, logins 
   const share = { light: 0.01, normal: 0.02, heavy: 0.05 }[level];
   const events = [];
   if (!real) {
-    events.push({ kind: 'agents', at: 0, until: totalMs, world: { pace: { minMs: 5_000, maxMs: 90_000 }, options: 0.3, hang: share, die: share },
+    events.push({ kind: 'agents', at: 0, until: totalMs, world: { pace: { minMs: 5_000, maxMs: 90_000 }, options: 0.3, hang: share, die: share, edits: true },
       says: `Agents answer in 5 to 90 seconds; ${Math.round(share * 100)}% hang and ${Math.round(share * 100)}% die mid-run, as real ones sometimes do.` });
     if (names.length > 1) events.push({ kind: 'login-out', at: at(0.2), until: at(0.4), out: [names[1]], says: `The ${names[1]} login ran out of usage.` });
-    if (codex && level !== 'light') events.push({ kind: 'codex-out', at: at(0.45), until: at(0.55), out: ['codex'], says: 'Codex ran out of usage.' });
+    // The real Codex runs out when its login does; only the scripted one can be made to.
+    if (codex && !codexReal && level !== 'light') events.push({ kind: 'codex-out', at: at(0.45), until: at(0.55), out: ['codex'], says: 'Codex ran out of usage.' });
     if (level !== 'light') events.push({ kind: 'all-out', at: at(0.62), until: at(0.7), out: names, says: 'Every Claude login ran out of usage.' });
     if (level === 'heavy') events.push({ kind: 'slow-agents', at: at(0.8), until: at(0.9), world: { pace: { minMs: 60_000, maxMs: 300_000 } }, says: 'Agents slowed to 1 to 5 minutes an answer.' });
   }
@@ -113,7 +139,7 @@ export function chaosPlan(level, totalMs, { real = false, cloud = false, logins 
 }
 
 // How long the cloud waits without a word from the Mac before it calls the
-// Mac away (main/cloud/run.mjs OFFLINE_AFTER_MS). A sleep shorter than this
+// Mac away (main/cloud/run.mts OFFLINE_AFTER_MS). A sleep shorter than this
 // never reaches the cloud's away path.
 export const CLOUD_AWAY_MS = 90_000;
 
@@ -167,8 +193,8 @@ export function restartAgain({ down, now, deadline, everyMs = 60_000 }) {
  * ever.
  */
 export function nextRound({ now, deadline, roundMs, idleInARow = 0, lastOutcome = null, maxIdle = 3, minRoundMs = 60_000 }) {
-  if (lastOutcome === 'signed-out') return { go: false, why: 'the tester could not sign in to Claude Code' };
-  if (lastOutcome === 'tester-out') return { go: false, why: 'the tester\'s own Claude Code ran out of usage' };
+  if (lastOutcome === 'signed-out') return { go: false, why: 'the tester could not sign in to Codex' };
+  if (lastOutcome === 'tester-out') return { go: false, why: 'the tester\'s own Codex ran out of usage' };
   if (idleInARow >= maxIdle) return { go: false, why: `the tester did nothing in ${idleInARow} rounds in a row` };
   if (deadline - now < minRoundMs) return { go: false, why: 'time is up' };
   return { go: true, endsAt: Math.min(now + roundMs, deadline) };
@@ -176,8 +202,8 @@ export function nextRound({ now, deadline, roundMs, idleInARow = 0, lastOutcome 
 
 /** What a round amounted to, from the actions it took and the last words of its session. */
 export function roundOutcome({ actions, text = '' }) {
-  if (/not logged in|invalid api key|please run \/login|authentication_error|OAuth token has expired/i.test(text) && actions === 0) return 'signed-out';
-  if (/hit your (session |weekly )?limit|usage limit reached|rate_limit_error/i.test(text) && actions === 0) return 'tester-out';
+  if (/not logged in|invalid api key|please run \/login|authentication_error|OAuth token has expired|401 Unauthorized|Failed to authenticate|codex login/i.test(text) && actions === 0) return 'signed-out';
+  if (/hit your (session |weekly |usage )?limit|usage limit|rate_limit_error/i.test(text) && actions === 0) return 'tester-out';
   return actions >= 3 ? 'acted' : 'idle';
 }
 
@@ -252,9 +278,9 @@ const PACE = {
   'between-meetings': 'You are in meetings or calls most of the day: step away for 15 to 40 minutes at a time (away 9, several in a row), then work in short bursts.',
 };
 
-const KEYS = 'N new thread; ⌘↵ (press Enter meta) sends; J/K or arrows move in the list; ↵ opens; esc goes back; R replies in an open thread; E closes a thread; L puts it off until later; Z undoes; ⌘K (press k meta) opens the command bar; / searches; B switches list and board; Tab moves between the tabs; S shows or hides the summary; 1 to 9 pick an option an agent offered.';
+const KEYS = 'N new thread; ⌘↵ (press Enter meta) sends; J/K or arrows move in the list; ↵ opens; esc goes back; R replies in an open thread; E closes a thread; L puts it off until later; Z undoes; ⌘K (press k meta) opens the command bar, which is also search; B switches list and board; Tab moves between the tabs; S shows or hides the summary; 1 to 9 pick an option an agent offered.';
 
-export function testerPrompt({ person, focus, room = null, browse, diary, shots, round, totalMinutes, minutesLeft, roundMinutes, fraction, diaryTail, issues, notYet, real, stoppedEarlyMin = 0 }) {
+export function testerPrompt({ person, focus, room = null, team = null, browse, diary, shots, round, totalMinutes, minutesLeft, roundMinutes, fraction, diaryTail, issues, notYet, real, codexReal = false, stoppedEarlyMin = 0 }) {
   const list = (xs, none) => (xs.length ? xs.map((x) => `- ${x}`).join('\n') : none);
   return `You are ${person.name}, ${person.role}. Below is who you are. Stay in character: use Agentbox the way you would on a real working day, to get your own work done, and notice what goes wrong the way you would.
 
@@ -263,19 +289,26 @@ ${person.text}
 THE APP
 Agentbox is an inbox for AI coding agents. You write a task as a new thread; an agent (Claude Code, or Codex) takes it, works, and answers in the thread. You reply, pick one of the options it offers, close the thread, put it off, and so on. ${person.knowsKeys ? `You know its keys: ${KEYS}` : 'You installed it today and do not know its keys yet. Find your way around as a new person would.'}
 
-You use the app through one command, run with Bash:
+You use the app through one command, run in your shell:
   ${browse} ${round === 1 ? 'open            (first, once)' : 'look            (the app is already open; start here)'}
   ${browse} look            (what is on screen, and numbered things you can press)
   ${browse} click 7         (press thing 7 from the last look; or click "New thread")
+  ${browse} click 7 shift   (press it holding keys: shift, meta, ctrl, alt)
+  ${browse} dblclick 7      (double-click it)        ${browse} rightclick 7   (right-click it)
+  ${browse} drag 7 12       (press on 7, drag to 12, let go)
+  ${browse} drag 7 +150     (drag the right edge of 7 that far across, as you widen a column)
+  ${browse} scroll down     (look lists only what is on screen; scroll down or up for the rest)
   ${browse} type "some text"
   ${browse} press n         (one key; add modifiers after: press Enter meta, press k meta)
-  ${browse} shot name       (a picture; you can open it with Read: ${shots}/name.png)
+  ${browse} shot name       (a picture; open it to see the screen: ${shots}/name.png)
   ${browse} away 5          (step away for up to 9 minutes, as you would between things, then look)
   ${browse} reload
 Run look after anything that changes the screen.
 
 ${real
-    ? 'The agents are real Claude Code and Codex on a real subscription, working in your projects\' repositories. Write tasks the way you normally would, but keep each one small enough to finish in a few minutes.'
+    ? `The agents are real Claude Code and Codex on a real subscription, working in your projects' repositories. Write tasks the way you normally would, but keep each one small enough to finish in a few minutes.${person.codex ? ' Send at least half of your work to Codex, and switch some threads between the two. Codex is the agent the team uses least, so what goes wrong with it is what nobody else finds. A Codex thread that fails, stalls, or says something you cannot act on is an issue to log.' : ''}`
+    : codexReal
+    ? 'The Codex agents are real Codex on a real subscription, working in your projects\' repositories: keep each Codex task small enough to finish in a few minutes. The Claude Code agents are stand-ins: they answer in seconds to a minute and a half with a short note naming the task, not real work. Send at least half of your work to Codex, and switch some threads between the two. Codex is the agent the team uses least, so what goes wrong with it is what nobody else finds. A Codex thread that fails, stalls, or says something you cannot act on is an issue to log.'
     : 'The agents are stand-ins: they take a few seconds to a minute and a half and answer with a short note naming the task, not real work. Judge the app, not the answers. Write tasks the way you normally would.'}
 
 TODAY'S TEST
@@ -283,6 +316,8 @@ ${focus ? `The team shipped a change and asked you to lean on it today: ${focus}
 
 ${room ? `YOUR ROOM
 You are signed in to a real team, and you are in the ${room} room, under Rooms in the sidebar. The person who asked for this test is in the room with you and reads it live, so it is like sharing an office: say hello when you start, tell them now and then what you are working on and how it is going, ask them when you are stuck or something in the app confused you, and answer when they write to you. Use the room the way you would with a coworker, not as a report. Look at their card, open their page, try what a room offers (a thread, a mention with @), and log anything about Rooms in your diary like anything else. Stay visible all day: they want to see you and what you are working on. Never go invisible, and if the menu under your name says you are, choose Come back.
+
+` : ''}${team ? `${team}
 
 ` : ''}YOUR DIARY
 You keep a diary while you work, and the person who asked you to test reads all of it.
@@ -311,7 +346,7 @@ ${list(notYet, 'You have tried everything on the usual list; go deeper on today\
 Do the ones someone like you would do.
 
 RULES
-- Use only those two commands, and Read for your own pictures.
+- Use only those two commands, and open only your own pictures.
 - Report only what you saw happen, with the steps. Do not guess at causes.
 - Taste is not an issue unless it stopped you or confused you.`;
 }

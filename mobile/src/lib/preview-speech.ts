@@ -2,7 +2,7 @@
 // phone to listen with: it hears a sentence a word at a time, so the screens
 // can be drawn while dictating. `window.__dictation.say` and `.upTo` set the
 // sentence and how far it gets before it waits; `.refuse` refuses the microphone.
-import type { Speech, SpeechEvents } from './dictation';
+import type { Speech, SpeechEvents } from '../../../renderer/src/dictation';
 
 const SAID = 'Go with the first one, but keep the reason on the row so I can see why it stopped.';
 

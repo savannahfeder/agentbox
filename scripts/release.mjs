@@ -18,7 +18,7 @@
 // sentences macOS shows in ITS OWN permission panels. Without them the panel is
 // the system's bare wording with no reason on it, which is what a tester walked
 // into. They do NOT ask for anything by existing: macOS only shows a panel when
-// something really reads that folder, and shared/project-folder-check.mjs is
+// something really reads that folder, and shared/project-folder-check.mts is
 // what stops that happening by accident. What they change is that a panel which
 // does appear says who is asking and what for.
 //
@@ -64,11 +64,17 @@ import { fileURLToPath } from 'node:url';
 import { envName, readEnv } from '../shared/product-name.mjs';
 import { liveDownload, RELEASE_REPO, DOWNLOAD_ASSET } from './lib/live-download.mjs';
 import { whyNotToRelease } from './lib/ship-rules.mjs';
-import { cloudAccountConfig } from '../main/cloud/config.mjs';
-import { loadCloudConfig } from '../main/team/session.mjs';
+import { cloudAccountConfig } from '../main/cloud/config.mts';
+import { loadCloudConfig } from '../main/team/session.mts';
 
 const repo = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const noSign = process.argv.includes('--no-sign');
+const profile = process.env.APPLE_KEYCHAIN_PROFILE || null;
+const keychain = process.env.APPLE_KEYCHAIN || null;
+const pinned = process.env.AGENTBOX_RELEASE_COMMIT || null;
+const head = () => {
+  try { return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim(); } catch { return null; }
+};
 
 function die(lines) {
   console.error(`\n${lines.join('\n')}\n`);
@@ -129,7 +135,7 @@ const identity = signingIdentity();
 // the repo stays clean and a copy run from source still has nowhere to send.
 //
 // THE VARIABLE IS NAMED FROM THE ONE PLACE THE APP IS NAMED, and it was not.
-// This read `ASTRAL_POSTHOG_KEY` by hand while main/analytics.mjs had moved to
+// This read `ASTRAL_POSTHOG_KEY` by hand while main/analytics.mts had moved to
 // `readEnv`, so the name you have to type to cut a release was two renames out
 // of date and matched nothing the app itself reads. `readEnv` answers to the
 // current name and to every older one, so an old note or an old shell profile
@@ -147,7 +153,7 @@ function posthogKey() {
 
 const analyticsKey = posthogKey();
 
-// WHERE THE FEEDBACK CARD SENDS (main/feedback.mjs), read the same two ways.
+// WHERE THE FEEDBACK CARD SENDS (main/feedback.mts), read the same two ways.
 // It is the address of the server function, not of anybody's inbox: who the
 // mail goes to is a secret on that function and never in a build.
 function feedbackAddress() {
@@ -162,12 +168,12 @@ function feedbackAddress() {
 
 const feedbackUrl = feedbackAddress();
 
-// WHERE AGENTBOX CLOUD IS (main/cloud/config.mjs): the server's address and
+// WHERE AGENTBOX CLOUD IS (main/cloud/config.mts): the server's address and
 // the database's public address and key, all public. A cloud.public.json in
 // cloud/ or ~/.agentbox points this build at another cloud; without one it is
-// the cloud every copy ships with (shared/cloud-address.mjs).
+// the cloud every copy ships with (shared/cloud-address.mts).
 const cloud = cloudAccountConfig(repo);
-// AND THE CLOUD SETTINGS › PHONE SIGNS IN TO (main/team/session.mjs
+// AND THE CLOUD SETTINGS › PHONE SIGNS IN TO (main/team/session.mts
 // loadCloudConfig): its address, public key and phone site, also public.
 const teamCloud = loadCloudConfig(repo, { packaged: false, env: {} });
 
@@ -190,7 +196,10 @@ if (!noSign) {
     ]);
   }
 
-  const missing = ['APPLE_ID', 'APPLE_TEAM_ID', 'APPLE_APP_SPECIFIC_PASSWORD'].filter((k) => !process.env[k]);
+  // A Keychain profile saved by `xcrun notarytool store-credentials` stands in
+  // for all three: Apple's tool keeps the password and this never sees it.
+  // `npm run deploy` sets one up and passes its name.
+  const missing = profile ? [] : ['APPLE_ID', 'APPLE_TEAM_ID', 'APPLE_APP_SPECIFIC_PASSWORD'].filter((k) => !process.env[k]);
   if (missing.length) {
     die([
       `Missing ${missing.join(', ')}.`,
@@ -207,7 +216,9 @@ if (!noSign) {
   }
   // Before a minute of signing is spent: the right commit, and a free version.
   const refusals = whyNotToRelease({
-    behind: commitsBehindMain(),
+    // `npm run deploy` checks the commit against main as it starts and pins it
+    // here, so main moving during the npm publish does not stop the build.
+    behind: pinned && pinned === head() ? 0 : commitsBehindMain(),
     version: JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'utf8')).version,
     released: releasedTags(),
   });
@@ -229,7 +240,7 @@ if (!noSign) {
       'To build without signing, run: npm run pack',
     ]);
   }
-  if (process.env.APPLE_TEAM_ID !== identity.team) {
+  if (!profile && process.env.APPLE_TEAM_ID !== identity.team) {
     die([
       `APPLE_TEAM_ID is "${process.env.APPLE_TEAM_ID}" and the certificate on this Mac belongs to "${identity.team}".`,
       `The certificate is ${identity.name}.`,
@@ -259,7 +270,7 @@ if (!fs.existsSync(path.join(repo, 'build', 'icon.icns'))) {
 // package.json now carries a publish config so the APP can find its updates,
 // and that same config is what electron-builder would upload through.
 const args = ['--mac', '--publish', 'never'];
-// Baked into the packaged package.json, which main/analytics.mjs reads. Only
+// Baked into the packaged package.json, which main/analytics.mts reads. Only
 // the key travels; nothing else about this machine does.
 if (analyticsKey) {
   args.push(`-c.extraMetadata.bakedPosthogKey=${analyticsKey}`);
@@ -268,12 +279,12 @@ if (analyticsKey) {
   console.log('→ no analytics key, so this build will send nothing');
 }
 // Not a stop like the analytics key: a build without it sends to the address
-// that ships in the code (FEEDBACK_ADDRESS in main/feedback.mjs).
+// that ships in the code (FEEDBACK_ADDRESS in main/feedback.mts).
 if (feedbackUrl) {
   args.push(`-c.extraMetadata.bakedFeedbackUrl=${feedbackUrl}`);
   console.log('→ baking the feedback address into the build');
 } else {
-  console.log(`→ no feedback address (${envName('FEEDBACK_URL')} or "feedbackUrl" in zero.config.json), so the Feedback card sends to the one in main/feedback.mjs`);
+  console.log(`→ no feedback address (${envName('FEEDBACK_URL')} or "feedbackUrl" in zero.config.json), so the Feedback card sends to the one in main/feedback.mts`);
 }
 if (cloud) {
   for (const k of ['gateway', 'supabaseUrl', 'anonKey']) args.push(`-c.extraMetadata.bakedCloud.${k}=${cloud[k]}`);
@@ -281,7 +292,7 @@ if (cloud) {
 }
 if (teamCloud) {
   for (const k of ['url', 'anonKey', 'phoneSite']) if (teamCloud[k]) args.push(`-c.extraMetadata.bakedTeam.${k}=${teamCloud[k]}`);
-  console.log(`→ baking the team cloud into the build (${teamCloud.url}): Settings › Phone can sign in, and Multiplayer is in Alpha features`);
+  console.log(`→ baking the team cloud into the build (${teamCloud.url}): Settings › Phone can sign in, and a team gets its Team page`);
 } else {
   console.log('→ no team.config.json, so this build cannot sign in for the phone');
 }
@@ -337,9 +348,13 @@ if (!noSign) {
     console.log(`→ sending ${dmg} to Apple (a few minutes)`);
     run('notarytool', 'xcrun', [
       'notarytool', 'submit', dmg,
-      '--apple-id', process.env.APPLE_ID,
-      '--team-id', process.env.APPLE_TEAM_ID,
-      '--password', process.env.APPLE_APP_SPECIFIC_PASSWORD,
+      ...(profile
+        ? ['--keychain-profile', profile, ...(keychain ? ['--keychain', keychain] : [])]
+        : [
+          '--apple-id', process.env.APPLE_ID,
+          '--team-id', process.env.APPLE_TEAM_ID,
+          '--password', process.env.APPLE_APP_SPECIFIC_PASSWORD,
+        ]),
       '--wait',
     ]);
 
@@ -370,7 +385,9 @@ if (!noSign) {
 // read live, and the one command that changes it. Best effort and quiet about
 // its own failure: a release must not be reported as broken because a laptop
 // was off the network for four seconds.
-if (!noSign && fresh.length) {
+// Inside `npm run deploy` the next step IS the publish, so this ending would
+// call a run that is going fine a failure.
+if (!noSign && fresh.length && !process.env.AGENTBOX_DEPLOY) {
   const shipped = fresh.map((f) => `release/${f}`).join(' ');
   let serving = null;
   // The tag comes back with the assets because the version comparison below

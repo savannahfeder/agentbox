@@ -218,15 +218,31 @@ export const LEAVE_SLACK = 24;
 //           above zero the stick watches and writes nothing.
 //   placed  where the last finished restore left her, or null. Read once, when
 //           a stick arms, and only while the box is still sitting on it.
-type RestoreMark = { live: number; placed: number | null };
+//   done    how many restores have finished, so a stick armed BEFORE one (a
+//           thread already drawn when she comes back to it) can tell that one
+//           landed and let go between two of its looks.
+//   endGap  how far from the end the last one left her, measured when it let go
+//           rather than after the page has grown again.
+type RestoreMark = { live: number; placed: number | null; done: number; endGap: number };
 const restores = new WeakMap<HTMLElement, RestoreMark>();
 const markOf = (el: HTMLElement): RestoreMark => {
   const was = restores.get(el);
   if (was) return was;
-  const fresh: RestoreMark = { live: 0, placed: null };
+  const fresh: RestoreMark = { live: 0, placed: null, done: 0, endGap: 0 };
   restores.set(el, fresh);
   return fresh;
 };
+
+const ABOVE_THE_FIRST_LINE = 20;
+
+/** The first line of the last message near the top, or the end when all of it already fits. */
+export const landingTop = (top: number, bottom: number) => Math.max(0, Math.min(bottom, Math.round(top - ABOVE_THE_FIRST_LINE)));
+
+/** Where a person starts reading a thread: the last message, as either kind of page draws it. */
+export function lastMessageIn(box: HTMLElement): Element | null {
+  const all = box.querySelectorAll('.thread-block.is-msg, .thread-block.is-msg-same, .outcome, .appendix-foot');
+  return all[all.length - 1] ?? null;
+}
 
 /**
  * Keep a scrolling box at its bottom for as long as it is at its bottom.
@@ -235,9 +251,13 @@ const markOf = (el: HTMLElement): RestoreMark => {
  * component's own cleanup does when she leaves the task. Her scrolling up stops
  * it too, until she scrolls back down.
  */
-export function holdAtBottom(el: HTMLElement | null, opts: { now?: () => number; keepPlace?: boolean } = {}): () => void {
+export function holdAtBottom(el: HTMLElement | null, opts: { now?: () => number; keepPlace?: boolean; readFrom?: () => Element | null } = {}): () => void {
   if (!el) return () => {};
   const now = opts.now ?? (() => Date.now());
+  // A message longer than the window lands on its first line, not its last, while
+  // the page settles and until she touches it. Then the ordinary rules hold.
+  const opened = now();
+  let landing = !!opts.readFrom;
   // KEEP HER PARAGRAPH WHERE IT IS WHEN ANYTHING ABOVE IT CHANGES HEIGHT, not
   // only on a re-wrap. The desktop's browser does this itself (scroll
   // anchoring); Safari on an iPhone does not, so there every picture or block
@@ -267,6 +287,7 @@ export function holdAtBottom(el: HTMLElement | null, opts: { now?: () => number;
   // moment the restore ENDS. Before, that was inferred from the position, which
   // is the same mistake `hers` is about.
   let underRestore = false;
+  let restoresSeen = markOf(el).done;
 
   // WHEN SHE LAST PUT A HAND ON THIS BOX, and -Infinity for never.
   //
@@ -292,7 +313,10 @@ export function holdAtBottom(el: HTMLElement | null, opts: { now?: () => number;
   // because the position cannot tell us apart from her. Nothing but a hand of
   // hers may switch this off.
   let hand = -Infinity;
-  const hers = () => now() - hand <= HER_HAND_MS;
+  // A button held down on the box: a scrollbar drag can wait any length of
+  // time between the press and the first move, so the window alone is not enough.
+  let held = false;
+  const hers = () => held || now() - hand <= HER_HAND_MS;
 
   // HOW WIDE THE COLUMN WAS LAST TIME WE LOOKED, and the paragraph she was
   // reading when she was not at the end. The pair is what survives a re-wrap.
@@ -304,15 +328,35 @@ export function holdAtBottom(el: HTMLElement | null, opts: { now?: () => number;
     // A RESTORE OWNS THE BOX WHILE IT RUNS, and standing down is not enough:
     // this has to keep WATCHING, or the moment the restore lets go it has no
     // idea where she was put and assumes she is at the end.
-    if (markOf(el).live > 0) {
+    const mark = markOf(el);
+    if (mark.live > 0) {
       underRestore = true;
       mine = Math.round(el.scrollTop);
       return;
+    }
+    if (mark.done !== restoresSeen) {
+      restoresSeen = mark.done;
+      underRestore = false;
+      stuck = mark.endGap <= LEAVE_SLACK;
+      mine = Math.round(el.scrollTop);
+      landing = false;
     }
     if (underRestore) {
       underRestore = false;
       stuck = gapToBottom(el) <= LEAVE_SLACK;
       mine = Math.round(el.scrollTop);
+      landing = false;
+    }
+    if (landing && (hand !== -Infinity || now() - opened > RESUME_WINDOW_MS)) landing = false;
+    const start = landing ? opts.readFrom!() : null;
+    if (start) {
+      const top = start.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
+      const want = landingTop(top, bottomOf(el));
+      if (Math.round(el.scrollTop) !== want) el.scrollTop = want;
+      mine = want;
+      stuck = want >= bottomOf(el) - AT_BOTTOM_SLACK;
+      width = widthOf(el);
+      return;
     }
     // THE COLUMN CHANGED WIDTH, so whatever moved scrollTop just now was the
     // page re-wrapping and not her, even with her hand a moment behind it: the
@@ -383,7 +427,10 @@ export function holdAtBottom(el: HTMLElement | null, opts: { now?: () => number;
   // are the events a person makes, and a reflow makes none of them. A scrollbar
   // drag is `mousedown` and then a run of scroll events with no further gesture,
   // which is why this is a window and not a one-shot.
-  const took = () => { hand = now(); };
+  const took = (e?: Event) => { hand = now(); if (e?.type === 'mousedown') held = true; };
+  const letGo = () => { held = false; };
+  // The release lands wherever the pointer ended up, so it is heard on the window.
+  const win = el.ownerDocument?.defaultView ?? null;
 
   function release() {
     if (!live) return;
@@ -392,11 +439,15 @@ export function holdAtBottom(el: HTMLElement | null, opts: { now?: () => number;
     el!.removeEventListener('scroll', onScroll);
     el!.removeEventListener('load', onLoad, true);
     for (const ev of HER_GESTURES) el!.removeEventListener(ev, took);
+    win?.removeEventListener('mouseup', letGo);
+    win?.removeEventListener('blur', letGo);
   }
 
   el.addEventListener('scroll', onScroll, { passive: true });
   el.addEventListener('load', onLoad, true);
   for (const ev of HER_GESTURES) el.addEventListener(ev, took, { passive: true });
+  win?.addEventListener('mouseup', letGo, { passive: true });
+  win?.addEventListener('blur', letGo, { passive: true });
   // BOTH BOXES, because the two ways to fall short of the end are different
   // things growing. The content growing is the obvious one. The box itself
   // SHRINKING is the other, and it happens every time the options strip or the
@@ -415,6 +466,7 @@ export function holdAtBottom(el: HTMLElement | null, opts: { now?: () => number;
   if (placed !== null && Math.round(el.scrollTop) === placed) {
     stuck = gapToBottom(el) <= LEAVE_SLACK;
     mine = placed;
+    landing = false;
   }
 
   pin();
@@ -443,6 +495,41 @@ export function resumeTo(
   opts: { now?: () => number; window?: number } = {},
 ): () => void {
   if (!el || !(top > 0)) return () => {};
+  return reachFor(el, () => top, opts);
+}
+
+/**
+ * BRING ONE THING ON THE PAGE INTO VIEW AND KEEP IT THERE WHILE THE PAGE
+ * SETTLES, the way `resumeTo` holds a place. A close raises its question on the
+ * turn that filed the task and unfolds the thread above it in the same press;
+ * a plain scrollIntoView lost to the stick, which pinned the growing page back
+ * to its end, so the question was never seen.
+ */
+export function bringIntoView(
+  el: HTMLElement | null,
+  target: () => Element | null,
+  opts: { now?: () => number; window?: number; block?: 'center' | 'nearest' } = {},
+): () => void {
+  if (!el) return () => {};
+  const block = opts.block ?? 'center';
+  return reachFor(el, () => {
+    const t = target();
+    if (!t?.isConnected) return null;
+    const box = el.getBoundingClientRect();
+    const r = t.getBoundingClientRect();
+    const top = r.top - box.top + el.scrollTop;
+    if (block === 'center') return Math.round(top - (el.clientHeight - r.height) / 2);
+    if (r.top >= box.top && r.bottom <= box.bottom) return Math.round(el.scrollTop);
+    return Math.round(r.top < box.top || r.height > el.clientHeight ? top : top + r.height - el.clientHeight);
+  }, opts, false);
+}
+
+function reachFor(
+  el: HTMLElement,
+  aim: () => number | null,
+  opts: { now?: () => number; window?: number },
+  stopOnArrival = true,
+): () => void {
   const now = opts.now ?? (() => Date.now());
   const window_ = opts.window ?? RESUME_WINDOW_MS;
   const started = now();
@@ -454,10 +541,13 @@ export function resumeTo(
 
   const reach = () => {
     if (!live) return;
-    const want = Math.min(top, bottomOf(el));
+    const top = aim();
+    if (top === null) return;
+    const want = Math.max(0, Math.min(top, bottomOf(el)));
     if (Math.round(el.scrollTop) !== want) el.scrollTop = want;
     // Arrived. A page that grows further from here is hers to follow or not.
-    if (want >= top) release();
+    // A thing on the page is followed for the whole window: what grows is above it.
+    if (stopOnArrival && want >= top) release();
   };
 
   // HER HAND ENDS IT, and here it really does have to be her gestures rather
@@ -480,6 +570,8 @@ export function resumeTo(
     // milliseconds later has no other way to know she was placed on purpose.
     mark.live = Math.max(0, mark.live - 1);
     mark.placed = Math.round(el!.scrollTop);
+    mark.endGap = gapToBottom(el!);
+    mark.done += 1;
     ro?.disconnect();
     clearInterval(timer);
     for (const ev of HERS) el!.removeEventListener(ev, release);

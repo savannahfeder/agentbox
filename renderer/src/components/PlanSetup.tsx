@@ -6,11 +6,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
+import { enterIsTheButtons } from '../focused-button';
 import {
   COPY, LOOK_AGAIN_FOR_MS, LOOK_AGAIN_MS, afterCheck, afterFound, enginesFor, foundHead, foundLede,
   foundRows, litRow, planName, planNote, planRows, readLog, readyEngines, setupLede, setupRows,
   worthLookingAgain,
-  type AskRow, type Engine, type EngineSetupState, type Plan, type StepRow,
+  type AskRow, type BarWords, type Engine, type EngineSetupState, type Plan, type StepRow,
 } from '../plan-setup';
 import { Cap } from './Onboarding';
 import { hoverLit } from '../onboarding';
@@ -72,6 +73,7 @@ export function AskList({ rows, label, onPick, busy = false, start = 0 }: {
 
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
+      if (enterIsTheButtons(e)) return;
       if (e.key === 'ArrowDown') { e.preventDefault(); setLit((n) => Math.min(rows.length - 1, n + 1)); }
       else if (e.key === 'ArrowUp') { e.preventDefault(); setLit((n) => Math.max(0, n - 1)); }
       else if (e.key === 'Enter') { e.preventDefault(); choose(lit); }
@@ -299,7 +301,7 @@ export function PlanQuestion({ onPick, onReady, onSkip, look, found = null }: {
   /*
    * SHOW IT WHERE ONE IS. The panel opens in the main process and the choice is
    * applied there in the same call, so no path off anybody's disk crosses the
-   * bridge (main/ipc.mjs, `zero:engine-bin`). A file that is not something
+   * bridge (main/ipc.mts, `zero:engine-bin`). A file that is not something
    * agents can run comes back as words, here, where the press was.
    *
    * Claude Code is what is asked for, because that is the one the app will not
@@ -506,12 +508,12 @@ export function PlanSetupCard({ plan, onDone, onSkip, state: given }: {
  *  run an agent: somebody skipped, or signed out since. Her words: "if somebody
  *  somehow has an issue, maybe that bar at the top makes sense".
  */
-export function PlanBar({ onSetup }: { onSetup: (plan: Plan) => void }) {
+export function PlanBar({ words, onSetup }: { words: BarWords; onSetup: (plan: Plan) => void }) {
   return (
     <div className="ps-bar" role="status">
-      <div className="ps-bar-say">{COPY.barSay} <span>{COPY.barSub}</span></div>
-      <button type="button" onClick={() => onSetup('claude')}>{COPY.barClaude}</button>
-      <button type="button" className="quiet" onClick={() => onSetup('codex')}>{COPY.barChatgpt}</button>
+      <div className="ps-bar-say">{words.say} <span>{COPY.barSub}</span></div>
+      <button type="button" onClick={() => onSetup(words.first.plan)}>{words.first.label}</button>
+      <button type="button" className="quiet" onClick={() => onSetup(words.second.plan)}>{words.second.label}</button>
     </div>
   );
 }

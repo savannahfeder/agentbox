@@ -11,7 +11,13 @@
 </p>
 
 <p align="center">
+  <a href="https://agentbox.ac/download"><strong>Download for Mac</strong></a>
+</p>
+
+<p align="center">
+  <a href="https://agentbox.ac">agentbox.ac</a> ·
   <a href="#install">Get it</a> ·
+  <a href="#an-interface-that-helps-you-hyperfocus">Hyperfocus</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#what-matters-most-goes-first">Priorities</a> ·
   <a href="#built-for-the-keyboard">Keys</a> ·
@@ -24,7 +30,7 @@
 </p>
 
 <p align="center">
-  Free and open source. A Mac app, or in your browser on any platform with <code>npx agentbox-app</code>,<br>
+  Free and open source. A Mac app, or in your browser on Linux with <code>npx agentbox-app</code>,<br>
   on the Claude Code or Codex plan you already have. No server, no account, no extra subscription.
 </p>
 
@@ -32,7 +38,22 @@
 
 ## Install
 
-There are two ways to run it: in the browser, or as a Mac app. Both need Node 22 and Claude Code or Codex installed and signed in.
+**As a Mac app.** [Download Agentbox for Mac](https://agentbox.ac/download). It is signed and notarised, and runs on Apple silicon and Intel.
+
+Every way needs Claude Code or Codex installed and signed in. Building it from source or running it in the browser also needs Node 22.18 or newer.
+
+**As a desktop app from source.** Build it from this repo. `npm start` is the desktop command on Omarchy and on a Mac:
+
+```
+git clone https://github.com/savannahfeder/agentbox.git
+cd agentbox
+npm install
+npm start
+```
+
+`npm install` ends with a count of vulnerabilities. What is left after `npm audit fix` are advisories on Vite,
+Vitest and the Tiptap editor that only a new major version of each would clear.
+The install worked if it exits without an error.
 
 **In your browser.** One command, nothing to install first:
 
@@ -42,6 +63,8 @@ npx agentbox-app
 
 It starts on your machine and opens a tab. On Linux that open goes through `xdg-open`. Nothing is hosted: it listens only on `127.0.0.1`, and the address carries a key that is new every run. Add `--help` to see the options. `--no-open` prints the address and leaves the browser to you.
 
+The terminal is the one piece that is compiled while it installs, and on Linux that needs `make` and a C++ compiler. Without them the install leaves the terminal out, everything else works, and the command says so each time it starts. On Debian or Ubuntu, `sudo apt install build-essential` and install again.
+
 From a checkout, build the screen once, then start it the same way. The install links the checkout's own command, so `npx` runs this copy rather than looking for `agentbox` on your PATH:
 
 ```
@@ -50,18 +73,9 @@ npm run build
 npx agentbox-app
 ```
 
-**As a desktop app.** Build it from this repo. `npm start` is the desktop command on Omarchy and on a Mac:
-
-```
-git clone https://github.com/savannahfeder/agentbox.git
-cd agentbox
-npm install
-npm start
-```
-
 On Linux, `npm install` puts `agentbox` on `~/.local/bin` and adds the app to the launcher. The entry is `$XDG_DATA_HOME/applications/agentbox.desktop` (`~/.local/share/applications` when that variable is unset), and it runs `agentbox`. That command starts this checkout, and it is written before Electron has downloaded its binary, so the first launch off the launcher does that download. Open the app from the launcher.
 
-Two of this repo's dependencies need an install script to work: `node-pty`, which is the terminal, and `esbuild`. `package.json` names them in `allowScripts`, by name rather than pinned to a version, so a dependency bump does not need re-approving. `electron-winstaller` is denied there: it is only for packing a Windows installer, which this repo does not do. npm 11 and newer print anything in neither list on every install, and `npm approve-scripts --allow-scripts-pending` lists them.
+Two of this repo's dependencies need an install script to work: `node-pty`, which is the terminal and is the one optional dependency here, and `esbuild`. `package.json` names them in `allowScripts`, by name rather than pinned to a version, so a dependency bump does not need re-approving. `electron-winstaller` is denied there: it is only for packing a Windows installer, which this repo does not do. npm 11 and newer print anything in neither list on every install, and `npm approve-scripts --allow-scripts-pending` lists them.
 
 `npm start` builds the app and opens it. On first run it walks you through connecting Claude Code or Codex and choosing a folder to work in.
 
@@ -135,6 +149,22 @@ asked. Code changes open right beside the row.
 
 <img src="docs/readme/loop.webp" alt="An agent reports the usage test passes; the change beside it shows it edited the expected value in the test, and the reply sends it back to fix the code" width="100%">
 
+## An interface that helps you hyperfocus
+
+The app keeps one decision in front of you at a time.
+
+- **You only see the agents that need you.** Anything still working stays out
+  of the inbox, so there is nothing to check on and no window to watch.
+- **Each one opens as a single card.** What the agent did, what it needs from
+  you, and the options it is offering, numbered.
+- **One key answers it.** `1` `2` `3` take an option, `E` approves the
+  recommendation, `R` replies in your own words. The next card is already on
+  screen.
+- **Urgent tasks first.** Your project order decides the rest, so the card in
+  front of you is always the one worth answering next.
+
+<img src="docs/readme/hyperfocus.webp" alt="An agent's card shows what it found and three numbered options, then a key is pressed and the next card is already there" width="100%">
+
 ## What matters most goes first
 
 Twenty agents means twenty things competing for your attention and for a limited
@@ -161,7 +191,7 @@ number of running sessions. Agentbox keeps one order and uses it for both.
 
 ## Built for the keyboard
 
-<img src="docs/readme/keys.webp" alt="The keys E, R, J, K and the number row light up over the inbox, then the command palette opens on the themes" width="100%">
+<img src="docs/readme/keys.webp" alt="The keys J, K, R, E and the number row light up over the inbox as a reply is sent and a row is marked done" width="100%">
 
 | Key | Does |
 |---|---|
@@ -175,9 +205,6 @@ number of running sessions. Agentbox keeps one order and uses it for both.
 | `S` | Show or hide the summary, in an open task |
 | `Z` | Undo |
 | `⌘K` or `Ctrl+K` | Everything else |
-
-Fifteen skins, each in light and dark, from plain slate to woodblock and riso
-prints. Press `⌘K` or `Ctrl+K` and type "theme". `Ctrl+K` is the same palette on Linux, where there is no Command key.
 
 ## Runs on the plan you already have
 
@@ -198,7 +225,7 @@ nothing new to pay for.
 <br>
 
 `zero.config.json` in the repo root, gitignored and machine-specific. Every
-default works unset and they all live in `main/config.mjs`. The ones that
+default works unset and they all live in `main/config.mts`. The ones that
 matter:
 
 - `storeRoot`: where the store lives. On macOS this defaults to a folder
@@ -231,11 +258,12 @@ matter:
 
 <br>
 
-Nothing, unless you are running a build that was signed and released with a
-PostHog key baked into it. A build made from this repo has no key, so a clone
-and a fork are silent, and with no key the whole path is off at every send.
+Nothing, unless you are running a released copy: the Mac app, or
+`npx agentbox-app`, each of which has a PostHog key baked in when it is
+released. A build made from this repo has no key, so a clone and a fork are
+silent, and with no key the whole path is off at every send.
 
-A released build counts eighteen things, and they are counts:
+A released copy counts nineteen things, and they are counts:
 
 - the app was opened
 - the app was used today, once a day
@@ -248,6 +276,7 @@ A released build counts eighteen things, and they are counts:
 - a reply was sent
 - a task finished
 - an agent started work
+- an agent could not start yet, and why, out of eighteen fixed words
 - an agent stopped work
 - the app was quit
 - the corner tag was hidden
@@ -256,16 +285,18 @@ A released build counts eighteen things, and they are counts:
 - setup imported agents
 - counts were turned off
 
-Each carries a random install id, the app and platform version, and at most
-seven other things: how long something took, how many of a thing there were,
+Each carries a random install id, the app and platform version, whether it
+came from the Mac app or the browser copy, which of two first runs a new install was shown, and at most
+eight other things: how long something took, how many of a thing there were,
 which kind of row it was out of six fixed words, whether an agent or you did
 it, whether an agent's run failed, whether it happened in setup's practice
-project, and which coding agent ran it, Claude Code or Codex.
+project, which coding agent ran it, Claude Code or Codex, and why an agent
+could not start yet, out of eighteen fixed words.
 No file contents, no prompts, no paths, no titles, nothing you typed.
-`shared/analytics-events.mjs` is the whole list, and anything a caller attaches
-beyond those seven is dropped rather than sent, so nobody can widen it by
+`shared/analytics-events.mts` is the whole list, and anything a caller attaches
+beyond those eight is dropped rather than sent, so nobody can widen it by
 accident. Crash reports travel the same way and are scrubbed first
-(`shared/crash-scrub.mjs`).
+(`shared/crash-scrub.mts`).
 
 **The events can be turned off,** and either way is enough on its own:
 
@@ -298,7 +329,7 @@ in exactly one place. The app can crash, restart or be rewritten without any
 agent noticing.
 
 - `main/` the Electron main process: config, the store
-  (`main/store/work-items.mjs` is the single write path), the supervisor that
+  (`main/store/work-items.mts` is the single write path), the supervisor that
   spawns one headless session per work item, and IPC.
 - `mcp/` the store server handed to those sessions.
 - `renderer/` the inbox: list, focus mode, rail, compose, palette, browser.
@@ -317,7 +348,13 @@ agent noticing.
 ```
 npm run dev        # vite HMR plus electron
 npm test
+npm run typecheck  # strict tsc over the back end and the renderer
 ```
+
+The app is TypeScript throughout. `main/`, `shared/` and `mcp/` are `.mts` that
+Node runs as they are, stripping the types at load, so there is no build step
+for the back end; the renderer and the phone app are `.ts` and `.tsx` built
+by Vite and Expo. CI runs the strict type check beside the tests on every push.
 
 Useful modes:
 

@@ -2,6 +2,7 @@
 // how an edit keeps what the app attached under the words.
 import { typedParts } from '../typed-message';
 import type { MoreItem } from './MessageMore';
+import type { MessageMarks } from './decisions';
 
 /** The words of a message, without the lines the app wrote for its attachments. */
 export function wordsOf(text: string): string {
@@ -14,13 +15,20 @@ export function withEmbeds(original: string, words: string): string {
   return [words.trim(), embeds.join('\n')].filter(Boolean).join('\n\n');
 }
 
-export function messageMore({ mine, text, onEdit, onDelete, onMarkUnread, onCopied }: {
+export function messageMore({ mine, text, onEdit, onDelete, onMarkUnread, onCopied, onDecide, onMove, marks = {}, decideLabel }: {
   mine: boolean;
   text: string;
   onEdit?: () => void;
   onDelete?: () => void;
   onMarkUnread?: () => void;
   onCopied?: () => void;
+  /** Only where a list exists: a group, or a conversation that files into the team's. */
+  onDecide?: (kind: 'decision' | 'priority', on: boolean) => void;
+  marks?: MessageMarks;
+  /** Where the words go when that is not the group they were said in. */
+  decideLabel?: string;
+  /** Only in a conversation with people: it and its replies start a thread of their own. */
+  onMove?: () => void;
 }): MoreItem[] {
   const words = wordsOf(text);
   const items: MoreItem[] = [];
@@ -31,6 +39,11 @@ export function messageMore({ mine, text, onEdit, onDelete, onMarkUnread, onCopi
       onClick: () => { void navigator.clipboard?.writeText(words).then(() => onCopied?.(), () => {}); },
     });
   }
+  if (onDecide && words) {
+    items.push({ label: marks.decision ? 'Not a decision' : decideLabel ?? 'Mark as a decision', onClick: () => onDecide('decision', !marks.decision) });
+    if (!decideLabel) items.push({ label: marks.priority ? 'Unpin these priorities' : 'Pin as this week’s priorities', onClick: () => onDecide('priority', !marks.priority) });
+  }
+  if (onMove && words) items.push({ label: 'Move to a new thread', onClick: onMove });
   if (onMarkUnread) items.push({ label: 'Mark unread', onClick: onMarkUnread });
   if (mine && onDelete) items.push('rule', { label: 'Delete message', onClick: onDelete, danger: true });
   return items;

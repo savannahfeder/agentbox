@@ -4,16 +4,20 @@ import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
+import { pickedName, tooBigToSend } from '../lib/attach';
 
-export interface Picked { name: string; dataBase64: string }
+// `uri` is the picked file on the phone, kept so its thumbnail is drawn from the file.
+export interface Picked { name: string; dataBase64: string; uri?: string }
 
 export async function pickPhotos(): Promise<Picked[]> {
-  const got = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images', 'videos'], allowsMultipleSelection: true, base64: true, quality: 0.9 });
+  const got = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images', 'videos'], allowsMultipleSelection: true, quality: 0.9, base64: Platform.OS === 'web' });
   if (got.canceled) return [];
   const out: Picked[] = [];
   for (const a of got.assets) {
-    const name = a.fileName || `photo-${out.length + 1}.${a.type === 'video' ? 'mov' : 'jpg'}`;
-    out.push({ name, dataBase64: a.base64 ?? await new File(a.uri).base64() });
+    const name = pickedName(a.fileName, a.type, out.length);
+    const big = tooBigToSend(name, a.fileSize);
+    if (big) throw new Error(big);
+    out.push({ name, dataBase64: a.base64 ?? await new File(a.uri).base64(), ...onPhone(a.uri) });
   }
   return out;
 }
@@ -21,7 +25,12 @@ export async function pickPhotos(): Promise<Picked[]> {
 export async function pickFiles(): Promise<Picked[]> {
   const got = await DocumentPicker.getDocumentAsync({ multiple: true, copyToCacheDirectory: true });
   if (got.canceled) return [];
-  return Promise.all(got.assets.map(async (a) => ({ name: a.name, dataBase64: await base64Of(a) })));
+  for (const a of got.assets) { const big = tooBigToSend(a.name, a.size); if (big) throw new Error(big); }
+  return Promise.all(got.assets.map(async (a) => ({ name: a.name, dataBase64: await base64Of(a), ...onPhone(a.uri) })));
+}
+
+function onPhone(uri: string): { uri?: string } {
+  return Platform.OS === 'web' ? {} : { uri };
 }
 
 // Expo's file reader is the phone's; the browser preview reads the picked file itself.

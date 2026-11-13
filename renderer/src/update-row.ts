@@ -15,10 +15,10 @@
 
 import type { UpdateState } from './types';
 import { NAME, Name } from '../../shared/product-name.mjs';
-import { MOVE_SAY, sayWhere } from '../../shared/where-it-runs-from.mjs';
+import { MOVE_SAY, sayWhere } from '../../shared/where-it-runs-from.mts';
 
 // WHERE THIS COPY IS RUNNING FROM, in the words main and the renderer share
-// (shared/where-it-runs-from.mjs). Re-exported here because this file is where
+// (shared/where-it-runs-from.mts). Re-exported here because this file is where
 // every surface already comes for the update words, and two doors to one set
 // of sentences is how a button and the row above it start disagreeing.
 export { MOVE_SAY };
@@ -116,7 +116,7 @@ export const CHECK_SAY = {
  *
  *  One function for the whole of it, because the alternative is each surface
  *  working the phases out again. The automatic check is SILENT when it fails
- *  (point 2 at the top of main/updater.mjs), so these sentences are the only
+ *  (point 2 at the top of main/updater.mts), so these sentences are the only
  *  place a person ever learns why: `error` and `unsupported` carry main's own
  *  reason through untouched, and neither may read as a healthy check.
  *
@@ -127,7 +127,7 @@ export const CHECK_SAY = {
  *
  *  THE TWO KINDS OF COPY DIFFER IN ONE PLACE ONLY: an installed app has a
  *  version number and comes back in seconds; a copy run from a checkout
- *  (main/source-updater.mjs) has a count of changes and rebuilds for about a
+ *  (main/source-updater.mts) has a count of changes and rebuilds for about a
  *  minute. Both are `ready`.
  */
 export type UpdateLook = {
@@ -138,7 +138,7 @@ export type UpdateLook = {
   /** Pressing it restarts onto the new version rather than looking again. */
   restart: boolean;
   /** Pressing it moves the app into Applications, which is the only thing
-   *  that will ever get this copy an update (shared/where-it-runs-from.mjs). */
+   *  that will ever get this copy an update (shared/where-it-runs-from.mts). */
   move: boolean;
   /** Nothing to press: a check, a download or a rebuild is under way. */
   busy: boolean;
@@ -200,14 +200,14 @@ function sentenceFor(phase: string, state: UpdateState | null | undefined, sourc
   }
   if (phase === 'checking') return CHECK_SAY.looking;
   if (phase === 'current') return CHECK_SAY.current;
-  // MAIN'S OWN REASON, UNTOUCHED. `shortError` in main/updater.mjs and `SAY` in
-  // main/source-updater.mjs are both already sentences a person can read.
+  // MAIN'S OWN REASON, UNTOUCHED. `shortError` in main/updater.mts and `SAY` in
+  // main/source-updater.mts are both already sentences a person can read.
   if (phase === 'error' || phase === 'unsupported') return state?.error || CHECK_SAY.unknown;
   return CHECK_SAY.idle;
 }
 
 /**
- * WHAT CHANGED, for a copy run from source (main/source-updater.mjs): the
+ * WHAT CHANGED, for a copy run from source (main/source-updater.mts): the
  *  commits' own first lines, newest first, and how many more there are. An
  *  installed app has no titles and gets an empty list. */
 export function changeLines(state: Pick<UpdateState, 'changes' | 'behind'> | null | undefined): string[] {

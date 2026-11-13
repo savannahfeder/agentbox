@@ -1,5 +1,5 @@
 // THE ROW THAT ASKS WHETHER A CODEX CONVERSATION COMES IN, on the renderer's
-// side. The rules and the words are in shared/codex-import.mjs; this is only
+// side. The rules and the words are in shared/codex-import.mts; this is only
 // what the list needs to draw it and what a key on it sends.
 //
 // So the row's right end is the two keys the list already draws as hints, Y and
@@ -9,7 +9,7 @@ import type { WorkItem } from './types';
 import type { RowKey } from './list-rules';
 import {
   CODEX_IMPORT_LABEL, CODEX_MIRROR_LABEL, NOT_IMPORTED_LABEL, codexIdOf as sharedCodexIdOf,
-} from '../../shared/codex-import.mjs';
+} from '../../shared/codex-import.mts';
 
 const has = (item: { labels?: string[] } | null | undefined, label: string) => (item?.labels ?? []).includes(label);
 
@@ -24,7 +24,7 @@ export const isCodexRow = (item: WorkItem | null | undefined): boolean => !!item
  w-d883b38446.
 
    IT WAS NEAR THE BOTTOM, AND THAT IS MEASURED. The inbox sorts on the score
-   in shared/rank.mjs: the user's running order over projects is worth a
+   in shared/rank.mts: the user's running order over projects is worth a
    hundred points a step and the row's own priority breaks ties, with recency
    only after that. A conversation lands in the project whose folder it ran in
    (`whereThreadLands`), and an import comes in at the default priority of 5.

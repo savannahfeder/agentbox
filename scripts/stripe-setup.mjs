@@ -22,9 +22,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { PLANS } from '../cloud/gateway/plans.mjs';
+import { PLANS, TEAM } from '../cloud/gateway/plans.mjs';
 import { formOf, lookupKeyOf } from '../cloud/gateway/stripe.mjs';
-import { readCloudConfig } from '../main/cloud/config.mjs';
+import { readCloudConfig } from '../main/cloud/config.mts';
 import { STRIPE_SECRET_NAME, GATEWAY_FUNCTION } from './cloud-gateway-setup.mjs';
 
 // SaaS sold to businesses (Stripe's tax codes).
@@ -32,6 +32,8 @@ const TAX_CODE = 'txcd_10103001';
 export const WEBHOOK_EVENTS = ['checkout.session.completed', 'customer.subscription.created', 'customer.subscription.updated', 'customer.subscription.deleted'];
 
 export const paidPlans = (plans = PLANS) => Object.entries(plans).filter(([, p]) => p.agents > 0 && p.dollarsPerMonth > 0);
+/** The team plan as Stripe sells it: one seat, bought once a member. */
+export const teamPlan = (team = TEAM) => ['team', { agents: team.agentsPerSeat, hoursPerMonth: team.hoursPerSeat, dollarsPerMonth: team.dollarsPerSeat }];
 const title = (plan) => plan[0].toUpperCase() + plan.slice(1);
 export const productOf = (plan, p) => ({
   name: `Agentbox Cloud ${title(plan)}`,
@@ -81,7 +83,8 @@ async function main() {
   // What is sold.
   const products = (await stripe('GET', '/v1/products', { limit: 100, active: true })).data;
   const sold = [];
-  for (const [plan, p] of paidPlans()) {
+  // The team's seat is sold too, but is not offered on a person's billing page as a switch.
+  for (const [plan, p] of [...paidPlans(), teamPlan()]) {
     const want = productOf(plan, p);
     let product = products.find((x) => x.metadata?.agentbox_plan === plan);
     if (!product) { product = await stripe('POST', '/v1/products', want); say(`made ${want.name}`); } else await stripe('POST', `/v1/products/${product.id}`, want);
@@ -93,7 +96,7 @@ async function main() {
       });
       say(`${want.name}: $${p.dollarsPerMonth} a month`);
     }
-    sold.push({ plan, product: product.id, price: price.id });
+    if (plan !== 'team') sold.push({ plan, product: product.id, price: price.id });
   }
 
   // The billing page.

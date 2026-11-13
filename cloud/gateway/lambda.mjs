@@ -9,13 +9,16 @@
 // credentials that signed it, and a role's last hours, where a run's results
 // link must outlive the run's 8.
 import { S3Client, GetObjectCommand, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { awsTransport, awsStorage } from '../../main/cloud/aws.mjs';
+import { awsTransport, awsStorage } from '../../main/cloud/aws.mts';
 import { createGateway } from './gateway.mjs';
-import { supabaseRest } from './phone.mjs';
-import { sendToExpo } from '../../main/phone-alerts.mjs';
+import { supabaseRest, teamsFrom } from './phone.mjs';
+import { sendToExpo } from '../../main/phone-alerts.mts';
 import { stripeClient } from './stripe.mjs';
 
 const TIMEOUT_MS = 20_000;
+// Under the function's own limit (FUNCTION_SECONDS in scripts/cloud-gateway-setup.mjs),
+// so a hung start is answered and ended in the ledger rather than killed by Lambda.
+const AGENTCORE_MS = 75_000;
 const http = { requestTimeout: TIMEOUT_MS, connectionTimeout: 5_000, throwOnRequestTimeout: true };
 const missing = (err) => ['NoSuchKey', 'NotFound'].includes(err?.name) || err?.$metadata?.httpStatusCode === 404;
 
@@ -116,18 +119,22 @@ export async function gatewayFromEnv(env = process.env, { readSecret = (arn) => 
   const region = env.REGION;
   const bucket = env.BUCKET;
   const key = JSON.parse(await readSecret(env.SIGNER_SECRET_ARN));
-  const transport = awsTransport({ region, runtimeArn: env.RUNTIME_ARN });
+  const transport = awsTransport({ region, runtimeArn: env.RUNTIME_ARN, timeoutMs: AGENTCORE_MS });
   const signer = awsStorage({ region, bucket, credentials: { accessKeyId: key.id, secretAccessKey: key.secret } });
   const objects = bucketObjects({ region, bucket });
   // Without it the server runs and says paying is not set up.
   const billing = env.STRIPE_SECRET_ARN ? JSON.parse(await readSecret(env.STRIPE_SECRET_ARN)) : null;
-  // Without it a phone's reply waits for its computer, as before.
+  // Without it a phone's reply waits for its computer, as before, and who is
+  // subscribed stays in the ledger alone.
   const database = env.SUPABASE_SERVICE_SECRET_ARN ? JSON.parse(await readSecret(env.SUPABASE_SERVICE_SECRET_ARN)) : null;
+  const db = database?.serviceKey ? supabaseRest({ url: env.SUPABASE_URL, serviceKey: database.serviceKey }) : null;
   return createGateway({
     ...(billing ? { stripe: stripeClient({ key: billing.key, webhookSecret: billing.webhookSecret, managedPayments: !!billing.managedPayments }) } : {}),
-    ...(database?.serviceKey ? {
+    ...(db ? {
+      db,
+      teams: teamsFrom(db),
       phone: {
-        db: supabaseRest({ url: env.SUPABASE_URL, serviceKey: database.serviceKey }),
+        db,
         runFiles: linkedFiles({ links: { get: signer.getUrl, put: signer.putUrl } }),
         sendPush: (messages) => sendToExpo(messages),
       },

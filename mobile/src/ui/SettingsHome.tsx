@@ -1,34 +1,30 @@
 // What Settings opens on: which computer it is about, and its pages in the
-// desktop's order and groups (renderer/src/settings-search.ts). Appearance
-// and Shortcuts are about the Mac's own screen and keys, and Cloud sells
-// plans, which the phone app does not (docs/mobile/PLAN.md, 3.1).
+// desktop's order and groups (renderer/src/settings-search.ts), under the
+// account and its Sign out, which was hard to find inside General. Shortcuts is
+// about the Mac's own keys, and Cloud sells plans, which the phone app does not
+// (docs/mobile/PLAN.md, 3.1). Appearance is here, for the phone's own look.
 import Constants from 'expo-constants';
-import { router } from 'expo-router';
-import { ago } from '../../../renderer/src/phone-rows';
+import { router } from '../lib/router';
+import { accountsAside, cloudOnlyAccounts } from '../lib/cloud-accounts';
+import { computerLine, versionLine } from '../lib/computer-line';
+import { PHONE_LOOKS, type PhoneLook } from '../lib/look';
 import { useCloud } from '../state/cloud';
+import { useLook } from '../state/look';
 import { useSettings, type SettingsState } from '../state/settings';
 import { GROUPS, SETTINGS_PAGES, type PageId } from './SettingsPages';
-import { Aside, Group, NavRow } from './SettingsParts';
+import { Aside, Button, Group, NavRow, Row } from './SettingsParts';
 
-// The computer sends its copy at least every five minutes (main/phone-inbox.mjs).
-const AWAY_MS = 15 * 60_000;
+export { computerLine };
 
-export function computerLine(s: SettingsState, now: number) {
-  if (!s.computer) return s.loaded || s.error ? 'Your computer’s settings appear here once Agentbox on it is up to date and signed in to this account.' : undefined;
-  const at = Date.parse(s.computer.updated_at) || 0;
-  return now - at > AWAY_MS ? `From ${s.computer.name}, last online ${ago(now - at)}. What you change waits for it.` : `From ${s.computer.name}.`;
-}
-
-function asideOf(id: PageId, s: SettingsState, email: string | undefined) {
+function asideOf(id: PageId, s: SettingsState, look: PhoneLook) {
   const w = s.settings?.workspace;
-  const chosen = (list?: { chosen: boolean; email: string | null }[]) => list?.find((a) => a.chosen)?.email ?? (list?.length ? `${list.length} account${list.length === 1 ? '' : 's'}` : undefined);
-  if (id === 'general') return email;
+  if (id === 'appearance') return PHONE_LOOKS.find((l) => l.id === look)?.name;
   if (!w) return undefined;
-  if (id === 'claude') return chosen(w.accounts);
-  if (id === 'codex') return chosen(w.codexAccounts);
-  if (id === 'running') return w.agentsAuto ? `Automatic (${w.agentsTotal})` : `${w.sessionsAtOnce} at once`;
+  if (id === 'claude') return accountsAside(w.accounts, cloudOnlyAccounts(w, 'claude').length);
+  if (id === 'codex') return accountsAside(w.codexAccounts, cloudOnlyAccounts(w, 'codex').length);
+  if (id === 'running') return w.paused ? 'Paused' : w.agentsAuto ? `Automatic (${w.agentsTotal})` : `${w.sessionsAtOnce} at once`;
   if (id === 'instructions') return w.adhdMode ? 'ADHD mode' : undefined;
-  if (id === 'projects') return String(s.settings.projects.length);
+  if (id === 'projects') return String(s.settings!.projects.length);
   return undefined;
 }
 
@@ -36,18 +32,22 @@ function asideOf(id: PageId, s: SettingsState, email: string | undefined) {
 export function PageList() {
   const c = useCloud();
   const s = useSettings();
+  const { look } = useLook();
   const email = c.cloud?.session()?.user.email ?? undefined;
   return (
     <>
+      <Group label="Account">
+        <Row first label={email ?? 'Signed in'} control={<Button title="Sign out" onPress={() => { c.signOut(); router.replace('/sign-in'); }} />} />
+      </Group>
       {GROUPS.map((g) => {
         const pages = SETTINGS_PAGES.filter((p) => p.group === g && p.shown(s));
         return pages.length ? (
           <Group key={g} label={g}>
-            {pages.map((p, i) => <NavRow key={p.id} first={i === 0} label={p.label} aside={asideOf(p.id, s, email)} onPress={() => router.push(`/settings/${p.id}`)} />)}
+            {pages.map((p, i) => <NavRow key={p.id} first={i === 0} label={p.label} aside={asideOf(p.id, s, look)} onPress={() => router.push(`/settings/${p.id}`)} />)}
           </Group>
         ) : null;
       })}
-      <Aside>Version {Constants.expoConfig?.version}</Aside>
+      <Aside>{versionLine(Constants.expoConfig?.version, Constants.nativeBuildVersion)}</Aside>
     </>
   );
 }

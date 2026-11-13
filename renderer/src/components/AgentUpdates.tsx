@@ -28,12 +28,16 @@ export function AgentUpdates({children}:{children:ReactNode}){
  },[]);
  useEffect(()=>{
   let live=true;
+  // An app slower than this clock must not gain a queue of status questions.
+  let asking=false;
   const poll=async()=>{
+   if(asking)return;asking=true;
    for(const engine of ['claude','codex'])try{
     const u=await api.agentUpdate(engine,'status');if(!live)continue;
     if(lastState.current[engine]==='running'&&u.state==='current')window.dispatchEvent(new Event('agent-models-changed'));
     lastState.current[engine]=u.state;save(u);
    }catch{}
+   asking=false;
   };
   // Every second on a desktop; a phone pays per question (../phone-polls).
   const timer=setInterval(poll,pollEvery(1000,onPhone()));return()=>{live=false;clearInterval(timer);};

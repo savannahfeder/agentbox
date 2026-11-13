@@ -1,6 +1,7 @@
-import { ruleLabel, type RepeatShape as RepeatRuleValue } from '../../shared/repeats.mjs';
-import { isShippedNote } from '../../shared/shipped-note.mjs';
+import { ruleLabel, type RepeatShape as RepeatRuleValue } from '../../shared/repeats.mts';
+import { isShippedNote } from '../../shared/shipped-note.mts';
 import { readMoment } from './when-words';
+import { localDate } from './local-dates';
 // Time and grouping, Superhuman-style: terse, scannable, never a full date
 // where "3m" will do.
 
@@ -13,7 +14,7 @@ export function ago(ts: number, now = Date.now()): string {
   if (h < 24) return `${h}h`;
   const d = Math.floor(h / 24);
   if (d < 7) return `${d}d`;
-  return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return localDate(ts, { month: 'short', day: 'numeric' });
 }
 
 // THE PANEL CLOCK, AND IT ONLY EVER MOVES ON THE MINUTE. Under a minute this
@@ -28,17 +29,16 @@ export function agoQuiet(ts: number, now = Date.now()): string {
 }
 
 export function stamp(ts: number, now = Date.now()): string {
-  const d = new Date(ts);
   const days = Math.floor((startOfDay(now) - startOfDay(ts)) / 86_400_000);
-  if (days === 0) return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }).toUpperCase();
+  if (days === 0) return localDate(ts, { hour: 'numeric', minute: '2-digit' });
+  return localDate(ts, { month: 'short', day: 'numeric' }).toUpperCase();
 }
 
 export function dayLabel(ts: number, now = Date.now()): string {
   const days = Math.floor((startOfDay(now) - startOfDay(ts)) / 86_400_000);
   if (days === 0) return 'Today';
   if (days === -1) return 'Tomorrow';
-  if (days < 0) return new Date(ts).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+  if (days < 0) return localDate(ts, { weekday: 'long', month: 'short', day: 'numeric' });
   if (days === 1) return 'Yesterday';
   if (days < 7) return `Last 7 days`;
   return 'Earlier';
@@ -195,8 +195,20 @@ export function liveOption(item: HasFields & { answer?: string }, n: number): Pa
 // alone or with a reason after them: "Ship it, then close the task" and "Close
 // this task, then file the follow-up" are still replies.
 const CLOSES = /^close (?:this|the) (?:task|thread)(?:$|\s*[,:;\p{Pd}](?!\s*(?:then|and|also)\b)|\s+(?:since|because|as|now that)\b)/iu;
+// "Keep it as sent and close this task" asks for no work either. Keeping something
+// in particular ("Keep the first layout and close this task") does.
+const KEEPS_AND_CLOSES = /^(?:keep|leave) (?:it|this|them|that)(?: as (?:is|sent|it is))?\s*,?\s+and close (?:this|the) (?:task|thread)$/i;
+// "Looks right, close this task" is a close too.
+const RIGHT_FIRST = /^(?:(?:that|it|this|all)\s+)?(?:looks\s+|is\s+)?(?:right|good|fine|great|perfect|correct)\s*[,.;:!]?\s+(?:and\s+|so\s+)?(?=close\b)/i;
 export function closesTheTask(option: string): boolean {
-  return CLOSES.test(bareOption(option));
+  const words = bareOption(option).replace(RIGHT_FIRST, '');
+  return CLOSES.test(words) || KEEPS_AND_CLOSES.test(words);
+}
+
+// "Keep it on the branch" is the same, and leaves the work off main on purpose.
+const STAYS_ON_BRANCH = /^(?:keep|leave)\s+(?:(?:it|this|them|that|the (?:change|changes|work|commits?))\s+)?(?:on|in)\s+(?:(?:the|its|this|a)\s+)?branch(?:\s+for now)?$/i;
+export function leavesItOnTheBranch(option: string): boolean {
+  return STAYS_ON_BRANCH.test(bareOption(option));
 }
 
 const bareOption = (option: string) => option.replace(/\s*\(recommended\)\s*/i, '').trim().replace(/[.!]+$/, '');
@@ -221,9 +233,28 @@ const asksToShip = (option: string) => SHIPS.test(bareOption(option).replace(/^[
 // instead of sending is the wrong surprise on an option that said enough.
 const SAYS_NOTHING = /^(?:change|revise|edit|adjust|tweak|amend|rework|redo|fix)\s+(?:something|anything|it|this|that|some of it|a few things|this (?:part|bit)|parts?|bits?)(?:\s+first)?$/i;
 
+// THE OPTION THAT THROWS THE WORK AWAY, which asks first because nothing takes
+// it back (./discard-asks-first.ts says the rest).
+//
+// THE WHOLE OPTION, OR NONE OF IT. "Discard the first layout and ship the
+// second" is an instruction that happens to begin with the word, and a
+// question in front of it would be the app second-guessing a sentence it did
+// not write.
+const DISCARDS = /^(?:discard|bin|delete|drop|throw away|throw out)\s+(?:it|them|this|that|the (?:change|changes|work|edits|diff|lot))(?:\s+away)?$|^(?:discard|throw (?:it|them|the (?:change|changes|lot)) (?:all )?away)$/i;
+
+export function discardsTheChange(option: string): boolean {
+  return DISCARDS.test(bareOption(option));
+}
+
+// AND THE APP'S OWN OFFER WHERE GIT CANNOT NAME AN AUTHOR (F-139,
+// ./ship-offer.ts). The name and email are the whole point of the press, so
+// sending it as it stands says nothing; it opens the box with its own words in
+// it, exactly as "Change something first" does.
+const NAMES_NOBODY = /^commit it and ship, as the name and email below$/i;
+
 export function needsYourWords(option: string): boolean {
   const words = bareOption(option);
-  return SAYS_NOTHING.test(words) || /^(?:something|anything) else$/i.test(words);
+  return SAYS_NOTHING.test(words) || NAMES_NOBODY.test(words) || /^(?:something|anything) else$/i.test(words);
 }
 
 // What Enter means in the schedule box, in one place so the key handler and the
@@ -233,7 +264,7 @@ export function needsYourWords(option: string): boolean {
 // fall-through to whichever preset happens to be highlighted: that fall-through
 // is what scheduled an item for thirty minutes when the user typed "tomorrow", while
 // the preview beside the box was already admitting it did not understand
-// (tests/snooze-honours-what-she-typed.test.mjs).
+// (tests/snooze-honours-what-she-typed.test.mts).
 export type EnterMeans = 'typed' | 'refuse' | 'selected';
 
 export function enterMeans(text: string, parsed: unknown): EnterMeans {
@@ -313,13 +344,28 @@ export function parseRepeat(raw: string): RepeatParse {
   return null;
 }
 
+// Repeat's presets, with "Once" first as the way back off rather than as a
+// thing to notice. The When picker, the New thread card's "Repeat it" and the
+// phone app all offer these, and two lists of them would drift the way the two
+// priority lists once did.
+export function repeatPresets(now = Date.now()): Array<{ label: string; rule: RepeatRuleValue | null }> {
+  const weekday = new Date(now).getDay();
+  const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][weekday];
+  return [
+    { label: 'Once', rule: null },
+    { label: 'Every morning at 8:00am', rule: { every: 'day', at: '08:00' } as RepeatRuleValue },
+    { label: 'Every weekday at 9:00am', rule: { every: 'weekday', at: '09:00' } as RepeatRuleValue },
+    { label: `Every ${dayName} at 9:00am`, rule: { every: 'week', on: weekday, at: '09:00' } as RepeatRuleValue },
+  ];
+}
+
 /**
  * A rule typed ALONE in a box, which is every picker that asks how often: the
  * When picker (`readWhen`) and the composer's Repeat it page. The same grammar
  * as `parseRepeat`, with one difference. A box holds nothing but the rule, so a
  * time after the rhythm is the time even without "at": "every day 5pm" is
  * five, where at the top of a message the "5pm" would be the task and the
- * hour would default to eight (tests/repeat-it-takes-a-rule-in-words.test.mjs).
+ * hour would default to eight (tests/repeat-it-takes-a-rule-in-words.test.mts).
  */
 export function readRule(raw: string): RepeatParse {
   const phrase = (raw ?? '').trim().replace(/\s+/g, ' ');
@@ -355,16 +401,17 @@ function timeOf(text: string): string | null {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
+export const repeatsLine = (rule: RepeatRuleValue): string => `Repeats ${ruleLabel(rule)}`;
+
 function repeatRule(rule: RepeatRuleValue): RepeatParse {
   return { rule, label: ruleLabel(rule) };
 }
 
 function stamp2(ts: number, now: number): { ts: number; label: string } {
-  const d = new Date(ts);
   const days = Math.floor((ts - startOfDay(now)) / 86_400_000);
-  const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const time = localDate(ts, { hour: 'numeric', minute: '2-digit' });
   const day = days === 0 ? 'today' : days === 1 ? 'tomorrow'
-    : d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    : localDate(ts, { weekday: 'short', month: 'short', day: 'numeric' });
   return { ts, label: `${day}, ${time}` };
 }
 
@@ -373,11 +420,11 @@ function stamp2(ts: number, now: number): { ts: number; label: string } {
 // From seven days on, or once the moment has gone, it carries its date too:
 // "3 weeks" typed on a Thursday printed "THU 8:00 AM", which read as this
 // Thursday when it meant Thursday 5 Nov
-// (tests/a-later-time-weeks-away-says-its-date.test.mjs).
+// (tests/a-later-time-weeks-away-says-its-date.test.mts).
 export function dayAndTime(ts: number, now = Date.now()): string {
   const days = Math.round((startOfDay(ts) - startOfDay(now)) / 86_400_000);
   const dated = days < 0 || days >= 7;
-  return new Date(ts).toLocaleString(undefined, {
+  return localDate(ts, {
     weekday: 'short', ...(dated ? { month: 'short', day: 'numeric' } : {}), hour: 'numeric', minute: '2-digit',
   });
 }
@@ -404,7 +451,12 @@ function flatten(body: string, headings: 'drop' | 'keep'): string {
     .replace(/^#{1,4}\s.*$/gm, (line) => (headings === 'keep' ? line.replace(/^#{1,4}\s*/, '') : ''))
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/[*_`>#]/g, '')
+    // A cloud run's key ask reads as what it asks for (shared/cloud-keys.mts).
+    // Its other asks are cards in the thread, and machine words anywhere else (round six: search showed them).
+    .replace(/^\s*`?AGENTBOX-NEEDS:\s*(sign-in|key|file|code)\s.*$/gim, '')
+    .replace(/^\s*`?AGENTBOX-NEEDS-A-KEY:\s*([A-Z][A-Z0-9_]+)\b[\s:\u2014\u2013-]*(.*?)`?\s*$/gm, (_l, name: string, what: string) => what || name)
+    // An underscore inside a word is part of it (STRIPE_SECRET_KEY), not emphasis.
+    .replace(/[*`>#]|(?<![A-Za-z0-9])_+|_+(?![A-Za-z0-9])/g, '')
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean)

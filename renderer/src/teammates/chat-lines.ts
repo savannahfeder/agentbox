@@ -2,10 +2,15 @@
 // runs leave, in time order, seen whole or through one teammate.
 import type { RunningSession, Teammate, TeamChatLine, TeamRunLine, TeammatesView, WorkItem } from '../types';
 import { spanLabel } from '../notes';
-import { nextRunAt } from '../../../shared/repeats.mjs';
-import { teammateIdOf } from '../../../shared/teammates.mjs';
+import { nextRunAt } from '../../../shared/repeats.mts';
+import { teammateIdOf } from '../../../shared/teammates.mts';
 
 export type ChatEntry = TeamChatLine | TeamRunLine;
+
+/** Teammates as the Chats list draws them: the primary first, the rest as they were. */
+export function matesInOrder<T extends Pick<Teammate, 'id'> & { primary?: boolean }>(team: readonly T[]): T[] {
+  return [...team.filter((t) => t.primary), ...team.filter((t) => !t.primary)];
+}
 
 const toList = (to: TeamChatLine['to']): string[] => (Array.isArray(to) ? to : to ? [to] : []);
 
@@ -22,15 +27,22 @@ export function chatEntries(view: TeammatesView | null | undefined, only: string
   const all: ChatEntry[] = [...view.chat, ...view.runs];
   // What you wrote in the chat reaches a waiting run as its answer; the chat
   // already shows it, so only answers typed in the thread itself get a line.
-  const saidInChat = new Set(view.chat.filter((m) => m.kind === 'msg' && m.from === 'you').map((m) => String(m.text ?? '').trim()));
+  // The run keeps your words folded onto one line and cut at 400 characters.
+  const folded = (s: unknown) => String(s ?? '').replace(/\s+/g, ' ').trim();
+  const saidInChat = view.chat.filter((m) => m.kind === 'msg' && m.from === 'you').map((m) => folded(m.text));
+  const alreadySaid = (text: unknown) => {
+    const t = folded(text);
+    const cut = t.endsWith('…') ? t.slice(0, -1).trimEnd() : null;
+    return saidInChat.some((s) => s === t || (!!cut && s.length > t.length && s.startsWith(cut)));
+  };
   // The team chat says a run finished and leaves out that it was picked up;
   // a teammate's own page keeps both.
-  const finished = new Set(view.runs.filter((r) => r.verb === 'finished').map((r) => r.item));
+  const finished = new Set(view.runs.filter((r) => r.verb === 'finished' || r.verb === 'stopped').map((r) => r.item));
   const shown = all.filter((e) => {
     if (!only && e.kind === 'run' && e.verb === 'picked' && finished.has(e.item)) return false;
     // A run's own start line repeats the pass that made it, so the pass speaks for it.
     if (e.kind === 'run' && e.verb === 'passed') return false;
-    if (e.kind === 'run' && e.verb === 'answered' && saidInChat.has(String(e.text ?? '').trim())) return false;
+    if (e.kind === 'run' && e.verb === 'answered' && alreadySaid(e.text)) return false;
     if (e.kind === 'msg' && (e as TeamChatLine & { start?: boolean }).start) return false;
     return only ? involves(e, only) : true;
   });
@@ -74,11 +86,50 @@ export function asksYou(view: TeammatesView | null | undefined, id: string): boo
 }
 
 // What you said back to a teammate's question: your next words to it, or null
-// while it is still waiting on you.
+// while it is still waiting on you. Answers sent together say which question
+// each is for, and pass over the ones they leave out.
 export function answerTo(view: TeammatesView | null | undefined, q: TeamChatLine): string | null {
+  return answerOf(view, q)?.text ?? null;
+}
+
+// The same, and whether it was given to this question by name.
+export function answerOf(view: TeammatesView | null | undefined, q: TeamChatLine): { text: string; named: boolean } | null {
   if (!view || q.kind !== 'msg' || !q.options?.length) return null;
-  const next = view.chat.find((m) => m.kind === 'msg' && m.from === 'you' && m.ts > q.ts && toList(m.to).includes(q.from));
-  return next ? String(next.text ?? '') : null;
+  for (const m of view.chat) {
+    if (m.kind !== 'msg' || m.from !== 'you' || m.ts <= q.ts || !toList(m.to).includes(q.from)) continue;
+    if (!m.answers) return { text: String(m.text ?? ''), named: false };
+    if (q.id in m.answers) return { text: m.answers[q.id], named: true };
+  }
+  // A reply typed in the thread that asked it answers it too.
+  const inThread = q.run ? view.runs.find((r) => r.verb === 'answered' && r.item === q.run && r.ts > q.ts) : null;
+  return inThread ? { text: String(inThread.text ?? ''), named: false } : null;
+}
+
+/** A teammate's questions asked in this thread, with answers to tap, that you have not answered anywhere. */
+export function openQuestionsIn(view: TeammatesView | null | undefined, item: Pick<WorkItem, 'id' | 'labels'>): TeamChatLine[] {
+  const tid = teammateIdOf(item);
+  if (!view || !tid) return [];
+  return view.chat.filter((m) => m.kind === 'msg' && m.from === tid && m.run === item.id && !!m.options?.length && !answerOf(view, m));
+}
+
+// The question a teammate's message asks: its last sentence that ends in a
+// question mark, else its first sentence.
+export function questionOf(text: string): string {
+  const sentences = String(text ?? '').replace(/\s+/g, ' ').trim().match(/[^.?!]+[.?!]*/g) ?? [];
+  const asked = sentences.filter((s) => s.trim().endsWith('?')).at(-1) ?? sentences[0] ?? '';
+  // A short lead such as "First question:" is the teammate counting, not asking.
+  const q = asked.trim().replace(/^[^:]{1,20}:\s*/, '');
+  return q.charAt(0).toUpperCase() + q.slice(1);
+}
+
+// Your answers to a teammate's questions as one message. Each answer goes
+// under the question it is for, because the teammate wakes on this message
+// alone; one answer needs no question over it.
+export function answersMessage(questions: Pick<TeamChatLine, 'id' | 'text'>[], picks: Record<string, string>): { text: string; answers: Record<string, string> } {
+  const answered = questions.map((q) => ({ q, a: (picks[q.id] ?? '').trim() })).filter((x) => x.a);
+  const answers = Object.fromEntries(answered.map(({ q, a }) => [q.id, a]));
+  if (answered.length === 1 && questions.length === 1) return { text: answered[0].a, answers };
+  return { text: answered.map(({ q, a }) => `> ${questionOf(q.text ?? '')}\n\n${a}`).join('\n\n'), answers };
 }
 
 // A teammate's run waiting its turn behind the one it is on. It is the
@@ -110,12 +161,35 @@ export function workingLine(
   t: Pick<Teammate, 'name' | 'running' | 'now'>,
   session: Pick<RunningSession, 'startedAt' | 'activity'> | null | undefined,
   now = Date.now(),
+  asked: string | null = null,
 ): { state: 'working' | 'waiting'; text: string; aside: string } | null {
   if (!t.running) return null;
   if (!session) return { state: 'waiting', text: 'Waiting for a free agent', aside: '' };
-  const run = t.now && t.now !== 'Waiting on you' && t.now !== 'Paused' ? t.now : 'its next run';
+  const run = asked || (t.now && t.now !== 'Waiting on you' && t.now !== 'Paused' ? t.now : 'its next run');
   const elapsed = Math.max(0, now - session.startedAt);
   return { state: 'working', text: session.activity?.at(-1)?.label?.trim() || run, aside: elapsed < 60_000 ? 'just started' : `${spanLabel(elapsed)} in` };
+}
+
+// What stands between a waiting run and an agent. No estimate: nothing knows how
+// long a run takes, so it says how long the busy ones have been going.
+const NAMED_AT_MOST = 3;
+export function whyWaiting({ item, running, queued, titleOf, now }: {
+  item: string;
+  running: Pick<RunningSession, 'itemId' | 'startedAt'>[];
+  queued: string[];
+  titleOf: (id: string) => string | null;
+  now: number;
+}): string {
+  const busy = running.filter((s) => s.itemId !== item);
+  if (!busy.length) return 'It starts at the next free moment.';
+  const named = busy.slice(0, NAMED_AT_MOST).map((s) => {
+    const span = now - s.startedAt;
+    return `${titleOf(s.itemId) ?? 'another thread'} (${span < 60_000 ? 'just started' : `${Math.floor(span / 60_000)}m`})`;
+  });
+  if (busy.length > NAMED_AT_MOST) named.push(`and ${busy.length - NAMED_AT_MOST} more`);
+  const ahead = queued.indexOf(item);
+  const behind = ahead > 0 ? ` ${ahead} ${ahead === 1 ? 'thread is' : 'threads are'} ahead of this one.` : '';
+  return `${busy.length} ${busy.length === 1 ? 'agent is' : 'agents are'} busy: ${named.join(', ')}.${behind}`;
 }
 
 // A run's first line. Its teammate's queue letting it go is not an agent
@@ -131,6 +205,41 @@ export function teamWorkingLine(name: string, line: { state: 'working' | 'waitin
   if (line.state === 'waiting') return { lead: `${name} is waiting for a free agent`, text: '' };
   if (/^[A-Z][a-z]+ing\b/.test(line.text)) return { lead: `${name} is`, text: line.text[0].toLowerCase() + line.text.slice(1) };
   return { lead: `${name} is on`, text: line.text };
+}
+
+// The live line in a teammate's own chat, said of it by name: the step alone
+// reads as an echo of the message above it, not as anyone working.
+export function liveLine(
+  t: Pick<Teammate, 'name' | 'running' | 'now'>,
+  session: Pick<RunningSession, 'startedAt' | 'activity'> | null | undefined,
+  now = Date.now(),
+  asked: string | null = null,
+  { answered = false, queued = true }: { answered?: boolean; queued?: boolean } = {},
+): { state: 'working' | 'waiting'; lead: string; text: string; aside: string } | null {
+  // A claim left behind by a run that has ended is no wait: its answer is already there.
+  if (answered && !session) return null;
+  // Nor is a run nothing will start: the queue is the one promise of a free agent.
+  if (!queued && !session) return null;
+  const line = workingLine(t, session, now, asked);
+  return line && { state: line.state, ...teamWorkingLine(t.name, line), aside: line.aside };
+}
+
+// What you said to a teammate that it has not answered. A message sent while
+// a run is open goes into that run, so this, not the thread's title, is what
+// the run is on; unless it was queued behind a run you did not start. Reads
+// every line about the teammate, since its chat hides queued and finished.
+export function pendingAsk(entries: readonly ChatEntry[], id: string): string | null {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const e = entries[i];
+    if (e.kind === 'msg') {
+      if (e.from === id && toList(e.to).every((x) => x === 'you')) return null;
+      if (e.from === 'you' && toList(e.to).includes(id)) return firstSentence(e.text ?? '') || null;
+    } else if (e.kind === 'run' && e.teammate === id) {
+      if (e.verb === 'answered') return firstSentence(e.text ?? '') || null;
+      if (e.verb === 'sent' || e.verb === 'finished' || e.verb === 'stopped' || e.verb === 'queued') return null;
+    }
+  }
+  return null;
 }
 
 export function longMessage(text: string): boolean {
@@ -176,16 +285,16 @@ export function goalLine(goal: string, counted: string | null | undefined): stri
   return c ? `${g.replace(/[.,;:\s]+$/, '')}, counted as ${c.replace(/^./, (x) => x.toLowerCase())}.` : g;
 }
 
+const ATTACHED = /!?\[([^\]\n]*)\]\((?:\.\/)?attachments\/[^)\s]+\)/g;
+
+/** A message's first sentence, without the links to what was attached: their names when that is all it is. */
 export function firstSentence(text: string): string {
-  const one = String(text ?? '').replace(/\s+/g, ' ').trim();
+  const raw = String(text ?? '');
+  const one = raw.replace(ATTACHED, ' ').replace(/\s+/g, ' ').trim();
+  if (!one) return [...raw.matchAll(ATTACHED)].map((m) => m[1]).filter(Boolean).join(', ');
   return one.match(/^.+?[.!?](?=\s|$)/)?.[0] ?? one;
 }
 
-/** The inbox tab every one of these threads sits in, or null when they differ or one is in none. */
-export function sentTab<T extends string>(tabs: (T | null)[]): T | null {
-  const first = tabs[0] ?? null;
-  return first !== null && tabs.every((x) => x === first) ? first : null;
-}
 
 // What it saved, shown in your chat with it as one quiet line.
 export const SAVED_VERBS = new Set(['learned', 'updated', 'lesson']);
@@ -193,7 +302,7 @@ export const SAVED_VERBS = new Set(['learned', 'updated', 'lesson']);
 // A teammate's chat with you: your words to it, its words to you, what it sent
 // you, what it saved, and work it holds for you. Everything else is its Log.
 function betweenYou(e: ChatEntry, id: string): boolean {
-  if (e.kind === 'run') return e.teammate === id && (e.verb === 'sent' || e.verb === 'answered');
+  if (e.kind === 'run') return e.teammate === id && (e.verb === 'sent' || e.verb === 'answered' || e.verb === 'stopped');
   if (e.kind === 'msg') {
     if (e.from === 'you') return toList(e.to).includes(id);
     return e.from === id && toList(e.to).every((x) => x === 'you');

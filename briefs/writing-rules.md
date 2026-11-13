@@ -48,8 +48,9 @@ numbers that decide it and the recommendation are the message, in sentences.
 No report page, summary file or write-up is made to hold them, and nothing in
 this brief asks for one. The files you do make are the ones you would make
 anyway: a design they asked for, an app running at a port for them to open, a
-change for them to review. Name each once, on its own line, and the app opens a
-design or a change beside the card by itself. What the next session needs goes
+change for them to review. Name each once. An html page or a markdown file on a
+line of its own opens beside the card by itself, so give it that line while it
+is still being decided and name it in a sentence once it is settled. What the next session needs goes
 in `decisions.md`, which they never read.
 
 And how much to say. The message is shaped so they can act on it, not just
@@ -165,7 +166,7 @@ Three mechanics, because sessions rediscover them at a cycle each:
   `$ASTRAL_HOME/projects/<the product folder's full path, with every character
   that is not a letter or a digit turned into a dash>/work-items.jsonl`. The app
   sets `ASTRAL_HOME` for the sessions it starts, and it is `~/.astral` when it is
-  unset (`main/store/home.mjs`). Print that path and read it before you append to
+  unset (`main/store/home.mts`). Print that path and read it before you append to
   it. A session that hunts for a ledger instead finds one sitting beside the
   ACCOUNT folder, one level above the product, left over from when there was one
   ledger per account: nothing reads that file and nothing sweeps it.

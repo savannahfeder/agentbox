@@ -9,7 +9,7 @@
 //            clipboard by itself, Codex's code is shown to type on OpenAI's
 //            page; every wait wears a moving mark;
 //   where    where new threads should start.
-// The sign-in itself happens in the cloud (main/cloud/logins.mjs).
+// The sign-in itself happens in the cloud (main/cloud/logins.mts).
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { AppMark } from './AppMark';
@@ -166,7 +166,9 @@ export function CloudSetup({ cloud, onMode, onClose, signInAs = null, plan = nul
   if (shown) {
     body = <SignIn s={shown} existing={accounts.some((a) => a.key === shown.key)} as={shown.engine === 'claude' ? signInAs : null} />;
   } else if (step === 'loading') {
-    body = <div className="fr-stack fr-stack-folders" />;
+    body = <div className="fr-stack fr-stack-folders cs-loading">
+      <p className="fr-lede"><Busy />{SETUP.loadingLede}</p>
+    </div>;
   } else if (step === 'pay') {
     body = <div className="fr-stack fr-stack-folders">
       <h1 className="fr-page">{SETUP.payHead}</h1>

@@ -8,7 +8,7 @@ export type Row = ['=' | '+' | '-', string];
 
 /**
  * A row's line number in the old file and in the new one, null on the side the
- * row does not exist in. `main/git-change.mjs` fills it from the `@@` header.
+ * row does not exist in. `main/git-change.mts` fills it from the `@@` header.
  *
  * Often absent. A change read from the conversation instead of git diffs one
  * edit's before against its after, so its offsets are inside a fragment, not
@@ -43,6 +43,9 @@ export type Change = {
   startedAt?: number;
   endedAt?: number;
   editCount?: number;
+  /** Where the folder stood when the run ended (main/git-change.mts). */
+  committed?: boolean | null;
+  uncommitted?: boolean | null;
 };
 
 export function isChangePath(path: string | undefined | null): boolean {
@@ -52,7 +55,7 @@ export function isChangePath(path: string | undefined | null): boolean {
 
 /**
  * Where one item's change is, product-relative. It has to match `changePath` in
- * main/code-change.mjs, which writes the file this opens.
+ * main/code-change.mts, which writes the file this opens.
  */
 export function changePathFor(itemId: string): string {
   return `runs/${itemId}/the-change-it-made.change`;
@@ -157,6 +160,18 @@ export function fileCount(n: number): string {
 export function changeSummary(change: Change): string {
   const files = change.files?.length ?? 0;
   return `${fileCount(files)} +${change.plus ?? 0} −${change.minus ?? 0}`;
+}
+
+/**
+ * "not committed", beside the figures, when the work in front of her never
+ * reached a commit (F-79). The diff of loose edits read exactly like the diff
+ * of a commit, so there was no way to tell which one a press would ship.
+ *
+ * Empty for anything else, including a change whose folder could not be read:
+ * a product with no repository has no commits to be short of.
+ */
+export function standingLabel(change: Change): string {
+  return change.committed === false && change.uncommitted === true ? 'not committed' : '';
 }
 
 /** How long the run took, in words. Empty when it is not known. */
@@ -288,7 +303,7 @@ export function tokenize(line: string): Tok[] {
 /**
  * The part of each line the other does not share, between their common start
  * and common end, or null when there is nothing worth marking
- * (tests/the-words-that-changed-are-marked.test.mjs).
+ * (tests/the-words-that-changed-are-marked.test.mts).
  */
 export function changedSpan(a: string, b: string): { minus: [number, number]; plus: [number, number] } | null {
   if (a === b) return null;
@@ -390,7 +405,7 @@ export function linesSkipped(before: Hunk | undefined, after: Hunk | undefined):
 
 /**
  * The lines a gap between two hunks stood for, read from the file on disk now
- * and numbered from `from` (tests/the-hidden-lines-open-in-place.test.mjs).
+ * and numbered from `from` (tests/the-hidden-lines-open-in-place.test.mts).
  * The file may have moved on since the change, so the rows either side of the
  * gap must still match at their numbers, or only the reason comes back.
  */
@@ -422,7 +437,7 @@ export function hunkGuessPx(rows: number): number {
 // The browser skips off-screen code in slices of at most this many rows, about
 // two screenfuls, rather than whole hunks. A hunk can be a whole new file, and
 // scrolling into one would make the browser lay out every row of it in one
-// frame. Pinned by tests/a-big-change-scrolls-without-stalling.test.mjs.
+// frame. Pinned by tests/a-big-change-scrolls-without-stalling.test.mts.
 export const SLICE_ROWS = 48;
 
 /** [from, to) row ranges cutting `n` rows into slices of at most SLICE_ROWS. */
@@ -504,7 +519,7 @@ export function toggled(set: ReadonlySet<string>, path: string): Set<string> {
 /**
  * Where an arrow on the tree goes, as a path, or null for nowhere. `shown` is
  * the files the tree draws, `all` every file in the same order. Folding never
- * moves her (tests/folding-the-tree-never-moves-the-code.test.mjs), so she may
+ * moves her (tests/folding-the-tree-never-moves-the-code.test.mts), so she may
  * be in a file the tree hides; then down is the next shown file after hers and
  * up the one before.
  */

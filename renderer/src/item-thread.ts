@@ -30,10 +30,10 @@
 // protecting: every node here carries the moment the ledger or the trace
 // stamped it, and nothing is invented, dropped or merged to put them in order.
 
-import { changedFile, commandWork, isBookkeeping, plainCommand, saidCount, shortPath, threadWindow, unleaked, workVerb } from '../../shared/agents.mjs';
+import { changedFile, commandWork, isBookkeeping, plainCommand, saidCount, shortPath, threadWindow, unleaked, workVerb } from '../../shared/agents.mts';
 import { said, traceLines } from './terminal';
-import { handsBack } from '../../shared/cloud-hand-back.mjs';
-import { editOfLine, resolveEdits, type EditLine } from '../../shared/message-edits.mjs';
+import { handsBack } from '../../shared/cloud-hand-back.mts';
+import { editOfLine, resolveEdits, type EditLine } from '../../shared/message-edits.mts';
 import type { TraceSession } from './notes';
 import { pickedLine, threadEvents, withRuns, type LedgerLine, type ThreadEvent } from './thread-history';
 import type { AgentEvent, AgentSaid, AgentTurn, AgentWork } from './types';
@@ -41,7 +41,7 @@ import { liftReplies } from './team/chat-threads';
 import type { UndoMark } from './undo-marks';
 
 // `[Read] strategy/art-style.md` — how the supervisor writes a tool call into a
-// trace (`traceStreamLine`, main/supervisor.mjs). The name is the tool and the
+// trace (`traceStreamLine`, main/supervisor.mts). The name is the tool and the
 // rest is its key input, already flattened to one string on the way to disk.
 const TOOL = /^\[([^\]]+)\]\s*(.*)$/;
 
@@ -84,7 +84,7 @@ export interface ItemOutcome {
  * ONE MESSAGE OF HERS THAT IS ON ITS WAY AND NOT IN THE LEDGER YET.
  *
  * A reply typed while a worker is up does not go to the ledger first. It goes
- * to the running session, and `submitReply` (main/live-replies.mjs) writes the
+ * to the running session, and `submitReply` (main/live-replies.mts) writes the
  * row only once the provider has acknowledged it. Claude acknowledges by
  * replaying the message, which it does at its next break, and
  * `attachClaudeInput` lets that wait run to 120 seconds before it gives up. The
@@ -111,6 +111,13 @@ export interface PendingSaid {
   refused?: string;
   // Agentbox Cloud took it with the computer shut.
   cloud?: boolean;
+  // Taken, and its thread's copy has not shown it yet (renderer/src/phone-rows.ts `copyShows`).
+  sent?: boolean;
+}
+
+/** Whether something sent to this row is on its way, which answers any card on it. */
+export function answerOnItsWay(sending: readonly PendingSaid[] | undefined): boolean {
+  return (sending ?? []).some((s) => !s.refused);
 }
 
 export interface ItemThread {
@@ -201,9 +208,13 @@ export function runNodes(session: TraceSession): AgentEvent[] {
       // The supervisor saves a diff for the code viewer. Its trace entry keeps
       // that file discoverable, but it is not a file the agent wrote.
       if (parts?.[1] === 'Write' && /(?:^|\/)runs\/[^/]+\/the-change-it-made\.change$/.test(parts[2].trim())) continue;
-      out.push(parts
-        ? workLine(line.at, parts[1], parts[2])
-        : workLine(line.at, '', line.text));
+      const work = parts ? workLine(line.at, parts[1], parts[2]) : workLine(line.at, '', line.text);
+      if (line.output != null) {
+        work.output = line.output;
+        work.lines = line.outputLines ?? 0;
+        work.failed = !!line.failed;
+      }
+      out.push(work);
       continue;
     }
     out.push({ at: line.at, who: 'it', text: line.text });
@@ -235,6 +246,7 @@ function saidLine(event: ThreadEvent): AgentWork {
     // file writes into "You put it off, wrote files".
     ...(event.who === 'you' ? { yours: true as const } : {}),
     ...(event.who === 'you' && event.by ? { by: event.by } : {}),
+    ...(event.fileMark ? { fileMark: event.fileMark } : {}),
   };
 }
 
@@ -316,7 +328,7 @@ function placedIsSaid(p: Placed): p is Placed & { node: AgentSaid } {
 }
 
 // Tool-call scaffolding that leaked into the prose, cut off it. The rule and
-// the row it comes from are in shared/agents.mjs, next to the write that stops
+// the row it comes from are in shared/agents.mts, next to the write that stops
 // it being stored in the first place; it is applied here as well because the
 // rows that already carry it are still on her screen.
 
@@ -538,14 +550,18 @@ export function itemThread(
   //
   // `undone`: THE Zs PRESSED ON THIS TASK (./undo-marks). Each is drawn as one
   // of her actions, and the ledger lines that Z wrote itself fold under it.
-  opts: { whole?: boolean; engine?: string | null; pending?: PendingSaid[]; chat?: boolean; undone?: UndoMark[] } = {},
+  //
+  // `me`: who is reading. A teammate's personal moves (Later, done, sent back)
+  // are theirs alone and are left out.
+  opts: { whole?: boolean; engine?: string | null; pending?: PendingSaid[]; chat?: boolean; undone?: UndoMark[]; numbers?: Record<string, number>; me?: string | null } = {},
 ): ItemThread {
   // The pickup-to-run match is thread-history's, not a second copy of it: it is
   // the part that can be wrong while the screen still looks perfect (a run
   // credited to the wrong pickup reads exactly like one credited to the right
-  // one), and it is pinned in tests/one-door-one-list.test.mjs. `readNotes` is
+  // one), and it is pinned in tests/one-door-one-list.test.mts. `readNotes` is
   // given one session at a time there, so a run's `raw` IS that session's text.
-  const events = withEdits(withRuns(threadEvents(lines, opts.engine), sessions), lines);
+  const events = withEdits(withRuns(threadEvents(lines, opts.engine, opts.numbers), sessions), lines)
+    .filter((e) => !(e.personal && e.by && opts.me && e.by !== opts.me));
   const out: AgentEvent[] = [];
   // Where the newest thing SAID sits, and which ledger message it was. A run's
   // narration is a message on the screen too, so it counts here: a row picked
@@ -598,7 +614,7 @@ export function itemThread(
     if (event.message && event.words) {
       const isAnswer = event.who === 'agent' && (event.field === 'result' || event.field === 'note');
       placed.push({
-        node: { at: event.at, who: event.who === 'you' ? 'you' : 'it', text: event.words, ...(event.by ? { by: event.by } : {}), ...(event.uid ? { uid: event.uid } : {}), ...(event.inReplyTo ? { inReplyTo: event.inReplyTo } : {}), ...(event.ran ? { ran: event.ran } : {}), ...(event.edited ? { edited: event.edited } : {}), ...(event.deleted ? { deleted: true } : {}) },
+        node: { at: event.at, who: event.who === 'you' ? 'you' : 'it', text: event.words, ...(event.by ? { by: event.by } : {}), ...(event.from ? { from: event.from } : {}), ...(event.voice ? { voice: event.voice } : {}), ...(event.uid ? { uid: event.uid } : {}), ...(event.inReplyTo ? { inReplyTo: event.inReplyTo } : {}), ...(event.ran ? { ran: event.ran } : {}), ...(event.edited ? { edited: event.edited } : {}), ...(event.deleted ? { deleted: true } : {}), ...(event.fileMark ? { fileMark: event.fileMark } : {}), ...(event.says ? { says: event.says } : {}), ...(event.sendsAt ? { sendsAt: event.sendsAt } : {}) },
         run: null,
         answer: isAnswer ? { at: event.at, text: event.words, field: event.field as 'result' | 'note', ...(event.ran ? { ran: event.ran } : {}) } : null,
       });
@@ -678,7 +694,7 @@ export function itemThread(
       && p.node.who === 'you' && (p.node.at ?? 0) >= mine.at
       && said(p.node.text ?? '') === words);
     if (landed) { spent.add(landed); continue; }
-    placed.push({ node: { at: mine.at, who: 'you', text: mine.text, pending: true, held: mine.held, ...(mine.refused ? { refused: mine.refused } : {}), ...(mine.cloud ? { cloud: true } : {}) }, run: null, answer: null });
+    placed.push({ node: { at: mine.at, who: 'you', text: mine.text, pending: true, held: mine.held, ...(mine.refused ? { refused: mine.refused } : {}), ...(mine.cloud ? { cloud: true } : {}), ...(mine.sent ? { sent: true } : {}) }, run: null, answer: null });
   }
 
   // TOOL-CALL SCAFFOLDING OFF EVERY MESSAGE FIRST, before two of them are

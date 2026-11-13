@@ -1,4 +1,4 @@
-// The phone's speech models, as lib/dictation.ts asks for them: Apple's newer
+// The phone's speech models, as renderer/src/dictation.ts asks for them: Apple's newer
 // one where the phone has it, else the keyboard's (lib/speech-engines.ts).
 import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
 import { Platform } from 'react-native';

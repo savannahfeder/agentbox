@@ -13,7 +13,8 @@
 // This module is the part with no React in it, so the walk can be tested
 // without a window.
 
-import { PRACTICE_NAME, PRACTICE_TASK } from '../../shared/first-run-practice.mjs';
+import { PRACTICE_NAME, PRACTICE_TASK } from '../../shared/first-run-practice.mts';
+import { titleFromFileName } from '../../shared/name-words.mts';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import { DONE } from './done-word';
 // The walk's own question card, and the one answer this file shares with it:
@@ -433,7 +434,7 @@ export function stepTo(s: FirstRun, step: Step): FirstRun {
  *
  *  Anything else answers null, which is what both the key and the button read
  *  to decide whether they are drawn at all. A Back that leads nowhere is the
- *  dead key `tests/the-walk-promises-no-dead-keys.test.mjs` exists to forbid. */
+ *  dead key `tests/the-walk-promises-no-dead-keys.test.mts` exists to forbid. */
 export function stepBack(step: Step): Step | null {
   // Nothing has been written down on the plan screen either: a setup that is
   // running carries on in the background, and the welcome asks again.
@@ -447,14 +448,7 @@ export function stepBack(step: Step): Step | null {
  * THE NAME IS TAKEN FROM THE FOLDER. `~/Desktop/dev/agentbox-v2` reads as
  *  `Agentbox v2`, because the folder is a path and the name is a name. */
 export function nameFromFolder(path: string): string {
-  const base = path.replace(/\/+$/, '').split('/').pop() ?? '';
-  return base
-    .replace(/[-_.]+/g, ' ')
-    .trim()
-    .replace(/\s+/g, ' ')
-    .split(' ')
-    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
-    .join(' ');
+  return titleFromFileName(path.replace(/\/+$/, '').split('/').pop() ?? '');
 }
 
 /**
@@ -543,7 +537,7 @@ export function projectsOfTheirOwn(products: Array<{ personal?: boolean }>): num
 //
 // So the question is now one whose answer is always there to be read, and the
 // sentence that answers it is ours with their numbers in it
-// (shared/first-run-shape.mjs). Correct on 29 of 29, in a median of 7.5ms.
+// (shared/first-run-shape.mts). Correct on 29 of 29, in a median of 7.5ms.
 // AND ON 2026-08-23 IT MOVED AGAIN, INTO THE PRACTICE PROJECT. Everything
 // above is still true of the old task and none of it is true of this one, so
 // the reasoning is kept rather than deleted: the readme-reading answer exists
@@ -551,14 +545,17 @@ export function projectsOfTheirOwn(products: Array<{ personal?: boolean }>): num
 // against a folder at all. As in Superhuman, the practice project is still the
 // whole UI. A task sent inside a project that is not theirs cannot
 // honestly report on their code, so the question and the answer are both
-// written down in shared/first-run-practice.mjs, and the answer is a decision
+// written down in shared/first-run-practice.mts, and the answer is a decision
 // an agent made on its own — which is the shape the very next beat teaches
 // them to close.
 //
-// main/first-run.mjs and shared/first-run-shape.mjs are UNCHANGED and still
+// main/first-run.mts and shared/first-run-shape.mts are UNCHANGED and still
 // read a folder: that path is what answers a task in a real project, and the
 // walk simply no longer sends one there.
 export const TASK_TITLE = PRACTICE_TASK.title;
+
+/** Whether a New thread draft is the tutorial's practice task, which must not outlive the tutorial. */
+export const practiceDraftLeft = (text: string): boolean => text.trim().startsWith(PRACTICE_TASK.title);
 export const TASK_BODY = PRACTICE_TASK.body;
 
 /** The line changes at fifteen seconds. Taken as recommended, round four. */
@@ -576,7 +573,7 @@ export const SLOW_AFTER_MS = 15_000;
 //
 // So the row, the reading pane, the ledger and the result are all real, and the
 // answer is read out of the folder chosen two screens earlier: see
-// main/first-run.mjs. Nothing about it can queue, stall or need the network.
+// main/first-run.mts. Nothing about it can queue, stall or need the network.
 
 /**
  * The mark on the walk's own row. The supervisor never spawns fresh work on a
@@ -633,7 +630,7 @@ export function walkRows<T extends { id: string }>(rows: T[], run: FirstRun | nu
   // examples afterward; don't make the inbox mysteriously empty when creation
   // begins."
   // The backdrop is no longer sifted by state here (2026-10-24): nothing in it
-  // needs you, so there is no half to leave out (shared/first-run-practice.mjs).
+  // needs you, so there is no half to leave out (shared/first-run-practice.mts).
   if (WITH_EXAMPLES.includes(run.step)) {
     const keep = new Set([...(run.examples ?? []), run.item, ...(run.backdrop ?? [])].filter(Boolean) as string[]);
     return rows.filter((r) => keep.has(r.id));
@@ -694,7 +691,7 @@ export function walkRows<T extends { id: string }>(rows: T[], run: FirstRun | nu
 
    `waiting` is a field on the row rather than a guess from its kind, because
    which of the three is stopped is the whole content of the lesson and it must
-   not be inferable wrongly. See shared/first-run-practice.mjs.
+   not be inferable wrongly. See shared/first-run-practice.mts.
 */
 
 /**
@@ -729,8 +726,7 @@ export function finishedCleared(
   laterAt: number,
 ): boolean {
   if (!run || !run.examples.length) return false;
-  const there = new Set(rows.map((r) => r.id));
-  return !run.examples.some((id, i) => i !== waitingAt && i !== laterAt && there.has(id));
+  return clearIds(rows, run, waitingAt, laterAt).length === 0;
 }
 
 /**
@@ -758,7 +754,10 @@ export function clearIds(
 ): string[] {
   if (!run) return [];
   const there = new Set(rows.map((r) => r.id));
-  return run.examples.filter((id, i) => i !== waitingAt && i !== laterAt && there.has(id));
+  const finished = run.examples.filter((id, i) => i !== waitingAt && i !== laterAt && there.has(id));
+  // Your own thread is in the inbox here only when Z brought it back. It is
+  // drawn at the top, so the ring and E start on it.
+  return run.item && there.has(run.item) ? [run.item, ...finished] : finished;
 }
 
 /**
@@ -928,7 +927,7 @@ export function pressAtWrongRow(beat: string[], pointed: string | null | undefin
 // what an inbox holds.
 
 // The three rows themselves are written by the main process and their copy
-// lives in shared/first-run-examples.mjs, so there is one place they are said.
+// lives in shared/first-run-examples.mts, so there is one place they are said.
 
 /**
  * WHETHER BEAT EIGHT IS OVER. It is over when none of the three is left in the
@@ -939,6 +938,18 @@ export function inboxCleared(rows: { id: string }[], run: FirstRun | null): bool
   if (!run || !run.examples.length) return false;
   const there = new Set(rows.map((r) => r.id));
   return !run.examples.some((id) => there.has(id));
+}
+
+/** Where the walk goes once the waiting thread is answered. A thread Z brought
+ *  back is still in the inbox then, and the clearing step is the one about it. */
+export function afterUnblock(
+  rows: { id: string }[], run: FirstRun | null, waitingAt: number,
+): 'where' | 'clear' | null {
+  if (!run) return null;
+  const own = !!run.item && rows.some((r) => r.id === run.item);
+  if (inboxCleared(rows, run) && !own) return 'where';
+  const waiting = waitingId(run, waitingAt);
+  return waiting && rows.some((r) => r.id === waiting) ? null : 'clear';
 }
 
 /*
@@ -975,7 +986,7 @@ export const COPY = {
   // AND IT NO LONGER ASSUMES A CODE FOLDER (2026-10-01). An assistant has no
   // project folder and the screen had no way past it. `folderNone` is that way
   // past: the project is made with no folder, and its agents work in a folder
-  // the app keeps for it (`productFolder` in main/supervisor.mjs falls back to
+  // the app keeps for it (`productFolder` in main/supervisor.mts falls back to
   // the project's own directory in the store).
   folderHead: 'Pick a folder for your first project.',
   folderLede: 'Agents can read and change the files in it. Any folder of documents works.',
@@ -1012,7 +1023,7 @@ export const COPY = {
   //
   // Round four left a bare ↵ in that corner when the Command-Enter button came
   // off. Enter really did work, so it was not a dead key by the rule in
-  // `tests/the-walk-promises-no-dead-keys.test.mjs`, but it was drawn in a
+  // `tests/the-walk-promises-no-dead-keys.test.mts`, but it was drawn in a
   // bordered box the size and shape of a button and it did nothing when it was
   // clicked, which is the same broken promise read the other way round. Submit
   // is the chosen word, so it is the one on the screen, and it says the same
@@ -1118,7 +1129,7 @@ export const COPY = {
      its key, the cap still breathes when nobody presses it, and a wrong press still
      answers. The walk simply stops telling anyone to put their hand somewhere. `ruleHead`,
      `ruleLine` and `ruleGo` are in decisions.md, 08-24, verbatim.
-     `tests/the-practice-project-is-the-whole-app.test.mjs` fails if any of the three comes
+     `tests/the-practice-project-is-the-whole-app.test.mts` fails if any of the three comes
      back, and it greps the whole of COPY for the word rather than only the three keys, so
      it also catches the rule reappearing as a line somewhere quieter.
   */
@@ -1236,7 +1247,7 @@ export const COPY = {
   // itself. What is new is that Agentbox knows they are there and remembers
   // which ones this project is for.
   //
-  // Every name on that list was read off her own Mac by main/agent-files.mjs
+  // Every name on that list was read off her own Mac by main/agent-files.mts
   // and nothing on the card said so, so the only honest reading of four
   // unfamiliar names on a setup screen is that they are samples. The line names
   // where they came from, and the folder each side was read out of is printed
@@ -1356,7 +1367,7 @@ export const COPY = {
    a condition inside a component, so the rule can be tested without a window.
 
    THE GATE ONLY EVER CLOSES ON A CERTAIN ANSWER, and that is the safety of it.
-   `missing` is true only after `main/engine-bin.mjs` has asked up to three
+   `missing` is true only after `main/engine-bin.mts` has asked up to three
    login shells and had every one of them exit properly, looked in sixteen
    places, read the version manager folders, looked inside the Claude desktop
    app, and found no trace of Claude Code anywhere
@@ -1648,6 +1659,10 @@ export function coach(
     opened?: boolean; view?: string; picking?: boolean; left?: number; palette?: boolean;
     /** Whether the page is drawn as the board, for the board beat's second half. */
     board?: boolean;
+    /** Whether the New thread box is open, for the send step. */
+    composing?: boolean;
+    /** Practice threads still in the inbox, for the inbox-zero line. */
+    unfinished?: number;
     tabs?: readonly string[];
     /** The team strip's tab names, when that strip is what is drawn. */
     tabNames?: Readonly<Record<string, string>>;
@@ -1728,7 +1743,8 @@ export function coach(
     // new thread card is drawn as an email and its button says Send, so the
     // sentence says what is written on the button somebody is looking at.
     case 'task':
-      return say('', 'Press ', '⌘↵', ' or click Send.');
+      // Escape shut the box: N reopens it with the draft, so N is what the card asks for.
+      return ctx.composing === false ? say('', 'Press ', 'N', ' to open your thread again.') : say('', 'Press ', '⌘↵', ' or click Send.');
     case 'working':
       return sinceSent >= SLOW_AFTER_MS
         ? say('Your agent is running.',
@@ -1764,9 +1780,8 @@ export function coach(
     // task ending one of two ways IS closing it or replying to it.
     // AND THE REPLY HALF NAMES THE BOX (2026-10-01). "Reply to it" is a thing
     // to do and not a thing to click, and the ring is round the box, so the
-    // card now points at it in words. CLOSING HAS NO BUTTON ON THIS SCREEN and
-    // the card does not invent one: Mark done is a row inside the menu beside
-    // Summary, which is two clicks behind a three-dot button, and naming it
+    // card now points at it in words. Closing has a button on this screen since
+    // w-bca8a6466f (Done, beside the dots in the top right), but naming it
     // would make this the longest line in the walk. The mouse route on this
     // beat is replying, which is the half somebody is here to learn.
     // AND A REPLY IS ANSWERED NOW (2026-10-06), so the card says what to reply
@@ -1881,7 +1896,7 @@ export function coach(
        right to close and the stopped one is right to answer, so teaching S on
        either would be teaching a key on a row it is wrong for. The fourth
        practice row is real work that is nobody's emergency, and it is the shape
-       S exists for: see `later` in shared/first-run-practice.mjs.
+       S exists for: see `later` in shared/first-run-practice.mts.
 
        TWO HALVES, LIKE `unblock`. The first is the row in the list, where the
        press happens; the second is the picker that opens over it, because a
@@ -2093,6 +2108,13 @@ export function coach(
       // THE OPENING IS HERS, WORD FOR WORD (tests/the-walk-teaches-undo-snooze-
       // and-notes). Three persona testers called "Great!" patronising in round
       // two (2026-10-06); that is noted for her and the sentence is not touched.
+      // An undo can bring a practice thread back after the last one was cleared.
+      if (ctx.unfinished) {
+        return say(
+          `${ctx.unfinished === 1 ? 'One thread is' : `${ctx.unfinished} threads are`} still in your inbox. Inbox zero is the goal.`,
+          'Press ', cap, `${or} to see where the rest went.`,
+        );
+      }
       return say(
         'Great! Your inbox is now empty. That is inbox zero, and it is the goal.',
         'Press ', cap, `${or} to see where it all went.`,
@@ -2136,7 +2158,7 @@ export function coach(
        label and keywords (palette-rows.ts), and the tutorial's row reads "Take
        the tutorial", so typing tutorial lands on exactly one row. If that label
        is ever reworded, this sentence is wrong, which is why
-       tests/the-tutorial-and-the-onboarding-are-two-things.test.mjs asserts the
+       tests/the-tutorial-and-the-onboarding-are-two-things.test.mts asserts the
        two against each other rather than each alone.
 
        AND THE LOUD LINE IS UNTOUCHED. What she does next is still her own first real task,
@@ -2249,7 +2271,7 @@ export function coach(
           // comes out to pay for it: the other half of this beat already says
           // `Every command in ${NAME} is in this list.` over the open list, and
           // the loud line has to stay ONE sentence
-          // (tests/the-coaching-card-is-two-lines.test.mjs).
+          // (tests/the-coaching-card-is-two-lines.test.mts).
           'Press ', '⌘K', ' or click the ⌘ button, or N for your first real thread.',
         );
       */
@@ -2401,8 +2423,8 @@ export function pressCounts(target: EventTarget | null): boolean {
      already in it.
 */
 
-/** The one cap that is a wrong press and still has to reach the app. */
-const NEVER_SWALLOWED = '⇥';
+/** Caps that are wrong presses and still have to reach the app: Tab, and Z, which the walk tells you undoes. */
+const NEVER_SWALLOWED = new Set(['⇥', 'Z']);
 
 /**
  * Whether the walk should eat this press before the app underneath sees it.
@@ -2415,7 +2437,7 @@ export function swallowPress(
 ): boolean {
   if (!pressCounts(target)) return false;
   if (!wrongPress(want, e)) return false;
-  return keyToken(e) !== NEVER_SWALLOWED;
+  return !NEVER_SWALLOWED.has(keyToken(e) ?? '');
 }
 
 /* ----------------- AND A LETTER TYPED AT A GLOWING BOX --------------------- */
@@ -2889,7 +2911,7 @@ export function fitsBeside(left: number, view: { w: number }): boolean {
 
 /**
  * Draw the ring and place the sentence. Pure, so the geometry is tested rather
- *  than eyeballed: tests/the-coach-ring-lands-on-the-thing.test.mjs. */
+ *  than eyeballed: tests/the-coach-ring-lands-on-the-thing.test.mts. */
 export function ring(
   anchor: Rect,
   bounds: { left: number; right: number },
@@ -3046,6 +3068,12 @@ export function saveFirstRun(store: Store, s: FirstRun): void {
   try { store.setItem(KEY, JSON.stringify(s)); } catch { /* a full disk is not a reason to stop the walk */ }
 }
 
+/** The tutorial saved before a reload, when its practice project is still there to resume. */
+export function resumableTutorial(saved: FirstRun, products: { slug: string; practice?: boolean }[]): FirstRun | null {
+  if (!saved.tutorial || !saved.practice) return null;
+  return products.some((p) => p.slug === saved.practice && p.practice) ? saved : null;
+}
+
 export function finishFirstRun(store: Store): void {
   try { store.setItem(DONE_KEY, '1'); store.removeItem(KEY); } catch { /* as above */ }
 }
@@ -3172,7 +3200,7 @@ export function forcedStep(param: string | null): Step | null {
 // ---------------------------------------------------------------------------
 // THE LAST SCREEN: THE USER'S CLAUDE CODE AGENTS.
 //
-// The files are read in the main process (main/agent-files.mjs); everything
+// The files are read in the main process (main/agent-files.mts); everything
 // here is the part with no window in it, so the screen's shape is tested
 // rather than eyeballed.
 //

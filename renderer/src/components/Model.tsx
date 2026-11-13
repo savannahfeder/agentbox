@@ -47,7 +47,7 @@ export function ModelPicker({ value, onChange, title, onOpenChange, engine = nul
   // Claude Code takes the alias `opus`, Codex takes the slug `gpt-5.6-sol`,
   // and drawing one engine's list beside the other's word was the defect she
   // reported on 2026-08-26. Since 2026-09-04 it is worse than a misreading --
-  // `codexModelRefusal` in main/supervisor.mjs stops a Codex run whose model
+  // `codexModelRefusal` in main/supervisor.mts stops a Codex run whose model
   // this Mac's Codex does not know, so a Claude alias on a Codex card is a row
   // that cannot run at all. Absent means Claude Code, which is every card on a
   // Mac with no Codex on it.

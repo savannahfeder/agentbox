@@ -6,8 +6,8 @@
 //   2. An agent mention reads "@Codex in Agentbox Team" in the text. Clicking it
 //      opens a small card with the project, the model and the effort ("Way 2").
 //      The reply box and its footer never change.
-//   3. Every agent works in a particular project, so Send waits until each agent
-//      mention names one, and says why.
+//   3. Every agent works in a particular project. Send on a mention without one
+//      opens its project list, and picking one sends.
 //   4. On send, each agent mention becomes a task in its project. The message
 //      keeps a link to that task, so every copy of the conversation (yours and
 //      your teammate's) knows which task answers it.
@@ -19,8 +19,8 @@
 // The words are what anyone reads; the address is what the app reads. Nothing
 // new is stored anywhere: a message is still one answer in the conversation's
 // ledger, and it syncs to the other person exactly as before.
-import { ENGINES } from '../../../shared/engines.mjs';
-import { projectSeenBy } from '../../../shared/thread-cards.mjs';
+import { ENGINES } from '../../../shared/engines.mts';
+import { projectSeenBy } from '../../../shared/thread-cards.mts';
 
 export interface ChatAgent { engine: string; label: string }
 export interface Project { slug: string; name: string }
@@ -79,11 +79,8 @@ export function findMentions(text: string, projects: readonly Project[]): Mentio
   return out;
 }
 
-/** Why Send has to wait, in a sentence, or null when it need not. */
-export function sendBlock(mentions: readonly Mention[]): string | null {
-  const loose = mentions.find((m) => !m.project);
-  return loose ? `Pick a project for @${loose.label}: click it to choose.` : null;
-}
+/** The first agent mention with no project yet, or -1. Send asks for its project. */
+export const looseMention = (mentions: readonly Mention[]) => mentions.findIndex((m) => !m.project);
 
 /** The mention as the text writes it. */
 export const mentionText = (label: string, project: Project | null) => `@${label}${project ? ` in ${project.name}` : ''}`;
@@ -156,14 +153,53 @@ export function chatProjects(
 export function chatTranscript(
   lines: ReadonlyArray<{ ts: number; by?: string; patch?: Record<string, unknown> | null }>,
   nameOf: (by: string | undefined) => string,
+  answerOf: (task: string) => string | null | undefined = () => null,
 ): Array<{ who: string; text: string }> {
   const out: Array<{ who: string; text: string }> = [];
   for (const l of lines.slice().sort((a, b) => a.ts - b.ts)) {
     const said = l.patch?.answer ?? l.patch?.body;
     if (typeof said !== 'string' || !said.trim() || said === '(withdrawn)') continue;
     out.push({ who: nameOf(l.by), text: said });
+    // An agent's answer is drawn under the message but is not in the ledger,
+    // so a later mention would otherwise be briefed without it.
+    for (const link of agentLinks(said)) {
+      const answer = link.task ? answerOf(link.task) : null;
+      if (answer?.trim()) out.push({ who: link.label, text: answer });
+    }
   }
   return out;
+}
+
+const ASKED_IN = 'asked-in:';
+
+/** The label a task started from a chat carries, naming that chat. */
+export const askedInLabel = (chat: { product: string; id: string }) => `${ASKED_IN}${chat.product}/${chat.id}`;
+
+/** The chat a task was asked in, or null for a task started anywhere else. */
+export function askedIn(task: { labels?: readonly string[] }): { product: string; id: string } | null {
+  const where = (task.labels ?? []).find((l) => l.startsWith(ASKED_IN))?.slice(ASKED_IN.length) ?? '';
+  const at = where.lastIndexOf('/');
+  return at > 0 && at < where.length - 1 ? { product: where.slice(0, at), id: where.slice(at + 1) } : null;
+}
+
+/**
+ * WHETHER A NEW ASK STARTS ON THIS MAC: when the conversation's last ask to an
+ * agent in the same project went to a thread kept on this Mac. Every mention
+ * makes a new thread, so "I moved it to the Mac, do it there" would otherwise
+ * start in the cloud again.
+ */
+export function lastAskKeptOnMac(
+  lines: ReadonlyArray<{ ts: number; patch?: Record<string, unknown> | null }>,
+  project: string,
+  find: (product: string, id: string) => { onMac?: boolean } | undefined,
+): boolean {
+  for (const l of lines.slice().sort((a, b) => b.ts - a.ts)) {
+    const said = l.patch?.answer ?? l.patch?.body;
+    if (typeof said !== 'string') continue;
+    const task = agentLinks(said).filter((a) => a.task && a.project === project).at(-1)?.task;
+    if (task) return find(project, task)?.onMac === true;
+  }
+  return false;
 }
 
 // How much of the conversation goes into the task. Enough to know what "findings

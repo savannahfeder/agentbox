@@ -9,6 +9,12 @@ import { SidebarMove, SidebarUpdate } from './SidebarUpdate';
 import { changeLines, closedHere, readMoveClosed, readUpdateClosed, writeMoveClosed, writeUpdateClosed } from '../update-row';
 import { AccountMenu } from '../team/account-menu';
 import type { Invisible } from '../team/rooms/GoInvisible';
+import { chord } from '../this-keyboard';
+
+// The search glass drawn at the sidebar's stroke, like Feedback's plane.
+function SearchGlyph() {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" aria-hidden="true"><g transform="translate(12 12) scale(.8) translate(-12 -12)" strokeWidth="1.5625"><circle cx="10.8" cy="10.8" r="6.6"/><path d="M15.6 15.6 20 20"/></g></svg>;
+}
 /** ONE NUMBER IN THE SIDEBAR, ON INBOX, AND IT IS DRAWN IN THE TAB'S OWN TYPE.
  *
  *  w-5f02e7b525. Only Inbox shows a number, like a classic email client, and of
@@ -40,11 +46,18 @@ import type { Invisible } from '../team/rooms/GoInvisible';
  *  deselected tab that is --text-faint at 400, exactly the word Inbox beside it;
  *  on the active one it is --text at 500. There is one rule rather than two.
  */
-export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSearch, onCompose: _onCompose, inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, onAccount, onSignIn, onFeedback, onSignOut, update = null, onUpdate, move = null, onMove, invisible = null, inboxLabel = 'Threads', rail = false, onHover, groups = null, onGroupsPage = false, onTeammatesPage = false }: {
+export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSearch, onCompose: _onCompose, inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, statuses = true, onAccount, onSignIn, onFeedback, onSignOut, update = null, onUpdate, move = null, onMove, invisible = null, inboxLabel = 'Inbox', onPalette, rail = false, onHover, groups = null, onGroupsPage = false, onTeammatesPage = false, onFiles, filesPage = false, onConnections, connectionsPage = false, onTasks, tasksPage = false, onHome, homePage = false }: {
   /** Whether one of the teammates' pages is up, which unlights Threads. */
   onTeammatesPage?: boolean;
+  /** The Files place, and whether it is the page. */
+  onFiles?: () => void; filesPage?: boolean;
+  onConnections?: () => void; connectionsPage?: boolean;
+  /** Every task on the team, as its own page (the layout whose tabs are only states). */
+  onTasks?: () => void; tasksPage?: boolean;
   /** The first row's name: Threads, or Inbox while its page holds groups too. */
   inboxLabel?: string;
+  /** Opens ⌘K, which finds threads and commands both. */
+  onPalette?: () => void;
   /** Narrow, and wide only while pointed at, with no way to pin it open (w-dcaa2c122e). False on a phone. */
   rail?: boolean; onHover?: (on: boolean) => void;
   /** The row under the first one, Groups or Chats, and whether a group is the page, which unlights it. */
@@ -55,7 +68,7 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
   // `version` is what its × closes, until a newer one arrives.
   update?: { installing: boolean; version?: string | null; changes?: string[]; behind?: number | null; error?: string | null } | null; onUpdate?: () => void;
   // OR A COPY THAT CANNOT UPDATE ITSELF FROM WHERE IT IS (SidebarMove, and
-  // shared/where-it-runs-from.mjs). Null on every copy that can, which is
+  // shared/where-it-runs-from.mts). Null on every copy that can, which is
   // nearly all of them. `place` is what its × closes.
   move?: { place: string | null; error?: string | null } | null; onMove?: () => void;
   page?: string | null; inboxCount?: number; scheduledCount?: number; usage?: ReactNode; onSettings?: () => void; onInstructions?: () => void;
@@ -73,11 +86,13 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
   // box. It is no longer a row here (w-1b574413db: single-player for launch);
   // your account menu still offers it. `onAccount` is your own row, which
   // opens the same pane without the cursor in the email box.
-  team?: TeamState | null; onInvite?: () => void; onAccount?: () => void; onSignIn?: () => void; onFeedback?: () => void;
+  team?: TeamState | null; onInvite?: () => void; statuses?: boolean; onAccount?: () => void; onSignIn?: () => void; onFeedback?: () => void;
   // The last row of your account menu.
   onSignOut?: () => void;
   // `collapsed` is true while the sidebar is narrow, which is always on a phone.
-  view: View; collapsed: boolean; onView: (view: View) => void; onSearch: () => void; onCompose: () => void;
+  view: View; collapsed: boolean; onView: (view: View) => void;
+  /** Home: its row above the Inbox, and whether it is the page on screen. */
+  onHome?: () => void; homePage?: boolean; onSearch: () => void; onCompose: () => void;
 }) {
   // The Team page is a page like Settings: while it is up no list tab is lit.
   const page = pageIn ?? (teamPage ? 'team' : null);
@@ -105,7 +120,7 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
   // ONE PAGE OF YOUR THREADS (approved 2026-10-01). In progress, Scheduled and
   // Closed are tabs on the Inbox now, not places in the sidebar, so the Inbox
   // tab is lit on every one of them.
-  const inboxLit = !page && !onGroupsPage && !onTeammatesPage && (['inbox', 'progress', 'snoozed', 'done'] as string[]).includes(view);
+  const inboxLit = !homePage && !page && !onGroupsPage && !onTeammatesPage && !filesPage && !connectionsPage && (['inbox', 'progress', 'snoozed', 'done'] as string[]).includes(view);
   // A pointer passing over on its way somewhere else does not open it.
   const hoverAt = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hover = rail && onHover ? {
@@ -138,7 +153,7 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
   // `:last-child` rule close the gap under Settings (workspace-navigation.css).
   const corner = me
     ? (onAccount
-      ? <AccountMenu me={me} now={Date.now()} collapsed={collapsed} onAccount={onAccount} onInvite={onInvite} onSettings={onSettings} onSignOut={onSignOut} invisible={invisible} />
+      ? <AccountMenu me={me} now={Date.now()} collapsed={collapsed} onAccount={onAccount} onInvite={onInvite} onSettings={onSettings} onSignOut={onSignOut} invisible={invisible} statuses={statuses} />
       : <><Face person={me} me /><span>{me.name || me.email}<small>{me.email}</small></span></>)
     : team?.configured && onTeam
       ? <button type="button" className="th-me-signin" aria-label="Sign in to your team" onClick={onTeam}>Sign in to your team</button>
@@ -147,14 +162,34 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
     <div className="th-team" title={collapsed ? undefined : teamName}>
       {mark}<span className="th-team-name">{teamName}</span>
     </div>
-    <nav className="workspace-tabs" aria-label="Threads">
-      <button data-tab="inbox" className={`workspace-tab${inboxLit ? ' active' : ''}${waiting > 0 ? ' has-count' : ''}`} aria-label={inboxLabel} aria-current={inboxLit ? 'page' : undefined} title={waiting > 0 ? `${inboxLabel} · ${waitingDescription}` : collapsed ? inboxLabel : undefined} onClick={() => onView('inbox')}><SidebarIcon view="inbox" /><span>{inboxLabel}</span>{waiting > 0 && <small className="workspace-running" aria-label={waitingDescription}>{waiting}</small>}</button>
+    {/* Search is a way to look, not a place to go, so it sits above the tabs
+        rather than among them, and its keys are text rather than caps. */}
+    {onPalette && <div className="workspace-find"><button type="button" aria-label="Search" title={`Search · ${chord('⌘K')}`} onClick={onPalette}><SearchGlyph /><span>Search</span><small className="workspace-keys" aria-hidden="true">{chord('⌘K')}</small></button></div>}
+    <nav className="workspace-tabs" aria-label="Inbox">
+      {onHome && <button data-tab="home" className={`workspace-tab${homePage ? ' active' : ''}`} aria-label="Home" aria-current={homePage ? 'page' : undefined} title={collapsed ? 'Home' : undefined} onClick={onHome}>
+        <svg className="workspace-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 10.4 12 5l7 5.4v8.6a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1z"/><path d="M10 20v-4.6a2 2 0 0 1 4 0V20"/></svg><span>Home</span>
+      </button>}
+      <button data-tab="inbox" className={`workspace-tab${inboxLit ? ' active' : ''}${waiting > 0 ? ' has-count' : ''}`} aria-label={inboxLabel} aria-current={inboxLit ? 'page' : undefined} title={waiting > 0 ? `${inboxLabel} · ${waitingDescription}` : collapsed ? inboxLabel : undefined} onClick={() => onView('inbox')}>{onHome ? <svg className="workspace-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9"/></svg> : <SidebarIcon view="inbox" />}<span>{inboxLabel}</span>{waiting > 0 && <small className="workspace-running" aria-label={waitingDescription}>{waiting}</small>}</button>
       {/* THERE IS NO TEAM TAB (w-05ff3d1438, 2026-10-01). The Team page and
           the Inbox were one question on two pages, so they are one page: the
           faces at the end of the Inbox's tab bar pick whose threads are on
           it. `onTeam` is still the sign-in link at the foot. */}
     </nav>
     {groups}
+    {(onConnections || onFiles || onTasks) && <nav className="workspace-tabs workspace-places" aria-label="Places">
+      {onTasks && <button data-tab="team" className={`workspace-tab${tasksPage ? ' active' : ''}`} aria-label="Team" aria-current={tasksPage ? 'page' : undefined} title={collapsed ? 'Team' : undefined} onClick={onTasks}>
+        <svg className="workspace-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="7.5" r="2.5"/><circle cx="6" cy="10" r="2"/><circle cx="18" cy="10" r="2"/><path d="M8 19c0-2.5 1.8-4.5 4-4.5s4 2 4 4.5"/><path d="M3 18c0-2 1.3-3.5 3-3.5 .8 0 1.5.3 2 .8M21 18c0-2-1.3-3.5-3-3.5-.8 0-1.5.3-2 .8"/></svg>
+        <span>Team</span>
+      </button>}
+      {onConnections && <button data-tab="connections" className={`workspace-tab${connectionsPage ? ' active' : ''}`} aria-label="Connections" aria-current={connectionsPage ? 'page' : undefined} title={collapsed ? 'Connections' : undefined} onClick={onConnections}>
+        <svg className="workspace-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 13.5a4 4 0 0 0 5.66 0l2.5-2.5a4 4 0 0 0-5.66-5.66l-1 1"/><path d="M14 10.5a4 4 0 0 0-5.66 0l-2.5 2.5a4 4 0 0 0 5.66 5.66l1-1"/></svg>
+        <span>Connections</span>
+      </button>}
+      {onFiles && <button data-tab="files" className={`workspace-tab${filesPage ? ' active' : ''}`} aria-label="Files" aria-current={filesPage ? 'page' : undefined} title={collapsed ? 'Files' : undefined} onClick={onFiles}>
+        <svg className="workspace-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 4.5h6.5l4 4V19a.5.5 0 0 1-.5.5H7a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5z"/><path d="M13.5 4.5v4h4"/></svg>
+        <span>Files</span>
+      </button>}
+    </nav>}
     <div className="workspace-bottom">
       {/* The card sits above the foot list; with the sidebar shut it is a
           row inside it (SidebarUpdate.tsx). */}

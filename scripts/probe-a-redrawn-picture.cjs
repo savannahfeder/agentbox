@@ -1,5 +1,5 @@
 // Does a design page's picture update when the file on disk is replaced under
-// the same name? Mirrors main.mjs: a standard+secure scheme, served with
+// the same name? Mirrors main.mts: a standard+secure scheme, served with
 // net.fetch(file://), the page in an iframe inside a file:// app window, and
 // "reopening" is pointing the frame at the page again. Hidden window only.
 const { app, BrowserWindow, protocol, net } = require('electron');
