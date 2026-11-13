@@ -29,6 +29,9 @@ import { askToSignIn, keepAfterSignIn, waitForSignIn, WAIT_MS } from './core/sig
 import { WORK_ITEM_STATUSES } from '../shared/work-items.mts';
 import { CONTEXT_WORDS, DONE_STEPS, DONE_STEP_WORDS, SUMMARY_WORDS } from '../shared/thread-cards.mts';
 import { AGENT_CREATION_KINDS } from '../shared/contracts.mts';
+import { joinCause } from './core/causes.mts';
+import { addRuleToProduct } from './core/project-rules.mts';
+import { joinedWords } from '../shared/causes.mts';
 // The descriptions below are read by every agent on every run, so the app is
 // named in them from the one place it is named. They said "the app" while this
 // server lived in that product's repo, which told every worker the wrong name
@@ -184,6 +187,16 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
       run: ({ product, ...patch }: { product: string } & ProductPatch) => json(updateProduct(product, patch)),
     },
 
+    {
+      name: 'add_project_rule',
+      description: 'Keep a rule the person gave for one project (when its work ships, what needs their yes, how it is done) in that project\'s instructions, which every agent working there reads from its next run. Only once they have agreed to keep it, and one rule per call, in their words.',
+      schema: {
+        product: z.string(),
+        rule: z.string().describe('one rule, a sentence or two'),
+      },
+      run: ({ product, rule }: { product: string; rule: string }) => json(addRuleToProduct(product, rule)),
+    },
+
     /* ------------------------------ documents ------------------------------ */
     {
       name: 'list_documents',
@@ -336,6 +349,29 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         runWords(patch);
         if (patch.blockedBy) patch.blockedBy = waitsNamed(patch.blockedBy);
         return json(noteToAnotherThread(id, patch, { ownItem }) ?? await claims.update(id, patch));
+      },
+    },
+    {
+      name: 'wait_on_cause',
+      description: 'When this thread is stuck on something outside its own work that other threads could hit too (a sign-in or key missing, git or GitHub refusing, the computer offline or out of memory, main broken, a service down), wait on that cause instead of asking the person. Every thread stuck on one cause waits behind one row, whose lead clears it or asks the person once for all of them, and each thread carries on by itself once it is cleared. Pass cause (what is wrong, in a few plain words the person would use, such as "Your Mac can\'t push to GitHub") and ask (what you would otherwise have told them). If causes are already open you are shown them: call again with causeId when yours is one of them, or with new: true when it is not. Never use it for a question about this thread\'s own work, which is still yours to ask.',
+      schema: {
+        cause: z.string().optional(),
+        ask: z.string().optional(),
+        causeId: z.string().optional().describe('an open cause this thread is stuck on too'),
+        new: z.boolean().optional().describe('true when none of the open causes is this one'),
+        id: z.string().optional().describe('the stuck thread; defaults to the one this session runs'),
+      },
+      run: async ({ id, cause, ask, causeId, new: isNew }: { id?: string; cause?: string; ask?: string; causeId?: string; new?: boolean }) => {
+        const threadId = id ?? ownItem;
+        if (!threadId) throw new Error('name the stuck thread with id');
+        const thread = listWorkItems({ includeDone: true }).find((i) => i.id === threadId);
+        if (!thread) throw new Error(`no thread ${threadId}`);
+        const joined = joinCause({ thread, cause, ask, causeId, isNew });
+        if (joined.choose) return json({ open: joined.choose, next: 'If one of these is what this thread is stuck on, call again with its causeId. If none is, call again with new: true.' });
+        await claims.update(threadId, { status: 'blocked', blockedBy: [joined.causeId] });
+        // A lead that already answered is started again, so its answer names everyone waiting.
+        if (!joined.opened) noteToAnotherThread(joined.causeId, { note: joinedWords(thread) }, { ownItem: threadId });
+        return json({ waitingOn: joined.causeId, opened: joined.opened, next: 'End your turn now with one line saying what this thread is waiting on. It carries on by itself when the cause is cleared, and you will be started again then.' });
       },
     },
     {

@@ -249,7 +249,7 @@ describe('someone with no plan', () => {
 
   it('the real plans have no free plan: the free hours are kept apart from them', () => {
     expect(Object.keys(PLANS).sort()).toEqual(['max', 'none', 'plus', 'pro']);
-    expect(PLANS.none).toEqual({ agents: 0, hoursPerMonth: 0 });
+    expect(PLANS.none).toEqual({ agents: 0, hoursPerMonth: 0, filesGB: 0 });
   });
 
   // The owner's numbers, 2026-10-20: Pro 400, Plus 1,200, Max 3,000, so each
@@ -302,7 +302,7 @@ describe('what the person is told', () => {
   it('names the plan, its agents and hours, and what is used', async () => {
     const { start, me } = setup();
     await start(1);
-    expect(await me()).toEqual({ plan: 'test', unlimited: false, agents: SET.test.agents, hoursPerMonth: SET.test.hoursPerMonth, running: 1, usedSeconds: 0, month: '2026-10', billing: 'given', terms: { accepted: TERMS_VERSION, current: TERMS_VERSION } });
+    expect(await me()).toEqual({ plan: 'test', unlimited: false, agents: SET.test.agents, hoursPerMonth: SET.test.hoursPerMonth, running: 1, usedSeconds: 0, month: '2026-10', billing: 'given', filesCap: 0, terms: { accepted: TERMS_VERSION, current: TERMS_VERSION } });
   });
 });
 

@@ -304,6 +304,63 @@ async function actAsTeammate(brief, prompt, answer) {
 
 let said = plan.say ?? 'the stub worker ran';
 
+// A THREAD STUCK ON A CAUSE, PLAYED: it waits on the cause's row and says so.
+async function actStuck(stuck) {
+  const server = storeServer();
+  if (!server || !process.env.ZERO_ITEM) return null;
+  const session = mcpSession(server);
+  try {
+    const out = await session.call('wait_on_cause', stuck);
+    let id = null;
+    try { id = JSON.parse(out?.result?.content?.[0]?.text ?? '{}').waitingOn ?? null; } catch { id = null; }
+    return id ? `Waiting on: ${stuck.cause}.` : `Could not wait on: ${stuck.cause}.`;
+  } finally {
+    session.close();
+  }
+}
+
+// A LEAD ON A CAUSE ROW, PLAYED (shared/causes.mts): asked first, it names the
+// threads waiting and asks the person once; started again after their reply,
+// it closes the row, which is what starts every thread behind it.
+const LEAD_MARK = 'You are the lead on this cause';
+async function actAsLead(first) {
+  const server = storeServer();
+  const me = process.env.ZERO_ITEM;
+  if (!server || !me) return null;
+  const session = mcpSession(server);
+  try {
+    // Started again by a thread joining: answer again with everyone. By the
+    // person's reply: check, as a real lead must, and close only if it is fixed.
+    // The thread's history holds every join; the person's reply is what matters when there is one.
+    const joinedNow = !/signed in/i.test(promptText.split('is waiting on this too').at(-1)) && promptText.includes('is waiting on this too');
+    if (!first && !joinedNow) {
+      if (world.stuck?.cause) return 'Checked, and a push still fails, so nothing has gone out yet. Run `gh auth status` to see which account git is using, then reply again.\n\n## Options\n1. Signed in, carry on';
+      await session.call('update_work_item', { id: me, status: 'done' });
+      return 'Checked that a push works again. Every thread that was waiting on this carries on by itself.';
+    }
+    let rows = [];
+    try { rows = JSON.parse((await session.call('list_work_items', {}))?.result?.content?.[0]?.text ?? '[]'); } catch { rows = []; }
+    const behind = rows.filter((r) => Array.isArray(r.blockedBy) && r.blockedBy.includes(me));
+    const n = behind.length;
+    return [
+      `**Sign in to GitHub on your Mac once, and ${n === 1 ? 'one thread carries' : `${n} threads carry`} on.**`,
+      '',
+      'Git on your Mac can\'t sign in to GitHub, so nothing can be pushed. These are finished and waiting on it:',
+      '',
+      ...behind.map((r) => `- ${r.label || r.title}`),
+      '',
+      '1. In Terminal on your Mac, run `gh auth login` and follow its prompts.',
+      '2. Then run `gh auth setup-git`.',
+      '3. Reply "Signed in". I\'ll check a push works, then they all carry on.',
+      '',
+      '## Options',
+      '1. Signed in, carry on',
+    ].join('\n');
+  } finally {
+    session.close();
+  }
+}
+
 // [[stub:act:<name>]] makes the store-tool calls its plan lists under
 // acts.<name> ({ calls: [{ tool, args }], say }), so a proof can have an agent
 // write a document or attach a file. A refused call is said in the answer.
@@ -574,8 +631,13 @@ if (slow > 0) {
 try {
   const brief = (() => { const at = argv.indexOf('--append-system-prompt'); return at >= 0 ? argv[at + 1] ?? '' : ''; })();
   if (brief.includes('team_post') && process.env.ZERO_ITEM) await actAsTeammate(brief, promptText, said);
-  const act = directive('stub:act')?.[1];
-  if (act && plan.acts?.[act]) said = await actFromPlan(plan.acts[act]);
+  // [[stub:act-first:<name>]] acts on the first start only, as a thread that got
+  // stuck once and is fine when it is started again.
+  const act = directive('stub:act')?.[1] ?? (attempt === 1 ? directive('stub:act-first')?.[1] : null);
+  if ((brief.includes(LEAD_MARK) || promptText.includes(LEAD_MARK)) && process.env.ZERO_ITEM) said = (await actAsLead(attempt === 1)) ?? said;
+  else if (act && plan.acts?.[act]) said = await actFromPlan(plan.acts[act]);
+  // A lead on a cause row is never itself stuck on the cause.
+  else if (turn.stuck) said = (await actStuck(turn.stuck)) ?? said;
   if (plan.approval) {
     const decision = await askTheFounder(plan.approval);
     say({ type: 'assistant', message: { content: [{ type: 'text', text: `the founder said: ${decision.behavior}` }] } });

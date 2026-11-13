@@ -9,7 +9,7 @@ const CHANGED = 'agentbox:home-settings';
 /** `skyTheme` is the sky worn, with the default filled in (./sky: shownSkyId); `picked` is whether a sky was chosen. */
 export type HomeSettings = { skyTheme: string | null; picked: boolean };
 
-const darkNow = () => document.documentElement.dataset.theme !== 'light';
+const darkNow = () => typeof document === 'undefined' || document.documentElement.dataset.theme !== 'light';
 
 function read(): HomeSettings {
   let saved: string | null = null;

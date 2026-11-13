@@ -7,7 +7,7 @@ export { streamingText, countHelpers, saidNothingSheCanUse } from './harnesses/c
 import { taskRemoteControl } from './task-remote-control.mts';
 import type { BridgeStateEvent } from './task-remote-control.mts';
 import { taskFolderPath, real, restoreTaskFolder } from './task-folders.mts';
-import { SHIP_LABEL, ShipQueue, readShipSettings, shipScriptFor, shipSlot } from './ship-queue.mts';
+import { SHIP_LABEL, ShipQueue, readShipSettings, shipScriptFor, shipSlot, stopShips } from './ship-queue.mts';
 import { MainTests } from './main-went-red.mts';
 import { SecurityScan } from './the-security-scan-went-red.mts';
 import { CloudServerWatch, serverError } from './cloud-server-down.mts';
@@ -124,6 +124,7 @@ import { saveConfig } from './config.mts';
 import { accountIdentity, nameForOrganization, profileForCloudLogin, isCloudLoginOf, toolingLine } from './account-tooling.mts';
 import type { AccountIdentity } from './account-tooling.mts';
 import { effectiveProfiles } from './account-discovery.mts';
+import { isCause } from '../shared/causes.mts';
 import { referencedFiles, isImagePath } from '../shared/referenced-files.mts';
 import { namedThreadsBlock } from '../shared/named-threads.mts';
 import { changePath } from './code-change.mts';
@@ -179,7 +180,7 @@ import { codexAccount, codexPlanEnded, ensureCodexHome } from './codex-account.m
 import { accountName } from '../shared/account-names.mts';
 import { nameRow, wantsName, askSmallModel, smallModelPictures } from './row-label.mts';
 import { catchUpRow, catchUpResult } from './catch-up.mts';
-import { isAuto, asksWho, routeCandidates, routePrompt, readRoute, routedPatch, orPrimary, NOBODY_WHY } from '../shared/auto-route.mts';
+import { isAuto, asksWho, routeCandidates, routePrompt, readRoute, readOffer, offerPrompt, readGains, routedPatch, orPrimary, NOBODY_WHY } from '../shared/auto-route.mts';
 import { LEVELS, latestMessage, sortMessage, wantsPriority } from './message-priority.mts';
 import { GUESSED_LEVELS, levelTask, wantsLevel } from './task-priority.mts';
 import { NAME, Name, envName, nameSlug, isOurSlug } from '../shared/product-name.mjs';
@@ -789,6 +790,7 @@ export interface SupervisorStore {
     filesFoldersLine?(project: string | undefined): string | null;
     briefFor(item: WorkItem): string | null;
     list?(now?: number): RouteMate[];
+    declinedRoles?(): string[];
     noteTrouble(text: string, now?: number): void;
     tick(opts: TickInput): Promise<unknown[]>;
   } | null;
@@ -1297,6 +1299,8 @@ export class Supervisor {
   declare cloudServerWatch: Pick<CloudServerWatch, 'down' | 'up'>;
   declare sessions: Map<string, WorkerSession>;
   declare onChange: (() => void) | null;
+  /** A run about to start, so its thread's files kept in the cloud start coming back. Never holds the start. */
+  declare onStarting?: ((item: WorkItem) => void) | null;
   declare onRecovered: ((news: RecoveryNews) => void) | null;
   declare paused: boolean;
   declare productOrder: string[];
@@ -2226,6 +2230,8 @@ export class Supervisor {
     // let go, and picked back up at the next start.
     for (const session of this.sessions.values()) if (!this._letGoOfHostedRun(session)) this._kill(session, session.cloud && session.engine !== 'codex' ? 'SIGHUP' : undefined);
     this._closeCodex(`${Name} is quitting`);
+    // A ship cut off here is tried again at the next start.
+    stopShips();
     this.stopMemoryGate();
     this.signInReturns?.stopAll();
     clearInterval(this._leftoverTimer);
@@ -2334,6 +2340,8 @@ export class Supervisor {
   // Anything this refuses stays where the lists put it, which is Needs you.
   resumeFinishedWaits(items: WorkItem[]) {
     const byId = new Map(items.map((i) => [`${i.product}:${i.id}`, i]));
+    // A cause row (shared/causes.mts) holds threads from every project.
+    const causes = new Map(items.filter(isCause).map((i) => [i.id, i]));
     const productBySlug = new Map((this.store.listProducts?.() ?? []).map((p) => [p.slug, p]));
     const me = process.env.AGENTBOX_PERSON_ID || null;
     const resumed: string[] = [];
@@ -2342,7 +2350,7 @@ export class Supervisor {
       if (this.sessions.has(item.id) || stoppedByHer(item)) continue;
       // A wait a person set comes back to them; it starts nothing (shared/thread-waits.mts).
       if (item.wrote?.blockedBy?.source === 'founder') continue;
-      const blockers = item.blockedBy.map((id) => byId.get(`${item.product}:${id}`));
+      const blockers = item.blockedBy.map((id) => byId.get(`${item.product}:${id}`) ?? causes.get(id));
       if (blockers.some((b) => !b || b.status !== 'done')) continue;
       const cleared = Math.max(...blockers.map((b) => b!.wrote?.status?.ts ?? 0));
       if (cleared <= (item.wrote?.blockedBy?.ts ?? 0) || cleared <= this._waitsSince) continue;
@@ -2358,6 +2366,10 @@ export class Supervisor {
       if (this._resumedWaits.has(key)) continue;
       if (!mayRunHere(item, productBySlug.get(item.product), me)) continue;
       this._resumedWaits.add(key);
+      // Its own last words say it is waiting, so it is told the cause is gone.
+      for (const b of blockers) {
+        if (isCause(b)) try { this.store.noteItem?.(item.product, item.id, `${b!.title} is cleared. Carry on from where this stopped.`); } catch { /* the resume still goes ahead */ }
+      }
       this.store.answerItem(item.product, item.id, { status: 'open' });
       this._resumeQueue.add(item.id);
       resumed.push(item.id);
@@ -5089,36 +5101,64 @@ export class Supervisor {
       .filter((i) => isAuto(i) && i.status === 'open' && !asksWho(i))
       .sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))[0];
     if (!next) return undefined;
+    const on = teammatesOn(this.config);
     let all: RouteMate[] = [];
-    try { all = teammatesOn(this.config) ? this.store.teammates?.list?.(now) ?? [] : []; } catch { all = []; }
+    try { all = on ? this.store.teammates?.list?.(now) ?? [] : []; } catch { all = []; }
     const team = routeCandidates(all);
     // What Auto cannot place goes to the primary, when there is one.
     const primary = primaryOf(all);
+    let declined: string[] = [];
+    try { declined = on ? this.store.teammates?.declinedRoles?.() ?? [] : []; } catch { declined = []; }
+    const taken = [...all.flatMap((t) => [t.name, t.role ?? '']), ...declined].filter(Boolean);
     const write = (decision: RouteDecision | null) => {
-      this.store.routeItem(next.product, next.id, routedPatch(next, orPrimary(decision, primary), { items, now: Date.now() }));
+      const patch = routedPatch(next, orPrimary(decision, primary), { items, now: Date.now() });
+      this.store.routeItem(next.product, next.id, patch);
       this.wake();
+      return patch;
     };
-    if (!team.length) { write({ to: 'agent', why: NOBODY_WHY }); return undefined; }
+    if (!on) { write({ to: 'agent', why: NOBODY_WHY }); return undefined; }
+    // With nobody to give it to, the thread starts at once; the question is
+    // still asked, for the offer of a teammate, which follows on the thread.
+    const early = team.length ? null : routedPatch(next, orPrimary({ to: 'agent', why: NOBODY_WHY }, primary), { items, now: Date.now() });
+    if (early) { this.store.routeItem(next.product, next.id, early); this.wake(); }
     this._routing = true;
     let product: Product | null = null;
     try { product = this.store.listProducts?.().find((p) => p.slug === next.product) ?? null; } catch { product = null; }
     const pictures = product ? smallModelPictures(this.attachedPictures(next, product)) : [];
-    const clean = (text: string) => (readRoute(text, team, primary) ? text : '');
+    const clean = (text: string) => (readRoute(text, team, primary) || readOffer(text) ? text : '');
     const ask = (sent: string[]) => {
-      const prompt = routePrompt(next, team, items, { primary, pictures: sent.length > 0 });
+      const prompt = routePrompt(next, team, items, { primary, declined, pictures: sent.length > 0 });
       return this._askSmall((opts) => askSmallModel(prompt, clean, { ...opts, timeoutMs: ROUTE_TIMEOUT_MS, pictures: sent }), { product: next.product });
     };
     // A call with pictures that fails is asked again in words alone.
     return ask(pictures)
       .then((answer) => (answer || !pictures.length ? answer : ask([])))
-      .then((answer) => write(readRoute(answer, team, primary)))
+      .then(async (answer) => {
+        const offer = readOffer(answer, { taken });
+        let routed = early?.routed;
+        if (!early) {
+          const decision = orPrimary(readRoute(answer, team, primary), primary);
+          const toMate = decision.to?.startsWith('mate:') && decision.to !== (primary ? `mate:${primary.id}` : null);
+          routed = write(decision).routed;
+          if (decision.ask || toMate) return;
+        }
+        if (!offer || !routed) return;
+        // The thread is already moving; the card's reasons are asked for after.
+        const said = await this._askSmall((opts) => askSmallModel(offerPrompt(next, offer), (t) => (readGains(t) ? t : ''), { ...opts, timeoutMs: ROUTE_TIMEOUT_MS }), { product: next.product });
+        const gains = said ? readGains(said) : null;
+        let now: WorkItem | undefined;
+        try { now = this.store.listItems().find((i) => i.product === next.product && i.id === next.id); } catch { now = undefined; }
+        // Given to someone else in the meantime: that choice stands, with no offer on it.
+        if (now?.routed && now.routed.at !== routed.at) return;
+        this.store.routeItem(next.product, next.id, { routed: { ...routed, offer: { ...offer, ...(gains ? { gains } : {}) } } });
+      })
       .catch((e) => {
         console.warn('zero: could not route a thread:', e.message);
+        if (early) return;
         try { write(null); } catch { /* the thread is gone */ }
       })
       .finally(() => { this._routing = false; });
   }
-
   sayItOnEveryStrandedRow(items: WorkItem[], now = Date.now(), { budgetMs = NEW_TRACES_BUDGET_MS } = {}) {
     let dirty = false;
     // AND THE SAME PASS COUNTS THEM, for the line above her list. The count
@@ -6693,6 +6733,8 @@ export class Supervisor {
     this._saveState();
     return sent;
   }
+
+  hasFilesForCloud(itemId: string): boolean { return this._filesWaitingFor(itemId).length > 0; }
 
   _filesWaitingFor(itemId: string): string[] {
     const waiting = this._filesForCloud?.get(itemId);
@@ -9635,7 +9677,7 @@ export class Supervisor {
       return out;
     };
     try {
-      const done = await teammates.tick({ items, now, deliver, tell, room: (engine: string | null) => this._roomToLookBack(engine, now) });
+      const done = await teammates.tick({ items, now, deliver, tell, room: (engine: string | null) => this._roomToLookBack(engine, now), chief: true });
       if (done.length) this.onChange?.();
     } catch (err) {
       teammates.noteTrouble?.(`Teammates could not wake: ${(err as Error).message}`, now);
@@ -11740,6 +11782,7 @@ export class Supervisor {
       return;
     }
     if (this._compactionJobs?.has(JSON.stringify([item.product, item.id]))) return;
+    try { this.onStarting?.(item); } catch (error) { console.warn(`zero: ${item.id}'s files did not start coming back:`, (error as Error).message); }
     // ASKED ONCE, HERE, AND ANSWERED CLAUDE CODE ON EVERY MACHINE TODAY. See
     // `_engineFor` for the two independent reasons why. It is asked ahead of
     // the door rather than after it because the door is the engine's own cap

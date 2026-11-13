@@ -83,9 +83,9 @@ export function rolePolicy({ bucket, runtimeArn, region, account, signerSecretAr
       { Effect: 'Allow', Action: ['bedrock-agentcore:InvokeAgentRuntime', 'bedrock-agentcore:StopRuntimeSession'], Resource: [runtimeArn, `${runtimeArn}/runtime-endpoint/*`] },
       { Effect: 'Allow', Action: ['s3:GetObject', 's3:PutObject', 's3:DeleteObject'], Resource: [at('ledger/*'), at('runs/*/calls/*')] },
       { Effect: 'Allow', Action: ['s3:GetObject'], Resource: [at('runs/*/done.json')] },
-      { Effect: 'Allow', Action: ['s3:DeleteObject'], Resource: [at('runs/*'), at('logins/*')] },
-      // runs/ too, so a done.json not there yet answers 404, not 403.
-      { Effect: 'Allow', Action: ['s3:ListBucket'], Resource: `arn:aws:s3:::${bucket}`, Condition: { StringLike: { 's3:prefix': ['ledger/*', 'runs/*'] } } },
+      { Effect: 'Allow', Action: ['s3:DeleteObject'], Resource: [at('runs/*'), at('logins/*'), at('files/*')] },
+      // runs/ too, so a done.json not there yet answers 404, not 403; files/ to weigh what a person keeps.
+      { Effect: 'Allow', Action: ['s3:ListBucket'], Resource: `arn:aws:s3:::${bucket}`, Condition: { StringLike: { 's3:prefix': ['ledger/*', 'runs/*', 'files/*'] } } },
       { Effect: 'Allow', Action: ['secretsmanager:GetSecretValue'], Resource: secrets.length === 1 ? secrets[0] : secrets },
       { Effect: 'Allow', Action: ['logs:CreateLogGroup', 'logs:CreateLogStream', 'logs:PutLogEvents'], Resource: `arn:aws:logs:${region}:${account}:log-group:/aws/lambda/${NAMES.fn}*` },
     ],
@@ -103,8 +103,8 @@ export function signerPolicy({ bucket }) {
   return {
     Version: '2012-10-17',
     Statement: [
-      { Effect: 'Allow', Action: ['s3:GetObject', 's3:PutObject'], Resource: ['runs/*', 'logins/*'].map((p) => `arn:aws:s3:::${bucket}/${p}`), Condition: { StringEquals: inALink } },
-      { Effect: 'Allow', Action: ['s3:ListBucket'], Resource: `arn:aws:s3:::${bucket}`, Condition: { StringEquals: inALink, StringLike: { 's3:prefix': ['runs/*'] } } },
+      { Effect: 'Allow', Action: ['s3:GetObject', 's3:PutObject'], Resource: ['runs/*', 'logins/*', 'files/*'].map((p) => `arn:aws:s3:::${bucket}/${p}`), Condition: { StringEquals: inALink } },
+      { Effect: 'Allow', Action: ['s3:ListBucket'], Resource: `arn:aws:s3:::${bucket}`, Condition: { StringEquals: inALink, StringLike: { 's3:prefix': ['runs/*', 'files/*'] } } },
     ],
   };
 }

@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { backWords, readDisplay, writeDisplay, filteredEmptyWords, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
 import { InboxComposer } from '../ui/NewThreadForm';
-import { closeWords, COUNT_GAP, filterCount, moreToTheRight, phoneBoard, shownTabs, TAB_GAP, TABS, tabsTighten, type Row, type TabId } from '../lib/tabs';
+import { closeWords, COUNT_GAP, filterCount, moreToTheRight, phoneBoard, shownTabs, TAB_GAP, TABS, tabsScale, tabsTighten, type Row, type TabId } from '../lib/tabs';
 import { evViewOf, keepEvView, myItems, type EvView } from '../lib/everything';
 import { agentChoices, type Harness } from '../lib/agent-filter';
 import { EverythingPlace } from '../ui/Everything';
@@ -185,6 +185,9 @@ function Tabs({ on, counts, pick, team }: { on: PlaceId; counts: Record<PlaceId,
   const counted = tabs.filter((t) => t.id !== 'done' && counts[t.id] > 0).length;
   const [tight, setTight] = useState(false);
   useEffect(() => { setTight((now) => tabsTighten(span, now, { tabs: tabs.length, counted })); }, [span.view, span.content, tabs.length, counted]);
+  const [fit, setFit] = useState({ scale: 1, measuredAt: 0 });
+  useEffect(() => { setFit((now) => tabsScale(span, tight, now)); }, [span.view, span.content, tight]);
+  const words = { fontSize: 15 * fit.scale, count: 11 * fit.scale };
   return (
     <View style={{ height: size.tabs, flexDirection: 'row', alignItems: 'center' }}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'center', paddingLeft: size.inset, paddingRight: 8, gap: tight ? TAB_GAP.tight : TAB_GAP.loose }}
@@ -194,8 +197,8 @@ function Tabs({ on, counts, pick, team }: { on: PlaceId; counts: Record<PlaceId,
         {tabs.map((t) => (
           <Pressable key={t.id} onPress={() => pick(t.id)} accessibilityRole="tab" accessibilityState={{ selected: on === t.id }}
             style={{ height: 32, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 2, borderBottomColor: on === t.id ? color.accent : 'transparent' }}>
-            <T style={{ fontSize: 15, lineHeight: 30, color: on === t.id ? color.text : color.dim }}>{t.label}</T>
-            {t.id !== 'done' && counts[t.id] > 0 && <T style={{ fontSize: 11, lineHeight: 30, fontFamily: font.medium, marginLeft: tight ? COUNT_GAP.tight : COUNT_GAP.loose, color: color.faint }}>{counts[t.id]}</T>}
+            <T style={{ fontSize: words.fontSize, lineHeight: 30, color: on === t.id ? color.text : color.dim }}>{t.label}</T>
+            {t.id !== 'done' && counts[t.id] > 0 && <T style={{ fontSize: words.count, lineHeight: 30, fontFamily: font.medium, marginLeft: tight ? COUNT_GAP.tight : COUNT_GAP.loose, color: color.faint }}>{counts[t.id]}</T>}
           </Pressable>
         ))}
       </ScrollView>
