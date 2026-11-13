@@ -138,12 +138,18 @@ describe('after a ship', () => {
   it('runs from the ship, after the push, and ends before the ship queue stops the ship', () => {
     const ship = read('scripts/ship.mjs');
     const pushed = ship.indexOf("say(`shipped ${sha}.`)");
-    const deploy = ship.indexOf('await deployAfterShip({ root, say, until: SHIP_ENDS_BY })');
+    const deploy = ship.indexOf('await deployAfterShip({ root, say, until: shipEndsBy })');
     expect(pushed).toBeGreaterThan(0);
     expect(deploy).toBeGreaterThan(pushed);
-    const queueStops = Number(/const SHIP_MS = (\d+) \* 60 \* 1000/.exec(read('main/ship-queue.mts'))[1]);
-    const shipEnds = Number(/SHIP_ENDS_BY = began \+ (\d+) \* 60_000/.exec(ship)[1]);
+    const queue = read('main/ship-queue.mts');
+    const queueStops = Number(/const SHIP_MS = (\d+) \* 60 \* 1000/.exec(queue)[1]);
+    const shipEnds = Number(/let shipEndsBy = began \+ (\d+) \* 60_000/.exec(ship)[1]);
     expect(shipEnds).toBeLessThan(queueStops);
+    // A push the hook runs every test for gets the queue's longer deadline.
+    const queueStopsLater = Number(/WHOLE_SUITE_SHIP_MS = (\d+) \* 60 \* 1000/.exec(queue)[1]);
+    const shipEndsLater = Number(/\n\s+shipEndsBy = began \+ (\d+) \* 60_000/.exec(ship)[1]);
+    expect(shipEndsLater).toBeLessThan(queueStopsLater);
+    expect(shipEndsLater).toBeGreaterThan(shipEnds);
     expect(read('scripts/lib/web-app-deploy.mjs')).toMatch(/until - Date\.now\(\) < DEPLOY_NEEDS_MS\) return \{ ok: false, why: 'the ship ran long/);
   });
 });

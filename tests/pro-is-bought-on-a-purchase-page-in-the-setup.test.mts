@@ -35,12 +35,13 @@ describe('what the page says', () => {
   // rather than keeping the product the same".
   it('names what Pro brings in three short lines, the cloud computer first', () => {
     expect(PRO_PITCH.head).toBe('Upgrade to Pro.');
-    expect(PRO_PITCH.perks.map((p) => p.title)).toEqual(['A computer for every agent', 'Your team in one inbox', 'Files saved in the cloud']);
+    // "unclear what 'your team in one inbox' means. needs something clearer" (2026-11-13).
+    expect(PRO_PITCH.perks.map((p) => p.title)).toEqual(['A computer for every agent', 'Share threads and tasks with your team', 'Files saved in the cloud']);
   });
   it('gives seven free days, and the price with no per person', () => {
     expect(TEAM.trialDays).toBe(7);
     expect(PRO_PITCH.cta).toBe('Try Pro free for 7 days');
-    expect(PRO_PITCH.terms).toBe(`Then $${TEAM.dollarsPerSeat} a month. Cancel any time.`);
+    expect(PRO_PITCH.terms).toBe('Cancel any time.');
     expect(JSON.stringify(PRO_PITCH)).not.toMatch(/per person|a person/);
   });
 });

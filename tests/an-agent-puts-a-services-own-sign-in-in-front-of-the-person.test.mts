@@ -105,6 +105,19 @@ describe('the sign_in tool', () => {
     expect(await waiting).toMatchObject({ status: 'landed', url: `http://localhost:${BACK}/callback?code=c&state=s1` });
   });
 
+  it('hands back the code the person pasted from the service\'s page', async () => {
+    const t = thread();
+    const ts = await tools(t.id);
+    const waiting = call(ts, { service: 'Supabase', url: 'https://supabase.com/dashboard/cli/login?session_id=x', asksForCode: true });
+    await new Promise((r) => setTimeout(r, 300));
+    const ask = openSignIn(disk.readWorkItem(product.dir, t.id));
+    expect(ask.asksForCode).toBe(true);
+    answer(t.id, { id: ask.id, said: 'code', code: '8f3a2b1c' });
+    const got = await waiting;
+    expect(got).toMatchObject({ status: 'code', code: '8f3a2b1c' });
+    expect(got.message).toMatch(/type it into the login/i);
+  });
+
   it('waits less than Codex\'s minute, and keeps waiting on the same ask', async () => {
     const { WAIT_MS, askToSignIn, waitForSignIn } = await import('../mcp/core/sign-in.mts');
     expect(WAIT_MS).toBeLessThan(60_000);

@@ -118,7 +118,7 @@ export interface WorkItem {
   due?: string;
   people?: string[];
   /** Sent to Auto: who it went to and why, or the two it asks her to pick from (shared/auto-route.mts). */
-  routed?: { to?: string; ask?: string[]; why: string; at: number; by: 'auto' | 'you' };
+  routed?: { to?: string; ask?: string[]; why: string; at: number; by: 'auto' | 'you'; offer?: { role: string; why: string; gains?: string[]; answered?: 'made' | 'no' } };
   // THE THREAD'S OWN FIELDS (approved 2026-10-01, shared/work-items.mts).
   // `visibility` absent reads as 'team'. The summary is shared: the agent keeps
   // it current and the person can edit it, and the later write wins.
@@ -325,6 +325,30 @@ export interface PlacedFile {
   folder?: string | null;
   /** Nobody put it there: it sits beside its thread's other files. */
   folderFollows?: boolean;
+  /** The newest version's size on this computer, or null when it is not here. */
+  bytes?: number | null;
+  /** Every version's, together. */
+  onMac?: number;
+  /** What Move older versions to the Trash would move. */
+  older?: number;
+  /** What this file's own Move to the Trash would move. */
+  movable?: number;
+  /** The newest version is kept in the cloud and off this computer. */
+  cloud?: boolean;
+  /** A small picture of it while it is in the cloud. */
+  poster?: string | null;
+}
+
+/** `undo` is what Z hands back to put them where they were. */
+export interface FilesTrashed { ok: boolean; moved: number; bytes: number; error?: string; undo?: string }
+export interface FilesCloudStatus {
+  /** null while the account cannot be read. */
+  cap: number | null;
+  bytes: number;
+  full: boolean;
+  on: boolean;
+  offAfterDays: number;
+  offBytes: number;
 }
 
 export interface FileFolder { id: string; project: string; name: string; parent: string | null; at: number }
@@ -366,6 +390,8 @@ export interface FilesPlaceView {
   key: string;
   project: string | null;
   name: string;
+  /** Its newest version is on its way back from the cloud. */
+  coming?: boolean;
   sentIn: FileSentIn[];
   /** Where Done in the editor puts the next version. */
   editsTo?: FileSentIn | null;
@@ -877,10 +903,10 @@ export interface CloudPlan {
   usedSeconds?: number;
   /** With no plan: the free hours, spent or not. */
   free?: { agents: number; hours: number; usedSeconds: number };
-  /** The team's shared hours: a trial until `endsAt`, or `seats` paid for. */
-  /** Hours and agents are this person's own; `people` is every member's own use (names come from the team). */
+  /** The team's hours: a trial until `endsAt`, or `seats` paid for; `seats` in a trial means the card is in and not yet charged. */
+  /** Hours are this person's own, with no limit at once; `people` is every member's own use (names come from the team). */
   team?: {
-    trial: boolean; endsAt: number | null; seats: number; members: number; owner: boolean; agents: number; running: number; hours: number; usedSeconds: number;
+    trial: boolean; endsAt: number | null; seats: number; members: number; owner: boolean; agents?: null; running: number; hours: number; usedSeconds: number;
     people?: { id: string; usedSeconds: number; running: number; name?: string }[];
   };
   /** Who bills the plan: Stripe, or nobody because it was set by hand. Absent from older servers. */
@@ -1581,6 +1607,8 @@ export interface WorkspaceSettings {
   /** The mode cloud runs start in, or 'same' for this computer's. */
   cloudPermission?: PermissionMode | 'same' | null;
   cloudCodexMode?: CodexModeId | 'same';
+  /** Settings › Files: kept in the cloud on a paid plan, and the days a film or picture stays unopened (0 is never). */
+  files?: { on: boolean; offAfterDays: number };
   /** What a Codex worker may do across the workspace. Never 'workspace' here. */
   codexMode: CodexModeId;
   // One switch over everything that leaves the machine, on at install
@@ -1742,6 +1770,7 @@ declare global {
       setProductHidden(p: { product: string; hidden: boolean }): Promise<unknown>;
       compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; onMac?: boolean }): Promise<WorkItem>;
       routeThread?(p: { product: string; id: string; to: string }): Promise<{ ok: true }>;
+      answerRouteOffer?(p: { product: string; id: string; make: boolean }): Promise<{ ok: true; made: string | null }>;
       // Feedback to the Agentbox team (main/feedback.mts). Optional: an older
       // main process under a newer window has no such door.
       sendFeedback?(p: { text: string; files: { name: string; type: string; size: number; data: string }[] }): Promise<{ ok: boolean; error?: string }>;
@@ -1785,6 +1814,9 @@ declare global {
       filesPlaceFolder?(p: FileFolderAct): Promise<{ ok: boolean; error?: string; folder?: string | null }>;
       filesPlaceNew?(p: { project: string; name: string; kind: 'document' | 'table'; folder: string | null }): Promise<{ ok: boolean; error?: string; key?: string }>;
       filesPlaceUpload?(p: { project: string; folder: string | null }): Promise<FilesUploaded>;
+      filesPlaceTrash?(p: { keys: string[]; older?: boolean }): Promise<FilesTrashed>;
+      filesPlaceUntrash?(p: { token: string }): Promise<{ ok: boolean; back?: number; error?: string }>;
+      filesCloud?(): Promise<FilesCloudStatus>;
       fileElsewhere?(p: { product: string; id: string; room?: string; copies: { path: string; file: string }[] }): Promise<FileElsewhere[]>;
       fileLine?(p: { product: string; id: string; room?: string }): Promise<FileLine[]>;
       teamComment(p: { personId: string; threadId: string; text: string }): Promise<TeamCallResult>;

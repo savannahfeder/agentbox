@@ -173,15 +173,19 @@ refuses any push that carries the old history. Carry your own commits across
 instead, then ship as usual:
 `git fetch origin && git rebase --onto refs/remotes/origin/main $(git merge-base HEAD 99b8b0e5b04fbbc976003851ebdbb7bb58c2bf89)`
 
-## NO WORKER EVER DRIVES THE USER'S OWN BROWSER
+## NO WORKER EVER DRIVES THE USER'S OWN BROWSER UNTIL THEY TURN IT ON (2026-11-11)
 
 Claude Code can attach a session to the browser a person is signed into with
-`--chrome`. That flag must never appear in anything this app spawns, because
-that browser is signed into every account its owner holds.
-`tests/no-worker-drives-her-own-browser.test.mts` fails if it ever does. A
-browser an agent may drive has to carry nothing; the app's own pane on the
-`persist:junk` partition is the only candidate. `--ide` is the user's to switch
-on, never ours.
+`--chrome`, and that browser is signed into every account its owner holds. It
+follows the person's own Claude Code: a worker gets it only when the account it
+runs on has "Claude in Chrome enabled by default" on (`/chrome`, kept as
+`claudeInChromeDefaultEnabled: true` in that account's `.claude.json`), which
+Claude Code itself ignores in a `-p` run. There is no Agentbox switch for it.
+Only `main/your-chrome.mts` may put `--chrome` on a worker's line: never in the
+cloud, and never on a run that skips permissions (that also skips Chrome's
+per-site asks).
+`tests/no-worker-drives-her-own-browser.test.mts` fails if the flag appears
+anywhere else. `--ide` is the user's to switch on, never ours.
 
 Nor does an agent start the person's Google Chrome headless: the Mac files that
 copy as their Chrome, and their own Chrome then opens no window. Every hidden

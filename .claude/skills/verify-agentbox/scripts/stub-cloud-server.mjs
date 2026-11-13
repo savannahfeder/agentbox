@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
 import crypto from 'node:crypto';
+import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -95,7 +96,8 @@ gw = createGateway({
   removeObject: async (k) => objects.del(k),
   objects,
   whoIs: async (t) => (t === 'stand-in' ? { id: PERSON } : null),
-  plans: { ...PLANS, standin: { agents: 6, hoursPerMonth: 1000 } },
+  // Files kept in the cloud as Pro keeps them; STUB_CLOUD_FILES_GB=0 is a plan that keeps none.
+  plans: { ...PLANS, standin: { agents: 6, hoursPerMonth: 1000, filesGB: Number(process.env.STUB_CLOUD_FILES_GB ?? PLANS.pro.filesGB) } },
   ...(freeHours ? { free: { ...FREE, hours: freeHours } } : {}),
   ...(teamRole ? {
     teamPlan: { ...TEAM, trialHoursPerMember: teamHours },
@@ -107,11 +109,38 @@ gw = createGateway({
   log: (m) => console.log(m),
 });
 
+const ZEROS = Buffer.alloc(1 << 20);
 const server = http.createServer(async (req, res) => {
+  const url = new URL(req.url, 'http://x');
+  // A kept file can be a film of hundreds of MB: streamed to disk and back, never held whole.
+  if (url.pathname.startsWith('/o/files')) {
+    const k = decodeURIComponent(url.pathname.slice(3));
+    try {
+      if (req.method === 'PUT') {
+        // Runs of zeros are left as holes, so a tester's padded film costs this machine no disk.
+        const tmp = `${fileOf(k)}.${process.pid}.tmp`;
+        const fd = fs.openSync(tmp, 'w');
+        let at = 0;
+        try {
+          for await (const c of req) {
+            if (!(c.length <= ZEROS.length && c.equals(ZEROS.subarray(0, c.length)))) fs.writeSync(fd, c, 0, c.length, at);
+            at += c.length;
+          }
+          fs.ftruncateSync(fd, at);
+        } finally { fs.closeSync(fd); }
+        fs.renameSync(tmp, fileOf(k));
+        return res.writeHead(200).end();
+      }
+      const st = fs.statSync(fileOf(k), { throwIfNoEntry: false });
+      if (!st) return res.writeHead(404).end();
+      res.writeHead(200, { 'content-length': st.size });
+      if (req.method === 'HEAD') return res.end();
+      return void pipeline(fs.createReadStream(fileOf(k)), res).catch(() => {});
+    } catch (err) { return res.writeHead(500).end(String(err?.message ?? err)); }
+  }
   const chunks = [];
   for await (const c of req) chunks.push(c);
   const body = Buffer.concat(chunks);
-  const url = new URL(req.url, 'http://x');
   try {
     if (url.pathname.startsWith('/o/')) {
       const k = decodeURIComponent(url.pathname.slice(3));

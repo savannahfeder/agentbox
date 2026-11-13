@@ -177,6 +177,24 @@ export function fileBytes(file: Pick<SharedFile, 'body'>): Uint8Array {
   return out;
 }
 
+// A blob opens on this site's origin, where the reader's sign-in is kept, so one
+// typed as a document would run the link owner's script there.
+const RASTER = /^image\/(png|jpeg|gif|webp|avif|bmp|x-icon)$/i;
+const FILM = /^video\/(mp4|webm|quicktime|ogg)$/i;
+
+/** The type a blob made on this page may carry: one that can never open as a page. */
+export function blobType(kind: string, type: string): string {
+  if (kind === 'image' && RASTER.test(type)) return type.toLowerCase();
+  if (kind === 'video') return FILM.test(type) ? type.toLowerCase() : 'video/mp4';
+  return 'application/octet-stream';
+}
+
+/** Where a picture is drawn from. An SVG can carry script, so it comes from a data: address, whose origin is opaque. */
+export function pictureAddress(file: Pick<SharedFile, 'body' | 'type'>): string {
+  if (/^image\/svg\+xml$/i.test(file.type)) return `data:image/svg+xml;base64,${file.body.replace(/\s+/g, '')}`;
+  return URL.createObjectURL(new Blob([fileBytes(file) as BlobPart], { type: blobType('image', file.type) }));
+}
+
 export function initialOf(name: string): string {
   return (name.trim().match(/\p{L}|\p{N}/u)?.[0] ?? '?').toUpperCase();
 }

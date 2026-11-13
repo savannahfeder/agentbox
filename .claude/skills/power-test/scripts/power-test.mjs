@@ -11,11 +11,13 @@
 //     --cloud-accounts a@x.com,b@y.com                 the cloud accounts the copies may spend, of those signed in (default all)
 //     --free-hours 0.5                                 with --stand-in-cloud: start on the Free plan with that many hours
 //     --chaos none|light|normal|heavy                  what goes wrong around them (default normal)
+//     --stuck                                          for a stretch, most stand-in agents get stuck on one shared cause (needs --stand-ins)
 //     --round-minutes 20                               one tester session, before it is started again with its diary
 //     --model <id>                                     the testers' Codex model
 //     --codex-home ~/.codex-2                          the Codex login testers spend (default: the one on the best plan)
 //     --keep                                           leave the copies up afterwards
 //     --files <dir>                                    copied into every project's documents in every copy (a table, a deck under test)
+//     --seed "<script> [args]"                         run with each copy's folder before its testers start (threads and files under test)
 //     --team <file> --room <name>                      one tester signs in to a real team (live.mjs --team) and talks in that room
 //     --stand-in-team "<name>"                         every tester on one team, through a stand-in team cloud of the run's own;
 //                                                      the first starts it, invites the rest and shares their first project
@@ -85,6 +87,7 @@ let mode;
 try { mode = agentMode({ standIns: args.includes('--stand-ins') ? (opt('stand-ins') ?? '') : null, standInCloud, cloud }); } catch (err) { stop(err.message); }
 // With stand-ins agreed, Codex stays real on the testers' own login wherever it can.
 const { real, codexReal, standIns } = mode;
+if (flag('stuck') && real) stop('--stuck gets stand-in agents stuck on one cause: it needs --stand-ins "<the person\'s words agreeing>".');
 const cloudAccounts = opt('cloud-accounts');
 if (cloudAccounts && !cloud) stop('--cloud-accounts narrows the cloud\'s accounts: add --cloud.');
 const focus = opt('focus');
@@ -94,6 +97,8 @@ if (opt('testers') || opt('tester-login')) stop('testers are always Codex now, s
 const team = opt('team');
 const room = opt('room');
 const files = opt('files') ? path.resolve(opt('files')) : null;
+const [seedScript, ...seedArgs] = opt('seed') ? opt('seed').split(/\s+/) : [];
+if (seedScript && !fs.existsSync(seedScript)) stop(`--seed: there is no script at ${seedScript}.`);
 if (files && !fs.existsSync(files)) stop(`--files: there is no folder at ${files}.`);
 const standInTeam = opt('stand-in-team');
 const shareStage = opt('share-stage');
@@ -139,6 +144,20 @@ function layCommands(dir, name) {
   }
   return { browse: path.join(dir, 'app'), diary: path.join(dir, 'diary') };
 }
+
+// ONE POWER TEST PER CHECKOUT: the copies are named per checkout and person, so
+// a second run drives the first one's apps and both testers' presses land in one
+// window (2026-11-09, two sessions on one thread, 80 issues mostly from that).
+const lock = `${instanceDir('power')}.lock`;
+const holder = Number(readJson(lock)?.pid);
+if (holder && holder !== process.pid) {
+  let alive = false;
+  try { process.kill(holder, 0); alive = true; } catch (e) { alive = e?.code === 'EPERM'; }
+  if (alive) stop(`another power test (pid ${holder}) is driving this checkout's copies. Wait for it to end, or stop it, then start again.`);
+}
+fs.mkdirSync(path.dirname(lock), { recursive: true });
+fs.writeFileSync(lock, JSON.stringify({ pid: process.pid }));
+process.on('exit', () => { try { if (Number(readJson(lock)?.pid) === process.pid) fs.rmSync(lock); } catch { /* gone */ } });
 
 const root = path.join(RUNS, `${new Date().toISOString().replace(/[:.]/g, '-')}-power`);
 fs.mkdirSync(root, { recursive: true });
@@ -242,7 +261,10 @@ for (const person of people) {
   await seedCode(state);
   if (files) layFiles(state, files);
   const seeded = person.history ? seedHistory(state, person, person.history) : new Set();
-  if (seeded.size) await live(name, 'restart');
+  // The copy's threads live under its store, which AGENTBOX_HOME names to the script.
+  const ran = seedScript ? await run(process.execPath, ['--experimental-strip-types', '--no-warnings', path.resolve(seedScript), instanceDir(name), ...seedArgs], { env: { ...process.env, AGENTBOX_HOME: path.join(instanceDir(name), 'store') }, timeoutMs: 10 * MIN, cwd: REPO }) : null;
+  if (ran && ran.code !== 0) say(`${person.name}: the seed failed: ${ran.out.trim().slice(-300)}`);
+  if (seeded.size || ran) await live(name, 'restart');
   setups.push({ person, name, dir, stateFile, seeded, cmds: layCommands(dir, name) });
 }
 
@@ -312,12 +334,19 @@ function diaryTail(dir) {
   });
 }
 
+/** Whether the tester's Chrome, as browse.mjs last wrote it down, is still there. */
+function browserAlive(st) {
+  const saved = st?.instance ? readJson(path.join(st.instance, 'browser.json')) : null;
+  if (!saved?.pid) return false;
+  try { process.kill(saved.pid, 0); return true; } catch (e) { return e?.code === 'EPERM'; }
+}
+
 async function runPerson({ person, name, dir, stateFile, seeded, failed, cmds }) {
   const result = { slug: person.slug, name: person.name, role: person.role, dir, rounds: 0, stopped: failed ?? null, coverage: null };
   progress[person.slug] = { round: 0, stopped: result.stopped };
   if (failed) return result;
   const state = () => readJson(stateFile);
-  const events = chaosPlan(chaos, totalMs, { real, cloud, logins: person.logins, codex: person.codex, codexReal: person.codex && codexReal });
+  const events = chaosPlan(chaos, totalMs, { real, cloud, logins: person.logins, codex: person.codex, codexReal: person.codex && codexReal, stuck: flag('stuck') });
   const fired = new Set();
   let quietUntil = 0;
   let busy = false;
@@ -325,12 +354,19 @@ async function runPerson({ person, name, dir, stateFile, seeded, failed, cmds })
   let worldText = null;
   const watcher = createWatcher({ state: state(), out: dir, seeded, afterMs: (real ? 30 : 10) * MIN, quiet: (now) => now < quietUntil, readState: state });
 
+  let browserCheckedAt = 0;
   const tick = async () => {
     if (busy || stopping) return;
     busy = true;
     try {
       const now = Date.now();
       const elapsed = now - startedAt;
+      // A sandboxed tester cannot start Chrome itself, so a browser that died is
+      // opened again from here, once a minute at most.
+      if (now - browserCheckedAt > MIN && !down) {
+        browserCheckedAt = now;
+        if (!browserAlive(state())) await run(cmds.browse, ['open'], { env: process.env, timeoutMs: 2 * MIN, cwd: dir });
+      }
       if (restartAgain({ down, now, deadline })) {
         down.tried = now;
         quietUntil = now + 2 * MIN;
