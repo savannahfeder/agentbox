@@ -19,6 +19,7 @@ import { cloudClaudeMode, cloudPermissionArgs } from '../cloud-permission.mts';
 import { claudeActivity } from '../agent-activity.mts';
 import { captureStream, streamingText, summarizeStreamLine, traceStreamLine } from './claude-stream.mts';
 import { definitionMethods, commonUpdatePlan } from './common.mts';
+import { chromeOnInClaudeCode, claudeJsonFor, yourChromeArgs } from '../your-chrome.mts';
 import type { BinKey, Env, HarnessItem, HarnessPlan, HarnessRecord, HarnessSpawnContext, HarnessSupervisor, SignInFilesWhere, UpdatePlanOptions } from './common.mts';
 import { findTranscript } from '../transcript-search.mts';
 const definition = harnessDefinition('claude')!;
@@ -29,6 +30,23 @@ const definition = harnessDefinition('claude')!;
 // outranks both (measured on 2.1.301, w-6d8c543a43). Every Claude Code run the
 // app starts carries it: workers in their settings file, small calls inline.
 export const NO_METERED_KEY = Object.freeze({ env: Object.freeze({ ANTHROPIC_API_KEY: '' }), apiKeyHelper: '' });
+
+/** A worker's line on this computer. A cloud run has no Chrome of the person's, so `cloudLaunch` never adds it. */
+export function localClaudeArgv(plan: Pick<HarnessPlan, 'args'>, { chromeOn }: { chromeOn: boolean }): string[] {
+  return streamInputArgs(definition.run, [...plan.args, ...yourChromeArgs(chromeOn, plan.args)]);
+}
+
+// A small-model question (a thread's name, a task's level, where Auto sends a
+// thread) is the question and nothing else: no tools, skills, MCP servers,
+// hooks, thinking or saved session. Without these each one carried a whole
+// agent's system prompt and tools, 85.8 KB to get back a name.
+const SMALL_MODEL_ALONE = Object.freeze([
+  '--system-prompt', 'Answer the message exactly as it asks, and nothing else.',
+  '--tools', '', '--disable-slash-commands',
+  '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
+  '--no-session-persistence',
+  '--settings', JSON.stringify({ ...NO_METERED_KEY, alwaysThinkingEnabled: false, disableAllHooks: true }),
+]);
 
 const pictureType = (p: string) => {
   const ext = path.extname(p).toLowerCase();
@@ -77,7 +95,7 @@ export const claudeHarness = {
     // The binary is the one this definition names, not a field spelled out
     // here: that is the last place an engine of this family needed code.
     const bin = sup.config[definition.binKey as BinKey];
-    const argv = streamInputArgs(definition.run, plan.args);
+    const argv = localClaudeArgv(plan, { chromeOn: chromeOnInClaudeCode(claudeJsonFor(profile, sup.config.home || os.homedir())) });
     const runEnv = { ...claudeLaunchEnv(bin, env), STORE_ACCOUNT_ID: sup.config.accountId, ...storeRootEnv(sup.config.storeRoot),
       ...(profile !== 'default' ? { [definition.homeEnv]: profile } : {}),
       ZERO_PRODUCT: item.product, ZERO_ITEM: item.id, ...sup.memoryGateEnv(item) };
@@ -107,9 +125,12 @@ export const claudeHarness = {
   memoryGate: (sup: HarnessSupervisor, item: HarnessItem) => sup.memoryGateEnv(item),
   // `-p "<words>"` cannot carry a picture, so a call with pictures sends the
   // words and the pictures as one message on stdin and reads the result event.
-  smallModelArgs: (prompt: string, model: string, pictures: readonly string[] = []) => pictures.length
-    ? ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--model', model, '--settings', JSON.stringify(NO_METERED_KEY)]
-    : ['-p', prompt, '--model', model, '--settings', JSON.stringify(NO_METERED_KEY)],
+  smallModelArgs: (prompt: string, model: string, pictures: readonly string[] = []) => [
+    ...(pictures.length
+      ? ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--model', model]
+      : ['-p', prompt, '--model', model]),
+    ...SMALL_MODEL_ALONE,
+  ],
   smallModelInput: (prompt: string, pictures: readonly string[] = []) => {
     if (!pictures.length) return null;
     const content = [

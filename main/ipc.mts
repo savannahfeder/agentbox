@@ -85,7 +85,7 @@ import { EVENT_NAMES } from '../shared/analytics-events.mts';
 import { appFinder } from './everything-found.mts';
 import { appFilesPlace } from './files-place.mts';
 import { Name } from '../shared/product-name.mjs';
-import { setUpGit, startGhLogin } from './github-browser-sign-in.mts';
+import { ghToken, setUpGit, startGhLogin } from './github-browser-sign-in.mts';
 import type { GhLogin } from './github-browser-sign-in.mts';
 import { handedOnByReply, isGivenTask, visibilityWhenMade } from '../shared/team-rules.mts';
 import { closeRefusal, closedAnywayNote } from '../shared/not-shipped.mts';
@@ -1371,6 +1371,16 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     return { ok: true };
   });
 
+  // HER ANSWER TO THE TEAMMATE AUTO OFFERED ON A THREAD (Teammates#answerOffer).
+  ipcMain.handle('zero:answer-route-offer', (_e, { product, id, make }: { product: string; id: string; make: boolean }) => {
+    const item = store.readItem(product, id);
+    if (!item) throw new Error('that thread is gone');
+    if (!store.teammates?.answerOffer) throw new Error('teammates are off');
+    const out = store.teammates.answerOffer({ ...item, product }, make === true);
+    supervisor.wake();
+    return { ok: true, made: out.made };
+  });
+
   /* ----------------------------- the first run ---------------------------- */
   // THE WALK'S EXAMPLE TASK, ANSWERED BY THE APP RATHER THAN BY A SESSION.
   //
@@ -2206,9 +2216,9 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   });
   // A saved key carries on every thread that was waiting on it, as if each had been replied to.
   // `reply` is the person's own words for the thread the key was pasted on, which go instead of the app's.
-  ipcMain.handle('zero:cloud-key', async (_e, { action, name, value, label, reply } = {}) => {
+  ipcMain.handle('zero:cloud-key', async (_e, { action, name, value, label, reply, from } = {}) => {
     try {
-      let { keys, freed } = await supervisor.cloudKey(action, name, value, { label: typeof label === 'string' ? label : null });
+      let { keys, freed } = await supervisor.cloudKey(action, name, value, { label: typeof label === 'string' ? label : null, from: from ?? null });
       if (reply?.id && typeof reply.answer === 'string' && reply.answer.trim()) {
         freed = [...freed.filter((t) => t.id !== reply.id || t.product !== reply.product), { product: reply.product, id: reply.id, answer: reply.answer }];
       }
@@ -2221,9 +2231,9 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     }
   });
   // What the person did with a sign-in link an agent is waiting on (shared/sign-in-ask.mjs).
-  ipcMain.handle('zero:sign-in-answer', (_e, { product, id, ask, said, url } = {}) => {
+  ipcMain.handle('zero:sign-in-answer', (_e, { product, id, ask, said, url, code } = {}) => {
     try {
-      store.answerSignIn(product, id, { id: ask, said, url });
+      store.answerSignIn(product, id, { id: ask, said, url, code });
       push();
       return { ok: true };
     } catch (err) {
@@ -2245,6 +2255,27 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
         push();
       });
       return { ok: true, code: login.code, url: login.url };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+  // The same sign-in for a cloud thread that asked for GitHub: `start` answers with the code and link,
+  // `token` waits for the approval and answers with the token gh made, which the card saves as GH_TOKEN.
+  let ghCloudLogin: GhLogin | null = null;
+  ipcMain.handle('zero:github-cloud-sign-in', async (_e, { action }: { action?: string } = {}) => {
+    try {
+      if (action === 'start') {
+        ghCloudLogin?.cancel();
+        const login = ghCloudLogin = await startGhLogin();
+        return { ok: true, code: login.code, url: login.url };
+      }
+      const login = ghCloudLogin;
+      if (!login) return { ok: false, error: 'Start GitHub\'s sign-in again.' };
+      const approved = await login.done;
+      if (ghCloudLogin === login) ghCloudLogin = null;
+      if (!approved) return { ok: false, error: 'GitHub\'s sign-in ended before it was approved. Start it again.' };
+      const token = await ghToken();
+      return token ? { ok: true, token } : { ok: false, error: 'GitHub signed in, but gh gave no token back. Paste a token instead.' };
     } catch (err) {
       return { ok: false, error: String((err as Error).message) };
     }

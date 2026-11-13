@@ -49,6 +49,7 @@ import { api } from '../api';
 import { CLOUD_KEY, CLOUD_WHEN_ON, cloudButtonCount, cloudFootLine, cloudIsOn, cloudMonthLine, cloudMoveLine, countedAccounts, type CloudMode, type CloudStatus } from '../cloud-menu';
 import { brokenAccounts, buttonAsksSignIn, menuSetupLine, readBrokenSeen, seenAfter, SETUP, writeBrokenSeen } from '../cloud-setup';
 import type { Offer, OfferGo } from '../cloud-upgrade';
+import { isCause, causeOf, waitingOn, causeWord, causeWhere, CAUSE_WAIT_WORD, CAUSE_BACK_WORDS } from '../../../shared/causes.mts';
 import './pages.css';
 
 // Before the frame is drawn in the app; a plain effect where there is no
@@ -809,6 +810,18 @@ export function ThreadCells({ item, product, now, person, tab }: {
     ?? linkCommentLine(item.linkComments)
     ?? (waitCameBack(item) ? item.waitEnded?.said : null)
     ?? item.handedOver?.said;
+  // ONE ROW PER CAUSE (shared/causes.mts): how many threads wait behind it, and from where.
+  const behind = isCause(item) && item.status !== 'done' ? waitingOn(item, allItems ?? []) : null;
+  if (behind) {
+    return <RowCells status={{ ...(status ?? cell), word: causeWord(behind.length) }} title={rowTitle(item)} pinned={!!item.pinned} where={causeWhere(item, behind, product?.name ?? '')} person={person}
+      priority={shownPriority(item)} updatedAt={when} when={back} now={now} action={action} />;
+  }
+  // And a thread behind one says what it waits on, and that it comes back when that is fixed.
+  const stuckOn = tab === 'snoozed' ? causeOf(item, allItems ?? []) : null;
+  if (stuckOn) {
+    return <RowCells status={{ ...(status ?? cell), word: CAUSE_WAIT_WORD }} title={rowTitle(item)} aside={stuckOn.title} where={product?.name ?? ''} person={person}
+      priority={shownPriority(item)} updatedAt={when} when={CAUSE_BACK_WORDS} now={now} />;
+  }
   return <RowCells status={status} retry={retry} lead={handedFace ?? <TeammateLead item={item} />} title={rowTitle(item)} aside={asideBesides(rowTitle(item), commented ?? (toApproveWords(waiting.get(`${item.product}/${item.id}`)) || null)) ?? undefined} shared={seen === 'people'} chosen={chosen} lock={lock} held={notStarted(item)} pinned={!!item.pinned && item.status !== 'done'} where={product?.name ?? ''} person={person}
     priority={shownPriority(item)} updatedAt={when} when={back} now={now} action={action} />;
 }
@@ -1097,15 +1110,18 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
           const on = pick && !!marked?.has(e.item!.id);
           const edge = isSelected(e) && !marked?.size;
           // A teammate's card carries their summary and never our agents.
-          const status = e.item ? statusCell(e.item, { ...factsFor(fleet, e.item.id), state: e.state, inProgress: e.state === 'running', now, practice: !!products.find((p) => p.slug === e.item!.product)?.practice }) : null;
+          const drawn = e.item ? statusCell(e.item, { ...factsFor(fleet, e.item.id), state: e.state, inProgress: e.state === 'running', now, practice: !!products.find((p) => p.slug === e.item!.product)?.practice }) : null;
+          // A cause card says how many wait behind it, as its list row does.
+          const status = drawn && e.item && isCause(e.item) && e.item.status !== 'done' ? { ...drawn, word: causeWord(waitingOn(e.item, allItems ?? []).length) } : drawn;
           const prio = rowPriorityId(e.priority);
           const seen = e.item ? sharing(e.item) : null;
           const who = seen === 'people' ? <SharedMark label="Visible to the people on it" /> : seen === 'private' ? <LockMark /> : null;
           const pin = e.item?.pinned && e.item.status !== 'done' ? <PinMark size={13} className="th-pin" /> : null;
           const marks = who || pin ? <>{who}{pin}</> : null;
           const cardWaits = e.card && e.card.state !== 'done' ? linkWords(e.card.blockedBy, team?.byId) : null;
+          const stuckOn = e.item ? causeOf(e.item, allItems ?? []) : null;
           const waitWord = e.item
-            ? waitWords(e.item, { items: allItems, cards: team?.state.cards ?? [], nameOf: (id: string) => team?.byId.get(id)?.name ?? 'Someone' })?.word
+            ? waitWords(e.item, { items: allItems, cards: team?.state.cards ?? [], nameOf: (id: string) => team?.byId.get(id)?.name ?? 'Someone' })?.word ?? (stuckOn ? `Waits on ${stuckOn.title}` : undefined)
             : cardWaits && `Waits on ${cardWaits}`;
           const messageProduct = e.message && e.item ? products.find((p) => p.slug === e.item!.product) : null;
           const onThem = messageProduct && iSpokeLast(e.item!, messageProduct, team?.me ?? null)
@@ -1139,7 +1155,7 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
             : onThem ? <span className="s">{onThem}</span>
             : waitWord ? <span className="s">{waitWord}</span>
             : e.card?.shippedAt ? <span className="s">Shipped</span>
-            : status && saysOnCard(status, e.item!, e.state)
+            : status && (saysOnCard(status, e.item!, e.state) || (status !== drawn))
             ? <span className="s"><StatusMark status={status} />{status.word}</span>
             : e.live && <RunningMark cloud={!!e.item && cloudIds.has(e.item.id)} />}{prio && <PriorityMark id={prio} />}{e.project && <span className="p">{e.project}</span>}
             {withOthers && <Face person={personOf(team, e.ownerId)} me={e.ownerId === me} />}</div>
