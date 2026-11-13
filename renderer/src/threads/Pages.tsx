@@ -578,7 +578,7 @@ export function InboxClear({ slot, first = false, sky = null }: { slot: (el: HTM
   const head = localStorage.getItem('zero.preview.zeroHead') || 'halo';
   const h2 = <h2>{first ? 'Give an agent its first task' : 'Nothing needs you'}</h2>;
   return <div className={`th-clear th-start zh-${head}`}>
-    {sky && <InboxSky art={sky} shape={shape} below={head === 'below'} />}
+    {sky && <InboxSky art={sky} shape={shape} below={head === 'below'} low={head === 'open'} />}
     {head === 'card' ? <div className="zh-card">{h2}<div className="th-clear-compose" ref={slot} /></div> : <>{h2}<div className="th-clear-compose" ref={slot} /></>}
   </div>;
 }
