@@ -79,7 +79,7 @@ describe('the setup account step', () => {
     expect(page).toMatch(/if \(!ready\) \{\s*const gap = partMissing\(part, \{ name, email, password \}\);[\s\S]{0,160}setMissing\(gap\);/);
   });
   it('lets the sign-in page own Back and Enter on this step', () => {
-    expect(split).toMatch(/<SignInPage purpose="team" startOn="sign-up" inSetup onSignedIn=\{next\} onBack=\{back \?\? undefined\} primaryRef=\{accountPrimary\} termsAt=\{foot\} \/>/);
+    expect(split).toMatch(/<SignInPage purpose="team" startOn="sign-up" inSetup onSignedIn=\{pastAccount\} onBack=\{back \?\? undefined\} primaryRef=\{accountPrimary\} termsAt=\{foot\} \/>/);
     expect(split).toMatch(/\{back && step !== 'account' && <button type="button" className="ss-back"/);
   });
   it('gives a step that draws no button of its own no stale Enter', () => {

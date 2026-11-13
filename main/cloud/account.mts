@@ -279,6 +279,20 @@ export async function signInToCloud({ config, acceptedTerms, name = os.hostname(
   return { ok: true, ...(me.status === 200 ? me.body : {}) };
 }
 
+/**
+ * This Mac's cloud key from the sign-in the team already has. The team and the
+ * cloud are one account on one database, so someone signed in to the first is
+ * not asked to sign in to the second. `acceptTerms` is true only where the
+ * terms were named as that account was made.
+ */
+export async function cloudFromTeamSignIn({ config, teamUrl, token, acceptTerms, env = process.env, home = os.homedir() }: { config: { gateway: string; supabaseUrl: string }; teamUrl: string | null | undefined; token: string | null | undefined; acceptTerms: boolean } & StoreDirs): Promise<AccountOutcome> {
+  if (signedIn(env, home)) return { ok: true };
+  const same = (u: unknown) => String(u ?? '').replace(/\/+$/, '');
+  if (!token || same(teamUrl) !== same(config.supabaseUrl)) return { ok: false, error: 'signed-out', message: `Sign in to ${Name} Cloud first.` };
+  const out = await signInToCloud({ config, acceptedTerms: acceptTerms ? await currentCloudTerms(config) : undefined, googleSignIn: async () => token, env, home });
+  return out.ok ? out : { ...out, message: out.message || out.error };
+}
+
 // The server's cloud and this Mac's key for it, or null when signed out.
 function signedIn(env: NodeJS.ProcessEnv, home: string): { gateway: string; key: string } | null {
   const gateway = readCloudConfig(env, home)?.gateway;

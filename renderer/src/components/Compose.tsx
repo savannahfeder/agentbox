@@ -40,7 +40,7 @@ import { ModelPicker } from './Model';
 import { DEFAULT_MODEL, engineModelPicked, readLastModel, writeLastModel, type ModelChoice } from '../models';
 import { effortChoicesFor, effortPicked, readLastEffort, writeLastEffort } from '../effort';
 import { EnginePicker } from './EnginePicker';
-import { engineThisMacOffers, readLastEngine, writeLastEngine } from '../engines';
+import { ENGINE_CHOSEN, engineThisMacOffers, readLastEngine, writeLastEngine } from '../engines';
 import { DEFAULT_ENGINE, ENGINES, type Engine } from '../../../shared/engines.mts';
 import { footerIsOpen, restingClause } from '../compose-footer';
 import { practiceRefusal } from '../compose-says';
@@ -153,6 +153,17 @@ export function Compose({ products, hidden, onSend, onReorder, onHide, onNewProj
   // stops at `xhigh` is not sent. The memory is kept for when the model changes back.
   const [effort, setEffort] = useState<string | null>(() => readLastEffort(undefined, engine));
   const pickEffort = (id: string | null) => { setEffort(id); writeLastEffort(id, undefined, engine); };
+  // The setup asks which agent while this box is already open behind it.
+  useEffect(() => {
+    const chosen = () => {
+      const id = engineThisMacOffers(readLastEngine(undefined, workspaceEngine), engineRows);
+      setEngine(id);
+      setModel(readLastModel(undefined, id, codexModelDefault ?? null));
+      setEffort(readLastEffort(undefined, id));
+    };
+    addEventListener(ENGINE_CHOSEN, chosen);
+    return () => removeEventListener(ENGINE_CHOSEN, chosen);
+  });
   const effortRows = effortChoicesFor(engine, model, { codexModels: codexModels ?? [], codexDefault: codexModelDefault ?? null });
   const effortOn = effortPicked(effort, effortRows) ? effort : null;
   // What the card opened with, frozen on the first render. The level and model

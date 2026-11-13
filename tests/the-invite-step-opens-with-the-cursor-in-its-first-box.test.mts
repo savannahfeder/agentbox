@@ -20,7 +20,9 @@ describe('where the cursor is when the invite step opens', () => {
   it('is put there on arrival, and only on the invite step', () => {
     expect(split).toMatch(/if \(step !== 'invite'\) return;\s*document\.querySelector<HTMLInputElement>\(`\.setup-split input\[data-ss-enter="\$\{inviteCursor\(!!p\.snap\?\.team\?\.team\)\}"\]`\)\?\.focus\(\);/);
   });
-  it('goes back to the name when Enter finds it empty', () => {
-    expect(split).toMatch(/setError\('Name your team first\.'\); document\.querySelector<HTMLInputElement>\('\.setup-split input\[data-ss-enter="to-email"\]'\)\?\.focus\(\); return;/);
+  // 2026-11-12: the team is made as Pro starts, so the name box arrives filled and an empty one is no error.
+  it('finds the name box already holding the team’s name', () => {
+    expect(split).toMatch(/useEffect\(\(\) => \{ setTeamName\(teamNow\); \}, \[teamNow\]\);/);
+    expect(split).not.toMatch(/Name your team first\./);
   });
 });

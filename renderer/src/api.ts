@@ -1738,6 +1738,12 @@ export const api = {
     if (!zero?.cloudAccountPay) return { ok: false, message: RESTART_NOTE };
     return zero.cloudAccountPay({ plan });
   },
+  /** Signs this computer in to the cloud with the team sign-in it already has. */
+  async cloudAccountFromTeam(acceptTerms: boolean): Promise<{ ok: boolean; error?: string; message?: string }> {
+    const zero = laterBridge();
+    if (!zero?.cloudAccountFromTeam) return { ok: false, message: RESTART_NOTE };
+    return zero.cloudAccountFromTeam({ acceptTerms });
+  },
   async cloudAccountBilling(): Promise<{ ok: boolean; error?: string; message?: string }> {
     const zero = window.zero;
     if (!zero?.cloudAccountBilling) return { ok: false, message: RESTART_NOTE };

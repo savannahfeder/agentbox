@@ -2192,6 +2192,19 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     return plan;
   });
   ipcMain.handle('zero:cloud-account-pay', (_e, { plan }: { plan?: string } = {}) => cloudCall('payForCloud', { plan }));
+  // The setup makes a team account one step before it offers Pro, and the payment is the cloud's.
+  ipcMain.handle('zero:cloud-account-from-team', async (_e, { acceptTerms }: { acceptTerms?: unknown } = {}) => {
+    try {
+      const home = supervisor.config.home || os.homedir();
+      const { cloudAccountConfig, cloudFromTeamSignIn } = await import('./cloud/account.mts');
+      const { loadCloudConfig } = await import('./team/session.mts');
+      const out = await cloudFromTeamSignIn({ config: cloudAccountConfig(supervisor.appDir, { home }), teamUrl: loadCloudConfig(supervisor.appDir)?.url, token: (await team?.liveToken?.()) ?? null, acceptTerms: acceptTerms === true, home });
+      push();
+      return out;
+    } catch (err) {
+      return { ok: false, error: 'unreachable', message: `The cloud did not answer: ${(err as Error)?.message || err}` };
+    }
+  });
   ipcMain.handle('zero:cloud-account-billing', () => cloudCall('openCloudBilling'));
   ipcMain.handle('zero:cloud-account-team-billing', () => cloudCall('cloudTeamBilling'));
 

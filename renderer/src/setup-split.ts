@@ -3,7 +3,7 @@
 // tests/the-setup-beside-the-app-asks-only-what-applies.test.mjs reads them.
 
 import { MATCH_SKY } from './home/sky';
-import { FREE, TEAM } from '../../cloud/gateway/plans.mjs';
+import { TEAM } from '../../cloud/gateway/plans.mjs';
 
 /** Where the app sits beside the setup, in window pixels: the steps panel's
  *  width, the app's top-left corner and scale, and, in the app's own pixels,
@@ -18,7 +18,7 @@ export function setupPreview(width: number, height: number) {
   return { left, x, y, scale, h: (height - 16 - y) / scale, right: Math.max(0, 1120 - (width - 16 - x) / scale) };
 }
 
-export type SetupStep = 'chats' | 'folder' | 'agent' | 'account' | 'plan' | 'invite' | 'pay' | 'teammates' | 'look';
+export type SetupStep = 'chats' | 'folder' | 'agent' | 'account' | 'plan' | 'invite' | 'teammates' | 'look';
 export type SetupPlan = 'free' | 'pro';
 
 /** Only the steps that can apply on this build: most people are not on a team,
@@ -30,23 +30,15 @@ export function setupSteps({ chats, team, teammates, project, signedIn = true, p
   if (agents > 1) out.push('agent');
   // Signing in is required, so it is a step, and what needs it comes after.
   if (team && !signedIn) out.push('account');
-  // The team is a paid thing: Free goes on without inviting anyone.
+  // One page offers Pro and takes its payment. The team is a paid thing, so inviting comes only once Pro is started.
   if (team && !onTeam) out.push('plan');
   if (team && (onTeam || plan === 'pro')) out.push('invite');
-  // Seats are bought for a team, so the purchase page follows the step that makes it.
-  if (team && !onTeam && plan === 'pro') out.push('pay');
   if (teammates && project) out.push('teammates');
   out.push('look');
   return out;
 }
 
-/** The plans the setup offers, at the prices the cloud charges (cloud/gateway/plans.mjs). */
-export const SETUP_PLANS: Array<{ id: SetupPlan; name: string; price: string; per?: string; tag?: string; sub: string }> = [
-  { id: 'free', name: 'Free', price: '$0', sub: `Just you, with ${FREE.hours} cloud hours to try` },
-  { id: 'pro', name: 'Pro', price: `$${TEAM.dollarsPerSeat}`, per: 'a month', tag: `${TEAM.trialDays} days free`, sub: `Your team, plus ${TEAM.agentsPerSeat} cloud agents at once` },
-];
-
-/** The purchase page's words: what Pro brings in three lines, the cloud computer first, the price in one quiet line.
+/** The plan page's words: what Pro brings in three lines, the cloud computer first, the price in one quiet line, and Free as the way on.
  *  components/ProShowcase.tsx draws one card for each line, in this order. */
 export const PRO_PITCH = {
   head: 'Upgrade to Pro.',
@@ -57,7 +49,14 @@ export const PRO_PITCH = {
   ],
   cta: `Try Pro free for ${TEAM.trialDays} days`,
   terms: `Then $${TEAM.dollarsPerSeat} a month. Cancel any time.`,
+  free: 'Stay on Free',
 };
+
+/** A team is made when Pro starts, before anyone has named it; the invite page shows the name to change. */
+export function teamNameFor(person: string | null | undefined): string {
+  const first = (person ?? '').trim().split(/\s+/)[0];
+  return first ? `${first}’s team` : 'My team';
+}
 
 const SHOWCASE_FILL = ['Fix the flaky date picker test', 'Add a health check endpoint', 'Profile the slowest page', 'Port the cron jobs to the queue', 'Write tests for the refund flow', 'Speed up the search index build'];
 /** The agents drawn on their own cloud computers: the person's own chats first, then stand-ins to make six. */

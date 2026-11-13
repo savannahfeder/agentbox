@@ -2,7 +2,6 @@
 // place of the app, one card for each line on the left (PRO_PITCH in
 // ../setup-split.ts), in the same order. Styles are in ./setup-split.css.
 import { useEffect, useRef } from 'react';
-import { TEAM } from '../../../cloud/gateway/plans.mjs';
 import { drawSky, skyTheme } from '../home/sky';
 import { useDarkWindow } from '../home/home-settings';
 
@@ -29,7 +28,7 @@ export function ProShowcase({ agents, team }: { agents: string[]; team: string |
       <canvas ref={sky} className="pro-sky" />
       <div className="pro-cards">
         <section className="pro-card" data-perk="cloud">
-          <header>{PERK_ICONS.cloud}Cloud computers<span>{TEAM.agentsPerSeat} at once</span></header>
+          <header>{PERK_ICONS.cloud}Cloud computers<span>One for each agent</span></header>
           <div className="pro-pcs">{agents.map((a) => <div key={a} className="pro-pc"><i /><span>{a}</span></div>)}</div>
         </section>
         <section className="pro-card" data-perk="team">

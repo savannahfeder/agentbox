@@ -2,8 +2,7 @@
 //
 // A first-day power user went through the setup by keyboard and logged it as
 // broken: "Agent choices are skipped by Tab", and had to click to pick Codex.
-// The same was true of the plan and the look: their rows were clickable and
-// nothing else, so a keyboard user could not pick Pro at all.
+// The same was true of the look: its rows were clickable and nothing else.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { nextChoice } from '../renderer/src/setup-split.ts';
@@ -31,9 +30,8 @@ describe('the choice one along', () => {
 });
 
 describe('the setup', () => {
-  it('moves the agent, the plan and the look with ↑ and ↓', () => {
+  it('moves the agent and the look with ↑ and ↓', () => {
     expect(split).toMatch(/choose\.current = \(by\) => setEngine\(nextChoice\(/);
-    expect(split).toMatch(/choose\.current = \(by\) => setPlan\(nextChoice\(/);
     expect(split).toMatch(/choose\.current = \(by\) => p\.onLook\(nextChoice\(/);
   });
   it('leaves the arrows alone while a box is being typed in, and on a step with no choice', () => {

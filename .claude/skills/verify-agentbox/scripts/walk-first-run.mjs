@@ -61,6 +61,13 @@ await page.call('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
     if (String(url).includes('zero%3Aengine-setup') && body.includes('"ready"') && body.includes('"codex"')) {
       return new Response(JSON.stringify({ ok: true, engine: 'codex', found: true, signedIn: true, certain: true }), { status: 200, headers: { 'content-type': 'application/json' } });
     }
+    // NOTHING HERE PAYS. The walk cannot give Stripe a card, so the cloud's three answers on the plan page are
+    // stood in for: signed in, checkout opened, seats bought. The team itself is made on the stand-in team cloud.
+    // What the real cloud says to a team sign-in is tests/the-setup-has-one-plan-page-then-payment-then-an-invite-you-can-skip.
+    const said = (o) => new Response(JSON.stringify(o), { status: 200, headers: { 'content-type': 'application/json' } });
+    if (String(url).includes('zero%3Acloud-account-from-team')) return said({ ok: true });
+    if (String(url).includes('zero%3Acloud-account-pay')) return said({ ok: true, where: 'checkout' });
+    if (String(url).includes('zero%3Acloud-account-plan') && window.__walkPaid) return said({ signedIn: true, team: { trial: false, seats: 1 } });
     return real(url, init);
   };
 })()` });
@@ -90,6 +97,8 @@ const enter = { key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\
 
 try {
   await page.until(`/ready/i.test(document.querySelector('.ob-foot')?.textContent ?? '')`, { why: 'the welcome to say which agents are ready' });
+  // The welcome fades in; a picture taken at once is a logo on an empty screen.
+  await page.wait(2500);
   await see('welcome', /CLAUDE CODE AND CODEX\s+READY/i);
   // One long press of Enter is one step, not the whole setup.
   await page.call('Input.dispatchKeyEvent', { type: 'keyDown', ...enter });
@@ -117,26 +126,23 @@ try {
   await page.type('correct-horse-9');
   await see('account-email-and-password', /Create account/i);
   await key('Enter');
-  await see('plan', /Pick a plan.*Free.*Pro/i);
-  await key('ArrowDown');
-  await see('plan-pro', /STEP \d+ OF 7/i);
+  await see('plan', /Upgrade to Pro.*Try Pro free for 7 days.*Stay on Free/i);
+  if (/at once/i.test(await page.evaluate(`document.querySelector('.setup-split')?.innerText ?? ''`))) throw new Error('the plan page still names a number of cloud agents at once');
   await key('Enter');
-  await see('invite', /Invite your team/i);
-  await page.type('Northwind');
-  await key('Enter');
+  await see('plan-waiting-on-stripe', /Finish in your browser/i);
+  await page.evaluate('window.__walkPaid = true');
+  await see('invite', /Invite your team.*Skip/i);
+  if (!await page.evaluate(`document.querySelector('.setup-split input[data-ss-enter="to-email"]')?.value === 'Dana’s team'`)) throw new Error('the invite page did not show the team made as Pro started');
   await page.type('theo@northwind.test');
   await key('Enter');
-  await see('invite-added', /Send 1 invite/i);
+  await see('invite-added', /Send 1 invite.*Skip/i);
   await key('Enter');
-  await see('pay', /Upgrade to Pro.*Skip for now/i);
-  await click('Skip for now');
   await see('look', /Pick your look/i);
   await key('Enter');
-  await see('all-set', /You’re set up.*4 chats brought in.*1 teammate invited/i);
+  await see('all-set', /You’re set up.*4 chats brought in.*1 teammate invited.*Start the walkthrough/i);
   await key('Enter');
 
-  await see('walkthrough-compose', /WALKTHROUGH 1 OF 5.*to send this practice thread/i);
-  await key('Enter', [CHORD]);
+  await see('walkthrough-compose', /WALKTHROUGH 1 OF 5.*to send this practice thread/i);  await key('Enter', [CHORD]);
   await see('walkthrough-working', /WALKTHROUGH 2 OF 5.*Your agent is working/i);
   await see('walkthrough-answered', /WALKTHROUGH 2 OF 5.*Your agent has answered/i);
   await key('Tab', ['shift']);
