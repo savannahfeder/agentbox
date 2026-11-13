@@ -23,13 +23,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { PGlite } from '@electric-sql/pglite';
 import {
   NOTE_WINDOW, NOTES_PER_RUN, VERSIONS, versionFor, firstNameFor, noteFor, keysMatch, readNoteConfig, sendFounderNotes, previewFor,
 } from '../cloud/supabase/functions/_shared/founder-note.mjs';
 import {
   DEFAULT_ADDRESS, noteUrl, senderLine, newKey, ownersFrom, secretsFile, vaultSql, heldMigration, resultsSql,
 } from '../scripts/lib/founder-note-setup.mjs';
+import { emptyDatabase } from './an-empty-test-database.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
@@ -266,8 +268,7 @@ create publication supabase_realtime;
   const due = async () => (await db.query(`select * from public.founder_note_due($1::uuid[], 7, 3, 50)`, [[id(1)]])).rows;
 
   beforeAll(async () => {
-    const { PGlite } = await import('@electric-sql/pglite');
-    db = new PGlite();
+    db = new PGlite(await emptyDatabase());
     await db.exec(STAND_IN);
     await db.exec(migrations);
     await signUp(1, 'owner@example.com', { daysAgo: 5 });
@@ -285,6 +286,7 @@ create publication supabase_realtime;
     await db.query('insert into public.team_members (team_id, person_id) values ($1, $2)', [other, id(8)]);
     await db.query('insert into public.founder_notes (person_id) values ($1)', [id(9)]);
   });
+  afterAll(() => db?.close());
 
   it('is everyone confirmed between 3 and 7 days old, oldest first, with the name they gave', async () => {
     expect(await due()).toEqual([
@@ -429,49 +431,58 @@ describe('setting it up', () => {
   });
 
   it('puts the address and key in the vault, and replaces them on a second run', async () => {
-    const { PGlite } = await import('@electric-sql/pglite');
-    const db = new PGlite();
-    await db.exec(`
-      create schema vault;
-      create table vault.secrets (id uuid primary key default gen_random_uuid(), name text unique, secret text);
-      create function vault.create_secret(s text, n text) returns uuid language sql as $$ insert into vault.secrets (name, secret) values (n, s) returning id $$;
-      create function vault.update_secret(i uuid, s text) returns void language sql as $$ update vault.secrets set secret = s where id = i $$;
-    `);
-    const url = noteUrl('abcdefghijklmnopqrst');
-    const first = newKey();
-    const second = newKey();
-    await db.exec(vaultSql({ url, key: first }));
-    await db.exec(vaultSql({ url, key: second }));
-    expect((await db.query('select name, secret from vault.secrets order by name')).rows).toEqual([
-      { name: 'founder_note_key', secret: second },
-      { name: 'founder_note_url', secret: url },
-    ]);
+    const db = new PGlite(await emptyDatabase());
+    try {
+      await db.exec(`
+        create schema vault;
+        create table vault.secrets (id uuid primary key default gen_random_uuid(), name text unique, secret text);
+        create function vault.create_secret(s text, n text) returns uuid language sql as $$ insert into vault.secrets (name, secret) values (n, s) returning id $$;
+        create function vault.update_secret(i uuid, s text) returns void language sql as $$ update vault.secrets set secret = s where id = i $$;
+      `);
+      const url = noteUrl('abcdefghijklmnopqrst');
+      const first = newKey();
+      const second = newKey();
+      await db.exec(vaultSql({ url, key: first }));
+      await db.exec(vaultSql({ url, key: second }));
+      expect((await db.query('select name, secret from vault.secrets order by name')).rows).toEqual([
+        { name: 'founder_note_key', secret: second },
+        { name: 'founder_note_url', secret: url },
+      ]);
+    } finally {
+      await db.close();
+    }
   });
 
   it('can hold the daily job: the table and query go in, a running job stops, nothing new is scheduled', async () => {
-    const { PGlite } = await import('@electric-sql/pglite');
-    const db = new PGlite();
-    await db.exec(STAND_IN_FOR_HOLD);
-    await db.exec(`
-      create schema cron;
-      create table cron.job (jobid serial primary key, jobname text);
-      create function cron.unschedule(id int) returns boolean language sql as $$ delete from cron.job where jobid = id returning true $$;
-      insert into cron.job (jobname) values ('founder-note'), ('something-else');
-    `);
-    const held = heldMigration(read('cloud/supabase/migrations/20261110000000_a_thank_you_note_from_the_founder.sql'));
-    expect(held).not.toMatch(/cron\.schedule/);
-    await db.exec(held);
-    await db.exec(held);
-    expect((await db.query('select jobname from cron.job')).rows).toEqual([{ jobname: 'something-else' }]);
-    expect((await db.query(`select count(*)::int as n from public.founder_note_due($1::uuid[], 7, 3, 50)`, [[]])).rows[0].n).toBe(0);
+    const db = new PGlite(await emptyDatabase());
+    try {
+      await db.exec(STAND_IN_FOR_HOLD);
+      await db.exec(`
+        create schema cron;
+        create table cron.job (jobid serial primary key, jobname text);
+        create function cron.unschedule(id int) returns boolean language sql as $$ delete from cron.job where jobid = id returning true $$;
+        insert into cron.job (jobname) values ('founder-note'), ('something-else');
+      `);
+      const held = heldMigration(read('cloud/supabase/migrations/20261110000000_a_thank_you_note_from_the_founder.sql'));
+      expect(held).not.toMatch(/cron\.schedule/);
+      await db.exec(held);
+      await db.exec(held);
+      expect((await db.query('select jobname from cron.job')).rows).toEqual([{ jobname: 'something-else' }]);
+      expect((await db.query(`select count(*)::int as n from public.founder_note_due($1::uuid[], 7, 3, 50)`, [[]])).rows[0].n).toBe(0);
+    } finally {
+      await db.close();
+    }
   });
 
   it('holds safely where there is no scheduler at all', async () => {
-    const { PGlite } = await import('@electric-sql/pglite');
-    const db = new PGlite();
-    await db.exec(STAND_IN_FOR_HOLD);
-    await expect(db.exec(heldMigration(read('cloud/supabase/migrations/20261110000000_a_thank_you_note_from_the_founder.sql')))).resolves.toBeDefined();
-    expect(() => heldMigration('select 1;')).toThrow();
+    const db = new PGlite(await emptyDatabase());
+    try {
+      await db.exec(STAND_IN_FOR_HOLD);
+      await expect(db.exec(heldMigration(read('cloud/supabase/migrations/20261110000000_a_thank_you_note_from_the_founder.sql')))).resolves.toBeDefined();
+      expect(() => heldMigration('select 1;')).toThrow();
+    } finally {
+      await db.close();
+    }
   });
 });
 

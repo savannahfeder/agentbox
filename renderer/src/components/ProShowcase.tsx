@@ -29,7 +29,7 @@ export function ProShowcase({ agents, team }: { agents: string[]; team: string |
       <canvas ref={sky} className="pro-sky" />
       <div className="pro-cards">
         <section className="pro-card" data-perk="cloud">
-          <header>{PERK_ICONS.cloud}Cloud computers<span>{TEAM.agentsPerSeat} at once</span></header>
+          <header>{PERK_ICONS.cloud}Cloud computers<span>Any number at once</span></header>
           <div className="pro-pcs">{agents.map((a) => <div key={a} className="pro-pc"><i /><span>{a}</span></div>)}</div>
         </section>
         <section className="pro-card" data-perk="team">

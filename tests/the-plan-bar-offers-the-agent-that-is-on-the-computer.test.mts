@@ -61,7 +61,7 @@ describe('what the plan bar offers', () => {
   // lead on being here and the sentence cannot name one plan.
   it('offers both sign-ins when both agents are here and signed out', () => {
     const bar = planBar([reading('claude', true, false), reading('codex', true, false)]);
-    expect(bar.say).toBe('Agents cannot start until they have a plan to run on.');
+    expect(bar.say).toBe('Agents cannot start until you sign in to your Claude or ChatGPT plan.');
     expect(bar.first).toEqual({ plan: 'claude', label: 'Sign in to Claude' });
     expect(bar.second).toEqual({ plan: 'codex', label: 'Sign in to ChatGPT' });
   });
