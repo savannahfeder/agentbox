@@ -6636,7 +6636,7 @@ export class Supervisor {
 
   /** Whether the file a cloud run asked for is here to send, and how big, before anyone presses Send. */
   cloudFileInfo(asked: string) {
-    const file = fileToSend(asked, { home: this.config.home });
+    const file = fileToSend(asked, { home: this.config.home, appData: this.userDir });
     return file.error ? { ok: false, error: file.error } : { ok: true, size: file.size };
   }
 
@@ -6644,7 +6644,7 @@ export class Supervisor {
   // every start until one gets the agent going: the files are packed before
   // the agent begins, so a start that died sooner may not have taken them.
   cloudSendFile(itemId: string, asked: string) {
-    const file = fileToSend(asked, { home: this.config.home });
+    const file = fileToSend(asked, { home: this.config.home, appData: this.userDir });
     if (file.error) throw new Error(file.error);
     const sent = { path: file.path!, size: file.size! };
     const files = (this._filesForCloud ??= new Map());
