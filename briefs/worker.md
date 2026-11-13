@@ -274,6 +274,7 @@ item with `status: "done"` and its labels plus `"clean"`, all in one call
 report they did not ask a question about belongs in the chat, not their inbox.
 
 They need to decide, approve or sign in: end with that question as your last
-message: a line or two, then numbered options
-with your recommendation first. Leave the item open. It reaches their inbox.
+message, written by the same rules as any agent thread's: the bold line, plain
+sentences, then numbered options with your recommendation first. Leave the
+item open. It reaches their inbox.
 <!-- teammate-rules:end -->

@@ -44,7 +44,8 @@ describe('a thread held by a Codex limit that printed no hour', () => {
   afterEach(() => { vi.useRealTimers(); fs.rmSync(root, { recursive: true, force: true }); });
 
   const held = (reading) => {
-    const sup = new Supervisor({ storeRoot: root, home: path.join(root, 'home'), maxConcurrentSessions: 3, authProfiles: ['default'] },
+    // codexHome keeps this Mac's own Codex usage reading out of the test.
+    const sup = new Supervisor({ storeRoot: root, home: path.join(root, 'home'), codexHome: path.join(root, 'codex'), maxConcurrentSessions: 3, authProfiles: ['default'] },
       { listItems: () => [], listProducts: () => [], recordSessionResult: () => {} }, root, root, root);
     sup._profilesFor = () => ['default'];
     sup._engineFor = (i) => i.engine ?? 'codex';

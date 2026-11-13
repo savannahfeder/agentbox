@@ -68,7 +68,7 @@ import { openForThePerson } from './opens-a-program.mts';
 import { installNotifier } from './notify.mts';
 import { createCornerTag } from './corner-tag.mts';
 import { loadLiquidGlass } from './liquid-glass.mts';
-import { DOC_SCHEMES, DocGrants, docPath } from './doc-scheme.mts';
+import { DOC_SCHEMES, DocGrants, docPath, servedApart } from './doc-scheme.mts';
 import { quietTheFramesScrollbars } from './frame-scrollbars.mts';
 import { letLocalAppsShowInThePane } from './local-app-frames.mts';
 import { hardenAttachedWebview } from './webview-guard.mts';
@@ -130,9 +130,10 @@ protocol.registerSchemesAsPrivileged([...DOC_SCHEMES.map((scheme) => ({
 
 // A local file answered so the window asks again next time instead of reusing
 // what it drew before. Why, measured, is at the page scheme's handler below.
-function noStore(res: Response) {
+function noStore(res: Response, extra: Record<string, string> = {}) {
   const headers = new Headers(res.headers);
   headers.set('cache-control', 'no-store');
+  for (const [k, v] of Object.entries(extra)) headers.set(k, v);
   return new Response(res.body, { status: res.status, headers });
 }
 
@@ -1434,7 +1435,7 @@ if (!app.requestSingleInstanceLock()) {
         // replaced on disk 2250 -> 3118 wide, page reopened, frame drew 2250.
         // With this header it drew 3118. These are local files; there is no
         // download to save by caching them.
-        return noStore(await net.fetch(pathToFileURL(file).toString()));
+        return noStore(await net.fetch(pathToFileURL(file).toString()), servedApart(file));
       } catch {
         return new Response('Not there.', { status: 404 });
       }

@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import {
   setupSteps, stepLabel, typingInSetup, setupLook, tourCount, lookChoices, starterChoices, inviteList, setUpLines, tourChecklist,
 } from '../renderer/src/setup-split.ts';
+import { SKY_THEMES } from '../renderer/src/home/sky.ts';
 
 describe('which steps the setup shows', () => {
   // The founder (2026-11-09): "we are making login required so this is not a
@@ -61,8 +62,10 @@ describe('the looks offered', () => {
   it('puts the look you have first, then Match my system, then the dark orange sky', () => {
     expect(lookChoices('sage', true).slice(0, 3)).toEqual(['sage', 'match', 'ember']);
   });
-  it('does not offer the light pink sky unless you already wear it', () => {
-    expect(lookChoices('light', true)).not.toContain('dusk-light');
+  // F-207 (QA session 41, Nov 9 2026): setup left out Light purple sky, which
+  // Settings offers, so the two lists disagreed.
+  it('offers every sky Settings offers, the light purple one too', () => {
+    for (const sky of SKY_THEMES) expect(lookChoices('light', true)).toContain(sky.id);
     expect(lookChoices('dusk-light', true)[0]).toBe('dusk-light');
   });
   it('lists each look once', () => {

@@ -13,7 +13,7 @@ import { backWords, boardColumns, DEFAULT_DISPLAY, keeps, sentAt, sorted, update
 import { searchThreads } from '../../../renderer/src/threads/search';
 import { parseQuery, splitHits } from '../../../renderer/src/search';
 import { stamp } from '../../../renderer/src/format';
-import { isUrgentRow } from '../../../renderer/src/interrupt';
+import { isUrgentRow } from '../../../renderer/src/urgent-arrival';
 import { priorityIdOf } from '../../../renderer/src/priority';
 import { toApproveWords, waitingCounts } from '../../../renderer/src/threads-made';
 import type { phoneView } from '../../../renderer/src/phone-rows';

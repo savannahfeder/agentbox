@@ -100,10 +100,10 @@ describe('versions the cloud has not numbered', () => {
   });
 
   it('looking up every file once does not look through every waiting version each time', () => {
-    const t = performance.now();
-    for (let i = 0; i < WAITING; i += 1) line.of(`p\0f${i}\0image`);
+    // The fastest of three, so a busy machine during the push's test run cannot fail it.
+    const pass = () => { const t = performance.now(); for (let i = 0; i < WAITING; i += 1) line.of(`p\0f${i}\0image`); return performance.now() - t; };
     // Before: about 125 ms here, and 4 ms after.
-    expect(performance.now() - t).toBeLessThan(40);
+    expect(Math.min(pass(), pass(), pass())).toBeLessThan(40);
   });
 });
 

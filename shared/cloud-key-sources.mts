@@ -2,15 +2,24 @@
 // file under the home folder (whole, or one line of an .env file), or a
 // variable in the person's login shell. The card says it in these words and
 // main/cloud/key-source.mts reads exactly this, so a yes is about what is shown.
+import { pathHoldsSignIns, keychainItemHoldsSignIns } from './sign-in-places.mts';
+
 export type KeySource = { place: 'keychain' | 'file' | 'shell'; from: string; entry?: string };
 export const KEY_PLACES = Object.freeze(['keychain', 'file', 'shell'] as const);
 
 const VARIABLE = /^[A-Za-z_][A-Za-z0-9_]{0,79}$/;
 const ITEM = /^[^\0-\x1f\x7f]{1,200}$/;
 
+/** Whether the place asked for is where a sign-in lives, which no card may read. */
+export function sourceHoldsSignIns({ place, from }: { place?: unknown; from?: unknown } = {}): boolean {
+  const at = String(from ?? '').trim();
+  return (place === 'keychain' && keychainItemHoldsSignIns(at)) || (place === 'file' && pathHoldsSignIns(at));
+}
+
 /** { place, from, entry? } when it is a place a key can be read from, else null. */
 export function keySource({ place, from, entry }: { place?: unknown; from?: unknown; entry?: unknown } = {}): KeySource | null {
   const at = String(from ?? '').trim();
+  if (sourceHoldsSignIns({ place, from: at })) return null;
   if (place === 'keychain') return ITEM.test(at) ? { place, from: at } : null;
   if (place === 'shell') return VARIABLE.test(at) ? { place, from: at } : null;
   if (place !== 'file' || !ITEM.test(at) || !(at.startsWith('~/') || at.startsWith('/'))) return null;

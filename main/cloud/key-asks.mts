@@ -11,7 +11,8 @@ import crypto from 'node:crypto';
 import { answerIsHers, appendSpoolLine, cardDigest, readSpoolJson, removeSpoolEntry, spoolEntryExists, writeSpoolFile } from '../approvals.mts';
 import { keyNameRefused, keyLabel } from '../../shared/cloud-keys.mts';
 import { NEED } from '../../shared/cloud-needs.mts';
-import { keySource, keySourceLine } from '../../shared/cloud-key-sources.mts';
+import { keySource, keySourceLine, sourceHoldsSignIns } from '../../shared/cloud-key-sources.mts';
+import { SIGN_IN_REFUSED } from '../../shared/sign-in-places.mts';
 import { readKeyFrom, keyIsThere } from './key-source.mts';
 import type { KeySource, ReadOptions } from './key-source.mts';
 import { cloudKeyNames, keysCarried, saveCloudKey } from './keys.mts';
@@ -106,6 +107,7 @@ export function createKeyAsks(o: KeyAsksOptions) {
     const name = String(args.name ?? '').trim();
     const refused = keyNameRefused(name);
     if (refused) return { status: 'denied', message: refused };
+    if (sourceHoldsSignIns({ place: args.place, from: args.from })) return { status: 'denied', message: `${SIGN_IN_REFUSED} Do not ask for it from anywhere else; finish without it.` };
     const src = keySource({ place: args.place, from: args.from, entry: args.entry }) as KeySource | null;
     if (!src) return { status: 'denied', message: 'Say where the key is on their computer: place keychain with the item\'s name, file with a path under their home folder (and entry for one variable of an .env file), or shell with the variable\'s name.' };
     const what = String(args.what ?? '').replace(/\s+/g, ' ').trim().slice(0, 200);

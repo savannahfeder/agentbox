@@ -113,6 +113,8 @@ export interface LiveFacts {
    * `supervisor.signInNeeded`: rows nothing can start because the tool they run
    *  on is signed out, each with that tool's name ("Claude Code", "Codex"). */
   signInNeeded?: Record<string, string>;
+  /** The inbox's sign-in bar is up, so a signed-out row points at it. */
+  signInBar?: boolean;
   /**
    * `supervisor.atLimit`: rows nothing can start because every login of their
    *  tool is out of usage, each with the tool's name and when it resets (0 when
@@ -350,6 +352,23 @@ export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null
     };
   }
 
+  // SIGNED OUT IS NOT QUEUED (2026-10-04), and it is said in or out of In
+  // progress: a run that died on the sign-out sits in Needs you beside one that
+  // never started, and both need the same one fix (F-210). With the inbox's
+  // sign-in bar up, that fix is its button, not a terminal.
+  const tool = signInNeeded[item.id];
+  if (tool && !shipping) {
+    const plan = tool === 'Codex' ? 'ChatGPT' : 'Claude';
+    return {
+      state: 'signin',
+      line: facts.signInBar
+        ? `${tool} is signed out. Sign in to ${plan} at the top of your inbox, and this starts on its own.`
+        : tool === 'Codex'
+          ? 'Codex is signed out. Open a terminal and run codex login, and this starts on its own.'
+          : `${tool} is signed out. Open a terminal, run claude, and type /login, and this starts on its own.`,
+    };
+  }
+
   // The two bars above the conversation already say these, in more words and
   // with the button that fixes them. Saying it twice on one screen is the
   // duplication this pane keeps having to be rescued from.
@@ -414,21 +433,6 @@ export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null
     return {
       state: 'elsewhere',
       line: 'An agent is working on this outside this window, in a terminal or on another computer, so its steps do not show here.',
-    };
-  }
-
-  // SIGNED OUT IS NOT QUEUED (2026-10-04). "An agent starts on it as soon as
-  // one is free" could sit on screen for half an hour while no agent could
-  // start at all, because the Claude Code login had run out. The row says what is
-  // wrong and the one thing that fixes it, and the sentence is drawn, not only
-  // announced: it is the next step, and there is nothing else to do.
-  const tool = signInNeeded[item.id];
-  if (tool) {
-    return {
-      state: 'signin',
-      line: tool === 'Codex'
-        ? 'Codex is signed out. Open a terminal and run codex login, and this starts on its own.'
-        : `${tool} is signed out. Open a terminal, run claude, and type /login, and this starts on its own.`,
     };
   }
 

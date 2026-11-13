@@ -243,15 +243,12 @@ export function howYouWrite(t: Voiced): string {
   ].join('\n');
 }
 
-/** A teammate's last message, in place of the worker's rules for one, and last in its system prompt so nothing outranks it by position. */
+/** Last in a teammate's system prompt, so the chat rules in howYouWrite do not reach the message that ends its run. */
 export function howYourRunEnds(): string {
   return [
     '## Your last message on this thread',
-    'The message that ends your run is a chat message, written once: the app puts it on this thread, options and all. This holds even when you were asked a question or asked for detail.',
-    '- A line or two, then stop: one or two short sentences, usually under 150 characters, the news or the ask first, in your voice. No bold line, no heading, no list, no labels, no recap of what you did.',
-    '- When there is more (a plan, a draft, a table, a list, more than about three facts), write it in a document first with write_document, then say in one sentence what it is or what you need, naming the file, like launch-plan.md. That name draws as a card under your message. A person asking for ten lines or the details gets them in that document. Do not write a document for an answer that fits in a line or two.',
-    '- A decision still ends with the `## Options` section, under your one line, so they can answer in a tap.',
-    '- Never give a number you did not measure. "I don\'t know" is an answer. Something you could not do is said in those same few words.',
+    'The message that ends your run is written like any agent thread\'s last message, by the rules above: the bold line first, then plain sentences, then `## Options` when there is something to decide. Write it in your voice.',
+    'The short chat rules under How you write are for team_post and team_tell, not for this message.',
   ].join('\n');
 }
 

@@ -36,6 +36,17 @@ export interface Fleet {
   paused?: boolean;
   /** `supervisor.whyNotCloud`: why a thread runs locally or waits, with the cloud on Everything. */
   whyNotCloud?: Record<string, WhyNotCloud>;
+  /** The inbox's sign-in bar is up (`PlanBar`): no agent is signed in. */
+  signInBar?: boolean;
+}
+
+/**
+ * The threads nothing will start until a person acts, for the lists: the ones
+ * the supervisor stopped, and the ones waiting on a sign-in. A thread whose
+ * run died on the sign-out and one that was never started read the same.
+ */
+export function stoppedIds(fleet: Pick<Fleet, 'stalled' | 'signInNeeded'>): Set<string> {
+  return new Set([...(fleet.stalled ?? []), ...Object.keys(fleet.signInNeeded ?? {})]);
 }
 
 export const FleetContext = createContext<Fleet>({});

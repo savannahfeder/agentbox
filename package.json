@@ -158,6 +158,11 @@
     "appId": "ac.astral.app",
     "productName": "Agentbox",
     "copyright": "Copyright © 2026 Agentbox",
+    "electronFuses": {
+      "runAsNode": true,
+      "enableNodeCliInspectArguments": false,
+      "enableNodeOptionsEnvironmentVariable": false
+    },
     "directories": {
       "output": "release",
       "buildResources": "build"

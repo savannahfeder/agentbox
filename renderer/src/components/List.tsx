@@ -7,7 +7,7 @@ import { useContext, useEffect, useRef, type PointerEvent as ReactPointerEvent, 
 import type { Product, RepeatRule, RunningSession, ThreadCard, View, WorkItem } from '../types';
 import { ago, dayAndTime, dayLabel, stamp } from '../format';
 import { REST_HEADING, URGENT_HEADING, clickIntent, rowKeys, rowSummary, rowTitle, walkRowKeys } from '../list-rules';
-import { isUrgentRow } from '../interrupt';
+import { isUrgentRow } from '../urgent-arrival';
 // THE SAME PREDICATE THE PANE USES, not a second copy of the rule. The row and
 // the pane disagreeing about one fact on one screen is what this import fixes.
 import { cameBackEmpty, cannotStartLine, runningSince } from '../live-line';

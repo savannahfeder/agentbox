@@ -38,7 +38,8 @@ import { batchWords, pickedPlan, type PickedPress } from '../lib/picked';
 import { onTheirWay, teamFrom, withPendingPauses, withPhoneAnswers } from '../lib/teammates';
 import { isUnread, markSeen as markSeenIn, markUnseen as markUnseenIn, readSeen } from '../lib/unread';
 import { alertToken, alertTokenIfAllowed, setIconCount } from '../platform/alerts';
-import { appStore, persist } from '../platform/persist';
+import { appStore, inboxFile, persist } from '../platform/persist';
+import { inboxKeeper, readLastInbox } from '../lib/last-inbox';
 import { forgetCrash, keptCrash } from '../platform/crash';
 import { crashReport, reportsOn } from '../lib/crash-note';
 
@@ -63,6 +64,8 @@ async function openCloud(): Promise<Cloud | null> {
 }
 
 const message = (err: unknown) => String((err as Error)?.message ?? err);
+const lastInbox = inboxKeeper(inboxFile);
+const keyOf = (t: { device: string; project: string; item: string }) => `${t.device}/${t.project}/${t.item}`;
 const UNDO_WORDS = ' · press Z to undo';
 
 function useCloudState() {
@@ -107,7 +110,9 @@ function useCloudState() {
           settingsAt.current = Date.now();
           void readSettingsRows(select).then((got) => { if (cloud.generation() === asked) setSettingsRows(got); }, () => { settingsAt.current = -Infinity; });
         }
-        setRead({ error: null, fetchedAt: Date.now(), first: false });
+        const fetchedAt = Date.now();
+        setRead({ error: null, fetchedAt, first: false });
+        if (!PREVIEW) lastInbox.keep(cloud.session()?.user.id, { projects, threads, commands }, fetchedAt);
         // Links before the screens draw, so a picture is pointed at its file the moment it is drawn.
         const owner = cloud.session()?.user.id;
         const want = owner ? objectsToSign(cloudPlaces(threads, phoneSlug), commands, links.current, owner) : [];
@@ -129,9 +134,18 @@ function useCloudState() {
 
   useEffect(() => {
     if (!cloud || !signedIn) return;
+    const kept = PREVIEW || rowsNow.current !== EMPTY ? null : readLastInbox(inboxFile, cloud.session()?.user.id);
+    if (kept) {
+      for (const t of kept.rows.threads) cache.current.set(keyOf(t), t);
+      setRows(kept.rows);
+      setRead({ error: null, fetchedAt: kept.fetchedAt, first: false });
+    }
     void refresh();
-    const timer = setInterval(() => { if (AppState.currentState === 'active') void refresh(); }, EVERY_MS);
-    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') void refresh(); });
+    // Not AppState.currentState: on Android it can stay 'background' after a
+    // launch, which left a failed first read on screen until a pull.
+    let front = true;
+    const timer = setInterval(() => { if (front) void refresh(); }, EVERY_MS);
+    const sub = AppState.addEventListener('change', (s) => { front = s === 'active'; if (front) void refresh(); });
     return () => { clearInterval(timer); sub.remove(); };
   }, [cloud, signedIn, refresh]);
 
@@ -408,6 +422,7 @@ function useCloudState() {
     } else c?.signOut();
     cache.current.clear();
     links.current.clear();
+    lastInbox.forget();
     setRows(EMPTY);
     setSettingsRows([]);
     settingsAt.current = -Infinity;
