@@ -9,6 +9,9 @@
 // With the column gone the name still lost to the two buttons, so Settings,
 // which leaves the page anyway, steps aside while the file is open.
 //
+// Since 2026-11-12 the job and lists sit behind buttons over the chat, not in
+// a column (a-teammates-page-keeps-its-work-behind-small-buttons-over-the-chat).
+//
 // Rendered here with the app's own styles, in a 400px pane with a file open,
 // and at full width with no file (where the column must stay).
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -31,7 +34,7 @@ beforeAll(async () => {
     stdin: { contents: `
       import React from 'react';
       import { createRoot } from 'react-dom/client';
-      import { Place, PlaceAction, PlaceList, JobBlock, SendBox } from './renderer/src/team/everything/PlacePage';
+      import { Place, PlaceAction, JobBlock, SendBox, listPart } from './renderer/src/team/everything/PlacePage';
       const now = Date.now();
       const m = { key: 'mate:yc', kind: 'mate', name: 'YC Partner', letter: 'Y', agents: 0 };
       const rows = [{ key: 'a', title: "For this week I'd aim for 50 Looms, 5 replies, 2 teams set up and 1 paying", word: '', at: now - 3600000, tone: 'done', onOpen: () => {} }];
@@ -39,7 +42,7 @@ beforeAll(async () => {
         <Place m={m} about="AI teammate" onBack={undefined}
           actions={<><PlaceAction onClick={() => {}}>Give a task</PlaceAction><PlaceAction quiet onClick={() => {}}>Settings</PlaceAction></>}
           chat={<SendBox placeholder="Message YC Partner" onSend={async () => null} />}
-          side={<><JobBlock job={${JSON.stringify(job)}} onSave={async () => null} /><PlaceList title="Finished this week" now={now} rows={rows} /></>} />);`,
+          parts={[...listPart('Done this week', rows, now), { key: 'job', label: 'Job', body: <JobBlock job={${JSON.stringify(job)}} onSave={async () => null} /> }]} />);`,
     resolveDir: process.cwd(), loader: 'tsx' },
     bundle: true, write: false, format: 'iife', jsx: 'automatic', logLevel: 'error',
     loader: { '.css': 'empty', '.svg': 'dataurl', '.png': 'dataurl', '.woff2': 'empty', '.mp3': 'empty' },
@@ -59,11 +62,13 @@ async function measure(width, docOpen) {
   const m = await page.evaluate(() => {
     const box = (s) => document.querySelector(s).getBoundingClientRect();
     const fits = (s) => { const e = document.querySelector(s); return e.scrollWidth <= e.clientWidth; };
-    const btns = [...document.querySelectorAll('.pl-btn')].filter((b) => b.offsetWidth > 0);
+    const btns = [...document.querySelectorAll('.pl-acts .pl-btn')].filter((b) => b.offsetWidth > 0);
     return {
       buttons: btns.map((b) => b.textContent),
       chat: Math.round(box('.pl-chat').width),
-      side: Math.round(box('.pl-side').width),
+      side: document.querySelector('.pl-side') ? 1 : 0,
+      jobShown: document.body.textContent.includes('Cohort 1'),
+      chips: [...document.querySelectorAll('.pl-chip')].map((b) => b.textContent),
       nameWhole: fits('.pl-name h2'),
       buttonsOneLine: btns.every((b) => {
         const words = document.createRange();
@@ -96,10 +101,39 @@ describe.skipIf(!browserAvailable)("an AI teammate's page beside an open file, 4
 describe.skipIf(!browserAvailable)('the same page with no file open, full width', () => {
   let m;
   beforeAll(async () => { m = await measure(1300, false); }, 30_000);
-  it('keeps the job and its lists in their column beside the chat, and Settings in the header', () => {
+  it('keeps the job and its lists behind buttons over the chat, and Settings in the header', () => {
     expect(m.buttons).toEqual(['Give a task', 'Settings']);
-    expect(m.side).toBe(272);
+    expect(m.side).toBe(0);
+    expect(m.chips).toEqual(['Chat', 'Done this week1', 'Job']);
+    expect(m.jobShown).toBe(false);
     expect(m.chat).toBeGreaterThan(800);
+    expect(m.chat).toBeLessThanOrEqual(900);
     expect(m.nameWhole).toBe(true);
   });
+});
+
+describe.skipIf(!browserAvailable)('pressing Job on the page', () => {
+  it('shows the job where the chat was, and Chat or Esc brings the chat back', async () => {
+    const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+    page.setDefaultTimeout(5_000);
+    await page.route('http://fits.test/**', (r) => r.fulfill({ contentType: 'text/html',
+      body: `<style>${css}</style><div class="app workspace-layout"><div class="list-pane pl-open" id="root" style="width:1300px;height:900px"></div></div>` }));
+    await page.goto('http://fits.test/');
+    await page.addScriptTag({ content: bundle });
+    await page.locator('.pl-chat .rm-compose-input').waitFor();
+    const state = () => page.evaluate(() => ({
+      chat: document.querySelector('.pl-chat').offsetWidth > 0,
+      job: [...document.querySelectorAll('.pl-view')].some((v) => v.offsetWidth > 0 && v.textContent.includes('Cohort 1')),
+      lit: [...document.querySelectorAll('.pl-chip[aria-selected="true"]')].map((b) => b.textContent),
+    }));
+    expect(await state()).toEqual({ chat: true, job: false, lit: ['Chat'] });
+    await page.locator('.pl-chip', { hasText: 'Job' }).click();
+    expect(await state()).toEqual({ chat: false, job: true, lit: ['Job'] });
+    await page.locator('.pl-chip', { hasText: 'Chat' }).click();
+    expect(await state()).toEqual({ chat: true, job: false, lit: ['Chat'] });
+    await page.locator('.pl-chip', { hasText: 'Job' }).click();
+    await page.keyboard.press('Escape');
+    expect(await state()).toEqual({ chat: true, job: false, lit: ['Chat'] });
+    await page.close();
+  }, 30_000);
 });

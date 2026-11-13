@@ -610,7 +610,34 @@ function LogPanel({ view, team, t, sessions, call, onClose, onOpenThread }: { vi
 /* --------------------------------------------------------------- details */
 // What it does and how it writes, over its chat when you ask, the settings folded
 // below. What you pick is kept the moment you pick it.
-function Details({ t, view, products, engines, models, call, onOpen, onNewProject }: { t: Teammate; view: TeammatesView | null; products: Product[]; engines: { id: string; label: string }[]; models: TeammateModels; call: Call; onOpen: (open: string) => void; onNewProject?: () => void }) {
+type AboutProps = { t: Teammate; view: TeammatesView | null; products: Product[]; engines: { id: string; label: string }[]; models: TeammateModels; call: Call; onOpen: (open: string) => void; onNewProject?: () => void };
+
+function Details(props: AboutProps) {
+  const { t, onOpen } = props;
+  return <><div className="tq-sheet-away" aria-hidden="true" onClick={() => onOpen(t.id)} />
+  <aside className="tq-sheet tq-details" role="dialog" aria-label={`About ${t.name}`}>
+    <div className="tq-sheet-head"><span>About</span><button type="button" className="tq-key" onClick={() => onOpen(t.id)}>Close</button></div>
+    <AboutFields {...props} />
+  </aside></>;
+}
+
+/** An AI teammate's About on its place: everything the sheet holds, its whole job, and every setting open. */
+export function TeammateAbout({ onChanged, models = NO_MODELS, ...props }: Omit<AboutProps, 'call' | 'models'> & { models?: TeammateModels; onChanged: () => void }) {
+  const [error, setError] = useState<string | null>(null);
+  const call: Call = async (op, args) => {
+    setError(null);
+    const r = await api.teammates(op, args);
+    if (!r.ok) { setError(r.error); return false; }
+    onChanged();
+    return r.value ?? true;
+  };
+  return <div className="tq-details tq-about-page">
+    <AboutFields {...props} models={models} call={call} whole />
+    {error && <p className="tq-error" role="alert">{error}</p>}
+  </div>;
+}
+
+function AboutFields({ t, view, products, engines, models, call, onOpen, onNewProject, whole = false }: AboutProps & { whole?: boolean }) {
   const [saved, setSaved] = useState(false);
   useEffect(() => { if (!saved) return undefined; const timer = setTimeout(() => setSaved(false), 2000); return () => clearTimeout(timer); }, [saved]);
   const keep = (patch: Record<string, unknown>) => { void call('update', { id: t.id, patch }).then((ok) => { if (ok !== false) setSaved(true); }); };
@@ -620,13 +647,31 @@ function Details({ t, view, products, engines, models, call, onOpen, onNewProjec
   const about = () => onOpen(`about:${t.id}`);
   const now = nowLine(t) === 'Paused' ? 'Paused. It still answers you, and does nothing on its own.' : nowLine(t);
   const knows = t.memory.slice(-3);
-  return <><div className="tq-sheet-away" aria-hidden="true" onClick={() => onOpen(t.id)} />
-  <aside className="tq-sheet tq-details" role="dialog" aria-label={`About ${t.name}`}>
-    <div className="tq-sheet-head"><span>About</span><button type="button" className="tq-key" onClick={() => onOpen(t.id)}>Close</button></div>
+  const job = t.job ? (t.status === 'draft' ? jobLine(t) : t.job) : null;
+  const settings = <dl>
+    <dt>Name</dt>
+    <dd><EditName key={t.name} name={t.name} onSave={(name) => keep({ name })} /></dd>
+    <dt>Model</dt>
+    <dd><ModelPicker value={t.model ?? null} onChange={(m) => keep({ model: m })} engine={t.engine ?? models.engine ?? null} codexModels={models.codex} codexDefault={models.codexDefault}
+      effort={t.effort ?? TEAMMATE_EFFORT} onEffortChange={(e) => keep({ effort: e })} /></dd>
+    {engines.length > 1 && <><dt>Runs on</dt>
+      <dd><PickOne value={t.engine ?? ''} label="Runs on" options={[...(t.engine ? [] : [{ id: '', label: 'Your default' }]), ...engines]} onPick={(id) => keep({ engine: id })} /></dd></>}
+    <dt>Works in</dt>
+    <dd>{real.length > 1 || onNewProject
+      ? <PickOne value={t.product} label="Works in" options={real.map((p) => ({ id: p.slug, label: p.name }))} onPick={(slug) => keep({ product: slug })} more={newProjectRow(onNewProject)} />
+      : product?.name ?? t.product}</dd>
+    <dt>Can read</dt>
+    <dd><PickOne value={t.readsMessages ? 'all' : 'threads'} label="What it can read" options={READS} onPick={(id) => keep({ readsMessages: id === 'all' })} /></dd>
+    <dt>Your team</dt>
+    <dd><PickOne value={t.openToTeam ? 'open' : 'ask'} label="What your team can do with it" options={TEAM_CAN} onPick={(id) => keep({ openToTeam: id === 'open' })} /></dd>
+    <dt>This week</dt>
+    <dd>{t.runsThisWeek} of {t.limit} runs</dd>
+  </dl>;
+  return <>
     <dl>
       {now !== 'Idle' && <><dt>Now</dt><dd>{now}</dd></>}
       <dt>Job</dt>
-      <dd><EditJob key={t.job ?? ''} job={t.job} shown={t.job ? clipLine(firstSentence(t.status === 'draft' ? jobLine(t) : t.job), 150) : null} onSave={(job) => keep({ job })} onRead={about} /></dd>
+      <dd><EditJob key={t.job ?? ''} job={t.job} shown={job && !whole ? clipLine(firstSentence(job), 150) : job} whole={whole} onSave={(next) => keep({ job: next })} onRead={about} /></dd>
       <dt>How it writes</dt>
       <dd><VoicePick voice={voiceOf(t)} words={t.voiceText ?? null} onPick={keep} /></dd>
       {/* While it is set up its times are guesses it is asking you about. */}
@@ -648,30 +693,10 @@ function Details({ t, view, products, engines, models, call, onOpen, onNewProjec
       <dt>Its work</dt>
       <dd className="tq-sheet-links"><Inline onClick={() => onOpen(`log:${t.id}`)}>Log</Inline><Inline onClick={about}>Everything it knows and how it works</Inline></dd>
     </dl>
-    <details className="tq-sheet-more">
-      <summary role="button">Settings</summary>
-      <dl>
-        <dt>Name</dt>
-        <dd><EditName key={t.name} name={t.name} onSave={(name) => keep({ name })} /></dd>
-        <dt>Model</dt>
-        <dd><ModelPicker value={t.model ?? null} onChange={(m) => keep({ model: m })} engine={t.engine ?? models.engine ?? null} codexModels={models.codex} codexDefault={models.codexDefault}
-          effort={t.effort ?? TEAMMATE_EFFORT} onEffortChange={(e) => keep({ effort: e })} /></dd>
-        {engines.length > 1 && <><dt>Runs on</dt>
-          <dd><PickOne value={t.engine ?? ''} label="Runs on" options={[...(t.engine ? [] : [{ id: '', label: 'Your default' }]), ...engines]} onPick={(id) => keep({ engine: id })} /></dd></>}
-        <dt>Works in</dt>
-        <dd>{real.length > 1 || onNewProject
-          ? <PickOne value={t.product} label="Works in" options={real.map((p) => ({ id: p.slug, label: p.name }))} onPick={(slug) => keep({ product: slug })} more={newProjectRow(onNewProject)} />
-          : product?.name ?? t.product}</dd>
-        <dt>Can read</dt>
-        <dd><PickOne value={t.readsMessages ? 'all' : 'threads'} label="What it can read" options={READS} onPick={(id) => keep({ readsMessages: id === 'all' })} /></dd>
-        <dt>Your team</dt>
-        <dd><PickOne value={t.openToTeam ? 'open' : 'ask'} label="What your team can do with it" options={TEAM_CAN} onPick={(id) => keep({ openToTeam: id === 'open' })} /></dd>
-        <dt>This week</dt>
-        <dd>{t.runsThisWeek} of {t.limit} runs</dd>
-      </dl>
-    </details>
+    {whole ? <><h4 className="tq-about-h">Settings</h4>{settings}</>
+      : <details className="tq-sheet-more"><summary role="button">Settings</summary>{settings}</details>}
     {saved && <span className="tq-st" role="status">Saved</span>}
-  </aside></>;
+  </>;
 }
 
 // How it writes: the styles, the sample line of the one picked, or your own words.
@@ -731,14 +756,15 @@ function EditName({ name, onSave }: { name: string; onSave: (name: string) => vo
     }} />;
 }
 
-function EditJob({ job, shown, onSave, onRead }: { job: string | null; shown: string | null; onSave: (job: string) => void; onRead: () => void }) {
+function EditJob({ job, shown, whole = false, onSave, onRead }: { job: string | null; shown: string | null; whole?: boolean; onSave: (job: string) => void; onRead: () => void }) {
   const [text, setText] = useState<string | null>(null);
   if (text === null) {
+    if (whole) return <><span className="tq-job-whole">{shown ?? <span className="dim">Nothing yet.</span>}</span><Inline onClick={() => setText(job ?? '')}>Edit</Inline></>;
     return <span>{shown ?? <span className="dim">Nothing yet.</span>} {shown && <Inline onClick={onRead}>Read all</Inline>} <Inline onClick={() => setText(job ?? '')}>Edit</Inline></span>;
   }
   const save = () => { const next = text.trim(); if (next && next !== job) onSave(next); setText(null); };
   return <span className="tq-job-edit">
-    <textarea className="tq-field" rows={6} value={text} aria-label="Its job" autoFocus onChange={(e) => setText(e.target.value)}
+    <textarea className="tq-field" rows={whole ? 14 : 6} value={text} aria-label="Its job" autoFocus onChange={(e) => setText(e.target.value)}
       onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setText(null); } }} />
     <span className="tq-job-keys"><button type="button" className="dock-send" disabled={!text.trim()} onClick={save}>Save</button> <button type="button" className="tq-key" onClick={() => setText(null)}>Cancel</button></span>
   </span>;
