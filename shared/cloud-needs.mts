@@ -12,6 +12,7 @@
 // (main/cloud/keys.mts). A file goes with the thread's next cloud turn, at the
 // same path. A code goes back as the reply.
 import { keyAsks, keyWords } from './cloud-keys.mts';
+import { keySourceFromWords, type KeySource } from './cloud-key-sources.mts';
 
 export const NEED = 'AGENTBOX-NEEDS:';
 // A closing backtick is taken off only when the line opened with one: the reason may hold inline code.
@@ -26,7 +27,7 @@ export interface Service {
 
 export type Need =
   | { kind: 'sign-in'; service: Service; why: string }
-  | { kind: 'key'; name: string; what: string }
+  | { kind: 'key'; name: string; what: string; from?: KeySource }
   | { kind: 'file'; path: string; why: string }
   | { kind: 'code'; about: string; why: string };
 
@@ -81,7 +82,11 @@ export function needsIn(text: string | null | undefined): Need[] {
       if (service) add({ kind, service, why }, `sign-in:${service.id}`);
     } else if (kind === 'key') {
       const [name, ...rest] = arg.split(/\s+/);
-      if (/^[A-Z][A-Z0-9_]{1,79}$/.test(name)) add({ kind, name, what: why || tidy(rest.join(' ')) }, `key:${name}`);
+      // A third part may say where on their computer it is (shared/cloud-key-sources.mjs).
+      const parts = why.split('|');
+      const from = parts.length === 2 ? keySourceFromWords(parts[1]) : null;
+      const what = from ? tidy(parts[0]) : why;
+      if (/^[A-Z][A-Z0-9_]{1,79}$/.test(name)) add({ kind, name, what: what || tidy(rest.join(' ')), ...(from ? { from } : {}) }, `key:${name}`);
     } else if (kind === 'file') {
       if (/^(~\/|\/)/.test(arg)) add({ kind, path: arg, why }, `file:${arg}`);
     } else {
