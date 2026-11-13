@@ -4478,7 +4478,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
   background: none; border: 1px solid transparent; border-radius: var(--tag-radius);
   font: inherit; font-size: 13px; color: var(--text); cursor: pointer; white-space: nowrap;
 }
-.ur > span:not(.ur-dot):not(.ur-bell):not(.ur-card) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ur > span:not(.ur-dot):not(.ur-bell):not(.ur-card):not(.ur-g-word) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .ur-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--chip-ask); animation: ur-arrive 1.2s ease-in-out 3; }
 @keyframes ur-arrive { 50% { opacity: .25; } }
 .ur-kbd {
@@ -4495,6 +4495,9 @@ img.product-mark { object-fit: cover; opacity: 1; }
 /* c: only a count, the thread on hover. f: the same box with the title in it. */
 .ur-c { position: relative; color: var(--text-dim); border-color: var(--line); }
 .ur-f-title { color: var(--text); }
+/* g: f with the word Urgent in the accent before the title. */
+.ur-g { gap: 8px; }
+.ur-g-word { flex: none; color: var(--chip-ask); font-weight: 500; }
 /* The card under it on hover. The padding is the bridge the pointer crosses. */
 .ur-card {
   position: absolute; top: 100%; right: -1px; z-index: 40; width: 340px; padding-top: 8px;

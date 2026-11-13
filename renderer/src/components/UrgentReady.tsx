@@ -1,12 +1,12 @@
 // The urgent thread that arrived while another was open, named in the top bar
 // until it is opened or this thread is left. Pressing it, or O, opens it.
 //
-// DRAFT: six looks to choose from (?urgentlook=a..f). Only the picked one ships.
+// DRAFT: seven looks to choose from (?urgentlook=a..g). Only the picked one ships.
 import { rowSummary, rowTitle } from '../list-rules';
 import { agoQuiet } from '../format';
 import type { WorkItem } from '../types';
 
-export type UrgentLook = 'a' | 'b' | 'c' | 'd' | 'e' | 'f';
+export type UrgentLook = 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g';
 
 const Key = () => <kbd className="ur-kbd">O</kbd>;
 
@@ -44,6 +44,12 @@ export function UrgentReady({ row, look = 'a', onOpen }: { row: WorkItem; look?:
   if (look === 'f') return (
     <button type="button" className="ur ur-c ur-f" onClick={onOpen}>
       <span className="ur-dot" /><span className="ur-f-title">{title}</span><Key />
+      <Card row={row} title={title} />
+    </button>
+  );
+  if (look === 'g') return (
+    <button type="button" className="ur ur-c ur-f ur-g" onClick={onOpen}>
+      <span className="ur-dot" /><span className="ur-g-word">Urgent</span><span className="ur-f-title">{title}</span><Key />
       <Card row={row} title={title} />
     </button>
   );
