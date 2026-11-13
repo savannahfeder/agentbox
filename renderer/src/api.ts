@@ -1699,8 +1699,8 @@ export const api = {
     return zero.cloudSendCode(p);
   },
 
-  /** A key kept in the cloud for every cloud run: saved under its name, or removed. */
-  async cloudKey(p: { action: 'save' | 'remove'; name: string; value?: string; label?: string; reply?: { product: string; id: string; answer: string } }): Promise<{ ok: boolean; keys?: { name: string; savedAt: number | null; label?: string | null }[]; freed?: string[]; cloudOff?: boolean; error?: string }> {
+  /** A key kept in the cloud for every cloud run: saved under its name, or removed. `from` reads it on this computer instead of `value`. */
+  async cloudKey(p: { action: 'save' | 'remove'; name: string; value?: string; label?: string; from?: { place: string; from: string; entry?: string }; reply?: { product: string; id: string; answer: string } }): Promise<{ ok: boolean; keys?: { name: string; savedAt: number | null; label?: string | null }[]; freed?: string[]; cloudOff?: boolean; error?: string }> {
     const zero = window.zero;
     if (!zero?.cloudKey) return { ok: false, error: RESTART_NOTE };
     return zero.cloudKey(p);
