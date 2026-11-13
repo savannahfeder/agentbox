@@ -18,10 +18,12 @@ export const PLANS = Object.freeze({
 export const FREE = Object.freeze({ agents: 2, hours: 5 });
 
 // A team's cloud (the owner, 2026-11-06; 7 days since 2026-11-10): free from
-// the day it was made, 10 hours a member shared by all; then $40 a seat a month, each seat
-// Pro's agents and hours, the hours one pool. Kept apart from PLANS, which are
-// one person's.
-export const TEAM = Object.freeze({ trialDays: 7, trialHoursPerMember: 10, trialAgentsPerMember: 2, hoursPerSeat: 400, agentsPerSeat: 10, dollarsPerSeat: 40 });
+// the day it was made, 50 hours a member (10 until 2026-11-13: "10 cloud hours
+// for pro is very bad given free is 5"); then $40 a seat a month, each seat
+// Pro's hours. Hours are its only limit: "there should never be a limit on how
+// many cloud agents a team can use at once" (the owner, 2026-11-13). Kept apart
+// from PLANS, which are one person's.
+export const TEAM = Object.freeze({ trialDays: 7, trialHoursPerMember: 50, hoursPerSeat: 400, dollarsPerSeat: 40 });
 
 export const RUN_CEILING_MS = 8 * 60 * 60_000;
 // The sandbox gives a sign-in 20 minutes, and checking it takes up to 4 more.
