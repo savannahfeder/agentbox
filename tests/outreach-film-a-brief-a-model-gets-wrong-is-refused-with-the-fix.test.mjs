@@ -5,8 +5,8 @@
 // from her row in four of the first ten films because her title and comment
 // were too long together, and one film opened the wrong thread because two
 // titles started alike. Measured by running checkBrief on the ten real briefs
-// (Collide's and Fencer's fail the Maya rule, Fencer's has a 293-character
-// line of code) and on the example below with one thing broken at a time.
+// (two fail the Maya rule, one has a 293-character line of code) and on the
+// example below with one thing broken at a time.
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';

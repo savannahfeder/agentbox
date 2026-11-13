@@ -1,9 +1,10 @@
 # Puts the slowed screen recording back on the voice's clock, moves the camera
 # in and out to what she is talking about, adds the clicks and keys as real
-# recorded sounds, shows the keys she presses, and lays her bubble and voice on
-# top, in one pass to one file.
+# recorded sounds, and lays her bubble and voice on top, in one pass to one
+# file. Also writes <out.mp4>.cuts.json: where each of record.mjs's cuts lands
+# on the voice's clock, for check-film.py.
 #
-# usage: python3 finish8.py <raw.mp4> <face.mp4> <masks dir> <sfx dir> <out.mp4> [--baked]
+# usage: python3 finish.py <raw.mp4> <face.mp4> <masks dir> <sfx dir> <out.mp4> --move-at -1 --end <s> [--baked]
 #   face.mp4 carries her voice; with --baked it is already a round bubble video.
 import json, sys, subprocess, bisect, math, os
 import numpy as np, cv2

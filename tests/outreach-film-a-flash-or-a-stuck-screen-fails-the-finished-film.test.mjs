@@ -1,12 +1,12 @@
 // A FLASH OR A STUCK SCREEN FAILS THE FINISHED FILM.
 //
-// Collide's outreach film v1 held the ⌘-Tab switcher from 0:04 to 0:10 (the
+// One lead's outreach film held the ⌘-Tab switcher from 0:04 to 0:10 (the
 // recorder got no frame of the app after it closed) and showed the inbox list
 // for one frame at 0:51.93. Every check then read the brief or the recorder's
 // log; none watched the finished film. check-film.py does. Measured on the
-// eleven real films: it fails Collide v1 for both faults, and every film made
-// before the recorder's cuts (the approved Alchemy v5 included) for a
-// one-frame flicker after the reply to Maya at about 1:17. Here it runs on
+// eleven real films: it fails that film for both faults, and every film made
+// before the recorder's cuts (the approved one included) for a one-frame
+// flicker after the reply to Maya at about 1:17. Here it runs on
 // small films drawn with ffmpeg: a clean one, one with a single odd frame, and
 // one whose promised cut never happens.
 import { describe, expect, it } from 'vitest';
