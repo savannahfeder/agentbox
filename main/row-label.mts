@@ -37,10 +37,20 @@ import { catchUpDue } from '../shared/agent-import.mts';
 // the fold makes the user outrank us on it, and the user still reads their own
 // words the moment they open the row (shared/work-items.mts).
 
+import os from 'node:os';
 import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import { codexLaunchEnv } from './codex-launch-env.mts';
 import { codexHome, codexSmallModel } from './codex-models.mts';
+
+/**
+ * Somewhere that is nobody's project, for a naming call to run in. On Windows
+ * `/tmp` is `\tmp` on the current drive, usually missing, and the spawn fails,
+ * so it gets the user's temp folder; Mac and Linux keep `/tmp`.
+ */
+export function smallModelCwd(platform: NodeJS.Platform = process.platform, tmpdir: () => string = os.tmpdir) {
+  return platform === 'win32' ? tmpdir() : '/tmp';
+}
 
 /**
  * The model this runs on. Small and fast on purpose: this is a naming call, it
@@ -261,7 +271,7 @@ function askOnce(prompt: string, clean: (text: string) => string, { claudeBin, c
       child = spawn(bin, harness.smallModelArgs(prompt, model, pictures), {
         // Somewhere that is nobody's project. A naming call must not pick up a
         // CLAUDE.md, a settings file or a hook from whatever folder it lands in.
-        cwd: '/tmp',
+        cwd: smallModelCwd(),
         ...(engine === 'codex' ? { env: codexLaunchEnv(bin, env) } : env ? { env } : {}),
         stdio: [input ? 'pipe' : 'ignore', 'pipe', 'pipe'],
       });
