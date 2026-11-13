@@ -15,10 +15,12 @@ if [ "$(uname)" = "Linux" ] && ! fc-list | grep -q "SF Pro Text"; then
     (cd "$t" && mkdir -p "$f" && cd "$f" && 7z x -y "../$f.dmg" >/dev/null)
   done
   find "$t" -name "*.pkg" -type f | while read -r p; do (cd "$(dirname "$p")" && 7z x -y "$p" >/dev/null); done
+  find "$t" \( -name "Payload~" -o -name "Payload" \) -type f | while read -r p; do (cd "$(dirname "$p")" && 7z x -y "$p" >/dev/null 2>&1 || true); done
   find "$t" -name "Payload~" | while read -r p; do (cd "$(dirname "$p")" && cpio -idm < "$p" 2>/dev/null || true); done
   mkdir -p "$HOME/.fonts"
   find "$t" \( -name "SF-Pro-Text-*.otf" -o -name "SF-Pro-Display-*.otf" -o -name "SF-Pro.ttf" -o -name "SF-Mono-*.otf" \) -exec cp {} "$HOME/.fonts/" \;
   rm -rf "$t"
+  ls "$HOME"/.fonts/SF-Pro-Text-*.otf >/dev/null 2>&1 || { echo "Apple's SF Pro did not install (its download or unpacking failed)"; exit 1; }
   mkdir -p "$HOME/.config/fontconfig"
   cat > "$HOME/.config/fontconfig/fonts.conf" <<'EOF'
 <?xml version="1.0"?>

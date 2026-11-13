@@ -116,15 +116,15 @@ if (missing.length) stop(2, `The kit at ${kit} is missing: ${missing.join(', ')}
 const work = fs.mkdtempSync(path.join(os.tmpdir(), `film-${slug}-`));
 let face = path.join(kit, 'voice/face.mp4');
 if (!exists(face)) {
-  const parts = exists(path.join(kit, 'voice')) ? fs.readdirSync(path.join(kit, 'voice')).filter((f) => /^face\.part-\d+\.mp4$/.test(f)).sort() : [];
+  // Byte pieces (`split -b`), so they join back to the very same file.
+  const parts = exists(path.join(kit, 'voice')) ? fs.readdirSync(path.join(kit, 'voice')).filter((f) => /^face\.mp4\.part-\d+$/.test(f)).sort((a, b) => Number(a.split('-').pop()) - Number(b.split('-').pop())) : [];
   if (parts.length) {
-    fs.writeFileSync(path.join(work, 'parts.txt'), parts.map((p) => `file '${path.join(kit, 'voice', p)}'`).join('\n'));
     face = path.join(work, 'face.mp4');
-    run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', path.join(work, 'parts.txt'), '-c', 'copy', face]);
+    fs.writeFileSync(face, Buffer.concat(parts.map((p) => fs.readFileSync(path.join(kit, 'voice', p)))));
   } else if (has('--no-voice')) {
     face = path.join(work, 'stand-in.mp4');
     run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', `color=c=0x3a3a3c:s=520x520:d=${FILM_END}`, '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=mono', '-t', String(FILM_END), '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', face]);
-  } else stop(2, `The kit has no voice: put face.mp4 (or face.part-1.mp4, face.part-2.mp4...) in ${path.join(kit, 'voice')}, or pass --no-voice for a silent screen check.`);
+  } else stop(2, `The kit has no voice: put face.mp4 (or its byte pieces face.mp4.part-0, face.mp4.part-1...) in ${path.join(kit, 'voice')}, or pass --no-voice for a silent screen check.`);
 }
 
 // ---- 5. the app, built once per version of it ----

@@ -71,7 +71,7 @@ public repo. It lives in the product documents at `outreach-films/kit/`:
 
 | Path | What |
 | --- | --- |
-| `voice/face.mp4`, or `voice/face.part-1.mp4`, `face.part-2.mp4`... | Her voice cut with her face (520x520). Parts under 25 MB each so a cloud run can fetch them; the command joins them. |
+| `voice/face.mp4`, or `voice/face.mp4.part-0`, `face.mp4.part-1`... | Her voice cut with her face (520x520). The pieces are the file split by bytes (`split -b 17000000 -d -a 1 face.mp4 face.mp4.part-`), each under 25 MB so a cloud run can fetch them; the command joins them back exactly. |
 | `cues.json` | When each line of her voice starts, in seconds. Belongs to that voice cut. |
 | `pointer.svg` | The Mac pointer. |
 | `icons/chrome.png`, `terminal.png`, `agentbox.png`, `finder.png` | The ⌘-Tab switcher's icons. |
