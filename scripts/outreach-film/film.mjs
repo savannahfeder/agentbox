@@ -128,7 +128,8 @@ if (!exists(face)) {
 }
 
 // ---- 5. the app, built once per version of it ----
-const sha = run('git', ['-C', REPO, 'rev-parse', 'HEAD'], { quiet: true }).stdout.trim();
+// The app's own folders, so a commit that changes only the film's tools reuses the build.
+const sha = crypto.createHash('sha1').update(run('git', ['-C', REPO, 'rev-parse', 'HEAD:renderer', 'HEAD:shared', 'HEAD:package-lock.json'], { quiet: true }).stdout).digest('hex');
 const hookHash = crypto.createHash('sha1').update(fs.readFileSync(path.join(HERE, 'demo-hook.mjs'))).update(fs.readFileSync(path.join(HERE, 'vite.film.config.mjs'))).digest('hex').slice(0, 8);
 const dist = path.join(os.tmpdir(), `outreach-film-app-${sha.slice(0, 10)}-${hookHash}`);
 if (!exists(path.join(dist, 'index.html'))) {
