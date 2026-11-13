@@ -14,8 +14,8 @@ const NAME: Record<PaidPlan, string> = { pro: 'Pro', plus: 'Plus', max: 'Max' };
 const n = (x: number) => x.toLocaleString('en-US');
 const paidOf = (plan: CloudPlan | null): PaidPlan | null => (ORDER.includes(plan?.plan as PaidPlan) ? (plan!.plan as PaidPlan) : null);
 const onFree = (plan: CloudPlan | null) => plan?.plan === 'free';
-/** What a payment changes: a plan, or a team's trial becoming paid seats. */
-export const planKey = (plan: CloudPlan | null) => `${plan?.plan ?? 'none'}${plan?.team?.trial ? ':trial' : ''}`;
+/** What a payment changes: a plan, a card added in a team's trial, or the trial becoming paid seats. */
+export const planKey = (plan: CloudPlan | null) => `${plan?.plan ?? 'none'}${plan?.team?.trial ? ':trial' : ''}${plan?.team?.seats ? ':seats' : ''}`;
 
 export interface OfferGo { label: string; act: 'sign-in' | 'plans' | 'cloud-on' | 'pay'; plan?: PaidPlan }
 export interface Offer { say: string; waiting: string; go: OfferGo | null }
@@ -58,7 +58,9 @@ export function cloudOffer({ cloud, plan, waiting, macFull }: {
   return null;
 }
 
-export interface PlanCard { id: PaidPlan; name: string; price: string; slots: string; hours: string; current: boolean; button: string | null }
+export interface PlanCard { id: PaidPlan; name: string; price: string; slots: string; hours: string; files: string; current: boolean; button: string | null }
+
+const filesWords = (gb: number) => `${gb >= 1024 ? `${n(gb / 1024)} TB` : `${n(gb)} GB`} of files in the cloud`;
 
 export function planCards(plan: CloudPlan | null): PlanCard[] {
   const mine = paidOf(plan);
@@ -70,6 +72,7 @@ export function planCards(plan: CloudPlan | null): PlanCard[] {
       id, name: NAME[id], price: `$${p.dollarsPerMonth}`,
       slots: p.unlimited ? 'Unlimited agent slots' : `+${p.agents} agent slots`,
       hours: `${n(p.hoursPerMonth)} hours a month`,
+      files: filesWords(p.filesGB),
       current: mine === id,
       button: mine === id ? null : `${verb} ${NAME[id]}`,
     };

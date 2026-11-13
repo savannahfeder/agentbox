@@ -65,14 +65,13 @@ export function staysOnTheTask(
 /**
  * IS SHE STILL ON THE ROW SHE RAN IT FROM.
  *
- * Written against the state rather than against each way out of a task, for the
- * same reason `heldByUrgent` is: Escape, the back arrow, clicking away and the
- * palette are four routes and fixing the ones you can find is how the fifth gets
- * missed. `null` focused means she has left, and then `wayOut` answers where to.
+ * Written against the state rather than against each way out of a task:
+ * Escape, the back arrow, clicking away and the palette are four routes and
+ * fixing the ones you can find is how the fifth gets missed. `null` focused
+ * means she has left, and then `wayOut` answers where to.
  *
- * A DIFFERENT ROW ENDS IT. An urgent row can take the pane over her head while
- * a command is running; from there the inbox is no longer a promise this rule
- * can keep, so it stops making it.
+ * A DIFFERENT ROW ENDS IT: from there the inbox is no longer a promise this
+ * rule can keep, so it stops making it.
  */
 export function stillFollowing(following: Followed, focused: { product: string; id: string } | null): Followed {
   if (!following) return null;

@@ -36,6 +36,14 @@ const TABLE_IN_A_MESSAGE = [
   'Just outside the list are Rippling and Deel, which move payroll rather than payments.',
 ].join('\n');
 
+export const fixtureUrgentArrival = (): Snapshot['items'][number] => ({
+  id: 'w-urgent-arrival', product: 'onboard', productName: 'Onboard', status: 'open', kind: 'question',
+  title: 'Sign-in is down for new teammates',
+  body: 'Every invite sent since 2pm lands on an error page. The cause is the redirect address that changed this morning. Putting it back takes one line, and I can ship it now.',
+  labels: [], priority: 9, epoch: 1, claim: null,
+  createdAt: now, updatedAt: Date.now(),
+});
+
 export const fixtureSnapshot: Snapshot = {
   // As a checkout has it (main/settings.mts alphaFeatures).
   alpha: { rooms: false },

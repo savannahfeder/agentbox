@@ -25,6 +25,11 @@
 # the one file in MacOS/, because a bundle has exactly one and a Mac without
 # PlistBuddy should still start her agents.
 here="$(cd "$(dirname "$0")" && pwd)"
+# The app's plain-JavaScript copy of the server (main/plain-copy.mts) starts
+# faster and lighter than the .mts, and needs no type flags.
+if [ -n "$ZERO_APPROVALS_SERVER" ] && [ -f "$ZERO_APPROVALS_SERVER" ] && [ -f "$ZERO_APPROVALS_RUNTIME" ] && [ -x "$ZERO_APPROVALS_RUNTIME" ]; then
+  exec env ELECTRON_RUN_AS_NODE=1 "$ZERO_APPROVALS_RUNTIME" "$ZERO_APPROVALS_SERVER"
+fi
 # The server is .mts, which a Node below 22.18 loads only when asked (main/strip-types.mts).
 strip_flags() { ELECTRON_RUN_AS_NODE=1 "$1" -e 'process.exit(process.features.typescript ? 0 : 1)' >/dev/null 2>&1 || echo --experimental-strip-types --disable-warning=ExperimentalWarning; }
 case "$here" in

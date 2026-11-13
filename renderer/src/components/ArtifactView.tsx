@@ -13,7 +13,7 @@ import { canPaintQuotes, paintQuotes } from '../paint-quotes';
 import { firstName, Face } from '../team/people';
 import { clock, type LedgerLine } from '../thread-history';
 import type { ArtifactMark, FileMarks, FileNote, NotePlace, Person } from '../types';
-import { hasSpot, letterGoesToTheNote, noteSendWords, noteSentWords, notesToSendTheAgent, notesToSendTheAgentAnywhere, otherFilesOpen, unsentWords, pageSpot, PIN_FRAME_S, pinned, viewOffers, whereANoteGoes, whoTalksOnFile, type Found } from '../artifact-pins';
+import { hasSpot, letterGoesToTheNote, noteBoxKey, noteSendWords, noteSentWords, notesToSendTheAgent, notesToSendTheAgentAnywhere, otherFilesOpen, unsentWords, pageSpot, PIN_FRAME_S, pinned, sentWithTheNote, viewOffers, whereANoteGoes, whoTalksOnFile, type Found } from '../artifact-pins';
 import { commentsInList, notesWithSaving, settleLocally, UNDO_MS } from '../note-saving';
 import { keptDraft, opensForTyping, SAVE_AFTER_A_PAUSE_MS, savedVersionArrived, wordsToSave } from '../edit-sitting';
 import { quotesKey } from '../selection-bar';
@@ -295,7 +295,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     setGo({ place: note.place, at: Date.now() });
   };
 
-  const send = async () => {
+  const send = async (now = false) => {
     const typed = words.trim();
     if ((!typed && !pictures.length) || !version || sending || attaching.length) return;
     // "Sofia, approved v4" names Sofia as surely as @Sofia does: it reaches her, not the agent.
@@ -303,7 +303,9 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     const to = addressedTo(typed, others);
     const goes = whereANoteGoes({ ...noteTo, text: typed });
     const mentions = [...new Set([...(to ? [to] : []), ...(goes.to === 'person' ? [goes.person] : []), ...named.filter((p) => p.id !== me && typed.includes(`@${firstName(p)}`)).map((p) => p.id)])];
-    const went = noteSentWords(sendWords);
+    const id = newId();
+    const withIt = now ? sentWithTheNote(goes, unsent.ids, id) : [];
+    const went = noteSentWords(withIt.length ? 'Send to your agent' : sendWords);
     setSending(true);
     let links = '';
     try { links = await persistAttachments(product, pictures); } catch (err) {
@@ -315,10 +317,10 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     const sentPictures = pictures;
     setPictures([]);
     const owner = whoseIsTheFile(files, version.id);
-    const id = newId();
     const place = placeNow;
     // A comment waits for Send, so the agent starts once for all of them; @agent sends this one now.
-    const tagged = withAgent && typeof version.agent === 'string' && tagsYourAgent(typed);
+    // ⌘↵ sends it with the rest in one toagent, so the agent starts once.
+    const tagged = !withIt.length && withAgent && typeof version.agent === 'string' && tagsYourAgent(typed);
     // It is in the list before the app has answered; a failure puts the words back.
     setSavingNotes((was) => [...was, { id, file: version.id, place, text, by: me, ts: Date.now(), resolved: false, replies: [], saving: true, wait: !tagged, ...(pinned(place) ? { pin: nextPin } : {}) } as unknown as FileNote]);
     setWords(''); setDraftPlace(null); setWholeAsked(false); setAsking(null);
@@ -332,7 +334,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
       setPictures(sentPictures);
       return;
     }
-    setJustSent(went);
+    if (!withIt.length || (await toAgent(withIt))) setJustSent(went);
     setNamed([]);
     // A pinned comment was covering the notes you carried; they come back once it is sent.
     const d = draftOf.current;
@@ -387,8 +389,8 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
 
   // Main sends the notes, so the thread draws them once and not again as an instruction.
   const toAgent = async (on: string[]) => {
-    if (!on.length) return;
-    failed(await write({ do: 'toagent', on }), 'Those notes did not reach the agent.');
+    if (!on.length) return true;
+    return !failed(await write({ do: 'toagent', on }), 'Those notes did not reach the agent.');
   };
   const unsent = withAgent ? notesToSendTheAgentAnywhere(marks, families, version?.id ?? null, people, me) : { ids: [], elsewhere: 0, elsewhereKind: 'picture' as const };
   const sendAll = () => toAgent(unsent.ids);
@@ -675,8 +677,11 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
       if (e.key === 'ArrowUp') { e.preventDefault(); setAsking({ ...asking, sel: (asking.sel - 1 + askingFor.length) % askingFor.length }); return; }
       if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); nameInto(askingFor[asking.sel]); return; }
     }
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !words.trim() && !pictures.length && unsent.ids.length) { e.preventDefault(); void sendAll(); return; }
-    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); }
+    const does = noteBoxKey({ key: e.key, chord: e.metaKey || e.ctrlKey, shift: e.shiftKey, composing: e.nativeEvent.isComposing, typed: !!words.trim() || !!pictures.length, waiting: unsent.ids.length });
+    if (does === 'leave') return;
+    e.preventDefault();
+    if (does === 'send waiting') void sendAll();
+    else void send(does === 'note and send');
   };
 
   const hint = kind === 'image' ? 'Click the picture to pin a note'

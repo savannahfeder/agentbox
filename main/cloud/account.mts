@@ -287,17 +287,18 @@ function signedIn(env: NodeJS.ProcessEnv, home: string): { gateway: string; key:
 }
 
 type FreeHours = { agents: number; hours: number; usedSeconds: number };
-type TeamHours = FreeHours & { running: number };
+type TeamHours = { hours: number; usedSeconds: number; running: number };
 
 /**
  * No plan reads as the hours a run would spend next, so every screen draws them
  * like a plan: a team's (`team`), spent or not, since they replace the free
  * hours; otherwise the free hours (`free`) while some are left.
  */
-export function cloudPlanOf<T extends { [field: string]: unknown }>(me: T): T | (T & { plan: 'free' | 'team'; agents: number; hoursPerMonth: number; usedSeconds: number }) {
+export function cloudPlanOf<T extends { [field: string]: unknown }>(me: T): T | (T & { plan: 'free' | 'team'; agents: number | null; hoursPerMonth: number; usedSeconds: number }) {
   if (me.plan !== 'none') return me;
   const tm = me.team as TeamHours | undefined;
-  if (tm) return { ...me, plan: 'team', agents: tm.agents, hoursPerMonth: tm.hours, usedSeconds: tm.usedSeconds, running: tm.running };
+  // A team has no limit at once; its hours are the limit.
+  if (tm) return { ...me, plan: 'team', unlimited: true, agents: null, hoursPerMonth: tm.hours, usedSeconds: tm.usedSeconds, running: tm.running };
   const f = me.free as FreeHours | undefined;
   if (!f || f.usedSeconds >= f.hours * 3600) return me;
   return { ...me, plan: 'free', agents: f.agents, hoursPerMonth: f.hours, usedSeconds: f.usedSeconds };
@@ -310,6 +311,24 @@ export async function cloudPlan({ env = process.env, home = os.homedir() }: Stor
   const me = await ask(at.gateway, '/v1/me', { key: at.key });
   if (me.status === 401) forgetCloudKey(at.key, env, home);
   return me.status === 200 ? { signedIn: true, ...cloudPlanOf(me.body as GatewayBody & { free?: FreeHours }) } : { signedIn: me.status !== 401, error: me.body.error || 'refused', message: me.body.message };
+}
+
+/** What this person keeps in the cloud and may, or null while that cannot be known: then nothing is sent or deleted. */
+export async function cloudFilesAccount({ env = process.env, home = os.homedir() }: StoreDirs = {}): Promise<{ bytes: number; cap: number; full: boolean; count: number } | null> {
+  const at = signedIn(env, home);
+  if (!at) return null;
+  const out = await ask(at.gateway, '/v1/files', { key: at.key }).catch(() => null);
+  if (!out || out.status !== 200) return null;
+  const b = out.body as { bytes?: unknown; cap?: unknown; full?: unknown; count?: unknown };
+  return typeof b.cap === 'number' ? { bytes: Number(b.bytes) || 0, cap: b.cap, full: !!b.full, count: Number(b.count) || 0 } : null;
+}
+
+/** The bucket through the cloud server, for files kept there. */
+export async function cloudFilesStorage({ env = process.env, home = os.homedir() }: StoreDirs = {}) {
+  const at = signedIn(env, home);
+  if (!at) return null;
+  const { managedClients } = await import('./managed.mts');
+  return managedClients({ url: at.gateway, key: at.key, onSignedOut: () => forgetCloudKey(at.key, env, home) }).storage;
 }
 
 /** What the team's owner sees of Stripe on Plan and Billing; `{ owner: false }` for anyone else. */

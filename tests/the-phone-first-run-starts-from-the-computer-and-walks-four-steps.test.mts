@@ -73,7 +73,7 @@ describe('the screens', () => {
     expect(signIn).not.toMatch(/signUp\(/);
     expect(signIn).toMatch(/router\.push\('\/no-account'\)/);
     expect(signIn).toMatch(/Sign up/);
-    expect(signIn).toMatch(/failed && /);
+    expect(signIn).toMatch(/failed \? 'Make your account on your computer'/);
     const noAccount = read('mobile/src/app/no-account.tsx');
     expect(noAccount).toMatch(/Make your account\\non your computer/);
     expect(noAccount).toMatch(/agentbox\.ac\/download/);

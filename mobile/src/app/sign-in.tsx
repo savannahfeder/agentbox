@@ -46,6 +46,7 @@ export default function SignIn() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Screen top={24} foot={<>
         <Btn kind="primary" label={busy === 'email' ? 'Signing in…' : 'Sign in'} disabled={!canSubmit} onPress={signIn} />
+        {error && <T accessibilityRole="alert" style={{ fontSize: 14, lineHeight: 20, color: color.dim, textAlign: 'center' }}>{error}</T>}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 4 }}>
           <View style={{ flex: 1, height: 1, backgroundColor: color.line }} />
           <Label>or</Label>
@@ -53,10 +54,11 @@ export default function SignIn() {
         </View>
         {(apple || c.preview) && <Btn label={busy === 'apple' ? 'Signing in…' : 'Continue with Apple'} lead={<AppleMark />} disabled={!!busy} onPress={run('apple', () => appleSignIn(c.cloud!))} />}
         <Btn label={busy === 'google' ? 'Signing in…' : 'Continue with Google'} lead={<GoogleMark />} disabled={!!busy} onPress={run('google', () => googleSignIn(c.cloud!))} />
-        <T style={{ fontSize: 14, lineHeight: 20, color: color.faint, textAlign: 'center', marginTop: 6 }}>
-          {'No account? '}
-          <T onPress={toNoAccount} accessibilityRole="link" style={{ fontSize: 14, color: color.text, textDecorationLine: 'underline', textDecorationColor: color.lineStrong }}>Sign up</T>
-        </T>
+        {/* Separate elements: Android gives a link nested in other text no bounds, so it cannot be tapped. */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', marginTop: 6 }}>
+          <T style={{ fontSize: 14, lineHeight: 20, color: color.faint }}>{failed ? 'New to Agentbox? ' : 'No account? '}</T>
+          <T onPress={toNoAccount} accessibilityRole="link" suppressHighlighting style={{ fontSize: 14, lineHeight: 20, color: color.text, textDecorationLine: 'underline', textDecorationColor: color.lineStrong }}>{failed ? 'Make your account on your computer' : 'Sign up'}</T>
+        </View>
       </>}>
         <Bars at="account" />
         <AppMark size={36} />
@@ -70,13 +72,6 @@ export default function SignIn() {
         </View>
         <T onPress={() => router.push({ pathname: '/reset-password', params: { email: email.trim() } })} accessibilityRole="link" suppressHighlighting
           style={{ alignSelf: 'flex-end', fontSize: 14, lineHeight: 20, color: color.dim, marginTop: 12, paddingVertical: 4 }}>Forgot password?</T>
-        {error && <T accessibilityRole="alert" style={{ fontSize: 14, lineHeight: 20, color: color.dim, marginTop: 16 }}>{error}</T>}
-        {failed && (
-          <T style={{ fontSize: 14, lineHeight: 20, color: color.dim, marginTop: 6 }}>
-            {'New to Agentbox? '}
-            <T onPress={toNoAccount} accessibilityRole="link" style={{ fontSize: 14, color: color.text, textDecorationLine: 'underline', textDecorationColor: color.lineStrong }}>Make your account on your computer</T>
-          </T>
-        )}
       </Screen>
     </KeyboardAvoidingView>
   );
