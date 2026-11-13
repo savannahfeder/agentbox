@@ -13,6 +13,7 @@ import http from 'node:http';
 import { FREE, PLANS, TEAM, RUN_CEILING_MS, SIGNIN_CEILING_MS, SIGNINS_AT_ONCE } from './plans.mjs';
 import { TERMS_VERSION } from './terms.mjs';
 import { LOGIN_NAME } from '../../shared/cloud-login-name.mts';
+import { isKeyObject } from '../../shared/cloud-keys.mts';
 import { Name } from '../../shared/product-name.mjs';
 import { JOIN_SCHEME } from '../../shared/room-links.mts';
 import { PAYING, planOfLookupKey } from './stripe.mjs';
@@ -462,6 +463,14 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     }))).filter(Boolean);
     if (Array.isArray(sent.also)) sent.also = await linked(sent.also);
     if (Array.isArray(sent.keys)) sent.keys = await linked(sent.keys);
+    // A saved key handed to a run while it goes (main/cloud/key-asks.mts), and never any other sign-in.
+    if (sent.action === 'files' && Array.isArray(sent.files) && sent.files.some((f) => f?.key !== undefined)) {
+      sent.files = await Promise.all(sent.files.map(async (f) => {
+        if (f?.key === undefined) return f;
+        if (typeof f.url !== 'string' || !f.url.startsWith(LOGIN_NAME) || !isKeyObject(f.url.slice(LOGIN_NAME.length))) throw bad('a key handed to a run is one of the saved keys');
+        return { ...f, url: await loginLink(person, f.url, 'get') };
+      }));
+    }
     if ('loginUrl' in sent) sent.loginUrl = await loginLink(person, sent.loginUrl, 'get');
     if ('saveUrl' in sent) {
       if (!SAVES_A_SIGNIN.has(sent.action)) throw bad('a sign-in is saved only by a sign-in');
