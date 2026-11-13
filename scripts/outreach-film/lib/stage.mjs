@@ -91,7 +91,11 @@ function demoInit({ seed, theme }) {
     },
     history(id) {
       const i = find(id); if (!i) return [];
-      const lines = [{ id: i.id, ts: i.createdAt, source: 'founder', ...(i.createdBy && i.createdBy !== 'me' ? { by: i.createdBy } : {}), patch: { title: i.title, body: i.ask ?? i.body, status: 'open', kind: i.kind, priority: i.priority } }];
+      // A thread with an answer opens on it, at the app's own spacing, with no
+      // message repeating its title. A running thread keeps its opening line,
+      // which would otherwise read "Nothing has been said here yet".
+      const teammate = i.createdBy && i.createdBy !== 'me';
+      const lines = !i.result ? [{ id: i.id, ts: i.createdAt, source: 'founder', ...(teammate ? { by: i.createdBy } : {}), patch: { title: i.title, body: i.ask ?? i.body, status: 'open', kind: i.kind, priority: i.priority } }] : [];
       if (i.result) lines.push({ id: i.id, ts: i.wrote?.result?.ts ?? i.updatedAt, source: 'agent', patch: { status: 'open', result: i.result } });
       if (i.answer) lines.push({ id: i.id, ts: i.wrote?.answer?.ts ?? i.updatedAt, source: 'founder', patch: { answer: i.answer } });
       return lines;

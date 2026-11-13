@@ -65,7 +65,7 @@ await page.evaluate((c) => {
   const css = document.createElement('style');
   css.textContent = `.th-mark{font-size:0 !important;color:transparent !important;background:url(/pics/logo.svg) center/contain no-repeat !important;}
   .th-me{display:none !important}
-  .msg.yours,.appendix-foot>.appendix-label{display:none !important}
+  .thread-block:has(> .msg.yours){display:none !important}
   .th-new,.th-disp{background:color-mix(in srgb, var(--surface) 70%, transparent) !important;backdrop-filter:blur(10px) saturate(1.2)}
   .film-nocaret{caret-color:transparent !important}
   #film-caret{position:fixed;width:2px;z-index:2147483645;pointer-events:none;display:none;border-radius:1px;animation:film-blink 1.06s steps(1,end) infinite}
