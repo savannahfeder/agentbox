@@ -1,7 +1,7 @@
 // The Today page: what each person and AI teammate finished, shipped and
 // decided, what is blocked and on whom, and what waits on you, read from the
 // store with no agent.
-import { cardStateOf, shippedAtOf, type WontStart } from '../../../shared/thread-cards.mts';
+import { cardStateOf, handedOn, shippedAtOf, type WontStart } from '../../../shared/thread-cards.mts';
 import { agentOnOrComing } from '../list-rules';
 import { shownTitle, withoutFiles } from '../../../shared/thread-title.mts';
 import { isShared, isTaskRow, runnerOf, taskNewsAt } from '../../../shared/team-rules.mts';
@@ -202,8 +202,7 @@ export function teamToday({ range, window, now, me, items, products, cards, deci
     const shipped = shippedAtOf(i);
     if (inRange(shipped)) { who.shipped.push(line(shipped!)); continue; }
     if (i.status === 'done') {
-      // Handing a thread on closes it with "Given to …" (main/team handOn): the work went on, it did not finish.
-      if (/^Given to /.test(i.answer ?? '')) continue;
+      if (handedOn(i)) continue;
       const doneAt = i.wrote?.status?.ts ?? i.updatedAt;
       // A task you gave is finished by whoever closed it, in their words, not yours.
       const closer = task ? keyOfPerson(i.wrote?.status?.by) : null;
@@ -244,7 +243,7 @@ export function teamToday({ range, window, now, me, items, products, cards, deci
     const line: TodayLine = { key: `card/${c.personId}/${c.threadId}`, title: c.title ?? '', at: c.updatedAt, card: c };
     if (inRange(c.shippedAt)) { if (named) who.shipped.push({ ...line, at: c.shippedAt! }); else who.privateDone += 1; continue; }
     if (c.state === 'done') {
-      if (inRange(c.updatedAt)) { if (named) who.finished.push(line); else who.privateDone += 1; }
+      if (inRange(c.updatedAt) && !handedOn({ status: 'done', answer: c.solution })) { if (named) who.finished.push(line); else who.privateDone += 1; }
       continue;
     }
     if (!named) {

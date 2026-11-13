@@ -29,6 +29,7 @@ export type ThreadState = typeof THREAD_STATES[number];
 
 export interface CardItem extends TaskRow {
   start?: string;
+  answer?: string | null;
   runAt?: number;
   claim?: unknown;
   claimExpired?: boolean;
@@ -342,6 +343,10 @@ export function cardStateOf(item: CardItem & { id: string }, { now = Date.now(),
   return { state: held ? 'waiting' : said, waitsOn, gotNowhere, held };
 }
 
+/** Handing a thread on closes it with this note (main/team handOn): the work went to someone else, it did not finish. */
+export const handedOn = (item: { status?: string; answer?: string | null }): boolean =>
+  item.status === 'done' && /^Given to /.test(item.answer ?? '');
+
 export function cardsFor<P extends CardProduct>({ products, readItems, now = Date.now(), since = null, me = null, running = [], wontStart = {} }: {
   products: readonly P[];
   readItems: (product: P) => readonly (CardItem & { id: string })[];
@@ -393,7 +398,8 @@ export function cardsFor<P extends CardProduct>({ products, readItems, now = Dat
     if (state === 'done' && !(item.updatedAt! >= kept)) continue;
     const s = summaryOf(item);
     // The run that got nowhere is said by the wait; as a solution it read as finished.
-    const solution = waitsOn && gotNowhere ? '' : s.solution;
+    // A thread handed on says so, so a teammate's screen never reads its close as finished.
+    const solution = handedOn(item) ? item.answer : waitsOn && gotNowhere ? '' : s.solution;
     const shippedAt = shippedAtOf(item);
     cards.push({
       threadId: item.id, visible: true, title: shownTitle(item), project: product.name,
