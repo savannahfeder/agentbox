@@ -27,6 +27,24 @@ describe('the email', () => {
     expect(mail.text).toContain('2. Sign in with theo@northwind.test.');
     expect(mail.text).toContain('3. Accept the invitation to Northwind.');
   });
+  // Read before it was ever sent: "I don't like this phrasing" of a line describing the product,
+  // and "shouldn't it have an invite link or button?"
+  it('does not describe the product in words nobody approved', () => {
+    expect(mail.text).not.toMatch(/in one place|in the background/);
+    expect(mail.text.split('\n')[0]).toBe('Dana Whitfield invited you to join Northwind on Agentbox.');
+    expect(mail.text.split('\n')[2]).toBe('To join:');
+  });
+  it('has a button that goes where Agentbox is downloaded, which is a page that exists', () => {
+    expect(mail.html).toContain(`<a href="${DOWNLOAD}"`);
+    expect(mail.html).toContain('>Get Agentbox</a>');
+    expect(mail.html).toContain('border-radius');
+    expect(mail.html).toContain('Sign in with theo@northwind.test and your invitation to Northwind is waiting.');
+  });
+  it('writes a name into the page as text, never as markup', () => {
+    const odd = inviteEmail({ ...invite, inviter: 'Dana "<b>" & co', team: 'A&B' }, config);
+    expect(odd.html).not.toMatch(/<b>/);
+    expect(odd.html).toContain('A&amp;B');
+  });
   it('is plain words: no dashes for pauses, nothing it cannot back', () => {
     expect(mail.text).not.toMatch(/—|–|!/);
     expect(mail.text).not.toMatch(/free|unlimited|best/i);
