@@ -41,7 +41,7 @@ export async function getMic({ systemPreferences, openExternal, owner = micOwner
   if (status === 'granted') return 'granted';
   if (status === 'denied' && owner.id) {
     const id = owner.id;
-    await new Promise<void>((resolve) => run('tccutil', ['reset', 'Microphone', id], { timeout: 10_000 }, () => resolve()));
+    await new Promise<void>((resolve) => run('tccutil', ['reset', 'Microphone', id], { timeout: 10_000, windowsHide: true }, () => resolve()));
   }
   const granted = await systemPreferences.askForMediaAccess('microphone').catch(() => false);
   if (granted) return 'granted';

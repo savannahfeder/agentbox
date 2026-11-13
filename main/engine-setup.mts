@@ -111,7 +111,7 @@ const ANSI = /\x1b\[[0-9;?]*[A-Za-z]/g;
 function realSpawn(file: string, args: string[], { env, onData, keepStdin = false }: SetupSpawnOptions = {}): SetupProcess {
   let child: ChildProcess;
   try {
-    child = nodeSpawn(file, args, { env, stdio: [keepStdin ? 'pipe' : 'ignore', 'pipe', 'pipe'] });
+    child = nodeSpawn(file, args, { env, stdio: [keepStdin ? 'pipe' : 'ignore', 'pipe', 'pipe'], windowsHide: true });
   } catch (error) {
     onData?.(`${(error as Error).message}\n`);
     return { exit: Promise.resolve(127), kill() {} };

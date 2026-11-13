@@ -274,6 +274,7 @@ function askOnce(prompt: string, clean: (text: string) => string, { claudeBin, c
         cwd: smallModelCwd(),
         ...(engine === 'codex' ? { env: codexLaunchEnv(bin, env) } : env ? { env } : {}),
         stdio: [input ? 'pipe' : 'ignore', 'pipe', 'pipe'],
+        windowsHide: true,
       });
     } catch {
       return resolve('');

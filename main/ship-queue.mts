@@ -351,7 +351,7 @@ export function failureNote(output: unknown) {
 }
 
 const commonDirOf = (dir: string) => new Promise<string | null>((resolve) => {
-  execFile('git', ['-C', dir, 'rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8', timeout: 10_000 }, (err, stdout) => {
+  execFile('git', ['-C', dir, 'rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8', timeout: 10_000, windowsHide: true }, (err, stdout) => {
     resolve(err ? null : realOrNull(String(stdout).trim()));
   });
 });
@@ -403,7 +403,7 @@ export async function runScript(script: string, cwd: string, { timeout = SHIP_MS
     try {
       // Its own process group, so a stop reaches the hook's test run and not
       // only this script.
-      child = spawn(node, [script], { cwd, env: { ...env, GIT_TERMINAL_PROMPT: '0', ...baseGate }, stdio: ['ignore', 'pipe', 'pipe'], detached: ownGroup });
+      child = spawn(node, [script], { cwd, env: { ...env, GIT_TERMINAL_PROMPT: '0', ...baseGate }, stdio: ['ignore', 'pipe', 'pipe'], detached: ownGroup, windowsHide: true });
     } catch (e) {
       resolve({ code: 1, out: String((e as Error)?.message ?? e) });
       return;

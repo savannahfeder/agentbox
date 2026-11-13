@@ -988,7 +988,7 @@ const NEW_KIT_EVERY_MS = 3 * 3_600_000;
 const NEW_KIT_LOOK_MS = 10 * 60_000;
 // Git asked without holding the window's thread (tests/the-window-waits-on-no-new-subprocess).
 const gitAsync = (cwd: string, args: string[]) => new Promise<string>((resolve, reject) => {
-  execFileCb('git', ['-C', cwd, ...args], { encoding: 'utf8', timeout: 30_000 }, (err, out) => (err ? reject(err) : resolve(String(out).trim())));
+  execFileCb('git', ['-C', cwd, ...args], { encoding: 'utf8', timeout: 30_000, windowsHide: true }, (err, out) => (err ? reject(err) : resolve(String(out).trim())));
 });
 // HOW LONG SHE WAITS AFTER PRESSING THE BUTTON, and until now it was the line
 // above: composing a task and answering a question both wrote a line to the
@@ -7030,7 +7030,7 @@ export class Supervisor {
     const flag = path.join(this.config.home || os.homedir(), '.agentbox', '.old-cloud-tokens-forgotten');
     try { if (fs.existsSync(flag)) return; } catch { return; }
     try {
-      forgetOldCloudTokens({ home: this.config.home || os.homedir(), service: OLD_TOKEN_SERVICE, exec: (cmd: string, args: string[]) => execFileSync(cmd, args, { stdio: 'ignore' }) });
+      forgetOldCloudTokens({ home: this.config.home || os.homedir(), service: OLD_TOKEN_SERVICE, exec: (cmd: string, args: string[]) => execFileSync(cmd, args, { stdio: 'ignore', windowsHide: true }) });
       fs.mkdirSync(path.dirname(flag), { recursive: true });
       fs.writeFileSync(flag, '');
     } catch { /* tried */ }
@@ -7660,12 +7660,12 @@ export class Supervisor {
     const sock = this._cloudHostAvailable() ? this._cloudHost() : null;
     if (sock) {
       const { ELECTRON_RUN_AS_NODE: _node, ...plain } = env;
-      const child = spawn(PERL, [shim, sock, ...args], { cwd, env: plain, stdio, detached: true });
+      const child = spawn(PERL, [shim, sock, ...args], { cwd, env: plain, stdio, detached: true, windowsHide: true });
       // No host answered: the next run looks for one afresh.
       child.on('exit', (code) => { if (code === 75 && this._cloudHostProc?.exitCode !== null) this._cloudHostProc = null; });
       return child;
     }
-    return spawn(process.execPath, [...stripTypesFlags(), this._cloudRunPath(), ...args], { cwd, env: { ...env, ELECTRON_RUN_AS_NODE: '1' }, stdio, detached: true });
+    return spawn(process.execPath, [...stripTypesFlags(), this._cloudRunPath(), ...args], { cwd, env: { ...env, ELECTRON_RUN_AS_NODE: '1' }, stdio, detached: true, windowsHide: true });
   }
 
   // A cloud run's environment: this Mac's cloud accounts, the phone it reports
@@ -7703,6 +7703,7 @@ export class Supervisor {
         env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
         detached: true,
         stdio: ['ignore', log, log],
+        windowsHide: true,
       });
       fs.closeSync(log);
       proc.on('error', () => {});
@@ -7737,6 +7738,7 @@ export class Supervisor {
         env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
         detached: true,
         stdio: ['ignore', log, log],
+        windowsHide: true,
       });
       fs.closeSync(log);
       proc.on('error', () => {});
@@ -7767,6 +7769,7 @@ export class Supervisor {
         env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
         detached: true,
         stdio: ['ignore', log, log],
+        windowsHide: true,
       });
       fs.closeSync(log);
       proc.on('error', () => {});
@@ -11731,6 +11734,7 @@ export class Supervisor {
         // login, so a row named here would be the wrong row for all but one.
         env: codexLaunchEnv(this.config.codexBin, { ...this._workerEnv('codex'), CODEX_HOME: home, ...this.codexMemoryGateEnv() }),
         stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: true,
       }),
       // WHAT IS LEFT OF THIS LOGIN'S LIMIT, ARRIVING UNBIDDEN. `onNotification`
       // is the channel for everything that belongs to no thread, and
