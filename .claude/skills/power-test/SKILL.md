@@ -96,10 +96,12 @@ you cite into the product's docs before you finish.
 - **How long.** A feature check: 1 hour. Before a launch: 3 hours or more.
   The chaos is laid out as fractions of the length, so a short run is the
   same day squeezed.
-- **Codex gets half the work.** The person does not use Codex, so its
-  failures reached them only on a thread they needed. Every tester who uses
-  Codex is told to send at least half its work there. On an agreed stand-in
-  run Codex still stays real, on the testers' own Codex login
+- **Codex gets most of the work.** The person does not use Codex, so its
+  failures reached them only on a thread they needed, and Codex gives more
+  use per plan. On real plans every tester who uses Codex is told to send
+  about four threads in five there and Claude Code the rest. On an agreed
+  stand-in run, whose Claude Code is free, it is at least half, and Codex
+  stays real on the testers' own Codex login
   (`live.mjs up --real-codex <home>`).
 - **Real plans are spent.** The copies' agents work in the fixture
   repositories on this computer's Claude and Codex plans. That is the point,
