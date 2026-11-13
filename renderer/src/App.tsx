@@ -147,7 +147,7 @@ import { aVoiceNoteIsRecording } from './team/useVoiceRecorder';
 import { aBoxIsListening } from './dictation';
 import { MentionCards, MentionRows } from './team/rooms/MentionRows';
 import { AgentsLine, MateThreads, NeedsFaces, PersonThreads, SpaceBar, TeamThreads } from './team/everything/TeamStrip';
-import { ChatStart, EmptyChat, JobBlock, Place as MemberPlace, PlaceAction, PlaceList, PlaceMates, SendBox, type PlaceRow } from './team/everything/PlacePage';
+import { ChatStart, EmptyChat, JobBlock, Place as MemberPlace, PlaceAction, SendBox, listPart, matesPart, type PlaceRow } from './team/everything/PlacePage';
 import { nowAndFinished, pressOpensIn, waitsOnYou, youWaitOn, type HomeLayout } from './team/everything/place';
 import { buildMembers, mateRunsOf, orderMembers, personCardsOf, readHidden, readOrder, splitHidden, teamRunsOf, type Hidden, type Member } from './team/everything/members';
 import { boardItems, cardOpens, evColumns, flipEvView, readEvView, whoseBoard, writeEvView, type EvTab, type EvView } from './team/everything/whose-board';
@@ -7874,16 +7874,16 @@ export default function App() {
             box={roomsUi.firstChat({ id, name: placeMember.name, avatarUrl: placeMember.avatarUrl ?? null }, `Message ${first}`)} />
           : <SendBox placeholder={`Message ${first}`} empty={<EmptyChat name={first} />}
             onSend={async (text) => { setComposeInitial({ to: id, body: text }); setModal('compose'); return null; }} />}
-        side={<>
-          <PlaceList title="Waiting on you" now={now} rows={[
+        parts={[
+          ...listPart('Waiting on you', [
             ...onYou.map((i) => itemRow(i, dueSaid(dayDeadline(i.due), now, { ahead: true })?.word ?? '', 'ask')),
             ...mentionsBy.map((m) => ({ key: m.id, title: m.body || `In ${m.roomName}`, word: m.roomName, at: m.at, tone: 'ask' as const, onOpen: () => roomsUi.openMention(m) })),
-          ]} />
-          <PlaceList title={`Tasks you gave ${first}`} now={now} rows={given.map((i) => itemRow(i, dueSaid(dayDeadline(i.due), now, { ahead: true })?.word ?? '', 'later'))} />
-          <PlaceList title="In progress" now={now} rows={theirs.now.map(cardRow)} />
-          <PlaceList title="Finished this week" now={now} rows={theirs.finished.map((c) => ({ ...cardRow(c), word: '' }))} />
-          <PlaceMates title={`${first}'s AI teammates`} mates={theirMates} waits={waits} onPick={(key) => pickMember(key)} />
-        </>} />;
+          ], now, { ask: true }),
+          ...listPart('Tasks you gave', given.map((i) => itemRow(i, dueSaid(dayDeadline(i.due), now, { ahead: true })?.word ?? '', 'later')), now),
+          ...listPart('In progress', theirs.now.map(cardRow), now),
+          ...listPart('Done this week', theirs.finished.map((c) => ({ ...cardRow(c), word: '' })), now),
+          ...matesPart('AI teammates', theirMates, waits, (key) => pickMember(key)),
+        ]} />;
     } else if (placeMember.key.startsWith('mate:')) {
       const id = placeMember.key.slice('mate:'.length);
       const t = teammatesUi.list.find((x) => x.id === id);
@@ -7895,15 +7895,14 @@ export default function App() {
       placeEl = <MemberPlace m={placeMember} waits={placeWaits} about={t?.role ?? 'AI teammate'} onBack={back} backTo={backTo}
         actions={<>
           <PlaceAction onClick={() => { setComposeInitial({ mate: id }); setModal('compose'); }} title={`A new thread for ${placeMember.name}`}>Give a task</PlaceAction>
-          <PlaceAction quiet onClick={() => { setEvPick(null); teammatesUi.go(id); }} title="Its chat with its settings beside it">Settings</PlaceAction>
         </>}
         chat={teammatesUi.chatWith(id)}
-        side={<>
-          <JobBlock job={t?.job ?? null} onSave={(job) => teammatesUi.setJob(id, job)} />
-          <PlaceList title="Waiting on you" now={now} rows={asks.map((i) => itemRow(i, '', 'ask'))} />
-          <PlaceList title="In progress" now={now} rows={split.now.map((i) => itemRow(i, word(i)[0], word(i)[1]))} />
-          <PlaceList title="Finished this week" now={now} rows={split.finished.map((i) => itemRow(i, '', 'done'))} />
-        </>} />;
+        parts={[
+          ...listPart('Waiting on you', asks.map((i) => itemRow(i, '', 'ask')), now, { ask: true }),
+          ...listPart('In progress', split.now.map((i) => itemRow(i, word(i)[0], word(i)[1])), now),
+          ...listPart('Done this week', split.finished.map((i) => itemRow(i, '', 'done')), now),
+          { key: 'about', label: 'About', body: teammatesUi.aboutOf(id) },
+        ]} />;
     } else {
       const tm = teamMates.find((x) => `theirmate:${x.owner}:${x.id}` === placeMember.key) ?? null;
       const owner = tm ? team?.byId.get(tm.owner) ?? null : null;
@@ -7913,11 +7912,11 @@ export default function App() {
         chat={<SendBox placeholder={`Write to ${tm.name}`}
           empty={<EmptyChat name={tm.name} />}
           onSend={async (text) => { const r = await api.teamMessageMate({ owner: tm.owner, mate: tm.id, text }); if (r.ok) { showToast(tm.open ? `Sent to ${tm.name}` : `Sent to ${first} to pass on`); void refresh(); } return r.ok ? null : r.error ?? 'That did not send.'; }} />}
-        side={<>
-          <JobBlock job={tm.job} />
-          {tm.running && tm.now && <div className="pl-sec"><h3>In progress</h3><p className="pl-text">{tm.now}</p></div>}
-          {ownerMember && <PlaceMates title="Whose it is" mates={[ownerMember]} waits={waits} onPick={(key) => pickMember(key)} />}
-        </>} />;
+        parts={[
+          ...(tm.running && tm.now ? [{ key: 'now', label: 'In progress', body: <p className="pl-text">{tm.now}</p> }] : []),
+          ...(tm.job ? [{ key: 'about', label: 'About', body: <JobBlock job={tm.job} /> }] : []),
+          ...(ownerMember ? [{ key: 'owner', label: ownerMember.name, onOpen: () => pickMember(ownerMember.key) }] : []),
+        ]} />;
     }
   }
   // BACK LANDS ON THE TAB THE BAR NAMED (w-474ac45a33). The thread may have
