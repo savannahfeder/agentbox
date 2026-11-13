@@ -78,7 +78,7 @@ import { CloudOffAsk } from './components/CloudOffAsk';
 import { Standing, STANDING } from './components/Standing';
 import { Settings } from './components/Settings';
 import { Snooze } from './components/Snooze';
-import { LATER_KEYWORDS, REOPEN_KEYWORDS } from './palette-rows';
+import { LATER_KEYWORDS, LATER_OLD_NAMES, REOPEN_KEYWORDS } from './palette-rows';
 /* The line, the toast and the dot on the cog were the other three drawn for that round and
  are gone; their copy is in decisions.md and their photographs on
  `astral/w-86452550e5-looks`.
@@ -91,9 +91,11 @@ import {
   markReplyInFlight, replyLanded, repliesInFlight, bringBackUnsent,
   type SentDraft, type ComposeDraft,
 } from './drafts';
-import { approvalStage, approvalClickAllowed, cardChord, pressWithin } from './approval-stage';
+import { approvalStage, approvalClickAllowed, cardChord, cardReplyChord, pressWithin } from './approval-stage';
+import { KeyCardActions } from './components/KeyCardActions';
+import { CardKey } from './components/CardKey';
 import { roomForTheCard } from './room-for-the-card';
-import { approvalAnswered, approvalAsker, approvalView } from './approval-card';
+import { approvalAnswered, approvalAsker, approvalView, KEY_CARD_TOOL } from './approval-card';
 // The new task card's two sentences: why it will not take one, and where the
 // one it took went. Only the second is raised from here, because by the time
 // there is anything to confirm the card has closed.
@@ -150,7 +152,7 @@ import { aVoiceNoteIsRecording } from './team/useVoiceRecorder';
 import { aBoxIsListening } from './dictation';
 import { MentionCards, MentionRows } from './team/rooms/MentionRows';
 import { AgentsLine, MateThreads, NeedsFaces, PersonThreads, SpaceBar, TeamThreads } from './team/everything/TeamStrip';
-import { EmptyChat, JobBlock, Place as MemberPlace, PlaceAction, PlaceList, PlaceMates, SendBox, type PlaceRow } from './team/everything/PlacePage';
+import { ChatStart, EmptyChat, JobBlock, Place as MemberPlace, PlaceAction, SendBox, listPart, matesPart, type PlaceRow } from './team/everything/PlacePage';
 import { nowAndFinished, pressOpensIn, waitsOnYou, youWaitOn, type HomeLayout } from './team/everything/place';
 import { buildMembers, mateRunsOf, orderMembers, personCardsOf, readHidden, readOrder, splitHidden, teamRunsOf, type Hidden, type Member } from './team/everything/members';
 import { boardItems, cardOpens, evColumns, flipEvView, readEvView, whoseBoard, writeEvView, type EvTab, type EvView } from './team/everything/whose-board';
@@ -215,7 +217,7 @@ import { lastUsedByMate, readMateOrder, settleMateOrder, writeMateOrder, type Ma
 import { NAME, Name } from '../../shared/product-name.mjs';
 import { NOT_ANSWERING, NOT_ANSWERING_MS, RESTART_IT, RESTART_IT_MS, SEND_NOT_TAKEN } from './not-answering';
 import { TEAM_WAIT_MS } from './boot-waits';
-import { signInAsk, SIGN_IN_SKIPPED } from './sign-in-ask';
+import { signInAsk, shareSignInStartsOn, SIGN_IN_SKIPPED } from './sign-in-ask';
 import { isNew } from '../../shared/notify-rules.mts';
 import { closedByTheOther, closedOverWords, inMyInbox, isGivenTask, isShared, isTaskRow, heldByAPerson, runnerOf, iSpokeLast } from '../../shared/team-rules.mts';
 import { Face, TeamContext, firstName, teamView } from './team/people';
@@ -238,7 +240,7 @@ import { FollowCards, FollowRows } from './threads/FollowRows';
 import { FollowContext, follow, followNews, isFollowing, markTold, readFollows, unfollow, writeFollows, type Follow } from './team/following';
 import { DecideContext, ShippedList } from './team/TeamLists';
 import { shippedThisWeek } from './team/shipped';
-import { teamToday, type TodayRange } from './team/today';
+import { everyoneRange, keepEveryoneRange, teamToday, type TodayRange } from './team/today';
 import { TodayPage } from './team/TodayPage';
 import { TasksPage } from './team/TasksPage';
 import { teamTasks } from './team/tasks';
@@ -282,15 +284,15 @@ import { BackForward } from './components/BackForward';
 
 const FIRST_IDEAS = ideasFor();
 
-/** Which first run this install shows, half each (shared/onboarding-arm.mts). */
+/** Which first run this install shows (shared/onboarding-arm.mts). */
 type Arm = 'tour' | 'classic';
 const ARM_WAIT_MS = 3000;
 async function armNow(): Promise<Arm> {
   try {
     const asked = (window.zero as { onboardingArm?: () => Promise<unknown> } | undefined)?.onboardingArm?.();
     const word = await Promise.race([asked, new Promise((r) => setTimeout(() => r(null), ARM_WAIT_MS))]);
-    return word === 'classic' ? 'classic' : 'tour';
-  } catch { return 'tour'; }
+    return word === 'tour' ? 'tour' : 'classic';
+  } catch { return 'classic'; }
 }
 
 type Modal = null | 'cloud-off' | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing';
@@ -1098,6 +1100,10 @@ export default function App() {
   // leave. Cmd+Y is caught in the main process, so this is the renderer's only
   // evidence the press landed at all.
   const [answered, setAnswered] = useState<{ id: string; allow: boolean } | null>(null);
+  // A key card (main/cloud/key-asks.mts): the one whose reply box is open, and the one answered in words.
+  const [keyReplyOpen, setKeyReplyOpen] = useState<string | null>(null);
+  const [repliedTo, setRepliedTo] = useState<string | null>(null);
+  const keyCardOnStage = useRef(false);
   // Held until the app has taken it: a stamp that left first put the card back as if unpressed.
   const [answerGoing, setAnswerGoing] = useState(false);
   const approvalPress = useRef<string | null>(null);
@@ -1107,12 +1113,14 @@ export default function App() {
     if (fresh) void answerCard(id, allow);
   };
   // An answer that did not go (the phone's database, a card that moved) puts the card back and says why.
-  const answerCard = async (id: string, allow: boolean) => {
+  const answerCard = async (id: string, allow: boolean, note?: string) => {
     setAnswered({ id, allow });
+    setRepliedTo(note ? id : null);
     setAnswerGoing(true);
-    const r = await pressWithin(() => window.zero?.approve?.({ id, allow }));
+    const r = await pressWithin(() => window.zero?.approve?.({ id, allow, ...(note ? { note } : {}) }));
     if (r && (r as { ok?: boolean }).ok === false) {
       setAnswered(null);
+      setRepliedTo(null);
       showToast(`Not answered: ${(r as { error?: string }).error ?? 'it did not go through'}`);
     } else if (onPhone()) {
       // The stamp on the leaving card is a flash on a phone screen (./approval-card.ts).
@@ -1833,8 +1841,8 @@ export default function App() {
     setView('inbox');
     sawPalette.current = false;
     setupStartedAgain.current = true;
-    // The setup a new install meets, with a way back to the app (`leaveSetupAgain`).
-    setTimeout(() => { setArm('tour'); setFresh(true); }, 0);
+    // The first run a new install meets; the new setup has a way back to the app (`leaveSetupAgain`).
+    setTimeout(() => { void armNow().then((a) => { setArm(a); setFresh(true); }); }, 0);
   }, [closeWhatFloats]);
   // Asked for from ⌘K, so its screens must have a way back. A real first run has
   // no app behind it to go back to.
@@ -2293,6 +2301,7 @@ export default function App() {
     if (pendingIds.has(i.id)) return false; // action held in the grace window: already sent, as far as the inbox is concerned
     if (i.product && scope && i.product !== scope) return false;
     if (commentsWaitOnYou(i, seenAt[i.id] ?? unreadSince)) return true;
+    if (i.linkComments?.length) return true;
     if (fileNewsFor(i, team?.me ?? null, { myName }).length) return true;
     // An agent is working on it right now: In progress, whatever it says
     // (`live` in list-rules, w-bc976fd247). Ahead of every branch here,
@@ -2843,6 +2852,8 @@ export default function App() {
   const [evPick, setEvPick] = useState<string | null>(null);
   const [todayOn, setTodayOn] = useState(false);
   const [todayRange, setTodayRange] = useState<TodayRange>('today');
+  const [everyoneRangeNow, setEveryoneRangeNow] = useState<TodayRange>(() => everyoneRange(localStorage));
+  const pickEveryoneRange = useCallback((r: TodayRange) => { keepEveryoneRange(localStorage, r); setEveryoneRangeNow(r); }, []);
   const [todayPick, setTodayPick] = useState<string | null>(null);
   const [tasksOn, setTasksOn] = useState(false);
   const [tasksPick, setTasksPick] = useState<string | null>(null);
@@ -6367,6 +6378,8 @@ export default function App() {
       // beat that teaches ⌘K is the last one, standing on the real app.
       const chord = cardChord(e, cardOnStage.current, cardDrawnAt.current?.id === cardOnStage.current ? cardDrawnAt.current.at : null);
       if (chord) { e.preventDefault(); void answerCardRef.current(chord.id, chord.allow); return; }
+      const replyTo = cardReplyChord(e, cardOnStage.current, keyCardOnStage.current, cardDrawnAt.current?.id === cardOnStage.current ? cardDrawnAt.current.at : null);
+      if (replyTo) { e.preventDefault(); setKeyReplyOpen(replyTo); return; }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         if (walkScreenRef.current) return;
         e.preventDefault();
@@ -7252,6 +7265,7 @@ export default function App() {
   const [landOn, setLandOn] = useState<string | null>(null);
   const finishClassic = useCallback((sent: string | null, runAt = 0, draft?: string) => {
     const to = firstRunLanding(sent, runAt);
+    setupStartedAgain.current = false;
     finishFirstRun(localStorage);
     // Onboarding was the moment to offer it; a project made later is mid-task (F-164).
     rememberOffered(localStorage);
@@ -7741,10 +7755,10 @@ export default function App() {
         still={evMember.kind === 'person' ? `${evMember.inProgress ?? 0} in progress` : undefined} />} />;
   const needsYouCount = { inbox: (mineShown ? shownCount(inbox) : 0) + theirCount('inbox') + leadCount + sharedFileNews.length + followingNews.length };
   const todayShown = teamMode && todayOn && !!snap && view === 'inbox' && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused && !teammatesShown && !roomShown && !filesShown && !connectionsShown;
-  const todayPage = (title?: string, onPerson?: (key: string) => void) => snap && team?.state.signedIn && !team.state.team ? <StartTeam me={team.state.me} onStarted={() => void refresh()} /> : snap ? <TodayPage title={title} onPerson={onPerson} range={todayRange} onRange={setTodayRange} onNeeds={goNeedsYou} picked={todayPick} onPicked={setTodayPick} keys={!modal}
+  const todayPage = (title?: string, onPerson?: (key: string) => void, range = todayRange, onRange: (r: TodayRange) => void = setTodayRange) => snap && team?.state.signedIn && !team.state.team ? <StartTeam me={team.state.me} onStarted={() => void refresh()} /> : snap ? <TodayPage title={title} onPerson={onPerson} range={range} onRange={onRange} onNeeds={goNeedsYou} picked={todayPick} onPicked={setTodayPick} keys={!modal}
     faces={new Map(members.map((m) => [m.key, m]))}
     day={teamToday({
-      range: todayRange, now, me: team?.me ?? null, items, products: snap.products, cards: weekCards,
+      range, now, me: team?.me ?? null, items, products: snap.products, cards: weekCards,
       decisions: Object.values(snap.team?.rooms?.decisions ?? {}).flat(),
       needs: mineInNeeds, mentions: roomsUi.live ? roomsUi.mentions : [], needsCount: needsYouCount.inbox,
       approvals: (filesForToday?.files ?? []).flatMap((f) => (f.approved ?? []).map((a) => ({ key: f.key, name: f.name, by: a.by ?? team?.me ?? null, at: a.at, threads: f.sentIn.flatMap((s) => (s.product && s.id ? [`${s.product}/${s.id}`] : [])) }))),
@@ -7889,20 +7903,20 @@ export default function App() {
         </>}
         chat={chatShows === 'chat' && room ? roomsUi.chatIn(room, (messages, pairRoomIds) => along(pairTimeline({ me: team?.me ?? '', other: id, rooms: pairRoomIds, messages, directItems: items, talk: snap.team?.threadTalk ?? [], titleOf }))) : chatShows === 'not yet' ? null
           : chatShows === 'first message'
-          ? <SendBox placeholder={`Message ${first}`} empty={<EmptyChat name={first} />}
-            onSend={(text) => roomsUi.startChat(id, placeMember.name, text)} />
+          ? <ChatStart empty={<EmptyChat name={first} />}
+            box={roomsUi.firstChat({ id, name: placeMember.name, avatarUrl: placeMember.avatarUrl ?? null }, `Message ${first}`)} />
           : <SendBox placeholder={`Message ${first}`} empty={<EmptyChat name={first} />}
             onSend={async (text) => { setComposeInitial({ to: id, body: text }); setModal('compose'); return null; }} />}
-        side={<>
-          <PlaceList title="Waiting on you" now={now} rows={[
+        parts={[
+          ...listPart('Waiting on you', [
             ...onYou.map((i) => itemRow(i, dueSaid(dayDeadline(i.due), now, { ahead: true })?.word ?? '', 'ask')),
             ...mentionsBy.map((m) => ({ key: m.id, title: m.body || `In ${m.roomName}`, word: m.roomName, at: m.at, tone: 'ask' as const, onOpen: () => roomsUi.openMention(m) })),
-          ]} />
-          <PlaceList title={`Tasks you gave ${first}`} now={now} rows={given.map((i) => itemRow(i, dueSaid(dayDeadline(i.due), now, { ahead: true })?.word ?? '', 'later'))} />
-          <PlaceList title="In progress" now={now} rows={theirs.now.map(cardRow)} />
-          <PlaceList title="Finished this week" now={now} rows={theirs.finished.map((c) => ({ ...cardRow(c), word: '' }))} />
-          <PlaceMates title={`${first}'s AI teammates`} mates={theirMates} waits={waits} onPick={(key) => pickMember(key)} />
-        </>} />;
+          ], now, { ask: true }),
+          ...listPart('Tasks you gave', given.map((i) => itemRow(i, dueSaid(dayDeadline(i.due), now, { ahead: true })?.word ?? '', 'later')), now),
+          ...listPart('In progress', theirs.now.map(cardRow), now),
+          ...listPart('Done this week', theirs.finished.map((c) => ({ ...cardRow(c), word: '' })), now),
+          ...matesPart('AI teammates', theirMates, waits, (key) => pickMember(key)),
+        ]} />;
     } else if (placeMember.key.startsWith('mate:')) {
       const id = placeMember.key.slice('mate:'.length);
       const t = teammatesUi.list.find((x) => x.id === id);
@@ -7914,15 +7928,14 @@ export default function App() {
       placeEl = <MemberPlace m={placeMember} waits={placeWaits} about={t?.role ?? 'AI teammate'} onBack={back} backTo={backTo}
         actions={<>
           <PlaceAction onClick={() => { setComposeInitial({ mate: id }); setModal('compose'); }} title={`A new thread for ${placeMember.name}`}>Give a task</PlaceAction>
-          <PlaceAction quiet onClick={() => { setEvPick(null); teammatesUi.go(id); }} title="Its chat with its settings beside it">Settings</PlaceAction>
         </>}
         chat={teammatesUi.chatWith(id)}
-        side={<>
-          <JobBlock job={t?.job ?? null} onSave={(job) => teammatesUi.setJob(id, job)} />
-          <PlaceList title="Waiting on you" now={now} rows={asks.map((i) => itemRow(i, '', 'ask'))} />
-          <PlaceList title="In progress" now={now} rows={split.now.map((i) => itemRow(i, word(i)[0], word(i)[1]))} />
-          <PlaceList title="Finished this week" now={now} rows={split.finished.map((i) => itemRow(i, '', 'done'))} />
-        </>} />;
+        parts={[
+          ...listPart('Waiting on you', asks.map((i) => itemRow(i, '', 'ask')), now, { ask: true }),
+          ...listPart('In progress', split.now.map((i) => itemRow(i, word(i)[0], word(i)[1])), now),
+          ...listPart('Done this week', split.finished.map((i) => itemRow(i, '', 'done')), now),
+          { key: 'about', label: 'About', body: teammatesUi.aboutOf(id) },
+        ]} />;
     } else {
       const tm = teamMates.find((x) => `theirmate:${x.owner}:${x.id}` === placeMember.key) ?? null;
       const owner = tm ? team?.byId.get(tm.owner) ?? null : null;
@@ -7932,11 +7945,11 @@ export default function App() {
         chat={<SendBox placeholder={`Write to ${tm.name}`}
           empty={<EmptyChat name={tm.name} />}
           onSend={async (text) => { const r = await api.teamMessageMate({ owner: tm.owner, mate: tm.id, text }); if (r.ok) { showToast(tm.open ? `Sent to ${tm.name}` : `Sent to ${first} to pass on`); void refresh(); } return r.ok ? null : r.error ?? 'That did not send.'; }} />}
-        side={<>
-          <JobBlock job={tm.job} />
-          {tm.running && tm.now && <div className="pl-sec"><h3>In progress</h3><p className="pl-text">{tm.now}</p></div>}
-          {ownerMember && <PlaceMates title="Whose it is" mates={[ownerMember]} waits={waits} onPick={(key) => pickMember(key)} />}
-        </>} />;
+        parts={[
+          ...(tm.running && tm.now ? [{ key: 'now', label: 'In progress', body: <p className="pl-text">{tm.now}</p> }] : []),
+          ...(tm.job ? [{ key: 'about', label: 'About', body: <JobBlock job={tm.job} /> }] : []),
+          ...(ownerMember ? [{ key: 'owner', label: ownerMember.name, onOpen: () => pickMember(ownerMember.key) }] : []),
+        ]} />;
     }
   }
   // BACK LANDS ON THE TAB THE BAR NAMED (w-474ac45a33). The thread may have
@@ -7959,6 +7972,7 @@ export default function App() {
   // it is asked inside its thread (NeedCard).
   const cardOnScreen = !!stage.card;
   cardOnStage.current = stage.card && !stage.verdict ? stage.card.id : null;
+  keyCardOnStage.current = stage.card?.tool === KEY_CARD_TOOL;
   if (cardOnStage.current && cardDrawnAt.current?.id !== cardOnStage.current) cardDrawnAt.current = { id: cardOnStage.current, at: Date.now() };
   const mover = {
     ids: new Set([...(snap?.cloud?.movable ?? []), ...(snap?.supervisor.running ?? []).filter((r) => r.movable).map((r) => r.itemId)]),
@@ -8311,7 +8325,7 @@ export default function App() {
                   team={homeTeam} progress={homeProgress} slot={setClearSlot}
                   onDoor={(d) => { if (d === 'inbox') openView('inbox'); else if (d === 'progress') { openView('inbox'); if (teamMode) goMine('progress'); else openView('progress'); } else openChatsPlace('team'); }}
                   onOpen={homeOpenRow} onMember={(key) => openChatsPlace(key)} onTeam={() => openChatsPlace('team')} />
-              ) : chatsPlaceShown ? <ChatsFrame current={chatsListKey}>{chatsPlace === 'team' ? <div className="team-page">{todayPage('Everyone', homeLayout === 'chats' ? (key) => openChatsPlace(key) : undefined)}</div> : placeEl}</ChatsFrame>
+              ) : chatsPlaceShown ? <ChatsFrame current={chatsListKey}>{chatsPlace === 'team' ? <div className="team-page">{todayPage('Everyone', homeLayout === 'chats' ? (key) => openChatsPlace(key) : undefined, everyoneRangeNow, pickEveryoneRange)}</div> : placeEl}</ChatsFrame>
               : connectionsShown ? (
                 <ConnectionsPlace now={now} focus={connectionsPage!.focus} onNotice={showToast} corner={connectionsCorner} cloudKeys={savedCloudKeyList} />
               ) : filesShown ? (
@@ -9019,7 +9033,7 @@ export default function App() {
               ...(view !== 'snoozed'
                 ? [{ id: 'done', label: `${DONE.verb} (${n} selected)`, keyHint: 'E', run: () => { setModal(null); batchDone(multiSel); } }]
                 : []),
-              { id: 'snooze', label: `Later (${n} selected)`, keywords: LATER_KEYWORDS, keyHint: 'L', run: () => openSnooze(sel) },
+              { id: 'snooze', label: `Later (${n} selected)`, keywords: LATER_KEYWORDS, oldNames: LATER_OLD_NAMES, keyHint: 'L', run: () => openSnooze(sel) },
               ...(sel.some((i) => returnAt(i) > Date.now())
                 ? [{ id: 'unsnooze', label: `Back to Inbox (${n} selected)`, run: () => unsnooze(sel) }]
                 : []),
@@ -9116,7 +9130,7 @@ export default function App() {
                   run: () => unsnooze(target),
                 }]
               : []),
-            { id: 'snooze', label: 'Later', keywords: LATER_KEYWORDS, keyHint: 'L', run: () => openSnooze(target) },
+            { id: 'snooze', label: 'Later', keywords: LATER_KEYWORDS, oldNames: LATER_OLD_NAMES, keyHint: 'L', run: () => openSnooze(target) },
             // WHAT THE THREAD'S OWN CONTROLS DO (w-e85916b92c): its summary
             // panel, three-dot menu, S key, Add people and a teammate's strip.
             ...(() => {
@@ -9639,7 +9653,7 @@ export default function App() {
         drawnIn(<SignInPage purpose="phone" waitingUrl={snap.team.signingIn?.url ?? null} onClose={closeAccountSignIn} onSignedIn={closeAccountSignIn} />, document.body)
       )}
       {shareSignInOpen && !phoneSignInOpen && snap?.team && !snap.team.signedIn && (
-        drawnIn(<SignInPage purpose="share" waitingUrl={snap.team.signingIn?.url ?? null} onClose={closeAccountSignIn} onSignedIn={closeAccountSignIn} />, document.body)
+        drawnIn(<SignInPage purpose="share" startOn={shareSignInStartsOn({ skipped: signInSkipped })} waitingUrl={snap.team.signingIn?.url ?? null} onClose={closeAccountSignIn} onSignedIn={closeAccountSignIn} />, document.body)
       )}
       {cloudSetupOpen && !snap.cloud?.setUp && snap.cloud?.offered && (
         drawnIn(<SignInPage purpose="cloud" onClose={() => setCloudSetupOpen(false)} onSignedIn={() => setCloudSetupOpen(true)} />, document.body)
@@ -9709,8 +9723,8 @@ export default function App() {
                   // The acknowledgement: a mark stamped over the card as it
                   // leaves, and the one word for what she decided.
                   <div className="approval-verdict" aria-live="polite">
-                    <span className="approval-verdict-mark" aria-hidden="true">{verdict === 'allow' ? '✓' : '✕'}</span>
-                    <span className="approval-verdict-word">{verdict === 'allow' ? 'Allowed' : 'Denied'}</span>
+                    <span className="approval-verdict-mark" aria-hidden="true">{verdict === 'allow' ? '✓' : repliedTo === a.id ? '↩' : '✕'}</span>
+                    <span className="approval-verdict-word">{verdict === 'allow' ? (a.tool === KEY_CARD_TOOL ? 'Sent' : 'Allowed') : repliedTo === a.id ? 'Replied' : 'Denied'}</span>
                   </div>
                 )}
                 {/* Who is asking (the agent and its thread, which opens behind
@@ -9766,13 +9780,19 @@ export default function App() {
                     </>
                   );
                 })()}
-                <div className="approval-actions">
-                  {/* The acknowledgement starts on the press, not on the round
-                      trip: main answers the file and echoes the same verdict
-                      back, so the click and the chord land on one behaviour. */}
-                  <button className="approval-allow" onPointerDown={() => { approvalPress.current = `${a.id}:true`; }} onPointerCancel={() => { approvalPress.current = null; }} onClick={(e) => clickCard(a.id, true, e.detail)}>Allow<span className="approval-key">{chord('⌘1')}</span></button>
-                  <button className="approval-deny" onPointerDown={() => { approvalPress.current = `${a.id}:false`; }} onPointerCancel={() => { approvalPress.current = null; }} onClick={(e) => clickCard(a.id, false, e.detail)}>Deny<span className="approval-key">{chord('⌘2')}</span></button>
-                </div>
+                {(() => {
+                  // The acknowledgement starts on the press, not on the round
+                  // trip: main answers the file and echoes the same verdict
+                  // back, so the click and the chord land on one behaviour.
+                  const keyCard = a.tool === KEY_CARD_TOOL;
+                  const allowButton = <button className="approval-allow" onPointerDown={() => { approvalPress.current = `${a.id}:true`; }} onPointerCancel={() => { approvalPress.current = null; }} onClick={(e) => clickCard(a.id, true, e.detail)}>{keyCard ? 'Send the key' : 'Allow'}<CardKey keys={chord('⌘1')} /></button>;
+                  const denyButton = <button className="approval-deny" onPointerDown={() => { approvalPress.current = `${a.id}:false`; }} onPointerCancel={() => { approvalPress.current = null; }} onClick={(e) => clickCard(a.id, false, e.detail)}>Deny<CardKey keys={chord('⌘2')} /></button>;
+                  if (keyCard) {
+                    return <KeyCardActions key={a.id} send={allowButton} deny={denyButton} chord={chord} replying={keyReplyOpen === a.id}
+                      onReplying={(on) => setKeyReplyOpen(on ? a.id : null)} onReply={(words) => { setKeyReplyOpen(null); void answerCard(a.id, false, words); }} />;
+                  }
+                  return <div className="approval-actions">{allowButton}{denyButton}</div>;
+                })()}
               </div>
             </div>
           </div>

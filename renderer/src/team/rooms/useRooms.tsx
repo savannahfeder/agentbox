@@ -11,7 +11,7 @@ import { OpenGroupNotice } from './OpenGroupNotice';
 import { RoomViewButton } from './RoomView';
 import { landed, sameMessages, storedName, withFileLinks } from './room-chat-rules';
 import { RoomPage, type RoomPane } from './RoomPage';
-import { RoomChat, type ChatAlong, type RoomChatCalls } from './RoomChat';
+import { FirstChatBox, RoomChat, type ChatAlong, type RoomChatCalls } from './RoomChat';
 import type { RoomFileOpening } from './RoomFileView';
 import { I } from './icons';
 import type { Conversation } from './MessagesPage';
@@ -396,13 +396,16 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
       full hang head={<></>} along={along?.(c.messages, c.rooms)} {...c.calls} /></div>;
   };
   // A two-person group with them, made if there is none, without leaving the page you are on.
+  const chatWith = async (personId: string, name: string): Promise<{ id: string } | { error: string }> => {
+    const id = pairRooms(all, personId, listedIn)[0]?.id;
+    if (id) return { id };
+    const res = await call<string>('create', { name: name.slice(0, 40), kind: 'group', people: [personId] });
+    return res.ok && res.value ? { id: res.value } : { error: res.error ?? 'Could not start the chat' };
+  };
   const startChat = async (personId: string, name: string, first?: string, files: readonly TeamMessageFile[] = []): Promise<string | null> => {
-    let id = pairRooms(all, personId, listedIn)[0]?.id ?? null;
-    if (!id) {
-      const res = await call<string>('create', { name: name.slice(0, 40), kind: 'group', people: [personId] });
-      if (!res.ok || !res.value) return res.error ?? 'Could not start the chat';
-      id = res.value;
-    }
+    const got = await chatWith(personId, name);
+    if ('error' in got) return got.error;
+    const { id } = got;
     const put: { name: string; stored: string }[] = [];
     for (const f of files) {
       const stored = storedName(f.name);
@@ -416,9 +419,21 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
     if (body) return send(id)(body, { inReplyTo: null, mentions: [] });
     return null;
   };
+  const firstChat = (person: { id: string; name: string; avatarUrl: string | null }, placeholder: string): ReactNode => {
+    const put = async (op: 'putFile' | 'putFileFrom', roomId: string, file: object) => {
+      const res = await call(op, roomId, file);
+      return res.ok ? null : res.error ?? 'That file did not send';
+    };
+    return <FirstChatBox key={person.id} person={{ ...person, me: false }} placeholder={placeholder}
+      open={async () => { const got = await chatWith(person.id, person.name); if ('error' in got) throw new Error(got.error); return got.id; }}
+      send={(roomId, body, mentions) => send(roomId)(body, { inReplyTo: null, mentions })}
+      putFile={(roomId, name, dataBase64) => put('putFile', roomId, { name, dataBase64 })}
+      putFileFrom={(roomId, name, srcPath) => put('putFileFrom', roomId, { name, srcPath })}
+      sending={rooms?.sending} onNotice={toast} />;
+  };
 
   return {
-    chatIn, startChat,
+    chatIn, startChat, firstChat,
     live, openId: !live ? null : open ? openId : empty ? 'groups' : null,
     open: (id: string) => openRoom(id), close, leave, page, dialogs, join, invisible, settingsPane,
     /** The sidebar's Groups: the group open last, or none. */

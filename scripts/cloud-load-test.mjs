@@ -66,11 +66,16 @@ export function tallyStep(n, runs) {
   const edges = runs.flatMap((r) => (r.ranFrom != null ? [[r.ranFrom, 1], [r.ranTo ?? r.endedAt ?? Infinity, -1]] : [])).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
   let peak = 0; let now = 0;
   for (const [, d] of edges) { now += d; peak = Math.max(peak, now); }
+  // A start in two halves: until the cloud took it (packing, sending, the server), then until the command began (the machine).
+  const spread = (xs) => { const s = xs.filter((x) => x != null).sort((a, b) => a - b); return s.length ? { medianS: +(s[s.length >> 1] / 1000).toFixed(1), slowestS: +(s.at(-1) / 1000).toFixed(1) } : null; };
+  const toSent = spread(runs.map((r) => (r.sentAt != null ? r.sentAt - r.begunAt : null)));
+  const sentToBegan = spread(runs.map((r) => (r.sentAt != null && r.ranFrom != null ? r.ranFrom - r.sentAt : null)));
   const agentSeconds = runs.reduce((s, r) => s + Math.max(0, ((r.endedAt ?? r.begunAt) - r.begunAt) / 1000), 0);
   return {
     n, peak, finished: done.length, lost: runs.filter((r) => !done.includes(r) && !twice(r)).length, doubled: doubled.length,
     slowestStartS: startMs.length ? +(startMs.at(-1) / 1000).toFixed(1) : null,
     medianStartS: startMs.length ? +(startMs[startMs.length >> 1] / 1000).toFixed(1) : null,
+    toSent, sentToBegan,
     agentHours: +(agentSeconds / 3600).toFixed(2), dollars: +(agentSeconds / 3600 * DOLLARS_PER_AGENT_HOUR).toFixed(2),
     // Runs that stopped early and were brought home by the app's next pass, as the supervisor's would.
     broughtHomeLater: runs.filter((r) => done.includes(r) && r.attempts > 1).length,
@@ -414,6 +419,10 @@ async function main() {
   let cloud = null;
   try {
     cloud = o.live ? await liveAccount({ say }) : await standinCloud({ tmp, chaos: o.chaos, concurrency: o.concurrency, log: () => {} });
+    // Stopped part-way, the throwaway Max account is still let go.
+    for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+      process.once(sig, () => { say(`stopped by ${sig}`); cloud.close().catch((e) => say(`could not clean up: ${e.message}`)).finally(() => process.exit(130)); });
+    }
     const clients = managedClients({ url: cloud.url, key: cloud.key });
     for (const n of o.steps) {
       say(`step ${n}: ${n} runs of ${secondsFor(n)} s, ${o.starting} starting at once${o.chatty ? ', a line a second' : ''}${o.chaos ? ', with chaos' : ''}`);

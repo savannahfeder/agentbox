@@ -77,9 +77,10 @@ export function matchesQuery(query: string, row: Searchable): boolean {
 const FIRST_AMONG_MATCHES = ['snooze'];
 
 // THE ROW IS CALLED LATER, after the key (w-66e3ece93d). It said "Remind Me
-// (Snooze)", so typing "later" never found it. The old words stay here, where
-// they are searched and never drawn, for whoever still reaches for them.
+// (Snooze)", so typing "later" never found it. The old names still find it,
+// ahead of any thread they also find.
 export const LATER_KEYWORDS = 'remind me snooze put off defer schedule';
+export const LATER_OLD_NAMES = ['remind me', 'snooze'];
 
 // No "inbox": typed alone it means going there, and this row would sit above
 // Go to Inbox under the return key.

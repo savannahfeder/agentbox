@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { guard, sweep, processes } from '../../../../scripts/lib/chrome-guard.mjs';
-import { MAC_CHROME, NO_HIDDEN_BROWSER, chromesForTesting, headlessShells } from '../../../../shared/hidden-browser.mts';
+import { MAC_CHROME, NO_HIDDEN_BROWSER, KEEPS_OFF_THE_KEYCHAIN, chromesForTesting, headlessShells } from '../../../../shared/hidden-browser.mts';
 
 export { chromesForTesting, headlessShells };
 
@@ -129,7 +129,7 @@ export async function launchChrome({ width = 1440, height = 900, profile, detach
   if (!fs.existsSync(bin)) throw new Error(`No browser at ${bin}. The live drive needs it.`);
   const chrome = start(bin, [
     '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
-    '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run',
+    '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run', ...KEEPS_OFF_THE_KEYCHAIN,
     `--window-size=${width},${height}`, 'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'], detached });
   const wsUrl = await new Promise((resolve, reject) => {
