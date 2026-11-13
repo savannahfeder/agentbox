@@ -19,7 +19,7 @@ import type { ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { runScript, stopShips } from '../main/ship-queue.mts';
+import { ShipQueue, runScript, stopShips } from '../main/ship-queue.mts';
 import { waitFor } from './waiting.mts';
 
 let tmp: string;
@@ -94,6 +94,14 @@ describe.skipIf(process.platform === 'win32')('a ship and the programs under it'
     await waitFor('the stubborn test run to be stopped', () => startedBy().length > 0 && startedBy().every((pid) => !alive(pid)));
   });
 
+  it('says when it was stopped because the app quit, and not when its deadline stopped it', async () => {
+    const quit = runScript(shipThat({ then: 'hangs' }), tmp, { timeout: 60_000 });
+    await started();
+    stopShips();
+    expect((await quit).quit).toBe(true);
+    expect((await runScript(shipThat({ then: 'hangs' }), tmp, { timeout: 1000 })).quit).toBeFalsy();
+  });
+
   it('a program the ship did not start is left alone', async () => {
     const other = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
     outside.push(other);
@@ -103,5 +111,47 @@ describe.skipIf(process.platform === 'win32')('a ship and the programs under it'
     await ran;
     await waitFor('the test run to be stopped', () => startedBy().every((pid) => !alive(pid)));
     expect(alive(other.pid!)).toBe(true);
+  });
+});
+
+describe('a ship the app\'s quit cut off', () => {
+  function queueWith(id: string, ran: { code: number; out: string; quit?: boolean }) {
+    const repo = path.join(tmp, 'repo');
+    const userDir = path.join(tmp, 'user');
+    fs.mkdirSync(path.join(repo, '.claude', 'worktrees', id), { recursive: true });
+    fs.mkdirSync(path.join(repo, 'scripts'), { recursive: true });
+    fs.writeFileSync(path.join(repo, 'scripts', 'ship.mjs'), '');
+    fs.mkdirSync(userDir, { recursive: true });
+    fs.writeFileSync(path.join(userDir, 'ship.json'), JSON.stringify({ team: { script: 'scripts/ship.mjs' } }));
+    const products = [{ slug: 'team', repoPath: repo }];
+    const item = { id, product: 'team', status: 'done', labels: ['ship'], updatedAt: 1000, wrote: { labels: { ts: 1000 } } };
+    const failed: string[] = [];
+    const woken: string[] = [];
+    const q = new ShipQueue({
+      store: { shipFailed: (_p: string, i: string) => { failed.push(i); }, shipped: () => {} },
+      userDir,
+      folderFor: (i) => path.join(repo, '.claude', 'worktrees', i.id),
+      isLive: () => false,
+      handBack: (i) => { woken.push(i.id); },
+      run: async () => ran,
+    });
+    const tick = () => q.tick([item], products);
+    return { tick, failed, woken, owed: () => q.owes(item, products) };
+  }
+
+  it('is not written down as failed, wakes no agent, and ships again at the next start', async () => {
+    const { tick, failed, woken, owed } = queueWith('w-cut', { code: 143, out: 'ship: pushing\n', quit: true });
+    await tick();
+    expect(failed).toEqual([]);
+    expect(woken).toEqual([]);
+    expect(owed()).toBe(true);
+  });
+
+  it('a ship that failed on its own is still written down and handed back', async () => {
+    const { tick, failed, woken, owed } = queueWith('w-red', { code: 1, out: 'PUSH REFUSED, because the tests above are red.\n' });
+    await tick();
+    expect(failed).toEqual(['w-red']);
+    expect(woken).toEqual(['w-red']);
+    expect(owed()).toBe(false);
   });
 });

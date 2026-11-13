@@ -62,7 +62,8 @@ export type ShipHandled = Record<string, number>;
 
 export interface ShipJob { item: ShipItem; product: ShipProduct; script: string; cwd: string }
 
-export interface ShipRun { code: number; out: string }
+/** `quit`: stopped because the app is quitting, so not a verdict on the change. */
+export interface ShipRun { code: number; out: string; quit?: boolean }
 
 export interface ShipStore {
   readItem?(slug: string, id: string): ConflictThread | null | undefined;
@@ -366,7 +367,7 @@ export function gitConfigEnv(pairs: [string, string][]): Record<string, string> 
 }
 
 // Process groups of the ships running now, so quitting the app can stop them.
-const runningShips = new Set<number>();
+const runningShips = new Map<number, () => void>();
 const ownGroup = process.platform !== 'win32';
 
 function signalShip(pid: number, signal: NodeJS.Signals) {
@@ -375,7 +376,7 @@ function signalShip(pid: number, signal: NodeJS.Signals) {
 
 /** Stops every running ship and everything under it (git, the hook, vitest and its workers). */
 export function stopShips() {
-  for (const pid of runningShips) signalShip(pid, 'SIGTERM');
+  for (const [pid, markQuit] of runningShips) { markQuit(); signalShip(pid, 'SIGTERM'); }
 }
 
 export async function runScript(script: string, cwd: string, { timeout = SHIP_MS, wholeSuiteTimeout = WHOLE_SUITE_SHIP_MS, env = process.env, gitConfig = [], graceMs = 5000 }: { timeout?: number; wholeSuiteTimeout?: number; env?: NodeJS.ProcessEnv; gitConfig?: [string, string][]; graceMs?: number } = {}): Promise<ShipRun> {
@@ -394,7 +395,8 @@ export async function runScript(script: string, cwd: string, { timeout = SHIP_MS
       return;
     }
     const pid = child.pid;
-    if (pid) runningShips.add(pid);
+    let quit = false;
+    if (pid) runningShips.set(pid, () => { quit = true; });
     let settled = false;
     let exitCode: number | null = null;
     const finish = () => {
@@ -402,7 +404,7 @@ export async function runScript(script: string, cwd: string, { timeout = SHIP_MS
       settled = true;
       clearTimeout(timer);
       if (pid) runningShips.delete(pid);
-      resolve({ code: exitCode ?? 1, out });
+      resolve({ code: exitCode ?? 1, out, ...(quit ? { quit } : {}) });
     };
     // Whatever is left in the group once the script is over is a leftover: a
     // polite stop, then a hard one, and the answer does not wait on a leftover
@@ -494,7 +496,7 @@ export class ShipQueue {
     // (w-f37a34def6, 2026-10-04). Within one app, `busy` already stops a
     // second start; across a restart, trying again is the point.
     const done = () => writeHandled(this.userDir, { ...readHandled(this.userDir), [keyOf(next.item)]: markedAt(next.item) });
-    this.busy = this.ship(next, products, items).then(done, done).finally(() => { this.busy = null; });
+    this.busy = this.ship(next, products, items).then((r) => { if (!r?.quit) done(); }, done).finally(() => { this.busy = null; });
     return this.busy;
   }
 
@@ -583,6 +585,10 @@ export class ShipQueue {
       giveBack?.();
     }
     const { code, out } = ran;
+    if (ran.quit) {
+      this.log.info?.(`zero: the ship of ${item.id} was stopped by the quit and goes again at the next start`);
+      return { code, quit: true };
+    }
     try {
       // Already on main: there is nothing to fix, so nobody is woken.
       const already = /There is nothing to ship/.test(out);
