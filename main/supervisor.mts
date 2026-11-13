@@ -62,6 +62,8 @@ import { CLOUD_SENT, readSent } from '../shared/cloud-start.mts';
 import { readCloudConfig, cloudAccountConfig, OLD_TOKEN_SERVICE, imageCapsToTry } from './cloud/config.mts';
 import { cloudVersionGaps } from '../shared/cloud-versions.mts';
 import { saveCloudKey, removeCloudKey, cloudKeyNames } from './cloud/keys.mts';
+import { readKeyFrom } from './cloud/key-source.mts';
+import { keySource } from '../shared/cloud-key-sources.mts';
 import { threadsKeysFree } from '../shared/cloud-needs.mts';
 import { fileToSend } from '../shared/cloud-sent-files.mts';
 import { cloudLoginState, mayRunOn, startCloudSignIn, renewCloudCodexLogin, sweepRetiredLogins, forgetOldCloudTokens, listCloudLogins, removeCloudLogin, newCloudAccountKey, lookAtCloudLogin, cloudLimits, markCloudLogin, cloudLoginInUse, cloudAccountsFrom, CLOUD_ACCOUNT_ENV } from './cloud/logins.mts';
@@ -1323,6 +1325,7 @@ export class Supervisor {
   declare _madeFolders: Map<string, string>;
   // Threads whose next turn goes to the cloud (a key saved or a file sent for it), and the files each sends.
   declare _cloudForKey: Set<string> | undefined;
+  declare _keyNamesSeen: Set<string> | undefined;
   declare _filesForCloud: Map<string, { paths: string[]; at: number }> | undefined;
   declare _filesGivenToCloud: Map<string, string[]> | undefined;
   declare _photos: Map<string, ReturnType<typeof snapshotRepo> | null> | undefined;
@@ -6619,17 +6622,41 @@ export class Supervisor {
   // threadsKeysFree), for the caller to reply to; each one's next turn goes
   // to the cloud, where the key is, even when this Mac has room for it.
   // With the cloud off nothing is freed: its threads run here, where no key is.
-  async cloudKey(action: 'save' | 'remove', name: string, value: string | undefined, { label = null }: { label?: string | null } = {}) {
+  // `from` is where on this computer the run said the key is: the person's press on that card reads it here.
+  async cloudKey(action: 'save' | 'remove', name: string, value: string | undefined, { label = null, from = null }: { label?: string | null; from?: unknown } = {}) {
     const { storage } = await this._cloudClients();
     let freed: { product: string; id: string; answer: string }[] = [];
+    if (action === 'save' && from) {
+      const src = keySource(from as { place?: unknown; from?: unknown; entry?: unknown });
+      if (!src) throw new Error('That is not a place a key can be read from.');
+      const read = await readKeyFrom(src, { home: this.config.home });
+      if (!('value' in read)) throw new Error(read.error);
+      value = read.value;
+    }
     if (action === 'save') {
       await saveCloudKey(name, value ?? '', { storage, home: this.config.home, label });
       if (this.config.cloudRuns !== false) freed = threadsKeysFree(this.store.listItems(Date.now()), cloudKeyNames({ home: this.config.home }).map((k) => k.name));
       for (const t of freed) (this._cloudForKey ??= new Set()).add(t.id);
     } else if (action === 'remove') await removeCloudKey(name, { storage, home: this.config.home });
     else throw new Error('a key is saved or removed');
+    const keys = cloudKeyNames({ home: this.config.home });
+    this._keyNamesSeen = new Set(keys.map((k) => k.name));
     this.onChange?.();
-    return { keys: cloudKeyNames({ home: this.config.home }), freed };
+    return { keys, freed };
+  }
+
+  // A key a cloud run saved after the person's yes on its card
+  // (main/cloud/key-asks.mts) frees the threads waiting on it, as one saved
+  // through cloudKey does. Only keys that appear while the app runs.
+  async _freeForKeysSavedByRuns() {
+    const names = cloudKeyNames({ home: this.config.home }).map((k) => k.name);
+    const seen = this._keyNamesSeen;
+    this._keyNamesSeen = new Set(names);
+    if (!seen || this.config.cloudRuns === false || !names.some((n) => !seen.has(n))) return;
+    for (const t of threadsKeysFree(this.store.listItems(Date.now()), names)) {
+      (this._cloudForKey ??= new Set()).add(t.id);
+      await submitReply(this, { product: t.product, id: t.id, answer: t.answer, status: 'open' }, () => this.store.answerItem(t.product, t.id, { answer: t.answer, status: 'open' }));
+    }
   }
 
   sendNextTurnToCloud(itemId: string) { (this._cloudForKey ??= new Set()).add(itemId); }
@@ -7461,6 +7488,8 @@ export class Supervisor {
     const { [CLOUD_ACCOUNT_ENV.claude]: _claude, [CLOUD_ACCOUNT_ENV.codex]: _codex, ...rest } = given;
     const env: NodeJS.ProcessEnv = { ...rest, ...this._cloudAccountEnv(),
       ...(this._phoneCarries?.slugs.has(given.ZERO_PRODUCT) ? { AGENTBOX_PHONE_DEVICE: this._phoneCarries.device } : {}),
+      // Where a key the run asks this Mac for (main/cloud/key-asks.mts) puts its card, and the public half that checks the answer.
+      ...(this.config?.storeRoot ? { ZERO_APPROVALS_DIR: path.join(this.config.storeRoot, '.approvals'), ZERO_APPROVALS_PUBKEY: approvalPublicKey() } : {}),
     };
     const sent = given.ZERO_ITEM ? this._filesWaitingFor(given.ZERO_ITEM) : [];
     if (sent.length && given.ZERO_ITEM) {
@@ -9104,7 +9133,20 @@ export class Supervisor {
       && this.restingUntil(item) <= now;
   }
 
+  // Ahead of every early return in the tick: a cloud run goes on while this
+  // computer is paused, braked or holding for setup, and so does its card.
+  _listenForSignInReturns() {
+    try {
+      this.signInReturns.sync([...this.sessions].flatMap(([id, s]) => {
+        if (!s?.cloud || !s.product) return [];
+        const ask = openSignIn(this.store.readItem?.(s.product, id));
+        return ask ? [{ product: s.product, id, ask: ask.id, url: ask.url }] : [];
+      }));
+    } catch (e) { console.warn('zero: listening for a sign-in to come back:', (e as Error).message); }
+  }
+
   async _tick() {
+    this._listenForSignInReturns();
     if (this.paused) { this._noteWaitingRows('paused'); return; }
     this._refreshMemoryReading();
     if (this.firstRunHolding()) { this._noteWaitingRows('setup'); return; }
@@ -9119,6 +9161,7 @@ export class Supervisor {
     // _cloudReady reads the cloud's setup (at most once a minute) first.
     try { this._cloudReady('codex'); this._renewCloudLogins(); void this._noteCloudOrgs(); } catch (e) { console.warn('zero: could not check the cloud sign-ins:', (e as Error).message); }
     try { if (this._cloudConfig) this._forgetOldCloudTokens(); } catch { /* tried */ }
+    try { await this._freeForKeysSavedByRuns(); } catch (e) { console.warn('zero: could not carry on threads for a saved key:', (e as Error).message); }
     // A COOLDOWN STOPS THE SPAWNING AND IT MUST NOT STOP THE TELLING. The brake
     // goes on when there is no healthy account left anywhere, for up to half an
     // hour, which is precisely the half hour her tasks are all stuck and the
@@ -9160,12 +9203,6 @@ export class Supervisor {
     this.bringBackWhatNeverShipped(items);
     // A task its agent marked ready goes out, one at a time, beside the tick.
     try { this.shipQueue.tick(items, this.store.listProducts()); } catch (e) { console.warn('zero: the ship queue:', (e as Error).message); }
-    try {
-      this.signInReturns.sync(items.flatMap((i) => {
-        const ask = openSignIn(i);
-        return ask && this.sessions.get(i.id)?.cloud ? [{ product: i.product, id: i.id, ask: ask.id, url: ask.url }] : [];
-      }));
-    } catch (e) { console.warn('zero: listening for a sign-in to come back:', (e as Error).message); }
 
     // A session that died without exiting still holds its row. Stopping it
     // here lets the passes below put a fresh worker on the row.
