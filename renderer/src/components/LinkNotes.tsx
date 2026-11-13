@@ -32,11 +32,11 @@ export function useLinkNotes(ask: { product: string; thread: string | null | und
   }, [read]);
   const reply = useCallback(async (text: string) => {
     if (!got) return false;
-    const out = await api.fileLinkComment({ token: got.token, text });
+    const out = await api.fileLinkComment({ token: got.token, text, ...(ask?.thread && ask.src ? { product: ask.product, thread: ask.thread, src: ask.src } : {}) });
     if (!out.ok) return false;
     setGot({ token: got.token, comments: out.comments ?? got.comments });
     return true;
-  }, [got]);
+  }, [got, key]); // eslint-disable-line react-hooks/exhaustive-deps
   return { comments: got?.comments ?? [], reply };
 }
 

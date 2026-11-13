@@ -105,6 +105,7 @@ export type WorkItemPatch = {
   waitEnded?: SaidAt;
   handedOver?: SaidAt;
   linkComment?: LinkComment;
+  linkReply?: { file: string; text: string };
   comment?: { text: string; name?: string };
   artifact?: ArtifactMarkPatch;
   putAway?: boolean;
@@ -117,7 +118,7 @@ type PatchValue = NonNullable<WorkItemPatch[WorkItemField]>;
 type PatchEntry = { [K in WorkItemField]-?: [K, NonNullable<WorkItemPatch[K]>] }[WorkItemField];
 
 // Marks on one line, not values the row holds, so the fold never keeps them as fields.
-type LineMark = 'react' | 'inReplyTo' | 'edit' | 'from' | 'voice' | 'forAgent' | 'fromNotes' | 'typed' | 'comment' | 'artifact' | 'putAway';
+type LineMark = 'react' | 'inReplyTo' | 'edit' | 'from' | 'voice' | 'forAgent' | 'fromNotes' | 'typed' | 'comment' | 'artifact' | 'putAway' | 'linkReply';
 
 export interface FieldWrite {
   ts: number;
@@ -389,6 +390,9 @@ export const WORK_ITEM_FIELDS: readonly WorkItemField[] = [
   // SOMEONE'S COMMENT ON THE THREAD'S FILE THROUGH ITS PUBLIC LINK:
   // `{ name, file, text }`, beside the note that says it (main/team/link-comments.mts).
   'linkComment',
+  // THE OWNER'S ANSWER TO THOSE, POSTED ON THE LINK PAGE: `{ file, text }`. It
+  // answers the comments before it and starts no agent.
+  'linkReply',
   // WORDS A TEAMMATE LEFT ON A SHARED THREAD: `{ text }`, on a line the sync
   // writes from the cloud's own comment (main/team/thread-share.mts). A delta
   // like `react`, read back as `waitingComments` until the owner deals with
@@ -809,6 +813,12 @@ function coerceField(field: string, value: Unchecked): PatchValue | undefined {
       const place = cleanPlace(value.place as RawPlace | null | undefined);
       return name && file && text ? { name, file, text, ...(place ? { place } : {}) } : undefined;
     }
+    case 'linkReply': {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+      const file = str(value.file, MAX_SHORT);
+      const text = str(value.text, MAX_TEXT_BYTES);
+      return file && text ? { file, text } : undefined;
+    }
     case 'waitEnded': case 'handedOver': {
       if (!value || typeof value !== 'object' || !Number.isFinite((value as Fields).at)) return undefined;
       const said = str((value as Fields).said, MAX_SUMMARY);
@@ -1024,7 +1034,7 @@ export function foldRawInto(items: Map<string, FoldingItem>, lines: unknown, tou
       }
       // WHICH MESSAGE A REPLY ANSWERS belongs to that reply's line alone. Held
       // as a value, the row would carry the newest reply's parent forever.
-      if (field === 'inReplyTo' || field === 'from' || field === 'voice' || field === 'forAgent' || field === 'fromNotes' || field === 'typed' || field === 'putAway') continue;
+      if (field === 'inReplyTo' || field === 'from' || field === 'voice' || field === 'forAgent' || field === 'fromNotes' || field === 'typed' || field === 'putAway' || field === 'linkReply') continue;
       if (field === 'comment') {
         if (line.by && teammateComment(line)) (item.waitingComments ??= []).push({ by: line.by, ts: line.ts, text: value.text });
         continue;
@@ -1095,7 +1105,7 @@ export function foldRawInto(items: Map<string, FoldingItem>, lines: unknown, tou
     }
     if (!isNotNews(line)) item.updatedAt = Math.max(item.updatedAt, line.ts);
     if (item.waitingComments && dealsWithComments(line)) delete item.waitingComments;
-    if (item.linkComments && dealsWithComments(line)) delete item.linkComments;
+    if (item.linkComments && (dealsWithComments(line) || (line.source === 'founder' && line.patch?.linkReply))) delete item.linkComments;
     if (line.ts < item.createdAt) item.createdAt = line.ts;
   }
 

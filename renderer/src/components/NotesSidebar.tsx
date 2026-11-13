@@ -15,6 +15,8 @@ import { canPaintQuotes, cellAround, paintQuotes } from '../paint-quotes';
 import { fileFamilyFor, notesBesideCount, notesCanPoint, noteAttachments, sentTimes, sidebarNotes } from '../notes-sidebar';
 import { noteBoxKey, noteSendWords, pinLabel, pinsToDraw, sentWithTheNote, whereANoteGoes, whoTalksOnFile } from '../artifact-pins';
 import { AttachRow } from './AttachRow';
+import { LinkNotes, useLinkNotes } from './LinkNotes';
+import { canShareFile } from './ShareLink';
 import { NotePictureShown } from './FileNoteCard';
 import { NoteGlyph } from './NoteGlyphs';
 import { PinMarks, spotIn } from './PinMarks';
@@ -212,7 +214,10 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
     highlights?.delete('av-quote'); highlights?.delete('av-quote-on');
   }, []);
 
-  const goTo = (note: FileNote) => {
+  // The file's words go to the agent; these came from the link page and are answered there.
+  const linkNotes = useLinkNotes(canShareFile(src) ? { product: item.product, thread: item.id, src } : null);
+
+  const goTo = (note: Pick<FileNote, 'id' | 'place'>) => {
     setActiveId(note.id);
     if (note.place.kind === 'pin' && pinsHere) {
       const box = pinsHere.parentElement;
@@ -312,6 +317,7 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
           <NotesSection word={canSend ? 'Sent' : 'Notes'} />
           {said.map(note)}
         </>}
+        <LinkNotes comments={linkNotes.comments} reply={linkNotes.reply} activeId={activeId} onGo={(place, id) => goTo({ id, place })} />
       </div>
       {trouble && <p className="sb-trouble" role="alert">{trouble}</p>}
       <form className="sb-foot" onSubmit={(e) => { e.preventDefault(); void add(); }}>
