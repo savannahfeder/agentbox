@@ -129,6 +129,27 @@ describe('a teammate working in private projects', () => {
   });
 });
 
+// Two testers found today's "Waiting on Codex usage" under Wednesday and
+// Thursday too: what is stuck is only known as of now. And a teammate's post
+// vanished once her agent answered and the thread waited on her.
+describe('what a post says on a past day and while a thread waits on its owner', () => {
+  const card = (o: Record<string, unknown>) => ({ personId: 'p-dev', visible: true, state: 'running', project: 'Lumen', blockedBy: [], blocks: [], people: null, priority: null, progress: null, updatedAt: on(12, 13), ...o });
+  const dayOf = (window: { from: number; to: number }, items: unknown[], cards: unknown[] = []) => teamToday({ ...base, window, items: items as never, cards: cards as never });
+  const stuck = item({ id: 's', title: 'Investor update', status: 'blocked', blockedBy: ['name:Codex usage'], updatedAt: on(12, 14) });
+  it('today\'s post says what is stuck', () => {
+    const me = postsOf(dayOf(standupWindow(on(12, 0), DEFAULT_STANDUP, NOW), [stuck]).people, { mates: true, live: true }).find((p) => p.key === 'me');
+    expect(me?.needs.map((n) => n.line.title)).toEqual(['Investor update']);
+  });
+  it('a past day\'s post does not carry today\'s blockers', () => {
+    const posts = postsOf(dayOf(standupWindow(on(11, 0), DEFAULT_STANDUP, NOW), [stuck]).people, { mates: true, live: false });
+    expect(posts.flatMap((p) => p.needs)).toEqual([]);
+  });
+  it('a thread waiting on its owner after the agent answered is still work they are on', () => {
+    const posts = postsOf(dayOf(standupWindow(on(12, 0), DEFAULT_STANDUP, NOW), [], [card({ threadId: 'w1', title: 'Teams pricing', state: 'waiting' })]).people, { mates: true, live: true });
+    expect(words(sentenceOf(posts.find((p) => p.key === 'person:p-dev')!))).toBe('Working on [Teams pricing].');
+  });
+});
+
 describe('the sentence for every shape of day', () => {
   const line = (title: string) => ({ key: title, title, at: 1 });
   const post = (o: Partial<ReturnType<typeof postsOf>[number]>) => ({ key: 'p', name: 'Dev Patel', kind: 'person' as const, done: [], shipped: [], finished: [], working: [], needs: [], privateDone: 0, ...o });

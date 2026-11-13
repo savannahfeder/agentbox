@@ -93,15 +93,17 @@ const byNewest = (a: TodayLine, b: TodayLine) => b.at - a.at;
 export const titleOf = (l: TodayLine) => l.title || (l.item ? shownTitle(l.item) : '');
 const titled = (l: TodayLine): TodayLine => (l.title ? l : { ...l, title: titleOf(l) });
 
-function postOf(p: TodayPerson): StandupPost {
+function postOf(p: TodayPerson, live: boolean): StandupPost {
   const g = groupsOf(p);
   return {
     key: p.key, name: p.name, kind: p.kind,
     shipped: [...p.shipped].sort(byNewest).map(titled),
     finished: [...p.finished, ...p.decided].sort(byNewest).map(titled),
     done: g.done.map(titled),
-    working: g.working.map(titled),
-    needs: g.blocked.map((l) => ({ line: titled(l), on: l.on ?? null })),
+    // A thread whose agent answered and now waits on its owner is still theirs to finish.
+    working: [...g.working, ...(p.waiting ?? [])].sort(byNewest).map(titled),
+    // What is stuck is only known as of now, so only today's post says it.
+    needs: live ? g.blocked.map((l) => ({ line: titled(l), on: l.on ?? null })) : [],
     privateDone: p.privateDone,
     privateWorking: p.privateWorking ?? 0,
   };
@@ -110,8 +112,8 @@ function postOf(p: TodayPerson): StandupPost {
 const says = (p: StandupPost) => p.done.length + p.working.length + p.needs.length + p.privateDone + (p.privateWorking ?? 0) > 0;
 
 /** A post per teammate. With AI teammates off, each AI teammate's work joins yours. */
-export function postsOf(people: readonly TodayPerson[], { mates }: { mates: boolean }): StandupPost[] {
-  const posts = people.map(postOf);
+export function postsOf(people: readonly TodayPerson[], { mates, live = true }: { mates: boolean; live?: boolean }): StandupPost[] {
+  const posts = people.map((p) => postOf(p, live));
   if (mates) return posts.filter(says);
   const mine = posts.find((p) => p.key === 'me') ?? { key: 'me', name: 'You', kind: 'me' as const, shipped: [], finished: [], done: [], working: [], needs: [], privateDone: 0 };
   for (const m of posts.filter((p) => p.kind === 'mate')) {

@@ -126,7 +126,7 @@ export function StandupPage({ now, faces, team = [], dayFor, onOpen, onPerson }:
         <label className="su-search">{I.search()}<input value={q} placeholder="Search standups" aria-label="Search standups" onChange={(e) => setQ(e.target.value)} /></label>
       </div>
       {days.map((d, i) => {
-        const posts = postsOf(dayFor(standupWindow(d, s, now)).people, { mates: s.mates }).filter((p) => postMatches(p, q));
+        const posts = postsOf(dayFor(standupWindow(d, s, now)).people, { mates: s.mates, live: d === midnight(now) }).filter((p) => postMatches(p, q));
         found += posts.length;
         const since = DAY_NAMES[new Date(previousStandupDay(d, s)).getDay()];
         // An earlier day with nothing in it is left out rather than said again and again.
