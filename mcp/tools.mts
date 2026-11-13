@@ -18,14 +18,14 @@ import { listProducts, getProduct, createProduct, updateProduct, type ProductPat
 import { listDocuments, nameOnThread, noteWrittenForRun, readDocument, writeDocument } from './core/documents.mts';
 import { listSkills, fetchSkill, fetchReference } from './core/skills.mts';
 import { listWorkItems, updateItem, createClaimRegistry, type AgentPatch, type ClaimAsk, type ItemFields, type WorkListFilter } from './core/work.mts';
-import { readStandingInstruction, setStandingInstruction } from './core/repeats.mts';
+import { createRepeatingTask, readStandingInstruction, setStandingInstruction, type NewRepeatingTask } from './core/repeats.mts';
 import { teamPost, teamPass, teamRemember, teamSetup, teamRoster, teamPlaybook, teamMethod, teamHire, noteToAnotherThread } from './core/teammates.mts';
 import { documentVersion, documentsWithFolders, keepAsWritten, fileWrittenDocument, teamFile, teamTell, teamTask, teamThreads, teamRead, waitsNamed } from './core/reach.mts';
 import { readTeammates, readTeamView, teamDir } from '../main/store/teammates-files.mts';
 import { legacyRoot } from '../main/store/project.mts';
 import { listProductChats, readProductChat } from './core/chat.mts';
 import { lookAtPage } from './core/page.mts';
-import { askToSignIn, waitForSignIn, WAIT_MS } from './core/sign-in.mts';
+import { askToSignIn, keepAfterSignIn, waitForSignIn, WAIT_MS } from './core/sign-in.mts';
 import { WORK_ITEM_STATUSES } from '../shared/work-items.mts';
 import { CONTEXT_WORDS, DONE_STEPS, DONE_STEP_WORDS, SUMMARY_WORDS } from '../shared/thread-cards.mts';
 import { AGENT_CREATION_KINDS } from '../shared/contracts.mts';
@@ -52,7 +52,7 @@ function runWords(fields: { model?: string; effort?: string }) {
 const CAPABILITIES = [
   'products', 'documents (read and write, any path in the product)',
   'personas and transcripts (they are documents)', 'skills', 'work items', 'past chats (read only)',
-  'the standing instruction behind a repeating task, on a thread that is one of its runs',
+  'making a new repeating task; changing the standing instruction behind one, on a thread that is one of its runs',
   'the team chat and passing work to a teammate, from any thread; remembering and setting up, on a thread that is a teammate\'s run',
   'writing to people on the team and reading the team\'s threads, when your owner is on a team',
   'looking at a page running on this machine (look_at_page, local addresses only)',
@@ -312,7 +312,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
     },
     {
       name: 'update_work_item',
-      description: 'Report progress on an item: set status to done when it is finished, blocked when it cannot proceed until something outside it changes, and leave a note saying where things stand. Keep the summary current with problem (shown as Context) and progress (shown as the Done list), which is all a teammate sees of the thread. A worker the app started for a row ends with its answer as its last message, and the app writes that message onto the row as the result, so such a worker does not pass result for its own row: the same answer written twice is what they then read twice. A row the founder wrote (labelled founder) is closed only when they asked for it: answering them is not finishing it, so the row stays open for them. To close one, pass closeBecause with their exact words asking you to; without them the rest of the write lands and the row is left open. A runAt you set holds workers off but keeps the row in their inbox; when they asked for it to be put off ("remind me Friday"), pass deferBecause with their exact words and it leaves their inbox until then. Writing to a row this session is not holding takes the row first, so there is no need to claim before you speak; the write is only refused when another session is genuinely on it, and that refusal is kept rather than thrown away, parked where the error says and handed to whoever takes the row next. Finishing a row hands the claim straight back, and you can still answer on it afterwards. A note or result alone on another agent\'s thread that is not running reaches it as your words and starts a turn there, unless its owner stopped it; its own note is left as it was.',
+      description: 'Report progress on an item: set status to done when it is finished, blocked when it cannot proceed until something outside it changes, and leave a note saying where things stand. Keep the summary current with problem (shown as Context) and progress (shown as the Done list), which is all a teammate sees of the thread. A worker the app started for a row ends with its answer as its last message, and the app writes that message onto the row as the result, so such a worker does not pass result for its own row: the same answer written twice is what they then read twice. A row the founder wrote (labelled founder) is closed only when they asked for it: answering them is not finishing it, so the row stays open for them. To close one, pass closeBecause with their exact words asking you to; without them the rest of the write lands and the row is left open. A runAt you set starts this thread again at that moment, and until then it waits out of their inbox, unless your answer offers options, which keep it there. When they asked for it to be put off ("remind me Friday"), pass deferBecause with their exact words: the moment is then theirs, and it brings the row back to them without starting a run. Writing to a row this session is not holding takes the row first, so there is no need to claim before you speak; the write is only refused when another session is genuinely on it, and that refusal is kept rather than thrown away, parked where the error says and handed to whoever takes the row next. Finishing a row hands the claim straight back, and you can still answer on it afterwards. A note or result alone on another agent\'s thread that is not running reaches it as your words and starts a turn there, unless its owner stopped it; its own note is left as it was.',
       schema: {
         id: z.string(),
         status: z.enum(WORK_ITEM_STATUSES).optional(),
@@ -322,8 +322,9 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         labels: z.array(z.string()).optional(),
         runAt: z.number().int().optional().describe('epoch ms to defer this item until; 0 clears a schedule and makes it available now'),
         closeBecause: z.string().optional().describe('only with status done on a row the founder wrote: their own words, quoted exactly from the row, asking you to close it'),
-        deferBecause: z.string().optional().describe('only with runAt on a row the founder wrote: their own words, quoted exactly from the row, asking for it to be put off or to be reminded later. Without them the row stays in their inbox'),
-        problem: z.string().optional().describe(`the summary's CONTEXT: a few plain sentences, ${CONTEXT_WORDS} words at most, about the whole thread for someone who has forgotten it: what the thread is for, then where it stands overall. Never only the latest round, which the answer gives`),
+        deferBecause: z.string().optional().describe('only with runAt on a row the founder wrote: their own words, quoted exactly from the row, asking for it to be put off or to be reminded later. Without them the row stays in their inbox. A reminder starts NO run; words asking for work at a time ("continue at 1:30") start a run then, and the answer\'s `saved` says which was kept'),
+        toAnAgentBecause: z.string().optional().describe('on a thread of theirs that went to a teammate when it should not have: their own words, quoted exactly from the row, saying so. The thread then goes to an ordinary agent, as their "Give it to someone else" would, and its next turn is not the teammate\'s'),
+        problem: z.string().optional().describe(`the summary's CONTEXT: a few plain sentences, ${CONTEXT_WORDS} words at most, about the whole thread for someone who has forgotten it. It says what the thread is about: what was asked for and why, in the words the person would use. Not where it stands or the latest round, which the answer gives`),
         progress: z.string().optional().describe(`the summary's DONE list: the steps taken so far, one per line, oldest first and newest last, ${DONE_STEPS} lines at most of ${DONE_STEP_WORDS} words each. Send the whole list each time; it replaces the last one. Every line is a step that FINISHED: one you are about to take goes on after it happens, never before`),
         solution: z.string().optional().describe(`no longer shown; leave it out (older threads may still carry one, ${SUMMARY_WORDS} words at most)`),
         blockedBy: z.array(z.string()).optional().describe('ids of threads this one waits on, or "person:<name>" for someone on the team whose code, answer or review it waits on. A thread that waits only on others leaves their Needs you, says whom it waits on, and comes back when that person writes or after 3 days, so set this rather than offering "wait for them" as a choice'),
@@ -361,6 +362,21 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         instruction: z.string().describe('the whole standing instruction, as the person would have typed it'),
       },
       run: ({ instruction }: { instruction: string }) => json(setStandingInstruction({ instruction }, thisRun())),
+    },
+    {
+      name: 'create_repeating_task',
+      description: 'Make a new repeating task, exactly as the person would with the When menu: every day, every weekday, or one day a week, at a local time. Each run is its own thread briefed with your instruction, so write it for an agent that has seen nothing of this conversation. Use it when the person asks for something to happen regularly, rather than telling them to set it up by hand. Every run spends their plan and starts on its own as their request, so on a thread it is made only with their own words there asking for something regular, quoted in askedBecause. It runs on the same coding agent and model as this thread. The first run starts within a minute unless startNow is false; then it waits for its next time.',
+      schema: {
+        product: z.string().optional().describe('which product it runs in; defaults to this thread\'s'),
+        title: z.string().describe('the short name it is listed under, such as "Daily security review"'),
+        instruction: z.string().describe('what every run is told to do'),
+        every: z.enum(['day', 'weekday', 'week']),
+        at: z.string().describe('local time, 24-hour "HH:MM", such as "09:00"'),
+        on: z.enum(['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']).optional().describe('the day, when every is week'),
+        startNow: z.boolean().optional().describe('false to wait for its first time instead of running now'),
+        askedBecause: z.string().optional().describe('on a thread: the person\'s own words on it asking for this to happen regularly, quoted exactly, such as "Daily 9am, audit Mondays 10am". Without them nothing is made'),
+      },
+      run: (ask: NewRepeatingTask) => json(createRepeatingTask(ask, thisRun())),
     },
 
     /* ------------------------------- teammates ------------------------------ */
@@ -579,8 +595,15 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         await keepCloudKey(keep.name, keep.value);
         return json({ status: 'kept', message: `Kept as ${keep.name} for every later cloud run.` });
       }
-      if (finished) return json({ status: 'closed', message: 'The card is gone. Carry on.' });
-      return json(await waitForSignIn(id, asked.id, { product }));
+      const inCloud = typeof keepCloudKey === 'function';
+      const withKeep = <T extends { message: string }>(out: T, finishing = false): T => {
+        if (!inCloud) return out;
+        const k = keepAfterSignIn(asked.service, { finishing });
+        return { ...out, ...(k.keep ? { keep: k.keep } : {}), message: `${out.message} ${k.message}` };
+      };
+      if (finished) return json(withKeep({ status: 'closed', message: 'The card is gone.' }));
+      const said = await waitForSignIn(id, asked.id, { product });
+      return json(said.status === 'signed_in' ? withKeep(said) : said.status === 'landed' ? withKeep(said, true) : said);
     },
   });
 

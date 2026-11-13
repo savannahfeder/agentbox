@@ -19,3 +19,14 @@ export function tokenFromLink(text: unknown): string | null {
   const m = /^(?:https?:\/\/[^/\s]+\/join\/|[a-z][a-z0-9+.-]*:\/\/join\/)([A-Za-z0-9_-]+)\/?(?:[?#].*)?$/i.exec(s);
   return m && TOKEN.test(m[1]) ? m[1] : null;
 }
+
+const PART = /^[\w-]{1,80}$/;
+
+/** A thread's place on the app's own scheme, which its web page opens: agentbox://t/<owner>/<thread>. */
+export const threadAppLink = (owner: string, id: string): string | null => (PART.test(String(owner)) && PART.test(String(id)) ? `${JOIN_SCHEME}://t/${owner}/${id}` : null);
+
+/** Whose thread an agentbox://t/ link names, or null for any other link. */
+export function threadFromAppLink(text: unknown): { owner: string; id: string } | null {
+  const m = new RegExp(`^${JOIN_SCHEME}://t/([^/?#\\s]+)/([^/?#\\s]+)/?(?:[?#].*)?$`, 'i').exec(String(text ?? '').trim());
+  return m && PART.test(m[1]) && PART.test(m[2]) ? { owner: m[1], id: m[2] } : null;
+}

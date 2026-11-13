@@ -1,12 +1,17 @@
 // A FILE SHARED BY ITS LINK, as the web app reads it: <site>/f/<token>.
-// The database side is cloud/supabase/migrations/20261105000001_a_file_anyone_with_its_link_can_read.sql.
+// The database side is cloud/supabase/migrations/20261105000001_a_file_anyone_with_its_link_can_read.sql
+// and 20261112120000_a_link_says_who_can_open_it_and_what_they_can_do.sql.
+import { mergeText } from '../../../shared/text-merge.mts';
+
+import { cleanPlace, type NotePlace, type RawPlace } from '../../../shared/artifact-marks.mts';
 
 export type Rpc = (name: string, args: Record<string, unknown>) => Promise<unknown>;
-export type FileKind = 'markdown' | 'page' | 'image' | 'pdf';
+export type FileKind = 'markdown' | 'page' | 'image' | 'pdf' | 'video';
 
 // The rows the database's functions answer with, as JSON; checked field by field below.
-interface LinkRow { name?: string; kind: FileKind; type?: string; body?: string; version?: number; created_at: string; updated_at: string; owner_name?: unknown; owner_avatar?: unknown; mine?: boolean }
-interface CommentRow { id: string; by_name?: unknown; by_avatar?: unknown; body?: string; created_at: string; mine?: boolean; by_owner?: boolean }
+interface LinkRow { name?: string; kind: FileKind; type?: string; body?: string; version?: number; created_at: string; updated_at: string; owner_name?: unknown; owner_avatar?: unknown; mine?: boolean; can?: unknown; rev?: unknown; changed_by_name?: unknown; anyone?: unknown }
+interface VersionRow { id: string; rev?: number; how?: unknown; by_name?: unknown; by_owner?: boolean; at: string; current?: boolean }
+interface CommentRow { id: string; by_name?: unknown; by_avatar?: unknown; body?: string; created_at: string; mine?: boolean; by_owner?: boolean; place?: unknown }
 
 export interface SharedFile {
   name: string;
@@ -20,9 +25,26 @@ export interface SharedFile {
   ownerName: string;
   ownerAvatar: string | null;
   mine: boolean;
+  /** What this person may do with it. Signed out, writing asks them to sign in first. */
+  can: LinkCan;
+  /** Which copy the link holds; 0 on a database too old to edit or keep history. */
+  rev: number;
+  /** Who made the copy the link holds, when it was not its owner. */
+  changedByName: string | null;
+  /** The site's own /raw address can read it signed out. */
+  anyone: boolean;
 }
 
-export type Shown = { state: 'file'; file: SharedFile } | { state: 'stopped' } | { state: 'unknown' };
+export type LinkCan = 'view' | 'comment' | 'edit' | 'owner';
+const RANK: Record<LinkCan, number> = { view: 1, comment: 2, edit: 3, owner: 4 };
+export const mayComment = (file: Pick<SharedFile, 'can'>): boolean => RANK[file.can] >= 2;
+/** Edited on its page: a document or a table, by an editor or its owner. */
+export const mayEdit = (file: Pick<SharedFile, 'can' | 'kind' | 'rev'>): boolean => RANK[file.can] >= 3 && file.kind === 'markdown' && file.rev > 0;
+export const mayLookBack = (file: Pick<SharedFile, 'can' | 'kind' | 'rev'>): boolean => RANK[file.can] >= 3 && (file.kind === 'markdown' || file.kind === 'page') && file.rev > 0;
+
+export type Shown = { state: 'file'; file: SharedFile } | { state: 'stopped' } | { state: 'unknown' } | { state: 'sign-in' } | { state: 'no-access' };
+
+export interface LinkVersion { id: string; how: 'shared' | 'edited' | 'restored'; byName: string; byOwner: boolean; at: number; current: boolean }
 
 export interface FileComment {
   id: string;
@@ -32,6 +54,8 @@ export interface FileComment {
   createdAt: number;
   mine: boolean;
   byOwner: boolean;
+  /** Where in the file it points; none for the whole file. */
+  place?: NotePlace;
 }
 
 // What a sentence leaves on a pasted link ("here it is: <link>." or "(<link>)").
@@ -43,7 +67,7 @@ export function sharedFileToken(pathname: string, onTheWebApp: boolean): string 
   return PATH.exec(pathname.replace(/^\/F\//, '/f/'))?.[1] ?? null;
 }
 
-const KINDS = new Set<FileKind>(['markdown', 'page', 'image', 'pdf']);
+const KINDS = new Set<FileKind>(['markdown', 'page', 'image', 'pdf', 'video']);
 
 export async function readSharedFile(rpc: Rpc, tok: string): Promise<Shown> {
   if (!/^[A-Za-z0-9_-]{16,64}$/.test(tok)) return { state: 'unknown' };
@@ -59,10 +83,68 @@ export async function readSharedFile(rpc: Rpc, tok: string): Promise<Shown> {
         ownerName: (typeof r.owner_name === 'string' && r.owner_name.trim()) || 'Someone',
         ownerAvatar: typeof r.owner_avatar === 'string' && /^https:/.test(r.owner_avatar) ? r.owner_avatar : null,
         mine: r.mine === true,
+        // A database from before links said what they allow answers none of these: every link let anyone comment.
+        can: r.mine === true ? 'owner' : typeof r.can === 'string' && r.can in RANK ? r.can as LinkCan : 'comment',
+        rev: Number.isInteger(r.rev) ? r.rev as number : 0,
+        changedByName: typeof r.changed_by_name === 'string' && r.changed_by_name.trim() ? r.changed_by_name.trim() : null,
+        anyone: r.anyone !== false,
       },
     };
   }
+  let door: unknown = null;
+  try { door = await rpc('file_link_door', { tok }); } catch { /* an older database has no door; the stopped check says enough */ }
+  if (door === 'sign-in' || door === 'no-access' || door === 'stopped') return { state: door };
+  if (door === 'unknown') return { state: 'unknown' };
   return (await rpc('file_link_stopped', { tok })) === true ? { state: 'stopped' } : { state: 'unknown' };
+}
+
+/**
+ * Saves an editor's words over the copy they started from. When somebody saved
+ * in between, the two are merged and saved over theirs, so nobody's words are lost.
+ */
+export async function saveEdit(
+  rpc: Rpc, latest: () => Promise<Pick<SharedFile, 'body' | 'rev'> | null>, tok: string, mine: string, from: { rev: number; body: string },
+): Promise<{ rev: number; body: string; merged: boolean }> {
+  try {
+    return { rev: Number(await rpc('edit_file_link', { tok, b: mine, base: from.rev })), body: mine, merged: false };
+  } catch (err) {
+    if (!/changed since/i.test(String((err as Error)?.message ?? err))) throw err;
+    const theirs = await latest();
+    if (!theirs) throw err;
+    const body = mergeText(from.body, theirs.body, mine, { overlap: 'mine' }).text;
+    return { rev: Number(await rpc('edit_file_link', { tok, b: body, base: theirs.rev })), body, merged: true };
+  }
+}
+
+const HOW = new Set(['shared', 'edited', 'restored']);
+export async function readHistory(rpc: Rpc, tok: string): Promise<LinkVersion[]> {
+  const rows = await rpc('file_link_history', { tok }) as VersionRow[] | null;
+  return (Array.isArray(rows) ? rows : []).filter((r) => HOW.has(String(r.how))).map((r) => ({
+    id: String(r.id), how: r.how as LinkVersion['how'], byName: (typeof r.by_name === 'string' && r.by_name.trim()) || 'Someone',
+    byOwner: r.by_owner === true, at: Date.parse(r.at) || 0, current: r.current === true,
+  }));
+}
+
+export async function readVersion(rpc: Rpc, tok: string, id: string): Promise<string | null> {
+  const body = await rpc('file_link_version', { tok, v: id });
+  return typeof body === 'string' ? body : null;
+}
+
+export async function restoreVersion(rpc: Rpc, tok: string, id: string, base: number): Promise<number> {
+  return Number(await rpc('restore_file_link_version', { tok, v: id, base }));
+}
+
+/** A version's time, always with the hour, as several fall on one day. */
+export function versionWhen(ts: number, now = Date.now()): string {
+  const d = new Date(ts);
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase().replace(' ', '');
+  if (d.toDateString() === new Date(now).toDateString()) return `Today at ${time}`;
+  const sameYear = d.getFullYear() === new Date(now).getFullYear();
+  return `${d.toLocaleDateString('en-US', sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' })} at ${time}`;
+}
+
+export function versionLine(v: Pick<LinkVersion, 'how' | 'byName'>): string {
+  return `${v.how === 'shared' ? 'Shared' : v.how === 'restored' ? 'Restored' : 'Edited'} by ${v.byName}`;
 }
 
 export async function readComments(rpc: Rpc, tok: string): Promise<FileComment[]> {
@@ -71,11 +153,16 @@ export async function readComments(rpc: Rpc, tok: string): Promise<FileComment[]
     id: String(r.id), byName: (typeof r.by_name === 'string' && r.by_name.trim()) || 'Someone',
     byAvatar: typeof r.by_avatar === 'string' && /^https:/.test(r.by_avatar) ? r.by_avatar : null,
     body: String(r.body ?? ''), createdAt: Date.parse(r.created_at) || 0, mine: r.mine === true, byOwner: r.by_owner === true,
+    ...placed(r.place),
   }));
 }
 
-export async function postComment(rpc: Rpc, tok: string, words: string): Promise<string> {
-  return String(await rpc('comment_on_file_link', { tok, b: words }));
+const placed = (raw: unknown): { place?: NotePlace } => { const place = cleanPlace(raw as RawPlace | null); return place && place.kind !== 'whole' ? { place } : {}; };
+
+/** `place` none or the whole file: the two-word call, which a database without places still answers. */
+export async function postComment(rpc: Rpc, tok: string, words: string, place: NotePlace | null = null): Promise<string> {
+  const p = placed(place).place;
+  return String(await rpc('comment_on_file_link', p ? { tok, b: words, p } : { tok, b: words }));
 }
 
 export async function removeComment(rpc: Rpc, id: string): Promise<void> {
@@ -102,18 +189,51 @@ export function sharedOn(ts: number, now = Date.now()): string {
   return d.toLocaleDateString('en-US', sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export function sharedLine(file: Pick<SharedFile, 'ownerName' | 'updatedAt'> & { createdAt?: number }, now = Date.now()): string {
-  const who = file.ownerName.length > 60 ? `${file.ownerName.slice(0, 59)}…` : file.ownerName;
+const short = (name: string) => (name.length > 60 ? `${name.slice(0, 59)}…` : name);
+
+export function sharedLine(file: Pick<SharedFile, 'ownerName' | 'updatedAt'> & { createdAt?: number; changedByName?: string | null }, now = Date.now()): string {
+  const who = short(file.ownerName);
   if (!file.updatedAt) return `Shared by ${who}`;
+  if (file.changedByName) return `Shared by ${who} · edited by ${short(file.changedByName)} ${sharedOn(file.updatedAt, now)}`;
   const updated = !!file.createdAt && file.updatedAt - file.createdAt > 1000;
   return `Shared by ${who} · ${updated ? 'updated ' : ''}${sharedOn(file.updatedAt, now)}`;
 }
+
+/** A film's link holds the list of its pieces (main/file-link.mts); null for anything else. */
+export function filmOf(file: Pick<SharedFile, 'kind' | 'body'>): { pieces: number; size: number; hash: string } | null {
+  if (file.kind !== 'video') return null;
+  try {
+    const { pieces, size, hash } = JSON.parse(file.body) as { pieces?: unknown; size?: unknown; hash?: unknown };
+    if (!Number.isInteger(pieces) || (pieces as number) < 1 || !Number.isInteger(size) || typeof hash !== 'string' || !/^[0-9a-f]{40}$/.test(hash)) return null;
+    return { pieces: pieces as number, size: size as number, hash };
+  } catch { return null; }
+}
+
+/** A film's bytes, piece by piece in order; null when a piece is missing. */
+export async function readFilm(
+  piece: (name: string) => Promise<Uint8Array | null>, token: string, film: { pieces: number; hash: string },
+  onProgress: (done: number) => void = () => {},
+): Promise<Uint8Array[] | null> {
+  const parts: Uint8Array[] = [];
+  for (let n = 0; n < film.pieces; n++) {
+    const got = await piece(`${token}/${film.hash}/${n}`);
+    if (!got) return null;
+    parts.push(got);
+    onProgress((n + 1) / film.pieces);
+  }
+  return parts;
+}
+
+/** A table goes up as text, as a document does (main/file-link.mts); its type tells them apart. */
+export const isTable = (file: { kind: string; type?: string }): boolean =>
+  file.kind === 'markdown' && /^text\/(csv|tab-separated-values)$/i.test(file.type ?? '');
 
 /**
  * The words over the file. A document's own first heading is its title, so the
  * page does not lead with "competitor-research.md"; `body` is the rest of it.
  */
-export function titleOf(file: Pick<SharedFile, 'name' | 'kind' | 'body'>): { title: string; body: string } {
+export function titleOf(file: Pick<SharedFile, 'name' | 'kind' | 'body'> & { type?: string }): { title: string; body: string } {
+  if (isTable(file)) return { title: file.name, body: file.body };
   if (file.kind === 'markdown') {
     const m = /^\s*#[ \t]+(.+?)[ \t]*#*[ \t]*(?:\r?\n|$)/.exec(file.body);
     if (m) return { title: m[1], body: file.body.slice(m[0].length) };

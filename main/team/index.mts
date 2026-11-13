@@ -30,7 +30,8 @@ import { referencedFiles } from '../../shared/referenced-files.mts';
 import { shortTitle } from '../../shared/thread-title.mts';
 import { taskTitle } from '../../shared/team-tasks.mts';
 import { firstSentence } from '../../shared/thread-cards.mts';
-import { cardsFor } from '../../shared/thread-cards.mts';
+import { openTo, seenNow, sentWords, threadLink } from '../../shared/thread-link.mts';
+import { cardsFor, type WontStart } from '../../shared/thread-cards.mts';
 import fs from 'node:fs';
 import { saveAttachments, attachmentMarkdown } from '../save-attachments.mts';
 import { hasLapsed, statusEnds } from '../../shared/team-status.mts';
@@ -40,13 +41,14 @@ import type { PhoneBackendCalls, PhoneHistoryLine, PhoneInboxOptions, PhoneItem 
 import { PHONE_UNDO_HOLD_MS } from '../../shared/phone-undo.mts';
 import { SNAPSHOT_LIMITS, phoneProjectsOf, phoneEligible } from '../../shared/phone-snapshot.mts';
 import { createRooms } from './rooms.mts';
+import { isOnTeam } from '../../shared/rooms-on.mts';
 import { noticeEndedWaits } from './waits.mts';
 import { handOverDepartures } from './departures.mts';
 import type { Departure } from './departures.mts';
 import type { CloudPhoneCommand } from './supabase-backend.mts';
 import { mateCard, splitCards } from '../../shared/mate-cards.mts';
 import type { BoardMate } from '../../shared/mate-cards.mts';
-import type { Mark } from '../../shared/artifact-marks.mts';
+import { cleanPlace, type Mark, type NotePlace, type RawPlace } from '../../shared/artifact-marks.mts';
 import type { RoomsBackend, RoomsOptions, RoomsState } from './rooms.mts';
 
 export interface TeamPerson {
@@ -88,17 +90,28 @@ export interface TeamState {
   rooms?: RoomsState;
   teamMates?: BoardMate[];
   sharedFileNews?: unknown[];
+  threadTalk?: unknown[];
   /** `${slug}/${id}` then person: when they last opened that conversation. */
   seen?: Record<string, Record<string, number>>;
 }
 
 /** A person's open work and AI teammates, handed on when they leave. */
 /** A file put in a link anyone can open. */
-export interface FileLinkShare { source: string; name: string; kind: string; type: string; body: string; version?: number; hash?: string }
+/** `path`: a film's own file, which goes up in pieces rather than in `body`. */
+export interface FileLinkShare { source: string; name: string; kind: string; type: string; body: string; version?: number; hash?: string; path?: string }
 /** This person's live link to one file. */
-export interface FileLinkRow { token: string; version: number; hash: string; createdAt: number; updatedAt: number; comments: number }
+export type LinkAccess = 'anyone' | 'people';
+export type LinkCan = 'view' | 'comment' | 'edit';
+/** `changedOnWeb`: its copy was edited on its page and is not yet in this person's files. */
+export interface FileLinkRow {
+  token: string; version: number; hash: string; createdAt: number; updatedAt: number; comments: number;
+  access: LinkAccess; can: LinkCan; rev: number; changedOnWeb: boolean; changedByName: string | null;
+}
+export interface FileLinkPerson { email: string; can: LinkCan; name: string | null; avatar: string | null }
 export interface FileLinkListed { token: string; source: string; name: string; kind: string; createdAt: number; updatedAt: number; comments: number }
-export interface FileLinkComment { id: string; byName: string; byAvatar: string | null; text: string; at: number; mine: boolean; byOwner: boolean }
+export interface SharedLinkFile { name: string; kind: string; type: string; body: string; version: number; createdAt: number; updatedAt: number; ownerName: string | null; ownerAvatar: string | null; mine: boolean; rev?: number }
+/** `place`: where in the file it points, as a note in the app does; none for the whole file. */
+export interface FileLinkComment { id: string; byName: string; byAvatar: string | null; text: string; at: number; mine: boolean; byOwner: boolean; place?: NotePlace }
 
 export interface TeamHandover { handTo: string; name: string; mates: { id: string; name?: unknown; job?: unknown; to: string | null }[] }
 
@@ -141,9 +154,25 @@ export type TeamBackend = Omit<SyncBackend, 'me' | 'personId'> & RoomsBackend & 
   fileLinkFor?(source: string): Promise<FileLinkRow | null>;
   myFileLinks?(): Promise<FileLinkListed[]>;
   stopFileLink?(token: string): Promise<void>;
+  /** A film's pieces under its link (20261109120000_a_film_can_be_shared_by_its_link.sql). */
+  putLinkPiece?(name: string, bytes: Buffer): Promise<unknown>;
+  linkPiecesHeld?(token: string, hash: string): Promise<number[]>;
+  /** Clears a link's pieces of every copy but `keep`; null clears them all. */
+  clearLinkPieces?(token: string, keep: string | null): Promise<void>;
+  /** What anyone with the link reads, for bringing a shared file in. */
+  fileLinkView?(token: string): Promise<{ stopped: boolean; file: SharedLinkFile | null }>;
+  linkPiece?(name: string): Promise<Buffer | null>;
   fileLinkComments?(token: string): Promise<FileLinkComment[]>;
-  commentOnFileLink?(token: string, text: string): Promise<unknown>;
+  commentOnFileLink?(token: string, text: string, place?: NotePlace | null): Promise<unknown>;
   newLinkComments?(since: number): Promise<LinkComment[]>;
+  setFileLinkAccess?(token: string, access: string, can: string): Promise<void>;
+  fileLinkPeople?(token: string): Promise<FileLinkPerson[]>;
+  /** `can` null takes them off. */
+  setFileLinkPerson?(token: string, email: string, can: string | null): Promise<void>;
+  linksChangedOnWeb?(): Promise<LinkEdit[]>;
+  fileLinkBroughtHome?(token: string, rev: number, version: number): Promise<unknown>;
+  /** The stand-in cloud's way to edit a link as its page would; the real page calls edit_file_link itself. */
+  editFileLink?(token: string, body: string, base: number): Promise<number>;
   subscribe(onChange: () => void): () => void;
 };
 
@@ -158,6 +187,8 @@ export interface TeamSession {
   adoptSession?(session: { supabaseUrl: string; access_token: string; refresh_token: string } | null): Promise<TeamBackend | null>;
   signUp?(account: { email: string; password: string; name: string }): Promise<{ backend?: TeamBackend; confirm?: boolean } | null | undefined>;
   signOut?(): Promise<unknown>;
+  /** The cloud as nobody, for what anyone may read: a shared file's link. */
+  anyone?(): Promise<TeamBackend | null>;
 }
 
 /** A project as the team service reads it from the store. */
@@ -193,6 +224,9 @@ export interface TeamRow {
   due?: unknown;
   edits?: Record<string, { gone?: boolean; text?: unknown } | undefined>;
   updatedAt?: number;
+  createdAt?: number;
+  visibility?: string;
+  visibleTo?: string[];
 }
 
 /** A line of a thread's ledger, as the team service reads it. */
@@ -224,6 +258,7 @@ export interface TeamStore {
   readThread(slug: string, id: string): { text?: string }[];
   readHistory(slug: string, id: string, opts?: { max?: number }): TeamHistoryLine[];
   answerItem(slug: string, id: string, patch: TeamAnswer): unknown;
+  threadEdit(slug: string, id: string, patch: { visibility: string; visibleTo: string[] }): unknown;
   teamPatch(slug: string, id: string, patch: { assignee: string }): unknown;
   composeItem(slug: string, fields: Record<string, unknown>): { id: string };
   commentOnASharedFile(slug: string, id: string, note: string, comment?: { name: string; file: string; text: string } | null): unknown;
@@ -269,7 +304,7 @@ export interface TeamPhone {
   stateFile: string;
 }
 
-export type TeamRoomsSetup = Pick<RoomsOptions, 'enabled' | 'device' | 'presenceFacts' | 'prefsFile'>;
+export type TeamRoomsSetup = Pick<RoomsOptions, 'device' | 'presenceFacts' | 'prefsFile'> & { enabled: (facts: { onTeam: boolean }) => boolean };
 
 export interface TeamServiceOptions {
   session?: TeamSession | null;
@@ -286,6 +321,8 @@ export interface TeamServiceOptions {
   carrierOptions?: Record<string, unknown> | null;
   /** The threads an agent is on right now, by id, so a card says so. */
   runningIds?: () => string[];
+  /** What the supervisor says it will not start, so no card says those are running. */
+  wontStart?: () => WontStart;
   /** This person's AI teammates, which the team sees on its board. */
   ownMates?: () => { id: string; name?: string; job?: string | null; openToTeam?: boolean; now?: string | null; running?: boolean; updatedAt?: number; createdAt?: number }[];
   phone?: TeamPhone | null;
@@ -307,11 +344,13 @@ interface TaskInput {
 /** What rides along with a message: a voice note, the agent it is for, a subject that makes it its own thread. */
 interface MessageExtras { voice?: unknown; forAgent?: unknown; subject?: unknown }
 
-import { linkAddress, linkSiteFor } from '../file-link.mts';
+import { filmPiece, linkAddress, linkSiteFor } from '../file-link.mts';
 import { noticeLinkComments } from './link-comments.mts';
 import type { LinkComment } from './link-comments.mts';
+import { bringLinkEditsHome, type LinkEdit } from './link-edits.mts';
 
 const LINK_COMMENTS_EVERY_MS = 60_000;
+const LINK_EDITS_EVERY_MS = 60_000;
 
 // `signingIn` is { url } while a Google sign-in waits on the browser, so the
 // page can offer that link again rather than a button that does nothing.
@@ -322,7 +361,7 @@ const EMPTY: TeamState = { configured: false, canSignIn: false, started: false, 
 export function teamForWindow(state: TeamState | null | undefined, multiplayer: boolean) {
   if (multiplayer || !state) return state;
   const { rooms, ...rest } = state;
-  return { ...rest, configured: false, team: null, invites: [], sent: [], people: [], cards: [], teamMates: [], sharedFileNews: [] };
+  return { ...rest, configured: false, team: null, invites: [], sent: [], people: [], cards: [], teamMates: [], sharedFileNews: [], threadTalk: [] };
 }
 
 export function createTeamService({
@@ -341,6 +380,7 @@ export function createTeamService({
   rooms: roomsSetup = null,
   // The threads an agent is on right now, by id, so a card says so.
   runningIds = () => [],
+  wontStart = () => ({}),
   // This person's AI teammates, which the team sees on its board.
   ownMates = () => [],
   sharing = () => true,
@@ -377,6 +417,7 @@ export function createTeamService({
     backend: () => backend, me: () => state.me, team: () => state, now, log, onChange,
     findFile: (ref, how = {}) => findFileToSend({ ref, meant: how.meant === true, products: store.listProducts({ includeArchived: true }) }),
     ...roomsSetup,
+    enabled: () => roomsSetup.enabled({ onTeam: isOnTeam(state) }),
   }) : null;
   if (site) QRCode.toString(site, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }).then((qr) => { siteQr = qr; set({ phoneSiteQr: qr }); }).catch(() => {});
 
@@ -558,6 +599,7 @@ export function createTeamService({
         await phoneOnce();
         await rooms?.tick().catch((err) => log(`rooms: ${err.message}`));
         await linkCommentsOnce();
+        await linkEditsOnce();
         pending = null;
       }
     });
@@ -584,6 +626,32 @@ export function createTeamService({
       });
       if (wrote) onChange();
     } catch (err) { log(`link comments: ${(err as Error).message}`); }
+  }
+
+  // Edits made on this person's link pages, into their files (main/team/link-edits.mts).
+  // `rightAway`: the share panel asked about an edited link, so it goes ahead of the minute.
+  let linkEditsAt = 0;
+  let linkEditsRunning: Promise<void> | null = null;
+  function linkEditsOnce(rightAway = false): Promise<void> {
+    if (linkEditsRunning) return linkEditsRunning;
+    if (!state.me || !backend?.linksChangedOnWeb || (!rightAway && now() - linkEditsAt < LINK_EDITS_EVERY_MS)) return Promise.resolve();
+    linkEditsAt = now();
+    const b = backend;
+    linkEditsRunning = (async () => {
+      try {
+        const wrote = await bringLinkEditsHome({
+          backend: b, log,
+          placeOf: (source) => kept().getLinkPlace(source),
+          setPlace: (source, place) => kept().setLinkPlace(source, place),
+          note: ({ product, thread }, text) => {
+            const p = products().find((x) => x.slug === product);
+            if (p && disk.readWorkItems(p.dir).some((i) => i.id === thread)) store.commentOnASharedFile(product, thread, text);
+          },
+        });
+        if (wrote) onChange();
+      } catch (err) { log(`link edits: ${(err as Error).message}`); } finally { linkEditsRunning = null; }
+    })();
+    return linkEditsRunning;
   }
 
   async function handOverWhatLeft(cards: TeamCard[], people: TeamPerson[]) {
@@ -734,7 +802,7 @@ export function createTeamService({
     // Off, the window shows no team and no Team / Private choice, so nothing
     // goes up, and what was up comes down as a private thread's card does.
     const listCards = (): SyncCard[] => (!sharing() ? [] : [
-      ...cardsFor({ products: products(), readItems: (p) => disk.readWorkItems(p.dir), since: state.me ? kept().getSince(state.me.id) : null, me: state.me?.id ?? null, running: runningIds() }),
+      ...cardsFor({ products: products(), readItems: (p) => disk.readWorkItems(p.dir), since: state.me ? kept().getSince(state.me.id) : null, me: state.me?.id ?? null, running: runningIds(), wontStart: wontStart() }),
       ...(ownMates() ?? []).map((t) => mateCard(t, { now: t.now ?? null, running: !!t.running, at: t.updatedAt ?? t.createdAt ?? 0 })),
     ]);
     threadShare = createThreadShare({
@@ -788,7 +856,7 @@ export function createTeamService({
   }
 
   return {
-    state: () => ({ ...state, sharedFileNews: threadShare?.fileNews() ?? [], ...(rooms ? { rooms: rooms.state() } : {}) }),
+    state: () => ({ ...state, sharedFileNews: threadShare?.fileNews() ?? [], threadTalk: threadShare?.talk() ?? [], ...(rooms ? { rooms: rooms.state() } : {}) }),
     rooms,
     /** What the desktop's banner was told arrived, for her phone's alerts (main/phone-alerts.mts). */
     phoneArrivals: (list: unknown[], needsYou: unknown[]) => phoneInbox?.arrivals(list, needsYou),
@@ -1166,9 +1234,14 @@ export function createTeamService({
       if (to === state.me.id) throw new Error('that thread is yours already');
       const { words, files, tooBig } = briefOfThread(row, product);
       const left = tooBig.length ? `(Not sent: ${tooBig.join(', ')}, over 10 MB. Ask ${state.me.name || 'me'} for ${tooBig.length === 1 ? 'it' : 'them'}.)` : '';
+      const brief = [words, left].filter(Boolean).join('\n\n');
+      // The task leads back to the thread, opened to them as Share's Send opens it.
+      const seen = seenNow(row, product, kept().getSince(state.me.id));
+      if (seen !== 'team') store.threadEdit(slug, id, openTo(seen, row.visibleTo, [to]));
+      const link = threadLink(state.me.id, id);
       const made = await this.giveTask(to, {
         title: row.label || row.title,
-        body: [words, left].filter(Boolean).join('\n\n'),
+        body: link ? sentWords(row.label || row.title || '', link, brief) : brief,
         priority: row.priority, due: row.due && row.due !== 'none' ? row.due : undefined, files,
       });
       // As your own words: a note would be drawn as the agent's checkpoint.
@@ -1223,6 +1296,9 @@ export function createTeamService({
 
     /** Those folders, as projects the file pane can read. */
     sharedThreadProducts: () => threadShare?.products() ?? [],
+
+    /** A teammate's file by the sha256 of its bytes, from a thread shared with this person (thread-share.mts). */
+    sharedFileByHash: (hash: string, o?: { fetch?: boolean }) => threadShare?.fileByHash(hash, o) ?? Promise.resolve(null),
 
     // Words to a thread's owner. The cloud decides who may: whoever can read the card.
     async commentOnThread(owner: string, threadId: string, text: unknown) {
@@ -1298,18 +1374,87 @@ export function createTeamService({
     async fileLink(source: string, hashNow: string | null = null, versionNow: number | null = null) {
       if (!linkSite) return { site: null, signedIn: !!state.me, link: null };
       if (!backend?.fileLinkFor || !state.me) return { site: linkSite, signedIn: false, link: null };
-      const l = await backend.fileLinkFor(source);
+      let l = await backend.fileLinkFor(source);
+      if (l?.changedOnWeb) {
+        await linkEditsOnce(true);
+        l = await backend.fileLinkFor(source);
+      }
       if (!l) return { site: linkSite, signedIn: true, link: null };
-      // `current`: the link holds the very copy on screen. `ahead`: it holds a later version than the one on screen.
+      // `current`: the link holds the very copy on screen. `ahead`: it holds a later version than the one on screen,
+      // or an edit made on its page that is not in the files yet, which Update link must not go over.
       const current = hashNow == null || l.hash === hashNow;
-      return { site: linkSite, signedIn: true, link: { ...l, url: linkAddress(linkSite, l.token), current, ahead: !current && versionNow != null && l.version > versionNow } };
+      const ahead = !current && (l.changedOnWeb || (versionNow != null && l.version > versionNow));
+      return { site: linkSite, signedIn: true, link: { ...l, url: linkAddress(linkSite, l.token), current, ahead } };
+    },
+    /** Where a shared file is on this computer, so an edit made on its page can come home beside it. */
+    rememberLinkPlace(source: string, file: string) {
+      const had = kept().getLinkPlace(source);
+      if (had?.path !== file) kept().setLinkPlace(source, { ...had, path: file });
+    },
+    async setFileLinkAccess(token: string, access: string, can: string) {
+      if (!backend?.setFileLinkAccess || !state.me) throw new Error('Sign in first.');
+      await backend.setFileLinkAccess(token, access, can);
+    },
+    async fileLinkPeople(token: string) {
+      if (!backend?.fileLinkPeople || !state.me) return [];
+      return backend.fileLinkPeople(token);
+    },
+    async setFileLinkPerson(token: string, email: string, can: string | null) {
+      if (!backend?.setFileLinkPerson || !backend.fileLinkPeople || !state.me) throw new Error('Sign in first.');
+      await backend.setFileLinkPerson(token, email, can);
+      return backend.fileLinkPeople(token);
     },
     /** Shares the file, or puts this copy of it in its live link. */
-    async shareFile({ source, name, kind, type, body, version, hash }: FileLinkShare) {
+    async shareFile({ source, name, kind, type, body, version, hash, path: file }: FileLinkShare) {
       if (!linkSite) throw new Error('This cloud has no website to share files on.');
       if (!backend?.shareFile || !state.me) throw new Error('Sign in to share a link.');
-      await backend.shareFile({ source, name, kind, type, body, version, hash });
+      if (kind !== 'video') {
+        await backend.shareFile({ source, name, kind, type, body, version, hash });
+        return this.fileLink(source, hash);
+      }
+      if (!file || !hash || !backend.putLinkPiece || !backend.linkPiecesHeld || !backend.fileLinkFor) throw new Error('This copy cannot share films yet.');
+      const { pieces } = JSON.parse(body) as { pieces: number };
+      const { linkPiecesHeld, putLinkPiece } = backend;
+      const putAll = async (token: string) => {
+        const held = new Set(await linkPiecesHeld(token, hash));
+        for (let n = 0; n < pieces; n++) if (!held.has(n)) await putLinkPiece(`${token}/${hash}/${n}`, filmPiece(file, n));
+      };
+      // A live link moves to the new copy only once all of it is up, so nobody opening it meets half a film.
+      const had = await backend.fileLinkFor(source);
+      if (had) {
+        await putAll(had.token);
+        await backend.shareFile({ source, name, kind, type, body, version, hash });
+      } else {
+        const token = String(await backend.shareFile({ source, name, kind, type, body, version, hash }));
+        try { await putAll(token); } catch (err) {
+          await backend.stopFileLink?.(token).catch(() => {});
+          throw err;
+        }
+      }
+      const live = await backend.fileLinkFor(source);
+      if (live && backend.clearLinkPieces) await backend.clearLinkPieces(live.token, hash).catch((err: Error) => log(`file link: old pieces stay: ${err.message}`));
       return this.fileLink(source, hash);
+    },
+    /** A file someone shared by its link, as anyone with the link reads it, with its bytes. */
+    async readFileLink(token: string) {
+      const b = backend ?? (await session?.anyone?.()) ?? null;
+      if (!b?.fileLinkView) throw new Error('This copy has no cloud to read shared files from.');
+      const { stopped, file } = await b.fileLinkView(token);
+      if (!file) throw new Error(stopped ? 'This link was stopped. Ask whoever sent it for a new one.' : 'This link does not work. Check it with whoever sent it.');
+      let bytes: Buffer;
+      if (file.kind === 'video') {
+        const { pieces, hash } = JSON.parse(file.body) as { pieces: number; hash: string };
+        const parts: Buffer[] = [];
+        for (let n = 0; n < pieces; n++) {
+          const got = await b.linkPiece?.(`${token}/${hash}/${n}`);
+          if (!got) throw new Error('This film did not come through. Try again.');
+          parts.push(got);
+        }
+        bytes = Buffer.concat(parts);
+      } else bytes = Buffer.from(file.body, file.kind === 'image' || file.kind === 'pdf' ? 'base64' : 'utf8');
+      // The review on the link comes in with the file; a cloud that will not say leaves it out.
+      const comments = await b.fileLinkComments?.(token).catch(() => []) ?? [];
+      return { file, bytes, comments };
     },
     /** Every live link of this person's, for the one list of what they made public. */
     async fileLinks() {
@@ -1320,17 +1465,18 @@ export function createTeamService({
     async stopFileLink(token: string) {
       if (!backend?.stopFileLink || !state.me) throw new Error('Sign in first.');
       await backend.stopFileLink(token);
+      if (backend.clearLinkPieces) await backend.clearLinkPieces(token, null).catch((err: Error) => log(`file link: a stopped film's pieces stay: ${err.message}`));
     },
     /** The comments people left on a link's page, and the owner's answer to them. */
     async fileLinkComments(token: string) {
       if (!backend?.fileLinkComments || !state.me) return [];
       return backend.fileLinkComments(token);
     },
-    async commentOnFileLink(token: string, text: unknown) {
+    async commentOnFileLink(token: string, text: unknown, place: unknown = null) {
       if (!backend?.commentOnFileLink || !state.me) throw new Error('Sign in first.');
       const words = String(text ?? '').trim();
       if (!words) throw new Error('Write something first.');
-      await backend.commentOnFileLink(token, words);
+      await backend.commentOnFileLink(token, words, cleanPlace(place as RawPlace | null) ?? null);
       return backend.fileLinkComments!(token);
     },
     /** A first name for the tile that says whose computer a file waits for. */

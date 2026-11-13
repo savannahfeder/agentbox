@@ -2,9 +2,11 @@
 // (new_comments_on_my_links in 20261105000001_a_file_anyone_with_its_link_can_read.sql).
 // A link's source is `<project>/<thread>/<file>` (main/file-link.mts linkSource).
 
+import type { NotePlace } from '../../shared/artifact-marks.mts';
+
 const QUOTE_MAX = 180;
 
-export interface LinkComment { token: string; source: string; name: string; byName: string; text: string; at: number }
+export interface LinkComment { token: string; source: string; name: string; byName: string; text: string; at: number; place?: NotePlace | null }
 export interface LinkThread { product: string; thread: string }
 
 export function threadOfSource(source: unknown): LinkThread | null {
@@ -35,7 +37,7 @@ export async function noticeLinkComments({ backend, cursor, setCursor, now, read
   setCursor: (at: number) => void;
   now: () => number;
   readItem: (place: LinkThread) => unknown;
-  write: (place: LinkThread, note: string, comment: { name: string; file: string; text: string }) => unknown;
+  write: (place: LinkThread, note: string, comment: { name: string; file: string; text: string; place?: NotePlace }) => unknown;
   log?: (line: string) => void;
 }): Promise<number> {
   if (!backend?.newLinkComments) return 0;
@@ -49,8 +51,11 @@ export async function noticeLinkComments({ backend, cursor, setCursor, now, read
   for (const [source, list] of bySource) {
     const place = threadOfSource(source);
     if (!place || !readItem(place)) continue;
-    const last = list[list.length - 1];
-    try { write(place, noteFor(list), { name: last.byName, file: last.name, text: last.text }); wrote += 1; } catch (err) { log(`link comments: ${(err as Error).message}`); }
+    // One line a comment, so the thread holds each of them and its place (shared/work-items.mts linkComments).
+    try {
+      for (const c of list) write(place, noteFor([c]), { name: c.byName, file: c.name, text: c.text, ...(c.place ? { place: c.place } : {}) });
+      wrote += 1;
+    } catch (err) { log(`link comments: ${(err as Error).message}`); }
   }
   setCursor(Math.max(...comments.map((c) => c.at)));
   return wrote;

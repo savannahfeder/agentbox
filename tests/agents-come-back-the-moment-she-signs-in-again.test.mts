@@ -27,7 +27,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
-import { signInFiles, signInStamp } from '../main/sign-in-files.mts';
+import { signInFiles, signInStamp, KeychainStamps } from '../main/sign-in-files.mts';
 import { liveLine, shortWord } from '../renderer/src/live-line.ts';
 
 const SIGNED_OUT = 'Failed to authenticate: OAuth session expired and could not be refreshed';
@@ -39,11 +39,16 @@ let root;
 let home;
 let sup;
 
-const start = (profiles = ['default']) => new Supervisor(
-  { home, storeRoot: root, maxConcurrentSessions: 3, authProfiles: profiles },
-  { listItems: () => [], listProducts: () => [] },
-  '/nonexistent-app',
-);
+// A Keychain with no entry for these logins, so the files are what is watched.
+const start = (profiles = ['default']) => {
+  const s = new Supervisor(
+    { home, storeRoot: root, maxConcurrentSessions: 3, authProfiles: profiles },
+    { listItems: () => [], listProducts: () => [] },
+    '/nonexistent-app',
+  );
+  s._keychainStamps = new KeychainStamps((service, done) => done(null));
+  return s;
+};
 
 const deadOnArrival = (words, profile = 'default', extra = {}) => ({
   itemId: 'w-test', product: 'agentbox', profile,

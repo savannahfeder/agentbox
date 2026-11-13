@@ -43,7 +43,8 @@ describe('a hidden browser', () => {
     const files = execFileSync('git', ['grep', '-l', '-e', "'--headless=new'", '--', '*.mjs', '*.mts', ':!tests/'], { cwd: ROOT, encoding: 'utf8' })
       .split('\n').filter(Boolean);
     expect(files.length).toBeGreaterThan(2);
-    const without = files.filter((f) => !fs.readFileSync(path.join(ROOT, f), 'utf8').includes("'--use-mock-keychain'"));
+    // shared/hidden-browser.mts KEEPS_OFF_THE_KEYCHAIN carries the flag.
+    const without = files.filter((f) => !/'--use-mock-keychain'|\.\.\.KEEPS_OFF_THE_KEYCHAIN/.test(fs.readFileSync(path.join(ROOT, f), 'utf8')));
     expect(without).toEqual([]);
   });
 });

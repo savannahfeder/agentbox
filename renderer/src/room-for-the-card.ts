@@ -12,26 +12,34 @@
 
 const ROOM = '--approval-room';
 const LIFT = '--approval-lift';
+const WIDTH = '--approval-width';
 
-/** The card's gap from the foot of the window, as in styles.css. */
+/** The card's gap from the foot of the window, and its width, as in styles.css. */
 export const CARD_FOOT = 22;
+export const CARD_WIDTH = 440;
+/** Narrower than this and the card stands above the box instead: lifted, it hangs over the thread. */
+export const NARROWEST = 340;
 const GAP = 8;
+/** Air between the card and a box it stands beside. */
+export const SIDE_GAP = 16;
 
 type Box = { left: number; right: number; top: number; bottom: number };
 
 /**
- * How far up the card stands so it covers no box a person types in. Below every
- * such box it would touch, or as high as the window lets it.
+ * Where the card stands so it covers no box a person types in: in its corner,
+ * narrowed to end beside any such box it would touch, or, when that would make it
+ * narrower than NARROWEST, at full width above them, as high as the window lets it.
+ * `card` is its full-width place in the corner.
  */
-export function cardLift(card: { left: number; right: number; height: number }, boxes: Box[], viewport: number): number {
-  let lift = CARD_FOOT;
-  for (const box of boxes) {
-    if (box.right <= box.left || box.bottom <= box.top) continue;
-    if (box.right <= card.left || box.left >= card.right) continue;
-    if (box.bottom <= viewport - CARD_FOOT - card.height) continue;
-    lift = Math.max(lift, viewport - box.top + GAP);
-  }
-  return Math.min(lift, Math.max(CARD_FOOT, viewport - card.height - GAP));
+export function cardPlace(card: { left: number; right: number; height: number }, boxes: Box[], viewport: number): { lift: number; width: number } {
+  const full = card.right - card.left;
+  const under = boxes.filter((box) => box.right > box.left && box.bottom > box.top
+    && box.right > card.left && box.left < card.right
+    && box.bottom > viewport - CARD_FOOT - card.height);
+  const width = Math.min(full, ...under.map((box) => card.right - box.right - SIDE_GAP));
+  if (width >= NARROWEST) return { lift: CARD_FOOT, width };
+  const lift = Math.max(...under.map((box) => viewport - box.top + GAP));
+  return { lift: Math.min(lift, Math.max(CARD_FOOT, viewport - card.height - GAP)), width: full };
 }
 
 /**
@@ -49,11 +57,16 @@ export function roomForTheCard(el: HTMLElement): () => void {
   // A thread opening under the card brings its Reply box with it.
   const lift = () => {
     const card = el.getBoundingClientRect();
+    // Measured from its full-width place, or a narrowed card would clear the box and widen
+    // again on the next look. On a phone it spans the screen, wider than CARD_WIDTH.
+    const corner = { left: card.right - Math.max(card.width, CARD_WIDTH), right: card.right, height: card.height };
     // `.dock-pill` is the Reply box folded: it is a button until it is pressed.
     const boxes = [...document.querySelectorAll('textarea, [contenteditable="true"], .dock-pill')]
       .filter((box) => !el.contains(box))
       .map((box) => box.getBoundingClientRect());
-    root.style.setProperty(LIFT, `${cardLift(card, boxes, window.innerHeight)}px`);
+    const place = cardPlace(corner, boxes, window.innerHeight);
+    root.style.setProperty(LIFT, `${place.lift}px`);
+    root.style.setProperty(WIDTH, `${place.width}px`);
   };
   lift();
   const looking = setInterval(lift, 400);
@@ -62,5 +75,6 @@ export function roomForTheCard(el: HTMLElement): () => void {
     clearInterval(looking);
     root.style.removeProperty(ROOM);
     root.style.removeProperty(LIFT);
+    root.style.removeProperty(WIDTH);
   };
 }

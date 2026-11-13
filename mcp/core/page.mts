@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { resolveAccount, resolveProduct } from './account.mts';
-import { MAC_CHROME, hiddenBrowser } from '../../shared/hidden-browser.mts';
+import { MAC_CHROME, KEEPS_OFF_THE_KEYCHAIN, hiddenBrowser } from '../../shared/hidden-browser.mts';
 
 /** Where a captured picture lands, beside everything else she is shown. */
 const SHOTS = 'attachments';
@@ -120,8 +120,8 @@ export async function captureWithChrome({ url, width, height, chrome = findChrom
   if (!chrome) return { error: 'No Chrome, Chromium or Edge on this computer, so there is nothing to open the page with.' };
   const profile = fs.mkdtempSync(path.join(process.env.TMPDIR ?? '/tmp', 'look-at-page-'));
   const child = spawn(chrome, [
-    '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--use-mock-keychain',
-    '--no-first-run', '--no-default-browser-check', '--hide-scrollbars',
+    '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
+    '--no-first-run', '--no-default-browser-check', '--hide-scrollbars', ...KEEPS_OFF_THE_KEYCHAIN,
     `--window-size=${width},${height}`, 'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
   const done = () => { try { child.kill('SIGKILL'); } catch { /* already gone */ } try { fs.rmSync(profile, { recursive: true, force: true }); } catch { /* best effort */ } };

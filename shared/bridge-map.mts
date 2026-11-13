@@ -104,6 +104,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   // Teammates: make, describe, start, edit, write to, and what they remember.
   teammates: 'zero:teammates',
   takeJoin: 'zero:take-join',
+  takeThreadLink: 'zero:take-thread-link',
   threadEdit: 'zero:thread-edit',
   // Move a thread to another project (shared/move-thread.mts).
   moveItem: 'zero:move-item',
@@ -137,6 +138,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   updateMove: 'zero:update-move',
   notify: 'zero:notify',
   notifyTest: 'zero:notify-test',
+  notifySettings: 'zero:notify-settings',
   onboardingArm: 'zero:onboarding-arm',
   stopSession: 'zero:stop-session',
   runNow: 'zero:run-now',
@@ -198,6 +200,8 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   stageAttachmentPart: 'zero:stage-attachment-part',
   crash: 'zero:crash',
   blankCheck: 'zero:blank-check',
+  // The appearance the desktop window's glass is drawn in; a tab has no glass.
+  glassTone: 'zero:glass-tone',
   track: 'zero:track',
   sessionTrace: 'zero:session-trace',
   itemHistory: 'zero:item-history',
@@ -210,6 +214,12 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   fileLinks: 'zero:file-links',
   fileLinkComments: 'zero:file-link-comments',
   fileLinkComment: 'zero:file-link-comment',
+  fileLinkAccess: 'zero:file-link-access',
+  fileLinkPeople: 'zero:file-link-people',
+  fileLinkPerson: 'zero:file-link-person',
+  // A file someone shared by its link, brought into one of your projects (main/bring-shared-file.mts).
+  bringSharedFile: 'zero:bring-shared-file',
+  takeSharedFile: 'zero:take-shared-file',
   codeChange: 'zero:code-change',
   codeFile: 'zero:code-file',
   saveCodeFile: 'zero:save-code-file',
@@ -246,6 +256,8 @@ export const PUSH_CHANNELS: Readonly<Record<string, string>> = {
   onZoomPercent: 'zero:zoom-percent',
   onRecovered: 'zero:recovered',
   onJoinRoom: 'zero:join-room',
+  onThreadLink: 'zero:thread-link',
+  onSharedFile: 'zero:shared-file',
   onOpenItem: 'zero:open-item',
   onOpenSettings: 'zero:open-settings',
   onScreenDetail: 'zero:screen-detail',

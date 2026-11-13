@@ -59,9 +59,9 @@ describe('a whole path in a message', () => {
 
 describe('what the window may load', () => {
   it('serves a pdf inside a root the app owns, and not outside it', () => {
-    expect(servable('/root/a/deck.pdf', ['/root'])).toBe(true);
-    expect(servable('/other/deck.pdf', ['/root'])).toBe(false);
-    expect(servable('/root/a/notes.txt', ['/root'])).toBe(false);
+    expect(servable('/root/a/deck.pdf', ['/root'], 'darwin')).toBe(true);
+    expect(servable('/other/deck.pdf', ['/root'], 'darwin')).toBe(false);
+    expect(servable('/root/a/notes.txt', ['/root'], 'darwin')).toBe(false);
   });
 });
 

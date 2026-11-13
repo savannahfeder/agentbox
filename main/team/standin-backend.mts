@@ -15,8 +15,9 @@ interface StandinWait { boot: string; events: ({ kind: 'change' } | { kind: 'roo
 async function post<T>(url: string, door: string, body: unknown, ms = CALL_MS): Promise<T> {
   const init = { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) };
   const res = await fetch(`${url}/${door}`, { ...init, signal: AbortSignal.timeout(ms) });
-  const out = await res.json().catch(() => ({})) as T & { error?: string };
-  if (!res.ok) throw new Error(out.error || `the stand-in cloud said ${res.status}`);
+  const out = await res.json().catch(() => ({})) as T & { error?: string; code?: string };
+  // The code rides along: "that file is already in the room" is told from a failure by it.
+  if (!res.ok) throw Object.assign(new Error(out.error || `the stand-in cloud said ${res.status}`), out.code ? { code: out.code } : {});
   return out;
 }
 
@@ -25,7 +26,9 @@ export function standinBackend(url: string, { token, personId, kind, methods }: 
   const backend: Record<string, unknown> & Partial<TeamBackend> = { kind, personId };
   for (const method of methods) {
     backend[method] = async (...args: unknown[]) => {
-      const { value } = await post<{ value: unknown }>(url, 'call', { token, method, args });
+      const sent = args.map((a) => (Buffer.isBuffer(a) ? { __bytes: a.toString('base64') } : a));
+      const { value } = await post<{ value: unknown }>(url, 'call', { token, method, args: sent });
+      if (value && typeof value === 'object' && typeof (value as { __bytes?: unknown }).__bytes === 'string') return Buffer.from((value as { __bytes: string }).__bytes, 'base64');
       return value === null ? undefined : value;
     };
   }
@@ -88,5 +91,6 @@ export function standinSession({ cloudConfig, testLogin }: { cloudConfig: CloudC
     cancelSignIn: () => {},
     reopen: () => {},
     async signOut() { signedIn = null; },
+    async anyone() { return signedIn; },
   };
 }

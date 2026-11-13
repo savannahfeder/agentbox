@@ -23,6 +23,10 @@ export interface Command {
   // Words she might TYPE that the label does not say. Matched, never shown;
   // the hint is shown, never matched (../palette-rows).
   keywords?: string;
+  /** What the row was called before a rename: typing one ranks the row as its label would. Keep them in keywords too. */
+  oldNames?: readonly string[];
+  /** A word the query must name before the row is offered (../palette-rows). */
+  onlyWith?: string;
   keyHint?: string;
   run: () => void;
   /** A line, file, comment or decision found inside something: drawn as its words with who and where under. */
@@ -32,7 +36,7 @@ export interface Command {
 /** What was found inside things, a labelled group of rows each (renderer/src/found-inside.ts). */
 export interface InsideSection { key: string; label: string; rows: Command[] }
 
-export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, machine = 'dark', onSetLook, skyThemes = [], onSkyTheme, staleFiles = [], updateReady = null, onInstallUpdate, onCheckUpdate, moveToApplications = false, onMoveToApplications, filtering = false, onOpenFilter, onClearFilter, onView, teamLayout = false, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onNewThread, onStanding, onSettings, onUsage, onShortcuts, roomsOn = false, groups = [], onGroups, onPickGroup, teamLists, filePages, onConnections, teammates = null, onTeammates, onPauseTeammate, boardUp = false, onFlipView, keyHints, onSetKeyHints, findThreads, findChats, findInside, onSearchFor, onFirstRun, onTutorial, onEndTutorial, onImportAgents, onClose, cloud = null, onCloudMode, open = true, phone = false, typed = '' }: {
+export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, machine = 'dark', onSetLook, skyThemes = [], onSkyTheme, staleFiles = [], updateReady = null, onInstallUpdate, onCheckUpdate, moveToApplications = false, onMoveToApplications, filtering = false, onOpenFilter, onClearFilter, onView, teamLayout = false, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onNewThread, onStanding, onSettings, onUsage, onShortcuts, roomsOn = false, groups = [], onGroups, onPickGroup, teamLists, filePages, onConnections, onHome, teammates = null, onTeammates, onPauseTeammate, boardUp = false, onFlipView, keyHints, onSetKeyHints, findThreads, findChats, findInside, onSearchFor, onFirstRun, onTutorial, onEndTutorial, onImportAgents, onClose, cloud = null, onCloudMode, open = true, phone = false, typed = '' }: {
   products: Product[];
   supervisorPaused: boolean;
   itemCommands?: Command[];
@@ -95,6 +99,8 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   /** The Files place: every file, then each project's page. */
   filePages?: readonly { id: string; title: string; hint?: string; run: () => void }[];
   onConnections?: () => void;
+  /** Absent where there is no Home page, as on a phone. */
+  onHome?: () => void;
   /** Your teammates, or null where there are none to have. */
   teammates?: readonly { id: string; name: string; role: string | null; paused?: boolean }[] | null;
   /** 'team' for the team chat, 'roster' for the Teammates tab, or a teammate's id. */
@@ -171,13 +177,15 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     })),
     // The cloud on or off, with its key, then each meaning of on (C).
     ...(cloud && onCloudMode ? cloudCommands(cloud).map((r, i) => ({
-      id: i === 0 ? 'cloud-toggle' : `cloud-${r.mode}`, label: r.label, hint: r.hint, keyHint: r.keyHint,
+      id: i === 0 ? 'cloud-toggle' : `cloud-${r.mode}`, label: r.label, hint: r.hint, keyHint: r.keyHint, onlyWith: r.onlyWith,
       keywords: 'cloud where threads run mac overflow everything move on off',
       run: () => onCloudMode(r.mode),
     })) : []),
     // Namespaced so they cannot share an id with an item command such as
     // 'done'. Ids become React keys, and a duplicate kept a stale row alive
     // through the filter (../palette-keys).
+    // Above Inbox, as in the sidebar, and so "home" lands here although Inbox answers to it too.
+    ...(onHome ? [{ id: 'view-home', label: 'Go to Home', keywords: 'start overview', run: onHome }] : []),
     ...pageRows({ team: teamLayout }).map((r) => ({ id: r.id, label: r.label, keywords: r.keywords, run: () => onView(r.view) })),
     // THE OTHER PAGE, AND EVERY GROUP ON IT (w-326fb83c0e). ⌘K found nothing
     // for "rooms", "groups" or "messages", so the only way onto the page was
@@ -188,6 +196,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       label: 'Go to Groups',
       hint: 'the people you work with, and what they are on',
       keywords: 'rooms room groups group chat channel messages message dm dms direct teammates team people together',
+      oldNames: ['rooms'],
       run: onGroups,
     }] : []),
     // One row per group, by its own name, as the projects above are. No hint:
@@ -297,6 +306,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       label: 'General agent instructions…',
       hint: 'every agent, every task',
       keywords: 'standing instructions rules your my brief guidelines preferences every agent every session tell agents dont do',
+      oldNames: ['standing instructions', 'your rules'],
       run: onStanding,
     },
     // WHAT IS LEFT OF YOUR LIMIT, BY NAME. It is read on the Claude pane, where
@@ -416,8 +426,8 @@ export function paletteOrder(all: Command[], threads: Command[], phone = false, 
     if (threads.length > chats) labels.set(at + chats, 'Threads');
   };
   // Ahead of the threads only when the words start words of its name: "sum up"
-  // is not "reSUMe interrUPted agents".
-  const named = (c: Command) => namesIt(query, c.label);
+  // is not "reSUMe interrUPted agents". A name it had before a rename counts.
+  const named = (c: Command) => namesIt(query, c.label) || (c.oldNames ?? []).some((n) => namesIt(query, n));
   const matched = all.filter((c) => !ASKED_FOR_BY_NAME.has(c.id) || !query.trim() || named(c));
   // "Waits on <that thread>" names a thread the words name, so it stays below
   // that thread unless its label starts with them.

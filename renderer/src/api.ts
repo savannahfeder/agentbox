@@ -7,6 +7,7 @@ import {updateFixture} from './agent-update-fixture';
 import type { Person, TeamBillingDetails } from './types';
 import type { AccountUsageReading, AgentConversation, AgentUpdate, AgentUpdateAction, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, ProductDashboard, ProjectSettings, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, TerminalAction, TerminalAnswer, TerminalAsk, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, FilesUploaded, TeamMessageFile, ThreadEditPatch, LiveRoomTicket, UpdateState, Usage, UsageLimit, WorkItem, WorkspaceSettings } from './types';
 import type { LedgerLine } from './thread-history';
+import type { NotePlace } from '../../shared/artifact-marks.mts';
 import type { AgentFile as AgentFileRow } from './onboarding';
 import type { AgentFolder, SessionThread } from './agent-import-card';
 import type { EngineSetupState } from './plan-setup';
@@ -29,10 +30,18 @@ const laterBridge = () => window.zero as (Omit<NonNullable<Window['zero']>, keyo
 
 export interface FileLinkAsk { product: string; thread: string; src: string }
 /** `current`: the link holds the copy of the file on screen now. */
-/** `ahead`: the link holds a later version of the file than the one on screen. */
-export interface FileLink { token: string; url: string; version: number; createdAt: number; updatedAt: number; comments: number; current: boolean; ahead?: boolean }
+/** `ahead`: the link holds a later version of the file than the one on screen, or an edit made on its page not yet in the files. */
+/** `editable`: a document or a table, which the people it lets edit can change on its page. */
+export interface FileLink {
+  token: string; url: string; version: number; createdAt: number; updatedAt: number; comments: number; current: boolean; ahead?: boolean;
+  access: LinkAccess; can: LinkCan; rev: number; changedOnWeb: boolean; changedByName: string | null; editable: boolean;
+}
+export type LinkAccess = 'anyone' | 'people';
+export type LinkCan = 'view' | 'comment' | 'edit';
+export interface LinkPerson { email: string; can: LinkCan; name: string | null; avatar: string | null }
 export interface PublicLink { token: string; url: string; source: string; name: string; kind: string; createdAt: number; updatedAt: number; comments: number }
-export interface LinkComment { id: string; byName: string; byAvatar: string | null; text: string; at: number; mine: boolean; byOwner: boolean }
+/** `place`: where in the file it points (shared/artifact-marks.mts NotePlace); none for the whole file. */
+export interface LinkComment { id: string; byName: string; byAvatar: string | null; text: string; at: number; mine: boolean; byOwner: boolean; place?: NotePlace }
 /** `site` null: this copy's cloud has no website, so there is nothing to share on. */
 export interface FileLinkState { ok: boolean; error?: string; site?: string | null; signedIn?: boolean; link?: FileLink | null }
 import { checkProjectFolder } from '../../shared/project-folder-check.mts';
@@ -606,6 +615,10 @@ export const api = {
         base.supervisor.queued = queued;
         base.supervisor.capacity = base.supervisor.running.filter((r) => (r as { where?: string }).where !== 'cloud').length;
       }
+      // &team=signedout: a build that can sign in, with nobody signed in and no team.
+      if (params.get('team') === 'signedout') {
+        base.team = { configured: false, canSignIn: true, started: true, signedIn: false, signingIn: null, me: null, team: null, people: [], cards: [], lastSyncAt: null, error: null };
+      }
       // &usagestale: a Codex reading six hours old whose five hour window has ended.
       if (params.has('usagestale')) {
         const now = Date.now();
@@ -794,10 +807,33 @@ export const api = {
     if (!zero?.fileLinkComments) return { ok: false, error: 'not here' };
     return zero.fileLinkComments(p);
   },
-  async fileLinkComment(p: { token: string; text: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }> {
+  /** A file someone shared by its link, brought into one of this person's projects as their own copy. */
+  async bringSharedFile(p: { link: string; product: string | null }): Promise<{ ok: boolean; error?: string; product?: string; id?: string; src?: string }> {
+    const zero = window.zero;
+    if (!zero?.bringSharedFile) return { ok: false, error: `quit and reopen ${NAME} to bring in shared files` };
+    return zero.bringSharedFile(p);
+  },
+  async fileLinkComment(p: { token: string; text: string; place?: NotePlace | null }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }> {
     const zero = window.zero;
     if (!zero?.fileLinkComment) return { ok: false, error: `quit and reopen ${NAME} to answer comments` };
     return zero.fileLinkComment(p);
+  },
+  /** Who can open a link, and what the link itself lets them do. */
+  async fileLinkAccess(p: { token: string; access: LinkAccess; can: LinkCan }): Promise<{ ok: boolean; error?: string }> {
+    const zero = window.zero;
+    if (!zero?.fileLinkAccess) return { ok: false, error: `quit and reopen ${NAME} to change who can open links` };
+    return zero.fileLinkAccess(p);
+  },
+  async fileLinkPeople(p: { token: string }): Promise<{ ok: boolean; error?: string; people?: LinkPerson[] }> {
+    const zero = window.zero;
+    if (!zero?.fileLinkPeople) return { ok: false, error: 'not here' };
+    return zero.fileLinkPeople(p);
+  },
+  /** Adds a person by email or changes what they can do; `can` null takes them off. */
+  async fileLinkPerson(p: { token: string; email: string; can: LinkCan | null }): Promise<{ ok: boolean; error?: string; people?: LinkPerson[] }> {
+    const zero = window.zero;
+    if (!zero?.fileLinkPerson) return { ok: false, error: `quit and reopen ${NAME} to share with people` };
+    return zero.fileLinkPerson(p);
   },
 
   /** "Try again" on a file in a conversation that was not delivered. */
@@ -811,7 +847,8 @@ export const api = {
   //
   // An older preload has never heard of it, and then the pane says so rather
   // than drawing an empty change.
-  async codeChange(p: { product: string; src: string }): Promise<{ ok: boolean; change?: unknown; error?: string }> {
+  // `summary` leaves out the diff's rows (main/code-change.mts readChangeSummary).
+  async codeChange(p: { product: string; src: string; summary?: boolean }): Promise<{ ok: boolean; change?: unknown; error?: string }> {
     if (useFixtures && p.src === 'review-bundle.change') return {ok:true,change:reviewSampleChange};
     if (useFixtures && p.src === 'artifact-layout-sample.change') return {ok:true,change:artifactSampleChange};
     const zero = window.zero;
@@ -1042,11 +1079,11 @@ export const api = {
     return (await window.zero?.filesPlaceOpen?.(p).catch(() => null)) ?? null;
   },
   /** Each file a thread names, as its version line numbers it. */
-  async fileLine(p: { product: string; id: string }): Promise<FileLine[]> {
+  async fileLine(p: { product: string; id: string; room?: string }): Promise<FileLine[]> {
     return (await window.zero?.fileLine?.(p).catch(() => null)) ?? [];
   },
   /** One answer per copy, in the order asked. */
-  async fileElsewhere(p: { product: string; id: string; copies: { path: string; file: string }[] }): Promise<FileElsewhere[]> {
+  async fileElsewhere(p: { product: string; id: string; room?: string; copies: { path: string; file: string }[] }): Promise<FileElsewhere[]> {
     const got = await window.zero?.fileElsewhere?.(p).catch(() => null);
     return Array.isArray(got) ? got : p.copies.map(() => ({ key: null, notes: [], approvals: [] }));
   },
@@ -1106,8 +1143,8 @@ export const api = {
     await window.zero.setThreadPins({ pins });
   },
 
-  /** Keep a thread on this Mac whatever the cloud is set to, or let it go again. */
-  async setThreadOnMac(onMac: Record<string, true | null>): Promise<void> {
+  /** Keep a thread on this Mac (true), send it to the cloud (false), or leave it to the cloud setting (null). */
+  async setThreadOnMac(onMac: Record<string, boolean | null>): Promise<void> {
     if (useFixtures || !window.zero?.setThreadOnMac) return;
     await window.zero.setThreadOnMac({ onMac });
   },
@@ -1193,11 +1230,11 @@ export const api = {
   // process behind them, and a build old enough not to have the handler is the
   // ordinary case for anybody who opens a stale window: both give null, and the
   // walk carries on in the project they made rather than stopping.
-  async firstRunPractice(): Promise<{ slug: string; examples: string[]; backdrop?: string[] } | null> {
+  async firstRunPractice(opts?: { bare?: boolean }): Promise<{ slug: string; examples: string[]; backdrop?: string[] } | null> {
     if (useFixtures) return null;
     const zero = window.zero;
     if (!zero?.firstRunPractice) return null;
-    return zero.firstRunPractice();
+    return opts ? zero.firstRunPractice(opts) : zero.firstRunPractice();
   },
 
   // AND OFF THE SCREEN AGAIN AT THE END. Archived, never deleted: everything

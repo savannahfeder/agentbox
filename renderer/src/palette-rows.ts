@@ -37,7 +37,8 @@ import { DONE } from './done-word';
 // Keeping those two jobs in separate fields is the point: the hint is UI copy
 // and has to read well, and a search that depends on copy reading a certain way
 // breaks the next time someone improves the sentence.
-export type Searchable = { label: string; keywords?: string };
+/** `onlyWith`: a word the query must name (two letters of it will do) before the row is offered at all. */
+export type Searchable = { label: string; keywords?: string; onlyWith?: string };
 
 // EVERY WORD OF THE QUERY MUST LAND, in any order, anywhere in the label or the
 // keywords. She types "dark mode", which as one substring appears in no label in
@@ -48,6 +49,8 @@ export type Searchable = { label: string; keywords?: string };
 export function matchesQuery(query: string, row: Searchable): boolean {
   const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   if (!words.length) return true;
+  const must = row.onlyWith?.toLowerCase();
+  if (must && !words.some((w) => w.length >= 2 && (must.startsWith(w) || w.startsWith(must)))) return false;
   const hay = `${row.label} ${row.keywords ?? ''}`.toLowerCase();
   return words.every((w) => hay.includes(w));
 }
@@ -74,9 +77,10 @@ export function matchesQuery(query: string, row: Searchable): boolean {
 const FIRST_AMONG_MATCHES = ['snooze'];
 
 // THE ROW IS CALLED LATER, after the key (w-66e3ece93d). It said "Remind Me
-// (Snooze)", so typing "later" never found it. The old words stay here, where
-// they are searched and never drawn, for whoever still reaches for them.
+// (Snooze)", so typing "later" never found it. The old names still find it,
+// ahead of any thread they also find.
 export const LATER_KEYWORDS = 'remind me snooze put off defer schedule';
+export const LATER_OLD_NAMES = ['remind me', 'snooze'];
 
 // No "inbox": typed alone it means going there, and this row would sit above
 // Go to Inbox under the return key.

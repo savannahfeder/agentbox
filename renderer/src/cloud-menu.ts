@@ -71,6 +71,8 @@ export interface CloudStatus {
   accounts?: CloudAccount[];
   /** Engines whose account on this Mac has no working sign-in in the cloud, so their threads run here. */
   notInCloud?: Array<'claude' | 'codex'>;
+  /** Engines with no sign-in in the cloud at all, so the cloud can run none of their threads. */
+  noCloudSignIn?: Array<'claude' | 'codex'>;
   signIns?: CloudSignIn[];
   /** 'resting' after runs failed in a row before their agent started, until `restingUntil`. */
   health?: 'ok' | 'failing' | 'resting';
@@ -88,6 +90,8 @@ export interface CloudStatus {
   movable?: string[];
   /** The keys saved for cloud runs, by name only (main/cloud/keys.mts). */
   keys?: { name: string; savedAt: number | null; label?: string | null }[];
+  /** The app moved off a Claude account at its limit (supervisor `_moveOffALimitedAccount`). */
+  switched?: { from: string; to: string; until: number } | null;
 }
 
 const agentName = (engine: 'claude' | 'codex') => (engine === 'codex' ? 'Codex' : 'Claude Code');
@@ -178,6 +182,12 @@ export const cloudAccountInUse = (accounts: CloudAccount[], engine: 'claude' | '
  */
 const clock = (t: number) => new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(' ', '').toLowerCase();
 
+// A weekly limit lifts days away, so its hour alone would read as today's.
+const dayAndHour = (t: number, now: number) => {
+  const hour = clock(t).replace(':00', '');
+  return new Date(t).toDateString() === new Date(now).toDateString() ? hour : `${new Date(t).toLocaleDateString('en-US', { weekday: 'short' })} ${hour}`;
+};
+
 export function cloudFootLine(cloud: CloudStatus, now = Date.now()): string {
   if (cloud.health === 'resting' && cloud.restingUntil && cloud.restingUntil > now) {
     const why = String(cloud.lastError || 'its runs failed before they started').slice(0, 120);
@@ -192,6 +202,10 @@ export function cloudFootLine(cloud: CloudStatus, now = Date.now()): string {
   // EVERY account was at its limit, which was right while runs rotated over
   // all of them and is silence now: the cloud starts nothing the moment the
   // account in use is out, however many others are signed in.
+  const moved = cloud.switched;
+  if (cloudIsOn(cloud) && moved && moved.until > now) {
+    return `${moved.from} is at its limit until ${dayAndHour(moved.until, now)}, so threads run on ${moved.to}.`;
+  }
   const inUse = cloudAccountInUse(cloud.accounts || [], 'claude');
   const until = inUse?.limitedUntil && inUse.limitedUntil > now ? inUse.limitedUntil : null;
   if (cloudIsOn(cloud) && until) {
@@ -226,11 +240,24 @@ export function cloudToggleNote(mode: CloudMode): string {
   return 'Cloud on: threads that don’t fit here start in the cloud';
 }
 
-/** ⌘K's rows: on or off with its key first, then each meaning of on. */
-export function cloudCommands(status: OnOff): { mode: CloudMode; label: string; keyHint?: string; hint?: string }[] {
+/** Turning the cloud off by ⌘C or ⌘K asks first: both were hit by accident. */
+export const cloudOffAsks = (mode: CloudMode) => mode === 'mac';
+export const CLOUD_OFF_ASK = {
+  head: 'Turn the cloud off?',
+  line: 'New threads and replies will run on this Mac.',
+  keep: 'Keep it on',
+  off: 'Turn off',
+} as const;
+
+/**
+ * ⌘K's rows: on or off with its key first, then each meaning of on. Turning
+ * it off is offered only once the query names the cloud, because "off" alone
+ * put it first under Enter.
+ */
+export function cloudCommands(status: OnOff): { mode: CloudMode; label: string; keyHint?: string; hint?: string; onlyWith?: string }[] {
   const on = cloudIsOn(status);
   return [
-    { mode: cloudToggleTarget(status), label: on ? 'Turn the cloud off' : 'Turn the cloud on', keyHint: CLOUD_KEY },
+    { mode: cloudToggleTarget(status), label: on ? 'Turn the cloud off' : 'Turn the cloud on', keyHint: CLOUD_KEY, ...(on ? { onlyWith: 'cloud' } : {}) },
     ...CLOUD_WHEN_ON.map((c) => ({
       mode: c.id,
       label: `Cloud on: ${c.label[0].toLowerCase()}${c.label.slice(1)}`,
@@ -268,22 +295,25 @@ export function onCloudPlan(cloud: CloudStatus | null | undefined): cloud is Clo
 
 /**
  * WHERE ONE THREAD RUNS, for its menu's row (threads/ThreadMenu.tsx): in the
- * cloud now, kept on this Mac, or here and free to go to the cloud. Null where
- * the cloud could never run it: no cloud set up, the cloud off and the thread
- * not kept, or a project the cloud does not take.
+ * cloud now, kept on this Mac, here and free to go to the cloud, or here
+ * because the whole cloud is off. Null where the cloud could never run it: no
+ * cloud set up, or a project or agent the cloud does not take.
  */
 export function threadPlace(
   item: { id: string; product: string; onMac?: boolean; needsMac?: string; labels?: string[] },
   session: { where?: string; movable?: boolean } | null,
   cloud: CloudStatus | null,
-): 'cloud' | 'here' | 'kept' | 'move' | 'needs' | null {
+  engine: string | null = null,
+): 'cloud' | 'here' | 'kept' | 'move' | 'needs' | 'off' | null {
   // The phone has no cloud status, only the computer's word on each run.
   if (session?.movable && session.where !== 'cloud') return 'move';
   if (!onCloudPlan(cloud)) return null;
   if (item.needsMac) return 'needs';
   if (item.onMac) return 'kept';
   if (session?.where === 'cloud') return 'cloud';
-  if (!cloudIsOn(cloud)) return null;
+  if (engine && cloud.noCloudSignIn?.includes(engine as 'claude' | 'codex')) return null;
+  const taken = !!cloud.projects?.includes(item.product);
+  if (!cloudIsOn(cloud)) return taken ? 'off' : null;
   if (cloud.movable?.includes(item.id)) return 'move';
-  return cloud.projects?.includes(item.product) ? 'here' : null;
+  return taken ? 'here' : null;
 }

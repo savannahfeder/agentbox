@@ -10,7 +10,7 @@ import { it, expect } from 'vitest';
 import fs from 'node:fs';
 
 const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
-const opener = (name) => app.match(new RegExp(`const ${name} = useCallback\\(\\(product: string, src: string\\) => \\{ (setOpenDoc\\(\\{[^}]*\\}\\)); \\}, \\[\\]\\);`))?.[1] ?? null;
+const opener = (name) => app.match(new RegExp(`const ${name} = useCallback\\(\\(product: string, src: string(?:, notes\\?: number)?\\) => \\{ (setOpenDoc\\(\\{[^}]*\\}\\)); \\}, \\[\\]\\);`))?.[1] ?? null;
 const hookOpens = app.match(/useTeammates\(\{[\s\S]*?onOpenFile: (\w+),/)?.[1];
 
 it('the AI teammate chat opens its files with an opener of its own', () => {

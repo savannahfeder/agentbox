@@ -16,7 +16,7 @@ import { foldWorkItems } from '../shared/work-items.mts';
 import * as reader from '../main/agents.mts';
 import { AgentSchedule } from '../main/agent-schedule.mts';
 import { agentKey } from '../shared/agents.mts';
-import { guard, sweep, startableChrome } from './lib/chrome-guard.mjs';
+import { guard, sweep, startableChrome, KEEPS_OFF_THE_KEYCHAIN } from './lib/chrome-guard.mjs';
 import { HOME, STORE_ROOT } from './lib/machine-paths.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -96,8 +96,8 @@ const dist = path.join(root, 'renderer', 'dist-thread-open');
 sweep();
 const profile = fs.mkdtempSync('/tmp/shot-profile-');
 const chrome = spawn(startableChrome(), [
-  '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--use-mock-keychain',
-  '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run',
+  '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
+  '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run', ...KEEPS_OFF_THE_KEYCHAIN,
   '--window-size=1440,980', 'about:blank',
 ], { stdio: ['ignore', 'ignore', 'pipe'] });
 guard(chrome, profile);

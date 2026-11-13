@@ -20,7 +20,7 @@ import { Hits } from './Hits';
 import type { ThreadSearchDetails } from '../threads/search';
 import { nextRunWords, repeatRow, repeatTag } from '../repeat-words';
 import { Face, TeamRowEnd, firstName, type TeamView } from '../team/people';
-import { commentLine } from '../threads/teammate-thread';
+import { commentLine, linkCommentLine } from '../threads/teammate-thread';
 import { fileNewsFor, fileNewsLine } from '../../../shared/artifact-marks.mts';
 import { CloudOfferRow, RepeatMark, RowCells, SectionHead, TableHead, ThreadCells, WaitingContext } from '../threads/Pages';
 import type { StackKey, StackSection } from '../threads/stack-rules';
@@ -96,7 +96,7 @@ export function dayGroups(
   return groups;
 }
 
-export function List({ items, view, keyView, hoveredId, selected, seen, unread, running, engineChoice, engines, stalled, queued, signInNeeded, atLimit, cannotStart, shipping, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, searchDetails, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover: hoverTo, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard, selectedCard = null, onEnd, onReorder, lead = null, foot = null, pointer, stack, leadIn = null }: {
+export function List({ items, view, keyView, hoveredId, selected, seen, unread, lastThread = null, running, engineChoice, engines, stalled, queued, signInNeeded, atLimit, cannotStart, shipping, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, searchDetails, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover: hoverTo, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard, selectedCard = null, onEnd, onReorder, lead = null, foot = null, pointer, stack, leadIn = null }: {
   /** The section the lead rows sit under instead of over the list: mentions and news are from people. */
   leadIn?: StackKey | null;
   /** Your threads as one list in sections (../threads/stack-rules): each section's header, and which section a row is in. */
@@ -121,6 +121,8 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
   seen: Set<string>;
   /** An agent wrote since you last opened it (renderer/src/unread.ts). */
   unread?: (item: WorkItem) => boolean;
+  /** The thread you were in last, washed so you can find it again. */
+  lastThread?: { product: string; id: string } | null;
   running: RunningSession[];
   /**
    * WHETHER THIS MAC HAS TWO CODING AGENTS TO TELL APART. False on almost every
@@ -472,7 +474,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                 {...(tab === 'inbox' && !isImportRow(item)
                   ? { 'data-hint': 'row', 'data-hint-text': '.subject' }
                   : {})}
-                className={`row ${made ? 'trouble-row ' : ''}${index === selected && !selectedCard ? 'selected' : ''} ${checked ? 'checked' : ''}${tab === 'inbox' && unread?.(item) ? ' unread' : ''}`}
+                className={`row ${made ? 'trouble-row ' : ''}${index === selected && !selectedCard ? 'selected' : ''} ${checked ? 'checked' : ''}${tab === 'inbox' && unread?.(item) ? ' unread' : ''}${lastThread?.id === item.id && lastThread.product === item.product ? ' recent' : ''}`}
                 /*
                  * ON MOUSE MOVE, NOT ON MOUSE ENTER. A pointer parked over the
                    list while she walks it with J and K would otherwise claim
@@ -556,7 +558,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                       rows' usual openings is a list of rows that look unrelated
                       to what was typed. */}
                   <div className="preview">
-                    <Hits text={summaries?.get(item.id) ?? fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string | null) => firstName(team?.byId.get(id ?? '') ?? null)) ?? commentLine(item.waitingComments, (id) => firstName(team?.byId.get(id) ?? null)) ?? rowSummary(item, tab)} terms={terms} phrase={phrase} />
+                    <Hits text={summaries?.get(item.id) ?? fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string | null) => firstName(team?.byId.get(id ?? '') ?? null)) ?? commentLine(item.waitingComments, (id) => firstName(team?.byId.get(id) ?? null)) ?? linkCommentLine(item.linkComments) ?? rowSummary(item, tab)} terms={terms} phrase={phrase} />
                   </div>
                 </div>
                 {/* Everything that is not the message itself lives at the right end, on the

@@ -99,6 +99,23 @@ describe('the number on the cloud button', () => {
     expect(button()).toBe(0);
   });
 
+  // Power testers, 2026-11-09: "Nothing is running, 26 threads wait in Needs
+  // you, but Cloud on, 1 running there", and 3 running on a plan of 2. A cloud
+  // run that answered stays open ten minutes for the next reply (`between`),
+  // and the button still counted it while its row sat in Needs you.
+  it('leaves out a cloud run that answered and waits for a reply', () => {
+    running('Tray filters', { cloud: true, between: true });
+    running('Phone alerts', { cloud: true });
+    expect(button()).toBe(1);
+    expect(button()).toBe(shownInTheCloud());
+  });
+
+  it('counts it again once a reply sets it working', () => {
+    const item = running('Tray filters', { cloud: true, between: true });
+    sup.sessions.get(item.id).between = false;
+    expect(button()).toBe(1);
+  });
+
   it('drops a picked-back-up run once it ends', async () => {
     await pickedBackUp();
     expect(button()).toBe(1);
@@ -112,6 +129,12 @@ describe('the cloud cap', () => {
   it('counts a picked-back-up run as a slot taken', async () => {
     running('Tray filters', { cloud: true });
     await pickedBackUp();
+    expect(sup._whyWaitingForCloud('claude')).toEqual({ why: 'cloud-full', detail: 2 });
+  });
+
+  it('counts a run waiting for a reply as a slot taken, since its machine is still up', () => {
+    running('Tray filters', { cloud: true, between: true });
+    running('Phone alerts', { cloud: true });
     expect(sup._whyWaitingForCloud('claude')).toEqual({ why: 'cloud-full', detail: 2 });
   });
 

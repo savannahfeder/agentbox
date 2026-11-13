@@ -169,8 +169,8 @@ async function handOn({ store, supervisor, product, id, text, sent, handOffMs }:
   return true;
 }
 
-// Approving a file the agent made is the go-ahead it was waiting for. A closed
-// thread is left closed: approving there is a record, not a request.
+// Approving a file this thread's agent made is the go-ahead it was waiting for.
+// A closed thread is left closed: approving there is a record, not a request.
 async function approvalToItsAgent({ store, supervisor, product, id, mark }: {
   store: NoteReplyStore;
   supervisor: NotesSupervisor;
@@ -186,6 +186,8 @@ async function approvalToItsAgent({ store, supervisor, product, id, mark }: {
   if (typeof version?.agent !== 'string') return false;
   const given = (item.artifacts?.approvals ?? []).filter((a) => a.file === mark.file).sort((a, b) => b.ts - a.ts)[0];
   if (!given) return false;
+  // A teammate's version is theirs to act on; approving it tells this agent nothing.
+  if (version.by && version.by !== given.by && version.by !== (item.runner ?? item.createdBy ?? null)) return false;
   const text = `Approved ${version.path}. Proceed as you proposed.`;
   // fromNotes keeps the thread from drawing this reply beside the approval it already shows.
   await submitReply(supervisor, { product, id, answer: text }, () => store.answerItem(product, id, { answer: text, fromNotes: [approvalId(given)] }));

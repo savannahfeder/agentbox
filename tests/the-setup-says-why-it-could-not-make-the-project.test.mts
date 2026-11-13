@@ -50,9 +50,9 @@ describe('a second walk over a store that already has that project', () => {
     // This is what makes the collision ordinary rather than exotic. If this
     // ever becomes false, the rest of this file is about a case nobody hits.
     const app = read('renderer/src/App.tsx');
-    const walkAgain = app.slice(app.indexOf('const walkAgain'), app.indexOf('const walkAgain') + 400);
+    const walkAgain = app.slice(app.indexOf('const walkAgain'), app.indexOf('\n  }, [', app.indexOf('const walkAgain')));
     expect(walkAgain).toContain('restartFirstRun');
-    expect(walkAgain).toContain('setRun(');
+    expect(walkAgain).toContain('setFresh(true)');
     expect(walkAgain).not.toContain('firstRunNeeded');
     // And the automatic path, which is the one that DOES wait, still does.
     expect(firstRunNeeded({ products: 20, done: false })).toBe(false);

@@ -248,6 +248,7 @@
   --artifact-corner: 10px;
   --artifact-corner-small: 6px;
   --radius: var(--artifact-corner-small);
+  --pill: 999px;
   /* An AI teammate is round like a person; its dashed ring tells it apart. */
   --mate-corner: 50%;
   --tag-radius: var(--radius);
@@ -901,6 +902,36 @@ body {
 }
 .topbar button { -webkit-app-region: no-drag; }
 
+/* BACK AND FORWARD (Alpha features). The arrows lead the header and whatever
+   follows them keeps its place at the left, not the middle the bar's
+   space-between would give a third item. */
+.back-forward { display: inline-flex; align-items: center; gap: 2px; margin-right: 12px; flex: none; }
+.topbar > .back-forward + * { margin-right: auto; }
+.back-forward button {
+  width: 26px; height: 26px; padding: 0; display: grid; place-items: center;
+  border: 0; border-radius: var(--tag-radius); background: none; color: var(--text-dim); cursor: pointer;
+}
+.back-forward button:not(:disabled) { color: var(--text); }
+.back-forward button:not(:disabled):hover { background: var(--film-strong); }
+.back-forward button:disabled { color: var(--text-faint); opacity: .45; cursor: default; }
+.back-forward svg { width: 15px; height: 15px; }
+.back-forward .back-forward-inbox { margin-right: 10px; }
+/* Home hides its header bar but keeps the arrows. */
+.app.home-shown > .topbar .back-forward { visibility: visible; }
+/* The arrows replace the one back arrow a thread and Settings already had. */
+.app.back-forward-on .thread-crumb-back svg,
+.app.back-forward-on .workspace-page-heading .workspace-back { display: none; }
+.app.back-forward-on .thread-crumb-back { padding-left: 0; }
+/* Chats, Groups and Team pull their header's first column left to the card
+   edge so its line meets the list's. The arrows come first in the bar, so the
+   column pulls further by their width and its name starts after them. */
+.app.back-forward-on { --bf-w: 66px; }
+.app.back-forward-on .topbar > .back-forward { position: relative; z-index: 2; }
+.app.back-forward-on .topbar > .back-forward + .gc-head { margin-left: calc(-32px - var(--bf-w)); }
+.app.back-forward-on.gt-inset .topbar > .back-forward + .gc-head { margin-left: calc(-44px - var(--bf-w)); }
+.app.back-forward-on .topbar > .back-forward + .gc-head > .gc-head-col { padding-left: calc(32px + var(--bf-w)); }
+.app.back-forward-on.gt-inset .topbar > .back-forward + .gc-head > .gc-head-col { padding-left: calc(44px + var(--bf-w)); }
+
 /* WHAT AN OPENED TASK HAS INSTEAD OF A TOP BAR. Nothing is drawn here. It
    exists for two things only, and both are invisible: 1. THE THREE BUTTONS
    MACOS PAINTS ON TOP OF US. titleBarStyle hiddenInset puts close, minimise and
@@ -1353,6 +1384,21 @@ body {
      declared at :root. */
   opacity: var(--row-line);
 }
+
+/* The last thread you were in. On the row itself, which runs the card's full
+   width, so the wash meets the card's left edge. The hairlines either side of
+   it start there too, or the wash's corners poke past them. */
+.row.recent {
+  --wash: 255 255 255;
+  background: linear-gradient(90deg, rgb(var(--wash) / 0.02), rgb(var(--wash) / 0.012) 25%, rgb(var(--wash) / 0.004) 50%, transparent 70%);
+}
+/* On white any grey read as dirt, so light mode takes the accent instead,
+   over enough stops that the fade shows no steps. */
+[data-theme="light"] .row.recent {
+  background: linear-gradient(90deg, rgb(238 96 24 / 0.07), rgb(238 96 24 / 0.045) 25%, rgb(238 96 24 / 0.015) 55%, transparent 85%);
+}
+.row.recent::after,
+.row.recent + .row::after { left: 0; }
 
 /* THE SELECTED ROW IS UNDERLINED. Chosen 2026-08-12, out of a family of six
    that were all text and a family of five before them that were all shapes.
@@ -2627,7 +2673,7 @@ body {
 /* Approval cards: a worker is frozen mid-action until the user answers,
    so these sit above everything, bottom-right, and say exactly what runs. */
 .approvals {
-  position: fixed; right: 22px; bottom: var(--approval-lift, 22px); z-index: 90; width: 440px;
+  position: fixed; right: 22px; bottom: var(--approval-lift, 22px); z-index: 90; width: var(--approval-width, 440px);
 }
 /* One card in front, the queue as stacked edges peeking above it. The ghosts
    are pure chrome: depth without height, so ten pending asks occupy the same
@@ -4071,6 +4117,14 @@ img.product-mark { object-fit: cover; opacity: 1; }
   color: var(--text-dim);
 }
 .palette-confirm { padding: 18px; font-size: 14px; line-height: 1.55; position: relative; }
+
+/* Turn the cloud off? (components/CloudOffAsk.tsx), in ⌘K's box and place. */
+.modal.cloud-off-ask { width: 400px; padding: 18px 18px 16px; }
+.cloud-off-ask-head { font-size: 15px; color: var(--text); margin-bottom: 6px; }
+.cloud-off-ask-line { font-size: 13.5px; color: var(--text-dim); line-height: 1.5; }
+.cloud-off-ask-acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.cloud-off-ask-acts .ts-done { height: 28px; padding: 0 8px 0 12px; gap: 8px; }
+.cloud-off-ask-acts .cloud-off-ask-go { color: var(--text); border-color: var(--line-strong); }
 
 /* ⌘K in the website's look (w-391bc4efbe): magnifier and Esc on the input, a
    mark per row, the keys in a footer. Scoped to `.palette-k` because the Later
@@ -9199,6 +9253,9 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
    plain white slab on the light theme. The `:root[data-skin] .modal.compose`
    block says the rest.
 */
+/* A dialog of its own, not a list dropping from the top like the command bar. */
+.modal-backdrop.fp-backdrop { place-items: center; padding-top: 0; }
+
 .fp-card {
   width: min(560px, 92vw);
   display: flex;
@@ -9425,3 +9482,10 @@ button.msg-kind { cursor: pointer; }
 button.msg-kind:hover { color: var(--text); border-color: var(--text-faint); }
 /* A comment is said beside the work, not to the agent: it reads at the size of what it answers. */
 .msg.yours:has(> .msg-head > .msg-kind) .msg-body { font-size: 15px; line-height: 1.6; font-weight: 400; }
+
+/* A thread a teammate gave you, above its title (team/HandedBy.tsx). */
+.handed-line { display: flex; align-items: center; gap: 9px; min-width: 0; margin: 4px 0 18px; padding: 10px 14px; background: var(--bg-raised); border: 1px solid var(--line); border-radius: 10px; font-size: 14px; color: var(--text-dim); }
+.handed-line b { font-weight: 500; color: var(--text); }
+.handed-who { flex: 0 0 auto; white-space: nowrap; }
+.handed-when { color: var(--text-faint); margin-left: 4px; }
+.handed-note { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); margin-left: 6px; }
