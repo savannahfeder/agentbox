@@ -13,7 +13,8 @@ import type { TraceSession } from '../notes';
 
 /** This thread's marks with those from the other copies, every pin numbered in the order it was made. */
 export function withElsewhere(own: FileMarks, elsewhere: FileElsewhere[]): FileMarks {
-  const theirs = elsewhere.flatMap((e) => e.notes);
+  // Every copy of one file answers with all of that file's notes.
+  const theirs = [...new Map(elsewhere.flatMap((e) => e.notes).filter((n) => !own.notes.some((x) => x.id === n.id)).map((n) => [n.id, n])).values()];
   if (!theirs.length && !elsewhere.some((e) => e.approvals.length)) return own;
   const pins = new Map<string, number>();
   const notes = [...own.notes, ...theirs].sort((a, b) => a.ts - b.ts).map((n) => {
@@ -22,7 +23,8 @@ export function withElsewhere(own: FileMarks, elsewhere: FileElsewhere[]): FileM
     pins.set(n.file, k);
     return { ...n, pin: k };
   });
-  return { ...own, notes, approvals: [...own.approvals, ...elsewhere.flatMap((e) => e.approvals)] };
+  const approvals = [...new Map(elsewhere.flatMap((e) => e.approvals).map((a) => [`${a.key}\0${a.by}\0${a.ts}`, a])).values()];
+  return { ...own, notes, approvals: [...own.approvals, ...approvals] };
 }
 
 /** The Files place file to write to when the mark answers another copy's comment, else null for this thread. */
@@ -89,6 +91,7 @@ export function ThreadArtifacts({ item, open, withAgent, onClose, onBeside, onNo
     people={people}
     open={open}
     ownerOfRow={item.runner ?? item.createdBy ?? null}
+    talkingWith={withAgent ? [] : (item.people ?? []).filter((p) => p !== team?.me)}
     write={(mark) => {
       const key = markGoesTo(mark, elsewhere);
       return key ? api.filesPlaceMark({ key, mark }) : api.fileMark({ product: item.product, id: item.id, mark });

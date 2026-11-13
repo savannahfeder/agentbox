@@ -31,7 +31,7 @@ describe('Message on someone’s page', () => {
     expect(page(card('sam', { me: true }), () => {})).not.toContain('Message</button>');
   });
   it('opens the chat in the Groups tab, the same chat each time for the same people', () => {
-    expect(message).toMatch(/const group = all\.find\(\(r\) => r\.kind === 'group'/);
+    expect(message).toMatch(/const group = people\.length === 1 \? pairRooms\(all, people\[0\], listedIn\)\[0\] : all\.find\(\(r\) => r\.kind === 'group'/);
     expect(message).toMatch(/openRoom\(id\);\s*\};\s*$/);
   });
   it('opens a teammate’s direct record instead', () => {

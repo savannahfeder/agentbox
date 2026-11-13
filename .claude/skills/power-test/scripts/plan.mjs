@@ -70,6 +70,14 @@ export function pickPeople(spec, people, rand = Math.random) {
  * Seeded history files a task that names a project there, or a tester rightly
  * calls it misfiled.
  */
+/** Which sample code a project is given: the one its name reads as, else by position. */
+export function fixtureFor(name, i) {
+  const words = String(name).toLowerCase().split(/[^a-z0-9]+/);
+  if (words.some((w) => ['web', 'site', 'app', 'mobile', 'frontend', 'ui'].includes(w))) return 'web';
+  if (words.some((w) => ['api', 'backend', 'service', 'infra', 'data'].includes(w))) return 'api';
+  return i % 2 ? 'web' : 'api';
+}
+
 export function projectNamedIn(title, projects) {
   const at = projects.findIndex((p) => new RegExp(`\\b${p.replace(/[^\w ]/g, '.')}\\b`, 'i').test(title));
   return at >= 0 ? at : undefined;
@@ -298,7 +306,7 @@ You use the app through one command, run in your shell:
 Run look after anything that changes the screen.
 
 ${real
-    ? `The agents are real Claude Code and Codex on a real subscription, working in your projects' repositories. Write tasks the way you normally would, but keep each one small enough to finish in a few minutes.${person.codex ? ' Send at least half of your work to Codex, and switch some threads between the two. Codex is the agent the team uses least, so what goes wrong with it is what nobody else finds. A Codex thread that fails, stalls, or says something you cannot act on is an issue to log.' : ''}`
+    ? `The agents are real Claude Code and Codex on a real subscription, working in your projects' repositories. Write tasks the way you normally would, but keep each one small enough to finish in a few minutes.${person.codex ? ' Send about four threads in five to Codex, use Claude Code now and then, and switch some threads between the two. Codex is the agent the team uses least, so what goes wrong with it is what nobody else finds. A Codex thread that fails, stalls, or says something you cannot act on is an issue to log.' : ''}`
     : codexReal
     ? 'The Codex agents are real Codex on a real subscription, working in your projects\' repositories: keep each Codex task small enough to finish in a few minutes. The Claude Code agents are stand-ins: they answer in seconds to a minute and a half with a short note naming the task, not real work. Send at least half of your work to Codex, and switch some threads between the two. Codex is the agent the team uses least, so what goes wrong with it is what nobody else finds. A Codex thread that fails, stalls, or says something you cannot act on is an issue to log.'
     : 'The agents are stand-ins: they take a few seconds to a minute and a half and answer with a short note naming the task, not real work. Judge the app, not the answers. Write tasks the way you normally would.'}

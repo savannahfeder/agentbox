@@ -35,7 +35,7 @@ import {
   CODEX_IMPORT_LABEL, NOT_IMPORTED_LABEL, codexIdOf, codexImportRow, codexMirrorPatch, isCodexImportRow, isCodexMirrorRow,
   productsForThread, threadsNeedingRows as codexThreadsNeedingRows,
 } from '../shared/codex-import.mts';
-import { buildClaimLine, buildReleaseLine, GIVEN_TASK } from '../shared/work-items.mts';
+import { buildClaimLine, buildReleaseLine, GIVEN_TASK, type LinkComment } from '../shared/work-items.mts';
 import { isEffortWord } from '../shared/effort-levels.mts';
 import { shippedNote } from '../shared/shipped-note.mts';
 import { notShipped } from '../shared/not-shipped.mts';
@@ -679,12 +679,16 @@ export class Store {
   }
 
   // The person's answer, or the app's when it caught the browser coming back, to the sign-in a thread is open on.
-  answerSignIn(slug: string, id: string, answer: { id: unknown; said: unknown; url?: unknown }, { source = 'founder', now = Date.now() }: { source?: 'founder' | 'system'; now?: number } = {}) {
+  answerSignIn(slug: string, id: string, answer: { id: unknown; said: unknown; url?: unknown; code?: unknown }, { source = 'founder', now = Date.now() }: { source?: 'founder' | 'system'; now?: number } = {}) {
     const item = this.readItem(slug, id);
     const ask = openSignIn(item);
     if (!ask || ask.id !== answer.id) throw new Error('That sign-in is no longer open.');
     const clean = cleanSignInAnswer({ ...answer, at: now });
-    if (!clean) throw new Error(answer.said === 'landed' ? 'That is not a web address. Paste the whole address from the browser.' : 'That answer is not one the agent can take.');
+    if (!clean) {
+      throw new Error(answer.said === 'landed' ? 'That is not a web address. Paste the whole address from the browser.'
+        : answer.said === 'code' ? 'Paste the code first.'
+        : 'That answer is not one the agent can take.');
+    }
     return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, { signInAnswer: clean }, { source, now });
   }
 
@@ -1112,7 +1116,7 @@ export class Store {
   // (main/team/link-comments.mts). Said as a note; a closed thread comes back
   // to wait on her as `closedBeforeItShipped` brings one, and a thread still
   // going is left going.
-  commentOnASharedFile(slug: string, id: string, note: string, linkComment: { name: string; file: string; text: string } | null = null) {
+  commentOnASharedFile(slug: string, id: string, note: string, linkComment: LinkComment | null = null) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
     const item = workItemsDisk.updateWorkItem(dir, id, { note, ...(linkComment ? { linkComment } : {}) }, { source: 'system' });
@@ -1248,6 +1252,7 @@ export class Store {
       name: PRACTICE_NAME,
       createdAt: new Date().toISOString(),
       [PRACTICE_FLAG]: true,
+      seenBy: 'private',
     }, null, 2));
     // AND THE SIDEBAR NOTE IS WRITTEN WITH IT.
     //

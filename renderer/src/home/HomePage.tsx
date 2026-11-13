@@ -3,9 +3,10 @@ import { agoShort, doors, type DoorKey, type TeamRowState } from './home-model';
 import { PriorityMark } from '../threads/Pages';
 import { priorityLabelOf, type PriorityId } from '../priority';
 import './home.css';
+import { enterIsTheButtons } from '../focused-button';
 
-/** `from` is the teammate who asked, when one did; priority is null at Medium, as in the Inbox. */
-export type NeedsRow = { key: string; letter: string; title: string; from: string | null; priority: PriorityId | null; project: string; at: number; unread: boolean };
+/** `from` is the teammate who asked, when one did; priority is null at Medium, as in the Inbox; an invitation has no time. */
+export type NeedsRow = { key: string; letter: string; title: string; from: string | null; priority: PriorityId | null; project: string; at: number | null; unread: boolean };
 export type TeamRow = { key: string; name: string; letter: string; ai: boolean; line: string; state: TeamRowState; week: number[]; total: number };
 export type ProgressRow = { key: string; letter: string; title: string; line: string; at: number };
 
@@ -22,9 +23,12 @@ function Bars({ week }: { week: number[] }) {
   </div>;
 }
 
-export function HomePage({ hello, now, needs, needsCount, progressCount, team, progress, slot, onDoor, onOpen, onMember, onTeam }: {
+export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCount, progressCount, team, progress, slot, onDoor, onOpen, onMember, onTeam }: {
   hello: string; now: number;
-  needs: NeedsRow[]; needsCount: number; progressCount: number;
+  needs: NeedsRow[]; needsCount: number;
+  /** The Inbox's own number, for its door. */
+  inboxCount?: number;
+  progressCount: number;
   /** Null when there is no team: the second card is your own In progress. */
   team: TeamRow[] | null;
   progress: ProgressRow[];
@@ -41,8 +45,14 @@ export function HomePage({ hello, now, needs, needsCount, progressCount, team, p
     // J and K walk Needs you and Enter opens the row, as they do in the Inbox.
     const key = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (enterIsTheButtons(e)) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.closest('input, textarea, [contenteditable="true"], .modal'))) return;
+      // The New thread box's suggestions take ↓ and Enter themselves; the setup has its own keys.
+      if (t?.closest('.tc-card') || document.documentElement.hasAttribute('data-setup')) return;
+      // Never from the New thread box's own controls, or with a menu or a dialog open.
+      if (t?.closest('.hm-start')) return;
+      if (document.querySelector('.modal-backdrop, .proj-menu, [role="listbox"], [role="menu"]')) return;
       const down = e.key === 'j' || e.key === 'ArrowDown', up = e.key === 'k' || e.key === 'ArrowUp';
       if (!down && !up && !(e.key === 'Enter' && pick >= 0)) return;
       if (!needs.length) return;
@@ -61,7 +71,7 @@ export function HomePage({ hello, now, needs, needsCount, progressCount, team, p
     <div className="hm-col">
       <h1 className="hm-hello">{hello}</h1>
       <nav className="hm-doors" aria-label="Places">
-        {doors({ needs: needsCount, progress: progressCount, team: !!team }).map((d) => (
+        {doors({ needs: inboxCount, progress: progressCount, team: !!team }).map((d) => (
           <button type="button" key={d.key} className={`hm-door hm-glass${d.key === 'inbox' && d.count ? ' hot' : ''}`} onClick={() => onDoor(d.key)}>
             {ICONS[d.key]}{d.label}{d.count !== null && <span className="c">{d.count}</span>}
           </button>
@@ -83,10 +93,10 @@ export function HomePage({ hello, now, needs, needsCount, progressCount, team, p
                   <span className="hm-tags">
                     {r.priority && <span className={`hm-prio${r.priority === 'urgent' ? ' urgent' : ''}`} title={priorityLabelOf(r.priority)} aria-label={priorityLabelOf(r.priority)}><PriorityMark id={r.priority} /></span>}
                     {r.from && <span className="hm-tag">{r.from}</span>}
-                    <span className="hm-tag">{r.project}</span>
+                    {r.project && <span className="hm-tag">{r.project}</span>}
                   </span>
                 </span>
-                <time>{agoShort(r.at, now)}</time>
+                {r.at !== null && <time>{agoShort(r.at, now)}</time>}
               </button>
             ))}
           </div>

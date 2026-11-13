@@ -23,6 +23,29 @@
 // glass in the Mac's own appearance, so Light on a dark Mac got dark glass.
 // Measured against the designs: Dark matches at 10%, Light at no tint.
 //
+// The third build, on the owner's Mac: every click left old pixels behind
+// on the glass (the Settings sidebar, earlier labels, doubled counts) and the
+// tint built up until it went dark. Reproduced in a demo copy photographed
+// from inside: a window switched to glass while running keeps stale pixels,
+// and so does one that is merely given its blur while running; a window
+// created with the blur stays clean under the same clicks, Settings, sidebar
+// and window resizes, pixel for pixel against a clean repaint, in both looks.
+// So every Mac window is made with the blur, solid until the switch is on.
+// Measured with Glass off, the blur underneath cost nothing: window drawing
+// 39-46% against 41% without it, the app's GPU 12-13% against 12-14%.
+//
+// The fourth build, on the owner's Mac over white and black pages and a
+// colourful one: "no evidence of a semi transparent background". Measured by
+// photographing a demo copy over white, then black: the frame moved 41 of 255
+// levels, a sixth of the desktop let through, greyed. The reference app lets
+// about a third through and keeps its colour. On macOS 26 and later the Mac's
+// own Liquid Glass under a transparent window moves 80 levels and keeps the
+// desktop's colour (a red-to-blue swing of 153 against 41); with a 30% Dark
+// tint the sidebar's labels stay readable over a bright wallpaper. Switching it
+// on and off in a running window left nothing behind, in both looks, and with
+// the switch off the window is as solid as before. Before macOS 26 the older
+// blur stays, as 'popover', which measured a third.
+//
 // Covered: the switch is off unless turned on, and flips the window live; a
 // Mac window can go glass and Linux and Windows never can; the page goes glass
 // only when both are true; the root stays clear and the tint lives on the app;
@@ -30,7 +53,7 @@
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { GLASS_ARG, applyGlass, glassTone, glassWindow } from '../main/window-glass.mts';
+import { GLASS_ARG, applyGlass, glassTone, glassWindow, loadWindowGlass } from '../main/window-glass.mts';
 import { alphaFeatures } from '../main/settings.mts';
 
 const read = (f: string) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');
@@ -59,51 +82,67 @@ describe('the switch', () => {
     expect(read('renderer/src/components/Settings.tsx')).toMatch(/setWorkspace\('alphaGlass', v\)/);
     expect(read('main/settings.mts')).toMatch(/case 'alphaGlass':\s*saveConfig\(config, \{ alphaGlass: !!value \}\)/);
     expect(read('main/ipc.mts')).toMatch(/if \(payload\?\.key === 'alphaGlass'\) glass\(alphaFeatures\(config\)\.glass\);/);
-    expect(read('main/main.mts')).toMatch(/glass: \(on\) => applyGlass\(window, process\.platform, on\)/);
+    expect(read('main/main.mts')).toMatch(/glass: \(on\) => applyGlass\(window, process\.platform, on, liquidGlass\)/);
   });
 });
 
 describe('the window', () => {
-  it('starts a Mac window glass when the switch is on', () => {
-    const w = glassWindow('darwin', true);
-    expect(w.vibrancy).toBe('sidebar');
-    expect(w.visualEffectState).toBe('active');
-    expect(w.backgroundColor).toBe('#00000000');
+  it('starts a Mac window with Liquid Glass transparent, glass when the switch is on and solid when off', () => {
+    const on = glassWindow('darwin', true, true);
+    expect(on).toEqual({ transparent: true, backgroundColor: '#00000000', trafficLightPosition: { x: 18, y: 18 }, additionalArguments: [GLASS_ARG] });
     // The lights are 14pt across: this centres them 25pt in and 25pt down.
-    expect(w.trafficLightPosition).toEqual({ x: 18, y: 18 });
+    expect(glassWindow('darwin', false, true)).toEqual({ transparent: true, backgroundColor: '#1a1a1c', additionalArguments: [GLASS_ARG] });
   });
 
-  it('starts a Mac window opaque when it is off, still able to go glass later', () => {
-    const w = glassWindow('darwin', false);
-    expect(w).toEqual({ visualEffectState: 'active', backgroundColor: '#1a1a1c', additionalArguments: [GLASS_ARG] });
-    expect(glassWindow('darwin', true).additionalArguments).toEqual([GLASS_ARG]);
+  it('starts a Mac without Liquid Glass with the older blur that lets a third through, already under it when off', () => {
+    const on = glassWindow('darwin', true, false);
+    expect(on).toMatchObject({ vibrancy: 'popover', visualEffectState: 'active', backgroundColor: '#00000000', trafficLightPosition: { x: 18, y: 18 } });
+    expect(on.transparent).toBeUndefined();
+    expect(glassWindow('darwin', false, false)).toEqual({ visualEffectState: 'active', vibrancy: 'popover', backgroundColor: '#1a1a1c', additionalArguments: [GLASS_ARG] });
   });
 
   it('keeps the opaque window on Linux and Windows, switch or not', () => {
     for (const platform of ['linux', 'win32'] as const) {
-      for (const on of [true, false]) expect(glassWindow(platform, on)).toEqual({ backgroundColor: '#1a1a1c', additionalArguments: [] });
+      for (const on of [true, false]) for (const liquid of [true, false]) expect(glassWindow(platform, on, liquid)).toEqual({ backgroundColor: '#1a1a1c', additionalArguments: [] });
     }
   });
 
-  it('turns a running Mac window glass and back, and touches nothing elsewhere', () => {
+  it('turns a running Mac window glass and back, showing or hiding the Liquid Glass, and touches nothing elsewhere', () => {
     const calls: unknown[][] = [];
+    const handle = Buffer.alloc(8);
     const win = {
       isDestroyed: () => false,
       setVibrancy: (v: unknown) => calls.push(['vibrancy', v]),
       setBackgroundColor: (c: unknown) => calls.push(['background', c]),
       setWindowButtonPosition: (p: unknown) => calls.push(['lights', p]),
+      getNativeWindowHandle: () => handle,
     };
-    applyGlass(win, 'darwin', true);
-    applyGlass(win, 'darwin', false);
+    const liquid = { set: (h: Buffer, on: boolean) => calls.push(['liquid', h === handle, on]) };
+    applyGlass(win, 'darwin', true, liquid);
+    applyGlass(win, 'darwin', false, liquid);
     expect(calls).toEqual([
-      ['vibrancy', 'sidebar'], ['background', '#00000000'], ['lights', { x: 18, y: 18 }],
-      ['vibrancy', null], ['background', '#1a1a1c'], ['lights', null],
+      ['background', '#00000000'], ['lights', { x: 18, y: 18 }], ['liquid', true, true],
+      ['background', '#1a1a1c'], ['lights', null], ['liquid', true, false],
     ]);
     calls.length = 0;
-    applyGlass(win, 'linux', true);
-    applyGlass(null, 'darwin', true);
-    applyGlass({ ...win, isDestroyed: () => true }, 'darwin', true);
+    applyGlass(win, 'darwin', true);
+    expect(calls).toEqual([['background', '#00000000'], ['lights', { x: 18, y: 18 }]]);
+    calls.length = 0;
+    applyGlass(win, 'linux', true, liquid);
+    applyGlass(null, 'darwin', true, liquid);
+    applyGlass({ ...win, isDestroyed: () => true }, 'darwin', true, liquid);
     expect(calls).toEqual([]);
+  });
+
+  it('loads Liquid Glass only on a Mac that has it, and otherwise falls back', () => {
+    const native = { available: () => true, set: () => true };
+    expect(loadWindowGlass({ mac: true, load: () => native })).toBe(native);
+    expect(loadWindowGlass({ mac: false, load: () => native })).toBeNull();
+    expect(loadWindowGlass({ mac: true, load: () => ({ ...native, available: () => false }) })).toBeNull();
+    expect(loadWindowGlass({ mac: true, load: () => { throw new Error('not built'); } })).toBeNull();
+    // Its own native file: the tray's glass is pinned to its approved look.
+    expect(read('main/native/window-glass/window-glass.mm')).toContain('NSGlassEffectView');
+    expect(read('scripts/build-liquid-glass.mjs')).toContain("build('window-glass'");
   });
 
   it('sets the glass to the look\'s own appearance, and back to the Mac\'s', () => {
@@ -118,11 +157,19 @@ describe('the window', () => {
     expect(app).toContain("window.zero?.glassTone?.({ tone: glassOn && 'glassAble' in document.documentElement.dataset && theme !== 'match' ? theme : 'system' });");
   });
 
+  it('never gives or takes a running window\'s blur, anywhere in the app', () => {
+    const files = fs.readdirSync(path.join(import.meta.dirname, '..', 'main'), { recursive: true, encoding: 'utf8' }).filter((n) => /\.m?[jt]s$/.test(n));
+    expect(files.length).toBeGreaterThan(50);
+    for (const f of files) expect(read(`main/${f}`), f).not.toMatch(/\bsetVibrancy\(/);
+  });
+
   it('is what the main window is made with', () => {
     const main = read('main/main.mts');
     const made = main.slice(main.indexOf('window = new BrowserWindow({'));
     const options = made.slice(0, made.indexOf('\n  });'));
-    expect(main).toContain('const { additionalArguments, ...glass } = glassWindow(process.platform, alphaFeatures(config).glass);');
+    expect(main).toContain('const { additionalArguments, ...glass } = glassWindow(process.platform, alphaFeatures(config).glass, !!liquidGlass);');
+    // Liquid Glass is a view under the page, put in once the window exists.
+    expect(made).toContain('if (alphaFeatures(config).glass) applyGlass(window, process.platform, true, liquidGlass);');
     expect(options).toContain('...glass,');
     expect(options).toMatch(/webPreferences: \{[^}]*additionalArguments,/);
     expect(options).not.toMatch(/backgroundColor:/);
@@ -146,8 +193,8 @@ describe('the page', () => {
     expect(nav).not.toMatch(/\[data-glass\][^{]*body \{[^}]*color-mix/);
   });
 
-  it('tints Dark lightly with its own ground, on the app, and outlines the card', () => {
-    expect(rule(`${DARK} .app.workspace-layout`)).toMatch(/background: color-mix\(in srgb, var\(--bg\) 10%, transparent\)/);
+  it('tints Dark with its own ground, on the app, and outlines the card', () => {
+    expect(rule(`${DARK} .app.workspace-layout`)).toMatch(/background: color-mix\(in srgb, var\(--bg\) 30%, transparent\)/);
     const card = rule(`${DARK} .workspace-layout::before`);
     expect(card).toMatch(/background: linear-gradient\(var\(--skin-pane\), var\(--skin-pane\)\), var\(--skin-image\) center \/ cover no-repeat fixed var\(--bg\)/);
     expect(card).toMatch(/box-shadow: 0 0 0 1\.5px color-mix\(in srgb, var\(--text\) 16%, transparent\)/);
@@ -171,7 +218,7 @@ describe('the page', () => {
   });
 
   it('makes the top band twice the traffic lights\' centre, so they sit in its middle', () => {
-    const { y } = glassWindow('darwin', true).trafficLightPosition!;
+    const { y } = glassWindow('darwin', true, true).trafficLightPosition!;
     const band = 2 * (y + 7);
     expect(band).toBe(50);
     expect(rule(`${GLASS} .app.workspace-layout`)).toMatch(new RegExp(`padding-top: ${band}px;`));
@@ -197,7 +244,7 @@ describe('the page', () => {
   });
 
   it('puts back and forward, then Home and Inbox, level with the lights', () => {
-    const { x, y } = glassWindow('darwin', true).trafficLightPosition!;
+    const { x, y } = glassWindow('darwin', true, true).trafficLightPosition!;
     const arrows = rule(`${GLASS} .topbar > .back-forward`);
     expect(arrows).toMatch(/position: fixed/);
     // The buttons are 26px tall, so their top is 13px above the lights' centre.

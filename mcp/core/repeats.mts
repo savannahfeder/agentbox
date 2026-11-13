@@ -18,6 +18,8 @@ import { listProjects, type ProjectSummary } from '../../main/store/project.mts'
 import { DAY_NAMES, nextRunAt, ruleIdOf, ruleLabel, sameRule, standingInstruction, type RepeatRule, type RepeatShape } from '../../shared/repeats.mts';
 import type { WorkItem } from '../../shared/work-items.mts';
 import { resolveProduct } from './account.mts';
+import { herRow, saidToClose } from './work.mts';
+import { filedByThePerson } from '../../shared/answers.mts';
 
 interface RunOptions { env?: NodeJS.ProcessEnv | Record<string, string | undefined>; now?: number }
 interface RuleOfRun { project: ProjectSummary; item: WorkItem; ruleId: string; rule: RepeatRule }
@@ -110,7 +112,88 @@ export interface NewRepeatingTask {
   at?: string;
   on?: string;
   startNow?: boolean;
+  askedBecause?: unknown;
 }
+
+// Every run of a rule is written as the person's own request and starts by
+// itself, so a worker makes one only on the person's word: their own thread,
+// and their words there asking for something regular.
+const REGULAR = /\b(every|each|daily|nightly|weekly|weekdays?|hourly|regular(ly)?|recurring|repeat(ing|ed)?|schedule[ds]?|mornings?|evenings?|nights?|(sun|mon|tues|wednes|thurs|fri|satur)days?|\d{1,2}(:\d\d)?\s?(am|pm)|\d{1,2}:\d\d)\b/i;
+const NOT_ASKED = 'No repeating task was made: every run would start on its own as the person\'s request, so it needs their own words on this thread asking for something regular, quoted exactly in askedBecause. If they asked for it, send it again with askedBecause set to their words; if not, ask them.';
+
+function personAskedForIt(thread: WorkItem | null, words: unknown): boolean {
+  return !!thread && herRow(thread) && filedByThePerson(thread) && REGULAR.test(String(words ?? '')) && saidToClose(thread, words);
+}
+
+export interface StopRepeatingTask {
+  which?: unknown;
+  product?: string;
+  askedBecause?: unknown;
+}
+
+export interface StoppedRepeatingTask {
+  repeat: string;
+  product: string;
+  label: string;
+  schedule: string;
+  ended: true;
+  endedAt: number;
+}
+
+const STOP = /\b(stop|stopped|end|cancel|switch(ed)?\s+(it\s+|that\s+|this\s+)?off|turn(ed)?\s+(it\s+|that\s+|this\s+)?off|pause|kill|remove|delete|no longer|(do not|don'?t) need)\b/i;
+const NOT_ASKED_TO_STOP = 'Nothing was stopped: it needs the person\'s own words on this thread asking for it to stop, quoted exactly in askedBecause. If they asked, send it again with their words; if not, ask them.';
+
+// Only what the person wrote themselves: a teammate's or the app's words on
+// the row are not their say-so.
+function theirWords(thread: WorkItem): string[] {
+  return (['body', 'title', 'answer'] as const)
+    .filter((f) => thread.wrote?.[f]?.source === 'founder')
+    .map((f) => String(thread[f] ?? ''));
+}
+
+function personAskedToStop(thread: WorkItem | null, words: unknown): boolean {
+  if (!thread || !(thread.labels ?? []).includes('founder') || !filedByThePerson(thread)) return false;
+  if (!STOP.test(String(words ?? ''))) return false;
+  const own = theirWords(thread);
+  return own.length > 0 && saidToClose({ title: '', body: '', answer: own.join('\n') }, words);
+}
+
+/**
+ * End a repeating task the person asked to stop, found by its id or its name.
+ * The person rarely knows which product a task lives in, so a name not found
+ * in this thread's product is looked for in every one.
+ */
+export function stopRepeatingTask(ask: StopRepeatingTask, { env = process.env, now = Date.now() }: RunOptions = {}): StoppedRepeatingTask {
+  const which = typeof ask.which === 'string' ? ask.which.trim() : '';
+  if (!which) throw new Error('which repeating task? pass its name as it is listed, or its id');
+
+  const itemId = String(env.ZERO_ITEM ?? '').trim();
+  const threadHome = itemId ? projectOf(itemId, String(env.ZERO_PRODUCT ?? '').trim() || null) : null;
+  const thread = threadHome ? readWorkItem(threadHome.dir, itemId, now) : null;
+  if (itemId && !personAskedToStop(thread, ask.askedBecause)) throw new Error(NOT_ASKED_TO_STOP);
+
+  const named = (r: RepeatRule) => r.id === which || r.title.trim().toLowerCase() === which.toLowerCase();
+  const inProject = (p: ProjectSummary) => rules.list(p.dir, now).filter(named).map((rule) => ({ project: p, rule }));
+  const first = ask.product?.trim() ? resolveProduct(ask.product) : threadHome;
+  let found = first ? inProject(first) : [];
+  if (!ask.product?.trim() && !found.some((f) => !f.rule.endedAt)) {
+    found = listProjects().flatMap(inProject);
+  }
+
+  const live = found.filter((f) => !f.rule.endedAt);
+  if (live.length > 1) {
+    throw new Error(`more than one repeating task is called "${which}": ${live.map((f) => `${f.rule.id} in ${f.project.name}`).join(', ')}. Pass the id of the one to stop.`);
+  }
+  const hit = live[0] ?? found[0];
+  if (!hit) {
+    const names = (first ? [first] : listProjects()).flatMap((p) => rules.list(p.dir, now).filter((r) => !r.endedAt).map((r) => `"${r.title}" (${r.id})`));
+    throw new Error(`no repeating task is called "${which}". Running now: ${names.join(', ') || 'none'}.`);
+  }
+
+  const rule = hit.rule.endedAt ? hit.rule : rules.endRule(hit.project.dir, hit.rule.id, now)!;
+  return { repeat: rule.id, product: hit.project.id, label: rule.title, schedule: ruleLabel(rule), ended: true, endedAt: rule.endedAt! };
+}
+
 export interface MadeRepeatingTask {
   repeat: string;
   product: string;
@@ -138,10 +221,11 @@ export function createRepeatingTask(ask: NewRepeatingTask, { env = process.env, 
   const itemId = String(env.ZERO_ITEM ?? '').trim();
   const threadHome = itemId ? projectOf(itemId, String(env.ZERO_PRODUCT ?? '').trim() || null) : null;
   const thread = threadHome ? readWorkItem(threadHome.dir, itemId, now) : null;
+  if (itemId && !personAskedForIt(thread, ask.askedBecause)) throw new Error(NOT_ASKED);
   const project = ask.product?.trim() ? resolveProduct(ask.product) : threadHome;
   if (!project) throw new Error('which product? pass product, since this session is not on a thread');
 
-  const on = ask.on === undefined ? undefined : DAY_NAMES.findIndex((d) => d.toLowerCase() === String(ask.on).trim().toLowerCase());
+  const on =ask.on === undefined ? undefined : DAY_NAMES.findIndex((d) => d.toLowerCase() === String(ask.on).trim().toLowerCase());
   const schedule = { every: ask.every, at: ask.at, ...(ask.every === 'week' ? { on: on === -1 ? undefined : on } : {}) };
   const startsNow = ask.startNow !== false;
 

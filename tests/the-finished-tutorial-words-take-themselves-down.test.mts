@@ -47,7 +47,7 @@ describe('1. the layer is armed once', () => {
   });
 
   it('and it is still the app that owns what the way out does', () => {
-    expect(app).toMatch(/<Landed agents=\{landing\.agents\} onGone=\{\(\) => setLanding\(null\)\} \/>/);
+    expect(app).toMatch(/<Landed agents=\{[^}]+\} onGone=\{\(\) => setLanding\(null\)\} onNew=\{startThread\} \/>/);
   });
 });
 

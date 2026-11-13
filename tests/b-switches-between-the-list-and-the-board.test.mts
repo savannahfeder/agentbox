@@ -77,8 +77,10 @@ describe('where B works', () => {
     const at = list.indexOf("case 'b': case 'B':");
     const branch = list.slice(at, list.indexOf('break;', at));
     expect(branch).toContain('search === null');
+    // A teammate's open thread is drawn on the Team page, so this covers it. A
+    // thread held after you left that page must not stop B (2026-11-12).
     expect(branch).toContain('!teamShown');
-    expect(branch).toContain('!openCard');
+    expect(branch).not.toContain('!openCard');
   });
 
   it('does nothing inside an open task', () => {

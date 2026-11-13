@@ -34,7 +34,9 @@ describe('what someone is working on today', () => {
   ] });
 
   it('lists a teammate\'s open threads that moved today, so Dev is not "nothing yet"', () => {
-    expect(titles(of(day, 'person:p-dev').working)).toEqual(['Onboarding B build', 'Group bookings v1']);
+    // The waiting one is his To do, not Working on (everyone-says-working-on-only-for-a-thread-an-agent-is-on).
+    expect(titles(of(day, 'person:p-dev').working)).toEqual(['Group bookings v1']);
+    expect(titles(of(day, 'person:p-dev').waiting)).toEqual(['Onboarding B build']);
     expect(day.quiet).not.toContain('Dev');
   });
 

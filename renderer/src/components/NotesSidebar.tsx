@@ -6,14 +6,14 @@ import { createPortal } from 'react-dom';
 import { api } from '../api';
 import { Face, TeamContext } from '../team/people';
 import { clock, type LedgerLine } from '../thread-history';
-import type { FileNote, NotePlace, Person, TableCell, WorkItem } from '../types';
+import type { FileElsewhere, FileNote, NotePlace, Person, TableCell, WorkItem } from '../types';
 import { isTablePath } from '../table-file';
-import { notedFilesInLines, threadFiles, versionForPath, whoseIsTheFile } from '../../../shared/artifact-marks.mts';
+import { whoseIsTheFile } from '../../../shared/artifact-marks.mts';
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { notePictures, noteWithPictures } from '../note-pictures';
 import { canPaintQuotes, cellAround, paintQuotes } from '../paint-quotes';
-import { notesCanPoint, noteAttachments, sentTimes, sidebarNotes } from '../notes-sidebar';
-import { pinLabel, pinsToDraw } from '../artifact-pins';
+import { fileFamilyFor, notesBesideCount, notesCanPoint, noteAttachments, sentTimes, sidebarNotes } from '../notes-sidebar';
+import { noteBoxKey, noteSendWords, pinLabel, pinsToDraw, sentWithTheNote, whereANoteGoes, whoTalksOnFile } from '../artifact-pins';
 import { AttachRow } from './AttachRow';
 import { NotePictureShown } from './FileNoteCard';
 import { NoteGlyph } from './NoteGlyphs';
@@ -61,6 +61,31 @@ export function NotesToggle({ open, waiting, onToggle }: { open: boolean; waitin
   );
 }
 
+/**
+ * Beside the chat, where notes are not drawn: the same corner mark, counting the
+ * file's notes, every copy's included, and pressing it opens them full screen.
+ */
+export function NotesBesideMark({ item, src, onOpen }: { item: WorkItem; src: string; onOpen: () => void }) {
+  const [lines, setLines] = useState<LedgerLine[]>([]);
+  useEffect(() => {
+    let live = true;
+    const read = () => { void api.itemHistory({ product: item.product, id: item.id }).then((r) => { if (live) setLines(r?.lines ?? []); }); };
+    read();
+    const off = api.onChanged(read);
+    return () => { live = false; off?.(); };
+  }, [item.product, item.id]);
+  const { fileIds, copies } = useMemo(() => fileFamilyFor(lines, src), [lines, src]);
+  const copiesKey = JSON.stringify(copies);
+  const [elsewhere, setElsewhere] = useState<FileElsewhere[]>([]);
+  useEffect(() => {
+    if (!copies.length) { setElsewhere([]); return undefined; }
+    let live = true;
+    void api.fileElsewhere({ product: item.product, id: item.id, copies }).then((all) => { if (live) setElsewhere(all); });
+    return () => { live = false; };
+  }, [item.product, item.id, copiesKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  return <NotesToggle open={false} waiting={notesBesideCount(item.artifacts?.notes ?? [], fileIds, elsewhere)} onToggle={onOpen} />;
+}
+
 type Quote = { text: string; cell?: TableCell };
 
 const Quoted = ({ quote }: { quote: Quote }) => (
@@ -105,17 +130,7 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
     return () => { live = false; off?.(); };
   }, [item.product, item.id]);
 
-  // The version this document is on the thread's file line, or a line of its own when no message named it.
-  const { version, fileIds, files } = useMemo(() => {
-    const asked = src.replace(/^\.\//, '');
-    const said = notedFilesInLines(lines);
-    const named = versionForPath(threadFiles(said), asked);
-    const all = named ? said : [...said, { path: asked, by: null, at: 0 }];
-    const families = threadFiles(all);
-    const v = named ?? versionForPath(families, asked);
-    const family = v ? families.find((f) => f.versions.some((x) => x.id === v.id)) : null;
-    return { version: v, fileIds: family ? family.versions.map((x) => x.id) : [], files: all };
-  }, [lines, src]);
+  const { version, fileIds, files } = useMemo(() => fileFamilyFor(lines, src), [lines, src]);
 
   const [pending, setPending] = useState<FileNote[]>([]);
   const stored = item.artifacts?.notes ?? [];
@@ -124,6 +139,11 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
   const canSend = typeof version?.agent === 'string';
   const sentAt = useMemo(() => sentTimes(lines), [lines]);
   const authors = [...new Set([...waiting, ...said].map((n) => n.by))].slice(0, 3);
+  const noteTo = {
+    people, me, agentMade: canSend, toAgent: canSend,
+    owner: version ? whoseIsTheFile(files, version.id) : null, threadOwner: item.runner ?? item.createdBy ?? null,
+    talking: whoTalksOnFile(all, fileIds, me),
+  };
 
   const aside = useRef<HTMLElement | null>(null);
   const page = useRef<HTMLElement | null>(null);
@@ -207,6 +227,7 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
   };
 
   const [words, setWords] = useState('');
+  const sendWords = noteSendWords({ ...noteTo, text: words, nameOf: whoSaid });
   const [pictures, setPictures] = useState<PendingAttachment[]>([]);
   const { attaching, collect } = useAttaching();
   const [sending, setSending] = useState(false);
@@ -232,7 +253,7 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
     if (got.length) setPictures((was) => [...was, ...got]);
   };
 
-  const add = async () => {
+  const add = async (now = false) => {
     const typed = words.trim();
     if ((!typed && !pictures.length) || !version || sending || attaching.length) return;
     setSending(true);
@@ -246,24 +267,29 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
     const place: NotePlace = spot ? { kind: 'pin', x: spot.x, y: spot.y } : quote ? { kind: 'quote', ...quote } : { kind: 'whole' };
     const id = newId();
     const owner = whoseIsTheFile(files, version.id);
+    const goes = whereANoteGoes({ ...noteTo, text: typed });
+    const mentions = goes.to === 'person' ? [goes.person] : [];
+    const withIt = now && canSend ? sentWithTheNote(goes, waiting.filter((n) => !n.saving).map((n) => n.id), id) : [];
     const kept = { words, quote, spot, pictures };
     const pin = spot ? { pin: pinNotes.length + 1 } : {};
-    setPending((was) => [...was, { id, file: version.id, place, text, by: me, ts: Date.now(), mentions: [], owner: null, uid: null, wait: true, saving: true, ...pin }]);
+    setPending((was) => [...was, { id, file: version.id, place, text, by: me, ts: Date.now(), mentions, owner: null, uid: null, wait: true, saving: true, ...pin }]);
     setWords(''); setQuote(null); setSpot(null); setPictures([]); setTrouble(null);
-    const out = await api.fileMark({ product: item.product, id: item.id, mark: { do: 'note', id, file: version.id, place, text, wait: true, ...(owner ? { owner } : {}) } })
+    const out = await api.fileMark({ product: item.product, id: item.id, mark: { do: 'note', id, file: version.id, place, text, wait: true, ...(mentions.length ? { mentions } : {}), ...(owner ? { owner } : {}) } })
       .catch((err: Error) => ({ ok: false, error: err.message }));
     setSending(false);
     // Kept, so Send can take it before the thread's own copy catches up.
-    if (out.ok) setPending((was) => was.map((n) => (n.id === id ? { ...n, saving: false } : n)));
-    else {
+    if (out.ok) {
+      setPending((was) => was.map((n) => (n.id === id ? { ...n, saving: false } : n)));
+      if (withIt.length) await sendNotes(withIt);
+    } else {
       setPending((was) => was.filter((n) => n.id !== id));
       setWords(kept.words); setQuote(kept.quote); setSpot(kept.spot); setPictures(kept.pictures);
       setTrouble(out.error ?? 'That note did not save.');
     }
   };
 
-  const send = async () => {
-    const on = waiting.filter((n) => !n.saving).map((n) => n.id);
+  const send = () => sendNotes(waiting.filter((n) => !n.saving).map((n) => n.id));
+  const sendNotes = async (on: string[]) => {
     if (!on.length) return;
     const out = await api.fileMark({ product: item.product, id: item.id, mark: { do: 'toagent', on } }).catch((err: Error) => ({ ok: false, error: err.message }));
     setTrouble(out.ok ? null : out.error ?? 'Those notes did not reach the agent.');
@@ -311,7 +337,8 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
               if (got.length) setPictures((was) => [...was, ...got]);
             } : undefined}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void add(); }
+              const does = noteBoxKey({ key: e.key, chord: e.metaKey || e.ctrlKey, shift: e.shiftKey, composing: e.nativeEvent.isComposing, typed: !!words.trim() || !!pictures.length, waiting: canSend ? waiting.length : 0 });
+              if (does !== 'leave') { e.preventDefault(); void (does === 'send waiting' ? send() : add(does === 'note and send')); }
               // The app ignores Escape inside a box, so letting go of it is what lets the next one leave full screen.
               else if (e.key === 'Escape') { e.preventDefault(); if (quote || spot || pinning) pointAt(null, null); else e.currentTarget.blur(); }
             }} />
@@ -328,7 +355,7 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
               </button>
             )}
             <span className="sb-spring" />
-            <button type="submit" className="sb-add" title="Add note (return)" aria-label="Add note"
+            <button type="submit" className="sb-add" title={`${sendWords} (return)`} aria-label={sendWords}
               disabled={(!words.trim() && !pictures.length) || sending || attaching.length > 0 || !!attachProblem(pictures)}>
               <ReturnGlyph />
             </button>

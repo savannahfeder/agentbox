@@ -25,7 +25,7 @@ const rule = (sel) => css.match(new RegExp(`(^|\\n)${sel.replace(/[.*+?^${}()|[\
 // orange timer that tells you how much time is left").
 describe('the card she picked', () => {
   it('reads the task title first, then where it went', () => {
-    const title = app.indexOf('{about && <span className="toast-title">{rowTitle(about)}</span>}');
+    const title = app.indexOf('{aboutTitle && <span className="toast-title">{aboutTitle}</span>}');
     const line = app.indexOf('<span className="toast-line">{line}</span>');
     expect(title).toBeGreaterThan(-1);
     expect(line).toBeGreaterThan(title);

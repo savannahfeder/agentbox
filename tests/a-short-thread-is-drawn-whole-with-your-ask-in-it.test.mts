@@ -7,6 +7,11 @@
 // `earlierCount` on those shapes: the page folded everything but the newest
 // answer, however few messages that was. Now one or two messages are drawn,
 // and the fold starts at three, where hiding them saves something.
+//
+// Since 2026-11-13 this holds only for the view from an answer you have since
+// followed up. A thread that has just come back drawn whole read as a chat, so
+// it opens on its answer however short it is
+// (a-thread-that-comes-back-opens-on-its-answer-however-short).
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,18 +27,11 @@ const work = (at) => ({ kind: 'work', at, verb: 'Listed', subject: './', output:
 const result = (at, text) => ({ at, text, field: 'result' });
 
 describe('how many messages a thread can hide before the fold is worth it', () => {
-  it('draws her ask and a short reply whole', () => {
-    const events = [you(1, 'write tests for the refund flow')];
-    const behind = earlierCount(events, result(5, 'Worked on it.'));
-    expect(behind).toBe(1);
-    expect(drawnWhole(behind)).toBe(true);
-  });
-
-  it('draws her ask, a progress note and the result whole', () => {
+  it('counts her ask and a progress note as two behind a fresh answer, which still folds', () => {
     const events = [you(1, 'the onboarding flow is still confusing people'), it_(2, 'Starting on this now.'), work(3)];
     const behind = earlierCount(events, result(9, 'Claude Code stopped partway through.'));
     expect(behind).toBe(2);
-    expect(drawnWhole(behind)).toBe(true);
+    expect(drawnWhole(behind, { leads: true })).toBe(false);
   });
 
   it('draws whole a thread she has answered since, with only her ask above the answer', () => {
@@ -56,7 +54,7 @@ describe('how many messages a thread can hide before the fold is worth it', () =
 describe('where the page reads it', () => {
   it('both folds, the newest answer alone and the view from the answer she followed up, ask it', () => {
     // A brought-in chat folds (an-imported-chat-opens-on-the-clean-page).
-    expect(thread).toMatch(/const short = !earlierOpen && drawnWhole\(behind, broughtIn\(item\)\);/);
+    expect(thread).toMatch(/const short = !earlierOpen && drawnWhole\(behind, \{ leads: alone, imported: broughtIn\(item\) \}\);/);
     expect(thread).toMatch(/const from = short \|\| earlierOpen \? -1 : start;/);
     expect(thread).toMatch(/if \(alone && !earlierOpen && !short\)/);
   });

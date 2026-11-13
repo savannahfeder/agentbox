@@ -46,8 +46,11 @@ describe('an agent asked for a repeating task', () => {
     delete process.env.ZERO_PRODUCT;
   });
 
+  // The thread's own words are the person's ask (tests/a-repeating-task-an-agent-makes-needs-the-persons-words).
+  const make = (ask, opts) => core.createRepeatingTask({ askedBecause: 'Regular app security checks', ...ask }, opts);
+
   const onAThread = (fields = {}) => {
-    const thread = work.createWorkItem(dir, { title: 'Regular app security checks', ...fields }, { source: 'founder' });
+    const thread = work.createWorkItem(dir, { title: 'Regular app security checks', labels: ['founder'], ...fields }, { source: 'founder' });
     process.env.ZERO_ITEM = thread.id;
     process.env.ZERO_PRODUCT = product.id;
     return thread;
@@ -56,7 +59,7 @@ describe('an agent asked for a repeating task', () => {
   it('makes a daily task whose runs carry the words asked for', async () => {
     onAThread();
     const now = at(2026, 11, 10, 20);
-    const made = core.createRepeatingTask({
+    const made = make({
       title: 'Daily security review',
       instruction: 'Do the daily security review in docs/security-checks.md, over what shipped since the last one.',
       every: 'day',
@@ -75,7 +78,7 @@ describe('an agent asked for a repeating task', () => {
   it('makes a weekly task on the day named', () => {
     onAThread();
     const now = at(2026, 11, 10, 20);
-    const made = core.createRepeatingTask({
+    const made = make({
       title: 'Weekly security audit',
       instruction: 'Do the weekly full security audit in docs/security-checks.md.',
       every: 'week',
@@ -90,13 +93,13 @@ describe('an agent asked for a repeating task', () => {
 
   it('runs on the coding agent and model of the thread that made it', () => {
     onAThread({ engine: 'codex', model: 'gpt-5.6-sol' });
-    const made = core.createRepeatingTask({ title: 'Audit', instruction: 'Audit.', every: 'day', at: '09:00' });
+    const made = make({ title: 'Audit', instruction: 'Audit.', every: 'day', at: '09:00' });
     const rule = repeats.get(dir, made.repeat);
     expect(rule.engine).toBe('codex');
     expect(rule.model).toBe('gpt-5.6-sol');
 
     onAThread();
-    const plain = repeats.get(dir, core.createRepeatingTask({ title: 'Review', instruction: 'Review.', every: 'day', at: '09:00' }).repeat);
+    const plain = repeats.get(dir, make({ title: 'Review', instruction: 'Review.', every: 'day', at: '09:00' }).repeat);
     expect(plain.engine).toBeUndefined();
     expect(plain.model).toBeUndefined();
   });
@@ -104,38 +107,38 @@ describe('an agent asked for a repeating task', () => {
   it('starts its first run now unless told to wait for its next time', () => {
     onAThread();
     const now = at(2026, 11, 10, 20);
-    const now1 = repeats.get(dir, core.createRepeatingTask({ title: 'A', instruction: 'A.', every: 'day', at: '09:00' }, { now }).repeat, now);
+    const now1 = repeats.get(dir, make({ title: 'A', instruction: 'A.', every: 'day', at: '09:00' }, { now }).repeat, now);
     expect(isOwed(now1, now)).toBe(true);
 
-    const later = repeats.get(dir, core.createRepeatingTask({ title: 'B', instruction: 'B.', every: 'day', at: '09:00', startNow: false }, { now }).repeat, now);
+    const later = repeats.get(dir, make({ title: 'B', instruction: 'B.', every: 'day', at: '09:00', startNow: false }, { now }).repeat, now);
     expect(isOwed(later, now)).toBe(false);
     expect(isOwed(later, at(2026, 11, 11, 9) + 60_000)).toBe(true);
   });
 
   it('refuses a schedule the app cannot keep, and makes nothing', () => {
     onAThread();
-    expect(() => core.createRepeatingTask({ title: 'A', instruction: 'A.', every: 'week', at: '09:00' })).toThrow(/day/i);
-    expect(() => core.createRepeatingTask({ title: 'A', instruction: 'A.', every: 'day', at: '9am' })).toThrow(/schedule/i);
-    expect(() => core.createRepeatingTask({ title: 'A', instruction: '  ', every: 'day', at: '09:00' })).toThrow(/instruction/i);
+    expect(() => make({ title: 'A', instruction: 'A.', every: 'week', at: '09:00' })).toThrow(/day/i);
+    expect(() => make({ title: 'A', instruction: 'A.', every: 'day', at: '9am' })).toThrow(/schedule/i);
+    expect(() => make({ title: 'A', instruction: '  ', every: 'day', at: '09:00' })).toThrow(/instruction/i);
     expect(repeats.list(dir)).toHaveLength(0);
   });
 
   it('makes one task when the same ask arrives twice', () => {
     onAThread();
     const ask = { title: 'Daily review', instruction: 'Review new code.', every: 'day', at: '09:00' };
-    const first = core.createRepeatingTask(ask);
-    const second = core.createRepeatingTask(ask);
+    const first = make(ask);
+    const second = make(ask);
     expect(second.repeat).toBe(first.repeat);
     expect(repeats.list(dir)).toHaveLength(1);
 
     // A different hour is a different task.
-    core.createRepeatingTask({ ...ask, at: '17:00' });
+    make({ ...ask, at: '17:00' });
     expect(repeats.list(dir)).toHaveLength(2);
   });
 
   it('can be made in a named product from a session on no thread', () => {
-    const made = core.createRepeatingTask({ product: product.id, title: 'A', instruction: 'A.', every: 'weekday', at: '08:30' });
+    const made = make({ product: product.id, title: 'A', instruction: 'A.', every: 'weekday', at: '08:30' });
     expect(repeats.get(dir, made.repeat).every).toBe('weekday');
-    expect(() => core.createRepeatingTask({ title: 'A', instruction: 'A.', every: 'day', at: '09:00' })).toThrow(/product/i);
+    expect(() => make({ title: 'A', instruction: 'A.', every: 'day', at: '09:00' })).toThrow(/product/i);
   });
 });

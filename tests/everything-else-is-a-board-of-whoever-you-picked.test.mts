@@ -110,7 +110,9 @@ describe('in the app', () => {
   // On a computer your own board is the whole board since 2026-11-09
   // (with-a-team-each-inbox-state-is-a-tab-of-its-own); a teammate's is still this one.
   it('with a team on, B and the View menu switch the team view, not the one without a team', () => {
-    expect(app).toMatch(/\(teamMode \? mineBoard : search === null && inboxDisplay\.view === 'board'\) && !roomShown \? \(/);
+    // `boardDrawn` holds this rule, which the tutorial's board beat reads too.
+    expect(app).toMatch(/const boardDrawn = teamMode \? mineBoard : search === null && inboxDisplay\.view === 'board';/);
+    expect(app).toMatch(/\{boardDrawn && !roomShown \? \(/);
     expect(app).toMatch(/case 'b': case 'B':\s*if \(teamMode\) \{/);
   });
 

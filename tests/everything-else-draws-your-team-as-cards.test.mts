@@ -92,8 +92,8 @@ describe('the cards', () => {
 
 // The chat itself is on the Chats page (w-2b3e1a85e5, tests/messages-open-on-the-chats-page-and-nowhere-else).
 describe('a card opens its chat', () => {
-  it('opens a person\'s direct record, else your chat with them in Groups', () => {
-    expect(app).toMatch(/const talk = person \? directWith\(person\) : null;\s*const chat = person && !talk \? personChats\.get\(person\) : undefined;/);
+  it('opens a person\'s chat in Groups while Rooms is live, else their direct record', () => {
+    expect(app).toMatch(/const chat = person \? personChats\.get\(person\) : undefined;\s*const talk = person && !\(roomsUi\.live && chat\) \? directWith\(person\) : null;/);
   });
 
   it('leaves the group\'s list and, for the team or one person, its people to the cards', () => {

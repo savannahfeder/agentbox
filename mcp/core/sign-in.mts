@@ -3,6 +3,7 @@
 // on a tool call at 60 seconds; the agent calls again to keep waiting.
 import { listProjects } from '../../main/store/project.mts';
 import { readWorkItem, updateWorkItem } from '../../main/store/work-items.mts';
+import { SERVICES } from '../../shared/cloud-needs.mts';
 import { answerTo, cleanSignIn, newSignInId, type SignInAsk, type SignInSaid } from '../../shared/sign-in-ask.mts';
 import type { WorkItem } from '../../shared/work-items.mts';
 import { resolveProduct } from './account.mts';
@@ -21,18 +22,47 @@ function own(id: string, product: string | null): { dir: string; item: WorkItem 
 
 const SAID: Record<SignInSaid, string> = {
   'signed-in': 'They say they finished signing in. Check that the login finished (its command exited, or the server\'s tools are there now) and carry on.',
+  code: 'They pasted the code the service\'s page showed them, in `code`. Type it into the login waiting for it (for a login run under `script` with its input on a pipe, write the code there ending in a carriage return, `\\r`, since a newline is not taken as Enter), check that the login finished, and carry on.',
   landed: 'Their browser was sent back to the address in `url`. Hand it to the login waiting for it: an MCP server\'s complete_authentication tool, the prompt of `codex mcp login --no-browser`, or `curl` it at the login\'s own localhost address on this machine. Then carry on.',
   skipped: 'They chose not to sign in now. Finish what you can without it, and say in your answer what is left.',
   replied: 'They wrote you a message on the thread instead, so the card is gone. Do not call sign_in again for this ask. Answer their message: if it is not with you yet, end your turn now and it comes next. If the work still needs the sign-in after that, ask again with a new call.',
 };
 
-export interface SignInRequest { service?: string; url?: string; code?: string; why?: string; ask?: string; finished?: boolean }
-export interface SignInWait { status: 'closed' | 'waiting' | 'signed_in' | 'landed' | 'skipped' | 'replied'; ask: string; url?: string; message: string }
+// Where a service's own login leaves its token on a cloud machine. Supabase's
+// CLI writes no file on Linux: the token goes in the kernel keyring, which the
+// machine takes with it.
+const READ_TOKEN: Record<string, string> = {
+  supabase: "{ command -v keyctl >/dev/null || sudo apt-get install -y -qq keyutils >/dev/null 2>&1; } && keyctl pipe %user:'keyring:supabase@Supabase CLI' 2>/dev/null || cat ~/.supabase/access-token",
+  github: 'gh auth token',
+};
+
+const plain = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+export interface KeepIt { keep?: { name: string; read?: string }; message: string }
+
+/** What a cloud agent is told to keep once the person signed in to `service`, so later cloud runs are signed in too. */
+export function keepAfterSignIn(service: string, { finishing = false }: { finishing?: boolean } = {}): KeepIt {
+  const n = plain(service);
+  const svc = SERVICES.find((s) => s.id === n || plain(s.name) === n || n.startsWith(plain(s.name)));
+  const when = finishing ? 'Once the login finishes, keep' : 'First, keep';
+  const why = 'this sign-in for every later cloud thread: a cloud machine forgets its logins when the run ends.';
+  if (!svc || svc.keys.length !== 1) {
+    const names = svc ? ` under ${svc.keys.map((k) => k.name).join(' and ')}, one call each` : ', under the variable its tools read, if they read one from the environment';
+    return { message: `${when} ${why} Read the token its login saved and call sign_in with this ask and keep${names}.` };
+  }
+  const name = svc.keys[0].name;
+  const read = READ_TOKEN[svc.id];
+  const how = read ? `Run \`${read}\`` : 'Read the token its login saved';
+  return { keep: { name, ...(read ? { read } : {}) }, message: `${when} ${why} ${how} and call sign_in with this ask and keep { name: '${name}', value: the token }.` };
+}
+
+export interface SignInRequest { service?: string; url?: string; code?: string; why?: string; asksForCode?: boolean; ask?: string; finished?: boolean }
+export interface SignInWait { status: 'closed' | 'waiting' | 'signed_in' | 'landed' | 'code' | 'skipped' | 'replied'; ask: string; url?: string; code?: string; message: string }
 
 const askOn = (item: WorkItem): SignInAsk | undefined => item.signIn as SignInAsk | undefined;
 
 /** Puts the ask on the thread, or closes it when the login finished by itself. */
-export function askToSignIn(id: string, { service, url, code, why, ask, finished }: SignInRequest, { product = null, now = Date.now() }: { product?: string | null; now?: number } = {}): SignInAsk {
+export function askToSignIn(id: string, { service, url, code, why, asksForCode, ask, finished }: SignInRequest, { product = null, now = Date.now() }: { product?: string | null; now?: number } = {}): SignInAsk {
   const { dir, item } = own(id, product);
   if (ask) {
     const open = askOn(item);
@@ -40,7 +70,7 @@ export function askToSignIn(id: string, { service, url, code, why, ask, finished
     if (finished) updateWorkItem(dir, id, { signIn: { ...open, done: true } }, { source: 'agent', now });
     return open;
   }
-  const next = cleanSignIn({ id: newSignInId(), service, url, code, why, at: now });
+  const next = cleanSignIn({ id: newSignInId(), service, url, code, why, asksForCode, at: now });
   if (!next) throw new Error('a sign-in needs the service\'s name and its http or https link');
   updateWorkItem(dir, id, { signIn: next }, { source: 'agent', now });
   return next;
@@ -56,7 +86,7 @@ export async function waitForSignIn(id: string, askId: string, { product = null,
     const answer = answerTo(item, askId);
     if (answer) {
       const status = answer.said === 'signed-in' ? 'signed_in' : answer.said;
-      return { status, ask: askId, ...(answer.url ? { url: answer.url } : {}), message: SAID[answer.said] };
+      return { status, ask: askId, ...(answer.url ? { url: answer.url } : {}), ...(answer.code ? { code: answer.code } : {}), message: SAID[answer.said] };
     }
     if (item.status === 'done') return { status: 'closed', ask: askId, message: 'The thread was closed.' };
     if (Date.now() >= until) {
