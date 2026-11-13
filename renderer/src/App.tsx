@@ -1831,8 +1831,8 @@ export default function App() {
     setView('inbox');
     sawPalette.current = false;
     setupStartedAgain.current = true;
-    // The setup a new install meets, with a way back to the app (`leaveSetupAgain`).
-    setTimeout(() => { setArm('tour'); setFresh(true); }, 0);
+    // The first run a new install meets; the new setup has a way back to the app (`leaveSetupAgain`).
+    setTimeout(() => { void armNow().then((a) => { setArm(a); setFresh(true); }); }, 0);
   }, [closeWhatFloats]);
   // Asked for from ⌘K, so its screens must have a way back. A real first run has
   // no app behind it to go back to.
@@ -7244,6 +7244,7 @@ export default function App() {
   const [landOn, setLandOn] = useState<string | null>(null);
   const finishClassic = useCallback((sent: string | null, runAt = 0, draft?: string) => {
     const to = firstRunLanding(sent, runAt);
+    setupStartedAgain.current = false;
     finishFirstRun(localStorage);
     // Onboarding was the moment to offer it; a project made later is mid-task (F-164).
     rememberOffered(localStorage);
