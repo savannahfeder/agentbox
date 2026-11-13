@@ -574,11 +574,12 @@ export function ConnectComputer({ email, onSignOut }: { email: string | null; on
  *  puts the one composer into `slot`. What is in progress has its own tab and
  *  is not counted here. */
 export function InboxClear({ slot, first = false, sky = null }: { slot: (el: HTMLDivElement | null) => void; first?: boolean; sky?: SkyArt | null }) {
-  const shape = (localStorage.getItem('zero.preview.zeroSky') || 'tall') as SkyShape;
-  return <div className="th-clear th-start">
-    {sky && <InboxSky art={sky} shape={shape} />}
-    <h2>{first ? 'Give an agent its first task' : 'Nothing needs you'}</h2>
-    <div className="th-clear-compose" ref={slot} />
+  const shape = (localStorage.getItem('zero.preview.zeroSky') || 'full') as SkyShape;
+  const head = localStorage.getItem('zero.preview.zeroHead') || 'halo';
+  const h2 = <h2>{first ? 'Give an agent its first task' : 'Nothing needs you'}</h2>;
+  return <div className={`th-clear th-start zh-${head}`}>
+    {sky && <InboxSky art={sky} shape={shape} below={head === 'below'} />}
+    {head === 'card' ? <div className="zh-card">{h2}<div className="th-clear-compose" ref={slot} /></div> : <>{h2}<div className="th-clear-compose" ref={slot} /></>}
   </div>;
 }
 

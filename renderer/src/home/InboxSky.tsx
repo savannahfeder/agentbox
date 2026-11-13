@@ -11,7 +11,7 @@ export type SkyShape = 'head' | 'tall' | 'full' | 'dim' | 'frame' | 'foot';
  * the header and nowhere else, so the list keeps every line. The streak is
  * drawn at the card's foot and turned over (home.css .inbox-sky-head).
  */
-export function InboxSky({ art, band = 190, shape = 'head' }: { art: SkyArt; band?: number; shape?: SkyShape }) {
+export function InboxSky({ art, band = 190, shape = 'head', below = false }: { art: SkyArt; band?: number; shape?: SkyShape; below?: boolean }) {
   useLayoutEffect(() => {
     const host = document.querySelector<HTMLElement>('.app.workspace-layout');
     if (!host) return;
@@ -40,7 +40,13 @@ export function InboxSky({ art, band = 190, shape = 'head' }: { art: SkyArt; ban
       Object.assign(head.style, { left: `${L}px`, top: `${T}px`, width: `${w}px`, height: `${h}px` });
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       const canvas = head.querySelector('canvas')!;
-      if (shape === 'full' || shape === 'dim') { drawSky(canvas, art, { from: 40, span: 300, dpr }); return; }
+      if (shape === 'full' || shape === 'dim') {
+        const h2 = below ? document.querySelector('.th-start h2') : null;
+        const under = h2 ? Math.round(h2.getBoundingClientRect().bottom - hr.top - T) : 0;
+        if (under > 0) drawSky(canvas, art, { from: under + 8, span: 160, curveTop: under - 40, dpr });
+        else drawSky(canvas, art, { from: 40, span: 300, dpr });
+        return;
+      }
       const tall = Math.round(h * 0.42);
       const reach = shape === 'head' ? band : tall;
       const start = Math.round(h - reach);
@@ -48,14 +54,15 @@ export function InboxSky({ art, band = 190, shape = 'head' }: { art: SkyArt; ban
     };
     const later = () => { if (!frame) frame = requestAnimationFrame(paint); };
     paint();
+    const settle = below ? setTimeout(() => { last = ''; later(); }, 400) : 0;
     const ro = new ResizeObserver(later);
     ro.observe(host);
     // The card moves when the sidebar opens or folds, which changes the window's classes, not its size.
     const moved = new MutationObserver(later);
     moved.observe(host, { attributes: true, attributeFilter: ['class'] });
-    return () => { ro.disconnect(); moved.disconnect(); if (frame) cancelAnimationFrame(frame); head.remove();
+    return () => { clearTimeout(settle); ro.disconnect(); moved.disconnect(); if (frame) cancelAnimationFrame(frame); head.remove();
       // The list's sky and the empty page's can be up together.
       if (!host.querySelector(':scope > .inbox-sky')) host.style.removeProperty('--sky-under'); };
-  }, [art, band, shape]);
+  }, [art, band, shape, below]);
   return null;
 }
