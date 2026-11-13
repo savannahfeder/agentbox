@@ -52,6 +52,7 @@ vi.mock('electron', () => ({
   Notification: { isSupported: () => false },
   dialog: { showErrorBox() {} },
   nativeImage: null,
+  nativeTheme: { shouldUseDarkColors: true, on() {} },
   powerMonitor: { on() {} },
   shell: { openExternal() {} },
 }));

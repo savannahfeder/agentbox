@@ -70,6 +70,7 @@
 .si-back { -webkit-app-region: no-drag; }
 .si-skip-corner { position: absolute; top: 18px; right: 22px; padding: 4px 6px; border: 0; background: none; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer; -webkit-app-region: no-drag; }
 .si-skip-corner:hover { color: var(--text); }
+:root[data-window-buttons="right"] .si-skip-corner { right: 150px; }
 /* On a phone the card is the screen's width, padding included, and never
    wider (the phone with the Mac shut signs in here, renderer/src/cloud-bridge.ts). */
 :root[data-door="phone"] .si-page { grid-template-columns: minmax(0, 1fr); }

@@ -53,6 +53,7 @@ import { dataFolderName, isNewUserBuild } from '../shared/side-build.mts';
 import { runningAsAFreshUser } from '../shared/fresh-user-home.mts';
 import { newUserTitle, newUserWindow } from './new-user-window.mts';
 import { applyGlass, glassTone, glassWindow, loadWindowGlass } from './window-glass.mts';
+import { tintWindowButtons, windowFrame } from './window-buttons.mts';
 import { openFreshUser } from './fresh-user.mts';
 import { installCrashReports, report as reportCrash, reportFromRenderer, pending as pendingCrashes, setTransport } from './crash-report.mts';
 import { keepThePageAlive } from './when-the-page-stops.mts';
@@ -818,7 +819,7 @@ async function createWindow() {
       height: 900,
     }),
     ...glass,
-    titleBarStyle: 'hiddenInset',
+    ...windowFrame(process.platform),
     webPreferences: {
       preload: path.join(appDir, 'preload.cjs'),
       contextIsolation: true,
@@ -1200,6 +1201,7 @@ async function createWindow() {
   // did-finish-load, which races the first effects and would drop the very
   // message it exists to deliver.
   ipcMain.handle('zero:glass-tone', (_e, payload) => { nativeTheme.themeSource = glassTone(payload?.tone); });
+  ipcMain.handle('zero:window-buttons', (_e, payload) => { tintWindowButtons(window, process.platform, payload?.dark); });
   ipcMain.handle('zero:boot-info', () => {
     const info = {
       reloaded: reloadRequested, builtAt: builtAt(), recovered: pendingRecovery,
