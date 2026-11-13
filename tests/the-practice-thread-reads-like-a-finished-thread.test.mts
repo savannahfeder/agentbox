@@ -41,6 +41,24 @@ describe('how the practice thread opens', () => {
   });
 });
 
+// Walked on a Mac the same day: pressing 1 sent the person back to the inbox list
+// with "WALKTHROUGH 4 OF 5" over it and no tip at all. A typed reply on the practice
+// thread keeps you in it and tells the walkthrough; a picked option did neither.
+describe('picking an option on the practice thread', () => {
+  const app = read('renderer/src/App.tsx');
+  it('keeps you in the thread, as a typed reply does', () => {
+    expect(app).toMatch(/takeBack, isTourPractice\(tourRef\.current, item\) \|\| !movesOn\(item\) \|\| pickStaysPut\(/);
+  });
+  it('counts as the reply the practice agent answers', () => {
+    expect(app).toMatch(/if \(isTourPractice\(tourRef\.current, item\)\) \{ const t = practiceReplied\(readTour\(localStorage\) \?\? tourRef\.current!\); setTour\(t\); tourRef\.current = t; \}\n      try \{ await api\.answer\(\{ product: item\.product, id: item\.id, answer,/);
+  });
+  // E pressed straight after 1 closed the thread, and the pick, landing a moment later, wrote an older
+  // copy of the walkthrough over "close is done": step 4 of 5 with no tip, for good.
+  it('builds on the walkthrough as saved, so a close in between is not undone', () => {
+    expect(app).toMatch(/practiceReplied\(readTour\(localStorage\) \?\? tourRef\.current!\)/);
+  });
+});
+
 describe('the walkthrough on it', () => {
   it('asks for a number, since the open thread offers options', () => {
     const tour = read('renderer/src/tour.ts');

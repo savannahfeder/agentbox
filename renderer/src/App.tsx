@@ -5661,6 +5661,8 @@ export default function App() {
     const letGo = () => setSending((q) => q.filter((s) => s !== mine));
     const takeBack = (): Restored => { letGo(); return null; };
     await deferCommit(item, async () => {
+      // The pick lands a few seconds after the press, and E may have closed the thread in between: build on what is saved, not on what this press saw.
+      if (isTourPractice(tourRef.current, item)) { const t = practiceReplied(readTour(localStorage) ?? tourRef.current!); setTour(t); tourRef.current = t; }
       try { await api.answer({ product: item.product, id: item.id, answer, ...(status ? { status } : {}) }); }
       catch (error) { letGo(); throw error; }
       setTimeout(letGo, LANDED_MS);
@@ -5675,7 +5677,7 @@ export default function App() {
       // "Sent", because the arrow says where the answer went and nothing said
       // what happened to it: "Option 1 → Practice" was read off the QA box as
       // meaning nothing.
-    }, pickSentWords(option.text, rowTitle(item)), takeBack, !movesOn(item) || pickStaysPut(option.text, { live: liveIds.has(item.id) }), { product: item.product, id: item.id }, undid);
+    }, pickSentWords(option.text, rowTitle(item)), takeBack, isTourPractice(tourRef.current, item) || !movesOn(item) || pickStaysPut(option.text, { live: liveIds.has(item.id) }), { product: item.product, id: item.id }, undid);
   }, [deferCommit, pushUndo, markDone, markSeen, movesOn, offerNow, focused?.id, focused?.product, liveIds]);
   // The discard question is raised inside `pickOption` and answered by
   // `answerCloseAsk`, which is made above it.
