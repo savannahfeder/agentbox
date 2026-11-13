@@ -14,7 +14,7 @@ import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { LAST_PRODUCT_KEY } from '../compose-project';
 import {
-  ENGINE_NAME, FIRST_RUN_STEP, chatChoices, chatsHeadline, foundLine, installGate, listKey, previousScreen, projectsToMake, readyEngines, setupWord, runningSetup, signedOutEngines,
+  ENGINE_NAME, FIRST_RUN_STEP, chatChoices, chatsHeadline, footWord, foundLine, installGate, listKey, previousScreen, projectsToMake, readyEngines, setupWord, runningSetup, signedOutEngines,
   type Engine, type Screen,
   inHomeFolder,
 } from '../first-run';
@@ -305,7 +305,7 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
             {setup && setup.phase !== 'ready' ? (
               <>
                 <span className="ob-sq ob-live" />{ENGINE_NAME[setup.engine]}
-                <b>{setup.phase === 'failed' ? (setup.error ?? 'did not finish') : setup.phase === 'signing-in' ? 'finish in your browser' : 'installing'}</b>
+                <b>{footWord(setup, signedOut)}</b>
               </>
             ) : ready?.length ? (
               <><span className="ob-sq" />{ready.map((engine) => ENGINE_NAME[engine]).join(' and ')} <b>ready</b></>
