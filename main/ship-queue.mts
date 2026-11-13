@@ -36,7 +36,13 @@ import type { GateAnswer, GateRequest, GateReply } from './memory-gate.mts';
 
 export const SHIP_LABEL = 'ship';
 const SHIP_MS = 20 * 60 * 1000;
+// The whole suite is about 3,000 files, and on a busy Mac it runs past 20 minutes.
+export const WHOLE_SUITE_SHIP_MS = 60 * 60 * 1000;
+// What scripts/ship.mjs says before a push the hook runs every test for.
+export const RUNS_EVERY_TEST = 'ship: the hook runs every test for this push';
 const KEEP = 4000;
+
+const minutes = (ms: number) => { const n = Math.max(1, Math.round(ms / 60_000)); return `${n} minute${n === 1 ? '' : 's'}`; };
 
 export interface ShipItem {
   id: string;
@@ -319,6 +325,9 @@ export function failureReply(output: unknown, { brief = null }: { brief?: string
     'Fix what the script says below in your task folder, commit, then add the label',
     `\`${SHIP_LABEL}\` to this row again and end your turn. Do not push or touch any`,
     'other folder yourself; the app ships it.',
+    'If your change is fine and what stopped it is outside it (git could not sign in,',
+    'no network, the computer), call `wait_on_cause` instead of asking the person,',
+    'and add the label again once you are started after it is cleared.',
     '',
     '```',
     tail,
@@ -356,7 +365,7 @@ export function gitConfigEnv(pairs: [string, string][]): Record<string, string> 
   return out;
 }
 
-export async function runScript(script: string, cwd: string, { timeout = SHIP_MS, env = process.env, gitConfig = [] }: { timeout?: number; env?: NodeJS.ProcessEnv; gitConfig?: [string, string][] } = {}): Promise<ShipRun> {
+export async function runScript(script: string, cwd: string, { timeout = SHIP_MS, wholeSuiteTimeout = WHOLE_SUITE_SHIP_MS, env = process.env, gitConfig = [] }: { timeout?: number; wholeSuiteTimeout?: number; env?: NodeJS.ProcessEnv; gitConfig?: [string, string][] } = {}): Promise<ShipRun> {
   const node = env.npm_node_execpath && fs.existsSync(env.npm_node_execpath) ? env.npm_node_execpath : 'node';
   const hooks = await baseHooksPath(cwd);
   const baseGate = gitConfigEnv([...(hooks ? [['core.hooksPath', hooks] as [string, string]] : []), ...gitConfig]);
@@ -369,10 +378,21 @@ export async function runScript(script: string, cwd: string, { timeout = SHIP_MS
       resolve({ code: 1, out: String((e as Error)?.message ?? e) });
       return;
     }
-    const keep = (b: Buffer | string) => { out = (out + b).slice(-64 * 1024); };
+    const began = Date.now();
+    const stopAfter = (ms: number) => setTimeout(() => { keep(`\nship: stopped after ${minutes(ms)}.`); child.kill('SIGTERM'); }, Math.max(0, began + ms - Date.now()));
+    let timer: NodeJS.Timeout;
+    let longer = false;
+    const keep = (b: Buffer | string) => {
+      out = (out + b).slice(-64 * 1024);
+      if (!longer && wholeSuiteTimeout > timeout && out.includes(RUNS_EVERY_TEST)) {
+        longer = true;
+        clearTimeout(timer);
+        timer = stopAfter(wholeSuiteTimeout);
+      }
+    };
     child.stdout!.on('data', keep);
     child.stderr!.on('data', keep);
-    const timer = setTimeout(() => { keep('\nship: stopped after 20 minutes.'); child.kill('SIGTERM'); }, timeout);
+    timer = stopAfter(timeout);
     child.on('error', (e: Error) => keep(`\n${e.message}`));
     child.on('close', (code) => { clearTimeout(timer); resolve({ code: code ?? 1, out }); });
   });

@@ -1,6 +1,5 @@
 // PURE. Where she was in each thread, kept for as long as the window is open,
-// so coming back to one puts her there: after an urgent thread took the screen,
-// or any other way back.
+// so coming back to one puts her there, whichever way she comes back.
 //
 // Only while the thread has no newer answer than when she left it. A new answer
 // is what she came back for, so the thread opens at its end as it always did.

@@ -9,6 +9,7 @@ import { NOTICE_KEY } from '../lib/ai-notice';
 import { ALERTS_KEY } from '../lib/push-device';
 import { syncStore } from '../lib/drafts';
 import type { Persist } from '../lib/kept';
+import type { InboxFile } from '../lib/last-inbox';
 
 const KEYS = ['agentbox-cloud-session', 'agentbox-cloud-verifier', 'agentbox-cloud-reset', ALERTS_KEY, NOTICE_KEY];
 
@@ -39,6 +40,25 @@ function fileStore() {
   AppState.addEventListener('change', (state) => { if (state !== 'active') void store.flush(); });
   return store;
 }
+
+// Its own file: the inbox can be megabytes, and kept.json is rewritten for every draft.
+const INBOX_KEY = 'agentbox-last-inbox';
+export const inboxFile: InboxFile = Platform.OS === 'web'
+  ? {
+    read: () => globalThis.localStorage.getItem(INBOX_KEY),
+    write: (text) => { if (text === null) globalThis.localStorage.removeItem(INBOX_KEY); else globalThis.localStorage.setItem(INBOX_KEY, text); },
+  }
+  : (() => {
+    const file = new File(Paths.document, 'last-inbox.json');
+    return {
+      read: () => (file.exists ? file.textSync() : null),
+      write: (text: string | null) => {
+        if (text === null) { if (file.exists) file.delete(); return; }
+        if (!file.exists) file.create();
+        file.write(text);
+      },
+    };
+  })();
 
 // Unwrapped on the web: the draft rules catch a full store themselves, and drop pictures to fit.
 export const appStore: { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void } = Platform.OS === 'web'

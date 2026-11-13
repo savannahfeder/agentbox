@@ -97,7 +97,7 @@ describe('the file waiting for the cloud', () => {
     expect(JSON.parse(String(sup._cloudRelayEnv({ ZERO_ITEM: 'w-film' }).AGENTBOX_SEND_FILES))).toEqual([file]);
   });
 
-  it('is known to be waiting from Send until a cloud run is given it, and only for its own thread', () => {
+  it('is known to be waiting from Send until a cloud run has taken it, and only for its own thread', () => {
     tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'card-file-'));
     const file = path.join(tmp, 'face.mp4');
     fs.writeFileSync(file, Buffer.alloc(1024));
@@ -109,6 +109,9 @@ describe('the file waiting for the cloud', () => {
     expect(sup.hasFilesForCloud('w-b')).toBe(false);
     const env = sup._cloudRelayEnv({ ZERO_ITEM: 'w-a' });
     expect(JSON.parse(String(env.AGENTBOX_SEND_FILES))).toEqual([file]);
+    // Still waiting until that run gets its agent going; a start that died sooner may not have taken it.
+    expect(sup.hasFilesForCloud('w-a')).toBe(true);
+    sup._settleFilesForCloud({ id: 'w-a' }, { cloud: true, sessionId: 's-1' });
     expect(sup.hasFilesForCloud('w-a')).toBe(false);
   });
 });

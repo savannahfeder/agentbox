@@ -1371,6 +1371,16 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     return { ok: true };
   });
 
+  // HER ANSWER TO THE TEAMMATE AUTO OFFERED ON A THREAD (Teammates#answerOffer).
+  ipcMain.handle('zero:answer-route-offer', (_e, { product, id, make }: { product: string; id: string; make: boolean }) => {
+    const item = store.readItem(product, id);
+    if (!item) throw new Error('that thread is gone');
+    if (!store.teammates?.answerOffer) throw new Error('teammates are off');
+    const out = store.teammates.answerOffer({ ...item, product }, make === true);
+    supervisor.wake();
+    return { ok: true, made: out.made };
+  });
+
   /* ----------------------------- the first run ---------------------------- */
   // THE WALK'S EXAMPLE TASK, ANSWERED BY THE APP RATHER THAN BY A SESSION.
   //
@@ -2206,9 +2216,9 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   });
   // A saved key carries on every thread that was waiting on it, as if each had been replied to.
   // `reply` is the person's own words for the thread the key was pasted on, which go instead of the app's.
-  ipcMain.handle('zero:cloud-key', async (_e, { action, name, value, label, reply } = {}) => {
+  ipcMain.handle('zero:cloud-key', async (_e, { action, name, value, label, reply, from } = {}) => {
     try {
-      let { keys, freed } = await supervisor.cloudKey(action, name, value, { label: typeof label === 'string' ? label : null });
+      let { keys, freed } = await supervisor.cloudKey(action, name, value, { label: typeof label === 'string' ? label : null, from: from ?? null });
       if (reply?.id && typeof reply.answer === 'string' && reply.answer.trim()) {
         freed = [...freed.filter((t) => t.id !== reply.id || t.product !== reply.product), { product: reply.product, id: reply.id, answer: reply.answer }];
       }
@@ -2221,9 +2231,9 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     }
   });
   // What the person did with a sign-in link an agent is waiting on (shared/sign-in-ask.mjs).
-  ipcMain.handle('zero:sign-in-answer', (_e, { product, id, ask, said, url } = {}) => {
+  ipcMain.handle('zero:sign-in-answer', (_e, { product, id, ask, said, url, code } = {}) => {
     try {
-      store.answerSignIn(product, id, { id: ask, said, url });
+      store.answerSignIn(product, id, { id: ask, said, url, code });
       push();
       return { ok: true };
     } catch (err) {

@@ -41,20 +41,23 @@ export function setupSteps({ chats, team, teammates, project, signedIn = true, p
 /** The plans the setup offers, at the prices the cloud charges (cloud/gateway/plans.mjs). */
 export const SETUP_PLANS: Array<{ id: SetupPlan; name: string; price: string; per?: string; tag?: string; sub: string }> = [
   { id: 'free', name: 'Free', price: '$0', sub: `Just you, with ${FREE.hours} cloud hours to try` },
-  { id: 'pro', name: 'Pro', price: `$${TEAM.dollarsPerSeat}`, per: 'a month', tag: `${TEAM.trialDays} days free`, sub: `Your team, plus ${TEAM.agentsPerSeat} cloud agents at once` },
+  { id: 'pro', name: 'Pro', price: `$${TEAM.dollarsPerSeat}`, per: 'a month', tag: `${TEAM.trialDays} days free`, sub: `Your team, plus ${TEAM.hoursPerSeat} cloud hours each` },
 ];
 
-/** The purchase page's words: what Pro brings in three lines, the cloud computer first, the price in one quiet line.
+/** The purchase page's words: what Pro brings in three lines, the cloud computer first, then the free week beside the paid month.
  *  components/ProShowcase.tsx draws one card for each line, in this order. */
 export const PRO_PITCH = {
   head: 'Upgrade to Pro.',
   perks: [
     { id: 'cloud', title: 'A computer for every agent' },
-    { id: 'team', title: 'Your team in one inbox' },
+    { id: 'team', title: 'Share threads and tasks with your team' },
     { id: 'files', title: 'Files saved in the cloud' },
   ],
+  // The free week beside the paid month, so the trial's hours are never read as the plan's.
+  trial: { label: `First ${TEAM.trialDays} days`, price: 'Free', line: `${TEAM.trialHoursPerMember} cloud hours to try` },
+  paid: { label: 'Then', price: `$${TEAM.dollarsPerSeat}`, per: 'a month', line: `${TEAM.hoursPerSeat} cloud hours a month` },
   cta: `Try Pro free for ${TEAM.trialDays} days`,
-  terms: `Then $${TEAM.dollarsPerSeat} a month. Cancel any time.`,
+  terms: 'Cancel any time.',
 };
 
 const SHOWCASE_FILL = ['Fix the flaky date picker test', 'Add a health check endpoint', 'Profile the slowest page', 'Port the cron jobs to the queue', 'Write tests for the refund flow', 'Speed up the search index build'];
@@ -70,9 +73,9 @@ export const teamPaid = (plan: { team?: { seats?: number } } | null | undefined)
 export const stepLabel = (steps: SetupStep[], step: SetupStep) => `Step ${steps.indexOf(step) + 1} of ${steps.length}`;
 
 /** Ids in shared sky themes and skins.ts: Light and Dark are the plain looks. */
-const LOOK_ORDER = [MATCH_SKY, 'ember', 'dusk', 'aurora', 'sage', 'light', 'dark'];
+const LOOK_ORDER = [MATCH_SKY, 'ember', 'dusk', 'aurora', 'sage', 'dusk-light', 'light', 'dark'];
 const LIGHT_SKIES = ['sage', 'dusk-light'];
-/** The look you have first, then the dark orange sky; the light pink sky only if you already wear it.
+/** The look you have first, then Match my system, then every sky Settings offers.
  *  A sky is drawn only on Home, so without it the choice is Light or Dark. */
 export function lookChoices(current: string, skies: boolean): string[] {
   if (!skies) {
