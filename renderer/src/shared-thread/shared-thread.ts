@@ -19,11 +19,20 @@ export type ThreadShown =
   | { state: 'shown'; title: string; owner: string; lines: SaidLine[]; names: Record<string, string> }
   | { state: 'hidden' };
 
-interface Select { select(table: string, query: string): Promise<any[]> }
+interface Select { select(table: string, query: string): Promise<readonly object[]> }
+
+interface PublishedLine {
+  patch?: { body?: unknown; answer?: unknown; result?: unknown; note?: unknown; comment?: { text?: unknown } };
+  source?: unknown; uid?: unknown; ts?: unknown; by?: unknown;
+}
+type WorkRow = { work?: { lines?: unknown } };
+type CardRow = { title?: unknown };
+type PersonRow = { id?: string; name?: unknown };
 
 /** What a line of the published work says, and whose it is; null for a line that says nothing. */
-export function saidLine(l: any, i: number): SaidLine | null {
-  const p = l?.patch ?? {};
+export function saidLine(l: PublishedLine | null | undefined, i: number): SaidLine | null {
+  if (!l) return null;
+  const p = l.patch ?? {};
   const text = [p.body, p.answer, p.result, p.note, p.comment?.text].find((t) => typeof t === 'string' && t.trim());
   if (!text) return null;
   const comment = !!p.comment?.text;
@@ -35,14 +44,15 @@ export async function readSharedThread(db: Select, owner: string, id: string): P
   if (!PART.test(owner) || !PART.test(id)) return { state: 'hidden' };
   const at = `person_id=eq.${owner}&thread_id=eq.${id}`;
   const [work, card] = await Promise.all([
-    db.select('thread_work', `${at}&select=work&limit=1`),
-    db.select('thread_cards', `${at}&select=title&limit=1`),
+    db.select('thread_work', `${at}&select=work&limit=1`) as Promise<WorkRow[]>,
+    db.select('thread_cards', `${at}&select=title&limit=1`) as Promise<CardRow[]>,
   ]);
   if (!work[0] && !card[0]) return { state: 'hidden' };
-  const lines = (Array.isArray(work[0]?.work?.lines) ? work[0].work.lines : []).map(saidLine).filter(Boolean) as SaidLine[];
+  const published = work[0]?.work?.lines;
+  const lines = (Array.isArray(published) ? published as PublishedLine[] : []).map(saidLine).filter(Boolean) as SaidLine[];
   const ids = [...new Set([owner, ...lines.map((l) => l.by).filter((b): b is string => !!b && PART.test(b))])];
-  const people = await db.select('people', `id=in.(${ids.join(',')})&select=id,name`).catch(() => []);
-  const names = Object.fromEntries(people.filter((p) => p?.id).map((p) => [p.id, String(p.name || '').trim() || 'A teammate']));
+  const people = await (db.select('people', `id=in.(${ids.join(',')})&select=id,name`) as Promise<PersonRow[]>).catch((): PersonRow[] => []);
+  const names = Object.fromEntries(people.filter((p): p is PersonRow & { id: string } => !!p?.id).map((p) => [p.id, String(p.name || '').trim() || 'A teammate']));
   return { state: 'shown', title: String(card[0]?.title || 'A thread'), owner, lines, names };
 }
 

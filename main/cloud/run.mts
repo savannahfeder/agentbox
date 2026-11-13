@@ -214,6 +214,7 @@ export interface RunMarker extends CloudMarker {
   resourceContext?: ResourceContext;
   resources?: ResourceState;
   resourceCapable?: boolean;
+  foldersCapable?: boolean;
   offline?: boolean;
   plain?: boolean;
   cursor?: number;
@@ -331,7 +332,7 @@ const COMMIT_NOTE = 'Your commits on this task\'s branch are sent back to their 
 // its film's files, ffmpeg and a key missing, and asked the person to move the
 // thread (2026-10-16). Kept true to cloud/sandbox/Dockerfile and ./docs.mts.
 const HEADING = '# You are running on a cloud machine, not on the person\'s own computer';
-const HAND_BACK_NOTE = `For a missing installed skill or task file, first use the store tool request_cloud_resource. Request a skill by name, or a file or folder by its path: relative to this task or the product's documents, or any path under the account's documents, other products' folders included, written out in full as the request writes it (\`~/...\` works). It returns a separate scratch path when delivery succeeds; read the skill's SKILL.md there with its references and scripts. A folder answers with its files, which you then ask for. Their own files outside the documents (on their Desktop, in Downloads or Movies, a film, recording or screenshot they made) and anything over 25 MB are only on their computer, unless they attached it to this thread. When the request is for such files, or cannot be done without them, whether it gives their path or only says what they are ("the original launch video", "my screenshots"), that is work that cannot go ahead here: hand it back as below rather than answering in part. For something the work can do without, such as a skill or a reference it would have liked, finish the rest and say exactly what is missing. Something missing does not end the conversation. When they ask a question or for a status, answer it from what you have (this thread, the documents, the code), say in one sentence what you could not recheck from here, and end with the option "Check from my computer". When the missing thing is something they can tell you in a reply, such as a link, a choice, a name or where a file is, ask for it in plain words as your usual final answer with options. Never ask them to type a password, key or sign-in into the thread. When the work itself cannot go ahead without a key, one of their apps, a private repository this machine cannot reach, or a file, folder or skill the request names or needs that request_cloud_resource cannot deliver, stop at once. Do not work around it, do not write to the work item, do not give the person commands to run, and do not offer to move the thread: the app moves it. End your turn with one line and nothing else: ${HAND_BACK} followed by what was missing, in a few words they would use (your AWS sign-in, the iOS simulator), since the app shows those words to them. A person who asks to have this thread moved to their computer, or picks "Check from my computer", is answered with this line as well. That line replaces your usual final answer and its options. The app then runs the same request again on their computer, where all of it is. A program you can install is not a reason to stop. Otherwise work as usual, and never write that line.`;
+const HAND_BACK_NOTE = `For a missing installed skill or task file, first use the store tool request_cloud_resource. Request a skill by name, or a file or folder by its path: relative to this task or the product's documents, or any path under the account's documents, other products' folders included, written out in full as the request writes it (\`~/...\` works). It returns a separate scratch path when delivery succeeds; read the skill's SKILL.md there with its references and scripts. Ask for a folder rather than its files one by one: it comes whole in one request, at the path the answer gives, unless it is too big, when it answers with its files, which you then ask for. Their own files outside the documents (on their Desktop, in Downloads or Movies, a film, recording or screenshot they made) and anything over 25 MB are only on their computer, unless they attached it to this thread. When the request is for such files, or cannot be done without them, whether it gives their path or only says what they are ("the original launch video", "my screenshots"), that is work that cannot go ahead here: hand it back as below rather than answering in part. For something the work can do without, such as a skill or a reference it would have liked, finish the rest and say exactly what is missing. Something missing does not end the conversation. When they ask a question or for a status, answer it from what you have (this thread, the documents, the code), say in one sentence what you could not recheck from here, and end with the option "Check from my computer". When the missing thing is something they can tell you in a reply, such as a link, a choice, a name or where a file is, ask for it in plain words as your usual final answer with options. Never ask them to type a password, key or sign-in into the thread. When the work itself cannot go ahead without a key, one of their apps, a private repository this machine cannot reach, or a file, folder or skill the request names or needs that request_cloud_resource cannot deliver, stop at once. Do not work around it, do not write to the work item, do not give the person commands to run, and do not offer to move the thread: the app moves it. End your turn with one line and nothing else: ${HAND_BACK} followed by what was missing, in a few words they would use (your AWS sign-in, the iOS simulator), since the app shows those words to them. A person who asks to have this thread moved to their computer, or picks "Check from my computer", is answered with this line as well. That line replaces your usual final answer and its options. The app then runs the same request again on their computer, where all of it is. A program you can install is not a reason to stop. Otherwise work as usual, and never write that line.`;
 // With keys (the names of those saved for cloud runs; null when this run's
 // image cannot place them), a missing key is asked for, not handed back.
 const handBackNote = (keys: string[] | null) => (keys
@@ -343,8 +344,12 @@ const handBackNote = (keys: string[] | null) => (keys
   : HAND_BACK_NOTE);
 const keysNote = (names: string[]) => [
   names.length ? `Keys and sign-ins they saved for cloud runs are in your environment under these names: ${names.join(', ')}.` : 'They have saved no keys or sign-ins for cloud runs yet.',
+  'When a service needs them to sign in, use its own browser sign-in, the way they would in Claude Code or Codex, before asking for any token: start its login in the background and hand its link, and any code it printed, to the sign_in tool, which shows it to them while you wait.',
+  'These print a link on this machine: `gh auth login --web` (after `sudo apt-get install -y gh`), `vercel login`, `netlify login`, `npx wrangler login --browser=false`, `fly auth login`, `stripe login`, `npm login --auth-type=web`, `eas login --device --non-interactive`, `aws login --remote` (with asksForCode), and an MCP server\'s authenticate tool or `codex mcp login --no-browser`.',
+  '`supabase login` refuses to run without a terminal, so give it one and a pipe for its code: `mkfifo /tmp/sb-in; (sleep 3600 > /tmp/sb-in &); script -qfc "supabase login --no-browser --agent no --output-format text" /tmp/sb-out < /tmp/sb-in` in the background, then hand the link in /tmp/sb-out to sign_in with asksForCode, and write the code it answers with into the pipe ending in a carriage return, which a newline does not stand in for: `printf \'%s\\r\' CODE > /tmp/sb-in`.',
+  'Once a login worked, keep the token it made with sign_in\'s keep, under the variable its tool reads, so later cloud runs are signed in too. A ship\'s push runs on their computer, and when that computer needs a GitHub sign-in the app asks for it on the thread itself, so never ask for that one.',
   'When the work needs something only they can give, do all of the work that does not need it, then ask for it: line one of your usual final answer says what you need in plain words, and just above its Options goes one line per thing, in one of these forms.',
-  `\`${NEED} sign-in SERVICE | what it is for\` connects a service whose tools read a token from the environment. SERVICE is one of ${SERVICES.map((s) => s.id).join(', ')}; once connected, every later cloud run has ${SERVICES.slice(0, 3).map((s) => s.keys.map((k) => k.name).join(' and ')).join(', ')} and the rest. Before either line, sign in the way they would in Claude Code or Codex: when the service has a browser sign-in (an MCP server's authenticate tool, \`codex mcp login --no-browser\`, or its command-line login, such as \`gh auth login --web\` after \`sudo apt-get install -y gh\`), start it in the background and hand its link to the sign_in tool, which shows it to them while you wait, then keep the token it made with sign_in's keep. A ship's push runs on their computer, and when that computer needs a GitHub sign-in the app asks for it on the thread itself, so never ask for that one.`,
+  `\`${NEED} sign-in SERVICE | what it is for\` asks them to paste the service's access token, on a card that links to the page where they make one. Use it only when the service has no browser sign-in here, or they chose Not now on it. SERVICE is one of ${SERVICES.map((s) => s.id).join(', ')}; once it is saved, every later cloud run has ${SERVICES.slice(0, 3).map((s) => s.keys.map((k) => k.name).join(' and ')).join(', ')} and the rest.`,
   `\`${NEED} key VARIABLE | what it is and where they get it\` asks for any other key a tool reads from the environment, under the variable the tool reads.`,
   `\`${NEED} file PATH | what it is for\` asks for a file only their computer has, by its full or ~/ path there, up to 1 GB. It is at that same path here on your next turn.`,
   `\`${NEED} code WHAT | what it is for\` asks for a one-time code, such as an npm one-time password or a verification code. It comes back as their reply.`,
@@ -1083,7 +1088,7 @@ export async function cloudRun({
   if (importOnly && !joining) return 0;
   if (!joining && (!login || login.engine !== engine)) { say(`this ${engine === 'codex' ? 'Codex' : 'Claude'} account has not signed in for the cloud`); return LOGIN_TROUBLE; }
 
-  let runId: string; let sessionId: string; let marker: RunMarker; let docs: RunDocs | null; let sentFiles: Set<string>; let sendFile: SendFile; let resourceCapable = false;
+  let runId: string; let sessionId: string; let marker: RunMarker; let docs: RunDocs | null; let sentFiles: Set<string>; let sendFile: SendFile; let resourceCapable = false; let foldersCapable = false;
   // Files that are a conversation, sent joined to the copy the bucket has.
   const conversations = new Set<string>();
   let mcpConfig: McpConfig = { mcpServers: {} };
@@ -1145,6 +1150,7 @@ export async function cloudRun({
     const { state: _s, pid: _p, at: _a, cursor: c, n: sent, conns, ...kept } = joining;
     marker = kept;
     resourceCapable = !!marker.resourceCapable || !!joinedAt!.caps?.includes('resources');
+    foldersCapable = !!marker.foldersCapable || !!joinedAt!.caps?.includes('folders');
     docs = joining.docs || null;
     // The app's servers as they are now win over the ones the run started
     // with (the approvals key is new at every start); the run's own record
@@ -1457,6 +1463,8 @@ export async function cloudRun({
   offlineOn = (started.caps || []).includes('offline');
   resourceCapable = (started.caps || []).includes('resources');
   marker.resourceCapable = resourceCapable;
+  foldersCapable = (started.caps || []).includes('folders');
+  marker.foldersCapable = foldersCapable;
   if (!resourceCapable) say('this cloud image cannot take a file or skill the run asks this Mac for; rebuild it (npm run deploy, or node scripts/cloud-setup.mjs)');
   if (!offlineOn) say('this cloud image stops at its next tool call while this Mac sleeps; rebuild it (node scripts/cloud-setup.mjs) to keep runs going');
   marker.offline = offlineOn;
@@ -1504,6 +1512,7 @@ export async function cloudRun({
     state: marker.resources ??= {}, save: () => saveMarker(),
     stopped: () => !!finished || leaving || cancelled,
     capable: () => resourceCapable,
+    folders: () => foldersCapable,
     log: say,
     upload: async (name, body) => {
       const k = cacheKey(name);
