@@ -152,7 +152,8 @@ const FILES_FOR_AGENTS = 40;
  * same name, as the agent's tools match it (mcp/core/reach.mts).
  */
 /** Counts for tests: how many threads were parsed for their files. */
-export const filesOfInternals = { parses: 0, entries: 0, lists: 0 };
+export const filesOfInternals = { parses: 0, entries: 0, lists: 0, chains: 0 };
+export const CHAIN_KEEP_MS = 30_000;
 
 // Every list of Files reads every thread, so a thread is parsed again only when
 // its lines did: one agent writing must not re-read thousands of threads.
@@ -585,20 +586,52 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     return found.ok ? found.path : null;
   };
 
-  // An open file asks for every copy it names on each change in the app, so a
-  // file's line is read once per state of the threads, with one reading of the projects.
+  // An open file asks for every copy it names on each change in the app, so the
+  // projects are read once per state of the threads.
   type Lined = { chain: LinedVersion[]; same: Map<string, string> };
-  let chainsFor: { files: PlacedFile[] | null; products: ArtifactProduct[]; shared: Map<string, boolean>; byKey: Map<string, Promise<Lined>> } = { files: null, products: [], shared: new Map(), byKey: new Map() };
+  type Chains = { files: PlacedFile[] | null; products: ArtifactProduct[]; productsSig: string; shared: Map<string, boolean>; byKey: Map<string, Promise<Lined>> };
+  let chainsFor: Chains = { files: null, products: [], productsSig: '', shared: new Map(), byKey: new Map() };
   const chainsNow = (files: PlacedFile[]) => {
-    if (chainsFor.files !== files) chainsFor = { files, products: readable(), shared: new Map(), byKey: new Map() };
+    if (chainsFor.files !== files) {
+      const products = readable();
+      chainsFor = { files, products, productsSig: products.map((p) => `${p.slug}|${p.dir}|${p.repoPath ?? ''}`).join('\n'), shared: new Map(), byKey: new Map() };
+    }
     return chainsFor;
   };
+  // A file's line looks up every copy of it every thread names, so a new line
+  // anywhere must not redo the files it left alone. A kept line is looked up
+  // again after CHAIN_KEEP_MS, which finds a file that arrived without a word.
+  const keptChains = new Map<string, { sig: string; line: string | null; until: number; value: Promise<Lined> }>();
+  const fileSigs = new WeakMap<PlacedFile, string>();
+  const fileSig = (f: PlacedFile): string => {
+    let sig = fileSigs.get(f);
+    if (sig === undefined) {
+      sig = JSON.stringify([f.key, f.chain.map((v) => [v.id, v.name, v.at, v.by, v.agent, v.edited, v.made, v.copies.map((c) => [refKey(c.thread.ref), c.path, c.at])])]);
+      fileSigs.set(f, sig);
+    }
+    return sig;
+  };
+  const lineSig = (key: string): string => lineNow().of(key).map((e) => `${e.n}:${e.hash}:${e.pending ? 1 : 0}:${e.kept ?? ''}`).join(',');
   function chainOf(f: PlacedFile, files: PlacedFile[]): Promise<Lined> {
     const now = chainsNow(files);
     const project = projectKey(f.project);
     if (!now.shared.has(project)) now.shared.set(project, audienceOf(f.project) !== 'private');
-    if (!now.byKey.has(f.key)) now.byKey.set(f.key, lineChain(f, now.shared.get(project), now.products));
-    return now.byKey.get(f.key)!;
+    if (now.byKey.has(f.key)) return now.byKey.get(f.key)!;
+    const shared = now.shared.get(project);
+    const sig = `${now.productsSig}\0${shared}\0${fileSig(f)}`;
+    const kept = keptChains.get(f.key);
+    if (kept && kept.sig === sig && Date.now() < kept.until && (kept.line === null || kept.line === lineSig(f.key))) {
+      now.byKey.set(f.key, kept.value);
+      return kept.value;
+    }
+    filesOfInternals.chains += 1;
+    const value = lineChain(f, shared, now.products);
+    const entry = { sig, line: null as string | null, until: Date.now() + CHAIN_KEEP_MS, value };
+    if (keptChains.size >= PARSED_KEEP) for (const [k, e] of keptChains) if (e.until <= Date.now()) keptChains.delete(k);
+    keptChains.set(f.key, entry);
+    value.then(() => { entry.line = lineSig(f.key); }, () => { if (keptChains.get(f.key) === entry) keptChains.delete(f.key); });
+    now.byKey.set(f.key, value);
+    return value;
   }
   // A group's file not fetched yet is null: drawing a view fetches nothing.
   const copyHere = (c: ChainCopy, products: ArtifactProduct[]): Promise<string | null> | string | null => (c.thread.ref.kind === 'room'
@@ -620,7 +653,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
   // A copy whose bytes are not here is the version that names it.
   const versionOfCopy = async (chain: readonly LinedVersion[], c: ChainCopy, products: ArtifactProduct[]): Promise<LinedVersion | null> => {
     const held = await versionHeld(chain, await copyHere(c, products));
-    return held === undefined ? chain.find((v) => !v.away && v.copies.some((x) => x.thread === c.thread && x.path === c.path)) ?? null : held;
+    return held === undefined ? chain.find((v) => !v.away && v.copies.some((x) => refKey(x.thread.ref) === refKey(c.thread.ref) && x.path === c.path)) ?? null : held;
   };
 
   const nameInRoom = (src: string): string => String(src).replace(/^\.?\/?attachments\//, '');
