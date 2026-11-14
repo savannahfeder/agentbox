@@ -10,7 +10,7 @@
 // in tests, and behind a plain HTTP server (gatewayServer).
 import crypto from 'node:crypto';
 import http from 'node:http';
-import { FREE, PLANS, TEAM, RUN_CEILING_MS, SIGNIN_CEILING_MS, SIGNINS_AT_ONCE } from './plans.mjs';
+import { FREE, PLANS, TEAM, RUN_CEILING_MS, SIGNIN_CEILING_MS, SIGNINS_AT_ONCE, FILES_LAPSE_DAYS } from './plans.mjs';
 import { TERMS_VERSION } from './terms.mjs';
 import { LOGIN_NAME } from '../../shared/cloud-login-name.mts';
 import { isKeyObject } from '../../shared/cloud-keys.mts';
@@ -22,7 +22,10 @@ import { createPhoneRunStatus } from './phone-status.mjs';
 
 const PERSON = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SESSION = /^[A-Za-z0-9_-]{1,180}$/;
-const KEY = /^(runs|logins)\/([A-Za-z0-9._@+=-]+(?:\/[A-Za-z0-9._@+=-]+)*)$/;
+const KEY = /^(runs|logins|files)\/([A-Za-z0-9._@+=-]+(?:\/[A-Za-z0-9._@+=-]+)*)$/;
+// A kept file is named by its bytes' sha256, so two copies are one object.
+const FILE_KEY = /^files\/[0-9a-f]{64}$/;
+const FILES_WEIGH_MS = 60_000;
 const LINK_MAX_SECONDS = 12 * 60 * 60;
 const LOGIN_LINK_SECONDS = 30 * 60;
 // Lambda takes and gives at most 6 MB; past RELAY_BYTES a call or an answer
@@ -196,6 +199,12 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     const recs = await Promise.all(members.map(async (m) => [m, m === person ? null : await recOf(m).catch(() => fresh())]));
     return { ...tm, people: recs.map(([m, rec]) => ({ id: m, rec })) };
   }
+  // A team's paid seat keeps files as Pro does; a trial keeps none.
+  const filesCapOf = (rec, tm) => {
+    const own = planOf(rec).filesGB || 0;
+    const seat = tm && !tm.trial && tm.seats ? teamPlan.filesGBPerSeat || 0 : 0;
+    return Math.max(own, seat) * 2 ** 30;
+  };
   // A team that cannot be read is no team for this start; the sweep leaves its runs alone.
   const teamOrNone = (person, t, opts) => teamNow(person, t, opts).catch((err) => { log(`could not read ${person}'s team: ${err?.message || err}`); return null; });
   const teamLeft = (tm, rec, t) => !!tm && teamUsedOf(rec, tm.id, tm.trial, t) < tm.seconds;
@@ -351,6 +360,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     return {
       plan: plans[rec.plan] ? rec.plan : 'none', unlimited: !!plan.unlimited, agents: plan.unlimited ? null : plan.agents, hoursPerMonth: plan.hoursPerMonth, running: live(rec, 'run').length, usedSeconds: rec.used[month(t)] || 0, month: month(t),
       billing: whoBills(rec),
+      filesCap: filesCapOf(rec, tm),
       terms: { accepted: rec.terms?.version ?? null, current: termsVersion },
       // Apart from the plan, so an app from before the free hours still reads no plan.
       ...(onFree(rec) ? { free: { agents: free.agents, hours: free.hours, usedSeconds: Math.min(free.hours * 3600, Math.round(rec.freeUsed || 0)) } } : {}),
@@ -538,8 +548,56 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     return { ok: true };
   }
 
+  async function weighFiles(person, t) {
+    const { items, truncated } = await objects.sizes(`files/u-${person}/`, { max: STORAGE_LIST_MAX });
+    const bytes = items.reduce((sum, o) => sum + o.size, 0);
+    return update(person, (r) => { r.files = { ...r.files, at: t, bytes, count: items.length, truncated }; return r.files; });
+  }
+
+  async function filesNow(person, rec) {
+    const t = now();
+    const cap = filesCapOf(rec, await teamOrNone(person, t));
+    const files = rec.files?.at && t - rec.files.at < FILES_WEIGH_MS ? rec.files : await weighFiles(person, t);
+    return { bytes: files.bytes || 0, count: files.count || 0, cap, full: !!cap && ((files.bytes || 0) >= cap || !!files.truncated) };
+  }
+
+  // Read and deleted on any plan, so a plan that ends can bring its files home.
+  async function fileLink(person, rec, { op, key, seconds }) {
+    if (!FILE_KEY.test(key)) throw bad('a kept file is files/ and the sha256 of its bytes');
+    const s = Math.min(LINK_MAX_SECONDS, Math.max(60, Number(seconds) || LINK_MAX_SECONDS));
+    if (op === 'put') {
+      const cap = filesCapOf(rec, await teamOrNone(person, now()));
+      if (!cap) throw new Refusal(403, 'files-plan', `Keeping files in the cloud comes with ${Name} Pro, Plus and Max.`);
+      if ((rec.files?.bytes || 0) >= cap || rec.files?.truncated) throw new Refusal(403, 'files-full', `Your ${gib(cap)} GB of files in the cloud are full.`, { cap });
+      const until = now() + s * 1000;
+      if (!(rec.filesUntil >= until)) await update(person, (r) => { r.filesUntil = Math.max(r.filesUntil || 0, until + LINK_NOTE_MS); });
+    }
+    return { url: await links[op](scopedKey(person, key), s) };
+  }
+
+  // A plan without files starts a clock; at FILES_LAPSE_DAYS what it kept is
+  // deleted. A team that cannot be read starts nothing.
+  async function sweepFiles(person, t, rec) {
+    if (!rec.files?.bytes && !rec.files?.lapsedAt) return;
+    let tm;
+    try { tm = await teamNow(person, t); } catch (err) { log(`could not read ${person}'s team for their files: ${err?.message || err}`); return; }
+    const cap = filesCapOf(rec, tm);
+    if (cap) {
+      if (rec.files.lapsedAt) await update(person, (r) => { delete r.files.lapsedAt; });
+      if ((rec.filesUntil || 0) > (rec.files.at || 0)) await weighFiles(person, t);
+      return;
+    }
+    if (!rec.files.lapsedAt) { await update(person, (r) => { r.files.lapsedAt = t; }); return; }
+    if (t - rec.files.lapsedAt < FILES_LAPSE_DAYS * DAY_MS) return;
+    const { items } = await objects.sizes(`files/u-${person}/`, { max: STORAGE_LIST_MAX });
+    for (let i = 0; i < items.length; i += 16) await Promise.all(items.slice(i, i + 16).map((o) => objects.del(o.key)));
+    log(`${person}'s plan has kept no files for ${FILES_LAPSE_DAYS} days; deleted their ${items.length} files (${gib(rec.files.bytes)} GB)`);
+    await update(person, (r) => { r.files = { at: t, bytes: 0, count: 0 }; });
+  }
+
   async function link(person, rec, { op, key, seconds }) {
     if (!['get', 'put', 'head'].includes(op)) throw bad('op is get, put or head');
+    if (typeof key === 'string' && key.startsWith('files/')) return fileLink(person, rec, { op, key, seconds });
     const scoped = scopedKey(person, key);
     if (!scoped) throw bad('a key is a run\'s or a sign-in\'s, inside your own space');
     // A sign-in is written only by the sandbox, on a link the server makes. A
@@ -560,6 +618,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   }
 
   async function remove(person, { key }) {
+    if (typeof key === 'string' && key.startsWith('files/') && !FILE_KEY.test(key)) throw bad('a kept file is files/ and the sha256 of its bytes');
     const scoped = scopedKey(person, key);
     if (!scoped) throw bad('a key is a run\'s or a sign-in\'s, inside your own space');
     await removeObject(scoped);
@@ -842,6 +901,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       if (route === 'POST /v1/invoke') return { status: 200, body: await invoke(person, data) };
       if (route === 'POST /v1/stop') return { status: 200, body: await stop(person, data) };
       if (route === 'POST /v1/link') return { status: 200, body: await link(person, rec, data) };
+      if (route === 'GET /v1/files') return { status: 200, body: await filesNow(person, rec) };
       if (route === 'POST /v1/delete') return { status: 200, body: await remove(person, data) };
       if (route === 'POST /v1/checkout') return { status: 200, body: await checkout(person, data, headers) };
       if (route === 'POST /v1/billing') return { status: 200, body: await billing(person, headers) };
@@ -985,6 +1045,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
         try {
           const rec = await sweepOne(person, t, await recOf(person));
           await weighStorage(person, t, rec);
+          await sweepFiles(person, t, await recOf(person));
           if (behindTheDatabase(rec)) { behind += 1; await tellTheDatabase(person, rec); }
           swept += 1;
         } catch (err) {

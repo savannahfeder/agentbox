@@ -84,10 +84,10 @@ describe('the copy on the cloud', () => {
     expect(`${a}/agentbox-cloud-501-bfc39bb599a4.sock`.length).toBeLessThan(104);
   });
 
-  it('sends everything to the cloud, and a copy off the cloud is left to the Mac\'s own setting', () => {
+  it('sends everything to the cloud, and a copy off the cloud sends nothing there', () => {
     const base = { storeRoot: '/s', engine: 'real' };
     expect(copyConfig({ ...base, cloud: true }).cloudRuns).toBe('all');
-    expect('cloudRuns' in copyConfig(base)).toBe(false);
+    expect(copyConfig(base).cloudRuns).toBe(false);
   });
 
   // The menu drew "When this Mac is full" on a copy sending everything to the

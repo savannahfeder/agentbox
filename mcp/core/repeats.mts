@@ -151,11 +151,23 @@ function theirWords(thread: WorkItem): string[] {
     .map((f) => String(thread[f] ?? ''));
 }
 
-function personAskedToStop(thread: WorkItem | null, words: unknown): boolean {
+/** Whether `words` are quoted from what the person wrote themselves on `thread`. */
+export function personSaid(thread: WorkItem | null | undefined, words: unknown): boolean {
   if (!thread || !(thread.labels ?? []).includes('founder') || !filedByThePerson(thread)) return false;
-  if (!STOP.test(String(words ?? ''))) return false;
   const own = theirWords(thread);
   return own.length > 0 && saidToClose({ title: '', body: '', answer: own.join('\n') }, words);
+}
+
+/** The thread this session's run is on: null when it names one that is gone, undefined off a thread. */
+export function threadOfThisRun({ env = process.env, now = Date.now() }: RunOptions = {}): WorkItem | null | undefined {
+  const itemId = String(env.ZERO_ITEM ?? '').trim();
+  if (!itemId) return undefined;
+  const home = projectOf(itemId, String(env.ZERO_PRODUCT ?? '').trim() || null);
+  return readWorkItem(home.dir, itemId, now);
+}
+
+function personAskedToStop(thread: WorkItem | null, words: unknown): boolean {
+  return STOP.test(String(words ?? '')) && personSaid(thread, words);
 }
 
 /**
