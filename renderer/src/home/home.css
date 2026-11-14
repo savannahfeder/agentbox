@@ -115,6 +115,16 @@
 :root[data-theme="light"] .hm-card::after { background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, .7)); }
 .hm-scroll { padding-bottom: 28px; }
 
+/* The Next card (next-steps.ts): five lines that all fit, so nothing fades at the foot. */
+.hm-next::after { display: none; }
+.hm-next .hm-scroll { padding-bottom: 0; }
+.hm-next .hm-row { grid-template-columns: 22px 1fr auto; height: 48px; padding: 0 18px; }
+.hm-next .hm-row:disabled { cursor: default; background: none; }
+.hm-tick { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; box-sizing: border-box; border: 1.5px solid color-mix(in srgb, var(--text) 24%, transparent); }
+.hm-tick.on { background: var(--text); border-color: var(--text); color: var(--bg); }
+.hm-next .hm-row.was .hm-text b { color: var(--text-faint); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--text) 30%, transparent); }
+.hm-go { font-size: 13px; color: var(--text-faint); white-space: nowrap; }
+
 /* The Inbox under a sky (approved 2026-11-08, design 86): the sky at full
    strength behind the header and nowhere else, so the list keeps the page.
    It is gone before the tab row: dots between 11px grey capitals defeat any halo. */

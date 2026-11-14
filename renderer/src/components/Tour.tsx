@@ -7,7 +7,7 @@ import { MAC } from '../this-keyboard';
 import { Name } from '../../../shared/product-name.mjs';
 import { FIRST_RUN_STEP } from '../first-run';
 import { ConfettiBurst } from './ConfettiBurst';
-import { THREAD_CLOSED, cursorOwed, fitsBesideTabs, stillPreparing, closeLessons, closesThread, finishLesson, keyLearns, learnedBy, lessonOf, tourLive, tourOver, tourStep, type Lesson, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
+import { THREAD_CLOSED, cursorOwed, finishedPlace, fitsBesideTabs, stillPreparing, closeLessons, closesThread, finishLesson, keyLearns, learnedBy, lessonOf, tourLive, tourOver, tourStep, type Lesson, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
 import './tour.css';
 
 type Box = { x: number; y: number; w: number; h: number };
@@ -166,6 +166,33 @@ function readScreen(view: string, thread: boolean, covered: boolean, palette: bo
 }
 
 const same = (a: Box | null, b: Box | null) => (!a || !b ? a === b : a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h);
+
+type Finished = ReturnType<typeof finishedPlace>;
+/** The walkthrough's last word, on Home's box: you finished, and a real thread starts here. */
+export function TourFinished({ covered }: { covered: boolean }) {
+  const [at, setAt] = useState<Finished | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const read = () => {
+      const box = document.querySelector('.hm-start .tc-card')?.getBoundingClientRect();
+      const hello = document.querySelector('.hm-hello')?.getBoundingClientRect();
+      const h = cardRef.current?.offsetHeight ?? 0;
+      const next = covered || !box?.width || !hello || !h ? null : finishedPlace(box, hello, h);
+      setAt((was) => (same(was?.glow ?? null, next?.glow ?? null) && was?.left === next?.left && was?.top === next?.top ? was : next));
+    };
+    read();
+    const t = setInterval(read, 120);
+    return () => clearInterval(t);
+  }, [covered]);
+  return (
+    <>
+      {at && <div className="tour-glow tour-glow-box" style={{ left: at.glow.x, top: at.glow.y, width: at.glow.w, height: at.glow.h }} aria-hidden="true" />}
+      <div ref={cardRef} className="tour-card" role="status" style={at ? { left: at.left, top: at.top } : { left: -9999, top: -9999 }}>
+        <span className="tour-say">You finished the walkthrough. Type your first real thread and press <K k={CMD} /><K k="↵" /></span>
+      </div>
+    </>
+  );
+}
 
 export function Tour({ tour, practice = false, practiceId = null, answering = false, view, thread, covered, palette, onChange, onPoint, onStep }: {
   tour: TourState | null;

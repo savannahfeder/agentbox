@@ -18,6 +18,10 @@ export interface Tour {
   urgent?: boolean;
   /** The one practice thread the walkthrough runs on, in a practice project nothing real is behind. */
   practice?: TourPractice;
+  /** The last tip is up on Home: you finished, and a real thread starts here. */
+  finishing?: boolean;
+  /** Home's Next card, from the moment the walkthrough is finished. Absent on one finished before the card existed. */
+  next?: { thread?: boolean; hidden?: boolean };
 }
 
 export interface TourPractice { slug: string; item?: string; replies: number; answered?: number }
@@ -81,7 +85,28 @@ export const tourOver = (t: Tour | null): boolean =>
 export const tourLive = (t: Tour | null): boolean => !!t && !t.skipped && !tourOver(t) && LESSONS.some((l) => !t.done.includes(l));
 export const madeUrgent = (t: Tour): Tour => ({ ...t, urgent: true });
 export const noteSent = (t: Tour): Tour => finishLesson({ ...t, sent: true }, 'compose');
-export const finishLesson = (t: Tour, l: Lesson): Tour => (t.done.includes(l) ? t : { ...t, done: [...t.done, l] });
+export function finishLesson(t: Tour, l: Lesson): Tour {
+  if (t.done.includes(l)) return t;
+  const next = { ...t, done: [...t.done, l] };
+  // The lesson that ends the walkthrough starts its last word and Home's Next card.
+  return !tourOver(t) && tourOver(next) ? { ...next, finishing: true, next: next.next ?? {} } : next;
+}
+export const tourFinishing = (t: Tour | null): boolean => !!t && !!t.finishing && tourOver(t);
+export const closeFinish = (t: Tour): Tour => ({ ...t, finishing: false });
+/** A real thread sent once the walkthrough is over: the last tip has been done, and the Next card ticks it. */
+export const firstThreadSent = (t: Tour): Tour => (t.next && tourOver(t) && !t.next.thread ? { ...t, finishing: false, next: { ...t.next, thread: true } } : t);
+export const hideNext = (t: Tour): Tour => ({ ...t, next: { ...t.next, hidden: true } });
+
+type Edges = { left: number; top: number; width: number; height: number };
+/** The last tip: a ring round Home's box with even room, and the card above the greeting on its left edge. */
+export function finishedPlace(box: Edges, hello: { left: number; top: number }, cardHeight: number) {
+  const ROOM = 6;
+  return {
+    glow: { x: box.left - ROOM, y: box.top - ROOM, w: box.width + 2 * ROOM, h: box.height + 2 * ROOM },
+    left: hello.left,
+    top: Math.max(12, hello.top - 20 - cardHeight),
+  };
+}
 export const lessonOf = (s: TourStep): Lesson =>
   s === 'folder' || s === 'pick' || s === 'write' || s === 'send' ? 'compose' : s === 'answered' || s === 'gettingReady' ? 'open' : s === 'inPalette' ? 'palette' : s === 'startHere' ? 'start' : s;
 
@@ -197,7 +222,8 @@ export function readTour(store: Store): Tour | null {
     const p = t.practice && typeof t.practice.slug === 'string'
       ? { practice: { slug: t.practice.slug, ...(typeof t.practice.item === 'string' ? { item: t.practice.item } : {}), replies: Number(t.practice.replies) || 0, ...(t.practice.answered ? { answered: Number(t.practice.answered) } : {}) } }
       : {};
-    return { sent: !!t.sent, skipped: !!t.skipped, done: Array.isArray(t.done) ? t.done : [], ...(t.urgent ? { urgent: true } : {}), ...p };
+    const n = t.next && typeof t.next === 'object' ? { next: { ...(t.next.thread ? { thread: true } : {}), ...(t.next.hidden ? { hidden: true } : {}) } } : {};
+    return { sent: !!t.sent, skipped: !!t.skipped, done: Array.isArray(t.done) ? t.done : [], ...(t.urgent ? { urgent: true } : {}), ...p, ...(t.finishing ? { finishing: true } : {}), ...n };
   } catch { return null; }
 }
 
