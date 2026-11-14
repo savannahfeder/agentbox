@@ -859,6 +859,8 @@ export interface TeamBillingInvoice { at: number; amount: number; status: 'paid'
 export interface TeamBillingDetails {
   periodStart: number | null; periodEnd: number | null;
   nextAt: number | null; nextAmount: number | null;
+  /** Set when the plan was cancelled: the day it ends, with no bill after it. */
+  endsAt?: number | null;
   card: { brand: string; last4: string } | null;
   email: string | null;
   invoices: TeamBillingInvoice[];

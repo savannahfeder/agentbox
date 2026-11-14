@@ -781,7 +781,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     if (!team?.id) throw new Refusal(404, 'no-team', 'You are not on a team.');
     if (!(team.owners || []).includes(person)) return { owner: false };
     const bill = (await readJson(teamKey(team.id))) || {};
-    const empty = { owner: true, periodStart: null, periodEnd: null, nextAt: null, nextAmount: null, card: null, email: null, invoices: [] };
+    const empty = { owner: true, periodStart: null, periodEnd: null, nextAt: null, nextAmount: null, endsAt: null, card: null, email: null, invoices: [] };
     if (!stripe || !bill.stripe?.customer) return empty;
     const [sub, customer, invoices] = await Promise.all([
       bill.stripe.subscription ? stripe.subscriptionWithCard(bill.stripe.subscription).catch(() => null) : null,
@@ -793,12 +793,17 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     // Newer Stripe keeps the period on the item, older on the subscription.
     const periodStart = at(item?.current_period_start ?? sub?.current_period_start);
     const periodEnd = at(item?.current_period_end ?? sub?.current_period_end);
-    const card = sub?.default_payment_method?.card ?? customer?.invoice_settings?.default_payment_method?.card ?? null;
-    const pays = PAYING.has(sub?.status) && !sub?.cancel_at_period_end;
+    // Paid with Link there is no card on the method, and "No card yet" was said to someone who had just paid.
+    const method = sub?.default_payment_method ?? customer?.invoice_settings?.default_payment_method ?? null;
+    const card = method?.card ?? (method?.type === 'link' ? { brand: 'Link', last4: '' } : null);
+    // Stripe marks a cancelled plan with the flag, or with an end date and no flag: either way no bill is coming.
+    const ending = PAYING.has(sub?.status) && (!!sub?.cancel_at_period_end || !!at(sub?.cancel_at));
+    const pays = PAYING.has(sub?.status) && !ending;
     return {
       ...empty, periodStart, periodEnd,
       nextAt: pays ? periodEnd : null,
       nextAmount: pays ? (Math.floor(Number(item?.quantity)) || bill.seats || 0) * teamPlan.dollarsPerSeat : null,
+      endsAt: ending ? (at(sub?.cancel_at) ?? periodEnd) : null,
       card: card ? { brand: String(card.brand || '').replace(/^./, (c) => c.toUpperCase()), last4: String(card.last4 || '') } : null,
       email: typeof customer?.email === 'string' ? customer.email : null,
       invoices: (invoices?.data ?? []).map((i) => ({
