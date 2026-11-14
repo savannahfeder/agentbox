@@ -159,6 +159,9 @@ export function copyConfig(state, had = {}) {
     // `up --alpha teammates`: features still in testing are off for a new person.
     ...Object.fromEntries((state.alpha ?? []).map((f) => [`alpha${f[0].toUpperCase()}${f.slice(1)}`, true])),
     ...((state.cloud || state.standInCloud) && !('cloudRuns' in had) ? { cloudRuns: 'all', cloudWhenOn: 'all' } : {}),
+    // The copy runs with the real home, so the app's default would send what
+    // does not fit here to the owner's own cloud.
+    ...(!state.cloud && !state.standInCloud ? { cloudRuns: false } : {}),
   };
 }
 
@@ -583,7 +586,7 @@ async function startStandInCloud(state) {
   // It imports .mts files; Node before 22.18 reads those only with the flag.
   const server = spawn(process.execPath, ['--experimental-strip-types', '--no-warnings', path.join(here, 'stub-cloud-server.mjs')], {
     detached: true, stdio: ['ignore', log, log],
-    env: { ...cleanEnv(), STUB_CLOUD_INSTANCE: INSTANCE, STUB_CLOUD_HOME: state.home, STUB_CLAUDE_PLAN: state.plan, ...(state.freeHours ? { STUB_CLOUD_FREE_HOURS: String(state.freeHours) } : {}), ...(state.cloudTeam ? { STUB_CLOUD_TEAM: state.cloudTeam, ...(state.cloudTeamHours ? { STUB_CLOUD_TEAM_HOURS: String(state.cloudTeamHours) } : {}) } : {}) },
+    env: { ...cleanEnv(), STUB_CLOUD_INSTANCE: INSTANCE, STUB_CLOUD_HOME: state.home, STUB_CLAUDE_PLAN: state.plan, ...(state.freeHours ? { STUB_CLOUD_FREE_HOURS: String(state.freeHours) } : {}), ...(process.env.STUB_CLOUD_FILES_GB ? { STUB_CLOUD_FILES_GB: process.env.STUB_CLOUD_FILES_GB } : {}), ...(state.cloudTeam ? { STUB_CLOUD_TEAM: state.cloudTeam, ...(state.cloudTeamHours ? { STUB_CLOUD_TEAM_HOURS: String(state.cloudTeamHours) } : {}) } : {}) },
   });
   server.unref();
   const deadline = Date.now() + 20_000;

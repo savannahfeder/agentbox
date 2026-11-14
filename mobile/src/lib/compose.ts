@@ -1,7 +1,7 @@
 // THE NEW-THREAD PAGE'S CHOICES, by the phone site's card's rules
 // (renderer/src/threads/ThreadComposer.tsx): which project it opens on and
 // falls back to, the agent, model and level it remembers, and what a send names.
-import { DEFAULT_MODEL, defaultModelFor, engineModelLabel, readLastModel, writeLastModel, type ModelChoice } from '../../../renderer/src/models';
+import { DEFAULT_MODEL, claudeModelRows, defaultModelFor, engineModelLabel, readLastModel, writeLastModel, type ModelChoice } from '../../../renderer/src/models';
 import { EFFORTS, defaultEffortFor, effortChoicesFor, effortPicked, effortShown, readLastEffort, writeLastEffort } from '../../../renderer/src/effort';
 import { readLastEngine, startingEngine } from '../../../renderer/src/engines';
 import { priorityValueOf, type PriorityId } from '../../../renderer/src/priority';
@@ -110,11 +110,17 @@ function threadEngine(item: { engine?: string; model?: string }, agents: Partial
   return agents.workspace === 'codex' && has('codex') ? 'codex' : 'claude';
 }
 
+// Older Codex rows carry a Claude word ("opus") from before the phone knew the
+// thread's agent; Codex cannot run it, so it is no model at all there.
+const claudeWord = (model: string) => /^claude-/.test(model) || claudeModelRows().some((m) => m.id === model || m.model === model);
+const staleOn = (engine: Harness, model: string | undefined) => !!model && engine === 'codex' && claudeWord(model);
+
 /** The model a thread's reply box shows and lists: the agent picked in the box, else the thread's own. */
 export function replyModel(item: { engine?: string; model?: string }, picked: Pick<Choices, 'model' | 'engine'>, codex: CodexOpts & Partial<Agents> = {}) {
   const own = threadEngine(item, codex);
   const engine: Harness = picked.engine === 'claude' || picked.engine === 'codex' ? picked.engine : own;
-  const model = picked.model ?? (engine === own ? item.model : undefined) ?? defaultModelFor(engine, codex.codexDefault ?? null);
+  const kept = engine === own && !staleOn(own, item.model) ? item.model : undefined;
+  const model = picked.model ?? kept ?? defaultModelFor(engine, codex.codexDefault ?? null);
   return { engine, model, label: engineModelLabel(engine, model, codex) };
 }
 
@@ -128,7 +134,7 @@ export function replyChoices(item: { engine?: string; model?: string }, picked: 
   const { engine: _picked, ...rest } = picked;
   const was = threadEngine(item, agents);
   const { engine } = replyModel(item, picked, agents);
-  if (engine === was || (agents.engines?.length ?? 0) < 2) return rest;
+  if (engine === was || (agents.engines?.length ?? 0) < 2) return picked.model === undefined && staleOn(engine, item.model) ? { ...rest, model: null } : rest;
   const sent = pickToSend({ model: picked.model ?? null, effort: picked.effort ?? null }, { engine, was, engineCount: agents.engines!.length });
   return { ...rest, engine, model: sent.model, effort: sent.effort };
 }
