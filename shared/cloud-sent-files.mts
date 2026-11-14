@@ -5,21 +5,38 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { NAME, WAS } from './product-name.mjs';
+import { pathHoldsSignIns } from './sign-in-places.mts';
 
 export const SENT_FILE_MAX = 1024 ** 3;
-const SIGN_INS = /(^|\/)(\.ssh|\.aws|\.gnupg|\.netrc|\.npmrc|\.pypirc|\.docker|\.kube|\.claude[^/]*|\.codex|\.agentbox|Keychains|\.config\/gh|\.config\/gcloud|\.password-store)(\/|$)/;
 
 export type FileToSend = { path: string; size: number; error?: undefined } | { error: string; path?: undefined; size?: undefined };
 
-/** The file to send for `asked` (a full or ~/ path), or why it cannot go. */
-export function fileToSend(asked: unknown, { home = os.homedir() }: { home?: string } = {}): FileToSend {
+const APP_FOLDERS = [NAME, ...WAS].map((n) => n.toLowerCase());
+
+// An agent reads the code and asks for the app's folder by its current name, but
+// a Mac that ran an older build keeps the folder's old name (main/main.mts).
+function inAppFolder(file: string, home: string, appData: string): string | null {
+  for (const base of [path.join(home, 'Library', 'Application Support'), path.join(home, '.config')]) {
+    const rel = path.relative(base, file).split(path.sep);
+    if (rel.length > 1 && rel[0] !== '..' && APP_FOLDERS.includes(rel[0].toLowerCase())) {
+      const there = path.join(appData, ...rel.slice(1));
+      if (fs.existsSync(there)) return there;
+    }
+  }
+  return null;
+}
+
+/** The file to send for `asked` (a full or ~/ path), or why it cannot go. `appData` is the app's own data folder. */
+export function fileToSend(asked: unknown, { home = os.homedir(), appData }: { home?: string; appData?: string } = {}): FileToSend {
   const raw = String(asked ?? '').trim();
   const full = raw.startsWith('~/') ? path.join(home, raw.slice(2)) : raw;
   if (!path.isAbsolute(full)) return { error: 'That is not a full path on this computer.' };
-  const resolved = path.resolve(full);
+  let resolved = path.resolve(full);
+  if (appData && !fs.existsSync(resolved)) resolved = inAppFolder(resolved, home, appData) ?? resolved;
   let real;
   try { real = fs.realpathSync(resolved); } catch { return { error: `${raw} is not on this computer.` }; }
-  if (SIGN_INS.test(resolved) || SIGN_INS.test(real)) return { error: 'That file holds sign-ins, so it never goes to the cloud.' };
+  if (pathHoldsSignIns(resolved) || pathHoldsSignIns(real)) return { error: 'That file holds sign-ins, so it never goes to the cloud.' };
   let st;
   try { st = fs.statSync(real); } catch { return { error: `${raw} could not be read.` }; }
   if (!st.isFile()) return { error: `${raw} is a folder, not a file.` };

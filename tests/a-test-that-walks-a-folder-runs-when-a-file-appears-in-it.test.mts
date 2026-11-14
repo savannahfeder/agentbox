@@ -115,6 +115,7 @@ describe('in this repository', () => {
 
   it('stays cheap: a renderer change gains only a handful of test files', () => {
     const picked = testsThatRead(['renderer/src/components/first-run.css'], here);
-    expect(picked.length).toBeLessThan(12);
+    // 13 since w-fbe5e95dea: the-design-is-rounded reads every stylesheet, in under a second.
+    expect(picked.length).toBeLessThan(13);
   });
 });

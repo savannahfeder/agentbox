@@ -553,6 +553,9 @@ export function projectsOfTheirOwn(products: Array<{ personal?: boolean }>): num
 // read a folder: that path is what answers a task in a real project, and the
 // walk simply no longer sends one there.
 export const TASK_TITLE = PRACTICE_TASK.title;
+
+/** Whether a New thread draft is the tutorial's practice task, which must not outlive the tutorial. */
+export const practiceDraftLeft = (text: string): boolean => text.trim().startsWith(PRACTICE_TASK.title);
 export const TASK_BODY = PRACTICE_TASK.body;
 
 /** The line changes at fifteen seconds. Taken as recommended, round four. */
@@ -723,8 +726,7 @@ export function finishedCleared(
   laterAt: number,
 ): boolean {
   if (!run || !run.examples.length) return false;
-  const there = new Set(rows.map((r) => r.id));
-  return !run.examples.some((id, i) => i !== waitingAt && i !== laterAt && there.has(id));
+  return clearIds(rows, run, waitingAt, laterAt).length === 0;
 }
 
 /**
@@ -752,7 +754,10 @@ export function clearIds(
 ): string[] {
   if (!run) return [];
   const there = new Set(rows.map((r) => r.id));
-  return run.examples.filter((id, i) => i !== waitingAt && i !== laterAt && there.has(id));
+  const finished = run.examples.filter((id, i) => i !== waitingAt && i !== laterAt && there.has(id));
+  // Your own thread is in the inbox here only when Z brought it back. It is
+  // drawn at the top, so the ring and E start on it.
+  return run.item && there.has(run.item) ? [run.item, ...finished] : finished;
 }
 
 /**
@@ -933,6 +938,18 @@ export function inboxCleared(rows: { id: string }[], run: FirstRun | null): bool
   if (!run || !run.examples.length) return false;
   const there = new Set(rows.map((r) => r.id));
   return !run.examples.some((id) => there.has(id));
+}
+
+/** Where the walk goes once the waiting thread is answered. A thread Z brought
+ *  back is still in the inbox then, and the clearing step is the one about it. */
+export function afterUnblock(
+  rows: { id: string }[], run: FirstRun | null, waitingAt: number,
+): 'where' | 'clear' | null {
+  if (!run) return null;
+  const own = !!run.item && rows.some((r) => r.id === run.item);
+  if (inboxCleared(rows, run) && !own) return 'where';
+  const waiting = waitingId(run, waitingAt);
+  return waiting && rows.some((r) => r.id === waiting) ? null : 'clear';
 }
 
 /*
@@ -1642,6 +1659,10 @@ export function coach(
     opened?: boolean; view?: string; picking?: boolean; left?: number; palette?: boolean;
     /** Whether the page is drawn as the board, for the board beat's second half. */
     board?: boolean;
+    /** Whether the New thread box is open, for the send step. */
+    composing?: boolean;
+    /** Practice threads still in the inbox, for the inbox-zero line. */
+    unfinished?: number;
     tabs?: readonly string[];
     /** The team strip's tab names, when that strip is what is drawn. */
     tabNames?: Readonly<Record<string, string>>;
@@ -1722,7 +1743,8 @@ export function coach(
     // new thread card is drawn as an email and its button says Send, so the
     // sentence says what is written on the button somebody is looking at.
     case 'task':
-      return say('', 'Press ', '⌘↵', ' or click Send.');
+      // Escape shut the box: N reopens it with the draft, so N is what the card asks for.
+      return ctx.composing === false ? say('', 'Press ', 'N', ' to open your thread again.') : say('', 'Press ', '⌘↵', ' or click Send.');
     case 'working':
       return sinceSent >= SLOW_AFTER_MS
         ? say('Your agent is running.',
@@ -2086,6 +2108,13 @@ export function coach(
       // THE OPENING IS HERS, WORD FOR WORD (tests/the-walk-teaches-undo-snooze-
       // and-notes). Three persona testers called "Great!" patronising in round
       // two (2026-10-06); that is noted for her and the sentence is not touched.
+      // An undo can bring a practice thread back after the last one was cleared.
+      if (ctx.unfinished) {
+        return say(
+          `${ctx.unfinished === 1 ? 'One thread is' : `${ctx.unfinished} threads are`} still in your inbox. Inbox zero is the goal.`,
+          'Press ', cap, `${or} to see where the rest went.`,
+        );
+      }
       return say(
         'Great! Your inbox is now empty. That is inbox zero, and it is the goal.',
         'Press ', cap, `${or} to see where it all went.`,
@@ -2394,8 +2423,8 @@ export function pressCounts(target: EventTarget | null): boolean {
      already in it.
 */
 
-/** The one cap that is a wrong press and still has to reach the app. */
-const NEVER_SWALLOWED = '⇥';
+/** Caps that are wrong presses and still have to reach the app: Tab, and Z, which the walk tells you undoes. */
+const NEVER_SWALLOWED = new Set(['⇥', 'Z']);
 
 /**
  * Whether the walk should eat this press before the app underneath sees it.
@@ -2408,7 +2437,7 @@ export function swallowPress(
 ): boolean {
   if (!pressCounts(target)) return false;
   if (!wrongPress(want, e)) return false;
-  return keyToken(e) !== NEVER_SWALLOWED;
+  return !NEVER_SWALLOWED.has(keyToken(e) ?? '');
 }
 
 /* ----------------- AND A LETTER TYPED AT A GLOWING BOX --------------------- */
@@ -3037,6 +3066,12 @@ export function readFirstRun(store: Store): FirstRun {
 
 export function saveFirstRun(store: Store, s: FirstRun): void {
   try { store.setItem(KEY, JSON.stringify(s)); } catch { /* a full disk is not a reason to stop the walk */ }
+}
+
+/** The tutorial saved before a reload, when its practice project is still there to resume. */
+export function resumableTutorial(saved: FirstRun, products: { slug: string; practice?: boolean }[]): FirstRun | null {
+  if (!saved.tutorial || !saved.practice) return null;
+  return products.some((p) => p.slug === saved.practice && p.practice) ? saved : null;
 }
 
 export function finishFirstRun(store: Store): void {

@@ -15,6 +15,7 @@ import { filesInLines, marksOf, reviewKind, threadFiles } from '../shared/artifa
 import { editOfLine, resolveEdits } from '../shared/message-edits.mts';
 import { firstHit, fold, holds, queryOf, windowAround } from '../shared/word-match.mts';
 import { withoutFileHomes } from '../shared/file-home.mts';
+import { isCauseLedger, withoutBrief } from '../shared/causes.mts';
 import type { ArtifactProduct } from './artifact-path.mts';
 import type { FileFamily, FileVersion, LinePatch, NotePlace, ReviewKind, ThreadLine } from '../shared/artifact-marks.mts';
 import type { Store } from './store.mts';
@@ -142,7 +143,9 @@ export function createFinder({ listThreads, loadThread, readText = async () => n
   async function build(t: FinderThread): Promise<FinderEntry> {
     const loaded = await loadThread(t);
     const { files, notes } = filesAndNotesOf(loaded.lines);
-    const messages = messagesOf(loaded.lines).map((m) => ({ ...m, f: fold(m.text) }));
+    // A cause row's body is its lead's brief, which nobody said.
+    const lines = isCauseLedger(loaded.lines) ? withoutBrief(loaded.lines) : loaded.lines;
+    const messages = messagesOf(lines).map((m) => ({ ...m, f: fold(m.text) }));
     const fileRows: FileRow[] = [];
     for (const f of files) {
       const row: FileRow = { ...f, f: fold(f.name), lines: [] };

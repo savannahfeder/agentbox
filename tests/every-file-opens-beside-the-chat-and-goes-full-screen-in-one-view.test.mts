@@ -62,9 +62,11 @@ describe('the wiring', () => {
   });
   it('the side pane\'s full-screen button opens the file view on your thread and on a teammate\'s', () => {
     const onMode = app.slice(app.indexOf('onMode={mode => {'), app.indexOf('split={artifactFraction('));
-    expect(onMode).toMatch(/fullScreenTakes\(/);
-    expect(onMode).toMatch(/setFullAt\(/);
-    expect(onMode).toMatch(/setCardOpenAt\(/);
+    expect(onMode).toMatch(/if \(mode === 'focus'\) docFull\(\)/);
+    const full = app.slice(app.indexOf('const docFull = (forNotes = false) => {'), app.indexOf('const openNotesFull'));
+    expect(full).toMatch(/fullScreenTakes\(/);
+    expect(full).toMatch(/setFullAt\(/);
+    expect(full).toMatch(/setCardOpenAt\(/);
   });
   // Three power testers read the film's own corner-arrows button, beside the
   // pane's identical one, as a second full screen that skipped the notes.
@@ -84,8 +86,8 @@ describe('the wiring', () => {
   // A power tester played a film to 0:03 beside the chat, went full screen, and
   // found it stopped at 0:00.
   it('a film goes full screen at the moment it had reached beside the chat', () => {
-    const onMode = app.slice(app.indexOf('onMode={mode => {'), app.indexOf('split={artifactFraction('));
-    expect(onMode).toMatch(/time: filmBeside\(\)/);
+    const full = app.slice(app.indexOf('const docFull = (forNotes = false) => {'), app.indexOf('const openNotesFull'));
+    expect(full).toMatch(/time: filmBeside\(\)/);
     const view = read('renderer/src/components/ArtifactView.tsx');
     expect(view).toMatch(/open\.time[^\n]*setGo\(\{ place: \{ kind: 'time', s: open\.time \}/);
   });

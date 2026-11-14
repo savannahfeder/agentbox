@@ -11,8 +11,8 @@
 // test's), and a tester session playing them for --minutes. Every stretch
 // after the first is told what was already logged, so testers confirm or go
 // elsewhere rather than file the same thing twice. --pace keeps starting
-// stretches while pace.mjs says the tester login's week is behind its line,
-// waits out a full 5-hour window, and stops at --hours. report.md ranks every issue.
+// stretches while pace.mjs says run, waits out a full 5-hour window or the
+// 85% hold, and stops at the target or --hours. report.md ranks every issue.
 //
 // Testers are always Codex, on the login codex-tester.mjs picks. --engine
 // external only writes each stretch's prompt to <person>/stretch-N.prompt.md
@@ -236,11 +236,7 @@ if (isMain) {
   });
   const diaries = () => Object.fromEntries(people.map((p) => [p.name, readDiary(path.join(dirs[p.slug], 'diary.jsonl')).issues]));
 
-  let reached = [];
-  try { reached = await (await import(path.join(REPO, 'scripts/phone-parity.mjs'))).newOnThePhone(7); } catch (err) { say(`could not read what reached the phone this week: ${err.message}`); }
-  const focus = focusFor(opt('focus'), reached);
-  if (reached.length) say(`${reached.length} features reached the phone this week; the testers are told to try each`);
-
+  // Before anything else is awaited: a stop while the phone's week is read still leaves a report.
   let stretch = 0;
   const report = (state) => writeReport(root, { people, dirs, stretch, minutes, engine, state });
   for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP']) {
@@ -252,6 +248,12 @@ if (isMain) {
       process.exit(1);
     });
   }
+
+  let reached = [];
+  try { reached = await (await import(path.join(REPO, 'scripts/phone-parity.mjs'))).newOnThePhone(7); } catch (err) { say(`could not read what reached the phone this week: ${err.message}`); }
+  const focus = focusFor(opt('focus'), reached);
+  if (reached.length) say(`${reached.length} features reached the phone this week; the testers are told to try each`);
+
   while (stretch < maxStretches && Date.now() < deadline) {
     if (pace && engine !== 'external') {
       const reading = await readingFor(codexHome);

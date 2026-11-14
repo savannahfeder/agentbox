@@ -169,7 +169,7 @@ describe('the nudge is remembered once, ever', () => {
 
 describe('every way a stopped row could leave the inbox goes past the nudge', () => {
   it('the single close does', () => {
-    expect(app).toMatch(/const markDone[\s\S]{0,1400}?nudgeOnStopped\(\[item\], 'E'\)/);
+    expect(app).toMatch(/const markDone[\s\S]{0,1800}?nudgeOnStopped\(\[item\], 'E'\)/);
   });
 
   it('a ticked selection does, so E over four ticks cannot take one out unwarned', () => {

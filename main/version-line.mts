@@ -14,6 +14,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { appendTo, cleanEntry, foldLine, foldOnto } from '../shared/version-line.mts';
+import { hashBytesOf } from './hash-bytes.mts';
 import type { LineEntry } from '../shared/version-line.mts';
 
 export interface StoredEntry extends LineEntry { local?: boolean }
@@ -99,10 +100,7 @@ export function versionLine({ dir, cloud = () => null, onMoved = () => {} }: { d
     const was = hashes.get(src);
     const settled = was && (was.seen == null || was.seen - was.mtime > RACY_MS);
     if (was && settled && was.size === size && was.mtime === mtime && (was.ns == null || was.ns === ns)) return was;
-    const hash = await new Promise<string>((resolve, reject) => {
-      const h = crypto.createHash('sha256');
-      fs.createReadStream(src).on('data', (d) => h.update(d)).on('end', () => resolve(h.digest('hex'))).on('error', reject);
-    }).catch(() => null);
+    const hash = await hashBytesOf(src).catch(() => null);
     if (!hash) return null;
     const out: FileHash = { size, mtime, ns, seen: Date.now(), hash };
     hashes.set(src, out);
@@ -113,9 +111,12 @@ export function versionLine({ dir, cloud = () => null, onMoved = () => {} }: { d
   const keptDir = (hash: string): string => path.join(dir, BYTES, hash);
   const kept = new Map<string, string>();
   function keptOf(hash: string): string | null {
-    if (kept.has(hash)) return kept.get(hash)!;
+    // A kept copy can be moved to the Trash or taken off to the cloud.
+    if (kept.has(hash) && fs.existsSync(kept.get(hash)!)) return kept.get(hash)!;
+    kept.delete(hash);
     let found: string | null = null;
-    try { const [name] = fs.readdirSync(keptDir(hash)).filter((n) => !n.endsWith('.tmp')); found = name ? path.join(keptDir(hash), name) : null; } catch { /* not kept */ }
+    // Finder leaves a .DS_Store behind when it trashes the kept copy.
+    try { const [name] = fs.readdirSync(keptDir(hash)).filter((n) => !n.endsWith('.tmp') && !n.startsWith('.')); found = name ? path.join(keptDir(hash), name) : null; } catch { /* not kept */ }
     if (found) kept.set(hash, found);
     return found;
   }

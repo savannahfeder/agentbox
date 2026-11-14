@@ -13,7 +13,7 @@ it('expires online status after ninety seconds, including after a reload', () =>
   for (const age of [89_999, 90_000]) expect(computerSays({ seenAt: now - age, cloud: false }, now).label).toBe('Your computer is online');
   for (const age of [90_001, 240_000]) {
     expect(computerSays({ seenAt: now - age, cloud: false }, now).desc).toContain('waits');
-    expect(phoneStatusLine({ error: null, fetchedAt: now, macSeen: now - age }, now)).toContain('waits');
+    expect(phoneStatusLine({ error: null, fetchedAt: now, macSeen: now - age }, now)).toContain('Open it to run what you send');
   }
   expect(computerSays({ seenAt: 0, cloud: false }, now).label).toBe('No computer connected yet');
   expect(phoneStatusLine({ error: 'offline', fetchedAt: now, macSeen: now }, now)).toContain("Can't reach");

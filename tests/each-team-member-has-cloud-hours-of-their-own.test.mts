@@ -1,11 +1,15 @@
-// EACH TEAM MEMBER HAS CLOUD HOURS OF THEIR OWN: a 14-day trial, then $40 a seat.
+// EACH TEAM MEMBER HAS CLOUD HOURS OF THEIR OWN: a 7-day trial, then $40 a seat.
 //
-// The owner's plan for the multiplayer launch: every team gets 14 days free,
-// each member with 10 cloud hours and 2 agents at once of their own; then $40
-// a member a month, each seat the same as the $40 cloud plan, 400 hours and 10
-// agents at once (2026-11-08, replacing one pool for the whole team: three
-// power testers ran a shared pool dry and could not tell who had). A person's
-// own paid plan comes first, then the team's, which replace their 5 free hours.
+// The owner's plan for the multiplayer launch: every team gets 7 days free
+// (14 until 2026-11-10, when she cut Pro's trial to 7),
+// each member with 50 cloud hours of their own (10 until 2026-11-13: "10 cloud
+// hours for pro is very bad given free is 5"); then $40 a member a month,
+// each seat the $40 cloud plan's 400 hours (2026-11-08, replacing one pool for
+// the whole team: three power testers ran a shared pool dry and could not tell
+// who had). Hours are the only limit, never how many run at once (2026-11-13,
+// tests/a-team-runs-any-number-at-once-and-a-card-trial-runs-on-trial-hours).
+// A person's own paid plan comes first, then the team's, which replace their 5
+// free hours.
 import { describe, it, expect } from 'vitest';
 import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { PLANS, TEAM } from '../cloud/gateway/plans.mjs';
@@ -24,6 +28,14 @@ const HOUR = 60 * 60_000;
 const DAY = 24 * HOUR;
 const MADE = Date.UTC(2026, 10, 17, 9, 0, 0);
 const SET = { ...PLANS, pro: { agents: 10, hoursPerMonth: 100, dollarsPerMonth: 40 } };
+// A member's whole trial as five-hour runs side by side, each under the 8-hour run ceiling.
+const TRIAL_RUNS = TEAM.trialHoursPerMember / 5;
+const ids = (first: number) => Array.from({ length: TRIAL_RUNS }, (_, i) => first + i);
+async function spendTrial(p: { start: (n: number) => Promise<unknown>; finish: (n: number) => Promise<unknown> }, tick: (ms: number) => void, first: number) {
+  for (const n of ids(first)) await p.start(n);
+  tick(5 * HOUR);
+  for (const n of ids(first)) await p.finish(n);
+}
 
 function setup({ members = [A, B], owners = [A], madeAt = MADE, start = MADE + HOUR } = {}) {
   let clock = start;
@@ -63,8 +75,8 @@ function setup({ members = [A, B], owners = [A], madeAt = MADE, start = MADE + H
 }
 
 describe('the trial', () => {
-  it('is 14 days, 10 hours and 2 agents at once a member; a seat is 400 hours and 10 agents', () => {
-    expect(TEAM).toMatchObject({ trialDays: 14, trialHoursPerMember: 10, trialAgentsPerMember: 2, hoursPerSeat: 400, agentsPerSeat: 10, dollarsPerSeat: 40 });
+  it('is 7 days and 50 hours a member; a seat is 400 hours and 100 GB of files', () => {
+    expect(TEAM).toEqual({ trialDays: 7, trialHoursPerMember: 50, hoursPerSeat: 400, dollarsPerSeat: 40, filesGBPerSeat: 100 });
   });
 
   it('runs a member with no plan on their own trial hours, not on their free hours', async () => {
@@ -74,16 +86,14 @@ describe('the trial', () => {
     tick(HOUR);
     await a.finish(1);
     const me = await a.me();
-    expect(me.team).toMatchObject({ trial: true, hours: 10, agents: 2, usedSeconds: 3600, endsAt: MADE + 14 * DAY, owner: true });
+    expect(me.team).toMatchObject({ trial: true, hours: 50, agents: null, usedSeconds: 3600, endsAt: MADE + 7 * DAY, owner: true });
     expect(me.free.usedSeconds).toBe(0);
   });
 
   it("one member spending all their hours leaves the other member's untouched", async () => {
     const { as, tick } = setup();
     const a = as(A); const b = as(B);
-    await a.start(1); await a.start(6);
-    tick(5 * HOUR);
-    await a.finish(1); await a.finish(6);
+    await spendTrial(a, tick, 100);
     expect((await a.start(7)).body).toMatchObject({ ok: false, error: 'hours' });
     expect((await b.me()).team.usedSeconds).toBe(0);
     expect((await b.start(2)).body.ok).toBe(true);
@@ -102,11 +112,11 @@ describe('the trial', () => {
   it('spent, refuses the next run and says whose hours are used and who can pay, never falling to the free hours', async () => {
     const { as, tick } = setup();
     const a = as(A); const b = as(B);
-    await a.start(1); await a.start(4); tick(5 * HOUR); await a.finish(1); await a.finish(4);
+    await spendTrial(a, tick, 100);
     const owner = await a.start(3);
     expect(owner.body).toMatchObject({ ok: false, error: 'hours' });
-    expect(owner.body.message).toBe('Your 10 trial hours are used. Pay for the team on Plan and Billing to keep running agents there.');
-    await b.start(5); await b.start(8); tick(5 * HOUR); await b.finish(5); await b.finish(8);
+    expect(owner.body.message).toBe('Your 50 trial hours are used. Pay for the team on Plan and Billing to keep running agents there.');
+    await spendTrial(b, tick, 200);
     expect((await b.start(9)).body.message).toMatch(/owner can pay/);
     expect((await a.me()).free.usedSeconds).toBe(0);
   });
@@ -114,15 +124,15 @@ describe('the trial', () => {
   it('spent, gives no upload link for a run, and no room to the phone', async () => {
     const { gw, as, tick } = setup();
     const a = as(A);
-    await a.start(1); await a.start(4); tick(5 * HOUR); await a.finish(1); await a.finish(4);
+    await spendTrial(a, tick, 100);
     expect((await a.call('POST', '/v1/link', { op: 'put', key: 'runs/r9/in.bundle', seconds: 600 })).status).toBe(403);
     expect(await gw.room(A)).toMatchObject({ ok: false, error: 'hours' });
   });
 
-  it("ends after 14 days: back to each member's own free hours", async () => {
+  it("ends after 7 days: back to each member's own free hours", async () => {
     const { as, tick } = setup();
     const a = as(A);
-    tick(14 * DAY);
+    tick(7 * DAY);
     expect((await a.start(1)).body.ok).toBe(true);
     tick(HOUR);
     await a.finish(1);
@@ -133,33 +143,28 @@ describe('the trial', () => {
 
   it('a day before the end, it still runs', async () => {
     const { as, tick } = setup();
-    tick(13 * DAY);
+    tick(6 * DAY);
     expect((await as(A).me()).team).toMatchObject({ trial: true });
   });
 
-  it('runs two agents at once for each member, whatever the others run', async () => {
+  it('runs as many agents at once as each member starts', async () => {
     const { as } = setup();
     const a = as(A); const b = as(B);
-    expect((await a.start(1)).body.ok).toBe(true);
-    expect((await a.start(2)).body.ok).toBe(true);
-    const third = await a.start(3);
-    expect(third.body).toMatchObject({ ok: false, error: 'agents' });
-    expect(third.body.message).toBe('All 2 of your cloud agents are running.');
+    for (const n of [1, 2, 3]) expect((await a.start(n)).body.ok).toBe(true);
     expect((await b.start(4)).body.ok).toBe(true);
-    expect((await b.start(5)).body.ok).toBe(true);
   });
 
   it("runs that outlast a member's hours end at the next call", async () => {
     const { as, tick, stopped } = setup();
     const a = as(A);
-    await a.start(1); await a.start(2);
+    for (const n of ids(1)) await a.start(n);
     tick(5 * HOUR + 60_000);
     await a.poll(1);
     expect(stopped()).toEqual(expect.arrayContaining([`u-${A}-run-1`, `u-${A}-run-2`]));
   });
 
   it('runs going when the trial ends are ended by the sweep', async () => {
-    const { gw, as, tick, stopped } = setup({ start: MADE + 14 * DAY - 60_000 });
+    const { gw, as, tick, stopped } = setup({ start: MADE + 7 * DAY - 60_000 });
     const a = as(A);
     await a.start(1);
     tick(2 * 60_000);
@@ -171,7 +176,7 @@ describe('the trial', () => {
 describe('the paid team', () => {
   const pay = (objects, seats) => objects.put('ledger/teams/team-1.json', JSON.stringify({ plan: 'team', seats, stripe: { status: 'active' } }));
 
-  it("gives each member a seat's 400 hours a month and 10 agents at once, the $40 cloud plan's", async () => {
+  it("gives each member a seat's 400 hours a month, the $40 cloud plan's", async () => {
     const { as, objects, tick } = setup();
     await pay(objects, 2);
     tick(30 * DAY);
@@ -179,9 +184,8 @@ describe('the paid team', () => {
     await a.start(1);
     tick(HOUR);
     await a.finish(1);
-    expect((await a.me()).team).toMatchObject({ trial: false, seats: 2, hours: 400, agents: 10, usedSeconds: 3600 });
+    expect((await a.me()).team).toMatchObject({ trial: false, seats: 2, hours: 400, agents: null, usedSeconds: 3600 });
     expect(TEAM.hoursPerSeat).toBe(PLANS.pro.hoursPerMonth);
-    expect(TEAM.agentsPerSeat).toBe(PLANS.pro.agents);
     expect(TEAM.dollarsPerSeat).toBe(PLANS.pro.dollarsPerMonth);
   });
 
@@ -252,7 +256,7 @@ describe('who is on a team, as the database says', () => {
 describe('what the app makes of it', () => {
   const NOW = MADE + 5 * DAY;
   const people = [{ id: A, usedSeconds: 4.2 * 3600, running: 1 }, { id: B, usedSeconds: 3.1 * 3600, running: 0 }, { id: C, usedSeconds: 0, running: 0 }];
-  const trial = { trial: true, endsAt: MADE + 14 * DAY, seats: 0, members: 3, owner: true, agents: 2, running: 1, hours: 10, usedSeconds: 4.2 * 3600, people };
+  const trial = { trial: true, endsAt: MADE + 7 * DAY, seats: 0, members: 3, owner: true, agents: null, running: 1, hours: 10, usedSeconds: 4.2 * 3600, people };
   const server = (team, over = {}) => ({ plan: 'none', agents: 0, hoursPerMonth: 0, running: 1, usedSeconds: 0, free: { agents: 2, hours: 5, usedSeconds: 0 }, team, ...over });
   const names = [
     { id: A, name: 'Sam Rivera', email: 's@example.com', avatarUrl: null, role: 'owner' },
@@ -262,8 +266,8 @@ describe('what the app makes of it', () => {
   const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/&#x27;/g, "'").replace(/\s+/g, ' ');
   const page = (team, me = A, billing = null) => text(renderToStaticMarkup(React.createElement(TeamBilling, { team, people: names, meId: me, billing, now: NOW })));
 
-  it('a team reads as the team plan, with your own agents and hours', () => {
-    expect(cloudPlanOf(server(trial))).toMatchObject({ plan: 'team', agents: 2, hoursPerMonth: 10, usedSeconds: 4.2 * 3600 });
+  it('a team reads as the team plan, with your own hours and no limit at once', () => {
+    expect(cloudPlanOf(server(trial))).toMatchObject({ plan: 'team', unlimited: true, agents: null, hoursPerMonth: 10, usedSeconds: 4.2 * 3600 });
   });
 
   it('your hours spent still read as the team, never as the free hours', () => {
@@ -276,12 +280,12 @@ describe('what the app makes of it', () => {
 
   it('the trial says its days, your hours now beside a seat after it, and the owner can pay for every seat', () => {
     const t = page(trial);
-    expect(t).toContain('9 days left in your team\'s trial');
+    expect(t).toContain('2 days left in your team\'s trial');
     expect(t).toContain('Started Nov 17');
-    expect(t).toContain('Ends Dec 1');
+    expect(t).toContain('Ends Nov 24');
     expect(t).toContain('Pay for 3 seats now · $120 a month');
-    expect(t).toMatch(/Now, each person 5\.8 of 10 of your trial hours left 2 agents at once/);
-    expect(t).toMatch(/From Dec 1, each person \$40 a month 400 cloud hours a month 10 agents at once · you pay \$120 a month for 3/);
+    expect(t).toMatch(/Now, each person 5\.8 of 10 of your trial hours left Any number at once/);
+    expect(t).toMatch(/From Nov 24, each person \$40 a month 400 cloud hours a month You pay \$120 a month for 3/);
   });
 
   it("each member's own hours left, you first, by the names the team knows", () => {
@@ -296,7 +300,7 @@ describe('what the app makes of it', () => {
   it('anyone but the owner is not offered to pay, and is told who pays', () => {
     const t = page({ ...trial, owner: false }, B);
     expect(t).not.toContain('Pay for');
-    expect(t).toContain('paid by your team\'s owner');
+    expect(t).toContain('Paid by your team\'s owner');
   });
 
   // A power tester saw a member's bar a third full beside "0 of 0.1 h": the number was rounded down.
@@ -306,17 +310,17 @@ describe('what the app makes of it', () => {
   });
 
   it('on its last day it says 1 day, never 0', () => {
-    expect(teamBillingView(trial, names, A, MADE + 14 * DAY - 60_000).days).toBe(1);
+    expect(teamBillingView(trial, names, A, MADE + 7 * DAY - 60_000).days).toBe(1);
   });
 
   it('a paying team shows its price, next bill, card and last invoice to its owner', () => {
-    const paid = { ...trial, trial: false, endsAt: null, seats: 3, agents: 10, hours: 400, usedSeconds: 96 * 3600, people: people.map((m) => ({ ...m, usedSeconds: m.usedSeconds * 20 })) };
+    const paid = { ...trial, trial: false, endsAt: null, seats: 3, agents: null, hours: 400, usedSeconds: 96 * 3600, people: people.map((m) => ({ ...m, usedSeconds: m.usedSeconds * 20 })) };
     const billing = { periodStart: NOW - 12 * DAY, periodEnd: NOW + 18 * DAY, nextAt: NOW + 18 * DAY, nextAmount: 120, card: { brand: 'Visa', last4: '4242' }, email: 'billing@example.com', invoices: [{ at: NOW - 12 * DAY, amount: 120, status: 'paid' }] };
     const t = page(paid, A, billing);
     expect(t).toContain('Team · $120 a month');
     expect(t).toContain('3 seats · next bill $120 on Dec 10');
     expect(t).toContain('Manage billing');
-    expect(t).toMatch(/This month, you 304 of 400 cloud hours left 10 agents at once/);
+    expect(t).toMatch(/This month, you 304 of 400 cloud hours left Any number at once/);
     expect(t).toMatch(/Billing Visa 4242 Invoices go to billing@example.com Last Nov 10, \$120 · Paid/);
     const member = page({ ...paid, owner: false }, B);
     expect(member).toContain('Paid by your team\'s owner');

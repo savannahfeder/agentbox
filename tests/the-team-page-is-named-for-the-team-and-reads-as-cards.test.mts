@@ -36,8 +36,8 @@ describe('the Everyone view', () => {
 });
 
 describe('a person\'s page', () => {
-  it('gives the chat the room, with a narrower side', () => {
-    expect(read('renderer/src/team/everything/everything.css')).toMatch(/\.pl-side \{ width: 272px;/);
+  it('gives the chat the room, with no column beside it', () => {
+    expect(read('renderer/src/team/everything/everything.css')).not.toContain('.pl-side');
   });
   it('wraps a long title to a second line rather than cutting it', () => {
     const css = read('renderer/src/team/everything/everything.css');
@@ -93,6 +93,6 @@ describe('a teammate’s thread opened from their page in Team', () => {
     expect(app).toContain('roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown || chatsPlaceShown || cardFromPlace,');
   });
   it('goes back to the page it came from, by name', () => {
-    expect(app).toContain("backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Everyone' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Inbox')}");
+    expect(app).toContain("backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Standup' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Inbox')}");
   });
 });

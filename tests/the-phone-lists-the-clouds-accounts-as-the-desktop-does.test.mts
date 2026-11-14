@@ -113,7 +113,7 @@ describe('the Claude Code and Codex pages on the phone', () => {
     expect(accountsAside([{ chosen: true, email: 'me@example.com' }, local[1]], 1)).toBe('me@example.com');
     expect(accountsAside([], 1)).toBe('1 account');
     expect(accountsAside([], 0)).toBe(undefined);
-    expect(fs.readFileSync(new URL('../mobile/src/ui/SettingsHome.tsx', import.meta.url), 'utf8')).toMatch(/accountsAside\(w\.accounts, cloudOnlyAccounts\(w, 'claude'\)\.length\)/);
+    expect(fs.readFileSync(new URL('../mobile/src/ui/SettingsHome.tsx', import.meta.url), 'utf8')).toMatch(/accountsAside\(computerAccounts\(w, id\), cloudOnlyAccounts\(w, id\)\.length\)/);
   });
 
   it('draws them on the pages', () => {

@@ -59,12 +59,39 @@ export function skyTheme(id: string | null | undefined): Sky | null {
   return SKY_THEMES.find((s) => s.id === id) ?? null;
 }
 
+/** Stored when plain Light or Dark is picked, so the default sky never covers that choice. */
+export const PLAIN = 'none';
+
+/** The sky worn: the one picked, none for a plain look picked, and otherwise orange in the dark and green in the light. */
+export function shownSkyId(saved: string | null, dark: boolean): SkyId | null {
+  if (saved === PLAIN) return null;
+  return skyTheme(saved)?.id ?? (dark ? 'ember' : 'sage');
+}
+
+/** The look step's choice that follows the Mac: it saves no sky, so shownSkyId wears orange in the dark and green in the light. */
+export const MATCH_SKY = 'match';
+
 const BAYER = [0, 32, 8, 40, 2, 34, 10, 42, 48, 16, 56, 24, 50, 18, 58, 26, 12, 44, 4, 36, 14, 46, 6, 38, 60, 28, 52, 20, 62, 30, 54, 22, 3, 35, 11, 43, 1, 33, 9, 41, 51, 19, 59, 27, 49, 17, 57, 25, 15, 47, 7, 39, 13, 45, 5, 37, 63, 31, 55, 23, 61, 29, 53, 21];
+
+export type Box = { x: number; y: number; w: number; h: number };
+
+/** How bright the streak's line is at a point: turned down behind `quiet` (the
+ *  words on the page) and back to full over a soft edge, so the line dims
+ *  without leaving a hole. The dots around it are not touched. */
+export function lineStrength(x: number, y: number, quiet: Box | null | undefined, low = 0.35, edge = 90): number {
+  if (!quiet) return 1;
+  const dx = Math.max(quiet.x - x, 0, x - (quiet.x + quiet.w));
+  const dy = Math.max(quiet.y - y, 0, y - (quiet.y + quiet.h));
+  const d = Math.hypot(dx, dy);
+  if (d >= edge) return 1;
+  const t = d / edge;
+  return low + (1 - low) * t * t * (3 - 2 * t);
+}
 
 /** Paints `art` into `canvas` at its CSS size. Dots start at `from` px and are
  *  fully in by `from + span`, dropping out in the ordered pattern above that. */
 /** `curveTop` lays the streak out in the card below that line instead of the whole card. */
-export function drawSky(canvas: HTMLCanvasElement, art: SkyArt, { from, span, dpr = 2, curveTop = 0 }: { from: number; span: number; dpr?: number; curveTop?: number }) {
+export function drawSky(canvas: HTMLCanvasElement, art: SkyArt, { from, span, dpr = 2, curveTop = 0, quiet = null }: { from: number; span: number; dpr?: number; curveTop?: number; quiet?: Box | null }) {
   const W = canvas.clientWidth, H = canvas.clientHeight;
   if (!W || !H) return;
   canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
@@ -122,10 +149,11 @@ export function drawSky(canvas: HTMLCanvasElement, art: SkyArt, { from, span, dp
       const n = vn(i / 22, j / 22) * 0.6 + vn(i / 6, j / 6) * 0.4;
       const along = Math.max(0, 1 - Math.abs(t - peak) * fall);
       const dc = d + (vn(i / 40, 3) - 0.5) * coreW * 1.2;
-      const core = Math.exp(-((dc / coreW) ** 2)) * (0.5 + 0.5 * n) * (0.35 + 0.65 * along);
-      const hot = Math.exp(-(((dc + coreW * 0.25) / hotW) ** 2)) * along * (0.6 + 0.4 * n);
+      const line = lineStrength(x, y, quiet);
+      const core = Math.exp(-((dc / coreW) ** 2)) * (0.5 + 0.5 * n) * (0.35 + 0.65 * along) * line;
+      const hot = Math.exp(-(((dc + coreW * 0.25) / hotW) ** 2)) * along * (0.6 + 0.4 * n) * line;
       const halo = dc > 0 ? Math.exp(-dc / haloW) * (0.3 + 0.7 * n) * (0.25 + 0.75 * along) : 0;
-      const ember = dc < 0 ? Math.exp(dc / (coreW * 3)) * 0.45 * n * along : 0;
+      const ember = dc < 0 ? Math.exp(dc / (coreW * 3)) * 0.45 * n * along * line : 0;
       const r = (core * P.core[0] + hot * P.hot[0] + halo * P.halo[0] + ember * P.ember[0]) * dim;
       const gg = (core * P.core[1] + hot * P.hot[1] + halo * P.halo[1] + ember * P.ember[1]) * dim;
       const b = (core * P.core[2] + hot * P.hot[2] + halo * P.halo[2] + ember * P.ember[2]) * dim;

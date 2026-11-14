@@ -200,7 +200,7 @@ describe('a teammate\'s answer on its thread', () => {
 describe('what else the web app had', () => {
   it('group messages that name you lead Needs you and count in it', () => {
     const src = read('mobile/src/app/index.tsx');
-    expect(src).toMatch(/mentionRows\(groups\.state\.mentions\)/);
+    expect(src).toMatch(/mentionRows\(groups\.state\.mentions, groups\.state\)/);
     expect(src).toMatch(/inbox: shown\.rows\.inbox\.length \+ mentions\.length/);
   });
   it('Mark unread brings the dot back until you open it again', () => {

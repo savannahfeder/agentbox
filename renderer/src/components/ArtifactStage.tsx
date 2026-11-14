@@ -581,7 +581,8 @@ function OpenedFile({ product, path, name, byline, notes, carried = [], draft, a
 
   if (!found) return <OpeningWait name={name} kind={kind} onAgain={onAgain} />;
   if (!opened) {
-    return <div className="doc-missing">{found.coming ? `${name} is on its way.` : missingSays ? `${name}: ${missingSays}` : `${name} could not be found.`}</div>;
+    // A says that starts "is" finishes the file's own sentence.
+    return <div className="doc-missing">{found.coming ? `${name} is on its way.` : missingSays ? (missingSays.startsWith('is ') ? `${name} ${missingSays}` : `${name}: ${missingSays}`) : `${name} could not be found.`}</div>;
   }
   if (kind === 'image') return <PictureStage url={seenAt(url as string, at)} name={name} notes={notes} carried={carried} draft={draft} activeId={activeId} go={go} showResolved={showResolved} keep={keep} onPlace={onPlace} onPick={onPick} onFound={onFound} onAgain={onAgain} />;
   if (kind === 'film') {

@@ -12,7 +12,9 @@
 // place a grant is reviewed; what changed is that she edits them as fields on
 // the project they belong to instead of in a text editor.
 
+import { isPackagedElectron } from './team/session.mts';
 import { teammatesOn } from '../shared/teammates.mts';
+import { roomsOnFor } from '../shared/rooms-on.mts';
 import { phoneChoiceOf, phoneProjectsOf, withPhoneAll, withPhoneProject, phoneEligible } from '../shared/phone-snapshot.mts';
 import fs from 'node:fs';
 import { harnessFor } from './harnesses.mts';
@@ -38,9 +40,9 @@ import { codexAccount, codexFreePlan, codexLoginCommand, makeCodexHome } from '.
 import { codexDefaultModel, codexModelsAcross } from './codex-models.mts';
 import { CODEX_DEFAULT_MODE, isCodexMode } from '../shared/codex-modes.mts';
 import { CLOUD_SAME, CLOUD_CLAUDE_DEFAULT, CLOUD_CODEX_DEFAULT } from './cloud-permission.mts';
-import { isPackagedElectron } from './team/session.mts';
 import { claudeModels } from './claude-models.mts';
 import { forgetCodexBin, INSTALL_URL as CODEX_INSTALL_URL } from './codex-bin.mts';
+import { filesSettingsOf, OFF_AFTER_DAYS } from './files-cloud.mts';
 
 export interface SettingsConfig {
   home?: string;
@@ -161,6 +163,8 @@ export interface SettingsDeps {
   config: SettingsConfig;
   supervisor: SettingsSupervisor;
   store: SettingsStore;
+  /** Whether this person is signed in and on a team, which Rooms is read with. */
+  onTeam?: () => boolean;
 }
 
 // Her Claude Code sessions in her inbox: all of them, only the ones stopped on
@@ -610,14 +614,18 @@ export function searchForEngineBin(config: SettingsConfig, engine: string) {
   return { ok: true, state };
 }
 
-// THE ALPHA FEATURES SWITCHES (w-3d0fa23ffb). Off unless someone turned them
-// on in Settings; only a real `true` counts. Multiplayer, the team version, is
-// the exception in a checkout, where it was always on.
-export function alphaFeatures(config?: SettingsConfig | null, { packaged = isPackagedElectron() }: { packaged?: boolean } = {}) {
+// THE ALPHA FEATURES SWITCHES (w-3d0fa23ffb). Teammates and Glass are off
+// unless someone turned them on; only a real `true` counts. Multiplayer is on
+// unless turned off: the first run offers a team, so it cannot wait behind a
+// switch. Rooms is on for someone on a team with Multiplayer on, unless they
+// turned it off, since a team without it gets no Team page
+// (shared/rooms-on.mts); a caller that does not know about the team reads it
+// as no team.
+export function alphaFeatures(config?: SettingsConfig | null, { packaged = isPackagedElectron(), onTeam = false }: { packaged?: boolean; onTeam?: boolean } = {}) {
   return {
-    rooms: config?.alphaRooms === true,
+    rooms: roomsOnFor(config, onTeam),
     teammates: teammatesOn(config),
-    multiplayer: packaged ? config?.alphaMultiplayer === true : config?.alphaMultiplayer !== false,
+    multiplayer: config?.alphaMultiplayer !== false,
     glass: config?.alphaGlass === true,
   };
 }
@@ -630,7 +638,7 @@ export function workspaceSessionArgs(config: SettingsConfig, supervisor?: Settin
 }
 
 // `search: false` is for a read on a timer (`knownEngine`).
-export function readSettings({ config, supervisor, store }: SettingsDeps, { search = true }: { search?: boolean } = {}) {
+export function readSettings({ config, supervisor, store, onTeam }: SettingsDeps, { search = true }: { search?: boolean } = {}) {
   const products = store.listProducts();
   const status = supervisor.status();
   const sessions = [...supervisor.sessions.values()];
@@ -823,6 +831,7 @@ export function readSettings({ config, supervisor, store }: SettingsDeps, { sear
       permissionArgs: workspaceArgs,
       cloudPermission: config.cloudPermission ?? CLOUD_CLAUDE_DEFAULT,
       cloudCodexMode: config.cloudCodexMode ?? CLOUD_CODEX_DEFAULT,
+      files: filesSettingsOf(config as { filesInCloud?: unknown; filesOffAfterDays?: unknown }),
       // ONE SWITCH FOR EVERYTHING THAT LEAVES THE MACHINE, and it is on when
       // Agentbox is installed (legal/privacy.html, section 10). Off stops the
       // counts AND the crash reports; there is deliberately no partial mode and
@@ -836,7 +845,7 @@ export function readSettings({ config, supervisor, store }: SettingsDeps, { sear
       // unless she turned it on, so only `true` means on.
       adhdMode: config.adhdMode === true,
       importNew: config.importNew === true,
-      alpha: alphaFeatures(config),
+      alpha: alphaFeatures(config, { onTeam: onTeam?.() ?? false }),
       // The corner tag over other apps (w-dafae58a23). On unless she turned it
       // off here, which is the only place it turns off for good.
       cornerTag: config.cornerTag !== false,
@@ -1392,6 +1401,16 @@ export function setWorkspaceSetting({ config, supervisor, store }: SettingsDeps,
       saveConfig(config, patch);
       Object.assign(config, patch);
       supervisor.onChange?.();
+      break;
+    }
+    // Settings › Files: whether files are kept in the cloud, and how long a
+    // film or picture stays here unopened (main/files-cloud.mts).
+    case 'filesInCloud':
+    case 'filesOffAfterDays': {
+      if (key === 'filesOffAfterDays' && !(OFF_AFTER_DAYS as readonly number[]).includes(Number(value))) throw new Error(`files stay ${OFF_AFTER_DAYS.join(', ')} days`);
+      const patch = key === 'filesInCloud' ? { filesInCloud: !!value } : { filesOffAfterDays: Number(value) };
+      saveConfig(config, patch);
+      Object.assign(config, patch);
       break;
     }
     case 'cleanupLeftovers':

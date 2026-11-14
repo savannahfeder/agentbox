@@ -16,7 +16,11 @@ import { PHONE_COMMANDS } from '../../shared/phone-snapshot.mts';
 import { roomsMemory } from './rooms-memory.mts';
 import type { MemoryRoomsFields } from './rooms-memory.mts';
 import type { LedgerLine } from './sync.mts';
-import type { FileLinkShare } from './index.mts';
+import { cleanPlace, type NotePlace, type RawPlace } from '../../shared/artifact-marks.mts';
+import type { FileLinkShare, LinkAccess, LinkCan } from './index.mts';
+
+const isAccess = (v: unknown): v is LinkAccess => v === 'anyone' || v === 'people';
+const isCan = (v: unknown): v is LinkCan => v === 'view' || v === 'comment' || v === 'edit';
 import { appendTo, cleanEntry, foldLine } from '../../shared/version-line.mts';
 
 // The database's own checks on a message's file (20261013000000_message_files.sql).
@@ -54,8 +58,11 @@ export interface MemoryThreadFile { owner: string; threadId: string; name: strin
 export interface MemoryThreadComment { id: string; owner: string; threadId: string; by: string; text: string; at: number }
 export interface MemoryFileMark { id: string; owner: string; threadId: string; by: string; mark: object; at: number }
 export interface MemoryPiece { projectId: string; name: string; byPerson: string; bytes: Buffer }
-export interface MemoryFileLink { token: string; owner: string; source: string; name: string; kind: string; type: string; body: string; version: number; hash: string; createdAt: number; updatedAt: number; stoppedAt: number | null }
-export interface MemoryFileLinkComment { id: string; token: string; by: string; text: string; at: number }
+export interface MemoryFileLink {
+  token: string; owner: string; source: string; name: string; kind: string; type: string; body: string; version: number; hash: string; createdAt: number; updatedAt: number; stoppedAt: number | null;
+  access?: LinkAccess; can?: LinkCan; rev?: number; changedBy?: string | null; changedOnWeb?: boolean;
+}
+export interface MemoryFileLinkComment { id: string; token: string; by: string; text: string; at: number; place?: NotePlace | null }
 export interface MemorySeen { projectId: string; itemId: string; personId: string; at: number }
 /** What a person who leaves hands over: their open work to `handTo`, each AI teammate to `to`. */
 export interface MemoryHandover { handTo: string; name?: unknown; mates?: unknown }
@@ -111,6 +118,8 @@ export interface MemoryCloud extends MemoryRoomsFields {
   fileLinks: Map<string, MemoryFileLink>;
   fileLinkComments: MemoryFileLinkComment[];
   linkPieces?: Map<string, { owner: string; bytes: Buffer }>;
+  /** token -> the people its owner added (20261112120000_a_link_says_who_can_open_it_and_what_they_can_do.sql). */
+  fileLinkPeople?: Map<string, { email: string; can: LinkCan; at: number }[]>;
   reads: Map<string, MemorySeen>;
   departures?: MemoryDeparture[];
   seq: number;
@@ -196,6 +205,26 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
     people: cloud.projectPeople.filter((pp) => pp.projectId === p.id).map((pp) => pp.personId),
   });
   const refuse: (what: string) => never = (what) => { throw new Error(`not allowed: ${what}`); };
+  // What this person may do with a link, as file_link_can_of decides it.
+  type LinkPersonRow = { email: string; can: LinkCan; at: number };
+  const peopleOf = (token: string): LinkPersonRow[] => (cloud.fileLinkPeople ??= new Map<string, LinkPersonRow[]>()).get(token) ?? [];
+  const canOf = (l: MemoryFileLink): LinkCan | 'owner' | null => {
+    if (l.stoppedAt) return null;
+    if (l.owner === personId) return 'owner';
+    const rank = { view: 1, comment: 2, edit: 3 } as const;
+    let best = (l.access ?? 'anyone') === 'anyone' ? rank[l.can ?? 'comment'] : 0;
+    const mail = confirmedEmail();
+    const mine = mail ? peopleOf(l.token).find((x) => x.email === mail) : null;
+    if (mine) best = Math.max(best, rank[mine.can]);
+    if (best === 3 && l.kind !== 'markdown') best = 2;
+    return best === 3 ? 'edit' : best === 2 ? 'comment' : best === 1 ? 'view' : null;
+  };
+  const myLiveLink = (token: string): MemoryFileLink => {
+    const l = cloud.fileLinks.get(token);
+    if (!l || l.owner !== personId || l.stoppedAt) throw new Error('this link was stopped');
+    return l;
+  };
+  const changedByName = (l: MemoryFileLink) => (l.changedBy && l.changedBy !== l.owner ? cloud.people.get(l.changedBy)?.name || 'Someone' : null);
   // The read rule of `listCards` below, for one card.
   const canReadFolder = (f: MemoryFolder) => myTeams().includes(f.teamId) && (f.people == null || f.by === personId || f.people.includes(personId));
   const canReadCard = (owner: string, threadId: string) => {
@@ -456,20 +485,79 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
       if (kind === 'video' && FILM_LIST.exec(String(body ?? ''))?.[1] !== hash) refuse('a film that is not the list of its pieces');
       const live = [...cloud.fileLinks.values()].find((l) => l.owner === personId && l.source === source && !l.stoppedAt);
       const fields = { name, kind, type, body, version: Math.max(1, version | 0), hash: String(hash ?? ''), updatedAt: cloud.now() };
-      if (live) { Object.assign(live, fields); return live.token; }
+      if (live) {
+        const changed = live.hash !== fields.hash;
+        Object.assign(live, fields, { changedOnWeb: false, ...(changed ? { rev: (live.rev ?? 1) + 1, changedBy: null } : {}) });
+        return live.token;
+      }
       const token = crypto.randomBytes(20).toString('hex');
-      cloud.fileLinks.set(token, { token, owner: personId, source, ...fields, createdAt: fields.updatedAt, stoppedAt: null });
+      cloud.fileLinks.set(token, { token, owner: personId, source, ...fields, createdAt: fields.updatedAt, stoppedAt: null, access: 'anyone', can: 'comment', rev: 1, changedBy: null, changedOnWeb: false });
       return token;
     },
 
     async fileLinkFor(source: string) {
       const l = [...cloud.fileLinks.values()].find((x) => x.owner === personId && x.source === source && !x.stoppedAt);
-      return l ? { token: l.token, version: l.version, hash: l.hash ?? '', createdAt: l.createdAt ?? l.updatedAt, updatedAt: l.updatedAt, comments: cloud.fileLinkComments.filter((c) => c.token === l.token).length } : null;
+      if (!l) return null;
+      return {
+        token: l.token, version: l.version, hash: l.hash ?? '', createdAt: l.createdAt ?? l.updatedAt, updatedAt: l.updatedAt, comments: cloud.fileLinkComments.filter((c) => c.token === l.token).length,
+        access: l.access ?? 'anyone', can: l.can ?? 'comment', rev: l.rev ?? 1, changedOnWeb: !!l.changedOnWeb, changedByName: changedByName(l),
+      };
+    },
+
+    async setFileLinkAccess(token: string, access: string, can: string) {
+      const l = myLiveLink(token);
+      if (!isAccess(access) || !isCan(can)) refuse('a way to share nobody knows');
+      Object.assign(l, { access, can });
+    },
+
+    async fileLinkPeople(token: string) {
+      const l = cloud.fileLinks.get(token);
+      if (!l || l.owner !== personId || l.stoppedAt) return [];
+      return peopleOf(token).map((x) => {
+        const p = [...cloud.people.values()].find((pp) => String(pp.email).toLowerCase() === x.email);
+        return { email: x.email, can: x.can, name: p?.name || null, avatar: p?.avatarUrl ?? null };
+      });
+    },
+
+    async setFileLinkPerson(token: string, email: string, can: string | null) {
+      myLiveLink(token);
+      const mail = String(email ?? '').trim().toLowerCase();
+      const list = peopleOf(token).filter((x) => x.email !== mail);
+      if (can === null) { cloud.fileLinkPeople!.set(token, list); return; }
+      if (!isCan(can)) refuse('a way to share nobody knows');
+      if (mail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) throw new Error('that is not an email address');
+      const had = peopleOf(token).find((x) => x.email === mail);
+      cloud.fileLinkPeople!.set(token, had ? peopleOf(token).map((x) => (x.email === mail ? { ...x, can } : x)) : [...list, { email: mail, can, at: cloud.now() }]);
+    },
+
+    async editFileLink(token: string, body: string, base: number) {
+      const l = cloud.fileLinks.get(token);
+      if (!l || l.stoppedAt) throw new Error('this link was stopped');
+      if (canOf(l) !== 'edit' && canOf(l) !== 'owner') throw new Error('this link does not let you edit');
+      if (l.kind !== 'markdown') throw new Error('only a document or a table can be edited on its page');
+      if ((l.rev ?? 1) !== base) throw new Error('changed since you opened it');
+      if (body === l.body) return l.rev ?? 1;
+      Object.assign(l, { body, hash: crypto.createHash('sha256').update(body).digest('hex').slice(0, 40), rev: (l.rev ?? 1) + 1, updatedAt: cloud.now(), changedBy: personId, changedOnWeb: true });
+      return l.rev!;
+    },
+
+    async linksChangedOnWeb() {
+      return [...cloud.fileLinks.values()]
+        .filter((l) => l.owner === personId && !l.stoppedAt && l.changedOnWeb)
+        .map((l) => ({ token: l.token, source: l.source, name: l.name, rev: l.rev ?? 1, hash: l.hash, version: l.version, byName: changedByName(l) ?? 'Someone' }));
+    },
+
+    async fileLinkBroughtHome(token: string, rev: number, version: number) {
+      const l = cloud.fileLinks.get(token);
+      if (l && l.owner === personId && !l.stoppedAt && (l.rev ?? 1) === rev) Object.assign(l, { changedOnWeb: false, version: Math.max(1, version | 0) });
     },
 
     async stopFileLink(token: string) {
       const l = cloud.fileLinks.get(token);
-      if (l && l.owner === personId && !l.stoppedAt) Object.assign(l, { stoppedAt: cloud.now(), body: '' });
+      if (l && l.owner === personId && !l.stoppedAt) {
+        Object.assign(l, { stoppedAt: cloud.now(), body: '' });
+        cloud.fileLinkPeople?.delete(token);
+      }
     },
 
     // A film's pieces in the private link-files bucket (20261109120000_a_film_can_be_shared_by_its_link.sql).
@@ -503,9 +591,9 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
     // What anyone with the link reads (file_link_view, file_link_comments_of).
     async fileLinkView(token: string) {
       const l = cloud.fileLinks.get(token);
-      if (!l || l.stoppedAt) return { stopped: !!l, file: null };
+      if (!l || l.stoppedAt || !canOf(l)) return { stopped: !!l?.stoppedAt, file: null };
       const owner = cloud.people.get(l.owner);
-      return { stopped: false, file: { name: l.name, kind: l.kind, type: l.type, body: l.body, version: l.version, createdAt: l.createdAt ?? l.updatedAt, updatedAt: l.updatedAt, ownerName: owner?.name || null, ownerAvatar: owner?.avatarUrl ?? null, mine: l.owner === personId } };
+      return { stopped: false, file: { name: l.name, kind: l.kind, type: l.type, body: l.body, version: l.version, createdAt: l.createdAt ?? l.updatedAt, updatedAt: l.updatedAt, ownerName: owner?.name || null, ownerAvatar: owner?.avatarUrl ?? null, mine: l.owner === personId, rev: l.rev ?? 1 } };
     },
 
     async fileLinkComments(token: string) {
@@ -513,7 +601,7 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
       if (!l || l.stoppedAt) return [];
       return cloud.fileLinkComments.filter((c) => c.token === token).map((c) => {
         const p = cloud.people.get(c.by);
-        return { id: c.id, byName: p?.name || 'Someone', byAvatar: p?.avatarUrl ?? null, text: c.text, at: c.at, mine: c.by === personId, byOwner: c.by === l.owner };
+        return { id: c.id, byName: p?.name || 'Someone', byAvatar: p?.avatarUrl ?? null, text: c.text, at: c.at, mine: c.by === personId, byOwner: c.by === l.owner, ...(c.place ? { place: c.place } : {}) };
       });
     },
 
@@ -529,15 +617,17 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
         .filter((c) => c.at > since && c.by !== personId)
         .map((c) => ({ c, l: cloud.fileLinks.get(c.token) }))
         .filter((x): x is { c: MemoryFileLinkComment; l: MemoryFileLink } => !!x.l && x.l.owner === personId && !x.l.stoppedAt)
-        .map(({ c, l }) => ({ token: c.token, source: l.source, name: l.name, byName: cloud.people.get(c.by)?.name || 'Someone', text: c.text, at: c.at }));
+        .map(({ c, l }) => ({ token: c.token, source: l.source, name: l.name, byName: cloud.people.get(c.by)?.name || 'Someone', text: c.text, at: c.at, ...(c.place ? { place: c.place } : {}) }));
     },
 
-    async commentOnFileLink(token: string, text: unknown) {
+    async commentOnFileLink(token: string, text: unknown, place: unknown = null) {
       const l = cloud.fileLinks.get(token);
       if (!l || l.stoppedAt) refuse('comment on a stopped link');
       const clean = String(text ?? '').trim();
       if (!clean || clean.length > 4000) refuse('a comment with nothing in it, or that long');
-      const row = { id: crypto.randomUUID(), token, by: personId, text: clean, at: cloud.now() };
+      const where = place == null ? null : cleanPlace(place as RawPlace);
+      if (place != null && !where) refuse('a place that is not in the file');
+      const row = { id: crypto.randomUUID(), token, by: personId, text: clean, at: cloud.now(), ...(where ? { place: where } : {}) };
       cloud.fileLinkComments.push(row);
       return row.id;
     },

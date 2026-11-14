@@ -63,6 +63,15 @@ those files still counts as a change to the look. Never move the fingerprints in
 `tests/fixtures/the-trays-approved-look.json` without that approval. Taking
 those pictures puts windows on their screen, so ask before you do it.
 
+## THE DESIGN IS ROUNDED (2026-11-10)
+
+A button, card, tip, key cap or ring with a border has rounded corners. Square
+ones kept coming back, so the founder had to point them out by hand.
+`tests/the-design-is-rounded-and-square-boxes-only-go-down` allows none in the
+first run, the setup, the walkthrough and the sign-in page, and elsewhere the
+count may only go down. Round what you touch; never raise a number in
+`tests/fixtures/square-boxes.json`.
+
 ## NOTHING RETRIES FOR EVER, NOTHING WAITS FOR EVER, NOTHING FAILS IN SILENCE (2026-10-19)
 
 One cloud thread's start died in under a second, every 15 seconds, 16,135
@@ -131,6 +140,12 @@ a Codex plan for testing only. Both skills start every tester as `codex exec`
 on the Codex login with the best plan; never run one as a subagent
 (`tests/every-synthetic-tester-runs-on-codex`).
 
+The app they test runs real agents on real plans, Claude Code and Codex
+(2026-11-11). Stand-in agents run only when the person agreed to them for
+that run, in their own words (`--stand-ins "<their words>"`), and the run
+says so up front. 48 of 50 runs were on stand-ins without anyone being told
+(`tests/a-power-test-runs-on-real-plans-unless-the-person-agreed`).
+
 The standard for the tester loop is thread w-e5f506ccb3: a synthetic team
 used the multiplayer build for whole workdays, logged what broke, agents
 fixed it on the branch, and the team tested the fixes. The person only chose
@@ -158,15 +173,19 @@ refuses any push that carries the old history. Carry your own commits across
 instead, then ship as usual:
 `git fetch origin && git rebase --onto refs/remotes/origin/main $(git merge-base HEAD 99b8b0e5b04fbbc976003851ebdbb7bb58c2bf89)`
 
-## NO WORKER EVER DRIVES THE USER'S OWN BROWSER
+## NO WORKER EVER DRIVES THE USER'S OWN BROWSER UNTIL THEY TURN IT ON (2026-11-11)
 
 Claude Code can attach a session to the browser a person is signed into with
-`--chrome`. That flag must never appear in anything this app spawns, because
-that browser is signed into every account its owner holds.
-`tests/no-worker-drives-her-own-browser.test.mts` fails if it ever does. A
-browser an agent may drive has to carry nothing; the app's own pane on the
-`persist:junk` partition is the only candidate. `--ide` is the user's to switch
-on, never ours.
+`--chrome`, and that browser is signed into every account its owner holds. It
+follows the person's own Claude Code: a worker gets it only when the account it
+runs on has "Claude in Chrome enabled by default" on (`/chrome`, kept as
+`claudeInChromeDefaultEnabled: true` in that account's `.claude.json`), which
+Claude Code itself ignores in a `-p` run. There is no Agentbox switch for it.
+Only `main/your-chrome.mts` may put `--chrome` on a worker's line: never in the
+cloud, and never on a run that skips permissions (that also skips Chrome's
+per-site asks).
+`tests/no-worker-drives-her-own-browser.test.mts` fails if the flag appears
+anywhere else. `--ide` is the user's to switch on, never ours.
 
 Nor does an agent start the person's Google Chrome headless: the Mac files that
 copy as their Chrome, and their own Chrome then opens no window. Every hidden

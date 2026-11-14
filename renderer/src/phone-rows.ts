@@ -428,7 +428,7 @@ export const macAway = (macSeen: number, now = Date.now()) => !!macSeen && now -
 /** The line over her inbox when what it shows may be out of date, or null. */
 export function phoneStatusLine({ error, fetchedAt, macSeen, cloud = false }: { error: string | null; fetchedAt: number; macSeen: number; cloud?: boolean }, now = Date.now()): string | null {
   if (error) return `Can't reach your inbox online.${fetchedAt ? ` This is how it was ${ago(now - fetchedAt)}.` : ''}`;
-  if (macAway(macSeen, now)) return cloud ? `Your computer is off. Replies carry on in ${Name} Cloud.` : `Your computer was last online ${ago(now - macSeen)}. What you send waits for it.`;
+  if (macAway(macSeen, now)) return cloud ? `Your computer is off. Replies carry on in ${Name} Cloud.` : `${Name} on your computer was last online ${ago(now - macSeen)}. Open it to run what you send.`;
   return null;
 }
 /**

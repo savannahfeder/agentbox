@@ -114,6 +114,22 @@ export class DocGrants {
   }
 }
 
+// Files from a shared link or a teammate's message land in an attachments
+// folder, a group's in .room-files, and older versions of either are kept in
+// .file-versions. The scheme's one origin can read every granted root, so a
+// page from there could read the project and its code; a CSP sandbox gives it
+// an opaque origin instead. Every file there, whatever its name: the type is
+// guessed from a name the sender chose.
+const APART = 'sandbox allow-scripts';
+const SENT_FOLDERS = new Set(['attachments', '.room-files', '.file-versions']);
+
+/** The headers a served file carries beyond its own: a sandbox for one someone else sent. */
+export function servedApart(file: string, platform: string = process.platform): Record<string, string> {
+  const p = platform === 'win32' ? path.win32 : path.posix;
+  const folders = p.dirname(p.normalize(file)).split(p.sep).map((s) => s.toLowerCase());
+  return folders.some((f) => SENT_FOLDERS.has(f)) ? { 'content-security-policy': APART } : {};
+}
+
 // A PAGE GOES OUT EXACTLY AS IT WAS WRITTEN, and that is deliberate.
 //
 // For a few hours on 2026-08-21 this file also injected a listener into every

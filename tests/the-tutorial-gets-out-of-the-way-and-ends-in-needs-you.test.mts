@@ -21,7 +21,7 @@ describe('the card', () => {
     expect(tour).not.toContain('skipTour');
   });
   it('sends you off once notifications are on', () => {
-    expect(tour).toContain('You’ll get a notification when it’s done. Explore the app while you wait');
+    expect(tour).toContain('We sent a test notification. Explore the app while you wait');
   });
   // The status line changes length as the agent works and there is nothing on it to press.
   it('and lights nothing while the agent works', () => {
