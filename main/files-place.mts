@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { resolveArtifact } from './artifact-path.mts';
+import { isProjectsOwnFile } from './store/paths.mts';
 import { approvalId, baseName, editedWords, familyName, familyOfName, filesInLines, marksOf, MAX_EDIT_BYTES, otherFilesInLines, otherKind, reviewKind, shownName, threadFiles, viewKind } from '../shared/artifact-marks.mts';
 import { saveNextVersion } from './file-version.mts';
 import { versionLine } from './version-line.mts';
@@ -806,6 +807,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
   function movableIn(roots: Roots, file: string): boolean {
     const real = realOr(file);
     if (real.split(path.sep).includes('.git') || roots.deny.some((d) => within(d, real))) return false;
+    if (isProjectsOwnFile(path.basename(real)) && roots.allow.includes(path.dirname(real))) return false;
     return roots.allow.some((a) => within(a, real));
   }
 

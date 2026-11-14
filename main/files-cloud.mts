@@ -135,16 +135,21 @@ export function filesKeeper({ dir, storage, account, settings, now = Date.now, p
     const store = await storage();
     if (!store) return false;
     if (freeBytes && (await freeBytes()) < entry.size + KEEP_FREE) { log(`no room to bring back ${entry.name}`); return false; }
-    const [first, ...rest] = entry.paths;
+    // A file at one of its paths now is newer work, so it only fills the free ones.
+    const free = entry.paths.filter((p) => !fs.existsSync(p));
+    if (!free.length) { log(`newer files took every place ${entry.name} came from; it stays in the cloud`); return false; }
+    const [first, ...rest] = free;
     const tmp = `${first}.coming-${process.pid}`;
     fs.mkdirSync(path.dirname(first), { recursive: true });
     try {
       if (!(await store.getToFile(keyOf(hash), tmp))) { log(`the cloud no longer has ${entry.name}`); return false; }
       if (await hashOf(tmp) !== hash) { log(`the cloud gave other bytes for ${entry.name}; it stays there`); return false; }
-      fs.renameSync(tmp, first);
+      // Never over a file that turned up while it came down.
+      const put = (place: () => void) => { try { place(); } catch (err) { if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err; } };
+      put(() => fs.linkSync(tmp, first));
       for (const p of rest) {
         fs.mkdirSync(path.dirname(p), { recursive: true });
-        fs.copyFileSync(first, p, fs.constants.COPYFILE_FICLONE);
+        put(() => fs.copyFileSync(tmp, p, fs.constants.COPYFILE_FICLONE | fs.constants.COPYFILE_EXCL));
       }
     } finally { fs.rmSync(tmp, { force: true }); }
     if (entry.poster) fs.rmSync(entry.poster, { force: true });

@@ -42,6 +42,19 @@ describe('what a file from someone else is served with', () => {
     expect(servedApart('C:\\Users\\you\\Zero\\agentbox\\Attachments\\x.html', 'win32')['content-security-policy']).toMatch(/^sandbox\b/);
   });
 
+  // 2026-11-14: a page sent in a group lands in .room-files, and an older
+  // version of a page a teammate sent is kept in .file-versions. Neither has an
+  // attachments folder in its path, so both opened from Files with the shared origin.
+  it('sent in a group, or kept as an older version, on a Mac and on Linux', () => {
+    for (const file of [
+      '/Users/you/Zero/accounts/acct/.room-files/r-1/plan.html',
+      '/Users/you/Zero/accounts/acct/.file-versions/version-bytes/ab12/plan.html',
+      '/home/you/.local/share/agentbox/accounts/acct/.Room-Files/r-1/x.svg',
+    ]) {
+      expect(servedApart(file, 'darwin')['content-security-policy'], file).toMatch(/^sandbox\b/);
+    }
+  });
+
   it("leaves the project's own pages as they are, so their pictures still load", () => {
     for (const file of [
       `${PROJECT}/designs/w-1/both-are-built.html`,
@@ -49,6 +62,7 @@ describe('what a file from someone else is served with', () => {
       '/Users/you/code/app/landing/index.html',
       `${PROJECT}/designs/attachments-mockup.html`,
       `${PROJECT}/not-attachments/x.html`,
+      `${PROJECT}/designs/room-files.html`,
     ]) {
       expect(servedApart(file, 'darwin'), file).toEqual({});
     }
