@@ -1586,6 +1586,7 @@ export default function App() {
   // THE WALKTHROUGH'S PRACTICE THREAD IS ANSWERED BY THE STORE, as the practice
   // tutorial's is: two seconds after it is sent, and after each reply lands.
   const tourPractice = tourLive(tour) ? tour!.practice ?? null : null;
+  const practiceAnswering = !!tourPractice?.item && focused?.id === tourPractice.item && (tourPractice.answered ?? 0) <= tourPractice.replies;
   const practiceRow = tourPractice?.item ? snap?.items.find((i) => i.id === tourPractice.item && i.product === tourPractice.slug) ?? null : null;
   const practiceDue = !!tourPractice?.item && (tourPractice.answered ?? 0) <= tourPractice.replies
     && (tourPractice.replies === 0 || (!!practiceRow && replyWritten(practiceRow)));
@@ -5678,7 +5679,9 @@ export default function App() {
       // "Sent", because the arrow says where the answer went and nothing said
       // what happened to it: "Option 1 → Practice" was read off the QA box as
       // meaning nothing.
-    }, pickSentWords(option.text, rowTitle(item)), takeBack, isTourPractice(tourRef.current, item) || !movesOn(item) || pickStaysPut(option.text, { live: liveIds.has(item.id) }), { product: item.product, id: item.id }, undid);
+    }, pickSentWords(option.text, rowTitle(item)), takeBack, isTourPractice(tourRef.current, item) || !movesOn(item) || pickStaysPut(option.text, { live: liveIds.has(item.id) }), { product: item.product, id: item.id }, undid,
+    // Nothing real is sent from the practice thread, so nothing is held back for an undo: its agent answers at once.
+    isTourPractice(tourRef.current, item) ? 0 : undefined);
   }, [deferCommit, pushUndo, markDone, markSeen, movesOn, offerNow, focused?.id, focused?.product, liveIds]);
   // The discard question is raised inside `pickOption` and answered by
   // `answerCloseAsk`, which is made above it.
@@ -8534,6 +8537,7 @@ export default function App() {
                     ...factsFor(fleet, focused.id),
                     running: snap.supervisor.running.length,
                     capacity: snap.supervisor.capacity,
+                    answering: practiceAnswering,
                     inProgress: belongsInProgress(focused, { deferredUntil: dueAt(focused), now, live: liveIds.has(focused.id), shipping: shippingIds.has(focused.id), stopped: stalledIds.has(focused.id) }),
                   }}
                   stoppable={!walking && stoppableNow(focused)}
@@ -9446,7 +9450,7 @@ export default function App() {
       {tourFramed && createPortal(<TourFrame done={tour!.done} now={tourNow} finished={finishing} onSkip={() => setTour(finishing ? closeFinish(tour!) : skipTour(tour!))} />, document.body)}
       {finishing && <TourFinished covered={!!run || settingsOpen || teamOpen || newProject || modal !== null} />}
       {!fresh && <Tour tour={tour} practice={!!tourTask} practiceId={tourPractice?.item ?? null} view={view} thread={!!focused}
-        answering={!!tourPractice?.item && focused?.id === tourPractice.item && (tourPractice.answered ?? 0) <= tourPractice.replies}
+        answering={practiceAnswering}
         covered={!!run || settingsOpen || teamOpen || newProject || (modal !== null && modal !== 'compose' && modal !== 'palette')}
         palette={modal === 'palette'}
         onChange={setTour}

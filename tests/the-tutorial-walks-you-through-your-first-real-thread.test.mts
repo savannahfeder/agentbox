@@ -486,7 +486,9 @@ describe('a key a tip counts', () => {
     const fs = await import('node:fs');
     const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
     const key = tour.slice(tour.indexOf('const key = (e: KeyboardEvent) => {'), tour.indexOf("window.addEventListener('pointerdown'"));
-    expect(key).toContain('const later = (t: TourState) => setTimeout(() => onChange(t), 0);');
+    // And onto what is saved by then (tests/the-practice-thread-shows-its-agent-thinking-until-it-answers).
+    expect(tour).toContain('const learnSoon = (l: Lesson) => setTimeout(() => {');
+    expect(key).toContain('learnSoon(lessonOf(step));');
     expect(key).not.toMatch(/\bonChange\(finishLesson/);
   });
   it('E counts the close, and not the command bar', async () => {

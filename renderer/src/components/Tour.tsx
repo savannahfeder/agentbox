@@ -7,7 +7,7 @@ import { MAC } from '../this-keyboard';
 import { Name } from '../../../shared/product-name.mjs';
 import { FIRST_RUN_STEP } from '../first-run';
 import { ConfettiBurst } from './ConfettiBurst';
-import { THREAD_CLOSED, cursorOwed, finishedPlace, fitsBesideTabs, stillPreparing, closeLessons, closesThread, finishLesson, keyLearns, learnedBy, lessonOf, tourLive, tourOver, tourStep, type Lesson, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
+import { THREAD_CLOSED, cursorOwed, finishedPlace, fitsBesideTabs, stillPreparing, closeLessons, closesThread, finishLesson, keyLearns, learnedBy, lessonOf, readTour, tourLive, tourOver, tourStep, type Lesson, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
 import './tour.css';
 
 type Box = { x: number; y: number; w: number; h: number };
@@ -228,6 +228,9 @@ export function Tour({ tour, practice = false, practiceId = null, answering = fa
   const before = useRef<TourScreen | null>(null);
   const countedSteps = useRef(new Set<number>());
   const live = tourLive(tour);
+  // A lesson learned by a press is written a beat after the press. What the app wrote in between
+  // (the pick it has just counted as a reply) must still be there, so the write starts from what is saved.
+  const learnSoon = (l: Lesson) => setTimeout(() => { const saved = readTour(localStorage) ?? tour; if (saved) onChange(finishLesson(saved, l)); }, 0);
   const point = useRef(onPoint);
   point.current = onPoint;
   const walked = useRef(false);
@@ -354,16 +357,15 @@ export function Tour({ tour, practice = false, practiceId = null, answering = fa
     const down = (e: PointerEvent) => {
       if (!onTarget(e.target)) return;
       if (IN_THE_BOX.includes(step) || step === 'busy' || step === 'palette' || step === 'gettingReady' || step === 'inPalette') return;
-      setTimeout(() => onChange(finishLesson(tour, lessonOf(step))), 0);
+      learnSoon(lessonOf(step));
     };
     const key = (e: KeyboardEvent) => {
-      // After the press has reached the app: saving now redraws it first, and the press is lost.
-      const later = (t: TourState) => setTimeout(() => onChange(t), 0);
       const typing = (e.target as Element | null)?.closest?.('input, textarea, [contenteditable="true"]');
       // The app holds the first E on a thread waiting on an answer, so it counts only once the thread has gone.
       // A close is counted when the app closes the thread (THREAD_CLOSED below); the first E on a waiting thread is held.
       if (!typing && closesThread(e, thread)) return;
-      if (!typing && keyLearns(step, e)) { later(finishLesson(tour, lessonOf(step))); return; }
+      // After the press has reached the app: saving now redraws it first, and the press is lost.
+      if (!typing && keyLearns(step, e)) { learnSoon(lessonOf(step)); return; }
     };
     window.addEventListener('pointerdown', down, true);
     window.addEventListener('keydown', key, true);

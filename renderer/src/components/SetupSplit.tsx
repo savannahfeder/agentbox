@@ -15,7 +15,7 @@ import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { starterAsks } from '../../../shared/teammates.mts';
 import { MATCH_SKY, SKY_THEMES, drawSky } from '../home/sky';
-import { PRO_PITCH, cloudShowcase, heldPress, inviteCursor, nextChoice, setupPreview, tabStop, teamNameFor, teamPaid, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
+import { PRO_PITCH, cloudShowcase, heldPress, inviteCursor, nextChoice, setupPreview, dashGoesBack, stepBefore, tabStop, teamNameFor, teamPaid, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
 import { ENGINE_CHOSEN, writeLastEngine } from '../engines';
 import { TEAM } from '../../../cloud/gateway/plans.mjs';
 import FolderPicker from './FolderPicker';
@@ -147,7 +147,8 @@ export function SetupSplit(p: SetupSplitProps) {
   stepsNow.current = steps;
   const pastAccount = useCallback(() => { setError(null); setAt((i) => (stepsNow.current[i] === 'account' ? i + 1 : i)); }, []);
   useEffect(() => { if (step === 'account' && signedIn) pastAccount(); }, [step, signedIn, pastAccount]);
-  const back = !finished && (at > 0 || p.onBack) ? () => { setError(null); if (at > 0) setAt((i) => i - 1); else p.onBack?.(); } : null;
+  const backTo = stepBefore(steps, at, signedIn);
+  const back = backTo !== null || p.onBack ? () => { setError(null); if (backTo !== null) setAt(backTo); else p.onBack?.(); } : null;
 
   // ---- invite
   const me = p.snap?.team?.me;
@@ -405,7 +406,9 @@ export function SetupSplit(p: SetupSplitProps) {
       <div className="ss-left">
         <div className="ss-brand"><Mark />{Name}</div>
         <div className="ss-steps">
-          {steps.map((s, i) => <i key={s} className={i < at ? 'ss-was' : i === at ? 'ss-is' : ''} />)}
+          {steps.map((s, i) => (dashGoesBack(steps, i, at, signedIn)
+            ? <button type="button" key={s} className="ss-was" tabIndex={-1} disabled={busy} aria-label={`Back to step ${i + 1}`} onClick={() => { setError(null); setAt(i); }} />
+            : <i key={s} className={i < at ? 'ss-was' : i === at ? 'ss-is' : ''} />))}
           <span>{step ? stepLabel(steps, step) : 'All set'}</span>
         </div>
         <div className="ss-body" key={step ?? 'done'}>

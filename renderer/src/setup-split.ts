@@ -21,6 +21,17 @@ export function setupPreview(width: number, height: number) {
 export type SetupStep = 'chats' | 'folder' | 'agent' | 'account' | 'plan' | 'invite' | 'teammates' | 'look';
 export type SetupPlan = 'free' | 'pro';
 
+/** Where Back goes, from a step or from the page after the last one. It passes over the account step once
+ *  the account is made: that step only sends you forward again. */
+export function stepBefore(steps: readonly SetupStep[], at: number, signedIn: boolean): number | null {
+  let to = Math.min(at, steps.length) - 1;
+  if (to >= 0 && steps[to] === 'account' && signedIn) to -= 1;
+  return to >= 0 ? to : null;
+}
+/** A dash at the top takes you back to its step once you have passed it. */
+export const dashGoesBack = (steps: readonly SetupStep[], i: number, at: number, signedIn: boolean): boolean =>
+  i < at && !(steps[i] === 'account' && signedIn);
+
 /** Only the steps that can apply on this build: most people are not on a team,
  *  and an AI teammate needs a project to work in. Tools are not asked for: the
  *  person's Claude Code and Codex already carry their connections. */

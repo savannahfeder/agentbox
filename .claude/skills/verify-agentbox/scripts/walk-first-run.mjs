@@ -147,6 +147,15 @@ try {
   await see('look', /Pick your look/i);
   await key('Enter');
   await see('all-set', /You’re set up.*4 chats brought in.*1 teammate invited.*Start the walkthrough/i);
+  // There is a way back from the last page: Back, and the dash of a step already passed.
+  if (!await click('Back')) throw new Error('the last page has no Back');
+  await see('back-from-all-set', /STEP 6 OF 6.*Pick your look/i);
+  await key('Enter');
+  await see('all-set-again', /You’re set up.*Start the walkthrough/i);
+  if (!await page.evaluate(`(() => { const d = [...document.querySelectorAll('.setup-split .ss-steps button')].at(-1); d?.click(); return !!d; })()`)) throw new Error('no dash at the top of the last page can be pressed');
+  await see('back-by-a-dash', /STEP 6 OF 6.*Pick your look/i);
+  await key('Enter');
+  await see('all-set-once-more', /You’re set up.*Start the walkthrough/i);
   await key('Enter');
 
   await see('walkthrough-compose', /WALKTHROUGH 1 OF 5.*to send this practice thread/i);  await key('Enter', [CHORD]);
@@ -158,6 +167,10 @@ try {
   // The practice answer ends in numbered options, so the tip asks for a number and nothing is typed.
   await see('walkthrough-choose', /WALKTHROUGH 3 OF 5.*to choose the recommended option/i);
   await key('1');
+  // The pick is a reply: the thread shows its agent thinking, as a real one does, and then the answer to it.
+  await page.until(`!!document.querySelector('.live-activity .live-word.is-shimmering')`, { ms: 1500, why: 'the practice thread to show its agent thinking once an option is picked' });
+  await see('walkthrough-thinking', /WALKTHROUGH \d OF 5/i);
+  await page.until(`/Shorter now/.test(document.querySelector('.focus-body')?.innerText ?? '')`, { ms: 8000, why: 'the practice thread to answer the option that was picked' });
   await see('walkthrough-close', /WALKTHROUGH 4 OF 5.*to close it/i);
   await key('e');
   await see('walkthrough-palette', /WALKTHROUGH 5 OF 5.*to find anything/i);
