@@ -94,6 +94,8 @@ describe('a primary teammate in the store', () => {
     expect(brief).toMatch(/team_hire/);
     expect(brief).toContain('Which cut goes out?');
     expect(brief).toMatch(/Video producer.*Makes the videos/);
+    // A research ask it was given became an offer to hand calls to the Loom lead (w-fa44760932).
+    expect(brief).toContain('such as research or a question: do it yourself in this run, as an ordinary agent would, and answer what they asked. Do not offer to hand on work they only mentioned along the way.');
   });
 
   it('a teammate that is not primary is not briefed as one', () => {

@@ -78,6 +78,19 @@ const cut = (s: string | null | undefined, n: number) => {
   return t.length > n ? `${t.slice(0, n - 1)}…` : t;
 };
 
+// A dictated task often says what it wants last, after paragraphs of
+// background, so a long body keeps both ends rather than only its start.
+const BODY_CHARS = 3000;
+const HEAD_CHARS = 1000;
+const MIDDLE_LEFT_OUT = ' … (the middle of a long task is left out here) … ';
+const ends = (s: string, n = BODY_CHARS) => {
+  const t = cut(s, Infinity);
+  if (t.length <= n) return t;
+  const head = t.slice(0, HEAD_CHARS).replace(/\s+\S*$/, '');
+  const tail = t.slice(t.length - (n - HEAD_CHARS)).replace(/^\S*\s+/, '');
+  return `${head}${MIDDLE_LEFT_OUT}${tail}`;
+};
+
 // Handed a picture's file name, the small model guessed what the picture
 // showed and matched a teammate on that.
 const PICTURE = /!\[[^\]\n]*\]\([^)\n]*\)/g;
@@ -119,7 +132,10 @@ export function routePrompt(
     'Their AI teammates:',
     ...who,
     '[0] None of them: an ordinary coding agent does it.',
-    ...(primary ? [`[P] ${primary.name}, their primary teammate: only when the task needs several of the teammates above, or is about the team's work as a whole.`] : []),
+    ...(primary ? [
+      `[P] ${primary.name}, their primary teammate: only when the person asks, in this task, for work from several of the teammates above, or asks about the team's work as a whole.`,
+      '    Background that only mentions what teammates do is not that.',
+    ] : []),
     '',
     'Reply with two lines and nothing else. The first, in one of these forms:',
     '  2 | It made the last four clips and runs the clip engine.',
@@ -131,6 +147,9 @@ export function routePrompt(
     'Name two numbers only when two teammates fit equally well and you cannot',
     'tell which; the person will be asked. When unsure between a teammate and',
     'none, answer 0.',
+    'Decide on what the person asks to be done, which a long task often says',
+    'last. What they tell you along the way, what they did, weighed or might',
+    'do, is context, not the ask.',
     'A teammate fits only when the task asks for the work its job describes.',
     'A word the task shares with a job is not a fit: "status" is not a',
     'teammate\'s status board, and "plan" is not its plan.',
@@ -159,7 +178,7 @@ export function routePrompt(
     '',
     '--- the task ---',
     cut(named(item?.title, pictures), 400),
-    cut(named(item?.body && item.body !== item.title ? item.body : '', pictures), 1500),
+    ends(named(item?.body && item.body !== item.title ? item.body : '', pictures)),
     '---',
   ].filter((l, i, all) => !(l === '' && all[i - 1] === '')).join('\n');
 }
@@ -228,7 +247,7 @@ export function offerPrompt(item: { title?: string | null; body?: string | null 
     '',
     '--- the task ---',
     cut(named(item?.title, false), 400),
-    cut(named(item?.body && item.body !== item.title ? item.body : '', false), 1500),
+    ends(named(item?.body && item.body !== item.title ? item.body : '', false)),
     '---',
   ].join('\n');
 }

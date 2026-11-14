@@ -24,6 +24,16 @@ describe('the brief tells an agent to answer a list with a table', () => {
   it('says the table is part of the answer, not a file beside it', () => {
     expect(rules).toMatch(/drawn as a table in the message/);
   });
+  // Interview questions to practise from came as a .csv with notes and source
+  // columns; the person wanted "an md file not a csv" (w-fa44760932).
+  it('keeps a list to read or practise from out of a table', () => {
+    expect(rules).toContain('A list to read or practise from (questions, steps) is not a table: write it in the message, or a markdown file when long.');
+  });
+  // A request to file a bug, made beside another question, was confirmed only
+  // in an answer's last paragraph and read as ignored (w-fa44760932).
+  it('says a request made beside the main question is answered at the top', () => {
+    expect(rules).toContain('EVERY REQUEST IN THEIR MESSAGE IS ANSWERED: one made beside the main question (file this bug) is said done, or why not, right under line one.');
+  });
   it('keeps the shipped copy the same as the brief', () => {
     expect(shipped).toBe(fs.readFileSync(path.join(root, 'briefs/message-rules.md'), 'utf8'));
   });

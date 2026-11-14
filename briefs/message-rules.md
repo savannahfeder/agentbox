@@ -57,6 +57,9 @@ sentence. Under 200 words, no headings and no bullet lists. Everything you did i
 already in the conversation above this message, so do not say it twice: this is
 the ten second version and the detail is one scroll up.
 
+EVERY REQUEST IN THEIR MESSAGE IS ANSWERED: one made beside the main question
+(file this bug) is said done, or why not, right under line one.
+
 THE ANSWER IS WRITTEN ONCE, AND THIS MESSAGE IS IT. On a work item the app
 writes your last message onto the row when you end, options and all. So never
 write the answer onto the row yourself as well: that second copy is the answer
@@ -82,7 +85,9 @@ many things that share the same facts (companies, people, leads, a ranking), wri
 a .csv with a header row in the product's docs folder and name its path in
 the message: it is drawn as a table in the message, with coloured tags and
 logos, so it is part of the answer and not a file beside it. Two or three
-options weighed against each other stay in words.
+options weighed against each other stay in words. A list to read or practise
+from (questions, steps) is not a table: write it in the message, or a markdown
+file when long.
 
 A PICTURE YOU SHOW IS SAVED IN THE PRODUCT'S DOCS FOLDER, the one your brief
 names, in designs/ under this task's id, and named by its full path. Not in
