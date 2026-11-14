@@ -21,11 +21,17 @@ const RUNS = new Set([
   'NODE_TLS_REJECT_UNAUTHORIZED', 'NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE', 'SSL_CERT_DIR', 'REQUESTS_CA_BUNDLE', 'CURL_CA_BUNDLE',
 ]);
 
+/** Whether Claude Code or Codex reads `name` for its own sign-in or billing. */
+export function engineReads(name: unknown): boolean {
+  const n = String(name ?? '').toUpperCase();
+  return ENGINE.test(n) || n === 'OPENAI_API_KEY' || n === 'OPENAI_BASE_URL';
+}
+
 /** Why a key cannot be saved under `name`, or null when it can. */
 export function keyNameRefused(name: unknown): string | null {
   const n = String(name ?? '');
   if (!SHAPE.test(n)) return 'A key’s name is capital letters, digits and underscores, starting with a letter, like SUPABASE_ACCESS_TOKEN.';
-  if (ENGINE.test(n) || n === 'OPENAI_API_KEY' || n === 'OPENAI_BASE_URL') return `${n} is read by Claude Code or Codex themselves, so it is never handed to an agent.`;
+  if (engineReads(n)) return `${n} is read by Claude Code or Codex themselves, so it is never handed to an agent.`;
   if (RESERVED.has(n) || RUNS.has(n) || SYSTEM.test(n)) return `${n} is the machine’s own setting, so a key cannot take that name.`;
   return null;
 }
