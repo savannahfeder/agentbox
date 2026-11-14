@@ -12,7 +12,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { readIndex, readCreationContent, saveCreation, setCreationStatus, CREATION_STATUSES } from '../../main/store/project.mts';
 import { runForProject } from '../../main/store/queues.mts';
-import { assertInside, deniesGitOrEnvPath, deniesMachineryPath } from '../../main/store/paths.mts';
+import { assertInside, deniesGitOrEnvPath, deniesMachineryPath, isProjectsOwnFile } from '../../main/store/paths.mts';
 import { AGENT_CREATION_KINDS, SCHEMA_VERSION } from '../../shared/contracts.mts';
 import { libraryFolderOf } from '../../shared/library-folder.mts';
 import { resolveProduct } from './account.mts';
@@ -243,6 +243,7 @@ export async function writeDocument(ref: string | null | undefined, { id = null,
     if (!nextPath) throw new Error('a new document needs a path, e.g. "reports/first-run.md" or "personas/marcus.md"');
     if (deniesGitOrEnvPath(nextPath)) throw new Error(`refusing to write a .git/.env path: ${nextPath}`);
     if (deniesMachineryPath(nextPath)) throw new Error(`refusing to write a reserved store path: ${nextPath}`);
+    if (isProjectsOwnFile(nextPath)) throw new Error(`${nextPath} is the project's own file, which the person changes in the app. Keep a rule they gave with add_project_rule, or change the project with update_product.`);
 
     // THE PATH ALREADY SAYS WHAT THIS IS, so a caller that did not name a kind
     // gets the one its extension implies rather than a blanket 'markdown'. Two

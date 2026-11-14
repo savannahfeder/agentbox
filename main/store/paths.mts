@@ -42,6 +42,15 @@ export function deniesMachineryPath(rel: unknown): boolean {
   return normalizeForDenyCheck(rel).split('/').some((seg) => MACHINERY_SET.has(seg));
 }
 
+// The project's own files at the top of its folder: its rules, which every
+// agent there reads as the person's, its settings (the code folder) and its
+// catalog. The person changes them in the app; no agent writes them as a document.
+const PROJECTS_OWN = new Set(['instructions.md', 'project.json', 'index.json', 'view.json']);
+export function isProjectsOwnFile(rel: unknown): boolean {
+  if (rel == null) return false;
+  return PROJECTS_OWN.has(normalizeForDenyCheck(rel).replace(/^(\.\/)+/, ''));
+}
+
 // Containment: resolve rel against root; realpath the nearest EXISTING
 // ancestor so a symlinked directory cannot smuggle the path outside; reject
 // a symlink as the final component (lstat). Throws on any violation, returns

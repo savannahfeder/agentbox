@@ -15,6 +15,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import type { BinaryLike } from 'node:crypto';
 import { run } from './exec.mts';
+import { isProjectsOwnFile } from '../store/paths.mts';
 
 // The folders that hold pictures by the gigabyte. Only this thread's own
 // designs go up from them; the rest of the folder is small.
@@ -173,6 +174,9 @@ export async function layDocs({ tgz, dir, sentAt = 0, laid = {}, sent = null }: 
       return inside(fs.realpathSync(path.dirname(file)), root);
     };
     for (const rel of files) {
+      // A run's copy of the project's rules or settings never comes home: every
+      // agent there would read what a cloud agent wrote as the person's.
+      if (isProjectsOwnFile(rel)) continue;
       const asIs = path.join(root, rel);
       let target = asIs;
       const body = fs.readFileSync(path.join(into, rel));
