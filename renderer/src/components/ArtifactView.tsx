@@ -32,7 +32,7 @@ import { FocusControl } from './FocusControl';
 import { DocText } from './DocText';
 import { useLiveSession, useLiveTicket } from '../live/live-session';
 import { FileNoteCard } from './FileNoteCard';
-import { LINK_REPLIED, LinkNotes, linkNotesOnTheFile, linkReplyWords, useLinkNotes, type LinkReplyTo } from './LinkNotes';
+import { LINK_REPLIED, LinkNotes, linkNotesOnTheFile, linkReplyChip, linkReplyWords, useLinkNotes, type LinkReplyTo } from './LinkNotes';
 import { NoteGlyph } from './NoteGlyphs';
 import { NotesHead, NotesSection, ReturnGlyph } from './NotesSidebar';
 import { ShareLink, canShareFile } from './ShareLink';
@@ -883,7 +883,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
                   {toLink ? (
                     <span className="av-chip">
                       <NoteGlyph name="reply" />
-                      <span className="av-chip-words">{linkReplyWords(toLink)}</span>
+                      <span className="av-chip-words">{linkReplyChip(toLink)}</span>
                       <button type="button" className="av-chip-off" aria-label="Write a note instead" title="Write a note instead"
                         onClick={() => { setToLink(null); box.current?.focus(); }}><CrossIcon /></button>
                     </span>

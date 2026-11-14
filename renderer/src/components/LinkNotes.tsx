@@ -61,7 +61,8 @@ export interface LinkReplyTo { id: string; name: string }
 
 export const LINK_REPLIED = 'Replied on the link page';
 
-export const linkReplyWords =(to: LinkReplyTo) => `Reply to ${to.name.split(/\s+/)[0]} on the link page`;
+export const linkReplyWords = (to: LinkReplyTo) => `Reply to ${to.name.split(/\s+/)[0]} on the link page`;
+export const linkReplyChip = (to: LinkReplyTo) => `To ${to.name.split(/\s+/)[0]} on the link page`;
 
 export function LinkNotes({ comments, onGo, onReply, replyingTo = null, activeId = null }: {
   activeId?: string | null;
