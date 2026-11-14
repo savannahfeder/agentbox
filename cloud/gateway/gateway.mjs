@@ -684,7 +684,10 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     // Paid for inside the team's free days, the card is charged when they end.
     // Stripe trials nothing that ends within 48 hours, so a team that close pays now.
     const trialEnds = Number(team.createdAt) + teamPlan.trialDays * DAY_MS;
-    const trialEnd = trialEnds - now() > 2 * DAY_MS ? trialEnds : null;
+    // Stripe words the free time in whole days, rounded down, so 6 days 23 hours read "6 days free" beside
+    // the app's 7. It is given whole days, rounded up: never less than promised, and under a day more.
+    const left = trialEnds - now();
+    const trialEnd = left > 2 * DAY_MS ? now() + Math.ceil(left / DAY_MS) * DAY_MS : null;
     const made = await stripe.checkout({ person, plan: 'team', team: team.id, quantity: Math.max(1, team.members.length), customer: bill.stripe?.customer, trialEnd, successUrl: `${base}/v1/paid?plan=team`, cancelUrl: `${base}/v1/paid?cancelled=1` });
     await updateTeam(team.id, (b) => { b.checkout = { id: made.id, url: made.url, by: person, at: now() }; });
     return { url: made.url, where: 'checkout' };
