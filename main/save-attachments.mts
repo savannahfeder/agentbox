@@ -16,12 +16,28 @@ import path from 'node:path';
 export interface AttachmentFile { name?: string; dataBase64?: string; srcPath?: string }
 export interface SavedAttachment { rel: string; name: string; image: boolean }
 
+const safeName = (name: string) => name.replace(/[^\w.-]+/g, '-');
+
+/** A folder goes as the files inside it, named under it, leaving out hidden ones like Finder's .DS_Store. */
+function filesIn(file: AttachmentFile): AttachmentFile[] {
+  const src = file?.srcPath;
+  if (file?.dataBase64 || !src || !fs.statSync(src).isDirectory()) return [file];
+  const top = file.name || path.basename(src);
+  return fs.readdirSync(src, { recursive: true, withFileTypes: true })
+    .filter((e) => e.isFile())
+    .map((e) => path.relative(src, path.join(e.parentPath, e.name)))
+    .filter((rel) => !rel.split(path.sep).some((part) => part.startsWith('.')))
+    .sort()
+    // Trimmed from the front, so a long folder name never costs the file its extension.
+    .map((rel) => ({ name: safeName(`${top}-${rel}`).slice(-80), srcPath: path.join(src, rel) }));
+}
+
 export function saveAttachments(dir: string, files?: AttachmentFile[] | null) {
   const outDir = path.join(dir, 'attachments');
   fs.mkdirSync(outDir, { recursive: true });
   const saved: SavedAttachment[] = [];
-  for (const file of files ?? []) {
-    const safe = String(file?.name ?? 'file').replace(/[^\w.-]+/g, '-').slice(0, 80);
+  for (const file of (files ?? []).flatMap(filesIn)) {
+    const safe = safeName(String(file?.name ?? 'file')).slice(0, 80);
     // A RANDOM SUFFIX, THE SAME ONE THE STAGING PATH ALREADY USES. The name
     // was the millisecond plus the filename, so two files saved in the same
     // millisecond with the same name overwrote each other and the message
