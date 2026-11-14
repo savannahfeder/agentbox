@@ -1,6 +1,6 @@
 ---
 name: product-loop
-description: Run Agentbox's own product loop. Synthetic power users test the phone app for a workday on the person's Codex plan (never Claude Code), paced to use about 90% of that plan's week by its reset, and the run fixes and ships what they find under the project's own instructions. Use when asked for the product loop, the self-improving loop, a workday of testers, testing the phone or iOS app with synthetic users, or spending the Codex week on testing.
+description: Run Agentbox's own product loop. Synthetic power users test the phone app for a workday on the person's Codex plan (never Claude Code), stopping at 85% of that plan's week while more than two days are left and at 90% by its reset, and the run fixes and ships what they find under the project's own instructions. Use when asked for the product loop, the self-improving loop, a workday of testers, testing the phone or iOS app with synthetic users, or spending the Codex week on testing.
 ---
 
 # The product loop
@@ -31,10 +31,12 @@ iPhone's size, touch on: look, tap, type, swipe, shot, away) and `diary`. A
 tester is `codex exec` with every API key stripped, in Codex's sandbox with
 the local network open, or without the sandbox on a machine that refuses it
 (the Agentbox cloud). Each stretch after the first is told what was already
-logged. `--pace` keeps starting stretches while that login's week is behind
-its line, waits out a full 5-hour window, and stops at the target or at
-`--hours`. `report.md` in the run folder ranks every issue, worst first, with
-pictures.
+logged. `--pace` keeps starting stretches however far ahead of an even spread
+the week is. It stops at 85% while more than two days are left before the
+reset, runs up to the target in the last two days, waits out a full 5-hour
+window, and stops at `--hours`. The person set that rule on 2026-11-13: never
+hold a test day back for being ahead of pace. `report.md` in the run folder
+ranks every issue, worst first, with pictures.
 
 | flag | what | default |
 |---|---|---|
@@ -141,5 +143,5 @@ end the day.
 >
 > If nothing in step 1 needs me, finish clean.
 
-`--pace` waits out a hold or a full 5-hour window inside its hours, so a
-day that starts ahead of the line still tests once the line passes it.
+`--pace` waits out the 85% hold or a full 5-hour window inside its hours,
+so a day that reaches either still tests once it clears.
