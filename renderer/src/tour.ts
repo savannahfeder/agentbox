@@ -20,8 +20,8 @@ export interface Tour {
   practice?: TourPractice;
   /** The last tip is up on Home: you finished, and a real thread starts here. */
   finishing?: boolean;
-  /** Home's Next card, from the moment the walkthrough is finished. Absent on one finished before the card existed. */
-  next?: { thread?: boolean; hidden?: boolean };
+  /** Home's greeting says you finished, from that tip going until a first real thread is sent. */
+  greets?: boolean;
 }
 
 export interface TourPractice { slug: string; item?: string; replies: number; answered?: number }
@@ -88,14 +88,15 @@ export const noteSent = (t: Tour): Tour => finishLesson({ ...t, sent: true }, 'c
 export function finishLesson(t: Tour, l: Lesson): Tour {
   if (t.done.includes(l)) return t;
   const next = { ...t, done: [...t.done, l] };
-  // The lesson that ends the walkthrough starts its last word and Home's Next card.
-  return !tourOver(t) && tourOver(next) ? { ...next, finishing: true, next: next.next ?? {} } : next;
+  // The lesson that ends the walkthrough starts its last word.
+  return !tourOver(t) && tourOver(next) ? { ...next, finishing: true, greets: true } : next;
 }
 export const tourFinishing = (t: Tour | null): boolean => !!t && !!t.finishing && tourOver(t);
 export const closeFinish = (t: Tour): Tour => ({ ...t, finishing: false });
-/** A real thread sent once the walkthrough is over: the last tip has been done, and the Next card ticks it. */
-export const firstThreadSent = (t: Tour): Tour => (t.next && tourOver(t) && !t.next.thread ? { ...t, finishing: false, next: { ...t.next, thread: true } } : t);
-export const hideNext = (t: Tour): Tour => ({ ...t, next: { ...t.next, hidden: true } });
+/** A real thread sent once the walkthrough is over: the last tip has been done, and nothing more is said. */
+export const firstThreadSent = (t: Tour): Tour => ((t.finishing || t.greets) && tourOver(t) ? { ...t, finishing: false, greets: false } : t);
+/** Not while the tip that says the same sentence is up: one screen says a thing once. */
+export const saysFinished = (t: Tour | null): boolean => !!t && !!t.greets && !t.finishing && tourOver(t);
 
 type Edges = { left: number; top: number; width: number; height: number };
 /** The last tip: a ring round Home's box with even room, and the card above the greeting on its left edge. */
@@ -222,8 +223,7 @@ export function readTour(store: Store): Tour | null {
     const p = t.practice && typeof t.practice.slug === 'string'
       ? { practice: { slug: t.practice.slug, ...(typeof t.practice.item === 'string' ? { item: t.practice.item } : {}), replies: Number(t.practice.replies) || 0, ...(t.practice.answered ? { answered: Number(t.practice.answered) } : {}) } }
       : {};
-    const n = t.next && typeof t.next === 'object' ? { next: { ...(t.next.thread ? { thread: true } : {}), ...(t.next.hidden ? { hidden: true } : {}) } } : {};
-    return { sent: !!t.sent, skipped: !!t.skipped, done: Array.isArray(t.done) ? t.done : [], ...(t.urgent ? { urgent: true } : {}), ...p, ...(t.finishing ? { finishing: true } : {}), ...n };
+    return { sent: !!t.sent, skipped: !!t.skipped, done: Array.isArray(t.done) ? t.done : [], ...(t.urgent ? { urgent: true } : {}), ...p, ...(t.finishing ? { finishing: true } : {}), ...(t.greets ? { greets: true } : {}) };
   } catch { return null; }
 }
 

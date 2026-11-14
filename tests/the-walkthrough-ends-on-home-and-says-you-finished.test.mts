@@ -6,28 +6,29 @@
 // with nothing happening in between". Walked on a throwaway copy: the last tip
 // went, the bar above the app went with it, and what was left was the inbox
 // with four real threads and confetti. Nothing said the walkthrough was over,
-// and the app starts on Home, not there. They also said the walkthrough showed
-// no way round the app, no team and no files.
+// and the app starts on Home, not there.
 //
-// They approved two pictures. The walkthrough's last word is a tip on Home's
-// box, where a real thread starts, with the bar reading "Walkthrough done".
-// After it a Next card stays on Home until it is done or hidden, pointing at
-// the first thread, the team, the tools and the files.
+// They approved a picture of it: the walkthrough's last word is a tip on
+// Home's box, where a real thread starts, with the bar reading "Walkthrough
+// done". Once the tip has gone, Home's greeting says you finished until a
+// first real thread is sent. A card of things to do next was built beside it
+// and taken out the same day: "the next card is not needed".
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { closeFinish, finishLesson, finishedPlace, firstThreadSent, hideNext, madeUrgent, noteSent, readTour, saveTour, skipTour, startTour, tourFinishing, tourLive, tourOver, type Lesson, type Tour } from '../renderer/src/tour.ts';
-import { addedAFile, finishedHello, nextRows, nextShown, saysFinished } from '../renderer/src/home/next-steps.ts';
+import { closeFinish, finishLesson, finishedPlace, firstThreadSent, madeUrgent, noteSent, readTour, saveTour, saysFinished, skipTour, startTour, tourFinishing, tourLive, tourOver, type Lesson, type Tour } from '../renderer/src/tour.ts';
+import { finishedHello } from '../renderer/src/home/home-model.ts';
 
 const read = (p: string) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 const lessons = (t: Tour, ...ls: Lesson[]) => ls.reduce(finishLesson, t);
 const almost = lessons(noteSent(startTour()), 'working', 'open', 'choose', 'close');
 const over = finishLesson(almost, 'palette');
+// Everyone who finished before this was built has a finished walkthrough saved with neither field.
+const old: Tour = { sent: true, skipped: false, done: over.done };
 
 describe('the lesson that ends the walkthrough', () => {
-  it('starts the finishing moment and the Next card', () => {
+  it('starts the finishing moment', () => {
     expect(tourOver(over)).toBe(true);
     expect(tourFinishing(over)).toBe(true);
-    expect(over.next).toEqual({});
   });
   it('is the urgent tip when a thread was made urgent on the way', () => {
     const urgent = madeUrgent(over);
@@ -37,19 +38,15 @@ describe('the lesson that ends the walkthrough', () => {
   });
   it('is not any lesson before it', () => {
     expect(tourFinishing(almost)).toBe(false);
-    expect(almost.next).toBeUndefined();
   });
   it('is not a walkthrough that was skipped', () => {
     expect(tourFinishing(skipTour(almost))).toBe(false);
     expect(tourFinishing(skipTour(over))).toBe(false);
   });
-  // Everyone who finished before this was built has a finished walkthrough saved with neither field.
   it('is not a walkthrough finished before there was a finishing moment', () => {
-    const old: Tour = { sent: true, skipped: false, done: over.done };
     expect(tourOver(old)).toBe(true);
     expect(tourFinishing(old)).toBe(false);
     expect(tourFinishing(finishLesson(old, 'palette'))).toBe(false);
-    expect(nextShown(old, [])).toBe(false);
   });
   it('does not count as the walkthrough still running', () => {
     expect(tourLive(over)).toBe(false);
@@ -57,29 +54,28 @@ describe('the lesson that ends the walkthrough', () => {
 });
 
 describe('the finishing moment ends', () => {
-  it('when it is closed, and the Next card stays', () => {
-    const closed = closeFinish(over);
-    expect(tourFinishing(closed)).toBe(false);
-    expect(closed.next).toEqual({});
+  it('when it is closed', () => {
+    expect(tourFinishing(closeFinish(over))).toBe(false);
   });
-  it('when a first real thread is sent, which the Next card ticks', () => {
-    const sent = firstThreadSent(over);
-    expect(tourFinishing(sent)).toBe(false);
-    expect(sent.next).toEqual({ thread: true });
+  it('when a first real thread is sent', () => {
+    expect(tourFinishing(firstThreadSent(over))).toBe(false);
   });
-  it('and a thread sent by someone with no Next card changes nothing', () => {
-    const old: Tour = { sent: true, skipped: false, done: over.done };
+  it('and a thread sent by anyone else changes nothing', () => {
     expect(firstThreadSent(old)).toBe(old);
     expect(firstThreadSent(almost)).toBe(almost);
+    const sent = firstThreadSent(over);
+    expect(firstThreadSent(sent)).toBe(sent);
   });
-  it('and is kept across a restart, with what the Next card knows', () => {
+  it('and is kept across a restart', () => {
     const kept = new Map<string, string>();
     const store = { getItem: (k: string) => kept.get(k) ?? null, setItem: (k: string, v: string) => { kept.set(k, v); } };
     saveTour(store, over);
     expect(tourFinishing(readTour(store))).toBe(true);
-    saveTour(store, hideNext(firstThreadSent(over)));
-    expect(readTour(store)).toMatchObject({ next: { thread: true, hidden: true } });
+    saveTour(store, closeFinish(over));
     expect(tourFinishing(readTour(store))).toBe(false);
+    expect(saysFinished(readTour(store))).toBe(true);
+    saveTour(store, firstThreadSent(over));
+    expect(saysFinished(readTour(store))).toBe(false);
   });
 });
 
@@ -94,40 +90,6 @@ describe('where the last tip sits', () => {
   });
 });
 
-describe('the Next card', () => {
-  const none = { thread: false, invited: false, tools: false, files: false, team: true };
-  it('has the walkthrough ticked and four things to do, in the approved words', () => {
-    expect(nextRows(none)).toEqual([
-      { key: 'walkthrough', words: 'Finish the walkthrough', where: '', done: true },
-      { key: 'thread', words: 'Start your first thread', where: 'Home', done: false },
-      { key: 'team', words: 'Invite your team', where: 'Team', done: false },
-      { key: 'tools', words: 'Connect your tools', where: 'Connections', done: false },
-      { key: 'files', words: 'Add a file', where: 'Files', done: false },
-    ]);
-  });
-  it('ticks each one from what has really happened', () => {
-    const rows = nextRows({ thread: true, invited: true, tools: false, files: true, team: true });
-    expect(rows.filter((r) => r.done).map((r) => r.key)).toEqual(['walkthrough', 'thread', 'team', 'files']);
-  });
-  // Walked: a new team's Files already holds team-look.md, which the app put there, and the line read as done.
-  it('counts a file you added, not the team look the app keeps or one an agent wrote', () => {
-    expect(addedAFile([{ name: 'team-look.md' }])).toBe(false);
-    expect(addedAFile([{ name: 'team-look.md' }, { name: 'report.md', agent: 'Claude Code' }])).toBe(false);
-    expect(addedAFile([{ name: 'team-look.md' }, { name: 'pricing.csv' }])).toBe(true);
-    expect(addedAFile([])).toBe(false);
-  });
-  it('does not ask a copy with no team to invite one', () => {
-    expect(nextRows({ ...none, team: false }).map((r) => r.key)).toEqual(['walkthrough', 'thread', 'tools', 'files']);
-  });
-  it('shows once the walkthrough is finished, until it is hidden or every line is done', () => {
-    expect(nextShown(over, nextRows(none))).toBe(true);
-    expect(nextShown(almost, nextRows(none))).toBe(false);
-    expect(nextShown(hideNext(over), nextRows(none))).toBe(false);
-    expect(nextShown(over, nextRows({ thread: true, invited: true, tools: true, files: true, team: true }))).toBe(false);
-    expect(nextShown(null, nextRows(none))).toBe(false);
-  });
-});
-
 describe('the greeting on Home', () => {
   it('says you finished, with your first name, in place of the time of day', () => {
     expect(finishedHello('Dana Whitfield')).toBe('You finished the walkthrough, Dana');
@@ -135,13 +97,18 @@ describe('the greeting on Home', () => {
   });
   // The tip above it says the same sentence, and one screen says a thing once.
   it('does not say it while the tip is up', () => {
-    expect(saysFinished(over, true)).toBe(false);
+    expect(saysFinished(over)).toBe(false);
   });
-  it('says it once the tip is closed, until a first thread is sent or the card is gone', () => {
-    expect(saysFinished(closeFinish(over), true)).toBe(true);
-    expect(saysFinished(firstThreadSent(over), true)).toBe(false);
-    expect(saysFinished(closeFinish(over), false)).toBe(false);
-    expect(saysFinished(almost, false)).toBe(false);
+  it('says it once the tip is closed, until a first real thread is sent', () => {
+    expect(saysFinished(closeFinish(over))).toBe(true);
+    expect(saysFinished(firstThreadSent(closeFinish(over)))).toBe(false);
+    expect(saysFinished(firstThreadSent(over))).toBe(false);
+  });
+  it('never says it to someone who skipped, has not finished, or finished before this was built', () => {
+    expect(saysFinished(skipTour(closeFinish(over)))).toBe(false);
+    expect(saysFinished(almost)).toBe(false);
+    expect(saysFinished(old)).toBe(false);
+    expect(saysFinished(null)).toBe(false);
   });
 });
 
@@ -165,18 +132,17 @@ describe('the window', () => {
     expect(tour).toContain("document.querySelector('.hm-start .tc-card')");
     expect(app).toMatch(/\{finishing && <TourFinished covered=\{/);
   });
-  it('ticks the first thread when one is sent, and not for the practice thread', () => {
+  it('counts a first thread when one is sent, and not the practice thread', () => {
     const practice = app.indexOf("// The walkthrough's practice thread: no toast and no undo.");
     const first = app.indexOf('if (made?.id && tourRef.current) setTour(firstThreadSent(tourRef.current));');
     expect(first).toBeGreaterThan(practice);
     expect(app.slice(practice, first)).toContain('return;');
   });
-  it('draws the Next card where the team card was, and hides it for good on Hide', () => {
-    expect(home).toMatch(/\{next \? \(\s*<section className="hm-card hm-glass hm-next" aria-label="Next">/);
-    expect(home).toContain('<button type="button" className="hm-link" onClick={next.onHide}>Hide</button>');
-    expect(app).toContain('onHide: () => setTour(hideNext(tourRef.current!))');
+  it('hands Home the greeting', () => {
+    expect(app).toContain('<HomePage hello={!fresh && saysFinished(tour) ? finishedHello(snap.team?.me?.name ?? null) : greeting(');
   });
-  it('opens the page each line names', () => {
-    expect(app).toMatch(/onGo: \(key\) => \{ if \(key === 'team'\) openChatsPlace\('team'\); else if \(key === 'tools'\) openConnectionsPage\(null\); else if \(key === 'files'\) openFiles\(null\); else/);
+  it('adds no card to Home', () => {
+    expect(home).not.toMatch(/hm-next|aria-label="Next"/);
+    expect(app).not.toMatch(/next-steps|nextRows|hideNext/);
   });
 });

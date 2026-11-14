@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { agoShort, doors, type DoorKey, type TeamRowState } from './home-model';
-import type { NextKey, NextRow } from './next-steps';
 import { PriorityMark } from '../threads/Pages';
 import { priorityLabelOf, type PriorityId } from '../priority';
 import './home.css';
@@ -24,12 +23,8 @@ function Bars({ week }: { week: number[] }) {
   </div>;
 }
 
-const TICK = <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" /></svg>;
-
-export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCount, progressCount, team, progress, next = null, slot, onDoor, onOpen, onMember, onTeam }: {
+export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCount, progressCount, team, progress, slot, onDoor, onOpen, onMember, onTeam }: {
   hello: string; now: number;
-  /** What to do once the walkthrough is finished, in place of the second card until it is done or hidden. */
-  next?: { rows: NextRow[]; onGo: (key: NextKey) => void; onHide: () => void } | null;
   needs: NeedsRow[]; needsCount: number;
   /** The Inbox's own number, for its door. */
   inboxCount?: number;
@@ -106,23 +101,7 @@ export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCoun
             ))}
           </div>
         </section>
-        {next ? (
-          <section className="hm-card hm-glass hm-next" aria-label="Next">
-            <header className="hm-head">
-              <span className="t">Next<em>{next.rows.filter((r) => r.done).length} of {next.rows.length}</em></span>
-              <button type="button" className="hm-link" onClick={next.onHide}>Hide</button>
-            </header>
-            <div className="hm-scroll">
-              {next.rows.map((r) => (
-                <button type="button" key={r.key} className={`hm-row${r.done ? ' was' : ''}`} disabled={r.key === 'walkthrough'} onClick={() => next.onGo(r.key)}>
-                  <span className={`hm-tick${r.done ? ' on' : ''}`}>{r.done && TICK}</span>
-                  <span className="hm-text"><b>{r.words}</b></span>
-                  {r.where && <span className="hm-go">{r.where}{r.key !== 'thread' && ' →'}</span>}
-                </button>
-              ))}
-            </div>
-          </section>
-        ) : team ? (
+        {team ? (
           <section className="hm-card hm-glass" aria-label="Team this week">
             <header className="hm-head">
               <span className="t">Team this week</span>

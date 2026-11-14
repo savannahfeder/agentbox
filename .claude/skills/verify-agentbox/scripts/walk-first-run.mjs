@@ -171,8 +171,8 @@ try {
   if (!await page.evaluate(`!!document.querySelector('.hm-start .tc-card') && !!document.querySelector('.tour-glow')`)) throw new Error('the last tip is up, but not on Home with its box lit');
   await page.evaluate(`document.querySelector('.tour-frame .tf-skip')?.click()`);
   await page.until(`!document.querySelector('.tour-frame') && !document.querySelector('.tour-card')`, { ms: 15_000, why: 'Close to put the last tip away' });
-  const home = await page.evaluate(`(document.querySelector('.hm-hello')?.innerText ?? '') + ' | ' + (document.querySelector('.hm-next')?.innerText ?? '').replace(/\\s+/g, ' ')`);
-  if (!/^You finished the walkthrough, Dana \| Next ?\d of 5 Hide Finish the walkthrough Start your first thread Home Invite your team Team → Connect your tools Connections → Add a file Files →/.test(home)) throw new Error(`Home after the walkthrough does not say you finished, or has no Next card. It says: ${home}`);
+  const hello = await page.evaluate(`document.querySelector('.hm-hello')?.innerText ?? ''`);
+  if (hello !== 'You finished the walkthrough, Dana') throw new Error(`Home after the walkthrough does not say you finished. Its greeting is: ${hello || 'not there'}`);
   await see('home-after', /^$/);
   if (page.errors.length) throw new Error(`the page logged ${page.errors.length} error(s): ${page.errors.slice(0, 3).join(' | ')}`);
 } catch (e) {

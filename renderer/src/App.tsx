@@ -188,7 +188,7 @@ import { ideasFor, runOfRule } from './first-run';
 import { Tour, TourFinished } from './components/Tour';
 import { TourFrame } from './components/TourFrame';
 import { laterTabShown } from './later-tab';
-import { type Lesson as TourLesson, PRACTICE_RUN_MS, THREAD_CLOSED, closeFinish, finishLesson, firstTask, firstThreadSent, hideNext, tourFinishing, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, showIdeas, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
+import { type Lesson as TourLesson, PRACTICE_RUN_MS, THREAD_CLOSED, closeFinish, finishLesson, firstTask, firstThreadSent, saysFinished, tourFinishing, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, showIdeas, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
 import {
   ANSWER_AFTER_MS, COACHED, COPY as WALK_COPY, FIRST_RUN_LABEL, advance as advanceRun, afterCommand, beatRows, coach, closingRefused, firstRunDone,
   afterUnblock, finishedCleared, firstRunNeeded, projectsOfTheirOwn, laterCleared, laterId, laterIndex,
@@ -270,8 +270,6 @@ import { SentLine } from './components/SentLine';
 import { TickedBar } from './components/TickedBar';
 import { AgentSending } from './team/AgentSending';
 import { HomePage, type NeedsRow, type ProgressRow, type TeamRow } from './home/HomePage';
-import { addedAFile, finishedHello, nextOwed, nextRows, nextShown, saysFinished } from './home/next-steps';
-import { useToolsConnected } from './home/use-tools-connected';
 import { homeNeedsRows } from './home/home-needs';
 import { needsYouList, openNeedsEntry } from './threads/needs-you-list';
 import { SkyBackdrop } from './home/SkyBackdrop';
@@ -279,7 +277,7 @@ import { InboxSky } from './home/InboxSky';
 import { SKY_THEME_KEY, setHomeSetting, useDarkWindow, useHomeSettings } from './home/home-settings';
 import { setupLook } from './setup-split';
 import { MATCH_SKY, PLAIN, SKY_THEMES, skyTheme } from './home/sky';
-import { engineLetter, engineName, greeting, somethingCoversTheList, teamRowState, weekCounts } from './home/home-model';
+import { engineLetter, engineName, finishedHello, greeting, somethingCoversTheList, teamRowState, weekCounts } from './home/home-model';
 import { sentFrom } from './team/company';
 import { reachAudienceOf } from '../../shared/teammate-reach.mts';
 import { useBackAndForward, type Stop as TrailStop } from './back-and-forward';
@@ -4386,9 +4384,6 @@ export default function App() {
   const filesForPalette = useFilesList(modal === 'palette');
   // Today lists approvals as decisions.
   const filesForToday = useFilesList(teamMode && todayOn);
-  // Home's Next card ticks its lines from what is really there (home/next-steps.ts).
-  const filesForNext = useFilesList(nextOwed(tour));
-  const toolsForNext = useToolsConnected(nextOwed(tour));
   // With teammates on, Groups is Chats: your AI teammates, people and groups
   // in one list, and the sidebar's row opens the chat you had open last.
   const openChatsPlace = (key: string) => {
@@ -7758,11 +7753,6 @@ export default function App() {
   const homeShown = homeOn && homeOpen && !run && !!snap && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
     && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown;
   const goHome = () => { openView('inbox'); setHomeOpen(true); };
-  const nextList = nextRows({
-    thread: !!tour?.next?.thread, team: teamMode, tools: toolsForNext, files: addedAFile(filesForNext?.files ?? []),
-    invited: (snap.team?.sent?.length ?? 0) > 0 || (snap.team?.people ?? []).some((p) => p.id !== snap.team?.me?.id),
-  });
-  const nextOn = !fresh && nextShown(tour, nextList);
   const inboxCount = inboxBadge({ rows: shownCount(inbox), leads: leadCount, fileNews: sharedFileNews.length, follows: followingNews.length });
   const inboxHere = !homeShown && view === 'inbox' && search === null && !settingsOpen && !teamShown && !focused && !focusedRepeat
     && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown;
@@ -8311,12 +8301,7 @@ export default function App() {
               {skyOnInbox && sky && <InboxSky art={sky.art} />}
               {skyOnPlace && sky && <InboxSky art={sky.art} />}
               {homeShown ? (
-                <HomePage hello={saysFinished(tour, nextOn) ? finishedHello(snap.team?.me?.name ?? null) : greeting(new Date(now).getHours(), snap.team?.me?.name ?? null)} now={now}
-                  next={nextOn ? {
-                    rows: nextList,
-                    onGo: (key) => { if (key === 'team') openChatsPlace('team'); else if (key === 'tools') openConnectionsPage(null); else if (key === 'files') openFiles(null); else document.querySelector<HTMLTextAreaElement>('.hm-start .tc-text')?.focus(); },
-                    onHide: () => setTour(hideNext(tourRef.current!)),
-                  } : null}
+                <HomePage hello={!fresh && saysFinished(tour) ? finishedHello(snap.team?.me?.name ?? null) : greeting(new Date(now).getHours(), snap.team?.me?.name ?? null)} now={now}
                   needs={homeNeeds} needsCount={needsList.length} inboxCount={needsYouCount.inbox} progressCount={mineShown ? shownCount(progressTab) : 0}
                   team={homeTeam} progress={homeProgress} slot={setClearSlot}
                   onDoor={(d) => { if (d === 'inbox') openView('inbox'); else if (d === 'progress') { openView('inbox'); if (teamMode) goMine('progress'); else openView('progress'); } else openChatsPlace('team'); }}
