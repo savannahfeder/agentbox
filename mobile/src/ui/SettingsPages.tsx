@@ -11,14 +11,14 @@ import { meterPair } from '../../../renderer/src/account-words';
 import { cloudRunsLine, cloudToggleTarget, type CloudMode } from '../../../renderer/src/cloud-menu';
 import { CODEX_CLOUD_WHAT, sameAsHere } from '../../../renderer/src/cloud-permission-words';
 import { CODEX_MODES, CODEX_MODE_ORDER } from '../../../renderer/src/codex-modes';
-import { MODE_ORDER, MODE_SENTENCE, MODE_WORDS } from '../../../renderer/src/modes';
+import { CUSTOM_MODE_FROM_PHONE, MODE_ORDER, MODE_SENTENCE, MODE_WORDS } from '../../../renderer/src/modes';
 import { runningFigures } from '../../../renderer/src/running-reading';
 import type { UsageLimit } from '../../../renderer/src/types';
 import { publicLinkLine, shareWords } from '../../../renderer/src/public-link-words';
 import { inRunningOrder } from '../lib/palette';
 import { linksShown, type PhoneLink } from '../lib/public-links';
 import { share } from './LinkMenu';
-import { cloudInUseName, cloudOnlyAccounts, newerUsage, placesOf, withPlaces } from '../lib/cloud-accounts';
+import { cloudInUseName, cloudOnlyAccounts, computerAccounts, loginLabel, newerUsage, placesOf, withPlaces } from '../lib/cloud-accounts';
 import { readMyRoomCard, roomCardGroups, roomCardPatch, roomsPageShown, saveMyRoomCard } from '../lib/rooms-settings';
 import { NAME } from '../../../shared/product-name.mjs';
 import { deleteAccount } from '../../../renderer/src/phone-account';
@@ -254,7 +254,7 @@ function Accounts({ engine, list }: { engine: 'claude' | 'codex'; list: Account[
         const signingIn = a.signedIn === false;
         const line = backAt(a.resetsAt, c.now) ?? a.note ?? (signingIn ? 'Finish signing in to use it' : a.plan ?? 'Signed in');
         return (
-          <Row key={a.id} first={i === 0} label={a.email ?? a.name ?? 'Not signed in'} badge={live ? 'In use' : undefined}
+          <Row key={a.id} first={i === 0} label={loginLabel(a, engine, i, list.length)} badge={live ? 'In use' : undefined}
             desc={signingIn ? line : withPlaces(line, placesOf(w, engine, a.id))}
             below={<Meters meters={meterPair(newerUsage(w, engine, a.id, a.usage ?? null)?.limits, c.now)} />}
             reading={mine && live ? r : undefined}
@@ -297,20 +297,33 @@ function InTheCloud({ k, copy, options, says }: { k: 'cloudPermission' | 'cloudC
   );
 }
 
+/** An agent the computer does not have: said once, with the cloud's own logins if it has any. */
+function Missing({ engine }: { engine: 'claude' | 'codex' }) {
+  const w = useSettings().settings!.workspace;
+  const cloud = cloudHere(w, engine);
+  return (
+    <>
+      <Group label="Status"><Row first label={`${engine === 'claude' ? 'Claude Code' : 'Codex'} is not on your computer`} /></Group>
+      {cloudOnlyAccounts(w, engine).length ? <Group label="Signed in"><Accounts engine={engine} list={[]} /></Group> : null}
+      {cloud ? <CloudGroup engine={engine} /> : null}
+    </>
+  );
+}
+
 function Claude() {
   const s = useSettings();
   const w = s.settings?.workspace;
   if (!w) return <Aside>{NOT_YET}</Aside>;
   const r = s.reading('workspace', 'permission', w.permission);
   const cloud = cloudHere(w, 'claude');
+  if (!w.claude.found) return <Missing engine="claude" />;
   return (
     <>
-      {!w.claude.found ? <Group label="Status"><Row first label="Claude Code is not on your computer" /></Group> : null}
-      <Group label="Signed in"><Accounts engine="claude" list={w.accounts} /></Group>
+      <Group label="Signed in"><Accounts engine="claude" list={computerAccounts(w, 'claude')} /></Group>
       {cloud ? <CloudGroup engine="claude" /> : null}
       <Group label="Permissions">
         {w.permission === 'custom'
-          ? <Row first label="Permission mode" desc={MODE_SENTENCE.custom} />
+          ? <Row first label="Permission mode" desc={CUSTOM_MODE_FROM_PHONE} />
           : <Row first label={cloud ? 'On your computer' : 'Permission mode'} desc={MODE_SENTENCE[r.value as keyof typeof MODE_SENTENCE]} reading={r}
             control={<Choice label="Permission mode" value={r.value as string} options={MODES} onChange={(v) => void s.change({ scope: 'workspace', key: 'permission', value: v })} />} />}
         {cloud ? <InTheCloud k="cloudPermission" copy={w.cloudPermission ?? null}options={MODES} says={(m) => MODE_SENTENCE[m as keyof typeof MODE_SENTENCE]} /> : null}
@@ -325,10 +338,10 @@ function Codex() {
   if (!w) return <Aside>{NOT_YET}</Aside>;
   const r = s.reading('workspace', 'codexMode', w.codexMode ?? 'auto');
   const cloud = cloudHere(w, 'codex');
+  if (!w.codex.found) return <Missing engine="codex" />;
   return (
     <>
-      {!w.codex.found ? <Group label="Status"><Row first label="Codex is not on your computer" /></Group> : null}
-      <Group label="Signed in"><Accounts engine="codex" list={w.codexAccounts} /></Group>
+      <Group label="Signed in"><Accounts engine="codex" list={computerAccounts(w, 'codex')} /></Group>
       {cloud ? <CloudGroup engine="codex" /> : null}
       <Group label="Permissions">
         <Row first label={cloud ? 'On your computer' : 'Permission mode'} desc={CODEX_MODES[r.value as keyof typeof CODEX_MODES]?.what} reading={r}

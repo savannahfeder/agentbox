@@ -11,6 +11,7 @@ import { shownTitle } from '../../shared/thread-title.mts';
 import { firstRealLine, offerIsLive, previewText, searchText } from './format';
 import { TROUBLE_ID } from './trouble-row';
 import { DONE } from './done-word';
+import { isCause } from '../../shared/causes.mts';
 
 /**
  * A thread put in Later and not begun. The window's copy of `notStarted` in
@@ -242,6 +243,8 @@ export function belongsInInbox(
   // The worker answered her ask and left the thread open (`answeredHerAsk`).
   if (answeredHerAsk(i)) return true;
   if (gaveUpOnTheAnswer(i)) return true;
+  // A closed cause row is filed: the threads behind it carrying on are the news.
+  if (i.status === 'done' && isCause(i)) return false;
   if (i.status === 'done') {
     // An agent's `done` on a thread the user wrote or spoke on is news; her own
     // `done` is the archive. A thread she spoke on is hers whoever filed it.

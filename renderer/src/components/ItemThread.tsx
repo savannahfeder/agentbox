@@ -62,10 +62,15 @@ import { firstName } from '../team/people';
 import { ThreadsMade, type MadeRow } from './ThreadsMade';
 import { TeammatesContext } from '../teammates/row-lead';
 import { RouteLine } from './RouteLine';
+import { TeammateOffer } from './TeammateOffer';
 import { withoutLoneQuoteMark } from '../typed-message';
 import { teammateIdOf, OFFER_LABEL } from '../../../shared/teammates.mts';
 import { REACH_LABEL } from '../../../shared/teammate-reach.mts';
 import { Name } from '../../../shared/product-name.mjs';
+import { isCause, isCauseLedger, withoutBrief } from '../../../shared/causes.mts';
+
+// A cause row's body is the brief its lead works from, not something said to her.
+const spoken = <T extends { source?: string; patch?: Record<string, unknown> | null }>(lines: T[]): T[] => (isCauseLedger(lines) ? withoutBrief(lines) : lines);
 
 // THE BACKSTOP, NOT THE HEARTBEAT.
 //
@@ -290,7 +295,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
     // away (../phone-polls, oneAtATime).
     const read = oneAtATime(() => Promise.allSettled([
       api.itemHistory({ product: item.product, id: item.id })
-        .then((r) => { if (live) setLedger({ key: rowKey, lines: r?.lines ?? [], error: r?.ok ? undefined : r?.error }); })
+        .then((r) => { if (live) setLedger({ key: rowKey, lines: spoken(r?.lines ?? []), error: r?.ok ? undefined : r?.error }); })
         .catch((err) => { if (live) setLedger({ key: rowKey, lines: [], error: String((err as Error)?.message ?? err) }); }),
       api.sessionTrace({ product: item.product, id: item.id })
         .then((r) => { if (live) setSessions(r?.sessions ?? []); })
@@ -476,7 +481,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
     <QueueSummary
       key={`${item.product}:${item.id}`}
       title={talkName ?? pageTitle(item)}
-      context={working && !queue.context ? workingContext(item.body ?? item.title ?? '', pageTitle(item), queue.repeats ?? null) : queue.context}
+      context={working && !queue.context ? workingContext(isCause(item) ? '' : item.body ?? item.title ?? '', pageTitle(item), queue.repeats ?? null) : queue.context}
       earlier={short ? 0 : behind}
       steps={!short && alone && (events.some((e) => e.kind === 'work') || after.length > 0)}
       open={earlierOpen}
@@ -506,6 +511,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
       <>
         {queueHead}
         <QueueAnswer text={clean(newest.text)} md={md} name={pageTitle(item)} by={signer ? { t: signer, at: newest.at } : null} />
+        <TeammateOffer item={item} />
         {byApp && outcome && <p className="one-app-note">{clean(outcome.text)}</p>}
         {afterList}
         {signInHere}
@@ -589,6 +595,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
         thread.host,
       )}
       {answer}
+      <TeammateOffer item={item} />
       {afterList}
       {signInHere}
       {/* AND WHAT THE NEWEST TURN FILED, under its own last word. */}

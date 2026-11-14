@@ -11,46 +11,24 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { offerFrom, OFFER_LABEL, OFFER_MAKE } from '../shared/teammates.mts';
 
-const NOW = new Date(2026, 9, 24, 9, 0).getTime();
 const DAY = 86_400_000;
 
-describe('the offer of a teammate', () => {
-  it('keeps every thread it came from, and none it did not', () => {
-    const ask = (id, title, ago) => ({ id, product: 'site', title, labels: ['founder'], status: 'done', createdAt: NOW - ago * DAY });
-    const items = [
-      ask('w-1', 'Agentbox launch video, version 3', 2),
-      ask('w-2', 'Agentbox launch video, cut the intro', 6),
-      ask('w-3', 'Agentbox launch video for the phone app', 9),
-      ask('w-4', 'Fix the login button', 1),
-    ];
-    const offer = offerFrom({ items, now: NOW });
-    expect(offer.threads.map((t) => t.id).sort()).toEqual(['w-1', 'w-2', 'w-3']);
-    expect(offer.threads[0]).toEqual({ product: 'site', id: 'w-1', title: 'Agentbox launch video, version 3' });
-  });
-});
-
-describe('making a teammate from the offer', () => {
-  it('hands its setup run what was said in every thread behind it, and tells it to learn from that first', async () => {
+// Since 2026-11-10 the offer is made on the thread itself, by Auto
+// (tests/auto-offers-a-teammate-in-the-moment); a tap on it still hands the
+// new teammate the thread it came from, whole.
+describe('making a teammate from the offer on a thread', () => {
+  it('hands its setup run what was said in the thread, and tells it to learn from that first', async () => {
     const { loadStore } = await import('../main/store-modules.mts');
     const { Teammates } = await import('../main/teammates.mts');
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-offer-learn-'));
     const mods = await loadStore();
     const w = mods.workItemsDisk;
     const now = Date.now();
-    const ids = [];
-    for (const [title, ago, said] of [
-      ['Write this week’s changelog from the merged PRs', 2, 'Group by what users notice, not by PR.'],
-      ['Write the changelog for the merged PRs this week', 9, 'No internal refactors in it, ever.'],
-      ['Changelog: write it up from merged PRs', 16, 'Shorter. One line per change.'],
-    ]) {
-      const made = w.createWorkItem(root, { title, labels: ['founder'] }, { source: 'founder', now: now - ago * DAY });
-      w.updateWorkItem(root, made.id, { result: 'Here is the changelog draft.' }, { source: 'agent', now: now - ago * DAY + 1000 });
-      w.updateWorkItem(root, made.id, { answer: said }, { source: 'founder', now: now - ago * DAY + 2000 });
-      w.updateWorkItem(root, made.id, { status: 'done' }, { source: 'founder', now: now - ago * DAY + 3000 });
-      ids.push(made.id);
-    }
+    const made = w.createWorkItem(root, { title: 'Write this week’s changelog from the merged PRs', labels: ['founder'] }, { source: 'founder', now: now - 2 * DAY });
+    w.updateWorkItem(root, made.id, { result: 'Here is the changelog draft.' }, { source: 'agent', now: now - 2 * DAY + 1000 });
+    w.updateWorkItem(root, made.id, { answer: 'Group by what users notice, not by PR.' }, { source: 'founder', now: now - 2 * DAY + 2000 });
+    w.updateWorkItem(root, made.id, { routed: { to: 'agent', why: 'x', at: now, by: 'auto', offer: { role: 'Changelog writer', why: 'It is every week.', gains: ['Learns what your users notice', 'Carries on from this changelog', 'Writes it every Friday, and asks you before it posts'] } } }, { source: 'system', now: now - 2 * DAY + 3000 });
     const store = {
       config: { storeRoot: root, accountId: 'acct-offer-learn' }, modules: mods,
       listProducts: () => [{ slug: 'site', dir: root, name: 'Site', repoPath: '/r' }],
@@ -59,26 +37,22 @@ describe('making a teammate from the offer', () => {
       readHistory: (slug, id, opts) => w.readItemHistory(root, id, opts),
     };
     const team = new Teammates(store);
-    await team.tick({ items: store.listItems(), now });
-    const offer = store.listItems().find((i) => (i.labels ?? []).includes(OFFER_LABEL));
-    w.updateWorkItem(root, offer.id, { answer: OFFER_MAKE }, { source: 'founder', now });
-    await team.tick({ items: store.listItems(), now });
+    const item = store.listItems().find((i) => i.id === made.id);
+    team.answerOffer(item, true, now);
 
     const [mate] = team.list();
     const opening = team.chat().messages.find((m) => m.kind === 'msg' && m.setup && m.to?.includes(mate.id));
-    expect(opening.threads.map((t) => t.id).sort()).toEqual([...ids].sort());
-    // A tight list: a blank line between items drew a gap a line high in the chat.
-    expect(opening.text).not.toMatch(/\n\n- /);
-    expect(opening.text.match(/^- /gm)).toHaveLength(3);
+    expect(opening.threads.map((t) => t.id)).toEqual([made.id]);
+    expect(opening.text).toMatch(/^Changelog writer\. Take on work like this thread/);
+    // The card's three reasons are what the person said yes to, so they are its job.
+    expect(opening.text).toContain('Writes it every Friday, and asks you before it posts');
+    expect(store.listItems().find((i) => i.id === made.id).routed.offer.answered).toBe('made');
 
-    // Since 2026-10-29 the threads are written out whole, one file each, and
-    // the setup run reads them and writes its method from them.
     const brief = team.briefFor({ id: 'w-setup', labels: ['founder', `teammate:${mate.id}`, 'hop:0'] }, now);
     expect(brief).toContain('## The threads you come from');
     const files = [...brief.matchAll(/^- (\/\S+\.md) \(/gm)].map((m) => m[1]);
-    expect(files).toHaveLength(3);
-    const all = files.map((f) => fs.readFileSync(f, 'utf8')).join('\n');
-    for (const said of ['Group by what users notice, not by PR.', 'No internal refactors in it, ever.', 'Shorter. One line per change.']) expect(all).toContain(said);
+    expect(files).toHaveLength(1);
+    expect(fs.readFileSync(files[0], 'utf8')).toContain('Group by what users notice, not by PR.');
     expect(brief).toMatch(/read every file under "The threads you come from"[^\n]*write your method/i);
 
     // Once it has written its method, its runs carry the method, not the threads again.
@@ -88,6 +62,81 @@ describe('making a teammate from the offer', () => {
     const next = team.briefFor({ id: 'w-next', labels: ['founder', `teammate:${mate.id}`, 'hop:0'] }, now);
     expect(next).not.toContain('## The threads you come from');
     expect(next).toContain('- Group by what users notice.');
+  });
+
+  // 2026-11-13: an answer on one thread left the same card waiting on every
+  // other thread that had been offered the same role.
+  it('answered on one thread, answers the same role waiting on your other threads, and no other role', async () => {
+    const { loadStore } = await import('../main/store-modules.mts');
+    const { Teammates } = await import('../main/teammates.mts');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-offer-everywhere-'));
+    const mods = await loadStore();
+    const w = mods.workItemsDisk;
+    const now = Date.now();
+    const offerOn = (title: string, role: string) => {
+      const it = w.createWorkItem(root, { title, labels: ['founder'] }, { source: 'founder', now });
+      w.updateWorkItem(root, it.id, { routed: { to: 'agent', why: 'x', at: now, by: 'auto', offer: { role, why: 'It repeats.' } } }, { source: 'system', now });
+      return it.id;
+    };
+    const a = offerOn('Weekly update for investors', 'Investor writer');
+    const b = offerOn('Investor update for March', 'investor writer');
+    const c = offerOn('Answer support email', 'Support lead');
+    const store = {
+      config: { storeRoot: root, accountId: 'acct-offer-everywhere' }, modules: mods,
+      listProducts: () => [{ slug: 'site', dir: root, name: 'Site', repoPath: '/r' }],
+      productDir: () => root,
+      listItems: () => w.readWorkItems(root).map((i) => ({ ...i, product: 'site' })),
+    };
+    const team = new Teammates(store);
+    team.answerOffer(store.listItems().find((i) => i.id === a), false, now);
+    const offerOf = (id: string) => store.listItems().find((i) => i.id === id).routed.offer;
+    expect(offerOf(a).answered).toBe('no');
+    expect(offerOf(b).answered).toBe('no');
+    expect(offerOf(c).answered).toBeUndefined();
+  });
+
+  it('turned down, is never offered again, and makes nobody', async () => {
+    const { loadStore } = await import('../main/store-modules.mts');
+    const { Teammates } = await import('../main/teammates.mts');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-offer-no-'));
+    const mods = await loadStore();
+    const w = mods.workItemsDisk;
+    const now = Date.now();
+    const made = w.createWorkItem(root, { title: 'Weekly investor update', labels: ['founder'] }, { source: 'founder', now });
+    w.updateWorkItem(root, made.id, { routed: { to: 'agent', why: 'x', at: now, by: 'auto', offer: { role: 'Investor relations', why: 'It is every week.' } } }, { source: 'system', now });
+    const store = {
+      config: { storeRoot: root, accountId: 'acct-offer-no' }, modules: mods,
+      listProducts: () => [{ slug: 'site', dir: root, name: 'Site', repoPath: '/r' }],
+      productDir: () => root,
+      listItems: () => w.readWorkItems(root).map((i) => ({ ...i, product: 'site' })),
+    };
+    const team = new Teammates(store);
+    team.answerOffer(store.listItems()[0], false, now);
+    expect(team.list()).toHaveLength(0);
+    expect(team.declinedRoles()).toEqual(['investor relations']);
+    expect(store.listItems()[0].routed.offer.answered).toBe('no');
+    expect(() => team.answerOffer(store.listItems()[0], true, now)).toThrow(/already answered/);
+  });
+
+  it('is no longer made in hindsight from alike titles', async () => {
+    const { loadStore } = await import('../main/store-modules.mts');
+    const { Teammates } = await import('../main/teammates.mts');
+    const { OFFER_LABEL } = await import('../shared/teammates.mts');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-offer-gone-'));
+    const mods = await loadStore();
+    const w = mods.workItemsDisk;
+    const now = Date.now();
+    for (const [title, ago] of [['Write the changelog from merged PRs', 2], ['Write the changelog for merged PRs', 9], ['Changelog from the merged PRs', 16]]) {
+      w.createWorkItem(root, { title, labels: ['founder'] }, { source: 'founder', now: now - ago * DAY });
+    }
+    const store = {
+      config: { storeRoot: root, accountId: 'acct-offer-gone' }, modules: mods,
+      listProducts: () => [{ slug: 'site', dir: root, name: 'Site', repoPath: '/r' }],
+      productDir: () => root,
+      listItems: () => w.readWorkItems(root).map((i) => ({ ...i, product: 'site' })),
+    };
+    await new Teammates(store).tick({ items: store.listItems(), now });
+    expect(store.listItems().some((i) => (i.labels ?? []).includes(OFFER_LABEL))).toBe(false);
   });
 });
 

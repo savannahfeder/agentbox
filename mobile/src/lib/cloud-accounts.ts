@@ -30,6 +30,18 @@ export function placesOf(w: Copy, engine: Engine, localId: string): string[] {
 
 export const withPlaces = (line: string, places: string[]) => [line, ...places].join(' · ');
 
+type LocalCopy<A, B> = { claude?: { found: boolean }; codex?: { found: boolean }; accounts?: A[]; codexAccounts?: B[] };
+
+/** The computer's own logins for an agent, none while the agent is not on it (the web's `webSettingsGroups`). */
+export function computerAccounts<A, B>(w: LocalCopy<A, B>, engine: Engine): (A | B)[] {
+  if (!w[engine]?.found) return [];
+  return (engine === 'claude' ? w.accounts : w.codexAccounts) ?? [];
+}
+
+/** What a login's row is called: its email, else its name, else "Claude account", never "Not signed in" over "Signed in". */
+export const loginLabel = (a: { email: string | null; name?: string | null }, engine: Engine, index: number, total: number) =>
+  a.email ?? a.name ?? accountName({ engine, index, total });
+
 /** What Settings' front page says beside Claude Code or Codex: the login in use, or how many the page lists. */
 export function accountsAside(local: readonly { chosen: boolean; email: string | null }[] | undefined, cloudOnly: number): string | undefined {
   const chosen = local?.find((a) => a.chosen)?.email;

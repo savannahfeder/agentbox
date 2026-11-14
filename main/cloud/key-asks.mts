@@ -107,7 +107,7 @@ export function createKeyAsks(o: KeyAsksOptions) {
     const name = String(args.name ?? '').trim();
     const refused = keyNameRefused(name);
     if (refused) return { status: 'denied', message: refused };
-    if (sourceHoldsSignIns({ place: args.place, from: args.from })) return { status: 'denied', message: `${SIGN_IN_REFUSED} Do not ask for it from anywhere else; finish without it.` };
+    if (sourceHoldsSignIns({ place: args.place, from: args.from, entry: args.entry })) return { status: 'denied', message: `${SIGN_IN_REFUSED} Do not ask for it from anywhere else; finish without it.` };
     const src = keySource({ place: args.place, from: args.from, entry: args.entry }) as KeySource | null;
     if (!src) return { status: 'denied', message: 'Say where the key is on their computer: place keychain with the item\'s name, file with a path under their home folder (and entry for one variable of an .env file), or shell with the variable\'s name.' };
     const what = String(args.what ?? '').replace(/\s+/g, ' ').trim().slice(0, 200);

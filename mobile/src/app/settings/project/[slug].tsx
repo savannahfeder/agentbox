@@ -4,7 +4,7 @@ import { Redirect, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Platform, TextInput } from 'react-native';
 import { CODEX_MODES } from '../../../../../renderer/src/codex-modes';
-import { MODE_SENTENCE, RULES_ALWAYS_APPLY } from '../../../../../renderer/src/modes';
+import { CUSTOM_MODE_FROM_PHONE, MODE_SENTENCE, RULES_ALWAYS_APPLY } from '../../../../../renderer/src/modes';
 import { moveProduct } from '../../../../../shared/rank.mts';
 import { router } from '../../../lib/router';
 import { useSettings } from '../../../state/settings';
@@ -60,7 +60,7 @@ export default function ProjectSettings() {
         ) : null}
         {permission.value !== 'workspace' ? (
           <Row stack label={two ? 'This project has its own Claude Code permissions' : 'This project has its own permissions'} reading={permission}
-            desc={permission.value === 'custom' ? MODE_SENTENCE.custom : `${MODE_SENTENCE[permission.value as keyof typeof MODE_SENTENCE] ?? ''} ${RULES_ALWAYS_APPLY}`}
+            desc={permission.value === 'custom' ? CUSTOM_MODE_FROM_PHONE : `${MODE_SENTENCE[permission.value as keyof typeof MODE_SENTENCE] ?? ''} ${RULES_ALWAYS_APPLY}`}
             control={<Button title="Use the workspace setting" onPress={() => set('permission', 'workspace')} />} />
         ) : null}
         {two && codex.value !== 'workspace' ? (

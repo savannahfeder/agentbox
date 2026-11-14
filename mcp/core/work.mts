@@ -31,6 +31,7 @@ import {
   parkPendingWrite, readPendingWrites, collectPendingWrites,
 } from '../../main/store/pending-writes.mts';
 import { resolveProduct } from './account.mts';
+import { isCause } from '../../shared/causes.mts';
 import { nameSlug } from '../../shared/product-name.mjs';
 import { PICKED_WHY, routedPatch, type RoutedPatch } from '../../shared/auto-route.mts';
 import { TEAMMATE_LABEL_PREFIX } from '../../shared/teammates.mts';
@@ -245,6 +246,8 @@ const plainly = (s: unknown) => String(s ?? '')
 export function herRow(item: Pick<WorkItem, 'labels' | 'routed'> | null | undefined): boolean {
   const labels = item?.labels ?? [];
   if (!labels.includes('founder')) return false;
+  // A cause row is the app's, and its lead closes it once the cause is cleared.
+  if (isCause(item)) return false;
   return !!item!.routed || !labels.some((l) => String(l).startsWith('repeat:') || String(l).startsWith('teammate:'));
 }
 

@@ -114,9 +114,10 @@ describe('with a primary employee', () => {
     expect(readRoute('P | It needs three of them.', candidates, chief)).toEqual({ to: 'mate:t-chief', why: 'It needs three of them.' });
   });
 
-  it('with nobody but the primary, a thread goes to an agent without asking anything', async () => {
+  // The small model is still asked afterwards, only about an offer of a
+  // teammate (tests/auto-offers-a-teammate-in-the-moment).
+  it('with nobody but the primary, a thread goes to an agent at once', async () => {
     expect(await route([0, '1 | x\n'], [chief])).toMatchObject({ labels: ['founder'], routed: { to: 'agent', why: NOBODY_WHY } });
-    expect(fake.spawns).toHaveLength(0);
   });
 });
 

@@ -73,7 +73,7 @@ export const codexHarness = {
   }),
   // `--image=` with the value attached, because `-i <FILE>...` takes every
   // word after it, the prompt included.
-  smallModelArgs: (prompt: string, _model?: string | null, pictures: readonly string[] = []) => [
+  smallModelArgs: (prompt: string, model?: string | null, pictures: readonly string[] = []) => [
 'exec', '--skip-git-repo-check', '--ephemeral', '--ignore-user-config', '--ignore-rules', '-s', 'read-only', '-c', 'model_reasoning_effort=low',
-    ...pictures.map((p) => `--image=${p}`), prompt],
+    ...(model ? ['-m', model] : []), ...pictures.map((p) => `--image=${p}`), prompt],
 };

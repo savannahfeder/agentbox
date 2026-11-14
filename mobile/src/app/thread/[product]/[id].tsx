@@ -52,7 +52,7 @@ import { agentChoices, laterHint, momentFromWords } from '../../../../../rendere
 import { Waiting } from '../../../ui/LogoOrbit';
 import { Markdown, type MessageFiles } from '../../../ui/Markdown';
 import { Selectable } from '../../../ui/Selectable';
-import { footRoom, IconButton, Pickable, PriorityBars, RunningMark, Sheet, SheetHead, SheetRow, T, TopBar, Wall } from '../../../ui/parts';
+import { ChoiceButton, footRoom, IconButton, PriorityBars, RunningMark, Sheet, SheetHead, SheetRow, T, TopBar, Wall } from '../../../ui/parts';
 import { ModelSheet, ModeSheet, PrioritySheet, barsFor } from '../../../ui/Pickers';
 import { ThreadMenu } from '../../../ui/ThreadMenu';
 import { DictationProblem, Listening, MicButton, useDictation } from '../../../ui/Dictation';
@@ -156,6 +156,10 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
   const typedAt = momentFromWords(typedLater, c.now);
   const sendAt = (at: number) => { setTypedLater(''); setSheet(null); setPicked((p) => ({ ...p, runAt: at || undefined })); };
   const mode = picked.permissionMode ?? 'auto';
+  const priorityWord = priorityLabelOf(shownLevel({ priority }));
+  const modeWord = MODE_WORDS[mode as keyof typeof MODE_WORDS] ?? mode;
+  const sentenceWord = { fontSize: 13, lineHeight: 21, color: color.faint };
+  const choiceWord = { fontSize: 13, lineHeight: 21, color: color.dim };
   const folded = foldedReply(draft.text, draft.files.map((f) => ({ name: f.name, image: isImageName(f.name) })));
   const deps = useRef<ReplyDeps | null>(null);
   deps.current = {
@@ -226,15 +230,19 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
               <Clip />
             </Pressable>
             <View style={{ marginLeft: -10, marginRight: -4 }}><MicButton talk={talk} /></View>
-            <T style={{ flex: 1, fontSize: 13, lineHeight: 21, color: color.faint }}>
-              <Pickable style={{ fontSize: 13, color: color.dim }} onPress={() => setSheet('priority')}>{priorityLabelOf(shownLevel({ priority }))}</Pickable>
-              {' priority. In '}
-              <Pickable style={{ fontSize: 13, color: color.dim }} onPress={() => setSheet('mode')}>{MODE_WORDS[mode as keyof typeof MODE_WORDS] ?? mode}</Pickable>
-              {' Mode. On '}
-              {/* A no-break space, so a model's name never splits over two lines. */}
-              <Pickable style={{ fontSize: 13, color: color.dim }} onPress={() => setSheet('model')}>{modelLabel.replace(/ /g, ' ')}</Pickable>
-              {'.'}
-            </T>
+            {/* Word by word, so the line wraps as the sentence did; a choice's name never splits. */}
+            <View style={{ flex: 1, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 3.5 }}>
+              <ChoiceButton style={choiceWord} said={`Priority: ${priorityWord}`} onPress={() => setSheet('priority')}>{priorityWord}</ChoiceButton>
+              <T style={sentenceWord}>priority.</T>
+              <T style={sentenceWord}>In</T>
+              <ChoiceButton style={choiceWord} said={`Mode: ${modeWord}`} onPress={() => setSheet('mode')}>{modeWord.replace(/ /g, ' ')}</ChoiceButton>
+              <T style={sentenceWord}>Mode.</T>
+              <T style={sentenceWord}>On</T>
+              <View style={{ flexDirection: 'row' }}>
+                <ChoiceButton style={choiceWord} said={`Model: ${modelLabel}`} onPress={() => setSheet('model')}>{modelLabel.replace(/ /g, ' ')}</ChoiceButton>
+                <T style={sentenceWord}>.</T>
+              </View>
+            </View>
             {/* One slot: Stop while it is in progress and the box is empty, Send once anything is typed (Focus.tsx). */}
             {offers.stop && !ready ? (
               <Pressable onPress={() => setSheet('stop')} disabled={stopping} accessibilityRole="button" accessibilityLabel={thread.running ? 'Stop this agent' : 'Stop this task'}

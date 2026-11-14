@@ -40,6 +40,7 @@ import { isUnread, markSeen as markSeenIn, markUnseen as markUnseenIn, readSeen 
 import { alertToken, alertTokenIfAllowed, setIconCount } from '../platform/alerts';
 import { appStore, inboxFile, persist } from '../platform/persist';
 import { inboxKeeper, readLastInbox } from '../lib/last-inbox';
+import { forgetDrafts } from '../lib/drafts';
 import { forgetCrash, keptCrash } from '../platform/crash';
 import { crashReport, reportsOn } from '../lib/crash-note';
 
@@ -422,6 +423,7 @@ function useCloudState() {
     } else c?.signOut();
     cache.current.clear();
     links.current.clear();
+    forgetDrafts(appStore);
     lastInbox.forget();
     setRows(EMPTY);
     setSettingsRows([]);

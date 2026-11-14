@@ -188,7 +188,7 @@ describe('every key the shortcuts page draws is one the app answers', () => {
   it('the arrows really do walk an agent’s options, and ↵ really sends one', () => {
     expect(focused).toContain("e.key === 'ArrowDown' && opts.length");
     expect(focused).toContain("e.key === 'ArrowUp' && opts.length");
-    expect(focused).toContain("e.key === 'Enter') { e.preventDefault(); if (optionSel !== null) pickOption(focused, optionSel); }");
+    expect(focused).toMatch(/e\.key === 'Enter'\) \{\s*e\.preventDefault\(\);\s*if \(optionSel !== null\) pickOption\(focused, optionSel\);/);
   });
 
   // J and K keep their meaning inside an open task. The page no longer says so

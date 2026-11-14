@@ -3,9 +3,10 @@
 //
 //   node pace.mjs [--home ~/.codex-2] [--target 90] [--json]
 //
-// The line runs from 0% at the start of the weekly window to --target at its
-// reset. Behind the line: run. Ahead: hold until the line catches up. The
-// 5-hour window nearly full: wait for it. Target reached: stop for the week.
+// Run, however far ahead of an even spread the week is: the person's rule
+// (2026-11-13) is to stop at 85% while more than two days are left before the
+// reset, and in those last two days to run up to --target. The 5-hour window
+// nearly full: wait for it. Target reached: stop for the week.
 // The reading is the last one Codex wrote in its session logs under --home,
 // which is what the app's usage meter shows. Without --home it is the Codex
 // login on the best plan (codex-tester.mjs).
@@ -16,8 +17,9 @@ import { rerunWithStripTypes } from '../../../../scripts/lib/rerun-with-strip-ty
 rerunWithStripTypes(import.meta.url);
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
-const WEEK = 7 * 24 * 3600_000;
 const SESSION_CAP = 90;
+const EARLY_CAP = 85;
+const LAST_DAYS = 2 * 24 * 3600_000;
 
 /** `{ week, session }` out of the limits the app draws, or null without a week. */
 export function readingFromLimits(limits) {
@@ -31,7 +33,7 @@ export function readingFromLimits(limits) {
 }
 
 /**
- * @returns {{ verdict: 'run'|'hold'|'wait'|'stop', why: string, line?: number, until?: number }}
+ * @returns {{ verdict: 'run'|'hold'|'wait'|'stop', why: string, until?: number }}
  */
 export function paceFor(reading, { now = Date.now(), target = 90 } = {}) {
   const week = reading?.week;
@@ -45,17 +47,12 @@ export function paceFor(reading, { now = Date.now(), target = 90 } = {}) {
   if (session && session.percent >= SESSION_CAP && Number.isFinite(session.resetsAt) && session.resetsAt > now) {
     return { verdict: 'wait', why: `The 5-hour window is at ${session.percent}%.`, until: session.resetsAt };
   }
-  const startedAt = week.resetsAt - WEEK;
-  const line = target * Math.min(1, Math.max(0, (now - startedAt) / WEEK));
-  if (week.percent < line) {
-    return { verdict: 'run', why: `The week is at ${week.percent}% and the line is at ${Math.round(line)}%.`, line };
+  const lastDaysFrom = week.resetsAt - LAST_DAYS;
+  const early = Math.min(EARLY_CAP, target);
+  if (now < lastDaysFrom && week.percent >= early) {
+    return { verdict: 'hold', why: `The week is at ${week.percent}% with more than two days left, and stops at ${early}% until two days are left.`, until: lastDaysFrom };
   }
-  return {
-    verdict: 'hold',
-    why: `The week is at ${week.percent}%, ahead of the line at ${Math.round(line)}%.`,
-    line,
-    until: startedAt + Math.round((week.percent / target) * WEEK),
-  };
+  return { verdict: 'run', why: `The week is at ${week.percent}%, under ${now < lastDaysFrom ? early : target}%.` };
 }
 
 /** The reading the pacer works from: that Codex login's latest. */
