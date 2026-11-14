@@ -14,6 +14,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { foldWorkItems, pickFields } from '../shared/work-items.mts';
 import { threadEvents } from '../renderer/src/thread-history.ts';
+import { createElement as h } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { LinkNotes, linkReplyWords } from '../renderer/src/components/LinkNotes.tsx';
+
+const src = (f: string) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');
 
 const make = { id: 'w-1', ts: 1, source: 'founder', patch: { title: 'Share the plan', status: 'blocked' } };
 const comment = (ts: number, text: string) => ({ id: 'w-1', ts, source: 'system', patch: { note: `B commented on plan.md. "${text}"`, linkComment: { name: 'B', file: 'plan.md', text } } });
@@ -78,8 +83,42 @@ describe('the store', () => {
   });
 });
 
+// The comments were listed beside the file with one small "Reply on the link
+// page" at the end, and QA still wrote in the box under them, which only ever
+// spoke to the agent. Each comment now has its own Reply, and it turns that box
+// into a reply on the link page.
+describe('a comment\'s Reply', () => {
+  const c = (id: string, extra = {}) => ({ id, byName: 'Tom Becker', byAvatar: null, text: `words ${id}`, at: 1, mine: false, byOwner: false, ...extra });
+  const draw = (props: Record<string, unknown>) => renderToStaticMarkup(h(LinkNotes, { comments: [c('a'), c('b'), c('me', { byOwner: true })], onGo() {}, onReply() {}, ...props }));
+
+  it('is on every comment but your own, and is the only way in', () => {
+    const html = draw({});
+    expect(html.match(/>Reply</g)).toHaveLength(2);
+    expect(html).not.toContain('Reply on the link page');
+  });
+
+  it('marks the comment being answered and hides its own Reply meanwhile', () => {
+    const html = draw({ replyingTo: 'b' });
+    expect(html.match(/>Reply</g)).toHaveLength(1);
+    expect(html.match(/av-note is-link is-on/g)).toHaveLength(1);
+  });
+
+  it('names the person and the link page on the box, by first name', () => {
+    expect(linkReplyWords({ id: 'a', name: 'Tom Becker' })).toBe('Reply to Tom on the link page');
+  });
+
+  for (const file of ['renderer/src/components/ArtifactView.tsx', 'renderer/src/components/NotesSidebar.tsx']) {
+    it(`sends the box to the link page, not the agent, while it is on (${path.basename(file)})`, () => {
+      const view = src(file);
+      expect(view).toMatch(/onReply=\{\(to\) => \{ setToLink\(to\)/);
+      expect(view).toMatch(/if \(toLink && \(?e\.key === 'Enter'[\s\S]{0,200}sendToLink\(\)/);
+      expect(view).toMatch(/const sendToLink = async \(\) => \{[\s\S]{0,200}linkNotes\.reply\(typed\)/);
+      expect(view).not.toMatch(/const sendToLink = async \(\) => \{[\s\S]{0,400}(fileMark|write\(\{ do: 'note')/);
+    });
+  }
+});
+
 describe('the Notes panel beside a thread\'s file', () => {
-  const src = (f: string) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');
 
   it('lists the link\'s comments with a way to reply on the link page', () => {
     const panel = src('renderer/src/components/NotesSidebar.tsx');
