@@ -80,3 +80,17 @@ export function teamRowState({ agents, waitingOnYou }: { agents: number | null; 
   if (waitingOnYou) return 'waiting';
   return agents ? 'working' : 'quiet';
 }
+
+const STATE_RANK: Record<TeamRowState, number> = { waiting: 0, working: 1, quiet: 2 };
+
+/** Team this week, busiest first: whoever waits on you, then whoever is
+ *  working, then the most finished this week, then the latest of it. Ties keep
+ *  the Team page's order. */
+export function busiestFirst<T extends { state: TeamRowState; week: readonly number[]; total: number }>(rows: readonly T[]): T[] {
+  const latest = (w: readonly number[]) => { for (let i = w.length - 1; i >= 0; i--) if (w[i]) return i; return -1; };
+  return rows.map((r, i) => ({ r, i })).sort((a, b) =>
+    STATE_RANK[a.r.state] - STATE_RANK[b.r.state]
+    || b.r.total - a.r.total
+    || latest(b.r.week) - latest(a.r.week)
+    || a.i - b.i).map((x) => x.r);
+}

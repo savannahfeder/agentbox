@@ -694,7 +694,9 @@ export function tabAfterSending({ team, kind, first = false, later, view, covere
 
 /* ----------------------------- hand to an agent ----------------------------- */
 
-const FILE_LINK = /!?\[([^\]]*)\]\((attachments\/[^)\s]+)\)/g;
+// A plain name only, as the sync fetches: a teammate's words keep their link
+// targets as written, and `attachments/../..` would hand on any folder of yours.
+const FILE_LINK = /!?\[([^\]]*)\]\((attachments\/[A-Za-z0-9][^)\s/\\]*)\)/g;
 
 /** What the card opens on for the message pressed: its words, who wrote them, and its files. */
 export function handOffStart({ product, id, message, nameOf, dir }: {
