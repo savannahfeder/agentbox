@@ -359,7 +359,7 @@ export function GroupsPlace({ tabs, onBack }: { tabs?: ReactNode; onBack?: () =>
 
   const back = onBack ? <IconButton label="Back to Chats" onPress={onBack}><Back size={18} /></IconButton> : undefined;
   const startChat = async (picked: string[], name: string) => {
-    const out = await g.act('create', { people: picked, name });
+    const out = await g.act('create', { people: picked, name, kind: 'group' });
     if (!out.error && typeof out.value === 'string') g.setLast(out.value);
     return out.error;
   };
@@ -394,7 +394,7 @@ export function GroupsPlace({ tabs, onBack }: { tabs?: ReactNode; onBack?: () =>
     if ((!words && !files.length) || sending) return;
     setFailed(null);
     if (editing) {
-      const out = await g.act('edit', editing.id, words, mentionList(words));
+      const out = await g.act('edit', room.id, editing.id, words, { mentions: mentionList(words) });
       if (out.error) { setFailed(out.error); return; }
       setEditing(null); setText('');
       return;
@@ -408,7 +408,7 @@ export function GroupsPlace({ tabs, onBack }: { tabs?: ReactNode; onBack?: () =>
     setSending(false);
     if (why) { setText(words); setFailed(why); }
   };
-  const react = (m: RoomMessage, emoji: string, on: boolean) => { void g.act('react', m.id, emoji, on).then((o) => { if (o.error) c.say(o.error); }); };
+  const react = (m: RoomMessage, emoji: string, on: boolean) => { void g.act('react', room.id, m.id, emoji, on).then((o) => { if (o.error) c.say(o.error); }); };
   const reactOnce = (m: RoomMessage, emoji: string) => react(m, emoji, !(g.meId && m.reactions?.[emoji]?.includes(g.meId)));
   const report = (m: RoomMessage) => {
     g.hideReported(m.id);
@@ -486,7 +486,7 @@ export function GroupsPlace({ tabs, onBack }: { tabs?: ReactNode; onBack?: () =>
       <MessageSheet m={acting} me={g.meId} who={acting ? nameOf(acting.by) : ''} open={!!acting} close={() => setActing(null)}
         onReact={(e) => acting && reactOnce(acting, e)} onThread={root || !acting ? undefined : () => setThread(acting.id)}
         onEdit={() => { if (acting) { setEditing(acting); setText(acting.body); setFiles([]); } }}
-        onDelete={() => { if (acting) void g.act('delete', acting.id).then((o) => { if (o.error) c.say(o.error); }); }}
+        onDelete={() => { if (acting) void g.act('deleteMessage', room.id, acting.id).then((o) => { if (o.error) c.say(o.error); }); }}
         onReport={() => acting && report(acting)} onBlock={() => acting && block(acting)} />
       {newChat}
     </>

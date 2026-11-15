@@ -226,7 +226,7 @@ export function ChatsPlace({ tabs, openGroup }: { tabs: ReactNode; openGroup: (i
         )}
       </ScrollView>
       {g.on && <NewChatSheet open={starting} close={() => setStarting(false)} mates={g.mates} start={async (people, name) => {
-        const out = await g.act('create', { people, name });
+        const out = await g.act('create', { people, name, kind: 'group' });
         if (!out.error && typeof out.value === 'string') openGroup(out.value);
         return out.error;
       }} />}

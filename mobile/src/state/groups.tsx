@@ -75,7 +75,7 @@ function useGroupsState() {
     const links: string[] = [];
     for (const f of files) {
       const name = roomFileName(f.name);
-      const out = await act('putFile', roomId, name, f.dataBase64);
+      const out = await act('putFile', roomId, { name, dataBase64: f.dataBase64 });
       if (out.error) return { links, error: out.error };
       links.push(`${isImageName(name) ? '!' : ''}[${f.name.replace(/[[\]]/g, '')}](attachments/${name})`);
     }

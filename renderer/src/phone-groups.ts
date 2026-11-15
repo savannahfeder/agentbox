@@ -421,11 +421,15 @@ export function phoneGroups(c: GroupsRest, { now = Date.now }: { now?: () => num
     markDone: (roomId: string) => markRead(roomId),
     older: (roomId: string) => older(roomId),
     file: (roomId: string, name: string) => groupFile(c, roomId, name),
-    react: (messageId: string, emoji: string, on?: boolean) => react(messageId, emoji, on),
-    edit: (messageId: string, body: string, mentions?: string[]) => edit(messageId, body, mentions),
-    delete: (messageId: string) => remove(messageId),
-    putFile: (roomId: string, name: string, dataBase64: string) => putFile(roomId, name, dataBase64),
-    create: (o: { people?: string[]; name?: string }) => create(o ?? {}),
+    // In the shapes of the Mac's own (main/team/rooms.mts), since the web app's window calls these too.
+    react: (_roomId: string, messageId: string, emoji: string, on?: boolean) => react(messageId, emoji, on),
+    edit: (_roomId: string, messageId: string, body: string, opts?: { mentions?: string[] }) => edit(messageId, body, opts?.mentions),
+    deleteMessage: (_roomId: string, messageId: string) => remove(messageId),
+    putFile: (roomId: string, file?: { name?: unknown; dataBase64?: unknown }) => putFile(roomId, String(file?.name ?? ''), String(file?.dataBase64 ?? '')),
+    create: (o?: { people?: string[]; name?: string; kind?: string; listed?: boolean }) => {
+      if ((o?.kind ?? 'group') !== 'group' || o?.listed) return Promise.reject(new Error('A chat is only ever people on your team.'));
+      return create(o ?? {});
+    },
   };
 
   /** The desktop's `rooms` door (main/ipc.mts `zero:rooms`), answered from here. */

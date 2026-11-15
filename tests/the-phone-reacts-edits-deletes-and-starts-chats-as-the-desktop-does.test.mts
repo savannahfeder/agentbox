@@ -91,7 +91,7 @@ describe('reactions', () => {
 
   it('a reaction goes through react_room_message and shows at once', async () => {
     const { c, g } = await ready();
-    const out = await g.door({ op: 'react', args: ['m2', '🎉', true] });
+    const out = await g.door({ op: 'react', args: ['r-1', 'm2', '🎉', true] });
     expect(out.ok).toBe(true);
     expect(c.calls.find((x) => x.kind === 'rpc')).toEqual({ kind: 'rpc', name: 'react_room_message', args: { m: 'm2', p_emoji: '🎉', p_on: true } });
     expect(message(g, 'm2').reactions).toEqual({ '🎉': [ME] });
@@ -99,9 +99,9 @@ describe('reactions', () => {
 
   it('taking a reaction back leaves the others on it', async () => {
     const { g } = await ready();
-    await g.door({ op: 'react', args: ['m1', '👍', true] });
+    await g.door({ op: 'react', args: ['r-1', 'm1', '👍', true] });
     expect(message(g, 'm1').reactions?.['👍']).toEqual([SAM, KAI, ME]);
-    await g.door({ op: 'react', args: ['m1', '👍', false] });
+    await g.door({ op: 'react', args: ['r-1', 'm1', '👍', false] });
     expect(message(g, 'm1').reactions?.['👍']).toEqual([SAM, KAI]);
   });
 });
@@ -109,7 +109,7 @@ describe('reactions', () => {
 describe('your own messages', () => {
   it('an edit goes through edit_room_message and shows the new words, marked edited', async () => {
     const { c, g } = await ready();
-    const out = await g.door({ op: 'edit', args: ['m2', '  the new words  ', [SAM]] });
+    const out = await g.door({ op: 'edit', args: ['r-1', 'm2', '  the new words  ', { mentions: [SAM] }] });
     expect(out.ok).toBe(true);
     expect(c.calls.find((x) => x.kind === 'rpc')).toEqual({ kind: 'rpc', name: 'edit_room_message', args: { m: 'm2', p_body: 'the new words', p_mentions: [SAM] } });
     expect(message(g, 'm2')).toMatchObject({ body: 'the new words', mentions: [SAM] });
@@ -118,22 +118,22 @@ describe('your own messages', () => {
 
   it('an edit to nothing is refused before it is sent', async () => {
     const { c, g } = await ready();
-    const out = await g.door({ op: 'edit', args: ['m2', '   ', []] });
+    const out = await g.door({ op: 'edit', args: ['r-1', 'm2', '   '] });
     expect(out.ok).toBe(false);
     expect(c.calls.some((x) => x.kind === 'rpc')).toBe(false);
   });
 
   it('a delete goes through delete_room_message and leaves the message as deleted', async () => {
     const { c, g } = await ready();
-    await g.door({ op: 'delete', args: ['m2'] });
+    await g.door({ op: 'deleteMessage', args: ['r-1', 'm2'] });
     expect(c.calls.find((x) => x.kind === 'rpc')).toEqual({ kind: 'rpc', name: 'delete_room_message', args: { m: 'm2' } });
     expect(message(g, 'm2')).toMatchObject({ deleted: true, body: '' });
   });
 
   it('someone else’s message cannot be edited or deleted from the phone', async () => {
     const { c, g } = await ready();
-    expect((await g.door({ op: 'edit', args: ['m1', 'mine now', []] })).ok).toBe(false);
-    expect((await g.door({ op: 'delete', args: ['m1'] })).ok).toBe(false);
+    expect((await g.door({ op: 'edit', args: ['r-1', 'm1', 'mine now'] })).ok).toBe(false);
+    expect((await g.door({ op: 'deleteMessage', args: ['r-1', 'm1'] })).ok).toBe(false);
     expect(c.calls.some((x) => x.kind === 'rpc')).toBe(false);
   });
 });
@@ -141,7 +141,7 @@ describe('your own messages', () => {
 describe('files', () => {
   it('a file goes into room_files as the person signed in', async () => {
     const { c, g } = await ready();
-    const out = await g.door({ op: 'putFile', args: ['r-1', 'photo-1.jpg', 'aGVsbG8='] });
+    const out = await g.door({ op: 'putFile', args: ['r-1', { name: 'photo-1.jpg', dataBase64: 'aGVsbG8=' }] });
     expect(out).toMatchObject({ ok: true, value: 'photo-1.jpg' });
     expect(c.calls.find((x) => x.kind === 'insert')).toEqual({ kind: 'insert', table: 'room_files', row: { room_id: 'r-1', name: 'photo-1.jpg', by_person: ME, data: 'aGVsbG8=' } });
   });
@@ -156,9 +156,9 @@ describe('files', () => {
 
   it('a name the room cannot keep, or a file over 10 MB, is refused before it goes', async () => {
     const { c, g } = await ready();
-    expect((await g.door({ op: 'putFile', args: ['r-1', '../x.jpg', 'aGVsbG8='] })).ok).toBe(false);
+    expect((await g.door({ op: 'putFile', args: ['r-1', { name: '../x.jpg', dataBase64: 'aGVsbG8=' }] })).ok).toBe(false);
     const big = 'A'.repeat(Math.ceil((10 * 1024 * 1024 + 3) / 3) * 4);
-    expect((await g.door({ op: 'putFile', args: ['r-1', 'big.mov', big] })).ok).toBe(false);
+    expect((await g.door({ op: 'putFile', args: ['r-1', { name: 'big.mov', dataBase64: big }] })).ok).toBe(false);
     expect(c.calls.some((x) => x.kind === 'insert')).toBe(false);
   });
 });
@@ -166,14 +166,14 @@ describe('files', () => {
 describe('starting a chat', () => {
   it('with one teammate, opens the two-person chat you already have', async () => {
     const { c, g } = await ready(true);
-    const out = await g.door({ op: 'create', args: [{ people: [ME, SAM] }] });
+    const out = await g.door({ op: 'create', args: [{ name: '', kind: 'group', people: [ME, SAM] }] });
     expect(out).toMatchObject({ ok: true, value: 'r-pair' });
     expect(c.calls.some((x) => x.name === 'create_room')).toBe(false);
   });
 
   it('with one teammate and no chat yet, makes one through create_room', async () => {
     const { c, g } = await ready();
-    const out = await g.door({ op: 'create', args: [{ people: [ME, SAM] }] });
+    const out = await g.door({ op: 'create', args: [{ name: '', kind: 'group', people: [ME, SAM] }] });
     expect(out).toMatchObject({ ok: true, value: 'r-new' });
     expect(c.calls.find((x) => x.name === 'create_room')?.args).toEqual({ p_name: '', p_kind: 'group', p_listed: false, p_people: [ME, SAM], p_invite_only: false });
   });
@@ -188,6 +188,7 @@ describe('starting a chat', () => {
     const { c, g } = await ready();
     expect((await g.door({ op: 'create', args: [{ people: [ME, OUT] }] })).ok).toBe(false);
     expect((await g.door({ op: 'create', args: [{ people: [ME] }] })).ok).toBe(false);
+    expect((await g.door({ op: 'create', args: [{ name: 'Open', kind: 'room', listed: true, people: [ME, SAM] }] })).ok).toBe(false);
     expect(c.calls.some((x) => x.name === 'create_room')).toBe(false);
   });
 });
