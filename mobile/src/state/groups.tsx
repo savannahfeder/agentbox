@@ -64,7 +64,7 @@ function useGroupsState() {
   }, [groups]);
   const setLast = useCallback((id: string) => { setLastRaw(id); appStore.setItem(LAST_GROUP_KEY, id); }, []);
 
-  // React, edit, delete, a file, a new chat: null when done, else why not.
+  // One of the door's actions; `error` says why it did not happen.
   const act = useCallback(async (op: string, ...args: unknown[]): Promise<{ error: string | null; value?: unknown }> => {
     if (!groups) return { error: 'Not signed in' };
     const out = await groups.door({ op, args });
