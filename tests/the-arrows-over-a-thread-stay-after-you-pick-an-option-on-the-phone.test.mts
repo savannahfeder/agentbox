@@ -38,10 +38,10 @@ describe('the walk over an open thread', () => {
     const now = [row('a'), row('c')];
     expect(walkKeeping(now, row('z'), before)).toBe(now);
   });
-  // 2026-11-15 (w-c740dc46eb): the founder asked for the count and both arrows
-  // off the phone's thread bar, which was too crowded to read.
-  it('is not on the phone\'s thread bar any more', () => {
+  it('is what the thread page walks', () => {
     const page = fs.readFileSync('mobile/src/app/thread/[product]/[id].tsx', 'utf8');
-    expect(page).not.toMatch(/walkKeeping|needsYouSpot|label="Next thread"|label="Previous thread"/);
+    expect(page).toMatch(/walkKeeping\(needsYouOrder\(asks, .*, inbox\), here, walked\.current\)/);
+    expect(page).toMatch(/needsYouSpot\(walk, here\)/);
+    expect(page).toMatch(/stepOver\(walk, here, dir\)/);
   });
 });

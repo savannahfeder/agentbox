@@ -10,7 +10,7 @@ import { activitySummary } from '../../../renderer/src/activity-summary';
 import type { ParsedOption } from '../../../renderer/src/format';
 import type { AgentWork } from '../../../renderer/src/types';
 import { stateWord } from '../../../renderer/src/threads-made';
-import { fileCount, figuresLabel, signed } from '../../../renderer/src/change-figures';
+import { fileCount, signed } from '../../../renderer/src/change-figures';
 import type { FiledRow, Thread } from '../lib/thread';
 import { FILED_WORDS, waitingWords, type Live } from '../lib/thread-offers';
 import { Chevron as FoldArrow } from './icons';
@@ -257,25 +257,14 @@ export function FiledList({ rows, label, open, approve, here, dismiss, inTurn }:
   );
 }
 
-/** The options strip: the question, a row per option, and the close question's way out (OptionsOffer.tsx). */
-/** What the last run changed: its figures, then each file (the desktop's change figures and the file bar of its code pane). */
 const figures = (c: { plus: number; minus: number }, size: number) => signed(c).map(({ sign, text }) => (
   <T key={sign} style={{ fontFamily: font.mono, fontSize: size, color: sign === '+' ? color.plus : color.minus }}>{text}</T>
 ));
 
-/** "+13 −1" beside Done, the desktop's code button (Focus.tsx `codeButton`). */
-export function ChangeFigures({ change, onPress }: { change: NonNullable<Thread['change']>; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`See the change, ${figuresLabel(change)}`} hitSlop={4}
-      style={({ pressed }) => ({ height: 30, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, marginRight: 2, borderRadius: corner.small, backgroundColor: pressed ? color.picked : 'transparent' })}>
-      {figures(change, 12.5)}
-    </Pressable>
-  );
-}
-
+/** What the last run changed: its figures, then each file (the desktop's change figures and the file bar of its code pane). */
 export function ChangeCard({ change }: { change: NonNullable<Thread['change']> }) {
   return (
-    <View style={{ marginTop: 21, borderWidth: 1, borderRadius: corner.card, borderColor: color.line, overflow: 'hidden' }}>
+    <View style={{ marginTop: 22, borderWidth: 1, borderRadius: corner.card, borderColor: color.line, overflow: 'hidden' }}>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingTop: 11, paddingHorizontal: 16, paddingBottom: 8 }}>
         {figures(change, 12.5)}
         <T style={{ fontSize: 12.5, color: color.faint }}>in {fileCount(change)}</T>
@@ -295,6 +284,7 @@ export function ChangeCard({ change }: { change: NonNullable<Thread['change']> }
   );
 }
 
+/** The options strip: the question, a row per option, and the close question's way out (OptionsOffer.tsx). */
 export function OptionsCard({ ask, options, busy, pick, keep, dir, files, foot = false, onFold }: {
   ask: string; options: ParsedOption[]; busy: boolean; pick: (o: ParsedOption) => void;
   keep?: { label: string; onKeep: () => void }; dir?: string | null; files?: MessageFiles;

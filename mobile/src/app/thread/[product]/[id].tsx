@@ -24,8 +24,13 @@ import type { Choices, Press, PressedItem } from '../../../lib/actions';
 import { useDraft } from '../../../lib/drafts';
 import { typedWords } from '../../../lib/files';
 import { threadOf, type FiledRow, type Thread, type ThreadEvent, type ThreadNode, type ThreadSaid } from '../../../lib/thread';
-import { askUnderAnswer, CHOICES_FOLDED, foldKey, foldedKeys, pageOf, splitHeadline, toggleFold } from '../../../lib/one-page';
-import { mateOf } from '../../../lib/teammates';
+import { askUnderAnswer, CHOICES_FOLDED, foldKey, foldedKeys, pageOf, splitHeadline, toggleFold, walkKeeping } from '../../../lib/one-page';
+import { needsYouOrder, needsYouSpot, stepOver } from '../../../lib/needs-you';
+import { shownTabs } from '../../../lib/tabs';
+import { readDisplay } from '../../../../../renderer/src/threads/page-rules';
+import { mentionRows } from '../../../../../renderer/src/team/rooms/room-rules';
+import { useGroups } from '../../../state/groups';
+import { mateOf, questionThread, questionsForYou } from '../../../lib/teammates';
 import { TeammateMark, ThreadQuestions } from '../../../ui/Teammates';
 import { screenGate } from '../../../lib/thread-gate';
 import { liveOf, moveChoices, offersOf, ruleFor, shownLevel, summaryParts, type Offers } from '../../../lib/thread-offers';
@@ -52,7 +57,7 @@ import { ChoiceButton, footRoom, IconButton, PriorityBars, RunningMark, Sheet, S
 import { ModelSheet, ModeSheet, PrioritySheet, barsFor } from '../../../ui/Pickers';
 import { ThreadMenu } from '../../../ui/ThreadMenu';
 import { DictationProblem, Listening, MicButton, useDictation } from '../../../ui/Dictation';
-import { ActLine, ChangeCard, ChangeFigures, FiledList, FocusActions, LiveLine, OptionsCard, RunLine, WorkLine } from '../../../ui/ThreadParts';
+import { ActLine, ChangeCard, FiledList, FocusActions, LiveLine, OptionsCard, RunLine, WorkLine } from '../../../ui/ThreadParts';
 import { color, corner, font, size } from '../../../ui/theme';
 
 const when = (at: number) => (at ? `${dayHeading(at)} ${clock(at)}` : '');
@@ -291,21 +296,6 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
   );
 }
 
-/** The change the figures beside Done open, as the desktop's code button opens its pane. */
-function ChangePage({ thread, change, close }: { thread: Thread; change: NonNullable<Thread['change']>; close: () => void }) {
-  const inset = useSafeAreaInsets();
-  return (
-    <Modal visible animationType="slide" onRequestClose={close}>
-      <View style={{ flex: 1, backgroundColor: color.bg }}>
-        <TopBar noReview left={<IconButton label="Back" onPress={close}><Back /></IconButton>} title={<T numberOfLines={1} style={{ fontSize: 15, paddingHorizontal: 6 }}>{thread.title}</T>} />
-        <ScrollView contentContainerStyle={{ paddingHorizontal: size.inset, paddingBottom: 40 + inset.bottom }}>
-          <ChangeCard change={change} />
-        </ScrollView>
-      </View>
-    </Modal>
-  );
-}
-
 function Summary({ thread, now, close }: { thread: Thread; now: number; close: () => void }) {
   const item = thread.item;
   // Context and Done, the summary's two lines, with the desktop's fallbacks.
@@ -366,7 +356,6 @@ export default function ThreadScreen() {
   const [error, setError] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
   const [summary, setSummary] = useState(false);
-  const [changeOpen, setChangeOpen] = useState(false);
   // The left-out middle, asked back; dropped on leaving the thread (ItemThread.tsx).
   const [whole, setWhole] = useState(false);
   // Close asked first while filed tasks wait (close-asks-first.ts).
@@ -399,6 +388,8 @@ export default function ThreadScreen() {
   const footList = useRef(0);
   // A page opens on its name; only a conversation with no answer yet opens at its end, to follow it.
   const placedOn = useRef<string | null>(null);
+  const walked = useRef<{ product: string; id: string }[]>([]);
+  const groups = useGroups();
 
   const back =() => (router.canGoBack() ? router.back() : router.replace('/'));
   // A thread sent from here, now made by the computer under its own id.
@@ -423,6 +414,20 @@ export default function ThreadScreen() {
     placedOn.current = `${product}/${id}`;
     resting.current = !page.answer && !thread.outcome && page.from === 0;
   }
+  // The arrows walk Needs you, as OneThingAtATime.tsx `QueueNav` does; the count beside them was asked off.
+  const here = { product: String(product), id: String(id) };
+  const inbox = shownTabs(c.tabs, readDisplay('inbox', appStore), c.now, c.view.products.map((p) => p.slug)).rows.inbox;
+  const inNeedsYou = new Set(inbox.map((r) => r.key));
+  const asks = questionsForYou(c.team, c.teamPending)
+    .map((q) => ({ ...q, thread: questionThread(q.question, c.view.items) }))
+    .filter((q) => !q.thread || !inNeedsYou.has(`${q.thread.product}/${q.thread.id}`));
+  const walk = walkKeeping(needsYouOrder(asks, groups.on ? mentionRows(groups.state.mentions, groups.state) : [], inbox), here, walked.current);
+  walked.current = walk;
+  const walking = !!needsYouSpot(walk, here);
+  const step = (dir: 1 | -1) => {
+    const to = stepOver(walk, here, dir);
+    if (to) router.setParams({ product: to.product, id: to.id });
+  };
   const roundKey = foldKey(item);
   const choicesFolded = foldedRounds.includes(roundKey);
   const foldChoices = () => {
@@ -511,8 +516,13 @@ export default function ThreadScreen() {
       <TopBar noReview
         left={<IconButton label="Back" width={34} onPress={back}><Back /></IconButton>}
         right={<>
-          {thread.change && <ChangeFigures change={thread.change} onPress={() => setChangeOpen(true)} />}
-          <IconButton label="Show the summary" width={44} onPress={() => setSummary(true)}><Panel /></IconButton>
+          {walking && (
+            <>
+              <IconButton label="Previous thread" width={32} onPress={() => step(-1)}><View style={{ opacity: stepOver(walk, here, -1) ? 1 : 0.35 }}><Chevron up /></View></IconButton>
+              <IconButton label="Next thread" width={32} onPress={() => step(1)}><View style={{ opacity: stepOver(walk, here, 1) ? 1 : 0.35 }}><Chevron /></View></IconButton>
+            </>
+          )}
+          <IconButton label="Show the summary" width={walking ? 36 : 44} onPress={() => setSummary(true)}><Panel /></IconButton>
           {/* Done in a box of its own, left of the dots, as the desktop draws it (threads/ThreadMenu.tsx). */}
           {threadState(item) !== 'done' && (
             <Pressable onPress={close} disabled={busy} accessibilityRole="button" accessibilityLabel="Mark done"
@@ -590,6 +600,7 @@ export default function ThreadScreen() {
               <Markdown text={thread.outcome.text} dir={dir} files={files} />
             </View>
           )}
+          {thread.change && <ChangeCard change={thread.change} />}
           {thread.after.length > 0 && (
             <View style={{ marginTop: 22, gap: 9 }}>
               {thread.after.map((a, k: number) => <ActLine key={`${a.at}-${k}`} act={a} joined={k > 0} />)}
@@ -641,7 +652,6 @@ export default function ThreadScreen() {
         onReport={() => router.push({ pathname: '/settings/feedback', params: { report: `${product}/${id}`, title: item.title ?? '', answer: (page.answer ? [page.answer.headline, page.answer.rest].filter(Boolean).join('\n\n') : thread.outcome?.text ?? '').slice(0, 4000) } })}
         onClose={close} closed={threadState(item) === 'done'} />
       {summary && <Summary thread={thread} now={c.now} close={() => setSummary(false)} />}
-      {changeOpen && thread.change && <ChangePage thread={thread} change={thread.change} close={() => setChangeOpen(false)} />}
     </Wall>
   );
 }

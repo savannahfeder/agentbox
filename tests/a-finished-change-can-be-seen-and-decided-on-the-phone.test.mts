@@ -138,16 +138,17 @@ describe('a finished thread opened on the phone', () => {
   });
 });
 
-// Asked on the first screenshots: the change goes in the bar as on the
-// desktop, and the bar loses the count, the arrows and Review, which crowded it.
+// Asked on the screenshots: the bar was too crowded, so the count and Review
+// come off it; the arrows stay, since a thread is judged by stepping through.
 describe('the phone thread bar', () => {
   const page = fs.readFileSync('mobile/src/app/thread/[product]/[id].tsx', 'utf8');
-  it('carries the change figures, which open the files', () => {
-    expect(page).toMatch(/thread\.change && <ChangeFigures change=\{thread\.change\} onPress=\{\(\) => setChangeOpen\(true\)\}/);
-    expect(page).toMatch(/<ChangePage thread=\{thread\} change=\{thread\.change\}/);
+  it('draws the change under the answer', () => {
+    expect(page).toMatch(/thread\.change && <ChangeCard change=\{thread\.change\} \/>/);
   });
-  it('has no count, no arrows and no Review button', () => {
-    expect(page).not.toMatch(/spot\.total|label="Next thread"|label="Previous thread"/);
+  it('keeps the up and down arrows but no count and no Review button', () => {
+    expect(page).toMatch(/label="Previous thread"/);
+    expect(page).toMatch(/label="Next thread"/);
+    expect(page).not.toMatch(/spot\.total|spot\.pos/);
     expect(page).toMatch(/<TopBar noReview\b/);
   });
   it('still brings a put-aside permission back from every other bar', () => {
