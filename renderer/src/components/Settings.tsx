@@ -873,7 +873,7 @@ function PhoneAppGroup({ email, onFeedback }: { email?: string | null; onFeedbac
   return (
     <Group id="phone-app" label="Get the app">
       <div className="set-row set-phone-qr">
-        {qr && <img alt="QR code that opens Agentbox on the App Store" src={`data:image/svg+xml;utf8,${encodeURIComponent(qr)}`} />}
+        {qr && <img alt={`QR code that opens ${Name} on the App Store`} src={`data:image/svg+xml;utf8,${encodeURIComponent(qr)}`} />}
         <div className="set-row-text">
           <div className="set-row-label">{Name} for iOS</div>
           <div className="set-row-desc">Scan with your phone's camera, then sign in {email ? <>as <b>{email}</b></> : `with your ${Name} account`}.</div>
