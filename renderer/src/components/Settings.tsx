@@ -2845,11 +2845,11 @@ function WebAccounts({ engine, list, reading, refusedAsk, onUse }: { engine: 'cl
   return (
     <>
       {list.map((a) => {
-        const live = picked && chosen(a);
+        const live = picked && chosen(a) && a.signedIn !== false;
         return (
           <ReadRow key={a.id} label={a.email ?? a.name ?? 'Not signed in'} desc={a.note ?? (a.signedIn === false ? 'Finish signing in to use it' : a.plan ?? 'Signed in')} reading={(mine && live) || refusedHere(a) ? reading : undefined}>
             {live ? <span className="set-in-use">In use</span>
-              : list.length > 1 && <button type="button" className="set-ghost" onClick={() => onUse(a.id)}>{picked ? 'Use this one' : 'Use only this one'}</button>}
+              : list.length > 1 && a.signedIn !== false && <button type="button" className="set-ghost" onClick={() => onUse(a.id)}>{picked ? 'Use this one' : 'Use only this one'}</button>}
           </ReadRow>
         );
       })}

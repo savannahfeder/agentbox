@@ -57,6 +57,7 @@ export interface WorkerThreadOptions {
   connectionServers?: ConnectionServers | null;
   mode?: string | null;
   reviewer?: string | null;
+  thread?: { item: string; product?: string | null } | null;
 }
 
 export type WorkerThreadParams = {
@@ -69,6 +70,7 @@ export type WorkerThreadParams = {
     mcp_servers: Record<string, McpServerEntry>;
     projects: Record<string, { trust_level: string }>;
     features: { apps: boolean; plugins: boolean; remote_plugin: boolean };
+    [threadTag: `shell_environment_policy.set.${string}`]: string;
   };
   model?: string;
   developerInstructions?: string;
@@ -272,7 +274,20 @@ const plainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof 
  * while signed out, so `createCodexWorker` also reports any server that starts
  * unasked (`sayUnasked`).
  */
-export function workerThreadParams({ cwd, model = null, instructions = null, mcpServers = [], storeServer = null, connectionServers = null, mode = null, reviewer = null }: WorkerThreadOptions = {}) {
+/**
+ * The thread's tag on every command it runs. One app-server runs every local
+ * Codex thread, so without this their programs are counted as the app's own
+ * and the leftovers sweep cannot tie them to a thread. Dotted keys add to a
+ * `shell_environment_policy` of the person's own rather than replace it.
+ */
+function threadTag(thread: WorkerThreadOptions['thread']): Record<`shell_environment_policy.set.${string}`, string> {
+  if (!thread || !/^w-[0-9a-f]+$/.test(thread.item)) return {};
+  const tag: Record<`shell_environment_policy.set.${string}`, string> = { 'shell_environment_policy.set.ZERO_ITEM': thread.item };
+  if (thread.product && /^[A-Za-z0-9._-]+$/.test(thread.product)) tag['shell_environment_policy.set.ZERO_PRODUCT'] = thread.product;
+  return tag;
+}
+
+export function workerThreadParams({ cwd, model = null, instructions = null, mcpServers = [], storeServer = null, connectionServers = null, mode = null, reviewer = null, thread = null }: WorkerThreadOptions = {}) {
   const posture = codexPosture(mode, { reviewer });
   const params: WorkerThreadParams = {
     cwd,
@@ -287,6 +302,7 @@ export function workerThreadParams({ cwd, model = null, instructions = null, mcp
       // Plugins can contribute MCP servers outside config.mcp_servers.
       // Keep this worker on the same explicit integration boundary.
       features: { apps: false, plugins: false, remote_plugin: false },
+      ...threadTag(thread),
     },
   };
   if (model) params.model = model;

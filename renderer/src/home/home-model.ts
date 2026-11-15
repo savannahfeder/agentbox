@@ -1,4 +1,5 @@
 // What Home shows, worked out from data the app already has.
+import { harnessOf } from '../box-filter';
 
 export function greeting(hour: number, name?: string | null): string {
   const part = hour < 4 ? 'Good evening' : hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
@@ -43,6 +44,24 @@ export function agoShort(at: number, now: number): string {
   const h = Math.floor(m / 60);
   if (h < 24) return `${h} hr`;
   return `${Math.floor(h / 24)} d`;
+}
+
+type EngineFacts = {
+  running?: readonly { itemId: string; product: string; engine?: string }[];
+  engines?: { workspace?: string | null; byItem?: Record<string, string> } | null;
+};
+
+/** Which coding agent a row is on: the run that really started, else a Codex
+ *  conversation, else main's answer for its next run. The row's own `engine`
+ *  is only what it asked for, and is absent when it takes the workspace default. */
+export function rowEngine(
+  item: { id: string; product: string; labels?: readonly string[]; engine?: string | null },
+  facts: EngineFacts,
+): string {
+  const run = facts.running?.find((r) => r.itemId === item.id && r.product === item.product);
+  if (run?.engine) return run.engine;
+  if (harnessOf({ labels: item.labels ? [...item.labels] : [], engine: item.engine }) === 'codex') return 'codex';
+  return facts.engines?.byItem?.[item.id] ?? facts.engines?.workspace ?? item.engine ?? 'claude';
 }
 
 export function engineName(engine: string | undefined): string {

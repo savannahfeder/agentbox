@@ -53,7 +53,7 @@ describe('an agent asked to stop a repeating task', () => {
 
   const rule = (title: string, where = dir) => repeats.setRule(where, { title, body: `${title}.`, every: 'day', at: '07:00' }, morning - 86_400_000)!;
 
-  const onAThread = (answer: string | null = 'Switch it off', labels = ['founder']) => {
+  const onAThread = (answer: string | null = 'Stop the daily check', labels = ['founder']) => {
     const thread = work.createWorkItem(dir, { title: 'Set up the new helper', body: 'Replaces the old daily check.', labels }, { source: 'founder', now: morning - 60_000 });
     if (answer) work.updateWorkItem(dir, thread.id, { answer }, { source: 'founder', now: morning - 30_000 });
     process.env.ZERO_ITEM = thread.id;
@@ -61,7 +61,7 @@ describe('an agent asked to stop a repeating task', () => {
     return thread;
   };
 
-  const stop = (which: string, askedBecause: string | undefined = 'Switch it off', extra: { product?: string } = {}) =>
+  const stop = (which: string, askedBecause: string | undefined = 'Stop the daily check', extra: { product?: string } = {}) =>
     core.stopRepeatingTask({ which, askedBecause, ...extra }, { now: morning });
 
   it('stops the task named, so it is not owed again', () => {
@@ -86,7 +86,7 @@ describe('an agent asked to stop a repeating task', () => {
 
   it('stops it from a teammate\'s run the person answered', () => {
     const old = rule('Daily check');
-    onAThread('Switch it off', ['founder', 'teammate:t-1', 'hop:0']);
+    onAThread('Stop the daily check', ['founder', 'teammate:t-1', 'hop:0']);
     expect(stop('Daily check').ended).toBe(true);
     expect(repeats.get(dir, old.id, morning)!.endedAt).toBe(morning);
   });
@@ -103,7 +103,7 @@ describe('an agent asked to stop a repeating task', () => {
   it('refuses a teammate\'s words standing in for the person\'s', () => {
     const old = rule('Daily check');
     const thread = onAThread(null, ['founder', 'teammate:t-1']);
-    work.updateWorkItem(dir, thread.id, { answer: 'Switch it off' }, { source: 'system', now: morning - 10_000 });
+    work.updateWorkItem(dir, thread.id, { answer: 'Stop the daily check' }, { source: 'system', now: morning - 10_000 });
     expect(() => stop('Daily check')).toThrow(/own words on this thread/i);
     expect(repeats.get(dir, old.id, morning)!.endedAt).toBeUndefined();
   });
@@ -127,8 +127,8 @@ describe('an agent asked to stop a repeating task', () => {
     const elsewhere = createProduct(`Other ${Math.random().toString(36).slice(2, 8)}`);
     const otherDir = path.join(appHome(), 'accounts', 'acct', elsewhere.id);
     const old = rule('Morning report', otherDir);
-    onAThread();
-    const done = stop('Morning report');
+    onAThread('Stop the morning report');
+    const done = stop('Morning report', 'Stop the morning report');
     expect(done.product).toBe(elsewhere.id);
     expect(repeats.get(otherDir, old.id, morning)!.endedAt).toBe(morning);
   });

@@ -13,7 +13,8 @@
 // apiece. A sample of the app showed that thread spawning git 100% of the time.
 // A new thread's `restoreTaskFolder` waited behind every one of those jobs.
 //
-// So a job somebody is waiting on goes ahead of the tidying up. What must NOT
+// Making a thread's folder now has a lane of its own (cc27442ff), and this pins
+// that it is never queued behind the tidying up. What must NOT
 // change: the tidying up still all happens, in its own order, and two waiting
 // jobs keep their order between themselves.
 import { describe, it, expect, afterEach } from 'vitest';

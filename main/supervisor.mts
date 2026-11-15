@@ -1372,6 +1372,7 @@ export class Supervisor {
   declare _traces: Map<string, { stamp: string; trace: ReturnType<typeof readDeadRunTrace> }> | undefined;
   declare _versionsLooked: Map<string, unknown> | undefined;
   declare _profilesKept: { at: number; list: ReturnType<typeof effectiveProfiles> } | undefined;
+  declare _pass: Map<string, unknown> | null | undefined;
   declare _reaching: Promise<unknown> | null | undefined;
   declare connections: SupervisorConnections | null | undefined;
   declare _resumeQueue: Set<string>;
@@ -6577,6 +6578,10 @@ export class Supervisor {
   // added for the cloud, and any sign-in going on. The usage file is read at
   // most every 30 seconds; the snapshot asks on every change.
   cloudStatus(handed?: WorkItem[]) {
+    return this._inOnePass(() => this._cloudStatusOf(handed));
+  }
+
+  _cloudStatusOf(handed?: WorkItem[]) {
     const config = readCloudConfig(process.env, this.config.home);
     const setUp = !!config;
     // Offered to a Mac whose app carries Agentbox Cloud's settings, until
@@ -7067,17 +7072,19 @@ export class Supervisor {
 
   // Set up, the engine offered, and this Mac's account of it signed in in the
   // cloud, working or resting at its limit; not one that must sign in again.
-  _cloudSignedInAtAll(engine: string = DEFAULT_ENGINE) {
+  _cloudSignedInAtAll(engine: string = DEFAULT_ENGINE): boolean {
     const which = engineOf(engine);
-    if (this.config.cloudRuns === false || !readCloudConfig(process.env, this.config.home)) return false;
-    if (!this.engineChoices().some((e) => e.id === which)) return false;
-    const now = Date.now();
-    // The account the cloud would run on, which is this Mac's or none.
-    const inUse = cloudLoginInUse(which, this._cloudAccountAsk(which, now));
-    if (!inUse) return false;
-    const state = cloudLoginState(inUse, { now });
-    // Resting at its limit, or a Codex sign-in being renewed: back soon.
-    return mayRunOn(state) || state === 'limited' || state === 'renew';
+    return this._onceInPass(`cloud-signed-in:${which}`, () => {
+      if (this.config.cloudRuns === false || !readCloudConfig(process.env, this.config.home)) return false;
+      if (!this.engineChoices().some((e) => e.id === which)) return false;
+      const now = Date.now();
+      // The account the cloud would run on, which is this Mac's or none.
+      const inUse = cloudLoginInUse(which, this._cloudAccountAsk(which, now));
+      if (!inUse) return false;
+      const state = cloudLoginState(inUse, { now });
+      // Resting at its limit, or a Codex sign-in being renewed: back soon.
+      return mayRunOn(state) || state === 'limited' || state === 'renew';
+    });
   }
 
   _maxCloud() {
@@ -8623,6 +8630,27 @@ export class Supervisor {
 
   /** `handed`: the threads a caller already read, so this reads none of its own. */
   status(handed?: WorkItem[]) {
+    return this._inOnePass(() => this._statusOf(handed));
+  }
+
+  // What every thread in one status pass asks alike (is this Mac signed in to
+  // the cloud) is read once in it, not once per thread.
+  _inOnePass<T>(run: () => T): T {
+    if (this._pass) return run();
+    this._pass = new Map();
+    try { return run(); } finally { this._pass = null; }
+  }
+
+  _onceInPass<T>(key: string, read: () => T): T {
+    const pass = this._pass;
+    if (!pass) return read();
+    if (pass.has(key)) return pass.get(key) as T;
+    const value = read();
+    pass.set(key, value);
+    return value;
+  }
+
+  _statusOf(handed?: WorkItem[]) {
     // One read of the threads for the whole answer: this runs for every
     // request the window makes.
     const readAt = Date.now();
@@ -11124,7 +11152,7 @@ export class Supervisor {
       // thread already running cannot un-launch them. Read fresh for THIS start
       // rather than once per app-server, and never caught: see `_codexIsolation`.
       ready: this._codexIsolation(client, handshake),
-      threadParams: (mcpServers: unknown) => this.codexThreadParamsFor(plan, cwd, mcpServers as unknown[], storeServer, home, { cloud }),
+      threadParams: (mcpServers: unknown) => this.codexThreadParamsFor(plan, cwd, mcpServers as unknown[], storeServer, home, { cloud, item }),
       askedMcpServers: Object.keys(plan.connectionServers ?? {}),
       turnParams: this.codexTurnParamsFor(plan),
       resumeThreadId: plan.resumeId,
@@ -11275,7 +11303,7 @@ export class Supervisor {
    */
   // `home` is the login this thread runs on. Its own list is the one checked:
   // reading the main login's let a free-plan login be handed gpt-6.1-sol.
-  codexThreadParamsFor(plan: SpawnPlan, cwd: string, mcpServers: unknown[], storeServer: ToolServer | null, home: string = this._codexHome(), { cloud = false }: { cloud?: boolean } = {}) {
+  codexThreadParamsFor(plan: SpawnPlan, cwd: string, mcpServers: unknown[], storeServer: ToolServer | null, home: string = this._codexHome(), { cloud = false, item = null }: { cloud?: boolean; item?: Pick<WorkItem, 'id' | 'product'> | null } = {}) {
     // ASKED HERE RATHER THAN CARRIED ON THE PLAN. A precomputed field would be
     // a second copy of this decision that a caller can forget to set, and the
     // way it fails is a word Codex cannot read reaching `thread/start` -- which
@@ -11301,6 +11329,7 @@ export class Supervisor {
       mcpServers,
       storeServer,
       connectionServers: plan?.connectionServers ?? null,
+      thread: item ? { item: item.id, product: item.product } : null,
       // WHAT SHE PICKED, AND IT IS ASKED FOR HERE FOR THE SAME REASON THE MODEL
       // IS: the one place that builds the params is the one place that decides,
       // so there is no precomputed field on the plan for a caller to forget.
