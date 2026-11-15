@@ -7,7 +7,7 @@
 // the store that day: 14 rows in Needs you, 10 of them from those 3 causes.
 //
 // Now a stuck thread calls wait_on_cause. The first to hit a cause opens one
-// row for it, which the app starts on its own (its agent is the lead); the rest
+// row for it, whose agent is the lead once the person replies; the rest
 // join that row and leave Needs you for Later. When the lead closes the row,
 // every thread behind it carries on, whichever project it is in.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -182,7 +182,7 @@ describe('a stuck thread waits on its cause through the store tool', () => {
   };
   const read = (id) => work.listWorkItems({ includeDone: true }).find((i) => i.id === id);
 
-  it('the first opens one row the app starts on its own, and the thread waits behind it', async () => {
+  it('the first opens one row, and the thread waits behind it', async () => {
     const a = thread(product, 'Who acts on comments');
     const said = await call(a.id, { cause: "Your Mac can't push to GitHub", ask: 'Run gh auth login', new: true });
     expect(said.opened).toBe(true);

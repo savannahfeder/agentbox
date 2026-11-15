@@ -33,7 +33,7 @@ import { keptStore } from '../lib/kept';
 import { previewCloud } from '../lib/preview';
 import { ALERTS_KEY, leaveAddress, readAlerts, takeAddressBack, type KeptAlerts } from '../lib/push-device';
 import type { PlaceId } from '../lib/groups';
-import { phoneTabs } from '../lib/tabs';
+import { phoneProjectOrder, phoneTabs } from '../lib/tabs';
 import { batchWords, pickedPlan, type PickedPress } from '../lib/picked';
 import { onTheirWay, teamFrom, withPendingPauses, withPhoneAnswers } from '../lib/teammates';
 import { isUnread, markSeen as markSeenIn, markUnseen as markUnseenIn, readSeen } from '../lib/unread';
@@ -153,7 +153,8 @@ function useCloudState() {
   const shown = useMemo(() => phoneView(rows, now), [rows, now]);
   // A permission answered on the phone and still inside its Undo leaves every list at once.
   const [heldIds, setHeldIds] = useState<ReadonlySet<string>>(() => new Set());
-  const view = useMemo(() => ({ ...shown, approvals: shown.approvals.filter((a) => !heldIds.has(a.id)) }), [shown, heldIds]);
+  const projectOrder = useMemo(() => phoneProjectOrder(settingsRows), [settingsRows]);
+  const view = useMemo(() => ({ ...shown, projectOrder, approvals: shown.approvals.filter((a) => !heldIds.has(a.id)) }), [shown, projectOrder, heldIds]);
   const tabs = useMemo(() => phoneTabs(view, now), [view, now]);
   const repeats = useMemo(() => phoneRepeats(settingsRows, rows.commands, rows.projects, now), [settingsRows, rows.commands, rows.projects, now]);
   const team = useMemo(() => (STORE_BUILD ? null : withPendingPauses(withPhoneAnswers(teamFrom(settingsRows), rows.commands), rows.commands)), [settingsRows, rows.commands]);

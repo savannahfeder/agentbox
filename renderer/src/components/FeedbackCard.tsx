@@ -53,8 +53,8 @@ function screenshotName(at = new Date()) {
 
 const extension = (name: string) => (name.includes('.') ? name.split('.').pop()!.slice(0, 4).toUpperCase() : 'FILE');
 
-export function FeedbackCard({ onClose, onSend }: { onClose: () => void; onSend: Send }) {
-  const [text, setText] = useState('');
+export function FeedbackCard({ onClose, onSend, start = '' }: { onClose: () => void; onSend: Send; start?: string }) {
+  const [text, setText] = useState(start);
   const [files, setFiles] = useState<FeedbackFile[]>([]);
   const [dragging, setDragging] = useState(false);
   const [sending, setSending] = useState(false);
@@ -66,7 +66,12 @@ export function FeedbackCard({ onClose, onSend }: { onClose: () => void; onSend:
   // is up while this count is above zero rather than on the last event.
   const depth = useRef(0);
 
-  useEffect(() => { box.current?.focus(); }, []);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, []);
   // Sent, it thanks you and gets out of the way on its own.
   useEffect(() => {
     if (!sent) return undefined;

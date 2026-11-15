@@ -2,8 +2,8 @@
 //
 // A thread stuck on something outside its own work (a sign-in, the computer,
 // git or GitHub, a broken main) parks behind a cause row instead of asking the
-// person itself. The cause row is an ordinary row the app starts on its own;
-// the agent on it is the lead, who clears the cause or asks once for every
+// person itself. The cause row waits in Needs you for the person's reply,
+// since any agent can open one; the agent their reply starts is the lead, who clears the cause or asks once for every
 // thread behind it. Closing it is what lets those threads carry on, through
 // the waits every row already has (`blockedBy`, resumeFinishedWaits).
 

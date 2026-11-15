@@ -27,6 +27,8 @@ const KEY = /^(runs|logins|files)\/([A-Za-z0-9._@+=-]+(?:\/[A-Za-z0-9._@+=-]+)*)
 const FILE_KEY = /^files\/[0-9a-f]{64}$/;
 const FILES_WEIGH_MS = 60_000;
 const LINK_MAX_SECONDS = 12 * 60 * 60;
+// The most S3 takes in one PUT.
+const ONE_UPLOAD_MAX = 5 * 2 ** 30;
 const LOGIN_LINK_SECONDS = 30 * 60;
 // Lambda takes and gives at most 6 MB; past RELAY_BYTES a call or an answer
 // goes through the person's own `runs/calls/` in the bucket instead.
@@ -551,7 +553,13 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   async function weighFiles(person, t) {
     const { items, truncated } = await objects.sizes(`files/u-${person}/`, { max: STORAGE_LIST_MAX });
     const bytes = items.reduce((sum, o) => sum + o.size, 0);
-    return update(person, (r) => { r.files = { ...r.files, at: t, bytes, count: items.length, truncated }; return r.files; });
+    const there = new Set(items.map((o) => o.key));
+    return update(person, (r) => {
+      r.files = { ...r.files, at: t, bytes, count: items.length, truncated };
+      // A file that landed is in the weight now, so its link stops counting.
+      if (r.filePuts) r.filePuts = Object.fromEntries(Object.entries(r.filePuts).filter(([k, p]) => !there.has(k) && p.until > t));
+      return r.files;
+    });
   }
 
   async function filesNow(person, rec) {
@@ -562,17 +570,29 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   }
 
   // Read and deleted on any plan, so a plan that ends can bring its files home.
-  async function fileLink(person, rec, { op, key, seconds }) {
+  // A link to upload counts against the cap until the sweep weighs what
+  // landed, at the size the app said, which the link is signed for. An older
+  // app says none, and its link counts as the largest one upload can be.
+  async function fileLink(person, rec, { op, key, seconds, size }) {
     if (!FILE_KEY.test(key)) throw bad('a kept file is files/ and the sha256 of its bytes');
     const s = Math.min(LINK_MAX_SECONDS, Math.max(60, Number(seconds) || LINK_MAX_SECONDS));
+    const scoped = scopedKey(person, key);
+    const stated = size == null ? null : Number(size);
     if (op === 'put') {
-      const cap = filesCapOf(rec, await teamOrNone(person, now()));
+      if (stated != null && !(Number.isSafeInteger(stated) && stated >= 0 && stated <= ONE_UPLOAD_MAX)) throw bad(`size is the upload's bytes, at most ${gib(ONE_UPLOAD_MAX)} GB`);
+      const t = now();
+      const cap = filesCapOf(rec, await teamOrNone(person, t));
       if (!cap) throw new Refusal(403, 'files-plan', `Keeping files in the cloud comes with ${Name} Pro, Plus and Max.`);
-      if ((rec.files?.bytes || 0) >= cap || rec.files?.truncated) throw new Refusal(403, 'files-full', `Your ${gib(cap)} GB of files in the cloud are full.`, { cap });
-      const until = now() + s * 1000;
-      if (!(rec.filesUntil >= until)) await update(person, (r) => { r.filesUntil = Math.max(r.filesUntil || 0, until + LINK_NOTE_MS); });
+      const until = t + s * 1000;
+      await update(person, (r) => {
+        const others = Object.entries(r.filePuts || {}).filter(([k, p]) => k !== scoped && p.until > t);
+        const pending = others.reduce((sum, [, p]) => sum + p.size, 0);
+        if ((r.files?.bytes || 0) + pending + Math.max(stated ?? 0, 1) > cap || r.files?.truncated) throw new Refusal(403, 'files-full', `Your ${gib(cap)} GB of files in the cloud are full.`, { cap });
+        r.filePuts = Object.fromEntries([...others, [scoped, { size: stated ?? ONE_UPLOAD_MAX, until }]]);
+        r.filesUntil = Math.max(r.filesUntil || 0, until + LINK_NOTE_MS);
+      });
     }
-    return { url: await links[op](scopedKey(person, key), s) };
+    return { url: await (op === 'put' && stated != null ? links.put(scoped, s, stated) : links[op](scoped, s)) };
   }
 
   // A plan without files starts a clock; at FILES_LAPSE_DAYS what it kept is
@@ -595,9 +615,9 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     await update(person, (r) => { r.files = { at: t, bytes: 0, count: 0 }; });
   }
 
-  async function link(person, rec, { op, key, seconds }) {
+  async function link(person, rec, { op, key, seconds, size }) {
     if (!['get', 'put', 'head'].includes(op)) throw bad('op is get, put or head');
-    if (typeof key === 'string' && key.startsWith('files/')) return fileLink(person, rec, { op, key, seconds });
+    if (typeof key === 'string' && key.startsWith('files/')) return fileLink(person, rec, { op, key, seconds, size });
     const scoped = scopedKey(person, key);
     if (!scoped) throw bad('a key is a run\'s or a sign-in\'s, inside your own space');
     // A sign-in is written only by the sandbox, on a link the server makes. A
