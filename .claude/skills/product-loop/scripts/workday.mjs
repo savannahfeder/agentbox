@@ -238,9 +238,6 @@ if (isMain) {
       }).listen(0, '127.0.0.1', () => resolve(`http://127.0.0.1:${server.address().port}/`));
     });
   }
-  const sandboxed = engine === 'codex' && codexCanSandbox();
-  say(`${people.map((p) => p.name).join(', ')} on the phone app at ${url}, ${minutes}-minute stretches on ${engine === 'codex' ? `Codex at ${codexHome} (${login.plan ?? 'plan unknown'}, ${login.why})${sandboxed ? '' : ', without Codex\'s sandbox, which this machine refuses'}` : 'testers started by hand'}. Evidence: ${root}`);
-
   const dirs = Object.fromEntries(people.map((p) => {
     const dir = path.join(root, p.slug);
     fs.mkdirSync(dir, { recursive: true });
@@ -280,6 +277,9 @@ if (isMain) {
       process.exit(1);
     });
   }
+  // Only once the handlers are in: whoever reads this line may stop the day straight away.
+  const sandboxed = engine === 'codex' && codexCanSandbox();
+  say(`${people.map((p) => p.name).join(', ')} on the phone app at ${url}, ${minutes}-minute stretches on ${engine === 'codex' ? `Codex at ${codexHome} (${login.plan ?? 'plan unknown'}, ${login.why})${sandboxed ? '' : ', without Codex\'s sandbox, which this machine refuses'}` : 'testers started by hand'}. Evidence: ${root}`);
 
   let reached = [];
   try { reached = await (await import(path.join(REPO, 'scripts/phone-parity.mjs'))).newOnThePhone(7); } catch (err) { say(`could not read what reached the phone this week: ${err.message}`); }
