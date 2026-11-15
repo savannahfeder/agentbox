@@ -276,7 +276,18 @@ export function phoneView(rows: PhoneRows, now = Date.now()) {
       } as PhoneItem);
     }
   }
-  return { now, products, items: [...items.values()], waiting, aliases, running, queued, runNow, stalled, shipping, signInNeeded, atLimit, paused, places, approvals, decided, cards };
+  // Threads on a computer that is away while another of hers is online: the
+  // banner reads the newest heartbeat, so nothing else says these will not run.
+  const seen = new Map<string, number>();
+  for (const p of rows.projects) seen.set(p.device, Math.max(seen.get(p.device) ?? 0, Date.parse(p.updated_at ?? '') || 0));
+  const online = new Set([...seen].filter(([, at]) => !macAway(at, now)).map(([d]) => d));
+  const carried = new Set(rows.projects.filter((p) => p.cloud === true).map((p) => phoneSlug(p.device, p.project)));
+  const live = new Set(running.map((r) => `${r.product}/${r.itemId}`));
+  const stranded = online.size === 0 ? [] : [...items.values()].filter((i) => {
+    const where = splitSlug(i.product);
+    return !!where && !online.has(where.device) && !carried.has(i.product) && !live.has(`${i.product}/${i.id}`);
+  }).map((i) => i.id);
+  return { now, products, items: [...items.values()], waiting, aliases, running, queued, runNow, stalled, shipping, signInNeeded, atLimit, paused, places, approvals, decided, cards, stranded };
 }
 
 /** What one thread's live line is told of the computer's queue, off the view (the phone app's thread page). */
