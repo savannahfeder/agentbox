@@ -38,7 +38,7 @@ describe('the To list', () => {
     expect(card).toMatch(/Invited, not joined yet/);
   });
   it('says nobody matches only when no invited person does either', () => {
-    expect(card).toMatch(/!found\.length && !invitedFound\.length && <span className="tc-none">Nobody on the team matches that\./);
+    expect(card).toMatch(/!found\.length && !invitedFound\.length && [^<]*<span className="tc-none">Nobody on the team matches that\./);
   });
 });
 

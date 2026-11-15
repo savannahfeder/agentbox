@@ -304,14 +304,15 @@ async function prepare(real, setupName = null, { logins = 2, codex = true, proje
     // checkout: a checkout under ~/Desktop or ~/Documents is a folder macOS
     // guards, and the installed app reading a script there waits on a privacy
     // prompt on the person's screen. Measured 2026-10-12: four workers sat for
-    // minutes before running a line. (The stand-in and the one file it imports
-    // use nothing but Node's own modules, so the two copies are the whole of it.)
+    // minutes before running a line. (The stand-in and the files it imports
+    // use nothing but Node's own modules, so these copies are the whole of it.)
     claudeBin = path.join(INSTANCE, 'bin', 'claude');
     fs.mkdirSync(path.dirname(claudeBin), { recursive: true });
     const stub = path.join(INSTANCE, 'bin', 'stub-claude-worker.mjs');
     fs.copyFileSync(STUB, stub);
     fs.copyFileSync(path.join(path.dirname(STUB), 'stand-in-world.mjs'), path.join(INSTANCE, 'bin', 'stand-in-world.mjs'));
     fs.copyFileSync(path.join(path.dirname(STUB), 'stand-in-artifacts.mjs'), path.join(INSTANCE, 'bin', 'stand-in-artifacts.mjs'));
+    fs.copyFileSync(path.join(path.dirname(STUB), 'stand-in-key-place.mjs'), path.join(INSTANCE, 'bin', 'stand-in-key-place.mjs'));
     fs.mkdirSync(path.join(INSTANCE, 'bin', 'pictures'), { recursive: true });
     for (const p of ['priority-palette.png', 'inbox-urgent.png']) fs.copyFileSync(path.join(REPO, 'docs', 'readme', p), path.join(INSTANCE, 'bin', 'pictures', p));
     fs.writeFileSync(claudeBin, `#!/bin/sh\nexec "${process.execPath}" "${stub}" "$@"\n`, { mode: 0o755 });
