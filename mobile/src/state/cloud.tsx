@@ -150,7 +150,7 @@ function useCloudState() {
     return () => { clearInterval(timer); sub.remove(); };
   }, [cloud, signedIn, refresh]);
 
-  const shown = useMemo(() => phoneView(rows, now), [rows, now]);
+  const shown = useMemo(() => phoneView(rows, now, settingsRows), [rows, now, settingsRows]);
   // A permission answered on the phone and still inside its Undo leaves every list at once.
   const [heldIds, setHeldIds] = useState<ReadonlySet<string>>(() => new Set());
   const view = useMemo(() => ({ ...shown, approvals: shown.approvals.filter((a) => !heldIds.has(a.id)) }), [shown, heldIds]);
@@ -434,7 +434,7 @@ function useCloudState() {
   }, [cloud, setRows, keepAlerts, notice]);
 
   return {
-    cloud, opened, signedIn, rows, view, tabs, repeats, status, statusNext, loading: read.first, onlineAt: read.error ? 0 : read.fetchedAt, now, refresh, send, answerApproval, closeAll, laterAll, pressPicked, attach, fileOf, toast, say,
+    cloud, opened, signedIn, rows, computers: settingsRows, view, tabs, repeats, status, statusNext, loading: read.first, onlineAt: read.error ? 0 : read.fetchedAt, now, refresh, send, answerApproval, closeAll, laterAll, pressPicked, attach, fileOf, toast, say,
     team, teamPending, watchTeam, askTeammate, wanted, goTo: setWanted, takeWanted: () => setWanted(null), minimizedApproval, setMinimizedApproval, approvalRoom, setApprovalRoom,
     dismissToast: () => setToast(null), signedInWith, signOut, preview: PREVIEW,
     notice: mine, noticeRead, agreed, answerNotice, leaveNotice, withdrawNotice: () => answerNotice(false),
